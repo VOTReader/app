@@ -5,9 +5,12 @@
 
 import { describe, it, expect } from 'vitest';
 import { summarizeBackupManifest, formatVerifyReport } from './backup-verify.js';
+import { buildV3Manifest, buildExportPayload } from './backup.js';
 import { writeContainer, readContainer } from './backup-container.js';
 import { formatBytes } from './format-bytes.js';
 
+// Hand-written counts and no `stores` block, so the summary reads `counts`
+// (its fallback). What the real exporter writes is tested at the end of the file.
 const v3Manifest = {
   app: 'VOTReader',
   exportVersion: 3,
@@ -248,5 +251,80 @@ describe('a salvaged (truncated) container reports what it can give back', () =>
     const r = formatVerifyReport(summarizeBackupManifest(v3Manifest), 'ok', 'v3');
     expect(r.message).toContain('2 media files');
     expect(r.message).not.toContain(' of 2 media files');
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   The journal store persists `{ list: [...] }` (journal-store.js), and until
+   countsVersion 2 both exporters counted that object's KEYS: every backup
+   declared 1 journal entry however many it held, and Verify printed the
+   claim. The fixture at the top of this file hand-writes 'vot-journal': 5, a
+   number the exporter could not produce, which is how the bug outlived its
+   own test. These run the real builders; nothing below writes a count.
+   ───────────────────────────────────────────────────────────────────────── */
+describe('Verify counts the journal a real export carries', () => {
+  const entry = (n) => ({
+    id: 'j' + n, title: 'Entry ' + n, blocks: [], mood: null, tags: [], notebookIds: [], pinned: false, created: n, updated: n,
+  });
+  // Each store in the shape it persists: the journal and its notebooks as
+  // `{ list }`, notes as a groupId map, bookmarks as an array.
+  const saved = {
+    'vot-journal': { list: [1, 2, 3, 4, 5].map(entry) },
+    'vot-journal-notebooks': { list: [
+      { id: 'jnb1', name: 'Daily', sortIndex: 0, created: 1, updated: 1 },
+      { id: 'jnb2', name: 'Prayer', sortIndex: 1, created: 2, updated: 2 },
+    ] },
+    'vot-notes': { g1: { groupId: 'g1', body: 'a' }, g2: { groupId: 'g2', body: 'b' } },
+    'vot-bookmarks': [{ id: 'b1', hlKey: 'bible:genesis:1:1' }],
+  };
+  const exportCtx = () => ({
+    storesMap: Object.fromEntries(Object.keys(saved).map((k) => [k, { store: {}, method: 'replaceAll' }])),
+    flagMap: {},
+    idbAdapter: { get: async (name) => saved[name] },
+    mediaStore: { allIds: async () => [], get: async () => null },
+    storageEstimate: async () => ({ quota: null, usage: null }),
+    nowIso: () => '2026-09-25T12:00:00.000Z',
+  });
+  /** The same file as the exporter wrote it before countsVersion: every store counted by its keys. */
+  const writtenBeforeCountsVersion = (m) => {
+    const old = { ...m, counts: { _media: m.counts._media } };
+    delete old.countsVersion;
+    for (const [k, v] of Object.entries(m.stores)) {
+      old.counts[k] = Array.isArray(v) ? v.length : (v && typeof v === 'object' ? Object.keys(v).length : 1);
+    }
+    return old;
+  };
+
+  it('v3: buildV3Manifest → container → Verify reports all 5 journal entries', async () => {
+    const built = await buildV3Manifest(exportCtx());
+    if (!built.ok) throw new Error('export failed');
+    const chunks = [];
+    await writeContainer(built.manifest, built.mediaEntries, (u8) => { chunks.push(u8.slice()); });
+    const read = await readContainer(new Blob(chunks));
+
+    const s = summarizeBackupManifest(read.manifest);
+    expect(s.journal).toBe(5);
+    const r = formatVerifyReport(s, read.integrity, 'v3');
+    expect(r.message).toContain('2 notes, 5 journal entries, 1 bookmark — ');
+    // 5 entries + 2 journal notebooks + 2 notes + 1 bookmark.
+    expect(r.message).toContain('10 records across 4 data stores');
+  });
+
+  it('legacy v2: buildExportPayload → JSON → Verify reports all 5 journal entries', async () => {
+    const built = await buildExportPayload(exportCtx());
+    if (!built.ok) throw new Error('export failed');
+    const r = formatVerifyReport(summarizeBackupManifest(JSON.parse(JSON.stringify(built.payload))), 'absent', 'legacy');
+    expect(r.message).toContain('5 journal entries');
+    expect(r.message).toContain('10 records across 4 data stores');
+  });
+
+  it('a backup written before countsVersion, which declares 1, verifies as the 5 it holds', async () => {
+    const built = await buildV3Manifest(exportCtx());
+    if (!built.ok) throw new Error('export failed');
+    const old = writtenBeforeCountsVersion(built.manifest);
+    expect(old.counts['vot-journal']).toBe(1);
+    const r = formatVerifyReport(summarizeBackupManifest(old), 'absent', 'v3');
+    expect(r.message).toContain('5 journal entries');
+    expect(r.message).toContain('10 records across 4 data stores');
   });
 });

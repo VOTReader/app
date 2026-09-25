@@ -38,6 +38,41 @@ export const DEFAULT_MEDIA_LIMIT_BYTES = 100 * 1024 * 1024;
  *  fontStyle from this). */
 export const DEFAULT_DATA_LS_KEYS = ['vot-state'];
 
+/** The rule a payload's `counts` block was written with, stamped on it as
+ *  `countsVersion` so an import recounts each file by its own writer's rule.
+ *  Absent = 1: every backup written before 2026-09-25 counted a `{ list }`
+ *  store's keys, so it declares 1 journal entry however many it holds.
+ *  2 = countStoreRecords. */
+export const COUNTS_VERSION = 2;
+
+/**
+ * How many records one store carries in a backup: the rule behind the
+ * `counts` block both builders write, BAK3's import reconciliation
+ * (verifyImportCounts) and Verify's summary (backup-verify.js). An array
+ * counts its items; a `{ list: [...] }` store (vot-journal,
+ * vot-journal-notebooks, vot-notebooks) counts its list, not its one key; any
+ * other object counts its keys; a flag or other scalar counts 1.
+ * @param {any} value  one entry of a payload's `stores` block
+ * @returns {number}
+ */
+export function countStoreRecords(value) {
+  if (value == null) return 0;
+  if (Array.isArray(value)) return value.length;
+  if (typeof value === 'object') return Array.isArray(value.list) ? value.list.length : Object.keys(value).length;
+  return 1;
+}
+
+/**
+ * countsVersion 1, the rule a payload without `countsVersion` was written
+ * with. Kept only so verifyImportCounts can recount those files the way their
+ * writer did; nothing writes it any more.
+ * @param {any} value
+ * @returns {number}
+ */
+function _countsV1(value) {
+  return Array.isArray(value) ? value.length : (value && typeof value === 'object' ? Object.keys(value).length : 1);
+}
+
 /**
  * Encode a Blob to base64 by streaming it in small chunks — never
  * loads the whole blob into a single string via FileReader, which would
@@ -279,14 +314,11 @@ export async function buildExportPayload(ctx) {
     return { ok: false, reason: 'read-failure', problems: exportProblems };
   }
 
-  // Integrity manifest: per-store entry count + media count, so an
+  // Integrity manifest: per-store record count + media count, so an
   // import can verify the round-trip captured everything (U14 check).
   /** @type {Record<string, number>} */
   const counts = { _media: Object.keys(media).length };
-  for (const name of Object.keys(stores)) {
-    const v = stores[name];
-    counts[name] = Array.isArray(v) ? v.length : (v && typeof v === 'object' ? Object.keys(v).length : 1);
-  }
+  for (const name of Object.keys(stores)) counts[name] = countStoreRecords(stores[name]);
 
   const payload = {
     app: 'VOTReader',
@@ -295,6 +327,7 @@ export async function buildExportPayload(ctx) {
     diagnosticLog: diagnosticLog,
     storageQuota: storageQuota,
     storageUsed: storageUsed,
+    countsVersion: COUNTS_VERSION,
     counts: counts,
     data: data,
     stores: stores,
@@ -407,10 +440,7 @@ export async function buildV3Manifest(ctx) {
 
   /** @type {Record<string, number>} */
   const counts = { _media: mediaMeta.length };
-  for (const name of Object.keys(stores)) {
-    const v = stores[name];
-    counts[name] = Array.isArray(v) ? v.length : (v && typeof v === 'object' ? Object.keys(v).length : 1);
-  }
+  for (const name of Object.keys(stores)) counts[name] = countStoreRecords(stores[name]);
 
   const manifest = {
     app: 'VOTReader',
@@ -419,6 +449,7 @@ export async function buildV3Manifest(ctx) {
     diagnosticLog: diagnosticLog,
     storageQuota: storageQuota,
     storageUsed: storageUsed,
+    countsVersion: COUNTS_VERSION,
     counts: counts,
     data: data,
     stores: stores,
@@ -556,6 +587,8 @@ async function _awaitDurability(storesMap, flagMap) {
  * (a forward-compat store the importer doesn't apply still reconciles here,
  * because we compare the manifest's counts to the manifest's own payload, not to
  * the live store). Absent/legacy `counts` (v1 backups) → [] (nothing to verify).
+ * Each store is recounted by the rule its file was written with
+ * (`countsVersion`, see COUNTS_VERSION).
  *
  * @param {any} manifest - the manifest/parsed envelope (has .counts, .stores)
  * @param {number} mediaApplied - media records successfully written this import
@@ -565,6 +598,13 @@ export function verifyImportCounts(manifest, mediaApplied) {
   const counts = manifest && manifest.counts;
   if (!counts || typeof counts !== 'object') return [];
   const stores = (manifest && manifest.stores) || {};
+  // Recounted by today's rule, a backup written before countsVersion existed
+  // would read "vot-journal 5/1" and tell the reader that journal entries which
+  // all restored did not. A rule newer than this app cannot be recounted, so
+  // its store counts go unchecked rather than guessed at; `_media` counts
+  // frames under every rule and is always checked.
+  const version = manifest.countsVersion === undefined ? 1 : manifest.countsVersion;
+  const recount = version === COUNTS_VERSION ? countStoreRecords : (version === 1 ? _countsV1 : null);
   /** @type {string[]} */
   const mismatches = [];
   for (const name of Object.keys(counts)) {
@@ -575,13 +615,8 @@ export function verifyImportCounts(manifest, mediaApplied) {
       continue;
     }
     const declared = counts[name];
-    if (typeof declared !== 'number') continue;
-    const payload = stores[name];
-    const actual = Array.isArray(payload)
-      ? payload.length
-      : (payload && typeof payload === 'object'
-        ? Object.keys(payload).length
-        : (payload != null ? 1 : 0));
+    if (typeof declared !== 'number' || !recount) continue;
+    const actual = Object.prototype.hasOwnProperty.call(stores, name) ? recount(stores[name]) : 0;
     if (declared !== actual) mismatches.push(`${name} ${actual}/${declared}`);
   }
   return mismatches;

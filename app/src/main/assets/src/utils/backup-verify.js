@@ -12,6 +12,7 @@
    backup utils). */
 
 import { formatBytes } from './format-bytes.js';
+import { countStoreRecords } from './backup.js';
 
 /**
  * Summarize a backup manifest (v3) or whole payload (legacy v1/v2 — same
@@ -19,6 +20,13 @@ import { formatBytes } from './format-bytes.js';
  * Defensive throughout: a malformed field yields zeros, never a throw —
  * the envelope validator has already accepted the file by the time this
  * runs, so anything odd here is cosmetic.
+ *
+ * Records are counted from the store data the file CARRIES (`stores`, by the
+ * exporter's own countStoreRecords), not from the `counts` its writer
+ * declared: every backup written before countsVersion 2 declares 1 journal
+ * entry however many it holds, and those files are the ones people verify
+ * before they need them. `counts` stands in only when there is no `stores`
+ * block.
  *
  * @param {any} manifest
  * @returns {{
@@ -31,12 +39,21 @@ import { formatBytes } from './format-bytes.js';
 export function summarizeBackupManifest(manifest) {
   const counts = (manifest && manifest.counts && typeof manifest.counts === 'object')
     ? manifest.counts : {};
+  const stores = (manifest && manifest.stores && typeof manifest.stores === 'object' && !Array.isArray(manifest.stores))
+    ? manifest.stores : null;
   let records = 0;
   let storeCount = 0;
-  for (const k of Object.keys(counts)) {
-    if (k === '_media') continue;
-    const n = counts[k];
-    if (typeof n === 'number' && Number.isFinite(n)) { records += n; storeCount += 1; }
+  /** @type {Map<string, number>} */
+  const byStore = new Map();
+  const add = (k, n) => { byStore.set(k, n); records += n; storeCount += 1; };
+  if (stores) {
+    for (const k of Object.keys(stores)) add(k, countStoreRecords(stores[k]));
+  } else {
+    for (const k of Object.keys(counts)) {
+      if (k === '_media') continue;
+      const n = counts[k];
+      if (typeof n === 'number' && Number.isFinite(n)) add(k, n);
+    }
   }
   const media = manifest ? manifest.media : null;
   let mediaCount = 0;
@@ -52,7 +69,7 @@ export function summarizeBackupManifest(manifest) {
   } else if (typeof counts._media === 'number') {
     mediaCount = counts._media;
   }
-  const pick = (k) => (typeof counts[k] === 'number' ? counts[k] : 0);
+  const pick = (k) => byStore.get(k) || 0;
   return {
     date: (manifest && typeof manifest.exportDate === 'string') ? manifest.exportDate : null,
     records,
