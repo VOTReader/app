@@ -441,7 +441,23 @@ export function buildScreenRoutes({
   //     (2026-09-20) — hasTextDestination gates every tap on the same rule.
   // Pure navigation: the AudioPlayer singleton is never touched, so playback
   // continues across the jump.
+  // W-03 (walk 2026-09-25): the back pill over a letter opened from a recording names where it RETURNS. It said
+  // "Listening Library" from everywhere, the Songs screens and the listening desk included. The Songs screens name
+  // their top frame (the song, the list, the hub; bundle-h's songsFrameTitle), the Library screens the Library, and
+  // any other page the desk was opened over its own title (the tab title the headers set).
+  const _audioTextFrom = (sourceScreen) => {
+    if (sourceScreen === SONGS_SCREEN) {
+      const frames = decodeSongsRoute(audioColKey);
+      const fn = /** @type {any} */ (globalThis).songsFrameTitle;
+      return typeof fn === 'function' ? fn(frames[frames.length - 1], /** @type {any} */ (globalThis).AudioLibraryStore) : 'Songs of the Letters';
+    }
+    if (typeof sourceScreen === 'string' && sourceScreen.indexOf('audio-library') === 0) return 'Listening Library';
+    if (sourceScreen === 'home') return 'Home';
+    const title = typeof document !== 'undefined' ? String(document.title || '').replace(/\s+[—-]\s+VOTReader$/, '').trim() : '';
+    return title && title !== 'VOTReader' ? title : 'Back';
+  };
   const _openAudioText = (track, sourceScreen) => {
+    const fromTitle = _audioTextFrom(sourceScreen);
     // textKeyOf (AudioShelf): the track's own key, or for a WTLB compilation the
     // letter under the clock — the same rule hasTextDestination gates the tap on.
     const key = textKeyOf(track) || '';
@@ -455,7 +471,7 @@ export function buildScreenRoutes({
       const m = typeof track.partLabel === 'string' ? track.partLabel.match(/^Chapter (\d+)$/) : null;
       navigateToLink(
         { type: 'bible', bookId: id, chapter: m ? Number(m[1]) : 1 },
-        { sourceLetterTitle: 'Listening Library' }
+        { sourceLetterTitle: fromTitle }
       );
       return;
     }
@@ -470,7 +486,7 @@ export function buildScreenRoutes({
       // exactly as the History arm prefers it.
       const slug = (study && study.slug) || studyId;
       setActiveReadKey(studyReadKey(slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(slug)]: id })));
-      navigateToLink({ type: 'study-letter', studyId, studyChapterId: id }, { sourceLetterTitle: 'Listening Library' });
+      navigateToLink({ type: 'study-letter', studyId, studyChapterId: id }, { sourceLetterTitle: fromTitle });
       return;
     }
     const collection = COL_BY_KEY.get(volKey);
@@ -479,7 +495,10 @@ export function buildScreenRoutes({
     // must not distinguish a Library open from an index open.
     pushFromLetter({
       sourceScreen,
-      sourceLetterTitle: 'Listening Library',
+      // Where the pill returns: the screen AND the place on it (a letter or chapter the desk was opened over).
+      sourceLetterId: letterId, sourceBookId: bookId, sourceChapterNum: chapterNum,
+      sourceStudyId: studyId, sourceStudyChapterId: studyChapterId,
+      sourceLetterTitle: fromTitle,
       destSnapshot: { screen: collection.letterScreen, letterId: id },
     });
     setLetterId(id);
@@ -516,7 +535,12 @@ export function buildScreenRoutes({
   };
   window.__songsBack = screen === SONGS_SCREEN ? _songsBack : null;
   // A letter page's songs card opens a song or the letter's songs; Back returns to this letter.
-  window.__openSongs = (frames, label) => _openSongs(frames, { screen, letterId, label: label || '' });
+  // Already on the Songs screen (the desk's "Song page ›" over a song list), the frames go on top of its stack, so
+  // Back returns to the list. From anywhere else Back returns to that page, the root pill naming it (W-03).
+  window.__openSongs = (frames, label) => {
+    if (screen === SONGS_SCREEN) { setAudioColKey(encodeSongsRoute(/** @type {any[]} */ (decodeSongsRoute(audioColKey)).concat(frames))); return; }
+    _openSongs(frames, { screen, letterId, label: label || (screen === 'home' ? '' : _audioTextFrom(screen)) });
+  };
 
   // Q8.3: VOT corpus is lazy-loaded as bundle-a-vot.js. Until it arrives,
   // every VOT route (indexes + letter views + WTLB entries + Holy Days +

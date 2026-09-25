@@ -185,7 +185,8 @@ export function songsFrameTitle(frame, library) {
 /* ── rows ─────────────────────────────────────────────────────────────── */
 
 /**
- * One song family: cover, title, an italic line, its length, and the round ▶.
+ * One song family: cover, title, an italic line, its length, and the round ▶. A tap on the row plays the family's
+ * lead version (W-02); "N versions ›" opens its song page.
  * `inList`: the row sits in its own collection's list, so its italic line names the version, not the collection again.
  * @param {{ key?: any, fam: any, song?: any, playingId: string, active: boolean, onPlay: (song: any) => void, onOpen?: (fam: any) => void, inList?: boolean }} props
  */
@@ -195,38 +196,32 @@ function FamilyRow({ fam, song, playingId, active, onPlay, onOpen, inList = fals
   if (!lead) return null;
   const count = cat.versionsOf(fam).length;
   const isCurrent = familyIsPlaying(fam.id, playingId);
-  const line = count > 1 ? count + ' versions' : inList ? lead.cr || lead.v || songLine(lead) : songLine(lead);
+  const line = count > 1 ? '' : inList ? lead.cr || lead.v || songLine(lead) : songLine(lead);
   const tap = () => { if (isCurrent) AudioPlayer.toggle(); else onPlay(lead); };
   return (
-    <div className={'songs-row' + (isCurrent ? ' is-current' : '')}>
-      <button type="button" className="songs-row-main" onClick={() => (onOpen ? onOpen(fam) : tap())}>
-        <SongCover song={lead} />
-        <span className="songs-row-copy"><strong>{fam.t}</strong><small>{line}</small></span>
-        <span className="songs-row-len">{songClock(lead.d)}</span>
-      </button>
-      <SongPlayButton playing={isCurrent && active} label={fam.t} onClick={tap} />
-    </div>
+    <SongListRow song={lead} title={fam.t} line={line} versions={count} onVersions={onOpen ? () => onOpen(fam) : undefined}
+      len={songClock(lead.d)} current={isCurrent} playing={isCurrent && active} onPlay={tap} />
   );
 }
 
 /**
- * One single song (a saved one, a recent one, a new one, a kept one): cover, title, its
- * maker or shelf in italic, its length, the round ▶ — and Remove on the Kept list.
+ * One single song (a saved one, a recent one, a new one, a kept one): cover, title, its maker or shelf in italic,
+ * its length, the round ▶ — and Remove on the Kept list. A tap on the row plays it (W-02); a song with other
+ * versions carries "N versions ›" to its song page.
  * @param {{ key?: any, song: any, playingId: string, active: boolean, onPlay: (song: any) => void, onOpen?: (song: any) => void, onRemove?: (song: any) => void }} props
  */
 function SongRow({ song, playingId, active, onPlay, onOpen, onRemove }) {
+  const cat = catalog();
+  const fam = cat.familyById(song.f);
+  const count = fam ? cat.versionsOf(fam).length : 1;
   const isCurrent = playingId === song.id;
   const tap = () => { if (isCurrent) AudioPlayer.toggle(); else onPlay(song); };
+  const line = onRemove ? (song.v || songLine(song)) + ' · ' + formatSongBytes(song.b) : songLine(song);
   return (
-    <div className={'songs-row' + (isCurrent ? ' is-current' : '')}>
-      <button type="button" className="songs-row-main" onClick={() => (onOpen ? onOpen(song) : tap())}>
-        <SongCover song={song} />
-        <span className="songs-row-copy"><strong>{song.t}</strong><small>{onRemove ? (song.v || songLine(song)) + ' · ' + formatSongBytes(song.b) : songLine(song)}</small></span>
-        {onRemove ? null : <span className="songs-row-len">{songClock(song.d)}</span>}
-      </button>
+    <SongListRow song={song} title={song.t} line={line} versions={count} onVersions={onOpen ? () => onOpen(song) : undefined}
+      len={onRemove ? '' : songClock(song.d)} current={isCurrent} playing={isCurrent && active} onPlay={tap}>
       {onRemove ? <button type="button" className="song-keep-remove" onClick={() => onRemove(song)} aria-label={'Remove ' + song.t + ' from this phone'}>Remove</button> : null}
-      <SongPlayButton playing={isCurrent && active} label={song.t} onClick={tap} />
-    </div>
+    </SongListRow>
   );
 }
 

@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 628 distinct identifiers.
+// Total: 630 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ACHIEVEMENT_STORE_NAMES: any;
@@ -287,6 +287,7 @@ declare const SongCover: any;
 declare const SongKeep: any;
 declare const SongKeepAction: any;
 declare const SongKeepCard: any;
+declare const SongListRow: any;
 declare const SongPlayButton: any;
 declare const SrchCard: any;
 declare const SrchGroup: any;
@@ -560,6 +561,7 @@ declare const songClock: any;
 declare const songCountLabel: any;
 declare const songFamilyTitle: any;
 declare const songLetterOf: any;
+declare const songsFrameTitle: any;
 declare const splitCompoundRef: any;
 declare const splitIntoVerses: any;
 declare const splitWithHighlight: any;

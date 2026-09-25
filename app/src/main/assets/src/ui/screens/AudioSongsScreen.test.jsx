@@ -234,11 +234,14 @@ describe('AudioSongsScreen -- the song page (final-03)', () => {
     expect(library.toggleSongSaved).toHaveBeenCalledWith('aaaaaaaaaaa2');
   });
 
-  it('a row opens its song; the page names its versions, its letter and its makers', async () => {
+  it('a row PLAYS on a tap (W-02); N versions opens its song; the page names its versions, its letter and its makers', async () => {
     const { props } = renderScreen([{ k: 'hub' }, { k: 'list', v: 'col:wtlb1' }]);
-    fireEvent.click(rowOf('Come, Love Awaits You').querySelector('.songs-row-main'));
+    fireEvent.click(rowOf('Come, Love Awaits You').querySelector('.songs-row-hit'));
+    expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ startId: 'aaaaaaaaaaa1' }));
+    expect(props.onPush).not.toHaveBeenCalled();
+    fireEvent.click(within(rowOf('Come, Love Awaits You')).getByRole('button', { name: 'All 2 versions of Come, Love Awaits You' }));
     expect(props.onPush).toHaveBeenCalledWith({ k: 'song', v: 'fam-a' });
-    expect(player.playSongs).not.toHaveBeenCalled();
+    player.playSongs.mockClear();
     cleanup();
 
     renderScreen([{ k: 'hub' }, { k: 'song', v: 'fam-a' }]);
@@ -247,7 +250,7 @@ describe('AudioSongsScreen -- the song page (final-03)', () => {
     fireEvent.click(screen.getByRole('button', { name: /From the letter/ }));
     expect(window.__openAudioText).toHaveBeenCalledWith({ key: 'wtlb1:come-love-awaits-you', title: 'Come, Love Awaits You (the letter)' });
     expect(screen.getByText('Made with Suno · by hmarie777 and others')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Keep/ })).toBeNull();                // KEEP waits for L6
+    expect(screen.queryByRole('button', { name: /Keep/ })).toBeNull();                // no keep store here (the keep test has one)
     fireEvent.click(screen.getByRole('button', { name: /^Play$/ }));
     expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ filter: { family: 'fam-a' }, startId: 'aaaaaaaaaaa1' }));
     fireEvent.click(screen.getByRole('button', { name: /Play Come, Love Awaits You, Pop/ }));

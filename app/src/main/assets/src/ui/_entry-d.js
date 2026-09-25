@@ -102,7 +102,7 @@ import { SongCatalog } from '../utils/song-catalog.js';
 // and the lazy Songs screens read them as globals. The route helpers keep the Songs stack in the tab's audioColKey.
 import {
   songClock, songCountLabel, currentSongId, playerIsActive, songLetterOf, familyIsPlaying, songFamilyTitle,
-  SongCover, SongPlayButton, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, RecentIcon, ChevronRightIcon, ChoiceSheet,
+  SongCover, SongPlayButton, SongListRow, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, RecentIcon, ChevronRightIcon, ChoiceSheet,
   loadSongLyrics, useSongLyrics, lyricLineAt, findSongFamilies,
 } from './components/SongParts.jsx';
 import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop } from '../utils/songs-route.js';
@@ -281,7 +281,7 @@ Object.assign(window, {
   summarizeBackupManifest, formatVerifyReport,
   AudioPlayer, audioTrackUrl, OfflineAudio, SongCatalog,
   songClock, songCountLabel, currentSongId, playerIsActive, songLetterOf, familyIsPlaying, songFamilyTitle,
-  SongCover, SongPlayButton, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, RecentIcon, ChevronRightIcon, ChoiceSheet,
+  SongCover, SongPlayButton, SongListRow, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, RecentIcon, ChevronRightIcon, ChoiceSheet,
   loadSongLyrics, useSongLyrics, lyricLineAt, findSongFamilies,
   SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop,
   SongKeep, formatSongBytes, SongKeepCard, SongKeepAction, useSongKeep, useSongsOnline, KeepIcon, KeptIcon,

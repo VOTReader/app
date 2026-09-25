@@ -193,6 +193,22 @@ describe('the listening desk in song mode (final-04)', () => {
     expect(Array.from(document.querySelectorAll('.audio-manager-tool-head span')).map((n) => n.textContent)).not.toContain('Speed');
   });
 
+  it('(W-02) the title and Song page open the song page, and the desk closes; the song plays on', () => {
+    window.__openSongs = vi.fn();
+    try {
+      playFamilyA();
+      let desk = openDesk();
+      fireEvent.click(within(desk).getByRole('button', { name: /^Song page/ }));
+      expect(window.__openSongs).toHaveBeenCalledWith([{ k: 'song', v: 'fam-a' }], '');
+      expect(screen.queryByRole('dialog')).toBeNull();
+      cleanup();
+      desk = openDesk();
+      fireEvent.click(within(desk).getByRole('button', { name: /Come, Love Awaits You — open its song page/ }));
+      expect(window.__openSongs).toHaveBeenCalledTimes(2);
+      expect(AudioPlayer.getState().status).not.toBe('idle');
+    } finally { delete window.__openSongs; }
+  });
+
   it('the Versions card switches to another version from the start and keeps the queue after it', () => {
     playFamilyA();
     at(40);

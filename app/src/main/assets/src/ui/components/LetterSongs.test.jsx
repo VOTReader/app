@@ -100,7 +100,7 @@ describe('the hero row: LISTEN and HEAR IT SUNG', () => {
 });
 
 describe('SONGS FROM THIS LETTER', () => {
-  it('lists the letter\'s songs as in-app rows: the round play plays, the row opens its song', () => {
+  it('lists the letter\'s songs as in-app rows: a tap on the row plays (W-02), N versions opens its song', () => {
     render(<LetterSongsCard volKey="wtlb1" letterId={WTLB.id} letterTitle={WTLB.title} />);
     const card = document.querySelector('.letter-songs-card');
     expect(card.querySelector('.related-card-title').textContent).toBe('Songs from this letter');
@@ -108,7 +108,11 @@ describe('SONGS FROM THIS LETTER', () => {
     expect(row.textContent).toContain('2 versions');
     fireEvent.click(within(row).getByRole('button', { name: /Play Come, Love Awaits You/ }));
     expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ startId: 'aaaaaaaaaaa1' }));
-    fireEvent.click(row.querySelector('.songs-row-main'));
+    player.playSongs.mockClear();
+    fireEvent.click(row.querySelector('.songs-row-hit'));                  // the row body: sound, not a page
+    expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ startId: 'aaaaaaaaaaa1' }));
+    expect(window.__openSongs).not.toHaveBeenCalled();
+    fireEvent.click(within(row).getByRole('button', { name: 'All 2 versions of Come, Love Awaits You' }));
     expect(window.__openSongs).toHaveBeenCalledWith([{ k: 'song', v: 'fam-a' }], 'Come, Love Awaits You');
     expect(screen.queryByRole('button', { name: /All .* of this letter/ })).toBeNull();   // one song: no "All"
   });

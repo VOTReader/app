@@ -11,7 +11,8 @@
                        and pause on a second tap.
      LetterSongsCard   SONGS FROM THIS LETTER, a related card below the text
                        and above the external ↗ links: up to 3 songs as in-app
-                       rows, then "All N songs of this letter ›".
+                       rows (a tap plays; "N versions ›" opens the song), then
+                       "All N songs of this letter ›" and the keep line (K1).
 
    Each subscribes to the player and the catalog ITSELF, so a clock tick
    re-renders a pill, never the letter. "Show songs on letter pages" (Settings
@@ -22,7 +23,7 @@
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { isSongKey, songIdOfKey } from '../../utils/audio-track.js';
 import { SongCatalog } from '../../utils/song-catalog.js';
-import { SongCover, SongPlayButton, songCountLabel, currentSongId, playerIsActive, ChevronRightIcon } from './SongParts.jsx';
+import { SongListRow, songCountLabel, currentSongId, playerIsActive, ChevronRightIcon } from './SongParts.jsx';
 import { SongKeepAction } from './SongKeepParts.jsx';
 
 /** Songs of this letter shown in the card before "All N songs". */
@@ -121,14 +122,11 @@ export function LetterSongsCard({ volKey, letterId, letterTitle, showSongs = tru
             if (playingFam) { AudioPlayer.toggle(); return; }
             AudioPlayer.playSongs({ ids: songs.map((s) => s.id), startId: lead.id, label: letterTitle || 'Songs of this letter' });
           };
+          // W-02: the row plays; "N versions ›" opens the song page.
           return (
-            <div key={lead.f} className={'songs-row' + (playingFam ? ' is-current' : '')}>
-              <button type="button" className="songs-row-main" onClick={() => open([{ k: 'song', v: lead.f }])}>
-                <SongCover song={lead} />
-                <span className="songs-row-copy"><strong>{title}</strong><small>{count > 1 ? count + ' versions' : lead.v || 'Songs of the Letters'}</small></span>
-              </button>
-              <SongPlayButton playing={playingFam && active} label={title} onClick={play} />
-            </div>
+            <SongListRow key={lead.f} song={lead} title={title} line={count > 1 ? '' : lead.v || 'Songs of the Letters'}
+              versions={count} onVersions={() => open([{ k: 'song', v: lead.f }])}
+              current={playingFam} playing={playingFam && active} onPlay={play} />
           );
         })}
       </div>

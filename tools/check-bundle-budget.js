@@ -73,7 +73,11 @@ const BUDGETS = [
   // and the desk read it on every screen (README section 6.3). The rest of the
   // 469,286 -> 536,115 drift since landing 24 was the month's shell work. Re-
   // baselined UP by the same rule: 543,676 x 1.15 = 625,227.4 -> the hundred above.
-  { file: 'bundle-d.js', measured: 543676, max: 625300 },   // most screens/sheets/utils
+  // 2026-09-25, Songs of the Letters K1 + K2 (ai-music): keeping songs on the phone (utils/song-keep.js, the
+  // KEEP controls, the player's kept-song arm) and the tap-to-play song row, in bundle-d because the bar, the desk and
+  // the letter page's songs card use them on every screen; with the day's shell work that left 751 B under the old
+  // ceiling. Re-baselined UP by the same rule: 624,549 x 1.15 = 718,231.4 -> the hundred above.
+  { file: 'bundle-d.js', measured: 624549, max: 718300 },   // most screens/sheets/utils
   // Re-baselined 2026-09-22 (292,190 B): the Answers landing's rules (~8 KB) and the
   // month's large-text / tap-target fixes, on top of 253,510 B measured 09-01.
   { file: 'app.min.css', measured: 292190, max: 336000 },   // render-blocking <link> in index.html

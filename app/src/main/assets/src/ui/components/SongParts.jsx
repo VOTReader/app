@@ -128,6 +128,41 @@ export function SongPlayButton({ playing, label, onClick, className = '' }) {
   );
 }
 
+/**
+ * One song row (walk W-02, 2026-09-25): a tap ANYWHERE on the row plays its song (a family row plays its lead
+ * version) — for an older listener the natural first tap must make sound. The round ▶ stays as the visible
+ * affordance and the pause state, and is the row's accessible control (the row-wide hit area is a pointer
+ * convenience, out of the tab order like the bar's pull-tab). A family with more than one version carries a
+ * tappable "N versions ›" in its second line (44 px tall) that opens its song page. `children` sit before the ▶
+ * (the Kept list's Remove).
+ * @param {{ key?: any, song: any, title: string, line?: string, versions?: number, onVersions?: () => void, len?: string,
+ *   current?: boolean, playing?: boolean, onPlay: () => void, children?: any }} props
+ */
+export function SongListRow({ song, title, line = '', versions = 0, onVersions, len = '', current = false, playing = false, onPlay, children = null }) {
+  return (
+    <div className={'songs-row song-tap-row' + (current ? ' is-current' : '')}>
+      <button type="button" className="songs-row-hit" tabIndex={-1} aria-hidden="true" onClick={onPlay} />
+      <SongCover song={song} />
+      <span className="songs-row-copy">
+        <strong>{title}</strong>
+        {line || (versions > 1 && onVersions) ? (
+          <span className="songs-row-line">
+            {line ? <small>{line}</small> : null}
+            {versions > 1 && onVersions ? (
+              <button type="button" className="songs-row-versions" onClick={(event) => { event.stopPropagation(); onVersions(); }} aria-label={'All ' + versions + ' versions of ' + title}>
+                {(line ? '· ' : '') + versions + ' versions'} <span aria-hidden="true">›</span>
+              </button>
+            ) : null}
+          </span>
+        ) : null}
+      </span>
+      {len ? <span className="songs-row-len">{len}</span> : null}
+      {children}
+      <SongPlayButton playing={playing} label={title} onClick={onPlay} />
+    </div>
+  );
+}
+
 const ICON = { viewBox: '0 0 24 24', 'aria-hidden': true, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' };
 
 export function ShuffleIcon() {

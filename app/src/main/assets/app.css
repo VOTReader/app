@@ -1289,6 +1289,10 @@
       .song-desk-version { margin: 2px 0 0; color: var(--cream-dim); font-size: var(--fs-15); }
       .song-desk-letter { min-height: 44px; margin: 0; padding: 0; border: 0; background: none; color: var(--gold); font-size: var(--fs-16); text-align: left; cursor: pointer; }
       .song-desk-letter:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+      /* W-02: the title opens the song page; "Open the letter ›" and "Song page ›" sit side by side. */
+      .song-desk-title { display: inline; margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: var(--gold-border); text-underline-offset: .18em; }
+      .song-desk-title:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+      .song-desk-links { display: flex; flex-wrap: wrap; column-gap: 1.1rem; }
       /* The Versions chips as pictured (final-04; Opus check of U2): pills, the playing version FILLED gold. */
       .song-desk-versions .audio-manager-segment button { border-radius: 999px; padding-left: 14px; padding-right: 14px; color: var(--cream); font-size: var(--fs-14); }
       .song-desk-versions .audio-manager-segment button.is-active { border-color: var(--gold); background: var(--gold); color: var(--bg); }
@@ -1664,6 +1668,18 @@
       .song-play svg { width:20px; height:20px; }
       .song-play:not(.is-playing) svg { margin-left:2px; }
       .song-play.is-playing { background:var(--gold); color:var(--bg); }
+      /* W-02 (walk 2026-09-25): a song row plays on a tap anywhere. .songs-row-hit is the row-wide target under the
+         row's content (which lets taps through); the "N versions ›" link, the ▶ and Remove sit above it. */
+      .song-tap-row { position:relative; }
+      .song-tap-row > .songs-row-hit { position:absolute; inset:0; z-index:0; width:100%; padding:0; border:0; border-radius:inherit; background:none; cursor:pointer; }
+      .song-tap-row > .song-cover, .song-tap-row > .songs-row-copy, .song-tap-row > .songs-row-len { position:relative; z-index:1; pointer-events:none; }
+      .song-tap-row > .songs-row-copy { margin-left:.25rem; }
+      .song-tap-row > .song-play, .song-tap-row > .song-keep-remove, .songs-row-versions { position:relative; z-index:2; pointer-events:auto; }
+      .songs-row-line { display:flex; align-items:center; gap:.3rem; min-width:0; }
+      .songs-row-line small { min-width:0; }
+      .songs-row-versions { flex:none; min-height:44px; margin:-13px 0; padding:0 .1rem; border:0; background:none; color:var(--gold); font:inherit; font-size:var(--fs-15); font-style:italic; white-space:nowrap; cursor:pointer; }
+      .songs-row-versions:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+      @media (hover:hover) { .song-tap-row:hover .songs-row-copy strong, .songs-row-versions:hover { color:var(--gold-bright); } }
       .songs-nav-row { display:flex; align-items:center; gap:.9rem; width:100%; min-height:60px; padding:.5rem .8rem; border:0; border-top:1px solid var(--border); background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
       .songs-card > .songs-nav-row:first-child { border-top:0; }
       .songs-nav-mark { width:40px; height:40px; flex:none; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--gold-border); border-radius:50%; color:var(--gold); }

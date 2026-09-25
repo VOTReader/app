@@ -187,6 +187,24 @@ describe('HomeScreen — shortcuts and demand loading', () => {
 });
 
 describe('HomeScreen — Listening Library card', () => {
+  it('(W-04) the Songs card says Over 1,000 before the catalog lands, asks for it, then says the real count', async () => {
+    vi.useFakeTimers();
+    setupGlobals();
+    globalThis.HomeOrderStore = { get: () => ['listening', 'songs'], set: () => {} };
+    const listeners = new Set();
+    const cat = { loaded: false, v: 0, songs: () => Array.from({ length: 1082 }, () => ({ hid: false, sh: 1 })),
+      subscribe: (cb) => { listeners.add(cb); return () => listeners.delete(cb); }, getVersion: () => cat.v, load: vi.fn(async () => {}) };
+    globalThis.SongCatalog = cat;
+    try {
+      renderHome({ onOpenSongs: () => {} });
+      expect(screen.getByText('Over 1,000 songs from the words of the letters')).toBeTruthy();
+      act(() => { vi.advanceTimersByTime(1600); });
+      expect(cat.load).toHaveBeenCalledTimes(1);
+      act(() => { cat.loaded = true; cat.v++; for (const cb of listeners) cb(); });
+      expect(screen.getByText('1,082 songs from the words of the letters')).toBeTruthy();
+    } finally { delete globalThis.SongCatalog; vi.useRealTimers(); }
+  });
+
   it('renders the card pixel-consistent with its neighbors and routes through onOpenAudio', () => {
     setupGlobals();
     const onOpenAudio = vi.fn();

@@ -16,16 +16,35 @@ function _homeDragTrace(msg) {
   } catch (_e) { /* ignore */ }
 }
 
-/** The Songs card's italic line: "1,082 songs from the words of the letters" once the catalog is loaded. */
+/**
+ * The Songs card's italic line: "1,082 songs from the words of the letters" once the catalog is loaded. W-04 (walk
+ * 2026-09-25): a cold first launch has no catalog yet, and the line said no number at all; it now says "Over 1,000"
+ * (the library has passed a thousand since its first publish) until the real count arrives.
+ */
 function songsDetail() {
   const cat = typeof SongCatalog !== 'undefined' ? SongCatalog : null;
   const n = cat && cat.loaded ? cat.songs().filter((s) => !s.hid && s.sh).length : 0;
-  return n ? n.toLocaleString('en-US') + ' songs from the words of the letters' : 'Songs from the words of the letters';
+  return n ? n.toLocaleString('en-US') + ' songs from the words of the letters' : 'Over 1,000 songs from the words of the letters';
+}
+
+/** Re-render Home when the song catalog lands, and ask for it once Home has painted (it is fetched once per launch). */
+function useSongCatalogCount() {
+  const cat = typeof SongCatalog !== 'undefined' ? SongCatalog : null;
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (cat ? cat.subscribe(cb) : () => {}), [cat]),
+    () => (cat ? cat.getVersion() : 0)
+  );
+  React.useEffect(() => {
+    if (!cat || cat.loaded) return undefined;
+    const t = setTimeout(() => { if (!cat.loaded) void cat.load(); }, 1500);
+    return () => clearTimeout(t);
+  }, [cat]);
 }
 
 export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, onOpenPlans }) {
   // rp1: the reader's plans for today, above Search (TodayCard.jsx)
   const todayRows = useTodayRows(readingPlans, isRead);
+  useSongCatalogCount();
   /* ──────────────────────────────────────────────────────────────
      Drag-and-drop home tiles (1s long-press → lift → drag → snap)
        Architecture note: we use IMPERATIVE DOM manipulation for all

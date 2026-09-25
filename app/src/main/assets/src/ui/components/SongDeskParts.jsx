@@ -48,17 +48,33 @@ function chipLabel(s, all) {
 export function SongDeskHead({ current, song, saved, onToggleSave, onClose }) {
   const letter = song ? songLetterOf(song) : null;
   const canOpen = !!letter && hasTextDestination(current) && typeof window !== 'undefined' && typeof window.__openAudioText === 'function';
+  // W-02: rows play on a tap, so the song page is reached from here too (a single-version song has no
+  // "N versions ›" link on its row): the title and "Song page ›" open it; the song keeps playing.
+  const canPage = !!(song && song.f) && typeof window !== 'undefined' && typeof window.__openSongs === 'function';
+  const openPage = () => { window.__openSongs([{ k: 'song', v: song.f }], ''); onClose(); };
+  const title = current.title || 'Untitled song';
   return (
     <div className="song-desk-head">
       <SongCover song={song || { id: songIdOfKey(current.key) }} large className="song-desk-cover" />
       <div className="song-desk-copy">
         <div className="audio-manager-kicker song-desk-kicker">Listening now</div>
-        <h2 id="audio-manager-title">{current.title || 'Untitled song'}</h2>
+        <h2 id="audio-manager-title">
+          {canPage ? <button type="button" className="song-desk-title" onClick={openPage} aria-label={title + ' — open its song page; the song keeps playing'}>{title}</button> : title}
+        </h2>
         {current.partLabel ? <p className="song-desk-version">{current.partLabel}</p> : null}
-        {canOpen ? (
-          <button type="button" className="song-desk-letter" onClick={() => { window.__openAudioText(current); onClose(); }} aria-label={'Open the letter' + (letter && letter.title ? ' — ' + letter.title : '') + '; the song keeps playing'}>
-            Open the letter <span aria-hidden="true">›</span>
-          </button>
+        {canOpen || canPage ? (
+          <div className="song-desk-links">
+            {canOpen ? (
+              <button type="button" className="song-desk-letter" onClick={() => { window.__openAudioText(current); onClose(); }} aria-label={'Open the letter' + (letter && letter.title ? ' — ' + letter.title : '') + '; the song keeps playing'}>
+                Open the letter <span aria-hidden="true">›</span>
+              </button>
+            ) : null}
+            {canPage ? (
+              <button type="button" className="song-desk-letter" onClick={openPage} aria-label="Song page; the song keeps playing">
+                Song page <span aria-hidden="true">›</span>
+              </button>
+            ) : null}
+          </div>
         ) : null}
       </div>
       <button type="button" className={'audio-manager-save' + (saved ? ' is-saved' : '')} aria-pressed={saved} aria-label={saved ? 'Remove from saved songs' : 'Save song'} onClick={onToggleSave}>
