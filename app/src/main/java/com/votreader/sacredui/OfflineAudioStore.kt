@@ -118,7 +118,7 @@ class OfflineAudioStore(
                     if (n != null && n > 0L) out.put(url, n)
                 }
             }
-            emit(JSONObject().put("type", "sizes").put("sizes", out).toString())
+            send(JSONObject().put("type", "sizes").put("sizes", out).toString())
         }
     }
 
@@ -233,7 +233,7 @@ class OfflineAudioStore(
                 else { queued.add(item.url); true }
             }
             if (!fresh) continue
-            emit(event("queued", item.url).toString())
+            send(event("queued", item.url).toString())
             executor.execute { download(item, name) }
         }
     }
@@ -250,7 +250,7 @@ class OfflineAudioStore(
                 else if (active?.url == u) cancelled.add(u)
             }
         }
-        for (u in dropped) emit(event("cancelled", u).toString())
+        for (u in dropped) send(event("cancelled", u).toString())
     }
 
     /** Stop everything queued or downloading. */
@@ -261,7 +261,7 @@ class OfflineAudioStore(
             queued.clear()
             active?.let { cancelled.add(it.url) }
         }
-        for (u in dropped) emit(event("cancelled", u).toString())
+        for (u in dropped) send(event("cancelled", u).toString())
     }
 
     /** Take [urls] off the phone (file and index entry). */
@@ -277,7 +277,7 @@ class OfflineAudioStore(
             if (gone.isNotEmpty()) persist()
         }
         for (f in files) File(dir, f).delete()
-        if (gone.isNotEmpty()) emit(JSONObject().put("type", "removed").put("urls", JSONArray(gone)).toString())
+        if (gone.isNotEmpty()) send(JSONObject().put("type", "removed").put("urls", JSONArray(gone)).toString())
     }
 
     /** Take every downloaded recording off the phone, and stop what is still queued or downloading. */
@@ -290,7 +290,7 @@ class OfflineAudioStore(
             persist()
         }
         for (f in files) File(dir, f).delete()
-        emit(JSONObject().put("type", "removed").put("all", true).toString())
+        send(JSONObject().put("type", "removed").put("all", true).toString())
     }
 
     /** Everything the shelf and the rows need, as one JSON object. */
@@ -360,14 +360,14 @@ class OfflineAudioStore(
             act.total = length
             if (length > MAX_BYTES) { fail(item.url, "size"); return }
             if (length > 0 && length + SPACE_MARGIN > freeBytes()) { fail(item.url, "space"); return }
-            emit(progress(act).toString())
+            send(progress(act).toString())
             var total = 0L
             var lastEmit = clock()
             FileOutputStream(part).use { out ->
                 opened.stream.use { input ->
                     val buf = ByteArray(64 * 1024)
                     while (true) {
-                        if (cancelled.remove(item.url)) { out.close(); part.delete(); active = null; emit(event("cancelled", item.url).toString()); return }
+                        if (cancelled.remove(item.url)) { out.close(); part.delete(); active = null; send(event("cancelled", item.url).toString()); return }
                         val n = input.read(buf)
                         if (n < 0) break
                         total += n
@@ -375,7 +375,7 @@ class OfflineAudioStore(
                         out.write(buf, 0, n)
                         act.bytes = total
                         val now = clock()
-                        if (now - lastEmit >= PROGRESS_MS) { lastEmit = now; emit(progress(act).toString()) }
+                        if (now - lastEmit >= PROGRESS_MS) { lastEmit = now; send(progress(act).toString()) }
                     }
                     out.fd.sync()
                 }
@@ -384,17 +384,28 @@ class OfflineAudioStore(
             // A chunked answer declared no length: its room is checked now, before the move.
             if (length <= 0 && freeBytes() < SPACE_MARGIN) { fail(item.url, "space"); return }
             val target = File(dir, name)
-            try {
-                Files.move(part.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-            } catch (e: Exception) {
-                Timber.w(e, "offline audio: could not move %s into place", name); fail(item.url, "disk"); return
-            }
+            // Cancel and Remove all take this lock too: the last cancellation check, the move into place and the index
+            // entry happen under ONE hold of it, so neither can land in between. A Remove all during the final read or
+            // the fsync used to be missed, and the recording came back after the shelf was emptied (the Codex
+            // refutation of 2026-09-24, M3).
+            var outcome = "done"
             synchronized(lock) {
-                entries[item.url] = Entry(name, total, clock(), item.key.take(MAX_TEXT), item.title.take(MAX_TEXT))
-                persist()
-                active = null   // before 'done': the page re-reads the state on it
+                if (cancelled.remove(item.url)) outcome = "cancelled"
+                else try {
+                    Files.move(part.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                    entries[item.url] = Entry(name, total, clock(), item.key.take(MAX_TEXT), item.title.take(MAX_TEXT))
+                    persist()
+                } catch (e: Exception) {
+                    Timber.w(e, "offline audio: could not move %s into place", name)
+                    outcome = "disk"
+                }
+                active = null   // before the event: the page re-reads the state on it
             }
-            emit(event("done", item.url).put("bytes", total).toString())
+            when (outcome) {
+                "done" -> send(event("done", item.url).put("bytes", total).toString())
+                "cancelled" -> send(event("cancelled", item.url).toString())
+                else -> fail(item.url, outcome)
+            }
         } catch (e: Exception) {
             Timber.w(e, "offline audio: download of %s failed", item.url)
             fail(item.url, "network")
@@ -405,9 +416,19 @@ class OfflineAudioStore(
         }
     }
 
+    /**
+     * Every event goes out through here. The observer is MainActivity's sink into its WebView, which a re-created
+     * Activity publishes before the WebView exists (and a destroyed one may still hold): an observer that throws must
+     * never stop a download, nor escape a worker thread, where an uncaught exception kills the app (the Codex
+     * refutation of 2026-09-24, M4). The page re-reads the whole state when it loads, so a lost event costs nothing.
+     */
+    private fun send(json: String) {
+        try { emit(json) } catch (e: Exception) { Timber.w(e, "offline audio: an event could not be delivered") }
+    }
+
     private fun fail(url: String, reason: String) {
         active = null
-        emit(event("failed", url).put("reason", reason).toString())
+        send(event("failed", url).put("reason", reason).toString())
     }
 
     private fun progress(a: Active) = event("progress", a.url).put("bytes", a.bytes).put("total", a.total)

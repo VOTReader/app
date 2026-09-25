@@ -512,11 +512,6 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         AudioKeepAliveService.commandSink = { cmd, posMs ->
             bridge.callOptional(JsEvent.MediaCommand, cmd, posMs)
         }
-        // Downloaded recordings (listening item 8): the process-wide store's
-        // events reach this Activity's page; cleared in onDestroy like the sink above.
-        offlineSink = { json -> bridge.callOptional(JsEvent.OfflineAudio, json) }
-        OfflineAudioStore.eventSink = offlineSink
-
         WindowCompat.setDecorFitsSystemWindows(window, false)
         // REQUIRED for an app that toggles immersive mode. Under the DEFAULT
         // cutout mode a window may lay out into the cutout only while that
@@ -546,6 +541,14 @@ class MainActivity : AppCompatActivity(), BridgeHost {
 
         webView = createConfiguredWebView()
         setContentView(webView)
+
+        // Downloaded recordings (listening item 8): the process-wide store's
+        // events reach this Activity's page; cleared in onDestroy like the
+        // media sink. Published only once webView exists: the sink reads it,
+        // and a download running across an Activity re-creation fires from its
+        // own thread at any moment (the Codex refutation of 2026-09-24, M4).
+        offlineSink = { json -> bridge.callOptional(JsEvent.OfflineAudio, json) }
+        OfflineAudioStore.eventSink = offlineSink
 
         // restoreState returns null when the bundle carries no COMMITTED WebView
         // navigation — and onSaveInstanceState calls saveState() unconditionally, so
