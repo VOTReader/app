@@ -315,6 +315,155 @@ const ASSET_INTEGRITY = {
 };
 // ── END GENERATED: ASSET_INTEGRITY ──
 
+/* ASSET_REVISIONS (REPORT #10, v06-02/04, 2026-09-25), generated beside ASSET_INTEGRITY: the sha256 of every
+   other file an update would download again although it did not change (core pictures and fonts, the
+   precached corpus, the reading fonts, the runtime src/data files cached on use). copyForward puts the
+   previous bucket's copy into the new bucket when it hashes to this revision (or to ASSET_INTEGRITY for a
+   text asset), so an update fetches only what changed. A copy that does not match is never used. */
+// ── BEGIN GENERATED: ASSET_REVISIONS (tools/sync-sw-version.js) ──
+const ASSET_REVISIONS = {
+  './dist/bundle-a-bible.js': 'e811e8814a927e0447a3aebca8a7c751ad5e3b8923715840e285259586c73e52',
+  './dist/bundle-a-matthew.js': '8f8ecc3930db7adc1aa21c413f46cd5cff37cc9d4886873246fd972a1d602599',
+  './dist/bundle-a-vot.js': '84454c3cf7c0cd7962224f12492af7135823fb0033d2ab3767eacb2efe012a0c',
+  './fonts/cinzel-decorative-latin-400-normal.woff2': '6faa34360509b8554ed4448e331401ece5ff179fbfabc76e20697490f775f1f1',
+  './fonts/cinzel-decorative-latin-700-normal.woff2': 'ccf78826a008161e97125f965d4e358e53b1921e852f76716e395724363f54fd',
+  './fonts/cinzel-latin-400-normal.woff2': 'd06f54fe8b6aa20e6ca62f7d7c143a56677e771a2f643c7a9f501643e26f6c62',
+  './fonts/cinzel-latin-700-normal.woff2': '0118ff4ce04337ce18138feaada5a78595dd36bd0aae4463bed9e840e8ebf78f',
+  './fonts/eb-garamond-latin-wght-italic.woff2': 'db33b9782c179176a605f32f73f570d2d2d248336b158751563d269da44dcc68',
+  './fonts/eb-garamond-latin-wght-normal.woff2': '06a500fa681930a277281821b8b30e3af9ecd882e933ffe7c851cae410f6579d',
+  './fonts/reading/alegreya-latin-wght-italic.woff2': 'd59e0fe386637fa9111ab7d7d4879b6592d3b53ad127b2f9ac1c38ceeae99bb8',
+  './fonts/reading/alegreya-latin-wght-normal.woff2': 'b72ff9c3962ff2712ded8ec852fa5575a83dfe02179e91e0f2411e4c8188b49e',
+  './fonts/reading/atkinson-hyperlegible-latin-400-italic.woff2': '9d46524b8ad2cb5e5714cd9d24e7bf52da24f1729bb01491b3e475a003d4dd9b',
+  './fonts/reading/atkinson-hyperlegible-latin-400-normal.woff2': '645d82bf357be70b39921da967c074d4f1221cb6bf5c695ac429a6afad33bf3c',
+  './fonts/reading/atkinson-hyperlegible-latin-700-italic.woff2': '7993f885e5819902c2c771b5c69a11b5d6122f0ff302cfaade13aab0a7aaae69',
+  './fonts/reading/atkinson-hyperlegible-latin-700-normal.woff2': '1043ede4be7500f61cec1b0862d1a5058cfe6bb37c4e6c1416c3275f0fdf1573',
+  './fonts/reading/bitter-latin-wght-italic.woff2': 'fc4f4b86e5e535f9de1e9001b432a30a4ad2505c0d148c0fbc6acebd23bf1819',
+  './fonts/reading/bitter-latin-wght-normal.woff2': '0fab60d8d9645bb1245523ef9e864fed9a5fa43900109f4ec768ad65a307d086',
+  './fonts/reading/cardo-latin-400-italic.woff2': '8efcf101e8fa376d47caf01891d0934b7661d21c42db191349448ec974c5e8df',
+  './fonts/reading/cardo-latin-400-normal.woff2': '04950239ced77fbea758148b42cda09525fb660438f280a579078252989666ed',
+  './fonts/reading/cardo-latin-700-normal.woff2': 'd80599658e1cb34bb3945a5ba8e928a6ec446895d8c41f4672d99566e6de021e',
+  './fonts/reading/cormorant-garamond-latin-400-italic.woff2': '9908516c1af1c7bc9228f40f99176246075a33f86439d8ff7957bef8bf2d4f7b',
+  './fonts/reading/cormorant-garamond-latin-400-normal.woff2': 'ce2e075eb435f7fa9ce71b495547cc3323e956a9ab5201245ae826932529ccba',
+  './fonts/reading/cormorant-garamond-latin-700-normal.woff2': '0e51a3c5daab6ca4ce175c20770da433d4f8466e41671349d1ad0899727e81f7',
+  './fonts/reading/crimson-pro-latin-wght-italic.woff2': 'd6a081fc792c0a872cdb5f19e8a8e087adc3fdf3f805e02e53b98bbec1a896aa',
+  './fonts/reading/crimson-pro-latin-wght-normal.woff2': 'bcf19c6a089c084c297aaefc94516f664dd72483583ab75c96c89cdad8c48ef0',
+  './fonts/reading/gelasio-latin-400-italic.woff2': '7f76df2558019b63ddcca34af1e1a080298e6813e4ceb8ac1845b4a4d0e4f151',
+  './fonts/reading/gelasio-latin-400-normal.woff2': 'ded17a925295abb128fdb1c5931a5684d7c38fcc019041a85a38b0e803e68571',
+  './fonts/reading/gelasio-latin-700-italic.woff2': '7727d750264579ff822169b600520275f4aaf53b555e1cf0cdb15d1b09abb6bd',
+  './fonts/reading/gelasio-latin-700-normal.woff2': 'dc84fb2335b1e76995db761c9f3229936efbe185a09a5507bf51cffd62ae4d8d',
+  './fonts/reading/gentium-book-plus-latin-400-italic.woff2': '427b5ed58ee687ddf065c6120a796ea15047c82715a1e806262b001b1ac511dd',
+  './fonts/reading/gentium-book-plus-latin-400-normal.woff2': 'fc467f342768153e33a1c93a65c9e81001e0ce8ed59563af9bb5d98f8c2f752e',
+  './fonts/reading/gentium-book-plus-latin-700-italic.woff2': 'bd97d26488d379db53005de3b8b879cadda5e693b9519a3f29dbf3738c276abf',
+  './fonts/reading/gentium-book-plus-latin-700-normal.woff2': 'df44bb3e61a46ae3dd1b8f4f1bd7b7faae6b4f46c83a1b2d9807e49b2d810b9f',
+  './fonts/reading/im-fell-english-latin-400-italic.woff2': '67794b617522c749fa4aaeb921425f20a1042127f797cd60a531645e921f379d',
+  './fonts/reading/im-fell-english-latin-400-normal.woff2': '7eaa08b6ab21143928e67676cdbec84a5ba1867d9552b442d4e9577d9516ff12',
+  './fonts/reading/lexend-latin-wght-normal.woff2': 'fd9e1879939db0539a7a184f8855e46217fba95bd805e12755b710ae10320806',
+  './fonts/reading/libre-baskerville-latin-400-italic.woff2': '602b4be4ce6e87a75b58a975616cf10bdbd8f690e9d2f8492d15df792aa88572',
+  './fonts/reading/libre-baskerville-latin-400-normal.woff2': 'b9da19c1728dccf755403001a2a9211e5e8007bcd87e312ed8a70c1780d82520',
+  './fonts/reading/libre-baskerville-latin-700-normal.woff2': '8aef3341680aa2157320460bd44f74c4ca629af1bf41b53fbbc28bfb6e6be5c2',
+  './fonts/reading/literata-latin-wght-italic.woff2': 'fc0b62b72a6da72c95116f8ae569470a33d0e859ff6eb4b4c96c21a61277744a',
+  './fonts/reading/literata-latin-wght-normal.woff2': 'a138ca8f81705ada6ec9956e99ff9ebaf3e46677007d3143b9af27b4c01762df',
+  './fonts/reading/lora-latin-wght-italic.woff2': '5c90e5e8de6d6d8870c4b2bc3bc5358b3b8c9fe7480a9d13de7bb0dba123aa9c',
+  './fonts/reading/lora-latin-wght-normal.woff2': 'b4f4c81206ad576fec510d17aef49a4350487620a6367f30dd15921d8df89a58',
+  './fonts/reading/merriweather-latin-400-italic.woff2': 'e36d4ea5fdc37567392e825ecd470324619e0b1ef3af733f1e29b6c7fd79dd7a',
+  './fonts/reading/merriweather-latin-400-normal.woff2': 'd37803ac79e20a50ec999b087dd56019dd4de3e71bd19379d0b97c0428f3d80e',
+  './fonts/reading/merriweather-latin-700-normal.woff2': '771dfae77e4c6476a4e1940ebe494e45720aa105a968a4e8145f385f956b997e',
+  './fonts/reading/neuton-latin-400-italic.woff2': '087e53c8eb688af3c1008515d35e762a80f108761523ebdd35666149ddda62b5',
+  './fonts/reading/neuton-latin-400-normal.woff2': '4ba2c19d59b04f66c65d03dc4b02d58fe385a41bab4b0d1e43ae368ef130cdfa',
+  './fonts/reading/neuton-latin-700-normal.woff2': '5bd03ac6b77f680604f036e4d8e5f25c8316f75202e43a944663d35a3b8e78b7',
+  './fonts/reading/noto-serif-latin-wght-italic.woff2': 'c1d24dc1e18878a44640e8b21b9e8eab5f281554aabc8e97ec84bfea87379219',
+  './fonts/reading/noto-serif-latin-wght-normal.woff2': '764b9acf65e84ed77eaa239d4367e174e2f51e4b94ef3fe470a14fb488744d73',
+  './fonts/reading/old-standard-tt-latin-400-italic.woff2': '82500030e59bf287b9e231461ffd700b6cdf2d10fb473a531b8ec7bf216eaad2',
+  './fonts/reading/old-standard-tt-latin-400-normal.woff2': '45180992dfa5d7a440a3e445b7d708af17e8b7dc98a99359e3a457dc60a462de',
+  './fonts/reading/old-standard-tt-latin-700-normal.woff2': '651abbfdbeb8c668be1ed1d5501902c9633c94bda52e68761cc19b25233e6ace',
+  './fonts/reading/playfair-display-latin-wght-italic.woff2': 'dcbe4e958b8ed22563fbc3ddff571be68aa7b01c849c8c1654d1dabe1a67ead6',
+  './fonts/reading/playfair-display-latin-wght-normal.woff2': '09fa5a6200b1ac78ac3551b4872b81d0618089d67495c4ab2bf4cbab89e7b3b5',
+  './fonts/reading/rosarivo-latin-400-italic.woff2': 'd8675a20d3676096ccf0397cd61911c591dbcbb37e0de979f6b2e9f7aad7326b',
+  './fonts/reading/rosarivo-latin-400-normal.woff2': 'adc2ade93c8fc4af678d8130399d30a533be7daab6bf474079cb97c5ce2a37ad',
+  './fonts/reading/sorts-mill-goudy-latin-400-italic.woff2': '9c5b9529a1fd63b8bfed0b21652efcc83393d6a2c556df4dfb84eb620ded237c',
+  './fonts/reading/sorts-mill-goudy-latin-400-normal.woff2': 'fb191d85e7020b238606ed1341549f7977b77202ebc68051871ed38fdf7b71b4',
+  './fonts/reading/source-serif-4-latin-wght-italic.woff2': '68e834b9c19811c711a145be68f690a4441dc603811dcc38be284c72ef6080c5',
+  './fonts/reading/source-serif-4-latin-wght-normal.woff2': 'a4788060054b8098f2e9ed76c38d8ae19ccbd19c7687c2f5ee3fbeecf4d8777b',
+  './fonts/reading/spectral-latin-400-italic.woff2': '74a6785ace78ef7b67c1f127cd5eb0e03f2439b98f819b2fad019e4c00ffdc7e',
+  './fonts/reading/spectral-latin-400-normal.woff2': '7c683b1f910d159f9f315f9c909332180ec18f0b2cfa5142423f21dd0a30f1ac',
+  './fonts/reading/spectral-latin-600-normal.woff2': 'a07d6ee59b6000b0f26b3fccce9c5865629a38a70956641f39e9e509cf47cd0d',
+  './fonts/reading/vollkorn-latin-wght-italic.woff2': '9994058df2f712d8a46363ec5d99d5eaa71736a5773b5d85aa5a248652d3a0cd',
+  './fonts/reading/vollkorn-latin-wght-normal.woff2': '40a805a97fee6022c92d8e8741da3a229c70fcc59babe427603604e640e4bc4f',
+  './icons/icon-16.png': '8c9f83d5da3cee54f284a9f795b89c038b57b17ec80e2f03e14154ae8064fb41',
+  './icons/icon-180.png': 'e070c45a8419afda414dceb5dc040438701c74b7e4fdc6c499b015257ad25a7d',
+  './icons/icon-192-maskable.png': '17a386a6187cc94d053c8e8ea6dfb2169c7cec7688cae856c82a09cbdf0229af',
+  './icons/icon-192.png': 'd35b9959211446da8f0630c2f5f2950b25c2aa85c882395e3262a410ec3fca98',
+  './icons/icon-32.png': '815a14ffef714e966f88ffbcc13d43a724f96680f6e2f47aa50761108dac355c',
+  './icons/icon-512-maskable.png': '63553a846fc3d0650c53fd87ef9735139a40e270c9c3d4b1a9b2de24348c5b54',
+  './icons/icon-512.png': 'e0fe65283e78ae7b5e6d36471b8e39a01107736c868266649c06d7c70402c54f',
+  './src/data/answers.js': 'cd7979a94e6bb393702c1d3a4d4bc34496c0ee28b7f4caff896c687c054645c5',
+  './src/data/audio-sync-sections.js': 'a48bd0c2f2352ca5ef21b903fe0f5dc9a6048f0b0492b6cf15d845edd54547ac',
+  './src/data/audio-sync.js': '4f178ca1758694292504ee8946aad9f5e23791ec7ba1df8395fe242537401f5e',
+  './src/data/bible-asv.js': '552b7ae92a206f103f53f51f33cc8b90365156244aab6b7c47f8da5d16d6a34b',
+  './src/data/bible-bsb.js': 'c6298eeaaba6bf491a0cbfe6f22ba3d19357ad29c6c88acd6f5bf4791347a6bd',
+  './src/data/bible-hnv.js': '582c866ccba90aa63170c958bda79d554f32dc5749a6949bb289aa51f96eeead',
+  './src/data/bible-kjv.js': '7aa0b3b47411894814df1d735f42eae82edc4727ed9fc6c05255fed46537bd5f',
+  './src/data/bible-lsv.js': '6678117eba2a0633c3ef7f912a406183fbcbe7a64597517fcac50b1862cb6256',
+  './src/data/bible-rkjv.js': '8aff1bbb50beaee6f9e6e215ca1de0dcaef61ce75fb637522c43aa6c3f94ed57',
+  './src/data/bible-rnkjv.js': 'fba44c03cc99eb2532009df85f41bddb8a587972090915bd2776c7734fa61c5e',
+  './src/data/bible-studies.js': '8b5f2e03791311e56fcd5677b43a3e8fd474a31b63fb12100a5b525a2f580ad3',
+  './src/data/bible-sync-brm-kjv.js': '3bad32acda60230b87468edbe7a5681c2f18ee452a10d897ac161d7bd781266f',
+  './src/data/bible-sync-tsot-matthew.js': 'cb5f612b25cdca8c1d2cc4bc713377fe754fca989d00ed8e53220b3ac5309444',
+  './src/data/bible-sync-web-ebible.js': 'a696000cc9d2dc5b483a716d6689ae58a46bd19cc3e55edfc7321f892a237431',
+  './src/data/bible-sync-wop-nkjv.js': 'c82c4f0d64e621073a0fcb2774e580d6a53beb2a6e814eddc93a21b056bc314c',
+  './src/data/bible-web.js': '22b119d895aa329b2f62e6ba7b1b5978f1fbcf13fc474d1de5d9b72c9a3558c2',
+  './src/data/bible-ylt.js': 'b6069acf40f8a8cc847390d7e8ee1af7c5b5d83d7e77c40c4bf612715c1acdf8',
+  './src/data/scripture-web-data.js': '7200af796f9ea64f7832f470dec48b9ab51e55fb1ee81e9b58b162f3b0bef86c',
+  './study-chart-chronology.jpg': 'd8991646f54d4b9861ce85bb7ff59517623307b9c7c851a592bd48b7b5b854a8',
+  './study-cover-lamb.jpg': 'dcb877b4ac506318d971b1d3f772862ad84cb5efb701dbf6387b42d3c1f31b58',
+  './study-cover-mtam.jpg': 'b0775896d907f7f8302b02d6f2ecdb6db9bfa0ed09715bda954f96b71c0d65ce',
+  './study-lamb-burial.jpg': '528f25d503522430628846b74987b3b559371e09e6c43e9b9233d009332a9114',
+  './study-lamb-crucifixion.jpg': '37996acaa07035a4dfd494ac81b409008992d4bf038d3d7f1356af667f51f97b',
+  './study-lamb-emmaus.jpg': 'f04e8f601b81b058a0a8d42797cbb86d331e585c9abb064df6329d555f5ad009',
+  './study-lamb-gethsemane.jpg': '5ea99c3ff507c3833e9633dee2df2d26ae1307820d79e890c3be0eee1ac26294',
+  './study-lamb-resurrection.jpg': '47637098274acf305c4bd990c953df72489f323e27b3140a673e539e27c25618',
+  './study-lamb-supper.jpg': 'af6822f8b843e573f822626a998addd734eee2851b6407cd2ab9bb252468e87c',
+  './study-lamb-thorns.jpg': 'a8f2336fb30ba2a3b01df50ee2c82ebc518e6572b827ba3b2d2507e57a7447bf',
+  './study-title-part-one-title.jpg': 'd4be10f90adb126192164b006c69a14046f8a7b79183ffa8c118fc892f5915e5',
+  './study-title-part-three-title.jpg': '98fb470fff471b7aa53a1a1a7f84286f2ee7e3b558e7951fc829c88a1e98fd26',
+  './study-title-part-two-title.jpg': '1e17c45b43b46fce7828f5474da16ee8af84ffc820bb443393b819efdb2640d7',
+};
+// ── END GENERATED: ASSET_REVISIONS ──
+
+/**
+ * Put an older bucket's copy of `url` into `cache` when its bytes are this build's (its revision). Newest
+ * older bucket first. False when there is no expectation, no older copy, or no copy that matches.
+ * @param {Cache} cache  the new bucket
+ * @param {string} url
+ * @param {string} prefix  'vot-core-' or 'vot-corpus-'
+ * @param {string} current  the new bucket's name (never copied from)
+ * @returns {Promise<boolean>}
+ */
+async function copyForward(cache, url, prefix, current) {
+  const want = ASSET_INTEGRITY[url] || ASSET_REVISIONS[url];
+  if (!want) return false;
+  try {
+    const keys = (await caches.keys()).filter((k) => k.startsWith(prefix) && k !== current).reverse();
+    for (const key of keys) {
+      const old = await (await caches.open(key)).match(url);
+      if (!old) continue;
+      // Read once and store what was read (a clone read in full would make the browser buffer the original too:
+      // two copies of a 5 MB Bible per worker, four workers).
+      const buf = await old.arrayBuffer();
+      if ((await sha256Stripped(buf)) !== want) continue;
+      await cache.put(url, new Response(buf, { status: old.status, statusText: old.statusText, headers: old.headers }));
+      return true;
+    }
+  } catch (_e) { /* a copy that cannot be read is fetched instead */ }
+  return false;
+}
+
+/** addVerified, from the previous bucket when the bytes are unchanged. */
+async function addCore(cache, url) {
+  if (await copyForward(cache, url, 'vot-core-', CORE_CACHE)) return;
+  await addVerified(cache, url);
+}
+
 /**
  * sha256 of a body, with CR bytes stripped.
  *
@@ -393,6 +542,14 @@ self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     try {
       await installCore();
+      // An older worker (one that predates the 2026-09-25 pruning guard) may delete this worker's buckets while it
+      // installs. The boot shell must be in its bucket when install resolves: install once more (unchanged files
+      // come from the previous bucket, so it is cheap), and refuse the install if it is still not there, so the
+      // previous worker keeps serving and the browser tries again later.
+      if (!(await shellCached())) {
+        await installCore();
+        if (!(await shellCached())) throw new Error('[sw] the boot shell vanished from its cache during install');
+      }
     } catch (err) {
       // service-worker-5 (2026-09-04): a refused install (a bad deploy, a
       // partially purged edge, a truncated upload — see ASSET_INTEGRITY above)
@@ -415,12 +572,20 @@ self.addEventListener('install', (event) => {
   })());
 });
 
+/** Every CRITICAL asset is in this build's core bucket right now. */
+async function shellCached() {
+  if (!(await caches.keys()).includes(CORE_CACHE)) return false;
+  const core = await caches.open(CORE_CACHE);
+  for (const url of CRITICAL_ASSETS) if (!(await core.match(url))) return false;
+  return true;
+}
+
 /** The install body, split out so the try/catch above stays a thin wrapper. */
 async function installCore() {
   const core = await caches.open(CORE_CACHE);
   // Critical shell — all-or-nothing; a miss here SHOULD fail install.
   await Promise.all(
-    CORE_ASSETS.filter((a) => CRITICAL_ASSETS.has(a)).map((u) => addVerified(core, u))
+    CORE_ASSETS.filter((a) => CRITICAL_ASSETS.has(a)).map((u) => addCore(core, u))
   );
   // Everything else — best-effort, so a single 404 (e.g. a partial deploy or
   // a renamed asset) doesn't abort the install and silently pin the old SW.
@@ -438,7 +603,7 @@ async function installCore() {
   // re-attempts it. That is the right trade for a non-boot asset, but it is a real
   // degradation and not a silent no-op — which is why it is warned, loudly.
   const bestEffort = CORE_ASSETS.filter((a) => !CRITICAL_ASSETS.has(a));
-  const results = await Promise.allSettled(bestEffort.map((u) => addVerified(core, u)));
+  const results = await Promise.allSettled(bestEffort.map((u) => addCore(core, u)));
   const failed = results
     .map((r, i) => (r.status === 'rejected' ? bestEffort[i] : null))
     .filter(Boolean);
@@ -473,12 +638,23 @@ async function installCore() {
     while (precacheIdx < precacheQueue.length) {
       const url = precacheQueue[precacheIdx++];
       try {
-        if (!(await corpus.match(url))) await corpus.add(freshReq(url));
+        if (!(await corpus.match(url)) && !(await copyForward(corpus, url, 'vot-corpus-', CORPUS_CACHE))) {
+          await corpus.add(freshReq(url));
+        }
       } catch (_e) {
         corpusFailed.push(url); // best-effort — corpusFirst still caches on first use
       }
     }
   }));
+  // The files cached on use (alternate translations, timings) that a reader already had: carried over when
+  // unchanged, so a corpus bump does not make them download again the next time they open. Never fetched here.
+  const precached = new Set(precacheQueue);
+  for (const url of Object.keys(ASSET_REVISIONS)) {
+    if (!/^\.\/src\/data\//.test(url) || precached.has(url)) continue;   // a regex, not a quoted path: list-runtime-src-assets reads quoted ones as precache entries
+    try {
+      if (!(await corpus.match(url))) await copyForward(corpus, url, 'vot-corpus-', CORPUS_CACHE);
+    } catch (_e) { /* fetched on use, as before */ }
+  }
   if (corpusFailed.length) {
     console.warn('[sw] install: ' + corpusFailed.length + ' corpus asset(s) not precached:', corpusFailed);
     const clientsList = await self.clients.matchAll({ includeUncontrolled: true });
@@ -567,6 +743,8 @@ async function repairMissing() {
       const item = missing[idx++];
       try {
         const cache = await caches.open(item.bucket);
+        const prefix = item.bucket === CORE_CACHE ? 'vot-core-' : 'vot-corpus-';
+        if (await copyForward(cache, item.url, prefix, item.bucket)) continue;
         if (item.verified) await addVerified(cache, item.url);
         else await cache.add(freshReq(item.url));
       } catch (_e) {
@@ -612,6 +790,12 @@ self.addEventListener('activate', (event) => {
  * @param {{ bucket: string }[]} missing  offlineMissing() for the current buckets
  */
 async function pruneStale(missing) {
+  // A worker only ever prunes buckets OLDER than its own. The page sends CHECK_OFFLINE to the ACTIVE worker 9 s
+  // after every load; during an update that is the old worker, whose "stale" buckets would include the ones the
+  // new worker is installing into right then (the refutation of 2026-09-25, round 3). So: nothing is pruned while
+  // a newer worker is installing or waiting, and a bucket created after this worker's own is never touched.
+  const reg = self.registration;
+  if (reg && (reg.installing || reg.waiting)) return;
   const keys = await caches.keys();
   const drop = []
     // An old core bucket is worth keeping only for what it may serve offline (oldCopyServes), never for code.
@@ -630,7 +814,10 @@ async function pruneStale(missing) {
  * that still has the Bible, not merely the newest one.
  */
 async function staleToDrop(keys, prefix, current, missing) {
-  const stale = keys.filter((k) => k.startsWith(prefix) && k !== current);
+  // caches.keys() is in creation order: only the buckets created before this worker's own are its to judge.
+  const own = keys.indexOf(current);
+  if (own < 0) return [];
+  const stale = keys.slice(0, own).filter((k) => k.startsWith(prefix));
   let need = missing.filter((m) => m.bucket === current).map((m) => m.url);
   const drop = [];
   for (const key of stale.slice().reverse()) {

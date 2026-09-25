@@ -128,7 +128,8 @@ if (ccvMatch[1] !== corpusVersion) {
 // Folding them in here puts them under the same rule as the corpus bundles: change
 // the bytes, bump CORPUS_VERSION. Derived from the SW's OWN list (not a disk glob)
 // so the gate cannot drift from what is actually pinned in the corpus bucket.
-const READING_FONTS = [...sw.matchAll(/'\.\/(fonts\/reading\/[^']+)'/g)].map((m) => m[1]).sort();
+// Unique: ASSET_REVISIONS (sync-sw-version.js) names each font a second time, with its hash.
+const READING_FONTS = [...new Set([...sw.matchAll(/'\.\/(fonts\/reading\/[^']+)'/g)].map((m) => m[1]))].sort();
 if (!READING_FONTS.length) {
   fail(
     'Could not extract any fonts/reading/ paths from service-worker.js.\n' +

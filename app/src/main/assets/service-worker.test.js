@@ -88,7 +88,7 @@ function realBytes(url) {
   try { return new Uint8Array(readFileSync(fp)); } catch { return null; }
 }
 
-function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, clientCount = 1, resolveKeys = false } = {}) {
+function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, clientCount = 1, resolveKeys = false, registration = undefined } = {}) {
   const handlers = {};
   const cacheModes = [];   // every mode the install precache actually requested
   const attempts = new Map();   // url -> how many times install fetched it
@@ -127,6 +127,7 @@ function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, cli
     location: { origin: 'https://app.test' },
     skipWaiting: () => {},
     clients: { claim: async () => { claimed.count += 1; }, matchAll: async () => fakeClients },
+    registration,
   };
   // `crypto` is passed EXPLICITLY rather than left to resolve off globalThis:
   // the SW's integrity check needs crypto.subtle.digest, and under jsdom the
@@ -460,12 +461,13 @@ describe('service-worker fetch + activate runtime (TEST-2)', () => {
 
   it('activate evicts STALE versioned caches, keeps the current ones', async () => {
     const sw = bootSW();
-    await install(sw);                              // creates the current vot-core-* / vot-corpus-*
-    const before = await sw.caches.keys();
-    const curCore = before.find((k) => k.startsWith('vot-core-'));
-    const curCorpus = before.find((k) => k.startsWith('vot-corpus-'));
+    // stale buckets are older than the install that replaces them (a worker prunes only older ones)
     await sw.caches.open('vot-core-OLD');
     await sw.caches.open('vot-corpus-OLD');
+    await install(sw);                              // creates the current vot-core-* / vot-corpus-*
+    const before = await sw.caches.keys();
+    const curCore = before.find((k) => k.startsWith('vot-core-') && k !== 'vot-core-OLD');
+    const curCorpus = before.find((k) => k.startsWith('vot-corpus-') && k !== 'vot-corpus-OLD');
     await activate(sw);
     const after = await sw.caches.keys();
     expect(after).toContain(curCore);
@@ -609,6 +611,116 @@ describe('service-worker — an incomplete install keeps the previous library (v
   });
 });
 
+/* AN UPDATE DOWNLOADS ONLY WHAT CHANGED (REPORT #10, v06-02/04, 2026-09-25). A new bucket name (a CACHE_VERSION
+   or CORPUS_VERSION bump) used to fetch every file again: ~17 MB of corpus for a timings-only bump, ~3 MB of
+   unchanged pictures for a deploy. Install now copies a file from the previous bucket when its bytes hash to
+   the generated revision, and fetches the rest. */
+describe('service-worker — copy unchanged files forward (v06-02/04)', () => {
+  /** A cached response carrying the file's real bytes (or tampered ones). */
+  const realResp = (url, tamper = false) => {
+    let bytes = realBytes(url);
+    if (tamper) { const b = new Uint8Array(bytes.length + 1); b.set(bytes); b[bytes.length] = 0x21; bytes = b; }
+    const ab = async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    return { ok: true, status: 200, statusText: 'OK', headers: { 'content-type': 'text/javascript' }, arrayBuffer: ab, clone: () => ({ arrayBuffer: ab }) };
+  };
+
+  it('a corpus file whose bytes did not change is copied from the previous bucket, not downloaded', async () => {
+    const sw = bootSW({ resolveKeys: true });
+    const old = await sw.caches.open('vot-corpus-OLD');
+    await old.put('./dist/bundle-a-bible.js', realResp('./dist/bundle-a-bible.js'));
+    await install(sw);
+    expect(sw.attempts.get('./dist/bundle-a-bible.js') || 0).toBe(0);
+    const cur = await sw.caches.open(CURRENT_CORPUS);
+    const copied = await cur.match('./dist/bundle-a-bible.js');
+    expect(new Uint8Array(await copied.arrayBuffer()).length).toBe(realBytes('./dist/bundle-a-bible.js').length);
+    expect(copied.headers.get('content-type'), 'the copy keeps its headers').toBe('text/javascript');
+  });
+
+  it('a previous copy whose bytes differ is never used: the file is downloaded', async () => {
+    const sw = bootSW({ resolveKeys: true });
+    const old = await sw.caches.open('vot-corpus-OLD');
+    await old.put('./dist/bundle-a-bible.js', realResp('./dist/bundle-a-bible.js', true));
+    await install(sw);
+    expect(sw.attempts.get('./dist/bundle-a-bible.js')).toBe(1);
+  });
+
+  it('core pictures and code carry over too (by revision and by integrity hash)', async () => {
+    const sw = bootSW({ resolveKeys: true });
+    const old = await sw.caches.open('vot-core-OLD');
+    await old.put('./study-cover-lamb.jpg', realResp('./study-cover-lamb.jpg'));
+    await old.put('./dist/bundle-e.js', realResp('./dist/bundle-e.js'));
+    await install(sw);
+    expect(sw.attempts.get('./study-cover-lamb.jpg') || 0).toBe(0);
+    expect(sw.attempts.get('./dist/bundle-e.js') || 0).toBe(0);
+    expect(await (await sw.caches.open(CURRENT_CORE)).match('./dist/bundle-e.js')).toBeTruthy();
+  });
+
+  it('an alternate translation the reader had opened comes along, unchanged, without a download', async () => {
+    const sw = bootSW({ resolveKeys: true });
+    const old = await sw.caches.open('vot-corpus-OLD');
+    await old.put('./src/data/bible-kjv.js', realResp('./src/data/bible-kjv.js'));
+    await install(sw);
+    expect(sw.attempts.get('./src/data/bible-kjv.js') || 0).toBe(0);
+    expect(await (await sw.caches.open(CURRENT_CORPUS)).match('./src/data/bible-kjv.js')).toBeTruthy();
+    // and one never opened is not fetched by the install either
+    expect(await (await sw.caches.open(CURRENT_CORPUS)).match('./src/data/bible-web.js')).toBeFalsy();
+  });
+
+  it('the generated revisions cover the corpus, the fonts, the core pictures and the runtime data', () => {
+    const block = SW_SRC.match(/const ASSET_REVISIONS = \{([\s\S]*?)\};/)[1];
+    for (const p of ['./dist/bundle-a-bible.js', './src/data/answers.js', './study-cover-lamb.jpg', './src/data/bible-kjv.js', './src/data/audio-sync.js']) {
+      expect(block, p).toContain(`'${p}': '`);
+    }
+    expect(block.match(/fonts\/reading\//g).length).toBeGreaterThan(40);
+  });
+});
+
+describe('service-worker — an older worker never prunes a newer one\'s buckets (the refutation, round 3)', () => {
+  const check = (sw) => new Promise((done) => {
+    sw.handlers.message({ data: { type: 'CHECK_OFFLINE' }, ports: [{ postMessage: done }], waitUntil: () => {} });
+  });
+
+  it('CHECK_OFFLINE on a whole library leaves a bucket created after this worker\'s own', async () => {
+    const sw = bootSW({ resolveKeys: true });
+    await sw.caches.open('vot-core-OLDER');
+    await install(sw);
+    await sw.caches.open('vot-core-NEWER');        // a newer worker installing right now
+    await sw.caches.open('vot-corpus-NEWER');
+    const status = await check(sw);
+    expect(status.complete).toBe(true);
+    const keys = await sw.caches.keys();
+    expect(keys).toContain('vot-core-NEWER');
+    expect(keys).toContain('vot-corpus-NEWER');
+    expect(keys).not.toContain('vot-core-OLDER');
+  });
+
+  it('nothing is pruned while a newer worker is installing or waiting', async () => {
+    const sw = bootSW({ resolveKeys: true, registration: { installing: {}, waiting: null } });
+    await sw.caches.open('vot-core-OLDER');
+    await install(sw);
+    await check(sw);
+    expect(await sw.caches.keys()).toContain('vot-core-OLDER');
+  });
+
+  it('install recovers when its core bucket is deleted halfway (an older worker without the guard)', async () => {
+    let swRef = null;
+    let struck = false;
+    const sw = bootSW({
+      resolveKeys: true,
+      fetchImpl: async (r, inst) => {
+        const url = typeof r === 'string' ? r : r.url;
+        if (!struck && url === './dist/bundle-h.js') { struck = true; await swRef.caches.delete(CURRENT_CORE); }
+        return inst(r);
+      },
+    });
+    swRef = sw;
+    await install(sw);
+    expect(struck).toBe(true);
+    const core = await sw.caches.open(CURRENT_CORE);
+    expect(await core.match('./index.html'), 'the boot shell is back in this build\'s bucket').toBeTruthy();
+    expect(await core.match('./dist/bundle-a.js')).toBeTruthy();
+  });
+});
 describe('service-worker — Songs of the Letters routes (2026-09-24)', () => {
   const songsCache = async (sw) => sw.caches.open('vot-songs-v1');
 

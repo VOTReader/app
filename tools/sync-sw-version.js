@@ -23,6 +23,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { createHash } from 'crypto';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { deriveRuntimeSrcAssets } from './list-runtime-src-assets.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const assetsDir = resolve(root, 'app/src/main/assets');
@@ -187,6 +188,44 @@ const integrityBlock = BEGIN + '\n'
   + 'const ASSET_INTEGRITY = {\n' + body + '\n};\n'
   + END;
 next = next.slice(0, bi) + integrityBlock + next.slice(ei + END.length);
+
+// ASSET_REVISIONS (REPORT #10, v06-02/04, 2026-09-25): a sha256 (CR-stripped, like the map above) for every
+// file an update would otherwise download again although its bytes did not change: the core pictures, fonts
+// and icons ASSET_INTEGRITY leaves out, the precached corpus, the reading fonts and the runtime src/data files
+// (the alternate translations and timings cached on use). The worker's install copies a file forward from the
+// previous bucket when its bytes hash to this revision, and fetches only the ones that changed: a timings-only
+// CORPUS_VERSION bump used to make every web reader download ~17 MB again, a core deploy ~3 MB of unchanged
+// pictures. A copy is served only when it hashes to the revision, so a wrong entry costs a download, never
+// wrong bytes.
+const REV_BEGIN = '// ── BEGIN GENERATED: ASSET_REVISIONS (tools/sync-sw-version.js) ──';
+const REV_END = '// ── END GENERATED: ASSET_REVISIONS ──';
+const rbi = next.indexOf(REV_BEGIN);
+const rei = next.indexOf(REV_END);
+if (rbi === -1 || rei === -1 || rei < rbi
+    || next.indexOf(REV_BEGIN) !== next.lastIndexOf(REV_BEGIN) || next.indexOf(REV_END) !== next.lastIndexOf(REV_END)) {
+  console.error('[sw-version] service-worker.js needs exactly one ASSET_REVISIONS marker pair:\n    ' + REV_BEGIN + '\n    ' + REV_END);
+  process.exit(1);
+}
+const listIn = (name) => {
+  const m = sw.match(new RegExp('const ' + name + ' = \\[([\\s\\S]*?)\\];'));
+  if (!m) { console.error('[sw-version] could not find ' + name + ' in service-worker.js'); process.exit(1); }
+  return [...m[1].replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').matchAll(/'([^']+)'/g)].map((x) => x[1]);
+};
+const revisionPaths = new Set([
+  ...paths.filter((p) => !isVerifiable(p)),
+  ...listIn('CORPUS_PRECACHE'),
+  ...listIn('READING_FONT_PRECACHE'),
+  ...deriveRuntimeSrcAssets().assets.map((p) => './' + p),
+]);
+const revisions = {};
+for (const p of [...revisionPaths].sort()) {
+  const fp = resolve(assetsDir, p.replace(/^\.\//, ''));
+  if (!existsSync(fp)) continue;   // a best-effort file absent from disk simply has no revision (it is fetched)
+  revisions[p] = createHash('sha256').update(readFileSync(fp).filter((b) => b !== 0x0d)).digest('hex');
+}
+const revBody = Object.keys(revisions).map((k) => `  '${k}': '${revisions[k]}',`).join('\n');
+next = next.slice(0, rbi) + REV_BEGIN + '\nconst ASSET_REVISIONS = {\n' + revBody + '\n};\n' + REV_END
+  + next.slice(rei + REV_END.length);
 
 if (next === sw) {
   console.log(`[sw-version] CACHE_VERSION already '${target}' (${counted} core assets, ${keys.length} integrity hashes) — no change.`);
