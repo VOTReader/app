@@ -381,7 +381,8 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
         )}
 
         <div className="content-layout">
-          <div className="letter-body" ref={mainRef}>
+          {/* data-mark-entry/-blocks: marks a corpus edit moved go back to their words (stores/corpus-mark-remap.js, n4-02) */}
+          <div className="letter-body" ref={mainRef} data-mark-entry={'letter:' + letter.id + ':'} data-mark-blocks={letter.blocks.length}>
             {letter.blocks.map((block, bi) => {
               if (block.type === "intro") return (
                 <p key={letter.id + ":" + bi} className="letter-intro" data-hl-key={letterHlKey(letter.id, bi)} data-hl-dom={true}>

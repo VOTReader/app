@@ -19,7 +19,8 @@
  *   node tools/check-mark-anchors.mjs              (pre-commit) staged vs HEAD
  *   node tools/check-mark-anchors.mjs --base <ref> (CI) working tree vs <ref>
  *   ACCEPT_MARK_SHIFT=1 git commit ...             a shift that is intended:
- *       say so in the commit, and remap the marks (the boot remap is owed).
+ *       say so in the commit, then run node tools/gen-mark-shifts.mjs and commit
+ *       stores/mark-shifts.js: the app moves readers' marks along it (corpus-mark-remap.js).
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
@@ -124,7 +125,7 @@ function main() {
   }
   if (!bad) { console.log('[mark-anchors] ok - no unchanged block moved in ' + files.length + ' keyed file(s)'); return 0; }
   if (process.env.ACCEPT_MARK_SHIFT === '1') {
-    console.log('[mark-anchors] ACCEPT_MARK_SHIFT=1: ' + bad + ' shifted entr' + (bad === 1 ? 'y' : 'ies') + ' let through; say so in the commit.');
+    console.log('[mark-anchors] ACCEPT_MARK_SHIFT=1: ' + bad + ' shifted entr' + (bad === 1 ? 'y' : 'ies') + ' let through; say so in the commit, then run node tools/gen-mark-shifts.mjs and commit src/stores/mark-shifts.js so the marks follow.');
     return 0;
   }
   console.log('[mark-anchors] FAIL: readers\' marks on these entries would move onto other words.');

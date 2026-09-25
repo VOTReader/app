@@ -53,6 +53,8 @@
      - __activeNoteGroup     written so the renderer knows which group is lit.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { remapCorpusMarks } from '../stores/corpus-mark-remap.js';
+
 /**
  * @param {{
  *   screen: string,
@@ -119,6 +121,12 @@ export function useDomAnnotationSync({ screen, letterId, placeKey, noteSheetTarg
     React.useCallback((cb) => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.subscribe(cb) : () => {}, []),
     () => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.getVersion() : 0
   );
+  // Answers is its own lazy file (sync-loaders.js): a topic opened cold by a
+  // link mounted after the first pass and its marks stayed unpainted (n4-02).
+  const answersCorpusV = React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof window.__answersCorpus !== 'undefined') ? window.__answersCorpus.subscribe(cb) : () => {}, []),
+    () => (typeof window.__answersCorpus !== 'undefined') ? window.__answersCorpus.getVersion() : 0
+  );
 
   React.useEffect(() => {
     const t = setTimeout(() => {
@@ -133,6 +141,9 @@ export function useDomAnnotationSync({ screen, letterId, placeKey, noteSheetTarg
       try { applyDOMBookmarks(); } catch (e) { console.error('applyDOMBookmarks failed', e); }
       try { applyNoteIcons(); } catch (e) { console.error('applyNoteIcons failed', e); }
       try { applyActiveNoteState(); } catch (e) { console.error('applyActiveNoteState failed', e); }
+      // n4-02: a mark a corpus edit moved onto other words goes back to them;
+      // the stores' bump re-runs this pass, which then paints it there.
+      try { remapCorpusMarks(); } catch (e) { console.error('remapCorpusMarks failed', e); }
       // If we navigated here from the Notes index by tapping a row, the
       // groupId of the note to open was stashed on the window. Consume it
       // and open the NoteSheet now that the source page is rendered.
@@ -158,7 +169,7 @@ export function useDomAnnotationSync({ screen, letterId, placeKey, noteSheetTarg
     }, 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setNoteSheetTarget is a useState setter passed in as a param (identity-stable per React invariant; eslint can't trace it through the destructured hook-return at the call site).
-  }, [annV, noteV, linkV, bkmV, nbV, screen, letterId, placeKey, bibleCorpusV, matthewCorpusV, votCorpusV]);
+  }, [annV, noteV, linkV, bkmV, nbV, screen, letterId, placeKey, bibleCorpusV, matthewCorpusV, votCorpusV, answersCorpusV]);
 
   // Toggle .is-active on every mark/icon belonging to the open note's group.
   // Default state: notes show only the trailing 📝 icon (no tint, no ribbon).

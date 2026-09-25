@@ -143,3 +143,19 @@ describe('WtlbEntryView — an Answers topic renders before the letters have lan
     expect(document.querySelector('.wtlb-source-line a').getAttribute('href')).toBe('https://answersonlygodcangive.com/Regarding_Pride');
   });
 });
+
+describe('WtlbEntryView — the body names its marks for the corpus remap (n4-02)', () => {
+  it('carries the key prefix and the paragraph count, and every paragraph key sits under it', () => {
+    renderEntry();
+    const body = document.querySelector('[data-mark-entry]');
+    expect(body.getAttribute('data-mark-entry')).toBe('wtlb:matters-of-the-heart:');
+    expect(body.getAttribute('data-mark-blocks')).toBe('2');
+    expect(Array.from(body.querySelectorAll('[data-hl-key]'), (el) => el.getAttribute('data-hl-key')))
+      .toEqual(['wtlb:matters-of-the-heart:0', 'wtlb:matters-of-the-heart:1']);
+  });
+
+  it('carries them with footnotes on too (the default for WTLB and Answers)', () => {
+    renderEntry({ footnotesMode: true });
+    expect(document.querySelector('[data-mark-entry]').getAttribute('data-mark-entry')).toBe('wtlb:matters-of-the-heart:');
+  });
+});

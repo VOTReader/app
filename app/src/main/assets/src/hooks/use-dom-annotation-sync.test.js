@@ -4,6 +4,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useDomAnnotationSync } from './use-dom-annotation-sync.js';
 import { navHandoff } from '../utils/nav-handoff.js';
+import { remapCorpusMarks as remapReal } from '../stores/corpus-mark-remap.js';
+
+vi.mock('../stores/corpus-mark-remap.js', () => ({ remapCorpusMarks: vi.fn() }));
+const remapCorpusMarks = vi.mocked(remapReal);
 
 const APPLY = ['applyDOMHighlights', 'applyDOMLinks', 'applyDOMBookmarks', 'applyNoteIcons', 'applyActiveNoteState'];
 // The four that only run inside the deferred setTimeout(0) pass. The fifth,
@@ -46,6 +50,8 @@ beforeEach(() => {
   window.__bibleCorpus = makeMutableStore();
   window.__matthewCorpus = makeMutableStore();
   window.__votCorpus = makeMutableStore();
+  window.__answersCorpus = makeMutableStore();
+  remapCorpusMarks.mockClear();
   // navHandoff (globalized by _entry-b in production) backs the two slots the
   // hook takes; start each case empty.
   window.navHandoff = navHandoff;
@@ -63,6 +69,7 @@ afterEach(() => {
   delete window.__bibleCorpus;
   delete window.__matthewCorpus;
   delete window.__votCorpus;
+  delete window.__answersCorpus;
   navHandoff._resetForTests();
   delete window.__activeNoteGroup;
 });
@@ -132,6 +139,29 @@ describe('useDomAnnotationSync — apply pass', () => {
     act(() => { window.__votCorpus.bump(); });
     act(() => { vi.advanceTimersByTime(0); });
     expect(window.applyDOMHighlights).toHaveBeenCalledTimes(base + 2);
+  });
+
+  it('re-applies when the Answers corpus lands: a topic opened by link paints its marks (n4-02 probe)', () => {
+    // Answers is its own lazy file (sync-loaders.js __answersCorpus); a topic opened cold by a
+    // ?p= link mounted after the first pass and nothing ran the pass again.
+    renderHook(() => useDomAnnotationSync(baseProps({ screen: 'wtlb-entry', letterId: 'regarding-spiritual-gifts' })));
+    act(() => { vi.advanceTimersByTime(0); });
+    const base = window.applyDOMHighlights.mock.calls.length;
+    act(() => { window.__answersCorpus.bump(); });
+    act(() => { vi.advanceTimersByTime(0); });
+    expect(window.applyDOMHighlights).toHaveBeenCalledTimes(base + 1);
+  });
+
+  it('runs the corpus remap after the paint passes, guarded like them', () => {
+    remapCorpusMarks.mockImplementation(() => { throw new Error('boom'); });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderHook(() => useDomAnnotationSync(baseProps()));
+    act(() => { vi.advanceTimersByTime(0); });
+    expect(remapCorpusMarks).toHaveBeenCalledTimes(1);
+    expect(remapCorpusMarks.mock.invocationCallOrder[0]).toBeGreaterThan(window.applyNoteIcons.mock.invocationCallOrder[0]);
+    expect(errSpy).toHaveBeenCalledWith('remapCorpusMarks failed', expect.any(Error));
+    errSpy.mockRestore();
+    remapCorpusMarks.mockReset();
   });
 
   it('re-applies when a chapter changes without changing the screen or letter id', () => {

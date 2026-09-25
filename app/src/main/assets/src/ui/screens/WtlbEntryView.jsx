@@ -499,7 +499,8 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
 
       <div className="page-wrapper">
         <div className="content-layout">
-          <div className="letter-body" ref={wtlbMainRef}>
+          {/* data-mark-entry/-blocks: marks a corpus edit moved go back to their words (stores/corpus-mark-remap.js, n4-02) */}
+          <div className="letter-body" ref={wtlbMainRef} data-mark-entry={'wtlb:' + entry.id + ':'} data-mark-blocks={entry.paragraphs.length}>
             {entry.paragraphs.map((p, pi) => {
               const paraRefs = refAnalysis.perParagraph[pi] || [];
               let refCursor = 0;

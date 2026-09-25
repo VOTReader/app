@@ -262,7 +262,6 @@ export function rekeyJournalMarks(entries, data) {
   var colonIds = Object.keys(blocksOf).filter(function(id) { return id.indexOf(':') >= 0; });
   var labelOf = data && data.inlineLabel !== undefined ? data.inlineLabel : inlineLinkLabel;
   var noPosition = !!(data && data.noPosition);
-  var out = /** @type {any} */ ({ moved: 0, left: 0 });
   var GONE = { gone: true };
 
   /** @type {Map<any, string>} */ var plainCache = new Map();
@@ -312,18 +311,63 @@ export function rekeyJournalMarks(entries, data) {
   }
 
   /**
-   * The new key for an old position key, null when the key stays.
-   * @param {any} key @param {any} text
-   * @param {((plain: string) => boolean) | null} exact @param {boolean} ranged
+   * Where a parsed position key's mark goes: its block's id key, or null (it stays).
+   * @param {any} p @param {any} text @param {{start?: any, end?: any, text?: any} | null} at
    */
-  function move(key, text, exact, ranged) {
+  function place(p, text, at) {
+    var id = pickBlock(p.blocks, p.n, text, { exact: at ? wordsAt(at.start, at.end, at.text) : null, plain: plainOf, noPosition: noPosition });
+    return id ? journalBlockKey(p.entryId, id) : null;
+  }
+
+  return rekeyMarkStores(data, { parse: parse, place: place });
+}
+
+/**
+ * The engine the journal re-key and the corpus remap (corpus-mark-remap.js,
+ * n4-02) share: every mark in the four stores whose key `how.parse` claims is
+ * placed by `how.place`, and the stores come back changed where a mark moved.
+ *
+ * how.parse(key, ranged) names what a key is: null for a key this pass leaves
+ * alone, an object with `gone: true` for one whose entry is gone (counted as
+ * left), else anything carrying `range` (a bookmark's or link end's
+ * :<start>-<end>, '' for none) that is handed to place.
+ * how.place(p, text, at) gives the key (without its range) the mark belongs
+ * under now; null when nothing places it (counted as left) and false when it
+ * is fine where it is (not counted). `text` is the mark's words when it kept
+ * them; `at` its words with the offsets they were made at, or null.
+ *
+ * @param {{
+ *   annotations?: Record<string, any[]> | null,
+ *   notes?: Record<string, any> | null,
+ *   bookmarks?: any[] | null,
+ *   links?: any[] | null,
+ * }} data - as rekeyJournalMarks takes it (never mutated)
+ * @param {{
+ *   parse: (key: any, ranged: boolean) => any,
+ *   place: (p: any, text: any, at: {start?: any, end?: any, text?: any} | null) => string | null | false,
+ * }} how
+ * @returns {{annotations?: Record<string, any[]>, notes?: Record<string, any>, bookmarks?: any[], links?: any[], moved: number, left: number}}
+ */
+export function rekeyMarkStores(data, how) {
+  var out = /** @type {any} */ ({ moved: 0, left: 0 });
+  var parse = how.parse;
+
+  /**
+   * The new key for a key, null when the key stays.
+   * @param {any} key @param {any} text
+   * @param {{start?: any, end?: any, text?: any} | null} at @param {boolean} ranged
+   */
+  function move(key, text, at, ranged) {
     var p = parse(key, ranged);
     if (!p) return null;
-    if (p === GONE) { out.left++; return null; }
-    var id = pickBlock(p.blocks, p.n, text, { exact: exact, plain: plainOf, noPosition: noPosition });
-    if (!id) { out.left++; return null; }
+    if (p.gone) { out.left++; return null; }
+    var to = how.place(p, text, at);
+    if (to === false) return null;
+    if (!to) { out.left++; return null; }
+    var nk = to + p.range;
+    if (nk === String(key)) return null;
     out.moved++;
-    return journalBlockKey(p.entryId, id) + p.range;
+    return nk;
   }
 
   // Annotation segments one by one: two marks under one old key can belong to
@@ -337,38 +381,37 @@ export function rekeyJournalMarks(entries, data) {
     /** @type {Record<string, boolean>} */ var own = Object.create(null);    // buckets this pass made (never the store's own arrays)
     /** @type {Record<string, boolean>} */ var into = Object.create(null);   // buckets a moved segment went into
     var moved = new Set();
-    var place = function(/** @type {string} */ dest, /** @type {any} */ a) {
+    var put = function(/** @type {string} */ dest, /** @type {any} */ a) {
       if (!own[dest]) { nextAnn[dest] = nextAnn[dest] ? nextAnn[dest].slice() : []; own[dest] = true; }
       nextAnn[dest].push(a);
     };
     Object.keys(ann).forEach(function(k) {
       var list = Array.isArray(ann[k]) ? ann[k] : [];
       var p = list.length ? parse(k, false) : null;
-      if (p === GONE) out.left += list.length;
-      if (!p || p === GONE) {
+      if (p && p.gone) out.left += list.length;
+      if (!p || p.gone) {
         // nothing here moves; an empty bucket stays empty and never replaces one a moved mark went into
         if (own[k]) list.forEach(function(a) { nextAnn[k].push(a); });
         else nextAnn[k] = ann[k];
         return;
       }
       list.forEach(function(a) {
-        var id = pickBlock(p.blocks, p.n, a && a.text, { exact: a ? wordsAt(a.start, a.end, a.text) : null, plain: plainOf, noPosition: noPosition });
+        var to = how.place(p, a && a.text, a ? { start: a.start, end: a.end, text: a.text } : null);
         var gk = a && a.groupId ? a.groupId + '\n' + k : null;
-        if (!id) {
-          out.left++;
+        if (!to || to === k) {
+          if (to === null) out.left++;
           if (gk) groupStays[gk] = true;
-          place(k, a);
+          put(k, a);
           return;
         }
         out.moved++;
-        var nk = journalBlockKey(p.entryId, id);
         if (gk) {
-          var to = groupTo[gk] || (groupTo[gk] = []);
-          if (to.indexOf(nk) < 0) to.push(nk);
+          var dests = groupTo[gk] || (groupTo[gk] = []);
+          if (dests.indexOf(to) < 0) dests.push(to);
         }
         moved.add(a);
-        into[nk] = true;
-        place(nk, a);
+        into[to] = true;
+        put(to, a);
       });
     });
     if (moved.size) {
@@ -412,7 +455,7 @@ export function rekeyJournalMarks(entries, data) {
     var nextBk = bookmarks.map(function(b) {
       if (!b || !b.hlKey) return b;
       var r = RANGE.exec(String(b.hlKey));
-      var nk = move(b.hlKey, b.label, r ? wordsAt(Number(r[1]), Number(r[2]), b.label) : null, true);
+      var nk = move(b.hlKey, b.label, r ? { start: Number(r[1]), end: Number(r[2]), text: b.label } : null, true);
       if (!nk) return b;
       bkChanged = true;
       return Object.assign({}, b, { hlKey: nk, updated: stamp(b) + STAMP_STEP });
@@ -426,8 +469,8 @@ export function rekeyJournalMarks(entries, data) {
     var end = function(/** @type {any} */ ep) {
       if (!ep || !ep.key) return ep;
       var r = RANGE.exec(String(ep.key));
-      var exact = r ? wordsAt(Number(r[1]), Number(r[2]), ep.text) : wordsAt(ep.start, ep.end, ep.text);
-      var nk = move(ep.key, ep.text || ep.label, exact, true);
+      var at = r ? { start: Number(r[1]), end: Number(r[2]), text: ep.text } : { start: ep.start, end: ep.end, text: ep.text };
+      var nk = move(ep.key, ep.text || ep.label, at, true);
       return nk ? Object.assign({}, ep, { key: nk }) : ep;
     };
     var nextLinks = links.map(function(ln) {

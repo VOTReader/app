@@ -135,3 +135,15 @@ describe('LetterView — an excerpt anchor lands on the block that holds it', ()
     expect(seekToSeen.at(-1)).toBe(null);
   });
 });
+
+describe('LetterView — the body names its marks for the corpus remap (n4-02)', () => {
+  it('carries the key prefix and the block count, and every block key sits under it', () => {
+    renderLetter();
+    const body = document.querySelector('[data-mark-entry]');
+    expect(body.getAttribute('data-mark-entry')).toBe('letter:the-wide-path:');
+    expect(body.getAttribute('data-mark-blocks')).toBe('4');
+    const keys = Array.from(body.querySelectorAll('[data-hl-key]'), (el) => el.getAttribute('data-hl-key'));
+    expect(keys.length).toBeGreaterThan(0);
+    expect(keys.every((k) => /^letter:the-wide-path:\d+$/.test(k))).toBe(true);
+  });
+});
