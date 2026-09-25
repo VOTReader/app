@@ -17,6 +17,9 @@
 import { searchData } from './search-data.js';
 import { parseTextQuery } from './query-parse.js';
 
+/** The books of one chapter: a lone number after one of them names a verse (v07-01). */
+const ONE_CHAPTER_BOOKS = new Set(['obadiah', 'philemon', '2john', '3john', 'jude']);
+
 /**
  * Resolve a word/roman/arabic numeral token to a number.
  * @param {string} s
@@ -251,6 +254,13 @@ export function parseReference(query, parseOpts) {
       const vs = rangeM[2] ? parseInt(rangeM[2], 10) : null;
       const ch2v = rangeM[3] ? parseInt(rangeM[3], 10) : null;
       const vs2 = rangeM[4] ? parseInt(rangeM[4], 10) : null;
+      // A one-chapter book: "Jude 3" / "Jude 3-5" name VERSES of its one chapter,
+      // as readers cite them. Read as a chapter it opened a blank screen (v07-01).
+      if (vs === null && vs2 === null && ONE_CHAPTER_BOOKS.has(bookId)) {
+        return ch2v !== null
+          ? { kind: 'ref-bible', bookId, bookTitle, chapter: 1, verseStart: ch, verseEnd: ch2v }
+          : { kind: 'ref-bible', bookId, bookTitle, chapter: 1, verseStart: ch };
+      }
       if (vs === null && ch2v !== null && vs2 === null) {
         return { kind: 'ref-bible', bookId, bookTitle, chapter: ch, chapterEnd: ch2v };
       }
@@ -264,6 +274,18 @@ export function parseReference(query, parseOpts) {
         return { kind: 'ref-bible', bookId, bookTitle, chapter: ch, verseStart: vs };
       }
       return { kind: 'ref-bible', bookId, bookTitle, chapter: ch };
+    }
+    // Chapter and verse without the colon: "John 3 16", "John 3.16" (qNorm made the
+    // '.' a space), "john 3v16", "John 3 16-18". These fell through to a text
+    // search of the digits (v07-05).
+    const cvM = rest.match(/^(\d+)(?: |v)(\d+)(?:-(\d+))?$/i);
+    if (cvM) {
+      const ch = parseInt(cvM[1], 10);
+      const vs = parseInt(cvM[2], 10);
+      const ve = cvM[3] ? parseInt(cvM[3], 10) : null;
+      return ve !== null
+        ? { kind: 'ref-bible', bookId, bookTitle, chapter: ch, verseStart: vs, verseEnd: ve }
+        : { kind: 'ref-bible', bookId, bookTitle, chapter: ch, verseStart: vs };
     }
   }
 

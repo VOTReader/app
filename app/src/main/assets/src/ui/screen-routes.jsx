@@ -533,6 +533,31 @@ export function buildScreenRoutes({
   };
 
   /**
+   * What the Bible chapter route renders when the corpus IS loaded and the book
+   * has no such chapter: "John 30:1" from Search, a stale deep link, and "Jude 3"
+   * before the parser read a lone number after a one-chapter book as the verse
+   * (v07-01). The route returned null there - no header, no nav. Same shape as
+   * _deadLetter: chrome, what the book holds, and a way into it.
+   * @param {any} bk the resolved book
+   * @param {number} num the chapter asked for
+   * @returns {any} never null
+   */
+  const _missingChapter = (bk, num) => {
+    const count = (bk && bk.chapters && bk.chapters.length) || 0;
+    const one = count === 1;
+    const body = (
+      <div className="sc-sheet-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '14px', textAlign: 'center', padding: '0 24px' }}>
+        <div>{bk.title + (one ? ' has one chapter' : ' has ' + count + ' chapters') + (num ? ', so there is no chapter ' + num + '.' : '.')}</div>
+        <button type="button" onClick={() => (one ? selectBibleCh(1) : goBibleIdx())} style={{ padding: '8px 20px', borderRadius: '999px', border: '1px solid currentColor', background: 'transparent', color: 'inherit', font: 'inherit', cursor: 'pointer', opacity: 0.85 }}>{'Open ' + bk.title}</button>
+      </div>
+    );
+    // A fallback must not be able to fail (see _deadLetter): chrome only when it is there.
+    return (typeof ScreenLayout === 'function')
+      ? <ScreenLayout navChildren={_idxNav()}>{body}</ScreenLayout>
+      : body;
+  };
+
+  /**
    * @param {any} jsx     the route's element, or falsy when the letter did not resolve
    * @param {string} [volKey] the collection, for the dead-letter fallback. Pass it
    *   on every letter/entry route; index routes have no letter to lose.
@@ -1253,6 +1278,8 @@ export function buildScreenRoutes({
       if (bookId && typeof window.__bibleCorpus !== 'undefined' && !window.__bibleCorpus.loaded) {
         return _corpusView(window.__bibleCorpus, window.__loadBibleCorpus, 'Loading Bible…');
       }
+      // The corpus is in and the book resolved, but not this chapter: a way out, not nothing.
+      if (book && !chapter) return _missingChapter(book, chapterNum);
       return null;
     },
 
