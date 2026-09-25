@@ -353,10 +353,12 @@ describe('end of page', () => {
     ctrl.destroy();
   });
 
-  it('will NOT cross a collection boundary', () => {
+  it('stops at a dead end: there is no next page to turn to', () => {
+    // A book or volume edge is NOT a dead end: the wrapper's canAdvance says yes
+    // to a boundary card the way a swipe commits one (AutoScrollControl.test.jsx).
     const { io, state } = makeIo();
     state.autoNext = true;
-    state.canAdv = false; // peek('next') returned a boundary card, or null
+    state.canAdv = false; // peek('next') returned null: the end of the reading chain
     state.el = makeEl({ scrollHeight: 5000, clientHeight: 800, endTop: 900 });
     state.lpm = 40;
     const ctrl = createAutoScroll(io);
@@ -365,6 +367,42 @@ describe('end of page', () => {
     expect(ctrl.getState().state).toBe('ended');
     expect(ctrl.getState().pauseReason).toBe('boundary');
     expect(state.advanced).toBe(0);
+    ctrl.destroy();
+  });
+
+  // as1 (Corbin 2026-09-24): auto-scroll carries on into the next book or volume. When that page is another
+  // screen, its controller is a new one; the run is handed over and picked up there.
+  it('an advance tells the wrapper its chain count, and reports when this controller carried on itself', () => {
+    const got = [];
+    let carriedOn = 0;
+    const { io, state } = makeIo({ advance: (n) => { got.push(n); }, onAdvanced: () => { carriedOn += 1; } });
+    state.autoNext = true;
+    state.el = makeEl({ scrollHeight: 5000, clientHeight: 800, endTop: 900 });
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 900, 50);
+    runTimers(state, 6000);
+    expect(got).toEqual([1]);
+    expect(carriedOn).toBe(0);   // still waiting out the restore
+    runFrames(state, 1);
+    expect(carriedOn).toBe(1);   // the page reconciled in place and this controller runs on
+    ctrl.destroy();
+  });
+
+  it("a run handed over from the screen before resumes once this screen's restore settles, chain and all", () => {
+    const { io, state } = makeIo();
+    state.el = makeEl({ scrollHeight: 5000, clientHeight: 800, endTop: 900 });
+    state.restoring = true;
+    const ctrl = createAutoScroll(io);
+    ctrl.resumeAdvance(3);
+    expect(ctrl.getState().state).toBe('advancing');
+    expect(state.runningClass[state.runningClass.length - 1]).toBe(true);
+    runFrames(state, 5);
+    expect(ctrl.getState().state).toBe('advancing');   // the scroll restore still owns scrollTop
+    state.restoring = false;
+    runFrames(state, 2);
+    expect(ctrl.getState().state).toBe('running');
+    expect(ctrl._internals().chain).toBe(3);             // the runaway cap still counts the pages before
     ctrl.destroy();
   });
 
