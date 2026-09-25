@@ -342,7 +342,9 @@ function _downloadedReading(track) {
   const key = track && typeof track.key === 'string' ? track.key : '';
   const volKey = _volKeyOf(key);
   if (!volKey) return null;
-  const item = { id: key.slice(volKey.length + 1) };
+  // The letter's title rides along: every reading of a letter carries its title (the swapped-in one read
+  // 'Untitled recording' on the bar and in the snapshot, the refutation of 2026-09-24, N7).
+  const item = { id: key.slice(volKey.length + 1), title: (track && track.title) || '' };
   const all = renditionsFor(volKey, item, track ? track.sub : null);
   return all.find((r) => r.tracks.length > 0 && r.tracks.every((t) => !_unreachable(t))) || null;
 }
@@ -727,6 +729,19 @@ function _sleepAtTrackEndFire() {
   _syncSleepVolume();   // paused at the bottom of the fade; the next Play is at full voice
   if (!wasLive) _notify();
   if (wasLive) _toast('Sleep timer ended. Playback paused.');
+}
+
+/**
+ * Let the element go of what it holds without ending the session: paused, its stream released (the src attribute
+ * removed, which fires no 'error' the way src='' does), its stall watchdog cleared. Play (toggle) loads the bar's
+ * recording into it again.
+ * @returns {void}
+ */
+function _releaseEl() {
+  _clearStallWatchdog();
+  if (!_el) return;
+  try { _el.pause(); } catch (_e) { /* already detached */ }
+  try { _el.removeAttribute('src'); _el.load(); } catch (_e) { /* jsdom / older WebViews */ }
 }
 
 /** Move a live loading/playing element into one intentional paused state. */
@@ -1155,22 +1170,32 @@ function _start() {
   if (_unreachable(track)) {
     const reading = _downloadedReading(track);
     if (reading) {
-      // Replace this letter's run of tracks with the downloaded reading, at the same part where it has one.
+      // Replace this letter's run of tracks with the downloaded reading, at the same part where it has one. The run
+      // may start past part 1 (a queue started at part 2 leaves part 1 behind), so parts are counted from this
+      // track's own place in its reading, not from the run (the refutation of 2026-09-24, S6).
       let a = _state.qi;
       while (a > 0 && _state.queue[a - 1] && _state.queue[a - 1].key === track.key) a--;
       let b = _state.qi;
       while (b + 1 < _state.queue.length && _state.queue[b + 1] && _state.queue[b + 1].key === track.key) b++;
-      const part = Math.min(_state.qi - a, reading.tracks.length - 1);
-      _state.queue = _state.queue.slice(0, a).concat(reading.tracks, _state.queue.slice(b + 1));
-      _state.qi = a + part;
+      const at = _locateTrack(track);
+      const own = at ? at.partIndex : _state.qi - a;
+      const first = Math.min(Math.max(0, own - (_state.qi - a)), reading.tracks.length - 1);
+      const tail = reading.tracks.slice(first);
+      _state.queue = _state.queue.slice(0, a).concat(tail, _state.queue.slice(b + 1));
+      _state.qi = a + Math.min(own - first, tail.length - 1);
       _start();
       return;
     }
     const ahead = _state.queue.findIndex((t, i) => i > _state.qi && (!_unreachable(t) || !!_downloadedReading(t)));
     if (ahead < 0) {
       _state.time = 0;
+      _state.duration = 0;
       _errorTime = 0;
+      // Paused BEFORE the element lets go, so its 'pause' finds nothing live to file.
       _setStatus('paused');
+      // A manual Next or Prev lands here with the element still playing the recording being LEFT: it would play on
+      // under a bar naming this one, its clock saved as this one's place (the refutation of 2026-09-24, M1).
+      _releaseEl();
       _persist();
       _toast(OFFLINE_MSG);
       return;
@@ -2120,28 +2145,29 @@ function _followLibraryRate() {
 }
 
 /**
- * Reader-alternate restore fidelity. `saved` is the placeholder track the bar
- * is already showing, which carries the reader when the snapshot predates the
- * startReader field. Every lookup that doesn't line up returns the queue
+ * Reader-alternate restore fidelity: the saved letter's run in the rebuilt
+ * queue becomes the rendition whose tracks include the saved URL, whichever
+ * reader that is. Every lookup that doesn't line up returns the queue
  * untouched, so a missing corpus or a retired alternate simply resumes on the
  * primary rendition rather than losing the position.
  *
  * @param {any} restore - the pending-restore descriptor
  * @param {Track[]} queue
- * @param {Track | undefined} saved
  * @returns {Track[]}
  */
-function _withRestoredAlternate(restore, queue, saved) {
+function _withRestoredAlternate(restore, queue) {
   try {
-    const reader = restore.startReader || (saved && saved.readerCode) || '';
-    if (!reader || !restore.key || !restore.url) return queue;
+    if (!restore.key || !restore.url) return queue;
     const at = queue.findIndex((t) => t.key === restore.key);
     if (at < 0) return queue;
     const divider = restore.key.indexOf(':');
     if (divider <= 0) return queue;
     const item = { id: restore.key.slice(divider + 1), title: queue[at].title };
+    // The rendition that HOLDS the saved recording, whoever reads it. The saved URL is the one fact about what was
+    // playing; the descriptor's startReader can name another voice (offline, a downloaded reading plays in place of
+    // the chosen one), and trusting it resumed that voice at the other one's clock (the refutation of 2026-09-24, M2).
     const rendition = renditionsFor(restore.volKey, item, restore.label)
-      .find((rd) => rd.reader === reader && rd.tracks.some((t) => t.url === restore.url));
+      .find((rd) => rd.tracks.some((t) => t.url === restore.url));
     if (!rendition) return queue;
     let end = at;
     while (end < queue.length && queue[end].key === restore.key) end++;
@@ -2279,7 +2305,7 @@ async function _rebuildRestoredQueue() {
     // A rebuilt queue always holds each letter's PRIMARY rendition, so a
     // listener resuming an alternate reader finds no url match. Swap that one
     // letter for the rendition that actually contains the saved track.
-    queue = _withRestoredAlternate(r, queue, _state.queue[0]);
+    queue = _withRestoredAlternate(r, queue);
     qi = r.url ? queue.findIndex((item) => item.url === r.url) : -1;
   }
   if (qi < 0 && r.key) {
