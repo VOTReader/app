@@ -62,7 +62,8 @@
      [8]            magic = "VOTBACK1" (ASCII)
      [8]            manifest length, bytes (uint64)
      [manifestLen]  manifest, UTF-8 JSON = { app:"VOTReader", exportVersion:3,
-                      exportDate, diagnosticLog, storageQuota/Used, counts,
+                      exportDate, diagnosticLog, storageQuota/Used,
+                      countsVersion, counts,
                       data:{vot-state:...}, stores:{...all IDB stores...},
                       media:[ {id, type, mime, size, width, height, duration,
                                created} ... ]  ← METADATA ONLY, NO bytes }

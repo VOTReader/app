@@ -30,9 +30,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import {
   blobToBase64, base64ToBlob, buildExportPayload, applyImportPayload,
-  buildV3Manifest, applyV3, verifyImportCounts, DEFAULT_MEDIA_LIMIT_BYTES, formatImportSpaceWarning,
+  buildV3Manifest, applyV3, verifyImportCounts, COUNTS_VERSION, DEFAULT_MEDIA_LIMIT_BYTES, formatImportSpaceWarning,
 } from './backup.js';
 import { writeContainer, readContainer } from './backup-container.js';
+import { summarizeBackupManifest, formatVerifyReport } from './backup-verify.js';
 import { renderHook } from '@testing-library/react';
 import { usePersistedState } from '../hooks/use-persisted-state.js';
 import { useSettings } from '../hooks/use-settings.js';
@@ -707,6 +708,47 @@ describe('verifyImportCounts (BAK3)', () => {
     expect(verifyImportCounts(manifest, 0)).toEqual([]);
   });
 
+  /* Both exporters counted a `{ list }` store (journal, notebooks, journal
+     notebooks) by its one key, so every backup declared "1 journal entry" and
+     Verify printed it. They now count the list, and stamp the rule they used. */
+  it('both builders count a { list } store by its list and stamp countsVersion', async () => {
+    const saved = { 'vot-journal': { list: [{ id: 'j1' }, { id: 'j2' }, { id: 'j3' }] }, 'vot-notebooks': { list: [] } };
+    const ctx = {
+      storesMap: { 'vot-journal': { store: {}, method: 'replaceAll' }, 'vot-notebooks': { store: {}, method: 'replaceAll' } },
+      flagMap: {}, idbAdapter: { get: async (name) => saved[name] },
+      mediaStore: { allIds: async () => [], get: async () => null },
+      storageEstimate: async () => ({ quota: null, usage: null }),
+    };
+    for (const built of [(await buildExportPayload(ctx)).payload, (await buildV3Manifest(ctx)).manifest]) {
+      expect(built.countsVersion).toBe(COUNTS_VERSION);
+      expect(built.counts['vot-journal']).toBe(3);
+      expect(built.counts['vot-notebooks']).toBe(0);
+      expect(verifyImportCounts(built, 0)).toEqual([]);
+    }
+  });
+
+  it('countsVersion 2 recounts a { list } store by its list, so a lost entry is caught', () => {
+    const list = [{ id: 'j1' }, { id: 'j2' }, { id: 'j3' }];
+    const manifest = (journal) => ({ countsVersion: COUNTS_VERSION, counts: { 'vot-journal': 3 }, stores: { 'vot-journal': journal } });
+    expect(verifyImportCounts(manifest({ list }), 0)).toEqual([]);
+    expect(verifyImportCounts(manifest({ list: list.slice(1) }), 0)).toEqual(['vot-journal 2/3']);
+  });
+
+  it('a backup written before countsVersion (journal declared as 1) restores without a false mismatch', () => {
+    // Its writer counted the journal object's one key. Recounted by today's rule,
+    // every clean restore of it would say "some records didn't restore (vot-journal 5/1)".
+    const manifest = {
+      counts: { _media: 0, 'vot-journal': 1, 'vot-bookmarks': 2 },
+      stores: { 'vot-journal': { list: [1, 2, 3, 4, 5] }, 'vot-bookmarks': [1, 2] },
+    };
+    expect(verifyImportCounts(manifest, 0)).toEqual([]);
+  });
+
+  it('a countsVersion newer than this app leaves store counts unchecked, never guessed; media is still checked', () => {
+    const manifest = { countsVersion: COUNTS_VERSION + 1, counts: { _media: 2, 'vot-journal': 9 }, stores: { 'vot-journal': { list: [] } } };
+    expect(verifyImportCounts(manifest, 1)).toEqual(['media 1/2']);
+  });
+
   it('applyV3 salvages a media shortfall: merge commit + countMismatches report', async () => {
     // A v3 manifest declaring 2 media frames, but the entries stream yields 1 →
     // the frame that arrived lands via the MERGE commit (nothing deleted) and
@@ -1257,6 +1299,64 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
     expect(rec.width).toBe(4);
     const restoredBytes = new Uint8Array(await rec.blob.arrayBuffer());
     expect(Array.from(restoredBytes)).toEqual(Array.from(mediaBytes));
+  }, 20000);
+
+  /* "Verify a Backup" said "1 journal entry" whatever the journal held: both
+     exporters counted the `{ list }` object JournalStore persists by its one key.
+     The whole chain on the real store: the journal it saves → each exporter →
+     Verify's report → the import's count reconciliation (BAK3). Then the same two
+     files with the counts the exporter wrote before countsVersion, as every backup
+     already on disk has them: Verify must still count their journal, and restoring
+     them must not call journal entries that all landed "didn't restore". */
+  it('Verify and the import both count every journal entry, in a new backup and an old one', async () => {
+    for (const title of ['First', 'Second', 'Third']) JournalStore.add({ title, blocks: [] });
+    await flushAll();
+    const exportCtx = {
+      storesMap: storesMap(), flagMap: flagMap(), idbAdapter: IDBAdapter, mediaStore: JournalMediaStore,
+      diagnosticLog: [], nowIso: () => '2026-09-25T12:00:00.000Z',
+    };
+    const importCtx = () => ({
+      storesMap: storesMap(), flagMap: flagMap(), mediaStore: JournalMediaStore, validateStorePayload, validateMediaRecord,
+    });
+    const verifyLine = (doc, integrity, kind) => formatVerifyReport(summarizeBackupManifest(doc), integrity, kind).message;
+    /** @param {any} m */
+    const writtenBeforeCountsVersion = (m) => {
+      const old = { ...m, counts: { _media: m.counts._media } };
+      delete old.countsVersion;
+      for (const [k, v] of Object.entries(m.stores)) {
+        old.counts[k] = Array.isArray(v) ? v.length : (v && typeof v === 'object' ? Object.keys(v).length : 1);
+      }
+      return old;
+    };
+
+    // v3, the .votbak both platforms export
+    const v3 = await buildV3Manifest(exportCtx);
+    expect(v3.ok).toBe(true);
+    const chunks = [];
+    await writeContainer(v3.manifest, v3.mediaEntries, (u8) => chunks.push(u8.slice()));
+    const read = await readContainer(new Blob(chunks));
+    expect(verifyLine(read.manifest, read.integrity, 'v3')).toContain('3 journal entries');
+    expect((await applyV3(read.manifest, read.entries, importCtx())).countMismatches).toEqual([]);
+
+    // v2, the legacy JSON payload
+    const v2 = await buildExportPayload(exportCtx);
+    expect(v2.ok).toBe(true);
+    const parsed = JSON.parse(JSON.stringify(v2.payload));
+    expect(verifyLine(parsed, 'absent', 'legacy')).toContain('3 journal entries');
+    expect((await applyImportPayload(parsed, importCtx())).countMismatches).toEqual([]);
+
+    // Both files as they were written before countsVersion
+    const oldV3 = writtenBeforeCountsVersion(read.manifest);
+    const oldV2 = writtenBeforeCountsVersion(parsed);
+    expect([oldV3.counts['vot-journal'], oldV2.counts['vot-journal']]).toEqual([1, 1]);
+    expect(verifyLine(oldV3, 'absent', 'v3')).toContain('3 journal entries');
+    expect(verifyLine(oldV2, 'absent', 'legacy')).toContain('3 journal entries');
+    expect((await applyV3(oldV3, [], importCtx())).countMismatches).toEqual([]);
+    expect((await applyImportPayload(oldV2, importCtx())).countMismatches).toEqual([]);
+
+    // Every restore above wrote the same three entries back
+    ALL_STORES.forEach((s) => s._resetForTests()); IDBAdapter._resetForTests(); await hydrateAllStores();
+    expect(JournalStore.all().map((e) => e.title).sort()).toEqual(['First', 'Second', 'Third']);
   }, 20000);
 
   /* n4-01 (sweep 2, 09-25): "Import & Overwrite" went through the stores' cross-tab
