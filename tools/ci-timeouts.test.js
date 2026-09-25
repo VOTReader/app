@@ -1,5 +1,4 @@
-/* n7-05 / n7-06 (sweep 2026-09-25): every workflow job carries a timeout, (The fresh-profile restore walk
-   joins CI once it is proven on a CI runner: d06e2da1's step failed there and passed locally.) Without a timeout a hung browser step holds a runner - and the
+/* n7-05 / n7-06 (sweep 2026-09-25): every workflow job carries a timeout, The fresh-profile restore walk is a CI gate too. Without a timeout a hung browser step holds a runner - and the
    deploy that waits for CI - for GitHub's 6-hour default. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -35,3 +34,8 @@ describe('workflow job timeouts', () => {
   }
 });
 
+describe('the restore walk is a CI gate (n7-06)', () => {
+  it('ci.yml runs npm run e2e:restore-fresh', () => {
+    expect(wf('ci.yml')).toMatch(/\n {8}run: npm run e2e:restore-fresh\n/);
+  });
+});
