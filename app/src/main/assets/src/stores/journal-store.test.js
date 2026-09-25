@@ -553,3 +553,27 @@ describe('JournalStore — pinning keeps the entry\'s date (v05-05)', () => {
     expect(keptDate(JournalStore.get('j_old'))).toBe(true);
   });
 });
+
+/* n4-07 (sweep 2, 09-25): the Journal hub's "recover" of an unclaimed voice memo
+   added an audio block with no id, and nothing enforced the id every journal mark
+   now keys on (v05-01: journal:<entryId>:<blockId>; the viewer's key={b.id}).
+   The store gives any block that arrives without one an id of its own. */
+describe('JournalStore: every block has an id (n4-07)', () => {
+  beforeEach(() => { JournalStore._resetForTests({ forceLoaded: true }); });
+
+  it('add() gives an id-less block an id and keeps the ones it has', () => {
+    const e = JournalStore.add({ title: '', blocks: [{ type: 'audio', mediaId: 'm_1', duration: 3, samples: null }, { id: 'b_keep', type: 'p', text: 'x' }] });
+    expect(e.blocks[0].id).toMatch(/^b_/);
+    expect(e.blocks[0].mediaId).toBe('m_1');
+    expect(e.blocks[1].id).toBe('b_keep');
+    expect(JournalStore.get(e.id).blocks[0].id).toBe(e.blocks[0].id);
+  });
+
+  it('update() does the same for blocks in a patch, and two new blocks get two ids', () => {
+    const e = JournalStore.add({ title: 't', blocks: [] });
+    const u = JournalStore.update(e.id, { blocks: [{ type: 'p', text: 'a' }, { type: 'p', text: 'b' }] });
+    expect(u.blocks[0].id).toMatch(/^b_/);
+    expect(u.blocks[1].id).toMatch(/^b_/);
+    expect(u.blocks[0].id).not.toBe(u.blocks[1].id);
+  });
+});

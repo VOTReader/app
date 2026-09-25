@@ -52,6 +52,23 @@ import { rekeyJournalMarks, JOURNAL_REKEY_STAMP } from './journal-mark-rekey.js'
 var rekeyWait = null;
 
 /**
+ * n4-07: every journal block has an id - marks key on it (v05-01,
+ * journal:<entryId>:<blockId>) and the viewer renders by it. A block that
+ * arrives without one (the hub's recovered voice memo did) gets one here, in
+ * JournalHelpers.blockId's b_<time>_<random> shape; the ones it has stay.
+ * @param {any[]} blocks
+ * @returns {any[]}
+ */
+function withBlockIds(blocks) {
+  var n = 0;
+  return blocks.map(function(b) {
+    if (!b || typeof b !== 'object' || b.id) return b;
+    n++;
+    return Object.assign({ id: 'b_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6) + n }, b);
+  });
+}
+
+/**
  * A journal entry. Block contents are intentionally `any[]` — block shape
  * is heterogeneous (text / image / audio / letter-card / chapter-card /
  * bookmark-card / note-card / inline-link / etc.); see journal-helpers.js
@@ -189,7 +206,7 @@ export var JournalStore = extendStore(
       var entry = {
         id: seed.id || jrnId(),
         title: seed.title || '',
-        blocks: Array.isArray(seed.blocks) ? seed.blocks.slice() : (typeof JournalHelpers !== 'undefined' ? JournalHelpers.defaultBlocks() : []),
+        blocks: Array.isArray(seed.blocks) ? withBlockIds(seed.blocks) : (typeof JournalHelpers !== 'undefined' ? JournalHelpers.defaultBlocks() : []),
         mood: seed.mood || null,
         tags: Array.isArray(seed.tags) ? seed.tags.slice() : [],
         notebookIds: Array.isArray(seed.notebookIds) ? seed.notebookIds.slice() : [],
@@ -236,6 +253,7 @@ export var JournalStore = extendStore(
       if (idx < 0) return null;
       var cur = list[idx];
       var stamp = (opts && opts.keepDate) ? (cur.updated || cur.created || 0) + 1 : Date.now();
+      if (Array.isArray(patch.blocks)) patch = Object.assign({}, patch, { blocks: withBlockIds(patch.blocks) });
       list[idx] = Object.assign({}, cur, patch, { updated: stamp });
       this._save();
       this._bump();
