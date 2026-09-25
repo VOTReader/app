@@ -139,7 +139,7 @@ import { DiagnosticLog } from '../utils/diagnostic-log.js';
 import { validateStorePayload, validateImportEnvelope, validateMediaRecord } from '../utils/import-validators.js';
 import { registerServiceWorker } from '../utils/sw-register.js';
 import { announceUpdateIfAny } from '../utils/update-toast.js';
-import { installUsageStats, usagePlatform } from '../utils/usage-stats.js';
+import { installUsageStats } from '../utils/usage-stats.js';
 
 // ── Data ────────────────────────────────────────────────────────────────
 import { JournalHelpers } from '../data/journal-helpers.js';
@@ -187,10 +187,10 @@ import {
 // Mirrors the implicit `function NAME(){}` → window.NAME classic-script
 // binding the modules had before this conversion.
 // us1: the one anonymous-usage-counts instance. Its version is the running build:
-// the service worker's answer, or in the APK (no controlling worker) the packaged
-// service-worker.js itself. The first-run notice (once) is a 12-second toast.
+// the controlling service worker's answer, or - on a first visit (no controller yet)
+// and in the APK - the service-worker.js this page was served with. The first-run notice (once) is a 12-second toast.
 const UsageStats = installUsageStats(window, async () =>
-  (await getBuildVersion()) || (usagePlatform() === 'apk' ? fetchServerBuildVersion() : null),
+  (await getBuildVersion()) || fetchServerBuildVersion(),
   (text) => showToast({ id: 'vot-usage-notice', className: 'vot-toast', text, durationMs: 12000 }));
 
 Object.assign(window, {
