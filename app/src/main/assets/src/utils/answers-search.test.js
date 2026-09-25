@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
-import { answersPlainText, answersFold, buildAnswersIndex, searchAnswers, answersSnippet } from './answers-search.js';
+import { answersPlainText, answersFold, buildAnswersIndex, searchAnswers, answersSnippet, TOPIC_SYNONYMS } from './answers-search.js';
 
 const topic = (id, title, paragraphs) => ({ id, title, paragraphs: paragraphs.map((text) => ({ align: 'justify', text })) });
 const FIXTURE = [
@@ -94,6 +94,39 @@ describe('on the real corpus', () => {
   const ctx = {};
   runInNewContext(src, ctx);
   const index = buildAnswersIndex(ctx.ANSWERS);
+  /* 2026-09-25, improvement sweep n5-02 / n5-07: the box asks "What does The Lord say about…",
+     and asking it that way found nothing. */
+  const firstTopic = (q) => { const r = searchAnswers(index, q); return r && r.topics.length ? r.topics[0].entry.id : null; };
+  it('a question finds its subject: the question words fall away when the full question finds no topic', () => {
+    expect(firstTopic('what does the lord say about prayer')).toBe('regarding-prayer');
+    expect(firstTopic('is the earth flat')).toBe('regarding-the-flat-earth-theory');
+    expect(firstTopic('What does God say about the Sabbath?')).toBe('god-speaks-about-the-sabbath');
+    expect(firstTopic('his name in vain')).toBe('god-speaks-regarding-those-who-take-his-name-in-vain');
+  });
+  it('an exact title keeps its precision (the question words stay when they are the title)', () => {
+    expect(firstTopic('day of the lord')).toBe('regarding-the-day-of-the-lord');
+    expect(firstTopic('the name of the lord')).toBe('the-name-of-the-lord');
+  });
+  it("the site's own alternate names and a few everyday words find their topic", () => {
+    expect(firstTopic('miracles')).toBe('regarding-healing');                // the site's "Regarding Miracles"
+    expect(firstTopic('anti-christ')).toBe('regarding-the-antichrist');     // "Regarding the Anti-Christ"
+    expect(firstTopic('original sin')).toBe('regarding-childrens-inheritance-on-earth-and-in-heaven');
+    expect(firstTopic('christmas')).toBe('regarding-the-holidays-of-men');
+    expect(firstTopic('tithe')).toBe('regarding-tithing');
+    expect(firstTopic('10 commandments')).toBe('regarding-the-ten-commandments');
+    // …and the passages that say the word are still counted.
+    expect(searchAnswers(index, 'christmas').mentions.length).toBeGreaterThan(0);
+  });
+  it('a long number finds its comma form; a year stays whole', () => {
+    expect(firstTopic('144000')).toBe('regarding-the-144-000-witnesses');
+    expect(firstTopic('144,000')).toBe('regarding-the-144-000-witnesses');
+    expect(searchAnswers(index, '2011').words).toEqual(['2011']);
+  });
+  it('every synonym names a topic that exists', () => {
+    const ids = new Set(ctx.ANSWERS.map((e) => e.id));
+    for (const id of Object.keys(TOPIC_SYNONYMS)) expect(ids.has(id), id).toBe(true);
+  });
+
   it('"sabbath" finds The Sabbath first, and the other topics that speak of it', () => {
     const r = searchAnswers(index, 'sabbath');
     expect(r.topics.map((t) => t.entry.id)).toEqual(['god-speaks-about-the-sabbath']);

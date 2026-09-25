@@ -14,9 +14,53 @@
    Folding is LENGTH-PRESERVING (lower-case + one-for-one quote swaps), so an
    index found in the folded text is the same index in the display text —
    answersSnippet relies on it to cut and mark the plain text directly.
+
+   READING A QUESTION (2026-09-25, improvement sweep n5-02 / n5-07). The box
+   says "What does The Lord say about…", and "what does the lord say about
+   prayer" found nothing: every word had to match. The query runs as typed
+   first, so an exact title ("day of the lord") keeps its precision; when that
+   finds no topic, it runs again without QUESTION_WORDS. A topic's title also
+   matches through the site's own alternate names (ANSWERS_URL_INDEX: "regarding
+   miracles" -> Healing, "regarding the anti christ" -> The Antichrist) and a
+   short hand list of everyday words (TOPIC_SYNONYMS: christmas -> Holidays of
+   Men, tithe -> Tithing), and a long number finds its comma form ("144000" ->
+   "144,000").
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { isAttribution, answersShortTitle } from './answers-shelves.js';
+import { ANSWERS_URL_INDEX } from './answers-url-index.js';
+
+/** What a question wraps around its subject; dropped only in the second pass. */
+export const QUESTION_WORDS = new Set([
+  'what', 'whats', "what's", 'does', 'do', 'did', 'the', 'lord', "lord's", 'god', "god's", 'say', 'says', 'said',
+  'saying', 'about', 'regarding', 'concerning', 'is', 'are', 'was', 'were', 'be', 'a', 'an', 'of', 'to', 'in', 'on',
+  'for', 'and', 'or', 'should', 'can', 'could', 'would', 'will', 'shall', 'we', 'i', 'me', 'my', 'you', 'your', 'us',
+  'our', 'how', 'why', 'when', 'who', 'where', 'which', 'there', 'it', 'its', 'this', 'that', 'these', 'those',
+  'tell', 'teach', 'teaches', 'his', 'him', 'he',
+]);
+
+/** Everyday words readers type for a topic the site titles otherwise; matched like its title. */
+export const TOPIC_SYNONYMS = {
+  'regarding-the-holidays-of-men': 'christmas easter halloween thanksgiving',
+  'regarding-tithing': 'tithe tithes',
+  'regarding-homosexuality': 'gay lesbian',
+  'regarding-the-wearing-of-jewelry': 'jewellery',
+  'regarding-marriage': 'divorce',
+  'regarding-the-ten-commandments': '10 commandments',
+};
+
+/** topic id -> the site's alternate names for it (the URL index's keys), built once. */
+let _aliasesById = null;
+function aliasesFor(id) {
+  if (!_aliasesById) {
+    _aliasesById = new Map();
+    for (const [key, tid] of Object.entries(ANSWERS_URL_INDEX || {})) {
+      if (!_aliasesById.has(tid)) _aliasesById.set(tid, []);
+      _aliasesById.get(tid).push(key);
+    }
+  }
+  return (_aliasesById.get(id) || []).concat(TOPIC_SYNONYMS[id] ? [TOPIC_SYNONYMS[id]] : []);
+}
 
 const HEADER_RE = /^_\d{1,2}\/\d{1,2}\/\d{2,4}_/;
 const DIVIDER_RE = /^\s*(?:✦|~|†)\s*$/;
@@ -39,7 +83,9 @@ export function answersFold(s) {
 }
 
 function queryWords(query) {
-  return answersFold(query).split(/[^a-z0-9']+/).map((w) => w.replace(/^'+|'+$/g, '')).filter(Boolean);
+  const words = answersFold(query).split(/[^a-z0-9']+/).map((w) => w.replace(/^'+|'+$/g, '')).filter(Boolean);
+  // "144000" -> "144 000", the groups the site's "144,000" splits into (years, under 5 digits, stay whole).
+  return words.flatMap((w) => (/^\d{5,}$/.test(w) ? w.replace(/\B(?=(\d{3})+(?!\d))/g, ' ').split(' ') : [w]));
 }
 
 function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -69,7 +115,8 @@ export function buildAnswersIndex(entries) {
     });
     // A page of prose with no attributions still searches as one passage.
     if (cur.paras.length && passages.length === 0) passages.push(cur);
-    out.push({ entry, short: answersShortTitle(entry.title), titleFold: answersFold(entry.title), passages });
+    out.push({ entry, short: answersShortTitle(entry.title), titleFold: answersFold(entry.title),
+      aliasFolds: aliasesFor(entry.id).map((a) => answersFold(a)), passages });
   }
   return out;
 }
@@ -84,6 +131,23 @@ export function buildAnswersIndex(entries) {
 export function searchAnswers(index, query) {
   const words = queryWords(query);
   if (!words.length) return null;
+  const full = runSearch(index, words);
+  if (full.topics.length) return full;
+  // A question: try again with only its subject words, and keep that when it finds a topic
+  // (or when the question as typed found nothing at all).
+  const core = words.filter((w) => !QUESTION_WORDS.has(w));
+  if (!core.length || core.length === words.length) return full;
+  const lean = runSearch(index, core);
+  return (lean.topics.length || (!full.mentions.length && lean.mentions.length)) ? lean : full;
+}
+
+/**
+ * One pass: topics whose title (or an alternate name) holds every word, then every other
+ * topic whose passages do.
+ * @param {ReturnType<typeof buildAnswersIndex>} index
+ * @param {string[]} words folded query words
+ */
+function runSearch(index, words) {
   const res = words.map((w) => wordRe(w));
   const all = (s) => res.every((re) => re.test(s));
   const topics = [];
@@ -106,7 +170,7 @@ export function searchAnswers(index, query) {
     // A title match whose passages never use the word still shows how it opens.
     const lead = t.passages.length ? t.passages[0].paras[0] : null;
     const row = { entry: t.entry, short: t.short, hits, firstPara, firstText, leadPara: lead ? lead.index : -1, leadText: lead ? lead.plain : '' };
-    if (all(t.titleFold)) topics.push(row);
+    if (all(t.titleFold) || (t.aliasFolds || []).some(all)) topics.push(row);
     else if (hits) { mentions.push(row); mentionPassages += hits; }
   }
   const q = words.join(' ');
