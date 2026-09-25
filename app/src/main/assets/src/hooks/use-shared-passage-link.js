@@ -14,7 +14,7 @@
    that resolves to nothing leaves the reader where the app restored them.
    =================================================================== */
 
-import { sharedPassageKey } from '../utils/passage-link.js';
+import { sharedPassageKey, publicPassageKey } from '../utils/passage-link.js';
 import { buildSourceEndpoint } from '../utils/nav-index.js';
 
 /** @returns {any} */
@@ -33,6 +33,15 @@ export function openSharedPassage(win, navigateToLink) {
     u.searchParams.delete('p');
     win.history.replaceState(win.history.state, '', u.pathname + u.search + u.hash);
   } catch (_e) { /* an address we cannot rewrite still opens the passage */ }
+  openKey(win, key, navigateToLink);
+  return key;
+}
+
+/**
+ * Load the corpus that can resolve a public key, then jump there silently.
+ * @param {any} win @param {string} key @param {(endpoint: any, meta?: any) => void} navigateToLink
+ */
+function openKey(win, key, navigateToLink) {
   const kind = key.split(':')[0];
   // n6-03: a first visit's first screen is the About welcome, and the corpus
   // can take seconds: say at once what is coming, and say it if it cannot.
@@ -70,7 +79,23 @@ export function openSharedPassage(win, navigateToLink) {
     if (studies) loads.push(Promise.resolve().then(studies).catch(() => null));
   }
   Promise.all(loads).then(go, go);
-  return key;
+}
+
+/**
+ * n6-15: the installed app opens shared links itself (an App Links VIEW filter,
+ * MainActivity + SharedLink.kt). At a cold start it boots index.html?p=<key>
+ * (openSharedPassage); when the app is already open it hands the key to the
+ * running page here, so nothing reloads (a letter playing keeps playing).
+ * True only when the key is a public passage key and is being opened.
+ * @param {any} win @param {(endpoint: any, meta?: any) => void} navigateToLink
+ */
+export function installSharedPassageHook(win, navigateToLink) {
+  win.__votOpenSharedPassage = (/** @type {unknown} */ k) => {
+    const key = publicPassageKey(k);
+    if (!key) return false;
+    openKey(win, key, navigateToLink);
+    return true;
+  };
 }
 
 /**
@@ -79,5 +104,5 @@ export function openSharedPassage(win, navigateToLink) {
  */
 export function useSharedPassageLink(navigateToLink) {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- once, at boot; navigateToLink never changes identity
-  React.useEffect(() => { openSharedPassage(window, navigateToLink); }, []);
+  React.useEffect(() => { installSharedPassageHook(window, navigateToLink); openSharedPassage(window, navigateToLink); }, []);
 }

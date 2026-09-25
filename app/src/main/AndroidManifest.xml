@@ -92,6 +92,19 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- n6-15: a shared passage link (https://votreader.github.io/app/?p=<key>) opens the app, not the
+                 browser. autoVerify: Android checks https://votreader.github.io/.well-known/assetlinks.json (repo
+                 VOTReader/VOTReader.github.io) for this package and signing key. /app only: the songs' pages and
+                 files stay the browser's. MainActivity + SharedLink.kt read the key. ManifestAppLinksTest pins it. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="votreader.github.io" />
+                <data android:path="/app" />
+                <data android:pathPrefix="/app/" />
+            </intent-filter>
         </activity>
 
         <!-- Started (never bound) service, launched only from our own process by

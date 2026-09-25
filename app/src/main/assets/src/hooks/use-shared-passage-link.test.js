@@ -3,7 +3,7 @@
    the key, and hand navigateToLink a silent jump. A key that names nothing
    leaves the reader where the app restored them. */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { openSharedPassage } from './use-shared-passage-link.js';
+import { openSharedPassage, installSharedPassageHook } from './use-shared-passage-link.js';
 
 function fakeWin(search, extra) {
   const replaced = [];
@@ -127,6 +127,36 @@ describe('openSharedPassage', () => {
     const { win, replaced } = fakeWin('?p=journal%3Aabc%3A0', {});
     expect(openSharedPassage(win, nav)).toBeNull();
     expect(replaced).toEqual([]);
+    expect(nav).not.toHaveBeenCalled();
+  });
+});
+
+/* n6-15: the installed app opens a shared link itself. At a cold start the APK
+   boots index.html?p=<key> (openSharedPassage above); when the app is already
+   open it asks the running page through window.__votOpenSharedPassage(key). */
+describe('installSharedPassageHook (the APK, app already open)', () => {
+  it('opens a key handed in by the app, and says it took it', async () => {
+    /** @type {any} */ (globalThis).BOOKS = JOHN;
+    const nav = vi.fn();
+    const { win, replaced } = fakeWin('', { __loadBibleCorpus: () => Promise.resolve() });
+    installSharedPassageHook(win, nav);
+    expect(typeof win.__votOpenSharedPassage).toBe('function');
+    expect(win.__votOpenSharedPassage('bible:john:3:16')).toBe(true);
+    expect(replaced).toEqual([]);                  // nothing on the address to take off
+    await flush();
+    expect(nav).toHaveBeenCalledTimes(1);
+    expect(nav.mock.calls[0][0]).toMatchObject({ type: 'bible', bookId: 'john', chapter: 3, verse: 16 });
+    expect(nav.mock.calls[0][1]).toMatchObject({ silent: true });
+  });
+
+  it('refuses what is not a public passage key (true only when it opens something)', async () => {
+    const nav = vi.fn();
+    const { win } = fakeWin('', { __loadBibleCorpus: () => Promise.resolve(), __loadVotCorpus: () => Promise.resolve() });
+    installSharedPassageHook(win, nav);
+    expect(win.__votOpenSharedPassage('journal:abc:1')).toBe(false);
+    expect(win.__votOpenSharedPassage(42)).toBe(false);
+    expect(win.__votOpenSharedPassage("bible:john:3:16');x(")).toBe(false);
+    await flush();
     expect(nav).not.toHaveBeenCalled();
   });
 });

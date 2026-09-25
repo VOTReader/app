@@ -587,7 +587,11 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             // cache ONLY — localStorage / DOM storage (where all journal,
             // notes, bookmarks, links data live) is untouched.
             webView.clearCache(true)
-            webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
+            // n6-15: launched by a shared passage link, the page boots with its key (openSharedPassage reads ?p=).
+            // Only a fresh launch carries one: a restore, or a relaunch from Recents, must not replay the link.
+            val launchedFromHistory = (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
+            val sharedKey = if (savedInstanceState == null && !launchedFromHistory) SharedLink.keyOf(intent.dataString) else null
+            webView.loadUrl(SharedLink.bootUrl(sharedKey))
         }
 
         // #3: arm the absolute splash-release backstop once the load is kicked
@@ -1384,6 +1388,22 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         webView.saveState(outState)
+    }
+
+    /**
+     * n6-15: a shared passage link tapped while the app is already open (launchMode singleTask). The running page
+     * opens it through its hook, so nothing reloads and a letter playing keeps playing; a page still booting (no hook
+     * yet) is reloaded with the key instead.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if ((intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) return
+        val key = SharedLink.keyOf(intent.dataString) ?: return
+        if (!::webView.isInitialized) return
+        bridge.callWithResult(SharedLink.openInPageJs(key)) { result ->
+            if (result != "true") webView.loadUrl(SharedLink.bootUrl(key))
+        }
     }
 
     override fun onResume() {
