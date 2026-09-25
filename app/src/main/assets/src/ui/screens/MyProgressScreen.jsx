@@ -310,8 +310,11 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOp
   const built = buildAchievements(collectAchievementSnapshot(readItems));
   const ms = built.featured || [];
   const msEarned = ms.filter((m) => m.earned);
+  // Most of its way covered; on a tie, the least left to go (MilestonesScreen picks the same way).
   const next = ms.filter((m) => !m.earned)
-    .reduce((best, m) => (!best || m.fraction > best.fraction ? m : best), /** @type {any} */ (null));
+    .reduce((best, m) => (!best || m.fraction > best.fraction
+      || (m.fraction === best.fraction && m.threshold - m.value < best.threshold - best.value) ? m : best),
+    /** @type {any} */ (null));
 
   /** Label / value rows on hairlines. @param {Array<{ label: string, value: string }>} rows */
   const facts = (rows) => (

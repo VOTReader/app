@@ -105,7 +105,7 @@ describe('MilestonesScreen — render', () => {
     expect(catHeadings()).toContain('Scripture Chapters');
     expect(catHeadings()).toContain('Listening');
     const summary = document.querySelector('.milestones-summary-count');
-    expect(summary.textContent).toMatch(/^0of \d+ reached$/);
+    expect(summary.textContent).toMatch(/^0 of \d+ reached$/);
   });
 
   it('marks the tiers the data has actually reached', () => {
@@ -116,6 +116,26 @@ describe('MilestonesScreen — render', () => {
     expect(earned).toContain('10 chapters read');
     expect(earned).not.toContain('25 chapters read');
     expect(document.querySelector('.milestones-summary-count strong').textContent).toBe(String(earned.length));
+  });
+
+  it('leads with the nearest milestone not yet reached, and its progress (2026-09-25)', () => {
+    setupGlobals();
+    renderScreen({ readItems: chaptersRead(10) });
+    const next = document.querySelector('.milestones-next');
+    expect(next.querySelector('.milestones-next-label').textContent).toBe('Next: 25 chapters read');
+    expect(next.querySelector('.milestones-next-tally').textContent).toBe('10 of 25');
+    expect(next.querySelector('.milestones-next-bar > div').style.width).toBe('40%');
+    // The gold-bordered summary box is gone; its count rides the header.
+    expect(document.querySelector('.milestones-summary')).toBeNull();
+    expect(document.querySelector('.study-head .milestones-summary-count')).toBeTruthy();
+  });
+
+  it('points a new reader at the smallest first step, not the first row of the ledger', () => {
+    setupGlobals();
+    renderScreen();
+    const label = document.querySelector('.milestones-next-label').textContent;
+    expect(document.querySelector('.milestones-next-tally').textContent).toBe('0 of 1');
+    expect(label).toMatch(/^Next: First /);
   });
 
   it('reads the listening tiers from the Listening Library', () => {
@@ -296,7 +316,7 @@ describe('MilestonesScreen — the folded My Progress rows', () => {
     setupGlobals();
     renderScreen();
     expect(document.querySelector('.milestones-summary-count').textContent)
-      .toBe('0of ' + ACHIEVEMENT_TOTAL + ' reached');
+      .toBe('0 of ' + ACHIEVEMENT_TOTAL + ' reached');
     expect(rowLabels().length).toBe(ACHIEVEMENT_TOTAL);
   });
 

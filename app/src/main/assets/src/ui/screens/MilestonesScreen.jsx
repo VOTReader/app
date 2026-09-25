@@ -45,7 +45,19 @@ export function MilestonesScreen({ onBack, backLabel = 'Library', readItems, onS
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
     [storeVersions, readItems]
   );
-  const pct = built.total ? Math.round((built.earned / built.total) * 100) : 0;
+  /* The nearest milestone leads (the redesign, 2026-09-25, Codex mockup r5
+     take 1): of everything not yet reached, the one with the most of its way
+     covered, and on a tie the one with the least left to go (so a new reader
+     is pointed at "First reading finished, 0 of 1", not at 10,000 words). It
+     replaced a gold-bordered box whose bar said only what the header's
+     "4 of 89 reached" already says. Progress picks its "Next" the same way. */
+  const next = React.useMemo(() => built.categories
+    .flatMap((cat) => cat.items)
+    .filter((item) => !item.earned)
+    .reduce((best, item) => (!best || item.fraction > best.fraction
+      || (item.fraction === best.fraction && item.threshold - item.value < best.threshold - best.value) ? item : best),
+    /** @type {any} */ (null)),
+  [built]);
 
   /* "Hide reached" (2026-08-09). 84 rows is a long scroll once most of the
      early tiers are earned; hiding them turns the screen into what is LEFT.
@@ -73,20 +85,23 @@ export function MilestonesScreen({ onBack, backLabel = 'Library', readItems, onS
       <div className="milestones-screen">
         <header className="study-head">
           <h1 className="study-head-title">Milestones</h1>
+          <span className="study-head-count milestones-summary-count"><strong>{built.earned}</strong> of {built.total} reached</span>
           <p className="study-head-sub">
             Every mark here reflects the reading, listening, and study record you keep on this device — no account or sign-up required.
           </p>
         </header>
 
-        <section className="milestones-summary" aria-label="Overall progress">
-          <div className="milestones-summary-count">
-            <strong>{built.earned}</strong>
-            <span>of {built.total} reached</span>
-          </div>
-          <div className="milestones-summary-bar" role="img" aria-label={pct + '% of milestones reached'}>
-            <div style={{ width: pct + '%' }} />
-          </div>
-        </section>
+        {next && (
+          <section className="milestones-next" aria-label="The nearest milestone">
+            <div className="milestones-next-head">
+              <span className="milestones-next-label">Next: {next.label}</span>
+              <span className="milestones-next-tally">{next.value.toLocaleString('en-US')} of {next.threshold.toLocaleString('en-US')}</span>
+            </div>
+            <div className="milestones-next-bar" aria-hidden="true">
+              <div style={{ width: Math.round(next.fraction * 100) + '%' }} />
+            </div>
+          </section>
+        )}
 
         <div className="milestones-controls">
           <button

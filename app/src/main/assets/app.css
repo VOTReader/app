@@ -1735,12 +1735,16 @@
       /* Milestones — the full achievements ledger. Same restrained shelf
          language as the Listening Library screens; earned rows carry the ✦. */
       .milestones-screen { width: 100%; max-width: 720px; margin: 0 auto; padding: 1.25rem min(1.35rem, 5vw) 2.5rem; }
-      .milestones-summary { display: flex; align-items: center; gap: 0.9rem; padding: 0.85rem; border: 1px solid var(--gold-border); border-left: 3px solid var(--gold); background: rgba(200, 164, 86, 0.045); }
-      .milestones-summary-count { flex: 0 0 auto; display: flex; flex-direction: column; }
-      .milestones-summary-count strong { color: var(--gold); font-family: 'Cinzel', serif; font-size: var(--fs-20); font-weight: 500; line-height: 1.1; }
-      .milestones-summary-count span { color: var(--cream-dim); font-size: var(--fs-11); }
-      .milestones-summary-bar { flex: 1; height: 6px; border-radius: 4px; background: rgba(200, 164, 86, 0.16); overflow: hidden; }
-      .milestones-summary-bar > div { height: 100%; border-radius: 4px; background: var(--gold); transition: width 0.3s ease; }
+      /* The count rides the page header now ("4 of 89 reached", .study-head-count);
+         the nearest milestone leads, as a row on a hairline, the Progress screen's
+         "Next" (the redesign, 2026-09-25). */
+      .milestones-summary-count strong { font-weight: 400; color: var(--cream-dim); }
+      .milestones-next { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.2rem 0 0.9rem; margin-bottom: 0.9rem; border-bottom: 1px solid var(--border); }
+      .milestones-next-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: 0.75rem; row-gap: 0.15rem; }
+      .milestones-next-label { min-width: 0; font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-dim); }
+      .milestones-next-tally { margin-left: auto; font-family: var(--font-body); font-size: var(--fs-14); color: var(--cream-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .milestones-next-bar { height: 3px; border-radius: 2px; background: var(--gold-faint); overflow: hidden; }
+      .milestones-next-bar > div { height: 100%; border-radius: 2px; background: var(--gold-dim); transition: width 0.3s ease; }
       /* Controls: the "Hide reached" filter + the per-category jump chips.
          Compact, but every target keeps the 44px touch floor. */
       .milestones-controls { display: flex; align-items: center; gap: 0.7rem; margin-top: 1rem; }
