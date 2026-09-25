@@ -5472,22 +5472,23 @@
     .picker-verse-text {
       user-select: text; -webkit-user-select: text;
     }
-    /* Legacy whole-verse tap-select styling retained for any consumer that
-       still emits .picker-verse rows. */
-    .picker-verse {
-      margin: 0 0 14px; padding: 6px 10px;
-      border-radius: 6px;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      transition: background 0.15s, box-shadow 0.15s;
-    }
-    .picker-verse:hover { background: rgba(127,158,180,0.08); }
-    .picker-verse.is-selected {
+    /* A whole verse taken by tapping its number: the native selection is
+       cleared, so the row carries the mark, a wash and a hairline ring. (The
+       rule used to style only a legacy .picker-verse row that nothing renders
+       any more, so a tapped verse showed no mark at all.) The box-shadow
+       spreads the wash past the text without padding, so marking a verse never
+       reflows the chapter; the ring is an outline, because a second translucent
+       shadow would paint under the wash's band and thicken it. */
+    .picker-verse-selectable.is-selected {
+      border-radius: 4px;
       background: rgba(31,121,165,0.32);
-      box-shadow: 0 0 0 1px rgba(108,180,220,0.55);
+      box-shadow: 0 0 0 6px rgba(31,121,165,0.32);
+      outline: 1px solid rgba(108,180,220,0.55); outline-offset: 6px;
     }
-    body.light .picker-verse.is-selected {
+    body.light .picker-verse-selectable.is-selected {
       background: rgba(64,153,198,0.28);
-      box-shadow: 0 0 0 1px rgba(32,121,168,0.55);
+      box-shadow: 0 0 0 6px rgba(64,153,198,0.28);
+      outline-color: rgba(32,121,168,0.55);
     }
     /* Letter excerpt picker — render-only body with native text selection */
     .picker-body-letter { padding: 18px 22px 80px; }

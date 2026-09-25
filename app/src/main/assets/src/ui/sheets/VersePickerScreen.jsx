@@ -160,7 +160,11 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
       verseEnd: vn,
       charStart: 0,
       charEnd: (v.text || '').length,
-      text: v.text || ''
+      text: v.text || '',
+      // Marks the row (.is-selected): with the native selection cleared below,
+      // the verse would otherwise show nothing at all. A drag selection
+      // replaces selInfo without this flag, so its own highlight is the mark.
+      whole: true
     });
     // Clear any native selection so the visual is purely the .is-selected ring.
     try {
@@ -287,7 +291,7 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
           {shownVerses.map(v => (
             <p
               key={v.n}
-              className="picker-verse-selectable"
+              className={"picker-verse-selectable" + (selInfo && selInfo.whole && v.n >= selInfo.verseStart && v.n <= selInfo.verseEnd ? " is-selected" : "")}
               data-verse={v.n}
             >
               <span
