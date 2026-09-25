@@ -461,6 +461,10 @@ function _reseedLsData(dataObj, dataLsKeys) {
   dataLsKeys.forEach((k) => {
     try { localStorage.removeItem(k); } catch (_e) { /* non-fatal */ }
   });
+  // n4-03: the journal re-key's stamp (JOURNAL_REKEY_STAMP, stores/journal-mark-rekey.js;
+  // backup.test.js pins the two spellings together). A restored backup's position
+  // keys get the first, position-aware pass on the boot after the reload.
+  try { localStorage.removeItem('vot.journalRekey'); } catch (_e) { /* non-fatal */ }
   Object.keys(dataObj || {}).forEach((k) => {
     if (k.indexOf('vot-') !== 0) return;
     const v = dataObj[k];

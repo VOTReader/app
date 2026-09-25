@@ -1302,6 +1302,20 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
     expect(BookmarkStore.get('b1').label).toBe('Backup label');
   }, 20000);
 
+  /* n4-03: after the journal re-key's first pass only a mark's words move it.
+     A restored backup can hold position keys that pass never saw, so every
+     import clears the stamp and the boot after the reload runs a first pass. */
+  it('(n4-03) an import clears the journal re-key stamp, whatever the backup version', async () => {
+    const { JOURNAL_REKEY_STAMP } = await import('../stores/journal-mark-rekey.js');
+    for (const payload of [{ exportVersion: 1, data: {} }, { exportVersion: 2, data: {}, stores: {} }]) {
+      localStorage.setItem(JOURNAL_REKEY_STAMP, 'v1');
+      await applyImportPayload(payload, {
+        storesMap: storesMap(), flagMap: flagMap(), mediaStore: JournalMediaStore, validateStorePayload, validateMediaRecord,
+      });
+      expect(localStorage.getItem(JOURNAL_REKEY_STAMP), 'v' + payload.exportVersion).toBeNull();
+    }
+  }, 20000);
+
   /* n4-01 refuter (Opus, 09-25) break 1: the v1 legacy path called the store's
      method directly, so an old backup still merged newest-wins. */
   it('(n4-01) a v1 backup restores exactly too', async () => {

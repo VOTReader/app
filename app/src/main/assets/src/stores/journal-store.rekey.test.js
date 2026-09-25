@@ -14,6 +14,7 @@ import { BookmarkStore } from './bookmark-store.js';
 import { LinkStore } from './link-store.js';
 import { JournalIndexStore } from './journal-index-store.js';
 import { JournalStatsStore } from './journal-stats-store.js';
+import { JOURNAL_REKEY_STAMP } from './journal-mark-rekey.js';
 
 beforeEach(() => {
   localStorage.clear();
@@ -82,6 +83,66 @@ describe('JournalStore.rekeyMarks()', () => {
     const before = AnnotationStore.all();
     expect(JournalStore.rekeyMarks()).toEqual({ moved: 0, left: 0 });
     expect(AnnotationStore.all()).toBe(before);
+  });
+
+  /* n4-03 (sweep 2): the pass runs at every boot, and a mark it left alone (no
+     block held its words, nothing markable at its old position) used to land on
+     whatever paragraph the reader later wrote at that position. After the first
+     finished pass only a mark's own words move it. */
+  it('(n4-03) a mark left alone by the first pass never lands on a paragraph written at its position later; its own words still move it', () => {
+    const e = JournalStore.add({ title: 'Short', blocks: [{ id: 'b_a', type: 'p', text: 'Grace.' }] });
+    const pos = (n) => 'journal:' + e.id + ':' + n;
+    AnnotationStore.add(pos(2), { id: 'hl_x', groupId: 'hl_x', kind: 'highlight', color: 'yellow', start: 0, end: 7, text: 'Nowhere' });
+    BookmarkStore.add({ id: 'bk_x', hlKey: pos(3), label: 'no words' });
+    AnnotationStore.add(pos(4), { id: 'hl_y', groupId: 'hl_y', kind: 'highlight', color: 'yellow', start: 0, end: 11, text: 'Found later' });
+    expect(JournalStore.rekeyMarks()).toEqual({ moved: 0, left: 3 });
+
+    // weeks later the reader writes more; paragraphs now sit at positions 2, 3 and 4
+    JournalStore.update(e.id, { blocks: [
+      { id: 'b_a', type: 'p', text: 'Grace.' },
+      { id: 'b_b', type: 'p', text: 'Peace.' },
+      { id: 'b_c', type: 'p', text: 'Written weeks later.' },
+      { id: 'b_d', type: 'p', text: 'Also new.' },
+      { id: 'b_e', type: 'p', text: 'The words Found later are here.' },
+    ] });
+    expect(JournalStore.rekeyMarks()).toEqual({ moved: 1, left: 2 });
+    expect(AnnotationStore.get(pos(2))[0].id).toBe('hl_x');            // still where it was, painted nowhere
+    expect(BookmarkStore.get('bk_x').hlKey).toBe(pos(3));
+    expect(AnnotationStore.get('journal:' + e.id + ':b_e')[0].id).toBe('hl_y');   // its words found it
+  });
+
+  it('(n4-04) the first finished pass leaves one diagnostics line; later passes add none', async () => {
+    const { DiagnosticLog } = await import('../utils/diagnostic-log.js');
+    globalThis.DiagnosticLog = DiagnosticLog;
+    try {
+      DiagnosticLog.clear();
+      const e = JournalStore.add({ title: 'One', blocks: [{ id: 'b_a', type: 'p', text: 'Grace.' }] });
+      AnnotationStore.add('journal:' + e.id + ':0', { id: 'hl', groupId: 'hl', kind: 'highlight', color: 'yellow', start: 0, end: 5, text: 'Grace' });
+      AnnotationStore.add('journal:' + e.id + ':5', { id: 'hl2', groupId: 'hl2', kind: 'highlight', color: 'yellow', start: 0, end: 4, text: 'Gone' });
+      const saved = vi.spyOn(AnnotationStore, 'whenSaved').mockResolvedValue(true);   // no IDB here: the save lands
+      JournalStore.rekeyMarks();
+      await vi.waitFor(() => expect(localStorage.getItem(JOURNAL_REKEY_STAMP)).toBe('v1'));
+      saved.mockRestore();
+      JournalStore.rekeyMarks();
+      await new Promise((r) => setTimeout(r, 20));
+      const lines = DiagnosticLog.entries().filter((x) => /journal-rekey/.test(JSON.stringify(x)));
+      expect(lines.length).toBe(1);
+      expect(JSON.stringify(lines[0])).toMatch(/moved 1, left 1/);
+    } finally { delete globalThis.DiagnosticLog; }
+  });
+
+  /* The n4-03 refuter (Opus, 09-25): the stamp went down before the pass's moves
+     were saved, so a tab closed (or a save failed) in between left a mark that
+     only its old position could place, with no later pass allowed to place it. */
+  it('(n4-03) a pass whose moves did not save leaves no stamp, so the next boot is a first pass again', async () => {
+    const e = JournalStore.add({ title: 'One', blocks: [{ id: 'b_a', type: 'p', text: 'Grace.' }] });
+    AnnotationStore.add('journal:' + e.id + ':0', { id: 'hl', groupId: 'hl', kind: 'highlight', color: 'yellow', start: 0, end: 5, text: 'Grace' });
+    const spy = vi.spyOn(AnnotationStore, 'whenSaved').mockResolvedValue(false);
+    try {
+      expect(JournalStore.rekeyMarks().moved).toBe(1);
+      await new Promise((r) => setTimeout(r, 20));
+      expect(localStorage.getItem(JOURNAL_REKEY_STAMP)).toBeNull();
+    } finally { spy.mockRestore(); }
   });
 
   it('F4: an inline bookmark link in a paragraph reads as the title the viewer shows', () => {

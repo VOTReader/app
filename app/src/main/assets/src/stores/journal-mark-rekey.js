@@ -47,6 +47,16 @@
    who edited a marked paragraph's words since.
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * n4-03 (sweep 2): the localStorage stamp the first finished pass writes. A
+ * mark left alone then (no block held its words, none sat at its position)
+ * must not land weeks later on a paragraph the reader writes at that position,
+ * so every pass after it moves a mark only onto its own words. An import
+ * clears it (backup.js _reseedLsData): a restored backup's position keys get
+ * the first pass again. Not 'vot-' prefixed, so no backup ever carries it.
+ */
+export const JOURNAL_REKEY_STAMP = 'vot.journalRekey';
+
 /** journal:<entryId>:<n> - an old POSITION key as the app made it (jrnId never puts a ':' in an id). */
 var POSITION_KEY = /^journal:([^:]+):(\d+)$/;
 
@@ -167,8 +177,10 @@ function wordsAt(start, end, text) {
  *   exact?: ((plain: string) => boolean) | null,
  *   plain?: ((block: any) => string) | null,
  *   labelOf?: ((kind: string, data: string) => string | null) | null,
+ *   noPosition?: boolean,
  * }} [opts] - exact: the words sit at the mark's own offsets in this text;
- *   plain: a block's words (default blockPlainText with labelOf, itself inlineLinkLabel by default)
+ *   plain: a block's words (default blockPlainText with labelOf, itself inlineLinkLabel by default);
+ *   noPosition: only the words place a mark, never the block at the old position (n4-03)
  * @returns {string | null}
  */
 export function pickBlock(blocks, idx, text, opts) {
@@ -190,6 +202,7 @@ export function pickBlock(blocks, idx, text, opts) {
     var best = exact >= 0 ? exact : loose;
     if (best >= 0) return /** @type {string} */ (blocks[best].id);
   }
+  if (o.noPosition) return null;
   var at = blocks[idx];
   return at && at.id && MARKABLE[at.type] ? at.id : null;
 }
@@ -234,9 +247,11 @@ function oneEach(list, moved) {
  *   bookmarks?: any[] | null,
  *   links?: any[] | null,
  *   inlineLabel?: ((kind: string, data: string) => string | null) | null,
+ *   noPosition?: boolean,
  * }} data - each store's data as it stands (never mutated): annotation segments carry
  *   text/start/end/groupId, notes keys/fullText, bookmarks hlKey/label, link ends
- *   key/text/label/start/end; inlineLabel reads an inline link's title (default inlineLinkLabel, null for none)
+ *   key/text/label/start/end; inlineLabel reads an inline link's title (default inlineLinkLabel, null for none);
+ *   noPosition: a pass after the first moves a mark only onto its own words (n4-03)
  * @returns {{annotations?: Record<string, any[]>, notes?: Record<string, any>, bookmarks?: any[], links?: any[], moved: number, left: number}}
  *   a store appears only when something in it changed; moved/left count records
  */
@@ -246,6 +261,7 @@ export function rekeyJournalMarks(entries, data) {
   // Entry ids holding a ':' (none the app makes, an import can) are matched first, longest wins.
   var colonIds = Object.keys(blocksOf).filter(function(id) { return id.indexOf(':') >= 0; });
   var labelOf = data && data.inlineLabel !== undefined ? data.inlineLabel : inlineLinkLabel;
+  var noPosition = !!(data && data.noPosition);
   var out = /** @type {any} */ ({ moved: 0, left: 0 });
   var GONE = { gone: true };
 
@@ -304,7 +320,7 @@ export function rekeyJournalMarks(entries, data) {
     var p = parse(key, ranged);
     if (!p) return null;
     if (p === GONE) { out.left++; return null; }
-    var id = pickBlock(p.blocks, p.n, text, { exact: exact, plain: plainOf });
+    var id = pickBlock(p.blocks, p.n, text, { exact: exact, plain: plainOf, noPosition: noPosition });
     if (!id) { out.left++; return null; }
     out.moved++;
     return journalBlockKey(p.entryId, id) + p.range;
@@ -336,7 +352,7 @@ export function rekeyJournalMarks(entries, data) {
         return;
       }
       list.forEach(function(a) {
-        var id = pickBlock(p.blocks, p.n, a && a.text, { exact: a ? wordsAt(a.start, a.end, a.text) : null, plain: plainOf });
+        var id = pickBlock(p.blocks, p.n, a && a.text, { exact: a ? wordsAt(a.start, a.end, a.text) : null, plain: plainOf, noPosition: noPosition });
         var gk = a && a.groupId ? a.groupId + '\n' + k : null;
         if (!id) {
           out.left++;

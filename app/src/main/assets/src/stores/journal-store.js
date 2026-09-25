@@ -42,7 +42,7 @@
 
 import { CachedStore, extendStore } from './cached-store.js';
 import { mergeListStore } from './store-merge.js';
-import { rekeyJournalMarks } from './journal-mark-rekey.js';
+import { rekeyJournalMarks, JOURNAL_REKEY_STAMP } from './journal-mark-rekey.js';
 
 /**
  * While rekeyMarks() waits for a store that is still loading: the unsubscribers
@@ -330,10 +330,14 @@ export var JournalStore = extendStore(
      * AND this move (an edit beats a delete), and the mark is there twice. So
      * once the pass's writes have landed it runs once more: the returned copy
      * moves too, and one copy stays, the newer (the refutation's F7).
+     * The first pass that is not waiting stamps localStorage (n4-03): every
+     * pass after it moves a mark only onto its own words, never onto whatever
+     * block now sits at its old position. Its settling pass keeps its rules.
      * @param {boolean} [again] - this is that one settling pass
+     * @param {boolean} [firstRules] - the settling pass of the stamping pass
      * @returns {{ moved: number, left: number, waiting?: number }}
      */
-    rekeyMarks(again) {
+    rekeyMarks(again, firstRules) {
       try {
         var self = this;
         var loading = [this,
@@ -356,20 +360,41 @@ export var JournalStore = extendStore(
           }
           return { moved: 0, left: 0, waiting: loading.length };
         }
+        // n4-03: after the first finished pass only a mark's own words move it
+        var stamped = false;
+        if (!firstRules) {
+          try { stamped = !!localStorage.getItem(JOURNAL_REKEY_STAMP); } catch (_e) { /* no storage: every pass is a first */ }
+        }
         var next = rekeyJournalMarks(this._load().list || [], {
           annotations: typeof AnnotationStore !== 'undefined' ? AnnotationStore.all() : null,
           notes: typeof NoteStore !== 'undefined' ? NoteStore.all() : null,
           bookmarks: typeof BookmarkStore !== 'undefined' ? BookmarkStore.all() : null,
-          links: typeof LinkStore !== 'undefined' ? LinkStore.all() : null
+          links: typeof LinkStore !== 'undefined' ? LinkStore.all() : null,
+          noPosition: stamped
         });
         /** @type {any[]} */ var written = [];
         if (next.annotations) { AnnotationStore.replaceAll(next.annotations); written.push(AnnotationStore); }
         if (next.notes) { NoteStore.replaceAll(next.notes); written.push(NoteStore); }
         if (next.bookmarks) { BookmarkStore.replaceAll(next.bookmarks); written.push(BookmarkStore); }
         if (next.links) { LinkStore.replaceAll(next.links); written.push(LinkStore); }
+        // The stamp waits for this pass's moves to be on disk (the n4-03 refuter):
+        // stamped first, a tab closed mid-save would leave a mark that only its
+        // old position could place, and no later pass would place it.
+        var stamp = function() {
+          try { localStorage.setItem(JOURNAL_REKEY_STAMP, 'v1'); } catch (_e) { /* best-effort */ }
+          // n4-04: the one trace this migration leaves; it rides the next backup's diagnostics
+          if (next.moved + next.left > 0 && typeof DiagnosticLog !== 'undefined') {
+            try { DiagnosticLog.warn('journal-rekey', 'moved ' + next.moved + ', left ' + next.left); } catch (_e) { /* logging must never break the pass */ }
+          }
+        };
         if (written.length && !again) {
           Promise.all(written.map(function(s) { return s.whenSaved(); }))
-            .then(function() { self.rekeyMarks(true); });
+            .then(function(saved) {
+              if (!stamped && saved.every(Boolean)) stamp();
+              self.rekeyMarks(true, !stamped);
+            });
+        } else if (!stamped && !again) {
+          stamp();
         }
         return { moved: next.moved, left: next.left };
       } catch (_e) {
