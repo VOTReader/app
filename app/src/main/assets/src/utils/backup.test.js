@@ -1259,6 +1259,78 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
     expect(Array.from(restoredBytes)).toEqual(Array.from(mediaBytes));
   }, 20000);
 
+  /* n4-01 (sweep 2, 09-25): "Import & Overwrite" went through the stores' cross-tab
+     merge with the backup as `ours` and the device as `theirs`, and that merge keeps the
+     NEWER copy of a record both sides hold. So a restore could not undo an edit made
+     after the backup: every device record newer than its backup copy survived, and
+     the reader got a mix of the two. The import must write the backup as it is. */
+  it('(n4-01) Import & Overwrite restores the backup exactly: a device edit made after it does not survive', async () => {
+    const note = (body, updated) => ({ g1: { groupId: 'g1', notebookIds: [], body, color: 'yellow', fullText: 'hi', keys: ['letter:wide-path:0'], created: 1, updated } });
+    const entry = (id, title, updated) => ({ id, title, blocks: [], mood: null, tags: [], notebookIds: [], pinned: false, created: 1, updated });
+    const mark = (label, updated) => [{ id: 'b1', hlKey: 'bible:genesis:1:1', label, created: 1, updated }];
+
+    // the backup
+    NoteStore.replaceAll(note('Backup note', 100));
+    JournalStore.replaceAll({ list: [entry('j1', 'Backup title', 100), entry('j2', 'Only in the backup', 50)] });
+    BookmarkStore.replaceAll(mark('Backup label', 100));
+    await flushAll();
+    const built = await buildExportPayload({
+      storesMap: storesMap(), flagMap: flagMap(), idbAdapter: IDBAdapter, mediaStore: JournalMediaStore,
+      diagnosticLog: [], nowIso: () => '2026-09-25T00:00:00.000Z',
+    });
+    expect(built.ok).toBe(true);
+    const json = JSON.stringify(built.payload);
+
+    // the reader keeps using the device: newer edits, one entry added, one deleted
+    NoteStore.replaceAll(note('Device note', 300));
+    JournalStore.replaceAll({ list: [entry('j1', 'Device title', 300), entry('j3', 'Added after the backup', 300)] });
+    BookmarkStore.replaceAll(mark('Device label', 300));
+    await flushAll();
+
+    // Import & Overwrite, then the reload that follows it
+    const res = await applyImportPayload(JSON.parse(json), {
+      storesMap: storesMap(), flagMap: flagMap(), mediaStore: JournalMediaStore, validateStorePayload, validateMediaRecord,
+    });
+    expect(res.importFailures).toBe(0);
+    expect(res.writeFailures).toBe(0);
+    ALL_STORES.forEach((s) => s._resetForTests()); IDBAdapter._resetForTests(); await hydrateAllStores();
+
+    expect(NoteStore.get('g1').body).toBe('Backup note');
+    expect(JournalStore.get('j1').title).toBe('Backup title');
+    expect(JournalStore.get('j2').title).toBe('Only in the backup');
+    expect(JournalStore.get('j3')).toBeFalsy();
+    expect(BookmarkStore.get('b1').label).toBe('Backup label');
+  }, 20000);
+
+  /* n4-01 refuter (Opus, 09-25) break 1: the v1 legacy path called the store's
+     method directly, so an old backup still merged newest-wins. */
+  it('(n4-01) a v1 backup restores exactly too', async () => {
+    const note = (body, updated) => ({ g1: { groupId: 'g1', notebookIds: [], body, color: 'yellow', fullText: 'hi', keys: ['letter:wide-path:0'], created: 1, updated } });
+    NoteStore.replaceAll(note('Device note', 300));
+    await flushAll();
+    const res = await applyImportPayload({ exportVersion: 1, data: { 'vot-notes': JSON.stringify(note('Backup note', 100)) } }, {
+      storesMap: storesMap(), flagMap: flagMap(), mediaStore: JournalMediaStore, validateStorePayload, validateMediaRecord,
+    });
+    expect(res.importFailures).toBe(0);
+    ALL_STORES.forEach((s) => s._resetForTests()); IDBAdapter._resetForTests(); await hydrateAllStores();
+    expect(NoteStore.get('g1').body).toBe('Backup note');
+  }, 20000);
+
+  /* n4-01 refuter break 2: the exact write read `_cache` when its lock turn
+     came, and an ordinary save already waiting on the lock (the import flow's
+     own persisted-state flush) had merged the device's newer copy back into
+     `_cache` by then. The exact write must write the data it was given. */
+  it('(n4-01) a save already in flight when the import starts cannot mix the device back in', async () => {
+    const note = (body, updated) => ({ g1: { groupId: 'g1', notebookIds: [], body, color: 'yellow', fullText: 'hi', keys: ['letter:wide-path:0'], created: 1, updated } });
+    NoteStore.replaceAll(note('Device note', 300));
+    await flushAll();
+    NoteStore.replaceAll(note('Device note', 300));            // an ordinary save, still waiting on its lock
+    NoteStore.replaceExact('replaceAll', note('Backup note', 100));
+    await flushAll();
+    ALL_STORES.forEach((s) => s._resetForTests()); IDBAdapter._resetForTests(); await hydrateAllStores();
+    expect(NoteStore.get('g1').body).toBe('Backup note');
+  }, 20000);
+
   /* 2026-09-10 (settings-builder): the default flips (dice, reading marker, Auto-Continue) are a
      MIGRATION keyed on `defaultsRev` INSIDE settings, and a backup carries settings whole. So a
      backup taken before tonight must import UNSTAMPED — the import restores bytes, it does not

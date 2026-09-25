@@ -187,6 +187,8 @@ function _cloneSnapshot(v) {
  *   _crossTabMerge: ((base: T | null, ours: T | null, theirs: T | null) => T) | null,
  *   _discardQueueOnRebase: boolean,
  *   _warnedNoLocks: boolean,
+ *   _exactNextSave: boolean,
+ *   replaceExact(method: string, data: any): void,
  *   _base: T | null,
  *   _lastWrite: Promise<any> | null,
  *   raw(): T,
@@ -372,6 +374,9 @@ export function CachedStore(storageKey, defaultVal, opts) {
     _crossTabMerge: crossTabMerge,
     _discardQueueOnRebase: discardQueueOnRebase,
     _warnedNoLocks: false,   // STOR5: one-shot guard for the locks-unavailable trace
+    /** n4-01: true only while replaceExact runs its replace method; the one
+     *  _saveMerged that method makes writes the data as given, no merge. */
+    _exactNextSave: false,
     /** STORE-1: the IDB snapshot this tab last synced with — the common
      *  ancestor for the 3-way cross-tab merge (set at hydrate + after each
      *  merge-flush, via _cloneSnapshot). Null until first hydrate, and forever
@@ -415,6 +420,25 @@ export function CachedStore(storageKey, defaultVal, opts) {
       try { this._cache = JSON.parse(localStorage.getItem(storageKey) || JSON.stringify(defaultVal)); }
       catch (_e) { this._cache = /** @type {any} */ (copyDefault()); }
       return /** @type {T} */ (this._cache);
+    },
+
+    /**
+     * n4-01: Import & Overwrite. Call this store's own replace method
+     * (`replaceAll` / `setAll` / `set`, so its shape rules still apply) and
+     * write the result AS IS. A plain replace on a merge store goes through
+     * the cross-tab merge with the device's copy as `theirs`, and that merge
+     * keeps the NEWER of two copies of a record: a restore could not undo an
+     * edit made after the backup. Here the backup is the truth; the merge
+     * ancestor becomes the written data, so the next ordinary save merges
+     * from it. A store with no merge writes blind already, so the flag is
+     * never read there.
+     * @param {string} method
+     * @param {any} data
+     */
+    replaceExact(method, data) {
+      this._exactNextSave = true;
+      try { /** @type {any} */ (this)[method](data); }
+      finally { this._exactNextSave = false; }
     },
 
     /**
@@ -509,7 +533,14 @@ export function CachedStore(storageKey, defaultVal, opts) {
      * local cache — identical to the pre-STORE-1 behavior, never worse.
      */
     _saveMerged() {
+      // n4-01: read (and spend) the exact-write flag NOW, synchronously inside
+      // replaceExact, not in the lock callback that runs later.
+      const exact = this._exactNextSave;
+      this._exactNextSave = false;
       if (_writeFence) { _fencedDirty.add(this); return; }
+      // ...and take the data NOW: a save already waiting on the lock merges
+      // into `_cache` (and replaces it) before this callback gets its turn.
+      const exactData = exact ? _cloneSnapshot(this._cache) : null;
       const self = this;
       const name = idbStoreName;
       const p = navigator.locks.request('vot-store:' + name, function () {
@@ -525,7 +556,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
           const ours = self._cache;
           let merged;
           try {
-            merged = self._crossTabMerge(self._base, ours, theirs);
+            merged = exact ? exactData : self._crossTabMerge(self._base, ours, theirs);
           } catch (e) {
             console.warn('cross-tab merge failed for', name, '— writing local cache', e);
             merged = ours;

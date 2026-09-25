@@ -471,6 +471,20 @@ function _reseedLsData(dataObj, dataLsKeys) {
 }
 
 /**
+ * n4-01: an import RESTORES. A merge store writes the backup as it is
+ * (CachedStore.replaceExact) instead of merging it newest-wins with the
+ * device's copy, which kept every record edited since the backup. Every
+ * import path (v1, v2, v3) comes through here.
+ * @param {any} store
+ * @param {string} method
+ * @param {any} data
+ */
+function _restoreStore(store, method, data) {
+  if (typeof store.replaceExact === 'function') store.replaceExact(method, data);
+  else store[method](data);
+}
+
+/**
  * Apply a v2-shape `stores` object to the IDB-backed stores + flags: SKIP any
  * section that fails shape validation (so a corrupt section can't overwrite good
  * data), call the store's import method otherwise, set/clear each flag. Returns
@@ -495,7 +509,7 @@ function _applyStoresAndFlags(storesObj, storesMap, flagMap, validateStorePayloa
       continue;
     }
     const { store, method } = storesMap[name];
-    try { store[method](storesObj[name]); }
+    try { _restoreStore(store, method, storesObj[name]); }
     catch (e) { importFailures += 1; console.warn('store import failed for', name, e); }
   }
   for (const name of Object.keys(flagMap)) {
@@ -638,7 +652,7 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
           continue;
         }
         const { store, method } = storesMap[name];
-        store[method](obj);
+        _restoreStore(store, method, obj);
       } catch (e) { importFailures += 1; console.warn('V1 import parse failed for', name, e); }
     }
     for (const name of Object.keys(flagMap)) {
