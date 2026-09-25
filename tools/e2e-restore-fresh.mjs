@@ -21,7 +21,7 @@
 
    Exit 0 = B restored exactly and C did not claim success; 1 = a FAIL line names what differed;
    2 = not drivable (a precondition). --keep keeps the downloaded backup; --shots <dir> writes
-   screenshots. A CI gate since 2026-09-25 (n7-06, ci.yml): npm run e2e:restore-fresh. */
+   screenshots. Not a CI gate yet (n7-06: on a CI runner it stopped at "no way into Settings" while it passed locally): npm run e2e:restore-fresh. */
 
 import http from 'node:http';
 import { createHash } from 'node:crypto';

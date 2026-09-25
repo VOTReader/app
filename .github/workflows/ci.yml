@@ -463,14 +463,6 @@ jobs:
         # FAILS (NOTHING-CHECKED), so this step cannot read green on an empty run.
         run: npm run e2e:readalong -- --synth --pixel-proof --keys one:regarding-the-celebration-of-christmas,wtlb1:a-heavy-stone,study:purity-ch1 --bible brm-kjv/psalms:23
 
-      - name: End-to-end backup restore on a fresh profile
-        # n7-06 (sweep 2026-09-25): the one check of the path a reader takes to get
-        # their data back - Export through Settings in a real browser, the file on disk,
-        # Import on a CLEAN profile, the confirm, the reload - was in no gate. It
-        # serves the assets itself on an OS-assigned port (~20 s) and exits 1 on any
-        # difference, and 1 if a file cut short claims "Import complete."
-        run: npm run e2e:restore-fresh
-
   kotlin-tests:
     name: Kotlin unit tests (NK1)
     runs-on: ubuntu-latest
