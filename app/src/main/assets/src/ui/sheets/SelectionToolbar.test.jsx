@@ -1130,6 +1130,29 @@ describe('SelectionToolbar — Copy / Share outcomes are reported (A15)', () => 
     expect(sent[0].text.endsWith('?p=bible%3Ajohn%3A3%3A16')).toBe(true);
   });
 
+  /* n6-10, the rest: the quote is in the reader's translation while the link opens in the recipient's, so the
+     label names it ("John 3:16 (KJV)"): two readers comparing the words know why they differ. */
+  it('(n6-10) a Bible quote names the reader\'s translation', async () => {
+    const g = /** @type {any} */ (globalThis);
+    g.StateStore = { get: () => ({ settings: { translation: 'kjv' } }) };
+    g.TRANSLATION_OPTIONS = [{ id: 'nkjv', label: 'NKJV', desc: 'New King James Version' }, { id: 'kjv', label: 'KJV', desc: 'King James Version' }];
+    try {
+      const sent = /** @type {any[]} */ ([]);
+      setShare((d) => { sent.push(d); return Promise.resolve(); });
+      const c = readingContainer('bible:john:3:16', QUOTE);
+      mount();
+      const r = document.createRange();
+      r.setStart(/** @type {any} */ (c.firstChild), 3);
+      r.setEnd(/** @type {any} */ (c.firstChild), 20);
+      r.getBoundingClientRect = () => /** @type {any} */ ({ left: 0, top: 100, right: 80, bottom: 116, width: 80, height: 16 });
+      stubSelection(r);
+      act(() => { fire(c, 'contextmenu', { clientX: 5, clientY: 5 }); });
+      tapAction('Share');
+      await settle();
+      expect(sent[0].text).toMatch(/3:16 \(KJV\)\n/);
+    } finally { delete g.StateStore; delete g.TRANSLATION_OPTIONS; }
+  });
+
   it('Share from the reader’s own journal sends the words alone, no link (A8)', async () => {
     const sent = /** @type {any[]} */ ([]);
     setShare((d) => { sent.push(d); return Promise.resolve(); });

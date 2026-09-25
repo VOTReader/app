@@ -58,6 +58,23 @@ function shareLabel(firstKey, lastKey) {
   return label + '–' + (a[2] === b[2] ? b[3] : b[2] + ':' + b[3]);
 }
 
+/** n6-10: a shared Bible quote is in the reader's translation while its link opens in the recipient's, so the
+    label names it: " (KJV)". Nothing when the settings are not known (no claim is better than a wrong one), and
+    nothing for a non-Bible key or a Bible text that is not a translation (TSOT Matthew's own ids carry a '-'). */
+function translationTag(key) {
+  const p = String(key || '').split(':');
+  if (p[0] !== 'bible' || !p[1] || p[1].indexOf('-') >= 0) return '';
+  const g = /** @type {any} */ (globalThis);
+  let code = null;
+  try { const s = g.StateStore && g.StateStore.get(); code = s && s.settings ? s.settings.translation : null; } catch (_e) { code = null; }
+  if (!g.StateStore) return '';
+  // TRANSLATION_OPTIONS is index.html's registry (the one data/translations.js translationLabel reads; not
+  // imported here: that module keeps load state a second bundle copy would split).
+  const opts = Array.isArray(g.TRANSLATION_OPTIONS) ? g.TRANSLATION_OPTIONS : [];
+  const found = opts.find((o) => o.id === (code || 'nkjv'));
+  return ' (' + (found ? found.label : 'NKJV') + ')';
+}
+
 function hlDisplayText(container, tcText, start, end) {
   if (!container) return tcText.slice(start, end);
   var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
@@ -1023,7 +1040,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       ? selInfo.multiContainers[0].dataset.hlKey : null);
     const many = selInfo.hlKey ? null : selInfo.multiContainers;
     const lastKey = many && many.length > 1 ? many[many.length - 1].dataset.hlKey : null;
-    const text = withPassageLink(selInfo.shareText || selInfo.text, key, key ? shareLabel(key, lastKey) : null);
+    const text = withPassageLink(selInfo.shareText || selInfo.text, key, key ? shareLabel(key, lastKey) + translationTag(key) : null);
     window.getSelection().removeAllRanges();
     setVisible(false);
     // 'shared' and 'cancelled' stay quiet: the native sheet was the feedback,
