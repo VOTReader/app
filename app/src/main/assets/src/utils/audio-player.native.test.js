@@ -146,6 +146,58 @@ describe('audio-player on the native player (m3)', () => {
     expect(bridge.audioPause).toHaveBeenCalled();
   });
 
+  it('a Next while playing stays loading through the new load, never paused (refutation M1 of the stand-in: M3)', async () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
+    send({ type: 'state', url: URL_OF('idA1'), pos: 5000, dur: 60000, playing: true, want: true });
+    await flush();
+    expect(AudioPlayer.getState().status).toBe('playing');
+    AudioPlayer.next();
+    expect(loads()[1].url).toBe(URL_OF('idA2'));
+    // In order on native's main looper: the pause's event (names idA1: ignored), then the load's (not yet playing).
+    send({ type: 'state', url: URL_OF('idA1'), pos: 5000, dur: 60000, playing: false, want: false });
+    send({ type: 'state', url: URL_OF('idA2'), pos: 0, dur: 0, playing: false, want: false, buffering: true });
+    await flush();
+    expect(AudioPlayer.getState().status).toBe('loading');
+    send({ type: 'state', url: URL_OF('idA2'), pos: 0, dur: 50000, playing: true, want: true });
+    await flush();
+    expect(AudioPlayer.getState().status).toBe('playing');
+  });
+
+  it('a seam journaled before this page loaded the recording is not replayed as its end (refutation M2)', async () => {
+    const listened = vi.fn();
+    globalThis.__votAudioListened = listened;
+    bridge.audioJournal = vi.fn(() => JSON.stringify({ url: URL_OF('idC'), pos: 30000, dur: 600000, playing: true, want: true,
+      seams: [{ seq: 1, from: URL_OF('idC'), url: URL_OF('idZ'), at: Date.now() - 3600000 }] }));
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    send({ type: 'state', url: URL_OF('idC'), pos: 30000, dur: 600000, playing: true, want: true });
+    await flush();
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    await flush();
+    expect(listened).not.toHaveBeenCalled();
+    expect(bridge.audioRelease).not.toHaveBeenCalled();
+    expect(AudioPlayer.getState().status).toBe('playing');
+  });
+
+  it('sleep at the end of this recording pauses native there, so a later seek does not play (refutation M1)', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    send({ type: 'state', url: URL_OF('idC'), pos: 5000, dur: 600000, playing: true, want: true });
+    await flush();
+    AudioPlayer.setSleepAtTrackEnd();
+    bridge.audioPause.mockClear();
+    // ExoPlayer at its end still wants to play (native also pauses itself there; the page does not rely on it).
+    send({ type: 'state', url: URL_OF('idC'), pos: 600000, dur: 600000, playing: false, want: true, ended: true });
+    await flush();
+    expect(AudioPlayer.getState().status).toBe('paused');
+    expect(bridge.audioPause).toHaveBeenCalledTimes(1);
+    send({ type: 'state', url: URL_OF('idC'), pos: 600000, dur: 600000, playing: false, want: false, ended: true });
+    AudioPlayer.seek(100);
+    expect(bridge.audioSeek).toHaveBeenCalledWith(100000);
+    send({ type: 'state', url: URL_OF('idC'), pos: 100000, dur: 600000, playing: false, want: false });
+    await flush();
+    expect(AudioPlayer.getState().status).toBe('paused');
+  });
+
   it('a pause from the lock screen pauses the player; the page\'s pause goes to native', async () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
     send({ type: 'state', url: URL_OF('idC'), pos: 5000, dur: 60000, playing: true, want: true });

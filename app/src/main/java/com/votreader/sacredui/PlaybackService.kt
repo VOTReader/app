@@ -98,6 +98,17 @@ class PlaybackService : MediaSessionService() {
             .build()
 
         override fun isCommandAvailable(command: Int): Boolean = availableCommands.contains(command)
+
+        /** What plays is the page's to choose: a jump to another item, a repeat or shuffle mode would change it
+         *  without a seam the page hears (a car's queue tap, AVRCP repeat; refutation S3). The app never asks. */
+        override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
+            if (mediaItemIndex == currentMediaItemIndex) super.seekTo(mediaItemIndex, positionMs)
+        }
+        override fun seekToDefaultPosition(mediaItemIndex: Int) {
+            if (mediaItemIndex == currentMediaItemIndex) super.seekToDefaultPosition(mediaItemIndex)
+        }
+        override fun setRepeatMode(repeatMode: Int) = Unit
+        override fun setShuffleModeEnabled(shuffleModeEnabled: Boolean) = Unit
         override fun seekToNext() = send("next")
         override fun seekToNextMediaItem() = send("next")
         override fun seekToPrevious() = send("prev")
@@ -107,6 +118,22 @@ class PlaybackService : MediaSessionService() {
     }
 
     private inner class Callback : MediaSession.Callback {
+        /**
+         * Another app's controller (the system's media card, Bluetooth, a car, a watch) gets transport only: play,
+         * pause, seek within the recording, next and previous. Changing the list, jumping to an item or setting
+         * repeat and shuffle stay the page's (refutation S3).
+         */
+        override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
+            if (controller.packageName == packageName) return MediaSession.ConnectionResult.AcceptedResultBuilder(session).build()
+            val transport = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon()
+                .removeAll(
+                    Player.COMMAND_CHANGE_MEDIA_ITEMS, Player.COMMAND_SET_MEDIA_ITEM, Player.COMMAND_SEEK_TO_MEDIA_ITEM,
+                    Player.COMMAND_SET_REPEAT_MODE, Player.COMMAND_SET_SHUFFLE_MODE,
+                )
+                .build()
+            return MediaSession.ConnectionResult.AcceptedResultBuilder(session).setAvailablePlayerCommands(transport).build()
+        }
+
         /**
          * Media items cross the session boundary without their uri, so it travels in the request metadata and is put
          * back here. Only this app's own controller may set what plays; another app's request is refused.

@@ -248,6 +248,8 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     private fun stopStreamingAudio() {
         vm.streamAudioActive = false
         AudioKeepAliveService.setActive(this, false)
+        // m3: the native player too - the page that owns its queue is gone (a renderer crash rebuilds it fresh).
+        if (nativeAudioLazy.isInitialized()) nativeAudioLazy.value.release()
     }
 
     override fun postToUi(action: () -> Unit) = runOnUiThread(action)

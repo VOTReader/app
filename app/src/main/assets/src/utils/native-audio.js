@@ -98,6 +98,17 @@ class NativeAudio extends EventTarget {
     this._startMs = 0;
     this._lastSeq = 0;
     this._upcomingSent = '';
+    /**
+     * What the page last asked native for (true = play, false = pause), until native's playWhenReady says it heard:
+     * events already in flight still carry the old wish and are not native's own play or pause. null = nothing asked.
+     * @type {boolean | null}
+     */
+    this._expect = null;
+    /** While a journal replay runs: native's own playWhenReady then, which a replayed advance must not override. */
+    this._replaying = false;
+    this._replayWant = false;
+    /** When this page handed native the recording (epoch ms): a journaled seam before it is not this page's. */
+    this._loadedAt = 0;
     this._gen = 0;                // bumps at every src change: stale async work checks it
     /** @type {ReturnType<typeof setInterval> | null} */
     this._ticker = null;
@@ -106,6 +117,11 @@ class NativeAudio extends EventTarget {
     if (typeof document !== 'undefined' && document.addEventListener) {
       this._onVisibility = () => { if (document.visibilityState === 'visible') this.reconcile(); this._syncTicker(); };
       document.addEventListener('visibilitychange', this._onVisibility);
+    }
+    // The page is going (a reload, an update, the renderer rebuilt): the queue's owner goes with it, so native stops,
+    // as the <audio> did. audio-player's own pagehide handler has saved the place by now (it registered first).
+    if (typeof window !== 'undefined' && window.addEventListener) {
+      window.addEventListener('pagehide', () => { if (_live === this && this._loaded) this._release(); });
     }
   }
 
@@ -133,6 +149,11 @@ class NativeAudio extends EventTarget {
     this._pos = 0;
     this._startMs = 0;
     this._playing = false;
+    // What native wanted was about the recording being left: without this, the new load's first state (not yet
+    // playing) read as native's own pause, and the player filed the listener's pause mid-load (refutation M3).
+    this._want = false;
+    this._buffering = false;
+    this._expect = null;
     this._syncTicker();
     if (!url) this._release();
   }
@@ -188,10 +209,13 @@ class NativeAudio extends EventTarget {
     const b = nativeBridge();
     if (!this._src || !b) return Promise.reject(new DOMException('no source', 'NotSupportedError'));
     const wasPaused = this._paused;
-    this._paused = false;
+    // A journal replay's advance (next() -> play) must not resume what the listener paused since (refutation S5).
+    const hold = this._replaying && !this._replayWant;
+    this._paused = hold;
     this._ended = false;
     if (!this._loaded) {
       this._loaded = true;
+      this._loadedAt = Date.now();
       this._nativeUrl = this._src;
       const meta = this._meta(this._src);
       const upcoming = this._upcoming();
@@ -203,6 +227,8 @@ class NativeAudio extends EventTarget {
       this._pos = this._startMs / 1000;
       this._anchorAt = now();
     }
+    if (hold) return Promise.resolve();
+    this._expect = true;
     b.audioPlay();
     if (wasPaused) this._fire('play');
     // Adopted after a seam: native is already producing sound for this url, and says so only at its next edge.
@@ -214,13 +240,18 @@ class NativeAudio extends EventTarget {
   }
 
   pause() {
-    if (this._paused) return;
+    if (this._paused) {
+      // Paused here while native still wants to play: an end (ExoPlayer keeps playWhenReady at its end), or a
+      // replay. Tell native, or its next seek would start playback the page thinks is paused (refutation M1).
+      if (this._loaded && this._want && this._expect !== false) { this._expect = false; nativeBridge()?.audioPause(); }
+      return;
+    }
     this._paused = true;
     this._pos = this.currentTime;
     this._anchorAt = now();
     this._playing = false;
     this._syncTicker();
-    if (this._loaded) nativeBridge()?.audioPause();
+    if (this._loaded) { this._expect = false; nativeBridge()?.audioPause(); }
     const gen = this._gen;
     queueMicrotask(() => { if (gen === this._gen && this._paused) this._fire('pause'); });
   }
@@ -251,7 +282,11 @@ class NativeAudio extends EventTarget {
     let j = null;
     try { j = JSON.parse(b.audioJournal() || 'null'); } catch (_e) { j = null; }
     if (!j || typeof j !== 'object') return;
-    for (const seam of Array.isArray(j.seams) ? j.seams : []) this._seam(seam);
+    this._replaying = true;
+    this._replayWant = !!j.want;
+    try {
+      for (const seam of Array.isArray(j.seams) ? j.seams : []) this._seam(seam, !!j.want);
+    } finally { this._replaying = false; }
     this.handle(Object.assign({}, j, { type: 'state' }));
   }
 
@@ -261,7 +296,7 @@ class NativeAudio extends EventTarget {
    */
   handle(e) {
     if (!e || typeof e !== 'object') return;
-    if (e.type === 'transition') { this._seam({ seq: e.seq, from: e.from, url: e.url }); }
+    if (e.type === 'transition') { this._seam({ seq: e.seq, from: e.from, url: e.url }, !!e.want); }
     const url = typeof e.url === 'string' ? e.url : '';
     // Native still on a recording the page has left (a src change it has not heard yet): not this element's news.
     if (!this._loaded || (url && url !== this._src && url !== this._nativeUrl)) return;
@@ -297,15 +332,21 @@ class NativeAudio extends EventTarget {
       }
       return;
     }
-    // Native's own pause: audio focus lost, headphones out, the lock screen's button.
-    if (wasWant && !this._want && !this._paused) {
+    if (this._expect !== null) {
+      // The page asked native to play or pause: events sent before native heard it still carry the old wish (a
+      // fresh load's first state, too, says "not playing" before the play arrives: refutation M3).
+      if (this._want === this._expect) this._expect = null;
+    } else if (wasWant && !this._want && !this._paused) {
+      // Native's own pause: audio focus lost, headphones out, the lock screen's button.
       this._paused = true;
       this._fire('pause');
-    } else if (!wasWant && this._want && this._paused) {
-      // Native's own play (the lock screen, a headset): the page follows.
+    } else if (this._want && this._paused && (!wasWant || this._playing)) {
+      // Native's own play (the lock screen, a headset, Play at an end): the page follows.
       this._paused = false;
+      this._ended = false;
       this._fire('play');
     }
+    if (this._paused) { this._playing = false; this._syncTicker(); this._fire('timeupdate'); return; }
     if (this._want && this._buffering && !wasBuffering) this._fire('waiting');
     if (this._playing && !wasPlaying) this._fire('playing');
     this._fire('timeupdate');
@@ -317,24 +358,30 @@ class NativeAudio extends EventTarget {
 
   /**
    * One seam native crossed: `from` finished and `url` began. Fires 'ended' for `from` when this element is still on
-   * it; the player's next() then points src at `url`, which adopts native's recording. Each seam counts once.
-   * @param {{ seq?: number, from?: string, url?: string }} seam
+   * it; the player's next() then points src at `url`, which adopts native's recording. Each seam counts once, and only
+   * a seam out of the recording this element is on counts at all: one out of a recording the page already left (a
+   * late event, refutation S2) or from before this page loaded it (M2) names nothing here.
+   * @param {{ seq?: number, from?: string, url?: string, at?: number }} seam
+   * @param {boolean} want native's playWhenReady now: a replay does not resume what was paused since (S5)
    */
-  _seam(seam) {
+  _seam(seam, want) {
     const seq = Number(seam && seam.seq) || 0;
     if (seq && seq <= this._lastSeq) return;
     if (seq) this._lastSeq = seq;
     const url = seam && typeof seam.url === 'string' ? seam.url : '';
-    if (!url) return;
+    if (!url || !this._loaded || seam.from !== this._src) return;
+    if (Number(seam.at) > 0 && Number(seam.at) < this._loadedAt) return;   // journaled before this page's load
     this._nativeUrl = url;
-    if (!this._loaded || seam.from !== this._src) return;
+    // Native consumed what it was told comes next: say it again for the new recording, even when it is the same
+    // list (repeat one: A after A, refutation S1).
+    this._upcomingSent = '';
     this._ended = true;
     this._pos = this._dur > 0 ? this._dur : this._pos;
     this._fire('ended');
     // The player moved on (src now native's url, adopted): the new recording starts at native's clock.
     if (this._src === url) {
       this._ended = false;
-      this._paused = false;
+      this._paused = !want;
       this._dur = NaN;
       this._ready = 1;
       this._pos = 0;
@@ -348,12 +395,15 @@ class NativeAudio extends EventTarget {
     this._paused = true;
     this._syncTicker();
     this.error = { code: e.name === 'not-playable' ? MEDIA_ERR_SRC_NOT_SUPPORTED : MEDIA_ERR_NETWORK };
-    this._loaded = false;   // play() loads it afresh (the player's retry)
+    this._loaded = false;
+    this._expect = null;   // play() loads it afresh (the player's retry)
     this._fire('error');
   }
 
   _release() {
     this._loaded = false;
+    this._expect = null;
+    this._want = false;
     this._nativeUrl = '';
     this._paused = true;
     this._playing = false;

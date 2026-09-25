@@ -81,6 +81,12 @@ object NativeAudioLogic {
 
         @Synchronized fun last(): Long = seq
 
+        /**
+         * Forget the seams (the numbering goes on). At every load by the page: a seam from before it is not this
+         * page's to replay (a reloaded page replayed an old "this recording ended" mid-listen, refutation M2).
+         */
+        @Synchronized fun clear() { seams.clear() }
+
         @Synchronized fun seams(): List<Seam> = seams.toList()
     }
 

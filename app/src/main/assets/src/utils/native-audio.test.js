@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 const A = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/a.mp3';
 const B = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/b.mp3';
 const C = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/c.mp3';
+const X = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/x.mp3';
 
 let NativeAudio;
 let nativeAudioAvailable;
@@ -264,7 +265,7 @@ describe('native-audio - the seam', () => {
       el.play();
     });
     bridge.audioJournal.mockReturnValue(JSON.stringify({ url: C, pos: 7000, dur: 90000, playing: true, want: true, last: 2,
-      seams: [{ seq: 1, from: A, url: B, at: 1 }, { seq: 2, from: B, url: C, at: 2 }] }));
+      seams: [{ seq: 1, from: A, url: B, at: Date.now() + 1 }, { seq: 2, from: B, url: C, at: Date.now() + 2 }] }));
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
     document.dispatchEvent(new Event('visibilitychange'));
     expect(heard).toEqual([A, B]);
@@ -291,6 +292,105 @@ describe('native-audio - the seam', () => {
     expect(el.src).toBe(C);
     expect(bridge.audioLoad).toHaveBeenCalledTimes(2);
     expect(JSON.parse(bridge.audioLoad.mock.calls[1][0]).url).toBe(C);
+  });
+
+  it('repeat one: after native used up the copy it held, the page hands over the next copy (refutation S1)', () => {
+    const el = new NativeAudio({ upcoming: () => [{ url: A, rate: 1 }] });
+    el.addEventListener('ended', () => { el.currentTime = 0; el.src = A; el.play(); el.syncUpcoming(); });
+    el.src = A;
+    el.play();
+    expect(JSON.parse(bridge.audioLoad.mock.calls[0][0]).upcoming.map((t) => t.url)).toEqual([A]);
+    state({ pos: 1000, playing: true, want: true });
+    bridge.audioUpcoming.mockClear();
+    send({ type: 'transition', from: A, url: A, seq: 1, pos: 0, dur: 60000, playing: true, want: true });
+    expect(bridge.audioUpcoming).toHaveBeenCalledWith(JSON.stringify([{ url: A, rate: 1 }]));
+  });
+
+  it('a transition that lands after the page moved on is nobody\'s, and a later src loads (refutation S2)', () => {
+    const el = new NativeAudio({ upcoming: () => [] });
+    el.src = A;
+    el.play();
+    state({ pos: 59900, playing: true, want: true });
+    el.src = X;
+    el.play();
+    send({ type: 'transition', from: A, url: B, seq: 1, pos: 0, dur: 60000, playing: true, want: true });
+    state({ url: X, pos: 0, dur: 90000, playing: true, want: true });
+    el.src = B;
+    el.play();
+    expect(bridge.audioLoad.mock.calls.map((c) => JSON.parse(c[0]).url)).toEqual([A, X, B]);
+  });
+
+  it('a journaled seam from before this load is not replayed (refutation M2)', () => {
+    const el = new NativeAudio({ upcoming: () => [] });
+    const ended = vi.fn();
+    el.addEventListener('ended', ended);
+    el.src = A;
+    el.play();
+    state({ pos: 30000, playing: true, want: true });
+    bridge.audioJournal.mockReturnValue(JSON.stringify({ url: A, pos: 30000, dur: 600000, playing: true, want: true, last: 1,
+      seams: [{ seq: 1, from: A, url: B, at: Date.now() - 60000 }] }));
+    el.reconcile();
+    expect(ended).not.toHaveBeenCalled();
+    expect(el.paused).toBe(false);
+  });
+
+  it('a replayed seam does not resume what the listener paused since (refutation S5)', () => {
+    const el = new NativeAudio({ upcoming: () => [] });
+    el.addEventListener('ended', () => { el.src = B; el.play(); });
+    el.src = A;
+    el.play();
+    state({ pos: 1000, playing: true, want: true });
+    const plays = bridge.audioPlay.mock.calls.length;
+    bridge.audioJournal.mockReturnValue(JSON.stringify({ url: B, pos: 4000, dur: 30000, playing: false, want: false, last: 1,
+      seams: [{ seq: 1, from: A, url: B, at: Date.now() + 1 }] }));
+    const seen = recorder(el);
+    el.reconcile();
+    expect(el.src).toBe(B);
+    expect(bridge.audioPlay.mock.calls.length).toBe(plays);   // no resume sent
+    expect(el.paused).toBe(true);
+    expect(seen).not.toContain('playing');
+  });
+
+  it('events in flight when the page asked for play or pause are not native\'s own pause or play', async () => {
+    const el = new NativeAudio();
+    el.src = A;
+    el.play();
+    state({ playing: true, want: true });
+    const seen = recorder(el);
+    el.pause();
+    await flush();
+    state({ type: 'tick', pos: 2000, playing: true, want: true });   // sent before native heard the pause
+    expect(seen).not.toContain('playing');
+    expect(seen).not.toContain('play');
+    expect(el.paused).toBe(true);
+    state({ pos: 2100, playing: false, want: false });              // native heard it
+    el.play();
+    state({ pos: 2100, playing: false, want: false });              // sent before native heard the play
+    await flush();
+    expect(seen.filter((t) => t === 'pause')).toHaveLength(1);      // only the page's own pause
+    expect(el.paused).toBe(false);
+  });
+
+  it('pausing an element that ended while native still wants to play tells native (refutation M1)', () => {
+    const el = new NativeAudio();
+    el.src = A;
+    el.play();
+    state({ playing: true, want: true });
+    state({ pos: 60000, ended: true, want: true });
+    expect(el.paused).toBe(true);
+    bridge.audioPause.mockClear();
+    el.pause();
+    el.pause();
+    expect(bridge.audioPause).toHaveBeenCalledTimes(1);
+  });
+
+  it('the page going away (reload, update, renderer rebuilt) lets native go (refutation S4)', () => {
+    const el = new NativeAudio();
+    el.src = A;
+    el.play();
+    window.dispatchEvent(new Event('pagehide'));
+    expect(bridge.audioRelease).toHaveBeenCalled();
+    expect(el.paused).toBe(true);
   });
 
   it('tells native what comes next only when it changed', () => {

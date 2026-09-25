@@ -62,6 +62,7 @@ class NativeAudioController(
         val volume = NativeAudioLogic.clampVolume(o.optDouble("volume", 1.0))
         val autoplay = o.optBoolean("autoplay", false)
         onMain { c ->
+            journal.clear()
             rates.clear()
             (listOf(track) + next).forEach { rates[it.url] = it.rate }
             current = track.url
@@ -212,6 +213,9 @@ class NativeAudioController(
                     Player.EVENT_PLAY_WHEN_READY_CHANGED, Player.EVENT_PLAYBACK_PARAMETERS_CHANGED,
                 )
             ) state(c, "state")
+            // At its end ExoPlayer keeps playWhenReady; an ended <audio> is paused, and the page files it so. Left
+            // wanting, the next seek (a verse tap) or the lock screen's Play started it behind a paused bar (M1).
+            if (c.playbackState == Player.STATE_ENDED && c.playWhenReady) c.pause()
             main.removeCallbacks(ticker)
             if (c.isPlaying) main.postDelayed(ticker, TICK_MS)
         }

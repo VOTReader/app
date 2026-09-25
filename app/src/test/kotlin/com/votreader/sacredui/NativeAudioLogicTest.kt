@@ -93,4 +93,14 @@ class NativeAudioLogicTest {
             NativeAudioLogic.seamsJson(j.seams()).json,
         )
     }
+
+    @Test
+    fun `a load forgets the seams before it, and the numbering goes on`() {
+        val j = NativeAudioLogic.Journal()
+        j.add("a", "b", 1L)
+        j.clear()
+        assertEquals(emptyList(), j.seams())
+        assertEquals(1L, j.last())
+        assertEquals(2L, j.add("b", "c", 2L).seq)
+    }
 }
