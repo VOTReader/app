@@ -324,13 +324,13 @@ export function LinksScreen(props) {
     <ScreenLayout navChildren={navChildren}>
       <div className="links-screen">
         {/* Header */}
-        <div className="notes-index-header">
-          <h1 className="notes-index-title">My Links</h1>
-          <span className="notes-index-count">
+        <header className="study-head">
+          <h1 className="study-head-title">Links</h1>
+          <span className="study-head-count">
             {allLinks.length}
             {allLinks.length === 1 ? ' link' : ' links'}
           </span>
-        </div>
+        </header>
 
         {/* Search */}
         <input

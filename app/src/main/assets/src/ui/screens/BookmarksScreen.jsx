@@ -320,13 +320,13 @@ export function BookmarksScreen(props) {
   return (
     <ScreenLayout navChildren={navChildren}>
       <div className="bkm-screen">
-        <div className="notes-index-header">
-          <h1 className="notes-index-title">My Bookmarks</h1>
-          <span className="notes-index-count">
+        <header className="study-head">
+          <h1 className="study-head-title">Bookmarks</h1>
+          <span className="study-head-count">
             {allBookmarks.length}
             {allBookmarks.length === 1 ? ' bookmark' : ' bookmarks'}
           </span>
-        </div>
+        </header>
 
         <input
           className="notes-index-search"

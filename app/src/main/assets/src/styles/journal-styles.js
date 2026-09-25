@@ -22,9 +22,7 @@
 
   // Hub screen
   R('.jrn-hub { padding: 0 0 110px; }');
-  R('.jrn-hub-header { padding: 14px 22px 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }');
-  R('.jrn-hub-title { font-family: var(--font-cinzel); color: var(--gold); font-size: var(--fs-20); font-weight: 600; margin: 0; text-transform: uppercase; letter-spacing: 0.05em; }');
-  R('.jrn-hub-count { font-family: var(--font-garamond); font-style: italic; color: var(--gold-dim); font-size: var(--fs-13); }');
+  // The hub's header is the shared personal-study header (.study-head in app.css).
 
   // Nav layout — push everything except the back arrow to the right.
   // ScreenLayout's nav is a flex row; this spacer eats the gap between

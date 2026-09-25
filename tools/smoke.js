@@ -350,7 +350,12 @@
     var LEGS = [
       { bundle: '__screensG', label: 'Personal Study → My Notes (bundle-g)',
         open: async function () { await goHome(); clickByText(/Personal Study/); await sleep(340); return clickByText(/My Notes|^\s*Notes(?![a-z])/); },
-        there: function () { return /My Notes/.test(document.body.textContent || ''); } },
+        // The shared personal-study header titles the screen "Notes" (2026-09-25); any
+        // pager peek of the Library beside it is titled "Library", so match the title exactly.
+        there: function () {
+          return [].slice.call(document.querySelectorAll('.study-head-title'))
+            .some(function (h) { return (h.textContent || '').trim() === 'Notes'; });
+        } },
       { bundle: '__screensH', label: 'Audio Readings → Listening Library (bundle-h)',
         open: async function () { await goHome(); return clickByText(/Audio Readings/); },
         there: function () { return /Saved recordings/.test(document.body.textContent || ''); } },

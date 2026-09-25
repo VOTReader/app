@@ -216,10 +216,10 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
             the screen title (.nb-drilled-title below) — rendering both stacked
             two headers on top of each other. */}
         {!drilledNbId && (
-          <div className="notes-index-header">
-            <h1 className="notes-index-title">My Notes</h1>
-            <span className="notes-index-count">{allNotes.length}{allNotes.length === 1 ? " note" : " notes"}</span>
-          </div>
+          <header className="study-head">
+            <h1 className="study-head-title">Notes</h1>
+            <span className="study-head-count">{allNotes.length}{allNotes.length === 1 ? " note" : " notes"}</span>
+          </header>
         )}
         {/* Tab strip — hidden while drilled in */}
         {!drilledNbId && (

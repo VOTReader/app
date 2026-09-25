@@ -209,6 +209,25 @@ describe('app.css — browse tiles sit on the hairline', () => {
   });
 });
 
+/* THE PERSONAL-STUDY HEADER HOLDS STILL (redesign, 2026-09-25). The eight screens share .study-head
+   (src/ui/screens/study-head.test.js checks the markup); their containers padded their tops 1.1 to
+   1.65rem, so the title jumped up to 9 px moving between siblings. One top inset now: measured at
+   top 87 px on all eight at 360 px. */
+describe('app.css — the personal-study header starts at one height', () => {
+  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  const block = (sel) => {
+    const m = new RegExp('(?:^|\\n)\\s*' + sel.replace(/[.]/g, '\\.') + ' \\{([^}]*)\\}').exec(bare);
+    return m ? m[1] : '';
+  };
+  it.each(['.library-screen', '.prg-screen', '.notes-index-screen', '.links-screen', '.bkm-screen', '.milestones-screen'])(
+    '%s pads its top 1.25rem', (sel) => {
+      expect(block(sel)).toMatch(/padding:\s*1\.25rem\s/);
+    });
+  it('the inset header (Journal, Highlights) pads the same 1.25rem itself', () => {
+    expect(block('.study-head.inset')).toMatch(/padding:\s*1\.25rem\s/);
+  });
+});
+
 /* THE LIBRARY IS A LIST (redesign, 2026-09-25, Codex mockup r4 take 1). Eight
    bordered cards in two columns became one column of rows on hairlines, in the
    Answers topic rows' language, with every count in one right-hand column. */
@@ -638,8 +657,8 @@ describe('app.css — the compact top bar and its ⋯ menu', () => {
 describe('app.css — labels in spaced capitals are 12 px or more', () => {
   const LABELS = [
     '.hni-eyebrow', '.vol-index-eyebrow', '.genre-col-label', '.scriptures-landing .genre-col-label',
-    '.volumes-landing .genre-col-label', '.library-eyebrow', '.audio-library-eyebrow',
-    '.audio-library-section-head span', '.milestones-eyebrow', '.select-sheet-eyebrow', '.tabs-overview-eyebrow',
+    '.volumes-landing .genre-col-label', '.audio-library-eyebrow',
+    '.audio-library-section-head span', '.select-sheet-eyebrow', '.tabs-overview-eyebrow',
     '.prg-stat-label', '.footnote-list-header', '.related-card-title', '.settings-section-label',
     '.srch-section-label', '.srch-group-header', '.chapter-card-label', '.answers-hit-eyebrow',
     '.section-heading', '.compact-list-header',

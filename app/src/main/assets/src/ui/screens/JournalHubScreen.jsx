@@ -347,10 +347,10 @@ export function JournalHubScreen(props) {
   return (
     <ScreenLayout navChildren={navChildren}>
       <div className="jrn-hub">
-        <div className="jrn-hub-header">
-          <h1 className="jrn-hub-title">My Journal</h1>
-          <span className="jrn-hub-count">{allEntries.length + (allEntries.length === 1 ? ' entry' : ' entries')}</span>
-        </div>
+        <header className="study-head inset">
+          <h1 className="study-head-title">Journal</h1>
+          <span className="study-head-count">{allEntries.length + (allEntries.length === 1 ? ' entry' : ' entries')}</span>
+        </header>
         <div className="jrn-tabs">
           <button className={'jrn-tab' + (tab === 'all' ? ' active' : '')} onClick={function() { setTab('all'); }}>All Entries</button>
           <button className={'jrn-tab' + (tab === 'pinned' ? ' active' : '')} onClick={function() { setTab('pinned'); }}>Pinned</button>

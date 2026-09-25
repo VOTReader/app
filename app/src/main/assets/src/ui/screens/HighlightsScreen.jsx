@@ -14,10 +14,7 @@ import { isMarkKind } from '../../utils/mark-kinds.js';
   if (typeof document === 'undefined' || document.getElementById('hlx-styles')) return;
   var R = [];
   R.push('.hlx-screen { padding: 0 0 90px; }');
-  R.push('.hlx-header { padding: 18px 22px 4px; }');
-  R.push('.hlx-eyebrow { font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.14em; color: var(--gold-dim); display: block; }');
-  R.push('.hlx-title { font-family: var(--font-cinzel); color: var(--gold); font-size: var(--fs-20); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin: 4px 0 2px; }');
-  R.push('.hlx-count { font-family: var(--font-garamond); font-style: italic; color: var(--cream-dim); font-size: var(--fs-13); }');
+  // The header is the shared personal-study header (.study-head in app.css).
   R.push('.hlx-controls { padding: 10px 18px 6px; display: flex; flex-direction: column; gap: 10px; }');
   // C2-C [C9]: the three `.hlx-search` rules MOVED to app.css (they now sit
   // directly after .notes-index-search, whose class this input also carries).
@@ -236,11 +233,10 @@ export function HighlightsScreen(props) {
   return (
     <ScreenLayout navChildren={navChildren}>
       <div className="hlx-screen">
-        <div className="hlx-header">
-          <span className="hlx-eyebrow">My Marks</span>
-          <h1 className="hlx-title">Highlights & Underlines</h1>
-          <span className="hlx-count">{marks.length + (marks.length === 1 ? ' mark' : ' marks')}</span>
-        </div>
+        <header className="study-head inset">
+          <h1 className="study-head-title">Highlights & Underlines</h1>
+          <span className="study-head-count">{marks.length + (marks.length === 1 ? ' mark' : ' marks')}</span>
+        </header>
         {marks.length > 0 && (
           <div className="hlx-controls">
             {/* C2-C [C9]: same class, same type, same aria wording as every

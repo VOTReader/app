@@ -71,11 +71,12 @@ export function MilestonesScreen({ onBack, backLabel = 'Library', readItems, onS
       navChildren={LibraryNav({ onBack, backLabel, showHome: false, onSearch, onHistory, onSettings, theme, onThemeChange })}
     >
       <div className="milestones-screen">
-        <div className="milestones-eyebrow">Your journey</div>
-        <h1>Milestones</h1>
-        <p className="milestones-intro">
-          Every mark here reflects the reading, listening, and study record you keep on this device — no account or sign-up required.
-        </p>
+        <header className="study-head">
+          <h1 className="study-head-title">Milestones</h1>
+          <p className="study-head-sub">
+            Every mark here reflects the reading, listening, and study record you keep on this device — no account or sign-up required.
+          </p>
+        </header>
 
         <section className="milestones-summary" aria-label="Overall progress">
           <div className="milestones-summary-count">

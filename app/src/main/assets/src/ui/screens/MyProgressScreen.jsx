@@ -278,9 +278,10 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOp
       navChildren={LibraryNav({ onBack: onBack, onSearch: onSearch, onHistory: onHistory, onSettings: onSettings, theme: theme, onThemeChange: onThemeChange })}
     >
       <div className="prg-screen">
-        <div className="library-eyebrow">Personal Study</div>
-        <h1 className="library-title">My Progress</h1>
-        <p className="library-sub">Your reading, journaling, and study at a glance.</p>
+        <header className="study-head">
+          <h1 className="study-head-title">Progress</h1>
+          <p className="study-head-sub">Your reading, journaling and study at a glance.</p>
+        </header>
 
         <div className="prg-hero">
           {heroStats.map((s) => (

@@ -124,9 +124,9 @@ describe('NotesIndexScreen — link-out back pill', () => {
 });
 
 describe('NotesIndexScreen drilled header', () => {
-  it('shows the "My Notes" index header at the top level', () => {
+  it('shows the Notes index header at the top level (the shared personal-study header)', () => {
     const { container } = render(<NotesIndexScreen {...props} />);
-    expect(container.querySelector('.notes-index-title').textContent).toBe('My Notes');
+    expect(container.querySelector('.study-head-title').textContent).toBe('Notes');
     expect(container.querySelector('.nb-drilled-title')).toBeNull();
   });
 
@@ -134,13 +134,13 @@ describe('NotesIndexScreen drilled header', () => {
     const { container, getByText } = render(<NotesIndexScreen {...props} />);
     fireEvent.click(getByText('Faith'));
     expect(container.querySelector('.nb-drilled-title').textContent).toBe('Faith');
-    expect(container.querySelector('.notes-index-title')).toBeNull();
+    expect(container.querySelector('.study-head-title')).toBeNull();
   });
 
   it('counts the drilled notebook’s notes, not the whole index', () => {
     const { container, getByText } = render(<NotesIndexScreen {...props} />);
     // 3 notes total, 2 of them in Faith (g1 + g3).
-    expect(container.querySelector('.notes-index-count').textContent).toBe('3 notes');
+    expect(container.querySelector('.study-head-count').textContent).toBe('3 notes');
     fireEvent.click(getByText('Faith'));
     expect(container.querySelector('.nb-drilled-count').textContent).toBe('2 notes');
   });
