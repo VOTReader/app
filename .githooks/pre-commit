@@ -270,6 +270,16 @@ if [ -n "$data_changed" ] || [ -n "$schema_tool_changed" ]; then
   echo ""
 fi
 
+# ─── Step 1b1: a corpus edit must not move readers' marks (n4-02) ───
+# Marks on letters, WTLB / Answers / Blessed / Holy Days entries and study
+# chapters key on block POSITION (utils/hl-keys.js). An edit that inserts or
+# removes a paragraph above unchanged ones moves every mark below it onto other
+# words, in silence (c62 did it to 'Regarding Spiritual Gifts'). Compares each
+# staged keyed file with HEAD's; ACCEPT_MARK_SHIFT=1 lets an intended move through.
+if [ -n "$data_changed" ]; then
+  node tools/check-mark-anchors.mjs || exit 1
+fi
+
 # ─── Step 1b2: read-along offsets address the right characters ──────
 # AUDIO_SYNC ships CHARACTER OFFSETS into a block's rendered textContent. That
 # domain is defined in the app (segment-dom-text.js) and measured offline by
