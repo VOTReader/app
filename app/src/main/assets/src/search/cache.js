@@ -37,7 +37,8 @@ const KEY = 'index';
    chain only). Every index cached before this still CONTAINS its titles and
    bodies, so the builder change alone would keep serving the leak to every
    installed client forever; the bump is what discards them. */
-export const MS_INDEX_VERSION = 'm8';   // m8: WTLB, The Blessed, Holy Days and Answers bodies without their **bold** / _italic_ markers (2026-09-25)
+export const MS_INDEX_VERSION = 'm9';   // m9: nothing indexed changes. segment-dom-text.js (fingerprinted) gained segmentsDomPieces for the link excerpt picker; the text index-builder reads is the same (2026-09-25)
+// m8: WTLB, The Blessed, Holy Days and Answers bodies without their **bold** / _italic_ markers (2026-09-25)
 // m7: letter and study bodies in the reader's text: no footnote numbers, letter-link labels, the renderer's spacing (2026-09-25)
 // m6: KJV-R verses from the KJV base, block-shaped Holy Days bodies, studies always in (REPORT #8, 2026-09-24)
 // m5: Answers Only God Can Give joins the index as its own kind (2026-09-22)

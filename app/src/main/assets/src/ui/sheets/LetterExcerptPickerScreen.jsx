@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { scrollBehavior } from '../../utils/reduced-motion.js';
+import { excerptBlocks, formatBFootnotesMode, piecesQuote } from '../../utils/excerpt-pieces.js';
 
 export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, returnTargetInsteadOfLink }) {
   const target = refineRequest.target;
@@ -20,39 +21,20 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
     return ctx ? ctx.entry : null;
   }, [target.letterId, target.entryId, target.studyChapterId]);
 
-  // Build a flat array of plain-text blocks from the entry. Each block's
-  // `key` is the bare data-index that LetterView/WtlbEntryView use for their
-  // hlKey, so a stored link with a "letter:id:N:start-end" target will
-  // prefix-match the rendered block element.
+  // The entry's pickable blocks, each drawn in the READER's own text
+  // (utils/excerpt-pieces.js): the offsets a selection measures here are the
+  // ones dom-links.js counts through the reader's DOM to place the link's icon.
+  // Each block's `key` is the bare data-index LetterView/WtlbEntryView end
+  // their hlKey in, so a stored "letter:id:N:start-end" target prefix-matches
+  // the rendered block. A Format B entry renders its references the way its
+  // route does (footnote numbers for Holy Days and Answers, "(Ref)" cites for
+  // WTLB and The Blessed).
+  const collectionLabel = target.collection || item.collection;
   const blocks = React.useMemo(() => {
-    if (!entry) return [];
-    if (entry.paragraphs) {
-      return entry.paragraphs.map((p, i) => ({
-        key: String(i),
-        text: (p.text || '').replace(/_([^_]+)_/g, '$1').replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\{\{ref:([^}]+)\}\}/g, '$1').replace(/\{\{nav:([^}]+)\}\}/g, '')
-      }));
-    }
-    if (entry.blocks) {
-      return entry.blocks.map((b, i) => {
-        let text = '';
-        if (b.type === 'para' || b.type === 'closing-fn' || b.type === 'intro') {
-          text = (b.segments || []).map(s => s.t === 'fn' ? '' : (s.v || '')).join('');
-        } else if (b.type === 'closing') {
-          text = b.text || '';
-        } else if (b.type === 'poetry') {
-          text = ((b.lines || b.segments) || []).map(line =>
-            Array.isArray(line) ? line.map(s => s.t === 'fn' ? '' : (s.v || '')).join('') :
-            (line && line.t === 'fn' ? '' : (line && line.v) || '')
-          ).join('\n');
-        } else if (b.type === 'note' || b.type === 'scripture') {
-          text = b.text || '';
-        }
-        // Keep original index even when text is empty so link-back keys match.
-        return { key: String(i), text };
-      }).filter(b => b.text.trim().length > 0);
-    }
-    return [];
-  }, [entry]);
+    const col = typeof COLLECTIONS !== 'undefined' && collectionLabel
+      ? COLLECTIONS.find((c) => c.label === collectionLabel) : null;
+    return excerptBlocks(entry, formatBFootnotesMode(col && col.volKey));
+  }, [entry, collectionLabel]);
 
   // Android back button goes back to LinkPicker (same save/restore pattern).
   React.useEffect(() => {
@@ -83,16 +65,21 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
     const blockEl = startNode.nodeType === 3 ? startNode.parentElement.closest('[data-block-key]') : /** @type {Element} */ (startNode).closest && /** @type {Element} */ (startNode).closest('[data-block-key]');
     if (!blockEl || !bodyRef.current || !bodyRef.current.contains(blockEl)) return null;
     const blockKey = /** @type {HTMLElement} */ (blockEl).dataset.blockKey;
+    // The block's textContent is the reader's (see `blocks`), so these offsets
+    // are the ones the link will be painted at.
     const fullText = blockEl.textContent;
     const preRange = document.createRange();
     preRange.selectNodeContents(blockEl);
     preRange.setEnd(range.startContainer, range.startOffset);
-    var start = preRange.toString().length;
-    var end = start + range.toString().length;
-    var snapped = snapRangeToWords(fullText, start, end);
-    start = snapped.start;
-    return { blockKey, start, end, text: fullText.slice(start, end) };
-  }, []);
+    const rawStart = preRange.toString().length;
+    // Whole words, and never across a poetry line or a soft break: the snap
+    // the reader's own selection toolbar applies.
+    const { start, end } = snapSelectionRange(blockEl, fullText, rawStart, rawStart + range.toString().length);
+    const block = blocks.find((b) => b.key === blockKey);
+    const text = block ? piecesQuote(block.pieces, start, end) : fullText.slice(start, end);
+    if (end <= start || !text.trim()) return null;
+    return { blockKey, start, end, text };
+  }, [blocks]);
   // Deferred-capture timer is cleared on unmount — closing the picker within
   // 150ms of a lift must not commit selection state into a dead component
   // (the sibling selectionchange effect below already clears its own timer).
@@ -145,7 +132,7 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
   const findTrim = findQ.trim().toLowerCase();
   const findMatches = React.useMemo(() => {
     if (findTrim.length < 2) return [];
-    return blocks.filter(b => b.text.toLowerCase().includes(findTrim)).map(b => b.key);
+    return blocks.filter(b => b.readText.toLowerCase().includes(findTrim)).map(b => b.key);
   }, [blocks, findTrim]);
   React.useEffect(() => { setFindIdx(0); }, [findTrim]);
   const findHitKey = findMatches.length ? findMatches[Math.min(findIdx, findMatches.length - 1)] : null;
@@ -223,6 +210,25 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
         <span className="picker-title">Select Text</span>
       </div>
       <div className="picker-breadcrumb">{contextLine}</div>
+      {/* Find sits OUTSIDE the scrolling body: ‹ › scroll the letter to each
+          hit, and inside the body the row scrolled away with the first one. */}
+      <div className="picker-find picker-find-bar">
+        <input
+          className="picker-find-input"
+          type="search"
+          placeholder={"Find in this " + entryNoun + "…"}
+          value={findQ}
+          onChange={e => setFindQ(e.target.value)}
+          aria-label={"Find text in this " + entryNoun}
+        />
+        {findTrim.length >= 2 && (
+          <>
+            <span className="picker-find-count">{findMatches.length ? (Math.min(findIdx, findMatches.length - 1) + 1) + ' of ' + findMatches.length : '0 found'}</span>
+            <button type="button" className="picker-find-nav" onClick={() => findStep(-1)} disabled={!findMatches.length} aria-label="Previous match">{"‹"}</button>
+            <button type="button" className="picker-find-nav" onClick={() => findStep(1)} disabled={!findMatches.length} aria-label="Next match">{"›"}</button>
+          </>
+        )}
+      </div>
       <div
         className="picker-body picker-body-letter"
         ref={bodyRef}
@@ -231,23 +237,6 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
       >
         <div className="picker-letter-title">{titleText}</div>
         {subtitleText && <div className="picker-letter-subtitle">{subtitleText}</div>}
-        <div className="picker-find">
-          <input
-            className="picker-find-input"
-            type="search"
-            placeholder={"Find in this " + entryNoun + "…"}
-            value={findQ}
-            onChange={e => setFindQ(e.target.value)}
-            aria-label={"Find text in this " + entryNoun}
-          />
-          {findTrim.length >= 2 && (
-            <>
-              <span className="picker-find-count">{findMatches.length ? (Math.min(findIdx, findMatches.length - 1) + 1) + ' of ' + findMatches.length : '0 found'}</span>
-              <button type="button" className="picker-find-nav" onClick={() => findStep(-1)} disabled={!findMatches.length} aria-label="Previous match">{"‹"}</button>
-              <button type="button" className="picker-find-nav" onClick={() => findStep(1)} disabled={!findMatches.length} aria-label="Next match">{"›"}</button>
-            </>
-          )}
-        </div>
         {hasSelection && <div className="picker-selection-hint">{'"' + (selInfo.text.length > 80 ? selInfo.text.slice(0, 77) + '…' : selInfo.text) + '"'}</div>}
         {!hasSelection && <div className="picker-selection-hint picker-selection-hint-empty">Long-press and drag to select an excerpt — or use the button below to link the whole {entryNoun}.</div>}
         {blocks.map(b => (
@@ -255,7 +244,9 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
             key={b.key}
             data-block-key={b.key}
             className={"picker-letter-block" + (b.key === findHitKey ? " picker-find-hit" : "")}
-          >{b.text}</p>
+          >{b.pieces.map((p, i) => (p.seam ? <br key={i} />
+            : p.fn ? <sup key={i} className="picker-fn">{p.text}</sup>
+            : <React.Fragment key={i}>{p.text}</React.Fragment>))}</p>
         ))}
       </div>
       <div className="picker-footer">

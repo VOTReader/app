@@ -16,7 +16,9 @@
    The fix is structural: BOTH sides call in here. `Segments.jsx` renders
    `segmentRenderText`, the extractor measures `segmentsDomText`, and
    segment-dom-text.test.js pins the pair against a real jsdom render, so a
-   future renderer change cannot silently re-open the gap. */
+   future renderer change cannot silently re-open the gap. The link excerpt
+   picker is a third caller: it draws segmentsDomPieces, so the offsets an
+   excerpt stores are the ones dom-links.js paints its icon at. */
 
 /** Segments whose DOM text is not their `v` (see Segments.jsx). */
 const RENDERS_NOTHING = 'stanza-break';
@@ -40,28 +42,41 @@ export function segmentRenderText(segments, i) {
 }
 
 /**
- * The exact `textContent` a rendered run of segments produces — the domain
- * every read-along character offset lives in.
+ * The rendered text of a run of segments, one piece per segment, for a surface
+ * that draws the run itself (the excerpt picker). A footnote marker is its own
+ * piece (`fn: true`), and a stanza break is a `seam`: the <div> Segments draws
+ * for it adds no character but ends the line.
  *
  * Mirrors Segments.jsx's branches: `fn` prints its number, `letter-link`
  * prints its LABEL (not `v`), `stanza-break` prints nothing, and every text
  * flavour goes through the collision guard and then renderTextWithScripRefs,
  * which unwraps `{{ref:Book 1:1}}` to the bare reference.
  * @param {Array<any>} segments
+ * @returns {Array<{text: string, fn?: boolean, seam?: boolean}>}
+ */
+export function segmentsDomPieces(segments) {
+  const out = [];
+  if (!segments) return out;
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    if (!seg) continue;
+    if (seg.t === RENDERS_NOTHING) { out.push({ text: '', seam: true }); continue; }
+    if (seg.t === 'fn') { out.push({ text: String(seg.v == null ? '' : seg.v), fn: true }); continue; }
+    if (seg.t === 'letter-link') { out.push({ text: String(seg.label == null ? '' : seg.label) }); continue; }
+    out.push({ text: String(segmentRenderText(segments, i)).replace(/\{\{ref:([^}]+)\}\}/g, (_m, ref) => ref.trim()) });
+  }
+  return out;
+}
+
+/**
+ * The exact `textContent` a rendered run of segments produces — the domain
+ * every read-along character offset lives in. It is segmentsDomPieces joined,
+ * so a surface drawing the pieces measures the same offsets.
+ * @param {Array<any>} segments
  * @returns {string}
  */
 export function segmentsDomText(segments) {
-  if (!segments || !segments.length) return '';
-  let out = '';
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i];
-    if (!seg || seg.t === RENDERS_NOTHING) continue;
-    if (seg.t === 'fn') { out += String(seg.v == null ? '' : seg.v); continue; }
-    if (seg.t === 'letter-link') { out += String(seg.label == null ? '' : seg.label); continue; }
-    out += String(segmentRenderText(segments, i))
-      .replace(/\{\{ref:([^}]+)\}\}/g, (_m, ref) => ref.trim());
-  }
-  return out;
+  return segmentsDomPieces(segments).map((p) => p.text).join('');
 }
 
 /**

@@ -23,7 +23,7 @@ import { runInNewContext } from 'vm';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-import { formatBDomText, formatBOffsetMap } from './format-b-dom-text.js';
+import { formatBDomText, formatBOffsetMap, formatBDomPieces, formatBRefScan } from './format-b-dom-text.js';
 import { formatBFragments } from '../../../../../../tools/audio-fragments-lib.mjs';
 import { WtlbEntryView } from '../ui/screens/WtlbEntryView.jsx';
 import { wtlbHlKey } from './hl-keys.js';
@@ -220,6 +220,49 @@ describe('THE CONTRACT — the projection equals what WtlbEntryView renders', ()
     expect(bad.slice(0, 6)).toEqual([]);
     expect(bad.length).toBe(0);
   }, 120000);
+});
+
+/* The pre-scan and the pieces view are what the link excerpt picker draws a
+   Format B paragraph from, so its offsets are the reader's. formatBRefScan is
+   WtlbEntryView's own pre-scan, lifted out (the component now calls it), and
+   must number exactly as the copy above does; formatBDomPieces must join to
+   formatBDomText, which THE CONTRACT pins to a real render. Answers, which
+   carries most of the corpus's references, runs through both. */
+describe('formatBRefScan and formatBDomPieces — the excerpt picker\'s view of a paragraph', () => {
+  const ctx = {};
+  for (const f of ['wtlb-one.js', 'wtlb-two.js', 'the-blessed.js', 'holy-days.js', 'answers.js']) {
+    runInNewContext(readFileSync(resolve(DATA, f), 'utf8'), ctx, { filename: f });
+  }
+  const entries = [...(ctx.WTLB_ONE || []), ...(ctx.WTLB_TWO || []), ...(ctx.THE_BLESSED || []),
+    ...(ctx.HOLY_DAYS || []), ...(ctx.ANSWERS || [])].filter((e) => e && Array.isArray(e.paragraphs));
+
+  it.each([true, false])('numbers every reference as the renderer does, footnotesMode=%s', (footnotesMode) => {
+    expect(entries.length).toBeGreaterThan(400);
+    for (const entry of entries) {
+      expect(formatBRefScan(entry.paragraphs, footnotesMode).perParagraph).toEqual(refAnalysis(entry.paragraphs, footnotesMode));
+    }
+  });
+
+  it.each([true, false])('joins to the rendered text, a number piece only in footnotesMode, footnotesMode=%s', (footnotesMode) => {
+    const bad = [];
+    let fnPieces = 0;
+    for (const entry of entries) {
+      const scan = formatBRefScan(entry.paragraphs, footnotesMode);
+      entry.paragraphs.forEach((p, pi) => {
+        const opts = { refs: scan.perParagraph[pi], footnotesMode };
+        const pieces = formatBDomPieces(p.text, opts);
+        const joined = pieces.map((x) => x.text).join('');
+        if (joined !== formatBDomText(p.text, opts)) bad.push(entry.id + ' p' + pi);
+        const numbers = pieces.filter((x) => x.fn).map((x) => x.text);
+        fnPieces += numbers.length;
+        const want = scan.perParagraph[pi].filter((r) => footnotesMode && !r.trailing).map((r) => String(r.num));
+        if (numbers.join(',') !== want.join(',')) bad.push(entry.id + ' p' + pi + ' numbers ' + numbers + ' != ' + want);
+      });
+    }
+    expect(bad.slice(0, 5)).toEqual([]);
+    if (footnotesMode) expect(fnPieces).toBeGreaterThan(500);
+    else expect(fnPieces).toBe(0);
+  });
 });
 
 /* THE END-TO-END SWEEP. The previous contract proves the projection reproduces

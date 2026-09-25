@@ -5374,6 +5374,13 @@
       -webkit-tap-highlight-color: transparent;
     }
     .picker-find-nav:disabled { opacity: 0.35; cursor: default; }
+    /* The excerpt picker's find row, pinned under the breadcrumb (outside the
+       scrolling body): ‹ › scroll the letter to each hit, so a row inside the
+       body scrolled out of reach on the first press. */
+    .picker-find-bar {
+      flex-shrink: 0; margin: 0; padding: 8px 22px;
+      border-bottom: 1px solid rgba(110,98,76,0.10);
+    }
     .picker-find-none {
       font-family: var(--font-body); font-style: italic; font-size: var(--fs-15);
       color: var(--cream-muted); padding: 14px 2px;
@@ -5522,6 +5529,14 @@
       margin: 0 0 14px; padding: 0;
       /* Allow native text selection */
       user-select: text; -webkit-user-select: text;
+    }
+    /* A footnote number in the excerpt picker: the reader's gold bubble as a
+       plain superscript. It is part of the block's text, because the reader's
+       DOM counts it and the excerpt's offsets must too, but the quote leaves
+       it out. */
+    .picker-fn {
+      font-size: 0.7em; line-height: 0;
+      color: var(--gold); margin: 0 1px;
     }
 
     /* ── NOTE SHEET (for highlight notes) ─────────────────────────── */

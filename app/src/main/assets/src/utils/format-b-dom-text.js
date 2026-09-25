@@ -61,16 +61,18 @@ function defaultBookTitle(id) {
 /**
  * Walk one paragraph the way renderLine does, emitting runs.
  *
- * A run is `{ raw, rawEnd, dom, domEnd, copy }`. `copy: true` means the raw
+ * A run is `{ raw, rawEnd, dom, domEnd, copy, kind }`. `copy: true` means the raw
  * characters survive one-for-one into the DOM, so an offset inside it maps
  * exactly; `copy: false` means the renderer substituted something of its own
  * (a footnote number for a reference, a book title for a nav link) and any
- * offset inside it can only resolve to the substitution's edges.
+ * offset inside it can only resolve to the substitution's edges. `kind` names
+ * the two runs a surface drawing the text itself must tell apart: 'fn' (a
+ * reference rendered as its footnote number) and 'br' (a soft break's <br/>).
  *
  * @param {string} text raw paragraph text
  * @param {{ refs?: Array<{ref: string, trailing: boolean, num: number|null}>,
  *           footnotesMode?: boolean, bookTitle?: (id: string) => string }} opts
- * @returns {{ text: string, runs: Array<{raw: number, rawEnd: number, dom: number, domEnd: number, copy: boolean}>, lineBounds: Set<number> }}
+ * @returns {{ text: string, runs: Array<{raw: number, rawEnd: number, dom: number, domEnd: number, copy: boolean, kind?: string}>, lineBounds: Set<number> }}
  */
 function walk(text, opts) {
   const runs = [];
@@ -78,9 +80,9 @@ function walk(text, opts) {
   let dom = '';
   const state = { refIndex: 0 };
 
-  const push = (rawStart, rawLen, out, copy) => {
+  const push = (rawStart, rawLen, out, copy, kind) => {
     if (!rawLen && !out.length) return;
-    runs.push({ raw: rawStart, rawEnd: rawStart + rawLen, dom: dom.length, domEnd: dom.length + out.length, copy });
+    runs.push({ raw: rawStart, rawEnd: rawStart + rawLen, dom: dom.length, domEnd: dom.length + out.length, copy, kind });
     dom += out;
   };
 
@@ -111,7 +113,7 @@ function walk(text, opts) {
         // only a NON-trailing one in footnotesMode becomes a bare number.
         const info = (opts.refs || [])[state.refIndex++];
         const asNumber = !!opts.footnotesMode && info && !info.trailing && info.num != null;
-        push(start, seg.length, asNumber ? String(info.num) : '(' + ref[1].trim() + ')', false);
+        push(start, seg.length, asNumber ? String(info.num) : '(' + ref[1].trim() + ')', false, asNumber ? 'fn' : undefined);
         continue;
       }
       const nav = seg.match(NAV_RE);
@@ -129,7 +131,7 @@ function walk(text, opts) {
         if (piece) push(cursor, piece.length, piece, true);
         cursor += piece.length;
         if (k < pieces.length - 1) {
-          push(cursor, 1, '', false);
+          push(cursor, 1, '', false, 'br');
           // The two lines now meet with NOTHING between them in textContent —
           // exactly the way Format A poetry lines do. Record the seam: a span
           // boundary there joins two word characters and is perfectly legal,
@@ -156,6 +158,74 @@ function walk(text, opts) {
  */
 export function formatBDomText(text, opts) {
   return walk(String(text == null ? '' : text), opts || {}).text;
+}
+
+/**
+ * The same rendered text in pieces, for a surface that draws the paragraph
+ * itself (the link excerpt picker): a footnote number is its own piece (`fn`),
+ * each soft break a `seam` (the renderer's <br/>, which adds no character), and
+ * everything between them one plain piece. The pieces' texts concatenate to
+ * formatBDomText, so offsets measured over them are the reader's own.
+ * @param {string} text
+ * @param {object} [opts]
+ * @returns {Array<{text: string, fn?: boolean, seam?: boolean}>}
+ */
+export function formatBDomPieces(text, opts) {
+  const { text: dom, runs } = walk(String(text == null ? '' : text), opts || {});
+  const out = [];
+  for (const r of runs) {
+    if (r.kind === 'br') { out.push({ text: '', seam: true }); continue; }
+    if (r.domEnd === r.dom) continue;                  // a stripped marker
+    const piece = dom.slice(r.dom, r.domEnd);
+    const last = out[out.length - 1];
+    if (r.kind === 'fn') out.push({ text: piece, fn: true });
+    else if (last && !last.fn && !last.seam) last.text += piece;
+    else out.push({ text: piece });
+  }
+  return out;
+}
+
+/**
+ * The renderer's reference pre-scan (WtlbEntryView's refAnalysis), for any
+ * caller that must render the same numbers: each paragraph's {{ref:}}s in
+ * order, whether each is TRAILING (only other markers follow it, so it stays a
+ * parenthesised cite even in footnotesMode) and, in footnotesMode, its number
+ * (one per distinct ref, numbered by first use across the whole entry).
+ * @param {Array<{text?: string}>} paragraphs
+ * @param {boolean} [footnotesMode]
+ * @returns {{ perParagraph: Array<Array<{ref: string, trailing: boolean, num: number|null}>>, refNumMap: Object<string, number>, orderedRefs: string[] }}
+ */
+export function formatBRefScan(paragraphs, footnotesMode) {
+  const perParagraph = [];
+  const refNumMap = {};
+  const orderedRefs = [];
+  let num = 0;
+  (paragraphs || []).forEach((p) => {
+    const text = (p && p.text) || '';
+    const arr = [];
+    const re = /\{\{ref:([^}]+)\}\}/g;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const ref = m[1].trim();
+      const after = text.slice(m.index + m[0].length);
+      const stripped = after.replace(/\{\{(?:ref|nav):[^}]+\}\}/g, '');
+      const hasWordChar = /\w/.test(stripped);
+      const hasLaterMarker = /\{\{(?:ref|nav):/.test(after);
+      const trailing = !hasWordChar && !hasLaterMarker;
+      let n = null;
+      if (footnotesMode && !trailing) {
+        if (!(ref in refNumMap)) {
+          num++;
+          refNumMap[ref] = num;
+          orderedRefs.push(ref);
+        }
+        n = refNumMap[ref];
+      }
+      arr.push({ ref, trailing, num: n });
+    }
+    perParagraph.push(arr);
+  });
+  return { perParagraph, refNumMap, orderedRefs };
 }
 
 /**
