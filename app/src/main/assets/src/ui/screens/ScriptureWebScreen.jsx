@@ -1019,6 +1019,25 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     setChromeHidden(next);
   }, [chromeHidden]);
 
+  /** Close whatever is on top of the web, one layer a call: the guide, then
+   * the empty-web notice, then the panels and the hover chip together.
+   * Escape and Android Back both come here (v08-03), so they agree.
+   * @returns {boolean} whether there was anything to close */
+  const closeTopOverlay = React.useCallback(() => {
+    if (guideOpen) { closeGuide(); return true; }
+    if (emptyShown) { dismissEmpty(); return true; }
+    if (listOpen || choices || detail || tip) {
+      setListOpen(false); setChoices(null); setDetail(null); setTip(null);
+      focusRef.current = { arc: -1, range: null }; schedule();
+      return true;
+    }
+    return false;
+  }, [guideOpen, closeGuide, emptyShown, dismissEmpty, listOpen, choices, detail, tip, schedule]);
+  // Android Back and the app's Escape dispatcher close the top overlay first
+  // instead of leaving the web (the hover chip alone is not worth a Back).
+  useModalRegistry({ id: 'scripture-web-overlay', dismiss: closeTopOverlay,
+    active: !!(guideOpen || emptyShown || listOpen || choices || detail) });
+
   // ── keyboard (PWA desktop) ──────────────────────────────────────────────
   const onKeyDown = React.useCallback((e) => {
     const v = viewRef.current;
@@ -1053,13 +1072,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       // panel \u2014 a second handler closed the notice and let the keystroke
       // through to onBack(), so one press both dismissed the tip and threw the
       // reader out to the Library.
-      if (guideOpen) { closeGuide(); }
-      else if (emptyShown) { dismissEmpty(); }
-      else if (listOpen || choices || detail || tip) {
-        setListOpen(false); setChoices(null); setDetail(null); setTip(null);
-        focusRef.current = { arc: -1, range: null }; schedule();
-      }
-      else if (onBack) onBack();
+      // v08-03: the app's own Escape dispatcher listens on the document; the
+      // keystroke stops here so it cannot close a panel AND leave the web,
+      // or leave twice when nothing is open.
+      e.preventDefault(); e.stopPropagation();
+      if (!closeTopOverlay() && onBack) onBack();
       return;
     } else return;
     e.preventDefault();
@@ -1068,8 +1085,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (atCeiling) setAnnounce(ZOOM_MAX_MESSAGE);
     else if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
     schedule();
-  }, [choices, detail, listOpen, tip, graph, onBack, resetView, schedule,
-      emptyShown, dismissEmpty, zoomCapFor, yFrameFor, guideOpen, closeGuide]);
+  }, [graph, onBack, resetView, schedule, zoomCapFor, yFrameFor, closeTopOverlay]);
 
   /** Follow the chosen line to its far foot: the camera centres on that
    * verse at the same zoom, the line stays spotlit, and the control turns
@@ -1867,11 +1883,11 @@ function connectionMeta(info) {
 }
 
 function ConnectionChooser({ choices, onChoose, onClose, title, meta }) {
-  const closeRef = React.useRef(null);
-  React.useEffect(() => { if (closeRef.current) closeRef.current.focus(); }, []);
+  // v03-03: Tab stays in the panel; closing it hands focus back to the web
+  const trapRef = useFocusTrap(true);
   return (
-    <div className="sw-choice" role="dialog" aria-modal="false" aria-label={title || 'Connections here'}>
-      <button ref={closeRef} type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close connection choices">×</button>
+    <div className="sw-choice" ref={trapRef} role="dialog" aria-modal="false" aria-label={title || 'Connections here'}>
+      <button type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close connection choices">×</button>
       <div className="sw-sheet-eyebrow">{title || 'Connections here'}</div>
       <div className="sw-sheet-meta">{meta || 'Several threads are close together. Choose the one you meant.'}</div>
       <div className="sw-choice-list">
@@ -1887,8 +1903,8 @@ function ConnectionChooser({ choices, onChoose, onClose, title, meta }) {
 }
 
 function ConnectionList({ items, mode, lensOn, onChoose, onClose }) {
-  const closeRef = React.useRef(null);
-  React.useEffect(() => { if (closeRef.current) closeRef.current.focus(); }, []);
+  // v03-03: Tab stays in the panel; closing it hands focus back to the web
+  const trapRef = useFocusTrap(true);
   // the canon list leads with the chapter it reads (landing 15)
   const chapter = mode !== 'personal' && items[0] && items[0].kind === 'chapter' ? items[0] : null;
   const eyebrow = mode === 'personal' ? 'Your nearby links'
@@ -1899,8 +1915,8 @@ function ConnectionList({ items, mode, lensOn, onChoose, onClose }) {
       + ' \u00b7 the strongest ' + (items.length - 1) + ' below; the chapter row lists where they all go.'
     : 'Select a connection to focus it and open its passages.';
   return (
-    <div className="sw-list" role="dialog" aria-modal="false" aria-label="Nearby connections" data-lens-on={lensOn ? '1' : '0'}>
-      <button ref={closeRef} type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close nearby connections">×</button>
+    <div className="sw-list" ref={trapRef} role="dialog" aria-modal="false" aria-label="Nearby connections" data-lens-on={lensOn ? '1' : '0'}>
+      <button type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close nearby connections">×</button>
       <div className="sw-sheet-eyebrow">{eyebrow}</div>
       <div className="sw-sheet-meta">{meta}</div>
       {items.length ? (
@@ -1918,8 +1934,8 @@ function ConnectionList({ items, mode, lensOn, onChoose, onClose }) {
 }
 
 function DetailSheet({ info, onClose, onOpen, onFollow, onGroup }) {
-  const closeRef = React.useRef(null);
-  React.useEffect(() => { if (closeRef.current) closeRef.current.focus(); }, []);
+  // v03-03: Tab stays in the panel; closing it hands focus back to the web
+  const trapRef = useFocusTrap(true);
   const cards = info.cards || [];
   const eyebrow = info.kind === 'link' ? 'Your link'
     : info.kind === 'underlay' ? 'Timothy\u2019s thread'
@@ -1940,9 +1956,9 @@ function DetailSheet({ info, onClose, onOpen, onFollow, onGroup }) {
       : info.connections.toLocaleString() + ' connections';
 
   return (
-    <div className="sw-sheet" role="dialog" aria-modal="false"
+    <div className="sw-sheet" ref={trapRef} role="dialog" aria-modal="false"
       aria-label={eyebrow + ' details'}>
-      <button ref={closeRef} type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close">
+      <button type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 6L6 18M6 6l12 12" /></svg>
       </button>
       <div className="sw-sheet-eyebrow">{eyebrow}</div>

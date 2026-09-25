@@ -66,6 +66,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
 import { createRenderer } from '../scripture-web/web-renderer.js';
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import { ScriptureWebScreen } from './ScriptureWebScreen.jsx';
+import { modalRegistry } from '../../hooks/use-modal-registry.js';
 
 const baseProps = () => ({
   // swGuideSeen: the how-to-read card (landing 13) opens on a first visit and
@@ -684,6 +685,80 @@ describe('the Nearby list reads the lens (landing 15)', () => {
     const sheet = container.querySelector('.sw-sheet');
     expect(sheet, 'the chapter sheet opened').toBeTruthy();
     expect(sheet.textContent).toMatch(/Chapter/);
+  });
+
+  /* v08-03: the panels were plain local state, so the app's Escape dispatcher
+     (a document listener) and Android Back (handleAndroidBack reads the modal
+     registry first) saw nothing open: one Escape closed the panel AND left the
+     web, and Back left with the sheet still up. */
+  it('(v08-03) Escape closes the panel without reaching the app dispatcher; Back closes it through the registry', async () => {
+    const appEscape = vi.fn();
+    document.addEventListener('keydown', appEscape);
+    try {
+      const { container } = await mountList();
+      fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+      expect(container.querySelector('.sw-list')).toBeTruthy();
+      expect(modalRegistry.isAnyOpen(), 'an open panel is in the registry').toBe(true);
+
+      fireEvent.keyDown(container.querySelector('.sw-list .sw-sheet-close'), { key: 'Escape' });
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+      expect(container.querySelector('.sw-list')).toBeNull();
+      expect(appEscape, 'the keystroke stopped at the web').not.toHaveBeenCalled();
+      expect(modalRegistry.isAnyOpen()).toBe(false);
+
+      // Android Back: handleAndroidBack dismisses the registry's top entry
+      fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+      expect(container.querySelector('.sw-list')).toBeTruthy();
+      act(() => { modalRegistry.peek().dismiss(); });
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+      expect(container.querySelector('.sw-list')).toBeNull();
+      expect(modalRegistry.isAnyOpen()).toBe(false);
+    } finally {
+      document.removeEventListener('keydown', appEscape);
+    }
+  });
+
+  it('(v08-03) Escape with nothing open leaves once, and the app dispatcher never leaves a second time', async () => {
+    const appEscape = vi.fn();
+    document.addEventListener('keydown', appEscape);
+    try {
+      for (const [prop, px] of [['clientWidth', 800], ['clientHeight', 360]]) {
+        Object.defineProperty(HTMLCanvasElement.prototype, prop, { configurable: true, get() { return px; } });
+      }
+      window.SCRIPTURE_WEB_DATA = { ok: true, count: 2 };
+      if (!prevDecode) prevDecode = vi.mocked(decodeGraph).getMockImplementation();
+      vi.mocked(decodeGraph).mockImplementation(() => two());
+      const onBack = vi.fn();
+      const { container } = render(<ScriptureWebScreen {...baseProps()} onBack={onBack} />);
+      await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+      fireEvent.keyDown(container.querySelector('.sw-root'), { key: 'Escape' });
+      expect(onBack).toHaveBeenCalledTimes(1);
+      expect(appEscape).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener('keydown', appEscape);
+    }
+  });
+
+  /* v03-03: the panels focused their close button on mount and nothing more:
+     Tab walked out into the page behind, and closing dropped focus on body. */
+  it('(v03-03) Tab stays inside an open panel and closing it hands focus back to the web', async () => {
+    const { container } = await mountList();
+    const root = container.querySelector('.sw-root');
+    root.focus();
+    fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    const list = container.querySelector('.sw-list');
+    const buttons = [...list.querySelectorAll('button')];
+    expect(document.activeElement).toBe(buttons[0]);
+    buttons[buttons.length - 1].focus();
+    fireEvent.keyDown(document.activeElement, { key: 'Tab' });
+    expect(document.activeElement, 'Tab from the last row wraps to the first').toBe(buttons[0]);
+    fireEvent.click(buttons[0]);
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(container.querySelector('.sw-list')).toBeNull();
+    expect(document.activeElement).toBe(root);
   });
 });
 

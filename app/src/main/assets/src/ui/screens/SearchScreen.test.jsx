@@ -189,6 +189,16 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     expect(screen.getByPlaceholderText(/Search scriptures/i).getAttribute('type')).toBe('search');
   });
 
+  /* v07-12: the empty state promised study notes and footnotes, which the
+     index never holds (index-builder.js NOT emitted, an owner directive). */
+  it('(v07-12) the empty state names only what search searches', () => {
+    const { container } = render(<SearchScreen {...baseProps()} />);
+    const hero = container.querySelector('.srch-empty-hero');
+    expect(hero).not.toBeNull();
+    expect(hero.textContent).not.toMatch(/study notes|footnotes/i);
+    expect(hero.textContent).toMatch(/Bible studies/);
+  });
+
   /* C2-C [C8]: the app's primary search field named itself only by
      placeholder — which stops being announced the moment a character is
      typed, and is never announced at all on a field restored with a query

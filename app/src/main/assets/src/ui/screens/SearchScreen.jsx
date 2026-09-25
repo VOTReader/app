@@ -483,7 +483,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           <>
             <div className="srch-empty-hero">
               <h3>Search everything</h3>
-              <p>Verses, letters, study notes, footnotes — across all 66 books and every Volume.</p>
+              <p>Verses, letters, Words To Live By and Bible studies — across all 66 books and every Volume.</p>
             </div>
             {settings.historyEnabled !== false && recents.length > 0 && (
               <>

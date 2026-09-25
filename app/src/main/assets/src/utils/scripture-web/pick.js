@@ -355,7 +355,7 @@ export function countTouching(g, lo, hi, density) {
 export function pickChapter(g, cam, view, px, py) {
   const { width, base, rulerDepth } = view;
   if (py < base - 2 || py > base + (rulerDepth || 40)) return -1;
-  const v = Math.round(xToVerse(cam, width, px));
+  const v = Math.floor(xToVerse(cam, width, px));
   if (!(v >= 0 && v < g.total)) return -1;
   return g.chapterOfVerse[v];
 }

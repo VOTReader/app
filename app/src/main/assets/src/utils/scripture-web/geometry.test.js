@@ -491,6 +491,16 @@ describe('focus + ruler picking', () => {
     expect(pickChapter(g, cam, view, x, 100)).toBe(-1);
   });
 
+  it('reads the chapter a tap is in, right up to its drawn end (v03-02)', () => {
+    // verse v spans [v, v+1): a quarter-verse left of the Alpha 2 | Beta 1
+    // boundary (x of verse 20) is still inside Alpha 2's last verse
+    const cam = createCamera(g.total);
+    clampCamera(cam, 1000, 5000);
+    const view = VIEW();
+    expect(pickChapter(g, cam, view, verseToX(cam, view.width, 19.75), view.base + 10)).toBe(1);
+    expect(pickChapter(g, cam, view, verseToX(cam, view.width, 20.25), view.base + 10)).toBe(2);
+  });
+
   it('reads a verse off the ruler when zoomed in', () => {
     const cam = createCamera(g.total);
     clampCamera(cam, 1000, 5000);
