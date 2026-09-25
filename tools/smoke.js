@@ -556,7 +556,9 @@
       // "Personal Study" (the card's eyebrow) — a bare /Library/ would match
       // the Listening Library card that now sits before it on Home.
       clickByText(/Personal Study/); await sleep(320);
-      return /My Notes|My Bookmarks|My Journal/.test(document.body.textContent || '');
+      // 95181e08 (the one-row Library) dropped the "My Notes" eyebrows; a row
+      // carries its title alone. Either shape passes.
+      return /My Notes|My Bookmarks|My Journal|Highlights & Underlines/.test(document.body.textContent || '');
     });
     await step('Listening Library', async function () {
       await goHome();
@@ -602,13 +604,13 @@
       const text = (credit && credit.textContent) || '';
       return /OpenBible\.info/.test(text) && /CC-BY/.test(text);
     });
-    await step('Library → Notes', async function () { return lib(/My Notes/, /My Notes/); });
-    await step('Library → Bookmarks', async function () { return lib(/My Bookmarks/, /My Bookmarks/); });
+    await step('Library → Notes', async function () { return lib(/My Notes|^\s*Notes\b/, /My Notes/); });
+    await step('Library → Bookmarks', async function () { return lib(/My Bookmarks|^\s*Bookmarks\b/, /My Bookmarks/); });
     await step('Library → Highlights', async function () { return lib(/My Marks|Highlights/, /Highlight|Underline/); });
-    await step('Library → Links', async function () { return lib(/My Links/, /Link/); });
-    await step('Library → Journal', async function () { return lib(/My Journal/, /Journal/); });
+    await step('Library → Links', async function () { return lib(/My Links|^\s*Links\b/, /Link/); });
+    await step('Library → Journal', async function () { return lib(/My Journal|^\s*Journal\b/, /Journal/); });
     await step('Library → Progress', async function () {
-      await lib(/My Progress/);
+      await lib(/My Progress|^\s*Progress\b/);
       return /Most Annotated/i.test(document.body.textContent || '');
     });
     await step('Library → Milestones', async function () {
