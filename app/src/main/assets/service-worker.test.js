@@ -734,25 +734,96 @@ describe('service-worker — Songs of the Letters routes (2026-09-24)', () => {
     expect(fetchEvent(sw, getReq('https://app.test/app/songs-1/x.mp3'))).toBeDefined();
   });
 
-  it('serves the catalog stale-while-revalidate: the cached copy at once, the fresh one stored for next time', async () => {
-    const fresh = { ok: true, redirected: false, body: 'catalog-v2', clone: () => ({ body: 'catalog-v2' }) };
+  it('serves covers and lyrics stale-while-revalidate: the cached copy at once, the fresh one stored for next time', async () => {
+    const url = 'https://app.test/songs/thumbs/512/3fa9c1d2e4b5.webp';
+    const fresh = { ok: true, redirected: false, body: 'thumb-v2', clone: () => ({ body: 'thumb-v2' }) };
     const netCalls = [];
     const waited = [];
     const sw = bootSW({ fetchImpl: async (r) => { netCalls.push(r.url); return fresh; } });
     const cache = await songsCache(sw);
-    const stale = { body: 'catalog-v1' };
-    await cache.put('https://app.test/songs/catalog.json', stale);
+    const stale = { body: 'thumb-v1' };
+    await cache.put(url, stale);
     let p;
     sw.handlers.fetch({
-      request: getReq('https://app.test/songs/catalog.json'),
+      request: getReq(url),
       respondWith: (promise) => { p = promise; },
       waitUntil: (promise) => { waited.push(promise); },
     });
     expect(await p).toBe(stale);                    // stale, immediately
     expect(waited).toHaveLength(1);                 // the refresh keeps the worker alive…
     await waited[0];
-    expect(netCalls).toEqual(['https://app.test/songs/catalog.json']);
-    expect(await cache.match('https://app.test/songs/catalog.json')).toEqual({ body: 'catalog-v2' });   // …and lands
+    expect(netCalls).toEqual([url]);
+    expect(await cache.match(url)).toEqual({ body: 'thumb-v2' });   // …and lands
+  });
+
+  /* n3-06: the catalog is the one songs file that changes in place (a takedown
+     hides a song). Stale-while-revalidate answered with the previous launch's
+     copy, so a takedown reached a web reader one launch late. */
+  describe('the catalog is network-first (n3-06)', () => {
+    const CAT = 'https://app.test/songs/catalog.json';
+    function catalogEvent(sw) {
+      let p;
+      const waited = [];
+      sw.handlers.fetch({ request: getReq(CAT), respondWith: (promise) => { p = promise; }, waitUntil: (w) => { waited.push(w); } });
+      return { res: p, waited };
+    }
+
+    it('a fresh answer wins over the cached copy and is kept', async () => {
+      const fresh = { ok: true, redirected: false, body: 'catalog-v2', clone: () => ({ body: 'catalog-v2' }) };
+      const sw = bootSW({ fetchImpl: async () => fresh });
+      const cache = await songsCache(sw);
+      await cache.put(CAT, { body: 'catalog-v1' });
+      const { res, waited } = catalogEvent(sw);
+      expect(await res).toBe(fresh);                  // unmarked: the network's own answer
+      await Promise.all(waited);
+      expect(await cache.match(CAT)).toEqual({ body: 'catalog-v2' });
+    });
+
+    it('offline, a 404, a 5xx or a redirect: the cached copy answers and stays', async () => {
+      for (const net of [
+        async () => { throw new TypeError('offline'); },
+        async () => ({ ok: false, status: 404, clone: () => ({}) }),
+        async () => ({ ok: false, status: 503, clone: () => ({}) }),
+        async () => ({ ok: true, redirected: true, clone: () => ({ body: 'portal' }) }),
+      ]) {
+        const sw = bootSW({ fetchImpl: net });
+        const cache = await songsCache(sw);
+        const kept = { body: 'catalog-v1' };
+        await cache.put(CAT, kept);
+        const { res, waited } = catalogEvent(sw);
+        const got = await res;
+        expect(await got.text()).toBe('catalog-v1');
+        expect(got.headers.get('X-VOT-Fallback')).toBe('1');   // the page knows it is not fresh
+        await Promise.all(waited);
+        expect(await cache.match(CAT)).toBe(kept);
+      }
+    });
+
+    it('a network slower than the wait: the copy answers, and the fresh one still lands for the next ask', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        let release;
+        const fresh = { ok: true, redirected: false, body: 'catalog-v2', clone: () => ({ body: 'catalog-v2' }) };
+        const sw = bootSW({ fetchImpl: () => new Promise((r) => { release = () => r(fresh); }) });
+        const cache = await songsCache(sw);
+        const kept = { body: 'catalog-v1' };
+        await cache.put(CAT, kept);
+        const { res, waited } = catalogEvent(sw);
+        let answered = null;
+        res.then((r) => { answered = r; });
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(answered).toBe(null);                  // still waiting on the network
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(await answered.text()).toBe('catalog-v1');   // the wait is over: the copy, marked
+        expect(answered.headers.get('X-VOT-Fallback')).toBe('1');
+        expect(waited.length).toBeGreaterThan(0);     // the request keeps the worker alive…
+        release();
+        await Promise.all(waited);
+        expect(await cache.match(CAT)).toEqual({ body: 'catalog-v2' });   // …and lands
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   it('with nothing cached, answers from the network and keeps the copy (thumbs and lyrics too)', async () => {

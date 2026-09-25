@@ -223,21 +223,23 @@ export function adoptSongCatalog(value) {
   const next = normalizeSongCatalog(value);
   if (!next) return false;
   _catalog = next;
+  _adoptedPrint = '';   // _adoptFresh stamps it when the bytes came from the network
   _error = false;
   _bump();
   return true;
 }
 
 /* ── the loader: network first, the last good copy kept ───────────────────
-   Once per launch (catalog-schema.md "App side"): fetch the published catalog
+   Once per launch (catalog-schema.md "App side"), and again while the app runs
+   (n3-06, _recheckSoon below): fetch the published catalog
    from the network; adopt it and keep it as the LAST GOOD COPY in IDB (the
    `meta` store, the one store the backup exempts: this is not user data).
    When the network fails — offline, a 404, a timeout — or answers with a
    catalog this build refuses (an unknown schema major), adopt the last good
    copy instead, so a bad publish or a tunnel never empties the Songs shelf.
-   The PWA's service worker answers this URL stale-while-revalidate, so a
-   network-first fetch there returns the SW's copy at once and refreshes it for
-   the next launch.
+   The PWA's service worker answers this URL network-first (n3-06; its copy
+   only when the network fails or takes over 4 s), so a takedown shows on the
+   launch after it is published, not the one after that.
    Async-notify-only, like the lazy corpora (ARCHITECTURE "Lazy corpora"):
    load() never bumps synchronously, so a render-phase kick is safe. */
 
@@ -251,7 +253,40 @@ let _loadPromise = null;
 /** IDBAdapter is bundle-b, reached at call time (the audio snapshot's rule). */
 const _idb = () => /** @type {any} */ (globalThis).IDBAdapter || null;
 
-/** @returns {Promise<unknown>} the network's catalog JSON, or null */
+/* n3-06: the catalog is checked again while the app runs, not only once per
+   process: a takedown or a new song otherwise waited for a cold launch (never,
+   in an APK left running for days). Again when the reader comes back to the app,
+   when the link returns, and when a screen asks load() — at most once per
+   RECHECK_MS, never while the page is hidden. The same bytes again change
+   nothing (no redraw, no IDB write); a failed check keeps what is loaded. */
+export const SONG_CATALOG_RECHECK_MS = 30 * 60 * 1000;
+/** A check that got no fresh answer may run again this soon (on the next trigger). */
+const RETRY_MS = 60 * 1000;
+/** The PWA's service worker marks an answer from its copy (offline, slow, a bad
+    answer) with this header (service-worker.js networkFirstCatalog): not fresh. */
+const FALLBACK_HEADER = 'X-VOT-Fallback';
+/** When the network was last asked, ms (moved back after a check with no fresh answer: _settle). */
+let _checkedAt = 0;
+/** The last ask got no fresh answer (offline, a 404, not JSON, the worker's copy): the link coming back asks again at once. */
+let _lastFailed = false;
+/** Bumped by the test reset, so a check still in flight never writes into the next test. */
+let _gen = 0;
+/** Fingerprint of the bytes of the catalog adopted from the network, '' until one is. */
+let _adoptedPrint = '';
+/** @type {Promise<void> | null} */
+let _recheck = null;
+/** @type {(() => void) | null} */
+let _unlisten = null;
+
+/** A cheap fingerprint (FNV-1a over the text, plus its length): equal bytes, equal print. @param {string} s */
+function _print(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return s.length + ':' + (h >>> 0).toString(36);
+}
+
+/** @returns {Promise<{ raw: unknown, print: string, stale: boolean } | null>} the catalog JSON, its print, and
+    whether it is the service worker's copy rather than the network's; null when there is none */
 async function _fetchCatalog() {
   const f = /** @type {any} */ (globalThis).fetch;
   if (typeof f !== 'function') return null;
@@ -260,7 +295,9 @@ async function _fetchCatalog() {
   try {
     const res = await f(SONGS_HOST.catalogUrl, { cache: 'no-cache', credentials: 'omit', signal: ctrl ? ctrl.signal : undefined });
     if (!res || !res.ok) return null;
-    return await res.json();
+    const text = await res.text();
+    const stale = !!(res.headers && typeof res.headers.get === 'function' && res.headers.get(FALLBACK_HEADER) === '1');
+    return { raw: JSON.parse(text), print: _print(text), stale };
   } catch (_e) {
     return null;   // offline, blocked, aborted, or not JSON — the last good copy answers
   } finally {
@@ -282,21 +319,98 @@ function _keepLastGood(raw) {
   try { Promise.resolve(idb.put(LAST_GOOD_STORE, LAST_GOOD_KEY, raw)).catch(() => {}); } catch (_e) { /* best-effort */ }
 }
 
+/** @param {unknown} v @returns {number} a publish stamp's time, NaN when there is none */
+const _stamp = (v) => (typeof v === 'string' && v ? Date.parse(v) : NaN);
+
+/**
+ * Adopt a network answer unless it is the bytes already adopted, or OLDER than
+ * the catalog loaded (its `generated` stamp: a CDN edge or the worker's copy
+ * must never undo a takedown). True when a catalog stands in memory.
+ * @param {{ raw: unknown, print: string }} fresh
+ */
+function _adoptFresh(fresh) {
+  if (_catalog && fresh.print === _adoptedPrint) return true;
+  if (_catalog) {
+    const raw = fresh.raw && typeof fresh.raw === 'object' ? /** @type {any} */ (fresh.raw) : {};
+    if (_stamp(raw.generated) < _stamp(_catalog.generated)) return true;
+  }
+  if (!adoptSongCatalog(fresh.raw)) return false;
+  _adoptedPrint = fresh.print;
+  _keepLastGood(fresh.raw);
+  return true;
+}
+
+const _hidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
+
+/**
+ * Record how a check went. With no fresh answer the next trigger may try again
+ * after RETRY_MS, and the link coming back ('online') tries at once.
+ * @param {{ stale: boolean } | null} fresh
+ */
+function _settle(fresh) {
+  _lastFailed = !fresh || fresh.stale;
+  if (_lastFailed) _checkedAt = Date.now() - SONG_CATALOG_RECHECK_MS + RETRY_MS;
+}
+
+/**
+ * Check the network again when the last check is RECHECK_MS old (or `force`,
+ * for the link coming back after a failed check). Only once a catalog is
+ * loaded, and only while the page is seen; concurrent asks share one request.
+ * @param {boolean} [force]
+ */
+function _recheckSoon(force) {
+  if (!_catalog || _recheck || _hidden()) return;
+  if (!force && Date.now() - _checkedAt < SONG_CATALOG_RECHECK_MS) return;
+  _checkedAt = Date.now();
+  const gen = _gen;
+  /** @type {Promise<void>} */
+  const run = (async () => {
+    try {
+      const fresh = await _fetchCatalog();
+      if (gen !== _gen) return;
+      _settle(fresh);
+      if (fresh) _adoptFresh(fresh);
+    } finally {
+      if (_recheck === run) _recheck = null;
+    }
+  })();
+  _recheck = run;
+}
+
+/** Coming back to the app, or the link coming back, re-checks. Once per process. */
+function _listen() {
+  if (_unlisten || typeof document === 'undefined' || typeof window === 'undefined') return;
+  const onShow = () => { if (!_hidden()) _recheckSoon(false); };
+  // The link coming back: a check with no fresh answer runs again at once, and
+  // a launch that found no catalog anywhere tries again.
+  const onOnline = () => { if (!_catalog && _error) void loadSongCatalog(); else _recheckSoon(_lastFailed); };
+  document.addEventListener('visibilitychange', onShow);
+  window.addEventListener('online', onOnline);
+  _unlisten = () => {
+    document.removeEventListener('visibilitychange', onShow);
+    window.removeEventListener('online', onOnline);
+  };
+}
+
 /**
  * Make the catalog available: network first, then the last good copy.
- * Resolves true when a catalog is loaded. Idempotent once it has succeeded;
- * a load that found nothing anywhere (first launch, offline) is retried by the
- * next call, and flags `error` meanwhile.
+ * Resolves true when a catalog is loaded. Once it has succeeded it answers at
+ * once from memory, and re-checks the network in the background when the last
+ * check is RECHECK_MS old (n3-06); a load that found nothing anywhere (first
+ * launch, offline) is retried by the next call, and flags `error` meanwhile.
  * @returns {Promise<boolean>}
  */
 export function loadSongCatalog() {
-  if (_loadPromise) return _loadPromise;
+  _listen();
+  if (_loadPromise) {
+    if (_catalog) _recheckSoon(false);
+    return _loadPromise;
+  }
   const run = (async () => {
+    _checkedAt = Date.now();
     const fresh = await _fetchCatalog();
-    if (fresh && adoptSongCatalog(fresh)) {
-      _keepLastGood(fresh);
-      return true;
-    }
+    _settle(fresh);
+    if (fresh && _adoptFresh(fresh)) return true;
     // The network failed or published a catalog this build refuses: the copy
     // already in memory stands; else the last good one from IDB.
     if (!_catalog) {
@@ -588,6 +702,12 @@ export function _resetSongCatalogForTests() {
   _error = false;
   _version = 0;
   _listeners.clear();
+  _checkedAt = 0;
+  _lastFailed = false;
+  _adoptedPrint = '';
+  _recheck = null;
+  _gen++;
+  if (_unlisten) { _unlisten(); _unlisten = null; }
 }
 
 /** The one catalog store. Bundle-h reads it as the `SongCatalog` global. */

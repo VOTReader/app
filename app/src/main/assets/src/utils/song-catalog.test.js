@@ -237,12 +237,13 @@ describe('the loader — network first, the last good copy kept (landing B)', ()
       put: vi.fn(async (store, key, value) => { map.set(store + '/' + key, value); }),
     };
   }
-  const ok = (body) => Promise.resolve({ ok: true, status: 200, json: async () => body });
+  const ok = (body) => Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify(body), json: async () => body });
   const v2 = { ...SONG_FIXTURE, version: '2026-09-25.6' };
 
   afterEach(() => {
     delete globalThis.IDBAdapter;
     delete globalThis.fetch;
+    vi.useRealTimers();
   });
 
   it('fetches the published catalog URL, adopts it and keeps it as the last good copy', async () => {
@@ -277,7 +278,7 @@ describe('the loader — network first, the last good copy kept (landing B)', ()
     globalThis.fetch = vi.fn(() => Promise.resolve({ ok: false, status: 404, json: async () => ({}) }));
     expect(await loadSongCatalog()).toBe(true);
     _resetSongCatalogForTests();
-    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad'); } }));
+    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, status: 200, text: async () => '<html>portal</html>', json: async () => { throw new SyntaxError('bad'); } }));
     expect(await loadSongCatalog()).toBe(true);
     expect(SongCatalog.catalogVersion()).toBe('2026-09-24.6');
   });
@@ -307,5 +308,204 @@ describe('the loader — network first, the last good copy kept (landing B)', ()
     globalThis.IDBAdapter = fakeIdb({ ...SONG_FIXTURE, schema: 9 });
     globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('offline')));
     expect(await loadSongCatalog()).toBe(false);
+  });
+});
+
+/* n3-06 (sweep 2): a takedown or a new song reached a reader only on a later
+   cold launch, and never in an APK process left running for days (the loader
+   fetched once per process). Now the catalog is checked again when the app
+   comes back into view, when the link returns, or when a screen asks for it,
+   at most once per SONG_CATALOG_RECHECK_MS. */
+describe('the loader — re-checked when the reader comes back (n3-06)', () => {
+  const ok = (body) => Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify(body), json: async () => body });
+  const T0 = new Date('2026-09-25T12:00:00Z');
+  const firstSong = SONG_FIXTURE.songs[0].id;
+  /** The fixture with its first song taken down (the publisher's `hid` flag), stamped anew. */
+  const takenDown = {
+    ...SONG_FIXTURE,
+    version: '2026-09-25.7',
+    songs: SONG_FIXTURE.songs.map((s, i) => (i === 0 ? { ...s, hid: true } : s)),
+  };
+  let hidden = false;
+  let made = false;
+  function setHidden(v) {
+    hidden = v;
+    document.dispatchEvent(new Event('visibilitychange'));
+  }
+  const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(T0);
+    hidden = false;
+    // Under jsdom (the repo-root run) the real document and window; under node
+    // (this folder's own config) bare event targets in their place.
+    made = typeof document === 'undefined';
+    if (made) {
+      globalThis.document = new EventTarget();
+      globalThis.window = new EventTarget();
+    }
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (hidden ? 'hidden' : 'visible') });
+    globalThis.IDBAdapter = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+  });
+  afterEach(() => {
+    delete globalThis.IDBAdapter;
+    delete globalThis.fetch;
+    _resetSongCatalogForTests();   // drops the listeners before the targets go
+    delete document.visibilityState;   // jsdom's own getter (on the prototype) answers again
+    if (made) {
+      delete globalThis.document;
+      delete globalThis.window;
+    }
+    vi.useRealTimers();
+  });
+
+  it('coming back after the interval fetches again and adopts a takedown', async () => {
+    globalThis.fetch = vi.fn(() => ok(SONG_FIXTURE));
+    expect(await loadSongCatalog()).toBe(true);
+    expect(songById(firstSong).hid).toBe(false);
+    globalThis.fetch = vi.fn(() => ok(takenDown));
+    setHidden(true);
+    vi.setSystemTime(new Date(T0.getTime() + 31 * 60 * 1000));
+    setHidden(false);
+    await flush();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(SongCatalog.catalogVersion()).toBe('2026-09-25.7');
+    expect(songById(firstSong).hid).toBe(true);
+    expect(globalThis.IDBAdapter.put).toHaveBeenLastCalledWith('meta', 'songs-catalog', takenDown);
+  });
+
+  it('coming back within the interval does not fetch', async () => {
+    globalThis.fetch = vi.fn(() => ok(SONG_FIXTURE));
+    await loadSongCatalog();
+    setHidden(true);
+    vi.setSystemTime(new Date(T0.getTime() + 5 * 60 * 1000));
+    setHidden(false);
+    await flush();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('the same bytes again: no redraw, no rewrite of the last good copy', async () => {
+    globalThis.fetch = vi.fn(() => ok(SONG_FIXTURE));
+    await loadSongCatalog();
+    const v = SongCatalog.getVersion();
+    const puts = globalThis.IDBAdapter.put.mock.calls.length;
+    vi.setSystemTime(new Date(T0.getTime() + 31 * 60 * 1000));
+    setHidden(true); setHidden(false);
+    await flush();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    expect(SongCatalog.getVersion()).toBe(v);
+    expect(globalThis.IDBAdapter.put.mock.calls.length).toBe(puts);
+  });
+
+  it('a failed re-check keeps the catalog as it was (no error, no empty shelf), and tries again next time', async () => {
+    globalThis.fetch = vi.fn(() => ok(SONG_FIXTURE));
+    await loadSongCatalog();
+    const v = SongCatalog.getVersion();
+    globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('offline')));
+    vi.setSystemTime(new Date(T0.getTime() + 31 * 60 * 1000));
+    setHidden(true); setHidden(false);
+    await flush();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(SongCatalog.loaded).toBe(true);
+    expect(SongCatalog.error).toBe(false);
+    expect(SongCatalog.getVersion()).toBe(v);
+    // The link comes back: the 'online' event re-checks without waiting another interval.
+    globalThis.fetch = vi.fn(() => ok(takenDown));
+    vi.setSystemTime(new Date(T0.getTime() + 32 * 60 * 1000));
+    window.dispatchEvent(new Event('online'));
+    await flush();
+    expect(SongCatalog.catalogVersion()).toBe('2026-09-25.7');
+  });
+
+  it('a hidden page never fetches; a screen asking load() again after the interval re-checks in the background', async () => {
+    globalThis.fetch = vi.fn(() => ok(SONG_FIXTURE));
+    await loadSongCatalog();
+    globalThis.fetch = vi.fn(() => ok(takenDown));
+    vi.setSystemTime(new Date(T0.getTime() + 31 * 60 * 1000));
+    setHidden(true);
+    await flush();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    hidden = false;   // an APK left in the foreground: no visibility event at all
+    expect(await loadSongCatalog()).toBe(true);   // answers at once from memory
+    await flush();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(SongCatalog.catalogVersion()).toBe('2026-09-25.7');
+  });
+
+  it("the service worker's marked copy is no fresh answer: the link coming back asks again at once", async () => {
+    globalThis.fetch = vi.fn(() => ok(SONG_FIXTURE));
+    await loadSongCatalog();
+    // Offline PWA: the worker answers 200 with its copy, marked.
+    const marked = { ok: true, status: 200, headers: new Headers({ 'X-VOT-Fallback': '1' }), text: async () => JSON.stringify(SONG_FIXTURE) };
+    globalThis.fetch = vi.fn(() => Promise.resolve(marked));
+    vi.setSystemTime(new Date(T0.getTime() + 31 * 60 * 1000));
+    setHidden(true); setHidden(false);
+    await flush();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    globalThis.fetch = vi.fn(() => ok(takenDown));
+    vi.setSystemTime(new Date(T0.getTime() + 31.5 * 60 * 1000));
+    window.dispatchEvent(new Event('online'));
+    await flush();
+    expect(SongCatalog.catalogVersion()).toBe('2026-09-25.7');
+  });
+
+  it('after a check with no fresh answer, coming back a minute later asks again (no 30 min wait)', async () => {
+    globalThis.fetch = vi.fn(() => ok(SONG_FIXTURE));
+    await loadSongCatalog();
+    globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('offline')));
+    vi.setSystemTime(new Date(T0.getTime() + 31 * 60 * 1000));
+    setHidden(true); setHidden(false);
+    await flush();
+    vi.setSystemTime(new Date(T0.getTime() + 31.5 * 60 * 1000));
+    setHidden(true); setHidden(false);
+    await flush();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);   // under a minute: no storm
+    globalThis.fetch = vi.fn(() => ok(takenDown));
+    vi.setSystemTime(new Date(T0.getTime() + 32.1 * 60 * 1000));
+    setHidden(true); setHidden(false);
+    await flush();
+    expect(SongCatalog.catalogVersion()).toBe('2026-09-25.7');
+  });
+
+  it('an OLDER catalog (a CDN edge, a stale copy) never replaces the one loaded: a takedown stays', async () => {
+    globalThis.fetch = vi.fn(() => ok({ ...takenDown, generated: '2026-09-25T10:00:00-06:00' }));
+    await loadSongCatalog();
+    expect(songById(firstSong).hid).toBe(true);
+    const puts = globalThis.IDBAdapter.put.mock.calls.length;
+    globalThis.fetch = vi.fn(() => ok(SONG_FIXTURE));   // generated 2026-09-24T23:40:00-06:00
+    vi.setSystemTime(new Date(T0.getTime() + 31 * 60 * 1000));
+    setHidden(true); setHidden(false);
+    await flush();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(songById(firstSong).hid).toBe(true);
+    expect(globalThis.IDBAdapter.put.mock.calls.length).toBe(puts);
+  });
+
+  it('a launch that found no catalog anywhere loads when the link comes back', async () => {
+    globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('offline')));
+    expect(await loadSongCatalog()).toBe(false);
+    expect(SongCatalog.error).toBe(true);
+    globalThis.fetch = vi.fn(() => ok(SONG_FIXTURE));
+    window.dispatchEvent(new Event('online'));
+    await flush();
+    expect(SongCatalog.loaded).toBe(true);
+    expect(SongCatalog.error).toBe(false);
+  });
+
+  it('two triggers at once share one request', async () => {
+    globalThis.fetch = vi.fn(() => ok(SONG_FIXTURE));
+    await loadSongCatalog();
+    let release;
+    globalThis.fetch = vi.fn(() => new Promise((r) => { release = r; }));
+    vi.setSystemTime(new Date(T0.getTime() + 31 * 60 * 1000));
+    setHidden(true); setHidden(false);
+    window.dispatchEvent(new Event('online'));
+    void loadSongCatalog();
+    await flush();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    release({ ok: true, status: 200, text: async () => JSON.stringify(takenDown) });
+    await flush();
+    expect(SongCatalog.catalogVersion()).toBe('2026-09-25.7');
   });
 });
