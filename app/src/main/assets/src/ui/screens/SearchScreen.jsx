@@ -121,7 +121,10 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     const loadMatthew = (typeof window.__loadMatthewCorpus === 'function') ? window.__loadMatthewCorpus().catch(() => {}) : Promise.resolve();
     const loadVot = (typeof window.__loadVotCorpus === 'function') ? window.__loadVotCorpus().catch(() => {}) : Promise.resolve();
     const loadAnswers = (typeof window.__loadAnswersCorpus === 'function') ? window.__loadAnswersCorpus().catch(() => {}) : Promise.resolve();
-    Promise.all([loadBible, loadMatthew, loadVot, loadAnswers])
+    // The studies too (v09-perf-01): without them a boot-then-Search index had no
+    // study chapters, and the cache key flipped on whether Studies had been opened.
+    const loadStudies = (typeof loadBibleStudies === 'function') ? Promise.resolve(loadBibleStudies()).catch(() => {}) : Promise.resolve();
+    Promise.all([loadBible, loadMatthew, loadVot, loadAnswers, loadStudies])
       .then(() => E.init({
         onProgress: (done, total) => { if (!cancelled) setBuildInfo((b) => ({ ...b, progress: { done, total } })); }
       }))

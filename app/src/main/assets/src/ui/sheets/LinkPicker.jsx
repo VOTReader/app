@@ -91,7 +91,9 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
       const fn = (/** @type {any} */ (window))[f];
       return (typeof fn === 'function') ? Promise.resolve(fn()).catch(() => {}) : Promise.resolve();
     });
-    try { if (typeof loadBibleStudies === 'function') loadBibleStudies(); } catch (_e) { /* best-effort */ }
+    // Awaited with the corpora (v09-perf-01): an index built without the studies
+    // is cached under a different key than one built with them.
+    try { if (typeof loadBibleStudies === 'function') loaders.push(Promise.resolve(loadBibleStudies()).catch(() => {})); } catch (_e) { /* best-effort */ }
     if (typeof (/** @type {any} */ (window)).__loadScreensE === 'function') (/** @type {any} */ (window)).__loadScreensE();
     // The 400ms floor stays: it keeps a cold ~10s index build off the picker's
     // own first paint. The corpora simply have to be in as WELL.

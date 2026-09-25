@@ -37,7 +37,8 @@ const KEY = 'index';
    chain only). Every index cached before this still CONTAINS its titles and
    bodies, so the builder change alone would keep serving the leak to every
    installed client forever; the bump is what discards them. */
-export const MS_INDEX_VERSION = 'm5';   // m5: Answers Only God Can Give joins the index as its own kind (2026-09-22)
+export const MS_INDEX_VERSION = 'm6';   // m6: KJV-R verses from the KJV base, block-shaped Holy Days bodies, studies always in (REPORT #8, 2026-09-24)
+// m5: Answers Only God Can Give joins the index as its own kind (2026-09-22)
 
 /** MUST equal service-worker.js CORPUS_VERSION — gate-enforced (SRCH1, see
  *  header). Busts the cached index on content-only corpus edits. */
@@ -60,6 +61,21 @@ function bookChapterCount() {
 }
 
 /**
+ * A sparse overlay's base edition (KJV-R -> KJV) fills every verse the overlay
+ * does not carry, so whether it was in memory shapes the index as much as the
+ * overlay does (v07-04). '' for an edition with no non-NKJV base.
+ * @param {string} translation
+ * @returns {string}
+ */
+function baseFlag(translation) {
+  const opts = g('TRANSLATION_OPTIONS');
+  const opt = Array.isArray(opts) ? opts.find((o) => o && o.id === translation) : null;
+  const base = opt && opt.base;
+  if (!base || base === 'nkjv') return '';
+  return '+' + (g('BIBLE_' + String(base).toUpperCase()) ? '1' : '0');
+}
+
+/**
  * Structural cache signature for the current corpus + translation.
  * @param {string} translation
  * @returns {string}
@@ -79,7 +95,7 @@ export function dataSignature(translation) {
     // and has no global, so it is 'n' rather than a flapping 0.
     'alt:' + (!translation || translation === 'nkjv'
       ? 'n'
-      : (g('BIBLE_' + translation.toUpperCase()) ? '1' : '0')),
+      : (g('BIBLE_' + translation.toUpperCase()) ? '1' : '0') + baseFlag(translation)),
     'bk:' + kc(g('BOOKS')) + '.' + bookChapterCount(),
     'mt:' + (MATTHEW && MATTHEW.chapters ? MATTHEW.chapters.length : 0),
     'v1:' + ln(g('LETTERS_V1')), 'v2:' + ln(g('LETTERS')), 'v3:' + ln(g('LETTERS_V3')),

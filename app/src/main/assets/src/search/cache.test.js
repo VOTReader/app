@@ -50,6 +50,23 @@ describe('cache signature', () => {
     expect(with_).not.toBe(without);
   });
 
+  it('KJV-R: the base edition (KJV) being in memory is part of the signature too (v07-04)', () => {
+    /* The KJV-R overlay is sparse; every verse it does not carry is indexed from
+       the KJV. An index built before BIBLE_KJV landed is NKJV-filled and must not
+       be served under the key of a complete one. */
+    const G = /** @type {any} */ (globalThis);
+    const prevOpts = G.TRANSLATION_OPTIONS;
+    G.TRANSLATION_OPTIONS = [{ id: 'rkjv', base: 'kjv' }];
+    G.BIBLE_RKJV = { john: { 3: [{ n: 16, text: 'rkjv 16' }] } };
+    delete G.BIBLE_KJV;
+    const without = dataSignature('rkjv');
+    G.BIBLE_KJV = { john: { 3: [{ n: 16, text: 'kjv 16' }] } };
+    const with_ = dataSignature('rkjv');
+    delete G.BIBLE_KJV; delete G.BIBLE_RKJV;
+    G.TRANSLATION_OPTIONS = prevOpts;
+    expect(with_).not.toBe(without);
+  });
+
   it('CONTROL: nkjv has no alt global by design, so its signature does not move', () => {
     /* NKJV text is baked into BOOKS, so there is no BIBLE_NKJV to be present or
        absent. Without this arm the case above is satisfied by a component that

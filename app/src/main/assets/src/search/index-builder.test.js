@@ -193,3 +193,51 @@ describe('Matthew Study Bible indexing', () => {
     /** @type {any} */ (globalThis).MATTHEW = prev;
   });
 });
+
+// ── REPORT #8 index content (v07-04, v07-09) ─────────────────────────────
+import { translateVerse } from '../data/translations.js';
+
+describe('buildDocs — verse text comes from translateVerse; block-shaped Holy Days index their bodies', () => {
+  const G = /** @type {any} */ (globalThis);
+  const EXTRA = {
+    TRANSLATION_OPTIONS: [{ id: 'nkjv' }, { id: 'kjv' }, { id: 'rkjv', base: 'kjv' }, { id: 'hnv' }],
+    // KJV-R is a SPARSE overlay on the KJV: Genesis 1:2 is overridden, 1:1 is not.
+    BIBLE_RKJV: { genesis: { 1: [{ n: 2, text: 'And the earth was without form (restored).' }] } },
+    BIBLE_KJV: { genesis: { 1: [{ n: 1, text: 'In the beginning God created the heaven and the earth.' }, { n: 2, text: 'KJV two' }] } },
+    // The HNV stores verses it does not carry as blank strings.
+    BIBLE_HNV: { genesis: { 1: [{ n: 1, text: 'In the beginning God created the heavens (HNV).' }, { n: 2, text: '' }] } },
+    translateVerse,
+  };
+  let prevData;
+  beforeAll(() => {
+    prevData = window.VotSearchData;
+    window.VotSearchData = VOT_DATA;
+    for (const k of Object.keys(GLOBALS)) G[k] = GLOBALS[k];
+    for (const k of Object.keys(EXTRA)) G[k] = EXTRA[k];
+    G.HOLY_DAYS = [...GLOBALS.HOLY_DAYS,
+      { id: 'hd-11', num: 11, title: 'Unleavened Bread', blocks: [{ segments: [{ v: 'Purge out the old leaven,' }, { v: 'says the Lord.' }] }] }];
+  });
+  afterAll(() => {
+    window.VotSearchData = prevData;
+    for (const k of [...Object.keys(GLOBALS), ...Object.keys(EXTRA)]) delete G[k];
+  });
+  const verse = (docs, n) => docs.find((d) => d.kind === 'verse' && d.bookId === 'genesis' && d.verseNum === n);
+
+  it('KJV-R: a verse the overlay does not carry is indexed from the KJV base, not the NKJV', () => {
+    const docs = buildDocs({ translation: 'rkjv' });
+    expect(verse(docs, 1).text).toBe('In the beginning God created the heaven and the earth.');
+    expect(verse(docs, 2).text).toBe('And the earth was without form (restored).');
+  });
+
+  it('a blank edition verse falls back to the NKJV instead of dropping out of the index', () => {
+    const docs = buildDocs({ translation: 'hnv' });
+    expect(verse(docs, 1).text).toBe('In the beginning God created the heavens (HNV).');
+    expect(verse(docs, 2).text).toBe('The earth was without form, and void.');
+  });
+
+  it('a Holy Days entry made of blocks indexes its body, not just its title', () => {
+    const hd = buildDocs({ translation: 'nkjv' }).find((d) => d.letterId === 'hd-11');
+    expect(hd.kind).toBe('holy-day');
+    expect(hd.text).toBe('Purge out the old leaven, says the Lord.');
+  });
+});

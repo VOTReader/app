@@ -148,6 +148,9 @@ export function buildDocs(options) {
         const ptxt = paragraphs[p] && paragraphs[p].text ? paragraphs[p].text : '';
         body += ' ' + ptxt.replace(/\{\{[^}]+\}\}/g, ' ');
       }
+      // Holy Days mixes shapes: 11 of its 16 entries are block-shaped letters with no
+      // paragraphs, and indexed only their titles (v07-09).
+      if (!paragraphs.length && en.blocks) body = letterText(en);
       body = body.replace(/\s+/g, ' ').trim();
       docs.push({
         id: nextId(),
@@ -209,7 +212,13 @@ export function buildDocs(options) {
 
   // ─── 66 Bible books — SCRIPTURES (incl. matthew-plain registered in BOOKS) ───
   if (typeof BOOKS !== 'undefined') {
-    const altData = (translation !== 'nkjv') ? window['BIBLE_' + translation.toUpperCase()] : null;
+    // The reader's edition, exactly as the chapter screen shows it: translateVerse
+    // (data/translations.js, a bundle-d global) makes the base hop of a sparse
+    // overlay (KJV-R -> KJV), skips blank verses and follows versification
+    // aliases. Reading only window['BIBLE_<CODE>'] indexed the NKJV for every verse
+    // KJV-R does not override and dropped the HNV's blank ones (v07-04).
+    const xlate = (translation !== 'nkjv' && typeof window.translateVerse === 'function') ? window.translateVerse : null;
+    const altData = (translation !== 'nkjv' && !xlate) ? window['BIBLE_' + translation.toUpperCase()] : null;
     const bookIds = Object.keys(BOOKS);
     for (let bi = 0; bi < bookIds.length; bi++) {
       const book = BOOKS[bookIds[bi]];
@@ -224,7 +233,7 @@ export function buildDocs(options) {
           const verses = section.verses || [];
           for (let vj = 0; vj < verses.length; vj++) {
             const v = verses[vj];
-            let text = v.text;
+            let text = xlate ? xlate(book.id, chapter.num, v, translation) : v.text;
             if (altBook) {
               const altCh = altBook[chapter.num];
               if (Array.isArray(altCh)) {

@@ -485,3 +485,40 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 });
+
+describe('SearchScreen — the index waits for the Bible Studies (v09-perf-01)', () => {
+  /* The screen awaited the Bible, Matthew, VOT and Answers corpora but never the
+     studies, so a reader who went from boot straight to Search built (and cached)
+     an index with no study chapters, and the cache key flipped with whether the
+     Studies screen had been opened first: a ~10 s cold rebuild each flip. */
+  const noop = () => {};
+  beforeEach(() => {
+    /** @type {any} */ (globalThis).ScreenLayout = ({ children }) => <div>{children}</div>;
+    /** @type {any} */ (globalThis).ConfirmStrip = ConfirmStrip;
+    /** @type {any} */ (globalThis).SRCH_QUICK_PICKS = [];
+    /** @type {any} */ (window).VotSearchData = { BOOK_DISPLAY: {}, SYNONYM_MAP: {} };
+    /** @type {any} */ (window).getRecentSearches = () => [];
+  });
+  afterEach(() => {
+    cleanup();
+    delete /** @type {any} */ (window).VotSearchMini;
+    delete /** @type {any} */ (globalThis).loadBibleStudies;
+  });
+
+  it('builds only after loadBibleStudies has settled', async () => {
+    let settle = noop;
+    /** @type {any} */ (globalThis).loadBibleStudies = vi.fn(() => new Promise((r) => { settle = () => r(true); }));
+    const init = vi.fn(() => Promise.resolve());
+    /** @type {any} */ (window).VotSearchMini = {
+      getState: () => ({ ready: false }), init, suggest: () => [], fuzzyBookSuggest: () => null,
+      search: () => Promise.resolve({ parsed: null, results: [], parsedTerms: [] }),
+    };
+    render(<SearchScreen query="" onQueryChange={noop} settings={{}} onSettingsChange={noop} onSelect={noop}
+      onBack={noop} searchScope={null} searchContext={null} onToggleScope={noop} onCommand={noop} />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(/** @type {any} */ (globalThis).loadBibleStudies).toHaveBeenCalled();
+    expect(init).not.toHaveBeenCalled();
+    await act(async () => { settle(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    expect(init).toHaveBeenCalled();
+  });
+});
