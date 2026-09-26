@@ -428,6 +428,23 @@ describe('createPagerGesture controller', () => {
     expect(calls.commits).toEqual([]);
   });
 
+  /* cp1 sweep: with text selected the drag followed the finger 1:1 and slid
+     the next chapter in (250 px of John 8 on screen) before snapping back —
+     a page turn it was never going to make. Pinned, it tugs like a dead end. */
+  it('with text selected the page only tugs (rubber band) and the neighbour never slides in', () => {
+    const { io, track, nextPeek, calls } = makeIO({ hasSelection: () => true });
+    const g = createPagerGesture(io);
+    g.start(startEv(350, 100));
+    g.move(moveEv(300, 100, 0));
+    g.move(moveEv(100, 100, 40));   // dx -250 of a 400 px page
+    const tx = Number(/translateX\((-?[\d.]+)px\)/.exec(track.style.transform)?.[1]);
+    expect(tx).toBeCloseTo(rubberBand(-250, 400), 5);
+    expect(Math.abs(tx)).toBeLessThan(400 * 0.18);
+    expect(nextPeek.style.transform || '').toBe('');
+    g.end();
+    expect(calls.commits).toEqual([]);
+  });
+
   it('reduced motion still commits, without a transition', () => {
     const { io, calls, track } = makeIO({ reducedMotion: () => true });
     const g = createPagerGesture(io);

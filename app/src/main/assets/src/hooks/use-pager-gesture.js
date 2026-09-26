@@ -273,16 +273,20 @@ export function createPagerGesture(io) {
     if (st.dir === dir) return;
     if (st.dir) parkPeek(st.dir);
     st.dir = dir;
-    st.desc = io.peekFor(dir) || null;     // null = dead end → rubber-band only
+    // null = dead end → rubber-band only. A PINNED gesture (text selected at
+    // axis-lock, see move) is a dead end too: the flip is refused at release,
+    // so the neighbour never slides in.
+    st.desc = st.pinned ? null : (io.peekFor(dir) || null);
     const trk = io.getTrack();
-    const pk = io.getPeek(dir);
+    const pk = st.desc ? io.getPeek(dir) : null;
     if (trk && trk.style) trk.style.willChange = 'transform';
     if (pk && pk.style) pk.style.willChange = 'transform';
   }
 
-  function applyDrag(dx, dir, width) {
+  // `withPeek` false (a dead end or a pinned gesture): only the page tugs.
+  function applyDrag(dx, dir, width, withPeek) {
     setStyle(io.getTrack(), 'none', `translateX(${dx}px)`);
-    const pk = io.getPeek(dir);
+    const pk = withPeek ? io.getPeek(dir) : null;
     if (pk) {
       const base = dir === 'next' ? width : -width;
       setStyle(pk, 'none', `translateX(${base + dx}px)`);
@@ -398,7 +402,7 @@ export function createPagerGesture(io) {
       // guard (in endGesture) still blocks a flip while selecting.
       s = {
         touchId: t0.identifier, startX: t0.clientX, startY: t0.clientY,
-        axis: null, dir: null, desc: null, dx: 0, samples: [],
+        axis: null, dir: null, desc: null, dx: 0, samples: [], pinned: false,
         width: io.getWidth(), lastEventTs: Date.now(),
       };
       armWatchdog();
@@ -426,6 +430,13 @@ export function createPagerGesture(io) {
         if (ax === null) return;
         if (ax === 'y') { endGesture('spring', null); return; }   // vertical → release to native scroll
         s.axis = 'x';
+        // PINNED (cp1 sweep, 2026-09-26): with text selected the flip is
+        // refused at release (endGesture's selection guard), but the drag
+        // used to follow the finger 1:1 with the next chapter sliding in —
+        // measured on John 7: 250 px of John 8 on screen, then a snap back.
+        // Promising a page turn it will not make reads as broken. Pinned,
+        // the page tugs with the dead-end rubber band and nothing slides in.
+        s.pinned = !!(io.hasSelection && io.hasSelection());
         // Lock direction + promote the track/peek to a compositing layer (cleared
         // in finishSettle so the live page renders on the main thread at rest).
         setDir(s, dx < 0 ? 'next' : 'prev');
@@ -439,7 +450,7 @@ export function createPagerGesture(io) {
       s.dx = dx;
       s.samples.push({ x: dx, t: e.timeStamp || 0 });
       if (s.samples.length > 6) s.samples.shift();
-      applyDrag(s.desc ? dx : rubberBand(dx, s.width), s.dir, s.width);
+      applyDrag(s.desc ? dx : rubberBand(dx, s.width), s.dir, s.width, !!s.desc);
     },
 
     end(e) {
