@@ -16,7 +16,11 @@
    The data plane stays where it was: utils/backup.js, backup-container.js,
    backup-android.js and backup-verify.js ride bundle-d and are reached here as
    the same window globals the screen used, so bundle-e never carries a second
-   copy of withBackupLock's lock or the stores. */
+   copy of withBackupLock's lock or the stores. The one import, backup-warn.js,
+   is stateless. The warnings that already write their own DiagnosticLog line
+   (integrity, Clear All's caches) keep console.warn, so nothing logs twice. */
+
+import { backupWarn } from './backup-warn.js';
 
 // Set immediately before an import applies; removed only when the apply
 // completes (or provably never started). A crash mid-restore leaves it behind,
@@ -381,13 +385,13 @@ export function createBackupFlow(ctx) {
         return true;
       } catch (e) {
         hideToast(_TOAST_ID);
-        console.warn('export write failed', e);
+        backupWarn('export write failed', e);
         // BAK5: discard the partial write so no truncated .votbak is left behind.
         try { await sink.abort?.(); } catch (_e) { /* best-effort cleanup */ }
         _showToast('Export failed while writing. Please try again.');
       }
     } catch (e) {
-      console.warn('export failed', e);
+      backupWarn('export failed', e);
       hideToast(_TOAST_ID);
       // The escape offer survives a throw out of the await above; nothing else
       // takes it down on that path.
@@ -459,7 +463,7 @@ export function createBackupFlow(ctx) {
       if (saved.sticky) _showToast(saved.text, 0); else _showToast(saved.text);
       return true;
     } catch (e) {
-      console.warn('android v3 export failed', e);
+      backupWarn('android v3 export failed', e);
       hideToast(_TOAST_ID);
       _showToast('Export failed while writing. Please try again.');
     }
@@ -667,7 +671,7 @@ export function createBackupFlow(ctx) {
       let read;
       try { read = await readContainer(file); }
       catch (e) {
-        console.warn('v3 container read failed', e);
+        backupWarn('v3 container read failed', e);
         _showToast('This backup file is corrupt or incomplete and could not be read.');
         return;
       }
@@ -679,7 +683,7 @@ export function createBackupFlow(ctx) {
       if (read.integrity !== 'ok' && read.integrity !== 'absent') _warnBackupIntegrity('web', read.integrity);
       const envelopeErrors = validateImportEnvelope(manifest);
       if (envelopeErrors.length) {
-        console.warn('import envelope invalid:', envelopeErrors);
+        backupWarn('import envelope invalid:', envelopeErrors);
         _showToast('This file does not look like a VOTReader backup.');
         return;
       }
@@ -696,7 +700,7 @@ export function createBackupFlow(ctx) {
         const parsed = JSON.parse(jsonText);
         const envelopeErrors = validateImportEnvelope(parsed);
         if (envelopeErrors.length) {
-          console.warn('import envelope invalid:', envelopeErrors);
+          backupWarn('import envelope invalid:', envelopeErrors);
           _showToast('This file does not look like a VOTReader backup.');
           return;
         }
@@ -711,7 +715,7 @@ export function createBackupFlow(ctx) {
         // SEC2: never surface the raw JSON.parse/exception text — V8 folds a
         // fragment of the malformed input into err.message. Log it for diagnostics;
         // show the same generic message the other corrupt-file paths use.
-        console.warn('import failed', err);
+        backupWarn('import failed', err);
         hideToast(_TOAST_ID);
         _showToast('This backup file is corrupt or incomplete and could not be read.');
       }
@@ -730,13 +734,13 @@ export function createBackupFlow(ctx) {
       });
       if (ready === 'cancelled') return;                  // user dismissed the picker
       // SEC2: log the raw native reason; show a generic, actionable message.
-      if (ready !== 'ok') { console.warn('v3 import open failed:', ready); _showToast('Import failed — could not open the file. Please try again.'); return; }
+      if (ready !== 'ok') { backupWarn('v3 import open failed:', ready); _showToast('Import failed — could not open the file. Please try again.'); return; }
       // 2. Open + sniff (native reads the magic, then the manifest OR the whole
       //    legacy file). Close the native stream on every non-v3 / error exit.
       let begin;
       try { begin = PlatformBridge.v3ImportBegin(); }
       catch (e) {
-        console.warn('v3 import begin failed', e);
+        backupWarn('v3 import begin failed', e);
         try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
         _showToast('Import failed: could not read file.');
         return;
@@ -766,7 +770,7 @@ export function createBackupFlow(ctx) {
       let manifest;
       try { manifest = JSON.parse(sniff.manifestJson); }
       catch (e) {
-        console.warn('v3 import manifest parse failed', e);
+        backupWarn('v3 import manifest parse failed', e);
         try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
         _showToast('This backup file is corrupt or incomplete and could not be read.');
         return;
@@ -774,7 +778,7 @@ export function createBackupFlow(ctx) {
       const envelopeErrors = validateImportEnvelope(manifest);
       if (envelopeErrors.length) {
         try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
-        console.warn('import envelope invalid:', envelopeErrors);
+        backupWarn('import envelope invalid:', envelopeErrors);
         _showToast('This file does not look like a VOTReader backup.');
         return;
       }
@@ -801,7 +805,7 @@ export function createBackupFlow(ctx) {
           validateStorePayload: validateStorePayload,
         }), () => integrityResult);
       } catch (e) {
-        console.warn('android v3 import failed', e);
+        backupWarn('android v3 import failed', e);
         hideToast(_TOAST_ID);
         _showToast('Import failed — the file may be corrupt or incomplete. Please try again.');
       } finally {
@@ -841,7 +845,7 @@ export function createBackupFlow(ctx) {
       } catch (e) {
         // SEC2: log for diagnostics; show a generic message, never the raw
         // exception text (may embed a fragment of the malformed file).
-        console.warn('import failed', e);
+        backupWarn('import failed', e);
         hideToast(_TOAST_ID);
         _showToast('This backup file is corrupt or incomplete and could not be read.');
       }
@@ -874,7 +878,7 @@ export function createBackupFlow(ctx) {
     const _checkEnvelope = (parsed) => {
       const errs = validateImportEnvelope(parsed);
       if (errs.length) {
-        console.warn('verify: envelope invalid', errs);
+        backupWarn('verify: envelope invalid', errs);
         _verifyFail('This file does not look like a VOTReader backup.');
         return false;
       }
@@ -888,10 +892,10 @@ export function createBackupFlow(ctx) {
           PlatformBridge.v3ImportOpen();
         });
         if (ready === 'cancelled') return;
-        if (ready !== 'ok') { console.warn('verify open failed:', ready); _verifyFail('Could not open the file. Please try again.'); return; }
+        if (ready !== 'ok') { backupWarn('verify open failed:', ready); _verifyFail('Could not open the file. Please try again.'); return; }
         let begin;
         try { begin = PlatformBridge.v3ImportBegin(); }
-        catch (e) { console.warn('verify begin failed', e); try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ } _verifyFail('Could not read the file.'); return; }
+        catch (e) { backupWarn('verify begin failed', e); try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ } _verifyFail('Could not read the file.'); return; }
         const sniff = classifyV3ImportBegin(begin);
         try {
           if (sniff.kind === 'error') {
@@ -903,7 +907,7 @@ export function createBackupFlow(ctx) {
           if (sniff.kind === 'legacy') {
             let parsed;
             try { parsed = JSON.parse(sniff.json); }
-            catch (e) { console.warn('verify legacy parse failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
+            catch (e) { backupWarn('verify legacy parse failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
             if (!_checkEnvelope(parsed)) return;
             _report(parsed, 'absent', 'legacy');
             return;
@@ -911,7 +915,7 @@ export function createBackupFlow(ctx) {
           if (sniff.kind !== 'v3') { _verifyFail('This file does not look like a VOTReader backup.'); return; }
           let manifest;
           try { manifest = JSON.parse(sniff.manifestJson); }
-          catch (e) { console.warn('verify manifest parse failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
+          catch (e) { backupWarn('verify manifest parse failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
           if (!_checkEnvelope(manifest)) return;
           // Drain every media frame (discarding the bytes) so the stream reaches
           // the trailing CRC — the generator runs the native verify via onDone.
@@ -931,7 +935,7 @@ export function createBackupFlow(ctx) {
             });
             for await (const _entry of entries) { /* verify-only: bytes discarded */ }
           } catch (e) {
-            console.warn('verify frame walk failed', e);
+            backupWarn('verify frame walk failed', e);
             _verifyFail('This backup could not be checked — the app could not read the file all the way through. Please try again.');
             return;
           }
@@ -956,7 +960,7 @@ export function createBackupFlow(ctx) {
           // as integrity 'truncated' with the frames that DID read, which is
           // the honest input to the report below.
           try { read = await readContainer(file); }
-          catch (e) { console.warn('verify container read failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
+          catch (e) { backupWarn('verify container read failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
           if (!_checkEnvelope(read.manifest)) return;
           _report(read.manifest, read.integrity, 'v3', {
             count: read.entries.length,
@@ -966,12 +970,12 @@ export function createBackupFlow(ctx) {
           if (file.size > 50 * 1024 * 1024) { _verifyFail('That file is too large to be a VOTReader backup (over 50 MB).'); return; }
           let parsed;
           try { parsed = JSON.parse(await file.text()); }
-          catch (e) { console.warn('verify legacy parse failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
+          catch (e) { backupWarn('verify legacy parse failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
           if (!_checkEnvelope(parsed)) return;
           _report(parsed, 'absent', 'legacy');
         }
       } catch (e) {
-        console.warn('verify failed', e);
+        backupWarn('verify failed', e);
         _verifyFail('This backup file is corrupt or incomplete and could not be read.');
       }
     })();
@@ -1062,7 +1066,7 @@ export function createBackupFlow(ctx) {
       // import starting against the just-wiped state would race the teardown.
       _scheduleBackupReload(600);
     } catch (e) {
-      console.warn('clear all personal data failed', e);
+      backupWarn('clear all personal data failed', e);
       // Wave-0: was alert('Clear failed. See console for details.') — native
       // dialog + dev-speak. The diagnostics still go to console.warn above;
       // the user gets an actionable message, not a pointer to tooling.

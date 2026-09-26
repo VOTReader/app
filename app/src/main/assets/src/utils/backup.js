@@ -22,6 +22,7 @@
 */
 
 import { validateV3MediaMetadata } from './import-validators.js';
+import { backupWarn } from './backup-warn.js';
 
 /**
  * @typedef {{ store: any, method: string }} ExportableEntry
@@ -242,7 +243,7 @@ export async function buildExportPayload(ctx) {
   const saveResults = await Promise.all(_saveTargets.map((s) => _whenSaved(s)));
   saveResults.forEach((ok, i) => {
     if (!ok && !staleProblems.includes(_saveNames[i])) {
-      console.warn('export: store write not durable', _saveNames[i]);
+      backupWarn('export: store write not durable', _saveNames[i]);
       staleProblems.push(_saveNames[i]);
     }
   });
@@ -270,13 +271,13 @@ export async function buildExportPayload(ctx) {
     try {
       const v = await idbAdapter.get(name, 'v');
       if (v !== undefined) stores[name] = v;
-    } catch (e) { console.warn('export: store read failed', name, e); exportProblems.push(name); }
+    } catch (e) { backupWarn('export: store read failed', name, e); exportProblems.push(name); }
   }
   for (const name of Object.keys(flagMap)) {
     try {
       const v = await idbAdapter.get(name, 'v');
       if (v !== undefined) stores[name] = !!v;
-    } catch (e) { console.warn('export: flag read failed', name, e); exportProblems.push(name); }
+    } catch (e) { backupWarn('export: flag read failed', name, e); exportProblems.push(name); }
   }
 
   // (c) media: encode JournalMediaStore blobs as base64.
@@ -301,7 +302,7 @@ export async function buildExportPayload(ctx) {
       };
     }
   } catch (e) {
-    console.warn('media export failed', e);
+    backupWarn('media export failed', e);
     exportProblems.push('journal media');
   }
 
@@ -383,7 +384,7 @@ export async function buildV3Manifest(ctx) {
   const saveResults = await Promise.all(_saveTargets.map((s) => _whenSaved(s)));
   saveResults.forEach((ok, i) => {
     if (!ok && !staleProblems.includes(_saveNames[i])) {
-      console.warn('export: store write not durable', _saveNames[i]);
+      backupWarn('export: store write not durable', _saveNames[i]);
       staleProblems.push(_saveNames[i]);
     }
   });
@@ -401,11 +402,11 @@ export async function buildV3Manifest(ctx) {
   const stores = {};
   for (const name of Object.keys(storesMap)) {
     try { const v = await idbAdapter.get(name, 'v'); if (v !== undefined) stores[name] = v; }
-    catch (e) { console.warn('export: store read failed', name, e); exportProblems.push(name); }
+    catch (e) { backupWarn('export: store read failed', name, e); exportProblems.push(name); }
   }
   for (const name of Object.keys(flagMap)) {
     try { const v = await idbAdapter.get(name, 'v'); if (v !== undefined) stores[name] = !!v; }
-    catch (e) { console.warn('export: flag read failed', name, e); exportProblems.push(name); }
+    catch (e) { backupWarn('export: flag read failed', name, e); exportProblems.push(name); }
   }
 
   // Media: per-blob METADATA for the manifest + the blob refs (SAME order) for
@@ -428,7 +429,7 @@ export async function buildV3Manifest(ctx) {
       mediaEntries.push({ id: id, blob: rec.blob });
     }
   } catch (e) {
-    console.warn('media export failed', e);
+    backupWarn('media export failed', e);
     exportProblems.push('journal media');
   }
 
@@ -500,7 +501,7 @@ function _reseedLsData(dataObj, dataLsKeys) {
     if (k.indexOf('vot-') !== 0) return;
     const v = dataObj[k];
     if (typeof v === 'string') {
-      try { localStorage.setItem(k, v); } catch (e) { console.warn('LS write failed for', k, e); }
+      try { localStorage.setItem(k, v); } catch (e) { backupWarn('LS write failed for', k, e); }
     }
   });
 }
@@ -540,18 +541,18 @@ function _applyStoresAndFlags(storesObj, storesMap, flagMap, validateStorePayloa
     const violations = validateStorePayload(name, storesObj[name]);
     if (violations.length) {
       skippedStores.push(name);
-      console.warn('skipping store with invalid payload:', name, violations);
+      backupWarn('skipping store with invalid payload:', name, violations);
       continue;
     }
     const { store, method } = storesMap[name];
     try { _restoreStore(store, method, storesObj[name]); }
-    catch (e) { importFailures += 1; console.warn('store import failed for', name, e); }
+    catch (e) { importFailures += 1; backupWarn('store import failed for', name, e); }
   }
   for (const name of Object.keys(flagMap)) {
     if (!(name in storesObj)) continue;
     const truthy = !!storesObj[name];
     try { if (truthy) flagMap[name].set(); else flagMap[name].clear(); }
-    catch (e) { importFailures += 1; console.warn('flag import failed for', name, e); }
+    catch (e) { importFailures += 1; backupWarn('flag import failed for', name, e); }
   }
   return { importFailures, skippedStores };
 }
@@ -687,12 +688,12 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
         const violations = validateStorePayload(name, obj);
         if (violations.length) {
           skippedStores.push(name);
-          console.warn('skipping V1 store with invalid payload:', name, violations);
+          backupWarn('skipping V1 store with invalid payload:', name, violations);
           continue;
         }
         const { store, method } = storesMap[name];
         _restoreStore(store, method, obj);
-      } catch (e) { importFailures += 1; console.warn('V1 import parse failed for', name, e); }
+      } catch (e) { importFailures += 1; backupWarn('V1 import parse failed for', name, e); }
     }
     for (const name of Object.keys(flagMap)) {
       if (parsed && parsed.data && (parsed.data[name] === '1' || parsed.data[name] === 1)) {
@@ -729,7 +730,7 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
       const mediaViolations = validateMediaRecord(id, record);
       if (mediaViolations.length) {
         importFailures += 1;
-        console.warn('skipping invalid media record:', id, mediaViolations);
+        backupWarn('skipping invalid media record:', id, mediaViolations);
         continue;
       }
       // 4 base64 chars -> 3 bytes (same estimate validateMediaRecord uses).
@@ -737,7 +738,7 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
       if (totalMediaBytes + approxBytes > mediaTotalLimitBytes) {
         importFailures += 1;
         mediaCapHit = true;
-        console.warn('skipping media past aggregate cap:', id);
+        backupWarn('skipping media past aggregate cap:', id);
         continue;
       }
       totalMediaBytes += approxBytes; // count what we're about to decode
@@ -750,10 +751,10 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
           created: record.created,
         });
         mediaApplied += 1;
-      } catch (e) { importFailures += 1; console.warn('media import failed for', id, e); }
+      } catch (e) { importFailures += 1; backupWarn('media import failed for', id, e); }
     }
     if (mediaCapHit) {
-      console.warn('import: media aggregate cap (' + mediaTotalLimitBytes + ' bytes) reached; some media skipped');
+      backupWarn('import: media aggregate cap (' + mediaTotalLimitBytes + ' bytes) reached; some media skipped');
     }
     // Prune stale media — present on the device but NOT mentioned by this backup —
     // for an exact REPLACE. An id the backup mentions is NEVER pruned (its existing
@@ -771,7 +772,7 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
         const inBackup = new Set(backupIds);
         const existingIds = await mediaStore.allIds();
         for (const id of existingIds) { if (!inBackup.has(id)) await mediaStore.delete(id); }
-      } catch (e) { console.warn('prune stale media failed', e); }
+      } catch (e) { backupWarn('prune stale media failed', e); }
     }
   }
 
@@ -915,7 +916,7 @@ async function _applyV3Unlocked(manifest, entries, ctx) {
         || m.size !== expected.size
         || blobSize !== expected.size) {
         importFailures += 1;
-        console.warn('skipping v3 media frame that does not match the manifest:', entry && entry.id);
+        backupWarn('skipping v3 media frame that does not match the manifest:', entry && entry.id);
         continue;
       }
       try {
@@ -927,13 +928,13 @@ async function _applyV3Unlocked(manifest, entries, ctx) {
         });
         stagedIds.add(entry.id);
         mediaApplied += 1;
-      } catch (e) { importFailures += 1; console.warn('media staging failed for', entry.id, e); }
+      } catch (e) { importFailures += 1; backupWarn('media staging failed for', entry.id, e); }
     }
   } catch (e) {
     // The container read itself broke (truncated/corrupt tail). Frames already
     // staged are still salvageable; the shortfall surfaces via countMismatches.
     streamBroken = true;
-    console.warn('v3 media stream broke mid-read; salvaging staged frames', e);
+    backupWarn('v3 media stream broke mid-read; salvaging staged frames', e);
   }
 
   const exactRestore = !streamBroken
@@ -947,7 +948,7 @@ async function _applyV3Unlocked(manifest, entries, ctx) {
     // Commit is a single IDB transaction — a failure rolled it back, so live
     // media is untouched. Staging cleanup is best-effort (invisible to reads).
     try { await mediaStore.abortImportReplace(); }
-    catch (cleanupError) { console.warn('media import staging cleanup failed', cleanupError); }
+    catch (cleanupError) { backupWarn('media import staging cleanup failed', cleanupError); }
     throw e;
   }
 
