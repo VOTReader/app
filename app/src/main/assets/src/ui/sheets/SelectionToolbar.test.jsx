@@ -843,6 +843,17 @@ describe('computeEdgeAutoScroll — the handle-drag edge decision (2026-07-29)',
   it('a degenerate box never scrolls', () => {
     expect(computeEdgeAutoScroll({ focusTop: 0, focusBottom: 0, boxTop: 100, boxBottom: 100, band: 90 })).toBe(0);
   });
+
+  /* cp1 sweep: an edge far outside the box is a selection the reader scrolled
+     away from, not a handle under a finger. It used to arm (-1 for anything
+     above the top band), so one stray selectionchange wound the page all the
+     way back to the selection. */
+  it('an edge far outside the box never arms; one just past the box (finger over the bar below) still does', () => {
+    expect(computeEdgeAutoScroll({ focusTop: -1900, focusBottom: -1884, ...BOX })).toBe(0);
+    expect(computeEdgeAutoScroll({ focusTop: 2600, focusBottom: 2616, ...BOX })).toBe(0);
+    expect(computeEdgeAutoScroll({ focusTop: 40, focusBottom: 56, ...BOX })).toBe(-1);
+    expect(computeEdgeAutoScroll({ focusTop: 790, focusBottom: 806, ...BOX })).toBe(1);
+  });
 });
 
 describe('edge auto-scroll interval — per-tick re-probe (2026-07-30)', () => {
@@ -1544,5 +1555,98 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
     act(() => { fire(yellow, 'click'); });
     const keys = g.AnnotationStore.add.mock.calls.map((/** @type {any[]} */ c) => c[0]);
     expect(keys).toEqual(['bible:john:7:37', 'bible:john:7:38', 'bible:john:7:39']);
+  });
+});
+
+/* cp1 sweep — the toolbar keeps out of the way while things move. */
+describe('SelectionToolbar — steps aside while the selection or the page is moving', () => {
+  afterEach(() => { vi.useRealTimers(); });
+  const toolbar = () => /** @type {HTMLElement | null} */ (document.querySelector('.sel-toolbar'));
+
+  it('a handle drag under a raised toolbar fades it until the selection settles, then it comes back', () => {
+    const c = readingContainer('bible:test:1:1', 'The Revelation of Jesus Christ, which God gave Him');
+    mount();
+    stubSelection(rangeOver(c, 4, 14));
+    act(() => { fire(c, 'contextmenu', { clientX: 5, clientY: 5 }); });
+    expect(toolbar()?.classList.contains('is-adjusting')).toBe(false);
+    vi.useFakeTimers();
+    // The start handle is dragged: the selection changes under the raised toolbar.
+    stubSelection(rangeOver(c, 0, 14));
+    act(() => { document.dispatchEvent(new Event('selectionchange')); });
+    expect(toolbar()?.classList.contains('is-adjusting')).toBe(true);
+    act(() => { vi.advanceTimersByTime(200); });
+    stubSelection(rangeOver(c, 0, 20));
+    act(() => { document.dispatchEvent(new Event('selectionchange')); });
+    act(() => { vi.advanceTimersByTime(300); });
+    expect(toolbar()?.classList.contains('is-adjusting'), 'still dragging: stays aside').toBe(true);
+    act(() => { vi.advanceTimersByTime(100); });
+    expect(toolbar()).not.toBeNull();
+    expect(toolbar()?.classList.contains('is-adjusting'), 'settled: back').toBe(false);
+  });
+
+  it('the raised selection\'s own late selectionchange (after the long-press contextmenu) does not blink it', () => {
+    const c = readingContainer('bible:test:1:1', 'The Revelation of Jesus Christ, which God gave Him');
+    mount();
+    const r = rangeOver(c, 4, 14);
+    stubSelection(r);
+    act(() => { fire(c, 'contextmenu', { clientX: 5, clientY: 5 }); });
+    act(() => { document.dispatchEvent(new Event('selectionchange')); });   // queued before the raise, delivered after
+    expect(toolbar()?.classList.contains('is-adjusting')).toBe(false);
+  });
+
+  it('comes back after the drag even when Android swallowed the long-press lift (the drag flag stuck on)', () => {
+    const c = readingContainer('bible:test:1:1', 'The Revelation of Jesus Christ, which God gave Him');
+    mount();
+    stubSelection(rangeOver(c, 4, 14));
+    act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });   // no pointerup ever arrives
+    act(() => { fire(c, 'contextmenu', { clientX: 5, clientY: 5 }); });   // the long-press raises it
+    expect(toolbar()).not.toBeNull();
+    vi.useFakeTimers();
+    stubSelection(rangeOver(c, 4, 30));
+    act(() => { document.dispatchEvent(new Event('selectionchange')); });
+    expect(toolbar()?.classList.contains('is-adjusting')).toBe(true);
+    act(() => { vi.advanceTimersByTime(400); });
+    expect(toolbar()?.classList.contains('is-adjusting')).toBe(false);
+  });
+
+  it('after a lift it waits for a fling to come to rest before it rises', () => {
+    const c = readingContainer('bible:test:1:1', 'The Revelation of Jesus Christ');
+    vi.useFakeTimers();
+    mount();
+    stubSelection(rangeOver(c, 4, 14));
+    act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
+    act(() => { fire(c, 'pointerup', { clientX: 5, clientY: 300 }); });
+    for (let t = 0; t < 400; t += 50) {               // the page is still flying
+      act(() => { c.dispatchEvent(new Event('scroll')); vi.advanceTimersByTime(50); });
+    }
+    expect(toolbar(), 'no toolbar riding the fling').toBeNull();
+    act(() => { vi.advanceTimersByTime(250); });
+    expect(toolbar()).not.toBeNull();
+  });
+
+  it('another scroller moving (a sheet, a strip of chips) does not hold it back', () => {
+    const c = readingContainer('bible:test:1:1', 'The Revelation of Jesus Christ');
+    const strip = document.createElement('div');
+    document.body.appendChild(strip);
+    vi.useFakeTimers();
+    mount();
+    stubSelection(rangeOver(c, 4, 14));
+    act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
+    act(() => { fire(c, 'pointerup', { clientX: 80, clientY: 5 }); });
+    for (let t = 0; t < 200; t += 50) {
+      act(() => { strip.dispatchEvent(new Event('scroll')); vi.advanceTimersByTime(50); });
+    }
+    expect(toolbar()).not.toBeNull();
+  });
+
+  it('with no fling it rises as it always did', () => {
+    const c = readingContainer('bible:test:1:1', 'The Revelation of Jesus Christ');
+    vi.useFakeTimers();
+    mount();
+    stubSelection(rangeOver(c, 4, 14));
+    act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
+    act(() => { fire(c, 'pointerup', { clientX: 80, clientY: 5 }); });
+    act(() => { vi.advanceTimersByTime(160); });
+    expect(toolbar()).not.toBeNull();
   });
 });

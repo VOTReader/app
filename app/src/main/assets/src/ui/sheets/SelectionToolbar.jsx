@@ -153,13 +153,44 @@ export function computeEdgeAutoScroll({ focusTop, focusBottom, boxTop, boxBottom
   // A band taller than half the box would arm both ends at once; clamp so the
   // middle of a short container is always a no-scroll zone.
   const b = Math.max(0, Math.min(band, (boxBottom - boxTop) / 2));
+  // A moving edge far OUTSIDE the box is not under a finger: it is a
+  // selection the reader scrolled away from (the toolbar stays up and follows
+  // it), and the first stray selectionchange would otherwise wind the page all
+  // the way back to it (cp1 sweep). A band's reach past the box still arms:
+  // the finger can rest just past the scroller, over the bar below it.
+  if (focusBottom < boxTop - b || focusTop > boxBottom + b) return 0;
   if (focusTop < boxTop + b) return -1;
   if (focusBottom > boxBottom - b) return 1;
   return 0;
 }
 
+/** Two ranges over the same boundary points.
+    @param {Range | null | undefined} a @param {Range | null | undefined} b */
+function sameRange(a, b) {
+  return !!a && !!b && a.startContainer === b.startContainer && a.startOffset === b.startOffset
+    && a.endContainer === b.endContainer && a.endOffset === b.endOffset;
+}
+
+/** A raised toolbar steps aside while its selection is being changed (a
+    handle drag, Shift+arrows) and comes back this long after it settles. */
+const SETTLE_MS = 350;
+/** After a lift, the toolbar waits for the page to be this still (no scroll
+    for this long) before it rises: a finger scroll ends in a fling. */
+const STILL_MS = 100;
+/** ...but never longer than this many waits (1.5 s): it always comes back. */
+const STILL_WAITS = 15;
+
 export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkRequest }) {
   const [visible, setVisible] = React.useState(false);
+  // cp1 sweep: true while a RAISED toolbar's selection is being changed — the
+  // toolbar fades out of the way until the selection settles (SETTLE_MS).
+  const [adjusting, setAdjusting] = React.useState(false);
+  const visibleRef = React.useRef(false);
+  visibleRef.current = visible;
+  // The range the raised toolbar was computed for. Its own selectionchange
+  // can arrive AFTER the raise (a long-press dispatches contextmenu before the
+  // queued selectionchange): that is not the selection changing.
+  const shownRangeRef = React.useRef(/** @type {Range | null} */ (null));
   const [pos, setPos] = React.useState({ x: 0, y: 0 });
   const [selInfo, setSelInfo] = React.useState(null); // { hlKey, start, end, text, copyText, existingHl, multiVerse, listen }
   const [activeStyle, setActiveStyle] = React.useState('highlight'); // 'highlight' | 'underline'
@@ -576,7 +607,36 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       // BOTTOM just under the selection, i.e. its body on top of the text.
       const y = rect.top - 10;
       setPos({ x, y });
+      shownRangeRef.current = range.cloneRange();
+      setAdjusting(false);
       setVisible(true);
+    };
+
+    // cp1 sweep: raise the toolbar once the page is STILL. A finger scroll
+    // ends in a fling, and a toolbar raised 150 ms after the lift rode the
+    // flying text (scroll-follow) across the screen and off it. Scroll events
+    // do not bubble, so the page's movement is heard in the capture phase.
+    let lastScroll = { at: 0, el: /** @type {any} */ (null) };
+    const onAnyScroll = (e) => { lastScroll = { at: Date.now(), el: e.target }; };
+    // Only the page the selection is on counts: another scroller moving (a
+    // sheet, a strip of chips) says nothing about the words the toolbar is for.
+    const selectionMoving = () => {
+      if (Date.now() - lastScroll.at >= STILL_MS) return false;
+      const el = lastScroll.el;
+      if (!el || el === document || !el.contains) return true;
+      try {
+        const s = window.getSelection();
+        return !!s && s.rangeCount > 0 && el.contains(s.getRangeAt(0).startContainer);
+      } catch (_e) { return false; }
+    };
+    let stillTimer = null;
+    const showWhenStill = (waits) => {
+      stillTimer = null;
+      if (waits > 0 && selectionMoving()) {
+        stillTimer = setTimeout(() => showWhenStill(waits - 1), STILL_MS);
+        return;
+      }
+      computeAndShow();
     };
 
     // Selection-change listener: hide on collapse; debounce-show after handle-drag
@@ -592,14 +652,24 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
             if (!s || s.isCollapsed) setVisible(false);
           }
         }, 150);
-      } else if (!dragRef.current) {
-        // Non-empty selection and pointer is already up: this is a handle-drag
-        // adjustment. Debounce so we wait for the user to finish dragging.
+      } else {
+        // Non-empty selection. With the pointer up this is a handle-drag (or
+        // Shift+arrow) adjustment: debounce so we wait for the user to finish
+        // (a pointer drag in progress raises on its own lift instead).
+        // A RAISED toolbar whose selection changed steps aside meanwhile (cp1
+        // sweep): it sat two lines above the words, over the very lines a
+        // start handle is dragged up into, and Android's own selection menu
+        // hides for a drag the same way. Raised means no pointer drag is
+        // running (pointerdown lowers it), so dragRef is not asked then: on
+        // Android a long-press selection swallows the lift and leaves it true.
+        const moved = visibleRef.current && !sameRange(sel.getRangeAt(0), shownRangeRef.current);
+        if (moved) setAdjusting(true);
+        if (!moved && dragRef.current) return;
         if (selChangeTimerRef.current) clearTimeout(selChangeTimerRef.current);
         selChangeTimerRef.current = setTimeout(function() {
           selChangeTimerRef.current = null;
           computeAndShow();
-        }, 350);
+        }, SETTLE_MS);
       }
     };
 
@@ -657,6 +727,9 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       tapPosRef.current = { x: e.clientX || 0, y: e.clientY || 0 };
       pointerDownTime = performance.now();
       dragRef.current = true;
+      // A raise still waiting on the last lift belongs to that gesture, not
+      // to this one (a second press inside its wait must not raise mid-drag).
+      if (stillTimer) { clearTimeout(stillTimer); stillTimer = null; }
       setVisible(false);
     };
     const onPointerUp = (e) => {
@@ -671,7 +744,8 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       // if ScreenLayout already flagged this lift as a scroll.
       const isBriefTap = (performance.now() - pointerDownTime) < 300;
       if (isCollapsed && isBriefTap && !window.__scrollLiftPending && tapTarget && routeAnnotationTap(tapTarget, pos.x, pos.y)) return;
-      setTimeout(computeAndShow, 150);
+      if (stillTimer) clearTimeout(stillTimer);
+      stillTimer = setTimeout(() => showWhenStill(STILL_WAITS), 150);
     };
 
     // Tap-to-open the action chip — the path differs by platform because a tap
@@ -757,6 +831,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     document.addEventListener('click', onClick);
     document.addEventListener('contextmenu', onContextMenu);
     document.addEventListener('copy', onCopy);
+    document.addEventListener('scroll', onAnyScroll, { capture: true, passive: true });
 
     return () => {
       document.removeEventListener('selectionchange', onSelectionChange);
@@ -766,6 +841,8 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       document.removeEventListener('click', onClick);
       document.removeEventListener('contextmenu', onContextMenu);
       document.removeEventListener('copy', onCopy);
+      document.removeEventListener('scroll', onAnyScroll, true);
+      if (stillTimer) clearTimeout(stillTimer);
       window.__nativeTapAnnotation = null;
     };
   }, [computeOffset, findHlContainer]);
@@ -1234,7 +1311,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   return (
     <div
       ref={toolbarRef}
-      className="sel-toolbar"
+      className={'sel-toolbar' + (adjusting ? ' is-adjusting' : '')}
       role="toolbar"
       aria-label="Text selection actions"
       style={{ left: pos.x, top: pos.y, transform: 'translateY(-100%)' }}

@@ -4695,6 +4695,12 @@
          showed the letter text through it, over the Listen from here row. */
     }
     body.light .sel-toolbar { background: rgb(232,222,200); box-shadow: 0 6px 22px rgba(0,0,0,0.22); }
+    /* cp1 sweep: while the selection is being changed (a handle drag, Shift+
+       arrows) the toolbar steps aside — it sat two lines above the words, over
+       the lines a start handle is dragged up into — and fades back where the
+       selection settles (SelectionToolbar SETTLE_MS). */
+    .sel-toolbar { transition: opacity 0.12s ease; }
+    .sel-toolbar.is-adjusting { opacity: 0; pointer-events: none; }
     /* Animate ONLY opacity (transform is set via inline style for positioning,
        and animating transform here clobbered the inline translateY(-100%)
        that makes the toolbar sit above the y-coordinate). */
