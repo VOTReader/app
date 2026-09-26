@@ -1126,7 +1126,9 @@ describe('SelectionToolbar — Copy / Share outcomes are reported (A15)', () => 
     tapAction('Share');
     await settle();
     expect(sent.length).toBe(1);
-    expect(sent[0].text).toMatch(/\n3:16–18\n|John 3:16–18\n|john 3:16–18\n/);
+    // ASCII hyphen: Permanent Rule 1 (verse ranges never take an en dash, labels included; cp1).
+    expect(sent[0].text).toMatch(/\n3:16-18\n|John 3:16-18\n|john 3:16-18\n/);
+    expect(sent[0].text).not.toMatch(/[–—]/);
     expect(sent[0].text.endsWith('?p=bible%3Ajohn%3A3%3A16')).toBe(true);
   });
 
@@ -1368,5 +1370,155 @@ describe('SelectionToolbar — Repeat', () => {
     const tb = await raise(c, 30, 45);
     expect(tb.querySelector('.sel-listen-btn')).not.toBeNull();
     expect(tb.querySelector('.sel-repeat-btn')).toBeNull();
+  });
+});
+
+/* cp1 (2026-09-26, a reader's request): a copied passage arrived as
+   "37On the last day, ..." with no reference, and the reader typed
+   "John 7:37-39" under it by hand. The Copy button and EVERY other way of
+   copying (Ctrl+C, the Android selection menu, the iOS callout: the document
+   `copy` event) now give a verse per line, "37 On", and the reference. */
+describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
+  const V37 = 'On the last day, that great day of the feast, YahuShua stood and cried out, saying, “If anyone thirsts, let him come to Me and drink.';
+  const V38 = 'He who believes in Me, as the Scripture has said, out of his heart will flow rivers of living water.”';
+  const V39 = 'But this He spoke concerning the Spirit, whom those believing in Him would receive; for the Holy Spirit was not yet given, because YahuShua was not yet glorified.';
+  const WANT = `37 ${V37}\n38 ${V38}\n39 ${V39}\nJohn 7:37-39 (NKJV-R)`;
+  const g = /** @type {any} */ (globalThis);
+  /** @type {PropertyDescriptor | undefined} */ let origClipboard;
+
+  beforeEach(() => {
+    origClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    g._bookTitle = (/** @type {string} */ id) => (id === 'john' ? 'John' : id);
+    g.StateStore = { get: () => ({ settings: { translation: 'rnkjv' } }) };
+    g.TRANSLATION_OPTIONS = [{ id: 'nkjv', label: 'NKJV' }, { id: 'rnkjv', label: 'NKJV-R' }];
+  });
+  afterEach(() => {
+    if (origClipboard) Object.defineProperty(navigator, 'clipboard', origClipboard);
+    else delete /** @type {any} */ (navigator).clipboard;
+    delete g._bookTitle; delete g.StateStore; delete g.TRANSLATION_OPTIONS;
+  });
+
+  /** BibleChapterView's markup: gutter number, verse block, icons, space. */
+  function chapter() {
+    const wrap = document.createElement('div');
+    wrap.className = 'verses-block';
+    wrap.innerHTML = [[37, V37], [38, V38], [39, V39]].map(([n, t]) =>
+      `<span id="v-${n}" class="verse"><span class="verse-num">${n}</span><span data-hl-key="bible:john:7:${n}">${t}</span> </span>`).join('');
+    document.body.appendChild(wrap);
+    return wrap;
+  }
+  /** The reader's selection: from the "37" in the gutter to the end of verse 39. */
+  function readersRange() {
+    const r = document.createRange();
+    r.setStart(/** @type {any} */ (document.querySelector('#v-37 .verse-num')).firstChild, 0);
+    const end = /** @type {any} */ (document.querySelector('[data-hl-key="bible:john:7:39"]')).firstChild;
+    r.setEnd(end, end.length);
+    r.getBoundingClientRect = () => /** @type {any} */ ({ left: 0, top: 100, right: 80, bottom: 116, width: 80, height: 16 });
+    return r;
+  }
+  /** A `copy` event as the browser dispatches it, with a clipboardData to write to.
+      @param {EventTarget} target */
+  function nativeCopy(target) {
+    const data = /** @type {Record<string, string>} */ ({});
+    const ev = new Event('copy', { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, 'clipboardData', { value: { setData: (/** @type {string} */ t, /** @type {string} */ v) => { data[t] = v; } } });
+    target.dispatchEvent(ev);
+    return { ev, data };
+  }
+
+  it('the Copy button copies the reader\'s John 7:37-39 as asked: "37 On ...", a verse per line, then the reference', () => {
+    chapter();
+    const written = /** @type {string[]} */ ([]);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: (/** @type {string} */ t) => { written.push(t); return Promise.resolve(); } }, writable: true, configurable: true,
+    });
+    mount();
+    stubSelection(readersRange());
+    act(() => { fire(/** @type {any} */ (document.querySelector('#v-38')), 'contextmenu', { clientX: 5, clientY: 5 }); });
+    const copyBtn = /** @type {any} */ ([...document.querySelectorAll('.sel-action-btn span')]
+      .find((s) => s.textContent === 'Copy')?.closest('.sel-action-btn'));
+    act(() => { fire(copyBtn, 'click'); });
+    expect(written).toEqual([WANT]);
+  });
+
+  it('Ctrl+C / the native menu\'s Copy (the document copy event) writes the same text and replaces the browser\'s', () => {
+    chapter();
+    mount();
+    stubSelection(readersRange());
+    const { ev, data } = nativeCopy(/** @type {any} */ (document.querySelector('#v-37 .verse-num')));
+    expect(data['text/plain']).toBe(WANT);
+    expect(ev.defaultPrevented).toBe(true);
+  });
+
+  it('a copy inside a text field is the field\'s own (search box, journal editor, the copy-fallback retry)', () => {
+    chapter();
+    const box = document.createElement('textarea');
+    box.value = 'my own words';
+    document.body.appendChild(box);
+    mount();
+    stubSelection(readersRange());   // even with reading text selected elsewhere
+    const { ev, data } = nativeCopy(box);
+    expect(data['text/plain']).toBeUndefined();
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it('Share sends the same passage without the numbers: a verse per line, Copy\'s reference, a link to the first verse', async () => {
+    chapter();
+    const origShare = Object.getOwnPropertyDescriptor(navigator, 'share');
+    const sent = /** @type {any[]} */ ([]);
+    Object.defineProperty(navigator, 'share', { value: (/** @type {any} */ d) => { sent.push(d); return Promise.resolve(); }, writable: true, configurable: true });
+    try {
+      mount();
+      stubSelection(readersRange());
+      act(() => { fire(/** @type {any} */ (document.querySelector('#v-38')), 'contextmenu', { clientX: 5, clientY: 5 }); });
+      const shareBtn = /** @type {any} */ ([...document.querySelectorAll('.sel-action-btn span')]
+        .find((sp) => sp.textContent === 'Share')?.closest('.sel-action-btn'));
+      act(() => { fire(shareBtn, 'click'); });
+      await act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
+      expect(sent[0].text).toBe(`${V37}\n${V38}\n${V39}\n\nJohn 7:37-39 (NKJV-R)\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A7%3A37`);
+    } finally {
+      if (origShare) Object.defineProperty(navigator, 'share', origShare);
+      else delete /** @type {any} */ (navigator).share;
+    }
+  });
+
+  it('Share keeps a Words To Live By poem\'s <br> lines apart (they arrived glued: "captiveThat")', async () => {
+    const p = readingContainer('wtlb:faith:2', '');
+    p.innerHTML = 'Take your every thought captive<br><br>That you may be set apart';
+    const origShare = Object.getOwnPropertyDescriptor(navigator, 'share');
+    const sent = /** @type {any[]} */ ([]);
+    Object.defineProperty(navigator, 'share', { value: (/** @type {any} */ d) => { sent.push(d); return Promise.resolve(); }, writable: true, configurable: true });
+    try {
+      mount();
+      const r = document.createRange();
+      r.setStart(p, 0);
+      r.setEnd(p, p.childNodes.length);
+      r.getBoundingClientRect = () => /** @type {any} */ ({ left: 0, top: 100, right: 80, bottom: 116, width: 80, height: 16 });
+      stubSelection(r);
+      act(() => { fire(p, 'contextmenu', { clientX: 5, clientY: 5 }); });
+      const shareBtn = /** @type {any} */ ([...document.querySelectorAll('.sel-action-btn span')]
+        .find((sp) => sp.textContent === 'Share')?.closest('.sel-action-btn'));
+      act(() => { fire(shareBtn, 'click'); });
+      await act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
+      expect(sent[0].text.startsWith('Take your every thought captive\n\nThat you may be set apart')).toBe(true);
+    } finally {
+      if (origShare) Object.defineProperty(navigator, 'share', origShare);
+      else delete /** @type {any} */ (navigator).share;
+    }
+  });
+
+  it('the reader\'s own journal and text outside the reading blocks keep the browser\'s copy', () => {
+    const p = readingContainer('journal:e1:b1', 'What I learned today');
+    mount();
+    stubSelection(rangeOver(p, 0, 8));
+    let r = nativeCopy(p);
+    expect(r.data['text/plain']).toBeUndefined();
+    expect(r.ev.defaultPrevented).toBe(false);
+    const d = document.createElement('div');
+    d.textContent = 'Reading settings';
+    document.body.appendChild(d);
+    stubSelection(rangeOver(d, 0, 7));
+    r = nativeCopy(d);
+    expect(r.ev.defaultPrevented).toBe(false);
   });
 });

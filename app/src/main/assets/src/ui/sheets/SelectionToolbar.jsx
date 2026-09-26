@@ -7,6 +7,7 @@ import { copyText as copyToClipboard, shareText } from '../../utils/copy-share.j
 import { CopyFallbackSheet } from './CopyFallbackSheet.jsx';
 import { withPassageLink } from '../../utils/passage-link.js';
 import { _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
+import { passageCopy, passageLabel, translationTag } from '../../utils/passage-copy.js';
 import { listenFromTarget, startListenFrom, repeatTarget, startRepeat, REPEAT_TIMES } from '../../utils/listen-from.js';
 // The chrome list is shared with applyDOMHighlights' re-anchor (v05-02): what the recorder leaves out, the re-finder must too.
 import { ANNOTATION_CHROME } from '../../renderer/anchor-view.js';
@@ -47,33 +48,10 @@ function blockAwareText(frag) {
   return parts.join('');
 }
 
-/** The reference a shared quote carries. n6-10: a quote across Bible verses
-    names its range ("John 3:16–18", "John 3:36–4:2"), not its first verse;
-    anything else keeps its first block's label. */
-function shareLabel(firstKey, lastKey) {
-  var label = _bookmarkSourceLabel(firstKey);
-  if (!lastKey || lastKey === firstKey) return label;
-  var a = firstKey.split(':'), b = lastKey.split(':');
-  if (a[0] !== 'bible' || b[0] !== 'bible' || a[1] !== b[1] || !a[3] || !b[3]) return label;
-  return label + '–' + (a[2] === b[2] ? b[3] : b[2] + ':' + b[3]);
-}
-
-/** n6-10: a shared Bible quote is in the reader's translation while its link opens in the recipient's, so the
-    label names it: " (KJV)". Nothing when the settings are not known (no claim is better than a wrong one), and
-    nothing for a non-Bible key or a Bible text that is not a translation (TSOT Matthew's own ids carry a '-'). */
-function translationTag(key) {
-  const p = String(key || '').split(':');
-  if (p[0] !== 'bible' || !p[1] || p[1].indexOf('-') >= 0) return '';
-  const g = /** @type {any} */ (globalThis);
-  let code = null;
-  try { const s = g.StateStore && g.StateStore.get(); code = s && s.settings ? s.settings.translation : null; } catch (_e) { code = null; }
-  if (!g.StateStore) return '';
-  // TRANSLATION_OPTIONS is index.html's registry (the one data/translations.js translationLabel reads; not
-  // imported here: that module keeps load state a second bundle copy would split).
-  const opts = Array.isArray(g.TRANSLATION_OPTIONS) ? g.TRANSLATION_OPTIONS : [];
-  const found = opts.find((o) => o.id === (code || 'nkjv'));
-  return ' (' + (found ? found.label : 'NKJV') + ')';
-}
+/* The reference a shared or repeated passage carries (passageLabel: "John
+   3:16-18", "John 3:36-4:2") and the reader's translation after it
+   (translationTag, n6-10) live in utils/passage-copy.js with Copy's: one
+   definition of how a passage is named. */
 
 function hlDisplayText(container, tcText, start, end) {
   if (!container) return tcText.slice(start, end);
@@ -507,11 +485,14 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         }
       })();
       if (!text) { setVisible(false); return; }
-      // Copy-specific text: keep verse-number spans so pasting preserves their
-      // inline position. Everything else (footnote bubbles, note icons) still
-      // stripped. Only the Copy action uses this; all other actions use `text`.
+      // Copy-specific text (cp1, utils/passage-copy.js): a verse per line, its
+      // number and a space, and the reference on the last line — what the
+      // document `copy` listener below gives Ctrl+C and the native menus too.
+      // Only the Copy action uses this; all other actions use `text`.
       const selCopyText = (() => {
         try {
+          const out = passageCopy(range);
+          if (out) return out.text;
           const frag = range.cloneContents();
           frag.querySelectorAll('.fn-ref, .hl-note-icon').forEach(function(el) { el.remove(); });
           return blockAwareText(frag).trim();
@@ -520,16 +501,22 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         }
       })();
       // n6-02: Share sends what Copy keeps (a poem's lines, a letter's
-      // paragraphs) without the verse numbers `text` also leaves out.
-      const selShareText = (() => {
+      // paragraphs, a verse per line) without the verse numbers `text` also
+      // leaves out, and names the passage the way Copy does (cp1). The same
+      // formatter, so a Words To Live By poem's <br> lines no longer arrive
+      // glued ("captiveThat you may").
+      const selShare = (() => {
         try {
+          const out = passageCopy(range, { numbers: false });
+          if (out) return { text: out.body, keys: out.keys, reference: out.reference };
           const frag = range.cloneContents();
           frag.querySelectorAll('.fn-ref, .hl-note-icon, .verse-num').forEach(function(el) { el.remove(); });
-          return blockAwareText(frag).trim() || text;
+          return { text: blockAwareText(frag).trim() || text, keys: [], reference: '' };
         } catch (_e) {
-          return text;
+          return { text, keys: [], reference: '' };
         }
       })();
+      const selShareText = selShare.text;
       const container = findHlContainer(range.startContainer);
       // annotation-selection-8: Chrome's triple-click ends the range at child 0
       // of the NEXT block, so the end boundary names a container the selection
@@ -564,7 +551,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         if (allHlContainers.length === 0) { setVisible(false); return; }
         // REPEAT THIS PASSAGE (rp1 part 3): the blocks the pane can loop, taken with Listen's target.
         const repeat = listen ? repeatTarget(allHlContainers.map((c) => c.getAttribute('data-hl-key') || '')) : null;
-        setSelInfo({ hlKey: null, start: 0, end: 0, text, copyText: selCopyText, shareText: selShareText, existingHl: null, multiVerse: true, multiContainers: allHlContainers, listen, repeat });
+        setSelInfo({ hlKey: null, start: 0, end: 0, text, copyText: selCopyText, shareText: selShareText, share: selShare, existingHl: null, multiVerse: true, multiContainers: allHlContainers, listen, repeat });
       } else {
         const hlKey = container.dataset.hlKey;
         const start = computeOffset(container, range.startContainer, range.startOffset);
@@ -572,7 +559,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         if (start >= end) { setVisible(false); return; }
         const existing = HighlightStore.get(hlKey).find(h => h.start <= start && h.end >= end);
         const repeat = listen ? repeatTarget([hlKey]) : null;
-        setSelInfo({ hlKey, start, end, text, copyText: selCopyText, shareText: selShareText, existingHl: existing || null, multiVerse: false, listen, repeat });
+        setSelInfo({ hlKey, start, end, text, copyText: selCopyText, shareText: selShareText, share: selShare, existingHl: existing || null, multiVerse: false, listen, repeat });
       }
       const rect = range.getBoundingClientRect();
       const toolbarW = 320;
@@ -737,12 +724,35 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       } catch (_e) { /* hit-test best-effort; DOM may be mid-update */ }
     };
 
+    // cp1: every OTHER way of copying reading text — Ctrl+C, the Android
+    // WebView / Chrome selection menu, the iOS callout — copies what the Copy
+    // button does (utils/passage-copy.js): the browser's own copy glued each
+    // verse number to its first word ("37On the last day") and carried no
+    // reference. A field's own text (the search box, the journal editor, the
+    // copy-fallback box's "Try again") and the reader's journal keep the
+    // browser's copy: passageCopy says isPublic false for those.
+    const onCopy = (e) => {
+      if (e.defaultPrevented || !e.clipboardData) return;
+      const t = e.target;
+      const host = t && t.nodeType === 3 ? t.parentElement : t;
+      if (host && host.closest && host.closest('input, textarea, [contenteditable]:not([contenteditable="false"])')) return;
+      let out = null;
+      try {
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed && sel.rangeCount > 0) out = passageCopy(sel.getRangeAt(0));
+      } catch (_e) { out = null; }
+      if (!out || !out.isPublic) return;
+      e.clipboardData.setData('text/plain', out.text);
+      e.preventDefault();
+    };
+
     document.addEventListener('selectionchange', onSelectionChange);
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('pointerup', onPointerUp);
     document.addEventListener('touchend', onPointerUp);
     document.addEventListener('click', onClick);
     document.addEventListener('contextmenu', onContextMenu);
+    document.addEventListener('copy', onCopy);
 
     return () => {
       document.removeEventListener('selectionchange', onSelectionChange);
@@ -751,6 +761,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       document.removeEventListener('touchend', onPointerUp);
       document.removeEventListener('click', onClick);
       document.removeEventListener('contextmenu', onContextMenu);
+      document.removeEventListener('copy', onCopy);
       window.__nativeTapAnnotation = null;
     };
   }, [computeOffset, findHlContainer]);
@@ -1036,11 +1047,19 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     // passage (utils/passage-link.js); a key that may not travel (the reader's
     // own journal) sends the words alone. A multi-verse selection links to
     // its first verse.
-    const key = selInfo.hlKey || (selInfo.multiContainers && selInfo.multiContainers[0]
-      ? selInfo.multiContainers[0].dataset.hlKey : null);
-    const many = selInfo.hlKey ? null : selInfo.multiContainers;
-    const lastKey = many && many.length > 1 ? many[many.length - 1].dataset.hlKey : null;
-    const text = withPassageLink(selInfo.shareText || selInfo.text, key, key ? shareLabel(key, lastKey) + translationTag(key) : null);
+    const share = selInfo.share;
+    let text;
+    if (share && share.keys && share.keys.length) {
+      // The blocks the words came from: the first opens the link, and the
+      // reference is Copy's ("John 7:37-39 (NKJV)", "The Wide Path (Volume Two)").
+      text = withPassageLink(share.text, share.keys[0], share.reference || null);
+    } else {
+      const key = selInfo.hlKey || (selInfo.multiContainers && selInfo.multiContainers[0]
+        ? selInfo.multiContainers[0].dataset.hlKey : null);
+      const many = selInfo.hlKey ? null : selInfo.multiContainers;
+      const lastKey = many && many.length > 1 ? many[many.length - 1].dataset.hlKey : null;
+      text = withPassageLink(selInfo.shareText || selInfo.text, key, key ? passageLabel(key, lastKey) + translationTag(key) : null);
+    }
     window.getSelection().removeAllRanges();
     setVisible(false);
     // 'shared' and 'cancelled' stay quiet: the native sheet was the feedback,
@@ -1080,7 +1099,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     const keys = target.keys;
     window.getSelection().removeAllRanges();
     setVisible(false);
-    startRepeat(target, shareLabel(keys[0], keys.length > 1 ? keys[keys.length - 1] : null));
+    startRepeat(target, passageLabel(keys[0], keys.length > 1 ? keys[keys.length - 1] : null));
   }, [selInfo]);
 
 
