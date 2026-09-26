@@ -1,0 +1,81 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* bible-idx: one book's chapter index (ChapterIndex.jsx) */
+  .idx { padding-top: 8px; }
+  .hdr { margin: 0 calc(-1 * var(--gutter)); padding: 0 var(--gutter) 22px; border-bottom: 1px solid var(--hairline); }
+  .hdr .h1 { margin-top: 4px; }
+  .hdr .meta.sub { margin-top: 6px; }
+  .playrow { display: flex; align-items: center; gap: 16px; margin-top: 22px; }
+  .prog { flex: 1; min-width: 0; }
+  .prog .progress { margin-top: 7px; }
+  .chs { margin-top: 16px; border-radius: 16px 16px 0 0; }
+  .chs .item { align-items: flex-start; gap: 12px; padding: 18px 16px 18px 14px; }
+  .num { width: 44px; flex: none; padding-top: 2px; }
+  .num b { display: flex; align-items: center; gap: 7px; font: 700 15px/1.2 var(--sans); color: var(--text-3); }
+  .rd { width: 7px; height: 7px; border-radius: 4px; background: var(--accent); flex: none; }
+  .ttl { flex: 1; min-width: 0; font: 500 18px/1.28 var(--serif); color: var(--text); }
+  /* keep each ' · ' phrase of a chapter title together */
+  .tp { display: inline-block; text-wrap: balance; }
+  .dur { flex: none; padding-top: 3px; font: 400 13px/1.35 var(--sans); color: var(--text-3); white-space: nowrap; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .dur .i { color: var(--accent); }
+  .item.cur { background: var(--accent-soft); }
+  .item.cur .pill { margin-top: 12px; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Gospels</span>
+  </div>
+  <div class="scroll idx">
+    <div class="hdr">
+      <div class="eyebrow">The Scriptures of Truth</div>
+      <div class="h1">John</div>
+      <div class="meta sub">The Gospel of John · 21 chapters</div>
+      <div class="playrow">
+        <span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen</span>
+        <div class="prog"><span class="meta">1 of 21 read</span><div class="progress"><i style="width:5%"></i></div></div>
+      </div>
+    </div>
+    <div class="group chs">
+      <div class="item">
+        <div class="num"><b>1<span class="rd"></span></b></div>
+        <div class="ttl"><span class="tp">The Word Became Flesh ·</span> <span class="tp">Behold the Lamb of God ·</span> <span class="tp">The First Disciples</span></div>
+        <div class="dur"><span>~4 min</span><i data-i="bookmark" class="xs fill" style="fill:currentColor"></i></div>
+      </div>
+      <div class="item cur">
+        <div class="num"><b>2</b></div>
+        <div class="ttl"><span class="tp">The Wedding at Cana ·</span> <span class="tp">The Temple Cleansed</span><div><span class="pill">Reading · 40%</span></div></div>
+        <div class="dur">~2 min</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>3</b></div>
+        <div class="ttl"><span class="tp">Nicodemus and the New Birth ·</span> <span class="tp">John the Baptist's Final Witness</span></div>
+        <div class="dur">~3 min</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>4</b></div>
+        <div class="ttl"><span class="tp">The Samaritan Woman at the Well ·</span> <span class="tp">The Nobleman's Son Healed</span></div>
+        <div class="dur">~5 min</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>5</b></div>
+        <div class="ttl"><span class="tp">The Healing at Bethesda ·</span> <span class="tp">The Father and the Son</span></div>
+        <div class="dur">~4 min</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>6</b></div>
+        <div class="ttl"><span class="tp">Feeding the Five Thousand ·</span> <span class="tp">The Bread of Life ·</span> <span class="tp">Many Disciples Turn Back</span></div>
+        <div class="dur">~7 min</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>7</b></div>
+        <div class="ttl"><span class="tp">At the Feast of Tabernacles ·</span> <span class="tp">Rivers of Living Water ·</span> <span class="tp">Division Among the People</span></div>
+        <div class="dur">~4 min</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

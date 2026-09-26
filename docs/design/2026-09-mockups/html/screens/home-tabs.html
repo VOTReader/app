@@ -1,0 +1,82 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script><script src="sy-icons.js"></script>
+<style>
+  /* slim top bar: search + tabs only */
+  .topbar.slim { height: 48px; padding-right: 12px; }
+  .topbar.slim .tabcount { margin: 0 0 0 4px; }
+
+  /* title lockup: small, centred, no ornaments */
+  .lockup { text-align: center; }
+  .lockup .t1 { font: 500 26px/1.1 var(--serif); letter-spacing: -0.005em; color: var(--text); }
+  .lockup .t2 { font: italic 400 17px/1.25 var(--serif); color: var(--text-2); margin-top: 2px; }
+  /* Garamond's italic ampersand is the swash "Et"; the upright one reads plainly */
+  .lockup .amp { font-style: normal; }
+  .home > .search { margin-top: 16px; }
+
+  /* continue reading */
+  .cont { margin-top: 12px; padding: 14px 16px; }
+  .cont .main { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
+  .cont .main .h3 { flex: 1; min-width: 0; text-wrap: pretty; }
+  .cont .foot { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+  .cont .foot .progress { flex: 1; }
+  .cont .foot .meta { font-variant-numeric: tabular-nums; }
+
+  /* collections */
+  .cols { margin-top: 12px; }
+  .cols .row { padding: 10px 16px; min-height: 60px; }
+  .cols .ttl { display: block; font: 500 18px/1.2 var(--serif); color: var(--text); }
+  .cols .meta { display: block; margin-top: 2px; }
+  .surprise { display: flex; justify-content: center; margin-top: 8px; }
+  .surprise .btn { height: 40px; }
+  /* Home's own quick-access row, docked at the foot (shortcuts, not a tab bar: nothing is "current") */
+  .tabbar .tb { width: 88px; white-space: nowrap; }
+  .tabbar .tb .nudge { transform: translateY(-3px); }
+</style></head>
+<body data-size="412x1030">
+<div class="screen tall">
+  <div class="status"></div>
+  <div class="topbar slim">
+    <span class="iconbtn"><i data-i="sy-info"></i></span>
+    <span class="spacer"></span>
+    <span class="iconbtn"><i data-i="search"></i></span>
+    <span class="tabcount">1</span>
+  </div>
+  <div class="scroll home">
+    <div class="lockup">
+      <div class="t1">The Volumes of Truth</div>
+      <div class="t2"><span class="amp">&amp;</span> The Scriptures of Truth</div>
+    </div>
+
+    <div class="search"><i data-i="search" class="sm"></i>Search the library</div>
+
+    <div class="card cont">
+      <div class="meta">Continue reading</div>
+      <div class="meta">Volume One · Letter 15</div>
+      <div class="main">
+        <div class="h3">Know That Which Has Been Poured Out, The Word of God</div>
+        <span class="btn primary sm"><i data-i="play" class="xs fill"></i>Listen</span>
+      </div>
+      <div class="foot"><div class="progress"><i style="width:40%"></i></div><span class="meta">40%</span></div>
+    </div>
+
+    <div class="list cols">
+      <div class="row"><span class="txt"><span class="ttl">The Volumes of Truth</span><span class="meta">7 volumes · 244 letters</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row"><span class="txt"><span class="ttl">The Scriptures of Truth</span><span class="meta">Genesis to Revelation · NKJV</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row"><span class="txt"><span class="ttl">Answers Only God Can Give</span><span class="meta">Topics and doctrines</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row"><span class="txt"><span class="ttl">Studies</span><span class="meta">Letter studies · Matthew Study Bible</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row"><span class="txt"><span class="ttl">Listening Library</span><span class="meta">The letters and scriptures, read aloud</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row"><span class="txt"><span class="ttl">Songs of the Letters</span><span class="meta">Sung by the flock</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row"><span class="txt"><span class="ttl">Library</span><span class="meta">Notes, journal &amp; bookmarks</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row"><span class="txt"><span class="ttl">Settings</span><span class="meta">Display, themes &amp; preferences</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+    </div>
+
+    <div class="surprise"><span class="btn text"><i data-i="sy-dice" class="sm"></i>Surprise Me</span></div>
+  </div>
+  <div class="tabbar">
+    <span class="tb"><i data-i="history"></i>Recent</span>
+    <span class="tb"><i data-i="notebook-pen"></i>Notes</span>
+    <span class="tb"><i data-i="bookmark"></i>Bookmarks</span>
+    <span class="tb"><i data-i="scripture-web" class="nudge"></i>Scripture Web</span>
+  </div>
+</div>
+</body></html>

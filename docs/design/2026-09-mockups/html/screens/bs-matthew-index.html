@@ -1,0 +1,82 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* matthew-idx: the Matthew Study Bible's chapter index (ChapterIndex.jsx + MATTHEW_NOTE_RATIO).
+     Pinned header; the list below is scrolled to the reader's place. */
+  .idx { padding-top: 8px; }
+  .hdr { margin: 0 calc(-1 * var(--gutter)); padding: 0 var(--gutter) 22px; border-bottom: 1px solid var(--hairline); }
+  .hdr .h1 { margin-top: 4px; }
+  .hdr .meta.sub { margin-top: 6px; }
+  .playrow { display: flex; align-items: center; gap: 16px; margin-top: 22px; }
+  .prog { flex: 1; min-width: 0; }
+  .prog .progress { margin-top: 7px; }
+  .chs { border-radius: 0; }
+  .chs .item { align-items: flex-start; gap: 12px; padding: 18px 16px 18px 14px; }
+  .num { width: 44px; flex: none; padding-top: 2px; }
+  .num b { display: flex; align-items: center; gap: 7px; font: 700 15px/1.2 var(--sans); color: var(--text-3); }
+  .rd { width: 7px; height: 7px; border-radius: 4px; background: var(--accent); flex: none; }
+  .ttl { flex: 1; min-width: 0; font: 500 18px/1.28 var(--serif); color: var(--text); }
+  .tp { display: inline-block; text-wrap: balance; }
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  /* commentary weight: study notes run N times the chapter's verse text */
+  .nchip { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 12px; background: var(--surface-2); color: var(--text-2); font: 400 12px/1 var(--sans); }
+  .nchip .i { color: var(--text-3); }
+  .item.cur .nchip { background: var(--surface); }
+  .dur { flex: none; padding-top: 3px; font: 400 13px/1.35 var(--sans); color: var(--text-3); white-space: nowrap; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .dur .i { color: var(--accent); }
+  .item.cur { background: var(--accent-soft); }
+  .sbar { position: absolute; right: 4px; top: 520px; width: 3px; height: 120px; border-radius: 2px; background: var(--text-3); opacity: .35; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Studies</span>
+  </div>
+  <div class="scroll idx">
+    <div class="hdr">
+      <div class="eyebrow">New Testament Study Bible</div>
+      <div class="h1">Matthew</div>
+      <div class="meta sub">The Gospel According to Matthew · 28 chapters</div>
+      <div class="playrow">
+        <span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen</span>
+        <div class="prog"><span class="meta">22 of 28 read</span><div class="progress"><i style="width:79%"></i></div></div>
+      </div>
+    </div>
+    <div class="group chs">
+      <div class="item">
+        <div class="num"><b>21<span class="rd"></span></b></div>
+        <div class="ttl"><span class="tp">The Triumphal Entry ·</span> <span class="tp">The Temple Cleansed ·</span> <span class="tp">The Wicked Vinedressers</span>
+          <div class="tags"><span class="nchip"><i data-i="message-square-quote" class="xs"></i>1.9× notes</span></div></div>
+        <div class="dur">~5 min</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>22<span class="rd"></span></b></div>
+        <div class="ttl"><span class="tp">The Wedding Feast ·</span> <span class="tp">Render to Caesar ·</span> <span class="tp">The Greatest Commandment</span>
+          <div class="tags"><span class="nchip"><i data-i="message-square-quote" class="xs"></i>3.4× notes</span></div></div>
+        <div class="dur">~4 min</div>
+      </div>
+      <div class="item cur">
+        <div class="num"><b>23</b></div>
+        <div class="ttl"><span class="tp">Seven Woes ·</span> <span class="tp">Lament Over Jerusalem</span>
+          <div class="tags"><span class="nchip"><i data-i="message-square-quote" class="xs"></i>4.3× notes</span><span class="pill">Reading · 40%</span></div></div>
+        <div class="dur">~4 min</div>
+      </div>
+      <div class="item">
+        <div class="num"><b>24</b></div>
+        <div class="ttl"><span class="tp">The Great Tribulation ·</span> <span class="tp">The Coming of the Son of Man ·</span> <span class="tp">No One Knows the Day or Hour</span>
+          <div class="tags"><span class="nchip"><i data-i="message-square-quote" class="xs"></i>8.4× notes</span></div></div>
+        <div class="dur"><span>~4 min</span><i data-i="bookmark" class="xs fill"></i></div>
+      </div>
+      <div class="item">
+        <div class="num"><b>25</b></div>
+        <div class="ttl"><span class="tp">The Ten Virgins ·</span> <span class="tp">The Talents ·</span> <span class="tp">The Sheep and the Goats</span>
+          <div class="tags"><span class="nchip"><i data-i="message-square-quote" class="xs"></i>3.9× notes</span></div></div>
+        <div class="dur">~4 min</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="sbar"></div>
+</body></html>

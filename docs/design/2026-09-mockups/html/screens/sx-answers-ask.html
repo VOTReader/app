@@ -1,0 +1,138 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="sx-icons.js"></script>
+<link rel="stylesheet" href="sx-common.css">
+<style>
+  /* header and ask box as screens/answers.html */
+  .intro { padding-top: 4px; }
+  .intro .h1 { margin-top: 6px; }
+  .intro .body { margin-top: 10px; }
+  .scroll > .search { margin-top: 20px; }
+  .search .q { flex: 1; min-width: 0; color: var(--text); font-size: 16px; white-space: nowrap; overflow: hidden; }
+  .search .x { color: var(--text-2); }
+  .sect { margin: 26px 0 12px; }
+  /* topic cards */
+  .hit { display: block; background: var(--surface); border-radius: 16px; padding: 14px 14px 16px 16px; }
+  [data-theme="light"] .hit { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .hit + .hit { margin-top: 8px; }
+  .hit .head { display: flex; align-items: center; gap: 10px; }
+  .hit .head .t { flex: 1; min-width: 0; }
+  .hit .eb { font: 400 13px/1.3 var(--sans); color: var(--text-3); }
+  .hit .ttl { font: 500 20px/1.25 var(--serif); color: var(--text); margin-top: 3px; }
+  .hit .head > .i { color: var(--text-3); }
+  .hit .sn { margin-top: 10px; font: 400 16px/1.5 var(--serif); color: var(--text-2); }
+  .hit .sn mark { background: var(--hl-honey); color: var(--text); }
+  .hit .src { margin-top: 8px; font: italic 400 13px/1.35 var(--sans); color: var(--text-3); }
+  /* mention list */
+  .sum { font: 400 14px/1.4 var(--sans); color: var(--text-2); margin: -2px 0 12px; }
+  .tlist .item { min-height: 52px; padding-top: 12px; padding-bottom: 12px; }
+  .tlist .nm { flex: 1; min-width: 0; font: 500 17px/1.25 var(--serif); color: var(--text); }
+  .tlist .n { min-width: 26px; height: 24px; padding: 0 8px; border-radius: 12px; background: var(--surface-2); font: 700 12px/24px var(--sans); color: var(--text-2); text-align: center; flex: none; }
+  .tlist .i { color: var(--text-3); }
+  .more { margin-top: 12px; }
+  /* nothing found */
+  .empty { padding: 36px 8px 0; text-align: center; }
+  .empty .h3 { font-size: 21px; text-wrap: balance; }
+  .empty .go { margin-top: 20px; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 12px 14px 12px 16px; border-radius: 16px; background: var(--surface-2); text-align: left; font: 700 15px/1.35 var(--sans); color: var(--text); }
+  .empty .go .t { flex: 1; min-width: 0; }
+  .empty .go .i { color: var(--text-2); }
+  .pf.tall { height: auto; }
+  .pf.tall > .screen { height: auto; padding-bottom: 28px; }
+</style></head>
+<body data-size="1396x1374">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Answers · asking a question</div>
+    <div class="meta">“What does The Lord say about…” searches Answers alone. Topics whose name holds every word come first, the top one with a passage; then every other topic whose passages speak of it, busiest first, eight at a time. Back clears the question before it leaves. Real results from answers.js.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(3, 412px); column-gap: 40px">
+
+    <div class="cell">
+      <div class="cap">“death” · the whole page<small>Two topics by name, then 220 passages in 73 more</small></div>
+      <div class="pf tall"><div class="screen tall">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span></div>
+        <div class="scroll">
+          <div class="intro">
+            <div class="eyebrow">Topics &amp; Doctrines</div>
+            <div class="h1">Answers Only God Can Give</div>
+            <div class="body">The Lord sets the record straight concerning a variety of topics, doctrines and traditions</div>
+          </div>
+          <div class="search"><i data-i="search" class="sm"></i><span class="q">death</span><i data-i="x" class="sm x"></i></div>
+
+          <div class="label sect">Topics</div>
+          <div class="hit">
+            <div class="head"><span class="t"><div class="eb">Death, Judgment &amp; The Kingdom · 7 passages</div><div class="ttl">The First Death</div></span><i data-i="chevron-right" class="sm"></i></div>
+            <div class="sn">Thus says The Lord: All people sleep in <mark>death</mark>, both those who have done good and those who have done evil. In no way are they among the living, nor are they aware.…</div>
+            <div class="src">From “Death and Awakening” ~ Volume 1</div>
+          </div>
+          <div class="hit">
+            <div class="head"><span class="t"><div class="eb">Death, Judgment &amp; The Kingdom · 12 passages</div><div class="ttl">The Second Death</div></span><i data-i="chevron-right" class="sm"></i></div>
+          </div>
+
+          <div class="label sect">Also spoken of in</div>
+          <div class="sum">220 more passages, across 73 topics</div>
+          <div class="group tlist">
+            <div class="item"><span class="nm">The Churches of Men</span><span class="n">10</span><i data-i="chevron-right" class="sm"></i></div>
+            <div class="item"><span class="nm">Abortion</span><span class="n">9</span><i data-i="chevron-right" class="sm"></i></div>
+            <div class="item"><span class="nm">The Day of The Lord</span><span class="n">9</span><i data-i="chevron-right" class="sm"></i></div>
+            <div class="item"><span class="nm">The Crucifixion</span><span class="n">8</span><i data-i="chevron-right" class="sm"></i></div>
+            <div class="item"><span class="nm">The Holy Days of God</span><span class="n">8</span><i data-i="chevron-right" class="sm"></i></div>
+            <div class="item"><span class="nm">The First and Second Resurrection</span><span class="n">7</span><i data-i="chevron-right" class="sm"></i></div>
+            <div class="item"><span class="nm">The Gathering Up (Rapture)</span><span class="n">7</span><i data-i="chevron-right" class="sm"></i></div>
+            <div class="item"><span class="nm">The Resurrection</span><span class="n">7</span><i data-i="chevron-right" class="sm"></i></div>
+          </div>
+          <span class="btn text more">65 more topics</span>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">“tithe” · no topic by that name<small>“Tithing” does not start with “tithe”, so it counts as a mention</small></div>
+      <div class="pf"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span></div>
+        <div class="scroll">
+          <div class="intro">
+            <div class="eyebrow">Topics &amp; Doctrines</div>
+            <div class="h1">Answers Only God Can Give</div>
+            <div class="body">The Lord sets the record straight concerning a variety of topics, doctrines and traditions</div>
+          </div>
+          <div class="search"><i data-i="search" class="sm"></i><span class="q">tithe</span><i data-i="x" class="sm x"></i></div>
+          <div class="label sect">Spoken of in</div>
+          <div class="sum">6 passages, across 6 topics</div>
+          <div class="group tlist">
+            <div class="item"><span class="nm">False Doctrines Within the Churches of Men Regarding...</span><span class="n">1</span><i data-i="chevron-right" class="sm"></i></div>
+            <div class="item"><span class="nm">Prophets (False)</span><span class="n">1</span><i data-i="chevron-right" class="sm"></i></div>
+            <div class="item"><span class="nm">Spiritual Gifts</span><span class="n">1</span><i data-i="chevron-right" class="sm"></i></div>
+            <div class="item"><span class="nm">The Churches of Men</span><span class="n">1</span><i data-i="chevron-right" class="sm"></i></div>
+            <div class="item"><span class="nm">Tithing</span><span class="n">1</span><i data-i="chevron-right" class="sm"></i></div>
+            <div class="item"><span class="nm">Woe to Those Who...</span><span class="n">1</span><i data-i="chevron-right" class="sm"></i></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">“nicodemus” · nothing in Answers<small>The button carries the word to Search: 7 matches there</small></div>
+      <div class="pf"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span></div>
+        <div class="scroll">
+          <div class="intro">
+            <div class="eyebrow">Topics &amp; Doctrines</div>
+            <div class="h1">Answers Only God Can Give</div>
+            <div class="body">The Lord sets the record straight concerning a variety of topics, doctrines and traditions</div>
+          </div>
+          <div class="search"><i data-i="search" class="sm"></i><span class="q">nicodemus</span><i data-i="x" class="sm x"></i></div>
+          <div class="empty">
+            <div class="h3">Nothing in Answers speaks of “nicodemus”.</div>
+            <div class="go"><i data-i="search" class="sm"></i><span class="t">Search the whole library for “nicodemus”</span><i data-i="chevron-right" class="sm"></i></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</body></html>

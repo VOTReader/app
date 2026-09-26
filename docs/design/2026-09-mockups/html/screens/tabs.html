@@ -1,0 +1,163 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .topbar .title { padding-left: 12px; }
+  .topbar .btn.text { height: 44px; font-size: 15px; padding: 0 10px; }
+  /* Deduplicate is inert when no two tabs show the same place (the app then drops the "· N") */
+  .topbar .btn.text.off { opacity: .4; }
+  /* Close all is a recoverable clear of reading places (the app asks "Close all 4 tabs?" first): tinted warn */
+  .topbar .btn-warn { margin: 0 8px 0 4px; flex: none; }
+  /* ⋮ Tab actions: top-right of the preview, far from the × (as dl-common.css draws it) */
+  .tmenu { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 15px; display: grid; place-items: center; z-index: 2;
+    background: color-mix(in srgb, var(--surface-2) 92%, transparent); color: var(--text-2); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 8px; }
+  .tab { height: 260px; border-radius: 16px; background: var(--surface); overflow: hidden; display: flex; flex-direction: column; }
+  [data-theme="light"] .tab { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .tab.cur, [data-theme="light"] .tab.cur { box-shadow: 0 0 0 2px var(--accent); }
+  .pv { flex: 1; min-height: 0; padding: 14px 12px 0; position: relative; overflow: hidden; }
+  .strip { height: 48px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 6px 0 12px; background: var(--surface-2); }
+  .strip .nm { flex: 1; min-width: 0; font: 700 13px/1.25 var(--sans); color: var(--text); text-wrap: balance; }
+  .strip .x { width: 32px; height: 32px; border-radius: 16px; display: grid; place-items: center; color: var(--text-3); flex: none; }
+
+  /* mini page vocabulary */
+  .mph { height: 5px; border-radius: 3px; background: var(--surface-3); }
+  .mph + .mph { margin-top: 7px; }
+  .mph.r { background: color-mix(in srgb, var(--dot-rose) 55%, var(--surface-3)); }
+  .mph.h { background: color-mix(in srgb, var(--dot-honey) 55%, var(--surface-3)); }
+  .mm { font: 400 8px/1.2 var(--sans); color: var(--text-3); }
+  .mt { font: 500 17px/1.1 var(--serif); color: var(--text); margin-top: 3px; }
+  .mt.big { font-size: 24px; margin-top: 0; }
+  .mb { margin-top: 12px; }
+  .mb + .mb { margin-top: 12px; }
+  .ln { display: flex; align-items: center; gap: 3px; height: 5px; }
+  .ln + .ln { margin-top: 7px; }
+  .ln .mph { flex: none; }
+  .ln .mph + .mph { margin-top: 0; }
+  .vn { font: 700 6px/1 var(--sans); color: var(--accent); width: 5px; flex: none; }
+
+  .mcont { margin-top: 12px; background: var(--surface-2); border-radius: 10px; padding: 8px 9px 9px; }
+  .mcont .ms { font: 500 13px/1.1 var(--serif); color: var(--text); margin-top: 2px; }
+  .mprog { height: 2px; border-radius: 1px; background: var(--surface-3); margin-top: 8px; overflow: hidden; }
+  .mprog i { display: block; height: 100%; background: var(--accent); }
+  .mtiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+  .mtiles span { height: 40px; border-radius: 8px; background: var(--surface-2); position: relative; }
+  .mtiles span b { position: absolute; left: 7px; bottom: 7px; width: 52%; height: 4px; border-radius: 2px; background: var(--surface-3); }
+  .mtiles span b::before { content: ''; position: absolute; left: 0; top: -14px; width: 9px; height: 9px; border-radius: 5px; background: var(--accent-soft); }
+
+  /* the Scripture Web is immersive and stays dark in both themes: its preview carries data-theme="dark" on a black canvas */
+  .pv.web { background: var(--bg); }
+  .arcs { position: absolute; left: 12px; top: 46px; width: 156px; height: 154px; }
+  .arcs path { fill: none; stroke-width: 1.2; stroke-linecap: round; }
+  .arcs .a { stroke: var(--accent); }
+  .arcs .b { stroke: var(--text-3); opacity: .6; }
+  .arcs .base { stroke: var(--text-3); stroke-width: 1; opacity: .45; }
+  .arcs .n { fill: var(--text-2); }
+  .arcs .n.on { fill: var(--accent); }
+
+  .newtab { position: absolute; left: 50%; bottom: 36px; transform: translateX(-50%); padding: 0 26px 0 20px; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="title">4 / 50 tabs open</span>
+    <span class="btn text off">Deduplicate</span>
+    <span class="btn sm btn-warn">Close all</span>
+  </div>
+  <div class="scroll">
+    <div class="grid">
+
+      <div class="tab">
+        <div class="pv"><span class="tmenu"><i data-i="ellipsis-vertical" class="xs"></i></span>
+          <div class="mph" style="width:56%;height:8px;border-radius:4px"></div>
+          <div class="mph" style="width:34%"></div>
+          <div class="mcont">
+            <div class="mm">Volume One</div>
+            <div class="ms">Letter 15</div>
+            <div class="mprog"><i style="width:38%"></i></div>
+          </div>
+          <div class="mtiles"><span><b></b></span><span><b></b></span><span><b></b></span><span><b></b></span></div>
+        </div>
+        <div class="strip"><span class="nm">Home</span><span class="x"><i data-i="x" class="xs"></i></span></div>
+      </div>
+
+      <div class="tab cur">
+        <div class="pv"><span class="tmenu"><i data-i="ellipsis-vertical" class="xs"></i></span>
+          <div class="mm">Volume One</div>
+          <div class="mt">Letter 15</div>
+          <div class="mb">
+            <div class="mph" style="width:100%"></div>
+            <div class="mph" style="width:95%"></div>
+            <div class="mph" style="width:98%"></div>
+            <div class="mph r" style="width:90%"></div>
+            <div class="mph r" style="width:62%"></div>
+          </div>
+          <div class="mb">
+            <div class="mph" style="width:100%"></div>
+            <div class="mph" style="width:93%"></div>
+            <div class="mph" style="width:97%"></div>
+            <div class="mph" style="width:70%"></div>
+          </div>
+          <div class="mb">
+            <div class="mph" style="width:99%"></div>
+            <div class="mph" style="width:88%"></div>
+            <div class="mph" style="width:95%"></div>
+          </div>
+        </div>
+        <div class="strip"><span class="nm">Volume One&nbsp;· Letter 15</span><span class="x"><i data-i="x" class="xs"></i></span></div>
+      </div>
+
+      <div class="tab">
+        <div class="pv"><span class="tmenu"><i data-i="ellipsis-vertical" class="xs"></i></span>
+          <div class="mt big">John 3</div>
+          <div class="mb">
+            <div class="ln"><span class="vn">1</span><span class="mph" style="width:84%"></span></div>
+            <div class="ln"><span class="mph" style="width:100%"></span></div>
+            <div class="ln"><span class="vn">2</span><span class="mph" style="width:62%"></span></div>
+            <div class="ln"><span class="mph" style="width:100%"></span></div>
+            <div class="ln"><span class="mph" style="width:96%"></span></div>
+            <div class="ln"><span class="mph" style="width:48%"></span></div>
+            <div class="ln"><span class="vn">3</span><span class="mph" style="width:40%"></span><span class="mph h" style="width:44%"></span></div>
+            <div class="ln"><span class="mph h" style="width:100%"></span></div>
+            <div class="ln"><span class="mph h" style="width:36%"></span></div>
+            <div class="ln"><span class="vn">4</span><span class="mph" style="width:80%"></span></div>
+            <div class="ln"><span class="mph" style="width:100%"></span></div>
+            <div class="ln"><span class="mph" style="width:91%"></span></div>
+            <div class="ln"><span class="vn">5</span><span class="mph" style="width:74%"></span></div>
+          </div>
+        </div>
+        <div class="strip"><span class="nm">John 3</span><span class="x"><i data-i="x" class="xs"></i></span></div>
+      </div>
+
+      <div class="tab">
+        <div class="pv web" data-theme="dark"><span class="tmenu"><i data-i="ellipsis-vertical" class="xs"></i></span>
+          <div class="mph" style="width:50%;height:8px;border-radius:4px"></div>
+          <div class="mph" style="width:30%"></div>
+          <svg class="arcs" viewBox="0 0 156 154">
+            <line class="base" x1="2" y1="136" x2="154" y2="136"/>
+            <path class="b" d="M8 136 A70 70 0 0 1 148 136"/>
+            <path class="b" d="M26 136 A42 42 0 0 1 110 136"/>
+            <path class="b" d="M88 136 A21 21 0 0 1 130 136"/>
+            <path class="b" d="M110 136 A19 19 0 0 1 148 136"/>
+            <path class="b" d="M26 136 A9 9 0 0 1 44 136"/>
+            <path class="a" d="M8 136 A29 29 0 0 1 66 136"/>
+            <path class="a" d="M44 136 A11 11 0 0 1 66 136"/>
+            <path class="a" d="M66 136 A41 41 0 0 1 148 136"/>
+            <circle class="n" cx="8" cy="136" r="2.4"/>
+            <circle class="n" cx="26" cy="136" r="2.4"/>
+            <circle class="n" cx="44" cy="136" r="2.4"/>
+            <circle class="n on" cx="66" cy="136" r="3.2"/>
+            <circle class="n" cx="88" cy="136" r="2.4"/>
+            <circle class="n" cx="110" cy="136" r="2.4"/>
+            <circle class="n" cx="130" cy="136" r="2.4"/>
+            <circle class="n" cx="148" cy="136" r="2.4"/>
+          </svg>
+        </div>
+        <div class="strip"><span class="nm">Scripture Web</span><span class="x"><i data-i="x" class="xs"></i></span></div>
+      </div>
+
+    </div>
+  </div>
+  <span class="btn primary newtab"><i data-i="plus" class="sm"></i>New tab</span>
+</div>
+</body></html>

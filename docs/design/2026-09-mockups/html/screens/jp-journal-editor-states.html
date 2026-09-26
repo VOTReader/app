@@ -1,0 +1,204 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* ── the approved editor chrome (screens/journal.html) ── */
+  .topbar .btn.text { height: 44px; padding: 0 14px; font-size: 16px; }
+  .entry { padding-top: 6px; }
+  .entry .date { margin-top: 6px; }
+  .para { margin-top: 26px; }
+  .para .ph + .ph { margin-top: 20px; }
+  .lastline { display: flex; align-items: center; gap: 4px; margin-top: 20px; }
+  .lastline .ph { flex: none; }
+  .caret { width: 2px; height: 22px; border-radius: 1px; background: var(--accent); }
+  .photo { width: 220px; height: 140px; border-radius: 14px; position: relative;
+    background:
+      radial-gradient(46% 62% at 74% 30%, color-mix(in srgb, var(--dot-honey) 52%, transparent), transparent 100%),
+      linear-gradient(180deg,
+        color-mix(in srgb, var(--dot-honey) 26%, var(--surface-3)) 0%,
+        color-mix(in srgb, var(--dot-clay) 22%, var(--surface-3)) 56%,
+        color-mix(in srgb, var(--dot-sage) 18%, var(--surface-2)) 100%); }
+  .blkm { margin-top: 28px; }
+  .memo { display: inline-flex; align-items: center; gap: 12px; height: 48px; padding: 0 18px 0 6px; border-radius: 24px; background: var(--surface-2); }
+  .memo .pb { width: 36px; height: 36px; border-radius: 18px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; }
+  .memo .pb .i { margin-left: 2px; }
+  .wave { display: flex; align-items: center; gap: 3px; height: 24px; }
+  .wave span { width: 3px; border-radius: 2px; background: var(--text-3); }
+  .memo .len { font: 400 13px/1 var(--sans); color: var(--text-2); }
+  /* the app's editor chrome (as jn-blocks.html draws it): the save state, and one floating + that opens Insert */
+  .saved { position: absolute; left: 20px; bottom: 42px; display: flex; align-items: center; gap: 6px; }
+  .fab { position: absolute; right: 20px; bottom: 22px; width: 56px; height: 56px; border-radius: 28px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; box-shadow: var(--shadow); }
+
+  /* ── reorder: grips in the left gutter, the grabbed block follows the finger ── */
+  .rb { position: relative; padding-left: 30px; }
+  .grip { fill: currentColor !important; stroke: none !important; }
+  .rb .grip { position: absolute; left: -2px; top: -7px; color: var(--text-3); }
+  .rb.media .grip { top: 50%; margin-top: -12px; }
+  .slot { width: 220px; height: 140px; border-radius: 14px; border: 1.5px dashed color-mix(in srgb, var(--accent) 60%, transparent); background: var(--accent-soft); }
+  .flying { position: absolute; left: 58px; top: 342px; box-shadow: var(--shadow), 0 0 0 1px var(--hairline); transform: scale(1.03); }
+  .flying .grip { color: var(--accent); }
+  .flyrow { position: absolute; left: 30px; top: 376px; display: flex; align-items: center; gap: 10px; }
+  .flyrow .gp { color: var(--accent); }
+
+  /* ── per-block delete: an × on media, a confirm strip at the block's top ── */
+  .delx { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 15px; background: color-mix(in srgb, var(--bg) 62%, transparent); color: var(--text); display: grid; place-items: center; }
+  .cstrip { display: flex; align-items: center; gap: 8px; background: var(--surface-2); border-radius: 14px; padding: 8px 8px 8px 14px; }
+  .cstrip .q { flex: 1; font: 700 14px/1.3 var(--sans); color: var(--text); }
+  .cstrip .btn.sm { padding: 0 12px; }
+  .cstrip .btn.secondary { background: var(--surface-3); }
+  .blkc .cstrip { margin-bottom: 18px; }
+
+  /* ── toasts (components.html) ── */
+  .toast { height: 52px; border-radius: 12px; background: var(--surface-3); display: flex; align-items: center; justify-content: space-between; padding: 0 6px 0 18px; font: 400 15px/1 var(--sans); color: var(--text); box-shadow: var(--shadow); }
+  .toast .btn { height: 40px; }
+  .toast.solo { padding-right: 18px; }
+  .ptoast { position: absolute; left: 20px; right: 20px; bottom: 112px; }
+
+  /* ── photo just attached ── */
+  .capfield { width: 220px; height: 40px; margin-top: 8px; border-radius: 10px; background: var(--surface-2); display: flex; align-items: center; padding: 0 12px; font: 400 14px/1 var(--sans); color: var(--text-3); }
+  .capfield .caret { height: 18px; margin-right: 2px; }
+  .spin { width: 14px; height: 14px; border-radius: 7px; border: 2px solid var(--surface-3); border-top-color: var(--accent); }
+
+  /* ── insert sheet ── */
+  .ins { top: 118px; padding-bottom: 12px; }
+  .shead { display: flex; align-items: center; gap: 4px; margin: -2px -10px 4px 0; }
+  .shead .h3 { flex: 1; }
+  .ins .label { margin: 12px 0 4px; }
+  .it { display: flex; align-items: center; gap: 14px; min-height: 54px; }
+  .it .ic { width: 38px; height: 38px; border-radius: 11px; background: var(--surface-2); color: var(--text-2); display: grid; place-items: center; flex: none; }
+  .it .tx { flex: 1; min-width: 0; }
+  .it .tx b { display: block; font: 400 16px/1.2 var(--sans); color: var(--text); }
+  .it .tx span { display: block; margin-top: 2px; font: 400 13px/1.25 var(--sans); color: var(--text-3); }
+  .it .chev { color: var(--text-3); }
+  .it.hot .ic { background: var(--accent-soft); color: var(--accent); }
+
+  /* ── recording sheet ── */
+  .rec { padding-bottom: 30px; }
+  .rst { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 18px; font: 700 13px/1 var(--sans); color: var(--text-2); letter-spacing: .02em; }
+  .rst .dot { width: 8px; height: 8px; border-radius: 4px; background: var(--accent); }
+  .rst.paused .dot { background: var(--text-3); }
+  .rtime { text-align: center; margin-top: 12px; font: 700 48px/1 var(--sans); color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .rtime small { font: 400 20px/1 var(--sans); color: var(--text-3); }
+  .rwave { display: flex; align-items: center; justify-content: space-between; height: 64px; margin: 22px 4px 0; }
+  .rwave span { width: 4px; border-radius: 2px; background: var(--text-3); }
+  .rwave.live span { background: var(--accent); }
+  .rwave span.p { background: var(--accent); }
+  .ract { display: flex; align-items: center; justify-content: center; gap: 22px; margin-top: 26px; }
+  .rbtn { width: 60px; height: 60px; border-radius: 30px; display: grid; place-items: center; background: var(--surface-2); color: var(--text); }
+  .rbtn.primary { background: var(--accent); color: var(--accent-ink); }
+  .rbtn .stop { width: 18px; height: 18px; border-radius: 4px; background: currentColor; }
+  .ract .btn.secondary { min-width: 104px; }
+  .rec .cstrip { margin-top: 26px; }
+  .pp { display: flex; justify-content: center; margin-top: 18px; }
+  .pp .rbtn { width: 52px; height: 52px; }
+
+  /* ── row 3: components at full size ── */
+  .comp { display: flex; flex-direction: column; gap: 12px; }
+  .panel { background: var(--surface); border-radius: 20px; padding: 16px 18px 18px; }
+  [data-theme="light"] .panel { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .panel .h3 { font-size: 18px; }
+  .panel .msg { margin-top: 10px; font: 400 15px/1.45 var(--sans); color: var(--text); }
+  .panel .acts { display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end; }
+  .memo.ed { display: flex; width: 100%; padding-right: 6px; }
+  .memo.ed .wave { flex: 1; justify-content: space-between; }
+  .memo.ed .del { width: 36px; height: 36px; border-radius: 18px; display: grid; place-items: center; color: var(--text-2); }
+  .saverow { display: flex; align-items: center; gap: 16px; }
+  .saverow .meta { display: flex; align-items: center; gap: 6px; }
+</style></head>
+<body data-size="1176x1742">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Journal · editor states</div>
+    <div class="meta">Built on the approved editor. Reorder, delete and undo, attaching a photo, and recording a voice memo, with the app's own words.</div>
+  </div>
+  <div class="board-grid" id="grid" style="grid-template-columns: repeat(4, 256px)"></div>
+  <div class="board-grid" id="grid3" style="grid-template-columns: 330px 372px 346px; margin-top: 6px"></div>
+</div>
+<script>
+  // deterministic bar heights (no Math.random, so both themes match)
+  function bars(n, lo, hi, seed) {
+    let s = seed, out = [];
+    for (let i = 0; i < n; i++) { s = (s * 9301 + 49297) % 233280; const r = s / 233280; const env = 0.55 + 0.45 * Math.sin(i / n * Math.PI); out.push(Math.round(lo + (hi - lo) * r * env)); }
+    return out;
+  }
+  const MEMO_WAVE = [6, 11, 17, 12, 20, 14, 8, 18, 23, 13, 16, 9, 14, 7, 11, 5].map(h => `<span style="height:${h}px"></span>`).join('');
+  const MEMO_WAVE_LONG = [6, 11, 17, 12, 20, 14, 8, 18, 23, 13, 16, 9, 14, 7, 11, 5, 9, 15, 21, 12, 17, 10, 6, 13, 8, 5].map(h => `<span style="height:${h}px"></span>`).join('');
+  const GRIP = '<svg class="i grip" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
+  const TITLE = `<div class="entry"><div class="h1">Morning reading</div><div class="meta date">September 24, 2026 · 7:12 AM</div></div>`;
+  const P = (ws, caret) => `<div class="para">${ws.map((w, i) => (caret && i === ws.length - 1) ? `<div class="lastline"><div class="ph" style="width:${w}%"></div><span class="caret"></span></div>` : `<div class="ph" style="width:${w}%"></div>`).join('')}</div>`;
+  const PHOTO = (x) => `<div class="blkm"><div class="photo">${x ? '<span class="delx"><i data-i="x" class="xs"></i></span>' : ''}</div></div>`;
+  const MEMO = `<div class="blkm" style="margin-top:12px"><div class="memo"><span class="pb"><i data-i="play" class="xs fill"></i></span><span class="wave">${MEMO_WAVE}</span><span class="len">0:42</span></div></div>`;
+  // The one floating + (Insert). The app hides it while the recording sheet is up (on === 'mic').
+  const FAB = (on) => on === 'mic' ? '' : `<span class="fab"><i data-i="plus"></i></span>`;
+  function editor({ body, status = '<i data-i="circle-check" class="xs"></i>Saved on this device', over = '', on = '', extra = '' }) {
+    return `<div class="phone-s"><div class="screen" style="position:relative">
+      <div class="status"></div>
+      <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Journal</span><span class="btn text">Done</span></div>
+      <div class="scroll">${TITLE}${body}</div>
+      <div class="meta saved">${status}</div>
+      ${FAB(on)}${extra}${over}
+    </div></div>`;
+  }
+  function sheet(cls, inner) { return `<div class="scrim"></div><div class="sheet ${cls}"><div class="grabber"></div>${inner}</div>`; }
+  const item = (icon, label, desc, drill, hot) => `<div class="it ${hot ? 'hot' : ''}"><span class="ic"><i data-i="${icon}" class="sm"></i></span><span class="tx"><b>${label}</b><span>${desc}</span></span>${drill ? '<i data-i="chevron-right" class="sm chev"></i>' : ''}</div>`;
+  const recWave = (live, played) => { const b = bars(48, 6, 60, live ? 17 : 5); return `<div class="rwave ${live ? 'live' : ''}">${b.map((h, i) => `<span class="${played && i / 48 <= played ? 'p' : ''}" style="height:${h}px"></span>`).join('')}</div>`; };
+  const RECHEAD = (t, x) => `<div class="shead"><span class="h3">${t}</span>${x ? '<span class="iconbtn"><i data-i="x"></i></span>' : ''}</div>`;
+
+  const REORDER = `
+    <div class="rb" style="margin-top:22px">${GRIP}${P([100, 96, 99, 57])}</div>
+    <div class="rb media" style="margin-top:26px">${GRIP.replace('class="i grip"', 'class="i grip" style="opacity:.35"')}<div class="slot"></div></div>
+    <div class="rb" style="margin-top:4px">${GRIP}${P([98, 100, 71])}</div>
+    <div class="rb media" style="margin-top:26px">${GRIP}<div class="memo"><span class="pb"><i data-i="play" class="xs fill"></i></span><span class="wave">${MEMO_WAVE}</span><span class="len">0:42</span></div></div>`;
+  const FLY = `<div class="flyrow"><span class="gp">${GRIP}</span><div class="photo flying" style="position:relative; left:auto; top:auto"></div></div>`;
+
+  const cells = [
+    ['Reorder blocks', 'Hold a grip: the photo lifts, the others slide aside', editor({ body: REORDER, extra: FLY, status: '<i data-i="circle-check" class="xs"></i>Saved on this device' })],
+    ['Delete a block', 'Media keeps its ×; a paragraph asks first', editor({ body: `<div class="blkc" style="margin-top:22px"><div class="cstrip"><span class="q">Delete this block?</span><span class="btn secondary sm">Cancel</span><span class="btn btn-danger sm">Yes, delete</span></div>${P([100, 96, 99, 93, 57]).replace('class="para"', 'class="para" style="margin-top:0"')}</div>` + PHOTO(true) + MEMO })],
+    ['Undo', 'Six seconds to take it back; it works even after Done', editor({ body: PHOTO(true) + MEMO, extra: '<div class="toast ptoast"><span>Block deleted.</span><span class="btn text">Undo</span></div>', status: '<span class="spin"></span>Saving…' })],
+    ['Insert', 'Everything a block can be; Image opens the gallery', editor({ body: P([100, 96, 99, 93, 41], true), over: sheet('ins', RECHEAD('Insert', true) +
+        '<div class="label">From the Library</div>' +
+        item('file-text', 'Card', 'Embed a chapter or letter title', true) +
+        item('message-square-quote', 'Excerpt', 'Embed a portion — pick word-precise text', true) +
+        '<div class="label">From your annotations</div>' +
+        item('bookmark', 'Bookmark', 'Pull in a saved passage', true) +
+        item('sticky-note', 'Note', 'Reference one of your annotations', true) +
+        item('notebook-pen', 'Journal entry', 'Link to another journal entry', true) +
+        item('notebook', 'Notebook', 'Link to a notebook of notes', true) +
+        '<div class="label">Capture</div>' +
+        item('image', 'Image', 'From device gallery', false, true) +
+        item('mic', 'Voice recording', 'Record a memo or prayer', false) +
+        '<div class="label">Text</div>' +
+        item('type', 'Body text', 'A new line to write freely', false) +
+        item('ellipsis-vertical', 'Divider', '3-diamond ornament', false)) })],
+    ['Photo attached', 'Lands below the paragraph; saved at once', editor({ on: 'image', status: '<span class="spin"></span>Saving…', body: P([100, 96, 99, 93, 41]) +
+        `<div class="blkm"><div class="photo"><span class="delx"><i data-i="x" class="xs"></i></span></div><div class="capfield"><span class="caret"></span>Caption (optional)</div></div>` +
+        `<div class="para" style="margin-top:24px"><div class="lastline" style="margin-top:0"><span class="caret"></span></div></div>` })],
+    ['Recording', 'The memo stops itself at five minutes', editor({ on: 'mic', body: P([100, 96, 99, 93, 41]) + PHOTO(false), over: sheet('rec', RECHEAD('Voice recording', true) +
+        '<div class="rst"><span class="dot"></span>Recording</div><div class="rtime">0:37</div>' + recWave(true) +
+        '<div class="ract"><span class="btn secondary">Cancel</span><span class="rbtn"><i data-i="pause" class="fill"></i></span><span class="rbtn primary"><span class="stop"></span></span></div>') })],
+    ['Discard confirmation', 'Back, ×, Cancel or the backdrop all ask first', editor({ on: 'mic', body: P([100, 96, 99, 93, 41]) + PHOTO(false), over: sheet('rec', RECHEAD('Voice recording', true) +
+        '<div class="rst paused"><span class="dot"></span>Paused</div><div class="rtime">1:12</div>' + recWave(false) +
+        '<div class="cstrip"><span class="q">Discard this recording?</span><span class="btn secondary sm">Cancel</span><span class="btn btn-danger sm">Yes, discard</span></div>') })],
+    ['Review', 'Already saved to the device; ✓ attaches it', editor({ on: 'mic', body: P([100, 96, 99, 93, 41]) + PHOTO(false), over: sheet('rec', RECHEAD('Review recording', false) +
+        '<div class="rst paused" style="color:var(--text-2)">Review</div><div class="rtime">0:12<small> / 0:42</small></div>' + recWave(false, 0.29) +
+        '<div class="pp"><span class="rbtn"><i data-i="play" class="fill"></i></span></div>' +
+        '<div class="ract" style="margin-top:18px"><span class="rbtn"><i data-i="x"></i></span><span class="rbtn primary"><i data-i="check"></i></span></div>') })],
+  ];
+  document.getElementById('grid').innerHTML = cells.map(c => `<div class="cell"><div class="cap">${c[0]}<small>${c[1] || '&nbsp;'}</small></div>${c[2]}</div>`).join('');
+
+  const row3 = [
+    ['Toasts', 'Undo for any removed block; a plain line when a photo fails', `<div class="comp">
+        <div class="toast"><span>Image removed.</span><span class="btn text">Undo</span></div>
+        <div class="toast"><span>Voice memo removed.</span><span class="btn text">Undo</span></div>
+        <div class="toast solo"><span>Could not save that image.</span></div>
+        <div class="saverow"><span class="meta"><span class="spin"></span>Saving…</span><span class="meta"><i data-i="circle-check" class="xs"></i>Saved on this device</span></div></div>`],
+    ['A voice memo in the editor', 'Its own delete; the strip replaces the player', `<div class="comp">
+        <div class="memo ed"><span class="pb"><i data-i="play" class="xs fill"></i></span><span class="wave">${MEMO_WAVE_LONG}</span><span class="len">0:42</span><span class="del"><i data-i="trash-2" class="sm"></i></span></div>
+        <div class="cstrip"><span class="q">Remove this voice memo?</span><span class="btn secondary sm">Cancel</span><span class="btn btn-danger sm">Yes, remove</span></div>
+        <div class="memo ed" style="padding-left:14px"><span class="meta" style="flex:1; color:var(--text)">Voice memo</span><span class="meta" style="font-family:var(--serif); font-style:italic; font-size:16px">Recording missing</span><span class="del"><i data-i="trash-2" class="sm"></i></span></div></div>`],
+    ['When the microphone can’t start', 'Nothing recorded, so these close at once', `<div class="comp">
+        <div class="panel"><div class="h3">Voice recording</div><div class="msg" style="color:var(--text-2)">Requesting microphone access…</div><div class="acts"><span class="btn secondary sm">Cancel</span></div></div>
+        <div class="panel"><div class="msg" style="margin-top:0">Microphone permission denied. Enable mic access for this app, then try again.</div><div class="acts"><span class="btn secondary sm">Close</span></div></div></div>`],
+  ];
+  document.getElementById('grid3').innerHTML = row3.map(c => `<div class="cell"><div class="cap">${c[0]}<small>${c[1]}</small></div>${c[2]}</div>`).join('');
+</script>
+</body></html>

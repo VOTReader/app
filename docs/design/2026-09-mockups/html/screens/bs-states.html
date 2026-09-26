@@ -1,0 +1,103 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* screen-routes.jsx: _corpusView (loading + failed), _missingChapter, _deadLetter.
+     Copy is the app's own. Loading and failed views render with no top bar (bare route element);
+     the missing-chapter and dead-letter views keep the library top bar. */
+  .center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 36px 90px; gap: 18px; }
+  .center .msg { font: 500 21px/1.35 var(--serif); color: var(--text); text-wrap: balance; }
+  .center .ld { font: 400 16px/1.3 var(--sans); color: var(--text-2); }
+  .bar { width: 96px; height: 3px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
+  .bar i { display: block; width: 40%; height: 100%; margin-left: 30%; border-radius: 2px; background: var(--accent); }
+  .center .i.lg { color: var(--text-3); }
+  .note { background: var(--surface); border-radius: 16px; padding: 18px 20px; }
+  [data-theme="light"] .note { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .note .h3 { margin-bottom: 8px; }
+  .note ul { margin-left: 18px; }
+  .note li { font: 400 14px/1.45 var(--sans); color: var(--text-2); }
+  .note li + li { margin-top: 8px; }
+</style></head>
+<body data-size="1180x1390">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Bible, Matthew and letter states</div>
+    <div class="meta">Loading, a failed download, a chapter the book does not have, and a letter that is gone. Each says what happened in one sentence and offers one way on.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(4, 256px)">
+
+    <div class="cell">
+      <div class="cap">Bible · loading<small>bible-idx and bible-ch</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="center"><i data-i="book-open" class="lg"></i><div class="ld">Loading Bible…</div><div class="bar"><i></i></div></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Matthew · loading<small>matthew-idx and matthew-ch</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="center"><i data-i="book-marked" class="lg"></i><div class="ld">Loading Matthew…</div><div class="bar"><i></i></div></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Letters · loading<small>Letters, Hidden Manna, study pages</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="center"><i data-i="scroll-text" class="lg"></i><div class="ld">Loading…</div><div class="bar"><i></i></div></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Download failed<small>Any of the three downloads</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="center"><div class="msg">Couldn’t load this section.</div><span class="btn primary">Try again</span></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Missing chapter<small>“John 30” from search or a link</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span></div>
+        <div class="center"><div class="msg">John has 21 chapters, so there is no chapter 30.</div><span class="btn primary">Open John</span></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">One-chapter book<small>“Jude 3” opens the one chapter</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span></div>
+        <div class="center"><div class="msg">Jude has one chapter, so there is no chapter 3.</div><span class="btn primary">Open Jude</span></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Letter no longer available<small>A saved tab whose letter is gone</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span></div>
+        <div class="center"><div class="msg">This letter is no longer available.</div><span class="btn primary">Back to the list</span></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Behaviour notes<small>From screen-routes.jsx</small></div>
+      <div class="note">
+        <div class="h3">Where each button goes</div>
+        <ul>
+          <li><b>Open John</b> opens the book’s chapter list; <b>Open Jude</b> opens its one chapter.</li>
+          <li><b>Back to the list</b> opens the letter’s own collection index. Hidden Manna has none, so there it opens The Volumes of Truth.</li>
+          <li><b>Try again</b> restarts the download that failed.</li>
+          <li>The loading and failed views have no top bar today; the system Back is the only way out while they show.</li>
+          <li>The back arrow on the missing-chapter and dead-letter views returns to The Volumes of Truth.</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

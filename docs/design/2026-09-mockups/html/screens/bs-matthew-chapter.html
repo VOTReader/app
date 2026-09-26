@@ -1,0 +1,45 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* matthew-ch in the app's DEFAULT study-notes mode (tab default mode:'pdf', showStudy:true):
+     the verses flow clean and the study panels wait at the chapter's end (ChapterView.jsx).
+     The panels, Inline mode and Off are drawn by the mt- screens. */
+  .chapter { padding-top: 6px; }
+  .subttl { margin-top: 8px; font: italic 400 19px/1.35 var(--serif); color: var(--text-2); text-wrap: balance; }
+  .tp { display: inline-block; }
+  .listen { margin-top: 16px; }
+  .reading { margin-top: 22px; }
+  .reading p + p { margin-top: 12px; }
+  /* Study notes: PDF | Inline | Off, floating over the text (ModeToggle.jsx), default PDF */
+  .notesctl { position: absolute; right: 12px; bottom: 22px; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px; border-radius: 18px; background: var(--surface-2); box-shadow: var(--shadow); }
+  .notesctl .lbl { font: 700 13px/1 var(--sans); color: var(--text-2); }
+  .notesctl .seg { background: var(--surface-3); width: 186px; }
+  .notesctl .seg span { height: 34px; font-size: 13px; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Matthew 3 · Study Bible</span>
+    <span class="iconbtn"><i data-i="search"></i></span>
+    <span class="iconbtn"><i data-i="bookmark"></i></span>
+    <span class="tabcount">1</span>
+  </div>
+  <div class="scroll chapter">
+    <div class="h1" style="font-size:40px">Matthew 3</div>
+    <div class="subttl"><span class="tp">John the Baptist Prepares the Way ·</span> <span class="tp">The Baptism of YahuShua</span></div>
+    <span class="btn secondary sm listen"><i data-i="play" class="xs fill"></i>Listen</span>
+
+    <div class="reading">
+      <p><span class="vnum">1</span>In those days John the Baptist came preaching in the wilderness of Judea, <span class="vnum">2</span>and saying, “Repent, for the Kingdom of Heaven is at hand!” <span class="vnum">3</span>For this is he who was spoken of by the prophet Isaiah, saying: “The voice of one crying in the wilderness: ‘Prepare the way of The Lord; make His paths straight.’”</p>
+      <p><span class="vnum">4</span>Now John himself was clothed in camel’s hair, with a leather belt around his waist, and his food was locusts and wild honey. <span class="vnum">5</span>Then Jerusalem, all Judea, and all the region around the Jordan went out to him <span class="vnum">6</span>and were baptized by him in the Jordan, confessing their sins.</p>
+      <p><span class="vnum">7</span>But when he saw many of the Pharisees and Sadducees coming to his baptism, he said to them, “Brood of vipers! Who warned you to flee from the wrath to come? <span class="vnum">8</span>Therefore bear fruits worthy of repentance, <span class="vnum">9</span>and do not think to say to yourselves, ‘We have Abraham as our father.’ For I say to you that God is able to raise up children to Abraham from these stones. <span class="vnum">10</span>And even now the ax is laid to the root of the trees. Therefore every tree which does not bear good fruit is cut down and thrown into the fire.</p>
+    </div>
+  </div>
+  <div class="notesctl">
+    <span class="lbl">Study notes</span>
+    <div class="seg"><span class="on">PDF</span><span>Inline</span><span>Off</span></div>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,94 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .intro { padding-top: 4px; }
+  .intro .h1 { margin-top: 4px; }
+  .intro .body { margin-top: 8px; }
+  .sum { margin-top: 22px; padding: 18px 20px 20px; }
+  .sum .cnt { display: flex; align-items: baseline; gap: 10px; }
+  .sum .cnt b { font: 700 34px/1 var(--sans); color: var(--text); letter-spacing: -0.01em; }
+  .sum .cnt span { font: 400 16px/1 var(--sans); color: var(--text-2); }
+  .sum .progress { height: 6px; border-radius: 3px; margin-top: 16px; }
+  .ctl { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; }
+  .hide { display: inline-flex; align-items: center; gap: 12px; font: 400 15px/1 var(--sans); color: var(--text); }
+  .jump { display: flex; gap: 8px; margin: 16px -20px 0; padding: 0 20px; overflow: hidden; white-space: nowrap; }
+  .cat { margin-top: 34px; }
+  .cat .hd { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .cat .hd .h2 { margin-top: 3px; }
+  .cat .hd b { font: 700 15px/1 var(--sans); color: var(--text-2); padding-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .ms { align-items: center; }
+  .ms .mk { width: 30px; height: 30px; border-radius: 15px; display: grid; place-items: center; flex: none; background: var(--surface-2); color: var(--text-3); }
+  .ms .mk svg { width: 12px; height: 12px; }
+  .ms.on .mk { background: var(--accent-soft); color: var(--accent); }
+  .ms .cp { flex: 1; min-width: 0; }
+  .ms .lb { font: 400 16px/1.25 var(--sans); color: var(--text); }
+  .ms:not(.on) .lb { color: var(--text-2); }
+  .ms .progress { margin-top: 9px; height: 3px; }
+  .ms .progress i { background: color-mix(in srgb, var(--accent) 70%, var(--surface-3)); }
+  .ms .v { flex: none; font: 400 13px/1.2 var(--sans); color: var(--text-3); text-align: right; font-variant-numeric: tabular-nums; }
+  .ms.on .v { color: var(--text-3); }
+  .endpad { height: 36px; }
+</style></head>
+<body data-size="412x2667">
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="x-spark" viewBox="0 0 24 24"><path fill="currentColor" d="M12 1.5c.9 6.4 3.9 9.6 10.5 10.5-6.6.9-9.6 4.1-10.5 10.5-.9-6.4-3.9-9.6-10.5-10.5C8.1 11.1 11.1 7.9 12 1.5z"/></symbol>
+  <symbol id="x-ring" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2.5"/></symbol>
+</svg>
+<div class="screen tall">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Library</span>
+  </div>
+  <div class="scroll">
+    <div class="intro">
+      <div class="eyebrow">Your journey</div>
+      <div class="h1">Milestones</div>
+      <div class="body">Every mark here reflects the reading, listening, and study record you keep on this device — no account or sign-up required.</div>
+    </div>
+
+    <div class="card sum">
+      <div class="cnt"><b>40</b><span>of 80 reached</span></div>
+      <div class="progress"><i style="width:50%"></i></div>
+    </div>
+
+    <div class="ctl">
+      <span class="hide"><span class="toggle"></span>Hide reached</span>
+      <span class="meta">80 milestones</span>
+    </div>
+
+    <div class="jump">
+      <span class="chip">Words Read</span><span class="chip">Readings Finished</span><span class="chip">Scripture Chapters</span><span class="chip">Letters &amp; Entries</span><span class="chip">Returnings</span>
+    </div>
+
+    <div id="cats"></div>
+    <div class="endpad"></div>
+  </div>
+</div>
+<script>
+  // utils/achievements.js categories, with a reader's snapshot: 118,400 words,
+  // 164 readings finished, 93 chapters, 112 letters (streak categories left out)
+  const n = (x) => x.toLocaleString('en-US');
+  const cats = [
+    { eyebrow: 'Measured, completed reading', label: 'Words Read', value: 118400,
+      defs: [[10000, '10,000 words read'], [50000, '50,000 words read'], [100000, '100,000 words read'], [250000, '250,000 words read'], [500000, '500,000 words read'], [750000, '750,000 words read'], [1000000, 'One million words read']] },
+    { eyebrow: 'Complete read-throughs, first time or fiftieth', label: 'Readings Finished', value: 164,
+      defs: [[1, 'First reading finished'], [5, '5 readings finished'], [10, '10 readings finished'], [25, '25 readings finished'], [50, '50 readings finished'], [100, '100 readings finished'], [200, '200 readings finished'], [365, '365 readings finished']] },
+    { eyebrow: 'Distinct chapters of the Scriptures marked read', label: 'Scripture Chapters', value: 93,
+      defs: [[1, 'First chapter read'], [10, '10 chapters read'], [25, '25 chapters read'], [50, '50 chapters read'], [100, '100 chapters read'], [260, '260 chapters read'], [500, '500 chapters read'], [1189, 'Every chapter, Genesis to Revelation']] },
+    { eyebrow: 'Distinct letters and entries marked read', label: 'Letters &amp; Entries', value: 112,
+      defs: [[1, 'First letter read'], [10, '10 letters &amp; entries read'], [30, '30 letters &amp; entries read'], [75, '75 letters &amp; entries read'], [150, '150 letters &amp; entries read'], [365, '365 letters &amp; entries read'], [729, 'The whole library of letters']] },
+  ];
+  document.getElementById('cats').innerHTML = cats.map(c => {
+    const earned = c.defs.filter(d => c.value >= d[0]).length;
+    return `<section class="cat">
+      <div class="hd"><div><span class="meta">${c.eyebrow}</span><div class="h2">${c.label}</div></div><b>${earned}/${c.defs.length}</b></div>
+      <div class="group">${c.defs.map(([t, l]) => {
+        const on = c.value >= t;
+        return `<div class="item ms ${on ? 'on' : ''}"><span class="mk"><svg><use href="#${on ? 'x-spark' : 'x-ring'}"/></svg></span>
+          <span class="cp"><div class="lb">${l}</div>${on ? '' : `<div class="progress"><i style="width:${Math.max(2, Math.round(c.value / t * 100))}%"></i></div>`}</span>
+          <span class="v">${on ? 'Reached' : n(c.value) + ' / ' + n(t)}</span></div>`;
+      }).join('')}</div></section>`;
+  }).join('');
+</script>
+</body></html>

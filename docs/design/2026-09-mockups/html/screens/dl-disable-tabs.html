@@ -1,0 +1,137 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="dl-common.css"><script src="../kit/kit.js"></script><script src="dl-icons.js"></script>
+<style>
+  .board-grid { grid-template-columns: repeat(2, 412px); gap: 28px 32px; }
+  .cell > .cap { min-height: 36px; }
+
+  /* ---- Home, exactly as screens/home.html ---- */
+  .topbar.slim { height: 48px; padding-right: 12px; }
+  .topbar.slim .tabcount { margin: 0 0 0 4px; }
+  .lockup { text-align: center; }
+  .lockup .t1 { font: 500 26px/1.1 var(--serif); letter-spacing: -0.005em; color: var(--text); }
+  .lockup .t2 { font: italic 400 17px/1.25 var(--serif); color: var(--text-2); margin-top: 2px; }
+  .lockup .amp { font-style: normal; }
+  .home > .search { margin-top: 16px; }
+  .cont { margin-top: 12px; padding: 14px 16px; }
+  .cont .main { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
+  .cont .main .h3 { flex: 1; min-width: 0; text-wrap: pretty; }
+  .cont .foot { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+  .cont .foot .progress { flex: 1; }
+  .cont .foot .meta { font-variant-numeric: tabular-nums; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  .tile { height: 68px; padding: 0 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    font: 400 12px/1.2 var(--sans); color: var(--text-2); white-space: nowrap; }
+  .tile .nudge { transform: translateY(-3px); }
+  .cols { margin-top: 12px; }
+  .cols .row { padding: 10px 16px; min-height: 60px; }
+  .cols .ttl { display: block; font: 500 18px/1.2 var(--serif); color: var(--text); }
+  .cols .meta { display: block; margin-top: 2px; }
+  .surprise { display: flex; justify-content: center; margin-top: 8px; }
+  .surprise .btn { height: 40px; }
+
+  /* the one-time hint, pointing at the tab count */
+  .coach { top: 85px; right: 12px; }
+  .coach::before { right: 11px; }
+
+  /* the prompt */
+  .scrim { z-index: 10; }
+  .dwrap { position: absolute; inset: 0; z-index: 11; display: grid; place-items: center; padding: 0 24px; }
+  .dialog .body + .body { margin-top: 10px; }
+</style></head>
+<body data-size="940x1128">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Tabs · the switcher hint and Disable tabs?</div>
+    <div class="meta">The hint shows once, the first time a second tab is open. The prompt comes after the last tab is closed three times in a row; closing any other tab starts the count again.</div>
+  </div>
+  <div class="board-grid">
+
+    <div class="cell">
+      <div class="cap">Tabs coach mark<small>A new tab opens on Home. Tapping the count or × puts the hint away for good</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar slim">
+          <span class="iconbtn"><i data-i="dl-info"></i></span>
+          <span class="spacer"></span>
+          <span class="iconbtn"><i data-i="search"></i></span>
+          <span class="tabcount ringed">2</span>
+        </div>
+        <span class="bubble coach">Tap to switch tabs<span class="iconbtn"><i data-i="x" class="xs"></i></span></span>
+        <div class="scroll home">
+          <div class="lockup">
+            <div class="t1">The Volumes of Truth</div>
+            <div class="t2"><span class="amp">&amp;</span> The Scriptures of Truth</div>
+          </div>
+          <div class="search"><i data-i="search" class="sm"></i>Search the library</div>
+          <div class="card cont">
+            <div class="meta">Continue reading</div>
+            <div class="meta">Volume One · Letter 15</div>
+            <div class="main">
+              <div class="h3">Know That Which Has Been Poured Out, The Word of God</div>
+              <span class="btn primary sm"><i data-i="play" class="xs fill"></i>Listen</span>
+            </div>
+            <div class="foot"><div class="progress"><i style="width:40%"></i></div><span class="meta">40%</span></div>
+          </div>
+          <div class="tiles">
+            <div class="card tile"><i data-i="history"></i>Recent</div>
+            <div class="card tile"><i data-i="notebook-pen"></i>Notes</div>
+            <div class="card tile"><i data-i="bookmark"></i>Bookmarks</div>
+            <div class="card tile"><i data-i="scripture-web" class="nudge"></i>Scripture Web</div>
+          </div>
+          <div class="list cols">
+            <div class="row"><span class="txt"><span class="ttl">The Volumes of Truth</span><span class="meta">7 volumes · 244 letters</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">The Scriptures of Truth</span><span class="meta">Genesis to Revelation · NKJV</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Answers Only God Can Give</span><span class="meta">Topics and doctrines</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Studies</span><span class="meta">Letter studies · Matthew Study Bible</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Listening Library</span><span class="meta">The letters and scriptures, read aloud</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Songs of the Letters</span><span class="meta">Sung by the flock</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Library</span><span class="meta">Notes, journal &amp; bookmarks</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Settings</span><span class="meta">Display, themes &amp; preferences</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+          </div>
+          <div class="surprise"><span class="btn text"><i data-i="dl-dice" class="sm"></i>Surprise Me</span></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Disable tabs?<small>Over the overview, after × on the only tab for the third time</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar tabs-top">
+          <span class="title">1 tab</span>
+          <span class="btn text off">Close all</span>
+        </div>
+        <div class="scroll">
+          <div class="tgrid">
+            <div class="tab cur">
+              <div class="pv">
+                <span class="tmenu"><i data-i="ellipsis-vertical" class="xs"></i></span>
+                <div class="mph" style="width:56%;height:8px;border-radius:4px"></div>
+                <div class="mph" style="width:34%"></div>
+                <div class="mcont"><div class="mm">Volume One</div><div class="ms">Letter 15</div><div class="mprog"><i style="width:38%"></i></div></div>
+                <div class="mtiles"><span><b></b></span><span><b></b></span><span><b></b></span><span><b></b></span></div>
+              </div>
+              <div class="strip"><span class="nm">Home</span><span class="x"><i data-i="x" class="xs"></i></span></div>
+            </div>
+          </div>
+        </div>
+        <span class="btn primary newtab"><i data-i="plus" class="sm"></i>New tab</span>
+        <div class="scrim"></div>
+        <div class="dwrap">
+          <div class="dialog">
+            <div class="eyebrow">You keep closing your last tab</div>
+            <div class="h2">Disable tabs?</div>
+            <p class="body">Tabs let you juggle multiple reading places — a chapter, a letter, a study in parallel. If you only read one at a time, disabling tabs hides the switcher and this close button.</p>
+            <p class="body">You can re-enable tabs anytime in Settings — your open tabs will be waiting.</p>
+            <div class="dacts">
+              <span class="btn primary block">Disable tabs</span>
+              <span class="btn secondary block">Keep tabs on</span>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</body></html>

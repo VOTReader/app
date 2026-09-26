@@ -1,0 +1,69 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .intro { padding-top: 4px; }
+  .intro .body { margin-top: 8px; }
+  .sect { margin: 26px 0 10px; }
+
+  /* a volume row: numeral medallion, name + meta, reading ring */
+  .vol .num { width: 40px; height: 40px; border-radius: 20px; flex: none; background: var(--surface-2); display: grid; place-items: center;
+    font: 500 17px/1 var(--serif); color: var(--accent); letter-spacing: 0.02em; }
+  .vol .num .i { color: var(--accent); }
+  .vol .ttl { display: block; font: 500 18px/1.25 var(--serif); color: var(--text); }
+  .vol .meta { display: block; margin-top: 2px; }
+  .ring { width: 28px; height: 28px; flex: none; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 2.5; }
+  .ring .tr { stroke: var(--surface-3); }
+  .ring .pr { stroke: var(--accent); stroke-linecap: round; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="spacer"></span>
+    <span class="tabcount">1</span>
+  </div>
+  <div class="scroll">
+    <div class="intro">
+      <div class="h1">The Volumes of Truth</div>
+      <div class="body">Letters from The Lord, Our God and Savior</div>
+    </div>
+
+    <div class="label sect">The seven volumes</div>
+    <div class="list">
+      <div class="row vol"><span class="num">I</span>
+        <span class="txt"><span class="ttl">Volume One</span><span class="meta">29 letters · 2004–2006</span></span>
+        <svg class="ring" viewBox="0 0 28 28"><circle class="tr" cx="14" cy="14" r="11"/><circle class="pr" cx="14" cy="14" r="11" stroke-dasharray="35.94 69.12"/></svg></div>
+      <div class="row vol"><span class="num">II</span>
+        <span class="txt"><span class="ttl">Volume Two</span><span class="meta">29 letters · 2004–2010</span></span>
+        <svg class="ring" viewBox="0 0 28 28"><circle class="tr" cx="14" cy="14" r="11"/></svg></div>
+      <div class="row vol"><span class="num">III</span>
+        <span class="txt"><span class="ttl">Volume Three</span><span class="meta">30 letters · 2006–2010</span></span>
+        <svg class="ring" viewBox="0 0 28 28"><circle class="tr" cx="14" cy="14" r="11"/></svg></div>
+      <div class="row vol"><span class="num">IV</span>
+        <span class="txt"><span class="ttl">Volume Four</span><span class="meta">29 letters · 2010–2011</span></span>
+        <svg class="ring" viewBox="0 0 28 28"><circle class="tr" cx="14" cy="14" r="11"/></svg></div>
+      <div class="row vol"><span class="num">V</span>
+        <span class="txt"><span class="ttl">Volume Five</span><span class="meta">29 letters · 2011–2014</span></span>
+        <svg class="ring" viewBox="0 0 28 28"><circle class="tr" cx="14" cy="14" r="11"/></svg></div>
+      <div class="row vol"><span class="num">VI</span>
+        <span class="txt"><span class="ttl">Volume Six</span><span class="meta">31 letters · 2011–2014</span></span>
+        <svg class="ring" viewBox="0 0 28 28"><circle class="tr" cx="14" cy="14" r="11"/></svg></div>
+      <div class="row vol"><span class="num">VII</span>
+        <span class="txt"><span class="ttl">Volume Seven</span><span class="meta">67 letters · 2005–2014</span></span>
+        <svg class="ring" viewBox="0 0 28 28"><circle class="tr" cx="14" cy="14" r="11"/></svg></div>
+    </div>
+
+    <div class="label sect">Collections</div>
+    <div class="list">
+      <div class="row vol"><span class="num"><i data-i="scroll-text" class="sm"></i></span>
+        <span class="txt"><span class="ttl">The Lord’s Rebuke</span><span class="meta">30 letters · Correction &amp; Warning</span></span>
+        <i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row vol"><span class="num"><i data-i="feather" class="sm"></i></span>
+        <span class="txt"><span class="ttl">Words To Live By: Part One</span><span class="meta">149 entries · Words of Wisdom</span></span>
+        <i data-i="chevron-right" class="chev sm"></i></div>
+    </div>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,195 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lk-common.css"><script src="lk-icons.js"></script>
+<style>
+  .board-grid { grid-template-columns: repeat(4, 256px); }
+  .np-empty .btn.secondary { background: var(--surface-2); }
+  .spin { color: var(--accent); }
+</style></head>
+<body data-size="1176x1392">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Create a link: every Search state</div>
+    <div class="meta">LinkPicker.jsx · what the Search tab says before, during and after a search that finds nothing, in both scopes · linking from John 3:3</div>
+  </div>
+  <div class="board-grid">
+
+    <!-- 1 search to link -->
+    <div class="cell">
+      <div class="cap">First time<small>No recent picks yet</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span></div>
+        <div class="scrim"></div>
+        <div class="sheet tall">
+          <div class="grabber"></div>
+          <div class="lk-shead"><span class="h2">Create a link</span><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="np-from"><div class="meta">Linking from</div><div class="t">John 3:3</div><div class="q">“unless one is born again, he cannot see the kingdom of God.”</div></div>
+          <div class="seg np-tabs"><span class="on">Search</span><span>Browse</span><span>Recent</span></div>
+          <div class="search np-search"><i data-i="search" class="sm"></i>Search titles &amp; references…</div>
+          <div class="np-scope"><div class="seg"><span class="on">Titles &amp; refs</span><span>Full text</span></div></div>
+          <div class="np-body">
+            <div class="np-empty">
+              <div class="ic"><i data-i="search"></i></div>
+              <div class="h3">Search to link</div>
+              <div class="body">Try a title or a reference like “Eph 6:5” — or flip to Full text to search any phrase inside the verses and letters.</div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 2 verse reference -->
+    <div class="cell">
+      <div class="cap">A verse reference<small>Already exact, so a tap links at once</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span></div>
+        <div class="scrim"></div>
+        <div class="sheet tall">
+          <div class="grabber"></div>
+          <div class="lk-shead"><span class="h2">Create a link</span><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="np-from"><div class="meta">Linking from</div><div class="t">John 3:3</div><div class="q">“unless one is born again, he cannot see the kingdom of God.”</div></div>
+          <div class="seg np-tabs"><span class="on">Search</span><span>Browse</span><span>Recent</span></div>
+          <div class="search np-search"><i data-i="search" class="sm"></i><span class="typed">1 pet 1:23<span class="lk-caret"></span></span><i data-i="x" class="sm x"></i></div>
+          <div class="np-scope"><div class="seg"><span class="on">Titles &amp; refs</span><span>Full text</span></div></div>
+          <div class="np-body">
+            <div class="label">Titles &amp; places</div>
+            <div class="pr pressed"><span class="bdg">NT</span><div class="tx"><div class="t">1 Peter 1:23</div><div class="m">New Testament</div></div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 3 no titles match -->
+    <div class="cell">
+      <div class="cap">No titles match<small>One tap moves the same words to Full text</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span></div>
+        <div class="scrim"></div>
+        <div class="sheet tall">
+          <div class="grabber"></div>
+          <div class="lk-shead"><span class="h2">Create a link</span><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="np-from"><div class="meta">Linking from</div><div class="t">John 3:3</div><div class="q">“unless one is born again, he cannot see the kingdom of God.”</div></div>
+          <div class="seg np-tabs"><span class="on">Search</span><span>Browse</span><span>Recent</span></div>
+          <div class="search np-search"><i data-i="search" class="sm"></i><span class="typed">nicodemus<span class="lk-caret"></span></span><i data-i="x" class="sm x"></i></div>
+          <div class="np-scope"><div class="seg"><span class="on">Titles &amp; refs</span><span>Full text</span></div></div>
+          <div class="np-body">
+            <div class="np-empty">
+              <div class="ic"><i data-i="lk-search-x"></i></div>
+              <div class="h3">No titles match</div>
+              <div class="body">Try “Genesis 1”, “Eph 6:5”, “The Wide Path” — or search inside the text itself.</div>
+              <span class="btn secondary sm">Search the full text instead</span>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 4 three letters -->
+    <div class="cell">
+      <div class="cap">Too short for Full text<small>Two letters are not a phrase yet</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span></div>
+        <div class="scrim"></div>
+        <div class="sheet tall">
+          <div class="grabber"></div>
+          <div class="lk-shead"><span class="h2">Create a link</span><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="np-from"><div class="meta">Linking from</div><div class="t">John 3:3</div><div class="q">“unless one is born again, he cannot see the kingdom of God.”</div></div>
+          <div class="seg np-tabs"><span class="on">Search</span><span>Browse</span><span>Recent</span></div>
+          <div class="search np-search"><i data-i="search" class="sm"></i><span class="typed">bo<span class="lk-caret"></span></span><i data-i="x" class="sm x"></i></div>
+          <div class="np-scope"><div class="seg"><span>Titles &amp; refs</span><span class="on">Full text</span></div></div>
+          <div class="chips np-corpus"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="np-body">
+            <div class="np-line"><i data-i="lk-text-search" class="sm"></i>Type at least three letters to search the text.</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 5 preparing -->
+    <div class="cell">
+      <div class="cap">Preparing Full text<small>Only on the first search after launch</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span></div>
+        <div class="scrim"></div>
+        <div class="sheet tall">
+          <div class="grabber"></div>
+          <div class="lk-shead"><span class="h2">Create a link</span><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="np-from"><div class="meta">Linking from</div><div class="t">John 3:3</div><div class="q">“unless one is born again, he cannot see the kingdom of God.”</div></div>
+          <div class="seg np-tabs"><span class="on">Search</span><span>Browse</span><span>Recent</span></div>
+          <div class="search np-search"><i data-i="search" class="sm"></i><span class="typed">nicodemus<span class="lk-caret"></span></span><i data-i="x" class="sm x"></i></div>
+          <div class="np-scope"><div class="seg"><span>Titles &amp; refs</span><span class="on">Full text</span></div></div>
+          <div class="chips np-corpus"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="np-body">
+            <div class="np-line"><i data-i="lk-loader" class="sm spin"></i>Preparing text search — the first run can take a few seconds…</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 6 nothing in the text -->
+    <div class="cell">
+      <div class="cap">Nothing in the text<small>A reference is not a phrase: it belongs in Titles &amp; refs</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span></div>
+        <div class="scrim"></div>
+        <div class="sheet tall">
+          <div class="grabber"></div>
+          <div class="lk-shead"><span class="h2">Create a link</span><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="np-from"><div class="meta">Linking from</div><div class="t">John 3:3</div><div class="q">“unless one is born again, he cannot see the kingdom of God.”</div></div>
+          <div class="seg np-tabs"><span class="on">Search</span><span>Browse</span><span>Recent</span></div>
+          <div class="search np-search"><i data-i="search" class="sm"></i><span class="typed">Eph 6:5<span class="lk-caret"></span></span><i data-i="x" class="sm x"></i></div>
+          <div class="np-scope"><div class="seg"><span>Titles &amp; refs</span><span class="on">Full text</span></div></div>
+          <div class="chips np-corpus"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="np-body">
+            <div class="np-empty">
+              <div class="ic"><i data-i="lk-search-x"></i></div>
+              <div class="h3">Nothing in the text matches</div>
+              <div class="body">Full text finds phrases inside verses and letters. For references like “Eph 6:5” or titles, switch to Titles &amp; refs.</div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 7 nothing in scriptures -->
+    <div class="cell">
+      <div class="cap">Nothing in one corpus<small>Names the corpus, then offers all three</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span></div>
+        <div class="scrim"></div>
+        <div class="sheet tall">
+          <div class="grabber"></div>
+          <div class="lk-shead"><span class="h2">Create a link</span><span class="iconbtn"><i data-i="x"></i></span></div>
+          <div class="np-from"><div class="meta">Linking from</div><div class="t">John 3:3</div><div class="q">“unless one is born again, he cannot see the kingdom of God.”</div></div>
+          <div class="seg np-tabs"><span class="on">Search</span><span>Browse</span><span>Recent</span></div>
+          <div class="search np-search"><i data-i="search" class="sm"></i><span class="typed">YahuShua<span class="lk-caret"></span></span><i data-i="x" class="sm x"></i></div>
+          <div class="np-scope"><div class="seg"><span>Titles &amp; refs</span><span class="on">Full text</span></div></div>
+          <div class="chips np-corpus"><span class="chip">All</span><span class="chip on">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="np-body">
+            <div class="np-empty">
+              <div class="ic"><i data-i="lk-search-x"></i></div>
+              <div class="h3">Nothing in Scriptures matches</div>
+              <div class="body">Full text finds phrases inside verses and letters. For references like “Eph 6:5” or titles, switch to Titles &amp; refs.</div>
+              <span class="btn secondary sm">Search every corpus instead</span>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 8 notes -->
+    <div class="cell">
+      <div class="cap">How the two scopes differ<small>From the source</small></div>
+      <div class="cap-note" style="max-width:250px">Titles &amp; refs is the default. It reads the app's own index of names, references and abbreviations, so “1 pet 1:23”, “V1 L15” and “repent” all land.<br><br>Full text reads the words inside every verse and letter. The corpus chips narrow it, and they appear only here. A chip is kept for this visit only; the Search screen's own choice is not changed.<br><br>A tap on a chapter opens the verse picker, a tap on a letter, entry or study chapter opens the excerpt picker, and an exact verse links at once.</div>
+    </div>
+
+  </div>
+</div>
+</body></html>

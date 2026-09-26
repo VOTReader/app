@@ -1,0 +1,90 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script><script src="sy-icons.js"></script><script src="sy-kbd.js"></script>
+<link rel="stylesheet" href="sy-common.css">
+<style>
+  .peek { margin-top: 16px; }
+</style></head>
+<body data-size="1396x1130">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Search · as you type</div>
+    <div class="meta">Suggestions answer from the first letter (named passages, then book names); the full search waits for two letters. A Bible reference is recognised as it is typed and offered as one card. Each list is the engine's real output for that query.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(3, 412px); column-gap: 40px">
+
+    <!-- A · first letter -->
+    <div class="cell">
+      <div class="cap">First letter “g” · suggestions only<small>Nothing is searched until a second letter</small></div>
+      <div class="phone-f"><div class="screen">
+        <div class="status"></div>
+        <div class="sbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <div class="search focus"><i data-i="search" class="sm"></i><span class="q">g<span class="caret"></span></span><i data-i="x" class="sm x"></i></div>
+        </div>
+        <div class="scroll">
+          <div class="corpus"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="sugg flow">
+            <div class="it"><i data-i="book-open" class="sm"></i><span class="l"><u>G</u>olden Rule</span><span class="h">Matthew 7:12</span></div>
+            <div class="it"><i data-i="book-open" class="sm"></i><span class="l"><u>G</u>reat Commission</span><span class="h">Matthew 28:18-20</span></div>
+            <div class="it"><i data-i="book-open" class="sm"></i><span class="l"><u>G</u>ood Samaritan</span><span class="h">Luke 10:25-37</span></div>
+            <div class="it"><i data-i="book-open" class="sm"></i><span class="l"><u>G</u>ood Shepherd</span><span class="h">John 10:1-18</span></div>
+            <div class="it"><i data-i="book-open" class="sm"></i><span class="l"><u>G</u>arden of Gethsemane</span><span class="h">Matthew 26:36-46</span></div>
+            <div class="it"><i data-i="book-open" class="sm"></i><span class="l"><u>G</u>reat Catch of Fish</span><span class="h">John 21:1-14</span></div>
+            <div class="it"><i data-i="book-open" class="sm"></i><span class="l"><u>G</u>ifts of the Spirit</span><span class="h">1 Corinthians 12</span></div>
+            <div class="it"><i data-i="book-open" class="sm"></i><span class="l"><u>G</u>arden of Eden</span><span class="h">Genesis 3</span></div>
+          </div>
+        </div>
+        <div class="kbd"></div>
+      </div></div>
+    </div>
+
+    <!-- B · second letter -->
+    <div class="cell">
+      <div class="cap">Second letter “ma” · the search runs<small>Passages, then books; results continue under the list</small></div>
+      <div class="phone-f"><div class="screen">
+        <div class="status"></div>
+        <div class="sbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <div class="search focus"><i data-i="search" class="sm"></i><span class="q">ma<span class="caret"></span></span><i data-i="x" class="sm x"></i></div>
+        </div>
+        <div class="scroll">
+          <div class="corpus"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="sugg flow">
+            <div class="it"><i data-i="book-open" class="sm"></i><span class="l"><u>Ma</u>gi</span><span class="h">Matthew 2:1-12</span></div>
+            <div class="it"><i data-i="book-open" class="sm"></i><span class="l"><u>Ma</u>cedonian Call</span><span class="h">Acts 16:6-10</span></div>
+            <div class="it"><i data-i="book-open" class="sm"></i><span class="l"><u>Ma</u>nna from Heaven</span><span class="h">Exodus 16</span></div>
+            <div class="it"><i data-i="book-open" class="sm"></i><span class="l"><u>Ma</u>rk of the Beast</span><span class="h">Revelation 13</span></div>
+            <div class="it"><i data-i="library" class="sm"></i><span class="l"><u>Ma</u>lachi</span><span class="h">Book</span></div>
+            <div class="it"><i data-i="library" class="sm"></i><span class="l"><u>Ma</u>tthew</span><span class="h">Book</span></div>
+            <div class="it"><i data-i="library" class="sm"></i><span class="l"><u>Ma</u>rk</span><span class="h">Book</span></div>
+          </div>
+          <div class="rhead peek"><span class="meta">Found <b>400+ matches</b> across <b>16 sections</b></span></div>
+        </div>
+        <div class="kbd"></div>
+      </div></div>
+    </div>
+
+    <!-- C · verse reference -->
+    <div class="cell">
+      <div class="cap">Typing “john 3:16” · a reference<small>One card straight to the chapter; no word search runs</small></div>
+      <div class="phone-f"><div class="screen">
+        <div class="status"></div>
+        <div class="sbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <div class="search focus"><i data-i="search" class="sm"></i><span class="q">john 3:16<span class="caret"></span></span><i data-i="x" class="sm x"></i></div>
+        </div>
+        <div class="scroll">
+          <div class="corpus"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="direct">
+            <span class="ic"><i data-i="book-open" class="sm"></i></span>
+            <span class="t"><b>John 3:16</b><span>Open chapter</span></span>
+            <i data-i="chevron-right"></i>
+          </div>
+        </div>
+        <div class="kbd"></div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</body></html>

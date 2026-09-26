@@ -1,0 +1,70 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* now playing, behind the scrim */
+  .np { padding-top: 4px; }
+  .nptitle { text-align: center; margin: 0 16px; }
+  .npmeta { text-align: center; margin-top: 6px; }
+  .panel { margin-top: 18px; padding: 16px 18px; }
+  .win { height: calc(18px * 1.6 * 6); overflow: hidden; }
+  .follow { font-size: 18px; line-height: 1.6; margin-top: calc(18px * 1.6 * -5); }
+  .follow .said { color: var(--text-3); }
+  .scrub { margin-top: 24px; padding: 0 2px; }
+  .times { display: flex; justify-content: space-between; margin-top: 12px; font-variant-numeric: tabular-nums; }
+  .transport { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding: 0 4px; }
+  .tb { width: 48px; height: 48px; display: grid; place-items: center; position: relative; color: var(--text); }
+  .tb b { position: absolute; inset: 0; display: grid; place-items: center; font: 700 9px/1 var(--sans); color: var(--text); padding-top: 1px; }
+  .playbtn.big { width: 68px; height: 68px; border-radius: 34px; }
+  .playbtn.big .i { width: 30px; height: 30px; }
+  .scrim { z-index: 1; }
+  .sheet { z-index: 2; }
+
+  /* sleep timer sheet */
+  .sheet .h2 { margin: 2px 0 6px; }
+  .opt { height: 48px; display: flex; align-items: center; justify-content: space-between; font: 400 16px/1 var(--sans); color: var(--text); }
+  .opt + .opt { border-top: 1px solid var(--hairline); }
+  .opt.on { color: var(--accent); font-weight: 700; }
+  .cap { margin-top: 12px; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="spacer"></span>
+  </div>
+  <div class="scroll np">
+    <div class="h2 nptitle">Know That Which Has Been Poured Out, The Word of God</div>
+    <div class="meta npmeta">Volume One · Letter 15</div>
+    <div class="card panel">
+      <div class="win">
+        <div class="reading follow"><p><span class="said"><span class="lead">Thus says The Lord:</span> How is it you have not recognized that which comes from The Father? For that which is of the devil is made plain and surrounds you on every side. Therefore the things of God become that much more precious, even as you, My son, are most precious in My sight...</span> <mark class="wash"><em>Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God, so shall you be in the day you surrender your life, the day you give up this fight and return to Me.</em></mark> Do you not understand that I have saved you? No, not by your own works, but by My life, which I willingly gave up for you. Therefore, turn to Me wholly and in truth.</p></div>
+      </div>
+    </div>
+    <div class="scrub">
+      <div class="slider"><i style="width:44%"></i><b style="left:44%"></b></div>
+      <div class="times meta"><span>2:41</span><span>6:05</span></div>
+    </div>
+    <div class="transport">
+      <span class="tb"><i data-i="skip-back"></i></span>
+      <span class="tb"><i data-i="rotate-ccw" class="lg"></i><b>15</b></span>
+      <span class="playbtn big"><i data-i="pause"></i></span>
+      <span class="tb"><i data-i="rotate-cw" class="lg"></i><b>15</b></span>
+      <span class="tb"><i data-i="skip-forward"></i></span>
+    </div>
+  </div>
+</div>
+<div class="scrim"></div>
+<div class="sheet">
+  <div class="grabber"></div>
+  <div class="h2">Sleep timer</div>
+  <div class="opts">
+    <div class="opt">Off</div>
+    <div class="opt">15 minutes</div>
+    <div class="opt">30 minutes</div>
+    <div class="opt">60 minutes</div>
+    <div class="opt on">End of this letter<i data-i="check" class="sm"></i></div>
+  </div>
+  <div class="meta cap">Audio fades out gently over 20 seconds.</div>
+</div>
+</body></html>

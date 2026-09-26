@@ -127,3 +127,42 @@ describe('VersePickerScreen find + selectionchange', () => {
     }
   });
 });
+
+/* Tapping a verse number takes the whole verse and CLEARS the native selection
+   ("so the visual is purely the .is-selected ring"), but the rows never got
+   the class, and .is-selected was styled only on a legacy .picker-verse row:
+   the verse the footer was about to link showed no mark at all. */
+describe('VersePickerScreen marks a whole verse taken by its number', () => {
+  it('rings the tapped verse, and only it', () => {
+    stubGlobals();
+    const { container } = render(<VersePickerScreen {...baseProps} />);
+    const rows = () => [...container.querySelectorAll('.picker-verse-selectable')];
+    expect(rows().some((r) => r.classList.contains('is-selected'))).toBe(false);
+    fireEvent.click(container.querySelectorAll('.picker-verse-num')[1]);
+    expect(rows().map((r) => r.classList.contains('is-selected'))).toEqual([false, true]);
+    fireEvent.click(container.querySelectorAll('.picker-verse-num')[0]);
+    expect(rows().map((r) => r.classList.contains('is-selected'))).toEqual([true, false]);
+  });
+
+  it('a later drag-selection takes over: its own highlight is the mark, not a whole-verse ring', () => {
+    vi.useFakeTimers();
+    stubGlobals();
+    const { container } = render(<VersePickerScreen {...baseProps} />);
+    fireEvent.click(container.querySelectorAll('.picker-verse-num')[0]);
+    const textNode = container.querySelectorAll('.picker-verse-text')[1].firstChild;
+    const getSelectionOrig = window.getSelection;
+    window.getSelection = /** @type {any} */ (() => ({
+      isCollapsed: false, rangeCount: 1,
+      getRangeAt: () => ({ startContainer: textNode, startOffset: 4, endContainer: textNode, endOffset: 13, toString: () => 'earth was' }),
+    }));
+    try {
+      act(() => { document.dispatchEvent(new Event('selectionchange')); });
+      act(() => { vi.advanceTimersByTime(200); });
+      expect(container.querySelector('.picker-verse-selectable.is-selected')).toBeNull();
+      expect(container.querySelector('.picker-footer-btn').textContent).toBe('Link this selection');
+    } finally {
+      window.getSelection = getSelectionOrig;
+      vi.useRealTimers();
+    }
+  });
+});

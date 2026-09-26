@@ -1,0 +1,86 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="dl-common.css"><script src="../kit/kit.js"></script><script src="dl-icons.js"></script>
+<style>
+  .scrim { z-index: 10; }
+  /* the sheet rides on top of the keyboard while the name is being typed */
+  .sheet { z-index: 11; bottom: 286px; border-radius: 24px 24px 0 0; padding-bottom: 14px; box-shadow: none; }
+  .kbd { z-index: 12; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar tabs-top">
+    <span class="title">4 tabs</span>
+    <span class="btn text">Close all</span>
+  </div>
+  <div class="scroll">
+    <div class="tgrid">
+
+      <div class="tab">
+        <div class="pv">
+          <span class="tmenu"><i data-i="ellipsis-vertical" class="xs"></i></span>
+          <div class="mph" style="width:56%;height:8px;border-radius:4px"></div>
+          <div class="mph" style="width:34%"></div>
+          <div class="mcont"><div class="mm">Volume One</div><div class="ms">Letter 15</div><div class="mprog"><i style="width:38%"></i></div></div>
+          <div class="mtiles"><span><b></b></span><span><b></b></span><span><b></b></span><span><b></b></span></div>
+        </div>
+        <div class="strip"><span class="nm">Home</span><span class="x"><i data-i="x" class="xs"></i></span></div>
+      </div>
+
+      <div class="tab cur">
+        <div class="pv">
+          <span class="tmenu"><i data-i="ellipsis-vertical" class="xs"></i></span>
+          <div class="mm">Volume One</div>
+          <div class="mt">Letter 15</div>
+          <div class="mb"><div class="mph" style="width:100%"></div><div class="mph" style="width:95%"></div><div class="mph" style="width:98%"></div><div class="mph r" style="width:90%"></div><div class="mph r" style="width:62%"></div></div>
+          <div class="mb"><div class="mph" style="width:100%"></div><div class="mph" style="width:93%"></div><div class="mph" style="width:97%"></div><div class="mph" style="width:70%"></div></div>
+        </div>
+        <div class="strip"><span class="nm">Volume One&nbsp;· Letter 15</span><span class="x"><i data-i="x" class="xs"></i></span></div>
+      </div>
+
+      <div class="tab">
+        <div class="pv">
+          <span class="tmenu"><i data-i="ellipsis-vertical" class="xs"></i></span>
+          <div class="mt big">John 3</div>
+        </div>
+        <div class="strip"><span class="nm">John 3</span><span class="x"><i data-i="x" class="xs"></i></span></div>
+      </div>
+
+      <div class="tab">
+        <div class="pv">
+          <span class="tmenu"><i data-i="ellipsis-vertical" class="xs"></i></span>
+          <div class="mph" style="width:50%;height:8px;border-radius:4px"></div>
+        </div>
+        <div class="strip"><span class="nm">Scripture Web</span><span class="x"><i data-i="x" class="xs"></i></span></div>
+      </div>
+
+    </div>
+  </div>
+  <span class="btn primary newtab"><i data-i="plus" class="sm"></i>New tab</span>
+</div>
+
+<div class="scrim"></div>
+<div class="sheet">
+  <div class="grabber"></div>
+  <div class="eyebrow">Tab 2</div>
+  <div class="h2">Tab actions</div>
+  <div class="acts-list">
+    <div class="rename">
+      <div class="flabel">Tab name</div>
+      <div class="field on">Morning reading<span class="caret"></span></div>
+      <div class="racts"><span class="btn ghost sm">Cancel</span><span class="btn primary sm">Save</span></div>
+    </div>
+    <div class="ai"><i data-i="dl-pin" class="sm"></i><div class="at"><div class="al">Pin tab</div><div class="ad">Moves this tab to the front and protects it from Close other tabs and Close all.</div></div></div>
+    <div class="ai"><i data-i="dl-copy-x" class="sm"></i><div class="at"><div class="al">Close other tabs</div><div class="ad">Keep only this tab open. 3 other tabs will be closed.</div></div></div>
+    <div class="ai"><i data-i="dl-arrow-right-to-line" class="sm"></i><div class="at"><div class="al">Close tabs to the right</div><div class="ad">Close 2 tabs after this one.</div></div></div>
+  </div>
+  <span class="btn secondary block cancel">Cancel</span>
+</div>
+
+<div class="kbd">
+  <div class="kr"><span class="k">q</span><span class="k">w</span><span class="k">e</span><span class="k">r</span><span class="k">t</span><span class="k">y</span><span class="k">u</span><span class="k">i</span><span class="k">o</span><span class="k">p</span></div>
+  <div class="kr mid"><span class="k">a</span><span class="k">s</span><span class="k">d</span><span class="k">f</span><span class="k">g</span><span class="k">h</span><span class="k">j</span><span class="k">k</span><span class="k">l</span></div>
+  <div class="kr"><span class="k fn"><i data-i="dl-arrow-big-up"></i></span><span class="k">z</span><span class="k">x</span><span class="k">c</span><span class="k">v</span><span class="k">b</span><span class="k">n</span><span class="k">m</span><span class="k fn"><i data-i="dl-delete"></i></span></div>
+  <div class="kr"><span class="k fn">?123</span><span class="k fn">,</span><span class="k space"></span><span class="k fn">.</span><span class="k go"><i data-i="check"></i></span></div>
+</div>
+</body></html>

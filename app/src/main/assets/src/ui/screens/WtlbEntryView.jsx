@@ -5,7 +5,7 @@
 import { inertAttr } from '../../utils/inert-attr.js';
 import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
 import { splitFormatBInline } from '../../utils/format-b-inline.js';
-import { formatBOffsetMap } from '../../utils/format-b-dom-text.js';
+import { formatBOffsetMap, formatBRefScan } from '../../utils/format-b-dom-text.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { excerptLanding } from '../../utils/excerpt-landing.js';
 import { LetterListenRow, LetterSongsCard } from '../components/LetterSongs.jsx';
@@ -101,39 +101,11 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     return () => clearTimeout(t);
   }, [entry.id]);
 
-  // Pre-scan paragraphs for scripture refs.
-  const refAnalysis = React.useMemo(() => {
-    const perParagraph = [];
-    const refNumMap = {};
-    const orderedRefs = [];
-    let num = 0;
-    entry.paragraphs.forEach((p) => {
-      const arr = [];
-      const re = /\{\{ref:([^}]+)\}\}/g;
-      let m;
-      while ((m = re.exec(p.text)) !== null) {
-        const ref = m[1].trim();
-        const after = p.text.slice(m.index + m[0].length);
-        const stripped = after.replace(/\{\{(?:ref|nav):[^}]+\}\}/g, '');
-        const hasWordChar = /\w/.test(stripped);
-        const hasLaterMarker = /\{\{(?:ref|nav):/.test(after);
-        const trailing = !hasWordChar && !hasLaterMarker;
-        let n = null;
-        if (footnotesMode && !trailing) {
-          if (!(ref in refNumMap)) {
-            num++;
-            refNumMap[ref] = num;
-            orderedRefs.push(ref);
-          }
-          n = refNumMap[ref];
-        }
-        arr.push({ ref, trailing, num: n });
-      }
-      perParagraph.push(arr);
-    });
-    return { perParagraph, refNumMap, orderedRefs };
+  // Pre-scan paragraphs for scripture refs (shared with the link excerpt
+  // picker, which has to render the same footnote numbers).
+  const refAnalysis = React.useMemo(() => formatBRefScan(entry.paragraphs, footnotesMode),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- identity-based cache key: entry.paragraphs is corpus data (read-only after boot); entry.id uniquely identifies the entry, so [entry.id, footnotesMode] is sufficient. Using [entry, ...] would force re-memoize on any parent re-render that hands a fresh object literal.
-  }, [entry.id, footnotesMode]);
+    [entry.id, footnotesMode]);
 
   // One projection per paragraph, rebuilt only when something the render
   // branches on actually changes. refAnalysis is the same pre-scan the renderer

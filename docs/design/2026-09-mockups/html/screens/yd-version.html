@@ -1,0 +1,218 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="yd-common.css"><script src="../kit/kit.js"></script><script src="yd-icons.js"></script>
+<style>
+  .ycol > .label { margin-bottom: -12px; }
+  .plat .set { padding-top: 12px; padding-bottom: 12px; }
+  .plat .hd { min-height: 28px; }
+  .plat .where { font: 400 13px/1.3 var(--sans); color: var(--text-3); margin-top: 2px; }
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 26px; margin-top: 12px; }
+  .bars i { flex: 1; border-radius: 3px 3px 0 0; background: var(--surface-3); display: block; }
+  .bars i:last-child { background: color-mix(in srgb, var(--accent) 70%, transparent); }
+  .absent { border-radius: 16px; border: 1.5px dashed var(--hairline); padding: 18px 16px; font: 400 14px/1.5 var(--sans); color: var(--text-3); text-wrap: pretty; }
+  [data-theme="light"] .absent { border-color: rgba(30,26,21,0.18); }
+  .band2 { margin-top: 18px; }
+</style></head>
+<body data-size="1800x1770">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Your data · version, protection and storage rows</div>
+    <div class="meta">Settings › Your Data. Every state of these rows, in the app’s own words. Check and Protect now appear exactly where the app offers them.</div>
+  </div>
+
+  <div class="ycols">
+    <!-- App version: web -->
+    <div class="ycol w412">
+      <div class="label">App version · web and installed web app</div>
+      <div class="cell">
+        <div class="cap">Checking<small>On opening Your Data, and after each Check. The button waits until the answer is in.</small></div>
+        <div class="group frag"><div class="set">
+          <div class="hd"><div class="txt"><div class="lbl">App version</div></div><span class="btn quiet sm is-off"><i data-i="yd-refresh-cw" class="xs"></i>Check</span></div>
+          <div class="dv quiet">Checking…</div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Up to date<small>The build this page runs is the one the server publishes.</small></div>
+        <div class="group frag"><div class="set">
+          <div class="hd"><div class="txt"><div class="lbl">App version</div></div><span class="btn quiet sm"><i data-i="yd-refresh-cw" class="xs"></i>Check</span></div>
+          <div class="dv">v1.0.2 · c1c091ff9f · corpus c61 — up to date with the published version.</div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Update available<small>The server publishes a newer build than the one running.</small></div>
+        <div class="group frag"><div class="set">
+          <div class="hd"><div class="txt"><div class="lbl">App version</div></div><span class="btn quiet sm"><i data-i="yd-refresh-cw" class="xs"></i>Check</span></div>
+          <div class="dv">v1.0.2 · e71130b6f4 · corpus c60 — an update is available (v1.0.2 · c1c091ff9f). Reopen the app to apply it.</div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Server out of reach<small>Offline, or the published version could not be read.</small></div>
+        <div class="group frag"><div class="set">
+          <div class="hd"><div class="txt"><div class="lbl">App version</div></div><span class="btn quiet sm"><i data-i="yd-refresh-cw" class="xs"></i>Check</span></div>
+          <div class="dv">v1.0.2 · c1c091ff9f · corpus c61 — could not reach the server to compare.</div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- App version: first visit + Android -->
+    <div class="ycol w412">
+      <div class="label">App version · first visit and Android</div>
+      <div class="cell">
+        <div class="cap">First visit on the web<small>No offline service worker controls the page yet, so no version is shown rather than a guessed one.</small></div>
+        <div class="group frag"><div class="set">
+          <div class="hd"><div class="txt"><div class="lbl">App version</div></div><span class="btn quiet sm"><i data-i="yd-refresh-cw" class="xs"></i>Check</span></div>
+          <div class="dv">Not yet managed by the offline service worker on this device.</div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Android app<small>Read from the installed app’s own files. An app cannot update itself over the web, so there is nothing to compare.</small></div>
+        <div class="group frag"><div class="set">
+          <div class="hd"><div class="txt"><div class="lbl">App version</div></div><span class="btn quiet sm"><i data-i="yd-refresh-cw" class="xs"></i>Check</span></div>
+          <div class="dv">v1.0.2 · c1c091ff9f · corpus c61 — the version installed on this device. New versions arrive by installing an update, not over the web.</div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Android, version unreadable<small>The installed app’s version file could not be read.</small></div>
+        <div class="group frag"><div class="set">
+          <div class="hd"><div class="txt"><div class="lbl">App version</div></div><span class="btn quiet sm"><i data-i="yd-refresh-cw" class="xs"></i>Check</span></div>
+          <div class="dv">Installed app build — updates arrive by installing a new APK, not over the web.</div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- Protection -->
+    <div class="ycol w412">
+      <div class="label">Protection</div>
+      <div class="cell">
+        <div class="cap">Can be asked for<small>Firefox in a browser tab, the one browser that asks you. Protect now appears only here and after a refusal.</small></div>
+        <div class="group frag"><div class="set">
+          <div class="hd"><div class="txt"><div class="lbl">Protection</div></div><span class="btn quiet sm"><i data-i="shield-check" class="xs"></i>Protect now</span></div>
+          <div class="dv">Not active — tap “Protect now” to request protection from automatic browser cleanup.</div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Denied<small>Firefox said no. Protect now stays for another try.</small></div>
+        <div class="group frag"><div class="set">
+          <div class="hd"><div class="txt"><div class="lbl">Protection</div></div><span class="btn quiet sm"><i data-i="shield-check" class="xs"></i>Protect now</span></div>
+          <div class="dv">Browser denied protection. Export regularly as a backup.</div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Protected<small>Always on the Android app, where the data lives in the app’s own storage.</small></div>
+        <div class="group frag"><div class="set">
+          <div class="hd"><div class="txt"><div class="lbl">Protection</div></div></div>
+          <div class="dv">Active — your data is protected from automatic browser cleanup.</div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Nothing to ask for<small>Chrome and Edge decide by themselves; Safari’s real safeguard is Add to Home Screen.</small></div>
+        <div class="group frag"><div class="set">
+          <div class="hd"><div class="txt"><div class="lbl">Protection</div></div></div>
+          <div class="dv">Your data is saved on this device. Export a backup regularly to keep it safe.</div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Checking · unavailable</div>
+        <div class="group frag">
+          <div class="set">
+            <div class="hd"><div class="txt"><div class="lbl">Protection</div></div></div>
+            <div class="dv quiet">Checking…</div>
+          </div>
+          <div class="set">
+            <div class="hd"><div class="txt"><div class="lbl">Protection</div></div></div>
+            <div class="dv">Persistence API unavailable on this browser.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Platform -->
+    <div class="ycol w412">
+      <div class="label">Platform</div>
+      <div class="cell">
+        <div class="cap">One value per device<small>All seven the row can show, with where each one appears.</small></div>
+        <div class="group frag plat">
+          <div class="set"><div class="hd"><div class="txt"><div class="lbl">Platform</div><div class="where">The Android app</div></div><span class="val">Android (App)</span></div></div>
+          <div class="set"><div class="hd"><div class="txt"><div class="lbl">Platform</div><div class="where">Safari, in a tab</div></div><span class="val">Safari</span></div></div>
+          <div class="set"><div class="hd"><div class="txt"><div class="lbl">Platform</div><div class="where">Added to the Home Screen</div></div><span class="val">Safari (Home Screen App)</span></div></div>
+          <div class="set"><div class="hd"><div class="txt"><div class="lbl">Platform</div><div class="where">Firefox</div></div><span class="val">Firefox</span></div></div>
+          <div class="set"><div class="hd"><div class="txt"><div class="lbl">Platform</div><div class="where">Chrome</div></div><span class="val">Chrome</span></div></div>
+          <div class="set"><div class="hd"><div class="txt"><div class="lbl">Platform</div><div class="where">Microsoft Edge</div></div><span class="val">Edge</span></div></div>
+          <div class="set"><div class="hd"><div class="txt"><div class="lbl">Platform</div><div class="where">Any other browser</div></div><span class="val">Web Browser</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="band-title band2"><span class="h3">Storage rows</span><span class="meta">The loading, unavailable and first-day states. The filled rows are on the Your Data page.</span></div>
+  <div class="ycols">
+    <div class="ycol w412">
+      <div class="label">Your data</div>
+      <div class="cell">
+        <div class="cap">Measuring<small>Counted fresh each time Your Data opens.</small></div>
+        <div class="group frag"><div class="set">
+          <div class="lbl">Your data</div>
+          <div class="dv quiet">Calculating…</div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">No journal photos or recordings<small>The bracketed media note appears only when there is media.</small></div>
+        <div class="group frag"><div class="set">
+          <div class="lbl">Your data</div>
+          <div class="dv">About 1.3 MB — your highlights, notes, journal, bookmarks, links, reading progress, and history. This is what Export backs up. Garden images are not counted here.</div>
+        </div></div>
+      </div>
+    </div>
+    <div class="ycol w412">
+      <div class="label">Total app data</div>
+      <div class="cell">
+        <div class="cap">Checking · unavailable · partly unavailable</div>
+        <div class="group frag">
+          <div class="set"><div class="lbl">Total app data</div><div class="dv quiet">Checking…</div></div>
+          <div class="set"><div class="lbl">Total app data</div><div class="dv">Storage info unavailable on this browser.</div></div>
+          <div class="set"><div class="lbl">Total app data</div><div class="dv">Storage info partially unavailable.</div></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">No quota reported<small>The “of …” part drops out when the device does not say how much room there is.</small></div>
+        <div class="group frag"><div class="set">
+          <div class="lbl">Total app data</div>
+          <div class="dv">About 612.4 MB — everything this app stores on the device, including the offline library and Garden images.</div>
+        </div></div>
+      </div>
+    </div>
+    <div class="ycol w412">
+      <div class="label">Growth</div>
+      <div class="cell">
+        <div class="cap">First day<small>Words only: one bar would be noise.</small></div>
+        <div class="group frag"><div class="set">
+          <div class="lbl">Growth</div>
+          <div class="dv">First measurement recorded — 42.8 MB. The trend appears the next day you open Settings.</div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Shrunk</div>
+        <div class="group frag"><div class="set">
+          <div class="lbl">Growth</div>
+          <div class="dv">Your data has shrunk by 1.1 MB across 6 measurements since 2026-09-19 — now 41.7 MB.</div>
+          <div class="bars" aria-hidden="true"><i style="height:24px"></i><i style="height:24px"></i><i style="height:24px"></i><i style="height:23px"></i><i style="height:23px"></i><i style="height:23px"></i></div>
+        </div></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Stayed level</div>
+        <div class="group frag"><div class="set">
+          <div class="lbl">Growth</div>
+          <div class="dv">Your data has stayed level across 3 measurements since 2026-09-23 — now 42.8 MB.</div>
+          <div class="bars" aria-hidden="true"><i style="height:24px"></i><i style="height:24px"></i><i style="height:24px"></i></div>
+        </div></div>
+      </div>
+    </div>
+    <div class="ycol w412">
+      <div class="label">Before any measurement</div>
+      <div class="cell">
+        <div class="cap">Growth is absent<small>Until the first measurement is recorded, the Growth row is not drawn at all.</small></div>
+        <div class="absent">No Growth row</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

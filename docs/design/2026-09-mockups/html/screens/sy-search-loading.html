@@ -1,0 +1,85 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script><script src="sy-icons.js"></script>
+<link rel="stylesheet" href="sy-common.css">
+<style>
+  .sblock.first { margin-top: 26px; }
+  .spinrow { display: flex; align-items: center; gap: 14px; }
+  .spin { width: 28px; height: 28px; border-radius: 14px; border: 3px solid var(--surface-3); border-top-color: var(--accent); border-right-color: var(--accent); flex: none; transform: rotate(20deg); }
+  .stale { opacity: .45; }
+  .sline .meta { color: var(--text-2); }
+</style></head>
+<body data-size="1396x1130">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Search · loading</div>
+    <div class="meta">The first open builds the search index once (about ten seconds, 33,096 entries); every later open restores it in a moment. While it builds, the hero and Quick picks wait. Once built, each new query shows “Searching…” and the previous results stay underneath until the new ones land.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(3, 412px); column-gap: 40px">
+
+    <div class="cell">
+      <div class="cap">First open · starting<small>Before the first count arrives</small></div>
+      <div class="phone-f"><div class="screen">
+        <div class="status"></div>
+        <div class="sbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <div class="search focus"><i data-i="search" class="sm"></i><span class="hint"><span class="caret" style="margin:0 2px 0 0"></span>Search scriptures, volumes, studies…</span></div>
+        </div>
+        <div class="scroll">
+          <div class="corpus"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="sblock first">
+            <div class="spinrow"><div class="spin"></div><div class="h3">Building search index…</div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">First open · building<small>The count and bar advance in steps of 2,000</small></div>
+      <div class="phone-f"><div class="screen">
+        <div class="status"></div>
+        <div class="sbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <div class="search focus"><i data-i="search" class="sm"></i><span class="hint"><span class="caret" style="margin:0 2px 0 0"></span>Search scriptures, volumes, studies…</span></div>
+        </div>
+        <div class="scroll">
+          <div class="corpus"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="sblock first">
+            <div class="h3">Building search index…</div>
+            <div class="progress"><i style="width:54%"></i></div>
+            <div class="meta cnt">18,000 / 33,096</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Searching “mercy”<small>“merc” results wait, faded, until the new ones land</small></div>
+      <div class="phone-f"><div class="screen">
+        <div class="status"></div>
+        <div class="sbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <div class="search focus"><i data-i="search" class="sm"></i><span class="q">mercy<span class="caret"></span></span><i data-i="x" class="sm x"></i></div>
+        </div>
+        <div class="scroll">
+          <div class="corpus"><span class="chip">All</span><span class="chip on">Scriptures</span><span class="chip">Volumes</span></div>
+          <div class="sline"><span class="meta">Searching…</span><div class="progress indet"><i></i></div></div>
+          <div class="stale">
+            <div class="rhead"><span class="meta">Found <b>379 matches</b> across <b>1 section</b></span>
+              <div class="seg sm"><span class="on">Relevance</span><span>Book order</span></div></div>
+            <div class="grp-h open" style="border-top:0;margin-top:10px"><span class="n">Scriptures</span><span class="c">379 matches</span><i data-i="chevron-down" class="sm"></i></div>
+            <div class="grp-items">
+              <div class="res"><div class="ttl">Ezekiel 27:27</div><div class="meta">A Lament for Tyre</div>
+                <div class="snip">“Your riches, wares, and <mark>merc</mark>handise, Your mariners and pilots, Your caulkers and <mark>merc</mark>handisers, All your men of war who are in you,…</div></div>
+              <div class="res"><div class="ttl">Revelation 18:11</div><div class="meta">The Kings and Merchants Weep</div>
+                <div class="snip">“And the <mark>merc</mark>hants of the earth will weep and mourn over her, for no one buys their <mark>merc</mark>handise anymore:</div></div>
+              <div class="res"><div class="ttl">Psalms 103:8</div><div class="meta">Bless the Lord, O My Soul</div>
+                <div class="snip">The LORD is <mark>merc</mark>iful and gracious, Slow to anger, and abounding in <mark>merc</mark>y.</div></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,85 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="jn-common.css"><script src="jn-common.js"></script>
+<style>
+  .media2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .mcol { display: flex; flex-direction: column; gap: 10px; }
+  .mcol .label { margin-top: 8px; }
+  .mcol .label:first-child { margin-top: 0; }
+  .mcol .note { margin-top: -2px; }
+  .gone .i { width: 28px; height: 28px; }
+  .capbar { margin-top: 12px; }
+  .pills { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+  .pills .label { margin-top: 10px; }
+  .pills .label:first-child { margin-top: 0; }
+  .mtop.bar { top: 40px; left: 134px; right: auto; }
+  .mtoast.sm { height: 40px; padding: 0 16px 0 13px; font-size: 13px; gap: 8px; }
+</style></head>
+<body data-size="1388x1640">
+<script>JN.writeSprite()</script>
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Journal · banners, missing media and milestones</div>
+    <div class="meta">Recordings no entry holds, media whose bytes are gone, an entry that no longer exists, and the milestone pill. The copy is the app's own.</div>
+  </div>
+  <div class="board-grid" id="grid" style="grid-template-columns: repeat(4, 309px)"></div>
+</div>
+<script>
+  const unc = (head, rows) => `<div class="card unc"><div class="hd"><span class="ic"><i data-i="mic" class="sm"></i></span><div class="body">${head}</div></div>${rows}</div>`;
+  const urow = (when) => `<div class="rw"><span class="meta">${when}</span><span class="btn secondary sm">Recover</span><span class="btn btn-danger sm">Discard</span></div>`;
+  const uconfirm = (when) => `<div class="rw confirming"><span class="meta">${when}</span><div class="cstrip"><span class="q">Delete this recording?</span><span class="btn secondary sm">Cancel</span><span class="btn btn-danger sm">Yes, delete</span></div></div>`;
+  const hub = (o) => JN.phone('m', JN.hub(o));
+  const RECOVERED = JN.hubCard('[Voice recording]', 'Sep 25 · 9:41 AM', null, [['mic', 'Voice · 0:08']], false, '[Voice recording]');
+  let waveBars = '';
+  for (let i = 0; i < 40; i++) waveBars += `<span style="height:${6 + Math.round(Math.abs(Math.sin(i * 0.6 + i * 0.13)) * 16)}px"></span>`;
+  const B = JN.blk;
+
+  const cells = [
+    ['One unclaimed recording', 'Saved, but no entry holds it; nothing is lost silently', hub({
+      body: unc('1 recording was saved but never attached to an entry.', urow('September 20, 2026 · 0:08')) + `<div class="entries">${JN.HUB_CARDS.slice(0, 2).join('')}</div>` })],
+    ['Discard asks first', 'The date stays in view above the question', hub({
+      body: unc('2 recordings were saved but never attached to an entry.', uconfirm('September 20, 2026 · 0:08') + urow('September 4, 2026 · 1:15')) + `<div class="entries">${JN.HUB_CARDS[0]}</div>` })],
+    ['After Recover', 'It becomes a new entry of its own, holding just the memo', hub({ count: '10 entries',
+      body: `<div class="entries">${RECOVERED}${JN.HUB_CARDS.slice(0, 2).join('')}</div>` })],
+    ['Entry Not Found', 'Opened from a link after the entry was deleted', JN.phone('m', `<div class="screen">
+      <div class="status"></div>
+      <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Journal</span></div>
+      <div class="scroll"><div class="empty"><div class="badge"><i data-i="notebook" class="lg"></i></div><div class="h2">Entry not found</div><div class="body">This journal entry may have been deleted.</div></div></div>
+    </div>`)],
+    ['Media in an entry, when its bytes are gone', 'Said in words; nothing is offered that would do nothing', `<div class="media2">
+        <div class="mcol">
+          <div class="label">An image, still loading</div>
+          <div class="gone loading"></div>
+          <div class="note">A blank block, with no words, until the photo arrives.</div>
+          <div class="label">An image that is gone</div>
+          <div><div class="gone">${JN.ic('jn-image-off')}Image missing</div><div class="ph capbar" style="width:44%; height:8px"></div></div>
+          <div class="note">The caption stays: those words are still yours.</div>
+        </div>
+        <div class="mcol">
+          <div class="label">A voice memo</div>
+          <div class="card vmemo"><span class="pb"><i data-i="play" class="sm fill"></i></span><div class="mb"><div class="wave">${waveBars}</div><div class="meta mm"><span>Voice memo</span><span>0:00 / 0:42</span></div></div></div>
+          <div class="label">A voice memo that is gone</div>
+          <div class="card vmemo miss"><span class="ic"><i data-i="mic" class="sm"></i></span><div><div class="t1">Voice memo</div><div class="t2">Recording missing</div></div></div>
+          <div class="note">No play button, no waveform, no length.</div>
+          <div class="label">The same, while editing</div>
+          <div class="card vmemo miss"><span class="ic"><i data-i="mic" class="sm"></i></span><div><div class="t1">Voice memo</div><div class="t2">Recording missing</div></div><span class="trash"><i data-i="trash-2" class="sm"></i></span></div>
+          <div class="note">Its delete stays, so a dead block can be cleared. Recovery lives in the hub banner.</div>
+        </div>
+      </div>`, 'span2'],
+    ['A milestone', 'On the first save of an entry that has words in it', JN.phone('m', JN.editor({
+      body: B('text', JN.para([100, 96, 99, 93, 57])) + B('text focus', JN.para([98, 100, 41], true)),
+      extra: '<div class="mtop bar"><span class="mtoast sm"><span class="st">✦</span>Milestone: <b>First entry</b></span></div>' }))],
+    ['The milestone pill', 'Three seconds at the top, then gone', `<div class="pills">
+        <div class="label">A journal milestone</div>
+        <span class="mtoast"><span class="st">✦</span>Milestone: <b>First entry</b></span>
+        <span class="mtoast"><span class="st">✦</span>Milestone: <b>7-day streak</b></span>
+        <div class="note">The journal's own list: First entry, 10, 30 and 100 entries, and 7-, 30- and 100-day streaks.</div>
+        <div class="label">A reading milestone</div>
+        <span class="mtoast"><span class="st">✦</span>Milestone: <b>10,000 words read</b></span>
+        <span class="mtoast"><span class="st">✦</span>Milestone: <b>Returned to a reading</b></span>
+        <div class="note">Reading milestones use the same pill, with their names from the milestones list. When several are reached at once, only the first is shown.</div>
+      </div>`],
+  ];
+  JN.fill('grid', cells);
+</script>
+</body></html>

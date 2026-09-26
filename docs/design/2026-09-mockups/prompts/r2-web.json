@@ -1,0 +1,24 @@
+{
+ "name": "r2-web",
+ "refs": [
+  "out/r1-web/web-A.png"
+ ],
+ "images": [
+  {
+   "file": "web-r2-refined.png",
+   "prompt": "Image 1 is the chosen design (the EDIT TARGET). Keep its layout, palette, typography, spacing and overall look exactly; change ONLY what the numbered list says. Every text string must be crisp and correctly spelled. No blur, no vignette, no depth-of-field. Changes: (1) remove every invented slogan and the bottom quote line; (2) the floating card reads 'Isaiah 53:5 \u2194 1 Peter 2:24' with the verbatim NKJV excerpt '\u201c\u2026by His stripes we are healed.\u201d' and the button 'Read both'; (3) keep the three-way control 'Scripture | My Web | Nearby', the 'Essential' density chip, Reset and the legend.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  },
+  {
+   "file": "web-r2-lightB.png",
+   "prompt": "Image 1 is the chosen design. Recreate it in the Vellum light palette (paper #F5F0E6, oxblood accent #7B2D26 for the selected thread, gilt hairlines), keeping the same arc diagram, controls and layout; no invented slogans; the floating card reads 'Isaiah 53:5 \u2194 1 Peter 2:24' with '\u201c\u2026by His stripes we are healed.\u201d' and 'Read both'. No blur, all text sharp.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  },
+  {
+   "file": "web-r2-thread.png",
+   "prompt": "Image 1 is the chosen design (the EDIT TARGET). Keep its layout, palette, typography, spacing and overall look exactly; change ONLY what the numbered list says. Every text string must be crisp and correctly spelled. No blur, no vignette, no depth-of-field. Changes: a thread has been tapped: the arc diagram dims to 30% except the one glowing gold thread, and a bottom sheet rises over the lower third showing both passages side by side, each with its reference and verbatim NKJV text - left 'Isaiah 53:5': 'But He was wounded for our transgressions, He was bruised for our iniquities; The chastisement for our peace was upon Him, And by His stripes we are healed.' - right '1 Peter 2:24': 'who Himself bore our sins in His own body on the tree, that we, having died to sins, might live for righteousness\u2014 by whose stripes you were healed.' - with two buttons 'Read Isaiah 53' and 'Read 1 Peter 2'.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  }
+ ],
+ "base": "A",
+ "preamble": "Image 1 (attached) is the chosen mockup from round 1: the design to iterate on. Use it as the edit target or layout reference exactly as each spec says.",
+ "max_primary": 95,
+ "max_weekly": 60
+}

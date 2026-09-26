@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="jn-common.css"><script src="jn-common.js"></script>
+<style>
+  .rbtn .i { width: 26px; height: 26px; }
+  .rbtn.big .i { width: 28px; height: 28px; }
+  .rbtn .i.pl { margin-left: 3px; }
+  .ract.review { gap: 30px; align-items: flex-end; }
+</style></head>
+<body data-size="1721x880">
+<script>JN.writeSprite()</script>
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Journal · recording a voice memo</div>
+    <div class="meta">+ → Voice recording opens this sheet over the entry. The take is written to the device the moment it ends, before you choose to keep it. The copy is the app's own.</div>
+  </div>
+  <div class="board-grid" id="grid" style="grid-template-columns: repeat(5, 309px)"></div>
+</div>
+<script>
+  const B = JN.blk;
+  const BG = B('text', JN.para([100, 96, 99, 93, 57])) + B('text focus', JN.para([98, 100, 90, 41], true)) + B('media', JN.photo(''), { noDel: true });
+  const LIVE = JN.bars(48, 4, 56, 17);
+  const CLIP = JN.bars(48, 4, 56, 5);
+  const wave = (hs, cls, played) => `<div class="rwave ${cls || ''}">${JN.spans(hs, i => (played != null && i / 48 <= played) ? 'p' : '')}</div>`;
+  const status = (t, paused) => `<div class="rst ${paused ? 'paused' : ''}"><span class="dot"></span>${t}</div>`;
+  const ctrl = (icon, label, primary, big) => `<span class="rc"><span class="rbtn ${primary ? 'primary' : ''} ${big ? 'big' : ''}">${icon}</span>${label}</span>`;
+  const PAUSE = '<i data-i="pause" class="fill"></i>';
+  const PLAY = '<i data-i="play" class="fill pl"></i>';
+  const STOP = '<span class="stop"></span>';
+  const rec = (inner, head = 'Voice recording', close = true) => JN.phone('m', JN.editor({ body: BG, fab: false, over: JN.sheet(JN.shead(head, { close }) + inner, 'rec') }));
+  const strip = `<div class="cstrip"><span class="q">Discard this recording?</span><span class="btn secondary sm">Cancel</span><span class="btn btn-danger sm">Yes, discard</span></div>`;
+
+  const cells = [
+    ['Requesting the microphone', 'Nothing is recorded yet, so Cancel closes at once', rec(`<div class="req"><div class="badge"><i data-i="mic" class="lg"></i></div>
+        <div class="body">Requesting microphone access…</div><span class="btn secondary">Cancel</span></div>`)],
+    ['Recording', 'The newest 48 bars; it stops by itself at 5:00', rec(status('Recording') + '<div class="rtime">0:37</div>' + wave(LIVE, 'live') +
+        `<div class="ract"><span class="btn secondary">Cancel</span>${ctrl(PAUSE, 'Pause')}${ctrl(STOP, 'Finish', true)}</div>`)],
+    ['Paused', 'The clock and the bars wait with you', rec(status('Paused', true) + '<div class="rtime">1:12</div>' + wave(LIVE) +
+        `<div class="ract"><span class="btn secondary">Cancel</span>${ctrl(PLAY, 'Resume')}${ctrl(STOP, 'Finish', true)}</div>`)],
+    ['Discard this recording?', 'Cancel, ×, back or the backdrop ask first', rec(status('Recording') + '<div class="rtime">0:52</div>' + wave(JN.bars(48, 4, 56, 29), 'live') + strip)],
+    ['Review recording', 'Tap the bars to move through it; Save adds the memo', rec(status('Review') + '<div class="rtime">0:12<small> / 1:03</small></div>' + wave(CLIP, '', 0.19) +
+        `<div class="ract review">${ctrl('<i data-i="x"></i>', 'Discard')}${ctrl(PLAY, 'Play', false, true)}${ctrl('<i data-i="check"></i>', 'Save', true)}</div>`, 'Review recording', false)],
+  ];
+  JN.fill('grid', cells);
+</script>
+</body></html>

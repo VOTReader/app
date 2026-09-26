@@ -1,0 +1,142 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="sx-icons.js"></script>
+<link rel="stylesheet" href="sx-common.css">
+<style>
+  /* reading screen, as screens/bible-select.html */
+  .chapter { padding-top: 6px; }
+  .sechead { margin: 22px 0 10px; }
+  .verses { position: relative; }
+  .sel { background: var(--accent-soft); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 3px; }
+  .handle { display: inline-block; width: 2px; height: 26px; background: var(--accent); vertical-align: -6px; position: relative; }
+  .handle::after { content: ''; position: absolute; left: -5px; width: 12px; height: 12px; border-radius: 6px; background: var(--accent); }
+  .handle.a::after { top: -11px; } .handle.b::after { bottom: -11px; }
+  /* the selection toolbar with the app's real controls, as screens/an-toolbar.html draws them:
+     three styles, the ten colours in toolbar order, Listen from here (John 3 has a recording), six actions */
+  .toolbar { position: relative; margin: 14px -6px 16px; background: var(--surface-2); border-radius: 18px; padding: 10px 12px 6px; box-shadow: var(--shadow); }
+  .toolbar::after { content: ''; position: absolute; left: 214px; bottom: -7px; width: 14px; height: 14px; background: var(--surface-2); transform: rotate(45deg); border-radius: 2px; }
+  .styles { display: flex; align-items: center; gap: 4px; }
+  .st { width: 44px; height: 40px; border-radius: 12px; display: grid; place-items: center; font: 500 21px/1 var(--serif); color: var(--text-2); flex: none; }
+  .st.on { background: var(--surface-3); color: var(--text); }
+  .st span { padding: 0 2px; line-height: 1.1; }
+  .st.hl span { background: var(--hl-honey); border-radius: 3px; }
+  .st.ul span { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+  .st.sq span { text-decoration: underline wavy; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+  .swrow { display: flex; justify-content: space-between; align-items: center; height: 44px; margin-top: 4px; padding: 0 2px 8px; border-bottom: 1px solid var(--hairline); box-sizing: content-box; }
+  .sw { width: 28px; height: 28px; border-radius: 14px; flex: none; }
+  .listen { display: flex; align-items: center; justify-content: center; gap: 9px; height: 44px; margin-top: 10px; border-radius: 22px; background: var(--accent-soft); color: var(--accent); font: 700 15px/1 var(--sans); }
+  .listen .i { width: 17px; height: 17px; fill: currentColor; }
+  .acts { display: grid; grid-template-columns: repeat(6, 1fr); padding-top: 6px; }
+  .act { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 7px 0 6px; border-radius: 12px; font: 400 12px/1 var(--sans); color: var(--text-2); white-space: nowrap; }
+  .act.press { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+  /* the search half */
+  .sbar .search .q.clip { -webkit-mask-image: linear-gradient(90deg, #000 80%, transparent); mask-image: linear-gradient(90deg, #000 80%, transparent); }
+  .notes { display: flex; flex-direction: column; gap: 18px; }
+  .notes .rule { height: 1px; background: var(--hairline); }
+</style></head>
+<body data-size="1356x1112">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Search · from a selection</div>
+    <div class="meta">Select words while reading, tap Search in the toolbar, and Search opens with exactly those words in the box, offering to stay in the book you were reading. Real engine output for the selection from John 3:3.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: 412px 412px 372px; column-gap: 40px">
+
+    <div class="cell">
+      <div class="cap">1 · Select, then Search<small>The toolbar’s six actions; Search is the fifth</small></div>
+      <div class="pf"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="title">John 3 · NKJV</span>
+          <span class="iconbtn"><i data-i="search"></i></span>
+          <span class="iconbtn"><i data-i="bookmark"></i></span>
+          <span class="tabcount">1</span>
+        </div>
+        <div class="scroll chapter">
+          <div class="h1" style="font-size:40px">John 3</div>
+          <div class="eyebrow sechead">Nicodemus and the New Birth</div>
+          <div class="reading verses">
+            <p><span class="vnum">1</span>There was a man of the Pharisees named Nicodemus, a ruler of the Jews. <span class="vnum">2</span>This man came to Jesus by night and said to Him, “Rabbi, we know that You are a teacher come from God; for no one can do these signs that You do unless God is with him.”</p>
+            <div class="toolbar">
+              <div class="styles"><span class="st hl on"><span>A</span></span><span class="st ul"><span>A</span></span><span class="st sq"><span>A</span></span></div>
+              <div class="swrow">
+                <span class="sw" style="background:var(--dot-honey)"></span><span class="sw" style="background:var(--dot-sage)"></span><span class="sw" style="background:var(--dot-rose)"></span><span class="sw" style="background:var(--dot-red)"></span><span class="sw" style="background:var(--dot-clay)"></span>
+                <span class="sw" style="background:var(--dot-sky)"></span><span class="sw" style="background:var(--dot-lavender)"></span><span class="sw" style="background:var(--dot-teal)"></span><span class="sw" style="background:var(--dot-brown)"></span><span class="sw" style="background:var(--dot-gray)"></span>
+              </div>
+              <div class="listen"><i data-i="play"></i>Listen from here</div>
+              <div class="acts">
+                <span class="act"><i data-i="notebook-pen"></i>Note</span>
+                <span class="act"><i data-i="link"></i>Link</span>
+                <span class="act"><i data-i="copy"></i>Copy</span>
+                <span class="act"><i data-i="share-2"></i>Share</span>
+                <span class="act press"><i data-i="search"></i>Search</span>
+                <span class="act"><i data-i="bookmark"></i>Bookmark</span>
+              </div>
+            </div>
+            <p><span class="vnum">3</span>Jesus answered and said to him, “Most assuredly, I say to you, <span class="handle a"></span><mark class="sel">unless one is born again, he cannot see the kingdom of God.</mark><span class="handle b"></span>”</p>
+            <p><span class="vnum">4</span>Nicodemus said to Him, “How can a man be born when he is old? Can he enter a second time into his mother’s womb and be born?”</p>
+            <p><span class="vnum">5</span>Jesus answered, “Most assuredly, I say to you, unless one is born of water and the Spirit, he cannot enter the kingdom of God. <span class="vnum">6</span>That which is born of the flesh is flesh, and that which is born of the Spirit is spirit.</p>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">2 · Search opens with the words<small>The box holds the selection; the chip offers John</small></div>
+      <div class="pf"><div class="screen">
+        <div class="status"></div>
+        <div class="sbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <div class="search"><i data-i="search" class="sm"></i><span class="q clip">unless one is born again, he cannot see the kingdom of God.</span><i data-i="x" class="sm x"></i></div>
+        </div>
+        <div class="scroll">
+          <div class="chips"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+          <span class="scope"><i data-i="search" class="sm"></i>Search in John</span>
+          <div class="rhead"><span class="meta">Found <b>400+ matches</b> across <b>18 sections</b></span>
+            <div class="seg sm"><span class="on">Relevance</span><span>Book order</span></div></div>
+          <div class="label sec">Best Matches</div>
+          <div class="res">
+            <div class="kl"><span class="label">Verse</span><span class="bdg hd">Nicodemus and the New Birth</span></div>
+            <div class="ttl">John 3:3</div>
+            <div class="snip">Jesus answered and said to him, “Most assuredly, I say to you, <mark>unless</mark> <mark>one</mark> is <mark>born</mark> <mark>again,</mark> he <mark>cannot</mark> <mark>see</mark> the <mark>kingdom</mark> of <mark>God.</mark>”</div>
+          </div>
+          <div class="res">
+            <div class="kl"><span class="label">Answers</span></div>
+            <div class="ttl">Regarding Being Born Again</div>
+            <div class="meta loc">Answers Only God Can Give</div>
+            <div class="snip">…<mark>Kingdom</mark> of Heaven, <mark>unless</mark> they are <mark>born</mark> <mark>again</mark>. For all are <mark>born</mark> physically, of human parents, by great travail into a world of sin. So then to enter The <mark>Kingdom</mark> of Heaven, <mark>one</mark>…</div>
+          </div>
+          <div class="res">
+            <div class="kl"><span class="label">Answers</span></div>
+            <div class="ttl">False Doctrines Within the Churches of Men Regarding...</div>
+            <div class="meta loc">Answers Only God Can Give</div>
+            <div class="snip">…<mark>See</mark>: Regarding the First Death Also <mark>See</mark>: Regarding the Second Death False Doctrine: <em>"Eternal torment in hell is a just and fair punishment for sinning <mark>against</mark> an eternal <mark>God</mark>"</em>…</div>
+          </div>
+          <div class="res">
+            <div class="kl"><span class="label">Letter</span></div>
+            <div class="ttl">Born Again</div>
+            <div class="meta loc">Volume Three · Letter 28</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">What travels<small>From the toolbar to the search box</small></div>
+      <div class="notes">
+        <div class="note"><b>The words, exactly.</b> The whole selection becomes the query, punctuation and all: “again,” and “God.” are searched and marked with their comma and full stop.</div>
+        <div class="rule"></div>
+        <div class="note"><b>Where you were.</b> Opened from John 3, the chip offers “Search in John”; one tap keeps the same words to John.</div>
+        <div class="rule"></div>
+        <div class="note"><b>No suggestions.</b> Past 40 characters the suggestion list stays away, so the results start right under the chip.</div>
+        <div class="rule"></div>
+        <div class="note"><b>Remembered when sent.</b> Opening a result keeps the whole sentence as a recent search (unless History is off).</div>
+        <div class="rule"></div>
+        <div class="note"><b>The toolbar row.</b> Note, Link, Copy, Share, Search, Bookmark. Link and the colour row need a selection that can be highlighted; Listen from here appears only on text with a recording.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

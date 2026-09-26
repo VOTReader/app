@@ -1,0 +1,89 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script><script src="rd-icons.js"></script>
+<link rel="stylesheet" href="rd-common.css">
+<style>
+  /* Wide screen: FootnoteSheet in rail mode (useRailMode). The sheet docks beside the reading column as a
+     non-modal panel: no scrim, no focus trap, the letter stays live and the tapped bubble stays lit. */
+  .wide { position: relative; width: 1280px; height: 800px; overflow: hidden; background: var(--bg); display: flex; flex-direction: column; }
+  .wide .topbar { height: 60px; padding: 0 20px 0 12px; flex: none; }
+  .wide .topbar .navlabel { padding-left: 2px; }
+  .wide .topbar .spacer { flex: 1; }
+  .panes { flex: 1; min-height: 0; display: flex; }
+  .left { width: 856px; flex: none; position: relative; overflow: hidden; margin-bottom: 18px; } /* ends at the bar's lower edge */
+  .left .rp { padding: 0 108px; }
+  .col { width: 640px; margin: 0 auto; padding-top: 18px; }
+  .col .display { font-size: 42px; margin-top: 8px; }
+  .col .ded { font-size: 17px; }
+  .col .reading { font-size: 20px; line-height: 1.65; margin-top: 20px; }
+  .col .reading p + p { margin-top: 16px; }
+  .col .reading .fn { width: 18px; height: 18px; border-radius: 9px; font-size: 11px; }
+  /* the rail */
+  .rail { position: absolute; top: 106px; right: 24px; width: 376px; background: var(--surface); border-radius: 22px; padding: 14px 20px 22px;
+    box-shadow: 0 0 0 1px var(--hairline), 0 10px 28px rgba(0,0,0,0.28); }
+  [data-theme="light"] .rail { box-shadow: 0 0 0 1px var(--hairline), 0 10px 28px rgba(60,40,20,0.10); }
+  .rail .fnhead { gap: 8px; }
+  .rail .fnhead .meta { flex: 1; }
+  .rail .rbtn { width: 40px; height: 40px; border-radius: 20px; }
+  .xbtn { width: 40px; height: 40px; border-radius: 20px; display: grid; place-items: center; color: var(--text-2); margin-right: -6px; }
+  .rail .verse { font-size: 19px; }
+  .wide .readbar { left: 148px; right: auto; width: 560px; bottom: 0; }
+</style></head>
+<body data-size="1280x800">
+<div class="wide">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="navlabel">Volume Two</span>
+    <span class="spacer"></span>
+    <span class="iconbtn"><i data-i="search"></i></span>
+    <span class="iconbtn"><i data-i="headphones"></i></span>
+    <span class="iconbtn"><i data-i="bookmark"></i></span>
+    <span class="tabcount">1</span>
+  </div>
+  <div class="panes">
+    <div class="left">
+      <div class="rp"><div class="bar"><i style="width:6%"></i></div><span class="pc">6%</span></div>
+      <div class="col lt">
+        <div class="meta ctx">Volume Two · Letter 4 · 4/18/05</div>
+        <div class="display">I Am The Passover and The Lamb, The New Covenant with Men</div>
+        <div class="lrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+        <div class="divider"></div>
+        <div class="ded">
+          <div class="from">From YahuShua HaMashiach, Our Lord and Savior</div>
+          <div>The Word of The Lord Spoken to Timothy</div>
+          <div>For All Those Who Have Ears to Hear</div>
+        </div>
+        <div class="reading">
+          <p><span class="lead">Thus says The Messiah who is called Christ, The Holy One of Israel:</span> I am The Lamb of God without spot or blemish, the blood which was shed and placed upon the doorposts,<span class="fn">1</span> delivering My people from the power of sin,<span class="fn">2</span> which is death.<span class="fn">3</span> I am The Passover.<span class="fn on">4</span></p>
+          <p>For as it is written in The Law, all things must be purified with blood, and without the shedding of blood there can be no remission.<span class="fn">5</span> Thus no one goes to The Father, unless they receive of Me. Unless they eat My flesh and drink My blood, they have no life in them. For whosoever eats My flesh and drinks My blood has everlasting life, and I will raise them up at the Last Day. For My flesh is food indeed, and My blood is drink indeed. Thus all who eat My flesh and drink My blood live in Me, and I in them.</p>
+          <p>I am The Living Bread which came down from Heaven! If anyone eats this bread, he will live forever! And the bread that I gave was My flesh, which was given for the life of the world. This I have already told you.<span class="fn">6</span> Therefore keep the Passover in remembrance of Me and My Passion, according to The New Covenant.<span class="fn">7</span></p>
+        </div>
+      </div>
+      <div class="readbar">
+        <span class="rb pn prev"><i data-i="chevron-left"></i><span class="pt"><b>Previous</b><span>Letter 3</span></span></span>
+        <span class="sep"></span>
+        <span class="rb"><i data-i="type"></i>Text</span>
+        <span class="rb"><i data-i="bookmark"></i>Save</span>
+        <span class="rb"><i data-i="share-2"></i>Share</span>
+        <span class="sep"></span>
+        <span class="rb pn next"><span class="pt"><b>Next</b><span>Letter 5</span></span><i data-i="chevron-right"></i></span>
+      </div>
+    </div>
+  </div>
+
+  <aside class="rail">
+    <div class="fnhead">
+      <span class="meta">Footnote 4 of 12</span>
+      <span class="navs"><span class="rbtn"><i data-i="chevron-left" class="sm"></i></span><span class="rbtn"><i data-i="chevron-right" class="sm"></i></span></span>
+      <span class="xbtn"><i data-i="x" class="sm"></i></span>
+    </div>
+    <div class="refrow"><span class="h2">1 Corinthians 5:7</span><span class="chip small">NKJV<i data-i="chevron-down" class="xs"></i></span></div>
+    <div class="meta cited">Cited in Volume Two · Letter 4</div>
+    <div class="reading verse"><p>Therefore purge out the old leaven, that you may be a new lump, since you truly are unleavened. For indeed Christ, our Passover, was sacrificed for us.</p></div>
+    <div class="acts">
+      <span class="btn primary block">Open 1 Corinthians 5</span>
+      <span class="btn secondary block"><i data-i="copy" class="sm"></i>Copy</span>
+    </div>
+  </aside>
+</div>
+</body></html>

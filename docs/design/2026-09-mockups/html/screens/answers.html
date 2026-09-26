@@ -1,0 +1,52 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .intro { padding-top: 4px; }
+  .intro .body { margin-top: 10px; }
+  .scroll > .search { margin-top: 20px; }
+  .sect { margin: 26px 0 12px; }
+  /* two tablets: I-V down the left, VI-X down the right */
+  .cmds { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(5, 52px); grid-auto-flow: column; gap: 8px; }
+  .cmd { display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; background: var(--surface); border-radius: 16px; min-width: 0; }
+  [data-theme="light"] .cmd { box-shadow: 0 1px 2px rgba(60,40,20,0.05); }
+  .cmd .rn { width: 40px; flex: none; text-align: center; font: 500 20px/1 var(--serif); color: var(--accent); }
+  .cmd .nm { font: 400 14px/1.2 var(--sans); color: var(--text); white-space: nowrap; }
+  .ttl { display: block; font: 500 17px/1.25 var(--serif); color: var(--text); }
+  .row .meta { display: block; margin-top: 3px; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+  </div>
+  <div class="scroll">
+    <div class="intro">
+      <div class="h1">Answers Only God Can Give</div>
+      <div class="body">The Lord sets the record straight concerning topics, doctrines and traditions.</div>
+    </div>
+    <div class="search"><i data-i="search" class="sm"></i>Search the topics</div>
+
+    <div class="label sect">The Ten Commandments</div>
+    <div class="cmds">
+      <div class="cmd"><span class="rn">I</span><span class="nm">No other gods</span></div>
+      <div class="cmd"><span class="rn">II</span><span class="nm">No idols</span></div>
+      <div class="cmd"><span class="rn">III</span><span class="nm">His name in vain</span></div>
+      <div class="cmd"><span class="rn">IV</span><span class="nm">The Sabbath</span></div>
+      <div class="cmd"><span class="rn">V</span><span class="nm">Honor parents</span></div>
+      <div class="cmd"><span class="rn">VI</span><span class="nm">Do not murder</span></div>
+      <div class="cmd"><span class="rn">VII</span><span class="nm">No adultery</span></div>
+      <div class="cmd"><span class="rn">VIII</span><span class="nm">Do not steal</span></div>
+      <div class="cmd"><span class="rn">IX</span><span class="nm">No false witness</span></div>
+      <div class="cmd"><span class="rn">X</span><span class="nm">Do not covet</span></div>
+    </div>
+
+    <div class="label sect">Browse by subject · 102 topics</div>
+    <div class="list">
+      <div class="row"><span class="txt"><span class="ttl">The Lord &amp; His Messiah</span><span class="meta">13 topics</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row"><span class="txt"><span class="ttl">His Word &amp; His Prophets</span><span class="meta">10 topics</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+      <div class="row"><span class="txt"><span class="ttl">Sin, Repentance &amp; Salvation</span><span class="meta">8 topics</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+    </div>
+  </div>
+</div>
+</body></html>

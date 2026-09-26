@@ -1,0 +1,52 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* scripture-genre: the books of one genre (ScriptureGenre.jsx) */
+  .intro { padding-top: 8px; }
+  .intro .h1 { margin-top: 4px; }
+  .intro .meta { margin-top: 6px; }
+  .books { margin-top: 26px; }
+  .books .row { min-height: 76px; }
+  .ttl { display: block; font: 500 21px/1.2 var(--serif); color: var(--text); }
+  .row .meta.sub { display: block; margin-top: 3px; }
+  .count { flex: none; text-align: right; font: 400 13px/1.3 var(--sans); color: var(--text-3); }
+  .count b { display: block; font: 700 17px/1.1 var(--sans); color: var(--text-2); }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Scriptures</span>
+  </div>
+  <div class="scroll">
+    <div class="intro">
+      <div class="eyebrow">New Testament</div>
+      <div class="h1">Gospels</div>
+      <div class="meta">4 books · 89 chapters</div>
+    </div>
+    <div class="list books">
+      <div class="row">
+        <span class="txt"><span class="ttl">Matthew</span><span class="meta sub">The Gospel of Matthew</span></span>
+        <span class="count"><b>28</b>chapters</span>
+        <i data-i="chevron-right" class="chev sm"></i>
+      </div>
+      <div class="row">
+        <span class="txt"><span class="ttl">Mark</span><span class="meta sub">The Gospel of Mark</span></span>
+        <span class="count"><b>16</b>chapters</span>
+        <i data-i="chevron-right" class="chev sm"></i>
+      </div>
+      <div class="row">
+        <span class="txt"><span class="ttl">Luke</span><span class="meta sub">The Gospel of Luke</span></span>
+        <span class="count"><b>24</b>chapters</span>
+        <i data-i="chevron-right" class="chev sm"></i>
+      </div>
+      <div class="row">
+        <span class="txt"><span class="ttl">John</span><span class="meta sub">The Gospel of John</span></span>
+        <span class="count"><b>21</b>chapters</span>
+        <i data-i="chevron-right" class="chev sm"></i>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

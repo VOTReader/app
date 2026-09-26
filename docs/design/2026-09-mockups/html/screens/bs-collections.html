@@ -1,0 +1,238 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* vot-flock-index / vot-timothy-index / vot-rebuke-index (VolumeLetterIndex.jsx),
+     the same list the approved Volume One index uses. */
+  .idx { padding-top: 8px; }
+  .hdr { margin: 0 calc(-1 * var(--gutter)); padding: 0 var(--gutter) 22px; border-bottom: 1px solid var(--hairline); }
+  .hdr .h1 { margin-top: 4px; }
+  .hdr .meta.sub { margin-top: 6px; }
+  .playrow { display: flex; align-items: center; gap: 16px; margin-top: 22px; }
+  .prog { flex: 1; min-width: 0; }
+  .prog .progress { margin-top: 7px; }
+  .letters { margin-top: 16px; border-radius: 16px 16px 0 0; }
+  .letters.mid { margin-top: 0; border-radius: 0; }
+  .letters .item { align-items: flex-start; gap: 12px; padding: 19px 16px 19px 14px; }
+  .num { width: 62px; flex: none; padding-top: 2px; }
+  .num b { display: flex; align-items: center; gap: 7px; font: 700 15px/1.2 var(--sans); color: var(--text-3); }
+  .num .d { display: block; margin-top: 3px; font: 400 12px/1.3 var(--sans); color: var(--text-3); }
+  .num .pre { display: flex; align-items: center; gap: 7px; font: 700 13px/1.2 var(--sans); color: var(--text-3); padding-top: 2px; }
+  .rd { width: 7px; height: 7px; border-radius: 4px; background: var(--accent); flex: none; }
+  .ttl { flex: 1; min-width: 0; font: 500 18px/1.28 var(--serif); color: var(--text); text-wrap: pretty; }
+  .dur { flex: none; padding-top: 3px; font: 400 13px/1.35 var(--sans); color: var(--text-3); white-space: nowrap; }
+  .item.cur { background: var(--accent-soft); }
+  .item.cur .pill { margin-top: 12px; }
+  .sbar { position: absolute; right: 4px; width: 3px; border-radius: 2px; background: var(--text-3); opacity: .35; }
+</style></head>
+<body data-size="1060x874">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">The letter collections</div>
+    <div class="meta">Letters to The Lord's Little Flock, Letters from Timothy and The Lord's Rebuke: each opens on its preface, then its letters in order.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(3, 309px)">
+
+    <!-- Little Flock: early in the collection -->
+    <div class="cell">
+      <div class="cap">vot-flock-index<small>Preface and the first letters read; the next is in progress.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="title">The Volumes of Truth</span>
+        </div>
+        <div class="scroll idx">
+          <div class="hdr">
+            <div class="eyebrow">The Volumes of Truth</div>
+            <div class="h1">Letters to The Lord's Little Flock</div>
+            <div class="meta sub">61 letters · 2004–2022</div>
+            <div class="playrow">
+              <span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Play all</span>
+              <div class="prog"><span class="meta">2 of 61 read</span><div class="progress"><i style="width:4%"></i></div></div>
+            </div>
+          </div>
+          <div class="group letters">
+            <div class="item">
+              <div class="num"><span class="pre">Preface<span class="rd"></span></span></div>
+              <div class="ttl">Be My Examples</div>
+              <div class="dur">~1 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>1<span class="rd"></span></b><span class="d">11/14/04</span></div>
+              <div class="ttl">Seek The Light Only</div>
+              <div class="dur">~1 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>2<span class="rd"></span></b><span class="d">11/18/04</span></div>
+              <div class="ttl">Adorn Yourself with The Word of God</div>
+              <div class="dur">~2 min</div>
+            </div>
+            <div class="item cur">
+              <div class="num"><b>3</b><span class="d">4/18/05</span></div>
+              <div class="ttl">All Things Were Ordained from the Beginning; No Other Name Is Given By Which You Must Be Saved<div><span class="pill">Reading · 40%</span></div></div>
+              <div class="dur">~2 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>4</b><span class="d">4/27/05</span></div>
+              <div class="ttl">Even to Children Is The Spirit Given</div>
+              <div class="dur">~1 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>5</b><span class="d">5/4/05</span></div>
+              <div class="ttl">In Due Time</div>
+              <div class="dur">~1 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>6</b><span class="d">7/2/05</span></div>
+              <div class="ttl">Discord</div>
+              <div class="dur">~1 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>7</b><span class="d">8/4/05</span></div>
+              <div class="ttl">All Things Fulfilled and Restored in The Kingdom</div>
+              <div class="dur">~1 min</div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- Timothy: not started -->
+    <div class="cell">
+      <div class="cap">vot-timothy-index<small>Nothing read yet.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="title">The Volumes of Truth</span>
+        </div>
+        <div class="scroll idx">
+          <div class="hdr">
+            <div class="eyebrow">The Volumes of Truth</div>
+            <div class="h1">Letters from Timothy</div>
+            <div class="meta sub">14 letters · 2005–2014</div>
+            <div class="playrow">
+              <span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Play all</span>
+              <div class="prog"><span class="meta">0 of 14 read</span><div class="progress"><i style="width:0%"></i></div></div>
+            </div>
+          </div>
+          <div class="group letters">
+            <div class="item">
+              <div class="num"><span class="pre">Preface</span></div>
+              <div class="ttl">Put All Your Trust in The Holy One</div>
+              <div class="dur">~1 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>1</b><span class="d">6/22/05</span></div>
+              <div class="ttl">Timothy’s Vision of YahuShua (Jesus) Standing upon the World</div>
+              <div class="dur">~1 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>2</b><span class="d">6/22/05</span></div>
+              <div class="ttl">The Shadow of The Almighty</div>
+              <div class="dur">~1 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>3</b><span class="d">7/10/05</span></div>
+              <div class="ttl">Stealing from the Power of the Cross</div>
+              <div class="dur">~1 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>4</b><span class="d">1/18/06</span></div>
+              <div class="ttl">The Origin of Life</div>
+              <div class="dur">~2 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>5</b><span class="d">2/6/06</span></div>
+              <div class="ttl">YahuShua HaMashiach Is King</div>
+              <div class="dur">~2 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>6</b><span class="d">4/11/06</span></div>
+              <div class="ttl">My Redeemer Lives</div>
+              <div class="dur">~5 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>7</b><span class="d">1/26/07</span></div>
+              <div class="ttl">Tithing</div>
+              <div class="dur">~1 min</div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- Rebuke: scrolled to the reader's place -->
+    <div class="cell">
+      <div class="cap">vot-rebuke-index<small>Header pinned; the list opens at the letter in progress.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="title">The Volumes of Truth</span>
+        </div>
+        <div class="scroll idx">
+          <div class="hdr">
+            <div class="eyebrow">A Testament Against The World</div>
+            <div class="h1">The Lord's Rebuke</div>
+            <div class="meta sub">30 letters · 2011–2022</div>
+            <div class="playrow">
+              <span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Play all</span>
+              <div class="prog"><span class="meta">12 of 30 read</span><div class="progress"><i style="width:40%"></i></div></div>
+            </div>
+          </div>
+          <div class="group letters mid">
+            <div class="item">
+              <div class="num"><b>10<span class="rd"></span></b><span class="d">5/6/11</span></div>
+              <div class="ttl">The Breach</div>
+              <div class="dur">~1 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>11<span class="rd"></span></b><span class="d">5/6/11</span></div>
+              <div class="ttl">Wrath and Recompense</div>
+              <div class="dur">~1 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>12<span class="rd"></span></b><span class="d">5/27/11</span></div>
+              <div class="ttl">The Generation of Wrath</div>
+              <div class="dur">~5 min</div>
+            </div>
+            <div class="item cur">
+              <div class="num"><b>13</b><span class="d">6/6/11</span></div>
+              <div class="ttl">Spiritual Famine<div><span class="pill">Reading · 40%</span></div></div>
+              <div class="dur">~3 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>14</b><span class="d">6/8/11</span></div>
+              <div class="ttl">I AM LORD</div>
+              <div class="dur">~2 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>15</b><span class="d">6/11/11</span></div>
+              <div class="ttl">The Power and the Majesty of The Lord</div>
+              <div class="dur">~2 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>16</b><span class="d">6/25/11</span></div>
+              <div class="ttl">The Days of the Martyred Prophets Are at an End</div>
+              <div class="dur">~2 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>17</b><span class="d">7/2/11</span></div>
+              <div class="ttl">REVOKED</div>
+              <div class="dur">~3 min</div>
+            </div>
+            <div class="item">
+              <div class="num"><b>18</b><span class="d">7/26/11</span></div>
+              <div class="ttl">ABASEMENT</div>
+              <div class="dur">~7 min</div>
+            </div>
+          </div>
+        </div>
+        <div class="sbar" style="top:470px;height:120px"></div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,161 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lk-common.css"><script src="lk-icons.js"></script>
+<style>
+  .board-grid { grid-template-columns: repeat(5, 256px) 400px; }
+  .pk-find .search { padding-right: 10px; }
+  .stackc { display: flex; flex-direction: column; gap: 22px; }
+  .vari { display: flex; flex-direction: column; gap: 8px; }
+  .vari .row2 { display: flex; flex-direction: column; gap: 4px; }
+  .vari .when { font: 400 12px/1.3 var(--sans); color: var(--text-3); }
+  .crumbx { display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border-radius: 12px; background: var(--surface); font: 400 13px/1.3 var(--sans); color: var(--text-3); }
+  .crumbx b { font-weight: 700; color: var(--text-2); }
+  .findx { display: flex; flex-direction: column; gap: 6px; }
+  .findx .search { height: 40px; border-radius: 12px; font-size: 14px; }
+  .footx { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .footx .btn { height: 38px; border-radius: 19px; font-size: 12.5px; padding: 0 8px; white-space: nowrap; }
+  .footx .wide { grid-column: span 2; }
+  .entry p { text-align: center; }
+</style></head>
+<body data-size="1880x762">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Select Text: excerpt picker states</div>
+    <div class="meta">LetterExcerptPickerScreen.jsx · a Words To Live By entry, a Bible study chapter, the Journal's insert mode, a search that finds nothing, a letter that can't be found, and every wording that changes</div>
+  </div>
+  <div class="board-grid">
+
+    <!-- 1 whole entry -->
+    <div class="cell">
+      <div class="cap">A whole entry<small>Words To Live By · nothing held</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Select Text</span></div>
+        <div class="pk-crumb"><i data-i="link" class="xs"></i>Linking from <b>John 3:3</b></div>
+        <div class="pk-body">
+          <div class="pk-hero"><div class="h1">Be Born Again</div><div class="meta">Words To Live By: Part Two</div></div>
+          <div class="pk-find"><div class="search"><i data-i="search" class="sm"></i>Find in this entry…</div></div>
+          <div class="pk-hint"><i data-i="lk-text-select" class="sm"></i>Long-press and drag to select an excerpt — or use the button below to link the whole entry.</div>
+          <div class="pk-letter entry">
+            <p>Repent in sincerity and in truth...</p>
+            <p class="poem" style="font-style:normal">Return to your First Love,
+Walk in the first works;
+Embrace The Word of God anew,
+Bringing forth works worthy of repentance...</p>
+            <p>That you may truly be born again...</p>
+            <p>Says The Lord.</p>
+          </div>
+        </div>
+        <div class="pk-foot"><span class="btn primary">Link the whole entry</span></div>
+      </div></div>
+    </div>
+
+    <!-- 2 whole chapter -->
+    <div class="cell">
+      <div class="cap">A whole chapter<small>A Bible study chapter · nothing held</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Select Text</span></div>
+        <div class="pk-crumb"><i data-i="link" class="xs"></i>Linking from <b>John 3:3</b></div>
+        <div class="pk-body">
+          <div class="pk-hero"><div class="h1">Purity Part Three: True Repentance</div><div class="meta">Purity - Bible/Letter Study</div></div>
+          <div class="pk-find"><div class="search"><i data-i="search" class="sm"></i>Find in this chapter…</div></div>
+          <div class="pk-hint"><i data-i="lk-text-select" class="sm"></i>Long-press and drag to select an excerpt — or use the button below to link the whole chapter.</div>
+          <div class="pk-letter">
+            <p>If we confess our sins, He is faithful and just to forgive us our sins and to cleanse us from all unrighteousness. <em>(1 John 1:9)</em></p>
+            <p>· <em>What is true repentance? True repentance is two-fold: First, we must acknowledge our sin, and repent, asking The Lord for forgiveness. Second, we must strive toward purity, and endeavor to no longer sin. Both are required for true repentance.</em></p>
+            <p><span class="lead">Bear fruit in keeping with repentance</span>. <em>(Matthew 3:8)</em></p>
+          </div>
+        </div>
+        <div class="pk-foot"><span class="btn primary">Link the whole chapter</span></div>
+      </div></div>
+    </div>
+
+    <!-- 3 journal insert -->
+    <div class="cell">
+      <div class="cap">From the Journal<small>Insert; long excerpts preview 77 characters</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Select Text</span></div>
+        <div class="pk-crumb"><i data-i="notebook-pen" class="xs"></i>Choose text to insert</div>
+        <div class="pk-body">
+          <div class="pk-hero"><div class="h1">Know That Which Has Been Poured Out, The Word of God</div><div class="meta">Volume One</div></div>
+          <div class="pk-find"><div class="search"><i data-i="search" class="sm"></i>Find in this letter…</div></div>
+          <div class="pk-prev">“Like a gemstone shining in the midst of all this darkness, easily found by th…”</div>
+          <div class="pk-letter">
+            <p><span class="lead">Thus says The Lord:</span> How is it you have not recognized that which comes from The Father? For that which is of the devil is made plain and surrounds you on every side. Therefore the things of God become that much more precious, even as you, My son, are most precious in My sight... <em><span class="lk-handle a"></span><mark class="lk-sel">Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God</mark><span class="lk-handle b"></span>, so shall you be in the day you surrender your life, the day you give up this fight and return to Me.</em> Do you not understand that I have saved you?</p>
+          </div>
+        </div>
+        <div class="pk-foot"><span class="btn primary">Insert this excerpt</span></div>
+      </div></div>
+    </div>
+
+    <!-- 4 0 found -->
+    <div class="cell">
+      <div class="cap">Nothing found<small>‹ › rest until a word matches</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Select Text</span></div>
+        <div class="pk-crumb"><i data-i="link" class="xs"></i>Linking from <b>John 3:3</b></div>
+        <div class="pk-body">
+          <div class="pk-hero"><div class="h1">Born Again</div><div class="meta">Volume Three</div></div>
+          <div class="pk-find">
+            <div class="search"><i data-i="search" class="sm"></i><span class="typed">shepherd</span><span class="cnt">0 found</span></div>
+            <span class="rbtn off"><i data-i="chevron-left" class="sm"></i></span><span class="rbtn off"><i data-i="chevron-right" class="sm"></i></span>
+          </div>
+          <div class="pk-hint"><i data-i="lk-text-select" class="sm"></i>Long-press and drag to select an excerpt — or use the button below to link the whole letter.</div>
+          <div class="pk-letter">
+            <p><span class="lead">Thus says The Lord:</span> It is written, <em>that none shall enter The Kingdom of Heaven, unless they are born again. For all are born physically, of human parents, by great travail into a world of sin. So then to enter The Kingdom of Heaven, one must also be born again, of the Spirit,</em> set apart from this world and from all that is sin. My son, you are being born again even now, from the first moment you came to Me in repentance, even to this day.</p>
+          </div>
+        </div>
+        <div class="pk-foot"><span class="btn primary">Link the whole letter</span></div>
+      </div></div>
+    </div>
+
+    <!-- 5 not found -->
+    <div class="cell">
+      <div class="cap">Letter not found<small>The target no longer resolves</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Select Text to Link</span></div>
+        <div class="pk-body">
+          <div class="pk-empty">
+            <div class="ic"><i data-i="lk-file-x"></i></div>
+            <div class="h3">Letter not found.</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 6 wording -->
+    <div class="cell">
+      <div class="cap">The words that change<small>By mode, and by what is being excerpted</small></div>
+      <div class="stackc comp">
+        <div class="vari">
+          <div class="row2"><span class="when">Linking, with a source passage</span><div class="crumbx"><i data-i="link" class="xs"></i>Linking from <b>John 3:3</b></div></div>
+          <div class="row2"><span class="when">Linking, source has no label</span><div class="crumbx"><i data-i="link" class="xs"></i>Choose text to link</div></div>
+          <div class="row2"><span class="when">Journal · Embed an excerpt</span><div class="crumbx"><i data-i="notebook-pen" class="xs"></i>Choose text to insert</div></div>
+        </div>
+        <div class="vari">
+          <span class="when">Letter · entry · study chapter</span>
+          <div class="findx">
+            <div class="search"><i data-i="search" class="sm"></i>Find in this letter…</div>
+            <div class="search"><i data-i="search" class="sm"></i>Find in this entry…</div>
+            <div class="search"><i data-i="search" class="sm"></i>Find in this chapter…</div>
+          </div>
+        </div>
+        <div class="vari">
+          <span class="when">With an excerpt held · with nothing held</span>
+          <div class="footx">
+            <span class="btn primary">Link this excerpt</span><span class="btn primary">Insert this excerpt</span>
+            <span class="btn primary">Link the whole letter</span><span class="btn primary">Insert the whole letter</span>
+            <span class="btn primary">Link the whole entry</span><span class="btn primary">Insert the whole entry</span>
+            <span class="btn primary">Link the whole chapter</span><span class="btn primary">Insert the whole chapter</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

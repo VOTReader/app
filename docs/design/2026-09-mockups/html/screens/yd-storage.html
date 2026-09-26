@@ -1,0 +1,195 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="yd-common.css"><script src="../kit/kit.js"></script><script src="yd-icons.js"></script>
+<style>
+  /* the top of a phone: the band, then the page it pushes down */
+  .crop { position: relative; width: 412px; overflow: hidden; border-radius: 26px; background: var(--bg); box-shadow: 0 0 0 1px var(--hairline), var(--shadow); display: flex; flex-direction: column; padding-bottom: 22px; }
+  .crop .scroll { flex: none; }
+  .crop .lt, .phone-s .lt { padding-top: 0; }
+  .cell > .cap { min-height: 48px; }
+  .ycol.wide { width: 540px; }
+  .pair { display: flex; gap: 28px; }
+  .pair .cell > .cap { min-height: 0; }
+  .note { font: 400 12px/1.35 var(--sans); color: var(--text-3); margin-top: 6px; font-style: italic; }
+  /* Home, as screens/home.html draws it (behind the restore guard) */
+  .topbar.slim { height: 48px; padding-right: 12px; }
+  .topbar.slim .tabcount { margin: 0 0 0 4px; }
+  .lockup { text-align: center; }
+  .lockup .t1 { font: 500 26px/1.1 var(--serif); letter-spacing: -0.005em; color: var(--text); }
+  .lockup .t2 { font: italic 400 17px/1.25 var(--serif); color: var(--text-2); margin-top: 2px; }
+  .lockup .amp { font-style: normal; }
+  .home > .search { margin-top: 16px; }
+  .cont { margin-top: 12px; padding: 14px 16px; }
+  .cont .main { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
+  .cont .main .h3 { flex: 1; min-width: 0; text-wrap: pretty; }
+  .cont .foot { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+  .cont .foot .progress { flex: 1; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  .tile { height: 68px; padding: 0 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font: 400 12px/1.2 var(--sans); color: var(--text-2); white-space: nowrap; }
+  .tile .nudge { transform: translateY(-3px); }
+  .hcols { margin-top: 12px; }
+  .hcols .row { padding: 10px 16px; min-height: 60px; }
+  .hcols .ttl { display: block; font: 500 18px/1.2 var(--serif); color: var(--text); }
+  .hcols .meta { display: block; margin-top: 2px; }
+  .screen .toast.float { width: 372px; }
+</style></head>
+<body data-size="1500x1364">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Storage health · banners, write toast, restore guard</div>
+    <div class="meta">The banners are app-wide and hold the very top of the screen, above the page. Only the most urgent one shows; they are numbered by priority. None can be dismissed: they leave when the problem does.</div>
+  </div>
+
+  <div class="ycols">
+    <div class="ycol w412">
+      <div class="cell">
+        <div class="cap">1 · A newer version saved this library<small>This build cannot open the data; nothing is lost.</small></div>
+        <div class="crop">
+          <div class="band">
+            <div class="status"></div>
+            <div class="bn"><i data-i="yd-circle-arrow-up" class="sm"></i><div class="bt">Your library was saved by a newer version of VOTReader, so this version can’t open it. Nothing on this device has been lost: install the latest version. Changes you make here won’t be saved.</div></div>
+          </div>
+          <div class="topbar slim"><span class="iconbtn"><i data-i="yd-info"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="search"></i></span><span class="tabcount">1</span></div>
+          <div class="scroll home"><div class="lockup"><div class="t1">The Volumes of Truth</div><div class="t2"><span class="amp">&amp;</span> The Scriptures of Truth</div></div><div class="search"><i data-i="search" class="sm"></i>Search the library</div></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">3 · Private window<small>Safari with a private-sized quota. Nothing will outlive the window.</small></div>
+        <div class="crop">
+          <div class="band">
+            <div class="status"></div>
+            <div class="bn"><i data-i="yd-eye-off" class="sm"></i><div class="bt">You’re in a private window. Nothing you save here will be kept when you close it.</div></div>
+          </div>
+          <div class="topbar slim"><span class="iconbtn"><i data-i="yd-info"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="search"></i></span><span class="tabcount">1</span></div>
+          <div class="scroll home"><div class="lockup"><div class="t1">The Volumes of Truth</div><div class="t2"><span class="amp">&amp;</span> The Scriptures of Truth</div></div><div class="search"><i data-i="search" class="sm"></i>Search the library</div></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">5 · Running low<small>80% used, or under 100 MB of room. Amber: a caution, not yet a loss.</small></div>
+        <div class="crop">
+          <div class="band warn">
+            <div class="status"></div>
+            <div class="bn"><i data-i="yd-hard-drive" class="sm"></i><div class="bt">Storage is running low — 50.0 MB remaining. New notes and recordings may not save.<div class="bnact"><span class="btn primary sm">Export data</span></div></div></div>
+          </div>
+          <div class="topbar slim"><span class="iconbtn"><i data-i="yd-info"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="search"></i></span><span class="tabcount">1</span></div>
+          <div class="scroll home"><div class="lockup"><div class="t1">The Volumes of Truth</div><div class="t2"><span class="amp">&amp;</span> The Scriptures of Truth</div></div><div class="search"><i data-i="search" class="sm"></i>Search the library</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ycol w412">
+      <div class="cell">
+        <div class="cap">2 · Last change not saved<small>A save failed with storage full. Export now opens Your Data.</small></div>
+        <div class="crop">
+          <div class="band">
+            <div class="status"></div>
+            <div class="bn"><i data-i="yd-save-off" class="sm"></i><div class="bt">Your last change couldn’t be saved — storage is full. Your work is still on screen but won’t be kept if you close the app. Export your data now.<div class="bnact"><span class="btn primary sm">Export now</span></div></div></div>
+          </div>
+          <div class="topbar slim"><span class="iconbtn"><i data-i="yd-info"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="search"></i></span><span class="tabcount">1</span></div>
+          <div class="scroll home"><div class="lockup"><div class="t1">The Volumes of Truth</div><div class="t2"><span class="amp">&amp;</span> The Scriptures of Truth</div></div><div class="search"><i data-i="search" class="sm"></i>Search the library</div></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">4 · Almost full<small>95% used, or under 50 MB of room.</small></div>
+        <div class="crop">
+          <div class="band">
+            <div class="status"></div>
+            <div class="bn"><i data-i="yd-hard-drive" class="sm"></i><div class="bt">Storage is almost full — 10.0 MB remaining. Your data may not save. Export now to avoid losing it.<div class="bnact"><span class="btn primary sm">Export now</span></div></div></div>
+          </div>
+          <div class="topbar slim"><span class="iconbtn"><i data-i="yd-info"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="search"></i></span><span class="tabcount">1</span></div>
+          <div class="scroll home"><div class="lockup"><div class="t1">The Volumes of Truth</div><div class="t2"><span class="amp">&amp;</span> The Scriptures of Truth</div></div><div class="search"><i data-i="search" class="sm"></i>Search the library</div></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">6 · Slow to load<small>Lowest priority. Clears by itself once storage catches up.</small></div>
+        <div class="crop">
+          <div class="band warn">
+            <div class="status"></div>
+            <div class="bn"><i data-i="yd-hourglass" class="sm"></i><div class="bt">Storage is slow to load — recent changes are kept on screen and will be saved automatically once it catches up.</div></div>
+          </div>
+          <div class="topbar slim"><span class="iconbtn"><i data-i="yd-info"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="search"></i></span><span class="tabcount">1</span></div>
+          <div class="scroll home"><div class="lockup"><div class="t1">The Volumes of Truth</div><div class="t2"><span class="amp">&amp;</span> The Scriptures of Truth</div></div><div class="search"><i data-i="search" class="sm"></i>Search the library</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ycol wide">
+      <div class="cell">
+        <div class="cap">Storage write toast<small>6 s, the moment one change fails to save; at most once every 8 s however many fail. It names this change; the banner speaks for storage as a whole.</small></div>
+        <div class="toast"><i data-i="yd-circle-x" class="sm err"></i><span class="grow">Couldn’t save your last change — device storage may be full. Open Settings → Your Data, or export a backup.</span></div>
+        <div class="note">Label change: the app says “Settings → Storage”, a place Settings does not have.</div>
+      </div>
+      <div class="cell">
+        <div class="cap">Restore guard<small>At the first start after an import that stopped partway (a crash, a closed app, power loss). Stays on screen: the app gives it no way to close.</small></div>
+        <div class="toast"><i data-i="yd-archive-restore" class="sm warn"></i><span class="grow">Your last restore may not have finished. If anything looks missing, import your backup file again (Settings → Your Data).</span></div>
+      </div>
+      <div class="pair">
+        <div class="cell">
+          <div class="cap">A failed save, in place</div>
+          <div class="phone-s"><div class="screen">
+            <div class="band">
+              <div class="status"></div>
+              <div class="bn"><i data-i="yd-save-off" class="sm"></i><div class="bt">Your last change couldn’t be saved — storage is full. Your work is still on screen but won’t be kept if you close the app. Export your data now.<div class="bnact"><span class="btn primary sm">Export now</span></div></div></div>
+            </div>
+            <div class="rp"><div class="bar"><i style="width:28%"></i></div><span class="pc">28%</span></div>
+            <div class="scroll lt">
+              <div class="meta ctx">Volume One · Letter 15 · 12/13/04</div>
+              <div class="display">Know That Which Has Been Poured Out, The Word of God</div>
+              <div class="lrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen · 6 min</span></div>
+              <div class="divider"></div>
+              <div class="body-ph">
+                <div class="ph" style="width:96%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:88%"></div><div class="ph" style="width:94%"></div><div class="ph" style="width:52%"></div>
+                <div class="gap"></div>
+                <div class="ph" style="width:99%"></div><div class="ph" style="width:91%"></div><div class="ph" style="width:97%"></div>
+              </div>
+            </div>
+            <div class="toast float" style="bottom:96px"><i data-i="yd-circle-x" class="sm err"></i><span class="grow">Couldn’t save your last change — device storage may be full. Open Settings → Your Data, or export a backup.</span></div>
+            <div class="readbar">
+              <span class="rb pn prev"><i data-i="chevron-left"></i><span class="pt"><b>Previous</b><span>Letter 14</span></span></span>
+              <span class="sep"></span>
+              <span class="rb"><i data-i="type"></i>Text</span>
+              <span class="rb"><i data-i="bookmark"></i>Save</span>
+              <span class="rb"><i data-i="share-2"></i>Share</span>
+              <span class="sep"></span>
+              <span class="rb pn next"><span class="pt"><b>Next</b><span>Letter 16</span></span><i data-i="chevron-right"></i></span>
+            </div>
+          </div></div>
+        </div>
+        <div class="cell">
+          <div class="cap">The restore guard, at start</div>
+          <div class="phone-s"><div class="screen">
+            <div class="status"></div>
+            <div class="topbar slim"><span class="iconbtn"><i data-i="yd-info"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="search"></i></span><span class="tabcount">1</span></div>
+            <div class="scroll home">
+              <div class="lockup"><div class="t1">The Volumes of Truth</div><div class="t2"><span class="amp">&amp;</span> The Scriptures of Truth</div></div>
+              <div class="search"><i data-i="search" class="sm"></i>Search the library</div>
+              <div class="card cont">
+                <div class="meta">Continue reading</div>
+                <div class="meta">Volume One · Letter 15</div>
+                <div class="main"><div class="h3">Know That Which Has Been Poured Out, The Word of God</div><span class="btn primary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+                <div class="foot"><div class="progress"><i style="width:40%"></i></div><span class="meta">40%</span></div>
+              </div>
+              <div class="tiles">
+                <div class="card tile"><i data-i="history"></i>Recent</div>
+                <div class="card tile"><i data-i="notebook-pen"></i>Notes</div>
+                <div class="card tile"><i data-i="bookmark"></i>Bookmarks</div>
+                <div class="card tile"><i data-i="scripture-web" class="nudge"></i>Scripture Web</div>
+              </div>
+              <div class="list hcols">
+                <div class="row"><span class="txt"><span class="ttl">The Volumes of Truth</span><span class="meta">7 volumes · 244 letters</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+                <div class="row"><span class="txt"><span class="ttl">The Scriptures of Truth</span><span class="meta">Genesis to Revelation · NKJV</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+                <div class="row"><span class="txt"><span class="ttl">Answers Only God Can Give</span><span class="meta">Topics and doctrines</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+                <div class="row"><span class="txt"><span class="ttl">Studies</span><span class="meta">Letter studies · Matthew Study Bible</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+                <div class="row"><span class="txt"><span class="ttl">Listening Library</span><span class="meta">The letters and scriptures, read aloud</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+                <div class="row"><span class="txt"><span class="ttl">Songs of the Letters</span><span class="meta">Sung by the flock</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+                <div class="row"><span class="txt"><span class="ttl">Library</span><span class="meta">Notes, journal &amp; bookmarks</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+                <div class="row"><span class="txt"><span class="ttl">Settings</span><span class="meta">Display, themes &amp; preferences</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+              </div>
+            </div>
+            <div class="toast float" style="bottom:28px"><i data-i="yd-archive-restore" class="sm warn"></i><span class="grow">Your last restore may not have finished. If anything looks missing, import your backup file again (Settings → Your Data).</span></div>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

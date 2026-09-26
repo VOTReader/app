@@ -1,0 +1,57 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="au-shared.css"><script src="../kit/kit.js"></script>
+<style>
+  .board-grid { grid-template-columns: repeat(4, 256px) 380px; column-gap: 30px; }
+  .ctl { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .ctl .btn { align-self: flex-start; } .ctl .btn .i { width: 20px; height: 20px; }
+  .chips.scrollx { margin: 2px calc(-1 * var(--gutter)) 0; padding: 0 var(--gutter); }
+  .chip .caret { font-size: 11px; margin-left: -2px; }
+  .search.typed { color: var(--text); } .search.typed .q { flex: 1; } .search.typed .i:last-child { color: var(--text-3); }
+  .au-sh.au-sh-mid { align-items: center; margin-top: 26px; }
+  .skl { margin-top: 26px; }
+  .sk { display: flex; align-items: center; gap: 14px; padding: 12px; }
+  .skc { width: 52px; height: 52px; border-radius: 10px; background: var(--surface-2); flex: none; }
+  .skt { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+  .skt .ph { display: block; margin: 0; }
+  .err { margin-top: 48px; display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
+  .err .body { color: var(--text-2); font-size: 17px; }
+  .empty { padding: 4px 2px 0; font: 400 15px/1.5 var(--sans); color: var(--text-3); }
+  .panel { background: var(--surface); border-radius: 16px; padding: 18px; }
+  [data-theme="light"] .panel { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .acts2 { display: flex; gap: 10px; }
+  .au-list.inset { background: var(--surface-2); }
+  .au-list.inset .au-rp { background: var(--surface-3); }
+  .au-list.inset .au-rp.on { background: var(--accent); }
+  .vr { display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 16px; min-height: 60px; }
+  .vr .vl { flex: 1; font: 400 16px/1.3 var(--sans); color: var(--text); }
+  .vr.cur { background: var(--accent-soft); }
+  .vr.cur .vl { font-weight: 700; }
+</style></head>
+<body data-size="1640x790">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Songs of the Letters · states</div>
+    <div class="meta">The hub while the catalog loads, when it cannot, filtered by a style, and a search that finds nothing; and the song page while its own song plays.</div>
+  </div>
+  <div class="board-grid">
+    <div class="cell"><div class="cap">Loading<small>Five quiet rows while the catalog arrives</small></div><div class="phone-s"><div class="screen"><div class="status"></div><div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Listening Library</span><span class="iconbtn"><i data-i="search"></i></span></div><div class="scroll"><div class="au-hero"><div class="eyebrow">Sung by the flock</div><div class="h1">Songs of the Letters</div><div class="body">Songs made by members of the flock with Suno, from the words of The Volumes of Truth.</div></div><div class="au-list skl"><div class="sk"><span class="skc"></span><span class="skt"><i class="ph" style="width:72%"></i><i class="ph" style="width:40%"></i></span></div><div class="sk"><span class="skc"></span><span class="skt"><i class="ph" style="width:58%"></i><i class="ph" style="width:46%"></i></span></div><div class="sk"><span class="skc"></span><span class="skt"><i class="ph" style="width:80%"></i><i class="ph" style="width:34%"></i></span></div><div class="sk"><span class="skc"></span><span class="skt"><i class="ph" style="width:64%"></i><i class="ph" style="width:50%"></i></span></div><div class="sk"><span class="skc"></span><span class="skt"><i class="ph" style="width:70%"></i><i class="ph" style="width:38%"></i></span></div></div></div></div></div></div>
+    <div class="cell"><div class="cap">First time, no connection<small>Try again asks for the catalog once more</small></div><div class="phone-s"><div class="screen"><div class="status"></div><div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Listening Library</span><span class="iconbtn"><i data-i="search"></i></span></div><div class="scroll"><div class="au-hero"><div class="eyebrow">Sung by the flock</div><div class="h1">Songs of the Letters</div><div class="body">Songs made by members of the flock with Suno, from the words of The Volumes of Truth.</div></div><div class="err"><div class="body">Songs need a connection the first time.</div><span class="btn secondary">Try again</span></div></div></div></div></div>
+    <div class="cell"><div class="cap">One style<small>Shuffle takes the style's name and count</small></div><div class="phone-s"><div class="screen"><div class="status"></div><div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Listening Library</span><span class="iconbtn"><i data-i="search"></i></span></div><div class="scroll"><div class="au-hero"><div class="eyebrow">Sung by the flock</div><div class="h1">Songs of the Letters</div><div class="body">Songs made by members of the flock with Suno, from the words of The Volumes of Truth.</div></div><div class="ctl"><span class="btn primary"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7h3.2c2.2 0 3.6 1 4.9 3l1.8 3c1.2 2 2.7 3 4.9 3h2.2M3.5 17h3.2c1.6 0 2.8-.5 3.8-1.6M14 8.6c1-1.1 2.2-1.6 3.8-1.6h2.7"/><path d="M18 4.5l2.5 2.5L18 9.5M18 14.5l2.5 2.5-2.5 2.5"/></svg>Shuffle Worship (224)</span><div class="search"><i data-i="search" class="sm"></i>Find a song, a letter, or a maker</div><div class="chips scrollx"><span class="chip">All</span><span class="chip on">Worship</span><span class="chip">Pop</span><span class="chip">Hip-hop</span><span class="chip">Cinematic</span><span class="chip">Folk</span><span class="chip">More<span class="caret">▾</span></span></div></div>
+  <div class="au-sh au-sh-mid"><div class="au-shc"><div class="h2">Worship</div></div><span class="meta">224 songs</span></div>
+  <div class="au-list"><div class="au-song"><span class="au-cover k6"></span><div class="au-cp"><div class="au-t">A Fire Behind Your Shame</div><div class="meta">Inspired by the letters</div></div><span class="au-len">8:02</span><span class="au-rp"><i data-i="play"></i></span></div><div class="au-song"><span class="au-cover k1"></span><div class="au-cp"><div class="au-t">A Kindled Fire</div><div class="meta">Letters from Timothy</div></div><span class="au-len">2:53</span><span class="au-rp"><i data-i="play"></i></span></div><div class="au-song"><span class="au-cover k2"></span><div class="au-cp"><div class="au-t">A Prayer for Guidance</div><div class="meta">Bible songs</div></div><span class="au-len">3:37</span><span class="au-rp"><i data-i="play"></i></span></div><div class="au-song"><span class="au-cover k3"></span><div class="au-cp"><div class="au-t">A Psalm of David</div><div class="meta">Words To Live By: Part One</div></div><span class="au-len">3:54</span><span class="au-rp"><i data-i="play"></i></span></div><div class="au-song"><span class="au-cover k5"></span><div class="au-cp"><div class="au-t">A Pure Heart</div><div class="meta">Words To Live By: Part Two</div></div><span class="au-len">4:54</span><span class="au-rp"><i data-i="play"></i></span></div></div></div></div></div></div>
+    <div class="cell"><div class="cap">Nothing found<small>Find looks through titles, versions, makers and letters</small></div><div class="phone-s"><div class="screen"><div class="status"></div><div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Listening Library</span><span class="iconbtn"><i data-i="search"></i></span></div><div class="scroll"><div class="au-hero"><div class="eyebrow">Sung by the flock</div><div class="h1">Songs of the Letters</div><div class="body">Songs made by members of the flock with Suno, from the words of The Volumes of Truth.</div></div><div class="ctl"><span class="btn primary"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7h3.2c2.2 0 3.6 1 4.9 3l1.8 3c1.2 2 2.7 3 4.9 3h2.2M3.5 17h3.2c1.6 0 2.8-.5 3.8-1.6M14 8.6c1-1.1 2.2-1.6 3.8-1.6h2.7"/><path d="M18 4.5l2.5 2.5L18 9.5M18 14.5l2.5 2.5-2.5 2.5"/></svg>Shuffle all songs</span><div class="search typed"><i data-i="search" class="sm"></i><span class="q">lighthouse</span><i data-i="x" class="sm"></i></div><div class="chips scrollx"><span class="chip on">All</span><span class="chip">Worship</span><span class="chip">Pop</span><span class="chip">Hip-hop</span><span class="chip">Cinematic</span><span class="chip">Folk</span><span class="chip">More<span class="caret">▾</span></span></div></div>
+  <div class="au-sh au-sh-mid"><div class="au-shc"><div class="h2">Songs</div></div><span class="meta">0 songs</span></div>
+  <div class="empty">No song by that name. Try a word from the letter.</div></div></div></div></div>
+    <div class="cell"><div class="cap">Song page · its song playing<small>Elect and Precious: Pause, and the playing version marked</small></div><div class="panel">
+  <div class="acts2"><span class="btn primary"><i data-i="pause" class="fill"></i>Pause</span><span class="btn secondary"><i data-i="star" class="fill" style="color:var(--accent)"></i>Saved</span></div>
+  <div class="h2" style="margin-top:22px">Versions</div>
+  <div class="au-list inset" style="margin-top:12px">
+    <div class="vr"><span class="vl">Cinematic · No. 3</span><span class="au-len">2:05</span><span class="au-rp"><i data-i="play"></i></span></div>
+    <div class="vr"><span class="vl">Folk · Pop</span><span class="au-len">3:28</span><span class="au-rp"><i data-i="play"></i></span></div>
+    <div class="vr"><span class="vl">Cinematic · No. 4</span><span class="au-len">2:44</span><span class="au-rp"><i data-i="play"></i></span></div>
+    <div class="vr cur"><span class="vl">Spoken · Cinematic</span><span class="au-len">1:16</span><span class="au-rp on"><i data-i="pause"></i></span></div>
+  </div>
+</div></div>
+  </div>
+</div>
+</body></html>

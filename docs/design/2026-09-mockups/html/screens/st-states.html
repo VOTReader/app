@@ -1,0 +1,154 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="st-settings.css"><script src="../kit/kit.js"></script>
+<style>
+  .cols { display: flex; gap: 32px; align-items: flex-start; }
+  .col { width: 412px; display: flex; flex-direction: column; gap: 30px; }
+  .frag { width: 412px; display: flex; flex-direction: column; gap: 12px; }
+  .frag .sect-l { margin: 0 2px -2px; }
+  .navset .set { padding: 12px 16px; }
+  .navset .ico { color: var(--text); }
+  /* skeleton of the progress table while the libraries load */
+  .skel { padding: 6px 0; }
+  .skrow { display: flex; align-items: center; gap: 12px; padding: 16px 16px 16px 14px; }
+  .skrow + .skrow { border-top: 1px solid var(--hairline); }
+  .skrow .dot { width: 18px; height: 18px; border-radius: 5px; background: var(--surface-3); }
+  .skrow .col2 { flex: 1; }
+  .skrow .ph + .ph { margin-top: 10px; }
+  .skrow .btnph { width: 46px; height: 14px; border-radius: 7px; background: var(--surface-3); }
+  .helpcard { text-align: center; padding: 22px 20px; }
+  .helpcard .body { text-wrap: balance; }
+  .helpcard .btn { margin-top: 16px; }
+</style></head>
+<body data-size="1380x1098">
+<!--st-icons--><svg xmlns="http://www.w3.org/2000/svg" style="display:none"><symbol id="i-sun-moon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8a2.83 2.83 0 0 0 4 4 4 4 0 1 1-4-4" /> <path d="M12 2v2" /> <path d="M12 20v2" /> <path d="m4.9 4.9 1.4 1.4" /> <path d="m17.7 17.7 1.4 1.4" /> <path d="M2 12h2" /> <path d="M20 12h2" /> <path d="m6.3 17.7-1.4 1.4" /> <path d="m19.1 4.9-1.4 1.4" /></symbol></svg><!--/st-icons-->
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Settings · what hides, what waits</div>
+    <div class="meta">A setting that depends on another is removed, not greyed, while the one above it is off, and it comes back when that one returns. Also shown: the progress table while the libraries load, an empty history, and the Help note when the tour cannot be asked for its count.</div>
+  </div>
+
+  <div class="cols">
+    <div class="col">
+      <div class="cell">
+        <div class="cap">Auto-Scroll off<small>The default. Scroll Speed, Auto-Continue and its pause are gone until it is on.</small></div>
+        <div class="frag"><div class="group">
+          <div class="set">
+            <div class="hd"><div class="txt"><div class="lbl">Auto-Scroll</div></div><span class="toggle"></span></div>
+            <div class="help">Adds a small play/pause pill to chapter and letter screens that scrolls the page for you at a steady reading pace. Touching the screen pauses it instantly; it picks back up a moment after you lift your finger. The pill fades out of the way while it runs.</div>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="cell">
+        <div class="cap">Auto-Continue off<small>Auto-Continue Pause means nothing without it, so it goes.</small></div>
+        <div class="frag"><div class="group">
+          <div class="set"><div class="hd"><div class="txt"><div class="lbl">Auto-Scroll</div></div><span class="toggle on"></span></div></div>
+          <div class="deps">
+            <div class="set">
+              <div class="hd"><div class="txt"><div class="lbl">Scroll Speed</div></div><span class="num">16 lines/min</span></div>
+              <div class="sl">
+                <div class="slc">
+                  <div class="track"><div class="slider"><i style="width:33.3%"></i><b style="left:33.3%"></b></div></div>
+                  <div class="scale"><span>4</span><span>40 lines/min</span></div>
+                </div>
+                <span class="btn text sm is-off">Reset</span>
+              </div>
+            </div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Auto-Continue</div></div><span class="toggle"></span></div></div>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="cell">
+        <div class="cap">Read-Along Highlight off<small>With no wash there is nothing to follow: Follow the Voice goes. Turn the Page stays.</small></div>
+        <div class="frag"><div class="group">
+          <div class="set">
+            <div class="hd"><div class="txt"><div class="lbl">Read-Along Highlight</div></div><span class="toggle"></span></div>
+            <div class="help">While a recorded letter is playing, softly wash the sentence being read so your eye can follow the voice. It uses the timings that ship with the app; letters that don’t have them simply play as before.</div>
+          </div>
+          <div class="set"><div class="hd"><div class="txt"><div class="lbl">Turn the Page with the Audio</div></div><span class="toggle on"></span></div></div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="cell">
+        <div class="cap">Search off<small>Synonym Search and Filter Stop Words go with it.</small></div>
+        <div class="frag"><div class="group">
+          <div class="set">
+            <div class="hd"><div class="txt"><div class="lbl">Search</div></div><span class="toggle"></span></div>
+            <div class="help">Full-text search across all 66 books + Volumes. When off, the search button is hidden everywhere.</div>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="cell">
+        <div class="cap">History off<small>Recording stops and its list is kept. The History icon also leaves Top-Nav Buttons.</small></div>
+        <div class="frag">
+          <div class="group">
+            <div class="set">
+              <div class="hd"><div class="txt"><div class="lbl">History</div></div><span class="toggle"></span></div>
+              <div class="help">Keep a running list of chapters and letters you’ve visited. When off, recording stops and the history button is hidden. Existing history is preserved.</div>
+            </div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Reading history</div><div class="val">86 entries</div></div><span class="btn warn sm">Clear History</span></div></div>
+          </div>
+          <div class="label sect-l">Top-Nav Buttons</div>
+          <div class="group navset">
+            <div class="set"><div class="hd"><span class="ico"><i data-i="settings" class="sm"></i></span><div class="txt"><div class="lbl">Settings Gear</div></div><span class="toggle on"></span></div></div>
+            <div class="set"><div class="hd"><span class="ico"><i data-i="bookmark" class="sm"></i></span><div class="txt"><div class="lbl">Bookmark</div></div><span class="toggle on"></span></div></div>
+            <div class="set"><div class="hd"><span class="ico"><i data-i="sun-moon" class="sm"></i></span><div class="txt"><div class="lbl">Theme</div></div><span class="toggle on"></span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="cap">Titles and headings both off<small>Restored Names only ever appears in them, so it goes until either returns.</small></div>
+        <div class="frag"><div class="group">
+          <div class="set"><div class="hd"><div class="txt"><div class="lbl">Chapter Titles</div></div><span class="toggle"></span></div></div>
+          <div class="set"><div class="hd"><div class="txt"><div class="lbl">Section Headings</div></div><span class="toggle"></span></div></div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="cell">
+        <div class="cap">Mark as Read off<small>The progress table goes; what is saved stays.</small></div>
+        <div class="frag"><div class="group">
+          <div class="set">
+            <div class="hd"><div class="txt"><div class="lbl">Mark as Read</div></div><span class="toggle"></span></div>
+            <div class="help">Chapters and letters are checked off automatically once you’ve genuinely read them — nearly all of the text seen, for about as long as reading it takes. A quick scroll to the bottom doesn’t count. Re-reads add a small ×2, ×3 beside the check. Progress stops recording when this is off, but what’s already saved is kept.</div>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="cell">
+        <div class="cap">Progress table loading<small>The table counts the whole library, which loads only when this group opens.</small></div>
+        <div class="frag">
+          <div class="label sect-l">Reading progress by book</div>
+          <div class="group skel">
+            <div class="skrow"><span class="dot"></span><div class="col2"><div class="ph" style="width:58%"></div><div class="ph" style="width:86%;height:4px"></div></div><span class="btnph"></span></div>
+            <div class="skrow"><span class="dot"></span><div class="col2"><div class="ph" style="width:44%"></div><div class="ph" style="width:86%;height:4px"></div></div><span class="btnph"></span></div>
+            <div class="skrow"><span class="dot"></span><div class="col2"><div class="ph" style="width:47%"></div><div class="ph" style="width:86%;height:4px"></div></div><span class="btnph"></span></div>
+            <div class="skrow"><span class="dot"></span><div class="col2"><div class="ph" style="width:30%"></div><div class="ph" style="width:86%;height:4px"></div></div><span class="btnph"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="cap">No reading history yet<small>Nothing to clear, so the button rests.</small></div>
+        <div class="frag"><div class="group">
+          <div class="set"><div class="hd"><div class="txt"><div class="lbl">Reading history</div><div class="val">0 entries</div></div><span class="btn warn sm is-off">Clear History</span></div></div>
+        </div></div>
+      </div>
+
+      <div class="cell">
+        <div class="cap">Help, tour count unavailable<small>With no tour on the page to ask, the note states no number.</small></div>
+        <div class="frag"><div class="card helpcard">
+          <p class="body">A short tour of the app: a few stops, a few minutes. It points at the real buttons; you can leave at any time.</p>
+          <span class="btn primary block">Show me around</span>
+        </div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

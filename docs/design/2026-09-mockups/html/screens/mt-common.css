@@ -1,0 +1,92 @@
+/* mt- shared styles: full-size phones on boards, the reading hero (matches bs-chapter-read /
+   bs-matthew-chapter), poetry verses, the Study notes control and the Matthew study notes.
+   Built only from kit tokens. */
+
+/* ---- full-size (1:1) phone on a board ---- */
+.phone-l { position: relative; width: 412px; height: 915px; border-radius: 26px; overflow: hidden; background: var(--bg); box-shadow: 0 0 0 1px var(--hairline), var(--shadow); flex: none; }
+.phone-l > .screen { position: relative; width: 412px; }
+.phone-l.tall { height: auto; }
+.phone-l.tall > .screen { height: auto; min-height: 915px; }
+.phone-m > .screen, .phone-s > .screen { overflow: hidden; }
+.cell > .cap small { max-width: 412px; }
+
+/* ---- notes card on a board (as bs-states) ---- */
+.note { background: var(--surface); border-radius: 16px; padding: 18px 20px; }
+[data-theme="light"] .note { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+.note .h3 { margin-bottom: 8px; }
+.note ul { margin-left: 18px; }
+.note li { font: 400 14px/1.45 var(--sans); color: var(--text-2); }
+.note li + li { margin-top: 8px; }
+.note b { color: var(--text); }
+
+/* ---- reading chapter (bs-chapter-read, bs-matthew-chapter) ---- */
+.chapter { padding-top: 6px; }
+.subttl { margin-top: 8px; font: italic 400 19px/1.35 var(--serif); color: var(--text-2); text-wrap: balance; }
+.tp { display: inline-block; }
+.listen { margin-top: 18px; }
+.sechead { margin: 30px 0 10px; }
+.chapter .reading p + p { margin-top: 12px; }
+.endmark { text-align: center; margin: 36px 0 24px; font: 400 15px/1 var(--serif); color: var(--text-3); letter-spacing: .3em; }
+.turns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.turn { background: var(--surface); border-radius: 16px; padding: 14px 16px 16px; min-height: 76px; }
+[data-theme="light"] .turn { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+.turn .meta { display: flex; align-items: center; gap: 2px; }
+.turn.next { text-align: right; }
+.turn.next .meta { justify-content: flex-end; }
+.turn .t { margin-top: 6px; font: 500 21px/1.2 var(--serif); color: var(--text); }
+
+/* "+ Show …" restore control: a quiet filled chip (no dashed outline in Vesper) */
+.restore { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px 0 11px; border-radius: 18px; background: var(--surface-2); color: var(--text-2); font: 400 14px/1 var(--sans); }
+.restore .i { color: var(--accent); }
+
+/* ---- poetry: one verse to a line, the number hung in the margin ---- */
+.poem .pv { position: relative; padding-left: 30px; }
+.poem .pv + .pv { margin-top: 10px; }
+.poem .pv .vnum { position: absolute; left: 0; top: 0.72em; width: 20px; margin: 0; text-align: right; vertical-align: baseline; line-height: 1; }
+
+/* ---- Study notes control (bs-matthew-chapter: floating, bottom right) ---- */
+.notesctl { position: absolute; right: 12px; bottom: 22px; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px; border-radius: 18px; background: var(--surface-2); box-shadow: var(--shadow); z-index: 4; }
+.notesctl .lbl { font: 700 13px/1 var(--sans); color: var(--text-2); }
+.notesctl .seg { background: var(--surface-3); width: 186px; }
+.notesctl .seg span { height: 34px; font-size: 13px; }
+.notesctl.inline-demo { position: relative; right: auto; bottom: auto; display: inline-flex; }
+
+/* ---- Matthew study notes ---- */
+.ref { font: 700 13px/1.2 var(--sans); color: var(--accent); white-space: nowrap; }
+.cite { font: italic 400 17px/1.3 var(--serif); color: var(--text); }
+.chev { color: var(--text-3); flex: none; }
+.hm { display: inline-grid; place-items: center; height: 22px; padding: 0 8px; border-radius: 11px; background: var(--accent-soft); color: var(--accent); font: 700 11px/1 var(--sans); letter-spacing: .06em; flex: none; }
+
+/* PDF panels, gathered at the chapter's end */
+.panel-t { margin: 34px 0 10px; }
+.refs .item { min-height: 48px; padding: 11px 14px 11px 16px; gap: 12px; }
+.refs .ref { width: 58px; flex: none; }
+.refs .cite { flex: 1; min-width: 0; }
+.vnotes { display: flex; flex-direction: column; gap: 8px; }
+.vn { background: var(--surface); border-radius: 16px; padding: 14px 16px 16px; }
+[data-theme="light"] .vn { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+.vn .hd { display: flex; align-items: flex-start; gap: 10px; }
+.vn .hd .vol { flex: 1; min-width: 0; font: 400 13px/1.3 var(--sans); color: var(--text-3); padding-top: 1px; }
+.vn .hd .chev, .vn .hd .hm { margin-left: auto; margin-top: -3px; }
+.vn .lt { margin-top: 6px; font: italic 500 18px/1.3 var(--serif); color: var(--text); }
+.vn .ex { margin-top: 8px; font: 400 15px/1.5 var(--sans); color: var(--text-2); }
+
+/* Inline: notes under the verse they close on */
+.vrow + .vrow { margin-top: 14px; }
+.vrow > p { margin: 0; }
+.inotes { margin: 10px 0 4px 2px; padding-left: 14px; border-left: 2px solid var(--surface-3); display: flex; flex-direction: column; gap: 8px; }
+.iref { display: flex; align-items: center; gap: 10px; background: var(--surface); border-radius: 12px; padding: 10px 12px 10px 14px; min-height: 44px; }
+[data-theme="light"] .iref { box-shadow: 0 1px 2px rgba(60,40,20,0.05); }
+.iref .cite { flex: 1; min-width: 0; font-size: 16px; }
+.iref.plain .cite { color: var(--text-2); }
+.inotes .vn { border-radius: 14px; padding: 12px 14px 14px; }
+.inotes .vn .lt { font-size: 17px; }
+.inotes .vn .ex { font-size: 14px; }
+.echoes { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 2px 16px; }
+.echo { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 11px 0 8px; border-radius: 14px; background: var(--surface-2); color: var(--text-2); font: 400 12.5px/1 var(--sans); white-space: nowrap; }
+.echo .i { width: 13px; height: 13px; color: var(--accent); }
+
+/* Further Study: external answer pages */
+.links { display: flex; flex-wrap: wrap; gap: 8px; }
+.links .chip { height: 36px; padding: 0 13px 0 14px; gap: 6px; }
+.links .chip .i { color: var(--text-3); }

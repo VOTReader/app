@@ -1,0 +1,121 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lk-common.css"><script src="lk-icons.js"></script>
+<style>
+  .board-grid { grid-template-columns: repeat(4, 256px) 300px; }
+  .stackc { display: flex; flex-direction: column; gap: 28px; }
+  .vari { display: flex; flex-direction: column; gap: 10px; }
+  .vari .row2 { display: flex; flex-direction: column; gap: 4px; }
+  .vari .when { font: 400 12px/1.3 var(--sans); color: var(--text-3); }
+  .crumbx { display: flex; align-items: center; gap: 7px; height: 36px; padding: 0 12px; border-radius: 12px; background: var(--surface); font: 400 13px/1.3 var(--sans); color: var(--text-3); }
+  .crumbx b { font-weight: 700; color: var(--text-2); }
+  .footx { padding: 10px; border-radius: 16px; background: var(--surface); }
+  .footx .btn { width: 100%; height: 48px; border-radius: 24px; }
+</style></head>
+<body data-size="1500x772">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Select Text: verse picker states</div>
+    <div class="meta">VersePickerScreen.jsx · the filter's dead end, the Journal's insert mode, a Matthew Study Bible chapter, a chapter that can't be found, and the words that change by mode</div>
+  </div>
+  <div class="board-grid">
+
+    <!-- 1 no verse matches -->
+    <div class="cell">
+      <div class="cap">No verse matches<small>The filter never hides the reason</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Select Text</span></div>
+        <div class="pk-crumb"><i data-i="link" class="xs"></i>Linking from <b>Born Again</b></div>
+        <div class="pk-body">
+          <div class="pk-hero"><div class="h1">John 15</div><div class="meta">Bible Chapter</div></div>
+          <div class="pk-find"><div class="search"><i data-i="search" class="sm"></i><span class="typed">shepherd</span><span class="cnt">0 of 27</span><i data-i="x" class="sm x"></i></div></div>
+          <div class="pk-hint"><i data-i="lk-pointer" class="sm"></i>Highlight any portion, or tap a verse number to grab the whole verse.</div>
+          <div class="pk-none">No verse in this chapter contains “shepherd”.</div>
+        </div>
+        <div class="pk-foot"><span class="btn off">Select a verse to continue</span></div>
+      </div></div>
+    </div>
+
+    <!-- 2 journal insert -->
+    <div class="cell">
+      <div class="cap">From the Journal<small>Embed an excerpt: insert, not link</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Select Text</span></div>
+        <div class="pk-crumb"><i data-i="notebook-pen" class="xs"></i>Choose scripture to insert</div>
+        <div class="pk-body">
+          <div class="pk-hero"><div class="h1">Psalms 23</div><div class="meta">Bible Chapter</div></div>
+          <div class="pk-find"><div class="search"><i data-i="search" class="sm"></i>Find a verse by its words…</div></div>
+          <div class="pk-prev">I will fear no evil; For You are with me</div>
+          <div class="pk-verses">
+            <p><span class="vn">1</span>A Psalm of David. The LORD is my shepherd; I shall not want.</p>
+            <p><span class="vn">2</span>He makes me to lie down in green pastures; He leads me beside the still waters.</p>
+            <p><span class="vn">3</span>He restores my soul; He leads me in the paths of righteousness For His name’s sake.</p>
+            <p><span class="vn">4</span>Yea, though I walk through the valley of the shadow of death, <span class="lk-handle a"></span><mark class="lk-sel">I will fear no evil; For You are with me</mark><span class="lk-handle b"></span>; Your rod and Your staff, they comfort me.</p>
+            <p><span class="vn">5</span>You prepare a table before me in the presence of my enemies; You anoint my head with oil; My cup runs over.</p>
+          </div>
+        </div>
+        <div class="pk-foot"><span class="btn primary">Insert this selection</span></div>
+      </div></div>
+    </div>
+
+    <!-- 3 matthew study bible -->
+    <div class="cell">
+      <div class="cap">Matthew Study Bible<small>Same picker, the study edition's text</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Select Text</span></div>
+        <div class="pk-crumb"><i data-i="link" class="xs"></i>Linking from <b>John 3:3</b></div>
+        <div class="pk-body">
+          <div class="pk-hero"><div class="h1">Matthew 5</div><div class="meta">Matthew Study Bible</div></div>
+          <div class="pk-find"><div class="search"><i data-i="search" class="sm"></i>Find a verse by its words…</div></div>
+          <div class="pk-hint"><i data-i="lk-pointer" class="sm"></i>Highlight any portion, or tap a verse number to grab the whole verse.</div>
+          <div class="pk-verses">
+            <p><span class="vn">1</span>And seeing the multitudes, He went up on a mountain, and when He was seated His disciples came to Him.</p>
+            <p><span class="vn">2</span>Then He opened His mouth and taught them, saying:</p>
+            <p><span class="vn">3</span>"Blessed are the poor in spirit, for theirs is the Kingdom of Heaven.</p>
+            <p><span class="vn">4</span>Blessed are those who mourn, for they shall be comforted.</p>
+            <p><span class="vn">5</span>Blessed are the meek, for they shall inherit the earth.</p>
+            <p><span class="vn">6</span>Blessed are those who hunger and thirst for righteousness, for they shall be filled.</p>
+          </div>
+        </div>
+        <div class="pk-foot"><span class="btn off">Select a verse to continue</span></div>
+      </div></div>
+    </div>
+
+    <!-- 4 not found -->
+    <div class="cell">
+      <div class="cap">Chapter not found<small>The target no longer resolves; back returns to the picker</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Select Verse</span></div>
+        <div class="pk-body">
+          <div class="pk-empty">
+            <div class="ic"><i data-i="lk-book-x"></i></div>
+            <div class="h3">Chapter not found.</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 5 the words that change -->
+    <div class="cell">
+      <div class="cap">The words that change<small>Under the header, and on the one button</small></div>
+      <div class="stackc comp">
+        <div class="vari">
+          <div class="row2"><span class="when">Linking, with a source passage</span><div class="crumbx"><i data-i="link" class="xs"></i>Linking from <b>Born Again</b></div></div>
+          <div class="row2"><span class="when">Linking, source has no label</span><div class="crumbx"><i data-i="link" class="xs"></i>Choose scripture to link</div></div>
+          <div class="row2"><span class="when">Journal · Embed an excerpt</span><div class="crumbx"><i data-i="notebook-pen" class="xs"></i>Choose scripture to insert</div></div>
+        </div>
+        <div class="vari">
+          <div class="row2"><span class="when">Nothing held yet</span><div class="footx"><span class="btn off">Select a verse to continue</span></div></div>
+          <div class="row2"><span class="when">Linking</span><div class="footx"><span class="btn primary">Link this selection</span></div></div>
+          <div class="row2"><span class="when">Journal</span><div class="footx"><span class="btn primary">Insert this selection</span></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

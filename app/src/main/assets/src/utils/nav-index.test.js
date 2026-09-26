@@ -1,3 +1,4 @@
+// @ts-nocheck
 /* nav-index — SESSION-2 (UX-BATCH-2026-07-12) LinkPicker overhaul plumbing.
    ─────────────────────────────────────────────────────────────────
    Pins three things:
@@ -10,9 +11,26 @@
    (3) buildNavTree — the Browse drill-down grouping. */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildNavIndex, contentDocToNavItem, buildNavTree } from './nav-index.js';
 
 const g = /** @type {any} */ (window);
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+/** books.js's own key order, which is the order _allBooks() iterates (Ephesians first, Genesis 27th). */
+function booksJsOrder() {
+  const src = fs.readFileSync(path.join(HERE, '../data/books.js'), 'utf8');
+  return [...src.matchAll(/^ {2}"([a-z0-9]+)": \{/gm)].map((m) => m[1]);
+}
+
+/** index.html's BIBLE_BOOK_LIST order: OT then NT, with 'matthew-plain' in Matthew's place. */
+function bibleBookListOrder() {
+  const html = fs.readFileSync(path.join(HERE, '../../index.html'), 'utf8');
+  const block = html.slice(html.indexOf('BIBLE_BOOK_LIST.push('), html.indexOf('OT_BOOK_IDS.clear()'));
+  return [...block.matchAll(/BOOKS(?:\.([a-z0-9]+)|\["([a-z0-9-]+)"\])/g)].map((m) => m[1] || m[2]);
+}
 
 function stubCorpora({ books = 1 } = {}) {
   const bookSet = { genesis: { id: 'genesis', title: 'Genesis', chapters: [{ num: 1 }, { num: 2 }] } };
@@ -28,7 +46,7 @@ function stubCorpora({ books = 1 } = {}) {
 beforeEach(() => { delete g.__NAV_INDEX; delete g.__NAV_INDEX_SIG; });
 afterEach(() => {
   ['_allBooks', '_matthew', 'COLLECTIONS', 'colPreface', 'colLetterArr', 'bookCategory',
-    'BIBLE_STUDIES', '__NAV_INDEX', '__NAV_INDEX_SIG'].forEach((k) => delete g[k]);
+    'BIBLE_STUDIES', 'BIBLE_BOOK_LIST', '__NAV_INDEX', '__NAV_INDEX_SIG'].forEach((k) => delete g[k]);
 });
 
 describe('buildNavIndex — signature-guarded memo', () => {
@@ -116,5 +134,47 @@ describe('buildNavTree — Browse drill-down grouping', () => {
     expect(tree.collections[0].entries[0]).toMatchObject({ kind: 'letter', letterId: 'first-letter' });
     expect(tree.matthewChapters).toEqual([]);
     expect(tree.studies).toEqual([]);
+  });
+
+  it('lists The Holy Bible in canonical order, not in the books.js order _allBooks() iterates', () => {
+    const declared = booksJsOrder();
+    const canon = bibleBookListOrder();
+    expect(canon).toHaveLength(66);
+    // The premise: the real books.js order is not canonical. If it ever becomes
+    // canonical, this test no longer exercises the sort and should be revisited.
+    expect(declared).not.toEqual(canon.filter((id) => id !== 'matthew-plain'));
+    stubCorpora();
+    const book = (id) => ({ id, title: id, chapters: [{ num: 1 }] });
+    // As in the app: { matthew (the study edition), ...BOOKS }, with
+    // 'matthew-plain' appended last by __finishBibleInit.
+    const all = { matthew: book('matthew') };
+    declared.forEach((id) => { all[id] = book(id); });
+    all['matthew-plain'] = book('matthew-plain');
+    g._allBooks = () => all;
+    g.BIBLE_BOOK_LIST = canon.map(book);
+
+    const ids = buildNavTree().bibleBooks.map((b) => b.bookId);
+    expect(ids).toEqual(canon);
+    expect(ids[0]).toBe('genesis');
+    expect(ids.indexOf('matthew-plain')).toBe(ids.indexOf('malachi') + 1);
+    expect(ids.indexOf('mark')).toBe(ids.indexOf('matthew-plain') + 1);
+    expect(ids[ids.length - 1]).toBe('revelation');
+    expect(ids).not.toContain('matthew'); // the study edition keeps its own root
+  });
+
+  it('keeps the encounter order while BIBLE_BOOK_LIST is still empty (Bible bundle not loaded)', () => {
+    stubCorpora();
+    const book = (id) => ({ id, title: id, chapters: [{ num: 1 }] });
+    g._allBooks = () => ({ exodus: book('exodus'), genesis: book('genesis') });
+    g.BIBLE_BOOK_LIST = [];
+    expect(buildNavTree().bibleBooks.map((b) => b.bookId)).toEqual(['exodus', 'genesis']);
+  });
+
+  it('places a book BIBLE_BOOK_LIST does not list after the listed ones, keeping its encounter order', () => {
+    stubCorpora();
+    const book = (id) => ({ id, title: id, chapters: [{ num: 1 }] });
+    g._allBooks = () => ({ zeta: book('zeta'), exodus: book('exodus'), alpha: book('alpha'), genesis: book('genesis') });
+    g.BIBLE_BOOK_LIST = [book('genesis'), undefined, book('exodus')]; // a hole must not break the ranking
+    expect(buildNavTree().bibleBooks.map((b) => b.bookId)).toEqual(['genesis', 'exodus', 'zeta', 'alpha']);
   });
 });

@@ -1,0 +1,92 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .sbar { height: 64px; display: flex; align-items: center; gap: 2px; padding: 0 20px 0 8px; }
+  .sbar .iconbtn { color: var(--text-2); }
+  .sbar .search { flex: 1; }
+  .sbar .search .q { flex: 1; color: var(--text); font-size: 16px; }
+  .sbar .search .x { color: var(--text-2); }
+  .scroll > .chips { margin-top: 6px; }
+  .rhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+  .rhead .meta { text-wrap: balance; }
+  .seg.sm { flex: none; border-radius: 10px; }
+  .seg.sm span { flex: none; height: 30px; padding: 0 11px; border-radius: 8px; font-size: 13px; }
+  .pass { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+  .pc { padding: 14px 14px 15px; }
+  .pc .i { color: var(--accent); }
+  .pc .ttl { font: 500 18px/1.2 var(--serif); color: var(--text); margin-top: 10px; }
+  .pc .meta { margin-top: 4px; }
+  .results { margin-top: 8px; }
+  .res { padding: 20px 0; }
+  .res + .res { border-top: 1px solid var(--hairline); }
+  .res .ttl { font: 500 19px/1.28 var(--serif); color: var(--text); margin-top: 6px; }
+  .res .meta { margin-top: 4px; }
+  .snip { margin-top: 12px; }
+  .snip .ln { display: flex; gap: 5px; }
+  .snip .ln + .ln { margin-top: 10px; }
+  .snip .ln .ph { flex: none; margin-top: 0; }
+  .snip .ln .ph.hit { background: color-mix(in srgb, var(--dot-honey) 50%, transparent); }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="sbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <div class="search"><i data-i="search" class="sm"></i><span class="q">faith</span><i data-i="x" class="sm x"></i></div>
+  </div>
+  <div class="scroll">
+    <div class="chips">
+      <span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span>
+    </div>
+
+    <div class="rhead">
+      <span class="meta">Found 400+ matches across 18 sections</span>
+      <div class="seg sm"><span class="on">Relevance</span><span>Book order</span></div>
+    </div>
+
+    <div class="pass">
+      <div class="card pc"><i data-i="book-open" class="sm"></i><div class="ttl">Faith Chapter</div><div class="meta">Hebrews 11</div></div>
+      <div class="card pc"><i data-i="book-open" class="sm"></i><div class="ttl">Faith Without Works</div><div class="meta">James 2</div></div>
+    </div>
+
+    <div class="results">
+      <div class="res">
+        <div class="label">Letter</div>
+        <div class="ttl">A Trying of Your Trust, a Testing of Your Resolve... Your <mark class="hl-honey">Faith</mark> Revealed</div>
+        <div class="meta">Letters to The Lord’s Little Flock · Letter 26</div>
+        <div class="snip">
+          <div class="ln"><div class="ph" style="width:34%"></div><div class="ph hit" style="width:11%"></div><div class="ph" style="width:48%"></div></div>
+          <div class="ln"><div class="ph" style="width:76%"></div></div>
+        </div>
+      </div>
+      <div class="res">
+        <div class="label">Chapter</div>
+        <div class="ttl">Hebrews 11</div>
+        <div class="meta">The Scriptures of Truth · NKJV</div>
+        <div class="snip">
+          <div class="ln"><div class="ph hit" style="width:11%"></div><div class="ph" style="width:84%"></div></div>
+          <div class="ln"><div class="ph" style="width:92%"></div></div>
+        </div>
+      </div>
+      <div class="res">
+        <div class="label">Answers</div>
+        <div class="ttl">Regarding <mark class="hl-honey">Faith</mark></div>
+        <div class="meta">Answers Only God Can Give</div>
+        <div class="snip">
+          <div class="ln"><div class="ph" style="width:58%"></div><div class="ph hit" style="width:11%"></div><div class="ph" style="width:25%"></div></div>
+          <div class="ln"><div class="ph" style="width:64%"></div></div>
+        </div>
+      </div>
+      <div class="res">
+        <div class="label">Chapter</div>
+        <div class="ttl">James 2</div>
+        <div class="meta">The Scriptures of Truth · NKJV</div>
+        <div class="snip">
+          <div class="ln"><div class="ph" style="width:22%"></div><div class="ph hit" style="width:11%"></div><div class="ph" style="width:61%"></div></div>
+          <div class="ln"><div class="ph" style="width:88%"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,146 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="yd-common.css"><script src="../kit/kit.js"></script><script src="yd-icons.js"></script>
+<style>
+  .cell > .cap { min-height: 48px; }
+  .ycol.comp { gap: 30px; }
+  .toast .play { flex: none; width: 26px; height: 26px; border-radius: 13px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; margin-top: -1px; }
+  .toast .play .i { width: 13px; height: 13px; fill: currentColor; margin-left: 2px; }
+  .toast .act.inline { display: inline; margin: 0; }
+  .screen .toast.float { width: max-content; max-width: 372px; }
+  /* Home, as screens/home.html draws it */
+  .topbar.slim { height: 48px; padding-right: 12px; }
+  .topbar.slim .tabcount { margin: 0 0 0 4px; }
+  .lockup { text-align: center; }
+  .lockup .t1 { font: 500 26px/1.1 var(--serif); letter-spacing: -0.005em; color: var(--text); }
+  .lockup .t2 { font: italic 400 17px/1.25 var(--serif); color: var(--text-2); margin-top: 2px; }
+  .lockup .amp { font-style: normal; }
+  .home > .search { margin-top: 16px; }
+  .cont { margin-top: 12px; padding: 14px 16px; }
+  .cont .main { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
+  .cont .main .h3 { flex: 1; min-width: 0; text-wrap: pretty; }
+  .cont .foot { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+  .cont .foot .progress { flex: 1; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  .tile { height: 68px; padding: 0 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font: 400 12px/1.2 var(--sans); color: var(--text-2); white-space: nowrap; }
+  .tile .nudge { transform: translateY(-3px); }
+  .hcols { margin-top: 12px; }
+  .hcols .row { padding: 10px 16px; min-height: 60px; }
+  .hcols .ttl { display: block; font: 500 18px/1.2 var(--serif); color: var(--text); }
+  .hcols .meta { display: block; margin-top: 2px; }
+</style></head>
+<body data-size="1344x774">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Updates · just updated, and a refused install</div>
+    <div class="meta">A new build takes over by itself on whatever screen is open, then says so once. Nothing to confirm; the app returns you to your place.</div>
+  </div>
+
+  <div class="ycols">
+    <div class="ycol w412 comp">
+      <div class="cell">
+        <div class="cap">Just updated<small>4 s. Once, on the first start of a new build.</small></div>
+        <div class="toast"><i data-i="circle-check" class="sm ok"></i><span class="grow">VOTReader was just updated.</span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">Just updated, with listening to resume<small>8 s. The update interrupted a recording and the browser will not restart sound by itself: the whole toast is the button.</small></div>
+        <div class="toast tap"><span class="play"><i data-i="play"></i></span><span class="grow">VOTReader was just updated. <span class="act inline">Tap to continue listening.</span></span></div>
+      </div>
+      <div class="cell">
+        <div class="cap">A new version failed to install · web<small>6 s. One file of the new build failed to download or did not match its checksum, so the update was refused and the working version stays. The file is named.</small></div>
+        <div class="toast"><i data-i="yd-circle-x" class="sm err"></i><span class="grow">A new version failed to install (<span style="white-space:nowrap">./dist/bundle-d.js</span>). Still running the current version.</span></div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Just updated, in place<small>Back on the letter you were reading.</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="rp"><div class="bar"><i style="width:28%"></i></div><span class="pc">28%</span></div>
+        <div class="scroll lt">
+          <div class="meta ctx">Volume One · Letter 15 · 12/13/04</div>
+          <div class="display">Know That Which Has Been Poured Out, The Word of God</div>
+          <div class="lrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen · 6 min</span></div>
+          <div class="divider"></div>
+          <div class="body-ph">
+            <div class="ph" style="width:96%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:88%"></div><div class="ph" style="width:94%"></div><div class="ph" style="width:52%"></div>
+            <div class="gap"></div>
+            <div class="ph" style="width:99%"></div><div class="ph" style="width:91%"></div><div class="ph" style="width:97%"></div><div class="ph" style="width:84%"></div><div class="ph" style="width:95%"></div><div class="ph" style="width:40%"></div>
+            <div class="gap"></div>
+            <div class="ph" style="width:98%"></div><div class="ph" style="width:92%"></div>
+          </div>
+        </div>
+        <div class="toast float" style="bottom:96px"><i data-i="circle-check" class="sm ok"></i><span class="grow">VOTReader was just updated.</span></div>
+        <div class="readbar">
+          <span class="rb pn prev"><i data-i="chevron-left"></i><span class="pt"><b>Previous</b><span>Letter 14</span></span></span>
+          <span class="sep"></span>
+          <span class="rb"><i data-i="type"></i>Text</span>
+          <span class="rb"><i data-i="bookmark"></i>Save</span>
+          <span class="rb"><i data-i="share-2"></i>Share</span>
+          <span class="sep"></span>
+          <span class="rb pn next"><span class="pt"><b>Next</b><span>Letter 16</span></span><i data-i="chevron-right"></i></span>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Listening to resume, in place<small>The player waits, paused at the same second.</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="rp"><div class="bar"><i style="width:44%"></i></div><span class="pc">44%</span></div>
+        <div class="scroll lt">
+          <div class="meta ctx">Volume One · Letter 15 · 12/13/04</div>
+          <div class="display">Know That Which Has Been Poured Out, The Word of God</div>
+          <div class="lrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen · 6 min</span></div>
+          <div class="divider"></div>
+          <div class="body-ph">
+            <div class="ph" style="width:96%"></div><div class="ph" style="width:100%"></div><div class="ph" style="width:88%"></div><div class="ph" style="width:94%"></div><div class="ph" style="width:52%"></div>
+            <div class="gap"></div>
+            <div class="ph" style="width:99%"></div><div class="ph" style="width:91%"></div><div class="ph" style="width:97%"></div><div class="ph" style="width:84%"></div><div class="ph" style="width:95%"></div><div class="ph" style="width:40%"></div>
+          </div>
+        </div>
+        <div class="toast float tap" style="bottom:100px"><span class="play"><i data-i="play"></i></span><span class="grow">VOTReader was just updated. <span class="act inline">Tap to continue listening.</span></span></div>
+        <div class="mini">
+          <span class="playbtn"><i data-i="play"></i></span>
+          <span class="t"><b>Know That Which Has Been Poured Out, The Word of God</b><span>Volume One · 2:41 / 6:05</span>
+            <div class="progress" style="margin-top:6px"><i style="width:44%"></i></div></span>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">A refused install, in place<small>Only on the web, where the app installs its own updates.</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar slim"><span class="iconbtn"><i data-i="yd-info"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="search"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll home">
+          <div class="lockup"><div class="t1">The Volumes of Truth</div><div class="t2"><span class="amp">&amp;</span> The Scriptures of Truth</div></div>
+          <div class="search"><i data-i="search" class="sm"></i>Search the library</div>
+          <div class="card cont">
+            <div class="meta">Continue reading</div>
+            <div class="meta">Volume One · Letter 15</div>
+            <div class="main"><div class="h3">Know That Which Has Been Poured Out, The Word of God</div><span class="btn primary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+            <div class="foot"><div class="progress"><i style="width:40%"></i></div><span class="meta">40%</span></div>
+          </div>
+          <div class="tiles">
+            <div class="card tile"><i data-i="history"></i>Recent</div>
+            <div class="card tile"><i data-i="notebook-pen"></i>Notes</div>
+            <div class="card tile"><i data-i="bookmark"></i>Bookmarks</div>
+            <div class="card tile"><i data-i="scripture-web" class="nudge"></i>Scripture Web</div>
+          </div>
+          <div class="list hcols">
+            <div class="row"><span class="txt"><span class="ttl">The Volumes of Truth</span><span class="meta">7 volumes · 244 letters</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">The Scriptures of Truth</span><span class="meta">Genesis to Revelation · NKJV</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Answers Only God Can Give</span><span class="meta">Topics and doctrines</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Studies</span><span class="meta">Letter studies · Matthew Study Bible</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Listening Library</span><span class="meta">The letters and scriptures, read aloud</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Songs of the Letters</span><span class="meta">Sung by the flock</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Library</span><span class="meta">Notes, journal &amp; bookmarks</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Settings</span><span class="meta">Display, themes &amp; preferences</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+          </div>
+        </div>
+        <div class="toast float" style="bottom:28px"><i data-i="yd-circle-x" class="sm err"></i><span class="grow">A new version failed to install (<span style="white-space:nowrap">./dist/bundle-d.js</span>). Still running the current version.</span></div>
+      </div></div>
+    </div>
+  </div>
+</div>
+</body></html>

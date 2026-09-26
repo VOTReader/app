@@ -1,0 +1,110 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .home { position: relative; }
+  .home > * { position: relative; }
+  /* wallpaper: warm charcoal with a soft gold warmth (dark) / paper-to-sand (light), all from tokens */
+  .home > .wall { position: absolute; inset: 0; background:
+      radial-gradient(95% 42% at 88% 4%, color-mix(in srgb, var(--dot-clay) 14%, transparent) 0%, transparent 70%),
+      radial-gradient(120% 38% at 8% 102%, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 70%),
+      linear-gradient(175deg, color-mix(in srgb, var(--surface-3) 90%, var(--dot-clay)) 0%, var(--surface-3) 55%, var(--surface-3) 100%); }
+  [data-theme="light"] .home > .wall { background:
+      radial-gradient(100% 45% at 12% 4%, var(--surface) 0%, transparent 70%),
+      linear-gradient(175deg, var(--surface-2) 0%, var(--surface-3) 100%); }
+  .home > .homebar { position: absolute; }
+
+  .hs { padding: 0 16px; margin-top: 60px; }
+  .w { background: var(--surface); border-radius: 24px; }
+  [data-theme="light"] .w { box-shadow: 0 1px 3px rgba(60,40,20,.08), 0 10px 28px rgba(60,40,20,.08); }
+
+  /* 4x2 Continue reading */
+  .w42 { height: 200px; padding: 20px 20px 18px; display: flex; flex-direction: column; }
+  .w42 .top { display: flex; align-items: flex-start; gap: 12px; }
+  .w42 .top .m { flex: 1; min-width: 0; }
+  .w42 .loc { margin-top: 2px; color: var(--text-2); }
+  .w42 .wt { font: 500 22px/1.2 var(--serif); color: var(--text); margin-top: 10px; text-wrap: balance; }
+  .w42 .pr { margin-top: auto; display: flex; align-items: center; gap: 12px; }
+  .w42 .pr .progress { flex: 1; }
+  .w42 .pr .meta { font-variant-numeric: tabular-nums; }
+  .listen { width: 52px; height: 52px; border-radius: 26px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; flex: none; }
+
+  /* 2x2 row */
+  .r2 { display: flex; gap: 16px; margin-top: 16px; }
+  .w22 { width: 182px; height: 204px; flex: none; padding: 18px 16px 16px; display: flex; flex-direction: column; }
+  .w22 .wt2 { font: 500 30px/1.1 var(--serif); color: var(--text); margin-top: 8px; }
+  .w22 .sub { margin-top: 4px; color: var(--text-2); text-wrap: balance; }
+  .wbtns { margin-top: auto; display: flex; gap: 8px; }
+  .apps22 { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+
+  .cell { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .app { width: 56px; height: 56px; border-radius: 13px; background: var(--surface-2); flex: none; }
+  [data-theme="light"] .app { box-shadow: 0 1px 2px rgba(60,40,20,.10); }
+  .lbl { width: 40px; height: 6px; border-radius: 3px; margin-top: 11px; background: color-mix(in srgb, var(--text) 22%, transparent); }
+  .apps4 { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 18px; height: 102px; }
+
+  .dock { position: absolute; left: 16px; right: 16px; bottom: 40px; display: flex; justify-content: space-between; padding: 0 6px; }
+  .dock .cell { width: 64px; }
+  .vicon { width: 56px; height: 56px; display: block; }
+  .name { margin-top: 8px; font: 400 12px/1 var(--sans); color: var(--text); white-space: nowrap; }
+</style></head>
+<body>
+<div class="screen home">
+  <div class="wall"></div>
+  <div class="status" data-time="6:12"></div>
+
+  <div class="hs">
+    <div class="w w42">
+      <div class="top">
+        <div class="m">
+          <div class="meta">Continue reading</div>
+          <div class="meta loc">Volume One · Letter 15</div>
+        </div>
+        <span class="listen"><i data-i="headphones"></i></span>
+      </div>
+      <div class="wt">Know That Which Has Been Poured Out, The Word of God</div>
+      <div class="pr"><div class="progress"><i style="width:40%"></i></div><span class="meta">40%</span></div>
+    </div>
+
+    <div class="r2">
+      <div class="w w22">
+        <div class="meta">Today</div>
+        <div class="wt2">John 3</div>
+        <div class="meta sub">Nicodemus and the New Birth</div>
+        <div class="wbtns"><span class="btn sm primary">Read</span><span class="btn sm secondary">Listen</span></div>
+      </div>
+      <div class="apps22">
+        <div class="cell"><span class="app"></span><span class="lbl"></span></div>
+        <div class="cell"><span class="app"></span><span class="lbl" style="width:34px"></span></div>
+        <div class="cell"><span class="app"></span><span class="lbl" style="width:44px"></span></div>
+        <div class="cell"><span class="app"></span><span class="lbl" style="width:36px"></span></div>
+      </div>
+    </div>
+
+    <div class="apps4">
+      <div class="cell"><span class="app"></span><span class="lbl" style="width:38px"></span></div>
+      <div class="cell"><span class="app"></span><span class="lbl" style="width:44px"></span></div>
+      <div class="cell"><span class="app"></span><span class="lbl" style="width:32px"></span></div>
+      <div class="cell"><span class="app"></span><span class="lbl" style="width:40px"></span></div>
+    </div>
+  </div>
+
+  <div class="dock">
+    <div class="cell"><span class="app"></span><span class="lbl" style="width:34px"></span></div>
+    <div class="cell"><span class="app"></span><span class="lbl" style="width:42px"></span></div>
+    <div class="cell">
+      <!-- VOTReader icon, direction A (book and flame) -->
+      <svg class="vicon" viewBox="0 0 100 100" aria-hidden="true">
+        <rect width="100" height="100" rx="22" fill="#000000"/>
+        <g transform="translate(0 2)">
+          <path fill="#EFE8DA" d="M48.4 51C48.4 44 31 39.5 17 45V70C31 64.5 48.4 69 48.4 76ZM51.6 51C51.6 44 69 39.5 83 45V70C69 64.5 51.6 69 51.6 76Z"/>
+          <path fill="#D4AF5A" transform="translate(50 45) scale(.8) translate(-50 -45)" d="M52.5 12C52.8 19 56.4 24.5 56.4 33.5C56.4 40.5 53.6 45 50 45C46.4 45 43.6 41.5 43.6 36.5C43.6 31.5 45.8 28.2 48.4 25C50.6 22.2 52.3 17.5 52.5 12Z"/>
+        </g>
+      </svg>
+      <span class="name">VOTReader</span>
+    </div>
+    <div class="cell"><span class="app"></span><span class="lbl" style="width:38px"></span></div>
+    <div class="cell"><span class="app"></span><span class="lbl" style="width:30px"></span></div>
+  </div>
+  <div class="homebar"></div>
+</div>
+</body></html>

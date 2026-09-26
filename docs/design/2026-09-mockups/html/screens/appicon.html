@@ -1,0 +1,102 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .page { width: 1200px; height: 800px; padding: 36px 44px 36px; display: flex; flex-direction: column; }
+  .head .meta { margin-top: 4px; }
+  .cols { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 28px; }
+  .col { background: var(--surface-2); border-radius: 16px; padding: 22px 24px 22px; display: flex; flex-direction: column; }
+  .stage { flex: 1; display: grid; place-items: center; }
+  .sizes { display: flex; justify-content: center; align-items: flex-end; gap: 36px; padding-bottom: 20px; }
+  .sizes figure { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .sizes figcaption { font: 400 13px/1 var(--sans); color: var(--text-3); }
+  .cap { border-top: 1px solid var(--hairline); padding-top: 16px; }
+  .cap .h3 { margin-top: 6px; }
+  .cap .meta { margin-top: 3px; white-space: nowrap; }
+
+  /* icons are brand assets: fixed colours in both themes */
+  .ico { display: block; --ibg: #000000; --i1: #EFE8DA; --i2: #D4AF5A; }
+  .ico.c { --ibg: #0B0B0A; }
+  .ico.mono { --ibg: #2E2D2A; --i1: #E7E1D5; --i2: #E7E1D5; }
+  .ico.xl { width: 200px; height: 200px; }
+  .ico.m { width: 64px; height: 64px; }
+  .ico.s { width: 40px; height: 40px; }
+</style></head>
+<body data-size="1200x800">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- (a) Book and flame -->
+  <symbol id="ic-a" viewBox="0 0 100 100">
+    <rect width="100" height="100" rx="22" style="fill:var(--ibg)"/>
+    <g transform="translate(0 2)">
+      <path style="fill:var(--i1)" d="M48.4 51C48.4 44 31 39.5 17 45V70C31 64.5 48.4 69 48.4 76ZM51.6 51C51.6 44 69 39.5 83 45V70C69 64.5 51.6 69 51.6 76Z"/>
+      <path style="fill:var(--i2)" transform="translate(50 45) scale(.8) translate(-50 -45)" d="M52.5 12C52.8 19 56.4 24.5 56.4 33.5C56.4 40.5 53.6 45 50 45C46.4 45 43.6 41.5 43.6 36.5C43.6 31.5 45.8 28.2 48.4 25C50.6 22.2 52.3 17.5 52.5 12Z"/>
+    </g>
+  </symbol>
+  <!-- (b) Star over the horizon -->
+  <symbol id="ic-b" viewBox="0 0 100 100">
+    <rect width="100" height="100" rx="22" style="fill:var(--ibg)"/>
+    <g transform="translate(0 1.5)">
+      <path style="fill:var(--i2)" d="M50 16C50 26.35 58.8 39 66 39C58.8 39 50 51.65 50 62C50 51.65 41.2 39 34 39C41.2 39 50 26.35 50 16Z"/>
+      <path style="fill:none;stroke:var(--i2)" stroke-width="3.2" stroke-linecap="round" d="M18 79A66 66 0 0 1 82 79"/>
+    </g>
+  </symbol>
+  <!-- (c) Book and dawn star -->
+  <symbol id="ic-c" viewBox="0 0 100 100">
+    <rect width="100" height="100" rx="22" style="fill:var(--ibg)"/>
+    <g transform="translate(0 2)">
+      <path style="fill:var(--i1)" d="M48.4 51C48.4 44 31 39.5 17 45V70C31 64.5 48.4 69 48.4 76ZM51.6 51C51.6 44 69 39.5 83 45V70C69 64.5 51.6 69 51.6 76Z"/>
+      <path style="fill:var(--i2)" d="M50 20C50 25.4 54.68 32 58.5 32C54.68 32 50 38.6 50 44C50 38.6 45.32 32 41.5 32C45.32 32 50 25.4 50 20Z"/>
+    </g>
+  </symbol>
+</svg>
+
+<div class="page">
+  <div class="head">
+    <div class="h2">App icon</div>
+    <div class="meta">Three directions · adaptive Android icon</div>
+  </div>
+
+  <div class="cols">
+    <section class="col">
+      <div class="label">Direction A</div>
+      <div class="stage"><svg class="ico xl"><use href="#ic-a" width="100%" height="100%"/></svg></div>
+      <div class="sizes">
+        <figure><svg class="ico m"><use href="#ic-a" width="100%" height="100%"/></svg><figcaption>64</figcaption></figure>
+        <figure><svg class="ico s"><use href="#ic-a" width="100%" height="100%"/></svg><figcaption>40</figcaption></figure>
+        <figure><svg class="ico m mono"><use href="#ic-a" width="100%" height="100%"/></svg><figcaption>Themed</figcaption></figure>
+      </div>
+      <div class="cap">
+        <div class="h3">Book and flame</div>
+        <div class="meta">Open book, a gold flame rising from the spine</div>
+      </div>
+    </section>
+
+    <section class="col">
+      <div class="label">Direction B</div>
+      <div class="stage"><svg class="ico xl"><use href="#ic-b" width="100%" height="100%"/></svg></div>
+      <div class="sizes">
+        <figure><svg class="ico m"><use href="#ic-b" width="100%" height="100%"/></svg><figcaption>64</figcaption></figure>
+        <figure><svg class="ico s"><use href="#ic-b" width="100%" height="100%"/></svg><figcaption>40</figcaption></figure>
+        <figure><svg class="ico m mono"><use href="#ic-b" width="100%" height="100%"/></svg><figcaption>Themed</figcaption></figure>
+      </div>
+      <div class="cap">
+        <div class="h3">Star over the horizon</div>
+        <div class="meta">Today’s star over the earth, made flat and quiet</div>
+      </div>
+    </section>
+
+    <section class="col">
+      <div class="label">Direction C</div>
+      <div class="stage"><svg class="ico xl c"><use href="#ic-c" width="100%" height="100%"/></svg></div>
+      <div class="sizes">
+        <figure><svg class="ico m c"><use href="#ic-c" width="100%" height="100%"/></svg><figcaption>64</figcaption></figure>
+        <figure><svg class="ico s c"><use href="#ic-c" width="100%" height="100%"/></svg><figcaption>40</figcaption></figure>
+        <figure><svg class="ico m mono"><use href="#ic-c" width="100%" height="100%"/></svg><figcaption>Themed</figcaption></figure>
+      </div>
+      <div class="cap">
+        <div class="h3">Book and dawn star</div>
+        <div class="meta">Open book, a small gold star above the spine</div>
+      </div>
+    </section>
+  </div>
+</div>
+</body></html>

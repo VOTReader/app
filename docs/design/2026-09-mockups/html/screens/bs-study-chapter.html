@@ -1,0 +1,73 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* bible-study-chapter: a study chapter, top to the chapter-end nav
+     (BibleStudyChapterView.jsx -> LetterView.jsx in study mode) */
+  .letter { padding-top: 8px; padding-bottom: 40px; }
+  .letter .h1 { margin-top: 8px; }
+  .letter .body.sub { margin-top: 10px; }
+  /* study-image block: the image is not served here, so a placeholder carries its description */
+  .fig { margin: 26px 0 0; aspect-ratio: 1073 / 674; border-radius: 16px; position: relative; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 0 22px 18px; text-align: center;
+    background:
+      radial-gradient(38% 46% at 22% 18%, color-mix(in srgb, var(--dot-sky) 30%, transparent), transparent 80%),
+      radial-gradient(22% 30% at 88% 70%, color-mix(in srgb, var(--dot-honey) 34%, transparent), transparent 80%),
+      radial-gradient(18% 24% at 25% 88%, color-mix(in srgb, var(--dot-honey) 30%, transparent), transparent 80%),
+      linear-gradient(160deg, var(--surface-3), var(--surface-2)); }
+  .fig .ic { position: absolute; top: 50%; left: 50%; margin: -32px 0 0 -14px; color: var(--text-3); opacity: .8; }
+  .fig .cap { font: italic 400 15px/1.35 var(--serif); color: var(--text-2); }
+  .fig .file { margin-top: 4px; font: 400 11px/1.2 var(--sans); color: var(--text-3); }
+  .h3.sh { margin: 26px 0 10px; }
+  .ref { color: var(--accent); }
+  .poem { margin-top: 16px; padding-left: 18px; }
+  .poem .ln { font: italic 400 19px/1.55 var(--serif); color: var(--text); }
+  .poem .src { margin-top: 6px; font: 400 19px/1.5 var(--serif); color: var(--text); }
+  .endmark { text-align: center; margin: 36px 0 24px; font: 400 15px/1 var(--serif); color: var(--text-3); }
+  .turns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .turn { background: var(--surface); border-radius: 16px; padding: 14px 16px 16px; }
+  [data-theme="light"] .turn { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .turn .meta { display: flex; align-items: center; gap: 2px; }
+  .turn.next { text-align: right; }
+  .turn.next .meta { justify-content: flex-end; }
+  .turn .t { margin-top: 6px; font: 500 17px/1.25 var(--serif); color: var(--text); }
+</style></head>
+<body data-size="412x1296">
+<div class="screen tall">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="spacer"></span>
+    <span class="iconbtn"><i data-i="headphones"></i></span>
+    <span class="iconbtn"><i data-i="bookmark"></i></span>
+    <span class="tabcount">1</span>
+  </div>
+  <div class="scroll letter">
+    <div class="eyebrow">YahuShua The Messiah, The Lamb of God · Chapter 8</div>
+    <div class="h1">Wednesday Evening Near Sundown, Passover (The Burial)</div>
+    <div class="body sub">The True Chronology of The Messiah's Crucifixion and Resurrection</div>
+
+    <div class="fig">
+      <i data-i="image" class="lg ic"></i>
+      <div class="cap">YahuShua is laid in the tomb by Joseph of Arimathea and Nicodemus</div>
+      <div class="file">study-lamb-burial.jpg</div>
+    </div>
+
+    <div class="h3 sh">YahuShua Is Buried by Joseph of Arimatheia and Nicodemus</div>
+    <div class="reading">
+      <p>Now when evening had come, there came a rich man from Arimatheia, named Joseph, who himself had also become a disciple of YahuShua. This man went to Pilate and asked for the body of YahuShua. Then Pilate commanded the body to be given to him. When Joseph had taken the body, he wrapped it in a clean linen cloth, and laid it in his new tomb which he had hewn out of the rock; and he rolled a large stone against the door of the tomb, and departed. — <span class="ref">Matthew 27:57-61</span></p>
+    </div>
+    <div class="poem">
+      <div class="ln">And they made His grave with the wicked—but with the rich</div>
+      <div class="ln">At His death, because He had done no violence,</div>
+      <div class="ln">Nor was any deceit in His mouth.</div>
+      <div class="src">— <span class="ref">Isaiah 53:9</span></div>
+    </div>
+
+    <div class="endmark">✦</div>
+    <div class="turns">
+      <div class="turn"><span class="meta"><i data-i="chevron-left" class="xs"></i>Previous</span><div class="t">Wednesday Afternoon, Passover (The Crucifixion)</div></div>
+      <div class="turn next"><span class="meta">Next<i data-i="chevron-right" class="xs"></i></span><div class="t">Three Days and Three Nights in the Tomb</div></div>
+    </div>
+  </div>
+</div>
+</body></html>

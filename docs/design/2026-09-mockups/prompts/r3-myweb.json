@@ -1,0 +1,21 @@
+{
+ "name": "r3-myweb",
+ "refs": [
+  "out/r2-home/home-r2-refined.png",
+  "out/r2-home/home-r2-light.png",
+  "../shots/18-scripture-web.png"
+ ],
+ "images": [
+  {
+   "file": "myweb-r3-dark.png",
+   "prompt": "Screen: SCRIPTURE WEB in 'My Web' mode, landscape phone (19.5:9). The same arc-diagram idea, but only the reader's own saved links are drawn: about twenty clear arcs over the 66-book baseline (tiny labels GEN ... REV), each arc in the reader's highlight colour; the segmented control shows 'My Web' selected; a side panel lists recent links: 'John 3:3 \u2194 Volume One \u00b7 Letter 15', 'Matthew 12:25 \u2194 Volume One \u00b7 Letter 15', 'Isaiah 53:5 \u2194 1 Peter 2:24'; a count '23 links you made'.\nRender in the DARK theme exactly like Image 1.\nRender as a crisp, flat, full-bleed Android phone screen UI mockup, front view, LANDSCAPE orientation (19.5:9), no hands, no desk, no perspective, no device photo; very thin rounded phone outline at most. Real, legible, correctly spelled text. Professional product-design quality (Apple Design Award / Material Design showcase level). Calm, reverent, uncluttered; strong typographic hierarchy; generous whitespace; consistent 8-pt spacing; touch targets at least 48 dp; WCAG AA contrast. No emoji, no stock photos, no people, no crosses or church clip-art, no logos.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  },
+  {
+   "file": "myweb-r3-light.png",
+   "prompt": "Screen: SCRIPTURE WEB in 'My Web' mode, landscape phone (19.5:9). The same arc-diagram idea, but only the reader's own saved links are drawn: about twenty clear arcs over the 66-book baseline (tiny labels GEN ... REV), each arc in the reader's highlight colour; the segmented control shows 'My Web' selected; a side panel lists recent links: 'John 3:3 \u2194 Volume One \u00b7 Letter 15', 'Matthew 12:25 \u2194 Volume One \u00b7 Letter 15', 'Isaiah 53:5 \u2194 1 Peter 2:24'; a count '23 links you made'.\nRender in the LIGHT theme exactly like Image 2.\nRender as a crisp, flat, full-bleed Android phone screen UI mockup, front view, LANDSCAPE orientation (19.5:9), no hands, no desk, no perspective, no device photo; very thin rounded phone outline at most. Real, legible, correctly spelled text. Professional product-design quality (Apple Design Award / Material Design showcase level). Calm, reverent, uncluttered; strong typographic hierarchy; generous whitespace; consistent 8-pt spacing; touch targets at least 48 dp; WCAG AA contrast. No emoji, no stock photos, no people, no crosses or church clip-art, no logos.\nTEXT FIDELITY (strict): use ONLY the exact wording supplied in this spec for any scripture, letter, lyric or dedication text. Wherever the layout needs more running text than supplied, render it as soft grey placeholder lines (greeked bars), never as readable sentences. Never write new sentences attributed to God, the Bible, the letters or the songs. UI labels may be written freely."
+  }
+ ],
+ "preamble": "Image 1 is the approved VOTReader design system in its DARK theme ('Vesper'); Image 2 is the same system in its LIGHT theme ('Vellum'). Every new screen must match them exactly: palette, typography (book serif for titles, humanist sans for UI), spacing, 16 dp radii, filled surfaces instead of outlines, icon style, and the single antique-gold accent (oxblood in light). Any further attached image is a screenshot of the CURRENT app, for content only.",
+ "max_primary": 95,
+ "max_weekly": 60
+}

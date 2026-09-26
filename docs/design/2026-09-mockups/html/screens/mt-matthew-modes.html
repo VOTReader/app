@@ -1,0 +1,317 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="mt-common.css">
+<style>
+  /* matthew-ch, the Study notes modes (ModeToggle.jsx, ChapterView.jsx, StudyPanels.jsx, InlineNotes.jsx,
+     InlineEcho.jsx). Matthew 23 throughout; all text verbatim from matthew.js. Chapter chrome and the
+     floating control are bs-matthew-chapter's. */
+  .cell > .cap { min-height: 52px; }
+  .clip37 { margin-top: -196px; }
+  .clipnote { margin-top: -212px; }
+  .offtop { margin-top: 8px; }
+
+  /* 1:1 crops */
+  .crop { position: relative; width: 412px; border-radius: 22px; overflow: hidden; background: var(--bg); box-shadow: 0 0 0 1px var(--hairline), var(--shadow); }
+  .crop > .screen { position: relative; height: auto; }
+  .crop .chapter { padding-bottom: 24px; }
+  .pair2 { display: flex; gap: 24px; }
+  .crop .k { font: 400 13px/1.3 var(--sans); color: var(--text-3); padding: 14px 20px 0; }
+  .crop .k b { color: var(--text-2); }
+  .pressed { background: var(--accent-soft); border-radius: 8px; margin: 8px -10px 0; padding: 5px 10px 6px; }
+  .restore.s { margin-top: 12px; }
+  .pad { padding: 18px 20px 22px; }
+  .pad .label { margin-bottom: 12px; }
+
+  /* the index card, exactly as bs-matthew-index */
+  .ix { border-radius: 16px; }
+  .ix .item { align-items: flex-start; gap: 12px; padding: 18px 16px 18px 14px; }
+  .ix .num { width: 44px; flex: none; padding-top: 2px; }
+  .ix .num b { display: flex; align-items: center; gap: 7px; font: 700 15px/1.2 var(--sans); color: var(--text-3); }
+  .ix .rd { width: 7px; height: 7px; border-radius: 4px; background: var(--accent); flex: none; }
+  .ix .ttl { flex: 1; min-width: 0; font: 500 18px/1.28 var(--serif); color: var(--text); }
+  .ix .tp { display: inline-block; text-wrap: balance; }
+  .ix .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .nchip { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 12px; background: var(--surface-2); color: var(--text-2); font: 400 12px/1 var(--sans); }
+  .nchip .i { color: var(--text-3); }
+  .ix .dur { flex: none; padding-top: 3px; font: 400 13px/1.35 var(--sans); color: var(--text-3); white-space: nowrap; }
+  .ixnote { margin-top: 10px; }
+
+  /* control states */
+  .ctls { display: flex; flex-direction: column; gap: 16px; }
+  .ctls .meta { margin-top: 6px; }
+  .single { width: 412px; }
+</style></head>
+<body data-size="1800x1905">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Matthew Study Bible: the Study notes modes</div>
+    <div class="meta">Matthew 23 (“4.3× notes”) in each mode. The floating control is bs-matthew-chapter’s; PDF is the default, drawn there at the top of Matthew 3.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(4, 412px)">
+
+    <!-- ───────── PDF: the panels begin ───────── -->
+    <div class="cell">
+      <div class="cap">PDF · after the last verse<small>The verses stay together; the notes wait at the end in two panels, in the book’s own order.</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="title">Matthew 23 · Study Bible</span>
+          <span class="iconbtn"><i data-i="search"></i></span>
+          <span class="iconbtn"><i data-i="bookmark"></i></span>
+          <span class="tabcount">1</span>
+        </div>
+        <div class="scroll chapter">
+          <div class="reading clip37">
+            <p><span class="vnum">37</span>"O Jerusalem, Jerusalem, the one who kills the prophets and stones those who are sent to her! How often I wanted to gather your children together, as a hen gathers her chicks under her wings, but you were not willing! <span class="vnum">38</span>See! Your house is left to you desolate. <span class="vnum">39</span>For I say to you, you shall see Me no more till you say, 'Blessed is He who comes in the name of The Lord!'"</p>
+          </div>
+          <div class="label panel-t">Scripture References</div>
+          <div class="group refs">
+            <div class="item"><span class="ref">23:5</span><span class="cite">Matthew 6:1-6, 16-18</span><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="item"><span class="ref">23:8-10</span><span class="cite">Colossians 1:18</span><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="item"><span class="ref">23:9</span><span class="cite">Malachi 1:6</span><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="item"><span class="ref">23:16</span><span class="cite">Matthew 5:33-34</span><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="item"><span class="ref">23:23</span><span class="cite">Hosea 6:6</span><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="item"><span class="ref">23:35</span><span class="cite">Genesis 4:8</span><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="item"><span class="ref">23:35</span><span class="cite">2 Chronicles 24:20-21</span><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="item"><span class="ref">23:37</span><span class="cite">2 Chronicles 36:15-16</span><i data-i="chevron-right" class="sm chev"></i></div>
+            <div class="item"><span class="ref">23:39</span><span class="cite">Psalm 118:26</span><i data-i="chevron-right" class="sm chev"></i></div>
+          </div>
+          <div class="label panel-t">Volumes of Truth Notes</div>
+          <div class="vnotes">
+            <div class="vn">
+              <div class="hd"><span class="ref">23:1-36</span><span class="vol">A Testament Against The World: The Lord's Rebuke</span><i data-i="chevron-right" class="sm chev"></i></div>
+              <div class="lt">“Far Removed”</div>
+              <div class="ex">Shall you trust in the works of your own hands, O sons of men? How long shall you be wise in your own eyes? I have looked upon you, O perverse and most deceitful generation! I have seen the rebellion within your hearts and how your minds betray you.</div>
+            </div>
+          </div>
+        </div>
+        <div class="notesctl"><span class="lbl">Study notes</span><div class="seg"><span class="on">PDF</span><span>Inline</span><span>Off</span></div></div>
+      </div></div>
+    </div>
+
+    <!-- ───────── PDF: further down, the HM note ───────── -->
+    <div class="cell">
+      <div class="cap">PDF · the Hidden Manna note<small>“HM” takes the chevron’s place (tooltip “Hidden Manna — The Word of The Lord Spoken to Timothy”). This one opens “Woe to Dallas”: bs-hidden-manna.</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="title">Matthew 23 · Study Bible</span>
+          <span class="iconbtn"><i data-i="search"></i></span>
+          <span class="iconbtn"><i data-i="bookmark"></i></span>
+          <span class="tabcount">1</span>
+        </div>
+        <div class="scroll chapter">
+          <div class="vnotes clipnote">
+            <div class="vn">
+              <div class="hd"><span class="ref">23:31, 33-34</span><span class="vol">Volume Two</span><i data-i="chevron-right" class="sm chev"></i></div>
+              <div class="lt">“To the Church Who Dwells in the Midst Of and Sits Upon Seven Hills”</div>
+              <div class="ex">For the fruit of the people is corrupt, their bounty wickedness, producing only rebellion against The Lord! Yet you, O church of harlots, are worse still! For with what can I compare you, and who are you like? You are a whole congregation of sly and deceitful snakes, a vicious den of vipers from which a great hissing has come forth against The Lord and His anointed, a den of thieves who cease not from robbing Me, captive children whose fathers persecuted and murdered those sent to them!</div>
+            </div>
+            <div class="vn">
+              <div class="hd"><span class="ref">23:32</span><span class="vol">A Testament Against The World: The Lord's Rebuke</span><i data-i="chevron-right" class="sm chev"></i></div>
+              <div class="lt">“Spiritual Famine”</div>
+              <div class="ex">They refuse to see, their eyes are blinded! They will not listen, their ears are unclean! They cover their faces and stop their ears! Foolish people, most wicked generation, I do not know you! Fill up then the full measure of your error, according to the perverse doctrines of your fathers! Bear the sin of your heresies, drink from the cup of your blasphemies, to the fullest!</div>
+            </div>
+            <div class="vn">
+              <div class="hd"><span class="ref">23:32, 36</span><span class="vol"></span><span class="hm">HM</span></div>
+              <div class="lt">“Woe to Dallas”</div>
+              <div class="ex">Fill up then, the measure of the sin of your fathers! Yes, add to your iniquity, that I may also add to you all that which I have purposed in My heart to do! Behold, I shall greatly trouble you, causing nature to rise up and fight against you! I shall leave your people desolate and bring you to utter ruin! Says The Lord.</div>
+            </div>
+            <div class="vn">
+              <div class="hd"><span class="ref">23:33</span><span class="vol">A Testament Against The World: The Lord's Rebuke</span><i data-i="chevron-right" class="sm chev"></i></div>
+              <div class="lt">“THE CUP OF THE WRATH OF MY FURY IS COME TO THE FULL”</div>
+              <div class="ex">Brood of vipers, congregations of sly and deceitful snakes, all you soothsayers and smooth-talkers who lull My people to sleep and seduce My children to commit fornication with the harlot, with your speech you woo My people to follow you into death! Your counsel brings them down to the pit!</div>
+            </div>
+          </div>
+        </div>
+        <div class="notesctl"><span class="lbl">Study notes</span><div class="seg"><span class="on">PDF</span><span>Inline</span><span>Off</span></div></div>
+      </div></div>
+    </div>
+
+    <!-- ───────── Inline ───────── -->
+    <div class="cell">
+      <div class="cap">Inline<small>Each note sits under the verse its first range ends on (23:1-36 under verse 36). A later range leaves an “↑” echo; tapping it scrolls back to the note.</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="title">Matthew 23 · Study Bible</span>
+          <span class="iconbtn"><i data-i="search"></i></span>
+          <span class="iconbtn"><i data-i="bookmark"></i></span>
+          <span class="tabcount">1</span>
+        </div>
+        <div class="scroll chapter">
+          <div class="reading">
+            <div class="vrow">
+              <p><span class="vnum">34</span>"Therefore, indeed, I send you prophets, wise men, and scribes. Some of them you will kill and crucify, and some of them you will scourge in your synagogues and persecute from city to city,</p>
+              <div class="echoes">
+                <span class="echo"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>23:1-3, 13-34 — Volume Seven</span>
+                <span class="echo"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>23:31, 33-34 — Volume Two</span>
+              </div>
+            </div>
+            <div class="vrow">
+              <p><span class="vnum">35</span>that on you may come all the righteous blood shed on the earth, from the blood of righteous Abel to the blood of Zechariah, whom you murdered between the temple and the altar.</p>
+              <div class="inotes">
+                <div class="iref"><span class="ref">23:35</span><span class="cite">Genesis 4:8</span><i data-i="chevron-right" class="sm chev"></i></div>
+                <div class="iref"><span class="ref">23:35</span><span class="cite">2 Chronicles 24:20-21</span><i data-i="chevron-right" class="sm chev"></i></div>
+              </div>
+            </div>
+            <div class="vrow">
+              <p><span class="vnum">36</span>Assuredly, I say to you, all these things will come upon this generation."</p>
+              <div class="inotes">
+                <div class="vn">
+                  <div class="hd"><span class="ref">23:1-36</span><span class="vol">A Testament Against The World: The Lord's Rebuke</span><i data-i="chevron-right" class="sm chev"></i></div>
+                  <div class="lt">“Far Removed”</div>
+                  <div class="ex">Shall you trust in the works of your own hands, O sons of men? How long shall you be wise in your own eyes? I have looked upon you, O perverse and most deceitful generation! I have seen the rebellion within your hearts and how your minds betray you.</div>
+                </div>
+                <div class="vn">
+                  <div class="hd"><span class="ref">23:1-36</span><span class="vol">A Testament Against The World: The Lord's Rebuke</span><i data-i="chevron-right" class="sm chev"></i></div>
+                  <div class="lt">“THE CUP OF THE WRATH OF MY FURY IS COME TO THE FULL”</div>
+                  <div class="ex">Peoples of the earth, your atrocities have kindled a great fire within Me! I am enraged as I look upon all these murdered innocent! Multitudes worship false gods and their own creations rather than their Creator—the cup of the wrath of My fury is come to the full.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="notesctl"><span class="lbl">Study notes</span><div class="seg"><span>PDF</span><span class="on">Inline</span><span>Off</span></div></div>
+      </div></div>
+    </div>
+
+    <!-- ───────── Off ───────── -->
+    <div class="cell">
+      <div class="cap">Off<small>No notes, references or Further Study. The chapter ends straight into the next and previous cards.</small></div>
+      <div class="phone-l"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="title">Matthew 23 · Study Bible</span>
+          <span class="iconbtn"><i data-i="search"></i></span>
+          <span class="iconbtn"><i data-i="bookmark"></i></span>
+          <span class="tabcount">1</span>
+        </div>
+        <div class="scroll chapter">
+          <div class="reading offtop">
+            <p><span class="vnum">34</span>"Therefore, indeed, I send you prophets, wise men, and scribes. Some of them you will kill and crucify, and some of them you will scourge in your synagogues and persecute from city to city, <span class="vnum">35</span>that on you may come all the righteous blood shed on the earth, from the blood of righteous Abel to the blood of Zechariah, whom you murdered between the temple and the altar. <span class="vnum">36</span>Assuredly, I say to you, all these things will come upon this generation."</p>
+            <p><span class="vnum">37</span>"O Jerusalem, Jerusalem, the one who kills the prophets and stones those who are sent to her! How often I wanted to gather your children together, as a hen gathers her chicks under her wings, but you were not willing! <span class="vnum">38</span>See! Your house is left to you desolate. <span class="vnum">39</span>For I say to you, you shall see Me no more till you say, 'Blessed is He who comes in the name of The Lord!'"</p>
+          </div>
+          <div class="endmark">✦</div>
+          <div class="turns">
+            <div class="turn"><span class="meta"><i data-i="chevron-left" class="xs"></i>Previous</span><div class="t">Matthew 22</div></div>
+            <div class="turn next"><span class="meta">Next<i data-i="chevron-right" class="xs"></i></span><div class="t">Matthew 24</div></div>
+          </div>
+        </div>
+        <div class="notesctl"><span class="lbl">Study notes</span><div class="seg"><span>PDF</span><span>Inline</span><span class="on">Off</span></div></div>
+      </div></div>
+    </div>
+
+    <!-- ───────── summary toggle ───────── -->
+    <div class="cell" style="grid-column: span 2">
+      <div class="cap">The summary, and hiding it<small>Tap the summary (“Tap to hide summary”) and “+ Show summary” takes its place, in every chapter of this tab. Off in Settings › Chapter Titles, neither shows.</small></div>
+      <div class="pair2">
+        <div class="crop"><div class="screen">
+          <div class="status"></div>
+          <div class="topbar">
+            <span class="iconbtn"><i data-i="chevron-left"></i></span>
+            <span class="title">Matthew 23 · Study Bible</span>
+            <span class="iconbtn"><i data-i="search"></i></span>
+            <span class="iconbtn"><i data-i="bookmark"></i></span>
+            <span class="tabcount">1</span>
+          </div>
+          <div class="scroll chapter">
+            <div class="h1" style="font-size:40px">Matthew 23</div>
+            <div class="subttl pressed"><span class="tp">Seven Woes ·</span> <span class="tp">Lament Over Jerusalem</span></div>
+            <span class="btn secondary sm listen"><i data-i="play" class="xs fill"></i>Listen</span>
+          </div>
+        </div></div>
+        <div class="crop"><div class="screen">
+          <div class="status"></div>
+          <div class="topbar">
+            <span class="iconbtn"><i data-i="chevron-left"></i></span>
+            <span class="title">Matthew 23 · Study Bible</span>
+            <span class="iconbtn"><i data-i="search"></i></span>
+            <span class="iconbtn"><i data-i="bookmark"></i></span>
+            <span class="tabcount">1</span>
+          </div>
+          <div class="scroll chapter">
+            <div class="h1" style="font-size:40px">Matthew 23</div>
+            <span class="restore s"><i data-i="plus" class="xs"></i>Show summary</span>
+            <div><span class="btn secondary sm listen"><i data-i="play" class="xs fill"></i>Listen</span></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- ───────── Further Study ───────── -->
+    <div class="cell">
+      <div class="cap">Further Study<small>After the notes in PDF and Inline. Each opens its AnswersOnlyGodCanGive.com page in the browser.</small></div>
+      <div class="crop pad">
+        <div class="label">Further Study</div>
+        <div class="links">
+          <span class="chip">Woe to Those Who...<svg class="i xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></span>
+          <span class="chip">Regarding the Churches of Men<svg class="i xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></span>
+          <span class="chip">Regarding the Day of The Lord<svg class="i xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></span>
+          <span class="chip">Lamentations From The Lord<svg class="i xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></span>
+          <span class="chip">Regarding the True Bride<svg class="i xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></span>
+          <span class="chip">The Messiah<svg class="i xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───────── the notes chip on the index ───────── -->
+    <div class="cell">
+      <div class="cap">Notes weight on the index<small>bs-matthew-index’s chip. Tooltip: “Study commentary runs 0.8× the length of this chapter's verse text”. A chapter with no notes has no chip.</small></div>
+      <div class="group ix">
+        <div class="item">
+          <div class="num"><b>2<span class="rd"></span></b></div>
+          <div class="ttl"><span class="tp">The Wise Men from the East ·</span> <span class="tp">The Flight into Egypt ·</span> <span class="tp">Herod Slaughters the Children</span></div>
+          <div class="dur">~3 min</div>
+        </div>
+        <div class="item">
+          <div class="num"><b>3<span class="rd"></span></b></div>
+          <div class="ttl"><span class="tp">John the Baptist Prepares the Way ·</span> <span class="tp">The Baptism of YahuShua</span>
+            <div class="tags"><span class="nchip"><i data-i="message-square-quote" class="xs"></i>0.8× notes</span></div></div>
+          <div class="dur">~2 min</div>
+        </div>
+      </div>
+      <div class="meta ixnote">Chapter 2 carries no notes; chapter 24 carries the most (8.4×).</div>
+    </div>
+
+    <!-- ───────── the control, three states ───────── -->
+    <div class="cell">
+      <div class="cap">Study notes control<small>Three views, always named; the pressed one is where the reader is. Tapping it again does nothing.</small></div>
+      <div class="crop pad ctls">
+        <div><div class="notesctl inline-demo"><span class="lbl">Study notes</span><div class="seg"><span class="on">PDF</span><span>Inline</span><span>Off</span></div></div><div class="meta">“Study notes as the PDF page”</div></div>
+        <div><div class="notesctl inline-demo"><span class="lbl">Study notes</span><div class="seg"><span>PDF</span><span class="on">Inline</span><span>Off</span></div></div><div class="meta">“Study notes in the text”</div></div>
+        <div><div class="notesctl inline-demo"><span class="lbl">Study notes</span><div class="seg"><span>PDF</span><span>Inline</span><span class="on">Off</span></div></div><div class="meta">“No study notes, references, or further reading”. From Off, PDF or Inline turns the notes back on in that view.</div></div>
+      </div>
+    </div>
+
+    <!-- ───────── HM on a letter not yet in the app ───────── -->
+    <div class="cell">
+      <div class="cap">HM, letter not in the app<small>10:9, 10:19 and 26:28 cite Hidden Manna letters that aren’t imported. The badge shows; the note stays still.</small></div>
+      <div class="vn single">
+        <div class="hd"><span class="ref">10:9</span><span class="vol"></span><span class="hm">HM</span></div>
+        <div class="lt">“I Have Purged; Behold, I Shall Wipe Away and Restore”</div>
+        <div class="ex">Prepare nothing for your journey, nor take anything with you when the time comes, save only those things I command you.</div>
+      </div>
+    </div>
+
+    <!-- ───────── notes ───────── -->
+    <div class="cell" style="grid-column: span 2">
+      <div class="cap">Behaviour notes<small>From ChapterView.jsx, ModeToggle.jsx, StudyPanels.jsx, InlineNotes.jsx and InlineEcho.jsx</small></div>
+      <div class="note">
+        <ul>
+          <li><b>PDF</b> (the default) keeps the verses clean and gathers everything after the last verse: Scripture References, Volumes of Truth Notes, then Further Study.</li>
+          <li><b>Inline</b> hangs each note under the last verse of its first range (23:8-10 sits under verse 10). “↑” echoes mark the end of every later range and scroll back to the note.</li>
+          <li>A note opens its letter, with “Back to Matthew 23”. A scripture reference opens the scripture sheet (mt-scripture-sheet); a commentary line with no verse behind it is plain text with no chevron.</li>
+          <li><b>HM</b> marks Hidden Manna. Only “Woe to Dallas” (23:32, 36) is in the app; this note is its only way in. Hidden Manna has no index, search result or Home tile.</li>
+          <li>The mode and whether notes show are kept per tab.</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

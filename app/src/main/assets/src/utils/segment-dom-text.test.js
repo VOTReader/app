@@ -11,7 +11,7 @@
 
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
-import { segmentsDomText, segmentRenderText } from './segment-dom-text.js';
+import { segmentsDomText, segmentRenderText, segmentsReadText, blockReadText } from './segment-dom-text.js';
 import { renderTextWithScripRefs } from './render-text.jsx';
 import { Segments } from '../ui/components/Segments.jsx';
 
@@ -96,5 +96,52 @@ describe('segmentsDomText is the domain Segments renders', () => {
   it('letter-link contributes its label, not its v', () => {
     expect(segmentsDomText([{ t: 'letter-link', label: 'Grafted In', v: 'ignored' }]))
       .toBe('Grafted In');
+  });
+});
+
+/* The READER's text — the search index's domain (index-builder letterText,
+   LetterView's excerpt landing): the rendered text with the footnote markers
+   taken out, asserted against a real render with its .fn-ref spans removed. */
+const squash = (s) => String(s).replace(/\s+/g, ' ').trim();
+function renderedTextWithoutFootnotes(segments) {
+  const { container } = render(
+    React.createElement('p', null,
+      React.createElement(Segments, { segments, onFnClick() {}, onScripClick() {} })),
+  );
+  container.querySelectorAll('.fn-ref').forEach((el) => el.remove());
+  return container.textContent;
+}
+
+describe('segmentsReadText is the rendered text without its footnote numbers', () => {
+  for (const [name, segments] of Object.entries(CASES)) {
+    if (name === 'stanza break contributes nothing') continue; // reads as a space: asserted below
+    it(name, () => {
+      expect(squash(segmentsReadText(segments))).toBe(squash(renderedTextWithoutFootnotes(segments)));
+    });
+  }
+
+  it('drops a footnote number without gluing or doubling its neighbours', () => {
+    // Volume One, Letter 15: a poetry line ends in footnote 2.
+    expect(segmentsReadText([{ t: 'italic', v: 'Thus by their fruits you shall know them.' }, { t: 'fn', v: '2' }]))
+      .toBe('Thus by their fruits you shall know them.');
+    expect(segmentsReadText([{ t: 'text', v: 'be set free!' }, { t: 'fn', v: '1' }, { t: 'text', v: 'THEY' }]))
+      .toBe('be set free! THEY');
+    expect(segmentsReadText([{ t: 'text', v: 'by their fruits' }, { t: 'fn', v: '1' }, { t: 'text', v: ', by the darkness' }]))
+      .toBe('by their fruits, by the darkness');
+  });
+
+  it('reads a letter-link by its label, a stanza break as a space, a scripture ref as the reference', () => {
+    expect(segmentsReadText([{ t: 'text', v: 'says The Lord. (' }, { t: 'letter-link', label: '"Blessed Be The Name"' }, { t: 'text', v: ')' }]))
+      .toBe('says The Lord. ("Blessed Be The Name")');
+    expect(squash(segmentsReadText(CASES['stanza break contributes nothing']))).toBe('line one line two');
+    expect(segmentsReadText([{ t: 'text', v: 'the scepter of Your kingdom. - {{ref:Psalm 45:6}}' }]))
+      .toBe('the scepter of Your kingdom. - Psalm 45:6');
+  });
+
+  it('blockReadText joins poetry lines with a space and reads a heading as nothing', () => {
+    expect(blockReadText({ lines: [[{ t: 'text', v: 'Line one,' }], [{ t: 'text', v: 'line two.' }, { t: 'fn', v: '3' }]] }))
+      .toBe('Line one, line two.');
+    expect(blockReadText({ type: 'heading', text: 'A Heading' })).toBe('');
+    expect(blockReadText(null)).toBe('');
   });
 });

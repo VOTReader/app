@@ -1,0 +1,159 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="yd-common.css"><script src="../kit/kit.js"></script><script src="yd-icons.js"></script>
+<style>
+  .vgrid { display: grid; grid-template-columns: repeat(4, 412px); gap: 26px 28px; align-items: start; }
+  .vgrid > .band-title { grid-column: 1 / -1; margin-top: 10px; }
+  .vgrid > .band-title:first-child { margin-top: 0; }
+  .vsum { font: 400 14px/1.5 var(--sans); color: var(--text-2); margin-top: 8px; text-wrap: pretty; }
+  .cell .label + .group { margin-top: 10px; }
+  .was { display: block; margin-top: 6px; font-style: italic; }
+  .pending { display: flex; flex-direction: column; gap: 14px; }
+  .pending .toast { align-self: center; }
+</style></head>
+<body data-size="1812x1545">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Your data · Verify Result</div>
+    <div class="meta">Settings › Your Data › Verify a Backup. The result is the row under Verify: what the file holds first, then the verdict. It stays until Dismiss or until you leave Settings. Nothing on this device changes.</div>
+  </div>
+
+  <div class="vgrid">
+    <div class="band-title"><span class="h3">Passed</span><span class="meta">The three endings of a backup that read back correctly.</span></div>
+
+    <div class="cell">
+      <div class="cap">In place · integrity check passed<small>A current backup, checksum intact. The result joins the Check a backup group.</small></div>
+      <div style="margin-top:8px">
+        <div class="label">Check a backup</div>
+        <div class="group frag" style="margin-top:10px">
+          <div class="set">
+            <div class="hd"><div class="txt"><div class="lbl">Verify a Backup</div></div><span class="btn quiet sm"><i data-i="yd-file-check" class="xs"></i>Verify</span></div>
+            <div class="help">Check a backup file without importing it: reads the whole file, verifies its structure and integrity checksum, and reports what it contains. Nothing on this device changes.</div>
+          </div>
+          <div class="set">
+            <div class="hd"><div class="txt"><div class="lbl">Verify Result</div></div><span class="btn quiet sm">Dismiss</span></div>
+            <div class="vsum">Backup from 9/20/2026, 8:14:03 PM: 38 notes, 124 highlights, 9 journal entries, 17 bookmarks — 1093 records across 26 data stores, plus 15 media files (41.6 MB).</div>
+            <div class="panel ok"><div class="pl"><i data-i="circle-check" class="sm"></i><span>Integrity check passed — the file looks intact.</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">No checksum yet<small>A backup made before exports carried a checksum.</small></div>
+      <div class="group frag"><div class="set">
+        <div class="hd"><div class="txt"><div class="lbl">Verify Result</div></div><span class="btn quiet sm">Dismiss</span></div>
+        <div class="vsum">Backup from 7/28/2026, 6:02:47 PM: 31 notes, 102 highlights, 7 journal entries, 14 bookmarks — 918 records across 24 data stores, plus 11 media files (30.2 MB).</div>
+        <div class="panel ok"><div class="pl"><i data-i="circle-check" class="sm"></i><span>Contents read back correctly. (No checksum — this backup predates integrity checksums; your next Export will include one.)</span></div></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Older text-format backup<small>A .json backup from before the current file format.</small></div>
+      <div class="group frag"><div class="set">
+        <div class="hd"><div class="txt"><div class="lbl">Verify Result</div></div><span class="btn quiet sm">Dismiss</span></div>
+        <div class="vsum">Backup from 3/14/2026, 9:30:12 AM: 22 notes, 76 highlights, 5 journal entries, 9 bookmarks — 604 records across 19 data stores, plus 6 media files (14.8 MB).</div>
+        <div class="panel ok"><div class="pl"><i data-i="circle-check" class="sm"></i><span>Older text-format backup — contents read back correctly (this format carries no checksum).</span></div></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">While the file is read<small>Verify, Export, Import and Clear pause, and any earlier result is cleared. A large file takes a moment.</small></div>
+      <div class="pending">
+        <div class="group frag"><div class="set">
+          <div class="hd"><div class="txt"><div class="lbl">Verify a Backup</div></div><span class="btn quiet sm is-off"><i data-i="yd-file-check" class="xs"></i>Verify</span></div>
+          <div class="help">Check a backup file without importing it: reads the whole file, verifies its structure and integrity checksum, and reports what it contains. Nothing on this device changes.</div>
+        </div></div>
+        <div class="toast"><span class="spin"></span><span class="grow">Checking backup…</span></div>
+      </div>
+    </div>
+
+    <div class="band-title"><span class="h3">Warnings</span><span class="meta">The file read, with a problem. The app writes these with a capitalised WARNING: and FAILED; drawn here in sentence case, as the import warnings already are.</span></div>
+
+    <div class="cell">
+      <div class="cap">Media cut short<small>The media stream stops early. The count is what can still be read, not what the file claims.</small></div>
+      <div class="group frag"><div class="set">
+        <div class="hd"><div class="txt"><div class="lbl">Verify Result</div></div><span class="btn quiet sm">Dismiss</span></div>
+        <div class="vsum">Backup from 9/20/2026, 8:14:03 PM: 38 notes, 124 highlights, 9 journal entries, 17 bookmarks — 1093 records across 26 data stores, plus 11 of 15 media files still readable (29.4 MB).</div>
+        <div class="panel warn"><div class="pl"><i data-i="yd-triangle-alert" class="sm"></i><span><b>Warning:</b> the media in this backup could not be read all the way through. Everything listed above can still be restored; the rest of the media is lost. Make a fresh Export.</span></div></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Integrity check failed · wording corrected<small>The app’s ending is garbled.<span class="was">Was: “Your data here still imported-readable, but make a fresh Export as soon as possible.”</span></small></div>
+      <div class="group frag"><div class="set">
+        <div class="hd"><div class="txt"><div class="lbl">Verify Result</div></div><span class="btn quiet sm">Dismiss</span></div>
+        <div class="vsum">Backup from 9/20/2026, 8:14:03 PM: 38 notes, 124 highlights, 9 journal entries, 17 bookmarks — 1093 records across 26 data stores, plus 15 media files (41.6 MB).</div>
+        <div class="panel warn"><div class="pl"><i data-i="yd-triangle-alert" class="sm"></i><span><b>Warning:</b> the integrity check failed — this file may be corrupted. What is listed above can still be read and imported, but make a fresh Export as soon as possible.</span></div></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Unexpected bytes at the end<small>The contents read, but the file’s closing checksum is damaged or followed by extra data.</small></div>
+      <div class="group frag"><div class="set">
+        <div class="hd"><div class="txt"><div class="lbl">Verify Result</div></div><span class="btn quiet sm">Dismiss</span></div>
+        <div class="vsum">Backup from 9/20/2026, 8:14:03 PM: 38 notes, 124 highlights, 9 journal entries, 17 bookmarks — 1093 records across 26 data stores, plus 15 media files (41.6 MB).</div>
+        <div class="panel warn"><div class="pl"><i data-i="yd-triangle-alert" class="sm"></i><span><b>Warning:</b> unexpected bytes at the end of the file — it may have been truncated or altered. Consider making a fresh Export.</span></div></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">The check did not finish<small>The app’s own check failed to run. That says nothing about the file.</small></div>
+      <div class="group frag"><div class="set">
+        <div class="hd"><div class="txt"><div class="lbl">Verify Result</div></div><span class="btn quiet sm">Dismiss</span></div>
+        <div class="vsum">Backup from 9/20/2026, 8:14:03 PM: 38 notes, 124 highlights, 9 journal entries, 17 bookmarks — 1093 records across 26 data stores, plus 15 media files (41.6 MB).</div>
+        <div class="panel warn"><div class="pl"><i data-i="yd-triangle-alert" class="sm"></i><span><b>Warning:</b> this backup could not be checked — the integrity check did not complete, so nothing here says whether the file is damaged. What is listed above was read from it. Try Verify again, and make a fresh Export if it keeps failing.</span></div></div>
+      </div></div>
+    </div>
+
+    <div class="band-title"><span class="h3">Failures</span><span class="meta">The file could not be read far enough to list anything, so there is no summary. The app gives these the same row as the warnings; drawn as errors to set them apart.</span></div>
+
+    <div class="cell">
+      <div class="cap">Not a backup<small>Any file whose contents are not a VOTReader backup.</small></div>
+      <div class="group frag"><div class="set">
+        <div class="hd"><div class="txt"><div class="lbl">Verify Result</div></div><span class="btn quiet sm">Dismiss</span></div>
+        <div class="panel err"><div class="pl"><i data-i="yd-circle-x" class="sm"></i><span>This file does not look like a VOTReader backup.</span></div></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Corrupt or incomplete<small>Nothing in it could be salvaged, not even the list of contents.</small></div>
+      <div class="group frag"><div class="set">
+        <div class="hd"><div class="txt"><div class="lbl">Verify Result</div></div><span class="btn quiet sm">Dismiss</span></div>
+        <div class="panel err"><div class="pl"><i data-i="yd-circle-x" class="sm"></i><span>This backup file is corrupt or incomplete and could not be read.</span></div></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Too large<small>Over the 50 MB limit for a file in the older text format.</small></div>
+      <div class="group frag"><div class="set">
+        <div class="hd"><div class="txt"><div class="lbl">Verify Result</div></div><span class="btn quiet sm">Dismiss</span></div>
+        <div class="panel err"><div class="pl"><i data-i="yd-circle-x" class="sm"></i><span>That file is too large to be a VOTReader backup (over 50 MB).</span></div></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Could not open · Android<small>The file picker could not hand the file over.</small></div>
+      <div class="group frag"><div class="set">
+        <div class="hd"><div class="txt"><div class="lbl">Verify Result</div></div><span class="btn quiet sm">Dismiss</span></div>
+        <div class="panel err"><div class="pl"><i data-i="yd-circle-x" class="sm"></i><span>Could not open the file. Please try again.</span></div></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Could not read · Android<small>The file was handed over but could not be read.</small></div>
+      <div class="group frag"><div class="set">
+        <div class="hd"><div class="txt"><div class="lbl">Verify Result</div></div><span class="btn quiet sm">Dismiss</span></div>
+        <div class="panel err"><div class="pl"><i data-i="yd-circle-x" class="sm"></i><span>Could not read the file.</span></div></div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Reading stopped partway · Android<small>The app’s link to the file broke mid-read. That says nothing about the file.</small></div>
+      <div class="group frag"><div class="set">
+        <div class="hd"><div class="txt"><div class="lbl">Verify Result</div></div><span class="btn quiet sm">Dismiss</span></div>
+        <div class="panel err"><div class="pl"><i data-i="yd-circle-x" class="sm"></i><span>This backup could not be checked — the app could not read the file all the way through. Please try again.</span></div></div>
+      </div></div>
+    </div>
+  </div>
+</div>
+</body></html>

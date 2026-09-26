@@ -1,0 +1,371 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="sx-icons.js"></script>
+<link rel="stylesheet" href="sx-common.css">
+<style>
+  /* shared list chrome (as the lb-, jp- and au- screens) */
+  .hd { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 4px; }
+  .hd .tt { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .hd .cnt { font-size: 15px; white-space: nowrap; }
+  .sortb { display: inline-flex; align-items: center; gap: 7px; height: 44px; padding: 0 4px 0 12px; color: var(--text-2); font: 400 14px/1 var(--sans); white-space: nowrap; flex: none; }
+  .sortb .i { color: var(--text-3); }
+  .scroll > .search, .lsearch { margin-top: 14px; }
+  .search.typed .q { flex: 1; min-width: 0; color: var(--text); font-size: 16px; white-space: nowrap; overflow: hidden; }
+  .search .x { color: var(--text-2); }
+  .search .clr { font: 700 14px/1 var(--sans); color: var(--accent); padding: 8px 2px 8px 8px; }
+  .countline { margin-top: 12px; font: 700 14px/1.3 var(--sans); color: var(--text-2); }
+  .tabs2 { margin-top: 14px; }
+  .stack10 > * + * { margin-top: 10px; }
+  .list-top { margin-top: 16px; }
+  /* history */
+  .hist .label { margin: 22px 0 6px; }
+  .ev { display: flex; align-items: flex-start; gap: 16px; padding: 10px 0; }
+  .ev .ic { width: 40px; height: 40px; border-radius: 20px; background: var(--surface-2); color: var(--text-2); display: grid; place-items: center; flex: none; }
+  .ev .txt { flex: 1; min-width: 0; padding-top: 1px; }
+  .ev .t { font: 500 18px/1.3 var(--serif); color: var(--text); }
+  .ev .meta { margin-top: 3px; }
+  /* link card */
+  .lk { position: relative; background: var(--surface); border-radius: 16px; --thread: color-mix(in srgb, var(--text-3) 42%, transparent); }
+  [data-theme="light"] .lk, [data-theme="light"] .nr, [data-theme="light"] .bk, [data-theme="light"] .hlc, [data-theme="light"] .jc { box-shadow: 0 1px 2px rgba(60,40,20,.06); }
+  .lk .ep { position: relative; padding: 14px 16px 14px 46px; }
+  .lk .ep .m { font: 400 13px/1.35 var(--sans); color: var(--text-3); }
+  .lk .ep .t { font: 500 18px/1.28 var(--serif); color: var(--text); margin-top: 3px; }
+  .lk .ep .q { font: italic 400 16px/1.45 var(--serif); color: var(--text-2); margin-top: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .lk .ep::before { content: ''; position: absolute; left: 21px; top: 40px; width: 9px; height: 9px; border-radius: 5px; box-sizing: border-box; }
+  .lk .ep.src::before { border: 2px solid var(--text-3); }
+  .lk .ep.tgt::before { background: var(--text-3); }
+  .lk .ep.src::after { content: ''; position: absolute; left: 25px; top: 51px; bottom: 0; width: 1.5px; background: var(--thread); }
+  .lk .ep.tgt::after { content: ''; position: absolute; left: 25px; top: 0; height: 38px; width: 1.5px; background: var(--thread); }
+  .lk .mid { position: relative; display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 2px 0 46px; }
+  .lk .mid::before { content: ''; position: absolute; left: 25px; top: 0; bottom: 0; width: 1.5px; background: var(--thread); }
+  .lk .mid .chain { position: absolute; left: 16px; top: 6px; width: 20px; height: 22px; display: grid; place-items: center; background: var(--surface); color: var(--text-2); }
+  .lk .mid .meta { flex: 1; }
+  .lk .mid .iconbtn { color: var(--text-2); }
+  /* note row */
+  .nr { position: relative; overflow: hidden; background: var(--surface); border-radius: 16px; padding: 14px 16px 16px 22px; }
+  .nr::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c, var(--accent)); }
+  .nr .src { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font: 700 13px/1.35 var(--sans); color: var(--text-2); }
+  .nr .src .d { font-weight: 400; color: var(--text-3); white-space: nowrap; }
+  .nr .body { margin-top: 12px; }
+  .nr .body .ph { height: 9px; }
+  .nr .body .ph + .ph { margin-top: 13px; }
+  .nr .anc { font: italic 400 16px/1.45 var(--serif); color: var(--text-2); margin-top: 12px; }
+  .ctl2 { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+  .ctl2 .btn { height: 36px; }
+  /* bookmark row */
+  .bk { display: flex; gap: 12px; background: var(--surface); border-radius: 16px; padding: 14px 6px 14px 16px; }
+  .bk .ic { color: var(--accent); margin-top: 1px; }
+  .bk .txt { flex: 1; min-width: 0; }
+  .bk .s { font: 500 18px/1.28 var(--serif); color: var(--text); }
+  .bk .lbl { margin-top: 10px; }
+  .bk .lbl .ph { height: 9px; }
+  .bk .nolbl { margin-top: 6px; font: italic 400 14px/1.3 var(--sans); color: var(--text-3); }
+  .bk .side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .bk .side .meta { padding: 3px 12px 0 0; white-space: nowrap; }
+  .bk .side .iconbtn { color: var(--text-2); width: 40px; height: 40px; }
+  /* marks */
+  .hlx-eb { margin-top: 2px; }
+  .hlx-t { font: 500 28px/1.12 var(--serif); letter-spacing: -0.01em; margin-top: 4px; }
+  .frow { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  .frow .lab { font: 400 13px/1 var(--sans); color: var(--text-3); width: 44px; flex: none; }
+  .frow.wrap { flex-wrap: wrap; row-gap: 8px; padding-left: 52px; position: relative; }
+  .frow.wrap .lab { position: absolute; left: 0; top: 10px; }
+  .frow .chip { height: 32px; padding: 0 12px; font-size: 13px; }
+  .frow .dt { width: 22px; height: 22px; border-radius: 11px; flex: none; }
+  .hlc { position: relative; overflow: hidden; background: var(--surface); border-radius: 16px; padding: 14px 16px 14px 22px; }
+  .hlc::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c); }
+  .hlc .top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .hlc .top .s { font: 700 13px/1.3 var(--sans); color: var(--text-2); }
+  .hlc .top .k { font: 400 13px/1.3 var(--sans); color: var(--text-3); }
+  .hlc .qt { margin-top: 8px; font: 400 17px/1.5 var(--serif); color: var(--text); }
+  .hlc .qt.ul { text-decoration: underline; text-decoration-color: var(--c); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+  .hlc .meta { margin-top: 8px; }
+  /* journal */
+  .jc { background: var(--surface); border-radius: 18px; padding: 16px 12px 16px 18px; }
+  .jc .row1 { display: flex; align-items: center; gap: 8px; }
+  .jc .row1 .ph { height: 14px; background: color-mix(in srgb, var(--text) 18%, var(--surface-3)); }
+  .jc .row1 .iconbtn { margin-left: auto; color: var(--text-2); width: 36px; height: 36px; }
+  .jc .dt { margin-top: 8px; }
+  .jc .pv { margin-top: 14px; }
+  .jc .pv .ph { height: 9px; }
+  .jc .pv .ph + .ph { margin-top: 13px; }
+  .jc .att { display: flex; gap: 8px; margin-top: 14px; }
+  .jc .att span { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 15px; background: var(--surface-2); font: 400 13px/1 var(--sans); color: var(--text-2); }
+  .jc .att .i { width: 15px; height: 15px; color: var(--text-3); }
+  /* saved recordings */
+  .au-hero .h1 { margin-top: 4px; }
+  .au-hero .body { margin-top: 8px; }
+  .au-sh { display: flex; align-items: flex-end; margin: 26px 0 12px; }
+  .au-sh .h2 { margin-top: 2px; display: flex; align-items: baseline; gap: 10px; }
+  .au-sh .h2 small { font: 400 15px/1 var(--sans); color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .au-sh .meta { margin-top: 4px; }
+  .au-list { background: var(--surface); border-radius: 16px; overflow: hidden; }
+  [data-theme="light"] .au-list { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .au-list > * + * { border-top: 1px solid var(--hairline); }
+  .au-rec { display: flex; align-items: flex-start; gap: 12px; padding: 14px 6px 6px 14px; }
+  .au-rp { width: 44px; height: 44px; border-radius: 22px; background: var(--surface-2); color: var(--text); display: grid; place-items: center; flex: none; }
+  .au-rp .i { width: 17px; height: 17px; fill: currentColor; }
+  .au-cp { flex: 1; min-width: 0; padding-top: 2px; }
+  .au-t { font: 500 17px/1.28 var(--serif); color: var(--text); }
+  .au-cp .meta { margin-top: 3px; }
+  .au-ml { display: flex; align-items: center; gap: 2px; min-height: 40px; }
+  .au-ml .w { font: 400 13px/1.35 var(--sans); color: var(--text-3); }
+  .au-ml .w.rem { color: var(--text-2); }
+  .au-ml .sp { flex: 1; }
+  .au-ib { width: 40px; height: 40px; border-radius: 20px; display: grid; place-items: center; color: var(--text-3); }
+  .au-ib .i { width: 19px; height: 19px; }
+  .au-ib.on { color: var(--accent); }
+  .au-ib.on .i { fill: currentColor; }
+  /* songs */
+  .shuf { margin-top: 18px; }
+  .schips { display: flex; gap: 8px; margin-top: 12px; overflow: hidden; }
+  .schips .chip { height: 32px; font-size: 13px; padding: 0 12px; }
+  .ssec { display: flex; align-items: baseline; justify-content: space-between; margin: 24px 0 12px; }
+  .ssec .h2 { font-size: 22px; }
+  .srow { display: flex; align-items: center; gap: 12px; padding: 10px 6px 10px 12px; }
+  .cover { width: 52px; height: 52px; border-radius: 10px; flex: none; --t1: var(--dot-honey); --t2: var(--dot-clay);
+    background: radial-gradient(85% 70% at 32% 18%, color-mix(in srgb, var(--t1) 58%, transparent), transparent 72%),
+      radial-gradient(90% 65% at 85% 105%, color-mix(in srgb, var(--t2) 40%, transparent), transparent 70%),
+      linear-gradient(160deg, var(--surface-3), var(--surface-2)); }
+  .cover.k2 { --t1: var(--dot-sky); --t2: var(--dot-lavender); } .cover.k3 { --t1: var(--dot-sage); --t2: var(--dot-honey); } .cover.k4 { --t1: var(--dot-rose); --t2: var(--dot-clay); }
+  .srow .cp { flex: 1; min-width: 0; }
+  .srow .cp b { display: block; font: 500 17px/1.25 var(--serif); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .srow .cp span { display: block; margin-top: 3px; font: italic 400 13px/1.3 var(--sans); color: var(--text-3); }
+  .srow .len { font: 400 13px/1 var(--sans); color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .srow .pb { width: 40px; height: 40px; border-radius: 20px; background: var(--surface-2); color: var(--text); display: grid; place-items: center; flex: none; }
+  .srow .pb .i { width: 15px; height: 15px; fill: currentColor; }
+  /* nothing-matches strip */
+  .nm { display: flex; flex-direction: column; gap: 12px; background: var(--bg); border-radius: 18px; padding: 16px; box-shadow: 0 0 0 1px var(--hairline); }
+  .nm .search { margin: 0; }
+  .nm .ttl2 { font: 500 20px/1.25 var(--serif); color: var(--text); text-align: center; margin-top: 10px; }
+  .nm .hint2 { font: 400 14px/1.4 var(--sans); color: var(--text-2); text-align: center; }
+  .nm .line2 { font: 400 15px/1.45 var(--sans); color: var(--text-2); }
+  .nm .line2 b { color: var(--text); }
+  .strip { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 309px); column-gap: 36px; margin-top: 4px; }
+  .strip-h { grid-column: 1 / -1; font: 500 21px/1.2 var(--serif); color: var(--text); padding-top: 16px; border-top: 1px solid var(--hairline); margin-top: 6px; }
+  .strip-h .meta { display: block; font-family: var(--sans); margin-top: 4px; }
+</style></head>
+<body data-size="1424x1990">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Search inside lists</div>
+    <div class="meta">Every personal list filters as you type, on its own words (titles, places, the words you marked or linked). Only History and Saved recordings count what matches; the others simply narrow, and say “No Matches” when nothing is left. Your own notes, labels and journal words stay as bars.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(4, 309px); column-gap: 36px; row-gap: 30px">
+
+    <!-- History -->
+    <div class="cell">
+      <div class="cap">History · “psalm”<small>Counts visits; every day with a match opens</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">History</span></div>
+        <div class="scroll hist">
+          <div class="search typed" style="margin-top:6px"><i data-i="search" class="sm"></i><span class="q">psalm</span><i data-i="x" class="sm x"></i></div>
+          <div class="countline">3 visits match</div>
+          <div class="label">Today</div>
+          <div class="ev"><span class="ic"><i data-i="book-open" class="sm"></i></span><div class="txt"><div class="t">Psalms 23</div><div class="meta">The Scriptures of Truth · 7:52 AM</div></div></div>
+          <div class="label">Yesterday</div>
+          <div class="ev"><span class="ic"><i data-i="book-open" class="sm"></i></span><div class="txt"><div class="t">Psalms 91</div><div class="meta">The Scriptures of Truth · 2 visits · 9:30 PM</div></div></div>
+          <div class="label">Tuesday · Sep 22</div>
+          <div class="ev"><span class="ic"><i data-i="book-open" class="sm"></i></span><div class="txt"><div class="t">Psalms 139</div><div class="meta">The Scriptures of Truth · 8:05 AM</div></div></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- My Links -->
+    <div class="cell">
+      <div class="cap">My Links · “born”<small>Both ends searched: titles, places, the linked words</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Library</span></div>
+        <div class="scroll">
+          <div class="hd"><div class="tt"><span class="h1">My Links</span><span class="meta cnt">12 links</span></div><span class="sortb"><i data-i="arrow-up-down" class="xs"></i>Newest</span></div>
+          <div class="search typed lsearch"><i data-i="search" class="sm"></i><span class="q">born</span><i data-i="x" class="sm x"></i></div>
+          <div class="stack10 list-top">
+            <div class="lk">
+              <div class="ep src"><div class="m">Source · Volume Two</div><div class="t">The True Baptism</div><div class="q">baptism by water is nothing, unless one is first washed by The Word, being baptized in the Spirit of Grace and Truth</div></div>
+              <div class="mid"><span class="chain"><i data-i="link" class="xs"></i></span><span class="meta">2h ago</span><span class="iconbtn"><i data-i="ellipsis-vertical" class="sm"></i></span></div>
+              <div class="ep tgt"><div class="m">Target · New Testament</div><div class="t">John 3:5</div><div class="q">Jesus answered, “Most assuredly, I say to you, unless one is born of water and the Spirit, he cannot enter the kingdom of God.</div></div>
+            </div>
+            <div class="lk">
+              <div class="ep src"><div class="m">Source · New Testament</div><div class="t">John 3:3</div><div class="q">unless one is born again, he cannot see the kingdom of God.</div></div>
+              <div class="mid"><span class="chain"><i data-i="link" class="xs"></i></span><span class="meta">3d ago</span><span class="iconbtn"><i data-i="ellipsis-vertical" class="sm"></i></span></div>
+              <div class="ep tgt"><div class="m">Target · Volume Three</div><div class="t">Born Again</div><div class="q">that none shall enter The Kingdom of Heaven, unless they are born again.</div></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- My Notes -->
+    <div class="cell">
+      <div class="cap">My Notes · All Notes · “fruit”<small>Your words, the passage, and its place are searched</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Library</span></div>
+        <div class="scroll">
+          <div class="hd"><div class="tt"><span class="h1">My Notes</span><span class="meta cnt">23 notes</span></div></div>
+          <div class="seg tabs2"><span>Notebooks</span><span class="on">All Notes</span></div>
+          <div class="search typed lsearch"><i data-i="search" class="sm"></i><span class="q">fruit</span><i data-i="x" class="sm x"></i></div>
+          <div class="ctl2"><span class="btn secondary sm"><i data-i="share-2" class="sm"></i>Share as Text</span><span class="sortb"><i data-i="arrow-up-down" class="xs"></i>Newest</span></div>
+          <div class="stack10" style="margin-top:12px">
+            <div class="nr" style="--c: var(--dot-sage)">
+              <div class="src"><span>Matthew 7:20</span><span class="d">2d ago</span></div>
+              <div class="body"><div class="ph" style="width:92%"></div><div class="ph" style="width:64%"></div></div>
+              <div class="anc">“Therefore by their fruits you will know them.”</div>
+            </div>
+            <div class="nr" style="--c: var(--dot-honey)">
+              <div class="src"><span>Know That Which Has Been Poured Out, The Word of God</span><span class="d">1w ago</span></div>
+              <div class="body"><div class="ph" style="width:88%"></div><div class="ph" style="width:96%"></div><div class="ph" style="width:40%"></div></div>
+              <div class="anc">“Thus by their fruits you shall know them.”</div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- My Bookmarks -->
+    <div class="cell">
+      <div class="cap">My Bookmarks · “john”<small>Searches the label and the place</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Library</span></div>
+        <div class="scroll">
+          <div class="hd"><div class="tt"><span class="h1">My Bookmarks</span><span class="meta cnt">9 bookmarks</span></div></div>
+          <div class="search typed lsearch"><i data-i="search" class="sm"></i><span class="q">john</span><i data-i="x" class="sm x"></i></div>
+          <div class="ctl2" style="justify-content:flex-end"><span class="sortb"><i data-i="arrow-up-down" class="xs"></i>Newest</span></div>
+          <div class="stack10" style="margin-top:6px">
+            <div class="bk"><i data-i="bookmark" class="sm ic"></i><div class="txt"><div class="s">John 3:16</div><div class="lbl"><div class="ph" style="width:70%"></div></div></div><div class="side"><span class="meta">3d ago</span><span class="iconbtn"><i data-i="ellipsis-vertical" class="sm"></i></span></div></div>
+            <div class="bk"><i data-i="bookmark" class="sm ic"></i><div class="txt"><div class="s">1 John 4:8</div><div class="nolbl">(no label)</div></div><div class="side"><span class="meta">1w ago</span><span class="iconbtn"><i data-i="ellipsis-vertical" class="sm"></i></span></div></div>
+            <div class="bk"><i data-i="bookmark" class="sm ic"></i><div class="txt"><div class="s">John 14:6</div><div class="lbl"><div class="ph" style="width:52%"></div></div></div><div class="side"><span class="meta">Aug 14</span><span class="iconbtn"><i data-i="ellipsis-vertical" class="sm"></i></span></div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- My Marks -->
+    <div class="cell">
+      <div class="cap">My Marks · “kingdom”<small>The marked words and their place; Type and Color still apply</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Library</span></div>
+        <div class="scroll">
+          <div class="eyebrow hlx-eb">My Marks</div>
+          <div class="hd" style="padding-top:0"><div class="tt"><span class="hlx-t">Highlights &amp; Underlines</span></div></div>
+          <div class="meta" style="margin-top:4px">124 marks</div>
+          <div class="search typed lsearch"><i data-i="search" class="sm"></i><span class="q">kingdom</span><i data-i="x" class="sm x"></i></div>
+          <div class="frow wrap"><span class="lab">Type</span><span class="chip on">All</span><span class="chip">Highlights</span><span class="chip">Underlines</span><span class="chip">Squiggles</span></div>
+          <div class="frow"><span class="lab">Color</span><span class="chip on">All</span><span class="dt" style="background:var(--dot-honey)"></span><span class="dt" style="background:var(--dot-sage)"></span><span class="dt" style="background:var(--dot-rose)"></span><span class="dt" style="background:var(--dot-sky)"></span></div>
+          <div class="stack10" style="margin-top:14px">
+            <div class="hlc" style="--c: var(--dot-honey)"><div class="top"><span class="s">John 3:3</span><span class="k">Highlight</span></div><div class="qt">“Most assuredly, I say to you, unless one is born again, he cannot see the kingdom of God.”</div><div class="meta">2d ago</div></div>
+            <div class="hlc" style="--c: var(--dot-sage)"><div class="top"><span class="s">Matthew 12:25</span><span class="k">Underline</span></div><div class="qt ul">“Every kingdom divided against itself is brought to desolation”</div><div class="meta">5d ago</div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- Journal -->
+    <div class="cell">
+      <div class="cap">My Journal · “sabbath”<small>Title, text and #tags; all of it yours, so all bars</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Library</span></div>
+        <div class="scroll">
+          <div class="hd"><div class="tt"><span class="h1">My Journal</span><span class="meta cnt">9 entries</span></div><span class="sortb"><i data-i="arrow-up-down" class="xs"></i>Newest</span></div>
+          <div class="seg tabs2"><span class="on">All Entries</span><span>Pinned</span></div>
+          <div class="search typed lsearch"><i data-i="search" class="sm"></i><span class="q">sabbath</span><i data-i="x" class="sm x"></i></div>
+          <div class="stack10" style="margin-top:14px">
+            <div class="jc">
+              <div class="row1"><div class="ph" style="width:46%"></div><span class="iconbtn"><i data-i="ellipsis-vertical" class="sm"></i></span></div>
+              <div class="meta dt">Sep 13 · 8:30 PM</div>
+              <div class="pv"><div class="ph" style="width:94%"></div><div class="ph" style="width:70%"></div></div>
+              <div class="att"><span><i data-i="book-open"></i>1 scripture</span><span><i data-i="scroll-text"></i>1 letter</span></div>
+            </div>
+            <div class="jc">
+              <div class="row1"><div class="ph" style="width:58%"></div><span class="iconbtn"><i data-i="ellipsis-vertical" class="sm"></i></span></div>
+              <div class="meta dt">Aug 29 · 7:40 AM</div>
+              <div class="pv"><div class="ph" style="width:90%"></div><div class="ph" style="width:48%"></div></div>
+              <div class="att"><span><i data-i="mic"></i>Voice · 1:12</span></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- Saved recordings -->
+    <div class="cell">
+      <div class="cap">Saved recordings · “volume one”<small>The count reads 3 of 9 while it narrows</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Listening Library</span></div>
+        <div class="scroll">
+          <div class="au-hero"><div class="eyebrow">Listening Library</div><div class="h1">Saved recordings</div><div class="body">The recordings you chose to keep — they travel with your VOTReader backup.</div></div>
+          <div class="search typed lsearch" style="margin-top:18px"><i data-i="search" class="sm"></i><span class="q">volume one</span><span class="clr">Clear</span></div>
+          <div class="au-sh"><div><div class="eyebrow">Keep close</div><div class="h2">Your shelf <small>3 of 9</small></div><div class="meta">Starred recordings, newest first.</div></div></div>
+          <div class="au-list">
+            <div class="au-rec"><span class="au-rp"><i data-i="play"></i></span><div class="au-cp"><div class="au-t">Know That Which Has Been Poured Out, The Word of God</div><div class="meta">Volume One</div><div class="au-ml"><span class="w rem">3:18 left</span><span class="sp"></span><span class="au-ib"><i data-i="file-text"></i></span><span class="au-ib on"><i data-i="star"></i></span></div></div></div>
+            <div class="au-rec"><span class="au-rp"><i data-i="play"></i></span><div class="au-cp"><div class="au-t">Death and Awakening</div><div class="meta">Volume One</div><div class="au-ml"><span class="w">Saved</span><span class="sp"></span><span class="au-ib"><i data-i="file-text"></i></span><span class="au-ib on"><i data-i="star"></i></span></div></div></div>
+            <div class="au-rec"><span class="au-rp"><i data-i="play"></i></span><div class="au-cp"><div class="au-t">Duty</div><div class="meta">Volume One</div><div class="au-ml"><span class="w">Finished</span><span class="sp"></span><span class="au-ib"><i data-i="file-text"></i></span><span class="au-ib on"><i data-i="star"></i></span></div></div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- Songs -->
+    <div class="cell">
+      <div class="cap">Songs of the Letters · “lamb”<small>Titles, versions, makers and letters; the count heads the list</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Listening Library</span></div>
+        <div class="scroll">
+          <div class="au-hero"><div class="eyebrow">Sung by the flock</div><div class="h1">Songs of the Letters</div><div class="body">Songs made by members of the flock with Suno, from the words of The Volumes of Truth.</div></div>
+          <span class="btn primary shuf"><i data-i="shuffle" class="sm"></i>Shuffle all songs</span>
+          <div class="search typed lsearch"><i data-i="search" class="sm"></i><span class="q">lamb</span><i data-i="x" class="sm x"></i></div>
+          <div class="schips"><span class="chip on">All</span><span class="chip">Worship</span><span class="chip">Pop</span><span class="chip">Hip-hop</span><span class="chip">Cinematic</span></div>
+          <div class="ssec"><span class="h2">Songs</span><span class="meta">4 songs</span></div>
+          <div class="au-list">
+            <div class="srow"><span class="cover"></span><span class="cp"><b>I Am The Passover and The Lamb</b><span>2 versions</span></span><span class="len">4:28</span><span class="pb"><i data-i="play"></i></span></div>
+            <div class="srow"><span class="cover k2"></span><span class="cp"><b>Song of the Lamb</b><span>2 versions</span></span><span class="len">2:51</span><span class="pb"><i data-i="play"></i></span></div>
+            <div class="srow"><span class="cover k3"></span><span class="cp"><b>The Lamb... NOW, The LION!</b><span>Bible songs</span></span><span class="len">4:18</span><span class="pb"><i data-i="play"></i></span></div>
+            <div class="srow"><span class="cover k4"></span><span class="cp"><b>The Song of The Lamb</b><span>2 versions</span></span><span class="len">2:46</span><span class="pb"><i data-i="play"></i></span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="strip-h">When nothing matches<span class="meta">Full size, in each list’s own words</span></div>
+    <div class="strip">
+      <div class="cell">
+        <div class="cap">History<small>The count line turns into the message</small></div>
+        <div class="nm">
+          <div class="search typed"><i data-i="search" class="sm"></i><span class="q">psalmz</span><i data-i="x" class="sm x"></i></div>
+          <div class="line2"><b>No visits match</b></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">The other five lists<small>Links, Notes, Bookmarks, Marks, Journal</small></div>
+        <div class="nm">
+          <div class="search typed"><i data-i="search" class="sm"></i><span class="q">harvest</span><i data-i="x" class="sm x"></i></div>
+          <div class="ttl2">No Matches</div>
+          <div class="hint2">Try a different search term.</div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">Saved recordings<small>The count reads 0 of 9</small></div>
+        <div class="nm">
+          <div class="search typed"><i data-i="search" class="sm"></i><span class="q">grace</span><span class="clr">Clear</span></div>
+          <div class="line2">No saved recordings match <b>“grace”</b>.</div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cap">Songs of the Letters<small>Under “Songs · 0 songs”</small></div>
+        <div class="nm">
+          <div class="search typed"><i data-i="search" class="sm"></i><span class="q">lighthouse</span><i data-i="x" class="sm x"></i></div>
+          <div class="line2">No song by that name. Try a word from the letter.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

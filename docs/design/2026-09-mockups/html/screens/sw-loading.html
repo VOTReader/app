@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="sw-icons.js"></script>
+<link rel="stylesheet" href="sw-common.css">
+<style>
+  .ghost { position: absolute; inset: 0; width: 915px; height: 412px; }
+  .ghost path { fill: none; stroke: var(--surface-3); stroke-width: 1; }
+  .ghost .ground { stroke: var(--accent); opacity: .3; }
+  .load { position: absolute; left: 0; right: 0; top: 214px; text-align: center; }
+  .load .t { font: italic 400 24px/1.2 var(--serif); color: var(--text-2); }
+</style></head>
+<body class="landscape" data-themes="dark">
+<div class="ls">
+  <!-- nothing to draw yet: the ground line and the dome's outline hold the place the web will fill -->
+  <svg class="ghost" viewBox="0 0 915 412" aria-hidden="true">
+    <path d="M18 346 A 439.5 254 0 0 1 897 346"/>
+    <path d="M131 346 A 326 188 0 0 1 783 346"/>
+    <path class="ground" d="M18 346.5 H897"/>
+  </svg>
+  <div class="chrome">
+    <span class="iconbtn back"><i data-i="chevron-left"></i></span>
+    <div class="brand"><div class="h2">Scripture Web</div></div>
+  </div>
+  <div class="load" role="status"><div class="t">Weaving the web…</div></div>
+</div>
+</body></html>

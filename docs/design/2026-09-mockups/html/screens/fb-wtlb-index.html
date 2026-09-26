@@ -1,0 +1,62 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* Words To Live By, Part One: pinned header, then the two-column grid scrolled to the reader's place */
+  .idx { padding-top: 8px; }
+  .hdr { margin: 0 calc(-1 * var(--gutter)); padding: 0 var(--gutter) 18px; border-bottom: 1px solid var(--hairline); }
+  .hdr .h1 { margin-top: 4px; }
+  .hdr .meta.sub { margin-top: 6px; }
+  /* Play all, then the recorded parts: one row that scrolls sideways */
+  .plays { margin: 18px calc(-1 * var(--gutter)) 0 0; }
+  .plays .btn.sm, .plays .chip { height: 36px; flex: none; }
+  .plays .chip { border-radius: 18px; }
+  .plays .chip .i { color: var(--text-3); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-top: 14px; }
+  .wc { background: var(--surface); border-radius: 16px; padding: 14px 14px 13px; display: flex; flex-direction: column; min-height: 112px; }
+  [data-theme="light"] .wc { box-shadow: 0 1px 2px rgba(60,40,20,0.05); }
+  .wc .n { display: flex; align-items: center; gap: 7px; font: 700 14px/1.2 var(--sans); color: var(--text-3); }
+  .rd { width: 7px; height: 7px; border-radius: 4px; background: var(--accent); flex: none; }
+  .wc .t { flex: 1; margin-top: 8px; font: 500 18px/1.25 var(--serif); color: var(--text); text-wrap: pretty; }
+  .wc .m { margin-top: 10px; font: 400 13px/1.2 var(--sans); color: var(--text-3); }
+  .wc.cur { background: var(--accent-soft); box-shadow: none; }
+  .wc.cur .pill { margin-top: 10px; align-self: flex-start; }
+  .sbar { position: absolute; right: 4px; top: 520px; width: 3px; height: 70px; border-radius: 2px; background: var(--text-3); opacity: .35; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">The Volumes of Truth</span>
+  </div>
+  <div class="scroll idx">
+    <div class="hdr">
+      <div class="eyebrow">Part One · Words of Wisdom</div>
+      <div class="h1">Words To Live By</div>
+      <div class="meta sub">149 entries</div>
+      <div class="chips plays">
+        <span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Play all</span>
+        <span class="chip"><i data-i="play" class="xs fill"></i>Part 1 · Intro–19</span>
+        <span class="chip"><i data-i="play" class="xs fill"></i>Part 2 · 20–39</span>
+        <span class="chip"><i data-i="play" class="xs fill"></i>Part 3 · 40–59</span>
+        <span class="chip"><i data-i="play" class="xs fill"></i>Part 4 · 60–80</span>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="wc"><div class="n">65<span class="rd"></span></div><div class="t">The Truth Endures Forever</div><div class="m">~1 min</div></div>
+      <div class="wc"><div class="n">66<span class="rd"></span></div><div class="t">Anathema</div><div class="m">~1 min</div></div>
+      <div class="wc"><div class="n">67<span class="rd"></span></div><div class="t">The Redeemer</div><div class="m">~1 min</div></div>
+      <div class="wc"><div class="n">68<span class="rd"></span></div><div class="t">Letting Go</div><div class="m">~1 min</div></div>
+      <div class="wc"><div class="n">69<span class="rd"></span></div><div class="t">True Fellowship</div><div class="m">~1 min</div></div>
+      <div class="wc cur"><div class="n">70</div><div class="t">Walk Humbly with Your God</div><span class="pill">Reading · 40%</span></div>
+      <div class="wc"><div class="n">71</div><div class="t">Faith</div><div class="m">~1 min</div></div>
+      <div class="wc"><div class="n">72</div><div class="t">Walking Free</div><div class="m">~1 min</div></div>
+      <div class="wc"><div class="n">73</div><div class="t">Antidote</div><div class="m">~1 min</div></div>
+      <div class="wc"><div class="n">74</div><div class="t">Idle Hands</div><div class="m">~1 min</div></div>
+      <div class="wc"><div class="n">75</div><div class="t">I Remain Always</div><div class="m">~1 min</div></div>
+      <div class="wc"><div class="n">76</div><div class="t">Elect and Precious</div><div class="m">~1 min</div></div>
+    </div>
+  </div>
+</div>
+<div class="sbar"></div>
+</body></html>

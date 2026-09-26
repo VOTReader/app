@@ -1,0 +1,55 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="au-shared.css"><script src="../kit/kit.js"></script>
+<style>
+  .board-grid { grid-template-columns: repeat(3, 412px); column-gap: 32px; }
+  .col { display: flex; flex-direction: column; gap: 22px; }
+  .col > .h3 { margin-bottom: -6px; }
+  .lrow + .lrow { margin-top: 14px; }
+  .lab { font: 700 12px/1.3 var(--sans); color: var(--text-3); letter-spacing: .04em; text-transform: uppercase; margin-bottom: 8px; }
+  .lrow .au-rec { background: var(--surface); border-radius: 16px; padding-bottom: 10px; }
+  [data-theme="light"] .lrow .au-rec { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .lrow .au-dl { margin: 6px 0 0; }
+  .hero-s { background: var(--bg); border-radius: 20px; padding: 16px 18px 18px; box-shadow: 0 0 0 1px var(--hairline); }
+  .hero-s .h2 { margin-top: 2px; }
+  .hero-s .meta { margin-top: 4px; }
+  .hero-s .au-acts { margin-top: 14px; }
+  .au-dl.coll { margin: 0; font-size: 13px; }
+  .au-dl.coll.ok { color: var(--text-2); }
+  .need { flex-basis: 100%; margin-top: 0 !important; }
+  .top { background: var(--bg); border-radius: 24px; overflow: hidden; box-shadow: 0 0 0 1px var(--hairline); }
+  .top .au-strip .lead { width: 20px; height: 20px; flex: none; color: var(--text-2); }
+  .top .pc { padding: 18px 20px 20px; }
+  .top .pc .ph + .ph { margin-top: 16px; }
+</style></head>
+<body data-size="1380x1170">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Downloads to the phone · states</div>
+    <div class="meta">Android app only. The plain line under a recording, the collection's action beside Play all, and the offline-library strip under the top bar. "Download" and "On this phone", never "Save".</div>
+  </div>
+  <div class="board-grid">
+    <div class="col"><div class="h3">Under a recording</div><div class="lrow"><div class="lab">Not on the phone yet</div><div class="au-rec"><span class="au-rp"><i data-i="play"></i></span><div class="au-cp"><div class="au-t"><span class="au-num">13</span>Duty</div><div class="meta au-srcl">Read by Benjamin</div><div class="au-dl get"><i data-i="download"></i>Download · 1.6 MB</div></div><span class="au-ib"><i data-i="file-text"></i></span></div></div>
+<div class="lrow"><div class="lab">Downloading</div><div class="au-rec"><span class="au-rp"><i data-i="play"></i></span><div class="au-cp"><div class="au-t"><span class="au-num">8</span>Sex</div><div class="meta au-srcl">Read by Benjamin</div><div class="au-dl get"><i data-i="download"></i>Downloading 42% <span class="lk">Cancel</span><span class="bar"><i style="width:42%"></i></span></div></div><span class="au-ib"><i data-i="file-text"></i></span></div></div>
+<div class="lrow"><div class="lab">On the phone</div><div class="au-rec"><span class="au-rp"><i data-i="play"></i></span><div class="au-cp"><div class="au-t"><span class="au-num">1</span>Chosen by God</div><div class="meta au-srcl">Read by Benjamin</div><div class="au-dl"><i data-i="circle-check"></i>On this phone · 3.1 MB</div></div><span class="au-ib"><i data-i="file-text"></i></span></div></div>
+<div class="lrow"><div class="lab">No signal, not on the phone</div><div class="au-rec off"><span class="au-rp off"><i data-i="play"></i></span><div class="au-cp"><div class="au-t"><span class="au-num">23</span>God Eternal</div><div class="meta au-srcl">Text-to-speech</div><div class="au-dl"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>Needs a connection</div></div><span class="au-ib"><i data-i="file-text"></i></span></div></div>
+<div class="lrow"><div class="lab">Failed</div><div class="au-rec"><span class="au-rp"><i data-i="play"></i></span><div class="au-cp"><div class="au-t"><span class="au-num">26</span>Watch</div><div class="meta au-srcl">Text-to-speech</div><div class="au-dl fail"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.5v.01"/></svg>Download failed · <span class="lk">Retry</span></div></div><span class="au-ib"><i data-i="file-text"></i></span></div></div>
+<div class="lrow"><div class="lab">No room</div><div class="au-rec"><span class="au-rp"><i data-i="play"></i></span><div class="au-cp"><div class="au-t"><span class="au-num">27</span>Purify Your Faith</div><div class="meta au-srcl">Read by Benjamin</div><div class="au-dl fail"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.5v.01"/></svg>Not enough room on this phone · <span class="lk">Retry</span></div></div><span class="au-ib"><i data-i="file-text"></i></span></div></div></div>
+    <div class="col"><div class="h3">Beside Play all</div><div class="cell"><div class="cap">Ready</div><div class="hero-s"><div class="eyebrow">Listening Library</div><div class="h2">Volume One</div><div class="meta">All 30 letters have recordings</div><div class="au-acts"><span class="btn primary sm"><i data-i="play" class="fill"></i>Play all</span><span class="btn secondary sm"><i data-i="download"></i>Download all</span></div></div></div>
+<div class="cell"><div class="cap">Downloading the collection</div><div class="hero-s"><div class="eyebrow">Listening Library</div><div class="h2">Volume One</div><div class="meta">All 30 letters have recordings</div><div class="au-acts"><span class="btn primary sm"><i data-i="play" class="fill"></i>Play all</span><span class="au-dl coll"><i data-i="download"></i>Downloading · 12 of 31 on this phone <span class="lk">Cancel</span></span></div></div></div>
+<div class="cell"><div class="cap">All of it on the phone</div><div class="hero-s"><div class="eyebrow">Listening Library</div><div class="h2">Volume One</div><div class="meta">All 30 letters have recordings</div><div class="au-acts"><span class="btn primary sm"><i data-i="play" class="fill"></i>Play all</span><span class="au-dl coll ok"><i data-i="circle-check"></i>All on this phone</span></div></div></div>
+<div class="cell"><div class="cap">No signal</div><div class="hero-s"><div class="eyebrow">Listening Library</div><div class="h2">Volume One</div><div class="meta">All 30 letters have recordings</div><div class="au-acts"><span class="btn primary sm"><i data-i="play" class="fill"></i>Play the 3 on this phone</span><span class="btn secondary sm is-off"><i data-i="download"></i>Download all</span><div class="meta need">Needs a connection</div></div></div></div></div>
+    <div class="col"><div class="h3">Offline library strip</div><div class="cell"><div class="cap">Incomplete<small>Only the missing files download again</small></div><div class="top"><div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Volume One</span><span class="iconbtn"><i data-i="search"></i></span></div>
+<div class="au-strip"><i data-i="download" class="lead"></i><div class="au-cp"><b>Offline library incomplete.</b> 3 files did not download.</div><span class="btn sm">Retry</span><span class="iconbtn"><i data-i="x" class="sm"></i></span></div>
+<div class="pc"><div class="ph" style="width:88%"></div><div class="ph" style="width:64%"></div></div></div></div>
+<div class="cell"><div class="cap">Retrying</div><div class="top"><div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Volume One</span><span class="iconbtn"><i data-i="search"></i></span></div>
+<div class="au-strip"><i data-i="download" class="lead"></i><div class="au-cp"><b>Downloading 3 missing files…</b></div><span class="iconbtn"><i data-i="x" class="sm"></i></span></div>
+<div class="pc"><div class="ph" style="width:88%"></div><div class="ph" style="width:64%"></div></div></div></div>
+<div class="cell"><div class="cap">Complete</div><div class="top"><div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Volume One</span><span class="iconbtn"><i data-i="search"></i></span></div>
+<div class="au-strip"><i data-i="circle-check" class="lead"></i><div class="au-cp"><b>Offline library complete.</b></div></div>
+<div class="pc"><div class="ph" style="width:88%"></div><div class="ph" style="width:64%"></div></div></div></div>
+<div class="cell"><div class="cap">Still incomplete<small>After a retry with no signal</small></div><div class="top"><div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Volume One</span><span class="iconbtn"><i data-i="search"></i></span></div>
+<div class="au-strip"><svg class="i lead" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.5v.01"/></svg><div class="au-cp"><b>Offline library incomplete.</b> 3 files are still missing. Connect to the internet, then retry.</div><span class="btn sm">Retry</span><span class="iconbtn"><i data-i="x" class="sm"></i></span></div>
+<div class="pc"><div class="ph" style="width:88%"></div><div class="ph" style="width:64%"></div></div></div></div></div>
+  </div>
+</div>
+</body></html>

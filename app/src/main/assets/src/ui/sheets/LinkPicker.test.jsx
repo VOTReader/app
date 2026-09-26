@@ -148,6 +148,43 @@ describe('LinkPicker Browse mode', () => {
     fireEvent.click(container.querySelector('.navpick-crumb-back'));
     expect(screen.getByText('Genesis')).toBeTruthy();
   });
+
+  it("badges a collection by its entries' registry label and counts in the right number", () => {
+    stubGlobals();
+    // The real shapes: buildNavTree groups Holy Days under its CATEGORY ('Holy
+    // Days'), while COL_NAV_ICON and every entry carry the registry label.
+    window.COL_NAV_ICON = new Map([['Volume One', 'V1'], ['Regarding The Holy Days', 'HD']]);
+    const hd = { kind: 'holy-days-entry', entryId: 'passover', label: 'Passover', category: 'Holy Days', collection: 'Regarding The Holy Days' };
+    const studyCh = (id, label, study) => ({ kind: 'study-letter-chapter', studyChapterId: id, label, category: 'Bible Studies', collection: study });
+    window.buildNavTree = () => ({
+      bibleBooks: [],
+      matthewChapters: [],
+      collections: [
+        { label: 'Volume One', entries: [{ kind: 'letter', letterId: 'l1', label: 'First Letter', category: 'Volume One', collection: 'Volume One' }] },
+        { label: 'Holy Days', entries: [hd, { ...hd, entryId: 'tabernacles', label: 'Tabernacles' }] },
+      ],
+      studies: [
+        { label: 'Odds Chart', chapters: [studyCh('odds-1', 'The Odds', 'Odds Chart')] },
+        { label: 'Purity', chapters: [studyCh('p1', 'Part One', 'Purity'), studyCh('p2', 'Part Two', 'Purity')] },
+      ],
+    });
+    const { container } = render(<LinkPicker {...baseProps} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Browse' }));
+    const rows = [...container.querySelectorAll('.navpick-row')].map((r) => ({
+      icon: r.querySelector('.navpick-row-icon').textContent,
+      label: r.querySelector('.navpick-row-label').textContent,
+      count: r.querySelector('.navpick-row-cat').textContent,
+    }));
+    expect(rows).toEqual([
+      { icon: 'V1', label: 'Volume One', count: '1 entry' },
+      { icon: 'HD', label: 'Holy Days', count: '2 entries' },
+      { icon: 'LS', label: 'Odds Chart', count: '1 chapter' },
+      { icon: 'LS', label: 'Purity', count: '2 chapters' },
+    ]);
+    // The group badge is the one its entry rows wear.
+    fireEvent.click(screen.getByText('Holy Days'));
+    expect([...container.querySelectorAll('.navpick-row-icon')].map((el) => el.textContent)).toEqual(['HD', 'HD']);
+  });
 });
 
 describe('LinkPicker Recent mode — the link network', () => {

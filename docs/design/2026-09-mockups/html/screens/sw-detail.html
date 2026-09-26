@@ -1,0 +1,97 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="../../../../../app/src/main/assets/src/data/scripture-web-data.js"></script>
+<script src="sw-data.js"></script>
+<script src="sw-icons.js"></script>
+<link rel="stylesheet" href="sw-common.css">
+<style>
+  .board-grid { grid-template-columns: 686px 686px; }
+  .cell > .cap small { max-width: 660px; }
+  .dsheet { height: 232px; }
+  .dsheet.auto { height: auto; }
+  .dsheet .reading.ex { font-style: italic; font-family: var(--serif); font-size: 16px; }
+  .dsheet .reading { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .cat { font: 400 12.5px/1.2 var(--sans); color: var(--text-3); margin: -1px 0 5px; }
+  .card-off { opacity: .6; }
+  .card-off .ref { color: var(--text-3); font-style: italic; }
+  .grp { margin: 2px 0 0; }
+  .grp .rw { min-height: 38px; padding: 5px 12px; }
+  .grp .rw .a { font-size: 15.5px; }
+  .grp .rw.on { background: var(--accent-soft); }
+  .grp .rw.on .a::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 4px; background: var(--accent); margin: 0 8px 2px 0; }
+  .grp .rw.on .b { color: var(--text-2); }
+  .gl { font: 400 12.5px/1.2 var(--sans); color: var(--text-3); margin: 0 0 6px 2px; }
+</style></head>
+<body data-size="1476x1270">
+<div class="board">
+  <div class="board-head"><div class="h2">Scripture Web · the detail sheet</div>
+    <div class="meta">The sheet a tap opens, in every variant web-thread.html does not show. Refs, counts, votes and verse text are real (NKJV); the reader’s link and its excerpt are illustrative but verbatim. Every end that can be opened says Open in reader, as in the app.</div></div>
+  <div class="board-grid">
+    <div class="cell"><div class="cap">Bundle<small>A count pill tapped: where the verse’s threads go, by chapter. Choosing a chapter lights only the threads to it; choosing it again lets go.</small></div>
+      <div class="lf f75"><div class="ls" id="fA" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">Chapter<small>A chapter tapped on the ruler: its whole web lit, the chapters its threads reach, and the chapter itself to open.</small></div>
+      <div class="lf f75"><div class="ls" id="fB" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">Verse<small>A verse tick tapped, zoomed in: its threads lit, the verse to open.</small></div>
+      <div class="lf f75"><div class="ls" id="fC" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">Your link<small>One of the reader’s links in My Web: the two ends side by side, joined by the chain, each opening where it was made.</small></div>
+      <div class="lf f75"><div class="ls" id="fD" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">Timothy’s thread<small>One of the Volumes’ own citations: the verse and the letter that cites it, with the kind of citation and the collection.</small></div>
+      <div class="lf f75"><div class="ls" id="fE" data-theme="dark"></div></div></div>
+    <div class="cell"><div class="cap">An end that cannot be opened<small>A card with no destination reads (unknown) and cannot be tapped. Defensive: every citation in today’s data resolves.</small></div>
+      <div class="lf f75"><div class="ls" id="fF" data-theme="dark"></div></div></div>
+  </div>
+</div>
+<script type="module">
+  import { drawZoom, drawOverview, drawMyWeb, overviewThreads, markRange, touching, chromeHTML, footHTML, iconize, vid, chapterOf, chapterRange, done } from './sw-lib.js';
+  const D = window.SW_DATA, T = D.text;
+  const x = '<span class="iconbtn x"><i data-i="x"></i></span>';
+  const head = (lbl, meta) => `<div class="grabber"></div>${x}<div class="hd"><span class="label">${lbl}</span><span class="meta">${meta}</span></div>`;
+  const grp = (rows) => `<div><div class="rows grp" role="group" aria-label="Where this bundle goes">${rows.map(([l, m, on]) => `<div class="rw${on ? ' on' : ''}"><div class="tx"><div class="a">${l}</div><div class="b">${m}</div></div></div>`).join('')}</div></div>`;
+  // the app's card affordance, the same on every end that has somewhere to go (sw-card-go)
+  const go = '<div class="acts"><span class="go">Open in reader ›</span></div>';
+  const vcard = (eyebrow, ref, cat, text) => `<div><div class="ce">${eyebrow}</div><div class="ref">${ref} <small>${cat}</small></div>
+      <div class="reading">${text}</div>${go}</div>`;
+  const join = '<div class="join"><i data-i="link"></i></div>';
+  const sheet = (html, auto) => `<div class="dsheet${auto ? ' auto' : ''}" role="dialog">${html}</div>`;
+  const put = (id, html, mode, auto) => { document.getElementById(id).innerHTML = '<canvas></canvas>' + chromeHTML(mode === 'myweb' ? { mode: 'myweb' } : {}) + sheet(html, auto); };
+
+  put('fA', head('Bundle · Isaiah 53:5', '27 connections converge here. Choose where they go to follow them.')
+    + `<div class="cols">${grp([['Isaiah 53', '3 threads · weight 68', true], ['Romans 5', '2 threads · weight 79'], ['Hebrews 10', '2 threads · weight 64'], ['Hebrews 9', '2 threads · weight 54']])}
+       ${vcard('Verse', 'Isaiah 53:5', 'Old Testament · NKJV', T['Isaiah 53:5'])}</div>`);
+  put('fB', head('Chapter', '12 verses · 239 connections')
+    + `<div class="cols">${grp([['Isaiah 53', '11 threads · weight 68'], ['John 1', '9 threads · weight 51'], ['1 Peter 2', '7 threads · weight 247'], ['Matthew 27', '7 threads · weight 44']])}
+       ${vcard('Chapter', 'Isaiah 53', 'Old Testament · NKJV', T['Isaiah 53:1'])}</div>`);
+  put('fC', head('Verse', '27 connections')
+    + `<div class="cols one">${vcard('Verse', 'Isaiah 53:5', 'Old Testament · NKJV', T['Isaiah 53:5'])}</div>`, 'canon', true);
+  put('fD', head('Your link', 'Scripture ↔ Volumes')
+    + `<div class="cols pair"><div><div class="ce">Source</div><div class="ref">Death and Awakening <small>Volume One</small></div>
+        <div class="reading ex">${D.excerpt['Death and Awakening']}</div>${go}</div>
+       ${join}${vcard('Target', 'John 6:40', 'New Testament · NKJV', T['John 6:40'])}</div>`, 'myweb', true);
+  put('fE', head('Timothy’s thread', 'footnotes · Vol IV')
+    + `<div class="cols pair">${vcard('Scripture', 'Isaiah 53:4', 'Old Testament · NKJV', T['Isaiah 53:4'])}
+       ${join}<div><div class="ce">Corpus</div><div class="ref">Without Spot or Blemish <small>Volume Four</small></div>
+        ${go}</div></div>`, 'myweb', true);
+  put('fF', head('Timothy’s thread', 'studies · Lamb')
+    + `<div class="cols pair">${vcard('Scripture', 'Isaiah 53:9', 'Old Testament · NKJV', T['Isaiah 53:9'] || '')}
+       ${join}<div class="card-off" aria-disabled="true"><div class="ce">Corpus</div><div class="ref">(unknown)</div></div></div>`, 'myweb', true);
+  iconize();
+
+  const camX = vid('Isaiah 53:1') + 6, v5 = vid('Isaiah 53:5');
+  const isa53 = chapterRange(chapterOf('Isaiah', 53));
+  drawZoom(document.querySelector('#fA canvas'), { camX, ppv: 32, camY: 0, base: 176, inset: 72, focusRange: [v5, v5], group: isa53, thin: 0.9, ink: 1 });
+  drawZoom(document.querySelector('#fC canvas'), { camX, ppv: 32, camY: 0, base: 176, inset: 72, focusRange: [v5, v5], thin: 0.7 });
+  const cb = document.querySelector('#fB canvas');
+  const res = drawOverview(cb, { top: 84, baseline: 172, dim: 0.22 });
+  const [lo, hi] = chapterRange(chapterOf('Isaiah', 53));
+  overviewThreads(cb, res, 84, touching(lo, hi), { alpha: 0.5, width: 1 });
+  markRange(cb, res, lo, hi, { min: 4 });
+  const link = D.links.findIndex((l) => l.a.label === 'Death and Awakening');
+  drawMyWeb(document.querySelector('#fD canvas'), { topY: 94, bottomY: 162, rail: D.rail, under: D.under, links: D.links, focus: link, dimUnder: 0.6 });
+  const pick = (label, pos) => { const v = vid(label); for (let k = 0; k < D.under.length; k += 3) if (D.under[k] === v && (pos == null || D.under[k + 1] === pos)) return [k / 3]; return []; };
+  const v4 = vid('Isaiah 53:4');
+  let vol4 = -1; for (let k = 0; k < D.under.length; k += 3) if (D.under[k] === v4 && D.under[k + 1] >= 88 && D.under[k + 1] < 117) vol4 = k / 3;
+  drawMyWeb(document.querySelector('#fE canvas'), { topY: 94, bottomY: 162, rail: D.rail, under: D.under, links: D.links, underFocus: [vol4], dimLinks: true });
+  drawMyWeb(document.querySelector('#fF canvas'), { topY: 94, bottomY: 162, rail: D.rail, under: D.under, links: D.links, underFocus: pick('Isaiah 53:9'), dimLinks: true });
+  done();
+</script>
+</body></html>

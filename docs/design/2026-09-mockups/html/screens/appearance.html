@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .preview { margin-top: 4px; padding: 18px 20px 16px; }
+  .sect { margin: 26px 0 10px; }
+  /* Light Theme is a switch: on in the light render, off in the dark one */
+  .lt .item { justify-content: space-between; color: var(--text); }
+  [data-theme="light"] .lt .toggle { background: var(--accent); }
+  [data-theme="light"] .lt .toggle::after { left: 21px; background: var(--accent-ink); }
+  .size { display: flex; align-items: center; gap: 18px; height: 60px; padding: 0 20px; }
+  .size .a1 { font: 400 14px/1 var(--sans); color: var(--text-2); }
+  .size .a2 { font: 400 24px/1 var(--sans); color: var(--text); }
+  .size .slider { flex: 1; }
+  /* value + Reset, as the Text Size row has them (Reset is inert at Standard) */
+  .szfoot { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; padding: 0 4px 0 20px; }
+  .szfoot .btn.text { height: 36px; opacity: .4; }
+  .fonts .item { justify-content: space-between; }
+  .fonts .fname { color: var(--text); line-height: 1.2; }
+  .fonts .i { color: var(--accent); }
+  .f-sys { font: 400 18px serif; }
+  .f-ebg { font: 400 19px var(--serif); }
+  .f-cor { font: 400 21px 'Cormorant Garamond', serif; }
+  .f-cri { font: 400 19px 'Crimson Pro', serif; }
+  .f-lib { font: 400 16px 'Libre Baskerville', serif; }
+  .f-atk { font: 400 16px 'Atkinson Hyperlegible', sans-serif; }
+  .f-lex { font: 400 16px 'Lexend', sans-serif; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Appearance</span>
+  </div>
+  <div class="scroll">
+    <div class="card preview">
+      <div class="reading">“Your word is a lamp to my feet and a light to my path.”</div>
+    </div>
+
+    <div class="label sect">Theme</div>
+    <div class="group lt">
+      <div class="item"><span>Light Theme</span><span class="toggle"></span></div>
+    </div>
+
+    <div class="label sect">Text size</div>
+    <div class="card size" style="padding:0 20px">
+      <span class="a1">A</span>
+      <div class="slider"><i style="width:9%"></i><b style="left:9%"></b></div>
+      <span class="a2">A</span>
+    </div>
+    <div class="szfoot"><span class="meta">Standard</span><span class="btn text">Reset</span></div>
+
+    <div class="label sect">Reading font</div>
+    <div class="group fonts">
+      <div class="item"><span class="fname f-sys">System Serif</span></div>
+      <div class="item"><span class="fname f-ebg">EB Garamond</span><i data-i="check" class="sm"></i></div>
+      <div class="item"><span class="fname f-cor">Cormorant Garamond</span></div>
+      <div class="item"><span class="fname f-cri">Crimson Pro</span></div>
+      <div class="item"><span class="fname f-lib">Libre Baskerville</span></div>
+      <div class="item"><span class="fname f-atk">Atkinson Hyperlegible</span></div>
+      <div class="item"><span class="fname f-lex">Lexend</span></div>
+    </div>
+  </div>
+</div>
+</body></html>

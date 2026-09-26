@@ -1,0 +1,53 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .intro { padding-top: 4px; }
+  /* translation switch */
+  .trans { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .chip.small { height: 28px; padding: 0 8px 0 11px; gap: 3px; font-size: 13px; }
+  .cont { display: flex; margin-top: 18px; }
+  .cont .pill { height: 32px; padding: 0 13px 0 11px; border-radius: 16px; font-size: 13px; gap: 7px; }
+  .sect { margin: 28px 0 10px; }
+
+  /* genre tiles */
+  .genres { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .gt { min-height: 84px; padding: 14px 16px 13px; display: flex; flex-direction: column; justify-content: space-between; }
+  .gt .nm { font: 500 18px/1.2 var(--serif); color: var(--text); }
+  .gt .meta { margin-top: 6px; white-space: nowrap; }
+  .gt.wide { grid-column: 1 / -1; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="spacer"></span>
+    <span class="tabcount">1</span>
+  </div>
+  <div class="scroll">
+    <div class="intro">
+      <div class="h1">The Scriptures of Truth</div>
+      <div class="trans"><span class="meta">New King James Version</span></div>
+      <div class="cont"><span class="pill"><i data-i="book-open" class="xs"></i>Continue: John 3</span></div>
+    </div>
+
+    <div class="label sect">Old Testament</div>
+    <div class="genres">
+      <div class="card gt"><div class="nm">The Law</div><div class="meta">5 books · 187 chapters</div></div>
+      <div class="card gt"><div class="nm">History</div><div class="meta">12 books · 249 chapters</div></div>
+      <div class="card gt"><div class="nm">Poetry &amp; Wisdom</div><div class="meta">5 books · 243 chapters</div></div>
+      <div class="card gt"><div class="nm">Major Prophets</div><div class="meta">5 books · 183 chapters</div></div>
+      <div class="card gt wide"><div class="nm">Minor Prophets</div><div class="meta">12 books · 67 chapters</div></div>
+    </div>
+
+    <div class="label sect">New Testament</div>
+    <div class="genres">
+      <div class="card gt"><div class="nm">Gospels</div><div class="meta">4 books · 89 chapters</div></div>
+      <div class="card gt"><div class="nm">Acts</div><div class="meta">1 book · 28 chapters</div></div>
+      <div class="card gt"><div class="nm">Paul’s Epistles</div><div class="meta">14 books · 100 chapters</div></div>
+      <div class="card gt"><div class="nm">General Epistles</div><div class="meta">7 books · 21 chapters</div></div>
+      <div class="card gt wide"><div class="nm">Revelation</div><div class="meta">1 book · 22 chapters</div></div>
+    </div>
+  </div>
+</div>
+</body></html>

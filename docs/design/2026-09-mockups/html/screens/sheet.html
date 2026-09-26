@@ -1,0 +1,89 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* letter behind the scrim */
+  .letter { padding-top: 8px; }
+  .letter .h1 { margin-top: 8px; }
+  .lines { margin-top: 26px; }
+  .para + .para { margin-top: 30px; }
+  .para > * + *, .para > .ph + .ph { margin-top: 20px; }
+  .phl { display: flex; align-items: center; gap: 6px; height: 10px; }
+  .phl .ph { flex: none; }
+  .phl .ph.rest { flex: 1; }
+  .phl .fn { margin-left: 0; }
+  /* the tapped numeral stays lit above the scrim */
+  .scrim { z-index: 1; }
+  .fn.lit { position: relative; z-index: 2; }
+  .sheet { z-index: 3; }
+
+  /* sheet */
+  .fnhead { display: flex; align-items: center; justify-content: space-between; }
+  .navs { display: flex; gap: 8px; }
+  .rbtn { width: 44px; height: 44px; border-radius: 22px; background: var(--surface-2); color: var(--text); display: grid; place-items: center; }
+  .rbtn.off { color: var(--text-3); opacity: .45; }
+  .refrow { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .chip.small { height: 28px; padding: 0 8px 0 11px; gap: 3px; font-size: 13px; }
+  .cited { margin-top: 4px; }
+  .verse { font-size: 18px; line-height: 1.6; margin-top: 14px; }
+  .acts { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="spacer"></span>
+    <span class="iconbtn"><i data-i="headphones"></i></span>
+    <span class="iconbtn"><i data-i="bookmark"></i></span>
+    <span class="tabcount">1</span>
+  </div>
+  <div class="scroll letter">
+    <div class="eyebrow">Volume One · Letter 15</div>
+    <div class="h1">Know That Which Has Been Poured Out, The Word of God</div>
+    <div class="lines">
+      <div class="para">
+        <div class="ph" style="width:100%"></div>
+        <div class="ph" style="width:96%"></div>
+        <div class="ph" style="width:99%"></div>
+        <div class="phl"><span class="ph" style="width:44%"></span><span class="fn lit">1</span><span class="ph rest"></span></div>
+        <div class="ph" style="width:57%"></div>
+      </div>
+      <div class="para">
+        <div class="ph" style="width:98%"></div>
+        <div class="ph" style="width:100%"></div>
+        <div class="ph" style="width:94%"></div>
+        <div class="ph" style="width:99%"></div>
+        <div class="ph" style="width:72%"></div>
+      </div>
+      <div class="para">
+        <div class="ph" style="width:100%"></div>
+        <div class="ph" style="width:97%"></div>
+        <div class="ph" style="width:100%"></div>
+        <div class="ph" style="width:92%"></div>
+        <div class="ph" style="width:98%"></div>
+        <div class="ph" style="width:40%"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="scrim"></div>
+<div class="sheet">
+  <div class="grabber"></div>
+  <div class="fnhead">
+    <span class="meta">Footnote 1 of 3</span>
+    <span class="navs">
+      <span class="rbtn off"><i data-i="chevron-left" class="sm"></i></span>
+      <span class="rbtn"><i data-i="chevron-right" class="sm"></i></span>
+    </span>
+  </div>
+  <div class="refrow">
+    <span class="h2">Matthew 12:25-26</span>
+  </div>
+  <div class="reading verse">
+    <p><span class="vnum">25</span>But Jesus knew their thoughts, and said to them: “Every kingdom divided against itself is brought to desolation, and every city or house divided against itself will not stand. <span class="vnum">26</span>If Satan casts out Satan, he is divided against himself. How then will his kingdom stand?</p>
+  </div>
+  <div class="acts">
+    <span class="btn primary block">Open Matthew 12</span>
+  </div>
+</div>
+</body></html>

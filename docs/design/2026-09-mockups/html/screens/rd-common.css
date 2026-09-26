@@ -1,0 +1,100 @@
+/* rd- area: the reading view's finer parts (letters, footnotes, cross-references, rails).
+   Built only from kit tokens. Hero, bar and sheet values are copied from the approved
+   letter.html / sheet.html so these screens sit beside them without a seam. */
+
+/* ---------- reading progress hairline + reading bar (letter.html) ---------- */
+.rp { height: 14px; padding: 0 var(--gutter); display: flex; align-items: center; gap: 10px; flex: none; }
+.rp .bar { flex: 1; height: 2px; border-radius: 1px; background: var(--surface-3); overflow: hidden; }
+.rp .bar i { display: block; height: 100%; background: var(--accent); }
+.rp .pc { font: 400 11px/1 var(--sans); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.readbar { justify-content: space-between; padding: 0 10px; z-index: 4; }
+.readbar .rb { min-width: 50px; }
+.readbar .rb .i { color: var(--text-2); }
+.readbar .pn { flex-direction: row; align-items: center; gap: 4px; min-width: 0; }
+.readbar .pt { display: flex; flex-direction: column; gap: 4px; }
+.readbar .next .pt { align-items: flex-end; }
+.readbar .pt b { font: 400 12px/1 var(--sans); color: var(--text-2); }
+.readbar .pt span { font: 400 11px/1 var(--sans); color: var(--text-3); }
+.readbar .sep { width: 1px; height: 30px; background: var(--hairline); }
+
+/* ---------- letter hero + meta (letter.html) ---------- */
+.lt .ctx { margin-top: 10px; }
+.lt .display { margin-top: 6px; }
+.subttl { margin-top: 10px; font: italic 400 19px/1.35 var(--serif); color: var(--text-2); text-wrap: balance; }
+.lrow { display: flex; margin-top: 16px; }
+.lt .divider { margin-top: 18px; }
+.ded { margin-top: 16px; font: 400 16px/1.4 var(--serif); color: var(--text-2); }
+.ded > div { text-wrap: balance; }
+.ded .from { font-style: italic; color: var(--text); }
+.ded .mnote { margin-top: 8px; font-style: italic; color: var(--text-3); }
+.ded .madd { margin-top: 8px; font-style: italic; color: var(--text-3); }
+.pre { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--hairline); font: italic 400 16px/1.5 var(--serif); color: var(--text-2); text-wrap: pretty; }
+
+/* ---------- inline marks in the reading text ---------- */
+.reading .fn { font-style: normal; }
+.fn.on { background: var(--accent); color: var(--accent-ink); }
+.nicon { color: var(--accent); margin-left: 4px; vertical-align: -2px; }
+/* in-app letter link: text colour, dotted gold rule */
+.lk { color: var(--text); border-bottom: 1px dotted var(--accent); padding-bottom: 1px; }
+.lk.i2 { font-style: italic; }
+/* scripture ref inside prose ({{ref:}}): one tappable chip, as the WTLB cites */
+.cite { display: inline-block; margin: 0 2px 0 3px; padding: 4px 8px; border-radius: 8px; background: var(--accent-soft);
+  color: var(--accent); font: 700 13px/1.1 var(--sans); font-style: normal; vertical-align: 2px; white-space: nowrap; }
+
+/* ---------- body block kinds ---------- */
+.si { margin-top: 26px; text-align: center; font: italic 400 17px/1.6 var(--serif); color: var(--text-2); text-wrap: pretty; }
+.si .lk { color: var(--text-2); }
+.sh2 { margin-top: 34px; font: 500 23px/1.22 var(--serif); color: var(--text); text-wrap: balance; }
+.sh3 { margin-top: 12px; font: 400 14px/1.35 var(--sans); color: var(--text-3); }
+.poem { margin: 26px 0 0; text-align: center; font: italic 400 18px/1.7 var(--serif); color: var(--text); }
+.poem .sb { height: 14px; }
+.closing { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--hairline); text-align: center; font: italic 400 18px/1.5 var(--serif); color: var(--text-2); text-wrap: balance; }
+.closing-fn { text-align: center; margin-top: 6px; }
+.closing-fn .fn { margin: 0; vertical-align: 0; }
+.orn { text-align: center; color: var(--text-3); font: 400 15px/1 var(--serif); margin: 30px 0 0; }
+/* photo-like placeholder for a study cover or figure (studies.html recipe) */
+.art { border-radius: 12px; position: relative; overflow: hidden;
+  background:
+    radial-gradient(90% 60% at 70% 4%, color-mix(in srgb, var(--dot-honey) 42%, transparent), transparent 78%),
+    radial-gradient(110% 60% at 10% 106%, color-mix(in srgb, var(--dot-clay) 26%, transparent), transparent 72%),
+    linear-gradient(170deg, var(--surface-3), var(--surface-2)); }
+.art > .i { position: absolute; left: 50%; top: 50%; margin: -12px 0 0 -12px; color: var(--text-3); opacity: .7; }
+
+/* ---------- footnote sheet parts (sheet.html) ---------- */
+.sheet.static { position: relative; left: auto; right: auto; bottom: auto; box-shadow: none; }
+.fnhead { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+.navs { display: flex; gap: 8px; }
+.rbtn { width: 44px; height: 44px; border-radius: 22px; background: var(--surface-2); color: var(--text); display: grid; place-items: center; flex: none; }
+.rbtn.off { color: var(--text-3); opacity: .45; }
+.refrow { display: flex; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+.chip.small { height: 28px; padding: 0 8px 0 11px; gap: 3px; font-size: 13px; }
+.cited { margin-top: 4px; }
+.verse { font-size: 18px; line-height: 1.6; margin-top: 14px; }
+.acts { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+/* rich in-app link: eyebrow + serif title + chevron (InAppLinkButton / GoToRefButton) */
+.xlink { display: flex; align-items: center; gap: 12px; padding: 12px 10px 12px 16px; border-radius: 16px; background: var(--surface-2); }
+.xlink .b { flex: 1; min-width: 0; }
+.xlink .e { display: block; font: 400 12px/1.2 var(--sans); color: var(--text-3); }
+.xlink .t { display: block; margin-top: 3px; font: 500 17px/1.28 var(--serif); color: var(--text); text-wrap: pretty; }
+.xlink > .i { color: var(--text-3); }
+.extl { display: inline-flex; align-items: center; gap: 4px; font: 700 14px/1 var(--sans); color: var(--accent); }
+.extl .i { width: 15px; height: 15px; }
+
+/* ---------- small frames for boards ---------- */
+.rd-phone { position: relative; width: 412px; height: 915px; border-radius: 30px; overflow: hidden; background: var(--bg);
+  box-shadow: 0 0 0 1px var(--hairline), var(--shadow); }
+.rd-phone > .screen { position: relative; width: 412px; }
+.rd-frame { position: relative; width: 412px; border-radius: 22px; overflow: hidden; background: var(--bg); box-shadow: 0 0 0 1px var(--hairline), var(--shadow); }
+.cap .v { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-2); }
+/* mockup-only marker: part of the page skipped in this drawing */
+.cut { display: flex; align-items: center; gap: 12px; margin: 26px calc(-1 * var(--gutter)) 6px; padding: 0 var(--gutter); }
+.cut::before, .cut::after { content: ''; flex: 1; border-top: 1px dashed var(--text-3); opacity: .55; }
+.cut span { font: 700 11px/1.2 var(--sans); color: var(--text-3); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+
+/* top bar extras */
+.topbar .navlabel { font: 400 16px/1.2 var(--sans); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* journal chip: the app's journal glyph in gold with a count badge */
+.jchip { position: relative; }
+.jchip .i { color: var(--accent); }
+.jchip .bdg { position: absolute; top: 5px; right: 3px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--accent); color: var(--accent-ink);
+  font: 700 11px/18px var(--sans); text-align: center; box-shadow: 0 0 0 2px var(--bg); }

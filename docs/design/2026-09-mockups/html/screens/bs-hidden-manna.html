@@ -1,0 +1,122 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* hm-letter (screen-routes 'hm-letter' -> LetterView.jsx, volumeLabel "Hidden Manna").
+     Reached only by tapping a Hidden Manna note in the Matthew Study Bible (goToLetterFromMatthew),
+     which pushes the "Back to Matthew N" breadcrumb and marks the quoted passage. */
+  .board-head .meta { max-width: 620px; }
+  /* the breadcrumb band: pinned under the top bar while the letter scrolls */
+  .crumb { height: 52px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--hairline); background: var(--bg); position: relative; z-index: 2; }
+  .crumb .chip { height: 36px; padding: 0 14px 0 8px; gap: 4px; background: var(--surface-2); color: var(--text-2); font-size: 14px; }
+  .crumb .chip .i { color: var(--accent); }
+  .crumb .chip b { color: var(--text); font-weight: 700; }
+  .letter { padding-top: 18px; }
+  .letter .h1 { margin-top: 8px; }
+  .lmeta { margin-top: 14px; }
+  .lmeta .d { font: 400 13px/1.3 var(--sans); color: var(--text-3); }
+  .lmeta .l { margin-top: 3px; font: italic 400 16px/1.35 var(--serif); color: var(--text-2); }
+  .reading { margin-top: 20px; }
+  .poem { margin-top: 18px; padding-left: 18px; }
+  .poem + .poem { margin-top: 14px; }
+  .poem div { font: italic 400 19px/1.55 var(--serif); color: var(--text); }
+  .closing { margin-top: 28px; text-align: center; font: italic 400 19px/1.4 var(--serif); color: var(--text-2); }
+  .endmark { text-align: center; margin: 18px 0 26px; font: 400 15px/1 var(--serif); color: var(--text-3); }
+  .turns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .turn { background: var(--surface); border-radius: 16px; padding: 14px 16px 16px; opacity: .45; }
+  .turn.next { text-align: right; }
+  .turn .t { margin-top: 6px; font: 500 19px/1.2 var(--serif); color: var(--text-3); }
+  .shift { margin-top: -472px; }
+</style></head>
+<body data-size="730x904">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Hidden Manna</div>
+    <div class="meta">Opened only from a Hidden Manna note in the Matthew Study Bible (here, Matthew 23:32, 36). No index, search result or Home tile leads to it, and Back returns to the Matthew chapter.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: 309px 309px">
+
+    <div class="cell">
+      <div class="cap">On arrival<small>The breadcrumb names the chapter it came from. The passage the note quoted is marked.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="spacer"></span>
+          <span class="iconbtn"><i data-i="bookmark"></i></span>
+          <span class="tabcount">1</span>
+        </div>
+        <div class="crumb"><span class="chip"><i data-i="chevron-left" class="sm"></i>Back to <b>Matthew 23</b></span></div>
+        <div class="scroll letter">
+          <div class="eyebrow">Hidden Manna · Letter 1</div>
+          <div class="h1">Woe to Dallas</div>
+          <div class="lmeta">
+            <div class="d">3/31/09</div>
+            <div class="l">From The Lord, Our God and Savior</div>
+            <div class="l">The Word of The Lord Spoken to Timothy</div>
+            <div class="l">For All Those Who Have Ears to Hear</div>
+          </div>
+          <div class="reading">
+            <p><span class="lead">Thus says The Lord God:</span> Woe to Dallas! Woe to the City of Innocent Blood! Woe to the nation not desired!...</p>
+            <p>Day by day, the bodies are piled up in heaps! Day by day, the unborn are slaughtered in droves, because of you! Whole generations of people murdered without cause! Multitudes of innocent cast off as refuse, BECAUSE OF YOU! <mark class="wash">Fill up then, the measure of the sin of your fathers! Yes, add to your iniquity, that I may also add to you all that which I have purposed in My heart to do! Behold, I shall greatly trouble you, causing nature to rise up and fight against you! I shall leave your people desolate and bring you to utter ruin! Says The Lord.</mark></p>
+          </div>
+          <div class="poem">
+            <div>Behold, all shall fall and crumble</div>
+            <div>Before The Lord, in His anger!</div>
+            <div>It shall be shaken down, it shall no more stand!...</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">End of the letter<small>The breadcrumb stays pinned. No previous or next letter: Hidden Manna has no list of its own.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="spacer"></span>
+          <span class="iconbtn"><i data-i="bookmark"></i></span>
+          <span class="tabcount">1</span>
+        </div>
+        <div class="crumb"><span class="chip"><i data-i="chevron-left" class="sm"></i>Back to <b>Matthew 23</b></span></div>
+        <div class="scroll letter">
+          <div class="shift">
+            <div class="eyebrow">Hidden Manna · Letter 1</div>
+            <div class="h1">Woe to Dallas</div>
+            <div class="lmeta">
+              <div class="d">3/31/09</div>
+              <div class="l">From The Lord, Our God and Savior</div>
+              <div class="l">The Word of The Lord Spoken to Timothy</div>
+              <div class="l">For All Those Who Have Ears to Hear</div>
+            </div>
+            <div class="reading">
+              <p><span class="lead">Thus says The Lord God:</span> Woe to Dallas! Woe to the City of Innocent Blood! Woe to the nation not desired!...</p>
+              <p>Day by day, the bodies are piled up in heaps! Day by day, the unborn are slaughtered in droves, because of you! Whole generations of people murdered without cause! Multitudes of innocent cast off as refuse, BECAUSE OF YOU! <mark class="wash">Fill up then, the measure of the sin of your fathers! Yes, add to your iniquity, that I may also add to you all that which I have purposed in My heart to do! Behold, I shall greatly trouble you, causing nature to rise up and fight against you! I shall leave your people desolate and bring you to utter ruin! Says The Lord.</mark></p>
+            </div>
+            <div class="poem">
+              <div>Behold, all shall fall and crumble</div>
+              <div>Before The Lord, in His anger!</div>
+              <div>It shall be shaken down, it shall no more stand!...</div>
+            </div>
+            <div class="poem">
+              <div>All shall crumble under the weight of My fury,</div>
+              <div>For all your forsaking of Me, and for all this blood</div>
+              <div>Which remains on your hands!...</div>
+            </div>
+            <div class="poem">
+              <div>THE BLOOD OF THE INNOCENT!...</div>
+            </div>
+            <div class="closing">Says The Lord.</div>
+            <div class="endmark">✦</div>
+            <div class="turns">
+              <div class="turn"><span class="meta">Previous</span><div class="t">—</div></div>
+              <div class="turn next"><span class="meta">Next</span><div class="t">—</div></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</body></html>

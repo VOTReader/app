@@ -1,0 +1,48 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lb-common.css"><script src="lb-icons.js"></script>
+<style>
+  .hub { padding-top: 6px; }
+  .hub .display { margin-top: 4px; }
+  .hub > .body { margin-top: 10px; max-width: 330px; text-wrap: balance; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 28px; }
+  .tile { position: relative; min-height: 130px; padding: 16px; border-radius: 18px; background: var(--surface); display: flex; flex-direction: column; }
+  [data-theme="light"] .tile { box-shadow: 0 1px 2px rgba(60,40,20,.06); }
+  .tile .ic { color: var(--text-2); }
+  .tile .nm { margin-top: auto; padding-top: 16px; font: 500 20px/1.2 var(--serif); color: var(--text); }
+  .tile .dt { margin-top: 3px; font: 400 13px/1.35 var(--sans); color: var(--text-3); }
+  .tile .chev { position: absolute; right: 12px; top: 15px; color: var(--text-3); }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Library</span>
+  </div>
+  <div class="scroll hub">
+    <div class="eyebrow">Personal Study</div>
+    <div class="display">Library</div>
+    <div class="body">Your collected notes, reflections, and saved passages.</div>
+
+    <div class="tiles">
+      <div class="tile"><i data-i="sticky-note" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+        <div class="nm">Notes</div><div class="dt">23 notes</div></div>
+      <div class="tile"><i data-i="link" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+        <div class="nm">Links</div><div class="dt">12 links</div></div>
+      <div class="tile"><i data-i="notebook" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+        <div class="nm">Journal</div><div class="dt">9 entries</div></div>
+      <div class="tile"><i data-i="bookmark" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+        <div class="nm">Bookmarks</div><div class="dt">7 bookmarks</div></div>
+      <div class="tile"><i data-i="highlighter" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+        <div class="nm">Highlights</div><div class="dt">124 marks</div></div>
+      <div class="tile"><i data-i="lb-chart" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+        <div class="nm">Progress</div><div class="dt">186 read</div></div>
+      <div class="tile"><i data-i="star" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+        <div class="nm">Milestones</div><div class="dt">23 of 89 reached</div></div>
+      <div class="tile"><i data-i="scripture-web" class="ic"></i><i data-i="chevron-right" class="sm chev"></i>
+        <div class="nm">Scripture Web</div><div class="dt">63,418 cross-references</div></div>
+    </div>
+  </div>
+</div>
+</body></html>

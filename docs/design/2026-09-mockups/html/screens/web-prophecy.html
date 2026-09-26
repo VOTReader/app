@@ -1,0 +1,36 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<script src="../../../../../app/src/main/assets/src/data/scripture-web-data.js"></script>
+<script src="sw-icons.js"></script>
+<link rel="stylesheet" href="sw-common.css">
+<style>
+  /* A CONCEPT, NOT THE APP: the 51 prophecy pairs ship in scripture-web-data.js, but nothing in the app draws them
+     and there is no Prophecy toggle. The label in the corner says so. Dark in both themes, as the web is. */
+  .layer { position: absolute; left: 56px; top: 90px; z-index: 3; display: flex; gap: 8px; align-items: center; }
+  .legend .fulfil { width: 90px; height: 5px; border-radius: 3px; background: var(--accent); }
+  .concept { position: absolute; left: 20px; bottom: 10px; z-index: 3; display: inline-flex; align-items: center; height: 20px; padding: 0 9px;
+    border-radius: 10px; box-shadow: inset 0 0 0 1px var(--surface-3); font: 700 10.5px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+</style></head>
+<body class="landscape" data-themes="dark">
+<div class="ls" id="f"></div>
+<script type="module">
+  import { drawOverview, overviewArch, chromeHTML, iconize, tok, G, done } from './sw-lib.js';
+  const f = document.getElementById('f');
+  f.innerHTML = '<canvas></canvas>'
+    + chromeHTML({ meta: 'Messianic prophecy<br>51 threads', two: true, tool: '<span class="chip on"><i data-i="check" class="xs"></i> Prophecy</span>' })
+    + '<div class="layer"><span class="pill"><i data-i="graduation-cap" class="xs"></i> From the study “YAHUSHUA More Than a Man”</span></div>'
+    + '<div class="foot"><span class="legend"><span>prophecy</span><i class="fulfil"></i><span>fulfilment</span></span></div>'
+    + '<span class="concept">Concept</span>';
+  iconize();
+  // the web stands back under the layer: a veil of the ground over full-strength ink (a low `dim` rounds the
+  // faintest strokes into false hues), then the 51 prophecy pairs in the accent on top
+  const cv = f.querySelector('canvas');
+  const res = drawOverview(cv, { top: 120, baseline: 346 });
+  const ctx = cv.getContext('2d');
+  ctx.save(); ctx.globalAlpha = 0.55; ctx.fillStyle = tok('--bg', cv); ctx.fillRect(0, 0, cv.clientWidth, 346);
+  ctx.globalAlpha = 0.85; ctx.lineWidth = 1.6; ctx.strokeStyle = tok('--accent', cv);
+  for (const p of G.prophecy) { overviewArch(ctx, res.X, res.baseline, 120, p.a, p.b); ctx.stroke(); }
+  ctx.restore();
+  done();
+</script>
+</body></html>

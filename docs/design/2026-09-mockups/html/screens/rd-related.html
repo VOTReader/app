@@ -1,0 +1,123 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script><script src="rd-icons.js"></script>
+<link rel="stylesheet" href="rd-common.css">
+<style>
+  /* The end of a letter (LetterView.jsx): closing, ornament, footnote list, prev/next cards, then every
+     related section the source supports. Volume Two, Letter 4; the "Also Read" row is borrowed from
+     Letter 23 (see the rd- report). */
+  .page { padding-bottom: 112px; }
+  .poem { margin-top: 18px; }
+  .sect { margin: 30px 0 10px; }
+  /* footnote list row */
+  .fnl .item { align-items: flex-start; gap: 14px; padding: 16px 16px 16px 14px; }
+  .fnl .n { width: 26px; height: 26px; border-radius: 13px; flex: none; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font: 700 12px/1 var(--sans); margin-top: -1px; }
+  .fnl .c { flex: 1; min-width: 0; }
+  .fnl .ref { font: 700 14px/1.35 var(--sans); color: var(--text); }
+  .fnl .pl { display: block; margin-top: 10px; font: 700 12px/1.2 var(--sans); color: var(--text-3); }
+  .fnl .v { margin-top: 3px; font: 400 16px/1.5 var(--serif); color: var(--text-2); }
+  .gos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .go { display: inline-flex; align-items: center; gap: 2px; height: 32px; padding: 0 8px 0 12px; border-radius: 16px; background: var(--surface-2); color: var(--text); font: 700 13px/1 var(--sans); white-space: nowrap; }
+  .go .i { color: var(--text-3); }
+  /* bottom prev / next cards */
+  .bnav { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 26px; }
+  .bcard { padding: 14px 16px 16px; }
+  .bcard .meta { display: flex; align-items: center; gap: 2px; }
+  .bcard .bt { display: block; margin-top: 6px; font: 500 17px/1.3 var(--serif); color: var(--text); text-wrap: pretty; }
+  .bcard.nx { text-align: right; }
+  .bcard.nx .meta { justify-content: flex-end; }
+  /* related rows */
+  .rel .item { gap: 12px; min-height: 58px; }
+  .rel .ttl { flex: 1; min-width: 0; font: 500 17px/1.3 var(--serif); color: var(--text); text-wrap: pretty; }
+  .rel .lbl { flex: 1; min-width: 0; font: 400 15px/1.3 var(--sans); color: var(--text); }
+  .rel .lead { color: var(--text-3); }
+  .rel .end { color: var(--text-3); }
+  .rel-top { margin-top: 34px; padding-top: 4px; border-top: 1px solid var(--hairline); }
+</style></head>
+<body data-size="412x2205">
+<div class="screen tall">
+  <div class="status"></div>
+  <div class="rp"><div class="bar"><i style="width:100%"></i></div><span class="pc">100%</span></div>
+  <div class="scroll page">
+    <div class="poem">
+      <div>Then shall you truly know Me,</div>
+      <div>Just as I have always known you,</div>
+      <div>Even from the foundation of the world...</div>
+    </div>
+    <div class="closing">Says He who is, and was, and is to come, YahuShua, The Salvation of God.</div>
+    <div class="closing-fn"><span class="fn">12</span></div>
+    <div class="orn">✦</div>
+
+    <!-- footnote list (the whole list is drawn in rd-footnotes-list) -->
+    <div class="label sect">Footnotes</div>
+    <div class="cut" style="margin-top:4px"><span>Scrolled past 1-11</span></div>
+    <div class="group fnl">
+      <div class="item">
+        <span class="n">12</span>
+        <div class="c">
+          <div class="ref">Revelation 1:4, Revelation 1:8, Revelation 11:17</div>
+          <span class="pl">1:4</span>
+          <div class="v">John, to the seven churches which are in Asia: Grace to you and peace from Him who is and who was and who is to come, and from the seven Spirits who are before His throne.</div>
+          <span class="pl">1:8</span>
+          <div class="v">“I am the Alpha and the Omega, the Beginning and the End,” says the Lord, “who is and who was and who is to come, the Almighty.”</div>
+          <span class="pl">11:17</span>
+          <div class="v">saying: “We give You thanks, O Lord God Almighty, the One who is and who was and who is to come, because You have taken Your great power and reigned.”</div>
+          <div class="gos">
+            <span class="go">Open Revelation 1:4<i data-i="chevron-right" class="xs"></i></span>
+            <span class="go">Open Revelation 1:8<i data-i="chevron-right" class="xs"></i></span>
+            <span class="go">Open Revelation 11:17<i data-i="chevron-right" class="xs"></i></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- previous / next letter -->
+    <div class="bnav">
+      <div class="card bcard"><span class="meta"><i data-i="chevron-left" class="xs"></i>Previous Letter</span><span class="bt">A Day in The Lord</span></div>
+      <div class="card bcard nx"><span class="meta">Next Letter<i data-i="chevron-right" class="xs"></i></span><span class="bt">The Holy Spirit</span></div>
+    </div>
+
+    <!-- related: each section appears only when the letter has data for it -->
+    <div class="rel-top"></div>
+    <div class="label sect">Also Read</div>
+    <div class="group rel">
+      <div class="item"><span class="ttl">“Obey God”</span><i data-i="chevron-right" class="sm end"></i></div>
+    </div>
+
+    <div class="label sect">Related Topics</div>
+    <div class="group rel">
+      <div class="item"><span class="ttl">Regarding The Holy Days of God</span><i data-i="chevron-right" class="sm end"></i></div>
+      <div class="item"><span class="ttl">The Messiah</span><i data-i="chevron-right" class="sm end"></i></div>
+      <div class="item"><span class="ttl">Regarding The Crucifixion</span><i data-i="chevron-right" class="sm end"></i></div>
+      <div class="item"><span class="ttl">Regarding the First and Second Resurrection</span><i data-i="chevron-right" class="sm end"></i></div>
+      <div class="item"><span class="ttl">Regarding Salvation</span><i data-i="chevron-right" class="sm end"></i></div>
+    </div>
+
+    <div class="label sect">Bible Study</div>
+    <div class="group rel">
+      <div class="item"><span class="ttl">YahuShua… The Lamb of God: The TRUE Chronology of The Messiah’s Crucifixion and Resurrection</span><i data-i="rd-arrow-up-right" class="sm end"></i></div>
+    </div>
+
+    <div class="label sect">Audio</div>
+    <div class="group rel">
+      <div class="item"><i data-i="music" class="sm lead"></i><span class="lbl">Audio Recording</span><i data-i="rd-arrow-up-right" class="sm end"></i></div>
+      <div class="item"><i data-i="music" class="sm lead"></i><span class="lbl">Listen on SoundCloud</span><i data-i="rd-arrow-up-right" class="sm end"></i></div>
+    </div>
+
+    <div class="label sect">Videos</div>
+    <div class="group rel">
+      <div class="item"><i data-i="play" class="sm lead fill"></i><span class="lbl">Video (with voice over)</span><i data-i="rd-arrow-up-right" class="sm end"></i></div>
+      <div class="item"><i data-i="play" class="sm lead fill"></i><span class="lbl">Video (excerpts set to music)</span><i data-i="rd-arrow-up-right" class="sm end"></i></div>
+      <div class="item"><i data-i="play" class="sm lead fill"></i><span class="lbl">Official YouTube Channel</span><i data-i="rd-arrow-up-right" class="sm end"></i></div>
+    </div>
+  </div>
+  <div class="readbar">
+    <span class="rb pn prev"><i data-i="chevron-left"></i><span class="pt"><b>Previous</b><span>Letter 3</span></span></span>
+    <span class="sep"></span>
+    <span class="rb"><i data-i="type"></i>Text</span>
+    <span class="rb"><i data-i="bookmark"></i>Save</span>
+    <span class="rb"><i data-i="share-2"></i>Share</span>
+    <span class="sep"></span>
+    <span class="rb pn next"><span class="pt"><b>Next</b><span>Letter 5</span></span><i data-i="chevron-right"></i></span>
+  </div>
+</div>
+</body></html>

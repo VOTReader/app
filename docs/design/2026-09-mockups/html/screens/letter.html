@@ -1,0 +1,61 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* hairline reading progress, pinned under the top bar */
+  .rp { height: 14px; padding: 0 var(--gutter); display: flex; align-items: center; gap: 10px; flex: none; }
+  .rp .bar { flex: 1; height: 2px; border-radius: 1px; background: var(--surface-3); overflow: hidden; }
+  .rp .bar i { display: block; height: 100%; background: var(--accent); }
+  .rp .pc { font: 400 11px/1 var(--sans); color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+  .letter { margin-bottom: 0; }
+  .ctx { margin-top: 10px; }
+  .letter .display { margin-top: 6px; }
+  .lrow { display: flex; margin-top: 16px; }
+  .letter .divider { margin-top: 18px; }
+  .ded { margin-top: 16px; font: 400 16px/1.4 var(--serif); color: var(--text-2); }
+  .ded > div { text-wrap: balance; }
+  .ded .from { font-style: italic; color: var(--text); }
+  .txt { margin-top: 18px; }
+  .txt p { text-wrap: pretty; }
+  .note { color: var(--accent); margin-left: 4px; vertical-align: -2px; }
+  .more { margin-top: 20px; }
+  .more .ph + .ph, .more .phl { margin-top: 20.8px; }
+  /* the paragraph runs on in placeholder lines; its footnote 1 sits where the letter puts it, at the paragraph's end */
+  .phl { display: flex; align-items: center; gap: 6px; height: 10px; }
+  .phl .ph { flex: none; }
+  .phl .fn { margin-left: 0; vertical-align: 0; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="spacer"></span>
+    <span class="iconbtn"><i data-i="bookmark"></i></span>
+    <span class="tabcount">1</span>
+  </div>
+  <div class="rp"><div class="bar"><i style="width:28%"></i></div><span class="pc">28%</span></div>
+  <div class="scroll letter">
+    <div class="meta ctx">Volume One · Letter 15 · 12/13/04</div>
+    <div class="display">Know That Which Has Been Poured Out, The Word of God</div>
+    <div class="lrow"><span class="btn secondary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+    <div class="divider"></div>
+    <div class="ded">
+      <div class="from">From YahuShua HaMashiach, Our Lord and Savior</div>
+      <div>The Word of The Lord Spoken to Timothy</div>
+      <div>For a Brother in Christ, and For All Those Who Have Ears to Hear</div>
+    </div>
+    <div class="reading txt">
+      <p><span class="lead">Thus says The Lord:</span> How is it you have not recognized that which comes from The Father? For that which is of the devil is made plain and surrounds you on every side. Therefore the things of God become that much more precious, even as you, My son, are most precious in My sight... <mark class="hl-honey"><em>Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God, so shall you be in the day you surrender your life, the day you give up this fight and return to Me.</em></mark><i data-i="notebook-pen" class="xs note"></i> Do you not understand that I have saved you? No, not by your own works, but by My life, which I willingly gave up for you. Therefore, turn to Me wholly and in truth.</p>
+    </div>
+    <div class="more">
+      <div class="ph" style="width:98%"></div>
+      <div class="ph" style="width:100%"></div>
+      <div class="ph" style="width:93%"></div>
+      <div class="ph" style="width:97%"></div>
+      <div class="ph" style="width:100%"></div>
+      <div class="phl"><span class="ph" style="width:61%"></span><span class="fn">1</span></div>
+    </div>
+  </div>
+</div>
+</body></html>

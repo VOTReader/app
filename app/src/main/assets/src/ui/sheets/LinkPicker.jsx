@@ -285,26 +285,36 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
     </button>
   );
 
+  /** "1 chapter", "6 chapters": a count whose noun agrees with it. */
+  const countLabel = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+
   const renderBrowse = () => {
     if (!tree) return null;
     // Level 0 — the app's own top-level sections, in home-menu order.
     if (!browseTop) {
       const rows = [];
       if (tree.bibleBooks.length) {
-        rows.push(renderBrowseGroupRow('bible', 'OT', 'bible-chapter', 'The Holy Bible', tree.bibleBooks.length + ' books',
+        rows.push(renderBrowseGroupRow('bible', 'OT', 'bible-chapter', 'The Holy Bible', countLabel(tree.bibleBooks.length, 'book', 'books'),
           () => pushBrowse({ type: 'bible', label: 'The Holy Bible' })));
       }
       if (tree.matthewChapters.length) {
-        rows.push(renderBrowseGroupRow('msb', 'SB', 'study-chapter', 'Matthew Study Bible', tree.matthewChapters.length + ' chapters',
+        rows.push(renderBrowseGroupRow('msb', 'SB', 'study-chapter', 'Matthew Study Bible', countLabel(tree.matthewChapters.length, 'chapter', 'chapters'),
           () => pushBrowse({ type: 'chapters', label: 'Matthew Study Bible', chapters: tree.matthewChapters })));
       }
       tree.collections.forEach((c) => {
-        rows.push(renderBrowseGroupRow('col:' + c.label, COL_NAV_ICON.get(c.label) || '?', c.entries[0] && c.entries[0].kind, c.label,
-          c.entries.length + (c.entries.length === 1 ? ' entry' : ' entries'),
+        // The badge is looked up by the entries' registry label, which is what
+        // COL_NAV_ICON is keyed by and what each entry row below uses. The
+        // group's own label is its CATEGORY, and Holy Days' category ('Holy
+        // Days') is not its registry label ('Regarding The Holy Days'), so a
+        // lookup by the group label found nothing and the row wore a '?'.
+        const first = c.entries[0];
+        const icon = COL_NAV_ICON.get((first && first.collection) || c.label) || '?';
+        rows.push(renderBrowseGroupRow('col:' + c.label, icon, first && first.kind, c.label,
+          countLabel(c.entries.length, 'entry', 'entries'),
           () => pushBrowse({ type: 'entries', label: c.label, entries: c.entries })));
       });
       tree.studies.forEach((s) => {
-        rows.push(renderBrowseGroupRow('study:' + s.label, 'LS', 'study-letter-chapter', s.label, s.chapters.length + ' chapters',
+        rows.push(renderBrowseGroupRow('study:' + s.label, 'LS', 'study-letter-chapter', s.label, countLabel(s.chapters.length, 'chapter', 'chapters'),
           () => pushBrowse({ type: 'entries', label: s.label, entries: s.chapters })));
       });
       if (!rows.length) {
@@ -323,7 +333,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
         <>
           {tree.bibleBooks.map((b) => renderBrowseGroupRow(b.bookId,
             b.category === 'Old Testament' ? 'OT' : 'NT', 'bible-chapter',
-            b.title, b.chapters.length + (b.chapters.length === 1 ? ' chapter' : ' chapters'),
+            b.title, countLabel(b.chapters.length, 'chapter', 'chapters'),
             () => pushBrowse({ type: 'chapters', label: b.title, chapters: b.chapters })))}
         </>
       );

@@ -1,0 +1,92 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="dl-common.css"><script src="../kit/kit.js"></script><script src="dl-icons.js"></script>
+<style>
+  /* The photo viewer stays dark in both themes, as in the app: photographs read truest on black. */
+  .board-grid { grid-template-columns: repeat(4, 309px); }
+  .cell > .cap { min-height: 52px; }
+  .wide { grid-column: 1 / -1; }
+
+  /* ---- the Garden viewer, exactly as jp-garden / jp-garden-states (immersive: no system bars) ---- */
+  .gv { position: relative; height: 915px; background: var(--bg); overflow: hidden; }
+  .gtop { position: absolute; left: 0; right: 0; top: 0; height: 72px; padding: 14px 12px 0; display: flex; align-items: center; justify-content: space-between; z-index: 2; }
+  .gtop .spacer { width: 44px; }
+  .count { height: 36px; padding: 0 16px; border-radius: 18px; background: var(--surface-2); display: inline-flex; align-items: center; gap: 4px; font: 700 15px/1 var(--sans); color: var(--text); font-variant-numeric: tabular-nums; }
+  .count span { font-weight: 400; color: var(--text-3); }
+  .gimg { position: absolute; left: 0; right: 0; top: 72px; bottom: 104px; display: grid; place-items: center; overflow: hidden; }
+  .photo { width: 412px; height: 549px;
+    background:
+      radial-gradient(38% 30% at 72% 18%, color-mix(in srgb, var(--dot-honey) 70%, transparent), transparent 100%),
+      radial-gradient(70% 40% at 30% 72%, color-mix(in srgb, var(--dot-sage) 55%, transparent), transparent 100%),
+      radial-gradient(50% 30% at 85% 88%, color-mix(in srgb, var(--dot-clay) 34%, transparent), transparent 100%),
+      linear-gradient(180deg,
+        color-mix(in srgb, var(--dot-sky) 34%, var(--surface-3)) 0%,
+        color-mix(in srgb, var(--dot-honey) 20%, var(--surface-3)) 42%,
+        color-mix(in srgb, var(--dot-sage) 34%, var(--surface-2)) 64%,
+        color-mix(in srgb, var(--dot-sage) 22%, var(--surface)) 100%); }
+  .gbot { position: absolute; left: 0; right: 0; bottom: 0; height: 104px; padding: 0 28px 22px; display: flex; align-items: center; justify-content: space-between; z-index: 2; background: var(--bg); }
+  .arrow { width: 56px; height: 56px; border-radius: 28px; background: var(--surface-2); color: var(--text); display: grid; place-items: center; }
+  .gbot .hint { font: 400 13px/1.3 var(--sans); color: var(--text-3); text-align: center; }
+  .msg { display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; padding: 0 44px; }
+  .msg .i { color: var(--text-3); }
+  .msg .t { font: 400 16px/1.45 var(--sans); color: var(--text-2); text-wrap: balance; }
+
+  /* ---- the page field: the counter turns into a number box in place ---- */
+  .jump { height: 40px; padding: 0 16px 0 4px; border-radius: 20px; background: var(--surface-2); display: inline-flex; align-items: center; gap: 8px;
+    font: 700 15px/1 var(--sans); color: var(--text); font-variant-numeric: tabular-nums; }
+  .jump .in { width: 78px; height: 32px; border-radius: 16px; background: var(--bg); box-shadow: inset 0 0 0 1.5px var(--accent);
+    display: inline-flex; align-items: center; justify-content: center; }
+  .jump .in .phx { font-weight: 400; color: var(--text-3); }
+  .jump .in .caret { height: 18px; }
+  .jump .of { font-weight: 400; color: var(--text-3); }
+  .kbd.num { z-index: 5; }
+
+  /* the three states of the counter at full size */
+  .spec { display: flex; align-items: flex-start; gap: 28px; }
+  .spec .st { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+  .spec .st .count { margin-top: 2px; }
+  .spec .st .meta { white-space: nowrap; }
+  .spec .arrowr { color: var(--text-3); margin-top: 11px; }
+  .spec .note { max-width: 520px; margin: 8px 0 0 20px; font: 400 14px/1.5 var(--sans); color: var(--text-2); text-wrap: pretty; }
+</style></head>
+<body data-size="1400x1040">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">A Return to The Garden · going to a page</div>
+    <div class="meta">Tapping the page count turns it into a number box. Go jumps; the page then streams in like any other. The viewer's own states are drawn in jp-garden-states.</div>
+  </div>
+  <div class="board-grid" id="grid"></div>
+</div>
+<script>
+  const kbd = (goTouch) => `<div class="kbd num">
+      <div class="kr"><span class="k">1</span><span class="k">2</span><span class="k">3</span></div>
+      <div class="kr"><span class="k">4</span><span class="k">5</span><span class="k">6</span></div>
+      <div class="kr"><span class="k">7</span><span class="k">8</span><span class="k">9</span></div>
+      <div class="kr"><span class="k fn"><i data-i="dl-delete"></i></span><span class="k">0</span><span class="k go" style="position:relative"><i data-i="dl-arrow-right"></i>${goTouch ? '<span class="touch" style="left:50%;top:50%"></span>' : ''}</span></div>
+    </div>`;
+  const viewer = ({ top, img, bottom = true, extra = '' }) => `<div class="phone-m"><div class="screen"><div class="gv" data-theme="dark">
+      <div class="gtop"><span class="iconbtn"><i data-i="chevron-left"></i></span>${top}<span class="spacer"></span></div>
+      <div class="gimg">${img}</div>
+      ${bottom ? '<div class="gbot"><span class="arrow"><i data-i="chevron-left"></i></span><span class="hint">A Return to The Garden</span><span class="arrow"><i data-i="chevron-right"></i></span></div>' : ''}
+      ${extra}
+    </div></div></div>`;
+  const count = (n) => `<span class="count">${n}<span>/ 209</span></span>`;
+  const jump = (val) => `<span class="jump"><span class="in">${val ? `${val}<span class="caret"></span>` : '<span class="caret"></span><span class="phx">1–209</span>'}</span><span class="of">/ 209</span></span>`;
+
+  const cells = [
+    ['The field opens', 'On page 12, tap the count. The number keys rise; the picture stays put', viewer({ top: jump(''), img: '<div class="photo"></div>', bottom: false, extra: kbd(false) })],
+    ['Type a page, then Go', 'Any number from 1 to 209', viewer({ top: jump('150'), img: '<div class="photo"></div>', bottom: false, extra: kbd(true) })],
+    ['Page 150 on its way', 'The count already reads the new page', viewer({ top: count(150), img: '<div class="msg"><span class="spin"></span><div class="t">Loading page 150…</div></div>' })],
+    ['If it cannot load', 'Try again fetches that page fresh', viewer({ top: count(150), img: '<div class="msg"><svg class="i lg"><use href="#i-dl-wifi-off"/></svg><div class="t">Failed to load — check your connection</div><span class="btn secondary sm">Try again</span></div>' })],
+  ];
+  const spec = `<div class="cell wide"><div class="cap">The page count, at full size<small>Resting, opened, typed</small></div>
+    <div class="spec">
+      <div class="st">${count(12)}<span class="meta">Resting · a button</span></div>
+      <i data-i="chevron-right" class="sm arrowr"></i>
+      <div class="st">${jump('')}<span class="meta">Opened · empty</span></div>
+      <i data-i="chevron-right" class="sm arrowr"></i>
+      <div class="st">${jump('150')}<span class="meta">Typed</span></div>
+      <p class="note">Only 1 to 209 moves the page. Any other number, or a tap anywhere else, closes the box and stays on the page you were on.</p>
+    </div></div>`;
+  document.getElementById('grid').innerHTML = cells.map(c => `<div class="cell"><div class="cap">${c[0]}<small>${c[1]}</small></div>${c[2]}</div>`).join('') + spec;
+</script>
+</body></html>

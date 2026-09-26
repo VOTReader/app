@@ -1,0 +1,124 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* milestones page (jp-milestones.html) */
+  .intro { padding-top: 4px; }
+  .intro .h1 { margin-top: 4px; }
+  .intro .body { margin-top: 8px; }
+  .sum { margin-top: 22px; padding: 18px 20px 20px; }
+  .sum .cnt { display: flex; align-items: baseline; gap: 10px; }
+  .sum .cnt b { font: 700 34px/1 var(--sans); color: var(--text); letter-spacing: -0.01em; }
+  .sum .cnt span { font: 400 16px/1 var(--sans); color: var(--text-2); }
+  .sum .progress { height: 6px; border-radius: 3px; margin-top: 16px; }
+  .ctl { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; }
+  .hide { display: inline-flex; align-items: center; gap: 12px; font: 400 15px/1 var(--sans); color: var(--text); }
+  .jump { display: flex; gap: 8px; margin: 16px -20px 0; padding: 0 20px; overflow: hidden; white-space: nowrap; }
+  .cat { margin-top: 30px; }
+  .cat .hd { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .cat .hd .h2 { margin-top: 3px; }
+  .cat .hd b { font: 700 15px/1 var(--sans); color: var(--text-2); padding-bottom: 4px; }
+  .ms { align-items: center; }
+  .ms .mk { width: 30px; height: 30px; border-radius: 15px; display: grid; place-items: center; flex: none; background: var(--surface-2); color: var(--text-3); }
+  .ms .mk svg { width: 12px; height: 12px; }
+  .ms.on .mk { background: var(--accent-soft); color: var(--accent); }
+  .ms .cp { flex: 1; min-width: 0; }
+  .ms .lb { font: 400 16px/1.25 var(--sans); color: var(--text-2); }
+  .ms .progress { margin-top: 9px; height: 3px; }
+  .ms .progress i { background: color-mix(in srgb, var(--accent) 70%, var(--surface-3)); }
+  .ms .v { flex: none; font: 400 13px/1.2 var(--sans); color: var(--text-3); text-align: right; }
+  .allclear { margin-top: 60px; text-align: center; padding: 0 20px; }
+  .allclear .badge { width: 64px; height: 64px; border-radius: 32px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; margin: 0 auto 16px; }
+  .allclear .badge svg { width: 22px; height: 22px; }
+  /* progress page (jp-progress.html) */
+  .hero { margin-top: 22px; padding: 20px 20px 22px; display: grid; grid-template-columns: 1fr 1fr; row-gap: 22px; column-gap: 16px; }
+  .stat b { display: block; font: 700 28px/1 var(--sans); color: var(--text); }
+  .stat .lb { display: block; margin-top: 8px; font: 400 15px/1.2 var(--sans); color: var(--text); }
+  .stat .meta { display: block; margin-top: 3px; }
+  .days { margin-top: 12px; padding: 16px 20px 18px; }
+  .days .hd { display: flex; justify-content: space-between; align-items: baseline; }
+  .days .hd span:first-child { font: 400 15px/1.2 var(--sans); color: var(--text); }
+  .bars { display: flex; align-items: flex-end; justify-content: space-between; height: 64px; margin-top: 16px; }
+  .bars i { width: 16px; height: 3px; border-radius: 2px; background: var(--surface-3); }
+  .sect { margin: 28px 0 10px; }
+  .msl { display: flex; flex-wrap: wrap; gap: 8px; }
+  .m { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 10px; border-radius: 16px; background: var(--surface-2); color: var(--text-3); font: 400 13.5px/1 var(--sans); white-space: nowrap; }
+  .m svg { width: 12px; height: 12px; }
+  .note { font: 400 15px/1.45 var(--sans); color: var(--text-2); }
+  /* components */
+  .comp { display: flex; flex-direction: column; gap: 12px; }
+  .tile { display: flex; gap: 14px; align-items: flex-start; }
+  .tile .ic { width: 42px; height: 42px; border-radius: 12px; background: var(--surface-2); color: var(--text-2); display: grid; place-items: center; flex: none; }
+  .tile .tx { flex: 1; min-width: 0; }
+  .tile .h3 { margin-top: 1px; }
+  .tile .d { margin-top: 3px; font: 400 14px/1.3 var(--sans); color: var(--text-2); }
+  .tile .g { margin-top: 8px; }
+  .toast { height: 48px; border-radius: 24px; background: var(--surface-3); display: inline-flex; align-items: center; gap: 10px; padding: 0 20px 0 16px; font: 400 15px/1 var(--sans); color: var(--text); box-shadow: var(--shadow); align-self: flex-start; }
+  .toast svg { width: 14px; height: 14px; color: var(--accent); }
+</style></head>
+<body data-size="1176x1180">
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="x-spark" viewBox="0 0 24 24"><path fill="currentColor" d="M12 1.5c.9 6.4 3.9 9.6 10.5 10.5-6.6.9-9.6 4.1-10.5 10.5-.9-6.4-3.9-9.6-10.5-10.5C8.1 11.1 11.1 7.9 12 1.5z"/></symbol>
+  <symbol id="x-ring" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2.5"/></symbol>
+</svg>
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Progress &amp; milestones · states</div>
+    <div class="meta">Hide reached, the all-clear, a new reader, the Library tiles, the notes that stand in for data, and the one quiet celebration.</div>
+  </div>
+  <div class="board-grid" id="grid" style="grid-template-columns: repeat(4, 256px)"></div>
+  <div class="board-grid" id="grid2" style="grid-template-columns: 340px 356px 352px; margin-top: 6px"></div>
+</div>
+<script>
+  const n = (x) => x.toLocaleString('en-US');
+  const mark = (on) => `<span class="mk"><svg><use href="#${on ? 'x-spark' : 'x-ring'}"/></svg></span>`;
+  const row = (l, v, t) => `<div class="item ms"><span class="mk"><svg><use href="#x-ring"/></svg></span><span class="cp"><div class="lb">${l}</div><div class="progress"><i style="width:${Math.round(v / t * 100)}%"></i></div></span><span class="v">${n(v)} / ${n(t)}</span></div>`;
+  function phone(inner) {
+    return `<div class="phone-s"><div class="screen">
+      <div class="status"></div>
+      <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Library</span></div>
+      <div class="scroll">${inner}</div></div></div>`;
+  }
+  const MSHEAD = (earned, hideOn, note, chips) => `<div class="intro"><div class="eyebrow">Your journey</div><div class="h1">Milestones</div>
+      <div class="body">Every mark here reflects the reading, listening, and study record you keep on this device — no account or sign-up required.</div></div>
+    <div class="card sum"><div class="cnt"><b>${earned}</b><span>of 80 reached</span></div><div class="progress"><i style="width:${Math.round(earned / 80 * 100)}%"></i></div></div>
+    <div class="ctl"><span class="hide"><span class="toggle ${hideOn ? 'on' : ''}"></span>Hide reached</span><span class="meta">${note}</span></div>
+    ${chips ? `<div class="jump">${chips.map(c => `<span class="chip">${c}</span>`).join('')}</div>` : ''}`;
+  const WORDS_LEFT = `<section class="cat"><div class="hd"><div><span class="meta">Measured, completed reading</span><div class="h2">Words Read</div></div><b>3/7</b></div>
+    <div class="group">${row('250,000 words read', 118400, 250000)}${row('500,000 words read', 118400, 500000)}${row('750,000 words read', 118400, 750000)}${row('One million words read', 118400, 1000000)}</div></section>`;
+  const WORDS_NEW = `<section class="cat"><div class="hd"><div><span class="meta">Measured, completed reading</span><div class="h2">Words Read</div></div><b>0/7</b></div>
+    <div class="group">${row('10,000 words read', 0, 10000)}${row('50,000 words read', 0, 50000)}${row('100,000 words read', 0, 100000)}${row('250,000 words read', 0, 250000)}</div></section>`;
+  const PROG_NEW = `<div class="intro"><div class="eyebrow">Personal Study</div><div class="h1">My Progress</div><div class="body">Your reading, journaling, and study at a glance.</div></div>
+    <div class="card hero">
+      <div class="stat"><b>0</b><span class="lb">Read</span><span class="meta">chapters &amp; letters</span></div>
+      <div class="stat"><b>0</b><span class="lb">Entries</span><span class="meta">in your journal</span></div>
+      <div class="stat"><b>0</b><span class="lb">Words read</span><span class="meta">across your reading</span></div>
+    </div>
+    <div class="card days"><div class="hd"><span>Last 14 days</span><span class="meta">0 words this week</span></div><div class="bars">${'<i></i>'.repeat(14)}</div></div>
+    <div class="label sect">Milestones</div>
+    <div class="card" style="padding:16px"><div class="msl">${['First reading finished', '10 readings finished', '50 readings finished', '200 readings finished', '10,000 words read'].map(l => `<span class="m"><svg><use href="#x-ring"/></svg>${l}</span>`).join('')}</div></div>`;
+  const cells = [
+    ['Hide reached', 'What is left; emptied categories drop away', phone(MSHEAD(40, true, '40 still to reach', ['Words Read', 'Readings Finished', 'Scripture Chapters', 'Letters &amp; Entries']) + WORDS_LEFT)],
+    ['All reached', 'With Hide reached on and nothing left', phone(MSHEAD(80, true, '0 still to reach') + `<div class="allclear"><div class="badge"><svg><use href="#x-spark"/></svg></div><div class="body">Every milestone here has been reached.</div></div>`)],
+    ['A new reader', 'Every row visible from the start, none earned', phone(MSHEAD(0, false, '80 milestones', ['Words Read', 'Readings Finished', 'Scripture Chapters', 'Letters &amp; Entries']) + WORDS_NEW)],
+    ['My Progress, first open', 'Pace, re-reads and time appear once measured', phone(PROG_NEW)],
+  ];
+  document.getElementById('grid').innerHTML = cells.map(c => `<div class="cell"><div class="cap">${c[0]}<small>${c[1]}</small></div>${c[2]}</div>`).join('');
+
+  const tile = (icon, eyebrow, title, detail, guide) => `<div class="card tile"><span class="ic"><i data-i="${icon}" class="sm"></i></span><div class="tx"><div class="meta">${eyebrow}</div><div class="h3">${title}</div><div class="d">${detail}</div>${guide ? `<div class="meta g">${guide}</div>` : ''}</div><i data-i="chevron-right" class="sm" style="color:var(--text-3); margin-top:12px"></i></div>`;
+  const row2 = [
+    ['Library tiles', 'Populated, and before anything is counted', `<div class="comp">
+      ${tile('gauge', 'My Progress', 'Progress', '213 read')}
+      ${tile('star', 'My Journey', 'Milestones', '40 of 80 reached')}
+      ${tile('star', 'My Journey', 'Milestones', 'None reached yet', 'Reading, listening, and study all count toward these.')}</div>`],
+    ['Notes that stand in for data', 'In the Reading and Most Annotated cards', `<div class="comp">
+      <div class="card"><div class="label" style="margin-bottom:10px">Reading</div><div class="note">Loading your library…</div></div>
+      <div class="card"><div class="label" style="margin-bottom:10px">Reading</div><div class="note">Mark as Read is off — reading progress isn’t being recorded. You can turn it on in Settings.</div></div>
+      <div class="card"><div class="label" style="margin-bottom:10px">Most Annotated</div><div class="note">Nothing marked yet — press and hold any text while reading to highlight it.</div></div></div>`],
+    ['The celebration', 'A small pill at the top for three seconds, once ever per milestone', `<div class="comp">
+      <span class="toast"><svg><use href="#x-spark"/></svg>Milestone: 100,000 words read</span>
+      <span class="toast"><svg><use href="#x-spark"/></svg>Milestone: First entry</span>
+      <div class="meta" style="margin-top:4px; max-width:330px">Several can cross at once on a long reading; only the first is shown, so nothing stacks over the page you just finished.</div></div>`],
+  ];
+  document.getElementById('grid2').innerHTML = row2.map(c => `<div class="cell"><div class="cap">${c[0]}<small>${c[1]}</small></div>${c[2]}</div>`).join('');
+</script>
+</body></html>

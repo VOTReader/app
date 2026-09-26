@@ -1,0 +1,205 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="ad-shared.css"><script src="../kit/kit.js"></script><script src="ad-icons.js"></script>
+<style>
+  .board { gap: 26px; }
+  .g1 { grid-template-columns: repeat(4, 309px); column-gap: 32px; }
+  .g2 { grid-template-columns: 320px 560px 412px; column-gap: 32px; }
+  .g3 { grid-template-columns: 580px 412px 300px; column-gap: 32px; }
+  .hub .hero .body { font-size: 15px; }
+  .hub .acts { margin-top: 16px; }
+  .sheet.cs { overflow: hidden; }
+  /* components drawn at full size */
+  .comp .tl { font: 400 13px/1.3 var(--sans); color: var(--text-3); margin-bottom: 8px; }
+  .comp .tl ~ .tl { margin-top: 18px; }
+  .comp .btn .i { width: 18px; height: 18px; }
+  .comp .chips { overflow: visible; }
+  .comp .chip .tri { font-size: 11px; margin-left: -1px; }
+  .crop.sm { width: 280px; padding: 16px 18px 18px; }
+  .crop.sm .h2 { margin-top: 3px; }
+  .crop.sm .empty-note { margin-top: 10px; padding: 0; }
+  .empties { display: grid; grid-template-columns: 280px 280px; gap: 16px 20px; align-content: start; }
+  .crop .sh.first { margin-top: 0; }
+  .crop .hb-chips { margin-right: -20px; }
+  .gone .topbar { margin: -18px -12px 0; }
+  .gone .empty-note { margin-top: 12px; }
+</style></head>
+<body data-size="1440x1720">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Songs of the Letters · browsing</div>
+    <div class="meta">Shuffle, the style chips and More styles, finding a song, a list of songs and its empty states, more songs from one letter, and a song that has gone. The hub's shelves and a song's own page are drawn in the au- set.</div>
+  </div>
+
+  <div class="board-grid g1">
+    <!-- 1. find -->
+    <div class="cell">
+      <div class="cap">Find<small>Looks through titles, versions, makers, letters and collections</small></div>
+      <div class="phone-m hub"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Listening Library</span><span class="iconbtn"><i data-i="search"></i></span></div>
+        <div class="scroll">
+          <div class="hero"><div class="eyebrow">Sung by the flock</div><div class="h1">Songs of the Letters</div><div class="body">Songs made by members of the flock with Suno, from the words of The Volumes of Truth.</div></div>
+          <div class="acts"><span class="btn primary"><i data-i="shuffle"></i>Shuffle all songs</span></div>
+          <div class="search hb-find"><i data-i="search"></i><span class="q">garden</span><span class="clr"><i data-i="x"></i></span></div>
+          <div class="chips hb-chips"><span class="chip on">All</span><span class="chip">Worship</span><span class="chip">Pop</span><span class="chip">Hip-hop</span><span class="chip">Cinematic</span><span class="chip">Folk</span><span class="chip">More<span class="tri">▾</span></span></div>
+          <div class="sh"><div class="shc"><div class="h2">Songs <small>7</small></div></div></div>
+          <div class="sg-list">
+            <div class="sg"><span class="cv k3"></span><div class="sg-cp"><div class="sg-t">A Return to the Garden</div><div class="sg-m">Words To Live By: Part One</div></div><span class="sg-len">3:50</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv k2"></span><div class="sg-cp"><div class="sg-t">Garden of Stillness</div><div class="sg-m">hmarie777</div></div><span class="sg-len">3:35</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv k6"></span><div class="sg-cp"><div class="sg-t">Garden Tabernacles</div><div class="sg-m">Inspired by the letters</div></div><span class="sg-len">5:20</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv"></span><div class="sg-cp"><div class="sg-t">Rooted Where the Garden Begins</div><div class="sg-m">Inspired by the letters</div></div><span class="sg-len">5:50</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv k5"></span><div class="sg-cp"><div class="sg-t">The Garden of His Peace</div><div class="sg-m">hmarie777</div></div><span class="sg-len">4:42</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv k4"></span><div class="sg-cp"><div class="sg-t">The Gardener</div><div class="sg-m">Bible songs</div></div><span class="sg-len">4:59</span><span class="rp"><i data-i="play"></i></span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 2. a style -->
+    <div class="cell">
+      <div class="cap">A style<small>The chip filters the shelf and Shuffle takes its name and count</small></div>
+      <div class="phone-m hub"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Listening Library</span><span class="iconbtn"><i data-i="search"></i></span></div>
+        <div class="scroll">
+          <div class="hero"><div class="eyebrow">Sung by the flock</div><div class="h1">Songs of the Letters</div><div class="body">Songs made by members of the flock with Suno, from the words of The Volumes of Truth.</div></div>
+          <div class="acts"><span class="btn primary"><i data-i="shuffle"></i>Shuffle Worship (224)</span></div>
+          <div class="search hb-find"><i data-i="search"></i>Find a song, a letter, or a maker</div>
+          <div class="chips hb-chips"><span class="chip">All</span><span class="chip on">Worship</span><span class="chip">Pop</span><span class="chip">Hip-hop</span><span class="chip">Cinematic</span><span class="chip">Folk</span><span class="chip">More<span class="tri">▾</span></span></div>
+          <div class="sh"><div class="shc"><div class="h2">Worship <small>224</small></div></div></div>
+          <div class="sg-list">
+            <div class="sg"><span class="cv k6"></span><div class="sg-cp"><div class="sg-t">A Fire Behind Your Shame</div><div class="sg-m">Inspired by the letters</div></div><span class="sg-len">8:02</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv"></span><div class="sg-cp"><div class="sg-t">A Kindled Fire</div><div class="sg-m">Letters from Timothy</div></div><span class="sg-len">2:53</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv k3"></span><div class="sg-cp"><div class="sg-t">A Prayer for Guidance</div><div class="sg-m">Bible songs</div></div><span class="sg-len">3:37</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv k2"></span><div class="sg-cp"><div class="sg-t">A Psalm of David</div><div class="sg-m">Words To Live By: Part One</div></div><span class="sg-len">3:54</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv k5"></span><div class="sg-cp"><div class="sg-t">A Pure Heart</div><div class="sg-m">Words To Live By: Part Two</div></div><span class="sg-len">4:54</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv k4"></span><div class="sg-cp"><div class="sg-t">A Voice</div><div class="sg-m">Inspired by the letters</div></div><span class="sg-len">3:55</span><span class="rp"><i data-i="play"></i></span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 3. More styles -->
+    <div class="cell">
+      <div class="cap">More styles<small>From More ▾: the rest of the styles, most songs first</small></div>
+      <div class="phone-m hub"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Listening Library</span><span class="iconbtn"><i data-i="search"></i></span></div>
+        <div class="scroll">
+          <div class="hero"><div class="eyebrow">Sung by the flock</div><div class="h1">Songs of the Letters</div><div class="body">Songs made by members of the flock with Suno, from the words of The Volumes of Truth.</div></div>
+          <div class="acts"><span class="btn primary"><i data-i="shuffle"></i>Shuffle all songs</span></div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet cs">
+          <div class="grabber"></div>
+          <div class="eyebrow">Songs of the Letters</div>
+          <div class="h2">More styles</div>
+          <div class="cs-opts">
+            <div class="cs-opt"><span class="l">Rock</span><span class="m">141 songs</span></div>
+            <div class="cs-opt"><span class="l">R&amp;B</span><span class="m">125 songs</span></div>
+            <div class="cs-opt"><span class="l">Dance</span><span class="m">89 songs</span></div>
+            <div class="cs-opt"><span class="l">World</span><span class="m">76 songs</span></div>
+            <div class="cs-opt"><span class="l">Spoken</span><span class="m">63 songs</span></div>
+            <div class="cs-opt"><span class="l">Country</span><span class="m">58 songs</span></div>
+            <div class="cs-opt"><span class="l">Retro</span><span class="m">43 songs</span></div>
+            <div class="cs-opt"><span class="l">Reggae</span><span class="m">20 songs</span></div>
+            <div class="cs-opt"><span class="l">A cappella</span><span class="m">14 songs</span></div>
+            <div class="cs-opt"><span class="l">Blues</span><span class="m">14 songs</span></div>
+            <div class="cs-opt"><span class="l">Instrumental</span><span class="m">13 songs</span></div>
+            <div class="cs-opt"><span class="l">Spanish</span><span class="m">11 songs</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 4. a list frame -->
+    <div class="cell">
+      <div class="cap">A list<small>See all from the hub; each row names its maker, or its shelf</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Songs of the Letters</span><span class="iconbtn"><i data-i="search"></i></span></div>
+        <div class="scroll">
+          <div class="hero"><div class="eyebrow">New from the flock</div><div class="h1">New from the flock</div><div class="body">10 songs · 41 min</div></div>
+          <div class="acts"><span class="btn primary sm"><i data-i="play" class="fill"></i>Play all</span><span class="btn secondary sm"><i data-i="shuffle"></i>Shuffle</span></div>
+          <div class="sg-list" style="margin-top:22px">
+            <div class="sg"><span class="cv k2"></span><div class="sg-cp"><div class="sg-t">From Your Arms</div><div class="sg-m">Sky of Sapphire</div></div><span class="sg-len">3:24</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv k4"></span><div class="sg-cp"><div class="sg-t">You Stepped In</div><div class="sg-m">Flock prayers</div></div><span class="sg-len">5:33</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv k5"></span><div class="sg-cp"><div class="sg-t">I Choose You</div><div class="sg-m">Sky of Sapphire</div></div><span class="sg-len">3:03</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv k6"></span><div class="sg-cp"><div class="sg-t">The Bridegroom Comes</div><div class="sg-m">Sky of Sapphire</div></div><span class="sg-len">5:14</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv"></span><div class="sg-cp"><div class="sg-t">I Choose You</div><div class="sg-m">Inspired by the letters</div></div><span class="sg-len">5:34</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv k3"></span><div class="sg-cp"><div class="sg-t">Your Grace Shines Bright</div><div class="sg-m">Sky of Sapphire</div></div><span class="sg-len">3:05</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv k5"></span><div class="sg-cp"><div class="sg-t">I Choose You</div><div class="sg-m">Sky of Sapphire</div></div><span class="sg-len">4:16</span><span class="rp"><i data-i="play"></i></span></div>
+            <div class="sg"><span class="cv k2"></span><div class="sg-cp"><div class="sg-t">Come Home</div><div class="sg-m">Inspired by the letters</div></div><span class="sg-len">3:59</span><span class="rp"><i data-i="play"></i></span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="board-grid g2">
+    <!-- 5. shuffle buttons -->
+    <div class="cell comp">
+      <div class="cap">Shuffle<small>One version of every song, so each is heard before any repeats</small></div>
+      <div class="tl">No style chosen</div>
+      <div><span class="btn primary"><i data-i="shuffle"></i>Shuffle all songs</span></div>
+      <div class="tl">A style chosen</div>
+      <div><span class="btn primary"><i data-i="shuffle"></i>Shuffle Worship (224)</span></div>
+      <div class="tl">A style from More</div>
+      <div><span class="btn primary"><i data-i="shuffle"></i>Shuffle Country (58)</span></div>
+    </div>
+    <!-- 6. chips -->
+    <div class="cell comp">
+      <div class="cap">Style chips<small>The whole row; on a phone it scrolls sideways. A style chosen from More takes the last chip's place</small></div>
+      <div class="tl">All styles</div>
+      <div class="chips"><span class="chip on">All</span><span class="chip">Worship</span><span class="chip">Pop</span><span class="chip">Hip-hop</span><span class="chip">Cinematic</span><span class="chip">Folk</span><span class="chip">More<span class="tri">▾</span></span></div>
+      <div class="tl">Country, chosen from More styles</div>
+      <div class="chips"><span class="chip">All</span><span class="chip">Worship</span><span class="chip">Pop</span><span class="chip">Hip-hop</span><span class="chip">Cinematic</span><span class="chip">Folk</span><span class="chip on">Country<span class="tri">▾</span></span></div>
+    </div>
+    <!-- 7. nothing found -->
+    <div class="cell">
+      <div class="cap">Nothing found<small>The box keeps its words; the hint points back to the letters</small></div>
+      <div class="crop">
+        <div class="search hb-find" style="margin-top:0"><i data-i="search"></i><span class="q">eden</span><span class="clr"><i data-i="x"></i></span></div>
+        <div class="chips hb-chips"><span class="chip on">All</span><span class="chip">Worship</span><span class="chip">Pop</span><span class="chip">Hip-hop</span><span class="chip">Cinematic</span><span class="chip">Folk</span></div>
+        <div class="sh"><div class="shc"><div class="h2">Songs <small>0</small></div></div></div>
+        <p class="empty-note">No song by that name. Try a word from the letter.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="board-grid g3">
+    <!-- 8. empty lists -->
+    <div class="cell">
+      <div class="cap">A list with nothing in it<small>No count, no Play all or Shuffle: only the list's own sentence</small></div>
+      <div class="empties">
+        <div class="crop sm"><div class="eyebrow">Your songs</div><div class="h2">Saved songs</div><p class="empty-note">Tap Save on any song and it will wait here.</p></div>
+        <div class="crop sm"><div class="eyebrow">Your songs</div><div class="h2">Recently played songs</div><p class="empty-note">Songs you play will appear here.</p></div>
+        <div class="crop sm"><div class="eyebrow">New from the flock</div><div class="h2">New from the flock</div><p class="empty-note">No songs yet.</p></div>
+        <div class="crop sm"><div class="eyebrow">Songs from this letter</div><div class="h2">Duty</div><p class="empty-note">No songs from this letter yet.</p></div>
+        <div class="crop sm"><div class="eyebrow">Songs of the Letters</div><div class="h2">Bible songs</div><p class="empty-note">No songs here yet.</p></div>
+      </div>
+    </div>
+    <!-- 9. more from this letter -->
+    <div class="cell">
+      <div class="cap">More songs from this letter<small>At the foot of My Redeemer Lives: three, then the whole letter's list</small></div>
+      <div class="crop">
+        <div class="sh first"><div class="shc"><div class="h2">More songs from this letter</div></div></div>
+        <div class="sg-list">
+          <div class="sg"><span class="cv"></span><div class="sg-cp"><div class="sg-t">A Kindled Fire</div><div class="sg-m">Letters from Timothy</div></div><span class="sg-len">2:53</span><span class="rp"><i data-i="play"></i></span></div>
+          <div class="sg"><span class="cv k4"></span><div class="sg-cp"><div class="sg-t">Help Me, O God!</div><div class="sg-m">Letters from Timothy</div></div><span class="sg-len">3:58</span><span class="rp"><i data-i="play"></i></span></div>
+          <div class="sg"><span class="cv k2"></span><div class="sg-cp"><div class="sg-t">How Many Times?!</div><div class="sg-m">Letters from Timothy</div></div><span class="sg-len">4:18</span><span class="rp"><i data-i="play"></i></span></div>
+        </div>
+        <div class="see">All 16 songs of this letter<i data-i="chevron-right"></i></div>
+      </div>
+    </div>
+    <!-- 10. a song that has gone -->
+    <div class="cell">
+      <div class="cap">A song that has gone<small>Its page reopened after the flock withdrew it</small></div>
+      <div class="crop gone" style="width:300px">
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Songs of the Letters</span></div>
+        <p class="empty-note">This song is no longer shared.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

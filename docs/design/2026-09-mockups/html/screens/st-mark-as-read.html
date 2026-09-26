@@ -1,0 +1,108 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="st-settings.css"><script src="../kit/kit.js"></script>
+<style>
+  .prog { padding: 0; }
+  .psec + .psec, .psec + .ptotal { border-top: 1px solid var(--hairline); }
+  .shd { display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 16px 14px; }
+  .shd .dis { color: var(--text-2); flex: none; margin-top: 3px; }
+  .shd .pt { flex: 1; min-width: 0; }
+  .shd .pl { font: 500 19px/1.25 var(--serif); color: var(--text); }
+  .row2 { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+  .row2 .progress { flex: 1; }
+  .row2 .tally { min-width: 72px; text-align: right; }
+  .tally { font: 400 13px/1 var(--sans); color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .cl { flex: none; height: 32px; padding: 0 8px; display: inline-flex; align-items: center; font: 700 14px/1 var(--sans); color: var(--text-2); }
+  .cl.is-off { color: var(--text-3); opacity: .45; }
+  .shd .cl { margin-top: -4px; }
+  .genre { padding: 12px 16px 4px 44px; }
+  .brow { display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 44px; min-height: 46px; }
+  .brow .bl { flex: 1; min-width: 0; font: 400 15px/1.3 var(--sans); color: var(--text); }
+  .brow .tally { min-width: 54px; text-align: right; }
+  .brow + .genre { margin-top: 8px; border-top: 1px solid var(--hairline); padding-top: 18px; }
+  .body-open { padding-bottom: 10px; }
+  .ptotal { display: flex; align-items: flex-start; gap: 12px; padding: 18px 16px; background: var(--surface-2); }
+  .ptotal .pt { flex: 1; min-width: 0; }
+  .ptotal .pl { font: 700 16px/1.3 var(--sans); color: var(--text); }
+  .ptotal .btn { flex: none; }
+  .btn.xs { height: 34px; border-radius: 17px; padding: 0 14px; font-size: 14px; }
+</style></head>
+<body data-size="412x1523">
+<!--st-icons--><svg xmlns="http://www.w3.org/2000/svg" style="display:none"></svg><!--/st-icons-->
+<div class="screen tall">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Mark as Read</span>
+  </div>
+  <div class="scroll st">
+
+    <div class="group" style="margin-top:8px">
+      <div class="set">
+        <div class="hd"><div class="txt"><div class="lbl">Mark as Read</div></div><span class="toggle on"></span></div>
+        <div class="help">Chapters and letters are checked off automatically once you’ve genuinely read them — nearly all of the text seen, for about as long as reading it takes. A quick scroll to the bottom doesn’t count. Re-reads add a small ×2, ×3 beside the check. Progress stops recording when this is off, but what’s already saved is kept.</div>
+      </div>
+    </div>
+
+    <div class="label sect">Reading progress by book</div>
+    <div class="group prog">
+
+      <div class="psec">
+        <div class="shd">
+          <i data-i="chevron-down" class="sm dis"></i>
+          <div class="pt"><div class="pl">The Volumes of Truth</div><div class="row2"><div class="progress"><i style="width:14.2%"></i></div><span class="tally">103 / 727</span></div></div>
+          <span class="cl">Clear</span>
+        </div>
+        <div class="body-open">
+          <div class="label genre">The Seven Volumes</div>
+          <div class="brow"><span class="bl">Volume One</span><span class="tally">15 / 29</span><span class="cl">Clear</span></div>
+          <div class="brow"><span class="bl">Volume Two</span><span class="tally">29 / 29</span><span class="cl">Clear</span></div>
+          <div class="brow"><span class="bl">Volume Three</span><span class="tally">4 / 30</span><span class="cl">Clear</span></div>
+          <div class="brow"><span class="bl">Volume Four</span><span class="tally">0 / 29</span><span class="cl is-off">Clear</span></div>
+          <div class="brow"><span class="bl">Volume Five</span><span class="tally">0 / 29</span><span class="cl is-off">Clear</span></div>
+          <div class="brow"><span class="bl">Volume Six</span><span class="tally">0 / 31</span><span class="cl is-off">Clear</span></div>
+          <div class="brow"><span class="bl">Volume Seven</span><span class="tally">0 / 67</span><span class="cl is-off">Clear</span></div>
+          <div class="label genre">Books &amp; Collections</div>
+          <div class="brow"><span class="bl">Letters from Timothy</span><span class="tally">14 / 14</span><span class="cl">Clear</span></div>
+          <div class="brow"><span class="bl">Letters to The Little Flock</span><span class="tally">26 / 62</span><span class="cl">Clear</span></div>
+          <div class="brow"><span class="bl">The Lord’s Rebuke</span><span class="tally">0 / 31</span><span class="cl is-off">Clear</span></div>
+          <div class="brow"><span class="bl">Words To Live By: Part One</span><span class="tally">12 / 149</span><span class="cl">Clear</span></div>
+          <div class="brow"><span class="bl">Words To Live By: Part Two</span><span class="tally">0 / 203</span><span class="cl is-off">Clear</span></div>
+          <div class="brow"><span class="bl">The Blessed</span><span class="tally">3 / 8</span><span class="cl">Clear</span></div>
+          <div class="brow"><span class="bl">Regarding The Holy Days</span><span class="tally">0 / 16</span><span class="cl is-off">Clear</span></div>
+        </div>
+      </div>
+
+      <div class="psec">
+        <div class="shd">
+          <i data-i="chevron-right" class="sm dis"></i>
+          <div class="pt"><div class="pl">New Testament</div><div class="row2"><div class="progress"><i style="width:24.6%"></i></div><span class="tally">64 / 260</span></div></div>
+          <span class="cl">Clear</span>
+        </div>
+      </div>
+
+      <div class="psec">
+        <div class="shd">
+          <i data-i="chevron-right" class="sm dis"></i>
+          <div class="pt"><div class="pl">Old Testament</div><div class="row2"><div class="progress"><i style="width:4%"></i></div><span class="tally">37 / 929</span></div></div>
+          <span class="cl">Clear</span>
+        </div>
+      </div>
+
+      <div class="psec">
+        <div class="shd">
+          <i data-i="chevron-right" class="sm dis"></i>
+          <div class="pt"><div class="pl">Studies</div><div class="row2"><div class="progress"><i style="width:9%"></i></div><span class="tally">9 / 100</span></div></div>
+          <span class="cl">Clear</span>
+        </div>
+      </div>
+
+      <div class="ptotal">
+        <div class="pt"><div class="pl">All Scriptures</div><div class="row2"><div class="progress"><i style="width:10.6%"></i></div><span class="tally">213 / 2016</span></div></div>
+        <span class="btn warn xs">Clear All</span>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+</body></html>

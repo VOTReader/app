@@ -1,0 +1,151 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="an-common.css"><script src="an-icons.js"></script>
+<style>
+  .ctx { width: 412px; padding: 0 20px; }
+  .ctx .an-tb { margin: 0 -6px; }
+  .ctx .reading { margin-top: 18px; }
+  .ctx .reading.ltr { font-style: normal; }
+  .ctx .eyebrow.sel-h { margin-top: 18px; }
+  .legend { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px 8px; }
+  .legend .it { display: flex; flex-direction: column; align-items: center; gap: 8px; font: 400 14px/1.2 var(--sans); color: var(--text-2); }
+  .legend .an-sw { width: 36px; height: 36px; border-radius: 18px; }
+  .legend-note { margin-top: 18px; }
+  /* in the phones the toolbar sits in the text flow, as on the approved John 3 screen */
+  .reading .an-tb.flow-a { margin: 14px -6px 16px; }
+  .reading .an-tb.flow-b { margin: 18px -6px 12px; }
+</style></head>
+<body data-size="1500x1270">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Selection toolbar: every state</div>
+    <div class="meta">SelectionToolbar.jsx. A long-press or a drag across reading text raises it. The approved John 3 screen (bible-select) shows it above a selection; this board adds the rest with the real three styles, ten colours and six actions.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: 412px 412px 256px 256px">
+
+    <!-- A: default -->
+    <div class="cell">
+      <div class="cap">Highlight, the default<small>Solid swatches; the chosen style carries over to the next selection</small></div>
+      <div class="ctx">
+        <div class="an-tb" data-an-ax="#a-sel" data-tb='{"style":"hl"}'></div>
+        <p class="reading"><span class="vnum">3</span>Jesus answered and said to him, “Most assuredly, I say to you, <span class="an-h a"></span><mark class="an-sel" id="a-sel">unless one is born again</mark><span class="an-h b"></span>, he cannot see the kingdom of God.”</p>
+      </div>
+    </div>
+
+    <!-- B: over an existing mark -->
+    <div class="cell">
+      <div class="cap">Over an existing mark<small>Remove appears at the end of the style row; the mark’s colour is ringed</small></div>
+      <div class="ctx">
+        <div class="an-tb" data-an-ax="#b-sel" data-tb='{"style":"hl","cur":"blue","rm":true}'></div>
+        <p class="reading"><span class="vnum">16</span><span class="an-h a"></span><mark class="mk hl c-blue"><mark class="an-sel" id="b-sel">For God so loved the world</mark></mark><span class="an-h b"></span> that He gave His only begotten Son, that whoever believes in Him should not perish but have everlasting life.</p>
+      </div>
+    </div>
+
+    <!-- G: flipped below (phone) -->
+    <div class="cell" style="grid-row: span 2">
+      <div class="cap">Flipped below<small>Top of a chapter: no room above, so it hangs under the selection</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span><span class="iconbtn"><i data-i="search"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll an-page">
+          <div class="h1" style="font-size:40px">John 3</div>
+          <div class="eyebrow sechead">Nicodemus and the New Birth</div>
+          <div class="reading">
+            <p><span class="vnum">1</span>There was a man of the Pharisees named <span class="an-h a"></span><mark class="an-sel" id="g-sel">Nicodemus, a ruler of the Jews.</mark><span class="an-h b"></span> <span class="vnum">2</span>This man came to</p>
+            <div class="an-tb up flow-b" data-an-ax="#g-sel" data-tb='{"style":"hl"}'></div>
+            <p>Jesus by night and said to Him, “Rabbi, we know that You are a teacher come from God; for no one can do these signs that You do unless God is with him.”</p>
+            <p><span class="vnum">3</span>Jesus answered and said to him, “Most assuredly, I say to you, unless one is born again, he cannot see the kingdom of God.”</p>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- H: across two verses (phone) -->
+    <div class="cell" style="grid-row: span 2">
+      <div class="cap">Across two verses<small>Colours and Note cover both; Link, Share and Bookmark start at the first</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span><span class="iconbtn"><i data-i="search"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll an-page">
+          <div class="h1" style="font-size:40px">John 3</div>
+          <div class="eyebrow sechead">Nicodemus and the New Birth</div>
+          <div class="reading">
+            <p><span class="vnum">1</span>There was a man of the Pharisees named Nicodemus, a ruler of the Jews. <span class="vnum">2</span>This man came to Jesus by night and said to Him, “Rabbi, we know that You are a teacher come from God; for no one can do these signs that You do unless God is with him.”</p>
+            <div class="an-tb flow-a" data-an-ax="#h-sel" data-tb='{"style":"hl"}'></div>
+            <p><span class="vnum">3</span>Jesus answered and said to him, “Most assuredly, I say to you, <span class="an-h a"></span><mark class="an-sel" id="h-sel">unless one is born again, he cannot see the kingdom of God.”</mark></p>
+            <p><mark class="an-sel"><span class="vnum">4</span>Nicodemus said to Him, “How can a man be born when he is old?</mark><span class="an-h b"></span> Can he enter a second time into his mother’s womb and be born?”</p>
+            <p><span class="vnum">5</span>Jesus answered, “Most assuredly, I say to you, unless one is born of water and the Spirit, he cannot enter the kingdom of God.</p>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- C: underline -->
+    <div class="cell">
+      <div class="cap">Underline<small>The swatches turn to rings</small></div>
+      <div class="ctx">
+        <div class="an-tb" data-an-ax="#c-sel" data-tb='{"style":"ul"}'></div>
+        <p class="reading"><span class="vnum">2</span>He makes me to lie down in green pastures; <span class="an-h a"></span><mark class="an-sel" id="c-sel">He leads me beside the still waters.</mark><span class="an-h b"></span> <span class="vnum">3</span>He restores my soul;</p>
+      </div>
+    </div>
+
+    <!-- D: squiggle -->
+    <div class="cell">
+      <div class="cap">Squiggle underline<small>Dashed rings</small></div>
+      <div class="ctx">
+        <div class="an-tb" data-an-ax="#d-sel" data-tb='{"style":"sq"}'></div>
+        <p class="reading"><span class="vnum">5</span><span class="an-h a"></span><mark class="an-sel" id="d-sel">Trust in the LORD with all your heart,</mark><span class="an-h b"></span> And lean not on your own understanding;</p>
+      </div>
+    </div>
+
+    <!-- E: listen from here -->
+    <div class="cell">
+      <div class="cap">On text with a recording<small>Listen from here starts the voice at the selected words</small></div>
+      <div class="ctx">
+        <div class="an-tb" data-an-ax="#e-sel" data-tb='{"style":"hl","listen":true}'></div>
+        <p class="reading">Therefore the things of God become that much more precious, even as you, My son, are most precious in My sight... <em><span class="an-h a"></span><mark class="an-sel" id="e-sel">Like a gemstone shining in the midst of all this darkness</mark><span class="an-h b"></span>, easily found by the eyes of God,</em></p>
+      </div>
+    </div>
+
+    <!-- F: link hidden -->
+    <div class="cell">
+      <div class="cap">No markable text: Link hidden<small>No styles, no colours, no Link. Today the toolbar closes here instead</small></div>
+      <div class="ctx">
+        <div class="an-tb" data-an-ax="#f-sel" data-tb='{"colors":false}'></div>
+        <div class="eyebrow sel-h"><span class="an-h a"></span><mark class="an-sel" id="f-sel">Nicodemus and the New Birth</mark><span class="an-h b"></span></div>
+      </div>
+    </div>
+
+    <!-- I: the ten colours -->
+    <div class="cell" style="grid-column: span 2">
+      <div class="cap">The ten colours<small>In toolbar order. Each swatch is announced as colour and style, e.g. “teal underline”</small></div>
+      <div class="legend">
+        <span class="it"><span class="an-sw c-yellow"></span>yellow</span><span class="it"><span class="an-sw c-green"></span>green</span><span class="it"><span class="an-sw c-pink"></span>pink</span><span class="it"><span class="an-sw c-red"></span>red</span><span class="it"><span class="an-sw c-orange"></span>orange</span>
+        <span class="it"><span class="an-sw c-blue"></span>blue</span><span class="it"><span class="an-sw c-purple"></span>purple</span><span class="it"><span class="an-sw c-teal"></span>teal</span><span class="it"><span class="an-sw c-brown"></span>brown</span><span class="it"><span class="an-sw c-gray"></span>gray</span>
+      </div>
+      <div class="meta legend-note">Six are the kit’s calm tones. Red, teal, brown and gray are new, set by measurement; the marks board shows all ten in text.</div>
+    </div>
+
+  </div>
+</div>
+<script>
+  // Toolbar rows from one template: data-tb='{"style":"hl|ul|sq","cur":"blue","rm":true,"listen":true,"colors":false}'
+  (function () {
+    var C = ['yellow','green','pink','red','orange','blue','purple','teal','brown','gray'];
+    var ACTS = [['notebook-pen','Note'],['link','Link'],['copy','Copy'],['share-2','Share'],['search','Search'],['bookmark','Bookmark']];
+    document.querySelectorAll('[data-tb]').forEach(function (el) {
+      var o = JSON.parse(el.getAttribute('data-tb')), h = '';
+      if (o.colors !== false) {
+        h += '<div class="sty">' + ['hl','ul','sq'].map(function (s) { return '<span class="an-sty ' + s + (o.style === s ? ' on' : '') + '"><span>A</span></span>'; }).join('')
+          + (o.rm ? '<span class="an-rm"><i data-i="x" class="sm"></i>Remove</span>' : '') + '</div>';
+        h += '<div class="sws ' + o.style + '">' + C.map(function (c) { return '<span class="an-sw c-' + c + (o.cur === c ? ' on' : '') + '"></span>'; }).join('') + '</div>';
+      }
+      if (o.listen) h += '<div class="listen an-listen"><i data-i="play" class="sm"></i>Listen from here</div>';
+      var acts = ACTS.filter(function (a) { return o.colors !== false || a[1] !== 'Link'; });
+      h += '<div class="acts' + (acts.length === 5 ? ' five' : '') + '">' + acts.map(function (a) { return '<span class="act"><i data-i="' + a[0] + '"></i>' + a[1] + '</span>'; }).join('') + '</div>';
+      el.innerHTML = h;
+    });
+  })();
+</script>
+<script src="an-common.js"></script>
+</body></html>

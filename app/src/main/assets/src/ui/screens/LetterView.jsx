@@ -7,6 +7,7 @@ import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../compo
 import { answersIdForUrl, answersLinkForUrl, openAnswersLink } from '../../utils/answers-links.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { excerptLanding } from '../../utils/excerpt-landing.js';
+import { blockReadText } from '../../utils/segment-dom-text.js';
 import { LetterListenRow, LetterSongsCard } from '../components/LetterSongs.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { letterHlKey } from '../../utils/hl-keys.js';
@@ -15,14 +16,11 @@ import { InstallCard } from '../components/InstallCard.jsx';
 
 /** Whitespace-squashed — the search index's text domain (index-builder letterText). */
 const _squash = (s) => String(s || '').replace(/\s+/g, ' ').trim();
-/** A block's plain text, walked the way the search index flattens it: prose
-    segments or poetry lines. Headings carry no hl-key (nothing to land on). */
-function _blockText(b) {
-  if (!b) return '';
-  if (b.segments) return b.segments.map((s) => s.v || '').join(' ');
-  if (b.lines) return b.lines.map((ln) => Array.isArray(ln) ? ln.map((s) => s.v || '').join(' ') : '').join(' ');
-  return '';
-}
+/** A block's plain text in the search index's own domain: blockReadText is the
+    very function index-builder flattens a letter with (prose segments or poetry
+    lines, no footnote numbers), so an excerpt cut from the index lands on the
+    words it came from. Headings carry no hl-key (nothing to land on). */
+const _blockText = blockReadText;
 
 export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, resolvePeek = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
@@ -182,7 +180,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     if (found < 0) return;
     const hlKey = letterHlKey(letter.id, found);
     setSurpriseBlockKey(hlKey);
-    setSurpriseBlockOff(off);   // the rows' domain is the block's text; the squash drifts by at most a few spaces
+    setSurpriseBlockOff(off);   // the rows' domain is the block's DOM text; the squash and any footnote numbers before the landing drift it by a few characters
     const timer = setTimeout(() => {
       const el = mainRef.current && mainRef.current.querySelector(`[data-hl-key="${hlKey}"]`);
       if (el) el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });

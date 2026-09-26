@@ -1,0 +1,19 @@
+/* st- (Settings area): the app's own reading fonts (fonts/reading/, OFL), referenced from the app's own files for the Reading Font picker board. Generated; do not hand-edit. */
+@font-face{font-family:'Cardo';font-weight:400;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/cardo-latin-400-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'Gentium Book Plus';font-weight:400;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/gentium-book-plus-latin-400-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'Rosarivo';font-weight:400;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/rosarivo-latin-400-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'Sorts Mill Goudy';font-weight:400;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/sorts-mill-goudy-latin-400-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'Old Standard TT';font-weight:400;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/old-standard-tt-latin-400-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'IM Fell English';font-weight:400;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/im-fell-english-latin-400-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'Lora';font-weight:100 900;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/lora-latin-wght-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'Literata';font-weight:100 900;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/literata-latin-wght-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'Merriweather';font-weight:400;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/merriweather-latin-400-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'Gelasio';font-weight:400;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/gelasio-latin-400-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'Source Serif 4';font-weight:100 900;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/source-serif-4-latin-wght-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'Noto Serif';font-weight:100 900;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/noto-serif-latin-wght-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'Spectral';font-weight:400;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/spectral-latin-400-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'Vollkorn';font-weight:100 900;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/vollkorn-latin-wght-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'Alegreya';font-weight:100 900;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/alegreya-latin-wght-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'Bitter';font-weight:100 900;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/bitter-latin-wght-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'Neuton';font-weight:400;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/neuton-latin-400-normal.woff2') format('woff2') format('woff2');}
+@font-face{font-family:'Playfair Display';font-weight:100 900;font-display:block;src:url('../../../../../app/src/main/assets/fonts/reading/playfair-display-latin-wght-normal.woff2') format('woff2') format('woff2');}

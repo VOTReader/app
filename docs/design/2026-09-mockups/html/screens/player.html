@@ -1,0 +1,71 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .np { padding-top: 4px; }
+  .nptitle { text-align: center; margin: 0 16px; }
+  .npmeta { text-align: center; margin-top: 6px; }
+
+  /* read-along panel: spoken text dims, the current sentence carries the wash */
+  .panel { margin-top: 20px; padding: 16px 18px; }
+  .win { height: calc(18px * 1.6 * 14); overflow: hidden; }
+  .follow { font-size: 18px; line-height: 1.6; }
+  .follow .said { color: var(--text-3); }
+
+  .scrub { margin-top: 26px; padding: 0 2px; }
+  .times { display: flex; justify-content: space-between; margin-top: 12px; font-variant-numeric: tabular-nums; }
+
+  /* transport */
+  .transport { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
+  .tp { width: 48px; height: 48px; display: grid; place-items: center; position: relative; color: var(--text); flex: none; }
+  .tp.lbl { width: 80px; }
+  .tp small { position: absolute; top: 44px; left: -8px; right: -8px; text-align: center; font: 400 11px/1.2 var(--sans); color: var(--text-3); white-space: nowrap; }
+  .tp b { position: absolute; inset: 0; display: grid; place-items: center; font: 700 9px/1 var(--sans); color: var(--text); padding-top: 1px; }
+  .playbtn.big { width: 64px; height: 64px; border-radius: 32px; }
+  .playbtn.big .i { width: 28px; height: 28px; }
+
+  /* secondary controls */
+  .ctl { margin-top: 34px; padding: 14px 4px 13px; display: grid; grid-template-columns: repeat(4, 1fr); }
+  .ctl .c { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .ctl .v { height: 28px; display: grid; place-items: center; color: var(--text-2); }
+  .ctl .v.num { font: 700 15px/1 var(--sans); color: var(--text); font-variant-numeric: tabular-nums; }
+  .ctl .c > span:last-child { font: 400 12px/1.2 var(--sans); color: var(--text-3); white-space: nowrap; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="spacer"></span>
+  </div>
+  <div class="scroll np">
+    <div class="h2 nptitle">Know That Which Has Been Poured Out, The Word of God</div>
+    <div class="meta npmeta">Volume One · Letter 15</div>
+
+    <div class="card panel">
+      <div class="win">
+        <div class="reading follow"><p><span class="said"><span class="lead">Thus says The Lord:</span> How is it you have not recognized that which comes from The Father? For that which is of the devil is made plain and surrounds you on every side. Therefore the things of God become that much more precious, even as you, My son, are most precious in My sight...</span> <mark class="wash"><em>Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God, so shall you be in the day you surrender your life, the day you give up this fight and return to Me.</em></mark> Do you not understand that I have saved you? No, not by your own works, but by My life, which I willingly gave up for you. Therefore, turn to Me wholly and in truth.</p></div>
+      </div>
+    </div>
+
+    <div class="scrub">
+      <div class="slider"><i style="width:44%"></i><b style="left:44%"></b></div>
+      <div class="times meta"><span>2:41</span><span>6:05</span></div>
+    </div>
+
+    <div class="transport">
+      <span class="tp lbl"><i data-i="skip-back"></i><small>Previous letter</small></span>
+      <span class="tp"><i data-i="rotate-ccw" class="lg"></i><b>15</b></span>
+      <span class="playbtn big"><i data-i="pause"></i></span>
+      <span class="tp"><i data-i="rotate-cw" class="lg"></i><b>15</b></span>
+      <span class="tp lbl"><i data-i="skip-forward"></i><small>Next letter</small></span>
+    </div>
+
+    <div class="card ctl">
+      <div class="c"><span class="v num">1×</span><span>Speed</span></div>
+      <div class="c"><span class="v"><i data-i="timer"></i></span><span>Sleep timer</span></div>
+      <div class="c"><span class="v"><span class="toggle on"></span></span><span>Follow text</span></div>
+      <div class="c"><span class="v"><i data-i="star" class="fill"></i></span><span>Saved</span></div>
+    </div>
+  </div>
+</div>
+</body></html>

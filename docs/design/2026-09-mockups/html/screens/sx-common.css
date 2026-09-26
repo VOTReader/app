@@ -1,0 +1,145 @@
+/* sx- area: search, every state not yet drawn. Kit tokens only, so one markup renders
+   Vesper (dark) and Vellum (light). Result rows follow screens/search.html; bars, chips,
+   groups and the direct card follow the sy- search boards so the set reads as one. */
+
+/* ---------- board helpers ---------- */
+.board-head .meta { max-width: 1120px; text-wrap: pretty; }
+.cell > .cap { min-height: 30px; }
+.pf { position: relative; width: 412px; height: 915px; border-radius: 30px; overflow: hidden; background: var(--bg);
+  box-shadow: 0 0 0 1px var(--hairline), var(--shadow); }
+.pf > .screen { position: relative; width: 412px; }
+.phone-m > .screen, .phone-s > .screen { overflow: hidden; }
+.panel { background: var(--surface); border-radius: 16px; padding: 4px 20px; }
+[data-theme="light"] .panel { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+.note { font: 400 13px/1.45 var(--sans); color: var(--text-3); text-wrap: pretty; }
+.note b { color: var(--text-2); font-weight: 700; }
+.legacy { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 10px; margin-left: 6px;
+  font: 700 11px/1 var(--sans); letter-spacing: 0; text-transform: none; color: var(--text-2); box-shadow: inset 0 0 0 1px var(--hairline); vertical-align: 1px; }
+
+/* ---------- search bar ---------- */
+.sbar { height: 64px; display: flex; align-items: center; gap: 2px; padding: 0 20px 0 8px; flex: none; }
+.sbar .iconbtn { color: var(--text-2); }
+.sbar .search { flex: 1; min-width: 0; }
+.sbar .search .q { flex: 1; min-width: 0; color: var(--text); font-size: 16px; white-space: nowrap; overflow: hidden; }
+.sbar .search .q.clip { -webkit-mask-image: linear-gradient(90deg, #000 86%, transparent); mask-image: linear-gradient(90deg, #000 86%, transparent); }
+.sbar .search .hint { flex: 1; min-width: 0; color: var(--text-3); font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sbar .search.focus { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 70%, transparent); }
+.sbar .x { color: var(--text-2); }
+.caret { display: inline-block; width: 2px; height: 20px; background: var(--accent); vertical-align: -4px; margin-left: 1px; border-radius: 1px; }
+.scroll > .chips { margin-top: 6px; }
+
+/* ---------- scope chip ---------- */
+.scope { margin-top: 12px; display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px 0 12px; border-radius: 18px;
+  background: var(--surface); color: var(--text-2); font: 400 14px/1 var(--sans); box-shadow: inset 0 0 0 1px var(--hairline); white-space: nowrap; }
+.scope .i { color: var(--text-3); }
+.scope.on { background: var(--accent-soft); color: var(--accent); font-weight: 700; box-shadow: none; padding-right: 3px; }
+.scope.on .i { color: var(--accent); }
+.scope .xb { width: 30px; height: 30px; border-radius: 15px; display: grid; place-items: center; }
+
+/* ---------- results header, section label ---------- */
+.rhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.rhead .meta { text-wrap: balance; }
+.rhead .meta b { color: var(--text-2); font-weight: 700; }
+.seg.sm { flex: none; border-radius: 10px; }
+.seg.sm span { flex: none; height: 30px; padding: 0 11px; border-radius: 8px; font-size: 13px; }
+.sec { margin-top: 22px; }
+
+/* ---------- result row (as screens/search.html) ---------- */
+.res { padding: 18px 0; }
+.res + .res { border-top: 1px solid var(--hairline); }
+.kl { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 20px; }
+.kl .label { margin-right: 2px; }
+.bdg { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 10px; background: var(--surface-2);
+  color: var(--text-2); font: 700 11px/1 var(--sans); letter-spacing: .02em; white-space: nowrap; }
+.bdg.hd { font: italic 400 12px/1 var(--sans); letter-spacing: 0; }
+.res .ttl { font: 500 19px/1.28 var(--serif); color: var(--text); margin-top: 6px; text-wrap: pretty; }
+.res .loc { margin-top: 4px; }
+.res .snip { margin-top: 10px; font: 400 16px/1.5 var(--serif); color: var(--text-2);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.res .snip mark, .snip-m mark { background: var(--hl-honey); color: var(--text); }
+.res .snip em { font-style: italic; }
+.snipph { margin-top: 12px; }
+.snipph .ln { display: flex; gap: 5px; }
+.snipph .ln + .ln { margin-top: 10px; }
+.snipph .ln .ph { flex: none; }
+.snipph .ln .ph + .ph { margin-top: 0; }
+.snipph .ln .ph.hit { background: color-mix(in srgb, var(--dot-honey) 50%, transparent); }
+
+/* ---------- grouped sections ---------- */
+.grp-h { display: flex; align-items: center; gap: 10px; min-height: 54px; border-top: 1px solid var(--hairline); }
+.grp-h .n { flex: 1; min-width: 0; font: 700 15px/1.25 var(--sans); color: var(--text); }
+.grp-h .c { font: 400 13px/1 var(--sans); color: var(--text-3); white-space: nowrap; }
+.grp-h .i { color: var(--text-3); }
+.grp.closed .grp-h .n { font-weight: 400; color: var(--text-2); }
+.grp-items .res:first-child { padding-top: 6px; }
+
+/* ---------- direct-hit card ---------- */
+.direct { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 16px; background: var(--accent-soft); margin-top: 14px; }
+.direct .ic { width: 44px; height: 44px; border-radius: 22px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; flex: none; }
+.direct .t { flex: 1; min-width: 0; }
+.direct .t b { display: block; font: 500 22px/1.15 var(--serif); color: var(--text); }
+.direct .t span { display: block; margin-top: 4px; font: 700 14px/1.2 var(--sans); color: var(--accent); }
+.direct > .i:last-child { color: var(--accent); }
+
+/* ---------- suggestion list (in the page flow, under the corpus row) ---------- */
+.sugg { background: var(--surface); border-radius: 16px; padding: 4px 0; margin-top: 14px; }
+[data-theme="light"] .sugg { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+.sugg .it { display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 0 16px; }
+.sugg .it + .it { border-top: 1px solid var(--hairline); }
+.sugg .it .i { color: var(--text-3); }
+.sugg .it .l { flex: 1; min-width: 0; font: 400 16px/1.25 var(--sans); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sugg .it .h { font: 400 13px/1 var(--sans); color: var(--text-3); white-space: nowrap; }
+.sugg .it .h.key { font: 400 12px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace; }
+
+/* ---------- idle page pieces ---------- */
+.s-hero { text-align: center; padding: 34px 16px 4px; }
+.s-hero .h2 { font-size: 26px; }
+.s-hero .body { margin-top: 8px; text-wrap: balance; }
+.s-label { margin: 28px 0 12px; }
+.chipwrap { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip.rec { padding-right: 4px; gap: 2px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--hairline); color: var(--text); max-width: 100%; }
+.chip.rec .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.chip.rec .xb { width: 30px; height: 30px; border-radius: 15px; display: grid; place-items: center; color: var(--text-3); flex: none; }
+.chip.qp { background: var(--surface-2); color: var(--text); }
+.confirm { background: var(--surface); border-radius: 16px; padding: 14px 16px; box-shadow: inset 0 0 0 1px var(--hairline); }
+.confirm .q { font: 400 15px/1.4 var(--sans); color: var(--text); }
+.confirm .acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+/* ---------- searching, building, errors, did you mean, none ---------- */
+.sline { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+.sline .meta { white-space: nowrap; color: var(--text-2); }
+.sline .progress { flex: 1; }
+.indet i { width: 38%; margin-left: 24%; }
+.sblock { margin-top: 18px; background: var(--surface); border-radius: 16px; padding: 18px 18px 20px; }
+[data-theme="light"] .sblock { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+.sblock .h3 { font-size: 20px; }
+.sblock .progress { margin-top: 14px; height: 4px; }
+.sblock .cnt { margin-top: 8px; font-variant-numeric: tabular-nums; }
+.spinrow { display: flex; align-items: center; gap: 14px; }
+.spin { width: 28px; height: 28px; border-radius: 14px; border: 3px solid var(--surface-3); border-top-color: var(--accent); border-right-color: var(--accent); flex: none; transform: rotate(20deg); }
+.err { display: flex; gap: 12px; align-items: flex-start; margin-top: 18px; background: var(--surface); border-radius: 16px; padding: 16px; }
+[data-theme="light"] .err { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+.err > .i { color: var(--danger); margin-top: 1px; }
+.err .body { color: var(--text); }
+.err .raw { font: 400 13px/1.4 ui-monospace, 'SFMono-Regular', Menlo, monospace; color: var(--text-2); }
+.none { text-align: center; padding: 56px 20px 0; }
+.none .glyph { width: 64px; height: 64px; border-radius: 32px; background: var(--surface-2); color: var(--text-3); display: grid; place-items: center; margin: 0 auto 20px; }
+.none .h2 { font-size: 23px; text-wrap: balance; }
+.dym { margin-top: 18px; background: var(--surface); border-radius: 16px; padding: 18px; }
+[data-theme="light"] .dym { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+.dym .h3 { font-size: 21px; color: var(--text); text-wrap: balance; }
+.dym .body { margin-top: 6px; }
+.dym .go { margin-top: 14px; }
+
+/* ---------- on-screen keyboard (typing states; filled by sx-kbd.js) ---------- */
+.kbd { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; height: 286px; background: var(--surface-2); padding: 10px 4px 26px; border-top: 1px solid var(--hairline); }
+.kbd .kr { display: flex; gap: 6px; padding: 0 3px; }
+.kbd .kr + .kr { margin-top: 11px; }
+.kbd .kr.mid { padding: 0 22px; }
+.kbd .k { flex: 1; height: 46px; border-radius: 8px; background: var(--surface); display: grid; place-items: center; font: 400 20px/1 var(--sans); color: var(--text); }
+[data-theme="dark"] .kbd .k { background: var(--surface-3); }
+.kbd .k.fn { flex: 1.35; font-size: 15px; color: var(--text-2); background: var(--surface-3); }
+[data-theme="dark"] .kbd .k.fn { background: color-mix(in srgb, var(--surface-3) 60%, var(--surface-2)); }
+.kbd .kr:last-child .k.fn { flex: 1.2; }
+.kbd .k.space { flex: 5; }
+.kbd .k.go { flex: 1.35; background: var(--accent); color: var(--accent-ink); border-radius: 23px; }

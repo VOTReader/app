@@ -1,0 +1,169 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script><script src="sy-icons.js"></script>
+<link rel="stylesheet" href="sy-common.css">
+<style>
+  [data-theme="dark"] .for-light, [data-theme="light"] .for-dark { display: none; }
+  .phone-m .screen { overflow: hidden; }
+  /* scrolled to the foot: the bars stay put, the page is clipped under them */
+  .scroll.home.down { display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 30px; }
+  .scroll.home.down > * { flex: none; }
+  .lockup .amp { font-style: normal; }
+  .hold { text-align: center; margin-top: 16px; font: 400 13px/1 var(--sans); color: var(--text-3); }
+  .surprise { margin-top: 6px; }
+  .surprise .btn { height: 48px; font-size: 16px; gap: 10px; }
+  .surprise .btn .i { width: 22px; height: 22px; }
+  .surprise .btn.busy { opacity: .6; }
+  .hstatus { display: flex; align-items: flex-start; justify-content: center; gap: 10px; margin: 14px 8px 0; }
+  .hstatus .spin { width: 16px; height: 16px; border-radius: 8px; border: 2.5px solid var(--surface-3); border-top-color: var(--accent); border-right-color: var(--accent); flex: none; margin-top: 2px; }
+  .hstatus .i { color: var(--danger); margin-top: 1px; }
+  .hstatus.bad { background: var(--surface); border-radius: 14px; padding: 12px 14px; text-align: left; justify-content: flex-start; }
+  .hstatus.bad span { color: var(--text); }
+  .ps { font: 400 19px/1.55 var(--serif); color: var(--text); }
+  .ps p + p { margin-top: 8px; }
+  .srow { width: 412px; }
+  .srow .sitem { display: flex; gap: 14px; align-items: flex-start; }
+  .srow .sitem .t { flex: 1; } .srow .sitem .t b { display: block; font: 700 15px/1.3 var(--sans); color: var(--text); }
+  .srow .sitem .t span { display: block; margin-top: 3px; font: 400 14px/1.45 var(--sans); color: var(--text-2); }
+  .srow .toggle { margin-top: 2px; }
+</style></head>
+<body data-size="1400x1110">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Surprise Me</div>
+    <div class="meta">The button at the foot of Home opens a random chapter or letter from everything that can be read (the Bible, the Matthew Study Bible, the studies and every Volume). It first makes sure the texts are on hand, which is the only moment that can fail. Back from the surprise returns Home.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(4, 309px); column-gap: 28px">
+
+    <div class="cell">
+      <div class="cap">Waiting at the foot of Home<small>Shown while Settings › Surprise Me Button is on</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar slim"><span class="spacer"></span><span class="iconbtn"><i data-i="search"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll home down">
+          <div class="lockup"><div class="t1">The Volumes of Truth</div><div class="t2"><span class="amp">&amp;</span> The Scriptures of Truth</div></div>
+          <div class="search"><i data-i="search" class="sm"></i>Search the library</div>
+          <div class="card cont">
+            <div class="meta">Continue reading</div>
+            <div class="meta">Volume One · Letter 15</div>
+            <div class="main"><div class="h3">Know That Which Has Been Poured Out, The Word of God</div><span class="btn primary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+            <div class="foot"><div class="progress"><i style="width:40%"></i></div><span class="meta">40%</span></div>
+          </div>
+          <div class="tiles">
+            <div class="card tile"><i data-i="history"></i>Recent</div><div class="card tile"><i data-i="notebook-pen"></i>Notes</div>
+            <div class="card tile"><i data-i="bookmark"></i>Bookmarks</div><div class="card tile"><i data-i="scripture-web"></i>Scripture Web</div>
+          </div>
+          <div class="list cols">
+            <div class="row"><span class="txt"><span class="ttl">The Volumes of Truth</span><span class="meta">7 volumes · 244 letters</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">The Scriptures of Truth</span><span class="meta">Genesis to Revelation · NKJV</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Answers Only God Can Give</span><span class="meta">Topics and doctrines</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Studies</span><span class="meta">Letter studies · Matthew Study Bible</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Listening Library</span><span class="meta">The letters and scriptures, read aloud</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Songs of the Letters</span><span class="meta">Sung by the flock</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+          </div>
+          <div class="hold">Hold to rearrange</div>
+          <div class="surprise"><span class="btn text"><i data-i="sy-dice"></i>Surprise Me</span></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Tapped · preparing<small>The button rests; one line says what is happening</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar slim"><span class="spacer"></span><span class="iconbtn"><i data-i="search"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll home down">
+          <div class="lockup"><div class="t1">The Volumes of Truth</div><div class="t2"><span class="amp">&amp;</span> The Scriptures of Truth</div></div>
+          <div class="search"><i data-i="search" class="sm"></i>Search the library</div>
+          <div class="card cont">
+            <div class="meta">Continue reading</div>
+            <div class="meta">Volume One · Letter 15</div>
+            <div class="main"><div class="h3">Know That Which Has Been Poured Out, The Word of God</div><span class="btn primary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+            <div class="foot"><div class="progress"><i style="width:40%"></i></div><span class="meta">40%</span></div>
+          </div>
+          <div class="tiles">
+            <div class="card tile"><i data-i="history"></i>Recent</div><div class="card tile"><i data-i="notebook-pen"></i>Notes</div>
+            <div class="card tile"><i data-i="bookmark"></i>Bookmarks</div><div class="card tile"><i data-i="scripture-web"></i>Scripture Web</div>
+          </div>
+          <div class="list cols">
+            <div class="row"><span class="txt"><span class="ttl">The Volumes of Truth</span><span class="meta">7 volumes · 244 letters</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">The Scriptures of Truth</span><span class="meta">Genesis to Revelation · NKJV</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Answers Only God Can Give</span><span class="meta">Topics and doctrines</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Studies</span><span class="meta">Letter studies · Matthew Study Bible</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Listening Library</span><span class="meta">The letters and scriptures, read aloud</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Songs of the Letters</span><span class="meta">Sung by the flock</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+          </div>
+          <div class="hold">Hold to rearrange</div>
+          <div class="hstatus"><span class="spin"></span><span class="body">Preparing a reading…</span></div>
+          <div class="surprise"><span class="btn text busy"><i data-i="sy-dice"></i>Surprise Me</span></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">The surprise<small>A random chapter or letter, opened at its start</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn q"><i data-i="chevron-left"></i></span><span class="iconbtn q"><i data-i="house" class="sm"></i></span><span class="spacer"></span>
+          <span class="iconbtn q"><i data-i="search" class="sm"></i></span><span class="iconbtn q"><i data-i="sun" class="sm for-dark"></i><i data-i="moon" class="sm for-light"></i></span><span class="iconbtn primary"><i data-i="bookmark" class="sm"></i></span><span class="tabcount">1</span>
+        </div>
+        <div class="scroll lpage">
+          <div class="h1" style="font-size:38px">Psalms 121</div>
+          <span class="listen"><i data-i="headphones" class="sm"></i>Listen</span>
+          <div class="eyebrow" style="margin:20px 0 10px">I Will Lift Up My Eyes to the Hills</div>
+          <div class="ps">
+            <p><span class="vnum">1</span>A Song of Ascents. I will lift up my eyes to the hills— From whence comes my help?</p>
+            <p><span class="vnum">2</span>My help comes from the LORD, Who made heaven and earth.</p>
+            <p><span class="vnum">3</span>He will not allow your foot to be moved; He who keeps you will not slumber.</p>
+            <p><span class="vnum">4</span>Behold, He who keeps Israel Shall neither slumber nor sleep.</p>
+            <p><span class="vnum">5</span>The LORD is your keeper; The LORD is your shade at your right hand.</p>
+            <p><span class="vnum">6</span>The sun shall not strike you by day, Nor the moon by night.</p>
+            <p><span class="vnum">7</span>The LORD shall preserve you from all evil; He shall preserve your soul.</p>
+            <p><span class="vnum">8</span>The LORD shall preserve your going out and your coming in From this time forth, and even forevermore.</p>
+          </div>
+          <div class="orn"><span>✦</span></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">When the texts cannot be fetched<small>The button is ready again; the line says what to do</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar slim"><span class="spacer"></span><span class="iconbtn"><i data-i="search"></i></span><span class="tabcount">1</span></div>
+        <div class="scroll home down">
+          <div class="lockup"><div class="t1">The Volumes of Truth</div><div class="t2"><span class="amp">&amp;</span> The Scriptures of Truth</div></div>
+          <div class="search"><i data-i="search" class="sm"></i>Search the library</div>
+          <div class="card cont">
+            <div class="meta">Continue reading</div>
+            <div class="meta">Volume One · Letter 15</div>
+            <div class="main"><div class="h3">Know That Which Has Been Poured Out, The Word of God</div><span class="btn primary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+            <div class="foot"><div class="progress"><i style="width:40%"></i></div><span class="meta">40%</span></div>
+          </div>
+          <div class="tiles">
+            <div class="card tile"><i data-i="history"></i>Recent</div><div class="card tile"><i data-i="notebook-pen"></i>Notes</div>
+            <div class="card tile"><i data-i="bookmark"></i>Bookmarks</div><div class="card tile"><i data-i="scripture-web"></i>Scripture Web</div>
+          </div>
+          <div class="list cols">
+            <div class="row"><span class="txt"><span class="ttl">The Volumes of Truth</span><span class="meta">7 volumes · 244 letters</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">The Scriptures of Truth</span><span class="meta">Genesis to Revelation · NKJV</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Answers Only God Can Give</span><span class="meta">Topics and doctrines</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Studies</span><span class="meta">Letter studies · Matthew Study Bible</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Listening Library</span><span class="meta">The letters and scriptures, read aloud</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+            <div class="row"><span class="txt"><span class="ttl">Songs of the Letters</span><span class="meta">Sung by the flock</span></span><i data-i="chevron-right" class="chev sm"></i></div>
+          </div>
+          <div class="hold">Hold to rearrange</div>
+          <div class="hstatus bad"><i data-i="sy-wifi-off" class="sm"></i><span class="body">Could not prepare a reading. Check your connection and try Surprise Me again.</span></div>
+          <div class="surprise"><span class="btn text"><i data-i="sy-dice"></i>Surprise Me</span></div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+  <div class="sy-sec">Where it is switched on or off</div>
+  <div class="cell">
+    <div class="cap">Settings › Reading<small>The same words as the button</small></div>
+    <div class="card srow"><div class="sitem"><span class="t"><b>Surprise Me Button</b><span>A breathing dice on the Home screen that opens a random chapter or letter when tapped.</span></span><span class="toggle on"></span></div></div>
+  </div>
+</div>
+</body></html>

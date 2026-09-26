@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="st-settings.css"><script src="../kit/kit.js"></script>
+<style>
+  .reset { flex: none; }
+</style></head>
+<body data-size="412x981">
+<!--st-icons--><svg xmlns="http://www.w3.org/2000/svg" style="display:none"></svg><!--/st-icons-->
+<div class="screen tall">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Auto-Scroll</span>
+  </div>
+  <div class="scroll st">
+
+    <div class="label sect first">Hands-free reading</div>
+    <div class="group">
+      <div class="set">
+        <div class="hd"><div class="txt"><div class="lbl">Auto-Scroll</div></div><span class="toggle on"></span></div>
+        <div class="help">Adds a small play/pause pill to chapter and letter screens that scrolls the page for you at a steady reading pace. Touching the screen pauses it instantly; it picks back up a moment after you lift your finger. The pill fades out of the way while it runs.</div>
+      </div>
+
+      <div class="deps">
+        <div class="set">
+          <div class="hd"><div class="txt"><div class="lbl">Scroll Speed</div></div><span class="num">16 lines/min</span></div>
+          <div class="sl">
+            <div class="slc">
+              <div class="track"><div class="slider"><i style="width:33.3%"></i><b style="left:33.3%"></b></div></div>
+              <div class="scale"><span>4</span><span>40 lines/min</span></div>
+            </div>
+            <span class="btn text sm reset is-off">Reset</span>
+          </div>
+          <div class="help">How fast the page moves on its own. The ± buttons on the reading pill adjust this too, without leaving the page — and the pill shows your words per minute, measured from the page you are on.</div>
+        </div>
+
+        <div class="set">
+          <div class="hd"><div class="txt"><div class="lbl">Auto-Continue</div></div><span class="toggle on"></span></div>
+          <div class="help">When auto-scroll reaches the end of the text, count down and turn to the next page on its own, the way a swipe does: on into the next chapter, letter, book, volume or study. It stops at the very end, and after a long unattended run.</div>
+        </div>
+
+        <div class="deps">
+          <div class="set">
+            <div class="hd"><div class="txt"><div class="lbl">Auto-Continue Pause</div></div><span class="num">2.5s</span></div>
+            <div class="sl">
+              <div class="slc">
+                <div class="track"><div class="slider"><i style="width:16.7%"></i><b style="left:16.7%"></b></div></div>
+                <div class="scale"><span>None</span><span>15s</span></div>
+              </div>
+              <span class="btn text sm reset is-off">Reset</span>
+            </div>
+            <div class="help">How long to wait at the end of the text before moving to the next page. The countdown stays visible on the pill the whole time, and tapping Cancel stops it. The pill’s ± adjust this too — even mid-countdown. Very short pages hold a little longer than this so a run of brief entries can’t flick past.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

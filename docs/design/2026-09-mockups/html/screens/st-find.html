@@ -1,0 +1,142 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="st-settings.css"><script src="../kit/kit.js"></script>
+<style>
+  .board-grid { grid-template-columns: repeat(4, 309px); }
+  .cell > .cap { min-height: 48px; }
+  .findlbl { margin: 6px 2px 8px; font: 400 14px/1.2 var(--sans); color: var(--text-2); }
+  .search.on { background: var(--surface-2); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent); color: var(--text-2); }
+  .search .q { flex: 1; color: var(--text); font-size: 16px; }
+  .search .x { color: var(--text-2); }
+  .status-line { margin: 12px 2px 0; }
+  .rg { display: flex; align-items: center; gap: 12px; margin: 22px 2px 10px; }
+  .rg .gi { width: 36px; height: 36px; border-radius: 10px; background: var(--surface-2); color: var(--accent); display: grid; place-items: center; flex: none; }
+  .rg .gt { flex: 1; min-width: 0; }
+  .rg .gt .h3 { line-height: 1.15; }
+  .rg .gt .meta { margin-top: 2px; }
+  .rg .chev { color: var(--text-3); flex: none; }
+  .rg .up { transform: rotate(180deg); }
+  .rg.closed { margin-bottom: 0; }
+  .group .set { padding: 12px 16px; }
+  .group .set .hd { min-height: 30px; }
+  .group .set .lbl { font-size: 15.5px; }
+  .group .set .val { font-size: 14px; margin-top: 2px; }
+  .nomatch { margin-top: 34px; text-align: center; padding: 0 18px; }
+  .nomatch .ic { width: 56px; height: 56px; border-radius: 28px; background: var(--surface-2); color: var(--text-3); display: grid; place-items: center; margin: 0 auto 16px; }
+  .nomatch .body { text-wrap: balance; }
+  .nomatch .btn { margin-top: 20px; }
+</style></head>
+<body data-size="1388x891">
+<!--st-icons--><svg xmlns="http://www.w3.org/2000/svg" style="display:none"><symbol id="i-panel-top" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M3 9h18" /></symbol></svg><!--/st-icons-->
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Settings · Find settings</div>
+    <div class="meta">The find box filters the groups by the reader’s own words. A match opens its group; dependent rows still follow their switches; a matched group can be closed again, and Clear filter restores the groups as they were.</div>
+  </div>
+  <div class="board-grid">
+
+    <!-- 1: speed -> two groups -->
+    <div class="cell">
+      <div class="cap">Two groups match<small>“speed” opens Listening and Auto-Scroll (off by default, so only its switch shows).</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Settings</span></div>
+        <div class="scroll">
+          <div class="findlbl">Find settings</div>
+          <div class="search on"><i data-i="search" class="sm"></i><span class="q">speed</span><i data-i="x" class="sm x"></i></div>
+          <div class="meta status-line">2 matching groups</div>
+
+          <div class="rg"><span class="gi"><i data-i="headphones" class="sm"></i></span><div class="gt"><div class="h3">Listening</div><div class="meta">Voices, speed &amp; read-along</div></div><i data-i="chevron-down" class="sm chev up"></i></div>
+          <div class="group">
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Bible Audio</div><div class="val">KJV · Biblical Restoration Ministries</div></div><i data-i="chevron-right" class="sm chev"></i></div></div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Letter Voice</div><div class="val">Automatic</div></div><i data-i="chevron-right" class="sm chev"></i></div></div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Default Speed</div><div class="val">1×</div></div><i data-i="chevron-right" class="sm chev"></i></div></div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Read-Along Highlight</div></div><span class="toggle on"></span></div></div>
+            <div class="deps"><div class="set"><div class="hd"><div class="txt"><div class="lbl">Follow the Voice</div></div><span class="toggle on"></span></div></div></div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Turn the Page with the Audio</div></div><span class="toggle on"></span></div></div>
+          </div>
+
+          <div class="rg"><span class="gi"><i data-i="arrow-up-down" class="sm"></i></span><div class="gt"><div class="h3">Auto-Scroll</div><div class="meta">Hands-free reading</div></div><i data-i="chevron-down" class="sm chev up"></i></div>
+          <div class="group">
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Auto-Scroll</div></div><span class="toggle"></span></div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 2: history -> two groups, one closed by the reader -->
+    <div class="cell">
+      <div class="cap">A match closed by hand<small>“history” finds two groups; the reader has closed Top-Nav Buttons again.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Settings</span></div>
+        <div class="scroll">
+          <div class="findlbl">Find settings</div>
+          <div class="search on"><i data-i="search" class="sm"></i><span class="q">history</span><i data-i="x" class="sm x"></i></div>
+          <div class="meta status-line">2 matching groups</div>
+
+          <div class="rg closed"><span class="gi"><i data-i="panel-top" class="sm"></i></span><div class="gt"><div class="h3">Top-Nav Buttons</div><div class="meta">Icons in the reading bar</div></div><i data-i="chevron-down" class="sm chev"></i></div>
+
+          <div class="rg"><span class="gi"><i data-i="search" class="sm"></i></span><div class="gt"><div class="h3">Search, Tabs &amp; History</div><div class="meta">Find, multitask, revisit</div></div><i data-i="chevron-down" class="sm chev up"></i></div>
+          <div class="group">
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Search</div></div><span class="toggle on"></span></div></div>
+            <div class="deps">
+              <div class="set"><div class="hd"><div class="txt"><div class="lbl">Synonym Search</div></div><span class="toggle on"></span></div></div>
+              <div class="set"><div class="hd"><div class="txt"><div class="lbl">Filter Stop Words in Search</div></div><span class="toggle on"></span></div></div>
+            </div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Tabs</div></div><span class="toggle on"></span></div></div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">History</div></div><span class="toggle on"></span></div></div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Reading history</div><div class="val">86 entries</div></div><span class="btn warn sm">Clear History</span></div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 3: marker -> one group -->
+    <div class="cell">
+      <div class="cap">One group matches<small>“marker” opens Reading, where both marker rows live.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Settings</span></div>
+        <div class="scroll">
+          <div class="findlbl">Find settings</div>
+          <div class="search on"><i data-i="search" class="sm"></i><span class="q">marker</span><i data-i="x" class="sm x"></i></div>
+          <div class="meta status-line">1 matching group</div>
+
+          <div class="rg"><span class="gi"><i data-i="book-open" class="sm"></i></span><div class="gt"><div class="h3">Reading</div><div class="meta">Translation, headings &amp; reading aids</div></div><i data-i="chevron-down" class="sm chev up"></i></div>
+          <div class="group">
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Bible Translation</div><div class="val">NKJV</div></div><i data-i="chevron-right" class="sm chev"></i></div></div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Chapter Titles</div></div><span class="toggle on"></span></div></div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Section Headings</div></div><span class="toggle on"></span></div></div>
+            <div class="deps"><div class="set"><div class="hd"><div class="txt"><div class="lbl">Restored Names</div></div><span class="toggle on"></span></div></div></div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Chapter &amp; Letter Arrows</div><div class="val">Hidden</div></div><i data-i="chevron-right" class="sm chev"></i></div></div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Scripture Browser</div><div class="val">Genre Grid</div></div><i data-i="chevron-right" class="sm chev"></i></div></div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Inline Reference Echoes</div></div><span class="toggle on"></span></div></div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Scrollbar Content Marker</div></div><span class="toggle on"></span></div></div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Reading Position Marker</div></div><span class="toggle on"></span></div></div>
+            <div class="set"><div class="hd"><div class="txt"><div class="lbl">Reading Streak Dwell Time</div><div class="val">20 seconds</div></div><i data-i="chevron-right" class="sm chev"></i></div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 4: no match -->
+    <div class="cell">
+      <div class="cap">No match<small>Every group hides; the status line says what to try.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Settings</span></div>
+        <div class="scroll">
+          <div class="findlbl">Find settings</div>
+          <div class="search on"><i data-i="search" class="sm"></i><span class="q">hymns</span><i data-i="x" class="sm x"></i></div>
+          <div class="nomatch">
+            <div class="ic"><i data-i="search" class="lg"></i></div>
+            <p class="body">No matching settings. Try font, audio, backup, or clear the filter.</p>
+            <span class="btn secondary sm">Clear filter</span>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</body></html>

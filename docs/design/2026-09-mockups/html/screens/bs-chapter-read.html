@@ -1,0 +1,62 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  /* bible-ch: a whole chapter, top to the chapter-end nav (BibleChapterView.jsx) */
+  .chapter { padding-top: 6px; padding-bottom: 40px; }
+  .subttl { margin-top: 8px; font: italic 400 19px/1.35 var(--serif); color: var(--text-2); text-wrap: balance; }
+  .listen { margin-top: 18px; }
+  .sechead { margin: 30px 0 10px; }
+  .reading p + p { margin-top: 12px; }
+  /* the reader's own marks on the text: a highlight, a link, a bookmark */
+  .mk { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 11px; background: var(--accent-soft); color: var(--accent); vertical-align: 1px; margin: 0 2px 0 3px; }
+  .mk .i { width: 13px; height: 13px; }
+  .endmark { text-align: center; margin: 36px 0 24px; font: 400 15px/1 var(--serif); color: var(--text-3); letter-spacing: .3em; }
+  .turns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .turn { background: var(--surface); border-radius: 16px; padding: 14px 16px 16px; min-height: 76px; }
+  [data-theme="light"] .turn { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .turn .meta { display: flex; align-items: center; gap: 2px; }
+  .turn.next { text-align: right; }
+  .turn.next .meta { justify-content: flex-end; }
+  .turn .t { margin-top: 6px; font: 500 21px/1.2 var(--serif); color: var(--text); }
+</style></head>
+<body data-size="412x2480">
+<div class="screen tall">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">John 2 · NKJV</span>
+    <span class="iconbtn"><i data-i="search"></i></span>
+    <span class="iconbtn"><i data-i="bookmark"></i></span>
+    <span class="tabcount">1</span>
+  </div>
+  <div class="scroll chapter">
+    <div class="h1" style="font-size:40px">John 2</div>
+    <div class="subttl">The Wedding at Cana · The Temple Cleansed</div>
+    <span class="btn secondary sm listen"><i data-i="play" class="xs fill"></i>Listen</span>
+
+    <div class="eyebrow sechead">The Wedding at Cana</div>
+    <div class="reading">
+      <p><span class="vnum">1</span>On the third day there was a wedding in Cana of Galilee, and the mother of Jesus was there. <span class="vnum">2</span>Now both Jesus and His disciples were invited to the wedding. <span class="vnum">3</span>And when they ran out of wine, the mother of Jesus said to Him, “They have no wine.”</p>
+      <p><span class="vnum">4</span>Jesus said to her, “Woman, what does your concern have to do with Me? My hour has not yet come.”</p>
+      <p><span class="vnum">5</span>His mother said to the servants, “<mark class="hl-honey">Whatever He says to you, do it.</mark>”</p>
+      <p><span class="vnum">6</span>Now there were set there six waterpots of stone, according to the manner of purification of the Jews, containing twenty or thirty gallons apiece. <span class="vnum">7</span>Jesus said to them, “Fill the waterpots with water.” And they filled them up to the brim. <span class="vnum">8</span>And He said to them, “Draw some out now, and take it to the master of the feast.” And they took it. <span class="vnum">9</span>When the master of the feast had tasted the water that was made wine, and did not know where it came from (but the servants who had drawn the water knew), the master of the feast called the bridegroom. <span class="vnum">10</span>And he said to him, “Every man at the beginning sets out the good wine, and when the guests have well drunk, then the inferior. You have kept the good wine until now!”</p>
+      <p><span class="vnum">11</span>This beginning of signs Jesus did in Cana of Galilee, and manifested His glory; and His disciples believed in Him.</p>
+      <p><span class="vnum">12</span>After this He went down to Capernaum, He, His mother, His brothers, and His disciples; and they did not stay there many days.</p>
+    </div>
+
+    <div class="eyebrow sechead">The Temple Cleansed</div>
+    <div class="reading">
+      <p><span class="vnum">13</span>Now the Passover of the Jews was at hand, and Jesus went up to Jerusalem. <span class="vnum">14</span>And He found in the temple those who sold oxen and sheep and doves, and the money changers doing business. <span class="vnum">15</span>When He had made a whip of cords, He drove them all out of the temple, with the sheep and the oxen, and poured out the changers’ money and overturned the tables. <span class="vnum">16</span>And He said to those who sold doves, “Take these things away! Do not make My Father’s house a house of merchandise!” <span class="vnum">17</span>Then His disciples remembered that it was written, “Zeal for Your house has eaten Me up.”<span class="mk" title="1 link"><i data-i="link"></i></span></p>
+      <p><span class="vnum">18</span>So the Jews answered and said to Him, “What sign do You show to us, since You do these things?” <span class="vnum">19</span>Jesus answered and said to them, “Destroy this temple, and in three days I will raise it up.”<span class="mk" title="Bookmark"><i data-i="bookmark" class="fill"></i></span></p>
+      <p><span class="vnum">20</span>Then the Jews said, “It has taken forty-six years to build this temple, and will You raise it up in three days?” <span class="vnum">21</span>But He was speaking of the temple of His body. <span class="vnum">22</span>Therefore, when He had risen from the dead, His disciples remembered that He had said this to them; and they believed the Scripture and the word which Jesus had said.</p>
+      <p><span class="vnum">23</span>Now when He was in Jerusalem at the Passover, during the feast, many believed in His name when they saw the signs which He did. <span class="vnum">24</span>But Jesus did not commit Himself to them, because He knew all men, <span class="vnum">25</span>and had no need that anyone should testify of man, for He knew what was in man.</p>
+    </div>
+
+    <div class="endmark">✦</div>
+    <div class="turns">
+      <div class="turn"><span class="meta"><i data-i="chevron-left" class="xs"></i>Previous</span><div class="t">John 1</div></div>
+      <div class="turn next"><span class="meta">Next<i data-i="chevron-right" class="xs"></i></span><div class="t">John 3</div></div>
+    </div>
+  </div>
+</div>
+</body></html>

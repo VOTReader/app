@@ -1,0 +1,74 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .topbar .btn.text { height: 44px; padding: 0 14px; font-size: 16px; }
+  .entry { padding-top: 6px; }
+  .entry .date { margin-top: 6px; }
+  /* body lines sit on the reading rhythm (19px / 1.62 = ~31px per line) */
+  .para { margin-top: 26px; }
+  .para .ph + .ph { margin-top: 20px; }
+  .para + .para { margin-top: 31px; }
+  .lastline { display: flex; align-items: center; gap: 4px; margin-top: 14px; }
+  .lastline .ph { flex: none; }
+  .caret { width: 2px; height: 22px; border-radius: 1px; background: var(--accent); }
+  .photo { width: 220px; height: 140px; border-radius: 14px; margin-top: 28px;
+    background:
+      radial-gradient(46% 62% at 74% 30%, color-mix(in srgb, var(--dot-honey) 52%, transparent), transparent 100%),
+      linear-gradient(180deg,
+        color-mix(in srgb, var(--dot-honey) 26%, var(--surface-3)) 0%,
+        color-mix(in srgb, var(--dot-clay) 22%, var(--surface-3)) 56%,
+        color-mix(in srgb, var(--dot-sage) 18%, var(--surface-2)) 100%); }
+  .memo { display: inline-flex; align-items: center; gap: 12px; height: 48px; padding: 0 18px 0 6px; border-radius: 24px; background: var(--surface-2); margin-top: 12px; }
+  .memo .pb { width: 36px; height: 36px; border-radius: 18px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; }
+  .memo .pb .i { margin-left: 2px; }
+  .wave { display: flex; align-items: center; gap: 3px; height: 24px; }
+  .wave span { width: 3px; border-radius: 2px; background: var(--text-3); }
+  .memo .len { font: 400 13px/1 var(--sans); color: var(--text-2); }
+  /* the editor's chrome as jn-blocks.html draws it: the save state, and the one floating + that opens Insert */
+  .saved { position: absolute; left: 20px; bottom: 42px; display: flex; align-items: center; gap: 6px; }
+  .fab { position: absolute; right: 20px; bottom: 22px; width: 56px; height: 56px; border-radius: 28px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; box-shadow: var(--shadow); }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="title">Journal</span>
+    <span class="btn text">Done</span>
+  </div>
+  <div class="scroll">
+    <div class="entry">
+      <div class="h1">Morning reading</div>
+      <div class="meta date">September 24, 2026 · 7:12 AM</div>
+    </div>
+
+    <div class="para">
+      <div class="ph" style="width:100%"></div>
+      <div class="ph" style="width:96%"></div>
+      <div class="ph" style="width:99%"></div>
+      <div class="ph" style="width:93%"></div>
+      <div class="ph" style="width:57%"></div>
+    </div>
+    <div class="para">
+      <div class="ph" style="width:98%"></div>
+      <div class="ph" style="width:100%"></div>
+      <div class="ph" style="width:90%"></div>
+      <div class="lastline"><div class="ph" style="width:41%"></div><span class="caret"></span></div>
+    </div>
+
+    <div class="photo"></div>
+    <div class="memo">
+      <span class="pb"><i data-i="play" class="xs fill"></i></span>
+      <span class="wave">
+        <span style="height:6px"></span><span style="height:11px"></span><span style="height:17px"></span><span style="height:12px"></span>
+        <span style="height:20px"></span><span style="height:14px"></span><span style="height:8px"></span><span style="height:18px"></span>
+        <span style="height:23px"></span><span style="height:13px"></span><span style="height:16px"></span><span style="height:9px"></span>
+        <span style="height:14px"></span><span style="height:7px"></span><span style="height:11px"></span><span style="height:5px"></span>
+      </span>
+      <span class="len">0:42</span>
+    </div>
+  </div>
+  <div class="meta saved"><i data-i="circle-check" class="xs"></i>Saved on this device</div>
+  <span class="fab"><i data-i="plus"></i></span>
+</div>
+</body></html>

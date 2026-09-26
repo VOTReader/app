@@ -1,0 +1,132 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="dl-common.css"><script src="../kit/kit.js"></script><script src="dl-icons.js"></script>
+<style>
+  /* ---- Home, exactly as screens/home.html ---- */
+  .topbar.slim { height: 48px; padding-right: 12px; }
+  .topbar.slim .tabcount { margin: 0 0 0 4px; }
+  .lockup { text-align: center; }
+  .lockup .t1 { font: 500 26px/1.1 var(--serif); letter-spacing: -0.005em; color: var(--text); }
+  .lockup .t2 { font: italic 400 17px/1.25 var(--serif); color: var(--text-2); margin-top: 2px; }
+  .lockup .amp { font-style: normal; }
+  .home > .search { margin-top: 16px; }
+  .cont { margin-top: 12px; padding: 14px 16px; }
+  .cont .main { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
+  .cont .main .h3 { flex: 1; min-width: 0; text-wrap: pretty; }
+  .cont .foot { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+  .cont .foot .progress { flex: 1; }
+  .cont .foot .meta { font-variant-numeric: tabular-nums; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  .tile { height: 68px; padding: 0 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    font: 400 12px/1.2 var(--sans); color: var(--text-2); white-space: nowrap; }
+  .tile .nudge { transform: translateY(-3px); }
+  .cols { margin-top: 12px; }
+  .cols .row { padding: 10px 16px; min-height: 60px; }
+  .cols .ttl { display: block; font: 500 18px/1.2 var(--serif); color: var(--text); }
+  .cols .meta { display: block; margin-top: 2px; }
+  .surprise { display: flex; justify-content: center; margin-top: 8px; }
+  .surprise .btn { height: 40px; }
+
+  /* ---- rearranging ---- */
+  .cols { position: relative; }
+  /* the quiet hint under the list: always there, never in the way (HomeScreen: "Hold to rearrange") */
+  .rehint { margin-top: 12px; text-align: center; font: 400 13px/1.3 var(--sans); color: var(--text-3); }
+  .rehint + .surprise { margin-top: 2px; }
+  /* the keyboard's live status line (role=status) */
+  .hstatus { margin-top: 6px; text-align: center; font: 400 14px/1.35 var(--sans); color: var(--text-2); }
+  .hstatus + .surprise { margin-top: 2px; }
+  /* pressed: the row darkens a step and a line fills along its foot while the finger holds still */
+  .row.pressing { position: relative; overflow: hidden; background: var(--surface-2); }
+  [data-theme="light"] .row.pressing { background: var(--surface-3); }
+  .row.pressing::after { content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: 62%; background: var(--accent); border-radius: 0 2px 2px 0; }
+  /* dragging: an open landing place, and the lifted row riding above it */
+  .slot { height: 61px; border-radius: 16px; background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent); }
+  .row.lifted { position: absolute; left: 0; right: 0; z-index: 5; transform: scale(1.04); background: var(--surface-2);
+    box-shadow: 0 0 0 1.5px var(--accent), var(--shadow); }
+  [data-theme="light"] .row.lifted { background: var(--surface); box-shadow: 0 0 0 1.5px var(--accent), 0 18px 40px rgba(60,40,20,0.22); }
+  /* keyboard focus */
+  .row.kfocus { outline: 2px solid var(--accent); outline-offset: 3px; }
+  /* Home is taller than the phone now (eight rows): a phone scrolled to the end of the page shows the list,
+     the hint and Surprise Me; the top bar stays put and the page slides up under it */
+  .home.scrolled { padding-bottom: 20px; }
+  .home.scrolled > .lockup { margin-top: calc(var(--sy, 0px) * -1); }
+  /* captions wrap to different lengths; keep the four phones level */
+  .cell > .cap { min-height: 52px; }
+</style></head>
+<body data-size="1400x905">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Home · rearranging the list</div>
+    <div class="meta">Hold a row to lift it, then drag it to a new place. The new order is kept on this device. The four shortcuts above the list stay where they are.</div>
+  </div>
+  <div class="board-grid" id="grid" style="grid-template-columns: repeat(4, 309px)"></div>
+</div>
+<script>
+  // Home's eight rows, in the app's order (screens/home.html); History is reached from Recent
+  const ITEMS = {
+    volumes: ['The Volumes of Truth', '7 volumes · 244 letters'],
+    scriptures: ['The Scriptures of Truth', 'Genesis to Revelation · NKJV'],
+    answers: ['Answers Only God Can Give', 'Topics and doctrines'],
+    studies: ['Studies', 'Letter studies · Matthew Study Bible'],
+    listening: ['Listening Library', 'The letters and scriptures, read aloud'],
+    songs: ['Songs of the Letters', 'Sung by the flock'],
+    library: ['Library', 'Notes, journal &amp; bookmarks'],
+    settings: ['Settings', 'Display, themes &amp; preferences'],
+  };
+  const row = (id, cls = '', extra = '', style = '') => `<div class="row ${cls}"${style ? ` style="${style}"` : ''}><span class="txt"><span class="ttl">${ITEMS[id][0]}</span><span class="meta">${ITEMS[id][1]}</span></span><i data-i="chevron-right" class="chev sm"></i>${extra}</div>`;
+
+  // sy: how far the page has scrolled (px), for the phones that show the end of the list
+  function home({ list, below = '', sy = 0 }) {
+    return `<div class="phone-m"><div class="screen">
+      <div class="status"></div>
+      <div class="topbar slim"><span class="iconbtn"><i data-i="dl-info"></i></span><span class="spacer"></span><span class="iconbtn"><i data-i="search"></i></span><span class="tabcount">1</span></div>
+      <div class="scroll home${sy ? ' scrolled' : ''}"${sy ? ` style="--sy:${sy}px"` : ''}>
+        <div class="lockup"><div class="t1">The Volumes of Truth</div><div class="t2"><span class="amp">&amp;</span> The Scriptures of Truth</div></div>
+        <div class="search"><i data-i="search" class="sm"></i>Search the library</div>
+        <div class="card cont">
+          <div class="meta">Continue reading</div>
+          <div class="meta">Volume One · Letter 15</div>
+          <div class="main"><div class="h3">Know That Which Has Been Poured Out, The Word of God</div><span class="btn primary sm"><i data-i="play" class="xs fill"></i>Listen</span></div>
+          <div class="foot"><div class="progress"><i style="width:40%"></i></div><span class="meta">40%</span></div>
+        </div>
+        <div class="tiles">
+          <div class="card tile"><i data-i="history"></i>Recent</div>
+          <div class="card tile"><i data-i="notebook-pen"></i>Notes</div>
+          <div class="card tile"><i data-i="bookmark"></i>Bookmarks</div>
+          <div class="card tile"><i data-i="scripture-web" class="nudge"></i>Scripture Web</div>
+        </div>
+        <div class="list cols">${list}</div>
+        <div class="rehint">Hold to rearrange</div>
+        ${below}
+        <div class="surprise"><span class="btn text"><i data-i="dl-dice" class="sm"></i>Surprise Me</span></div>
+      </div>
+    </div></div>`;
+  }
+
+  const ORDER = ['volumes', 'scriptures', 'answers', 'studies', 'listening', 'songs', 'library', 'settings'];
+
+  // 180px: the top bar's edge falls in the gap above the Continue card's title, not through a line of text
+  const resting = home({ sy: 180, list: ORDER.map(id => row(id)).join('') });
+
+  const pressed = home({ list:
+    row('volumes') +
+    row('scriptures', 'pressing', '<span class="touch" style="left:300px;top:50%"></span>') +
+    ['answers', 'studies', 'listening', 'songs', 'library', 'settings'].map(id => row(id)).join('') });
+
+  const dragging = home({ list:
+    row('volumes') + row('scriptures') + '<div class="slot"></div>' +
+    ['answers', 'studies', 'songs', 'library', 'settings'].map(id => row(id)).join('') +
+    row('listening', 'lifted', '<span class="touch" style="left:318px;top:30px"></span>', 'top:124px') });
+
+  const keyboard = home({ sy: 180,
+    list: row('volumes') + row('scriptures') + row('studies', 'kfocus') + ['answers', 'listening', 'songs', 'library', 'settings'].map(id => row(id)).join(''),
+    below: '<div class="hstatus">Studies moved up.</div>' });
+
+  const cells = [
+    ['Resting', 'Scrolled to the end: the hint sits under the list in the quietest grey, always there', resting],
+    ['Pressed', 'After a still moment the row shades and a line fills along its foot; at about 1.4 s it lifts. Moving first just scrolls', pressed],
+    ['Dragging', 'The lifted row follows the finger and the others slide apart to open its landing place. A short buzz as it lifts', dragging],
+    ['From a keyboard', 'Alt + ↑ or ↓ on a focused row swaps it with its neighbour; the line under the list says what moved', keyboard],
+  ];
+  document.getElementById('grid').innerHTML = cells.map(c => `<div class="cell"><div class="cap">${c[0]}<small>${c[1]}</small></div>${c[2]}</div>`).join('');
+</script>
+</body></html>

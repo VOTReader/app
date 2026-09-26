@@ -1,0 +1,97 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="an-common.css"><script src="an-icons.js"></script>
+<style>
+  .sheet { --ring-gap: var(--surface); }
+  .sheet.under { z-index: 5; }
+  .scrim.s2 { z-index: 6; }
+  .sheet.nbp { z-index: 7; }
+  .ns-sws { display: flex; justify-content: space-between; align-items: center; height: 34px; margin-top: 12px; }
+  .ns-sws .an-sw { width: 26px; height: 26px; border-radius: 13px; }
+  /* picker */
+  .nb-hd { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+  .nb-hd .h3 { flex: 1; }
+  .nb-hd .iconbtn { margin-right: -10px; color: var(--text-2); }
+  .nb-new { display: flex; gap: 8px; margin-top: 12px; }
+  .nb-in { flex: 1; min-width: 0; height: 48px; border-radius: 14px; background: var(--surface-2); display: flex; align-items: center; padding: 0 14px; font: 400 16px/1 var(--sans); color: var(--text-3); }
+  .nb-in .ph { height: 10px; margin: 0; background: color-mix(in srgb, var(--text-3) 38%, transparent); }
+  .nb-in.on { box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .btn.off { opacity: .4; }
+  .nb-list { margin-top: 14px; border-radius: 16px; background: var(--surface-2); padding: 0 6px 0 16px; }
+  .nb-row { display: flex; align-items: center; gap: 14px; min-height: 56px; }
+  .nb-row + .nb-row, .nb-row + .an-cf, .an-cf + .nb-row { border-top: 1px solid var(--hairline); }
+  .nb-row .ph { flex: none; height: 10px; margin: 0; background: color-mix(in srgb, var(--text-3) 38%, transparent); }
+  .nb-row .sp { flex: 1; }
+  .nb-row .iconbtn { color: var(--text-3); width: 44px; height: 44px; }
+  .ck { width: 24px; height: 24px; border-radius: 7px; flex: none; box-shadow: inset 0 0 0 1.5px var(--text-3); display: grid; place-items: center; color: transparent; }
+  .ck.on { background: var(--accent); box-shadow: none; color: var(--accent-ink); }
+  .ck .i { width: 16px; height: 16px; stroke-width: 3; }
+  .nb-list .an-cf { background: transparent; border-radius: 0; margin-left: -16px; margin-right: -6px; padding: 14px 12px 12px 16px; }
+  .nb-list .an-cf .phi { width: 84px; background: color-mix(in srgb, var(--text-3) 38%, transparent); }
+  .nb-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 26px 18px 10px; }
+  .nb-empty .ic { width: 56px; height: 56px; border-radius: 28px; background: var(--surface-2); color: var(--text-2); display: grid; place-items: center; }
+  .nb-empty .body { margin-top: 14px; max-width: 280px; text-wrap: balance; }
+  .sheet .foot { margin-top: 18px; }
+  .sheet .an-cf.inline { margin-top: 18px; }
+  /* full size */
+  .comp { width: 372px; display: flex; flex-direction: column; gap: 14px; }
+  .comp .nb-new, .comp .foot { margin: 0; }
+  .comp .nb-list { margin: 0; }
+  .comp .note { margin-top: -6px; }
+</style></head>
+<body data-size="1176x1392">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Add to Notebook</div>
+    <div class="meta">NotebookPickerSheet.jsx, opened over the note sheet (its notebook row, or ⋯). Ticks wait for Save; creating and deleting a notebook happen at once. Notebook names are placeholder bars.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(4, 256px)" id="grid"></div>
+</div>
+<script>
+  (function () {
+    var C = ['yellow','green','pink','red','orange','blue','purple','teal','brown','gray'];
+    var bg = '<div class="status"></div>'
+      + '<div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">John 3 · NKJV</span><span class="iconbtn"><i data-i="search"></i></span><span class="iconbtn"><i data-i="bookmark"></i></span><span class="tabcount">1</span></div>'
+      + '<div class="scroll an-page"><div class="h1" style="font-size:40px">John 3</div><div class="eyebrow sechead">Nicodemus and the New Birth</div><div class="reading">'
+      + '<p><span class="vnum">4</span>Nicodemus said to Him, “How can a man be born when he is old? Can he enter a second time into his mother’s womb and be born?”</p>'
+      + '<p><span class="vnum">5</span>Jesus answered, “Most assuredly, I say to you, <mark class="mk hl c-yellow">unless one is born of water and the Spirit, he cannot enter the kingdom of God.</mark><span class="nmk c-yellow"><i data-i="sticky-note"></i></span></p>'
+      + '</div></div><div class="scrim"></div>'
+      + '<div class="sheet under c-yellow"><div class="grabber"></div><div class="ns-head"><span class="ns-dot"></span><span class="h3">Edit note</span></div>'
+      + '<div class="ns-anchor clamp">“unless one is born of water and the Spirit, he cannot enter the kingdom of God.”</div>'
+      + '<div class="label ns-lab">Style and colour</div><div class="ns-styles"><span class="an-sty hl on"><span>A</span></span><span class="an-sty ul"><span>A</span></span><span class="an-sty sq"><span>A</span></span></div>'
+      + '<div class="ns-sws"><span class="an-sw blank"></span>' + C.map(function (c) { return '<span class="an-sw c-' + c + (c === 'yellow' ? ' on' : '') + '"></span>'; }).join('') + '</div>'
+      + '<div class="ta"></div><div class="nbrow"></div><div class="foot"><span class="btn secondary">Cancel</span><span class="btn primary">Save</span></div></div>'
+      + '<div class="scrim s2"></div>';
+    var check = '<i data-i="check"></i>';
+    function row(w, on) { return '<div class="nb-row"><span class="ck' + (on ? ' on' : '') + '">' + check + '</span><span class="ph" style="width:' + w + 'px"></span><span class="sp"></span><span class="iconbtn"><i data-i="x" class="sm"></i></span></div>'; }
+    function list(rows) { return '<div class="nb-list">' + rows.join('') + '</div>'; }
+    function head(t) { return '<div class="grabber"></div><div class="nb-hd"><span class="h3">' + t + '</span><span class="iconbtn"><i data-i="x"></i></span></div>'; }
+    function create(typed) {
+      return '<div class="nb-new">' + (typed
+        ? '<span class="nb-in on"><span class="ph" style="width:118px"></span><span class="caret"></span></span><span class="btn primary">Create</span>'
+        : '<span class="nb-in">New notebook name…</span><span class="btn secondary off">Create</span>') + '</div>';
+    }
+    function foot(saveOn) { return '<div class="foot"><span class="btn secondary">Cancel</span><span class="btn primary' + (saveOn ? '' : ' off') + '">Save</span></div>'; }
+    var four = [row(96, false), row(132, true), row(78, false), row(112, false)];
+    var cells = [
+      ['Add to Notebook, populated', 'Not filed yet; one tick waiting for Save', head('Add to Notebook') + create(false) + list(four) + foot(true)],
+      ['Manage Notebooks, unchanged', 'Already filed in two; Save is off: “No changes to save”', head('Manage Notebooks') + create(false) + list([row(96, true), row(132, true), row(78, false), row(112, false)]) + foot(false)],
+      ['Naming a new notebook', 'Create adds it at once and ticks it; the tick waits for Save', head('Add to Notebook') + create(true) + list(four) + foot(true)],
+      ['No notebooks yet', 'The first visit', head('Add to Notebook') + create(false)
+        + '<div class="nb-empty"><span class="ic"><i data-i="an-folder"></i></span><div class="body">No notebooks yet. Type a name above to create your first one.</div></div>' + foot(false)],
+      ['Delete a notebook', '× on its row; its notes move to Uncategorized', head('Add to Notebook') + create(false)
+        + list([row(96, false), '<div class="an-cf"><div class="q">Delete “<span class="phi"></span>”? Notes will move to Uncategorized.</div><div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm an-danger">Yes, delete</span></div></div>', row(78, false), row(112, false)]) + foot(true)],
+      ['Discard changes?', '×, Back or a tap outside while ticks are unsaved', head('Add to Notebook') + create(false) + list(four)
+        + '<div class="an-cf inline"><span class="q">Discard changes?</span><div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm an-danger">Yes, discard</span></div></div>']
+    ];
+    var h = '';
+    cells.forEach(function (c) {
+      h += '<div class="cell"><div class="cap">' + c[0] + '<small>' + c[1] + '</small></div><div class="phone-s"><div class="screen">' + bg + '<div class="sheet nbp">' + c[2] + '</div></div></div></div>';
+    });
+    h += '<div class="cell" style="grid-column: span 2"><div class="cap">Full size<small>The create row, a ticked and an unticked notebook, and the footer both ways</small></div><div class="comp">'
+      + create(false) + create(true) + list([row(132, true), row(96, false)]) + foot(true) + foot(false)
+      + '<div class="meta note">Save is off until a tick changes; its hint reads “No changes to save”.</div></div></div>';
+    document.getElementById('grid').innerHTML = h;
+  })();
+</script>
+</body></html>

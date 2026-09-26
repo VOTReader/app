@@ -1,0 +1,83 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="au-shared.css"><script src="../kit/kit.js"></script>
+<style>
+  .topbar { position: relative; z-index: 3; background: var(--bg); }
+  .page { position: relative; flex: 1; overflow: hidden; }
+  .body-t { padding: 0 var(--gutter); }
+  .body-t p { margin: 0; }
+  .poem { margin-top: 18px; padding-left: 22px; }
+  .poem + .poem { margin-top: 14px; }
+  .reading .fn { margin-left: 3px; }
+  /* the read-along wash: the clause being read, painted over the text (no layout change) */
+  mark.au-wash { color: inherit; }
+  .safe { position: absolute; left: 0; right: 0; bottom: 0; height: 22px; background: var(--bg); z-index: 4; }
+  /* the auto-scroll transport, lifted above the docked bar */
+  .ascroll { position: absolute; left: 50%; bottom: 136px; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 2px; height: 48px; padding: 0 16px 0 4px; border-radius: 24px; background: var(--surface-2); box-shadow: var(--shadow); white-space: nowrap; }
+  .ascroll .sb { width: 40px; height: 40px; border-radius: 20px; display: grid; place-items: center; color: var(--text-2); font: 400 22px/1 var(--sans); }
+  .ascroll .sb.play { background: var(--surface-3); color: var(--text); }
+  .ascroll .sb.play .i { width: 18px; height: 18px; fill: currentColor; }
+  .ascroll .ro { margin-left: 8px; font: 400 13px/1 var(--sans); color: var(--text-2); font-variant-numeric: tabular-nums; }
+</style></head>
+<body>
+<div class="screen">
+  <div class="status"></div>
+  <div class="topbar">
+    <span class="iconbtn"><i data-i="chevron-left"></i></span>
+    <span class="spacer"></span>
+    <span class="iconbtn"><i data-i="headphones"></i></span>
+    <span class="iconbtn"><i data-i="bookmark"></i></span>
+    <span class="tabcount">1</span>
+  </div>
+  <div class="page" id="page">
+    <div class="body-t reading" id="body">
+      <p><span class="lead">Thus says The Lord:</span> How is it you have not recognized that which comes from The Father? For that which is of the devil is made plain and surrounds you on every side. Therefore the things of God become that much more precious, even as you, My son, are most precious in My sight... <em>Like a gemstone shining in the midst of all this darkness, easily found by the eyes of God, so shall you be in the day you surrender your life, the day you give up this fight and return to Me.</em> Do you not understand that I have saved you? No, not by your own works, but by My life, which I willingly gave up for you. Therefore, turn to Me wholly and in truth. And no more let the doctrines of men in the churches steal from your trust; nor let their traditions pollute your faith anymore. Be set apart from the ways of this world, and depart from the churches of men. For I alone am your faith, I alone am your completion. Therefore listen, and you will also know, for by the Spirit of God are all things revealed to the chosen. Search your heart, My son, and you will find Me; embrace My words, and you will begin to know Me. For indeed, there are many gifts of the Spirit which I bestow upon all those who love Me, many gifts given to those who are willing to give up everything and follow Me. Thus Timothy is just one among many who hear My voice, one voice in a great chorus growing ever louder, of the number I am sending. Yet to him did I say, <em>“Write that which I speak, and place it in a book”;</em> also commanding him to share that which the Spirit causes him to understand. For the latter is that which My people call inspired of God or inspired in the Spirit; and the former, that which the prophets hear, the voice of The Living God. Therefore listen to Timothy, for he speaks for Me, he hears My voice. <mark class="au-wash" id="now">Behold, he has sat in My presence and strives to obey all I ask of him.</mark> Do not say then, nor conceive any notion within your heart, that he may be deceived by the devil. Or have you never read these Scriptures: <em>Every kingdom divided against itself will surely be brought to ruin, and every house divided against itself will collapse. If satan also is divided against himself, how then will his kingdom stand?</em><span class="fn">1</span></p>
+      <div class="poem"><em>Do men gather grapes of thorns, or figs of thistles?...</em></div>
+      <div class="poem"><em>For a good tree brings forth good fruit,<br>But a corrupt tree brings forth evil fruit;<br>Neither can a corrupt tree bring forth good fruit...</em></div>
+      <div class="poem"><em>And every tree that does not bring forth<br>Good fruit is hewn down and cast into the fire...</em></div>
+      <div class="poem"><em>Thus by their fruits you shall know them.</em><span class="fn">2</span></div>
+    </div>
+  </div>
+
+  <!-- auto-scroll transport (Settings: Auto-Scroll on); idle while the voice leads -->
+  <div class="ascroll">
+    <span class="sb">−</span>
+    <span class="sb play"><i data-i="play"></i></span>
+    <span class="sb">+</span>
+    <span class="ro">~136 wpm · 16 lines/min</span>
+  </div>
+
+  <div class="safe"></div>
+  <div class="au-bar">
+    <span class="au-tab"><i data-i="chevron-down"></i></span>
+    <div class="au-row">
+      <span class="playbtn"><i data-i="pause"></i></span>
+      <div class="au-main">
+        <div class="au-bt">Know That Which Has Been Poured Out, The Word of God</div>
+        <div class="au-bs"><span class="src">Volume One · Read by Benjamin</span><span class="pos">· 1 of 15</span></div>
+      </div>
+      <span class="au-bi"><i data-i="skip-back"></i></span>
+      <span class="au-bi"><i data-i="skip-forward"></i></span>
+      <span class="au-bi x"><i data-i="x"></i></span>
+    </div>
+    <div class="au-seek"><span>2:47</span><div class="slider"><i style="width:45.8%"></i><b style="left:45.8%"></b></div><span>6:05</span></div>
+  </div>
+</div>
+<script>
+  // Follow the Voice keeps the clause being read inside the band 25%-60% down the scroller,
+  // landing it at 35%: scroll the letter so the washed clause sits there.
+  document.fonts.ready.then(() => {
+    const page = document.getElementById('page'), body = document.getElementById('body'), now = document.getElementById('now');
+    const pr = page.getBoundingClientRect(), nr = now.getClientRects()[0];
+    const target = pr.top + pr.height * 0.35;
+    const shift = Math.round(nr.top - target);
+    body.style.marginTop = (-shift) + 'px';
+    // then nudge so a whole line, not half of one, meets the top bar
+    const lh = parseFloat(getComputedStyle(body).lineHeight);
+    const pTop = body.querySelector('p').getBoundingClientRect().top, top = page.getBoundingClientRect().top;
+    const cut = ((top - pTop) % lh + lh) % lh;            // how far the top line is hidden
+    const down = cut > 0.5 ? cut + 4 : 4;                  // bring that line fully into view
+    body.style.marginTop = (-shift + down) + 'px';
+    document.body.dataset.shift = shift - down;
+  });
+</script>
+</body></html>

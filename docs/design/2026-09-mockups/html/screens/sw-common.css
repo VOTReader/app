@@ -1,0 +1,133 @@
+/* sw- area: the Scripture Web and My Web, shared by web*.html too. Built on kit.css tokens only.
+   The web stays dark in both themes, as in the app (its canvas is black by construction and its chrome
+   takes the dark ink in both themes): a full-screen page is dark-only (body data-themes="dark"); on a
+   board each screen .ls, and each .tray holding a loose web component, carries data-theme="dark".
+   So nothing here needs a light variant. */
+
+/* ---- a landscape screen (915x412), standalone or inside a board frame ---- */
+body.landscape { width: 915px; height: 412px; }
+.ls { position: relative; width: 915px; height: 412px; overflow: hidden; background: var(--bg); color: var(--text); }
+.ls > canvas { position: absolute; inset: 0; width: 915px; height: 412px; }
+/* a dark scope inside a light board: the kit's light-only shadow on the switch must not leak in */
+[data-theme="dark"] .seg span.on { box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
+/* a loose web component on a board (a tip, a list panel): shown on a piece of the web's own black ground,
+   which clips the component's dark shadow off the paper (and vanishes into a dark board) */
+.tray { align-self: flex-start; max-width: 100%; background: var(--bg); color: var(--text); border-radius: 18px; padding: 12px; overflow: hidden; }
+
+/* board frames: a landscape screen scaled down (transform, so canvases keep their 915px layout box) */
+.lf { position: relative; border-radius: 22px; overflow: hidden; background: var(--bg); box-shadow: 0 0 0 1px var(--hairline), var(--shadow); flex: none; }
+.lf > .ls { transform-origin: 0 0; }
+.lf.f100 { width: 915px; height: 412px; }
+.lf.f75 { width: 686px; height: 309px; } .lf.f75 > .ls { transform: scale(.75); }
+.lf.f62 { width: 567px; height: 255px; } .lf.f62 > .ls { transform: scale(.62); }
+.crop { position: relative; overflow: hidden; border-radius: 16px; background: var(--bg); box-shadow: 0 0 0 1px var(--hairline); }
+.crop > .ls { position: absolute; left: 0; top: 0; }
+
+/* ---- top chrome ---- */
+.chrome { position: absolute; left: 8px; right: 16px; top: 12px; display: flex; align-items: flex-start; gap: 12px; z-index: 3; }
+.chrome .back { width: 44px; height: 44px; margin-top: -3px; margin-right: -8px; flex: none; }
+.brand { flex: none; min-width: 0; }
+.brand .h2 { font-size: 26px; line-height: 1.12; white-space: nowrap; }
+.brand .meta { margin-top: 1px; }
+.brand .meta.one { white-space: nowrap; }
+.brand .meta.two { width: 142px; text-wrap: balance; }
+/* the switch says which web is showing (two stops; Nearby is a button in the strip, not a third web).
+   It keeps one place in both webs: straight after the title, so switching never moves it */
+.chrome .seg { position: absolute; left: 204px; top: 2px; width: 220px; margin: 0; }
+.chrome .right { margin-left: auto; }
+.chrome .right { display: flex; gap: 5px; margin-top: 2px; flex: none; }
+.chrome .chip { padding: 0 12px; }
+.chip.ic { width: 34px; padding: 0; justify-content: center; }
+.chip.ic.on { background: var(--accent); color: var(--accent-ink); }
+.chip .i { width: 16px; height: 16px; }
+.sepv { width: 1px; height: 22px; margin: 6px 3px 0; background: var(--hairline); flex: none; }
+/* the density flash: a status line under the title for 3.6 s after a switch */
+.hint { position: absolute; left: 56px; top: 66px; z-index: 3; display: flex; align-items: center; gap: 8px;
+  font: 400 13px/1.3 var(--sans); color: var(--text); background: var(--surface-2); border-radius: 12px; padding: 7px 12px 7px 10px; box-shadow: 0 2px 10px rgba(0,0,0,.3); }
+.hint .dot { width: 8px; height: 8px; background: var(--accent); }
+/* hidden controls: only the way back stays, quiet */
+.quiet { position: absolute; right: 16px; top: 14px; z-index: 3; width: 34px; height: 34px; display: grid; place-items: center; color: var(--text-3); opacity: .75; }
+.quiet .i { width: 15px; height: 15px; }
+
+/* ---- the foot: the colour key (no credit line; the OpenBible CC-BY credit lives on About) ---- */
+.foot { position: absolute; bottom: 10px; left: 20px; right: 20px; display: flex; justify-content: flex-end; align-items: center; z-index: 2; }
+.legend { display: flex; align-items: center; gap: 8px; font: 400 13px/1.35 var(--sans); color: var(--text-3); }
+.legend .ramp { width: 90px; height: 5px; border-radius: 3px; background: linear-gradient(90deg, rgb(212,175,90), rgb(201,132,143), rgb(134,169,201)); }
+.legend .gap { width: 10px; }
+.hist { display: inline-flex; align-items: flex-start; gap: 2px; height: 10px; margin-top: 2px; }
+.hist b { display: block; width: 2px; background: var(--text-3); border-radius: 1px; }
+.hist b:nth-child(1) { height: 4px; } .hist b:nth-child(2) { height: 10px; } .hist b:nth-child(3) { height: 6px; }
+
+/* My Web's key: two families, a pin per shape for yours, a line per source for Timothy's */
+.mkey { position: absolute; left: 20px; bottom: 9px; z-index: 2; display: flex; flex-direction: column; gap: 3px; font: 400 12.5px/1.3 var(--sans); color: var(--text-3); }
+.mkey .kr { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.mkey .fam { color: var(--text-2); font-weight: 700; width: 62px; }
+.mkey .sep { color: var(--text-3); opacity: .6; margin: 0 1px; }
+.pin { width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-sizing: border-box; border: 1.6px solid currentColor; flex: none; }
+.pin.fill { border: 0; background: currentColor; width: 8px; height: 8px; }
+.pin.ringdot { background: radial-gradient(circle, currentColor 0 2px, transparent 2.4px); }
+.sline { width: 16px; height: 2.5px; border-radius: 2px; display: inline-block; flex: none; }
+.k-scr { color: var(--accent); } .k-vol { color: var(--dot-clay); } .k-x { color: var(--dot-rose); }
+.s-fn { background: var(--dot-sky); } .s-sn { background: var(--dot-sage); } .s-wt { background: var(--dot-lavender); } .s-st { background: var(--text-3); }
+
+/* ---- the rail reset pills (My Web, a zoomed rail) ---- */
+.rreset { position: absolute; left: 16px; z-index: 3; height: 30px; border-radius: 15px; padding: 0 11px; display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface-2); color: var(--text); font: 700 12.5px/1 var(--sans); box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+.rreset .i { width: 14px; height: 14px; color: var(--accent); }
+
+/* ---- the pop card (web.html's selection card) ---- */
+.pop { position: absolute; z-index: 4; background: var(--surface); border-radius: 18px; padding: 14px 16px; box-shadow: var(--shadow); }
+.pop .ref { font: 500 18px/1.2 var(--serif); }
+.pop .ref span { color: var(--accent); }
+
+/* ---- tip chip (hover / press) ---- */
+.tip { position: absolute; z-index: 5; width: max-content; max-width: 300px; background: var(--surface-2); border-radius: 14px; padding: 11px 14px 12px; box-shadow: var(--shadow); }
+.tip .label { font-size: 11px; margin-bottom: 6px; }
+.tip .r { font: 500 17px/1.25 var(--serif); color: var(--text); }
+.tip .ar { font: 400 13px/1 var(--sans); color: var(--accent); margin: 3px 0 3px 1px; }
+.tip .m { margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--hairline); font: 400 13px/1.35 var(--sans); color: var(--text-3); }
+.tip .m b { color: var(--text-2); font-weight: 400; }
+
+/* ---- panels: the chooser, the nearby list ---- */
+.panel { position: absolute; z-index: 5; background: var(--surface); border-radius: 20px; box-shadow: var(--shadow); padding: 14px 8px 8px 16px; }
+.panel .head { min-height: 40px; }
+.panel .head .t { padding-right: 44px; }
+.panel .x { position: absolute; right: 6px; top: 6px; }
+.panel .t { font: 500 19px/1.2 var(--serif); color: var(--text); }
+.panel .sub { margin-top: 3px; font: 400 13px/1.35 var(--sans); color: var(--text-3); text-wrap: pretty; }
+.rows { margin-top: 10px; margin-right: 8px; background: var(--surface-2); border-radius: 14px; overflow: hidden; }
+.rows .rw { display: flex; align-items: center; gap: 10px; padding: 9px 12px; min-height: 50px; }
+.rows .rw + .rw { border-top: 1px solid var(--hairline); }
+.rows .rw .tx { flex: 1; min-width: 0; }
+.rows .rw .a { font: 500 16px/1.25 var(--serif); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rows .rw .a span { color: var(--accent); font: 400 13px/1 var(--sans); margin: 0 5px; }
+.rows .rw .b { margin-top: 2px; font: 400 12.5px/1.3 var(--sans); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rows .rw .chev { color: var(--text-3); width: 18px; height: 18px; }
+.rows .rw.lead { background: var(--accent-soft); }
+.rows .rw.lead .a { font-weight: 600; }
+.rows .rw .ic { width: 30px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: var(--surface-3); color: var(--accent); flex: none; }
+.rows .rw .ic .i { width: 16px; height: 16px; }
+.empty-line { margin: 18px 8px 14px 0; font: 400 15px/1.45 var(--sans); color: var(--text-2); }
+
+/* ---- the detail sheet (web-thread.html's .dsheet) ---- */
+.dsheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; background: var(--surface); border-radius: 22px 22px 0 0; padding: 10px 22px 16px; box-shadow: var(--shadow); }
+.dsheet .grabber { margin-bottom: 8px; }
+.dsheet .x { position: absolute; right: 16px; top: 12px; }
+.dsheet .hd { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; padding-right: 48px; }
+.dsheet .hd .label { font-size: 11.5px; color: var(--accent); }
+.dsheet .hd .meta { color: var(--text-3); }
+.dsheet .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
+.dsheet .cols.one { grid-template-columns: 1fr; }
+/* two ends side by side, the chain between them (the source's sw-card-join) */
+.dsheet .cols.pair { grid-template-columns: 1fr 34px 1fr; gap: 0 10px; }
+.join { display: grid; place-items: center; color: var(--text-3); padding-top: 10px; }
+.join .i { width: 18px; height: 18px; }
+/* a card's eyebrow: From / To, Source / Target, Scripture / Corpus, Verse, Chapter */
+.ce { font: 700 11px/1.2 var(--sans); letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); margin-bottom: 3px; }
+.dsheet .ref { font: 500 19px/1.2 var(--serif); margin-bottom: 4px; }
+.dsheet .ref small { font: 400 12px/1 var(--sans); color: var(--text-3); margin-left: 6px; }
+.dsheet .reading { font-size: 15.5px; line-height: 1.45; color: var(--text-2); }
+.dsheet .acts { display: flex; gap: 10px; margin-top: 10px; align-items: center; }
+/* every end that can be opened says so in the source's words, one quiet accent line per card */
+.go { display: inline-flex; align-items: center; min-height: 36px; font: 700 14px/1 var(--sans); color: var(--accent); white-space: nowrap; }
+.dsheet .acts .go { margin-top: -4px; }

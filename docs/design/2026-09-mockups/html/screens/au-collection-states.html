@@ -1,0 +1,103 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><link rel="stylesheet" href="au-shared.css"><script src="../kit/kit.js"></script>
+<style>
+  .board-grid { grid-template-columns: 256px 256px 256px 420px; column-gap: 34px; }
+  .col { display: flex; flex-direction: column; gap: 26px; }
+  .au-item.cur { background: var(--accent-soft); }
+  .au-item .au-rec { padding-bottom: 4px; }
+  .au-item .au-ml { min-height: 38px; margin-bottom: 4px; }
+  .au-item .au-ml .au-dl { margin: 0; }
+  .au-item.off .au-t { color: var(--text-3); }
+  .au-when2 { color: var(--text-2); }
+  .textonly { margin-top: 10px; font: 400 15px/1.45 var(--sans); color: var(--text-3); }
+  .textonly .lnk { color: var(--text); text-decoration: underline; text-decoration-color: var(--text-3); text-underline-offset: 3px; }
+  .phone-s .h1 { font-size: 28px; }
+  .comps { display: grid; grid-template-columns: max-content 1fr; gap: 10px 14px; align-items: center; }
+  .comps .chip { height: 40px; border-radius: 20px; color: var(--text); gap: 8px; padding: 0 16px 0 14px; }
+  .comps .au-dl { margin: 0; }
+  .panel { background: var(--surface); border-radius: 16px; padding: 16px 18px; }
+  [data-theme="light"] .panel { box-shadow: 0 1px 2px rgba(60,40,20,0.06); }
+  .panel .au-sh { margin-top: 0; }
+  .panel .body.e { color: var(--text-3); margin-top: 10px; }
+  .note { font: 400 14px/1.4 var(--sans); color: var(--text-3); }
+</style></head>
+<body data-size="1380x1000">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">One source's recordings · states</div>
+    <div class="meta">A recorded Bible edition, a part-recorded study, no signal, the long compilations, and the empty cases. Download lines appear only in the Android app.</div>
+  </div>
+  <div class="board-grid">
+    <div class="cell"><div class="cap">A Bible edition<small>Rows are books; a book's chapters open beneath it</small></div><div class="phone-s"><div class="screen"><div class="status"></div><div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Listening Library</span><span class="iconbtn"><i data-i="search"></i></span></div>
+  <div class="scroll">
+    <div class="au-hero"><div class="eyebrow">Listening Library</div><div class="h1">KJV · Biblical Restoration Ministries</div><div class="body">All 66 books</div>
+      <div class="au-acts"><span class="btn primary sm"><i data-i="play" class="fill"></i>Play all</span></div></div>
+    <div class="au-sh"><div class="au-shc"><div class="eyebrow">Book by book</div><div class="h2">Recordings <small>66</small></div></div></div>
+    <div class="au-list">
+      <div class="au-item cur"><div class="au-rec"><span class="au-rp on"><i data-i="pause"></i></span><div class="au-cp"><div class="au-t">Genesis</div><div class="au-ml au-ml3"><span class="au-dl get"><i data-i="download"></i>Download · 48 MB</span><span class="au-sp"></span><span class="au-disc open">50 chapters<i data-i="chevron-down"></i></span></div></div><span class="au-ib"><i data-i="file-text"></i></span></div><div class="au-sub"><div class="au-v"><span class="au-rp sm"><i data-i="play"></i></span>Chapter 1</div><div class="au-v cur"><span class="au-rp sm"><i data-i="play"></i></span>Chapter 2</div><div class="au-v"><span class="au-rp sm"><i data-i="play"></i></span>Chapter 3</div><div class="au-v"><span class="au-rp sm"><i data-i="play"></i></span>Chapter 4</div></div></div>
+      <div class="au-item"><div class="au-rec"><span class="au-rp"><i data-i="play"></i></span><div class="au-cp"><div class="au-t">Exodus</div><div class="au-ml au-ml3"><span class="au-dl get"><i data-i="download"></i>Download · 39 MB</span><span class="au-sp"></span><span class="au-disc">40 chapters<i data-i="chevron-down"></i></span></div></div><span class="au-ib"><i data-i="file-text"></i></span></div></div>
+      <div class="au-item"><div class="au-rec"><span class="au-rp"><i data-i="play"></i></span><div class="au-cp"><div class="au-t">Leviticus</div><div class="au-ml au-ml3"><span class="au-dl get"><i data-i="download"></i>Download · 27 MB</span><span class="au-sp"></span><span class="au-disc">27 chapters<i data-i="chevron-down"></i></span></div></div><span class="au-ib"><i data-i="file-text"></i></span></div></div>
+    </div>
+  </div>
+  <div class="au-bar"><span class="au-tab"><i data-i="chevron-down"></i></span>
+    <div class="au-row"><span class="playbtn"><i data-i="pause"></i></span>
+      <div class="au-main"><div class="au-bt">Genesis 2</div><div class="au-bs"><span class="src">KJV · Biblical Restoration Ministries</span><span class="pos">· 1 of 49</span></div></div>
+      <span class="au-bi"><i data-i="skip-back"></i></span><span class="au-bi"><i data-i="skip-forward"></i></span><span class="au-bi x"><i data-i="x"></i></span></div>
+    <div class="au-seek"><span>1:12</span><div class="slider"><i style="width:31%"></i><b style="left:31%"></b></div><span>3:52</span></div></div>
+</div></div></div>
+    <div class="cell"><div class="cap">A part-recorded study<small>Unrecorded chapters are named and open to read</small></div><div class="phone-s"><div class="screen"><div class="status"></div><div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Listening Library</span><span class="iconbtn"><i data-i="search"></i></span></div>
+  <div class="scroll">
+    <div class="au-hero"><div class="eyebrow">Listening Library</div><div class="h1">YahuShua The Messiah, The Lamb of God</div><div class="body">14 of 16 chapters have recordings</div>
+      <div class="textonly">Text only: <span class="lnk">Preface</span>, <span class="lnk">The True Chronology Chart</span></div>
+      <div class="au-acts"><span class="btn primary sm"><i data-i="play" class="fill"></i>Play all</span><span class="btn secondary sm"><i data-i="download"></i>Download all</span></div></div>
+    <div class="au-sh"><div class="au-shc"><div class="eyebrow">In order</div><div class="h2">Recordings <small>14</small></div></div></div>
+    <div class="au-list">
+      <div class="au-item"><div class="au-rec"><span class="au-rp"><i data-i="play"></i></span><div class="au-cp"><div class="au-t"><span class="au-num">1</span>I Am The Passover and The Lamb, The New Covenant With Men</div><div class="meta au-srcl">Text-to-speech</div><div class="au-ml au-ml3"><span class="au-dl get"><i data-i="download"></i>Download · 9.4 MB</span><span class="au-sp"></span></div></div><span class="au-ib"><i data-i="file-text"></i></span></div></div>
+      <div class="au-item"><div class="au-rec"><span class="au-rp"><i data-i="play"></i></span><div class="au-cp"><div class="au-t"><span class="au-num">2</span>Anointing and Entry into Jerusalem</div><div class="meta au-srcl">Text-to-speech</div><div class="au-ml au-ml3"><span class="au-dl get"><i data-i="download"></i>Download · 7.8 MB</span><span class="au-sp"></span></div></div><span class="au-ib"><i data-i="file-text"></i></span></div></div>
+      <div class="au-item"><div class="au-rec"><span class="au-rp"><i data-i="play"></i></span><div class="au-cp"><div class="au-t"><span class="au-num">3</span>Tuesday Night, Passover</div><div class="meta au-srcl">Text-to-speech</div><div class="au-ml au-ml3"><span class="au-dl get"><i data-i="download"></i>Download · 8.1 MB</span><span class="au-sp"></span></div></div><span class="au-ib"><i data-i="file-text"></i></span></div></div>
+    </div>
+  </div>
+</div></div></div>
+    <div class="cell"><div class="cap">No signal<small>Play all plays only what is on the phone</small></div><div class="phone-s"><div class="screen"><div class="status"></div><div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Listening Library</span><span class="iconbtn"><i data-i="search"></i></span></div>
+  <div class="scroll">
+    <div class="au-hero"><div class="eyebrow">Listening Library</div><div class="h1">Volume One</div><div class="body">All 30 letters have recordings</div>
+      <div class="au-acts"><span class="btn primary sm"><i data-i="play" class="fill"></i>Play the 3 on this phone</span><span class="btn secondary sm is-off"><i data-i="download"></i>Download all</span></div>
+      <div class="meta" style="margin-top:8px">Needs a connection</div></div>
+    <div class="au-sh"><div class="au-shc"><div class="eyebrow">In order</div><div class="h2">Recordings <small>30</small></div></div></div>
+    <div class="au-list">
+      <div class="au-item off"><div class="au-rec"><span class="au-rp off"><i data-i="play"></i></span><div class="au-cp"><div class="au-t">A Word of Warning</div><div class="meta au-srcl">Read by Benjamin</div><div class="au-ml au-ml3"><span class="au-dl"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>Needs a connection</span><span class="au-sp"></span><span class="au-disc">2 voices<i data-i="chevron-down"></i></span></div></div><span class="au-ib"><i data-i="file-text"></i></span></div></div>
+      <div class="au-item"><div class="au-rec"><span class="au-rp"><i data-i="play"></i></span><div class="au-cp"><div class="au-t"><span class="au-num">1</span>Chosen by God</div><div class="meta au-srcl">Read by Benjamin</div><div class="au-ml au-ml3"><span class="au-dl"><i data-i="circle-check"></i>On this phone · 3.1 MB</span><span class="au-sp"></span><span class="au-disc">2 voices<i data-i="chevron-down"></i></span></div></div><span class="au-ib"><i data-i="file-text"></i></span></div></div>
+      <div class="au-item off"><div class="au-rec"><span class="au-rp off"><i data-i="play"></i></span><div class="au-cp"><div class="au-t"><span class="au-num">2</span>Honor Not the Day of the Dead... Honor God</div><div class="meta au-srcl">Read by Benjamin</div><div class="au-ml au-ml3"><span class="au-dl"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>Needs a connection</span><span class="au-sp"></span><span class="au-disc">2 voices<i data-i="chevron-down"></i></span></div></div><span class="au-ib"><i data-i="file-text"></i></span></div></div>
+      <div class="au-item"><div class="au-rec"><span class="au-rp"><i data-i="play"></i></span><div class="au-cp"><div class="au-t"><span class="au-num">3</span>Christmas</div><div class="meta au-srcl">2 parts · Read by Benjamin</div><div class="au-ml au-ml3"><span class="au-dl"><i data-i="circle-check"></i>On this phone · 5.7 MB</span><span class="au-sp"></span><span class="au-disc">2 voices<i data-i="chevron-down"></i></span></div></div><span class="au-ib"><i data-i="file-text"></i></span></div></div>
+    </div>
+  </div>
+</div></div></div>
+    <div class="col">
+      <div class="cell"><div class="cap">Compilations<small>Words To Live By: Part One, in longer sittings</small></div>
+        <div class="panel">
+          <div class="au-sh"><div class="au-shc"><div class="eyebrow">In longer sittings</div><div class="h2">Compilations</div></div></div>
+          <div class="comps"><span class="chip comp"><i data-i="play" class="xs fill"></i>Part 1 · Intro–19</span><span class="au-dl"><i data-i="circle-check"></i>On this phone · 41 MB</span>
+<span class="chip comp"><i data-i="play" class="xs fill"></i>Part 2 · 20–39</span><span class="au-dl get"><i data-i="download"></i>Download · 36 MB</span>
+<span class="chip comp"><i data-i="play" class="xs fill"></i>Part 3 · 40–59</span><span class="au-dl"><i data-i="circle-check"></i>On this phone · 38 MB</span>
+<span class="chip comp"><i data-i="play" class="xs fill"></i>Part 4 · 60–80</span><span class="au-dl get"><i data-i="download"></i>Downloading 42% <span class="lk">Cancel</span><span class="bar"><i style="width:42%"></i></span></span>
+<span class="chip comp"><i data-i="play" class="xs fill"></i>Part 5 · 81–102</span><span class="au-dl get"><i data-i="download"></i>Download · 40 MB</span>
+<span class="chip comp"><i data-i="play" class="xs fill"></i>Part 6 · 103–124</span><span class="au-dl fail"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.5v.01"/></svg>Download failed · <span class="lk">Retry</span></span>
+<span class="chip comp"><i data-i="play" class="xs fill"></i>Part 7 · 125–148</span><span class="au-dl get"><i data-i="download"></i>Download · 43 MB</span></div>
+        </div>
+      </div>
+      <div class="cell"><div class="cap">A source with nothing to show</div>
+        <div class="panel">
+          <div class="eyebrow">Listening Library</div><div class="h1" style="margin-top:4px">Recordings</div>
+          <div class="body e">This source has no recordings to show. Step back to the Listening Library to choose another.</div>
+        </div>
+      </div>
+      <div class="cell"><div class="cap">Recorded, but nothing yet · the list's footer</div>
+        <div class="panel">
+          <div class="body e" style="margin-top:0">No recordings here yet. They arrive as each reading is finished.</div>
+          <div class="note" style="margin-top:12px">2 chapters await recording.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

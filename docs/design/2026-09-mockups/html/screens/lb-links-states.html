@@ -1,0 +1,121 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="lb-common.css"><script src="lb-icons.js"></script>
+<style>
+  .lks { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
+  .lk.lit { position: relative; z-index: 6; }
+  .lb-callout { display: flex; gap: 12px; align-items: flex-start; margin-top: 16px; padding: 14px 16px; border-radius: 16px; background: color-mix(in srgb, var(--lb-danger) 10%, var(--surface)); }
+  .lb-callout .i { color: var(--lb-danger); margin-top: 1px; }
+  .lb-callout .body { font-size: 14px; color: var(--text-2); }
+  /* component cells */
+  .comp { width: 100%; }
+  .sorts { display: flex; flex-direction: column; gap: 10px; }
+  .sorts .srow { display: flex; align-items: center; gap: 12px; }
+  .sorts .n { width: 22px; font: 700 12px/1 var(--sans); color: var(--text-3); text-align: right; }
+  .sortbtn { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px 0 12px; border-radius: 20px; background: var(--surface-2); font: 400 14px/1 var(--sans); color: var(--text-2); }
+  .sortbtn .i { color: var(--text-3); }
+  .sortbtn.cur { color: var(--text); font-weight: 700; }
+  .lcard { background: var(--surface-2); border-radius: 16px; padding: 14px 16px 6px; }
+  .lcard .dir { font: 400 13px/1.35 var(--sans); color: var(--text-3); }
+  .lcard .ref { font: 500 18px/1.28 var(--serif); color: var(--text); margin-top: 2px; }
+  .lcard .mm { font: 400 13px/1.35 var(--sans); color: var(--text-3); margin-top: 2px; }
+  .lcard .pv { font: 400 16px/1.5 var(--serif); color: var(--text-2); margin-top: 8px; }
+  .lcard .pv b { font: 700 11px/1 var(--sans); color: var(--accent); vertical-align: .45em; margin-right: 3px; }
+  .lcard .pv.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .lcard .ar { display: flex; align-items: center; justify-content: space-between; margin: 4px -8px 0; }
+  .lcard .ar .btn { height: 44px; font-size: 14px; }
+  .lcard .ar .btn.muted { color: var(--text-2); font-weight: 400; }
+  .lcard .ar .btn.muted.ml { margin-left: auto; }
+  .lcard.confirm .top { opacity: .45; }
+  .lcard.confirm .lb-confirm { margin: 12px -8px 10px; background: var(--surface-3); }
+  .lcard.confirm .lb-confirm .btn.secondary { background: var(--surface-2); }
+</style></head>
+<body data-size="1176x1180">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Links: sort, search, removal and empty states</div>
+    <div class="meta">LinksScreen.jsx (search, sort, empty) and LinkCard.jsx (show more, remove). Row options, delete and the broken-link notice are drawn by lk-.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(4, 256px)">
+
+    <!-- 4 no matches -->
+    <div class="cell">
+      <div class="cap">Search, no matches<small>Searches titles, places and the linked words</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Links</span></div>
+        <div class="scroll">
+          <div class="lb-head"><div class="tt"><span class="h1">Links</span><span class="meta cnt">12</span></div><span class="lb-sort"><i data-i="arrow-up-down" class="xs"></i>Newest</span></div>
+          <div class="search lb-search"><i data-i="search" class="sm"></i><span class="typed">sabbath</span><i data-i="x" class="sm x"></i></div>
+          <div class="lb-empty">
+            <div class="ic"><i data-i="search"></i></div>
+            <div class="h3">No matches</div>
+            <div class="body">Try a different search term.</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 5 empty -->
+    <div class="cell">
+      <div class="cap">No links yet<small>First visit; search and sort wait for a first link</small></div>
+      <div class="phone-s"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar"><span class="iconbtn"><i data-i="chevron-left"></i></span><span class="title">Links</span></div>
+        <div class="scroll">
+          <div class="lb-head"><div class="tt"><span class="h1">Links</span><span class="meta cnt">0</span></div></div>
+          <div class="lb-empty" style="padding-top: 120px">
+            <div class="ic"><i data-i="link"></i></div>
+            <div class="h3">No links yet</div>
+            <div class="body">Select text in any letter or Bible chapter, tap Link in the toolbar, and pick a destination. Your links will appear here.</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- components -->
+    <div class="cell">
+      <div class="cap">Sort<small>One button steps through four orders</small></div>
+      <div class="sorts comp">
+        <div class="srow"><span class="n">1</span><span class="sortbtn cur"><i data-i="arrow-up-down" class="xs"></i>Newest</span></div>
+        <div class="srow"><span class="n">2</span><span class="sortbtn"><i data-i="arrow-up-down" class="xs"></i>Oldest</span></div>
+        <div class="srow"><span class="n">3</span><span class="sortbtn"><i data-i="arrow-up-down" class="xs"></i>Source A-Z</span></div>
+        <div class="srow"><span class="n">4</span><span class="sortbtn"><i data-i="arrow-up-down" class="xs"></i>Target A-Z</span></div>
+        <div class="meta" style="margin-top:6px">A fifth tap returns to Newest.</div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Remove, confirmed<small>The card cannot be opened while asking</small></div>
+      <div class="lcard confirm">
+        <div class="top"><div class="dir">from</div><div class="ref">The True Baptism</div><div class="mm">Volume Two · 2h ago</div>
+          <div class="pv clamp">baptism by water is nothing, unless one is first washed by The Word, being baptized in the Spirit of Grace and Truth</div></div>
+        <div class="lb-confirm"><div class="q">Remove this link?</div>
+          <div class="acts"><span class="btn sm secondary">Cancel</span><span class="btn sm danger">Yes, remove</span></div></div>
+      </div>
+    </div>
+
+    <div class="cell" style="grid-column: span 2">
+      <div class="cap">Long passages, reading view card<small>Three lines, then Show more; the whole card opens the passage</small></div>
+      <div style="display:flex; gap:16px; align-items:flex-start">
+        <div class="lcard" style="width:256px">
+          <div class="dir">to</div><div class="ref">Matthew 3:11</div><div class="mm">New Testament · 5d ago</div>
+          <div class="pv clamp"><b>11</b>I indeed baptize you with water unto repentance, but He who is coming after me is mightier than I, whose sandals I am not worthy to carry. He will baptize you with the Holy Spirit and fire.</div>
+          <div class="ar"><span class="btn text">Show more</span><span class="btn text muted">Remove link</span></div>
+        </div>
+        <div class="lcard" style="width:256px">
+          <div class="dir">to</div><div class="ref">Matthew 3:11</div><div class="mm">New Testament · 5d ago</div>
+          <div class="pv"><b>11</b>I indeed baptize you with water unto repentance, but He who is coming after me is mightier than I, whose sandals I am not worthy to carry. He will baptize you with the Holy Spirit and fire.</div>
+          <div class="ar"><span class="btn text">Show less</span><span class="btn text muted">Remove link</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <div class="cap">Long passages, in this list<small>Each end stops at two lines</small></div>
+      <div class="meta" style="max-width:250px">In Links the passage under each end stops at two lines with an ellipsis; tapping that end opens the whole passage. Show more belongs to the card in the reading view.</div>
+    </div>
+
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,187 @@
+/* an-common.css: shared pieces for the annotation boards (an-*). Built on kit tokens, so every rule renders in
+   both Vesper (dark) and Vellum (light). Matches bible-select (toolbar, selection) and lb-common (chip, sheet). */
+
+/* ---------- the ten annotation colours ----------
+   The app's names (HL_COLORS) mapped onto the kit's ten mark colours (kit.css --dot-/--hl-): the calm six plus
+   red, teal, brown and gray, chosen by measurement: every wash-to-wash pair stays at least dE2000 6.5 apart in
+   both themes (the kit's own closest pair is 6.8), text on every wash is at least 9.5:1, and every stroke clears
+   3:1 on its ground.
+   --an-<c>  dot (swatches, card bars)   --anw-<c>  wash (highlight fill)   --ans-<c>  stroke (underline, squiggle, note icon) */
+:root, [data-theme] {
+  --an-yellow: var(--dot-honey);    --anw-yellow: var(--hl-honey);    --ans-yellow: var(--dot-honey);
+  --an-green:  var(--dot-sage);     --anw-green:  var(--hl-sage);     --ans-green:  var(--dot-sage);
+  --an-pink:   var(--dot-rose);     --anw-pink:   var(--hl-rose);     --ans-pink:   var(--dot-rose);
+  --an-red:    var(--dot-red);      --anw-red:    var(--hl-red);      --ans-red:    var(--dot-red);
+  --an-orange: var(--dot-clay);     --anw-orange: var(--hl-clay);     --ans-orange: var(--dot-clay);
+  --an-blue:   var(--dot-sky);      --anw-blue:   var(--hl-sky);      --ans-blue:   var(--dot-sky);
+  --an-purple: var(--dot-lavender); --anw-purple: var(--hl-lavender); --ans-purple: var(--dot-lavender);
+  --an-teal:   var(--dot-teal);     --anw-teal:   var(--hl-teal);     --ans-teal:   var(--dot-teal);
+  --an-brown:  var(--dot-brown);    --anw-brown:  var(--hl-brown);    --ans-brown:  var(--dot-brown);
+  --an-gray:   var(--dot-gray);     --anw-gray:   var(--hl-gray);     --ans-gray:   var(--dot-gray);
+  /* destructive: the kit's danger (a muted rose), always tinted, as .btn-danger */
+  --an-danger: var(--danger);
+  --an-danger-bg: var(--danger-soft);
+  --an-danger-line: var(--danger-line);
+}
+[data-theme="light"] {
+  /* Vellum strokes: the dots under 3:1 on paper are deepened for lines only */
+  --ans-yellow: #a47b1c; --ans-green: #5b8757; --ans-blue: #5582b0; --ans-brown: #655949;
+}
+.c-yellow { --c: var(--an-yellow); --w: var(--anw-yellow); --s: var(--ans-yellow); }
+.c-green  { --c: var(--an-green);  --w: var(--anw-green);  --s: var(--ans-green); }
+.c-pink   { --c: var(--an-pink);   --w: var(--anw-pink);   --s: var(--ans-pink); }
+.c-red    { --c: var(--an-red);    --w: var(--anw-red);    --s: var(--ans-red); }
+.c-orange { --c: var(--an-orange); --w: var(--anw-orange); --s: var(--ans-orange); }
+.c-blue   { --c: var(--an-blue);   --w: var(--anw-blue);   --s: var(--ans-blue); }
+.c-purple { --c: var(--an-purple); --w: var(--anw-purple); --s: var(--ans-purple); }
+.c-teal   { --c: var(--an-teal);   --w: var(--anw-teal);   --s: var(--ans-teal); }
+.c-brown  { --c: var(--an-brown);  --w: var(--anw-brown);  --s: var(--ans-brown); }
+.c-gray   { --c: var(--an-gray);   --w: var(--anw-gray);   --s: var(--ans-gray); }
+.c-blank  { --c: var(--accent);    --w: transparent;       --s: var(--accent); }
+
+/* ---------- marks in reading text ---------- */
+mark.mk { background: none; color: inherit; border-radius: 3px; padding: 1px 0; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+mark.mk.hl { background: var(--w); }
+mark.mk.ul { text-decoration: underline; text-decoration-color: var(--s); text-decoration-thickness: 2.5px; text-underline-offset: 4px; text-decoration-skip-ink: none; }
+mark.mk.sq { text-decoration: underline wavy; text-decoration-color: var(--s); text-decoration-thickness: 1.6px; text-underline-offset: 4px; text-decoration-skip-ink: none; }
+mark.mk.open { background: var(--accent-soft); }                      /* its note sheet is open (.is-active) */
+mark.mk.approx { text-decoration: underline dotted; text-decoration-color: var(--text-3); text-decoration-thickness: 1.5px; text-underline-offset: 4px; }
+/* note icon at the end of a noted passage (as lb-note-sheet's .nmk) */
+.nmk { display: inline-block; width: 17px; height: 17px; vertical-align: -2px; margin: 0 1px 0 3px; color: var(--s, var(--accent)); position: relative; }
+.nmk .i { width: 17px; height: 17px; }
+.nmk b { position: absolute; top: -7px; right: -10px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font: 700 10px/16px var(--sans); text-align: center; }
+
+/* ---------- selection + handles (as bible-select) ---------- */
+.an-sel { background: var(--accent-soft); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 3px; }
+.an-h { display: inline-block; width: 2px; height: 26px; background: var(--accent); vertical-align: -6px; position: relative; }
+.an-h::after { content: ''; position: absolute; left: -5px; width: 12px; height: 12px; border-radius: 6px; background: var(--accent); }
+.an-h.a::after { top: -11px; } .an-h.b::after { bottom: -11px; }
+
+/* ---------- selection toolbar (the approved bible-select panel, grown to the real controls) ---------- */
+.an-tb { position: relative; width: 384px; background: var(--surface-2); border-radius: 18px; padding: 10px 12px 6px; box-shadow: var(--shadow); }
+.an-tb::after { content: ''; position: absolute; left: calc(var(--ax, 192px) - 7px); bottom: -7px; width: 14px; height: 14px; background: var(--surface-2); transform: rotate(45deg); border-radius: 2px; }
+.an-tb.up::after { bottom: auto; top: -7px; }
+.an-tb.noarrow::after { display: none; }
+.an-tb .sty { display: flex; align-items: center; gap: 4px; }
+.an-tb .sws { display: flex; justify-content: space-between; align-items: center; height: 44px; margin-top: 4px; padding: 0 2px 8px; border-bottom: 1px solid var(--hairline); box-sizing: content-box; }
+.an-tb .listen { margin-top: 10px; }
+.an-tb .acts { display: grid; grid-template-columns: repeat(6, 1fr); padding-top: 6px; }
+.an-tb .acts.five { grid-template-columns: repeat(5, 1fr); }
+.an-tb .act { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 7px 0 6px; border-radius: 12px; font: 400 12px/1 var(--sans); color: var(--text-2); white-space: nowrap; }
+.an-tb .act .i { color: var(--text-2); }
+/* style buttons (as lb-sty) */
+.an-sty { width: 44px; height: 40px; border-radius: 12px; display: grid; place-items: center; font: 500 21px/1 var(--serif); color: var(--text-2); flex: none; }
+.an-sty.on { background: var(--surface-3); color: var(--text); }
+.an-sty span { padding: 0 2px; line-height: 1.1; }
+.an-sty.hl span { background: var(--anw-yellow); border-radius: 3px; }
+.an-sty.ul span { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.an-sty.sq span { text-decoration: underline wavy; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+/* the remove control: its own place at the end of the style row, never next to a swatch */
+.an-rm { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px 0 10px; border-radius: 18px; background: var(--an-danger-bg); color: var(--an-danger); box-shadow: inset 0 0 0 1px var(--an-danger-line); font: 700 14px/1 var(--sans); }
+.an-rm .i { color: var(--an-danger); }
+/* swatches */
+.an-sw { width: 28px; height: 28px; border-radius: 14px; flex: none; background: var(--c); box-sizing: border-box; }
+.an-sw.on { box-shadow: 0 0 0 2px var(--ring-gap, var(--surface-2)), 0 0 0 4px var(--text); }
+.ul > .an-sw, .an-sw.ring { background: transparent; border: 3px solid var(--s); }
+.sq > .an-sw, .an-sw.dash { background: transparent; border: 3px dashed var(--s); }
+.an-sw.blank { position: relative; background: transparent; border: 1.5px solid var(--text-3); overflow: hidden; }
+.an-sw.blank::after { content: ''; position: absolute; left: 50%; top: 50%; width: 1.5px; height: 150%; background: var(--text-3); transform: translate(-50%, -50%) rotate(45deg); }
+/* Listen from here */
+.an-listen { display: flex; align-items: center; justify-content: center; gap: 9px; height: 44px; border-radius: 22px; background: var(--accent-soft); color: var(--accent); font: 700 15px/1 var(--sans); }
+.an-listen .i { width: 17px; height: 17px; fill: currentColor; }
+
+/* ---------- floating popover + annotation chip (as lb-pop / lb chip-a) ---------- */
+.an-pop { position: absolute; background: var(--surface-2); border-radius: 18px; box-shadow: var(--shadow); }
+[data-theme="light"] .an-pop { background: var(--surface); box-shadow: 0 18px 40px rgba(60,40,20,.18), 0 0 0 1px var(--hairline); }
+.an-pop.static { position: relative; display: inline-flex; }
+.an-pop.pt::before { content: ''; position: absolute; top: -6px; left: calc(var(--ax, 50%) - 6px); width: 12px; height: 12px; background: inherit; transform: rotate(45deg); border-radius: 2px; }
+[data-theme="light"] .an-pop.pt::before { box-shadow: -1px -1px 0 0 var(--hairline); }
+.an-chip { display: flex; align-items: center; padding: 6px; }
+.an-chip .b { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; width: 66px; height: 60px; border-radius: 12px; font: 400 12px/1 var(--sans); color: var(--text-2); }
+.an-chip .b .i { color: var(--text); }
+.an-chip .back { width: 40px; height: 60px; border-radius: 12px; display: grid; place-items: center; color: var(--text-2); flex: none; }
+.an-chip .back.on { background: var(--surface-3); }
+.an-chip .row { display: flex; align-items: center; gap: 7px; padding: 0 8px 0 2px; }
+.an-chip .row .an-sw { width: 26px; height: 26px; }
+.an-chip .row .an-sw.on { box-shadow: 0 0 0 2px var(--ring-gap, var(--surface-2)), 0 0 0 4px var(--text); }
+[data-theme="light"] .an-chip .row { --ring-gap: var(--surface); }
+.an-chip .row .an-sty { width: 48px; height: 44px; }
+.an-chip .row .an-sty.on { box-shadow: inset 0 0 0 1.5px var(--text-2); }
+.an-chip.cf { display: block; width: 300px; padding: 16px 14px 12px 18px; }
+
+/* ---------- confirm strip (ConfirmStrip: question + Cancel + Yes) ---------- */
+.an-cf { background: var(--surface-2); border-radius: 16px; padding: 14px 14px 12px 16px; }
+.an-cf .q { font: 400 15px/1.4 var(--sans); color: var(--text); }
+.an-cf .q .cq { display: block; margin-top: 4px; font-size: 14px; color: var(--text-2); }
+.an-cf .acts, .an-chip.cf .acts, .an-tb.cf .acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.an-cf .btn.secondary { background: var(--surface-3); }
+.an-cf.on3 { background: var(--surface-3); } .an-cf.on3 .btn.secondary { background: var(--surface-2); }
+.an-cf.inline { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 16px; }
+.an-cf.inline .q { flex: 1; min-width: 0; }
+.an-cf.inline .acts { margin: 0; }
+.btn.an-danger { background: var(--an-danger-bg); color: var(--an-danger); box-shadow: inset 0 0 0 1px var(--an-danger-line); }
+.an-tb.cf { padding: 16px 14px 12px 18px; }
+.an-tb.cf .q, .an-chip.cf .q { font: 400 16px/1.42 var(--sans); color: var(--text); }
+.an-tb.cf .q .cq, .an-chip.cf .q .cq { display: block; margin-top: 4px; font-size: 14px; color: var(--text-2); }
+.an-tb.cf .btn.secondary, .an-chip.cf .btn.secondary { background: var(--surface-3); }
+[data-theme="light"] .an-chip.cf .btn.secondary { background: var(--surface-2); }
+
+/* ---------- toast (as the components board) ---------- */
+.an-toast { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 14px 18px; border-radius: 12px; background: var(--surface-3); color: var(--text); font: 400 15px/1.4 var(--sans); box-shadow: var(--shadow); }
+.an-toast.ph-pos { position: absolute; left: 20px; right: 20px; bottom: 32px; z-index: 8; }
+
+/* ---------- note sheet pieces (as lb-note-sheet) ---------- */
+.ns-head { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+.ns-head .h3 { flex: 1; }
+.ns-head .iconbtn { margin-right: -10px; }
+.ns-head .iconbtn.on { background: var(--surface-2); color: var(--text); }
+.ns-dot { width: 26px; height: 26px; border-radius: 13px; background: var(--c); box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px color-mix(in srgb, var(--text) 30%, transparent); flex: none; margin-left: 2px; }
+.ns-dot.blank { position: relative; overflow: hidden; background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-3); }
+.ns-dot.blank::after { content: ''; position: absolute; left: 50%; top: 50%; width: 1.5px; height: 150%; background: var(--text-3); transform: translate(-50%, -50%) rotate(45deg); }
+.ns-anchor { position: relative; margin-top: 10px; padding-left: 14px; font: italic 400 18px/1.5 var(--serif); color: var(--text-2); }
+.ns-anchor::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 3px; border-radius: 2px; background: var(--c); }
+.ns-anchor.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ns-date { margin-top: 10px; }
+.ns-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.ns-tag { display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 12px 0 9px; border-radius: 14px; background: var(--surface-2); color: var(--text-2); }
+.ns-tag .i { width: 15px; height: 15px; }
+.ns-tag .ph { height: 8px; }
+.ns-body { margin-top: 18px; }
+.ns-body .ph { height: 11px; }
+.ns-body .ph + .ph { margin-top: 17px; }
+.ns-lab { margin: 16px 0 8px; }
+.ns-styles { display: flex; gap: 6px; }
+.ns-styles .an-sty { width: 48px; height: 44px; background: var(--surface-2); }
+.ns-styles .an-sty.on { background: var(--surface-3); box-shadow: inset 0 0 0 1.5px var(--text-2); }
+.ta { margin-top: 16px; min-height: 120px; padding: 16px; border-radius: 14px; background: var(--surface-2); }
+.ta .ph { height: 10px; background: color-mix(in srgb, var(--text-3) 30%, transparent); }
+.ta .ph + .ph { margin-top: 16px; }
+.caret { display: inline-block; width: 2px; height: 20px; margin-left: 1px; border-radius: 1px; background: var(--accent); vertical-align: -4px; }
+.nbrow { display: flex; align-items: center; gap: 12px; height: 52px; margin-top: 10px; padding: 0 14px; border-radius: 14px; background: var(--surface-2); font: 400 15px/1.2 var(--sans); color: var(--text); }
+.nbrow .i { color: var(--text-2); }
+.nbrow .grow { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.nbrow .grow .ph { height: 9px; background: color-mix(in srgb, var(--text-3) 34%, transparent); }
+.foot { display: flex; gap: 10px; margin-top: 16px; }
+.foot .btn { flex: 1; }
+
+/* ---------- action list inside a sheet (as lb-acts) ---------- */
+.an-acts { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.an-acts .grp { border-radius: 16px; background: var(--surface-2); padding: 0 16px; }
+.an-acts .a { display: flex; align-items: center; gap: 16px; min-height: 52px; font: 400 16px/1.2 var(--sans); color: var(--text); }
+.an-acts .a .i { color: var(--text-2); }
+.an-acts .a + .a { border-top: 1px solid var(--hairline); }
+.an-acts .a.dz, .an-acts .a.dz .i { color: var(--an-danger); }
+
+/* ---------- inline placeholder bar (a notebook name inside a sentence) ---------- */
+.phi { display: inline-block; height: 9px; border-radius: 5px; background: var(--surface-3); vertical-align: 1px; }
+
+/* ---------- reading view behind sheets ---------- */
+.an-page { padding-top: 6px; }
+.an-page .sechead { margin: 22px 0 10px; }
+.an-page .reading p + p { margin-top: 10px; }
+.an-page .reading .lead { font-weight: 700; font-style: italic; }
+.scrim, .sheet, .an-pop, .an-float { z-index: 5; }
+.scrim { z-index: 4; }
+.scrim.lite { background: color-mix(in srgb, var(--bg) 35%, transparent); }
+.an-float { position: absolute; }
+.lit { position: relative; z-index: 6; }

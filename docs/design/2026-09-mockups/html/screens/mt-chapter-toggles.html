@@ -1,0 +1,142 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<link rel="stylesheet" href="mt-common.css">
+<style>
+  /* bible-ch focus modes (BibleChapterView.jsx): tap the chapter title or any section heading to
+     hide it for this tab; a "+ Show …" control brings it back. Same chapter chrome as bs-chapter-read. */
+  .board-grid > .cell > .cap { min-height: 52px; }
+  .restore.t { margin-top: 12px; }
+  .restore.h { margin: 26px 0 4px; }
+  .first { margin-top: 22px; }
+  .up { margin-top: -6px; }
+
+  /* full-size details */
+  .det { display: flex; flex-direction: column; gap: 14px; width: 412px; }
+  .spec { background: var(--bg); border-radius: 20px; padding: 16px 20px 18px; box-shadow: 0 0 0 1px var(--hairline); }
+  .spec .k { font: 400 13px/1.3 var(--sans); color: var(--text-3); margin-bottom: 10px; }
+  .spec .k b { color: var(--text-2); font-weight: 700; }
+  .spec .h1 { font-size: 40px; }
+  .pressed { background: var(--accent-soft); border-radius: 8px; }
+  .spec .subttl.pressed { display: block; margin: 8px -10px 0; padding: 5px 10px 6px; }
+  .spec .eyebrow.pressed { display: inline-block; margin-left: -8px; padding: 6px 8px; }
+</style></head>
+<body data-size="1500x885">
+<div class="board">
+  <div class="board-head">
+    <div class="h2">Chapter title and section headings, hidden</div>
+    <div class="meta">Tapping the title or any heading hides it in this tab, in every chapter, until “+ Show …” brings it back. Settings › Reading › Chapter Titles and Section Headings set the default.</div>
+  </div>
+  <div class="board-grid" style="grid-template-columns: repeat(3, 309px) 412px">
+
+    <!-- ───────── title hidden ───────── -->
+    <div class="cell">
+      <div class="cap">Chapter title hidden<small>The book’s own title stands in for the chapter title. The headings stay.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="title">John 3 · NKJV</span>
+          <span class="iconbtn"><i data-i="search"></i></span>
+          <span class="iconbtn"><i data-i="bookmark"></i></span>
+          <span class="tabcount">1</span>
+        </div>
+        <div class="scroll chapter">
+          <div class="h1" style="font-size:40px">John 3</div>
+          <div class="subttl">The Gospel of John</div>
+          <span class="restore t"><i data-i="plus" class="xs"></i>Show chapter title</span>
+          <div><span class="btn secondary sm listen"><i data-i="play" class="xs fill"></i>Listen</span></div>
+          <div class="eyebrow sechead">Nicodemus and the New Birth</div>
+          <div class="reading">
+            <p><span class="vnum">1</span>There was a man of the Pharisees named Nicodemus, a ruler of the Jews. <span class="vnum">2</span>This man came to Jesus by night and said to Him, “Rabbi, we know that You are a teacher come from God; for no one can do these signs that You do unless God is with him.”</p>
+            <p><span class="vnum">3</span>Jesus answered and said to him, “Most assuredly, I say to you, unless one is born again, he cannot see the kingdom of God.”</p>
+            <p><span class="vnum">4</span>Nicodemus said to Him, “How can a man be born when he is old? Can he enter a second time into his mother’s womb and be born?”</p>
+            <p><span class="vnum">5</span>Jesus answered, “Most assuredly, I say to you, unless one is born of water and the Spirit, he cannot enter the kingdom of God. <span class="vnum">6</span>That which is born of the flesh is flesh, and that which is born of the Spirit is spirit.</p>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ───────── headings hidden ───────── -->
+    <div class="cell">
+      <div class="cap">Section headings hidden<small>The control waits at the top of the chapter; the verses start without their heading.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="title">John 3 · NKJV</span>
+          <span class="iconbtn"><i data-i="search"></i></span>
+          <span class="iconbtn"><i data-i="bookmark"></i></span>
+          <span class="tabcount">1</span>
+        </div>
+        <div class="scroll chapter">
+          <div class="h1" style="font-size:40px">John 3</div>
+          <div class="subttl"><span class="tp">Nicodemus and the New Birth ·</span> <span class="tp">John the Baptist's Final Witness</span></div>
+          <div><span class="btn secondary sm listen"><i data-i="play" class="xs fill"></i>Listen</span></div>
+          <span class="restore h"><i data-i="plus" class="xs"></i>Show section headings</span>
+          <div class="reading first">
+            <p><span class="vnum">1</span>There was a man of the Pharisees named Nicodemus, a ruler of the Jews. <span class="vnum">2</span>This man came to Jesus by night and said to Him, “Rabbi, we know that You are a teacher come from God; for no one can do these signs that You do unless God is with him.”</p>
+            <p><span class="vnum">3</span>Jesus answered and said to him, “Most assuredly, I say to you, unless one is born again, he cannot see the kingdom of God.”</p>
+            <p><span class="vnum">4</span>Nicodemus said to Him, “How can a man be born when he is old? Can he enter a second time into his mother’s womb and be born?”</p>
+            <p><span class="vnum">5</span>Jesus answered, “Most assuredly, I say to you, unless one is born of water and the Spirit, he cannot enter the kingdom of God. <span class="vnum">6</span>That which is born of the flesh is flesh, and that which is born of the Spirit is spirit. <span class="vnum">7</span>Do not marvel that I said to you, ‘You must be born again.’</p>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ───────── headings hidden, further down ───────── -->
+    <div class="cell">
+      <div class="cap">Headings hidden, further down<small>Verse 21 runs straight on into verse 22, where “John the Baptist's Final Witness” stood, with no break.</small></div>
+      <div class="phone-m"><div class="screen">
+        <div class="status"></div>
+        <div class="topbar">
+          <span class="iconbtn"><i data-i="chevron-left"></i></span>
+          <span class="title">John 3 · NKJV</span>
+          <span class="iconbtn"><i data-i="search"></i></span>
+          <span class="iconbtn"><i data-i="bookmark"></i></span>
+          <span class="tabcount">1</span>
+        </div>
+        <div class="scroll chapter">
+          <div class="reading up">
+            <p><span class="vnum">16</span>For God so loved the world that He gave His only begotten Son, that whoever believes in Him should not perish but have everlasting life. <span class="vnum">17</span>For God did not send His Son into the world to condemn the world, but that the world through Him might be saved.</p>
+            <p><span class="vnum">18</span>“He who believes in Him is not condemned; but he who does not believe is condemned already, because he has not believed in the name of the only begotten Son of God. <span class="vnum">19</span>And this is the condemnation, that the light has come into the world, and men loved darkness rather than light, because their deeds were evil. <span class="vnum">20</span>For everyone practicing evil hates the light and does not come to the light, lest his deeds should be exposed. <span class="vnum">21</span>But he who does the truth comes to the light, that his deeds may be clearly seen, that they have been done in God.”</p>
+            <p><span class="vnum">22</span>After these things Jesus and His disciples came into the land of Judea, and there He remained with them and baptized. <span class="vnum">23</span>Now John also was baptizing in Aenon near Salim, because there was much water there. And they came and were baptized. <span class="vnum">24</span>For John had not yet been thrown into prison.</p>
+            <p><span class="vnum">25</span>Then there arose a dispute between some of John’s disciples and the Jews about purification. <span class="vnum">26</span>And they came to John and said to him, “Rabbi, He who was with you beyond the Jordan, to whom you have testified—behold, He is baptizing, and all are coming to Him!”</p>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ───────── full-size details ───────── -->
+    <div class="cell">
+      <div class="cap">The controls, full size<small>Tap targets and their restore chips. The tooltips are the app’s own words.</small></div>
+      <div class="det">
+        <div class="spec">
+          <div class="k"><b>Tap the title</b> · “Tap to hide chapter title”</div>
+          <div class="h1">John 3</div>
+          <div class="subttl pressed">Nicodemus and the New Birth · John the Baptist's Final Witness</div>
+        </div>
+        <div class="spec">
+          <div class="k"><b>Title hidden</b> · “Show chapter title”</div>
+          <span class="restore"><i data-i="plus" class="xs"></i>Show chapter title</span>
+        </div>
+        <div class="spec">
+          <div class="k"><b>Tap any heading</b> · “Tap to hide headings”</div>
+          <span class="eyebrow pressed">Nicodemus and the New Birth</span>
+        </div>
+        <div class="spec">
+          <div class="k"><b>Headings hidden</b> · “Show section headings”</div>
+          <span class="restore"><i data-i="plus" class="xs"></i>Show section headings</span>
+        </div>
+        <div class="note">
+          <ul>
+            <li>With Settings › Chapter Titles off, the book’s title shows and there is nothing to restore.</li>
+            <li>The restore chips appear only while their setting is on and something is hidden.</li>
+            <li>Psalm 119’s stanza names (Aleph, Beth…) are section headings and hide the same way.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body></html>

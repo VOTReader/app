@@ -1,0 +1,154 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../kit/kit.css"><script src="../kit/kit.js"></script>
+<style>
+  .page { width: 1200px; height: 800px; padding: 36px 44px 30px; display: flex; flex-direction: column; }
+  .head .meta { margin-top: 4px; }
+  .grid { flex: 1; display: grid; grid-template-columns: 712px 1fr; column-gap: 56px; margin: 30px 0 30px; }
+  .col { display: flex; flex-direction: column; justify-content: space-between; gap: 38px; }
+  .grp > .label { margin-bottom: 12px; }
+  .pair { display: flex; gap: 32px; align-items: flex-start; }
+
+  /* buttons: four states */
+  .btable { display: grid; grid-template-columns: 80px repeat(4, 158px); row-gap: 14px; align-items: center; }
+  .btable > * { justify-self: start; }
+  .btn.primary.is-pressed { background: color-mix(in srgb, var(--accent) 84%, var(--accent-ink)); }
+  .btn.secondary.is-pressed { background: color-mix(in srgb, var(--surface-2) 86%, var(--text)); }
+  .btn.text.is-pressed { background: color-mix(in srgb, var(--accent) 13%, transparent); }
+  .btn.is-focused { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn.is-disabled { opacity: .4; }
+
+  .seg.w { width: 280px; }
+  .toggles { display: flex; gap: 22px; }
+  .toggles > span { display: flex; flex-direction: column; align-items: center; gap: 7px; }
+
+  .sz { width: 280px; }
+  .sz .t { font: 400 15px/1.2 var(--sans); color: var(--text); }
+  .sz .r { display: flex; align-items: center; gap: 14px; margin-top: 12px; height: 24px; }
+  .sz .r .slider { flex: 1; }
+  .sz .a1 { font: 500 14px/1 var(--serif); color: var(--text-2); }
+  .sz .a2 { font: 500 22px/1 var(--serif); color: var(--text-2); }
+
+  .toast { width: 300px; height: 52px; border-radius: 12px; background: var(--surface-3); display: flex; align-items: center; justify-content: space-between; padding: 0 6px 0 18px; font: 400 15px/1 var(--sans); color: var(--text); box-shadow: var(--shadow); }
+  .toast .btn { height: 40px; }
+
+  .row .h3 { margin-bottom: 2px; }
+  .cr .loc { margin-top: 12px; }
+  .cr .h3 { margin-top: 4px; }
+  .cr .foot { display: flex; align-items: center; gap: 16px; margin-top: 16px; }
+  .cr .foot .progress { flex: 1; }
+
+  .sh { background: var(--surface); border-radius: 24px 24px 0 0; padding: 10px 20px 20px; }
+
+  .tokens { border-top: 1px solid var(--hairline); padding-top: 18px; }
+  .tokens .label { margin-bottom: 12px; }
+  .toks { display: flex; justify-content: space-between; }
+  .tok { display: flex; align-items: center; gap: 12px; width: 172px; }
+  .tok .sw { width: 44px; height: 44px; border-radius: 12px; flex: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 18%, transparent); }
+  .tok b { display: block; font: 700 14px/1.25 var(--sans); color: var(--text); }
+  .tok .hex { font-variant-numeric: tabular-nums; }
+</style></head>
+<body data-size="1200x800">
+<div class="page">
+  <div class="head">
+    <div class="h2">Components</div>
+    <div class="meta">VOTReader · Vesper (dark) / Vellum (light)</div>
+  </div>
+
+  <div class="grid">
+    <div class="col">
+      <section class="grp">
+        <div class="label">Buttons</div>
+        <div class="btable">
+          <span></span><span class="meta">Default</span><span class="meta">Pressed</span><span class="meta">Focused</span><span class="meta">Disabled</span>
+          <span class="meta">Primary</span>
+          <span class="btn primary">Begin reading</span><span class="btn primary is-pressed">Begin reading</span>
+          <span class="btn primary is-focused">Begin reading</span><span class="btn primary is-disabled">Begin reading</span>
+          <span class="meta">Secondary</span>
+          <span class="btn secondary">Maybe later</span><span class="btn secondary is-pressed">Maybe later</span>
+          <span class="btn secondary is-focused">Maybe later</span><span class="btn secondary is-disabled">Maybe later</span>
+          <span class="meta">Text</span>
+          <span class="btn text">Skip</span><span class="btn text is-pressed">Skip</span>
+          <span class="btn text is-focused">Skip</span><span class="btn text is-disabled">Skip</span>
+        </div>
+      </section>
+
+      <div class="pair">
+        <section class="grp">
+          <div class="label">Chips</div>
+          <div class="chips"><span class="chip on">All</span><span class="chip">Scriptures</span><span class="chip">Volumes</span></div>
+        </section>
+        <section class="grp">
+          <div class="label">Segmented control</div>
+          <div class="seg w"><span class="on">Scripture</span><span>My Web</span></div>
+        </section>
+        <section class="grp">
+          <div class="label">Toggle</div>
+          <div class="toggles">
+            <span><span class="toggle"></span><span class="meta">Off</span></span>
+            <span><span class="toggle on"></span><span class="meta">On</span></span>
+          </div>
+        </section>
+      </div>
+
+      <div class="pair" style="gap:48px">
+        <section class="grp">
+          <div class="label">Slider</div>
+          <div class="sz">
+            <div class="t">Text size</div>
+            <div class="r"><span class="a1">A</span><div class="slider"><i style="width:45%"></i><b style="left:45%"></b></div><span class="a2">A</span></div>
+          </div>
+        </section>
+        <section class="grp">
+          <div class="label">Toast</div>
+          <div class="toast"><span>Tab closed.</span><span class="btn text">Undo</span></div>
+        </section>
+      </div>
+    </div>
+
+    <div class="col">
+      <section class="grp">
+        <div class="label">List row</div>
+        <div class="row">
+          <div class="txt"><div class="h3">The Volumes of Truth</div><div class="meta">7 volumes · 244 letters</div></div>
+          <i data-i="chevron-right" class="chev"></i>
+        </div>
+      </section>
+      <section class="grp">
+        <div class="label">Card</div>
+        <div class="card cr">
+          <div class="meta">Continue reading</div>
+          <div class="meta loc">Volume One · Letter 15</div>
+          <div class="h3">Know That Which Has Been Poured Out, The Word of God</div>
+          <div class="foot">
+            <div class="progress"><i style="width:40%"></i></div>
+            <span class="btn primary sm"><i data-i="play" class="xs fill"></i>Listen</span>
+          </div>
+        </div>
+      </section>
+      <section class="grp">
+        <div class="label">Bottom sheet header</div>
+        <div class="sh"><div class="grabber"></div><div class="h3">Sleep timer</div></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="tokens">
+    <div class="label">Tokens</div>
+    <div class="toks">
+      <div class="tok" data-tok="bg"><span class="sw" style="background:var(--bg)"></span><span><b>bg</b><span class="meta hex"></span></span></div>
+      <div class="tok" data-tok="surface"><span class="sw" style="background:var(--surface)"></span><span><b>surface</b><span class="meta hex"></span></span></div>
+      <div class="tok" data-tok="surface-2"><span class="sw" style="background:var(--surface-2)"></span><span><b>surface-2</b><span class="meta hex"></span></span></div>
+      <div class="tok" data-tok="text"><span class="sw" style="background:var(--text)"></span><span><b>text</b><span class="meta hex"></span></span></div>
+      <div class="tok" data-tok="text-2"><span class="sw" style="background:var(--text-2)"></span><span><b>text-2</b><span class="meta hex"></span></span></div>
+      <div class="tok" data-tok="accent"><span class="sw" style="background:var(--accent)"></span><span><b>accent</b><span class="meta hex"></span></span></div>
+    </div>
+  </section>
+</div>
+<script>
+  // Each theme shows its own values: read the resolved custom properties off :root.
+  const cs = getComputedStyle(document.documentElement);
+  document.querySelectorAll('.tok').forEach(t => {
+    t.querySelector('.hex').textContent = cs.getPropertyValue('--' + t.dataset.tok).trim().toUpperCase();
+  });
+</script>
+</body></html>
