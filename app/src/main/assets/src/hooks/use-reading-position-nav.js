@@ -201,7 +201,8 @@ export function useReadingPositionNav({
   // synchronously then flush via saveProphecyCardStates on commit. W2.3b
   // routes the read + write through ProphecyCardsStore (HydrationGate has
   // already resolved by the time this hook runs).
-  const prophecyCardStatesRef = React.useRef(() => ProphecyCardsStore.getAll());
+  // Lazy: holds the reader until the first render swaps in the data it returns.
+  const prophecyCardStatesRef = React.useRef(/** @type {any} */ (() => ProphecyCardsStore.getAll()));
   if (typeof prophecyCardStatesRef.current === 'function') {
     prophecyCardStatesRef.current = prophecyCardStatesRef.current();
   }

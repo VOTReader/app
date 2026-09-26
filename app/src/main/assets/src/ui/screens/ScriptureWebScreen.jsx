@@ -31,6 +31,7 @@ import {
   visibleArcs, threadEnds, footBundles, bundleGroups, lensRange, nearbyChapter, nearbyThreads,
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
+/** @typedef {import('../../utils/scripture-web/decode.js').Density} Density */
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { WebFallbackList } from '../scripture-web/WebFallbackList.jsx';
 import { startChapter } from '../../utils/scripture-web/chapter-connections.js';
@@ -184,11 +185,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // per verse; Corbin, 2026-09-11: "verify that fully zoomed in, the full
   // corpus and all 63000 lines are visible and interactable, UNLESS the user
   // has it set to essential." The stored setting is the whole state.
+  /** @returns {Density} */
   const storedDensity = () => {
     // `classic` was the old internal name; accept it once so existing
     // settings migrate naturally while the feature speaks in user terms.
     const saved = settings && settings.webDensity === 'classic' ? 'famous' : settings && settings.webDensity;
-    return DENSITY_STEPS.indexOf(saved) >= 0 ? saved : 'famous';
+    return DENSITY_STEPS.indexOf(saved) >= 0 ? /** @type {Density} */ (saved) : 'famous';
   };
   const [density, setDensity] = React.useState(storedDensity);
   const [detail, setDetail] = React.useState(null);      // the open sheet
@@ -222,7 +224,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const railZoomRef = React.useRef(railZoom);
   const rendererRef = React.useRef(null);
   const viewRef = React.useRef({ W: 0, H: 0, DPR: 1 });
-  const focusRef = React.useRef({ arc: -1, range: null });
+  // range2: the group chosen inside a range (chooseGroup), drawn as a second band.
+  const focusRef = React.useRef(/** @type {{ arc: number, range: any, range2?: [number, number] | null }} */ ({ arc: -1, range: null }));
   const topbarRef = React.useRef(null);
   const anchoredRef = React.useRef({ ppv: 0, x: 0, W: 0, density: '', value: 0 });
   // the convergence pills: the counted cells, cached across frames while
@@ -280,7 +283,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // run it hundreds of times a second), so it calls the LATEST draw via a ref
   // rather than closing over one. Same for the pointer handlers below.
   const drawRef = React.useRef(() => {});
-  const handlersRef = React.useRef({});
+  const handlersRef = React.useRef(/** @type {any} */ ({}));
   const hoverRafRef = React.useRef(0);
   const hoverPointRef = React.useRef(null);
 
@@ -734,7 +737,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     });
   }, [graph, schedule, loc, camFor, zoomCapFor, live, yFrameFor, liftAt]);
 
-  const hitCandidatesAt = React.useCallback((cx, cy) => {
+  // Verse and chapter candidates carry no distance: they only ever come alone.
+  const hitCandidatesAt = React.useCallback(/** @returns {Array<{ kind: string, distance?: number } & Record<string, any>>} */ (cx, cy) => {
     const g = graph, cam = camRef.current, v = viewRef.current;
     if (!g || !cam || !v.W) return [];
     const px = cx * v.DPR, py = cy * v.DPR;
@@ -1212,7 +1216,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
               <span className="sw-sr-only">Connection density</span>
               <select className="sw-select" value={density} aria-label="Connection density"
                 onChange={(e) => {
-                  const next = e.target.value;
+                  const next = /** @type {Density} */ (e.target.value);
                   setDensity(next);
                   flashHint(DENSITY_LABEL[next] + ' — ' + DENSITY_HINT[next]);
                   if (typeof updateSetting === 'function') updateSetting('webDensity', next);

@@ -221,7 +221,8 @@ export function JournalHubScreen(props) {
         role="button"
         tabIndex={0}
         onClick={function(e) {
-          if (e.target.closest && e.target.closest('.jrn-card-menu-btn')) return;
+          const t = /** @type {Element} */ (e.target);
+          if (t.closest && t.closest('.jrn-card-menu-btn')) return;
           onOpenEntry && onOpenEntry(entry.id);
         }}
         onKeyDown={function(e) {

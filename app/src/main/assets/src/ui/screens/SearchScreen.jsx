@@ -101,7 +101,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   const inputRef = React.useRef(null);
   useImeHideBlur(inputRef);
   const [state, setState] = React.useState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0 });
-  const [buildInfo, setBuildInfo] = React.useState({ ready: false, building: false, progress: null });
+  const [buildInfo, setBuildInfo] = React.useState(/** @type {{ ready: boolean, building: boolean, progress: any, error?: string }} */ ({ ready: false, building: false, progress: null }));
   const [showSuggest, setShowSuggest] = React.useState(false);
   const [suggestions, setSuggestions] = React.useState([]);
   const [recents, setRecents] = React.useState([]);

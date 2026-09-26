@@ -9,7 +9,8 @@
 // signature. NOT proper types — that's a separate project.
 // Total: 616 distinct identifiers.
 
-// Cross-bundle bare-name globals — all `any` by design.
+// Cross-bundle bare-name globals — `any` by design, except React and
+// ReactDOM, typed from @types/react 18 (TYPED_GLOBALS in the generator).
 declare const ACHIEVEMENT_STORE_NAMES: any;
 declare const ANSWERS: any;
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -234,8 +235,8 @@ declare const READING_CHAIN: any;
 declare const READING_FONTS: any;
 declare const READING_SCREENS: any;
 declare const READ_VERSION_ID: any;
-declare const React: any;
-declare const ReactDOM: any;
+declare const React: typeof import('react');
+declare const ReactDOM: typeof import('react-dom') & typeof import('react-dom/client');
 declare const ReadingChromeProvider: any;
 declare const ReadingDotContext: any;
 declare const ReadingPlansScreen: any;

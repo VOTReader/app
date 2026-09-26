@@ -299,7 +299,7 @@ function renderNoteIcon(segIdx, entries, hlKey) {
   );
 }
 
-export const HighlightableText = React.memo(function HighlightableText({ text, hlKey }) {
+export const HighlightableText = React.memo(/** @param {{ text: string, hlKey: string }} props */ function HighlightableText({ text, hlKey }) {
   // Subscribe to AnnotationStore mutations. F1+F2: snapshot the per-KEY
   // version, not the global one — so adding/removing/recoloring an annotation
   // on one verse re-renders only THAT verse, not all 176 in the chapter. A

@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vites
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
 
+/** @returns {import('react').ReactElement} */
 function Boom() { throw new Error('kaboom'); }
 
 // NOISE-1 (2026-08-09): the Reset-to-Home / Reload-App handlers call

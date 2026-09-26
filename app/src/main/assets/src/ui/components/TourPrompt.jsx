@@ -35,7 +35,7 @@ export function TourPrompt({ screen }) {
   // (Settings) with nothing to scroll it clear (emulator, 2026-09-04). Like the player bar
   // (body.audio-bar-open), it declares itself: a body class and its measured height, and
   // app.css pads .screen-scroll by that much, so every tile can still be reached.
-  const ref = React.useRef(/** @type {HTMLElement|null} */ (null));
+  const ref = React.useRef(/** @type {HTMLDivElement|null} */ (null));
   React.useLayoutEffect(() => {
     if (!show) return undefined;
     const root = document.documentElement;

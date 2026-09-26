@@ -68,6 +68,16 @@ VENDOR_GLOBALS = [
     'VotSearchData',
 ]
 
+# The globals tsc gets a REAL type for instead of `any` (v15-code-health-02).
+# With React as `any`, tsc checked no JSX prop and no hook call anywhere. The
+# types come from @types/react / @types/react-dom, pinned in package.json to
+# the major of the vendored runtime (react.min.js, 18.2.0; react-version.test.js
+# holds both to it).
+TYPED_GLOBALS = {
+    'React': "typeof import('react')",
+    'ReactDOM': "typeof import('react-dom') & typeof import('react-dom/client')",
+}
+
 
 def strip_js_comments(text):
     """Blank out // and /* */ comments, leaving string literals alone (an
@@ -273,10 +283,11 @@ def main():
         '// signature. NOT proper types — that\'s a separate project.',
         f'// Total: {len(sorted_globals)} distinct identifiers.',
         '',
-        '// Cross-bundle bare-name globals — all `any` by design.',
+        '// Cross-bundle bare-name globals — `any` by design, except React and',
+        '// ReactDOM, typed from @types/react 18 (TYPED_GLOBALS in the generator).',
     ]
     for name in sorted_globals:
-        dts_lines.append(f'declare const {name}: any;')
+        dts_lines.append(f'declare const {name}: {TYPED_GLOBALS.get(name, "any")};')
     dts_lines.append('')
     dts_lines.append('// Window runtime bridges (window.__pendingHighlight, window.__closeSheet,')
     dts_lines.append('// etc.) — permissive index signature. Each bridge has a runtime contract')

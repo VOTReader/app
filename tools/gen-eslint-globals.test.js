@@ -51,6 +51,12 @@ describe('gen-eslint-globals', () => {
     }
   });
 
+  it('tsc gets React and ReactDOM typed, not any (v15-code-health-02)', () => {
+    const dts = readFileSync(join(HERE, 'globals.generated.d.ts'), 'utf8');
+    expect(dts).toContain("declare const React: typeof import('react');");
+    expect(dts).toContain("declare const ReactDOM: typeof import('react-dom') & typeof import('react-dom/client');");
+  });
+
   it('an export block reads identifiers, never its comments', () => {
     const entry = [
       'Object.assign(window, {',

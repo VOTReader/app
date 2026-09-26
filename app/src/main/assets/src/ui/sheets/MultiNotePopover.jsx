@@ -48,6 +48,7 @@ export function MultiNotePopover({ payload, onClose, onPick }) {
   // never renders off-screen even for one frame; the layout effect refines it.
   const fallbackLeft = Math.max(8, Math.min(x - popW / 2, window.innerWidth - popW - 8));
   const fallbackTop = Math.max(8, y + 12);
+  /** @type {import('react').CSSProperties} */
   const style = pos
     ? { left: pos.left, top: pos.top, width: popW, maxHeight: pos.maxHeight, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }
     : { left: fallbackLeft, top: fallbackTop, width: popW, maxHeight: Math.max(120, window.innerHeight - fallbackTop - 8), overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' };

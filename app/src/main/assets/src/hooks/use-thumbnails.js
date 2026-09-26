@@ -416,7 +416,7 @@ export function useThumbnails({
   // Single async-await path: clone render (takeThemedScreenshot) for content
   // tabs, true-pixel shot (takeScreenshot) for Garden — see the primary-
   // capture comment below.
-  const captureActiveTabThumbnail = React.useCallback(async (opts) => {
+  const captureActiveTabThumbnail = React.useCallback(/** @param {{ urgent?: boolean }} [opts] */ async (opts) => {
     if (!tabsEnabled) return;
     if (captureInFlightRef.current) return;
     // AUTO-SCROLL SUPPRESSION. A capture is an html2canvas clone render plus a

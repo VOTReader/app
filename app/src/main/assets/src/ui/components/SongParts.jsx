@@ -181,6 +181,7 @@ export function SongListRow({ song, title, line = '', versions = 0, onVersions, 
   );
 }
 
+/** @type {import('react').SVGProps<SVGSVGElement>} */
 const ICON = { viewBox: '0 0 24 24', 'aria-hidden': true, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' };
 
 export function ShuffleIcon() {

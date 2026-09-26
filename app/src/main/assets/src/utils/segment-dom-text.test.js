@@ -27,7 +27,7 @@ afterEach(cleanup);
 function renderedText(segments) {
   const { container } = render(
     React.createElement('p', null,
-      React.createElement(Segments, { segments, onFnClick() {}, onScripClick() {} })),
+      React.createElement(/** @type {any} */ (Segments), { segments, onFnClick() {}, onScripClick() {} })),
   );
   return container.textContent;
 }
@@ -106,7 +106,7 @@ const squash = (s) => String(s).replace(/\s+/g, ' ').trim();
 function renderedTextWithoutFootnotes(segments) {
   const { container } = render(
     React.createElement('p', null,
-      React.createElement(Segments, { segments, onFnClick() {}, onScripClick() {} })),
+      React.createElement(/** @type {any} */ (Segments), { segments, onFnClick() {}, onScripClick() {} })),
   );
   container.querySelectorAll('.fn-ref').forEach((el) => el.remove());
   return container.textContent;

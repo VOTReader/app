@@ -204,7 +204,7 @@ function playerMark() {
 function useLatestFn(fn) {
   const ref = React.useRef(fn);
   ref.current = fn;
-  return /** @type {F} */ (React.useCallback((...args) => ref.current(...args), []));
+  return /** @type {F} */ (/** @type {unknown} */ (React.useCallback((...args) => ref.current(...args), [])));
 }
 
 /**

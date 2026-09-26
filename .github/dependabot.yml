@@ -65,6 +65,13 @@ updates:
       # these pins together. tools/react-version.test.js holds them equal.
       - dependency-name: "react"
       - dependency-name: "react-dom"
+      # The React types follow the same major (v15-code-health-02): tsc types the
+      # React global from them, so a 19 major would pass code 18 cannot run.
+      # Patch/minor within 18 still flow.
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
 
       # ── eslint 10: BLOCKED UPSTREAM, not declined (2026-08-11) ──
       # eslint-plugin-react's newest published release (7.37.5, and it IS the
