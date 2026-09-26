@@ -13,6 +13,7 @@
   },
   "include": [
     "tools/globals.generated.d.ts",
+    "tools/hook-globals.generated.d.ts",
     "app/src/main/assets/src/utils/**/*",
     "app/src/main/assets/src/stores/**/*",
     "app/src/main/assets/src/hooks/**/*",

@@ -57,6 +57,21 @@ describe('gen-eslint-globals', () => {
     expect(dts).toContain("declare const ReactDOM: typeof import('react-dom') & typeof import('react-dom/client');");
   });
 
+  it('tsc gets each hook typed from its module, and the strict pass gets it as any (v15-code-health-09)', () => {
+    const dts = readFileSync(join(HERE, 'globals.generated.d.ts'), 'utf8');
+    const typed = readFileSync(join(HERE, 'hook-globals.generated.d.ts'), 'utf8');
+    const loose = readFileSync(join(HERE, 'hook-globals.any.generated.d.ts'), 'utf8');
+    expect(typed).toContain("declare const useNav: typeof import('../app/src/main/assets/src/hooks/use-nav.js').useNav;");
+    expect(typed).toContain("declare const useTabs: typeof import('../app/src/main/assets/src/hooks/use-tabs.js').useTabs;");
+    expect(loose).toContain('declare const useNav: any;');
+    expect(dts).not.toMatch(/declare const useNav\b/);   // declared twice is a tsc error
+    const names = (t) => [...t.matchAll(/^declare const (\w+):/gm)].map((m) => m[1]);
+    expect(names(loose)).toEqual(names(typed));
+    for (const [cfg, file] of [['tsconfig.json', 'tools/hook-globals.generated.d.ts'], ['tsconfig.strict-data.json', 'tools/hook-globals.any.generated.d.ts']]) {
+      expect(JSON.parse(readFileSync(join(HERE, '..', cfg), 'utf8')).include).toContain(file);
+    }
+  });
+
   it('an export block reads identifiers, never its comments', () => {
     const entry = [
       'Object.assign(window, {',

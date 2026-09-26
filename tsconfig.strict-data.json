@@ -5,6 +5,7 @@
   },
   "include": [
     "tools/globals.generated.d.ts",
+    "tools/hook-globals.any.generated.d.ts",
     "app/src/main/assets/src/stores/**/*.js",
     "app/src/main/assets/src/utils/backup*.js"
   ],

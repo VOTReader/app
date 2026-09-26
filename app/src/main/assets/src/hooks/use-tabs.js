@@ -73,6 +73,41 @@
 import { useRefMirror } from './use-ref-mirror.js';
 import { AboutSeenFlagStore } from '../stores/app-flag-stores.js';
 
+/**
+ * One tab's reading state: what tabField(key) reads and writes (v15-code-health-09).
+ * The object-valued fields carry small ad-hoc shapes their owners define.
+ * @typedef {Object} Tab
+ * @property {string} screen
+ * @property {string | null} bookId
+ * @property {number | null} chapterNum
+ * @property {string | null} letterId
+ * @property {string | null} studyId
+ * @property {string | null} studyChapterId
+ * @property {boolean} fromStudies
+ * @property {string | null} genreId
+ * @property {string | null} audioColKey
+ * @property {string} mode
+ * @property {boolean} showStudy
+ * @property {Record<string, any> | null} surpriseAnchor
+ * @property {any[]} fromLetterStack
+ * @property {boolean} titleFocusHidden
+ * @property {boolean} headingsFocusHidden
+ * @property {{ chapterNum: number | null } | null} fromMatthewCh
+ * @property {string | null} fromWtlb
+ * @property {boolean} fromSearch
+ * @property {boolean} fromSurprise
+ * @property {string} searchQuery
+ * @property {Record<string, any> | null} searchOrigin
+ * @property {string | null} searchScope
+ * @property {any} searchContext
+ * @property {Record<string, any> | null} navOrigin
+ * @property {number} gardenPage
+ * @property {Record<string, number>} scrollPositions
+ * @property {string | null} title
+ * @property {string | null} subtitle
+ */
+
+/** @type {Tab} */
 export const DEFAULT_TAB = {
   screen: 'home',
   bookId: null, chapterNum: null, letterId: null,
@@ -97,6 +132,16 @@ export const DEFAULT_TAB = {
 };
 
 /**
+ * The setter tabField(key) returns: a value, or an updater of the current one.
+ * @template {keyof Tab} K
+ * @typedef {(val: Tab[K] | ((cur: Tab[K]) => Tab[K])) => void} TabSetter
+ */
+
+/**
+ * @typedef {<K extends keyof Tab>(key: K) => [Tab[K], TabSetter<K>]} TabField
+ */
+
+/**
  * Tab-state container hook (P6k-A). Owns the tabs[] array + activeTabIdx
  * cursor + the tabField factory that returns the [value, setter] tuple
  * for any tab-scoped key. Tab-state operations (open/close/switch) live
@@ -109,10 +154,10 @@ export const DEFAULT_TAB = {
  *
  * @param {{ saved: import('./use-saved-state.js').SavedState }} args
  * @returns {{
- *   DEFAULT_TAB: any,
- *   tabField: (key: string) => any[],
- *   activeTab: any,
- *   tabs: any[],
+ *   DEFAULT_TAB: Tab,
+ *   tabField: TabField,
+ *   activeTab: Tab,
+ *   tabs: Tab[],
  *   activeTabIdx: number,
  *   setTabs: (updater: any) => void,
  *   setActiveTabIdx: (updater: any) => void,
@@ -170,7 +215,8 @@ export function useTabs({ saved }) {
     }));
   }, [_activeIdx]);
   const _uatRef = useRefMirror(updateActiveTab);
-  const _tabSetters = React.useRef({});
+  const _tabSetters = React.useRef(/** @type {Record<string, (val: any) => void>} */ ({}));
+  /** @type {TabField} */
   const tabField = (key) => {
     if (!_tabSetters.current[key]) {
       _tabSetters.current[key] = (val) => _uatRef.current((cur) => ({

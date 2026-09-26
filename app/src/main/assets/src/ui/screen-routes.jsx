@@ -57,140 +57,141 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * [14] THE ROUTE CONTRACT — every dependency App() must hand to
  * buildScreenRoutes, name-checked by tsc on the app.jsx call site (a
  * missing or renamed prop is a typecheck error, not a silent undefined
- * inside a route). Per-field types are deliberately `*` for now —
- * the NAME contract is the load-bearing half; tighten types field-by-
- * field as they prove worth pinning.
+ * inside a route). Each field carries the type its source in App() has
+ * (v15-code-health-09): tab-backed state names its use-tabs.js Tab field,
+ * the rest were read off tsc. A `*` field is still `any` where App() gets
+ * it; type that source first, then the field here.
  * @typedef {Object} ScreenRouteDeps
- * @property {*} screen
- * @property {*} setScreen
- * @property {*} bookId
- * @property {*} setBookId
- * @property {*} chapterNum
- * @property {*} setChapterNum
- * @property {*} letterId
- * @property {*} setLetterId
- * @property {*} studyId
- * @property {*} [setStudyId]
- * @property {*} studyChapterId
- * @property {*} setStudyChapterId
- * @property {*} fromStudies
- * @property {*} setFromStudies
- * @property {*} fromSearch
- * @property {*} setFromSearch
+ * @property {import('../hooks/use-tabs.js').Tab['screen']} screen
+ * @property {import('../hooks/use-tabs.js').TabSetter<'screen'>} setScreen
+ * @property {import('../hooks/use-tabs.js').Tab['bookId']} bookId
+ * @property {import('../hooks/use-tabs.js').TabSetter<'bookId'>} setBookId
+ * @property {import('../hooks/use-tabs.js').Tab['chapterNum']} chapterNum
+ * @property {import('../hooks/use-tabs.js').TabSetter<'chapterNum'>} setChapterNum
+ * @property {import('../hooks/use-tabs.js').Tab['letterId']} letterId
+ * @property {import('../hooks/use-tabs.js').TabSetter<'letterId'>} setLetterId
+ * @property {import('../hooks/use-tabs.js').Tab['studyId']} studyId
+ * @property {import('../hooks/use-tabs.js').TabSetter<'studyId'>} [setStudyId]
+ * @property {import('../hooks/use-tabs.js').Tab['studyChapterId']} studyChapterId
+ * @property {import('../hooks/use-tabs.js').TabSetter<'studyChapterId'>} setStudyChapterId
+ * @property {import('../hooks/use-tabs.js').Tab['fromStudies']} fromStudies
+ * @property {import('../hooks/use-tabs.js').TabSetter<'fromStudies'>} setFromStudies
+ * @property {import('../hooks/use-tabs.js').Tab['fromSearch']} fromSearch
+ * @property {import('../hooks/use-tabs.js').TabSetter<'fromSearch'>} setFromSearch
  * @property {(v: boolean) => void} setFromSurprise
- * @property {*} mode
- * @property {*} setMode
- * @property {*} showStudy
- * @property {*} setShowStudy
- * @property {*} genreId
- * @property {*} setGenreId
- * @property {*} audioColKey
- * @property {*} setAudioColKey
- * @property {*} surpriseAnchor
- * @property {*} setSurpriseAnchor
+ * @property {import('../hooks/use-tabs.js').Tab['mode']} mode
+ * @property {import('../hooks/use-tabs.js').TabSetter<'mode'>} setMode
+ * @property {import('../hooks/use-tabs.js').Tab['showStudy']} showStudy
+ * @property {import('../hooks/use-tabs.js').TabSetter<'showStudy'>} setShowStudy
+ * @property {import('../hooks/use-tabs.js').Tab['genreId']} genreId
+ * @property {import('../hooks/use-tabs.js').TabSetter<'genreId'>} setGenreId
+ * @property {import('../hooks/use-tabs.js').Tab['audioColKey']} audioColKey
+ * @property {import('../hooks/use-tabs.js').TabSetter<'audioColKey'>} setAudioColKey
+ * @property {import('../hooks/use-tabs.js').Tab['surpriseAnchor']} surpriseAnchor
+ * @property {import('../hooks/use-tabs.js').TabSetter<'surpriseAnchor'>} setSurpriseAnchor
  * @property {*} theme
- * @property {*} setTheme
- * @property {*} settings
- * @property {*} toggleSetting
- * @property {*} updateSetting
- * @property {*} titleFocusHidden
- * @property {*} setTitleFocusHidden
- * @property {*} headingsFocusHidden
- * @property {*} setHeadingsFocusHidden
+ * @property {import('react').Dispatch<any>} setTheme
+ * @property {import('../hooks/use-settings.js').Settings} settings
+ * @property {(key: string) => void} toggleSetting
+ * @property {(key: string, val: any) => void} updateSetting
+ * @property {import('../hooks/use-tabs.js').Tab['titleFocusHidden']} titleFocusHidden
+ * @property {import('../hooks/use-tabs.js').TabSetter<'titleFocusHidden'>} setTitleFocusHidden
+ * @property {import('../hooks/use-tabs.js').Tab['headingsFocusHidden']} headingsFocusHidden
+ * @property {import('../hooks/use-tabs.js').TabSetter<'headingsFocusHidden'>} setHeadingsFocusHidden
  * @property {*} activeReadKey
- * @property {*} setActiveReadKey
+ * @property {(key: any, commitFn: any) => void} setActiveReadKey
  * @property {*} lastReadChapters
- * @property {*} setLastReadChapters
+ * @property {import('react').Dispatch<any>} setLastReadChapters
  * @property {*} lastReadLetterMap
- * @property {*} setLastReadForVol
- * @property {*} readItems
- * @property {*} readHistory
- * @property {*} markRead
- * @property {*} unmarkRead
- * @property {*} isRead
- * @property {*} getReadKey
- * @property {*} clearReadForBook
- * @property {*} clearAllProgress
- * @property {*} clearHistory
+ * @property {(volKey: string, id: string) => void} setLastReadForVol
+ * @property {Record<string, number | true>} readItems
+ * @property {import('../hooks/use-history.js').HistoryEntry[]} readHistory
+ * @property {(bid: string, cid: string | number, payload?: { words: number; activeMs: number; }) => void} markRead
+ * @property {(bid: string, cid: string | number) => void} unmarkRead
+ * @property {(bid: string, cid: string | number) => boolean} isRead
+ * @property {(bid: string, cid: string | number) => string} getReadKey
+ * @property {(bid: string) => void} clearReadForBook
+ * @property {() => void} clearAllProgress
+ * @property {() => void} clearHistory
  * @property {*} activeLetter
  * @property {*} activeVolKey
  * @property {*} book
  * @property {*} chapter
- * @property {*} goHome
- * @property {*} goNavOrigin
- * @property {*} navOrigin
- * @property {*} goSearch
- * @property {*} goHistory
- * @property {*} goSettings
- * @property {*} goAbout
- * @property {*} goVolumesHome
- * @property {*} goScripturesHome
- * @property {*} goScriptureGenre
- * @property {*} goBibleIdx
- * @property {*} goMatthewIdx
- * @property {*} goStudiesHome
- * @property {*} goNotesIndex
- * @property {*} goLinksIndex
- * @property {*} goBookmarksIndex
- * @property {*} goJournalHub
- * @property {*} goHighlightsIndex
- * @property {*} goProgress
- * @property {*} goReadingPlans
- * @property {*} goJournalViewer
- * @property {*} goJournalEditor
- * @property {*} goSearchOrigin
- * @property {*} goColIdx
- * @property {*} handleSelect
- * @property {*} handleSurprise
- * @property {*} handleScriptureSelect
- * @property {*} handleVolumeSelect
- * @property {*} handleSearchSelect
- * @property {*} handleSearchCommand
- * @property {*} selectMatthewCh
- * @property {*} selectBibleCh
- * @property {*} selectStudy
- * @property {*} selectStudyChapter
- * @property {*} getStudyById
- * @property {*} getStudyChapter
- * @property {*} studyReadKey
- * @property {*} prevChainEntry
- * @property {*} nextChainEntry
- * @property {*} goToChainEntryFirst
- * @property {*} goToChainEntryLast
- * @property {*} studiesLoading
- * @property {*} studiesError
- * @property {*} retryStudies
- * @property {*} UNIFIED_CHAIN
+ * @property {() => void} goHome
+ * @property {() => void} goNavOrigin
+ * @property {import('../hooks/use-tabs.js').Tab['navOrigin']} navOrigin
+ * @property {() => void} goSearch
+ * @property {() => void} goHistory
+ * @property {() => void} goSettings
+ * @property {() => void} goAbout
+ * @property {() => void} goVolumesHome
+ * @property {() => void} goScripturesHome
+ * @property {(gid: any) => void} goScriptureGenre
+ * @property {() => void} goBibleIdx
+ * @property {() => void} goMatthewIdx
+ * @property {() => void} goStudiesHome
+ * @property {() => void} goNotesIndex
+ * @property {() => void} goLinksIndex
+ * @property {() => void} goBookmarksIndex
+ * @property {() => void} goJournalHub
+ * @property {() => void} goHighlightsIndex
+ * @property {() => void} goProgress
+ * @property {() => void} goReadingPlans
+ * @property {(eid: any) => void} goJournalViewer
+ * @property {(eid: any) => void} goJournalEditor
+ * @property {() => void} goSearchOrigin
+ * @property {(volKey: any) => void} goColIdx
+ * @property {(id: any) => void} handleSelect
+ * @property {() => void} handleSurprise
+ * @property {(id: string, clearGenre?: boolean) => void} handleScriptureSelect
+ * @property {(id: any) => void} handleVolumeSelect
+ * @property {(entry: any, terms?: string[]) => void} handleSearchSelect
+ * @property {(action: any) => void} handleSearchCommand
+ * @property {(num: number) => void} selectMatthewCh
+ * @property {(num: number) => void} selectBibleCh
+ * @property {(id: any) => void} selectStudy
+ * @property {(sid: any, chId: any) => void} selectStudyChapter
+ * @property {(id: any) => any} getStudyById
+ * @property {(study: any, chId: any) => any} getStudyChapter
+ * @property {(slug: any) => string} studyReadKey
+ * @property {(slug: any) => any} prevChainEntry
+ * @property {(slug: any) => any} nextChainEntry
+ * @property {(slug: any) => () => void} goToChainEntryFirst
+ * @property {(slug: any) => () => void} goToChainEntryLast
+ * @property {boolean} studiesLoading
+ * @property {boolean} studiesError
+ * @property {() => void} retryStudies
+ * @property {any[]} UNIFIED_CHAIN
  * @property {*} searchQuery
  * @property {*} setSearchQuery
  * @property {*} searchScope
  * @property {*} setSearchScope
  * @property {*} searchContext
  * @property {*} journalEntryId
- * @property {*} createAndEditJournal
- * @property {*} openInAppLetter
+ * @property {() => void} createAndEditJournal
+ * @property {(target: any, meta: any) => void} openInAppLetter
  * @property {*} openLinkSidebar
- * @property {*} navigateToLink
- * @property {*} pushFromLetter
+ * @property {(endpoint: any, meta?: any) => void} navigateToLink
+ * @property {(entry: any) => void} pushFromLetter
  * @property {*} backHint
- * @property {*} tapThroughBack
- * @property {*} goToLetterFromMatthew
- * @property {*} setNavOrigin
+ * @property {() => void} tapThroughBack
+ * @property {(vol: any, letter: any, excerpt: any) => void} goToLetterFromMatthew
+ * @property {import('../hooks/use-tabs.js').TabSetter<'navOrigin'>} setNavOrigin
  * @property {*} setNoteSheetTarget
  * @property {*} bcvPrevBook
  * @property {*} bcvNextBook
- * @property {*} bcvOnPrevBook
- * @property {*} bcvOnNextBook
+ * @property {() => void} bcvOnPrevBook
+ * @property {() => void} bcvOnNextBook
  * @property {*} bcvPrevBoundaryTitle
  * @property {*} bcvNextBoundaryTitle
- * @property {*} prophecyCardStatesRef
- * @property {*} saveProphecyCardStates
- * @property {*} fromMatthewChRef
- * @property {*} setFromMatthewCh
- * @property {*} setFromWtlb
- * @property {*} boundaryConfig
- * @property {*} gardenPage
- * @property {*} setGardenPage
+ * @property {{ current: any; }} prophecyCardStatesRef
+ * @property {() => void} saveProphecyCardStates
+ * @property {{ current: { chapterNum: number; }; }} fromMatthewChRef
+ * @property {import('../hooks/use-tabs.js').TabSetter<'fromMatthewCh'>} setFromMatthewCh
+ * @property {import('../hooks/use-tabs.js').TabSetter<'fromWtlb'>} setFromWtlb
+ * @property {(volKey: string, entry: any) => any} boundaryConfig
+ * @property {import('../hooks/use-tabs.js').Tab['gardenPage']} gardenPage
+ * @property {import('../hooks/use-tabs.js').TabSetter<'gardenPage'>} setGardenPage
  */
 
 /** @param {ScreenRouteDeps} deps */
@@ -1124,7 +1125,7 @@ export function buildScreenRoutes({
     ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
     'scriptures-home': () => (
       <ScripturesHome
-        onSelect={(...a) => { _startNewTrail(); handleScriptureSelect(...a); }}
+        onSelect={(/** @type {[id: string, clearGenre?: boolean]} */ ...a) => { _startNewTrail(); handleScriptureSelect(...a); }}
         onGenre={goScriptureGenre}
         onBack={goHome}
         onSearch={goSearch}
@@ -1140,7 +1141,7 @@ export function buildScreenRoutes({
     'scripture-genre': () => genreId && (
       <ScriptureGenre
         genreId={genreId}
-        onSelect={(...a) => { _startNewTrail(); handleScriptureSelect(...a); }}
+        onSelect={(/** @type {[id: string, clearGenre?: boolean]} */ ...a) => { _startNewTrail(); handleScriptureSelect(...a); }}
         onBack={goScripturesHome}
         onSearch={goSearch}
         onHistory={goHistory}
