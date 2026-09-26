@@ -460,6 +460,24 @@ function _leaseHeld() {
 }
 
 /**
+ * A live text selection is the reader's hand on the words (highlighting,
+ * copying, writing a note): the follow must not glide the page, and the
+ * selection toolbar with it, out from under them once the 4 s grace of the
+ * press that made it runs out (cp1 sweep, 2026-09-26). The auto-scroll
+ * transport already pauses for a selection (use-autoscroll hasSelection).
+ * The wash keeps painting; the follow resumes with the next sentence after
+ * the selection is gone.
+ *
+ * @returns {boolean}
+ */
+function _readerSelecting() {
+  try {
+    const s = typeof window !== 'undefined' && window.getSelection ? window.getSelection() : null;
+    return !!s && !s.isCollapsed && String(s).length > 0;
+  } catch (_e) { return false; }
+}
+
+/**
  * Drop any glide we own. Called on user intent, on a retarget, and on unmount.
  *
  * @param {{ current: number | null }} glideRef
@@ -492,7 +510,7 @@ function _glideTo(el, to, glideRef) {
     glideRef.current = null;
     // READ-FIRST: compare what the container reads NOW against what we last
     // wrote. Reading back after a write is a forced synchronous layout.
-    if (_leaseHeld() || Math.abs((el.scrollTop || 0) - wrote) > DRIFT_PX) return;
+    if (_leaseHeld() || _readerSelecting() || Math.abs((el.scrollTop || 0) - wrote) > DRIFT_PX) return;
     const t = (typeof ts === 'number' && Number.isFinite(ts)) ? ts : Date.now();
     if (t0 === null) t0 = t;
     const p = Math.min(1, GLIDE_MS > 0 ? (t - t0) / GLIDE_MS : 1);
@@ -514,7 +532,7 @@ function _glideTo(el, to, glideRef) {
  * @returns {void}
  */
 function _follow(range, mainRef, userScrollAt, glideRef) {
-  if (_leaseHeld()) return;
+  if (_leaseHeld() || _readerSelecting()) return;
   if (Date.now() - userScrollAt.current < USER_SCROLL_MS) return;
   const scroller = _scrollerOf(mainRef);
   if (!scroller) return;

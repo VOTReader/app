@@ -527,6 +527,47 @@ describe('ReadAlongHighlight — follow-scroll obeys the scrollTop lease', () =>
     frame(GLIDE_END);
     expect(scroller.scrollTop).toBe(4000);
   });
+
+  /* cp1 sweep: a reader selecting a verse to highlight while the recording
+     plays had the page glided away under the selection and its toolbar once
+     the press's 4 s grace ran out. A live selection holds the page like the
+     auto-scroll transport's hasSelection pause. */
+  describe('a live text selection', () => {
+    const origGetSelection = window.getSelection;
+    /** @param {boolean} on */
+    const selecting = (on) => {
+      window.getSelection = () => /** @type {any} */ ({ isCollapsed: !on, rangeCount: on ? 1 : 0, toString: () => (on ? 'the Word' : '') });
+    };
+    afterEach(() => { window.getSelection = origGetSelection; });
+
+    it('holds the page still — the wash still moves on', () => {
+      mount();
+      selecting(true);
+      followOnce();
+      expect(painted()).toBe('Sentence number two.');
+      expect(scroller.scrollTop).toBe(0);
+    });
+
+    it('stops a glide already in flight the moment text is selected', () => {
+      mount();
+      play();
+      clockTo(6);
+      frame(0);
+      frame(130);
+      const partway = scroller.scrollTop;
+      expect(partway).toBeGreaterThan(0);
+      selecting(true);
+      frame(GLIDE_END);
+      expect(scroller.scrollTop).toBe(partway);
+    });
+
+    it('a collapsed selection (a caret, nothing selected) does not hold it', () => {
+      mount();
+      selecting(false);
+      followOnce();
+      expect(scroller.scrollTop).toBeCloseTo(EXPECTED_SCROLL, 5);
+    });
+  });
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
