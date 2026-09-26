@@ -20,17 +20,18 @@
    bundle-f carries only this feature's own code.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { decodeGraph, maxSpanOf } from '../../utils/scripture-web/decode.js';
+import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
-  localizeFactor, squashFactor, MAX_STRETCH, rotatePointer,
-  maxZoomFor, ribbonStyle, arcShape, maxCamY, ALTITUDE_MARKS, spanAtHeight, lensDimFor,
+  rotatePointer, ribbonStyle, arcShape, maxCamY, ALTITUDE_MARKS, spanAtHeight, lensDimFor,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
   visibleArcs, threadEnds, footBundles, bundleGroups, lensRange, nearbyChapter, nearbyThreads,
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
+import { useWebCamera } from '../scripture-web/use-web-camera.js';
+import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 /** @typedef {import('../../utils/scripture-web/decode.js').Density} Density */
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { WebFallbackList } from '../scripture-web/WebFallbackList.jsx';
@@ -63,18 +64,9 @@ const SHORT_STUDY = {
   'trinity-exposed': 'Trinity', 'purity': 'Purity',
 };
 
-/** Deepest zoom, as a multiple of fit-to-width. Well past single-verse. */
-/**
- * The zoom ceiling, from the frame rather than from a constant. 44 CSS px
- * per verse is the point past which nothing new can separate - every arc
- * leaving a verse shares one foot at every zoom - so the old fixed 4000 was
- * 247 CSS px per verse on a 1920 px desktop, 5.6x into a void, and about
- * right on a 375 px phone only by accident.
- */
-
-const maxZoomOf = (graph, v) => (graph
-  ? maxZoomFor(graph.total, (v.W || 1) / (v.DPR || 1))
-  : 4000);
+/* The zoom ceiling (maxZoomOf), the frame, the render arguments and the y
+   frame live in utils/scripture-web/web-frame.js, pure and tested; the
+   cameras and view that feed them in ui/scripture-web/use-web-camera.js. */
 
 /** What the live region says when + does nothing because it can do nothing. */
 const ZOOM_MAX_MESSAGE = 'Zoomed all the way in';
@@ -97,8 +89,6 @@ function anchoredDensity(cache, g, cam, v, density) {
   }
   return cache.value / ((v.W || 1) / (v.DPR || 1));
 }
-/** Height reserved below the baseline for the ruler + book names. */
-const RULER_H = 74;
 
 const DENSITY_LABEL = { essential: 'Essential', famous: 'Famous' };
 
@@ -213,19 +203,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const [personalCount, setPersonalCount] = React.useState(0);
 
   // ── everything below here is per-frame state; deliberately NOT React ──
-  const camRef = React.useRef(null);
-  /* r2: the Volumes rail has a camera of its own, so the top and bottom halves
-     zoom and pan independently (Corbin: "zoom into Rebuke [top] and on the
-     bottom half zoom into Isaiah, both at once"). Seeded when the personal
-     graph is built; clamped on every personal frame. */
-  const camVRef = React.useRef(null);
-  const lastRailRef = React.useRef('bottom');
   const [railZoom, setRailZoom] = React.useState({ top: false, bottom: false });
   const railZoomRef = React.useRef(railZoom);
   const rendererRef = React.useRef(null);
-  const viewRef = React.useRef({ W: 0, H: 0, DPR: 1 });
-  // range2: the group chosen inside a range (chooseGroup), drawn as a second band.
-  const focusRef = React.useRef(/** @type {{ arc: number, range: any, range2?: [number, number] | null }} */ ({ arc: -1, range: null }));
   const topbarRef = React.useRef(null);
   const anchoredRef = React.useRef({ ppv: 0, x: 0, W: 0, density: '', value: 0 });
   // the convergence pills: the counted cells, cached across frames while
@@ -245,6 +225,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // frame() runs per draw and must stay identity-stable, so it reads the mode
   // from a ref rather than closing over the state value.
   const modeRef = React.useRef('canonical');
+  // The cameras (canon + Volumes rail), the view, the focused thread and the
+  // frame maths that reads them (v15-code-health-06).
+  const {
+    camRef, camVRef, lastRailRef, viewRef, focusRef,
+    frame, viewFor, zoomCapFor, yFrameFor, camFor,
+  } = useWebCamera({ graph, density, modeRef });
   const theme = settings && settings.theme;
 
   // ── load the graph asset (lazy, injected script, precached by the SW) ──
@@ -357,52 +343,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   React.useEffect(() => { modeRef.current = mode; schedule(); }, [mode, schedule]);
   React.useEffect(() => { rotatedRef.current = rotated; schedule(); }, [rotated, schedule]);
 
-  /**
-   * The vertical frame. On a wide screen the dome fills naturally; on a tall
-   * one an unstretched semicircle would sit in the bottom quarter, so the
-   * whole composition (dome + ruler) is CENTRED in the leftover height
-   * instead of pinned to the bottom edge.
-   */
-  const frame = React.useCallback(() => {
-    const v = viewRef.current;
-    // A narrow screen puts the controls along the BOTTOM, so the ruler needs
-    // to finish above them — reserve the control strip as well as its own
-    // two label rows, or book names print underneath the buttons.
-    const narrow = (v.W / (v.DPR || 1)) <= 560;
-    // Wide screens reserve the legend/credit line too, or the staggered book
-    // labels print straight through it (the "legends colliding" report).
-    const ruler = (narrow ? RULER_H + 104 : RULER_H + 26) * v.DPR;
-    const avail = v.H - ruler;
-    if (modeRef.current === 'personal') {
-      // No dome to centre — the rails want the whole frame, less the strip the
-      // legend and credit occupy along the bottom.
-      const base = avail - 20 * v.DPR;
-      return { base, ceil: base * 0.985, ruler };
-    }
-    const domeH = Math.min(avail, (v.W / 2) * MAX_STRETCH);
-    // Bias the slack ABOVE the dome (0.72 / 0.28) rather than centring it:
-    // the controls live at the bottom on a narrow screen, and a dome floating
-    // in the middle leaves a dead band between the ruler and them.
-    const base = Math.min(avail, domeH + Math.max(0, avail - domeH) * 0.72);
-    return { base, ceil: domeH * 0.985, ruler };
-  }, []);
-
-  const viewFor = React.useCallback(() => {
-    const v = viewRef.current;
-    const cam = camRef.current;
-    const f = frame();
-    return {
-      width: v.W, height: v.H, base: f.base, ceil: f.ceil,
-      squash: squashFactor(f.ceil, v.W),
-      localize: localizeFactor(cam.ppv / fitPPV(cam, v.W)),
-      // the camera's height, device px: the shader draws the baseline camY
-      // below base and the picker reads the same off the camera
-      camY: cam.y > 0 ? cam.y : 0,
-      density, rulerDepth: f.ruler,
-      focusArc: focusRef.current.arc, focusRange: focusRef.current.range,
-      focusRange2: focusRef.current.range2 || null,
-    };
-  }, [density, frame]);
 
   /**
    * Close the empty-web notice for good.
@@ -445,42 +385,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       votX: camVRef.current ? (pos) => verseToX(/** @type {any} */ (camVRef.current), v.W, pos) : undefined,
       showUnderlay,
     };
-  }, [frame, showUnderlay]);
+  }, [camRef, camVRef, frame, showUnderlay, viewRef]);
 
-  /** The ceiling for whichever camera is asked about: the Bible's is a
-   * relation on the canon (44 CSS px a verse); the Volumes' the same
-   * relation on its own rail. */
-  const zoomCapFor = React.useCallback((c) => {
-    const v = viewRef.current;
-    if (c && c === camVRef.current) return maxZoomFor(c.total, (v.W || 1) / (v.DPR || 1));
-    return maxZoomOf(graph, v);
-  }, [graph]);
-
-  /** The widest thread's span, verses: the y camera's ceiling reads the law
-   * at it. Once per graph. */
-  const maxSpan = React.useMemo(() => (graph ? maxSpanOf(graph) : 0), [graph]);
-
-  /** The frame the canon camera moves its y inside (geometry.YFrame); null
-   * for a My Web rail, whose world is exactly the frame. Absence is the
-   * signal: clampCamera without a frame holds y at 0. */
-  const yFrameFor = React.useCallback((c) => {
-    if (modeRef.current === 'personal' || !c || c !== camRef.current) return null;
-    const v = viewRef.current;
-    const f = frame();
-    return { base: f.base, ceil: f.ceil, squash: squashFactor(f.ceil, v.W), maxSpan };
-  }, [frame, maxSpan]);
-
-  /** The camera under a device-px y: above the gap's midline the Volumes
-   * rail, below it the Bible rail; the canon web has one camera for all. */
-  const camFor = React.useCallback((yDevice) => {
-    const cv = camVRef.current;
-    if (modeRef.current !== 'personal' || !cv) return camRef.current;
-    const v = viewRef.current;
-    const rails = railFrame({ H: v.H, DPR: v.DPR }, frame().base);
-    const top = yDevice < (rails.topY + rails.bottomY) / 2;
-    lastRailRef.current = top ? 'top' : 'bottom';
-    return top ? cv : camRef.current;
-  }, [frame]);
 
   // ── render ──────────────────────────────────────────────────────────────
   const draw = React.useCallback(() => {
@@ -602,7 +508,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (wrapRef.current) wrapRef.current.setAttribute('data-bundle-badges', String(badgeBoxesRef.current.length));
     // the walk's window on the badges (device px boxes), like __swContextCeiling: unset in the app
     if (typeof globalThis.__swWalk !== 'undefined') globalThis.__swBadgeBoxes = badgeBoxesRef.current;
-  }, [graph, density, viewFor, mode, railOpts, zoomCapFor, capFractionNow, yFrameFor]);
+  }, [graph, camRef, viewRef, mode, zoomCapFor, camVRef, viewFor, density, focusRef, yFrameFor, railOpts, capFractionNow]);
 
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule]);
 
@@ -684,7 +590,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       renderer.dispose();
       rendererRef.current = null;
     };
-  }, [graph, schedule, glRetry, yFrameFor]);
+  }, [graph, schedule, glRetry, yFrameFor, camRef, viewRef]);
 
   // ── the personal web ────────────────────────────────────────────────────
   const linkVersion = useLinkVersion();
@@ -701,7 +607,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (typeof BIBLE_STUDIES === 'undefined' && typeof loadBibleStudies === 'function') {
       loadBibleStudies().then((ok) => { if (ok) setStudiesTick((n) => n + 1); });
     }
-  }, [graph, mode, linkVersion, studiesTick, schedule]);
+  }, [graph, mode, linkVersion, studiesTick, schedule, camVRef]);
 
   /**
    * The elevator's lift (landing 14): for a pointer going down on the track
@@ -720,7 +626,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       const f = lift.y1 > lift.y0 ? (lift.y1 - yCss * v.DPR) / (lift.y1 - lift.y0) : 0;
       cam.y = Math.max(0, Math.min(1, f)) * lift.maxY;
     };
-  }, []);
+  }, [camRef, viewRef]);
 
   // ── gestures — imperative, never React state per frame ──────────────────
   // Wiring itself lives in gestures.js (attachWebGestures) — a pure move, so
@@ -735,7 +641,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       schedule, maxZoom: (c) => zoomCapFor(c || camRef.current), clampCamera, zoomAbout, xToVerse,
       yFrame: yFrameFor, lift: liftAt,
     });
-  }, [graph, schedule, loc, camFor, zoomCapFor, live, yFrameFor, liftAt]);
+  }, [graph, schedule, loc, camFor, zoomCapFor, live, yFrameFor, liftAt, viewRef, camRef]);
 
   // Verse and chapter candidates carry no distance: they only ever come alone.
   const hitCandidatesAt = React.useCallback(/** @returns {Array<{ kind: string, distance?: number } & Record<string, any>>} */ (cx, cy) => {
@@ -782,7 +688,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     }
     return pickArcs(g, cam, view, px, py, 14 * v.DPR, 4)
       .map((hit) => ({ kind: 'arc', hit, distance: hit.distance }));
-  }, [graph, viewFor, mode, railOpts, showUnderlay]);
+  }, [graph, camRef, viewRef, viewFor, mode, railOpts, showUnderlay]);
 
   const hitAt = React.useCallback((cx, cy) => hitCandidatesAt(cx, cy)[0] || null,
     [hitCandidatesAt]);
@@ -877,7 +783,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       }) : [],
       // Opening a chapter highlights the WHOLE chapter on arrival.
       cards: [chapterCard(g.books[ch[0]], ch[1], ch[3], first)] };
-  }, [graph, density, viewFor]);
+  }, [graph, camRef, viewRef, density, viewFor]);
 
   const listItems = React.useMemo(() => {
     if (!graph || !listOpen) return [];
@@ -906,7 +812,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       }
     }
     return found.map(describe).filter(Boolean);
-  }, [describe, density, graph, listOpen, mode, showUnderlay]);
+  }, [graph, listOpen, mode, describe, showUnderlay, camRef, viewRef, density]);
 
   const commitFound = React.useCallback((found) => {
     if (!found) return;
@@ -926,7 +832,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     setDetail(found);
     setAnnounce(summaryOf(found));
     schedule();
-  }, [schedule]);
+  }, [camRef, focusRef, schedule]);
 
   const hover = React.useCallback((cx, cy) => {
     hoverPointRef.current = { cx, cy };
@@ -977,13 +883,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       return;
     }
     commitFound(described[0]);
-  }, [commitFound, describe, hitCandidatesAt, schedule, liftAt]);
+  }, [liftAt, hitCandidatesAt, describe, viewRef, commitFound, schedule, focusRef]);
 
   const doubleTap = React.useCallback((cx) => {
     const cam = camRef.current, v = viewRef.current;
     zoomAbout(cam, v.W, cx * v.DPR, 2.5, maxZoomOf(graph, v), yFrameFor(cam) || undefined);
     schedule();
-  }, [graph, schedule, yFrameFor]);
+  }, [camRef, graph, schedule, viewRef, yFrameFor]);
 
   // Publish the latest handlers for the (stable) gesture listeners to call.
   React.useEffect(() => { handlersRef.current = { hover, tap, doubleTap }; }, [hover, tap, doubleTap]);
@@ -997,7 +903,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     c.x = c.total / 2;
     clampCamera(c, v.W, zoomCapFor(c));
     schedule();
-  }, [schedule, zoomCapFor]);
+  }, [camRef, camVRef, schedule, viewRef, zoomCapFor]);
 
   const resetView = React.useCallback(() => {
     const cam = camRef.current, v = viewRef.current;
@@ -1012,7 +918,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     focusRef.current = { arc: -1, range: null };
     hoverRef.current = -1;
     setDetail(null); setChoices(null); setListOpen(false); setTip(null); schedule();
-  }, [graph, schedule, resetRail]);
+  }, [camRef, viewRef, graph, camVRef, resetRail, focusRef, schedule]);
 
   const toggleChrome = React.useCallback(() => {
     const next = !chromeHidden;
@@ -1036,7 +942,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       return true;
     }
     return false;
-  }, [guideOpen, closeGuide, emptyShown, dismissEmpty, listOpen, choices, detail, tip, schedule]);
+  }, [guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, focusRef, schedule]);
   // Android Back and the app's Escape dispatcher close the top overlay first
   // instead of leaving the web (the hover chip alone is not worth a Back).
   useModalRegistry({ id: 'scripture-web-overlay', dismiss: closeTopOverlay,
@@ -1089,7 +995,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (atCeiling) setAnnounce(ZOOM_MAX_MESSAGE);
     else if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
     schedule();
-  }, [graph, onBack, resetView, schedule, zoomCapFor, yFrameFor, closeTopOverlay]);
+  }, [viewRef, lastRailRef, camVRef, camRef, zoomCapFor, yFrameFor, graph, schedule, resetView, closeTopOverlay, onBack]);
 
   /** Follow the chosen line to its far foot: the camera centres on that
    * verse at the same zoom, the line stays spotlit, and the control turns
@@ -1104,7 +1010,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     setDetail(Object.assign({}, info, { far: toFar ? 'from' : 'to' }));
     setAnnounce('Following the line to ' + (toFar ? info.b : info.a).label);
     schedule();
-  }, [schedule, zoomCapFor, yFrameFor]);
+  }, [camRef, viewRef, zoomCapFor, yFrameFor, schedule]);
 
   const openEndpoint = React.useCallback((endpoint) => {
     if (!endpoint || typeof navigateToLink !== 'function') return;
@@ -1123,7 +1029,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     setDetail(Object.assign({}, info, { chosenGroup: same || !grp ? null : grp.chapterIndex }));
     setAnnounce(same || !grp ? 'Showing the strongest again.' : grp.count + ' threads to ' + grp.label + ' shown.');
     schedule();
-  }, [schedule]);
+  }, [focusRef, schedule]);
   // ── render ──────────────────────────────────────────────────────────────
   if (loadError) {
     return (
