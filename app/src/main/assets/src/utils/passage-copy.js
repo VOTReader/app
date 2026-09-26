@@ -44,9 +44,10 @@
      dropped the tag for every id with a '-');
    - the Matthew Study Bible: "(Study Bible)", its own corrected text, which
      Settings does not change (naming the Settings translation would be false);
-   - a footnote or scripture sheet, and a letter's footnote list: the
-     reference it shows, "(NKJV)" unless the reference names its own (their
-     verse text is the NKJV the letters cite): data-copy-ref;
+   - a footnote or scripture sheet, a letter's footnote list and the Answers
+     Ten Commandments sheet: the reference it shows, "(NKJV)" unless the
+     reference names its own (their verse text is the NKJV the letters cite):
+     data-copy-ref;
    - words on a reading page outside its verse blocks (a heading, a letter's
      intro quote): the page's own name, from its data-copy-key.
    ═══════════════════════════════════════════════════════════════════════ */

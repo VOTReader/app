@@ -24,6 +24,7 @@ import {
   answersSubjectById, answersFiledUnder,
 } from '../../utils/answers-shelves.js';
 import { buildAnswersIndex, searchAnswers, answersSnippet } from '../../utils/answers-search.js';
+import { sheetReference } from '../../utils/passage-copy.js';
 
 let _landing = { query: '', sheetN: /** @type {number | null} */ (null) };
 export function resetAnswersLanding() { _landing = { query: '', sheetN: null }; }
@@ -111,7 +112,10 @@ function CommandmentSheet({ cmd, topics, onOpenTopic, onGoToRef, onDismiss }) {
           <div className="select-sheet-ornament-diamond">{'✦'}</div>
           <div className="select-sheet-ornament-line r" />
         </div>
-        <blockquote className="answers-sheet-verse">
+        {/* data-copy-ref: a copy of the verse ends with "Exodus 20:13 (NKJV)", the
+            translation of the words shown (answers-shelves.js), whatever Settings
+            picks for the reader; the reference button is left out of the copy. */}
+        <blockquote className="answers-sheet-verse" data-copy-ref={sheetReference(cmd.ref)}>
           <p>{verse}</p>
           {onGoToRef
             ? <button type="button" className="answers-sheet-ref" onClick={() => onGoToRef(cmd.ref)}>{cmd.ref}</button>

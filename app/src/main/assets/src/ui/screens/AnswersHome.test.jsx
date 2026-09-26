@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { AnswersHome, AnswersSubject, AnswersAZ, resetAnswersLanding } from './AnswersHome.jsx';
 import { ANSWERS_SUBJECTS, answersFiledUnder } from '../../utils/answers-shelves.js';
+import { passageCopy } from '../../utils/passage-copy.js';
 
 const ctx = {};
 runInNewContext(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'answers.js'), 'utf8'), ctx);
@@ -73,6 +74,20 @@ describe('AnswersHome — the landing', () => {
     // Hardware back closes the sheet first.
     act(() => { window.__closeSheet(); });
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  // cp1 follow-up: every copy names where it is from. The sheet's words are the
+  // NKJV (answers-shelves.js), so it says so whatever Settings picks.
+  it('a copy of the commandment ends with its reference, once, in the translation shown', () => {
+    render(<AnswersHome {...base} onGoToRef={noop} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Commandment VI: Do not murder/ }));
+    const quote = screen.getByRole('dialog').querySelector('.answers-sheet-verse');
+    const words = document.createRange();
+    words.selectNodeContents(quote.querySelector('p'));
+    expect(passageCopy(words).text).toBe('You shall not murder.\nExodus 20:13 (NKJV)');
+    const withButton = document.createRange();
+    withButton.selectNodeContents(quote);
+    expect(passageCopy(withButton).text).toBe('You shall not murder.\nExodus 20:13 (NKJV)');
   });
 
   it('asking shows the topic, then where else it is spoken of, and opens on the matching passage', () => {
