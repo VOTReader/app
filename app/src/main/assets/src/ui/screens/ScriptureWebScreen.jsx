@@ -39,6 +39,7 @@ import { startChapter } from '../../utils/scripture-web/chapter-connections.js';
 import { bucketDrawCount as bucketDrawCountFor } from '../../utils/scripture-web/decode.js';
 import { readChromeTokens, LINK_KIND_NAMES, MY_WEB_SOURCES, MY_WEB_LINK_KINDS, distanceRampRGB } from '../../utils/scripture-web/palette.js';
 import { placeRailLabels } from '../../utils/scripture-web/rail-labels.js';
+import { entryHlBase } from '../../utils/hl-keys.js';
 import {
   buildVotRail, buildPersonalGraph, buildCuratedUnderlay,
 } from '../../utils/scripture-web/personal-graph.js';
@@ -2077,7 +2078,7 @@ function curatedEndpoint(edge, node) {
       : edge.volKey === 'holydays' ? 'holy-days-entry'
       : edge.volKey === 'wtlb2' ? 'wtlb-two-entry' : 'wtlb-one-entry';
     return {
-      type, key: 'wtlb:' + edge.entryId + ':0', entryId: edge.entryId,
+      type, key: entryHlBase(type, edge.entryId) + ':0', entryId: edge.entryId,
       screen,
       volKey: edge.volKey, collection: edge.volKey, label: node.title,
     };

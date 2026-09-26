@@ -29,6 +29,7 @@
 
 import { CachedStore, extendStore } from './cached-store.js';
 import { mergeArrayStore } from './store-merge.js';
+import { HOLY_DAYS_LETTER_IDS } from '../utils/hl-keys.js';
 
 /**
  * A link endpoint (either source or target). The `key` is the hlKey
@@ -63,7 +64,8 @@ import { mergeArrayStore } from './store-merge.js';
  *   id: string,
  *   source: LinkEndpoint,
  *   target: LinkEndpoint,
- *   created: number
+ *   created: number,
+ *   updated?: number   // set by a rekey (here, journal-mark-rekey.js) so the cross-tab merge keeps it
  * }} Link
  */
 
@@ -115,9 +117,10 @@ export const LinkStore = extendStore(
 
     /**
      * Validate `this._cache`, dropping malformed records — any non-object, or
-     * any link missing a `source.key` or `target.key`. Idempotent: clean data
-     * passes through untouched. Persists + bumps only when records were
-     * actually dropped.
+     * any link missing a `source.key` or `target.key` — and rekey Holy Days
+     * endpoints to the space their reader paints (rekeyHolyDaysEndpoint).
+     * Idempotent: clean data passes through untouched. Persists + bumps only
+     * when a record was dropped or rekeyed.
      *
      * (W7.1 retired the legacy {a,b} → {source,target} conversion this method
      * used to also perform. Live data is already in the {source,target} shape;
@@ -139,7 +142,20 @@ export const LinkStore = extendStore(
         }
         return true;
       });
-      if (this._cache.length !== before) {
+      let rekeyed = false;
+      this._cache = this._cache.map(function (/** @type {any} */ lnk) {
+        const source = rekeyHolyDaysEndpoint(lnk.source);
+        const target = rekeyHolyDaysEndpoint(lnk.target);
+        if (source === lnk.source && target === lnk.target) return lnk;
+        rekeyed = true;
+        // Stamped a half-step newer (as journal-mark-rekey.js does): the
+        // cross-tab merge in _save keeps the newer copy of an id and hands a
+        // tie to the one on disk, which would put the old keys back. A real
+        // edit made later (Date.now() is whole) still wins.
+        const was = typeof lnk.updated === 'number' ? lnk.updated : typeof lnk.created === 'number' ? lnk.created : 0;
+        return { ...lnk, source, target, updated: was + 0.5 };
+      });
+      if (this._cache.length !== before || rekeyed) {
         this._save();
         this._bump();
       }
@@ -248,6 +264,28 @@ export const LinkStore = extendStore(
     }
   });
 })();
+
+/**
+ * A Holy Days endpoint saved before 2026-09-26 in the wtlb: space although its
+ * entry renders in LetterView (hl-keys HOLY_DAYS_LETTER_IDS), returned rekeyed
+ * to letter:, excerpt suffix kept; any other endpoint is returned as it is. The
+ * picker and the Scripture Web keyed every Holy Days target wtlb:, so links into
+ * 11 of the 16 entries never showed a chain icon or scrolled to their block.
+ * _normalize runs this on every load, not as a versioned migration, because a
+ * backup restore or an older tab's merge can deliver the old keys again.
+ * The type (or, for links older than the holy-days type, the screen) decides:
+ * "devotion" is also a WTLB One entry, whose wtlb: links are right.
+ *
+ * @param {any} ep
+ * @returns {any}
+ */
+export function rekeyHolyDaysEndpoint(ep) {
+  if (!ep || typeof ep.key !== 'string' || !ep.key.startsWith('wtlb:')) return ep;
+  if (ep.type !== 'holy-days' && ep.screen !== 'holy-days-entry') return ep;
+  const id = ep.key.split(':')[1];
+  if (!HOLY_DAYS_LETTER_IDS.has(id)) return ep;
+  return { ...ep, key: 'letter:' + ep.key.slice('wtlb:'.length) };
+}
 
 /**
  * Persist a link, dedup'ing if the exact pair already exists. Returns

@@ -166,8 +166,16 @@ describe('navItemToEndpoint — the object LinkStore keeps forever', () => {
     for (const [kind, type] of [['wtlb-entry', 'wtlb'], ['blessed-entry', 'blessed'], ['holy-days-entry', 'holy-days']]) {
       const ep = navItemToEndpoint({ kind, entryId: 'e1', screen: 's', collection: 'c', label: 'L' });
       expect(ep.type).toBe(type);
-      expect(ep.key).toBe('wtlb:e1:0');    // ONE key space for all three, by design
+      expect(ep.key).toBe('wtlb:e1:0');    // WtlbEntryView's key space for all three
     }
+  });
+
+  it('keys a block-shaped Holy Days entry letter:, the space LetterView paints it in', () => {
+    expect(navItemToEndpoint({ kind: 'holy-days-entry', entryId: 'unleavened', screen: 'holy-days-entry', collection: 'Regarding The Holy Days', label: 'Unleavened' }))
+      .toMatchObject({ type: 'holy-days', key: 'letter:unleavened:0', entryId: 'unleavened' });
+    // The same id in WTLB One stays wtlb: ("devotion" is in both).
+    expect(navItemToEndpoint({ kind: 'wtlb-entry', entryId: 'devotion', screen: 'wtlb-one-entry', collection: 'WTLB', label: 'Devotion' }).key)
+      .toBe('wtlb:devotion:0');
   });
 
   it('gives a study chapter a :0 verse slot when no verse was picked', () => {

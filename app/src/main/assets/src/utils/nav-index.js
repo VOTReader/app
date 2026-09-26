@@ -37,7 +37,7 @@
  *
  * @returns {NavItem[]}
  */
-import { bibleHlKey } from './hl-keys.js';
+import { bibleHlKey, entryHlBase } from './hl-keys.js';
 
 export function buildNavIndex() {
   const sig = Object.keys(_allBooks()).length
@@ -484,7 +484,7 @@ export function navItemToEndpoint(it) {
   if (it.kind === 'wtlb-entry' || it.kind === 'blessed-entry' || it.kind === 'holy-days-entry') {
     const _type = it.kind === 'holy-days-entry' ? 'holy-days' : it.kind === 'blessed-entry' ? 'blessed' : 'wtlb';
     return {
-      type: _type, key: 'wtlb:' + it.entryId + ':0',
+      type: _type, key: entryHlBase(_type, it.entryId) + ':0',
       entryId: it.entryId, screen: it.screen, collection: it.collection,
       label: it.label, preview: ''
     };

@@ -13,6 +13,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { LinkStore, persistLink, lnkId, hlId } from './link-store.js';
+import { mergeArrayStore } from './store-merge.js';
 
 // Build a typed endpoint for persistLink — coerces the literal so
 // `type: 'bible'` narrows to the LinkEndpoint union instead of widening to
@@ -153,6 +154,76 @@ describe('LinkStore._normalize — malformed-record guard', () => {
       expect(l.source.key).toBeTruthy();
       expect(l.target.key).toBeTruthy();
     }
+  });
+});
+
+describe('LinkStore._normalize — Holy Days links keyed where their reader paints', () => {
+  // Before 2026-09-26 the picker and the Scripture Web keyed every Holy Days
+  // target wtlb:<id>, but 11 of the 16 entries render in LetterView, whose
+  // blocks are letter:<id>:<n>, so those links never showed a chain icon and
+  // a tap could not scroll to the picked block.
+  const hdLink = (id, target) => ({
+    id, created: 1,
+    source: { type: 'bible', key: 'bible:exodus:12:1', label: 'Ex 12:1' },
+    target,
+  });
+
+  it('rekeys a stored Holy Days target in a block-shaped entry to letter:, excerpt range kept', () => {
+    localStorage.setItem('vot-links', JSON.stringify([
+      hdLink('lnk_hd', { type: 'holy-days', key: 'wtlb:unleavened:4:10-52', entryId: 'unleavened', screen: 'holy-days-entry', label: 'Unleavened' }),
+    ]));
+    const [l] = LinkStore.all();
+    expect(l.target.key).toBe('letter:unleavened:4:10-52');
+    expect(l.target.entryId).toBe('unleavened');
+    expect(LinkStore.getForKeyPrefix('letter:unleavened:4').map((x) => x.id)).toEqual(['lnk_hd']);
+    // Persisted: a reload reads the new key back.
+    LinkStore._resetForTests({ forceLoaded: true });
+    expect(LinkStore.all()[0].target.key).toBe('letter:unleavened:4:10-52');
+  });
+
+  it('rekeys either endpoint, and one whose type predates holy-days but whose screen names it', () => {
+    localStorage.setItem('vot-links', JSON.stringify([{
+      id: 'lnk_both', created: 1,
+      source: { type: 'holy-days', key: 'wtlb:pentecost:0', entryId: 'pentecost', label: 'Pentecost' },
+      target: { type: 'wtlb', key: 'wtlb:atonement:2', entryId: 'atonement', screen: 'holy-days-entry', label: 'Atonement' },
+    }]));
+    const [l] = LinkStore.all();
+    expect(l.source.key).toBe('letter:pentecost:0');
+    expect(l.target.key).toBe('letter:atonement:2');
+  });
+
+  it('leaves paragraph-shaped Holy Days, WTLB One "devotion" and every other link alone', () => {
+    const untouched = [
+      hdLink('lnk_para', { type: 'holy-days', key: 'wtlb:the-holy-days:1', entryId: 'the-holy-days', screen: 'holy-days-entry', label: 'The Holy Days' }),
+      hdLink('lnk_wtlb', { type: 'wtlb', key: 'wtlb:devotion:3', entryId: 'devotion', screen: 'wtlb-one-entry', label: 'Devotion' }),
+      hdLink('lnk_done', { type: 'holy-days', key: 'letter:devotion:3', entryId: 'devotion', screen: 'holy-days-entry', label: 'Devotion' }),
+      hdLink('lnk_letter', { type: 'letter', key: 'letter:the-wide-path:0', letterId: 'the-wide-path', label: 'The Wide Path' }),
+    ];
+    localStorage.setItem('vot-links', JSON.stringify(untouched));
+    expect(LinkStore.all()).toEqual(untouched);
+  });
+
+  it('survives the cross-tab merge its own save runs against the old copy on disk', () => {
+    // IDB mode: _save merges the cache with what another tab (or the store's
+    // own earlier write) left on disk; a tie goes to the disk copy.
+    const old = [hdLink('lnk_hd', { type: 'holy-days', key: 'wtlb:unleavened:4:10-52', entryId: 'unleavened', label: 'Unleavened' })];
+    localStorage.setItem('vot-links', JSON.stringify(old));
+    const rekeyed = LinkStore.all();
+    expect(rekeyed[0].updated).toBe(1.5);   // created 1, a half-step newer
+    const merged = mergeArrayStore(old, rekeyed, old);
+    expect(merged[0].target.key).toBe('letter:unleavened:4:10-52');
+    // A real edit made after the repair, on the old key, still wins.
+    const edited = [{ ...old[0], updated: 2 }];
+    expect(mergeArrayStore(old, rekeyed, edited)[0].updated).toBe(2);
+  });
+
+  it('is idempotent: a second load finds nothing to change', () => {
+    localStorage.setItem('vot-links', JSON.stringify([
+      hdLink('lnk_hd', { type: 'holy-days', key: 'wtlb:keep-the-passover:0', entryId: 'keep-the-passover', label: 'Keep The Passover' }),
+    ]));
+    const first = JSON.stringify(LinkStore.all());
+    LinkStore._resetForTests({ forceLoaded: true });
+    expect(JSON.stringify(LinkStore.all())).toBe(first);
   });
 });
 
