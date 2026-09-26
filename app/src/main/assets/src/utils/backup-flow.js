@@ -472,7 +472,8 @@ export function createBackupFlow(ctx) {
   const exportPersonalData = async () => {
     // Both platforms now write the v3 STREAMING container (.votbak). Web streams
     // via openExportSink + writeContainer; Android via the native chunked bridge.
-    // (The v2 buildExportPayload remains exported for rollback + the P5 fold.)
+    // (The v2 buildExportPayload stays exported: rollback, and the tests make legacy
+    // backups with it for the v2 import path. Its store read is shared with v3.)
     if (PlatformBridge.isAndroid) await _exportV3Android();
     else await _exportV3Web();
   };
