@@ -393,6 +393,12 @@ export default defineConfig({
           // measured 92.07 / 86.61 / 97.44 / 94.10
           statements: 91, branches: 85, functions: 96, lines: 93,
         },
+        'app/src/main/assets/src/utils/backup-flow.js': {
+          // v15-code-health-05: the Settings backup flows, out of the ui/** tree
+          // the include leaves unmeasured. backup-flow.test.js alone measured
+          // 91.19 / 79.46 / 93.22 / 94.72.
+          statements: 90, branches: 78, functions: 92, lines: 93,
+        },
         'app/src/main/assets/src/utils/storage-health.js': {
           // measured 93.40 / 90.04 / 96.97 / 96.57
           statements: 92, branches: 89, functions: 95, lines: 95,

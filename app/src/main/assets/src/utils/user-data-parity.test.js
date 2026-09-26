@@ -5,7 +5,7 @@
    ─────────────────────────────────────────────────────────────────────
    Four lists name the user's own stores, and nothing made them agree:
 
-     1. SettingsScreen.jsx  _exportableStores() + _flagStores()
+     1. backup-flow.js      _exportableStores() + _flagStores()
         — WHAT THE BACKUP WRITES AND RESTORES. The source of truth: a
           store missing here is not in the user's only backup at all.
      2. utils/user-data-size.js  USER_DATA_STORES
@@ -66,7 +66,9 @@ import { USER_DATA_STORES } from './user-data-size.js';
 import { IDBAdapter } from '../stores/idb-adapter.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SETTINGS_PATH = join(HERE, '..', 'ui', 'screens', 'SettingsScreen.jsx');
+// The export + flag maps moved out of SettingsScreen with the backup flows
+// (v15-code-health-05); the constant keeps its name so the legs read as before.
+const SETTINGS_PATH = join(HERE, 'backup-flow.js');
 const VALIDATORS_PATH = join(HERE, 'import-validators.js');
 
 const SETTINGS_SRC = readFileSync(SETTINGS_PATH, 'utf8');
@@ -122,12 +124,12 @@ function votLiterals(region) {
 
 /** Leg 1a — the stores the backup exports and restores by payload. */
 const EXPORTABLE = votLiterals(sliceBetween(
-  SETTINGS_SRC, 'SettingsScreen.jsx', 'const _exportableStores = () => {', 'return stores;',
+  SETTINGS_SRC, 'backup-flow.js', 'const _exportableStores = () => {', 'return stores;',
 ));
 
 /** Leg 1b — the boolean flag stores the backup carries alongside them. */
 const FLAGS = votLiterals(sliceBetween(
-  SETTINGS_SRC, 'SettingsScreen.jsx', 'const _flagStores = () => ({', '});',
+  SETTINGS_SRC, 'backup-flow.js', 'const _flagStores = () => ({', '});',
 ));
 
 /** Leg 3 — the store names the import trust boundary shape-checks. */
@@ -181,8 +183,8 @@ describe('user-data parity — extraction sanity', () => {
     // Floors, not exact counts: adding a store must not fail THIS test (it
     // fails the parity tests below, which say what to do). They exist so a
     // regex that stops matching can never make the parity checks vacuous.
-    expect(EXPORTABLE.length, 'SettingsScreen _exportableStores() parsed too small').toBeGreaterThanOrEqual(15);
-    expect(FLAGS.length, 'SettingsScreen _flagStores() parsed too small').toBeGreaterThanOrEqual(4);
+    expect(EXPORTABLE.length, 'backup-flow _exportableStores() parsed too small').toBeGreaterThanOrEqual(15);
+    expect(FLAGS.length, 'backup-flow _flagStores() parsed too small').toBeGreaterThanOrEqual(4);
     expect(SHAPED.length, 'import-validators STORE_SHAPES parsed too small').toBeGreaterThanOrEqual(15);
     expect(USER_DATA_STORES.length).toBeGreaterThanOrEqual(18);
     // Leg 4 is a real import, not a regex — it needs no marker sanity, only
@@ -222,7 +224,7 @@ describe('user-data parity — USER_DATA_STORES (the "Your Data" size)', () => {
     // that promise with bytes the reader would lose anyway.
     expectCovered(
       USER_DATA_STORES, BACKED_UP,
-      "SettingsScreen's export map", 'app/src/main/assets/src/ui/screens/SettingsScreen.jsx',
+      "backup-flow's export map", 'app/src/main/assets/src/utils/backup-flow.js',
       'the "Your Data" size counts bytes the backup never saves, overstating what is protected.',
     );
   });
@@ -243,7 +245,7 @@ describe('user-data parity — STORE_SHAPES (the import trust boundary)', () => 
   it('shape-checks nothing the backup does NOT restore', () => {
     expectCovered(
       SHAPED, EXPORTABLE,
-      "SettingsScreen's export map", 'app/src/main/assets/src/ui/screens/SettingsScreen.jsx',
+      "backup-flow's export map", 'app/src/main/assets/src/utils/backup-flow.js',
       'a shape is declared for a store nothing imports — either the store was dropped '
       + 'from the backup (and its shape is dead) or it was never wired in.',
     );
@@ -271,8 +273,8 @@ describe('user-data parity — STORE_NAMES (the IDB schema)', () => {
     // burden is on the author to say why it is not the reader's to keep.
     expectCovered(
       SCHEMA, BACKED_UP,
-      "SettingsScreen's export + flag maps",
-      'app/src/main/assets/src/ui/screens/SettingsScreen.jsx',
+      "backup-flow's export + flag maps",
+      'app/src/main/assets/src/utils/backup-flow.js',
       'the store exists, the app writes to it, and Export does not read it — '
       + 'whatever it holds dies with the device. If it genuinely is not user '
       + 'data, exempt it HERE by name with the reason, the way `meta` is.',

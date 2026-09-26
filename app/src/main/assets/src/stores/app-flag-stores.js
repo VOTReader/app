@@ -101,7 +101,7 @@ export const AnnHintDismissedFlagStore = buildFlagStore('vot-ann-hint-dismissed'
 
 /** "Show me around" is done — finished, skipped, or "Don't show this again"
     on the Home strip (review-tutorial, 2026-09-04). Read by TourController
-    (bundle-b) and TourPrompt (bundle-d); listed in Settings' _flagStores so a
+    (bundle-b) and TourPrompt (bundle-d); listed in backup-flow.js's _flagStores so a
     restored backup does not pitch the strip at a reader who already said no.
     IDB schema v11 added the store; no legacy LS data exists for this key. */
 export const TourDoneFlagStore = buildFlagStore('vot-tour-done');

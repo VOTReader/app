@@ -39,13 +39,13 @@
 
 /**
  * The IDB stores (in the main `votreader` database) that hold the user's
- * own content. Mirrors SettingsScreen._exportableStores() + _flagStores()
+ * own content. Mirrors backup-flow.js _exportableStores() + _flagStores()
  * keys — i.e. exactly what the backup includes — so "Your Data" size and
  * "Export" cover the same set. If a store is added to the export, add it
  * here too (and vice-versa).
  *
  * That "add it here too" instruction is no longer on anyone's memory:
- * `user-data-parity.test.js` asserts this list, the SettingsScreen export
+ * `user-data-parity.test.js` asserts this list, the backup-flow.js export
  * map, and import-validators' STORE_SHAPES name the same stores, and fails
  * naming whichever leg is short. It was written because this list had gone
  * a release without `vot-audio-library` — exported and restored, but

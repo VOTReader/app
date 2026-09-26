@@ -195,7 +195,8 @@ describe('a scheduled reload does not outlive the screen that scheduled it', () 
     // Comments are stripped first: this file's own header quotes the old form,
     // and a matcher that reads prose would fire on the explanation rather than
     // on the code.
-    const SCREEN = join(dirname(fileURLToPath(import.meta.url)), 'SettingsScreen.jsx');
+    // The flows (and so both callers) moved to utils/backup-flow.js (v15-code-health-05).
+    const SCREEN = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'utils', 'backup-flow.js');
     const src = readFileSync(SCREEN, 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
     // The stripper carries its own control: a dead stripper leaves the file
@@ -204,6 +205,10 @@ describe('a scheduled reload does not outlive the screen that scheduled it', () 
       .toBeLessThan(readFileSync(SCREEN, 'utf8').length);
     const inline = src.match(/setTimeout\([^;]*location\.reload/g) || [];
     expect(inline, 'an inline reload timer bypasses _scheduleBackupReload').toEqual([]);
+    // ...and none crept back into the screen the flows left.
+    const screenSrc = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'SettingsScreen.jsx'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(screenSrc.match(/setTimeout\([^;]*location\.reload/g) || [], 'an inline reload timer in SettingsScreen').toEqual([]);
     // and the scheduler is actually there — otherwise zero inline timers is
     // satisfied by a screen that no longer reloads at all.
     expect(src).toContain('const _scheduleBackupReload');

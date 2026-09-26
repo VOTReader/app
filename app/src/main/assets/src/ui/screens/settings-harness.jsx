@@ -1,8 +1,8 @@
-// @ts-nocheck — installs free-var globals; SettingsScreen takes no ES imports
+// @ts-nocheck — installs free-var globals; SettingsScreen reaches its cross-bundle deps as globals
 /* SettingsScreen test harness — NOT a test file (no *.test.jsx suffix, so
    vitest does not collect it; import it from one that is).
    ═══════════════════════════════════════════════════════════════════════
-   SettingsScreen is ~1400 lines with ZERO ES imports: every dependency is a
+   SettingsScreen imports only its own bundle-e helpers: every other dependency is a
    free-var global resolved at runtime through the classic-script lexical
    environment — 73 of them. That cost is why the screen had no test at all,
    and why its render gates were verified only by hand in a browser.
