@@ -12312,7 +12312,7 @@ var BIBLE_STUDIES = [
                       "label": "\"Do Not Look Back; Escape to The Father's House\" - Volume Five",
                       "link": {
                         "collection": "Volume Five",
-                        "letterTitle": "Do Not Look Back; Escape to The Fathers House"
+                        "letterTitle": "Do Not Look Back; Escape to The Father’s House"
                       }
                     },
                     {

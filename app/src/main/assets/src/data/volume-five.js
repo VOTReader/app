@@ -1794,12 +1794,12 @@ var LETTERS_V5 = [
     },
     "nextLetter": {
       "id": "do-not-look-back-escape-to-the-fathers-house",
-      "title": "Do Not Look Back; Escape to The Fathers House"
+      "title": "Do Not Look Back; Escape to The Father’s House"
     }
   },
   {
     "id": "do-not-look-back-escape-to-the-fathers-house",
-    "title": "Do Not Look Back; Escape to The Fathers House",
+    "title": "Do Not Look Back; Escape to The Father’s House",
     "date": "12/7/10",
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
@@ -2083,7 +2083,7 @@ var LETTERS_V5 = [
     "num": 15,
     "prevLetter": {
       "id": "do-not-look-back-escape-to-the-fathers-house",
-      "title": "Do Not Look Back; Escape to The Fathers House"
+      "title": "Do Not Look Back; Escape to The Father’s House"
     },
     "nextLetter": {
       "id": "most-needful",
