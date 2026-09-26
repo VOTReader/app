@@ -291,15 +291,18 @@ gray   → #9e9e9e  (subtle, low-emphasis)
 
 **Back-compat:** The old palette used `'cyan'` (value `#4dd0e1`). Old saved highlights with `color: 'cyan'` still render — `.hl-cyan` and `.hl-underline.hl-cyan` rules are kept as compat shims (rendering the new teal value).
 
-### 17.7e Selection-toolbar pointerup lifecycle
+### 17.7e Selection-toolbar lifecycle
 
-The toolbar uses a `dragRef` + `pointerdown`/`pointerup`/`touchend`/`contextmenu` lifecycle:
-- `pointerdown` → `dragRef.current = true`, hide stale toolbar
-- `pointerup` / `touchend` → schedule `computeAndShow()` 60ms later (lets selection finalize)
-- `selectionchange` → only HIDES the toolbar (when selection collapses)
-- `contextmenu` (Android long-press) → also schedules `computeAndShow()` 80ms later
+The toolbar uses a `dragRef` + `pointerdown`/`pointerup`/`touchend`/`contextmenu`/`selectionchange` lifecycle (rewritten in the cp1 sweep, 2026-09-26):
+- `pointerdown` → `dragRef.current = true`, hide the toolbar, and drop a raise still pending from the previous lift.
+- `pointerup` / `touchend` → 150 ms later, raise once the selection's own scroller is still (`STILL_MS` 100 ms without a scroll event from it, capped at 1.5 s): a finger scroll ends in a fling, and a toolbar raised mid-fling rode the text off the screen.
+- `contextmenu` (Android long-press and handle-drag stop, desktop right-click) → raise now and suppress the native menu, when either end of the selection is in a reading block.
+- `selectionchange`: collapsed → hide (after 150 ms, so a tap on the toolbar can land). Changed under a RAISED toolbar (a handle drag, Shift+arrows) → `.is-adjusting` fades it out of the way and it re-raises `SETTLE_MS` (350 ms) after the selection settles; the raised selection's own late `selectionchange` (a long-press dispatches `contextmenu` first) is not a change. Pointer up and no toolbar → debounce-raise.
+- `copy` (Ctrl+C, the Android WebView / Chrome menu, the iOS callout) → the Copy button's text, below.
 
-Result: toolbar appears once after selection settles, rather than following the cursor pixel-by-pixel during drag.
+Result: the toolbar appears once the selection and the page have settled, never over the lines a handle is being dragged into, and never riding a fling.
+
+**Copy / Share text (cp1, `utils/passage-copy.js`).** `passageCopy(range)` is the one serializer: a verse per line with its gutter number and a space ("37 On the last day"; a single verse is numbered only when its number was selected), a letter's paragraphs a blank line apart, a poem's lines (`<div>` or WTLB `<br>`) a line apart, `ANNOTATION_CHROME` and headings left out, then the reference line (`passageReference`: "John 7:37-39 (NKJV)" with the reader's translation, "The Wide Path (Volume Two)"; Hidden Manna by title alone; the journal none, and its copy is left to the browser). Share uses it with `{ numbers: false }` and puts the reference and link under the words. Every multi-block action (highlight, note, remove, copy) reaches only `readingBlocksIn(range)`: never an annotation icon's key and never the inert `.pager-peek` clones a select-all also spans.
 
 ### 17.9 CSS classes
 
