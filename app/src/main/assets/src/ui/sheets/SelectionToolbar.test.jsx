@@ -1521,4 +1521,28 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
     r = nativeCopy(d);
     expect(r.ev.defaultPrevented).toBe(false);
   });
+
+  it('a select-all highlight marks only the page on screen, never the swipe previews of the next and previous chapters', async () => {
+    const peek = document.createElement('div');
+    peek.className = 'pager-peek pager-peek-next';
+    peek.setAttribute('inert', '');
+    peek.innerHTML = '<span class="verse"><span class="verse-num">1</span><span data-hl-key="bible:john:8:1">But Jesus went to the Mount of Olives.</span></span>';
+    chapter();
+    document.body.appendChild(peek);
+    mount();
+    const all = document.createRange();
+    all.setStart(document.body, 0);
+    all.setEnd(document.body, document.body.childNodes.length);
+    all.getBoundingClientRect = () => /** @type {any} */ ({ left: 0, top: 100, right: 80, bottom: 116, width: 80, height: 16 });
+    stubSelection(all);
+    // Ctrl+A: no pointer, so the toolbar rises from the settled selectionchange.
+    await act(async () => {
+      document.dispatchEvent(new Event('selectionchange'));
+      await new Promise((r) => setTimeout(r, 400));
+    });
+    const yellow = /** @type {any} */ (document.querySelector('.sel-color-btn[data-color="yellow"]'));
+    act(() => { fire(yellow, 'click'); });
+    const keys = g.AnnotationStore.add.mock.calls.map((/** @type {any[]} */ c) => c[0]);
+    expect(keys).toEqual(['bible:john:7:37', 'bible:john:7:38', 'bible:john:7:39']);
+  });
 });

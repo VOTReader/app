@@ -7,7 +7,7 @@ import { copyText as copyToClipboard, shareText } from '../../utils/copy-share.j
 import { CopyFallbackSheet } from './CopyFallbackSheet.jsx';
 import { withPassageLink } from '../../utils/passage-link.js';
 import { _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
-import { passageCopy, passageLabel, translationTag } from '../../utils/passage-copy.js';
+import { passageCopy, passageLabel, translationTag, readingBlocksIn } from '../../utils/passage-copy.js';
 import { listenFromTarget, startListenFrom, repeatTarget, startRepeat, REPEAT_TIMES } from '../../utils/listen-from.js';
 // The chrome list is shared with applyDOMHighlights' re-anchor (v05-02): what the recorder leaves out, the re-finder must too.
 import { ANNOTATION_CHROME } from '../../renderer/anchor-view.js';
@@ -545,9 +545,13 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       // on screen decides; see utils/listen-from.js).
       const listen = listenFromTarget(sel);
       if (isMultiVerse) {
-        // Cross-container selection: find all [data-hl-key] containers that overlap
-        const allHlContainers = Array.from(document.querySelectorAll('[data-hl-key]'))
-          .filter(function(c) { return range.intersectsNode(c); });
+        // Cross-container selection: every reading block the range reaches.
+        // readingBlocksIn, not every [data-hl-key] it intersects: a select-all
+        // also spans the swipe previews (inert clones of the previous and
+        // next chapters, pager-peek), and a highlight made then was saved on
+        // both neighbours' verses too (measured on John 7: 53 live marks and
+        // 130 in the peeks). Note icons carry their block's key as well.
+        const allHlContainers = readingBlocksIn(range);
         if (allHlContainers.length === 0) { setVisible(false); return; }
         // REPEAT THIS PASSAGE (rp1 part 3): the blocks the pane can loop, taken with Listen's target.
         const repeat = listen ? repeatTarget(allHlContainers.map((c) => c.getAttribute('data-hl-key') || '')) : null;
@@ -777,7 +781,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       const sel = window.getSelection();
       const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
       const containers = selInfo.multiContainers ||
-        (range ? Array.from(document.querySelectorAll('[data-hl-key]')).filter(function(c) { return range.intersectsNode(c); }) : []);
+        (range ? readingBlocksIn(range) : []);
       const groupId = hlId();
       // Recolor semantics: only remove groups whose range EXACTLY matches
       // the new selection in this container — partial overlap is preserved
@@ -862,7 +866,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
     const containers = selInfo.multiVerse
       ? (selInfo.multiContainers ||
-          (range ? Array.from(document.querySelectorAll('[data-hl-key]')).filter(c => range.intersectsNode(c)) : []))
+          (range ? readingBlocksIn(range) : []))
       : [document.querySelector('[data-hl-key="' + (selInfo.hlKey || '').replace(/"/g, '\\"') + '"]')].filter(Boolean);
     containers.forEach(function(container) {
       if (!container) return;
@@ -944,7 +948,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     let createdGroup = false;
     if (selInfo.multiVerse) {
       const containers = selInfo.multiContainers ||
-        (range ? Array.from(document.querySelectorAll('[data-hl-key]')).filter(c => range.intersectsNode(c)) : []);
+        (range ? readingBlocksIn(range) : []);
       // Attach to an OVERLAPPING group that doesn't already have a note (keeps
       // its existing style/color); otherwise create a new group at the default.
       let attachTarget = null;
