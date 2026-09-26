@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════
 // ESLint config — flat config (ESLint 9.x)
 // ═══════════════════════════════════════════════════════════════════════
-// Scope: every .js and .jsx under app/src/main/assets/src (the 159 source
-// modules). Out of scope: dist (built output), .min.js (vendor),
+// Scope: every .js and .jsx under app/src/main/assets/src (every source
+// module; count them with ls/wc, a number here drifts). Out of scope: dist (built output), .min.js (vendor),
 // src/data (auto-generated corpus data, would be pure noise).
 //
 // NB: line comments throughout this header — block /* */ comments break

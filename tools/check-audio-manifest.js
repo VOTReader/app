@@ -49,7 +49,10 @@
  * Usage:
  *   node tools/check-audio-manifest.js            offline (pre-commit + CI)
  *   node tools/check-audio-manifest.js --release  also ask GitHub whether every
- *                                                 emitted id is on audio-v1
+ *                                                 emitted id is on audio-v1,
+ *                                                 and list release assets it
+ *                                                 never emits (orphans; a
+ *                                                 report, not a failure)
  *                                                 (needs gh; not a CI gate)
  */
 import { readFileSync, existsSync } from 'fs';
@@ -309,15 +312,26 @@ if (process.argv.includes('--release')) {
   try {
     const rid = execFileSync(GH, ['api', `repos/${REPO}/releases/tags/${TAG}`, '-q', '.id'],
       { encoding: 'utf8' }).trim();
-    const out = execFileSync(GH, ['api', '--paginate', `repos/${REPO}/releases/${rid}/assets?per_page=100`, '-q', '.[].name'],
+    const out = execFileSync(GH, ['api', '--paginate', `repos/${REPO}/releases/${rid}/assets?per_page=100`, '-q', '.[] | "\\(.name)\t\\(.size)"'],
       { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
-    const onRelease = new Set(out.split('\n').map((n) => n.trim()).filter(Boolean));
-    const missing = [...emitted].filter((id) => !onRelease.has(id + '.mp3'));
-    console.log(`[audio-manifest] release ${TAG}: ${onRelease.size} assets, ${missing.length} emitted id(s) not yet mirrored`);
+    const sizes = new Map();
+    for (const line of out.split('\n')) {
+      const [name, size] = line.trim().split('\t');
+      if (name) sizes.set(name, Number(size) || 0);
+    }
+    const missing = [...emitted].filter((id) => !sizes.has(id + '.mp3'));
+    console.log(`[audio-manifest] release ${TAG}: ${sizes.size} assets, ${missing.length} emitted id(s) not yet mirrored`);
     if (missing.length) {
       fail(`${missing.length} emitted id(s) are not on the ${TAG} release — run ` +
            `\`python tools/mirror-audio-release.py --until-done\`. First: ${missing.slice(0, 5).join(', ')}`);
     }
+    // The reverse leg: an asset on the release that the manifest never emits is
+    // an orphan (dead weight, or a recording that lost its mapping). Reported,
+    // not failed: deleting one is the owner's call, not this checker's.
+    const orphans = [...sizes.keys()].filter((n) => !emitted.has(n.replace(/\.mp3$/, ''))).sort();
+    const orphanMb = orphans.reduce((n, o) => n + sizes.get(o), 0) / 1e6;
+    console.log(`[audio-manifest] release ${TAG}: ${orphans.length} asset(s) the manifest never emits (${orphanMb.toFixed(1)} MB)` +
+      (orphans.length ? `: ${orphans.join(', ')}` : ''));
   } catch (e) {
     fail('--release could not read the GitHub release: ' + (e && e.message ? e.message.split('\n')[0] : e));
   }

@@ -15,8 +15,9 @@ window-globalized export, run `npm run lint:globals` and stage the
 regenerated files yourself; CI's smoke-lite gate fails on a stale copy.
 
 Sources scanned:
-  1. _entry-b.js / _entry.js / _entry-d.js — Object.assign(window, {...})
-     blocks (the canonical export point for bundle B/C/D modules).
+  1. Every file in ENTRY_FILES below (_entry-b.js, _entry.js, _entry-d.js
+     through _entry-h.js) — Object.assign(window, {...}) blocks (the
+     canonical export point for each bundle's modules).
   2. index.html — top-level `const|let|var|function|class NAME` declarations
      inside the inline <script> blocks (TabsContext, BIBLE_BOOK_LIST,
      COLLECTIONS, the hook-DAG-style declarations, etc.).
