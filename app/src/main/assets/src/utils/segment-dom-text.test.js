@@ -93,6 +93,16 @@ describe('segmentsDomText is the domain Segments renders', () => {
     expect(segmentRenderText(segs, 1)).toBe(' Next');
   });
 
+  it('keeps a quote mark on its words across a segment seam (v14-corpus-01)', () => {
+    const run = (a, b) => segmentRenderText([{ t: 'text', v: a }, { t: 'italic', v: b }], 1);
+    expect(run('turn from it: "', 'I will set')).toBe('I will set');     // opening straight quote
+    expect(run('“', 'Many of them that')).toBe('Many of them that');      // a lone opening curly quote
+    expect(run('your Seed,', '" who is Messiah')).toBe('" who is Messiah'); // closing quote
+    expect(run('RIGHTEOUSNESS.', '” - {{ref:Jeremiah 23:6}}')).toBe('” - {{ref:Jeremiah 23:6}}');
+    expect(run('He said', '"Come')).toBe(' "Come');                      // a quote that OPENS still gets its space
+    expect(run('said:', 'Come')).toBe(' Come');
+  });
+
   it('letter-link contributes its label, not its v', () => {
     expect(segmentsDomText([{ t: 'letter-link', label: 'Grafted In', v: 'ignored' }]))
       .toBe('Grafted In');

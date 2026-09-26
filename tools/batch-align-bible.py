@@ -359,12 +359,17 @@ def ship(ed, belts_dir, want_settings=None, idx=None):
                 # 20:1, CONFIRMED at t = 0.00 -- the only such row in four editions,
                 # 2026-09-13) would never paint. One centisecond is the start.
                 arr[r["n"] - 1] = max(1, int(round(t * 100)))
-        # Monotonic within the chapter: the app binary-searches these, so a
-        # backwards step would make a verse unreachable.
+        # Strictly increasing within the chapter: the app binary-searches these,
+        # so a backwards step would make a verse unreachable, and a TIE paints
+        # only the later verse. A row at or before the onset above it is a
+        # wrong-window probe (WOP 1 Samuel 30:15 and Isaiah 52:4 both heard the
+        # verse before them, 'clamped' in the belt) and ships dark, 0 = unproven;
+        # the old clamp to the previous onset shipped two verses that never
+        # painted (sweep-2 v14-corpus-03, 2026-09-26).
         last = 0
         for i, v in enumerate(arr):
-            if v and v < last:
-                arr[i] = last
+            if v and v <= last:
+                arr[i] = 0
             elif v:
                 last = v
         table.setdefault(book_id, {})[str(chapter)] = arr

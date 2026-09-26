@@ -153,6 +153,18 @@ class ShipIndexesByVerseNumber(unittest.TestCase):
         arr = self._ship(d)["2samuel"]["20"]
         self.assertEqual(arr, [1, 200, 300], "verse 1 at the very start ships as 1 cs, never 0")
 
+    def test_an_onset_at_or_before_the_one_above_ships_dark_not_tied(self):
+        # WOP 1 Samuel 30:15 and Isaiah 52:4 (sweep-2 v14-corpus-03): leg B heard
+        # the verse BEFORE them, landed earlier than the row above, and the old
+        # shipper clamped it UP to that onset -- a tie, so the upper verse never
+        # painted. A row at or before the onset above is unprovable: it ships 0.
+        d = belt("isaiah", 52, [1, 2, 3, 4, 5])
+        d["verses"][3]["t"] = 2.5          # verse 4 heard before verse 3
+        d["verses"][4]["t"] = 3.0          # verse 5 ties verse 3
+        arr = self._ship(d)["isaiah"]["52"]
+        self.assertEqual(arr, [100, 200, 300, 0, 0])
+        self.assertTrue(all(b > a for a, b in zip([x for x in arr if x], [x for x in arr if x][1:])))
+
     def test_a_dense_chapter_is_unaffected(self):
         # The control. Without it the assertion above would also pass on a
         # shipper that had simply stopped writing anything after a gap, and it

@@ -53400,7 +53400,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "the grave or the pit ."
+                "v": "the grave or the pit."
               }
             ]
           },
@@ -53421,7 +53421,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "the Valley of Hinnom ."
+                "v": "the Valley of Hinnom."
               },
               {
                 "t": "text",
@@ -53772,7 +53772,7 @@ var BIBLE_STUDIES = [
             "segments": [
               {
                 "t": "bold-italic",
-                "v": "*ALL WHO HAVE SINNED FIRST GO TO SHEOL [Hebrew word penned 65 times in the Old Testament Scriptures. It has been translated in the KJV: \"Grave\" – 31 times, \"Pit\" – 3 times and Mistranslated \"Hell\" – 31 times; SHEOL is also mistranslated in the New Testament as \"Hades\" (from the Greek) (i.e. {{ref:Acts 2:27}} ({{ref:Acts 2:27}}) ):"
+                "v": "*ALL WHO HAVE SINNED FIRST GO TO SHEOL [Hebrew word penned 65 times in the Old Testament Scriptures. It has been translated in the KJV: \"Grave\" – 31 times, \"Pit\" – 3 times and Mistranslated \"Hell\" – 31 times; SHEOL is also mistranslated in the New Testament as \"Hades\" (from the Greek) (i.e. {{ref:Acts 2:27}}):"
               }
             ]
           },
@@ -54292,7 +54292,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "in the day they are called forth from the pit , when they stand up in their graves"
+                "v": "in the day they are called forth from the pit, when they stand up in their graves"
               },
               {
                 "t": "text",
@@ -54352,7 +54352,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "Thus they have made their covenant with death , and with the grave they are in agreement.\""
+                "v": "Thus they have made their covenant with death, and with the grave they are in agreement.\""
               },
               {
                 "t": "italic",
@@ -54383,7 +54383,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "Lo, they have made their covenant with death , and with the grave they are in agreement!"
+                "v": "Lo, they have made their covenant with death, and with the grave they are in agreement!"
               },
               {
                 "t": "text",
@@ -54531,7 +54531,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "Your hands I commit My spirit ."
+                "v": "Your hands I commit My spirit."
               },
               {
                 "t": "italic",
@@ -54803,7 +54803,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "Death is swallowed up in victory ."
+                "v": "Death is swallowed up in victory."
               },
               {
                 "t": "italic",
@@ -55096,7 +55096,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "There will be a resurrection of the dead, both of the just and the unjust ."
+                "v": "There will be a resurrection of the dead, both of the just and the unjust."
               },
               {
                 "t": "italic",
@@ -56263,7 +56263,7 @@ var BIBLE_STUDIES = [
             "segments": [
               {
                 "t": "bold-italic",
-                "v": "Please take note of the definitions of these >> emphasized words << in Strong's Exhaustive Concordance of the Bible , which is an exhaustive cross-reference of every word in the KJV back to the word in the original text."
+                "v": "Please take note of the definitions of these >> emphasized words << in Strong's Exhaustive Concordance of the Bible, which is an exhaustive cross-reference of every word in the KJV back to the word in the original text."
               }
             ]
           },
@@ -56390,7 +56390,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "that they may not be ."
+                "v": "that they may not be."
               },
               {
                 "t": "italic",
@@ -58960,7 +58960,7 @@ var BIBLE_STUDIES = [
             "segments": [
               {
                 "t": "bold-italic",
-                "v": "*This parable was prophetic, in saying “ neither will they be persuaded though one rise from the dead .”"
+                "v": "*This parable was prophetic, in saying “ neither will they be persuaded though one rise from the dead.”"
               }
             ]
           },
@@ -59118,7 +59118,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": "1. The Lazarus of the parable was Eleazar, Abraham’s steward ( {{ref:Genesis 15:2}} ({{ref:Genesis 15:2}}) ). 2. He was a Gentile “of Damascus”, “a proselyte of the gate”, who “ate the crumbs.” 3. He was disinherited (to become a beggar), but he remained faithful to Abraham and God. 4. When his earthly life was over, he received Abraham’s inheritance after all (he was in Abraham’s bosom) — in “everlasting habitations.” 5. The Rich Man of the parable was Judah. This son of Jacob had five literal brothers as did the Rich Man. 6. He was also a literal son of Abraham, while Eleazar (Lazarus) was not! 7. The Rich Man (Judah) also had the kingship (purple) and the priesthood (linen). 8. Yet Judah, a representative of God on earth, was not the true steward of the Abrahamic blessings. 9. Though he and his literal brothers had been graced with the “oracles of God” (the Old Testament), they would not respond to The One resurrected from the dead (The Messiah, who is called Christ). 10. The “great gulf” was the Jordan rift valley, the dividing line between Gentile lands and the Holy Land of promise (Abraham’s inheritance). Crossing the Jordan was a typical figure recognized by the Jews as a symbol of salvation."
+                "v": "1. The Lazarus of the parable was Eleazar, Abraham’s steward ( {{ref:Genesis 15:2}} ). 2. He was a Gentile “of Damascus”, “a proselyte of the gate”, who “ate the crumbs.” 3. He was disinherited (to become a beggar), but he remained faithful to Abraham and God. 4. When his earthly life was over, he received Abraham’s inheritance after all (he was in Abraham’s bosom) — in “everlasting habitations.” 5. The Rich Man of the parable was Judah. This son of Jacob had five literal brothers as did the Rich Man. 6. He was also a literal son of Abraham, while Eleazar (Lazarus) was not! 7. The Rich Man (Judah) also had the kingship (purple) and the priesthood (linen). 8. Yet Judah, a representative of God on earth, was not the true steward of the Abrahamic blessings. 9. Though he and his literal brothers had been graced with the “oracles of God” (the Old Testament), they would not respond to The One resurrected from the dead (The Messiah, who is called Christ). 10. The “great gulf” was the Jordan rift valley, the dividing line between Gentile lands and the Holy Land of promise (Abraham’s inheritance). Crossing the Jordan was a typical figure recognized by the Jews as a symbol of salvation."
               },
               {
                 "t": "bold-italic",
@@ -59289,7 +59289,7 @@ var BIBLE_STUDIES = [
               [
                 {
                   "t": "italic",
-                  "v": "~ (The Volumes of Truth, Volume 4 )"
+                  "v": "~ (The Volumes of Truth, Volume 4)"
                 }
               ]
             ]
@@ -59491,7 +59491,7 @@ var BIBLE_STUDIES = [
               [
                 {
                   "t": "italic",
-                  "v": "~ (The Volumes of Truth, Volume 2 )"
+                  "v": "~ (The Volumes of Truth, Volume 2)"
                 }
               ]
             ]
@@ -59757,7 +59757,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "transgression under The Law ."
+                "v": "transgression under The Law."
               },
               {
                 "t": "text",
@@ -59800,7 +59800,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "could not be justified by the Law of Moses ."
+                "v": "could not be justified by the Law of Moses."
               },
               {
                 "t": "text",
@@ -60032,7 +60032,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "I had not known sin, but by the Law ."
+                "v": "I had not known sin, but by the Law."
               },
               {
                 "t": "text",
@@ -60486,7 +60486,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "The Day of Pentecost ."
+                "v": "The Day of Pentecost."
               },
               {
                 "t": "text",
@@ -60912,7 +60912,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "rested the Sabbath day according to the commandment ."
+                "v": "rested the Sabbath day according to the commandment."
               },
               {
                 "t": "text",
@@ -61297,7 +61297,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "they have despised the Law of YAHUWAH , and have not kept His commandments"
+                "v": "they have despised the Law of YAHUWAH, and have not kept His commandments"
               },
               {
                 "t": "text",
@@ -61590,7 +61590,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "slay the Passover lamb ."
+                "v": "slay the Passover lamb."
               },
               {
                 "t": "text",
@@ -61704,7 +61704,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "ye desire again to be in bondage ? Ye observe days, and months, and times, and years"
+                "v": "ye desire again to be in bondage? Ye observe days, and months, and times, and years"
               },
               {
                 "t": "text",
@@ -61755,7 +61755,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "reject the commandment of God, that ye may keep your own tradition ."
+                "v": "reject the commandment of God, that ye may keep your own tradition."
               },
               {
                 "t": "text",
@@ -61784,7 +61784,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "Let no man therefore judge you in meat, or in drink, or in respect of an holyday, or of the new moon, or of the Sabbath days: Which are a shadow of things to come; but the body is of Christ ."
+                "v": "Let no man therefore judge you in meat, or in drink, or in respect of an holyday, or of the new moon, or of the Sabbath days: Which are a shadow of things to come; but the body is of Christ."
               },
               {
                 "t": "text",
@@ -62581,7 +62581,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "For the Spirit is not a person , nor have I called it by name."
+                "v": "For the Spirit is not a person, nor have I called it by name."
               },
               {
                 "t": "text",
@@ -62615,7 +62615,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Volume 2 )"
+                "v": ", Volume 2)"
               }
             ]
           },
@@ -62666,7 +62666,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Volume 2 )"
+                "v": ", Volume 2)"
               }
             ]
           },
@@ -62679,7 +62679,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "For the Spirit is not a person , as one separate. Rather it is a gift, a blessing received through The Messiah."
+                "v": "For the Spirit is not a person, as one separate. Rather it is a gift, a blessing received through The Messiah."
               },
               {
                 "t": "text",
@@ -62713,7 +62713,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Volume 3 )"
+                "v": ", Volume 3)"
               }
             ]
           },
@@ -62756,7 +62756,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Volume 3 )"
+                "v": ", Volume 3)"
               }
             ]
           },
@@ -62791,7 +62791,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Volume 7 )"
+                "v": ", Volume 7)"
               }
             ]
           }
@@ -62947,7 +62947,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Volume 3 )"
+                "v": ", Volume 3)"
               }
             ]
           },
@@ -62998,7 +62998,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Volume 3 )"
+                "v": ", Volume 3)"
               }
             ]
           }
@@ -63041,7 +63041,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "No prophecy of Scripture is to be interpreted by an individual on his own ; for never has a prophecy come as a result of human willing"
+                "v": "No prophecy of Scripture is to be interpreted by an individual on his own; for never has a prophecy come as a result of human willing"
               },
               {
                 "t": "text",
@@ -63062,7 +63062,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "arrogant assumption , which led them into their own private interpretation of My Word, having also forgotten that no prophecy of Scripture is to be interpreted by an individual on his own . For no prophecy or Scripture has ever come about by the power of man’s will."
+                "v": "arrogant assumption, which led them into their own private interpretation of My Word, having also forgotten that no prophecy of Scripture is to be interpreted by an individual on his own. For no prophecy or Scripture has ever come about by the power of man’s will."
               },
               {
                 "t": "text",
@@ -63092,7 +63092,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Letters to The Lord's Little Flock )"
+                "v": ", Letters to The Lord's Little Flock)"
               }
             ]
           },
@@ -63105,7 +63105,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "Beware of the doctrines and traditions of men in the churches. Stumble not over the letter, nor be led astray by perverse interpretations or biased translations , by which the churches of men have marred My Word before the people."
+                "v": "Beware of the doctrines and traditions of men in the churches. Stumble not over the letter, nor be led astray by perverse interpretations or biased translations, by which the churches of men have marred My Word before the people."
               },
               {
                 "t": "text",
@@ -63135,7 +63135,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Volume 2 )"
+                "v": ", Volume 2)"
               }
             ]
           },
@@ -63148,7 +63148,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "Churches of men, what god is this you serve?! What savior is this you testify of?! Behold, he has become unrecognizable to Me, an idol which you have made, a corrupt image which you have established upon the doctrines and traditions of men, which run contrary to Me and My Word! Yes, it is MY Word which you have polluted, mistranslated and misinterpreted , according to the vain deceits of men in authority, whose hearts are perverse, overflowing with pride, puffed up and full of vanity! Says The Lord."
+                "v": "Churches of men, what god is this you serve?! What savior is this you testify of?! Behold, he has become unrecognizable to Me, an idol which you have made, a corrupt image which you have established upon the doctrines and traditions of men, which run contrary to Me and My Word! Yes, it is MY Word which you have polluted, mistranslated and misinterpreted, according to the vain deceits of men in authority, whose hearts are perverse, overflowing with pride, puffed up and full of vanity! Says The Lord."
               },
               {
                 "t": "text",
@@ -63170,7 +63170,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Volume 7 )"
+                "v": ", Volume 7)"
               }
             ]
           },
@@ -63199,7 +63199,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "though it is greatly misinterpreted, the error of which is compounded by the mistranslations of men. Yet worse still is the interpretation of My Word by men of intellect and learning , who shroud their arrogance in pretense and hide their error under the guise of established doctrine - unprofitable servants who lead My people astray."
+                "v": "though it is greatly misinterpreted, the error of which is compounded by the mistranslations of men. Yet worse still is the interpretation of My Word by men of intellect and learning, who shroud their arrogance in pretense and hide their error under the guise of established doctrine - unprofitable servants who lead My people astray."
               },
               {
                 "t": "text",
@@ -63229,7 +63229,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Volume 2 )"
+                "v": ", Volume 2)"
               }
             ]
           },
@@ -63242,7 +63242,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "no prophecy of Scripture is to be interpreted by an individual on his own . For no prophecy or Scripture has ever come about by the power of man’s will."
+                "v": "no prophecy of Scripture is to be interpreted by an individual on his own. For no prophecy or Scripture has ever come about by the power of man’s will."
               },
               {
                 "t": "text",
@@ -63266,7 +63266,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "For I tell you the truth, the translations of men are greatly erred, which leads to an even greater misinterpretation of My Word by the churches of men , who seek not the Truth as it is but long for that which is malleable, embracing only that which yields to their own perverse desires and expectations."
+                "v": "For I tell you the truth, the translations of men are greatly erred, which leads to an even greater misinterpretation of My Word by the churches of men, who seek not the Truth as it is but long for that which is malleable, embracing only that which yields to their own perverse desires and expectations."
               },
               {
                 "t": "text",
@@ -63274,7 +63274,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "Be wary of their scholars, and stop your ears from hearing the arrogant speeches of all these men in authority; be wary and vigilant. For they hold tightly to singleness of doctrine, teaching always that which is built upon the corrupt knowledge and vain understanding of men, men who refuse to let go of that which was passed down to them by their forefathers, by which they also remain blind, doctrines and traditions I hate! For they hold onto judgment, seeking always to expose the darkness in men, though they themselves continue to embrace every contemptuous word and deed, perverting My Word and polluting My name before many witnesses . Thus the day is coming and is already here, when all they have wrought in My name shall be tried, it shall surely be tested, and found wanting, declares The Lord."
+                "v": "Be wary of their scholars, and stop your ears from hearing the arrogant speeches of all these men in authority; be wary and vigilant. For they hold tightly to singleness of doctrine, teaching always that which is built upon the corrupt knowledge and vain understanding of men, men who refuse to let go of that which was passed down to them by their forefathers, by which they also remain blind, doctrines and traditions I hate! For they hold onto judgment, seeking always to expose the darkness in men, though they themselves continue to embrace every contemptuous word and deed, perverting My Word and polluting My name before many witnesses. Thus the day is coming and is already here, when all they have wrought in My name shall be tried, it shall surely be tested, and found wanting, declares The Lord."
               },
               {
                 "t": "text",
@@ -63296,7 +63296,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Volume 4 )"
+                "v": ", Volume 4)"
               }
             ]
           }
@@ -63339,7 +63339,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "Do not add to His words , lest He rebuke you, and you be found a liar."
+                "v": "Do not add to His words, lest He rebuke you, and you be found a liar."
               },
               {
                 "t": "text",
@@ -63431,7 +63431,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "do not add to My words , lest I rebuke you and you be found a liar,"
+                "v": "do not add to My words, lest I rebuke you and you be found a liar,"
               },
               {
                 "t": "text",
@@ -63497,7 +63497,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Volume 4 )"
+                "v": ", Volume 4)"
               }
             ]
           },
@@ -63536,7 +63536,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Volume 2 )"
+                "v": ", Volume 2)"
               }
             ]
           },
@@ -63557,7 +63557,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "twisting and segregating the Scriptures, both adding to and taking away , that they may continue to uphold their own corrupt doctrines and filthy traditions, which I hate!"
+                "v": "twisting and segregating the Scriptures, both adding to and taking away, that they may continue to uphold their own corrupt doctrines and filthy traditions, which I hate!"
               },
               {
                 "t": "text",
@@ -63579,7 +63579,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Volume 7 )"
+                "v": ", Volume 7)"
               }
             ]
           },
@@ -63630,7 +63630,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Volume 3 )"
+                "v": ", Volume 3)"
               }
             ]
           },
@@ -63643,7 +63643,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "For you do always add to and take away from My words , in an effort to uphold your own way. Know you not, that which is of God has salt in itself and in no wise needs seasoning?"
+                "v": "For you do always add to and take away from My words, in an effort to uphold your own way. Know you not, that which is of God has salt in itself and in no wise needs seasoning?"
               },
               {
                 "t": "text",
@@ -63665,7 +63665,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "italic",
-                "v": ", Volume 7 )"
+                "v": ", Volume 7)"
               }
             ]
           }
@@ -63911,7 +63911,7 @@ var BIBLE_STUDIES = [
             "segments": [
               {
                 "t": "italic",
-                "v": "Question asked by Timothy: Lord, can You help me better understand {{ref:John 16:13-15}} ({{ref:John 16:13-15}}) ?"
+                "v": "Question asked by Timothy: Lord, can You help me better understand {{ref:John 16:13-15}}?"
               }
             ]
           },
@@ -64914,7 +64914,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "keeping The Law is a reflection of My own spirit in you ."
+                "v": "keeping The Law is a reflection of My own spirit in you."
               },
               {
                 "t": "text",
@@ -66105,7 +66105,7 @@ var BIBLE_STUDIES = [
               },
               {
                 "t": "bold-italic",
-                "v": "If you ask of Me forgiveness, I shall surely forgive you, even for all you have done. Yet to continue in those same sins, for which you had sought forgiveness, is most unpleasant in My sight. For by doing so, you have made My forgiveness of no effect. For that which requires forgiveness is the very same from which you must depart, lest your repentance become unrepentance, crucifying Me again and again in your heart . For repentance is more than the asking. It must come from a deep desire to be set free in My love, followed by a sincere unyielding commitment to make your love perfect through your obedience, the shedding of the skin of this world, the crucifying of your old man with his sinful ways... The putting on of the new man who is renewed in the knowledge of The Holy One, conforming to the image of Him who created him, says The Lord."
+                "v": "If you ask of Me forgiveness, I shall surely forgive you, even for all you have done. Yet to continue in those same sins, for which you had sought forgiveness, is most unpleasant in My sight. For by doing so, you have made My forgiveness of no effect. For that which requires forgiveness is the very same from which you must depart, lest your repentance become unrepentance, crucifying Me again and again in your heart. For repentance is more than the asking. It must come from a deep desire to be set free in My love, followed by a sincere unyielding commitment to make your love perfect through your obedience, the shedding of the skin of this world, the crucifying of your old man with his sinful ways... The putting on of the new man who is renewed in the knowledge of The Holy One, conforming to the image of Him who created him, says The Lord."
               },
               {
                 "t": "text",

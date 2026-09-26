@@ -85,12 +85,29 @@ def flat_translation_map(translation):
     return json.loads(body[:-1])
 
 
-def fresh_verses(bab, ed, book, ch, tmp, flat=None):
+def extract_all(translation, tmp):
+    """Every chapter of a translation from ONE extractor run (its --all mode): the
+    same readers as the per-chapter call, so nkjv (books.js) and vot-matthew cost one
+    node spawn instead of one per chapter (sweep-2 n7-04: 1,217 spawns, 152 s of CI).
+    Keyed by audio-manifest id. None when the run fails; the caller then falls back
+    to per-chapter extraction, which names the failing chapter."""
+    path = os.path.join(tmp, f"all.{translation}.json")
+    r = subprocess.run(["node", os.path.join(BASE, "extract-bible-verses.mjs"), "--all", path,
+                        "--translation", translation],
+                       capture_output=True, encoding="utf-8", errors="replace", cwd=ROOT)
+    if r.returncode != 0 or not os.path.exists(path):
+        return None
+    return json.load(open(path, encoding="utf-8"))
+
+
+def fresh_verses(bab, ed, book, ch, tmp, flat=None, every=None):
     if flat is not None:
         rows = flat.get("matthew-plain" if book == "matthew" else book, {}).get(str(ch))
         if rows is None:
             return None
         return sorted(({"n": r["n"], "text": str(r["text"])} for r in rows), key=lambda r: r["n"])
+    if every is not None and str(ch) in every.get(book, {}):
+        return every[book][str(ch)]
     path = os.path.join(tmp, f"{book}_{ch:03d}.json")
     r = subprocess.run(["node", os.path.join(BASE, "extract-bible-verses.mjs"), book, str(ch), path,
                         "--translation", bab.EDITIONS[ed]["translation"]],
@@ -110,8 +127,8 @@ def rebuild(belt):
             arr[r["n"] - 1] = max(1, int(round(t * 100)))   # 1, never 0: 0 reads as unproven (ship())
     last = 0
     for i, v in enumerate(arr):
-        if v and v < last:
-            arr[i] = last
+        if v and v <= last:
+            arr[i] = 0                  # at or before the onset above: dark (ship(), v14-corpus-03)
         elif v:
             last = v
     return arr
@@ -129,6 +146,8 @@ def check(ed, a):
     idx = {} if structural else bab.audio_index(ed)
     belts_dir = os.path.join(BASE, "_align-work", "bible", ed)
     flat = flat_translation_map(bab.EDITIONS[ed]["translation"])
+    tmp = tempfile.mkdtemp(prefix="bible-sync-validate-")
+    every = extract_all(bab.EDITIONS[ed]["translation"], tmp) if flat is None else None
     data_path = a.data or os.path.join(DATA, f"bible-sync-{ed}.js")
     src = open(data_path, encoding="utf-8").read()
     var = "BIBLE_SYNC_" + ed.upper().replace("-", "_")
@@ -139,7 +158,6 @@ def check(ed, a):
     table = json.loads(m.group(1))
     problems = []
     pinned = []                 # chapters in the file below the gate by bab.GATE_PINS (printed, never silent)
-    tmp = tempfile.mkdtemp(prefix="bible-sync-validate-")
     chapters = slots = zeros = 0
     shipped = set()
     absent = []                 # slots this edition has no verse for
@@ -149,7 +167,7 @@ def check(ed, a):
             tag = f"{book}_{ch:03d}"
             chapters += 1
             shipped.add((book, ch))
-            verses = fresh_verses(bab, ed, book, ch, tmp, flat)
+            verses = fresh_verses(bab, ed, book, ch, tmp, flat, every)
             if verses is None:
                 problems.append((tag, "reference verses could not be extracted"))
                 continue
@@ -198,8 +216,9 @@ def check(ed, a):
                 problems.append((tag, "non-integer or negative slot"))
             last = 0
             for i, v in enumerate(arr):
-                if v and v < last:
-                    problems.append((tag, f"onset steps backwards at verse {i + 1}"))
+                if v and v <= last:
+                    problems.append((tag, f"onset does not step forward at verse {i + 1} "
+                                          "(a tie paints only the later verse)"))
                 if v:
                     last = v
             if structural:

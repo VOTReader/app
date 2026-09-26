@@ -871,6 +871,24 @@ export function validateFormatC(books, opts = {}) {
 
 // ── Format D (Bible Studies: bible-studies.js) ───────────────────
 
+// STUDY1 (sweep-2 v14-corpus-02, 2026-09-26): the site import left 57 spaces
+// before punctuation ("not a person , nor") and 3 doubled cites
+// ("{{ref:X}} ({{ref:X}})") the live site does not have. A digit or a dot after
+// the mark is left alone ("4 .5", "word ...").
+const STRAY_SPACE_RE = /[\w'"”’}] +[,;:?.!)](?![.\d])/;
+const DOUBLED_REF_RE = /\{\{ref:([^}]+)\}\} \(\{\{ref:\1\}\}\)/;
+
+/** Every segment text ("v") anywhere under a study chapter. */
+function segmentTexts(node, out = []) {
+  if (Array.isArray(node)) {
+    for (const x of node) segmentTexts(x, out);
+  } else if (node && typeof node === 'object') {
+    if (typeof node.v === 'string') out.push(node.v);
+    for (const k of Object.keys(node)) if (k !== 'v') segmentTexts(node[k], out);
+  }
+  return out;
+}
+
 /**
  * @param {object[]} studies - BIBLE_STUDIES array
  * @param {{ strict?: boolean, fileName?: string }} [opts]
@@ -941,6 +959,12 @@ export function validateFormatD(studies, opts = {}) {
         }
         if (ch.blocks !== undefined && !Array.isArray(ch.blocks)) {
           errors.push(`${cp}: "blocks" must be an array if present`);
+        }
+        for (const v of segmentTexts(ch)) {
+          const sp = v.match(STRAY_SPACE_RE);
+          if (sp) errors.push(`${cp}: STUDY1 — a space before punctuation ("${sp[0]}"); the site has none`);
+          const dup = v.match(DOUBLED_REF_RE);
+          if (dup) errors.push(`${cp}: STUDY1 — a doubled scripture cite "${dup[0]}"; keep one {{ref}}`);
         }
       }
     }

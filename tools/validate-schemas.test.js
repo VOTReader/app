@@ -992,6 +992,15 @@ describe('validateFormatD', () => {
     expect(validateFormatD([study]).errors).toEqual([]);
   });
 
+  it('STUDY1: flags a space before punctuation and a doubled cite, deep in a chapter', () => {
+    const seg = (v) => ({ id: 'study-1-ch1', blocks: [{ type: 'p', segments: [{ t: 'text', v }] }] });
+    const err = (v) => validateFormatD([validStudy({ chapters: [seg(v)] })]).errors;
+    expect(err('For the Spirit is not a person , nor')[0]).toContain('STUDY1');
+    expect(err('understand {{ref:John 16:13-15}} ?')[0]).toContain('STUDY1');
+    expect(err('see {{ref:Acts 2:27}} ({{ref:Acts 2:27}})').join()).toContain('doubled');
+    expect(err('For the Spirit is not a person, nor... (Volume 4) {{ref:Acts 2:27}} ({{ref:Acts 2:28}})')).toEqual([]);
+  });
+
   it('detects missing chapters', () => {
     const s = validStudy(); delete s.chapters;
     expect(validateFormatD([s]).errors[0]).toContain('chapters');

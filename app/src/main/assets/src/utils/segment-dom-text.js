@@ -23,11 +23,21 @@
 /** Segments whose DOM text is not their `v` (see Segments.jsx). */
 const RENDERS_NOTHING = 'stanza-break';
 
+/** The previous segment ends on an OPENING quote or bracket: the word after it
+ *  belongs to it (`turn from it: "` + `I will set` must not read `" I will`).
+ *  A straight quote opens when a space, bracket or dash stands before it. */
+const OPENS = /(?:[([{“‘]|(?:^|[\s([{—–-])["'])$/;
+/** This segment starts with a CLOSING quote: a curly one, or a straight one
+ *  followed by a space, punctuation or the end (`your Seed,` + `" who is`). */
+const CLOSES = /^(?:[”’]|")(?=$|[\s.,;:!?)\]}—–-])/;
+
 /**
  * The collision guard, verbatim from Segments.jsx: inject a leading space
  * when the previous segment ended non-whitespace and this one opens with a
  * word char / bracket / quote. Deliberately NOT applied before trailing
- * punctuation that the fetch script split into its own segment.
+ * punctuation that the fetch script split into its own segment, after an
+ * opening quote, or before a closing one: 182 quote marks in the Bible
+ * Studies stood a space away from their words (sweep-2 v14-corpus-01).
  * @param {Array<any>} segments
  * @param {number} i
  * @returns {string}
@@ -37,6 +47,7 @@ export function segmentRenderText(segments, i) {
   if (!seg) return '';
   const prevV = i > 0 ? (segments[i - 1] && segments[i - 1].v) || '' : '';
   return seg.v && /^[\w([{"“‘]/.test(seg.v) && /\S$/.test(prevV)
+      && !OPENS.test(prevV) && !CLOSES.test(seg.v)
     ? ' ' + seg.v
     : seg.v || '';
 }

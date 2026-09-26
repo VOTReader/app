@@ -37,7 +37,7 @@ const KEY = 'index';
    chain only). Every index cached before this still CONTAINS its titles and
    bodies, so the builder change alone would keep serving the leak to every
    installed client forever; the bump is what discards them. */
-export const MS_INDEX_VERSION = 'm9';   // m9: nothing indexed changes. segment-dom-text.js (fingerprinted) gained segmentsDomPieces for the link excerpt picker; the text index-builder reads is the same (2026-09-25)
+export const MS_INDEX_VERSION = 'm10';  // m10: segmentRenderText no longer puts a seam space after an opening quote or before a closing one, so 187 Bible Study passages index as '"I will' not '" I will' (sweep-2 v14-corpus-01, 2026-09-26); an m9 index holds the old text. PREVIOUS m9: nothing indexed changes. segment-dom-text.js (fingerprinted) gained segmentsDomPieces for the link excerpt picker; the text index-builder reads is the same (2026-09-25)
 // m8: WTLB, The Blessed, Holy Days and Answers bodies without their **bold** / _italic_ markers (2026-09-25)
 // m7: letter and study bodies in the reader's text: no footnote numbers, letter-link labels, the renderer's spacing (2026-09-25)
 // m6: KJV-R verses from the KJV base, block-shaped Holy Days bodies, studies always in (REPORT #8, 2026-09-24)
@@ -45,7 +45,7 @@ export const MS_INDEX_VERSION = 'm9';   // m9: nothing indexed changes. segment-
 
 /** MUST equal service-worker.js CORPUS_VERSION — gate-enforced (SRCH1, see
  *  header). Busts the cached index on content-only corpus edits. */
-export const CORPUS_CONTENT_VERSION = 'c64';
+export const CORPUS_CONTENT_VERSION = 'c65';
 
 function ln(v) { return (v && typeof v.length === 'number') ? v.length : 0; }
 function kc(v) { return (v && typeof v === 'object') ? Object.keys(v).length : 0; }
