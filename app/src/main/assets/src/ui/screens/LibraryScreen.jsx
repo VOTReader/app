@@ -23,6 +23,7 @@
 import { ACHIEVEMENT_STORE_NAMES, buildAchievements, collectAchievementSnapshot } from '../../utils/achievements.js';
 import { isMarkKind } from '../../utils/mark-kinds.js';
 import { createPressDrag } from '../../utils/press-drag.js';
+import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 
 // Abnormal-path trace for the tile drag — console.warn + DiagnosticLog so a
 // failing device names itself (same pattern as [tabdrag]/[thumb]).
@@ -35,17 +36,9 @@ function _libDragTrace(msg) {
   } catch (_e) { /* ignore */ }
 }
 
-/** Subscribe to one cross-bundle store by name (absent store = inert). */
-function useStoreVersion(name) {
-  const store = /** @type {any} */ (globalThis)[name];
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (store && typeof store.subscribe === 'function') ? store.subscribe(cb) : () => {}, [store]),
-    () => (store && typeof store.getVersion === 'function') ? store.getVersion() : 0
-  );
-}
 
 export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenMilestones, onOpenPlans, readingPlanCount, onOpenScriptureWeb, totalReadCount, readItems, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
-  ACHIEVEMENT_STORE_NAMES.forEach(useStoreVersion);   // fixed list — stable hook order
+  ACHIEVEMENT_STORE_NAMES.forEach(useStoreVersionByName);   // fixed list — stable hook order
   // (AudioLibraryStore is in that list — the milestones chip counts listening.
   // The Listening Library itself moved to a HOME card on 2026-08-09.)
 

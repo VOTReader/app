@@ -15,21 +15,14 @@
    _entry-d.js fills, because a second bundled copy of achievements.js would
    be two module states of one table. */
 
-/** Subscribe to one cross-bundle store by name (absent store = inert).
- *  RETURNS the version so the caller can key work on it. */
-function useStoreVersion(name) {
-  const store = /** @type {any} */ (globalThis)[name];
-  return React.useSyncExternalStore(
-    React.useCallback((cb) => (store && typeof store.subscribe === 'function') ? store.subscribe(cb) : () => {}, [store]),
-    () => (store && typeof store.getVersion === 'function') ? store.getVersion() : 0
-  );
-}
+import { useStoreVersionByName } from '../../hooks/use-store-version.js';
+
 
 export function MilestonesScreen({ onBack, backLabel = 'Library', readItems, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   // Fixed list → stable hook order. The joined versions are the memo key
   // below: every one of these stores can change an achievement, and none of
   // them can change one without bumping its version.
-  const storeVersions = ACHIEVEMENT_STORE_NAMES.map(useStoreVersion).join('|');
+  const storeVersions = ACHIEVEMENT_STORE_NAMES.map(useStoreVersionByName).join('|');
 
   // Rebuilding all ~84 achievements means re-reading ten stores and walking
   // the whole readItems map. Unmemoized, that ran on EVERY render — including
