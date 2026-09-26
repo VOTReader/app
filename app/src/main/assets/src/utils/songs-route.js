@@ -14,7 +14,8 @@
    Frames:
      { k: 'hub', q?, st? }   the hub; q = the Find box, st = the style chip
      { k: 'list', v }        a collection or shelf: 'col:<volKey>', 'shelf:inspired' | 'shelf:bible' |
-                             'shelf:originals', 'saved', 'recent', 'new', 'kept' (on this phone, K1), 'letter:<volKey:letterId>'
+                             'shelf:originals', 'saved', 'recent', 'new', 'kept' (on this phone, K1), 'letter:<volKey:letterId>',
+                             'sung:<volKey:letterId>' (only its verbatim songs)
      { k: 'song', v }        one song (a family id) and its versions
      { k: 'readings' }       the letters read with music
    ═══════════════════════════════════════════════════════════════════════ */

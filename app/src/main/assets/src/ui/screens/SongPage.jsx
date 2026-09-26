@@ -3,7 +3,9 @@
 
    A frame of the Songs screen ({ k: 'song', v: <family id> }), drawn by
    AudioSongsScreen. A centred cover; SONG · N VERSIONS; the title; "From the
-   letter: … ›" only for a medium or high link; the collection; "Made with
+   letter: … ›" only for a medium or high link whose lead version sings the
+   letter's own words (the verbatim gate), "Inspired by the letter: … ›" for
+   an interpretation; the collection; "Made with
    Suno · by …"; PLAY (filled) and SAVE (outlined); the KEEP card (K1); the
    version rows (first four, then "Show all N versions ›"); a lyrics preview;
    more songs from the same letter.
@@ -53,6 +55,11 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
   if (!fam || !lead) return <p className="songs-empty">This song is no longer shared.</p>;
 
   const letter = songLetterOf(fam) || songLetterOf(lead);
+  // The verbatim gate (Corbin 2026-09-25): only a song that sings the letter's own words may say it is "from the
+  // letter" or that its words are the letter's. The link names the version the page leads with (and PLAY plays);
+  // the lyrics footer names the version whose words it shows. A catalog without `vs` claims nothing.
+  const leadVerbatim = cat.isVerbatimSong(lead);
+  const wordsVerbatim = cat.isVerbatimSong(worded);
   const isCurrent = familyIsPlaying(fam.id, playingId);
   // n3-08: the desk saves the version playing, so the page counts ANY version
   // saved (it looked at the first only, and its Save then made a second copy)
@@ -91,7 +98,7 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
       <h1>{fam.t}</h1>
       {letter ? (
         <button type="button" className="song-page-letter" onClick={openLetter}>
-          <span>From the letter:</span> <em>{letter.title || 'Open the letter'}</em> <span aria-hidden="true">›</span>
+          <span>{leadVerbatim ? 'From the letter:' : 'Inspired by the letter:'}</span> <em>{letter.title || 'Open the letter'}</em> <span aria-hidden="true">›</span>
         </button>
       ) : null}
       <p className="song-page-shelf">{letter ? letter.colLabel : shelfWords(fam.col)}</p>
@@ -145,7 +152,7 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
               {allLyrics ? 'Show less' : 'Show all lyrics'}<ChevronRightIcon />
             </button>
           ) : null}
-          <p className="song-lyrics-foot">{letter && letter.title ? 'Words from the letter “' + letter.title + '” · lyrics transcribed' : 'Lyrics transcribed'}</p>
+          <p className="song-lyrics-foot">{songLyricsFoot(wordsVerbatim, letter)}</p>
         </section>
       ) : null}
 

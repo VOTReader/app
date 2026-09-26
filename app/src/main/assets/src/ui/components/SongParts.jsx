@@ -80,6 +80,17 @@ export function songLetterOf(item) {
 }
 
 /**
+ * The line under a song's lyrics. Only a song that sings the letter's own words
+ * (the verbatim gate, Corbin 2026-09-25) names the letter as their source; an
+ * interpretation's words are the song's own.
+ * @param {boolean} verbatim @param {{ title: string } | null | undefined} letter @returns {string}
+ */
+export function songLyricsFoot(verbatim, letter) {
+  if (!verbatim) return 'Lyrics transcribed from the song';
+  return letter && letter.title ? 'Words from the letter “' + letter.title + '” · lyrics transcribed' : 'Lyrics transcribed';
+}
+
+/**
  * The song a family row speaks for: the version the player holds when it is
  * one of this family's, else the family's featured one.
  * @param {string} familyId @param {string} playingId @returns {boolean}

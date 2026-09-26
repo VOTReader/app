@@ -26,7 +26,7 @@ import {
   SongCatalog,
   _resetSongCatalogForTests,
 } from './song-catalog.js';
-import { SONG_FIXTURE, bigSongCatalog } from './song-catalog.fixture.js';
+import { SONG_FIXTURE, VERBATIM_FIXTURE, bigSongCatalog } from './song-catalog.fixture.js';
 
 beforeEach(() => {
   _resetSongCatalogForTests();
@@ -507,5 +507,45 @@ describe('the loader — re-checked when the reader comes back (n3-06)', () => {
     release({ ok: true, status: 200, text: async () => JSON.stringify(takenDown) });
     await flush();
     expect(SongCatalog.catalogVersion()).toBe('2026-09-25.7');
+  });
+});
+
+/* The verbatim gate (Corbin 2026-09-25; catalog-schema.md): "Hear it sung" is offered only for songs that sing the
+   letter's or the scripture's own words. Golden rows copied from the live catalog 2026-09-25.1092.2. */
+describe('song-catalog -- the verbatim gate', () => {
+  beforeEach(() => { _resetSongCatalogForTests(); adoptSongCatalog(VERBATIM_FIXTURE); });
+  afterEach(() => { _resetSongCatalogForTests(); });
+
+  it('(golden) reads vb and vs: "Born Again" 0 / false; "Come, Love Awaits You" Country 0.99 / true', () => {
+    expect(songById('620080f78d26')).toMatchObject({ t: 'Born Again', vb: 0, vs: false });
+    expect(songById('179aabfb6748')).toMatchObject({ vb: 0.99, vs: true });
+    expect(familyById('born-again')).toMatchObject({ vs: false, vfeat: '', nvs: 0 });
+    expect(familyById('the-kingdom')).toMatchObject({ vs: true, vfeat: '00000000cab2', nvs: 1 });
+    expect(SongCatalog.isVerbatimSong(songById('179aabfb6748'))).toBe(true);
+    expect(SongCatalog.isVerbatimSong(songById('620080f78d26'))).toBe(false);
+  });
+
+  it('a row without vs (an older cached catalog) counts as false', () => {
+    expect(songById('fffffffffff1')).toMatchObject({ vb: null, vs: false });
+    expect(familyById('no-vs')).toMatchObject({ vs: false, vfeat: '' });
+    expect(songsForLetter('one:old-letter', { verbatim: true })).toEqual([]);
+    // a vs that is not literally true is not a pass
+    adoptSongCatalog({ ...VERBATIM_FIXTURE, version: 'x', songs: VERBATIM_FIXTURE.songs.map((s) => (s.id === '620080f78d26' ? { ...s, vs: 'true', vb: 7 } : s)) });
+    expect(songById('620080f78d26')).toMatchObject({ vs: false, vb: null });
+  });
+
+  it('songsForLetter takes an explicit verbatim filter; without it every linked song still comes back', () => {
+    expect(songsForLetter('three:born-again', { verbatim: true })).toEqual([]);
+    expect(songsForLetter('three:born-again').map((s) => s.id)).toEqual(['620080f78d26']);
+    expect(songsForLetter('wtlb1:come-love-awaits-you', { verbatim: true }).map((s) => s.id)).toEqual(['179aabfb6748']);
+    // a mixed family leads with its vfeat, and its interpretation is left out
+    expect(songsForLetter('wtlb1:the-kingdom').map((s) => s.id)).toEqual(['00000000cab1', '00000000cab2']);
+    expect(songsForLetter('wtlb1:the-kingdom', { verbatim: true }).map((s) => s.id)).toEqual(['00000000cab2']);
+  });
+
+  it('the vfeat leads its family even when catalog order puts another verbatim version first', () => {
+    adoptSongCatalog({ ...VERBATIM_FIXTURE, version: 'y',
+      songs: VERBATIM_FIXTURE.songs.map((s) => (s.id === '00000000cab1' ? { ...s, vs: true, vb: 0.7 } : s)) });
+    expect(songsForLetter('wtlb1:the-kingdom', { verbatim: true }).map((s) => s.id)).toEqual(['00000000cab2', '00000000cab1']);
   });
 });

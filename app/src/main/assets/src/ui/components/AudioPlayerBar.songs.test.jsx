@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { adoptSongCatalog, _resetSongCatalogForTests } from '../../utils/song-catalog.js';
-import { SONG_FIXTURE } from '../../utils/song-catalog.fixture.js';
+import { SONG_FIXTURE, VERBATIM_FIXTURE } from '../../utils/song-catalog.fixture.js';
 import { AudioPlayerBar } from './AudioPlayerBar.jsx';
 import { textKeyOf, hasTextDestination } from './AudioShelf.jsx';
 import { _resetSongLyricsForTests, lyricLineAt } from './SongParts.jsx';
@@ -343,5 +343,52 @@ describe('lyricLineAt', () => {
     expect(lyricLineAt(lines, 16)).toBe(1);
     expect(lyricLineAt(lines, 30)).toBe(-1);     // an instrumental break
     expect(lyricLineAt(lines, 41)).toBe(2);
+  });
+});
+
+/* The verbatim gate (Corbin 2026-09-25): the desk never says a song's words are the letter's unless it sings them.
+   Golden: "Born Again" (Rock, hmarie777) sings wholly new lyrics. */
+describe('the listening desk: the verbatim gate', () => {
+  beforeEach(() => {
+    LYRICS['620080f78d26'] = { v: 1, id: '620080f78d26', synced: false, lines: [{ t: 'New words of the song', s: 1, e: 4 }] };
+    LYRICS['179aabfb6748'] = { v: 1, id: '179aabfb6748', synced: false, lines: [{ t: 'Come, love awaits you', s: 1, e: 4 }] };
+    globalThis.COL_BY_KEY = new Map([
+      ['three', { volKey: 'three', label: 'Volume Three', letterScreen: 'three-letter' }],
+      ['wtlb1', { volKey: 'wtlb1', label: 'Words to Live By, Part One', letterScreen: 'wtlb1-entry' }],
+    ]);
+    globalThis.colLetterArr = (col) => (col.volKey === 'three' ? [{ id: 'born-again', title: 'Born Again' }] : [{ id: 'come-love-awaits-you', title: 'Come, Love Awaits You' }]);
+    _resetSongCatalogForTests();
+    adoptSongCatalog(VERBATIM_FIXTURE);
+  });
+  afterEach(() => { delete LYRICS['620080f78d26']; delete LYRICS['179aabfb6748']; });
+
+  const openDesk = () => {
+    render(<AudioPlayerBar />);
+    fireEvent.click(document.querySelector('.audio-bar-song-summary'));
+    return screen.getByRole('dialog');
+  };
+
+  it('(golden) "Born Again": Inspired by the letter (still opens it), lyrics transcribed from the song, no claim', async () => {
+    act(() => { AudioPlayer.playSongs({ filter: { family: 'born-again' } }); });
+    const desk = openDesk();
+    expect(await within(desk).findByText('New words of the song')).toBeTruthy();
+    fireEvent.click(within(desk).getByRole('button', { name: /^Inspired by the letter — Born Again/ }));
+    expect(window.__openAudioText).toHaveBeenCalledTimes(1);
+  });
+
+  it('(golden) "Born Again": the lyrics footer names the song, not the letter', async () => {
+    act(() => { AudioPlayer.playSongs({ filter: { family: 'born-again' } }); });
+    const desk = openDesk();
+    expect(await within(desk).findByText('New words of the song')).toBeTruthy();
+    expect(desk.querySelector('.song-lyrics-foot').textContent).toBe('Lyrics transcribed from the song');
+    expect(desk.textContent).not.toMatch(/Words from the letter|From the letter/i);
+  });
+
+  it('a verbatim song keeps Open the letter and Words from the letter', async () => {
+    act(() => { AudioPlayer.playSongs({ filter: { family: 'come-love-awaits-you' } }); });
+    const desk = openDesk();
+    expect(await within(desk).findByText('Come, love awaits you')).toBeTruthy();
+    expect(within(desk).getByRole('button', { name: /^Open the letter — Come, Love Awaits You/ })).toBeTruthy();
+    expect(desk.querySelector('.song-lyrics-foot').textContent).toBe('Words from the letter “Come, Love Awaits You” · lyrics transcribed');
   });
 });

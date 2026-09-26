@@ -151,11 +151,14 @@ export function listContent(v, library) {
     };
   }
   if (v === 'new') return { eyebrow: 'New from the flock', title: 'New from the flock', families: null, songs: newestSongs(NEW_TOTAL), empty: 'No songs yet.' };
-  if (v.indexOf('letter:') === 0) {
-    const key = v.slice(7);
+  // 'sung:' is the letter card's "All N songs of this letter ›": only the families that sing the letter's own
+  // words (the verbatim gate, Corbin 2026-09-25). 'letter:' (the song page's link) lists every song made from it.
+  const sung = v.indexOf('sung:') === 0;
+  if (sung || v.indexOf('letter:') === 0) {
+    const key = v.slice(sung ? 5 : 7);
     /** @type {any[]} */
     const fams = [];
-    for (const s of cat.songsForLetter(key)) {
+    for (const s of cat.songsForLetter(key, { verbatim: sung })) {
       const fam = cat.familyById(s.f);
       if (fam && fams.indexOf(fam) < 0) fams.push(fam);
     }
@@ -589,16 +592,21 @@ function SongsList({ frame, library, playingId, active, onPush }) {
   const fams = content.families;
   // A family row in a letter's list leads with that letter's own version.
   const letterKey = frame.v.indexOf('letter:') === 0 ? frame.v.slice(7) : '';
-  const leadFor = (fam) => (letterKey ? cat.versionsOf(fam).find((s) => s.src && s.src.id === letterKey) : null) || cat.featuredOf(fam);
+  // The letter card's list ('sung:') holds only the versions that sing the letter's words, each family's vfeat first.
+  const sungKey = frame.v.indexOf('sung:') === 0 ? frame.v.slice(5) : '';
+  const sungSongs = sungKey ? cat.songsForLetter(sungKey, { verbatim: true }) : null;
+  const versionsHere = (fam) => (sungSongs ? sungSongs.filter((s) => s.f === fam.id) : cat.versionsOf(fam));
+  const leadFor = (fam) => (sungSongs ? versionsHere(fam)[0] || null
+    : (letterKey ? cat.versionsOf(fam).find((s) => s.src && s.src.id === letterKey) : null) || cat.featuredOf(fam));
   const leads = fams ? fams.map(leadFor).filter(Boolean) : content.songs || [];
-  const count = fams ? songsIn(fams) : leads.length;
-  const seconds = (fams ? fams.reduce((sum, fam) => sum + cat.versionsOf(fam).reduce((a, s) => a + s.d, 0), 0) : leads.reduce((a, s) => a + s.d, 0));
+  const count = fams ? (sungSongs ? sungSongs.length : songsIn(fams)) : leads.length;
+  const seconds = (fams ? fams.reduce((sum, fam) => sum + versionsHere(fam).reduce((a, s) => a + s.d, 0), 0) : leads.reduce((a, s) => a + s.d, 0));
   const hours = seconds >= 3600 ? (Math.round(seconds / 360) / 10) + ' h' : Math.max(1, Math.round(seconds / 60)) + ' min';
   const ids = leads.map((s) => s.id);
   const play = (song, shuffle) => AudioPlayer.playSongs({ ids, startId: song ? song.id : undefined, shuffle: !!shuffle, label: content.title });
   // K1: Keep all keeps every version shown here (the count the header states); the Kept list removes instead.
   /** @type {string[]} */
-  const allIds = fams ? fams.reduce((out, fam) => out.concat(cat.versionsOf(fam).map((s) => s.id)), /** @type {string[]} */ ([])) : ids;
+  const allIds = fams ? fams.reduce((out, fam) => out.concat(versionsHere(fam).map((s) => s.id)), /** @type {string[]} */ ([])) : ids;
   const missing = keptList ? keep.missing() : [];
   const keptBytes = keptList ? keep.bytesOf(ids) : 0;
   // Rows are memoized: their taps call through these, so they play and open the list as it is now.

@@ -103,7 +103,7 @@ import { SongCatalog } from '../utils/song-catalog.js';
 import {
   songClock, songCountLabel, currentSongId, playerIsActive, songLetterOf, familyIsPlaying, songFamilyTitle,
   SongCover, SongPlayButton, SongListRow, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, RecentIcon, ChevronRightIcon, ChoiceSheet,
-  loadSongLyrics, useSongLyrics, lyricLineAt, findSongFamilies,
+  loadSongLyrics, useSongLyrics, lyricLineAt, findSongFamilies, songLyricsFoot,
 } from './components/SongParts.jsx';
 import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop } from '../utils/songs-route.js';
 // Keep on this phone (K1): ONE keep store beside the player that plays kept songs from it; the lazy Songs screens and
@@ -282,7 +282,7 @@ Object.assign(window, {
   AudioPlayer, audioTrackUrl, OfflineAudio, SongCatalog,
   songClock, songCountLabel, currentSongId, playerIsActive, songLetterOf, familyIsPlaying, songFamilyTitle,
   SongCover, SongPlayButton, SongListRow, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, RecentIcon, ChevronRightIcon, ChoiceSheet,
-  loadSongLyrics, useSongLyrics, lyricLineAt, findSongFamilies,
+  loadSongLyrics, useSongLyrics, lyricLineAt, findSongFamilies, songLyricsFoot,
   SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop,
   SongKeep, formatSongBytes, SongKeepCard, SongKeepAction, useSongKeep, useSongsOnline, KeepIcon, KeptIcon,
   // …and the shelf parts + audio tables bundle-h reads as free globals.

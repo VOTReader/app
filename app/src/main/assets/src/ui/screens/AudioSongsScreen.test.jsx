@@ -320,3 +320,66 @@ describe('AudioSongsScreen -- states', () => {
     expect(load).toHaveBeenCalledTimes(1);
   });
 });
+
+/* The verbatim gate (Corbin 2026-09-25): a song page may say its words are the letter's only when the song sings
+   them, word for word. "Born Again" (Rock, hmarie777) sings wholly new lyrics and said "Words from the letter". */
+describe('AudioSongsScreen -- the verbatim gate on the song page', () => {
+  beforeEach(async () => {
+    const { VERBATIM_FIXTURE } = await import('../../utils/song-catalog.fixture.js');
+    _resetSongCatalogForTests();
+    adoptSongCatalog(VERBATIM_FIXTURE);
+    installGlobals();
+    globalThis.COL_BY_KEY = new Map([
+      ['three', { label: 'Volume Three', volKey: 'three' }],
+      ['wtlb1', { label: 'Words to Live By, Part One', volKey: 'wtlb1' }],
+    ]);
+    globalThis.colLetterArr = (col) => (col.volKey === 'three' ? [{ id: 'born-again', title: 'Born Again' }]
+      : [{ id: 'come-love-awaits-you', title: 'Come, Love Awaits You' }, { id: 'the-kingdom', title: 'The Kingdom' }]);
+    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ v: 1, synced: false, lines: [{ t: 'A line the song sings', s: 1, e: 2 }] }) }));
+    library.isSongSaved = vi.fn(() => false);
+    library.toggleSongSaved = vi.fn();
+    window.__openAudioText = vi.fn();
+  });
+  afterEach(() => { delete window.__openAudioText; });
+
+  it('(golden) "Born Again" says Inspired by the letter, keeps the way there, and never claims the letter\'s words', async () => {
+    renderScreen([{ k: 'hub' }, { k: 'song', v: 'born-again' }]);
+    const link = screen.getByRole('button', { name: /Inspired by the letter: Born Again/ });
+    fireEvent.click(link);
+    expect(window.__openAudioText).toHaveBeenCalledWith({ key: 'three:born-again', title: 'Born Again' });
+    expect(await screen.findByText('A line the song sings')).toBeTruthy();
+    expect(document.querySelector('.song-lyrics-foot').textContent).toBe('Lyrics transcribed from the song');
+    const page = document.querySelector('.song-page').textContent;
+    expect(page).not.toMatch(/From the letter/i);
+    expect(page).not.toMatch(/Words from the letter/i);
+  });
+
+  it('a verbatim song keeps From the letter and Words from the letter', async () => {
+    renderScreen([{ k: 'hub' }, { k: 'song', v: 'come-love-awaits-you' }]);
+    expect(screen.getByRole('button', { name: /^From the letter: Come, Love Awaits You/ })).toBeTruthy();
+    expect(await screen.findByText('A line the song sings')).toBeTruthy();
+    expect(document.querySelector('.song-lyrics-foot').textContent).toBe('Words from the letter “Come, Love Awaits You” · lyrics transcribed');
+  });
+
+  it('a catalog row without vs claims nothing', async () => {
+    globalThis.colLetterArr = () => [{ id: 'old-letter', title: 'Old Letter' }];
+    globalThis.COL_BY_KEY = new Map([['one', { label: 'Volume One', volKey: 'one' }]]);
+    renderScreen([{ k: 'hub' }, { k: 'song', v: 'no-vs' }]);
+    expect(screen.getByRole('button', { name: /Inspired by the letter: Old Letter/ })).toBeTruthy();
+    expect(await screen.findByText('A line the song sings')).toBeTruthy();
+    expect(document.querySelector('.song-lyrics-foot').textContent).toBe('Lyrics transcribed from the song');
+  });
+
+  it('the letter card\'s list ("sung:") holds only the verbatim versions; the song page\'s "letter:" list keeps every song', () => {
+    renderScreen([{ k: 'hub' }, { k: 'list', v: 'sung:wtlb1:the-kingdom' }]);
+    fireEvent.click(screen.getByRole('button', { name: /Play all/i }));
+    expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ ids: ['00000000cab2'] }));
+    cleanup();
+    player.playSongs.mockClear();
+    renderScreen([{ k: 'hub' }, { k: 'list', v: 'sung:three:born-again' }]);
+    expect(rowOf('Born Again')).toBeNull();
+    cleanup();
+    renderScreen([{ k: 'hub' }, { k: 'list', v: 'letter:three:born-again' }]);
+    expect(rowOf('Born Again')).toBeTruthy();
+  });
+});

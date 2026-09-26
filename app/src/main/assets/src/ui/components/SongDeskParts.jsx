@@ -4,7 +4,9 @@
    in place of its reading pieces while the current track is a song:
 
      SongDeskHead       a 72 px cover, LISTENING NOW, the title, the version,
-                        "Open the letter ›" (only for a medium/high link), "Song
+                        "Open the letter ›" (only for a medium/high link;
+                        "Inspired by the letter ›" when the song is an
+                        interpretation, not the letter's words), "Song
                         page ›", the quiet keep row (K3) and Save
      SongVersionsCard   the Voice card's grammar for a song's versions: up to 4
                         chips and "All N ›" (a choice sheet); switching starts
@@ -21,10 +23,10 @@
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { songIdOfKey } from '../../utils/audio-track.js';
-import { familyById, versionsOf } from '../../utils/song-catalog.js';
+import { familyById, versionsOf, isVerbatimSong } from '../../utils/song-catalog.js';
 import {
   SongCover, ChoiceSheet, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, songLetterOf, songClock,
-  useSongLyrics, lyricLineAt,
+  useSongLyrics, lyricLineAt, songLyricsFoot,
 } from './SongParts.jsx';
 import { PlayIcon, PauseIcon, StarIcon, hasTextDestination } from './AudioShelf.jsx';
 import { SongKeepQuiet } from './SongKeepParts.jsx';
@@ -55,6 +57,8 @@ export function SongDeskHead({ current, song, saved, onToggleSave, onClose }) {
   const canPage = !!(song && song.f) && typeof window !== 'undefined' && typeof window.__openSongs === 'function';
   const openPage = () => { window.__openSongs([{ k: 'song', v: song.f }], ''); onClose(); };
   const title = current.title || 'Untitled song';
+  // The verbatim gate: an interpretation keeps the way to its letter but never says it is the letter's words.
+  const linkWords = isVerbatimSong(song) ? 'Open the letter' : 'Inspired by the letter';
   return (
     <div className="song-desk-head">
       <SongCover song={song || { id: songIdOfKey(current.key) }} large className="song-desk-cover" />
@@ -67,8 +71,8 @@ export function SongDeskHead({ current, song, saved, onToggleSave, onClose }) {
         {canOpen || canPage ? (
           <div className="song-desk-links">
             {canOpen ? (
-              <button type="button" className="song-desk-letter" onClick={() => { window.__openAudioText(current); onClose(); }} aria-label={'Open the letter' + (letter && letter.title ? ' — ' + letter.title : '') + '; the song keeps playing'}>
-                Open the letter <span aria-hidden="true">›</span>
+              <button type="button" className="song-desk-letter" onClick={() => { window.__openAudioText(current); onClose(); }} aria-label={linkWords + (letter && letter.title ? ' — ' + letter.title : '') + '; the song keeps playing'}>
+                {linkWords} <span aria-hidden="true">›</span>
               </button>
             ) : null}
             {canPage ? (
@@ -224,7 +228,7 @@ export function SongLyricsCard({ song, time }) {
           <p key={i} className={'song-lyrics-line' + (i === now ? ' is-now' : '')} aria-current={i === now ? 'true' : undefined}>{line.t}</p>
         ))}
       </div>
-      <p className="song-lyrics-foot">{letter && letter.title ? 'Words from the letter “' + letter.title + '” · lyrics transcribed' : 'Lyrics transcribed'}</p>
+      <p className="song-lyrics-foot">{songLyricsFoot(isVerbatimSong(song), letter)}</p>
     </div>
   );
 }

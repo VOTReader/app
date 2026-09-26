@@ -263,6 +263,17 @@ boot rebuild both call.
   lets `/songs-<n>/` mp3s pass straight through and serves `/songs/catalog.json`,
   `/songs/thumbs/` and `/songs/lyrics/` stale-while-revalidate from its own
   unversioned `vot-songs-v1` bucket.
+- **The verbatim gate (Corbin 2026-09-25).** A song whose catalog row has `vs: true`
+  sings the letter's or the scripture's own words; anything else (an interpretation,
+  a song not judged yet, a row of an older catalog without `vs`) does not. Only
+  verbatim songs get the letter page's ♪ HEAR IT SUNG and a row in its SONGS FROM
+  THIS LETTER card (`songsForLetter(key, { verbatim: true })`: each family's `vfeat`
+  first; the card's "All N ›" opens the `sung:<key>` list). The song page and the
+  desk never call an interpretation "From the letter" or its lyrics "Words from the
+  letter": the link reads "Inspired by the letter" (it still opens the letter) and
+  the lyrics footer "Lyrics transcribed from the song". Every other surface (hub,
+  shelves, the song page's "More songs from this letter" and its `letter:<key>`
+  list) still lists every song.
 
 ### Kept on this phone (K1, 2026-09-25)
 

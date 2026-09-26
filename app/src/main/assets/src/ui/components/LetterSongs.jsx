@@ -5,14 +5,20 @@
      LetterListenRow   the hero row: the FILLED ▶ LISTEN (when the letter is
                        recorded) and, beside it at the same height, the
                        outlined ♪ HEAR IT SUNG (when the catalog links a song
-                       to this letter with medium or high confidence). One tap
-                       to sound: the featured song, then the rest of this
-                       letter's songs. BOTH pills show a playing state (W3-08)
-                       and pause on a second tap.
+                       that SINGS THE LETTER'S OWN WORDS, verbatim, to this
+                       letter with medium or high confidence). One tap to
+                       sound: the first verbatim family's `vfeat`, then the
+                       rest of this letter's verbatim songs. BOTH pills show a
+                       playing state (W3-08) and pause on a second tap.
      LetterSongsCard   SONGS FROM THIS LETTER, a related card below the text
-                       and above the external ↗ links: up to 3 songs as in-app
-                       rows (a tap plays; "N versions ›" opens the song), then
-                       "All N songs of this letter ›" and the keep line (K1).
+                       and above the external ↗ links: up to 3 verbatim families
+                       as in-app rows (a tap plays its `vfeat`; "N versions ›"
+                       opens the song), then "All N songs of this letter ›"
+                       (verbatim families) and the keep line (K1).
+
+   The verbatim gate (Corbin 2026-09-25, catalog-schema.md): a musical
+   interpretation with new lyrics is never offered here, only songs whose
+   words are the letter's. A catalog without `vs` offers nothing.
 
    Each subscribes to the player and the catalog ITSELF, so a clock tick
    re-renders a pill, never the letter. "Show songs on letter pages" (Settings
@@ -37,9 +43,9 @@ function useSongCatalog(want) {
   }, [want]);
 }
 
-/** The songs made from `volKey:id`, featured first, or [] (setting off, catalog not in). */
+/** The songs of `volKey:id` that sing its own words, each family's `vfeat` first, or [] (setting off, catalog not in). */
 function lettersSongs(want, letterKey) {
-  return want && SongCatalog.loaded ? SongCatalog.songsForLetter(letterKey) : [];
+  return want && SongCatalog.loaded ? SongCatalog.songsForLetter(letterKey, { verbatim: true }) : [];
 }
 
 const MUSIC_NOTE = <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 3.5v11.1a3.6 3.6 0 1 0 2 3.2V8.2l6.5-1.6V3z" /></svg>;
@@ -99,7 +105,7 @@ export function LetterSongsCard({ volKey, letterId, letterTitle, showSongs = tru
   const songs = lettersSongs(showSongs, letterKey);
   if (!songs.length) return null;
 
-  /** One row per family, led by that family's version of THIS letter. */
+  /** One row per verbatim family, led by its `vfeat` (the version that sings the letter's words). */
   const leads = [];
   const seen = new Set();
   for (const s of songs) if (!seen.has(s.f)) { seen.add(s.f); leads.push(s); }
@@ -132,7 +138,7 @@ export function LetterSongsCard({ volKey, letterId, letterTitle, showSongs = tru
       </div>
       {/* Past three songs, the rest are one tap away. A song's own versions live on its song page. */}
       {leads.length > CARD_SONGS ? (
-        <button type="button" className="letter-songs-all" onClick={() => open([{ k: 'list', v: 'letter:' + letterKey }])}>
+        <button type="button" className="letter-songs-all" onClick={() => open([{ k: 'list', v: 'sung:' + letterKey }])}>
           All {songCountLabel(leads.length)} of this letter<ChevronRightIcon />
         </button>
       ) : null}

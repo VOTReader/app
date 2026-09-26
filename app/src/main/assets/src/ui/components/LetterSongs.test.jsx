@@ -24,7 +24,7 @@ vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
 
 import { LetterListenRow, LetterSongsCard } from './LetterSongs.jsx';
 import { adoptSongCatalog, _resetSongCatalogForTests } from '../../utils/song-catalog.js';
-import { SONG_FIXTURE } from '../../utils/song-catalog.fixture.js';
+import { SONG_FIXTURE, VERBATIM_FIXTURE } from '../../utils/song-catalog.fixture.js';
 
 const WTLB = { id: 'come-love-awaits-you', title: 'Come, Love Awaits You' };
 const ONE = { id: 'the-letter', title: 'The Letter' };
@@ -121,13 +121,14 @@ describe('SONGS FROM THIS LETTER', () => {
     const extra = ['e1', 'e2', 'e3'].map((f, i) => ({
       id: 'eeeeeeeeeee' + (i + 1), t: 'Extra ' + i, f, v: 'Pop', st: ['pop'], dl: 'sung', lang: 'en',
       src: { k: 'letter', id: 'wtlb1:come-love-awaits-you', c: 'h' }, d: 100, b: 1, sh: 1, cr: null, lyr: 0, rd: null, fs: '2025-09-21', hid: false, dup: null,
+      vb: 0.9, vs: true,
     }));
     adoptSongCatalog({ ...SONG_FIXTURE, songs: SONG_FIXTURE.songs.concat(extra),
       families: SONG_FIXTURE.families.concat(extra.map((s) => ({ id: s.f, t: s.t, feat: s.id, n: 1, col: 'wtlb1', src: s.src, lb: '' }))) });
     render(<LetterSongsCard volKey="wtlb1" letterId={WTLB.id} letterTitle={WTLB.title} />);
     expect(document.querySelectorAll('.letter-songs-card .songs-row').length).toBe(3);
     fireEvent.click(screen.getByRole('button', { name: /All 4 songs of this letter/ }));
-    expect(window.__openSongs).toHaveBeenCalledWith([{ k: 'list', v: 'letter:wtlb1:come-love-awaits-you' }], 'Come, Love Awaits You');
+    expect(window.__openSongs).toHaveBeenCalledWith([{ k: 'list', v: 'sung:wtlb1:come-love-awaits-you' }], 'Come, Love Awaits You');
   });
 
   it('offers to keep this letter’s songs on the phone, every version, sized from the catalog (K1)', async () => {
@@ -147,5 +148,64 @@ describe('SONGS FROM THIS LETTER', () => {
     cleanup();
     const off = render(<LetterSongsCard volKey="wtlb1" letterId={WTLB.id} showSongs={false} />);
     expect(off.container.innerHTML).toBe('');
+  });
+});
+
+/* The verbatim gate (Corbin 2026-09-25): "Hear it sung" and the letter's songs card offer ONLY songs that sing
+   the letter's own words, never a musical interpretation. Golden: "Born Again" (Rock, hmarie777, 620080f78d26)
+   sings wholly new lyrics (vb 0, vs false). */
+describe('the verbatim gate', () => {
+  const BORN_AGAIN = { id: 'born-again', title: 'Born Again' };
+  const KINGDOM = { id: 'the-kingdom', title: 'The Kingdom' };
+  beforeEach(() => { adoptSongCatalog(VERBATIM_FIXTURE); });
+
+  it('(golden) the letter three:born-again shows NO Hear it sung and no card row', () => {
+    render(<LetterListenRow volKey="three" letter={BORN_AGAIN} collectionLabel="Volume Three" />);
+    expect(screen.queryByRole('button', { name: 'Hear it sung' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Listen' })).toBeTruthy();     // the reading stays
+    cleanup();
+    const card = render(<LetterSongsCard volKey="three" letterId="born-again" letterTitle="Born Again" />);
+    expect(card.container.innerHTML).toBe('');
+  });
+
+  it('a verbatim song (Come, Love Awaits You, Country) keeps the pill and the card', () => {
+    render(<LetterListenRow volKey="wtlb1" letter={WTLB} collectionLabel="Part One" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Hear it sung' }));
+    expect(player.playSongs).toHaveBeenCalledWith({ ids: ['179aabfb6748'], startId: '179aabfb6748', label: 'Come, Love Awaits You' });
+    cleanup();
+    render(<LetterSongsCard volKey="wtlb1" letterId={WTLB.id} letterTitle={WTLB.title} />);
+    expect(document.querySelectorAll('.letter-songs-card .songs-row').length).toBe(1);
+  });
+
+  it('a mixed family: the pill and the card play its verbatim vfeat, never the featured interpretation', () => {
+    render(<LetterListenRow volKey="wtlb1" letter={KINGDOM} collectionLabel="Part One" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Hear it sung' }));
+    expect(player.playSongs).toHaveBeenLastCalledWith({ ids: ['00000000cab2'], startId: '00000000cab2', label: 'The Kingdom' });
+    cleanup();
+    player.playSongs.mockClear();
+    render(<LetterSongsCard volKey="wtlb1" letterId={KINGDOM.id} letterTitle={KINGDOM.title} />);
+    fireEvent.click(document.querySelector('.letter-songs-card .songs-row-hit'));
+    expect(player.playSongs).toHaveBeenLastCalledWith(expect.objectContaining({ ids: ['00000000cab2'], startId: '00000000cab2' }));
+  });
+
+  it('a catalog row with no vs field counts as false: no pill, no card', () => {
+    render(<LetterListenRow volKey="one" letter={{ id: 'old-letter', title: 'Old Letter' }} collectionLabel="Volume One" />);
+    expect(screen.queryByRole('button', { name: 'Hear it sung' })).toBeNull();
+    cleanup();
+    const card = render(<LetterSongsCard volKey="one" letterId="old-letter" />);
+    expect(card.container.innerHTML).toBe('');
+  });
+
+  it('"All N songs of this letter" counts the verbatim families only', () => {
+    const extra = ['v1', 'v2', 'v3', 'i1', 'i2'].map((f, i) => ({
+      id: '00000000ee0' + (i + 1), t: 'Extra ' + f, f, v: 'Pop', st: ['pop'], dl: 'sung', lang: 'en',
+      src: { k: 'letter', id: 'wtlb1:come-love-awaits-you', c: 'h' }, d: 100, b: 1, sh: 1, cr: null, lyr: 0, rd: null, fs: '2025-09-21', hid: false, dup: null,
+      vb: f[0] === 'v' ? 0.9 : 0.1, vs: f[0] === 'v',
+    }));
+    adoptSongCatalog({ ...VERBATIM_FIXTURE, songs: VERBATIM_FIXTURE.songs.concat(extra),
+      families: VERBATIM_FIXTURE.families.concat(extra.map((s) => ({ id: s.f, t: s.t, feat: s.id, n: 1, col: 'wtlb1', src: s.src, lb: '', vs: s.vs, vfeat: s.vs ? s.id : null, nvs: s.vs ? 1 : 0 }))) });
+    render(<LetterSongsCard volKey="wtlb1" letterId={WTLB.id} letterTitle={WTLB.title} />);
+    expect(Array.from(document.querySelectorAll('.letter-songs-card .songs-row strong')).map((n) => n.textContent)).not.toContain('Extra i1');
+    expect(screen.getByRole('button', { name: /All 4 songs of this letter/ })).toBeTruthy();
   });
 });

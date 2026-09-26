@@ -57,8 +57,9 @@ const FILTER_KEYS = ['col', 'style', 'letter', 'family', 'q', 'lang', 'dl'];
  * @typedef {{ k: string, id: string, c: string }} SongSource
  * @typedef {{ id: string, t: string, f: string, v: string, st: string[], dl: string, lang: string | null,
  *   src: SongSource, d: number, b: number, sh: number, cr: string | null, lyr: number, rd: string | null,
- *   fs: string, hid: boolean, dup: string | null }} Song
- * @typedef {{ id: string, t: string, feat: string, n: number, col: string, src: SongSource, lb: string }} SongFamily
+ *   fs: string, hid: boolean, dup: string | null, vb: number | null, vs: boolean }} Song
+ * @typedef {{ id: string, t: string, feat: string, n: number, col: string, src: SongSource, lb: string,
+ *   vs: boolean, vfeat: string, nvs: number }} SongFamily
  * @typedef {{ key: string, song: string | null, d: number }} SongReading
  * @typedef {{ schema: number, version: string, generated: string, songs: Song[], families: SongFamily[],
  *   readings: SongReading[], styles: Record<string, string>,
@@ -147,6 +148,10 @@ function _song(raw) {
     fs: _str(raw.fs, 32),
     hid: raw.hid === true,
     dup: isSongId(raw.dup) ? raw.dup : null,
+    // The verbatim gate (catalog-schema.md): the song sings the letter's or the scripture's own words. Only a
+    // literal `true` passes, so an older cached catalog without `vs` offers no "Hear it sung" and makes no claim.
+    vb: typeof raw.vb === 'number' && raw.vb >= 0 && raw.vb <= 1 ? raw.vb : null,
+    vs: raw.vs === true,
   };
 }
 
@@ -157,6 +162,7 @@ function _family(raw) {
   return {
     id, t: _str(raw.t, 240) || 'Untitled song', feat: isSongId(raw.feat) ? raw.feat : '',
     n: Math.floor(_num(raw.n)), col: _str(raw.col, 40), src: _source(raw.src), lb: _str(raw.lb, 60),
+    vs: raw.vs === true, vfeat: isSongId(raw.vfeat) ? raw.vfeat : '', nvs: Math.floor(_num(raw.nvs)),
   };
 }
 
@@ -195,7 +201,7 @@ export function normalizeSongCatalog(value) {
   const versions = new Map();
   for (const song of songs) {
     if (!song.f) continue;
-    if (!famById.has(song.f)) famById.set(song.f, { id: song.f, t: song.t, feat: '', n: 0, col: '', src: song.src, lb: '' });
+    if (!famById.has(song.f)) famById.set(song.f, { id: song.f, t: song.t, feat: '', n: 0, col: '', src: song.src, lb: '', vs: false, vfeat: '', nvs: 0 });
     const list = versions.get(song.f);
     if (list) list.push(song); else versions.set(song.f, [song]);
   }
@@ -523,17 +529,42 @@ export function familiesFor(filter) {
 }
 
 /**
+ * Does this song sing the letter's or the scripture's own words, verbatim
+ * (catalog-schema.md "verbatim gate", Corbin 2026-09-25)? False for an
+ * interpretation, for a song not judged yet, and for any row of an older
+ * catalog that has no `vs`.
+ * @param {Song | null | undefined} song @returns {boolean}
+ */
+export function isVerbatimSong(song) {
+  return !!song && song.vs === true;
+}
+
+/**
  * The songs made from one letter (`volKey:letterId`), medium or high
  * confidence only — low is never shown (README §1.4). Grouped by family,
  * featured first.
- * @param {unknown} letterKey @returns {Song[]}
+ *
+ * `{ verbatim: true }` keeps only the songs that sing the letter's own words
+ * (the "Hear it sung" pill and the letter's songs card): a family with none
+ * drops out, and each family leads with its `vfeat` (the version "Hear it
+ * sung" plays), then its other verbatim versions.
+ * @param {unknown} letterKey @param {{ verbatim?: boolean }} [opts] @returns {Song[]}
  */
-export function songsForLetter(letterKey) {
+export function songsForLetter(letterKey, opts) {
   if (typeof letterKey !== 'string' || !letterKey) return [];
+  const verbatim = !!(opts && opts.verbatim === true);
   const f = { letter: letterKey };
   /** @type {Song[]} */
   const out = [];
-  for (const fam of familiesFor(f)) for (const s of _matchingVersions(fam, f)) out.push(s);
+  for (const fam of familiesFor(f)) {
+    let list = _matchingVersions(fam, f);
+    if (verbatim) {
+      list = list.filter(isVerbatimSong);
+      const at = list.findIndex((s) => s.id === fam.vfeat);
+      if (at > 0) list = [list[at]].concat(list.slice(0, at), list.slice(at + 1));
+    }
+    for (const s of list) out.push(s);
+  }
   return out;
 }
 
@@ -730,6 +761,7 @@ export const SongCatalog = {
   versionsOf,
   featuredOf,
   songsForLetter,
+  isVerbatimSong,
   songAlbumLabel,
   songAssetUrl,
   songThumbUrl,
