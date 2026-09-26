@@ -95,7 +95,7 @@ Audio remains streaming-only. There is no local download manager, arbitrary
 remote URL loader, or second media player. One refinement rides the HTTP
 cache: when the current track is fully buffered on a healthy connection, the
 player quietly warms the next two queued tracks through a detached,
-never-playing element (`_maybePrefetchNext` in `audio-player.js`), so track
+never-playing element (`_maybePrefetchNext` in `audio-player/prefetch.js`), so track
 boundaries start near-instantly. Save-Data or 2g-class connections disable
 it; the cache — not the app — owns eviction.
 
@@ -104,7 +104,7 @@ it; the cache — not the app — owns eviction.
 | Responsibility | Owner |
 | --- | --- |
 | Track URL policy, persisted track normalization, and the two display registries (`BIBLE_AUDIO_EDITIONS`, `AUDIO_READERS`) | `app/src/main/assets/src/utils/audio-track.js` |
-| Playback, Media Session, durable position, queue editing, sleep timer, and audio arbitration | `app/src/main/assets/src/utils/audio-player.js` |
+| Playback, Media Session, durable position, queue editing, sleep timer, and audio arbitration | `app/src/main/assets/src/utils/audio-player.js` (the public face: typedefs, the `AudioPlayer` object, the boot) and `app/src/main/assets/src/utils/audio-player/*.js` (the player, one concern a module; the map is in audio-player.js's header) |
 | Saved recordings, recent history, speed preference, and lifetime play count | `app/src/main/assets/src/stores/audio-library-store.js` |
 | Per-recording resume points (URL → position) | `app/src/main/assets/src/stores/audio-positions-store.js` |
 | Compact transport and expanded listening desk | `app/src/main/assets/src/ui/components/AudioPlayerBar.jsx`, `AudioManagerSheet.jsx` |
