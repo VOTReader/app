@@ -199,7 +199,8 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
       </header>
 
       <div className="page-wrapper">
-        <div className="chapter-body" ref={bodyRef}>
+        {/* data-copy-key: words copied here outside a verse block still name the chapter (utils/passage-copy.js). */}
+        <div className="chapter-body" ref={bodyRef} data-copy-key={'study:' + book.id + '-' + chapter.num}>
           {mode === "pdf" ? (
             /* ── PDF MODE: clean flowing verse text + study panels below ── */
             <>

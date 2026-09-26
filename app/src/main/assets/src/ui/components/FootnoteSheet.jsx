@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { inertAttr } from '../../utils/inert-attr.js';
+import { sheetReference } from '../../utils/passage-copy.js';
 
 export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, onNavigate, onGoToRef }) {
   const isOpen = num != null;
@@ -71,7 +72,7 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
               <>
                 <span className="fn-sheet-ref">{fn.ref}</span>
                 {verse ? (
-                  <div className="fn-sheet-verse">
+                  <div className="fn-sheet-verse" data-copy-ref={sheetReference(fn.ref)}>
                     <ScriptureVerseText text={verse} cite={fn.ref} />
                   </div>
                 ) : (

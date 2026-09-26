@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { inertAttr } from '../../utils/inert-attr.js';
+import { sheetReference } from '../../utils/passage-copy.js';
 
 export function ScriptureSheet({ activeRef, onClose, onGoToRef }) {
   const isOpen = activeRef != null;
@@ -25,7 +26,7 @@ export function ScriptureSheet({ activeRef, onClose, onGoToRef }) {
             <span className="sc-sheet-tag">{"Scripture Reference \xB7 "}{activeRef.ref}</span>
             <span className="sc-sheet-cite">{activeRef.cite}</span>
             {verseText ? (
-              <div className="sc-sheet-verse">
+              <div className="sc-sheet-verse" data-copy-ref={sheetReference(activeRef.cite)}>
                 <ScriptureVerseText text={verseText} cite={activeRef.cite} />
               </div>
             ) : (

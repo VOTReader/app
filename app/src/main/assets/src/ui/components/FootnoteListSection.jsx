@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { scrollBehavior } from '../../utils/reduced-motion.js';
+import { sheetReference } from '../../utils/passage-copy.js';
 
 export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef }) {
   const entries = Object.entries(footnotes);
@@ -33,7 +34,8 @@ export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef })
           title={`Jump back to footnote ${num} in the body`}
         >
           <div className="footnote-list-num">{num}{"."}</div>
-          <div>
+          {/* A scripture footnote's verse, copied, names itself (utils/passage-copy.js). */}
+          <div data-copy-ref={fn.type === "scripture" ? sheetReference(fn.ref) : undefined}>
             {fn.type === "scripture" ? (
               <>
                 <span className="footnote-list-ref">{fn.ref}</span>

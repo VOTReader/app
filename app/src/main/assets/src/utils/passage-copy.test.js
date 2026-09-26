@@ -4,7 +4,7 @@
    takes on every reading surface: a verse per line, its number and a space,
    footnote digits and icons left out, and the reference on the last line. */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { passageCopy, passageLabel, passageReference, readingBlocksIn, isVerseKey, translationTag } from './passage-copy.js';
+import { passageCopy, passageLabel, passageReference, readingBlocksIn, isVerseKey, translationTag, sheetReference } from './passage-copy.js';
 
 const V37 = 'On the last day, that great day of the feast, YahuShua stood and cried out, saying, “If anyone thirsts, let him come to Me and drink.';
 const V38 = 'He who believes in Me, as the Scripture has said, out of his heart will flow rivers of living water.”';
@@ -13,7 +13,7 @@ const V39 = 'But this He spoke concerning the Spirit, whom those believing in Hi
 const g = /** @type {any} */ (globalThis);
 
 beforeEach(() => {
-  g._bookTitle = (/** @type {string} */ id) => ({ john: 'John', psalms: 'Psalms' })[id] || id;
+  g._bookTitle = (/** @type {string} */ id) => ({ john: 'John', psalms: 'Psalms', 'matthew-plain': 'Matthew' })[id] || id;
   g.StateStore = { get: () => ({ settings: { translation: 'rnkjv' } }) };
   g.TRANSLATION_OPTIONS = [{ id: 'nkjv', label: 'NKJV' }, { id: 'rnkjv', label: 'NKJV-R' }, { id: 'kjv', label: 'KJV' }];
   g.findEntryContext = (/** @type {string} */ id) => ({
@@ -212,13 +212,91 @@ describe('labels', () => {
     expect(passageReference(['study:matthew-5:12-s0'])).toBe('Matthew 5:12 (study note)');
   });
 
-  it('the translation is the reader\'s; unknown settings claim nothing; TSOT Matthew is not a translation', () => {
+  it('the translation is the reader\'s, read from Settings at the copy; unknown settings claim nothing', () => {
     expect(translationTag('bible:john:3:16')).toBe(' (NKJV-R)');
     g.StateStore = { get: () => ({ settings: { translation: 'kjv' } }) };
     expect(translationTag('bible:john:3:16')).toBe(' (KJV)');
-    expect(translationTag('bible:matthew-tsot:5:3')).toBe('');
     expect(translationTag('letter:x:1')).toBe('');
     delete g.StateStore;
     expect(translationTag('bible:john:3:16')).toBe('');
+  });
+
+  /* cp1 follow-up: Matthew is "matthew-plain" in the Bible reader, and the old
+     rule (no tag for an id with a '-', meant for TSOT Matthew) dropped its tag. */
+  it('Matthew in the Bible reader names the translation too; a book the reader does not translate does not', () => {
+    g.BIBLE_BOOK_LIST = [{ id: 'john', title: 'John' }, { id: 'matthew-plain', title: 'Matthew' }];
+    try {
+      expect(translationTag('bible:matthew-plain:5:16')).toBe(' (NKJV-R)');
+      expect(translationTag('bible:matthew-tsot:5:16')).toBe('');
+      expect(passageReference(['bible:matthew-plain:5:3', 'bible:matthew-plain:5:5'])).toBe('Matthew 5:3-5 (NKJV-R)');
+    } finally { delete g.BIBLE_BOOK_LIST; }
+  });
+
+  it('the Matthew Study Bible is named as itself, whatever Settings say (its words do not change with them)', () => {
+    expect(passageReference(['study:matthew-5:3', 'study:matthew-5:5'])).toBe('Matthew 5:3-5 (Study Bible)');
+    expect(passageReference(['study:matthew-5'])).toBe('Matthew 5 (Study Bible)');
+  });
+
+  it('a whole chapter (a page\'s own key) is named with its translation', () => {
+    expect(passageReference(['bible:john:7'])).toBe('John 7 (NKJV-R)');
+  });
+
+  it('a sheet names its NKJV verse, or keeps the translation its reference already names', () => {
+    expect(sheetReference('John 3:16')).toBe('John 3:16 (NKJV)');
+    expect(sheetReference('John 14:6 (KJV)')).toBe('John 14:6 (KJV)');
+    expect(sheetReference('')).toBe('');
+  });
+});
+
+/* cp1 follow-up, Corbin: "It should always append the highlighted section name
+   and range and detect what translation is currently selected in settings". */
+describe('passageCopy — always ends with where the words are from', () => {
+  it('a heading copied alone names its chapter and the Settings translation', () => {
+    const body = document.createElement('div');
+    body.className = 'chapter-body';
+    body.setAttribute('data-copy-key', 'bible:john:7');
+    body.innerHTML = '<div class="section-heading">Rivers of Living Water</div>';
+    document.body.appendChild(body);
+    const h = /** @type {Element} */ (body.firstElementChild);
+    expect(/** @type {any} */ (passageCopy(range(h, 0, h, 1))).text).toBe('Rivers of Living Water\nJohn 7 (NKJV-R)');
+  });
+
+  it('a footnote sheet\'s verses keep their numbers apart ("19 For", not "19For") and name themselves', () => {
+    const v = document.createElement('div');
+    v.className = 'fn-sheet-verse';
+    v.setAttribute('data-copy-ref', 'John 3:19-20 (NKJV)');
+    v.innerHTML = '<span><span><sup class="verse-sup">19</sup>And this is the condemnation. </span><span><sup class="verse-sup">20</sup>For everyone practicing evil hates the light.</span></span>';
+    document.body.appendChild(v);
+    expect(/** @type {any} */ (passageCopy(range(v, 0, v, v.childNodes.length))).text)
+      .toBe('19 And this is the condemnation. 20 For everyone practicing evil hates the light.\nJohn 3:19-20 (NKJV)');
+  });
+
+  it('a block whose entry cannot be named still carries its page\'s name', () => {
+    const page = document.createElement('div');
+    page.className = 'page-wrapper';
+    page.setAttribute('data-copy-key', 'letter:the-wide-path');
+    page.innerHTML = '<p data-hl-key="letter:unknown-card:3">Hear the Word of The Lord.</p>';
+    document.body.appendChild(page);
+    const p = /** @type {Element} */ (page.firstElementChild);
+    expect(/** @type {any} */ (passageCopy(range(p, 0, p, 1))).text).toBe('Hear the Word of The Lord.\nThe Wide Path (Volume Two)');
+  });
+
+  it('a control\'s label inside a sheet is not the passage', () => {
+    const v = document.createElement('div');
+    v.setAttribute('data-copy-ref', 'John 3:16 (NKJV)');
+    v.innerHTML = '<span>For God so loved the world</span><button>Go to John 3:16</button>';
+    document.body.appendChild(v);
+    expect(/** @type {any} */ (passageCopy(range(v, 0, v, v.childNodes.length))).text).toBe('For God so loved the world\nJohn 3:16 (NKJV)');
+  });
+
+  it('the reader\'s journal gets no page name even inside a named page', () => {
+    const page = document.createElement('div');
+    page.setAttribute('data-copy-key', 'letter:the-wide-path');
+    page.innerHTML = '<p data-hl-key="journal:e1:b1">What I learned today</p>';
+    document.body.appendChild(page);
+    const p = /** @type {Element} */ (page.firstElementChild);
+    const out = /** @type {any} */ (passageCopy(range(p, 0, p, 1)));
+    expect(out.text).toBe('What I learned today');
+    expect(out.isPublic).toBe(false);
   });
 });

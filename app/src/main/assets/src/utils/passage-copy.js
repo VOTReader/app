@@ -34,6 +34,21 @@
      translation, a letter's title with its volume. The reader's own journal
      gets no reference and keeps the browser's copy (isPublic false).
    Verse ranges use the ASCII hyphen (Permanent Rule 1).
+
+   ALWAYS (cp1 follow-up, Corbin 2026-09-26: "It should always append the
+   highlighted section name and range and detect what translation is currently
+   selected in settings"). Every copy of reading text ends with where it is
+   from, and names the translation of the words it holds:
+   - the Bible reader: the translation selected in Settings, Matthew included
+     (its id there is "matthew-plain", and a rule meant for TSOT Matthew had
+     dropped the tag for every id with a '-');
+   - the Matthew Study Bible: "(Study Bible)", its own corrected text, which
+     Settings does not change (naming the Settings translation would be false);
+   - a footnote or scripture sheet, and a letter's footnote list: the
+     reference it shows, "(NKJV)" unless the reference names its own (their
+     verse text is the NKJV the letters cite): data-copy-ref;
+   - words on a reading page outside its verse blocks (a heading, a letter's
+     intro quote): the page's own name, from its data-copy-key.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { _bookmarkSourceLabel } from './bookmark-source.js';
@@ -41,6 +56,10 @@ import { ANNOTATION_CHROME } from '../renderer/anchor-view.js';
 
 /** The swipe previews: inert clones of the neighbour pages (ScreenLayout). */
 const OFF_PAGE = '[inert], .pager-peek';
+/** A verse number: the Bible reader's gutter number and a sheet's gold superscript. */
+const VERSE_NUMBER = '.verse-num, .verse-sup';
+/** The Matthew Study Bible's text is its own (corrected) edition, not a translation Settings picks. */
+const STUDY_TAG = ' (Study Bible)';
 /** Elements that start a line of their own. */
 const BLOCK_TAGS = new Set(['DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'BLOCKQUOTE', 'SECTION', 'ARTICLE']);
 const PUBLIC_KINDS = new Set(['bible', 'study', 'letter', 'wtlb', 'blessed', 'holy-days']);
@@ -71,9 +90,9 @@ export function passageLabel(firstKey, lastKey) {
 }
 
 /** n6-10: a Bible quote is in the reader's translation, so its reference names
-    it: " (KJV)". Nothing when the settings are not known (no claim is better
-    than a wrong one), for a non-Bible key, or for a Bible text that is not a
-    translation (TSOT Matthew's own ids carry a '-').
+    it: " (KJV)", read from Settings at the moment of the copy. Nothing when the
+    settings are not known (no claim is better than a wrong one), for a
+    non-Bible key, or for a book the Bible reader does not translate.
     TRANSLATION_OPTIONS is a top-level `const` in index.html: a global binding
     but NOT a window property, so it is read by bare name (translations.js
     translationLabel does the same). Reading it off window found nothing, and
@@ -81,13 +100,25 @@ export function passageLabel(firstKey, lastKey) {
     @param {string} key */
 export function translationTag(key) {
   const p = String(key || '').split(':');
-  if (p[0] !== 'bible' || !p[1] || p[1].indexOf('-') >= 0) return '';
+  if (p[0] !== 'bible' || !p[1] || !isTranslatedBook(p[1])) return '';
   if (typeof StateStore === 'undefined' || !StateStore) return '';
   let code = null;
   try { const s = StateStore.get(); code = s && s.settings ? s.settings.translation : null; } catch (_e) { code = null; }
   const opts = typeof TRANSLATION_OPTIONS !== 'undefined' && Array.isArray(TRANSLATION_OPTIONS) ? TRANSLATION_OPTIONS : [];
   const found = opts.find((o) => o.id === (code || 'nkjv'));
   return ' (' + (found ? found.label : 'NKJV') + ')';
+}
+
+/** Does the Bible reader show this book in the reader's translation? Every
+    book on its canonical list does. Matthew is "matthew-plain" there: the plain
+    NKJV Matthew, translated like the rest; the old test for a '-' (meant for
+    TSOT Matthew's own text) dropped its tag. Before the list is known (tests,
+    a cold start) the key is taken at its word.
+    @param {string} id */
+function isTranslatedBook(id) {
+  const list = typeof BIBLE_BOOK_LIST !== 'undefined' && Array.isArray(BIBLE_BOOK_LIST) ? BIBLE_BOOK_LIST : null;
+  if (!list || !list.length) return true;
+  return list.some((b) => !!b && b.id === id);
 }
 
 /** A letter-family entry's reference: its title and its collection,
@@ -107,12 +138,48 @@ function entryReference(key) {
     @param {string[]} keys  the copied blocks' keys, in reading order */
 export function passageReference(keys) {
   if (!keys.length) return '';
-  const kind = keys[0].split(':')[0];
+  const p = keys[0].split(':');
+  const kind = p[0];
   if (!PUBLIC_KINDS.has(kind)) return '';
   const verses = keys.filter(isVerseKey);
-  if (verses.length) return passageLabel(verses[0], verses[verses.length - 1]) + translationTag(verses[0]);
+  if (verses.length) {
+    const label = passageLabel(verses[0], verses[verses.length - 1]);
+    return label + (kind === 'study' ? STUDY_TAG : translationTag(verses[0]));
+  }
+  // A whole chapter (a page's own key): "John 7 (NKJV)", "Matthew 5 (Study Bible)".
+  if (kind === 'bible' && p.length === 3) return _bookmarkSourceLabel(keys[0]) + translationTag(keys[0]);
+  if (kind === 'study' && p.length === 2) {
+    const ch = /^(.+)-(\d+)$/.exec(p[1] || '');
+    return ch ? ch[1].charAt(0).toUpperCase() + ch[1].slice(1) + ' ' + ch[2] + STUDY_TAG : '';
+  }
   if (kind === 'study') return _bookmarkSourceLabel(keys[0]);
   return entryReference(keys[0]);
+}
+
+/** A sheet's reference for the verse text it shows: the reference itself when
+    it names its translation ("John 14:6 (KJV)"), otherwise with " (NKJV)" (the
+    letters cite the NKJV, and a sheet falls back to the NKJV corpus).
+    @param {string} ref */
+export function sheetReference(ref) {
+  const r = String(ref || '').trim();
+  if (!r) return '';
+  return /\([A-Za-z][A-Za-z0-9-]*\)$/.test(r) ? r : r + ' (NKJV)';
+}
+
+/** The reference a page or a sheet declares for its words outside any verse
+    block: data-copy-ref (a literal: a sheet's "John 3:16 (NKJV)") or
+    data-copy-key (named like a passage: "letter:the-wide-path" is "The Wide
+    Path (Volume Two)"). '' when the range is under neither.
+    @param {Range} range */
+function declaredReference(range) {
+  const node = range.commonAncestorContainer;
+  const el = node.nodeType === 1 ? /** @type {Element} */ (node) : node.parentElement;
+  const host = el && el.closest ? el.closest('[data-copy-ref], [data-copy-key]') : null;
+  if (!host || host.closest(OFF_PAGE)) return '';
+  const literal = host.getAttribute('data-copy-ref');
+  if (literal) return literal;
+  const key = host.getAttribute('data-copy-key');
+  return key ? passageReference([key]) : '';
 }
 
 /** The reading blocks ([data-hl-key]) the range reaches, in document order —
@@ -161,7 +228,8 @@ function plainText(frag, numbers = true) {
     if (el) {
       if (el.matches(ANNOTATION_CHROME)) return;
       if (el.tagName === 'BR') { out += '\n'; return; }
-      if (el.classList.contains('verse-num')) {
+      if (el.tagName === 'BUTTON') return;   // a control's label ("Go to John 3:16") is not the passage
+      if (el.matches(VERSE_NUMBER)) {
         const n = (el.textContent || '').trim();
         if (n && numbers) out += n + ' ';
         return;
@@ -210,7 +278,14 @@ export function passageCopy(range, { numbers = true } = {}) {
     before.setEnd(clip.startContainer, clip.startOffset);
     parts.push({ el, key: el.getAttribute('data-hl-key') || '', body, fromTop: !plainText(before.cloneContents()) });
   });
-  if (!parts.length) return null;
+  if (!parts.length) {
+    // No verse block in it: words a page or a sheet declares a reference for
+    // (a heading, an intro quote, a footnote's verse), or none of ours.
+    const declared = declaredReference(range);
+    const words = declared ? plainText(range.cloneContents(), numbers) : '';
+    if (!words) return null;
+    return { text: words + '\n' + declared, body: words, reference: declared, keys: [], isPublic: true };
+  }
   const manyVerses = parts.filter((p) => isVerseKey(p.key)).length > 1;
   let text = '';
   parts.forEach((p, i) => {
@@ -226,12 +301,14 @@ export function passageCopy(range, { numbers = true } = {}) {
     text += body;
   });
   const keys = parts.map((p) => p.key);
-  const reference = passageReference(keys);
+  const isPublic = PUBLIC_KINDS.has(keys[0].split(':')[0]);
+  // A block whose entry cannot be named still carries its page's name.
+  const reference = passageReference(keys) || (isPublic ? declaredReference(range) : '');
   return {
     text: reference ? text + '\n' + reference : text,
     body: text,
     reference,
     keys,
-    isPublic: PUBLIC_KINDS.has(keys[0].split(':')[0]),
+    isPublic,
   };
 }

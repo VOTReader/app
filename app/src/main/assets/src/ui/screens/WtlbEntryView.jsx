@@ -497,7 +497,8 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         </div>
       </header>
 
-      <div className="page-wrapper">
+      {/* data-copy-key: words copied from this entry outside its paragraphs still name it (utils/passage-copy.js). */}
+      <div className="page-wrapper" data-copy-key={'wtlb:' + entry.id}>
         <div className="content-layout">
           {/* data-mark-entry/-blocks: marks a corpus edit moved go back to their words (stores/corpus-mark-remap.js, n4-02) */}
           <div className="letter-body" ref={wtlbMainRef} data-mark-entry={'wtlb:' + entry.id + ':'} data-mark-blocks={entry.paragraphs.length}>

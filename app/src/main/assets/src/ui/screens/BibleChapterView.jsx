@@ -214,7 +214,9 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
         );
       })()}
       <div className="page-wrapper">
-        <div className="chapter-body" ref={bodyRef}>
+        {/* data-copy-key: words copied here outside a verse (a heading) still
+            name the chapter and the reader's translation (utils/passage-copy.js). */}
+        <div className="chapter-body" ref={bodyRef} data-copy-key={'bible:' + book.id + ':' + chapter.num}>
           {showSectionHeadings && headingsFocusHidden && chapter.sections.some((s) => s.heading || s.letter) && (
             <button
               className="hero-subtitle-restore headings-restore"

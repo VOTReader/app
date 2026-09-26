@@ -340,7 +340,9 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
         </div>
       </header>
 
-      <div className="page-wrapper">
+      {/* data-copy-key: words copied from this page outside its blocks (the
+          intro quote, a heading) still name the letter (utils/passage-copy.js). */}
+      <div className="page-wrapper" data-copy-key={'letter:' + letter.id}>
         <div className="letter-meta">
           <div className="meta-date">{letter.date}</div>
           <div className="meta-from">{Array.isArray(letter.from) ? <Segments segments={letter.from} {...fnProps} /> : letter.from}</div>
