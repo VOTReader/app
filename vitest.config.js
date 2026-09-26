@@ -364,14 +364,8 @@ export default defineConfig({
         // point below their measured coverage (search/engine.js is the tenth and
         // already had one). Same discipline as the rest: ratchet up, never down.
         'app/src/main/assets/src/utils/audio-player.js': {
-          // measured 91.33 / 83.23 / 91.03 / 97.38; since the s6r split (2026-09-26) only the public face
-          // (typedefs, the AudioPlayer object, the boot): 100 / 83.33 / 100 / 100
+          // measured 91.33 / 83.23 / 91.03 / 97.38
           statements: 90, branches: 82, functions: 90, lines: 96,
-        },
-        // The player itself since the s6r split: the fifteen modules together (one aggregate, as the single
-        // file was). Measured 93.49 / 88.19 / 95.28 / 98.54 at the split.
-        'app/src/main/assets/src/utils/audio-player/**': {
-          statements: 92, branches: 87, functions: 94, lines: 97,
         },
         'app/src/main/assets/src/utils/platform-bridge.js': {
           // measured 91.50 / 73.18 / 90.57 / 94.15
