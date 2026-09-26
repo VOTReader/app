@@ -36,7 +36,10 @@ export const USAGE_ENDPOINT = 'https://stats.votreader.workers.dev/v1/b';
 export const USAGE_STORAGE_KEY = 'vot.usage.v1';
 export const USAGE_ENABLED_KEY = 'vot.usage.enabled';
 export const USAGE_NOTICE_KEY = 'vot.usage.noticed';
-export const USAGE_NOTICE_TEXT = 'VOTReader sends anonymous counts (letters opened, minutes listened, errors) to help improve the app. No account, no device ID, nothing you write. Turn it off in Settings > Your Data.';
+/* One sentence (Corbin 2026-09-26: "concise, nothing verbose"). A new reader
+   meets it on the About screen's first page, which marks it seen; the toast is
+   left only for a reader already past that screen (see installUsageStats). */
+export const USAGE_NOTICE_TEXT = 'VOTReader sends anonymous usage counts, never anything you write. Turn them off in Settings › Your Data.';
 
 const MAX_SEALED = 30;
 const MAX_QUEUE_BYTES = 64 * 1024;
@@ -271,13 +274,16 @@ export function createUsageStats(o = {}) {
  * The app's one instance, wired to the page lifecycle: flush when hidden (the
  * last reliable moment), when back online, and every 15 minutes in the foreground.
  * showNotice(text) puts the one-time first-run notice on screen (Corbin 09-24:
- * a first-run notice); it is marked seen once shown.
+ * a first-run notice); it is marked seen once shown. It returns (or resolves)
+ * false when it did not show it (the About screen will, and marks it seen
+ * there), so the notice is never counted as seen before someone has shown it.
  * @param {any} [win]
  * @param {() => Promise<any>} [getVersion]
- * @param {(text: string) => void} [showNotice]
+ * @param {(text: string) => (boolean | void | Promise<boolean | void>)} [showNotice]
+ * @param {Parameters<typeof createUsageStats>[0]} [opts]  createUsageStats' options (tests)
  */
-export function installUsageStats(win = typeof window !== 'undefined' ? window : undefined, getVersion, showNotice) {
-  const stats = createUsageStats();
+export function installUsageStats(win = typeof window !== 'undefined' ? window : undefined, getVersion, showNotice, opts) {
+  const stats = createUsageStats(opts);
   if (!win || stats.isGuarded()) return stats;
   const run = (fn) => { try { fn(); } catch (_e) { /* stats never break the app */ } };
   win.document?.addEventListener?.('visibilitychange', () => {
@@ -292,12 +298,11 @@ export function installUsageStats(win = typeof window !== 'undefined' ? window :
     let v = null;
     try { v = getVersion ? await getVersion() : null; } catch (_e) { v = null; }
     // The notice first: nothing is sent until it has been shown.
-    run(() => {
-      if (showNotice && stats.needsNotice()) {
-        showNotice(USAGE_NOTICE_TEXT);
-        stats.markNoticed();
-      }
-    });
+    if (showNotice && stats.needsNotice()) {
+      let shown = false;
+      try { shown = (await showNotice(USAGE_NOTICE_TEXT)) !== false; } catch (_e) { shown = false; }
+      if (shown) run(() => stats.markNoticed());
+    }
     run(() => stats.start(v));
   };
   if (typeof win.requestIdleCallback === 'function') win.requestIdleCallback(() => begin(), { timeout: 10000 });

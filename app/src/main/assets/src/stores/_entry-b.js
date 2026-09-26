@@ -192,10 +192,21 @@ import {
 // binding the modules had before this conversion.
 // us1: the one anonymous-usage-counts instance. Its version is the running build:
 // the controlling service worker's answer, or - on a first visit (no controller yet)
-// and in the APK - the service-worker.js this page was served with. The first-run notice (once) is a 12-second toast.
+// and in the APK - the service-worker.js this page was served with. The first-run notice
+// is one line on the About screen's first page, which every new reader sees and which
+// marks it seen (Corbin 09-26: "the first two introductory screens once, concise"). The
+// toast only reaches a reader already past that screen who has not seen it.
 const UsageStats = installUsageStats(window, async () =>
   (await getBuildVersion()) || fetchServerBuildVersion(),
-  (text) => showToast({ id: 'vot-usage-notice', className: 'vot-toast', text, durationMs: 12000 }));
+  async (text) => {
+    // The About flag lives in IndexedDB: read it once the stores have loaded. The first idle
+    // moment comes before that (measured), and a returning reader read as "not past About"
+    // was never shown the notice at all.
+    await hydrateAllStores();
+    if (!AboutSeenFlagStore.is()) return false;   // the About screen shows it
+    showToast({ id: 'vot-usage-notice', className: 'vot-toast', text, durationMs: 8000 });
+    return true;
+  });
 
 Object.assign(window, {
   // Platform bridge (W1.1)

@@ -8,6 +8,8 @@
    look caught it.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { USAGE_NOTICE_TEXT } from '../../utils/usage-stats.js';
+
 /** The credited song makers in the loaded catalog, most songs first; [] before it loads. @returns {string[]} */
 export function songMakers() {
   const cat = typeof SongCatalog !== 'undefined' && SongCatalog.loaded ? SongCatalog : null;
@@ -20,6 +22,11 @@ export function songMakers() {
 
 export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, onThemeChange }) {
   const [page, setPage] = React.useState(1);
+  // us1: the usage-counts notice is on page 1, which every new reader sees
+  // (page 2 can be skipped with Back), so it is seen here and no toast follows.
+  React.useEffect(() => {
+    try { if (window.UsageStats) window.UsageStats.markNoticed(); } catch (_e) { /* stats never break the intro */ }
+  }, []);
 
   const handleBack     = page === 2 ? () => setPage(1) : onBack;
   const handleContinue = page === 1 ? () => setPage(2) : onContinue;
@@ -47,6 +54,7 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
                   <p>The Volumes of Truth are the Word of The Lord, given through His servant Timothy.</p>
                   <p>This reader was made by a disciple for personal study; it is not the canonical source.</p>
                   <p>Your notes, journal, and highlights stay on this device — use Settings → Export to back them up.</p>
+                  <p className="about-usage">{USAGE_NOTICE_TEXT}</p>
                   <p>
                     For the canonical text, audio, video, and PDFs, visit{" "}
                     <a href="https://www.thevolumesoftruth.com" target="_blank" rel="noopener noreferrer"><em>thevolumesoftruth.com</em></a>
@@ -91,7 +99,6 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
                       leaves) is unchanged and stays; the download claim is now
                       the truth. */}
                   <p>Fully offline to read. Tapping Listen streams that recording, and the <em>Return to the Garden</em> images load the same way, from this app&rsquo;s own release files. Your notes, highlights and journal never leave this device.</p>
-                  <p>VOTReader sends anonymous counts (which letters are opened, minutes listened, errors) to help improve the app. No account, no device ID, nothing you write. Turn it off in Settings &rsaquo; Your Data.</p>
                 </div>
               </>
             )}

@@ -1,6 +1,6 @@
 /* us1: the app's anonymous usage counts - flags, the offline queue, sending, opt-out, guards. */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createUsageStats, usageGuarded, usagePlatform, USAGE_STORAGE_KEY, USAGE_ENABLED_KEY, USAGE_NOTICE_KEY } from './usage-stats.js';
+import { createUsageStats, installUsageStats, usageGuarded, usagePlatform, USAGE_STORAGE_KEY, USAGE_ENABLED_KEY, USAGE_NOTICE_KEY, USAGE_NOTICE_TEXT } from './usage-stats.js';
 import { validateBatch } from './usage-schema.js';
 
 function memStorage() {
@@ -230,5 +230,85 @@ describe('what can be linked, and when anything may leave (us1 refutation)', () 
     expect(s.snapshot().queued[0].act).toMatchObject({ first: 1 }); // a wiped app is a new install
     s.setEnabled(false); s.reset();
     expect(s.isEnabled()).toBe(false);
+  });
+});
+/* cp1 follow-up (Corbin 2026-09-26): the notice is one line on the About
+   screen's first page, which marks it seen; the toast is only for a reader
+   already past that screen. Nothing may be sent before it has been shown. */
+describe('the first-run notice', () => {
+  const fakeWin = () => ({
+    document: { addEventListener() {}, visibilityState: 'visible' },
+    addEventListener() {}, setInterval() {},
+    requestIdleCallback: (/** @type {() => void} */ fn) => fn(),
+  });
+  const opts = () => ({
+    storage, guarded: false, plat: 'pwa', now: () => new Date(clock),
+    fetch: async (/** @type {any} */ _u, /** @type {any} */ init) => { sent.push(JSON.parse(init.body)); return { status: 204 }; },
+    beacon: () => true,
+  });
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+
+  it('is one sentence: what is sent, what never is, and where to turn it off', () => {
+    expect(USAGE_NOTICE_TEXT.length).toBeLessThan(120);
+    expect(USAGE_NOTICE_TEXT.split(/[.!?](\s|$)/).filter((x) => x && x.trim()).length).toBeLessThanOrEqual(2);
+    expect(USAGE_NOTICE_TEXT).toMatch(/anonymous usage counts/i);
+    expect(USAGE_NOTICE_TEXT).toMatch(/never anything you write/i);
+    expect(USAGE_NOTICE_TEXT).toMatch(/Settings . Your Data/);
+  });
+
+  it('a new reader: the toast declines (the About screen shows it), so it stays unseen and nothing is sent', async () => {
+    storage.removeItem(USAGE_NOTICE_KEY);
+    const asked = /** @type {string[]} */ ([]);
+    const s = installUsageStats(fakeWin(), async () => null, (t) => { asked.push(t); return false; }, opts());
+    await settle();
+    expect(asked).toEqual([USAGE_NOTICE_TEXT]);
+    expect(s.needsNotice()).toBe(true);
+    expect(sent).toEqual([]);
+    s.markNoticed();                          // the About screen's first page
+    expect(s.needsNotice()).toBe(false);
+  });
+
+  it('a reader already past the About screen gets the one-line toast once, and is then counted as having seen it', async () => {
+    storage.removeItem(USAGE_NOTICE_KEY);
+    const asked = /** @type {string[]} */ ([]);
+    const s = installUsageStats(fakeWin(), async () => null, (t) => { asked.push(t); return true; }, opts());
+    await settle();
+    expect(asked.length).toBe(1);
+    expect(s.needsNotice()).toBe(false);
+    const again = /** @type {string[]} */ ([]);
+    installUsageStats(fakeWin(), async () => null, (t) => { again.push(t); return true; }, opts());
+    await settle();
+    expect(again).toEqual([]);
+  });
+});
+
+describe('the first-run notice, decided after the stores load', () => {
+  const fakeWin = () => ({
+    document: { addEventListener() {}, visibilityState: 'visible' },
+    addEventListener() {}, setInterval() {},
+    requestIdleCallback: (/** @type {() => void} */ fn) => fn(),
+  });
+  const opts = () => ({ storage, guarded: false, plat: 'pwa', now: () => new Date(clock), fetch: async () => ({ status: 204 }), beacon: () => true });
+  const settle = () => new Promise((r) => setTimeout(r, 5));
+
+  /* The toast asks whether the reader is past the About screen, a flag kept in
+     IndexedDB: the answer can only come once the stores have loaded, so the
+     notice waits for it (measured: the first idle moment came first, and a
+     returning reader was never shown the notice). */
+  it('an answer that arrives later still decides: seen when shown, unseen when declined', async () => {
+    storage.removeItem(USAGE_NOTICE_KEY);
+    let s = installUsageStats(fakeWin(), async () => null, () => new Promise((r) => setTimeout(() => r(false), 1)), opts());
+    await settle();
+    expect(s.needsNotice()).toBe(true);
+    s = installUsageStats(fakeWin(), async () => null, () => new Promise((r) => setTimeout(() => r(true), 1)), opts());
+    await settle();
+    expect(s.needsNotice()).toBe(false);
+  });
+
+  it('a notice that throws is not counted as seen', async () => {
+    storage.removeItem(USAGE_NOTICE_KEY);
+    const s = installUsageStats(fakeWin(), async () => null, async () => { throw new Error('no toast host'); }, opts());
+    await settle();
+    expect(s.needsNotice()).toBe(true);
   });
 });
