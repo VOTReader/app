@@ -26,6 +26,12 @@ import { JournalStore } from '../../stores/journal-store.js';
 import { JournalHelpers } from '../../data/journal-helpers.js';
 import { createPressDrag } from '../../utils/press-drag.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../../data/journal-helpers.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalHelpers() { return 'JournalHelpers' in globalThis ? /** @type {any} */ (globalThis).JournalHelpers : real.JournalHelpers; } }; });
+vi.mock('../../stores/journal-stats-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalStatsStore() { return /** @type {any} */ (globalThis).JournalStatsStore; } }; });
+vi.mock('../../stores/journal-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalStore() { return 'JournalStore' in globalThis ? /** @type {any} */ (globalThis).JournalStore : real.JournalStore; } }; });
+vi.mock('../../utils/storage-health.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get StorageHealth() { return /** @type {any} */ (globalThis).StorageHealth; } }; });
+
 beforeEach(() => {
   localStorage.clear();
   JournalStore._resetForTests({ forceLoaded: true });

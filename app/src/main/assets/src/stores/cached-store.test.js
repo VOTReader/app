@@ -36,6 +36,10 @@ import {
 } from './cached-store.js';
 import { IDBAdapter } from './idb-adapter.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../utils/storage-health.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get StorageHealth() { return /** @type {any} */ (globalThis).StorageHealth; } }; });
+vi.mock('../utils/diagnostic-log.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get DiagnosticLog() { return /** @type {any} */ (globalThis).DiagnosticLog; } }; });
+
 /* ═══════════════════════════════════════════════════════════════════
    PART 1 — Original reactivity contract (LS-only mode, unchanged).
    ═══════════════════════════════════════════════════════════════════ */

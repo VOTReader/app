@@ -13,6 +13,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { ReadingDotContext, ResumeReadingNavBtn } from './ResumeReadingNavBtn.jsx';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../../data/scripture-resolution.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get LETTER_SCREEN_SET() { return /** @type {any} */ (globalThis).LETTER_SCREEN_SET; } }; });
+
 beforeEach(() => {
   /** @type {any} */ (globalThis).LETTER_SCREEN_SET = new Set(['vot-letter', 'wtlb-entry']);
 });

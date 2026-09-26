@@ -7,6 +7,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useRestoreGuard, RESTORE_INFLIGHT_KEY } from './use-restore-guard.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../utils/toast.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get showToast() { return /** @type {any} */ (globalThis).showToast; } }; });
+
 beforeEach(() => { localStorage.clear(); });
 afterEach(() => { delete /** @type {any} */ (globalThis).showToast; });
 

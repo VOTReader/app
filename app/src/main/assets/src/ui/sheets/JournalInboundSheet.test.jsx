@@ -7,6 +7,11 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { JournalInboundSheet } from './JournalInboundSheet.jsx';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../../stores/journal-index-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalIndexStore() { return /** @type {any} */ (globalThis).JournalIndexStore; } }; });
+vi.mock('../../stores/journal-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalStore() { return /** @type {any} */ (globalThis).JournalStore; } }; });
+vi.mock('../../data/journal-helpers.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalHelpers() { return /** @type {any} */ (globalThis).JournalHelpers; } }; });
+
 function stubGlobals() {
   window.JournalIndexStore = { entriesReferencing: () => ['je1'] };
   window.JournalStore = { get: (id) => ({ id, title: 'Morning prayer', updated: 2, created: 1 }) };

@@ -23,6 +23,9 @@ import { JournalStore } from '../../stores/journal-store.js';
 import { JournalHelpers } from '../../data/journal-helpers.js';
 import { createPressDrag } from '../../utils/press-drag.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../../data/journal-helpers.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalHelpers() { return 'JournalHelpers' in globalThis ? /** @type {any} */ (globalThis).JournalHelpers : real.JournalHelpers; } }; });
+
 beforeEach(() => {
   vi.useFakeTimers();
   localStorage.clear();

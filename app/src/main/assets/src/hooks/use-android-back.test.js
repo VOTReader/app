@@ -13,6 +13,11 @@ import { modalRegistry } from './use-modal-registry.js';
 import { useHistorySync, suppressNextHistoryPush, clearSuppressNextHistoryPush } from './use-history-sync.js';
 import { PlatformBridge } from '../utils/platform-bridge.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('./use-history-sync.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get clearSuppressNextHistoryPush() { return 'clearSuppressNextHistoryPush' in globalThis ? /** @type {any} */ (globalThis).clearSuppressNextHistoryPush : real.clearSuppressNextHistoryPush; }, get suppressNextHistoryPush() { return 'suppressNextHistoryPush' in globalThis ? /** @type {any} */ (globalThis).suppressNextHistoryPush : real.suppressNextHistoryPush; } }; });
+vi.mock('../data/scripture-resolution.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get COL_BY_INDEX_SC() { return /** @type {any} */ (globalThis).COL_BY_INDEX_SC; }, get COL_BY_LETTER_SC() { return /** @type {any} */ (globalThis).COL_BY_LETTER_SC; }, get LETTER_SCREEN_SET() { return /** @type {any} */ (globalThis).LETTER_SCREEN_SET; } }; });
+vi.mock('../stores/app-flag-stores.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get AboutSeenFlagStore() { return /** @type {any} */ (globalThis).AboutSeenFlagStore; } }; });
+
 beforeEach(() => {
   modalRegistry._reset(); // module-level singleton — clear between runs (NAV1)
   /** @type {any} */ (globalThis).LETTER_SCREEN_SET = new Set(['vot-one-letter', 'vot-letter']);

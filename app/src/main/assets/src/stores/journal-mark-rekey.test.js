@@ -3,8 +3,11 @@
    two paragraphs, then inserts a photo at the top of the entry. Under position
    keys the photo took position 0 and every mark slid one paragraph up; the
    re-key has to put each mark back on the words it was made on. */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { rekeyJournalMarks, pickBlock, blockPlainText, journalBlockKey, inlineLinkLabel } from './journal-mark-rekey.js';
+
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('./bookmark-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get BookmarkStore() { return /** @type {any} */ (globalThis).BookmarkStore; } }; });
 
 // The entry AFTER the photo went in above: the marks were made on [A, B, C] at 0, 1, 2.
 const ENTRY = {

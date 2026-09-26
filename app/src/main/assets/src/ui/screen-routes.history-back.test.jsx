@@ -47,6 +47,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { buildScreenRoutes } from './screen-routes.jsx';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../data/scripture-resolution.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get COL_BY_INDEX_SC() { return /** @type {any} */ (globalThis).COL_BY_INDEX_SC; } }; });
+
 beforeEach(() => {
   /** @type {any} */ (globalThis).HistoryScreen = () => null;
   /** @type {any} */ (globalThis).ChapterIndex = () => null;

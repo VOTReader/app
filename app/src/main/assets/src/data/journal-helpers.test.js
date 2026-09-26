@@ -6,8 +6,12 @@
    owner-reported "lying show more". Embedding body text is the Excerpt flow.
    Note cards now title themselves by their annotation source. */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { JournalHelpers } from './journal-helpers.js';
+
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('./scripture-resolution.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get COL_BY_KEY() { return /** @type {any} */ (globalThis).COL_BY_KEY; }, get findEntryContext() { return /** @type {any} */ (globalThis).findEntryContext; } }; });
+vi.mock('../stores/note-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get NoteStore() { return /** @type {any} */ (globalThis).NoteStore; } }; });
 
 const g = /** @type {any} */ (globalThis);
 

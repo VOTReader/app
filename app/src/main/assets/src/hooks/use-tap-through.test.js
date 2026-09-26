@@ -32,6 +32,9 @@ import { renderHook, act } from '@testing-library/react';
 import { useTapThrough } from './use-tap-through.js';
 import { navHandoff } from '../utils/nav-handoff.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../data/letter-linking.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get resolveVotLetter() { return /** @type {any} */ (globalThis).resolveVotLetter; } }; });
+
 // ── Global stubs ────────────────────────────────────────────────────────
 let _prevResolve;
 

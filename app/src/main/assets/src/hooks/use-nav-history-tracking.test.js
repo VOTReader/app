@@ -43,6 +43,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useNavHistoryTracking } from './use-nav-history-tracking.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../data/scripture-resolution.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get COL_BY_LETTER_SC() { return /** @type {any} */ (globalThis).COL_BY_LETTER_SC; } }; });
+
 // ── Global stubs ────────────────────────────────────────────────────────
 // The hook reads MATTHEW / BOOKS / COL_BY_LETTER_SC as bare-name globals
 // (cross-bundle pattern documented in the hook header). In jsdom,

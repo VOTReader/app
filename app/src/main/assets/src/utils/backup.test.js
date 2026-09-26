@@ -64,6 +64,15 @@ import { HomeOrderStore } from '../stores/home-order-store.js';
 import { StateStore } from '../stores/state-store.js';
 import { WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore } from '../stores/app-flag-stores.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('./storage-health.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get StorageHealth() { return 'StorageHealth' in globalThis ? /** @type {any} */ (globalThis).StorageHealth : real.StorageHealth; } }; });
+vi.mock('../stores/annotation-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get AnnotationStore() { return 'AnnotationStore' in globalThis ? /** @type {any} */ (globalThis).AnnotationStore : real.AnnotationStore; } }; });
+vi.mock('../stores/note-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get NoteStore() { return 'NoteStore' in globalThis ? /** @type {any} */ (globalThis).NoteStore : real.NoteStore; } }; });
+vi.mock('../stores/bookmark-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get BookmarkStore() { return 'BookmarkStore' in globalThis ? /** @type {any} */ (globalThis).BookmarkStore : real.BookmarkStore; } }; });
+vi.mock('../stores/link-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get LinkStore() { return 'LinkStore' in globalThis ? /** @type {any} */ (globalThis).LinkStore : real.LinkStore; } }; });
+vi.mock('../stores/journal-index-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalIndexStore() { return 'JournalIndexStore' in globalThis ? /** @type {any} */ (globalThis).JournalIndexStore : real.JournalIndexStore; } }; });
+vi.mock('../stores/journal-stats-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalStatsStore() { return 'JournalStatsStore' in globalThis ? /** @type {any} */ (globalThis).JournalStatsStore : real.JournalStatsStore; } }; });
+
 /* ─────────────────────────────────────────────────────────────────────
    PART 1 — codecs
    ───────────────────────────────────────────────────────────────────── */

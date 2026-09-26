@@ -58,12 +58,15 @@
    become a second place to lose a store.
 */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { USER_DATA_STORES } from './user-data-size.js';
 import { IDBAdapter } from '../stores/idb-adapter.js';
+
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../stores/idb-adapter.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get IDBAdapter() { return 'IDBAdapter' in globalThis ? /** @type {any} */ (globalThis).IDBAdapter : real.IDBAdapter; } }; });
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // The export + flag maps moved out of SettingsScreen with the backup flows

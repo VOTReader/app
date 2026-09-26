@@ -14,6 +14,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSheetOrchestration } from './use-sheet-orchestration.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../stores/bookmark-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get BookmarkStore() { return /** @type {any} */ (globalThis).BookmarkStore; } }; });
+
 const baseArgs = (over) => ({
   screen: 'home', letterId: null, bookId: null,
   chapterNum: null, studyId: null, studyChapterId: null,

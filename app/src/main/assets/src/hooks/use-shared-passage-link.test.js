@@ -5,6 +5,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { openSharedPassage, installSharedPassageHook } from './use-shared-passage-link.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../utils/toast.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get showToast() { return /** @type {any} */ (globalThis).showToast; } }; });
+
 function fakeWin(search, extra) {
   const replaced = [];
   const win = {

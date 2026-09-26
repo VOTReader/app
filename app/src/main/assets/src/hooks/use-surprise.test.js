@@ -8,6 +8,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSurprise } from './use-surprise.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../data/scripture-resolution.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get COLLECTIONS() { return /** @type {any} */ (globalThis).COLLECTIONS; }, get COL_BY_KEY() { return /** @type {any} */ (globalThis).COL_BY_KEY; }, get _studies() { return /** @type {any} */ (globalThis)._studies; }, get colLetterArr() { return /** @type {any} */ (globalThis).colLetterArr; }, get colPreface() { return /** @type {any} */ (globalThis).colPreface; } }; });
+
 let _prevMATTHEW, _prevBBL, _prev_studies, _prevCOLLECTIONS, _prevCOL_BY_KEY, _prevColLetterArr, _prevColPreface;
 let _prevRandom, _prevGetRandomValues;
 

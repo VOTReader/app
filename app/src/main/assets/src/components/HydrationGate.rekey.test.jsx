@@ -8,6 +8,9 @@ import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import { HydrationGate } from './HydrationGate.jsx';
 import { _resetStoreRegistry } from '../stores/cached-store.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../stores/journal-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalStore() { return /** @type {any} */ (globalThis).JournalStore; } }; });
+
 const G = /** @type {any} */ (globalThis);
 
 afterEach(() => {

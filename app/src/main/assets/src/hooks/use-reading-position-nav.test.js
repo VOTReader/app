@@ -39,6 +39,9 @@ import { renderHook, act } from '@testing-library/react';
 import { useReadingPositionNav } from './use-reading-position-nav.js';
 import { ProphecyCardsStore } from '../stores/prophecy-cards-store.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../data/scripture-resolution.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get COL_BY_KEY() { return /** @type {any} */ (globalThis).COL_BY_KEY; }, get COL_BY_LETTER_SC() { return /** @type {any} */ (globalThis).COL_BY_LETTER_SC; } }; });
+
 // ── Global stubs ────────────────────────────────────────────────────────
 let _prevCOL_BY_KEY;
 

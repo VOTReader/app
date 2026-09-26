@@ -39,6 +39,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useBibleStudies } from './use-bible-studies.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../data/scripture-resolution.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get _matthew() { return /** @type {any} */ (globalThis)._matthew; }, get _studies() { return /** @type {any} */ (globalThis)._studies; } }; });
+
 // ── Global stubs ────────────────────────────────────────────────────────
 let _prev_studies, _prev_matthew, _prevMATTHEW;
 

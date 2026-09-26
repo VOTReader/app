@@ -20,6 +20,10 @@ import { renderHook } from '@testing-library/react';
 import { useJournalMediaSweep } from './use-journal-media-sweep.js';
 import { RESTORE_INFLIGHT_KEY } from './use-restore-guard.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../stores/journal-media-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalMediaStore() { return /** @type {any} */ (globalThis).JournalMediaStore; } }; });
+vi.mock('../stores/journal-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalStore() { return /** @type {any} */ (globalThis).JournalStore; } }; });
+
 beforeEach(() => {
   localStorage.clear();
   vi.useFakeTimers();

@@ -42,6 +42,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useReadingChainNav } from './use-reading-chain-nav.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../data/scripture-resolution.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get COLLECTIONS() { return /** @type {any} */ (globalThis).COLLECTIONS; }, get COL_BY_KEY() { return /** @type {any} */ (globalThis).COL_BY_KEY; }, get READING_CHAIN() { return /** @type {any} */ (globalThis).READING_CHAIN; }, get _boundaryShort() { return /** @type {any} */ (globalThis)._boundaryShort; }, get colLetterArr() { return /** @type {any} */ (globalThis).colLetterArr; }, get colPreface() { return /** @type {any} */ (globalThis).colPreface; } }; });
+
 // ── Global stubs ────────────────────────────────────────────────────────
 // useReadingChainNav reads MANY cross-bundle globals: BOOKS, COLLECTIONS,
 // COL_BY_KEY, READING_CHAIN, BIBLE_BOOK_LIST, colLetterArr, colPreface,

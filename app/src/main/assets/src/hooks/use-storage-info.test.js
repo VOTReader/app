@@ -9,6 +9,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useStorageInfo } from './use-storage-info.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../utils/storage-health.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get StorageHealth() { return /** @type {any} */ (globalThis).StorageHealth; } }; });
+
 let _listeners;
 let _version;
 let _report;

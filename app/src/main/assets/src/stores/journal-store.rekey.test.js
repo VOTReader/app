@@ -16,6 +16,15 @@ import { JournalIndexStore } from './journal-index-store.js';
 import { JournalStatsStore } from './journal-stats-store.js';
 import { JOURNAL_REKEY_STAMP } from './journal-mark-rekey.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('./annotation-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get AnnotationStore() { return 'AnnotationStore' in globalThis ? /** @type {any} */ (globalThis).AnnotationStore : real.AnnotationStore; } }; });
+vi.mock('./note-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get NoteStore() { return 'NoteStore' in globalThis ? /** @type {any} */ (globalThis).NoteStore : real.NoteStore; } }; });
+vi.mock('./bookmark-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get BookmarkStore() { return 'BookmarkStore' in globalThis ? /** @type {any} */ (globalThis).BookmarkStore : real.BookmarkStore; } }; });
+vi.mock('./link-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get LinkStore() { return 'LinkStore' in globalThis ? /** @type {any} */ (globalThis).LinkStore : real.LinkStore; } }; });
+vi.mock('../utils/diagnostic-log.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get DiagnosticLog() { return 'DiagnosticLog' in globalThis ? /** @type {any} */ (globalThis).DiagnosticLog : real.DiagnosticLog; } }; });
+vi.mock('./journal-index-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalIndexStore() { return 'JournalIndexStore' in globalThis ? /** @type {any} */ (globalThis).JournalIndexStore : real.JournalIndexStore; } }; });
+vi.mock('./journal-stats-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalStatsStore() { return 'JournalStatsStore' in globalThis ? /** @type {any} */ (globalThis).JournalStatsStore : real.JournalStatsStore; } }; });
+
 beforeEach(() => {
   localStorage.clear();
   JournalStore._resetForTests({ forceLoaded: true });

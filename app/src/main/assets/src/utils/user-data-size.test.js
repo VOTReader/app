@@ -18,8 +18,12 @@
        so they can never inflate "your data".
 */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { measureUserData, USER_DATA_STORES, getUserDataSamples, recordUserDataSample } from './user-data-size.js';
+
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../stores/idb-adapter.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get IDBAdapter() { return /** @type {any} */ (globalThis).IDBAdapter; } }; });
+vi.mock('../stores/journal-media-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalMediaStore() { return /** @type {any} */ (globalThis).JournalMediaStore; } }; });
 
 /** @type {any} */
 const realIDB = globalThis.IDBAdapter;

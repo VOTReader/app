@@ -1,11 +1,14 @@
 // @ts-nocheck — tests stub JournalIndexStore + COLLECTIONS globals
 /* dom-journal-chip — the JournalChip component + pure refKey builders. */
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import {
   JournalChip, jrnRefKeyForLetter, jrnRefKeyForBookmark,
 } from './dom-journal-chip.jsx';
+
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../stores/journal-index-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalIndexStore() { return /** @type {any} */ (globalThis).JournalIndexStore; } }; });
 
 describe('jrnRefKey builders', () => {
   it('jrnRefKeyForLetter', () => {

@@ -39,6 +39,9 @@ import { renderHook } from '@testing-library/react';
 import { useNav } from './use-nav.js';
 import { navHandoff } from '../utils/nav-handoff.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../data/scripture-resolution.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get COL_BY_KEY() { return /** @type {any} */ (globalThis).COL_BY_KEY; } }; });
+
 // ── Global stubs ────────────────────────────────────────────────────────
 // useNav reads COL_BY_KEY (cross-bundle Map, populated by _entry-b in
 // production). Same window-vs-globalThis pattern as P7a's tests — the
@@ -90,6 +93,7 @@ const makeSetters = () => ({
   setNavOrigin: vi.fn(),
   setFromSearch: vi.fn(),
   setFromWtlb: vi.fn(),
+  setFromSurprise: vi.fn(),
   setFromLetterStack: vi.fn(),
   setJournalEntryId: vi.fn(),
   setGardenPage: vi.fn(),

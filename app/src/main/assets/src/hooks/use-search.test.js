@@ -58,6 +58,9 @@ import { renderHook, act } from '@testing-library/react';
 import { useSearch } from './use-search.js';
 import { navHandoff } from '../utils/nav-handoff.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../data/scripture-resolution.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get COL_BY_INDEX_SC() { return /** @type {any} */ (globalThis).COL_BY_INDEX_SC; }, get COL_BY_LETTER_SC() { return /** @type {any} */ (globalThis).COL_BY_LETTER_SC; }, get COL_BY_SEARCH_ID() { return /** @type {any} */ (globalThis).COL_BY_SEARCH_ID; }, get colLetterArr() { return /** @type {any} */ (globalThis).colLetterArr; }, get colPreface() { return /** @type {any} */ (globalThis).colPreface; } }; });
+
 // ── Global stubs ────────────────────────────────────────────────────────
 let _prevBOOKS, _prevCOL_BY_LETTER_SC, _prevCOL_BY_SEARCH_ID;
 let _prevColLetterArr, _prevColPreface;

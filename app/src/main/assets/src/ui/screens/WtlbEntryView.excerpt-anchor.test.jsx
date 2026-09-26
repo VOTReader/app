@@ -9,6 +9,9 @@ import * as ReactDOM from 'react-dom';
 import { WtlbEntryView } from './WtlbEntryView.jsx';
 import { LibraryNav } from '../components/LibraryNav.jsx';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../../data/scripture-resolution.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get COL_BY_KEY() { return /** @type {any} */ (globalThis).COL_BY_KEY; } }; });
+
 const seekToSeen = [];
 const seekOffsetSeen = [];
 vi.mock('../components/ReadAlongHighlight.jsx', () => ({

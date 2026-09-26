@@ -19,6 +19,10 @@ import { CachedStore, extendStore, _resetStoreRegistry, setStoreWriteFence } fro
 import { IDBAdapter } from './idb-adapter.js';
 import { mergeListStore, mergeStateStore } from './store-merge.js';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+// With no stub set, the real logger: storage-health (reached through cached-store) imports it too.
+vi.mock('../utils/diagnostic-log.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get DiagnosticLog() { return 'DiagnosticLog' in globalThis ? /** @type {any} */ (globalThis).DiagnosticLog : real.DiagnosticLog; } }; });
+
 const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 
 /* One shared in-memory IDB: { [storeName]: { [key]: value } }. get/put deep-

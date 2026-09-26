@@ -25,7 +25,7 @@
    beforeEach so the cascade code sees them.
 */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { JournalStore } from './journal-store.js';
 import { AnnotationStore } from './annotation-store.js';
 import { NoteStore } from './note-store.js';
@@ -34,6 +34,15 @@ import { LinkStore } from './link-store.js';
 import { JournalIndexStore } from './journal-index-store.js';
 import { JournalStatsStore } from './journal-stats-store.js';
 import { mergeListStore } from './store-merge.js';
+
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('./annotation-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get AnnotationStore() { return 'AnnotationStore' in globalThis ? /** @type {any} */ (globalThis).AnnotationStore : real.AnnotationStore; } }; });
+vi.mock('./note-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get NoteStore() { return 'NoteStore' in globalThis ? /** @type {any} */ (globalThis).NoteStore : real.NoteStore; } }; });
+vi.mock('./bookmark-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get BookmarkStore() { return 'BookmarkStore' in globalThis ? /** @type {any} */ (globalThis).BookmarkStore : real.BookmarkStore; } }; });
+vi.mock('./link-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get LinkStore() { return 'LinkStore' in globalThis ? /** @type {any} */ (globalThis).LinkStore : real.LinkStore; } }; });
+vi.mock('./journal-index-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalIndexStore() { return 'JournalIndexStore' in globalThis ? /** @type {any} */ (globalThis).JournalIndexStore : real.JournalIndexStore; } }; });
+vi.mock('./journal-stats-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalStatsStore() { return 'JournalStatsStore' in globalThis ? /** @type {any} */ (globalThis).JournalStatsStore : real.JournalStatsStore; } }; });
+vi.mock('./journal-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalStore() { return 'JournalStore' in globalThis ? /** @type {any} */ (globalThis).JournalStore : real.JournalStore; } }; });
 
 beforeEach(() => {
   localStorage.clear();

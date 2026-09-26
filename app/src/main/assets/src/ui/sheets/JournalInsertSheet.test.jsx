@@ -15,6 +15,11 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { JournalHelpers } from '../../data/journal-helpers.js';
 import { JournalInsertSheet } from './JournalInsertSheet.jsx';
 
+// The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../../stores/bookmark-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get BookmarkStore() { return /** @type {any} */ (globalThis).BookmarkStore; } }; });
+vi.mock('../../stores/note-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get NoteStore() { return /** @type {any} */ (globalThis).NoteStore; } }; });
+vi.mock('../../stores/notebook-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get NotebookStore() { return /** @type {any} */ (globalThis).NotebookStore; } }; });
+
 /** @type {any} */ (globalThis).JournalHelpers = JournalHelpers;
 
 const g = /** @type {any} */ (globalThis);
