@@ -37,7 +37,6 @@ export default defineConfig({
       'app/src/main/assets/src/**/*.test.{js,jsx}',
       'app/src/main/assets/*.test.{js,jsx}', // service-worker.test.js (SW lives at the assets root)
       'tools/**/*.test.{js,jsx}',
-      'stats/**/*.test.js', // the usage-stats Worker (us1), on node:sqlite
     ],
     // Default reporter ('default') is fine for v1. Add 'json' / 'junit'
     // when CI reporting needs structured output.

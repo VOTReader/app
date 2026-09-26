@@ -334,29 +334,7 @@ function _hidden() {
  */
 function _raiseKeepAlive() {
   if (_tourShowing()) return;
-  if (!_setAudioActive(true) && _hidden()) {
-    _usage('audio_hidden'); // us1: how often readers meet the silent-skip condition in the field
-    setTimeout(_pauseUnheard, 0);
-  }
-}
-
-/* us1: anonymous usage counts (utils/usage-stats.js on window). The key is the
-   recording's kind - its volume key, 'song' or 'compilation' - never a title. */
-let _usageStartedUrl = /** @type {string | null} */ (null);
-function _usageKind(track) {
-  if (!track) return 'none';
-  if (_isSong(track)) return 'song';
-  const i = track.key ? track.key.indexOf(':') : -1;
-  return i > 0 ? track.key.slice(0, i) : 'compilation';
-}
-function _usage(name, n) {
-  try {
-    const u = typeof window !== 'undefined' ? /** @type {any} */ (window).UsageStats : null;
-    if (!u) return;
-    const kind = _usageKind(_state.queue[_state.qi]);
-    if (name === 'listen_s') u.addSeconds(name, kind, n);
-    else u.count(name, n ? kind + ':' + n : kind);
-  } catch (_e) { /* stats never break playback */ }
+  if (!_setAudioActive(true) && _hidden()) setTimeout(_pauseUnheard, 0);
 }
 
 /** Set by an honest pause while hidden; the next return to the screen says why playback stopped. */
@@ -808,8 +786,6 @@ function _ensureEl() {
   el.addEventListener('playing', () => {
     _setStatus('playing');
     _recordSongStart();
-    const t = _state.queue[_state.qi];
-    if (t && t.url !== _usageStartedUrl) { _usageStartedUrl = t.url; _usage('listen_start'); }
   });
   el.addEventListener('waiting', () => _setStatus('loading'));
   // Only downgrade a genuinely-playing element: our own stop()/track-switch
@@ -839,9 +815,6 @@ function _ensureEl() {
     // displayed (whole-second) clock actually changes.
     const sec = Math.floor(_state.time);
     if (sec !== _lastTick) {
-      // us1: media seconds heard; a seek (a jump over 4 s: past a 1 Hz tick at the fastest
-      // rate, the native player's hidden cadence) is not listening.
-      if (sec - _lastTick > 0 && sec - _lastTick <= 4 && !el.paused) _usage('listen_s', sec - _lastTick);
       _lastTick = sec;
       _syncMediaSessionPosition();
       _notify();
@@ -867,7 +840,6 @@ function _ensureEl() {
     const looped = _state.loop ? _loopEnded() : '';
     if (looped === 'wrap') return;
     if (looped === 'done') { _markPaused(); return; }
-    _usage('listen_end');
     _notifyListened();
     // A recording heard to its end has no place to return to. Drop the record,
     // and flag the URL so the advance can't write the ending clock back in.
@@ -1006,9 +978,7 @@ function _onError() {
   _setStatus('paused');
   _persist();
   // A downloaded recording failing offline is a load failure, not a missing connection.
-  const unreachable = _unreachable(_state.queue[_state.qi]);
-  _usage('audio_err', unreachable ? 'network' : 'load');
-  _toast(unreachable ? OFFLINE_MSG : LOAD_FAIL_MSG);
+  _toast(_unreachable(_state.queue[_state.qi]) ? OFFLINE_MSG : LOAD_FAIL_MSG);
 }
 
 /* ── gentle queue prefetch (owner directive 2026-08-09) ───────────────────

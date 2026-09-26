@@ -143,7 +143,6 @@ import { validateStorePayload, validateImportEnvelope, validateMediaRecord } fro
 import { registerServiceWorker } from '../utils/sw-register.js';
 import { attachInstallCapture } from '../utils/install-offer.js';
 import { announceUpdateIfAny } from '../utils/update-toast.js';
-import { installUsageStats } from '../utils/usage-stats.js';
 
 // ── Data ────────────────────────────────────────────────────────────────
 import { JournalHelpers } from '../data/journal-helpers.js';
@@ -190,29 +189,13 @@ import {
 // (Cluster A, Cluster D, the inline App() block) can call by bare name.
 // Mirrors the implicit `function NAME(){}` → window.NAME classic-script
 // binding the modules had before this conversion.
-// us1: the one anonymous-usage-counts instance. Its version is the running build:
-// the controlling service worker's answer, or - on a first visit (no controller yet)
-// and in the APK - the service-worker.js this page was served with. The first-run notice
-// is one line on the About screen's first page, which every new reader sees and which
-// marks it seen (Corbin 09-26: "the first two introductory screens once, concise"). The
-// toast only reaches a reader already past that screen who has not seen it.
-const UsageStats = installUsageStats(window, async () =>
-  (await getBuildVersion()) || fetchServerBuildVersion(),
-  async (text) => {
-    // The About flag lives in IndexedDB: read it once the stores have loaded. The first idle
-    // moment comes before that (measured), and a returning reader read as "not past About"
-    // was never shown the notice at all.
-    await hydrateAllStores();
-    if (!AboutSeenFlagStore.is()) return false;   // the About screen shows it
-    showToast({ id: 'vot-usage-notice', className: 'vot-toast', text, durationMs: 8000 });
-    return true;
-  });
+// No usage statistics (Corbin 2026-09-25: us1 is removed; the app sends nothing about its
+// use). A device that ran us1 may still hold its queue and flags: clear them, quietly.
+try { ['vot.usage.v1', 'vot.usage.enabled', 'vot.usage.noticed'].forEach((k) => localStorage.removeItem(k)); } catch (_e) { /* no storage: nothing to clear */ }
 
 Object.assign(window, {
   // Platform bridge (W1.1)
   PlatformBridge,
-  // us1: anonymous usage counts (utils/usage-stats.js)
-  UsageStats,
   // Stores
   CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_SKIP_LIST,
   // v04-02: Clear All (bundle-d) fences every store write until it reloads.

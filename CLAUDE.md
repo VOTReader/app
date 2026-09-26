@@ -30,7 +30,7 @@ The one-line index of every landed phase (with commit hashes) heads **HISTORY.md
 
 - **App name is "VOTReader"** (personal app; multi-user-shaped but no auth, no organization).
 - **AI features are ALLOWED** (Corbin 2026-09-22 retired the 2026-05-11 no-AI rule) within three security limits every feature keeps: no credentials, login or auth anywhere; personal data stays on the device; **no API key ever ships inside the PWA or the APK** (the PWA is public, so a key in it is a leak; Corbin 09-02). The retired LiteLLM nim-proxy stays retired.
-- **Anonymous usage counts (us1, Corbin 2026-09-24):** `src/utils/usage-stats.js` sends day-counts to the `stats/` Worker (stats.votreader.workers.dev): ids, kinds and tags only - never a device id, search words, error text or anything the reader wrote - with a first-run notice and an off switch in Settings > Your Data. A new counter needs its name in `usage-schema.js` (both sides read it).
+- **No usage statistics or analytics in the app (Corbin 2026-09-25):** us1 (the counters, the first-run notice, the Settings switch, the `stats/` Worker source) is removed and the app sends nothing about its use. Whatever Cloudflare collects on its own is fine; app-side counters, beacons or a telemetry notice are a no-go unless he asks for them.
 - **NO security risks** — anything that could leak personal data or LAN-expose a service is a defect, not a polish item.
 - `android:allowBackup="false"` — Export/Import in Settings → "Your Data" is the only backup mechanism. JSON file, user-owned, no credentials.
 - GitHub identity **VOTReader** (the repo is public, for GitHub Pages) and Garden images on `VOTReader/votreader-assets` releases are fine for now.

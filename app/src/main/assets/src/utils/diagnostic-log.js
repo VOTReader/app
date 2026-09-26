@@ -14,9 +14,7 @@
 
    Parity with BoundedLogTree (deliberate, so the two merge cleanly):
      - Capacity: 200 entries, FIFO eviction (oldest dropped on overflow).
-     - In-memory ONLY — never persisted, its entries never sent over the
-       network (us1 counts an error's TAG into the anonymous usage stats,
-       never its message),
+     - In-memory ONLY — never persisted, never sent over the network,
        cleared on page refresh. Matches BoundedLogTree's "in-process only,
        cleared on app kill" and the project's "local data only / no
        security risks" policy (CLAUDE.md User policies).
@@ -129,14 +127,6 @@ function _push(lvl, tag, msg) {
   if (_buffer.length > CAPACITY) _buffer.shift();
 }
 
-/** us1: count into the anonymous usage stats (utils/usage-stats.js) when bundle-b has put them on window. */
-function usageCount(name, key) {
-  try {
-    const u = typeof window !== 'undefined' ? /** @type {any} */ (window).UsageStats : null;
-    if (u) u.count(name, String(key).toLowerCase());
-  } catch (_e) { /* stats never break diagnostics */ }
-}
-
 /* ─── Public functions ──────────────────────────────────────────────── */
 
 /**
@@ -153,10 +143,7 @@ function _warn(tag, message) { _push('W', tag, message); }
  * @param {string} tag
  * @param {string} message
  */
-function _error(tag, message) {
-  _push('E', tag, message);
-  usageCount('err', tag); // us1: a count per tag leaves the device, never the message
-}
+function _error(tag, message) { _push('E', tag, message); }
 
 /**
  * Record a timing. `label` names the thing measured; `durationMs` is
@@ -170,10 +157,6 @@ function _error(tag, message) {
 function _timing(tag, label, durationMs) {
   const ms = Number.isFinite(durationMs) ? Math.round(durationMs) : 0;
   _push('I', tag, String(label) + ' ' + ms + 'ms');
-  // us1: the cold-start mark (app.jsx) as one of four buckets.
-  if (tag === 'boot' && label === 'app-first-mount') {
-    usageCount('boot', ms < 1000 ? 'lt1s' : ms < 2000 ? '1to2s' : ms < 4000 ? '2to4s' : 'gt4s');
-  }
 }
 
 /**

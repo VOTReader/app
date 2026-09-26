@@ -174,11 +174,6 @@ export var ReadingStatsStore = extendStore(
       var words = Math.max(0, Math.round((args && args.words) || 0));
       var ms = Math.max(0, Math.round((args && args.activeMs) || 0));
       if (!words) return [];
-      // us1: a credited read-through, counted by its key into the anonymous usage stats.
-      try {
-        var usage = typeof window !== 'undefined' ? /** @type {any} */ (window).UsageStats : null;
-        if (usage && args && args.key) usage.count('read_done', String(args.key));
-      } catch (_e) { /* stats never break reading credit */ }
       var data = this._load();
       data.totalWordsRead = (data.totalWordsRead || 0) + words;
       data.totalActiveMs = (data.totalActiveMs || 0) + ms;

@@ -89,41 +89,6 @@ describe('AboutScreen — page 2 describes the app that actually shipped', () =>
   });
 });
 
-/* us1 + cp1 follow-up (Corbin 2026-09-26: the usage-statistics notice "just add
-   it to the first two introductory screens once, concise, nothing verbose").
-   It was a 12-second toast AND a paragraph on page 2 (which Back skips). Now it
-   is one sentence on page 1, which every new reader sees, and opening the screen
-   counts as seeing it, so no toast follows. */
-describe('AboutScreen — the usage-counts notice, once and short', () => {
-  afterEach(() => { delete /** @type {any} */ (window).UsageStats; });
-
-  it('page 1 says it in one sentence: what is sent, what never is, where to turn it off', () => {
-    setupGlobals();
-    renderAbout();
-    const line = /** @type {HTMLElement} */ (document.querySelector('.about-usage'));
-    expect(line).not.toBeNull();
-    expect(line.textContent).toMatch(/anonymous usage counts/i);
-    expect(line.textContent).toMatch(/never anything you write/i);
-    expect(line.textContent).toMatch(/Settings . Your Data/);
-    expect(line.textContent.length).toBeLessThan(120);
-  });
-
-  it('page 2 does not say it again', () => {
-    setupGlobals();
-    renderAbout();
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    expect(document.querySelector('.about-features').textContent).not.toMatch(/anonymous/i);
-  });
-
-  it('opening the screen marks the notice seen, so no toast repeats it', () => {
-    setupGlobals();
-    const markNoticed = vi.fn();
-    /** @type {any} */ (window).UsageStats = { markNoticed };
-    renderAbout();
-    expect(markNoticed).toHaveBeenCalledTimes(1);
-  });
-});
-
 describe('AboutScreen — the Songs of the Letters credit (L8)', () => {
   it('credits the songs and names the consented makers the catalog publishes, most songs first', async () => {
     const Songs = await import('../../utils/song-catalog.js');

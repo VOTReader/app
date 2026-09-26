@@ -297,21 +297,6 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     return out;
   }, [state.parsed, settings.searchCorpus]);
 
-  // us1: one anonymous count per SETTLED search (1.5 s after the results land,
-  // so typing "john" is one search, not four), plus search_zero when nothing
-  // came back. The words searched never leave the device.
-  const usageZero = state.phase === 'done' && state.results.length === 0 && directEntries.length === 0;
-  React.useEffect(() => {
-    if (!query || !query.trim() || state.phase !== 'done') return undefined;
-    const t = setTimeout(() => {
-      try {
-        const u = /** @type {any} */ (window).UsageStats;
-        if (u) { u.count('search'); if (usageZero) u.count('search_zero'); }
-      } catch (_e) { /* stats never break search */ }
-    }, 1500);
-    return () => clearTimeout(t);
-  }, [query, state.phase, usageZero]);
-
   // Top results: best 5 cross-corpus hits shown before groups (All mode only,
   // only for text queries — ref queries already have directEntries cards)
   const topResults = React.useMemo(() => {

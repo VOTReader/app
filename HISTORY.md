@@ -10,6 +10,7 @@ Reverse-chronological; each landed CI-green + deployed. Each landing adds its on
 detailed entry to the "Detailed session log" below. Until 2026-09-22 this index lived in CLAUDE.md; it moved here
 verbatim so the briefing that auto-loads into every session stays short.
 
+- **The usage statistics come out** (09-26, us1 removed) — Corbin: "just get rid of the usage statistics entirely … I didn't want analytics implemented that far." The app counts and sends nothing about its use: no counters (opens, read-throughs, listening, searches, marks, errors, boot time), no first-run notice or toast, no About line, no Settings switch or "See What Is Shared"; the stats host is out of CSP `connect-src`, and a device that ran us1 has its leftover queue and flags cleared at boot. The `stats/` Worker source left the repo; the deployed Worker and its D1 database stay on Corbin's Cloudflare account, receiving nothing.
 - **Copy names the passage; selecting stops fighting the reader** (09-26, cp1) — a reader pasted "37On the last day, …" and typed "John 7:37-39" under it by hand: the Copy button and every native copy (Ctrl+C, the Android menu, the iOS callout) now give a verse per line, "37 On", and ALWAYS the reference, in the translation Settings shows ("John 7:37-39 (NKJV-R)", "Matthew 5:16 (KJV)", "The Wide Path (Volume Two)", a sheet's "Isaiah 13:11 (NKJV)"); the usage-counts notice is one line on the About screen's first page instead of a toast; Share names a passage the same way (its tag always said NKJV) and keeps a WTLB poem's lines; a select-all highlight no longer marks the swipe previews' chapters; a heading double-click no longer hides them all and selects the verse beneath; a swipe with text selected tugs instead of teasing the next chapter; read-along's follow and the toolbar keep out of the way of a selection. VOTReader/app#24.
 - **The redesign continues: rows, not boxes** (09-25) — Settings groups show their values; the Library, Progress, the notebooks and every one-column index list became rows on hairlines; Milestones and Progress lead with the nearest milestone; Holy Days' playlists moved under its title; 22 more labels reached 12 px, and the selection toolbar's actions became plain words; an Opus walk's large-type findings fixed; one page header for the eight personal-study screens; the browse tiles lost their gold outlines; seven silently broken walkers repaired (`18251e37` … `3da0cb08`; Codex rounds 4-6 on the board).
 - **The redesign begins: a calmer dark, one ⋯ menu, a contents sheet, and Answers made to answer** (09-25) — Codex image_gen mockups (three directions, three takes on eleven screens; board https://claude.ai/artifact/Phi2pMCqLDbViNjwnYw29h) and a Sonnet UX walk of seven journeys drove it: off-white text and an older gold on true black with quieter hairlines, Settings / History / theme folded into a named ⋯ menu (8 → 6 controls), 12 px spaced-capital labels, a contents sheet for long Answers topics, source taps that land on the passage, question-style Answers search, six raw "=Heading=" topics and six mis-pointed Blessed sources fixed (c62, c63), and a converter that refuses to move readers' marks. `dd59c408` · `54b14b14` · `ca97b7eb` · `73be0b2b` · `9ac16ee4` · `3049d296`.
@@ -106,6 +107,21 @@ verbatim so the briefing that auto-loads into every session stays short.
 ## Detailed session log — 2026-06-12 → present (moved from CLAUDE.md, 2026-07-24)
 
 These are the dated “Current state / Previous state” narrative entries that lived at the top of CLAUDE.md. They were relocated here verbatim (headings demoted one level) to keep CLAUDE.md — which auto-loads into every session's context — lean. New sessions PREPEND their detailed entry here; CLAUDE.md keeps only the short summary, and the one-liner index is the "Closed-phases index" above (moved out of CLAUDE.md 2026-09-22).
+
+### 2026-09-26 — the usage statistics come out: the app sends nothing about its use (us1 removed)
+
+**Why.** Corbin, 09-25 23:3x, on the us1 toast: "No new notice, nothing, just get rid of the usage statistics entirely … let cloudflare collect whatever cloudflare collects, but the rest is a no-go, I didn't want analytics implemented that far." It supersedes the 09-24 go-ahead for us1 and cp1's one-line About notice (the entry below). CLAUDE.md's user policy now says no app analytics.
+
+**What left.**
+- The client: `utils/usage-stats.js` (counter, offline queue, beacon), `utils/usage-schema.js`, their tests, and every call into them — HistoryStore opens, ReadingStatsStore read-throughs, the audio player's listen start / seconds / end / errors and `audio_hidden`, Search's settled and zero-result counts, the highlight / bookmark / new-journal counts, DiagnosticLog's error-tag and boot-time buckets.
+- The screens: the About screen's notice line, the toast for readers past About, Settings > Your Data's "Share anonymous usage counts" switch and "See What Is Shared", Clear All's reset, and their settings-search words.
+- The wiring: `https://stats.votreader.workers.dev` out of CSP `connect-src`; the E2 comment in `index.html` says "no telemetry by policy" again (its inline-script hash is the pre-us1 one); `window.UsageStats` out of bundle-b and the ESLint globals mirror; smoke:ci's us1 check.
+- The server source: `stats/` (Worker, D1 migration, dashboard, tests) and its vitest include. Git history keeps it.
+- What us1 left on a device: boot removes `vot.usage.v1` (the queue), `vot.usage.enabled` and `vot.usage.noticed`.
+
+**Kept.** The APK's versionName = CACHE_VERSION (`2045c473`): it names the build and counts nothing.
+
+**Left for Corbin.** The Worker (stats.votreader.workers.dev) and its D1 database `votreader-stats` are still on his Cloudflare account, now receiving nothing; deleting them is his call.
 
 ### 2026-09-26 — a copied passage names itself; selecting, dragging and scrolling stop fighting the reader (cp1 + sweep; VOTReader/app#24)
 
