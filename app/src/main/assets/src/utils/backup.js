@@ -497,9 +497,10 @@ function _reseedLsData(dataObj, dataLsKeys) {
   // backup.test.js pins the two spellings together). A restored backup's position
   // keys get the first, position-aware pass on the boot after the reload.
   try { localStorage.removeItem('vot.journalRekey'); } catch (_e) { /* non-fatal */ }
-  Object.keys(dataObj || {}).forEach((k) => {
+  const lsData = dataObj || {};
+  Object.keys(lsData).forEach((k) => {
     if (k.indexOf('vot-') !== 0) return;
-    const v = dataObj[k];
+    const v = lsData[k];
     if (typeof v === 'string') {
       try { localStorage.setItem(k, v); } catch (e) { backupWarn('LS write failed for', k, e); }
     }

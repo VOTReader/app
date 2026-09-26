@@ -87,9 +87,13 @@ export const NoteStore = extendStore(
       const data = this._load();
       const existing = data[groupId];
       const ts = Date.now();
-      data[groupId] = {
+      // The defaults a NEW note starts from; an existing note's own fields win.
+      const fresh = {
         groupId, notebookIds: [], body: '', color: 'yellow',
         fullText: '', keys: [], created: ts,
+      };
+      data[groupId] = {
+        ...fresh,
         ...(existing || {}),
         ...fields,
         updated: ts

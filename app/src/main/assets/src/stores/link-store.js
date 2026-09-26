@@ -110,7 +110,7 @@ export const LinkStore = extendStore(
       try { this._cache = JSON.parse(localStorage.getItem('vot-links') || '[]'); }
       catch (_e) { this._cache = []; }
       this._normalize();
-      return this._cache;
+      return /** @type {Link[]} */ (this._cache);
     },
 
     /**

@@ -137,7 +137,7 @@ export function remapCorpusMarkData(entries, data, shifts) {
   function place(p, _text, at) {
     // Only the words a mark recorded, where it recorded them: never a label or a title.
     var words = at && typeof at.text === 'string' ? at.text : '';
-    if (!words.trim() || typeof at.start !== 'number' || typeof at.end !== 'number' || !(at.end > at.start)) return false;
+    if (!at || !words.trim() || typeof at.start !== 'number' || typeof at.end !== 'number' || !(at.end > at.start)) return false;
     var e = p.entry, n = p.n;
     // A listed position whose block today has no key (a heading now sits where a
     // paragraph was) holds no mark made on today's text: straight to the targets.

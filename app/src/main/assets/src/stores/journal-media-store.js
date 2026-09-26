@@ -191,7 +191,7 @@ export var JournalMediaStore = (function() {
       var lruId = _urlCache.keys().next().value;   // first inserted = least-recently-used
       var victim = _urlCache.get(lruId);
       _urlCache.delete(lruId);
-      try { URL.revokeObjectURL(victim); } catch (_e) { /* best-effort */ }
+      try { URL.revokeObjectURL(/** @type {string} */ (victim)); } catch (_e) { /* best-effort */ }
     }
   }
   /** Revoke every cached URL and empty the cache; returns how many it held. */
@@ -204,7 +204,7 @@ export var JournalMediaStore = (function() {
     return n;
   }
   function _touchUrl(id) {
-    var url = _urlCache.get(id);
+    var url = /** @type {string} */ (_urlCache.get(id));   // callers touch only a cached id
     _urlCache.delete(id);
     _urlCache.set(id, url);
   }
@@ -460,7 +460,7 @@ export var JournalMediaStore = (function() {
     delete: function(id) {
       if (!id) return Promise.resolve();
       if (_urlCache.has(id)) {
-        try { URL.revokeObjectURL(_urlCache.get(id)); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
+        try { URL.revokeObjectURL(/** @type {string} */ (_urlCache.get(id))); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
         _urlCache.delete(id);
       }
       return tx('readwrite').then(function(store) {
@@ -604,7 +604,7 @@ export var JournalMediaStore = (function() {
      */
     objectUrl: function(id) {
       if (!id) return Promise.resolve(null);
-      if (_urlCache.has(id)) { _touchUrl(id); return Promise.resolve(_urlCache.get(id)); }
+      if (_urlCache.has(id)) { _touchUrl(id); return Promise.resolve(/** @type {string} */ (_urlCache.get(id))); }
       return this.get(id).then(function(rec) {
         if (!rec || !rec.blob) return null;
         try {

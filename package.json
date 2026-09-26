@@ -17,7 +17,7 @@
     "build:csp": "node tools/sync-csp-hashes.js",
     "build:sw": "node tools/sync-sw-version.js",
     "check:csp": "node tools/sync-csp-hashes.js --check",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-data.json --noEmit",
     "lint:globals": "python tools/gen-eslint-globals.py",
     "lint": "npm run lint:globals && eslint app/src/main/assets/src",
     "lint:fix": "npm run lint:globals && eslint app/src/main/assets/src --fix",

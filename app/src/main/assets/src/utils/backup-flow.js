@@ -563,7 +563,7 @@ export function createBackupFlow(ctx) {
       // power loss) the marker survives and useRestoreGuard warns on next boot.
       // A handled failure below leaves it SET on purpose — writeFailures means
       // data did not durably land, and an unknown throw may have part-applied.
-      let restoreMarker = null;
+      let restoreMarker = /** @type {{ previous: string | null, token: string } | null} */ (null);
       try {
         restoreMarker = {
           previous: localStorage.getItem(RESTORE_INFLIGHT_KEY),

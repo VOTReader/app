@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strictNullChecks": true
+  },
+  "include": [
+    "tools/globals.generated.d.ts",
+    "app/src/main/assets/src/stores/**/*.js",
+    "app/src/main/assets/src/utils/backup*.js"
+  ],
+  "exclude": [
+    "app/src/main/assets/src/stores/_entry-b.js",
+    "**/*.test.js"
+  ]
+}

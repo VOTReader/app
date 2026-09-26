@@ -375,7 +375,7 @@ export function rekeyMarkStores(data, how) {
   // block they went to, and the old key too while one of them stays there.
   /** @type {Record<string, string[]>} */ var groupTo = Object.create(null);
   /** @type {Record<string, boolean>} */ var groupStays = Object.create(null);
-  var ann = data && data.annotations;
+  const ann = data && data.annotations;
   if (ann) {
     /** @type {Record<string, any[]>} */ var nextAnn = Object.create(null);
     /** @type {Record<string, boolean>} */ var own = Object.create(null);    // buckets this pass made (never the store's own arrays)
@@ -420,7 +420,7 @@ export function rekeyMarkStores(data, how) {
     }
   }
 
-  var notes = data && data.notes;
+  const notes = data && data.notes;
   if (notes) {
     /** @type {Record<string, any>} */ var nextNotes = {};
     var notesChanged = false;

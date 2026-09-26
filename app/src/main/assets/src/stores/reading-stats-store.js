@@ -241,7 +241,7 @@ export var ReadingStatsStore = extendStore(
       var next = { b: blockCount, c: merged, t: touchedAt || Date.now() };
       if (weights && weights.length === blockCount) {
         next.tw = weights.reduce(function(sum, w) { return sum + Math.max(0, Number(w) || 0); }, 0);
-        next.w = merged.reduce(function(sum, idx) { return sum + Math.max(0, Number(weights[idx]) || 0); }, 0);
+        next.w = merged.reduce(function(sum, idx) { return sum + Math.max(0, Number(/** @type {number[]} */ (weights)[idx]) || 0); }, 0);
       }
       map[key] = next;
 

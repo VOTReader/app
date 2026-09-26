@@ -91,7 +91,7 @@ import { mergeStateStore } from './store-merge.js';
  * undefined) keeps the LS payload predictable for the boot script.
  *
  * @param {VotState | null | undefined} full
- * @returns {{ theme: string | undefined, settings: { fontStyle: string | undefined, fontScale: string | undefined } }}
+ * @returns {{ theme: string | null | undefined, settings: { fontStyle: string | undefined, fontScale: string | undefined } }}
  */
 function _bootScriptShim(full) {
   return {

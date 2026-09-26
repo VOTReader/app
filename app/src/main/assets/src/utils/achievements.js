@@ -296,7 +296,7 @@ export const FEATURED_UNLOCK_DEFS = Object.freeze(
       key: f.unlockKey, achievementKey: def.key,
       metric: String(def.metric), threshold: def.threshold, label: def.label,
     }) : null;
-  }).filter(Boolean)
+  }).filter(/** @returns {d is NonNullable<typeof d>} */ (d) => Boolean(d))
 );
 
 /** @param {unknown} v @returns {number} */

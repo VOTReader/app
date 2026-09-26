@@ -571,7 +571,8 @@ export function CachedStore(storageKey, defaultVal, opts) {
           const ours = self._cache;
           let merged;
           try {
-            merged = exact ? exactData : self._crossTabMerge(self._base, ours, theirs);
+            // _saveMerged runs only for a store that has a merge (both callers check).
+            merged = exact ? exactData : /** @type {NonNullable<typeof self._crossTabMerge>} */ (self._crossTabMerge)(self._base, ours, theirs);
           } catch (e) {
             console.warn('cross-tab merge failed for', name, '— writing local cache', e);
             merged = ours;

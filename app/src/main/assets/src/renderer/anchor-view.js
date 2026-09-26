@@ -38,7 +38,7 @@ export function isAnnotationChrome(n, container) {
  */
 export function chromeAwareView(container) {
   var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-  var parts = [], at = [], off = 0, prevBlock = null;
+  var parts = [], at = [], off = 0, prevBlock = /** @type {HTMLElement | null} */ (null);
   while (walker.nextNode()) {
     var n = walker.currentNode;
     var t = n.textContent || '';
