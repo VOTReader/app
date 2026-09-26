@@ -13,6 +13,7 @@ import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { letterHlKey } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
+import { highlightExcerptInDom } from '../../utils/highlight.jsx';
 
 /** Whitespace-squashed — the search index's text domain (index-builder letterText). */
 const _squash = (s) => String(s || '').replace(/\s+/g, ' ').trim();

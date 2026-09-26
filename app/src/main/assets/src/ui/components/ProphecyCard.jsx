@@ -25,6 +25,8 @@
    `letter:<chapterId>:<groupIdx>:<ot|nt|vot|intro>:<blockIdx>`. Only
    `data-read-seg` stays absent — annotation on, measurement off. */
 
+import { letterHlKey } from '../../utils/hl-keys.js';
+
 export function ProphecyCard({ type, tag, label, blocks, fnProps, stateKey, statesRef, onSaveStates, expandSignal }) {
   // Read initial state from persistent ref, default to expanded (true)
   const stored = statesRef && statesRef.current[stateKey];

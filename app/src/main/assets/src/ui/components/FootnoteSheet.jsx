@@ -4,6 +4,7 @@
 
 import { inertAttr } from '../../utils/inert-attr.js';
 import { sheetReference } from '../../utils/passage-copy.js';
+import { _fnTextRedundantWithLink } from './VerseWithNumbers.jsx';
 
 export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, onNavigate, onGoToRef }) {
   const isOpen = num != null;

@@ -18,6 +18,8 @@
    The destructure below mirrors index.html inline #1 — kept here for
    clarity so this file reads as self-contained.
    ═══════════════════════════════════════════════════════════════════════ */
+import { buildScreenRoutes } from './ui/screen-routes.jsx';
+
 const { useState, useEffect } = React;
 
 function App() {

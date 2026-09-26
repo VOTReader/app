@@ -38,6 +38,10 @@ function applySavedScrollToEl(el, saved) {
   if (y > 0) el.scrollTop = y;
 }
 
+/**
+ * @param {{ navChildren?: any, children?: any, hideTabsBtn?: boolean, trackScroll?: boolean, pager?: any,
+ *   stickyNav?: boolean, inert?: boolean, restoreScroll?: any, placeKey?: string }} props
+ */
 export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '' }) {
   const scrollRef = React.useRef(null);
   // `inert`: this ScreenLayout is a THROWAWAY visual clone of a neighbor screen,

@@ -2,6 +2,8 @@
    VerseWithNumbers — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { splitIntoVerses } from '../../utils/scripture-parse.js';
+
 export function VerseWithNumbers({ text, refStr }) {
   const segments = splitIntoVerses(text, refStr);
   if (!segments) {

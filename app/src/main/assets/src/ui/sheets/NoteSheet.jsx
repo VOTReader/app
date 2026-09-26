@@ -7,6 +7,7 @@ import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { shareText } from '../../utils/copy-share.js';
 import { withPassageLink } from '../../utils/passage-link.js';
 import { _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
+import { relativeDate } from '../../utils/dates.js';
 
 /**
  * @param {{ groupId: any, startInEditMode: any, freshGroup?: any, onClose: any, onOpenNotebookPicker?: any }} props

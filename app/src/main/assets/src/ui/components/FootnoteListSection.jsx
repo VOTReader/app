@@ -4,6 +4,7 @@
 
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { sheetReference } from '../../utils/passage-copy.js';
+import { _fnTextRedundantWithLink } from './VerseWithNumbers.jsx';
 
 export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef }) {
   const entries = Object.entries(footnotes);

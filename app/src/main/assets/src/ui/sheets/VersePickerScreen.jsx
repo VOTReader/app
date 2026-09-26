@@ -2,6 +2,8 @@
    VersePickerScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { bibleHlKey } from '../../utils/hl-keys.js';
+
 export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, returnTargetInsteadOfLink }) {
   const target = refineRequest.target;
   const item = refineRequest.item;

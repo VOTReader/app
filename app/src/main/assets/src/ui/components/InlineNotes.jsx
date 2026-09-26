@@ -7,6 +7,8 @@
    ('study:matthew-5:12') — suffixes keep these containers distinct from
    the verse text container that owns the bare key. */
 
+import { renderCommentaryCite } from './ModeToggle.jsx';
+
 export function InlineNotes({ scriptures, votNotes, onScriptureClick, onVotLetterClick, hlKeyBase }) {
   if (!scriptures.length && !votNotes.length) return null;
   const ann = (suffix) => hlKeyBase ? { 'data-hl-key': hlKeyBase + '-' + suffix, 'data-hl-dom': true } : {};

@@ -17,6 +17,8 @@
    =================================================================== */
 
 /* ── Source label for a bookmark ─────────────────────────────── */
+import { _bookTitle } from './note-source.js';
+
 export function _bookmarkSourceLabel(hlKey) {
   if (!hlKey) return 'Bookmark';
   var parts = hlKey.split(':');

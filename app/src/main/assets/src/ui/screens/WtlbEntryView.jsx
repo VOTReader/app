@@ -15,6 +15,7 @@ import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { answersFiledUnder } from '../../utils/answers-shelves.js';
 import { AnswersContentsLine } from '../components/AnswersContents.jsx';
 import { passageTextBefore } from '../../utils/answers-contents.js';
+import { highlightExcerptInDom } from '../../utils/highlight.jsx';
 
 
 /** Readable fallback for a {{nav:bookId:ch}} target before the lazy Bible

@@ -25,6 +25,8 @@
    call time.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { _bookmarkSourceEndpoint, _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
+
 export function AppShellSheets({
   // Selection toolbar handlers
   openLinkPicker, openNoteSheet, closeNoteSheet,

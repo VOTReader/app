@@ -2,6 +2,8 @@
    LinkCard — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { relativeDate } from '../../utils/dates.js';
+
 export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate }) {
   const [expanded, setExpanded] = React.useState(false);
   // confirmRemove: false | true — governs the tap-confirm strip (§11.1: no instant delete).

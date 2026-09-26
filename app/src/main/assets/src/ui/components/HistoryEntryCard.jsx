@@ -5,6 +5,8 @@
 /* `chip` is the shared reading chip (components/ReadingMinChip.jsx), passed
    in rather than derived here: the corpus lookup it needs belongs to the
    screen, which can resolve one book per render instead of one per row. */
+import { timeAgo } from '../../utils/dates.js';
+
 export function HistoryEntryCard({ entry, onSelect, chip = null }) {
   const isLetter = entry.type === 'letter';
   const isStudy = entry.type === 'study-chapter';

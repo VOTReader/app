@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+import { relativeDate } from '../../utils/dates.js';
 
 export function MultiNotePopover({ payload, onClose, onPick }) {
   const popW = 320;

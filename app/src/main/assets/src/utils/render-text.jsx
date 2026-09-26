@@ -24,6 +24,8 @@
  * @param {string | null | undefined} [highlightText]  substring to highlight, if any
  * @returns {any}  React node | string
  */
+import { splitWithHighlight } from './highlight.jsx';
+
 export function renderTextWithScripRefs(text, baseClassName, onScripClick, highlightText) {
   if (!text) return baseClassName ? <span className={baseClassName}>{text}</span> : text;
   const hasRef = text.includes('{{ref:');

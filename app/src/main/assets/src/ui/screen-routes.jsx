@@ -47,6 +47,7 @@ import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSo
 import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
 import { AnswersHome, AnswersSubject, AnswersAZ } from './screens/AnswersHome.jsx';
 import { answersSubjectById } from '../utils/answers-shelves.js';
+import { GARDEN_DEFAULT_TIER } from '../utils/garden.js';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;

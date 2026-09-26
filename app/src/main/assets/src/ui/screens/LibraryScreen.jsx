@@ -22,6 +22,7 @@
 
 import { ACHIEVEMENT_STORE_NAMES, buildAchievements, collectAchievementSnapshot } from '../../utils/achievements.js';
 import { isMarkKind } from '../../utils/mark-kinds.js';
+import { createPressDrag } from '../../utils/press-drag.js';
 
 // Abnormal-path trace for the tile drag — console.warn + DiagnosticLog so a
 // failing device names itself (same pattern as [tabdrag]/[thumb]).

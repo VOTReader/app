@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { scrollBehavior } from '../../utils/reduced-motion.js';
+import { parseRefRanges } from '../../utils/scripture-parse.js';
 
 export function InlineEcho({ scriptures, votNotes }) {
   if (!scriptures.length && !votNotes.length) return null;

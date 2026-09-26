@@ -21,6 +21,9 @@
    same convention as the rest of this cluster.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { GARDEN_TIERS, getGardenTier } from '../../utils/garden.js';
+import { TourPrompt } from './TourPrompt.jsx';
+
 export function AppShellOverlays({
   // Tabs overview + TabActionSheet
   settings, updateSetting,

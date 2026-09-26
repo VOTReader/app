@@ -9,6 +9,8 @@
    is annotatable at the letter it opens. `hlKeyBase` comes from the owning
    chapter; absent (legacy callers) the panels render exactly as before. */
 
+import { renderCommentaryCite } from './ModeToggle.jsx';
+
 export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLetterClick, hlKeyBase }) {
   const hasScriptures = scriptures && scriptures.length > 0;
   const hasVot = votNotes && votNotes.length > 0;

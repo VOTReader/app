@@ -1,0 +1,24 @@
+{
+  "_comment": "Same-bundle bare references tools/bridge-imports.mjs leaves on the window bridge ON PURPOSE (v15-code-health-04). Each is stubbed as a global by the tests of the module that reads it, so an import would bypass the stub; converting one means rewriting those tests against the real module first. bridge-imports.test.js fails on any same-bundle bare reference NOT listed here.",
+  "ui/_entry-d.js": {
+    "LibraryNav": "screen tests stub it (the real one needs HomeBtn / NavButtons / TabsNavBtn from bundle-b)",
+    "ScreenLayout": "screen-routes tests stub it (the real one needs TabsNavBtn)",
+    "GoToRefButton": "FootnoteSheet / FootnoteListSection / ScriptureSheet tests stub it",
+    "bookCategory": "the real one reads index.html's _OT_BOOKS_INLINE, absent in LinkCard / nav-index tests",
+    "buildNavTree": "LinkPicker tests stub nav-index",
+    "buildSourceEndpoint": "LinkPicker / VersePicker / excerpt-picker tests stub nav-index",
+    "contentDocToNavItem": "LinkPicker tests stub nav-index",
+    "navItemToEndpoint": "LinkPicker tests stub nav-index",
+    "searchNavIndex": "LinkPicker tests stub nav-index",
+    "describeTab": "TabsOverview tests stub tabs.js (the real one reads COL_BY_LETTER_SC)",
+    "scrollKeyForTab": "TabsOverview tests stub tabs.js",
+    "tabContentKey": "TabsOverview tests stub tabs.js",
+    "tabHasProgressBar": "TabsOverview tests stub tabs.js",
+    "countItemWords": "ReadingMinChip / index / History / progress-stats tests cover the counters-absent branch",
+    "readingMinutes": "ReadingMinChip / index tests cover the counters-absent branch",
+    "noteSourceLabel": "NoteRow tests stub it",
+    "noteSourceSegments": "NoteRow tests stub it",
+    "SongCatalog": "HomeScreen / About tests stub it with spies",
+    "loadBibleStudies": "HomeScreen / LinkPicker tests stub it with spies"
+  }
+}

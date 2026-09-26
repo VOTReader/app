@@ -2,6 +2,9 @@
    Segments — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { renderTextWithScripRefs } from '../../utils/render-text.jsx';
+import { segmentRenderText } from '../../utils/segment-dom-text.js';
+
 export function Segments({ segments, activeFn, onFnClick, onScripClick, onLetterClick, onInAppLink, studyMode: _studyMode, footnotes: _footnotes, highlightText }) {
   const activateOnKey = (event, activate) => {
     if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); }

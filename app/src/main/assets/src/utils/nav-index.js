@@ -37,6 +37,8 @@
  *
  * @returns {NavItem[]}
  */
+import { bibleHlKey } from './hl-keys.js';
+
 export function buildNavIndex() {
   const sig = Object.keys(_allBooks()).length
     // Total LETTERS across every collection, not COLLECTIONS.length (a static

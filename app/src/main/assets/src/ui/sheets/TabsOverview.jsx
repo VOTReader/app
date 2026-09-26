@@ -35,6 +35,8 @@
  * @param {number} boxW @param {number} boxH
  * @returns {boolean}
  */
+import { createPressDrag } from '../../utils/press-drag.js';
+
 export function thumbAspectMismatch(naturalW, naturalH, boxW, boxH) {
   if (!naturalW || !naturalH || !boxW || !boxH) return false;
   const thumbAr = naturalW / naturalH;

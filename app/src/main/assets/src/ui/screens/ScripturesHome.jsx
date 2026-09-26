@@ -2,6 +2,8 @@
    ScripturesHome — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { translationName } from '../../data/translations.js';
+
 export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy: _onMatthewStudy, layout, onCycleLayout, translation }) {
   // Q8: pre-trigger the Bible corpus load when this screen mounts so the
   // user's likely next action (tap a genre tile or book) doesn't pay the

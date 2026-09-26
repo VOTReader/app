@@ -12,6 +12,8 @@
    BookmarkStore, useFocusTrap, relativeDate, ConfirmStrip.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { relativeDate } from '../../utils/dates.js';
+
 export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDone }) {
   var useState = React.useState;
   var _ci = useState(null); var confirmingId = _ci[0]; var setConfirmingId = _ci[1];

@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+import { relativeDate } from '../../utils/dates.js';
 
 /**
  * @param {{ note: any, onTap: any, onTapSegment?: any, hideNotebookId?: any }} props

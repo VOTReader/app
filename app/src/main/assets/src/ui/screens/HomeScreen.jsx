@@ -4,6 +4,8 @@
 
 import { resetAnswersLanding } from './AnswersHome.jsx';
 import { TodayCard, useTodayRows } from '../components/TodayCard.jsx';
+import { createPressDrag } from '../../utils/press-drag.js';
+import { translationLabel } from '../../data/translations.js';
 
 // Abnormal-path trace for the tile drag — console.warn + DiagnosticLog so a
 // failing device names itself (same pattern as [tabdrag]/[thumb]).
