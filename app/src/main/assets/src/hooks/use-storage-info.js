@@ -42,6 +42,8 @@
  *
  * @returns {StorageInfo}
  */
+import { StorageHealth } from '../utils/storage-health.js';
+
 export function useStorageInfo() {
   const [persistDenied, setPersistDenied] = React.useState(false);
 

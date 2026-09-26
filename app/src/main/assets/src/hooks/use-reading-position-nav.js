@@ -107,6 +107,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { ProphecyCardsStore } from '../stores/prophecy-cards-store.js';
+import { COL_BY_KEY, COL_BY_LETTER_SC } from '../data/scripture-resolution.js';
 
 /**
  * Whether `id` names a book on the Scriptures shelves (SCRIPTURE_GENRES, an

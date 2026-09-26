@@ -24,6 +24,9 @@ vi.mock('../utils/platform-bridge.js', () => ({
   captureTargetEl: () => (typeof document !== 'undefined' ? document.querySelector('.screen-layout') : null),
 }));
 import { useThumbnails } from './use-thumbnails.js';
+// use-thumbnails imports StateStore (bridge-imports, v15-code-health-04); this
+// contract ran with no StateStore global, which the GC reads as "state is real".
+vi.mock('../stores/state-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get StateStore() { return /** @type {any} */ (globalThis).StateStore; } }; });
 
 const g = /** @type {any} */ (globalThis);
 const U = (tag) => 'data:image/jpeg;base64,' + tag + 'x'.repeat(1200);

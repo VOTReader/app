@@ -131,6 +131,8 @@
 // as1b: at most one boundary jump waits for its letters at a time; a newer
 // jump (or any landed one) cancels it. After JUMP_WAIT_MS the wait is dropped,
 // so a slow load never pulls the reader off a page they went on to meanwhile.
+import { COLLECTIONS, COL_BY_KEY, READING_CHAIN, _boundaryShort, colLetterArr, colPreface } from '../data/scripture-resolution.js';
+
 const JUMP_WAIT_MS = 8000;
 let _pendingJumpCancel = null;
 function _cancelPendingJump() {

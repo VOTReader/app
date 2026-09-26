@@ -26,6 +26,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { hydrateAllStores, clearLegacyLs } from '../stores/cached-store.js';
+import { JournalStore } from '../stores/journal-store.js';
+import { StorageHealth } from '../utils/storage-health.js';
 
 const { useState, useEffect } = React;
 

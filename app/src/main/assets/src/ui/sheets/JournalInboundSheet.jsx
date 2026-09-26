@@ -2,6 +2,11 @@
    JournalInboundSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { JournalHelpers } from '../../data/journal-helpers.js';
+import { JournalIndexStore } from '../../stores/journal-index-store.js';
+import { JournalStore } from '../../stores/journal-store.js';
+import { useFocusTrap } from '../../hooks/use-focus-trap.js';
+
 export function JournalInboundSheet({ refKey, resourceLabel, onClose, onOpenEntry }) {
   var trapRef = useFocusTrap(true);
   var ids = (typeof JournalIndexStore !== 'undefined') ? JournalIndexStore.entriesReferencing(refKey) : [];

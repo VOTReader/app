@@ -85,6 +85,7 @@
 
 import { useRefMirror } from './use-ref-mirror.js';
 import { PlatformBridge, captureTargetEl } from '../utils/platform-bridge.js';
+import { StateStore } from '../stores/state-store.js';
 
 /**
  * Publish the tab-card aspect ratio (--card-ar) from the APP COLUMN

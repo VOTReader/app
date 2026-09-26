@@ -51,6 +51,8 @@
  * @param {number} max
  * @returns {number}
  */
+import { COLLECTIONS, COL_BY_KEY, _studies, colLetterArr, colPreface } from '../data/scripture-resolution.js';
+
 function _randomIndex(max) {
   if (!Number.isInteger(max) || max <= 0) return 0;
   if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {

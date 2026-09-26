@@ -32,6 +32,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { IDBAdapter } from './idb-adapter.js';
+import { DiagnosticLog } from '../utils/diagnostic-log.js';
+import { StorageHealth } from '../utils/storage-health.js';
 
 /**
  * Module-private registry of IDB-backed stores. Populated automatically

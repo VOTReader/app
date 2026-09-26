@@ -5,6 +5,8 @@
    normal React component; the helpers are pure refKey builders.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { JournalIndexStore } from '../stores/journal-index-store.js';
+
 export function JournalChip({ refKey, onClick, label }) {
   // Subscribe to JournalIndexStore — chip count updates when an entry
   // gains/loses a reference to this refKey.

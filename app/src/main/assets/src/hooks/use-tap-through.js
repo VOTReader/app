@@ -105,6 +105,8 @@
  *   openInAppLetter: (target: any, meta?: any) => void
  * }}
  */
+import { resolveVotLetter } from '../data/letter-linking.js';
+
 export function useTapThrough({
   screen, bookId, chapterNum, letterId, studyId, studyChapterId,
   pushFromLetter,

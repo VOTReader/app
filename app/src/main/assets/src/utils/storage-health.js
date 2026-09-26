@@ -446,7 +446,9 @@ async function _assessImpl() {
     return fallback;
   }
 
+  /** @type {StorageEstimate | null} */
   var estimate = null;
+  /** @type {boolean | null} */
   var persisted = null;
 
   try { estimate = await storage.estimate(); } catch (_e) { /* best-effort */ }

@@ -13,7 +13,7 @@
      }>
 
      LinkEndpoint: {
-       type:    'bible' | 'study' | 'letter' | 'wtlb' | 'blessed' | 'holy-days',
+       type:    'bible' | 'study' | 'letter' | 'wtlb' | 'blessed' | 'holy-days' | 'study-letter' | 'journal',
        key:     string,   // e.g. "bible:genesis:1:3-7" or "letter:the-wide-path:2:10-40"
        label:   string,
        // Optional:
@@ -38,7 +38,7 @@ import { HOLY_DAYS_LETTER_IDS } from '../utils/hl-keys.js';
  * branch on `type` and read what they need.
  *
  * @typedef {{
- *   type: 'bible' | 'study' | 'letter' | 'wtlb' | 'blessed' | 'holy-days',
+ *   type: 'bible' | 'study' | 'letter' | 'wtlb' | 'blessed' | 'holy-days' | 'study-letter' | 'journal',
  *   key: string,
  *   label: string,
  *   bookId?: string,

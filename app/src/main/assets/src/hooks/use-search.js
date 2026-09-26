@@ -165,6 +165,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
+import { COL_BY_INDEX_SC, COL_BY_LETTER_SC, COL_BY_SEARCH_ID, colLetterArr, colPreface } from '../data/scripture-resolution.js';
 
 /**
  * Search domain hook. Owns search state (4 tabFields), the

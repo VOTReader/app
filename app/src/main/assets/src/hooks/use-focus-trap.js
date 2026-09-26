@@ -63,10 +63,11 @@ function _focusables(root) {
  *
  * @param {boolean} active - trap engaged while true (same flag that renders
  *   the dialog; the ref must be attached to the dialog's root element).
- * @returns {{ current: HTMLElement | null }} ref to attach to the dialog root
+ * @returns {{ current: HTMLDivElement | null }} ref to attach to the dialog root
+ *   (every dialog root in the app is a <div>)
  */
 export function useFocusTrap(active) {
-  const ref = React.useRef(/** @type {HTMLElement | null} */ (null));
+  const ref = React.useRef(/** @type {HTMLDivElement | null} */ (null));
 
   React.useEffect(() => {
     if (!active) return undefined;

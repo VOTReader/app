@@ -22,6 +22,8 @@
 /** Set before an import applies; removed on completion. Wiped by Clear All
  *  (vot-* prefix) and never part of DEFAULT_DATA_LS_KEYS, so a backup can
  *  neither export nor reseed it. */
+import { showToast } from '../utils/toast.js';
+
 export const RESTORE_INFLIGHT_KEY = 'vot-restore-inflight';
 
 /** Mount-only: warn once if the previous session died mid-restore. */

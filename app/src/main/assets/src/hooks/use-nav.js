@@ -150,6 +150,8 @@
  *   goToGardenFirst: () => void
  * }}
  */
+import { COL_BY_KEY } from '../data/scripture-resolution.js';
+
 export function useNav({
   screen, bookId, chapterNum, letterId, studyId, studyChapterId,
   setScreen, setBookId, setChapterNum, setGenreId,

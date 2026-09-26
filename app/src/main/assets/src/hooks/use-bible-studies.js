@@ -147,6 +147,8 @@
  *   goToChainEntryLast: (slug: string) => () => void
  * }}
  */
+import { _matthew, _studies } from '../data/scripture-resolution.js';
+
 export function useBibleStudies({
   setScreen, setBookId, setChapterNum,
   setStudyId, setStudyChapterId,

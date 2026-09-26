@@ -82,6 +82,8 @@
  * typeof-guarded (cluster-B idiom) so bare test hosts need no stub;
  * same-day repeat calls are store-side no-ops.
  */
+import { ReadingStreakStore } from '../stores/reading-streak-store.js';
+
 function _recordReadingDay() {
   if (typeof ReadingStreakStore !== 'undefined' && ReadingStreakStore) {
     try { ReadingStreakStore.recordReadingDay(Date.now()); }

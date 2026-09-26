@@ -115,6 +115,7 @@ export function parseRefStr(str) {
   // SC4: strip a trailing translation tag and capture it. Accept letters AND
   // digits ("NIV84"); an unrecognized parenthetical is dropped (fail-soft) so
   // a junk tag doesn't fail the whole ref.
+  /** @type {string | null} */
   let tag = null;
   const tagM = s.match(/\s*\(([^)]*)\)\s*$/);
   if (tagM) { tag = /^[A-Za-z0-9]+$/.test(tagM[1]) ? tagM[1] : null; s = s.slice(0, tagM.index).trim(); }
@@ -185,15 +186,20 @@ export function splitCompoundRef(refStr) {
   // 1-char→1-char, so chunk ordinals still line up with the raw string.
   const src = String(refStr).replace(/[–—]/g, '-');
   const out = [];
+  /** @type {string | null} */
   let carryBook = null;   // last book seen — inherited by a bookless segment
   let index = -1;         // chunk ordinal across the whole string
   src.split(';').forEach((segment) => {
-    let segBook = null, segChapter = null;
+    /** @type {string | null} */
+    let segBook = null;
+    /** @type {number | null} */
+    let segChapter = null;
     segment.split(',').forEach((chunk, i) => {
       index++;
       const text = chunk.trim();
       if (!text) return;
       const base = text.replace(_CROSS_CHAPTER_TAIL, ':$1');
+      /** @type {ReturnType<typeof parseRefStr>} */
       let parsed = null;
       if (i === 0) {
         parsed = parseRefStr(base);
@@ -349,7 +355,7 @@ export function parseScriptureRef(str) {
  */
 export function resolveVerseText(endpoint) {
   if (endpoint.type === 'bible') {
-    const book = _allBooks()[endpoint.bookId];
+    const book = endpoint.bookId ? _allBooks()[endpoint.bookId] : null;
     if (!book) return endpoint.preview || '';
     const ch = book.chapters && book.chapters.find(c => c.num === endpoint.chapter);
     if (!ch) return endpoint.preview || '';

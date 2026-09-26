@@ -43,6 +43,14 @@
 import { CachedStore, extendStore } from './cached-store.js';
 import { mergeListStore } from './store-merge.js';
 import { rekeyJournalMarks, JOURNAL_REKEY_STAMP } from './journal-mark-rekey.js';
+import { AnnotationStore } from './annotation-store.js';
+import { BookmarkStore } from './bookmark-store.js';
+import { DiagnosticLog } from '../utils/diagnostic-log.js';
+import { JournalHelpers } from '../data/journal-helpers.js';
+import { JournalIndexStore } from './journal-index-store.js';
+import { JournalStatsStore } from './journal-stats-store.js';
+import { LinkStore } from './link-store.js';
+import { NoteStore } from './note-store.js';
 
 /**
  * While rekeyMarks() waits for a store that is still loading: the unsubscribers
@@ -331,7 +339,10 @@ export var JournalStore = extendStore(
         }
         if (typeof LinkStore !== 'undefined') {
           (LinkStore.all() || []).forEach(function(ln) {
-            var s = ln.source || {}, t = ln.target || {};
+            /** @type {Partial<import('./link-store.js').LinkEndpoint>} */
+            var s = ln.source || {};
+            /** @type {Partial<import('./link-store.js').LinkEndpoint>} */
+            var t = ln.target || {};
             var hit =
               (s.key && mine(s.key)) ||
               (t.key && mine(t.key)) ||
@@ -381,12 +392,13 @@ export var JournalStore = extendStore(
     rekeyMarks(again, firstRules) {
       try {
         var self = this;
-        var loading = [this,
+        /** @type {Array<{ isReady: () => boolean, subscribe: (cb: () => void) => () => void }>} */
+        var loading = /** @type {any} */ ([this,
           typeof AnnotationStore !== 'undefined' ? AnnotationStore : null,
           typeof NoteStore !== 'undefined' ? NoteStore : null,
           typeof BookmarkStore !== 'undefined' ? BookmarkStore : null,
           typeof LinkStore !== 'undefined' ? LinkStore : null
-        ].filter(function(s) { return s && typeof s.isReady === 'function' && !s.isReady(); });
+        ].filter(function(s) { return s && typeof s.isReady === 'function' && !s.isReady(); }));
         if (loading.length) {
           if (!rekeyWait && !again) {
             rekeyWait = loading.map(function(s) {

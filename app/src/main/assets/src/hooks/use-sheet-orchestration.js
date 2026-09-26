@@ -73,6 +73,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useLinkPickerOrchestration } from './use-link-picker-orchestration.js';
+import { BookmarkStore } from '../stores/bookmark-store.js';
 
 /**
  * Sheet/overlay state container + window-bridge wirings. Owns the transient

@@ -149,6 +149,9 @@ import {
   isArmed as _rootExitIsArmed,
 } from '../utils/root-exit-toast.js';
 import { modalRegistry } from './use-modal-registry.js';
+import { AboutSeenFlagStore } from '../stores/app-flag-stores.js';
+import { COL_BY_INDEX_SC, COL_BY_LETTER_SC, LETTER_SCREEN_SET } from '../data/scripture-resolution.js';
+import { clearSuppressNextHistoryPush, suppressNextHistoryPush } from './use-history-sync.js';
 
 /**
  * Wire window.handleAndroidBack — the function Kotlin's MainActivity calls

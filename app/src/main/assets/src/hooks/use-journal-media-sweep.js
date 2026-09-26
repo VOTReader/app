@@ -33,6 +33,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { RESTORE_INFLIGHT_KEY } from './use-restore-guard.js';
+import { JournalMediaStore } from '../stores/journal-media-store.js';
+import { JournalStore } from '../stores/journal-store.js';
 
 /** Mount-only: schedule the hygiene sweep once, 4 s after boot. */
 export function useJournalMediaSweep() {

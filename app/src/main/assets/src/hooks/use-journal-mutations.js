@@ -56,6 +56,9 @@
  * }} args
  * @returns {{ createAndEditJournal: () => void }}
  */
+import { JournalStore } from '../stores/journal-store.js';
+import { StorageHealth } from '../utils/storage-health.js';
+
 export function useJournalMutations({ setJournalEntryId, setScreen }) {
   const createAndEditJournal = () => {
     if (typeof JournalStore === 'undefined') return;

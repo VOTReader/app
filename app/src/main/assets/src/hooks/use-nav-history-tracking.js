@@ -90,6 +90,8 @@
  * }} args
  * @returns {void}
  */
+import { COL_BY_LETTER_SC } from '../data/scripture-resolution.js';
+
 export function useNavHistoryTracking({
   screen, bookId, chapterNum, letterId, studyId, studyChapterId,
   addToHistory, _findLetter, getStudyById, getStudyChapter,

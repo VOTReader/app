@@ -71,6 +71,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
+import { COL_BY_LETTER_SC } from '../data/scripture-resolution.js';
 
 // ── scrollPositions LRU bound (Wave 0) ─────────────────────────────────────
 // The per-tab scrollPositions map grew MONOTONICALLY forever — every screen

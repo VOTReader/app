@@ -120,6 +120,9 @@ export function useMarkAsRead(enabled, onMarkRead, trackKey) {
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
+import { COL_BY_KEY } from '../data/scripture-resolution.js';
+import { ReadingStreakStore } from '../stores/reading-streak-store.js';
+import { jrnShowMilestoneToast } from '../stores/journal-stats-store.js';
 
 /**
  * App-level read-progress state. Owns readItems (the per-collection

@@ -16,6 +16,7 @@
 
 import { sharedPassageKey, publicPassageKey } from '../utils/passage-link.js';
 import { buildSourceEndpoint } from '../utils/nav-index.js';
+import { showToast } from '../utils/toast.js';
 
 /** @returns {any} */
 function books() { return (typeof BOOKS !== 'undefined') ? BOOKS : null; }

@@ -20,5 +20,8 @@
     "noteSourceSegments": "NoteRow tests stub it",
     "SongCatalog": "HomeScreen / About tests stub it with spies",
     "loadBibleStudies": "HomeScreen / LinkPicker tests stub it with spies"
+  },
+  "stores/_entry-b.js": {
+    "ReadingStatsStore": "vitest.setup.js imports use-read-tracker, so importing it there would load reading-stats-store -> cached-store before any test file's vi.mock could replace their dependencies"
   }
 }

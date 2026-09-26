@@ -54,6 +54,11 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { remapCorpusMarks } from '../stores/corpus-mark-remap.js';
+import { AnnotationStore } from '../stores/annotation-store.js';
+import { BookmarkStore } from '../stores/bookmark-store.js';
+import { LinkStore } from '../stores/link-store.js';
+import { NoteStore } from '../stores/note-store.js';
+import { NotebookStore } from '../stores/notebook-store.js';
 
 /**
  * @param {{

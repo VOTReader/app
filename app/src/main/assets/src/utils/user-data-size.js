@@ -52,6 +52,9 @@
  * invisible to the "Your Data" number.
  * @type {string[]}
  */
+import { IDBAdapter } from '../stores/idb-adapter.js';
+import { JournalMediaStore } from '../stores/journal-media-store.js';
+
 export const USER_DATA_STORES = [
   'vot-annotations',
   'vot-notes',

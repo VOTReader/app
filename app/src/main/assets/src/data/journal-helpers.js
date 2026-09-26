@@ -30,6 +30,10 @@
 ═══════════════════════════════════════════════════════════════ */
 
 import { normalizeExcerptDisplay } from '../utils/excerpt-display.js';
+import { BookmarkStore } from '../stores/bookmark-store.js';
+import { COL_BY_KEY, findEntryContext } from './scripture-resolution.js';
+import { NoteStore } from '../stores/note-store.js';
+import { NotebookStore } from '../stores/notebook-store.js';
 
 export var JournalHelpers = (function() {
 
