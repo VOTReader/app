@@ -69,6 +69,30 @@ VENDOR_GLOBALS = [
 ]
 
 
+def strip_js_comments(text):
+    """Blank out // and /* */ comments, leaving string literals alone (an
+    import path or a URL may hold '//'). Newlines survive, so a line-anchored
+    match downstream still sees the same lines."""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch in '"\'`':
+            j = i + 1
+            while j < n and text[j] != ch:
+                j += 2 if text[j] == chr(92) else 1   # a backslash escapes the next character
+            out.append(text[i:j + 1]); i = j + 1
+        elif text.startswith('//', i):
+            j = text.find('\n', i)
+            i = n if j == -1 else j
+        elif text.startswith('/*', i):
+            j = text.find('*/', i + 2)
+            j = n if j == -1 else j + 2
+            out.append(re.sub(r'[^\n]', ' ', text[i:j])); i = j
+        else:
+            out.append(ch); i += 1
+    return ''.join(out)
+
+
 def extract_object_assign_idents(text, entry_file):
     """Find every Object.assign(window, ...) call and harvest its exports.
 
@@ -78,6 +102,12 @@ def extract_object_assign_idents(text, entry_file):
       3. Mixed: Object.assign(window, NS1, { D })  — combo
     """
     out = set()
+    # Comments first: the export blocks carry section labels ("// Stores",
+    # "// Late stores + data"), and the identifier scan below read their words
+    # as exports, so `Stores`, `Data`, `data` and the rest became app-wide
+    # readonly globals that silenced no-undef for names nothing binds
+    # (v15-code-health-03).
+    text = strip_js_comments(text)
     # Match Object.assign(window, <args...>) and split on top-level commas.
     for m in re.finditer(
         r'Object\.assign\s*\(\s*window\s*,\s*((?:[^()]*|\([^()]*\))*)\)',
@@ -159,6 +189,10 @@ def extract_corpus_globals():
     function-scoped helpers that happen to have leading-cap names."""
     out = set()
     for f in sorted(DATA_DIR.glob('*.js')):
+        # A test file's constants (HERE, DIST, BUNDLES) are its own, never the
+        # app's: *.test.js is not a data module (v15-code-health-03).
+        if '.test.' in f.name:
+            continue
         text = f.read_text(encoding='utf-8')
         for ident in re.findall(
             r'^(?:const|let|var)\s+([A-Z_][A-Z0-9_]*)\s*=',
