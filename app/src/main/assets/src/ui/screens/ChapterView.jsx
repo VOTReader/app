@@ -7,6 +7,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
+import { tapToggle } from '../../utils/tap-guard.js';
 
 export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, onNavigateToLink, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
   const bodyRef = React.useRef(null);
@@ -165,7 +166,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
               <button
                 type="button"
                 className="hero-subtitle hero-subtitle-tappable"
-                onClick={() => setTitleFocusHidden && setTitleFocusHidden(true)}
+                onClick={tapToggle(() => setTitleFocusHidden && setTitleFocusHidden(true))}
                 title="Tap to hide summary"
               >
                 {chapter.title}
@@ -173,7 +174,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
             ) : (
               <button
                 className="hero-subtitle-restore"
-                onClick={() => setTitleFocusHidden && setTitleFocusHidden(false)}
+                onClick={tapToggle(() => setTitleFocusHidden && setTitleFocusHidden(false))}
                 title="Show summary"
                 aria-label="Show chapter summary"
               >+ Show summary</button>

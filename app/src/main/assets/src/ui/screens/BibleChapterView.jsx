@@ -8,6 +8,7 @@ import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
+import { tapToggle } from '../../utils/tap-guard.js';
 
 export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
   const bodyRef = React.useRef(null);
@@ -175,7 +176,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
                   <button
                     type="button"
                     className="hero-title-action"
-                    onClick={() => setTitleFocusHidden && setTitleFocusHidden(true)}
+                    onClick={tapToggle(() => setTitleFocusHidden && setTitleFocusHidden(true))}
                     title="Tap to hide chapter title"
                   >
                     {titleText}
@@ -185,7 +186,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
               {canFocusTitle && titleFocusHidden && (
                 <button
                   className="hero-subtitle-restore"
-                  onClick={() => setTitleFocusHidden && setTitleFocusHidden(false)}
+                  onClick={tapToggle(() => setTitleFocusHidden && setTitleFocusHidden(false))}
                   title="Show chapter title"
                   aria-label="Show chapter title"
                 >+ Show chapter title</button>
@@ -217,7 +218,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
           {showSectionHeadings && headingsFocusHidden && chapter.sections.some((s) => s.heading || s.letter) && (
             <button
               className="hero-subtitle-restore headings-restore"
-              onClick={() => setHeadingsFocusHidden && setHeadingsFocusHidden(false)}
+              onClick={tapToggle(() => setHeadingsFocusHidden && setHeadingsFocusHidden(false))}
               title="Show section headings"
               aria-label="Show section headings"
             >+ Show section headings</button>
@@ -254,7 +255,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
                 {sec.letter ? (
                   <div
                     className="section-heading-psalm119 section-heading-tappable"
-                    onClick={() => setHeadingsFocusHidden && setHeadingsFocusHidden(true)}
+                    onClick={tapToggle(() => setHeadingsFocusHidden && setHeadingsFocusHidden(true))}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHeadingsFocusHidden && setHeadingsFocusHidden(true); } }}
                     title="Tap to hide headings"
                     role="button"
@@ -266,7 +267,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
                 ) : sec.heading ? (
                   <div
                     className="section-heading section-heading-tappable"
-                    onClick={() => setHeadingsFocusHidden && setHeadingsFocusHidden(true)}
+                    onClick={tapToggle(() => setHeadingsFocusHidden && setHeadingsFocusHidden(true))}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHeadingsFocusHidden && setHeadingsFocusHidden(true); } }}
                     title="Tap to hide headings"
                     role="button"
