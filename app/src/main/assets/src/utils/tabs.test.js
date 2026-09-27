@@ -23,6 +23,7 @@ afterEach(() => {
   delete (/** @type {any} */ (globalThis)).COL_BY_LETTER_SC;
   delete (/** @type {any} */ (globalThis)).COL_BY_INDEX_SC;
   delete (/** @type {any} */ (globalThis)).colLetterArr;
+  delete (/** @type {any} */ (globalThis)).colPreface;
 });
 
 describe('tabContentKey', () => {
@@ -87,6 +88,12 @@ describe('describeTab', () => {
   it('a letter screen resolves the letter title via the collection registry', () => {
     /** @type {any} */ (globalThis).colLetterArr = () => [{ id: 'the-wide-path', title: 'The Wide Path' }];
     expect(describeTab({ screen: 'vot-letter', letterId: 'the-wide-path' })).toEqual({ title: 'The Wide Path', subtitle: 'Volume Two', resolved: true });
+  });
+  it('a volume preface resolves its own title, not the generic fallback (lw1: the tab kept the last letter name)', () => {
+    /** @type {any} */ (globalThis).colLetterArr = () => [{ id: 'chosen-by-god', title: 'Chosen by God' }];
+    /** @type {any} */ (globalThis).colPreface = () => ({ id: 'a-word-of-warning', title: 'A Word of Warning' });
+    expect(describeTab({ screen: 'vot-letter', letterId: 'a-word-of-warning' })).toEqual({ title: 'A Word of Warning', subtitle: 'Volume Two', resolved: true });
+    expect(describeTab({ screen: 'vot-letter', letterId: 'chosen-by-god' }).title).toBe('Chosen by God');
   });
   it('marks a letter tab UNRESOLVED when the VOT corpus has not loaded (so the overview keeps the remembered title)', () => {
     // Corpus absent → colLetterArr returns [] → the letter isn't found → the
