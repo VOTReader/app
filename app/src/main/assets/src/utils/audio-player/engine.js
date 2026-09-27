@@ -54,7 +54,7 @@ import {
   _setLastPersistSec,
 } from './persist.js';
 import { _maybePrefetchNext } from './prefetch.js';
-import { _followSectionLetter, _resetSectionFollow } from './sections.js';
+import { _followSectionLetter, _resetSectionFollow, _setSecLastT } from './sections.js';
 import { _sleepAtTrackEndFire, _sleepTimerFire, _syncSleepVolume } from './sleep.js';
 
 /* ── module state (singleton) ─────────────────────────────────────────── */
@@ -170,6 +170,9 @@ function _ensureEl() {
     _syncMediaSessionPosition();
     _notify();
   });
+  // A seek from outside the page (native: the lock screen, Bluetooth, a car) never went through seek(): a jump is
+  // never heard time, so the compilation follower re-bases on the next tick (sweep n1-07).
+  el.addEventListener('seeking', () => _setSecLastT(-1));
   el.addEventListener('timeupdate', () => {
     _state.time = el.currentTime || 0;
     if (el.duration) _state.duration = el.duration;
@@ -500,6 +503,9 @@ export function prewarm(volKey, letterId) {
   if (!url) return;
   el.src = url;
   _prewarmKey = key;
+  // Native (m3): the src above only notes the url; binding the player's service is the warm-up there (n1-05).
+  const warm = /** @type {any} */ (el).prewarm;
+  if (typeof warm === 'function') warm.call(el);
 }
 
 /**

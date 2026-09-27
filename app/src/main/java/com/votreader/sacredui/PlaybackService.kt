@@ -44,8 +44,8 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+        // No cross-protocol redirects: every recording is https, and cleartext is blocked app-wide (sweep n1-09).
         val http = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(20_000)
         val offline = OfflineAudioStore.shared(this)

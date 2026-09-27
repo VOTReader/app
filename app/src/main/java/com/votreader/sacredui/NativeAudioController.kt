@@ -42,13 +42,14 @@ class NativeAudioController(
     /** The speed each recording plays at (songs at 1x, readings at the reading speed), applied at its seam. */
     private val rates = HashMap<String, Float>()
     private val journal = NativeAudioLogic.Journal()
-    /** The url playing, and the id of its item: ids are unique per load, so a repeat of one url is still a seam. */
-    private var current: String? = null
-    private var currentId: String? = null
+    /** The url playing and its item, and which moves are seams ([NativeAudioLogic.Cursor]). */
+    private val cursor = NativeAudioLogic.Cursor()
     private var serial = 0L
     private var reason = 0
 
     @Volatile private var snapshot = ""
+    /** The Activity is gone ([shutdown]): a late call must not connect a controller nothing would release (n1-08). */
+    @Volatile private var closed = false
 
     private class Track(val url: String, val title: String, val artist: String, val album: String, val rate: Float)
 
@@ -65,9 +66,8 @@ class NativeAudioController(
             journal.clear()
             rates.clear()
             (listOf(track) + next).forEach { rates[it.url] = it.rate }
-            current = track.url
             val items = (listOf(track) + next).map(::item)
-            currentId = items[0].mediaId
+            cursor.load(items[0].mediaId, track.url)
             c.setMediaItems(items, 0, startMs)
             c.setPlaybackSpeed(track.rate)
             c.volume = volume
@@ -93,7 +93,7 @@ class NativeAudioController(
 
     override fun rate(rate: Double) {
         val r = NativeAudioLogic.clampRate(rate)
-        onMain { c -> c.setPlaybackSpeed(r); current?.let { rates[it] = r } }
+        onMain { c -> c.setPlaybackSpeed(r); cursor.url?.let { rates[it] = r } }
     }
 
     override fun volume(volume: Double) {
@@ -138,15 +138,20 @@ class NativeAudioController(
         c.stop()
         c.clearMediaItems()
         rates.clear()
-        current = null
-        currentId = null
+        cursor.clear()
         state(c, "state")
     }
 
     override fun journal(): String = snapshot
 
+    /** Bind the service now, so the first Listen does not pay for it (sweep n1-05). Plays nothing. */
+    override fun prewarm() {
+        main.post { if (!closed && controller == null) connect() }
+    }
+
     /** The Activity is going: stop (the page that owns the queue goes with it) and let the service go. */
     fun shutdown() = main.post {
+        closed = true
         main.removeCallbacks(ticker)
         controller?.let { it.removeListener(listener); it.stop(); it.clearMediaItems() }
         future?.let { MediaController.releaseFuture(it) }
@@ -159,6 +164,7 @@ class NativeAudioController(
 
     private fun onMain(block: (MediaController) -> Unit) {
         main.post {
+            if (closed) return@post
             val c = controller
             if (c != null) run(c, block) else { pending += block; connect() }
         }
@@ -176,6 +182,7 @@ class NativeAudioController(
         f.addListener({
             try {
                 val c = f.get()
+                if (closed || future !== f) { MediaController.releaseFuture(f); return@addListener }
                 controller = c
                 c.addListener(listener)
                 val queued = pending.toList()
@@ -185,7 +192,7 @@ class NativeAudioController(
                 Timber.w(e, "native audio: could not connect to the playback service")
                 future = null
                 pending.clear()
-                emit(obj("type" to "error", "url" to (current ?: ""), "code" to 0, "name" to "no-service"))
+                emit(obj("type" to "error", "url" to (cursor.url ?: ""), "code" to 0, "name" to "no-service"))
             }
         }, ContextCompat.getMainExecutor(context))
     }
@@ -202,16 +209,10 @@ class NativeAudioController(
     private val listener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, why: Int) {
             val c = controller ?: return
-            val id = mediaItem?.mediaId
-            // Dropping the played item from the front is reported as a second transition INTO the same item: one
-            // seam, not two (measured on the emulator, m3a look 23:20).
-            if (id == currentId) return
             val url = mediaItem?.let(::urlOf)
-            currentId = id
             val auto = why == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || why == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT
-            if (!auto || url == null) { current = url; return }
-            val from = current ?: ""
-            current = url
+            val from = cursor.enter(mediaItem?.mediaId, url, auto) ?: return
+            if (url == null) return
             rates[url]?.let { c.setPlaybackSpeed(it) }
             val seam = journal.add(from, url, System.currentTimeMillis())
             state(c, "transition", "from" to from, "seq" to seam.seq)
@@ -220,6 +221,13 @@ class NativeAudioController(
         }
 
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, why: Int) { reason = why }
+
+        /** A seek from anywhere (the lock screen, Bluetooth, a car, a watch, or the page): the page's clock jumps
+         *  with it, and a jump is never heard time (sweep n1-07: a scrub credited the letters it skipped). */
+        override fun onPositionDiscontinuity(old: Player.PositionInfo, new: Player.PositionInfo, why: Int) {
+            val c = controller ?: return
+            if (why == Player.DISCONTINUITY_REASON_SEEK || why == Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT) state(c, "seeked")
+        }
 
         override fun onPlayerError(error: PlaybackException) {
             val c = controller ?: return
@@ -261,6 +269,8 @@ class NativeAudioController(
             "idle" to (c.playbackState == Player.STATE_IDLE),
             "reason" to reason,
             "last" to journal.last(),
+            // When pos was read (epoch ms): the page adds the bridge's delivery time to it (sweep n1-04).
+            "at" to System.currentTimeMillis(),
         )
         val json = obj(*base, *extra)
         snapshot = obj(*base, "seams" to NativeAudioLogic.seamsJson(journal.seams()))

@@ -24,6 +24,8 @@ interface NativeAudioPort {
     fun release()
     /** A snapshot the page reads when it comes back on screen: position, state and the seams it may have missed. */
     fun journal(): String
+    /** Get ready to play (bind the service) without playing: a letter with a recording opened (sweep n1-05). */
+    fun prewarm() {}
 }
 
 /**
@@ -54,10 +56,23 @@ object NativeAudioLogic {
         }
     }
 
-    /** Only the app's own recordings play natively (the page checks too; native does not trust it). */
-    fun playable(url: String?): Boolean =
-        url != null && url.length <= MAX_URL && (url.startsWith("https://") ||
-            url.startsWith("http://127.0.0.1") || url.startsWith("http://localhost"))
+    /**
+     * Only the app's own recordings play natively (the page checks too; native does not trust it): https on the
+     * hosts that serve them, the host parsed exactly (a prefix match let `https://github.com.evil.example` through).
+     * No http: the manifest blocks cleartext app-wide (sweep n1-09).
+     */
+    fun playable(url: String?): Boolean {
+        if (url == null || url.length > MAX_URL || !url.startsWith("https://")) return false
+        val rest = url.substring("https://".length)
+        val end = rest.indexOfFirst { it == '/' || it == '?' || it == '#' }
+        val authority = if (end < 0) rest else rest.substring(0, end)
+        val host = authority.lowercase()
+        if (host !in AUDIO_HOSTS) return false   // a port, user info or trailing dot is not ours either
+        return host != "github.com" || rest.substring(authority.length).startsWith("/VOTReader/")
+    }
+
+    /** Where the app's recordings live: release assets on github.com (and the hosts they redirect to), songs on Pages. */
+    private val AUDIO_HOSTS = setOf("github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com", "votreader.github.io")
 
     /** Page text shown on the lock screen and in the notification, bounded. */
     fun label(text: String?): String = (text ?: "").take(MAX_TEXT)
@@ -90,6 +105,37 @@ object NativeAudioLogic {
         @Synchronized fun clear() { seams.clear() }
 
         @Synchronized fun seams(): List<Seam> = seams.toList()
+    }
+
+    /**
+     * Which recording the player is on, and whether a move to another is a seam the page must hear (sweep n1-06: the
+     * controller's decision, out of the Player.Listener so JaCoCo sees it). Ids are unique per load
+     * ("<serial>|<url>"), so a repeat of one url is still a seam; dropping the played item from the front is reported
+     * as a second transition INTO the same item, which is not (measured on the emulator, m3a look 23:20). Main
+     * looper only.
+     */
+    class Cursor {
+        /** The url playing (null before a load or after a release). */
+        var url: String? = null
+            private set
+        private var id: String? = null
+
+        /** The page loaded [url] as item [id]. */
+        fun load(id: String?, url: String?) { this.id = id; this.url = url }
+
+        fun clear() { id = null; url = null }
+
+        /**
+         * The player moved to item [id] playing [url], by itself ([auto]: the last one ended) or not (the page's
+         * own load or seek). Returns the url that ended when this is a seam the page must hear, else null.
+         */
+        fun enter(id: String?, url: String?, auto: Boolean): String? {
+            if (id == this.id) return null
+            this.id = id
+            val from = this.url
+            this.url = url
+            return if (auto && url != null) from ?: "" else null
+        }
     }
 
     /** A JSON string literal; the event and journal JSON is built by hand so this stays plain JVM. */

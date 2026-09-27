@@ -298,6 +298,21 @@ class OfflineAudioStoreTest {
     }
 
     @Test
+    fun `a batch is queued with one event, before any of it downloads (n2-03)`() {
+        val held = Held()
+        val s = heldStore(held, mutableListOf())
+        s.enqueue(listOf(item(url1), item(url2), item("https://example.com/x.mp3")))
+        val queued = events.filter { it.getString("type") == "queued" }
+        assertEquals(1, queued.size)
+        val urls = queued[0].getJSONArray("urls")
+        assertEquals(listOf(url1, url2), (0 until urls.length()).map { urls.getString(it) })
+        assertEquals(url1, queued[0].getString("url"))
+        s.enqueue(listOf(item(url1)))
+        assertEquals(1, events.count { it.getString("type") == "queued" }, "nothing new: no event")
+        held.run()
+    }
+
+    @Test
     fun `the same recording queued twice downloads once`() {
         val held = Held()
         val opened = mutableListOf<String>()

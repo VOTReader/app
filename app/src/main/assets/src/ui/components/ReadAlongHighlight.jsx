@@ -705,7 +705,7 @@ export function listenTargetAt(frags, hlKey, offset, letterId, hlKeyFn, offsetMa
 const REPEAT_TOAST_ID = 'vot-repeat-toast';
 const REPEAT_FAIL_MSG = 'This passage has no timings to repeat by.';
 const REPEAT_PART_MSG = 'Repeat works within one part of the recording. Select inside the part that is playing.';
-/** How long a Repeat waits for the unit it started (and its timings) before it is dropped. */
+/** How long a Repeat or a Listen from here waits for the unit it started (and its timings) before it is dropped. */
 const REPEAT_WAIT_MS = 20000;
 
 /**
@@ -1062,7 +1062,7 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   onListenRef.current = onListen;
   const listenCtx = React.useRef(/** @type {{ frags: any, loaded: boolean, status: string }} */ ({ frags: null, loaded: false, status: 'idle' }));
   listenCtx.current = { frags, loaded, status: st.status };
-  const pendingListen = React.useRef(/** @type {{ hlKey: string, offset: number | null } | null} */ (null));
+  const pendingListen = React.useRef(/** @type {{ hlKey: string, offset: number | null, at: number } | null} */ (null));
   const pendingRepeat = React.useRef(/** @type {{ keys: string[], label: string, times: number, at: number } | null} */ (null));
   /** Loop the passage's span (repeatSpanOf) through the player; a paused bar resumes, as start() does. A passage
    *  this recording cannot loop says so (a toast), never nothing: one in, or reaching into, another part of a
@@ -1102,7 +1102,7 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
           if (c.status === 'paused') AudioPlayer.toggle();
           return true;
         }
-        pendingListen.current = { hlKey, offset: off };
+        pendingListen.current = { hlKey, offset: off, at: Date.now() };
         const go = onListenRef.current;
         if (typeof go === 'function') go();
         return true;
@@ -1142,6 +1142,9 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       return;
     }
     const p = pendingListen.current;
+    // Likewise a Listen from here whose start never came: left armed, it hijacked the next plain Listen of this
+    // unit, minutes later, to that old place (sweep n1-11).
+    if (p && Date.now() - p.at > REPEAT_WAIT_MS) { pendingListen.current = null; return; }
     if (!p || !loaded || !frags) return;
     pendingListen.current = null;
     const i = listenTargetAt(frags, p.hlKey, p.offset, letterId, hlKeyFn, offsetMapFn, mainRef.current);

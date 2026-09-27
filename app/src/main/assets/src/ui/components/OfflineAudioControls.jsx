@@ -32,7 +32,60 @@ export function useOfflineAudio() {
     React.useCallback((cb) => (s ? s.subscribe(cb) : () => {}), [s]),
     () => (s ? s.getVersion() : 0),
   );
-  return s && s.available() ? s : null;
+  const off = s && s.available() ? s : null;
+  React.useEffect(() => { _announce(off); });
+  return off;
+}
+
+/** The app's one polite live region for downloads (n2-06), made at the first control's mount so it is there before
+ *  the first news. The seq last read out: news from before it is not read. */
+let _liveEl = /** @type {HTMLElement | null} */ (null);
+let _heardSeq = -1;
+
+/** Read the store's latest news out once (a batch started, the queue finished, a download failed). @param {any} off */
+function _announce(off) {
+  if (!off || typeof off.news !== 'function' || typeof document === 'undefined') return;
+  const n = off.news();
+  if (!n) return;
+  if (!_liveEl || !_liveEl.isConnected) {
+    _liveEl = document.createElement('p');
+    _liveEl.className = 'sr-only';
+    _liveEl.setAttribute('role', 'status');
+    _liveEl.setAttribute('aria-live', 'polite');
+    _liveEl.id = 'offline-audio-status';
+    document.body.appendChild(_liveEl);
+    if (_heardSeq < 0) _heardSeq = n.seq;
+  }
+  if (n.seq === _heardSeq) return;
+  _heardSeq = n.seq;
+  _liveEl.textContent = n.text;
+}
+
+/**
+ * Keep keyboard and screen-reader focus on a control that swaps its element as its state moves on (Download ->
+ * Cancel -> On this phone): when the focused element went with the old state, focus lands on the new one's button
+ * (or the new line itself) instead of the page's top (n2-06). Never takes focus from anywhere else.
+ * @param {string} state what decides which element renders
+ */
+function useKeepFocus(state) {
+  const ref = React.useRef(/** @type {any} */ (null));
+  const owned = React.useRef(false);
+  React.useLayoutEffect(() => {
+    if (!owned.current || typeof document === 'undefined') return;
+    const a = document.activeElement;
+    if (a && a !== document.body && a.isConnected) { owned.current = !!(ref.current && ref.current.contains(a)); return; }
+    const root = ref.current;
+    if (!root) return;
+    const target = root.tagName === 'BUTTON' ? root : root.querySelector('button:not([disabled])') || root;
+    if (target === root && root.tagName !== 'BUTTON' && !root.hasAttribute('tabindex')) root.setAttribute('tabindex', '-1');
+    try { target.focus({ preventScroll: true }); } catch (_e) { /* an old engine */ }
+  }, [state]);
+  return {
+    ref,
+    onFocus: () => { owned.current = true; },
+    // A blur with nowhere to go is the focused element leaving with its state: still ours to put back.
+    onBlur: (/** @type {any} */ e) => { if (e.relatedTarget) owned.current = false; },
+  };
 }
 
 /** @returns {boolean} false while the phone has no signal */
@@ -127,27 +180,30 @@ export function OfflineRowStatus({ tracks, name }) {
     if (off && urls.length) off.requestSizes(urls);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the joined urls: a new array each render must not re-ask
   }, [off, urlKey]);
-  if (!off || !urls.length) return null;
-  const u = unitState(off, urls);
+  const u = off && urls.length ? unitState(off, urls) : null;
+  const shown = !u ? '' : u.status === 'saved' ? 'saved' : !online && u.status !== 'downloading' ? 'offline' : u.status;
+  const focus = useKeepFocus(shown);
+  if (!off || !u) return null;
   const download = () => off.download(list.map((t) => _item(t, name)));
-  if (u.status === 'saved') {
-    return <p className="offline-row is-saved"><CheckIcon /><span>On this phone{u.bytes ? ' · ' + formatBytes(u.bytes) : ''}</span></p>;
+  if (shown === 'saved') {
+    return <p className="offline-row is-saved" {...focus}><CheckIcon /><span>On this phone{u.bytes ? ' · ' + formatBytes(u.bytes) : ''}</span></p>;
   }
-  if (!online && u.status !== 'downloading') {
-    return <p className="offline-row is-offline"><NoSignalIcon /><span>Needs a connection</span></p>;
+  if (shown === 'offline') {
+    return <p className="offline-row is-offline" {...focus}><NoSignalIcon /><span>Needs a connection</span></p>;
   }
   if (u.status === 'downloading') {
     return (
-      <div className="offline-row is-busy">
+      <div className="offline-row is-busy" {...focus}>
         <span className="offline-row-label"><DownloadIcon /><span>{'Downloading ' + u.percent + '%'}</span></span>
         <button type="button" className="offline-row-link" onClick={() => off.cancel(urls)} aria-label={'Cancel the download of ' + name}>Cancel</button>
-        <span className="offline-row-bar" aria-hidden="true"><span style={{ width: u.percent + '%' }} /></span>
+        <span className="offline-row-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={u.percent}
+          aria-label={'Downloading ' + name}><span style={{ width: u.percent + '%' }} /></span>
       </div>
     );
   }
   if (u.status === 'failed') {
     return (
-      <p className="offline-row is-failed">
+      <p className="offline-row is-failed" {...focus}>
         <AlertIcon />
         <span>{u.failed === 'space' ? 'Not enough room on this phone' : 'Download failed'}</span>
         <span aria-hidden="true">·</span>
@@ -157,7 +213,7 @@ export function OfflineRowStatus({ tracks, name }) {
   }
   const size = formatBytes(u.remaining || 0);
   return (
-    <button type="button" className="offline-row offline-row-download" onClick={download}
+    <button type="button" className="offline-row offline-row-download" onClick={download} {...focus}
       aria-label={'Download ' + name + ' to this phone' + (size ? ', ' + size : '')}>
       <DownloadIcon /><span>{'Download' + (size ? ' · ' + size : '')}</span>
     </button>
@@ -172,17 +228,17 @@ export function OfflineCollectionAction({ units, label }) {
   const off = useOfflineAudio();
   const online = useOnline();
   const [asking, setAsking] = React.useState(false);
-  if (!off) return null;
-  const tracks = (Array.isArray(units) ? units : []).flat().filter((t) => t && typeof t.url === 'string');
+  const tracks = off ? (Array.isArray(units) ? units : []).flat().filter((t) => t && typeof t.url === 'string') : [];
   const urls = tracks.map((t) => t.url);
-  if (!urls.length) return null;
-  const u = unitState(off, urls);
+  const u = urls.length ? unitState(off, urls) : null;
+  const focus = useKeepFocus(!u ? '' : u.status === 'saved' || u.status === 'downloading' ? u.status : 'ask');
+  if (!off || !u) return null;
   if (u.status === 'saved') {
-    return <p className="offline-collection is-saved"><CheckIcon /><span>All on this phone</span></p>;
+    return <p className="offline-collection is-saved" {...focus}><CheckIcon /><span>All on this phone</span></p>;
   }
   if (u.status === 'downloading') {
     return (
-      <p className="offline-collection is-busy">
+      <p className="offline-collection is-busy" {...focus}>
         <DownloadIcon /><span>{'Downloading · ' + u.saved + ' of ' + u.count + ' on this phone'}</span>
         <button type="button" className="offline-row-link" onClick={() => off.cancel(urls)}>Cancel</button>
       </p>
@@ -194,7 +250,7 @@ export function OfflineCollectionAction({ units, label }) {
   const noRoom = need !== null && free > 0 && need + SPACE_MARGIN > free;
   const recordings = todo.length === 1 ? '1 recording' : todo.length + ' recordings';
   return (
-    <div className="offline-collection">
+    <div className="offline-collection" {...focus}>
       <button type="button" className="audio-library-secondary-action" disabled={!online}
         onClick={() => { off.refresh(); setAsking(true); }} aria-expanded={asking}>
         <DownloadIcon /><span>Download all</span>

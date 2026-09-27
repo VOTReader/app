@@ -43,6 +43,16 @@ let _failed = new Map();
 let _sizes = new Map();
 /** @type {Set<string>} */
 let _sizesAsked = new Set();
+/** Asked by rows this turn, sent together once it ends: one bridge call per screen, not one per row (n2-02). */
+/** @type {Set<string>} */
+let _sizesToSend = new Set();
+let _sizesFlushQueued = false;
+/** What a screen reader hears next (n2-06): a batch started, the queue finished, a download failed. Not per percent. */
+let _news = { seq: 0, text: '' };
+/** @param {string} text */
+function _say(text) { _news = { seq: _news.seq + 1, text }; }
+/** The most urls one size call carries (OfflineAudioStore.MAX_SIZE_BATCH). */
+const SIZE_BATCH = 400;
 let _loaded = false;
 
 /** @returns {any} */
@@ -98,13 +108,17 @@ function _onEvent(json) {
     case 'done':
     case 'removed':
       if (url && _active && _active.url === url) _active = null;
+      if (e.type === 'done' && !_active && !_queued.size) _say('Download finished');
       refresh();
       return;
-    case 'queued':
-      if (!url) return;
-      _queued.add(url);
-      _failed.delete(url);
+    case 'queued': {
+      // One event for the whole batch a Download all queued (n2-03), or one per url from an older shell.
+      const urls = Array.isArray(e.urls) ? e.urls.filter((u) => typeof u === 'string') : url ? [url] : [];
+      if (!urls.length) return;
+      for (const u of urls) { _queued.add(u); _failed.delete(u); }
+      _say(urls.length === 1 ? 'Download started' : 'Downloading ' + urls.length + ' recordings');
       break;
+    }
     case 'progress':
       if (!url) return;
       _queued.delete(url);
@@ -115,6 +129,7 @@ function _onEvent(json) {
       _queued.delete(url);
       if (_active && _active.url === url) _active = null;
       _failed.set(url, typeof e.reason === 'string' ? e.reason : 'network');
+      _say(e.reason === 'space' ? 'Download failed: not enough room on this phone' : 'Download failed');
       break;
     case 'cancelled':
       if (!url) return;
@@ -127,8 +142,10 @@ function _onEvent(json) {
         const n = Number(sizes[k]);
         if (n > 0) _sizes.set(k, n);
       }
-      // What went unanswered (no signal, a failed lookup) may be asked again by the next screen that shows it.
-      for (const u of [..._sizesAsked]) if (!_sizes.has(u)) _sizesAsked.delete(u);
+      // What went unanswered (no signal, a failed lookup) may be asked again by the next screen that shows it: only
+      // what this answer was for (it names them), not what another call still has on its way (n2-02).
+      const asked = Array.isArray(e.asked) ? e.asked : [..._sizesAsked];
+      for (const u of asked) if (typeof u === 'string' && !_sizes.has(u)) _sizesAsked.delete(u);
       break;
     }
     default:
@@ -170,6 +187,21 @@ function _holdsSongs() {
   return !!(_active && isSongUrl(_active.url));
 }
 
+/** Send what the rows asked for this turn: every row of a screen mounts in one commit, so one call (n2-02). */
+function _flushSizes() {
+  _sizesFlushQueued = false;
+  const all = [..._sizesToSend];
+  _sizesToSend = new Set();
+  const b = _bridge();
+  for (let i = 0; i < all.length; i += SIZE_BATCH) {
+    const want = all.slice(i, i + SIZE_BATCH);
+    try {
+      if (!b || typeof b.offlineAudioSizes !== 'function') throw new Error('no bridge');
+      b.offlineAudioSizes(JSON.stringify(want));
+    } catch (_e) { for (const u of want) _sizesAsked.delete(u); }
+  }
+}
+
 /** @param {string[]} urls @param {string} method */
 function _send(urls, method) {
   const b = _bridge();
@@ -180,6 +212,8 @@ function _send(urls, method) {
 export const OfflineAudio = {
   subscribe,
   getVersion: () => _version,
+  /** The latest news for a screen reader: { seq, text } (seq 0 = none yet). */
+  news: () => _news,
   /** @returns {boolean} true in the phone app (a bridge that can keep downloads) */
   available: () => !!_bridge(),
   refresh,
@@ -208,8 +242,10 @@ export const OfflineAudio = {
     if (!b || typeof b.offlineAudioSizes !== 'function') return;
     const want = (Array.isArray(urls) ? urls : []).filter((u) => typeof u === 'string' && !_saved.has(u) && !_sizes.has(u) && !_sizesAsked.has(u));
     if (!want.length) return;
-    for (const u of want) _sizesAsked.add(u);
-    try { b.offlineAudioSizes(JSON.stringify(want)); } catch (_e) { for (const u of want) _sizesAsked.delete(u); }
+    for (const u of want) { _sizesAsked.add(u); _sizesToSend.add(u); }
+    if (_sizesFlushQueued) return;
+    _sizesFlushQueued = true;
+    queueMicrotask(_flushSizes);
   },
   /** The recordings on the phone (songs kept on it are songItems'). @returns {SavedItem[]} newest first */
   items: () => { if (!_loaded) refresh(); return [..._saved.values()].filter((it) => !isSongUrl(it.url)).sort((a, b) => b.savedAt - a.savedAt); },
@@ -262,6 +298,7 @@ export const OfflineAudio = {
   _reset() {
     _listeners.clear();
     _saved = new Map(); _queued = new Set(); _failed = new Map(); _sizes = new Map(); _sizesAsked = new Set();
+    _sizesToSend = new Set(); _sizesFlushQueued = false; _news = { seq: 0, text: '' };
     _active = null; _totalBytes = 0; _freeBytes = -1; _loaded = false; _version = 0;
     _install();
   },

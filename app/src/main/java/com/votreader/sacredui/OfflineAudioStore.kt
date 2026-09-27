@@ -86,6 +86,9 @@ class OfflineAudioStore(
     private val sizeLock = Any()
     private val sizeCache = HashMap<String, Pair<Long, Map<String, Long>>>()   // guarded by sizeLock
     private val listingFailedAt = HashMap<String, Long>()                        // guarded by sizeLock
+    // HEADs spent per tag since the window began: tag -> (windowStart, count). The budget is per tag and window, not
+    // per call: a screen of rows asking one by one once spent a thousand (sweep n2-02).
+    private val headsSpent = HashMap<String, Pair<Long, Int>>()                   // guarded by sizeLock
 
     init {
         // A .part is a download a kill interrupted: never resumed, never served.
@@ -98,28 +101,37 @@ class OfflineAudioStore(
      * Look up the size of each of [urls] before it is downloaded (the rows' "Download · 18 MB", a collection's total):
      * one release listing per tag, cached on the phone for a week, a HEAD per file only for what a listing does not
      * answer. Runs on its own worker (never behind a download) and answers with one event:
-     * {type: "sizes", sizes: {url: bytes}}; a size nobody could give is simply absent.
+     * {type: "sizes", sizes: {url: bytes}, asked: [url...]}; a size nobody could give is simply absent, and `asked`
+     * lets the page ask again for exactly those later (not for what another call still has on its way).
      */
     fun requestSizes(urls: List<String>) {
-        val wanted = urls.distinct().mapNotNull { u -> splitRelease(u)?.let { Triple(u, it.first, it.second) } }.take(MAX_SIZE_BATCH)
-        if (wanted.isEmpty()) return
+        val asked = urls.distinct().take(MAX_SIZE_BATCH)
+        if (asked.isEmpty()) return
+        val wanted = asked.mapNotNull { u -> splitRelease(u)?.let { Triple(u, it.first, it.second) } }
         sizeExecutor.execute {
             val out = JSONObject()
-            var heads = 0
             for ((tag, group) in wanted.groupBy { it.second }) {
                 val listing = listingFor(tag)
                 for ((url, _, asset) in group) {
-                    // A HEAD (a round trip and a redirect) only for what a listing did not answer, a few per ask:
-                    // a failed listing must not turn one screen into a thousand requests.
-                    val n = listing?.get(asset) ?: if (heads < MAX_HEADS_PER_ASK) {
-                        heads++
+                    // A HEAD (a round trip and a redirect) only for what a listing did not answer, and only while this
+                    // tag's budget lasts: a failed listing must not turn one screen into a thousand requests.
+                    val n = listing?.get(asset) ?: if (takeHead(tag)) {
                         try { headSize(url) } catch (_: Exception) { null }
                     } else null
                     if (n != null && n > 0L) out.put(url, n)
                 }
             }
-            send(JSONObject().put("type", "sizes").put("sizes", out).toString())
+            send(JSONObject().put("type", "sizes").put("sizes", out).put("asked", JSONArray(asked)).toString())
         }
+    }
+
+    /** One HEAD from [tag]'s budget: [MAX_HEADS_PER_TAG] per [LISTING_RETRY_MS] window, whatever the calls. */
+    private fun takeHead(tag: String): Boolean = synchronized(sizeLock) {
+        val now = clock()
+        val (start, n) = headsSpent[tag]?.takeIf { now - it.first < LISTING_RETRY_MS } ?: (now to 0)
+        if (n >= MAX_HEADS_PER_TAG) { headsSpent[tag] = start to n; return false }
+        headsSpent[tag] = start to (n + 1)
+        true
     }
 
     private fun listingFor(tag: String): Map<String, Long>? {
@@ -232,16 +244,20 @@ class OfflineAudioStore(
 
     /** Queue [items] (skipping any not from the audio releases, already on the phone, or already queued). */
     fun enqueue(items: List<Item>) {
+        val fresh = ArrayList<Pair<Item, String>>()
         for (item in items) {
             val name = fileNameFor(item.url) ?: continue
-            val fresh = synchronized(lock) {
+            val isNew = synchronized(lock) {
                 if (entries.containsKey(item.url) || queued.contains(item.url) || active?.url == item.url) false
                 else { queued.add(item.url); true }
             }
-            if (!fresh) continue
-            send(event("queued", item.url).toString())
-            executor.execute { download(item, name) }
+            if (isNew) fresh += item to name
         }
+        if (fresh.isEmpty()) return
+        // One event for the batch, before any worker starts on it: a Download all of 150 re-drew the screen 150 times
+        // (sweep n2-03). `url` names the first, for a page that reads only that.
+        send(JSONObject().put("type", "queued").put("url", fresh[0].first.url).put("urls", JSONArray(fresh.map { it.first.url })).toString())
+        for ((item, name) in fresh) executor.execute { download(item, name) }
     }
 
     /**
@@ -575,7 +591,7 @@ class OfflineAudioStore(
         private const val MAX_SIZE_BATCH = 400
         // One call from the page: a Bible book tops out at 150 chapters, the largest collection at 203 entries.
         private const val MAX_BATCH = 400
-        private const val MAX_HEADS_PER_ASK = 40
+        private const val MAX_HEADS_PER_TAG = 40
         private const val LISTING_RETRY_MS = 10L * 60 * 1000
         private const val MAX_LISTING_BYTES = 8L * 1024 * 1024
         private const val API_RELEASE_BY_TAG = "https://api.github.com/repos/VOTReader/votreader-assets/releases/tags/"
