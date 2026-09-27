@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { snippet, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
 
 describe('snippet', () => {
@@ -250,5 +250,45 @@ describe('findPlaces — every place, the snippet\'s own included, with its hits
 
   it('is empty for no hits', () => {
     expect(findPlaces('nothing here', ['flood'])).toEqual([]);
+  });
+});
+
+/* Review of 22419b59 (2026-09-26): a card's term list is the typed words first,
+   then their synonyms and the engine's matched forms. Counted as separate words
+   they skewed every rule that counts words; they are one word family, named by
+   the typed word, which wins a tie. */
+describe('synonyms, forms and archaic twins are one word with the word typed', () => {
+  const pad = (n) => 'and the word went on. '.repeat(n);
+  let prev;
+  beforeEach(() => { prev = window.VotSearchData; window.VotSearchData = { SYNONYM_MAP: { love: ['love', 'charity'], charity: ['love', 'charity'] } }; });
+  afterEach(() => { window.VotSearchData = prev; });
+
+  it('a synonym is not a rarer word: the snippet shows the word typed, and every place is kept', () => {
+    const t = pad(2) + 'I love you. ' + pad(20) + 'love one another. ' + pad(20) + 'put on charity. ' + pad(20) + 'love is patient. ' + pad(20) + 'love never fails. ' + pad(2);
+    expect(snippet(t, ['love', 'charity'], 120)).toContain('I love you');
+    expect(findPlaces(t, ['love', 'charity'], 120)).toHaveLength(5);
+    expect(morePlaces(t, ['love', 'charity'], 120).map((p) => p.clip.includes('charity') || p.clip.includes('love'))).toEqual([true, true, true, true]);
+  });
+
+  it('a back-form is not a rarer word: typed "wept" leads, and weep’s places stay', () => {
+    const t = pad(2) + 'weep with those who weep. ' + pad(20) + 'weep not. ' + pad(20) + 'Jesus wept. ' + pad(20) + 'they weep. ' + pad(2);
+    // typed wept, the engine's matched forms after it
+    expect(snippet(t, ['wept', 'weep'], 120)).toContain('Jesus wept');
+    expect(findPlaces(t, ['wept', 'weep'], 120)).toHaveLength(4);
+  });
+
+  it('the words that meet still win, and two different typed words still count as two', () => {
+    const t = pad(2) + 'a charity alone. ' + pad(20) + 'love the brethren with charity and faith. ' + pad(20) + 'faith alone. ' + pad(2);
+    // love (+ charity) and faith: two typed words
+    expect(snippet(t, ['love', 'faith', 'charity'], 120)).toContain('love the brethren');
+  });
+});
+
+describe('findPlaces never comes back empty when the words appear (review of 22419b59)', () => {
+  it('a pair straddling a cut is still one place: lord at 0 and 100, shepherd at 130', () => {
+    const t = 'Lord' + ' '.repeat(96) + 'Lord' + ' '.repeat(26) + 'shepherd.';
+    const places = findPlaces(t, ['lord', 'shepherd'], 120);
+    expect(places.length).toBeGreaterThan(0);
+    expect(places.map((p) => p.hits.map((h) => t.slice(h.idx, h.idx + h.len)))).toEqual([['Lord', 'shepherd']]);
   });
 });
