@@ -29,6 +29,10 @@ function insideWord(text, i) { return i > 0 && i < text.length && WORD_CHAR.test
  * joins the family of a shorter term it starts with, and an archaic form joins
  * its modern word's. Two terms matching at one position ("flood", "flooding" at
  * "flooding") are one hit, the longer.
+ *
+ * The cap is PER TERM (400 each): shorter terms are scanned first, and one cap for
+ * all of them let a common word ("lord", 400 times in a long Answers topic) use it
+ * up before the word that told the unit apart ("shepherd") was scanned at all.
  * @param {string} text
  * @param {string[]} terms
  * @returns {Array<{ idx: number, len: number, term: string }>}
@@ -53,19 +57,31 @@ function occurrences(text, terms) {
   for (let i = 0; i < expanded.length; i++) {
     const t = expanded[i];
     let idx = lower.indexOf(t);
-    while (idx >= 0 && at.size < 400) {
+    let n = 0;
+    while (idx >= 0 && n < 400) {
       // longer terms come later, so the last write at a position is the longest
-      if (startsWord(lower, idx)) at.set(idx, { idx, len: t.length, term: family[t] });
+      if (startsWord(lower, idx)) { at.set(idx, { idx, len: t.length, term: family[t] }); n++; }
       idx = lower.indexOf(t, idx + t.length);
     }
   }
   return [...at.values()].sort((a, b) => a.idx - b.idx);
 }
 
+/** How often each word family occurs: the rarer a query word is in THIS text, the
+ *  more a passage holding it tells the unit apart. */
+function familyCounts(occ) {
+  const n = Object.create(null);
+  for (let i = 0; i < occ.length; i++) n[occ[i].term] = (n[occ[i].term] || 0) + 1;
+  return n;
+}
+
 /**
  * The ~maxLen-wide window covering the MOST DISTINCT query terms — the passage
  * where the query words actually cluster (the remembered phrase), not the
- * first stray hit of one common word. Ties resolve to the earliest window.
+ * first stray hit of one common word. Among windows holding as many, the one
+ * whose words are RAREST in this text wins (each distinct word weighs 1 / its
+ * count): "the lord is my shepherd" in a topic that says Lord 24 times and
+ * shepherd once shows the shepherd, not the first Lord. Then the earliest.
  * Archaic-aware (a "you" query finds "thee"/"thou"/"ye"). Null when no term
  * occurs in the text.
  * @param {string} text
@@ -75,21 +91,30 @@ function occurrences(text, terms) {
  *   query words (word families) the window holds
  */
 export function bestMatch(text, terms, maxLen) {
-  const occ = occurrences(text, terms);
+  return bestIn(occurrences(text, terms), maxLen);
+}
+
+/** bestMatch over an occurrence list already made. */
+function bestIn(occ, maxLen) {
   if (!occ.length) return null;
+  const freq = familyCounts(occ);
   let bestStart = occ[0].idx;
   let bestCount = 0;
+  let bestWeight = 0;
   let bestSpan = occ[0].len;
   for (let s = 0; s < occ.length; s++) {
     const winStart = occ[s].idx;
     const seen = Object.create(null);
     let count = 0;
+    let weight = 0;
     let spanEnd = winStart + occ[s].len;
     for (let e = s; e < occ.length && (occ[e].idx + occ[e].len) <= winStart + maxLen; e++) {
-      if (!seen[occ[e].term]) { seen[occ[e].term] = true; count++; }
+      if (!seen[occ[e].term]) { seen[occ[e].term] = true; count++; weight += 1 / freq[occ[e].term]; }
       spanEnd = occ[e].idx + occ[e].len;
     }
-    if (count > bestCount) { bestCount = count; bestStart = winStart; bestSpan = spanEnd - winStart; }
+    if (count > bestCount || (count === bestCount && weight > bestWeight + 1e-9)) {
+      bestCount = count; bestWeight = weight; bestStart = winStart; bestSpan = spanEnd - winStart;
+    }
   }
   return { start: bestStart, span: bestSpan, count: bestCount };
 }
@@ -171,6 +196,56 @@ export function matchExcerpt(text, terms, len) {
   return m ? text.slice(m.start, m.start + len) : '';
 }
 
+/**
+ * Gather occurrences into places, one per `maxLen`-wide run of hits in reading
+ * order, and keep the ones worth a reader's tap:
+ *  - with two or more query words, the places holding as many of them as the best
+ *    window of the whole text does (`most`); a stray single word is not the passage
+ *    a reader remembers;
+ *  - when no window holds two (the words never meet in this text), the places of the
+ *    RAREST word, the one that tells the unit apart ("shepherd", not the Lord the
+ *    topic names 24 times);
+ *  - one query word: every place.
+ * @param {Array<{ idx: number, len: number, term: string }>} occ  the hits to gather
+ * @param {number} maxLen
+ * @param {Record<string, number>} freq  family counts over the WHOLE text
+ * @param {number} bestCount  the best window's word count over the whole text
+ * @returns {Array<{ start: number, span: number, hits: Array<{ idx: number, len: number }> }>}
+ */
+function gather(occ, maxLen, freq, bestCount) {
+  const places = [];
+  for (let i = 0; i < occ.length;) {
+    const start = occ[i].idx;
+    const fams = Object.create(null);
+    let count = 0;
+    let end = start + occ[i].len;
+    const hits = [];
+    let j = i;
+    do {
+      if (!fams[occ[j].term]) { fams[occ[j].term] = true; count++; }
+      end = Math.max(end, occ[j].idx + occ[j].len);
+      hits.push({ idx: occ[j].idx, len: occ[j].len });
+      j++;
+    } while (j < occ.length && occ[j].idx + occ[j].len <= start + maxLen);
+    places.push({ start, span: end - start, count, fams, hits });
+    i = j;
+  }
+  let most = bestCount;
+  for (const p of places) if (p.count > most) most = p.count;
+  let keep;
+  if (most >= 2) keep = (p) => p.count === most;
+  else {
+    const names = Object.keys(freq);
+    if (names.length <= 1) keep = () => true;
+    else {
+      let min = Infinity;
+      for (const f of names) if (freq[f] < min) min = freq[f];
+      keep = (p) => names.some((f) => freq[f] === min && p.fams[f]);
+    }
+  }
+  return places.filter(keep).map((p) => ({ start: p.start, span: p.span, hits: p.hits }));
+}
+
 /* How much of the text around its first hit a result card's snippet surely shows:
    the snippet is cut 180 chars wide, but its box holds three lines centred on
    the first <mark> (SrchSnippet), about 50 chars before the hit and 60 from it
@@ -185,11 +260,8 @@ const SHOWN_FROM = 60;
  * judgment" further down the same letter, the passage she was after).
  *
  * The hits the card's snippet already shows are left out (the stretch around
- * the best window's first hit, SHOWN_BEFORE / SHOWN_FROM); the rest are gathered
- * into places, one per `maxLen`-wide run of hits, in the order the text reads.
- * With two or more query words, only the places that hold as many of them as the
- * best window does are kept: a stray single word is not the passage a reader
- * remembers.
+ * the best window's first hit, SHOWN_BEFORE / SHOWN_FROM); the rest gather into
+ * places the way gather() keeps them, in the order the text reads.
  *
  * Each place carries `start` (its first hit, a word start: the landing reads
  * text.slice(start, start + 48), as matchExcerpt does) and `clip`, the
@@ -203,32 +275,29 @@ export function morePlaces(text, terms, maxLen) {
   maxLen = maxLen || 120;
   const occ = occurrences(text, terms);
   if (!occ.length) return [];
-  const best = bestMatch(text, terms, 180);
+  const best = bestIn(occ, 180);
   const shownFrom = best ? best.start - SHOWN_BEFORE : -1;
   const shownTo = best ? best.start + SHOWN_FROM : -1;
   const rest = occ.filter((o) => o.idx < shownFrom || o.idx + o.len > shownTo);
-  const places = [];
-  for (let i = 0; i < rest.length;) {
-    const start = rest[i].idx;
-    const seen = Object.create(null);
-    let count = 0;
-    let end = start + rest[i].len;
-    let j = i;
-    do {
-      if (!seen[rest[j].term]) { seen[rest[j].term] = true; count++; }
-      end = Math.max(end, rest[j].idx + rest[j].len);
-      j++;
-    } while (j < rest.length && rest[j].idx + rest[j].len <= start + maxLen);
-    places.push({ start, span: end - start, count });
-    i = j;
-  }
-  // The bar is the best window's, the snippet's own included: when the snippet
-  // holds the only passage with every word, the one-word leftovers are not places.
-  let most = best ? best.count : 0;
-  for (const p of places) if (p.count > most) most = p.count;
-  return places
-    .filter((p) => most < 2 || p.count === most)
+  return gather(rest, maxLen, familyCounts(occ), best ? best.count : 0)
     .map((p) => ({ start: p.start, clip: clipAround(text, p, maxLen) }));
+}
+
+/**
+ * EVERY place a unit's text matches, the snippet's own included, each with its
+ * hits: what the reader's find bar steps through ("2 of 3") and marks, over the
+ * text the reading screen renders. Same places as a result card lists.
+ * @param {string} text
+ * @param {string[]} terms
+ * @param {number} [maxLen=120]
+ * @returns {Array<{ start: number, span: number, hits: Array<{ idx: number, len: number }> }>}
+ */
+export function findPlaces(text, terms, maxLen) {
+  maxLen = maxLen || 120;
+  const occ = occurrences(text, terms);
+  if (!occ.length) return [];
+  const best = bestIn(occ, 180);
+  return gather(occ, maxLen, familyCounts(occ), best ? best.count : 0);
 }
 
 /**

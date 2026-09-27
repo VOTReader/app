@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { snippet, highlightSpans, matchExcerpt, morePlaces } from './snippet.js';
+import { snippet, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
 
 describe('snippet', () => {
   it('returns short text unchanged when no terms', () => {
@@ -206,5 +206,49 @@ describe('bestMatch counts word families, not highlight forms', () => {
     // Before: flood + flooding + flooded counted as three distinct terms, pulling the
     // snippet to the late cluster of longer forms and away from the plain word.
     expect(snippet(t, ['flood', 'flooding', 'flooded'], 60)).toContain('the flood rose');
+  });
+});
+
+/* When the query's words never meet in a text, the passage worth showing is the
+   one with the word that tells this text apart, not the first of a word it says
+   everywhere (2026-09-26: "the lord is my shepherd" showed an Answers topic's
+   first "Lord" and listed 23 more Lords, with its one "shepherd" nowhere). */
+describe('the rarer word leads when the words never meet', () => {
+  const pad = (n) => 'and the word went on. '.repeat(n);
+  const TOPIC = pad(2) + 'the Lord spoke. ' + pad(20) + 'the Lord came. ' + pad(20) + 'the Lord is near. '
+    + pad(20) + 'He is our shepherd and guide. ' + pad(20) + 'the Lord reigns. ' + pad(2);
+
+  it('the snippet shows the rarer word', () => {
+    expect(snippet(TOPIC, ['lord', 'shepherd'], 120)).toContain('our shepherd');
+  });
+
+  it('the other places are the rarer word\'s, not every "Lord"', () => {
+    const two = TOPIC + pad(20) + 'The good shepherd knows His own. ' + pad(2);
+    const places = morePlaces(two, ['lord', 'shepherd'], 120);
+    expect(places.map((p) => two.slice(p.start, p.start + 8))).toEqual(['shepherd']);
+    expect(places[0].clip).toContain('good shepherd knows');
+  });
+
+  it('a word said 500 times cannot crowd the rarer one out of the scan', () => {
+    const t = 'Lord, '.repeat(500) + 'my shepherd. ' + pad(3);
+    expect(snippet(t, ['lord', 'shepherd'], 120)).toContain('my shepherd');
+  });
+
+  it('where the words DO meet, that passage still wins over the rare word alone', () => {
+    const t = pad(2) + 'a shepherd alone. ' + pad(20) + 'the Lord is my shepherd. ' + pad(20) + 'the Lord. ' + pad(2);
+    expect(snippet(t, ['lord', 'shepherd'], 120)).toContain('the Lord is my shepherd');
+  });
+});
+
+describe('findPlaces — every place, the snippet\'s own included, with its hits', () => {
+  it('lists each place in reading order with the hits it marks', () => {
+    const t = 'a flooding rain. ' + 'and the word went on. '.repeat(10) + 'Be a flood of water which covers, But a flood of judgment.';
+    const places = findPlaces(t, ['flood', 'flooding'], 120);
+    expect(places.map((p) => p.hits.map((h) => t.slice(h.idx, h.idx + h.len)))).toEqual([['flooding'], ['flood', 'flood']]);
+    expect(t.slice(places[1].start).startsWith('flood of water')).toBe(true);
+  });
+
+  it('is empty for no hits', () => {
+    expect(findPlaces('nothing here', ['flood'])).toEqual([]);
   });
 });
