@@ -100,7 +100,11 @@ export function describeTab(tab) {
   // Volumes & letter collections (via COLLECTIONS registry)
   const _ltrCol = COL_BY_LETTER_SC.get(s);
   if (_ltrCol) {
-    const l = colLetterArr(_ltrCol).find(e => e.id === tab.letterId);
+    // A volume's preface lives outside its letters array (colPreface); without
+    // it the preface tab kept the previous letter's name (lw1, 2026-09-26).
+    const _pref = typeof colPreface === 'function' ? colPreface(_ltrCol) : null;
+    const l = colLetterArr(_ltrCol).find(e => e.id === tab.letterId)
+      || (_pref && _pref.id === tab.letterId ? _pref : null);
     return { title: l?.title || (_ltrCol.kind === 'letter' ? 'Letter' : 'Entry'), subtitle: _ltrCol.label, resolved: !!l };
   }
   const _idxCol = COL_BY_INDEX_SC.get(s);

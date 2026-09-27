@@ -57,6 +57,20 @@ describe('useKeyboardInset', () => {
     expect(kh()).toBe('300px');
   });
 
+  it('subtracts the visual viewport pan, so a panned view does not lift sheets twice (lw1)', () => {
+    const vv = mockVV(800);
+    renderHook(() => useKeyboardInset());
+    vv.height = 355; vv.offsetTop = 152; // keyboard 445px, Chrome panned the view up 152px
+    vv._fire('scroll');
+    expect(kh()).toBe('293px'); // keyboard top at 152 + 355 = 507 in layout px
+    vv.offsetTop = 400;                  // panned almost the whole keyboard: small but not zero
+    vv._fire('scroll');
+    expect(kh()).toBe('45px');
+    vv.offsetTop = 500;                  // panned past it: never negative
+    vv._fire('scroll');
+    expect(kh()).toBe('0px');
+  });
+
   it('clamps a sub-80px residual diff to 0', () => {
     mockVV(770); // diff 30 < 80
     renderHook(() => useKeyboardInset());

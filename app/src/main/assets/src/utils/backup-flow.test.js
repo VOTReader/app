@@ -192,6 +192,16 @@ describe('the busy lock', () => {
 });
 
 describe('Export (web)', () => {
+  it('names the file for the reader’s local date, not the UTC one (lw1)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const late = new Date(2026, 8, 26, 23, 30); // 23:30 local on the 26th: already the 27th in UTC west of Greenwich
+      vi.setSystemTime(late);
+      bridge.openExportSink.mockResolvedValue({ write: async () => {}, close: vi.fn(() => Promise.resolve()) });
+      await createBackupFlow(ctx).exportPersonalData();
+      expect(bridge.openExportSink.mock.calls.at(-1)[0]).toBe('votreader-backup-2026-09-26.votbak');
+    } finally { vi.useRealTimers(); }
+  });
   it('flushes the pending state, streams the container and says it saved', async () => {
     const written = [];
     bridge.openExportSink.mockResolvedValue({ write: async (c) => { written.push(c); }, close: vi.fn(() => Promise.resolve()) });
