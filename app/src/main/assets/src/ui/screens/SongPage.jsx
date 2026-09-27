@@ -30,7 +30,7 @@ function shelfWords(col) {
 }
 
 /** "by hmarie777", "by hmarie777 and others", or "by members of the flock". @param {any[]} versions */
-export function makersLine(versions) {
+function makersLine(versions) {
   const makers = [];
   for (const s of versions) if (s.cr && makers.indexOf(s.cr) < 0) makers.push(s.cr);
   if (!makers.length) return 'Made with Suno · by members of the flock';

@@ -37,7 +37,7 @@ export const DEFAULT_MEDIA_LIMIT_BYTES = 100 * 1024 * 1024;
 /** localStorage keys carried verbatim in the payload's `data` block
  *  (the boot-shim StateStore mirror; a V1 client restores theme +
  *  fontStyle from this). */
-export const DEFAULT_DATA_LS_KEYS = ['vot-state'];
+const DEFAULT_DATA_LS_KEYS = ['vot-state'];
 
 /** The rule a payload's `counts` block was written with, stamped on it as
  *  `countsVersion` so an import recounts each file by its own writer's rule.

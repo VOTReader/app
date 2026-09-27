@@ -214,7 +214,7 @@ export const groupHead = (label) => groupHeads()
   .find((h) => { const l = h.querySelector('.settings-section-label'); return l && l.textContent.trim() === label; });
 
 /** The whole <div.settings-section> a group header belongs to, or undefined. */
-export const groupSection = (label) => {
+const groupSection = (label) => {
   const head = groupHead(label);
   return head ? head.closest('.settings-section') : undefined;
 };
@@ -228,7 +228,7 @@ export const groupRowLabels = (label) => {
 };
 
 /** Open every collapsed group (the redesign mounts group bodies lazily). */
-export function expandAllGroups() {
+function expandAllGroups() {
   for (const head of groupHeads()) {
     if (head.getAttribute('aria-expanded') === 'false') fireEvent.click(head);
   }

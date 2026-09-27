@@ -131,7 +131,7 @@ function songLine(song) {
  * @param {string} v @param {any} library
  * @returns {{ eyebrow: string, title: string, families: any[] | null, songs: any[] | null, empty: string }}
  */
-export function listContent(v, library) {
+function listContent(v, library) {
   const cat = catalog();
   if (v === 'saved' || v === 'recent') {
     const ids = library ? (v === 'saved' ? library.songSaved() : library.songRecent()) : [];

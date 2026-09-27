@@ -58,9 +58,9 @@ import { CopyFallbackSheet } from '../sheets/CopyFallbackSheet.jsx';
 export const NavMenuContext = React.createContext(/** @type {NavMenuValue | null} */ (null));
 
 /** The Settings slider's range and the menu's step (SettingsScreen's TextSizeSliderRow: 0.8-3). */
-export const MENU_SCALE_MIN = 0.8;
-export const MENU_SCALE_MAX = 3;
-export const MENU_SCALE_STEP = 0.1;
+const MENU_SCALE_MIN = 0.8;
+const MENU_SCALE_MAX = 3;
+const MENU_SCALE_STEP = 0.1;
 
 /**
  * The next text scale one step up or down, clamped to the slider's range and

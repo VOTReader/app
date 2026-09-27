@@ -111,7 +111,7 @@ export function isSongUrl(url) {
  *  a selected edition does not carry a book. Named once: resolveBibleAudio
  *  reads it, and a future partial edition must not turn it into a literal at
  *  each call site. */
-export const BIBLE_AUDIO_DEFAULT = 'brm-kjv';
+const BIBLE_AUDIO_DEFAULT = 'brm-kjv';
 
 /**
  * THE edition declaration. tools/gen-bible-audio-manifest.mjs IMPORTS this and

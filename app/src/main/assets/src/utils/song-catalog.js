@@ -611,17 +611,6 @@ export function seededShuffle(list, seed) {
 }
 
 /**
- * "Shuffle all songs": ONE version per family, so a listener hears every
- * different song before any repeats — the featured version, or the first
- * version the filter admits when the featured one does not (a Worship chip on
- * a family whose first take is Pop) — in a seeded order.
- * @param {unknown} filter @param {number} seed @returns {Song[]}
- */
-export function shuffledFeatured(filter, seed) {
-  return songQueue({ filter, one: true, shuffle: true, seed });
-}
-
-/**
  * Begin a list at the song the listener chose. The chosen song takes its own
  * SLOT — itself, or, in a one-version-per-family list, its family's pick (a
  * listener who chose take 6 hears take 6, not the featured take as well). A

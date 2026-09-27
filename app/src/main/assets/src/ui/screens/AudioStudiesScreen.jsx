@@ -26,7 +26,7 @@ function studiesList() {
  * @param {any} study
  * @returns {number}
  */
-export function studyRecordedCount(study) {
+function studyRecordedCount(study) {
   const manifest = typeof AUDIO_MANIFEST !== 'undefined' && AUDIO_MANIFEST ? AUDIO_MANIFEST : null;
   if (!manifest || !study || !Array.isArray(study.chapters)) return 0;
   return study.chapters.filter((chapter) => chapter && manifest['study:' + chapter.id]).length;
@@ -49,7 +49,7 @@ export function studiesSummary() {
  * @param {any} study
  * @returns {string}
  */
-export function studyCountLine(study) {
+function studyCountLine(study) {
   const total = study && Array.isArray(study.chapters) ? study.chapters.length : 0;
   const recorded = studyRecordedCount(study);
   const noun = total === 1 ? ' chapter' : ' chapters';

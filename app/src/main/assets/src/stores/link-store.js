@@ -279,7 +279,7 @@ export const LinkStore = extendStore(
  * @param {any} ep
  * @returns {any}
  */
-export function rekeyHolyDaysEndpoint(ep) {
+function rekeyHolyDaysEndpoint(ep) {
   if (!ep || typeof ep.key !== 'string' || !ep.key.startsWith('wtlb:')) return ep;
   if (ep.type !== 'holy-days' && ep.screen !== 'holy-days-entry') return ep;
   const id = ep.key.split(':')[1];
