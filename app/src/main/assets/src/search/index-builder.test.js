@@ -123,6 +123,12 @@ describe('buildDocs (narrow index scope)', () => {
     expect(letters.some((d) => d.letterId === 'v1-preface' && d.title === 'A Word of Warning')).toBe(true);
   });
 
+  it('a preface (num 0) is located as "Preface", the way LetterView names it, never "Letter ?"', () => {
+    const letters = docs.filter((d) => d.kind === 'letter' && d.volumeId === 'v1');
+    expect(letters.find((d) => d.letterId === 'v1-preface').ref).toBe('Volume One · Preface');
+    expect(letters.find((d) => d.letterId === 'the-wide-path').ref).toBe('Volume One · Letter 1');
+  });
+
   it('emits WTLB / Blessed / Holy-Days entries with markup stripped from the body', () => {
     const wtlb = docs.find((d) => d.kind === 'wtlb');
     expect(wtlb).toMatchObject({ title: 'Matters of the Heart', volumeId: 'wtlb1' });

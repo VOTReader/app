@@ -142,7 +142,9 @@ export function buildDocs(options) {
         title: L.title || '', // indexed — the letter NAME
         heading: volumeLabel || '',
         text: letterText(L), // indexed — the body
-        ref: volumeLabel + ' · Letter ' + (L.num || '?'),
+        // A collection's opening letter is num 0, which LetterView calls "Preface";
+        // the index printed it "Letter ?" (five prefaces, V1/V7/Timothy/Flock/Rebuke).
+        ref: volumeLabel + ' · ' + (L.num === 0 ? 'Preface' : 'Letter ' + (L.num || '?')),
       });
     }
   }
