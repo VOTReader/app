@@ -195,4 +195,20 @@ class OfflineAudioSizesTest {
         held.forEach { it.run() }
         assertEquals(false, s.isSaved(a1))
     }
+
+    @Test
+    fun `a download newer than the cached listing is not stale (the refuter's repro)`() {
+        var listed = 1000L
+        val s = savingStore(lister = { mapOf("one-christmas-B.mp3" to listed) }, body = { ByteArray(900) { 4 } })
+        s.requestSizes(listOf(a1))                      // the collection screen cached 1000
+        listed = 900L                                   // then the asset was uploaded again
+        now += 3600L * 1000                             // an hour on, the listener downloads it: 900 bytes, current
+        s.enqueue(listOf(OfflineAudioStore.Item(a1, "one:christmas", "Christmas")))
+        assertEquals(900L, s.fileFor(a1)!!.length())
+        assertEquals(false, staleOf(s, a1))
+        s.checkSaved()                                  // the cache is under 6 h old: not read again, still not stale
+        assertEquals(false, staleOf(s, a1))
+        val again = savingStore(lister = { null }, body = { ByteArray(0) })   // and after a restart, offline
+        assertEquals(false, staleOf(again, a1))
+    }
 }

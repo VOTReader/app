@@ -154,6 +154,22 @@ class OfflineAudioStore(
         return size > 0L && size != e.bytes
     }
 
+    /**
+     * A download just landed with [bytes]: those are the release's bytes now, newer than any listing held. A listing
+     * cached before a re-upload would otherwise call the fresh file stale, and Update could never clear it (the
+     * refutation of s3r chunk 2).
+     */
+    private fun noteLanded(url: String, bytes: Long) {
+        val (tag, asset) = splitRelease(url) ?: return
+        synchronized(sizeLock) {
+            val hit = sizeCache[tag] ?: return
+            val held = hit.second[asset] ?: return
+            if (held == bytes) return
+            sizeCache[tag] = hit.first to (hit.second + (asset to bytes))
+            persistSizes()
+        }
+    }
+
     /** One HEAD from [tag]'s budget: [MAX_HEADS_PER_TAG] per [LISTING_RETRY_MS] window, whatever the calls. */
     private fun takeHead(tag: String): Boolean = synchronized(sizeLock) {
         val now = clock()
@@ -463,6 +479,7 @@ class OfflineAudioStore(
                 }
                 active = null   // before the event: the page re-reads the state on it
             }
+            if (outcome == "done") noteLanded(item.url, total)
             when (outcome) {
                 "done" -> send(event("done", item.url).put("bytes", total).toString())
                 "cancelled" -> send(event("cancelled", item.url).toString())
