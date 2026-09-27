@@ -58,6 +58,7 @@ const METHODS = [
   'v3ImportClose',
   'getCrashLog',
   'clearGardenCache',
+  'shareText',
   'setImmersiveMode',
   'haptic',
   'isAndroid',
@@ -105,6 +106,7 @@ function mockAndroidBridge() {
     v3ImportClose: vi.fn(),
     getCrashLog: vi.fn(() => '[{"ts":0,"tag":"x","msg":"y"}]'),
     clearGardenCache: vi.fn(),
+    shareText: vi.fn(() => true),
     setImmersiveMode: vi.fn(),
     haptic: vi.fn(),
   };
@@ -216,6 +218,8 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     ['v3ImportNextBlob', [], '42'],
     ['v3ImportReadChunk', [65536], ''],
     ['v3ImportVerify', [], 'ok'],
+    // sh1: the phone's share sheet answers whether it took the text.
+    ['shareText', ['Blessed are the meek\nMatthew 5:5 (NKJV)'], true],
   ];
   it.each(valueCases)('value method %s returns native result and forwards args %o', async (name, args, expected) => {
     let result = bridge[name](...args);
@@ -277,6 +281,10 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
   });
   it('nativeRecordAmplitude returns 0 on web', () => {
     expect(bridge.nativeRecordAmplitude()).toBe(0);
+  });
+  it('shareText never takes the text on web (navigator.share is copy-share’s own path)', () => {
+    expect(bridge.shareText('Blessed are the meek')).toBe(false);
+    expect(warnSpy).not.toHaveBeenCalled();
   });
   it('the journal-3 2a recovery verbs are inert on web', () => {
     // Web has no served-file dir: webNativeRecordStop hands the Blob straight to

@@ -310,6 +310,17 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     override fun launchMicPermissionRequest() {
         micPrepLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
+    // sh1: the phone's own share sheet for a passage or a note (AppInterface.shareText checked the text).
+    override fun launchShareSheet(text: String) {
+        val send = Intent(Intent.ACTION_SEND)
+            .setType("text/plain")
+            .putExtra(Intent.EXTRA_TEXT, text)
+        try {
+            startActivity(Intent.createChooser(send, null))
+        } catch (e: Exception) {
+            Timber.w(e, "Share sheet launch failed")
+        }
+    }
     override fun hasAudioPermission(): Boolean = ContextCompat.checkSelfPermission(
         this, Manifest.permission.RECORD_AUDIO
     ) == PackageManager.PERMISSION_GRANTED

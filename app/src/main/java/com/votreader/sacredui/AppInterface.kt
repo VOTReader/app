@@ -460,6 +460,21 @@ class AppInterface(
         host.postToUi { host.launchExportPicker(suggestedName, content) }
     }
 
+    /**
+     * sh1 (Corbin 2026-09-27): Share opens the phone's own share sheet (Messages, WhatsApp, email…). The WebView has
+     * no navigator.share, so until now utils/copy-share.js could only copy the passage and ask the reader to paste it;
+     * it calls this first. True = the sheet is on its way (Android cannot tell the page whether the reader then shared
+     * or closed it). False = refused, and the page copies the text instead: an empty one, or one longer than
+     * [MAX_SHARE_CHARS], which could overflow the binder transaction that carries it to the sheet. Nothing leaves the
+     * phone unless the reader picks an app in the sheet. The launch is UI work, so it hops through postToUi.
+     */
+    @JavascriptInterface
+    fun shareText(text: String?): Boolean {
+        val body = text?.takeIf { it.isNotBlank() && it.length <= MAX_SHARE_CHARS } ?: return false
+        host.postToUi { host.launchShareSheet(body) }
+        return true
+    }
+
     // ─── v3 streaming backup (BACKUP-STREAMING-PLAN P3) ──────────────────
     // GB-scale export/import. The binary framing lives in StorageManager (a
     // native mirror of src/utils/backup-container.js); these
@@ -812,5 +827,10 @@ class AppInterface(
         bridge.callOptional(
             JsEvent.NativeRecordingComplete, result.base64, result.durationMs, "audio/mp4", null, url
         )
+    }
+
+    companion object {
+        /** The longest text one share carries (sh1): about 200 KB as UTF-16, far under the binder's 1 MB buffer. */
+        const val MAX_SHARE_CHARS = 100_000
     }
 }

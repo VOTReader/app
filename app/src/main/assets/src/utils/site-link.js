@@ -18,11 +18,13 @@
    - A Letter Study is one page; HUB_PAGES are pages that hold a study's
      description and its PDF rather than its words (the Matthew Study Bible
      among them), so a link there quotes nothing.
-   Then the passage itself: a text fragment ("#:~:text=first words,last
-   words"), which Chrome, Edge, Safari and Firefox scroll to and highlight;
-   the letters' own links already use them. Words the page does not have
-   open the page (or the section) as a plain link would, so the quote can
-   make a link better and never worse.
+   Then, when the reader asks for it (Settings › Copy & Share › Highlight the
+   Passage, cp3; off by default, so a link names the letter alone), the
+   passage itself: a text fragment ("#:~:text=first words,last words"), which
+   Chrome, Edge, Safari and Firefox scroll to and highlight; the letters' own
+   links already use them. Words the page does not have open the page (or the
+   section) as a plain link would, so the quote can make a link better and
+   never worse.
 
    tools/site-pages.json is the site's page list (tools/fetch-site-pages.py
    refreshes it); site-link.test.js resolves every letter, preface, entry,

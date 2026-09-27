@@ -78,6 +78,13 @@ interface BridgeHost {
     fun launchMicPermissionRequest()
 
     /**
+     * sh1: open Android's share sheet (the system chooser over ACTION_SEND, text/plain) with [text]. Called on the UI
+     * thread (AppInterface.shareText hops there). A sheet that cannot open is logged, never thrown: the reader still
+     * has Copy.
+     */
+    fun launchShareSheet(text: String)
+
+    /**
      * Launch the SAF create-document picker for a v3 streaming export
      * (BACKUP-STREAMING-PLAN P3). Unlike [launchExportPicker] (v2: the whole
      * payload is handed over up front), this only obtains the destination URI

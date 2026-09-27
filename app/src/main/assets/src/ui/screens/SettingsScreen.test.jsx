@@ -44,7 +44,7 @@ describe('settings filter and lazy progress', () => {
     fireEvent.click(groupHead('Your Data'));
     expect(groupHead('Your Data').getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }));
-    expect(groupHeads()).toHaveLength(10);   // nine plus the tour's Help group
+    expect(groupHeads()).toHaveLength(11);   // ten plus the tour's Help group
     expect(groupHead('Appearance').getAttribute('aria-expanded')).toBe('true');
     expect(document.activeElement).toBe(screen.getByLabelText('Find settings'));
   });
@@ -210,6 +210,36 @@ describe('read-along settings disclosure', () => {
     expect(onToggle).toHaveBeenCalledWith('readAlongFollow');
     fireEvent.click(within(row('Read-Along Highlight')).getByRole('switch'));
     expect(onToggle).toHaveBeenCalledWith('readAlongHighlight');
+  });
+});
+
+/* Copy & Share (cp3, Corbin 2026-09-27): the Share link choice had to be reachable
+   without a long press ("on PC and others"), and a website link that highlights the
+   copied words is "an option, not the default". */
+describe('Copy & Share group', () => {
+  it('holds Share Includes (the app link by default) and Highlight the Passage (off by default)', () => {
+    renderSettings();
+    const labels = groupRowLabels('Copy & Share');
+    expect(labels).toContain('Share Includes');
+    expect(labels).toContain('Highlight the Passage');
+    expect(within(row('Highlight the Passage')).getByRole('switch').getAttribute('aria-checked')).toBe('false');
+    expect(groupHead('Copy & Share').textContent).toContain('Share: app link · Highlight off');
+  });
+
+  it('writes through the keys Copy and Share read', () => {
+    const onToggle = vi.fn();
+    renderSettings({ shareLink: 'site', linkHighlight: true }, { onToggle });
+    expect(groupHead('Copy & Share').textContent).toContain('Share: website link · Highlight on');
+    fireEvent.click(within(row('Highlight the Passage')).getByRole('switch'));
+    expect(onToggle).toHaveBeenCalledWith('linkHighlight');
+  });
+
+  it('is found by "share", "link" and "highlight"', () => {
+    renderSettings({}, {}, { expandGroups: false });
+    for (const word of ['share', 'link', 'highlight']) {
+      fireEvent.change(screen.getByLabelText('Find settings'), { target: { value: word } });
+      expect(groupHeads().map((h) => h.textContent), word).toEqual(expect.arrayContaining([expect.stringContaining('Copy & Share')]));
+    }
   });
 });
 
@@ -1085,9 +1115,9 @@ describe('Android v3 import — native stream not closed until the confirm settl
    ─────────────────────────────────────────────────────────────────────── */
 describe('settings groups — collapsible accordion', () => {
   const GROUPS = ['Appearance', 'Reading', 'Listening', 'Auto-Scroll', 'Top-Nav Buttons',
-    'Search, Tabs & History', 'A Return to The Garden', 'Your Data', 'Mark as Read', 'Help'];
+    'Search, Tabs & History', 'Copy & Share', 'A Return to The Garden', 'Your Data', 'Mark as Read', 'Help'];
 
-  it('renders all 10 group headers, every one collapsed on entry', () => {
+  it('renders all 11 group headers, every one collapsed on entry', () => {
     renderSettings({}, {}, { expandGroups: false });
     expect(groupHeads().length).toBe(GROUPS.length);
     for (const label of GROUPS) {

@@ -101,6 +101,55 @@ describe('shareText', () => {
   });
 });
 
+describe("shareText in the Android app: the phone's own share sheet (sh1)", () => {
+  /** @type {any} */ let bridge;
+  /** @type {any} */ const G = globalThis;
+  /** @type {any} */ let prev;
+
+  beforeEach(() => {
+    prev = G.PlatformBridge;
+    bridge = { isAndroid: true, shareText: vi.fn(() => true) };
+    G.PlatformBridge = bridge;
+    setShare(undefined);   // the WebView has no navigator.share
+  });
+  afterEach(() => {
+    if (prev === undefined) delete G.PlatformBridge; else G.PlatformBridge = prev;
+  });
+
+  it("hands the text to the share sheet: 'shared', and nothing is copied", async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    setClipboard({ writeText });
+    await expect(shareText('Peace')).resolves.toBe('shared');
+    expect(bridge.shareText).toHaveBeenCalledWith('Peace');
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it("copies instead when the phone refuses the text (empty, or too long for one share)", async () => {
+    bridge.shareText = vi.fn(() => false);
+    const writeText = vi.fn(() => Promise.resolve());
+    setClipboard({ writeText });
+    await expect(shareText('Peace')).resolves.toBe('copied-instead');
+    expect(writeText).toHaveBeenCalledWith('Peace');
+  });
+
+  it('a bridge that throws falls through to the web paths', async () => {
+    bridge.shareText = vi.fn(() => { throw new Error('bridge gone'); });
+    const share = vi.fn(() => Promise.resolve());
+    setShare(share);
+    await expect(shareText('Peace')).resolves.toBe('shared');
+    expect(share).toHaveBeenCalledWith({ text: 'Peace' });
+  });
+
+  it('on the web the bridge is never asked', async () => {
+    bridge.isAndroid = false;
+    const share = vi.fn(() => Promise.resolve());
+    setShare(share);
+    await expect(shareText('Peace')).resolves.toBe('shared');
+    expect(bridge.shareText).not.toHaveBeenCalled();
+    expect(share).toHaveBeenCalledWith({ text: 'Peace' });
+  });
+});
+
 describe('copyFromSelection (the Try again path)', () => {
   it("copies the selected field with execCommand inside the tap: 'copied', no async call", async () => {
     const field = document.createElement('textarea');

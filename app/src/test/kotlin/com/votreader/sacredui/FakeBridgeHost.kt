@@ -72,6 +72,9 @@ class FakeBridgeHost(
     /** Counts ensureNotificationsPermission() calls (media-card contextual ask). */
     var notificationsPermissionAskCount: Int = 0
 
+    /** Records the text of every launchShareSheet call (sh1), in order. */
+    val shareSheetCalls: MutableList<String> = mutableListOf()
+
     override fun postToUi(action: () -> Unit) {
         postedActions.add(action)
         if (executePostedImmediately) action()
@@ -101,6 +104,10 @@ class FakeBridgeHost(
     override fun launchMicPermissionRequest() {
         micPermissionLaunchCount++
         micPermissionThrowsOnLaunch?.let { throw it }
+    }
+
+    override fun launchShareSheet(text: String) {
+        shareSheetCalls.add(text)
     }
 
     override fun hasAudioPermission(): Boolean = hasAudioPermissionValue

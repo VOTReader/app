@@ -183,6 +183,17 @@ const STILL_WAITS = 15;
     sooner than Android's own long-press (about 500 ms). */
 const SHARE_HOLD_MS = 450;
 
+/** The link a tap on Share attaches: Settings › Copy & Share › Share Includes
+    (cp3, Corbin 2026-09-27: the choice had to be reachable without a long
+    press, on a PC and everywhere else). 'app' unless the reader chose 'site'.
+    @returns {'app' | 'site'} */
+function shareLinkSetting() {
+  try {
+    const s = typeof StateStore !== 'undefined' && StateStore ? StateStore.get() : null;
+    return s && s.settings && s.settings.shareLink === 'site' ? 'site' : 'app';
+  } catch (_e) { return 'app'; }
+}
+
 /** Share's second link (cp2): shown above the actions once the reader holds
     Share, for a passage the website has. A tap on Share sends the app's link
     (Corbin: "share just links to the app"); this offers the website's too, for
@@ -1198,15 +1209,16 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     });
   }, [selInfo, confirmCopied]);
 
-  // cp2: Share's two links. A tap shares with the app's; a hold (about half a
-  // second), a right-click or the context-menu key offers the website's too,
-  // in a row above the actions (the finger stays on Share, so lifting it never
-  // lands on a choice), when the passage has a page there. The click that ends
-  // a hold is not a share; the next press forgets the hold.
+  // cp2: Share's two links. A tap shares with the one Settings › Copy & Share ›
+  // Share Includes names (the app's unless the reader chose the website's, cp3);
+  // a hold (about half a second), a right-click or the context-menu key offers
+  // both, in a row above the actions (the finger stays on Share, so lifting it
+  // never lands on a choice), when the passage has a page there. The click that
+  // ends a hold is not a share; the next press forgets the hold.
   const canChooseLink = !!(selInfo && selInfo.share && selInfo.share.siteText);
   const onShareTap = () => {
     if (shareHeldRef.current) { shareHeldRef.current = false; return; }
-    handleShare('app');
+    handleShare(shareLinkSetting());
   };
   const onShareRelease = () => { if (shareHoldRef.current) { clearTimeout(shareHoldRef.current); shareHoldRef.current = null; } };
   const onSharePress = () => {
@@ -1545,7 +1557,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           onPointerLeave={onShareRelease}
           onPointerCancel={onShareRelease}
           onContextMenu={onShareMenu}
-          title={canChooseLink ? 'Share (hold for the website link)' : 'Share'}
+          title={canChooseLink ? 'Share (hold or right-click to choose the link)' : 'Share'}
         >
           <svg viewBox="0 0 24 24">
             <circle cx="18" cy="5" r="3" />

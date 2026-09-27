@@ -84,6 +84,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {() => void} v3ImportClose
  * @property {() => string} getCrashLog
  * @property {() => void} clearGardenCache
+ * @property {(text: string) => boolean} shareText
  */
 
 /**
@@ -189,6 +190,10 @@ const androidImpl = {
   // NTV3: wipe the native Garden image disk cache (cacheDir/garden, up to 800 MB).
   // Called from "Clear All My Data" so the native cache doesn't survive the wipe.
   clearGardenCache: () => /** @type {any} */ (window).AndroidBridge.clearGardenCache(),
+  // sh1: the phone's share sheet (the WebView has no navigator.share). True when
+  // it took the text; false for an empty one or one too long for a single share
+  // (utils/copy-share.js then copies it instead).
+  shareText: (text) => /** @type {any} */ (window).AndroidBridge.shareText(text),
 };
 
 // ── Web impl: placeholders (W1.3 / W1.4 / W1.5 fill in actual behavior) ─
@@ -1101,6 +1106,9 @@ const webImpl = {
   // NTV3: web has no app-managed Garden cache (Garden <img>s are browser
   // HTTP-cached); "Clear All" deletes the IDB data, so this is a genuine no-op.
   clearGardenCache: () => {},
+  // sh1: the web's share sheet is navigator.share, which utils/copy-share.js
+  // calls itself; there is no second one to reach, so the text is never taken.
+  shareText: () => false,
 
   // Category 3 — real web impls
   takeScreenshot: webTakeScreenshot,         // Tier A (html2canvas)

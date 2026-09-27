@@ -31,6 +31,14 @@
    reader's tap on "Try again", with the fallback sheet's textarea
    selected, so the legacy execCommand('copy') can succeed where the async
    API was refused, and the async API gets a fresh user activation.
+
+   sh1 (Corbin 2026-09-27): the Android app's WebView has no
+   navigator.share, so until now Share there always copied instead. The
+   phone's own share sheet (Messages, WhatsApp, email…) now comes through
+   the bridge (PlatformBridge.shareText, AppInterface.shareText) and is
+   tried first. Android cannot say whether the reader then shared or
+   closed the sheet, so its answer is 'shared' (quiet, as a cancel is); a
+   text it refuses (empty, or too long for one share) is copied instead.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /** @typedef {'copied' | 'failed'} CopyOutcome */
@@ -56,6 +64,21 @@ export function copyText(text) {
 }
 
 /**
+ * The Android app's share sheet (sh1): true when the phone took the text.
+ * False on the web (no bridge), and when the bridge refuses or throws.
+ * @param {string} text
+ * @returns {boolean}
+ */
+function appShareSheet(text) {
+  try {
+    return typeof PlatformBridge !== 'undefined' && !!PlatformBridge && PlatformBridge.isAndroid === true
+      && typeof PlatformBridge.shareText === 'function' && PlatformBridge.shareText(text) === true;
+  } catch (_e) {
+    return false;
+  }
+}
+
+/**
  * Share `text` through the native share sheet; without one, or when the
  * share fails for any reason other than the reader cancelling, copy it.
  * @param {string} text
@@ -66,6 +89,7 @@ export function shareText(text) {
   const copyInstead = () => copyText(text).then(
     (r) => /** @type {ShareOutcome} */ (r === 'copied' ? 'copied-instead' : 'failed'),
   );
+  if (appShareSheet(text)) return Promise.resolve(/** @type {ShareOutcome} */ ('shared'));
   if (!nav || typeof nav.share !== 'function') return copyInstead();
   /** @type {Promise<void>} */
   let pending;

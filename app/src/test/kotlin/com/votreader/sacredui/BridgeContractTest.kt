@@ -110,6 +110,9 @@ class BridgeContractTest {
         "v3ImportClose" to 0,
         "getCrashLog" to 0,
         "clearGardenCache" to 0,
+        // sh1: the phone's share sheet. Mirrored by platform-bridge.js androidImpl
+        // (utils/copy-share.js calls PlatformBridge.shareText before navigator.share).
+        "shareText" to 1,
         "haptic" to 1,
         // Listening item 8, downloaded recordings: called DIRECTLY (guarded
         // window.AndroidBridge) by src/utils/offline-audio.js, the same pattern as
