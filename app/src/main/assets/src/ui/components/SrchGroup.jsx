@@ -14,15 +14,23 @@ const GROUP_UNIT = {
   answers: ['topic', 'topics'], 'bible-studies': ['chapter', 'chapters'],
 };
 
-export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen }) {
+/* Cards render a page at a time: a group can hold hundreds now that each
+   collection keeps its own 400 (Answers holds about 600 topics for "the"), and
+   every card cuts and measures a snippet. */
+export const SRCH_GROUP_PAGE = 50;
+
+export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = false }) {
   const [open, setOpen] = React.useState(defaultOpen !== false);
+  const [shown, setShown] = React.useState(SRCH_GROUP_PAGE);
   const meta = SRCH_GROUP_META[gkey] || { label: gkey };
+  const unit = (GROUP_UNIT[gkey] || ['match', 'matches'])[items.length === 1 && !capped ? 0 : 1];
+  const left = items.length - shown;
   return (
     <div className={"srch-group" + (open ? '' : ' collapsed')}>
       <button className="srch-group-header" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <span>
           {meta.label}
-          <span className="srch-group-count-inline"> · {items.length} {(GROUP_UNIT[gkey] || ['match', 'matches'])[items.length === 1 ? 0 : 1]}</span>
+          <span className="srch-group-count-inline"> · {items.length.toLocaleString('en-US')}{capped ? '+' : ''} {unit}</span>
         </span>
         {/* Session-5 (5): the old 0.55rem ▾/▸ glyph was a near-invisible
             affordance — a real 24px chevron that ROTATES makes the
@@ -33,9 +41,14 @@ export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen }) {
           group closed, and each card cuts and measures a snippet. */}
       {open ? (
         <div className="srch-group-items">
-          {items.map((entry, i) => (
+          {items.slice(0, shown).map((entry, i) => (
             <SrchCard key={i} entry={entry} terms={terms} onSelect={onSelect} />
           ))}
+          {left > 0 ? (
+            <button type="button" className="srch-group-more" onClick={() => setShown((n) => n + SRCH_GROUP_PAGE)}>
+              {left <= SRCH_GROUP_PAGE ? 'Show ' + left + ' more' : 'Show ' + SRCH_GROUP_PAGE + ' more of ' + left.toLocaleString('en-US')}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

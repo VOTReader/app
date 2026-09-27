@@ -41,6 +41,26 @@ describe('SrchGroup', () => {
     expect(count('zz', items)).toBe(' · 2 matches');
   });
 
+  it('a capped group says "400+" (it may hold more), in grouped thousands', () => {
+    const many = Array.from({ length: 400 }, (_, i) => ({ doc: { title: 'v' + i } }));
+    const { container } = render(<SrchGroup gkey="bible" items={many} terms={[]} onSelect={() => {}} defaultOpen={false} capped={true} />);
+    expect(container.querySelector('.srch-group-count-inline').textContent).toBe(' · 400+ verses');
+  });
+
+  it('renders a long group a page at a time', () => {
+    const many = Array.from({ length: 120 }, (_, i) => ({ doc: { title: 'L' + i } }));
+    const { container } = render(<SrchGroup gkey="answers" items={many} terms={[]} onSelect={() => {}} defaultOpen={true} />);
+    expect(container.querySelectorAll('.stub-card')).toHaveLength(50);
+    const more = container.querySelector('.srch-group-more');
+    expect(more.textContent).toBe('Show 50 more of 70');
+    fireEvent.click(more);
+    expect(container.querySelectorAll('.stub-card')).toHaveLength(100);
+    expect(container.querySelector('.srch-group-more').textContent).toBe('Show 20 more');
+    fireEvent.click(container.querySelector('.srch-group-more'));
+    expect(container.querySelectorAll('.stub-card')).toHaveLength(120);
+    expect(container.querySelector('.srch-group-more')).toBeNull();
+  });
+
   it('an open group closes again', () => {
     const { container, getByRole } = render(<SrchGroup gkey="v7" items={items} terms={[]} onSelect={() => {}} defaultOpen={true} />);
     expect(container.querySelectorAll('.stub-card')).toHaveLength(2);

@@ -3757,6 +3757,9 @@
     .srch-group-count { color:var(--gold-dim); font-size:var(--fs-10); }
     .srch-group-items { display:block; }
     .srch-group.collapsed .srch-group-items { display:none; }
+    /* A long group renders its cards a page at a time (SrchGroup). */
+    .srch-group-more { display:block; box-sizing:border-box; width:100%; min-height:44px; padding:0.6rem 1.1rem; background:none; border:none; border-bottom:1px solid rgba(200,164,86,0.12); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold); text-align:center; }
+    .srch-group-more:active { background:var(--gold-faint); }
 
     .srch-card { display:block; width:100%; text-align:left; background:none; border:none; border-bottom:1px solid rgba(200,164,86,0.12); cursor:pointer; padding:0.8rem 1.1rem; transition:background 0.15s; }
     .srch-card:active { background:var(--gold-faint); }

@@ -60,6 +60,28 @@ describe('VotSearchMini engine', () => {
     expect(VotSearchMini.getStats().docCount).toBe(5); // 3 verses + 1 verse + 1 letter
   });
 
+  /* One total budget let the Bible's verses crowd the letters out of the All
+     corpus ("lord": 125 of 890 volume hits kept). perVolume caps each
+     collection on its own, and the result says which ones it cut. */
+  it('perVolume caps each collection on its own, so verses cannot crowd a letter out', async () => {
+    const total = await VotSearchMini.search('lord god', { limit: 1 });
+    expect(total.results).toHaveLength(1);
+    expect(total.truncated).toBe(true);
+    const lord = await VotSearchMini.search('lord', { limit: 100, perVolume: 1 });
+    expect(lord.results.map((r) => r.doc.volumeId).sort()).toEqual(['bible', 'v1']);
+    expect(lord.capped).toEqual([]);
+    expect(lord.truncated).toBe(false);
+  });
+
+  it('names the collections that hit their cap, and only those', async () => {
+    const god = await VotSearchMini.search('god', { limit: 100, perVolume: 1 });
+    expect(god.results.map((r) => r.doc.volumeId)).toEqual(['bible']); // John 3:16 and Genesis 1:1 both match
+    expect(god.capped).toEqual(['bible']);
+    const roomy = await VotSearchMini.search('god', { limit: 100, perVolume: 5 });
+    expect(roomy.results).toHaveLength(2);
+    expect(roomy.capped).toEqual([]);
+  });
+
   it('finds a single-word verse hit', async () => {
     const { results } = await VotSearchMini.search('shepherd');
     expect(results.length).toBeGreaterThan(0);

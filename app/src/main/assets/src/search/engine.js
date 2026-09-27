@@ -207,8 +207,13 @@ async function ensureReady(options) {
 /**
  * Execute a search.
  * @param {string} query
- * @param {{translation?:string, useStopWords?:boolean, synonyms?:boolean, scope?:{bookId?:string,volumeId?:string}|null, corpus?:string, limit?:number}} [options]
- * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null}>}
+ * `limit` caps the hits in all; `perVolume`, when given, caps each collection's own
+ * (doc.volumeId: 'bible', 'v7', 'answers'...). A single total let the Bible's verses
+ * fill the whole budget in the All corpus: "love" kept 90 of its 379 volume hits and
+ * "lord" 125 of 890, with no sign anything was missing. `capped` names every
+ * collection that hit its cap (it may hold more), `truncated` says the total did.
+ * @param {{translation?:string, useStopWords?:boolean, synonyms?:boolean, scope?:{bookId?:string,volumeId?:string}|null, corpus?:string, limit?:number, perVolume?:number}} [options]
+ * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean}>}
  */
 async function search(query, options) {
   options = options || {};
@@ -367,14 +372,23 @@ async function search(query, options) {
   const scopeBookId = scope && scope.bookId ? scope.bookId : null;
   const scopeVolumeId = scope && scope.volumeId ? scope.volumeId : null;
   const corpusFilter = corpus === 'all' ? null : corpus;
+  const perVolume = options.perVolume || 0;
+  const volCount = Object.create(null);
+  const capped = Object.create(null);
 
-  for (let h = 0; h < rankedIds.length && out.length < limit; h++) {
+  let h = 0;
+  for (; h < rankedIds.length && out.length < limit; h++) {
     const id = rankedIds[h];
     const doc = docLookup[id];
     if (!doc) continue;
     if (corpusFilter && doc.corpus !== corpusFilter) continue;
     if (scopeBookId && doc.bookId !== scopeBookId) continue;
     if (scopeVolumeId && doc.volumeId !== scopeVolumeId) continue;
+    // Before the word filters, which tokenise the whole doc: a full collection
+    // costs nothing more to pass over. (A doc the filters would have refused can
+    // mark its collection capped, so "400+" may mean exactly 400; never fewer.)
+    const vid = doc.volumeId || '';
+    if (perVolume && (volCount[vid] || 0) >= perVolume) { capped[vid] = true; continue; }
     if (phraseToks || hasMust || hasMustNot) {
       const toks = kjvEncode((doc.text || '') + ' ' + (doc.title || '') + ' ' + (doc.heading || '') + ' ' + (doc.ref || ''));
       if (phraseToks && !hasTokenRun(toks, phraseToks)) continue;
@@ -384,10 +398,11 @@ async function search(query, options) {
     const dedupKey = doc.kind + '|' + (doc.ref || '') + '|' + (doc.text || '').slice(0, 60);
     if (seen[dedupKey]) continue;
     seen[dedupKey] = true;
+    volCount[vid] = (volCount[vid] || 0) + 1;
     out.push({ score: scoreMap[id], doc: reshapeDoc(doc), terms: matchedTerms[id] || [] });
   }
 
-  return { parsed, results: out, parsedTerms: filtered, textQuery: p };
+  return { parsed, results: out, parsedTerms: filtered, textQuery: p, capped: Object.keys(capped), truncated: out.length >= limit && h < rankedIds.length };
 }
 
 /**

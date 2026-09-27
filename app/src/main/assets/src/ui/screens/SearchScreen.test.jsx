@@ -114,19 +114,19 @@ describe("groupInSiteOrder (the website's collection order)", () => {
 });
 
 describe('matchCountLabel (W0: honest 400+ cap)', () => {
-  it('returns the plain count below the cap', () => {
-    expect(matchCountLabel(0, 400)).toBe('0');
-    expect(matchCountLabel(1, 400)).toBe('1');
-    expect(matchCountLabel(399, 400)).toBe('399');
+  it('returns the plain count when nothing was cut', () => {
+    expect(matchCountLabel(0)).toBe('0');
+    expect(matchCountLabel(1, false)).toBe('1');
+    expect(matchCountLabel(399, false)).toBe('399');
   });
 
-  it('returns "400+" at the cap (the count is a floor, not a total)', () => {
-    expect(matchCountLabel(400, 400)).toBe('400+');
+  it('adds "+" when the engine cut the results short (the count is a floor, not a total)', () => {
+    expect(matchCountLabel(400, true)).toBe('400+');
   });
 
-  it('returns the plain count when no limit applies', () => {
-    expect(matchCountLabel(400, 0)).toBe('400');
-    expect(matchCountLabel(400, null)).toBe('400');
+  it('groups thousands, now that each collection keeps its own 400', () => {
+    expect(matchCountLabel(1290, false)).toBe('1,290');
+    expect(matchCountLabel(1290, true)).toBe('1,290+');
   });
 });
 
@@ -306,7 +306,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
       score: 1, doc: { kind: 'verse', ref: 'R' + i, text: 't' },
     }));
     /** @type {any} */ (window).VotSearchMini.search = vi.fn(
-      () => Promise.resolve({ parsed: null, results, parsedTerms: [] }),
+      () => Promise.resolve({ parsed: null, results, parsedTerms: [], capped: ['bible'], truncated: false }),
     );
     const props = baseProps();
     const { rerender } = render(<SearchScreen {...props} />);
@@ -414,6 +414,42 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     const many = [];
     for (let i = 0; i < 40; i++) many.push({ score: 40 - i, doc: { kind: 'letter', title: 'x' + i, text: 't', g: 'v3' } });
     expect(await run(many)).toEqual({ open: ['true'], best: false });
+    vi.useRealTimers();
+  });
+
+  it('asks the engine for SEARCH_LIMIT per collection, so verses cannot crowd the letters out', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: null, results: [], parsedTerms: [] }));
+    const props = baseProps();
+    const { rerender } = render(<SearchScreen {...props} />);
+    rerender(<SearchScreen {...props} query="love" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    const opts = /** @type {any} */ (window).VotSearchMini.search.mock.calls[0][1];
+    expect(opts.perVolume).toBe(SEARCH_LIMIT);
+    expect(opts.limit).toBeGreaterThan(SEARCH_LIMIT);
+    vi.useRealTimers();
+  });
+
+  it("a capped collection's group is told so, by its group key", async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => (doc.volumeId === 'matthew-study' ? 'matthew' : doc.volumeId);
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchGroup = ({ gkey, capped }) => <div className="stub-group" data-key={gkey} data-capped={String(capped)} />;
+    const results = [
+      { score: 3, doc: { kind: 'verse', volumeId: 'bible', bookId: 'john', ref: 'John 1:1', text: 't' } },
+      { score: 2, doc: { kind: 'verse', volumeId: 'matthew-study', bookId: 'matthew', ref: 'Matthew 1:1', text: 't' } },
+      { score: 1, doc: { kind: 'letter', volumeId: 'v7', title: 'L', text: 't' } },
+    ];
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: null, results, parsedTerms: [], capped: ['bible', 'matthew-study'], truncated: false }));
+    const props = baseProps();
+    const { rerender } = render(<SearchScreen {...props} />);
+    rerender(<SearchScreen {...props} query="love" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    const capped = Object.fromEntries([...document.querySelectorAll('.stub-group')].map((g) => [g.getAttribute('data-key'), g.getAttribute('data-capped')]));
+    expect(capped).toEqual({ bible: 'true', v7: 'false', matthew: 'true' });
+    expect(screen.getByText(/Found/i).closest('.srch-results-summary').textContent).toContain('3+ matches');
     vi.useRealTimers();
   });
 

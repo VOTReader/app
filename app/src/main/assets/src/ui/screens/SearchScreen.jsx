@@ -36,20 +36,25 @@ function pickEngine() {
   return window.VotSearchMini;
 }
 
-// W0 (micro-gap a/c): the engine is asked for at most SEARCH_LIMIT hits, so a
-// result count of exactly SEARCH_LIMIT means "at least that many" — the summary
-// must say "400+", never present the cap as the full count.
+// The engine keeps at most SEARCH_LIMIT hits PER COLLECTION (its perVolume
+// option), so the Bible's verses can no longer crowd the letters out of the All
+// corpus, and SEARCH_TOTAL_LIMIT in all, a bound the shipped corpus never
+// reaches ("the": about 3,300). A collection that hit its cap may hold more, so
+// its count reads "400+", and so does the summary (W0 micro-gap a: never present
+// a cap as the full count).
 export const SEARCH_LIMIT = 400;
+export const SEARCH_TOTAL_LIMIT = 6000;
 
 /**
- * Honest result-count label: "<limit>+" when the engine cap was hit, else the
- * exact count as a string. Pure for testability.
+ * Honest result-count label: "<count>+" when the engine cut the results short
+ * (a collection hit its cap, or the total did), else the exact count, grouped
+ * ("1,290"). Pure for testability.
  * @param {number} count
- * @param {number|null|undefined} limit 0/null/undefined = uncapped
+ * @param {boolean} [more] the engine cut the results short
  * @returns {string}
  */
-export function matchCountLabel(count, limit) {
-  return (limit && count >= limit) ? limit + '+' : String(count);
+export function matchCountLabel(count, more) {
+  return count.toLocaleString('en-US') + (more ? '+' : '');
 }
 
 /**
@@ -127,7 +132,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   const songsFound = songQuery.length >= 2 && typeof findSongFamilies === 'function' ? findSongFamilies(songQuery).length : 0;
   const inputRef = React.useRef(null);
   useImeHideBlur(inputRef);
-  const [state, setState] = React.useState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0 });
+  const [state, setState] = React.useState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false });
   const [buildInfo, setBuildInfo] = React.useState(/** @type {{ ready: boolean, building: boolean, progress: any, error?: string }} */ ({ ready: false, building: false, progress: null }));
   const [showSuggest, setShowSuggest] = React.useState(false);
   const [suggestions, setSuggestions] = React.useState([]);
@@ -199,11 +204,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
        engine exactly where it always did. Gating here as well would put the
        decision in two places and only one of them would know the query's kind. */
     const q = (query || '').trim();
-    if (!q) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0 });return;}
+    if (!q) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false });return;}
     // SRCH-6: a 1-char query floods the forward tokenizer with hundreds of title
     // prefix hits ("a" → every "A Warning"/"ABASEMENT"…). Require ≥2 alphanumerics
     // before the full search; the suggest box (above) still reacts at 1 char.
-    if (q.replace(/[^a-z0-9]/gi, '').length < 2) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0 });return;}
+    if (q.replace(/[^a-z0-9]/gi, '').length < 2) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false });return;}
     if (debounceRef.current) clearTimeout(debounceRef.current);
     // Stale-query guard: the engine yields the main thread mid-search, so a
     // slow older query can resolve AFTER a newer one and silently overwrite
@@ -222,7 +227,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         synonyms: settings.searchSynonyms !== false,
         scope: searchScope || null,
         corpus: settings.searchCorpus || 'all',
-        limit: SEARCH_LIMIT
+        limit: SEARCH_TOTAL_LIMIT,
+        perVolume: SEARCH_LIMIT
       }).then((r) => {
         if (stale) return;
         // SRCH4: include the matched synonyms (when synonym search is on) so the
@@ -235,10 +241,10 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.SYNONYM_MAP,
           settings.searchSynonyms !== false,
         );
-        setState({ phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length });
+        setState({ phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated });
       }).catch((err) => {
         if (stale) return;
-        setState({ phase: 'done', parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0 });
+        setState({ phase: 'done', parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0, capped: [], truncated: false });
       });
     }, 140);
     return () => {
@@ -273,6 +279,19 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     () => groupInSiteOrder(state.results, srchGroupKey, SRCH_GROUP_META),
     [state.results]
   );
+
+  // The groups whose collection hit the engine's per-collection cap (it names
+  // collections by volumeId; a group is keyed by srchGroupKey, the same id but
+  // for the Study Bible, 'matthew-study' -> 'matthew').
+  const cappedGroups = React.useMemo(() => {
+    const out = new Set();
+    if (!state.capped.length) return out;
+    const vids = new Set(state.capped);
+    for (const entry of state.results) {
+      if (entry.doc && vids.has(entry.doc.volumeId)) out.add(srchGroupKey(entry.doc));
+    }
+    return out;
+  }, [state.results, state.capped]);
 
   // The canonical re-sort of scripture groups.
   const visibleGroups = React.useMemo(() => {
@@ -558,7 +577,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         {query && buildInfo.ready && state.phase === 'done' && state.results.length > 0 && (
           <div className="srch-results-summary">
             {/* W0 (micro-gap a): at the engine cap the count is a floor — "400+", not "400". */}
-            Found <strong>{matchCountLabel(state.results.length, SEARCH_LIMIT)} {state.results.length === 1 ? "match" : "matches"}</strong>
+            Found <strong>{matchCountLabel(state.results.length, state.capped.length > 0 || state.truncated)} {state.results.length === 1 ? "match" : "matches"}</strong>
             {" across "}<strong>{grouped.length} {grouped.length === 1 ? "section" : "sections"}</strong>
           </div>
         )}
@@ -598,6 +617,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
                 key={g.key + '|' + query + '|' + sortMode}
                 gkey={g.key}
                 items={g.items}
+                capped={cappedGroups.has(g.key)}
                 terms={state.terms}
                 onSelect={handleSelect}
                 /* A long result set opens as a contents list, every collection
