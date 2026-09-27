@@ -36,6 +36,7 @@ import {
   BM25_PARAMS, TITLE_BM25, KEYWORD_CONTENT_WORDS, KEYWORD_WORDS, joinApostropheS, SYNONYM_WEIGHT, FORM_WEIGHT, NEAR_PHRASE_MIN, ORIGINAL_BOOST, REPRINT_KINDS, nearPhrase, titleMatch,
 } from './ranking.js';
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
+import { onIdle } from '../utils/on-idle.js';
 
 /**
  * The parse kinds a direct-nav card answers ALONE.
@@ -326,7 +327,9 @@ async function build(options) {
   const docs = buildDocs({ translation: code });
   const t1 = now();
   const ms = new MiniSearch(buildMiniSearchOptions());
-  const CHUNK = 2000;
+  // 500 at a time: a chunk of 2,000 held the main thread for about a second on a
+  // slow phone (UI audit 2026-09-27), and the box stalled under the reader's typing.
+  const CHUNK = 500;
   for (let i = 0; i < docs.length; i += CHUNK) {
     ms.addAll(docs.slice(i, i + CHUNK));
     if (options.onProgress) options.onProgress(Math.min(i + CHUNK, docs.length), docs.length);
@@ -345,8 +348,11 @@ async function build(options) {
     cached: false,
     translation: code,
   };
-  // Persist for next session (fire-and-forget; ~0.5s serialize + IDB write).
-  saveCached(sig, JSON.stringify(ms)).catch(() => {});
+  // Persist for next session (fire-and-forget) once the reader is not waiting on it:
+  // serializing the index is one long task (1.7 s on a slow phone), and it ran the
+  // moment the build finished, so the first search froze behind it (UI audit
+  // 2026-09-27).
+  onIdle(() => { saveCached(sig, JSON.stringify(ms)).catch(() => {}); }, { timeout: 15000, fallbackDelay: 3000 });
 }
 
 function sameTranslation(opts) {
