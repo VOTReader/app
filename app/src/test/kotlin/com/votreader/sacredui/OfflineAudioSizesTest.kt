@@ -109,7 +109,7 @@ class OfflineAudioSizesTest {
     }
 
     @Test
-    fun `the HEAD budget is per release and window, not per call: rows asking one by one spend 40 (n2-02)`() {
+    fun `the HEAD budget is per release and window, not per call, so rows asking one by one spend 40 (n2-02)`() {
         var headed = 0
         val s = store(lister = { null }, head = { headed++; 5L })
         (1..66).forEach { s.requestSizes(listOf(base + "audio-v1/letter-$it-B.mp3")) }
