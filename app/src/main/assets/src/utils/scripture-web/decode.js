@@ -137,7 +137,7 @@ export function decodeGraph(data) {
  * @param {number} count @param {number} total
  * @returns {{slotA:Float32Array, slotB:Float32Array}} slotA at `from`, slotB at `to`, 0..1
  */
-export function assignSlots(from, to, count, total) {
+function assignSlots(from, to, count, total) {
   // counting sort of the 2·count feet by verse
   const start = new Uint32Array(total + 1);
   for (let i = 0; i < count; i++) { start[from[i] + 1]++; start[to[i] + 1]++; }

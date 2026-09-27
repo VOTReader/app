@@ -25,7 +25,7 @@ const TOP_INSET = 96;
 /** Curve tension for inter-rail ribbons: how far control points push out. */
 const RIBBON_BOW = 0.42;
 /** An endpoint this far past the screen edge still counts as on screen (device px). */
-export const EDGE_MARGIN = 24;
+const EDGE_MARGIN = 24;
 /** How far past the screen edge a thread to an off-screen book completes its
  * rise, as a fraction of the width; grows with the log of the distance so a
  * thread to a far book exits shallower than one to the next book over. */
@@ -37,7 +37,7 @@ const REACH_MARGIN = 0.12;
  * whole width is a shallow streak, and 2,095 of them are the field again. */
 const REACH_GAPS = 1.4;
 /** The level run along the far rail is drawn at this share of the thread's alpha. */
-export const RUN_ALPHA = 0.3;
+const RUN_ALPHA = 0.3;
 /** Layers per colour bin while a gesture is live (opts.capFraction 0): about
  * 250 strokes a frame instead of a thousand, so a pinch on a phone keeps its
  * frames; at rest the cap is the full one (every visible layer) and the
@@ -390,7 +390,7 @@ class ContextBatches {
  * @param {number} px
  * @param {number} py
  */
-export function distanceToPath(pts, px, py) {
+function distanceToPath(pts, px, py) {
   let best = Infinity;
   for (let i = 1; i < pts.length; i++) {
     const [x1, y1] = pts[i - 1], [x2, y2] = pts[i];
@@ -630,12 +630,6 @@ export function pickPersonalLinks(personal, opts, px, py, tol, limit) {
     if (d < tol) insertNearest(best, { index: i, distance: d }, cap);
   }
   return best;
-}
-
-/** Backwards-compatible nearest-link helper for small callers. */
-export function pickPersonal(personal, opts, px, py, tol) {
-  const hit = pickPersonalLinks(personal, opts, px, py, tol, 1)[0];
-  return hit ? hit.index : -1;
 }
 
 /**

@@ -86,13 +86,3 @@ export function startRepeat(target, label) {
   const lf = /** @type {any} */ (pane());
   return !!(target && lf && typeof lf.repeat === 'function' && lf.repeat(target.keys, label, REPEAT_TIMES));
 }
-
-/**
- * Act on a selection: listenFromTarget, then startListenFrom.
- *
- * @param {Selection | null | undefined} selection
- * @returns {boolean} false when there was nothing to start
- */
-export function listenFromSelection(selection) {
-  return startListenFrom(listenFromTarget(selection));
-}

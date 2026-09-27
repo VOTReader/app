@@ -7,7 +7,7 @@ import { readingChipWpm, readingMinChip } from './ReadingMinChip.jsx';
 
 /* Read marks are COUNT-aware (2026-08-03): a re-read letter shows ✓ ×N.
    Rendered as one shared element so every index surface stays identical. */
-export function ReadCheck({ count }) {
+function ReadCheck({ count }) {
   if (!count) return null;
   return (
     <span className="read-check" aria-label={count > 1 ? `Read ${count} times` : 'Read'}>

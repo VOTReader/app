@@ -117,22 +117,6 @@ export function maxZoomFor(total, widthCss) {
 }
 
 /**
- * An arc's span on a log scale against the canon: 0 for a one-verse arc, 1
- * for one spanning the whole canon. The shader computes the same value from
- * aFrom/aTo and uTotal.
- *
- * @param {number} span - |to - from| in verses
- * @param {number} total
- * @returns {number} 0..1
- */
-export function spanLogOf(span, total) {
-  const t = total > 1 ? total : 2;
-  const s = span > 1 ? span : 1;
-  const k = Math.log(s) / Math.log(t);
-  return k < 0 ? 0 : k > 1 ? 1 : k;
-}
-
-/**
  * Alpha every anchored ribbon reaches at the ceiling. The worst Distance stop
  * needs an effective 0.83 on black and 0.85 on parchment to clear WCAG's 3:1
  * non-text floor alone (design-perf, from the ramp and relative luminance).

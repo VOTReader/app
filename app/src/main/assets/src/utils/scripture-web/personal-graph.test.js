@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   VOT_TYPES, baseKey, buildVotRail, placeEndpoint, buildPersonalGraph,
-  buildCuratedUnderlay, refKeyToRailEndpoint,
+  buildCuratedUnderlay,
 } from './personal-graph.js';
 
 // Bottom rail: 2 books x 2 chapters x 10 verses, matching the geometry tests.
@@ -225,24 +225,5 @@ describe('curated underlay', () => {
 
   it('is empty when there is no rail yet', () => {
     expect(buildCuratedUnderlay([{ v: 1, volKey: 'one', letterId: 'duty' }], {}).count).toBe(0);
-  });
-});
-
-describe('journal-index refKey translation', () => {
-  it('translates the journal grammar into rail-placeable endpoints', () => {
-    // The journal index uses its OWN grammar, distinct from hlKeys.
-    expect(placeEndpoint(refKeyToRailEndpoint('chapter:beta:1'), ctx))
-      .toMatchObject({ rail: 'bible', pos: 20 });
-    expect(placeEndpoint(refKeyToRailEndpoint('verse:alpha:2:4'), ctx))
-      .toMatchObject({ rail: 'bible', pos: 13 });
-    expect(placeEndpoint(refKeyToRailEndpoint('letter:one/duty'), ctx))
-      .toMatchObject({ rail: 'vot', pos: 1 });
-  });
-
-  it('returns null for grammars it does not own', () => {
-    expect(refKeyToRailEndpoint('bookmark:abc')).toBeNull();
-    expect(refKeyToRailEndpoint('note:xyz')).toBeNull();
-    expect(refKeyToRailEndpoint('nonsense')).toBeNull();
-    expect(refKeyToRailEndpoint('')).toBeNull();
   });
 });

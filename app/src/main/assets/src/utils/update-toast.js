@@ -97,10 +97,10 @@ function takeUpdateReload() {
 export const UPDATED_TOAST_ID = 'vot-toast-updated';
 export const UPDATED_TOAST_TEXT = 'VOTReader was just updated.';
 export const UPDATED_TOAST_LISTEN_TEXT = 'VOTReader was just updated. Tap to continue listening.';
-export const UPDATED_TOAST_MS = 4000;
+const UPDATED_TOAST_MS = 4000;
 /** The tap-toast stays longer: it carries an action, and the bar's Play button
  *  remains after it goes. */
-export const UPDATED_TOAST_LISTEN_MS = 8000;
+const UPDATED_TOAST_LISTEN_MS = 8000;
 
 /** @type {(() => void) | null} the resume the player asked us to carry */
 let pendingResume = null;

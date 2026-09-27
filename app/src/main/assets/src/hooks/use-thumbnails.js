@@ -180,7 +180,7 @@ export function captureIsCalm(now) {
  * @param {string} dataUrl
  * @returns {Promise<'dark'|'light'|null>}
  */
-export function classifyThumbTheme(dataUrl) {
+function classifyThumbTheme(dataUrl) {
   return new Promise((resolve) => {
     try {
       const img = new Image();

@@ -77,7 +77,7 @@ import { readingFontById, readingFontCss } from '../utils/reading-fonts.js';
    "make surprise me dice button and reading dot on by default"; Auto-Continue with them
    (only reachable once Auto-Scroll is on, i.e. once the reader asked for hands-free).
    @type {ReadonlyArray<Readonly<Record<string, any[]>>>}  key → [old default, new default] */
-export const DEFAULT_FLIPS = Object.freeze([
+const DEFAULT_FLIPS = Object.freeze([
   Object.freeze({ showSurpriseButton: [false, true], showReadingDot: [false, true], autoScrollNext: [false, true] }),
 ]);
 
