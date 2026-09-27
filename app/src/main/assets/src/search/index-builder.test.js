@@ -43,7 +43,7 @@ const GLOBALS = {
   WTLB_ONE: [{ id: 'wtlb-1', num: 1, title: 'Matters of the Heart', paragraphs: [{ text: 'The wailing of the penitent {{ref:Matthew 4:4}} brings forth healing.' }] }],
   THE_BLESSED: [{ id: 'blessed-1', num: 1, title: 'The Blessed One', paragraphs: [{ text: 'Blessed are they that mourn.' }] }],
   HOLY_DAYS: [{ id: 'hd-1', num: 1, title: 'Passover', paragraphs: [{ text: 'Remember the passover forever.' }] }],
-  ANSWERS: [{ id: 'regarding-pride', num: 105, title: 'Regarding Pride', paragraphs: [{ text: 'The pride of man {{ref:Proverbs 16:18}} goes before destruction.' }, { text: '~ [From “Pride” ~ Words To Live By: Part One]' }] }],
+  ANSWERS: [{ id: 'regarding-pride', num: 105, title: 'Regarding Pride', paragraphs: [{ text: 'The pride of man {{ref:Proverbs 16:18}} goes before destruction.' }, { text: '~ [From “Pride” ~ Words To Live By: Part One]' }, { text: 'Humble yourselves.\n**The Truth: Regarding Humility**\n• **_Also see:_** _"Regarding the Holidays of Men"_\n\u{1F4D6} Also See: Grace AND The Law (Bible/Letter Study)\nFor I tell you the truth: walk humbly.' }] }],
   HIDDEN_MANNA: [{ id: 'woe-dallas', num: 1, title: 'Woe to Dallas', blocks: [{ segments: [{ v: 'Woe to the great city.' }] }] }],
   // PRODUCTION SHAPE (2026-09-22): a study chapter carries `id` + `blocks` (para
   // segments with `v`), never `content`. The old `content: [{ text }]` fixture
@@ -81,6 +81,15 @@ describe('buildDocs (narrow index scope)', () => {
     expect(ans[0]).toMatchObject({ letterId: 'regarding-pride', volumeId: 'answers', corpus: 'volumes', title: 'Regarding Pride' });
     expect(ans[0].text).toContain('pride of man');
     expect(ans[0].text).not.toContain('{{ref');
+  });
+
+  it('an Answers topic’s cross-reference lines are not its words (search audit 2026-09-27)', () => {
+    const ans = docs.find((d) => d.kind === 'answers');
+    expect(ans.text).toContain('Humble yourselves');
+    expect(ans.text).toContain('I tell you the truth: walk humbly');   // "the truth:" in a sentence stays
+    expect(ans.text).not.toContain('Regarding Humility');
+    expect(ans.text).not.toContain('Holidays of Men');
+    expect(ans.text).not.toContain('Grace AND The Law');
   });
 
   it('every doc carries an id, a corpus discriminator, and a kind', () => {

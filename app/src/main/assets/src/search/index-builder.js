@@ -149,6 +149,20 @@ export function buildDocs(options) {
     }
   }
 
+  /* AN ANSWERS TOPIC'S CROSS-REFERENCES ARE NOT ITS WORDS (search audit 2026-09-27).
+     The False Doctrines page links every topic by its name ("The Truth: Regarding the
+     Churches of Men", 302 such lines), and a dozen topics close a section with "Also
+     See:" links. Indexed as text, the links made that page match every topic's own
+     title, and it outranked "Regarding the Churches of Men" for its title typed
+     whole. Cross-references stay out of the index (INDEX SCOPE, search-config.js);
+     the page still shows them. */
+  const CROSS_REF_LINE = /^\s*(?:(?:\u2022|\u{1F4D6})\s*)?(?:[*_]+\s*)*(?:The Truth:|Also See\b)/iu;
+  /** @param {string} text */
+  function withoutCrossRefs(text) {
+    if (!/The Truth:|Also See/i.test(text)) return text;
+    return text.split('\n').filter((line) => !CROSS_REF_LINE.test(line)).join('\n');
+  }
+
   /** Emit ONE folded doc per paragraph-entry (WTLB / Blessed / Holy Days). */
   function pushEntryCollection(arr, kind, volumeId, volumeLabel) {
     if (!Array.isArray(arr)) return;
@@ -159,7 +173,7 @@ export function buildDocs(options) {
       const paragraphs = en.paragraphs || [];
       for (let p = 0; p < paragraphs.length; p++) {
         const ptxt = paragraphs[p] && paragraphs[p].text ? paragraphs[p].text : '';
-        body += ' ' + formatBReadText(ptxt);
+        body += ' ' + formatBReadText(kind === 'answers' ? withoutCrossRefs(ptxt) : ptxt);
       }
       // Holy Days mixes shapes: 11 of its 16 entries are block-shaped letters with no
       // paragraphs, and indexed only their titles (v07-09).
