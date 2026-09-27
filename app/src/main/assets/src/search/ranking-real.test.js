@@ -77,6 +77,14 @@ describe('ranking on the audit\u2019s cases', () => {
     expect(refs(await VotSearchMini.search('false prophets'))[0]).toBe('Answers Only God Can Give · Regarding False Prophets');
   });
 
+  it('a quote nothing holds word for word is searched as its words, and says so', async () => {
+    const r = await VotSearchMini.search('"The earth shall grow old like a garment"');
+    expect(r.unquoted).toBe('The earth shall grow old like a garment');
+    expect(refs(r)[0]).toBe('Volume One · Letter 1 · All Things Pass');
+    // a quote the text holds stays a quote
+    expect((await VotSearchMini.search('"grow old like a garment"')).unquoted).toBeUndefined();
+  });
+
   it('a one-word title typed whole ranks its letter above a text rich in its synonyms', async () => {
     expect(refs(await VotSearchMini.search('Wisdom'))[0]).toBe('Volume One · Letter 3 · Wisdom');
   });

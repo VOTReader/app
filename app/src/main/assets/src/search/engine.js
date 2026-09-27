@@ -383,10 +383,10 @@ async function ensureReady(options) {
  * "lord" 125 of 890, with no sign anything was missing. `capped` names every
  * collection that hit its cap (it may hold more), `truncated` says the total did.
  * `_corrected` is the engine's own: this search is a corrected query's re-run.
- * @param {{translation?:string, useStopWords?:boolean, synonyms?:boolean, scope?:{bookId?:string,volumeId?:string}|null, corpus?:string, limit?:number, perVolume?:number, allWords?:boolean, _corrected?:boolean}} [options]
+ * @param {{translation?:string, useStopWords?:boolean, synonyms?:boolean, scope?:{bookId?:string,volumeId?:string}|null, corpus?:string, limit?:number, perVolume?:number, allWords?:boolean, _corrected?:boolean, _unquoted?:boolean}} [options]
  * `corrections` lists each typed word that found nothing of its own and was
  * searched as the nearest indexed word instead ({ from: 'shephard', to: 'shepherd' }).
- * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>, stopWordsOnly?:boolean}>}
+ * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>, stopWordsOnly?:boolean, unquoted?:string}>}
  */
 async function search(query, options) {
   options = options || {};
@@ -707,6 +707,15 @@ async function search(query, options) {
     out.push({ score: scoreMap[id], doc: reshapeDoc(doc), terms: matchedTerms[id] || [] });
   }
 
+  /* A QUOTED PHRASE NOTHING HOLDS IS SEARCHED AS ITS WORDS (search audit 2026-09-27).
+     A quote remembered one word off ("the earth shall grow old like a garment", where
+     the letter says "will") showed "No results" with the letter a word away; the
+     reader had to know to take the quote marks off. `unquoted` names the phrase, so
+     the screen can say what it did. */
+  if (p.phrase && !out.length && !options._unquoted) {
+    const again = await search(String(query).replace(/["\u201C\u201D\u201E\u201F]/g, ' '), { ...options, _unquoted: true });
+    if (again.results && again.results.length) return { ...again, unquoted: p.phrase };
+  }
   return { parsed, results: out, parsedTerms: filtered, textQuery: p, capped: Object.keys(capped), truncated: out.length >= limit && h < rankedIds.length, corrections };
 }
 

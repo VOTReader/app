@@ -355,7 +355,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           settings.searchSynonyms !== false,
           /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.STOP_WORDS_TRIMMED,
         );
-        const done = { phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [], stopWordsOnly: !!r.stopWordsOnly };
+        const done = { phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [], stopWordsOnly: !!r.stopWordsOnly, unquoted: r.unquoted || null };
         if (!r.error) lastSearch = { memo, allWordsFor, state: done };
         setState(done);
       }).catch((err) => {
@@ -742,6 +742,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
               <SrchCard key={'d' + i} entry={d} terms={[]} onSelect={handleSelect} isDirect={true} />
             ))}
           </div>
+        )}
+
+        {/* A quote nothing holds word for word was searched as its words: said, not done silently. */}
+        {query && state.phase === 'done' && state.results.length > 0 && state.unquoted && (
+          <div className="srch-corrected">No exact match for “{state.unquoted}”. Showing results for its words.</div>
         )}
 
         {query && buildInfo.ready && state.phase === 'done' && state.results.length > 0 && (

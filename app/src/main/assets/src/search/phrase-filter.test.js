@@ -74,9 +74,14 @@ describe('search: phrases and +/- words match words, not letters inside words (v
     expect(refs(r)).toContain('Revelation 1:10');
   });
 
+  /* Since 2026-09-27 a quote nothing holds is searched as its words, and the result
+     says so (`unquoted`), so the order is checked by that fallback firing. */
   it('a phrase still has to be the words in that order', async () => {
-    const r = await VotSearchMini.search('"shepherd the lord"', { synonyms: false });
-    expect(refs(r)).not.toContain('Psalms 23:1');
+    const out = await VotSearchMini.search('"shepherd the lord"', { synonyms: false });
+    expect(out.unquoted, 'no text holds the words in that order').toBe('shepherd the lord');
+    const inOrder = await VotSearchMini.search('"the lord is my shepherd"', { synonyms: false });
+    expect(inOrder.unquoted).toBeUndefined();
+    expect(refs(inOrder)).toEqual(['Psalms 23:1']);
   });
 
   it('"heart -art" keeps the verse about a heart: art is not a word in it', async () => {
