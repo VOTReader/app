@@ -531,14 +531,15 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           return text;
         }
       })();
-      // n6-02: Share sends what Copy keeps (a poem's lines, a letter's
-      // paragraphs, a verse per line) without the verse numbers `text` also
-      // leaves out, and names the passage the way Copy does (cp1). The same
-      // formatter, so a Words To Live By poem's <br> lines no longer arrive
-      // glued ("captiveThat you may").
+      // n6-02 / cp2: Share sends what Copy sends (a poem's lines, a letter's
+      // paragraphs, a verse per line with its number and a space) and names
+      // the passage the same way; only its link differs, the app's own
+      // (handleShare) where Copy gives the website's. The same formatter, so
+      // a Words To Live By poem's <br> lines no longer arrive glued
+      // ("captiveThat you may").
       const selShare = (() => {
         try {
-          const out = passageCopy(range, { numbers: false });
+          const out = passageCopy(range);
           if (out) return { text: out.body, keys: out.keys, reference: out.reference };
           const frag = range.cloneContents();
           frag.querySelectorAll('.fn-ref, .hl-note-icon, .verse-num').forEach(function(el) { el.remove(); });
