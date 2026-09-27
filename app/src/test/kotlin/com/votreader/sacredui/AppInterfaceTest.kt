@@ -357,6 +357,35 @@ class AppInterfaceTest {
         )
     }
 
+    // ─── sh1: the phone's share sheet ─────────────────────────────────
+
+    @Test
+    fun `shareText hands the text to the host's share sheet on the UI thread and says it did`() {
+        val host = FakeBridgeHost()
+        val (app, _, _) = newSubject(host = host)
+
+        assertTrue(app.shareText("Blessed are the meek\nMatthew 5:5 (NKJV)"))
+
+        assertEquals(1, host.postedActions.size, "should hop through postToUi")
+        assertEquals(listOf("Blessed are the meek\nMatthew 5:5 (NKJV)"), host.shareSheetCalls)
+    }
+
+    @Test
+    fun `shareText refuses an empty text or one too long for a single share, so the page copies it instead`() {
+        val host = FakeBridgeHost()
+        val (app, _, _) = newSubject(host = host)
+
+        assertFalse(app.shareText(null))
+        assertFalse(app.shareText(""))
+        assertFalse(app.shareText(" \n\t "))
+        assertFalse(app.shareText("x".repeat(AppInterface.MAX_SHARE_CHARS + 1)))
+        assertTrue(host.postedActions.isEmpty())
+        assertTrue(host.shareSheetCalls.isEmpty())
+
+        assertTrue(app.shareText("x".repeat(AppInterface.MAX_SHARE_CHARS)))
+        assertEquals(1, host.shareSheetCalls.size)
+    }
+
     // ─── v3 streaming backup delegation (BACKUP-STREAMING-PLAN P3) ────
     // The base64 boundary (v3ExportChunk decode / v3ImportReadChunk encode) needs
     // android.util.Base64, which is a stub in this plain-JVM suite, so it is proven
