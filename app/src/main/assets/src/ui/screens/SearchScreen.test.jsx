@@ -16,7 +16,7 @@ import { resolve, dirname } from 'node:path';
 // @ts-ignore -- no node types in this tsconfig
 import { fileURLToPath } from 'node:url';
 import {
-  expandSnippetTerms, matchCountLabel, useImeHideBlur, SearchScreen, SEARCH_LIMIT, groupInSiteOrder, correctedQuery,
+  expandSnippetTerms, matchCountLabel, useImeHideBlur, SearchScreen, SEARCH_LIMIT, groupInSiteOrder, correctedQuery, letterRefCards,
 } from './SearchScreen.jsx';
 import {
   srchSortCanonical as realSrchSortCanonical,
@@ -856,5 +856,50 @@ describe('SearchScreen — the songs shortcut row', () => {
     Songs._resetSongCatalogForTests();
     renderAt('love awaits', vi.fn());
     expect(screen.queryByText(/songs? match/)).toBeNull();
+  });
+});
+
+/* A letter card opens a letter that exists (search audit 2026-09-27): "letter 55"
+   made a card for Volume Two's Letter 55, which does not exist, and the tap did
+   nothing; "volume 7 letter 99" the same. */
+describe('letterRefCards', () => {
+  const D = { VOLUME_COLLECTIONS: [
+    { id: 'v1', screen: 'vot-one-letter', dataVar: 'L1', prefaceVar: null, label: 'Volume One' },
+    { id: 'v2', screen: 'vot-letter', dataVar: 'L2', prefaceVar: null, label: 'Volume Two' },
+    { id: 'v7', screen: 'vot-seven-letter', dataVar: 'L7', prefaceVar: 'L7P', label: 'Volume Seven' },
+  ] };
+  const win = {
+    L1: [{ id: 'a55', num: 55, title: 'One Fifty-Five' }],
+    L2: [{ id: 'b1', num: 1, title: 'Two One' }],
+    L7: [{ id: 'c55', num: 55, title: 'Vengeance Is Mine, I Shall Repay' }, { id: 'c70', num: 70, title: 'The Last' }],
+    L7P: { id: 'c0', num: 0, title: 'Preface' },
+  };
+
+  it('names the letter\u2019s title, and carries its id', () => {
+    const r = letterRefCards({ kind: 'ref-letter', volumeId: 'v7', letterNum: 55, label: 'Volume Seven · Letter 55' }, D, win);
+    expect(r.cards).toHaveLength(1);
+    expect(r.cards[0].__label).toBe('Volume Seven · Letter 55');
+    expect(r.cards[0].__sub).toBe('Vengeance Is Mine, I Shall Repay');
+    expect(r.cards[0].ref.letterId).toBe('c55');
+  });
+
+  it('a letter that is not there is said, with no card to tap', () => {
+    const r = letterRefCards({ kind: 'ref-letter', volumeId: 'v7', letterNum: 99, label: 'Volume Seven · Letter 99' }, D, win);
+    expect(r.cards).toEqual([]);
+    expect(r.missing).toBe('Volume Seven has no Letter 99 (it runs 1 to 70).');
+  });
+
+  it('"letter 55" offers each collection that holds a Letter 55, in the site\u2019s order', () => {
+    const r = letterRefCards({ kind: 'ref-letter', anyVolume: true, volumeId: 'v2', letterNum: 55, label: 'Letter 55' }, D, win);
+    expect(r.cards.map((c) => c.__label)).toEqual(['Volume One · Letter 55', 'Volume Seven · Letter 55']);
+    expect(r.cards.map((c) => c.ref.volumeId)).toEqual(['v1', 'v7']);
+    expect(letterRefCards({ kind: 'ref-letter', anyVolume: true, volumeId: 'v2', letterNum: 99, label: 'Letter 99' }, D, win).missing)
+      .toBe('No collection has a Letter 99.');
+  });
+
+  it('before the letters have loaded, the card is the one parsed', () => {
+    const r = letterRefCards({ kind: 'ref-letter', anyVolume: true, volumeId: 'v2', letterNum: 55, label: 'Letter 55' }, D, {});
+    expect(r.cards.map((c) => c.__label)).toEqual(['Letter 55']);
+    expect(r.missing).toBeNull();
   });
 });

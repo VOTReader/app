@@ -51,3 +51,55 @@ describe('passage names as readers type them', () => {
     expect(at('the lord\u2019s prayer', 'volumes')).toBe('text');
   });
 });
+
+/** @param {string} q */
+const letter = (q) => {
+  const p = /** @type {any} */ (parseReference(q, { corpus: 'volumes' })) || {};
+  return p.kind === 'ref-letter' ? (p.anyVolume ? 'any' : p.volumeId) + ' ' + p.letterNum : p.kind;
+};
+
+describe('letters as readers name them', () => {
+  it('a volume and a letter, with punctuation, words for numbers, either way round', () => {
+    expect(letter('Volume Seven, Letter 55')).toBe('v7 55');
+    expect(letter('Vol. 7 Letter 55')).toBe('v7 55');
+    expect(letter('v7 55')).toBe('v7 55');
+    expect(letter('v7:55')).toBe('v7 55');
+    expect(letter('volume 7 #55')).toBe('v7 55');
+    expect(letter('Volume 2, Letter 13')).toBe('v2 13');
+    expect(letter('letter 55 volume 7')).toBe('v7 55');
+    expect(letter('letter 55 of volume seven')).toBe('v7 55');
+    expect(letter('Volume Three Letter Twenty Two')).toBe('v3 22');
+    expect(letter('Volume Three Letter Twenty-Two')).toBe('v3 22');
+    expect(letter('v7 preface')).toBe('v7 0');
+    expect(letter('V2L5')).toBe('v2 5');
+  });
+
+  it('a collection named in words, with or without "letter", a curly apostrophe or not', () => {
+    expect(letter('Timothy letter 3')).toBe('timothy 3');
+    expect(letter('little flock letter 2')).toBe('flock 2');
+    expect(letter('Lord’s Little Flock 2')).toBe('flock 2');
+    expect(letter('Rebuke letter 1')).toBe('rebuke 1');
+    expect(letter('The Lord’s Rebuke 1')).toBe('rebuke 1');
+    expect(letter('blessed letter 4')).toBe('blessed 4');
+  });
+
+  it('Words To Live By with its part, or without it (Part One’s)', () => {
+    expect(letter('WTLB 95')).toBe('wtlb1 95');
+    expect(letter('WTLB Part One 95')).toBe('wtlb1 95');
+    expect(letter('words to live by 95')).toBe('wtlb1 95');   // read Part Two: [12one two] took the space
+    expect(letter('words to live by part two 12')).toBe('wtlb2 12');
+    expect(letter('wtlb 1:45')).toBe('wtlb1 45');
+    expect(letter('WTLB 2 12')).toBe('wtlb2 12');
+  });
+
+  it('a letter alone is every collection’s letter of that number', () => {
+    expect(letter('letter 55')).toBe('any 55');
+    expect(letter('letter five')).toBe('any 5');
+  });
+
+  it('words that begin like a reference stay words', () => {
+    expect(letter('very good')).toBe('text');
+    expect(letter('blessed are the meek')).toBe('text');
+    expect(letter('vol 7')).toBe('text');
+  });
+});

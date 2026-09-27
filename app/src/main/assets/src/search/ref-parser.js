@@ -158,6 +158,108 @@ export function fuzzyBookSuggest(raw) {
   return bestScore <= 2 ? bestId : null;
 }
 
+/* A LETTER AS READERS NAME IT (search audit 2026-09-27). "Volume Seven, Letter 55",
+   "Vol. 7 Letter 55", "v7 55", "v7:55", "letter 55 volume 7", "volume 7 #55", "Volume
+   Three Letter Twenty Two", "v7 preface", "Timothy letter 3", "Lord's Little Flock 2",
+   "The Lord's Rebuke 1" and "WTLB 95" each found nothing; "words to live by 95" opened
+   Part Two (a character class, [12one two], read the space as the part); and a curly
+   apostrophe ("Lord’s Rebuke 1") missed. */
+const TENS = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+const ONES = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 };
+
+/**
+ * A letter reference in the shape the letter patterns read: apostrophes straight,
+ * "twenty two" as 22, "55th" as 55, punctuation and "no." / "number" / "#" as space.
+ * @param {string} lower
+ * @returns {string}
+ */
+export function letterShape(lower) {
+  return String(lower)
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)[\s-]+(one|two|three|four|five|six|seven|eight|nine)\b/g,
+      (m, t, o) => String(TENS[/** @type {keyof typeof TENS} */ (t)] + ONES[/** @type {keyof typeof ONES} */ (o)]))
+    .replace(/(\d)(?:st|nd|rd|th)\b/g, '$1')
+    .replace(/[.,;:#()!?]+/g, ' ')
+    .replace(/\b(?:no|number)\s+(?=\d)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** A volume named by a number or a number word ("7", "seven") as its collection. */
+function volumeOf(/** @type {string} */ tok) {
+  const D = searchData();
+  const n = parseWordNum(tok);
+  if (n !== null) return D.VOLUME_TOKEN_MAP['v' + n] || null;
+  return D.VOLUME_TOKEN_MAP[tok] || null;
+}
+
+/** The reference to letter `tok` (a number, a number word, "preface") of `vc`, or null. */
+function letterIn(/** @type {any} */ vc, /** @type {string} */ tok, /** @type {string} */ sep) {
+  if (/^(?:preface|intro|introduction|0)$/.test(tok)) {
+    return { kind: 'ref-letter', volumeId: vc.id, volumeScreen: vc.screen, letterNum: 0, letterId: null, isPreface: true, label: vc.label + ' · Preface' };
+  }
+  const n = parseWordNum(tok);
+  if (n === null) return null;
+  return { kind: 'ref-letter', volumeId: vc.id, volumeScreen: vc.screen, letterNum: n, letterId: null, label: vc.label + sep + n };
+}
+
+/** The collections named in words, and the words that name them (after letterShape). */
+const COLLECTION_REFS = [
+  { re: /^(?:the )?(?:lft|lt|timothy|letters? (?:from|of) timothy) (?:(?:letter|ltr|l) ?)?([a-z]+|\d+)$/, id: 'timothy' },
+  { re: /^(?:the )?(?:llf|lf|flock|(?:letters? to )?(?:the )?(?:lord'?s )?little flock) (?:(?:letter|ltr|l) ?)?([a-z]+|\d+)$/, id: 'flock' },
+  { re: /^(?:the )?(?:lr|rebuke|lord'?s rebuke|a testament against the world(?: the lord'?s rebuke)?) (?:(?:letter|ltr|l) ?)?([a-z]+|\d+)$/, id: 'rebuke' },
+  { re: /^(?:tb|the blessed|blessed) (?:(?:letter|ltr|l|entry) ?)?([a-z]+|\d+)$/, id: 'blessed' },
+  { re: /^(?:hd|holy ?days?) (?:(?:letter|ltr|l|entry|day) ?)?([a-z]+|\d+)$/, id: 'holydays' },
+];
+
+/**
+ * A letter reference in letterShape's form, or null: a volume and a letter either
+ * way round ("volume 7 letter 55", "v7 55", "letter 55 volume 7", "v7 preface"), a
+ * collection named in words ("timothy letter 3", "the lord's rebuke 1"), Words To Live
+ * By with or without its part ("wtlb 1 45", "wtlb part one 95"; "wtlb 95" is Part
+ * One's), or a letter alone ("letter 55": every collection holding it, SearchScreen).
+ * @param {string} lv
+ * @returns {Object|null}
+ */
+export function parseLetterRef(lv) {
+  const D = searchData();
+  let m = lv.match(/^(?:volume|vol|v) ?([a-z]+|\d+) (?:(?:letter|ltr|l) ?)?([a-z]+|\d+)$/);
+  if (m) {
+    const vc = volumeOf(m[1]);
+    const r = vc && letterIn(vc, m[2], ' · Letter ');
+    if (r) return r;
+  }
+  m = lv.match(/^(?:(?:letter|ltr|l) ?([a-z]+|\d+)|(preface|introduction|intro)) (?:(?:of|in|from|to) )?(?:the )?(?:volume|vol|v) ?([a-z]+|\d+)$/);
+  if (m) {
+    const vc = volumeOf(m[3]);
+    const r = vc && letterIn(vc, m[1] || m[2], ' · Letter ');
+    if (r) return r;
+  }
+  for (const c of COLLECTION_REFS) {
+    const cm = lv.match(c.re);
+    if (!cm) continue;
+    const vc = D.VOLUME_COLLECTIONS.find((v) => v.id === c.id);
+    const r = vc && letterIn(vc, cm[1], ' ');
+    if (r) return r;
+  }
+  m = lv.match(/^(?:wtlb|words to live by) ?(?:part ?)?(1|2|one|two|i|ii) (?:(?:section|sec|entry) ?)?(\d+)$/)
+    || lv.match(/^(?:wtlb|words to live by) (?:(?:section|sec|entry) ?)?()(\d+)$/);
+  if (m) {
+    const partTwo = m[1] === '2' || m[1] === 'two' || m[1] === 'ii';
+    const vW = partTwo ? D.VOLUME_TOKEN_MAP.wtlb2 : D.VOLUME_TOKEN_MAP.wtlb1;
+    const n = parseInt(m[2], 10);
+    if (vW) return { kind: 'ref-letter', volumeId: vW.id, volumeScreen: vW.screen, letterNum: n, letterId: null, label: vW.label + ' ' + n };
+  }
+  // "Letter N" alone: every collection that holds a letter N (SearchScreen offers each);
+  // Volume Two is the card until the collections' letters are loaded.
+  m = lv.match(/^(?:letter|ltr) ([a-z]+|\d+)$/);
+  if (m) {
+    const n = parseWordNum(m[1]);
+    if (n !== null) return { kind: 'ref-letter', anyVolume: true, volumeId: 'v2', volumeScreen: 'vot-letter', letterNum: n, letterId: null, label: 'Letter ' + n };
+  }
+  return null;
+}
+
 /**
  * Parse a raw query into a structured reference / command, or fall through to a
  * free-text query (query-parse.js). `parseOpts.corpus` gates which reference
@@ -208,67 +310,8 @@ export function parseReference(query, parseOpts) {
       const dvc = D.VOLUME_TOKEN_MAP['v' + dvn];
       if (dvc && !isNaN(dln)) return { kind: 'ref-letter', volumeId: dvc.id, volumeScreen: dvc.screen, letterNum: dln, letterId: null, label: dvc.label + ' · Letter ' + dln };
     }
-    const volLetterM = lower.match(/^v(?:ol(?:ume)?)?\s+(\w+)\s+(?:l(?:tr|etter)?\s*)?(\w+)?$/);
-    if (volLetterM) {
-      const volTok = volLetterM[1];
-      const letterTok = volLetterM[2];
-      const vc = D.VOLUME_TOKEN_MAP['v' + volTok] || D.VOLUME_TOKEN_MAP['volume' + volTok] || D.VOLUME_TOKEN_MAP[volTok];
-      if (vc && letterTok) {
-        if (letterTok === 'preface' || letterTok === 'intro' || letterTok === '0') {
-          return { kind: 'ref-letter', volumeId: vc.id, volumeScreen: vc.screen, letterNum: 0, letterId: null, isPreface: true, label: vc.label + ' · Preface' };
-        }
-        const lnum = parseWordNum(letterTok);
-        if (lnum !== null) return { kind: 'ref-letter', volumeId: vc.id, volumeScreen: vc.screen, letterNum: lnum, letterId: null, label: vc.label + ' · Letter ' + lnum };
-      }
-    }
-
-    // "WTLB 1:45" / "WTLB1:45" / "WTLB Part 1 Section 45"
-    const wtlbM = lower.match(/^wtlb\s*(?:part\s*)?([12])\s*(?::|section|sec|\s)\s*(\d+)$/);
-    if (wtlbM) {
-      const part = wtlbM[1];
-      const sec = parseInt(wtlbM[2], 10);
-      const vWtlb = part === '1' ? D.VOLUME_TOKEN_MAP.wtlb1 : D.VOLUME_TOKEN_MAP.wtlb2;
-      if (vWtlb && !isNaN(sec)) return { kind: 'ref-letter', volumeId: vWtlb.id, volumeScreen: vWtlb.screen, letterNum: sec, letterId: null, label: vWtlb.label + ' ' + sec };
-    }
-
-    // "Words To Live By Part 1 45"
-    const wtlbLong = lower.match(/^words\s*to\s*live\s*by(?:\s*part)?\s*([12one two]+)\s*(?::|section|sec|\s)?\s*(\d+)$/);
-    if (wtlbLong) {
-      const p = wtlbLong[1];
-      const n2 = parseInt(wtlbLong[2], 10);
-      const vW = (p === '1' || p === 'one') ? D.VOLUME_TOKEN_MAP.wtlb1 : D.VOLUME_TOKEN_MAP.wtlb2;
-      if (vW && !isNaN(n2)) return { kind: 'ref-letter', volumeId: vW.id, volumeScreen: vW.screen, letterNum: n2, letterId: null, label: vW.label + ' ' + n2 };
-    }
-
-    // Shorthand: LfT 5, LLF 3, LR 10, TB 3, HD 5
-    const shorthand = [
-      { re: /^(?:lft|timothy|letters\s*from\s*timothy|letter\s*from\s*timothy|lt)\s+(\w+)$/, id: 'timothy' },
-      { re: /^(?:llf|flock|little\s*flock|letters\s*to\s*(?:the\s*)?(?:lord[''s]*\s*)?little\s*flock|lf)\s+(\w+)$/, id: 'flock' },
-      { re: /^(?:lr|rebuke|lord[''s]*\s*rebuke|a\s*testament\s*against\s*the\s*world)\s+(\w+)$/, id: 'rebuke' },
-      { re: /^(?:tb|the\s*blessed|blessed)\s+(\w+)$/, id: 'blessed' },
-      { re: /^(?:hd|holy\s*days?)\s+(\w+)$/, id: 'holydays' },
-    ];
-    for (let s = 0; s < shorthand.length; s++) {
-      const m = lower.match(shorthand[s].re);
-      if (m) {
-        let vcS = null;
-        for (let vv = 0; vv < D.VOLUME_COLLECTIONS.length; vv++) if (D.VOLUME_COLLECTIONS[vv].id === shorthand[s].id) vcS = D.VOLUME_COLLECTIONS[vv];
-        if (vcS) {
-          if (m[1] === 'preface' || m[1] === 'intro') return { kind: 'ref-letter', volumeId: vcS.id, volumeScreen: vcS.screen, letterNum: 0, isPreface: true, label: vcS.label + ' · Preface' };
-          const snum = parseWordNum(m[1]);
-          if (snum !== null) return { kind: 'ref-letter', volumeId: vcS.id, volumeScreen: vcS.screen, letterNum: snum, label: vcS.label + ' ' + snum };
-        }
-      }
-    }
-
-    // "Letter N" — default to V2, fall back to V1
-    const letterOnly = lower.match(/^letter\s+(\w+)$/);
-    if (letterOnly) {
-      const ln2 = parseWordNum(letterOnly[1]);
-      if (ln2 !== null) {
-        return { kind: 'ref-letter', volumeId: 'v2', volumeScreen: 'vot-letter', letterNum: ln2, label: 'Volume Two · Letter ' + ln2, fallbackVolumeId: 'v1', fallbackVolumeScreen: 'vot-one-letter' };
-      }
-    }
+    const letterRef = parseLetterRef(letterShape(lower));
+    if (letterRef) return letterRef;
   } // end allowVolumeRefs
 
   if (!allowScriptureRefs) {

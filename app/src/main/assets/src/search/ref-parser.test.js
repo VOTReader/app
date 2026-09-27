@@ -91,7 +91,8 @@ describe('parseReference', () => {
     expect(parseReference('v2 l5')).toMatchObject({ kind: 'ref-letter', volumeId: 'v2', letterNum: 5 });
     expect(parseReference('wtlb 1:45')).toMatchObject({ kind: 'ref-letter', volumeId: 'wtlb1', letterNum: 45 });
     expect(parseReference('lft five')).toMatchObject({ kind: 'ref-letter', volumeId: 'timothy', letterNum: 5 });
-    expect(parseReference('letter five')).toMatchObject({ kind: 'ref-letter', volumeId: 'v2', letterNum: 5, fallbackVolumeId: 'v1' });
+    // a letter alone names no collection: SearchScreen offers each that holds it
+    expect(parseReference('letter five')).toMatchObject({ kind: 'ref-letter', anyVolume: true, letterNum: 5 });
   });
 
   it('falls through to a text query', () => {

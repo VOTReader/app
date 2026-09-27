@@ -45,6 +45,62 @@ function pickEngine() {
   return window.VotSearchMini;
 }
 
+/* A LETTER REFERENCE OPENS A LETTER THAT EXISTS (search audit 2026-09-27). "letter 55"
+   made a card for Volume Two's Letter 55, which does not exist, and the tap did nothing;
+   "volume 7 letter 99" the same. The numbered collections, in the site's order. */
+const NUMBERED_LETTERS = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'timothy', 'flock', 'rebuke'];
+
+/**
+ * The cards a letter reference offers, each naming the letter's title: the letter
+ * named when its collection holds it; for "letter N" alone, each numbered collection
+ * that holds a letter N. A collection whose letters have not loaded yet gets the card
+ * as parsed (its tap resolves once they have). `missing` says a letter is not there.
+ * @param {any} p  a ref-letter parse
+ * @param {any} D  VotSearchData
+ * @param {any} win  where the collections' letters live (window)
+ * @returns {{ cards: Array<{__label:string, __sub:string, ref:any}>, missing: string|null }}
+ */
+export function letterRefCards(p, D, win) {
+  const cols = (D && D.VOLUME_COLLECTIONS) || [];
+  /** undefined: not loaded; null: not there */
+  const letterOf = (/** @type {any} */ vc, /** @type {number} */ num) => {
+    const arr = vc.dataVar && win ? win[vc.dataVar] : null;
+    if (!Array.isArray(arr)) return undefined;
+    if (num === 0) return (vc.prefaceVar && win[vc.prefaceVar]) || arr.find((l) => l && l.num === 0) || null;
+    return arr.find((l) => l && l.num === num) || null;
+  };
+  const card = (/** @type {any} */ vc, /** @type {any} */ L, /** @type {string} */ label) => ({
+    __label: label,
+    __sub: (L && L.title) || 'Open letter',
+    ref: { ...p, anyVolume: false, volumeId: vc.id, volumeScreen: vc.screen, letterId: (L && L.id) || null },
+  });
+  if (p.anyVolume) {
+    const cards = [];
+    let unknown = false;
+    for (const id of NUMBERED_LETTERS) {
+      const vc = cols.find((/** @type {any} */ c) => c.id === id);
+      if (!vc) continue;
+      const L = letterOf(vc, p.letterNum);
+      if (L === undefined) unknown = true;
+      else if (L) cards.push(card(vc, L, vc.label + ' · Letter ' + p.letterNum));
+    }
+    if (cards.length) return { cards, missing: null };
+    if (unknown) return { cards: [{ __label: p.label, __sub: 'Open letter', ref: p }], missing: null };
+    return { cards: [], missing: 'No collection has a Letter ' + p.letterNum + '.' };
+  }
+  const vc = cols.find((/** @type {any} */ c) => c.id === p.volumeId);
+  if (!vc) return { cards: [{ __label: p.label, __sub: 'Open letter', ref: p }], missing: null };
+  const L = letterOf(vc, p.letterNum);
+  if (L === null) {
+    const arr = win[vc.dataVar] || [];
+    let hi = 0;
+    for (const l of arr) if (l && typeof l.num === 'number' && l.num > hi) hi = l.num;
+    const what = p.letterNum === 0 ? 'a preface' : (/^v\d$/.test(vc.id) || NUMBERED_LETTERS.indexOf(vc.id) >= 0 ? 'Letter ' : 'number ') + p.letterNum;
+    return { cards: [], missing: vc.label + ' has no ' + what + (hi ? ' (it runs 1 to ' + hi + ').' : '.') };
+  }
+  return { cards: [card(vc, L, p.label)], missing: null };
+}
+
 // The engine keeps at most SEARCH_LIMIT hits PER COLLECTION (its perVolume
 // option), so the Bible's verses can no longer crowd the letters out of the All
 // corpus, and SEARCH_TOTAL_LIMIT in all, a bound the shipped corpus never
@@ -351,12 +407,22 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       const lbl = p.bookTitle + ' ' + p.chapter + (p.chapterEnd ? '–' + p.chapterEnd : '') + (p.verseStart ? ':' + p.verseStart + (p.verseEnd ? '-' + p.verseEnd : '') : '');
       out.push({ __direct: true, __corpus: curCorpus, __label: lbl, __sub: p.kind === 'named-passage' ? 'Named passage — open' : 'Open chapter', ref: p });
     } else if (p.kind === 'ref-letter' && allowLetter) {
-      out.push({ __direct: true, __corpus: curCorpus, __label: p.label, __sub: 'Open letter', ref: p });
+      const lr = letterRefCards(p, /** @type {any} */ (window).VotSearchData, window);
+      for (const c of lr.cards) out.push({ __direct: true, __corpus: curCorpus, ...c });
     } else if (p.kind === 'ref-book' && allowBible) {
       out.push({ __direct: true, __corpus: curCorpus, __label: p.bookTitle, __sub: 'Open book index', ref: p });
     }
     return out;
-  }, [state.parsed, settings.searchCorpus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- buildInfo.ready: the collections' letters load with the index, and the cards read them off window.
+  }, [state.parsed, settings.searchCorpus, buildInfo.ready]);
+
+  // A letter reference to a letter that is not there says so, instead of a card that does nothing.
+  const letterRefMissing = React.useMemo(() => {
+    const p = state.parsed;
+    if (!p || p.kind !== 'ref-letter' || (settings.searchCorpus || 'all') === 'scriptures') return null;
+    return letterRefCards(p, /** @type {any} */ (window).VotSearchData, window).missing;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- buildInfo.ready: as above, the letters load with the index.
+  }, [state.parsed, settings.searchCorpus, buildInfo.ready]);
 
   // Top results: the best 5 hits shown before the groups whenever there is more
   // than one group, in every corpus. The groups follow the site's order, not
@@ -684,7 +750,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </div>
         )}
 
-        {query && buildInfo.ready && state.phase === 'done' && state.results.length === 0 && directEntries.length === 0 && !didYouMean && (
+        {query && state.phase === 'done' && letterRefMissing && (
+          <div className="srch-corrected">{letterRefMissing}</div>
+        )}
+
+        {query && buildInfo.ready && state.phase === 'done' && state.results.length === 0 && directEntries.length === 0 && !didYouMean && !letterRefMissing && (
           <div className="search-no-results">No results for “{query.trim()}”</div>
         )}
 
