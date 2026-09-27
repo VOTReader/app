@@ -205,6 +205,7 @@ export function MoreMenuBtn() {
         </svg>
       </button>
       {open && pos ? ReactDOM.createPortal(
+        <>
         <div
           className="more-menu"
           role="menu"
@@ -247,7 +248,7 @@ export function MoreMenuBtn() {
             <span className="more-menu-step">
               <button type="button" role="menuitem" aria-label="Smaller text" disabled={pct <= MENU_SCALE_MIN * 100}
                 onClick={() => ctx.onFontScale(stepFontScale(ctx.fontScale, -1))}>A−</button>
-              <span className="more-menu-step-value" aria-live="polite">{pct === 100 ? 'Standard' : pct + '%'}</span>
+              <span className="more-menu-step-value">{pct === 100 ? 'Standard' : pct + '%'}</span>
               <button type="button" role="menuitem" aria-label="Larger text" disabled={pct >= MENU_SCALE_MAX * 100}
                 onClick={() => ctx.onFontScale(stepFontScale(ctx.fontScale, 1))}>A+</button>
             </span>
@@ -259,7 +260,12 @@ export function MoreMenuBtn() {
             </svg>
             <span>Settings</span>
           </button>
-        </div>,
+        </div>
+        {/* The text size's announcement: a role=menu may own only its items, so
+            the live region sits beside the menu, visually hidden (axe
+            aria-required-children); the readout above is what the eye sees. */}
+        <span className="more-menu-live sr-only" aria-live="polite">{'Text size ' + (pct === 100 ? 'Standard' : pct + '%')}</span>
+        </>,
         document.body,
       ) : null}
       {fallback ? (

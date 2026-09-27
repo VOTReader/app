@@ -108,6 +108,24 @@ describe('MoreMenuBtn — the compact bar', () => {
     expect(document.querySelector('.more-menu-step-value').textContent).toBe('300%');
   });
 
+  /* a11y (axe aria-required-children, 2026-09-27): a role=menu may own only
+     menu items and groups of them, and the text size's live readout sat inside
+     it. The readout the eye sees stays where it is; the announcement comes from
+     a visually hidden live region portaled beside the menu instead. */
+  it('the text size is announced from outside the menu, and the menu owns no live region', () => {
+    const s = setup({ fontScale: '1.1' });
+    s.open();
+    expect(s.menu().querySelector('[aria-live]')).toBeNull();
+    const live = document.querySelector('.more-menu-live');
+    expect(live).not.toBeNull();
+    expect(s.menu().contains(live)).toBe(false);
+    expect(live.getAttribute('aria-live')).toBe('polite');
+    expect(live.classList.contains('sr-only')).toBe(true);
+    expect(live.textContent).toBe('Text size 110%');
+    expect(document.querySelector('.more-menu-step-value').textContent).toBe('110%');
+    act(() => { fireEvent.keyDown(document, { key: 'Escape' }); });
+  });
+
   it('an outside press closes it; a press inside does not', () => {
     const s = setup();
     s.open();
