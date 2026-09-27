@@ -21,9 +21,11 @@
 import { copyFromSelection } from '../../utils/copy-share.js';
 
 /**
- * @param {{ text: string, verb?: 'copy' | 'share', onClose: () => void, onCopied: () => void }} props
+ * @param {{ text: string, verb?: 'copy' | 'share', what?: string, onClose: () => void, onCopied: () => void }} props
+ *   what: what the text is, in the instructions ("passage"; the ⋯ menu's
+ *   Copy website link says "link", cp2)
  */
-export function CopyFallbackSheet({ text, verb, onClose, onCopied }) {
+export function CopyFallbackSheet({ text, verb, what = 'passage', onClose, onCopied }) {
   const fieldRef = React.useRef(/** @type {HTMLTextAreaElement | null} */ (null));
   const [stillBlocked, setStillBlocked] = React.useState(false);
   const trapRef = useFocusTrap(true);
@@ -62,8 +64,8 @@ export function CopyFallbackSheet({ text, verb, onClose, onCopied }) {
         </h2>
         <p id="copy-fallback-help" className="copy-fallback-help">
           {stillBlocked
-            ? 'Still blocked. Press and hold the passage, choose Select all, then Copy.'
-            : 'Copy the selected passage below, or try again.'}
+            ? 'Still blocked. Press and hold the ' + what + ', choose Select all, then Copy.'
+            : 'Copy the selected ' + what + ' below, or try again.'}
         </p>
         <textarea
           ref={fieldRef}
@@ -71,7 +73,7 @@ export function CopyFallbackSheet({ text, verb, onClose, onCopied }) {
           readOnly
           value={text}
           rows={rows}
-          aria-label="The passage"
+          aria-label={'The ' + what}
         />
         <div className="copy-fallback-actions">
           <button type="button" className="copy-fallback-btn primary" onClick={retry}>Try again</button>

@@ -152,3 +152,91 @@ describe('stepFontScale', () => {
     expect(stepFontScale('junk', -1)).toBe('0.9');
   });
 });
+
+/* cp2 (Corbin 2026-09-27): "Copy link to this letter" — for a reader who wants
+   to send the letter, not a quote. On a reading page the site has, the ⋯ menu's
+   first item copies that page's link on thevolumesoftruth.com. */
+describe('MoreMenuBtn — Copy website link (cp2)', () => {
+  const g = globalThis;
+  let written;
+  let origClipboard;
+  beforeEach(() => {
+    written = [];
+    origClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: (t) => { written.push(t); return Promise.resolve(); } }, configurable: true, writable: true,
+    });
+    g.findEntryContext = (id) => ({
+      'the-wide-path': { kind: 'letter', screen: 'vot-letter', collection: 'Volume Two', title: 'The Wide Path' },
+      'come-love-awaits-you': { kind: 'wtlb', screen: 'wtlb-one-entry', collection: 'Words To Live By: Part One', title: 'Come, Love Awaits You' },
+    })[id] || null;
+    g.showToast = vi.fn();
+  });
+  afterEach(() => {
+    if (origClipboard) Object.defineProperty(navigator, 'clipboard', origClipboard);
+    else delete navigator.clipboard;
+    delete g.findEntryContext; delete g.showToast; delete g.useFocusTrap;
+    cleanup();
+    pages.splice(0).forEach((d) => d.remove());
+  });
+  const pages = [];
+  const pageOf = (key, html = '') => {
+    const d = document.createElement('div');
+    d.innerHTML = html || `<div class="page-wrapper" data-copy-key="${key}"></div>`;
+    document.body.appendChild(d);
+    pages.push(d);
+  };
+  const next = () => { cleanup(); pages.splice(0).forEach((d) => d.remove()); };
+  const linkItem = () => [...document.querySelectorAll('.more-menu [role="menuitem"]')].find((b) => /Copy website link/.test(b.textContent));
+
+  it('on a letter: first, naming the site; it copies the letter\'s link and says what was copied', async () => {
+    pageOf('letter:the-wide-path');
+    const { open } = setup();
+    open();
+    const item = linkItem();
+    expect(item).toBeTruthy();
+    expect(document.querySelector('.more-menu [role="menuitem"]')).toBe(item);
+    expect(item.querySelector('.more-menu-item-sub').textContent).toBe('thevolumesoftruth.com');
+    await act(async () => { fireEvent.click(item); });
+    expect(written).toEqual(['https://www.thevolumesoftruth.com/The_Wide_Path']);
+    expect(g.showToast).toHaveBeenCalledWith(expect.objectContaining({ text: 'Link copied: The Wide Path (Volume Two)' }));
+    expect(document.querySelector('.more-menu')).toBeNull();
+    expect(document.activeElement).toBe(document.querySelector('.nav-more-btn'));
+  });
+
+  it('a Words To Live By entry copies its own section of the Part page', async () => {
+    pageOf('wtlb:come-love-awaits-you');
+    const { open } = setup();
+    open();
+    await act(async () => { fireEvent.click(linkItem()); });
+    expect(written).toEqual(['https://www.thevolumesoftruth.com/Words_To_Live_By:_Part_One#Come.2C_Love_Awaits_You']);
+  });
+
+  it('the Bible (no page on the site), a screen that is no reading page, and a swipe preview offer none', () => {
+    pageOf('bible:john:7');
+    let s = setup();
+    s.open();
+    expect(linkItem()).toBeUndefined();
+    next();
+    s = setup();
+    s.open();
+    expect(linkItem()).toBeUndefined();
+    next();
+    pageOf('', '<div class="pager-peek" inert><div data-copy-key="letter:the-wide-path"></div></div>');
+    s = setup();
+    s.open();
+    expect(linkItem()).toBeUndefined();
+  });
+
+  it('a refused clipboard keeps the link on screen, to copy by hand', async () => {
+    g.useFocusTrap = () => ({ current: null });
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('denied')) }, configurable: true, writable: true });
+    pageOf('letter:the-wide-path');
+    const { open } = setup();
+    open();
+    await act(async () => { fireEvent.click(linkItem()); });
+    const box = document.querySelector('.copy-fallback-text');
+    expect(box.value).toBe('https://www.thevolumesoftruth.com/The_Wide_Path');
+    expect(document.querySelector('.copy-fallback-help').textContent).toBe('Copy the selected link below, or try again.');
+  });
+});

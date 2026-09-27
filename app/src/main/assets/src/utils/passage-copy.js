@@ -231,6 +231,21 @@ function declaredOrigin(range) {
   return origin && origin.reference ? origin : null;
 }
 
+/** The reading page on screen as a link to its place on the site (a letter's
+    page, a compilation entry's section, an Answers topic's own page), with its
+    name: what the ⋯ menu's "Copy website link" copies (cp2). The page is the
+    one whose data-copy-key is not a swipe preview's. null on a screen that is
+    no reading page, or a page the site does not have (the Bible).
+    @param {ParentNode} [root]
+    @returns {{ link: string, reference: string } | null} */
+export function pageSiteLink(root = document) {
+  const host = Array.from(root.querySelectorAll('[data-copy-key]')).find((el) => !el.closest(OFF_PAGE));
+  const key = host ? host.getAttribute('data-copy-key') || '' : '';
+  const origin = key ? passageOrigin([key]) : null;
+  const link = origin && origin.target ? siteUrl(origin.target) : '';
+  return origin && link ? { link, reference: origin.reference } : null;
+}
+
 /** Does the boundary at `offset` in `node` fall inside a word ("Bel|oved")?
     @param {Node} node @param {number} offset */
 function splitsWord(node, offset) {
