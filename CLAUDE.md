@@ -34,6 +34,7 @@ The one-line index of every landed phase (with commit hashes) heads **HISTORY.md
 - **NO security risks** — anything that could leak personal data or LAN-expose a service is a defect, not a polish item.
 - `android:allowBackup="false"` — Export/Import in Settings → "Your Data" is the only backup mechanism. JSON file, user-owned, no credentials.
 - GitHub identity **VOTReader** (the repo is public, for GitHub Pages) and Garden images on `VOTReader/votreader-assets` releases are fine for now.
+- **Offline audio on the web goes through the relay (Corbin 2026-09-26):** `relay/` (audio.votreader.workers.dev) relays ONLY the votreader-assets `audio-*` release mp3s, for the PWA's offline saves (`utils/offline-audio-web.js`, played back by the service worker with no signal). Streaming stays direct from GitHub; same per-recording / per-collection rule as the APK, no whole-edition button. The relay logs nothing.
 - No Play Store thinking until everything else is done — would also require Timothy's permission first.
 
 ## Permanent rules (never violate)

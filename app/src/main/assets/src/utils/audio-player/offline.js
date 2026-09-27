@@ -10,6 +10,7 @@ import { renditionsFor, _volKeyOf } from './catalog.js';
 import {
   _isSong,
   _native,
+  _el,
   _offline,
   OFFLINE_MSG,
   _toast,
@@ -39,12 +40,23 @@ export function _songKept(track) {
 
 /**
  * What the element loads for `track`: a kept song's object URL on the web (one alive at a time, revoked when the
- * track moves on), else the track's own URL. Native reads a kept song's file under its URL, so it always gets that.
+ * track moves on), a recording saved in this browser from the service worker's copy (cf1), else the track's own
+ * URL. Native reads a kept song's or a downloaded recording's file under its URL, so it always gets that.
  * @param {Track} track @returns {string}
  */
 export function _srcFor(track) {
-  if (_native || !_isSong(track)) return track.url;
+  if (_native) return track.url;
+  if (!_isSong(track)) return OfflineAudio.webSrc(track.url, _el && !_el.error ? _el.src : '');
   return SongKeep.objectUrlFor(songIdOfKey(track.key)) || track.url;
+}
+
+/**
+ * The element, unfailed, holds `track` in its other web form (streamed, or the saved copy): a resume that swaps
+ * the one for the other when the signal changed carries on from where it was, not from 0:00 (cf1).
+ * @param {Track} track @returns {boolean}
+ */
+export function _holdsOtherForm(track) {
+  return !_native && !!_el && !_el.error && OfflineAudio.webSameRecording(track.url, _el.src);
 }
 
 /**

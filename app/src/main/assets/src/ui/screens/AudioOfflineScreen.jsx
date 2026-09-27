@@ -3,7 +3,7 @@
 
    Built to Codex's mockup round 1, option 1 (lanes/readalong/out/mockups/offline/r1-1.png): each download with its
    size, a tap on it plays it (with no signal too), a Remove per row, and Remove all, which asks first. The Listening
-   Library hub's "On this phone" row opens it; it exists only in the Android app, where downloads are possible.
+   Library hub's "On this phone" row opens it; it exists where downloads are possible (the Android app, or a browser that keeps recordings: cf1).
 */
 
 /* Cluster H (esbuild bundle-h.js, lazy), with the other Listening Library screens. OfflineAudio and AudioPlayer stay

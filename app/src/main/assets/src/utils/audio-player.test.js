@@ -1952,6 +1952,30 @@ describe('audio-player — load errors', () => {
     expect(el().currentTime).toBe(12.4);           // …and metadata restores it
   });
 
+  // cf1: a recording saved in this browser streams online and plays its saved copy offline. A pause across losing
+  // the signal swaps one for the other, and that resume carries on from where it was, not from 0:00 (the refuter).
+  it('a pause across losing signal resumes a saved recording from its saved copy where it was', async () => {
+    const { OfflineAudio } = await import('./offline-audio.js');
+    const LOCAL = 'https://app.test/app/offline-audio/audio-v1/idC.mp3';
+    vi.spyOn(OfflineAudio, 'webSrc').mockImplementation((url, held) => (held === LOCAL || navigator.onLine === false ? LOCAL : url));
+    vi.spyOn(OfflineAudio, 'webSameRecording').mockImplementation((url, src) => src === url || src === LOCAL);
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    expect(el().src).toBe(URL_OF('idC'));          // online: streamed from GitHub, as always
+    el().currentTime = 12.4;
+    el().dispatchEvent(new Event('timeupdate'));
+    AudioPlayer.toggle();                           // pause
+    setOnline(false);
+    AudioPlayer.toggle();                           // play, with no signal
+    expect(el().src).toBe(LOCAL);
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(12.4);
+    // Back online, the saved copy it holds keeps playing (no reload to GitHub).
+    AudioPlayer.toggle();
+    setOnline(true);
+    AudioPlayer.toggle();
+    expect(el().src).toBe(LOCAL);
+  });
+
   /* The retry above arms its OWN deferred seek, and it is the same singleton
      and the same one listener slot as every other one. If the reader gives up
      on the failing recording and opens a different one before its metadata

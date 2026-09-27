@@ -4,6 +4,8 @@
 // semantics: a non-ok response rejects, and addAll is all-or-nothing), capture
 // the registered handlers, and drive 'install'.
 import { describe, it, expect, vi } from 'vitest';
+// Node's Blob: jsdom's replaces the global one, and Node's Response cannot read a jsdom Blob (cf1's range tests).
+import { Blob as NodeBlob } from 'buffer';
 import { readFileSync } from 'fs';
 import { webcrypto } from 'crypto';
 import { resolve, dirname } from 'path';
@@ -857,6 +859,69 @@ describe('service-worker — Songs of the Letters routes (2026-09-24)', () => {
     await sw.caches.open('vot-songs-v1');
     await activate(sw);
     expect(await sw.caches.keys()).toContain('vot-songs-v1');
+  });
+});
+
+describe('service-worker — recordings saved for offline on the web (cf1)', () => {
+  const GH = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/abc.mp3';
+  const LOCAL = 'https://app.test/app/offline-audio/audio-v1/abc.mp3';
+  const bytes = Uint8Array.from({ length: 100 }, (_, i) => i);
+  const ranged = (url, range) => ({ ...getReq(url, 'no-cors'), headers: { get: (h) => (h === 'Range' ? range : null) } });
+  async function saved() {
+    const sw = bootSW({ fetchImpl: async () => { throw new Error('offline'); } });
+    // A real Cache hands out a fresh response per match; the fake one hands back what was put, so put a readable-forever one.
+    await (await sw.caches.open('vot-offline-audio-v1')).put(GH, { blob: async () => new NodeBlob([bytes]) });
+    return sw;
+  }
+  const body = async (res) => [...new Uint8Array(await res.arrayBuffer())];
+
+  it('answers a range with a 206 cut from the saved bytes (Safari asks bytes=0-1 first)', async () => {
+    const sw = await saved();
+    const r = await fetchEvent(sw, ranged(LOCAL, 'bytes=0-1'));
+    expect(r.status).toBe(206);
+    expect(r.headers.get('Content-Range')).toBe('bytes 0-1/100');
+    expect(r.headers.get('Content-Length')).toBe('2');
+    expect(r.headers.get('Accept-Ranges')).toBe('bytes');
+    expect(await body(r)).toEqual([0, 1]);
+    const open = await fetchEvent(sw, ranged(LOCAL, 'bytes=98-'));
+    expect(open.headers.get('Content-Range')).toBe('bytes 98-99/100');
+    expect(await body(open)).toEqual([98, 99]);
+    const suffix = await fetchEvent(sw, ranged(LOCAL, 'bytes=-3'));
+    expect(await body(suffix)).toEqual([97, 98, 99]);
+    const past = await fetchEvent(sw, ranged(LOCAL, 'bytes=50-500'));
+    expect(past.headers.get('Content-Range')).toBe('bytes 50-99/100');
+  });
+
+  it('answers no range with the whole file, and an impossible range with 416', async () => {
+    const sw = await saved();
+    const whole = await fetchEvent(sw, getReq(LOCAL, 'no-cors'));
+    expect(whole.status).toBe(200);
+    expect(whole.headers.get('Content-Length')).toBe('100');
+    expect((await body(whole)).length).toBe(100);
+    const bad = await fetchEvent(sw, ranged(LOCAL, 'bytes=100-'));
+    expect(bad.status).toBe(416);
+    expect(bad.headers.get('Content-Range')).toBe('bytes */100');
+  });
+
+  it('a recording not saved (removed while it played) redirects to the release itself', async () => {
+    const sw = bootSW();
+    const r = await fetchEvent(sw, ranged('https://app.test/app/offline-audio/audio-v1/gone.mp3', 'bytes=0-'));
+    expect(r.status).toBe(302);
+    expect(r.headers.get('Location')).toBe('https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/gone.mp3');
+  });
+
+  it('streaming is untouched: the release URL itself passes straight to the network', () => {
+    const sw = bootSW();
+    expect(fetchEvent(sw, getReq(GH, 'no-cors'))).toBeUndefined();
+    expect(fetchEvent(sw, getReq('https://audio.votreader.workers.dev/audio-v1/abc.mp3'))).toBeUndefined();
+  });
+
+  it('activate never deletes the reader\u2019s saved recordings', async () => {
+    const sw = bootSW();
+    await (await sw.caches.open('vot-offline-audio-v1')).put(GH, { blob: async () => new NodeBlob([bytes]) });
+    await install(sw);
+    await activate(sw);
+    expect(await sw.caches.keys()).toContain('vot-offline-audio-v1');
   });
 });
 
