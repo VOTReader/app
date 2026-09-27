@@ -17,6 +17,59 @@
 import { searchData } from './search-data.js';
 import { parseTextQuery } from './query-parse.js';
 
+/* NAMED PASSAGES AS READERS TYPE THEM (search audit 2026-09-27). A passage was found
+   only by a key typed exactly as it is written, so "the lord's prayer", "the ten
+   commandments", "10 commandments", "lord’s prayer" with a curly apostrophe and "the
+   beatitudes" found no card (the last was "corrected" to platitudes). A key and a
+   query now meet in one shape (passageKey). */
+const PASSAGE_SKIP = new Set(['the', 'a', 'an', 'of', 'on', 'in', 'to', 'and']);
+
+/**
+ * A named-passage key or a query in the shape they are matched in: lower case, the
+ * apostrophes gone, the little words (the, a, an, of, on, in, to, and) dropped, a
+ * number word as its digits. "The Lord’s Prayer" and "lords prayer" are one key;
+ * "the ten commandments" and "10 commandments" another.
+ * @param {string} s
+ * @returns {string}
+ */
+export function passageKey(s) {
+  const D = searchData();
+  const words = String(s || '').toLowerCase().replace(/['\u2018\u2019]/g, '').split(/[^a-z0-9]+/);
+  const out = [];
+  for (const w of words) {
+    if (!w || PASSAGE_SKIP.has(w)) continue;
+    out.push(D.WORD_NUMS && Object.prototype.hasOwnProperty.call(D.WORD_NUMS, w) ? String(D.WORD_NUMS[w]) : w);
+  }
+  return out.join(' ');
+}
+
+/** @type {WeakMap<object, Map<string, any>>} each passage list's keys, in passageKey's shape */
+const PASSAGE_BY_KEY = new WeakMap();
+
+/**
+ * The named passage a query names, typed any of the ways passageKey folds; null when none.
+ * @param {string} q
+ * @returns {any}
+ */
+function namedPassageFor(q) {
+  const D = searchData();
+  const exact = D.NAMED_PASSAGE_INDEX && D.NAMED_PASSAGE_INDEX[q.toLowerCase()];
+  if (exact) return exact;
+  const list = D.NAMED_PASSAGES;
+  if (!list || !list.length) return null;
+  let byKey = PASSAGE_BY_KEY.get(list);
+  if (!byKey) {
+    byKey = new Map();
+    for (const np of list) for (const k of np.keys || []) {
+      const pk = passageKey(k);
+      if (pk && !byKey.has(pk)) byKey.set(pk, np);
+    }
+    PASSAGE_BY_KEY.set(list, byKey);
+  }
+  const key = passageKey(q);
+  return (key && byKey.get(key)) || null;
+}
+
 /** The books of one chapter: a lone number after one of them names a verse (v07-01). */
 const ONE_CHAPTER_BOOKS = new Set(['obadiah', 'philemon', '2john', '3john', 'jude']);
 
@@ -127,21 +180,6 @@ export function parseReference(query, parseOpts) {
   if (D.COMMAND_MAP[lower]) {
     const cmd = D.COMMAND_MAP[lower];
     return { kind: 'command', action: cmd.action, label: cmd.label };
-  }
-
-  // Named passages (Bible — Scriptures corpus only)
-  if (allowScriptureRefs && D.NAMED_PASSAGE_INDEX[lower]) {
-    const np = D.NAMED_PASSAGE_INDEX[lower];
-    return {
-      kind: 'named-passage',
-      bookId: np.bookId,
-      bookTitle: D.BOOK_DISPLAY[np.bookId] || np.bookId,
-      chapter: np.chapter,
-      chapterEnd: np.chapterEnd || null,
-      verseStart: np.verseStart || null,
-      verseEnd: np.verseEnd || null,
-      label: q,
-    };
   }
 
   // ═══ Volume / Letter refs — VOLUMES corpus only ═══
@@ -287,6 +325,22 @@ export function parseReference(query, parseOpts) {
         ? { kind: 'ref-bible', bookId, bookTitle, chapter: ch, verseStart: vs, verseEnd: ve }
         : { kind: 'ref-bible', bookId, bookTitle, chapter: ch, verseStart: vs };
     }
+  }
+
+  // Named passages (Bible — Scriptures corpus only), after the references: "Psalm 23"
+  // and "Isaiah 7" are the chapters typed (the key "isaiah 7" opened verse 14 instead).
+  const np = namedPassageFor(q);
+  if (np) {
+    return {
+      kind: 'named-passage',
+      bookId: np.bookId,
+      bookTitle: D.BOOK_DISPLAY[np.bookId] || np.bookId,
+      chapter: np.chapter,
+      chapterEnd: np.chapterEnd || null,
+      verseStart: np.verseStart || null,
+      verseEnd: np.verseEnd || null,
+      label: q,
+    };
   }
 
   return parseTextQuery(q);
