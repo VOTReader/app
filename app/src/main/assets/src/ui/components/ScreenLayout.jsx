@@ -40,9 +40,9 @@ function applySavedScrollToEl(el, saved) {
 
 /**
  * @param {{ navChildren?: any, children?: any, hideTabsBtn?: boolean, trackScroll?: boolean, pager?: any,
- *   stickyNav?: boolean, inert?: boolean, restoreScroll?: any, placeKey?: string }} props
+ *   stickyNav?: boolean, inert?: boolean, restoreScroll?: any, placeKey?: string, landmarks?: boolean }} props
  */
-export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '' }) {
+export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '', landmarks = true }) {
   const scrollRef = React.useRef(null);
   // `inert`: this ScreenLayout is a THROWAWAY visual clone of a neighbor screen,
   // mounted by the pager (PagerPeek) UNDER the live screen so the finger-follow
@@ -298,26 +298,33 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
   // what Lighthouse's landmark-one-main was reporting). The inert peek branch
   // above stays a <div>: a swipe preview is aria-hidden + inert, and a second
   // main element is exactly the duplicate the audit fails on next.
+  //
+  // `landmarks={false}`: a layout drawn OVER the live screen inside a dialog (the
+  // Tabs overview) keeps the same boxes and classes but no <nav>/<main> — the
+  // live screen's are the document's, and a second pair is axe's
+  // landmark-no-duplicate-main / landmark-unique. No CSS selects the elements.
+  const Nav = landmarks ? 'nav' : 'div';
+  const Main = landmarks ? 'main' : 'div';
   return (
     <div className="screen-layout">
-      <nav className="top-nav">
+      <Nav className="top-nav">
         {navChildren}
         <ResumeReadingNavBtn />
         {hideTabsBtn ? null : <TabsNavBtn />}
         <MoreMenuBtn />
-      </nav>
+      </Nav>
       {pager ? (
         <div className="pager-viewport">
-          <main className="screen-scroll" ref={ref}>
+          <Main className="screen-scroll" ref={ref}>
             <div className="pager-track" ref={trackRef}>{children}</div>
-          </main>
+          </Main>
           {prevDesc && <PagerPeek side="prev" desc={prevDesc} peekRef={peekPrevRef} />}
           {nextDesc && <PagerPeek side="next" desc={nextDesc} peekRef={peekNextRef} />}
         </div>
       ) : (
-        <main className="screen-scroll" ref={ref}>
+        <Main className="screen-scroll" ref={ref}>
           {children}
-        </main>
+        </Main>
       )}
       {stickyNav}
       {/* First-run annotation tip — reading screens only (`pager` is passed

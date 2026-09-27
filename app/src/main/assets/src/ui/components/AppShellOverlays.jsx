@@ -104,7 +104,9 @@ export function AppShellOverlays({
           {/* The overlay nav carries back + Home only — hide the whole right
               cluster. onHomeBefore: __goHome changes the screen UNDER this
               overlay, so close it too or the tap looks like a dead button. */}
-          <ScreenLayout trackScroll={false} navChildren={LibraryNav({
+          {/* landmarks={false}: the live screen underneath owns the document's
+              one main landmark and its nav; this dialog must not add a second pair. */}
+          <ScreenLayout trackScroll={false} landmarks={false} navChildren={LibraryNav({
             onBack: () => setTabsOverviewOpen(false),
             backTitle: 'Back',
             onHomeBefore: () => setTabsOverviewOpen(false),

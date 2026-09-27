@@ -77,9 +77,27 @@ describe('ScreenLayout — the one main landmark', () => {
     expect(container.querySelector('.screen-scroll')).toBeTruthy();
   });
 
+  /* a11y (axe landmark-no-duplicate-main / landmark-unique, 2026-09-27): the
+     Tabs overview is a dialog drawn over the live screen with its own
+     ScreenLayout, so the document carried two <main>s and two unnamed <nav>s
+     while it was open. A layout inside an overlay renders the same boxes with
+     the same classes, and no landmarks. */
+  it('landmarks={false} (an overlay over the live screen) renders no <main> and no <nav>, same classes', () => {
+    const { container } = render(<SL hideTabsBtn trackScroll={false} landmarks={false} navChildren={null}>tabs</SL>);
+    expect(container.querySelectorAll('main, nav').length).toBe(0);
+    expect(container.querySelector('.screen-layout > div.top-nav')).toBeTruthy();
+    expect(container.querySelector('.screen-layout > div.screen-scroll')).toBeTruthy();
+  });
+
+  it('the Tabs overview passes landmarks={false}', () => {
+    const src = readFileSync(resolve(UI, 'components/AppShellOverlays.jsx'), 'utf-8');
+    expect(src).toMatch(/<ScreenLayout trackScroll=\{false\} landmarks=\{false\}/);
+  });
+
   it('is the ONLY product component in src/ui that writes a <main> element', () => {
     const offenders = uiSources()
-      .filter(([, src]) => /<main[\s>]/.test(src))
+      // ScreenLayout names the element as a string (`landmarks ? 'main' : 'div'`)
+      .filter(([, src]) => /<main[\s>]|\? 'main' :/.test(src))
       .map(([rel]) => rel);
     expect(offenders).toEqual(['components/ScreenLayout.jsx']);
   });
