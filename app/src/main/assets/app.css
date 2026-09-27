@@ -636,6 +636,9 @@
         text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
       }
       .more-menu-item svg { width: 20px; height: 20px; color: var(--gold); flex-shrink: 0; }
+      /* cp2: "Copy website link" names the site it copies, under it. */
+      .more-menu-item-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      .more-menu-item-sub { font-size: var(--fsc-13); color: var(--cream-muted); }
       .more-menu-item:focus-visible, .more-menu-seg button:focus-visible, .more-menu-step button:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
       .more-menu-item:active { background: var(--gold-faint); }
       @media (hover: hover) { .more-menu-item:hover { background: var(--gold-faint); } }
@@ -4879,6 +4882,20 @@
       transition: background 0.12s, border-color 0.12s;
     }
     .sel-listen-btn:active { background: var(--gold-faint); }
+    /* cp2: Share held offers the website link too, in a row above the actions. */
+    .sel-link-choice { gap: 8px; }
+    .sel-link-choice-btn {
+      flex: 1 1 auto; min-height: 44px; padding: 6px 10px; border-radius: 8px; cursor: pointer;
+      background: transparent; border: 1px solid var(--gold); color: var(--gold);
+      font-family: 'Cinzel', serif; font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .sel-link-choice-btn:active { background: var(--gold-faint); }
+    .sel-link-choice-cancel {
+      flex: 0 0 auto; min-width: 44px; min-height: 44px; border-radius: 8px; cursor: pointer;
+      background: none; border: 1px solid transparent; color: var(--cream-muted); font-size: var(--fs-15);
+      -webkit-tap-highlight-color: transparent;
+    }
     .sel-listen-btn svg { width: 15px; height: 15px; fill: var(--gold); stroke: none; flex-shrink: 0; }
     /* REPEAT (rp1 part 3, mockup r1-repeat.png): the right-hand segment of the
        same outlined box, Listen from here on the left, one gold divider. */

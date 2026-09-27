@@ -50,10 +50,23 @@
      data-copy-ref;
    - words on a reading page outside its verse blocks (a heading, a letter's
      intro quote): the page's own name, from its data-copy-key.
+
+   THE LINK (cp2, Corbin 2026-09-27: "inserts the name of the letter at the
+   bottom AND provides the closest possible link to it on the website proper,
+   thevolumesoftruth.com, so flock members can copy-paste easily"). Under the
+   reference, a copy of the Volumes of Truth carries its address on the site
+   (utils/site-link.js): the letter's page, a compilation entry's section, and
+   the copied words as a text fragment, so the link opens on the passage. A
+   passage quoted in an Answers topic names the letter it is from (its
+   "~ [From …]" source line) and links there; words across several of its
+   passages name the topic and link its answersonlygodcangive.com page. The
+   Bible has no page on the site: a verse copy keeps its reference alone.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { _bookmarkSourceLabel } from './bookmark-source.js';
 import { ANNOTATION_CHROME } from '../renderer/anchor-view.js';
+import { siteTarget, sourceTarget, pageTarget, siteUrl, collectionName, MATTHEW_STUDY_PAGE } from './site-link.js';
+import { passageSource, isQuotedWords } from './answers-contents.js';
 
 /** The swipe previews: inert clones of the neighbour pages (ScreenLayout). */
 const OFF_PAGE = '[inert], .pager-peek';
@@ -122,39 +135,71 @@ function isTranslatedBook(id) {
   return list.some((b) => !!b && b.id === id);
 }
 
-/** A letter-family entry's reference: its title and its collection,
-    "Subject to No Man (Volume Two)". Hidden Manna keeps its title alone: it is
-    reached only through the Matthew study chain and is never named as a
-    collection in the open. '' when the entry is not known.
-    @param {string} key */
-function entryReference(key) {
-  const p = key.split(':');
-  const ctx = typeof findEntryContext === 'function' ? findEntryContext(p[1], p[0]) : null;
-  if (!ctx || !ctx.title) return '';
-  if (!ctx.collection || ctx.screen === 'hm-letter') return ctx.title;
-  return ctx.title + ' (' + ctx.collection + ')';
+/**
+ * @typedef {{ reference: string, target: import('./site-link.js').SiteTarget | null, quoteKeys?: Set<string> }} Origin
+ *   reference: the line a copy ends with ('' for none); target: where the words
+ *   live on the site (null: nowhere, as for the Bible); quoteKeys: the blocks
+ *   whose words the site's page has (all of them when absent).
+ */
+
+/** What a copy of these blocks ends with, and where they live on the site.
+    A letter-family entry is named by its title and its collection, "Subject
+    to No Man (Volume Two)"; Hidden Manna keeps its title alone: it is reached
+    only through the Matthew study chain and is never named as a collection in
+    the open.
+    @param {string[]} keys  the copied blocks' keys, in reading order
+    @returns {Origin} */
+function passageOrigin(keys) {
+  /** @type {Origin} */
+  const none = { reference: '', target: null };
+  if (!keys.length) return none;
+  const p = keys[0].split(':');
+  const kind = p[0];
+  if (!PUBLIC_KINDS.has(kind)) return none;
+  const verses = keys.filter(isVerseKey);
+  if (verses.length) {
+    const label = passageLabel(verses[0], verses[verses.length - 1]);
+    return kind === 'study'
+      ? { reference: label + STUDY_TAG, target: pageTarget(MATTHEW_STUDY_PAGE) }
+      : { reference: label + translationTag(verses[0]), target: null };
+  }
+  // A whole chapter (a page's own key): "John 7 (NKJV)", "Matthew 5 (Study Bible)".
+  if (kind === 'bible') return { reference: p.length === 3 ? _bookmarkSourceLabel(keys[0]) + translationTag(keys[0]) : '', target: null };
+  if (kind === 'study') {
+    const ch = p.length === 2 ? /^(.+)-(\d+)$/.exec(p[1] || '') : null;
+    const reference = p.length !== 2 ? _bookmarkSourceLabel(keys[0])
+      : ch ? ch[1].charAt(0).toUpperCase() + ch[1].slice(1) + ' ' + ch[2] + STUDY_TAG : '';
+    return { reference, target: pageTarget(MATTHEW_STUDY_PAGE) };
+  }
+  const ctx = typeof findEntryContext === 'function' ? findEntryContext(p[1], kind) : null;
+  if (!ctx || !ctx.title) return none;
+  if (ctx.screen === 'answers-entry') return answersOrigin(ctx, keys);
+  const reference = !ctx.collection || ctx.screen === 'hm-letter' ? ctx.title : ctx.title + ' (' + ctx.collection + ')';
+  return { reference, target: siteTarget(ctx) };
+}
+
+/** An Answers topic is passages quoted from the letters. Copied words within
+    one passage name the letter they are from (the passage's "~ [From …]" line)
+    and link there, quoting only the letter's own words (not the source line,
+    a divider or the site's section headings); words across passages name the
+    topic and link its page on answersonlygodcangive.com.
+    @param {{ title: string, collection?: string, entry?: any }} ctx
+    @param {string[]} keys
+    @returns {Origin} */
+function answersOrigin(ctx, keys) {
+  const paras = ctx.entry && Array.isArray(ctx.entry.paragraphs) ? ctx.entry.paragraphs : [];
+  const at = keys.map((k) => Number(k.split(':')[2])).filter((n) => Number.isInteger(n));
+  const src = at.length ? passageSource(paras, Math.min(...at), Math.max(...at)) : null;
+  const quoteKeys = new Set(keys.filter((k) => isQuotedWords(paras[Number(k.split(':')[2])])));
+  if (src) return { reference: src.title + ' (' + collectionName(src.collection) + ')', target: sourceTarget(src.title, src.collection), quoteKeys };
+  const href = ctx.entry && typeof ctx.entry.siteUrl === 'string' ? ctx.entry.siteUrl : '';
+  return { reference: ctx.title + ' (' + ctx.collection + ')', target: href ? { href } : null, quoteKeys };
 }
 
 /** The line a copy of these blocks ends with, or '' for none.
     @param {string[]} keys  the copied blocks' keys, in reading order */
 export function passageReference(keys) {
-  if (!keys.length) return '';
-  const p = keys[0].split(':');
-  const kind = p[0];
-  if (!PUBLIC_KINDS.has(kind)) return '';
-  const verses = keys.filter(isVerseKey);
-  if (verses.length) {
-    const label = passageLabel(verses[0], verses[verses.length - 1]);
-    return label + (kind === 'study' ? STUDY_TAG : translationTag(verses[0]));
-  }
-  // A whole chapter (a page's own key): "John 7 (NKJV)", "Matthew 5 (Study Bible)".
-  if (kind === 'bible' && p.length === 3) return _bookmarkSourceLabel(keys[0]) + translationTag(keys[0]);
-  if (kind === 'study' && p.length === 2) {
-    const ch = /^(.+)-(\d+)$/.exec(p[1] || '');
-    return ch ? ch[1].charAt(0).toUpperCase() + ch[1].slice(1) + ' ' + ch[2] + STUDY_TAG : '';
-  }
-  if (kind === 'study') return _bookmarkSourceLabel(keys[0]);
-  return entryReference(keys[0]);
+  return passageOrigin(keys).reference;
 }
 
 /** A sheet's reference for the verse text it shows: the reference itself when
@@ -167,20 +212,79 @@ export function sheetReference(ref) {
   return /\([A-Za-z][A-Za-z0-9-]*\)$/.test(r) ? r : r + ' (NKJV)';
 }
 
-/** The reference a page or a sheet declares for its words outside any verse
-    block: data-copy-ref (a literal: a sheet's "John 3:16 (NKJV)") or
-    data-copy-key (named like a passage: "letter:the-wide-path" is "The Wide
-    Path (Volume Two)"). '' when the range is under neither.
-    @param {Range} range */
-function declaredReference(range) {
+/** What a page or a sheet declares for its words outside any verse block:
+    data-copy-ref (a literal: a sheet's "John 3:16 (NKJV)") or data-copy-key
+    (named, and placed on the site, like a passage: "letter:the-wide-path" is
+    "The Wide Path (Volume Two)" at its page). null when the range is under
+    neither.
+    @param {Range} range
+    @returns {Origin | null} */
+function declaredOrigin(range) {
   const node = range.commonAncestorContainer;
   const el = node.nodeType === 1 ? /** @type {Element} */ (node) : node.parentElement;
   const host = el && el.closest ? el.closest('[data-copy-ref], [data-copy-key]') : null;
-  if (!host || host.closest(OFF_PAGE)) return '';
+  if (!host || host.closest(OFF_PAGE)) return null;
   const literal = host.getAttribute('data-copy-ref');
-  if (literal) return literal;
-  const key = host.getAttribute('data-copy-key');
-  return key ? passageReference([key]) : '';
+  if (literal) return { reference: literal, target: null };
+  const key = host.getAttribute('data-copy-key') || '';
+  const origin = key ? passageOrigin([key]) : null;
+  return origin && origin.reference ? origin : null;
+}
+
+/** The reading page on screen as a link to its place on the site (a letter's
+    page, a compilation entry's section, an Answers topic's own page), with its
+    name: what the ⋯ menu's "Copy website link" copies (cp2). The page is the
+    one whose data-copy-key is not a swipe preview's. null on a screen that is
+    no reading page, or a page the site does not have (the Bible).
+    @param {ParentNode} [root]
+    @returns {{ link: string, reference: string } | null} */
+export function pageSiteLink(root = document) {
+  const host = Array.from(root.querySelectorAll('[data-copy-key]')).find((el) => !el.closest(OFF_PAGE));
+  const key = host ? host.getAttribute('data-copy-key') || '' : '';
+  const origin = key ? passageOrigin([key]) : null;
+  const link = origin && origin.target ? siteUrl(origin.target) : '';
+  return origin && link ? { link, reference: origin.reference } : null;
+}
+
+/** Does the boundary at `offset` in `node` fall inside a word ("Bel|oved")?
+    @param {Node} node @param {number} offset */
+function splitsWord(node, offset) {
+  if (node.nodeType !== 3) return false;
+  const s = /** @type {Text} */ (node).data;
+  return offset > 0 && offset < s.length && /[\p{L}\p{N}]/u.test(s[offset - 1]) && /[\p{L}\p{N}]/u.test(s[offset]);
+}
+
+/** The copied words, line by line, for the link's quote: a line never runs
+    across a paragraph, a poem's line, a footnote bubble or a verse number
+    (where the site's words break as well: its footnotes are "[1]" marks), and
+    a word the selection cuts in two is left out (the page has no "eloved").
+    @param {Range[]} clips  the copied parts of the passage's blocks, in order
+    @returns {string[][]} */
+function quoteLines(clips) {
+  /** @type {string[][]} */
+  const lines = [];
+  let line = '';
+  // A line of marks alone ("dunghill³..." leaves "...") is nothing to find.
+  const flush = () => { const t = line.trim(); if (/[\p{L}\p{N}]/u.test(t)) lines.push(t.split(/\s+/)); line = ''; };
+  /** @param {Node} node */
+  const walk = (node) => {
+    if (node.nodeType === 3) { line += /** @type {Text} */ (node).data; return; }
+    if (node.nodeType !== 1 && node.nodeType !== 11) return;
+    const el = node.nodeType === 1 ? /** @type {Element} */ (node) : null;
+    if (el && (el.matches(ANNOTATION_CHROME) || el.matches(VERSE_NUMBER) || el.tagName === 'BR' || el.tagName === 'BUTTON')) { flush(); return; }
+    const block = !!el && BLOCK_TAGS.has(el.tagName);
+    if (block) flush();
+    node.childNodes.forEach(walk);
+    if (block) flush();
+  };
+  clips.forEach((c, i) => {
+    const start = lines.length;
+    walk(c.cloneContents());
+    flush();
+    if (i === 0 && lines.length > start && splitsWord(c.startContainer, c.startOffset)) lines[start].shift();
+    if (i === clips.length - 1 && lines.length > start && splitsWord(c.endContainer, c.endOffset)) lines[lines.length - 1].pop();
+  });
+  return lines;
 }
 
 /** The reading blocks ([data-hl-key]) the range reaches, in document order —
@@ -258,15 +362,15 @@ function verseNumberOf(el) {
 /**
  * What a copy of `range` puts on the clipboard, or null when the range holds
  * no reading text (the browser's own copy stands then). `text` is `body`, then
- * `reference` on its own line. With `numbers` false the verse numbers are left
- * out (Share sends the words; its link and reference say which verses).
+ * `reference` and `link` (its place on thevolumesoftruth.com, cp2) each on its
+ * own line. With `numbers` false the verse numbers are left out.
  * @param {Range} range
  * @param {{ numbers?: boolean }} [opts]
- * @returns {{ text: string, body: string, reference: string, keys: string[], isPublic: boolean } | null}
+ * @returns {{ text: string, body: string, reference: string, link: string, keys: string[], isPublic: boolean } | null}
  */
 export function passageCopy(range, { numbers = true } = {}) {
   if (!range || range.collapsed) return null;
-  /** @type {{ el: Element, key: string, body: string, fromTop: boolean }[]} */
+  /** @type {{ el: Element, key: string, body: string, clip: Range, fromTop: boolean }[]} */
   const parts = [];
   readingBlocksIn(range).forEach((el) => {
     const clip = clipTo(range, el);
@@ -277,15 +381,18 @@ export function passageCopy(range, { numbers = true } = {}) {
     const before = document.createRange();
     before.setStart(el, 0);
     before.setEnd(clip.startContainer, clip.startOffset);
-    parts.push({ el, key: el.getAttribute('data-hl-key') || '', body, fromTop: !plainText(before.cloneContents()) });
+    parts.push({ el, key: el.getAttribute('data-hl-key') || '', body, clip, fromTop: !plainText(before.cloneContents()) });
   });
+  const ending = (/** @type {string} */ body, /** @type {string} */ reference, /** @type {string} */ link) =>
+    body + (reference ? '\n' + reference : '') + (link ? '\n' + link : '');
   if (!parts.length) {
     // No verse block in it: words a page or a sheet declares a reference for
     // (a heading, an intro quote, a footnote's verse), or none of ours.
-    const declared = declaredReference(range);
+    const declared = declaredOrigin(range);
     const words = declared ? plainText(range.cloneContents(), numbers) : '';
-    if (!words) return null;
-    return { text: words + '\n' + declared, body: words, reference: declared, keys: [], isPublic: true };
+    if (!declared || !words) return null;
+    const link = declared.target ? siteUrl(declared.target, quoteLines([range])) : '';
+    return { text: ending(words, declared.reference, link), body: words, reference: declared.reference, link, keys: [], isPublic: true };
   }
   const manyVerses = parts.filter((p) => isVerseKey(p.key)).length > 1;
   let text = '';
@@ -304,11 +411,17 @@ export function passageCopy(range, { numbers = true } = {}) {
   const keys = parts.map((p) => p.key);
   const isPublic = PUBLIC_KINDS.has(keys[0].split(':')[0]);
   // A block whose entry cannot be named still carries its page's name.
-  const reference = passageReference(keys) || (isPublic ? declaredReference(range) : '');
+  let origin = passageOrigin(keys);
+  if (!origin.reference && isPublic) origin = declaredOrigin(range) || origin;
+  const quoted = origin.quoteKeys;
+  const link = origin.target
+    ? siteUrl(origin.target, quoteLines(parts.filter((p) => !quoted || quoted.has(p.key)).map((p) => p.clip)))
+    : '';
   return {
-    text: reference ? text + '\n' + reference : text,
+    text: ending(text, origin.reference, link),
     body: text,
-    reference,
+    reference: origin.reference,
+    link,
     keys,
     isPublic,
   };

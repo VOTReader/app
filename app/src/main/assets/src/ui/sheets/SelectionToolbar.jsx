@@ -179,6 +179,26 @@ const SETTLE_MS = 350;
 const STILL_MS = 100;
 /** ...but never longer than this many waits (1.5 s): it always comes back. */
 const STILL_WAITS = 15;
+/** Holding Share this long offers the website link too (cp2), a little
+    sooner than Android's own long-press (about 500 ms). */
+const SHARE_HOLD_MS = 450;
+
+/** Share's second link (cp2): shown above the actions once the reader holds
+    Share, for a passage the website has. A tap on Share sends the app's link
+    (Corbin: "share just links to the app"); this offers the website's too, for
+    someone without the app. Escape and Android Back close it (the registry).
+    @param {{ onApp: () => void, onSite: () => void, onCancel: () => void }} props */
+function ShareLinkChoice({ onApp, onSite, onCancel }) {
+  const id = React.useId();
+  useModalRegistry({ id: 'share-link-choice:' + id, dismiss: onCancel });
+  return (
+    <div className="sel-toolbar-row sel-link-choice" role="group" aria-label="Share with which link">
+      <button type="button" className="sel-link-choice-btn" onClick={onApp}>App link</button>
+      <button type="button" className="sel-link-choice-btn" onClick={onSite}>Website link</button>
+      <button type="button" className="sel-link-choice-cancel" onClick={onCancel} aria-label="Cancel">✕</button>
+    </div>
+  );
+}
 
 export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkRequest }) {
   const [visible, setVisible] = React.useState(false);
@@ -205,7 +225,20 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   // A15: the passage a Copy / Share could not deliver ({ text, verb }), kept
   // on screen by CopyFallbackSheet after the toolbar itself has closed.
   const [copyFallback, setCopyFallback] = React.useState(/** @type {{ text: string, verb: 'copy' | 'share' } | null} */ (null));
-  React.useEffect(() => { setConfirmingRemove(false); }, [selInfo]);
+  // cp2: holding Share (or right-clicking it, or its context-menu key) offers
+  // the website link too; a tap sends the app's.
+  const [choosingLink, setChoosingLink] = React.useState(false);
+  const shareHoldRef = React.useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
+  const shareHeldRef = React.useRef(false);
+  // A new selection drops a pending Share hold too, so its row never opens over the next passage (cl1 review).
+  React.useEffect(() => {
+    setConfirmingRemove(false); setChoosingLink(false);
+    if (shareHoldRef.current) { clearTimeout(shareHoldRef.current); shareHoldRef.current = null; }
+    shareHeldRef.current = false;
+  }, [selInfo]);
+  // The row closing forgets the hold: Android may send no click after a long-press, and a later
+  // keyboard or TalkBack Share (a click with no pointerdown) must not be swallowed (cl1 review).
+  React.useEffect(() => { if (!choosingLink) shareHeldRef.current = false; }, [choosingLink]);
 
   // W1.5(a.2) — register with the central modal registry while the toolbar
   // is visible so Escape dismisses the selection (via __hideSelectionToolbar's
@@ -517,13 +550,14 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       })();
       if (!text) { setVisible(false); return; }
       // Copy-specific text (cp1, utils/passage-copy.js): a verse per line, its
-      // number and a space, and the reference on the last line — what the
-      // document `copy` listener below gives Ctrl+C and the native menus too.
-      // Only the Copy action uses this; all other actions use `text`.
+      // number and a space, the reference, and (cp2) the passage's link on
+      // thevolumesoftruth.com — what the document `copy` listener below gives
+      // Ctrl+C and the native menus too. Copy and Share use it; all other
+      // actions use `text`.
+      const copied = (() => { try { return passageCopy(range); } catch (_e) { return null; } })();
       const selCopyText = (() => {
+        if (copied) return copied.text;
         try {
-          const out = passageCopy(range);
-          if (out) return out.text;
           const frag = range.cloneContents();
           frag.querySelectorAll('.fn-ref, .hl-note-icon').forEach(function(el) { el.remove(); });
           return blockAwareText(frag).trim();
@@ -531,20 +565,21 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           return text;
         }
       })();
-      // n6-02: Share sends what Copy keeps (a poem's lines, a letter's
-      // paragraphs, a verse per line) without the verse numbers `text` also
-      // leaves out, and names the passage the way Copy does (cp1). The same
+      // n6-02 / cp2: Share sends what Copy sends (a poem's lines, a letter's
+      // paragraphs, a verse per line with its number and a space) and names
+      // the passage the same way; only its link differs: the app's own on a
+      // tap (handleShare), or, held and chosen, the website's (Copy's whole
+      // text, siteText; '' when the passage has no page there). The same
       // formatter, so a Words To Live By poem's <br> lines no longer arrive
       // glued ("captiveThat you may").
       const selShare = (() => {
+        if (copied) return { text: copied.body, keys: copied.keys, reference: copied.reference, siteText: copied.link ? copied.text : '' };
         try {
-          const out = passageCopy(range, { numbers: false });
-          if (out) return { text: out.body, keys: out.keys, reference: out.reference };
           const frag = range.cloneContents();
           frag.querySelectorAll('.fn-ref, .hl-note-icon, .verse-num').forEach(function(el) { el.remove(); });
-          return { text: blockAwareText(frag).trim() || text, keys: [], reference: '' };
+          return { text: blockAwareText(frag).trim() || text, keys: [], reference: '', siteText: '' };
         } catch (_e) {
-          return { text, keys: [], reference: '' };
+          return { text, keys: [], reference: '', siteText: '' };
         }
       })();
       const selShareText = selShare.text;
@@ -1122,15 +1157,20 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     onNoteRequest && onNoteRequest(groupId, /*startInEditMode=*/true, /*freshGroup=*/createdGroup);
   }, [selInfo, onNoteRequest, computeOffset]);
 
-  const handleShare = React.useCallback(() => {
+  const handleShare = React.useCallback((/** @type {'app' | 'site'} */ which) => {
     if (!selInfo) return;
     // A8: the quote travels with its reference and a link that opens the
     // passage (utils/passage-link.js); a key that may not travel (the reader's
     // own journal) sends the words alone. A multi-verse selection links to
-    // its first verse.
+    // its first verse. cp2: that is the app's link (Corbin: "share just links
+    // to the app"); held and chosen, the website's instead, Copy's own text,
+    // for someone without the app.
     const share = selInfo.share;
+    setChoosingLink(false);
     let text;
-    if (share && share.keys && share.keys.length) {
+    if (which === 'site' && share && share.siteText) {
+      text = share.siteText;
+    } else if (share && share.keys && share.keys.length) {
       // The blocks the words came from: the first opens the link, and the
       // reference is Copy's ("John 7:37-39 (NKJV)", "The Wide Path (Volume Two)").
       text = withPassageLink(share.text, share.keys[0], share.reference || null);
@@ -1150,6 +1190,32 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       else if (outcome === 'failed') setCopyFallback({ text, verb: 'share' });
     });
   }, [selInfo, confirmCopied]);
+
+  // cp2: Share's two links. A tap shares with the app's; a hold (about half a
+  // second), a right-click or the context-menu key offers the website's too,
+  // in a row above the actions (the finger stays on Share, so lifting it never
+  // lands on a choice), when the passage has a page there. The click that ends
+  // a hold is not a share; the next press forgets the hold.
+  const canChooseLink = !!(selInfo && selInfo.share && selInfo.share.siteText);
+  const onShareTap = () => {
+    if (shareHeldRef.current) { shareHeldRef.current = false; return; }
+    handleShare('app');
+  };
+  const onShareRelease = () => { if (shareHoldRef.current) { clearTimeout(shareHoldRef.current); shareHoldRef.current = null; } };
+  const onSharePress = () => {
+    shareHeldRef.current = false;
+    onShareRelease();
+    if (!canChooseLink) return;
+    shareHoldRef.current = setTimeout(() => { shareHoldRef.current = null; shareHeldRef.current = true; setChoosingLink(true); }, SHARE_HOLD_MS);
+  };
+  const onShareMenu = (/** @type {any} */ e) => {
+    // Never the document's own contextmenu handler: it would raise the toolbar anew.
+    e.preventDefault();
+    e.stopPropagation();
+    onShareRelease();
+    if (canChooseLink) setChoosingLink(true);
+  };
+  React.useEffect(() => () => onShareRelease(), []);
 
   const handleSearch = React.useCallback(() => {
     if (!selInfo) return;
@@ -1429,6 +1495,9 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           )}
         </div>
       )}
+      {choosingLink && canChooseLink && (
+        <ShareLinkChoice onApp={() => handleShare('app')} onSite={() => handleShare('site')} onCancel={() => setChoosingLink(false)} />
+      )}
       {/* Action buttons: note only for single-container; link + copy/share/search always */}
       <div className="sel-toolbar-row sel-toolbar-actions">
         {/* Note works for multi-verse / multi-paragraph selections too — the
@@ -1461,7 +1530,16 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           </svg>
           <span>Copy</span>
         </button>
-        <button className="sel-action-btn" onClick={handleShare} title="Share">
+        <button
+          className="sel-action-btn"
+          onClick={onShareTap}
+          onPointerDown={onSharePress}
+          onPointerUp={onShareRelease}
+          onPointerLeave={onShareRelease}
+          onPointerCancel={onShareRelease}
+          onContextMenu={onShareMenu}
+          title={canChooseLink ? 'Share (hold for the website link)' : 'Share'}
+        >
           <svg viewBox="0 0 24 24">
             <circle cx="18" cy="5" r="3" />
             <circle cx="6" cy="12" r="3" />

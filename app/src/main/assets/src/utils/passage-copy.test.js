@@ -89,7 +89,7 @@ describe('passageCopy — a Bible passage (the reader\'s John 7:37-39)', () => {
     expect(/** @type {any} */ (passageCopy(range(num, 1, end, end.length))).text.startsWith('37 On the last day')).toBe(true);
   });
 
-  it('numbers: false (Share) gives the words alone, a verse per line, with the reference apart', () => {
+  it('numbers: false gives the words alone, a verse per line, with the reference apart', () => {
     bibleChapter([[37, V37], [38, V38]]);
     const num37 = /** @type {Node} */ (document.querySelector('#v-37 .verse-num')?.firstChild);
     const end = lastText(block('bible:john:7:38'));
@@ -138,7 +138,8 @@ describe('passageCopy — letters and poems', () => {
   it('paragraphs a blank line apart, a poem a line per line, the heading left out, the letter named with its volume', () => {
     const body = letter();
     const out = /** @type {any} */ (passageCopy(range(body, 0, body, body.childNodes.length)));
-    expect(out.text).toBe('Hear the Word of The Lord.\n\nTherefore, turn from this\nWicked way you have chosen!\nThe Wide Path (Volume Two)');
+    expect(out.text).toBe('Hear the Word of The Lord.\n\nTherefore, turn from this\nWicked way you have chosen!\nThe Wide Path (Volume Two)\n'
+      + 'https://www.thevolumesoftruth.com/The_Wide_Path#:~:text=Hear%20the%20Word%20of,way%20you%20have%20chosen%21');
   });
 
   it('<br> soft breaks (WTLB) are line breaks, not glued words', () => {
@@ -147,7 +148,8 @@ describe('passageCopy — letters and poems', () => {
     p.innerHTML = 'Take your every thought captive<br><br>That you may be set apart';
     document.body.appendChild(p);
     expect(/** @type {any} */ (passageCopy(range(p, 0, p, p.childNodes.length))).text)
-      .toBe('Take your every thought captive\n\nThat you may be set apart\nFaith (Words To Live By: Part One)');
+      .toBe('Take your every thought captive\n\nThat you may be set apart\nFaith (Words To Live By: Part One)\n'
+        + 'https://www.thevolumesoftruth.com/Words_To_Live_By:_Part_One#Faith:~:text=Take%20your%20every%20thought,may%20be%20set%20apart');
   });
 
   it('a verse number inside a quoted poem line gets its space too', () => {
@@ -163,7 +165,8 @@ describe('passageCopy — letters and poems', () => {
     p.setAttribute('data-hl-key', 'letter:manna-1:0');
     p.textContent = 'I AM the Bread of Life.';
     document.body.appendChild(p);
-    expect(/** @type {any} */ (passageCopy(range(p, 0, p, 1))).text).toBe('I AM the Bread of Life.\nThe Bread of Life');
+    expect(/** @type {any} */ (passageCopy(range(p, 0, p, 1))).text)
+      .toBe('I AM the Bread of Life.\nThe Bread of Life\nhttps://www.thevolumesoftruth.com/The_Bread_of_Life#:~:text=I%20AM%20the%20Bread%20of%20Life%2E');
   });
 
   it('the reader\'s own journal: the words alone, and not public (the browser keeps its own copy)', () => {
@@ -278,7 +281,8 @@ describe('passageCopy — always ends with where the words are from', () => {
     page.innerHTML = '<p data-hl-key="letter:unknown-card:3">Hear the Word of The Lord.</p>';
     document.body.appendChild(page);
     const p = /** @type {Element} */ (page.firstElementChild);
-    expect(/** @type {any} */ (passageCopy(range(p, 0, p, 1))).text).toBe('Hear the Word of The Lord.\nThe Wide Path (Volume Two)');
+    expect(/** @type {any} */ (passageCopy(range(p, 0, p, 1))).text)
+      .toBe('Hear the Word of The Lord.\nThe Wide Path (Volume Two)\nhttps://www.thevolumesoftruth.com/The_Wide_Path#:~:text=Hear%20the%20Word%20of%20The%20Lord%2E');
   });
 
   it('a control\'s label inside a sheet is not the passage', () => {
@@ -298,5 +302,125 @@ describe('passageCopy — always ends with where the words are from', () => {
     const out = /** @type {any} */ (passageCopy(range(p, 0, p, 1)));
     expect(out.text).toBe('What I learned today');
     expect(out.isPublic).toBe(false);
+  });
+});
+
+/* cp2 (Corbin 2026-09-27): a copy from the Volumes of Truth ends with the
+   letter's name AND the closest link to it on thevolumesoftruth.com, so a
+   reader pasting it never hunts for the link: the letter's page (or its
+   section of a compilation page) and the copied words as a text fragment. */
+describe('passageCopy — the link to the passage on thevolumesoftruth.com', () => {
+  const SITE = 'https://www.thevolumesoftruth.com/';
+  const ABORTION = {
+    siteUrl: 'https://answersonlygodcangive.com/Thus_Says_The_Lord_Regarding_Abortion',
+    paragraphs: [
+      { align: 'justify', text: 'WOE TO THOSE WHO HARM THE LITTLE ONES!' },
+      { align: 'justify', text: 'Therefore, thus says The Lord: The murder of the innocent leads to the death of the guilty.' },
+      { align: 'right', text: '~ [From “Abortion: Murder of the Innocent” ~ Volume 2]' },
+      { align: 'center', text: '✦' },
+      { align: 'justify', text: 'Another passage from Pentecost.' },
+      { align: 'right', text: '~ [From “Pentecost” ~ Volume 6]' },
+    ],
+  };
+  beforeEach(() => {
+    const base = g.findEntryContext;
+    g.findEntryContext = (/** @type {string} */ id, /** @type {string} */ kind) => ({
+      abortion: { kind: 'wtlb', screen: 'answers-entry', collection: 'Answers Only God Can Give', title: 'Thus Says The Lord Regarding Abortion', entry: ABORTION },
+      'embracing-the-gift': { kind: 'holy-days', screen: 'holy-days-entry', collection: 'Regarding The Holy Days', title: 'Embracing The Gift', entry: { type: 'wtlb', sourceLabel: 'Words To Live By: Part One' } },
+      'purity-ch1': { kind: 'study-letter', screen: 'bible-study-chapter', collection: 'Purity - Bible/Letter Study', title: 'Purity Part One: Purity is Important to God' },
+    })[id] || base(id, kind);
+  });
+  /** @param {string} id @param {string[]} texts */
+  function topic(id, texts) {
+    const page = document.createElement('div');
+    page.innerHTML = texts.map((t, i) => `<p data-hl-key="wtlb:${id}:${i}">${t}</p>`).join('');
+    document.body.appendChild(page);
+    return page;
+  }
+
+  it('a letter: its name, then its page quoting the first and last words; a cut word and a footnote mark are never quoted', () => {
+    const p = document.createElement('p');
+    p.setAttribute('data-hl-key', 'letter:the-wide-path:4');
+    p.innerHTML = 'Beloved, walk the narrow way.<span class="fn-ref">3</span> Few are they who find it.';
+    document.body.appendChild(p);
+    const out = /** @type {any} */ (passageCopy(range(/** @type {Node} */ (p.firstChild), 1, lastText(p), lastText(p).length)));
+    expect(out.body).toBe('eloved, walk the narrow way. Few are they who find it.');
+    expect(out.reference).toBe('The Wide Path (Volume Two)');
+    // "eloved," is not a word the page has; "way. Few" runs across the site's "[3]".
+    expect(out.link).toBe(SITE + 'The_Wide_Path#:~:text=walk%20the%20narrow%20way.,they%20who%20find%20it%2E');
+    expect(out.text).toBe(out.body + '\n' + out.reference + '\n' + out.link);
+  });
+
+  it('marks left alone past a footnote ("dunghill³...") are not quoted: the quote ends on words', () => {
+    const c = document.createElement('div');
+    c.setAttribute('data-hl-key', 'letter:the-wide-path:3');
+    c.innerHTML = '<div class="poetry-line">He who raises the poor from the dust</div><div class="poetry-line">And lifts the needy out of the dunghill<span class="fn-ref">3</span>...</div>';
+    document.body.appendChild(c);
+    expect(/** @type {any} */ (passageCopy(range(c, 0, c, c.childNodes.length))).link)
+      .toBe(SITE + 'The_Wide_Path#:~:text=He%20who%20raises%20the,out%20of%20the%20dunghill');
+  });
+
+  it('the Bible has no page on the site: a verse keeps its reference alone', () => {
+    const w = bibleChapter([[16, 'For God so loved the world']], 'john:3');
+    const out = /** @type {any} */ (passageCopy(range(w, 0, w, w.childNodes.length)));
+    expect(out.link).toBe('');
+    expect(out.text).toBe('16 For God so loved the world\nJohn 3:16 (NKJV-R)');
+  });
+
+  it('a Holy Days entry taken from Words To Live By links to its section there', () => {
+    const p = document.createElement('p');
+    p.setAttribute('data-hl-key', 'wtlb:embracing-the-gift:0');
+    p.textContent = 'Receive the gift.';
+    document.body.appendChild(p);
+    const out = /** @type {any} */ (passageCopy(range(p, 0, p, 1)));
+    expect(out.reference).toBe('Embracing The Gift (Regarding The Holy Days)');
+    expect(out.link).toBe(SITE + 'Words_To_Live_By:_Part_One#Embracing_The_Gift:~:text=Receive%20the%20gift%2E');
+  });
+
+  it('a Letter Study links its study\'s page; the Matthew Study Bible its page, which holds the PDF, quoting nothing', () => {
+    const p = document.createElement('p');
+    p.setAttribute('data-hl-key', 'letter:purity-ch1:2');
+    p.textContent = 'Blessed are the pure in heart.';
+    document.body.appendChild(p);
+    expect(/** @type {any} */ (passageCopy(range(p, 0, p, 1))).link)
+      .toBe(SITE + 'Purity_-_Bible/Letter_Study#:~:text=Blessed%20are%20the%20pure%20in%20heart%2E');
+    document.body.innerHTML = '';
+    const w = document.createElement('div');
+    w.innerHTML = '<span class="verse-num">3</span><span data-hl-key="study:matthew-5:3">Blessed are the poor in spirit</span>';
+    document.body.appendChild(w);
+    expect(/** @type {any} */ (passageCopy(range(w, 0, w, w.childNodes.length))).link)
+      .toBe(SITE + 'The_Volumes_of_Truth_New_Testament_Study_Bible_-_The_Book_of_Matthew');
+  });
+
+  it('an Answers passage names the letter it is from and links there, never quoting its source line', () => {
+    const page = topic('abortion', ABORTION.paragraphs.map((p) => p.text));
+    const out = /** @type {any} */ (passageCopy(range(page, 1, page, 3)));
+    expect(out.reference).toBe('Abortion: Murder of the Innocent (Volume Two)');
+    expect(out.link).toBe(SITE + 'Abortion:_Murder_of_the_Innocent#:~:text=Therefore%2C%20thus%20says%20The,death%20of%20the%20guilty%2E');
+  });
+
+  it('words across Answers passages name the topic and link its own page', () => {
+    const page = topic('abortion', ABORTION.paragraphs.map((p) => p.text));
+    const out = /** @type {any} */ (passageCopy(range(page, 1, page, 5)));
+    expect(out.reference).toBe('Thus Says The Lord Regarding Abortion (Answers Only God Can Give)');
+    expect(out.link).toBe('https://answersonlygodcangive.com/Thus_Says_The_Lord_Regarding_Abortion#:~:text=Therefore%2C%20thus%20says%20The,Another%20passage%20from%20Pentecost%2E');
+  });
+
+  it('a heading or title outside the paragraphs links its letter', () => {
+    const page = document.createElement('div');
+    page.setAttribute('data-copy-key', 'letter:the-wide-path');
+    page.innerHTML = '<h1 class="letter-title">The Wide Path</h1>';
+    document.body.appendChild(page);
+    const h = /** @type {Element} */ (page.firstElementChild);
+    const out = /** @type {any} */ (passageCopy(range(h, 0, h, 1)));
+    expect(out.text).toBe('The Wide Path\nThe Wide Path (Volume Two)\n' + SITE + 'The_Wide_Path#:~:text=The%20Wide%20Path');
+  });
+
+  it('the reader\'s journal never gets a link', () => {
+    const p = document.createElement('p');
+    p.setAttribute('data-hl-key', 'journal:e1:b1');
+    p.textContent = 'What I learned today';
+    document.body.appendChild(p);
+    expect(/** @type {any} */ (passageCopy(range(p, 0, p, 1))).link).toBe('');
   });
 });

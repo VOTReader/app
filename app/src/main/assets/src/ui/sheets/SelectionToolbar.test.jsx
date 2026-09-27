@@ -1241,7 +1241,7 @@ describe('SelectionToolbar — Copy keeps a poetry selection\'s line breaks (cg1
 
   /* n6-02 (sweep 2): the cg1 fix reached Copy only; Share still sent
      frag.textContent, so a poem's lines and a letter's paragraphs arrived glued. */
-  it('(n6-02) Share keeps the lines apart too, and leaves the verse numbers out', async () => {
+  it('(n6-02) Share keeps the lines apart too, numbered as Copy numbers them (cp2)', async () => {
     const origShare = Object.getOwnPropertyDescriptor(navigator, 'share');
     const sent = /** @type {any[]} */ ([]);
     Object.defineProperty(navigator, 'share', { value: (d) => { sent.push(d); return Promise.resolve(); }, writable: true, configurable: true });
@@ -1263,7 +1263,7 @@ describe('SelectionToolbar — Copy keeps a poetry selection\'s line breaks (cg1
       act(() => { fire(shareBtn, 'click'); });
       await act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
       expect(sent.length).toBe(1);
-      expect(sent[0].text.startsWith('If anyone adds to these words,\nI will add to them the punishments')).toBe(true);
+      expect(sent[0].text.startsWith('18 If anyone adds to these words,\nI will add to them the punishments')).toBe(true);
     } finally {
       if (origShare) Object.defineProperty(navigator, 'share', origShare);
       else delete /** @type {any} */ (navigator).share;
@@ -1473,7 +1473,7 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
     expect(ev.defaultPrevented).toBe(false);
   });
 
-  it('Share sends the same passage without the numbers: a verse per line, Copy\'s reference, a link to the first verse', async () => {
+  it('Share sends what Copy sends (the numbers too, cp2), then Copy\'s reference and a link that opens the app at the first verse', async () => {
     chapter();
     const origShare = Object.getOwnPropertyDescriptor(navigator, 'share');
     const sent = /** @type {any[]} */ ([]);
@@ -1486,7 +1486,7 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
         .find((sp) => sp.textContent === 'Share')?.closest('.sel-action-btn'));
       act(() => { fire(shareBtn, 'click'); });
       await act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
-      expect(sent[0].text).toBe(`${V37}\n${V38}\n${V39}\n\nJohn 7:37-39 (NKJV-R)\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A7%3A37`);
+      expect(sent[0].text).toBe(`37 ${V37}\n38 ${V38}\n39 ${V39}\n\nJohn 7:37-39 (NKJV-R)\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A7%3A37`);
     } finally {
       if (origShare) Object.defineProperty(navigator, 'share', origShare);
       else delete /** @type {any} */ (navigator).share;
@@ -1513,6 +1513,43 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
       await act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
       expect(sent[0].text.startsWith('Take your every thought captive\n\nThat you may be set apart')).toBe(true);
     } finally {
+      if (origShare) Object.defineProperty(navigator, 'share', origShare);
+      else delete /** @type {any} */ (navigator).share;
+    }
+  });
+
+  /* cp2 (Corbin 2026-09-27): a letter's Copy ends with its name and its link on
+     thevolumesoftruth.com; its Share sends the same words and name, and "share
+     just links to the app". */
+  it('a letter: Copy links the website (its page and the words), Share the app', async () => {
+    g.findEntryContext = () => ({ kind: 'letter', screen: 'vot-letter', collection: 'Volume Two', title: 'The Wide Path' });
+    const p = readingContainer('letter:the-wide-path:1', 'Yet in your arrogance, you continue to forsake your Maker.');
+    const written = /** @type {string[]} */ ([]);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: (/** @type {string} */ t) => { written.push(t); return Promise.resolve(); } }, writable: true, configurable: true,
+    });
+    const origShare = Object.getOwnPropertyDescriptor(navigator, 'share');
+    const sent = /** @type {any[]} */ ([]);
+    Object.defineProperty(navigator, 'share', { value: (/** @type {any} */ d) => { sent.push(d); return Promise.resolve(); }, writable: true, configurable: true });
+    try {
+      mount();
+      const words = 'Yet in your arrogance, you continue to forsake your Maker.';
+      const raise = () => {
+        stubSelection(rangeOver(p, 0, words.length));
+        act(() => { fire(p, 'contextmenu', { clientX: 5, clientY: 5 }); });
+      };
+      const press = (/** @type {string} */ label) => act(() => { fire(/** @type {any} */ ([...document.querySelectorAll('.sel-action-btn span')]
+        .find((sp) => sp.textContent === label)?.closest('.sel-action-btn')), 'click'); });
+      raise();
+      press('Copy');
+      expect(written).toEqual([words + '\nThe Wide Path (Volume Two)\n'
+        + 'https://www.thevolumesoftruth.com/The_Wide_Path#:~:text=Yet%20in%20your%20arrogance%2C,to%20forsake%20your%20Maker%2E']);
+      raise();
+      press('Share');
+      await act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
+      expect(sent[0].text).toBe(words + '\n\nThe Wide Path (Volume Two)\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1');
+    } finally {
+      delete g.findEntryContext;
       if (origShare) Object.defineProperty(navigator, 'share', origShare);
       else delete /** @type {any} */ (navigator).share;
     }
@@ -1648,5 +1685,94 @@ describe('SelectionToolbar — steps aside while the selection or the page is mo
     act(() => { fire(c, 'pointerup', { clientX: 80, clientY: 5 }); });
     act(() => { vi.advanceTimersByTime(160); });
     expect(toolbar()).not.toBeNull();
+  });
+});
+
+/* cp2 (Corbin 2026-09-27, "do both suggestions"): Share sends the app's link on
+   a tap; holding it offers the website's too, for someone without the app. */
+describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
+  const g = /** @type {any} */ (globalThis);
+  const WORDS = 'Yet in your arrogance, you continue to forsake your Maker.';
+  const SITE = 'https://www.thevolumesoftruth.com/The_Wide_Path#:~:text=Yet%20in%20your%20arrogance%2C,to%20forsake%20your%20Maker%2E';
+  /** @type {any[]} */ let sent;
+  /** @type {PropertyDescriptor | undefined} */ let origShare;
+  beforeEach(() => {
+    sent = [];
+    origShare = Object.getOwnPropertyDescriptor(navigator, 'share');
+    Object.defineProperty(navigator, 'share', { value: (/** @type {any} */ d) => { sent.push(d); return Promise.resolve(); }, writable: true, configurable: true });
+    g.findEntryContext = () => ({ kind: 'letter', screen: 'vot-letter', collection: 'Volume Two', title: 'The Wide Path' });
+    g._bookTitle = (/** @type {string} */ id) => (id === 'john' ? 'John' : id);
+  });
+  afterEach(() => {
+    if (origShare) Object.defineProperty(navigator, 'share', origShare);
+    else delete /** @type {any} */ (navigator).share;
+    delete g.findEntryContext; delete g._bookTitle;
+  });
+  const settle = () => act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
+  const shareBtn = () => /** @type {any} */ ([...document.querySelectorAll('.sel-action-btn span')].find((sp) => sp.textContent === 'Share')?.closest('.sel-action-btn'));
+  const choice = (/** @type {string} */ label) => /** @type {any} */ ([...document.querySelectorAll('.sel-link-choice button')].find((b) => (b.getAttribute('aria-label') || b.textContent) === label));
+  function raise(/** @type {string} */ key, /** @type {string} */ words) {
+    const p = readingContainer(key, words);
+    mount();
+    stubSelection(rangeOver(p, 0, words.length));
+    act(() => { fire(p, 'contextmenu', { clientX: 5, clientY: 5 }); });
+    return p;
+  }
+  const hold = async () => {
+    act(() => { fire(shareBtn(), 'pointerdown', { button: 0 }); });
+    await act(async () => { await new Promise((res) => setTimeout(res, 500)); });
+  };
+
+  it('a tap shares with the app link; a hold offers both, and the click that ends the hold shares nothing', async () => {
+    raise('letter:the-wide-path:1', WORDS);
+    expect(document.querySelector('.sel-link-choice')).toBeNull();
+    await hold();
+    expect(choice('App link')).toBeTruthy();
+    expect(choice('Website link')).toBeTruthy();
+    act(() => { fire(shareBtn(), 'pointerup'); fire(shareBtn(), 'click'); });
+    await settle();
+    expect(sent).toEqual([]);
+    expect(document.querySelector('.sel-link-choice')).not.toBeNull();
+  });
+
+  it('"Website link" shares Copy\'s own text: the words, the name, the thevolumesoftruth.com link', async () => {
+    raise('letter:the-wide-path:1', WORDS);
+    await hold();
+    act(() => { fire(choice('Website link'), 'click'); });
+    await settle();
+    expect(sent.map((d) => d.text)).toEqual([WORDS + '\nThe Wide Path (Volume Two)\n' + SITE]);
+    expect(document.querySelector('.sel-toolbar')).toBeNull();
+  });
+
+  it('"App link" shares as a tap does; a right-click opens the choice without raising the toolbar anew', async () => {
+    raise('letter:the-wide-path:1', WORDS);
+    act(() => { fire(shareBtn(), 'contextmenu', { button: 2 }); });
+    expect(choice('App link')).toBeTruthy();
+    act(() => { fire(choice('App link'), 'click'); });
+    await settle();
+    expect(sent.map((d) => d.text)).toEqual([WORDS + '\n\nThe Wide Path (Volume Two)\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1']);
+  });
+
+  it('a hold with no click after it (Android) never swallows the next keyboard or TalkBack Share (cl1 review)', async () => {
+    raise('letter:the-wide-path:1', WORDS);
+    await hold();
+    act(() => { fire(choice('Cancel'), 'click'); });
+    act(() => { fire(shareBtn(), 'click'); });
+    await settle();
+    expect(sent.map((d) => d.text)).toEqual([WORDS + '\n\nThe Wide Path (Volume Two)\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1']);
+  });
+
+  it('✕ closes the choice; a passage the website does not have (the Bible) offers none', async () => {
+    raise('letter:the-wide-path:1', WORDS);
+    await hold();
+    act(() => { fire(choice('Cancel'), 'click'); });
+    expect(document.querySelector('.sel-link-choice')).toBeNull();
+    cleanup(); document.body.innerHTML = '';
+    raise('bible:john:3:16', 'For God so loved the world');
+    await hold();
+    expect(document.querySelector('.sel-link-choice')).toBeNull();
+    act(() => { fire(shareBtn(), 'pointerup'); fire(shareBtn(), 'click'); });
+    await settle();
+    expect(sent.map((d) => d.text)).toEqual(['For God so loved the world\n\nJohn 3:16\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A3%3A16']);
   });
 });

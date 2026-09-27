@@ -26,7 +26,21 @@
      size controls keep it open so the reader sees each change land;
    - ArrowUp / ArrowDown / Home / End move between items; focus goes to the
      first item on open and back to ⋯ when the menu is dismissed.
+
+   COPY WEBSITE LINK (cp2, Corbin 2026-09-27). On a reading page the site
+   has (a letter, a Words To Live By / Blessed / Holy Days entry, a Letter
+   Study, the Matthew Study Bible, an Answers topic), the first item copies
+   that page's link on thevolumesoftruth.com (answersonlygodcangive.com for
+   an Answers topic): the link alone, for a reader who wants to send the
+   letter, not a quote. The page is read when the menu opens, from the
+   data-copy-key the page declares for Copy (utils/passage-copy.js
+   pageSiteLink), so no screen passes anything in. A refused clipboard keeps
+   the link on screen (CopyFallbackSheet) instead of losing it.
    ═══════════════════════════════════════════════════════════════════════ */
+
+import { pageSiteLink } from '../../utils/passage-copy.js';
+import { copyText } from '../../utils/copy-share.js';
+import { CopyFallbackSheet } from '../sheets/CopyFallbackSheet.jsx';
 
 /**
  * @typedef {Object} NavMenuValue
@@ -64,10 +78,23 @@ export function stepFontScale(current, dir) {
 
 const ITEM_SELECTOR = '[role="menuitem"], [role="menuitemradio"]';
 
+/** "thevolumesoftruth.com": the site a link goes to, under "Copy website link". @param {string} link */
+function siteName(link) {
+  try { return new URL(link).host.replace(/^www\./, ''); } catch (_e) { return ''; }
+}
+
+/** @param {string} text */
+function toast(text) {
+  if (typeof showToast === 'function') showToast({ id: 'vot-toast-copy', className: 'vot-toast', text });
+}
+
 export function MoreMenuBtn() {
   const ctx = React.useContext(NavMenuContext);
   const [open, setOpen] = React.useState(false);
   const [pos, setPos] = React.useState(/** @type {{top:number,right:number}|null} */ (null));
+  // The page on screen's website link, read as the menu opens (cp2).
+  const [page, setPage] = React.useState(/** @type {{link:string,reference:string}|null} */ (null));
+  const [fallback, setFallback] = React.useState(/** @type {string|null} */ (null));
   const btnRef = React.useRef(/** @type {HTMLButtonElement|null} */ (null));
   const menuRef = React.useRef(/** @type {HTMLDivElement|null} */ (null));
 
@@ -83,6 +110,9 @@ export function MoreMenuBtn() {
     if (!open || !btnRef.current) return;
     const r = btnRef.current.getBoundingClientRect();
     setPos({ top: Math.round(r.bottom + 6), right: Math.max(8, Math.round(window.innerWidth - r.right)) });
+    let here = null;
+    try { here = pageSiteLink(); } catch (_e) { here = null; }   // a menu never breaks on a page it cannot name
+    setPage(here);
   }, [open]);
 
   // Focus the first item once the menu exists: it mounts one commit after `open`
@@ -144,6 +174,17 @@ export function MoreMenuBtn() {
 
   /** Leave the screen: close first, then act (the next screen owns focus). */
   const go = (/** @type {() => void} */ fn) => () => { close(false); if (typeof fn === 'function') fn(); };
+  // Copy website link: the reader stays on the page, so focus goes back to ⋯;
+  // the toast names what was copied, and a refused clipboard shows the link.
+  const copyPageLink = () => {
+    const here = page;
+    close(true);
+    if (!here) return;
+    copyText(here.link).then((outcome) => {
+      if (outcome === 'copied') toast('Link copied: ' + here.reference);
+      else setFallback(here.link);
+    });
+  };
   const pct = Math.round(parseFloat(String(ctx.fontScale || '1')) * 100) || 100;
   const theme = ctx.theme === 'light' ? 'light' : 'dark';
 
@@ -172,6 +213,18 @@ export function MoreMenuBtn() {
           style={{ top: pos.top + 'px', right: pos.right + 'px' }}
           onKeyDown={onKeyDown}
         >
+          {page ? (
+            <button type="button" role="menuitem" className="more-menu-item" onClick={copyPageLink}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+              <span className="more-menu-item-text">
+                <span>Copy website link</span>
+                <span className="more-menu-item-sub">{siteName(page.link)}</span>
+              </span>
+            </button>
+          ) : null}
           {ctx.historyEnabled ? (
             <button type="button" role="menuitem" className="more-menu-item" onClick={go(ctx.onHistory)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
@@ -208,6 +261,15 @@ export function MoreMenuBtn() {
           </button>
         </div>,
         document.body,
+      ) : null}
+      {fallback ? (
+        <CopyFallbackSheet
+          text={fallback}
+          verb="copy"
+          what="link"
+          onClose={() => setFallback(null)}
+          onCopied={() => { setFallback(null); toast('Link copied'); }}
+        />
       ) : null}
     </>
   );

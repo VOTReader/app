@@ -86,6 +86,50 @@ export function contentsSummary(c) {
   return named > 1 ? `${named} sections · ${p}` : p;
 }
 
+/**
+ * A source line's parts: "~ [From “Pentecost” ~ Volume 6]" → { title: 'Pentecost',
+ * collection: 'Volume 6' }; null for any other paragraph.
+ * @param {unknown} text
+ * @returns {{ title: string, collection: string } | null}
+ */
+export function answersSource(text) {
+  const m = typeof text === 'string' ? SOURCE_RE.exec(text.trim()) : null;
+  return m ? { title: m[1], collection: m[2].trim() } : null;
+}
+
+/**
+ * The letter paragraphs `from`..`to` of a topic quote (cp2: a copy names it and
+ * links to it): the source line closing their passage, the first at or after
+ * `from`. null when they run past it (they span passages, each from its own
+ * letter) or a section heading comes first (words no source line claims).
+ * @param {Array<{ text?: string, align?: string }> | null | undefined} paragraphs
+ * @param {number} from
+ * @param {number} to
+ * @returns {{ title: string, collection: string } | null}
+ */
+export function passageSource(paragraphs, from, to) {
+  const paras = Array.isArray(paragraphs) ? paragraphs : [];
+  for (let i = Math.max(0, from); i < paras.length; i++) {
+    const p = paras[i];
+    const text = p && typeof p.text === 'string' ? p.text.trim() : '';
+    if (!text) continue;
+    if (isAttribution(text)) return i >= to ? answersSource(text) : null;
+    if (i > from && p.align === 'center' && HEADING_RE.test(text)) return null;
+  }
+  return null;
+}
+
+/**
+ * Is this paragraph the quoted letter's own words, not the topic's frame (a
+ * source line, the ✦ divider between passages, a section heading)? cp2: a
+ * copy's link quotes only words the letter's page has.
+ * @param {{ text?: string, align?: string } | null | undefined} p
+ */
+export function isQuotedWords(p) {
+  const text = p && typeof p.text === 'string' ? p.text.trim() : '';
+  return !!text && !isAttribution(text) && text !== '✦' && !(p.align === 'center' && HEADING_RE.test(text));
+}
+
 const HEADER_LINE_RE = /^_\d{1,2}\/\d{1,2}\/\d{2,4}_/;
 
 /**
