@@ -49,14 +49,22 @@
        their catalog, covers and lyrics (songs/). It IS 'self' in the PWA, but
        the APK's origin is appassets.androidplatform.net, so the host is named;
        and media-src has no 'self' at all. What may PLAY from it is narrower
-       still: audio-track.js accepts one exact song pattern. -->
+       still: audio-track.js accepts one exact song pattern.
+       https://audio.votreader.workers.dev (cf1, 2026-09-26) is in connect-src:
+       the relay the PWA saves recordings for offline through; media-src
+       'self' is the service worker's saved copy (offline-audio/...).
+       Cloudflare Web Analytics (cfa1, Corbin 2026-09-26 21:3x): its beacon
+       (static.cloudflareinsights.com in script-src) posts one page view per
+       app open to cloudflareinsights.com (connect-src); spa off, no cookies,
+       nothing shown in the app; the numbers live only in his Cloudflare
+       dashboard. The service worker never caches it (cross-origin). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-Eeh01SK8uypEtKAtRbV1aRd2sSX2sGVP4u/jOl0Sv38=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-CSTsiXpSL6PrFbnnOKxr26HHhI6qbL1gLcEyixUvtIU=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-Eeh01SK8uypEtKAtRbV1aRd2sSX2sGVP4u/jOl0Sv38=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-CSTsiXpSL6PrFbnnOKxr26HHhI6qbL1gLcEyixUvtIU=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     font-src 'self' data:;
-    connect-src 'self' https://votreader.github.io https://audio.votreader.workers.dev;
+    connect-src 'self' https://votreader.github.io https://audio.votreader.workers.dev https://cloudflareinsights.com;
     media-src 'self' blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     object-src 'none';
     frame-src 'none';
@@ -768,5 +776,7 @@ const SRCH_QUICK_PICKS = [
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(/*#__PURE__*/React.createElement(ErrorBoundary, null, /*#__PURE__*/React.createElement(HydrationGate, null, /*#__PURE__*/React.createElement(App, null))));
 </script>
+  <!-- Cloudflare Web Analytics (cfa1): one page view per app open, spa off; nothing about it is shown in the app. -->
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "4daaa3064b7d4d93851405bf00114c92", "spa": false}'></script>
 </body>
 </html>
