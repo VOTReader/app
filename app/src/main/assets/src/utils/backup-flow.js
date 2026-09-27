@@ -22,6 +22,13 @@
 
 import { backupWarn } from './backup-warn.js';
 
+/** The reader's own calendar date, YYYY-MM-DD, for backup file names. toISOString
+ *  is UTC, so an evening export in the Americas was named for tomorrow (lw1).
+ *  @param {Date} d @returns {string} */
+export function _localStamp(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 // Set immediately before an import applies; removed only when the apply
 // completes (or provably never started). A crash mid-restore leaves it behind,
 // and useRestoreGuard turns that into a loud boot prompt. Keep the literal in
@@ -323,7 +330,7 @@ export function createBackupFlow(ctx) {
         _showToast('Export aborted — the backup index is over the 16 MiB restore limit. Nothing was saved. Clear unneeded personal data, then export again.', 0);
         return;
       }
-      const stamp = new Date().toISOString().slice(0, 10);
+      const stamp = _localStamp(new Date());
       const filename = `votreader-backup-${stamp}.votbak`;
       // The destination picker takes over the screen; drop the "Preparing…" toast.
       hideToast(_TOAST_ID);
@@ -437,7 +444,7 @@ export function createBackupFlow(ctx) {
         _showToast('Export aborted — the backup index is over the 16 MiB restore limit. Nothing was saved. Clear unneeded personal data, then export again.', 0);
         return;
       }
-      const stamp = new Date().toISOString().slice(0, 10);
+      const stamp = _localStamp(new Date());
       const filename = `votreader-backup-${stamp}.votbak`;
       // The destination picker takes over the screen; drop the "Preparing…" toast.
       hideToast(_TOAST_ID);
