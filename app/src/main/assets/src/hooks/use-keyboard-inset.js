@@ -27,7 +27,12 @@ export function useKeyboardInset() {
       // residual diff (~1-3px) even when the keyboard is closed — clamp
       // anything under 80px to 0 so we don't shift overlays for noise.
       const diff = Math.max(0, window.innerHeight - vv.height);
-      const kh = diff > 80 ? diff : 0;
+      // The keyboard's top edge in layout coordinates is offsetTop + height:
+      // Chrome also PANS the visual viewport up to the focused field, and a
+      // bare diff then lifts fixed sheets a second time, past the top of
+      // the screen (lw1 2026-09-26, S22: the note box hidden above view).
+      // The 80px clamp stays on the raw diff, which says the keyboard is open.
+      const kh = diff > 80 ? Math.max(0, Math.round(diff - (vv.offsetTop || 0))) : 0;
       root.style.setProperty('--keyboard-height', kh + 'px');
     };
     vv.addEventListener('resize', update);
