@@ -33,7 +33,7 @@ import { kjvEncode } from './tokenize.js';
 import { snippet, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
 import {
   KIND_BOOST, coverageMultiplier, popcount, PHRASE_BOOST, SYNONYM_DEMOTION,
-  BM25_PARAMS, TITLE_BM25, KEYWORD_CONTENT_WORDS, KEYWORD_WORDS, joinApostropheS, SYNONYM_WEIGHT, FORM_WEIGHT, NEAR_PHRASE_MIN, ORIGINAL_BOOST, REPRINT_KINDS, nearPhrase, titleMatch,
+  BM25_PARAMS, KEYWORD_BM25, KEYWORD_CONTENT_WORDS, KEYWORD_WORDS, joinApostropheS, SYNONYM_WEIGHT, FORM_WEIGHT, NEAR_PHRASE_MIN, ORIGINAL_BOOST, REPRINT_KINDS, nearPhrase, titleMatch,
 } from './ranking.js';
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
 import { onIdle } from '../utils/on-idle.js';
@@ -117,17 +117,18 @@ export function expandContractions(q) {
 
 /**
  * One unit's BM25 search, the body and the title scored apart and summed per text:
- * the body as BM25 (BM25_PARAMS), the title with its floor for a query of a word or
- * two (TITLE_BM25, where the reason is). A unit of several words (a quoted phrase)
+ * BM25 as published (BM25_PARAMS), or with MiniSearch's floor for a keyword search
+ * (KEYWORD_BM25, where the reason is). A unit of several words (a quoted phrase)
  * matches when the body holds them all, or the title does.
  * @param {string} term
  * @param {Object} opts
- * @param {boolean} [titleFloor]
+ * @param {boolean} [keyword]
  * @returns {any[]}
  */
-function searchUnit(term, opts, titleFloor) {
-  const body = msIndex.search(term, { ...opts, fields: ['text'], bm25: BM25_PARAMS }) || [];
-  const title = msIndex.search(term, { ...opts, fields: ['title'], bm25: titleFloor ? TITLE_BM25 : BM25_PARAMS }) || [];
+function searchUnit(term, opts, keyword) {
+  const bm25 = keyword ? KEYWORD_BM25 : BM25_PARAMS;
+  const body = msIndex.search(term, { ...opts, fields: ['text'], bm25 }) || [];
+  const title = msIndex.search(term, { ...opts, fields: ['title'], bm25 }) || [];
   if (!title.length) return body;
   const byId = new Map();
   for (let i = 0; i < body.length; i++) byId.set(body[i].id, body[i]);
@@ -217,16 +218,16 @@ function splitCompound(word) {
  * ("Showing results for shepherd"); null for a phrase's fuzzy retry.
  * @param {string} term
  * @param {Object} opts  the unit's exact + prefix options
- * @param {boolean} [titleFloor]  searchUnit's
+ * @param {boolean} [keyword]  searchUnit's
  * @returns {{ res: any[], to: string | null }}
  */
-function searchCorrected(term, opts, titleFloor) {
+function searchCorrected(term, opts, keyword) {
   const tokens = kjvEncode(term);
-  if (tokens.length !== 1) return { res: searchUnit(term, { ...opts, fuzzy: FUZZY }, titleFloor), to: null };
+  if (tokens.length !== 1) return { res: searchUnit(term, { ...opts, fuzzy: FUZZY }, keyword), to: null };
   const word = tokens[0];
   const parts = splitCompound(word);
   if (parts) {
-    const res = searchUnit(parts.join(' '), { ...opts, prefix: false, combineWith: 'AND' }, titleFloor)
+    const res = searchUnit(parts.join(' '), { ...opts, prefix: false, combineWith: 'AND' }, keyword)
       .filter((h) => hasTokenRun(kjvEncode((h.text || '') + ' ' + (h.title || '')), parts));
     if (res.length) return { res, to: parts.join(' ') };
   }
@@ -250,7 +251,7 @@ function searchCorrected(term, opts, titleFloor) {
       bestRank = rank;
     }
   }
-  if (best) return { res: searchUnit(best, opts, titleFloor), to: best };
+  if (best) return { res: searchUnit(best, opts, keyword), to: best };
   return { res: [], to: null };
 }
 
@@ -519,7 +520,6 @@ async function search(query, options) {
     ? kjvEncode(p.phrase).filter((t) => !(STOP_TRIMMED && STOP_TRIMMED.has(t))).length
     : units.filter((u) => u.literal && !isStopTerm(u.term)).length;
   const keyword = contentWords <= KEYWORD_CONTENT_WORDS && kjvEncode(p.phrase || query).length <= KEYWORD_WORDS;
-  const titleFloor = keyword;
   /** @param {any} unit @param {any[]} res */
   const accumulate = (unit, res) => {
     const weight = unit.literal || unit.joined ? 1 : unit.form ? FORM_WEIGHT : SYNONYM_WEIGHT;
@@ -554,7 +554,7 @@ async function search(query, options) {
   for (let u = 0; u < units.length; u++) {
     const unit = units[u];
     let res;
-    try { res = searchUnit(unit.term, unitOpts(unit), titleFloor); } catch { continue; }
+    try { res = searchUnit(unit.term, unitOpts(unit), keyword); } catch { continue; }
     if (res && res.length) { heard[unit.origin] = true; accumulate(unit, res); }
     else if (unit.literal) unheard.push(unit);
   }
@@ -574,7 +574,7 @@ async function search(query, options) {
     if (heard[unit.origin]) continue;
     if (/\d/.test(unit.term)) continue;   // a number is not a typo: "316" is not "16"
     let fixed;
-    try { fixed = searchCorrected(unit.term, unitOpts(unit), titleFloor); } catch { continue; }
+    try { fixed = searchCorrected(unit.term, unitOpts(unit), keyword); } catch { continue; }
     if (!fixed.res.length) continue;
     accumulate(unit, fixed.res);
     const typed = kjvEncode(unit.term);

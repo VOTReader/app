@@ -16,7 +16,7 @@ const VOT_DATA = {
   OT_BOOK_IDS: [], NT_BOOK_IDS: ['john'], GENRE_GROUPS: {}, WORD_NUMS: {}, ROMAN_NUMS: {},
 };
 // Verses outnumber titled texts, as in the corpus: MiniSearch's average title is then
-// under one word, the condition the title's floor answers (ranking.js TITLE_BM25).
+// under one word, the condition the title's floor answers (ranking.js KEYWORD_BM25).
 const FILLER = Array.from({ length: 40 }, (_, i) => ({ n: 7 + i, text: 'And the people went up to the city, and they sat down there. ' + i }));
 const WATCHMAN = 'Hear Me, O My people. To this day you persecute My prophets and stone My servants, says The Lord. Repent, and turn from your ways, for the hour is late and the harvest is near.';
 const topic = (words, n) => Array.from({ length: n }, (_, i) => words[i % words.length] + ' is spoken of here, and more besides.').join(' ');

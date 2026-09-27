@@ -60,17 +60,21 @@ export const SYNONYM_DEMOTION = 0.5;
  *  and left the Scriptures ranking as it was. */
 export const BM25_PARAMS = { k: 1.2, b: 0.7, d: 0 };
 
-/** The title keeps MiniSearch's BM25+ floor for a keyword search. A verse
- *  has no title, and MiniSearch averages a field's length over every document, so
- *  the average title is under one word and a title of five is scored as if it were
- *  thirteen times too long: without the floor a word in a title counted for almost
- *  nothing ("humility" put two short WTLB entries above "Humility and The Word of
- *  God"; "144000" put the False Doctrines index above "Regarding the 144,000
- *  Witnesses"). A longer query is a passage or a title typed out, and a floor paid
- *  for each of its words let any title sharing two of them outrank the verse quoted
- *  ("I am the resurrection, and the life" #6); titleMatch answers a title typed out.
- *  The engine scores the body and the title apart (engine searchUnit). */
-export const TITLE_BM25 = { k: 1.2, b: 0.7, d: 0.5 };
+/** A keyword search keeps MiniSearch's BM25+ floor, in a text's title and its body.
+ *  The title: a verse has no title, and MiniSearch averages a field's length over
+ *  every document, so the average title is under one word and a title of five is
+ *  scored as if it were thirteen times too long; without the floor a word in a title
+ *  counted for almost nothing ("humility" put two short WTLB entries above "Humility
+ *  and The Word of God"; "144000" put the False Doctrines index above "Regarding the
+ *  144,000 Witnesses"). The body: a word or two is a topic, and a letter that says it
+ *  again and again is about it; without the floor a text's length decided, and every
+ *  short verse holding the word outranked the letter ("flood": Vengeance Is Mine #12
+ *  in the Volumes, the passage Brianna was looking for, 2026-09-26). A longer query is
+ *  a passage or a title typed out: BM25 as published (a floor paid on each of its
+ *  words let any text sharing two of them outrank the verse quoted: "I am the
+ *  resurrection, and the life" #6), and titleMatch answers a title typed out. The
+ *  engine scores the body and the title apart (engine searchUnit). */
+export const KEYWORD_BM25 = { k: 1.2, b: 0.7, d: 0.5 };
 /** A keyword search, as against a passage or a title typed out: at most this many
  *  words that are not stop words, and this many in all ("false prophets", "mark of
  *  the beast"; "fear I am coming to" is a passage). */
