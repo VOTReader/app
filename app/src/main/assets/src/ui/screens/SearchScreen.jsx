@@ -291,10 +291,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     return () => clearTimeout(t);
   }, []);
 
-  // Compute suggestions as-you-type. Re-show on every query change, hide only
-  // on explicit user action (pick / blur / Escape / clear).
-  const [suggestDismissed, setSuggestDismissed] = React.useState(false);
-  React.useEffect(() => {setSuggestDismissed(false);}, [query]);
+  // Compute suggestions as-you-type. They stay closed for the query they were closed
+  // on (a pick, Escape, the clear button) and open again once it changes. A flag
+  // reset on every query change reopened them on the pick itself, which changes
+  // the query (search audit 2026-09-27).
+  const [dismissedFor, setDismissedFor] = React.useState(/** @type {string|null} */ (null));
   React.useEffect(() => {
     const q = (query || '').trim();
     if (!q || q.length < 1 || q.length > 40) {setSuggestions([]);setShowSuggest(false);return;}
@@ -302,8 +303,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     if (!E) return;
     const s = E.suggest(q, { max: 8 });
     setSuggestions(s);
-    setShowSuggest(s.length > 0 && !buildInfo.building && !suggestDismissed);
-  }, [query, buildInfo.building, suggestDismissed]);
+    setShowSuggest(s.length > 0 && !buildInfo.building && dismissedFor !== query);
+  }, [query, buildInfo.building, dismissedFor]);
 
   // Run search with debounce — one box, one index, everything included.
   React.useEffect(() => {
@@ -317,7 +318,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     // SRCH-6: a 1-char query floods the forward tokenizer with hundreds of title
     // prefix hits ("a" → every "A Warning"/"ABASEMENT"…). Require ≥2 alphanumerics
     // before the full search; the suggest box (above) still reacts at 1 char.
-    if (q.replace(/[^a-z0-9]/gi, '').length < 2) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false, corrections: [] });return;}
+    if (q.replace(/[^\p{L}\p{N}]/gu, '').length < 2) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false, corrections: [] });return;}
     if (resumedFrom.current === memo && lastSearch && lastSearch.allWordsFor === allWordsFor) return;
     resumedFrom.current = null;
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -354,7 +355,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           settings.searchSynonyms !== false,
           /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.STOP_WORDS_TRIMMED,
         );
-        const done = { phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [] };
+        const done = { phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [], stopWordsOnly: !!r.stopWordsOnly };
         if (!r.error) lastSearch = { memo, allWordsFor, state: done };
         setState(done);
       }).catch((err) => {
@@ -432,7 +433,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     const allowLetter = curCorpus === 'all' || curCorpus === 'volumes';
     const out = [];
     if ((p.kind === 'ref-bible' || p.kind === 'named-passage') && allowBible) {
-      const lbl = p.bookTitle + ' ' + p.chapter + (p.chapterEnd ? '–' + p.chapterEnd : '') + (p.verseStart ? ':' + p.verseStart + (p.verseEnd ? '-' + p.verseEnd : '') : '');
+      const lbl = p.bookTitle + ' ' + p.chapter + (p.chapterEnd ? '-' + p.chapterEnd : '') + (p.verseStart ? ':' + p.verseStart + (p.verseEnd ? '-' + p.verseEnd : '') : '');
       out.push({ __direct: true, __corpus: curCorpus, __label: lbl, __sub: p.kind === 'named-passage' ? 'Named passage — open' : 'Open chapter', ref: p });
     } else if (p.kind === 'ref-letter' && allowLetter) {
       const lr = letterRefCards(p, /** @type {any} */ (window).VotSearchData, window);
@@ -460,7 +461,19 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     if (!state.results.length) return [];
     if (directEntries.length > 0) return [];
     if (grouped.length <= 1) return [];
-    return state.results.slice(0, 5);
+    // One card per text: a Holy Days entry reprints its letter word for word, and
+    // both took a place in the five.
+    const seen = new Set();
+    const top = [];
+    for (const r of state.results) {
+      const d = r.doc || {};
+      const k = (d.title || d.ref || '') + '|' + String(d.text || '').slice(0, 80);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      top.push(r);
+      if (top.length === 5) break;
+    }
+    return top;
   }, [state.results, grouped.length, directEntries.length]);
 
   // Fuzzy book suggestion for did-you-mean — very conservative.
@@ -499,18 +512,28 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // out of the doc and land the reader ON the passage (use-search.js).
   const handleSelect = (entry) => { recordSearch(); onSelect(entry, state.terms, (query || '').trim()); };
 
-  const clearQuery = () => {onQueryChange('');setShowSuggest(false);setSuggestDismissed(true);};
+  // The box keeps the focus: the button that cleared it goes away with the query,
+  // and the focus went with it (the keyboard closed under the reader's thumb).
+  const clearQuery = () => {
+    onQueryChange('');
+    setShowSuggest(false);
+    setDismissedFor('');
+    if (inputRef.current) inputRef.current.focus();
+  };
 
   const fireSuggestion = (sug) => {
+    setDismissedFor(sug.query);
     onQueryChange(sug.query);
     setShowSuggest(false);
-    setSuggestDismissed(true);
   };
 
   const handleKey = (e) => {
     if (e.key === 'Enter') { recordSearch(); return; }
     if (e.key === 'Escape') {
-      if (showSuggest) {setShowSuggest(false);setSuggestDismissed(true);} else
+      // A search box clears itself on Escape as well: closing the suggestions
+      // emptied the query.
+      e.preventDefault();
+      if (showSuggest) {setShowSuggest(false);setDismissedFor(query);} else
       if (query) {clearQuery();} else
       onBack();
     }
@@ -536,7 +559,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             placeholder="Search scriptures, volumes, studies…"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            onFocus={() => setShowSuggest(suggestions.length > 0)}
+            onFocus={() => setShowSuggest(suggestions.length > 0 && dismissedFor !== query)}
             onKeyDown={handleKey}
             autoComplete="off"
             autoCorrect="off"
@@ -606,7 +629,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         )}
 
         {showSuggest && suggestions.length > 0 && (
-          <div className="srch-suggest">
+          <div className="srch-suggest-anchor"><div className="srch-suggest">
             {suggestions.map((s, i) => (
               <button key={i} className="srch-suggest-item" onMouseDown={(e) => {e.preventDefault();fireSuggestion(s);}}>
                 <span className="srch-suggest-kind">{s.kind}</span>
@@ -614,7 +637,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
                 {s.hint && <span className="srch-suggest-hint">{s.hint}</span>}
               </button>
             ))}
-          </div>
+          </div></div>
         )}
 
         {state.error && <div className="srch-error">Error: {state.error}</div>}
@@ -786,7 +809,17 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         )}
 
         {query && buildInfo.ready && state.phase === 'done' && state.results.length === 0 && directEntries.length === 0 && !didYouMean && !letterRefMissing && (
-          <div className="search-no-results">No results for “{query.trim()}”</div>
+          <div className="search-no-results">
+            {state.stopWordsOnly ?
+            <>“{query.trim()}” is in nearly every verse and letter. Add another word to search.</> :
+            <>No results for “{query.trim()}”{searchScope && searchContext ? ' in ' + searchContext.label : ''}.</>}
+            {searchScope && !state.stopWordsOnly ? <>{' '}<button type="button" className="srch-more-link" onClick={onToggleScope}>Search everywhere</button></> : null}
+          </div>
+        )}
+
+        {/* Nothing to search for: an emoji or punctuation alone left a blank screen. */}
+        {query && query.trim() && !/[\p{L}\p{N}]/u.test(query) && (
+          <div className="search-no-results">Type a word, a title or a reference to search.</div>
         )}
 
       </div>

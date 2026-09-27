@@ -585,6 +585,117 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 
+  /* The UI walk (search audit 2026-09-27). */
+  const typeAndWait = async (props, q) => {
+    const r = render(<SearchScreen {...props} />);
+    r.rerender(<SearchScreen {...props} query={q} />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    return r;
+  };
+
+  it('a picked suggestion stays picked: the list does not reopen on the query it set', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (window).VotSearchMini.suggest = () => [{ query: 'psalm 23', label: 'Psalm 23', kind: 'Ref' }];
+    let q = 'psa';
+    const props = { ...baseProps(), onQueryChange: (v) => { q = v; } };
+    const r = await typeAndWait(props, 'psa');
+    const item = document.querySelector('.srch-suggest-item');
+    expect(item, 'the list, open').toBeTruthy();
+    fireEvent.mouseDown(item);
+    r.rerender(<SearchScreen {...props} query={q} />);
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(q).toBe('psalm 23');
+    expect(document.querySelector('.srch-suggest-item'), 'closed after the pick').toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('Escape closes the suggestions and leaves the query alone', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (window).VotSearchMini.suggest = () => [{ query: 'psalm 23', label: 'Psalm 23', kind: 'Ref' }];
+    const onQueryChange = vi.fn();
+    await typeAndWait({ ...baseProps(), onQueryChange }, 'psa');
+    const input = screen.getByRole('searchbox', { name: 'Search' });
+    const ev = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    act(() => { input.dispatchEvent(ev); });
+    expect(ev.defaultPrevented, 'the search box does not clear itself as well').toBe(true);
+    expect(document.querySelector('.srch-suggest-item')).toBeNull();
+    expect(onQueryChange).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('the clear button keeps the focus in the box', async () => {
+    vi.useFakeTimers();
+    await typeAndWait(baseProps(), 'mercy');
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect(document.activeElement).toBe(screen.getByRole('searchbox', { name: 'Search' }));
+    vi.useRealTimers();
+  });
+
+  it('a stop word alone says why nothing is listed, not "No results"', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: { kind: 'text' }, results: [], parsedTerms: [], textQuery: null, stopWordsOnly: true }));
+    await typeAndWait(baseProps(), 'the');
+    const none = document.querySelector('.search-no-results');
+    expect(none.textContent).toContain('is in nearly every verse and letter');
+    vi.useRealTimers();
+  });
+
+  it('nothing to search for (an emoji alone) says so instead of a blank screen', async () => {
+    vi.useFakeTimers();
+    await typeAndWait(baseProps(), '\u{1F64F}');
+    expect(document.querySelector('.search-no-results').textContent).toBe('Type a word, a title or a reference to search.');
+    vi.useRealTimers();
+  });
+
+  it('a Hebrew name is searched: letters in any script count', async () => {
+    vi.useFakeTimers();
+    const search = vi.fn(() => Promise.resolve({ parsed: null, results: [], parsedTerms: [] }));
+    /** @type {any} */ (window).VotSearchMini.search = search;
+    await typeAndWait(baseProps(), '\u05D9\u05D4\u05D5\u05E9\u05E2');
+    expect(search).toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('a scope that holds nothing says where it looked, and offers everywhere', async () => {
+    vi.useFakeTimers();
+    const onToggleScope = vi.fn();
+    const props = { ...baseProps(), searchScope: { volumeId: 'v7' }, searchContext: { label: 'Volume Seven' }, onToggleScope };
+    await typeAndWait(props, 'zzzz');
+    const none = document.querySelector('.search-no-results');
+    expect(none.textContent).toContain('No results for \u201czzzz\u201d in Volume Seven.');
+    fireEvent.click(screen.getByRole('button', { name: 'Search everywhere' }));
+    expect(onToggleScope).toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('Best Matches shows a text once: a Holy Days reprint does not take a second place', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchGroup = () => null;
+    /** @type {any} */ (globalThis).SrchCard = ({ entry }) => <div className="stub-card">{entry.doc.title + ' ' + entry.doc.g}</div>;
+    const doc = (g, title, kind) => ({ kind, title, text: 'Keep the Passover, says The Lord.', g });
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: null, parsedTerms: ['passover'], results: [
+      { score: 3, doc: doc('v3', 'Keep The Passover', 'letter') },
+      { score: 3, doc: doc('holydays', 'Keep The Passover', 'holy-day') },
+      { score: 1, doc: { kind: 'verse', ref: 'Exodus 12:11', text: 'It is the Lord\u2019s Passover.', g: 'bible' } },
+    ] }));
+    await typeAndWait(baseProps(), 'passover');
+    const best = [...document.querySelectorAll('.srch-top-results .stub-card')].map((c) => c.textContent);
+    expect(best).toEqual(['Keep The Passover v3', 'undefined bible']);
+    vi.useRealTimers();
+  });
+
+  it('a passage card\u2019s chapter range uses a hyphen (Permanent Rule 1)', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).SrchCard = ({ entry, isDirect }) => (isDirect ? <div className="stub-direct">{entry.__label}</div> : null);
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: { kind: 'named-passage', bookId: 'matthew', bookTitle: 'Matthew', chapter: 5, chapterEnd: 7, label: 'sermon on the mount' }, results: [], parsedTerms: [] }));
+    await typeAndWait(baseProps(), 'sermon on the mount');
+    expect(document.querySelector('.stub-direct').textContent).toBe('Matthew 5-7');
+    vi.useRealTimers();
+  });
+
   it('no correction, no note', async () => {
     vi.useFakeTimers();
     /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({

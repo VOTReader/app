@@ -64,8 +64,17 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '' }) {
   // NAME so a result is identifiable at a glance; verses/headings lead with their
   // reference. The location (ref) becomes a muted sub-line when it isn't the name.
   const named = doc.kind !== 'verse' && doc.kind !== 'heading' && doc.kind !== 'chapter-title' && !!doc.title;
-  const headline = named ? doc.title : refLine;
-  const locLine = (named && refLine && refLine !== doc.title) ? refLine : '';
+  let headline = named ? doc.title : refLine;
+  let locLine = (named && refLine && refLine !== doc.title) ? refLine : '';
+  // A study chapter leads with its own title. The index folds the study's name into
+  // both its title and its location, so the card said the long name twice.
+  const cut = doc.kind === 'bible-study' && doc.title ? doc.title.indexOf(' \u2014 ') : -1;
+  if (cut > 0) {
+    const study = doc.title.slice(0, cut);
+    const num = String(doc.ref || '').indexOf(study) === 0 ? String(doc.ref).slice(study.length).trim() : '';
+    headline = doc.title.slice(cut + 3);
+    locLine = study + (num ? ' \u00b7 Chapter ' + num : '');
+  }
   const body = doc.kind === 'heading' ? (doc.heading || doc.text) :
   (doc.kind === 'chapter-title' || doc.kind === 'letter-title' || doc.kind === 'wtlb-title' || doc.kind === 'blessed-title' || doc.kind === 'holy-day-title' || doc.kind === 'answers-title') ?
   (doc.title || doc.text) :

@@ -171,3 +171,16 @@ describe('SrchCard — more places in this letter', () => {
     expect(container.querySelector('.srch-places-toggle')).toBeNull();
   });
 });
+
+/* A study chapter's card said the study's long name twice: the index folds it into
+   the chapter's title and its location (search audit 2026-09-27). */
+describe('SrchCard for a Bible study chapter', () => {
+  it('leads with the chapter\u2019s own title, and names the study once, with the chapter', () => {
+    /** @type {any} */ (globalThis).SRCH_KIND_LABEL = { 'bible-study': { label: 'Study', cls: '' } };
+    const study = 'YahuShua The Messiah, The Lamb of God';
+    const e = { score: 1, doc: { kind: 'bible-study', title: study + ' \u2014 Tuesday Night, Passover', ref: study + ' 3', text: 'On the tenth day of the month.' } };
+    const { container } = render(<SrchCard entry={e} terms={['passover']} onSelect={() => {}} isDirect={false} />);
+    expect(container.querySelector('.srch-card-ref').textContent).toBe('Tuesday Night, Passover');
+    expect(container.querySelector('.srch-card-loc').textContent).toBe(study + ' \u00b7 Chapter 3');
+  });
+});

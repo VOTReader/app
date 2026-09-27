@@ -386,7 +386,7 @@ async function ensureReady(options) {
  * @param {{translation?:string, useStopWords?:boolean, synonyms?:boolean, scope?:{bookId?:string,volumeId?:string}|null, corpus?:string, limit?:number, perVolume?:number, allWords?:boolean, _corrected?:boolean}} [options]
  * `corrections` lists each typed word that found nothing of its own and was
  * searched as the nearest indexed word instead ({ from: 'shephard', to: 'shepherd' }).
- * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>}>}
+ * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>, stopWordsOnly?:boolean}>}
  */
 async function search(query, options) {
   options = options || {};
@@ -441,7 +441,7 @@ async function search(query, options) {
 
   // All-stop-word query → no searchable content.
   if (useStop && terms.length && terms.every(isStopTerm)) {
-    return { parsed, results: [], parsedTerms: [], textQuery: null };
+    return { parsed, results: [], parsedTerms: [], textQuery: null, stopWordsOnly: true };
   }
   let filtered;
   if (!useStop || terms.length <= 4) filtered = terms.slice();
