@@ -34,23 +34,30 @@ export function expandQueryTerms(filtered, opts) {
   const units = [];
   const seen = Object.create(null);
   let didExpand = false;
+  /* EVERY WORD THE READER TYPED IS A LITERAL OF ITS OWN, FIRST (2026-09-27). This
+     loop used to expand each word's synonyms as it went, so a typed word that was an
+     earlier word's synonym ("Whom you call Christ and Jesus": jesus is in christ's
+     group; "the pagan and the heathen") was already `seen` and never got its own
+     unit, its origin never matched, and the phrase ranking, which needs every typed
+     word, could not fire: those phrases ranked #17 and #23 (search audit). A word
+     typed twice still gets one unit, at the first place it was typed; the engine
+     counts coverage over the origins that HAVE a literal unit. */
   for (let ti = 0; ti < filtered.length; ti++) {
     const baseTerm = String(filtered[ti]).toLowerCase();
-    if (!seen[baseTerm]) {
-      seen[baseTerm] = true;
-      units.push({ term: filtered[ti], origin: ti, literal: true });
-    }
-    if (useSyn) {
-      const grp = SYN[baseTerm];
-      if (grp) {
-        for (let gi = 0; gi < grp.length; gi++) {
-          const syn = String(grp[gi]).toLowerCase();
-          if (!seen[syn]) {
-            seen[syn] = true;
-            units.push({ term: syn, origin: ti, literal: false });
-            didExpand = true;
-          }
-        }
+    if (seen[baseTerm]) continue;
+    seen[baseTerm] = true;
+    units.push({ term: filtered[ti], origin: ti, literal: true });
+  }
+  if (useSyn) {
+    for (let ti = 0; ti < filtered.length; ti++) {
+      const grp = SYN[String(filtered[ti]).toLowerCase()];
+      if (!grp) continue;
+      for (let gi = 0; gi < grp.length; gi++) {
+        const syn = String(grp[gi]).toLowerCase();
+        if (seen[syn]) continue;
+        seen[syn] = true;
+        units.push({ term: syn, origin: ti, literal: false });
+        didExpand = true;
       }
     }
   }

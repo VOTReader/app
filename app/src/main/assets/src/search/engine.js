@@ -375,6 +375,15 @@ async function search(query, options) {
     if (fixed.to && typed.length === 1 && typed[0] !== fixed.to) corrections.push({ from: typed[0], to: fixed.to });
   }
 
+  /* THE WORDS THAT COUNT (2026-09-27). Coverage and the phrase ranking ask whether a
+     doc holds every word the reader typed; that is every origin with a literal unit.
+     A word typed twice has one unit (synonyms.js), at its first place, so counting
+     the typed terms themselves ("dust you are and to dust you shall return": dust
+     twice) asked for a coverage no doc could reach and the phrase never ranked. */
+  let requiredMask = 0;
+  for (let u = 0; u < units.length; u++) if (units[u].literal && units[u].origin < 31) requiredMask |= (1 << units[u].origin);
+  const required = popcount(requiredMask);
+
   const rankedIds = Object.keys(scoreMap);
   // KIND_BOOST (once).
   for (let i = 0; i < rankedIds.length; i++) {
@@ -392,11 +401,11 @@ async function search(query, options) {
   // shephard" boosts Psalm 23:1 the way the phrase spelled right does.
   const fixedTo = Object.create(null);
   for (let c = 0; c < corrections.length; c++) fixedTo[corrections[c].from] = corrections[c].to;
-  const qTokens = (!p.phrase && filtered.length > 1) ? kjvEncode(query).map((t) => fixedTo[t] || t) : null;
+  const qTokens = (!p.phrase && required > 1) ? kjvEncode(query).map((t) => fixedTo[t] || t) : null;
   if (qTokens) {
     for (let i = 0; i < rankedIds.length; i++) {
       const id = rankedIds[i];
-      if (popcount(termMask[id] || 0) === filtered.length) {
+      if (popcount((termMask[id] || 0) & requiredMask) === required) {
         const d = docLookup[id];
         if (d && phraseTokenMatch((d.text || '') + ' ' + (d.title || ''), qTokens)) scoreMap[id] *= PHRASE_BOOST;
       }
