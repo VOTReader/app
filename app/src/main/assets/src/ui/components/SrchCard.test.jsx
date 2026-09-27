@@ -110,6 +110,14 @@ describe('SrchCard — more places in this letter', () => {
     /** @type {any} */ (globalThis).VotSearchMini = { snippet, highlightSpans, morePlaces };
   });
 
+  it('a places list the reader opened is open again when the search comes back', () => {
+    const first = render(<SrchCard entry={letter()} terms={['flood']} onSelect={() => {}} isDirect={false} memo="flood|v" />);
+    fireEvent.click(first.container.querySelector('.srch-places-toggle'));
+    first.unmount();
+    const again = render(<SrchCard entry={letter()} terms={['flood']} onSelect={() => {}} isDirect={false} memo="flood|v" />);
+    expect(again.container.querySelector('.srch-places-toggle').getAttribute('aria-expanded')).toBe('true');
+  });
+
   it('says how many more places the letter holds, closed until asked', () => {
     const { container } = render(<SrchCard entry={letter()} terms={['flood']} onSelect={() => {}} isDirect={false} />);
     const toggle = container.querySelector('.srch-places-toggle');

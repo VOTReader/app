@@ -85,3 +85,18 @@ describe('SrchGroup', () => {
     expect(container.querySelectorAll('.stub-card')).toHaveLength(0);
   });
 });
+
+/* Back from a result re-mounted the screen with every group closed (search audit
+   2026-09-27, "flood": Volume Seven opened, a letter read, Back, the group closed). */
+describe('SrchGroup remembers, for one search, what the reader opened', () => {
+  it('opened and paged, it comes back open for the same search, and closed for another', () => {
+    const first = render(<SrchGroup gkey="v7" items={items} terms={[]} onSelect={() => {}} defaultOpen={false} memo="flood" />);
+    fireEvent.click(first.getByRole('button'));
+    first.unmount();
+    const again = render(<SrchGroup gkey="v7" items={items} terms={[]} onSelect={() => {}} defaultOpen={false} memo="flood" />);
+    expect(again.container.querySelectorAll('.stub-card')).toHaveLength(2);
+    again.unmount();
+    const other = render(<SrchGroup gkey="v7" items={items} terms={[]} onSelect={() => {}} defaultOpen={false} memo="rain" />);
+    expect(other.container.querySelectorAll('.stub-card')).toHaveLength(0);
+  });
+});

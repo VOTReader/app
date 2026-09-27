@@ -110,6 +110,26 @@ export function letterRefCards(p, D, win) {
 export const SEARCH_LIMIT = 400;
 export const SEARCH_TOTAL_LIMIT = 6000;
 
+/* SEARCH COMES BACK AS THE READER LEFT IT (search audit 2026-09-27). Back from a
+   result re-ran the search from nothing, and the screen's scroll was restored
+   against an empty list before the results arrived ("flood": 920 px became 379).
+   The last finished search is kept, and a screen opened on the same query and
+   settings starts from it; what was opened in it is srch-memory's (bundle-d). */
+/** @type {{ memo: string, allWordsFor: string, state: any } | null} */
+let lastSearch = null;
+
+/**
+ * The one string a search's results, and what was opened in them, are kept under.
+ * @param {string} q  the query, trimmed
+ * @param {any} settings
+ * @param {any} scope
+ * @returns {string}
+ */
+export function searchMemo(q, settings, scope) {
+  const s = settings || {};
+  return [q, s.searchCorpus || 'all', s.translation || 'nkjv', s.searchUseStopWords !== false, s.searchSynonyms !== false, scope ? JSON.stringify(scope) : ''].join('\u0001');
+}
+
 /**
  * Honest result-count label: "<count>+" when the engine cut the results short
  * (a collection hit its cap, or the total did), else the exact count, grouped
@@ -212,12 +232,16 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   const songsFound = songQuery.length >= 2 && typeof findSongFamilies === 'function' ? findSongFamilies(songQuery).length : 0;
   const inputRef = React.useRef(null);
   useImeHideBlur(inputRef);
-  const [state, setState] = React.useState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false, corrections: [] });
+  const memo = searchMemo((query || '').trim(), settings, searchScope);
+  const resumed = lastSearch && lastSearch.memo === memo && (query || '').trim() ? lastSearch : null;
+  const [state, setState] = React.useState(resumed ? resumed.state : { phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false, corrections: [] });
+  // the search this screen opened on, already on screen: not run again
+  const resumedFrom = React.useRef(resumed ? memo : null);
   /* Under a card (a named passage, a book name) the words' matches stop at five, so the
      card is not buried (search-2). "resurrection" and "passover" are passages AND the
      words of hundreds of letters, and the rest were out of reach (search audit
      2026-09-27): the summary offers them, for this query only. */
-  const [allWordsFor, setAllWordsFor] = React.useState('');
+  const [allWordsFor, setAllWordsFor] = React.useState(resumed ? resumed.allWordsFor : '');
   const [buildInfo, setBuildInfo] = React.useState(/** @type {{ ready: boolean, building: boolean, progress: any, error?: string }} */ ({ ready: false, building: false, progress: null }));
   const [showSuggest, setShowSuggest] = React.useState(false);
   const [suggestions, setSuggestions] = React.useState([]);
@@ -294,6 +318,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     // prefix hits ("a" → every "A Warning"/"ABASEMENT"…). Require ≥2 alphanumerics
     // before the full search; the suggest box (above) still reacts at 1 char.
     if (q.replace(/[^a-z0-9]/gi, '').length < 2) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false, corrections: [] });return;}
+    if (resumedFrom.current === memo && lastSearch && lastSearch.allWordsFor === allWordsFor) return;
+    resumedFrom.current = null;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     // Stale-query guard: the engine yields the main thread mid-search, so a
     // slow older query can resolve AFTER a newer one and silently overwrite
@@ -328,7 +354,9 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           settings.searchSynonyms !== false,
           /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.STOP_WORDS_TRIMMED,
         );
-        setState({ phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [] });
+        const done = { phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [] };
+        if (!r.error) lastSearch = { memo, allWordsFor, state: done };
+        setState(done);
       }).catch((err) => {
         if (stale) return;
         setState({ phase: 'done', parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0, capped: [], truncated: false, corrections: [] });
@@ -338,7 +366,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       stale = true;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, buildInfo.ready, settings.translation, settings.searchUseStopWords, settings.searchSynonyms, settings.searchCorpus, searchScope, allWordsFor]);
+  }, [query, buildInfo.ready, settings.translation, settings.searchUseStopWords, settings.searchSynonyms, settings.searchCorpus, searchScope, allWordsFor, memo]);
 
   // Handle command-kind parsed results
   React.useEffect(() => {
@@ -722,7 +750,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           <div className="srch-top-results">
             <div className="srch-section-label">Best Matches</div>
             {topResults.map((entry, i) => (
-              <SrchCard key={'top' + i} entry={entry} terms={state.terms} onSelect={handleSelect} />
+              <SrchCard key={'top' + i} entry={entry} terms={state.terms} onSelect={handleSelect} memo={memo} />
             ))}
           </div>
         )}
@@ -733,12 +761,15 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
               <SrchGroup
                 /* Not keyed by the sort: toggling Book order must not close
                    the group the reader opened (cards carry stable keys). */
-                key={g.key + '|' + query}
+                /* ...but keyed by the search: narrowed to Scriptures, the one group left
+                   opens as a lone group does, not closed as the All list had it. */
+                key={g.key + '|' + memo}
                 gkey={g.key}
                 items={g.items}
                 capped={cappedGroups.has(g.key)}
                 terms={state.terms}
                 onSelect={handleSelect}
+                memo={memo}
                 /* A long result set opens as a contents list, every collection
                    closed under Best Matches, so the reader picks the collection;
                    opening the first five used to open whichever five ranked

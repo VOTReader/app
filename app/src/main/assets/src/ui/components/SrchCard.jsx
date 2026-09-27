@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { translationLabel } from '../../data/translations.js';
+import { recall, remember, docKey } from './srch-memory.js';
 
 /* What one unit of a kind is called in "3 more places in this letter": the kinds
    whose one doc is a whole letter, entry, topic or study chapter, so its text can
@@ -16,7 +17,7 @@ const PLACE_UNIT = {
   'bible-study': 'chapter',
 };
 
-export function SrchCard({ entry, terms, onSelect, isDirect }) {
+export function SrchCard({ entry, terms, onSelect, isDirect, memo = '' }) {
   const doc = (!isDirect && entry && entry.doc) || null;
   // Merge the engine's per-result matched terms (MiniSearch only — the
   // doc-side words a fuzzy/prefix search actually hit, e.g. typed "sheperd"
@@ -38,7 +39,13 @@ export function SrchCard({ entry, terms, onSelect, isDirect }) {
     return sm.morePlaces(placeText, hlTerms || []);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- termsKey is hlTerms by value; the array is rebuilt every render.
   }, [placeText, termsKey]);
-  const [placesOpen, setPlacesOpen] = React.useState(false);
+  // `memo` names the search: a "more places" list the reader opened is open again on Back.
+  const placesKey = doc ? 'places|' + docKey(doc) : '';
+  const [placesOpen, setPlacesOpen] = React.useState(() => !!(placesKey && recall(memo, placesKey)));
+  const togglePlaces = () => {
+    remember(memo, placesKey, !placesOpen);
+    setPlacesOpen(!placesOpen);
+  };
 
   if (isDirect) {
     return (
@@ -93,7 +100,7 @@ export function SrchCard({ entry, terms, onSelect, isDirect }) {
         type="button"
         className="srch-places-toggle"
         aria-expanded={placesOpen}
-        onClick={() => setPlacesOpen((o) => !o)}
+        onClick={togglePlaces}
       >
         <span>{n} more {n === 1 ? 'place' : 'places'} in this {unit}</span>
         <span className={"srch-places-chevron" + (placesOpen ? " open" : "")} aria-hidden="true">▸</span>

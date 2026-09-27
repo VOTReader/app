@@ -557,6 +557,34 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 
+  it('Back to the same search opens on its results at once, without searching again', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchGroup = ({ gkey, memo }) => <div className="stub-group" data-key={gkey} data-memo={memo} />;
+    const search = vi.fn(() => Promise.resolve({ parsed: null, parsedTerms: ['remembered'], results: [
+      { score: 2, doc: { kind: 'letter', title: 'a', text: 't', g: 'v7' } },
+      { score: 1, doc: { kind: 'letter', title: 'b', text: 't', g: 'v1' } },
+    ] }));
+    /** @type {any} */ (window).VotSearchMini.search = search;
+    const props = { ...baseProps(), settings: { searchCorpus: 'volumes' } };
+    const first = render(<SearchScreen {...props} />);
+    first.rerender(<SearchScreen {...props} query="remembered words" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    expect(search).toHaveBeenCalledTimes(1);
+    first.unmount();
+    // the screen comes back (Back from the letter): the groups are there on the first render
+    render(<SearchScreen {...props} query="remembered words" />);
+    const groups = [...document.querySelectorAll('.stub-group')];
+    expect(groups.map((g) => g.getAttribute('data-key'))).toEqual(['v1', 'v7']);
+    expect(groups[0].getAttribute('data-memo')).toContain('remembered words');
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    expect(search, 'not searched again').toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
   it('no correction, no note', async () => {
     vi.useFakeTimers();
     /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({

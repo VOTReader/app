@@ -2,6 +2,8 @@
    SrchGroup — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { recall, remember, docKey } from './srch-memory.js';
+
 /* What a group counts, so the header says "8 letters", not "8 matches": a card is
    one letter, entry, topic, chapter or verse, and a letter can match in several
    places (SrchCard lists them), so "matches" undercounted what a group holds. */
@@ -25,13 +27,16 @@ export const SRCH_GROUP_PAGE = 50;
    are the engine's own dedup key plus the unit ids. */
 function cardKey(entry, i) {
   const d = entry && entry.doc;
-  if (!d) return 'i' + i;
-  return [d.kind, d.volumeId, d.letterId, d.ref, d.title, String(d.text || '').slice(0, 60)].join('|');
+  return d ? docKey(d) : 'i' + i;
 }
 
-export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = false }) {
-  const [open, setOpen] = React.useState(defaultOpen !== false);
-  const [shown, setShown] = React.useState(SRCH_GROUP_PAGE);
+/* `memo` names the search (SearchScreen): a group the reader opened, and how far
+   they paged it, are open and paged again when the screen comes back to it. */
+export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = false, memo = '' }) {
+  const was = recall(memo, 'group|' + gkey);
+  const [open, setOpen] = React.useState(was ? was.open : defaultOpen !== false);
+  const [shown, setShown] = React.useState(was ? was.shown : SRCH_GROUP_PAGE);
+  React.useEffect(() => { remember(memo, 'group|' + gkey, { open, shown }); }, [memo, gkey, open, shown]);
   const meta = SRCH_GROUP_META[gkey] || { label: gkey };
   const unit = (GROUP_UNIT[gkey] || ['match', 'matches'])[items.length === 1 && !capped ? 0 : 1];
   const left = items.length - shown;
@@ -52,7 +57,7 @@ export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = 
       {open ? (
         <div className="srch-group-items">
           {items.slice(0, shown).map((entry, i) => (
-            <SrchCard key={cardKey(entry, i)} entry={entry} terms={terms} onSelect={onSelect} />
+            <SrchCard key={cardKey(entry, i)} entry={entry} terms={terms} onSelect={onSelect} memo={memo} />
           ))}
           {left > 0 ? (
             <button type="button" className="srch-group-more" onClick={() => setShown((n) => n + SRCH_GROUP_PAGE)}>
