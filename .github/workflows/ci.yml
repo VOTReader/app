@@ -472,6 +472,16 @@ jobs:
         # runner first (branch run 36123741219) after its first try went red (08298894).
         run: npm run e2e:restore-fresh
 
+      - name: End-to-end search quality
+        # tools/e2e-search.mjs (search audit 2026-09-27): the queries readers type,
+        # run against the corpus that ships, with the index built as the search
+        # screen builds it: verses quoted as remembered, letter titles whole and in
+        # part, passages a word off, typos, references, passage names. The fixture
+        # suites pin the engine's rules on hand-made texts; this is the check that
+        # the real corpus still answers them. Each case names the report or audit it
+        # came from; a run that checks nothing FAILS (NOTHING-CHECKED).
+        run: npm run e2e:search
+
   kotlin-tests:
     name: Kotlin unit tests (NK1)
     runs-on: ubuntu-latest
