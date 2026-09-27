@@ -9,7 +9,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { OfflineRowStatus, OfflineCollectionAction, formatBytes } from './OfflineAudioControls.jsx';
-import { AudioOfflineScreen } from '../screens/AudioOfflineScreen.jsx';
+import { AudioOfflineScreen, groupShelf } from '../screens/AudioOfflineScreen.jsx';
 
 const U = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/' + id + '.mp3';
 const T = (id, extra = {}) => ({ key: 'one:' + id, title: 'Letter ' + id, url: U(id), ...extra });
@@ -257,6 +257,62 @@ describe('On this phone (the shelf)', () => {
     expect(container.querySelectorAll('.audio-offline-item')).toHaveLength(1);
     expect(getByRole('button', { name: /^remove i am the passover/i })).toBeTruthy();
     expect(queryByRole('button', { name: /^remove all/i })).toBeNull();
+  });
+
+  it('groups a Bible book by edition, chapters in their order, and removes the book after asking (n2-04)', () => {
+    const s = fakeStore();
+    globalThis.BIBLE_AUDIO_EDITIONS = { 'brm-kjv': { volKey: 'bible-brm-kjv', short: 'KJV · BRM' } };
+    const ch = (n, at) => s.st.saved.set(U('gen' + n), { url: U('gen' + n), key: 'bible-brm-kjv:genesis', title: 'Genesis · Chapter ' + n, bytes: 1_000_000, savedAt: at });
+    ch(10, 1); ch(2, 3); ch(1, 2);
+    save(s, 'a', 18_000_000, 'I Am The Passover');   // added last: its group comes first
+    const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    const groups = container.querySelectorAll('.audio-offline-item');
+    expect(groups).toHaveLength(2);
+    const book = groups[1];
+    expect(book.querySelector('.audio-offline-group-head strong').textContent).toBe('Genesis · KJV · BRM');
+    expect(book.textContent).toMatch(/3 recordings · 3 MB/);
+    const rows = [...book.querySelectorAll('.audio-library-row:not(.audio-offline-group-head) strong')].map((x) => x.textContent);
+    expect(rows).toEqual(['Chapter 1', 'Chapter 2', 'Chapter 10']);
+    fireEvent.click(getByRole('button', { name: /^remove genesis · kjv · brm, 3 recordings/i }));
+    expect(s.remove).not.toHaveBeenCalled();
+    fireEvent.click(getByRole('button', { name: /^yes, remove$/i }));
+    expect(s.remove).toHaveBeenCalledWith([U('gen1'), U('gen2'), U('gen10')]);
+    delete globalThis.BIBLE_AUDIO_EDITIONS;
+  });
+
+  it('groupShelf keeps a download with no key on its own, and a letter\'s parts together', () => {
+    const it = (id, key, title, at) => ({ url: U(id), key, title, bytes: 1, savedAt: at });
+    const g = groupShelf([it('p2', 'one:x', 'X · Part 2', 1), it('p1', 'one:x', 'X · Part 1', 2), it('z', '', 'recovered-id', 3)]);
+    expect(g.map((x) => x.title)).toEqual(['recovered-id', 'X']);
+    expect(g[1].items.map((x) => x.title)).toEqual(['X · Part 1', 'X · Part 2']);
+  });
+
+  it('offers an update for a recording uploaded again, and checks when it opens (n2-01)', () => {
+    const s = fakeStore();
+    s.checkForUpdates = vi.fn();
+    s.update = vi.fn(() => true);
+    s.isUpdating = () => false;
+    save(s, 'a', 18_000_000, 'I Am The Passover');
+    s.st.saved.get(U('a')).stale = true;
+    const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    expect(s.checkForUpdates).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toMatch(/Update available/);
+    fireEvent.click(getByRole('button', { name: /^update i am the passover/i }));
+    expect(s.update).toHaveBeenCalledWith([expect.objectContaining({ url: U('a') })]);
+  });
+
+  it('shows what is on its way and what did not download, with Cancel all and Retry all (n2-05)', () => {
+    const s = fakeStore();
+    s.cancelAll = vi.fn();
+    const failed = [{ url: U('c'), key: 'one:c', title: 'Letter c' }];
+    s.pending = () => ({ busy: 12, failed });
+    const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    expect(container.textContent).toMatch(/Downloading · 12 recordings to go/);
+    expect(container.textContent).toMatch(/Did not download · 1 recording/);
+    fireEvent.click(getByRole('button', { name: /^cancel all/i }));
+    expect(s.cancelAll).toHaveBeenCalledTimes(1);
+    fireEvent.click(getByRole('button', { name: /^retry all/i }));
+    expect(s.download).toHaveBeenCalledWith(failed);
   });
 
   it('an empty shelf says how to fill it', () => {

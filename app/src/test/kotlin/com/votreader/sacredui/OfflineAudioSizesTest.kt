@@ -131,4 +131,68 @@ class OfflineAudioSizesTest {
         assertEquals(listOf(a1, "https://example.com/x.mp3"), (0 until asked.length()).map { asked.getString(it) })
         assertEquals(0, last.getJSONObject("sizes").length())
     }
+
+    // ── n2-01: a recording uploaded again (same URL, new bytes) shows as an update ──
+
+    private fun savingStore(lister: (String) -> Map<String, Long>?, body: () -> ByteArray) = OfflineAudioStore(
+        tmp.root, opener = { OfflineAudioStore.Opened(java.io.ByteArrayInputStream(body()), body().size.toLong()) },
+        executor = direct, freeBytes = { 1L shl 40 }, emit = { events += JSONObject(it) },
+        clock = { now }, sizeLister = lister, headSize = { null }, sizeExecutor = direct,
+    )
+
+    private fun staleOf(s: OfflineAudioStore, url: String): Boolean {
+        val items = JSONObject(s.stateJson()).getJSONArray("items")
+        return (0 until items.length()).map { items.getJSONObject(it) }.first { it.getString("url") == url }.optBoolean("stale", false)
+    }
+
+    @Test
+    fun `a recording whose release asset changed size is stale once the shelf checks, and an update replaces it`() {
+        var listed = 1000L
+        var bytes = ByteArray(1000) { 1 }
+        val s = savingStore(lister = { mapOf("one-christmas-B.mp3" to listed) }, body = { bytes })
+        s.enqueue(listOf(OfflineAudioStore.Item(a1, "one:christmas", "Christmas")))
+        assertTrue(s.isSaved(a1))
+        s.checkSaved()
+        assertEquals("checked", events.last().getString("type"))
+        assertEquals(false, staleOf(s, a1), "the same size: not stale")
+        listed = 900L                                   // uploaded again, trimmed
+        now += 7L * 3600 * 1000                         // the shelf opens later: its listing is older than 6 h
+        s.checkSaved()
+        assertEquals(true, staleOf(s, a1))
+        s.enqueue(listOf(OfflineAudioStore.Item(a1, "one:christmas", "Christmas")))
+        assertEquals(1, events.count { it.optString("type") == "queued" }, "a plain download of a saved one is refused")
+        bytes = ByteArray(900) { 2 }
+        s.enqueue(listOf(OfflineAudioStore.Item(a1, "one:christmas", "Christmas", update = true)))
+        assertTrue(s.isSaved(a1))
+        assertEquals(900L, s.fileFor(a1)!!.length())
+        assertEquals(false, staleOf(s, a1), "the new bytes match the listing")
+    }
+
+    @Test
+    fun `a stored index without the new field reads as before, and no listing means not stale`() {
+        val s = savingStore(lister = { null }, body = { ByteArray(10) { 3 } })
+        s.enqueue(listOf(OfflineAudioStore.Item(a1, "one:christmas", "Christmas")))
+        s.checkSaved()
+        assertEquals(false, staleOf(s, a1))
+        val again = savingStore(lister = { null }, body = { ByteArray(0) })   // a new store reads the index from disk
+        assertTrue(again.isSaved(a1))
+        assertEquals(10L, again.fileFor(a1)!!.length())
+    }
+
+    @Test
+    fun `remove during an update stops it, so the recording does not come back`() {
+        val held = mutableListOf<Runnable>()
+        val s = OfflineAudioStore(
+            tmp.root, opener = { OfflineAudioStore.Opened(java.io.ByteArrayInputStream(ByteArray(5)), 5L) },
+            executor = { held += it }, freeBytes = { 1L shl 40 }, emit = { events += JSONObject(it) },
+            clock = { now }, sizeLister = { null }, headSize = { null }, sizeExecutor = direct,
+        )
+        s.enqueue(listOf(OfflineAudioStore.Item(a1, "k", "t")))
+        held.removeAt(0).run()
+        assertTrue(s.isSaved(a1))
+        s.enqueue(listOf(OfflineAudioStore.Item(a1, "k", "t", update = true)))
+        s.remove(listOf(a1))
+        held.forEach { it.run() }
+        assertEquals(false, s.isSaved(a1))
+    }
 }

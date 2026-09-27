@@ -146,6 +146,8 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
   React.useEffect(() => { if (songs && !songs.loaded) void songs.load(); }, [songs]);
   const songTotal = songs && songs.loaded ? songs.songs().filter((s) => !s.hid && s.sh).length : 0;
   const downloads = offline ? offline.items() : [];
+  // Recordings on their way: the row shows (and says so) while a Download all runs, not only once one landed (n2-05).
+  const busy = offline && typeof offline.pending === 'function' ? offline.pending().busy : 0;
   const isPlaying = state.status === 'playing';
   const isLoading = state.status === 'loading';
   const active = isPlaying || isLoading;
@@ -241,14 +243,16 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
         </section>
 
         {/* Downloads to the phone (item 8): shown once something is on it; Android only. */}
-        {offline && downloads.length ? (
+        {offline && (downloads.length || busy) ? (
           <section className="audio-library-section audio-library-offline-row" aria-label="On this phone">
             <div className="audio-library-shelf">
               <button type="button" className="audio-library-shelf-row" onClick={() => { if (onOpenOffline) onOpenOffline(); }}>
                 <span className="audio-library-shelf-mark" aria-hidden="true"><DownloadIcon /></span>
                 <span className="audio-library-shelf-copy">
                   <strong>On this phone</strong>
-                  <small>{(downloads.length === 1 ? '1 recording' : downloads.length + ' recordings') + ' · ' + formatBytes(offline.totalBytes()) + ' · plays with no signal'}</small>
+                  <small>{busy
+                    ? 'Downloading · ' + (busy === 1 ? '1 recording' : busy + ' recordings') + ' to go'
+                    : (downloads.length === 1 ? '1 recording' : downloads.length + ' recordings') + ' · ' + formatBytes(offline.totalBytes()) + ' · plays with no signal'}</small>
                 </span>
                 <span className="audio-library-shelf-tail">
                   <b>{downloads.length}</b>

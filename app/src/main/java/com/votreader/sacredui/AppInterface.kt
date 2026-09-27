@@ -632,6 +632,10 @@ class AppInterface(
     @JavascriptInterface
     fun offlineAudioSizes(json: String?) { host.offlineAudio?.requestSizesJson(json) }
 
+    /** The shelf opened: check the recordings on the phone for re-uploads; answered as one "checked" event. */
+    @JavascriptInterface
+    fun offlineAudioCheck() { host.offlineAudio?.checkSavedJson() }
+
     // ─── The native player (m3) ─────────────────────────────────────────
     // utils/native-audio.js, the page's stand-in <audio>, drives ExoPlayer through these. Binder thread: the port
     // posts its work to the main looper and never throws; each call is wrapped anyway, because a throw across the
