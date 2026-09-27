@@ -221,4 +221,67 @@ describe('storage-growth series', () => {
     expect(await getUserDataSamples()).toEqual([]);
     await expect(recordUserDataSample(123)).resolves.toBeDefined();
   });
+
+  it('a new day appends a point after yesterday\'s', async () => {
+    const idb = fakeMeta();
+    /** @type {any} */ (globalThis).IDBAdapter = idb;
+    idb.mem.set('meta/user-data-samples', [{ d: '2000-01-01', b: 1 }]);
+    const series = await recordUserDataSample(2);
+    expect(series.map((s) => s.b)).toEqual([1, 2]);
+  });
+
+  it('keys a sample by the LOCAL calendar day, zero-padded or not', async () => {
+    vi.useFakeTimers();
+    try {
+      /** @type {any} */ (globalThis).IDBAdapter = fakeMeta();
+      vi.setSystemTime(new Date(2026, 11, 25, 12, 0, 0)); // two-digit month + day
+      expect((await recordUserDataSample(1))[0].d).toBe('2026-12-25');
+      /** @type {any} */ (globalThis).IDBAdapter = fakeMeta();
+      vi.setSystemTime(new Date(2026, 2, 4, 23, 59, 0));  // one-digit month + day, late evening
+      expect((await recordUserDataSample(1))[0].d).toBe('2026-03-04');
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('a negative, non-numeric or infinite total never writes a bogus point', async () => {
+    const idb = fakeMeta();
+    /** @type {any} */ (globalThis).IDBAdapter = idb;
+    expect((await recordUserDataSample(-50))[0].b).toBe(0);
+    expect((await recordUserDataSample('abc'))[0].b).toBe(0);
+    idb.mem.clear();
+    expect(await recordUserDataSample(Infinity)).toEqual([]);
+    expect(idb.mem.size).toBe(0);
+  });
+
+  it('a non-array stored series reads as empty', async () => {
+    const idb = fakeMeta();
+    /** @type {any} */ (globalThis).IDBAdapter = idb;
+    idb.mem.set('meta/user-data-samples', { d: '2026-01-01', b: 1 });
+    expect(await getUserDataSamples()).toEqual([]);
+  });
+});
+
+/* utf8Bytes' fallback runs on a host without TextEncoder (or one whose encode
+   throws). It must agree with the real encoder byte-for-byte, or the Settings
+   number shifts by host. */
+describe('measureUserData — UTF-8 byte count without TextEncoder', () => {
+  const RealTE = globalThis.TextEncoder;
+  const samples = ['plain ascii', 'café ñ', 'Ω ≈ “quoted” — dash', 'emoji 🙏 and 𝔊'];
+  const realBytes = (s) => new RealTE().encode(JSON.stringify(s)).length;
+  beforeEach(() => { fakeMedia([]); });
+  afterEach(() => { globalThis.TextEncoder = RealTE; });
+
+  it.each(samples)('the manual count matches TextEncoder for %s', async (text) => {
+    const expected = realBytes(text);
+    fakeStores({ 'vot-notes': text });
+    delete globalThis.TextEncoder;
+    expect((await measureUserData()).structured).toBe(expected);
+  });
+
+  it('a TextEncoder that throws falls back to the manual count', async () => {
+    const text = 'Grace — 恵み 🙏';
+    const expected = realBytes(text);
+    fakeStores({ 'vot-notes': text });
+    globalThis.TextEncoder = class { encode() { throw new Error('broken'); } };
+    expect((await measureUserData()).structured).toBe(expected);
+  });
 });

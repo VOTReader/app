@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-  THUMB_DB, THUMB_STORE, openThumbDB, idbPut, idbDelete, idbReadAll,
+  THUMB_DB, THUMB_STORE, openThumbDB, idbPut, idbDelete, idbReadAll, idbAllKeys,
 } from './thumb-store.js';
 
 beforeEach(async () => {
@@ -174,5 +174,106 @@ describe('ThumbStore — storage-backup-4: Clear All My Data must actually delet
     await idbPut('proof', 'alive');
     const all = await idbReadAll();
     expect(all.proof).toBe('alive');
+  });
+});
+
+describe('ThumbStore — idbAllKeys (the GC sweep names what is ON DISK)', () => {
+  it('lists every stored key as a string, without needing the values', async () => {
+    await idbPut('tab:a', 'x');
+    await idbPut('tab:b', 'y');
+    expect((await idbAllKeys()).sort()).toEqual(['tab:a', 'tab:b']);
+  });
+
+  it('is empty on an empty store', async () => {
+    expect(await idbAllKeys()).toEqual([]);
+  });
+});
+
+/* Best-effort contract, failure side: every helper resolves (never rejects) when
+   IDB misbehaves — a blank tab card beats a crashed Tabs overview. The live
+   connection is real (fake-indexeddb); only its transaction() is made to fail. */
+describe('ThumbStore — transaction failures resolve quietly', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  /** A transaction stand-in whose request / tx fires the named failure. */
+  function failingTx(kind) {
+    const req = {};
+    const tx = {
+      objectStore: () => ({
+        put: () => req, delete: () => req,
+        getAllKeys: () => req, openCursor: () => req,
+      }),
+    };
+    queueMicrotask(() => {
+      if (kind === 'tx-error') tx.onerror && tx.onerror();
+      if (kind === 'tx-abort') tx.onabort && tx.onabort();
+      if (kind === 'req-error') req.onerror && req.onerror();
+    });
+    return /** @type {any} */ (tx);
+  }
+
+  it('a throwing transaction() resolves every helper to its empty value', async () => {
+    const db = await openThumbDB();
+    vi.spyOn(db, 'transaction').mockImplementation(() => { throw new Error('InvalidStateError'); });
+    await expect(idbPut('k', 'v')).resolves.toBeUndefined();
+    await expect(idbDelete('k')).resolves.toBeUndefined();
+    await expect(idbAllKeys()).resolves.toEqual([]);
+    await expect(idbReadAll()).resolves.toEqual({});
+  });
+
+  it('idbPut resolves on a transaction error or abort (quota)', async () => {
+    const db = await openThumbDB();
+    vi.spyOn(db, 'transaction').mockImplementationOnce(() => failingTx('tx-error'))
+      .mockImplementationOnce(() => failingTx('tx-abort'));
+    await expect(idbPut('k', 'v')).resolves.toBeUndefined();
+    await expect(idbPut('k', 'v')).resolves.toBeUndefined();
+  });
+
+  it('idbDelete resolves on a transaction error', async () => {
+    const db = await openThumbDB();
+    vi.spyOn(db, 'transaction').mockImplementation(() => failingTx('tx-error'));
+    await expect(idbDelete('k')).resolves.toBeUndefined();
+  });
+
+  it('idbAllKeys resolves [] on a request error', async () => {
+    const db = await openThumbDB();
+    vi.spyOn(db, 'transaction').mockImplementation(() => failingTx('req-error'));
+    await expect(idbAllKeys()).resolves.toEqual([]);
+  });
+
+  it('idbReadAll resolves what it has so far on a cursor error', async () => {
+    const db = await openThumbDB();
+    vi.spyOn(db, 'transaction').mockImplementation(() => failingTx('req-error'));
+    await expect(idbReadAll()).resolves.toEqual({});
+  });
+});
+
+/* No IDB at all (private mode, a blocked origin): the singleton resolves null and
+   every helper degrades to its empty value. Needs a FRESH module instance, since
+   the connection promise is cached for the life of the module. */
+describe('ThumbStore — IDB unavailable', () => {
+  const realIDB = globalThis.indexedDB;
+  afterEach(() => { globalThis.indexedDB = realIDB; vi.resetModules(); });
+
+  async function freshModuleWith(idb) {
+    vi.resetModules();
+    globalThis.indexedDB = idb;
+    return import('./thumb-store.js');
+  }
+
+  it('indexedDB.open throwing resolves null, and the helpers resolve empty', async () => {
+    const m = await freshModuleWith({ open: () => { throw new Error('SecurityError'); } });
+    await expect(m.openThumbDB()).resolves.toBeNull();
+    await expect(m.idbPut('k', 'v')).resolves.toBeUndefined();
+    await expect(m.idbDelete('k')).resolves.toBeUndefined();
+    await expect(m.idbAllKeys()).resolves.toEqual([]);
+    await expect(m.idbReadAll(['k'])).resolves.toEqual({});
+  });
+
+  it('an open request that errors resolves null', async () => {
+    const m = await freshModuleWith({
+      open: () => { const req = {}; queueMicrotask(() => req.onerror()); return req; },
+    });
+    await expect(m.openThumbDB()).resolves.toBeNull();
   });
 });
