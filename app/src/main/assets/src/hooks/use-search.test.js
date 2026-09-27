@@ -732,6 +732,28 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
     expect(props.setScreen).toHaveBeenLastCalledWith('bible-study-chapter');
   });
 
+  it('a tapped place (SrchCard "more places") lands where THAT place starts, not on the snippet\'s passage', () => {
+    const text = 'a flooding rain came. Later: Be a flood of water which covers, But a flood of judgment to destroy';
+    const at = text.indexOf('flood of water');
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect(
+      { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'vengeance', text }, terms: ['flood'], placeStart: at },
+      ['flood'],
+    ); });
+    expect(calls, 'the snippet window is not consulted').toEqual([]);
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith({ type: 'excerpt', text: text.slice(at, at + 48), letterId: 'vengeance' });
+    expect(props.setLetterId).toHaveBeenCalledWith('vengeance');
+  });
+
+  it('a place start outside the text falls back to the query\'s own excerpt', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect(
+      { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'vengeance', text: 'the still small voice spoke' }, placeStart: 999 },
+      ['still'],
+    ); });
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith({ type: 'excerpt', text: 'still small voice spoke', letterId: 'vengeance' });
+  });
+
   it('no match (a title hit, no terms) clears the anchor so a stale verse anchor cannot leak in', () => {
     const { result, props } = setup();
     act(() => { result.current.handleSearchSelect({ doc: { kind: 'letter-title', volumeId: 'vot-two', letterId: 'wide-path', text: '' } }, []); });

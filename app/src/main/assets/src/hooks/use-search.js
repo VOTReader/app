@@ -367,6 +367,11 @@ export function useSearch({
   // was never about. For a study doc that is the CHAPTER id (what LetterView
   // renders), not doc.letterId (the study).
   const excerptAnchor = (doc, terms, entry, letterId) => {
+    // A tapped PLACE (SrchCard's "more places" list) names where in the text it
+    // starts, a word start: the landing reads the same 48 chars matchExcerpt cuts.
+    if (entry && typeof entry.placeStart === 'number' && doc && doc.text && entry.placeStart >= 0 && entry.placeStart < doc.text.length) {
+      return { type: 'excerpt', text: doc.text.slice(entry.placeStart, entry.placeStart + 48), letterId: letterId || null };
+    }
     const sm = /** @type {any} */ (window).VotSearchMini;
     if (!sm || typeof sm.matchExcerpt !== 'function' || !doc || !doc.text) return null;
     const own = Array.isArray(terms) ? terms : [];

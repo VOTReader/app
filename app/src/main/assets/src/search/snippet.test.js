@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { snippet, highlightSpans, matchExcerpt } from './snippet.js';
+import { snippet, highlightSpans, matchExcerpt, morePlaces } from './snippet.js';
 
 describe('snippet', () => {
   it('returns short text unchanged when no terms', () => {
@@ -136,5 +136,75 @@ describe('search results read as whole words', () => {
     const text = 'x'.repeat(30) + ' filler words here and there ' + 'Therefore, love one another As I have loved you' + ' more words follow here'.repeat(4);
     const out = snippet(text, ['love', 'one', 'another'], 70);
     expect(out).toContain('love one another');
+  });
+});
+
+/* Every place a letter says the words (Brianna, 2026-09-26). "flood" showed
+   Vengeance Is Mine's "a flooding rain" and never the "flood of judgment" further
+   down the same letter; a card now lists the rest. The text below is that letter's
+   shape: one early hit, then three late ones, two of them one line apart. */
+describe('morePlaces — every other place a unit matches', () => {
+  const pad = (n) => 'and the word went on. '.repeat(n);
+  const TEXT = pad(3) + 'Behold, I shall bring upon them a flooding rain, a great deluge. ' + pad(300)
+    + 'nor shall I flood the face of the earth in My anger, nor drown the nations in the depths of My sorrow. '
+    + 'For that which I pour out shall not Be a flood of water which covers, But a flood of judgment to destroy, '
+    + pad(3);
+
+  it('lists the hits the snippet does not show, a line apart joined as one place, in reading order', () => {
+    const places = morePlaces(TEXT, ['flood'], 120);
+    expect(places.map((p) => TEXT.slice(p.start, p.start + 12))).toEqual(['flood the fa', 'flood of wat']);
+    expect(places[0].clip).toContain('nor shall I flood the face');
+    expect(places[1].clip).toContain('Be a flood of water which covers, But a flood of judgment');
+  });
+
+  it('never lists the hit the snippet already shows', () => {
+    const shown = snippet(TEXT, ['flood'], 180);
+    expect(shown).toContain('flooding rain');
+    expect(morePlaces(TEXT, ['flood'], 120).some((p) => p.clip.includes('flooding rain'))).toBe(false);
+  });
+
+  it('counts a word and the longer forms the engine matched as ONE word', () => {
+    // SrchCard highlights the query plus the engine's matched forms: flood + flooding.
+    // Counted apart, the "flooding" hit was worth two words and every place holding
+    // "flood" alone was filtered away as a partial match.
+    const places = morePlaces(TEXT, ['flood', 'flooding'], 120);
+    expect(places.map((p) => TEXT.slice(p.start, p.start + 5))).toEqual(['flood', 'flood']);
+  });
+
+  it('with two query words, keeps only the places that hold both', () => {
+    const t = pad(3) + 'the flood came first. ' + pad(40) + 'a flood alone here. ' + pad(40)
+      + 'a flood of judgment to destroy. ' + pad(40) + 'judgment alone. ' + pad(3);
+    const places = morePlaces(t, ['flood', 'judgment'], 120);
+    // the snippet shows the both-words window; nothing else holds both
+    expect(snippet(t, ['flood', 'judgment'], 180)).toContain('flood of judgment');
+    expect(places).toEqual([]);
+  });
+
+  it('counts an archaic form as its modern word ("thee" is "you")', () => {
+    const t = pad(3) + 'I love you. ' + pad(40) + 'I have called thee by name. ' + pad(40) + 'you and thee both. ' + pad(3);
+    const places = morePlaces(t, ['you'], 120);
+    // one query word: every place is kept, whichever form it holds
+    expect(places.map((p) => t.slice(p.start, p.start + 4))).toEqual(['thee', 'you ']);
+  });
+
+  it('returns nothing for no terms, no hits, or one hit', () => {
+    expect(morePlaces(TEXT, [])).toEqual([]);
+    expect(morePlaces(TEXT, ['zebra'])).toEqual([]);
+    expect(morePlaces(pad(10) + 'one flood only. ' + pad(10), ['flood'])).toEqual([]);
+  });
+
+  it('starts every place on a word, so the landing excerpt reads from the hit', () => {
+    for (const p of morePlaces(TEXT, ['flood'], 120)) {
+      expect(TEXT.slice(p.start).startsWith('flood')).toBe(true);
+    }
+  });
+});
+
+describe('bestMatch counts word families, not highlight forms', () => {
+  it('a longer matched form is not worth two words: the earliest window of the typed word wins', () => {
+    const t = 'the flood rose. ' + 'and the word went on. '.repeat(20) + 'the flooding came, flooded and flooding. ';
+    // Before: flood + flooding + flooded counted as three distinct terms, pulling the
+    // snippet to the late cluster of longer forms and away from the plain word.
+    expect(snippet(t, ['flood', 'flooding', 'flooded'], 60)).toContain('the flood rose');
   });
 });

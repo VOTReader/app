@@ -3774,6 +3774,21 @@
     .srch-card.card-direct { background:var(--gold-faint); }
     .srch-card.card-direct .srch-card-ref { color:var(--gold-bright); font-size:var(--fs-12); }
     .srch-card.card-direct .srch-card-snippet { color:var(--gold-dim); font-size:var(--fs-10); letter-spacing:0.14em; text-transform:uppercase; font-family:'Cinzel',serif; margin-top:0.2rem; }
+    /* Every other place a letter says the words (SrchCard): one quiet row under the
+       snippet, "2 more places in this letter", opening to a list of short passages,
+       each its own tap. The wrap carries the card's divider, so the row and the list
+       read as part of the card above them. */
+    .srch-card-wrap { border-bottom:1px solid rgba(200,164,86,0.12); }
+    .srch-card-wrap > .srch-card { border-bottom:none; padding-bottom:0.4rem; }
+    .srch-places-toggle { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; box-sizing:border-box; width:calc(100% - 2.2rem); min-height:44px; margin:0 1.1rem; padding:0.35rem 0; background:none; border:none; border-top:1px solid rgba(200,164,86,0.12); cursor:pointer; text-align:left; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); }
+    .srch-places-toggle:active { color:var(--gold); }
+    .srch-places-chevron { width:24px; height:24px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; font-size:var(--fs-15); line-height:1; color:var(--gold); transition:transform 0.18s ease; }
+    .srch-places-chevron.open { transform:rotate(90deg); }
+    .srch-places { list-style:none; margin:0; padding:0 0 0.35rem; }
+    .srch-place { display:flex; align-items:center; gap:0.6rem; box-sizing:border-box; width:100%; min-height:44px; padding:0.5rem 1.1rem 0.5rem 2rem; background:none; border:none; border-top:1px solid rgba(200,164,86,0.08); cursor:pointer; text-align:left; font-family:var(--font-body); font-size:var(--fs-15); line-height:1.45; color:var(--cream-muted); }
+    .srch-place:active { background:var(--gold-faint); }
+    .srch-place-text { flex:1; min-width:0; }
+    .srch-place-go { flex-shrink:0; color:var(--gold-dim); font-size:var(--fs-15); }
 
     .srch-did-you-mean { padding:0.7rem 1.2rem; background:var(--gold-faint); border-bottom:1px solid var(--gold-border); font-family:var(--font-body); font-size:var(--fs-15); color:var(--cream-dim); }
     .srch-did-you-mean button { background:none; border:none; color:var(--gold-bright); font-family:var(--font-body); font-size:var(--fs-15); font-style:italic; cursor:pointer; padding:0; text-decoration:underline dotted; }

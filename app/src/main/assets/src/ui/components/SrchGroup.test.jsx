@@ -25,6 +25,22 @@ describe('SrchGroup', () => {
     expect([...container.querySelectorAll('.stub-card')].map((c) => c.textContent)).toEqual(['Vengeance Is Mine', 'A Day of Slaughter']);
   });
 
+  it('the header counts what the group holds: letters, entries, verses; "matches" only for an unknown group', () => {
+    const count = (gkey, list) => {
+      const { container, unmount } = render(<SrchGroup gkey={gkey} items={list} terms={[]} onSelect={() => {}} defaultOpen={false} />);
+      const text = container.querySelector('.srch-group-count-inline').textContent;
+      unmount();
+      return text;
+    };
+    expect(count('v7', items)).toBe(' · 2 letters');
+    expect(count('v7', items.slice(0, 1))).toBe(' · 1 letter');
+    expect(count('wtlb1', items)).toBe(' · 2 entries');
+    expect(count('bible', items)).toBe(' · 2 verses');
+    expect(count('answers', items)).toBe(' · 2 topics');
+    expect(count('bible-studies', items)).toBe(' · 2 chapters');
+    expect(count('zz', items)).toBe(' · 2 matches');
+  });
+
   it('an open group closes again', () => {
     const { container, getByRole } = render(<SrchGroup gkey="v7" items={items} terms={[]} onSelect={() => {}} defaultOpen={true} />);
     expect(container.querySelectorAll('.stub-card')).toHaveLength(2);
