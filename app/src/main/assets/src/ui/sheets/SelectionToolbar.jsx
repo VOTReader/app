@@ -645,6 +645,13 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       shownRangeRef.current = range.cloneRange();
       setAdjusting(false);
       setVisible(true);
+      // hint1 (lw1): the reader has long-pressed, so the first-run "Hold your
+      // finger on any line" pill (AnnotationHint) has done its job: the same
+      // durable flag its ✕ sets. Once, and never a reason to keep the bar down.
+      try {
+        const hintFlag = typeof AnnHintDismissedFlagStore !== 'undefined' ? AnnHintDismissedFlagStore : null;
+        if (hintFlag && !hintFlag.is()) hintFlag.set();
+      } catch (_e) { /* the pill's problem, not the toolbar's */ }
     };
 
     // cp1 sweep: raise the toolbar once the page is STILL. A finger scroll

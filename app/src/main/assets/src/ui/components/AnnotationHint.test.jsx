@@ -34,10 +34,15 @@ function makeStore(overrides) {
 // a component remount (a simulated cold boot) still sees the recorded flag.
 function makeFlagStore(initiallySet = false) {
   let v = initiallySet;
+  let ver = 0;
+  const subs = new Set();
+  const bump = () => { ver++; subs.forEach((cb) => cb()); };
   return {
     is: () => v,
-    set: () => { v = true; },
-    clear: () => { v = false; },
+    set: () => { v = true; bump(); },
+    clear: () => { v = false; bump(); },
+    subscribe: (cb) => { subs.add(cb); return () => subs.delete(cb); },
+    getVersion: () => ver,
   };
 }
 
@@ -136,6 +141,19 @@ describe('AnnotationHint', () => {
     // Simulated cold boot: any session-only window state is gone; only the
     // persisted flag store remains. The hint must NOT re-pitch.
     delete window.__annHintDismissed;
+    render(<AnnotationHint />);
+    act(() => { vi.advanceTimersByTime(2600); });
+    expect(screen.queryByText(HINT_TEXT)).toBeNull();
+  });
+
+  it('goes for good once the reader has long-pressed (hint1: the toolbar sets the same flag), with no mark saved', () => {
+    setupStores();
+    const first = render(<AnnotationHint />);
+    act(() => { vi.advanceTimersByTime(2600); });
+    expect(screen.getByText(HINT_TEXT)).toBeTruthy();
+    act(() => { window.AnnHintDismissedFlagStore.set(); });  // SelectionToolbar raised its bar
+    expect(screen.queryByText(HINT_TEXT)).toBeNull();
+    first.unmount();
     render(<AnnotationHint />);
     act(() => { vi.advanceTimersByTime(2600); });
     expect(screen.queryByText(HINT_TEXT)).toBeNull();
