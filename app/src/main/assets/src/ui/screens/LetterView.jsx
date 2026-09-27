@@ -11,7 +11,7 @@ import { blockReadText } from '../../utils/segment-dom-text.js';
 import { LetterListenRow, LetterSongsCard } from '../components/LetterSongs.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { FindInUnit } from '../components/FindInUnit.jsx';
-import { letterHlKey } from '../../utils/hl-keys.js';
+import { letterHlKey, letterHlPrefix } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
@@ -657,7 +657,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
           Settings → Reading. */}
       {/* Opened from search: every place the words appear, marked, and the pill
           that steps between them. Live pane only, like the read-along. */}
-      {!inert && <FindInUnit anchor={surpriseAnchor} unitId={letter.id} mainRef={mainRef} noun={studyMode ? 'chapter' : 'letter'} />}
+      {!inert && <FindInUnit anchor={surpriseAnchor} unitId={letter.id} mainRef={mainRef} noun={studyMode ? 'chapter' : 'letter'} keyPrefix={letterHlPrefix(letter.id)} />}
       {!inert && <ReadAlongHighlight volKey={volKey} letterId={letter.id} mainRef={mainRef} leadRef={leadRef} onListen={AudioPlayer.hasAudio(volKey, letter.id) ? () => AudioPlayer.playLetter({ volKey, letter, collectionLabel: volumeLabel || null }) : null} hlKeyFn={letterHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} seekTo={surpriseBlockKey} seekOffset={surpriseBlockOff} />}
 
       {/* Interactive chrome (bottom sheets + the prophecy expand FAB) portals

@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, act } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
-import { FindInUnit, readUnitText, rangeFor, locate } from './FindInUnit.jsx';
+import { FindInUnit, readUnitText, rangeFor, locate, placeAt } from './FindInUnit.jsx';
 import { findPlaces } from '../../search/snippet.js';
 
 // ReactDOM is a runtime global in the app (bundle-a UMD); the pill portals through it.
@@ -72,6 +72,32 @@ describe('readUnitText — the words the reader sees', () => {
     const at = flat.indexOf('flood');
     expect(at).toBeGreaterThanOrEqual(0);
     expect(rangeFor(segs, at, at + 5).toString()).toBe('flood');
+  });
+});
+
+describe('readUnitText with a key prefix — the unit’s own blocks only', () => {
+  it('reads the keyed blocks and never the footnote list, links or cards the body also holds (review of b3841d3e)', () => {
+    const root = document.createElement('div');
+    root.innerHTML = '<p data-hl-key="letter:v:0">a flood came</p>'
+      + '<ol class="footnotes"><li>Genesis 7:17 the flood was forty days</li></ol>'
+      + '<div data-hl-key="letter:v:g1:0"><p>a flood of judgment</p></div>'
+      + '<div class="related"><a>God Speaks About the Flood</a></div>'
+      + '<p data-hl-key="letter:vv:0">another letter’s flood</p>'
+      + '<p data-hl-key="letter:v:9" style="display:none">a hidden flood</p>';
+    const { flat } = readUnitText(root, 'letter:v:');
+    expect(flat.trim().replace(/\s+/g, ' ')).toBe('a flood came a flood of judgment');
+  });
+});
+
+describe('placeAt — the place the landing is in', () => {
+  it('the place whose span holds the landing, even when it does not start there (review of b3841d3e)', () => {
+    // a card grouped its places around its snippet: the tapped one starts at 100,
+    // inside this list's first place (0-105), not at the second's start (130)
+    const places = [{ start: 0, span: 105 }, { start: 130, span: 5 }, { start: 250, span: 5 }];
+    expect(placeAt(places, 100)).toBe(0);
+    expect(placeAt(places, 131)).toBe(1);
+    expect(placeAt(places, 200)).toBe(2);   // in none: the nearest start
+    expect(placeAt(places, -1)).toBe(0);
   });
 });
 

@@ -32,6 +32,15 @@ export function bibleHlKey(bookId, chapter, verse) { return 'bible:' + bookId + 
 export function letterHlKey(letterId, blockIdx) { return 'letter:' + letterId + ':' + blockIdx; }
 
 /**
+ * What every block key of one letter starts with (`letter:<letterId>:`), a prophecy
+ * card's included: FindInUnit reads only the blocks carrying it.
+ *
+ * @param {string} letterId
+ * @returns {string}
+ */
+export function letterHlPrefix(letterId) { return 'letter:' + letterId + ':'; }
+
+/**
  * Build the canonical hlKey for a WTLB paragraph anchor.
  * Format: `wtlb:<entryId>:<paraIdx>`.
  *
@@ -40,6 +49,14 @@ export function letterHlKey(letterId, blockIdx) { return 'letter:' + letterId + 
  * @returns {string}
  */
 export function wtlbHlKey(entryId, paraIdx) { return 'wtlb:' + entryId + ':' + paraIdx; }
+
+/**
+ * What every paragraph key of one entry starts with (`wtlb:<entryId>:`).
+ *
+ * @param {string} entryId
+ * @returns {string}
+ */
+export function wtlbHlPrefix(entryId) { return 'wtlb:' + entryId + ':'; }
 
 /**
  * Build the canonical hlKey for a MATTHEW STUDY BIBLE anchor (ChapterView —

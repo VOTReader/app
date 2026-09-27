@@ -7,10 +7,13 @@
    ‹ › ×" (Brianna, 2026-09-26). The result card already lists the places;
    this is the same list, on the page.
 
-   WHAT IT READS. The rendered unit: the text nodes under the host's body
-   (mainRef), footnote numbers, controls and hidden text skipped, block
-   elements and line breaks read as a space, so a place is found in the words
-   the reader sees. The places are the search's own (VotSearchMini.findPlaces
+   WHAT IT READS. The unit's own reading blocks as rendered: the elements
+   under the host's body (mainRef) keyed with the unit's annotation prefix
+   (`letter:<id>:` / `wtlb:<id>:`), footnote numbers, controls and hidden text
+   skipped, block elements and line breaks read as a space. The body also holds
+   the footnote list, Related Topics and Also Read links, the songs and install
+   cards; reading it whole counted their words as places (review of b3841d3e),
+   and the search never indexed them. The places are the search's own (VotSearchMini.findPlaces
    over that text, with the terms the result card marked): the same runs a
    card lists, the rarer word leading when the words never meet.
 
@@ -49,11 +52,13 @@ const LETTER = /\p{L}/u;
  * The unit's words as the reader sees them, and where each run of them lives:
  * `flat` joins the text nodes in document order (a block element, a line
  * break and a hidden run break it with one space), `segs` maps flat offsets
- * back to text nodes.
+ * back to text nodes. With `keyPrefix`, only the blocks whose data-hl-key
+ * starts with it are read (the outermost ones; a hidden one is skipped).
  * @param {Element | null} root
+ * @param {string} [keyPrefix]
  * @returns {{ flat: string, segs: Array<{ node: Text, start: number, end: number }> }}
  */
-export function readUnitText(root) {
+export function readUnitText(root, keyPrefix) {
   /** @type {Array<{ node: Text, start: number, end: number }>} */
   const segs = [];
   let flat = '';
@@ -82,7 +87,23 @@ export function readUnitText(root) {
       if (block) sep();
     }
   };
-  walk(root);
+  if (!keyPrefix) { walk(root); return { flat, segs }; }
+  /** @param {Element} el */
+  const hidden = (el) => {
+    for (let n = /** @type {Element | null} */ (el); n && n !== root; n = n.parentElement) {
+      if (view && view.getComputedStyle(n).display === 'none') return true;
+    }
+    return false;
+  };
+  for (const b of root.querySelectorAll('[data-hl-key]')) {
+    if (!(b.getAttribute('data-hl-key') || '').startsWith(keyPrefix)) continue;
+    const outer = b.parentElement && b.parentElement.closest('[data-hl-key]');
+    if (outer && root.contains(outer)) continue;
+    if (hidden(b)) continue;
+    sep();
+    walk(b);
+    sep();
+  }
   return { flat, segs };
 }
 
@@ -152,12 +173,19 @@ function wordEnd(flat, i) {
 }
 
 /**
- * @param {Array<{ start: number }>} places
+ * The place the landing is in: the one whose span holds `at` (a few characters of
+ * slack for the index-vs-page drift), else the one starting nearest it. A card
+ * groups its places around what its snippet already shows, so a tapped place can
+ * start inside one of these rather than at its start (review of b3841d3e).
+ * @param {Array<{ start: number, span: number }>} places
  * @param {number} at
- * @returns {number} the place starting nearest `at` (0 when `at` is unknown)
+ * @returns {number} 0 when `at` is unknown
  */
-function nearest(places, at) {
+export function placeAt(places, at) {
   if (at < 0 || !places.length) return 0;
+  for (let i = 0; i < places.length; i++) {
+    if (at >= places[i].start - 3 && at <= places[i].start + places[i].span + 3) return i;
+  }
   let best = 0;
   for (let i = 1; i < places.length; i++) {
     if (Math.abs(places[i].start - at) < Math.abs(places[best].start - at)) best = i;
@@ -236,14 +264,15 @@ function inView(root, place) {
  * @param {string} props.unitId  the unit on screen (the anchor names the one it was made for)
  * @param {{ current: Element | null }} props.mainRef  the unit's body
  * @param {string} [props.noun]  "letter", "entry", "topic", "chapter": the pill's accessible name
+ * @param {string} [props.keyPrefix]  the unit's block keys ('letter:<id>:'): only those blocks are read
  */
-export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter' }) {
+export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix = '' }) {
   const find = (anchor && anchor.type === 'excerpt' && anchor.find && Array.isArray(anchor.find.terms) && anchor.find.terms.length
     && (!anchor.letterId || anchor.letterId === unitId)) ? anchor.find : null;
   const [closed, setClosed] = React.useState(false);
   const [count, setCount] = React.useState(0);
   const [cur, setCur] = React.useState(0);
-  /** @type {{ current: Array<{ start: number, ranges: Range[] }> }} */
+  /** @type {{ current: Array<{ start: number, span: number, ranges: Range[] }> }} */
   const placesRef = React.useRef([]);
   const curRef = React.useRef(0);
   const active = !!find && !closed;
@@ -258,8 +287,8 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter' }) {
     if (!root || !sm || typeof sm.findPlaces !== 'function') return undefined;
     let first = true;
     const build = () => {
-      const { flat, segs } = readUnitText(root);
-      /** @type {Array<{ start: number, ranges: Range[] }>} */
+      const { flat, segs } = readUnitText(root, keyPrefix);
+      /** @type {Array<{ start: number, span: number, ranges: Range[] }>} */
       const places = [];
       for (const p of sm.findPlaces(flat, find.terms, PLACE_LEN)) {
         const ranges = [];
@@ -267,10 +296,10 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter' }) {
           const r = rangeFor(segs, h.idx, wordEnd(flat, h.idx + h.len));
           if (r) ranges.push(r);
         }
-        if (ranges.length) places.push({ start: p.start, ranges });
+        if (ranges.length) places.push({ start: p.start, span: p.span, ranges });
       }
       placesRef.current = places;
-      if (first) { first = false; curRef.current = nearest(places, locate(flat, anchor.text)); }
+      if (first) { first = false; curRef.current = placeAt(places, locate(flat, anchor.text)); }
       else if (curRef.current >= places.length) curRef.current = Math.max(0, places.length - 1);
       setCount(places.length);
       setCur(curRef.current);
@@ -278,28 +307,33 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter' }) {
     };
     build();
 
-    // Bring the tapped place into view once the landing has settled, unless the
-    // reader has put a finger on the page in the meantime: then it is theirs.
+    // Bring the tapped place into view once the landing has settled, and only
+    // then: never while another writer holds the page (a scroll restore, the
+    // autoscroll transport), never without the page having come to rest, and not
+    // at all once the reader has touched anything (the page, the autoscroll pill,
+    // a key): then the page is theirs (review of b3841d3e).
     let tries = 0;
     let last = -1;
     let still = 0;
     let settle = /** @type {any} */ (null);
     const scroller = root.closest('.screen-scroll');
     const handsOn = () => clearInterval(settle);
-    const HANDS = ['pointerdown', 'touchstart', 'wheel'];
-    if (scroller) for (const ev of HANDS) scroller.addEventListener(ev, handsOn, { passive: true });
+    const HANDS = ['pointerdown', 'touchstart', 'wheel', 'keydown'];
+    for (const ev of HANDS) document.addEventListener(ev, handsOn, { capture: true, passive: true });
     settle = setInterval(() => {
       tries++;
-      const restoring = document.body.classList.contains('scroll-restoring');
+      const busy = document.body.classList.contains('scroll-restoring') || document.body.classList.contains('autoscroll-running');
       const top = scroller ? scroller.scrollTop : 0;
       // The host's landing scroll starts 150 ms in: judge nothing before it has.
       if (tries <= 5) { last = top; return; }
-      still = (!restoring && top === last) ? still + 1 : 0;
+      still = (!busy && top === last) ? still + 1 : 0;
       last = top;
-      if (still >= 2 || tries > 40) {
+      if (still >= 2) {
         clearInterval(settle);
         const place = placesRef.current[curRef.current];
-        if (place && !restoring && !inView(root, place)) reveal(root, place);
+        if (place && !inView(root, place)) reveal(root, place);
+      } else if (tries > 40) {
+        clearInterval(settle);   // it never came to rest: leave it where it is
       }
     }, 60);
 
@@ -310,7 +344,7 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter' }) {
     if (mo) mo.observe(root, { childList: true, characterData: true, subtree: true });
     return () => {
       clearInterval(settle);
-      if (scroller) for (const ev of HANDS) scroller.removeEventListener(ev, handsOn);
+      for (const ev of HANDS) document.removeEventListener(ev, handsOn, { capture: true });
       clearTimeout(timer);
       if (mo) mo.disconnect();
       unmark();
