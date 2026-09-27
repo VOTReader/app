@@ -3821,6 +3821,7 @@
        corrected query is a tap that puts it in the box. */
     .srch-corrected { padding:0.6rem 1.2rem; border-bottom:1px solid var(--gold-border); font-family:var(--font-body); font-size:var(--fs-15); font-style:italic; color:var(--cream-dim); }
     .srch-corrected-link { background:none; border:none; padding:0.6rem 0.15rem; margin:-0.6rem -0.15rem; color:var(--gold-bright); font-family:var(--font-body); font-size:var(--fs-15); font-style:italic; cursor:pointer; text-decoration:underline; text-underline-offset:0.15em; }
+    .srch-more-link { background:none; border:none; padding:0.6rem 0.15rem; margin:-0.6rem -0.15rem; color:var(--gold-bright); font:inherit; cursor:pointer; text-decoration:underline; text-underline-offset:0.15em; }
 
     .srch-empty-hero { padding:2rem 1.5rem 1rem; text-align:center; font-family:var(--font-body); color:var(--cream-muted); }
     .srch-empty-hero h3 { font-family:'Cinzel Decorative',serif; font-size:var(--fs-18); letter-spacing:0.1em; color:var(--gold); font-weight:400; margin-bottom:0.5rem; }

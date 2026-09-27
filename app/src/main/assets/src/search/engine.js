@@ -383,7 +383,7 @@ async function ensureReady(options) {
  * "lord" 125 of 890, with no sign anything was missing. `capped` names every
  * collection that hit its cap (it may hold more), `truncated` says the total did.
  * `_corrected` is the engine's own: this search is a corrected query's re-run.
- * @param {{translation?:string, useStopWords?:boolean, synonyms?:boolean, scope?:{bookId?:string,volumeId?:string}|null, corpus?:string, limit?:number, perVolume?:number, _corrected?:boolean}} [options]
+ * @param {{translation?:string, useStopWords?:boolean, synonyms?:boolean, scope?:{bookId?:string,volumeId?:string}|null, corpus?:string, limit?:number, perVolume?:number, allWords?:boolean, _corrected?:boolean}} [options]
  * `corrections` lists each typed word that found nothing of its own and was
  * searched as the nearest indexed word instead ({ from: 'shephard', to: 'shepherd' }).
  * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>}>}
@@ -433,7 +433,8 @@ async function search(query, options) {
      readings of one query, and the return carries both. */
   const navAlso = parsed.kind !== 'text';
   const p = navAlso ? parseTextQuery(query) : parsed;
-  if (navAlso) limit = Math.min(limit, NAV_TEXT_LIMIT);
+  // `allWords`: the reader asked for every match under the card (SearchScreen).
+  if (navAlso && !options.allWords) limit = Math.min(limit, NAV_TEXT_LIMIT);
   const D = searchData();
   const terms = (p.phrase ? p.phrase.split(/\s+/) : p.terms.map(withoutPossessive)).concat(p.must);
   const useStop = options.useStopWords !== false;

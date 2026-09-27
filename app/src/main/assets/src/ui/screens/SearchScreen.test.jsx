@@ -527,6 +527,36 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 
+  /* A passage's card caps the words' matches at five (search-2), and "resurrection"
+     is the word of hundreds of letters: the summary offers the rest (search audit
+     2026-09-27); the card comes before the summary that counts the words' matches. */
+  it('under a card, the summary offers every match, and the card comes first', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).SrchCard = ({ isDirect }) => (isDirect ? <div className="stub-direct" /> : null);
+    const card = { kind: 'named-passage', bookId: 'matthew', bookTitle: 'Matthew', chapter: 28, label: 'resurrection' };
+    const hit = (i) => ({ score: 10 - i, doc: { kind: 'letter', title: 'L' + i, text: 't', ref: 'Volume One · Letter ' + i } });
+    const search = vi.fn((q, opts) => Promise.resolve(opts.allWords
+      ? { parsed: card, parsedTerms: ['resurrection'], results: [0, 1, 2, 3, 4, 5, 6, 7].map(hit), truncated: false }
+      : { parsed: card, parsedTerms: ['resurrection'], results: [0, 1, 2, 3, 4].map(hit), truncated: true }));
+    /** @type {any} */ (window).VotSearchMini.search = search;
+    const props = baseProps();
+    const { rerender } = render(<SearchScreen {...props} />);
+    rerender(<SearchScreen {...props} query="resurrection" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    const summary = document.querySelector('.srch-results-summary');
+    expect(summary.textContent).toContain('5+ matches');
+    const direct = document.querySelector('.stub-direct');
+    expect(direct.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING, 'the card before the summary').toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Show every match' }));
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    expect(search.mock.calls[search.mock.calls.length - 1][1].allWords).toBe(true);
+    expect(document.querySelector('.srch-results-summary').textContent).toContain('8 matches');
+    expect(screen.queryByRole('button', { name: 'Show every match' })).toBeNull();
+    vi.useRealTimers();
+  });
+
   it('no correction, no note', async () => {
     vi.useFakeTimers();
     /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({

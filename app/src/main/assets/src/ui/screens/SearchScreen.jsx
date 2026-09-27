@@ -157,6 +157,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   const inputRef = React.useRef(null);
   useImeHideBlur(inputRef);
   const [state, setState] = React.useState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false, corrections: [] });
+  /* Under a card (a named passage, a book name) the words' matches stop at five, so the
+     card is not buried (search-2). "resurrection" and "passover" are passages AND the
+     words of hundreds of letters, and the rest were out of reach (search audit
+     2026-09-27): the summary offers them, for this query only. */
+  const [allWordsFor, setAllWordsFor] = React.useState('');
   const [buildInfo, setBuildInfo] = React.useState(/** @type {{ ready: boolean, building: boolean, progress: any, error?: string }} */ ({ ready: false, building: false, progress: null }));
   const [showSuggest, setShowSuggest] = React.useState(false);
   const [suggestions, setSuggestions] = React.useState([]);
@@ -252,7 +257,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         scope: searchScope || null,
         corpus: settings.searchCorpus || 'all',
         limit: SEARCH_TOTAL_LIMIT,
-        perVolume: SEARCH_LIMIT
+        perVolume: SEARCH_LIMIT,
+        allWords: allWordsFor === q
       }).then((r) => {
         if (stale) return;
         // SRCH4: include the matched synonyms (when synonym search is on) so the
@@ -276,7 +282,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       stale = true;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, buildInfo.ready, settings.translation, settings.searchUseStopWords, settings.searchSynonyms, settings.searchCorpus, searchScope]);
+  }, [query, buildInfo.ready, settings.translation, settings.searchUseStopWords, settings.searchSynonyms, settings.searchCorpus, searchScope, allWordsFor]);
 
   // Handle command-kind parsed results
   React.useEffect(() => {
@@ -611,11 +617,27 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </div>
         )}
 
+        {/* The card answers the query; the summary below counts the words' matches,
+            so it follows the card rather than seem to count it. */}
+        {directEntries.length > 0 && (
+          <div className="srch-groups">
+            {directEntries.map((d, i) => (
+              <SrchCard key={'d' + i} entry={d} terms={[]} onSelect={handleSelect} isDirect={true} />
+            ))}
+          </div>
+        )}
+
         {query && buildInfo.ready && state.phase === 'done' && state.results.length > 0 && (
           <div className="srch-results-summary">
             {/* W0 (micro-gap a): at the engine cap the count is a floor — "400+", not "400". */}
             Found <strong>{matchCountLabel(state.results.length, state.capped.length > 0 || state.truncated)} {state.results.length === 1 ? "match" : "matches"}</strong>
             {" across "}<strong>{grouped.length} {grouped.length === 1 ? "section" : "sections"}</strong>
+            {directEntries.length > 0 && state.truncated && allWordsFor !== query.trim() && (
+              <>
+                {' · '}
+                <button type="button" className="srch-more-link" onClick={() => setAllWordsFor(query.trim())}>Show every match</button>
+              </>
+            )}
           </div>
         )}
 
@@ -627,14 +649,6 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
               aria-label={sortMode === 'relevance' ? 'Sort results in book order' : 'Sort results by relevance'}
               onClick={() => setSortMode(sortMode === 'relevance' ? 'canonical' : 'relevance')}
             >{sortMode === 'relevance' ? 'Book order' : 'Relevance'}</button>
-          </div>
-        )}
-
-        {directEntries.length > 0 && (
-          <div className="srch-groups">
-            {directEntries.map((d, i) => (
-              <SrchCard key={'d' + i} entry={d} terms={[]} onSelect={handleSelect} isDirect={true} />
-            ))}
           </div>
         )}
 
