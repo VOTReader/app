@@ -7,7 +7,7 @@ export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen }) {
   const meta = SRCH_GROUP_META[gkey] || { label: gkey };
   return (
     <div className={"srch-group" + (open ? '' : ' collapsed')}>
-      <button className="srch-group-header" onClick={() => setOpen((o) => !o)}>
+      <button className="srch-group-header" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <span>
           {meta.label}
           <span className="srch-group-count-inline"> · {items.length} {items.length === 1 ? "match" : "matches"}</span>
@@ -17,11 +17,15 @@ export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen }) {
             collapse/expand state legible at a glance. */}
         <span className={"srch-group-chevron" + (open ? " open" : "")} aria-hidden="true">▸</span>
       </button>
-      <div className="srch-group-items">
-        {items.map((entry, i) => (
-          <SrchCard key={i} entry={entry} terms={terms} onSelect={onSelect} />
-        ))}
-      </div>
+      {/* A closed group renders no cards: a long result set opens with every
+          group closed, and each card cuts and measures a snippet. */}
+      {open ? (
+        <div className="srch-group-items">
+          {items.map((entry, i) => (
+            <SrchCard key={i} entry={entry} terms={terms} onSelect={onSelect} />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -7,8 +7,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
+/* Node builtins in an app/src test: this tsconfig has no node types, so the
+   three specifiers are ts-ignored (the use-lazy-bundles.test.jsx precedent). */
+// @ts-ignore -- no node types in this tsconfig
+import { readFileSync } from 'node:fs';
+// @ts-ignore -- no node types in this tsconfig
+import { resolve, dirname } from 'node:path';
+// @ts-ignore -- no node types in this tsconfig
+import { fileURLToPath } from 'node:url';
 import {
-  expandSnippetTerms, matchCountLabel, useImeHideBlur, SearchScreen, SEARCH_LIMIT,
+  expandSnippetTerms, matchCountLabel, useImeHideBlur, SearchScreen, SEARCH_LIMIT, groupInSiteOrder,
 } from './SearchScreen.jsx';
 import {
   srchSortCanonical as realSrchSortCanonical,
@@ -57,6 +65,54 @@ describe('expandSnippetTerms (SRCH4)', () => {
 /* matchCountLabel (micro-gap a) — the engine caps at SEARCH_LIMIT (400), so a
    count of exactly 400 means "at least 400", not "exactly 400". Displaying
    the raw number overstates precision; the summary must say "400+". */
+/* The result groups follow the website's order (Brianna, 2026-09-26): the
+   collections as trumpetcallofgodonline.com lists them, whatever the query. */
+const INDEX_HTML = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'index.html'), 'utf-8');
+function realGroupMeta() {
+  const start = INDEX_HTML.indexOf('const SRCH_GROUP_META = {');
+  const end = INDEX_HTML.indexOf('};', start);
+  return new Function('return ' + INDEX_HTML.slice(INDEX_HTML.indexOf('{', start), end + 1))();
+}
+
+describe("groupInSiteOrder (the website's collection order)", () => {
+  const hit = (g, score) => ({ score, doc: { g } });
+  const key = (doc) => doc.g;
+
+  it("index.html lists the collections in the website's order, the Bible first and Answers last", () => {
+    const meta = realGroupMeta();
+    const byOrder = Object.keys(meta).sort((a, b) => meta[a].order - meta[b].order);
+    expect(byOrder).toEqual([
+      'bible', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7',
+      'rebuke', 'wtlb1', 'wtlb2', 'blessed', 'flock', 'timothy', 'holydays',
+      'matthew', 'matthew-study', 'bible-studies', 'answers', 'letters', 'other',
+    ]);
+  });
+
+  it('orders the groups by the site, not by their best score', () => {
+    const meta = realGroupMeta();
+    // relevance order: Volume Seven's letter scored highest, the Bible lowest
+    const results = [hit('v7', 9), hit('answers', 8), hit('wtlb1', 7), hit('v7', 6), hit('flock', 5), hit('v2', 4), hit('rebuke', 3), hit('bible', 1)];
+    expect(groupInSiteOrder(results, key, meta).map((g) => g.key))
+      .toEqual(['bible', 'v2', 'v7', 'rebuke', 'wtlb1', 'flock', 'answers']);
+  });
+
+  it("keeps each group's own items in relevance order", () => {
+    const results = [hit('v7', 9), hit('v2', 8), hit('v7', 2)];
+    const v7 = groupInSiteOrder(results, key, realGroupMeta()).find((g) => g.key === 'v7');
+    expect(v7.items.map((e) => /** @type {any} */ (e).score)).toEqual([9, 2]);
+  });
+
+  it('puts a group the table does not know after every known one, in first-seen order', () => {
+    const results = [hit('zz', 9), hit('yy', 8), hit('v1', 1)];
+    expect(groupInSiteOrder(results, key, realGroupMeta()).map((g) => g.key)).toEqual(['v1', 'zz', 'yy']);
+  });
+
+  it('returns no groups for no results', () => {
+    expect(groupInSiteOrder([], key, realGroupMeta())).toEqual([]);
+  });
+});
+
 describe('matchCountLabel (W0: honest 400+ cap)', () => {
   it('returns the plain count below the cap', () => {
     expect(matchCountLabel(0, 400)).toBe('0');
@@ -297,6 +353,67 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     expect(row, 'the sort row').toBeTruthy();
     expect([...row.querySelectorAll('button')].map((b) => b.className)).toEqual(['srch-sort-btn']);
     expect(row.querySelector('.srch-sort-btn').textContent).toBe('Book order');
+    vi.useRealTimers();
+  });
+
+  it("the groups render in the site's order, closed under Best Matches, in the Volumes corpus too", async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchGroup = ({ gkey, defaultOpen }) => (
+      <div className="stub-group" data-key={gkey} data-open={String(defaultOpen)} />
+    );
+    /** @type {any} */ (globalThis).SrchCard = ({ entry }) => <div className="stub-card">{entry.doc.title}</div>;
+    const results = [];
+    for (let i = 0; i < 20; i++) results.push({ score: 100 - i, doc: { kind: 'letter', title: 'seven-' + i, text: 't', g: 'v7' } });
+    for (let i = 0; i < 20; i++) results.push({ score: 50 - i, doc: { kind: 'letter', title: 'two-' + i, text: 't', g: 'v2' } });
+    results.push({ score: 1, doc: { kind: 'wtlb', title: 'wtlb', text: 't', g: 'wtlb1' } });
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: null, results, parsedTerms: [] }));
+    const props = { ...baseProps(), settings: { searchCorpus: 'volumes' } };
+    const { rerender } = render(<SearchScreen {...props} />);
+    rerender(<SearchScreen {...props} query="flood" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    const groups = [...document.querySelectorAll('.stub-group')];
+    expect(groups.map((g) => g.getAttribute('data-key'))).toEqual(['v2', 'v7', 'wtlb1']);
+    // 41 hits: a contents list, every group closed ...
+    expect(groups.map((g) => g.getAttribute('data-open'))).toEqual(['false', 'false', 'false']);
+    // ... under the five best hits, which lead in the Volumes corpus as in All.
+    const best = document.querySelector('.srch-top-results');
+    expect(best, 'Best Matches').toBeTruthy();
+    expect([...best.querySelectorAll('.stub-card')].map((c) => c.textContent)).toEqual(['seven-0', 'seven-1', 'seven-2', 'seven-3', 'seven-4']);
+    vi.useRealTimers();
+  });
+
+  it('a short result set opens every group, and one group has no Best Matches row', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchGroup = ({ gkey, defaultOpen }) => (
+      <div className="stub-group" data-key={gkey} data-open={String(defaultOpen)} />
+    );
+    const run = async (results) => {
+      /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: null, results, parsedTerms: [] }));
+      const props = baseProps();
+      const { rerender, unmount } = render(<SearchScreen {...props} />);
+      rerender(<SearchScreen {...props} query="flood" />);
+      act(() => { vi.advanceTimersByTime(200); });
+      await act(async () => { await Promise.resolve(); });
+      const out = {
+        open: [...document.querySelectorAll('.stub-group')].map((g) => g.getAttribute('data-open')),
+        best: !!document.querySelector('.srch-top-results'),
+      };
+      unmount();
+      return out;
+    };
+    const few = await run([
+      { score: 2, doc: { kind: 'letter', title: 'a', text: 't', g: 'v7' } },
+      { score: 1, doc: { kind: 'letter', title: 'b', text: 't', g: 'v1' } },
+    ]);
+    expect(few).toEqual({ open: ['true', 'true'], best: true });
+    const many = [];
+    for (let i = 0; i < 40; i++) many.push({ score: 40 - i, doc: { kind: 'letter', title: 'x' + i, text: 't', g: 'v3' } });
+    expect(await run(many)).toEqual({ open: ['true'], best: false });
     vi.useRealTimers();
   });
 

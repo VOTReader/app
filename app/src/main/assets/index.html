@@ -52,7 +52,7 @@
        still: audio-track.js accepts one exact song pattern. -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-Eeh01SK8uypEtKAtRbV1aRd2sSX2sGVP4u/jOl0Sv38=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-GEQrKen77xLJ3xIKZuIbIep3lMTlcOruCvTvPIlzrJE=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-Eeh01SK8uypEtKAtRbV1aRd2sSX2sGVP4u/jOl0Sv38=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-CSTsiXpSL6PrFbnnOKxr26HHhI6qbL1gLcEyixUvtIU=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     font-src 'self' data:;
@@ -701,26 +701,30 @@ const SRCH_KIND_LABEL = {
   'bible-study': { label: 'Study', cls: 'badge-note' }
 };
 
+/* `order` is the order the result groups are listed in, always: the Bible, then the
+   collections in the order trumpetcallofgodonline.com lists them (Volumes 1-7, The
+   Lord's Rebuke, Words To Live By One and Two, The Blessed, Little Flock, Timothy, The
+   Holy Days, the NT Study Bible, the studies), then Answers, the sister site. */
 const SRCH_GROUP_META = {
-  'matthew': { label: 'Matthew Study Bible', order: 1 },
-  'bible': { label: 'Scriptures', order: 2 },
-  'matthew-study': { label: 'Matthew · Notes', order: 3 },
-  'v1': { label: 'Volume One', order: 4 },
-  'v2': { label: 'Volume Two', order: 5 },
-  'v3': { label: 'Volume Three', order: 6 },
-  'v4': { label: 'Volume Four', order: 7 },
-  'v5': { label: 'Volume Five', order: 8 },
-  'v6': { label: 'Volume Six', order: 9 },
-  'v7': { label: 'Volume Seven', order: 10 },
-  'timothy': { label: 'Letters from Timothy', order: 11 },
-  'flock': { label: "Lord's Little Flock", order: 12 },
-  'rebuke': { label: "The Lord's Rebuke", order: 13 },
-  'blessed': { label: 'The Blessed', order: 14 },
-  'wtlb1': { label: 'WTLB · Part One', order: 15 },
-  'wtlb2': { label: 'WTLB · Part Two', order: 16 },
-  'holydays': { label: 'Holy Days', order: 17 },
-  'answers': { label: 'Answers Only God Can Give', order: 18 },
-  'bible-studies': { label: 'Bible Studies', order: 19 },
+  'bible': { label: 'Scriptures', order: 1 },
+  'v1': { label: 'Volume One', order: 2 },
+  'v2': { label: 'Volume Two', order: 3 },
+  'v3': { label: 'Volume Three', order: 4 },
+  'v4': { label: 'Volume Four', order: 5 },
+  'v5': { label: 'Volume Five', order: 6 },
+  'v6': { label: 'Volume Six', order: 7 },
+  'v7': { label: 'Volume Seven', order: 8 },
+  'rebuke': { label: "The Lord's Rebuke", order: 9 },
+  'wtlb1': { label: 'WTLB · Part One', order: 10 },
+  'wtlb2': { label: 'WTLB · Part Two', order: 11 },
+  'blessed': { label: 'The Blessed', order: 12 },
+  'flock': { label: "Lord's Little Flock", order: 13 },
+  'timothy': { label: 'Letters from Timothy', order: 14 },
+  'holydays': { label: 'Holy Days', order: 15 },
+  'matthew': { label: 'Matthew Study Bible', order: 16 },
+  'matthew-study': { label: 'Matthew · Notes', order: 17 },
+  'bible-studies': { label: 'Bible Studies', order: 18 },
+  'answers': { label: 'Answers Only God Can Give', order: 19 },
   'letters': { label: 'Letters', order: 20 },
   'other': { label: 'Other', order: 99 }
 };

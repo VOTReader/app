@@ -53,6 +53,33 @@ export function matchCountLabel(count, limit) {
 }
 
 /**
+ * Bucket results by collection and list the buckets in the SITE's order
+ * (SRCH_GROUP_META `order`: the Bible, then the collections as
+ * trumpetcallofgodonline.com lists them). Relevance used to order the buckets, so
+ * Volume Seven could sit above Volume Two and the list reshuffled on every
+ * query; a reader who navigates by collection now finds each one where it
+ * always is (Brianna, 2026-09-26). Relevance keeps its place in each bucket's
+ * own order and in the Best Matches row above the buckets. Pure for testability.
+ * @param {Array<{doc:Object}>} results  the engine's hits, relevance order
+ * @param {(doc:Object) => string} groupKey
+ * @param {Record<string, {order?:number}>} meta
+ * @returns {Array<{key:string, items:Array<{doc:Object}>}>}
+ */
+export function groupInSiteOrder(results, groupKey, meta) {
+  const groups = Object.create(null);
+  const keys = [];
+  for (const entry of results) {
+    const g = groupKey(entry.doc);
+    if (!groups[g]) { groups[g] = []; keys.push(g); }
+    groups[g].push(entry);
+  }
+  const rank = (k) => (meta[k] && meta[k].order) || 99;
+  // Array.prototype.sort is stable: two unknown keys keep their first-seen order.
+  keys.sort((a, b) => rank(a) - rank(b));
+  return keys.map((k) => ({ key: k, items: groups[k] }));
+}
+
+/**
  * W0 (IME blur): exiting search cost up to 3 back presses because the input
  * kept focus after the IME hid (back 1 closed the keyboard, back 2 only
  * dropped the stranded focus, back 3 finally navigated). Mirrors the
@@ -241,25 +268,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // cut read Object.keys(BOOKS) and silently no-opped; owner-caught).
   const bookIndex = SRCH_CANONICAL_BOOK_INDEX;
 
-  // Group results by source
-  const grouped = React.useMemo(() => {
-    if (!state.results.length) return [];
-    const groups = {};
-    for (let i = 0; i < state.results.length; i++) {
-      const entry = state.results[i];
-      const g = srchGroupKey(entry.doc);
-      if (!groups[g]) groups[g] = [];
-      groups[g].push(entry);
-    }
-    const keys = Object.keys(groups);
-    keys.sort((a, b) => {
-      const aTop = groups[a][0]?.score || 0;
-      const bTop = groups[b][0]?.score || 0;
-      if (aTop !== bTop) return bTop - aTop;
-      return (SRCH_GROUP_META[a]?.order || 99) - (SRCH_GROUP_META[b]?.order || 99);
-    });
-    return keys.map((k) => ({ key: k, items: groups[k] }));
-  }, [state.results]);
+  // Group results by source, the groups in the site's order.
+  const grouped = React.useMemo(
+    () => groupInSiteOrder(state.results, srchGroupKey, SRCH_GROUP_META),
+    [state.results]
+  );
 
   // The canonical re-sort of scripture groups.
   const visibleGroups = React.useMemo(() => {
@@ -297,16 +310,16 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     return out;
   }, [state.parsed, settings.searchCorpus]);
 
-  // Top results: best 5 cross-corpus hits shown before groups (All mode only,
-  // only for text queries — ref queries already have directEntries cards)
+  // Top results: the best 5 hits shown before the groups whenever there is more
+  // than one group, in every corpus. The groups follow the site's order, not
+  // relevance, so this row is where relevance leads (only for text queries —
+  // ref queries already have directEntries cards).
   const topResults = React.useMemo(() => {
     if (!state.results.length) return [];
     if (directEntries.length > 0) return [];
-    const corpus = settings.searchCorpus || 'all';
-    if (corpus !== 'all') return [];
     if (grouped.length <= 1) return [];
     return state.results.slice(0, 5);
-  }, [state.results, grouped.length, settings.searchCorpus, directEntries.length]);
+  }, [state.results, grouped.length, directEntries.length]);
 
   // Fuzzy book suggestion for did-you-mean — very conservative.
   // Only fires when the query is a SHORT single-token that plausibly looks
@@ -580,14 +593,19 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
 
         {visibleGroups.length > 0 && (
           <div className="srch-groups">
-            {visibleGroups.map((g, i) => (
+            {visibleGroups.map((g) => (
               <SrchGroup
                 key={g.key + '|' + query + '|' + sortMode}
                 gkey={g.key}
                 items={g.items}
                 terms={state.terms}
                 onSelect={handleSelect}
-                defaultOpen={state.results.length <= 30 || i < 5}
+                /* A long result set opens as a contents list, every collection
+                   closed under Best Matches, so the reader picks the collection;
+                   opening the first five used to open whichever five ranked
+                   highest, which in the site's order would be the Bible and
+                   Volumes One to Four whatever the query. */
+                defaultOpen={visibleGroups.length === 1 || state.results.length <= 30}
               />
             ))}
           </div>
