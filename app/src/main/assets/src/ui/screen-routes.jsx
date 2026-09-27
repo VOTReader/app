@@ -145,7 +145,7 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {() => void} handleSurprise
  * @property {(id: string, clearGenre?: boolean) => void} handleScriptureSelect
  * @property {(id: any) => void} handleVolumeSelect
- * @property {(entry: any, terms?: string[]) => void} handleSearchSelect
+ * @property {(entry: any, terms?: string[], query?: string) => void} handleSearchSelect
  * @property {(action: any) => void} handleSearchCommand
  * @property {(num: number) => void} selectMatthewCh
  * @property {(num: number) => void} selectBibleCh

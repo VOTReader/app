@@ -366,16 +366,21 @@ export function useSearch({
   // turning the page, the arrows) cannot re-land a stale search on a letter it
   // was never about. For a study doc that is the CHAPTER id (what LetterView
   // renders), not doc.letterId (the study).
-  const excerptAnchor = (doc, terms, entry, letterId) => {
+  // FIND IN THE UNIT (2026-09-26): the anchor also carries what to find, the
+  // words the result card marked (the query's own, its synonyms, the engine's
+  // matched forms) and the query as typed, for the host's FindInUnit pill
+  // ("flood  2 of 3").
+  const excerptAnchor = (doc, terms, entry, letterId, query) => {
+    const own = Array.isArray(terms) ? terms : [];
+    const hit = (entry && Array.isArray(entry.terms)) ? entry.terms.filter((t) => own.indexOf(t) < 0) : [];
+    const find = own.length || hit.length ? { terms: own.concat(hit), label: String(query || '').trim() || own.concat(hit)[0] } : null;
     // A tapped PLACE (SrchCard's "more places" list) names where in the text it
     // starts, a word start: the landing reads the same 48 chars matchExcerpt cuts.
     if (entry && typeof entry.placeStart === 'number' && doc && doc.text && entry.placeStart >= 0 && entry.placeStart < doc.text.length) {
-      return { type: 'excerpt', text: doc.text.slice(entry.placeStart, entry.placeStart + 48), letterId: letterId || null };
+      return { type: 'excerpt', text: doc.text.slice(entry.placeStart, entry.placeStart + 48), letterId: letterId || null, find };
     }
     const sm = /** @type {any} */ (window).VotSearchMini;
     if (!sm || typeof sm.matchExcerpt !== 'function' || !doc || !doc.text) return null;
-    const own = Array.isArray(terms) ? terms : [];
-    const hit = (entry && Array.isArray(entry.terms)) ? entry.terms.filter((t) => own.indexOf(t) < 0) : [];
     // The query's OWN words cut the excerpt. The engine's per-hit terms are
     // prefix expansions ('in' -> into, indeed; 'the' -> these, them, they...),
     // and matchExcerpt scores a window by DISTINCT terms, so merged in as equals
@@ -384,11 +389,11 @@ export function useSearch({
     // stay as the fallback for a hit the typed words cannot find at all — a
     // typo the engine corrected.
     const text = (own.length ? sm.matchExcerpt(doc.text, own) : '') || (hit.length ? sm.matchExcerpt(doc.text, own.concat(hit)) : '');
-    return text ? { type: 'excerpt', text, letterId: letterId || null } : null;
+    return text ? { type: 'excerpt', text, letterId: letterId || null, find } : null;
   };
 
-  /** @param {any} entry @param {string[]} [terms] the query terms (SearchScreen state.terms) */
-  const handleSearchSelect = (entry, terms) => {
+  /** @param {any} entry @param {string[]} [terms] the query terms (SearchScreen state.terms) @param {string} [query] the query as typed */
+  const handleSearchSelect = (entry, terms, query) => {
     setFromSearch(true);
     // v01-04: this unit came from search, so its Back returns to search. A Surprise
     // breadcrumb left from earlier outranks fromSearch in the letter screens' Back
@@ -469,7 +474,7 @@ export function useSearch({
       const vm = SRCH_VOL_MAP[doc.volumeId];
       if (!vm || !doc.letterId) return;
       setLetterId(doc.letterId);
-      setSurpriseAnchor(excerptAnchor(doc, terms, entry, doc.letterId));
+      setSurpriseAnchor(excerptAnchor(doc, terms, entry, doc.letterId, query));
       if (vm.activeKey) setActiveReadKey(vm.activeKey, () => vm.lastReadFn(doc.letterId));
       else vm.lastReadFn(doc.letterId);
       setScreen(vm.screen);
@@ -484,7 +489,7 @@ export function useSearch({
       const chId = doc.studyChapterId || studyChapterIdByNum(doc.letterId, doc.chapterNum);
       setStudyId(doc.letterId || null);
       setStudyChapterId(chId || null);
-      setSurpriseAnchor(excerptAnchor(doc, terms, entry, chId));
+      setSurpriseAnchor(excerptAnchor(doc, terms, entry, chId, query));
       setScreen('bible-study-chapter');
       return;
     }

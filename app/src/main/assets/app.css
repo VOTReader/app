@@ -439,6 +439,8 @@
         --study-note:  rgba(214,179,95,0.10);
         --study-border: rgba(214,179,95,0.24);
         --reading-wash: rgba(214,179,95,0.20);   /* the read-along wash: ::highlight(vot-reading) and a song's current lyric line */
+        --find-wash:    rgba(200,164,86,0.24);   /* a searched word on the page: ::highlight(vot-find), the result cards' mark */
+        --find-now:     rgba(214,179,95,0.52);   /* the place being looked at: ::highlight(vot-find-current) */
         --radius:      6px;
         --transition:  0.2s ease;
 
@@ -554,6 +556,8 @@
         --study-note:  rgba(122,92,16,0.07);
         --study-border: rgba(122,92,16,0.22);
         --reading-wash: rgba(122,92,16,0.16);
+        --find-wash:    rgba(122,92,16,0.18);
+        --find-now:     rgba(122,92,16,0.38);
         --tap-ref:        var(--gold-dim);
         --tap-ref-sub:    var(--gold-border);
         --tap-ref-active: var(--gold);
@@ -2826,6 +2830,11 @@
     /* Read-along: the sentence currently being read aloud (CSS Custom
        Highlight API — no DOM mutation; only these properties apply). */
     ::highlight(vot-reading) { background-color: var(--reading-wash); }
+    /* Find in the unit (FindInUnit): every place the searched words appear, and,
+       stronger and underlined, the place being looked at. Gold like the result
+       cards' marks, never a highlighter colour a reader's own marks could wear. */
+    ::highlight(vot-find) { background-color: var(--find-wash); }
+    ::highlight(vot-find-current) { background-color: var(--find-now); text-decoration: underline; text-decoration-color: var(--gold); text-decoration-thickness: 2px; text-underline-offset: 0.2em; }
     .wtlb-footnote-list { margin-top:3.5rem; padding-top:2.5rem; }
     .wtlb-footnote-list .footnote-list-item { margin-bottom:1rem; padding:0.7rem 0.9rem; }
     .wtlb-footnote-list .footnote-list-header { margin-bottom:1.5rem; font-size:var(--fs-11); text-align:center; }
@@ -7333,6 +7342,48 @@
        clears .is-dim on document touchstart/pointerdown). Kept above zero
        so the control is never invisible-but-live. */
     .ascroll-pill.is-dim { opacity: 0.25; }
+    /* ── FIND pill (FindInUnit): "flood | 2 of 3 | ‹ › ×" ──
+       The autoscroll pill's shape and place (portaled, centred, max-content),
+       one layer above it (196) and stacked over it and over the mini-player
+       when either is showing, so the two never cover each other. Chrome, so
+       its type names the --fsc-* px twins. */
+    .find-pill {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      bottom: max(1.4rem, calc(var(--inset-bottom, 0px) + 0.4rem));
+      z-index: 196;
+      display: flex; align-items: center;
+      width: max-content; max-width: calc(100vw - 24px);
+      padding: 2px 4px 2px 16px;
+      /* Opaque, unlike the autoscroll pill: the letter's large type ghosted
+         through 6% of it, behind the pill's own small labels. */
+      background: rgb(20,20,24);
+      border: 1px solid var(--gold-border);
+      border-radius: 999px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+    }
+    body.light .find-pill { background: rgb(247,242,232); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
+    body.autoscroll-on .find-pill { bottom: calc(max(1.4rem, calc(var(--inset-bottom, 0px) + 0.4rem)) + 58px); }
+    body.audio-bar-open .find-pill { bottom: calc(max(1.4rem, calc(var(--inset-bottom, 0px) + 0.4rem)) + 72px); }
+    body.audio-bar-open.autoscroll-on .find-pill { bottom: calc(max(1.4rem, calc(var(--inset-bottom, 0px) + 0.4rem)) + 130px); }
+    .find-pill-word {
+      font-family: var(--font-cinzel, Georgia, serif); font-size: var(--fsc-12); letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--gold); max-width: 9.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      padding-right: 12px; border-right: 1px solid var(--gold-border);
+    }
+    .find-pill-count {
+      font-family: var(--font-body); font-size: var(--fsc-15); color: var(--cream-dim); white-space: nowrap;
+      padding: 0 12px; border-right: 1px solid var(--gold-border);
+    }
+    .find-pill-btn {
+      width: 44px; height: 44px; flex-shrink: 0; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: none; border: none; border-radius: 999px; cursor: pointer;
+      color: var(--gold); font-family: var(--font-body); font-size: var(--fsc-24); line-height: 1;
+    }
+    .find-pill-btn:disabled { opacity: 0.3; cursor: default; }
+    .find-pill-btn:active:not(:disabled) { background: var(--gold-faint); }
+    @media (hover: hover) { .find-pill-btn:not(:disabled):hover { color: var(--gold-bright); } }
+    .find-pill-close { font-size: var(--fsc-20); color: var(--cream-dim); }
     .ascroll-btn {
       background: none; border: none; cursor: pointer; color: var(--gold);
       display: flex; align-items: center; justify-content: center;
@@ -7371,6 +7422,9 @@
     /* A reader who has switched auto-scroll on is not the audience for the
        first-run annotation tip, and both sit bottom-centre. */
     body.autoscroll-on .ann-hint-pill { display: none; }
+    /* Nor is a reader stepping through search words (FindInUnit's pill sits in
+       the same bottom-centre spot). */
+    body:has(.find-pill) .ann-hint-pill { display: none; }
 
     /* ── SESSION-4 TEXT-ONLY SCALING — chrome pin (must stay LAST) ───────
        --font-scale multiplies the ROOT font-size (the WL1 rule near the top

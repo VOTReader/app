@@ -707,7 +707,7 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
       ['still', 'voice'],
     ); });
     expect(calls).toEqual([['the still small voice spoke', ['still', 'voice']]]);
-    expect(props.setSurpriseAnchor).toHaveBeenCalledWith({ type: 'excerpt', text: 'still small voice spoke', letterId: 'wide-path' });
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(expect.objectContaining({ type: 'excerpt', text: 'still small voice spoke', letterId: 'wide-path' }));
     expect(props.setLetterId).toHaveBeenCalledWith('wide-path');
   });
 
@@ -719,16 +719,16 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
       ['spoek'],
     ); });
     expect(calls).toEqual([['the still small voice spoke', ['spoek']], ['the still small voice spoke', ['spoek', 'spoke']]]);
-    expect(props.setSurpriseAnchor).toHaveBeenCalledWith({ type: 'excerpt', text: 'voice spoke', letterId: 'wide-path' });
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(expect.objectContaining({ type: 'excerpt', text: 'voice spoke', letterId: 'wide-path' }));
   });
 
   it('a WTLB hit and a study hit take the same anchor', () => {
     const { result, props } = setup();
     act(() => { result.current.handleSearchSelect({ doc: { kind: 'wtlb', volumeId: 'wtlb1', letterId: 'e1', text: 'body' } }, ['body']); });
-    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith({ type: 'excerpt', text: 'still small voice spoke', letterId: 'e1' });
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'excerpt', text: 'still small voice spoke', letterId: 'e1' }));
     act(() => { result.current.handleSearchSelect({ doc: { kind: 'bible-study', letterId: 'purity', chapterNum: 1, studyChapterId: 'purity-ch1', text: 'body' } }, ['body']); });
     // A study doc's letterId is the STUDY; the chapter LetterView renders has the chapter id.
-    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith({ type: 'excerpt', text: 'still small voice spoke', letterId: 'purity-ch1' });
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'excerpt', text: 'still small voice spoke', letterId: 'purity-ch1' }));
     expect(props.setScreen).toHaveBeenLastCalledWith('bible-study-chapter');
   });
 
@@ -741,7 +741,7 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
       ['flood'],
     ); });
     expect(calls, 'the snippet window is not consulted').toEqual([]);
-    expect(props.setSurpriseAnchor).toHaveBeenCalledWith({ type: 'excerpt', text: text.slice(at, at + 48), letterId: 'vengeance' });
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(expect.objectContaining({ type: 'excerpt', text: text.slice(at, at + 48), letterId: 'vengeance' }));
     expect(props.setLetterId).toHaveBeenCalledWith('vengeance');
   });
 
@@ -751,7 +751,32 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
       { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'vengeance', text: 'the still small voice spoke' }, placeStart: 999 },
       ['still'],
     ); });
-    expect(props.setSurpriseAnchor).toHaveBeenCalledWith({ type: 'excerpt', text: 'still small voice spoke', letterId: 'vengeance' });
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(expect.objectContaining({ type: 'excerpt', text: 'still small voice spoke', letterId: 'vengeance' }));
+  });
+
+  /* Find in the unit (2026-09-26): the landing names what to find, the words
+     the result card marked (the query's own, then the engine's matched forms),
+     and the query as typed, for the host's pill. */
+  it('the landing carries what to find: the card\u2019s marked words and the query as typed', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect(
+      { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'wide-path', text: 'the still small voice spoke' }, terms: ['spoke', 'still'] },
+      ['still', 'voice'],
+      'Still Voice',
+    ); });
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(expect.objectContaining({
+      find: { terms: ['still', 'voice', 'spoke'], label: 'Still Voice' },
+    }));
+  });
+
+  it('a tapped place carries it too; with no query as typed, the first word labels the pill', () => {
+    const text = 'a flooding rain came. Later: Be a flood of water which covers';
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect(
+      { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'vengeance', text }, terms: ['flooding'], placeStart: text.indexOf('flood of') },
+      ['flood'],
+    ); });
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(expect.objectContaining({ find: { terms: ['flood', 'flooding'], label: 'flood' } }));
   });
 
   it('no match (a title hit, no terms) clears the anchor so a stale verse anchor cannot leak in', () => {
