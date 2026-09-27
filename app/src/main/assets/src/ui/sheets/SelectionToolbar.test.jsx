@@ -1687,3 +1687,83 @@ describe('SelectionToolbar — steps aside while the selection or the page is mo
     expect(toolbar()).not.toBeNull();
   });
 });
+
+/* cp2 (Corbin 2026-09-27, "do both suggestions"): Share sends the app's link on
+   a tap; holding it offers the website's too, for someone without the app. */
+describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
+  const g = /** @type {any} */ (globalThis);
+  const WORDS = 'Yet in your arrogance, you continue to forsake your Maker.';
+  const SITE = 'https://www.thevolumesoftruth.com/The_Wide_Path#:~:text=Yet%20in%20your%20arrogance%2C,to%20forsake%20your%20Maker%2E';
+  /** @type {any[]} */ let sent;
+  /** @type {PropertyDescriptor | undefined} */ let origShare;
+  beforeEach(() => {
+    sent = [];
+    origShare = Object.getOwnPropertyDescriptor(navigator, 'share');
+    Object.defineProperty(navigator, 'share', { value: (/** @type {any} */ d) => { sent.push(d); return Promise.resolve(); }, writable: true, configurable: true });
+    g.findEntryContext = () => ({ kind: 'letter', screen: 'vot-letter', collection: 'Volume Two', title: 'The Wide Path' });
+    g._bookTitle = (/** @type {string} */ id) => (id === 'john' ? 'John' : id);
+  });
+  afterEach(() => {
+    if (origShare) Object.defineProperty(navigator, 'share', origShare);
+    else delete /** @type {any} */ (navigator).share;
+    delete g.findEntryContext; delete g._bookTitle;
+  });
+  const settle = () => act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
+  const shareBtn = () => /** @type {any} */ ([...document.querySelectorAll('.sel-action-btn span')].find((sp) => sp.textContent === 'Share')?.closest('.sel-action-btn'));
+  const choice = (/** @type {string} */ label) => /** @type {any} */ ([...document.querySelectorAll('.sel-link-choice button')].find((b) => (b.getAttribute('aria-label') || b.textContent) === label));
+  function raise(/** @type {string} */ key, /** @type {string} */ words) {
+    const p = readingContainer(key, words);
+    mount();
+    stubSelection(rangeOver(p, 0, words.length));
+    act(() => { fire(p, 'contextmenu', { clientX: 5, clientY: 5 }); });
+    return p;
+  }
+  const hold = async () => {
+    act(() => { fire(shareBtn(), 'pointerdown', { button: 0 }); });
+    await act(async () => { await new Promise((res) => setTimeout(res, 500)); });
+  };
+
+  it('a tap shares with the app link; a hold offers both, and the click that ends the hold shares nothing', async () => {
+    raise('letter:the-wide-path:1', WORDS);
+    expect(document.querySelector('.sel-link-choice')).toBeNull();
+    await hold();
+    expect(choice('App link')).toBeTruthy();
+    expect(choice('Website link')).toBeTruthy();
+    act(() => { fire(shareBtn(), 'pointerup'); fire(shareBtn(), 'click'); });
+    await settle();
+    expect(sent).toEqual([]);
+    expect(document.querySelector('.sel-link-choice')).not.toBeNull();
+  });
+
+  it('"Website link" shares Copy\'s own text: the words, the name, the thevolumesoftruth.com link', async () => {
+    raise('letter:the-wide-path:1', WORDS);
+    await hold();
+    act(() => { fire(choice('Website link'), 'click'); });
+    await settle();
+    expect(sent.map((d) => d.text)).toEqual([WORDS + '\nThe Wide Path (Volume Two)\n' + SITE]);
+    expect(document.querySelector('.sel-toolbar')).toBeNull();
+  });
+
+  it('"App link" shares as a tap does; a right-click opens the choice without raising the toolbar anew', async () => {
+    raise('letter:the-wide-path:1', WORDS);
+    act(() => { fire(shareBtn(), 'contextmenu', { button: 2 }); });
+    expect(choice('App link')).toBeTruthy();
+    act(() => { fire(choice('App link'), 'click'); });
+    await settle();
+    expect(sent.map((d) => d.text)).toEqual([WORDS + '\n\nThe Wide Path (Volume Two)\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1']);
+  });
+
+  it('✕ closes the choice; a passage the website does not have (the Bible) offers none', async () => {
+    raise('letter:the-wide-path:1', WORDS);
+    await hold();
+    act(() => { fire(choice('Cancel'), 'click'); });
+    expect(document.querySelector('.sel-link-choice')).toBeNull();
+    cleanup(); document.body.innerHTML = '';
+    raise('bible:john:3:16', 'For God so loved the world');
+    await hold();
+    expect(document.querySelector('.sel-link-choice')).toBeNull();
+    act(() => { fire(shareBtn(), 'pointerup'); fire(shareBtn(), 'click'); });
+    await settle();
+    expect(sent.map((d) => d.text)).toEqual(['For God so loved the world\n\nJohn 3:16\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A3%3A16']);
+  });
+});

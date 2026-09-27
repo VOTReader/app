@@ -4864,6 +4864,20 @@
       transition: background 0.12s, border-color 0.12s;
     }
     .sel-listen-btn:active { background: var(--gold-faint); }
+    /* cp2: Share held offers the website link too, in a row above the actions. */
+    .sel-link-choice { gap: 8px; }
+    .sel-link-choice-btn {
+      flex: 1 1 auto; min-height: 44px; padding: 6px 10px; border-radius: 8px; cursor: pointer;
+      background: transparent; border: 1px solid var(--gold); color: var(--gold);
+      font-family: 'Cinzel', serif; font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .sel-link-choice-btn:active { background: var(--gold-faint); }
+    .sel-link-choice-cancel {
+      flex: 0 0 auto; min-width: 44px; min-height: 44px; border-radius: 8px; cursor: pointer;
+      background: none; border: 1px solid transparent; color: var(--cream-muted); font-size: var(--fs-15);
+      -webkit-tap-highlight-color: transparent;
+    }
     .sel-listen-btn svg { width: 15px; height: 15px; fill: var(--gold); stroke: none; flex-shrink: 0; }
     /* REPEAT (rp1 part 3, mockup r1-repeat.png): the right-hand segment of the
        same outlined box, Listen from here on the left, one gold divider. */
