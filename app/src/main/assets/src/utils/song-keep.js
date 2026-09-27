@@ -94,7 +94,7 @@ function _notify() {
 
 /** @returns {boolean} the Android app keeps songs natively */
 function _native() {
-  return OfflineAudio.available();
+  return OfflineAudio.native();
 }
 
 /** @param {unknown} url @returns {string} the song id of a shard URL, or '' */

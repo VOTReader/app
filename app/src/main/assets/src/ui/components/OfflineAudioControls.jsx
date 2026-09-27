@@ -8,10 +8,11 @@
    the size and the phone's free space. Words: "Download" and "On this
    phone" - never "Save", which already means the listener's favourites.
 
-   Only in the Android app. OfflineAudio (utils/offline-audio.js) and
-   AudioPlayer live in bundle-d and are read here as FREE GLOBALS: one store
-   and one player for the whole app (see _entry-h.js). On the web the store
-   is unavailable and nothing here renders.
+   In the Android app and, since cf1 (2026-09-26), in a browser that keeps
+   recordings (the PWA; an iPhone only from its Home Screen): OfflineAudio
+   (utils/offline-audio.js) and AudioPlayer live in bundle-d and are read here
+   as FREE GLOBALS: one store and one player for the whole app (see
+   _entry-h.js). Where no store exists, nothing here renders.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /** The phone keeps this much free beyond a download (OfflineAudioStore's SPACE_MARGIN). */
@@ -23,7 +24,8 @@ function _store() {
 }
 
 /**
- * Re-render on every download change. The store when downloads are possible here (the Android app), else null.
+ * Re-render on every download change. The store when downloads are possible here (the Android app, or a browser
+ * that keeps recordings: cf1), else null.
  * @returns {any}
  */
 export function useOfflineAudio() {

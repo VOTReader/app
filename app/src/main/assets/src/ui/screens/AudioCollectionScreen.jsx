@@ -119,7 +119,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
   );
 
   const [openVoices, setOpenVoices] = React.useState(/** @type {string | null} */ (null));
-  // Downloads to the phone (item 8): the store when this is the Android app, else null; and the signal.
+  // Downloads to the phone (item 8): the store where downloads are possible (the Android app, or a browser: cf1), else null; and the signal.
   const offline = useOfflineAudio();
   const online = useOnline();
   // One book's chapters, disclosed. Rendered only while open — a Bible edition

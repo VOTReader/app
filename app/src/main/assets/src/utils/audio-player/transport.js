@@ -32,7 +32,7 @@ import {
 } from './engine.js';
 import { _clearLoop, _clearLoopTimer, LOOP_SLACK_S } from './loop.js';
 import { _clearMediaSession, _setAudioActive, _syncMediaSessionPosition, _syncNative } from './media-session.js';
-import { _srcFor } from './offline.js';
+import { _holdsOtherForm, _srcFor } from './offline.js';
 import {
   _clearPersist,
   _persist,
@@ -81,8 +81,10 @@ export function toggle() {
   const src = _srcFor(track);
   if (_el.error || _el.src !== src) {
     // Re-load it and seek back to where playback died once metadata is
-    // available (currentTime can't be set before then).
-    const resumeAt = _errorTime;
+    // available (currentTime can't be set before then). A pause across a
+    // change of signal swaps a saved recording's stream for its saved copy
+    // (cf1): that carries on from where it was paused.
+    const resumeAt = _holdsOtherForm(track) ? _state.time : _errorTime;
     _el.src = src;
     // AFTER src: the load algorithm resets playbackRate (see _start).
     try { _el.defaultPlaybackRate = _state.rate; _el.playbackRate = _state.rate; } catch (_e) { /* older media engines can ignore rates */ }

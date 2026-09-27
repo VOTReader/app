@@ -37,6 +37,7 @@ export default defineConfig({
       'app/src/main/assets/src/**/*.test.{js,jsx}',
       'app/src/main/assets/*.test.{js,jsx}', // service-worker.test.js (SW lives at the assets root)
       'tools/**/*.test.{js,jsx}',
+      'relay/**/*.test.js', // the offline-audio relay Worker (cf1)
     ],
     // Default reporter ('default') is fine for v1. Add 'json' / 'junit'
     // when CI reporting needs structured output.

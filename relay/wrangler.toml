@@ -1,0 +1,9 @@
+# VOTReader offline-audio relay (cf1). Deploy and operate: relay/README.md.
+name = "audio"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+# No logs, traces or analytics of its own (Corbin 2026-09-25: no usage stats).
+[observability]
+enabled = false

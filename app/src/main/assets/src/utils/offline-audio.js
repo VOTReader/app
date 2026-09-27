@@ -12,9 +12,12 @@
    The native store is the truth. A 'done' or 'removed' event re-reads its
    whole state (one JSON call); 'queued', 'progress', 'failed' and
    'cancelled' are applied as they arrive (window.__votOfflineAudio, from
-   JsEvent.OfflineAudio). On the web there is no bridge: nothing is
-   available and every call is a no-op, which is right — the release assets
-   answer without CORS, so a page cannot keep their bytes.
+   JsEvent.OfflineAudio). In a browser the same calls go to
+   offline-audio-web.js (cf1, 2026-09-26): saves come through the relay
+   Worker into Cache Storage and the service worker plays them back, so the
+   PWA and an iPhone on its Home Screen keep recordings too. Where neither
+   store exists (an iPhone in a Safari tab, a private window) nothing is
+   available and every call is a no-op.
 
    Bridge: window.AndroidBridge.offlineAudioState / offlineAudioSave /
    offlineAudioRemove / offlineAudioCancel, called directly (the
@@ -22,6 +25,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { isSongUrl } from './audio-track.js';
+import { WebOfflineAudio } from './offline-audio-web.js';
 
 /** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number }} SavedItem */
 /** @typedef {'saved' | 'downloading' | 'queued' | 'failed' | 'none'} OfflineStatus */
@@ -55,10 +59,15 @@ function _say(text) { _news = { seq: _news.seq + 1, text }; }
 const SIZE_BATCH = 400;
 let _loaded = false;
 
-/** @returns {any} */
-function _bridge() {
+/** @returns {any} the phone app's bridge, or null */
+function _nativeBridge() {
   const b = typeof window !== 'undefined' ? /** @type {any} */ (window).AndroidBridge : null;
   return b && typeof b.offlineAudioState === 'function' ? b : null;
+}
+
+/** @returns {any} the store downloads go to: the phone app's, else this browser's (cf1), else null */
+function _bridge() {
+  return _nativeBridge() || (WebOfflineAudio.supported() ? WebOfflineAudio : null);
 }
 
 function _notify() {
@@ -214,8 +223,22 @@ export const OfflineAudio = {
   getVersion: () => _version,
   /** The latest news for a screen reader: { seq, text } (seq 0 = none yet). */
   news: () => _news,
-  /** @returns {boolean} true in the phone app (a bridge that can keep downloads) */
+  /** @returns {boolean} true where recordings can be kept: the phone app, or a browser with the web store (cf1) */
   available: () => !!_bridge(),
+  /** @returns {boolean} true in the phone app (native keeps the files; song-keep.js keeps songs there too) */
+  native: () => !!_nativeBridge(),
+  /**
+   * What the web player loads for a recording: its saved copy in this browser with no signal, else `url` (cf1).
+   * `held` (the element's current, unfailed src) is kept when it is this recording's saved copy already.
+   * @param {string} url @param {string} [held] @returns {string}
+   */
+  webSrc: (url, held) => (_nativeBridge() ? url : WebOfflineAudio.srcFor(url, held)),
+  /**
+   * Is `src` this recording in its other web form (its GitHub URL or its saved copy)? A resume that swaps one for
+   * the other carries on from where it was (cf1).
+   * @param {string} url @param {string} src @returns {boolean}
+   */
+  webSameRecording: (url, src) => !_nativeBridge() && !!src && (src === url || src === WebOfflineAudio.localFor(url)),
   refresh,
   /** @param {string} url */
   isSaved: (url) => statusOf(url) === 'saved',
@@ -260,9 +283,9 @@ export const OfflineAudio = {
   },
   freeBytes: () => { if (!_loaded) refresh(); return _freeBytes; },
   /**
-   * Download each of `list` to the phone (queued one at a time natively).
+   * Download each of `list` to the phone (queued one at a time, natively or in the web store).
    * @param {Array<{ url: string, key: string, title: string }>} list
-   * @returns {boolean} false where downloads are not possible (the web)
+   * @returns {boolean} false where downloads are not possible
    */
   download(list) {
     if (!_loaded) refresh();
