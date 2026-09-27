@@ -621,6 +621,43 @@ describe('how to read this web (landing 13): one card, plain words, once', () =>
     expect(container.querySelector('.sw-guide')).toBeNull();
     expect(onBack).not.toHaveBeenCalled();
   });
+
+  /* 2026-09-27 keyboard walk: the card was the one Scripture Web panel without
+     useFocusTrap (the Nearby list, the chooser and the detail sheet got theirs
+     in v03-03). It opened with focus left on the page, Tab walked out of it, and
+     closing dropped focus on <body>. */
+  it('takes focus when the ? button opens it, keeps Tab inside, and hands focus back to ? on close', async () => {
+    const { container } = await mountGuide();
+    const help = screen.getByRole('button', { name: /how to read this web/i });
+    help.focus();
+    fireEvent.click(help);
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    const card = container.querySelector('.sw-guide');
+    const gotIt = screen.getByRole('button', { name: /got it/i });
+    expect(document.activeElement, 'focus moves into the card').toBe(gotIt);
+    fireEvent.keyDown(document.activeElement, { key: 'Tab' });
+    expect(card.contains(document.activeElement), 'Tab stays inside').toBe(true);
+    fireEvent.keyDown(document.activeElement, { key: 'Tab', shiftKey: true });
+    expect(card.contains(document.activeElement), 'Shift+Tab stays inside').toBe(true);
+    fireEvent.click(gotIt);
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(container.querySelector('.sw-guide')).toBeNull();
+    expect(document.activeElement, 'focus returns to the ? button').toBe(help);
+  });
+
+  it('Escape from inside the card closes it and hands focus back to ?', async () => {
+    const onBack = vi.fn();
+    const { container } = await mountGuide({ onBack });
+    const help = screen.getByRole('button', { name: /how to read this web/i });
+    help.focus();
+    fireEvent.click(help);
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    fireEvent.keyDown(document.activeElement, { key: 'Escape' });
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(container.querySelector('.sw-guide')).toBeNull();
+    expect(onBack).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(help);
+  });
 });
 
 describe('the Nearby list reads the lens (landing 15)', () => {

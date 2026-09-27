@@ -17,8 +17,10 @@
 
    BEHAVIOR:
      - On activate: remembers document.activeElement, then focuses the
-       first element carrying [data-autofocus], else the first focusable,
-       else the container itself (tabIndex -1 is applied if absent).
+       first element carrying [data-autofocus] (or, when that element is a
+       container that cannot take focus, its first focusable), else the
+       first focusable, else the container itself (tabIndex -1 is applied
+       if absent).
      - Tab on the last focusable wraps to the first; Shift+Tab on the
        first wraps to the last. Focus that escaped the container (e.g.
        a programmatic .focus() elsewhere) is pulled back on the next Tab.
@@ -84,7 +86,13 @@ export function useFocusTrap(active) {
     // itself (given tabIndex -1 so .focus() works on a plain div).
     const already = document.activeElement;
     if (!(already instanceof Node && root.contains(already))) {
-      const preferred = /** @type {HTMLElement | null} */ (root.querySelector('[data-autofocus]'));
+      let preferred = /** @type {HTMLElement | null} */ (root.querySelector('[data-autofocus]'));
+      // [data-autofocus] may mark a region (the Answers commandment sheet marks
+      // its topic list): .focus() on a plain div is a silent no-op, so a
+      // container that cannot take focus hands it to its first focusable.
+      if (preferred && !preferred.matches(FOCUSABLE_SELECTOR)) {
+        preferred = /** @type {HTMLElement | null} */ (preferred.querySelector(FOCUSABLE_SELECTOR));
+      }
       const list = _focusables(root);
       const target = preferred || list[0] || root;
       if (target === root && !root.hasAttribute('tabindex')) root.setAttribute('tabindex', '-1');

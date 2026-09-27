@@ -61,6 +61,22 @@ describe('useFocusTrap', () => {
     hook2.unmount();
   });
 
+  /* 2026-09-27 keyboard walk: the Answers commandment sheet marks its topic
+     LIST (a plain div) data-autofocus. .focus() on a div without tabindex is a
+     silent no-op, so the sheet opened with focus still on the page behind it. */
+  it('[data-autofocus] on a container that cannot take focus lands on its first focusable', () => {
+    const { root, buttons } = buildDialog('c');
+    const list = document.createElement('div');
+    list.setAttribute('data-autofocus', '');
+    const inner = document.createElement('button');
+    inner.textContent = 'topic';
+    list.appendChild(inner);
+    root.insertBefore(list, buttons[1]);
+    const hook = mountTrap(root);
+    expect(document.activeElement).toBe(inner);
+    hook.unmount();
+  });
+
   it('Tab on the last focusable wraps to the first (and is preventDefaulted)', () => {
     const { root, buttons } = buildDialog('c');
     const hook = mountTrap(root);
