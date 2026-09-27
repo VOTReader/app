@@ -118,6 +118,14 @@ describe('SrchCard — more places in this letter', () => {
     expect(again.container.querySelector('.srch-places-toggle').getAttribute('aria-expanded')).toBe('true');
   });
 
+  it('the same letter in Best Matches and in its group are two cards: opening one opens only it', () => {
+    const inGroup = render(<SrchCard entry={letter()} terms={['flood']} onSelect={() => {}} isDirect={false} memo="flood|w" where="v7" />);
+    fireEvent.click(inGroup.container.querySelector('.srch-places-toggle'));
+    inGroup.unmount();
+    const best = render(<SrchCard entry={letter()} terms={['flood']} onSelect={() => {}} isDirect={false} memo="flood|w" where="best" />);
+    expect(best.container.querySelector('.srch-places-toggle').getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('says how many more places the letter holds, closed until asked', () => {
     const { container } = render(<SrchCard entry={letter()} terms={['flood']} onSelect={() => {}} isDirect={false} />);
     const toggle = container.querySelector('.srch-places-toggle');

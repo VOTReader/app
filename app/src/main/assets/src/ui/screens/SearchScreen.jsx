@@ -778,7 +778,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           <div className="srch-top-results">
             <div className="srch-section-label">Best Matches</div>
             {topResults.map((entry, i) => (
-              <SrchCard key={'top' + i} entry={entry} terms={state.terms} onSelect={handleSelect} memo={memo} />
+              <SrchCard key={'top' + i} entry={entry} terms={state.terms} onSelect={handleSelect} memo={memo} where="best" />
             ))}
           </div>
         )}

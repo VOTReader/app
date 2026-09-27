@@ -57,7 +57,7 @@ export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = 
       {open ? (
         <div className="srch-group-items">
           {items.slice(0, shown).map((entry, i) => (
-            <SrchCard key={cardKey(entry, i)} entry={entry} terms={terms} onSelect={onSelect} memo={memo} />
+            <SrchCard key={cardKey(entry, i)} entry={entry} terms={terms} onSelect={onSelect} memo={memo} where={gkey} />
           ))}
           {left > 0 ? (
             <button type="button" className="srch-group-more" onClick={() => setShown((n) => n + SRCH_GROUP_PAGE)}>

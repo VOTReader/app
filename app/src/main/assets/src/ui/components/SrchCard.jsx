@@ -17,7 +17,7 @@ const PLACE_UNIT = {
   'bible-study': 'chapter',
 };
 
-export function SrchCard({ entry, terms, onSelect, isDirect, memo = '' }) {
+export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = '' }) {
   const doc = (!isDirect && entry && entry.doc) || null;
   // Merge the engine's per-result matched terms (MiniSearch only — the
   // doc-side words a fuzzy/prefix search actually hit, e.g. typed "sheperd"
@@ -40,7 +40,9 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '' }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- termsKey is hlTerms by value; the array is rebuilt every render.
   }, [placeText, termsKey]);
   // `memo` names the search: a "more places" list the reader opened is open again on Back.
-  const placesKey = doc ? 'places|' + docKey(doc) : '';
+  // `where` is the row the card sits in: a letter in Best Matches and in its group is two
+  // cards, and opening one opened both on Back.
+  const placesKey = doc ? 'places|' + where + '|' + docKey(doc) : '';
   const [placesOpen, setPlacesOpen] = React.useState(() => !!(placesKey && recall(memo, placesKey)));
   const togglePlaces = () => {
     remember(memo, placesKey, !placesOpen);
