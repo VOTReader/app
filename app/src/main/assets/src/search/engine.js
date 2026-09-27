@@ -10,7 +10,7 @@
    Search pipeline (faithful to the audited multi-signal ranking, with BM25 as
    the per-unit scorer + native fuzzy/prefix):
      1. parse → command / reference / named-passage short-circuit to a nav card
-     2. stop-word filter + synonym expansion → search "units"
+     2. stop-word filter + synonym expansion + word forms → search "units"
      3. one MiniSearch BM25 search per unit (literal = fuzzy+prefix; synonym =
         exact-only), accumulating per-doc score + a term-coverage bitmask
      4. re-rank: KIND_BOOST · coverage multiplier · phrase-proximity boost ·
@@ -28,6 +28,7 @@ import { buildDocs } from './index-builder.js';
 import { parseReference, fuzzyBookSuggest, levenshtein } from './ref-parser.js';
 import { parseTextQuery } from './query-parse.js';
 import { expandQueryTerms } from './synonyms.js';
+import { wordForms } from './word-forms.js';
 import { kjvEncode } from './tokenize.js';
 import { snippet, highlightSpans, matchExcerpt, morePlaces } from './snippet.js';
 import { KIND_BOOST, coverageMultiplier, popcount, phraseTokenMatch, PHRASE_BOOST, SYNONYM_DEMOTION } from './ranking.js';
@@ -282,6 +283,26 @@ async function search(query, options) {
     const ex = expandQueryTerms(filtered, { enabled: options.synonyms !== false });
     units = ex.units;
     didExpand = ex.didExpand;
+    /* WORD FORMS (2026-09-26). A literal word reaches only forward through its
+       prefix ("flood" finds flooding; "flooding" never finds flood), so typing
+       "prayed" missed 397 of the 463 pray-family results. Each one-word literal
+       adds its family (word-forms.js) as exact, non-literal units under the
+       same origin: they count toward the word's coverage, a doc found only
+       through them takes the synonym demotion, so the typed form ranks first,
+       and a form not in the index finds nothing. Never for a phrase. */
+    const had = new Set(units.map((u) => String(u.term).toLowerCase()));
+    const forms = [];
+    for (const u of units) {
+      if (!u.literal) continue;
+      const toks = kjvEncode(u.term);
+      if (toks.length !== 1) continue;
+      for (const f of wordForms(toks[0], (w) => D.STOP_WORDS_TRIMMED.has(w))) {
+        if (had.has(f)) continue;
+        had.add(f);
+        forms.push({ term: f, origin: u.origin, literal: false, form: true });
+      }
+    }
+    if (forms.length) { units = units.concat(forms); didExpand = true; }
   }
 
   // One BM25 search per unit; accumulate score + coverage bitmask.
@@ -304,15 +325,17 @@ async function search(query, options) {
       const id = hit.id;
       scoreMap[id] = (scoreMap[id] || 0) + hit.score;
       if (!docLookup[id]) docLookup[id] = hit;
-      if (unit.literal) {
-        literalHit[id] = true;
+      if (unit.literal) literalHit[id] = true;
+      if (unit.literal || unit.form) {
         // hit.terms is the DOC-side vocabulary that matched (MiniSearch derives
         // it from the match map), so for a fuzzy/prefix hit it's the corrected
         // word — query "sheperd" carries "shepherd" here. The snippet
         // highlighter only knows the literal typed terms, so these ride along
         // on the result for the UI to merge in (v1.1 gap: corrected words
-        // rendered unmarked). Literal units only: synonym units match exactly,
-        // and SRCH4's expandSnippetTerms already covers those.
+        // rendered unmarked). A word-form unit's hit ("flood" for a typed
+        // "flooding") rides the same way, or its snippet would show no mark.
+        // Not synonym units: they match exactly, and SRCH4's
+        // expandSnippetTerms already covers those.
         if (hit.terms) {
           const mt = matchedTerms[id] || (matchedTerms[id] = []);
           for (let t = 0; t < hit.terms.length && mt.length < 12; t++) {
