@@ -103,3 +103,41 @@ describe('letters as readers name them', () => {
     expect(letter('vol 7')).toBe('text');
   });
 });
+
+describe('Bible references as readers type them', () => {
+  it('a book misspelled, or begun and not finished, before a chapter', () => {
+    expect(at('philipians 4:13')).toBe('philippians 4:13');
+    expect(at('Philippines 4:13')).toBe('philippians 4:13');
+    expect(at('Galations 5:22')).toBe('galatians 5:22');
+    expect(at('ecclesiastics 3:1')).toBe('ecclesiastes 3:1');
+    expect(at('eccles 3:1')).toBe('ecclesiastes 3:1');
+    expect(at('Duet 6:4')).toBe('deuteronomy 6:4');
+    expect(at('Matthews 6:33')).toBe('matthew 6:33');
+    expect(at('Proverb 3:5')).toBe('proverbs 3:5');
+    expect(at('Isaih 53')).toBe('isaiah 53');
+    expect(at('Jerimiah 29:11')).toBe('jeremiah 29:11');
+    expect(at('Habbakuk 2:4')).toBe('habakkuk 2:4');
+    expect(at('Zach 4:6')).toBe('zechariah 4:6');
+    expect(at('Jam 4:7')).toBe('james 4:7');
+    expect(at('1 thes 4:16')).toBe('1thessalonians 4:16');
+    expect(at('jhon 3:16')).toBe('john 3:16');
+  });
+
+  it('ordinals, "chapter" and "verse", a translation’s name, a verse list, a pasted dash', () => {
+    expect(at('1st cor 13')).toBe('1corinthians 13');
+    expect(at('2nd tim 3:16')).toBe('2timothy 3:16');
+    expect(at('John chapter 3')).toBe('john 3');
+    expect(at('John 3 verse 16')).toBe('john 3:16');
+    expect(at('John 3:16 KJV')).toBe('john 3:16');
+    expect(at('John 3:16 (NKJV)')).toBe('john 3:16');
+    expect(/** @type {any} */ (parseReference('John 3:16,17'))).toMatchObject({ chapter: 3, verseStart: 16, verseEnd: 17 });
+    expect(/** @type {any} */ (parseReference('Psalm 23:1–6'))).toMatchObject({ bookId: 'psalms', chapter: 23, verseStart: 1, verseEnd: 6 });
+  });
+
+  it('a word that is only near a book name stays a word', () => {
+    expect(at('day 7')).toBe('text');
+    expect(at('son 3')).toBe('text');
+    expect(at('rome')).toBe('text');
+    expect(at('vol 7', 'scriptures')).toBe('text');
+  });
+});

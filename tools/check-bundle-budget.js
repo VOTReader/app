@@ -97,7 +97,11 @@ const BUDGETS = [
   // was 42,753 raw in bundle-a), with SearchScreen and the engine that read it.
   // This is the deliberate other side of a cold-boot saving, not growth:
   // 161,860 x 1.15 = 186,139 -> the hundred above.
-  { file: 'bundle-e.js', measured: 161860, max: 186200 },   // Settings/Search/Garden + the search tables
+  // 2026-09-27, the search audit: 161,860 -> 187,654 is search code, not a pulled-in
+  // dependency. The 09-26 batches (every place in a letter, word forms, Book order, the
+  // typo note: 178,486 by their end) and the audit's ranking, typos, passage names and
+  // letter and Bible references (+9,168). 187,654 x 1.15 = 215,802 -> the hundred above.
+  { file: 'bundle-e.js', measured: 187654, max: 215900 },   // Settings/Search/Garden + the search tables
   // The Scripture Web. Re-baselined 32,447 -> 41,806 when My Web landed, then
   // 41,806 -> 57,610 for s13: Go to/Nearby, dense-line disambiguation,
   // navigable corpus underlay cards, focus-safe dialogs, and orientation UX.

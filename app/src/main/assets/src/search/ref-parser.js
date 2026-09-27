@@ -137,6 +137,105 @@ export function levenshtein(a, b, cap) {
 }
 
 /**
+ * Edit distance counting a swapped pair of letters as one slip (optimal string
+ * alignment), bounded: returns cap+1 once it provably exceeds cap.
+ * @param {string} a
+ * @param {string} b
+ * @param {number} cap
+ * @returns {number}
+ */
+export function damerau(a, b, cap) {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > cap) return cap + 1;
+  /** @type {number[]|null} */
+  let before = null;
+  let prev = [];
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      let v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (before && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, before[j - 2] + 1);
+      cur[j] = v;
+      if (v < rowMin) rowMin = v;
+    }
+    if (rowMin > cap) return cap + 1;
+    before = prev;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+/**
+ * A book name a slip or two off, or begun and not finished, in a query that goes on
+ * with a chapter (search audit 2026-09-27: "philipians 4:13", "Duet 6:4", "Isaih 53",
+ * "Galations 5:22", "Habbakuk 2:4", "eccles 3:1", "Jam 4:7" each fell through to a
+ * text search of the misspelling). The nearest book name or abbreviation of four
+ * letters or more by damerau: within one slip for a word of four or five letters,
+ * two for a longer one; failing that, the one book whose names the word begins. A
+ * word of three letters is read only as a beginning, and only before a chapter and
+ * verse ("jam 4:7"; "day 7" and "son 3" stay words). Null when two books are as near.
+ * @param {string} raw  the words before the chapter
+ * @param {boolean} withVerse  the chapter goes on with a verse ("4:7")
+ * @returns {string|null}
+ */
+export function nearBookToken(raw, withVerse) {
+  const D = searchData();
+  const t = String(raw || '').toLowerCase().replace(/\s+/g, '');
+  const letters = t.replace(/^[123]/, '');
+  if (!/^[a-z]+$/.test(letters) || letters.length < 3 || (letters.length === 3 && !withVerse)) return null;
+  if (D.VOLUME_TOKEN_MAP && D.VOLUME_TOKEN_MAP[t]) return null;   // the Volumes' own words ("vol", "v7")
+  const keys = Object.keys(D.BOOK_ABBREVS);
+  const budget = letters.length <= 3 ? 0 : letters.length <= 5 ? 1 : 2;
+  if (budget > 0) {
+    let best = null;
+    let bestD = budget + 1;
+    let tie = false;
+    for (const k of keys) {
+      const kk = k.replace(/\s+/g, '');
+      if (kk.replace(/^[123]/, '').length < 4) continue;   // a real name, not a short abbreviation
+      const d = damerau(t, kk, budget);
+      if (d > budget) continue;
+      const id = D.BOOK_ABBREVS[k];
+      if (d < bestD) { bestD = d; best = id; tie = false; }
+      else if (d === bestD && id !== best) tie = true;
+    }
+    if (best && !tie) return best;
+    if (best) return null;
+  }
+  const ids = new Set();
+  for (const k of keys) {
+    const kk = k.replace(/\s+/g, '');
+    if (kk.length > t.length && kk.startsWith(t)) ids.add(D.BOOK_ABBREVS[k]);
+  }
+  return ids.size === 1 ? /** @type {string} */ (ids.values().next().value) : null;
+}
+
+/* A REFERENCE AS READERS TYPE IT (search audit 2026-09-27): "John chapter 3", "John 3
+   verse 16", "John 3:16 KJV", "John 3:16,17", "1st cor 13", "2nd tim 3:16" and "Psalm
+   23:1-6" typed with an en dash each fell through to a text search of its words and digits. */
+const TRANSLATION_TAG = /\s+\(?(?:kjv|nkjv|niv|esv|nasb|nlt|rsv|nrsv|asv|web|ylt|amp|msg|csb|hcsb|net|cjb|brm|wop)\)?$/;
+/**
+ * A reference in the shape the Bible-reference patterns read: a pasted dash as a
+ * hyphen, a translation's name dropped, an ordinal as its digit, "chapter" and
+ * "verse" as the colon they stand for, a verse list ("16,17") as the range holding it.
+ * @param {string} lower
+ * @returns {string}
+ */
+export function refShape(lower) {
+  return lower
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
+    .replace(TRANSLATION_TAG, '')
+    .replace(/^(?:1st|first)\s+/, '1 ')
+    .replace(/^(?:2nd|second)\s+/, '2 ')
+    .replace(/^(?:3rd|third)\s+/, '3 ')
+    .replace(/\b(?:chapter|chap|ch)\.?\s*(?=\d)/g, '')
+    .replace(/(\d)\s*(?:verses|verse|vv|vs|v)\.?\s*(?=\d)/g, '$1:')
+    .replace(/(\d)\s*,\s*(?=\d)/g, '$1-');
+}
+
+/**
  * Suggest the closest book id for a likely-mistyped book name (≤2 edits).
  * @param {string} raw
  * @returns {string|null}
@@ -319,14 +418,15 @@ export function parseReference(query, parseOpts) {
   }
 
   // Bible ref — "Rom 8:28", "Romans 8", "John 14:1-16:33", "Gen 1-3", "Rom8:28", …
-  const qNorm = q.replace(/[.,\s]+/g, ' ').replace(/\s*:\s*/g, ':').replace(/\s*-\s*/g, '-').trim();
+  const qNorm = refShape(lower).replace(/[.,\s]+/g, ' ').replace(/\s*:\s*/g, ':').replace(/\s*-\s*/g, '-').trim();
   const qExp = qNorm.replace(/^([0-3]?[a-z]+)(\d)/i, '$1 $2');
   const toks = qExp.split(/\s+/);
-  for (let tk = Math.min(toks.length, 4); tk >= 1; tk--) {
+  // The book as typed first; then, before a chapter only, a book name a slip off.
+  for (let pass = 0; pass < 2; pass++) for (let tk = Math.min(toks.length, 4); tk >= 1; tk--) {
     const attempt = toks.slice(0, tk).join(' ').toLowerCase();
-    const bookId = resolveBookToken(attempt);
-    if (!bookId) continue;
     const rest = toks.slice(tk).join(' ').trim();
+    const bookId = pass === 0 ? resolveBookToken(attempt) : (/^\d/.test(rest) ? nearBookToken(attempt, rest.indexOf(':') > 0) : null);
+    if (!bookId) continue;
     const bookTitle = D.BOOK_DISPLAY[bookId] || bookId;
     if (!rest) return { kind: 'ref-book', bookId, bookTitle };
     const rangeM = rest.match(/^(\d+)(?::(\d+))?(?:-(\d+)(?::(\d+))?)?$/);
