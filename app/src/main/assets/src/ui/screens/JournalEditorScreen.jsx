@@ -1084,6 +1084,9 @@ export function JournalEditorScreen(props) {
       <div className="jrn-editor">
         <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFileChosen} />
         <div className="jrn-editor-meta">
+          {/* The screen's heading for a screen reader's heading list; the title
+              field below is what the eye reads as one (sr-only paints nothing). */}
+          <h1 className="sr-only">Journal entry</h1>
           <input
             className="jrn-editor-title"
             type="text"
