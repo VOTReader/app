@@ -383,7 +383,7 @@ export function offsetIn(el, node, nodeOffset) {
  * @param {number} y
  * @returns {{ node: any, offset: number } | null}
  */
-export function caretAt(doc, x, y) {
+function caretAt(doc, x, y) {
   try {
     if (typeof doc.caretPositionFromPoint === 'function') {
       const p = doc.caretPositionFromPoint(x, y);
@@ -658,7 +658,7 @@ function _paintLead(leadRef, mainRef, readAlongFollow, userScrollAt, glideRef, l
  * @param {boolean} leadOn
  * @returns {number}
  */
-export function readingIndexAt(frags, t, leadOn) {
+function readingIndexAt(frags, t, leadOn) {
   const i = fragmentAt(frags, t);
   return i >= 0 ? i : (leadOn ? LEAD_IDX : -1);
 }
@@ -680,7 +680,7 @@ export function readingIndexAt(frags, t, leadOn) {
  * @param {HTMLElement | null} mainEl
  * @returns {number}
  */
-export function listenTargetAt(frags, hlKey, offset, letterId, hlKeyFn, offsetMapFn, mainEl) {
+function listenTargetAt(frags, hlKey, offset, letterId, hlKeyFn, offsetMapFn, mainEl) {
   let target = -1;
   for (let i = 0; i < frags.length; i++) {
     const bi = frags[i][1];

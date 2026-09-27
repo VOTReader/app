@@ -282,6 +282,22 @@ describe('SelectionToolbar — long-press / right-click raises the toolbar (sele
     expect(document.querySelector('.sel-toolbar')).not.toBeNull();
   });
 
+  it('the first long-press retires the "Hold your finger" hint: it sets the hint\'s durable flag (hint1)', () => {
+    const g = /** @type {any} */ (globalThis);
+    let set = 0;
+    g.AnnHintDismissedFlagStore = { is: () => set > 0, set: () => { set++; } };
+    try {
+      const c = readingContainer('bible:test:1:2', 'who bore witness to the word of God');
+      mount();
+      stubSelection(rangeOver(c, 0, 14));
+      act(() => { fire(c, 'contextmenu', { clientX: 20, clientY: 20 }); });
+      expect(document.querySelector('.sel-toolbar')).not.toBeNull();
+      expect(set).toBe(1);
+      act(() => { fire(c, 'contextmenu', { clientX: 20, clientY: 20 }); });
+      expect(set).toBe(1);   // once: an already-set flag is not written again
+    } finally { delete g.AnnHintDismissedFlagStore; }
+  });
+
   it('a long-press on a highlight mark with NO selection does not open the chip', () => {
     const c = readingContainer(
       'bible:test:1:2',
@@ -1749,6 +1765,15 @@ describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
     act(() => { fire(shareBtn(), 'contextmenu', { button: 2 }); });
     expect(choice('App link')).toBeTruthy();
     act(() => { fire(choice('App link'), 'click'); });
+    await settle();
+    expect(sent.map((d) => d.text)).toEqual([WORDS + '\n\nThe Wide Path (Volume Two)\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1']);
+  });
+
+  it('a hold with no click after it (Android) never swallows the next keyboard or TalkBack Share (cl1 review)', async () => {
+    raise('letter:the-wide-path:1', WORDS);
+    await hold();
+    act(() => { fire(choice('Cancel'), 'click'); });
+    act(() => { fire(shareBtn(), 'click'); });
     await settle();
     expect(sent.map((d) => d.text)).toEqual([WORDS + '\n\nThe Wide Path (Volume Two)\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1']);
   });

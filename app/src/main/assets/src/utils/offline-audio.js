@@ -27,7 +27,7 @@
 import { isSongUrl } from './audio-track.js';
 import { WebOfflineAudio } from './offline-audio-web.js';
 
-/** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number }} SavedItem */
+/** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number, stale: boolean }} SavedItem */
 /** @typedef {'saved' | 'downloading' | 'queued' | 'failed' | 'none'} OfflineStatus */
 
 /** @type {Set<() => void>} */
@@ -47,6 +47,9 @@ let _failed = new Map();
 let _sizes = new Map();
 /** @type {Set<string>} */
 let _sizesAsked = new Set();
+/** What each download was asked as ({key, title}), so a failure can be retried from anywhere (n2-05). */
+/** @type {Map<string, { url: string, key: string, title: string }>} */
+let _asked = new Map();
 /** Asked by rows this turn, sent together once it ends: one bridge call per screen, not one per row (n2-02). */
 /** @type {Set<string>} */
 let _sizesToSend = new Set();
@@ -92,7 +95,7 @@ function refresh() {
   _saved = new Map();
   for (const it of items) {
     if (it && typeof it.url === 'string') {
-      _saved.set(it.url, { url: it.url, key: String(it.key || ''), title: String(it.title || ''), bytes: Number(it.bytes) || 0, savedAt: Number(it.savedAt) || 0 });
+      _saved.set(it.url, { url: it.url, key: String(it.key || ''), title: String(it.title || ''), bytes: Number(it.bytes) || 0, savedAt: Number(it.savedAt) || 0, stale: it.stale === true });
     }
   }
   _totalBytes = Number(s.totalBytes) || 0;
@@ -114,6 +117,9 @@ function _onEvent(json) {
   if (!_loaded) refresh();
   const url = typeof e.url === 'string' ? e.url : null;
   switch (e.type) {
+    case 'checked':   // the listings of what is on the phone were read again: items now say which are stale (n2-01)
+      refresh();
+      return;
     case 'done':
     case 'removed':
       if (url && _active && _active.url === url) _active = null;
@@ -295,12 +301,48 @@ export const OfflineAudio = {
     if (!b || typeof b.offlineAudioSave !== 'function') return false;
     if (!items.length) return true;
     try { b.offlineAudioSave(JSON.stringify(items)); } catch (_e) { return false; }
-    for (const t of items) { _queued.add(t.url); _failed.delete(t.url); }
+    for (const t of items) { _queued.add(t.url); _failed.delete(t.url); _asked.set(t.url, t); }
     _notify();
     return true;
   },
+  /**
+   * The recordings on their way (queued or downloading; songs being kept left out) and the ones that failed this
+   * session and can be asked again (n2-05).
+   * @returns {{ busy: number, failed: Array<{ url: string, key: string, title: string }> }}
+   */
+  pending: () => {
+    if (!_loaded) refresh();
+    const busy = [..._queued].filter((u) => !isSongUrl(u)).length + (_active && !isSongUrl(_active.url) && !_queued.has(_active.url) ? 1 : 0);
+    const failed = [];
+    for (const u of _failed.keys()) { const t = _asked.get(u); if (t && !isSongUrl(u) && !_saved.has(u)) failed.push(t); }
+    return { busy, failed };
+  },
   /** @param {string[]} urls */
   remove: (urls) => { _send(urls, 'offlineAudioRemove'); },
+  /**
+   * Ask the phone whether any recording on it was uploaded again since it was downloaded (the shelf opening; n2-01).
+   * The answer re-reads the state, whose items carry `stale`.
+   */
+  checkForUpdates: () => {
+    const b = _bridge();
+    if (b && typeof b.offlineAudioCheck === 'function') { try { b.offlineAudioCheck(); } catch (_e) { /* quiet */ } }
+  },
+  /**
+   * Download the current bytes of recordings already on the phone (stale ones); each keeps playing from the old
+   * file until the new one is whole.
+   * @param {Array<{ url: string, key: string, title: string }>} list
+   * @returns {boolean}
+   */
+  update(list) {
+    const b = _bridge();
+    const items = (Array.isArray(list) ? list : []).filter((t) => t && typeof t.url === 'string' && _saved.has(t.url))
+      .map((t) => ({ url: t.url, key: String(t.key || ''), title: String(t.title || ''), update: true }));
+    if (!b || typeof b.offlineAudioSave !== 'function' || !items.length) return false;
+    try { b.offlineAudioSave(JSON.stringify(items)); } catch (_e) { return false; }
+    return true;
+  },
+  /** An update of a recording on the phone is on its way. @param {string} url */
+  isUpdating: (url) => _saved.has(url) && (_queued.has(url) || !!(_active && _active.url === url)),
   /** Every RECORDING off the phone (kept songs stay: they are the Songs screens' to remove). */
   removeAll: () => {
     if (!_holdsSongs()) { _send(['*'], 'offlineAudioRemove'); return; }
@@ -320,7 +362,7 @@ export const OfflineAudio = {
   /** Tests only: forget everything and re-install the receiver. */
   _reset() {
     _listeners.clear();
-    _saved = new Map(); _queued = new Set(); _failed = new Map(); _sizes = new Map(); _sizesAsked = new Set();
+    _saved = new Map(); _queued = new Set(); _failed = new Map(); _sizes = new Map(); _sizesAsked = new Set(); _asked = new Map();
     _sizesToSend = new Set(); _sizesFlushQueued = false; _news = { seq: 0, text: '' };
     _active = null; _totalBytes = 0; _freeBytes = -1; _loaded = false; _version = 0;
     _install();

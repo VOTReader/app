@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { snippet, highlightSpans, matchExcerpt, morePlaces } from './snippet.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { snippet, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
 
 describe('snippet', () => {
   it('returns short text unchanged when no terms', () => {
@@ -206,5 +206,89 @@ describe('bestMatch counts word families, not highlight forms', () => {
     // Before: flood + flooding + flooded counted as three distinct terms, pulling the
     // snippet to the late cluster of longer forms and away from the plain word.
     expect(snippet(t, ['flood', 'flooding', 'flooded'], 60)).toContain('the flood rose');
+  });
+});
+
+/* When the query's words never meet in a text, the passage worth showing is the
+   one with the word that tells this text apart, not the first of a word it says
+   everywhere (2026-09-26: "the lord is my shepherd" showed an Answers topic's
+   first "Lord" and listed 23 more Lords, with its one "shepherd" nowhere). */
+describe('the rarer word leads when the words never meet', () => {
+  const pad = (n) => 'and the word went on. '.repeat(n);
+  const TOPIC = pad(2) + 'the Lord spoke. ' + pad(20) + 'the Lord came. ' + pad(20) + 'the Lord is near. '
+    + pad(20) + 'He is our shepherd and guide. ' + pad(20) + 'the Lord reigns. ' + pad(2);
+
+  it('the snippet shows the rarer word', () => {
+    expect(snippet(TOPIC, ['lord', 'shepherd'], 120)).toContain('our shepherd');
+  });
+
+  it('the other places are the rarer word\'s, not every "Lord"', () => {
+    const two = TOPIC + pad(20) + 'The good shepherd knows His own. ' + pad(2);
+    const places = morePlaces(two, ['lord', 'shepherd'], 120);
+    expect(places.map((p) => two.slice(p.start, p.start + 8))).toEqual(['shepherd']);
+    expect(places[0].clip).toContain('good shepherd knows');
+  });
+
+  it('a word said 500 times cannot crowd the rarer one out of the scan', () => {
+    const t = 'Lord, '.repeat(500) + 'my shepherd. ' + pad(3);
+    expect(snippet(t, ['lord', 'shepherd'], 120)).toContain('my shepherd');
+  });
+
+  it('where the words DO meet, that passage still wins over the rare word alone', () => {
+    const t = pad(2) + 'a shepherd alone. ' + pad(20) + 'the Lord is my shepherd. ' + pad(20) + 'the Lord. ' + pad(2);
+    expect(snippet(t, ['lord', 'shepherd'], 120)).toContain('the Lord is my shepherd');
+  });
+});
+
+describe('findPlaces — every place, the snippet\'s own included, with its hits', () => {
+  it('lists each place in reading order with the hits it marks', () => {
+    const t = 'a flooding rain. ' + 'and the word went on. '.repeat(10) + 'Be a flood of water which covers, But a flood of judgment.';
+    const places = findPlaces(t, ['flood', 'flooding'], 120);
+    expect(places.map((p) => p.hits.map((h) => t.slice(h.idx, h.idx + h.len)))).toEqual([['flooding'], ['flood', 'flood']]);
+    expect(t.slice(places[1].start).startsWith('flood of water')).toBe(true);
+  });
+
+  it('is empty for no hits', () => {
+    expect(findPlaces('nothing here', ['flood'])).toEqual([]);
+  });
+});
+
+/* Review of 22419b59 (2026-09-26): a card's term list is the typed words first,
+   then their synonyms and the engine's matched forms. Counted as separate words
+   they skewed every rule that counts words; they are one word family, named by
+   the typed word, which wins a tie. */
+describe('synonyms, forms and archaic twins are one word with the word typed', () => {
+  const pad = (n) => 'and the word went on. '.repeat(n);
+  let prev;
+  beforeEach(() => { prev = window.VotSearchData; window.VotSearchData = { SYNONYM_MAP: { love: ['love', 'charity'], charity: ['love', 'charity'] } }; });
+  afterEach(() => { window.VotSearchData = prev; });
+
+  it('a synonym is not a rarer word: the snippet shows the word typed, and every place is kept', () => {
+    const t = pad(2) + 'I love you. ' + pad(20) + 'love one another. ' + pad(20) + 'put on charity. ' + pad(20) + 'love is patient. ' + pad(20) + 'love never fails. ' + pad(2);
+    expect(snippet(t, ['love', 'charity'], 120)).toContain('I love you');
+    expect(findPlaces(t, ['love', 'charity'], 120)).toHaveLength(5);
+    expect(morePlaces(t, ['love', 'charity'], 120).map((p) => p.clip.includes('charity') || p.clip.includes('love'))).toEqual([true, true, true, true]);
+  });
+
+  it('a back-form is not a rarer word: typed "wept" leads, and weep’s places stay', () => {
+    const t = pad(2) + 'weep with those who weep. ' + pad(20) + 'weep not. ' + pad(20) + 'Jesus wept. ' + pad(20) + 'they weep. ' + pad(2);
+    // typed wept, the engine's matched forms after it
+    expect(snippet(t, ['wept', 'weep'], 120)).toContain('Jesus wept');
+    expect(findPlaces(t, ['wept', 'weep'], 120)).toHaveLength(4);
+  });
+
+  it('the words that meet still win, and two different typed words still count as two', () => {
+    const t = pad(2) + 'a charity alone. ' + pad(20) + 'love the brethren with charity and faith. ' + pad(20) + 'faith alone. ' + pad(2);
+    // love (+ charity) and faith: two typed words
+    expect(snippet(t, ['love', 'faith', 'charity'], 120)).toContain('love the brethren');
+  });
+});
+
+describe('findPlaces never comes back empty when the words appear (review of 22419b59)', () => {
+  it('a pair straddling a cut is still one place: lord at 0 and 100, shepherd at 130', () => {
+    const t = 'Lord' + ' '.repeat(96) + 'Lord' + ' '.repeat(26) + 'shepherd.';
+    const places = findPlaces(t, ['lord', 'shepherd'], 120);
+    expect(places.length).toBeGreaterThan(0);
+    expect(places.map((p) => p.hits.map((h) => t.slice(h.idx, h.idx + h.len)))).toEqual([['Lord', 'shepherd']]);
   });
 });

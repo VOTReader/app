@@ -79,6 +79,9 @@ const GLOBALS = {
       { num: 7, sections: [{ heading: '', verses: [verse(17, 'Now the flood was on the earth forty days.')] }] },
       { num: 8, sections: [{ heading: '', verses: [verse(22, 'While the earth remains, seedtime and harvest shall not cease.')] }] },
     ] },
+    psalms: { id: 'psalms', title: 'Psalms', chapters: [
+      { num: 19, sections: [{ heading: '', verses: [verse(4, 'In them He has set the rays of the sun,'), verse(6, 'Its rays go forth from one end of heaven.')] }] },
+    ] },
     john: { id: 'john', title: 'John', chapters: [
       { num: 11, sections: [{ heading: '', verses: [verse(35, 'Jesus wept.')] }] },
       { num: 17, sections: [{ heading: '', verses: [verse(9, 'I pray for them. I do not pray for the world.')] }] },
@@ -123,6 +126,17 @@ describe('search: a typed word finds its family', () => {
 
   it('a quoted phrase stays exactly as typed', async () => {
     expect(refs(await VotSearchMini.search('"flooding rain"'))).toEqual(['Volume Seven · Letter 55']);
+  });
+
+  /* A real word the corpus inflects differently is not a typo: "prays" is
+     nowhere in the text, but pray and prayed are. The typo fallback waited only
+     on the typed spelling, so it corrected "prays" to its one-edit neighbour with
+     the most documents, "rays", and showed the sun. */
+  it('"prays" finds pray through its family, never a one-edit "rays"', async () => {
+    const r = await VotSearchMini.search('prays');
+    expect(refs(r)).toContain('John 17:9');
+    expect(refs(r)).not.toContain('Psalms 19:4');
+    expect(r.corrections).toEqual([]);
   });
 
   it('"saw" never reaches "seedtime" through a made-up "seed"', async () => {

@@ -51,7 +51,7 @@ export function distanceRampRGB(t) {
 }
 
 /** Old↔Old, the prophecy bridge, New↔New. */
-export const TESTAMENT_COLORS = {
+const TESTAMENT_COLORS = {
   ot: [0.816, 0.659, 0.220],      // gold — the app's own accent family
   bridge: [0.957, 0.561, 0.694],  // rose — what the reader is here to see
   nt: [0.424, 0.706, 0.863],      // blue
@@ -70,22 +70,6 @@ export const GENRE_COLORS = [
   [0.643, 0.502, 0.886],  // general epistles
   [0.804, 0.404, 0.812],  // revelation
 ];
-
-export const GENRE_NAMES = [
-  'Law', 'History', 'Poetry', 'Major Prophets', 'Minor Prophets',
-  'Gospels', 'Acts', 'Pauline Epistles', 'General Epistles', 'Revelation',
-];
-
-/** Exclusive upper book-index bound of each genre, canonical order. */
-export const GENRE_BOOK_ENDS = [5, 17, 22, 27, 39, 43, 44, 57, 65, 66];
-
-/** Genre bucket for a canonical book index. */
-export function genreOfBook(bookIndex) {
-  for (let g = 0; g < GENRE_BOOK_ENDS.length; g++) {
-    if (bookIndex < GENRE_BOOK_ENDS[g]) return g;
-  }
-  return GENRE_BOOK_ENDS.length - 1;
-}
 
 /* ── My Web's colour law (design-myweb-colour.md, 2026-09-11) ──────────────
    Two families a reader tells apart at a glance, and a colour-blind reader by

@@ -125,9 +125,15 @@ def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False):
     B = al.nw_rows(tx["words"], cols, owners, al.nw_align(tx["words"], cols, s, names or None))
     say(f"  {len(B)}/{len(verses)} verses placed  (transcript {len(tx['words'])} words, {tx['dur']}s)")
 
-    snap = al.make_snap(al.silence_intervals(wav, stamp=stamp))
+    sil = al.silence_intervals(wav, stamp=stamp)
+    snap = al.make_snap(sil)
     rows = al.belt(A, B, units, s, lambda t, txt: al.probe(wav, t, txt, s, wl, names or None),
                    snap_fn=snap, end_t=tx.get("dur"))
+    # The transcript anchor (tx_anchor, 2026-09-26): a name-list opening leg B skipped, and a
+    # REVIEW guess the transcript can place, move to the words heard. Stamped below (txAnchor).
+    moved = al.tx_anchor(rows, units, tx["words"], names or None, nrm, sil)
+    if moved:
+        say(f"  transcript anchor moved {len(moved)} onset(s)")
     n_conf = sum(1 for r in rows if r["status"] == "CONFIRMED")
     n_probed = sum(1 for r in rows if r["status"].startswith("PROBED"))
     n_review = sum(1 for r in rows if r["status"] == "REVIEW")
@@ -144,7 +150,7 @@ def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False):
                                              ensure_ascii=False, separators=(",", ":"))),
            "settings": s, "audio": audio, "audioSize": os.path.getsize(audio),
            **al.witness_stamp(s),
-           "names": sorted(names),
+           "names": sorted(names), "txAnchor": al.TX_ANCHOR,
            "confirmed": n_conf, "probed": n_probed, "review": n_review,
            "verses": rows}
     path = os.path.join(out_dir, out_tag + ".json")

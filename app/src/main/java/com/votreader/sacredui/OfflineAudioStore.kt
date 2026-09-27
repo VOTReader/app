@@ -53,8 +53,11 @@ class OfflineAudioStore(
     private val headSize: (String) -> Long? = ::headLength,
     private val sizeExecutor: Executor = Executors.newSingleThreadExecutor { r -> Thread(r, "offline-audio-sizes").apply { isDaemon = true } },
 ) {
-    /** One recording to download: its release URL, the player key it plays under, and a title for the shelf. */
-    data class Item(val url: String, val key: String, val title: String)
+    /**
+     * One recording to download: its release URL, the player key it plays under, and a title for the shelf. [update]:
+     * it is on the phone already and its release asset changed; the new bytes replace it once whole (sweep n2-01).
+     */
+    data class Item(val url: String, val key: String, val title: String, val update: Boolean = false)
 
     /** An open download: the body, its declared length (-1 unknown) and how to release the connection. */
     class Opened(val stream: InputStream, val length: Long, val onClose: () -> Unit = {})
@@ -125,6 +128,48 @@ class OfflineAudioStore(
         }
     }
 
+    /**
+     * The shelf opened: read the release listing of every tag with a recording on the phone again when the one held is
+     * older than [CHECK_TTL], so a re-uploaded asset (same URL, new bytes: the read-along timings were made on the new
+     * ones) shows as an update, not only a week later (sweep n2-01). One 'checked' event back; the page re-reads the
+     * state, whose items carry `stale`.
+     */
+    fun checkSaved() {
+        val tags = synchronized(lock) { entries.keys.mapNotNull { splitRelease(it)?.first }.toSet() }
+        if (tags.isEmpty()) return
+        sizeExecutor.execute {
+            for (tag in tags) listingFor(tag, CHECK_TTL)
+            send(JSONObject().put("type", "checked").toString())
+        }
+    }
+
+    /**
+     * A recording on the phone is stale when its release's listing names the asset at another size than the bytes on
+     * the phone: the asset was uploaded again. Size is the test (a trim or a re-encode changes it); an asset the
+     * listing does not name, or no listing, is never called stale.
+     */
+    private fun isStale(url: String, e: Entry, listings: Map<String, Map<String, Long>>): Boolean {
+        val (tag, asset) = splitRelease(url) ?: return false
+        val size = listings[tag]?.get(asset) ?: return false
+        return size > 0L && size != e.bytes
+    }
+
+    /**
+     * A download just landed with [bytes]: those are the release's bytes now, newer than any listing held. A listing
+     * cached before a re-upload would otherwise call the fresh file stale, and Update could never clear it (the
+     * refutation of s3r chunk 2).
+     */
+    private fun noteLanded(url: String, bytes: Long) {
+        val (tag, asset) = splitRelease(url) ?: return
+        synchronized(sizeLock) {
+            val hit = sizeCache[tag] ?: return
+            val held = hit.second[asset] ?: return
+            if (held == bytes) return
+            sizeCache[tag] = hit.first to (hit.second + (asset to bytes))
+            persistSizes()
+        }
+    }
+
     /** One HEAD from [tag]'s budget: [MAX_HEADS_PER_TAG] per [LISTING_RETRY_MS] window, whatever the calls. */
     private fun takeHead(tag: String): Boolean = synchronized(sizeLock) {
         val now = clock()
@@ -134,10 +179,10 @@ class OfflineAudioStore(
         true
     }
 
-    private fun listingFor(tag: String): Map<String, Long>? {
+    private fun listingFor(tag: String, ttl: Long = SIZE_TTL): Map<String, Long>? {
         synchronized(sizeLock) {
             val hit = sizeCache[tag]
-            if (hit != null && clock() - hit.first < SIZE_TTL) return hit.second
+            if (hit != null && clock() - hit.first < ttl) return hit.second
             // A listing that just failed (no signal, GitHub's 60-an-hour limit) is not asked again for a while.
             val failed = listingFailedAt[tag]
             if (failed != null && clock() - failed < LISTING_RETRY_MS) return hit?.second
@@ -197,7 +242,7 @@ class OfflineAudioStore(
         for (i in 0 until minOf(arr.length(), MAX_BATCH)) {
             val o = arr.optJSONObject(i) ?: continue
             val url = o.optString("url")
-            if (url.isNotEmpty()) items += Item(url, o.optString("key"), o.optString("title"))
+            if (url.isNotEmpty()) items += Item(url, o.optString("key"), o.optString("title"), o.optBoolean("update", false))
         }
         if (items.isNotEmpty()) enqueue(items)
     }
@@ -213,6 +258,9 @@ class OfflineAudioStore(
         val urls = parseUrls(json) ?: return
         if (urls.contains("*")) cancelAll() else if (urls.isNotEmpty()) cancel(urls)
     }
+
+    /** The shelf opened: check the recordings on the phone for updates (one 'checked' event back). */
+    fun checkSavedJson() { checkSaved() }
 
     /** `[url, ...]`: look their sizes up (one 'sizes' event back). */
     fun requestSizesJson(json: String?) {
@@ -248,7 +296,7 @@ class OfflineAudioStore(
         for (item in items) {
             val name = fileNameFor(item.url) ?: continue
             val isNew = synchronized(lock) {
-                if (entries.containsKey(item.url) || queued.contains(item.url) || active?.url == item.url) false
+                if ((entries.containsKey(item.url) && !item.update) || queued.contains(item.url) || active?.url == item.url) false
                 else { queued.add(item.url); true }
             }
             if (isNew) fresh += item to name
@@ -286,8 +334,9 @@ class OfflineAudioStore(
         for (u in dropped) send(event("cancelled", u).toString())
     }
 
-    /** Take [urls] off the phone (file and index entry). */
+    /** Take [urls] off the phone (file and index entry), and stop an update of any of them on its way. */
     fun remove(urls: List<String>) {
+        cancel(urls)
         val gone = ArrayList<String>()
         val files = ArrayList<String>()
         synchronized(lock) {
@@ -316,15 +365,22 @@ class OfflineAudioStore(
     }
 
     /** Everything the shelf and the rows need, as one JSON object. */
-    fun stateJson(): String = synchronized(lock) {
+    fun stateJson(): String {
+        val listings = synchronized(sizeLock) { sizeCache.mapValues { it.value.second } }
+        return synchronized(lock) { stateJsonLocked(listings) }
+    }
+
+    private fun stateJsonLocked(listings: Map<String, Map<String, Long>>): String {
         val items = JSONArray()
         var total = 0L
         for ((url, e) in entries) {
-            items.put(JSONObject().put("url", url).put("key", e.key).put("title", e.title).put("bytes", e.bytes).put("savedAt", e.savedAt))
+            val o = JSONObject().put("url", url).put("key", e.key).put("title", e.title).put("bytes", e.bytes).put("savedAt", e.savedAt)
+            if (isStale(url, e, listings)) o.put("stale", true)
+            items.put(o)
             total += e.bytes
         }
         val a = active
-        JSONObject()
+        return JSONObject()
             .put("items", items)
             .put("totalBytes", total)
             .put("freeBytes", runCatching { freeBytes() }.getOrDefault(-1L))
@@ -423,6 +479,7 @@ class OfflineAudioStore(
                 }
                 active = null   // before the event: the page re-reads the state on it
             }
+            if (outcome == "done") noteLanded(item.url, total)
             when (outcome) {
                 "done" -> send(event("done", item.url).put("bytes", total).toString())
                 "cancelled" -> send(event("cancelled", item.url).toString())
@@ -588,6 +645,8 @@ class OfflineAudioStore(
 
         // Sizes: a week-old listing is asked again; one ask covers at most a big collection or book.
         private const val SIZE_TTL = 7L * 24 * 3600 * 1000
+        /** How old a listing may be when the shelf checks the recordings on the phone for updates. */
+        private const val CHECK_TTL = 6L * 3600 * 1000
         private const val MAX_SIZE_BATCH = 400
         // One call from the page: a Bible book tops out at 150 chapters, the largest collection at 203 entries.
         private const val MAX_BATCH = 400

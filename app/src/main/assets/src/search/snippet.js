@@ -7,6 +7,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { expandArchaicTerms, ARCHAIC_NORMALIZE } from './tokenize.js';
+import { wordForms } from './word-forms.js';
+import { searchData } from './search-data.js';
 
 /* Whole words only (2026-09-22). The engine tokenises on word boundaries, so a term
    found INSIDE another word ("one" in "everyone", "love" in "Beloved") is never what
@@ -19,53 +21,126 @@ function startsWord(text, i) { return i === 0 || !WORD_CHAR.test(text[i - 1]); }
 function insideWord(text, i) { return i > 0 && i < text.length && WORD_CHAR.test(text[i - 1]) && WORD_CHAR.test(text[i]); }
 
 /**
+ * Which typed word each term stands for. The list a card highlights is the
+ * query's own words FIRST, then what search added for them: synonyms (charity
+ * for love), the engine's matched forms (flooding, and weep for a typed wept),
+ * archaic twins (thee for you). Counted as separate words they skewed every
+ * rule that counts words: a lone "charity" won the snippet as the rarer word,
+ * and a place holding love and charity outranked every place holding love
+ * (review of 22419b59, 2026-09-26). Two terms are one WORD FAMILY when one
+ * extends the other, they are archaic twins, the synonym table pairs them, or
+ * one is a word form of the other (word-forms.js); the family is named by its
+ * first-listed member, the word the reader typed. A term is PRIMARY when it is
+ * that word or extends it ("flooding" for flood): the typed word itself, which
+ * wins a tie over its synonyms and back-forms.
+ * @param {string[]} terms  in the caller's order, the typed words first
+ * @returns {Map<string, { fam: string, primary: boolean }>}
+ */
+function familiesOf(terms) {
+  const SYN = /** @type {Record<string, string[]>} */ (searchData().SYNONYM_MAP || {});
+  if (SYN !== cacheSyn) { FAMILY_CACHE.clear(); cacheSyn = SYN; }
+  const key = terms.join('\u0001');
+  const hit = FAMILY_CACHE.get(key);
+  if (hit) return hit;
+  /** @type {string[]} */
+  const list = [];
+  for (const t of terms) {
+    const w = String(t || '').toLowerCase().trim();
+    if (w && list.indexOf(w) < 0) list.push(w);
+  }
+  const parent = list.map((_, i) => i);
+  const root = (/** @type {number} */ i) => { while (parent[i] !== i) i = parent[i] = parent[parent[i]]; return i; };
+  const forms = list.map((w) => (/^[a-z]+$/.test(w) ? new Set(wordForms(w)) : new Set()));
+  const norm = (/** @type {string} */ w) => ARCHAIC_NORMALIZE[w] || w;
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      const a = list[i];
+      const b = list[j];
+      if (b.startsWith(a) || a.startsWith(b) || norm(a) === norm(b)
+        || (SYN[a] && SYN[a].indexOf(b) >= 0) || (SYN[b] && SYN[b].indexOf(a) >= 0)
+        || forms[i].has(b) || forms[j].has(a)) {
+        const ra = root(i);
+        const rb = root(j);
+        // the earlier-listed root names the family: the word the reader typed
+        if (ra !== rb) { if (ra < rb) parent[rb] = ra; else parent[ra] = rb; }
+      }
+    }
+  }
+  /** @type {Map<string, { fam: string, primary: boolean }>} */
+  const out = new Map();
+  for (let i = 0; i < list.length; i++) {
+    const rep = list[root(i)];
+    const w = list[i];
+    const primary = w.startsWith(rep) || norm(w) === norm(rep);
+    // the archaic twins a scan expands to belong where their word does
+    for (const v of expandArchaicTerms([w])) {
+      const lv = v.toLowerCase();
+      if (!out.has(lv)) out.set(lv, { fam: rep, primary });
+    }
+  }
+  if (FAMILY_CACHE.size > 64) FAMILY_CACHE.clear();
+  FAMILY_CACHE.set(key, out);
+  return out;
+}
+/** Families by term list, for the synonym table they were made with. */
+/** @type {Map<string, Map<string, { fam: string, primary: boolean }>>} */
+const FAMILY_CACHE = new Map();
+/** @type {any} */ let cacheSyn = null;
+
+/**
  * EVERY whole-word occurrence of every matchable term (archaic-aware), in text
- * order, one per position, capped for long bodies.
+ * order, one per position, capped for long bodies. `term` is the hit's word
+ * family (familiesOf), which is what a window's "distinct words" count, and
+ * `primary` says the hit is the typed word itself (or extends it). Two terms
+ * matching at one position ("flood", "flooding" at "flooding") are one hit, the
+ * longer.
  *
- * `term` is the hit's WORD FAMILY, which is what a window's "distinct terms" count:
- * the list a card highlights carries the forms the engine matched ("flood" and
- * "flooding" for a search of flood) and the archaic twins ("thee" for you), and
- * counted as separate words they made "flooding" worth two of "flood". A term
- * joins the family of a shorter term it starts with, and an archaic form joins
- * its modern word's. Two terms matching at one position ("flood", "flooding" at
- * "flooding") are one hit, the longer.
+ * The cap is PER TERM (400 each): shorter terms are scanned first, and one cap for
+ * all of them let a common word ("lord", 400 times in a long Answers topic) use it
+ * up before the word that told the unit apart ("shepherd") was scanned at all.
  * @param {string} text
  * @param {string[]} terms
- * @returns {Array<{ idx: number, len: number, term: string }>}
+ * @returns {Array<{ idx: number, len: number, term: string, primary: boolean }>}
  */
 function occurrences(text, terms) {
   if (!text || !terms || !terms.length) return [];
-  const expanded = expandArchaicTerms(terms)
-    .map((t) => t.toLowerCase())
+  const fams = familiesOf(terms);
+  const expanded = [...fams.keys()]
     .filter((t) => t.length >= 2)
     .sort((a, b) => a.length - b.length || (a < b ? -1 : 1));
-  const family = Object.create(null);
-  for (let i = 0; i < expanded.length; i++) {
-    const t = expanded[i];
-    let fam = ARCHAIC_NORMALIZE[t] || t;
-    for (let j = 0; j < i; j++) {
-      if (t.startsWith(expanded[j])) { fam = family[expanded[j]]; break; }
-    }
-    family[t] = fam;
-  }
   const lower = text.toLowerCase();
   const at = new Map();
   for (let i = 0; i < expanded.length; i++) {
     const t = expanded[i];
+    const f = /** @type {{ fam: string, primary: boolean }} */ (fams.get(t));
     let idx = lower.indexOf(t);
-    while (idx >= 0 && at.size < 400) {
+    let n = 0;
+    while (idx >= 0 && n < 400) {
       // longer terms come later, so the last write at a position is the longest
-      if (startsWord(lower, idx)) at.set(idx, { idx, len: t.length, term: family[t] });
+      if (startsWord(lower, idx)) { at.set(idx, { idx, len: t.length, term: f.fam, primary: f.primary }); n++; }
       idx = lower.indexOf(t, idx + t.length);
     }
   }
   return [...at.values()].sort((a, b) => a.idx - b.idx);
 }
 
+/** How often each word family occurs: the rarer a query word is in THIS text, the
+ *  more a passage holding it tells the unit apart. */
+function familyCounts(occ) {
+  const n = Object.create(null);
+  for (let i = 0; i < occ.length; i++) n[occ[i].term] = (n[occ[i].term] || 0) + 1;
+  return n;
+}
+
 /**
  * The ~maxLen-wide window covering the MOST DISTINCT query terms — the passage
  * where the query words actually cluster (the remembered phrase), not the
- * first stray hit of one common word. Ties resolve to the earliest window.
+ * first stray hit of one common word. Among windows holding as many, the one
+ * whose words are RAREST in this text wins (each distinct word weighs 1 / its
+ * count): "the lord is my shepherd" in a topic that says Lord 24 times and
+ * shepherd once shows the shepherd, not the first Lord. Then a window holding
+ * the typed word itself over one holding only its synonyms or back-forms, then
+ * the earliest.
  * Archaic-aware (a "you" query finds "thee"/"thou"/"ye"). Null when no term
  * occurs in the text.
  * @param {string} text
@@ -75,23 +150,46 @@ function occurrences(text, terms) {
  *   query words (word families) the window holds
  */
 export function bestMatch(text, terms, maxLen) {
-  const occ = occurrences(text, terms);
-  if (!occ.length) return null;
-  let bestStart = occ[0].idx;
-  let bestCount = 0;
-  let bestSpan = occ[0].len;
+  return bestIn(occurrences(text, terms), maxLen);
+}
+
+/**
+ * Every window: the hits from each one to maxLen past its start, scored.
+ * @param {Array<{ idx: number, len: number, term: string, primary: boolean }>} occ
+ * @param {number} maxLen
+ * @param {Record<string, number>} freq
+ */
+function windows(occ, maxLen, freq) {
+  const out = [];
   for (let s = 0; s < occ.length; s++) {
     const winStart = occ[s].idx;
     const seen = Object.create(null);
     let count = 0;
+    let weight = 0;
+    let primary = false;
     let spanEnd = winStart + occ[s].len;
     for (let e = s; e < occ.length && (occ[e].idx + occ[e].len) <= winStart + maxLen; e++) {
-      if (!seen[occ[e].term]) { seen[occ[e].term] = true; count++; }
+      if (!seen[occ[e].term]) { seen[occ[e].term] = true; count++; weight += 1 / freq[occ[e].term]; }
+      if (occ[e].primary) primary = true;
       spanEnd = occ[e].idx + occ[e].len;
     }
-    if (count > bestCount) { bestCount = count; bestStart = winStart; bestSpan = spanEnd - winStart; }
+    out.push({ s, start: winStart, span: spanEnd - winStart, count, weight, primary });
   }
-  return { start: bestStart, span: bestSpan, count: bestCount };
+  return out;
+}
+
+/** Better window first: more typed words, rarer ones, the typed word itself, earlier. */
+function better(a, b) {
+  return (b.count - a.count) || (b.weight - a.weight) || ((b.primary ? 1 : 0) - (a.primary ? 1 : 0)) || (a.start - b.start);
+}
+
+/** bestMatch over an occurrence list already made. */
+function bestIn(occ, maxLen) {
+  if (!occ.length) return null;
+  const wins = windows(occ, maxLen, familyCounts(occ));
+  let best = wins[0];
+  for (let i = 1; i < wins.length; i++) if (better(wins[i], best) < 0) best = wins[i];
+  return { start: best.start, span: best.span, count: best.count };
 }
 
 /**
@@ -171,6 +269,72 @@ export function matchExcerpt(text, terms, len) {
   return m ? text.slice(m.start, m.start + len) : '';
 }
 
+/**
+ * Gather occurrences into places, BEST CLUSTERS FIRST: every hit's window is
+ * scored the way the snippet's is (typed words, rarity, the typed word itself,
+ * position) and taken best-first, each place running from its hit to maxLen on
+ * over the hits no better place has claimed. Cutting runs from the first hit
+ * instead split a pair that straddled a cut ("lord" at 0 and 100, "shepherd" at
+ * 130), so no place held both and a count taken from another window size left
+ * none to show (review of 22419b59). Returned in reading order.
+ * @param {Array<{ idx: number, len: number, term: string, primary: boolean }>} occ
+ * @param {number} maxLen
+ * @param {Record<string, number>} freq  family counts over the WHOLE text
+ * @returns {Array<{ start: number, span: number, count: number, fams: Record<string, boolean>, hits: Array<{ idx: number, len: number }> }>}
+ */
+function cluster(occ, maxLen, freq) {
+  const wins = windows(occ, maxLen, freq).sort(better);
+  const taken = new Array(occ.length).fill(false);
+  const places = [];
+  for (const w of wins) {
+    if (taken[w.s]) continue;
+    const start = occ[w.s].idx;
+    const fams = Object.create(null);
+    let count = 0;
+    let end = start + occ[w.s].len;
+    const hits = [];
+    for (let e = w.s; e < occ.length && !taken[e] && occ[e].idx + occ[e].len <= start + maxLen; e++) {
+      taken[e] = true;
+      if (!fams[occ[e].term]) { fams[occ[e].term] = true; count++; }
+      end = Math.max(end, occ[e].idx + occ[e].len);
+      hits.push({ idx: occ[e].idx, len: occ[e].len });
+    }
+    places.push({ start, span: end - start, count, fams, hits });
+  }
+  return places.sort((a, b) => a.start - b.start);
+}
+
+/**
+ * The places worth a reader's tap:
+ *  - with two or more typed words, the places holding as many of them as the best
+ *    place of the whole text does (`most`); a stray single word is not the passage
+ *    a reader remembers;
+ *  - when no place holds two (the words never meet in this text), the places of
+ *    the RAREST word, the one that tells the unit apart ("shepherd", not the Lord
+ *    the topic names 24 times);
+ *  - one typed word (its synonyms and forms with it): every place.
+ * @template {{ count: number, fams: Record<string, boolean> }} P
+ * @param {P[]} places
+ * @param {Record<string, number>} freq
+ * @param {number} most
+ * @returns {P[]}
+ */
+function keep(places, freq, most) {
+  if (most >= 2) return places.filter((p) => p.count === most);
+  const names = Object.keys(freq);
+  if (names.length <= 1) return places;
+  let min = Infinity;
+  for (const f of names) if (freq[f] < min) min = freq[f];
+  return places.filter((p) => names.some((f) => freq[f] === min && p.fams[f]));
+}
+
+/** The most typed words any place holds. */
+function mostOf(places) {
+  let most = 0;
+  for (const p of places) if (p.count > most) most = p.count;
+  return most;
+}
+
 /* How much of the text around its first hit a result card's snippet surely shows:
    the snippet is cut 180 chars wide, but its box holds three lines centred on
    the first <mark> (SrchSnippet), about 50 chars before the hit and 60 from it
@@ -185,11 +349,8 @@ const SHOWN_FROM = 60;
  * judgment" further down the same letter, the passage she was after).
  *
  * The hits the card's snippet already shows are left out (the stretch around
- * the best window's first hit, SHOWN_BEFORE / SHOWN_FROM); the rest are gathered
- * into places, one per `maxLen`-wide run of hits, in the order the text reads.
- * With two or more query words, only the places that hold as many of them as the
- * best window does are kept: a stray single word is not the passage a reader
- * remembers.
+ * the best window's first hit, SHOWN_BEFORE / SHOWN_FROM); the rest cluster into
+ * places and are kept the way keep() keeps them, in the order the text reads.
  *
  * Each place carries `start` (its first hit, a word start: the landing reads
  * text.slice(start, start + 48), as matchExcerpt does) and `clip`, the
@@ -203,32 +364,34 @@ export function morePlaces(text, terms, maxLen) {
   maxLen = maxLen || 120;
   const occ = occurrences(text, terms);
   if (!occ.length) return [];
-  const best = bestMatch(text, terms, 180);
+  const freq = familyCounts(occ);
+  const best = bestIn(occ, 180);
   const shownFrom = best ? best.start - SHOWN_BEFORE : -1;
   const shownTo = best ? best.start + SHOWN_FROM : -1;
   const rest = occ.filter((o) => o.idx < shownFrom || o.idx + o.len > shownTo);
-  const places = [];
-  for (let i = 0; i < rest.length;) {
-    const start = rest[i].idx;
-    const seen = Object.create(null);
-    let count = 0;
-    let end = start + rest[i].len;
-    let j = i;
-    do {
-      if (!seen[rest[j].term]) { seen[rest[j].term] = true; count++; }
-      end = Math.max(end, rest[j].idx + rest[j].len);
-      j++;
-    } while (j < rest.length && rest[j].idx + rest[j].len <= start + maxLen);
-    places.push({ start, span: end - start, count });
-    i = j;
-  }
-  // The bar is the best window's, the snippet's own included: when the snippet
-  // holds the only passage with every word, the one-word leftovers are not places.
-  let most = best ? best.count : 0;
-  for (const p of places) if (p.count > most) most = p.count;
-  return places
-    .filter((p) => most < 2 || p.count === most)
+  // the bar is the whole text's best place, the snippet's own included: when only
+  // the snippet holds every word, the one-word leftovers are not places
+  const most = mostOf(cluster(occ, maxLen, freq));
+  return keep(cluster(rest, maxLen, freq), freq, most)
     .map((p) => ({ start: p.start, clip: clipAround(text, p, maxLen) }));
+}
+
+/**
+ * EVERY place a unit's text matches, the snippet's own included, each with its
+ * hits: what the reader's find bar steps through ("2 of 3") and marks, over the
+ * text the reading screen renders. Same places as a result card lists.
+ * @param {string} text
+ * @param {string[]} terms
+ * @param {number} [maxLen=120]
+ * @returns {Array<{ start: number, span: number, hits: Array<{ idx: number, len: number }> }>}
+ */
+export function findPlaces(text, terms, maxLen) {
+  maxLen = maxLen || 120;
+  const occ = occurrences(text, terms);
+  if (!occ.length) return [];
+  const freq = familyCounts(occ);
+  const places = cluster(occ, maxLen, freq);
+  return keep(places, freq, mostOf(places)).map((p) => ({ start: p.start, span: p.span, hits: p.hits }));
 }
 
 /**

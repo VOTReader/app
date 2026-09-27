@@ -20,7 +20,7 @@ export const ANNOTATION_CHROME = '.fn-ref, .hl-note-icon, .verse-link-icon, .inl
  * @param {Element} container
  * @returns {boolean}
  */
-export function isAnnotationChrome(n, container) {
+function isAnnotationChrome(n, container) {
   var el = n.parentElement;
   while (el && el !== container) {
     if (el.matches && el.matches(ANNOTATION_CHROME)) return true;

@@ -47,7 +47,7 @@ export function _fmtWords(n) {
 }
 
 /** "3h 24m" / "48 min" — lifetime reading-time display. @param {number} ms */
-export function _fmtDuration(ms) {
+function _fmtDuration(ms) {
   const min = Math.round(Math.max(0, ms || 0) / 60000);
   if (min < 60) return min + ' min';
   return Math.floor(min / 60) + 'h ' + (min % 60) + 'm';

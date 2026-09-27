@@ -18,7 +18,7 @@
 import { answersContents, contentsSummary } from '../../utils/answers-contents.js';
 
 /** Fewer passages than this and a topic reads end to end without help. */
-export const CONTENTS_MIN_PASSAGES = 3;
+const CONTENTS_MIN_PASSAGES = 3;
 
 /**
  * @param {{ entry: any, onJump: (index: number) => void }} props

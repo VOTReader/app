@@ -119,6 +119,7 @@ class BridgeContractTest {
         "offlineAudioRemove" to 1,
         "offlineAudioCancel" to 1,
         "offlineAudioSizes" to 1,
+        "offlineAudioCheck" to 0,
         // m3, the native player: called DIRECTLY (guarded window.AndroidBridge)
         // by src/utils/native-audio.js, the page's stand-in <audio>; no
         // platform-bridge mirror. JSON in; audioJournal answers JSON.

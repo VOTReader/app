@@ -1,11 +1,11 @@
 // @ts-nocheck
 /* listen-from: a text selection becomes a LISTEN FROM HERE call (listening item 7, 2026-09-22).
    The selection toolbar asks listenFromTarget(selection) whether to offer the action (the selection starts in
-   a block the live reading pane's unit owns, and that unit has a recording), and listenFromSelection(selection)
+   a block the live reading pane's unit owns, and that unit has a recording), and startListenFrom(target)
    to act: the block's data-hl-key and the selection start's offset in the block's textContent (the domain the
    rows and the paint use) go to window.__votListenFrom.start. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { listenFromTarget, listenFromSelection, repeatTarget, startRepeat } from './listen-from.js';
+import { listenFromTarget, startListenFrom, repeatTarget, startRepeat } from './listen-from.js';
 
 let body;
 const selectAt = (node, offset) => {
@@ -30,7 +30,7 @@ afterEach(() => {
   document.getSelection().removeAllRanges();
 });
 
-describe('listenFromTarget / listenFromSelection', () => {
+describe('listenFromTarget / startListenFrom', () => {
   it('names the block and the offset of the selection start in its text', () => {
     const em = body.querySelector('em').firstChild;              // "block" inside block 1, after "Second "
     const t = listenFromTarget(selectAt(em, 2));
@@ -46,7 +46,7 @@ describe('listenFromTarget / listenFromSelection', () => {
   });
 
   it('acts through the pane: start(hlKey, offset)', () => {
-    expect(listenFromSelection(selectAt(body.querySelector('p').firstChild, 6))).toBe(true);
+    expect(startListenFrom(listenFromTarget(selectAt(body.querySelector('p').firstChild, 6)))).toBe(true);
     expect(globalThis.__votListenFrom.start).toHaveBeenCalledWith('letter:x:0', 6);
   });
 });

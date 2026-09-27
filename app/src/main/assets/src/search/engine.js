@@ -30,7 +30,7 @@ import { parseTextQuery } from './query-parse.js';
 import { expandQueryTerms } from './synonyms.js';
 import { wordForms } from './word-forms.js';
 import { kjvEncode } from './tokenize.js';
-import { snippet, highlightSpans, matchExcerpt, morePlaces } from './snippet.js';
+import { snippet, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
 import { KIND_BOOST, coverageMultiplier, popcount, phraseTokenMatch, PHRASE_BOOST, SYNONYM_DEMOTION } from './ranking.js';
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
 
@@ -86,12 +86,16 @@ function hasTokenRun(toks, run) {
  * The edit budget stays MiniSearch's own: round(0.2 x length), capped at maxFuzzy
  * (one edit for 3-7 letters, two for 8+), so a short word never widens to two.
  * A multi-word unit (a quoted phrase) keeps the plain fuzzy retry.
+ * `to` names the word searched in the typed one's place, so the screen can say
+ * so ("Showing results for shepherd"); null for a phrase's fuzzy retry, which
+ * corrects no one word.
  * @param {string} term
  * @param {Object} opts  the unit's exact + prefix options
+ * @returns {{ res: any[], to: string | null }}
  */
 function searchCorrected(term, opts) {
   const tokens = kjvEncode(term);
-  if (tokens.length !== 1) return msIndex.search(term, { ...opts, fuzzy: FUZZY });
+  if (tokens.length !== 1) return { res: msIndex.search(term, { ...opts, fuzzy: FUZZY }) || [], to: null };
   const word = tokens[0];
   const maxEdits = Math.min(MS_SEARCH_DEFAULTS.maxFuzzy, Math.round(word.length * FUZZY));
   for (let edits = 1; edits <= maxEdits; edits++) {
@@ -106,9 +110,9 @@ function searchCorrected(term, opts) {
     for (const w in docs) {
       if (best === null || docs[w] > docs[best] || (docs[w] === docs[best] && w < best)) best = w;
     }
-    if (best) return msIndex.search(best, opts);
+    if (best) return { res: msIndex.search(best, opts) || [], to: best };
   }
-  return [];
+  return { res: [], to: null };
 }
 
 /** @type {any} */ let msIndex = null;
@@ -214,7 +218,9 @@ async function ensureReady(options) {
  * "lord" 125 of 890, with no sign anything was missing. `capped` names every
  * collection that hit its cap (it may hold more), `truncated` says the total did.
  * @param {{translation?:string, useStopWords?:boolean, synonyms?:boolean, scope?:{bookId?:string,volumeId?:string}|null, corpus?:string, limit?:number, perVolume?:number}} [options]
- * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean}>}
+ * `corrections` lists each typed word that found nothing of its own and was
+ * searched as the nearest indexed word instead ({ from: 'shephard', to: 'shepherd' }).
+ * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>}>}
  */
 async function search(query, options) {
   options = options || {};
@@ -311,15 +317,9 @@ async function search(query, options) {
   const literalHit = Object.create(null);
   const matchedTerms = Object.create(null);
   const docLookup = Object.create(null);
-  for (let u = 0; u < units.length; u++) {
-    const unit = units[u];
-    let res;
-    try {
-      const opts = { prefix: unit.literal, fuzzy: false, combineWith: 'AND', boost: MS_SEARCH_DEFAULTS.boost };
-      res = msIndex.search(unit.term, opts);
-      if (unit.literal && (!res || !res.length)) res = searchCorrected(unit.term, opts);
-    } catch { continue; }
-    if (!res) continue;
+  const unitOpts = (unit) => ({ prefix: unit.literal, fuzzy: false, combineWith: 'AND', boost: MS_SEARCH_DEFAULTS.boost });
+  /** @param {any} unit @param {any[]} res */
+  const accumulate = (unit, res) => {
     for (let r = 0; r < res.length; r++) {
       const hit = res[r];
       const id = hit.id;
@@ -345,6 +345,34 @@ async function search(query, options) {
       }
       if (unit.origin < 31) termMask[id] = (termMask[id] || 0) | (1 << unit.origin);
     }
+  };
+  const heard = Object.create(null);   // origin -> some unit of that word found something
+  const unheard = [];                  // literal units that found nothing as typed
+  for (let u = 0; u < units.length; u++) {
+    const unit = units[u];
+    let res;
+    try { res = msIndex.search(unit.term, unitOpts(unit)); } catch { continue; }
+    if (res && res.length) { heard[unit.origin] = true; accumulate(unit, res); }
+    else if (unit.literal) unheard.push(unit);
+  }
+  /* THE TYPO FALLBACK WAITS FOR THE WHOLE FAMILY (2026-09-26). A typed word that
+     finds nothing as typed but whose forms or synonyms do is a real word this
+     corpus happens to inflect differently ("prays", where the text says pray and
+     prayed); correcting it to the nearest spelling instead could land on any
+     one-edit neighbour with more documents ("rays"). Only a word nothing of its
+     own reached is a typo, and the correction is reported so the screen can say
+     "Showing results for shepherd" rather than change the reader's words
+     silently. */
+  const corrections = [];
+  for (let u = 0; u < unheard.length; u++) {
+    const unit = unheard[u];
+    if (heard[unit.origin]) continue;
+    let fixed;
+    try { fixed = searchCorrected(unit.term, unitOpts(unit)); } catch { continue; }
+    if (!fixed.res.length) continue;
+    accumulate(unit, fixed.res);
+    const typed = kjvEncode(unit.term);
+    if (fixed.to && typed.length === 1 && typed[0] !== fixed.to) corrections.push({ from: typed[0], to: fixed.to });
   }
 
   const rankedIds = Object.keys(scoreMap);
@@ -360,7 +388,11 @@ async function search(query, options) {
     if (cc > 1) scoreMap[rankedIds[i]] *= coverageMultiplier(cc);
   }
   // Phrase-proximity boost (multi-word non-phrase queries, full-coverage docs).
-  const qTokens = (!p.phrase && filtered.length > 1) ? kjvEncode(query) : null;
+  // A corrected word counts as the word it was corrected to, so "the lord is my
+  // shephard" boosts Psalm 23:1 the way the phrase spelled right does.
+  const fixedTo = Object.create(null);
+  for (let c = 0; c < corrections.length; c++) fixedTo[corrections[c].from] = corrections[c].to;
+  const qTokens = (!p.phrase && filtered.length > 1) ? kjvEncode(query).map((t) => fixedTo[t] || t) : null;
   if (qTokens) {
     for (let i = 0; i < rankedIds.length; i++) {
       const id = rankedIds[i];
@@ -425,7 +457,7 @@ async function search(query, options) {
     out.push({ score: scoreMap[id], doc: reshapeDoc(doc), terms: matchedTerms[id] || [] });
   }
 
-  return { parsed, results: out, parsedTerms: filtered, textQuery: p, capped: Object.keys(capped), truncated: out.length >= limit && h < rankedIds.length };
+  return { parsed, results: out, parsedTerms: filtered, textQuery: p, capped: Object.keys(capped), truncated: out.length >= limit && h < rankedIds.length, corrections };
 }
 
 /**
@@ -514,6 +546,7 @@ export const VotSearchMini = {
   snippet,
   matchExcerpt,
   morePlaces,
+  findPlaces,
   highlightSpans,
   levenshtein,
   fuzzyBookSuggest,

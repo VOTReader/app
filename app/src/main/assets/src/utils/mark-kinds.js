@@ -21,25 +21,3 @@ export const MARK_KINDS = ['highlight', 'underline', 'squiggle'];
 export function isMarkKind(kind) {
   return kind === 'highlight' || kind === 'underline' || kind === 'squiggle';
 }
-
-/**
- * Distinct marks in AnnotationStore data: a mark across several blocks is one
- * (its segments share a groupId).
- * @param {Record<string, any[]> | null | undefined} all
- * @returns {number}
- */
-export function countMarkGroups(all) {
-  /** @type {Record<string, 1>} */ const seen = Object.create(null);
-  let n = 0;
-  const keys = Object.keys(all || {});
-  for (let i = 0; i < keys.length; i++) {
-    const list = (all && all[keys[i]]) || [];
-    for (let j = 0; j < list.length; j++) {
-      const a = list[j];
-      if (!a || !isMarkKind(a.kind)) continue;
-      const g = a.groupId || a.id;
-      if (!seen[g]) { seen[g] = 1; n++; }
-    }
-  }
-  return n;
-}

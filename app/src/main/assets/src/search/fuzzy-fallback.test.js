@@ -52,6 +52,11 @@ const GLOBALS = {
     romans: { id: 'romans', title: 'Romans', chapters: [
       { num: 13, sections: [{ heading: '', verses: [verse(7, 'Render therefore to all their due: taxes to whom taxes are due, customs to whom customs, fear to whom fear, honor to whom honor.'), verse(8, 'Owe no man anything except to love.')] }] },
     ] },
+    // The Lord and my shepherd, dense and short, never the phrase: it outranks
+    // Psalm 23:1 on BM25 alone, so only the phrase boost puts the psalm first.
+    micah: { id: 'micah', title: 'Micah', chapters: [
+      { num: 7, sections: [{ heading: '', verses: [verse(14, 'Shepherd, my Lord; shepherd Your people, Lord, my shepherd.')] }] },
+    ] },
     ephesians: { id: 'ephesians', title: 'Ephesians', chapters: [
       { num: 2, sections: [{ heading: '', verses: [verse(8, 'For by grace you have been saved through faith, and that not of yourselves; it is the gift of God,')] }] },
     ] },
@@ -95,6 +100,24 @@ describe('search: typo tolerance only where the word as typed finds nothing', ()
   it('a real typo still finds its word: "shephard" -> the shepherd', async () => {
     const r = await VotSearchMini.search('shephard', { synonyms: false });
     expect(refs(r)).toContain('Psalms 23:1');
+  });
+
+  /* The correction is said out loud (2026-09-26): the screen shows "Showing
+     results for shepherd", so the engine names what it searched instead. */
+  it('names the correction it made, and none for a word found as typed', async () => {
+    expect((await VotSearchMini.search('shephard', { synonyms: false })).corrections)
+      .toEqual([{ from: 'shephard', to: 'shepherd' }]);
+    expect((await VotSearchMini.search('shepherd', { synonyms: false })).corrections).toEqual([]);
+    // one word of several: only that word is named
+    expect((await VotSearchMini.search('my shephard', { synonyms: false })).corrections)
+      .toEqual([{ from: 'shephard', to: 'shepherd' }]);
+  });
+
+  it('a corrected phrase ranks like the phrase spelled right: Psalm 23:1 first', async () => {
+    const right = await VotSearchMini.search('the lord is my shepherd', { synonyms: false });
+    const typo = await VotSearchMini.search('the lord is my shephard', { synonyms: false });
+    expect(refs(right)[0]).toBe('Psalms 23:1');
+    expect(refs(typo)[0]).toBe('Psalms 23:1');
   });
 
   it('the highlight terms a result carries are the words that matched, never a near-miss', async () => {

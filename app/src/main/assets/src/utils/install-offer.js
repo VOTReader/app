@@ -18,7 +18,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export const SNOOZE_DAYS = 21;
-export const MAX_DISMISSALS = 3;
+const MAX_DISMISSALS = 3;
 
 /**
  * @param {string} ua

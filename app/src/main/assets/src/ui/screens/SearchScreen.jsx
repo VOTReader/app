@@ -2,6 +2,8 @@
    SearchScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { kjvEncode } from '../../search/tokenize.js';
+
 /**
  * SRCH4: build the snippet-highlight term list. SrchSnippet only marks the terms
  * we hand it, so when synonym search is ON we expand each LITERAL query term
@@ -85,6 +87,29 @@ export function groupInSiteOrder(results, groupKey, meta) {
 }
 
 /**
+ * The query with each corrected word put in (the engine's `corrections`: a typed
+ * word that found nothing of its own, searched as the nearest indexed word). The
+ * note under the corpus row offers it: "Showing results for the lord is my
+ * shepherd". A query word is matched the way the engine read it (kjvEncode: any
+ * case, accents and apostrophes folded), so an accented typo is rewritten too
+ * (review of 875dff9f). Pure.
+ * @param {string} query
+ * @param {Array<{from:string, to:string}>} corrections
+ * @returns {string}
+ */
+export function correctedQuery(query, corrections) {
+  const q = String(query || '').trim();
+  const to = Object.create(null);
+  for (const c of corrections || []) if (c && c.from && c.to) to[c.from] = c.to;
+  // each run of word characters, folded the engine's way; a run that folds to
+  // one corrected word is replaced whole
+  return q.replace(/[\p{L}\p{M}\p{N}'\u2019]+/gu, (w) => {
+    const toks = kjvEncode(w);
+    return toks.length === 1 && to[toks[0]] ? to[toks[0]] : w;
+  });
+}
+
+/**
  * W0 (IME blur): exiting search cost up to 3 back presses because the input
  * kept focus after the IME hid (back 1 closed the keyboard, back 2 only
  * dropped the stranded focus, back 3 finally navigated). Mirrors the
@@ -132,7 +157,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   const songsFound = songQuery.length >= 2 && typeof findSongFamilies === 'function' ? findSongFamilies(songQuery).length : 0;
   const inputRef = React.useRef(null);
   useImeHideBlur(inputRef);
-  const [state, setState] = React.useState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false });
+  const [state, setState] = React.useState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false, corrections: [] });
   const [buildInfo, setBuildInfo] = React.useState(/** @type {{ ready: boolean, building: boolean, progress: any, error?: string }} */ ({ ready: false, building: false, progress: null }));
   const [showSuggest, setShowSuggest] = React.useState(false);
   const [suggestions, setSuggestions] = React.useState([]);
@@ -204,11 +229,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
        engine exactly where it always did. Gating here as well would put the
        decision in two places and only one of them would know the query's kind. */
     const q = (query || '').trim();
-    if (!q) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false });return;}
+    if (!q) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false, corrections: [] });return;}
     // SRCH-6: a 1-char query floods the forward tokenizer with hundreds of title
     // prefix hits ("a" → every "A Warning"/"ABASEMENT"…). Require ≥2 alphanumerics
     // before the full search; the suggest box (above) still reacts at 1 char.
-    if (q.replace(/[^a-z0-9]/gi, '').length < 2) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false });return;}
+    if (q.replace(/[^a-z0-9]/gi, '').length < 2) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false, corrections: [] });return;}
     if (debounceRef.current) clearTimeout(debounceRef.current);
     // Stale-query guard: the engine yields the main thread mid-search, so a
     // slow older query can resolve AFTER a newer one and silently overwrite
@@ -241,10 +266,10 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.SYNONYM_MAP,
           settings.searchSynonyms !== false,
         );
-        setState({ phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated });
+        setState({ phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [] });
       }).catch((err) => {
         if (stale) return;
-        setState({ phase: 'done', parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0, capped: [], truncated: false });
+        setState({ phase: 'done', parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0, capped: [], truncated: false, corrections: [] });
       });
     }, 140);
     return () => {
@@ -261,7 +286,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: effect should fire only when parsed-result changes. Adding onCommand would re-fire on every parent re-render that rebuilds the callback, calling the command handler multiple times for the same parsed.command. Closure always picks up the latest onCommand at the point state.parsed actually changes.
   }, [state.parsed]);
 
-  // [8] Canonical sort — a client-side view over the fetched set (the corpus
+  // [8] Book order — a client-side view over the fetched set (the corpus
   // pills above narrow what is SEARCHED; this re-orders what is RENDERED —
   // instant, no re-query). Resets on a new query. The result-filter chips
   // that sat beside it (All / Scriptures / Volumes / WTLB / Studies) were the
@@ -293,18 +318,16 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     return out;
   }, [state.results, state.capped]);
 
-  // The canonical re-sort of scripture groups.
+  // Book order re-sorts EVERY group: verses by book, chapter and verse, a
+  // collection's letters, entries and topics by their number (Brianna,
+  // 2026-09-26: the volumes in order, and the letters in each).
   const visibleGroups = React.useMemo(() => {
     if (sortMode !== 'canonical') return grouped;
-    return grouped.map((g) => (
-      (g.key === 'bible' || g.key === 'matthew')
-        ? { key: g.key, items: srchSortCanonical(g.items, bookIndex) }
-        : g
-    ));
+    return grouped.map((g) => ({ key: g.key, items: srchSortCanonical(g.items, bookIndex) }));
   }, [grouped, sortMode, bookIndex]);
-  // Sort toggle only matters when a scripture group with ≥2 verses is visible.
+  // The toggle only matters when some group has two or more results to order.
   const sortToggleVisible = React.useMemo(
-    () => visibleGroups.some((g) => (g.key === 'bible' || g.key === 'matthew') && g.items.length > 1),
+    () => visibleGroups.some((g) => g.items.length > 1),
     [visibleGroups]
   );
 
@@ -374,7 +397,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
 
   // The query's terms ride along so the dispatcher can cut the matched excerpt
   // out of the doc and land the reader ON the passage (use-search.js).
-  const handleSelect = (entry) => { recordSearch(); onSelect(entry, state.terms); };
+  const handleSelect = (entry) => { recordSearch(); onSelect(entry, state.terms, (query || '').trim()); };
 
   const clearQuery = () => {onQueryChange('');setShowSuggest(false);setSuggestDismissed(true);};
 
@@ -574,6 +597,20 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </button>
         ) : null}
 
+        {/* A typo the engine corrected is said out loud, never done silently:
+            "No results for “shephard”. Showing results for shepherd." The
+            corrected query is a tap that puts it in the box. */}
+        {query && state.phase === 'done' && state.results.length > 0 && state.corrections.length > 0 && (
+          <div className="srch-corrected">
+            No results for {state.corrections.map((c, i) => (
+              <React.Fragment key={c.from}>{i > 0 ? ', ' : ''}“{c.from}”</React.Fragment>
+            ))}. Showing results for{' '}
+            <button type="button" className="srch-corrected-link" onClick={() => onQueryChange(correctedQuery(query, state.corrections))}>
+              {correctedQuery(query, state.corrections)}
+            </button>.
+          </div>
+        )}
+
         {query && buildInfo.ready && state.phase === 'done' && state.results.length > 0 && (
           <div className="srch-results-summary">
             {/* W0 (micro-gap a): at the engine cap the count is a floor — "400+", not "400". */}
@@ -587,7 +624,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           <div className="srch-filter-row">
             <button
               className="srch-sort-btn"
-              aria-label={sortMode === 'relevance' ? 'Sort verses in book order' : 'Sort verses by relevance'}
+              aria-label={sortMode === 'relevance' ? 'Sort results in book order' : 'Sort results by relevance'}
               onClick={() => setSortMode(sortMode === 'relevance' ? 'canonical' : 'relevance')}
             >{sortMode === 'relevance' ? 'Book order' : 'Relevance'}</button>
           </div>
@@ -614,7 +651,9 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           <div className="srch-groups">
             {visibleGroups.map((g) => (
               <SrchGroup
-                key={g.key + '|' + query + '|' + sortMode}
+                /* Not keyed by the sort: toggling Book order must not close
+                   the group the reader opened (cards carry stable keys). */
+                key={g.key + '|' + query}
                 gkey={g.key}
                 items={g.items}
                 capped={cappedGroups.has(g.key)}

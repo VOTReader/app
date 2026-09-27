@@ -500,21 +500,6 @@ export function findWebReference(g, input) {
   };
 }
 
-/**
- * Centre a chapter in the viewport at a given zoom — used by "go to".
- * @param {import('./decode.js').ScriptureGraph} g
- * @param {{x:number, ppv:number, total:number}} cam
- * @param {number} width
- * @param {number} chapterIndex
- * @param {number} [ppv]
- */
-export function focusChapter(g, cam, width, chapterIndex, ppv) {
-  const [lo, hi] = chapterRange(g, chapterIndex);
-  cam.x = (lo + hi) / 2;
-  if (ppv) cam.ppv = ppv;
-  return cam;
-}
-
 /** Screen x of a verse — re-exported so callers need only this module. */
 /* ── Convergence (structure-law.md; density-law.md section 2 before it) ──
  *

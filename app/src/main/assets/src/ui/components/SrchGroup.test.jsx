@@ -61,6 +61,23 @@ describe('SrchGroup', () => {
     expect(container.querySelector('.srch-group-more')).toBeNull();
   });
 
+  it('a card keeps its own state when Book order re-sorts the group (keyed by doc, not by index)', () => {
+    // A card with state of its own: what it was first given. With index keys, the
+    // re-sort handed card 0's state (an opened places list, a centred snippet) to
+    // whichever result moved into slot 0.
+    function StatefulCard({ entry }) {
+      const [first] = React.useState(entry.doc.title);
+      return <div className="stub-card">{entry.doc.title + '=' + first}</div>;
+    }
+    /** @type {any} */ (globalThis).SrchCard = StatefulCard;
+    const a = { doc: { kind: 'letter', ref: 'Volume Seven · Letter 55', title: 'Vengeance Is Mine', text: 'x' } };
+    const b = { doc: { kind: 'letter', ref: 'Volume Seven · Letter 9', title: 'Recompense', text: 'y' } };
+    const { container, rerender } = render(<SrchGroup gkey="v7" items={[a, b]} terms={[]} onSelect={() => {}} defaultOpen={true} />);
+    rerender(<SrchGroup gkey="v7" items={[b, a]} terms={[]} onSelect={() => {}} defaultOpen={true} />);
+    expect([...container.querySelectorAll('.stub-card')].map((c) => c.textContent))
+      .toEqual(['Recompense=Recompense', 'Vengeance Is Mine=Vengeance Is Mine']);
+  });
+
   it('an open group closes again', () => {
     const { container, getByRole } = render(<SrchGroup gkey="v7" items={items} terms={[]} onSelect={() => {}} defaultOpen={true} />);
     expect(container.querySelectorAll('.stub-card')).toHaveLength(2);

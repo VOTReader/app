@@ -14,7 +14,6 @@ import {
   featuredOf,
   normalizeSongCatalog,
   seededShuffle,
-  shuffledFeatured,
   songAlbumLabel,
   songAssetUrl,
   songById,
@@ -190,15 +189,15 @@ describe('order — the seeded shuffle and songQueue', () => {
 
   it('shuffle plays ONE version per family — the featured one, unless a filter needs another', () => {
     adoptSongCatalog(SONG_FIXTURE);
-    const all = shuffledFeatured({}, 7).map((s) => s.id).sort();
+    const all = songQueue({ filter: {}, one: true, shuffle: true, seed: 7 }).map((s) => s.id).sort();
     expect(all).toEqual(['aaaaaaaaaaa1', 'bbbbbbbbbbb1', 'ccccccccccc2']);
     // Worship: fam-c's featured version is rock, so its worship take stands in.
-    expect(shuffledFeatured({ style: 'worship' }, 7).map((s) => s.id).sort()).toEqual(['bbbbbbbbbbb1', 'ccccccccccc1']);
+    expect(songQueue({ filter: { style: 'worship' }, one: true, shuffle: true, seed: 7 }).map((s) => s.id).sort()).toEqual(['bbbbbbbbbbb1', 'ccccccccccc1']);
   });
 
   it('a 900-family shuffle holds 900 different songs', () => {
     adoptSongCatalog(bigSongCatalog(900));
-    const order = shuffledFeatured({}, 99);
+    const order = songQueue({ filter: {}, one: true, shuffle: true, seed: 99 });
     expect(order).toHaveLength(900);
     expect(new Set(order.map((s) => s.f)).size).toBe(900);
   });

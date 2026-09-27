@@ -230,7 +230,15 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   const [choosingLink, setChoosingLink] = React.useState(false);
   const shareHoldRef = React.useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
   const shareHeldRef = React.useRef(false);
-  React.useEffect(() => { setConfirmingRemove(false); setChoosingLink(false); }, [selInfo]);
+  // A new selection drops a pending Share hold too, so its row never opens over the next passage (cl1 review).
+  React.useEffect(() => {
+    setConfirmingRemove(false); setChoosingLink(false);
+    if (shareHoldRef.current) { clearTimeout(shareHoldRef.current); shareHoldRef.current = null; }
+    shareHeldRef.current = false;
+  }, [selInfo]);
+  // The row closing forgets the hold: Android may send no click after a long-press, and a later
+  // keyboard or TalkBack Share (a click with no pointerdown) must not be swallowed (cl1 review).
+  React.useEffect(() => { if (!choosingLink) shareHeldRef.current = false; }, [choosingLink]);
 
   // W1.5(a.2) — register with the central modal registry while the toolbar
   // is visible so Escape dismisses the selection (via __hideSelectionToolbar's
@@ -637,6 +645,13 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       shownRangeRef.current = range.cloneRange();
       setAdjusting(false);
       setVisible(true);
+      // hint1 (lw1): the reader has long-pressed, so the first-run "Hold your
+      // finger on any line" pill (AnnotationHint) has done its job: the same
+      // durable flag its ✕ sets. Once, and never a reason to keep the bar down.
+      try {
+        const hintFlag = typeof AnnHintDismissedFlagStore !== 'undefined' ? AnnHintDismissedFlagStore : null;
+        if (hintFlag && !hintFlag.is()) hintFlag.set();
+      } catch (_e) { /* the pill's problem, not the toolbar's */ }
     };
 
     // cp1 sweep: raise the toolbar once the page is STILL. A finger scroll

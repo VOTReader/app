@@ -75,7 +75,10 @@ if (hashes.length === 0) {
 // (the whole point) and no blob: (export uses a blob <a download> HREF, never a
 // blob script; verified no new Worker(blob)/blob <script>, FlexSearch not in
 // worker mode).
-const nextDirective = `script-src 'self' ${hashes.join(' ')};`;
+// The one external script: Cloudflare Web Analytics' beacon (cfa1, Corbin 2026-09-26 21:3x), loaded by src, so
+// no hash; its host is named here so every re-hash keeps it.
+const SCRIPT_HOSTS = ['https://static.cloudflareinsights.com'];
+const nextDirective = `script-src 'self' ${SCRIPT_HOSTS.join(' ')} ${hashes.join(' ')};`;
 
 // Scope the rewrite to INSIDE the CSP `content="..."` attribute so the word
 // "script-src" in the explanatory <!-- comment --> above the meta tag is never

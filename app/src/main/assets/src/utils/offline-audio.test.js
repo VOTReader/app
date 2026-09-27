@@ -194,6 +194,35 @@ describe('offline-audio — in the phone app', () => {
     expect(OfflineAudio.news().text).toBe('Download finished');
   });
 
+  it('knows what is on its way and what failed, to retry from anywhere (n2-05)', () => {
+    const b = fakeBridge();
+    OfflineAudio.download([{ url: U1, key: 'k1', title: 't1' }, { url: U2, key: 'k2', title: 't2' }]);
+    expect(OfflineAudio.pending()).toEqual({ busy: 2, failed: [] });
+    send({ type: 'progress', url: U1, bytes: 1, total: 10 });
+    expect(OfflineAudio.pending().busy).toBe(2);
+    send({ type: 'failed', url: U1, reason: 'network' });
+    expect(OfflineAudio.pending()).toEqual({ busy: 1, failed: [{ url: U1, key: 'k1', title: 't1' }] });
+    expect(b.offlineAudioSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks a download whose release was uploaded again, and updates it in place (n2-01)', () => {
+    const b = fakeBridge([{ url: U1, key: 'k1', title: 't1', bytes: 20, savedAt: 1 }]);
+    b.offlineAudioCheck = vi.fn();
+    OfflineAudio.refresh();
+    expect(OfflineAudio.items()[0].stale).toBe(false);
+    OfflineAudio.checkForUpdates();
+    expect(b.offlineAudioCheck).toHaveBeenCalledTimes(1);
+    native.items[0].stale = true;
+    send({ type: 'checked' });
+    expect(OfflineAudio.items()[0].stale).toBe(true);
+    expect(OfflineAudio.update([{ url: U2, key: 'k2', title: 't2' }])).toBe(false);   // not on the phone: no update
+    expect(OfflineAudio.update([OfflineAudio.items()[0]])).toBe(true);
+    expect(JSON.parse(b.offlineAudioSave.mock.calls[0][0])).toEqual([{ url: U1, key: 'k1', title: 't1', update: true }]);
+    send({ type: 'queued', urls: [U1] });
+    expect(OfflineAudio.isUpdating(U1)).toBe(true);
+    expect(OfflineAudio.statusOf(U1)).toBe('saved');   // it plays from the old file meanwhile
+  });
+
   it('a cancelled download is simply not there any more', () => {
     fakeBridge();
     send({ type: 'queued', url: U1 });

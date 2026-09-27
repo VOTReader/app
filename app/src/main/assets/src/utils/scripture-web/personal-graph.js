@@ -230,37 +230,3 @@ export function buildCuratedUnderlay(votEdges, ctx) {
   for (let i = 0; i < n; i++) { versePos[i] = rows[i][0]; votPos[i] = rows[i][1]; source[i] = myWebSourceIndex(rows[i][2].kind); }
   return { count: n, versePos, votPos, source, records: rows.map((row) => row[2]) };
 }
-
-/**
- * Normalize a journal-index refKey into a LinkStore-shaped endpoint.
- * The journal index uses its OWN grammar ("chapter:genesis:3",
- * "letter:<volKey>/<letterId>"), distinct from the hlKey grammar links use,
- * so it must be translated before it can share a rail.
- *
- * @param {string} refKey
- * @returns {object|null} a LinkEndpoint-shaped object
- */
-export function refKeyToRailEndpoint(refKey) {
-  const s = String(refKey || '');
-  const cut = s.indexOf(':');
-  if (cut < 0) return null;
-  const kind = s.slice(0, cut);
-  const rest = s.slice(cut + 1);
-  if (kind === 'verse' || kind === 'chapter') {
-    const parts = rest.split(':');
-    const bookId = parts[0];
-    const chapter = parseInt(parts[1], 10);
-    const verse = parts[2] != null ? parseInt(parts[2], 10) : undefined;
-    if (!bookId || !(chapter > 0)) return null;
-    return { type: 'bible', key: 'bible:' + rest, bookId, chapter, verse, label: rest };
-  }
-  if (kind === 'letter') {
-    const slash = rest.indexOf('/');
-    if (slash < 0) return { type: 'letter', key: 'letter:' + rest, letterId: rest, label: rest };
-    return {
-      type: 'letter', key: 'letter:' + rest.slice(slash + 1),
-      volKey: rest.slice(0, slash), letterId: rest.slice(slash + 1), label: rest,
-    };
-  }
-  return null;
-}
