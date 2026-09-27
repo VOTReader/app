@@ -10,6 +10,15 @@ import { expandArchaicTerms, ARCHAIC_NORMALIZE } from './tokenize.js';
 import { wordForms } from './word-forms.js';
 import { searchData } from './search-data.js';
 
+/* A short word (two letters or fewer) or a stop word matches only itself, as the
+   engine now searches it (search audit 2026-09-27): "ye" marked "Yet", "me" marked
+   "men", "the" marked "these" and "them", and each counted as a place. */
+/** @param {string} t  lowercase */
+function wholeOnly(t) {
+  const stop = searchData().STOP_WORDS_TRIMMED;
+  return t.length <= 2 || !!(stop && stop.has(t));
+}
+
 /* Whole words only (2026-09-22). The engine tokenises on word boundaries, so a term
    found INSIDE another word ("one" in "everyone", "love" in "Beloved") is never what
    it matched on. A hit starts where a word starts and is marked to the word's end
@@ -117,7 +126,7 @@ function occurrences(text, terms) {
     let n = 0;
     while (idx >= 0 && n < 400) {
       // longer terms come later, so the last write at a position is the longest
-      if (startsWord(lower, idx)) { at.set(idx, { idx, len: t.length, term: f.fam, primary: f.primary }); n++; }
+      if (startsWord(lower, idx) && !(wholeOnly(t) && WORD_CHAR.test(lower[idx + t.length] || ''))) { at.set(idx, { idx, len: t.length, term: f.fam, primary: f.primary }); n++; }
       idx = lower.indexOf(t, idx + t.length);
     }
   }
@@ -410,11 +419,17 @@ export function highlightSpans(text, terms) {
     if (t && t.length >= 2) tokens.push(t);
   }
   if (!tokens.length) return [{ text, hit: false }];
-  const esc = tokens.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  esc.sort((a, b) => b.length - a.length); // longer first
+  const escape = (/** @type {string} */ t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const longerFirst = (/** @type {string} */ a, /** @type {string} */ b) => b.length - a.length;
+  // a hit starts a word and runs to its end: "love" marks "loves" whole, never "Be-love-d";
+  // a short word or a stop word marks only itself ("ye", never "Yet")
+  const reach = tokens.filter((t) => !wholeOnly(t)).map(escape).sort(longerFirst);
+  const whole = tokens.filter(wholeOnly).map(escape).sort(longerFirst);
+  const alts = [];
+  if (reach.length) alts.push('(?:' + reach.join('|') + ')[\\p{L}\\p{N}]*');
+  if (whole.length) alts.push('(?:' + whole.join('|') + ')(?![\\p{L}\\p{N}])');
   let re;
-  // a hit starts a word and runs to its end: "love" marks "loves" whole, never "Be-love-d"
-  try { re = new RegExp('(?<![\\p{L}\\p{N}])(?:' + esc.join('|') + ')[\\p{L}\\p{N}]*', 'giu'); } catch { return [{ text, hit: false }]; }
+  try { re = new RegExp('(?<![\\p{L}\\p{N}])(?:' + alts.join('|') + ')', 'giu'); } catch { return [{ text, hit: false }]; }
   const out = [];
   let last = 0;
   let m;

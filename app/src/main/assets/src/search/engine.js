@@ -75,6 +75,42 @@ function hasTokenRun(toks, run) {
   return false;
 }
 
+/* SHORT WORDS, APOSTROPHES (search audit 2026-09-27). A literal word was also
+   searched as a prefix, so every one- and two-letter word ("a", "i", the "s" an
+   apostrophe leaves of "Lord's") and every stop word ("the" reaching these, them,
+   their) matched thousands of words, and the longest texts, holding all of them,
+   won: "a virgin shall conceive" ranked Isaiah 7:14 45th ("virgin shall conceive":
+   1st), "The Lord's Table" #8, "lord's supper" put four topics highlighting
+   "skillful" and "smoke" above 1 Cor 11:20. Only a word of three letters or more
+   that is not a stop word reaches forward now; the rest match whole words. */
+/** @param {string} term */
+function prefixable(term) {
+  const stop = searchData().STOP_WORDS_TRIMMED;
+  return term.length >= 3 && !(stop && stop.has(term));
+}
+/** A typed term whose words are all stop words ("the", "me." with its period). */
+function isStopTerm(term) {
+  const toks = kjvEncode(term);
+  const STOP = searchData().STOP_WORDS_TRIMMED;
+  return !!STOP && toks.length > 0 && toks.every((t) => STOP.has(t));
+}
+/** "Lord's" searches Lord: a possessive's "s" is not a word the reader meant. */
+function withoutPossessive(term) {
+  const toks = kjvEncode(term);
+  return toks.length >= 2 && toks[toks.length - 1] === 's' ? toks.slice(0, -1).join(' ') : term;
+}
+/* A negative contraction is its two words, as the text mostly spells them: "don't
+   look back" found its letter at #119, "do not look back" at #1. */
+const NT_BASE = { wo: 'will', sha: 'shall', ai: 'am' };   // the base the pattern leaves: wo|n't, sha|n't
+/** @param {string} q */
+export function expandContractions(q) {
+  return String(q).replace(/\b([a-z]+)n['\u2019]t\b/gi, (m, base) => {
+    const b = base.toLowerCase();
+    if (b === 'ca') return 'cannot';
+    return (NT_BASE[b] || base) + ' not';
+  });
+}
+
 /**
  * The typo fallback for one literal unit that found nothing as typed.
  *
@@ -241,6 +277,7 @@ async function search(query, options) {
      — the wait was moved, not removed. A case asserts a text query still builds,
      because "the index was not built" is otherwise satisfied by a search() that
      stopped building for everything. */
+  query = expandContractions(query);
   const parsed = parseReference(query, { corpus });
   if (!parsed) return { parsed: null, results: [] };
   // Command + structured references (bible / book / letter / named-passage) are
@@ -268,16 +305,16 @@ async function search(query, options) {
   const p = navAlso ? parseTextQuery(query) : parsed;
   if (navAlso) limit = Math.min(limit, NAV_TEXT_LIMIT);
   const D = searchData();
-  const terms = (p.phrase ? p.phrase.split(/\s+/) : p.terms.slice()).concat(p.must);
+  const terms = (p.phrase ? p.phrase.split(/\s+/) : p.terms.map(withoutPossessive)).concat(p.must);
   const useStop = options.useStopWords !== false;
 
   // All-stop-word query → no searchable content.
-  if (useStop && terms.length && terms.every((t) => D.STOP_WORDS_TRIMMED.has(t.toLowerCase()))) {
+  if (useStop && terms.length && terms.every(isStopTerm)) {
     return { parsed, results: [], parsedTerms: [], textQuery: null };
   }
   let filtered;
   if (!useStop || terms.length <= 4) filtered = terms.slice();
-  else { filtered = terms.filter((t) => !D.STOP_WORDS_TRIMMED.has(t.toLowerCase())); if (!filtered.length) filtered = terms; }
+  else { filtered = terms.filter((t) => !isStopTerm(t)); if (!filtered.length) filtered = terms; }
   if (!filtered.length && !p.phrase) return { parsed, results: [], parsedTerms: filtered, textQuery: p };
 
   // Build search units (literal + synonyms).
@@ -317,7 +354,10 @@ async function search(query, options) {
   const literalHit = Object.create(null);
   const matchedTerms = Object.create(null);
   const docLookup = Object.create(null);
-  const unitOpts = (unit) => ({ prefix: unit.literal, fuzzy: false, combineWith: 'AND', boost: MS_SEARCH_DEFAULTS.boost });
+  const unitOpts = (unit) => ({ prefix: unit.literal ? prefixable : false, fuzzy: false, combineWith: 'AND', boost: MS_SEARCH_DEFAULTS.boost });
+  // A stop word the reader typed among real words ranks, but is not a word to mark:
+  // its matches do not ride on the result for the snippet and the find bar.
+  const contentTyped = units.some((u) => u.literal && !isStopTerm(u.term));
   /** @param {any} unit @param {any[]} res */
   const accumulate = (unit, res) => {
     for (let r = 0; r < res.length; r++) {
@@ -326,7 +366,7 @@ async function search(query, options) {
       scoreMap[id] = (scoreMap[id] || 0) + hit.score;
       if (!docLookup[id]) docLookup[id] = hit;
       if (unit.literal) literalHit[id] = true;
-      if (unit.literal || unit.form) {
+      if ((unit.literal || unit.form) && !(contentTyped && isStopTerm(unit.term))) {
         // hit.terms is the DOC-side vocabulary that matched (MiniSearch derives
         // it from the match map), so for a fuzzy/prefix hit it's the corrected
         // word — query "sheperd" carries "shepherd" here. The snippet
@@ -367,6 +407,7 @@ async function search(query, options) {
   for (let u = 0; u < unheard.length; u++) {
     const unit = unheard[u];
     if (heard[unit.origin]) continue;
+    if (/\d/.test(unit.term)) continue;   // a number is not a typo: "316" is not "16"
     let fixed;
     try { fixed = searchCorrected(unit.term, unitOpts(unit)); } catch { continue; }
     if (!fixed.res.length) continue;

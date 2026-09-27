@@ -51,6 +51,15 @@ describe('expandSnippetTerms (SRCH4)', () => {
     expect(new Set(out).size).toBe(out.length); // de-duped
   });
 
+  it('drops the stop words the reader typed among real words, which are not words to mark (search audit 2026-09-27)', () => {
+    const stop = new Set(['is', 'the', 'me']);
+    expect(expandSnippetTerms({ kind: 'text', phrase: '' }, ['faith', 'is', 'the', 'substance'], MAP, true, stop)).toEqual(['faith', 'substance']);
+    // punctuation typed onto a stop word does not hide it
+    expect(expandSnippetTerms({ kind: 'text', phrase: '' }, ['question', 'me.'], MAP, true, stop)).toEqual(['question']);
+    // only stop words: they are all there is to mark
+    expect(expandSnippetTerms({ kind: 'text', phrase: '' }, ['is', 'the'], MAP, true, stop)).toEqual(['is', 'the']);
+  });
+
   it('never synonym-expands the phrase (the engine exempts phrases)', () => {
     // 'shepherd' is the PHRASE, parsedTerms is empty → no synonym pulled in.
     expect(expandSnippetTerms({ kind: 'text', phrase: 'shepherd' }, [], MAP, true))

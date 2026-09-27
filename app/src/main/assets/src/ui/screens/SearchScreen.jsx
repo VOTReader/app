@@ -16,11 +16,17 @@ import { kjvEncode } from '../../search/tokenize.js';
  * @param {string[]} parsedTerms
  * @param {Record<string,string[]>|null|undefined} synMap
  * @param {boolean} synonymsOn
+ * @param {Set<string>|null} [stop]  the stop words: dropped when real words were typed too
  * @returns {string[]}
  */
-export function expandSnippetTerms(parsed, parsedTerms, synMap, synonymsOn) {
+export function expandSnippetTerms(parsed, parsedTerms, synMap, synonymsOn, stop) {
   if (!parsed || parsed.kind !== 'text') return [];
-  const base = [parsed.phrase].filter(Boolean).concat(parsedTerms || []);
+  // A stop word typed among real words ("faith is the substance") ranks, but is not
+  // a word to mark or count as a place (search audit 2026-09-27: the find pill read
+  // "1 of 22" on a lone "is").
+  const isStop = (/** @type {string} */ t) => { const toks = kjvEncode(t); return !!stop && toks.length > 0 && toks.every((w) => stop.has(w)); };
+  const typed = (parsedTerms || []).some((t) => !isStop(t)) ? (parsedTerms || []).filter((t) => !isStop(t)) : (parsedTerms || []);
+  const base = [parsed.phrase].filter(Boolean).concat(typed);
   if (!synonymsOn || !synMap) return base;
   const out = new Set(base);
   for (const t of (parsedTerms || [])) {
@@ -265,6 +271,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           r.textQuery || r.parsed, r.parsedTerms || [],
           /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.SYNONYM_MAP,
           settings.searchSynonyms !== false,
+          /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.STOP_WORDS_TRIMMED,
         );
         setState({ phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [] });
       }).catch((err) => {
