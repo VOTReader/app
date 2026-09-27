@@ -455,3 +455,17 @@ describe('JournalEditorScreen — P1-5: milestone/stats wait for the first non-e
     localStorage.removeItem(JRN_STATS_MARKER_KEY);
   });
 });
+
+/* a11y (axe page-has-heading-one, 2026-09-27): the editor was the one screen
+   in the audit walk with no level-one heading, so a screen reader's heading
+   list was empty on it. The heading is visually hidden: nothing on screen moves. */
+describe('JournalEditorScreen — the screen has a heading', () => {
+  it('carries one visually hidden level-one heading', () => {
+    const entry = JournalStore.add({ title: 'orig', blocks: [JournalHelpers.newBlock('p', { text: 'first' })] });
+    const { container } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    const h1s = container.querySelectorAll('h1');
+    expect(h1s.length).toBe(1);
+    expect(h1s[0].textContent).toBe('Journal entry');
+    expect(h1s[0].classList.contains('sr-only')).toBe(true);
+  });
+});
