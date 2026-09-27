@@ -79,7 +79,10 @@ export function _bookmarkSourceEndpoint(hlKey) {
   }
   if (kind === 'study') {
     var m = (parts[1] || '').match(/^(.+)-(\d+)$/);
-    if (m) return { type: 'study', key: hlKey, bookId: m[1], chapter: parseInt(m[2], 10), verse: parseInt(parts[2] || '0', 10) };
+    // A chapter panel's key ("panel-s0") has no verse: it opens the chapter
+    // (verse null), never verse NaN — same call as buildSourceEndpoint (n6-11).
+    var vn = parseInt(parts[2] || '0', 10);
+    if (m) return { type: 'study', key: hlKey, bookId: m[1], chapter: parseInt(m[2], 10), verse: vn > 0 ? vn : null };
   }
   if (kind === 'letter' || kind === 'wtlb' || kind === 'blessed' || kind === 'holy-days') {
     var ctx = (typeof findEntryContext === 'function') ? findEntryContext(parts[1], kind) : null;

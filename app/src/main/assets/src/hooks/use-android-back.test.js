@@ -527,3 +527,468 @@ describe('useAndroidBack — Answers Only God Can Give', () => {
     expect(props.setScreen).toHaveBeenCalledWith('answers-subject');
   });
 });
+
+describe('useAndroidBack — the dismiss-first gates', () => {
+  it('an open sheet (window.__closeSheet) is closed, its slot cleared, and nothing navigates', () => {
+    const close = vi.fn();
+    window.__closeSheet = close;
+    const props = baseProps({ screen: 'settings' });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(window.__closeSheet).toBeNull();
+    expect(props.goNavOrigin).not.toHaveBeenCalled();
+    expect(props.cancelDwell).not.toHaveBeenCalled();
+  });
+
+  it('screen routing cancels any dwell timer first', () => {
+    const props = baseProps({ screen: 'settings' });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.cancelDwell).toHaveBeenCalledTimes(1);
+  });
+
+  it('the tap-through pop restores every captured source field', () => {
+    const props = baseProps({
+      screen: 'vot-letter',
+      fromLetterRef: { current: [
+        { sourceScreen: 'old', sourceLetterId: 'nope' },
+        { sourceScreen: 'bible-study-chapter', sourceBookId: 'b', sourceChapterNum: 3, sourceLetterId: null, sourceStudyId: 'st', sourceStudyChapterId: 'sc' },
+      ] },
+    });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    // pops only the TOP entry
+    const updater = props.setFromLetterStack.mock.calls[0][0];
+    expect(updater([1, 2, 3])).toEqual([1, 2]);
+    expect(window.navHandoff.clear).toHaveBeenCalledWith('pendingHighlight');
+    expect(props.setBookId).toHaveBeenCalledWith('b');
+    expect(props.setChapterNum).toHaveBeenCalledWith(3);
+    expect(props.setLetterId).toHaveBeenCalledWith(null);
+    expect(props.setStudyId).toHaveBeenCalledWith('st');
+    expect(props.setStudyChapterId).toHaveBeenCalledWith('sc');
+    expect(props.setJournalEntryId).not.toHaveBeenCalled(); // not captured → untouched
+    expect(props.setScreen).toHaveBeenCalledWith('bible-study-chapter');
+  });
+
+  it('a letter screen with an empty tap-through stack falls to the collection route', () => {
+    const props = baseProps({ screen: 'vot-one-letter', fromLetterRef: { current: [] } });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.setFromLetterStack).not.toHaveBeenCalled();
+    expect(props.setScreen).toHaveBeenCalledWith('vot-one-index');
+  });
+});
+
+describe('useAndroidBack — hub and index screens', () => {
+  it.each(['settings', 'history', 'audio-library-studies', 'reading-plans', 'scripture-web', 'my-progress'])('%s backs through goNavOrigin', (screen) => {
+    const props = baseProps({ screen });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.goNavOrigin).toHaveBeenCalledTimes(1);
+  });
+
+  it('about marks itself seen before backing out', () => {
+    const props = baseProps({ screen: 'about' });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(/** @type {any} */ (globalThis).AboutSeenFlagStore.set).toHaveBeenCalledTimes(1);
+    expect(props.goNavOrigin).toHaveBeenCalledTimes(1);
+  });
+
+  it('Songs pops its own stack when the screen registered one', () => {
+    const songsBack = vi.fn();
+    window.__songsBack = songsBack;
+    try {
+      const props = baseProps({ screen: 'audio-library-songs' });
+      renderHook(() => useAndroidBack(props));
+      expect(window.handleAndroidBack()).toBe('true');
+      expect(songsBack).toHaveBeenCalledTimes(1);
+      expect(props.goNavOrigin).not.toHaveBeenCalled();
+    } finally { delete window.__songsBack; }
+  });
+
+  it('Songs leaves by its origin when no Songs stack is registered', () => {
+    const props = baseProps({ screen: 'audio-library-songs' });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.goNavOrigin).toHaveBeenCalledTimes(1);
+  });
+
+  it('the journal editor returns to the viewer of the entry being edited', () => {
+    const props = baseProps({ screen: 'journal-editor', journalEntryId: 'e5' });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.goJournalViewer).toHaveBeenCalledWith('e5');
+  });
+
+  it.each(['library', 'scriptures-home', 'volumes-home', 'studies-home'])('%s backs to Home', (screen) => {
+    const props = baseProps({ screen });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.goHome).toHaveBeenCalledTimes(1);
+  });
+
+  it('search backs to its own origin', () => {
+    const props = baseProps({ screen: 'search' });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.goSearchOrigin).toHaveBeenCalledTimes(1);
+  });
+
+  it('a scripture genre backs to the Scriptures hub', () => {
+    const props = baseProps({ screen: 'scripture-genre' });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.goScripturesHome).toHaveBeenCalledTimes(1);
+  });
+
+  it('a collection index screen and the garden both back to Volumes', () => {
+    /** @type {any} */ (globalThis).COL_BY_INDEX_SC = new Map([['vot-one-index', {}]]);
+    for (const screen of ['vot-one-index', 'garden-view']) {
+      const props = baseProps({ screen });
+      const h = renderHook(() => useAndroidBack(props));
+      expect(window.handleAndroidBack()).toBe('true');
+      expect(props.goVolumesHome).toHaveBeenCalledTimes(1);
+      h.unmount();
+    }
+  });
+
+  it('unmount removes the installed handler', () => {
+    const h = renderHook(() => useAndroidBack(baseProps()));
+    expect(typeof window.handleAndroidBack).toBe('function');
+    h.unmount();
+    expect(window.handleAndroidBack).toBeUndefined();
+  });
+});
+
+describe('useAndroidBack — chapter and study routes', () => {
+  afterEach(() => { delete window.BOOKS; });
+
+  it('plain matthew-ch backs to the Matthew index and clears the chapter', () => {
+    const props = baseProps({ screen: 'matthew-ch' });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.setChapterNum).toHaveBeenCalledWith(null);
+    expect(props.setScreen).toHaveBeenCalledWith('matthew-idx');
+  });
+
+  it('bible-ch entered from WTLB returns to that WTLB screen and consumes the flag', () => {
+    const props = baseProps({ screen: 'bible-ch', fromWtlb: 'wtlb-entry' });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.setFromWtlb).toHaveBeenCalledWith(null);
+    expect(props.setScreen).toHaveBeenCalledWith('wtlb-entry');
+  });
+
+  it('a single-chapter book skips its one-row index and goes to the genre', () => {
+    window.BOOKS = { jude: { chapters: [{}] } };
+    const props = baseProps({ screen: 'bible-ch', bookId: 'jude', genreId: 'epistles' });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.setScreen).toHaveBeenCalledWith('scripture-genre');
+    expect(props.setScreen).not.toHaveBeenCalledWith('bible-idx');
+  });
+
+  it('a single-chapter book with no genre goes to the Scriptures hub', () => {
+    window.BOOKS = { jude: { chapters: [{}] } };
+    const props = baseProps({ screen: 'bible-ch', bookId: 'jude' });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.goScripturesHome).toHaveBeenCalledTimes(1);
+  });
+
+  it('a multi-chapter book (corpus loaded) backs to its index', () => {
+    window.BOOKS = { genesis: { chapters: [{}, {}] } };
+    const props = baseProps({ screen: 'bible-ch', bookId: 'genesis' });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.setChapterNum).toHaveBeenCalledWith(null);
+    expect(props.setScreen).toHaveBeenCalledWith('bible-idx');
+  });
+
+  it('plain bible-idx with no genre goes to the Scriptures hub', () => {
+    const props = baseProps({ screen: 'bible-idx' });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.goScripturesHome).toHaveBeenCalledTimes(1);
+  });
+
+  it('a surprise study chapter backs to Home', () => {
+    const props = baseProps({ screen: 'bible-study-chapter', fromSurprise: true });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.setFromSurprise).toHaveBeenCalledWith(false);
+    expect(props.goHome).toHaveBeenCalledTimes(1);
+  });
+
+  it('a study chapter from search returns to search and clears the anchor', () => {
+    const props = baseProps({ screen: 'bible-study-chapter', fromSearch: true });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.setFromSearch).toHaveBeenCalledWith(false);
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null);
+    expect(props.setScreen).toHaveBeenCalledWith('search');
+  });
+
+  it('a chapter of a multi-chapter study backs to the study index', () => {
+    const getStudyById = vi.fn(() => ({ chapters: [{}, {}] }));
+    const props = baseProps({ screen: 'bible-study-chapter', studyId: 'st1', getStudyById });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(getStudyById).toHaveBeenCalledWith('st1');
+    expect(props.setStudyChapterId).toHaveBeenCalledWith(null);
+    expect(props.setScreen).toHaveBeenCalledWith('bible-study-index');
+  });
+
+  it('a one-chapter (or unknown) study backs straight to the Studies home', () => {
+    for (const study of [{ chapters: [{}] }, null]) {
+      const props = baseProps({ screen: 'bible-study-chapter', studyId: 'st1', getStudyById: () => study });
+      const h = renderHook(() => useAndroidBack(props));
+      window.handleAndroidBack();
+      expect(props.goStudiesHome).toHaveBeenCalledTimes(1);
+      expect(props.setScreen).not.toHaveBeenCalledWith('bible-study-index');
+      h.unmount();
+    }
+  });
+});
+
+describe('useAndroidBack — letter screens via the COLLECTIONS registry', () => {
+  it('a letter opened from a Matthew chapter returns there', () => {
+    const props = baseProps({ screen: 'vot-one-letter', fromMatthewCh: 5 });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.setFromMatthewCh).toHaveBeenCalledWith(null);
+    expect(props.setScreen).toHaveBeenCalledWith('matthew-ch');
+  });
+
+  it('a letter opened from search returns to search and clears the anchor', () => {
+    const props = baseProps({ screen: 'vot-one-letter', fromSearch: true });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.setFromSearch).toHaveBeenCalledWith(false);
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null);
+    expect(props.setScreen).toHaveBeenCalledWith('search');
+  });
+
+  it('a letter opened from a study returns to the study chapter', () => {
+    const props = baseProps({ screen: 'vot-one-letter', fromStudies: true });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.setFromStudies).toHaveBeenCalledWith(false);
+    expect(props.setScreen).toHaveBeenCalledWith('bible-study-chapter');
+  });
+
+  it('a collection with no index screen backs to Home', () => {
+    /** @type {any} */ (globalThis).COL_BY_LETTER_SC = new Map([['solo-letter', { volKey: 'solo' }]]);
+    const props = baseProps({ screen: 'solo-letter' });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.goHome).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useAndroidBack — W1.5(c) Escape key (web only)', () => {
+  let suppress, clear;
+  beforeEach(() => {
+    PlatformBridge.isAndroid = false;
+    suppress = vi.fn(); clear = vi.fn();
+    /** @type {any} */ (globalThis).__origSuppress = /** @type {any} */ (globalThis).suppressNextHistoryPush;
+    /** @type {any} */ (globalThis).__origClear = /** @type {any} */ (globalThis).clearSuppressNextHistoryPush;
+    /** @type {any} */ (globalThis).suppressNextHistoryPush = suppress;
+    /** @type {any} */ (globalThis).clearSuppressNextHistoryPush = clear;
+  });
+  afterEach(() => {
+    /** @type {any} */ (globalThis).suppressNextHistoryPush = /** @type {any} */ (globalThis).__origSuppress;
+    /** @type {any} */ (globalThis).clearSuppressNextHistoryPush = /** @type {any} */ (globalThis).__origClear;
+    delete /** @type {any} */ (globalThis).__origSuppress; delete /** @type {any} */ (globalThis).__origClear;
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    document.body.innerHTML = '';
+  });
+
+  function press(init) {
+    const e = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true, ...init });
+    document.dispatchEvent(e);
+    return e;
+  }
+
+  it('routes Escape to the back handler with the suppress handshake and consumes it', () => {
+    const props = baseProps({ screen: 'settings' });
+    renderHook(() => useAndroidBack(props));
+    const e = press();
+    expect(suppress).toHaveBeenCalledTimes(1);
+    expect(props.goNavOrigin).toHaveBeenCalledTimes(1);
+    expect(e.defaultPrevented).toBe(true);
+  });
+
+  it('Escape at the root clears the suppress flag and leaves the key alone', () => {
+    const props = baseProps({ screen: 'home' });
+    renderHook(() => useAndroidBack(props));
+    const e = press();
+    expect(suppress).toHaveBeenCalledTimes(1);
+    expect(clear).toHaveBeenCalled();
+    expect(e.defaultPrevented).toBe(false);
+  });
+
+  it('Escape with no back handler installed is a root no-op', () => {
+    const props = baseProps({ screen: 'settings' });
+    renderHook(() => useAndroidBack(props));
+    delete window.handleAndroidBack;
+    const e = press();
+    expect(clear).toHaveBeenCalled();
+    expect(e.defaultPrevented).toBe(false);
+  });
+
+  it('other keys and IME composition are ignored', () => {
+    const props = baseProps({ screen: 'settings' });
+    renderHook(() => useAndroidBack(props));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    press({ isComposing: true });
+    expect(suppress).not.toHaveBeenCalled();
+    expect(props.goNavOrigin).not.toHaveBeenCalled();
+  });
+
+  it('fullscreen lets the browser exit natively (no dismiss, no nav, no preventDefault)', () => {
+    const dismiss = vi.fn();
+    modalRegistry.register({ id: 'sheet', dismiss });
+    const props = baseProps({ screen: 'settings' });
+    renderHook(() => useAndroidBack(props));
+    Object.defineProperty(document, 'fullscreenElement', { value: document.body, configurable: true });
+    try {
+      const e = press();
+      expect(e.defaultPrevented).toBe(false);
+      expect(dismiss).not.toHaveBeenCalled();
+      expect(props.goNavOrigin).not.toHaveBeenCalled();
+    } finally { delete /** @type {any} */ (document).fullscreenElement; }
+  });
+
+  it('an open modal is dismissed alone — never dismiss-AND-navigate', () => {
+    const dismiss = vi.fn();
+    modalRegistry.register({ id: 'sheet', dismiss });
+    const props = baseProps({ screen: 'settings' });
+    renderHook(() => useAndroidBack(props));
+    const e = press();
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    expect(e.defaultPrevented).toBe(true);
+    expect(suppress).not.toHaveBeenCalled();
+    expect(props.goNavOrigin).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['an input', () => document.createElement('input')],
+    ['a textarea', () => document.createElement('textarea')],
+    ['a contenteditable', () => { const d = document.createElement('div'); d.contentEditable = 'true'; d.tabIndex = 0; Object.defineProperty(d, 'isContentEditable', { value: true }); return d; }],
+  ])('a focused %s keeps Escape for itself (blur, not navigate)', (_label, make) => {
+    const el = make();
+    document.body.appendChild(el);
+    el.focus();
+    expect(document.activeElement).toBe(el);
+    const props = baseProps({ screen: 'settings' });
+    renderHook(() => useAndroidBack(props));
+    press();
+    expect(suppress).not.toHaveBeenCalled();
+    expect(props.goNavOrigin).not.toHaveBeenCalled();
+  });
+
+  it('is not installed on Android, and is removed on unmount', () => {
+    PlatformBridge.isAndroid = true;
+    try {
+      const props = baseProps({ screen: 'settings' });
+      const h = renderHook(() => useAndroidBack(props));
+      press();
+      expect(props.goNavOrigin).not.toHaveBeenCalled();
+      h.unmount();
+    } finally { PlatformBridge.isAndroid = false; }
+    const props2 = baseProps({ screen: 'settings' });
+    const h2 = renderHook(() => useAndroidBack(props2));
+    h2.unmount();
+    press();
+    expect(props2.goNavOrigin).not.toHaveBeenCalled();
+  });
+});
+
+describe('useAndroidBack — W1.5(d) popstate + root double-tap exit (web only)', () => {
+  let suppress, clear, pushSpy;
+  beforeEach(async () => {
+    PlatformBridge.isAndroid = false;
+    const toast = await import('../utils/root-exit-toast.js');
+    toast._reset();
+    suppress = vi.fn(); clear = vi.fn();
+    /** @type {any} */ (globalThis).__origSuppress = /** @type {any} */ (globalThis).suppressNextHistoryPush;
+    /** @type {any} */ (globalThis).__origClear = /** @type {any} */ (globalThis).clearSuppressNextHistoryPush;
+    /** @type {any} */ (globalThis).suppressNextHistoryPush = suppress;
+    /** @type {any} */ (globalThis).clearSuppressNextHistoryPush = clear;
+    pushSpy = vi.spyOn(history, 'pushState');
+    window.__historyReady = true;
+  });
+  afterEach(async () => {
+    (await import('../utils/root-exit-toast.js'))._reset();
+    /** @type {any} */ (globalThis).suppressNextHistoryPush = /** @type {any} */ (globalThis).__origSuppress;
+    /** @type {any} */ (globalThis).clearSuppressNextHistoryPush = /** @type {any} */ (globalThis).__origClear;
+    delete /** @type {any} */ (globalThis).__origSuppress; delete /** @type {any} */ (globalThis).__origClear;
+    delete window.__historyReady;
+  });
+
+  const pop = () => window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+
+  it('ignores a load-time popstate before history sync is ready (Firefox)', () => {
+    delete window.__historyReady;
+    const props = baseProps({ screen: 'settings' });
+    renderHook(() => useAndroidBack(props));
+    pop();
+    expect(suppress).not.toHaveBeenCalled();
+    expect(props.goNavOrigin).not.toHaveBeenCalled();
+  });
+
+  it('a navigating back arms suppress and pushes nothing', () => {
+    const props = baseProps({ screen: 'settings' });
+    renderHook(() => useAndroidBack(props));
+    pop();
+    expect(suppress).toHaveBeenCalledTimes(1);
+    expect(props.goNavOrigin).toHaveBeenCalledTimes(1);
+    expect(clear).not.toHaveBeenCalled();
+    expect(pushSpy).not.toHaveBeenCalled();
+  });
+
+  it('first back at root pushes a replacement entry and arms the exit toast; the second lets the exit happen', async () => {
+    const { isArmed } = await import('../utils/root-exit-toast.js');
+    const props = baseProps({ screen: 'home' });
+    renderHook(() => useAndroidBack(props));
+    pop();
+    expect(clear).toHaveBeenCalledTimes(1);
+    expect(pushSpy).toHaveBeenCalledTimes(1);
+    expect(isArmed()).toBe(true);
+    pop();
+    expect(pushSpy).toHaveBeenCalledTimes(1); // no second replacement
+    expect(isArmed()).toBe(false);
+  });
+
+  it('a blocked pushState at root still arms the toast', async () => {
+    const { isArmed } = await import('../utils/root-exit-toast.js');
+    pushSpy.mockImplementation(() => { throw new Error('sandboxed'); });
+    const props = baseProps({ screen: 'home' });
+    renderHook(() => useAndroidBack(props));
+    expect(() => pop()).not.toThrow();
+    expect(isArmed()).toBe(true);
+  });
+
+  it('with no back handler installed the press is treated as root', async () => {
+    const { isArmed } = await import('../utils/root-exit-toast.js');
+    const props = baseProps({ screen: 'settings' });
+    renderHook(() => useAndroidBack(props));
+    delete window.handleAndroidBack;
+    pop();
+    expect(clear).toHaveBeenCalledTimes(1);
+    expect(isArmed()).toBe(true);
+  });
+
+  it('is not installed on Android', () => {
+    PlatformBridge.isAndroid = true;
+    try {
+      const props = baseProps({ screen: 'settings' });
+      renderHook(() => useAndroidBack(props));
+      pop();
+      expect(suppress).not.toHaveBeenCalled();
+    } finally { PlatformBridge.isAndroid = false; }
+  });
+});

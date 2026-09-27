@@ -85,10 +85,19 @@ export function AnnotationHint() {
   // → the old session-only window flag keeps those hosts working.
   const _flag = typeof AnnHintDismissedFlagStore !== 'undefined'
     ? AnnHintDismissedFlagStore : null;
-  const [dismissed, setDismissed] = React.useState(
+  const [dismissedHere, setDismissed] = React.useState(
     () => (_flag ? _flag.is()
       : (typeof window !== 'undefined' && !!window.__annHintDismissed))
   );
+  // hint1 (lw1): the reader's first long-press sets the same flag
+  // (SelectionToolbar, when its bar comes up), so the pill goes for good
+  // once the gesture is learned, even with no mark saved yet.
+  const _flagSubs = !!(_flag && typeof _flag.subscribe === 'function' && typeof _flag.getVersion === 'function');
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (_flagSubs ? _flag.subscribe(cb) : () => {}), [_flag, _flagSubs]),
+    () => (_flagSubs ? _flag.getVersion() : 0)
+  );
+  const dismissed = dismissedHere || !!(_flag && _flag.is());
   React.useEffect(() => {
     const t = setTimeout(() => setDelayDone(true), 2500);
     return () => clearTimeout(t);

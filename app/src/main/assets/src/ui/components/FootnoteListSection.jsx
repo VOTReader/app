@@ -21,20 +21,27 @@ export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef })
     <div className="footnote-list">
       <div className="footnote-list-header">Footnotes</div>
       {entries.map(([num, fn]) => (
+        // The card takes a pointer tap anywhere; the keyboard and screen-reader
+        // control is the number. The card is not role=button itself: its Go to
+        // Scripture / Read more / link buttons would be presentational children
+        // of a button, which TalkBack and VoiceOver flatten away (axe
+        // nested-interactive). The card's focus ring follows the number (app.css).
         <div
           key={num}
           id={`fn-item-${num}`}
           className="footnote-list-item"
-          role="button"
-          tabIndex={0}
           onClick={() => scrollToBubble(num)}
-          onKeyDown={(e) => {
-            if (e.target !== e.currentTarget) return;
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToBubble(num); }
-          }}
           title={`Jump back to footnote ${num} in the body`}
         >
-          <div className="footnote-list-num">{num}{"."}</div>
+          <div
+            className="footnote-list-num"
+            role="button"
+            tabIndex={0}
+            aria-label={`Jump back to footnote ${num} in the body`}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToBubble(num); }
+            }}
+          >{num}{"."}</div>
           {/* A scripture footnote's verse, copied, names itself (utils/passage-copy.js). */}
           <div data-copy-ref={fn.type === "scripture" ? sheetReference(fn.ref) : undefined}>
             {fn.type === "scripture" ? (

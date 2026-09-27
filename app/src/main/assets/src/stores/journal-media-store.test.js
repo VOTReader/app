@@ -860,3 +860,373 @@ describe('JournalMediaStore connection lifecycle', () => {
     expect((await JournalMediaStore.get('after-clear')).type).toBe('audio');
   });
 });
+
+describe('JournalMediaStore — input guards and the link marker', () => {
+  it('stageImportRecord rejects a record missing id, blob or type, and stages nothing', async () => {
+    for (const bad of [null, { blob: makeBlob(4, 'image/jpeg'), type: 'image' },
+      { id: 'x', type: 'image' }, { id: 'x', blob: makeBlob(4, 'image/jpeg') }]) {
+      await expect(JournalMediaStore.stageImportRecord(bad)).rejects.toThrow('Invalid staged media record');
+    }
+    await JournalMediaStore.commitImportMerge();
+    expect(await JournalMediaStore.allIds()).toEqual([]);
+  });
+
+  it('put keeps a caller-supplied created / size / mime', async () => {
+    await JournalMediaStore.put({ id: 'kept', type: 'image', blob: makeBlob(8, 'image/jpeg'), created: 5, size: 99, mime: 'image/png' });
+    const rec = await JournalMediaStore.get('kept');
+    expect(rec).toMatchObject({ created: 5, size: 99, mime: 'image/png' });
+  });
+
+  it('objectUrl resolves null for a falsy or unknown id', async () => {
+    expect(await JournalMediaStore.objectUrl('')).toBeNull();
+    expect(await JournalMediaStore.objectUrl('never-stored')).toBeNull();
+  });
+
+  it('objectUrl resolves null when createObjectURL throws', async () => {
+    await JournalMediaStore.put({ id: 'nourl', type: 'image', blob: makeBlob(8, 'image/jpeg') });
+    JournalMediaStore.releaseObjectUrls();
+    const orig = URL.createObjectURL;
+    URL.createObjectURL = () => { throw new Error('unsupported'); };
+    try {
+      expect(await JournalMediaStore.objectUrl('nourl')).toBeNull();
+    } finally { URL.createObjectURL = orig; }
+  });
+
+  it('markLinked drops the unlinked marker, and the record stops being unclaimed', async () => {
+    await JournalMediaStore.put({ id: 'm_new', type: 'audio', blob: makeBlob(4, 'audio/webm'), unlinked: true });
+    expect((await JournalMediaStore.unclaimed()).map((r) => r.id)).toEqual(['m_new']);
+    await JournalMediaStore.markLinked('m_new');
+    const rec = await JournalMediaStore.get('m_new');
+    expect('unlinked' in rec).toBe(false);
+    expect(rec.blob.size).toBe(4); // the bytes survive the re-put
+    expect(await JournalMediaStore.unclaimed([])).toEqual([]);
+  });
+
+  it('markLinked is a quiet no-op for a falsy id, a missing record, or one already linked', async () => {
+    await expect(JournalMediaStore.markLinked('')).resolves.toBeUndefined();
+    await expect(JournalMediaStore.markLinked('gone')).resolves.toBeUndefined();
+    await JournalMediaStore.put({ id: 'linked', type: 'image', blob: makeBlob(4, 'image/jpeg'), created: 7 });
+    const putSpy = vi.spyOn(JournalMediaStore, 'put');
+    try {
+      await expect(JournalMediaStore.markLinked('linked')).resolves.toBeUndefined();
+      expect(putSpy).not.toHaveBeenCalled(); // no needless rewrite of the blob
+    } finally { putSpy.mockRestore(); }
+  });
+
+  it('pruneOrphans treats a record with no created stamp as old enough to prune', async () => {
+    await JournalMediaStore.put({ id: 'undated', type: 'image', blob: makeBlob(4, 'image/jpeg') });
+    // put() stamps created; strip it by staging + merging the raw record instead
+    await JournalMediaStore.beginImportReplace();
+    await JournalMediaStore.stageImportRecord({ id: 'undated', type: 'image', blob: makeBlob(4, 'image/jpeg') });
+    await JournalMediaStore.commitImportMerge();
+    expect((await JournalMediaStore.get('undated')).created).toBeUndefined();
+    expect(await JournalMediaStore.pruneOrphans([], 1000)).toBe(1);
+    expect(await JournalMediaStore.get('undated')).toBeNull();
+  });
+});
+
+/* The header probe, format by format. The probe is private, so each case is
+   read through the one decision it drives: a source whose header proves BOTH
+   dimensions >= maxDim is decoded with the resize hint; anything else (small,
+   unknown, unreadable) decodes un-hinted. Real bytes, stub decoder. */
+describe('JournalMediaStore — compressImage() header probe across formats', () => {
+  /** @type {any} */
+  let createElementSpy;
+  function installFakeCanvas() {
+    const fakeCanvas = {
+      width: 0, height: 0,
+      getContext: vi.fn(() => ({ drawImage: vi.fn() })),
+      toBlob: vi.fn((cb) => cb(new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }))),
+    };
+    const realCreate = document.createElement.bind(document);
+    createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag) => (tag === 'canvas' ? fakeCanvas : realCreate(tag)));
+  }
+  afterEach(() => {
+    if (createElementSpy) { createElementSpy.mockRestore(); createElementSpy = null; }
+    delete /** @type {any} */ (globalThis).createImageBitmap;
+  });
+
+  async function hintFor(bytes, type, srcW = 2000, srcH = 2000) {
+    installFakeCanvas();
+    const cib = decoderMock(srcW, srcH);
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+    const blob = bytes instanceof Blob ? bytes : new Blob([bytes], { type });
+    await JournalMediaStore.compressImage(blob, { maxDim: 1600 });
+    return (cib.mock.calls[0][1] || {}).resizeWidth;
+  }
+
+  function gif(w, h) {
+    const u = new Uint8Array(13);
+    u.set([0x47, 0x49, 0x46, 0x38, 0x39, 0x61], 0); // GIF89a
+    const dv = new DataView(u.buffer);
+    dv.setUint16(6, w, true); dv.setUint16(8, h, true);
+    return u;
+  }
+  function riff(fourcc, fill) {
+    const u = new Uint8Array(32);
+    const dv = new DataView(u.buffer);
+    u.set([0x52, 0x49, 0x46, 0x46], 0);   // RIFF
+    u.set([0x57, 0x45, 0x42, 0x50], 8);   // WEBP
+    dv.setUint32(12, fourcc);
+    fill(u, dv);
+    return u;
+  }
+  const vp8 = (w, h) => riff(0x56503820, (_u, dv) => { dv.setUint16(26, w, true); dv.setUint16(28, h, true); });
+  const vp8l = (w, h) => riff(0x5650384C, (_u, dv) => { dv.setUint32(21, ((w - 1) & 0x3FFF) | (((h - 1) & 0x3FFF) << 14), true); });
+  const vp8x = (w, h) => riff(0x56503858, (u) => {
+    const a = w - 1, b = h - 1;
+    u.set([a & 0xFF, (a >> 8) & 0xFF, (a >> 16) & 0xFF, b & 0xFF, (b >> 8) & 0xFF, (b >> 16) & 0xFF], 24);
+  });
+
+  it('GIF: reads the logical screen size', async () => {
+    expect(await hintFor(gif(2000, 1800), 'image/gif')).toBe(1600);
+    expect(await hintFor(gif(640, 480), 'image/gif', 640, 480)).toBeUndefined();
+  });
+
+  it('WebP lossy (VP8 ): reads the 14-bit frame size', async () => {
+    expect(await hintFor(vp8(3000, 2000), 'image/webp')).toBe(1600);
+    expect(await hintFor(vp8(800, 600), 'image/webp', 800, 600)).toBeUndefined();
+  });
+
+  it('WebP lossless (VP8L): reads the packed (w-1),(h-1)', async () => {
+    expect(await hintFor(vp8l(4000, 3000), 'image/webp')).toBe(1600);
+    expect(await hintFor(vp8l(1600, 1599), 'image/webp', 1600, 1599)).toBeUndefined(); // one pixel short
+  });
+
+  it('WebP extended (VP8X): reads the 24-bit canvas', async () => {
+    expect(await hintFor(vp8x(5000, 4000), 'image/webp')).toBe(1600);
+    expect(await hintFor(vp8x(1000, 5000), 'image/webp', 1000, 5000)).toBeUndefined();
+  });
+
+  it('WebP with an unknown chunk declines to guess', async () => {
+    expect(await hintFor(riff(0x414C5048, () => {}), 'image/webp')).toBeUndefined(); // "ALPH"
+  });
+
+  it('a header shorter than 10 bytes is unknown', async () => {
+    expect(await hintFor(new Uint8Array([0xFF, 0xD8, 0xFF]), 'image/jpeg')).toBeUndefined();
+  });
+
+  it('JPEG: fill bytes, standalone markers and junk between segments are walked past', async () => {
+    const junkAndMarkers = [0x00, 0x12, 0xFF, 0xFF, 0xFF, 0x01, 0xFF, 0xD0];
+    const blob = new Blob([jpegOf([junkAndMarkers], 3200, 2400)], { type: 'image/jpeg' });
+    expect(await hintFor(blob)).toBe(1600);
+  });
+
+  it('JPEG with no frame header in the probe is unknown', async () => {
+    const u = new Uint8Array([0xFF, 0xD8].concat(app1(new Array(20).fill(0)), [0xFF, 0xD9]));
+    expect(await hintFor(u, 'image/jpeg')).toBeUndefined();
+  });
+
+  it('a source that cannot be sliced, or whose bytes cannot be read, decodes un-hinted', async () => {
+    installFakeCanvas();
+    const cib = decoderMock(3000, 3000);
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+    await JournalMediaStore.compressImage(/** @type {any} */ ({ size: 10 }), { maxDim: 1600 });
+    expect((cib.mock.calls[0][1] || {}).resizeWidth).toBeUndefined();
+
+    const noBuffer = /** @type {any} */ ({ size: 10, slice: () => ({}) });
+    await JournalMediaStore.compressImage(noBuffer, { maxDim: 1600 });
+    expect((cib.mock.calls[1][1] || {}).resizeWidth).toBeUndefined();
+
+    const unreadable = /** @type {any} */ ({ size: 10, slice: () => ({ arrayBuffer: () => Promise.reject(new Error('NotReadableError')) }) });
+    await JournalMediaStore.compressImage(unreadable, { maxDim: 1600 });
+    expect((cib.mock.calls[2][1] || {}).resizeWidth).toBeUndefined();
+  });
+
+  it('uses the 1600 px / 0.8 quality defaults when no options are passed', async () => {
+    installFakeCanvas();
+    /** @type {any} */ (globalThis).createImageBitmap = decoderMock(4000, 3000);
+    const out = await JournalMediaStore.compressImage(jpegBlob(4000, 3000));
+    expect(out.width).toBe(1600);
+    expect(out.height).toBe(1200);
+  });
+});
+
+/* The encode step's failures are TERMINAL: a decoded bitmap that cannot be drawn
+   or encoded will fail the <img> fallback the same way, so compressImage must
+   reject at once rather than pay for another full-resolution decode. */
+describe('JournalMediaStore — compressImage() encode failures and fallbacks', () => {
+  /** @type {any} */
+  let createElementSpy;
+  /** @type {any} */
+  let canvas;
+  const realImage = globalThis.Image;
+  function installCanvas(over) {
+    canvas = {
+      width: 0, height: 0,
+      getContext: vi.fn(() => ({ drawImage: vi.fn() })),
+      toBlob: vi.fn((cb) => cb(new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }))),
+      ...over,
+    };
+    const realCreate = document.createElement.bind(document);
+    createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag) => (tag === 'canvas' ? canvas : realCreate(tag)));
+  }
+  afterEach(() => {
+    if (createElementSpy) { createElementSpy.mockRestore(); createElementSpy = null; }
+    delete /** @type {any} */ (globalThis).createImageBitmap;
+    globalThis.Image = realImage;
+  });
+  const bitmap = (w, h) => ({ width: w, height: h, close: vi.fn() });
+
+  it('rejects a 0-byte file before decoding anything', async () => {
+    const cib = vi.fn();
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+    await expect(JournalMediaStore.compressImage(new Blob([], { type: 'image/jpeg' }))).rejects.toThrow('Image file is empty');
+    expect(cib).not.toHaveBeenCalled();
+  });
+
+  it('a zero-dimension bitmap is terminal: rejected, released, and never retried', async () => {
+    installCanvas();
+    const bmp = bitmap(0, 0);
+    const cib = vi.fn().mockResolvedValue(bmp);
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+    const err = await JournalMediaStore.compressImage(jpegBlob(800, 600)).catch((e) => e);
+    expect(err.message).toBe('Image has zero dimensions');
+    expect(err.terminal).toBe(true);
+    expect(cib).toHaveBeenCalledTimes(1);
+    expect(bmp.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('no 2D context is terminal', async () => {
+    installCanvas({ getContext: () => null });
+    /** @type {any} */ (globalThis).createImageBitmap = vi.fn().mockResolvedValue(bitmap(800, 600));
+    await expect(JournalMediaStore.compressImage(jpegBlob(800, 600))).rejects.toThrow('Canvas 2D unavailable');
+  });
+
+  it('a draw that throws is terminal', async () => {
+    installCanvas({ getContext: () => ({ drawImage: () => { throw new Error('tainted'); } }) });
+    /** @type {any} */ (globalThis).createImageBitmap = vi.fn().mockResolvedValue(bitmap(800, 600));
+    await expect(JournalMediaStore.compressImage(jpegBlob(800, 600))).rejects.toThrow('Image draw failed');
+  });
+
+  it('an encoder that yields no bytes is terminal', async () => {
+    installCanvas({ toBlob: (cb) => cb(null) });
+    const cib = vi.fn().mockResolvedValue(bitmap(800, 600));
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+    const err = await JournalMediaStore.compressImage(jpegBlob(800, 600)).catch((e) => e);
+    expect(err.message).toBe('Image encoding failed');
+    expect(err.terminal).toBe(true);
+    expect(cib).toHaveBeenCalledTimes(1);
+  });
+
+  it('a WebView without toBlob encodes through toDataURL', async () => {
+    const bytes = [0xFF, 0xD8, 0xFF, 0xD9];
+    installCanvas({ toBlob: undefined, toDataURL: vi.fn(() => 'data:image/jpeg;base64,' + btoa(String.fromCharCode(...bytes))) });
+    const bmp = bitmap(800, 600);
+    /** @type {any} */ (globalThis).createImageBitmap = vi.fn().mockResolvedValue(bmp);
+    const out = await JournalMediaStore.compressImage(jpegBlob(800, 600), { quality: 0.5 });
+    expect(canvas.toDataURL).toHaveBeenCalledWith('image/jpeg', 0.5);
+    expect(out.blob.type).toBe('image/jpeg');
+    expect(out.blob.size).toBe(4);
+    expect(out).toMatchObject({ width: 800, height: 600 });
+    expect(bmp.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('a toDataURL that fails is terminal', async () => {
+    installCanvas({ toBlob: undefined, toDataURL: () => 'not-a-data-url' });
+    /** @type {any} */ (globalThis).createImageBitmap = vi.fn().mockResolvedValue(bitmap(800, 600));
+    await expect(JournalMediaStore.compressImage(jpegBlob(800, 600))).rejects.toThrow('Image encoding failed');
+  });
+
+  it('a terminal failure on the retry decode does not fall through to <img>', async () => {
+    installCanvas({ getContext: () => null });
+    const cib = vi.fn()
+      .mockRejectedValueOnce(new Error('imageOrientation unsupported'))
+      .mockResolvedValueOnce(bitmap(800, 600));
+    /** @type {any} */ (globalThis).createImageBitmap = cib;
+    const imgCtor = vi.fn();
+    globalThis.Image = /** @type {any} */ (imgCtor);
+    await expect(JournalMediaStore.compressImage(jpegBlob(800, 600))).rejects.toThrow('Canvas 2D unavailable');
+    expect(imgCtor).not.toHaveBeenCalled();
+  });
+
+  /** An <img> stand-in that "loads" (or fails) as soon as src is set. */
+  function fakeImage({ fail = false, w = 1000, h = 500 } = {}) {
+    return class {
+      constructor() { this.naturalWidth = w; this.naturalHeight = h; }
+      set src(_v) { queueMicrotask(() => (fail ? this.onerror() : this.onload())); }
+    };
+  }
+
+  function stubUrls() {
+    const created = [], revoked = [];
+    const oc = URL.createObjectURL, orv = URL.revokeObjectURL;
+    URL.createObjectURL = () => { const u = 'blob:img-' + created.length; created.push(u); return u; };
+    URL.revokeObjectURL = (u) => { revoked.push(u); };
+    return { created, revoked, restore() { URL.createObjectURL = oc; URL.revokeObjectURL = orv; } };
+  }
+
+  it('both bitmap decodes failing falls back to <img>, and its URL is revoked', async () => {
+    installCanvas();
+    /** @type {any} */ (globalThis).createImageBitmap = vi.fn().mockRejectedValue(new Error('decode failed'));
+    globalThis.Image = /** @type {any} */ (fakeImage({ w: 3200, h: 1600 }));
+    const urls = stubUrls();
+    try {
+      const out = await JournalMediaStore.compressImage(jpegBlob(3200, 1600));
+      expect(out).toMatchObject({ width: 1600, height: 800 });
+      expect(urls.revoked).toEqual(urls.created);
+    } finally { urls.restore(); }
+  });
+
+  it('without createImageBitmap the <img> path is used directly', async () => {
+    installCanvas();
+    globalThis.Image = /** @type {any} */ (fakeImage({ w: 400, h: 300 }));
+    const urls = stubUrls();
+    try {
+      const out = await JournalMediaStore.compressImage(jpegBlob(400, 300));
+      expect(out).toMatchObject({ width: 400, height: 300 });
+    } finally { urls.restore(); }
+  });
+
+  it('an <img> that cannot load rejects and still revokes its URL', async () => {
+    installCanvas();
+    globalThis.Image = /** @type {any} */ (fakeImage({ fail: true }));
+    const urls = stubUrls();
+    try {
+      await expect(JournalMediaStore.compressImage(jpegBlob(400, 300))).rejects.toThrow('Image load failed');
+      expect(urls.revoked).toEqual(urls.created);
+    } finally { urls.restore(); }
+  });
+});
+
+/* No IndexedDB (private mode / a blocked origin): every IDB-backed call rejects
+   rather than hanging, and a later call retries the open instead of replaying
+   the cached failure. Needs a fresh module instance (the connection promise is
+   module-private). */
+describe('JournalMediaStore — IndexedDB unavailable', () => {
+  const realIDB = window.indexedDB;
+  afterEach(() => {
+    Object.defineProperty(window, 'indexedDB', { value: realIDB, configurable: true, writable: true });
+    vi.resetModules();
+  });
+
+  async function freshStoreWith(idb) {
+    vi.resetModules();
+    Object.defineProperty(window, 'indexedDB', { value: idb, configurable: true, writable: true });
+    return (await import('./journal-media-store.js')).JournalMediaStore;
+  }
+
+  it('rejects with a clear error when window.indexedDB is missing', async () => {
+    const store = await freshStoreWith(undefined);
+    await expect(store.allIds()).rejects.toThrow('IndexedDB not available');
+    await expect(store.get('x')).rejects.toThrow('IndexedDB not available');
+  });
+
+  it('a blocked open rejects, and the next call opens again', async () => {
+    let opens = 0;
+    const store = await freshStoreWith({
+      open: () => { opens++; const req = {}; queueMicrotask(() => req.onblocked()); return req; },
+    });
+    await expect(store.list()).rejects.toThrow('Journal media database open blocked');
+    await expect(store.list()).rejects.toThrow('Journal media database open blocked');
+    expect(opens).toBe(2); // the failed promise was not cached
+  });
+
+  it('an open error rejects with the request error', async () => {
+    const boom = new Error('VersionError');
+    const store = await freshStoreWith({
+      open: () => { const req = {}; queueMicrotask(() => req.onerror({ target: { error: boom } })); return req; },
+    });
+    await expect(store.allIds()).rejects.toBe(boom);
+  });
+});

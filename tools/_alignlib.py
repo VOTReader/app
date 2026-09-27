@@ -797,6 +797,179 @@ def _interpolate_runs(rows, end_t=None, weights=None):
         i = j
 
 
+# The transcript anchor's version, stamped in a belt it has run on (txAnchor). 1 = 2026-09-26 (refuted,
+# never written); 2 = 2026-09-26 night: snapped to the pause's end, scan after the previous row,
+# opening words adjacent, the name test on long words only, leg A's onset kept inside the opening,
+# an unsnapped whisper start only for a move of a second or more.
+TX_ANCHOR = 2
+
+
+def _sounds_like_start(heard, pre):
+    """True when a heard word could be the skipped words' opening: same first letter and the
+    folded spellings 60 % alike, against the first skipped word, the second, or the two run together
+    ("eltika" for "Eltekeh", "mijakan" for "Me Jarkon", "amen" for "Amam"). A section heading the
+    WEB reader speaks before the verse ("firstborn animals" before "You shall dedicate") is not.
+    Both sides at least 4 letters: 'have' is not 'he', 'o' is not 'O Lord' (the refuter, 02:2x)."""
+    if not heard or not pre:
+        return False
+    h = _name_fold(heard)
+    if len(h) < 4:
+        return False
+    for cand in (pre[0], "".join(pre[:2])) + tuple(pre[1:2]):
+        c = _name_fold(cand)
+        if len(c) >= 4 and h[:1] == c[:1] and difflib.SequenceMatcher(None, h, c).ratio() >= 0.6:
+            return True
+    return False
+
+
+def _voice_onset(t, sil, back_off=0.05, max_snap=2.5):
+    """A whisper word start inside a pause (whisper stretches a word back over the silence before
+    it, 0.4-2 s) moves to the pause's end, where the voice starts. The belt's own make_snap stops
+    at 1.5 s; a transcript start has been seen 2.1 s early (BRM 1 Chronicles 25:14)."""
+    for s0, e0 in sil or ():
+        if s0 - 0.03 <= t < e0 - back_off:
+            return e0 - back_off if e0 - back_off - t <= max_snap else t
+    return t
+
+
+def tx_anchor(rows, units, words, names=None, nrm=None, sil=None):
+    """Re-place two kinds of onset the belt's legs got wrong, from the transcript it already has
+    (the refuter of the c64 ship, 2026-09-25: 6 name-list onsets 0.5-2.5 s late, 6 of 12 guessed
+    onsets in filled holes 1.3-5 s off). Runs after belt(); a proven row that is neither is never
+    touched, and a moved row stays strictly between its neighbours.
+
+    (A) prefixFrom. Leg B marked the verse's first words unspoken (skippedPrefix) and leg A's
+        onset moved to the first word B heard -- in a name list the SECOND name, because the
+        first was misheard ("Kiriath Baal" -> onset on the later "Kiriath" of Kiriath Jearim).
+        When the transcript has words in the gap between the previous verse's end and that
+        onset (at most prefix + 2 of them, the first not an echo of the previous verse's close,
+        ending before the kept word begins) and the first of them sounds like the skipped
+        opening (_sounds_like_start), the onset moves to it. A speech tag no reader speaks
+        leaves no such word, and a section heading the WEB reader speaks there does not sound
+        like the verse, so both keep their trim.
+    (B) txAnchor. A REVIEW row was spread between its proven neighbours (_interpolate_runs).
+        When the transcript after the previous row's onset and before the next proven one says
+        the verse's opening -- its first word one of the opening two, the word after it the
+        next opening word, and probe_ok's in-order scan on the next 12 words heard -- the onset
+        moves to the earliest such word and the row is no longer `interpolated`. Status stays
+        REVIEW: the proven counts and the ship gate do not move.
+    Then the voice onset (the refuter of v1, 2026-09-26 02:2x: 17 of 22 worse rows were whisper
+    starts inside the pause before the word): a start in a silence (`sil`, WEB/BRM) moves to the
+    silence's end; with no silence map (WOP's music bed) leg A's own onset stands when it falls
+    inside the first two words matched.
+    Returns the list of (n, old t, new t, kind) it changed."""
+    nrm = nrm or norm_token
+    hw = [nrm(w[0]) for w in words]
+    changed = []
+
+    def proven(j):
+        r = rows[j]
+        return r.get("t") is not None and not r.get("interpolated")
+
+    def opens(k, want):
+        """Word k is the verse's first or second word and the word heard after it the next one. On
+        the second, the word before it is not the first: that opening was the previous row's."""
+        for j in (0, 1):
+            if j == 1 and k > 0 and tok_match(hw[k - 1], want[0], names):
+                continue
+            if j < len(want) and tok_match(hw[k], want[j], names):
+                if j + 1 >= len(want) or (k + 1 < len(hw) and tok_match(hw[k + 1], want[j + 1], names)):
+                    return True
+        return False
+
+    for i, r in enumerate(rows):
+        if r.get("t") is None:
+            continue
+        u = units[i]
+        toks = [nrm(t) for t in (u.get("tokens") or [])]
+        pj = next((j for j in range(i - 1, -1, -1) if proven(j)), None)
+        nj = next((j for j in range(i + 1, len(rows)) if proven(j)), None)
+        prev_t = rows[pj]["t"] if pj is not None else 0.0
+        lo = (rows[pj].get("tEnd") or prev_t) if pj is not None else 0.0
+        # Never at or before the previous row's onset, a guess included: a REVIEW run's scan from
+        # the last proven verse found an earlier verse's "the sixteenth" (WOP 1 Chronicles 24:15).
+        lit_prev = next((rows[j]["t"] for j in range(i - 1, -1, -1) if rows[j].get("t") is not None), 0.0)
+        hi = rows[nj]["t"] if nj is not None else float("inf")
+        kind = k_hit = None
+        if r.get("skippedPrefix") and not r.get("interpolated"):
+            pre = [nrm(t) for t in spoken_words(r["skippedPrefix"])]
+            gap = [k for k, w in enumerate(words) if lo - 0.05 <= w[1] < r["t"] - 0.05 and w[1] > lit_prev]
+            tail = [nrm(t) for t in (units[pj].get("tokens") or [])[-3:]] if pj is not None else []
+            if gap and len(gap) <= len(pre) + 2 and hw[gap[0]] not in tail \
+                    and words[gap[0]][2] <= r["t"] + 0.02 and _sounds_like_start(hw[gap[0]], pre):
+                k_hit, kind = gap[0], "prefixFrom"
+        elif r.get("interpolated") and toks:
+            want = toks[:8]
+            for k, w in enumerate(words):
+                # From 0.6 s before the previous verse's end: leg A's tEnd runs late into the pause
+                # and whisper starts the next word early in it (BRM Luke 3:24 "which" @ 221.2, the
+                # previous end 221.49). A start that ends up before that end is refused below.
+                if w[1] < lo - 0.6 or w[1] <= lit_prev:
+                    continue
+                if w[1] >= hi:
+                    break
+                if opens(k, want) and probe_ok(want, hw[k:k + 12], names, tolerant=bool(names)):
+                    k_hit, kind = k, "txAnchor"
+                    break
+            # The recording may read other words than the text (WEB 1 Corinthians 5:2 reads "you
+            # are arrogant" for "you are puffed up"): the scan then fails, but leg B's own placement
+            # still stands when it sits past the previous verse's end, before the next proven onset,
+            # on the verse's opening: a content word, or the first two words heard in a row ("you
+            # are" @ 18.18; Job 26:2 "how" @ 7.72). A bare "the" is any verse's (1 Samuel 13:21).
+            tB = r.get("tB")
+            if k_hit is None and tB is not None and lo - 0.05 <= tB < hi and tB > lit_prev:
+                at = [k for k, w in enumerate(words) if abs(w[1] - tB) < 0.005]
+                if at and tok_match(hw[at[0]], want[0], names) and (len(want[0]) >= 4 or opens(at[0], want[:2])):
+                    k_hit, kind = at[0], "txAnchor"
+        if k_hit is None:
+            continue
+        # A list verse's opening is the previous verse's too ("the king of ..., one", WEB Joshua
+        # 12:21 matched v20's Achshaph; the v4 refuter, 22:1x): the verse's first name after its
+        # opening word must be heard at its place, give or take a word.
+        if kind == "txAnchor":
+            nm = name_tokens(u.get("text") or "", nrm)
+            p = next((q for q, t in enumerate(want) if q > 0 and t in nm), None)
+            if p is not None and not any(k_hit + q < len(hw) and tok_match(hw[k_hit + q], want[p], nm)
+                                         for q in (p - 1, p, p + 1)):
+                continue
+        ws, we = words[k_hit][1], words[k_hit][2]
+        tA = r.get("tA")
+        # Leg A just before the pause the whisper start sits in was the voice, and the pause's end
+        # is the word after (BRM Nehemiah 11:34: "Hadid" 290.91-291.3, whisper 291.52 in the
+        # silence to 292.02, which is "Zeboim"): the row keeps its place.
+        s0 = next((iv[0] for iv in sil or () if iv[0] - 0.03 <= ws < iv[1]), None)
+        if kind == "txAnchor" and s0 is not None and tA is not None and lo - 0.05 < tA < s0 <= tA + 0.8:
+            continue
+        # WOP's whisper stamps run up to 0.6 s ahead of the voice through the music bed ("the"
+        # 201.64-202.30, voice 202.85, Nehemiah 7:32): leg A's onset stands inside the first two
+        # words matched. The refuter of v2 (21:5x): a whisper start with no silence to snap to is
+        # 0.2-0.7 s early in the pause (BRM Exodus 20:12, 1 Timothy 5:3) -- it moves a quarter
+        # second on and only when that still moves the onset a full second.
+        upto = words[k_hit + 2][1] if k_hit + 2 < len(words) else we + 0.6
+        new_t = _voice_onset(ws, sil)
+        if new_t == ws:
+            if kind == "txAnchor" and tA is not None and ws - 0.05 <= tA < upto:
+                new_t = tA
+            else:
+                if abs(ws - r["t"]) < 1.0:
+                    continue
+                new_t = max(ws, min(ws + 0.25, we - 0.05))
+        if new_t < lo - 0.05:
+            continue
+        new_t = round(new_t, 2)
+        # Strictly between the nearest LIT rows either side, guesses included: ship() leaves a
+        # row at or before the onset above it dark (v14-corpus-03).
+        lit_next = next((rows[j]["t"] for j in range(i + 1, len(rows)) if rows[j].get("t") is not None),
+                        float("inf"))
+        if not (max(prev_t, lit_prev) < new_t < min(hi, lit_next)) or abs(new_t - r["t"]) < 0.005:
+            continue
+        changed.append((r.get("n"), r["t"], new_t, kind))
+        r[kind] = r["t"]
+        r["t"] = new_t
+        r.pop("interpolated", None)
+    return changed
+
+
 def release_caches():
     """Drop the per-recording PCM cache and hand torch's allocator back its
     blocks. The models are deliberately kept -- reloading them per item is the
