@@ -50,6 +50,175 @@ export const PHRASE_BOOST = 6;
 /** Synonym-only hit demotion (matched no literal query term). */
 export const SYNONYM_DEMOTION = 0.5;
 
+/* ── Search audit 2026-09-27 (617 Bible + 3,706 Volumes queries on the real corpus) ── */
+
+/** BM25 as published: no BM25+ floor. MiniSearch's default d = 0.5 pays every matched
+ *  word a fixed amount whatever the text's length, so an Answers topic of 5,000 words
+ *  holding every common word outranked the verse the reader quoted: 86 of 362 verse
+ *  queries lost Best Matches to them ("I am the way, the truth, and the life":
+ *  John 14:6 at #113). d = 0 lifted Best Matches from 267 to 339 of 408, lost none,
+ *  and left the Scriptures ranking as it was. */
+export const BM25_PARAMS = { k: 1.2, b: 0.7, d: 0 };
+
+/** The title keeps MiniSearch's BM25+ floor for a keyword search. A verse
+ *  has no title, and MiniSearch averages a field's length over every document, so
+ *  the average title is under one word and a title of five is scored as if it were
+ *  thirteen times too long: without the floor a word in a title counted for almost
+ *  nothing ("humility" put two short WTLB entries above "Humility and The Word of
+ *  God"; "144000" put the False Doctrines index above "Regarding the 144,000
+ *  Witnesses"). A longer query is a passage or a title typed out, and a floor paid
+ *  for each of its words let any title sharing two of them outrank the verse quoted
+ *  ("I am the resurrection, and the life" #6); titleMatch answers a title typed out.
+ *  The engine scores the body and the title apart (engine searchUnit). */
+export const TITLE_BM25 = { k: 1.2, b: 0.7, d: 0.5 };
+/** A keyword search, as against a passage or a title typed out: at most this many
+ *  words that are not stop words, and this many in all ("false prophets", "mark of
+ *  the beast"; "fear I am coming to" is a passage). */
+export const KEYWORD_CONTENT_WORDS = 2;
+export const KEYWORD_WORDS = 4;
+
+/** What a synonym's or a word form's match is worth beside the typed word's. They
+ *  added at full weight to any text that also held the typed word, so a one-word
+ *  title lost to texts rich in its synonyms ("Sanctuary" #17, #1 with synonyms off). */
+export const SYNONYM_WEIGHT = 0.5;
+export const FORM_WEIGHT = 0.7;
+
+/** The graded phrase boost starts at this much of the typed phrase held together. */
+export const NEAR_PHRASE_MIN = 0.5;
+/** A title typed whole; the leading words a title opens with that readers leave off. */
+export const TITLE_EXACT_BOOST = 3;
+const TITLE_LEAD = new Set(['regarding', 'the', 'a', 'an']);
+/** The original over a reprint when both hold the typed words together: a letter, a
+ *  verse, a Words To Live By or a Blessed entry over the Answers topic, Holy Days
+ *  entry or Bible study that quotes it (they are compilations of the letters and
+ *  verses). The Answers topic quoting a passage outranked its letter 14 times in 133
+ *  quoted phrases ("to this day you persecute": Answers above Volume Two · Letter 29). */
+export const ORIGINAL_BOOST = 2;
+export const REPRINT_KINDS = new Set(['answers', 'holy-day', 'bible-study']);
+
+/**
+ * How much of the typed phrase a text holds TOGETHER, 0..1, the phrase ranking's
+ * graded half (search audit 2026-09-27). The boost was all or nothing: every typed
+ * word in a row, or nothing. A remembered phrase is often one word off ("will" for
+ * "shall", a word dropped), and 111 of 185 such queries lost the letter from the top
+ * 5. This scores the query's adjacent word PAIRS: the most of them found as adjacent
+ * pairs within one stretch of the text a little longer than the phrase (a dropped,
+ * swapped or added word or two), each pair weighted 1, or 0.35 when both words are
+ * stop words ("of the" is everywhere). 1 = every pair; a phrase one word off keeps
+ * most of them.
+ * @param {string[]} toks  the text's tokens (kjvEncode)
+ * @param {string[]} qTokens  the query's tokens (kjvEncode)
+ * @param {Set<string>} stop
+ * @returns {number}
+ */
+export function nearPhrase(toks, qTokens, stop) {
+  const m = qTokens.length;
+  if (!toks || m < 2) return 0;
+  /** @type {Map<string, number[]>} */
+  const pairAt = new Map();
+  const weight = [];
+  let total = 0;
+  for (let i = 0; i + 1 < m; i++) {
+    const w = stop && stop.has(qTokens[i]) && stop.has(qTokens[i + 1]) ? 0.35 : 1;
+    weight.push(w);
+    total += w;
+    const key = qTokens[i] + ' ' + qTokens[i + 1];
+    const list = pairAt.get(key);
+    if (list) list.push(i); else pairAt.set(key, [i]);
+  }
+  /** @type {Array<[number, number]>} */
+  const found = [];
+  for (let j = 0; j + 1 < toks.length; j++) {
+    const list = pairAt.get(toks[j] + ' ' + toks[j + 1]);
+    if (list) for (const i of list) found.push([j, i]);
+  }
+  if (!found.length) return 0;
+  const span = m + 4;
+  let best = 0;
+  let lo = 0;
+  /** @type {Map<number, number>} */
+  const inWin = new Map();
+  let sum = 0;
+  for (let hi = 0; hi < found.length; hi++) {
+    const [jh, ih] = found[hi];
+    inWin.set(ih, (inWin.get(ih) || 0) + 1);
+    if (inWin.get(ih) === 1) sum += weight[ih];
+    while (found[lo][0] < jh - span) {
+      const il = found[lo][1];
+      const n = /** @type {number} */ (inWin.get(il)) - 1;
+      inWin.set(il, n);
+      if (n === 0) sum -= weight[il];
+      lo++;
+    }
+    if (sum > best) best = sum;
+  }
+  return total ? best / total : 0;
+}
+
+/**
+ * The tokens with a possessive's or a contraction's lone "s" joined to its word:
+ * the tokenizer splits "God's" into god + s, and a reader types "gods" ("gods
+ * messengers", "whats in a name"), so a title or a phrase typed without its
+ * apostrophe never matched its own words.
+ * @param {string[]} toks
+ * @returns {string[]}
+ */
+export function joinApostropheS(toks) {
+  if (!toks || toks.indexOf('s') < 0) return toks;
+  /** @type {string[]} */
+  const out = [];
+  for (let i = 0; i < toks.length; i++) {
+    if (toks[i] === 's' && out.length) out[out.length - 1] += 's';
+    else out.push(toks[i]);
+  }
+  return out;
+}
+
+/** The length of the longest common subsequence: the words two lists share in order. */
+function commonInOrder(/** @type {string[]} */ a, /** @type {string[]} */ b) {
+  let prev = new Array(b.length + 1).fill(0);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [0];
+    for (let j = 1; j <= b.length; j++) cur[j] = a[i - 1] === b[j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]);
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+/** How much of the typed words, in order, a title must hold before it counts. */
+export const TITLE_QUERY_MIN = 0.75;
+
+/**
+ * How a unit's title answers the typed words: TITLE_EXACT_BOOST when the query is
+ * the title (a leading "Regarding" / "The" aside, as readers type it: "tithing" is
+ * "Regarding Tithing"); for a title typed in part or misremembered, by how many of
+ * the typed words the title holds in order (at least TITLE_QUERY_MIN of them, and
+ * two) and how much of the title they are ("Regarding the Days" of "Regarding the
+ * Days of Noah"; "Pride Comes Before a Fall" for "Pride Goes Before a Fall"); 1
+ * otherwise. There was no title signal beyond the field boost, and a title typed
+ * whole lost to longer texts holding its words ("Wisdom" #2 behind "Discernment",
+ * "The Truth" #6).
+ * @param {string[]} titleToks
+ * @param {string[]} qTokens
+ * @returns {number}
+ */
+export function titleMatch(titleToks, qTokens) {
+  if (!titleToks || !titleToks.length || !qTokens || !qTokens.length) return 1;
+  const t = joinApostropheS(titleToks);
+  const q = joinApostropheS(qTokens);
+  const strip = (/** @type {string[]} */ x) => { let i = 0; while (i < x.length - 1 && TITLE_LEAD.has(x[i])) i++; return x.slice(i); };
+  const tt = strip(t);
+  const qq = strip(q);
+  if (tt.length === qq.length && tt.every((w, i) => w === qq[i])) return TITLE_EXACT_BOOST;
+  if (q.length < 2) return 1;
+  const common = commonInOrder(q, t);
+  if (common < 2) return 1;
+  const qCov = common / q.length;
+  if (qCov < TITLE_QUERY_MIN) return 1;
+  const tCov = common / t.length;
+  return 1 + (TITLE_EXACT_BOOST - 1) * qCov * qCov * (0.5 + 0.5 * tCov);
+}
+
 /**
  * Count set bits — the number of DISTINCT original query terms a doc matched.
  * @param {number} mask

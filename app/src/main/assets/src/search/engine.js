@@ -31,7 +31,10 @@ import { expandQueryTerms } from './synonyms.js';
 import { wordForms } from './word-forms.js';
 import { kjvEncode } from './tokenize.js';
 import { snippet, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
-import { KIND_BOOST, coverageMultiplier, popcount, phraseTokenMatch, PHRASE_BOOST, SYNONYM_DEMOTION } from './ranking.js';
+import {
+  KIND_BOOST, coverageMultiplier, popcount, PHRASE_BOOST, SYNONYM_DEMOTION,
+  BM25_PARAMS, TITLE_BM25, KEYWORD_CONTENT_WORDS, KEYWORD_WORDS, joinApostropheS, SYNONYM_WEIGHT, FORM_WEIGHT, NEAR_PHRASE_MIN, ORIGINAL_BOOST, REPRINT_KINDS, nearPhrase, titleMatch,
+} from './ranking.js';
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
 
 /**
@@ -112,6 +115,32 @@ export function expandContractions(q) {
 }
 
 /**
+ * One unit's BM25 search, the body and the title scored apart and summed per text:
+ * the body as BM25 (BM25_PARAMS), the title with its floor for a query of a word or
+ * two (TITLE_BM25, where the reason is). A unit of several words (a quoted phrase)
+ * matches when the body holds them all, or the title does.
+ * @param {string} term
+ * @param {Object} opts
+ * @param {boolean} [titleFloor]
+ * @returns {any[]}
+ */
+function searchUnit(term, opts, titleFloor) {
+  const body = msIndex.search(term, { ...opts, fields: ['text'], bm25: BM25_PARAMS }) || [];
+  const title = msIndex.search(term, { ...opts, fields: ['title'], bm25: titleFloor ? TITLE_BM25 : BM25_PARAMS }) || [];
+  if (!title.length) return body;
+  const byId = new Map();
+  for (let i = 0; i < body.length; i++) byId.set(body[i].id, body[i]);
+  for (let i = 0; i < title.length; i++) {
+    const t = title[i];
+    const b = byId.get(t.id);
+    if (!b) { body.push(t); continue; }
+    b.score += t.score;
+    for (let w = 0; w < t.terms.length; w++) if (b.terms.indexOf(t.terms[w]) < 0) b.terms.push(t.terms[w]);
+  }
+  return body;
+}
+
+/**
  * The typo fallback for one literal unit that found nothing as typed.
  *
  * A one-word term is corrected to the NEAREST word in the index: one edit before
@@ -127,11 +156,12 @@ export function expandContractions(q) {
  * corrects no one word.
  * @param {string} term
  * @param {Object} opts  the unit's exact + prefix options
+ * @param {boolean} [titleFloor]  searchUnit's
  * @returns {{ res: any[], to: string | null }}
  */
-function searchCorrected(term, opts) {
+function searchCorrected(term, opts, titleFloor) {
   const tokens = kjvEncode(term);
-  if (tokens.length !== 1) return { res: msIndex.search(term, { ...opts, fuzzy: FUZZY }) || [], to: null };
+  if (tokens.length !== 1) return { res: searchUnit(term, { ...opts, fuzzy: FUZZY }, titleFloor), to: null };
   const word = tokens[0];
   const maxEdits = Math.min(MS_SEARCH_DEFAULTS.maxFuzzy, Math.round(word.length * FUZZY));
   for (let edits = 1; edits <= maxEdits; edits++) {
@@ -146,12 +176,35 @@ function searchCorrected(term, opts) {
     for (const w in docs) {
       if (best === null || docs[w] > docs[best] || (docs[w] === docs[best] && w < best)) best = w;
     }
-    if (best) return { res: msIndex.search(best, opts) || [], to: best };
+    if (best) return { res: searchUnit(best, opts, titleFloor), to: best };
   }
   return { res: [], to: null };
 }
 
 /** @type {any} */ let msIndex = null;
+
+/* A text's tokens, kept for the phrase ranking: the same few hundred candidates come
+   back on every keystroke of a query. Bounded by total tokens (a long Answers topic is
+   20,000), oldest out first; emptied when the index is rebuilt. */
+/** @type {Map<string, string[]>} */
+const TOKEN_CACHE = new Map();
+let tokenCacheSize = 0;
+/** @param {string} id @param {{ text?: string, title?: string }} doc */
+function docTokens(id, doc) {
+  let t = TOKEN_CACHE.get(id);
+  if (t) return t;
+  t = joinApostropheS(kjvEncode((doc.text || '') + ' ' + (doc.title || '')));
+  TOKEN_CACHE.set(id, t);
+  tokenCacheSize += t.length;
+  while (tokenCacheSize > 1500000 && TOKEN_CACHE.size > 1) {
+    const oldest = /** @type {string} */ (TOKEN_CACHE.keys().next().value);
+    tokenCacheSize -= /** @type {string[]} */ (TOKEN_CACHE.get(oldest)).length;
+    TOKEN_CACHE.delete(oldest);
+  }
+  return t;
+}
+/** The phrase ranking reads at most this many of the best-scored texts. */
+const PHRASE_CANDIDATES = 500;
 /** @type {Promise<boolean>|null} */ let building = null;
 let ready = false;
 /** @type {Error|null} */ let buildError = null;
@@ -174,6 +227,10 @@ function reshapeDoc(r) {
 /** Build the in-memory index for one translation (chunked for onProgress). */
 async function build(options) {
   options = options || {};
+  // a new index is new texts behind the same ids (a translation change): the phrase
+  // ranking's token cache must not outlive the index it was read from
+  TOKEN_CACHE.clear();
+  tokenCacheSize = 0;
   const code = options.translation || 'nkjv';
   const sig = dataSignature(code);
 
@@ -358,14 +415,24 @@ async function search(query, options) {
   // A stop word the reader typed among real words ranks, but is not a word to mark:
   // its matches do not ride on the result for the snippet and the find bar.
   const contentTyped = units.some((u) => u.literal && !isStopTerm(u.term));
+  /* A word or two is a keyword search, and a word in a title is the strongest sign of
+     the text meant ("144000", "false prophets"). More is a passage or a title typed out,
+     and the original of a passage comes before the texts that reprint it. */
+  const STOP_TRIMMED = D.STOP_WORDS_TRIMMED;
+  const contentWords = p.phrase
+    ? kjvEncode(p.phrase).filter((t) => !(STOP_TRIMMED && STOP_TRIMMED.has(t))).length
+    : units.filter((u) => u.literal && !isStopTerm(u.term)).length;
+  const keyword = contentWords <= KEYWORD_CONTENT_WORDS && kjvEncode(p.phrase || query).length <= KEYWORD_WORDS;
+  const titleFloor = keyword;
   /** @param {any} unit @param {any[]} res */
   const accumulate = (unit, res) => {
+    const weight = unit.literal ? 1 : unit.form ? FORM_WEIGHT : SYNONYM_WEIGHT;
     for (let r = 0; r < res.length; r++) {
       const hit = res[r];
       const id = hit.id;
-      scoreMap[id] = (scoreMap[id] || 0) + hit.score;
+      scoreMap[id] = (scoreMap[id] || 0) + hit.score * weight;
       if (!docLookup[id]) docLookup[id] = hit;
-      if (unit.literal) literalHit[id] = true;
+      if (unit.literal) literalHit[id] = true;   // a text found only through a form or a synonym is demoted below: the typed form first
       if ((unit.literal || unit.form) && !(contentTyped && isStopTerm(unit.term))) {
         // hit.terms is the DOC-side vocabulary that matched (MiniSearch derives
         // it from the match map), so for a fuzzy/prefix hit it's the corrected
@@ -391,7 +458,7 @@ async function search(query, options) {
   for (let u = 0; u < units.length; u++) {
     const unit = units[u];
     let res;
-    try { res = msIndex.search(unit.term, unitOpts(unit)); } catch { continue; }
+    try { res = searchUnit(unit.term, unitOpts(unit), titleFloor); } catch { continue; }
     if (res && res.length) { heard[unit.origin] = true; accumulate(unit, res); }
     else if (unit.literal) unheard.push(unit);
   }
@@ -409,7 +476,7 @@ async function search(query, options) {
     if (heard[unit.origin]) continue;
     if (/\d/.test(unit.term)) continue;   // a number is not a typo: "316" is not "16"
     let fixed;
-    try { fixed = searchCorrected(unit.term, unitOpts(unit)); } catch { continue; }
+    try { fixed = searchCorrected(unit.term, unitOpts(unit), titleFloor); } catch { continue; }
     if (!fixed.res.length) continue;
     accumulate(unit, fixed.res);
     const typed = kjvEncode(unit.term);
@@ -437,19 +504,48 @@ async function search(query, options) {
     const cc = popcount(termMask[rankedIds[i]] || 0);
     if (cc > 1) scoreMap[rankedIds[i]] *= coverageMultiplier(cc);
   }
-  // Phrase-proximity boost (multi-word non-phrase queries, full-coverage docs).
-  // A corrected word counts as the word it was corrected to, so "the lord is my
-  // shephard" boosts Psalm 23:1 the way the phrase spelled right does.
+  /* THE PHRASE RANKING, graded (search audit 2026-09-27). A text holding the typed
+     words together outranks one that scatters them: the exact run of every typed word
+     x PHRASE_BOOST as before; a run one word off (a word swapped, dropped or added)
+     by how much of it the text holds together (ranking.js nearPhrase). Read on the
+     PHRASE_CANDIDATES best-scored texts holding every typed word, or all but one of
+     three or more. A corrected word counts as the word it was corrected to, so "the
+     lord is my shephard" ranks Psalm 23:1 the way the phrase spelled right does. */
   const fixedTo = Object.create(null);
   for (let c = 0; c < corrections.length; c++) fixedTo[corrections[c].from] = corrections[c].to;
-  const qTokens = (!p.phrase && required > 1) ? kjvEncode(query).map((t) => fixedTo[t] || t) : null;
-  if (qTokens) {
+  const typedTokens = joinApostropheS(kjvEncode(query).map((t) => fixedTo[t] || t));
+  const STOP = D.STOP_WORDS_TRIMMED;
+  if (!p.phrase && required > 1 && typedTokens.length > 1) {
+    const needCover = required >= 3 ? required - 1 : required;
+    const cands = rankedIds.filter((id) => popcount((termMask[id] || 0) & requiredMask) >= needCover)
+      .sort((a, b) => scoreMap[b] - scoreMap[a])
+      .slice(0, PHRASE_CANDIDATES);
+    for (const id of cands) {
+      const d = docLookup[id];
+      if (!d) continue;
+      const toks = docTokens(id, d);
+      const exact = hasTokenRun(toks, typedTokens);
+      const near = exact ? 1 : nearPhrase(toks, typedTokens, STOP);
+      if (exact) scoreMap[id] *= PHRASE_BOOST;
+      else if (near >= NEAR_PHRASE_MIN) scoreMap[id] *= 1 + (PHRASE_BOOST - 1) * near * near;
+      // the original before a reprint when both hold the phrase
+      if (near >= 0.9 && !keyword && !REPRINT_KINDS.has(d.kind)) scoreMap[id] *= ORIGINAL_BOOST;
+    }
+  }
+  // A quoted phrase: every text shown holds it (the filter below), so the original first.
+  if (p.phrase) {
     for (let i = 0; i < rankedIds.length; i++) {
-      const id = rankedIds[i];
-      if (popcount((termMask[id] || 0) & requiredMask) === required) {
-        const d = docLookup[id];
-        if (d && phraseTokenMatch((d.text || '') + ' ' + (d.title || ''), qTokens)) scoreMap[id] *= PHRASE_BOOST;
-      }
+      const d = docLookup[rankedIds[i]];
+      if (d && !REPRINT_KINDS.has(d.kind)) scoreMap[rankedIds[i]] *= ORIGINAL_BOOST;
+    }
+  }
+  // A title typed whole, or a run of it, ranks its unit up (ranking.js titleMatch).
+  if (typedTokens.length) {
+    for (let i = 0; i < rankedIds.length; i++) {
+      const d = docLookup[rankedIds[i]];
+      if (!d || !d.title || d.kind === 'verse') continue;
+      const tm = titleMatch(kjvEncode(d.title), typedTokens);
+      if (tm > 1) scoreMap[rankedIds[i]] *= tm;
     }
   }
   // Synonym-only demotion.
