@@ -658,6 +658,10 @@ class AppInterface(
     @JavascriptInterface
     fun audioAskNotifications() { host.ensureNotificationsPermission() }
 
+    /** A letter with a recording opened: bind the player's service now, so the first Listen starts warm (n1-05). */
+    @JavascriptInterface
+    fun audioPrewarm() { native { it.prewarm() } }
+
     /** New lock-screen text for the recording playing: {title, artist, album}. */
     @JavascriptInterface
     fun audioMeta(json: String?) { native { it.meta(json) } }

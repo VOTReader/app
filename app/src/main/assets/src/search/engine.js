@@ -10,7 +10,7 @@
    Search pipeline (faithful to the audited multi-signal ranking, with BM25 as
    the per-unit scorer + native fuzzy/prefix):
      1. parse → command / reference / named-passage short-circuit to a nav card
-     2. stop-word filter + synonym expansion → search "units"
+     2. stop-word filter + synonym expansion + word forms → search "units"
      3. one MiniSearch BM25 search per unit (literal = fuzzy+prefix; synonym =
         exact-only), accumulating per-doc score + a term-coverage bitmask
      4. re-rank: KIND_BOOST · coverage multiplier · phrase-proximity boost ·
@@ -28,8 +28,9 @@ import { buildDocs } from './index-builder.js';
 import { parseReference, fuzzyBookSuggest, levenshtein } from './ref-parser.js';
 import { parseTextQuery } from './query-parse.js';
 import { expandQueryTerms } from './synonyms.js';
+import { wordForms } from './word-forms.js';
 import { kjvEncode } from './tokenize.js';
-import { snippet, highlightSpans, matchExcerpt } from './snippet.js';
+import { snippet, highlightSpans, matchExcerpt, morePlaces } from './snippet.js';
 import { KIND_BOOST, coverageMultiplier, popcount, phraseTokenMatch, PHRASE_BOOST, SYNONYM_DEMOTION } from './ranking.js';
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
 
@@ -207,8 +208,13 @@ async function ensureReady(options) {
 /**
  * Execute a search.
  * @param {string} query
- * @param {{translation?:string, useStopWords?:boolean, synonyms?:boolean, scope?:{bookId?:string,volumeId?:string}|null, corpus?:string, limit?:number}} [options]
- * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null}>}
+ * `limit` caps the hits in all; `perVolume`, when given, caps each collection's own
+ * (doc.volumeId: 'bible', 'v7', 'answers'...). A single total let the Bible's verses
+ * fill the whole budget in the All corpus: "love" kept 90 of its 379 volume hits and
+ * "lord" 125 of 890, with no sign anything was missing. `capped` names every
+ * collection that hit its cap (it may hold more), `truncated` says the total did.
+ * @param {{translation?:string, useStopWords?:boolean, synonyms?:boolean, scope?:{bookId?:string,volumeId?:string}|null, corpus?:string, limit?:number, perVolume?:number}} [options]
+ * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean}>}
  */
 async function search(query, options) {
   options = options || {};
@@ -277,6 +283,26 @@ async function search(query, options) {
     const ex = expandQueryTerms(filtered, { enabled: options.synonyms !== false });
     units = ex.units;
     didExpand = ex.didExpand;
+    /* WORD FORMS (2026-09-26). A literal word reaches only forward through its
+       prefix ("flood" finds flooding; "flooding" never finds flood), so typing
+       "prayed" missed 397 of the 463 pray-family results. Each one-word literal
+       adds its family (word-forms.js) as exact, non-literal units under the
+       same origin: they count toward the word's coverage, a doc found only
+       through them takes the synonym demotion, so the typed form ranks first,
+       and a form not in the index finds nothing. Never for a phrase. */
+    const had = new Set(units.map((u) => String(u.term).toLowerCase()));
+    const forms = [];
+    for (const u of units) {
+      if (!u.literal) continue;
+      const toks = kjvEncode(u.term);
+      if (toks.length !== 1) continue;
+      for (const f of wordForms(toks[0], (w) => D.STOP_WORDS_TRIMMED.has(w))) {
+        if (had.has(f)) continue;
+        had.add(f);
+        forms.push({ term: f, origin: u.origin, literal: false, form: true });
+      }
+    }
+    if (forms.length) { units = units.concat(forms); didExpand = true; }
   }
 
   // One BM25 search per unit; accumulate score + coverage bitmask.
@@ -299,15 +325,17 @@ async function search(query, options) {
       const id = hit.id;
       scoreMap[id] = (scoreMap[id] || 0) + hit.score;
       if (!docLookup[id]) docLookup[id] = hit;
-      if (unit.literal) {
-        literalHit[id] = true;
+      if (unit.literal) literalHit[id] = true;
+      if (unit.literal || unit.form) {
         // hit.terms is the DOC-side vocabulary that matched (MiniSearch derives
         // it from the match map), so for a fuzzy/prefix hit it's the corrected
         // word — query "sheperd" carries "shepherd" here. The snippet
         // highlighter only knows the literal typed terms, so these ride along
         // on the result for the UI to merge in (v1.1 gap: corrected words
-        // rendered unmarked). Literal units only: synonym units match exactly,
-        // and SRCH4's expandSnippetTerms already covers those.
+        // rendered unmarked). A word-form unit's hit ("flood" for a typed
+        // "flooding") rides the same way, or its snippet would show no mark.
+        // Not synonym units: they match exactly, and SRCH4's
+        // expandSnippetTerms already covers those.
         if (hit.terms) {
           const mt = matchedTerms[id] || (matchedTerms[id] = []);
           for (let t = 0; t < hit.terms.length && mt.length < 12; t++) {
@@ -367,14 +395,23 @@ async function search(query, options) {
   const scopeBookId = scope && scope.bookId ? scope.bookId : null;
   const scopeVolumeId = scope && scope.volumeId ? scope.volumeId : null;
   const corpusFilter = corpus === 'all' ? null : corpus;
+  const perVolume = options.perVolume || 0;
+  const volCount = Object.create(null);
+  const capped = Object.create(null);
 
-  for (let h = 0; h < rankedIds.length && out.length < limit; h++) {
+  let h = 0;
+  for (; h < rankedIds.length && out.length < limit; h++) {
     const id = rankedIds[h];
     const doc = docLookup[id];
     if (!doc) continue;
     if (corpusFilter && doc.corpus !== corpusFilter) continue;
     if (scopeBookId && doc.bookId !== scopeBookId) continue;
     if (scopeVolumeId && doc.volumeId !== scopeVolumeId) continue;
+    // Before the word filters, which tokenise the whole doc: a full collection
+    // costs nothing more to pass over. (A doc the filters would have refused can
+    // mark its collection capped, so "400+" may mean exactly 400; never fewer.)
+    const vid = doc.volumeId || '';
+    if (perVolume && (volCount[vid] || 0) >= perVolume) { capped[vid] = true; continue; }
     if (phraseToks || hasMust || hasMustNot) {
       const toks = kjvEncode((doc.text || '') + ' ' + (doc.title || '') + ' ' + (doc.heading || '') + ' ' + (doc.ref || ''));
       if (phraseToks && !hasTokenRun(toks, phraseToks)) continue;
@@ -384,10 +421,11 @@ async function search(query, options) {
     const dedupKey = doc.kind + '|' + (doc.ref || '') + '|' + (doc.text || '').slice(0, 60);
     if (seen[dedupKey]) continue;
     seen[dedupKey] = true;
+    volCount[vid] = (volCount[vid] || 0) + 1;
     out.push({ score: scoreMap[id], doc: reshapeDoc(doc), terms: matchedTerms[id] || [] });
   }
 
-  return { parsed, results: out, parsedTerms: filtered, textQuery: p };
+  return { parsed, results: out, parsedTerms: filtered, textQuery: p, capped: Object.keys(capped), truncated: out.length >= limit && h < rankedIds.length };
 }
 
 /**
@@ -475,6 +513,7 @@ export const VotSearchMini = {
   suggest,
   snippet,
   matchExcerpt,
+  morePlaces,
   highlightSpans,
   levenshtein,
   fuzzyBookSuggest,

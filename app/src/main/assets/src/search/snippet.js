@@ -6,7 +6,7 @@
    Ported verbatim from the FlexSearch engine.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { expandArchaicTerms } from './tokenize.js';
+import { expandArchaicTerms, ARCHAIC_NORMALIZE } from './tokenize.js';
 
 /* Whole words only (2026-09-22). The engine tokenises on word boundaries, so a term
    found INSIDE another word ("one" in "everyone", "love" in "Beloved") is never what
@@ -19,6 +19,50 @@ function startsWord(text, i) { return i === 0 || !WORD_CHAR.test(text[i - 1]); }
 function insideWord(text, i) { return i > 0 && i < text.length && WORD_CHAR.test(text[i - 1]) && WORD_CHAR.test(text[i]); }
 
 /**
+ * EVERY whole-word occurrence of every matchable term (archaic-aware), in text
+ * order, one per position, capped for long bodies.
+ *
+ * `term` is the hit's WORD FAMILY, which is what a window's "distinct terms" count:
+ * the list a card highlights carries the forms the engine matched ("flood" and
+ * "flooding" for a search of flood) and the archaic twins ("thee" for you), and
+ * counted as separate words they made "flooding" worth two of "flood". A term
+ * joins the family of a shorter term it starts with, and an archaic form joins
+ * its modern word's. Two terms matching at one position ("flood", "flooding" at
+ * "flooding") are one hit, the longer.
+ * @param {string} text
+ * @param {string[]} terms
+ * @returns {Array<{ idx: number, len: number, term: string }>}
+ */
+function occurrences(text, terms) {
+  if (!text || !terms || !terms.length) return [];
+  const expanded = expandArchaicTerms(terms)
+    .map((t) => t.toLowerCase())
+    .filter((t) => t.length >= 2)
+    .sort((a, b) => a.length - b.length || (a < b ? -1 : 1));
+  const family = Object.create(null);
+  for (let i = 0; i < expanded.length; i++) {
+    const t = expanded[i];
+    let fam = ARCHAIC_NORMALIZE[t] || t;
+    for (let j = 0; j < i; j++) {
+      if (t.startsWith(expanded[j])) { fam = family[expanded[j]]; break; }
+    }
+    family[t] = fam;
+  }
+  const lower = text.toLowerCase();
+  const at = new Map();
+  for (let i = 0; i < expanded.length; i++) {
+    const t = expanded[i];
+    let idx = lower.indexOf(t);
+    while (idx >= 0 && at.size < 400) {
+      // longer terms come later, so the last write at a position is the longest
+      if (startsWord(lower, idx)) at.set(idx, { idx, len: t.length, term: family[t] });
+      idx = lower.indexOf(t, idx + t.length);
+    }
+  }
+  return [...at.values()].sort((a, b) => a.idx - b.idx);
+}
+
+/**
  * The ~maxLen-wide window covering the MOST DISTINCT query terms — the passage
  * where the query words actually cluster (the remembered phrase), not the
  * first stray hit of one common word. Ties resolve to the earliest window.
@@ -27,25 +71,12 @@ function insideWord(text, i) { return i > 0 && i < text.length && WORD_CHAR.test
  * @param {string} text
  * @param {string[]} terms
  * @param {number} maxLen
- * @returns {{ start: number, span: number } | null}
+ * @returns {{ start: number, span: number, count: number } | null}  count: the distinct
+ *   query words (word families) the window holds
  */
 export function bestMatch(text, terms, maxLen) {
-  if (!text || !terms || !terms.length) return null;
-  const expanded = expandArchaicTerms(terms);
-  const lower = text.toLowerCase();
-  // Collect EVERY occurrence of every matchable term (capped for long bodies).
-  const occ = [];
-  for (let i = 0; i < expanded.length; i++) {
-    const t = expanded[i].toLowerCase();
-    if (t.length < 2) continue;
-    let idx = lower.indexOf(t);
-    while (idx >= 0 && occ.length < 400) {
-      if (startsWord(lower, idx)) occ.push({ idx, len: t.length, term: t });
-      idx = lower.indexOf(t, idx + t.length);
-    }
-  }
+  const occ = occurrences(text, terms);
   if (!occ.length) return null;
-  occ.sort((a, b) => a.idx - b.idx);
   let bestStart = occ[0].idx;
   let bestCount = 0;
   let bestSpan = occ[0].len;
@@ -60,7 +91,7 @@ export function bestMatch(text, terms, maxLen) {
     }
     if (count > bestCount) { bestCount = count; bestStart = winStart; bestSpan = spanEnd - winStart; }
   }
-  return { start: bestStart, span: bestSpan };
+  return { start: bestStart, span: bestSpan, count: bestCount };
 }
 
 /**
@@ -78,6 +109,18 @@ export function snippet(text, terms, maxLen) {
     if (text.length <= maxLen) return text;
     return text.slice(0, closeBetweenWords(text, 0, maxLen, 0)) + '…';
   }
+  return clipAround(text, m, maxLen);
+}
+
+/**
+ * The ~maxLen-char excerpt centred on a matched span, opened and closed between
+ * words, with an ellipsis on each cut side.
+ * @param {string} text
+ * @param {{ start: number, span: number }} m
+ * @param {number} maxLen
+ * @returns {string}
+ */
+function clipAround(text, m, maxLen) {
   // Center the matched span within maxLen.
   const pad = Math.max(0, Math.floor((maxLen - m.span) / 2));
   let start = Math.max(0, m.start - pad);
@@ -126,6 +169,66 @@ export function matchExcerpt(text, terms, len) {
   len = len || 48;
   const m = bestMatch(text, terms, len);
   return m ? text.slice(m.start, m.start + len) : '';
+}
+
+/* How much of the text around its first hit a result card's snippet surely shows:
+   the snippet is cut 180 chars wide, but its box holds three lines centred on
+   the first <mark> (SrchSnippet), about 50 chars before the hit and 60 from it
+   on the narrowest phone. A hit in that stretch is on screen already. */
+const SHOWN_BEFORE = 50;
+const SHOWN_FROM = 60;
+
+/**
+ * Every OTHER place a unit's text matches: the passages a result card lists
+ * under its snippet, so a letter that says the word four times offers all four
+ * (Brianna, 2026-09-26: "flood" showed "a flooding rain" and never the "flood of
+ * judgment" further down the same letter, the passage she was after).
+ *
+ * The hits the card's snippet already shows are left out (the stretch around
+ * the best window's first hit, SHOWN_BEFORE / SHOWN_FROM); the rest are gathered
+ * into places, one per `maxLen`-wide run of hits, in the order the text reads.
+ * With two or more query words, only the places that hold as many of them as the
+ * best window does are kept: a stray single word is not the passage a reader
+ * remembers.
+ *
+ * Each place carries `start` (its first hit, a word start: the landing reads
+ * text.slice(start, start + 48), as matchExcerpt does) and `clip`, the
+ * between-words excerpt centred on it.
+ * @param {string} text
+ * @param {string[]} terms
+ * @param {number} [maxLen=120]
+ * @returns {Array<{ start: number, clip: string }>}
+ */
+export function morePlaces(text, terms, maxLen) {
+  maxLen = maxLen || 120;
+  const occ = occurrences(text, terms);
+  if (!occ.length) return [];
+  const best = bestMatch(text, terms, 180);
+  const shownFrom = best ? best.start - SHOWN_BEFORE : -1;
+  const shownTo = best ? best.start + SHOWN_FROM : -1;
+  const rest = occ.filter((o) => o.idx < shownFrom || o.idx + o.len > shownTo);
+  const places = [];
+  for (let i = 0; i < rest.length;) {
+    const start = rest[i].idx;
+    const seen = Object.create(null);
+    let count = 0;
+    let end = start + rest[i].len;
+    let j = i;
+    do {
+      if (!seen[rest[j].term]) { seen[rest[j].term] = true; count++; }
+      end = Math.max(end, rest[j].idx + rest[j].len);
+      j++;
+    } while (j < rest.length && rest[j].idx + rest[j].len <= start + maxLen);
+    places.push({ start, span: end - start, count });
+    i = j;
+  }
+  // The bar is the best window's, the snippet's own included: when the snippet
+  // holds the only passage with every word, the one-word leftovers are not places.
+  let most = best ? best.count : 0;
+  for (const p of places) if (p.count > most) most = p.count;
+  return places
+    .filter((p) => most < 2 || p.count === most)
+    .map((p) => ({ start: p.start, clip: clipAround(text, p, maxLen) }));
 }
 
 /**

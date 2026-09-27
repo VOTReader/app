@@ -168,6 +168,8 @@ class MainActivity : AppCompatActivity(), BridgeHost {
 
     // This page's sink for downloaded-recording events (listening item 8), kept so onDestroy clears only its own.
     private var offlineSink: ((String) -> Unit)? = null
+    /** The system-transport receiver this Activity set (onDestroy clears the statics only while they are still this). */
+    private var commandSink: ((String, Long) -> Unit)? = null
 
     // #5: the asset loader + its handler are stateless w.r.t. the WebView
     // instance, so build them ONCE (lazy) and reuse across renderer-crash
@@ -518,11 +520,13 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // player. Cleared in onDestroy: with the WebView gone there is no
         // player to command, and the next Activity re-registers its own sink
         // (same static-hook pattern as VOTReaderApp.releaseTree).
-        AudioKeepAliveService.commandSink = { cmd, posMs ->
+        val sink: (String, Long) -> Unit = { cmd, posMs ->
             bridge.callOptional(JsEvent.MediaCommand, cmd, posMs)
         }
+        commandSink = sink
+        AudioKeepAliveService.commandSink = sink
         // m3: the native player's session sends next/previous to the same receiver (the page owns the queue).
-        PlaybackService.commandSink = AudioKeepAliveService.commandSink
+        PlaybackService.commandSink = sink
         WindowCompat.setDecorFitsSystemWindows(window, false)
         // REQUIRED for an app that toggles immersive mode. Under the DEFAULT
         // cutout mode a window may lay out into the cutout only while that
@@ -1449,9 +1453,12 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // #3: drop the pending splash safety hatch — the Activity is gone, so
         // there's nothing left to release (and nothing to leak).
         mainHandler.removeCallbacks(splashSafetyHatch)
-        // System-transport sink is bound to THIS Activity's bridge/WebView.
-        AudioKeepAliveService.commandSink = null
-        PlaybackService.commandSink = null
+        // System-transport sink is bound to THIS Activity's bridge/WebView. Cleared only while it is still ours: a quick
+        // relaunch's new Activity may already have set its own, and Next on the lock screen went nowhere (sweep n1-08).
+        commandSink?.let { mine ->
+            if (AudioKeepAliveService.commandSink === mine) AudioKeepAliveService.commandSink = null
+            if (PlaybackService.commandSink === mine) PlaybackService.commandSink = null
+        }
         // m3: the page that owns the queue is going, so native playback stops with it (as the <audio> did).
         if (nativeAudioLazy.isInitialized()) nativeAudioLazy.value.shutdown()
         // Only if it is still THIS page's: a quick relaunch's new Activity may already have set its own.

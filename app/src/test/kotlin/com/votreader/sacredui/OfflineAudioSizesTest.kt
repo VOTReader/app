@@ -107,4 +107,28 @@ class OfflineAudioSizesTest {
         s.requestSizes(many)
         assertEquals(2, listed, "and asked again after ten minutes")
     }
+
+    @Test
+    fun `the HEAD budget is per release and window, not per call, so rows asking one by one spend 40 (n2-02)`() {
+        var headed = 0
+        val s = store(lister = { null }, head = { headed++; 5L })
+        (1..66).forEach { s.requestSizes(listOf(base + "audio-v1/letter-$it-B.mp3")) }
+        assertEquals(40, headed)
+        s.requestSizes(listOf(b1))
+        assertEquals(41, headed, "another release has its own budget")
+        now += 11L * 60 * 1000
+        s.requestSizes(listOf(base + "audio-v1/letter-99-B.mp3"))
+        assertEquals(42, headed, "a new window, a new budget")
+    }
+
+    @Test
+    fun `each answer names what it was asked, answered or not`() {
+        val s = store(lister = { null })
+        s.requestSizes(listOf(a1, a1, "https://example.com/x.mp3"))
+        val last = events.last()
+        assertEquals("sizes", last.getString("type"))
+        val asked = last.getJSONArray("asked")
+        assertEquals(listOf(a1, "https://example.com/x.mp3"), (0 until asked.length()).map { asked.getString(it) })
+        assertEquals(0, last.getJSONObject("sizes").length())
+    }
 }

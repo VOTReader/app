@@ -140,6 +140,53 @@ describe('a recording row: what the phone holds, and the next step', () => {
   });
 });
 
+describe('downloads a keyboard or screen reader can follow (n2-06)', () => {
+  it('Download keeps focus: it lands on Cancel, then on the finished line, never the page top', () => {
+    const s = fakeStore();
+    s.st.sizes.set(U('a'), 1000);
+    const { getByRole, container } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
+    const btn = getByRole('button', { name: /download letter a/i });
+    btn.focus();
+    fireEvent.click(btn);
+    s.st.status.set(U('a'), 'downloading');
+    s.st.progress.set(U('a'), { bytes: 400, total: 1000 });
+    act(() => s.bump());
+    expect(document.activeElement).toBe(getByRole('button', { name: /cancel the download of letter a/i }));
+    const bar = getByRole('progressbar', { name: /downloading letter a/i });
+    expect(bar.getAttribute('aria-valuenow')).toBe('40');
+    save(s, 'a', 1000);
+    act(() => s.bump());
+    expect(document.activeElement).toBe(container.querySelector('.offline-row.is-saved'));
+  });
+
+  it('a row that never had focus never takes it', () => {
+    const s = fakeStore();
+    const other = document.createElement('button');
+    document.body.appendChild(other);
+    other.focus();
+    render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
+    s.st.status.set(U('a'), 'downloading');
+    act(() => s.bump());
+    expect(document.activeElement).toBe(other);
+    other.remove();
+  });
+
+  it('news is read out once, in one polite live region: not what happened before the screen opened', () => {
+    const s = fakeStore();
+    let news = { seq: 3, text: 'Download finished' };
+    s.news = () => news;
+    render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
+    render(<OfflineRowStatus tracks={[T('b')]} name="Letter b" />);
+    const regions = document.querySelectorAll('#offline-audio-status');
+    expect(regions).toHaveLength(1);
+    expect(regions[0].getAttribute('role')).toBe('status');
+    expect(regions[0].textContent).toBe('');
+    news = { seq: 4, text: 'Downloading 12 recordings' };
+    act(() => s.bump());
+    expect(regions[0].textContent).toBe('Downloading 12 recordings');
+  });
+});
+
 describe('Download all, beside Play all', () => {
   const units = [[T('a')], [T('b'), T('b2')], [T('c')]];
 

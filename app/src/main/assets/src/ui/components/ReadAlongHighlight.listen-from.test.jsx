@@ -43,12 +43,13 @@ const BLOCK1 = 'Second paragraph, first clause. Second paragraph, second clause.
 const MANIFEST = { ['one:' + ID]: [['idLong', 'B']] };
 const SYNC = { ['one:' + ID]: [[12.0, 0, 0, 28, 0], [30.0, 1, 0, 31, 0], [36.5, 1, 32, 64, 0]] };
 
-function Host({ withListen = true, onListenSpy, readAlongOn = true }) {
+function Host({ withListen = true, onListenSpy, readAlongOn = true, refuse = false }) {
   const mainRef = React.useRef(null);
   const onListen = React.useCallback(() => {
     if (onListenSpy) onListenSpy();
+    if (refuse) return;   // offline with nothing saved: a toast, nothing loads
     AudioPlayer.playLetter({ volKey: 'one', letter: { id: ID, title: 'A Long Letter' }, collectionLabel: 'Volume One' });
-  }, [onListenSpy]);
+  }, [onListenSpy, refuse]);
   return (
     <div className="screen-scroll">
       <div className="letter-body" ref={mainRef}>
@@ -113,6 +114,19 @@ describe('window.__votListenFrom: play the unit on screen from a chosen clause',
     act(() => { LF().start(letterHlKey(ID, 1), 3); });
     expect(spy).not.toHaveBeenCalled();
     expect(AudioPlayer.getState().time).toBe(30);
+  });
+
+  it('a start the host refused does not hijack a later plain Listen of this unit (n1-11)', () => {
+    const spy = vi.fn();
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    render(<Host onListenSpy={spy} refuse />);
+    act(() => { LF().start(letterHlKey(ID, 1), 40); });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(AudioPlayer.getState().status).toBe('idle');
+    now.mockReturnValue(1_000_000 + 60_000);   // a minute on, back online: the hero's plain Listen
+    act(() => { AudioPlayer.playLetter({ volKey: 'one', letter: { id: ID, title: 'A Long Letter' }, collectionLabel: 'Volume One' }); });
+    expect(AudioPlayer.getState().time, 'from the start, not the old landing').toBe(0);
+    now.mockRestore();
   });
 
   it('paused on this unit: seeks and resumes', () => {

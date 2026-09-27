@@ -120,25 +120,78 @@ describe('offline-audio — in the phone app', () => {
     expect(b.offlineAudioCancel).not.toHaveBeenCalled();                       // nothing of the recordings' on its way
   });
 
-  it('asks the phone for sizes before a download and answers them per recording', () => {
+  it('asks the phone for sizes before a download and answers them per recording', async () => {
     const b = fakeBridge([{ url: U2, key: 'k2', title: 't2', bytes: 20, savedAt: 1 }]);
     OfflineAudio.refresh();
     expect(OfflineAudio.sizeOf(U1)).toBeNull();
     OfflineAudio.requestSizes([U1, U2]);
+    await Promise.resolve();
     expect(JSON.parse(b.offlineAudioSizes.mock.calls[0][0])).toEqual([U1]);   // a download on the phone already knows its size
     send({ type: 'sizes', sizes: { [U1]: 18_000_000 } });
     expect(OfflineAudio.sizeOf(U1)).toBe(18_000_000);
     expect(OfflineAudio.sizeOf(U2)).toBe(20);
     OfflineAudio.requestSizes([U1]);
+    await Promise.resolve();
     expect(b.offlineAudioSizes).toHaveBeenCalledTimes(1);                     // known sizes are not asked again
   });
 
-  it('a size the phone could not give is asked again next time (not given up for the session)', () => {
+  it('a size the phone could not give is asked again next time (not given up for the session)', async () => {
     const b = fakeBridge();
     OfflineAudio.requestSizes([U1, U2]);
+    await Promise.resolve();
     send({ type: 'sizes', sizes: { [U1]: 5 } });   // U2 went unanswered (no signal, a failed lookup)
     OfflineAudio.requestSizes([U1, U2]);
+    await Promise.resolve();
     expect(JSON.parse(b.offlineAudioSizes.mock.calls[1][0])).toEqual([U2]);
+  });
+
+  it('every row of a screen asking in one turn is one call to the phone (n2-02)', async () => {
+    const b = fakeBridge();
+    const url = (i) => U1.replace('.mp3', '-' + i + '.mp3');
+    for (let i = 0; i < 66; i++) OfflineAudio.requestSizes([url(i), url(i + 1)]);
+    expect(b.offlineAudioSizes).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(b.offlineAudioSizes).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(b.offlineAudioSizes.mock.calls[0][0])).toHaveLength(67);
+  });
+
+  it('an answer frees only what it was asked, not a later call still on its way (n2-02)', async () => {
+    const b = fakeBridge();
+    OfflineAudio.requestSizes([U1]);
+    await Promise.resolve();
+    OfflineAudio.requestSizes([U2]);
+    await Promise.resolve();
+    send({ type: 'sizes', sizes: {}, asked: [U1] });   // U1's lookup failed; U2's is still out
+    OfflineAudio.requestSizes([U1, U2]);
+    await Promise.resolve();
+    expect(JSON.parse(b.offlineAudioSizes.mock.calls[2][0])).toEqual([U1]);
+  });
+
+  it('one queued event carries a whole Download all (n2-03)', () => {
+    fakeBridge();
+    const seen = vi.fn();
+    OfflineAudio.subscribe(seen);
+    seen.mockClear();
+    send({ type: 'queued', urls: [U1, U2, 7] });
+    expect(OfflineAudio.statusOf(U1)).toBe('queued');
+    expect(OfflineAudio.statusOf(U2)).toBe('queued');
+    expect(seen).toHaveBeenCalledTimes(1);
+  });
+
+  it('has news for a screen reader: a batch started, a failure, the queue finished (n2-06)', () => {
+    const b = fakeBridge();
+    expect(OfflineAudio.news().seq).toBe(0);
+    send({ type: 'queued', urls: [U1, U2] });
+    expect(OfflineAudio.news().text).toBe('Downloading 2 recordings');
+    send({ type: 'progress', url: U1, bytes: 1, total: 10 });
+    send({ type: 'failed', url: U1, reason: 'space' });
+    expect(OfflineAudio.news().text).toBe('Download failed: not enough room on this phone');
+    const seq = OfflineAudio.news().seq;
+    send({ type: 'progress', url: U2, bytes: 1, total: 10 });
+    expect(OfflineAudio.news().seq).toBe(seq);   // not per percent
+    b.offlineAudioState.mockReturnValue(JSON.stringify({ items: [], queued: [] }));
+    send({ type: 'done', url: U2 });
+    expect(OfflineAudio.news().text).toBe('Download finished');
   });
 
   it('a cancelled download is simply not there any more', () => {

@@ -8,10 +8,10 @@
    results WITHOUT entry.terms (direct-ref parses) through unchanged. */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, fireEvent } from '@testing-library/react';
 import { SrchCard } from './SrchCard.jsx';
 import { SrchSnippet } from './SrchSnippet.jsx';
-import { snippet, highlightSpans } from '../../search/snippet.js';
+import { snippet, highlightSpans, morePlaces } from '../../search/snippet.js';
 
 beforeEach(() => {
   // SrchCard / SrchSnippet read these as free-var globals (window-attached in prod).
@@ -91,5 +91,75 @@ describe('SrchCard translation badge (W0: registry label, never a raw id)', () =
     const e = { score: 1, doc: { kind: 'verse', ref: 'John 1:1', text: VERSE, translation: 'nkjv' } };
     const { container } = render(<SrchCard entry={e} terms={[]} onSelect={() => {}} isDirect={false} />);
     expect(container.querySelectorAll('.srch-card-badge')).toHaveLength(1); // kind badge only
+  });
+});
+
+/* Every place a letter says the words (Brianna, 2026-09-26): the card lists the
+   places its snippet does not show, closed under one quiet row, each its own tap. */
+describe('SrchCard — more places in this letter', () => {
+  const pad = (n) => 'and the word went on. '.repeat(n);
+  const LETTER = pad(3) + 'Behold, I shall bring upon them a flooding rain. ' + pad(300)
+    + 'nor shall I flood the face of the earth in My anger. ' + pad(20)
+    + 'Be a flood of water which covers, But a flood of judgment to destroy. ' + pad(3);
+  const letter = (kind = 'letter') => ({
+    score: 1, terms: ['flood', 'flooding'],
+    doc: { kind, title: 'Vengeance Is Mine, I Shall Repay', ref: 'Volume Seven · Letter 55', text: LETTER, volumeId: 'v7', letterId: 'vengeance' },
+  });
+  beforeEach(() => {
+    /** @type {any} */ (globalThis).SRCH_KIND_LABEL = { letter: { label: 'Letter', cls: 'badge-letter' }, answers: { label: 'Answers', cls: '' } };
+    /** @type {any} */ (globalThis).VotSearchMini = { snippet, highlightSpans, morePlaces };
+  });
+
+  it('says how many more places the letter holds, closed until asked', () => {
+    const { container } = render(<SrchCard entry={letter()} terms={['flood']} onSelect={() => {}} isDirect={false} />);
+    const toggle = container.querySelector('.srch-places-toggle');
+    expect(toggle.textContent).toContain('2 more places in this letter');
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector('.srch-places')).toBeNull();
+  });
+
+  it('opens to the places, the words marked, and a place taps through with where it starts', () => {
+    const picked = [];
+    const { container } = render(<SrchCard entry={letter()} terms={['flood']} onSelect={(e) => picked.push(e)} isDirect={false} />);
+    fireEvent.click(container.querySelector('.srch-places-toggle'));
+    expect(container.querySelector('.srch-places-toggle').getAttribute('aria-expanded')).toBe('true');
+    const rows = [...container.querySelectorAll('.srch-place')];
+    expect(rows).toHaveLength(2);
+    expect(rows[1].textContent).toContain('Be a flood of water which covers, But a flood of judgment');
+    expect([...rows[1].querySelectorAll('mark')].map((m) => m.textContent)).toEqual(['flood', 'flood']);
+    fireEvent.click(rows[1]);
+    expect(picked).toHaveLength(1);
+    expect(LETTER.slice(picked[0].placeStart).startsWith('flood of water')).toBe(true);
+    expect(picked[0].doc.letterId).toBe('vengeance');
+  });
+
+  it('the card itself still opens the snippet\'s passage, with no place named', () => {
+    const picked = [];
+    const { container } = render(<SrchCard entry={letter()} terms={['flood']} onSelect={(e) => picked.push(e)} isDirect={false} />);
+    fireEvent.click(container.querySelector('.srch-card'));
+    expect(picked[0].placeStart).toBeUndefined();
+  });
+
+  it('names the unit by kind: an Answers topic', () => {
+    const { container } = render(<SrchCard entry={letter('answers')} terms={['flood']} onSelect={() => {}} isDirect={false} />);
+    expect(container.querySelector('.srch-places-toggle').textContent).toContain('2 more places in this topic');
+  });
+
+  it('a verse, or a letter that says the word once, has no places row', () => {
+    const verse = { score: 1, doc: { kind: 'verse', ref: 'Genesis 7:17', text: 'Now the flood was on the earth forty days.' } };
+    const once = { score: 1, doc: { kind: 'letter', title: 'A Day of Slaughter', ref: 'Volume Seven · Letter 53', text: pad(5) + 'as a flood to cover the land. ' + pad(5) } };
+    for (const e of [verse, once]) {
+      const { container, unmount } = render(<SrchCard entry={e} terms={['flood']} onSelect={() => {}} isDirect={false} />);
+      expect(container.querySelector('.srch-places-toggle')).toBeNull();
+      expect(container.querySelector('.srch-card-wrap')).toBeNull();
+      unmount();
+    }
+  });
+
+  it('an engine without morePlaces (an older cached bundle-e) renders the plain card', () => {
+    /** @type {any} */ (globalThis).VotSearchMini = { snippet, highlightSpans };
+    const { container } = render(<SrchCard entry={letter()} terms={['flood']} onSelect={() => {}} isDirect={false} />);
+    expect(container.querySelector('.srch-card')).toBeTruthy();
+    expect(container.querySelector('.srch-places-toggle')).toBeNull();
   });
 });

@@ -197,6 +197,50 @@ describe('native-audio - the <audio> surface', () => {
     el.setMeta({ title: 'Letter Three' });
   });
 
+  it('the clock starts from when native read the position, not from when the event arrived (n1-04)', () => {
+    const el = new NativeAudio();
+    el.src = A;
+    el.play();
+    clock = 100_000;   // an anchor made up to 0 would read as none
+    const wall = vi.spyOn(Date, 'now').mockReturnValue(50_000);
+    state({ pos: 10000, playing: true, want: true, at: 50_000 - 200 });   // 200 ms on the bridge
+    expect(el.currentTime).toBeCloseTo(10.2);
+    state({ type: 'tick', pos: 11000, playing: true, want: true, at: 50_000 - 40 });   // a quicker one: no step back
+    expect(el.currentTime).toBeCloseTo(11.04);
+    state({ type: 'tick', pos: 12000, rate: 1.5, playing: true, want: true, at: 50_000 - 100 });
+    expect(el.currentTime).toBeCloseTo(12.15);   // 100 ms at 1.5x
+    state({ type: 'tick', pos: 13000, playing: true, want: true, at: 50_000 - 5_000 });   // a stale snapshot
+    expect(el.currentTime).toBeCloseTo(14);      // makes up at most 1 s
+    state({ type: 'tick', pos: 14000, playing: true, want: true, at: 50_000 + 500 });   // a clock ahead: nothing
+    expect(el.currentTime).toBeCloseTo(14);
+    state({ type: 'tick', pos: 15000, playing: true, want: true });   // an older shell: no stamp
+    expect(el.currentTime).toBeCloseTo(15);
+    wall.mockRestore();
+  });
+
+  it('a seek from outside the page fires seeking before its timeupdate (n1-07)', () => {
+    const el = new NativeAudio();
+    el.src = A;
+    el.play();
+    state({ pos: 1000, playing: true, want: true });
+    const seen = [];
+    el.addEventListener('seeking', () => seen.push('seeking@' + el.currentTime));
+    el.addEventListener('timeupdate', () => seen.push('timeupdate'));
+    state({ type: 'seeked', pos: 40000, playing: true, want: true });
+    expect(seen).toEqual(['seeking@40', 'timeupdate']);
+    state({ type: 'tick', pos: 41000, playing: true, want: true });
+    expect(seen.filter((x) => x.startsWith('seeking'))).toHaveLength(1);
+  });
+
+  it('prewarm asks native to bind its player, and is quiet on a shell without it (n1-05)', () => {
+    const el = new NativeAudio();
+    el.prewarm();
+    bridge.audioPrewarm = vi.fn();
+    el.prewarm();
+    expect(bridge.audioPrewarm).toHaveBeenCalledTimes(1);
+    expect(bridge.audioLoad).not.toHaveBeenCalled();
+  });
+
   it('an end with nothing after it is a pause then an ended, once', () => {
     const el = new NativeAudio();
     el.src = A;

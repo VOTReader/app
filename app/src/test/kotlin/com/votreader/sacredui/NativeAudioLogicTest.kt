@@ -47,10 +47,19 @@ class NativeAudioLogicTest {
     }
 
     @Test
-    fun `only https recordings (and a local test server) may play`() {
+    fun `only the app's own https recordings may play`() {
         assertTrue(NativeAudioLogic.playable("https://votreader.github.io/songs-1/a.mp3"))
-        assertTrue(NativeAudioLogic.playable("http://127.0.0.1:8089/a.mp3"))
-        assertTrue(NativeAudioLogic.playable("http://localhost:8089/a.mp3"))
+        assertTrue(NativeAudioLogic.playable("https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/a.mp3"))
+        assertTrue(NativeAudioLogic.playable("https://release-assets.githubusercontent.com/github-production-release-asset/1/a?sp=r"))
+        assertTrue(NativeAudioLogic.playable("https://GitHub.com/VOTReader/x.mp3"))
+        // n1-09: no cleartext (blocked app-wide), and the host is parsed exactly, not prefix-matched.
+        assertFalse(NativeAudioLogic.playable("http://127.0.0.1:8089/a.mp3"))
+        assertFalse(NativeAudioLogic.playable("http://localhost:8089/a.mp3"))
+        assertFalse(NativeAudioLogic.playable("http://localhost.example.org/a.mp3"))
+        assertFalse(NativeAudioLogic.playable("https://github.com.evil.example/VOTReader/a.mp3"))
+        assertFalse(NativeAudioLogic.playable("https://github.com@evil.example/VOTReader/a.mp3"))
+        assertFalse(NativeAudioLogic.playable("https://github.com/someone-else/a.mp3"))
+        assertFalse(NativeAudioLogic.playable("https://votreader.github.io.evil.example/songs-1/a.mp3"))
         assertFalse(NativeAudioLogic.playable(null))
         assertFalse(NativeAudioLogic.playable("http://evil.example/a.mp3"))
         assertFalse(NativeAudioLogic.playable("file:///data/data/x/a.mp3"))
@@ -102,5 +111,25 @@ class NativeAudioLogicTest {
         assertEquals(emptyList(), j.seams())
         assertEquals(1L, j.last())
         assertEquals(2L, j.add("b", "c", 2L).seq)
+    }
+
+    @Test
+    fun `the cursor names a seam once, for a move the player made by itself (n1-06)`() {
+        val c = NativeAudioLogic.Cursor()
+        assertNull(c.url)
+        c.load("1|A", "A")
+        assertEquals("A", c.url)
+        assertEquals("A", c.enter("2|B", "B", auto = true))       // A ended, B began: a seam out of A
+        assertEquals("B", c.url)
+        assertNull(c.enter("2|B", "B", auto = true))              // the played item dropped from the front: same item
+        assertEquals("B", c.enter("3|B", "B", auto = true))       // repeat one: the same url, a new item, a seam
+        assertNull(c.enter("4|C", "C", auto = false))             // the page's own move is no seam, but is followed
+        assertEquals("C", c.url)
+        assertNull(c.enter("5|?", null, auto = true))             // an item with no url names nothing
+        assertNull(c.url)
+        assertEquals("", c.enter("6|D", "D", auto = true))        // out of nothing known: from ""
+        c.clear()
+        assertNull(c.url)
+        assertEquals("", c.enter("6|D", "D", auto = true))        // after a release the same id is new again
     }
 }

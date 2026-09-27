@@ -39,6 +39,8 @@
 
 /** How far currentTime may run on past native's last word before it waits for the next. */
 const MAX_EXTRAPOLATE_S = 1.5;
+/** The most of a native event's delivery time the clock makes up (a stale snapshot is not a slow bridge). */
+const MAX_LAG_MS = 1000;
 /** <audio> fires timeupdate every 250 ms or so while playing. */
 const TICK_MS = 250;
 /** MediaError codes (the player only reads that one exists). */
@@ -280,6 +282,13 @@ class NativeAudio extends EventTarget {
     if (b && typeof b.audioMeta === 'function') b.audioMeta(json);
   }
 
+  /** A letter with a recording opened: native binds its player service now, so the first Listen starts warm
+   *  (sweep n1-05). Plays and loads nothing. */
+  prewarm() {
+    const b = nativeBridge();
+    if (b && typeof b.audioPrewarm === 'function') b.audioPrewarm();
+  }
+
   /* ── the seam ────────────────────────────────────────────────────── */
 
   /** Tell native what plays after this recording (only when it changed). The player calls this at each start and
@@ -326,13 +335,19 @@ class NativeAudio extends EventTarget {
     const wasBuffering = this._buffering;
     const dur = Number(e.dur) > 0 ? Number(e.dur) / 1000 : NaN;
     this._pos = Math.max(0, Number(e.pos) || 0) / 1000;
-    this._anchorAt = now();
+    // Native read pos at e.at: the bridge took the time since then, and the clock runs on from that moment, not
+    // from this one. Anchored at arrival, it lagged native by the bridge's delay and stepped back when one event
+    // came quicker than the last (sweep n1-04).
+    this._anchorAt = now() - lagMs(e);
     this._rate = Number(e.rate) > 0 ? Number(e.rate) : this._rate;
     this._buf = Math.max(0, Number(e.buf) || 0) / 1000;
     this._playing = !!e.playing;
     this._want = !!e.want;
     this._held = this._want && !!e.suppressed;
     this._buffering = !!e.buffering;
+    // A seek from outside the page (the lock screen, Bluetooth, a car): before the clock's jump reaches the player
+    // as a timeupdate, so a compilation does not credit the letters it skipped (sweep n1-07).
+    if (e.type === 'seeked') this._fire('seeking');
     if (dur > 0 && dur !== this._dur) {
       const first = !(this._dur > 0);
       this._dur = dur;
@@ -478,6 +493,18 @@ function receive(json) {
   let e = null;
   try { e = typeof json === 'string' ? JSON.parse(json) : json; } catch (_e) { return; }
   _live.handle(e);
+}
+
+/**
+ * How long a native event took to arrive, from its `at` stamp (epoch ms, the same wall clock as Date.now()): 0 for
+ * an event without one, at most MAX_LAG_MS.
+ * @param {any} e
+ * @returns {number}
+ */
+function lagMs(e) {
+  const at = Number(e && e.at);
+  if (!(at > 0)) return 0;
+  return Math.max(0, Math.min(MAX_LAG_MS, Date.now() - at));
 }
 
 function now() {
