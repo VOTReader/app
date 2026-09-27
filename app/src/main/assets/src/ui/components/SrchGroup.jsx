@@ -19,6 +19,16 @@ const GROUP_UNIT = {
    every card cuts and measures a snippet. */
 export const SRCH_GROUP_PAGE = 50;
 
+/* A card's key is its doc, not its index: Book order re-sorts a group in place,
+   and an index key handed each card another result (its snippet centred on the
+   old one's hit, its opened "more places" list moved to a stranger). The fields
+   are the engine's own dedup key plus the unit ids. */
+function cardKey(entry, i) {
+  const d = entry && entry.doc;
+  if (!d) return 'i' + i;
+  return [d.kind, d.volumeId, d.letterId, d.ref, d.title, String(d.text || '').slice(0, 60)].join('|');
+}
+
 export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = false }) {
   const [open, setOpen] = React.useState(defaultOpen !== false);
   const [shown, setShown] = React.useState(SRCH_GROUP_PAGE);
@@ -42,7 +52,7 @@ export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = 
       {open ? (
         <div className="srch-group-items">
           {items.slice(0, shown).map((entry, i) => (
-            <SrchCard key={i} entry={entry} terms={terms} onSelect={onSelect} />
+            <SrchCard key={cardKey(entry, i)} entry={entry} terms={terms} onSelect={onSelect} />
           ))}
           {left > 0 ? (
             <button type="button" className="srch-group-more" onClick={() => setShown((n) => n + SRCH_GROUP_PAGE)}>

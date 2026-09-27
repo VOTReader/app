@@ -73,6 +73,21 @@ describe('srchSortCanonical', () => {
     expect(sorted[2]).toBe(b);
   });
 
+  /* Brianna (2026-09-26): Book order puts the LETTERS in order too. */
+  it('orders a collection’s letters, entries and topics by their number, the preface (0) first', () => {
+    const L = (num, kind = 'letter') => ({ doc: { kind, letterNum: num, volumeId: 'v7' } });
+    const sorted = srchSortCanonical([L(55), L(9), L(37), L(0), L(53)], idx);
+    expect(sorted.map((e) => e.doc.letterNum)).toEqual([0, 9, 37, 53, 55]);
+    expect(srchSortCanonical([L(95, 'wtlb'), L(12, 'wtlb')], idx).map((e) => e.doc.letterNum)).toEqual([12, 95]);
+    expect(srchSortCanonical([L(88, 'answers'), L(3, 'answers')], idx).map((e) => e.doc.letterNum)).toEqual([3, 88]);
+  });
+
+  it('orders study chapters by study (as they first appear), then by chapter', () => {
+    const S = (study, ch) => ({ doc: { kind: 'bible-study', letterId: study, chapterNum: ch } });
+    const sorted = srchSortCanonical([S('purity', 4), S('lamb', 2), S('purity', 1), S('lamb', 1)], idx);
+    expect(sorted.map((e) => e.doc.letterId + ' ' + e.doc.chapterNum)).toEqual(['purity 1', 'purity 4', 'lamb 1', 'lamb 2']);
+  });
+
   it('empty map = order unchanged', () => {
     const items = [v('john', 3, 16), v('genesis', 1, 1)];
     expect(srchSortCanonical(items, new Map())).toEqual(items);

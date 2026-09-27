@@ -261,7 +261,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: effect should fire only when parsed-result changes. Adding onCommand would re-fire on every parent re-render that rebuilds the callback, calling the command handler multiple times for the same parsed.command. Closure always picks up the latest onCommand at the point state.parsed actually changes.
   }, [state.parsed]);
 
-  // [8] Canonical sort — a client-side view over the fetched set (the corpus
+  // [8] Book order — a client-side view over the fetched set (the corpus
   // pills above narrow what is SEARCHED; this re-orders what is RENDERED —
   // instant, no re-query). Resets on a new query. The result-filter chips
   // that sat beside it (All / Scriptures / Volumes / WTLB / Studies) were the
@@ -293,18 +293,16 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     return out;
   }, [state.results, state.capped]);
 
-  // The canonical re-sort of scripture groups.
+  // Book order re-sorts EVERY group: verses by book, chapter and verse, a
+  // collection's letters, entries and topics by their number (Brianna,
+  // 2026-09-26: the volumes in order, and the letters in each).
   const visibleGroups = React.useMemo(() => {
     if (sortMode !== 'canonical') return grouped;
-    return grouped.map((g) => (
-      (g.key === 'bible' || g.key === 'matthew')
-        ? { key: g.key, items: srchSortCanonical(g.items, bookIndex) }
-        : g
-    ));
+    return grouped.map((g) => ({ key: g.key, items: srchSortCanonical(g.items, bookIndex) }));
   }, [grouped, sortMode, bookIndex]);
-  // Sort toggle only matters when a scripture group with ≥2 verses is visible.
+  // The toggle only matters when some group has two or more results to order.
   const sortToggleVisible = React.useMemo(
-    () => visibleGroups.some((g) => (g.key === 'bible' || g.key === 'matthew') && g.items.length > 1),
+    () => visibleGroups.some((g) => g.items.length > 1),
     [visibleGroups]
   );
 
@@ -587,7 +585,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           <div className="srch-filter-row">
             <button
               className="srch-sort-btn"
-              aria-label={sortMode === 'relevance' ? 'Sort verses in book order' : 'Sort verses by relevance'}
+              aria-label={sortMode === 'relevance' ? 'Sort results in book order' : 'Sort results by relevance'}
               onClick={() => setSortMode(sortMode === 'relevance' ? 'canonical' : 'relevance')}
             >{sortMode === 'relevance' ? 'Book order' : 'Relevance'}</button>
           </div>
@@ -614,7 +612,9 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           <div className="srch-groups">
             {visibleGroups.map((g) => (
               <SrchGroup
-                key={g.key + '|' + query + '|' + sortMode}
+                /* Not keyed by the sort: toggling Book order must not close
+                   the group the reader opened (cards carry stable keys). */
+                key={g.key + '|' + query}
                 gkey={g.key}
                 items={g.items}
                 capped={cappedGroups.has(g.key)}

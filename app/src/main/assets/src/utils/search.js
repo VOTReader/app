@@ -73,21 +73,42 @@ export const SRCH_CANONICAL_BOOK_INDEX = (() => {
   return m;
 })();
 
+/* The kinds whose one doc is a numbered unit of its collection: a letter, a WTLB /
+   Blessed / Holy Days entry, an Answers topic (its num is its place in the site's
+   page list), a study chapter. */
+const SRCH_UNIT_KINDS = new Set(['letter', 'letter-title', 'wtlb', 'wtlb-title', 'blessed', 'blessed-title', 'holy-day', 'holy-day-title', 'answers', 'answers-title', 'bible-study']);
+
 /**
- * Sort verse-family result items into canonical book order (book, chapter,
- * verse) instead of relevance. Non-verse docs (or verses whose book isn't
- * in the index map) sink to the end, keeping their relative order — the
- * sort is stable.
+ * Sort result items into BOOK ORDER, the order a reader meets them in the book:
+ * verses by (book, chapter, verse); a letter, entry or topic by its number, so
+ * Volume Seven's hits read Letter 9, 37, 53, 55 (the preface, num 0, first); a
+ * study chapter by its study, then its chapter (the studies keep the order they
+ * first appear in, since a group holds several). Brianna (2026-09-26) navigates
+ * search by collection and asked for the letters in order, not only the verses.
+ * Docs with no place (an unknown book, an unknown kind) sink to the end keeping
+ * their relative order; the sort is stable.
  *
- * @param {Array<{doc?: {kind?: string, bookId?: string, chapterNum?: number, verseNum?: number}}>} items
+ * @param {Array<{doc?: {kind?: string, bookId?: string, chapterNum?: number, verseNum?: number, letterNum?: number, letterId?: string}}>} items
  * @param {Map<string, number>} bookIndex - bookId → canonical position
- * @returns {Array<{doc?: {kind?: string, bookId?: string, chapterNum?: number, verseNum?: number}}>} a NEW array (input untouched)
+ * @returns {Array<{doc?: {kind?: string, bookId?: string, chapterNum?: number, verseNum?: number, letterNum?: number, letterId?: string}}>} a NEW array (input untouched)
  */
 export function srchSortCanonical(items, bookIndex) {
+  /** @type {Map<string, number>} */
+  const studyRank = new Map();
   const rank = (e) => {
     const d = e && e.doc;
-    if (!d || !d.bookId || !bookIndex.has(d.bookId)) return null;
-    return [bookIndex.get(d.bookId), d.chapterNum || 0, d.verseNum || 0];
+    if (!d) return null;
+    if (d.kind === 'verse') {
+      if (!d.bookId || !bookIndex.has(d.bookId)) return null;
+      return [0, /** @type {number} */ (bookIndex.get(d.bookId)), d.chapterNum || 0, d.verseNum || 0];
+    }
+    if (!d.kind || !SRCH_UNIT_KINDS.has(d.kind)) return null;
+    if (d.kind === 'bible-study') {
+      const study = d.letterId || '';
+      if (!studyRank.has(study)) studyRank.set(study, studyRank.size);
+      return [1, /** @type {number} */ (studyRank.get(study)), d.chapterNum || 0, 0];
+    }
+    return [1, 0, typeof d.letterNum === 'number' ? d.letterNum : 0, 0];
   };
   return items
     .map((e, i) => ({ e, i, r: rank(e) }))
@@ -95,8 +116,7 @@ export function srchSortCanonical(items, bookIndex) {
       if (a.r === null && b.r === null) return a.i - b.i;
       if (a.r === null) return 1;
       if (b.r === null) return -1;
-      return (a.r[0] - b.r[0]) || (a.r[1] - b.r[1]) || (a.r[2] - b.r[2]) || (a.i - b.i);
+      return (a.r[0] - b.r[0]) || (a.r[1] - b.r[1]) || (a.r[2] - b.r[2]) || (a.r[3] - b.r[3]) || (a.i - b.i);
     })
     .map((x) => x.e);
 }
-

@@ -453,6 +453,34 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 
+  it('Book order shows for a letters-only search and puts each volume’s letters in number order, without closing the group', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.volumeId;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    let mounts = 0;
+    function MountCountingGroup({ gkey, items }) {
+      React.useEffect(() => { mounts++; }, []);
+      return <div className="stub-group" data-key={gkey}>{items.map((e) => e.doc.letterNum).join(',')}</div>;
+    }
+    /** @type {any} */ (globalThis).SrchGroup = MountCountingGroup;
+    const L = (num, score) => ({ score, doc: { kind: 'letter', volumeId: 'v7', letterNum: num, title: 'L' + num, ref: 'Volume Seven · Letter ' + num, text: 't' + num } });
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: null, results: [L(55, 9), L(9, 8), L(53, 7), L(37, 6)], parsedTerms: [] }));
+    const props = { ...baseProps(), settings: { searchCorpus: 'volumes' } };
+    const { rerender } = render(<SearchScreen {...props} />);
+    rerender(<SearchScreen {...props} query="flood" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    expect(document.querySelector('.stub-group').textContent).toBe('55,9,53,37');   // relevance
+    const btn = document.querySelector('.srch-sort-btn');
+    expect(btn, 'the toggle shows for letters alone').toBeTruthy();
+    expect(btn.getAttribute('aria-label')).toBe('Sort results in book order');
+    const before = mounts;
+    fireEvent.click(btn);
+    expect(document.querySelector('.stub-group').textContent).toBe('9,37,53,55');
+    expect(mounts, 'the group was re-sorted in place, not re-mounted (a reader’s open group stays open)').toBe(before);
+    vi.useRealTimers();
+  });
+
   it('(a) the summary keeps the exact count below the cap', async () => {
     vi.useFakeTimers();
     /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({
