@@ -18,9 +18,13 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
- * Bidirectional archaic→modern pronoun normalization, applied at index AND
- * query time. Conservative (pronouns only) — verb-form stemming (saith/says)
- * would cost precision for little gain.
+ * Bidirectional archaic→modern normalization, applied at index AND query time.
+ * Conservative: the pronouns, and (2026-09-27) the archaic AUXILIARIES that have
+ * exactly one modern form (shalt, wilt, hast, hath, doth, dost, didst, canst), so
+ * a verse quoted in KJV wording ("thou shalt not", "the LORD hath") lines up with
+ * the NKJV text word for word and the phrase ranking can see it. General
+ * verb-form stemming (saith/says, cometh/comes) stays out: it would cost precision
+ * for little gain, and search/word-forms.js reaches those families at query time.
  * @type {Object<string,string>}
  */
 export const ARCHAIC_NORMALIZE = {
@@ -30,6 +34,15 @@ export const ARCHAIC_NORMALIZE = {
   thy: 'your',
   thine: 'your',
   thyself: 'yourself',
+  // the archaic auxiliaries (one modern form each)
+  shalt: 'shall',
+  wilt: 'will',
+  hast: 'have',
+  hath: 'has',
+  doth: 'does',
+  dost: 'do',
+  didst: 'did',
+  canst: 'can',
 };
 
 /**
@@ -45,6 +58,9 @@ export function kjvEncode(str) {
   // ~every field at index time; accented queries still fold. ̀-ͯ are the
   // combining diacritical marks dropped after decomposition.
   if (/[^ -~]/.test(s)) s = s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  // A number written with thousands separators is one number: "144,000" is the
+  // token 144000, as a reader types it (it split into 144 and 000).
+  if (s.indexOf(',') >= 0) s = s.replace(/(\d),(?=\d{3}(?!\d))/g, '$1');
   const tokens = s.replace(/[^a-z0-9\s]+/g, ' ').split(/\s+/);
   const out = [];
   for (let i = 0; i < tokens.length; i++) {

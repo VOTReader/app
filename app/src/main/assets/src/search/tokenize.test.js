@@ -37,6 +37,24 @@ describe('kjvEncode', () => {
   });
 });
 
+describe('kjvEncode: numbers and KJV auxiliaries (search audit 2026-09-27)', () => {
+  it('reads a number with thousands separators as one number, as a reader types it', () => {
+    expect(kjvEncode('the 144,000 sealed')).toEqual(['the', '144000', 'sealed']);
+    expect(kjvEncode('1,000,000 men')).toEqual(['1000000', 'men']);
+  });
+
+  it('leaves a comma that is not a thousands separator alone', () => {
+    expect(kjvEncode('verses 16,17 and 1,2345')).toEqual(['verses', '16', '17', 'and', '1', '2345']);
+  });
+
+  it('folds the archaic auxiliaries to their one modern form, so KJV wording lines up with the NKJV', () => {
+    expect(kjvEncode('Thou shalt not kill')).toEqual(['you', 'shall', 'not', 'kill']);
+    expect(kjvEncode('the LORD hath spoken; doth he not')).toEqual(['the', 'lord', 'has', 'spoken', 'does', 'he', 'not']);
+    expect(kjvEncode('wilt thou, hast thou, dost thou, didst thou, canst thou'))
+      .toEqual(['will', 'you', 'have', 'you', 'do', 'you', 'did', 'you', 'can', 'you']);
+  });
+});
+
 describe('ARCHAIC_NORMALIZE / ARCHAIC_EXPAND tables', () => {
   it('normalize maps the six archaic forms', () => {
     expect(ARCHAIC_NORMALIZE.thee).toBe('you');

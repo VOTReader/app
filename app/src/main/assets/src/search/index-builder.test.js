@@ -39,7 +39,7 @@ const GLOBALS = {
     ] }],
   },
   LETTERS_V1_PREFACE: { id: 'v1-preface', num: 0, title: 'A Word of Warning', blocks: [{ segments: [{ v: 'Hear the word of warning.' }] }] },
-  LETTERS_V1: [{ id: 'the-wide-path', num: 1, title: 'The Wide Path', blocks: [{ segments: [{ v: 'Broad is the way that leads to destruction.' }] }] }],
+  LETTERS_V1: [{ id: 'the-wide-path', num: 1, title: 'The Wide Path', blocks: [{ segments: [{ v: 'Broad is the way that leads to destruction.' }] }, { type: 'closing', text: 'Says The Lord, The One who sees.' }] }],
   WTLB_ONE: [{ id: 'wtlb-1', num: 1, title: 'Matters of the Heart', paragraphs: [{ text: 'The wailing of the penitent {{ref:Matthew 4:4}} brings forth healing.' }] }],
   THE_BLESSED: [{ id: 'blessed-1', num: 1, title: 'The Blessed One', paragraphs: [{ text: 'Blessed are they that mourn.' }] }],
   HOLY_DAYS: [{ id: 'hd-1', num: 1, title: 'Passover', paragraphs: [{ text: 'Remember the passover forever.' }] }],
@@ -121,6 +121,11 @@ describe('buildDocs (narrow index scope)', () => {
     expect(wide.text).toContain('Broad is the way');
     expect(wide.corpus).toBe('volumes');
     expect(letters.some((d) => d.letterId === 'v1-preface' && d.title === 'A Word of Warning')).toBe(true);
+  });
+
+  it('a letter\u2019s closing line is part of its body (search audit 2026-09-27: 189 closings were unsearchable)', () => {
+    const wide = docs.find((d) => d.kind === 'letter' && d.letterId === 'the-wide-path');
+    expect(wide.text).toBe('Broad is the way that leads to destruction. Says The Lord, The One who sees.');
   });
 
   it('a preface (num 0) is located as "Preface", the way LetterView names it, never "Letter ?"', () => {

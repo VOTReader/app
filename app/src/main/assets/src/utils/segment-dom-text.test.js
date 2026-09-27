@@ -154,4 +154,9 @@ describe('segmentsReadText is the rendered text without its footnote numbers', (
     expect(blockReadText({ type: 'heading', text: 'A Heading' })).toBe('');
     expect(blockReadText(null)).toBe('');
   });
+
+  it('blockReadText reads a closing line, which the letter renders verbatim (search audit 2026-09-27)', () => {
+    expect(blockReadText({ type: 'closing', text: 'Says The Lord, The One who sees, The One who knows.' }))
+      .toBe('Says The Lord, The One who sees, The One who knows.');
+  });
 });

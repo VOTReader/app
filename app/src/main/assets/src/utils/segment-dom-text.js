@@ -120,9 +120,12 @@ export function segmentsReadText(segments) {
 }
 
 /**
- * A letter block's reading text: its prose segments, or its poetry lines (one
- * run per line, joined by a space). Any other block (a heading, an image)
- * reads as ''.
+ * A letter block's reading text: its prose segments, its poetry lines (one run
+ * per line, joined by a space), or a closing line's text ("Says The Lord, The One
+ * who sees, The One who knows."), which LetterView renders verbatim. A closing
+ * read as '' until 2026-09-27, so the 189 closings in the corpus were on screen
+ * and unsearchable (the letters' own sign-offs, 32 distinct lines). Any other
+ * block (a heading, an image) reads as ''.
  * @param {any} block
  * @returns {string}
  */
@@ -130,5 +133,6 @@ export function blockReadText(block) {
   if (!block) return '';
   if (block.segments) return segmentsReadText(block.segments);
   if (block.lines) return block.lines.map((ln) => (Array.isArray(ln) ? segmentsReadText(ln) : '')).join(' ');
+  if (block.type === 'closing' && typeof block.text === 'string') return block.text;
   return '';
 }
