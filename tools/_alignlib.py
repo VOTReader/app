@@ -380,6 +380,94 @@ def cuda_dll_dirs():
 
 # ------------------------------------------------------------------ leg B ---
 
+# The transcript fill (2026-09-24 measure, landed c64): 1,065 of the 1,241 >= 25 s
+# holes in the Bible transcripts sit in a chapter's FIRST 30 s window -- whisper
+# hears the heading ("Job, chapter 28"), ends the window on a single closing
+# timestamp, faster-whisper seeks to 30 s and verses 1-3 get no leg B. A clip that
+# starts where the hole starts has no heading to end on. Only words wholly inside
+# a hole are added, so a transcript without holes is untouched. Outside
+# settings_hash on purpose (like TX_ANCHOR): it only ADDS witness words where
+# there were none; the transcript records it as `fill` and the belt as txFill.
+TX_FILL = 1
+TX_FILL_MIN = 20.0
+
+
+def tx_holes(words, dur, mn):
+    """[(a, b), ...]: spans >= mn s with no word - before the first word, between two words, after the last."""
+    if not words:
+        return [(0.0, float(dur))] if dur and dur >= mn else []
+    out = []
+    if words[0][1] >= mn:
+        out.append((0.0, float(words[0][1])))
+    for x, y in zip(words, words[1:]):
+        if y[1] - x[2] >= mn:
+            out.append((float(x[2]), float(y[1])))
+    if dur and dur - words[-1][2] >= mn:
+        out.append((float(words[-1][2]), float(dur)))
+    return out
+
+
+def tx_max_gap(words, a, b):
+    """The longest stretch of [a, b] with no word."""
+    ts = sorted((w[1], w[2]) for w in words if w[2] > a and w[1] < b)
+    last, best = a, 0.0
+    for s, e in ts:
+        best = max(best, s - last)
+        last = max(last, e)
+    return round(max(best, b - last), 2)
+
+
+def _tx_fill_span(a, b, clip_fn, mn, pad, rounds, slack, dur):
+    """Words for one hole [a, b]: up to `rounds` asks, each on what is still a hole
+    inside [a, b] (a span that yielded nothing is never asked twice). -> (words, asks).
+    A clip padded past the hole re-hears its boundary words, which the transcript
+    already has, so only words wholly inside the hole are kept."""
+    got, asked = [], set()
+    for _ in range(rounds):
+        edges = [[None, a, a]] + sorted(got, key=lambda w: (w[1], w[2])) + [[None, b, b]]
+        subs = [(x[2], y[1]) for x, y in zip(edges, edges[1:]) if y[1] - x[2] >= mn]
+        subs = [h for h in subs if (round(h[0], 2), round(h[1], 2)) not in asked]
+        if not subs:
+            break
+        for x, y in subs:
+            asked.add((round(x, 2), round(y, 2)))
+            t0, t1 = max(0.0, x - pad), (min(float(dur), y + pad) if dur else y + pad)
+            heard = [[w[0], round(w[1] + t0, 2), round(w[2] + t0, 2)] for w in (clip_fn(t0, t1) or [])]
+            got.extend(w for w in heard if w[1] >= x - slack and w[2] <= y + slack)
+    return sorted(got, key=lambda w: (w[1], w[2])), len(asked)
+
+
+def tx_fill(words, dur, ears, mn=TX_FILL_MIN, pad=0.3, rounds=2, slack=0.05):
+    """-> (new_words, report). `ears`: [(name, clip_fn), ...], clip_fn(t0, t1) ->
+    [[token, start, end], ...] relative to t0, tried in order: the next is asked
+    only where the ones before left the hole >= mn, and the hearing leaving the
+    smallest gap is kept whole (the first on a tie), never a mix of two."""
+    cur, report = [list(w) for w in words], []
+    for a, b in tx_holes(words, dur, mn):
+        best, tried = None, []
+        for name, fn in ears:
+            got, asks = _tx_fill_span(a, b, fn, mn, pad, rounds, slack, dur)
+            gap = tx_max_gap(got, a, b)
+            tried.append([name, len(got), gap, asks])
+            if best is None or gap < best[2]:
+                best = (name, got, gap, asks)
+            if gap < mn:
+                break
+        name, got, gap, asks = best
+        cur.extend(got)
+        report.append({"a": round(a, 2), "b": round(b, 2), "variant": name, "added": len(got),
+                       "gapAfter": gap, "asks": asks, "tried": tried})
+    cur.sort(key=lambda w: (w[1], w[2]))
+    return cur, report
+
+
+def tx_fill_stamp(tx, mn=TX_FILL_MIN):
+    """The belt's record of its transcript's fill: the version that filled it (0 = never
+    filled) and how many holes >= mn it still has."""
+    return {"txFill": (tx.get("fill") or {}).get("v", 0),
+            "txHoles": len(tx_holes(tx.get("words") or [], tx.get("dur") or 0, mn))}
+
+
 class WhisperLeg:
     """faster-whisper word timestamps — the WITNESS leg.
 
@@ -398,8 +486,45 @@ class WhisperLeg:
                                        compute_type=self.s["compute_type"])
         return self._model
 
-    def transcribe_words(self, wav_path, cache_path=None, stamp=None):
+    def _words(self, clip, hs=True):
+        """Word stamps for one clip under the leg's own settings; hs=False turns the
+        silence-skip off (it drops a run of low-confidence names as 'hallucination':
+        the name-list holes, Joshua 15, 1 Chronicles 6)."""
+        s = self.s
+        segs, _ = self.model().transcribe(
+            clip, language="en", word_timestamps=True,
+            beam_size=s["beam_size"], temperature=s["temperature"],
+            condition_on_previous_text=s["condition_on_previous_text"],
+            initial_prompt=s["initial_prompt"], vad_filter=s["vad_filter"],
+            hallucination_silence_threshold=s["hallucination_silence_threshold"] if hs else None)
+        nrm = normalizer(s)
+        return [[n, round(w.start, 2), round(w.end, 2)]
+                for seg in segs for w in (seg.words or []) for n in [nrm(w.word)] if n]
+
+    def fill(self, data, wav_path, mn=TX_FILL_MIN):
+        """Fill a fresh transcript's holes (tx_fill), one clip per hole: the leg's own
+        settings first, then the silence-skip off where they leave the hole."""
+        if not tx_holes(data["words"], data.get("dur"), mn):
+            data["fill"] = {"v": TX_FILL, "min": mn, "holes": []}
+            return data
+        audio = pcm_16k(wav_path)
+
+        def ear(hs):
+            return lambda t0, t1: self._words(audio[int(t0 * 16000):int(t1 * 16000)], hs)
+        words, report = tx_fill(data["words"], data.get("dur"), [("family", ear(True)), ("nohs", ear(False))], mn)
+        data["words"] = words
+        data["fill"] = {"v": TX_FILL, "min": mn, "holes": report}
+        added = sum(r["added"] for r in report)
+        print(f"    leg B fill: {len(report)} hole(s) >= {mn:g} s, +{added} words")
+        return data
+
+    def transcribe_words(self, wav_path, cache_path=None, stamp=None, fill_min=None):
         """-> {'words': [[token, start, end], ...], 'dur': float}. Cached verbatim.
+
+        `fill_min`: fill a FRESH transcript's holes >= fill_min s (WhisperLeg.fill;
+        the Bible belt passes TX_FILL_MIN). A cached transcript is read back as it
+        is, filled or not -- a cache never changes under a re-belt (the belt's
+        txFill/txHoles say which it heard).
 
         `stamp` identifies the AUDIO the cache was made from (the Bible belt
         passes the chapter mp3's byte size). A cache carrying a different stamp
@@ -446,6 +571,8 @@ class WhisperLeg:
             data["stamp"] = stamp
         if truncated:
             data["truncated"] = True
+        elif fill_min:
+            self.fill(data, wav_path, fill_min)
         if cache_path and not truncated:
             os.makedirs(os.path.dirname(cache_path), exist_ok=True)
             json.dump(data, open(cache_path, "w", encoding="utf-8"))

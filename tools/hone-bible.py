@@ -107,7 +107,8 @@ def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False):
 
     say(f"leg B: {s['whisper_model']} + global match ...")
     wl = _whisper(s)
-    tx = wl.transcribe_words(wav, os.path.join(out_dir, out_tag + ".tx.json"), stamp=stamp)
+    tx = wl.transcribe_words(wav, os.path.join(out_dir, out_tag + ".tx.json"), stamp=stamp,
+                             fill_min=al.TX_FILL_MIN)
     nrm = al.match_normalizer(s, tx["words"])
     cols, owners = [], []
     for u in units:
@@ -150,7 +151,7 @@ def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False):
                                              ensure_ascii=False, separators=(",", ":"))),
            "settings": s, "audio": audio, "audioSize": os.path.getsize(audio),
            **al.witness_stamp(s),
-           "names": sorted(names), "txAnchor": al.TX_ANCHOR,
+           "names": sorted(names), "txAnchor": al.TX_ANCHOR, **al.tx_fill_stamp(tx),
            "confirmed": n_conf, "probed": n_probed, "review": n_review,
            "verses": rows}
     path = os.path.join(out_dir, out_tag + ".json")
