@@ -477,6 +477,22 @@ async function search(query, options) {
       }
     }
     if (forms.length) { units = units.concat(forms); didExpand = true; }
+    /* A NAME TYPED IN PARTS (search audit 2026-09-27). The Volumes write HaMashiach
+       and YahuShua as one word, so "Ha Mashiach" found only the texts that split it.
+       Two typed words side by side that the index holds as one word are searched as
+       that word too, standing for both (its `cover`). */
+    for (let i = 0; i + 1 < filtered.length && i + 1 < 31; i++) {
+      const a = kjvEncode(filtered[i]);
+      const b = kjvEncode(filtered[i + 1]);
+      if (a.length !== 1 || b.length !== 1) continue;
+      // not with a stop word: "in deed" is not "indeed"
+      if (D.STOP_WORDS_TRIMMED && (D.STOP_WORDS_TRIMMED.has(a[0]) || D.STOP_WORDS_TRIMMED.has(b[0]))) continue;
+      const joined = a[0] + b[0];
+      if (joined.length < 5 || had.has(joined) || !termExists(joined)) continue;
+      had.add(joined);
+      units.push({ term: joined, origin: i, cover: (1 << i) | (1 << (i + 1)), literal: false, joined: true });
+      didExpand = true;
+    }
   }
 
   // One BM25 search per unit; accumulate score + coverage bitmask.
@@ -500,14 +516,14 @@ async function search(query, options) {
   const titleFloor = keyword;
   /** @param {any} unit @param {any[]} res */
   const accumulate = (unit, res) => {
-    const weight = unit.literal ? 1 : unit.form ? FORM_WEIGHT : SYNONYM_WEIGHT;
+    const weight = unit.literal || unit.joined ? 1 : unit.form ? FORM_WEIGHT : SYNONYM_WEIGHT;
     for (let r = 0; r < res.length; r++) {
       const hit = res[r];
       const id = hit.id;
       scoreMap[id] = (scoreMap[id] || 0) + hit.score * weight;
       if (!docLookup[id]) docLookup[id] = hit;
-      if (unit.literal) literalHit[id] = true;   // a text found only through a form or a synonym is demoted below: the typed form first
-      if ((unit.literal || unit.form) && !(contentTyped && isStopTerm(unit.term))) {
+      if (unit.literal || unit.joined) literalHit[id] = true;   // a text found only through a form or a synonym is demoted below: the typed form first
+      if ((unit.literal || unit.form || unit.joined) && !(contentTyped && isStopTerm(unit.term))) {
         // hit.terms is the DOC-side vocabulary that matched (MiniSearch derives
         // it from the match map), so for a fuzzy/prefix hit it's the corrected
         // word — query "sheperd" carries "shepherd" here. The snippet
@@ -524,7 +540,7 @@ async function search(query, options) {
           }
         }
       }
-      if (unit.origin < 31) termMask[id] = (termMask[id] || 0) | (1 << unit.origin);
+      if (unit.origin < 31) termMask[id] = (termMask[id] || 0) | (unit.cover || (1 << unit.origin));
     }
   };
   const heard = Object.create(null);   // origin -> some unit of that word found something

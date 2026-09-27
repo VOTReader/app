@@ -395,6 +395,16 @@ var SYNONYM_GROUPS = [
   // into the full set of messianic / deity names. The name<->name synonyms stay.
   ['yahushua','yeshua','yahshua','yahusha','yeshu','jesus','christ','messiah'],
   ['yahuwah','yahweh','yhwh','jehovah','elohim','adonai'],
+  // Names the KJV's New Testament spells from the Greek, and Immanuel as the Volumes
+  // write it (search audit 2026-09-27: "Elias" and "Esaias" found nothing).
+  ['elijah','elias'],
+  ['isaiah','esaias'],
+  ['jonah','jonas'],
+  ['jeremiah','jeremias','jeremy'],
+  ['elisha','eliseus'],
+  ['hosea','osee'],
+  ['zion','sion'],
+  ['immanuel','emmanuel','immanu el'],
   ['holy spirit','holy ghost','ruach hakodesh','comforter','advocate','helper'],
   ['heaven','heavens','paradise','celestial'],
   ['hell','sheol','hades','gehenna','grave','pit','lake of fire'],
