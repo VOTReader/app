@@ -11,7 +11,7 @@
 
 import { useOfflineAudio, formatBytes } from '../components/OfflineAudioControls.jsx';
 
-/** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number }} ShelfItem */
+/** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number, stale?: boolean }} ShelfItem */
 /** @typedef {{ id: string, lead: string, title: string, items: ShelfItem[], bytes: number, savedAt: number }} ShelfGroup */
 
 /** Where a Bible edition's recording comes from, for a book's heading ("Genesis · KJV · BRM"). @param {string} key */
