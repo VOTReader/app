@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { kjvEncode } from '../../search/tokenize.js';
+import { applyCorrections } from '../../search/query-parse.js';
 
 /**
  * SRCH4: build the snippet-highlight term list. SrchSnippet only marks the terms
@@ -104,15 +105,7 @@ export function groupInSiteOrder(results, groupKey, meta) {
  * @returns {string}
  */
 export function correctedQuery(query, corrections) {
-  const q = String(query || '').trim();
-  const to = Object.create(null);
-  for (const c of corrections || []) if (c && c.from && c.to) to[c.from] = c.to;
-  // each run of word characters, folded the engine's way; a run that folds to
-  // one corrected word is replaced whole
-  return q.replace(/[\p{L}\p{M}\p{N}'\u2019]+/gu, (w) => {
-    const toks = kjvEncode(w);
-    return toks.length === 1 && to[toks[0]] ? to[toks[0]] : w;
-  });
+  return applyCorrections(query, corrections);
 }
 
 /**

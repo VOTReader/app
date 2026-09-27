@@ -8,6 +8,8 @@
    Ported from the FlexSearch engine's parseTextQuery.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { kjvEncode } from './tokenize.js';
+
 /**
  * @typedef {Object} TextQuery
  * @property {'text'} kind
@@ -47,4 +49,25 @@ export function parseTextQuery(q) {
     terms.push(p.toLowerCase());
   }
   return { kind: 'text', phrase, cleanQuery: q.toLowerCase(), must, mustNot, terms };
+}
+
+/**
+ * The query with each corrected word put in (the engine's `corrections`: a typed
+ * word nothing of its own reached, searched as the nearest indexed word, or as the
+ * words a compound is written as). A query word is matched the way the engine read
+ * it (kjvEncode: any case, accents and apostrophes folded), so an accented typo is
+ * rewritten too; a word it cannot find leaves the query as it was. The engine
+ * re-runs the corrected query, and the screen offers it ("Showing results for ...").
+ * @param {string} query
+ * @param {Array<{from:string, to:string}>} corrections
+ * @returns {string}
+ */
+export function applyCorrections(query, corrections) {
+  const q = String(query || '').trim();
+  const to = Object.create(null);
+  for (const c of corrections || []) if (c && c.from && c.to) to[c.from] = c.to;
+  return q.replace(/[\p{L}\p{M}\p{N}'\u2019]+/gu, (w) => {
+    const toks = kjvEncode(w);
+    return toks.length === 1 && to[toks[0]] ? to[toks[0]] : w;
+  });
 }

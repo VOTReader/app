@@ -169,8 +169,10 @@ describe('search: a typo is corrected to the one nearest word', () => {
     expect(refs(r)).toContain('Psalms 19:4');
   });
 
-  it('a short word never widens to two edits: "grcae" finds nothing', async () => {
-    const r = await VotSearchMini.search('grcae', { synonyms: false });
-    expect(refs(r)).toEqual([]);
+  /* A swapped pair of letters is one slip (search audit 2026-09-27): "grcae" is
+     grace. A short word still never reaches a word two slips away. */
+  it('a short word reaches one slip, a swapped pair included, never two: "grcae" is grace, "gxaze" nothing', async () => {
+    expect(refs(await VotSearchMini.search('grcae', { synonyms: false }))).toContain('John 1:17');
+    expect(refs(await VotSearchMini.search('gxaze', { synonyms: false }))).toEqual([]);
   });
 });

@@ -26,7 +26,7 @@ import { searchData } from './search-data.js';
 import { buildMiniSearchOptions, MS_STORE_FIELDS, MS_SEARCH_DEFAULTS } from './search-config.js';
 import { buildDocs } from './index-builder.js';
 import { parseReference, fuzzyBookSuggest, levenshtein } from './ref-parser.js';
-import { parseTextQuery } from './query-parse.js';
+import { parseTextQuery, applyCorrections } from './query-parse.js';
 import { expandQueryTerms } from './synonyms.js';
 import { wordForms } from './word-forms.js';
 import { kjvEncode } from './tokenize.js';
@@ -140,20 +140,80 @@ function searchUnit(term, opts, titleFloor) {
   return body;
 }
 
+/** Is `term` a word of the index? (The index's own term map; a search where it lacks one.) */
+function termExists(term) {
+  const idx = msIndex && msIndex._index;
+  if (idx && typeof idx.has === 'function') return idx.has(term);
+  return !!(msIndex && msIndex.search(term, { prefix: false, fuzzy: false }).length);
+}
+
+/**
+ * The slip that turns `word` into `cand`, as a rank (search audit 2026-09-27): a
+ * swapped pair (0: beleive, recieve, wrold), a letter left out (1: fxed, rightousness),
+ * a letter too many (2: sond), a wrong letter (3: babilon), anything further (4). A
+ * swapped pair is two edits to Levenshtein, so a word of seven letters or fewer never
+ * reached its word ("wrold" and "beleive" found nothing, "recieve" became "relieve");
+ * and ranking the neighbours by how many texts hold them alone chose "wrath" for
+ * "erath" and "earth" for "warth".
+ */
+function slipRank(word, cand) {
+  const a = word.length;
+  const b = cand.length;
+  if (a === b) {
+    const diff = [];
+    for (let i = 0; i < a; i++) if (word[i] !== cand[i]) diff.push(i);
+    if (diff.length === 2 && diff[1] === diff[0] + 1 && word[diff[0]] === cand[diff[1]] && word[diff[1]] === cand[diff[0]]) return 0;
+    if (diff.length === 1) return 3;
+    return 4;
+  }
+  const inside = (/** @type {string} */ s, /** @type {string} */ l) => { let i = 0; for (let j = 0; j < l.length && i < s.length; j++) if (s[i] === l[j]) i++; return i === s.length; };
+  if (b === a + 1 && inside(word, cand)) return 1;
+  if (a === b + 1 && inside(cand, word)) return 2;
+  return 4;
+}
+
+/**
+ * A word written as a compound the text spells in parts: "abednego" (Abed-Nego),
+ * "mahershalalhashbaz", "immanuel" (Immanu El). The split into two to four indexed
+ * words, each of two letters or more, fewest parts first; null when none.
+ * @param {string} word
+ * @returns {string[]|null}
+ */
+function splitCompound(word) {
+  if (word.length < 6) return null;
+  /** @type {Map<number, string[]|null>} */
+  const memo = new Map();
+  const from = (/** @type {number} */ i, /** @type {number} */ partsLeft) => {
+    if (i === word.length) return [];
+    if (partsLeft === 0) return null;
+    const key = i * 8 + partsLeft;
+    if (memo.has(key)) return /** @type {string[]|null} */ (memo.get(key));
+    let best = null;
+    for (let j = word.length; j >= i + 2; j--) {
+      const part = word.slice(i, j);
+      if (j - i === word.length) continue;   // the whole word is not a split
+      if (!termExists(part)) continue;
+      const rest = from(j, partsLeft - 1);
+      if (rest && (!best || rest.length + 1 < best.length)) best = [part].concat(rest);
+    }
+    memo.set(key, best);
+    return best;
+  };
+  return from(0, 4);
+}
+
 /**
  * The typo fallback for one literal unit that found nothing as typed.
  *
- * A one-word term is corrected to the NEAREST word in the index: one edit before
- * two, and among words at the same distance the one in the most documents (the
- * word a reader most likely meant; ties alphabetical, so the answer never depends
- * on insertion order). That word is then searched as if it had been typed, exact +
- * prefix, so "shephard" finds "shepherd" AND "shepherds" and nothing at two edits.
- * The edit budget stays MiniSearch's own: round(0.2 x length), capped at maxFuzzy
- * (one edit for 3-7 letters, two for 8+), so a short word never widens to two.
+ * First a compound the text spells in parts (splitCompound), searched as those words
+ * in a row. Then the nearest indexed word by the slip that makes it (slipRank: a
+ * swapped pair, a letter left out, one too many, a wrong one), and among words at the
+ * same slip the one in the most documents (ties alphabetical). The edit budget is
+ * MiniSearch's own, round(0.2 x length) capped at maxFuzzy, counted the Damerau way
+ * (a swapped pair is one slip). That word is then searched as if typed, exact + prefix.
  * A multi-word unit (a quoted phrase) keeps the plain fuzzy retry.
- * `to` names the word searched in the typed one's place, so the screen can say
- * so ("Showing results for shepherd"); null for a phrase's fuzzy retry, which
- * corrects no one word.
+ * `to` names what was searched in the typed word's place, so the screen can say so
+ * ("Showing results for shepherd"); null for a phrase's fuzzy retry.
  * @param {string} term
  * @param {Object} opts  the unit's exact + prefix options
  * @param {boolean} [titleFloor]  searchUnit's
@@ -163,21 +223,33 @@ function searchCorrected(term, opts, titleFloor) {
   const tokens = kjvEncode(term);
   if (tokens.length !== 1) return { res: searchUnit(term, { ...opts, fuzzy: FUZZY }, titleFloor), to: null };
   const word = tokens[0];
-  const maxEdits = Math.min(MS_SEARCH_DEFAULTS.maxFuzzy, Math.round(word.length * FUZZY));
-  for (let edits = 1; edits <= maxEdits; edits++) {
-    const near = msIndex.search(word, { ...opts, prefix: false, fuzzy: edits });
-    if (!near || !near.length) continue;
-    const docs = Object.create(null);
-    for (let r = 0; r < near.length; r++) {
-      const ts = near[r].terms || [];
-      for (let t = 0; t < ts.length; t++) docs[ts[t]] = (docs[ts[t]] || 0) + 1;
-    }
-    let best = null;
-    for (const w in docs) {
-      if (best === null || docs[w] > docs[best] || (docs[w] === docs[best] && w < best)) best = w;
-    }
-    if (best) return { res: searchUnit(best, opts, titleFloor), to: best };
+  const parts = splitCompound(word);
+  if (parts) {
+    const res = searchUnit(parts.join(' '), { ...opts, prefix: false, combineWith: 'AND' }, titleFloor)
+      .filter((h) => hasTokenRun(kjvEncode((h.text || '') + ' ' + (h.title || '')), parts));
+    if (res.length) return { res, to: parts.join(' ') };
   }
+  const budget = Math.max(1, Math.min(MS_SEARCH_DEFAULTS.maxFuzzy, Math.round(word.length * FUZZY)));
+  // Levenshtein reach one wider than the budget, so a swapped pair (two Levenshtein
+  // edits, one slip) is in reach; slipRank then keeps what is within the budget.
+  const near = msIndex.search(word, { ...opts, prefix: false, fuzzy: Math.min(budget + 1, MS_SEARCH_DEFAULTS.maxFuzzy) }) || [];
+  const docs = Object.create(null);
+  for (let r = 0; r < near.length; r++) {
+    const ts = near[r].terms || [];
+    for (let t = 0; t < ts.length; t++) docs[ts[t]] = (docs[ts[t]] || 0) + 1;
+  }
+  let best = null;
+  let bestRank = 9;
+  for (const w in docs) {
+    if (w === word) continue;
+    const rank = slipRank(word, w);
+    if (rank === 4 && budget < 2) continue;   // beyond one slip for a word of seven letters or fewer
+    if (best === null || rank < bestRank || (rank === bestRank && (docs[w] > docs[best] || (docs[w] === docs[best] && w < best)))) {
+      best = w;
+      bestRank = rank;
+    }
+  }
+  if (best) return { res: searchUnit(best, opts, titleFloor), to: best };
   return { res: [], to: null };
 }
 
@@ -310,7 +382,8 @@ async function ensureReady(options) {
  * fill the whole budget in the All corpus: "love" kept 90 of its 379 volume hits and
  * "lord" 125 of 890, with no sign anything was missing. `capped` names every
  * collection that hit its cap (it may hold more), `truncated` says the total did.
- * @param {{translation?:string, useStopWords?:boolean, synonyms?:boolean, scope?:{bookId?:string,volumeId?:string}|null, corpus?:string, limit?:number, perVolume?:number}} [options]
+ * `_corrected` is the engine's own: this search is a corrected query's re-run.
+ * @param {{translation?:string, useStopWords?:boolean, synonyms?:boolean, scope?:{bookId?:string,volumeId?:string}|null, corpus?:string, limit?:number, perVolume?:number, _corrected?:boolean}} [options]
  * `corrections` lists each typed word that found nothing of its own and was
  * searched as the nearest indexed word instead ({ from: 'shephard', to: 'shepherd' }).
  * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>}>}
@@ -471,7 +544,9 @@ async function search(query, options) {
      "Showing results for shepherd" rather than change the reader's words
      silently. */
   const corrections = [];
-  for (let u = 0; u < unheard.length; u++) {
+  // Under a card (a book name, a named passage) the card answers the query: no typo
+  // guess ("Beatitudes", the quick pick, showed "Showing results for platitudes").
+  for (let u = 0; u < (navAlso ? 0 : unheard.length); u++) {
     const unit = unheard[u];
     if (heard[unit.origin]) continue;
     if (/\d/.test(unit.term)) continue;   // a number is not a typo: "316" is not "16"
@@ -481,6 +556,18 @@ async function search(query, options) {
     accumulate(unit, fixed.res);
     const typed = kjvEncode(unit.term);
     if (fixed.to && typed.length === 1 && typed[0] !== fixed.to) corrections.push({ from: typed[0], to: fixed.to });
+  }
+  /* A CORRECTED QUERY IS SEARCHED AS THAT QUERY (2026-09-27). "Showing results for
+     shepherd" showed 152 results where "shepherd" shows 171 (the UI walk): the
+     corrected word was searched bare, without the synonyms, forms and phrase ranking
+     the same word gets when typed. Re-run the query with the corrections put in, and
+     report them. */
+  if (corrections.length && !options._corrected) {
+    const fixedQuery = applyCorrections(query, corrections);
+    if (fixedQuery !== query.trim()) {
+      const again = await search(fixedQuery, { ...options, _corrected: true });
+      return { ...again, corrections: corrections.concat(again.corrections || []) };
+    }
   }
 
   /* THE WORDS THAT COUNT (2026-09-27). Coverage and the phrase ranking ask whether a
