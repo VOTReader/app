@@ -1167,20 +1167,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       <button type="button" className={'sw-btn sw-btn-icon sw-guide-btn' + (guideOpen ? ' is-on' : '')}
         onClick={() => (guideOpen ? closeGuide() : setGuideOpen(true))}
         aria-label="How to read this web" aria-expanded={guideOpen} aria-haspopup="dialog">?</button>
-      {guideOpen && (
-        <div className="sw-guide" role="dialog" aria-labelledby="sw-guide-title">
-          <div className="sw-guide-title" id="sw-guide-title">How to read this web</div>
-          <ul className="sw-guide-body">
-            <li>Every thread joins two passages of Scripture. Its feet stand on the verses it joins; the taller the arch, the farther apart they are.</li>
-            <li>Colour is distance: violet threads join near neighbours, green ones cross the whole Bible. The books run along the bottom.</li>
-            <li>Pinch or press <strong>+</strong> to zoom in. Past the overview, the chapter under the middle is lit and the rest stands back.</li>
-            <li>Tap a thread to see both ends and follow it. Tap a number under the baseline to list every thread landing on that verse.</li>
-            <li>Drag the web down to look up into the sky, where the long threads live. The ruler on the left names the height; the bar on the right jumps.</li>
-            <li><strong>Reset</strong> brings you home.</li>
-          </ul>
-          <button type="button" className="sw-sheet-follow sw-guide-close" onClick={closeGuide}>Got it</button>
-        </div>
-      )}
+      {guideOpen && <HowToReadGuide onClose={closeGuide} />}
       {emptyShown && (
         <div className="sw-empty">
           <div className="sw-empty-title">Your web is still being woven.</div>
@@ -1791,6 +1778,28 @@ function connectionMeta(info) {
   }
   if (info.kind === 'underlay') return info.joins;
   return LINK_KIND_NAMES[info.joins] || 'Your link';
+}
+
+/** The how-to-read card (landing 13). A dialog like the panels below it, so it
+ * gets their trap: focus in on open, Tab kept inside, focus handed back to
+ * where the reader was (the ? button) on close. Escape and Back close it
+ * through closeTopOverlay, the same as the panels. */
+function HowToReadGuide({ onClose }) {
+  const trapRef = useFocusTrap(true);
+  return (
+    <div className="sw-guide" ref={trapRef} role="dialog" aria-labelledby="sw-guide-title">
+      <div className="sw-guide-title" id="sw-guide-title">How to read this web</div>
+      <ul className="sw-guide-body">
+        <li>Every thread joins two passages of Scripture. Its feet stand on the verses it joins; the taller the arch, the farther apart they are.</li>
+        <li>Colour is distance: violet threads join near neighbours, green ones cross the whole Bible. The books run along the bottom.</li>
+        <li>Pinch or press <strong>+</strong> to zoom in. Past the overview, the chapter under the middle is lit and the rest stands back.</li>
+        <li>Tap a thread to see both ends and follow it. Tap a number under the baseline to list every thread landing on that verse.</li>
+        <li>Drag the web down to look up into the sky, where the long threads live. The ruler on the left names the height; the bar on the right jumps.</li>
+        <li><strong>Reset</strong> brings you home.</li>
+      </ul>
+      <button type="button" className="sw-sheet-follow sw-guide-close" onClick={onClose}>Got it</button>
+    </div>
+  );
 }
 
 function ConnectionChooser({ choices, onChoose, onClose, title, meta }) {

@@ -10,6 +10,7 @@ import { runInNewContext } from 'node:vm';
 import { AnswersHome, AnswersSubject, AnswersAZ, resetAnswersLanding } from './AnswersHome.jsx';
 import { ANSWERS_SUBJECTS, answersFiledUnder } from '../../utils/answers-shelves.js';
 import { passageCopy } from '../../utils/passage-copy.js';
+import { useFocusTrap } from '../../hooks/use-focus-trap.js';
 
 const ctx = {};
 runInNewContext(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'answers.js'), 'utf8'), ctx);
@@ -78,6 +79,22 @@ describe('AnswersHome — the landing', () => {
 
   // cp1 follow-up: every copy names where it is from. The sheet's words are the
   // NKJV (answers-shelves.js), so it says so whatever Settings picks.
+  /* 2026-09-27 keyboard walk: the sheet marks its topic list data-autofocus, a
+     plain div, so with the real trap it opened with focus left on the tablet. */
+  it('with the real focus trap, the sheet opens on its first topic and Back hands focus to the tablet', () => {
+    window.useFocusTrap = useFocusTrap;
+    render(<AnswersHome {...base} />);
+    const tablet = document.querySelectorAll('.answers-tablet-row')[5];
+    tablet.focus();
+    act(() => { fireEvent.click(tablet); });
+    const sheet = screen.getByRole('dialog');
+    expect(document.activeElement).toBe(sheet.querySelector('.answers-topic-list button'));
+    // Escape and Android Back both reach this sheet through window.__closeSheet
+    act(() => { window.__closeSheet(); });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(tablet);
+  });
+
   it('a copy of the commandment ends with its reference, once, in the translation shown', () => {
     render(<AnswersHome {...base} onGoToRef={noop} />);
     fireEvent.click(screen.getByRole('button', { name: /^Commandment VI: Do not murder/ }));
