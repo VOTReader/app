@@ -16,7 +16,7 @@ import { resolve, dirname } from 'node:path';
 // @ts-ignore -- no node types in this tsconfig
 import { fileURLToPath } from 'node:url';
 import {
-  expandSnippetTerms, matchCountLabel, useImeHideBlur, SearchScreen, SEARCH_LIMIT, groupInSiteOrder,
+  expandSnippetTerms, matchCountLabel, useImeHideBlur, SearchScreen, SEARCH_LIMIT, groupInSiteOrder, correctedQuery,
 } from './SearchScreen.jsx';
 import {
   srchSortCanonical as realSrchSortCanonical,
@@ -110,6 +110,19 @@ describe("groupInSiteOrder (the website's collection order)", () => {
 
   it('returns no groups for no results', () => {
     expect(groupInSiteOrder([], key, realGroupMeta())).toEqual([]);
+  });
+});
+
+describe('correctedQuery (a corrected typo, offered back as a query)', () => {
+  it('puts each corrected word in, whole words, any case', () => {
+    expect(correctedQuery('the Lord is my Shephard', [{ from: 'shephard', to: 'shepherd' }])).toBe('the Lord is my shepherd');
+    expect(correctedQuery('shephard psalmm', [{ from: 'shephard', to: 'shepherd' }, { from: 'psalmm', to: 'psalm' }])).toBe('shepherd psalm');
+  });
+
+  it('never rewrites inside another word, and leaves a query it cannot find the word in', () => {
+    expect(correctedQuery('shephardess shephard', [{ from: 'shephard', to: 'shepherd' }])).toBe('shephardess shepherd');
+    expect(correctedQuery('flood', [{ from: 'zzz', to: 'z' }])).toBe('flood');
+    expect(correctedQuery('  flood  ', [])).toBe('flood');
   });
 });
 
@@ -478,6 +491,41 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     fireEvent.click(btn);
     expect(document.querySelector('.stub-group').textContent).toBe('9,37,53,55');
     expect(mounts, 'the group was re-sorted in place, not re-mounted (a reader’s open group stays open)').toBe(before);
+    vi.useRealTimers();
+  });
+
+  it('a corrected typo is said out loud, and the corrected query is one tap into the box', async () => {
+    vi.useFakeTimers();
+    const onQueryChange = vi.fn();
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({
+      parsed: null, parsedTerms: [], corrections: [{ from: 'shephard', to: 'shepherd' }],
+      results: [{ score: 1, doc: { kind: 'verse', ref: 'Psalms 23:1', text: 'The LORD is my shepherd' } }],
+    }));
+    const props = { ...baseProps(), onQueryChange };
+    const { rerender } = render(<SearchScreen {...props} />);
+    rerender(<SearchScreen {...props} query="my Shephard" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    const note = document.querySelector('.srch-corrected');
+    expect(note, 'the note').toBeTruthy();
+    expect(note.textContent).toBe('No results for “shephard”. Showing results for my shepherd.');
+    fireEvent.click(note.querySelector('.srch-corrected-link'));
+    expect(onQueryChange).toHaveBeenCalledWith('my shepherd');
+    vi.useRealTimers();
+  });
+
+  it('no correction, no note', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({
+      parsed: null, parsedTerms: [], corrections: [],
+      results: [{ score: 1, doc: { kind: 'verse', ref: 'Psalms 23:1', text: 'The LORD is my shepherd' } }],
+    }));
+    const props = baseProps();
+    const { rerender } = render(<SearchScreen {...props} />);
+    rerender(<SearchScreen {...props} query="shepherd" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    expect(document.querySelector('.srch-corrected')).toBeNull();
     vi.useRealTimers();
   });
 

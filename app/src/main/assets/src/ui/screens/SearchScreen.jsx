@@ -85,6 +85,26 @@ export function groupInSiteOrder(results, groupKey, meta) {
 }
 
 /**
+ * The query with each corrected word put in (the engine's `corrections`: a typed
+ * word that found nothing of its own, searched as the nearest indexed word). The
+ * note under the corpus row offers it: "Showing results for the lord is my
+ * shepherd". Whole words, any case; a word the query does not hold as typed (the
+ * engine folds accents and apostrophes) leaves the query as it was. Pure.
+ * @param {string} query
+ * @param {Array<{from:string, to:string}>} corrections
+ * @returns {string}
+ */
+export function correctedQuery(query, corrections) {
+  let q = String(query || '').trim();
+  for (const c of corrections || []) {
+    if (!c || !c.from || !c.to) continue;
+    const esc = c.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    q = q.replace(new RegExp('(?<![\\p{L}\\p{N}])' + esc + '(?![\\p{L}\\p{N}])', 'giu'), c.to);
+  }
+  return q;
+}
+
+/**
  * W0 (IME blur): exiting search cost up to 3 back presses because the input
  * kept focus after the IME hid (back 1 closed the keyboard, back 2 only
  * dropped the stranded focus, back 3 finally navigated). Mirrors the
@@ -132,7 +152,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   const songsFound = songQuery.length >= 2 && typeof findSongFamilies === 'function' ? findSongFamilies(songQuery).length : 0;
   const inputRef = React.useRef(null);
   useImeHideBlur(inputRef);
-  const [state, setState] = React.useState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false });
+  const [state, setState] = React.useState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false, corrections: [] });
   const [buildInfo, setBuildInfo] = React.useState(/** @type {{ ready: boolean, building: boolean, progress: any, error?: string }} */ ({ ready: false, building: false, progress: null }));
   const [showSuggest, setShowSuggest] = React.useState(false);
   const [suggestions, setSuggestions] = React.useState([]);
@@ -204,11 +224,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
        engine exactly where it always did. Gating here as well would put the
        decision in two places and only one of them would know the query's kind. */
     const q = (query || '').trim();
-    if (!q) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false });return;}
+    if (!q) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false, corrections: [] });return;}
     // SRCH-6: a 1-char query floods the forward tokenizer with hundreds of title
     // prefix hits ("a" → every "A Warning"/"ABASEMENT"…). Require ≥2 alphanumerics
     // before the full search; the suggest box (above) still reacts at 1 char.
-    if (q.replace(/[^a-z0-9]/gi, '').length < 2) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false });return;}
+    if (q.replace(/[^a-z0-9]/gi, '').length < 2) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false, corrections: [] });return;}
     if (debounceRef.current) clearTimeout(debounceRef.current);
     // Stale-query guard: the engine yields the main thread mid-search, so a
     // slow older query can resolve AFTER a newer one and silently overwrite
@@ -241,10 +261,10 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.SYNONYM_MAP,
           settings.searchSynonyms !== false,
         );
-        setState({ phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated });
+        setState({ phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [] });
       }).catch((err) => {
         if (stale) return;
-        setState({ phase: 'done', parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0, capped: [], truncated: false });
+        setState({ phase: 'done', parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0, capped: [], truncated: false, corrections: [] });
       });
     }, 140);
     return () => {
@@ -571,6 +591,20 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             <span aria-hidden="true">›</span>
           </button>
         ) : null}
+
+        {/* A typo the engine corrected is said out loud, never done silently:
+            "No results for “shephard”. Showing results for shepherd." The
+            corrected query is a tap that puts it in the box. */}
+        {query && state.phase === 'done' && state.results.length > 0 && state.corrections.length > 0 && (
+          <div className="srch-corrected">
+            No results for {state.corrections.map((c, i) => (
+              <React.Fragment key={c.from}>{i > 0 ? ', ' : ''}“{c.from}”</React.Fragment>
+            ))}. Showing results for{' '}
+            <button type="button" className="srch-corrected-link" onClick={() => onQueryChange(correctedQuery(query, state.corrections))}>
+              {correctedQuery(query, state.corrections)}
+            </button>.
+          </div>
+        )}
 
         {query && buildInfo.ready && state.phase === 'done' && state.results.length > 0 && (
           <div className="srch-results-summary">
