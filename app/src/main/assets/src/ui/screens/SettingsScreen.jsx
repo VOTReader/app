@@ -521,6 +521,12 @@ function _platformLabel(platform) {
 
 // Search groups by the reader's vocabulary, including controls hidden behind
 // dependencies. A match opens its group; dependent rows still obey their toggles.
+/** Settings › Copy & Share › Share Includes (cp3): the link a tap on Share sends. */
+const SHARE_LINK_OPTIONS = [
+  { id: 'app', label: 'App Link', desc: 'Opens the passage in VOTReader, even offline, for anyone who has the app.' },
+  { id: 'site', label: 'Website Link', desc: 'Opens the letter on thevolumesoftruth.com, for anyone, with a connection.' },
+];
+
 const SETTINGS_TOPICS = {
   appearance: 'appearance theme light dark text size font typeface',
   reading: 'reading bible translation chapter titles section headings restored names chapter letter arrows scripture browser inline reference echoes scrollbar content marker reading position marker dot resume streak dwell time surprise me button random letter dice keep screen on double tap click fullscreen',
@@ -528,6 +534,7 @@ const SETTINGS_TOPICS = {
   autoscroll: 'auto scroll hands free reading speed continue pause',
   topnav: 'top nav buttons icons settings gear history theme bookmark compact bar more menu',
   features: 'search synonyms synonym filter stop words tabs history',
+  share: 'copy share sharing link links website app highlight passage words thevolumesoftruth',
   garden: 'a return to the garden image quality pictures',
   data: 'your data backup export import restore verify storage privacy diagnostic diagnostics log app version updates clear delete reset platform total growth protection',
   progress: 'mark as read progress book reading clear',
@@ -1302,6 +1309,32 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             />
           </div>
           <HistoryClearRow historyCount={historyCount} onClearHistory={onClearHistory} />
+        </SettingsGroup>
+
+        {/* Copy & Share (cp3, Corbin 2026-09-27). A copy of a letter ends with its
+            link on thevolumesoftruth.com (utils/site-link.js); Share ends with
+            the app's. Two choices live here so no one needs a long press to reach
+            them: which link a tap on Share sends (holding or right-clicking Share
+            still picks either for one share), and whether a website link opens
+            on the copied words highlighted (off: the letter itself). */}
+        <SettingsGroup label="Copy & Share" sub={glance.share} {...groupProps('share')}>
+          <div className="settings-card">
+            <SelectField
+              eyebrow="Copy & Share"
+              title="Share Includes"
+              label="Share Includes"
+              desc="The link a tap on Share puts under the passage. Hold Share, or right-click it on a computer, to pick the other one for a single share. Copy always adds the website link."
+              value={settings.shareLink === 'site' ? 'site' : 'app'}
+              options={SHARE_LINK_OPTIONS}
+              onChange={(v) => onSetting("shareLink", v)}
+            />
+            <SettingsRow
+              label="Highlight the Passage"
+              desc="Off (default): a website link opens the letter itself, like thevolumesoftruth.com/The_Wide_Path. On: it opens the letter scrolled to the words you copied, highlighted."
+              checked={!!settings.linkHighlight}
+              onToggle={() => onToggle("linkHighlight")}
+            />
+          </div>
         </SettingsGroup>
 
         <SettingsGroup label="A Return to The Garden" sub={glance.garden} {...groupProps('garden')}>

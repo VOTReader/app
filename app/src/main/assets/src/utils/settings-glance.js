@@ -44,6 +44,7 @@ export function settingsGlance(o) {
       'Headings ' + onOff(s.showSectionHeadings !== false),
       'Restored names ' + onOff(s.restoredNames !== false),
     ].join(' · '),
+    share: 'Share: ' + (s.shareLink === 'site' ? 'website link' : 'app link') + ' · Highlight ' + onOff(!!s.linkHighlight),
     listening: [
       (o && o.readerLabel) || 'Default voice',
       'Read-along ' + onOff(s.readAlongHighlight !== false),

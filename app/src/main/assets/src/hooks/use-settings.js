@@ -187,6 +187,12 @@ export function useSettings({ savedSettings, theme }) {
       // A NEW key, so `...savedS` cannot shadow it and every existing profile gets the calmer bar;
       // off restores the old icon row exactly (the three toggles above govern it again).
       compactTopBar: true,
+      // Copy & Share (cp3, Corbin 2026-09-27): the link a tap on Share attaches ('app' | 'site';
+      // holding Share still offers both), and whether a website link also quotes the copied words
+      // so the site opens on them highlighted (off: the link names the letter alone). New keys,
+      // so every profile starts at these defaults.
+      shareLink: "app",
+      linkHighlight: false,
       showScrollNotch: true,
       arrowLayout: "off", // "split" | "right" | "left" | "nav" | "off"
       fontScale: "1", // WL1 — text-size multiplier ("1" | "1.15" | "1.3" | "1.5"); drives --font-scale on <html>

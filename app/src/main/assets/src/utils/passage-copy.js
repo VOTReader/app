@@ -61,6 +61,8 @@
    "~ [From …]" source line) and links there; words across several of its
    passages name the topic and link its answersonlygodcangive.com page. The
    Bible has no page on the site: a verse copy keeps its reference alone.
+   cp3: the quote is the reader's option (Settings › Copy & Share › Highlight
+   the Passage, off by default); by default the link names the letter alone.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { _bookmarkSourceLabel } from './bookmark-source.js';
@@ -121,6 +123,19 @@ export function translationTag(key) {
   const opts = typeof TRANSLATION_OPTIONS !== 'undefined' && Array.isArray(TRANSLATION_OPTIONS) ? TRANSLATION_OPTIONS : [];
   const found = opts.find((o) => o.id === (code || 'nkjv'));
   return ' (' + (found ? found.label : 'NKJV') + ')';
+}
+
+/** cp3 (Corbin 2026-09-27): "the attached link actually HIGHLIGHTS the shared
+    text on the website proper. Great idea, but that should be an option, not
+    the default. Default should just be the link to the main letter." A website
+    link names the letter's page (a compilation entry's section) unless
+    Settings › Copy & Share › Highlight the Passage is on; then it quotes the
+    copied words as well (#:~:text=), and the site opens on them highlighted.
+    Read from Settings at the moment of the copy, like the translation.
+    @returns {boolean} */
+export function highlightLinks() {
+  if (typeof StateStore === 'undefined' || !StateStore) return false;
+  try { const s = StateStore.get(); return !!(s && s.settings && s.settings.linkHighlight); } catch (_e) { return false; }
 }
 
 /** Does the Bible reader show this book in the reader's translation? Every
@@ -363,12 +378,14 @@ function verseNumberOf(el) {
  * What a copy of `range` puts on the clipboard, or null when the range holds
  * no reading text (the browser's own copy stands then). `text` is `body`, then
  * `reference` and `link` (its place on thevolumesoftruth.com, cp2) each on its
- * own line. With `numbers` false the verse numbers are left out.
+ * own line. With `numbers` false the verse numbers are left out. The link
+ * names the letter's page (a compilation entry's section) and quotes the copied
+ * words only with `quote` (by default the reader's Highlight the Passage, cp3).
  * @param {Range} range
- * @param {{ numbers?: boolean }} [opts]
+ * @param {{ numbers?: boolean, quote?: boolean }} [opts]
  * @returns {{ text: string, body: string, reference: string, link: string, keys: string[], isPublic: boolean } | null}
  */
-export function passageCopy(range, { numbers = true } = {}) {
+export function passageCopy(range, { numbers = true, quote = highlightLinks() } = {}) {
   if (!range || range.collapsed) return null;
   /** @type {{ el: Element, key: string, body: string, clip: Range, fromTop: boolean }[]} */
   const parts = [];
@@ -391,7 +408,7 @@ export function passageCopy(range, { numbers = true } = {}) {
     const declared = declaredOrigin(range);
     const words = declared ? plainText(range.cloneContents(), numbers) : '';
     if (!declared || !words) return null;
-    const link = declared.target ? siteUrl(declared.target, quoteLines([range])) : '';
+    const link = declared.target ? siteUrl(declared.target, quote ? quoteLines([range]) : undefined) : '';
     return { text: ending(words, declared.reference, link), body: words, reference: declared.reference, link, keys: [], isPublic: true };
   }
   const manyVerses = parts.filter((p) => isVerseKey(p.key)).length > 1;
@@ -415,7 +432,7 @@ export function passageCopy(range, { numbers = true } = {}) {
   if (!origin.reference && isPublic) origin = declaredOrigin(range) || origin;
   const quoted = origin.quoteKeys;
   const link = origin.target
-    ? siteUrl(origin.target, quoteLines(parts.filter((p) => !quoted || quoted.has(p.key)).map((p) => p.clip)))
+    ? siteUrl(origin.target, quote ? quoteLines(parts.filter((p) => !quoted || quoted.has(p.key)).map((p) => p.clip)) : undefined)
     : '';
   return {
     text: ending(text, origin.reference, link),

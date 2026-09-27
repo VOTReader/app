@@ -1559,7 +1559,7 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
       raise();
       press('Copy');
       expect(written).toEqual([words + '\nThe Wide Path (Volume Two)\n'
-        + 'https://www.thevolumesoftruth.com/The_Wide_Path#:~:text=Yet%20in%20your%20arrogance%2C,to%20forsake%20your%20Maker%2E']);
+        + 'https://www.thevolumesoftruth.com/The_Wide_Path']);
       raise();
       press('Share');
       await act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
@@ -1709,7 +1709,8 @@ describe('SelectionToolbar — steps aside while the selection or the page is mo
 describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
   const g = /** @type {any} */ (globalThis);
   const WORDS = 'Yet in your arrogance, you continue to forsake your Maker.';
-  const SITE = 'https://www.thevolumesoftruth.com/The_Wide_Path#:~:text=Yet%20in%20your%20arrogance%2C,to%20forsake%20your%20Maker%2E';
+  // cp3: a website link names the letter alone unless Highlight the Passage is on.
+  const SITE = 'https://www.thevolumesoftruth.com/The_Wide_Path';
   /** @type {any[]} */ let sent;
   /** @type {PropertyDescriptor | undefined} */ let origShare;
   beforeEach(() => {
@@ -1722,7 +1723,7 @@ describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
   afterEach(() => {
     if (origShare) Object.defineProperty(navigator, 'share', origShare);
     else delete /** @type {any} */ (navigator).share;
-    delete g.findEntryContext; delete g._bookTitle;
+    delete g.findEntryContext; delete g._bookTitle; delete g.StateStore;
   });
   const settle = () => act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
   const shareBtn = () => /** @type {any} */ ([...document.querySelectorAll('.sel-action-btn span')].find((sp) => sp.textContent === 'Share')?.closest('.sel-action-btn'));
@@ -1758,6 +1759,23 @@ describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
     await settle();
     expect(sent.map((d) => d.text)).toEqual([WORDS + '\nThe Wide Path (Volume Two)\n' + SITE]);
     expect(document.querySelector('.sel-toolbar')).toBeNull();
+  });
+
+  // cp3 (Corbin 2026-09-27): the choice without a long press. Settings › Copy & Share ›
+  // Share Includes makes a plain tap send the website link; Highlight the Passage adds the words.
+  it('Share Includes: Website link makes a tap send Copy\'s text; Highlight the Passage quotes the words', async () => {
+    g.StateStore = { get: () => ({ settings: { shareLink: 'site' } }) };
+    raise('letter:the-wide-path:1', WORDS);
+    act(() => { fire(shareBtn(), 'click'); });
+    await settle();
+    expect(sent.map((d) => d.text)).toEqual([WORDS + '\nThe Wide Path (Volume Two)\n' + SITE]);
+    cleanup(); document.body.innerHTML = ''; sent.length = 0;
+    g.StateStore = { get: () => ({ settings: { shareLink: 'site', linkHighlight: true } }) };
+    raise('letter:the-wide-path:1', WORDS);
+    act(() => { fire(shareBtn(), 'click'); });
+    await settle();
+    expect(sent.map((d) => d.text)).toEqual([WORDS + '\nThe Wide Path (Volume Two)\n'
+      + SITE + '#:~:text=Yet%20in%20your%20arrogance%2C,to%20forsake%20your%20Maker%2E']);
   });
 
   it('"App link" shares as a tap does; a right-click opens the choice without raising the toolbar anew', async () => {

@@ -139,7 +139,7 @@ describe('passageCopy — letters and poems', () => {
     const body = letter();
     const out = /** @type {any} */ (passageCopy(range(body, 0, body, body.childNodes.length)));
     expect(out.text).toBe('Hear the Word of The Lord.\n\nTherefore, turn from this\nWicked way you have chosen!\nThe Wide Path (Volume Two)\n'
-      + 'https://www.thevolumesoftruth.com/The_Wide_Path#:~:text=Hear%20the%20Word%20of,way%20you%20have%20chosen%21');
+      + 'https://www.thevolumesoftruth.com/The_Wide_Path');
   });
 
   it('<br> soft breaks (WTLB) are line breaks, not glued words', () => {
@@ -149,7 +149,7 @@ describe('passageCopy — letters and poems', () => {
     document.body.appendChild(p);
     expect(/** @type {any} */ (passageCopy(range(p, 0, p, p.childNodes.length))).text)
       .toBe('Take your every thought captive\n\nThat you may be set apart\nFaith (Words To Live By: Part One)\n'
-        + 'https://www.thevolumesoftruth.com/Words_To_Live_By:_Part_One#Faith:~:text=Take%20your%20every%20thought,may%20be%20set%20apart');
+        + 'https://www.thevolumesoftruth.com/Words_To_Live_By:_Part_One#Faith');
   });
 
   it('a verse number inside a quoted poem line gets its space too', () => {
@@ -166,7 +166,7 @@ describe('passageCopy — letters and poems', () => {
     p.textContent = 'I AM the Bread of Life.';
     document.body.appendChild(p);
     expect(/** @type {any} */ (passageCopy(range(p, 0, p, 1))).text)
-      .toBe('I AM the Bread of Life.\nThe Bread of Life\nhttps://www.thevolumesoftruth.com/The_Bread_of_Life#:~:text=I%20AM%20the%20Bread%20of%20Life%2E');
+      .toBe('I AM the Bread of Life.\nThe Bread of Life\nhttps://www.thevolumesoftruth.com/The_Bread_of_Life');
   });
 
   it('the reader\'s own journal: the words alone, and not public (the browser keeps its own copy)', () => {
@@ -282,7 +282,7 @@ describe('passageCopy — always ends with where the words are from', () => {
     document.body.appendChild(page);
     const p = /** @type {Element} */ (page.firstElementChild);
     expect(/** @type {any} */ (passageCopy(range(p, 0, p, 1))).text)
-      .toBe('Hear the Word of The Lord.\nThe Wide Path (Volume Two)\nhttps://www.thevolumesoftruth.com/The_Wide_Path#:~:text=Hear%20the%20Word%20of%20The%20Lord%2E');
+      .toBe('Hear the Word of The Lord.\nThe Wide Path (Volume Two)\nhttps://www.thevolumesoftruth.com/The_Wide_Path');
   });
 
   it('a control\'s label inside a sheet is not the passage', () => {
@@ -323,6 +323,8 @@ describe('passageCopy — the link to the passage on thevolumesoftruth.com', () 
     ],
   };
   beforeEach(() => {
+    // These pin the quote itself: Highlight the Passage on (cp3; off by default, see below).
+    g.StateStore = { get: () => ({ settings: { translation: 'rnkjv', linkHighlight: true } }) };
     const base = g.findEntryContext;
     g.findEntryContext = (/** @type {string} */ id, /** @type {string} */ kind) => ({
       abortion: { kind: 'wtlb', screen: 'answers-entry', collection: 'Answers Only God Can Give', title: 'Thus Says The Lord Regarding Abortion', entry: ABORTION },
@@ -414,6 +416,20 @@ describe('passageCopy — the link to the passage on thevolumesoftruth.com', () 
     const h = /** @type {Element} */ (page.firstElementChild);
     const out = /** @type {any} */ (passageCopy(range(h, 0, h, 1)));
     expect(out.text).toBe('The Wide Path\nThe Wide Path (Volume Two)\n' + SITE + 'The_Wide_Path#:~:text=The%20Wide%20Path');
+  });
+
+  it('cp3: by default the link names the letter alone (a compilation entry, its section); the setting adds the words', () => {
+    g.StateStore = { get: () => ({ settings: { translation: 'rnkjv' } }) };
+    const p = document.createElement('p');
+    p.setAttribute('data-hl-key', 'letter:the-wide-path:4');
+    p.textContent = 'Beloved, walk the narrow way.';
+    document.body.appendChild(p);
+    const r = range(/** @type {Node} */ (p.firstChild), 0, /** @type {Node} */ (p.firstChild), 29);
+    expect(/** @type {any} */ (passageCopy(r)).link).toBe(SITE + 'The_Wide_Path');
+    expect(/** @type {any} */ (passageCopy(r, { quote: true })).link).toBe(SITE + 'The_Wide_Path#:~:text=Beloved%2C%20walk%20the%20narrow%20way%2E');
+    g.StateStore = { get: () => ({ settings: { translation: 'rnkjv', linkHighlight: true } }) };
+    expect(/** @type {any} */ (passageCopy(r)).link).toBe(SITE + 'The_Wide_Path#:~:text=Beloved%2C%20walk%20the%20narrow%20way%2E');
+    expect(/** @type {any} */ (passageCopy(r, { quote: false })).link).toBe(SITE + 'The_Wide_Path');
   });
 
   it('the reader\'s journal never gets a link', () => {
