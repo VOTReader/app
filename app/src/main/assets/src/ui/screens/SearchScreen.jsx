@@ -2,6 +2,8 @@
    SearchScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { kjvEncode } from '../../search/tokenize.js';
+
 /**
  * SRCH4: build the snippet-highlight term list. SrchSnippet only marks the terms
  * we hand it, so when synonym search is ON we expand each LITERAL query term
@@ -88,20 +90,23 @@ export function groupInSiteOrder(results, groupKey, meta) {
  * The query with each corrected word put in (the engine's `corrections`: a typed
  * word that found nothing of its own, searched as the nearest indexed word). The
  * note under the corpus row offers it: "Showing results for the lord is my
- * shepherd". Whole words, any case; a word the query does not hold as typed (the
- * engine folds accents and apostrophes) leaves the query as it was. Pure.
+ * shepherd". A query word is matched the way the engine read it (kjvEncode: any
+ * case, accents and apostrophes folded), so an accented typo is rewritten too
+ * (review of 875dff9f). Pure.
  * @param {string} query
  * @param {Array<{from:string, to:string}>} corrections
  * @returns {string}
  */
 export function correctedQuery(query, corrections) {
-  let q = String(query || '').trim();
-  for (const c of corrections || []) {
-    if (!c || !c.from || !c.to) continue;
-    const esc = c.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    q = q.replace(new RegExp('(?<![\\p{L}\\p{N}])' + esc + '(?![\\p{L}\\p{N}])', 'giu'), c.to);
-  }
-  return q;
+  const q = String(query || '').trim();
+  const to = Object.create(null);
+  for (const c of corrections || []) if (c && c.from && c.to) to[c.from] = c.to;
+  // each run of word characters, folded the engine's way; a run that folds to
+  // one corrected word is replaced whole
+  return q.replace(/[\p{L}\p{M}\p{N}'\u2019]+/gu, (w) => {
+    const toks = kjvEncode(w);
+    return toks.length === 1 && to[toks[0]] ? to[toks[0]] : w;
+  });
 }
 
 /**

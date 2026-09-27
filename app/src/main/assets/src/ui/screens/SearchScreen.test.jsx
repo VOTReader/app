@@ -114,6 +114,10 @@ describe("groupInSiteOrder (the website's collection order)", () => {
 });
 
 describe('correctedQuery (a corrected typo, offered back as a query)', () => {
+  it('matches a query word the way the engine read it: an accented typo is rewritten too', () => {
+    expect(correctedQuery('the lord is my Shéphard', [{ from: 'shephard', to: 'shepherd' }])).toBe('the lord is my shepherd');
+  });
+
   it('puts each corrected word in, whole words, any case', () => {
     expect(correctedQuery('the Lord is my Shephard', [{ from: 'shephard', to: 'shepherd' }])).toBe('the Lord is my shepherd');
     expect(correctedQuery('shephard psalmm', [{ from: 'shephard', to: 'shepherd' }, { from: 'psalmm', to: 'psalm' }])).toBe('shepherd psalm');
