@@ -18,28 +18,56 @@
    ("Matthew 5:3-4, 7"), both of which the old local `.split(';')` dropped on
    the floor. A ref string with no parseable part renders nothing.
 
-   findBook needs the lazy Bible corpus. The mount effect pre-warms
-   __loadBibleCorpus (idempotent, async-notify-only — the Q8 loader
-   contract) so the corpus is usually ready by tap time; a tap that still
-   can't resolve retries briefly on an interval — the same pattern as the
-   journal viewer's {{ref:}} links.
+   findBook needs the lazy Bible corpus. The button warms __loadBibleCorpus
+   (idempotent, async-notify-only — the Q8 loader contract) when it comes
+   into view, and again on pointerdown/focus, so the corpus is usually ready
+   by tap time; a tap that still can't resolve retries briefly on an
+   interval — the same pattern as the journal viewer's {{ref:}} links.
+
+   NOT AT MOUNT. FootnoteListSection mounts one button per footnote at the
+   foot of every footnoted letter, so a mount-time warm downloaded the whole
+   Bible (1.4 MB gzip, a ~0.6 s parse) on every letter open, before any tap
+   (docs/perf/lighthouse-2026-09.md, item 2). The view warm observes against
+   the reading column's scroll box (.screen-scroll) with a look-ahead margin,
+   so the corpus starts as the reader nears the footnote list; a sheet's
+   button is in view the moment the sheet opens, which keeps the old
+   warm-on-open timing there. Without IntersectionObserver it falls back to
+   the old mount warm.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
  * @param {{ refStr?: string | null, onGo?: ((endpoint: any) => void) | null }} props
  */
+const WARM_LOOKAHEAD = '800px 0px';
+
+function warmBibleCorpus() {
+  if (typeof window.__loadBibleCorpus === 'function') window.__loadBibleCorpus();
+}
+
 export function GoToRefButton({ refStr, onGo }) {
   const retryRef = React.useRef(/** @type {any} */ (null));
-  React.useEffect(() => {
-    if (typeof window.__loadBibleCorpus === 'function') window.__loadBibleCorpus();
-    return () => {
-      if (retryRef.current) { clearInterval(retryRef.current); retryRef.current = null; }
-    };
+  const firstBtnRef = React.useRef(/** @type {HTMLButtonElement | null} */ (null));
+  React.useEffect(() => () => {
+    if (retryRef.current) { clearInterval(retryRef.current); retryRef.current = null; }
   }, []);
   const targets = (refStr && typeof splitCompoundRef === 'function')
     ? splitCompoundRef(refStr)
     : [];
-  if (targets.length === 0 || !onGo) return null;
+  const shown = targets.length > 0 && !!onGo;
+  React.useEffect(() => {
+    const el = firstBtnRef.current;
+    if (!shown || !el) return undefined;
+    const IO = /** @type {any} */ (globalThis).IntersectionObserver;
+    if (typeof IO !== 'function') { warmBibleCorpus(); return undefined; }
+    const io = new IO((entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      io.disconnect();
+      warmBibleCorpus();
+    }, { root: el.closest('.screen-scroll'), rootMargin: WARM_LOOKAHEAD });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [shown]);
+  if (!shown) return null;
   const go = (parsed) => {
     if (retryRef.current) return; // a resolve retry is already pending
     const tryNav = () => {
@@ -63,7 +91,8 @@ export function GoToRefButton({ refStr, onGo }) {
       {targets.map((part, i) => (
         // part.ref is the canonical self-contained label — "(TAG)" suffix
         // dropped, dash variants normalized, an inherited book spelled out.
-        <button key={i} type="button" className="fn-sheet-link-btn sc-sheet-goto-btn" onClick={() => go(part.parsed)}>
+        <button key={i} ref={i === 0 ? firstBtnRef : undefined} type="button" className="fn-sheet-link-btn sc-sheet-goto-btn"
+          onPointerDown={warmBibleCorpus} onFocus={warmBibleCorpus} onClick={() => go(part.parsed)}>
           <span className="fn-sheet-link-body">
             <span className="fn-sheet-link-eyebrow">Go to Scripture</span>
             <span className="fn-sheet-link-title">{part.ref}</span>

@@ -3,12 +3,12 @@
    Contract: parse the sheet's ref string with the REAL parseRefStr; when it
    reads as a Bible ref, render the gold in-app-link-style button; a tap
    resolves the ref via findBook into a {type:'bible'} endpoint and hands it
-   to onGo. findBook needs the lazy Bible corpus — the mount effect pre-warms
-   __loadBibleCorpus, and a tap that can't resolve yet retries briefly on an
+   to onGo. findBook needs the lazy Bible corpus — the button warms
+   __loadBibleCorpus when it comes into view or on pointerdown/focus, and a tap that can't resolve yet retries briefly on an
    interval (the journal-viewer {{ref:}} pattern) instead of dropping the tap. */
 
 import { it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, fireEvent } from '@testing-library/react';
 import { GoToRefButton } from './GoToRefButton.jsx';
 import { parseRefStr, splitCompoundRef, findBook } from '../../data/scripture-resolution.js';
 
@@ -114,7 +114,91 @@ it('a comma verse list becomes its own button (bible-studies.js "1 John 4:9-10, 
   expect(onGo).toHaveBeenCalledWith({ type: 'bible', bookId: '1john', chapter: 4, verse: 14 });
 });
 
-it('pre-warms the Bible corpus on mount', () => {
+/* ── Corpus warm-up (docs/perf/lighthouse-2026-09.md, item 2) ──────────────
+   The mount effect used to call __loadBibleCorpus, and FootnoteListSection
+   mounts one button per footnote, so every footnoted letter downloaded the
+   whole Bible (1.4 MB gzip) at page load. The warm now happens when a button
+   comes into view (near the reading column's scroll box), or on pointerdown
+   or focus — never at bare mount. */
+class FakeIO {
+  static last = /** @type {FakeIO | null} */ (null);
+  constructor(cb, opts) { this.cb = cb; this.opts = opts; this.els = []; this.disconnected = false; FakeIO.last = this; }
+  observe(el) { this.els.push(el); }
+  unobserve() {}
+  disconnect() { this.disconnected = true; }
+  fire(isIntersecting) { this.cb(this.els.map((target) => ({ target, isIntersecting }))); }
+}
+const withIO = () => { FakeIO.last = null; g.IntersectionObserver = FakeIO; };
+
+it('does NOT load the Bible corpus at mount (a footnoted letter no longer downloads it on open)', () => {
+  withIO();
+  window.__loadBibleCorpus = vi.fn();
+  render(<Btn refStr="Isaiah 13:11" onGo={() => {}} />);
+  expect(window.__loadBibleCorpus).not.toHaveBeenCalled();
+  delete g.IntersectionObserver;
+});
+
+it('warms the corpus once the button comes into view, then stops observing', () => {
+  withIO();
+  window.__loadBibleCorpus = vi.fn();
+  const { container } = render(<Btn refStr="Isaiah 13:11" onGo={() => {}} />);
+  const io = FakeIO.last;
+  expect(io.els[0]).toBe(container.querySelector('.sc-sheet-goto-btn'));
+  io.fire(false);
+  expect(window.__loadBibleCorpus).not.toHaveBeenCalled();
+  io.fire(true);
+  expect(window.__loadBibleCorpus).toHaveBeenCalledTimes(1);
+  expect(io.disconnected).toBe(true);
+  delete g.IntersectionObserver;
+});
+
+it('observes against the reading column scroll box with a look-ahead margin', () => {
+  withIO();
+  window.__loadBibleCorpus = vi.fn();
+  const scroller = document.createElement('div');
+  scroller.className = 'screen-scroll';
+  document.body.appendChild(scroller);
+  render(<Btn refStr="Isaiah 13:11" onGo={() => {}} />, { container: scroller });
+  expect(FakeIO.last.opts.root).toBe(scroller);
+  expect(FakeIO.last.opts.rootMargin).toMatch(/px/);
+  cleanup();
+  scroller.remove();
+  delete g.IntersectionObserver;
+});
+
+it('warms the corpus on pointerdown and on focus, before the tap lands', () => {
+  withIO();
+  window.__loadBibleCorpus = vi.fn();
+  const { container } = render(<Btn refStr="Isaiah 13:11" onGo={() => {}} />);
+  const btn = container.querySelector('.sc-sheet-goto-btn');
+  fireEvent.pointerDown(btn);
+  expect(window.__loadBibleCorpus).toHaveBeenCalledTimes(1);
+  fireEvent.focus(btn);
+  expect(window.__loadBibleCorpus).toHaveBeenCalledTimes(2);
+  delete g.IntersectionObserver;
+});
+
+it('disconnects the observer on unmount (no warm after the sheet closes)', () => {
+  withIO();
+  window.__loadBibleCorpus = vi.fn();
+  const { unmount } = render(<Btn refStr="Isaiah 13:11" onGo={() => {}} />);
+  const io = FakeIO.last;
+  unmount();
+  expect(io.disconnected).toBe(true);
+  delete g.IntersectionObserver;
+});
+
+it('no button, no observer, no warm (unparseable ref)', () => {
+  withIO();
+  window.__loadBibleCorpus = vi.fn();
+  render(<Btn refStr="not a reference" onGo={() => {}} />);
+  expect(FakeIO.last).toBeNull();
+  expect(window.__loadBibleCorpus).not.toHaveBeenCalled();
+  delete g.IntersectionObserver;
+});
+
+it('without IntersectionObserver it falls back to the old mount warm', () => {
+  delete g.IntersectionObserver;
   window.__loadBibleCorpus = vi.fn();
   render(<Btn refStr="Isaiah 13:11" onGo={() => {}} />);
   expect(window.__loadBibleCorpus).toHaveBeenCalledTimes(1);
