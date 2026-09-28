@@ -31,6 +31,10 @@
                                    stored thumbs would be the wrong aspect)
      - capture-after-nav effect   (fires 350 ms after screen/tab change,
                                    then waits out the calm gate)
+     - the web boot quiet window  (web only: no non-urgent capture until
+                                   WEB_BOOT_CAPTURE_FLOOR_MS after the first
+                                   render AND an idle moment — keeps
+                                   html2canvas out of page load)
      - overview-open heal effect  (opening the overview captures the active
                                    content tab URGENTLY — safe: clone renders
                                    exclude the overlay; heals blank/stale
@@ -86,6 +90,7 @@
 import { useRefMirror } from './use-ref-mirror.js';
 import { PlatformBridge, captureTargetEl } from '../utils/platform-bridge.js';
 import { StateStore } from '../stores/state-store.js';
+import { onIdle } from '../utils/on-idle.js';
 
 /**
  * Publish the tab-card aspect ratio (--card-ar) from the APP COLUMN
@@ -167,6 +172,77 @@ export function noteCaptureInteraction(kind, now, remainingTouches) {
 export function captureIsCalm(now) {
   const down = (_touchDown || _mouseDown) && (now - _lastInteractTs) <= DOWN_STALE_MS;
   return !down && (now - _lastInteractTs) >= CAPTURE_CALM_MS;
+}
+
+/* ── Web boot quiet window ──────────────────────────────────────────────
+   Lighthouse mobile (docs/perf/lighthouse-2026-09.md, item 1): the after-nav
+   capture fired 350 ms after the FIRST screen, so the html2canvas load and
+   its clone renders (plus the other-theme render) landed in the middle of
+   page load — 4.5 to 8.2 s of 4x-throttled main-thread time on the reading
+   pages, the top bootup-time entry on every page. Nobody sees a card during
+   load: the Tabs overview is the only place cards appear, and opening it
+   captures URGENTLY (the heal effect below, and goTabs in app.jsx).
+   So on the WEB every non-urgent capture waits until the page has been up
+   for WEB_BOOT_CAPTURE_FLOOR_MS (measured from the hook's first mount, i.e.
+   the first render) AND the main thread has an idle moment; navigations in
+   that window collapse into ONE capture of whatever tab is active when it
+   lifts. The window lifts once per page load and never re-arms.
+   ANDROID is untouched (PlatformBridge.isAndroid): it keeps the 350 ms
+   cadence, and the native PixelCopy Garden path is not involved. */
+export const WEB_BOOT_CAPTURE_FLOOR_MS = 10000;
+const WEB_BOOT_IDLE_TIMEOUT_MS = 5000;
+let _bootFloorAt = /** @type {number | null} */ (null);
+let _bootSettled = false;
+/** @type {Array<() => void>} */
+let _bootWaiters = [];
+let _bootTimer = /** @type {any} */ (null);
+let _bootIdleCancel = /** @type {null | (() => void)} */ (null);
+
+/** Start the floor clock at the first render (first call wins). */
+function noteCaptureBootStart(now) {
+  if (_bootFloorAt == null) _bootFloorAt = now + WEB_BOOT_CAPTURE_FLOOR_MS;
+}
+
+/**
+ * Run `fn` once the boot window has lifted (floor passed + an idle moment);
+ * runs it synchronously when it already has.
+ * @param {() => void} fn
+ * @returns {() => void} cancel
+ */
+function whenCaptureBootSettled(fn) {
+  if (_bootSettled) { fn(); return () => {}; }
+  _bootWaiters.push(fn);
+  if (!_bootTimer && !_bootIdleCancel) {
+    const now = performance.now();
+    noteCaptureBootStart(now);
+    const wait = Math.max(0, /** @type {number} */ (_bootFloorAt) - now);
+    _bootTimer = setTimeout(() => {
+      _bootTimer = null;
+      _bootIdleCancel = onIdle(() => {
+        _bootIdleCancel = null;
+        _bootSettled = true;
+        const waiters = _bootWaiters;
+        _bootWaiters = [];
+        waiters.forEach((w) => w());
+      }, { timeout: WEB_BOOT_IDLE_TIMEOUT_MS });
+    }, wait);
+  }
+  return () => { _bootWaiters = _bootWaiters.filter((w) => w !== fn); };
+}
+
+/**
+ * Tests only: reset the boot window. `settled` true opens it (the state every
+ * pre-existing capture test assumes); false re-arms it with a fresh floor.
+ * @param {boolean} settled
+ */
+export function _resetCaptureBootGateForTests(settled) {
+  if (_bootTimer) clearTimeout(_bootTimer);
+  if (_bootIdleCancel) _bootIdleCancel();
+  _bootTimer = null;
+  _bootIdleCancel = null;
+  _bootWaiters = [];
+  _bootFloorAt = null;
+  _bootSettled = settled;
 }
 
 /**
@@ -411,6 +487,11 @@ export function useThumbnails({
 
   // Pending calm-gate deferral (see the gate at the top of the callback).
   const calmDeferTimerRef = React.useRef(/** @type {any} */ (null));
+  // Pending web boot-window wait (its cancel), at most one per hook.
+  const bootWaitCancelRef = React.useRef(/** @type {null | (() => void)} */ (null));
+
+  // The boot window's floor counts from the first render.
+  React.useEffect(() => { noteCaptureBootStart(performance.now()); }, []);
 
   // ── Capture callback ───────────────────────────────────────────────────
   // HARD INVARIANT: must be React.useCallback with dep array [tabsEnabled].
@@ -428,6 +509,18 @@ export function useThumbnails({
     // overview-open heal covers anything still stale.
     if (typeof document !== 'undefined' && document.body
       && document.body.classList.contains('autoscroll-running')) return;
+    // WEB BOOT QUIET WINDOW (see the module header). Non-urgent web captures
+    // wait for it; one pending wait per hook, so boot-time navigations
+    // collapse into one capture. Android keeps its cadence.
+    if (!(opts && opts.urgent) && !PlatformBridge.isAndroid && !_bootSettled) {
+      if (!bootWaitCancelRef.current) {
+        bootWaitCancelRef.current = whenCaptureBootSettled(() => {
+          bootWaitCancelRef.current = null;
+          captureActiveTabThumbnail();
+        });
+      }
+      return;
+    }
     // CALM GATE (see the module header). A render that starts within a beat
     // of a touch is a render the NEXT tap or scroll queues behind — the felt
     // "input takes a second" defect. Non-urgent captures wait for calm and
@@ -576,6 +669,14 @@ export function useThumbnails({
     if (captureRetryTimerRef.current) clearTimeout(captureRetryTimerRef.current);
     if (calmDeferTimerRef.current) clearTimeout(calmDeferTimerRef.current);
   }, []);
+
+  // ── Pending boot-window wait — drop on unmount or a tabsEnabled flip ────
+  // The wait holds THIS callback identity; when it changes (tabs toggled) or
+  // the hook unmounts, the stale wait must not capture. The after-nav effect
+  // re-requests under the new identity.
+  React.useEffect(() => () => {
+    if (bootWaitCancelRef.current) { bootWaitCancelRef.current(); bootWaitCancelRef.current = null; }
+  }, [captureActiveTabThumbnail]);
 
   // ── Calm-tracker listeners ─────────────────────────────────────────────
   // Feed the module-level interaction tracker the calm gate reads. Document
