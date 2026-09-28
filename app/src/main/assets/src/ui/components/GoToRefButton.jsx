@@ -35,15 +35,15 @@
    the old mount warm.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/**
- * @param {{ refStr?: string | null, onGo?: ((endpoint: any) => void) | null }} props
- */
 const WARM_LOOKAHEAD = '800px 0px';
 
 function warmBibleCorpus() {
   if (typeof window.__loadBibleCorpus === 'function') window.__loadBibleCorpus();
 }
 
+/**
+ * @param {{ refStr?: string | null, onGo?: ((endpoint: any) => void) | null }} props
+ */
 export function GoToRefButton({ refStr, onGo }) {
   const retryRef = React.useRef(/** @type {any} */ (null));
   const firstBtnRef = React.useRef(/** @type {HTMLButtonElement | null} */ (null));
