@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   MatthewChapterView — Cluster D (esbuild bundle-d.js)
+   MatthewChapterView — lazy bundle-g (esbuild bundle-g.js)
    ═══════════════════════════════════════════════════════════════════════
    The Matthew chapter screen — extracted from the inline `matthew-ch`
    ROUTES entry in app.jsx (Phase 2 P9b). Wraps ChapterView with the

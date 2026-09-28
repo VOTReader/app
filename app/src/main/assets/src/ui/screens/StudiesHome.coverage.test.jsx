@@ -9,8 +9,11 @@
 import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { render, cleanup, screen } from '@testing-library/react';
 import { StudiesHome } from './StudiesHome.jsx';
+// StudiesHome rides bundle-g and reads these as bundle-d globals; the real ones, so the badge is the shipped badge.
+import { studyCoverage, studyCoverageDetail } from '../../utils/audio-coverage.js';
+import { CoverageBadge } from '../components/CoverageBadge.jsx';
 
-const GLOBALS = ['ScreenLayout', 'LibraryNav', 'AUDIO_MANIFEST', 'BIBLE_AUDIO_MANIFEST'];
+const GLOBALS = ['ScreenLayout', 'LibraryNav', 'AUDIO_MANIFEST', 'BIBLE_AUDIO_MANIFEST', 'studyCoverage', 'studyCoverageDetail', 'CoverageBadge'];
 
 const STUDIES = [
   // recorded whole (6 of 6, the way Purity ships)
@@ -24,6 +27,7 @@ const STUDIES = [
 beforeEach(() => {
   window.ScreenLayout = ({ children }) => <div>{children}</div>;
   window.LibraryNav = () => null;
+  Object.assign(window, { studyCoverage, studyCoverageDetail, CoverageBadge });
   window.AUDIO_MANIFEST = {
     'study:purity-ch1': [['a', 'V']],
     'study:purity-ch2': [['b', 'V']],

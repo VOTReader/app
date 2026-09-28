@@ -77,7 +77,10 @@ const BUDGETS = [
   // KEEP controls, the player's kept-song arm) and the tap-to-play song row, in bundle-d because the bar, the desk and
   // the letter page's songs card use them on every screen; with the day's shell work that left 751 B under the old
   // ceiling. Re-baselined UP by the same rule: 624,549 x 1.15 = 718,231.4 -> the hundred above.
-  { file: 'bundle-d.js', measured: 624549, max: 718300 },   // most screens/sheets/utils
+  // 2026-09-28, Lighthouse item 5 (docs/perf/lighthouse-2026-09.md): StudiesHome, BibleStudyIndex,
+  // BibleStudyChapterView and MatthewChapterView leave for bundle-g. Today's tree measured 675,690 before
+  // the move and 663,792 after. The ceiling is NOT loosened to 663,792 x 1.15: the room stays unclaimed.
+  { file: 'bundle-d.js', measured: 663792, max: 718300 },   // most screens/sheets/utils
   // Re-baselined 2026-09-22 (292,190 B): the Answers landing's rules (~8 KB) and the
   // month's large-text / tap-target fixes, on top of 253,510 B measured 09-01.
   // 2026-09-25 (n7-08): the tree had grown to 335,980 B, 20 under this ceiling. Measured first: 91.5 KB
@@ -87,7 +90,7 @@ const BUDGETS = [
   { file: 'app.min.css', measured: 285867, max: 328800 },   // render-blocking <link> in index.html
   { file: 'screens-e.min.css', measured: 8156, max: 9400 },   // Settings/Search/Garden rules, loaded with bundle-e
   { file: 'screens-f.min.css', measured: 15359, max: 17700 }, // the Scripture Web's rules, with bundle-f
-  { file: 'screens-g.min.css', measured: 15283, max: 17600 }, // the Personal Study screens' rules, with bundle-g
+  { file: 'screens-g.min.css', measured: 15900, max: 17600 }, // the Personal Study and Studies screens' rules, with bundle-g
   { file: 'screens-h.min.css', measured: 11473, max: 13200 },   // the Listening Library's and Songs' rules, with bundle-h
   // ── lazy, but still fetched + parsed on the reader's device ──
   // Re-baselined 114,137 -> 131,027 on 2026-09-11 (landing 89's tree): eight landings of
@@ -142,7 +145,10 @@ const BUDGETS = [
   // exactly what bundle-b lost — platform-bridge.js is read as a free global
   // by JournalRecordingSheet instead of imported, so no second copy of the
   // bridge came with them). 143,998 x 1.15 = 165,597.7 -> the hundred above.
-  { file: 'bundle-g.js', measured: 143998, max: 165600 },   // Personal Study screens + the journal screens
+  // 2026-09-28, Lighthouse item 5: the Studies hub, a study's index and chapter and the Matthew chapter
+  // view arrive from bundle-d (+12,428 B on today's 155,845; they read their shared helpers as bundle-d
+  // globals, so nothing is shipped twice). 168,273 x 1.15 = 193,513.95 -> the hundred above.
+  { file: 'bundle-g.js', measured: 168273, max: 193600 },   // Personal Study + journal + Studies/Matthew screens
   // The Listening Library, split out on 2026-09-22 (landing 24): the browsing
   // surface only. audio-player.js, AudioShelf, AudioSeekSlider and CoverageBadge
   // stay in bundle-d for the shell's player bar, so this stays SMALL - a jump

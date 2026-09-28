@@ -70,6 +70,17 @@ import * as JournalViewer from './screens/JournalViewerScreen.jsx';
 import * as JournalEditor from './screens/JournalEditorScreen.jsx';
 import { JournalInsertSheet } from './sheets/JournalInsertSheet.jsx';
 import { JournalRecordingSheet } from './sheets/JournalRecordingSheet.jsx';
+// Lighthouse item 5 (docs/perf/lighthouse-2026-09.md): the Studies hub, a
+// study's index and chapter, and the Matthew chapter view, out of bundle-d.
+// Each is reached only by navigation (a restored tab too goes through its
+// route, which waits for this bundle like the screens above). What they share
+// with the reading path — LetterView, ChapterView, the study panels, the
+// read-along — stays in bundle-d and is read here as free globals: their files
+// import none of it.
+import { StudiesHome } from './screens/StudiesHome.jsx';
+import { BibleStudyIndex } from './screens/BibleStudyIndex.jsx';
+import { BibleStudyChapterView } from './screens/BibleStudyChapterView.jsx';
+import { MatthewChapterView } from './screens/MatthewChapterView.jsx';
 
 Object.assign(window, {
   MyProgressScreen,
@@ -83,6 +94,7 @@ Object.assign(window, {
   _collectMarks, HighlightRow, HighlightsScreen,
   composeNotesExport, notesExportFilename, shareNotesExport,
   JournalInsertSheet, JournalRecordingSheet,
+  StudiesHome, BibleStudyIndex, BibleStudyChapterView, MatthewChapterView,
 });
 
 // The three journal screens, spread whole: the wildcard keeps every export,
