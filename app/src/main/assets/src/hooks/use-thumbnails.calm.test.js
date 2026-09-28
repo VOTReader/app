@@ -37,7 +37,7 @@ vi.mock('../utils/platform-bridge.js', () => ({
 import { PlatformBridge } from '../utils/platform-bridge.js';
 import {
   useThumbnails, noteCaptureInteraction, captureIsCalm,
-  CAPTURE_CALM_MS, CALM_RECHECK_MS,
+  CAPTURE_CALM_MS, CALM_RECHECK_MS, _resetCaptureBootGateForTests,
 } from './use-thumbnails.js';
 
 const g = /** @type {any} */ (globalThis);
@@ -53,6 +53,9 @@ const stampRecentTouch = () => noteCaptureInteraction('touch-up', performance.no
 
 beforeEach(() => {
   vi.useFakeTimers();
+  // Post-boot cadence: the web boot quiet window has its own test file
+  // (use-thumbnails.boot.test.js).
+  _resetCaptureBootGateForTests(true);
   g.idbReadAll = vi.fn(async () => ({}));
   g.idbPut = vi.fn();
   g.idbDelete = vi.fn();
