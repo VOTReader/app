@@ -35,7 +35,7 @@ vi.mock('../utils/platform-bridge.js', () => ({
   captureTargetEl: () => (typeof document !== 'undefined' ? document.querySelector('.screen-layout') : null),
 }));
 import { PlatformBridge } from '../utils/platform-bridge.js';
-import { useThumbnails } from './use-thumbnails.js';
+import { useThumbnails, _resetCaptureBootGateForTests } from './use-thumbnails.js';
 
 const g = /** @type {any} */ (globalThis);
 const takeScreenshot = /** @type {import('vitest').Mock} */ (PlatformBridge.takeScreenshot);
@@ -43,6 +43,9 @@ const takeThemedScreenshot = /** @type {import('vitest').Mock} */ (PlatformBridg
 
 beforeEach(() => {
   vi.useFakeTimers();
+  // Post-boot cadence: the web boot quiet window has its own test file
+  // (use-thumbnails.boot.test.js).
+  _resetCaptureBootGateForTests(true);
   g.idbReadAll = vi.fn(async () => ({}));
   g.idbPut = vi.fn();
   g.idbDelete = vi.fn();
