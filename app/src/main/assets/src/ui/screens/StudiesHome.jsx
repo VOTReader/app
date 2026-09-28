@@ -1,9 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   StudiesHome — Cluster D (esbuild bundle-d.js)
-   ═══════════════════════════════════════════════════════════════════════ */
-
-import { studyCoverage, studyCoverageDetail } from '../../utils/audio-coverage.js';
-import { CoverageBadge } from '../components/CoverageBadge.jsx';
+   StudiesHome — lazy bundle-g (esbuild bundle-g.js)
+   ═══════════════════════════════════════════════════════════════════════
+   studyCoverage, studyCoverageDetail and CoverageBadge are bundle-d globals,
+   read at call time rather than imported: a bundled copy would ship twice. */
 
 export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, onSelectStudy, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   // Q8.2: pre-fire the Matthew Study Bible corpus load. By the time the

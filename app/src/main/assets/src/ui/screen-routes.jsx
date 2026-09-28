@@ -1315,7 +1315,11 @@ export function buildScreenRoutes({
         />
       );
     },
-    'studies-home': () => (
+    // StudiesHome, BibleStudyIndex, BibleStudyChapterView and MatthewChapterView
+    // live in bundle-g (Lighthouse item 5): until its IIFE has defined them,
+    // each route shows _corpusView's loader and asks for the bundle, exactly as
+    // the Personal Study routes above do.
+    'studies-home': () => typeof StudiesHome !== 'undefined' ? (
       <StudiesHome
         studies={UNIFIED_CHAIN}
         studiesLoading={studiesLoading}
@@ -1336,7 +1340,7 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         theme={theme} onThemeChange={setTheme}
       />
-    ),
+    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
     'bible-idx': () => {
       // Wave 0: the index back goes to the GENRE screen when one is active
       // (scripture-genre), otherwise to Scriptures — name that destination
@@ -1422,7 +1426,11 @@ export function buildScreenRoutes({
     //    components in src/ui/screens/. ──
     'matthew-ch': () => {
       // Q8.2: MATTHEW lazy-loaded — show loading (or a retry on failure, E1).
+      // Ask for bundle-g (the view itself) alongside the corpus rather than after
+      // it: idempotent and async-notify-only, like every _corpusView kick.
+      if (typeof MatthewChapterView === 'undefined' && typeof window.__loadScreensG === 'function') window.__loadScreensG();
       if (typeof MATTHEW === 'undefined') return _corpusView(window.__matthewCorpus, window.__loadMatthewCorpus, 'Loading Matthew…');
+      if (typeof MatthewChapterView === 'undefined') return _corpusView(window.__screensG, window.__loadScreensG, 'Loading…');
       // The Matthew study cards cross-reference VOT letters; resolveVotLetter only
       // resolves once the VOT corpus has loaded and __finishVotInit has rebuilt
       // VOT_LETTER_REGISTRY. On a cold-boot restore STRAIGHT into Matthew, nothing
@@ -1459,6 +1467,7 @@ export function buildScreenRoutes({
 
     'bible-study-index': () => {
       if (!studyId) return null;
+      if (typeof BibleStudyIndex === 'undefined') return _corpusView(window.__screensG, window.__loadScreensG, 'Loading…');
       const study = getStudyById(studyId);
       if (!study) return studiesLoading ? <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>Loading…</div> : null;
       return (
@@ -1479,7 +1488,7 @@ export function buildScreenRoutes({
       );
     },
 
-    'bible-study-chapter': () => (
+    'bible-study-chapter': () => typeof BibleStudyChapterView !== 'undefined' ? (
       <BibleStudyChapterView
         studyId={studyId}
         studyChapterId={studyChapterId}
@@ -1511,7 +1520,7 @@ export function buildScreenRoutes({
         pushFromLetter={pushFromLetter}
         sharedViewProps={sharedViewProps}
       />
-    ),
+    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
 
     'holy-days-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>

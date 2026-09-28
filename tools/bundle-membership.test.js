@@ -92,3 +92,45 @@ describe('vendored MIT notices survive into the shipped bundles', () => {
     expect(/Regenerate:/.test(built), 'bundle-e.js is shipping the vendor file build instructions').toBe(false);
   });
 });
+
+
+/* THE STUDIES SCREENS AND THE MATTHEW CHAPTER VIEW LEAVE THE COLD-BOOT BUNDLE.
+   ─────────────────────────────────────────────────────────────────────
+   docs/perf/lighthouse-2026-09.md item 5: Lighthouse found 136-142 KB of
+   bundle-d's 185 KB (gzip) not executed at load. StudiesHome, BibleStudyIndex,
+   BibleStudyChapterView and MatthewChapterView are reached only by navigation
+   (a restored tab lands on them through the same lazy route), so they ride
+   bundle-g, behind __loadScreensG, as the Personal Study screens do.
+   screen-routes.lazy-studies.test.jsx pins the routes' loading behaviour; this
+   pins the BUILT bytes, so a helpful re-import into bundle-d fails a test.
+   The marker is the Object.assign KEY after `{` or `,` (a definition), not the
+   bare name bundle-d keeps in its `typeof X` guard (see bundle-g-membership). */
+describe('the Studies screens and the Matthew chapter view ride bundle-g, not bundle-d', () => {
+  const LAZY_STUDY = ['StudiesHome', 'BibleStudyIndex', 'BibleStudyChapterView', 'MatthewChapterView'];
+  const defines = (bundle, name) => new RegExp('[{,]\\s*' + name + ':').test(bundle);
+  const d = readFileSync(resolve(DIST, 'bundle-d.js'), 'utf-8');
+  const g = readFileSync(resolve(DIST, 'bundle-g.js'), 'utf-8');
+
+  it('bundle-g defines them', () => {
+    for (const name of LAZY_STUDY) expect(defines(g, name), `bundle-g.js lacks ${name}`).toBe(true);
+  });
+
+  it('bundle-d no longer defines them, and still asks for them', () => {
+    for (const name of LAZY_STUDY) {
+      expect(defines(d, name), `bundle-d.js still defines ${name}`).toBe(false);
+      expect(d.includes(name), `bundle-d.js lost its guard on ${name}`).toBe(true);
+    }
+    // The control: the regex does find a definition bundle-d still owns.
+    expect(defines(d, 'BibleChapterView'), 'defines() found nothing in bundle-d — wrong pattern?').toBe(true);
+  });
+
+  it('what the reading path shares with them stays in bundle-d, one copy', () => {
+    // BibleStudyChapterView renders LetterView and ChapterView over a study
+    // chapter, and both are boot-path screens: bundle-g must read them as
+    // free globals rather than carry a second copy.
+    for (const name of ['LetterView', 'ChapterView', 'ChapterIndex']) {
+      expect(defines(d, name), `bundle-d.js no longer defines ${name}`).toBe(true);
+      expect(defines(g, name), `bundle-g.js ships its own ${name}`).toBe(false);
+    }
+  });
+});

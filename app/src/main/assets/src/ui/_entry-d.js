@@ -116,7 +116,7 @@ import { SongKeepCard, SongKeepAction, useSongKeep, useSongsOnline, KeepIcon, Ke
    across the bundle boundary: a second bundled copy of audio-player.js would be
    TWO players, and a second AudioShelf two module states of one row. */
 import { BIBLE_AUDIO_EDITIONS, audioReaderLabel, bibleAudioOffered } from '../utils/audio-track.js';
-import { COVERAGE_NONE, COVERAGE_READ_ALONG, bibleEditionCoverage } from '../utils/audio-coverage.js';
+import { COVERAGE_NONE, COVERAGE_READ_ALONG, bibleEditionCoverage, studyCoverage, studyCoverageDetail } from '../utils/audio-coverage.js';
 import { AudioSeekSlider } from './components/AudioSeekSlider.jsx';
 import { CoverageBadge } from './components/CoverageBadge.jsx';
 import {
@@ -209,12 +209,11 @@ import { ChapterView } from './screens/ChapterView.jsx';
 import { LibraryScreen } from './screens/LibraryScreen.jsx';
 import { VolumesHome } from './screens/VolumesHome.jsx';
 
-import { StudiesHome } from './screens/StudiesHome.jsx';
 import { AboutScreen } from './screens/AboutScreen.jsx';
 import { HomeScreen } from './screens/HomeScreen.jsx';
-import { BibleStudyIndex } from './screens/BibleStudyIndex.jsx';
-import { BibleStudyChapterView } from './screens/BibleStudyChapterView.jsx';
-import { MatthewChapterView } from './screens/MatthewChapterView.jsx';
+// StudiesHome, BibleStudyIndex, BibleStudyChapterView and MatthewChapterView
+// ride bundle-g (docs/perf/lighthouse-2026-09.md item 5): reached only by
+// navigation, their routes wait for it as the other bundle-g routes do.
 import { ChapterIndex } from './screens/ChapterIndex.jsx';
 import { ScriptureGenre } from './screens/ScriptureGenre.jsx';
 import { ScripturesHome } from './screens/ScripturesHome.jsx';
@@ -288,6 +287,8 @@ Object.assign(window, {
   // …and the shelf parts + audio tables bundle-h reads as free globals.
   BIBLE_AUDIO_EDITIONS, audioReaderLabel, bibleAudioOffered,
   COVERAGE_NONE, COVERAGE_READ_ALONG, bibleEditionCoverage, AudioSeekSlider, CoverageBadge,
+  // …and StudiesHome (bundle-g) reads the study coverage pair.
+  studyCoverage, studyCoverageDetail,
   ArrowIcon, AudioShelfRow, ChevronIcon, CloseIcon, PauseIcon, PlayIcon, SearchIcon,
   StarIcon, TextIcon, audioLibraryStore, audioPositionsStore, hasTextDestination,
   relativePlayedAt, remainingLabel, renditionRemainingLabel, trackMeta, trackName,
@@ -323,9 +324,9 @@ Object.assign(window, {
   // Screens
   LetterView, WtlbEntryView, BibleChapterView, ChapterView,
   LibraryScreen,
-  VolumesHome, StudiesHome, AboutScreen,
+  VolumesHome, AboutScreen,
   HomeScreen,
-  BibleStudyIndex, BibleStudyChapterView, MatthewChapterView, ChapterIndex,
+  ChapterIndex,
   ScriptureGenre, ScripturesHome,
   _bookmarkSourceLabel, _bookmarkSourceEndpoint, BookmarkPopover,
   // Sheets

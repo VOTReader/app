@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   BibleStudyIndex — Cluster D (esbuild bundle-d.js)
-   ═══════════════════════════════════════════════════════════════════════ */
-
-import { scrollBehavior } from '../../utils/reduced-motion.js';
+   BibleStudyIndex — lazy bundle-g (esbuild bundle-g.js)
+   ═══════════════════════════════════════════════════════════════════════
+   scrollBehavior is a bundle-d global, read at call time rather than
+   imported, as the other bundle-g screens do. */
 
 export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, markAsReadEnabled, backHint = null, onTapThroughBack }) {
   const currentRef = React.useRef(null);
