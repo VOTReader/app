@@ -212,7 +212,17 @@ export const TITLE_QUERY_MIN = 0.75;
  * @returns {number}
  */
 export function titleMatch(titleToks, qTokens, stop) {
-  const inOrder = titleInOrder(titleToks, qTokens);
+  let inOrder = titleInOrder(titleToks, qTokens);
+  // A run of small words in a long title is no title named: "openly from the beginning" quotes a letter, not
+  // "...That Purposed from the Beginning Shall Be Done..." ("not by human power" still names "Not By Human Means").
+  if (stop && inOrder > 1 && inOrder < TITLE_EXACT_BOOST) {
+    const content = joinApostropheS(qTokens).filter((w) => !stop.has(w) && !TITLE_LEAD.has(w));
+    const tl = new Set(joinApostropheS(titleToks));
+    const ql = new Set(joinApostropheS(qTokens));
+    const tt = joinApostropheS(titleToks);
+    if (content.length && content.filter((w) => tl.has(w)).length < TITLE_QUERY_MIN * content.length
+      && tt.filter((w) => ql.has(w)).length < 0.5 * tt.length) inOrder = 1;
+  }
   return stop && inOrder < TITLE_EXACT_BOOST ? Math.max(inOrder, titleWords(titleToks, qTokens, stop)) : inOrder;
 }
 /** A title's content words met in any order, by lemma: TITLE_BAG_RATE of the in-order score. */

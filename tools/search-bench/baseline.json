@@ -1,6 +1,6 @@
 {
- "pass": 407,
- "strict": 321,
+ "pass": 409,
+ "strict": 323,
  "top5": 465,
  "found": 498,
  "style": {
@@ -11,8 +11,8 @@
   "middle": 49,
   "misremembered": 69,
   "paraphrase": 33,
-  "rare": 41,
-  "title": 29,
+  "rare": 42,
+  "title": 30,
   "typos": 23,
   "unitgist": 8
  },
@@ -20,7 +20,7 @@
   "answers": 48,
   "bible": 95,
   "cross": 8,
-  "letters": 159,
+  "letters": 161,
   "studies": 31,
   "words": 66
  }
