@@ -346,8 +346,9 @@ export function ListenSource(props) {
     if (!offline) return;
     offline.download(allTracks.flat().map((t) => ({ url: t.url, key: t.key, title: t.title })));
   };
-  const numberOf = (/** @type {any} */ g, /** @type {any} */ item, /** @type {number} */ i) => (item.num === 0 ? '·' : item.num || i + 1);
-  const resumeWord = resumeAt ? (resumeAt.g.col && resumeAt.g.col.kind === 'chapter' ? 'Chapter ' : 'Letter ') + numberOf(resumeAt.g, resumeAt.item, resumeAt.g.items.indexOf(resumeAt.item)) : '';
+  const numberOf = (/** @type {any} */ g, /** @type {any} */ item, /** @type {number} */ i) => (item.num === 0 ? 'P' : item.num || i + 1);
+  const resumeWord = !resumeAt ? '' : resumeAt.item.num === 0 ? 'Preface'
+    : (resumeAt.g.col && resumeAt.g.col.kind === 'chapter' ? 'Chapter ' : 'Letter ') + numberOf(resumeAt.g, resumeAt.item, resumeAt.g.items.indexOf(resumeAt.item));
 
   return (
     <ScreenLayout navChildren={LibraryNav({ onBack: props.onBack, backLabel: props.backLabel, showHome: false, onSearch: props.onSearch, onHistory: props.onHistory, onSettings: props.onSettings, theme: props.theme, onThemeChange: props.onThemeChange })}>

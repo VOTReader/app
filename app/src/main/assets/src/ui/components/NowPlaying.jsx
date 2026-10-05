@@ -42,6 +42,7 @@ export function listenEyebrow(track) {
     const letters = typeof g.colLetterArr === 'function' ? (g.colLetterArr(col) || []) : [];
     const letter = letters.find((/** @type {any} */ l) => l && l.id === id);
     const noun = col.kind && col.kind !== 'letter' ? 'Entry' : 'Letter';
+    if (letter && letter.num === 0) return col.label + ' · Preface';
     return letter && letter.num ? col.label + ' · ' + noun + ' ' + letter.num : col.label || '';
   }
   return (track && track.sub) || '';
@@ -131,7 +132,7 @@ export function NowPlaying({ state, current, voices, saved, onToggleSave, onClos
           {reader ? <span className="now-playing-reader">{reader}</span> : null}
         </div>
 
-        <AudioSeekSlider className="now-playing-seek" ariaLabel="Playback position" time={state.time} duration={state.duration} />
+        <AudioSeekSlider className="audio-manager-seek now-playing-seek" ariaLabel="Playback position" time={state.time} duration={state.duration} />
         <div className="now-playing-times"><span>{formatClock(state.time)}</span><span>{duration ? '−' + formatClock(Math.max(0, duration - (state.time || 0))) : ''}</span></div>
 
         <div className="now-playing-transport">
