@@ -42,7 +42,9 @@ export function listenEyebrow(track) {
     const letters = typeof g.colLetterArr === 'function' ? (g.colLetterArr(col) || []) : [];
     const letter = letters.find((/** @type {any} */ l) => l && l.id === id);
     const noun = col.kind && col.kind !== 'letter' ? 'Entry' : 'Letter';
-    if (letter && letter.num === 0) return col.label + ' · Preface';
+    // The preface lives outside colLetterArr (colPreface reads it from its own global).
+    const preface = typeof g.colPreface === 'function' ? g.colPreface(col) : null;
+    if ((letter && letter.num === 0) || (preface && preface.id === id)) return col.label + ' · Preface';
     return letter && letter.num ? col.label + ' · ' + noun + ' ' + letter.num : col.label || '';
   }
   return (track && track.sub) || '';

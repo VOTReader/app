@@ -1279,7 +1279,7 @@ export function _resetStoreRegistry() {
                                track, position, queue, forward-only horizon.
                                Written every few seconds while playing.
      'vot-audio-recent-open' — the Listening Library's recently-played
-                               disclosure state (ui/screens/AudioLibraryScreen.jsx
+                               disclosure state (the retired AudioLibraryScreen's
                                RECENT_OPEN_KEY).
    Both audio keys post-date W2.4 and are deliberately LS (sync reads on the
    player's hot path). The flag makes cleanup one-shot, but it is only set

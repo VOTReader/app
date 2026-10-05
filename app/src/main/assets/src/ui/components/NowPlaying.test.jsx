@@ -15,7 +15,7 @@ const { player } = vi.hoisted(() => ({
 }));
 vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
 
-import { NowPlaying } from './NowPlaying.jsx';
+import { NowPlaying, listenEyebrow } from './NowPlaying.jsx';
 
 const T = { key: 'one:a', url: 'u:a', title: 'Belong to the Church Without Walls', sub: 'Volume One', readerCode: 'B' };
 const base = (over = {}) => ({
@@ -29,6 +29,17 @@ beforeEach(() => {
   Object.values(player).forEach((v) => { if (typeof v === 'function' && 'mockClear' in v) v.mockClear(); });
 });
 afterEach(() => { cleanup(); delete globalThis.COL_BY_KEY; delete globalThis.colLetterArr; delete window.__openAudioText; });
+
+describe('listenEyebrow', () => {
+  it('names a letter, and the preface that lives outside the letter list', () => {
+    globalThis.colPreface = () => ({ id: 'pref' });
+    try {
+      expect(listenEyebrow({ key: 'one:a' })).toBe('Volume One · Letter 7');
+      expect(listenEyebrow({ key: 'one:pref' })).toBe('Volume One · Preface');
+      expect(listenEyebrow({ key: 'nope:x', sub: 'Purity' })).toBe('Purity');
+    } finally { delete globalThis.colPreface; }
+  });
+});
 
 describe('NowPlaying', () => {
   it('draws the typographic cover: eyebrow, title, reader', () => {

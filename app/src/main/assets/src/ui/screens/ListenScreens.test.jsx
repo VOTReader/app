@@ -110,6 +110,13 @@ describe('ListenRoot', () => {
     expect(p.onOpenHistory).toHaveBeenCalled();
   });
 
+  it('an unreleased Bible edition has no Scriptures row (the hide flag, as the old hub shelf honored it)', () => {
+    const [hiddenId, hidden] = Object.entries(AudioTrack.BIBLE_AUDIO_EDITIONS)[0];
+    globalThis.bibleAudioOffered = (e) => e.volKey !== hidden.volKey;
+    render(<ListenRoot {...rootProps()} bibleAudio={hiddenId} />);
+    expect(screen.queryByRole('button', { name: new RegExp('^' + hidden.label) })).toBeNull();
+  });
+
   it('offline: one calm banner with the way to Downloads', () => {
     Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
     const p = rootProps();

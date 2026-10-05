@@ -1,4 +1,4 @@
-// @ts-nocheck -- classic-global screen contract, as AudioLibraryScreen.test.jsx.
+// @ts-nocheck -- classic-global screen contract, as ListenScreens.test.jsx.
 /* THE STUDIES GET A DOORWAY IN THE LISTENING LIBRARY (listening item 4, 2026-09-22).
    The Bible/Letter Studies have recordings (Lamb of God 14 of 16 chapters, Purity 6 of 6, and Tim is recording
    the rest), but the Listening Library's Browse shelf had no way in: the 2026-09-22 walk looked for one and found
@@ -26,9 +26,7 @@ const { player } = vi.hoisted(() => {
 });
 vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
 
-import { AudioLibraryScreen } from './AudioLibraryScreen.jsx';
 import { AudioStudiesScreen } from './AudioStudiesScreen.jsx';
-import { AudioCollectionScreen } from './AudioCollectionScreen.jsx';
 import * as Shelf from '../components/AudioShelf.jsx';
 import * as AudioTrack from '../../utils/audio-track.js';
 import * as AudioCoverage from '../../utils/audio-coverage.js';
@@ -71,55 +69,6 @@ afterEach(() => {
   for (const k of ['ScreenLayout', 'LibraryNav', 'AudioPlayer', 'COLLECTIONS', 'COL_BY_KEY', 'AUDIO_MANIFEST', 'BIBLE_AUDIO_MANIFEST', 'BIBLE_STUDIES', 'AudioLibraryStore']) delete globalThis[k];
 });
 
-describe('the Listening Library hub: one doorway for the studies', () => {
-  it('shows a Bible/Letter Studies row with the honest count, and it opens the studies', () => {
-    const onOpenStudies = vi.fn();
-    render(<AudioLibraryScreen onBack={noop} onOpenCollection={noop} onOpenVolumes={noop} onOpenSaved={noop} onOpenTrack={noop} onOpenStudies={onOpenStudies} {...common} />);
-    const row = screen.getByText('Bible/Letter Studies').closest('button');
-    // '2 recorded' read as two CHAPTERS (Codex critique 3): it counts studies with audio.
-    expect(row.textContent).toContain('3 studies · 2 with audio');
-    fireEvent.click(row);
-    expect(onOpenStudies).toHaveBeenCalledTimes(1);
-  });
-
-  it('shows no studies row while no study has a recording (a doorway to nothing to hear)', () => {
-    installGlobals({ manifest: { 'one:wide-path': [['idWide', 'B']] } });
-    render(<AudioLibraryScreen onBack={noop} onOpenCollection={noop} onOpenVolumes={noop} onOpenSaved={noop} onOpenTrack={noop} onOpenStudies={noop} {...common} />);
-    expect(screen.queryByText('Bible/Letter Studies')).toBeNull();
-  });
-});
-
-describe('the Listening Library hub: On this phone (item 8)', () => {
-  const U = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/' + id + '.mp3';
-  function fakeStore(items, available = true) {
-    globalThis.OfflineAudio = {
-      subscribe: () => () => {}, getVersion: () => 0, available: () => available,
-      items: () => items, totalBytes: () => items.reduce((n, i) => n + i.bytes, 0), statusOf: () => 'none', sizeOf: () => null,
-    };
-  }
-  afterEach(() => { delete globalThis.OfflineAudio; });
-  const hub = (onOpenOffline) => render(<AudioLibraryScreen onBack={noop} onOpenCollection={noop} onOpenVolumes={noop} onOpenSaved={noop} onOpenTrack={noop} onOpenStudies={noop} onOpenOffline={onOpenOffline} {...common} />);
-
-  it('shows what the phone holds and opens it', () => {
-    fakeStore([{ url: U('a'), key: 'one:a', title: 'A', bytes: 18_000_000, savedAt: 1 }, { url: U('b'), key: 'one:b', title: 'B', bytes: 12_000_000, savedAt: 2 }]);
-    const onOpenOffline = vi.fn();
-    hub(onOpenOffline);
-    const row = screen.getByText('On this phone').closest('button');
-    expect(row.textContent).toContain('2 recordings · 30 MB');
-    fireEvent.click(row);
-    expect(onOpenOffline).toHaveBeenCalledTimes(1);
-  });
-
-  it('is absent with nothing downloaded, and on the web', () => {
-    fakeStore([]);
-    hub(noop);
-    expect(screen.queryByText('On this phone')).toBeNull();
-    cleanup();
-    fakeStore([{ url: U('a'), key: 'one:a', title: 'A', bytes: 1, savedAt: 1 }], false);
-    hub(noop);
-    expect(screen.queryByText('On this phone')).toBeNull();
-  });
-});
 
 describe('the Studies screen', () => {
   it('lists every study in reading order, recorded ones read-along, the rest honest', () => {
@@ -158,34 +107,6 @@ describe('the Studies screen', () => {
   });
 });
 
-describe('a study in the recordings screen', () => {
-  it('lists the recorded chapters, counts the rest, and plays the study as one queue', () => {
-    const onOpenText = vi.fn();
-    render(<AudioCollectionScreen volKey="study:lamb-of-god" onBack={noop} onOpenText={onOpenText} {...common} />);
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('YahuShua The Messiah, The Lamb of God');
-    expect(document.querySelector('.audio-library-intro').textContent).toBe('2 of 3 chapters have recordings');
-    // Codex critique 4: the count names what a listener will skip, and each name opens its text.
-    const skip = document.querySelector('.audio-collection-text-only');
-    expect(skip.textContent).toBe('Text only: Preface');
-    fireEvent.click(skip.querySelector('button'));
-    expect(onOpenText).toHaveBeenCalledWith(expect.objectContaining({ key: 'study:lamb-of-god-ch0' }));
-    // Each row: the chapter's number badge, then its title (the letters' shape).
-    const rows = [...document.querySelectorAll('.audio-collection-item strong')];
-    expect(rows.map((n) => n.querySelector('.audio-collection-num').textContent)).toEqual(['1', '2']);
-    expect(rows.map((n) => n.lastChild.textContent)).toEqual(['I Am The Passover', 'Anointing']);
-    fireEvent.click(screen.getByText('Play all').closest('button'));
-    expect(player.playCollection).toHaveBeenCalledWith(expect.objectContaining({ volKey: 'study', items: STUDIES[1].chapters, collectionLabel: STUDIES[1].title }));
-  });
-});
-
-describe('a study in the recordings screen: many text-only chapters', () => {
-  it('counts them instead of naming them past three', () => {
-    const big = { id: 'big', title: 'Big Study', chapters: [1, 2, 3, 4, 5, 6].map((n) => ch('big', n, 'Ch ' + n)) };
-    installGlobals({ studies: [...STUDIES, big], manifest: { ...MANIFEST, 'study:big-ch1': [['b1', 'B']], 'study:big-ch2': [['b2', 'B']] } });
-    render(<AudioCollectionScreen volKey="study:big" onBack={noop} onOpenText={noop} {...common} />);
-    expect(document.querySelector('.audio-collection-text-only').textContent).toBe('4 chapters are text only');
-  });
-});
 
 /* n6-09 (sweep 2, 09-25): loadBibleStudies resolves false on a failed fetch, and the
    screen ignored it: "Loading the studies..." stayed up for good. It now says it

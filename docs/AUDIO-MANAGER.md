@@ -109,7 +109,7 @@ it; the cache — not the app — owns eviction.
 | Per-recording resume points (URL → position) | `app/src/main/assets/src/stores/audio-positions-store.js` |
 | Compact transport and expanded listening desk | `app/src/main/assets/src/ui/components/AudioPlayerBar.jsx`, `AudioManagerSheet.jsx` |
 | The one scrubber both of those render | `app/src/main/assets/src/ui/components/AudioSeekSlider.jsx` |
-| Saved/recent/browse screen | `app/src/main/assets/src/ui/screens/AudioLibraryScreen.jsx` |
+| Listen tab (root, sources, Bible, Your Listening) | `app/src/main/assets/src/ui/screens/ListenScreens.jsx` (overhaul; replaced AudioLibraryScreen) |
 | IDB registration, import validation, and Settings backup mapping | `idb-adapter.js`, `import-validators.js`, `SettingsScreen.jsx` |
 
 Two module-private descriptors are mirrored into the player's public state

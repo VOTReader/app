@@ -1234,7 +1234,7 @@ export function buildScreenRoutes({
       />
     ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
     // rv1: a Bible edition opens its books and chapter grid (ListenBible); a letter collection, a study or a voice the
-    // Source screen (AudioCollectionScreen is retired from the bundle, kept for the cleanup).
+    // Source screen (they replaced AudioCollectionScreen, removed in the rv1 cleanup).
     'audio-library-collection': () => typeof audioColKey === 'string' && audioColKey.lastIndexOf('bible-', 0) === 0 ? (
       typeof ListenBible !== 'undefined' ? (
         <ListenBible key={audioColKey} volKey={audioColKey} onBack={goNavOrigin} backLabel="Listen" onOpenNowPlaying={_openNowPlaying}

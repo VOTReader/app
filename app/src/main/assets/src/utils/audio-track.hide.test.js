@@ -10,7 +10,7 @@
    flag on the registry entry, `unreleased: true`, took it out of every door
    at once:
 
-     the Listening Library's shelf      AudioLibraryScreen.test.jsx
+     the Listen tab's Scriptures        ListenScreens.test.jsx
      the desk's Voice chips             AudioManagerSheet.test.jsx
      Settings' Bible Audio picker       SettingsScreen.hidden-edition.test.jsx
      the Listen pill's resolver         here (resolveBibleAudio)
