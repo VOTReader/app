@@ -117,7 +117,8 @@ export function allowedSiteRootFiles() {
   if (!block) return null;
   // Pages control files: not app assets, but legitimately published. build-sha.txt is the
   // deploy's own floor (ci10: tools/deploy-target.mjs reads the live one).
-  const names = new Set(['service-worker.js', 'CNAME', '.nojekyll', 'build-sha.txt']);
+  // privacy.html (pp1): the public privacy policy Google Play links to; a page of its own, never cached by the app.
+  const names = new Set(['service-worker.js', 'CNAME', '.nojekyll', 'build-sha.txt', 'privacy.html']);
   for (const m of block[1].matchAll(/'\.\/([^'/]+)'/g)) names.add(m[1]);
   return names;
 }

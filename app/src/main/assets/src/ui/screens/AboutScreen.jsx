@@ -69,6 +69,11 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
                     AI Songs of the Letters: songs made by members of the flock with Suno (suno.com), from the words of The Volumes of Truth. Shared freely, never sold.
                     {songMakers().length ? ' With songs by ' + songMakers().join(', ') + ', and others of the flock.' : null}
                   </p>
+                  {/* pp1: the public privacy policy (the page Google Play links to). */}
+                  <p className="about-credit">
+                    <a href="https://votreader.github.io/app/privacy.html" target="_blank" rel="noopener noreferrer">Privacy policy</a>
+                    : no accounts, and nothing you write leaves this device.
+                  </p>
                 </div>
               </>
             ) : (

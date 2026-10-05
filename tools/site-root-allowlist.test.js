@@ -49,6 +49,10 @@ describe('the published site root', () => {
     expect(allowed.has('.nojekyll')).toBe(true);
   });
 
+  it('publishes the privacy policy Google Play links to (pp1)', () => {
+    expect(allowed.has('privacy.html')).toBe(true);
+  });
+
   // sj1 (REPORT v06-05): splash.jpg, 481 KB, sat in CORE_ASSETS long after the
   // last thing that showed it was gone, so every client precached it, every
   // deploy published it and every APK carried it. Being in CORE_ASSETS makes a
