@@ -24,7 +24,7 @@ import { ReadingDotContext } from '../components/ResumeReadingNavBtn.jsx';
 /** @param {{ title: string, sub?: string | null, onClick?: any, lead?: string }} props */
 export function RootRow({ title, sub, onClick, lead }) {
   return (
-    <li className="root-row-li">
+    <li className="root-item">
       <button type="button" className="root-row" onClick={onClick}>
         {/* The numeral is drawn from data-lead (CSS ::before), so the row's text still starts with its title. */}
         {lead ? <span className="root-row-lead" data-lead={lead} aria-hidden="true" /> : null}
@@ -96,14 +96,14 @@ export function HomeRoot({ onSelect, onSurprise, showSurprise, onSearch, onNotes
         <TodayCard rows={todayRows} markAsReadEnabled={markAsReadEnabled}
           onRead={(next) => onPlanRead && onPlanRead(next)} onListen={(next) => onPlanListen && onPlanListen(next)}
           onOpenPlans={() => onOpenPlans && onOpenPlans()} />
-        <ul className="root-rows">
+        <ul className="root-list">
           <RootRow title="The Scriptures of Truth" sub={'Genesis to Revelation · ' + translationLabel(translation)} onClick={() => open('scriptures')} />
           <RootRow title="Answers Only God Can Give" sub="The Lord sets the record straight" onClick={() => open('answers')} />
           <RootRow title="Listening Library" sub="Hear the letters read aloud" onClick={() => BottomTabs.select('listen')} />
           <RootRow title="Studies" sub="Letter Studies · Matthew Study Bible" onClick={() => open('studies')} />
         </ul>
         <h2 className="caps-label">Your library</h2>
-        <ul className="root-rows">
+        <ul className="root-list">
           {onNotes ? <RootRow title="Notes & bookmarks" sub="Your personal collection" onClick={onNotes} /> : null}
           {onScriptureWeb ? <RootRow title="The Scripture Web" sub="Every cross-reference, drawn" onClick={onScriptureWeb} /> : null}
           {showSurprise ? <RootRow title="Surprise me" sub="Open a random chapter or letter" onClick={surprise} /> : null}

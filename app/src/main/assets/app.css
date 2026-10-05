@@ -634,8 +634,8 @@
       .gold-pill-wide { display: flex; width: 100%; justify-content: space-between; margin: 0 0 16px; }
       .gold-pill:active { filter: brightness(1.08); }
       .gold-pill:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 3px; }
-      .root-rows { list-style: none; margin: 0 0 8px; padding: 0; border-top: 1px solid var(--divider); }
-      .root-row-li { border-bottom: 1px solid var(--divider); }
+      .root-list { list-style: none; margin: 0 0 8px; padding: 0; border-top: 1px solid var(--divider); }
+      .root-item { border-bottom: 1px solid var(--divider); }
       .root-row {
         display: flex; align-items: center; gap: 14px; width: 100%; min-height: 76px; padding: 14px 0; box-sizing: border-box;
         background: none; border: 0; color: inherit; text-align: left; cursor: pointer; font-family: var(--font-ui);
@@ -661,7 +661,7 @@
       .root-search-ph { flex: 1; min-width: 0; font-size: var(--fs-18); color: var(--cream-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .root-search:focus-visible { outline: none; border-color: var(--gold); }
       .read-root .caps-label:first-of-type { margin-top: 24px; }
-      .root-rows-numeral .root-row { min-height: 64px; }
+      .root-list-numeral .root-row { min-height: 64px; }
       /* The mini player rides on the bar, square to it (its own inset padding is the bar's now). */
       body:has(.tabbar) .audio-bar { bottom: var(--dock-sys); padding-bottom: min(0.5rem, 10px); }
 

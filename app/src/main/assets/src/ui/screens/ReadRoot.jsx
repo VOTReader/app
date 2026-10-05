@@ -74,20 +74,20 @@ export function ReadRoot({ onSelect, onOpen, onSearch, onScriptureWeb, translati
           </>
         ) : null}
         <h2 className="caps-label">The Volumes of Truth</h2>
-        <ul className="root-rows root-rows-numeral">
+        <ul className="root-list root-list-numeral">
           {VOLUMES.map(([id, title, k, numeral]) => (
             <RootRow key={id} lead={numeral} title={title} sub={count(k, 'letters')} onClick={() => onSelect(id)} />
           ))}
         </ul>
         <h2 className="caps-label">Collections</h2>
-        <ul className="root-rows">
+        <ul className="root-list">
           {COLLECTIONS.map(([id, title, k, noun]) => (
             <RootRow key={id} title={title} sub={count(k, noun)} onClick={() => onSelect(id)} />
           ))}
           <RootRow title="A Return to The Garden" sub="209 pages · a visual journey" onClick={() => onSelect('garden')} />
         </ul>
         <h2 className="caps-label">The Scriptures of Truth</h2>
-        <ul className="root-rows">
+        <ul className="root-list">
           <RootRow title="The Holy Bible" sub={'Genesis to Revelation · ' + translationLabel(translation)} onClick={() => go('scriptures')} />
           <RootRow title="Answers Only God Can Give" sub="The Lord sets the record straight" onClick={() => go('answers')} />
           <RootRow title="Studies" sub="Letter Studies · Matthew Study Bible" onClick={() => go('studies')} />

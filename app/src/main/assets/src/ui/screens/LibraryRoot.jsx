@@ -21,7 +21,7 @@ export function LibraryRoot({ onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJ
     })}>
       <div className="root-page library-root">
         <h2 className="caps-label">Your study</h2>
-        <ul className="root-rows">
+        <ul className="root-list">
           <RootRow title="Notes" sub="What you wrote beside the text" onClick={onOpenNotes} />
           <RootRow title="Highlights & underlines" sub="The passages you marked" onClick={onOpenHighlights} />
           <RootRow title="Bookmarks" sub="Places to come back to" onClick={onOpenBookmarks} />
@@ -30,13 +30,13 @@ export function LibraryRoot({ onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJ
           {onOpenScriptureWeb ? <RootRow title="The Scripture Web" sub="Every cross-reference, drawn" onClick={onOpenScriptureWeb} /> : null}
         </ul>
         <h2 className="caps-label">Your reading</h2>
-        <ul className="root-rows">
+        <ul className="root-list">
           {historyEnabled !== false && onHistory ? <RootRow title="Recent" sub="Where you have been reading" onClick={onHistory} /> : null}
           <RootRow title="Reading plans" sub={plans} onClick={onOpenPlans} />
           <RootRow title="Progress" sub={totalReadCount > 0 ? totalReadCount + ' read' : 'Chapters you read are counted here'} onClick={onOpenProgress} />
         </ul>
         <h2 className="caps-label">App</h2>
-        <ul className="root-rows">
+        <ul className="root-list">
           <RootRow title="Settings" sub="Appearance, reading, listening, your data" onClick={onSettings} />
           {onAbout ? <RootRow title="Help & about" sub="Show me around, credits, version" onClick={onAbout} /> : null}
         </ul>

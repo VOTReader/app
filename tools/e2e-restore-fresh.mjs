@@ -96,11 +96,11 @@ async function freshProfile(tag, { downloads } = {}) {
   // the profile stayed on About page 1 - which hides the Settings gear.
   const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
-    const home = await page.evaluate(() => /Personal Study/.test(document.body.textContent || ''));
+    const home = await page.evaluate(() => (/Personal Study/.test(document.body.textContent || '') || !!document.querySelector('.home-root')));
     if (home) break;
     if (!(await clickIf(page, 'Continue')) && !(await clickIf(page, 'Begin Reading'))) await sleep(250);
   }
-  need(await page.evaluate(() => /Personal Study/.test(document.body.textContent || '')), `${tag}: never reached Home past the first-run pages`);
+  need(await page.evaluate(() => (/Personal Study/.test(document.body.textContent || '') || !!document.querySelector('.home-root'))), `${tag}: never reached Home past the first-run pages`);
   await hydrated(page);
   // The tour offer over Home on a first visit can also arrive a beat late.
   for (let i = 0; i < 8 && !(await clickIf(page, 'Maybe later')); i++) await sleep(250);
@@ -155,7 +155,12 @@ async function openYourData(page) {
 /** Home -> Bookmarks -> the seeded bookmark. Returns the text the reading view then shows ('' when
  *  the row was missing). A reader's route, so the app records the reading position itself. */
 async function openSeededBookmark(page) {
-  await page.evaluate(() => { const h = document.querySelector('[aria-label="Home"]'); if (h) /** @type {HTMLElement} */ (h).click(); });
+  // rs1 (overhaul): with the tab bar, Bookmarks is a row on the Library tab's root.
+  await page.evaluate(() => {
+    const w = /** @type {any} */ (window);
+    if (w.BottomTabs && document.querySelector('.tabbar')) { if (w.BottomTabs.active() !== 'library') w.BottomTabs.select('library'); w.BottomTabs.select('library'); return; }
+    const h = document.querySelector('[aria-label="Home"]'); if (h) /** @type {HTMLElement} */ (h).click();
+  });
   await sleep(700);
   need(await clickIf(page, 'Bookmarks'), 'no Bookmarks shortcut on Home');
   const listed = await page.waitForFunction(() => [...document.querySelectorAll('.bkm-row')].some((r) => /B2 bookmark/.test(r.textContent || '')), { timeout: 8000 }).then(() => true, () => false);

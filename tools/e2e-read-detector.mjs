@@ -200,7 +200,11 @@ try {
      step needs, with a bounded timeout that fails loudly and names the step. */
   const waitForScreen = async (label, fn, ...args) => {
     try { await page.waitForFunction(fn, { timeout: 30000 }, ...args); }
-    catch (e) { throw new Error(`walk stalled waiting for ${label}: ${(e && e.message) || e}`); }
+    catch (e) {
+      // Name where the walk actually stood, so a stall on the runner says more than the timeout.
+      const at = await page.evaluate(() => document.title + ' | ' + ((document.querySelector('h1') || {}).textContent || '').slice(0, 60)).catch(() => '?');
+      throw new Error(`walk stalled waiting for ${label} (at: ${at}): ${(e && e.message) || e}`);
+    }
   };
   const HAS_TEXT = (src) => {
     const rx = new RegExp(src);
@@ -239,7 +243,16 @@ try {
   // below waits for the button it is about to click; this one now does too.
   await waitThenClick('the onboarding Continue button', /Continue/);
   await waitThenClick('the Begin Reading button', /Begin Reading/);
-  await waitThenClick('Home', /Prophetic Letters/);
+  // rs1 (overhaul): with the tab bar, the Volumes landing is the Read tab's root (no Prophetic Letters tile).
+  await waitForScreen('Home', () => !!document.querySelector('.home-root') || [...document.querySelectorAll('button')].some((b) => /Prophetic Letters/.test(b.textContent)));
+  const tabbed = await page.evaluate(() => {
+    const w = /** @type {any} */ (window);
+    if (!(w.BottomTabs && document.querySelector('.tabbar'))) return false;
+    w.BottomTabs.select('read');
+    w.BottomTabs.select('read');
+    return true;
+  });
+  if (!tabbed) await waitThenClick('Home', /Prophetic Letters/);
   await waitThenClick('the volumes screen', /Volume One(?!\d)/, () => page.evaluate(
     () => { if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus(); },
   ));
