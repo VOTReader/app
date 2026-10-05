@@ -291,6 +291,16 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     liveUntilRef.current = performance.now() + LIVE_HOLD_MS;
     releaseAtRef.current = 0;
   }, []);
+  /* The hover chip names what is under a resting mouse. A drag, pinch, wheel or key pan moves the
+     web out from under it, so each one drops it (sw1 B4: it stayed put over different lines). */
+  const tipOnRef = React.useRef(false);
+  React.useEffect(() => { tipOnRef.current = !!tip; }, [tip]);
+  const dropHover = React.useCallback(() => {
+    if (hoverRafRef.current) { cancelAnimationFrame(hoverRafRef.current); hoverRafRef.current = 0; }
+    hoverPointRef.current = null;
+    hoverRef.current = -1;
+    if (tipOnRef.current) { tipOnRef.current = false; setTip(null); }
+  }, []);
   /** 0 while live, rising to 1 over FADE_MS after the hold; schedules the next frame while fading. */
   const capFractionNow = React.useCallback(() => {
     const now = performance.now();
@@ -638,11 +648,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (!el || !graph) return;
     return attachWebGestures(el, {
       loc, dpr: () => viewRef.current.DPR, cam: () => camRef.current, camFor,
-      view: () => viewRef.current, handlers: () => handlersRef.current, live,
+      view: () => viewRef.current, handlers: () => handlersRef.current,
+      live: () => { live(); dropHover(); },
       schedule, maxZoom: (c) => zoomCapFor(c || camRef.current), clampCamera, zoomAbout, xToVerse,
       yFrame: yFrameFor, lift: liftAt,
     });
-  }, [graph, schedule, loc, camFor, zoomCapFor, live, yFrameFor, liftAt, viewRef, camRef]);
+  }, [graph, schedule, loc, camFor, zoomCapFor, live, dropHover, yFrameFor, liftAt, viewRef, camRef]);
 
   // Verse and chapter candidates carry no distance: they only ever come alone.
   const hitCandidatesAt = React.useCallback(/** @returns {Array<{ kind: string, distance?: number } & Record<string, any>>} */ (cx, cy) => {
@@ -879,12 +890,15 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       setChoices(described);
       setDetail(null);
       setListOpen(false);
+      // nothing is chosen while the chooser asks, and its rows replace the hover chip
+      focusRef.current = { arc: -1, range: null };
+      dropHover();
       setAnnounce(described.length + ' nearby connections. Choose one.');
       schedule();
       return;
     }
     commitFound(described[0]);
-  }, [liftAt, hitCandidatesAt, describe, viewRef, commitFound, schedule, focusRef]);
+  }, [liftAt, hitCandidatesAt, describe, viewRef, commitFound, schedule, focusRef, dropHover]);
 
   const doubleTap = React.useCallback((cx) => {
     const cam = camRef.current, v = viewRef.current;
@@ -930,6 +944,16 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     setChromeHidden(next);
   }, [chromeHidden]);
 
+  /** Close the cards (the chooser, the Nearby list, the connection sheet) and let go of the chosen
+   * line. Every close goes through here: the sheet's x once cleared the card but kept focusRef, so
+   * the shader held every other thread at 5 % ink until Escape or Back (sw1 B1, 2026-10-05). */
+  const closeCards = React.useCallback(() => {
+    setListOpen(false); setChoices(null); setDetail(null); setTip(null);
+    focusRef.current = { arc: -1, range: null };
+    hoverRef.current = -1;
+    schedule();
+  }, [focusRef, schedule]);
+
   /** Close whatever is on top of the web, one layer a call: the guide, then
    * the empty-web notice, then the panels and the hover chip together.
    * Escape and Android Back both come here (v08-03), so they agree.
@@ -937,13 +961,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const closeTopOverlay = React.useCallback(() => {
     if (guideOpen) { closeGuide(); return true; }
     if (emptyShown) { dismissEmpty(); return true; }
-    if (listOpen || choices || detail || tip) {
-      setListOpen(false); setChoices(null); setDetail(null); setTip(null);
-      focusRef.current = { arc: -1, range: null }; schedule();
-      return true;
-    }
+    if (listOpen || choices || detail || tip) { closeCards(); return true; }
     return false;
-  }, [guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, focusRef, schedule]);
+  }, [guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards]);
   // Android Back and the app's Escape dispatcher close the top overlay first
   // instead of leaving the web (the hover chip alone is not worth a Back).
   useModalRegistry({ id: 'scripture-web-overlay', dismiss: closeTopOverlay,
@@ -991,12 +1011,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       return;
     } else return;
     e.preventDefault();
+    dropHover();
     clampCamera(cam, v.W, ceiling, yf);
     const centre = Math.round(cam.x);
     if (atCeiling) setAnnounce(ZOOM_MAX_MESSAGE);
     else if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
     schedule();
-  }, [viewRef, lastRailRef, camVRef, camRef, zoomCapFor, yFrameFor, graph, schedule, resetView, closeTopOverlay, onBack]);
+  }, [viewRef, lastRailRef, camVRef, camRef, zoomCapFor, yFrameFor, graph, schedule, resetView, closeTopOverlay, onBack, dropHover]);
 
   /** Follow the chosen line to its far foot: the camera centres on that
    * verse at the same zoom, the line stays spotlit, and the control turns
@@ -1185,12 +1206,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       {tip && <TipChip info={tip} viewport={viewRef.current} />}
       {choices && <ConnectionChooser choices={Array.isArray(choices) ? choices : choices.items}
         title={Array.isArray(choices) ? undefined : choices.title} meta={Array.isArray(choices) ? undefined : choices.meta}
-        onChoose={commitFound} onClose={() => { setChoices(null); schedule(); }} />}
+        onChoose={commitFound} onClose={closeCards} />}
       {listOpen && <ConnectionList items={listItems} mode={mode}
         lensOn={mode !== 'personal' && !!(camRef.current && viewRef.current.W && lensRange(graph, camRef.current, viewRef.current.W))}
-        onChoose={commitFound} onClose={() => setListOpen(false)} />}
+        onChoose={commitFound} onClose={closeCards} />}
       {detail && (
-        <DetailSheet info={detail} onClose={() => setDetail(null)} onOpen={openEndpoint} onFollow={followThread}
+        <DetailSheet info={detail} onClose={closeCards} onOpen={openEndpoint} onFollow={followThread}
           onGroup={chooseGroup} />
       )}
 

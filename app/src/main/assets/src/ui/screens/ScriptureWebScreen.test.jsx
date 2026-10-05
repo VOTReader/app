@@ -55,7 +55,8 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
       // throws its arguments away that frame is invisible — which is exactly how
       // a line ends up unwitnessed. Recording is additive; no other case reads it.
       draw: (opts) => {
-        DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density, camY: opts && opts.camY, camX: opts && opts.camX, lens: opts && opts.lens });
+        DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density, camY: opts && opts.camY, camX: opts && opts.camX, lens: opts && opts.lens,
+          focusArc: opts && opts.focusArc, focusRange: opts && opts.focusRange });
         return { instances: 0, draws: 0 };
       },
       dispose: vi.fn(),
@@ -286,6 +287,39 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(sheet.textContent).toMatch(/Isaiah/);
     });
 
+    /* sw1 B4 (audit-web 10-05): the hover chip was set only by a resting mouse and cleared by nothing
+       that moved the web, so after a key pan or a drag it named a line that was no longer under it. */
+    it('the hover chip drops when the web moves under it: a key pan, then a drag', async () => {
+      const linked = () => Object.assign(graph(), {
+        count: 1,
+        books: [{ id: 'isaiah', title: 'Isaiah', abbr: 'Isa', start: 15000 }],
+        chapters: [[0, 1, 15000, 1000]],
+        from: new Uint16Array([15548]), to: new Uint16Array([15555]), votes: new Int16Array([7]),
+        buckets: [{ off: 0, len: 1, off20: 0, off10: 1, segments: 8, chunks: [[15548, 15555]] }],
+        chunkSize: 256,
+      });
+      const { container } = await mount({}, linked);
+      await toCeiling();
+      const root = container.querySelector('.sw-root');
+      const ev = (type, x, y, pointerType = 'mouse') => new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 21, pointerType, clientX: x, clientY: y });
+      const hoverLine = async () => {
+        await act(async () => { root.dispatchEvent(ev('pointermove', 422, 170)); await new Promise((r) => setTimeout(r, 40)); });
+        expect(container.querySelector('.sw-tip'), 'PRECONDITION: a resting mouse on the line shows its chip').toBeTruthy();
+      };
+      await hoverLine();
+      await pressFrame('ArrowLeft');
+      expect(container.querySelector('.sw-tip'), 'a key pan drops the chip').toBeNull();
+      await pressFrame('ArrowRight');
+      await hoverLine();
+      await act(async () => {
+        root.dispatchEvent(ev('pointerdown', 422, 170));
+        root.dispatchEvent(ev('pointermove', 470, 170));
+        root.dispatchEvent(ev('pointerup', 470, 170));
+        await new Promise((r) => setTimeout(r, 40));
+      });
+      expect(container.querySelector('.sw-tip'), 'a drag drops the chip').toBeNull();
+    });
+
     it('CONTROL: a reader whose stored choice is Essential stays Essential at Overview and at the ceiling (cannot fail today; it guards the fix from over-correcting)', async () => {
       await mount({ settings: { webDensity: 'essential' } });
       expect(shown()).toBe('essential');
@@ -370,6 +404,22 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(lastCamX()).toBeCloseTo(15551, 0);
       // the line stays chosen throughout: the sheet is still up
       expect(container.querySelector('.sw-sheet')).toBeTruthy();
+    });
+
+    /* sw1 B1 (audit-web 10-05): the card's x closed the card but left the line focused, so the shader kept
+       every other thread at 5 % ink for good; Escape and Back cleared it, the visible x did not. */
+    it('closing the card with its x lets go of the line: the next frame draws with no focus', async () => {
+      const { container } = await mount({}, threaded);
+      for (let i = 0; i < 40; i++) await pressFrame('+');
+      await pickNearby();
+      expect(container.querySelector('.sw-sheet'), 'the connection sheet opened').toBeTruthy();
+      expect(DRAWN[DRAWN.length - 1].focusArc, 'PRECONDITION: the chosen line is focused').toBe(0);
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+      expect(container.querySelector('.sw-sheet')).toBeNull();
+      const last = DRAWN[DRAWN.length - 1];
+      expect(last.focusArc).toBe(-1);
+      expect(last.focusRange).toBeNull();
     });
 
     it('at the ceiling the off-screen foot of the line is written on its body, and the on-screen foot reads off the ruler (book, chapter, verse)', async () => {
