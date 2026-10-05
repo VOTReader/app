@@ -370,12 +370,7 @@ function bestPassageFirst(out, idOf, units, stop, named) {
   const span = Math.max(12, Math.round(typed * 1.6));
   const top = out.slice(0, PASSAGE_REACH).map((e, i) => {
     const id = idOf.get(e) || String(i);
-    let lem = LEMMA_CACHE.get(id);
-    if (!lem) {
-      lem = kjvEncode(e.doc.text || '').map(lemma);
-      LEMMA_CACHE.set(id, lem);
-      if (LEMMA_CACHE.size > 400) LEMMA_CACHE.delete(/** @type {string} */ (LEMMA_CACHE.keys().next().value));
-    }
+    const lem = docLemmas(id, e.doc.text || '');
     const share = named(e.doc) ? 2 : bestWindow(query, lem, span);
     return { e, i, share, key: share - PASSAGE_RANK_COST * i - (e.doc.kind === 'answers' && share < 2 ? REPRINT_COST : 0) };
   });
@@ -530,14 +525,8 @@ function excerptCover(id, text, hits) {
   }
   return best;
 }
-/**
- * The original cited by the Answers excerpt that holds most of the query, or null when none holds half.
- * @param {string} id  the Answers doc's id
- * @param {string} text
- * @param {string[]} words  the query's words, encoded
- */
-function citedOriginal(id, text, words) {
-  const pieces = excerpts(id, text);
+/** The query's content words as bestWindow reads them, rare words weighing more, and the window's reach. */
+function passageQuery(/** @type {string[]} */ words) {
   const n = msIndex.documentCount || 1;
   const seen = new Set();
   const query = [];
@@ -548,22 +537,58 @@ function citedOriginal(id, text, words) {
     const df = docFreq(w);
     query.push({ lem, weight: Math.log(1 + (n - df + 0.5) / (df + 0.5)), syn: new Set() });
   }
-  const span = Math.max(12, Math.round(words.length * 1.6));
+  return { query, span: Math.max(12, Math.round(words.length * 1.6)) };
+}
+/** A text's tokens, lemmatized (LEMMA_CACHE). */
+function docLemmas(/** @type {string} */ id, /** @type {string} */ text) {
+  let lem = LEMMA_CACHE.get(id);
+  if (!lem) {
+    lem = kjvEncode(text).map(lemma);
+    LEMMA_CACHE.set(id, lem);
+    if (LEMMA_CACHE.size > 400) LEMMA_CACHE.delete(/** @type {string} */ (LEMMA_CACHE.keys().next().value));
+  }
+  return lem;
+}
+/** The original `src` holds the query as well as its reprint's passage does (`share`): a reprint words some passages its own way. */
+function holdsAsWell(/** @type {string} */ src, /** @type {ReturnType<typeof passageQuery>} */ pq, /** @type {number} */ share) {
+  const f = /** @type {Map<string, any>} */ (ORIGINAL_DOCS).get(src);
+  return !!f && bestWindow(pq.query, docLemmas(src, f.text), pq.span) >= share - CITE_SLACK;
+}
+/**
+ * The original cited by the Answers excerpt that holds most of the query, or null when none holds half.
+ * @param {string} id  the Answers doc's id
+ * @param {string} text
+ * @param {string[]} words  the query's words, encoded
+ */
+function citedOriginal(id, text, words) {
+  const pq = passageQuery(words);
   let best = 0.5;
   let src = null;
-  for (const p of pieces) {
+  for (const p of excerpts(id, text)) {
     if (!p.src) continue;
-    const s = bestWindow(query, p.lem, span);
+    const s = bestWindow(pq.query, p.lem, pq.span);
     if (s > best) { best = s; src = p.src; }
   }
-  if (!src) return null;
-  // Answers words some excerpts its own way: the letter must hold the query as well as the excerpt does.
-  let lem = LEMMA_CACHE.get(src);
-  if (!lem) {
-    lem = kjvEncode(/** @type {Map<string, any>} */ (ORIGINAL_DOCS).get(src).text).map(lemma);
-    LEMMA_CACHE.set(src, lem);
-  }
-  return bestWindow(query, lem, span) >= best - CITE_SLACK ? src : null;
+  return src && holdsAsWell(src, pq, best) ? src : null;
+}
+/* A WORDS TO LIVE BY ENTRY IS A LETTER CONDENSED (search benchmark, 2026-10-05). Its lines are
+   cut from one letter and joined by "...", re-broken and re-capitalized, so no sentence of it is
+   the letter's word for word and the matched place alone carries too few of the letter's runs
+   (10 open misses: the entry first, its letter below). The whole entry's runs vote once for its
+   letter. */
+/** @type {Map<string, string|null>} entry id -> the letter it condenses */
+const SOURCE_CACHE = new Map();
+function condensedFrom(/** @type {string} */ id, /** @type {string} */ text, /** @type {number} */ tier) {
+  if (SOURCE_CACHE.has(id)) return SOURCE_CACHE.get(id) || null;
+  const D = /** @type {Map<string, any>} */ (ORIGINAL_DOCS);
+  /** @type {Map<string, number>} */ const votes = new Map();
+  eachShingle(kjvEncode(text), (h) => {
+    for (const x of /** @type {Map<number, string[]>} */ (SHINGLES).get(h) || []) if (x !== id && ORIGINAL_TIER[D.get(x).kind] < tier) votes.set(x, (votes.get(x) || 0) + 1);
+  });
+  const ranked = [...votes].sort((a, b) => b[1] - a[1]);
+  const src = ranked.length && ranked[0][1] >= 3 && (ranked.length < 2 || ranked[0][1] >= 2 * ranked[1][1]) ? ranked[0][0] : null;
+  SOURCE_CACHE.set(id, src);
+  return src;
 }
 /**
  * Move each original ahead of a reprint of it near the top (in place).
@@ -614,7 +639,18 @@ function originalsFirst(out, idOf, terms, allowed, named, near) {
       const own = src ? near(id, e.doc) : 0;
       if (src && (own < NEAR_PHRASE_MIN || near(src, D.get(src)) >= own - 0.1)) found = lower([src]);
     }
+    if (!found && (e.doc.kind === 'wtlb' || e.doc.kind === 'blessed')) {
+      const id = idOf.get(e) || '';
+      const src = condensedFrom(id, e.doc.text, tier);
+      const pq = passageQuery(words);
+      const share = src ? bestWindow(pq.query, docLemmas(id, e.doc.text), pq.span) : 0;
+      const own = src ? near(id, e.doc) : 0;
+        if (src && share >= 0.5 && holdsAsWell(src, pq, share) && (own < NEAR_PHRASE_MIN || near(src, D.get(src)) >= own - 0.1)) found = [src];
+    }
     if (!found || !found.length) continue;
+    // The first original of all: a letter before the Words To Live By entry that condenses it.
+    const top = Math.min(...found.map((x) => ORIGINAL_TIER[D.get(x).kind]));
+    found = found.filter((x) => ORIGINAL_TIER[D.get(x).kind] === top);
     // The original already ranked highest, else the first that the filters allow.
     let j = -1;
     for (let r = 0; r < out.length; r++) if (found.indexOf(idOf.get(out[r]) || '') >= 0) { j = r; break; }
@@ -663,6 +699,7 @@ async function build(options) {
   CITED = null;
   LEMMA_CACHE.clear();
   EXCERPT_CACHE.clear();
+  SOURCE_CACHE.clear();
   const code = options.translation || 'nkjv';
   const sig = dataSignature(code);
 
