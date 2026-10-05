@@ -97,15 +97,16 @@ export function NowPlayingText({ state, current, onOpen }) {
 
   if (!frags || !blocks) return null;
   const now = idx >= 0 ? clauseText(blocks, frags[idx]) : '';
-  const next = clauseText(blocks, frags[idx + 1]);
-  if (!now && !next) return null;
+  // What comes next, dimmed: the pane fills the room the controls leave, so it reads ahead (the hub, 2026-10-05).
+  const next = [1, 2, 3].map((k) => clauseText(blocks, frags[idx + k])).filter(Boolean);
+  if (!now && !next.length) return null;
   const body = (
     <>
       {now ? <span className="now-playing-text-now">{now}</span> : null}
-      {next ? <span className="now-playing-text-next" aria-hidden="true">{next}</span> : null}
+      {next.map((t, k) => <span key={idx + 1 + k} className="now-playing-text-next" aria-hidden="true">{t}</span>)}
     </>
   );
   return onOpen
-    ? <button type="button" className="now-playing-text" onClick={onOpen} aria-label={(now || next) + ' (open the reading here)'}>{body}</button>
+    ? <button type="button" className="now-playing-text" onClick={onOpen} aria-label={(now || next[0]) + ' (open the reading here)'}>{body}</button>
     : <div className="now-playing-text">{body}</div>;
 }

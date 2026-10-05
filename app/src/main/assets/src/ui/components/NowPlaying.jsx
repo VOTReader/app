@@ -111,7 +111,7 @@ export function NowPlaying({ state, current, voices, saved, onToggleSave, onClos
   const canOpen = hasTextDestination(current);
 
   return (
-    <section className="now-playing" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="now-playing-title">
+    <section className="now-playing" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="now-playing-title" data-focus-self="">
       <header className="now-playing-top">
         <button type="button" className="now-playing-icon" onClick={onClose} aria-label="Close Now Playing"><ChevronDown /></button>
         <span className="now-playing-name">Now Playing</span>

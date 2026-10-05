@@ -62,7 +62,7 @@ describe('NowPlayingText', () => {
     clock.t = 2;
     const { container } = render(<NowPlayingText state={state({ time: 2 })} current={T} onOpen={null} />);
     expect(container.querySelector('.now-playing-text-now')).toBeNull();
-    expect(container.querySelector('.now-playing-text-next').textContent).toBe('I belong to no church named of men.');
+    expect([...container.querySelectorAll('.now-playing-text-next')].map((n) => n.textContent)).toEqual(['I belong to no church named of men.', 'I belong to The Lord, YahuShua HaMashiach,', 'Whole paragraph read as one.']);
   });
 
   it('the clause under the clock, the next one under it; a tap opens the reading', () => {
@@ -70,7 +70,7 @@ describe('NowPlayingText', () => {
     const onOpen = vi.fn();
     const { container } = render(<NowPlayingText state={state({ time: 14 })} current={T} onOpen={onOpen} />);
     expect(container.querySelector('.now-playing-text-now').textContent).toBe('I belong to The Lord, YahuShua HaMashiach,');
-    expect(container.querySelector('.now-playing-text-next').textContent).toBe('Whole paragraph read as one.');
+    expect([...container.querySelectorAll('.now-playing-text-next')].map((n) => n.textContent)).toEqual(['Whole paragraph read as one.']);
     fireEvent.click(screen.getByRole('button', { name: /YahuShua HaMashiach, \(open the reading here\)/ }));
     expect(onOpen).toHaveBeenCalled();
   });
