@@ -377,11 +377,12 @@
 
     var LEGS = [
       { bundle: '__screensG', label: 'Personal Study → My Notes (bundle-g)',
-        open: async function () { await goHome(); clickByText(/Personal Study/); await sleep(340); return clickByText(/My Notes|^\s*Notes(?![a-z])/); },
+        // rs3 (overhaul): the Library root opens Marks & notes (bundle-g) where it used to list Notes.
+        open: async function () { await goHome(); clickByText(/Personal Study/); await sleep(340); return clickByText(/My Notes|^\s*Notes(?![a-z])|^\s*Marks & notes/); },
         // The shared personal-study header titles the screen "Notes" (2026-09-25); any
         // pager peek of the Library beside it is titled "Library", so match the title exactly.
         there: function () {
-          return [].slice.call(document.querySelectorAll('.study-head-title'))
+          return !!document.querySelector('.marks-page') || [].slice.call(document.querySelectorAll('.study-head-title'))
             .some(function (h) { return (h.textContent || '').trim() === 'Notes'; });
         } },
       { bundle: '__screensH', label: 'Audio Readings → Listening Library (bundle-h)',
@@ -390,7 +391,7 @@
         there: function () { return /Your Listening/.test(document.body.textContent || ''); } },
       { bundle: '__screensE', label: 'App Configuration → Settings (bundle-e)',
         open: async function () { await goHome(); return clickByText(/App Configuration|^Settings/); },
-        there: function () { return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data/.test(document.body.textContent || ''); } },
+        there: function () { return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data|Downloads & storage/.test(document.body.textContent || ''); } },
       { bundle: '__screensF', label: 'Personal Study → Scripture Web (bundle-f)',
         open: async function () { await goHome(); clickByText(/Personal Study/); await sleep(340); return clickByText(/Scripture Web/); },
         there: function () { return !!document.querySelector('.sw-root'); } },
@@ -592,7 +593,7 @@
       clickByText(/Personal Study/); await sleep(320);
       // 95181e08 (the one-row Library) dropped the "My Notes" eyebrows; a row
       // carries its title alone. Either shape passes.
-      return /My Notes|My Bookmarks|My Journal|Highlights & Underlines/i.test(document.body.textContent || '');
+      return /My Notes|My Bookmarks|My Journal|Highlights & Underlines|Marks & notes/i.test(document.body.textContent || '');
     });
     await step('Listening Library', async function () {
       await goHome();
@@ -635,7 +636,9 @@
       await goHome();
       if (!clickByText(/About VOTReader/)) return false;
       await sleep(400);
-      const credit = document.querySelector('.about-credit');
+      // rs2/rs3 (overhaul): Help & about is a Settings page; the credit sits on its Credits & licenses page.
+      if (!document.querySelector('.about-credit') && clickRaw(/^Credits & licenses/)) await sleep(400);
+      const credit = document.querySelector('.about-credit, .settings-credit-line');
       const text = (credit && credit.textContent) || '';
       return /OpenBible\.info/.test(text) && /CC-BY/.test(text);
     });
@@ -652,7 +655,7 @@
     });
     await step('Settings', async function () {
       clickByText(/App Configuration|^Settings/); await sleep(360);
-      return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data/.test(document.body.textContent || '');
+      return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data|Downloads & storage/.test(document.body.textContent || '');
     });
     await goHome();
     return out;
@@ -864,6 +867,10 @@
       // 1. Enable Tabs via the Settings UI (idempotent — skip if already on).
       await goHome(); await sleep(200);
       clickByText(/App Configuration|^Settings/); await sleep(420);
+      // rs2 (overhaul): the Settings root is a list of pages; Tabs lives on Reading.
+      var readingHead = [].slice.call(document.querySelectorAll('.settings-group-head'))
+        .find(function (h) { return /^\s*Reading/.test(h.textContent || '') && h.getAttribute('aria-expanded') === 'false'; });
+      if (readingHead) { readingHead.click(); await sleep(360); }
       var tabsRow = [].slice.call(document.querySelectorAll('.settings-row'))
         .find(function (r) {
           var l = r.querySelector('.settings-row-label');
