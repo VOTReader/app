@@ -27,6 +27,7 @@
     "e2e:readalong": "node tools/e2e-readalong.mjs",
     "e2e:restore-fresh": "node tools/e2e-restore-fresh.mjs",
     "e2e:search": "node tools/e2e-search.mjs",
+    "bench:search": "node tools/search-bench.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

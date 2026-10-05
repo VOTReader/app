@@ -1,0 +1,27 @@
+{
+ "pass": 276,
+ "strict": 253,
+ "top5": 434,
+ "found": 498,
+ "style": {
+  "crossover": 36,
+  "exact": 55,
+  "firstwords": 18,
+  "gist": 6,
+  "middle": 31,
+  "misremembered": 43,
+  "paraphrase": 8,
+  "rare": 33,
+  "title": 25,
+  "typos": 18,
+  "unitgist": 3
+ },
+ "group": {
+  "answers": 31,
+  "bible": 90,
+  "cross": 3,
+  "letters": 104,
+  "studies": 18,
+  "words": 30
+ }
+}

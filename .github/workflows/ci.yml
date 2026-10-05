@@ -546,11 +546,33 @@ jobs:
         # came from; a run that checks nothing FAILS (NOTHING-CHECKED).
         run: npm run e2e:search
 
+  search-bench:
+    name: Search benchmark (500 remembered queries)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5   # ~65 s locally: corpus load, index build, 500 queries
+    # tools/search-bench.mjs (search lane, 2026-10-05): 500 things readers remember, each
+    # with the query a blind writer typed for it, run through the shipped engine in plain
+    # node. Fails when the pass count, or any style or collection, falls below the floor in
+    # tools/search-bench/baseline.json. It needs no npm install (node built-ins and the
+    # repo's own source only), so it finishes well inside the other jobs.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name != github.repository
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+      - name: Search benchmark
+        run: npm run bench:search
+
   build:
     name: build + syntax-check
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [gates, vitest, browser]
+    needs: [gates, vitest, browser, search-bench]
     # Every PR opened here ran this whole chain TWICE. Measured, not inferred:
     # `gh pr checks 13` listed each check under two distinct run ids
     # (33872042913 and 33872045621). The `push` and `pull_request` events both
@@ -571,17 +593,17 @@ jobs:
     #
     # always(): a job whose needs failed is SKIPPED by default, and a skipped
     # required check counts as passing. This one runs anyway and fails unless
-    # all three jobs succeeded.
+    # all four jobs succeeded.
     if: >-
       always() &&
       (github.event_name != 'pull_request' ||
       github.event.pull_request.head.repo.full_name != github.repository)
     steps:
-      - name: All three CI jobs passed
+      - name: All four CI jobs passed
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          echo "gates/vitest/browser: $RESULTS"
+          echo "gates/vitest/browser/search-bench: $RESULTS"
           for r in $RESULTS; do [ "$r" = success ] || exit 1; done
 
 
