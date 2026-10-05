@@ -114,7 +114,7 @@ const dayOf = (ms) => new Date(ms).toDateString();
 /**
  * The boot-time pass: check health, then take today's snapshot. Quiet on every
  * failure. Resolves to what it did, for tests and the diagnostic log.
- * @param {{ now?: () => number, sink?: any, force?: boolean }} [opts] force: snapshot now, no comparison (acceptCurrent)
+ * @param {{ now?: () => number, sink?: any, force?: boolean, weeklyBridge?: any }} [opts] force: snapshot now, no comparison (acceptCurrent); weeklyBridge: a stand-in for AndroidBridge (tests)
  * @returns {Promise<'no-sink' | 'not-loaded' | 'damaged' | 'snapshotted' | 'fresh' | 'empty' | 'failed'>}
  */
 export async function run(opts) {
@@ -148,7 +148,11 @@ export async function run(opts) {
     });
     if (json.length > MAX_SNAPSHOT_BYTES) return 'failed';
     if (_cleared) return 'empty';                 // Clear All ran while this pass read
-    return (await sink.save(json)) ? 'snapshotted' : 'failed';
+    const saved = await sink.save(json);
+    // The weekly copy rides the same healthy pass: never from a library that looked
+    // damaged or empty above, so a loss can never rotate the good copies out.
+    await weeklyCopy({ now, stores, bridge: opts && opts.weeklyBridge });
+    return saved ? 'snapshotted' : 'failed';
   } catch (e) {
     DiagnosticLog.warn('data-health', 'snapshot pass failed: ' + ((e && /** @type {any} */ (e).name) || e));
     return 'failed';
@@ -329,4 +333,75 @@ export async function clearSnapshots() {
   return ok;
 }
 
-export const DataSafety = { run, restoreMissing, acceptCurrent, clearSnapshots, status, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY };
+// ─── The weekly copy in Downloads/VOTReader (dl-weekly, phone app only) ─────
+// A snapshot lives in the app's files dir: it outlives a WebView storage wipe but
+// not an uninstall. Once a week the same stores also go to a file the reader can
+// see (DownloadsCopy.kt keeps the newest 4), which Import reads like any backup and
+// which carries the data to another build of the app. On by default; the reader
+// can turn it off in Your Data.
+
+export const WEEKLY_OFF_KEY = 'vot-weekly-copy-off';
+/** A copy is due 6.5 days after the last, so a daily pass at a slightly earlier hour keeps the week. */
+const WEEKLY_DUE_MS = 6.5 * 86400000;
+
+/** @param {any} [b] */
+function weeklyBridge(b) {
+  const w = /** @type {any} */ (typeof window !== 'undefined' ? window : {});
+  const x = b || w.AndroidBridge;
+  return x && typeof x.weeklyCopySave === 'function' && typeof x.weeklyCopyStatus === 'function' ? x : null;
+}
+
+/** On unless the reader turned it off. */
+export function weeklyOn() {
+  try { return localStorage.getItem(WEEKLY_OFF_KEY) !== '1'; } catch (_e) { return true; }
+}
+
+/** @param {boolean} on */
+export function setWeeklyOn(on) {
+  try { if (on) localStorage.removeItem(WEEKLY_OFF_KEY); else localStorage.setItem(WEEKLY_OFF_KEY, '1'); } catch (_e) { /* no storage */ }
+}
+
+/** `{ supported, on, count, newestAt }`; supported is false off the phone app and before Android 10. @param {{ bridge?: any }} [opts] */
+export function weeklyStatus(opts) {
+  const none = { supported: false, on: false, count: 0, newestAt: 0 };
+  const b = weeklyBridge(opts && opts.bridge);
+  if (!b) return none;
+  try {
+    const st = JSON.parse(String(b.weeklyCopyStatus() || '{}'));
+    if (!st || !st.supported) return none;
+    return { supported: true, on: weeklyOn(), count: +st.count || 0, newestAt: +st.newestAt || 0 };
+  } catch (_e) { return none; }
+}
+
+/**
+ * The weekly copy's file: a v2 JSON backup Import accepts (validateImportEnvelope).
+ * No `media` key at all - an import of `media: {}` would prune every journal photo
+ * on the phone; without one the import leaves media alone. `data` carries the
+ * boot-shim keys a real export does (backup.js DEFAULT_DATA_LS_KEYS).
+ * @param {Record<string, any>} stores @param {number} nowMs
+ */
+export function weeklyCopyJson(stores, nowMs) {
+  /** @type {Record<string, string>} */ const data = {};
+  try { const v = localStorage.getItem('vot-state'); if (typeof v === 'string') data['vot-state'] = v; } catch (_e) { /* no storage */ }
+  return JSON.stringify({ app: 'VOTReader', exportVersion: 2, weeklyCopy: true, exportDate: new Date(nowMs).toISOString(), data, stores });
+}
+
+/**
+ * Write this week's copy when one is due. Returns 'off' | 'unsupported' | 'recent' | 'written' | 'failed'.
+ * @param {{ now: () => number, stores: Record<string, any>, bridge?: any }} p
+ */
+export async function weeklyCopy(p) {
+  if (!weeklyOn()) return 'off';
+  const b = weeklyBridge(p.bridge);
+  const st = weeklyStatus({ bridge: b });
+  if (!b || !st.supported) return 'unsupported';
+  const t = p.now();
+  if (st.newestAt && t - st.newestAt < WEEKLY_DUE_MS) return 'recent';
+  try {
+    if (b.weeklyCopySave(weeklyCopyJson(p.stores, t))) return 'written';
+  } catch (_e) { /* quiet */ }
+  DiagnosticLog.warn('data-health', 'weekly copy to Downloads failed');
+  return 'failed';
+}
+
+export const DataSafety = { weeklyStatus, setWeeklyOn, run, restoreMissing, acceptCurrent, clearSnapshots, status, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY };

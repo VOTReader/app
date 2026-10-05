@@ -10,7 +10,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { IDBAdapter } from '../stores/idb-adapter.js';
 import { CachedStore, _resetStoreRegistry, setStoreWriteFence } from '../stores/cached-store.js';
 import { StorageHealth } from './storage-health.js';
-import { DataSafety, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY } from './data-safety.js';
+import { DataSafety, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, WEEKLY_OFF_KEY, weeklyCopyJson } from './data-safety.js';
+import { validateImportEnvelope } from './import-validators.js';
+import { applyImportPayload } from './backup.js';
 import { pruneSnapshotNames, snapshotName, snapshotTime, KEEP_DAYS, KEEP_WEEKS } from './snapshot-sink.js';
 
 const ANN = { 'bible:john:3:16': [{ id: 'a1', groupId: 'a1', kind: 'highlight', start: 0, end: 5, color: 'yellow', created: 1, updated: 1 }],
@@ -231,5 +233,76 @@ describe('refuter findings (datasafe 10-05 second pass)', () => {
     const { allowProgressClear } = await import('../stores/store-merge.js');
     allowProgressClear();
     expect(localStorage.getItem(HEALTH_SKIP_KEY)).toBe('1');
+  });
+});
+
+describe('the weekly copy in Downloads/VOTReader (dl-weekly)', () => {
+  /** DownloadsCopy.kt in memory: keeps the newest 4, like the real one. */
+  function fakeBridge(supported = true) {
+    const files = [];
+    return {
+      files,
+      weeklyCopySave: vi.fn((json) => { files.push({ json, at: Date.now() }); files.splice(0, Math.max(0, files.length - 4)); return true; }),
+      weeklyCopyStatus: () => JSON.stringify({ supported, count: files.length, newestAt: files.length ? files[files.length - 1].at : 0 }),
+    };
+  }
+  const DAY = 86400000;
+  async function runOn(day, sink, bridge) {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(Date.UTC(2026, 9, 1, 15) + day * DAY);
+    try { return await DataSafety.run({ sink, weeklyBridge: bridge }); } finally { vi.useRealTimers(); }
+  }
+
+  it('is written on the first healthy pass, then once a week', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    const sink = memorySink();
+    const bridge = fakeBridge();
+    for (let day = 0; day < 15; day++) await runOn(day, sink, bridge);
+    expect(bridge.weeklyCopySave).toHaveBeenCalledTimes(3);          // days 0, 7, 14
+    expect(DataSafety.weeklyStatus({ bridge })).toMatchObject({ supported: true, on: true, count: 3 });
+  });
+
+  it('is never written from a library that looks damaged or empty', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    const sink = memorySink();
+    const bridge = fakeBridge();
+    await runOn(0, sink, bridge);
+    for (const n of ['vot-annotations', 'vot-notes', 'vot-links']) await IDBAdapter.put(n, 'v', n === 'vot-links' ? [] : {});
+    await IDBAdapter.put('vot-state', 'v', { theme: 'dark', readItems: {} });
+    expect(await runOn(8, sink, bridge)).toBe('damaged');
+    expect(bridge.weeklyCopySave).toHaveBeenCalledTimes(1);
+  });
+
+  it('the reader can turn it off; off the phone app it is unsupported', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    const bridge = fakeBridge();
+    DataSafety.setWeeklyOn(false);
+    expect(localStorage.getItem(WEEKLY_OFF_KEY)).toBe('1');
+    await runOn(0, memorySink(), bridge);
+    expect(bridge.weeklyCopySave).not.toHaveBeenCalled();
+    expect(DataSafety.weeklyStatus({ bridge }).on).toBe(false);
+    DataSafety.setWeeklyOn(true);
+    expect(DataSafety.weeklyStatus({ bridge }).on).toBe(true);
+    expect(DataSafety.weeklyStatus({ bridge: fakeBridge(false) }).supported).toBe(false);
+    expect(DataSafety.weeklyStatus().supported).toBe(false);          // no AndroidBridge (the web app)
+  });
+
+  it('is a backup Import accepts, and importing it never prunes journal photos', async () => {
+    localStorage.setItem('vot-state', JSON.stringify(STATE));
+    const parsed = JSON.parse(weeklyCopyJson({ 'vot-annotations': ANN, 'vot-notes': NOTES }, Date.UTC(2026, 9, 5)));
+    expect(validateImportEnvelope(parsed)).toEqual([]);
+    expect(parsed.data['vot-state']).toBe(JSON.stringify(STATE));
+    expect('media' in parsed).toBe(false);
+    const mediaStore = { allIds: vi.fn(async () => ['photo-1']), delete: vi.fn(async () => {}), put: vi.fn(async () => {}) };
+    await applyImportPayload(parsed, {
+      storesMap: {}, flagMap: {}, mediaStore,
+      validateStorePayload: () => [], validateMediaRecord: () => [],
+    });
+    expect(mediaStore.delete).not.toHaveBeenCalled();
+    // The trap it avoids: the same file with media: {} deletes every photo on the phone.
+    await applyImportPayload({ ...parsed, media: {} }, {
+      storesMap: {}, flagMap: {}, mediaStore,
+      validateStorePayload: () => [], validateMediaRecord: () => [],
+    });
+    expect(mediaStore.delete).toHaveBeenCalledWith('photo-1');
   });
 });

@@ -1429,4 +1429,29 @@ describe('Your Data: the last backup and the automatic snapshots (datasafe 10-05
     renderSettings();
     await waitFor(() => expect(document.body.textContent).toContain('Newest today · 3 kept on this phone'));
   });
+
+  it('shows the weekly copy in Downloads with a calm off switch (dl-weekly)', async () => {
+    let on = true;
+    /** @type {any} */ (globalThis).DataSafety = {
+      status: async () => ({ where: 'phone', count: 1, newestAt: Date.now() }),
+      weeklyStatus: () => ({ supported: true, on, count: 2, newestAt: Date.now() }),
+      setWeeklyOn: vi.fn((v) => { on = v; }),
+    };
+    renderSettings();
+    await waitFor(() => expect(document.body.textContent).toContain('Newest today · in Downloads/VOTReader, the last 4 kept'));
+    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Turn off');
+    fireEvent.click(btn);
+    expect(globalThis.DataSafety.setWeeklyOn).toHaveBeenCalledWith(false);
+    await waitFor(() => expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Turn on')).toBe(true));
+  });
+
+  it('shows no weekly line where it cannot be kept (the web app, Android 9)', async () => {
+    /** @type {any} */ (globalThis).DataSafety = {
+      status: async () => ({ where: 'browser', count: 1, newestAt: Date.now() }),
+      weeklyStatus: () => ({ supported: false, on: false, count: 0, newestAt: 0 }),
+    };
+    renderSettings();
+    await waitFor(() => expect(document.body.textContent).toContain('kept in this browser'));
+    expect(document.body.textContent).not.toContain('Weekly copy');
+  });
 });

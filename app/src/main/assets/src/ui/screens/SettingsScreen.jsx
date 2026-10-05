@@ -524,6 +524,13 @@ function _snapshotText(st) {
   return 'Newest ' + _daysAgo(st.newestAt) + ' · ' + st.count + ' ' + where;
 }
 
+/** dl-weekly: the weekly copy in Downloads. @param {{ on: boolean, count: number, newestAt: number }} w */
+function _weeklyText(w) {
+  if (!w.on) return 'Off';
+  if (!w.count) return 'Once a week to Downloads/VOTReader (the last 4 kept)';
+  return 'Newest ' + _daysAgo(w.newestAt) + ' · in Downloads/VOTReader, the last 4 kept';
+}
+
 function _platformLabel(platform) {
   switch (platform) {
     case 'android-webview': return 'Android (App)';
@@ -635,6 +642,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const [buildInfo, setBuildInfo] = React.useState({ state: 'loading', running: null, server: null });
   // datasafe 10-05: the automatic snapshots' line in Your Data (DataSafety lives in bundle-b).
   const [safety, setSafety] = React.useState(/** @type {{ where: string | null, count: number, newestAt: number } | null} */ (null));
+  // dl-weekly: the weekly copy in Downloads (phone app, Android 10+).
+  const [weekly, setWeekly] = React.useState(/** @type {{ supported: boolean, on: boolean, count: number, newestAt: number } | null} */ (null));
+  React.useEffect(() => {
+    if (typeof DataSafety !== 'undefined' && typeof DataSafety.weeklyStatus === 'function') setWeekly(DataSafety.weeklyStatus());
+  }, []);
+  const toggleWeekly = React.useCallback(() => {
+    if (typeof DataSafety === 'undefined' || !weekly) return;
+    DataSafety.setWeeklyOn(!weekly.on);
+    setWeekly(DataSafety.weeklyStatus());
+  }, [weekly]);
   React.useEffect(() => {
     let alive = true;
     if (typeof DataSafety !== 'undefined' && typeof DataSafety.status === 'function') {
@@ -1404,6 +1421,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             <DataInfoRow label="Last backup" value={_lastBackupText()} />
             {safety && safety.where && (
               <DataInfoRow label="Automatic snapshots" value={_snapshotText(safety)} />
+            )}
+            {weekly && weekly.supported && (
+              <DataInfoRow label="Weekly copy" value={_weeklyText(weekly)}>
+                <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); toggleWeekly(); }}>{weekly.on ? 'Turn off' : 'Turn on'}</button>
+              </DataInfoRow>
             )}
             <DataInfoRow label="Protection" value={protectionDisplayText}>
               {showProtectButton && (
