@@ -26,7 +26,7 @@
    is what lets it live outside the test-file glob. Callers pass their own
    spies as props to renderSettings. */
 
-import { render, fireEvent } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { SettingsScreen } from './SettingsScreen.jsx';
 import { SettingsRow } from '../components/SettingsRow.jsx';
 import { SelectField } from '../components/SelectField.jsx';
@@ -227,19 +227,15 @@ export const groupRowLabels = (label) => {
     : [];
 };
 
-/** Open every collapsed group (the redesign mounts group bodies lazily). */
-function expandAllGroups() {
-  for (const head of groupHeads()) {
-    if (head.getAttribute('aria-expanded') === 'false') fireEvent.click(head);
-  }
-}
+/** Every group, in the root list's order (rs2: one page per group). */
+export const ALL_GROUPS = ['appearance', 'reading', 'listening', 'features', 'share', 'storage', 'data', 'help'];
 
 /**
  * Mount SettingsScreen with `settings` merged over sane defaults. Pass
  * `onSetting` / `onToggle` (your own spies) via `props` to assert writes.
- * Groups default COLLAPSED in production (redesign 2026-07-31); this
- * helper expands them all post-render so row-level assertions keep
- * working — pass `{ expandGroups: false }` to test the collapsed state.
+ * Production opens on the root list (rs2: a row opens its group as a page);
+ * this helper mounts every group's page at once (initialGroups) so row-level
+ * assertions keep working — pass `{ expandGroups: false }` for the root list.
  */
 export function renderSettings(settings = {}, props = {}, { expandGroups = true } = {}) {
   const result = render(
@@ -257,10 +253,10 @@ export function renderSettings(settings = {}, props = {}, { expandGroups = true 
       onClearAll={() => {}}
       onClearHistory={() => {}}
       historyCount={0}
+      initialGroups={expandGroups ? ALL_GROUPS : null}
       {...props}
     />
   );
-  if (expandGroups) expandAllGroups();
   return result;
 }
 

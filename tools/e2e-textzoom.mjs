@@ -139,7 +139,7 @@ try {
     await click('Back'); await page.evaluate(() => { const t = [...document.querySelectorAll('.library-tile')].find((t) => (t.querySelector('.library-tile-title') || {}).textContent === 'Journal'); t && t.click(); }); await sleep(700); await setScale();
     await stop('journal');
     await click('Home'); await click('App Configuration'); await sleep(300);
-    await page.evaluate(() => { for (const h of document.querySelectorAll('.settings-group-head')) if (/Appearance|Your Data/.test(h.textContent)) h.click(); }); await sleep(500); await setScale();
+    await page.evaluate(() => { for (const h of document.querySelectorAll('.settings-group-head')) if (/Appearance|Your [Dd]ata/.test(h.textContent)) h.click(); }); await sleep(500); await setScale();
     await stop('settings');
     await click('Search'); await stop('search');
     if (errors.length) fail(`${scale}: page errors: ${errors.slice(0, 3).join(' | ')}`);

@@ -74,7 +74,7 @@ describe('tour-steps — shape', () => {
     }
   });
 
-  it('the backup stop opens the Your Data group and never presses Export for the reader', () => {
+  it('the backup stop opens the Your Data group and never presses Back up now for the reader', () => {
     const backup = TOUR_STEPS.find((s) => s.id === 'backup');
     expect(backup.settingsGroup).toBe('data');
     expect(backup.act).toBeNull();
@@ -214,7 +214,8 @@ describe('tour-steps — words', () => {
 
   it("uses the trailer's phrases verbatim", () => {
     const all = TOUR_STEPS.map((s) => s.title + ' ' + s.text).join(' ');
-    for (const w of ['Press Listen', 'The words light up as they are read', 'verse by verse', 'Journal', 'a backup', 'Export']) expect(all, w).toContain(w);
+    // rs2: the backup button reads "Back up now" in the new look, and the stop names what is on screen.
+    for (const w of ['Press Listen', 'The words light up as they are read', 'verse by verse', 'Journal', 'a backup', 'Back up now']) expect(all, w).toContain(w);
     expect(TOUR_WORDS).toContain('Press Listen');
   });
 });

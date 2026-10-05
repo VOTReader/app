@@ -171,7 +171,7 @@ describe('a scheduled reload does not outlive the screen that scheduled it', () 
       }),
     });
     const { unmount } = renderSettings();
-    await act(async () => { btn('Import').click(); });
+    await act(async () => { btn('Restore').click(); });
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     const confirm = btn('Import & Overwrite');
     expect(confirm, 'the import confirm sheet did not open — this case measured nothing').toBeTruthy();

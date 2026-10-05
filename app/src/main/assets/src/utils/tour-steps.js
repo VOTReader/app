@@ -186,10 +186,10 @@ const STOPS = [
   },
   {
     id: 'backup', screen: 'settings', enter: 'openSettingsData', settingsGroup: 'data',
-    target: { selector: '[data-settings-group="data"] button', text: 'Export' }, act: null,
+    target: { selector: '[data-settings-group="data"] button', text: 'Back up now' }, act: null,
     label: 'Your Data',
     title: 'Keep a backup',
-    text: 'Your notes stay on your device. One tap on Export saves a backup file. Import brings it back.',
+    text: 'Your notes stay on your device. One tap on Back up now saves a backup file. Restore brings it back.',
     primary: 'Next',
   },
   /* SETTINGS GETS A STOP (Corbin, 2026-09-10: "a stop showing users they can toggle certain

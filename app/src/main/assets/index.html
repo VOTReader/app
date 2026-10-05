@@ -60,7 +60,7 @@
        dashboard. The service worker never caches it (cross-origin). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-Eeh01SK8uypEtKAtRbV1aRd2sSX2sGVP4u/jOl0Sv38=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-CSTsiXpSL6PrFbnnOKxr26HHhI6qbL1gLcEyixUvtIU=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-Eeh01SK8uypEtKAtRbV1aRd2sSX2sGVP4u/jOl0Sv38=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-0vSLJ1zPTX27zFgRt8d3lOKV5WkHv2WGTBzDMvU1FTY=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     font-src 'self' data:;
@@ -583,11 +583,11 @@ const SCRIPTURE_LAYOUT_OPTIONS = [
 { id: 'canonical', label: 'Canonical Scroll', desc: 'One long scroll in canonical reading order' }];
 
 const ARROW_LAYOUT_OPTIONS = [
-{ id: 'split', label: 'Split · Left + Right', desc: 'Arrows on opposite edges of the content. Default.' },
+{ id: 'split', label: 'Split · Left + Right', desc: 'Arrows on opposite edges of the content.' },
 { id: 'right', label: 'Right-handed', desc: 'Both arrows tucked on the right for one-thumb reach.' },
 { id: 'left', label: 'Left-handed', desc: 'Both arrows tucked on the left for one-thumb reach.' },
 { id: 'nav', label: 'In Top Nav', desc: 'Small bubble arrows inside the top nav bar.' },
-{ id: 'off', label: 'Hidden', desc: 'Hide both arrows. Use the bottom prev/next cards.' }];
+{ id: 'off', label: 'Hidden', desc: 'Hide both arrows. Use the bottom prev/next cards. Default.' }];
 
 var BIBLE_BOOK_LIST = [];
 var OT_BOOK_IDS = new Set();

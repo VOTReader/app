@@ -70,7 +70,7 @@ function setup(file) {
 afterEach(() => { cleanup(); teardownSettingsGlobals(); vi.restoreAllMocks(); });
 
 const clickVerify = async () => {
-  const btn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Verify');
+  const btn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Check file');
   expect(btn).toBeTruthy();
   await act(async () => { btn.click(); });
   await flush();

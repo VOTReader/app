@@ -3574,6 +3574,128 @@
       .settings-screen { padding-left:1rem; padding-right:1rem; }
       .settings-group-head { padding-left:min(0.75rem, 12px); padding-right:min(0.75rem, 12px); }
     }
+    /* ── SETTINGS IN THE NEW LOOK (rs2, the overhaul canvas: Settings, Appearance, Reading, Listening,
+       Downloads & storage, Help & about; Codex sheets 31-34) ── a root list of hairline rows (name over its
+       current values, a chevron), each opening its group as a page; rows are hairline-ruled, no cards or
+       boxes; spaced gold capitals over a section; gold switches; a quiet outlined button for an action. */
+    .settings-screen.rs2 { padding:8px 24px 40px; max-width:var(--col-max, 720px); margin:0 auto; font-family:var(--font-ui); }
+    .rs2 .settings-header { max-width:none; margin:8px 0 12px; }
+    .rs2 .settings-title { font-weight:400; font-size:var(--fs-30); line-height:1.15; letter-spacing:0; margin:0; }
+    .rs2 .settings-groups { max-width:none; }
+    .rs2 .settings-save-note { display:block; margin:18px 0 0; font-size:var(--fs-15); color:var(--cream-muted); }
+    .rs2 .settings-find { margin:0 0 8px; }
+    .rs2 .settings-find input { height:52px; padding:0 16px; background:var(--input-bg); border:1px solid var(--input-border); border-radius:var(--radius-lg); font-family:var(--font-ui); font-size:var(--fs-18); }
+    .rs2 .settings-find input:focus-visible { outline:none; border-color:var(--gold); }
+    .rs2 .settings-find button { height:52px; border-radius:var(--radius-lg); border-color:var(--input-border); background:none; font-family:var(--font-ui); font-size:var(--fs-16); }
+    /* The root rows and the page rows that open a page */
+    .rs2 .settings-section, .rs2 .settings-section.open { margin:0; }
+    .settings-nav-row, .rs2 .settings-group-head.settings-nav-row {
+      display:flex; align-items:center; gap:12px; width:100%; min-height:64px; padding:12px 0; box-sizing:border-box;
+      background:none; border:0; border-bottom:1px solid var(--divider); border-radius:0; transform:none;
+      color:inherit; text-align:left; cursor:pointer; font-family:var(--font-ui);
+    }
+    .settings-nav-row:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; border-radius:6px; }
+    @media (hover:hover){ .rs2 .settings-group-head.settings-nav-row:hover { transform:none; border-color:var(--divider); } .settings-nav-row:hover .settings-nav-title { color:var(--gold-bright, var(--gold)); } }
+    .settings-nav-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+    .settings-nav-title, .rs2 .settings-group-head .settings-section-label.settings-nav-title {
+      font-family:var(--font-ui); font-size:var(--fs-22); line-height:1.2; letter-spacing:0; text-transform:none; color:var(--cream); margin:0;
+    }
+    .rs2 .settings-nav-title::after { content:none; }
+    .settings-nav-sub, .rs2 .settings-group-sub.settings-nav-sub { font-family:var(--font-ui); font-size:var(--fs-16); line-height:1.3; color:var(--cream-dim); }
+    .settings-nav-chev { flex-shrink:0; color:var(--cream-muted); }
+    .rs2 .settings-card .settings-nav-title { font-size:var(--fs-20); }
+    /* A page: its sections' heads are gold capitals (a search shows several); a lone page hides its head */
+    .rs2 .settings-page-section-head { display:block; width:100%; min-height:44px; padding:24px 0 8px; background:none; border:0; border-radius:0; text-align:left; cursor:pointer; transform:none; }
+    @media (hover:hover){ .rs2 .settings-page-section-head:hover { transform:none; } }
+    .rs2 .settings-page-section-head .settings-section-label { margin:0; font-size:var(--fs-13); letter-spacing:var(--track-caps); color:var(--gold); }
+    .rs2 .settings-page-section-head .settings-section-label::after { content:none; }
+    .rs2.settings-single .settings-page-section-head { display:none; }
+    .rs2 .settings-group-body { margin:0; }
+    .rs2 .settings-caps { margin:28px 0 4px; }
+    .rs2 .settings-danger-caps { color:var(--danger); }
+    /* Rows: hairlines, no card */
+    .rs2 .settings-card { background:none; border:0; border-radius:0; overflow:visible; }
+    .rs2 .settings-row, .rs2 .settings-card > .settings-row:last-child { border-bottom:1px solid var(--divider); }
+    .rs2 .settings-row-head { padding:10px 0; min-height:56px; }
+    .rs2 .settings-row-label { font-family:var(--font-ui); font-size:var(--fs-20); letter-spacing:0; line-height:1.25; color:var(--cream); }
+    .rs2 .settings-row-value { font-size:var(--fs-16); font-style:normal; color:var(--cream-dim); }
+    .rs2 .settings-row-desc { font-size:var(--fs-15); font-style:normal; color:var(--cream-dim); padding:0 0 12px; }
+    .rs2 .settings-data-value { font-size:var(--fs-16); font-style:normal; color:var(--cream-dim); padding:0 0 12px; margin-top:-6px; }
+    .rs2 .settings-select-trigger { background:none; border:0; padding:0 0 0 8px; }
+    .rs2 .txtsize-controls { margin-top:0; padding-bottom:8px; }
+    .rs2 .txtsize-preview { font-size:var(--fs-20); line-height:1.4; }
+    .rs2 .settings-row.danger-zone { margin-top:0; border-top:0; }
+    .rs2 .settings-danger-wide { width:100%; min-height:48px; margin:8px 0 0; }
+    .settings-danger-note { margin:8px 0 12px; font-size:var(--fs-15); line-height:1.4; color:var(--cream-dim); }
+    /* Switches: a gold track, a cream thumb */
+    .rs2 .settings-toggle { width:48px; height:28px; }
+    .rs2 .settings-toggle-track { border-radius:14px; background:var(--divider); opacity:1; }
+    .rs2 .settings-toggle input:checked ~ .settings-toggle-track { background:var(--pill-fill); }
+    .rs2 .settings-toggle-thumb { top:3px; left:3px; width:22px; height:22px; background:var(--cream-muted); box-shadow:none; }
+    .rs2 .settings-toggle input:checked ~ .settings-toggle-thumb { transform:translateX(20px); background:var(--cream); }
+    /* An action: a quiet outlined button; the destructive one in the danger colour */
+    .rs2 .settings-clear-btn { min-height:40px; padding:0 16px; border:1px solid var(--gold); border-radius:9px; color:var(--gold); font-family:var(--font-ui); font-size:var(--fs-16); letter-spacing:0; text-transform:none; }
+    .rs2 .settings-clear-btn.danger { border-color:var(--danger); color:var(--danger); font-size:var(--fs-16); letter-spacing:0; text-transform:none; }
+    /* Appearance › Theme */
+    .settings-theme-row { padding-bottom:16px; }
+    .settings-theme-row .settings-caps { margin:8px 0 10px; }
+    .settings-theme-tiles { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
+    .settings-theme-tile {
+      position:relative; height:104px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+      border:1px solid var(--divider); border-radius:12px; background:var(--bg2); color:var(--cream); cursor:pointer;
+      font-family:var(--font-ui); font-size:var(--fs-18);
+    }
+    .settings-theme-tile.on { border:1.5px solid var(--gold); }
+    .settings-theme-tile:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+    .settings-theme-swatch { width:40px; height:28px; border-radius:5px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
+    .settings-theme-swatch > span { width:22px; height:2px; }
+    .settings-theme-dark .settings-theme-swatch { background:#172022; border:1px solid #3A4648; }
+    .settings-theme-dark .settings-theme-swatch > span { background:#ECEDE8; }
+    .settings-theme-light .settings-theme-swatch { background:#EFE6D2; }
+    .settings-theme-light .settings-theme-swatch > span { background:#3B3226; }
+    /* Your data › Last backup */
+    .settings-backup-card { margin:8px 0 8px; padding:20px; border:1px solid var(--divider); border-radius:12px; background:var(--bg2); }
+    .settings-backup-card .settings-caps { margin:0 0 8px; }
+    .settings-backup-when { margin:0 0 6px; font-family:var(--font-ui); font-size:var(--fs-30); line-height:1.15; color:var(--cream); }
+    .settings-backup-what { margin:0 0 16px; font-size:var(--fs-16); line-height:1.4; color:var(--cream-dim); overflow-wrap:anywhere; }
+    .settings-backup-btn { width:100%; justify-content:center; }
+    .settings-backup-btn:disabled { opacity:0.5; cursor:default; }
+    /* Help & about: the tour row is a row like the others (it was a gold bar) */
+    .rs2 .settings-help-btn { min-height:64px; padding:12px 0; border-radius:0; background:none; color:inherit; border:0; border-bottom:1px solid var(--divider); text-transform:none; letter-spacing:0; font-size:inherit; }
+    /* About, Credits & licenses, Privacy */
+    .settings-info-page p { margin:0 0 16px; font-size:var(--fs-20); line-height:1.45; color:var(--cream); }
+    .settings-info-page p.caps-label { margin:28px 0 4px; font-size:var(--fs-13); line-height:1.4; color:var(--gold); }
+    .settings-info-page .settings-info-display { margin:8px 0 4px; font-size:clamp(var(--fs-36), 11vw, var(--fs-48)); line-height:1.06; }
+    .settings-info-page .settings-info-version { margin:0 0 20px; font-size:var(--fs-16); color:var(--cream-dim); }
+    .settings-ext-link { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:52px; border-bottom:1px solid var(--divider); color:var(--gold); text-decoration:none; font-size:var(--fs-20); }
+    .settings-credit-list { margin:0; }
+    .settings-credit { display:grid; grid-template-columns:5.5rem minmax(0, 1fr); gap:12px; padding:10px 0; border-bottom:1px solid var(--divider); }
+    .settings-credit dt { font-size:var(--fs-18); color:var(--cream); }
+    .settings-credit dd { margin:0; font-size:var(--fs-16); line-height:1.4; color:var(--cream-dim); }
+    .settings-info-page .settings-credit-line { font-size:var(--fs-16); color:var(--cream-dim); }
+    .settings-credit-line a { color:var(--gold); }
+    /* The two confirm sheets (the wipe, the import overwrite) */
+    .settings-sheet-text { margin:0 0 14px; font-size:var(--fs-16); line-height:1.5; color:var(--cream); }
+    .settings-sheet-pre { white-space:pre-line; margin-bottom:18px; }
+    .settings-sheet-warn { color:var(--danger); }
+    .settings-sheet-link { display:inline-block; min-height:44px; margin:0 0 6px; padding:0; background:none; border:0; color:var(--gold); text-decoration:underline; font-family:var(--font-ui); font-size:var(--fs-18); cursor:pointer; }
+    .settings-sheet-hint { margin:0 0 8px; font-size:var(--fs-14); color:var(--cream-muted); }
+    .settings-sheet-hint strong { color:var(--gold); letter-spacing:0.15em; }
+    .settings-sheet-input {
+      width:100%; box-sizing:border-box; margin-bottom:18px; padding:0.7rem 0.5rem; text-align:center;
+      font-family:var(--font-ui); font-size:var(--fs-18); letter-spacing:0.22em; text-transform:uppercase; color:var(--cream);
+      background:var(--input-bg); border:1px solid var(--input-border); border-radius:8px; outline:none;
+    }
+    .settings-sheet-input:focus-visible { border-color:var(--gold); }
+    .settings-sheet-actions { display:flex; gap:10px; justify-content:flex-end; }
+    /* Reading › Reading progress (was inline styles on the Mark as Read group) */
+    .rs2 .progress-table { border:0; border-radius:0; background:none; }
+    .rs2 .progress-row { padding:0.8rem 0; border-bottom:1px solid var(--divider); }
+    .progress-section-caret { color:var(--gold-dim); font-size:var(--fs-12); min-width:0.75rem; }
+    .progress-section-toggle .progress-row-label { color:var(--gold); }
+    .progress-genre-row { background:var(--bg2); padding-top:0.45rem; padding-bottom:0.45rem; padding-left:2rem; }
+    .progress-genre-label { flex:1; font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); }
+    @media (max-width:520px) { .settings-screen.rs2 { padding-left:16px; padding-right:16px; } }
     /* ── Reading Font picker (2026-07-31) ─────────────────────────────────
        A standard SelectField dropdown sheet; option names render in their
        font via the bundled 'p-<id>' preview subsets (name glyphs only —

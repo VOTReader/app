@@ -273,7 +273,7 @@ try {
   note(`A reading position (recorded by opening the bookmark): ${JSON.stringify(before.lastReadChapters)}`);
 
   await openYourData(A.page);
-  await click(A.page, 'Export');
+  await click(A.page, 'Back up now');
   const exported = await waitToast(A.page, /saved|exported|backup/i, 30000);
   note(`A export toast: ${JSON.stringify(exported)}`);
   // The Blob download lands in `dl`; wait for a complete file (no .crdownload).
@@ -292,7 +292,7 @@ try {
   // ── B: another clean profile, Import through the UI, compare ──
   const B = await freshProfile('B');
   await openYourData(B.page);
-  const [chooser] = await Promise.all([B.page.waitForFileChooser({ timeout: 10000 }), click(B.page, 'Import')]);
+  const [chooser] = await Promise.all([B.page.waitForFileChooser({ timeout: 10000 }), click(B.page, 'Restore')]);
   await chooser.accept([backupPath]);
   await B.page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Import & Overwrite'), { timeout: 15000 });
   if (shotsDir) await B.page.screenshot({ path: join(shotsDir, 'b2-B-confirm.png') });
@@ -330,7 +330,7 @@ try {
   writeFileSync(cut, bytes.subarray(0, Math.max(0, bytes.length - 1024)));
   const C = await freshProfile('C');
   await openYourData(C.page);
-  const [chooserC] = await Promise.all([C.page.waitForFileChooser({ timeout: 10000 }), click(C.page, 'Import')]);
+  const [chooserC] = await Promise.all([C.page.waitForFileChooser({ timeout: 10000 }), click(C.page, 'Restore')]);
   await chooserC.accept([cut]);
   const confirmShown = await C.page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Import & Overwrite'), { timeout: 8000 }).then(() => true, () => false);
   let cToast;

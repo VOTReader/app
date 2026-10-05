@@ -81,7 +81,7 @@ async function importBackup(applyResult) {
     applyV3: () => { log.push('apply'); return Promise.resolve(applyResult); },
   });
   renderSettings();
-  await act(async () => { btn('Import').click(); });
+  await act(async () => { btn('Restore').click(); });
   await settle();
   const confirm = btn('Import & Overwrite');
   expect(confirm, 'the import confirm sheet did not open - this case measured nothing').toBeTruthy();

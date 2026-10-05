@@ -34,18 +34,17 @@ afterEach(() => { cleanup(); teardownSettingsGlobals(); vi.restoreAllMocks(); })
 const slider = (label) => document.querySelector(`input[type="range"][aria-label*="${label}"]`);
 
 describe('settings filter and lazy progress', () => {
-  it('finds and expands backup settings, then restores the previous accordion state', () => {
+  it('finds backup settings as a page, and Clear filter goes back to the root list (rs2)', () => {
     renderSettings({}, {}, { expandGroups: false });
-    fireEvent.click(groupHead('Appearance'));
     fireEvent.change(screen.getByLabelText('Find settings'), { target: { value: 'backup' } });
     expect(groupHeads()).toHaveLength(1);
-    expect(groupHead('Your Data').getAttribute('aria-expanded')).toBe('true');
-    expect(row('Verify a Backup')).toBeTruthy();
-    fireEvent.click(groupHead('Your Data'));
-    expect(groupHead('Your Data').getAttribute('aria-expanded')).toBe('false');
+    expect(groupHead('Your data').getAttribute('aria-expanded')).toBe('true');
+    expect(row('Check a backup')).toBeTruthy();
+    fireEvent.click(groupHead('Your data'));
+    expect(groupHeads()).toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }));
-    expect(groupHeads()).toHaveLength(11);   // ten plus the tour's Help group
-    expect(groupHead('Appearance').getAttribute('aria-expanded')).toBe('true');
+    expect(groupHeads()).toHaveLength(8);
+    expect(groupHeads().every((h) => h.getAttribute('aria-expanded') === 'false')).toBe(true);
     expect(document.activeElement).toBe(screen.getByLabelText('Find settings'));
   });
 
@@ -55,7 +54,7 @@ describe('settings filter and lazy progress', () => {
     renderSettings({}, {}, { expandGroups: false });
     fireEvent.change(screen.getByLabelText('Find settings'), { target: { value: 'tour' } });
     expect(groupHeads()).toHaveLength(1);
-    expect(groupHead('Help')).toBeTruthy();
+    expect(groupHead('Help & about')).toBeTruthy();
     expect(screen.getAllByText(/Show me around/).length).toBeGreaterThanOrEqual(1);
   });
 
@@ -70,7 +69,7 @@ describe('settings filter and lazy progress', () => {
     expect(screen.getByRole('status').textContent).toContain('No matching settings');
   });
 
-  it('does not load corpora for Appearance; opens them for Mark as Read', () => {
+  it('does not load corpora for Appearance; opens them for Reading (its progress table)', () => {
     window.__loadVotCorpus = vi.fn(() => Promise.resolve());
     window.__loadBibleCorpus = vi.fn(() => Promise.resolve());
     try {
@@ -78,7 +77,8 @@ describe('settings filter and lazy progress', () => {
       fireEvent.click(groupHead('Appearance'));
       expect(window.__loadVotCorpus).not.toHaveBeenCalled();
       expect(window.__loadBibleCorpus).not.toHaveBeenCalled();
-      fireEvent.click(groupHead('Mark as Read'));
+      fireEvent.click(groupHead('Appearance'));   // back to the root list
+      fireEvent.click(groupHead('Reading'));      // the progress table lives on Reading (rs2)
       expect(window.__loadVotCorpus).toHaveBeenCalledTimes(1);
       expect(window.__loadBibleCorpus).toHaveBeenCalledTimes(1);
     } finally {
@@ -218,18 +218,21 @@ describe('read-along settings disclosure', () => {
    copied words is "an option, not the default". */
 describe('Copy & Share group', () => {
   it('holds Share Includes (the app link by default) and Highlight the Passage (off by default)', () => {
-    renderSettings();
-    const labels = groupRowLabels('Copy & Share');
+    renderSettings({}, {}, { expandGroups: false });
+    // The root row says the group's current values (rs2: the glance rides the row, not the page).
+    expect(groupHead('Copy & share').textContent).toContain('Share: app link · Highlight off');
+    fireEvent.click(groupHead('Copy & share'));
+    const labels = groupRowLabels('Copy & share');
     expect(labels).toContain('Share Includes');
     expect(labels).toContain('Highlight the Passage');
     expect(within(row('Highlight the Passage')).getByRole('switch').getAttribute('aria-checked')).toBe('false');
-    expect(groupHead('Copy & Share').textContent).toContain('Share: app link · Highlight off');
   });
 
   it('writes through the keys Copy and Share read', () => {
     const onToggle = vi.fn();
-    renderSettings({ shareLink: 'site', linkHighlight: true }, { onToggle });
-    expect(groupHead('Copy & Share').textContent).toContain('Share: website link · Highlight on');
+    renderSettings({ shareLink: 'site', linkHighlight: true }, { onToggle }, { expandGroups: false });
+    expect(groupHead('Copy & share').textContent).toContain('Share: website link · Highlight on');
+    fireEvent.click(groupHead('Copy & share'));
     fireEvent.click(within(row('Highlight the Passage')).getByRole('switch'));
     expect(onToggle).toHaveBeenCalledWith('linkHighlight');
   });
@@ -238,7 +241,7 @@ describe('Copy & Share group', () => {
     renderSettings({}, {}, { expandGroups: false });
     for (const word of ['share', 'link', 'highlight']) {
       fireEvent.change(screen.getByLabelText('Find settings'), { target: { value: word } });
-      expect(groupHeads().map((h) => h.textContent), word).toEqual(expect.arrayContaining([expect.stringContaining('Copy & Share')]));
+      expect(groupHeads().map((h) => h.textContent), word).toEqual(expect.arrayContaining([expect.stringContaining('Copy & share')]));
     }
   });
 });
@@ -265,11 +268,11 @@ describe('Listening group', () => {
     expect(reading).toContain('Chapter Titles');
   });
 
-  it('sits between Reading and Auto-Scroll', () => {
+  it('sits between Reading and Search & history (rs2: Auto-Scroll moved under Reading)', () => {
     renderSettings({}, {}, { expandGroups: false });
     const labels = groupHeads().map((h) => h.querySelector('.settings-section-label').textContent.trim());
     expect(labels.indexOf('Listening')).toBe(labels.indexOf('Reading') + 1);
-    expect(labels.indexOf('Auto-Scroll')).toBe(labels.indexOf('Listening') + 1);
+    expect(labels.indexOf('Search & history')).toBe(labels.indexOf('Listening') + 1);
   });
 
   it('keeps the read-along disclosure discipline inside its new group', () => {
@@ -288,7 +291,7 @@ describe('Listening group', () => {
     window.__openSongs = vi.fn();
     try {
       renderSettings();
-      expect(groupRowLabels('Listening')).toContain('Songs kept on this phone');
+      expect(groupRowLabels('Downloads & storage')).toContain('Songs kept on this phone');   // rs2: moved from Listening
       const button = within(row('Songs kept on this phone')).getByRole('button');
       expect(button.textContent).toContain('3 · 141 MB · Manage');
       fireEvent.click(button);
@@ -538,16 +541,16 @@ describe('export/import copy names the real .votbak artifact', () => {
     return r.querySelector('.settings-row-desc').textContent;
   };
 
-  it('Export no longer promises a "single JSON file" the user will never find', () => {
+  it('Back up now no longer promises a "single JSON file" the user will never find', () => {
     renderSettings();
-    const desc = descOf('Export Your Data');
+    const desc = document.querySelector('.settings-backup-what').textContent;
     expect(desc).toContain('.votbak');
     expect(desc).not.toContain('single JSON');
   });
 
   it('Import tells the user to pick the .votbak backup', () => {
     renderSettings();
-    const desc = descOf('Import from Backup');
+    const desc = descOf('Restore from a backup');
     expect(desc).toContain('.votbak');
   });
 });
@@ -573,7 +576,7 @@ describe('v3 export manifest limit', () => {
       },
     });
     renderSettings();
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back up now' }));
 
     await vi.waitFor(() => expect(build).toHaveBeenCalledTimes(1));
     expect(openExportSink).not.toHaveBeenCalled();
@@ -602,7 +605,7 @@ describe('v3 export manifest limit', () => {
       },
     });
     renderSettings();
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back up now' }));
     await vi.waitFor(() => expect(build).toHaveBeenCalledTimes(1));
     return toast;
   };
@@ -654,6 +657,9 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
     expect(modalRegistry.peek() && modalRegistry.peek().id).toBe('settings-wipe-dialog');
     fireEvent.click(screen.getByText('Cancel'));
     expect(screen.queryByText('Delete All Personal Data')).toBeNull();
+    // rs2: what stays registered is the open page itself - Back now goes to the root list.
+    expect(modalRegistry.openIds()).toEqual(['settings-page']);
+    act(() => { modalRegistry.peek().dismiss(); });
     expect(modalRegistry.isAnyOpen()).toBe(false);
   });
 
@@ -812,7 +818,7 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
 
   it('asks via a registered sheet and applies NOTHING until Import is tapped', async () => {
     const { confirmSpy, applySpy } = setupImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByText('Restore'));
     const sheet = await findImportSheet();
     // The destructive semantics are intact — a real choice, in-app…
     expect(confirmSpy).not.toHaveBeenCalled();
@@ -825,15 +831,15 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
 
   it('dismissing the sheet (Cancel OR the Back/Escape registry path) applies nothing', async () => {
     const { applySpy } = setupImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByText('Restore'));
     await findImportSheet();
     fireEvent.click(screen.getByText('Cancel'));
     expect(screen.queryByText(/will OVERWRITE/)).toBeNull();
     expect(applySpy).not.toHaveBeenCalled();
 
     // Re-open and take the registry dismiss route this time.
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Import' }).disabled).toBe(false));
-    fireEvent.click(screen.getByText('Import'));
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Restore' }).disabled).toBe(false));
+    fireEvent.click(screen.getByText('Restore'));
     const sheet = await findImportSheet();
     act(() => { sheet.dismiss(); });
     expect(screen.queryByText(/will OVERWRITE/)).toBeNull();
@@ -842,28 +848,28 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
 
   it('locks all backup actions until the active picker and confirmation settle', async () => {
     const { pickImportFile } = setupImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByText('Restore'));
     await findImportSheet();
 
-    for (const name of ['Export', 'Import', 'Verify']) {
+    for (const name of ['Back up now', 'Restore', 'Check file']) {
       expect(screen.getByRole('button', { name }).disabled).toBe(true);
     }
     expect(screen.getByRole('button', { name: 'Clear All My Data' }).disabled).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
     expect(pickImportFile).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByText('Cancel'));
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Import' }).disabled).toBe(false));
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Restore' }).disabled).toBe(false));
   });
 
   it('keeps destructive data actions locked after import until the scheduled reload', async () => {
     const { applySpy } = setupImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByText('Restore'));
     await findImportSheet();
     fireEvent.click(screen.getByText('Import & Overwrite'));
     await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
 
-    expect(screen.getByRole('button', { name: 'Import' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Restore' }).disabled).toBe(true);
     expect(screen.getByRole('button', { name: 'Clear All My Data' }).disabled).toBe(true);
   });
 
@@ -875,7 +881,7 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
       return { importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] };
     });
     setupImport({ applyImportPayload: applySpy });
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByText('Restore'));
     await findImportSheet();
     fireEvent.click(screen.getByText('Import & Overwrite'));
 
@@ -889,7 +895,7 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
     localStorage.removeItem('vot-restore-inflight');
     const applySpy = vi.fn(async () => { throw new Error('corrupt payload'); });
     setupImport({ applyImportPayload: applySpy });
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByText('Restore'));
     await findImportSheet();
     fireEvent.click(screen.getByText('Import & Overwrite'));
 
@@ -903,7 +909,7 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
   it('does not erase another tab\'s restore marker when the import lock is busy', async () => {
     localStorage.setItem('vot-restore-inflight', 'active-tab-marker');
     setupImport({ applyImportPayload: vi.fn(async () => { throw new Error('another backup import is already in progress'); }) });
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByText('Restore'));
     await findImportSheet();
     fireEvent.click(screen.getByText('Import & Overwrite'));
 
@@ -917,7 +923,7 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
     const toastSpy = vi.fn();
     const pendingAnnotations = { ...globalThis.AnnotationStore, getState: () => 'pending' };
     const { applySpy } = setupImport({ AnnotationStore: pendingAnnotations, showToast: toastSpy });
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByText('Restore'));
     await findImportSheet();
     fireEvent.click(screen.getByText('Import & Overwrite'));
 
@@ -979,7 +985,7 @@ describe('a truncated backup is reported as cut, not as failing its checksum', (
     });
     renderSettings();
 
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByText('Restore'));
     await vi.waitFor(() => expect(textsOf(toastSpy)).toMatch(CUT));
     expect(textsOf(toastSpy)).not.toMatch(CHECKSUM);
   });
@@ -1004,7 +1010,7 @@ describe('a truncated backup is reported as cut, not as failing its checksum', (
     });
     renderSettings();
 
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByText('Restore'));
     await vi.waitFor(() => expect(textsOf(toastSpy)).toMatch(CHECKSUM));
     expect(textsOf(toastSpy)).not.toMatch(CUT);
   });
@@ -1032,7 +1038,7 @@ describe('a truncated backup is reported as cut, not as failing its checksum', (
     });
     renderSettings();
 
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByText('Restore'));
     await screen.findByText(/will OVERWRITE/);
     fireEvent.click(screen.getByText('Import & Overwrite'));
 
@@ -1086,7 +1092,7 @@ describe('Android v3 import — native stream not closed until the confirm settl
 
   it('holds v3ImportClose until AFTER apply — never while the sheet is up', async () => {
     const { closeSpy, applySpy } = setupAndroidImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByText('Restore'));
     await screen.findByText(/will OVERWRITE/);
     // THE REGRESSION: pre-fix the finally fired here, before the user chose.
     expect(closeSpy).not.toHaveBeenCalled();
@@ -1098,7 +1104,7 @@ describe('Android v3 import — native stream not closed until the confirm settl
 
   it('cancelling still closes the native stream and applies nothing', async () => {
     const { closeSpy, applySpy } = setupAndroidImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByText('Restore'));
     await screen.findByText(/will OVERWRITE/);
     expect(closeSpy).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText('Cancel'));
@@ -1113,50 +1119,96 @@ describe('Android v3 import — native stream not closed until the confirm settl
    a closed group's body is UNMOUNTED, not hidden — out of tab order and
    screen-reader order, same discipline as the auto-scroll disclosure.
    ─────────────────────────────────────────────────────────────────────── */
-describe('settings groups — collapsible accordion', () => {
-  const GROUPS = ['Appearance', 'Reading', 'Listening', 'Auto-Scroll', 'Top-Nav Buttons',
-    'Search, Tabs & History', 'Copy & Share', 'A Return to The Garden', 'Your Data', 'Mark as Read', 'Help'];
+/* rs2 (the overhaul canvas): the Settings root is a list of eight rows; a row opens its group as a
+   page; Back steps page -> root -> leave (the shell's rule: overlay, then stack). */
+describe('settings root list and pages (rs2)', () => {
+  const GROUPS = ['Appearance', 'Reading', 'Listening', 'Search & history', 'Copy & share',
+    'Downloads & storage', 'Your data', 'Help & about'];
+  beforeEach(() => modalRegistry._reset());
+  const title = () => document.querySelector('.settings-title').textContent;
+  const back = () => fireEvent.click(screen.getByRole('button', { name: 'Back' }));
 
-  it('renders all 11 group headers, every one collapsed on entry', () => {
+  it('renders the eight rows in the canvas order, every one closed, with no setting mounted', () => {
     renderSettings({}, {}, { expandGroups: false });
-    expect(groupHeads().length).toBe(GROUPS.length);
-    for (const label of GROUPS) {
-      const head = groupHead(label);
-      expect(head).toBeTruthy();
-      expect(head.getAttribute('aria-expanded')).toBe('false');
-    }
-    // Collapsed means UNMOUNTED — zero setting rows exist yet.
+    expect(groupHeads().map((h) => h.querySelector('.settings-section-label').textContent.trim())).toEqual(GROUPS);
+    for (const h of groupHeads()) expect(h.getAttribute('aria-expanded')).toBe('false');
     expect(rowLabels().length).toBe(0);
     expect(document.querySelectorAll('.settings-card').length).toBe(0);
+    expect(title()).toBe('Settings');
+    expect(modalRegistry.isAnyOpen()).toBe(false);
   });
 
-  it('opening a group mounts its rows; closing unmounts them again', () => {
+  it('a row opens its group as a page: its title, its rows, and no other group', () => {
     renderSettings({}, {}, { expandGroups: false });
     fireEvent.click(groupHead('Appearance'));
-    expect(groupHead('Appearance').getAttribute('aria-expanded')).toBe('true');
-    expect(row('Light Theme')).toBeTruthy();
-    expect(row('Reading Position Marker')).toBeUndefined(); // other groups stay closed
-    fireEvent.click(groupHead('Appearance'));
-    expect(row('Light Theme')).toBeUndefined();
+    expect(title()).toBe('Appearance');
+    expect(groupHeads()).toHaveLength(1);
+    expect(screen.getByRole('radiogroup', { name: 'Theme' })).toBeTruthy();
+    expect(row('Text Size')).toBeTruthy();
+    expect(row('Reading Position Marker')).toBeUndefined();   // other groups stay unmounted
+    expect(screen.queryByLabelText('Find settings')).toBeNull();
   });
 
-  it('groups open independently', () => {
-    renderSettings({}, {}, { expandGroups: false });
+  it('Back closes the page first (header arrow and the registry path), and only the root leaves', () => {
+    const onBack = vi.fn();
+    renderSettings({}, { onBack }, { expandGroups: false });
     fireEvent.click(groupHead('Reading'));
-    fireEvent.click(groupHead('Your Data'));
-    expect(row('Chapter Titles')).toBeTruthy();
-    expect(row('Export Your Data')).toBeTruthy();
-    expect(row('Light Theme')).toBeUndefined();
+    expect(modalRegistry.peek().id).toBe('settings-page');
+    back();
+    expect(title()).toBe('Settings');
+    expect(groupHeads()).toHaveLength(8);
+    expect(onBack).not.toHaveBeenCalled();
+    fireEvent.click(groupHead('Your data'));
+    act(() => { modalRegistry.peek().dismiss(); });   // hardware Back / Escape
+    expect(groupHeads()).toHaveLength(8);
+    expect(modalRegistry.isAnyOpen()).toBe(false);
+    back();
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  it('Auto-Scroll lives in its own group and keeps its nested disclosure', () => {
+  it('Help & about opens About, Credits & licenses and Privacy; Back returns to Help & about', () => {
+    renderSettings({}, {}, { expandGroups: false });
+    fireEvent.click(groupHead('Help & about'));
+    fireEvent.click(screen.getByRole('button', { name: /^Privacy/ }));
+    expect(title()).toBe('Privacy');
+    expect(screen.getByText('VOTReader has no accounts and no sign-in.')).toBeTruthy();
+    expect(screen.getByText(/Cloudflare Web Analytics/)).toBeTruthy();
+    back();
+    expect(title()).toBe('Help & about');
+    fireEvent.click(screen.getByRole('button', { name: 'Credits & licenses' }));
+    expect(title()).toBe('Credits & licenses');
+    expect(screen.getByText('OpenBible.info')).toBeTruthy();   // the CC-BY credit
+    expect(screen.getByText('New King James Version. © 1982 Thomas Nelson.')).toBeTruthy();
+    back();
+    fireEvent.click(screen.getByRole('button', { name: 'About VOTReader' }));
+    expect(screen.getByText(/given through His servant Timothy/)).toBeTruthy();
+    back();
+    back();
+    expect(title()).toBe('Settings');
+  });
+
+  it('Auto-Scroll lives under Reading and keeps its nested disclosure', () => {
     renderSettings({ autoScroll: true, autoScrollNext: true }, {}, { expandGroups: false });
-    fireEvent.click(groupHead('Auto-Scroll'));
+    fireEvent.click(groupHead('Reading'));
     expect(row('Auto-Scroll')).toBeTruthy();
     expect(row('Scroll Speed')).toBeTruthy();
     expect(row('Auto-Continue Pause')).toBeTruthy();
   });
+
+  it('Theme is two tiles; the chosen one is checked and the other switches the theme', () => {
+    const onThemeChange = vi.fn();
+    renderSettings({}, { onThemeChange });
+    const dark = screen.getByRole('radio', { name: 'Dark' });
+    const light = screen.getByRole('radio', { name: 'Light' });
+    expect(dark.getAttribute('aria-checked')).toBe('true');
+    expect(light.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(dark);
+    expect(onThemeChange).not.toHaveBeenCalled();
+    fireEvent.click(light);
+    expect(onThemeChange).toHaveBeenCalledWith('light');
+  });
 });
+
 
 describe('settings folio summary', () => {
   it('surfaces the active theme, text scale, and reading typeface', () => {
@@ -1210,28 +1262,16 @@ describe('dependency-gated rows unmount with their dependency', () => {
     expect(row('Restored Names')).toBeTruthy();
   });
 
-  it('the History nav chip vanishes while History itself is off (the old icon row)', () => {
-    renderSettings({ historyEnabled: false, compactTopBar: false });
-    // Only the feature row remains under the "History" name…
-    expect(screen.getAllByRole('switch', { name: 'History' }).length).toBe(1);
-    cleanup();
-    renderSettings({ compactTopBar: false });
-    // …with History on, the Top-Nav chip joins it.
-    expect(screen.getAllByRole('switch', { name: 'History' }).length).toBe(2);
+  it('the old Top-Nav chips are gone (rs2: no screen read them); Compact Top Bar stays, in Appearance', () => {
+    for (const compactTopBar of [true, false]) {
+      renderSettings({ compactTopBar });
+      expect(groupRowLabels('Appearance')).toContain('Compact Top Bar');
+      expect(screen.getAllByRole('switch', { name: 'History' }).length).toBe(1);   // the feature row only
+      for (const chip of ['Settings Gear', 'Theme', 'Bookmark']) expect(screen.queryByRole('switch', { name: chip })).toBeNull();
+      cleanup();
+    }
   });
 
-  it('the compact top bar (the default) unmounts the chips of the icons it moves into ⋯', () => {
-    renderSettings({});
-    expect(screen.getByRole('switch', { name: 'Compact Top Bar' })).toBeTruthy();
-    expect(screen.getAllByRole('switch', { name: 'History' }).length).toBe(1);   // the feature row only
-    expect(screen.queryByRole('switch', { name: 'Settings Gear' })).toBeNull();
-    expect(screen.queryByRole('switch', { name: 'Theme' })).toBeNull();
-    expect(screen.getByRole('switch', { name: 'Bookmark' })).toBeTruthy();
-    cleanup();
-    renderSettings({ compactTopBar: false });
-    expect(screen.getByRole('switch', { name: 'Settings Gear' })).toBeTruthy();
-    expect(screen.getByRole('switch', { name: 'Theme' })).toBeTruthy();
-  });
 });
 
 describe('fullscreen gesture setting', () => {
@@ -1340,7 +1380,7 @@ describe('export escape — the save picker that never settles', () => {
       },
     });
     renderSettings();
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back up now' }));
     return { build, captured };
   };
 
@@ -1365,7 +1405,7 @@ describe('export escape — the save picker that never settles', () => {
       },
     });
     renderSettings();
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back up now' }));
 
     const el = await vi.waitFor(() => {
       const found = document.getElementById('vot-toast-export-escape');

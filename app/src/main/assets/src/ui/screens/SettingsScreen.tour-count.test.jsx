@@ -14,7 +14,7 @@ import * as steps from '../../utils/tour-steps.js';
 const { TOUR_STOPS_WORD } = steps;
 const TOUR_MINUTES_WORD = steps.TOUR_MINUTES_WORD;   // read off the module so this file loads on the base tree
 
-const note = () => /** @type {HTMLElement} */ (document.querySelector('.settings-help-note')).textContent;
+const note = () => /** @type {HTMLElement} */ (document.querySelector('.settings-help-btn .settings-nav-sub')).textContent;
 
 beforeEach(() => { setupSettingsGlobals(); });
 afterEach(() => { cleanup(); delete /** @type {any} */ (globalThis).TourController; teardownSettingsGlobals(); });

@@ -19,6 +19,8 @@
  *   fontLabel?: string,            // the reading font's name
  *   readerLabel?: string | null,   // the letter voice ("Benjamin"), null for the default
  *   gardenLabel?: string | null,   // the Garden image tier's name
+ *   appData?: string | null,       // everything the app stores on the device, formatted ("412 MB"); null while unknown
+ *   lastBackup?: string | null,    // when this device last exported ("Exported 3 days ago")
  * }} o
  * @returns {Record<string, string>}
  */
@@ -56,7 +58,9 @@ export function settingsGlance(o) {
         : feats.map(([n, on]) => n + ' ' + onOff(on)).join(' · ').replace(/^search/, 'Search'),
     garden: (o && o.gardenLabel) || 'Image quality',
     progress: s.markAsRead ? 'Marking chapters as read' : 'Off',
-    data: 'Back up, restore & storage',
-    help: 'Show me around & About',
+    // rs2: the two groups the redesign split out of Your Data, and Help & about.
+    storage: [(o && o.appData) ? o.appData + ' on this device' : 'Songs, Garden pictures and space used', (o && o.gardenLabel) || null].filter(Boolean).join(' · '),
+    data: (o && o.lastBackup) || 'Back up, restore & storage',
+    help: 'Tour, credits, privacy and version',
   };
 }
