@@ -112,7 +112,7 @@ describe('run(): the boot pass', () => {
     await IDBAdapter.put('vot-notes', 'v', {});
     await IDBAdapter.put('vot-state', 'v', {});
     localStorage.setItem(HEALTH_SKIP_KEY, '1');
-    expect(await DataSafety.run({ sink })).not.toBe('damaged');
+    expect(await DataSafety.run({ sink })).toBe('snapshotted');      // the reader's new library, snapshotted now
     expect(localStorage.getItem(HEALTH_SKIP_KEY)).toBeNull();
     expect(StorageHealth.getReport().dataMissing).toBeNull();
   });
