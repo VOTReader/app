@@ -22,7 +22,9 @@ const git = (args, opts = {}) => execFileSync('git', args, { cwd: root, encoding
 /** A commit whose parent is HEAD and whose tree is HEAD's plus `files` ({path: content}). Never checked out. */
 function commitWith(files) {
   const idx = join(mkdtempSync(join(tmpdir(), 'vot-prepush-')), 'index');
-  const env = { ...process.env, GIT_INDEX_FILE: idx };
+  // CI's runners have no git identity, and commit-tree refuses without one
+  const who = { GIT_AUTHOR_NAME: 'pre-push test', GIT_AUTHOR_EMAIL: 'test@invalid', GIT_COMMITTER_NAME: 'pre-push test', GIT_COMMITTER_EMAIL: 'test@invalid' };
+  const env = { ...process.env, ...who, GIT_INDEX_FILE: idx };
   git(['read-tree', 'HEAD'], { env });
   for (const [path, content] of Object.entries(files)) {
     const blob = git(['hash-object', '-w', '--stdin'], { env, input: content });
