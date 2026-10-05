@@ -121,7 +121,7 @@ export function buildDocs(options) {
   }
 
   /** Emit ONE folded doc per letter (name in title + body in text). */
-  function pushLetterCollection(letters, volumeId, volumeLabel) {
+  function pushLetterCollection(letters, volumeId, volumeLabel, preface) {
     if (!Array.isArray(letters)) return;
     for (let i = 0; i < letters.length; i++) {
       const L = letters[i];
@@ -142,9 +142,9 @@ export function buildDocs(options) {
         title: L.title || '', // indexed — the letter NAME
         heading: volumeLabel || '',
         text: letterText(L), // indexed — the body
-        // A collection's opening letter is num 0, which LetterView calls "Preface";
-        // the index printed it "Letter ?" (five prefaces, V1/V7/Timothy/Flock/Rebuke).
-        ref: volumeLabel + ' · ' + (L.num === 0 ? 'Preface' : 'Letter ' + (L.num || '?')),
+        // A collection's opening letter (its prefaceVar, which carries no num) LetterView
+        // calls "Preface"; the index printed it "Letter ?" (five: V1/V7/Timothy/Flock/Rebuke).
+        ref: volumeLabel + ' · ' + (L === preface || L.num === 0 ? 'Preface' : 'Letter ' + (L.num || '?')),
       });
     }
   }
@@ -281,7 +281,7 @@ export function buildDocs(options) {
     const V = D.VOLUME_COLLECTIONS[vc];
     if (V.id === 'wtlb1' || V.id === 'wtlb2' || V.id === 'blessed' || V.id === 'holydays') continue;
     const arr = collectLetters(V.prefaceVar, V.dataVar);
-    if (arr) pushLetterCollection(arr, V.id, V.label);
+    if (arr) pushLetterCollection(arr, V.id, V.label, V.prefaceVar ? window[V.prefaceVar] : null);
   }
 
   // ─── Paragraph entry collections — VOLUMES ───

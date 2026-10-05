@@ -38,7 +38,8 @@ const GLOBALS = {
       { n: 3, text: 'Blessed are the poor in spirit, restored reading.' },
     ] }],
   },
-  LETTERS_V1_PREFACE: { id: 'v1-preface', num: 0, title: 'A Word of Warning', blocks: [{ segments: [{ v: 'Hear the word of warning.' }] }] },
+  // as the corpus has them: a preface carries no num (2026-10-05: five showed "Letter ?")
+  LETTERS_V1_PREFACE: { id: 'v1-preface', title: 'A Word of Warning', blocks: [{ segments: [{ v: 'Hear the word of warning.' }] }] },
   LETTERS_V1: [{ id: 'the-wide-path', num: 1, title: 'The Wide Path', blocks: [{ segments: [{ v: 'Broad is the way that leads to destruction.' }] }, { type: 'closing', text: 'Says The Lord, The One who sees.' }] }],
   WTLB_ONE: [{ id: 'wtlb-1', num: 1, title: 'Matters of the Heart', paragraphs: [{ text: 'The wailing of the penitent {{ref:Matthew 4:4}} brings forth healing.' }] }],
   THE_BLESSED: [{ id: 'blessed-1', num: 1, title: 'The Blessed One', paragraphs: [{ text: 'Blessed are they that mourn.' }] }],
@@ -137,7 +138,7 @@ describe('buildDocs (narrow index scope)', () => {
     expect(wide.text).toBe('Broad is the way that leads to destruction. Says The Lord, The One who sees.');
   });
 
-  it('a preface (num 0) is located as "Preface", the way LetterView names it, never "Letter ?"', () => {
+  it('a preface (no num, or num 0) is located as "Preface", the way LetterView names it, never "Letter ?"', () => {
     const letters = docs.filter((d) => d.kind === 'letter' && d.volumeId === 'v1');
     expect(letters.find((d) => d.letterId === 'v1-preface').ref).toBe('Volume One · Preface');
     expect(letters.find((d) => d.letterId === 'the-wide-path').ref).toBe('Volume One · Letter 1');

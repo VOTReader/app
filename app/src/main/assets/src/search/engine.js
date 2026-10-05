@@ -1131,6 +1131,24 @@ async function search(query, options) {
   originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) =>
     (!corpusFilter || d.corpus === corpusFilter) && (!scopeBookId || d.bookId === scopeBookId) && (!scopeVolumeId || d.volumeId === scopeVolumeId),
     named, (id, d) => nearOf[id] ?? (typedTokens.length > 1 ? nearPhrase(docTokens(id, d), typedTokens, STOP) : 0));
+  /* MATTHEW ONCE (search plan S1, 2026-10-05). Matthew is in the corpus twice, the Study Bible's
+     restored text under The Volumes and the plain chapter under Scriptures, so "judge not" showed
+     Matthew 7:1 twice, one under the other. Across both collections a verse shows once, as whichever
+     of the two the query found first; a search kept to one collection still finds its own. */
+  if (!corpusFilter) {
+    const seenVerse = new Set();
+    let w = 0;
+    for (let r = 0; r < out.length; r++) {
+      const d = out[r].doc;
+      if (d.kind === 'verse' && (d.bookId === 'matthew' || d.bookId === 'matthew-plain')) {
+        const k = d.chapterNum + ':' + d.verseNum;
+        if (seenVerse.has(k)) continue;
+        seenVerse.add(k);
+      }
+      out[w++] = out[r];
+    }
+    out.length = w;
+  }
 
   /* A QUOTED PHRASE NOTHING HOLDS IS SEARCHED AS ITS WORDS (search audit 2026-09-27).
      A quote remembered one word off ("the earth shall grow old like a garment", where

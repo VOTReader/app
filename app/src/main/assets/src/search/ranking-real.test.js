@@ -20,8 +20,12 @@ const VOT_DATA = {
 const FILLER = Array.from({ length: 40 }, (_, i) => ({ n: 7 + i, text: 'And the people went up to the city, and they sat down there. ' + i }));
 const WATCHMAN = 'Hear Me, O My people. To this day you persecute My prophets and stone My servants, says The Lord. Repent, and turn from your ways, for the hour is late and the harvest is near.';
 const topic = (words, n) => Array.from({ length: n }, (_, i) => words[i % words.length] + ' is spoken of here, and more besides.').join(' ');
+const JUDGE = 'Judge not, that you be not judged.';
 const GLOBALS = {
+  // Matthew twice, as the corpus has it: the Study Bible (The Volumes) and the plain chapter (Scriptures)
+  MATTHEW: { chapters: [{ num: 7, title: 'Matthew 7', verses: [{ n: 1, text: '“' + JUDGE }] }] },
   BOOKS: {
+    'matthew-plain': { id: 'matthew-plain', title: 'Matthew', chapters: [{ num: 7, sections: [{ heading: '', verses: [{ n: 1, text: JUDGE }] }] }] },
     john: { id: 'john', title: 'John', chapters: [{ num: 14, sections: [{ heading: '', verses: [{ n: 6, text: 'Jesus said to him, I am the way, the truth, and the life. No one comes to the Father except through Me.' }].concat(FILLER) }] }] },
   },
   LETTERS_V1: [
@@ -106,6 +110,13 @@ describe('ranking on the audit\u2019s cases', () => {
     const r = refs(await VotSearchMini.search('when the silver cord snaps and the gold bowl breaks at the fountain'));
     expect(r[0]).toBe('Volume One · Letter 9 · The Silver Cord');
     expect(r).toContain('Answers Only God Can Give · Regarding Silver');
+  });
+
+  it('a Matthew verse shows once across both collections, and in either one kept to itself', async () => {
+    const all = (await VotSearchMini.search('judge not that you be not judged')).results.filter((x) => x.doc.kind === 'verse' && x.doc.chapterNum === 7);
+    expect(all.length).toBe(1);
+    const scr = (await VotSearchMini.search('judge not that you be not judged', { corpus: 'scriptures' })).results;
+    expect(scr.some((x) => x.doc.bookId === 'matthew-plain')).toBe(true);
   });
 
   it('a word or two is a keyword search: the topic titled with them comes first', async () => {
