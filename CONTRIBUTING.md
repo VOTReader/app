@@ -38,6 +38,7 @@ git -C D:/VOTReader-studio worktree add .claude/worktrees/<name> -b <branch> ori
 
 ```sh
 git config core.hooksPath || git config core.hooksPath .githooks   # the pre-commit gate: shows it, or turns it on
+sh tools/install-merge-drivers.sh   # once per clone: dist/, service-worker.js and index.html stop conflicting on generated lines
 npm ci                        # Node 22+ (.nvmrc pins 24), exact lockfile, as CI does
 npm run build
 python tools/preview-server.py 8090 app/src/main/assets    # then open http://127.0.0.1:8090/

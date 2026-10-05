@@ -25,6 +25,14 @@
 
 import * as React from 'react';
 import { afterEach } from 'vitest';
+
+// A git hook exports GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE to everything it runs, this suite included, and any
+// child `git` inherits them: a test's `git init` / `git config` in a temp dir then writes to the REAL repository
+// (2026-10-05 04:07: core.bare=true and a stray [user] in D:/VOTReader-studio/.git/config broke every worktree).
+// No test may see them; tools/git-env.test.js proves it. A test that needs a repo makes its own with git -C <temp>.
+for (const k of Object.keys(process.env)) {
+  if (k.startsWith('GIT_')) delete process.env[k];
+}
 import { cleanup } from '@testing-library/react';
 import { modalRegistry, useModalRegistry } from './app/src/main/assets/src/hooks/use-modal-registry.js';
 import { useFocusTrap } from './app/src/main/assets/src/hooks/use-focus-trap.js';
