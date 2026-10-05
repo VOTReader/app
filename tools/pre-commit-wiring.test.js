@@ -153,7 +153,7 @@ describe('pre-commit: the S22 measurement is checked at commit time (v12-05)', (
 describe('pre-commit: the bundles are rebuilt before the tests read them (v12-03)', () => {
   it('runs `npm run build` exactly once, before vitest', () => {
     const builds = lines.map((l, i) => (/^\s*npm run build\s*$/.test(l) ? i : -1)).filter((i) => i >= 0);
-    const vitest = lines.findIndex((l) => /^\s*npm run test:hook\s*$/.test(l));
+    const vitest = lines.findIndex((l) => /^\s*heavy_run vitest npm run test:hook\s*$/.test(l));
     expect(builds.length, 'one build per commit').toBe(1);
     expect(vitest).toBeGreaterThan(-1);
     expect(builds[0], 'the build must come before the tests that read dist/').toBeLessThan(vitest);
@@ -174,13 +174,25 @@ describe('pre-commit: one heavy gate run machine-wide (Step 0a, crash brief 2026
   };
   const gateEnv = (lock) => ({ GATE_SKIP: '', GATE_HELD_BY: '', GATE_LOCK: lock });
 
-  it.skipIf(!existsSync(GATE_SH))('takes the gate lock for its run and gives it back at exit', () => {
+  // ln1 item 7 (2026-10-05): only vitest and gradle hold the lock (heavy_run, in a subshell that releases it when the
+  // step ends). Holding it for the whole hook queued every lane's lint, tsc and build behind one another.
+  it.skipIf(!existsSync(GATE_SH))('a commit with no heavy step never takes the lock', () => {
     const lock = deadLock();
     const onDisk = readFileSync(resolve(root, '.gitignore'), 'utf8');
     const { out } = runHookWithBlob('.gitignore', onDisk + '\n# gate wiring\n', { env: gateEnv(lock) });
-    expect(out).toContain('[gate] clearing a stale');
-    expect(existsSync(lock), 'released when the hook exits').toBe(false);
+    expect(out).not.toContain('[gate]');
+    expect(existsSync(lock), 'the lock is left as it was').toBe(true);
   }, 120_000);
+
+  it('vitest and gradle run through heavy_run, and nothing else takes the lock', () => {
+    const hook = readFileSync(resolve(root, '.githooks/pre-commit'), 'utf8');
+    expect(hook).toMatch(/^\s*heavy_run vitest npm run test:hook$/m);
+    expect(hook).toMatch(/^\s*heavy_run vitest-tools npx vitest run tools\/$/m);
+    expect(hook).toMatch(/^\s*heavy_run gradle \$GRADLE_CMD :app:testDebugUnitTest/m);
+    const takes = hook.split('\n').filter((l) => /gate_take/.test(l) && !l.trim().startsWith('#'));
+    expect(takes).toHaveLength(1);
+    expect(takes[0]).toMatch(/\( \. D:\/Swarm\/tools\/gate\.sh && gate_take "pre-commit \$heavy_what" && "\$@" \)/);
+  });
 
   it.skipIf(!existsSync(GATE_SH))('leaves the lock alone for a commit of docs only', () => {
     const lock = deadLock();
