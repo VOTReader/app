@@ -14,10 +14,14 @@
 
    Parity with BoundedLogTree (deliberate, so the two merge cleanly):
      - Capacity: 200 entries, FIFO eviction (oldest dropped on overflow).
-     - In-memory ONLY — never persisted, never sent over the network,
-       cleared on page refresh. Matches BoundedLogTree's "in-process only,
-       cleared on app kill" and the project's "local data only / no
-       security risks" policy (CLAUDE.md User policies).
+     - In-memory, never sent over the network, cleared on page refresh -
+       EXCEPT the storage-health tags (PERSIST_TAGS: hydration, store,
+       state-guard, data-health). A slow start that degrades a store and
+       then recovers left its only trace in a buffer the next reload
+       emptied, so nobody could ever read it (datasafe 2026-10-05). Those
+       warnings also go to a PERSIST_CAP-entry ring in localStorage
+       (PERSIST_KEY, on this device only) and are read back into the
+       buffer at the next boot, so a later Export JSON carries them.
      - Sanitization: the SAME redactions BoundedLogTree applies —
        content:// / file:// URIs → "[uri]", absolute Android paths →
        "[path]", and HTTP(S) query/fragment data → "[redacted]". Keeps
@@ -110,10 +114,38 @@ function sanitize(s) {
     .replace(WEB_URL, redactWebUrl);
 }
 
+/* ─── The persisted storage-health ring (datasafe 2026-10-05) ─────────── */
+
+/** localStorage key of the ring (in cached-store's LS_SKIP_LIST). */
+export const PERSIST_KEY = 'vot-diag-ring';
+/** Entries kept across reloads. */
+const PERSIST_CAP = 50;
+/** Tags whose warnings outlive the page: the storage-health channels. */
+const PERSIST_TAGS = new Set(['hydration', 'store', 'state-guard', 'data-health']);
+
+/** @returns {DiagEntry[]} the ring, oldest first; [] when absent or unreadable. */
+function _readRing() {
+  try {
+    const raw = localStorage.getItem(PERSIST_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((e) => e && typeof e.t === 'number' && typeof e.msg === 'string') : [];
+  } catch (_e) { return []; }
+}
+
+/** @param {DiagEntry} entry */
+function _appendRing(entry) {
+  try {
+    const ring = _readRing();
+    ring.push(entry);
+    localStorage.setItem(PERSIST_KEY, JSON.stringify(ring.slice(-PERSIST_CAP)));
+  } catch (_e) { /* quota or no storage: the in-memory entry still stands */ }
+}
+
 /* ─── Module state ──────────────────────────────────────────────────── */
 
-/** @type {DiagEntry[]} */
-let _buffer = [];
+/** Seeded with the ring, so earlier sessions' storage warnings show in an export.
+ *  @type {DiagEntry[]} */
+let _buffer = _readRing();
 
 /**
  * Append one entry, evicting the oldest when over capacity. Both tag and
@@ -123,8 +155,10 @@ let _buffer = [];
  * @param {string} msg
  */
 function _push(lvl, tag, msg) {
-  _buffer.push({ t: Date.now(), lvl, tag: sanitize(String(tag)), msg: sanitize(String(msg)) });
+  const entry = { t: Date.now(), lvl, tag: sanitize(String(tag)), msg: sanitize(String(msg)) };
+  _buffer.push(entry);
   if (_buffer.length > CAPACITY) _buffer.shift();
+  if (lvl !== 'I' && PERSIST_TAGS.has(entry.tag)) _appendRing(entry);
 }
 
 /* ─── Public functions ──────────────────────────────────────────────── */
@@ -179,8 +213,14 @@ function _toJSON() {
   return JSON.stringify(_buffer);
 }
 
-/** Drop all stored entries. Also the test-reset hook (the only mutable state). */
-function _clear() { _buffer = []; }
+/** Drop all stored entries, the persisted ring too. Also the test-reset hook. */
+function _clear() {
+  _buffer = [];
+  try { localStorage.removeItem(PERSIST_KEY); } catch (_e) { /* no storage: nothing persisted */ }
+}
+
+/** The persisted storage-health ring alone (oldest first), for the data-health check. */
+function _persisted() { return _readRing(); }
 
 /* ─── Export ─────────────────────────────────────────────────────────── */
 
@@ -191,6 +231,7 @@ export const DiagnosticLog = {
   entries: _entries,
   toJSON: _toJSON,
   clear: _clear,
+  persisted: _persisted,
   CAPACITY,
   // Exposed for direct unit testing of the redaction (mirrors
   // BoundedLogTree.sanitize being `internal` for its same-module tests).

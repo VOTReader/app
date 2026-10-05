@@ -66,6 +66,10 @@ let setSpy;
 beforeEach(() => {
   vi.useFakeTimers();
   setSpy = vi.spyOn(StateStore, 'set').mockImplementation(() => {});
+  // Every case here is App over a store that has loaded (what HydrationGate
+  // guarantees on a normal boot). A mount over an unloaded store writes nothing
+  // (header item 9): storage-dataloss-1005.test.jsx covers that.
+  vi.spyOn(StateStore, 'getState').mockReturnValue('loaded');
 });
 
 afterEach(() => {

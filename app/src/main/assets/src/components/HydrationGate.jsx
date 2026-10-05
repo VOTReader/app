@@ -23,13 +23,28 @@
    root render. Bundled into bundle-b via _entry-b.js so the
    index.html lexical-mirror script can expose it to the createRoot
    call.
+
+   THE LATE-LOAD REMOUNT (datasafe 2026-10-05): a store slower than its
+   hydration timeout (3 s) settles 'degraded', and App renders on defaults
+   for it - useSavedState and every other read-once-at-mount site read
+   those defaults and never look again. When such a store later loads its
+   real data, the gate remounts App (a new key on the wrapper) so every one
+   of them reads the real data. Recoveries landing together are coalesced
+   into one remount (REMOUNT_COALESCE_MS). usePersistedState writes nothing
+   from a mount that began before vot-state loaded, so the remount loses no
+   saved data; what changes on screen is that the reader's own place and
+   settings come back.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { hydrateAllStores, clearLegacyLs } from '../stores/cached-store.js';
+import { hydrateAllStores, clearLegacyLs, storesNotLoaded } from '../stores/cached-store.js';
 import { JournalStore } from '../stores/journal-store.js';
 import { StorageHealth } from '../utils/storage-health.js';
+import { DiagnosticLog } from '../utils/diagnostic-log.js';
 
 const { useState, useEffect } = React;
+
+/** Stores that load within this window of each other cause one remount. */
+export const REMOUNT_COALESCE_MS = 250;
 
 /**
  * Wrap the app root. Awaits hydrateAllStores() exactly once at mount;
@@ -39,6 +54,11 @@ const { useState, useEffect } = React;
  */
 export function HydrationGate({ children }) {
   const [hydrated, setHydrated] = useState(false);
+  const [mountKey, setMountKey] = useState(0);
+  // The stores not loaded when the gate opened: what App's first mount read
+  // defaults for. Taken at the open, not in the effect below - a store may
+  // load between App's first render and that effect.
+  const lateRef = React.useRef(/** @type {any[]} */ ([]));
 
   useEffect(() => {
     let alive = true;
@@ -72,11 +92,40 @@ export function HydrationGate({ children }) {
           performance.mark('vot-hydration-end');
           performance.measure('vot-hydration', 'vot-hydration-start', 'vot-hydration-end');
         } catch (_e) { /* perf unsupported */ }
+        lateRef.current = storesNotLoaded();
         setHydrated(true);
         if (typeof StorageHealth !== 'undefined') StorageHealth.start();
       });
     return () => { alive = false; };
   }, []);
+
+  // The late-load remount (header). Armed once, when the gate opens.
+  useEffect(() => {
+    if (!hydrated) return undefined;
+    let waiting = lateRef.current;
+    if (waiting.length === 0) return undefined;
+    /** @type {any} */ let timer = null;
+    let loadedCount = 0;
+    const onChange = () => {
+      const still = waiting.filter((s) => s.getState() !== 'loaded');
+      if (still.length === waiting.length) return;
+      loadedCount += waiting.length - still.length;
+      waiting = still;
+      if (timer != null) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('hydration', 'remounted App: ' + loadedCount + ' store(s) loaded after the gate opened');
+        loadedCount = 0;
+        setMountKey((k) => k + 1);
+      }, REMOUNT_COALESCE_MS);
+    };
+    const unsubs = waiting.map((s) => s.subscribe(onChange));
+    onChange();   // one may have loaded before this effect ran
+    return () => {
+      unsubs.forEach((u) => u());
+      if (timer != null) clearTimeout(timer);
+    };
+  }, [hydrated]);
 
   if (!hydrated) {
     return (
@@ -86,5 +135,5 @@ export function HydrationGate({ children }) {
     );
   }
 
-  return children;
+  return <React.Fragment key={mountKey}>{children}</React.Fragment>;
 }

@@ -204,10 +204,18 @@ export function useReadingPositionNav({
   // already resolved by the time this hook runs).
   // Lazy: holds the reader until the first render swaps in the data it returns.
   const prophecyCardStatesRef = React.useRef(/** @type {any} */ (() => ProphecyCardsStore.getAll()));
+  // datasafe 2026-10-05: a map read before the store loaded is defaults, and
+  // setAll is a whole-map replacement - saving it would erase every card state
+  // the reader has. Such a mount saves nothing; HydrationGate remounts App
+  // when the store loads, and that mount reads the real map.
+  const prophecyReadUnloadedRef = React.useRef(false);
   if (typeof prophecyCardStatesRef.current === 'function') {
+    const store = /** @type {any} */ (ProphecyCardsStore);
+    prophecyReadUnloadedRef.current = typeof store.getState === 'function' && store.getState() !== 'loaded';
     prophecyCardStatesRef.current = prophecyCardStatesRef.current();
   }
   const saveProphecyCardStates = React.useCallback(() => {
+    if (prophecyReadUnloadedRef.current) return;
     ProphecyCardsStore.setAll(prophecyCardStatesRef.current);
   }, []);
 

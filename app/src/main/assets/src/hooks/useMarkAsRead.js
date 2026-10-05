@@ -122,6 +122,7 @@ export function useMarkAsRead(enabled, onMarkRead, trackKey) {
 import { useRefMirror } from './use-ref-mirror.js';
 import { COL_BY_KEY } from '../data/scripture-resolution.js';
 import { ReadingStreakStore } from '../stores/reading-streak-store.js';
+import { allowProgressClear } from '../stores/store-merge.js';
 
 /**
  * App-level read-progress state. Owns readItems (the per-collection
@@ -269,7 +270,10 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
     }
   };
 
+  // Both clears arm StateStore's progress-wipe guard first (store-merge.js):
+  // they are the only writes allowed to take a real ledger to nothing.
   const clearAllProgress = () => {
+    allowProgressClear();
     setReadItems({});
     clearFrontiers(`${VERSION_ID}:`);
   };
@@ -277,6 +281,7 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
   // Folded in from the inline `onClearBook` arrow at the consumer site so
   // VERSION_ID stays internal to the hook.
   const clearReadForBook = (bid) => {
+    allowProgressClear();
     setReadItems((prev) => {
       const next = { ...prev };
       Object.keys(next).forEach((k) => { if (k.startsWith(`${VERSION_ID}:${bid}:`)) delete next[k]; });

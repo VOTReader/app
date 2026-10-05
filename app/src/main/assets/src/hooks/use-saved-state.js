@@ -99,7 +99,7 @@ export function _validateTabState(s) {
 
 import { StateStore } from '../stores/state-store.js';
 import { mergeStateStore } from '../stores/store-merge.js';
-import { takeResumeRecord } from './use-persisted-state.js';
+import { takeResumeRecord, stateStoreUnloaded } from './use-persisted-state.js';
 
 /**
  * Read + validate vot-state exactly once on mount. Source-of-truth
@@ -139,7 +139,9 @@ export function useSavedState() {
     try {
       // The leave record, when this boot is the far side of a reload; the
       // store otherwise. Read-and-clear is one call.
-      const resumed = takeResumeRecord();
+      // usePersistedState item 9: an unloaded mount writes nothing and is
+      // remounted once the store loads, so it leaves the record for that mount.
+      const resumed = takeResumeRecord({ keep: stateStoreUnloaded() });
       const stored = StateStore.get();
       // n4-05: the record's base (the union this tab last saw land) makes it a
       // 3-way merge: a read mark another tab cleared stays cleared.

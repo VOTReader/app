@@ -1206,6 +1206,17 @@ export function hasAnyPendingStores() {
 }
 
 /**
+ * The registered IDB stores that have not loaded their real data yet
+ * ('pending' or 'degraded'). HydrationGate watches these after it lets App in
+ * on a slow start, and remounts App when they load (datasafe 2026-10-05).
+ *
+ * @returns {any[]}
+ */
+export function storesNotLoaded() {
+  return Array.from(_idbStoreRegistry).filter(function (s) { return s._state !== 'loaded'; });
+}
+
+/**
  * E5: true iff any registered IDB store is currently in the degraded tier.
  * Used to clear the "storage is slow" banner only once NO store remains
  * degraded (a single store recovering must not hide a still-broken one).
@@ -1280,6 +1291,7 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-journal-new-entry-stats',  // use-journal-mutations → JournalEditorScreen
   'vot-restore-inflight',         // use-restore-guard
   'vot-last-seen-build',          // utils/update-toast.js — the last build this profile saw
+  'vot-diag-ring',                // utils/diagnostic-log.js — storage-health warnings kept across reloads
 ]);
 
 /** Meta-store key holding the W2.4 cleanup-complete flag. */

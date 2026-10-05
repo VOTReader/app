@@ -121,6 +121,18 @@
         the mount write's merge. n4-05: the record also carries `base`, the
         last union this tab saw land (whenSaved true), so that merge is
         3-way and a read mark another tab CLEARED stays cleared.
+     9. NEVER WRITE FROM AN UNLOADED MOUNT (datasafe 2026-10-05): a store
+        that takes longer than its hydration timeout (3 s) to open goes
+        'degraded', HydrationGate renders App anyway, and useSavedState reads
+        {} - so App renders defaults. The store then loads the real record
+        and makes it the merge base, and the next ordinary write sent the
+        defaults: every read mark, last-read place, setting and tab erased
+        (reproduced; on Corbin's phone it "keeps" happening). So a mount that
+        began while StateStore was not 'loaded' writes NOTHING - no persist,
+        no leave record, no flush on hide or unmount - for its whole life.
+        HydrationGate remounts App once the store loads, and that mount reads
+        the real record and writes as usual. store-merge.js's progress-wipe
+        guard is the net under this.
 
    OWNS:
      - the persist effect(s) that write the vot-state union, including
@@ -165,6 +177,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { StateStore } from '../stores/state-store.js';
+import { DiagnosticLog } from '../utils/diagnostic-log.js';
 
 /**
  * Trailing-edge debounce window for non-boot-critical unions. 250ms is
@@ -203,13 +216,16 @@ export function takeResumeState() {
  * the union this tab last saw land in the store, null when it has none (an
  * older build's record, or no write had landed yet). Same rules, same
  * read-once clearing.
+ * @param {{ keep?: boolean }} [opts] keep: read without clearing (header item 9)
  * @returns {{ state: Record<string, any>, base: Record<string, any> | null } | null}
  */
-export function takeResumeRecord() {
+export function takeResumeRecord(opts) {
   let raw = null;
   try {
     raw = sessionStorage.getItem(RESUME_STATE_KEY);
-    if (raw != null) sessionStorage.removeItem(RESUME_STATE_KEY);
+    // `keep` (item 9): a mount that cannot write must leave the record for
+    // the remount that can.
+    if (raw != null && !(opts && opts.keep === true)) sessionStorage.removeItem(RESUME_STATE_KEY);
   } catch (_e) { return null; }                   // sessionStorage unavailable
   if (raw == null) return null;
   let rec;
@@ -229,6 +245,17 @@ export function takeResumeRecord() {
  * @param {any} s
  * @returns {{ theme: any, fontStyle: any, fontScale: any }}
  */
+/**
+ * Header item 9: true when StateStore has not loaded its real record (a
+ * hydration that timed out into 'degraded', or one still pending). A store
+ * without the state machine (LS mode) counts as loaded.
+ * @returns {boolean}
+ */
+export function stateStoreUnloaded() {
+  const store = /** @type {any} */ (StateStore);
+  return typeof store.getState === 'function' && store.getState() !== 'loaded';
+}
+
 function _bootFields(s) {
   return {
     theme: s && s.theme,
@@ -284,6 +311,15 @@ export function usePersistedState({
   const landedRef = React.useRef(null);
   const writeSeqRef = React.useRef(0);
   const landedSeqRef = React.useRef(0);
+  // Header item 9: decided once, at the first render, and never revisited -
+  // the union this mount renders came from what useSavedState read then.
+  const unloadedRef = React.useRef(/** @type {boolean | null} */ (null));
+  if (unloadedRef.current === null) {
+    unloadedRef.current = stateStoreUnloaded();
+    if (unloadedRef.current && typeof DiagnosticLog !== 'undefined') {
+      DiagnosticLog.warn('state-guard', 'App mounted before vot-state loaded (' + StateStore.getState() + '): writes held until the remount');
+    }
+  }
   /* n4-05: hand a union to the store; once it is on disk it is the base of the
      next leave record. A later write that lands first is never overtaken by an
      older one. Refs only, so every render's copy is the same function. */
@@ -321,6 +357,7 @@ export function usePersistedState({
        store write or the reload behind it. */
     const flush = (patch, opts) => {
       if (frozenRef.current) return;             // contract 7: the stale union must not land
+      if (unloadedRef.current) return;           // item 9: built on defaults, never written
       if (timerRef.current != null) { clearTimeout(timerRef.current); timerRef.current = null; }
       const pending = pendingRef.current;
       const leaving = !!(opts && opts.reload === true);
@@ -423,8 +460,8 @@ export function usePersistedState({
     };
     latestRef.current = union;
     // Contract 7: rendered from pre-import state — kept in latestRef for a thaw,
-    // never written while frozen.
-    if (frozenRef.current) return;
+    // never written while frozen. Item 9: rendered from defaults, never written.
+    if (frozenRef.current || unloadedRef.current) return;
     const prev = writtenRef.current;
     const boot = _bootFields(union);
     const prevBoot = _bootFields(prev);

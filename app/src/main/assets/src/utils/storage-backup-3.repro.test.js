@@ -51,10 +51,11 @@ describe('REPRO storage-backup-3: degraded then recovered vot-state', () => {
     await hydration;
     expect(StateStore.getState()).toBe('degraded');
 
-    // HydrationGate has resolved, so App mounts and its first persistence
-    // effect writes its in-memory boot defaults while the store is degraded.
+    // HydrationGate has resolved, so App mounts on its in-memory boot defaults
+    // while the store is degraded. Since datasafe 2026-10-05 that mount writes
+    // nothing at all (usePersistedState item 9); before, its mount write queued.
     renderHook(() => usePersistedState(bootDefaults));
-    expect(StateStore._queue).toHaveLength(1);
+    expect(StateStore._queue).toHaveLength(0);
 
     // The original IDB read eventually returns the user's actual state.
     resolveHydration(realState);
