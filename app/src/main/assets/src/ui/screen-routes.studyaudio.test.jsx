@@ -116,7 +116,8 @@ describe('On this phone (item 8): the hub door and the route', () => {
       const routes = buildScreenRoutes(p);
       routes['audio-library']().props.onOpenDownloads();
       expect(p.setNavOrigin).toHaveBeenCalledWith({ screen: 'audio-library', returnOrigin: null });
-      expect(p.setScreen).toHaveBeenCalledWith('audio-library-offline');
+      expect(p.setAudioColKey).toHaveBeenCalledWith('yours:downloads');
+      expect(p.setScreen).toHaveBeenCalledWith('audio-library-history');   // rv1: Your Listening, Downloads segment
     } finally { delete globalThis.ListenRoot; }
   });
 

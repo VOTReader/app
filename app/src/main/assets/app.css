@@ -1513,6 +1513,8 @@
       .listen-row-menu { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0 12px 42px; border-bottom: 1px solid var(--border); }
       .listen-row-menu button { min-height: 40px; padding: 0 12px; border: 1px solid var(--border); border-radius: 9px; background: none; color: var(--cream); font: inherit; font-size: var(--fs-15); cursor: pointer; }
       .listen-segment { display: grid; grid-template-columns: 1fr 1fr; margin: 0.5rem 0 0.75rem; border: 1px solid var(--gold); border-radius: 10px; overflow: hidden; }
+      .listen-segment-3 { grid-template-columns: repeat(3, 1fr); }
+      .listen-remove { min-height: 40px; padding: 0 14px; font-size: var(--fs-16); }
       .listen-segment button { min-height: 44px; border: 0; background: none; color: var(--cream); font: inherit; font-size: var(--fs-16); cursor: pointer; }
       .listen-segment button.is-on { background: var(--gold); color: var(--bg); }
       .listen-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin: 1rem 0; }

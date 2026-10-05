@@ -21,7 +21,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 // rv1 (overhaul): the Listen tab replaces the old hub and The Volumes screen.
-import { ListenRoot, ListenSource, ListenHistory, ListenBible } from './screens/ListenScreens.jsx';
+import { ListenRoot, ListenSource, ListenYours, ListenBible } from './screens/ListenScreens.jsx';
 import { AudioSavedScreen } from './screens/AudioSavedScreen.jsx';
 import { AudioStudiesScreen } from './screens/AudioStudiesScreen.jsx';
 import { AudioOfflineScreen } from './screens/AudioOfflineScreen.jsx';
@@ -29,7 +29,7 @@ import { AudioOfflineScreen } from './screens/AudioOfflineScreen.jsx';
 import { AudioSongsScreen, songsFrameTitle } from './screens/AudioSongsScreen.jsx';
 
 Object.assign(window, {
-  ListenRoot, ListenSource, ListenHistory, ListenBible, AudioSavedScreen, AudioStudiesScreen, AudioOfflineScreen, AudioSongsScreen,
+  ListenRoot, ListenSource, ListenYours, ListenBible, AudioSavedScreen, AudioStudiesScreen, AudioOfflineScreen, AudioSongsScreen,
   // W-03: the back pill over a letter opened from a Songs screen names that screen's top frame (screen-routes).
   songsFrameTitle,
 });

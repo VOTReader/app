@@ -14,7 +14,8 @@
                     ('voice:<code>'): eyebrow, title, one fact line, a gold
                     Play / Resume pill, an outline Download, hairline rows
                     (number, title, "Read by … · status", a state glyph).
-     ListenHistory  every recording started, newest first.
+     ListenYours    YOUR LISTENING: Saved | Downloads | History, one verb
+                    "Download" (replaces the Saved and On this phone screens).
      ListenBible    a Bible edition: its books, Old | New Testament; a book
                     opens its chapter grid (Codex sheet 37): Resume ·
                     Chapter N, Download book, chapters heard checked.
@@ -429,22 +430,69 @@ export function ListenSource(props) {
 }
 
 /**
- * Every recording started, newest first (YOUR LISTENING › History).
- * @param {{ onBack: () => void, backLabel?: string, onOpenNowPlaying: () => void,
+ * YOUR LISTENING in one place (audit-listen 5.2/5.10): Saved | Downloads | History, one verb "Download". Saved and
+ * History play on a tap; Downloads shows the storage line, what is on its way (with Cancel) and each recording with
+ * Remove; songs kept on the phone are one row away (the Songs screen's Kept list).
+ * @param {{ segment?: string, onBack: () => void, backLabel?: string, onOpenNowPlaying: () => void,
  *   onSearch: () => void, onHistory: () => void, onSettings: () => void, theme: any, onThemeChange: (t: any) => void }} props
  */
-export function ListenHistory(props) {
+export function ListenYours(props) {
   const { library } = useListenStores();
+  const offline = useOfflineAudio();
+  const [segment, setSegment] = React.useState(props.segment === 'downloads' || props.segment === 'history' ? props.segment : 'saved');
+  const saved = library && typeof library.saved === 'function' ? library.saved() : [];
   const recent = library && typeof library.recent === 'function' ? library.recent() : [];
+  const items = offline ? offline.items() : [];
+  const pending = offline && typeof offline.pending === 'function' ? offline.pending() : { busy: 0 };
+  const play = (/** @type {any} */ t) => { AudioPlayer.playTrack(t); props.onOpenNowPlaying(); };
+  const tabs = [['saved', 'Saved'], ['downloads', 'Downloads'], ['history', 'History']];
+  const openKept = () => { const open = /** @type {any} */ (window).__openSongs; if (typeof open === 'function') open([{ k: 'list', v: 'kept' }], 'Your Listening'); };
+
   return (
     <ScreenLayout navChildren={LibraryNav({ onBack: props.onBack, backLabel: props.backLabel, showHome: false, onSearch: props.onSearch, onHistory: props.onHistory, onSettings: props.onSettings, theme: props.theme, onThemeChange: props.onThemeChange })}>
-      <div className="listen-screen">
-        <Eyebrow>Your Listening</Eyebrow>
-        <h1 className="listen-source-title">History</h1>
-        {recent.map((t) => (
-          <ListenRow key={t.url} title={trackName(t)} line={[listenEyebrow(t), minutesLeft(t), relativePlayedAt(t.playedAt)].filter(Boolean).join(' · ')}
-            onClick={() => { AudioPlayer.playTrack(t); props.onOpenNowPlaying(); }} />
-        ))}
+      <div className="listen-screen listen-source">
+        <Eyebrow>Listen</Eyebrow>
+        <h1 className="listen-source-title">Your Listening</h1>
+        <div className="listen-segment listen-segment-3" role="tablist" aria-label="Your Listening">
+          {tabs.map(([id, name]) => (
+            <button key={id} type="button" role="tab" aria-selected={segment === id} className={segment === id ? 'is-on' : ''} onClick={() => setSegment(id)}>{name}</button>
+          ))}
+        </div>
+
+        {segment === 'saved' ? (
+          saved.length ? saved.map((t) => (
+            <ListenRow key={t.url} title={trackName(t)} line={[listenEyebrow(t), minutesLeft(t)].filter(Boolean).join(' · ')} onClick={() => play(t)} />
+          )) : <p className="listen-source-line">Tap ☆ on any recording to keep it here.</p>
+        ) : null}
+
+        {segment === 'downloads' ? (
+          <>
+            {offline ? (
+              <p className="listen-source-line">{'VOTReader ' + (formatBytes(offline.totalBytes()) || '0 MB') + (offline.freeBytes() ? ' · ' + formatBytes(offline.freeBytes()) + ' free' : '')}</p>
+            ) : <p className="listen-source-line">Downloads need the app, or this site added to your Home Screen.</p>}
+            {pending.busy ? (
+              <p className="listen-offline" role="status">{'Downloading ' + pending.busy + (pending.busy === 1 ? ' recording' : ' recordings')}
+                <button type="button" onClick={() => offline.cancel()}>Cancel</button></p>
+            ) : null}
+            {items.map((it) => (
+              <div key={it.url} className="listen-source-row">
+                <span className="listen-row-copy">
+                  <span className="listen-row-title">{it.title || 'Recording'}</span>
+                  <span className="listen-row-line">{formatBytes(it.bytes)}</span>
+                </span>
+                <button type="button" className="listen-outline listen-remove" onClick={() => offline.remove([it.url])} aria-label={'Remove ' + (it.title || 'this recording') + ' from this phone'}>Remove</button>
+              </div>
+            ))}
+            {offline && !items.length && !pending.busy ? <p className="listen-source-line">Download a letter, a collection or a Bible book to listen with no signal.</p> : null}
+            <ListenRow title="Songs on this phone" onClick={openKept} />
+          </>
+        ) : null}
+
+        {segment === 'history' ? (
+          recent.length ? recent.map((t) => (
+            <ListenRow key={t.url} title={trackName(t)} line={[listenEyebrow(t), minutesLeft(t), relativePlayedAt(t.playedAt)].filter(Boolean).join(' · ')} onClick={() => play(t)} />
+          )) : <p className="listen-source-line">What you play will be listed here.</p>
+        ) : null}
       </div>
     </ScreenLayout>
   );

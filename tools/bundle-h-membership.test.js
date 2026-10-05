@@ -31,7 +31,7 @@ const read = (p) => readFileSync(p, 'utf-8');
    screen-routes renders behind (`typeof AudioLibraryScreen !== 'undefined'`). */
 // rv1 (overhaul): the Listen tab's three screens replaced the hub (AudioLibraryScreen) and The Volumes.
 // rv1: ListenSource and ListenBible replaced AudioCollectionScreen (left unbundled, for the cleanup).
-const MARKERS = ['ListenRoot', 'ListenSource', 'ListenHistory', 'ListenBible', 'AudioSavedScreen', 'AudioStudiesScreen', 'AudioOfflineScreen', 'AudioSongsScreen'];
+const MARKERS = ['ListenRoot', 'ListenSource', 'ListenYours', 'ListenBible', 'AudioSavedScreen', 'AudioStudiesScreen', 'AudioOfflineScreen', 'AudioSongsScreen'];
 /* `name + ':'` alone is not enough, and landing 28 proved it: the minifier
    writes a guarded free-global read as a TERNARY — `typeof X=="function"?X:…`
    — and that colon reads exactly like a definition. A definition is a KEY in

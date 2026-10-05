@@ -537,9 +537,9 @@ export function buildScreenRoutes({
       bibleAudio={settings && settings.bibleAudio}
       onOpenSource={(key) => { setAudioColKey(key); _enterAudioSub('audio-library-collection'); }}
       onOpenBible={(vk) => { setAudioColKey(vk); _enterAudioSub('audio-library-collection'); }}
-      onOpenSaved={() => _enterAudioSub('audio-library-saved')}
-      onOpenDownloads={() => _enterAudioSub('audio-library-offline')}
-      onOpenHistory={() => _enterAudioSub('audio-library-history')}
+      onOpenSaved={() => { setAudioColKey('yours:saved'); _enterAudioSub('audio-library-history'); }}
+      onOpenDownloads={() => { setAudioColKey('yours:downloads'); _enterAudioSub('audio-library-history'); }}
+      onOpenHistory={() => { setAudioColKey('yours:history'); _enterAudioSub('audio-library-history'); }}
       onOpenSongs={() => { setAudioColKey(encodeSongsRoute([{ k: 'hub' }])); _enterAudioSub(SONGS_SCREEN); }}
       onReadStudies={() => _enterAudioSub('audio-library-studies')}
       onOpenNowPlaying={_openNowPlaying}
@@ -1182,8 +1182,10 @@ export function buildScreenRoutes({
     // lands on the root). Play and Resume open the full-screen Now Playing through the bar (__openNowPlaying).
     'audio-library': () => _listenRoot(),
     'audio-library-volumes': () => _listenRoot(),
-    'audio-library-history': () => typeof ListenHistory !== 'undefined' ? (
-      <ListenHistory onBack={goNavOrigin} backLabel="Listen" onOpenNowPlaying={_openNowPlaying}
+    // YOUR LISTENING (Saved | Downloads | History): the segment rides the tab's audioColKey ('yours:<segment>').
+    'audio-library-history': () => typeof ListenYours !== 'undefined' ? (
+      <ListenYours key={audioColKey} segment={typeof audioColKey === 'string' && audioColKey.lastIndexOf('yours:', 0) === 0 ? audioColKey.slice(6) : 'history'}
+        onBack={goNavOrigin} backLabel="Listen" onOpenNowPlaying={_openNowPlaying}
         onSearch={goSearch} onHistory={goHistory} onSettings={goSettings} theme={theme} onThemeChange={setTheme} />
     ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
     // Downloads to the phone (listening item 8): the hub's "On this phone" row.

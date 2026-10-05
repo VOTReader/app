@@ -27,7 +27,7 @@ const { player, setPlayerState } = vi.hoisted(() => {
 });
 vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
 
-import { ListenRoot, ListenSource, ListenHistory, ListenBible } from './ListenScreens.jsx';
+import { ListenRoot, ListenSource, ListenYours, ListenBible } from './ListenScreens.jsx';
 import * as Shelf from '../components/AudioShelf.jsx';
 import * as AudioTrack from '../../utils/audio-track.js';
 import { listenEyebrow, listenReaderLine } from '../components/NowPlaying.jsx';
@@ -178,14 +178,33 @@ describe('ListenSource', () => {
   });
 });
 
-describe('ListenHistory', () => {
-  it('lists what was started, newest first, and plays it', () => {
+describe('ListenYours', () => {
+  const props = (segment) => ({ segment, onBack: vi.fn(), onOpenNowPlaying: vi.fn(), onSearch: vi.fn(), onHistory: vi.fn(), onSettings: vi.fn(), theme: 'dark', onThemeChange: vi.fn() });
+
+  it('History lists what was started and plays it; the segments switch', () => {
     recent = [{ key: 'one:a', url: 'u:a', title: 'Chosen by God', playedAt: Date.now() }];
-    const onOpenNowPlaying = vi.fn();
-    render(<ListenHistory onBack={vi.fn()} onOpenNowPlaying={onOpenNowPlaying} onSearch={vi.fn()} onHistory={vi.fn()} onSettings={vi.fn()} theme="dark" onThemeChange={vi.fn()} />);
+    const p = props('history');
+    render(<ListenYours {...p} />);
     fireEvent.click(screen.getByRole('button', { name: /Chosen by God/ }));
     expect(player.playTrack).toHaveBeenCalled();
-    expect(onOpenNowPlaying).toHaveBeenCalled();
+    expect(p.onOpenNowPlaying).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('tab', { name: 'Saved' }));
+    expect(screen.getByText('Tap ☆ on any recording to keep it here.')).toBeTruthy();
+  });
+
+  it('Downloads: the storage line, each recording with Remove, and the empty line', () => {
+    const remove = vi.fn();
+    globalThis.OfflineAudio = {
+      available: () => true, subscribe: () => () => {}, getVersion: () => 0, news: () => null,
+      items: () => [{ url: 'u:a', title: 'Chosen by God', bytes: 6_400_000 }], totalBytes: () => 6_400_000, freeBytes: () => 18e9,
+      pending: () => ({ busy: 0 }), remove, cancel: vi.fn(),
+    };
+    try {
+      render(<ListenYours {...props('downloads')} />);
+      expect(screen.getByText('VOTReader 6.4 MB · 18 GB free')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Chosen by God from this phone' }));
+      expect(remove).toHaveBeenCalledWith(['u:a']);
+    } finally { delete globalThis.OfflineAudio; }
   });
 });
 

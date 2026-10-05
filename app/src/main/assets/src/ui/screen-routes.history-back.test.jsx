@@ -435,7 +435,8 @@ describe('screen-routes — the Listening Library returns to its actual origin',
     const { routes, props } = makeRoutes({ navOrigin: { screen: 'volumes-home' } });
     routes['audio-library']().props.onOpenSaved();
     expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'audio-library', returnOrigin: { screen: 'volumes-home' } });
-    expect(props.setScreen).toHaveBeenCalledWith('audio-library-saved');
+    expect(props.setAudioColKey).toHaveBeenCalledWith('yours:saved');
+    expect(props.setScreen).toHaveBeenCalledWith('audio-library-history');   // rv1: Your Listening, Saved segment
 
     const { routes: nextRoutes, props: nextProps } = makeRoutes();
     const saved = nextRoutes['audio-library-saved']();
