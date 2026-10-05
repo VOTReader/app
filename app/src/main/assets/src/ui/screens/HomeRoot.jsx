@@ -13,7 +13,9 @@
    Home stays as it was. Same props as HomeScreen.
 
    Continue reading goes where the resume dot goes (ReadingDotContext's
-   onGo = App's goToLastRead) and shows while there is a last place.
+   onGo = App's goToLastRead) and shows while there is a last place; with
+   none it becomes "Start reading" (today's plan portion, or Volume One,
+   Letter 1).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { resetAnswersLanding } from './AnswersHome.jsx';
@@ -83,6 +85,32 @@ export function HomeRoot({ onSelect, onSurprise, showSurprise, onSearch, onNotes
     }
   };
 
+  // With no last place (a fresh install), the pill reads "Start reading": today's plan portion when a plan has one ready,
+  // otherwise Volume One, Letter 1. The letter route needs the Volumes in memory, so that path loads them first.
+  const ready = todayRows.filter((r) => !r.loading && r.next);
+  const planNext = (ready.find((r) => !r.done) || ready[0] || {}).next || null;
+  const startReading = async () => {
+    if (!onPlanRead) return;
+    if (planNext) { onPlanRead(planNext); return; }
+    if (busy.current) return;
+    busy.current = true;
+    try {
+      const load = /** @type {any} */ (window).__loadVotCorpus;
+      if (typeof load === 'function') await load();
+      const g = /** @type {any} */ (globalThis);
+      const col = g.COL_BY_KEY && g.COL_BY_KEY.get('one');
+      const first = col && typeof g.colLetterArr === 'function' ? (g.colLetterArr(col) || [])[0] : null;
+      if (!mounted.current) return;
+      if (first && first.id) { setStatus(''); onPlanRead({ bid: col.readKey, cid: first.id }); }
+      else onSelect('volume-one');
+    } catch (_e) {
+      if (mounted.current) setStatus('Could not open Volume One. Check your connection and try again.');
+    } finally {
+      busy.current = false;
+    }
+  };
+  const hasPlace = !!(dot.hasPlace && dot.onGo);
+
   return (
     <ScreenLayout navChildren={LibraryNav({
       hideBack: true, showHome: false, hide: ['settings', 'history', 'theme'],
@@ -92,7 +120,8 @@ export function HomeRoot({ onSelect, onSurprise, showSurprise, onSearch, onNotes
       <div className="root-page home-root">
         <h1 className="root-display">The Volumes of Truth</h1>
         <p className="root-sub">Letters from The Lord, Our God and Savior</p>
-        {dot.hasPlace && dot.onGo ? <GoldPill wide icon="arrow" onClick={dot.onGo}>Continue reading</GoldPill> : null}
+        {hasPlace ? <GoldPill wide icon="arrow" onClick={dot.onGo}>Continue reading</GoldPill>
+          : onPlanRead ? <GoldPill wide icon="arrow" onClick={startReading}>Start reading</GoldPill> : null}
         <TodayCard rows={todayRows} markAsReadEnabled={markAsReadEnabled}
           onRead={(next) => onPlanRead && onPlanRead(next)} onListen={(next) => onPlanListen && onPlanListen(next)}
           onOpenPlans={() => onOpenPlans && onOpenPlans()} />
