@@ -145,6 +145,20 @@ if [ -z "$VOT_HOOK_TEST_NO_STAGE_GUARD" ]; then
   fi
 fi
 
+# ─── Step 0b1: no CRLF copies of LF files under the build's inputs (2026-10-05) ──
+# Python's text-mode writes on Windows leave CRLF on disk; `* text=auto eol=lf` stores LF and git status calls the file
+# clean, but the build reads the bytes: tools/split-lazy-css measures distance in characters, so a CRLF app.css built a
+# dist/ that differed from CI's and main's "committed bundles match source" gate went red three times (02424434..af12783a).
+# Stripping the CRs changes nothing git stores, so rewrite them here, before Step 1z builds. (D:/Swarm/tools/land.sh does
+# the same before its rebuild.) Python writers: open(path, 'w', encoding='utf-8', newline='\n').
+crlf_copies=$(git ls-files --eol -- app/src/main/assets tools | awk -F'\t' '{ split($1, a, " "); if (a[1] == "i/lf" && a[2] == "w/crlf") print $2 }')
+if [ -n "$crlf_copies" ]; then
+  echo "[pre-commit] rewriting CRLF copies of LF files as LF before the build reads them:"
+  echo "$crlf_copies" | sed 's/^/    /'
+  # git add then only refreshes the index's stat (the blob is the same); a file with a real unstaged edit is left unstaged
+  echo "$crlf_copies" | while IFS= read -r f; do sed -i 's/\r$//' "$f" && { git diff --quiet -- "$f" && git add -- "$f"; true; }; done
+fi
+
 # ─── Step 0b2: this checkout's node_modules match the lockfile (n7-02) ──
 # Worktrees do not share node_modules. After main moved to vitest 5 the older
 # worktrees kept vitest 4, so their hooks passed what CI failed (92f0b90a).

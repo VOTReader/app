@@ -126,6 +126,32 @@ describe('pre-commit: the commit is the index (v12-04, improvement sweep 2026-09
   });
 });
 
+describe('pre-commit: CRLF copies are rewritten before the build reads them (2026-10-05)', () => {
+  it('turns a CRLF copy of an LF file under the build inputs into LF, and leaves the rest alone', () => {
+    // the step's exact lines, run in a throwaway repo (never this one: hooks share one .git across worktrees)
+    const step = hook.slice(hook.indexOf('crlf_copies=$(git ls-files --eol'), hook.indexOf('# ─── Step 0b2'));
+    expect(step).toContain('sed -i');
+    const dir = mkdtempSync(join(tmpdir(), 'vot-crlf-'));
+    const g = (...a) => execFileSync('git', ['-C', dir, ...a], { encoding: 'utf8' });
+    g('init', '-q'); g('config', 'core.autocrlf', 'false');
+    writeFileSync(join(dir, '.gitattributes'), '* text=auto eol=lf\n');
+    mkdirSync(join(dir, 'app/src/main/assets'), { recursive: true });
+    writeFileSync(join(dir, 'app/src/main/assets/app.css'), 'a{}\r\nb{}\r\n');   // as Python's text mode writes it
+    writeFileSync(join(dir, 'notes.txt'), 'x\r\n');                              // outside the build inputs
+    g('add', '-A'); g('-c', 'user.name=t', '-c', 'user.email=t@invalid', 'commit', '-qm', 'x');
+    expect(g('status', '--porcelain'), 'git calls the CRLF copy clean').toBe('');
+    const r = spawnSync('sh', ['-c', step], { cwd: dir, encoding: 'utf8' });
+    expect(r.stdout + r.stderr).toContain('app/src/main/assets/app.css');
+    expect(readFileSync(join(dir, 'app/src/main/assets/app.css'), 'utf8')).toBe('a{}\nb{}\n');
+    expect(readFileSync(join(dir, 'notes.txt'), 'utf8')).toBe('x\r\n');
+    expect(g('status', '--porcelain')).toBe('');
+  });
+
+  it('runs before the build', () => {
+    expect(hook.indexOf('crlf_copies=$(git ls-files --eol')).toBeLessThan(lines.findIndex((l) => /^\s*npm run build\s*$/.test(l)) >= 0 ? hook.indexOf('\n  npm run build\n') : -1);
+  });
+});
+
 describe('pre-commit: the S22 measurement is checked at commit time (v12-05)', () => {
   it('arms on Scripture Web source and on the measurement itself, not on other screens', () => {
     const s22 = indentedTriggerFor('s22_changed');
