@@ -32,6 +32,7 @@ const GLOBALS = {
     { id: 'evident', num: 5, title: 'Evident', blocks: [{ segments: [{ v: 'Let your humility be evident.' }] }] },
     { id: 'watchman', num: 6, title: 'The Watchman', blocks: [{ segments: [{ v: WATCHMAN }] }] },
     { id: 'false-prophets', num: 7, title: 'False Prophets Among You', blocks: [{ segments: [{ v: 'Beware of false prophets, for false prophets are many, and the false prophets speak lies.' }] }] },
+    { id: 'creator', num: 8, title: 'In the Days of Your Youth', blocks: [{ segments: [{ v: 'Hear Me. Remember now your Creator in the days of your youth, before the difficult days come, says The Lord.' }] }] },
   ],
   ANSWERS: [
     // the long compilation that holds every word, everywhere
@@ -40,6 +41,8 @@ const GLOBALS = {
     { id: 'persecution', num: 2, title: 'Regarding Persecution', paragraphs: [{ text: WATCHMAN + ' To this day you persecute My prophets.' }] },
     { id: 'false-prophets-topic', num: 3, title: 'Regarding False Prophets', paragraphs: [{ text: 'The Lord speaks of false prophets. ' + topic(['watch', 'pray', 'stand', 'endure', 'repent', 'hear', 'obey', 'walk', 'turn', 'love', 'wait', 'seek'], 60) }] },
     // a topic that reprints the letter and dwells on its words (search benchmark, 2026-10-05)
+    // a long topic holding the same few words over and over, never together (search benchmark, 2026-10-05)
+    { id: 'scattered', num: 5, title: 'Regarding Seasons', paragraphs: [{ text: Array.from({ length: 40 }, (_, i) => ['remember', 'creator', 'days', 'come', 'young'][i % 5] + ' is spoken of here. ' + 'The field is sown and the grain is gathered in its season. '.repeat(4)).join('') }] },
     { id: 'late-hour', num: 4, title: 'Regarding the Hour', paragraphs: [{ text: 'The hour is late; turn, and repent, says The Lord. '.repeat(12) + WATCHMAN }] },
   ],
 };
@@ -82,6 +85,12 @@ describe('ranking on the audit\u2019s cases', () => {
     const r = refs(await VotSearchMini.search(q));
     expect(r[0]).toBe('Volume One · Letter 6 · The Watchman');
     expect(r).toContain('Answers Only God Can Give · Regarding the Hour');
+  });
+
+  /* A remembered sentence in the reader's own words: a long topic holds its few words, far apart, and
+     outscored the short letter holding them together (search benchmark 2026-10-05). */
+  it('a sentence put in other words finds the passage holding its words together, not a topic scattering them', async () => {
+    expect(refs(await VotSearchMini.search('remember the creator while you are young before the days come'))[0]).toBe('Volume One · Letter 8 · In the Days of Your Youth');
   });
 
   it('a word or two is a keyword search: the topic titled with them comes first', async () => {
