@@ -123,6 +123,25 @@ describe('titleMatch: a title typed whole ranks its unit first', () => {
   });
 });
 
+describe('titleMatch with the stop words: a title remembered out of order or in another form', () => {
+  const STOP = new Set(['the', 'of', 'in', 'it', 'is', 'who', 'you', 'a', 'to']);
+  const tm = (title, q) => titleMatch(kjvEncode(title), kjvEncode(q), STOP);
+  it('its words in another order or form still name it, a little less than typed whole', () => {
+    for (const [title, q] of [['The Hypocrite’s Portion', 'portion of the hypocrites'], ['Walking Free', 'walk free'], ['The Pure of Heart', 'pure in heart']]) {
+      expect(tm(title, q)).toBeGreaterThan(2);
+      expect(tm(title, q)).toBeLessThan(TITLE_EXACT_BOOST);
+    }
+  });
+  it('1 when a word the reader meant is missing from it, or the query is a sentence around it', () => {
+    expect(tm('The Days of Noah', 'noah and the flood')).toBe(1);
+    expect(tm('Who You Choose', 'it is who you choose')).toBe(1);
+    expect(tm('Walking Free', 'free')).toBe(1);
+  });
+  it('the title typed whole is still the title', () => {
+    expect(tm('Regarding Tithing', 'tithing')).toBe(TITLE_EXACT_BOOST);
+  });
+});
+
 describe('BM25_PARAMS', () => {
   it('is BM25 as published: no BM25+ floor paying long texts for every word they hold', () => {
     expect(BM25_PARAMS.d).toBe(0);

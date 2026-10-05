@@ -1058,7 +1058,7 @@ async function search(query, options) {
     for (let i = 0; i < rankedIds.length; i++) {
       const d = docLookup[rankedIds[i]];
       if (!d || !d.title || d.kind === 'verse') continue;
-      const tm = titleMatch(kjvEncode(d.title), typedTokens);
+      const tm = titleMatch(kjvEncode(d.title), typedTokens, STOP);
       if (tm > 1) scoreMap[rankedIds[i]] *= tm;
     }
   }
@@ -1123,7 +1123,7 @@ async function search(query, options) {
   const named = (/** @type {any} */ d) => {
     if (!d.title) return false;
     const tt = kjvEncode(d.title);
-    return titleMatch(tt, typedTokens) > 1 || (keyword && typedTokens.some((w) => !(STOP && STOP.has(w)) && tt.indexOf(w) >= 0));
+    return titleMatch(tt, typedTokens, STOP) > 1 || (keyword && typedTokens.some((w) => !(STOP && STOP.has(w)) && tt.indexOf(w) >= 0));
   };
   // A first result holding the typed words in a row, or one word off, is a quote found: no re-ordering.
   const quoted = out.length && (nearOf[idOf.get(out[0]) || ''] || 0) >= NEAR_PHRASE_MIN;

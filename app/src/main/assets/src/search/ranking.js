@@ -22,6 +22,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { kjvEncode } from './tokenize.js';
+import { lemma } from './passage.js';
 
 /**
  * Per-kind score multipliers. Only the kinds the narrow index emits appear here
@@ -201,12 +202,35 @@ export const TITLE_QUERY_MIN = 0.75;
  * Days of Noah"; "Pride Comes Before a Fall" for "Pride Goes Before a Fall"); 1
  * otherwise. There was no title signal beyond the field boost, and a title typed
  * whole lost to longer texts holding its words ("Wisdom" #2 behind "Discernment",
- * "The Truth" #6).
+ * "The Truth" #6). Given the stop words, a title is also matched by its content words
+ * in any order and form, a little less ("portion of the hypocrites" is "The Hypocrite's
+ * Portion", "walk free" is "Walking Free", "pure in heart" is "The Pure of Heart":
+ * search benchmark 2026-10-05).
  * @param {string[]} titleToks
  * @param {string[]} qTokens
+ * @param {Set<string>} [stop]
  * @returns {number}
  */
-export function titleMatch(titleToks, qTokens) {
+export function titleMatch(titleToks, qTokens, stop) {
+  const inOrder = titleInOrder(titleToks, qTokens);
+  return stop && inOrder < TITLE_EXACT_BOOST ? Math.max(inOrder, titleWords(titleToks, qTokens, stop)) : inOrder;
+}
+/** A title's content words met in any order, by lemma: TITLE_BAG_RATE of the in-order score. */
+export const TITLE_BAG_RATE = 0.9;
+function titleWords(/** @type {string[]} */ titleToks, /** @type {string[]} */ qTokens, /** @type {Set<string>} */ stop) {
+  const skip = (/** @type {string} */ w) => stop.has(w) || TITLE_LEAD.has(w);
+  const content = (/** @type {string[]} */ x) => [...new Set(joinApostropheS(x).filter((w) => !skip(w)).map(lemma).filter((w) => !skip(w)))];
+  const q = content(qTokens);
+  const t = content(titleToks);
+  if (q.length < 2 || !t.length) return 1;
+  // Every word the reader meant, not most (out of order, most of a title's words are anywhere),
+  // and the title give or take a word: "it is who you choose" quotes a letter, not "Who You Choose".
+  if (!q.every((w) => t.indexOf(w) >= 0)) return 1;
+  const tl = new Set(joinApostropheS(titleToks).map(lemma));
+  if (joinApostropheS(qTokens).filter((w) => !TITLE_LEAD.has(w) && !tl.has(lemma(w))).length > 1) return 1;
+  return 1 + (TITLE_EXACT_BOOST - 1) * TITLE_BAG_RATE * (0.5 + 0.5 * q.length / t.length);
+}
+function titleInOrder(/** @type {string[]} */ titleToks, /** @type {string[]} */ qTokens) {
   if (!titleToks || !titleToks.length || !qTokens || !qTokens.length) return 1;
   const t = joinApostropheS(titleToks);
   const q = joinApostropheS(qTokens);
