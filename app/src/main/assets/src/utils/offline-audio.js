@@ -24,8 +24,9 @@
    setAudioActive pattern; BridgeContractTest pins the four).
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { isSongUrl } from './audio-track.js';
+import { isSongUrl, resolveBibleAudio } from './audio-track.js';
 import { WebOfflineAudio } from './offline-audio-web.js';
+import { loadAudioSync, loadBibleSync, loadAudioSyncSections } from './sync-loaders.js';
 
 /** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number, stale: boolean }} SavedItem */
 /** @typedef {'saved' | 'downloading' | 'queued' | 'failed' | 'none'} OfflineStatus */
@@ -66,6 +67,33 @@ let _loaded = false;
 function _nativeBridge() {
   const b = typeof window !== 'undefined' ? /** @type {any} */ (window).AndroidBridge : null;
   return b && typeof b.offlineAudioState === 'function' ? b : null;
+}
+
+/**
+ * In the browser, a download also fetches its read-along timings (audit-listen item 26). The timings files are
+ * cache-on-use in the service worker (corpusFirst serves every src/data/*.js from the corpus cache once fetched),
+ * so a recording downloaded with "Download all" and never played online used to play offline with no wash. The
+ * phone app ships them as assets: nothing to warm there. Letters fetch audio-sync.js, a Bible chapter its PLAYING
+ * edition's file (resolved from the recording, as the wash does), a compilation (no key) audio-sync-sections.js.
+ * @param {Array<{ url: string, key: string }>} items
+ */
+function _warmTimings(items) {
+  if (_nativeBridge()) return;
+  let letters = false, sections = false;
+  const editions = new Set();
+  for (const t of items) {
+    if (isSongUrl(t.url)) continue;
+    if (!t.key) { sections = true; continue; }
+    if (t.key.lastIndexOf('bible-', 0) === 0) {
+      const ed = resolveBibleAudio({ track: t }).paint;
+      if (ed && ed.volKey) editions.add(ed.volKey);
+      continue;
+    }
+    letters = true;
+  }
+  if (letters) loadAudioSync();
+  if (sections) loadAudioSyncSections();
+  for (const v of editions) loadBibleSync(v);
 }
 
 /** @returns {any} the store downloads go to: the phone app's, else this browser's (cf1), else null */
@@ -302,6 +330,7 @@ export const OfflineAudio = {
     if (!items.length) return true;
     try { b.offlineAudioSave(JSON.stringify(items)); } catch (_e) { return false; }
     for (const t of items) { _queued.add(t.url); _failed.delete(t.url); _asked.set(t.url, t); }
+    _warmTimings(items);
     _notify();
     return true;
   },
