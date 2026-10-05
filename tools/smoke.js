@@ -255,7 +255,33 @@
   }
 
   // ── UI walk helpers ──────────────────────────────────────────────────
+  // rs1 (overhaul): with the tab bar, the classic Home's tiles are tabs (or a tab's row). Each entry maps a tile's
+  // eyebrow to the tab it became, and the row to open there, if any.
+  var TAB_TILES = [
+    [/Prophetic Letters/, 'read', null], [/Personal Study/, 'library', null], [/Audio Readings/, 'listen', null],
+    [/App Configuration/, 'library', /^Settings/], [/About VOTReader/, 'library', /^Help & about/],
+    [/Topics & Doctrines/, null, /^Answers Only God Can Give/],
+  ];
+  function tabbed() { return !!document.querySelector('.tabbar') && typeof window.BottomTabs !== 'undefined'; }
+  function toTabRoot(id) {
+    if (window.BottomTabs.active() !== id) window.BottomTabs.select(id);
+    window.BottomTabs.select(id);  // the lit tab pops to its root
+  }
   function clickByText(re) {
+    if (tabbed()) {
+      var tile = TAB_TILES.find(function (t) { return re.source.indexOf(t[0].source) !== -1; });
+      if (tile) {
+        if (tile[1]) toTabRoot(tile[1]);
+        if (!tile[2]) return true;
+        var row = tile[2];
+        if (!tile[1]) return clickRaw(row);
+        setTimeout(function () { clickRaw(row); }, 120);
+        return true;
+      }
+    }
+    return clickRaw(re);
+  }
+  function clickRaw(re) {
     var els = [].slice.call(document.querySelectorAll('button,[role="button"],a'));
     var el = els.find(function (e) {
       var t = (e.textContent || '') + ' ' + (e.getAttribute('aria-label') || '') +
@@ -271,6 +297,7 @@
     // Study") are CSS text-transform:uppercase, so innerText omits/alters
     // them while textContent keeps the raw string. Two+ distinct tiles
     // present ⇒ we're on the home grid (no other screen has them).
+    if (tabbed()) return window.BottomTabs.active() === 'home' && !!document.querySelector('.home-root');
     var btns = [].slice.call(document.querySelectorAll('button,[role="button"]'));
     var hits = btns.filter(function (b) {
       return /Prophetic Letters|Personal Study|The Holy Bible|Study Editions/
@@ -281,6 +308,7 @@
   async function goHome() {
     for (var attempt = 0; attempt < 5; attempt++) {
       if (onHome()) return true;
+      if (tabbed()) { toTabRoot('home'); await sleep(300); continue; }
       var btns = [].slice.call(document.querySelectorAll('button'));
       // Home affordance varies by screen: an icon button (title/aria
       // "Home") on reading screens, OR a text button "← Home" on index
@@ -564,7 +592,7 @@
       clickByText(/Personal Study/); await sleep(320);
       // 95181e08 (the one-row Library) dropped the "My Notes" eyebrows; a row
       // carries its title alone. Either shape passes.
-      return /My Notes|My Bookmarks|My Journal|Highlights & Underlines/.test(document.body.textContent || '');
+      return /My Notes|My Bookmarks|My Journal|Highlights & Underlines/i.test(document.body.textContent || '');
     });
     await step('Listening Library', async function () {
       await goHome();

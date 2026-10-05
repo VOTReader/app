@@ -26,7 +26,8 @@ export function RootRow({ title, sub, onClick, lead }) {
   return (
     <li className="root-row-li">
       <button type="button" className="root-row" onClick={onClick}>
-        {lead ? <span className="root-row-lead" aria-hidden="true">{lead}</span> : null}
+        {/* The numeral is drawn from data-lead (CSS ::before), so the row's text still starts with its title. */}
+        {lead ? <span className="root-row-lead" data-lead={lead} aria-hidden="true" /> : null}
         <span className="root-row-text">
           <span className="root-row-title">{title}</span>
           {sub ? <span className="root-row-sub">{sub}</span> : null}

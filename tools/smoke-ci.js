@@ -82,7 +82,15 @@ async function auditCompactReadingNav(page) {
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 550));
   };
 
-  const onHome = await page.evaluate(() => !!Array.from(document.querySelectorAll('button')).find((el) => /Prophetic Letters/i.test(el.textContent || '')));
+  // rs1 (overhaul): with the tab bar, Home is a tab and the Volumes landing is the Read tab's root.
+  const tabbed = await page.evaluate(() => {
+    const read = Array.from(document.querySelectorAll('.tabbar-tab')).find((el) => (el.textContent || '').trim() === 'Read');
+    if (!read) return false;
+    read.click();
+    return true;
+  });
+  if (tabbed) await new Promise((resolveDelay) => setTimeout(resolveDelay, 550));
+  const onHome = tabbed || await page.evaluate(() => !!Array.from(document.querySelectorAll('button')).find((el) => /Prophetic Letters/i.test(el.textContent || '')));
   if (!onHome) {
     const clickedHome = await page.evaluate(() => {
       const button = document.querySelector('button[title="Home"]');
@@ -93,7 +101,7 @@ async function auditCompactReadingNav(page) {
     if (!clickedHome) throw new Error('compact-nav Home button not found');
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 550));
   }
-  await clickButton(/Prophetic Letters/);
+  if (!tabbed) await clickButton(/Prophetic Letters/);
   await clickButton(/Words To Live By:\s*Part One/);
   await clickButton(/^1\s*Introduction/);
 
@@ -120,7 +128,9 @@ async function auditCompactReadingNav(page) {
     // "Index" — so the live assertion names it too (and is stronger for it:
     // "Back to Index" would have passed on any WTLB-family screen).
     const hasBack = labels.some((label) => /Back to Part One/i.test(String(label)));
-    const hasHome = labels.some((label) => /^Home$/i.test(String(label)));
+    // rs1 (overhaul): with the tab bar, Home is its first tab instead of a top-bar button.
+    const homeTab = Array.from(document.querySelectorAll('.tabbar-tab')).some((el) => (el.textContent || '').trim() === 'Home' && el.getBoundingClientRect().width > 0);
+    const hasHome = homeTab || labels.some((label) => /^Home$/i.test(String(label)));
     return { ok: clipped.length === 0 && hasBack && hasHome, clipped, hasBack, hasHome, items };
   });
 }
@@ -209,9 +219,15 @@ async function auditPhoneTapTargets(page) {
   };
   const goHome = async () => {
     for (let i = 0; i < 5; i++) {
-      const home = await page.evaluate(() => !!document.querySelector('.home-shortcuts'));
+      const home = await page.evaluate(() => !!document.querySelector('.home-shortcuts, .home-root'));
       if (home) return;
       await page.evaluate(() => {
+        // rs1 (overhaul): with the tab bar, Home is a tab (a tap on the lit tab pops it to its root).
+        if (window.BottomTabs && document.querySelector('.tabbar')) {
+          if (window.BottomTabs.active() !== 'home') window.BottomTabs.select('home');
+          window.BottomTabs.select('home');
+          return;
+        }
         const b = document.querySelector('button[title="Home"]') ||
           Array.from(document.querySelectorAll('button')).find((x) => /back/i.test(x.getAttribute('aria-label') || ''));
         if (b) b.click(); else history.back();
@@ -229,7 +245,13 @@ async function auditPhoneTapTargets(page) {
   };
 
   await goHome();
-  await clickText(/Prophetic Letters/);
+  const readTab = await page.evaluate(() => {
+    if (!(window.BottomTabs && document.querySelector('.tabbar'))) return false;
+    window.BottomTabs.select('read');
+    window.BottomTabs.select('read');
+    return true;
+  });
+  if (readTab) await pause(600); else await clickText(/Prophetic Letters/);
   await clickText(/^Volume One/);
   await clickText(/A Word of Warning/);
   const fn = await page.evaluate(() => {
@@ -244,7 +266,13 @@ async function auditPhoneTapTargets(page) {
   if (!letter.probed) throw new Error('tap-target walk: probed nothing on the letter');
 
   await goHome();
-  await clickText(/^Search library/);
+  // rs1 (overhaul): the new Home has no "Search library" chip; Search is the top bar's icon.
+  const barSearch = await page.evaluate(() => {
+    const b = document.querySelector('.home-root') && document.querySelector('.top-nav button[title="Search"]');
+    if (b) b.click();
+    return !!b;
+  });
+  if (barSearch) await pause(600); else await clickText(/^Search library/);
   const typed = await page.evaluate(() => {
     const box = document.querySelector('input[type="search"], .srch-input, input');
     if (!box) return false;
