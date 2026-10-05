@@ -107,6 +107,9 @@ function classOf(c) {
   } else {
     for (const k of holders(c.sentence)) members.add(k);
     if (c.level === 'sentence') for (const k of versesQuoted(c.sentence)) for (const t of matthewTwin(k)) members.add(t);
+    // An Answers heading that cites a letter ("Excerpt from: Let All in the Earth Be Brought into...") has that letter as its original.
+    const cited = /^excerpt from:\s*(.+)$/i.exec(c.sentence.trim());
+    if (cited) for (const k of titleNorm[norm(cited[1])] || []) members.add(k);
     members.add(c.uk);
   }
   return { members, best: Math.min(...[...members].map(TIER)) };
