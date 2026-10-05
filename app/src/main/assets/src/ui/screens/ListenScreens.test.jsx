@@ -30,7 +30,7 @@ import { listenEyebrow, listenReaderLine } from '../components/NowPlaying.jsx';
 
 const A = { id: 'a', num: 1, title: 'Chosen by God' };
 const B = { id: 'b', num: 2, title: 'Christmas' };
-const COL = { key: 'one', cardId: 'vot-one-index', label: 'Volume One', kind: 'letter' };
+const COL = { volKey: 'one', cardId: 'vot-one-index', label: 'Volume One', kind: 'letter' };
 let positions;
 let recent;
 let saved;

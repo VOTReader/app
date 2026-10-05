@@ -92,17 +92,22 @@ function minutesLeft(track) {
   return Math.max(1, Math.round((p.d - p.t) / 60)) + ' min left';
 }
 
+/** A collection's key: the registry calls it volKey (COL_BY_KEY is keyed by it). */
+function keyOf(col) {
+  return col ? col.volKey || col.key || '' : '';
+}
+
 /** The public letter collections that have recordings (Hidden Manna has none and stays out). */
 function letterCollections() {
   const cols = typeof COLLECTIONS !== 'undefined' && Array.isArray(COLLECTIONS) ? COLLECTIONS.filter((c) => c && c.cardId) : [];
-  return cols.filter((c) => AudioPlayer.collectionHasAudio(c.key));
+  return cols.filter((c) => AudioPlayer.collectionHasAudio(keyOf(c)));
 }
 
 /** A collection's recorded letters in reading order (preface first where there is one). */
 function recordedLetters(col) {
   const preface = typeof colPreface === 'function' ? colPreface(col) : null;
   const letters = typeof colLetterArr === 'function' ? (colLetterArr(col) || []) : [];
-  return (preface ? [preface, ...letters] : letters).filter((l) => l && l.id && AudioPlayer.hasAudio(col.key, l.id));
+  return (preface ? [preface, ...letters] : letters).filter((l) => l && l.id && AudioPlayer.hasAudio(keyOf(col), l.id));
 }
 
 /** "29 letters", "7 entries". */
@@ -115,7 +120,7 @@ function countWords(col, n) {
 function voiceShelves(code) {
   return letterCollections().map((col) => ({
     col,
-    letters: recordedLetters(col).filter((l) => AudioPlayer.renditionsFor(col.key, l, col.label).some((r) => r.reader === code)),
+    letters: recordedLetters(col).filter((l) => AudioPlayer.renditionsFor(keyOf(col), l, col.label).some((r) => r.reader === code)),
   })).filter((shelf) => shelf.letters.length);
 }
 
@@ -207,7 +212,7 @@ export function ListenRoot(props) {
         ) : (
           <section className="listen-hero" aria-labelledby="listen-hero-title">
             <h2 id="listen-hero-title" className="listen-hero-title">Hear the Letters read aloud</h2>
-            {first ? <button type="button" className="listen-pill" onClick={() => props.onOpenSource(first.key)}><PlayGlyph />{'Start with ' + first.label}</button> : null}
+            {first ? <button type="button" className="listen-pill" onClick={() => props.onOpenSource(keyOf(first))}><PlayGlyph />{'Start with ' + first.label}</button> : null}
             {yourEdition ? <ListenRow title="The Bible, chapter by chapter" onClick={() => props.onOpenBible(BIBLE_AUDIO_EDITIONS[yourEdition].volKey)} /> : null}
           </section>
         )}
@@ -217,7 +222,7 @@ export function ListenRoot(props) {
 
         <Eyebrow>The Letters</Eyebrow>
         {collections.map((col) => (
-          <ListenRow key={col.key} title={col.label} line={countWords(col, recordedLetters(col).length)} onClick={() => props.onOpenSource(col.key)} />
+          <ListenRow key={keyOf(col)} title={col.label} line={countWords(col, recordedLetters(col).length)} onClick={() => props.onOpenSource(keyOf(col))} />
         ))}
 
         <Eyebrow>The Scriptures</Eyebrow>
@@ -304,7 +309,7 @@ export function ListenSource(props) {
   if (key.lastIndexOf('voice:', 0) === 0) {
     const v = VOICES.find((x) => x.code === key.slice(6)) || null;
     const shelves = v ? voiceShelves(v.code) : [];
-    src = { eyebrow: 'Voices', title: v ? v.name : '', line: v ? v.line : '', groups: shelves.map((s) => ({ heading: s.col.label, volKey: s.col.key, label: s.col.label, col: s.col, items: s.letters, reader: v ? v.code : null })) };
+    src = { eyebrow: 'Voices', title: v ? v.name : '', line: v ? v.line : '', groups: shelves.map((s) => ({ heading: s.col.label, volKey: keyOf(s.col), label: s.col.label, col: s.col, items: s.letters, reader: v ? v.code : null })) };
   } else if (key.lastIndexOf('study:', 0) === 0) {
     const study = studiesList().find((s) => s && (s.id === key.slice(6) || s.slug === key.slice(6))) || null;
     const items = study && Array.isArray(study.chapters) ? study.chapters.filter((c) => c && AudioPlayer.hasAudio('study', c.id)) : [];
@@ -312,7 +317,7 @@ export function ListenSource(props) {
   } else {
     const col = typeof COL_BY_KEY !== 'undefined' ? COL_BY_KEY.get(key) : null;
     const items = col ? recordedLetters(col) : [];
-    src = { eyebrow: 'The Letters', title: col ? col.label : '', line: col ? countWords(col, items.length) + ' · read-along' : '', groups: col ? [{ heading: '', volKey: col.key, label: col.label, col, items, reader: null }] : [] };
+    src = { eyebrow: 'The Letters', title: col ? col.label : '', line: col ? countWords(col, items.length) + ' · read-along' : '', groups: col ? [{ heading: '', volKey: key, label: col.label, col, items, reader: null }] : [] };
   }
 
   const tracksOf = (/** @type {any} */ g, /** @type {any} */ item) => {
