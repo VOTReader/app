@@ -21,6 +21,27 @@
 
 import { OfflineLibrary } from '../../utils/offline-library.js';
 
+/**
+ * A strip under the top nav takes layout room while it shows: it declares body.offline-strip-open and its measured
+ * height in --offline-strip-h, and app.css opens that much room under the page's nav. Shared with the storage banner
+ * (cz3, 2026-10-05), which used to sit fixed over the nav and hide Back and Home; the two never show together.
+ * @param {boolean} shown
+ */
+export function useTopStrip(shown) {
+  const ref = React.useRef(/** @type {HTMLDivElement|null} */ (null));
+  React.useLayoutEffect(() => {
+    if (!shown) return undefined;
+    const root = document.documentElement;
+    const measure = () => { const el = ref.current; const h = el ? el.getBoundingClientRect().height : 0; if (h) root.style.setProperty('--offline-strip-h', Math.ceil(h * 10) / 10 + 'px'); };
+    document.body.classList.add('offline-strip-open');
+    measure();
+    const ro = typeof ResizeObserver !== 'undefined' && ref.current ? new ResizeObserver(measure) : null;
+    if (ro) ro.observe(ref.current);
+    return () => { if (ro) ro.disconnect(); document.body.classList.remove('offline-strip-open'); root.style.removeProperty('--offline-strip-h'); };
+  }, [shown]);
+  return ref;
+}
+
 /** @param {number} n @param {string} one @param {string} many */
 function count(n, one, many) { return n === 1 ? '1 ' + one : n + ' ' + many; }
 
@@ -45,18 +66,7 @@ export function OfflineLibraryBanner() {
       close: true,
     };
   }
-  const shown = !!view;
-  const ref = React.useRef(/** @type {HTMLDivElement|null} */ (null));
-  React.useLayoutEffect(() => {
-    if (!shown) return undefined;
-    const root = document.documentElement;
-    const measure = () => { const el = ref.current; const h = el ? el.getBoundingClientRect().height : 0; if (h) root.style.setProperty('--offline-strip-h', Math.ceil(h * 10) / 10 + 'px'); };
-    document.body.classList.add('offline-strip-open');
-    measure();
-    const ro = typeof ResizeObserver !== 'undefined' && ref.current ? new ResizeObserver(measure) : null;
-    if (ro) ro.observe(ref.current);
-    return () => { if (ro) ro.disconnect(); document.body.classList.remove('offline-strip-open'); root.style.removeProperty('--offline-strip-h'); };
-  }, [shown]);
+  const ref = useTopStrip(!!view);
   if (!view) return null;
 
   return (

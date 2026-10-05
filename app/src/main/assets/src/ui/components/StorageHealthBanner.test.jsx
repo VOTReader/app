@@ -190,6 +190,26 @@ describe('StorageHealthBanner — scenario 6 (warning)', () => {
     /** @type {HTMLElement} */ (container.querySelector('.sh-banner-btn')).click();
     expect(spy).toHaveBeenCalledOnce();
   });
+
+  it('takes room under the nav while it shows, so Back and Home stay tappable (cz3)', () => {
+    // jsdom has no layout: give the banner the 52 px it measured at 360 px (hub overlay audit s9).
+    const rect = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      const h = this.classList.contains('sh-banner') ? 52 : 0;
+      return /** @type {DOMRect} */ ({ x: 0, y: 0, top: 0, left: 0, right: 0, width: 0, bottom: h, height: h, toJSON() { return {}; } });
+    };
+    const root = document.documentElement;
+    try {
+      const { unmount } = renderBanner({ tier: StorageHealth.TIER.WARNING, remaining: 30e6 });
+      expect(document.body.classList.contains('offline-strip-open')).toBe(true);
+      expect(root.style.getPropertyValue('--offline-strip-h')).toBe('52px');
+      unmount();
+      expect(document.body.classList.contains('offline-strip-open')).toBe(false);
+      expect(root.style.getPropertyValue('--offline-strip-h')).toBe('');
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = rect;
+    }
+  });
 });
 
 /* ─── Banner: scenario 7 (critical) ───────────────────────────── */

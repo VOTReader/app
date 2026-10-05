@@ -128,11 +128,13 @@
       body.light .copy-fallback-btn { color: #5a5040; border-color: rgba(90,69,32,0.3); }
       body.light .copy-fallback-btn.primary { background: rgba(90,69,32,0.1); color: #5a4520; }
 
-      /* StorageHealthBanner — fixed strip above the nav (z-index 101 > nav 100).
+      /* StorageHealthBanner — fixed strip just UNDER the nav (cz3, 2026-10-05: it sat over the nav at top:0
+         and hid Back, Home and Search while it warned about data). It takes layout room the way the offline
+         strip does (useTopStrip: body.offline-strip-open + --offline-strip-h). z-index 101 > nav 100.
          Three severity styles: gold (soft), amber (warning), danger (critical). */
       .sh-banner {
-        position: fixed; top: 0; left: 0; right: 0; z-index: 101;
-        padding: calc(var(--inset-top, 0px) + 0.5rem) 1rem 0.6rem;
+        position: fixed; top: calc(var(--inset-top, 0px) + 44px + 22.4px + 1px); left: 0; right: 0; z-index: 101;
+        padding: 0.5rem 1rem 0.6rem;
         display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.8rem;
         font-size: var(--fs-12); line-height: 1.4;
         box-shadow: 0 4px 16px rgba(0,0,0,0.4);

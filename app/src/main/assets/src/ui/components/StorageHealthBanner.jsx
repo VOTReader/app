@@ -22,7 +22,7 @@
      HEALTHY                              → null (nothing)
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { OfflineLibraryBanner } from './OfflineLibraryBanner.jsx';
+import { OfflineLibraryBanner, useTopStrip } from './OfflineLibraryBanner.jsx';
 
 /**
  * @returns {import('../../utils/storage-health.js').StorageHealthReport}
@@ -36,12 +36,14 @@ export function StorageHealthBanner({ onNavigateSettings }) {
   const report = useStorageHealth();
 
   const scenario = _pickScenario(report);
+  // cz3: under the nav and taking room there, like the offline strip (it hid Back, Home and Search when fixed over the nav).
+  const ref = useTopStrip(!!scenario);
   // B5: with no storage scenario, the strip is free for the offline library's
   // notice (it renders nothing unless files are missing). Data danger wins.
   if (!scenario) return <OfflineLibraryBanner />;
 
   return (
-    <div className={`sh-banner sh-banner-${scenario.style}`} role="alert">
+    <div ref={ref} className={`sh-banner sh-banner-${scenario.style}`} role="alert">
       <div className="sh-banner-text">{scenario.text}</div>
       <div className="sh-banner-actions">
         {scenario.buttons.map((btn, i) => (

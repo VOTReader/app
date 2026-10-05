@@ -4,6 +4,20 @@
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 
+/**
+ * Where the chip's top edge goes (cz2, 2026-10-05). It opens 10 px under the tap; when that would cross the bottom
+ * (the gesture inset and 8 px of air) it flips 10 px above the tap, and it never climbs under the top bar (nav
+ * bottom + 8). A mark tapped at y 880 of 915 used to open the chip 26 px off the screen.
+ * @param {number} y tap point @param {number} h chip height @param {number} vh innerHeight
+ * @param {number} insetBottom @param {number} navBottom
+ */
+export function chipTop(y, h, vh, insetBottom, navBottom) {
+  const floor = vh - insetBottom - 8;
+  let top = y + 10;
+  if (top + h > floor) top = y - 10 - h;
+  return Math.max(navBottom + 8, Math.min(top, floor - h));
+}
+
 export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
   const [mode, setMode] = React.useState('main'); // 'main' | 'confirm' | 'colors' | 'style'
   // Reset mode whenever a fresh chip opens (different group)
@@ -18,6 +32,16 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
   // BookmarkPopover): scrim + Escape already existed; this adds the
   // focus/semantics half. Must run before the early returns (hooks rule).
   const trapRef = useFocusTrap(!!chip);
+  // Measured placement (the height differs by mode): runs after every render, before paint.
+  React.useLayoutEffect(() => {
+    const el = trapRef.current;
+    if (!chip || !el) return;
+    const cs = getComputedStyle(document.documentElement);
+    const insetBottom = parseFloat(cs.getPropertyValue('--inset-bottom')) || 0;
+    const nav = document.querySelector('.top-nav');
+    const navBottom = nav ? nav.getBoundingClientRect().bottom : (parseFloat(cs.getPropertyValue('--inset-top')) || 0);
+    el.style.top = chipTop(chip.y, el.getBoundingClientRect().height, window.innerHeight, insetBottom, navBottom) + 'px';
+  });
   if (!chip) return null;
   const { x, y, hlKey, groupId } = chip;
   const ann = (AnnotationStore.get(hlKey) || []).find(h => h.groupId === groupId);

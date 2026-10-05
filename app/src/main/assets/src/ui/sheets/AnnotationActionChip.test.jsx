@@ -9,7 +9,7 @@
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { AnnotationActionChip } from './AnnotationActionChip.jsx';
+import { AnnotationActionChip, chipTop } from './AnnotationActionChip.jsx';
 import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
 
 // The chip's confirm mode renders the REAL ConfirmStrip (a bare global at
@@ -120,5 +120,23 @@ describe('AnnotationActionChip style switcher', () => {
     expect(window.AnnotationStore.removeGroup).not.toHaveBeenCalled();
     expect(screen.getByText('Cancel')).toBeTruthy();
     expect(screen.getByText('Yes, remove')).toBeTruthy();
+  });
+});
+
+describe('chipTop: the chip stays on the screen (cz2)', () => {
+  // 412x915, chip 51 px tall, nav bottom 67.
+  it('opens 10 px under the tap when it fits', () => {
+    expect(chipTop(400, 51, 915, 0, 67)).toBe(410);
+  });
+  it('flips above the tap near the bottom (a mark at y 880 opened the chip 26 px off the screen)', () => {
+    expect(chipTop(880, 51, 915, 0, 67)).toBe(819);
+    expect(chipTop(880, 51, 915, 0, 67) + 51).toBeLessThanOrEqual(915 - 8);
+  });
+  it('counts the APK gesture inset as the bottom', () => {
+    expect(chipTop(860, 51, 915, 24, 67)).toBe(799);
+  });
+  it('never climbs under the top bar', () => {
+    expect(chipTop(70, 51, 915, 0, 135)).toBe(143);
+    expect(chipTop(100, 400, 300, 0, 67)).toBe(75);
   });
 });
