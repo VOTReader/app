@@ -117,6 +117,10 @@ class BridgeContractTest {
         "snapshotList" to 0,
         "snapshotRead" to 1,
         "snapshotClear" to 0,
+        // dl-weekly: the weekly copy in Downloads/VOTReader (DownloadsCopy), called
+        // directly by src/utils/data-safety.js, guarded.
+        "weeklyCopySave" to 1,
+        "weeklyCopyStatus" to 0,
         // sh1: the phone's share sheet. Mirrored by platform-bridge.js androidImpl
         // (utils/copy-share.js calls PlatformBridge.shareText before navigator.share).
         "shareText" to 1,

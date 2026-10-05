@@ -69,6 +69,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // dir, outside the WebView's storage (SnapshotStore, datasafe 2026-10-05).
     val snapshots: SnapshotStore = SnapshotStore(java.io.File(application.filesDir, "snapshots"))
 
+    // ---- The weekly copy in Downloads/VOTReader: a file the reader can see, which
+    // outlives an uninstall (DownloadsCopy, datasafe dl-weekly 2026-10-05).
+    val weeklyCopies: DownloadsCopy = DownloadsCopy.forDevice(application.contentResolver)
+
     // ---- v3 streaming backup: the SAF picker is async, so the chosen
     // destination (export) / source (import) URI is stashed here between
     // v3*Open() launching the picker and the binder-thread bridge methods that

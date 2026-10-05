@@ -63,6 +63,18 @@ class AppInterfaceTest {
         assertEquals(true, app.snapshotClear())
     }
 
+    @Test
+    fun `weekly copy methods delegate to the view model's DownloadsCopy`() {
+        val copies = mockk<DownloadsCopy>()
+        every { copies.save("{}", any()) } returns true
+        every { copies.statusJson() } returns "{\"supported\":true,\"count\":1,\"newestAt\":5}"
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.weeklyCopies } returns copies
+        val (app, _, _) = newSubject(vm = vm)
+        assertEquals(true, app.weeklyCopySave("{}"))
+        assertEquals("{\"supported\":true,\"count\":1,\"newestAt\":5}", app.weeklyCopyStatus())
+    }
+
     // ─── The native player (m3): thin delegations to the port ───────────
 
     private class FakePort : NativeAudioPort {

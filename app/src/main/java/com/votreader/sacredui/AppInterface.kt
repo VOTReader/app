@@ -642,6 +642,14 @@ class AppInterface(
     @JavascriptInterface
     fun snapshotClear(): Boolean = vm.snapshots.clear()
 
+    /** Write this week's copy to Downloads/VOTReader (keeps the newest 4). False when refused, failed or before Android 10. */
+    @JavascriptInterface
+    fun weeklyCopySave(json: String?): Boolean = vm.weeklyCopies.save(json)
+
+    /** `{"supported","count","newestAt"}` for the weekly copies this app wrote. */
+    @JavascriptInterface
+    fun weeklyCopyStatus(): String = vm.weeklyCopies.statusJson()
+
     // ─── Downloaded recordings (listening item 8) ───────────────────────
     // JSON in, JSON out. The page's JSON is untrusted; OfflineAudioStore parses it
     // (a bad shape is a quiet no-op). Runs on the binder thread: the store is
