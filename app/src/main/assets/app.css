@@ -619,6 +619,8 @@
       body:has(.tabbar) .top-nav .tabs-hint-wrap,
       body[data-tab-root] .top-nav .nav-back-icon { display: none; }
       body:has(.tabbar) .top-nav .nav-search-btn[title="Search"] { margin-left: auto; }
+      /* A page title beside the back arrow (The Holy Bible, rs2c) sits by the arrow; the title carries the push. */
+      body:has(.tabbar) .top-nav .nav-home:has(~ .nav-app-name) { margin-right: 0; }
       body:has(.tabbar) .top-nav :is(.nav-search-btn, .nav-more-btn, .nav-back-icon) { color: var(--cream); }
       /* ── TAB ROOTS in the new look (rs1; audit-style.md §1, Corbin's reference) ── a display title, a gold
          pill, hairline rows with a chevron (no cards, no boxes), spaced gold capitals over a section. */
@@ -652,6 +654,18 @@
         text-transform: uppercase; color: var(--gold); margin: 32px 0 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       }
       .home-root .today-card { margin: 0 0 24px; }
+      /* The Holy Bible (rs2c): the translation over the title, the testament switch, tighter book rows. */
+      .root-eyebrow { margin: 16px 0 0; }
+      .root-eyebrow + .root-display { margin-top: 6px; }
+      /* The switch matches the Listen tab's .listen-segment; its own rules here, because the split-lazy-css step
+         may move the Listen block into a sheet this page never loads. */
+      .root-segment { display: grid; grid-template-columns: 1fr 1fr; margin: 0 0 8px; border: 1px solid var(--gold); border-radius: 10px; overflow: hidden; }
+      .root-segment button { min-height: 44px; border: 0; background: none; color: var(--cream); font-family: var(--font-ui); font-size: var(--fs-16); cursor: pointer; }
+      .root-segment button.is-on { background: var(--pill-fill); color: var(--on-gold); }
+      .root-segment button:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
+      .root-list-tight .root-row { min-height: 60px; padding: 8px 0; }
+      .root-list-tight .root-row-title { font-size: var(--fs-20); }
+      .root-list-tight .root-row-sub { font-size: var(--fs-15); }
       .nav-screen-title { font-size: var(--fsc-20); }
       .root-search {
         display: flex; align-items: center; gap: 12px; width: 100%; height: 56px; padding: 0 16px; box-sizing: border-box; margin: 8px 0 8px;

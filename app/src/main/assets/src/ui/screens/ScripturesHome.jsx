@@ -3,8 +3,14 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { translationName } from '../../data/translations.js';
+import { ScripturesRoot } from './ScripturesRoot.jsx';
 
-export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy: _onMatthewStudy, layout, onCycleLayout, translation }) {
+/** The Holy Bible in the new look (ScripturesRoot) wherever the tab bar exists; the classic layouts otherwise. */
+export function ScripturesHome(props) {
+  return typeof BottomTabs !== 'undefined' ? <ScripturesRoot {...props} /> : <ScripturesHomeClassic {...props} />;
+}
+
+function ScripturesHomeClassic({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy: _onMatthewStudy, layout, onCycleLayout, translation }) {
   // Q8: pre-trigger the Bible corpus load when this screen mounts so the
   // user's likely next action (tap a genre tile or book) doesn't pay the
   // full ~7 MB download wait. The subscription re-renders this component
