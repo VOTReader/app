@@ -6,6 +6,7 @@ import { resetAnswersLanding } from './AnswersHome.jsx';
 import { TodayCard, useTodayRows } from '../components/TodayCard.jsx';
 import { createPressDrag } from '../../utils/press-drag.js';
 import { translationLabel } from '../../data/translations.js';
+import { HomeRoot } from './HomeRoot.jsx';
 
 // Abnormal-path trace for the tile drag — console.warn + DiagnosticLog so a
 // failing device names itself (same pattern as [tabdrag]/[thumb]).
@@ -43,7 +44,12 @@ function useSongCatalogCount() {
   }, [cat]);
 }
 
-export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, onOpenPlans }) {
+// rs1 (overhaul): with the tab bar (BottomTabs) Home is the new-look root; without it, the classic Home below.
+export function HomeScreen(props) {
+  return typeof BottomTabs !== 'undefined' ? <HomeRoot {...props} /> : <HomeScreenClassic {...props} />;
+}
+
+function HomeScreenClassic({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, onOpenPlans }) {
   // rp1: the reader's plans for today, above Search (TodayCard.jsx)
   const todayRows = useTodayRows(readingPlans, isRead);
   useSongCatalogCount();

@@ -22,11 +22,12 @@ import { clampLpm, clampEndDwell } from '../../hooks/use-autoscroll.js';
 // Re-exported here because this is the seam everything else already imports.
 export { clampEndDwell };
 
-export function ReadingChromeProvider({ screen, dotEnabled, onGo, settings, updateSetting, nav, children }) {
+export function ReadingChromeProvider({ screen, dotEnabled, hasPlace, onGo, settings, updateSetting, nav, children }) {
   const s = settings || {};
   // Deliberately un-memoized (carried over from app.jsx): goToLastRead reads
   // live nav state from its closure, and the sole consumer is one tiny button.
-  const dotValue = { screen, enabled: !!dotEnabled, onGo };
+  // hasPlace (rs1): a last place exists, dot setting or not; Home's Continue reading reads it.
+  const dotValue = { screen, enabled: !!dotEnabled, hasPlace: !!hasPlace, onGo };
   const autoValue = React.useMemo(() => ({
     enabled: !!s.autoScroll,
     speedLpm: clampLpm(s.autoScrollLpm),

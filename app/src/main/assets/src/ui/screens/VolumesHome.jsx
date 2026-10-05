@@ -2,7 +2,14 @@
    VolumesHome — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function VolumesHome({ onSelect, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+import { ReadRoot } from './ReadRoot.jsx';
+
+// rs1 (overhaul): with the tab bar (BottomTabs) this is the Read tab's root; without it, the classic landing.
+export function VolumesHome(props) {
+  return typeof BottomTabs !== 'undefined' ? <ReadRoot {...props} /> : <VolumesHomeClassic {...props} />;
+}
+
+function VolumesHomeClassic({ onSelect, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   // Q8.3: VOT corpus is lazy. Subscribe + pre-fire on mount so the
   // letter-count details fill in once bundle-a-vot.js loads. Use
   // colLetterArr (lazy-safe) for all collections — returns [] when

@@ -471,6 +471,7 @@
         --fs-16:  1rem;        --fsc-16:  16px;   /* body / reading anchor */
         --fs-18:  1.125rem;    --fsc-18:  18px;
         --fs-20:  1.25rem;     --fsc-20:  20px;
+        --fs-22:  1.375rem;    --fsc-22:  22px;   /* rs1: the new-look row title (audit-style.md) */
         --fs-24:  1.5rem;      --fsc-24:  24px;
         --fs-30:  1.875rem;    --fsc-30:  30px;
         --fs-36:  2.25rem;     --fsc-36:  36px;
@@ -619,6 +620,47 @@
       body[data-tab-root] .top-nav .nav-back-icon { display: none; }
       body:has(.tabbar) .top-nav .nav-search-btn[title="Search"] { margin-left: auto; }
       body:has(.tabbar) .top-nav :is(.nav-search-btn, .nav-more-btn, .nav-back-icon) { color: var(--cream); }
+      /* ── TAB ROOTS in the new look (rs1; audit-style.md §1, Corbin's reference) ── a display title, a gold
+         pill, hairline rows with a chevron (no cards, no boxes), spaced gold capitals over a section. */
+      .nav-app-name { font-family: var(--font-ui); font-size: var(--fsc-24); color: var(--cream); padding-left: 12px; margin-right: auto; white-space: nowrap; }
+      .root-page { padding: 8px 24px 32px; max-width: var(--col-max, 720px); margin: 0 auto; box-sizing: border-box; font-family: var(--font-ui); }
+      .root-display { text-wrap: balance; font-family: var(--font-ui); font-weight: 400; font-size: clamp(var(--fs-36), 11vw, var(--fs-48)); line-height: 1.06; letter-spacing: -0.01em; color: var(--cream); margin: 16px 0 8px; text-align: left; }
+      .root-sub { font-size: var(--fs-18); color: var(--cream-dim); margin: 0 0 24px; line-height: 1.35; }
+      .gold-pill {
+        display: inline-flex; align-items: center; gap: 12px; height: 52px; padding: 0 20px; border-radius: var(--radius-lg);
+        background: var(--pill-fill); color: var(--on-gold); border: 0; cursor: pointer;
+        font-family: var(--font-ui); font-size: var(--fsc-20); font-weight: 500; letter-spacing: 0.005em;
+      }
+      .gold-pill-wide { display: flex; width: 100%; justify-content: space-between; margin: 0 0 16px; }
+      .gold-pill:active { filter: brightness(1.08); }
+      .gold-pill:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 3px; }
+      .root-rows { list-style: none; margin: 0 0 8px; padding: 0; border-top: 1px solid var(--divider); }
+      .root-row-li { border-bottom: 1px solid var(--divider); }
+      .root-row {
+        display: flex; align-items: center; gap: 14px; width: 100%; min-height: 76px; padding: 14px 0; box-sizing: border-box;
+        background: none; border: 0; color: inherit; text-align: left; cursor: pointer; font-family: var(--font-ui);
+      }
+      .root-row:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; border-radius: 6px; }
+      .root-row-lead { width: 40px; flex-shrink: 0; color: var(--gold); font-size: var(--fs-20); }
+      .root-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+      .root-row-title { font-size: var(--fs-22); line-height: 1.2; color: var(--cream); }
+      .root-row-sub { font-size: var(--fs-16); line-height: 1.3; color: var(--cream-dim); }
+      .root-row-chev { flex-shrink: 0; color: var(--cream-muted); }
+      .caps-label {
+        font-family: var(--font-ui); font-size: var(--fs-13); font-weight: 500; letter-spacing: var(--track-caps);
+        text-transform: uppercase; color: var(--gold); margin: 32px 0 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .home-root .today-card { margin: 0 0 24px; }
+      .nav-screen-title { font-size: var(--fsc-20); }
+      .root-search {
+        display: flex; align-items: center; gap: 12px; width: 100%; height: 56px; padding: 0 16px; box-sizing: border-box; margin: 8px 0 8px;
+        background: var(--input-bg); border: 1px solid var(--input-border); border-radius: var(--radius-lg);
+        color: var(--cream); cursor: text; font-family: var(--font-ui); text-align: left;
+      }
+      .root-search-ph { flex: 1; min-width: 0; font-size: var(--fs-18); color: var(--cream-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .root-search:focus-visible { outline: none; border-color: var(--gold); }
+      .read-root .caps-label:first-of-type { margin-top: 24px; }
+      .root-rows-numeral .root-row { min-height: 64px; }
       /* The mini player rides on the bar, square to it (its own inset padding is the bar's now). */
       body:has(.tabbar) .audio-bar { bottom: var(--dock-sys); padding-bottom: min(0.5rem, 10px); }
 

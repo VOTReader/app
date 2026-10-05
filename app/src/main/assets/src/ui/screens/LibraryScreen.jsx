@@ -38,7 +38,14 @@ function _libDragTrace(msg) {
 // The stores behind the Notes, Links, Bookmarks, Journal and Highlights counts.
 const LIBRARY_COUNT_STORES = Object.freeze(['NoteStore', 'LinkStore', 'BookmarkStore', 'JournalStore', 'AnnotationStore']);
 
-export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenPlans, readingPlanCount, onOpenScriptureWeb, totalReadCount, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+import { LibraryRoot } from './LibraryRoot.jsx';
+
+// rs1 (overhaul): with the tab bar (BottomTabs) this is the Library tab's root; without it, the classic Library.
+export function LibraryScreen(props) {
+  return typeof BottomTabs !== 'undefined' ? <LibraryRoot {...props} /> : <LibraryScreenClassic {...props} />;
+}
+
+function LibraryScreenClassic({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenPlans, readingPlanCount, onOpenScriptureWeb, totalReadCount, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
   // The tile counts below read these stores directly; subscribing to each one is
   // what keeps a count live while the Library stays open (a note saved in a
   // sheet, a bookmark removed). Fixed list — stable hook order.

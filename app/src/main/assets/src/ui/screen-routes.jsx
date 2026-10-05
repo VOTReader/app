@@ -956,6 +956,7 @@ export function buildScreenRoutes({
           onSearch={goSearch}
           onHistory={goHistory}
           onSettings={goSettings}
+          onAbout={goAbout}
           historyEnabled={settings.historyEnabled !== false}
           theme={theme} onThemeChange={setTheme}
         />
@@ -1162,6 +1163,14 @@ export function buildScreenRoutes({
     'volumes-home': () => (
       <VolumesHome
         onSelect={(id) => { _startNewTrail(); handleVolumeSelect(id); }}
+        onOpen={handleSelect}
+        onScriptureWeb={() => {
+          // rs1 (overhaul): the Read root's Scripture Web row, the same entry as Home's.
+          if (typeof window.__loadScreensF === 'function') window.__loadScreensF();
+          setNavOrigin({ screen: 'volumes-home', returnOrigin: navOrigin || null });
+          setScreen('scripture-web');
+        }}
+        translation={settings.translation}
         onBack={goHome}
         onSearch={goSearch}
         onHistory={goHistory}
