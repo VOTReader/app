@@ -358,7 +358,8 @@
         } },
       { bundle: '__screensH', label: 'Audio Readings → Listening Library (bundle-h)',
         open: async function () { await goHome(); return clickByText(/Audio Readings/); },
-        there: function () { return /Saved recordings/.test(document.body.textContent || ''); } },
+        // rv1 (overhaul): the Listen tab root replaced the hub; YOUR LISTENING is always shown.
+        there: function () { return /Your Listening/.test(document.body.textContent || ''); } },
       { bundle: '__screensE', label: 'App Configuration → Settings (bundle-e)',
         open: async function () { await goHome(); return clickByText(/App Configuration|^Settings/); },
         there: function () { return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data/.test(document.body.textContent || ''); } },
@@ -569,15 +570,16 @@
       await goHome();
       clickByText(/Audio Readings/); await sleep(360);
       const body = document.body.textContent || '';
-      // The hub's own furniture: the saved doorway + one doorway per source.
-      return /Saved recordings/.test(body) && /The Volumes of Truth/.test(body) && /Biblical Restoration Ministries/.test(body);
+      // rv1 (overhaul): the Listen root's own furniture: the Letters, the Scriptures, Your Listening.
+      return /Your Listening/.test(body) && /Volume One/.test(body) && /Biblical Restoration Ministries/.test(body);
     });
-    await step('Listening → The Volumes', async function () {
+    await step('Listening → Volume One', async function () {
       await goHome();
       clickByText(/Audio Readings/); await sleep(360);
-      clickByText(/The Volumes of Truth/); await sleep(400);
-      // The collection list lives one level in, not splayed across the hub.
-      return /Volume One/.test(document.body.textContent || '') && /Collections/.test(document.body.textContent || '');
+      clickByText(/^Volume One/); await sleep(400);
+      // The Source screen: its fact line and a numbered row read by someone.
+      const body = document.body.textContent || '';
+      return /read-along/.test(body) && /Read by|Synthesized voice/.test(body);
     });
     await step('Scripture Web', async function () {
       // Reached from the Library like every other personal-study surface. The
