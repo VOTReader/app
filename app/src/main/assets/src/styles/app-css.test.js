@@ -802,3 +802,46 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
     expect(Number(ls[1])).toBeLessThanOrEqual(0.1);
   });
 });
+
+/* cz1 (zones, 2026-10-05): one bottom dock owns where every floating control sits. Eleven pairwise lifts
+   (+58/+72/+130/7.5rem) each kept ONE pair apart and everything else collided (hub overlay audit). These pin
+   the stack's expressions; tools/e2e-dock-geometry.mjs measures every co-visible combination. */
+describe('bottom dock stack (cz1)', () => {
+  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  const ws = (s) => s.replace(/\s+/g, ' ');
+  const decl = (sel, prop) => {
+    const b = ruleBlock(CSS, sel);
+    const m = b && new RegExp('(?:^|;|\\s)' + prop + ':\\s*([^;]+)').exec(b);
+    return m ? ws(m[1].trim()) : null;
+  };
+  it('the rows live on :root, and body states fill them', () => {
+    expect(decl(':root {\n        --dock-sys', '--dock-sys')).toBe('max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px))');
+    expect(bare).toMatch(/--dock-floor:\s*max\(1\.4rem, calc\(var\(--dock-sys\) \+ 0\.4rem\)\)/);
+    expect(decl('body.audio-bar-open {', '--dock-player')).toBe('96px');
+    expect(decl('body.autoscroll-on {', '--dock-transport')).toBe('60px');
+    expect(decl('body:has(.mode-toggle-wrap) {', '--dock-context')).toBe('64px');
+  });
+  it('each control stands on the rows under it', () => {
+    expect(decl('\n    .ascroll-pill {', 'bottom')).toBe('calc(var(--dock-floor) + var(--dock-player))');
+    expect(decl('\n    .find-pill {', 'bottom')).toBe('calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport))');
+    expect(decl('\n      .mode-toggle-wrap {', 'bottom')).toBe('calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport))');
+    expect(decl('.ann-hint-pill', 'bottom')).toBe('calc(max(1.2rem, var(--dock-sys)) + var(--dock-context))');
+    expect(decl('.vot-toast {', 'bottom')).toBe('var(--dock-toast-bottom)');
+    expect(decl('.vot-toast {', 'top')).toBe('var(--dock-toast-top)');
+    expect(decl('\n      .tour-prompt { bottom', 'bottom')).toBe('calc(max(14px, var(--dock-sys)) + var(--dock-player))');
+  });
+  it('the pairwise lifts are gone, and find hides the Study Notes toggle', () => {
+    expect(bare).not.toMatch(/body\.audio-bar-open \.ascroll-pill/);
+    expect(bare).not.toMatch(/\.find-pill \{ bottom: calc\(max\(1\.4rem/);
+    expect(bare).not.toMatch(/\+ (58|72|130)px\)/);
+    expect(decl('body:has(.find-pill) .mode-toggle-wrap {', 'display')).toBe('none');
+  });
+  it('the root-exit toast and the journal FAB ride the same stack', () => {
+    const exit = readFileSync(join(SRC_ROOT, 'utils', 'root-exit-toast.js'), 'utf8');
+    expect(exit).toContain("'bottom:var(--dock-toast-bottom, calc(env(safe-area-inset-bottom, 0px) + 2rem))'");
+    expect(exit).toContain("'top:var(--dock-toast-top, auto)'");
+    const jrn = readFileSync(join(SRC_ROOT, 'styles', 'journal-styles.js'), 'utf8');
+    expect(jrn).toContain('.jrn-fab { position: fixed; bottom: calc(24px + var(--dock-sys, env(safe-area-inset-bottom, 0px)) + var(--dock-player, 0px));');
+    expect(jrn).not.toContain('body.audio-bar-open .jrn-fab');
+  });
+});

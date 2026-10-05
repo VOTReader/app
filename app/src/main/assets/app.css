@@ -37,7 +37,7 @@
         z-index: 9998;
         left: 50%;
         transform: translateX(-50%);
-        bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem);
+        bottom: var(--dock-toast-bottom); top: var(--dock-toast-top);
         max-width: min(92%, 32rem);
         background: rgba(20,20,24,0.94);
         color: #f0e6d2;
@@ -510,6 +510,48 @@
         --input-text:       var(--cream);  /* light mode override below */
         --white:            #ffffff;       /* pure white (theme-agnostic) */
       }
+      /* ── BOTTOM DOCK (cz1, 2026-10-05) ── one stack owns where every floating
+         bottom control sits, so none of them can land on another. Rows, bottom up:
+           sys        the gesture bar / home indicator (env() on iOS, Kotlin's --inset-bottom on the APK)
+           player     the mini player, 70px + its 23px pull tab (+3 gap), while body.audio-bar-open
+           transport  the auto-scroll pill, while body.autoscroll-on (taller when its dwell row is open)
+           context    the screen's own control: Study Notes / prophecy Expand (.mode-toggle-wrap, right),
+                      the journal FAB
+           message    toasts (.vot-toast, the root-exit toast) ride on top of everything above, the find
+                      pill included. While the tour prompt fills the bottom, and on a short screen (landscape:
+                      412px cannot hold player + pill + find + a toast under a 67px nav), they drop in under the nav
+         Each control's bottom is the floor plus the rows under it; a row that is not showing is 0px. The
+         rows are set on body (the classes live there), so every rule below resolves them per state.
+         The find pill stacks on the transport; the hint and the tour prompt sit in the message lane. */
+      :root {
+        --dock-sys: max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px));
+        --dock-floor: max(1.4rem, calc(var(--dock-sys) + 0.4rem));
+        --dock-player: 0px; --dock-transport: 0px; --dock-context: 0px; --dock-find: 0px;
+        /* the top bar's bottom edge: .top-nav's 44px row + 22.4px padding + 1px border, as .chapter-nav-sticky has it */
+        --dock-nav-bottom: calc(var(--inset-top, 0px) + 44px + 22.4px + 1px);
+      }
+      body.audio-bar-open { --dock-player: 96px; }
+      body.autoscroll-on { --dock-transport: 60px; }
+      body.autoscroll-on:has(.ascroll-pill.is-expanded) { --dock-transport: 106px; }  /* two 44px rows: 98px + 8 */
+      body:has(.find-pill) { --dock-find: 58px; }  /* 50px pill + 8 */
+      body:has(.mode-toggle-wrap) { --dock-context: 64px; }
+      body:has(.jrn-fab) { --dock-context: 72px; }
+      /* The message lane: where a toast's bottom edge goes (restated for the hint below). A toast reads
+         --dock-toast-bottom / --dock-toast-top; exactly one of them is auto. */
+      body {
+        --dock-message: calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport) + var(--dock-find) + var(--dock-context) + 0.6rem);
+        --dock-toast-bottom: var(--dock-message); --dock-toast-top: auto;
+        --dock-under-nav: calc(var(--dock-nav-bottom) + var(--offline-strip-h, 0px) + 8px);
+      }
+      /* A short screen cannot stack all of them: the auto-scroll dwell row (an adjuster the reader opened)
+         folds while find is open, and the Study Notes toggle steps aside while that row is open, as it does for find. */
+      @media (max-height: 500px) {
+        body { --dock-toast-bottom: auto; --dock-toast-top: var(--dock-under-nav); }
+        body:has(.find-pill) .ascroll-dwell-row { display: none; }
+        body.autoscroll-on:has(.ascroll-pill.is-expanded):has(.find-pill) { --dock-transport: 60px; }
+        body:has(.ascroll-pill.is-expanded) .mode-toggle-wrap { display: none; }
+      }
+
       /* ── LIGHT THEME OVERRIDES ── */
       body.light {
         --bg:          #f7f2e8;
@@ -839,7 +881,6 @@
           border-right: 1px solid var(--gold-border);
         }
         .chapter-nav-sticky { max-width: var(--col-max); margin: 0 auto; }
-        .surprise-fab { right: calc(50vw - var(--col-max) / 2 + 1.5rem); }
         /* (.link-sidebar's matching column-pin lives NEXT TO its base rule —
            same specificity, so it must come after it in the cascade.) */
       }
@@ -1223,12 +1264,6 @@
          cards. The inset term tracks the bar's own safe-area padding. */
       body.audio-bar-open .screen-scroll {
         padding-bottom: calc(92px + max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px)));
-      }
-      /* The auto-scroll transport is fixed and bottom-anchored (its transform
-         is doing the left:50% centering, so it must not be touched) — the lift
-         restates .ascroll-pill's own bottom expression plus the bar. */
-      body.audio-bar-open .ascroll-pill {
-        bottom: calc(max(1.4rem, calc(var(--inset-bottom, 0px) + 0.4rem)) + 72px);
       }
       @media (prefers-reduced-motion: reduce) {
         /* The global W10-lite block near-zeros the duration, which would park
@@ -2140,7 +2175,7 @@
     
       @media (max-width: 500px) {
         .vol-index-title { font-size: var(--fs-30); }
-        .mode-toggle-wrap { bottom: 1rem; right: 1rem; }
+        .mode-toggle-wrap { right: 1rem; }
         .mode-btn { padding: 0.5rem 0.75rem; font-size: var(--fs-10); }
       }
       /* ── INLINE NOTES ── */
@@ -2211,10 +2246,13 @@
       .inline-echo-pill .echo-arrow { font-size: var(--fs-11); line-height: 1; }
 
       /* ── PDF/INLINE TOGGLE ── */
+      /* The context row of the bottom dock (cz1): above the player and the auto-scroll pill, and off the
+         gesture bar. It steps aside while find is open (the find pill takes the row over the transport). */
       .mode-toggle-wrap {
-        position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 200;
+        position: fixed; bottom: calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport)); right: 1.5rem; z-index: 200;
         display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
       }
+      body:has(.find-pill) .mode-toggle-wrap { display: none; }
       /* (column-pin lives NEXT TO the base rule — same specificity, so it
          must come after it in the cascade; see .link-sidebar note above.) */
       @media (min-width: 768px) {
@@ -2223,7 +2261,8 @@
       /* ── First-run annotation tip (AnnotationHint) ── */
       .ann-hint-pill {
         position: fixed; left: 50%; transform: translateX(-50%);
-        bottom: max(1.2rem, var(--inset-bottom, 0px));
+        /* Message lane, above the context row (cz1: the Study Notes toggle sat on its ✕). */
+        bottom: calc(max(1.2rem, var(--dock-sys)) + var(--dock-context));
         z-index: 190; /* under the mode-toggle pill (200) + sheets */
         display: flex; align-items: center; gap: 10px;
         /* width:max-content defeats the left:50% shrink-to-fit trap (a
@@ -2257,8 +2296,8 @@
          same base offset and is up to three lines tall on a 320 px phone;
          7.5rem clears that. Not while autoscroll hides the pill. Kept AFTER the
          pill's own rule: app-css.test.js reads the first '.ann-hint-pill'. */
-      body:not(.autoscroll-on):has(.ann-hint-pill) .vot-toast {
-        bottom: calc(max(1.2rem, var(--inset-bottom, 0px)) + 7.5rem);
+      body:not(.autoscroll-on):has(.ann-hint-pill) {
+        --dock-message: calc(max(1.2rem, var(--dock-sys)) + var(--dock-context) + 7.5rem);
       }
       .ann-hint-icon { width: 22px; height: 22px; color: var(--gold); flex-shrink: 0; }
       .ann-hint-text {
@@ -7204,11 +7243,12 @@
        never displace it. width:max-content defeats the left:50% shrink-to-fit
        trap (a transform-centered fixed box otherwise sizes against the HALF
        viewport and needlessly wraps) — same fix as .ann-hint-pill.
-       z-index 195: above the first-run hint (190), below the Matthew mode
-       pill (200), which is bottom-RIGHT and so never overlaps anyway. */
+       z-index 195: above the first-run hint (190). The transport row of the
+       bottom dock (cz1): it sits on the player; the Study Notes toggle (200)
+       sits on it (they overlapped at every width while each kept its own offset). */
     .ascroll-pill {
       position: fixed; left: 50%; transform: translateX(-50%);
-      bottom: max(1.4rem, calc(var(--inset-bottom, 0px) + 0.4rem));
+      bottom: calc(var(--dock-floor) + var(--dock-player));
       z-index: 195;
       display: flex; flex-direction: column; align-items: center; gap: 2px;
       width: max-content; max-width: calc(100vw - 24px);
@@ -7232,7 +7272,7 @@
        its type names the --fsc-* px twins. */
     .find-pill {
       position: fixed; left: 50%; transform: translateX(-50%);
-      bottom: max(1.4rem, calc(var(--inset-bottom, 0px) + 0.4rem));
+      bottom: calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport));
       z-index: 196;
       display: flex; align-items: center;
       width: max-content; max-width: calc(100vw - 24px);
@@ -7245,9 +7285,6 @@
       box-shadow: 0 6px 20px rgba(0,0,0,0.45);
     }
     body.light .find-pill { background: rgb(247,242,232); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
-    body.autoscroll-on .find-pill { bottom: calc(max(1.4rem, calc(var(--inset-bottom, 0px) + 0.4rem)) + 58px); }
-    body.audio-bar-open .find-pill { bottom: calc(max(1.4rem, calc(var(--inset-bottom, 0px) + 0.4rem)) + 72px); }
-    body.audio-bar-open.autoscroll-on .find-pill { bottom: calc(max(1.4rem, calc(var(--inset-bottom, 0px) + 0.4rem)) + 130px); }
     .find-pill-word {
       font-family: var(--font-cinzel, Georgia, serif); font-size: var(--fsc-12); letter-spacing: 0.14em; text-transform: uppercase;
       color: var(--gold); max-width: 9.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -8001,7 +8038,13 @@
          the frame) and a portrait phone at Text Size 3 (264 for 298). The Home scroller reserves
          the strip's measured height below, so growing costs no tile its reach. Measured after:
          portrait 360x800 194 / 232 / 298 px at Text Size 1 / 1.8 / 3. */
-      .tour-prompt { bottom: max(14px, var(--inset-bottom, 0px)); z-index: 310; padding: 14px 16px 10px; }
+      /* Message lane (cz1): over the mini player, not on it (z310 hid the whole bar, pause and close included). */
+      .tour-prompt { bottom: calc(max(14px, var(--dock-sys)) + var(--dock-player)); z-index: 310; padding: 14px 16px 10px; }
+      /* On a short screen (landscape, the player open) it scrolls inside itself rather than climb onto the nav.
+         While it shows, toasts drop in under the nav (first run on Home is where the root-exit toast shows):
+         the 80px it leaves free there is that lane (a two-line toast is 68px). */
+      .tour-prompt { max-height: calc(100vh - max(14px, var(--dock-sys)) - var(--dock-player) - var(--dock-under-nav) - 80px); }
+      body.tour-prompt-open { --dock-toast-bottom: auto; --dock-toast-top: var(--dock-under-nav); }
       /* Neither button ever breaks a word (journey F1.2): "Show me around" (176 px) and "Maybe
          later" (141) need 325 px of row and have 262 on a 320 phone, 302 on a 360 — so on those the
          second drops to its own line, right-aligned under a full-width primary, instead of the
@@ -8038,7 +8081,7 @@
       /* Room for the strip (TourPrompt measures itself into --tour-prompt-h): the last Home tile
          scrolls clear of it, as the last paragraph does of the player bar above. */
       body.tour-prompt-open .screen-scroll {
-        padding-bottom: calc(var(--tour-prompt-h, 200px) + 28px + max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px)));
+        padding-bottom: calc(var(--tour-prompt-h, 200px) + 28px + var(--dock-player) + var(--dock-sys));
       }
       /* THE CARD'S TYPE IS CAPPED, like the strip's since 2026-09-12 (the Tour Reviewer, 2026-09-13):
          uncapped, Text Size 3 on a 360x800 phone showed the Listen card's eyebrow and title with 11

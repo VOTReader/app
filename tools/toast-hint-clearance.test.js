@@ -6,6 +6,8 @@
  * three lines tall on a narrow phone. Measured in the real built app at
  * 390x844 (2026-09-22): the "Copied" toast (y 763-812) sat inside the pill
  * (y 746-825). The fix lifts every toast while the pill is in the document.
+ * cz1 (2026-10-05): the lift is now the bottom dock's message lane (--dock-message, which .vot-toast reads
+ * through --dock-toast-bottom), and both start from the pill's base over the context row.
  * jsdom has no layout, so this pins the CSS contract: the lift rule exists,
  * starts from the pill's own base offset, and clears a three-line pill.
  */
@@ -26,11 +28,14 @@ function block(selector) {
 
 describe('toasts clear the first-run tip pill (ux3)', () => {
   it('lifts .vot-toast while an .ann-hint-pill is in the page (and not hidden by autoscroll)', () => {
-    const lift = block('body:not(.autoscroll-on):has(.ann-hint-pill) .vot-toast');
+    const lift = block('body:not(.autoscroll-on):has(.ann-hint-pill)');
     expect(lift, 'the lift rule is missing from app.css').toBeTruthy();
     // Starts from the pill's own base, so the two can never drift apart.
-    expect(block('.ann-hint-pill')).toMatch(/bottom:\s*max\(1\.2rem, var\(--inset-bottom, 0px\)\)/);
-    const m = /bottom:\s*calc\(max\(1\.2rem, var\(--inset-bottom, 0px\)\) \+ ([\d.]+)rem\)/.exec(lift || '');
+    const base = String.raw`max\(1\.2rem, var\(--dock-sys\)\) \+ var\(--dock-context\)`;
+    expect(block('.ann-hint-pill')).toMatch(new RegExp(String.raw`bottom:\s*calc\(` + base + String.raw`\)`));
+    expect(block('.vot-toast')).toMatch(/bottom:\s*var\(--dock-toast-bottom\)/);
+    expect(CSS).toMatch(/--dock-toast-bottom:\s*var\(--dock-message\)/);
+    const m = new RegExp(String.raw`--dock-message:\s*calc\(` + base + String.raw` \+ ([\d.]+)rem\)`).exec(lift || '');
     expect(m, 'the lift must be the pill base plus a rem offset').toBeTruthy();
     // Measured: the two-line pill is 79 px tall at 390 px wide, so a three-line pill (a 320 px phone) is about
     // 100 px = 6.3rem; the lift must clear that with a visible gap.

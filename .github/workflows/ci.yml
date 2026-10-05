@@ -495,6 +495,13 @@ jobs:
         # user) + pre-loads the lazy corpora so every screen has its data.
         run: npm run smoke:ci
 
+      - name: Floating controls never overlap (dock geometry)
+        # tools/e2e-dock-geometry.mjs (zones cz1, 2026-10-05): the shipped app.min.css and the journal sheet in a
+        # blank page, one stand-in per floating control at its measured size, every combination that can show at
+        # once x 412x915 / 360x740 / 915x412 x with and without the APK's insets. No two rects may intersect and none
+        # may leave the screen. ~10 s, no server.
+        run: npm run e2e:dock
+
       - name: End-to-end read detector
         # e2e-read-detector.mjs proves the read detector end to end in a real
         # compositing Chromium: completion, the ledger, the day bucket, and the

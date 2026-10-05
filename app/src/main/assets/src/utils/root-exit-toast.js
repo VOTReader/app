@@ -72,8 +72,10 @@ function _ensureToast() {
     'z-index:9998',
     'left:50%',
     'transform:translateX(-50%)',
-    // Anchor near the bottom; respect safe-area inset for notched devices.
-    'bottom:calc(env(safe-area-inset-bottom, 0px) + 2rem)',
+    // The bottom dock's message lane (app.css --dock-message, cz1): above the
+    // mini player and every floating control, like .vot-toast.
+    'bottom:var(--dock-toast-bottom, calc(env(safe-area-inset-bottom, 0px) + 2rem))',
+    'top:var(--dock-toast-top, auto)',
     'background:rgba(20,20,24,0.92)',
     'color:#f0e6d2',
     'border:1px solid rgba(255,215,140,0.35)',

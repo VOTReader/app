@@ -172,7 +172,8 @@ describe('the mini-player song skin (final-08)', () => {
     const css = readFileSync(resolve(here, '../../../app.css'), 'utf-8');
     expect(css).toContain(':where(.audio-bar, .audio-manager-sheet) button { font-family: inherit; }');
     const journal = readFileSync(resolve(here, '../../styles/journal-styles.js'), 'utf-8');
-    expect(journal).toContain('body.audio-bar-open .jrn-fab { bottom: calc(24px + 72px');
+    // cz1: the FAB rides the bottom dock, whose player row is the bar plus its pull tab while one is open.
+    expect(journal).toContain('.jrn-fab { position: fixed; bottom: calc(24px + var(--dock-sys, env(safe-area-inset-bottom, 0px)) + var(--dock-player, 0px));');
   });
 });
 
