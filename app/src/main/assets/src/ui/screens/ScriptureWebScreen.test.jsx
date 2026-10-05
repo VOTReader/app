@@ -56,7 +56,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
       // a line ends up unwitnessed. Recording is additive; no other case reads it.
       draw: (opts) => {
         DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density, camY: opts && opts.camY, camX: opts && opts.camX, lens: opts && opts.lens,
-          focusArc: opts && opts.focusArc, focusRange: opts && opts.focusRange });
+          focusArc: opts && opts.focusArc, focusRange: opts && opts.focusRange, lensDim: opts && opts.lensDim });
         return { instances: 0, draws: 0 };
       },
       dispose: vi.fn(),
@@ -571,6 +571,20 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(zoomText(container)).toBe('1711x');
       expect(shownLens(container)).toBe('0-' + (CANON - 1));
       expect(DRAWN[DRAWN.length - 1].lens).toEqual([0, CANON - 1]);
+      // sw1: fully set in by the ceiling; on the way, one + press past 6x is a step, not the whole drop
+      expect(DRAWN[DRAWN.length - 1].lensDim).toBeCloseTo(0.35, 6);
+    });
+
+    it('the lens eases in: the first frame past 6x keeps most of the ink (sw1)', async () => {
+      await mount();
+      let firstLensed = null;
+      for (let i = 0; i < 12 && !firstLensed; i++) {
+        await pressFrame('+');
+        const last = DRAWN[DRAWN.length - 1];
+        if (last.lens) firstLensed = last;
+      }
+      expect(firstLensed, 'PRECONDITION: a press reached the lens').toBeTruthy();
+      expect(firstLensed.lensDim).toBeGreaterThan(0.75);
     });
 
     it('My Web has no lens: switching at the ceiling clears data-lens and the draw carries null', async () => {

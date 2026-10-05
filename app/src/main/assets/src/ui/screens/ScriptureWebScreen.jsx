@@ -23,7 +23,7 @@
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
-  rotatePointer, ribbonStyle, arcShape, maxCamY, ALTITUDE_MARKS, spanAtHeight, lensDimFor,
+  rotatePointer, ribbonStyle, arcShape, maxCamY, ALTITUDE_MARKS, spanAtHeight, lensDimFor, lensShareAt,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
@@ -487,8 +487,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const style = ribbonStyle(zoom, base.localize, chrome.isLight, perCssPx);
     // the convergence pills: how many threads meet at each foot cell
     const bundles = bundlesFor(bundleRef.current, g, cam, base, v, density);
+    // the lens eases in from 6x to 24x rather than switching on at 6x (sw1)
+    const lensDim = lens ? lensShareAt(zoom) : 1;
     r.draw(Object.assign({}, base, {
-      lens,
+      lens, lensDim,
       camX: cam.x, ppv: cam.ppv,
       strokeWidth: style.strokeWidthCss * v.DPR,
       alpha: style.alpha,
@@ -526,7 +528,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (wrapRef.current) wrapRef.current.setAttribute('data-elevator', elevatorRef.current ? elevatorRef.current.at.toFixed(4) : '');
     const labels = drawThreadRefs(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved }), v, chrome, density, focusRef.current.arc);
     if (wrapRef.current) wrapRef.current.setAttribute('data-thread-labels', String(labels));
-    badgeBoxesRef.current = drawBundleBadges(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved, lens }), v, chrome, bundles);
+    badgeBoxesRef.current = drawBundleBadges(uiRef.current, g, cam, Object.assign({}, base, { inset, reserved, lens, lensDim }), v, chrome, bundles);
     if (wrapRef.current) wrapRef.current.setAttribute('data-bundle-badges', String(badgeBoxesRef.current.length));
     // the walk's window on the badges (device px boxes), like __swContextCeiling: unset in the app
     if (typeof globalThis.__swWalk !== 'undefined') globalThis.__swBadgeBoxes = badgeBoxesRef.current;
@@ -1536,7 +1538,7 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
     const wCell = (cell.hi - cell.lo + 1) * ppv;
     const text = fmtCount(n);
     if (ctx.measureText(text).width + fs * 0.9 > wCell + 2 * DPR) continue;   // a pill wider than its cell lies
-    const box = pill(text, cx, cy, false, lensDimFor(cell.lo, cell.hi, view.lens || null));
+    const box = pill(text, cx, cy, false, lensDimFor(cell.lo, cell.hi, view.lens || null, view.lensDim));
     if (box) boxes.push(Object.assign(box, { cell, rep: -1 }));
   }
   ctx.restore();

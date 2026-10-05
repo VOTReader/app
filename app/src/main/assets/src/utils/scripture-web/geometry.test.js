@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  LOCALIZE_START, LOCALIZE_END, MAX_STRETCH, FLYOVER_MARGIN, FLYOVER_FLOOR,
+  LOCALIZE_START, LOCALIZE_END, LENS_FULL, LENS_CONTEXT, lensShareAt, lensDimFor, MAX_STRETCH, FLYOVER_MARGIN, FLYOVER_FLOOR,
   localizeFactor, squashFactor, arcDistance, arcHeightAt,
   arcShape, arcShapeGLSL, footX,
   arcAnchored, flyOverDim, flyOverGLSL, glslFloat,
@@ -586,5 +586,28 @@ describe('decode', () => {
   it('throws on missing data rather than rendering nothing silently', () => {
     expect(() => decodeGraph(null)).toThrow(/missing/);
     expect(() => decodeGraph({ count: 0 })).toThrow(/missing/);
+  });
+});
+
+/* sw1 (audit-web 10-05): the lens switched fully on at LOCALIZE_START, so one + press past 6x dropped every
+   other chapter from full ink to LENS_CONTEXT and the frame's mean brightness halved. It eases in now. */
+describe('the lens eases in from LOCALIZE_START to LENS_FULL', () => {
+  it('keeps full ink up to 6x, reaches LENS_CONTEXT at 24x (the localize span) and stays there', () => {
+    expect(LENS_FULL).toBe(LOCALIZE_END);
+    expect(lensShareAt(1)).toBe(1);
+    expect(lensShareAt(LOCALIZE_START)).toBe(1);
+    expect(lensShareAt(LENS_FULL)).toBeCloseTo(LENS_CONTEXT, 10);
+    expect(lensShareAt(1711)).toBeCloseTo(LENS_CONTEXT, 10);
+  });
+  it('never jumps: one + press (x1.6) anywhere moves the share by less than half the full step', () => {
+    let worst = 0;
+    for (let z = 1; z < 2000; z *= 1.01) worst = Math.max(worst, Math.abs(lensShareAt(z * 1.6) - lensShareAt(z)));
+    expect(worst).toBeLessThan((1 - LENS_CONTEXT) / 2 + 1e-9);
+    for (let z = 1; z < 2000; z *= 1.05) expect(lensShareAt(z * 1.05)).toBeLessThanOrEqual(lensShareAt(z) + 1e-12);
+  });
+  it('the count pills follow the same share', () => {
+    expect(lensDimFor(10, 20, [100, 200], lensShareAt(7))).toBeCloseTo(lensShareAt(7), 10);
+    expect(lensDimFor(10, 20, [100, 200])).toBe(LENS_CONTEXT);
+    expect(lensDimFor(150, 160, [100, 200], 0.5)).toBe(1);
   });
 });

@@ -375,8 +375,9 @@ export function createRenderer(canvas, graph, opts = {}) {
      *   density:import('../../utils/scripture-web/decode.js').Density,
      *   light:boolean, bg:string,
      *   focusRange:(number[]|null), focusRange2?:(number[]|null), focusArc:number, hoverArc?:number,
-     *   lens?:(number[]|null)}} v
+     *   lens?:(number[]|null), lensDim?:number}} v
      *   lens: pick.lensRange(); the chapter under the frame's centre, lit while nothing is tapped
+     *   lensDim: what the rest keeps of its alpha under the lens (geometry.lensShareAt; LENS_CONTEXT if absent)
      */
     draw(v) {
       if (lost) return lastStats;
@@ -410,7 +411,7 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.uniform1f(U.uFocusArc, v.focusArc == null ? -1 : v.focusArc);
       if (v.lens) gl.uniform2f(U.uLens, v.lens[0], v.lens[1]);
       else gl.uniform2f(U.uLens, 1, 0);
-      gl.uniform1f(U.uLensDim, LENS_CONTEXT);
+      gl.uniform1f(U.uLensDim, v.lensDim != null ? v.lensDim : LENS_CONTEXT);
       gl.uniform1f(U.uHoverArc, v.hoverArc == null ? -1 : v.hoverArc);
       if (v.focusRange) gl.uniform2f(U.uFocusRange, v.focusRange[0], v.focusRange[1]);
       else gl.uniform2f(U.uFocusRange, 1, 0);
