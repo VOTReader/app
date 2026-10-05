@@ -22,6 +22,8 @@
  *   G1  no two visible controls' rects intersect (a control nested in another is one control);
  *   G2  every visible control lies inside the viewport, below the top bar (inset-top + 67.4 px) and above
  *       the gesture inset (the player's own padding is the one thing allowed under it);
+ *   G4  scrolled to its end, the reading text's last line rests clear above every control that stays up (the
+ *       scroller's end padding is the dock's live height; toasts and the first-run hint come and go);
  *   G3  every control the case expects is visible, and the Study Notes toggle is hidden while find is open
  *       (and, on a short screen, while the dwell row is open).
  * It cannot see a control whose size grows past its stand-in: the sizes are the measured ones, and a
@@ -51,7 +53,7 @@ const PARTS = {
   autoscroll: '<div class="ascroll-pill"><div style="height:44px;width:100vw"></div></div>',
   expanded:   '<div class="ascroll-pill is-expanded"><div style="height:44px;width:100vw"></div><div class="ascroll-row ascroll-dwell-row" style="height:44px"></div></div>',
   find:       '<div class="find-pill"><div style="height:44px;width:100vw"></div></div>',
-  toggle:     '<div class="mode-toggle-wrap"><div style="height:51px;width:229px"></div></div>',
+  toggle:     '<div class="mode-toggle-wrap"><div class="mode-toggle-label">Study Notes</div><div class="mode-toggle"><div style="height:33px;width:229px"></div></div></div>',
   hint:       '<div class="ann-hint-pill"><div style="height:57px;width:100vw"></div></div>',            // 79px with its padding
   toast:      '<div class="vot-toast show"><div style="height:38px;width:100vw"></div></div>',          // two lines: 68px
   rootexit:   `<div id="vot-root-exit-toast" style="${ROOT_EXIT};opacity:1"><div style="height:20px;width:200px"></div></div>`,
@@ -93,7 +95,8 @@ try {
       }, ins);
       for (const c of CASES) {
         const r = await page.evaluate((parts, c) => {
-          document.body.innerHTML = c.map((k) => parts[k]).join('');
+          document.body.innerHTML = '<div class="screen-scroll" style="position:fixed;inset:0"><div style="height:3000px"></div><p id="dock-last" style="margin:0;height:28px">the last line</p></div>'
+            + c.map((k) => parts[k]).join('');
           document.body.classList.toggle('audio-bar-open', c.includes('player'));
           document.body.classList.toggle('autoscroll-on', c.includes('autoscroll') || c.includes('expanded'));
           document.body.classList.toggle('tour-prompt-open', c.includes('tour'));
@@ -104,7 +107,14 @@ try {
           const els = [...document.body.querySelectorAll('.audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .mode-toggle-wrap, .ann-hint-pill, .vot-toast, #vot-root-exit-toast, .tour-prompt, .jrn-fab')];
           const vis = els.map((el) => ({ el, k: el.className || el.id, cs: getComputedStyle(el), q: el.getBoundingClientRect() }))
             .filter((o) => o.cs.display !== 'none' && o.q.width && o.q.height);
-          const out = { hits: [], off: [], missing: [], shown: [] };
+          const out = { hits: [], off: [], missing: [], shown: [], text: [] };
+          const scroller = document.querySelector('.screen-scroll');
+          scroller.scrollTop = 1e6;
+          const last = document.getElementById('dock-last').getBoundingClientRect();
+          for (const o of vis) {
+            if (o.el.closest('.vot-toast, #vot-root-exit-toast, .ann-hint-pill')) continue;
+            if (o.q.top < last.bottom - 0.5) out.text.push(`${o.k} top ${Math.round(o.q.top)} < last line ${Math.round(last.bottom)}`);
+          }
           for (let i = 0; i < vis.length; i++) for (let j = i + 1; j < vis.length; j++) {
             const A = vis[i], B = vis[j];
             if (A.el.contains(B.el) || B.el.contains(A.el)) continue;
@@ -132,6 +142,7 @@ try {
         for (const x of r.hits) fails.push(`G1 ${tag}: ${x}`);
         for (const x of r.off) fails.push(`G2 ${tag}: off screen ${x}`);
         for (const x of r.missing) fails.push(`G3 ${tag}: ${x}`);
+        for (const x of r.text) fails.push(`G4 ${tag}: ${x}`);
       }
     }
   }

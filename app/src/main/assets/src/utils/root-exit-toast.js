@@ -76,7 +76,7 @@ function _ensureToast() {
     // mini player and every floating control, like .vot-toast.
     'bottom:var(--dock-toast-bottom, calc(env(safe-area-inset-bottom, 0px) + 2rem))',
     'top:var(--dock-toast-top, auto)',
-    'background:rgba(20,20,24,0.92)',
+    'background:rgb(20,20,24)',
     'color:#f0e6d2',
     'border:1px solid rgba(255,215,140,0.35)',
     'border-radius:24px',

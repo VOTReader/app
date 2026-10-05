@@ -113,6 +113,20 @@ function findScrollParent(node) {
               navBottom: number, viewportH: number, lineH: number,
               maxScrollUp: number }} a
     @returns {{ y: number, scrollUp: number }} */
+/** The top edge of the bottom dock (zones, 2026-10-05): the highest visible floating bottom control - the mini
+    player and its pull tab, the auto-scroll and find pills, the Study Notes toggle - or the viewport's bottom when none
+    shows. The toolbar measures its "below the selection" room against this, so it never lands on the player or a pill
+    (it sits above them in z, so it covered their buttons).
+    @param {Document} [doc] @param {number} [vh] @returns {number} */
+export function dockTop(doc = document, vh = window.innerHeight) {
+  let top = vh;
+  for (const el of doc.querySelectorAll('.audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .mode-toggle-wrap')) {
+    const r = el.getBoundingClientRect();
+    if (r.width && r.height && r.top < top && getComputedStyle(el).display !== 'none') top = r.top;
+  }
+  return top;
+}
+
 export function computeToolbarPlacement({ selTop, selBottom, toolbarH, navBottom, viewportH, lineH, maxScrollUp }) {
   const margin = 8;
   const gap = Math.min(Math.max(2 * lineH, 40), 120); // "two lines", sane-bounded
@@ -390,7 +404,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
             selBottom: rect.bottom,
             toolbarH: h,
             navBottom,
-            viewportH: window.innerHeight,
+            viewportH: dockTop(),
             lineH,
             maxScrollUp: allowAssistScroll && scroller ? scroller.scrollTop : 0,
           });

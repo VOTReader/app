@@ -31,7 +31,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
-import { SelectionToolbar, computeToolbarPlacement, computeEdgeAutoScroll } from './SelectionToolbar.jsx';
+import { SelectionToolbar, computeToolbarPlacement, computeEdgeAutoScroll, dockTop } from './SelectionToolbar.jsx';
 import { snapSelectionRange as realSnapSelectionRange } from '../../renderer/annotation-engine.jsx';
 import { showToast as realShowToast, _resetToasts } from '../../utils/toast.js';
 
@@ -1808,5 +1808,30 @@ describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
     act(() => { fire(shareBtn(), 'pointerup'); fire(shareBtn(), 'click'); });
     await settle();
     expect(sent.map((d) => d.text)).toEqual(['"For God so loved the world"\n\nJohn 3:16\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A3%3A16']);
+  });
+});
+
+describe('dockTop: the toolbar measures its room below the selection against the bottom dock', () => {
+  const box = (cls, top, h, display = 'block') => {
+    const el = document.createElement('div'); el.className = cls; el.style.display = display;
+    el.getBoundingClientRect = () => /** @type {DOMRect} */ ({ top, bottom: top + h, left: 0, right: 100, width: 100, height: h, x: 0, y: top, toJSON() { return {}; } });
+    document.body.appendChild(el); return el;
+  };
+  afterEach(() => { document.body.innerHTML = ''; });
+  it('is the viewport bottom when nothing floats', () => {
+    expect(dockTop(document, 915)).toBe(915);
+  });
+  it('is the highest visible control: the pill over the player', () => {
+    box('audio-bar', 845, 70); box('audio-bar-pull', 822, 26); box('ascroll-pill', 745, 52);
+    expect(dockTop(document, 915)).toBe(745);
+  });
+  it('skips a hidden control (the Study Notes toggle while find is open)', () => {
+    box('audio-bar', 845, 70); box('mode-toggle-wrap', 600, 51, 'none');
+    expect(dockTop(document, 915)).toBe(845);
+  });
+  it('keeps the toolbar off the player: below the selection only when it fits above the dock', () => {
+    const base = { selTop: 100, selBottom: 700, toolbarH: 48, navBottom: 67, lineH: 28, maxScrollUp: 0 };
+    expect(computeToolbarPlacement({ ...base, viewportH: 915 }).y).toBe(804);
+    expect(computeToolbarPlacement({ ...base, viewportH: 745 }).y).toBe(123);
   });
 });

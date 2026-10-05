@@ -819,7 +819,7 @@ describe('bottom dock stack (cz1)', () => {
     expect(bare).toMatch(/--dock-floor:\s*max\(1\.4rem, calc\(var\(--dock-sys\) \+ 0\.4rem\)\)/);
     expect(decl('body.audio-bar-open {', '--dock-player')).toBe('96px');
     expect(decl('body.autoscroll-on {', '--dock-transport')).toBe('60px');
-    expect(decl('body:has(.mode-toggle-wrap) {', '--dock-context')).toBe('64px');
+    expect(decl('body:has(.mode-toggle-wrap) {', '--dock-context')).toBe('72px');
   });
   it('each control stands on the rows under it', () => {
     expect(decl('\n    .ascroll-pill {', 'bottom')).toBe('calc(var(--dock-floor) + var(--dock-player))');
@@ -835,6 +835,19 @@ describe('bottom dock stack (cz1)', () => {
     expect(bare).not.toMatch(/\.find-pill \{ bottom: calc\(max\(1\.4rem/);
     expect(bare).not.toMatch(/\+ (58|72|130)px\)/);
     expect(decl('body:has(.find-pill) .mode-toggle-wrap {', 'display')).toBe('none');
+  });
+  it('a full-screen Garden image hides the player and the whole dock (cz5)', () => {
+    expect(decl('body:has(.garden-fullscreen) :is(.audio-bar, .ascroll-pill, .find-pill, .mode-toggle-wrap) {', 'display')).toBe('none');
+    expect(decl('body:has(.garden-fullscreen) {', '--dock-player')).toBe('0px');
+  });
+  it('every dock surface is opaque, and the reading text scrolls clear of the stack (cz7)', () => {
+    for (const sel of ['\n    .ascroll-pill {', '\n    .find-pill {', '.ann-hint-pill', '.mode-toggle {']) {
+      expect(decl(sel, 'background'), sel).toBe('var(--bg3)');
+    }
+    expect(decl('.vot-toast {', 'background')).toBe('rgb(20,20,24)');
+    expect(bare).not.toMatch(/\.ascroll-pill\.is-dim\s*\{\s*opacity/);
+    expect(decl('body:is(.audio-bar-open, .autoscroll-on, :has(.mode-toggle-wrap, .jrn-fab, .find-pill)) .screen-scroll {', 'padding-bottom'))
+      .toBe('calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport) + var(--dock-find) + var(--dock-context) + 8px)');
   });
   it('the root-exit toast and the journal FAB ride the same stack', () => {
     const exit = readFileSync(join(SRC_ROOT, 'utils', 'root-exit-toast.js'), 'utf8');

@@ -39,7 +39,7 @@
         transform: translateX(-50%);
         bottom: var(--dock-toast-bottom); top: var(--dock-toast-top);
         max-width: min(92%, 32rem);
-        background: rgba(20,20,24,0.94);
+        background: rgb(20,20,24);  /* cz7: opaque, nothing reads through */
         color: #f0e6d2;
         border: 1px solid rgba(255,215,140,0.35);
         border-radius: 12px;
@@ -56,7 +56,7 @@
       }
       .vot-toast.show { opacity: 1; }
       body.light .vot-toast {
-        background: rgba(247,242,232,0.96);
+        background: rgb(247,242,232);
         color: #2a2018;
         border-color: rgba(176,144,56,0.5);
         box-shadow: 0 8px 28px rgba(0,0,0,0.18);
@@ -536,8 +536,16 @@
       body.autoscroll-on { --dock-transport: 60px; }
       body.autoscroll-on:has(.ascroll-pill.is-expanded) { --dock-transport: 106px; }  /* two 44px rows: 98px + 8 */
       body:has(.find-pill) { --dock-find: 58px; }  /* 50px pill + 8 */
-      body:has(.mode-toggle-wrap) { --dock-context: 64px; }
+      body:has(.mode-toggle-wrap) { --dock-context: 72px; }  /* the 59px Study Notes card + 8 + air */
       body:has(.jrn-fab) { --dock-context: 72px; }
+      /* cz5 (Corbin 02:59: "Media player should be auto hidden when viewing ... the garden images"): a full-screen
+         image view hides the mini player and the whole dock; playback goes on, and they come back on leaving. */
+      body:has(.garden-fullscreen) :is(.audio-bar, .ascroll-pill, .find-pill, .mode-toggle-wrap) { display: none; }
+      body:has(.garden-fullscreen) { --dock-player: 0px; --dock-transport: 0px; --dock-context: 0px; --dock-find: 0px; }
+      /* cz7: the reading text can always scroll clear of the dock: the scroller's end padding is the live stack. */
+      body:is(.audio-bar-open, .autoscroll-on, :has(.mode-toggle-wrap, .jrn-fab, .find-pill)) .screen-scroll {
+        padding-bottom: calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport) + var(--dock-find) + var(--dock-context) + 8px);
+      }
       /* The message lane: where a toast's bottom edge goes (restated for the hint below). A toast reads
          --dock-toast-bottom / --dock-toast-top; exactly one of them is auto. */
       body {
@@ -552,6 +560,7 @@
         body:has(.find-pill) .ascroll-dwell-row { display: none; }
         body.autoscroll-on:has(.ascroll-pill.is-expanded):has(.find-pill) { --dock-transport: 60px; }
         body:has(.ascroll-pill.is-expanded) .mode-toggle-wrap { display: none; }
+        .mode-toggle-label { display: none; }  /* the caption goes before a button does (cz7) */
       }
 
       /* ── LIGHT THEME OVERRIDES ── */
@@ -620,7 +629,6 @@
       /* Theme switcher: hidden in the top nav when "Theme Button in Top Nav" is
          off. Theme stays changeable via the Light Theme setting (Text & Translation). */
       body.no-theme-nav .nav-theme-btn { display: none; }
-      body.light .mode-toggle { background: rgba(247,242,232,0.97); }
       body.light .hero-bg { display: none; }
 
       .nav-theme-btn { background: none; border: none; cursor: pointer; color: var(--gold); padding: 0.5rem; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); transition: color 0.2s; min-width: 44px; min-height: 44px; flex-shrink: 0; }
@@ -1261,12 +1269,8 @@
       .audio-bar-nav svg, .audio-bar-close svg { width: 20px; height: 20px; }
       @media (hover: hover) { .audio-bar-nav:hover, .audio-bar-close:hover { color: var(--gold); } }
       .audio-bar-nav:active, .audio-bar-close:active { background: var(--gold-faint); }
-      /* Room for the bar: .screen-scroll is the ONE scroll container per
-         screen, so padding there clears the last paragraph and the bottom-nav
-         cards. The inset term tracks the bar's own safe-area padding. */
-      body.audio-bar-open .screen-scroll {
-        padding-bottom: calc(92px + max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px)));
-      }
+      /* Room for the bar: .screen-scroll is the ONE scroll container per screen; its end padding is the
+         bottom dock's live height (the cz7 rule by the dock tokens). */
       @media (prefers-reduced-motion: reduce) {
         /* The global W10-lite block near-zeros the duration, which would park
            the pulse at an arbitrary opacity; state it statically instead. */
@@ -2284,7 +2288,7 @@
         padding: 10px 6px 10px 14px;
         /* No backdrop-filter (2026-07-28): floats over scrolling text; the
            96%-opaque bg needs no blur. */
-        background: rgba(20,17,12,0.96);
+        background: var(--bg3);  /* cz7: opaque */
         border: 1px solid var(--gold-border); border-radius: 14px;
         box-shadow: 0 6px 24px rgba(0,0,0,0.5);
         animation: annHintIn 0.5s ease;
@@ -2300,7 +2304,7 @@
         user-select: none;
         -webkit-user-select: none;
       }
-      body.light .ann-hint-pill { background: rgba(247,242,232,0.97); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
+      body.light .ann-hint-pill { background: var(--bg3); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
       @keyframes annHintIn { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
       /* ux3 (A15 critique, 2026-09-22): while this tip pill is up, a toast sits ABOVE it instead of on its words
          ("Copied" covered "Long-press any text..."). The pill starts at the
@@ -2326,21 +2330,23 @@
       }
       .ann-hint-close:active { color: var(--gold); }
 
-      /* Caption above the pill — names what the modes apply to. */
+      /* cz7: caption and segments are ONE opaque card (the caption floated over verse text with no backing,
+         and the segments let the text show through). The card is the surface; the caption is its top line. */
+      .mode-toggle-wrap {
+        background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 22px;
+        padding: 5px 4px 3px; box-shadow: 0 4px 24px rgba(0,0,0,0.55);
+      }
+      body.light .mode-toggle-wrap { box-shadow: 0 4px 18px rgba(0,0,0,0.16); }
       .mode-toggle-label {
         font-family: 'Cinzel', serif; font-size: var(--fs-10);
         letter-spacing: 0.18em; text-transform: uppercase;
         color: var(--gold-dim);
-        padding: 2px 8px; border-radius: 8px;
-        background: rgba(0,0,0,0.85); /* was blur(8px) over scrolling text — see .top-nav note */
-        margin-right: 6px;
+        padding: 0 14px;
       }
-      body.light .mode-toggle-label { background: rgba(247,242,232,0.8); }
       .mode-toggle {
         display: flex; align-items: center; gap: 0; border-radius: 40px;
-        border: 1px solid var(--gold-border);
-        background: rgba(0,0,0,0.97); /* was blur(16px) — the auto-scroll pill floats over LIVE scrolling text; see .top-nav note */
-        overflow: hidden; box-shadow: 0 4px 32px rgba(0,0,0,0.6);
+        background: var(--bg3);
+        overflow: hidden;
       }
       .mode-btn {
         display: flex; align-items: center; gap: 0.45rem;
@@ -7264,18 +7270,20 @@
       display: flex; flex-direction: column; align-items: center; gap: 2px;
       width: max-content; max-width: calc(100vw - 24px);
       padding: 3px 10px 3px 4px;
-      background: rgba(20,20,24,0.94);
+      background: var(--bg3);  /* cz7: opaque, the verse text no longer reads through */
       border: 1px solid var(--gold-border);
       border-radius: 999px;
       box-shadow: 0 6px 20px rgba(0,0,0,0.45);
       transition: opacity 260ms ease;
     }
-    body.light .ascroll-pill { background: rgba(247,242,232,0.97); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
+    body.light .ascroll-pill { background: var(--bg3); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
     /* IDLE FADE — reading text is the product; chrome that stays bright
        competes with it. Any touch restores full opacity (the component
        clears .is-dim on document touchstart/pointerdown). Kept above zero
        so the control is never invisible-but-live. */
-    .ascroll-pill.is-dim { opacity: 0.25; }
+    /* cz7: the surface stays opaque; only its controls fade. */
+    .ascroll-pill > * { transition: opacity 260ms ease; }
+    .ascroll-pill.is-dim > * { opacity: 0.35; }
     /* ── FIND pill (FindInUnit): "flood | 2 of 3 | ‹ › ×" ──
        The autoscroll pill's shape and place (portaled, centred, max-content),
        one layer above it (196) and stacked over it and over the mini-player
@@ -7290,12 +7298,12 @@
       padding: 2px 4px 2px 16px;
       /* Opaque, unlike the autoscroll pill: the letter's large type ghosted
          through 6% of it, behind the pill's own small labels. */
-      background: rgb(20,20,24);
+      background: var(--bg3);
       border: 1px solid var(--gold-border);
       border-radius: 999px;
       box-shadow: 0 6px 20px rgba(0,0,0,0.45);
     }
-    body.light .find-pill { background: rgb(247,242,232); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
+    body.light .find-pill { background: var(--bg3); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
     .find-pill-word {
       font-family: var(--font-cinzel, Georgia, serif); font-size: var(--fsc-12); letter-spacing: 0.14em; text-transform: uppercase;
       color: var(--gold); max-width: 9.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
