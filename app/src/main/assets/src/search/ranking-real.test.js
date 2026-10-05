@@ -32,6 +32,7 @@ const GLOBALS = {
     { id: 'evident', num: 5, title: 'Evident', blocks: [{ segments: [{ v: 'Let your humility be evident.' }] }] },
     { id: 'watchman', num: 6, title: 'The Watchman', blocks: [{ segments: [{ v: WATCHMAN }] }] },
     { id: 'false-prophets', num: 7, title: 'False Prophets Among You', blocks: [{ segments: [{ v: 'Beware of false prophets, for false prophets are many, and the false prophets speak lies.' }] }] },
+    { id: 'silver', num: 9, title: 'The Silver Cord', blocks: [{ segments: [{ v: 'Hear Me. The silver cord is loosed and the golden bowl is broken, says The Lord, and the pitcher is shattered at the fountain.' }] }] },
     { id: 'creator', num: 8, title: 'In the Days of Your Youth', blocks: [{ segments: [{ v: 'Hear Me. Remember now your Creator in the days of your youth, before the difficult days come, says The Lord.' }] }] },
   ],
   ANSWERS: [
@@ -44,6 +45,11 @@ const GLOBALS = {
     // a long topic holding the same few words over and over, never together (search benchmark, 2026-10-05)
     { id: 'scattered', num: 5, title: 'Regarding Seasons', paragraphs: [{ text: Array.from({ length: 40 }, (_, i) => ['remember', 'creator', 'days', 'come', 'young'][i % 5] + ' is spoken of here. ' + 'The field is sown and the grain is gathered in its season. '.repeat(4)).join('') }] },
     { id: 'late-hour', num: 4, title: 'Regarding the Hour', paragraphs: [{ text: 'The hour is late; turn, and repent, says The Lord. '.repeat(12) + WATCHMAN }] },
+    // a chain of cited excerpts, as the Answers are: one reprints a letter, the rest hold the query's words apart (2026-10-05)
+    { id: 'excerpts', num: 6, title: 'Regarding Silver', paragraphs: [{ text: [
+      'The silver cord is loosed and the golden bowl is broken, says The Lord. ~ [From “The Silver Cord” ~ Volume 1]',
+      ...Array.from({ length: 12 }, (_, i) => ['Silver snaps', 'The cord breaks', 'Gold', 'The bowl', 'The fountain', 'When it snaps'][i % 6] + ' is spoken of here, and the potter and the pitcher besides; the wheel turns. ~ [From “The Watchman” ~ Volume 1]'),
+    ].join(' ✦ ') }] },
   ],
 };
 const refs = (r) => r.results.map((x) => x.doc.ref + (x.doc.kind === 'verse' ? '' : ' · ' + x.doc.title));
@@ -91,6 +97,15 @@ describe('ranking on the audit\u2019s cases', () => {
      outscored the short letter holding them together (search benchmark 2026-10-05). */
   it('a sentence put in other words finds the passage holding its words together, not a topic scattering them', async () => {
     expect(refs(await VotSearchMini.search('remember the creator while you are young before the days come'))[0]).toBe('Volume One · Letter 8 · In the Days of Your Youth');
+  });
+
+  /* An Answers topic is a chain of excerpts, each naming its letter: one reprints the passage meant and
+     the rest hold its words apart, and the whole topic counted as holding them all (search benchmark
+     2026-10-05: an Answers topic first in 47 of 108 open misses). The letter comes first. */
+  it('a passage in other words finds its letter before the Answers topic that excerpts it', async () => {
+    const r = refs(await VotSearchMini.search('when the silver cord snaps and the gold bowl breaks at the fountain'));
+    expect(r[0]).toBe('Volume One · Letter 9 · The Silver Cord');
+    expect(r).toContain('Answers Only God Can Give · Regarding Silver');
   });
 
   it('a word or two is a keyword search: the topic titled with them comes first', async () => {

@@ -318,7 +318,9 @@ const PHRASE_CANDIDATES = 500;
    came first and the passage meant sat 2nd to 20th (paraphrase 12 of 75). The first PASSAGE_REACH
    results are re-ordered by their best passage (passage.js bestWindow), the engine's own order
    breaking near-ties, unless the first already holds the query together, the search is a keyword
-   or a quote, or a result's title is what the query names (it keeps the top). */
+   or a quote, or a result's title is what the query names (it keeps the top). An Answers topic
+   reprints the verses and letters, so its best passage ties theirs: it yields to an original
+   holding as much (REPRINT_COST), and does not keep its place for holding the query together. */
 const PASSAGE_REACH = 30;
 /** The first result holding this share of the query in one passage keeps its place. */
 const PASSAGE_HELD = 0.9;
@@ -326,6 +328,8 @@ const PASSAGE_HELD = 0.9;
 const PASSAGE_RANK_COST = 0.01;
 /** How much more of the query a passage must hold to take the engine's first place. */
 const PASSAGE_MARGIN = 0.15;
+/** How much less of the query an original's passage may hold and still come before an Answers topic. */
+const REPRINT_COST = 0.05;
 /** @type {Map<string, string[]>} doc id -> its tokens' lemmas, alongside TOKEN_CACHE */
 const LEMMA_CACHE = new Map();
 /** How many texts hold `term` (the index's own term data). */
@@ -372,13 +376,17 @@ function bestPassageFirst(out, idOf, units, stop, named) {
       LEMMA_CACHE.set(id, lem);
       if (LEMMA_CACHE.size > 400) LEMMA_CACHE.delete(/** @type {string} */ (LEMMA_CACHE.keys().next().value));
     }
-    return { e, i, share: named(e.doc) ? 2 : bestWindow(query, lem, span) };
+    const share = named(e.doc) ? 2 : bestWindow(query, lem, span);
+    return { e, i, share, key: share - PASSAGE_RANK_COST * i - (e.doc.kind === 'answers' && share < 2 ? REPRINT_COST : 0) };
   });
-  if (!top.length || top[0].share >= PASSAGE_HELD) return;
+  if (!top.length) return;
   const first = top[0];
-  top.sort((a, b) => (b.share - PASSAGE_RANK_COST * b.i) - (a.share - PASSAGE_RANK_COST * a.i));
-  // The engine's first is overtaken only by a passage holding clearly more of the query.
-  if (top[0] !== first && top[0].share < first.share + PASSAGE_MARGIN) { top.splice(top.indexOf(first), 1); top.unshift(first); }
+  const reprint = first.e.doc.kind === 'answers' && first.share < 2;
+  if (first.share >= PASSAGE_HELD && !reprint) return;
+  top.sort((a, b) => b.key - a.key);
+  // The engine's first is overtaken only by a passage holding clearly more of the query; an
+  // Answers topic, by an original holding as much (it reprints them).
+  if (top[0] !== first && top[0].share < first.share + (reprint ? -REPRINT_COST : PASSAGE_MARGIN)) { top.splice(top.indexOf(first), 1); top.unshift(first); }
   for (let i = 0; i < top.length; i++) out[i] = top[i].e;
 }
 
@@ -454,6 +462,109 @@ function originals() {
   ORIGINALS = O;
   return O;
 }
+/* AN ANSWERS EXCERPT NAMES ITS LETTER (search benchmark, 2026-10-05). An Answers topic is a
+   chain of letter excerpts, each closed by its source: "~ [From “The Alarm of War” ~ Volume 7]"
+   (1,421 of its 1,434 excerpts name a letter, Words To Live By or Blessed text by title). A
+   sentence the reader put in other words matches no sentence or run of the letter word for word,
+   so the excerpt holding most of the query names the original instead (47 of the 108 open misses
+   had an Answers topic first). */
+const CITE = /\[\s*From\s+[“"](.+)[”"]\s*~\s*([^\]]*)\]/;
+/** A citation's collection, as the corpus names it. */
+const CITE_VOLUME = {
+  "the lord's rebuke": 'rebuke', "letters to the lord's little flock": 'flock', 'letters from timothy': 'timothy',
+  'words to live by: part one': 'wtlb1', 'words to live by: part two': 'wtlb2', 'the blessed': 'blessed',
+};
+/** How much less of the query the cited letter may hold than its excerpt (an edge word cut). */
+const CITE_SLACK = 0.05;
+const citeKey =(/** @type {string} */ s) => s.toLowerCase().replace(/[’‘]/g, "'").replace(/[^a-z0-9]+/g, ' ').trim();
+/** @type {Map<string, string[]>|null} an original's title (citeKey) -> its doc ids */ let CITED = null;
+/** @type {Map<string, Array<{toks: Set<string>, lem: string[], src: string|null}>>} Answers doc id -> its excerpts */
+const EXCERPT_CACHE = new Map();
+/** An Answers topic's excerpts (each with its words and the original it cites), read once a session. */
+function excerpts(/** @type {string} */ id, /** @type {string} */ text) {
+  let pieces = EXCERPT_CACHE.get(id);
+  if (!pieces) {
+    try { originals(); } catch { /* no citations: coverage still reads the excerpts */ }
+    pieces = text.split('✦').map((p) => {
+      const t = kjvEncode(p);
+      return { toks: new Set(t), lem: t.map(lemma), src: ORIGINAL_DOCS ? citedId(p) : null };
+    });
+    EXCERPT_CACHE.set(id, pieces);
+  }
+  return pieces;
+}
+/** The original an excerpt's citation names, or null. */
+function citedId(/** @type {string} */ piece) {
+  const m = piece.match(CITE);
+  if (!m) return null;
+  if (!CITED) {
+    CITED = new Map();
+    for (const [id, f] of /** @type {Map<string, any>} */ (ORIGINAL_DOCS)) if (f.kind !== 'verse' && f.title) addTo(CITED, citeKey(f.title), id);
+  }
+  const ids = CITED.get(citeKey(m[1].replace(/[”"]\s*$/, '')));
+  if (!ids) return null;
+  const vol = m[2].trim().toLowerCase().replace(/[’‘]/g, "'");
+  const v = /^volume (\d+)$/.exec(vol);
+  const want = v ? 'v' + v[1] : CITE_VOLUME[vol];
+  const D = /** @type {Map<string, any>} */ (ORIGINAL_DOCS);
+  return ids.find((x) => D.get(x).volumeId === want) || (ids.length === 1 ? ids[0] : null);
+}
+/* AN ANSWERS TOPIC COVERS A QUERY ONE EXCERPT AT A TIME (search benchmark, 2026-10-05). A
+   topic of up to 127,000 characters holds nearly any query's every word somewhere, and coverage
+   (ranking.js coverageMultiplier, 15x for eight words) paid it as if it held them together: an
+   Answers topic came first in 47 of the 108 open misses, over the verse or letter meant. Its
+   coverage counts the query words its best single excerpt holds. */
+/**
+ * @param {string} id  the Answers doc's id
+ * @param {string} text
+ * @param {Array<[number, string[]]>} hits  each matched word list with the query words (bits) it counts for
+ * @returns {number}
+ */
+function excerptCover(id, text, hits) {
+  let best = 0;
+  for (const p of excerpts(id, text)) {
+    let mask = 0;
+    for (const [bits, terms] of hits) if (terms.some((t) => p.toks.has(t))) mask |= bits;
+    const c = popcount(mask);
+    if (c > best) best = c;
+  }
+  return best;
+}
+/**
+ * The original cited by the Answers excerpt that holds most of the query, or null when none holds half.
+ * @param {string} id  the Answers doc's id
+ * @param {string} text
+ * @param {string[]} words  the query's words, encoded
+ */
+function citedOriginal(id, text, words) {
+  const pieces = excerpts(id, text);
+  const n = msIndex.documentCount || 1;
+  const seen = new Set();
+  const query = [];
+  for (const w of words) {
+    const lem = lemma(w);
+    if (seen.has(lem)) continue;
+    seen.add(lem);
+    const df = docFreq(w);
+    query.push({ lem, weight: Math.log(1 + (n - df + 0.5) / (df + 0.5)), syn: new Set() });
+  }
+  const span = Math.max(12, Math.round(words.length * 1.6));
+  let best = 0.5;
+  let src = null;
+  for (const p of pieces) {
+    if (!p.src) continue;
+    const s = bestWindow(query, p.lem, span);
+    if (s > best) { best = s; src = p.src; }
+  }
+  if (!src) return null;
+  // Answers words some excerpts its own way: the letter must hold the query as well as the excerpt does.
+  let lem = LEMMA_CACHE.get(src);
+  if (!lem) {
+    lem = kjvEncode(/** @type {Map<string, any>} */ (ORIGINAL_DOCS).get(src).text).map(lemma);
+    LEMMA_CACHE.set(src, lem);
+  }
+  return bestWindow(query, lem, span) >= best - CITE_SLACK ? src : null;
+}
 /**
  * Move each original ahead of a reprint of it near the top (in place).
  * @param {Array<{score:number, doc:any, terms?:string[]}>} out  ranked, best first
@@ -461,8 +572,9 @@ function originals() {
  * @param {string[]} terms  the words a landing marks (the query's own)
  * @param {(doc:any) => boolean} allowed  the search's corpus and scope filters
  * @param {(doc:any) => boolean} named  the query names this text's title: it keeps its place
+ * @param {(id:string, doc:any) => number} near  how nearly a text holds the typed words in a row (0..1)
  */
-function originalsFirst(out, idOf, terms, allowed, named) {
+function originalsFirst(out, idOf, terms, allowed, named, near) {
   if (!terms.length) return;
   let O;
   try { O = originals(); } catch { return; }
@@ -476,17 +588,16 @@ function originalsFirst(out, idOf, terms, allowed, named) {
     if (!tier || !e.doc.text || named(e.doc)) continue;
     const ex = matchExcerpt(e.doc.text, terms);
     const at = ex ? e.doc.text.indexOf(ex) : -1;
-    if (at < 0) continue;
     const lower = (/** @type {string[]|undefined} */ ids) => (ids || []).filter((x) => D.has(x) && ORIGINAL_TIER[D.get(x).kind] < tier);
     let found = null;
-    for (const sp of sentenceSpans(e.doc.text)) {
+    if (at >= 0) for (const sp of sentenceSpans(e.doc.text)) {
       if (sp.end < at || sp.start > at + ex.length) continue;
       const k = sentenceKey(sp.text);
       if (!k || words.filter((w) => (' ' + k + ' ').indexOf(' ' + w + ' ') >= 0).length < need) continue;
       const l = lower(O.get(k));
       if (l.length) { found = l; break; }
     }
-    if (!found) {
+    if (!found && at >= 0) {
       // The matched place, a little either side (its edge words may be cut), by its shingles.
       const win = kjvEncode(e.doc.text.slice(Math.max(0, at - 40), at + ex.length + 40)).slice(1, -1);
       if (words.filter((w) => win.indexOf(w) >= 0).length >= need) {
@@ -496,7 +607,14 @@ function originalsFirst(out, idOf, terms, allowed, named) {
         if (votes.size) found = [...votes.keys()].sort((a, b) => /** @type {number} */ (votes.get(b)) - /** @type {number} */ (votes.get(a)));
       }
     }
-    if (!found) continue;
+    if (!found && e.doc.kind === 'answers') {
+      const id = idOf.get(e) || '';
+      const src = citedOriginal(id, e.doc.text, words);
+      // A quote of the Answers' own wording stays with it, when the letter words it otherwise.
+      const own = src ? near(id, e.doc) : 0;
+      if (src && (own < NEAR_PHRASE_MIN || near(src, D.get(src)) >= own - 0.1)) found = lower([src]);
+    }
+    if (!found || !found.length) continue;
     // The original already ranked highest, else the first that the filters allow.
     let j = -1;
     for (let r = 0; r < out.length; r++) if (found.indexOf(idOf.get(out[r]) || '') >= 0) { j = r; break; }
@@ -542,7 +660,9 @@ async function build(options) {
   ORIGINALS = null;
   ORIGINAL_DOCS = null;
   SHINGLES = null;
+  CITED = null;
   LEMMA_CACHE.clear();
+  EXCERPT_CACHE.clear();
   const code = options.translation || 'nkjv';
   const sig = dataSignature(code);
 
@@ -745,6 +865,8 @@ async function search(query, options) {
   const termMask = Object.create(null);
   const literalHit = Object.create(null);
   const matchedTerms = Object.create(null);
+  /** @type {Record<string, Array<[number, string[]]>>} an Answers topic's matched words, each with the query words it counts for */
+  const answersHits = Object.create(null);
   const docLookup = Object.create(null);
   const unitOpts = (unit) => ({ prefix: unit.literal ? prefixable : false, fuzzy: false, combineWith: 'AND', boost: MS_SEARCH_DEFAULTS.boost });
   // A stop word the reader typed among real words ranks, but is not a word to mark:
@@ -784,7 +906,10 @@ async function search(query, options) {
           }
         }
       }
-      if (unit.origin < 31) termMask[id] = (termMask[id] || 0) | (unit.cover || (1 << unit.origin));
+      if (unit.origin < 31) {
+        termMask[id] = (termMask[id] || 0) | (unit.cover || (1 << unit.origin));
+        if (hit.kind === 'answers' && hit.terms) (answersHits[id] || (answersHits[id] = [])).push([unit.cover || (1 << unit.origin), hit.terms]);
+      }
     }
   };
   const heard = Object.create(null);   // origin -> some unit of that word found something
@@ -847,9 +972,10 @@ async function search(query, options) {
     const kb = d && KIND_BOOST[d.kind];
     if (kb) scoreMap[rankedIds[i]] *= kb;
   }
-  // Coverage multiplier (distinct original terms matched).
+  // Coverage multiplier (distinct original terms matched); an Answers topic's, within one excerpt.
   for (let i = 0; i < rankedIds.length; i++) {
-    const cc = popcount(termMask[rankedIds[i]] || 0);
+    const id = rankedIds[i];
+    const cc = answersHits[id] ? excerptCover(id, docLookup[id].text || '', answersHits[id]) : popcount(termMask[id] || 0);
     if (cc > 1) scoreMap[rankedIds[i]] *= coverageMultiplier(cc);
   }
   /* THE PHRASE RANKING, graded (search audit 2026-09-27). A text holding the typed
@@ -967,7 +1093,7 @@ async function search(query, options) {
   if (!keyword && !p.phrase && !quoted) bestPassageFirst(out, idOf, units, isStopTerm, named);
   originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) =>
     (!corpusFilter || d.corpus === corpusFilter) && (!scopeBookId || d.bookId === scopeBookId) && (!scopeVolumeId || d.volumeId === scopeVolumeId),
-    named);
+    named, (id, d) => nearOf[id] ?? (typedTokens.length > 1 ? nearPhrase(docTokens(id, d), typedTokens, STOP) : 0));
 
   /* A QUOTED PHRASE NOTHING HOLDS IS SEARCHED AS ITS WORDS (search audit 2026-09-27).
      A quote remembered one word off ("the earth shall grow old like a garment", where
