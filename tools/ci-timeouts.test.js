@@ -23,7 +23,7 @@ function jobs(text) {
 }
 
 describe('workflow job timeouts', () => {
-  for (const [file, expected] of [['ci.yml', { build: 30, 'kotlin-tests': 20 }], ['deploy-web.yml', { gate: 5, build: 15, deploy: 10 }]]) {
+  for (const [file, expected] of [['ci.yml', { gates: 20, vitest: 20, browser: 30, build: 5, 'kotlin-tests': 20 }], ['deploy-web.yml', { gate: 5, build: 15, deploy: 10 }]]) {
     it(`${file}: every job has one`, () => {
       const js = jobs(wf(file));
       expect(Object.keys(js).sort()).toEqual(Object.keys(expected).sort());
@@ -37,5 +37,20 @@ describe('workflow job timeouts', () => {
 describe('the restore walk is a CI gate (n7-06)', () => {
   it('ci.yml runs npm run e2e:restore-fresh', () => {
     expect(wf('ci.yml')).toMatch(/\n {8}run: npm run e2e:restore-fresh\n/);
+  });
+});
+
+/* ln1 (2026-10-05): the serial build job became gates / vitest / browser in parallel. `build + syntax-check` is the only
+   required status check on main, so the job that publishes it must wait for all three and must RUN when one fails: a
+   skipped required check counts as passing. */
+describe('the required check covers every CI job (ln1)', () => {
+  const build = jobs(wf('ci.yml')).build;
+  it('keeps the exact required name', () => {
+    expect(build).toMatch(/^ {4}name: build \+ syntax-check\n/);
+  });
+  it('needs gates, vitest and browser, and runs when one of them fails', () => {
+    expect(build).toMatch(/\n {4}needs: \[gates, vitest, browser\]\n/);
+    expect(build).toMatch(/\n {4}if: >-\n {6}always\(\) &&/);
+    expect(build).toMatch(/\[ "\$r" = success \] \|\| exit 1/);
   });
 });
