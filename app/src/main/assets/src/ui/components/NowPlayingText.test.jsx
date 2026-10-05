@@ -50,6 +50,10 @@ describe('clauseText', () => {
     expect(clauseText(LETTER.blocks, ROWS[2])).toBe('Whole paragraph read as one.');
     expect(clauseText(LETTER.blocks, [1, 1, 70, 90, 0])).toBe('');
     expect(clauseText(LETTER.blocks, [1, 0, 0, 5, 0])).toBe('');   // a heading has no text domain
+    // A footnote marker counts in the offsets (it is in the DOM text) but is not a word: the pane drops it.
+    const fn = [{ type: 'para', segments: [{ t: 'text', v: 'as it is written.' }, { t: 'fn', v: 1 }, { t: 'text', v: ' For as I am' }] }];
+    expect(clauseText(fn, [0, 0, 0, 18, 0])).toBe('as it is written.');
+    expect(clauseText(fn, [0, 0, 18, 30, 0])).toBe('For as I am');
   });
 });
 

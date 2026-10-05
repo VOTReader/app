@@ -5,9 +5,9 @@
    ═══════════════════════════════════════════════════════════════════════
    No new data: the rows are the page wash's own (letterFragsFor, the same
    alternate-voice and part choice ReadAlongHighlight makes), and the words
-   are cut from the letter's blocks with blockDomText (utils/block-dom-text.js), the text domain the
+   are cut from the letter's blocks with blockSpanText (utils/block-dom-text.js), the text domain the
    aligner measured those offsets in (pinned corpus-wide by
-   tools/block-dom-text.test.js). A Format-B row (-1/-1) shows its whole block.
+   tools/block-dom-text.test.js), footnote numbers dropped. A Format-B row (-1/-1) shows its whole block.
 
    Letters only for now. A Bible chapter's rows are whole verses of a text
    this screen does not hold, and a compilation's follow the section under
@@ -22,7 +22,7 @@
 
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { loadAudioSync, audioSyncStore } from '../../utils/sync-loaders.js';
-import { blockDomText } from '../../utils/block-dom-text.js';
+import { blockSpanText } from '../../utils/block-dom-text.js';
 import { fragmentAt, letterFragsFor } from './ReadAlongHighlight.jsx';
 
 /** The wash paints this far ahead of the clock (ReadAlongHighlight LEAD_S): the eye meets the clause as the voice does. */
@@ -55,12 +55,7 @@ function blocksOf(track) {
  */
 export function clauseText(blocks, row) {
   if (!blocks || !row) return '';
-  const text = blockDomText(blocks[row[1]]);
-  if (!text) return '';
-  const cs = row[2], ce = row[3];
-  if (cs < 0) return text.trim();
-  if (ce > text.length || cs >= ce) return '';
-  return text.slice(cs, ce).trim();
+  return blockSpanText(blocks[row[1]], row[2], row[3]);
 }
 
 /**
