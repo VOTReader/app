@@ -168,6 +168,8 @@ export function useNav({
 
   // ── Core navigation ──────────────────────────────────────────────────
   const goHome = () => {
+    // rs1 (overhaul): Home lights the Home tab and keeps the tab it leaves (utils/bottom-tabs.js).
+    if (window.BottomTabs) window.BottomTabs.markHome();
     setFromSearch(false);
     setFromWtlb(null);
     setFromLetterStack([]);

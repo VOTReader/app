@@ -81,7 +81,7 @@ function _ensureToast() {
     'border:1px solid rgba(255,215,140,0.35)',
     'border-radius:24px',
     'padding:10px 18px',
-    "font-family:'Cinzel',serif",
+    "font-family:var(--font-ui)",
     'font-size:var(--fs-12)',
     'letter-spacing:0.08em',
     'text-transform:uppercase',

@@ -126,6 +126,7 @@ import { useDomAnnotationSync } from '../hooks/use-dom-annotation-sync.js';
 import { useKeyboardInset } from '../hooks/use-keyboard-inset.js';
 import { useDocumentTitle } from '../hooks/use-document-title.js';
 import { useTabTitleMemo } from '../hooks/use-tab-title-memo.js';
+import { BottomTabs, BOTTOM_TABS, useBottomTabs } from '../utils/bottom-tabs.js';
 import { useLazyBundles } from '../hooks/use-lazy-bundles.js';
 import { useDesktopKeyboard } from '../hooks/use-desktop-keyboard.js';
 import { useSharedPassageLink } from '../hooks/use-shared-passage-link.js';
@@ -268,6 +269,8 @@ Object.assign(window, {
   useKeyboardInset,
   useDocumentTitle,
   useTabTitleMemo,
+  // rs1 (overhaul): the four tabs and their stacks; TabBar (bundle-d) reads this copy.
+  BottomTabs, BOTTOM_TABS, useBottomTabs,
   useLazyBundles,
   useDesktopKeyboard,
   useSharedPassageLink,

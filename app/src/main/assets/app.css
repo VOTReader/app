@@ -297,6 +297,10 @@
          These stay OUTSIDE #custom-fonts on purpose — the picker must
          render every option's name in its font even in classic mode.
          reading-fonts.test.js gates this block ↔ READING_FONTS ↔ disk. */
+      /* rs1 (overhaul): the CHROME face, always on and apart from the Reading Font picker. A family name of its
+         own, so "System Serif" (which disables #custom-fonts' 'EB Garamond') changes the reading text only. */
+      @font-face { font-family: 'VOT UI Garamond'; font-weight: 400 800; font-style: normal; src: url('../fonts/eb-garamond-latin-wght-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'VOT UI Garamond'; font-weight: 400 800; font-style: italic; src: url('../fonts/eb-garamond-latin-wght-italic.woff2') format('woff2'); font-display: swap; }
       @font-face { font-family: 'Cormorant Garamond'; font-weight: 400; font-style: normal; src: url('../fonts/reading/cormorant-garamond-latin-400-normal.woff2') format('woff2'); font-display: swap; }
       @font-face { font-family: 'Cormorant Garamond'; font-weight: 700; font-style: normal; src: url('../fonts/reading/cormorant-garamond-latin-700-normal.woff2') format('woff2'); font-display: swap; }
       @font-face { font-family: 'Cormorant Garamond'; font-weight: 400; font-style: italic; src: url('../fonts/reading/cormorant-garamond-latin-400-italic.woff2') format('woff2'); font-display: swap; }
@@ -357,13 +361,12 @@
       @font-face { font-family: 'Lexend'; font-weight: 100 900; font-style: normal; src: url('../fonts/reading/lexend-latin-wght-normal.woff2') format('woff2'); font-display: swap; }
 
       :root {
-        --bg:          #000000;
-        /* True Black IS the dark theme (owner call 2026-08-03; was the [10]
-           settings.trueBlack modifier): raised surfaces sit at pure black /
-           a hair above, so OLED pixels shut off and hairline borders still
-           read. Text, gold, highlight colors untouched. */
-        --bg2:         #000000;
-        --bg3:         #070707;
+        --bg:          #172022;   /* rs1 overhaul: charcoal slate (Corbin's reference, audit-style.md); true black is body.trueblack */
+        /* The overhaul (Corbin 10-05 picked the look) replaces the 08-03 "True Black IS the dark theme" call on
+           this review branch: the page is charcoal slate with raised surfaces a step up; true black stays as
+           the OLED variant (body.trueblack, below the dock block). */
+        --bg2:         #1C2527;
+        --bg3:         #242D2F;
         /* THE DARK INK, NAMED ONCE. These seven are the theme's dark values AND
            the Scripture Web chrome's ink in both themes (the chrome floats over a
            canvas that is black by construction; chrome-light, 2026-09-11). The
@@ -379,13 +382,13 @@
            0.38 to 0.24 alpha so the 225 outlined boxes recede. Ratios on #000 / --bg3 stay far above AA:
            gold 10.4:1, gold-dim 8.3, cream-dim 15.0, cream-muted 9.4 (app-css.contrast.test.js). The
            Scripture Web chrome shares these, so it follows; its canvas draws its own gold from JS. */
-        --ink-gold:        #d6b35f;
-        --ink-gold-bright: #e8c977;
-        --ink-gold-dim:    #c29f57;
-        --ink-gold-faint:  rgba(214,179,95,0.13);
-        --ink-gold-border: rgba(214,179,95,0.24);
-        --ink-cream-dim:   #e0d9cc;
-        --ink-cream-muted: #b9b1a1;
+        --ink-gold:        #c4a469;
+        --ink-gold-bright: #d2b57c;
+        --ink-gold-dim:    #b39760;
+        --ink-gold-faint:  rgba(196,164,105,0.13);
+        --ink-gold-border: rgba(196,164,105,0.30);
+        --ink-cream-dim:   #b8bfbf;
+        --ink-cream-muted: #8e9798;
         --gold:        var(--ink-gold);
         --gold-bright: var(--ink-gold-bright);
         --gold-dim:    var(--ink-gold-dim);
@@ -408,8 +411,8 @@
            cards and shelf rows already draw, light is the one the picker header
            and footer already draw. tools/check-css-tokens.js now fails the build
            on any var(--name) with no declaration and no fallback. */
-        --border:      rgba(200,164,86,0.16);
-        --cream:       #ece6db;   /* was #ffffff: warm off-white, 16.8:1 on #000 (the calmer dark, above) */
+        --border:      #2c3537;
+        --cream:       #ecede8;   /* was #ffffff: warm off-white, 16.8:1 on #000 (the calmer dark, above) */
         --cream-dim:   var(--ink-cream-dim);
         --cream-muted: var(--ink-cream-muted);
         --study-note:  rgba(214,179,95,0.10);
@@ -418,6 +421,7 @@
         --find-wash:    rgba(200,164,86,0.24);   /* a searched word on the page: ::highlight(vot-find), the result cards' mark */
         --find-now:     rgba(214,179,95,0.52);   /* the place being looked at: ::highlight(vot-find-current) */
         --radius:      6px;
+        --radius-lg:   12px;   /* rs1: the gold pill and the search field */
         --transition:  0.2s ease;
 
         /* ══ TYPE SCALE — THE single source of truth for every font-size ══
@@ -472,7 +476,8 @@
         --fs-36:  2.25rem;     --fsc-36:  36px;
         --fs-48:  3rem;        --fsc-48:  48px;
 
-        --font-cinzel:   'Cinzel', serif;
+        --font-cinzel:   'VOT UI Garamond', Georgia, serif;   /* rs1: the chrome is EB Garamond, always on (audit-style.md) */
+        --font-ui:       'VOT UI Garamond', Georgia, serif;
         /* --font-body: THE body-text font. use-settings.js overwrites this
            on <html> from settings.fontStyle (Reading Font picker). The
            default doubles as the "classic" look: with #custom-fonts
@@ -511,6 +516,15 @@
         --settings-danger:  #c0392b;   /* danger deep red (Clear All) */
         --input-text:       var(--cream);  /* light mode override below */
         --white:            #ffffff;       /* pure white (theme-agnostic) */
+        /* ── rs1 overhaul tokens (audit-style.md §3) ── */
+        --divider:          #2C3537;   /* 1px hairlines between rows and sections; nothing heavier */
+        --input-bg:         #242D2F;
+        --input-border:     #66706F;   /* 3.25:1, the WCAG 1.4.11 floor for a field's edge */
+        --pill-fill:        #BB9B64;
+        --on-gold:          #1A1206;   /* 7.05:1 on --pill-fill */
+        --tab-inactive:       #D0D6D7;
+        --tab-inactive-label: #B8BFBF;
+        --track-caps:       0.26em;
       }
       /* ── BOTTOM DOCK (cz1, 2026-10-05) ── one stack owns where every floating
          bottom control sits, so none of them can land on another. Rows, bottom up:
@@ -543,7 +557,7 @@
       body:has(.garden-fullscreen) :is(.audio-bar, .ascroll-pill, .find-pill, .mode-toggle-wrap) { display: none; }
       body:has(.garden-fullscreen) { --dock-player: 0px; --dock-transport: 0px; --dock-context: 0px; --dock-find: 0px; }
       /* cz7: the reading text can always scroll clear of the dock: the scroller's end padding is the live stack. */
-      body:is(.audio-bar-open, .autoscroll-on, :has(.mode-toggle-wrap, .jrn-fab, .find-pill)) .screen-scroll {
+      body:is(.audio-bar-open, .autoscroll-on, :has(.mode-toggle-wrap, .jrn-fab, .find-pill, .tabbar)) .screen-scroll {
         padding-bottom: calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport) + var(--dock-find) + var(--dock-context) + 8px);
       }
       /* The message lane: where a toast's bottom edge goes (restated for the hint below). A toast reads
@@ -562,13 +576,63 @@
         body:has(.ascroll-pill.is-expanded) .mode-toggle-wrap { display: none; }
         .mode-toggle-label { display: none; }  /* the caption goes before a button does (cz7) */
       }
+      /* ── TAB BAR (rs1, overhaul review build) ── Home / Read / Listen / Library (ui/components/TabBar.jsx).
+         While it shows, the whole bottom dock stands on it: --dock-sys becomes the gesture inset PLUS the bar,
+         so every control above (player, pills, Study Notes, toasts, the tour) lifts by the bar's height. */
+      :root { --tabbar-h: 0px; }
+      body:has(.tabbar) {
+        --tabbar-h: 64px;
+        --dock-sys: calc(max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px)) + var(--tabbar-h));
+        --dock-floor: calc(var(--dock-sys) + 8px);
+      }
+      html:fullscreen .tabbar { display: none; }
+      /* A short screen (landscape) cannot hold the bar under a reading dock that is working (412px: nav 67 + the
+         player, the auto-scroll pill, find and a toast). While auto-scroll or find runs there, the bar steps aside. */
+      @media (max-height: 500px) {
+        body:is(.autoscroll-on, :has(.find-pill)) .tabbar { display: none; }
+        body:is(.autoscroll-on, :has(.find-pill)):has(.tabbar) { --tabbar-h: 0px; }
+      }
+      html:fullscreen body:has(.tabbar) { --tabbar-h: 0px; }
+      .tabbar {
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 149;
+        display: flex; align-items: stretch; box-sizing: border-box;
+        height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px)));
+        padding: 0 max(env(safe-area-inset-left, 0px), 4px) max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px)) max(env(safe-area-inset-right, 0px), 4px);
+        background: var(--bg); border-top: 1px solid var(--divider);
+      }
+      .tabbar-tab {
+        flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+        padding: 6px 0 4px; background: none; border: 0; cursor: pointer;
+        color: var(--tab-inactive); font-family: var(--font-ui); font-size: var(--fsc-14); line-height: 1.1; letter-spacing: 0.01em;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .tabbar-tab .tabbar-label { color: var(--tab-inactive-label); }
+      .tabbar-tab.is-active, .tabbar-tab.is-active .tabbar-label { color: var(--gold); }
+      .tabbar-tab:focus-visible { outline: 2px solid var(--gold); outline-offset: -4px; border-radius: 10px; }
+      .tabbar-icon { width: 26px; height: 26px; flex-shrink: 0; }
+      /* The top bar in the new look: the page's own plane, no rule under it. Home is a tab now, and the open-pages
+         counter moved into ⋮; a tab's root has no back arrow. The Search icon carries the cluster's push so the
+         cluster still hugs the right with no back arrow on the left. */
+      body:has(.tabbar) .top-nav { background: var(--bg); border-bottom: 0; }
+      body:has(.tabbar) .top-nav [title="Home"],
+      body:has(.tabbar) .top-nav .tabs-hint-wrap,
+      body[data-tab-root] .top-nav .nav-back-icon { display: none; }
+      body:has(.tabbar) .top-nav .nav-search-btn[title="Search"] { margin-left: auto; }
+      body:has(.tabbar) .top-nav :is(.nav-search-btn, .nav-more-btn, .nav-back-icon) { color: var(--cream); }
+      /* The mini player rides on the bar, square to it (its own inset padding is the bar's now). */
+      body:has(.tabbar) .audio-bar { bottom: var(--dock-sys); padding-bottom: min(0.5rem, 10px); }
 
+      /* rs1: True Black, the OLED variant of the charcoal dark (was the default dark until the overhaul). */
+      body.trueblack:not(.light) {
+        --bg: #000000; --bg2: #0F1415; --bg3: #141A1B;
+        --divider: #22292B; --border: #22292B; --input-bg: #141A1B; --input-border: #5E6869;
+      }
       /* ── LIGHT THEME OVERRIDES ── */
       body.light {
-        --bg:          #f7f2e8;
-        --bg2:         #ede7d8;
-        --bg3:         #e6dece;
-        --gold:        #7a5c10;
+        --bg:          #F4EFE4;   /* rs1: the parchment twin (audit-style.md) */
+        --bg2:         #EAE3D4;
+        --bg3:         #E2DACA;
+        --gold:        #7A5A1C;
         --gold-bright: #6e520e;   /* emphasis by depth on parchment: darker than --gold, never paler.
                                      #9b7418 measured 3.13-3.84:1 at three small-text sites (sweep 2026-09-05);
                                      this reads 5.3:1 on the active chip ground, 6.5:1 on --bg. */
@@ -576,10 +640,10 @@
         --gold-faint:  rgba(122,92,16,0.08);
         --gold-border: rgba(122,92,16,0.28);
         --gold-glow:   rgba(122,92,16,0.35);
-        --border:      rgba(110,98,76,0.18);   /* the light twin — see :root */
-        --cream:       #000000;
-        --cream-dim:   #150a04;
-        --cream-muted: #3a2510;
+        --border:      #D9CFBD;   /* the light twin — see :root */
+        --cream:       #1E1A15;
+        --cream-dim:   #4F473D;
+        --cream-muted: #6B6153;
         --study-note:  rgba(122,92,16,0.07);
         --study-border: rgba(122,92,16,0.22);
         --reading-wash: rgba(122,92,16,0.16);
@@ -588,10 +652,17 @@
         --tap-ref:        var(--gold-dim);
         --tap-ref-sub:    var(--gold-border);
         --tap-ref-active: var(--gold);
-        --link-blue:   #387493;   /* W10-lite: darkened from #4a90b8 (3.15:1) to clear WCAG AA 4.5:1 on the light bg (4.60:1) */
+        --link-blue:   #326c8a;   /* W10-lite: darkened from #4a90b8 (3.15:1) to clear WCAG AA 4.5:1 on the light bg; rs1 parchment: 5.02:1 on --bg, 4.51 on --bg2 */
         --danger:      #a02622;   /* a11y-ux-1: :root's #ef9a9a is tuned for the dark theme (9.36:1 on dark --bg3) and had no light override, so every light-theme danger/delete site was falling through to it at 1.61-1.93:1 against light bg/bg2/bg3; this clears WCAG AA 4.5:1 on all three (6.73:1 / 6.09:1 / 5.62:1) */
         --accent-pink: #c2185b;
         --input-text:  #2a2520;   /* near-black with brown tint, softer than #000 */
+        --divider:     #D9CFBD;
+        --input-bg:    #EAE3D4;
+        --input-border: #8F826B;
+        --pill-fill:   #7A5A1C;   /* the dark-on-gold pill is 2.3:1 on parchment, so light inverts it */
+        --on-gold:     #FBF6EC;
+        --tab-inactive: #4F473D;
+        --tab-inactive-label: #4F473D;
       }
       body.light .top-nav { background: rgba(247,242,232,0.95); }
       /* ── Right-cluster alignment ──────────────────────────────────────────
@@ -937,7 +1008,7 @@
         .top-nav .settings-gear-btn { display: none; }
       }
       .nav-home {
-        font-family: 'Cinzel', serif; font-size: var(--fs-12); letter-spacing: 0.18em;
+        font-family: var(--font-ui); font-size: var(--fs-12); letter-spacing: 0.18em;
         text-transform: uppercase; color: var(--gold); background: none; border: none;
         cursor: pointer; padding: 0.45rem 0.55rem; transition: color var(--transition);
         white-space: nowrap; opacity: 0.85; min-height: 44px; display: flex; align-items: center;
@@ -961,7 +1032,7 @@
          `nav-home nav-back-icon` through LibraryNav. Do not reintroduce. */
       .nav-arrows { display: flex; gap: 0.3rem; flex-shrink: 0; }
       .nav-btn {
-        font-family: 'Cinzel', serif; font-size: var(--fs-12); letter-spacing: 0.1em;
+        font-family: var(--font-ui); font-size: var(--fs-12); letter-spacing: 0.1em;
         color: var(--cream-muted); background: transparent;
         border: 1px solid var(--gold-border); border-radius: 4px;
         padding: 0.45rem 0.75rem; cursor: pointer; transition: all var(--transition);
@@ -977,7 +1048,7 @@
         width: 1.9rem; height: 1.9rem; padding: 0;
         background: transparent; border: 1px solid var(--gold-border); border-radius: 50%;
         color: var(--gold); cursor: pointer; font-size: var(--fs-16); line-height: 1;
-        font-family: 'Cinzel', serif; font-weight: 500;
+        font-family: var(--font-ui); font-weight: 500;
         transition: all 0.18s ease; flex-shrink: 0;
         -webkit-tap-highlight-color: transparent;
         position: relative;
@@ -1038,7 +1109,7 @@
         background: rgba(0,0,0,0.85);
         border: 1px solid var(--gold-border); border-radius: 50%;
         color: var(--gold); cursor: pointer;
-        font-family: 'Cinzel', serif; font-weight: 500;
+        font-family: var(--font-ui); font-weight: 500;
         font-size: var(--fs-24); line-height: 1;
         transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
         box-shadow: 0 4px 14px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(200,164,86,0.06);
@@ -1082,11 +1153,11 @@
       }
       .vol-index-header { text-align: center; margin-bottom: 2.5rem; }
       .vol-index-eyebrow {
-        font-family: 'Cinzel', serif; font-size:var(--fs-12); letter-spacing:0.18em;
+        font-family: var(--font-ui); font-size:var(--fs-12); letter-spacing:0.18em;
         text-transform: uppercase; color: var(--gold); opacity: 0.8; margin-bottom: 0.5rem;
       }
       .vol-index-title {
-        font-family: 'Cinzel Decorative', serif; font-size: var(--fs-36);
+        font-family: var(--font-ui); font-size: var(--fs-36);
         color: var(--cream); margin-bottom: 0.3rem; line-height: 1.2;
       }
       .vol-index-subtitle {
@@ -1452,12 +1523,12 @@
       @keyframes audio-manager-rise { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
       .audio-manager-sheet .sheet-handle-row { margin-bottom: 0.2rem; }
       .audio-manager-kicker {
-        margin: 0 0 0.28rem; font-family: 'Cinzel', serif; font-size: var(--fs-10);
+        margin: 0 0 0.28rem; font-family: var(--font-ui); font-size: var(--fs-10);
         letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold-dim);
       }
       .audio-manager-head { display: flex; align-items: flex-start; gap: 0.85rem; padding-bottom: 1rem; border-bottom: 1px solid var(--gold-border); }
       .audio-manager-track-copy { flex: 1; min-width: 0; }
-      .audio-manager-track-copy h2 { margin: 0; color: var(--cream); font-family: 'Cinzel', serif; font-size: var(--fs-18); font-weight: 500; line-height: 1.3; }
+      .audio-manager-track-copy h2 { margin: 0; color: var(--cream); font-family: var(--font-ui); font-size: var(--fs-18); font-weight: 500; line-height: 1.3; }
       .audio-manager-track-copy p { margin: 0.3rem 0 0; color: var(--cream-dim); font-size: var(--fs-12); font-style: italic; line-height: 1.45; }
       /* Desk-title jump (2026-08-09): the title is a BUTTON that opens the
          playing letter/chapter's text without touching playback. Reset the
@@ -1466,13 +1537,13 @@
       .audio-manager-jump { background: none; border: 0; padding: 0; margin: 0; display: block; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; border-radius: 6px; }
       .audio-manager-jump:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
       .audio-manager-jump-chevron { color: var(--gold-dim); font-family: inherit; }
-      .audio-manager-jump-cue { display: block; margin-top: 0.4rem; color: var(--gold-dim); font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.04em; }
+      .audio-manager-jump-cue { display: block; margin-top: 0.4rem; color: var(--gold-dim); font-family: var(--font-ui); font-size: var(--fs-10); letter-spacing: 0.04em; }
       @media (hover: hover) { .audio-manager-jump:hover h2 { color: var(--gold); } .audio-manager-jump:hover .audio-manager-jump-chevron, .audio-manager-jump:hover .audio-manager-jump-cue { color: var(--gold); } }
       .audio-manager-save {
         flex: 0 0 auto; min-width: 58px; min-height: 44px; padding: 0.3rem 0.55rem;
         display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.05rem;
         background: transparent; border: 1px solid var(--gold-border); border-radius: 7px; color: var(--gold-dim);
-        cursor: pointer; font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.04em;
+        cursor: pointer; font-family: var(--font-ui); font-size: var(--fs-10); letter-spacing: 0.04em;
       }
       .audio-manager-save svg { width: 19px; height: 19px; }
       .audio-manager-save.is-saved { color: var(--gold); background: var(--gold-faint); border-color: var(--gold); }
@@ -1497,7 +1568,7 @@
       .audio-manager-round, .audio-manager-play {
         flex: 0 0 auto; width: 44px; height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
         border: 1px solid var(--gold-border); border-radius: 50%; background: transparent; color: var(--gold); cursor: pointer;
-        font-family: 'Cinzel', serif; font-size: var(--fs-11); font-variant-numeric: tabular-nums;
+        font-family: var(--font-ui); font-size: var(--fs-11); font-variant-numeric: tabular-nums;
       }
       .audio-manager-round svg { width: 21px; height: 21px; }
       .audio-manager-play { width: 58px; height: 58px; background: var(--gold-faint); border-color: var(--gold); color: var(--gold-bright); }
@@ -1512,7 +1583,7 @@
       .audio-manager-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0.65rem; padding: 0.85rem 0; border-top: 1px solid var(--gold-border); }
       .audio-manager-tool { min-width: 0; padding: 0.65rem; background: rgba(200, 164, 86, 0.035); border: 1px solid rgba(200, 164, 86, 0.16); border-radius: 8px; }
       .audio-manager-tool-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem; color: var(--cream-dim); font-size: var(--fs-11); }
-      .audio-manager-tool-head strong { color: var(--gold); font-family: 'Cinzel', serif; font-size: var(--fs-11); font-weight: 500; white-space: nowrap; }
+      .audio-manager-tool-head strong { color: var(--gold); font-family: var(--font-ui); font-size: var(--fs-11); font-weight: 500; white-space: nowrap; }
       .audio-manager-segment { display: flex; flex-wrap: wrap; gap: 0.28rem; }
       /* Speed tool (AudioSpeedControl): −/+ are the transport's 44px rounds, the
          slider is the desk's seek slider by class (same --seek-pct fill), the
@@ -1540,14 +1611,14 @@
       .audio-manager-queue { padding-top: 0.75rem; border-top: 1px solid var(--gold-border); }
       .audio-manager-section-head { display: flex; align-items: center; justify-content: space-between; gap: 0.65rem; padding: 0 0.1rem 0.45rem; }
       .audio-manager-section-head div { display: flex; flex-direction: column; gap: 0.08rem; min-width: 0; }
-      .audio-manager-section-head span { color: var(--gold-dim); font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.18em; text-transform: uppercase; }
+      .audio-manager-section-head span { color: var(--gold-dim); font-family: var(--font-ui); font-size: var(--fs-10); letter-spacing: 0.18em; text-transform: uppercase; }
       .audio-manager-section-head strong { color: var(--cream-muted); font-size: var(--fs-11); font-weight: 400; }
       .audio-manager-section-head > button { min-height: 44px; min-width: 44px; padding: 0.2rem 0.55rem; border: 0; border-radius: 5px; background: transparent; color: var(--gold-dim); cursor: pointer; font-size: var(--fs-11); }
       @media (hover: hover) { .audio-manager-section-head > button:hover { background: var(--gold-faint); color: var(--gold); } }
       .audio-manager-queue ol { margin: 0; padding: 0; list-style: none; }
       .audio-manager-queue li { display: flex; align-items: stretch; min-width: 0; border-top: 1px solid rgba(200, 164, 86, 0.13); }
       .audio-manager-queue-main { flex: 1; min-width: 0; min-height: 54px; padding: 0.45rem 0.25rem; display: flex; align-items: center; gap: 0.6rem; border: 0; background: transparent; color: var(--cream); cursor: pointer; text-align: left; }
-      .audio-manager-queue-number { width: 1.25rem; flex: 0 0 1.25rem; color: var(--gold-dim); font-family: 'Cinzel', serif; font-size: var(--fs-11); text-align: center; }
+      .audio-manager-queue-number { width: 1.25rem; flex: 0 0 1.25rem; color: var(--gold-dim); font-family: var(--font-ui); font-size: var(--fs-11); text-align: center; }
       .audio-manager-queue-main > span:last-child { min-width: 0; display: flex; flex-direction: column; gap: 0.12rem; }
       .audio-manager-queue-main strong { overflow: hidden; color: var(--cream); font-size: var(--fs-13); font-weight: 400; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
       .audio-manager-queue-main small { overflow: hidden; color: var(--cream-dim); font-size: var(--fs-11); font-style: italic; text-overflow: ellipsis; white-space: nowrap; }
@@ -1585,7 +1656,7 @@
          read as one unit, before the transport. */
       .audio-manager-voice-top { margin: 0.35rem 0 0.75rem; padding: 0.55rem 0.65rem 0.6rem; border: 1px solid var(--gold-border); border-radius: 10px; background: var(--gold-faint); }
       .audio-manager-queue-actions { display: flex; align-items: center; }
-      .audio-manager-queue-actions button { width: 44px; min-width: 44px; height: 44px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--gold-dim); cursor: pointer; font-family: 'Cinzel', serif; font-size: var(--fs-16); }
+      .audio-manager-queue-actions button { width: 44px; min-width: 44px; height: 44px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--gold-dim); cursor: pointer; font-family: var(--font-ui); font-size: var(--fs-16); }
       @media (hover: hover) { .audio-manager-queue-actions button:not(:disabled):hover { background: var(--gold-faint); color: var(--gold); } }
       .audio-manager-empty { margin: 0; padding: 0.7rem 0.15rem 0.25rem; color: var(--cream-dim); font-size: var(--fs-12); font-style: italic; line-height: 1.5; }
       @media (max-width: 480px) {
@@ -1602,8 +1673,8 @@
       .audio-library-screen { width:100%; max-width:860px; margin:0 auto; padding:1.4rem min(1.45rem,5vw) 3rem; background:var(--bg); }
       .audio-library-hero { position:relative; padding:.55rem 0 1.35rem; overflow:hidden; }
       .audio-library-hero::after { content:""; position:absolute; width:20rem; height:20rem; right:-11rem; top:-13rem; border:1px solid rgba(200,164,86,.16); border-radius:50%; box-shadow:0 0 0 1.2rem rgba(200,164,86,.025),0 0 0 3.1rem rgba(200,164,86,.018); pointer-events:none; }
-      .audio-library-eyebrow { position:relative; z-index:1; color:var(--gold-dim); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; }
-      .audio-library-screen h1 { position:relative; z-index:1; margin:.27rem 0 0; color:var(--cream); font-family:'Cinzel Decorative',serif; font-size:clamp(var(--fs-24),4.6vw,var(--fs-30)); font-weight:400; line-height:1.16; }
+      .audio-library-eyebrow { position:relative; z-index:1; color:var(--gold-dim); font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; }
+      .audio-library-screen h1 { position:relative; z-index:1; margin:.27rem 0 0; color:var(--cream); font-family:var(--font-ui); font-size:clamp(var(--fs-24),4.6vw,var(--fs-30)); font-weight:400; line-height:1.16; }
       .audio-library-intro { position:relative; z-index:1; margin:.58rem 0 0; max-width:38rem; color:var(--cream-dim); font-size:var(--fs-14); font-style:italic; line-height:1.55; }
       .audio-library-hero .audio-library-primary-action { position:relative; z-index:1; margin-top:.9rem; }
       /* Studies (Codex critique 2 + 4, 2026-09-23): the head's listen/read split, and a partly recorded study's text-only chapters. */
@@ -1636,22 +1707,22 @@
       .offline-collection { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; max-width:100%; }
       .offline-collection:has(.offline-confirm) { flex-basis:100%; }
       .offline-collection.is-saved, .offline-collection.is-busy { font-size:var(--fs-12); color:var(--gold); }
-      .audio-library-secondary-action { min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:.4rem; padding:.34rem .73rem; border:1px solid var(--gold); border-radius:7px; background:transparent; color:var(--gold); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-10); font-weight:600; letter-spacing:.035em; }
+      .audio-library-secondary-action { min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:.4rem; padding:.34rem .73rem; border:1px solid var(--gold); border-radius:7px; background:transparent; color:var(--gold); cursor:pointer; font-family:var(--font-ui); font-size:var(--fs-10); font-weight:600; letter-spacing:.035em; }
       .audio-library-secondary-action:disabled { opacity:.5; cursor:default; }
       .audio-library-secondary-action .offline-icon { width:16px; height:16px; }
       .offline-collection-note { margin:0; font-size:var(--fs-12); color:var(--cream-dim); }
       .offline-confirm { flex-basis:100%; margin:.4rem 0 0; padding:.8rem .9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); }
-      .offline-confirm-title { margin:0 0 .3rem; color:var(--cream); font-family:'Cinzel',serif; font-size:var(--fs-14); }
+      .offline-confirm-title { margin:0 0 .3rem; color:var(--cream); font-family:var(--font-ui); font-size:var(--fs-14); }
       .offline-confirm-line { margin:.1rem 0; color:var(--cream-dim); font-size:var(--fs-12); }
       .offline-confirm-warn { margin:.35rem 0 0; color:#e0897a; font-size:var(--fs-12); }
       body.light .offline-confirm-warn { color:#9b3a2a; }
       .offline-confirm-actions { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.7rem; }
-      .offline-confirm-cancel, .offline-confirm-go { min-height:44px; padding:.34rem .9rem; border-radius:7px; border:1px solid var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-10); font-weight:600; letter-spacing:.035em; cursor:pointer; }
+      .offline-confirm-cancel, .offline-confirm-go { min-height:44px; padding:.34rem .9rem; border-radius:7px; border:1px solid var(--gold); font-family:var(--font-ui); font-size:var(--fs-10); font-weight:600; letter-spacing:.035em; cursor:pointer; }
       .offline-confirm-cancel { background:transparent; color:var(--gold); }
       .offline-confirm-go { background:var(--gold); color:#17130a; }
       body.light .offline-confirm-go { color:var(--bg); }
       .offline-confirm-go:disabled { opacity:.45; cursor:default; }
-      .audio-offline-remove { min-height:36px; padding:.2rem .7rem; border:1px solid var(--gold-border); border-radius:7px; background:transparent; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:.035em; cursor:pointer; }
+      .audio-offline-remove { min-height:36px; padding:.2rem .7rem; border:1px solid var(--gold-border); border-radius:7px; background:transparent; color:var(--gold); font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:.035em; cursor:pointer; }
       .audio-offline-remove-all { margin-top:1rem; }
       .offline-row-download:focus-visible, .offline-row-link:focus-visible, .audio-library-secondary-action:focus-visible, .offline-confirm-cancel:focus-visible, .offline-confirm-go:focus-visible, .audio-offline-remove:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
       .audio-library-search { position:relative; z-index:1; min-height:46px; margin-top:1rem; display:flex; align-items:center; gap:.5rem; padding:0 .68rem; border:1px solid var(--gold-border); border-radius:9px; background:rgba(9,8,5,.22); transition:border-color .16s ease,background .16s ease; }
@@ -1662,10 +1733,10 @@
       .audio-library-now-art { position:relative; z-index:1; width:64px; height:64px; display:flex; align-items:center; justify-content:center; gap:4px; overflow:hidden; border:1px solid rgba(200,164,86,.5); border-radius:18px; background:linear-gradient(145deg,rgba(200,164,86,.22),rgba(200,164,86,.045)); }.audio-library-now-art span { width:3px; height:18%; border-radius:999px; background:var(--gold); opacity:.72; transform-origin:center; }.audio-library-now-art span:nth-child(2) { height:44%; }.audio-library-now-art span:nth-child(3) { height:68%; }.audio-library-now-art span:nth-child(4) { height:37%; }.audio-library-now-art span:nth-child(5) { height:24%; }
       .audio-library-now.is-active .audio-library-now-art span { animation:audio-library-wave .8s ease-in-out infinite alternate; }.audio-library-now.is-active .audio-library-now-art span:nth-child(2) { animation-delay:-.23s; }.audio-library-now.is-active .audio-library-now-art span:nth-child(3) { animation-delay:-.48s; }.audio-library-now.is-active .audio-library-now-art span:nth-child(4) { animation-delay:-.12s; }.audio-library-now.is-active .audio-library-now-art span:nth-child(5) { animation-delay:-.38s; }
       @keyframes audio-library-wave { from { transform:scaleY(.55); opacity:.52; } to { transform:scaleY(1.35); opacity:1; } }
-      .audio-library-now-copy { position:relative; z-index:1; min-width:0; display:flex; flex-direction:column; gap:.16rem; }.audio-library-now-copy > span { color:var(--gold-dim); font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:.18em; text-transform:uppercase; }.audio-library-now-copy h2 { margin:0; overflow:hidden; color:var(--cream); font-family:'Cormorant Garamond',serif; font-size:clamp(var(--fs-18),3vw,var(--fs-20)); font-weight:600; line-height:1.1; text-overflow:ellipsis; white-space:nowrap; }.audio-library-now-copy small { overflow:hidden; color:var(--cream-dim); font-size:var(--fs-11); font-style:italic; text-overflow:ellipsis; white-space:nowrap; }
+      .audio-library-now-copy { position:relative; z-index:1; min-width:0; display:flex; flex-direction:column; gap:.16rem; }.audio-library-now-copy > span { color:var(--gold-dim); font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:.18em; text-transform:uppercase; }.audio-library-now-copy h2 { margin:0; overflow:hidden; color:var(--cream); font-family:'Cormorant Garamond',serif; font-size:clamp(var(--fs-18),3vw,var(--fs-20)); font-weight:600; line-height:1.1; text-overflow:ellipsis; white-space:nowrap; }.audio-library-now-copy small { overflow:hidden; color:var(--cream-dim); font-size:var(--fs-11); font-style:italic; text-overflow:ellipsis; white-space:nowrap; }
       /* wrap: the card gained prev/next (2026-08-09), so five controls can sit
          here — at 360px they wrap onto a second line instead of overflowing. */
-      .audio-library-now-actions { position:relative; z-index:1; display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:.28rem; }.audio-library-primary-action { min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:.4rem; padding:.34rem .73rem; border:1px solid var(--gold); border-radius:7px; background:var(--gold); color:#17130a; cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-10); font-weight:600; letter-spacing:.035em; }.audio-library-primary-action > span { color:#17130a; font-family:inherit; font-size:inherit; letter-spacing:inherit; text-transform:none; }.audio-library-primary-action svg { width:16px; height:16px; }.audio-library-primary-action[aria-busy="true"] { opacity:.75; }
+      .audio-library-now-actions { position:relative; z-index:1; display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:.28rem; }.audio-library-primary-action { min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:.4rem; padding:.34rem .73rem; border:1px solid var(--gold); border-radius:7px; background:var(--gold); color:#17130a; cursor:pointer; font-family:var(--font-ui); font-size:var(--fs-10); font-weight:600; letter-spacing:.035em; }.audio-library-primary-action > span { color:#17130a; font-family:inherit; font-size:inherit; letter-spacing:inherit; text-transform:none; }.audio-library-primary-action svg { width:16px; height:16px; }.audio-library-primary-action[aria-busy="true"] { opacity:.75; }
       .audio-library-icon-button { width:44px; min-width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0; border:1px solid transparent; border-radius:7px; background:transparent; color:var(--gold-dim); cursor:pointer; }.audio-library-icon-button svg { width:18px; height:18px; }.audio-library-save-button.is-saved { color:var(--gold); background:rgba(200,164,86,.12); border-color:rgba(200,164,86,.28); }
       /* The hub's scrubber is the shared AudioSeekSlider (2026-08-09) — the
          painted-div progressbar it replaces could be read but never moved.
@@ -1685,10 +1756,10 @@
       .audio-library-saved-row { margin-top:1.15rem; }
       .audio-library-section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:.75rem; padding:0 .1rem .63rem; }
       .audio-library-section-head > div { display:flex; flex-direction:column; gap:.1rem; min-width:0; }
-      .audio-library-section-head span { color:var(--gold-dim); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:.18em; text-transform:uppercase; }
-      .audio-library-section-head h2 { margin:.12rem 0 0; color:var(--cream); font-family:'Cinzel',serif; font-size:var(--fs-16); font-weight:400; }
+      .audio-library-section-head span { color:var(--gold-dim); font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:.18em; text-transform:uppercase; }
+      .audio-library-section-head h2 { margin:.12rem 0 0; color:var(--cream); font-family:var(--font-ui); font-size:var(--fs-16); font-weight:400; }
       .audio-library-section-head p { margin:.18rem 0 0; color:var(--cream-dim); font-size:var(--fs-10); font-style:italic; line-height:1.35; }
-      .audio-library-section-head > strong, .audio-library-section-tail > strong { min-width:34px; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-16); font-weight:500; text-align:right; }
+      .audio-library-section-head > strong, .audio-library-section-tail > strong { min-width:34px; color:var(--gold); font-family:var(--font-ui); font-size:var(--fs-16); font-weight:500; text-align:right; }
       .audio-library-section-head strong small { color:var(--gold-dim); font-family:inherit; font-size:var(--fs-10); font-weight:400; }
       .audio-library-section-tail { display:flex; align-items:center; gap:.3rem; }
       .audio-library-clear { min-width:44px; min-height:44px; padding:.22rem .38rem; border:0; border-radius:5px; background:transparent; color:var(--gold-dim); cursor:pointer; font:inherit; font-size:var(--fs-10); }
@@ -1699,15 +1770,15 @@
       .audio-library-row-copy { min-width:0; min-height:47px; padding:.1rem 0; display:flex; flex-direction:column; justify-content:center; gap:.12rem; }.audio-library-row-copy strong { overflow:hidden; color:var(--cream); font-size:var(--fs-13); font-weight:500; line-height:1.25; text-overflow:ellipsis; white-space:nowrap; }.audio-library-row-copy small { overflow:hidden; color:var(--cream-dim); font-size:var(--fs-10); font-style:italic; text-overflow:ellipsis; white-space:nowrap; }
       .audio-library-row-actions { display:flex; align-items:center; justify-content:flex-end; gap:.1rem; }.audio-library-row-actions > span { max-width:5.4rem; overflow:hidden; padding:0 .12rem; color:var(--cream-dim); font-size:var(--fs-10); text-align:right; text-overflow:ellipsis; white-space:nowrap; }.audio-library-row-actions > span.audio-library-remaining { color:var(--gold-dim); font-variant-numeric:tabular-nums; }
       .audio-library-empty { margin:0; padding:1rem .85rem .1rem; color:var(--cream-dim); font-size:var(--fs-12); font-style:italic; line-height:1.5; }.audio-library-empty b { color:var(--cream); font-style:normal; font-weight:500; }.audio-library-retry { margin:.5rem 0 0; min-height:44px; padding:0 1.2rem; border-radius:999px; border:1px solid var(--ink-gold-border, currentColor); background:transparent; color:var(--cream); font:inherit; font-style:normal; cursor:pointer; }
-      .audio-library-group { margin:1.15rem 0 .45rem; color:var(--cream); font-family:'Cinzel',serif; font-size:var(--fs-12); font-weight:500; letter-spacing:.08em; text-transform:uppercase; }
+      .audio-library-group { margin:1.15rem 0 .45rem; color:var(--cream); font-family:var(--font-ui); font-size:var(--fs-12); font-weight:500; letter-spacing:.08em; text-transform:uppercase; }
       .audio-library-shelf { overflow:hidden; border:1px solid rgba(200,164,86,.16); border-radius:10px; background:rgba(0,0,0,.045); }
       .audio-library-shelf-row { display:grid; grid-template-columns:36px minmax(0,1fr) auto; align-items:center; width:100%; min-height:64px; gap:.6rem; padding:.6rem .72rem; border:0; border-top:1px solid rgba(200,164,86,.13); background:transparent; color:inherit; cursor:pointer; text-align:left; font:inherit; transition:background .16s ease; }.audio-library-shelf-row:first-child { border-top:0; }
       .audio-library-shelf-mark { width:32px; height:32px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(200,164,86,.24); border-radius:10px; color:var(--gold); font-size:var(--fs-15); }.audio-library-shelf-mark svg { width:16px; height:16px; }
-      .audio-library-shelf-copy { min-width:0; display:flex; flex-direction:column; gap:.13rem; }.audio-library-shelf-copy strong { overflow:hidden; color:var(--cream); font-family:'Cinzel',serif; font-size:var(--fs-11); font-weight:400; line-height:1.32; text-overflow:ellipsis; white-space:nowrap; }.audio-library-shelf-copy small { overflow:hidden; color:var(--gold-dim); font-size:var(--fs-10); font-style:italic; text-overflow:ellipsis; white-space:nowrap; }
-      .audio-library-shelf-tail { display:flex; align-items:center; gap:.34rem; color:var(--gold-dim); }.audio-library-shelf-tail b { color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-12); font-weight:500; }.audio-library-shelf-tail svg { width:18px; height:18px; }
+      .audio-library-shelf-copy { min-width:0; display:flex; flex-direction:column; gap:.13rem; }.audio-library-shelf-copy strong { overflow:hidden; color:var(--cream); font-family:var(--font-ui); font-size:var(--fs-11); font-weight:400; line-height:1.32; text-overflow:ellipsis; white-space:nowrap; }.audio-library-shelf-copy small { overflow:hidden; color:var(--gold-dim); font-size:var(--fs-10); font-style:italic; text-overflow:ellipsis; white-space:nowrap; }
+      .audio-library-shelf-tail { display:flex; align-items:center; gap:.34rem; color:var(--gold-dim); }.audio-library-shelf-tail b { color:var(--gold); font-family:var(--font-ui); font-size:var(--fs-12); font-weight:500; }.audio-library-shelf-tail svg { width:18px; height:18px; }
       .audio-collection-chips { display:flex; flex-wrap:wrap; gap:.45rem; padding-top:.7rem; }.audio-collection-chips > button,.audio-collection-compilation > button:first-child { min-height:44px; display:inline-flex; align-items:center; gap:.4rem; padding:.3rem .68rem; border:1px solid rgba(200,164,86,.26); border-radius:999px; background:rgba(200,164,86,.045); color:var(--cream); cursor:pointer; font:inherit; font-size:var(--fs-11); }.audio-collection-chips > button svg,.audio-collection-compilation > button:first-child svg { width:14px; height:14px; color:var(--gold); }
       .audio-collection-item { border-top:1px solid rgba(200,164,86,.13); }.audio-collection-item:first-child { border-top:0; }.audio-collection-item .audio-library-row { border-top:0; }.audio-collection-item.is-current { background:rgba(200,164,86,.05); }
-      .audio-collection-num { margin-right:.45rem; color:var(--gold-dim); font-family:'Cinzel',serif; font-size:var(--fs-10); font-weight:400; }
+      .audio-collection-num { margin-right:.45rem; color:var(--gold-dim); font-family:var(--font-ui); font-size:var(--fs-10); font-weight:400; }
       .audio-collection-voices { min-height:44px; display:inline-flex; align-items:center; gap:.28rem; padding:.2rem .5rem; border:1px solid rgba(200,164,86,.22); border-radius:999px; background:transparent; color:var(--gold-dim); cursor:pointer; font:inherit; font-size:var(--fs-10); }.audio-collection-voices svg { width:14px; height:14px; transition:transform .18s ease; }.audio-collection-voices.is-open svg { transform:rotate(180deg); }.audio-collection-voices.is-open { border-color:var(--gold); color:var(--gold); }
       .audio-collection-voice-list { display:flex; flex-direction:column; gap:.1rem; padding:.15rem .5rem .55rem 2.9rem; }
       .audio-collection-voice { display:flex; align-items:center; gap:.55rem; }.audio-collection-voice > span { color:var(--cream-dim); font-size:var(--fs-11); font-style:italic; }.audio-collection-voice.is-current > span { color:var(--gold); font-style:normal; }.audio-collection-voice .audio-library-row-play { width:38px; min-height:38px; }.audio-collection-voice .audio-library-row-play svg { width:14px; height:14px; }
@@ -1918,7 +1989,7 @@
         padding: 0.45em 1.1em; border-radius: 999px;
         background: linear-gradient(180deg, var(--gold-faint), transparent);
         border: 1px solid var(--gold-border); color: var(--gold); cursor: pointer;
-        font-family: 'Cinzel', serif; font-size:var(--fs-12);
+        font-family: var(--font-ui); font-size:var(--fs-12);
         letter-spacing: 0.12em; text-transform: uppercase; line-height: 1.2;
         transition: border-color 0.18s, transform 0.18s;
       }
@@ -1943,7 +2014,7 @@
         padding: 0.35em 0.7em; border-radius: 8px;
         background: linear-gradient(180deg, var(--gold-faint), transparent);
         border: 1px solid var(--gold-border); color: var(--gold); cursor: pointer;
-        font-family: 'Cinzel', serif; font-size: var(--fs-11);
+        font-family: var(--font-ui); font-size: var(--fs-11);
         letter-spacing: 0.08em; line-height: 1.2;
         transition: border-color 0.18s, background 0.18s;
       }
@@ -2007,7 +2078,7 @@
       }
       .hero-content { position: relative; z-index: 3; }
       .hero-eyebrow {
-        font-family: 'Cinzel', serif;
+        font-family: var(--font-ui);
         /* Fluid: the ENDS are scale tokens, the vw term between them is the
            point (see the type-scale block's documented clamp exception). */
         font-size: clamp(var(--fs-12), 2.3vw, var(--fs-13));   /* was 10-12: every phone got the 10 px floor */
@@ -2016,7 +2087,7 @@
         overflow-wrap: break-word; word-wrap: break-word; line-height: 1.6;
       }
       .hero-title {
-        font-family: 'Cinzel Decorative', serif;
+        font-family: var(--font-ui);
         /* Standardized reading-title size — gentle responsive scale that sits
            just above the index titles (.vol-index-title) and never balloons
            past its top token. Length-independent: a long title wraps at the
@@ -2049,7 +2120,7 @@
         padding: 0.25rem 0.75rem;
         background: transparent; border: 1px dashed var(--gold-border);
         border-radius: 999px; cursor: pointer;
-        font-family: 'Cinzel', serif; font-size: var(--fs-10);
+        font-family: var(--font-ui); font-size: var(--fs-10);
         letter-spacing: 0.16em; text-transform: uppercase;
         color: var(--gold-dim);
         transition: all 0.2s ease;
@@ -2127,14 +2198,14 @@
         padding-left: 1.8rem; position: relative;
       }
       .verses-block .verse .verse-num {
-        font-family: 'Cinzel', serif; font-size: var(--fs-11); color: var(--gold);
+        font-family: var(--font-ui); font-size: var(--fs-11); color: var(--gold);
         position: absolute; left: 0; top: 0.2rem;
         letter-spacing: 0.05em; line-height: 1;
         vertical-align: baseline; margin-right: 0;
       }
       /* Default for any stray .verse outside .verses-block (legacy) */
       .verse-num {
-        font-family: 'Cinzel', serif; font-size: var(--fs-10); color: var(--gold);
+        font-family: var(--font-ui); font-size: var(--fs-10); color: var(--gold);
         vertical-align: super; margin-right: 0.15em; letter-spacing: 0.05em;
         line-height: 1;
       }
@@ -2145,7 +2216,7 @@
       }
       .study-panel-group { margin-bottom: 1.5rem; }
       .study-panel-group-title {
-        font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.3em;
+        font-family: var(--font-ui); font-size: var(--fs-10); letter-spacing: 0.3em;
         text-transform: uppercase; color: var(--gold); margin-bottom: 0.7rem;
         display: flex; align-items: center; gap: 0.6rem;
       }
@@ -2170,7 +2241,7 @@
       }
       }
       .scripture-ref-tag {
-        font-family: 'Cinzel', serif; font-size: var(--fs-10); color: var(--gold);
+        font-family: var(--font-ui); font-size: var(--fs-10); color: var(--gold);
         letter-spacing: 0.08em; white-space: nowrap; flex-shrink: 0; padding-top: 0.05rem;
       }
       .scripture-ref-text { color: var(--cream-muted); font-style: italic; line-height: 1.5; }
@@ -2186,11 +2257,11 @@
       }
       .vot-note-header { display: flex; align-items: baseline; gap: 0.6rem; margin-bottom: 0.4rem; flex-wrap: wrap; }
       .vot-note-ref {
-        font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.1em;
+        font-family: var(--font-ui); font-size: var(--fs-10); letter-spacing: 0.1em;
         color: var(--gold); white-space: nowrap;
       }
       .vot-note-vol {
-        font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.1em;
+        font-family: var(--font-ui); font-size: var(--fs-10); letter-spacing: 0.1em;
         color: var(--gold-dim); font-style: normal;
       }
       .vot-note-letter {
@@ -2207,7 +2278,7 @@
       }
       .vot-note-hm, .inline-vot-hm {
         margin-left: auto; align-self: center; flex-shrink: 0;
-        font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.14em;
+        font-family: var(--font-ui); font-size: var(--fs-10); letter-spacing: 0.14em;
         color: var(--gold-dim); padding: 0.12rem 0.35rem;
         border: 1px solid var(--gold-border); border-radius: 2px;
         text-transform: uppercase;
@@ -2224,7 +2295,7 @@
       /* Links */
       .study-links { display: flex; flex-wrap: wrap; gap: 0.5rem; }
       .study-link {
-        font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.14em;
+        font-family: var(--font-ui); font-size: var(--fs-10); letter-spacing: 0.14em;
         text-transform: uppercase; color: var(--gold);
         background: rgba(200,164,86,0.08); border: 1px solid rgba(200,164,86,0.25);
         border-radius: 3px; padding: 0.3rem 0.7rem;
@@ -2257,7 +2328,7 @@
       .bottom-nav-card.next { text-align: right; }
       .bottom-nav-card.placeholder { opacity: 0.3; pointer-events: none; }
       .bottom-nav-label {
-        font-family: 'Cinzel', serif; font-size: var(--fs-11); letter-spacing: 0.22em;
+        font-family: var(--font-ui); font-size: var(--fs-11); letter-spacing: 0.22em;
         text-transform: uppercase; color: var(--gold); margin-bottom: 0.3rem; overflow-wrap: break-word;
       }
       .bottom-nav-title { font-size: var(--fs-16); color: var(--cream); line-height: 1.4; }
@@ -2266,7 +2337,7 @@
       /* ── ORNAMENT DIVIDER ── */
       .ornament-divider { display: flex; align-items: center; gap: 0.75rem; margin: 2.5rem 0 1.5rem; }
       .ornament-divider-line { flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--gold-border), transparent); }
-      .ornament-divider-symbol { font-family: 'Cinzel', serif; font-size: var(--fs-12); color: var(--gold-dim); letter-spacing: 0.15em; }
+      .ornament-divider-symbol { font-family: var(--font-ui); font-size: var(--fs-12); color: var(--gold-dim); letter-spacing: 0.15em; }
     
       /* ── ANIMATIONS ── */
     
@@ -2291,7 +2362,7 @@
       }
       @media (hover: hover) { .inline-note-scripture:hover { opacity: 0.75; } }
       .inline-note-tag {
-        font-family: 'Cinzel', serif; font-size: var(--fs-10);
+        font-family: var(--font-ui); font-size: var(--fs-10);
         color: var(--gold); letter-spacing: 0.08em;
         white-space: nowrap; flex-shrink: 0;
       }
@@ -2303,8 +2374,8 @@
         padding: 0.55rem 0.7rem;
       }
       .inline-vot-header { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.25rem; }
-      .inline-vot-ref { font-family: 'Cinzel', serif; font-size: var(--fs-10); color: var(--gold); letter-spacing: 0.08em; }
-      .inline-vot-vol { font-family: 'Cinzel', serif; font-size: var(--fs-10); color: var(--gold-dim); }
+      .inline-vot-ref { font-family: var(--font-ui); font-size: var(--fs-10); color: var(--gold); letter-spacing: 0.08em; }
+      .inline-vot-vol { font-family: var(--font-ui); font-size: var(--fs-10); color: var(--gold-dim); }
       .inline-vot-letter { font-size: var(--fs-12); color: var(--cream-muted); font-style: italic; margin-bottom: 0.3rem; }
       .inline-vot-excerpt { font-size: var(--fs-14); color: var(--cream-dim); line-height: 1.65; }
       .inline-vot-chevron {
@@ -2330,7 +2401,7 @@
         padding: 0.25rem 0.6rem; border-radius: 20px;
         border: 1px solid rgba(200,164,86,0.25);
         background: rgba(200,164,86,0.06);
-        font-family: 'Cinzel', serif; font-size: var(--fs-10);
+        font-family: var(--font-ui); font-size: var(--fs-10);
         letter-spacing: 0.08em; color: var(--gold-dim);
         cursor: pointer; transition: all 0.2s ease;
         text-transform: uppercase; white-space: nowrap;
@@ -2420,7 +2491,7 @@
       }
       body.light .mode-toggle-wrap { box-shadow: 0 4px 18px rgba(0,0,0,0.16); }
       .mode-toggle-label {
-        font-family: 'Cinzel', serif; font-size: var(--fs-10);
+        font-family: var(--font-ui); font-size: var(--fs-10);
         letter-spacing: 0.18em; text-transform: uppercase;
         color: var(--gold-dim);
         padding: 0 14px;
@@ -2433,7 +2504,7 @@
       .mode-btn {
         display: flex; align-items: center; gap: 0.45rem;
         padding: 0.55rem 1rem; border: none; background: transparent;
-        font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.16em;
+        font-family: var(--font-ui); font-size: var(--fs-10); letter-spacing: 0.16em;
         text-transform: uppercase; color: var(--cream-muted);
         cursor: pointer; transition: all 0.25s ease; white-space: nowrap;
       }
@@ -2490,7 +2561,7 @@
     /* ── LETTER META ── */
     
     .letter-meta { padding:0 0 0.25rem; margin-bottom:2.5rem; }
-    .meta-date { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.2em; color:var(--gold); text-transform:uppercase; margin-bottom:0.5rem; }
+    .meta-date { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.2em; color:var(--gold); text-transform:uppercase; margin-bottom:0.5rem; }
     .meta-from { font-style:italic; color:var(--cream-dim); font-size:var(--fs-16); margin-bottom:0.2rem; }
     .meta-spoken { font-size:var(--fs-15); color:var(--cream-muted); margin-bottom:0.2rem; }
     .meta-for { font-size:var(--fs-15); color:var(--cream-muted); margin-bottom:0.2rem; }
@@ -2519,7 +2590,7 @@
        optimization changes no geometry. */
     body.scroll-restoring .letter-para, body.scroll-restoring .section-block, body.scroll-restoring .songs-list > .songs-row { content-visibility: visible; }
     .letter-intro { font-size:var(--fs-18); line-height:1.85; color:var(--cream); margin-bottom:1.8rem; }
-    .study-heading { font-family:'Cinzel',serif; font-size:var(--fs-16); letter-spacing:0.16em; color:var(--gold); text-transform:uppercase; text-align:center; margin:2.6rem 0 1.1rem; line-height:1.4; }
+    .study-heading { font-family:var(--font-ui); font-size:var(--fs-16); letter-spacing:0.16em; color:var(--gold); text-transform:uppercase; text-align:center; margin:2.6rem 0 1.1rem; line-height:1.4; }
     .study-heading-l3 { font-size:var(--fs-13); color:var(--gold-dim); letter-spacing:0.18em; margin:2rem 0 0.85rem; }
 
     /* ── PROPHECY GROUP (collapsible stacked cards) ── */
@@ -2541,16 +2612,16 @@
     .section-intro-text { font-family:var(--font-body); font-size:var(--fs-18); line-height:1.85; color:var(--cream); font-style:italic; margin-bottom:1rem; }
     .section-intro-text .letter-link-ref { font-style:italic; }
     .prophecy-group { margin:2rem 0 2.5rem; }
-    .prophecy-group-label { font-family:'Cinzel',serif; font-size:var(--fs-15); letter-spacing:0.14em; color:var(--gold); text-transform:uppercase; text-align:center; margin-bottom:1.2rem; line-height:1.4; }
+    .prophecy-group-label { font-family:var(--font-ui); font-size:var(--fs-15); letter-spacing:0.14em; color:var(--gold); text-transform:uppercase; text-align:center; margin-bottom:1.2rem; line-height:1.4; }
     .prophecy-card { border:1px solid var(--gold-border); border-radius:0.6rem; margin-bottom:0.8rem; overflow:hidden; transition:border-color 0.2s; }
     .prophecy-card-header { display:flex; align-items:center; justify-content:space-between; width:100%; padding:0.75rem 1rem; background:none; border:0; color:inherit; font:inherit; text-align:left; cursor:pointer; user-select:none; -webkit-user-select:none; }
     .prophecy-card-header:active { opacity:0.7; }
-    .prophecy-card-tag { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.16em; text-transform:uppercase; font-weight:600; }
+    .prophecy-card-tag { font-family:var(--font-ui); font-size:var(--fs-11); letter-spacing:0.16em; text-transform:uppercase; font-weight:600; }
     .prophecy-card-chevron { font-size:var(--fs-11); transition:transform 0.25s ease; color:var(--cream-dim); }
     .prophecy-card-chevron.collapsed { transform:rotate(-90deg); }
     .prophecy-card-body { padding:0 1rem 1rem; }
     .prophecy-card-body.collapsed { display:none; }
-    .prophecy-card-sublabel { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.8rem; opacity:0.8; }
+    .prophecy-card-sublabel { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.8rem; opacity:0.8; }
     .prophecy-card-body .letter-para { font-size:var(--fs-16); line-height:1.75; margin-bottom:1.2rem; }
     .prophecy-card-body .letter-para:last-child { margin-bottom:0; }
 
@@ -2597,7 +2668,7 @@
     .bold-italic { font-weight:600; font-style:italic; }
     .italic-text { font-style:italic; color:var(--cream-dim); }
     /* ── FOOTNOTE BUBBLE ── */
-    .fn-ref { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; font-family:'Cinzel',serif; font-size:var(--fs-10); font-weight:600; color:var(--tap-ref); border:1px solid var(--tap-ref-sub); border-radius:50%; cursor:pointer; vertical-align:super; margin:0 1px; line-height:1; transition:all 0.18s ease; background:rgba(200,164,86,0.06); position:relative; top:-2px; }
+    .fn-ref { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; font-family:var(--font-ui); font-size:var(--fs-10); font-weight:600; color:var(--tap-ref); border:1px solid var(--tap-ref-sub); border-radius:50%; cursor:pointer; vertical-align:super; margin:0 1px; line-height:1; transition:all 0.18s ease; background:rgba(200,164,86,0.06); position:relative; top:-2px; }
     /* The marker is DRAWN 18 px but a finger needs 24 (WCAG 2.2 2.5.8): a transparent ring grows the HIT area to 30 px
        and changes nothing the eye sees. tools/smoke-ci.js probes what a finger lands on at 360x800 (2026-09-22). */
     .fn-ref::after { content:''; position:absolute; inset:-6px; border-radius:50%; }
@@ -2665,7 +2736,7 @@
       grid-column:1; justify-self:start;
       width:44px; height:44px; margin-left:-8px; padding:0;
       background:none; border:none; cursor:pointer;
-      color:var(--gold-dim); font-size:var(--fsc-30); line-height:1; font-family:'Cinzel',serif;
+      color:var(--gold-dim); font-size:var(--fsc-30); line-height:1; font-family:var(--font-ui);
       display:flex; align-items:center; justify-content:center;
       -webkit-tap-highlight-color:transparent; transition:color 0.15s ease;
     }
@@ -2680,7 +2751,7 @@
     .sheet-handle-bar { width:44px; height:4px; background:var(--gold-border); border-radius:2px; transition:background 0.15s ease; }
     .sheet-handle-grab:active .sheet-handle-bar { background:var(--gold); }
     @media (hover:hover) { .sheet-handle-grab:hover .sheet-handle-bar { background:var(--gold); } }
-    .fn-sheet-num { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.2em; color:var(--gold); text-transform:uppercase; margin-bottom:0.4rem; }
+    .fn-sheet-num { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.2em; color:var(--gold); text-transform:uppercase; margin-bottom:0.4rem; }
     /* flex-wrap (300%-cap spill fix): at Text Size extremes the Cinzel
        "Footnote N of M" label + the two 44px pager circles exceed a 375px
        phone's sheet width — the pager wraps under the label instead of
@@ -2692,10 +2763,10 @@
     /* 44px px-pinned circles (was 1.9rem ≈ 30px) — the ‹ › footnote pager is
        the sheet's smallest target and the owner's older reader is the
        audience; px so the Text Size slider can't balloon them. */
-    .fn-sheet-nav-btn { width:44px; height:44px; border-radius:50%; border:1px solid var(--gold-border); background:transparent; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fsc-20); line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.15s ease, border-color 0.15s ease; padding:0; }
+    .fn-sheet-nav-btn { width:44px; height:44px; border-radius:50%; border:1px solid var(--gold-border); background:transparent; color:var(--gold); font-family:var(--font-ui); font-size:var(--fsc-20); line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.15s ease, border-color 0.15s ease; padding:0; }
     .fn-sheet-nav-btn:hover:not(:disabled), .fn-sheet-nav-btn:focus-visible:not(:disabled) { background:rgba(200,164,86,0.1); border-color:var(--gold); }
     .fn-sheet-nav-btn:disabled { opacity:0.32; cursor:default; }
-    .fn-sheet-ref { font-family:'Cinzel',serif; font-size:var(--fs-18); color:var(--gold-bright); margin-bottom:0.75rem; display:block; }
+    .fn-sheet-ref { font-family:var(--font-ui); font-size:var(--fs-18); color:var(--gold-bright); margin-bottom:0.75rem; display:block; }
     .fn-sheet-verse { font-size:var(--fs-16); line-height:1.75; color:var(--cream-dim); font-style:italic; }
     .fn-sheet-note { font-size:var(--fs-16); color:var(--cream-dim); line-height:1.6; font-style:italic; }
     .fn-sheet-verse-missing { font-size:var(--fs-15); color:var(--cream-muted); line-height:1.55; font-style:italic; padding:0.6rem 0.9rem; border-left:2px solid var(--gold-border); background:rgba(200,164,86,0.04); border-radius:0 4px 4px 0; }
@@ -2707,25 +2778,25 @@
       width:100%; margin-top:0.85rem; padding:0.7rem 0.9rem;
       background:rgba(200,164,86,0.08); border:1px solid var(--gold-border);
       border-radius:6px; color:var(--gold-bright); cursor:pointer;
-      font-family:'Cinzel',serif; font-size:var(--fs-13); letter-spacing:0.04em;
+      font-family:var(--font-ui); font-size:var(--fs-13); letter-spacing:0.04em;
       text-align:left; transition:all 0.2s ease;
       font-style:normal;
     }
     .fn-sheet-link-btn:active { background:rgba(200,164,86,0.18); transform:scale(0.99); }
     @media (hover: hover) { .fn-sheet-link-btn:hover { background:rgba(200,164,86,0.14); border-color:var(--gold-dim); } }
-    .fn-sheet-link-btn .fn-sheet-link-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; color:var(--gold-dim); text-transform:uppercase; display:block; margin-bottom:0.1rem; }
+    .fn-sheet-link-btn .fn-sheet-link-eyebrow { font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.2em; color:var(--gold-dim); text-transform:uppercase; display:block; margin-bottom:0.1rem; }
     .fn-sheet-link-btn .fn-sheet-link-title { display:block; color:var(--gold-bright); font-size:var(--fs-15); line-height:1.3; }
     .fn-sheet-link-btn .fn-sheet-link-chevron { margin-left:auto; color:var(--gold-dim); font-size:var(--fs-18); flex-shrink:0; align-self:center; }
     .fn-sheet-link-body { flex:1; min-width:0; }
     .fn-sheet-see-also { margin-top:1.1rem; padding-top:0.9rem; border-top:1px solid var(--gold-border); }
-    .fn-sheet-see-also-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.1rem; display:block; }
+    .fn-sheet-see-also-label { font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.1rem; display:block; }
     /* Footnote list (bottom of letter) — compact in-app link */
     .footnote-list-link-btn {
       display:inline-flex; align-items:center; gap:0.35rem;
       margin-left:0.4rem; padding:0.1rem 0.5rem;
       background:rgba(200,164,86,0.07); border:1px solid var(--gold-border);
       border-radius:4px; color:var(--gold); cursor:pointer;
-      font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.12em;
+      font-family:var(--font-ui); font-size:var(--fs-11); letter-spacing:0.12em;
       text-transform:uppercase; transition:all 0.18s ease;
       font-style:normal; vertical-align:middle;
     }
@@ -2742,8 +2813,8 @@
     }
     .footnote-list-link-btn.fn-list-rich .fn-list-rich-body { flex:1; }
     .footnote-list-link-btn.fn-list-rich .fn-list-rich-body { display:flex; flex-direction:column; min-width:0; text-align:left; }
-    .footnote-list-link-btn.fn-list-rich .fn-list-rich-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; color:var(--gold-dim); text-transform:uppercase; margin-bottom:0.1rem; }
-    .footnote-list-link-btn.fn-list-rich .fn-list-rich-title { font-family:'Cinzel',serif; font-size:var(--fs-13); line-height:1.25; color:var(--gold-bright); text-transform:none; letter-spacing:normal; white-space:normal; }
+    .footnote-list-link-btn.fn-list-rich .fn-list-rich-eyebrow { font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.2em; color:var(--gold-dim); text-transform:uppercase; margin-bottom:0.1rem; }
+    .footnote-list-link-btn.fn-list-rich .fn-list-rich-title { font-family:var(--font-ui); font-size:var(--fs-13); line-height:1.25; color:var(--gold-bright); text-transform:none; letter-spacing:normal; white-space:normal; }
     /* ── Back-to-source hint pill ── tiny row above the hero showing where
        Android back will take the user when they arrived via a tap-through.
        Only renders when fromLetterStack is non-empty. Tappable — same as back. */
@@ -2771,7 +2842,7 @@
       border:1px solid var(--gold-border);
       border-radius:999px;
       color:var(--gold-dim);
-      font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em;
+      font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.12em;
       text-transform:uppercase;
       cursor:pointer;
       transition:all 0.18s ease;
@@ -2844,12 +2915,12 @@
         box-shadow: 0 0 10px rgba(var(--hl-peak-r), var(--hl-peak-g), var(--hl-peak-b), var(--hl-glow-a));
       }
     }
-    .sc-sheet-tag { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; color:var(--gold); text-transform:uppercase; margin-bottom:0.35rem; display:block; }
-    .sc-sheet-cite { font-family:'Cinzel',serif; font-size:var(--fs-18); color:var(--gold-bright); margin-bottom:0.85rem; display:block; }
+    .sc-sheet-tag { font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.2em; color:var(--gold); text-transform:uppercase; margin-bottom:0.35rem; display:block; }
+    .sc-sheet-cite { font-family:var(--font-ui); font-size:var(--fs-18); color:var(--gold-bright); margin-bottom:0.85rem; display:block; }
     .sc-sheet-verse { font-size:var(--fs-16); line-height:1.85; color:var(--cream-dim); font-style:italic; }
     .sc-sheet-compound { display:flex; flex-direction:column; gap:1.1rem; }
     .sc-sheet-compound-part { display:flex; flex-direction:column; gap:0.35rem; }
-    .sc-sheet-compound-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.14em; color:var(--gold); text-transform:uppercase; margin-bottom:0.1rem; display:block; }
+    .sc-sheet-compound-label { font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.14em; color:var(--gold); text-transform:uppercase; margin-bottom:0.1rem; display:block; }
     .footnote-list-verse .sc-sheet-compound { gap:0.75rem; }
     .footnote-list-verse .sc-sheet-compound-label { font-size:var(--fs-10); }
     .sc-sheet-loading { color:var(--gold-dim); font-size:var(--fs-14); font-style:italic; animation:pulse 1.4s ease infinite; }
@@ -2880,7 +2951,7 @@
     .wtlb-footnote-list .footnote-list-header { margin-bottom:1.5rem; font-size:var(--fs-11); text-align:center; }
     /* Parenthetical inline scripture cite (WTLB/Blessed/trailing refs) */
     .wtlb-cite {
-      font-family:'Cinzel', serif; font-style:italic;
+      font-family:var(--font-ui); font-style:italic;
       font-size:0.82em; color:var(--gold-dim);
       text-decoration:none; letter-spacing:0.04em;
       margin:0 0.15em; padding:0 0.08em;
@@ -2892,7 +2963,7 @@
       transition:color 0.18s ease;
     }
     @media (hover: hover) { .wtlb-cite:hover, .wtlb-cite:active { color:var(--gold-bright); } }
-    .footnote-list-header { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:1rem; }
+    .footnote-list-header { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:1rem; }
     /* The body beside the number may shrink below its longest line and wraps:
        a verse quote ran 570 px wide in a 360 px phone at Text Size 3. */
     .footnote-list-item > :not(.footnote-list-num) { flex:1 1 auto; min-width:0; overflow-wrap:break-word; }
@@ -2913,8 +2984,8 @@
     .footnote-list-missing { color:var(--cream-muted); font-style:italic; font-size:var(--fs-14); }
     .footnote-list-url-extra { display:block; font-size:var(--fs-14); margin-top:0.3rem; }
     @keyframes fnPulse { 0%{background:transparent} 12%{background:rgba(200,164,86,0.28)} 30%{background:rgba(200,164,86,0.06)} 48%{background:rgba(200,164,86,0.22)} 70%{background:rgba(200,164,86,0.04)} 85%{background:rgba(200,164,86,0.14)} 100%{background:transparent} }
-    .footnote-list-num { font-family:'Cinzel',serif; font-size:var(--fs-12); color:var(--gold); font-weight:600; min-width:1.2rem; padding-top:0.15rem; }
-    .footnote-list-ref { font-family:'Cinzel',serif; font-size:var(--fs-14); color:var(--gold-bright); display:inline; margin-right:0.4rem; }
+    .footnote-list-num { font-family:var(--font-ui); font-size:var(--fs-12); color:var(--gold); font-weight:600; min-width:1.2rem; padding-top:0.15rem; }
+    .footnote-list-ref { font-family:var(--font-ui); font-size:var(--fs-14); color:var(--gold-bright); display:inline; margin-right:0.4rem; }
     .footnote-list-verse { font-style:italic; color:var(--cream-dim); }
     /* ExpandableVerse's "Read more / Show less" (styled inline until 2026-09-24). The label is 12 px tall
        at the end of a line of verse, inside a card whose own tap scrolls up to the footnote's bubble, so a
@@ -2922,7 +2993,7 @@
        without moving a pixel of text: 16 px up covers the end of the line above (same card), and 16 px down
        stays inside the card's bottom padding plus the gap before the next card (0.5rem + 0.6rem here,
        0.7rem + 1rem in the WTLB list), so it never takes a tap meant for the next footnote. */
-    .footnote-verse-toggle { display:inline-block; position:relative; margin-left:0.5em; background:none; border:none; cursor:pointer; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.1em; text-transform:uppercase; padding:0; vertical-align:middle; line-height:1; }
+    .footnote-verse-toggle { display:inline-block; position:relative; margin-left:0.5em; background:none; border:none; cursor:pointer; color:var(--gold); font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.1em; text-transform:uppercase; padding:0; vertical-align:middle; line-height:1; }
     .footnote-verse-toggle::before { content:''; position:absolute; inset:-16px -4px; }
     .footnote-list-note-text { font-style:italic; }
     /* ── RELATED / AUDIO ── */
@@ -2945,7 +3016,7 @@
     .letter-songs-all svg { width:18px; height:18px; }
     .letter-songs-all:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
     .related-card { background:var(--bg3); border:1px solid var(--gold-border); border-radius:6px; padding:1.2rem min(1.4rem, 6vw); }
-    .related-card-title { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); margin-bottom:0.75rem; }
+    .related-card-title { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); margin-bottom:0.75rem; }
     .related-link { display:block; min-height:44px; box-sizing:border-box; color:var(--cream-dim); text-decoration:none; font-size:var(--fs-15); line-height:1.5; padding:0.6rem 0; border-bottom:1px solid transparent; transition:all var(--transition); }
     @media (hover: hover) { .related-link:hover { color:var(--gold-bright); border-bottom-color:var(--gold-dim); } }
     /* External-link affordance: every target="_blank" anchor (audio/video
@@ -2959,8 +3030,8 @@
        and give the three section tiles more breathing room */
     .home-screen-app { justify-content:flex-start; padding-top:1.6rem; }
     .home-screen-app .home-sub { margin-bottom:2rem; }
-    .home-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); opacity:0.8; margin-bottom:0.75rem; text-align:center; }
-    .home-title { font-family:'Cinzel Decorative',serif; font-size:var(--fs-30); color:var(--cream); text-align:center; margin-bottom:0.4rem; line-height:1.2; }
+    .home-eyebrow { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); opacity:0.8; margin-bottom:0.75rem; text-align:center; }
+    .home-title { font-family:var(--font-ui); font-size:var(--fs-30); color:var(--cream); text-align:center; margin-bottom:0.4rem; line-height:1.2; }
     .home-sub { font-size:var(--fs-16); color:var(--cream-muted); text-align:center; font-style:italic; margin-bottom:2rem; }
     .home-ornament { display:flex; align-items:center; gap:0.75rem; margin-bottom:2.5rem; width:100%; max-width:25rem; }
     /* ── Volumes landing: fill screen, no scroll ── */
@@ -3007,7 +3078,7 @@
     }
     /* Primary hero title — elegant Cinzel Decorative, lighter weight for less blockiness */
     .home-main-title {
-      font-family: 'Cinzel Decorative', 'Cinzel', serif;
+      font-family: var(--font-ui);
       font-weight: 400;
       font-size: var(--fs-24);
       color: var(--gold);
@@ -3238,7 +3309,7 @@
     .hni-eyebrow, .hni-title, .hni-detail { overflow-wrap: anywhere; }
     .hni-eyebrow {
       display: block;
-      font-family: 'Cinzel', serif;
+      font-family: var(--font-ui);
       font-size:var(--fs-12);
       letter-spacing:0.18em;
       text-transform: uppercase;
@@ -3247,7 +3318,7 @@
     }
     .hni-title {
       display: block;
-      font-family: 'Cinzel', serif;
+      font-family: var(--font-ui);
       font-size: var(--fs-16);
       color: var(--gold);
       letter-spacing: 0.04em;
@@ -3281,7 +3352,7 @@
     /* A column label heads HALF a phone's width (176 px at 360): at 12 px and
        0.18em "THE SEVEN VOLUMES" took two lines beside a one-line "COLLECTIONS"
        and set the columns out of step (the 09-25 walk). 0.1em fits it. */
-    .genre-col-label { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.5rem; padding-bottom:0.35rem; border-bottom:1px solid var(--gold-border); }
+    .genre-col-label { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.5rem; padding-bottom:0.35rem; border-bottom:1px solid var(--gold-border); }
     /* The browse tiles (Volumes, Scriptures, Answers subjects) keep their gold
        titles but sit on the hairline, not a gold outline, with their counts in
        upright muted type (the redesign, 2026-09-25): a grid of gold boxes was
@@ -3290,8 +3361,8 @@
     .genre-tile { background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:0.9rem 1rem; cursor:pointer; text-align:left; transition:all var(--transition); }
     @media (hover: hover) { .genre-tile:hover { border-color:var(--gold); background:var(--gold-faint); } }
     .genre-tile.locked { opacity:0.38; pointer-events:none; }
-    .genre-tile-title { font-family:'Cinzel',serif; font-size:var(--fs-14); color:var(--gold); letter-spacing:0.04em; line-height:1.3; }
-    .genre-tile-badge { display:inline-block; margin-top:0.3rem; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.16em; text-transform:uppercase; color:var(--gold); background:rgba(200,164,86,0.12); border:1px solid rgba(200,164,86,0.3); border-radius:3px; padding:0.1rem 0.4rem; }
+    .genre-tile-title { font-family:var(--font-ui); font-size:var(--fs-14); color:var(--gold); letter-spacing:0.04em; line-height:1.3; }
+    .genre-tile-badge { display:inline-block; margin-top:0.3rem; font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.16em; text-transform:uppercase; color:var(--gold); background:rgba(200,164,86,0.12); border:1px solid rgba(200,164,86,0.3); border-radius:3px; padding:0.1rem 0.4rem; }
     .genre-tile-sub { font-family:var(--font-body); font-size:var(--fs-12); color:var(--cream-muted); margin-top:0.15rem; }
     .studies-empty { font-family:var(--font-body); font-style:italic; color:var(--cream-dim); padding:1.2rem 0.5rem; text-align:center; }
     /* Studies home — stacked full-width tiles */
@@ -3378,7 +3449,7 @@
       /* Wave 0 — visible caption under the dice; matches the aria-label
          (label-in-name). Styled after .home-rearrange-hint. */
       .surprise-fab-caption {
-        font-family:'Cinzel', serif;
+        font-family:var(--font-ui);
         font-size:var(--fs-10); letter-spacing:0.22em; text-transform:uppercase;
         color:var(--gold-dim); opacity:0.8;
         pointer-events:none;
@@ -3396,7 +3467,7 @@
     /* ── SETTINGS SCREEN ── */
     .settings-screen { min-height:100%; width:100%; box-sizing:border-box; display:flex; flex-direction:column; align-items:stretch; padding:clamp(1.25rem,3vw,2rem) clamp(1rem,4vw,3rem) 5rem; }
     .settings-header { width:100%; max-width:62rem; margin:0 auto 1.25rem; text-align:left; }
-    .settings-title { font-family:'Cinzel Decorative',serif; font-size:clamp(var(--fs-24),4vw,var(--fs-30)); color:var(--cream); margin:0 0 0.65rem; letter-spacing:0.02em; }
+    .settings-title { font-family:var(--font-ui); font-size:clamp(var(--fs-24),4vw,var(--fs-30)); color:var(--cream); margin:0 0 0.65rem; letter-spacing:0.02em; }
     .settings-intro { max-width:38rem; margin:0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-16); line-height:1.55; }
     .settings-save-note { display:flex; align-items:center; gap:0.75rem; margin:1rem 0 0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-15); }
     .settings-save-note > span { width:0.55rem; height:0.55rem; flex:0 0 auto; border-radius:50%; background:var(--gold); box-shadow:0 0 0 4px var(--gold-faint); }
@@ -3409,7 +3480,7 @@
     .settings-find button { min-height:44px; padding:0.5rem 0.75rem; border:1px solid var(--gold-border); border-radius:6px; background:var(--bg2); color:var(--gold); font:inherit; cursor:pointer; }
     .settings-find p { margin:0.5rem 0 0; color:var(--cream-muted); }
     .settings-section { width:100%; margin-bottom:0.75rem; }
-    .settings-section-label { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.6rem; }
+    .settings-section-label { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.6rem; }
     .settings-section-label::after { content:''; flex:1; height:1px; background:linear-gradient(to right,var(--gold-border),transparent); }
     /* ── Accordion groups ───────────────────────────────────────────────────
        The header is a folio index row: a quiet hairline, one icon, a title,
@@ -3464,7 +3535,7 @@
     .settings-row-head { display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem; padding:0.62rem 0.95rem; min-height:46px; row-gap:8px; }
     .settings-row-grow { flex:1 1 auto; min-width:0.5rem; }
     .settings-row-text { flex:1; min-width:0; }
-    .settings-row-label { font-family:'Cinzel',serif; font-size:var(--fs-13); letter-spacing:0.05em; color:var(--cream); }
+    .settings-row-label { font-family:var(--font-ui); font-size:var(--fs-13); letter-spacing:0.05em; color:var(--cream); }
     .settings-row-value { font-size:var(--fs-13); color:var(--gold); font-style:italic; text-align:right; }
     .settings-row-desc { font-size:var(--fs-13); color:var(--cream-muted); font-style:italic; line-height:1.45; padding:0 0.95rem 0.72rem; }
     /* Structured ⓘ content (the Bible Translation explainer passes a node,
@@ -3476,7 +3547,7 @@
     .settings-data-value { font-size:var(--fs-13); color:var(--gold-dim); font-style:italic; line-height:1.45; padding:0 0.95rem 0.66rem; }
     /* Hit area is not paint: the target stays 44 px, the visible ⓘ is a 29 px hairline ring drawn
        inside it (a 44 px bordered square stood taller than the 26 px Export button beside it). */
-    .settings-info-btn { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; flex-shrink:0; padding:0; line-height:1; border:0; border-radius:50%; background:radial-gradient(circle, transparent 13px, var(--gold-border) 13.5px, var(--gold-border) 14.5px, transparent 15px); color:var(--gold); font-family:'Cinzel',serif; font-style:italic; font-size:var(--fs-13); cursor:pointer; }
+    .settings-info-btn { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; flex-shrink:0; padding:0; line-height:1; border:0; border-radius:50%; background:radial-gradient(circle, transparent 13px, var(--gold-border) 13.5px, var(--gold-border) 14.5px, transparent 15px); color:var(--gold); font-family:var(--font-ui); font-style:italic; font-size:var(--fs-13); cursor:pointer; }
     @media (hover:hover){ .settings-info-btn:hover{ color:var(--gold); background:radial-gradient(circle, transparent 13px, var(--gold-dim) 13.5px, var(--gold-dim) 14.5px, transparent 15px); } }
     .settings-info-btn[aria-expanded="true"]{ color:var(--gold); background:radial-gradient(circle, var(--gold-faint) 13.5px, var(--gold) 13.5px, var(--gold) 14.5px, transparent 15px); }
     /* Compact select trigger — the label stays in place; value + chevron open the sheet */
@@ -3491,7 +3562,7 @@
     .settings-chip { display:flex; align-items:center; gap:0.5rem; border:1px solid var(--gold-border); border-radius:20px; padding:0.3rem 0.5rem 0.3rem 0.7rem; background:transparent; cursor:pointer; max-width:100%; }
     .settings-chip-label { min-width:0; }
     @media (hover:hover){ .settings-chip:hover{ border-color:var(--gold-dim); } }
-    .settings-chip-label { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.04em; color:var(--cream); }
+    .settings-chip-label { font-family:var(--font-ui); font-size:var(--fs-11); letter-spacing:0.04em; color:var(--cream); }
     .settings-chip .settings-toggle { width:34px; height:20px; }
     .settings-chip .settings-toggle-thumb { width:14px; height:14px; }
     .settings-chip .settings-toggle input:checked ~ .settings-toggle-thumb { transform:translateX(14px); }
@@ -3501,7 +3572,7 @@
     .settings-row-disabled .settings-toggle-track { background:var(--cream-muted) !important; opacity:0.35 !important; }
     .settings-row-disabled .settings-toggle { cursor:not-allowed; }
     .settings-row-disabled-hint {
-      font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.14em; text-transform:uppercase;
+      font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.14em; text-transform:uppercase;
       color:var(--gold-dim); line-height:1.5; padding:0 0.95rem 0.62rem;
     }
     .settings-toggle { position:relative; width:44px; height:26px; flex-shrink:0; }
@@ -3520,7 +3591,7 @@
     .about-card { width:100%; max-width:35rem; background:var(--bg2); border:1px solid var(--gold-border); border-radius:14px; padding:2rem 1.6rem 2.2rem; text-align:center; }
     .about-diamonds { display:flex; align-items:center; justify-content:center; gap:1.5rem; margin:0 auto; }
     .about-diamond { width:6px; height:6px; background:var(--gold); transform:rotate(45deg); display:inline-block; }
-    .about-heading { font-family:'Cinzel',serif; font-size:var(--fs-16); letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); margin:1.4rem 0 1.8rem; font-weight:500; }
+    .about-heading { font-family:var(--font-ui); font-size:var(--fs-16); letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); margin:1.4rem 0 1.8rem; font-weight:500; }
     .about-body { text-align:center; }
     .about-body p { font-family:var(--font-body); font-size:var(--fs-16); line-height:1.65; color:var(--cream-dim); margin:0 0 1.4rem; }
     .about-body p:last-child { margin-bottom:0; }
@@ -3549,10 +3620,10 @@
       .about-card > .about-diamonds:last-of-type { margin-top:1rem; margin-bottom:1rem; }
       .about-page-dots { margin-top:0.6rem; }
     }
-    .about-body p.about-subhead { font-family:'Cinzel',serif; font-size:var(--fs-13); letter-spacing:0.25em; text-transform:uppercase; color:var(--gold); margin:1.2rem 0 0.85rem; }
+    .about-body p.about-subhead { font-family:var(--font-ui); font-size:var(--fs-13); letter-spacing:0.25em; text-transform:uppercase; color:var(--gold); margin:1.2rem 0 0.85rem; }
     .about-body p.about-subhead:first-child { margin-top:0; }
     body.light .about-body p.about-subhead { color:var(--gold); }
-    .about-continue { display:inline-block; font-family:'Cinzel',serif; font-size:var(--fs-14); letter-spacing:0.3em; text-transform:uppercase; color:var(--gold); background:transparent; border:1px solid var(--gold-border); border-radius:10px; padding:0.85rem 2.4rem; cursor:pointer; transition:background 0.18s ease, border-color 0.18s ease; }
+    .about-continue { display:inline-block; font-family:var(--font-ui); font-size:var(--fs-14); letter-spacing:0.3em; text-transform:uppercase; color:var(--gold); background:transparent; border:1px solid var(--gold-border); border-radius:10px; padding:0.85rem 2.4rem; cursor:pointer; transition:background 0.18s ease, border-color 0.18s ease; }
     .about-continue:hover, .about-continue:focus-visible { background:rgba(200,164,86,0.08); border-color:var(--gold); }
     body.light .about-card { background:var(--bg2); border-color:var(--gold-border); }
     body.light .about-body p { color:#3a3527; }
@@ -3570,7 +3641,7 @@
     .select-field:active { background:var(--gold-faint); border-color:var(--gold-dim); }
     @media (hover: hover) { .select-field:hover { border-color:var(--gold-dim); } }
     .select-field-body { flex:1; min-width:0; }
-    .select-field-label { font-family:'Cinzel',serif; font-size:var(--fs-15); color:var(--gold-bright); letter-spacing:0.04em; line-height:1.25; }
+    .select-field-label { font-family:var(--font-ui); font-size:var(--fs-15); color:var(--gold-bright); letter-spacing:0.04em; line-height:1.25; }
     .select-field-caption { display:block; font-size:var(--fs-12); color:var(--cream-muted); font-style:italic; line-height:1.35; margin-top:0.2rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .select-field-chevron { color:var(--gold-dim); font-size:var(--fs-24); line-height:1; flex-shrink:0; transform:translateY(-1px); }
 
@@ -3593,8 +3664,8 @@
     .select-sheet::-webkit-scrollbar-thumb { background:var(--gold-dim); border-radius:2px; }
     @keyframes selectSheetSlideUp { to { transform:translateY(0); } }
     /* (.select-sheet-handle RETIRED — see the SheetHandle block by .fn-sheet.) */
-    .select-sheet-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); text-align:center; margin-bottom:0.35rem; }
-    .select-sheet-title { font-family:'Cinzel Decorative',serif; font-size:var(--fs-20); color:var(--gold-bright); text-align:center; letter-spacing:0.08em; line-height:1.25; }
+    .select-sheet-eyebrow { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); text-align:center; margin-bottom:0.35rem; }
+    .select-sheet-title { font-family:var(--font-ui); font-size:var(--fs-20); color:var(--gold-bright); text-align:center; letter-spacing:0.08em; line-height:1.25; }
     .select-sheet-ornament { display:flex; align-items:center; justify-content:center; gap:0.6rem; margin:0.55rem 0 1.1rem; }
     .select-sheet-ornament-line { height:1px; width:56px; background:linear-gradient(to right, transparent, var(--gold-dim)); }
     .select-sheet-ornament-line.r { background:linear-gradient(to left, transparent, var(--gold-dim)); }
@@ -3616,40 +3687,40 @@
     }
     body.light .select-sheet-option.selected { background:rgba(122,92,16,0.12); box-shadow:0 0 14px rgba(122,92,16,0.14) inset; }
     .select-sheet-option-main { display:flex; align-items:center; gap:0.6rem; }
-    .select-sheet-option-label { font-family:'Cinzel',serif; font-size:var(--fs-15); color:var(--gold-bright); letter-spacing:0.04em; flex:1; }
+    .select-sheet-option-label { font-family:var(--font-ui); font-size:var(--fs-15); color:var(--gold-bright); letter-spacing:0.04em; flex:1; }
     .select-sheet-option-check { color:var(--gold-bright); font-size:var(--fs-16); line-height:1; flex-shrink:0; }
     /* Right-aligned per-option status (Reading Font picker: "Built in" /
        "Downloaded" / "~77 KB" / "Downloading…"). */
-    .select-sheet-option-meta { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-dim); flex-shrink:0; white-space:nowrap; }
+    .select-sheet-option-meta { font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-dim); flex-shrink:0; white-space:nowrap; }
     .select-sheet-option-desc { font-size:var(--fs-13); color:var(--cream-muted); font-style:italic; margin-top:0.3rem; line-height:1.45; }
     /* ── COMPACT LIST LAYOUT ── */
     .compact-list { width:100%; max-width:32.5rem; }
     .compact-list-group { margin-bottom:1rem; }
-    .compact-list-header { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); padding:0.5rem 0; border-bottom:1px solid var(--gold-border); margin-bottom:0.35rem; }
+    .compact-list-header { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); padding:0.5rem 0; border-bottom:1px solid var(--gold-border); margin-bottom:0.35rem; }
     .compact-list-item { display:flex; align-items:center; gap:0.6rem; padding:0.55rem 0.8rem; background:var(--bg2); border:1px solid var(--gold-border); border-radius:6px; cursor:pointer; text-align:left; margin-bottom:0.3rem; position:relative; }
     .compact-list-item:active { background:var(--gold-faint); }
-    .compact-list-title { font-family:'Cinzel',serif; font-size:var(--fs-13); color:var(--gold); flex:1; letter-spacing:0.03em; }
-    .compact-list-detail { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.14em; text-transform:uppercase; color:var(--gold-dim); }
+    .compact-list-title { font-family:var(--font-ui); font-size:var(--fs-13); color:var(--gold); flex:1; letter-spacing:0.03em; }
+    .compact-list-detail { font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.14em; text-transform:uppercase; color:var(--gold-dim); }
     /* ── FLAT GRID LAYOUT ── */
     .flat-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; width:100%; max-width:32.5rem; }
     .flat-grid-card { background:var(--bg2); border:1px solid var(--gold-border); border-radius:8px; padding:0.8rem 0.6rem; cursor:pointer; text-align:center; position:relative; }
     .flat-grid-card:active { background:var(--gold-faint); border-color:var(--gold); }
-    .flat-grid-title { font-family:'Cinzel',serif; font-size:var(--fs-12); color:var(--gold); letter-spacing:0.03em; line-height:1.25; }
-    .flat-grid-detail { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); margin-top:0.2rem; }
+    .flat-grid-title { font-family:var(--font-ui); font-size:var(--fs-12); color:var(--gold); letter-spacing:0.03em; line-height:1.25; }
+    .flat-grid-detail { font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); margin-top:0.2rem; }
     /* ── CANONICAL SCROLL LAYOUT ── */
     @keyframes canonBreathe {
       0%, 100% { box-shadow: 0 0 0 transparent; border-color: var(--gold-border); }
       50% { box-shadow: 0 0 14px var(--gold-glow), 0 0 4px var(--gold-faint); border-color: var(--gold-dim); }
     }
     .canon-scroll { width:100%; max-width:32.5rem; display:flex; flex-direction:column; }
-    .canon-scroll-divider { font-family:'Cinzel Decorative',serif; font-size:var(--fs-12); letter-spacing:0.28em; text-transform:uppercase; color:var(--gold); text-align:center; padding:1.5rem 0 0.8rem; }
+    .canon-scroll-divider { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.28em; text-transform:uppercase; color:var(--gold); text-align:center; padding:1.5rem 0 0.8rem; }
     .canon-card { display:flex; width:100%; align-items:center; gap:1rem; background:var(--bg2); border:1px solid var(--gold-border); border-left:3px solid var(--gold-dim); border-radius:8px; padding:1rem 1.2rem; cursor:pointer; text-align:left; position:relative; margin-bottom:0.55rem; animation:canonBreathe 5s ease-in-out infinite; }
     .canon-card:active { background:var(--gold-faint); border-color:var(--gold); }
-    .canon-card-num { font-family:'Cinzel',serif; font-size:var(--fs-18); font-weight:600; color:var(--gold); opacity:0.3; min-width:1.8rem; text-align:center; line-height:1; }
+    .canon-card-num { font-family:var(--font-ui); font-size:var(--fs-18); font-weight:600; color:var(--gold); opacity:0.3; min-width:1.8rem; text-align:center; line-height:1; }
     .canon-card-body { flex:1; min-width:0; }
-    .canon-card-title { font-family:'Cinzel',serif; font-size:var(--fs-16); color:var(--gold); letter-spacing:0.04em; margin-bottom:0.15rem; }
+    .canon-card-title { font-family:var(--font-ui); font-size:var(--fs-16); color:var(--gold); letter-spacing:0.04em; margin-bottom:0.15rem; }
     .canon-card-sub { font-family:var(--font-body); font-size:var(--fs-15); color:var(--cream-muted); font-style:italic; line-height:1.3; }
-    .canon-card-detail { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); margin-top:0.2rem; }
+    .canon-card-detail { font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); margin-top:0.2rem; }
     /* ── Scriptures layout cycle (in-content, top-right corner) ───────────
        Cycles scriptureLayout without digging through Settings. ABSOLUTE on
        purpose: the genre branch (.scriptures-landing) is an explicit
@@ -3689,7 +3760,7 @@
        right-aligned under the icon as a small opaque chip, because in the
        .scriptures-landing context it lands over the tail of .home-title —
        reading as a deliberate 1.5s toast rather than a text collision. */
-    .scripture-layout-cycle-caption { position:absolute; top:100%; right:0; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); text-align:right; white-space:nowrap; pointer-events:none; }
+    .scripture-layout-cycle-caption { position:absolute; top:100%; right:0; font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); text-align:right; white-space:nowrap; pointer-events:none; }
     .scripture-layout-cycle-caption span { display:inline-block; padding:0.25rem 0.45rem; border:1px solid var(--gold-border); border-radius:4px; background:var(--bg2); animation:layoutCycleFade 1.5s ease forwards; }
     @keyframes layoutCycleFade { 0% { opacity:0; } 15% { opacity:0.85; } 65% { opacity:0.85; } 100% { opacity:0; } }
     .settings-gear-btn { background:none; border:none; cursor:pointer; color:var(--gold); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; }
@@ -3708,7 +3779,7 @@
     /* white-space:nowrap → normal + max-width (300%-cap spill fix): at the
        Text Size extreme, "Clear All" as one unbreakable line ran off a 375px
        screen; letting the label wrap inside the button keeps it on-screen. */
-    .settings-clear-btn { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.15em; text-transform:uppercase; color:var(--cream-muted); background:transparent; border:1px solid var(--gold-border); border-radius:4px; padding:0.4rem 0.75rem; cursor:pointer; transition:all var(--transition); max-width:100%; }
+    .settings-clear-btn { font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.15em; text-transform:uppercase; color:var(--cream-muted); background:transparent; border:1px solid var(--gold-border); border-radius:4px; padding:0.4rem 0.75rem; cursor:pointer; transition:all var(--transition); max-width:100%; }
     @media (hover: hover) { .settings-clear-btn:hover { color:var(--gold); border-color:var(--gold-dim); } }
     .settings-clear-btn:disabled { opacity:0.3; cursor:default; pointer-events:none; }
     .settings-clear-btn.warning { color:var(--settings-warning); border-color:var(--settings-warning); font-size:var(--fs-10); }
@@ -3728,8 +3799,8 @@
        SHRINKS (ellipsis) instead of shoving the tally + Clear onto a ragged
        second line — every row reads label · tally · button on ONE line.
        flex-wrap stays on .progress-row as the extreme-font-scale escape. */
-    .progress-row-label { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.06em; color:var(--cream); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .progress-row-tally { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.1em; color:var(--gold-dim); white-space:nowrap; min-width:4.5rem; text-align:right; flex-shrink:0; }
+    .progress-row-label { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.06em; color:var(--cream); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .progress-row-tally { font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.1em; color:var(--gold-dim); white-space:nowrap; min-width:4.5rem; text-align:right; flex-shrink:0; }
     /* Per-row Clear buttons sit in a 60+-row table — lighter than the
        standalone action buttons so the table reads as a table. */
     .progress-row .settings-clear-btn { padding:0.3rem 0.6rem; font-size:var(--fs-10); flex-shrink:0; }
@@ -3746,13 +3817,13 @@
        real height after its first paint, so the placeholder estimate only affects
        the very first scroll past it (minimal jank). chrome108 floor supports it. */
     .section-block { margin-bottom:1.8rem; content-visibility:auto; contain-intrinsic-size:auto 500px; }
-    .section-heading { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.7rem; padding-bottom:0.4rem; border-bottom:1px solid var(--gold-border); }
+    .section-heading { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.7rem; padding-bottom:0.4rem; border-bottom:1px solid var(--gold-border); }
     /* Poetic books (Psalms, Proverbs, etc.) render each verse on its own line */
     .verses-block.is-poetry .verse { display:block; margin-bottom:0.5rem; text-indent:0; padding-left:1.8rem; position:relative; }
     .verses-block.is-poetry .verse .verse-num { position:absolute; left:0; top:0.15rem; }
     .section-heading-psalm119 { display:flex; align-items:center; gap:0.75rem; margin-bottom:0.7rem; padding-bottom:0.4rem; border-bottom:1px solid var(--gold-border); }
     .hebrew-letter { font-size:var(--fs-48); line-height:1; color:transparent; -webkit-text-stroke:1.5px var(--gold); font-family:var(--font-body); flex-shrink:0; }
-    .hebrew-letter-name { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.28em; text-transform:uppercase; color:var(--gold-dim); }
+    .hebrew-letter-name { font-family:var(--font-ui); font-size:var(--fs-11); letter-spacing:0.28em; text-transform:uppercase; color:var(--gold-dim); }
 
     /* ── SEARCH ── */
     .search-input { flex:1; min-width:0; background:rgba(255,255,255,0.06); border:1px solid var(--gold-border); border-radius:6px; color:var(--cream); font-family:var(--font-body); font-size:var(--fs-16); padding:0.45rem 0.75rem; outline:none; transition:border-color 0.2s; }
@@ -3772,7 +3843,7 @@
     /* The All / Scriptures / Volumes row wraps at a large text size instead of pushing the third
        button off the right edge (a11y-ux-6, measured at 1.8 and 2.0). */
     .srch-corpus-row { flex-wrap:wrap; row-gap:0.35rem; display:flex; gap:0.35rem; padding:0.6rem 1.2rem; border-bottom:1px solid var(--gold-border); background:var(--bg2); }
-    .srch-corpus-btn { flex:1; background:transparent; border:1px solid var(--gold-border); border-radius:20px; padding:0.4rem 0.6rem; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.15em; text-transform:uppercase; color:var(--cream-muted); cursor:pointer; transition:background 0.18s, color 0.18s, border-color 0.18s; }
+    .srch-corpus-btn { flex:1; background:transparent; border:1px solid var(--gold-border); border-radius:20px; padding:0.4rem 0.6rem; font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.15em; text-transform:uppercase; color:var(--cream-muted); cursor:pointer; transition:background 0.18s, color 0.18s, border-color 0.18s; }
     .srch-corpus-btn.active { background:var(--gold-faint); color:var(--gold-bright); border-color:var(--gold-dim); }
     .srch-corpus-btn:active { background:rgba(200,164,86,0.15); }
     /* [8] result-filter chips + verse sort toggle — same pill language as
@@ -3782,14 +3853,14 @@
        hidden scrollbar, where a reader at 1.8x could not know a third chip existed (a11y-ux-6). */
     .srch-filter-row { display:flex; flex-wrap:wrap; gap:0.35rem; padding:0.55rem 1.2rem 0.15rem; overflow-x:auto; scrollbar-width:none; align-items:center; }
     .srch-filter-row::-webkit-scrollbar { display:none; }
-    .srch-sort-btn { flex:0 0 auto; margin-left:auto; background:none; border:none; border-bottom:1px dashed var(--gold-border); padding:0.3rem 0.1rem; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); cursor:pointer; white-space:nowrap; }
+    .srch-sort-btn { flex:0 0 auto; margin-left:auto; background:none; border:none; border-bottom:1px dashed var(--gold-border); padding:0.3rem 0.1rem; font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); cursor:pointer; white-space:nowrap; }
     .srch-sort-btn { position:relative; }
     .srch-sort-btn::after { content:''; position:absolute; inset:-6px -4px; } /* 22 px tall drawn, 34 px to a finger (see .fn-ref::after) */
     .srch-sort-btn:active { color:var(--gold); }
 
     /* ── SEARCH v2 (Orama) ── */
 
-    .srch-scope-chip { display:flex; align-items:center; gap:0.5rem; width:100%; padding:0.55rem 0.9rem; background:var(--bg2); border:none; border-bottom:1px solid var(--gold-border); color:var(--gold-dim); font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.12em; text-transform:uppercase; cursor:pointer; transition:color 0.2s, background 0.2s; text-align:left; }
+    .srch-scope-chip { display:flex; align-items:center; gap:0.5rem; width:100%; padding:0.55rem 0.9rem; background:var(--bg2); border:none; border-bottom:1px solid var(--gold-border); color:var(--gold-dim); font-family:var(--font-ui); font-size:var(--fs-11); letter-spacing:0.12em; text-transform:uppercase; cursor:pointer; transition:color 0.2s, background 0.2s; text-align:left; }
     .srch-scope-chip:hover { color:var(--gold); }
     .srch-scope-chip.active { background:var(--gold-faint); color:var(--gold-bright); border-bottom-color:var(--gold); }
     .srch-scope-chip-icon { font-size:var(--fs-14); }
@@ -3801,9 +3872,9 @@
     .srch-suggest { position:absolute; left:0; right:0; top:0; z-index:10; background:var(--bg2); border-bottom:1px solid var(--gold); max-height:60vh; overflow-y:auto; box-shadow:0 4px 10px rgba(0,0,0,0.35); }
     .srch-suggest-item { display:flex; align-items:center; gap:0.6rem; padding:0.5rem 1rem; cursor:pointer; border-bottom:1px solid rgba(200,164,86,0.08); width:100%; text-align:left; background:none; border-left:none; border-right:none; border-top:none; color:inherit; }
     .srch-suggest-item:active { background:var(--gold-faint); }
-    .srch-suggest-kind { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.15em; text-transform:uppercase; color:var(--gold-dim); border:1px solid var(--gold-border); border-radius:3px; padding:0.08rem 0.35rem; flex-shrink:0; }
+    .srch-suggest-kind { font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.15em; text-transform:uppercase; color:var(--gold-dim); border:1px solid var(--gold-border); border-radius:3px; padding:0.08rem 0.35rem; flex-shrink:0; }
     .srch-suggest-label { font-family:var(--font-body); font-size:var(--fs-15); color:var(--cream); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .srch-suggest-hint { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.1em; color:var(--gold-dim); flex-shrink:0; }
+    .srch-suggest-hint { font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.1em; color:var(--gold-dim); flex-shrink:0; }
 
     .srch-top-results { border-bottom:2px solid var(--gold-border); padding-bottom:0.3rem; margin-bottom:0.2rem; }
     /* Songs of the Letters (L8): the one shortcut row above the results when the loaded song catalog matches. */
@@ -3815,21 +3886,21 @@
     .srch-groups { display:block; }
     .srch-group { border-bottom:1px solid var(--gold-border); }
     .srch-group-count-inline { color:var(--gold-bright); font-weight:600; letter-spacing:0.1em; }
-    .srch-group-header { display:flex; align-items:center; justify-content:space-between; padding:0.5rem 1rem; background:var(--bg2); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); border:none; width:100%; text-align:left; }
+    .srch-group-header { display:flex; align-items:center; justify-content:space-between; padding:0.5rem 1rem; background:var(--bg2); cursor:pointer; font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); border:none; width:100%; text-align:left; }
     .srch-group-header:active { background:var(--gold-faint); }
     .srch-group-count { color:var(--gold-dim); font-size:var(--fs-10); }
     .srch-group-items { display:block; }
     .srch-group.collapsed .srch-group-items { display:none; }
     /* A long group renders its cards a page at a time (SrchGroup). */
-    .srch-group-more { display:block; box-sizing:border-box; width:100%; min-height:44px; padding:0.6rem 1.1rem; background:none; border:none; border-bottom:1px solid rgba(200,164,86,0.12); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold); text-align:center; }
+    .srch-group-more { display:block; box-sizing:border-box; width:100%; min-height:44px; padding:0.6rem 1.1rem; background:none; border:none; border-bottom:1px solid rgba(200,164,86,0.12); cursor:pointer; font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold); text-align:center; }
     .srch-group-more:active { background:var(--gold-faint); }
 
     .srch-card { display:block; width:100%; text-align:left; background:none; border:none; border-bottom:1px solid rgba(200,164,86,0.12); cursor:pointer; padding:0.8rem 1.1rem; transition:background 0.15s; }
     .srch-card:active { background:var(--gold-faint); }
     .srch-card-top { display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.3rem; }
-    .srch-card-ref { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold); }
-    .srch-card-loc { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-dim); margin:-0.12rem 0 0.32rem; }
-    .srch-card-badge { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); border:1px solid var(--gold-border); border-radius:3px; padding:0.08rem 0.35rem; }
+    .srch-card-ref { font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold); }
+    .srch-card-loc { font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-dim); margin:-0.12rem 0 0.32rem; }
+    .srch-card-badge { font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); border:1px solid var(--gold-border); border-radius:3px; padding:0.08rem 0.35rem; }
     .srch-card-badge.badge-verse { color:var(--cream-muted); }
     .srch-card-badge.badge-note { color:var(--gold); border-color:var(--gold-dim); }
     .srch-card-badge.badge-footnote { color:var(--gold-dim); }
@@ -3839,14 +3910,14 @@
     .srch-snippet-scroll { max-height:4.2rem; overflow:hidden; }
     .srch-card.card-direct { background:var(--gold-faint); }
     .srch-card.card-direct .srch-card-ref { color:var(--gold-bright); font-size:var(--fs-12); }
-    .srch-card.card-direct .srch-card-snippet { color:var(--gold-dim); font-size:var(--fs-10); letter-spacing:0.14em; text-transform:uppercase; font-family:'Cinzel',serif; margin-top:0.2rem; }
+    .srch-card.card-direct .srch-card-snippet { color:var(--gold-dim); font-size:var(--fs-10); letter-spacing:0.14em; text-transform:uppercase; font-family:var(--font-ui); margin-top:0.2rem; }
     /* Every other place a letter says the words (SrchCard): one quiet row under the
        snippet, "2 more places in this letter", opening to a list of short passages,
        each its own tap. The wrap carries the card's divider, so the row and the list
        read as part of the card above them. */
     .srch-card-wrap { border-bottom:1px solid rgba(200,164,86,0.12); }
     .srch-card-wrap > .srch-card { border-bottom:none; padding-bottom:0.4rem; }
-    .srch-places-toggle { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; box-sizing:border-box; width:calc(100% - 2.2rem); min-height:44px; margin:0 1.1rem; padding:0.35rem 0; background:none; border:none; border-top:1px solid rgba(200,164,86,0.12); cursor:pointer; text-align:left; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); }
+    .srch-places-toggle { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; box-sizing:border-box; width:calc(100% - 2.2rem); min-height:44px; margin:0 1.1rem; padding:0.35rem 0; background:none; border:none; border-top:1px solid rgba(200,164,86,0.12); cursor:pointer; text-align:left; font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); }
     .srch-places-toggle:active { color:var(--gold); }
     .srch-places-chevron { width:24px; height:24px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; font-size:var(--fs-15); line-height:1; color:var(--gold); transition:transform 0.18s ease; }
     .srch-places-chevron.open { transform:rotate(90deg); }
@@ -3865,10 +3936,10 @@
     .srch-more-link { background:none; border:none; padding:0.6rem 0.15rem; margin:-0.6rem -0.15rem; color:var(--gold-bright); font:inherit; cursor:pointer; text-decoration:underline; text-underline-offset:0.15em; }
 
     .srch-empty-hero { padding:2rem 1.5rem 1rem; text-align:center; font-family:var(--font-body); color:var(--cream-muted); }
-    .srch-empty-hero h3 { font-family:'Cinzel Decorative',serif; font-size:var(--fs-18); letter-spacing:0.1em; color:var(--gold); font-weight:400; margin-bottom:0.5rem; }
+    .srch-empty-hero h3 { font-family:var(--font-ui); font-size:var(--fs-18); letter-spacing:0.1em; color:var(--gold); font-weight:400; margin-bottom:0.5rem; }
     .srch-empty-hero p { font-size:var(--fs-15); line-height:1.5; }
     .srch-quick-row { display:flex; flex-wrap:wrap; gap:0.45rem; justify-content:center; padding:0.6rem 1rem 1.2rem; }
-    .srch-quick-chip { background:var(--gold-faint); border:1px solid var(--gold-border); color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.14em; text-transform:uppercase; padding:0.35rem 0.7rem; border-radius:20px; cursor:pointer; }
+    .srch-quick-chip { background:var(--gold-faint); border:1px solid var(--gold-border); color:var(--gold); font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.14em; text-transform:uppercase; padding:0.35rem 0.7rem; border-radius:20px; cursor:pointer; }
     .srch-quick-chip:active { background:rgba(200,164,86,0.2); }
     /* W0 (micro-gap b): per-recent remove ✕. The wrap keeps the chip visually
        identical (same padding/radius); the ✕ overlays its right end. 28px
@@ -3880,7 +3951,7 @@
     .srch-chip-remove:active { color:var(--gold); }
 
     .srch-error { padding:1rem 1.2rem; color:#d98888; font-family:var(--font-body); font-size:var(--fs-14); background:rgba(217,136,136,0.06); border-bottom:1px solid rgba(217,136,136,0.3); }
-    .srch-progress { padding:0.5rem 1rem; background:var(--bg2); color:var(--gold-dim); font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.14em; text-transform:uppercase; }
+    .srch-progress { padding:0.5rem 1rem; background:var(--bg2); color:var(--gold-dim); font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.14em; text-transform:uppercase; }
     .srch-progress-bar { height:2px; background:var(--gold-border); margin-top:0.35rem; border-radius:1px; overflow:hidden; }
     .srch-progress-bar-fill { height:100%; background:var(--gold); transition:width 0.2s; }
     /* W0 (micro-gap c): indeterminate variant for the in-flight search
@@ -3891,10 +3962,10 @@
     @keyframes srch-indet { 0% { transform:translateX(-110%); } 100% { transform:translateX(270%); } }
 
     .srch-input-row { display:flex; align-items:center; gap:0.4rem; flex:1; min-width:0; }
-    .srch-clear-btn { background:none; border:none; color:var(--gold-dim); cursor:pointer; font-size:var(--fs-20); padding:0 0.35rem; font-family:'Cinzel',serif; flex-shrink:0; }
+    .srch-clear-btn { background:none; border:none; color:var(--gold-dim); cursor:pointer; font-size:var(--fs-20); padding:0 0.35rem; font-family:var(--font-ui); flex-shrink:0; }
     .srch-clear-btn:active { color:var(--gold); }
 
-    .srch-section-label { padding:0.45rem 1rem 0.2rem; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); }
+    .srch-section-label { padding:0.45rem 1rem 0.2rem; font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); }
     .nav-search-btn { background:none; border:none; cursor:pointer; color:var(--gold); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; flex-shrink:0; }
     .top-nav :is(.nav-search-btn,.settings-gear-btn,.nav-theme-btn):active { background:var(--gold-faint); }
     @media (hover:hover) { .top-nav :is(.nav-search-btn,.settings-gear-btn,.nav-theme-btn):hover { background:var(--gold-faint); color:var(--gold-bright); } }
@@ -3916,7 +3987,7 @@
       gap:0.35rem; padding:0.85rem 0.95rem; width:100%; min-width:0;
     }
     .chapter-cards.two-col .two-col-num {
-      font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em;
+      font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.12em;
       text-transform:uppercase; color:var(--gold-dim); font-weight:600; line-height:1;
     }
     .chapter-cards.two-col .chapter-card-btn.is-current .two-col-num { color:var(--gold); }
@@ -3944,13 +4015,13 @@
        chip is hidden on the one-column index; the two-column Bible grid keeps its own chip rule. */
     .chapter-card-btn { container-type:inline-size; }
     @container (max-width: 14rem) { .chapter-cards:not(.two-col) .chapter-card-btn .idx-min-chip { display:none; } }
-    .chapter-card-num { font-family:'Cinzel',serif; font-size:var(--fs-20); font-weight:600; color:var(--gold); min-width:min(2.2rem, 11vw); text-align:center; flex-shrink:0; line-height:1; }
+    .chapter-card-num { font-family:var(--font-ui); font-size:var(--fs-20); font-weight:600; color:var(--gold); min-width:min(2.2rem, 11vw); text-align:center; flex-shrink:0; line-height:1; }
     .chapter-card-btn.is-current .chapter-card-num { color:var(--gold-bright); }
     .chapter-card-divider { width:1px; align-self:stretch; background:var(--gold-border); flex-shrink:0; min-height:1.8rem; }
     .chapter-card-info { flex:1; min-width:0; }
     /* Long study/letter names must not eat the card (owner report 2026-08-09):
        the eyebrow label ellipsizes on one line, the title clamps at two. */
-    .chapter-card-label { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.18rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .chapter-card-label { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.18rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .chapter-card-title { font-family:var(--font-body); font-size:var(--fs-16); color:var(--cream); line-height:1.3; font-style:italic; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; }
     .chapter-card-title.untitled { font-style:normal; color:var(--cream-muted); font-size:var(--fs-14); }
     /* THE INDEX LISTS ARE ROWS (the redesign, 2026-09-25). A volume's letters, a
@@ -3978,7 +4049,7 @@
        never carries its meaning in colour alone (the word is the message; the
        title is the sentence behind it). */
     .coverage-badge-wrap { display:inline-flex; align-items:baseline; gap:0.45em; flex-wrap:wrap; margin-left:0.55em; vertical-align:middle; }
-    .coverage-badge { display:inline-block; padding:0.12em 0.6em; border:1px solid var(--gold-border,var(--gold-dim)); border-radius:999px; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em; text-transform:uppercase; white-space:nowrap; color:var(--gold-dim); }
+    .coverage-badge { display:inline-block; padding:0.12em 0.6em; border:1px solid var(--gold-border,var(--gold-dim)); border-radius:999px; font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.12em; text-transform:uppercase; white-space:nowrap; color:var(--gold-dim); }
     .coverage-badge-read-along { border-color:var(--gold); background:var(--gold-faint); color:var(--gold); }
     .coverage-badge-listening-only { border-style:dashed; }
     .coverage-badge-no-recording { opacity:0.72; }
@@ -4008,7 +4079,7 @@
        width. */
     .idx-note-chip {
       display:inline-block; margin-top:0.3rem; white-space:nowrap;
-      font-family:'Cinzel',serif; font-size:var(--fs-12);
+      font-family:var(--font-ui); font-size:var(--fs-12);
       letter-spacing:0.06em; text-transform:uppercase;
       color:var(--gold-dim); border:1px solid var(--gold-border);
       border-radius:999px; padding:1px 7px;
@@ -4020,7 +4091,7 @@
     .part-group-card.is-expanded { background:var(--gold-faint); border-color:rgba(200,164,86,0.5); }
     body.light .part-group-card { background:var(--bg2); }
     body.light .part-group-card.is-expanded { background:var(--gold-faint); }
-    .part-group-num { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.18rem; }
+    .part-group-num { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.18rem; }
     .part-group-card.is-expanded .part-group-num { color:var(--gold); }
     .part-group-title { font-family:var(--font-body); font-size:var(--fs-16); font-style:italic; color:var(--cream); line-height:1.3; }
     .part-group-subtitle { font-family:var(--font-body); font-size:var(--fs-13); color:var(--cream-dim); font-style:italic; line-height:1.35; margin-top:0.2rem; }
@@ -4049,21 +4120,21 @@
       max-width:28.75rem; margin:0 auto;
     }
     .history-empty-sigil {
-      font-family:'Cinzel Decorative',serif; font-size:var(--fs-36);
+      font-family:var(--font-ui); font-size:var(--fs-36);
       color:var(--gold-dim); opacity:0.5; margin-bottom:1rem;
     }
     .history-empty-title {
-      font-family:'Cinzel Decorative',serif; font-size:var(--fs-24);
+      font-family:var(--font-ui); font-size:var(--fs-24);
       color:var(--gold-bright); margin-bottom:0.9rem;
     }
     .history-empty-body {
       font-size:var(--fs-16); line-height:1.65; color:var(--cream-muted); font-style:italic;
     }
-    .history-entry-time { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em; color:var(--gold-dim); flex-shrink:0; margin-left:0.5rem; white-space:nowrap; }
+    .history-entry-time { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.12em; color:var(--gold-dim); flex-shrink:0; margin-left:0.5rem; white-space:nowrap; }
     /* Result tally under the search box — states the count in words so the
        filtered emptiness below it is never mistaken for a broken screen. */
     .history-search-count {
-      font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em;
+      font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.12em;
       text-transform:uppercase; color:var(--gold-dim);
       margin:-0.35rem 0 0.9rem; padding-left:0.15rem;
     }
@@ -4084,7 +4155,7 @@
     .history-year-rule { flex:1; height:1px; background:linear-gradient(to right, transparent, var(--gold-border)); }
     .history-year-rule.r { background:linear-gradient(to left, transparent, var(--gold-border)); }
     .history-year-label {
-      font-family:'Cinzel',serif; font-size:var(--fs-20); letter-spacing:0.28em;
+      font-family:var(--font-ui); font-size:var(--fs-20); letter-spacing:0.28em;
       color:var(--gold); text-transform:uppercase; flex-shrink:0;
     }
     .history-month-section { padding-left:0.3rem; margin-top:0.4rem; }
@@ -4095,11 +4166,11 @@
       min-height:48px;
     }
     .history-month-label {
-      font-family:'Cinzel',serif; font-size:var(--fs-16); letter-spacing:0.22em;
+      font-family:var(--font-ui); font-size:var(--fs-16); letter-spacing:0.22em;
       color:var(--gold-dim); text-transform:uppercase;
     }
     .history-month-count {
-      font-family:'Cinzel',serif; font-size:var(--fs-14); letter-spacing:0.1em;
+      font-family:var(--font-ui); font-size:var(--fs-14); letter-spacing:0.1em;
       color:var(--cream-dim); margin-left:auto; opacity:0.75;
     }
     .history-week-section { padding-left:0.6rem; margin-top:0.25rem; }
@@ -4110,11 +4181,11 @@
       min-height:42px;
     }
     .history-week-label {
-      font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em;
+      font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.18em;
       color:var(--gold-dim); text-transform:uppercase; opacity:0.85;
     }
     .history-week-count {
-      font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.08em;
+      font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.08em;
       color:var(--cream-dim); margin-left:auto; opacity:0.7;
     }
     .history-current-section { margin-top:0.6rem; }
@@ -4126,11 +4197,11 @@
       min-height:46px;
     }
     .history-day-label {
-      font-family:'Cinzel',serif; font-size:var(--fs-15); letter-spacing:0.2em;
+      font-family:var(--font-ui); font-size:var(--fs-15); letter-spacing:0.2em;
       color:var(--gold); text-transform:uppercase; white-space:nowrap;
     }
     .history-day-count {
-      font-family:'Cinzel',serif; font-size:var(--fs-14); letter-spacing:0.08em;
+      font-family:var(--font-ui); font-size:var(--fs-14); letter-spacing:0.08em;
       color:var(--gold-dim);
     }
     .history-day-spacer { flex:1; min-width:1.5rem; }
@@ -4145,7 +4216,7 @@
     /* "3 visits" under the newest visit's time: a day's repeats of one reading are one row
        (journey row 3, 2026-09-12; the Deduplicate chore left with it). */
     .history-entry-visits { display:block; text-align:right; color:var(--cream-muted); }
-    .verse-sup { color:var(--gold); font-size:0.65em; margin-right:0.15em; font-family:'Cinzel',serif; }
+    .verse-sup { color:var(--gold); font-size:0.65em; margin-right:0.15em; font-family:var(--font-ui); }
     .fn-link { color:var(--gold); text-decoration:underline; }
     .inline-scrip-ref { color:var(--tap-ref); font-style:italic; text-decoration:none; border-bottom:1px dotted var(--tap-ref-sub); cursor:pointer; padding-bottom:0.02em; }
     .inline-scrip-ref:active { color:var(--tap-ref-active); border-bottom-color:var(--tap-ref); }
@@ -4163,7 +4234,7 @@
       background:transparent; border:1px solid var(--gold-border);
       border-radius:6px; cursor:pointer;
       color:var(--gold); transition:all 0.18s ease;
-      font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.08em;
+      font-family:var(--font-ui); font-size:var(--fs-11); letter-spacing:0.08em;
       -webkit-tap-highlight-color:transparent; margin-left:0.15rem; flex-shrink:0;
       position:relative;
     }
@@ -4175,7 +4246,7 @@
     .tabs-nav-btn.active { background:var(--gold-faint); border-color:var(--gold); color:var(--gold-bright); }
     @media (hover:hover) { .tabs-nav-btn:hover { color:var(--gold-bright); border-color:var(--gold-dim); } }
     .tabs-nav-btn-glyph { font-size:var(--fs-14); line-height:1; display:inline-block; transform:translateY(-1px); }
-    .tabs-nav-btn-count { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.05em; min-width:0.9em; text-align:center; }
+    .tabs-nav-btn-count { font-family:var(--font-ui); font-size:var(--fs-11); letter-spacing:0.05em; min-width:0.9em; text-align:center; }
 
     /* UX5 — first-use coachmark pointing at the tab switcher glyph. */
     .tabs-hint-wrap { position:relative; display:inline-flex; flex-shrink:0; }
@@ -4210,12 +4281,12 @@
     .tabs-overview { max-width:55rem; margin:0 auto; padding:calc(1.5rem + var(--inset-top, 0px)) 1rem calc(5rem + var(--inset-bottom, 0px)); }
     .tabs-overview-header { text-align:center; margin-bottom:1.8rem; padding:0 0.5rem; }
     .tabs-overview-eyebrow {
-      font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em;
+      font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.18em;
       text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.4rem;
     }
     .tabs-overview-title {
       /* Fluid ends are tokens; the vw term between them is the point. */
-      font-family:'Cinzel Decorative',serif; font-size:clamp(var(--fs-36),8vw,var(--fs-48));
+      font-family:var(--font-ui); font-size:clamp(var(--fs-36),8vw,var(--fs-48));
       color:var(--cream); line-height:1.1; margin:0;
     }
     .tabs-overview-ornament { display:flex; align-items:center; justify-content:center; gap:0.6rem; margin:0.7rem auto 0.55rem; max-width:240px; }
@@ -4223,7 +4294,7 @@
     .tabs-overview-ornament-line.r { background:linear-gradient(to left, transparent, var(--gold-border)); }
     .tabs-overview-ornament-diamond { color:var(--gold-dim); font-size:var(--fs-10); }
     .tabs-overview-meta {
-      font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.18em;
+      font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.18em;
       text-transform:uppercase; color:var(--gold-dim);
       margin-bottom:0.95rem;
     }
@@ -4232,7 +4303,7 @@
       margin-bottom:0.5rem;
     }
     .tabs-action-btn {
-      font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.16em;
+      font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.16em;
       text-transform:uppercase; color:var(--gold-dim);
       padding:0.5rem 0.85rem; background:transparent;
       border:1px solid var(--gold-border); border-radius:7px; cursor:pointer;
@@ -4291,7 +4362,7 @@
     }
     .tab-card-thumb-sigil {
       color:var(--gold-dim); opacity:0.35; font-size:var(--fs-48);
-      font-family:'Cinzel Decorative',serif;
+      font-family:var(--font-ui);
     }
     .tab-card-thumb-scrim {
       position:absolute; inset:0; pointer-events:none;
@@ -4330,7 +4401,7 @@
     @media (hover:hover) { .tab-card-close:hover { background:rgba(200,164,86,0.10); color:var(--gold-bright); } }
 
     .tab-card-eyebrow {
-      font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.22em;
+      font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.22em;
       text-transform:uppercase; color:rgba(245,216,106,0.95);
       margin-bottom:0.2rem;
       text-shadow:0 1px 2px rgba(0,0,0,0.85);
@@ -4350,11 +4421,11 @@
     .tab-rename-input { flex:1; min-width:0; background:rgba(255,255,255,0.06); border:1px solid var(--gold-border); border-radius:6px; color:var(--cream); font-family:var(--font-body); font-size:var(--fs-16); padding:0.5rem 0.7rem; outline:none; }
     .tab-rename-input:focus { border-color:var(--gold-dim); }
     body.light .tab-rename-input { background:rgba(0,0,0,0.04); }
-    .tab-rename-save, .tab-rename-cancel { background:transparent; border:1px solid var(--gold-border); border-radius:6px; padding:0.45rem 0.7rem; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; }
+    .tab-rename-save, .tab-rename-cancel { background:transparent; border:1px solid var(--gold-border); border-radius:6px; padding:0.45rem 0.7rem; font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; }
     .tab-rename-save { color:var(--gold-bright); background:var(--gold-faint); border-color:var(--gold-dim); }
     .tab-rename-cancel { color:var(--cream-muted); }
     .tab-card-title {
-      font-family:'Cinzel Decorative',serif; font-size:var(--fs-16);
+      font-family:var(--font-ui); font-size:var(--fs-16);
       color:var(--white); line-height:1.18;
       margin-bottom:0.22rem;
       text-shadow:0 1px 3px rgba(0,0,0,0.65);
@@ -4364,7 +4435,7 @@
     body.light .tab-card-title { color:#1a1a24; text-shadow:0 1px 2px rgba(247,242,232,0.95); }
     .tab-card.active .tab-card-title { color:var(--gold-bright); }
     .tab-card-subtitle {
-      font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.16em;
+      font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.16em;
       text-transform:uppercase; color:rgba(255,255,255,0.92);
       line-height:1.35;
       text-shadow:0 1px 2px rgba(0,0,0,0.8);
@@ -4395,13 +4466,13 @@
     .tab-card-new:active { background:var(--gold-faint); border-color:var(--gold); color:var(--gold); }
     @media (hover:hover) { .tab-card-new:hover { border-color:var(--gold-dim); color:var(--gold); background:rgba(200,164,86,0.03); } }
     .tab-card-new-plus {
-      font-family:'Cinzel Decorative',serif; font-size:var(--fs-36); line-height:1;
+      font-family:var(--font-ui); font-size:var(--fs-36); line-height:1;
       color:var(--gold-dim);
     }
     .tab-card-new:active .tab-card-new-plus,
     .tab-card-new:hover .tab-card-new-plus { color:var(--gold); }
     .tab-card-new-label {
-      font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.22em;
+      font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.22em;
       text-transform:uppercase;
     }
 
@@ -4468,11 +4539,11 @@
       animation:selectSheetSlideUp 0.28s cubic-bezier(0.32,0.72,0,1) both;
     }
     .disable-tabs-eyebrow {
-      font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.22em;
+      font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.22em;
       text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.5rem;
     }
     .disable-tabs-title {
-      font-family:'Cinzel Decorative',serif; font-size:var(--fs-30);
+      font-family:var(--font-ui); font-size:var(--fs-30);
       color:var(--gold-bright); margin:0 0 0.95rem; line-height:1.15;
     }
     .disable-tabs-body {
@@ -4482,7 +4553,7 @@
     }
     .disable-tabs-actions { display:flex; gap:0.7rem; justify-content:center; flex-wrap:wrap; }
     .disable-tabs-btn {
-      font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.16em;
+      font-family:var(--font-ui); font-size:var(--fs-11); letter-spacing:0.16em;
       text-transform:uppercase; padding:0.7rem 1.15rem;
       border-radius:8px; cursor:pointer; transition:all 0.18s ease;
       -webkit-tap-highlight-color:transparent; min-width:11ch;
@@ -4688,7 +4759,7 @@
       padding: 9px 13px;
       display: flex; flex-direction: column; align-items: center; gap: 2px;
       color: var(--cream-dim);
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.10em; text-transform: uppercase;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
@@ -4717,7 +4788,7 @@
     .ann-chip-confirm-btn {
       background: none; border: 1px solid transparent;
       padding: 6px 10px; border-radius: 6px;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.10em; text-transform: uppercase;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
       transition: background 0.12s, border-color 0.12s, color 0.12s;
@@ -4805,7 +4876,7 @@
       width: 30px; height: 30px; border-radius: 8px;
       border: 1.5px solid transparent; cursor: pointer;
       background: transparent; color: var(--cream-dim);
-      font-family: 'Cinzel', serif; font-size: var(--fs-16); font-weight: 600;
+      font-family: var(--font-ui); font-size: var(--fs-16); font-weight: 600;
       display: flex; align-items: center; justify-content: center;
       -webkit-tap-highlight-color: transparent;
       transition: border-color 0.12s, background 0.12s, color 0.12s;
@@ -4941,7 +5012,7 @@
       flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 8px;
       min-height: 44px; padding: 6px 12px; border-radius: 8px; cursor: pointer;
       background: transparent; border: 1px solid var(--gold);
-      color: var(--gold); font-family: 'Cinzel', serif;
+      color: var(--gold); font-family: var(--font-ui);
       font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
       -webkit-tap-highlight-color: transparent;
       transition: background 0.12s, border-color 0.12s;
@@ -4952,7 +5023,7 @@
     .sel-link-choice-btn {
       flex: 1 1 auto; min-height: 44px; padding: 6px 10px; border-radius: 8px; cursor: pointer;
       background: transparent; border: 1px solid var(--gold); color: var(--gold);
-      font-family: 'Cinzel', serif; font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+      font-family: var(--font-ui); font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
       -webkit-tap-highlight-color: transparent;
     }
     .sel-link-choice-btn:active { background: var(--gold-faint); }
@@ -4968,7 +5039,7 @@
       flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 8px;
       min-height: 44px; padding: 6px 14px; border-radius: 0 8px 8px 0; cursor: pointer;
       background: transparent; border: 1px solid var(--gold); border-left-width: 0;
-      color: var(--gold); font-family: 'Cinzel', serif;
+      color: var(--gold); font-family: var(--font-ui);
       font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
       -webkit-tap-highlight-color: transparent;
       transition: background 0.12s;
@@ -5050,7 +5121,7 @@
       padding: 14px 18px 10px;
     }
     .link-sidebar-title {
-      font-family: 'Cinzel', serif; font-size: var(--fs-16);
+      font-family: var(--font-ui); font-size: var(--fs-16);
       letter-spacing: 0.04em; color: var(--cream-dim);
       font-weight: 500;
     }
@@ -5093,7 +5164,7 @@
       gap: 10px; margin-bottom: 2px;
     }
     .link-card-ref {
-      font-family: 'Cinzel', serif; font-size: var(--fs-15);
+      font-family: var(--font-ui); font-size: var(--fs-15);
       color: var(--link-blue); font-weight: 500;
       flex: 1; min-width: 0; word-break: break-word;
     }
@@ -5110,7 +5181,7 @@
     /* Created date stamp under the category line. Same visual treatment as
        other date affordances across the app (Cinzel caps, gold-dim). */
     .link-card-date {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.16em; text-transform: uppercase;
       color: var(--gold-dim); margin-bottom: 6px;
     }
@@ -5123,7 +5194,7 @@
     /* Directional eyebrow ("to " / "from ") prepended to the ref label.
        Lowercase, gold-dim, so it reads as metadata rather than content. */
     .link-card-direction {
-      font-family: 'Cinzel', serif; font-style: normal;
+      font-family: var(--font-ui); font-style: normal;
       font-size: var(--fs-10); letter-spacing: 0.12em; text-transform: lowercase;
       color: var(--gold-dim); margin-right: 2px; opacity: 0.8;
     }
@@ -5131,14 +5202,14 @@
        excerpt because the destination has no excerpt of its own. Subtle
        so the actual excerpt text still reads as the primary content. */
     .link-card-from-label {
-      font-family: 'Cinzel', serif; font-style: normal;
+      font-family: var(--font-ui); font-style: normal;
       font-size: var(--fs-10); letter-spacing: 0.14em; text-transform: uppercase;
       color: var(--gold-dim); margin-right: 4px;
     }
     .link-card-remove {
       display: inline-block;
       background:none; border:0; padding:0;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.1em; text-transform: uppercase;
       color: var(--cream-muted); cursor: pointer;
       -webkit-tap-highlight-color: transparent;
@@ -5149,7 +5220,7 @@
     }
     .link-card-show-more {
       background:none; border:0; padding:0;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.1em; text-transform: uppercase;
       color: var(--gold-dim); cursor: pointer;
       -webkit-tap-highlight-color: transparent;
@@ -5222,7 +5293,7 @@
       stroke: var(--cream); flex-shrink: 0;
     }
     .navpick-title {
-      font-family: 'Cinzel', serif; font-size: var(--fs-18);
+      font-family: var(--font-ui); font-size: var(--fs-18);
       color: var(--cream); flex: 1;
     }
     .navpick-close {
@@ -5265,7 +5336,7 @@
       -webkit-overflow-scrolling: touch;
     }
     .navpick-section-label {
-      font-family: 'Cinzel', serif; font-size: var(--fs-12);
+      font-family: var(--font-ui); font-size: var(--fs-12);
       letter-spacing: 0.10em; color: var(--link-blue);
       padding: 12px 4px 6px;
     }
@@ -5286,7 +5357,7 @@
       background: rgba(0,0,0,0.4);
       border: 1px solid rgba(180,150,90,0.35);
       display: flex; align-items: center; justify-content: center;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.05em; color: var(--gold-dim);
       flex-shrink: 0;
     }
@@ -5313,7 +5384,7 @@
       padding: 40px 12px; text-align: center;
     }
     .navpick-empty-title {
-      font-family: 'Cinzel', serif; font-size: var(--fs-15);
+      font-family: var(--font-ui); font-size: var(--fs-15);
       color: var(--cream-dim); margin-bottom: 8px;
     }
     .navpick-empty-hint {
@@ -5331,7 +5402,7 @@
     .navpick-tab {
       flex: 1; min-height: 38px;
       background: transparent; border: none; border-radius: 999px;
-      font-family: 'Cinzel', serif; font-size: var(--fs-12); letter-spacing: 0.12em;
+      font-family: var(--font-ui); font-size: var(--fs-12); letter-spacing: 0.12em;
       text-transform: uppercase; color: var(--cream-muted);
       cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
       -webkit-tap-highlight-color: transparent;
@@ -5349,7 +5420,7 @@
     .navpick-scope-btn {
       background: transparent; border: none; border-bottom: 2px solid transparent;
       padding: 8px 2px; min-height: 36px;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.14em;
+      font-family: var(--font-ui); font-size: var(--fs-10); letter-spacing: 0.14em;
       text-transform: uppercase; color: var(--cream-muted); cursor: pointer;
       -webkit-tap-highlight-color: transparent;
       transition: color 0.15s ease, border-color 0.15s ease;
@@ -5367,7 +5438,7 @@
     .navpick-corpus-btn {
       flex: 1; min-height: 44px; padding: 0 6px;
       background: transparent; border: 1px solid var(--gold-border); border-radius: 999px;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.14em;
+      font-family: var(--font-ui); font-size: var(--fs-10); letter-spacing: 0.14em;
       text-transform: uppercase; color: var(--cream-muted); cursor: pointer;
       -webkit-tap-highlight-color: transparent;
       transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
@@ -5381,7 +5452,7 @@
       margin-top: 16px; padding: 10px 22px; min-height: 44px;
       background: rgba(200,164,86,0.10); border: 1px solid var(--gold-border);
       border-radius: 999px; color: var(--gold-bright);
-      font-family: 'Cinzel', serif; font-size: var(--fs-11); letter-spacing: 0.1em;
+      font-family: var(--font-ui); font-size: var(--fs-11); letter-spacing: 0.1em;
       text-transform: uppercase; cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
@@ -5399,7 +5470,7 @@
       -webkit-tap-highlight-color: transparent;
     }
     .navpick-crumb-label {
-      font-family: 'Cinzel', serif; font-size: var(--fs-13); letter-spacing: 0.08em;
+      font-family: var(--font-ui); font-size: var(--fs-13); letter-spacing: 0.08em;
       color: var(--cream); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .navpick-row-chevron { margin-left: auto; color: var(--gold-dim); font-size: var(--fs-18); flex-shrink: 0; }
@@ -5444,7 +5515,7 @@
     }
     .navpick-link-endpoint:active { background: rgba(200,164,86,0.18); }
     .navpick-link-ep-eyebrow {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.2em;
+      font-family: var(--font-ui); font-size: var(--fs-10); letter-spacing: 0.2em;
       text-transform: uppercase; color: var(--gold-dim);
     }
     .navpick-link-ep-label {
@@ -5469,7 +5540,7 @@
     .picker-find-input::placeholder { color: var(--cream-muted); }
     .picker-find-input:focus { border-color: var(--gold); outline: none; }
     .picker-find-count {
-      font-family: 'Cinzel', serif; font-size: var(--fs-11); letter-spacing: 0.06em;
+      font-family: var(--font-ui); font-size: var(--fs-11); letter-spacing: 0.06em;
       color: var(--cream-muted); flex-shrink: 0; white-space: nowrap;
     }
     .picker-find-nav {
@@ -5543,7 +5614,7 @@
     }
     .picker-back:active { color: var(--gold); }
     .picker-title {
-      flex: 1; font-family: 'Cinzel', serif; font-size: var(--fs-16);
+      flex: 1; font-family: var(--font-ui); font-size: var(--fs-16);
       color: var(--cream); letter-spacing: 0.02em;
     }
     .picker-confirm {
@@ -5606,11 +5677,11 @@
     /* Letter excerpt picker — render-only body with native text selection */
     .picker-body-letter { padding: 18px 22px 80px; }
     .picker-letter-title {
-      font-family: 'Cinzel', serif; font-size: var(--fs-20);
+      font-family: var(--font-ui); font-size: var(--fs-20);
       color: var(--gold); text-align: center; margin: 6px 0 4px;
     }
     .picker-letter-subtitle {
-      font-family: 'Cinzel', serif; font-size: var(--fs-12);
+      font-family: var(--font-ui); font-size: var(--fs-12);
       color: var(--cream-muted); text-align: center; letter-spacing: 0.12em;
       margin-bottom: 18px;
     }
@@ -5687,7 +5758,7 @@
     .note-sheet-color-dot:active { transform: scale(0.92); }
     .note-sheet-title {
       flex: 1;
-      font-family: 'Cinzel', serif; font-size: var(--fs-12);
+      font-family: var(--font-ui); font-size: var(--fs-12);
       letter-spacing: 0.18em; text-transform: uppercase;
       color: var(--gold);
     }
@@ -5712,7 +5783,7 @@
     }
     /* Relative date under the anchor in NoteSheet read mode. */
     .note-sheet-date {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.18em; text-transform: uppercase;
       color: var(--gold-dim);
       margin: -8px 0 12px;
@@ -5736,7 +5807,7 @@
       background: transparent;
       border: 1px dashed var(--gold-border); border-radius: 8px;
       color: var(--gold-dim); cursor: pointer;
-      font-family: 'Cinzel', serif; font-size: var(--fs-11);
+      font-family: var(--font-ui); font-size: var(--fs-11);
       letter-spacing: 0.10em; text-transform: uppercase;
       -webkit-tap-highlight-color: transparent;
       transition: color 0.12s, border-color 0.12s, background 0.12s;
@@ -5763,7 +5834,7 @@
     .note-sheet-save {
       flex: 1;
       padding: 11px; border-radius: 8px; cursor: pointer;
-      font-family: 'Cinzel', serif; font-size: var(--fs-11);
+      font-family: var(--font-ui); font-size: var(--fs-11);
       letter-spacing: 0.16em; text-transform: uppercase;
       background: var(--gold); border: 1px solid var(--gold);
       color: var(--bg); transition: background 0.15s;
@@ -5781,7 +5852,7 @@
     .note-sheet-secondary {
       flex: 1;
       padding: 11px; border-radius: 8px; cursor: pointer;
-      font-family: 'Cinzel', serif; font-size: var(--fs-11);
+      font-family: var(--font-ui); font-size: var(--fs-11);
       letter-spacing: 0.16em; text-transform: uppercase;
       background: transparent; border: 1px solid var(--gold-border);
       color: var(--cream-dim); transition: background 0.15s, color 0.15s, border-color 0.15s;
@@ -5800,7 +5871,7 @@
       display: block; width: 100%; padding: 12px 16px;
       background: none; border: none;
       text-align: left; cursor: pointer;
-      font-family: 'Cinzel', serif; font-size: var(--fs-11);
+      font-family: var(--font-ui); font-size: var(--fs-11);
       letter-spacing: 0.10em; text-transform: uppercase;
       color: var(--cream-dim);
       -webkit-tap-highlight-color: transparent;
@@ -5868,7 +5939,7 @@
     .study-head.inset { padding: 1.25rem 22px 0; margin-bottom: 0.6rem; }
     .study-head-title {
       margin: 0; min-width: 0;
-      font-family: 'Cinzel Decorative', serif; font-size: clamp(var(--fs-24), 4vw, var(--fs-30));
+      font-family: var(--font-ui); font-size: clamp(var(--fs-24), 4vw, var(--fs-30));
       color: var(--cream); letter-spacing: 0.02em; line-height: 1.2;
       overflow-wrap: break-word;
     }
@@ -6012,7 +6083,7 @@
     }
     .prg-section-head h2 {
       margin: 0;
-      font-family: 'Cinzel', serif; font-size: var(--fs-12); font-weight: 400;
+      font-family: var(--font-ui); font-size: var(--fs-12); font-weight: 400;
       letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-dim);
     }
     .prg-section-meta {
@@ -6073,7 +6144,7 @@
       display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
       column-gap: 0.75rem; row-gap: 0.15rem;
       margin-bottom: 0.55rem;
-      font-family: 'Cinzel', serif; font-size: var(--fs-12); letter-spacing: 0.12em;
+      font-family: var(--font-ui); font-size: var(--fs-12); letter-spacing: 0.12em;
       text-transform: uppercase; color: var(--gold-dim);
     }
     .prg-days-head > :last-child {
@@ -6129,7 +6200,7 @@
       padding: 11px 12px 13px;
       background: transparent; border: none;
       border-bottom: 2px solid transparent;
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      font-family: var(--font-ui); font-size:var(--fs-12);
       letter-spacing: 0.12em; text-transform: uppercase;
       color: var(--cream-muted);
       cursor: pointer; -webkit-tap-highlight-color: transparent;
@@ -6245,7 +6316,7 @@
        and count as the personal-study header (.study-head), in one line. */
     .nb-drilled-title {
       margin: 0;
-      font-family: 'Cinzel Decorative', serif; font-size: clamp(var(--fs-20), 3.4vw, var(--fs-24));
+      font-family: var(--font-ui); font-size: clamp(var(--fs-20), 3.4vw, var(--fs-24));
       letter-spacing: 0.02em; color: var(--cream); line-height: 1.2;
       flex: 1; min-width: 0;
       overflow-wrap: break-word;   /* wraps, never "Study o…" (180 %, the 09-25 walk) */
@@ -6259,7 +6330,7 @@
       background: transparent; border: 1px solid var(--gold-border);
       color: var(--cream-muted);
       padding: 6px 10px; border-radius: 6px;
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      font-family: var(--font-ui); font-size:var(--fs-12);
       letter-spacing: 0.10em; text-transform: uppercase;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
       /* Own row now, so the label can carry a real touch target. */
@@ -6277,7 +6348,7 @@
       padding: 7px 12px;
       background: var(--bg); border: 1px solid var(--gold); border-radius: 8px;
       color: var(--cream);
-      font-family: 'Cinzel', serif; font-size: var(--fs-16);
+      font-family: var(--font-ui); font-size: var(--fs-16);
       letter-spacing: 0.06em;
       outline: none;
     }
@@ -6329,14 +6400,14 @@
     .notes-index-sort {
       margin-left: auto;
       display: flex; align-items: center; gap: 0.4rem;
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      font-family: var(--font-ui); font-size:var(--fs-12);
       letter-spacing: 0.12em; text-transform: uppercase;
       color: var(--cream-muted);
     }
     .notes-index-sort-btn {
       background: transparent; border: 1px solid var(--gold-border);
       color: var(--cream-dim);
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      font-family: var(--font-ui); font-size:var(--fs-12);
       letter-spacing: 0.10em; text-transform: uppercase;
       padding: 6px 11px; border-radius: 6px;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
@@ -6376,7 +6447,7 @@
       display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap;
     }
     .note-row-source {
-      font-family: 'Cinzel', serif; font-size: var(--fs-12);
+      font-family: var(--font-ui); font-size: var(--fs-12);
       color: var(--gold-bright); letter-spacing: 0.04em;
       flex-shrink: 1; min-width: 0;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -6393,7 +6464,7 @@
       cursor: pointer;
     }
     .note-row-date {
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      font-family: var(--font-ui); font-size:var(--fs-12);
       letter-spacing: 0.12em; text-transform: uppercase;
       color: var(--cream-muted);
       margin-left: auto;
@@ -6431,7 +6502,7 @@
     }
     .note-row-nb {
       display: inline-flex; align-items: center; gap: 0.3rem;
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      font-family: var(--font-ui); font-size:var(--fs-12);
       letter-spacing: 0.10em; text-transform: uppercase;
       color: var(--cream-muted);
       padding: 2px 7px;
@@ -6449,7 +6520,7 @@
       color: var(--cream-muted);
     }
     .notes-empty-title {
-      font-family: 'Cinzel', serif; font-size: var(--fs-14);
+      font-family: var(--font-ui); font-size: var(--fs-14);
       letter-spacing: 0.10em; text-transform: uppercase;
       color: var(--cream-dim); margin-bottom: 0.5rem;
     }
@@ -6487,7 +6558,7 @@
     }
     .nb-picker-title {
       flex: 1;
-      font-family: 'Cinzel', serif; font-size: var(--fs-12);
+      font-family: var(--font-ui); font-size: var(--fs-12);
       letter-spacing: 0.18em; text-transform: uppercase;
       color: var(--gold);
     }
@@ -6521,7 +6592,7 @@
       padding: 10px 14px; border-radius: 8px;
       background: var(--gold); border: 1px solid var(--gold);
       color: var(--bg);
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.14em; text-transform: uppercase;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
     }
@@ -6607,7 +6678,7 @@
       flex: 1; padding: 12px 0; border-radius: 8px;
       background: transparent; border: 1px solid var(--border);
       color: var(--cream-dim);
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.14em; text-transform: uppercase;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
     }
@@ -6616,7 +6687,7 @@
       flex: 1.4; padding: 12px 0; border-radius: 8px;
       background: var(--gold); border: 1px solid var(--gold);
       color: var(--bg);
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.14em; text-transform: uppercase;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
     }
@@ -6635,7 +6706,7 @@
     }
     .note-sheet-nb-chip {
       display: inline-flex; align-items: center; gap: 0.3rem;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.10em; text-transform: uppercase;
       color: var(--cream-muted);
       padding: 3px 9px;
@@ -6666,7 +6737,7 @@
     }
     body.light .multinote-popover { box-shadow: 0 10px 28px rgba(0,0,0,0.22); }
     .multinote-header {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.18em; text-transform: uppercase;
       color: var(--gold-dim);
       padding: 10px 14px;
@@ -6701,7 +6772,7 @@
       line-height: 1.4;
     }
     .multinote-row-meta {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.10em; text-transform: uppercase;
       color: var(--cream-muted);
     }
@@ -6735,13 +6806,13 @@
     @media (hover: hover) { .link-row-side:hover { background: var(--gold-faint); } }
     .link-row-source { border-bottom: 1px solid var(--gold-border); }
     .link-row-side-eyebrow {
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      font-family: var(--font-ui); font-size:var(--fs-12);
       letter-spacing: 0.12em; text-transform: uppercase;
       color: var(--gold-dim); margin-bottom: 0.1rem;
     }
     .link-row-source .link-row-side-eyebrow { color: var(--gold); }
     .link-row-side-label {
-      font-family: 'Cinzel', serif; font-size: var(--fs-13);
+      font-family: var(--font-ui); font-size: var(--fs-13);
       letter-spacing: 0.04em;
       color: var(--cream-dim);
       line-height: 1.25;
@@ -6749,7 +6820,7 @@
     .link-row-source .link-row-side-label { color: var(--gold-bright); }
     body.light .link-row-source .link-row-side-label { color: var(--gold); }
     .link-row-side-cat {
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      font-family: var(--font-ui); font-size:var(--fs-12);
       letter-spacing: 0.12em; text-transform: uppercase;
       color: var(--cream-muted);
     }
@@ -6785,7 +6856,7 @@
       stroke: var(--gold-dim); flex-shrink: 0;
     }
     .link-row-date {
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      font-family: var(--font-ui); font-size:var(--fs-12);
       letter-spacing: 0.12em; text-transform: uppercase;
       color: var(--cream-muted);
     }
@@ -6835,7 +6906,7 @@
       width: 100%; padding: 14px 20px;
       background: transparent; border: none;
       text-align: left; cursor: pointer;
-      font-family: 'Cinzel', serif; font-size: var(--fs-11);
+      font-family: var(--font-ui); font-size: var(--fs-11);
       letter-spacing: 0.12em; text-transform: uppercase;
       color: var(--cream-dim);
       -webkit-tap-highlight-color: transparent;
@@ -6883,7 +6954,7 @@
     .bkm-create-sheet { min-height: auto; }
     .bkm-create-body { padding: 4px 20px 22px; overflow-y: auto; }
     .bkm-create-source {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.2em; text-transform: uppercase;
       color: var(--gold-dim); margin-bottom: 4px;
     }
@@ -6897,7 +6968,7 @@
       max-height: 110px; overflow-y: auto;
     }
     .bkm-create-field-label {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.18em; text-transform: uppercase;
       color: var(--gold-dim); margin: 14px 0 6px;
     }
@@ -6934,7 +7005,7 @@
       gap: 0.45rem; padding: 10px 12px;
       background: var(--bg2); color: var(--cream-dim);
       border: 1px solid var(--gold-border); border-radius: 8px;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.16em; text-transform: uppercase;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
       transition: background 0.12s, border-color 0.12s, color 0.12s;
@@ -7019,7 +7090,7 @@
     @media (hover: hover) { .bkm-row-content:hover:not(:disabled) { background: var(--gold-faint); } }
     .bkm-row-content:disabled { cursor: default; }
     .bkm-row-source {
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
+      font-family: var(--font-ui); font-size:var(--fs-12);
       letter-spacing: 0.1em; text-transform: uppercase;
       color: var(--gold);
     }
@@ -7120,7 +7191,7 @@
     .bkm-popover-btn {
       flex: 1; padding: 6px 8px;
       background: none; border: none; cursor: pointer;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.1em; text-transform: uppercase;
       color: var(--gold-dim);
       -webkit-tap-highlight-color: transparent;
@@ -7133,7 +7204,7 @@
     .bkm-popover-btn-primary { color: var(--gold); }
     /* Relative date below the bookmark label, subtle Cinzel caps. */
     .bkm-popover-date {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.16em; text-transform: uppercase;
       color: var(--gold-dim); padding: 0 12px 6px;
     }
@@ -7164,7 +7235,7 @@
     /* Inline thought-edit inside the action sheet (long-press flow). */
     .bkm-action-thought-edit { padding: 12px 14px 8px; }
     .bkm-action-thought-prompt {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.18em; text-transform: uppercase;
       color: var(--gold-dim); margin-bottom: 6px;
     }
@@ -7201,7 +7272,7 @@
       border-radius: 999px;
       background: var(--gold);
       color: var(--bg);
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       font-weight: 700;
       display: flex; align-items: center; justify-content: center;
       line-height: 1;
@@ -7236,7 +7307,7 @@
     }
     body.light .navpick-context { background: rgba(180,150,90,0.10); }
     .navpick-context-label {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.14em; text-transform: uppercase;
       color: var(--gold-dim);
     }
@@ -7274,7 +7345,7 @@
       position: relative; flex-shrink: 0;
       background: none; border: 1px solid var(--gold-border);
       border-radius: 999px; padding: 8px 18px;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
+      font-family: var(--font-ui); font-size: var(--fs-10);
       letter-spacing: 0.1em; text-transform: uppercase;
       color: var(--cream-dim); cursor: pointer;
       -webkit-tap-highlight-color: transparent;
@@ -7305,7 +7376,7 @@
       border-radius: 12px;
       background: var(--gold-faint);
       color: var(--gold);
-      font-family: 'Cinzel', serif; font-size: var(--fs-14);
+      font-family: var(--font-ui); font-size: var(--fs-14);
       letter-spacing: 0.05em;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
       transition: background 0.14s, border-color 0.14s, color 0.14s;
@@ -7491,11 +7562,11 @@
     .txtsize-controls { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
     .txtsize-slider { flex: 1; accent-color: var(--gold); min-height: 28px; cursor: pointer; }
     .txtsize-value {
-      font-family: 'Cinzel', serif; font-size: var(--fsc-11); letter-spacing: 0.08em;
+      font-family: var(--font-ui); font-size: var(--fsc-11); letter-spacing: 0.08em;
       color: var(--gold); min-width: 44px; text-align: right; flex-shrink: 0;
     }
     .txtsize-reset {
-      font-family: 'Cinzel', serif; font-size: var(--fsc-10); letter-spacing: 0.12em;
+      font-family: var(--font-ui); font-size: var(--fsc-10); letter-spacing: 0.12em;
       text-transform: uppercase; color: var(--gold-dim);
       background: transparent; border: 1px solid var(--gold-border); border-radius: 6px;
       padding: 6px 10px; cursor: pointer; flex-shrink: 0;
@@ -8274,12 +8345,12 @@
    wide; at a large Text Size (rem grows with it) they stack. */
 .answers-tablets { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, max(140px, 8.5rem)), 1fr)); gap:0.75rem; }
 .answers-tablet { display:flex; flex-direction:column; min-width:0; padding:1rem 0.25rem 0.3rem; border:1px solid var(--gold-border); border-radius:5rem 5rem 10px 10px / 2.75rem 2.75rem 10px 10px; background:var(--bg2); }
-.answers-tablet-range { padding-bottom:0.45rem; text-align:center; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.28em; color:var(--gold-dim); }
+.answers-tablet-range { padding-bottom:0.45rem; text-align:center; font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.28em; color:var(--gold-dim); }
 .answers-tablet-row { display:flex; align-items:center; gap:0.35rem; min-height:44px; padding:0.2rem 0.125rem; border:0; border-top:1px solid var(--border); border-radius:4px; background:none; color:var(--cream-dim); text-align:left; cursor:pointer; font-family:var(--font-body); font-size:var(--fs-15); line-height:1.2; }
 .answers-tablet-label { flex:1 1 0; min-width:0; }
 /* 1.8rem holds "VIII" (the widest numeral, ~1.65rem) and leaves each label
    one line beside it on a 360 px phone. */
-.answers-tablet-numeral { flex:0 0 1.8rem; text-align:center; font-family:'Cinzel',serif; font-size:var(--fs-15); color:var(--gold); }
+.answers-tablet-numeral { flex:0 0 1.8rem; text-align:center; font-family:var(--font-ui); font-size:var(--fs-15); color:var(--gold); }
 @media (hover:hover) { .answers-tablet-row:hover { background:var(--gold-faint); } }
 .answers-subjects .genre-tile { display:flex; flex-direction:column; justify-content:center; min-height:5.25rem; }
 .answers-subjects .answers-az-tile { background:var(--gold-faint); }
@@ -8302,8 +8373,8 @@
 .answers-hit-card { display:flex; flex-direction:column; gap:0.5rem; width:100%; margin-bottom:0.6rem; padding:0.8rem 1rem; box-sizing:border-box; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); color:var(--cream-dim); text-align:left; cursor:pointer; font-family:var(--font-body); }
 .answers-hit-head { display:flex; align-items:center; gap:0.75rem; }
 .answers-hit-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:0.2rem; }
-.answers-hit-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); }
-.answers-hit-title { font-family:'Cinzel',serif; font-size:var(--fs-16); letter-spacing:0.04em; color:var(--gold); }
+.answers-hit-eyebrow { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); }
+.answers-hit-title { font-family:var(--font-ui); font-size:var(--fs-16); letter-spacing:0.04em; color:var(--gold); }
 .answers-hit-snippet { font-size:var(--fs-16); line-height:1.5; color:var(--cream-dim); }
 .answers-hit-mark { background:transparent; color:var(--gold-bright); font-weight:600; }
 .answers-hit-source { font-size:var(--fs-13); font-style:italic; color:var(--gold-dim); }
@@ -8315,13 +8386,13 @@
 .answers-az-jump { display:flex; flex-wrap:wrap; justify-content:center; gap:0.15rem; width:100%; max-width:32.5rem; margin-bottom:1rem; }
 /* A full finger per letter (walker, 2026-09-24: 36.8 px wide at 360 px). 44 px costs a fourth row of
    letters on a phone; 2.3rem still wins once the text grows past it. */
-.answers-az-jump button { min-width:max(44px, 2.3rem); min-height:44px; border:0; border-radius:6px; background:none; color:var(--gold); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-15); }
+.answers-az-jump button { min-width:max(44px, 2.3rem); min-height:44px; border:0; border-radius:6px; background:none; color:var(--gold); cursor:pointer; font-family:var(--font-ui); font-size:var(--fs-15); }
 @media (hover:hover) { .answers-az-jump button:hover { background:var(--gold-faint); } }
-.answers-az-letter { padding:0.2rem 0 0.25rem; border-bottom:1px solid var(--gold-border); scroll-margin-top:0.5rem; font-family:'Cinzel',serif; font-size:var(--fs-18); color:var(--gold); }
+.answers-az-letter { padding:0.2rem 0 0.25rem; border-bottom:1px solid var(--gold-border); scroll-margin-top:0.5rem; font-family:var(--font-ui); font-size:var(--fs-18); color:var(--gold); }
 /* A commandment's sheet: its verse, then its topics. */
 .answers-sheet-verse { margin:0 0 1.1rem; padding:0; text-align:center; }
 .answers-sheet-verse p { margin:0 0 0.4rem; font-family:var(--font-body); font-size:var(--fs-18); font-style:italic; line-height:1.45; color:var(--cream); }
-.answers-sheet-ref { min-height:44px; padding:0 0.6rem; border:0; background:none; cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.08em; color:var(--gold); }
+.answers-sheet-ref { min-height:44px; padding:0 0.6rem; border:0; background:none; cursor:pointer; font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.08em; color:var(--gold); }
 /* An Answers topic's contents (AnswersContents.jsx, 2026-09-25; picture: calls/ux-0925/r3-passages.png take 1):
    a quiet line under the title that opens a sheet of its sections or passages. */
 .answers-contents-line { display:inline-flex; align-items:center; gap:0.35rem; min-height:44px; margin:0.35rem auto 0; padding:0 0.75rem; border:0; background:none; cursor:pointer; font-family:var(--font-body); font-size:var(--fs-16); font-style:italic; color:var(--cream-muted); -webkit-tap-highlight-color:transparent; }

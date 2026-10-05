@@ -846,7 +846,7 @@ describe('bottom dock stack (cz1)', () => {
     }
     expect(decl('.vot-toast {', 'background')).toBe('rgb(20,20,24)');
     expect(bare).not.toMatch(/\.ascroll-pill\.is-dim\s*\{\s*opacity/);
-    expect(decl('body:is(.audio-bar-open, .autoscroll-on, :has(.mode-toggle-wrap, .jrn-fab, .find-pill)) .screen-scroll {', 'padding-bottom'))
+    expect(decl('body:is(.audio-bar-open, .autoscroll-on, :has(.mode-toggle-wrap, .jrn-fab, .find-pill, .tabbar)) .screen-scroll {', 'padding-bottom'))
       .toBe('calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport) + var(--dock-find) + var(--dock-context) + 8px)');
   });
   it('the root-exit toast and the journal FAB ride the same stack', () => {

@@ -100,11 +100,11 @@ describe('the Scripture Web chrome reads on its black canvas in the light theme 
   });
 
   // The calmer dark (2026-09-25) moved --ink-cream-dim from #f2ede5 (18.02:1) to #e0d9cc; the pill follows.
-  it('calibration: in the dark theme a pill resolves to the shared cream ink (14.97:1)', () => {
+  it('calibration: in the dark theme a pill resolves to the shared cream ink (11.24:1, rs1 charcoal palette)', () => {
     const root = mountChrome();
     const ink = inkOf(root.querySelector(SITES['pill .sw-btn']));
-    expect(ink).toEqual([0xe0, 0xd9, 0xcc]);
-    expect(onBlack(ink)).toBeCloseTo(14.97, 1);
+    expect(ink).toEqual([0xb8, 0xbf, 0xbf]);
+    expect(onBlack(ink)).toBeCloseTo(11.24, 1);
   });
 
   /* The chrome rule and :root's dark set spelled the same seven literals twice (chrome-light,

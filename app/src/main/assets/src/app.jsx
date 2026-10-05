@@ -149,6 +149,7 @@ function App() {
   // reverts a viewed tab to a generic "Reading"/"Entry" when its lazy corpus
   // isn't loaded this session.
   useTabTitleMemo({ activeTab, updateActiveTab });
+  useBottomTabs({ activeTab, updateActiveTab });
   // Desktop keyboard shortcuts (web only): / + Ctrl+F search, arrows = chapter nav (W4.2).
   useDesktopKeyboard();
   /* __bookmarkCreate, inboundJournalPayload, __openJournalInbound,

@@ -23,6 +23,7 @@
 
 import { GARDEN_TIERS, getGardenTier } from '../../utils/garden.js';
 import { TourPrompt } from './TourPrompt.jsx';
+import { TabBar } from './TabBar.jsx';
 
 export function AppShellOverlays({
   // Tabs overview + TabActionSheet
@@ -92,6 +93,8 @@ export function AppShellOverlays({
           null while idle. Mounted here so it survives every screen change
           (free-variable global, same convention as StorageHealthBanner). */}
       <AudioPlayerBar />
+      {/* rs1 (overhaul): Home / Read / Listen / Library, under the dock. */}
+      <TabBar screen={screen} />
 
       {settings.tabsEnabled && tabsOverviewOpen && (
         <div className="tabs-overview-layer" ref={tabsTrapRef} role="dialog" aria-modal="true" aria-labelledby="tabs-overview-title">

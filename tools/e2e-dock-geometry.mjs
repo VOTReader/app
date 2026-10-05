@@ -59,6 +59,7 @@ const PARTS = {
   rootexit:   `<div id="vot-root-exit-toast" style="${ROOT_EXIT};opacity:1"><div style="height:20px;width:200px"></div></div>`,
   tour:       '<div class="tour-prompt"><div style="height:192px"></div></div>',                         // 218px
   fab:        '<button class="jrn-fab jrn-fab-newentry"></button>',
+  tabbar:     '<nav class="tabbar"><button class="tabbar-tab"></button></nav>',                     // rs1 (overhaul)
 };
 // What can be on screen at once. Reading screens: hint yields to the player (AnnotationHint), autoscroll and
 // find hide it (app.css); find hides the toggle. Home: the tour prompt. Journal: the FAB.
@@ -73,6 +74,8 @@ for (const player of [0, 1]) for (const msg of ['', 'toast', 'rootexit']) {
   CASES.push(['tour', player && 'player', msg].filter(Boolean));
   CASES.push(['fab', player && 'player', msg].filter(Boolean));
 }
+// rs1 (overhaul): every case again with the 4-tab bar under the dock.
+for (const c of CASES.splice(0)) CASES.push(c, [...c, 'tabbar']);
 const VIEWPORTS = [[412, 915], [360, 740], [915, 412]];
 const insetsFor = (w, h) => [null, w > h ? [28, 24] : [68, 24]];
 
@@ -104,7 +107,7 @@ try {
           if (tour) document.documentElement.style.setProperty('--tour-prompt-h', Math.round(tour.getBoundingClientRect().height) + 'px');
           const sys = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inset-bottom')) || 0;
           const navBottom = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inset-top')) || 0) + 67.4;
-          const els = [...document.body.querySelectorAll('.audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .mode-toggle-wrap, .ann-hint-pill, .vot-toast, #vot-root-exit-toast, .tour-prompt, .jrn-fab')];
+          const els = [...document.body.querySelectorAll('.audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .mode-toggle-wrap, .ann-hint-pill, .vot-toast, #vot-root-exit-toast, .tour-prompt, .jrn-fab, .tabbar')];
           const vis = els.map((el) => ({ el, k: el.className || el.id, cs: getComputedStyle(el), q: el.getBoundingClientRect() }))
             .filter((o) => o.cs.display !== 'none' && o.q.width && o.q.height);
           const out = { hits: [], off: [], missing: [], shown: [], text: [] };
@@ -123,16 +126,18 @@ try {
             if (ix > 0.5 && iy > 0.5) out.hits.push(`${A.k} x ${B.k} (${Math.round(ix)}x${Math.round(iy)})`);
           }
           for (const o of vis) {
-            const floor = o.el.classList.contains('audio-bar') ? innerHeight : innerHeight - sys;
+            const floor = o.el.classList.contains('audio-bar') || o.el.classList.contains('tabbar') ? innerHeight : innerHeight - sys;
             if (o.q.left < -0.5 || o.q.top < navBottom - 0.5 || o.q.right > innerWidth + 0.5 || o.q.bottom > floor + 0.5)
               out.off.push(`${o.k} [${[o.q.left, o.q.top, o.q.right, o.q.bottom].map(Math.round)}]`);
           }
           const want = { player: '.audio-bar', autoscroll: '.ascroll-pill', expanded: '.ascroll-pill', find: '.find-pill', toggle: '.mode-toggle-wrap',
-            hint: '.ann-hint-pill', toast: '.vot-toast', rootexit: '#vot-root-exit-toast', tour: '.tour-prompt', fab: '.jrn-fab' };
+            hint: '.ann-hint-pill', toast: '.vot-toast', rootexit: '#vot-root-exit-toast', tour: '.tour-prompt', fab: '.jrn-fab', tabbar: '.tabbar' };
           for (const k of c) {
             const el = document.querySelector(want[k]);
             const shown = vis.some((o) => o.el === el);
-            const expect = !(k === 'toggle' && (c.includes('find') || (c.includes('expanded') && innerHeight <= 500)));
+            const busy = c.includes('find') || c.includes('autoscroll') || c.includes('expanded');
+            const expect = !(k === 'toggle' && (c.includes('find') || (c.includes('expanded') && innerHeight <= 500)))
+              && !(k === 'tabbar' && busy && innerHeight <= 500);  // rs1: on a short screen the bar steps aside for a working dock
             if (shown !== expect) out.missing.push(`${k} ${shown ? 'shown' : 'hidden'}`);
           }
           return out;

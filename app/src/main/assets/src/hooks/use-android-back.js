@@ -174,7 +174,7 @@ export function useAndroidBack({
   setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId, setJournalEntryId,
   setFromLetterStack, setFromSearch, setFromStudies, setFromWtlb, setFromMatthewCh, setFromSurprise,
   setTabsOverviewOpen, setSurpriseAnchor,
-  cancelDwell, goNavOrigin, goHome, goSearchOrigin, goScripturesHome,
+  cancelDwell, goNavOrigin, goHome: _goHome, goSearchOrigin, goScripturesHome,
   goStudiesHome, goVolumesHome, goJournalViewer,
   getStudyById,  // App()-local helper; threaded so the bible-study-chapter
                  // back path can introspect the current study's chapter count.
@@ -184,6 +184,8 @@ export function useAndroidBack({
   // Call-time mirrors — handleAndroidBack reads the LATEST nav state when
   // the user presses back, not the value frozen into its []-deps closure.
   const screenRef = useRefMirror(screen);
+  // rs1: inside a tab other than Home, the routing table's "goHome" ends at that tab's root, not Home.
+  const goHome = () => { const bt = window.BottomTabs; if (!(bt && bt.back(screenRef.current))) _goHome(); };
   const bookIdRef = useRefMirror(bookId);
   const genreIdRef = useRefMirror(genreId);
   const fromSearchRef = useRefMirror(fromSearch);
@@ -277,6 +279,9 @@ export function useAndroidBack({
         tapThroughBackRef.current();
         return "true";
       }
+      // rs1 (overhaul): at the root of a tab other than Home, Back goes to the Home tab (audit-ia §2 step 4).
+      { const bt = window.BottomTabs; const tab = bt && bt.active();
+      if (tab && tab !== "home" && s === bt.rootOf(tab)) {bt.select("home");return "true";} }
       if (s === "settings") {goNavOrigin();return "true";} else
       if (s === "history") {goNavOrigin();return "true";} else
       if (s === "about") {AboutSeenFlagStore.set();goNavOrigin();return "true";} else

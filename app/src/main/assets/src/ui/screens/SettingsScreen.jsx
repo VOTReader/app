@@ -1468,7 +1468,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                         onKeyDown={(e) => { if (e.key === 'Enter' && wipeOk) { closeWipe(); _runLockedBackupOperation(clearAllPersonalData); } }}
                         style={{
                           width: "100%", boxSizing: "border-box", textAlign: "center",
-                          fontFamily: "'Cinzel', serif", fontSize: "var(--fs-16)", letterSpacing: "0.22em",
+                          fontFamily: "var(--font-ui)", fontSize: "var(--fs-16)", letterSpacing: "0.22em",
                           textTransform: "uppercase", color: "var(--cream)",
                           background: "var(--bg)", border: "1px solid var(--gold-border)",
                           borderRadius: "6px", padding: "0.7rem 0.5rem", outline: "none", marginBottom: "18px"
@@ -1563,7 +1563,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                     {isOpen && grp.genres.map((genre) => (
                       <React.Fragment key={genre.label}>
                         <div className="progress-row" style={{ background: "var(--bg2)", paddingTop: "0.45rem", paddingBottom: "0.45rem", paddingLeft: "2rem" }}>
-                          <span style={{ fontFamily: "'Cinzel',serif", fontSize: "var(--fs-10)", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--gold-dim)", flex: 1 }}>
+                          <span style={{ fontFamily: "var(--font-ui)", fontSize: "var(--fs-10)", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--gold-dim)", flex: 1 }}>
                             {genre.label}
                           </span>
                         </div>

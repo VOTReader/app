@@ -197,6 +197,7 @@ import { AudioPlayButton, AudioSectionChips } from './components/AudioPlayButton
 import { StorageHealthBanner, useStorageHealth } from './components/StorageHealthBanner.jsx';
 import { Safari7DayModal, IosPwaWelcomeCard } from './components/SafariFlows.jsx';
 import { AppShellOverlays } from './components/AppShellOverlays.jsx';
+import { TabBar } from './components/TabBar.jsx';
 import { TourPrompt } from './components/TourPrompt.jsx';
 import { AppShellSheets } from './components/AppShellSheets.jsx';
 import { AnnotationDomSync } from './components/AnnotationDomSync.jsx';
@@ -319,7 +320,7 @@ Object.assign(window, {
   NoteRow, LinkCard, LinkIcon, BookmarkIcon, HolyDaysPlaylistHeader,
   AudioPlayerBar, AudioManagerSheet, AudioPlayButton, AudioSectionChips,
   StorageHealthBanner, useStorageHealth, Safari7DayModal, IosPwaWelcomeCard,
-  AppShellOverlays, AppShellSheets, AnnotationDomSync, TourPrompt,
+  AppShellOverlays, TabBar, AppShellSheets, AnnotationDomSync, TourPrompt,
   buildScreenRoutes,
   // Screens
   LetterView, WtlbEntryView, BibleChapterView, ChapterView,

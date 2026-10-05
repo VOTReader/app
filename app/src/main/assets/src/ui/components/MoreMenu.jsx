@@ -76,6 +76,7 @@ export function stepFontScale(current, dir) {
   return String(Math.round(next * 100) / 100);
 }
 
+const _NO_TABS = React.createContext(null);
 const ITEM_SELECTOR = '[role="menuitem"], [role="menuitemradio"]';
 
 /** "thevolumesoftruth.com": the site a link goes to, under "Copy website link". @param {string} link */
@@ -90,6 +91,8 @@ function toast(text) {
 
 export function MoreMenuBtn() {
   const ctx = React.useContext(NavMenuContext);
+  // TabsContext is a window global (bundle-a); a test page without it gets no Open pages item.
+  const tabsCtx = React.useContext(typeof TabsContext !== 'undefined' ? TabsContext : _NO_TABS);
   const [open, setOpen] = React.useState(false);
   const [pos, setPos] = React.useState(/** @type {{top:number,right:number}|null} */ (null));
   // The page on screen's website link, read as the menu opens (cp2).
@@ -201,7 +204,7 @@ export function MoreMenuBtn() {
         aria-expanded={open}
       >
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" />
+          <circle cx="12" cy="5" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="12" cy="19" r="1.7" />
         </svg>
       </button>
       {open && pos ? ReactDOM.createPortal(
@@ -232,6 +235,15 @@ export function MoreMenuBtn() {
                 <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 .49-5.01" />
               </svg>
               <span>History</span>
+            </button>
+          ) : null}
+          {tabsCtx && tabsCtx.enabled && typeof BottomTabs !== 'undefined' ? (
+            // rs1 (overhaul): the tab counter left the bar for the tab bar; open pages live here (audit-ia: "Open pages").
+            <button type="button" role="menuitem" className="more-menu-item" onClick={go(tabsCtx.onOpen)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                <rect x="3" y="7" width="13" height="13" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-3" />
+              </svg>
+              <span>Open pages ({tabsCtx.count})</span>
             </button>
           ) : null}
           <div className="more-menu-row" role="group" aria-label="Theme">
