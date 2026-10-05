@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- rv0: the review build's launcher label, beside the daily "VOTReader" (build type `preview`). -->
+<resources>
+    <string name="app_name">VOTReader Preview</string>
+</resources>

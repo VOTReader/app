@@ -92,6 +92,16 @@ android {
             initWith(getByName("debug"))
             isDebuggable = false
         }
+        // rv0 (hub 2026-10-05, Corbin: "save the overhaul for my review"): the REVIEW build of the
+        // `overhaul` branch. Same debug signing as daily, but its own applicationId
+        // (com.votreader.sacredui.preview) and label (src/preview/res: "VOTReader Preview"), so it
+        // installs BESIDE the daily app with its own WebView storage and never reads or migrates
+        // the reader's data. Debuggable stays on so a phone look can inspect it over adb.
+        create("preview") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".preview"
+            versionNameSuffix = "-preview"
+        }
     }
 
     // AGP 8.0+ disabled automatic BuildConfig generation; re-enable so
