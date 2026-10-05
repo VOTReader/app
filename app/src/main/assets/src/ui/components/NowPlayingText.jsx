@@ -97,8 +97,9 @@ export function NowPlayingText({ state, current, onOpen }) {
 
   if (!frags || !blocks) return null;
   const now = idx >= 0 ? clauseText(blocks, frags[idx]) : '';
-  // What comes next, dimmed: the pane fills the room the controls leave, so it reads ahead (the hub, 2026-10-05).
-  const next = [1, 2, 3].map((k) => clauseText(blocks, frags[idx + k])).filter(Boolean);
+  // What comes next, dimmed: the pane fills the room the controls leave and reads ahead (the hub, 2026-10-05);
+  // eight clauses fill the tallest phone, the pane's fade cuts the rest.
+  const next = [1, 2, 3, 4, 5, 6, 7, 8].map((k) => clauseText(blocks, frags[idx + k])).filter(Boolean);
   if (!now && !next.length) return null;
   const body = (
     <>
