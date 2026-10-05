@@ -37,6 +37,7 @@ import {
 } from './ranking.js';
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
 import { onIdle } from '../utils/on-idle.js';
+import { lemma, bestWindow } from './passage.js';
 
 /**
  * The parse kinds a direct-nav card answers ALONE.
@@ -312,6 +313,75 @@ function docTokens(id, doc) {
 /** The phrase ranking reads at most this many of the best-scored texts. */
 const PHRASE_CANDIDATES = 500;
 
+/* THE BEST PASSAGE (search benchmark, 2026-10-05). A remembered sentence in the reader's own words
+   shares only a few words with the text, and a long topic holds those few somewhere, far apart: it
+   came first and the passage meant sat 2nd to 20th (paraphrase 12 of 75). The first PASSAGE_REACH
+   results are re-ordered by their best passage (passage.js bestWindow), the engine's own order
+   breaking near-ties, unless the first already holds the query together, the search is a keyword
+   or a quote, or a result's title is what the query names (it keeps the top). */
+const PASSAGE_REACH = 30;
+/** The first result holding this share of the query in one passage keeps its place. */
+const PASSAGE_HELD = 0.9;
+/** How much a place lower in the engine's order costs, against the passage share (0..1). */
+const PASSAGE_RANK_COST = 0.01;
+/** How much more of the query a passage must hold to take the engine's first place. */
+const PASSAGE_MARGIN = 0.15;
+/** @type {Map<string, string[]>} doc id -> its tokens' lemmas, alongside TOKEN_CACHE */
+const LEMMA_CACHE = new Map();
+/** How many texts hold `term` (the index's own term data). */
+function docFreq(term) {
+  const data = msIndex && msIndex._index && msIndex._index.get(term);
+  if (!data) return 0;
+  let n = 0;
+  for (const docs of data.values()) if (docs.size > n) n = docs.size;
+  return n;
+}
+/**
+ * @param {Array<{score:number, doc:any, terms?:string[]}>} out
+ * @param {Map<any, string>} idOf
+ * @param {Array<{term:string, origin:number, literal?:boolean}>} units  the search's units: each typed
+ *   word (literal) with its synonyms, names and forms (same origin)
+ * @param {(term:string) => boolean} stop
+ * @param {(doc:any) => boolean} named
+ */
+function bestPassageFirst(out, idOf, units, stop, named) {
+  const n = msIndex.documentCount || 1;
+  const seen = new Set();
+  const query = [];
+  let typed = 0;
+  for (const u of units) {
+    if (!u.literal || stop(u.term)) continue;
+    for (const w of kjvEncode(u.term)) {
+      typed++;
+      const lem = lemma(w);
+      if (seen.has(lem)) continue;
+      seen.add(lem);
+      const df = docFreq(w);
+      const syn = new Set();
+      for (const v of units) if (v.origin === u.origin && v !== u) for (const x of kjvEncode(v.term)) syn.add(lemma(x));
+      query.push({ lem, weight: Math.log(1 + (n - df + 0.5) / (df + 0.5)), syn });
+    }
+  }
+  if (query.length < 3) return;
+  const span = Math.max(12, Math.round(typed * 1.6));
+  const top = out.slice(0, PASSAGE_REACH).map((e, i) => {
+    const id = idOf.get(e) || String(i);
+    let lem = LEMMA_CACHE.get(id);
+    if (!lem) {
+      lem = kjvEncode(e.doc.text || '').map(lemma);
+      LEMMA_CACHE.set(id, lem);
+      if (LEMMA_CACHE.size > 400) LEMMA_CACHE.delete(/** @type {string} */ (LEMMA_CACHE.keys().next().value));
+    }
+    return { e, i, share: named(e.doc) ? 2 : bestWindow(query, lem, span) };
+  });
+  if (!top.length || top[0].share >= PASSAGE_HELD) return;
+  const first = top[0];
+  top.sort((a, b) => (b.share - PASSAGE_RANK_COST * b.i) - (a.share - PASSAGE_RANK_COST * a.i));
+  // The engine's first is overtaken only by a passage holding clearly more of the query.
+  if (top[0] !== first && top[0].share < first.share + PASSAGE_MARGIN) { top.splice(top.indexOf(first), 1); top.unshift(first); }
+  for (let i = 0; i < top.length; i++) out[i] = top[i].e;
+}
+
 /* THE ORIGINAL BEFORE ITS REPRINT (search benchmark, 2026-10-05). Answers, Holy Days and
    the studies reprint letters, Words To Live By and verses word for word, and a long Answers
    topic holds every word of most queries: a remembered letter sentence came back with the
@@ -472,6 +542,7 @@ async function build(options) {
   ORIGINALS = null;
   ORIGINAL_DOCS = null;
   SHINGLES = null;
+  LEMMA_CACHE.clear();
   const code = options.translation || 'nkjv';
   const sig = dataSignature(code);
 
@@ -789,6 +860,8 @@ async function search(query, options) {
      three or more. A corrected word counts as the word it was corrected to, so "the
      lord is my shephard" ranks Psalm 23:1 the way the phrase spelled right does. */
   const fixedTo = Object.create(null);
+  /** @type {Record<string, number>} the phrase pass's reading: how nearly a text holds the typed words in a row */
+  const nearOf = Object.create(null);
   for (let c = 0; c < corrections.length; c++) fixedTo[corrections[c].from] = corrections[c].to;
   const typedTokens = joinApostropheS(kjvEncode(query).map((t) => fixedTo[t] || t));
   const STOP = D.STOP_WORDS_TRIMMED;
@@ -803,6 +876,7 @@ async function search(query, options) {
       const toks = docTokens(id, d);
       const exact = hasTokenRun(toks, typedTokens);
       const near = exact ? 1 : nearPhrase(toks, typedTokens, STOP);
+      nearOf[id] = near;
       if (exact) scoreMap[id] *= PHRASE_BOOST;
       else if (near >= NEAR_PHRASE_MIN) scoreMap[id] *= 1 + (PHRASE_BOOST - 1) * near * near;
       // the original before a reprint when both hold the phrase
@@ -882,14 +956,18 @@ async function search(query, options) {
     idOf.set(entry, id);
     out.push(entry);
   }
+  // A title the query names keeps its place; in a keyword search, a title holding one of its words ("144,000").
+  const named = (/** @type {any} */ d) => {
+    if (!d.title) return false;
+    const tt = kjvEncode(d.title);
+    return titleMatch(tt, typedTokens) > 1 || (keyword && typedTokens.some((w) => !(STOP && STOP.has(w)) && tt.indexOf(w) >= 0));
+  };
+  // A first result holding the typed words in a row, or one word off, is a quote found: no re-ordering.
+  const quoted = out.length && (nearOf[idOf.get(out[0]) || ''] || 0) >= NEAR_PHRASE_MIN;
+  if (!keyword && !p.phrase && !quoted) bestPassageFirst(out, idOf, units, isStopTerm, named);
   originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) =>
     (!corpusFilter || d.corpus === corpusFilter) && (!scopeBookId || d.bookId === scopeBookId) && (!scopeVolumeId || d.volumeId === scopeVolumeId),
-    // A title the query names keeps its place; in a keyword search, a title holding one of its words ("144,000").
-    (d) => {
-      if (!d.title) return false;
-      const tt = kjvEncode(d.title);
-      return titleMatch(tt, typedTokens) > 1 || (keyword && typedTokens.some((w) => !(STOP && STOP.has(w)) && tt.indexOf(w) >= 0));
-    });
+    named);
 
   /* A QUOTED PHRASE NOTHING HOLDS IS SEARCHED AS ITS WORDS (search audit 2026-09-27).
      A quote remembered one word off ("the earth shall grow old like a garment", where

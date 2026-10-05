@@ -1,27 +1,27 @@
 {
- "pass": 359,
- "strict": 288,
- "top5": 439,
+ "pass": 373,
+ "strict": 299,
+ "top5": 457,
  "found": 498,
  "style": {
   "crossover": 36,
   "exact": 71,
   "firstwords": 24,
-  "gist": 10,
+  "gist": 15,
   "middle": 48,
   "misremembered": 65,
-  "paraphrase": 14,
+  "paraphrase": 23,
   "rare": 38,
   "title": 25,
   "typos": 23,
   "unitgist": 5
  },
  "group": {
-  "answers": 45,
-  "bible": 90,
+  "answers": 46,
+  "bible": 91,
   "cross": 5,
-  "letters": 140,
-  "studies": 30,
-  "words": 49
+  "letters": 148,
+  "studies": 31,
+  "words": 52
  }
 }
