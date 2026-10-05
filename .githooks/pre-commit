@@ -41,17 +41,8 @@
 #      project on any source change. Zero-tolerance: any type error
 #      fails the commit.
 #
-#   4. vitest + coverage floors (Q5.1 / C2-D [D1])   when any .js/.jsx source file changes
-#      `npm run test:coverage` runs the full vitest suite once WITH the v8
-#      coverage floors in vitest.config.js (~66s measured 2026-08-10 for
-#      3,941 tests). jsdom environment; React-as-global + window.__* stubs
-#      in vitest.setup.js. Zero-tolerance: a failing test OR a floor breach
-#      fails the commit. `npm run test` stays coverage-free for the dev loop.
-#
-#   4b. vitest run tools/     when a tools/*.js|mjs script is staged and no
-#      app source is (Step 4 already covers it otherwise). tools/ sits
-#      outside tsconfig and the bundle-source list, so a gate script used to
-#      reach CI with no local run of its own *.test.js.
+#   4, 4b, 6: vitest and the Kotlin unit tests run in .githooks/pre-push, once per push
+#      (ln1 item 6, 2026-10-05): ~2 min a commit here, five times over for a batch of five.
 #
 #   5. npm run build          when any bundle-source file changes
 #      Rebuilds every dist/ bundle, the CSP hashes and the SW version
@@ -64,13 +55,6 @@
 #      UNSTAGED edits (the gates and the build read the working tree);
 #      0c warns when staged Scripture Web source no longer matches its
 #      S22 frame-time measurement (CI's check:s22 would fail).
-#
-#   6. gradle test (NK1)     when any .kt or app/build.gradle.kts changes
-#      `./gradlew :app:testDebugUnitTest` runs the full Kotlin unit-test
-#      suite (JUnit 5 + Robolectric, junit-vintage bridge). Zero-tolerance:
-#      any failing Kotlin test fails the commit, same discipline as the
-#      JS-side vitest gate. First run ~60s (Gradle daemon cold start);
-#      subsequent ~5-10s with the daemon warm.
 #
 # This file is VERSIONED. To activate, run once per clone:
 #   git config core.hooksPath .githooks
@@ -132,31 +116,12 @@ staged=$(git diff --cached --name-only "$against")
 # setup-python pins 3.13) keeps `python`. Every Python step below runs $PYBIN.
 if command -v py >/dev/null 2>&1 && py -3.13 -c "" >/dev/null 2>&1; then PYBIN="py -3.13"; else PYBIN="python"; fi
 
-# ─── Step 0a: one heavy gate run machine-wide, tests on 8 workers (crash brief 2026-09-24) ──
-# The laptop bugchecked twice on 09-24 while a full vitest ran on 23 of 24 threads (vitest 4
-# defaults to CPUs - 1) beside other lanes' gates. D:/Swarm/tools/gate.sh waits for the lanes'
-# D:/Swarm/locks/gates.lock (mkdir + who-file) and holds it while a heavy step runs (vitest.config.js
-# caps workers at 4 off CI). It never waits on this lane's own wrapper or a parent that holds the
-# lock, and never removes a lock it cannot prove dead (it runs without it after 10 min instead).
-# A commit of only .md/.txt files skips it; so does a machine without D:/Swarm (CI runs no hooks).
-# Tests: python D:/Swarm/tools/test_gate.py and the Step 0a cases in tools/pre-commit-wiring.test.js.
-#
-# ln1 item 7 (2026-10-05): only the two heavy steps hold it - vitest (Steps 4 / 4b) and gradle (the Kotlin step).
-# Holding it for the whole hook made every lane's lint, tsc and build wait in one queue (four hooks queued ~3 min
-# each at 03:2x); those are seconds each and run side by side now. heavy_run takes the lock in a subshell, so it is
-# released the moment that step ends, pass or fail.
+# Step 0a (the machine-wide gates.lock around vitest and gradle) moved with them to .githooks/pre-push.
+# A commit of only .md/.txt files runs no node gate (Step 0b2 reads this).
 gate_heavy=$(printf '%s\n' "$staged" | grep -vE '^$|\.(md|txt)$' || true)
-heavy_run() {  # heavy_run <what> <command...>
-  heavy_what=$1; shift
-  if [ -n "$gate_heavy" ] && [ -f D:/Swarm/tools/gate.sh ]; then
-    ( . D:/Swarm/tools/gate.sh && gate_take "pre-commit $heavy_what" && "$@" )
-  else
-    "$@"
-  fi
-}
 
 # ─── Step 0b: the commit is the INDEX; every gate reads the WORKING TREE (v12-04) ──
-# Lint, tsc, vitest and Step 5's rebuild all read files on disk, and Step 5
+# Lint, tsc and Step 5's rebuild all read files on disk, and Step 5
 # stages the dist/ it builds from them. A bundle source with UNSTAGED edits
 # therefore commits bundles compiled from code the commit does not contain, and
 # the gates pass on code that is not being committed (improvement sweep
@@ -560,9 +525,9 @@ if [ -n "$mem_changed" ]; then
   echo ""
 fi
 
-# ─── Step 1z: rebuild the bundles BEFORE the tests (v12-03) ──────────
-# Step 4's vitest reads dist/ (bundle-membership, the service-worker hashes,
-# the CSS rule-order tests), so it has to run AFTER the rebuild, or an
+# ─── Step 1z: rebuild the bundles BEFORE the gates (v12-03) ──────────
+# vitest (now in .githooks/pre-push) reads dist/ (bundle-membership, the service-worker hashes,
+# the CSS rule-order tests), so the committed dist/ must be the rebuilt one, or an
 # index.html / manifest.json / offline.html edit failed service-worker.test.js
 # on the stale ASSET_INTEGRITY hash before the hook got to rebuild it (the
 # "order trap" CONTRIBUTING.md used to warn about). Build here; Step 5
@@ -688,45 +653,6 @@ if [ -n "$src_changed" ]; then
   echo "[pre-commit] Typecheck OK."
   echo ""
 
-  # ─── Step 4: vitest run + coverage floor (Q5.1 / C2-D [D1]) ───────
-  # Source files changed → run the full vitest suite. Zero-tolerance on a
-  # failing test AND on the coverage floors in vitest.config.js.
-  #
-  # This used to run the coverage-free `npm run test`, so the floors were
-  # enforced ONLY in CI — a collapse in the covered tier (a suite deleted, a
-  # module silently unimported) reached main and failed after push instead of
-  # at the commit prompt. `test:coverage` is the same suite plus the v8
-  # instrumentation: measured 2026-08-10 at 66s vs 47s for 3,941 tests, on a
-  # commit that already pays for a bundle rebuild. `npm run test` stays
-  # coverage-free for watch/dev so the fast loop is untouched.
-  #
-  # ln1 (2026-10-05): the hook runs `npm run test:hook` (tools/test-hook.sh): the same suite in vitest's vmThreads pool
-  # with no coverage, ~4x faster; CI's test:coverage keeps the floors and gates the deploy. See that script.
-  echo "[pre-commit] Source files staged — running vitest (fast mode; CI enforces the coverage floors)..."
-  # core.hooksPath is ABSOLUTE (the primary checkout's copy runs for every worktree), so a worktree branched before
-  # test:hook existed runs this hook too: it keeps its own tree's command.
-  if grep -q '"test:hook"' package.json; then
-    heavy_run vitest npm run test:hook
-  else
-    heavy_run vitest npm run test:coverage
-  fi
-  status=$?
-  if [ $status -ne 0 ]; then
-    echo ""
-    echo "---------------------------------------------------------------"
-    echo "Tests OR the coverage floor FAILED — see vitest output above."
-    echo "A coverage line under its threshold means the covered tier (hooks/"
-    echo "stores/utils/renderer/search) LOST ground — find the suite or module"
-    echo "that stopped running. The floors sit ~25 points under measured, so"
-    echo "they only trip on a collapse; never lower one to make this pass."
-    echo "Fix the failing tests, re-stage the file(s), then retry."
-    echo "Emergency bypass (not recommended): git commit --no-verify"
-    echo "---------------------------------------------------------------"
-    exit 1
-  fi
-  echo "[pre-commit] Tests OK."
-  echo ""
-
   # ─── App() size budget (P11 canary) ──────────────────────────────
   # If app.jsx itself is staged, enforce its line budget — the composition
   # root must stay decomposed (new concerns belong in src/hooks/, not
@@ -747,41 +673,6 @@ if [ -n "$src_changed" ]; then
     echo "[pre-commit] App() size OK."
     echo ""
   fi
-fi
-
-# ─── Step 4b: a gate script's own tests (tools/*.test.js) ──────────
-# tools/ sits outside tsconfig.json and the bundle-source list, so a commit
-# that stages only a gate script (check-*.js, sync-*.js, smoke-*.js) reached
-# CI with no local run of the script's *.test.js suite — the very scripts
-# that catch silent regressions elsewhere. Step 4 already ran the whole
-# suite when app source changed; otherwise run just tools/.
-tools_changed=$(echo "$staged" | grep -E '^tools/.*\.(js|mjs)$' || true)
-if [ -n "$tools_changed" ] && [ -z "$src_changed" ]; then
-  if ! command -v npx >/dev/null 2>&1; then
-    for candidate in \
-        "/c/Program Files/nodejs" \
-        "/c/Program Files (x86)/nodejs" \
-        "$LOCALAPPDATA/Programs/Node.js" \
-        "$HOME/AppData/Roaming/npm"; do
-      if [ -x "$candidate/npx" ] || [ -x "$candidate/npx.cmd" ]; then
-        export PATH="$candidate:$PATH"
-        break
-      fi
-    done
-  fi
-  echo "[pre-commit] tools/ script staged — running the tools/ vitest suite..."
-  heavy_run vitest-tools npx vitest run tools/
-  status=$?
-  if [ $status -ne 0 ]; then
-    echo ""
-    echo "---------------------------------------------------------------"
-    echo "A tools/ test FAILED — see vitest output above."
-    echo "Fix the gate script or its test, re-stage, then retry the commit."
-    echo "---------------------------------------------------------------"
-    exit 1
-  fi
-  echo "[pre-commit] tools/ tests OK."
-  echo ""
 fi
 
 # ─── Step 5: re-stage the rebuilt bundles + SW cache version ──────────────────────
@@ -1007,49 +898,6 @@ if [ $status -ne 0 ]; then
   echo "Emergency bypass (not recommended): git commit --no-verify"
   echo "---------------------------------------------------------------"
   exit 1
-fi
-
-# ─── Step 6: gradle test (NK1) ──────────────────────────────────────
-# Any change to a .kt source file or the app/build.gradle.kts means the
-# Kotlin unit-test suite needs to run. Mirrors the JS-side vitest gate
-# in zero-tolerance discipline. First run cold-starts the Gradle daemon
-# (~60s); subsequent runs are ~5-10s with the daemon warm.
-#
-# We test on test-source changes too — a flaky test file or a new test
-# that breaks the suite should fail at the commit prompt, not in CI.
-kotlin_changed=$(echo "$staged" | grep -E '^(app/src/(main|test)/.*\.kt|app/src/main/AndroidManifest\.xml|app/src/main/res/.*|app/build\.gradle\.kts|gradle/libs\.versions\.toml)$' || true)
-
-if [ -n "$kotlin_changed" ]; then
-  echo "[pre-commit] Kotlin sources or gradle config changed — running ./gradlew :app:testDebugUnitTest..."
-  if [ -x ./gradlew ]; then
-    GRADLE_CMD="./gradlew"
-  elif command -v gradle >/dev/null 2>&1; then
-    GRADLE_CMD="gradle"
-  else
-    echo "---------------------------------------------------------------"
-    echo "Neither ./gradlew nor gradle on PATH. Cannot run Kotlin tests."
-    echo "If you intentionally do not have Gradle locally, use:"
-    echo "  git commit --no-verify"
-    echo "and the CI gate will catch any test failures on push."
-    echo "---------------------------------------------------------------"
-    exit 1
-  fi
-  heavy_run gradle $GRADLE_CMD :app:testDebugUnitTest :app:jacocoTestCoverageVerification
-  status=$?
-  if [ $status -ne 0 ]; then
-    echo ""
-    echo "---------------------------------------------------------------"
-    echo "Kotlin tests OR coverage gate FAILED — see gradle output above."
-    echo "HTML test report: app/build/reports/tests/testDebugUnitTest/index.html"
-    echo "HTML coverage report:"
-    echo "  app/build/reports/jacoco/jacocoTestReport/html/index.html"
-    echo "  (run \`./gradlew :app:jacocoTestReport\` first if missing)"
-    echo "Fix the failing tests, re-stage, then retry the commit."
-    echo "Emergency bypass (not recommended): git commit --no-verify"
-    echo "---------------------------------------------------------------"
-    exit 1
-  fi
-  echo "[pre-commit] Kotlin tests + coverage gate OK."
 fi
 
 exit 0

@@ -1,0 +1,147 @@
+#!/bin/sh
+# pre-push hook - the two heavy gates, once per push (ln1 item 6, 2026-10-05; audit-gates.md row 6):
+#
+#   vitest            when the pushed commits change app source (app/src/main/assets/src/**.js|jsx) or the test
+#                     setup (vitest.config.js, vitest.setup.js, package.json, package-lock.json): `npm run test:hook`
+#                     (tools/test-hook.sh: the full suite in vmThreads, no coverage; CI's test:coverage keeps the floors).
+#   vitest tools/     when they change a gate script (tools/**.js|mjs) and no app source.
+#   Kotlin            when they change an input the Robolectric suite reads: `gradlew :app:testDebugUnitTest
+#                     :app:jacocoTestCoverageVerification`.
+#
+# These ran in .githooks/pre-commit on EVERY commit until 2026-10-05: ~2 min per commit, and a batch of five commits
+# paid it five times for one push. The commit hook keeps the data gates, lint-staged, tsc and the build (seconds); CI
+# runs every gate again on the pushed tree before the deploy takes it, so this hook is the early warning, not the last.
+#
+# What is tested is the WORKING TREE: the gates read files on disk. So the hook refuses a push whose commit differs
+# from the disk (outside .md/.txt) - check out what you push, or commit/stash the edits. land.sh runs this hook on the
+# lane's commits BEFORE its rebase (the tree the lane built and saw) and pushes the rebased result with LAND_GATED_SHA
+# set, so a landing pays for one vitest, not one per retry. A gate that passed is remembered per tree
+# ($GIT_COMMON_DIR/vot-gates/<tree>.<gate>), so pushing the same tree again (a branch, then main) runs nothing twice.
+#
+# Tests: tools/pre-push.test.js (VOT_PREPUSH_DRY=1 prints the gates instead of running them).
+# Emergency bypass (not recommended): git push --no-verify. CI still runs everything.
+
+exec 1>&2
+
+ZERO=0000000000000000000000000000000000000000
+if [ -n "$LAND_GATED_SHA" ]; then
+  echo "[pre-push] gated by land.sh before its rebase ($LAND_GATED_SHA): not running the gates again."
+  exit 0
+fi
+
+cache=${VOT_PREPUSH_CACHE:-$(git rev-parse --git-common-dir)/vot-gates}
+
+# npm/npx on PATH (winget's Node may not be on an inherited PATH; same probe as the commit hook)
+if ! command -v npm >/dev/null 2>&1; then
+  for candidate in "/c/Program Files/nodejs" "/c/Program Files (x86)/nodejs" "$LOCALAPPDATA/Programs/Node.js" "$HOME/AppData/Roaming/npm"; do
+    if [ -x "$candidate/npm" ] || [ -x "$candidate/npm.cmd" ]; then export PATH="$candidate:$PATH"; break; fi
+  done
+fi
+
+# One heavy run machine-wide (crash brief 2026-09-24): D:/Swarm/tools/gate.sh holds D:/Swarm/locks/gates.lock for the
+# step, in a subshell that releases it when the step ends. CI and machines without D:/Swarm run the step directly.
+heavy_run() {  # heavy_run <what> <command...>
+  heavy_what=$1; shift
+  if [ -n "$VOT_PREPUSH_DRY" ]; then echo "[pre-push] would run: $heavy_what $*"; return 0; fi
+  if [ -f D:/Swarm/tools/gate.sh ]; then
+    ( . D:/Swarm/tools/gate.sh && gate_take "pre-push $heavy_what" && "$@" </dev/null )
+  else
+    "$@" </dev/null
+  fi
+}
+
+# passed <tree> <gate>: this gate already passed on this exact tree
+passed() { [ -f "$cache/$1.$2" ]; }
+remember() {   # a week of passes is plenty; older ones are pruned here
+  [ -n "$VOT_PREPUSH_DRY" ] && return 0
+  mkdir -p "$cache" && echo "$(date '+%F %T') ${SWARM_LANE:-?}" > "$cache/$1.$2"
+  find "$cache" -type f -mtime +7 -delete 2>/dev/null
+  return 0
+}
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$ZERO" ] && continue                        # a branch delete pushes nothing
+  # the files this push changes: from the remote's tip when we have it and it is an ancestor, else every commit that
+  # no remote-tracking ref holds yet (a new branch, or a remote we have not fetched)
+  if [ "$remote_sha" != "$ZERO" ] && git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+    files=$(git diff --name-only "$remote_sha" "$local_sha")
+  else
+    files=$(git log --format= --name-only -m "$local_sha" --not --remotes | sort -u)
+  fi
+
+  src_changed=$(echo "$files" | grep -E '^(app/src/main/assets/src/.*\.(js|jsx)|vitest\.(config|setup)\.js|package(-lock)?\.json)$' || true)
+  tools_changed=$(echo "$files" | grep -E '^tools/.*\.(js|mjs)$' || true)
+  kotlin_changed=$(echo "$files" | grep -E '^(app/src/(main|test)/.*\.kt|app/src/main/AndroidManifest\.xml|app/src/main/res/.*|app/build\.gradle\.kts|gradle/libs\.versions\.toml)$' || true)
+
+  tree=$(git rev-parse "$local_sha^{tree}")
+  gates=""
+  if [ -n "$src_changed" ]; then gates="vitest"
+  elif [ -n "$tools_changed" ]; then gates="vitest-tools"; fi
+  [ -n "$kotlin_changed" ] && gates="$gates gradle"
+  todo=""
+  for g in $gates; do
+    if passed "$tree" "$g" || { [ "$g" = vitest-tools ] && passed "$tree" vitest; }; then
+      echo "[pre-push] $g already passed on tree ${tree%"${tree#???????}"} ($(cat "$cache/$tree.$g" 2>/dev/null || cat "$cache/$tree.vitest"))."
+    else
+      todo="$todo $g"
+    fi
+  done
+  [ -z "$todo" ] && continue
+
+  # the gates read the disk: it must be the commit being pushed (docs aside)
+  if [ -z "$VOT_PREPUSH_NO_TREE_GUARD" ]; then
+    differs=$(git diff --name-only "$local_sha" -- | grep -vE '\.(md|txt)$' || true)
+    if [ -n "$differs" ]; then
+      echo "[pre-push] FATAL: the working tree is not the commit being pushed (${local_sha%"${local_sha#???????}"} -> $remote_ref):"
+      echo "$differs" | head -20 | sed 's/^/    /'
+      echo "  The gates test the files on disk. Check out the commit you push, or commit / stash these edits, then push again."
+      exit 1
+    fi
+  fi
+
+  # this checkout's node_modules match the lockfile (n7-02; worktrees do not share them; older branches lack the tool)
+  if [ -z "$VOT_PREPUSH_DRY" ] && [ "$todo" != " gradle" ] && [ -f tools/check-node-modules.js ]; then
+    node tools/check-node-modules.js || exit 1
+  fi
+  for g in $todo; do
+    case $g in
+      vitest)
+        echo "[pre-push] app source in this push - running vitest (fast mode; CI enforces the coverage floors)..."
+        # core.hooksPath is ABSOLUTE (the primary checkout's copy runs for every worktree): a worktree branched before
+        # test:hook existed keeps its own tree's command.
+        if grep -q '"test:hook"' package.json; then
+          heavy_run vitest npm run test:hook
+        else
+          heavy_run vitest npm run test:coverage
+        fi
+        ;;
+      vitest-tools)
+        echo "[pre-push] tools/ script in this push - running the tools/ vitest suite..."
+        heavy_run vitest-tools npx vitest run tools/
+        ;;
+      gradle)
+        echo "[pre-push] Kotlin sources or gradle config in this push - running the Kotlin unit tests..."
+        if [ -x ./gradlew ]; then GRADLE_CMD="./gradlew"
+        elif command -v gradle >/dev/null 2>&1; then GRADLE_CMD="gradle"
+        else
+          echo "[pre-push] FATAL: neither ./gradlew nor gradle on PATH; cannot run the Kotlin tests (git push --no-verify skips them; CI runs them)."
+          exit 1
+        fi
+        heavy_run gradle "$GRADLE_CMD" :app:testDebugUnitTest :app:jacocoTestCoverageVerification
+        ;;
+    esac
+    rc=$?
+    if [ $rc -ne 0 ]; then
+      echo ""
+      echo "---------------------------------------------------------------"
+      echo "[pre-push] $g FAILED - see the output above. Nothing was pushed."
+      [ "$g" = gradle ] && echo "Reports: app/build/reports/tests/testDebugUnitTest/index.html, app/build/reports/jacoco/"
+      echo "Fix it, commit, push again. Emergency bypass (not recommended): git push --no-verify"
+      echo "---------------------------------------------------------------"
+      exit 1
+    fi
+    remember "$tree" "$g"
+    [ -z "$VOT_PREPUSH_DRY" ] && echo "[pre-push] $g OK."
+  done
+done
+exit 0
