@@ -2093,7 +2093,8 @@
       .audio-sec-chip:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
       /* Placement rows: the pill sits under the hero ornament, or under a
          collection index header with its chips wrapping below. */
-      .hero-play-row { margin-top: 1.1rem; display: flex; justify-content: center; }
+      .hero-play-row { margin-top: 0; display: flex; justify-content: flex-start; }
+      .hero .hero-offline-line { margin-left: 0; text-align: left; }
       .vol-index-play-row { margin-top: 1.4rem; display: flex; justify-content: center; }
       .vol-index-play-row + .audio-sec-chips { margin-top: 0.8rem; }
 
@@ -2102,76 +2103,34 @@
         position: relative; overflow: hidden;
         /* rem up to a px ceiling: at Text Size 1.8 the old 5.5rem/4rem grew to 158/115 px and the
            hero filled 77 % of a 360x800 screen with the first words below the fold (2026-09-05). */
-        padding: min(5.5rem, 110px) min(1.8rem, max(29px, 7vw)) min(4rem, 80px); text-align: center;
-        border-bottom: 1px solid var(--gold-border);
+        /* The new look (rs2b, Corbin's reference phone 3): a flat page, the title set left on the reading column's
+           edge (the sides are .page-wrapper's), no band and no rule under it. */
+        padding: min(1.75rem, 32px) min(1.5rem, max(24px, 7vw)) min(0.5rem, 10px); text-align: left;
       }
-      .hero-bg {
-        position: absolute; inset: 0; z-index: 1;
-        background: linear-gradient(
-          to bottom,
-          #1f1500 0%,
-          #2a1d00 35%,
-          #1a1200 70%,
-          var(--bg) 100%
-        );
-        pointer-events: none;
-      }
-      .hero-bg.vol {
-        background: linear-gradient(
-          to bottom,
-          #03060f 0%,
-          #070e24 30%,
-          #09122e 55%,
-          #060c1e 75%,
-          var(--bg) 100%
-        );
-      }
-      /* Bible Study hero: warmer, deeper amber signals "Study" vs Volumes. */
-      .hero-bg.study {
-        background: linear-gradient(
-          to bottom,
-          #120802 0%,
-          #1e0f00 30%,
-          #2b1a02 55%,
-          #1a0f00 75%,
-          var(--bg) 100%
-        );
-      }
-      .hero-bg.ot {
-        background: linear-gradient(
-          to bottom,
-          #1a0f00 0%,
-          #211400 35%,
-          #1a0e00 70%,
-          var(--bg) 100%
-        );
-      }
-      .hero-content { position: relative; z-index: 3; }
+      .hero-bg { display: none; }
+      .hero-content { position: relative; z-index: 3; max-width: 45rem; margin: 0 auto; }
       .hero-eyebrow {
         font-family: var(--font-ui);
         /* Fluid: the ENDS are scale tokens, the vw term between them is the
            point (see the type-scale block's documented clamp exception). */
         font-size: clamp(var(--fs-12), 2.3vw, var(--fs-13));   /* was 10-12: every phone got the 10 px floor */
-        letter-spacing: 0.2em; text-transform: uppercase;
-        color: var(--gold); opacity: 0.85; margin-bottom: 0.85rem;
+        font-weight: 500; letter-spacing: var(--track-caps); text-transform: uppercase;
+        color: var(--gold); margin-bottom: 0.6rem;
         overflow-wrap: break-word; word-wrap: break-word; line-height: 1.6;
       }
       .hero-title {
-        font-family: var(--font-ui);
-        /* Standardized reading-title size — gentle responsive scale that sits
-           just above the index titles (.vol-index-title) and never balloons
-           past its top token. Length-independent: a long title wraps at the
-           same size as a short one (the old .hero-title-long shrink is gone).
-           Fluid ends are tokens; the vw term between them is the point. */
-        font-size: clamp(var(--fs-30), 5vw, var(--fs-36));
-        color: var(--cream); line-height: 1.2; margin-bottom: 1.6rem;
+        font-family: var(--font-ui); font-weight: 400; letter-spacing: -0.01em; text-wrap: balance;
+        /* The reference's display size (the tab roots' .root-display, a step down for long titles): a long title
+           wraps at the same size as a short one. Fluid ends are tokens; the vw term between them is the point. */
+        font-size: clamp(var(--fs-30), 10.5vw, var(--fs-48));
+        color: var(--cream); line-height: 1.1; margin-bottom: 1.25rem;
         overflow-wrap: break-word; word-wrap: break-word;
         hyphens: auto;
       }
       .hero-subtitle {
         font-family: var(--font-body); font-size: var(--fs-16); font-style: italic;
         color: var(--cream-muted); max-width: 31.25rem;
-        margin: 0.35rem auto 1.4rem; line-height: 1.5;
+        margin: -0.5rem 0 1.25rem; line-height: 1.5;
       }
       /* Tappable variant — preserves the original .hero-subtitle look entirely; adds only cursor + press/hover feedback */
       .hero-subtitle-tappable {
@@ -2210,7 +2169,7 @@
       /* Tappable hero title (66-book flow) — the button sits inside the h1 so
          heading navigation and native control semantics both remain intact. */
       .hero-title-action {
-        padding: 0; background: none; border: 0; color: inherit; font: inherit;
+        padding: 0; background: none; border: 0; color: inherit; font: inherit; text-align: inherit;
         line-height: inherit; letter-spacing: inherit;
         cursor: pointer;
         transition: color 0.18s ease;
@@ -2240,14 +2199,8 @@
         .section-heading.section-heading-tappable:hover { color: var(--gold); }
         .section-heading-psalm119.section-heading-tappable:hover { background: rgba(200,164,86,0.04); }
       }
-      .hero-ornament { display: flex; align-items: center; gap: 0.75rem; max-width: 280px; margin: 0 auto; }
-      .hero-ornament-line {
-        flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--gold-border), transparent);
-      }
-      .hero-ornament-line.r {
-        background: linear-gradient(to left, transparent, var(--gold-border), transparent);
-      }
-      .hero-ornament-diamond { width: 7px; height: 7px; background: var(--gold-dim); transform: rotate(45deg); flex-shrink: 0; }
+      /* The diamond-and-rules ornament is the old look's; the new hero has no ornament (rs2b). */
+      .hero-ornament { display: none; }
     
       /* ── PAGE / CHAPTER BODY ── */
       .page-wrapper {
@@ -2630,13 +2583,14 @@
     
     /* ── LETTER META ── */
     
-    .letter-meta { padding:0 0 0.25rem; margin-bottom:2.5rem; }
-    .meta-date { font-family:var(--font-ui); font-size:var(--fs-12); letter-spacing:0.2em; color:var(--gold); text-transform:uppercase; margin-bottom:0.5rem; }
-    .meta-from { font-style:italic; color:var(--cream-dim); font-size:var(--fs-16); margin-bottom:0.2rem; }
-    .meta-spoken { font-size:var(--fs-15); color:var(--cream-muted); margin-bottom:0.2rem; }
-    .meta-for { font-size:var(--fs-15); color:var(--cream-muted); margin-bottom:0.2rem; }
+    /* The new look (rs2b): plain chrome-face lines under the Listen pill, ended by one hairline. */
+    .letter-meta { padding:0 0 1.5rem; margin-bottom:2rem; border-bottom:1px solid var(--divider); font-family:var(--font-ui); line-height:1.45; }
+    .meta-date { font-size:var(--fs-16); color:var(--cream-dim); margin-bottom:0.3rem; }
+    .meta-from { color:var(--cream-dim); font-size:var(--fs-16); margin-bottom:0.15rem; }
+    .meta-spoken { font-size:var(--fs-16); color:var(--cream-dim); margin-bottom:0.15rem; }
+    .meta-for { font-size:var(--fs-16); color:var(--cream-dim); margin-bottom:0.15rem; }
     .meta-note { font-size:var(--fs-14); color:var(--gold-dim); font-style:italic; margin-top:0.4rem; }
-    .meta-preamble { margin-top:0.6rem; font-size:var(--fs-15); color:var(--cream-muted); font-style:italic; line-height:1.6; border-top:1px solid var(--gold-border); padding-top:0.6rem; }
+    .meta-preamble { margin-top:0.6rem; font-size:var(--fs-15); color:var(--cream-muted); font-style:italic; line-height:1.6; border-top:1px solid var(--divider); padding-top:0.6rem; }
     .meta-addendum { font-size:var(--fs-14); color:var(--gold-dim); font-style:italic; margin-top:0.4rem; }
     .meta-addendum a { color:var(--gold); text-decoration:none; }
     @media (hover: hover) { .meta-addendum a:hover { color:var(--gold-bright); } }
@@ -3072,12 +3026,16 @@
     .related-section:empty { display:none; }
     /* Songs of the Letters on a letter page (L4, picture final-05): LISTEN filled, HEAR IT SUNG outlined beside it, same
        height, each with the pill's 44 px hit band; both show a playing state (W3-08). The songs card is a related card. */
+    /* The new look (rs2b, Corbin's reference): a rectangular gold Listen button, title case, play glyph first. */
     .letter-listen-row { flex-wrap:wrap; gap:.75rem; }
-    .letter-listen-row .hero-play-pill { min-height:40px; padding:.6em 1.1em; font-size:var(--fs-13); font-weight:600; letter-spacing:.1em; white-space:nowrap; }
-    .letter-listen-row.has-songs .hero-play-pill { flex:1 1 9.5rem; max-width:15rem; justify-content:center; }
-    .letter-listen-pill { border-color:var(--gold); background:var(--gold); color:var(--bg); }
+    .hero .hero-play-pill, .letter-listen-row .hero-play-pill { min-height:48px; padding:.5em 1.3em .5em 1em; border-radius:var(--radius-lg); font-size:var(--fs-18); font-weight:500; letter-spacing:.005em; text-transform:none; white-space:nowrap; gap:.6em; }
+    .hero .hero-play-pill svg, .letter-listen-row .hero-play-pill svg { width:1.2em; height:1.2em; }
+    .hero .hero-play-pill:not(.letter-sung-pill) { border-color:var(--pill-fill); background:var(--pill-fill); color:var(--on-gold); }
+    .hero .hero-play-pill.is-playing:not(.letter-sung-pill) { background:var(--gold-bright); border-color:var(--gold-bright); }
+    .letter-listen-row.has-songs .hero-play-pill { flex:0 1 auto; justify-content:center; }
+    .letter-listen-pill { border-color:var(--pill-fill); background:var(--pill-fill); color:var(--on-gold); }
     .letter-listen-pill.is-playing { background:var(--gold-bright); border-color:var(--gold-bright); }
-    .letter-sung-pill { border-color:var(--gold); background:transparent; }
+    .letter-sung-pill { border-color:var(--gold-border); background:transparent; }
     .letter-sung-pill.is-playing { background:var(--gold-faint); }
     @media (hover: hover) { .letter-listen-pill:hover { background:var(--gold-bright); } }
     .letter-songs-card { grid-column:1 / -1; }
