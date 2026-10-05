@@ -219,3 +219,33 @@ describe('useHistory — clearHistory', () => {
     expect(HistoryStore.list()).toEqual([]);
   });
 });
+
+describe('useHistory — Hidden Manna stays out of every list (hm1)', () => {
+  it('filters Hidden Manna visits already stored, without deleting them', () => {
+    const seed = [
+      { type: 'letter', letterId: 'woe-to-dallas', letterTitle: 'Woe to Dallas', volumeScreen: null, key: 'lt:woe-to-dallas', ts: 3 },
+      { type: 'letter', letterId: 'the-wide-path', letterTitle: 'The Wide Path', volumeScreen: 'vol-two-idx', key: 'lt:the-wide-path', ts: 2 },
+      { type: 'chapter', bookId: 'matthew', chapterNum: 5, key: 'ch:matthew:5', ts: 1 },
+    ];
+    HistoryStore._cache = /** @type {any} */ (seed);
+    const { result, rerender } = renderHook(() => useHistory(true));
+    expect(result.current.readHistory.map((e) => e.key)).toEqual(['lt:the-wide-path', 'ch:matthew:5']);
+    const first = result.current.readHistory;
+    rerender();
+    expect(result.current.readHistory).toBe(first);            // a stable snapshot (no render loop)
+    expect(HistoryStore.list()).toHaveLength(3);                // stored records untouched
+  });
+
+  it('an older entry with no volumeScreen is caught by the Hidden Manna letter ids once loaded', () => {
+    const prev = window.HIDDEN_MANNA;
+    window.HIDDEN_MANNA = [{ id: 'woe-to-dallas', title: 'Woe to Dallas' }];
+    try {
+      HistoryStore._cache = /** @type {any} */ ([
+        { type: 'letter', letterId: 'woe-to-dallas', key: 'lt:woe-to-dallas', ts: 2 },
+        { type: 'letter', letterId: 'the-wide-path', key: 'lt:the-wide-path', ts: 1 },
+      ]);
+      const { result } = renderHook(() => useHistory(true));
+      expect(result.current.readHistory.map((e) => e.letterId)).toEqual(['the-wide-path']);
+    } finally { window.HIDDEN_MANNA = prev; }
+  });
+});

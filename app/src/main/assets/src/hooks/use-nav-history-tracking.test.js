@@ -612,3 +612,14 @@ describe('useNavHistoryTracking — late-arriving lazy corpus (RED)', () => {
     });
   });
 });
+
+describe('useNavHistoryTracking — Hidden Manna is never recorded (hm1)', () => {
+  it('a Hidden Manna letter visit writes no history entry', () => {
+    window.COL_BY_LETTER_SC.set('hm-letter', { volKey: 'hm', indexScreen: null });
+    const _findLetter = vi.fn(() => ({ id: 'woe-to-dallas', title: 'Woe to Dallas', num: null }));
+    const props = { ...baseProps(), screen: 'hm-letter', letterId: 'woe-to-dallas', _findLetter };
+    const { rerender } = renderHook(() => useNavHistoryTracking(props));
+    rerender();
+    expect(props.addToHistory).not.toHaveBeenCalled();
+  });
+});
