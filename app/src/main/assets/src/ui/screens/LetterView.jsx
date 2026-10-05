@@ -37,7 +37,6 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   const mainRef = React.useRef(null);
   /* The title is what the reader says before the body's first timed row
      (ReadAlongHighlight's lead-in, 2026-09-22). */
-  const leadRef = React.useRef(null);
 
   const goPrev = () => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary();
   const goNext = () => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary();
@@ -315,7 +314,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               OMITTED (and its separator with it) rather than asserting
               "Volume Two". The position label alone is honest. */}
           <div className="hero-eyebrow">{volumeLabel ? <>{volumeLabel} {"\xA0\xB7\xA0"} </> : null}{studyMode ? letter.num === 0 ? "Preface" : `Chapter ${letter.num}` : letter.num === 0 ? "Preface" : `Letter ${letter.num}`}</div>
-          <h1 className="hero-title" ref={leadRef}>{letter.title}</h1>
+          <h1 className="hero-title">{letter.title}</h1>
           {letter.subtitle && <div className="hero-subtitle">{letter.subtitle}</div>}
           <div className="hero-ornament">
             <div className="hero-ornament-line" />
@@ -658,7 +657,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
       {/* Opened from search: every place the words appear, marked, and the pill
           that steps between them. Live pane only, like the read-along. */}
       {!inert && <FindInUnit anchor={surpriseAnchor} unitId={letter.id} mainRef={mainRef} noun={studyMode ? 'chapter' : 'letter'} keyPrefix={letterHlPrefix(letter.id)} />}
-      {!inert && <ReadAlongHighlight volKey={volKey} letterId={letter.id} mainRef={mainRef} leadRef={leadRef} onListen={AudioPlayer.hasAudio(volKey, letter.id) ? () => AudioPlayer.playLetter({ volKey, letter, collectionLabel: volumeLabel || null }) : null} hlKeyFn={letterHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} seekTo={surpriseBlockKey} seekOffset={surpriseBlockOff} />}
+      {!inert && <ReadAlongHighlight volKey={volKey} letterId={letter.id} mainRef={mainRef} onListen={AudioPlayer.hasAudio(volKey, letter.id) ? () => AudioPlayer.playLetter({ volKey, letter, collectionLabel: volumeLabel || null }) : null} hlKeyFn={letterHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} seekTo={surpriseBlockKey} seekOffset={surpriseBlockOff} />}
 
       {/* Interactive chrome (bottom sheets + the prophecy expand FAB) portals
           to <body>, so an inert peek rendering it would put a DUPLICATE,

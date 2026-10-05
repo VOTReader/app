@@ -16,7 +16,7 @@
    shelf, one copy of each table. */
 
 import { studiesSummary } from './AudioStudiesScreen.jsx';
-import { useOfflineAudio, formatBytes, DownloadIcon } from '../components/OfflineAudioControls.jsx';
+import { useOfflineAudio, formatBytes, DownloadIcon, OfflineNote } from '../components/OfflineAudioControls.jsx';
 
 /** Recent list disclosure state. Deliberately localStorage, not the tab state:
  *  it is a shelf preference, not a place the reader navigated to. */
@@ -178,6 +178,7 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
           <h1>Listening Library</h1>
           <p className="audio-library-intro">A quiet place for the recordings you return to, the ones you just heard, and every source waiting to be explored.</p>
         </header>
+        <OfflineNote text="You’re offline. Recordings on this phone still play." />
 
         {current ? (
           <section className={'audio-library-now' + (active ? ' is-active' : '')} aria-labelledby="audio-library-now-title">

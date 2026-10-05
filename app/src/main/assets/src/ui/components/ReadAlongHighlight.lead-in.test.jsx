@@ -1,21 +1,16 @@
 // @ts-nocheck — the ReadAlongHighlight harness (real AudioPlayer, fake media element), with a heading on the page.
-/* THE HEADING LIGHTS WHILE IT IS READ (listening item 1, 2026-09-22).
+/* THE HEADER NEVER LIGHTS (Corbin 2026-10-05: "No longer highlight top portion, e.g. 'Volume 3, Letter 24, & title.'
+   During listening"). Supersedes listening item 1 (2026-09-22), which washed the title (a letter) or the
+   "Book · Chapter N" line (a Bible chapter) while the recording's intro announced it.
    ═══════════════════════════════════════════════════════════════════════
-   Every recording opens before its first timed row: a letter's intro sting, then the reader saying the
-   collection and the title (the shipped timings put the first row at a median 17.4 s over 750 letters,
-   731 of them dark for more than 10 s); a Bible chapter's narrator saying "Psalm 23" (WEB median 6.5 s).
-   The page used to stay dark through all of it, which reads as a broken read-along (the 2026-09-22 walk
-   filed exactly that against a letter that was fine). A host now hands the component the element the
-   voice is on before the body starts (`leadRef`: a letter's title, a chapter's "Book · Chapter N" line),
-   and the wash sits there until the first row takes over.
-
-   What must NOT light it: a later part of a multi-part letter (its own lead-in is not the title), the
-   wash switched off, a host that names no heading, and a WTLB compilation's entry page (the file's own
-   intro belongs to no entry; an entry is loaded only once the clock is inside its span). */
+   Every recording opens before its first timed row: the reader saying the collection and the title (median 17.4 s
+   over 750 letters), a narrator saying "Psalm 23". Through all of it the page stays unwashed; the wash starts on the
+   first body clause, and seeking back into the intro clears it. The hosts render the real hero markup around the
+   body, and no host hands the component a heading any more (the source guard at the end). */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { act, cleanup, render } from '@testing-library/react';
 import React from 'react';
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { AudioPlayer } from '../../utils/audio-player.js';
@@ -63,17 +58,16 @@ const SYNC = {
 };
 
 /** A letter page the way LetterView builds it: the hero title outside the body, the blocks inside. */
-function LetterHost({ lead = true, readAlongOn = true }) {
+function LetterHost({ readAlongOn = true }) {
   const mainRef = React.useRef(null);
-  const leadRef = React.useRef(null);
   return (
     <div className="screen-scroll">
-      <header className="hero"><h1 className="hero-title" ref={leadRef}>{TITLE}</h1></header>
+      <header className="hero"><div className="hero-eyebrow">{'Volume Three  ·  Letter 24'}</div><h1 className="hero-title">{TITLE}</h1></header>
       <div className="letter-body" ref={mainRef}>
         <p data-hl-key={letterHlKey('a-word-of-warning', 0)}>{BLOCK0}</p>
         <p data-hl-key={letterHlKey('a-word-of-warning', 1)}>{BLOCK1}</p>
       </div>
-      <ReadAlongHighlight volKey="one" letterId="a-word-of-warning" mainRef={mainRef} leadRef={lead ? leadRef : undefined}
+      <ReadAlongHighlight volKey="one" letterId="a-word-of-warning" mainRef={mainRef}
         hlKeyFn={letterHlKey} readAlongOn={readAlongOn} readAlongFollow={false} />
     </div>
   );
@@ -82,14 +76,13 @@ function LetterHost({ lead = true, readAlongOn = true }) {
 /** A chapter page the way BibleChapterView builds it: the "Book · Chapter N" line is what the narrator says first. */
 function BibleHost({ bookId, chapter, verses }) {
   const mainRef = React.useRef(null);
-  const leadRef = React.useRef(null);
   return (
     <div className="screen-scroll">
-      <header className="hero"><div className="hero-eyebrow" ref={leadRef}>{`Psalms \u00a0·\u00a0 Chapter ${chapter}`}</div></header>
+      <header className="hero"><div className="hero-eyebrow">{`Psalms \u00a0·\u00a0 Chapter ${chapter}`}</div></header>
       <div className="chapter-body" ref={mainRef}>
         {verses.map((n) => <span key={n} data-hl-key={`bible:${bookId}:${chapter}:${n}`}>{`Verse ${n} of ${bookId} ${chapter}.`}</span>)}
       </div>
-      <ReadAlongHighlight volKey="bible-wop-nkjv" letterId={bookId} chapter={chapter} mainRef={mainRef} leadRef={leadRef}
+      <ReadAlongHighlight volKey="bible-wop-nkjv" letterId={bookId} chapter={chapter} mainRef={mainRef}
         hlKeyFn={(b, n) => `bible:${b}:${chapter}:${n}`} readAlongOn readAlongFollow={false} />
     </div>
   );
@@ -131,60 +124,60 @@ afterEach(() => {
   localStorage.removeItem('vot-audio-pos');
 });
 
-describe('the lead-in: the heading is washed until the first timed row', () => {
-  it('a letter lights its title from the first moment, then hands over to the first clause', () => {
+describe('the header never lights: the wash starts at the body', () => {
+  it('a letter stays unwashed through the intro, then lights the first clause at its row', () => {
     render(<LetterHost />);
     playLetter();
-    expect(painted(), 'at 0 s the voice is on the title').toBe(TITLE);
+    expect(painted(), 'at 0 s the voice is on the title: nothing painted').toBeNull();
     clockTo(9);
-    expect(painted(), 'still reading the title at 9 s').toBe(TITLE);
+    expect(painted(), 'still the intro at 9 s: nothing painted').toBeNull();
     clockTo(14);
-    expect(painted(), 'the first clause takes over at its row').toBe('Thus says The Lord');
+    expect(painted(), 'the first clause lights at its row').toBe('Thus says The Lord');
   });
 
-  it('seeking back into the lead-in lights the title again', () => {
+  it('seeking back into the intro clears the wash, never moves it to the title', () => {
     render(<LetterHost />);
     playLetter();
     clockTo(16);
     expect(painted()).toBe(' to everyone who hears.');
     clockTo(3);
-    expect(painted()).toBe(TITLE);
+    expect(painted()).toBeNull();
   });
 
-  it('the second part of a two-part letter keeps its own lead-in dark', () => {
+  it('the second part of a two-part letter stays dark until its own first row', () => {
     render(<LetterHost />);
     playLetter();
     act(() => { AudioPlayer.next(); });
     clockTo(1);
-    expect(painted(), 'part 2 opens on no title').toBeNull();
+    expect(painted()).toBeNull();
     clockTo(5);
     expect(painted()).toBe(BLOCK1);
   });
 
-  it('nothing lights with the wash switched off, lead-in or not', () => {
+  it('nothing lights with the wash switched off', () => {
     render(<LetterHost readAlongOn={false} />);
     playLetter();
-    clockTo(3);
-    expect(painted()).toBeNull();
-  });
-
-  it('a host that names no heading keeps the old dark lead-in', () => {
-    render(<LetterHost lead={false} />);
-    playLetter();
-    clockTo(3);
-    expect(painted()).toBeNull();
     clockTo(14);
-    expect(painted()).toBe('Thus says The Lord');
+    expect(painted()).toBeNull();
   });
 
-  it('a Bible chapter lights its "Book · Chapter N" line while the narrator announces it', () => {
+  it('a Bible chapter keeps its "Book · Chapter N" line dark while the narrator announces it', () => {
     const first = WOP.psalms[23].find((cs) => cs > 0) / 100;       // the real WOP Psalm 23, verse 1 onset
-    expect(first, 'the fixture needs a real lead-in').toBeGreaterThan(1);
+    expect(first, 'the fixture needs a real intro').toBeGreaterThan(1);
     render(<BibleHost bookId="psalms" chapter={23} verses={[1, 2, 3]} />);
     act(() => { AudioPlayer.playBibleBook({ volKey: 'bible-wop-nkjv', bookId: 'psalms', label: 'NKJV · Dramatized', chapterNum: 23 }); });
     clockTo(first - 1);
-    expect(painted()).toBe('Psalms \u00a0·\u00a0 Chapter 23');
+    expect(painted()).toBeNull();
     clockTo(first + 0.5);
     expect(painted()).toBe('Verse 1 of psalms 23.');
+  });
+
+  it('source guard: no reading screen hands the read-along its heading (leadRef is gone)', () => {
+    const screens = join(HERE, '..', 'screens');
+    const hosts = readdirSync(screens).filter((f) => f.endsWith('.jsx') && !f.includes('.test.'))
+      .filter((f) => readFileSync(join(screens, f), 'utf8').includes('<ReadAlongHighlight'));
+    expect(hosts.length, 'the read-along hosts were found').toBeGreaterThanOrEqual(4);
+    for (const f of hosts) expect(readFileSync(join(screens, f), 'utf8'), f).not.toMatch(/leadRef/);
+    expect(readFileSync(join(HERE, 'ReadAlongHighlight.jsx'), 'utf8')).not.toMatch(/leadRef|_paintLead/);
   });
 });

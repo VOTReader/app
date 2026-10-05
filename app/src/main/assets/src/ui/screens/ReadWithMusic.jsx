@@ -12,6 +12,8 @@
    Bundle-h; the player, the catalog and the song pieces are bundle-d globals.
 */
 
+import { useOnline } from '../components/OfflineAudioControls.jsx';
+
 /** Reading order of the collections, for the list's order. */
 const CHAIN = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'rebuke', 'wtlb1', 'wtlb2', 'blessed', 'flock', 'timothy'];
 
@@ -72,6 +74,7 @@ export function readingLetters() {
  * @param {{ state: any }} props
  */
 export function ReadWithMusic({ state }) {
+  const online = useOnline();
   const rows = readingLetters();
   const cur = Array.isArray(state.queue) ? state.queue[state.qi] : null;
   const active = playerIsActive(state);
@@ -93,14 +96,16 @@ export function ReadWithMusic({ state }) {
       <section className="songs-section reading-list" aria-label="Letters read with music">
         {rows.length ? rows.map((row) => {
           const here = !!(cur && cur.key === row.key && cur.readerCode === 'M');
+          // Offline, a reading not on this phone cannot play (2026-10-05); the one playing can always pause.
+          const off = !online && !here && !AudioPlayer.playableNow(row.volKey, row.id);
           return (
-            <div key={row.key} className={'reading-row' + (here ? ' is-current' : '')}>
-              <button type="button" className="songs-row-main reading-row-main" onClick={() => play(row)}>
+            <div key={row.key} className={'reading-row' + (here ? ' is-current' : '') + (off ? ' is-unavailable' : '')}>
+              <button type="button" className="songs-row-main reading-row-main" onClick={() => play(row)} disabled={off}>
                 <span className="songs-row-copy"><strong>{row.title}</strong><small>{row.colLabel}</small></span>
                 {row.d ? <span className="songs-row-len">{songClock(row.d)}</span> : null}
               </button>
-              <button type="button" className="reading-along" onClick={() => readAlong(row)} aria-label={'Read along with ' + row.title}>Read-along</button>
-              <SongPlayButton playing={here && active} label={row.title + ', read with music'} onClick={() => play(row)} />
+              <button type="button" className="reading-along" onClick={() => readAlong(row)} disabled={off} aria-label={'Read along with ' + row.title}>Read-along</button>
+              <SongPlayButton playing={here && active} label={row.title + ', read with music'} onClick={() => play(row)} disabled={off} />
             </div>
           );
         }) : <p className="songs-empty">The letters are still loading.</p>}

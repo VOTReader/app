@@ -22,6 +22,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { SONG_KEY_PREFIX, isSongId, isSongKey, isSongUrl, songIdOfKey } from './audio-track.js';
+import { NetStatus, isNetworkError } from './net-status.js';
 
 export { isSongKey };
 
@@ -303,8 +304,11 @@ async function _fetchCatalog() {
     if (!res || !res.ok) return null;
     const text = await res.text();
     const stale = !!(res.headers && typeof res.headers.get === 'function' && res.headers.get(FALLBACK_HEADER) === '1');
+    // The service worker answers with its copy only when the network did not (NetStatus: the app's requests are the probe).
+    if (stale) NetStatus.reportFailure(); else NetStatus.reportOk();
     return { raw: JSON.parse(text), print: _print(text), stale };
   } catch (_e) {
+    if (isNetworkError(_e)) NetStatus.reportFailure();
     return null;   // offline, blocked, aborted, or not JSON — the last good copy answers
   } finally {
     if (timer) clearTimeout(timer);

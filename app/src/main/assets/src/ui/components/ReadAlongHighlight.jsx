@@ -23,12 +23,11 @@
    WtlbEntryView (live pane only — never in an inert swipe peek, which
    would fight over the ONE global ::highlight registration).
 
-   THE LEAD-IN (2026-09-22). Before the first timed row the voice is on the
-   heading — a letter's intro and title, a Bible narrator's "Psalm 23" — for a
-   median 17.4 s on the shipped letters, and a dark page there read as broken.
-   A host that passes `leadRef` (its title, or a chapter's "Book · Chapter N"
-   line) gets the wash on that element until row 0 takes over; see _paintLead
-   and `leadOn` for where it is (and is not) allowed.
+   NO LEAD-IN (Corbin 2026-10-05: "No longer highlight top portion, e.g.
+   'Volume 3, Letter 24, & title.' During listening"). Before the first timed
+   row the voice is on the heading; the page stays unwashed until row 0, the
+   first body clause. The 2026-09-22 lead-in that washed the title is gone, and
+   the header block is never painted (ReadAlongHighlight.lead-in.test.jsx).
 
    ┌─ THE SCROLLTOP LEASE — THIS IS THE FIFTH WRITER ──────────────────┐
    │ hooks/use-autoscroll.js's header enumerates the writers that may  │
@@ -121,12 +120,6 @@ const DRIFT_PX = 1.5;
  * this value so what an ear check hears is what the app will paint.
  */
 const LEAD_S = 0.15;
-/**
- * The index the wash holds while it sits on the HEADING (see paintLead) —
- * distinct from -1 (nothing painted) so both drivers' "did the index change"
- * guard sees the lead-in begin and end like any other fragment boundary.
- */
-const LEAD_IDX = -2;
 
 /**
  * The release asset this track streams: the URL's last path segment without
@@ -619,51 +612,6 @@ function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScr
 }
 
 /**
- * PAINT THE LEAD-IN (2026-09-22): the whole heading element, while no row of
- * the recording has started. Every recording opens before its first timed row
- * — a letter's intro sting, then the reader saying the collection and the
- * title (median 17.4 s over the 750 shipped letter timelines); a Bible
- * narrator announcing "Psalm 23" (WEB median 6.5 s) — and a page that stays
- * dark through all of it reads as a broken read-along. The heading is where the
- * voice is, so the wash sits on it until row 0 takes over. Same claim-first,
- * clear-on-every-give-up contract as _paintAt.
- *
- * @param {{ current: any }} leadRef - the host's heading element
- * @param {{ current: any }} mainRef
- * @param {boolean} readAlongFollow
- * @param {{ current: number }} userScrollAt
- * @param {{ current: number | null }} glideRef
- * @param {{ current: number }} lastFrag
- * @returns {void}
- */
-function _paintLead(leadRef, mainRef, readAlongFollow, userScrollAt, glideRef, lastFrag) {
-  lastFrag.current = LEAD_IDX;
-  const clear = () => { /** @type {any} */ (CSS).highlights.delete(HL_NAME); };
-  const el = leadRef && leadRef.current;
-  if (!el || !el.ownerDocument || el.isConnected === false) { clear(); return; }
-  const range = el.ownerDocument.createRange();
-  try { range.selectNodeContents(el); } catch (_e) { clear(); return; }
-  const H = /** @type {any} */ (globalThis).Highlight;
-  if (typeof H !== 'function') { clear(); return; }
-  /** @type {any} */ (CSS).highlights.set(HL_NAME, new H(range));
-  if (readAlongFollow) _follow(range, mainRef, userScrollAt, glideRef);
-}
-
-/**
- * The index to show at clock `t`: the fragment under it, else the heading
- * while the lead-in is allowed, else -1 (nothing).
- *
- * @param {any[]} frags
- * @param {number} t
- * @param {boolean} leadOn
- * @returns {number}
- */
-function readingIndexAt(frags, t, leadOn) {
-  const i = fragmentAt(frags, t);
-  return i >= 0 ? i : (leadOn ? LEAD_IDX : -1);
-}
-
-/**
  * LISTEN FROM HERE's landing (2026-09-22): in block `hlKey`, the last fragment
  * starting at or before `offset` in the RENDERED text (a Format B row's corpus
  * offset is projected through offsetMapFn first, the way the paint does), else
@@ -753,15 +701,11 @@ export function repeatSpanOf(frags, keys, letterId, hlKeyFn) {
  *   starts, in the rows' own offset domain (Format A: the block's text; Format B:
  *   corpus offsets, unprojected). The fragment holding it, or the last one before
  *   it, is the target; absent (a verse landing), the block's first fragment.
- * @param {{ current: HTMLElement | null } | null} [props.leadRef] - the element the
- *   voice is on BEFORE the first timed row (a letter's title, a chapter's
- *   "Book · Chapter N" line): washed through the lead-in of the recording's
- *   first part. Absent, the lead-in stays dark as it always did.
  * @param {(() => void) | null} [props.onListen] - the host's own Listen action
  *   (its hero pill's). Given, this unit offers LISTEN FROM HERE through
  *   window.__votListenFrom; absent (no recording), it offers nothing.
  */
-export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0, offsetMapFn = null, seekTo = null, seekOffset = null, leadRef = null, onListen = null }) {
+export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0, offsetMapFn = null, seekTo = null, seekOffset = null, onListen = null }) {
   // Named, not discarded: the two lazy-timing effects below depend on it so a
   // failed fetch is re-asked on transport activity — see read-along-5.
   const playerVersion = React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
@@ -899,14 +843,6 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     // reader listens to never paints.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, part, perAsset, corpusVersion]);
-  // THE LEAD-IN (_paintLead): the heading is what the voice is on only at the
-  // opening of a unit's FIRST recording — part 0 of a letter (an alternate
-  // rendition's first track walks to 0 the same way), and every Bible chapter,
-  // which is a recording of its own. Never a later part, and never a
-  // compilation (key null): an entry there is loaded only once the clock is
-  // inside its span, so the file's intro belongs to no entry.
-  const leadOn = !!leadRef && !!track && track.key != null && (!!chapter || part === 0);
-
   // USER INTENT REVOKES THE LEASE (header rule 2). Capture + passive, matching
   // use-autoscroll's own yield listeners so it cannot be starved by the pager's
   // or the tap-suppressor's handlers, and never needs to cancel.
@@ -937,11 +873,8 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     let stopped = false;
     const tick = () => {
       id = null;
-      const i = readingIndexAt(frags, AudioPlayer.getPreciseTime() + LEAD_S, leadOn);
-      if (i !== lastFrag.current) {
-        if (i === LEAD_IDX) _paintLead(leadRef, mainRef, readAlongFollow, userScrollAt, glide, lastFrag);
-        else _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag, offsetMapFn);
-      }
+      const i = fragmentAt(frags, AudioPlayer.getPreciseTime() + LEAD_S);
+      if (i !== lastFrag.current) _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag, offsetMapFn);
       if (!stopped) id = requestAnimationFrame(tick);
     };
     id = requestAnimationFrame(tick);
@@ -949,7 +882,7 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       stopped = true;
       if (id != null) { try { cancelAnimationFrame(id); } catch (_e) { /* frame source gone */ } }
     };
-  }, [active, frags, letterId, hlKeyFn, mainRef, readAlongFollow, offsetMapFn, leadOn, leadRef]);
+  }, [active, frags, letterId, hlKeyFn, mainRef, readAlongFollow, offsetMapFn]);
 
   // THE SAFETY NET + the structural clear. Runs on the player's whole-second
   // tick; the index guard inside makes it a no-op whenever the frame loop above
@@ -962,12 +895,11 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       lastFrag.current = -1;
       return undefined;
     }
-    const i = readingIndexAt(frags, time + LEAD_S, leadOn);
+    const i = fragmentAt(frags, time + LEAD_S);
     if (i === lastFrag.current) return undefined;
-    if (i === LEAD_IDX) _paintLead(leadRef, mainRef, readAlongFollow, userScrollAt, glide, lastFrag);
-    else _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag, offsetMapFn);
+    _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag, offsetMapFn);
     return undefined;
-  }, [frags, time, letterId, hlKeyFn, mainRef, readAlongFollow, offsetMapFn, leadOn, leadRef]);
+  }, [frags, time, letterId, hlKeyFn, mainRef, readAlongFollow, offsetMapFn]);
 
   // TAP A CLAUSE, HEAR IT. The wash itself is a CSS Custom Highlight — a
   // decoration with no box and no events — so the tap is resolved from the

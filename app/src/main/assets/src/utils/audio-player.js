@@ -64,6 +64,7 @@ import {
   setPreferredReader,
 } from './audio-player/catalog.js';
 import { _g, getState, getVersion, subscribe } from './audio-player/core.js';
+import { playableNow } from './audio-player/offline.js';
 import { getPreciseTime, prewarm } from './audio-player/engine.js';
 import { clearLoop, isNative, setLoop } from './audio-player/loop.js';
 import { _onVisible, syncKeepAlive } from './audio-player/media-session.js';
@@ -177,6 +178,7 @@ export const AudioPlayer = {
   renditionsFor,
   setPreferredReader,
   playbackTracks,
+  playableNow,
   playLetter,
   playCollection,
   playSection,

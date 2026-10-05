@@ -458,8 +458,13 @@ export function buildScreenRoutes({
     const title = typeof document !== 'undefined' ? String(document.title || '').replace(/\s+[—-]\s+VOTReader$/, '').trim() : '';
     return title && title !== 'VOTReader' ? title : 'Back';
   };
+  // Corbin 2026-10-05: "Get rid of back to listening library pill, listening library is not a true screen". Text
+  // opened from a Listening Library screen (or the desk over one) pushes a `silent` entry: no pill, but hardware
+  // Back still returns to the shelf it came from (backActive, the History arm's rule). Songs and other pages keep theirs.
   const _openAudioText = (track, sourceScreen) => {
     const fromTitle = _audioTextFrom(sourceScreen);
+    const silent = sourceScreen !== SONGS_SCREEN && typeof sourceScreen === 'string' && sourceScreen.indexOf('audio-library') === 0;
+    const linkMeta = silent ? { sourceLetterTitle: fromTitle, silent: true } : { sourceLetterTitle: fromTitle };
     // textKeyOf (AudioShelf): the track's own key, or for a WTLB compilation the
     // letter under the clock — the same rule hasTextDestination gates the tap on.
     const key = textKeyOf(track) || '';
@@ -473,7 +478,7 @@ export function buildScreenRoutes({
       const m = typeof track.partLabel === 'string' ? track.partLabel.match(/^Chapter (\d+)$/) : null;
       navigateToLink(
         { type: 'bible', bookId: id, chapter: m ? Number(m[1]) : 1 },
-        { sourceLetterTitle: fromTitle }
+        linkMeta
       );
       return;
     }
@@ -488,7 +493,7 @@ export function buildScreenRoutes({
       // exactly as the History arm prefers it.
       const slug = (study && study.slug) || studyId;
       setActiveReadKey(studyReadKey(slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(slug)]: id })));
-      navigateToLink({ type: 'study-letter', studyId, studyChapterId: id }, { sourceLetterTitle: fromTitle });
+      navigateToLink({ type: 'study-letter', studyId, studyChapterId: id }, linkMeta);
       return;
     }
     const collection = COL_BY_KEY.get(volKey);
@@ -502,6 +507,7 @@ export function buildScreenRoutes({
       sourceStudyId: studyId, sourceStudyChapterId: studyChapterId,
       sourceLetterTitle: fromTitle,
       destSnapshot: { screen: collection.letterScreen, letterId: id },
+      ...(silent ? { silent: true } : {}),
     });
     setLetterId(id);
     setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id));
@@ -1203,7 +1209,8 @@ export function buildScreenRoutes({
         onReadStudy={(studyId) => {
           // A study with no recording yet opens to READ (Codex critique 1,
           // 2026-09-23): its index, or its one page, with the back pill
-          // returning to the Studies screen (same wiring as _openAudioText).
+          // returning to the Studies screen (same wiring as _openAudioText: a
+          // silent entry, Back returns there with no pill, Corbin 2026-10-05).
           const s = getStudyById(studyId);
           if (!s || !Array.isArray(s.chapters) || !s.chapters.length) return;
           const single = s.chapters.length === 1 || s.singlePage;
@@ -1213,6 +1220,7 @@ export function buildScreenRoutes({
             destSnapshot: single
               ? { screen: 'bible-study-chapter', studyId, studyChapterId: s.chapters[0].id }
               : { screen: 'bible-study-index', studyId },
+            silent: true,
           });
           selectStudy(studyId);
         }}

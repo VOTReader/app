@@ -24,13 +24,20 @@
    re-renders a pill, never the letter. "Show songs on letter pages" (Settings
    → Listening, default on) turns both song parts off; LISTEN is untouched.
    A song is never the letter's reading: nothing here gives read credit.
+
+   OFFLINE (Corbin 2026-10-05: "Disable certain features when offline"): a
+   pill that cannot make sound with no network (the reading not downloaded,
+   no song of this letter kept) is disabled, and one calm line under the row
+   says why. What is on the phone stays live; a pill already playing can
+   always pause. NetStatus decides offline (useSongsOnline).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { isSongKey, songIdOfKey } from '../../utils/audio-track.js';
 import { SongCatalog } from '../../utils/song-catalog.js';
 import { SongListRow, songCountLabel, currentSongId, playerIsActive, ChevronRightIcon } from './SongParts.jsx';
-import { SongKeepAction } from './SongKeepParts.jsx';
+import { SongKeepAction, useSongsOnline } from './SongKeepParts.jsx';
+import { SongKeep } from '../../utils/song-keep.js';
 
 /** Songs of this letter shown in the card before "All N songs". */
 const CARD_SONGS = 3;
@@ -57,6 +64,8 @@ const PAUSE = <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><p
  */
 export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = true }) {
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  React.useSyncExternalStore(SongKeep.subscribe, SongKeep.getVersion);
+  const online = useSongsOnline();
   useSongCatalog(showSongs);
   const letterKey = volKey + ':' + letter.id;
   const recorded = AudioPlayer.hasAudio(volKey, letter.id);
@@ -78,21 +87,39 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
   };
   const listening = readingHere && active;
   const singing = songHere && active;
+  // Offline: only what is on the phone can sound (online, playableNow is always true).
+  const listenOff = recorded && !readingHere && !AudioPlayer.playableNow(volKey, letter.id);
+  const singOff = songs.length > 0 && !online && !songHere && !songs.some((s) => SongKeep.isKept(s.id));
+  const offLine = offlineLine(listenOff, singOff);
 
   return (
-    <div className={'hero-play-row letter-listen-row' + (songs.length ? ' has-songs' : '')}>
-      {recorded ? (
-        <button type="button" className={'hero-play-pill letter-listen-pill' + (listening ? ' is-playing' : '')} onClick={listen} aria-pressed={listening} aria-label={listening ? 'Pause the reading' : 'Listen'}>
-          {listening ? PAUSE : PLAY}<span>{listening ? 'Pause' : 'Listen'}</span>
-        </button>
-      ) : null}
-      {songs.length ? (
-        <button type="button" className={'hero-play-pill letter-sung-pill' + (singing ? ' is-playing' : '')} onClick={sing} aria-pressed={singing} aria-label={singing ? 'Pause the song' : 'Hear it sung'}>
-          {singing ? PAUSE : MUSIC_NOTE}<span>{singing ? 'Pause song' : 'Hear it sung'}</span>
-        </button>
-      ) : null}
-    </div>
+    <>
+      <div className={'hero-play-row letter-listen-row' + (songs.length ? ' has-songs' : '')}>
+        {recorded ? (
+          <button type="button" className={'hero-play-pill letter-listen-pill' + (listening ? ' is-playing' : '')} onClick={listen} disabled={listenOff} aria-pressed={listening} aria-label={listening ? 'Pause the reading' : 'Listen'}>
+            {listening ? PAUSE : PLAY}<span>{listening ? 'Pause' : 'Listen'}</span>
+          </button>
+        ) : null}
+        {songs.length ? (
+          <button type="button" className={'hero-play-pill letter-sung-pill' + (singing ? ' is-playing' : '')} onClick={sing} disabled={singOff} aria-pressed={singing} aria-label={singing ? 'Pause the song' : 'Hear it sung'}>
+            {singing ? PAUSE : MUSIC_NOTE}<span>{singing ? 'Pause song' : 'Hear it sung'}</span>
+          </button>
+        ) : null}
+      </div>
+      {offLine ? <p className="hero-offline-line" role="status">{offLine}</p> : null}
+    </>
   );
+}
+
+/**
+ * The one calm line under a hero row whose pills went quiet offline, or '' when nothing is off.
+ * @param {boolean} listenOff @param {boolean} singOff @returns {string}
+ */
+export function offlineLine(listenOff, singOff) {
+  if (listenOff && singOff) return 'You’re offline. This reading and its songs aren’t on this phone.';
+  if (listenOff) return 'You’re offline. This reading isn’t on this phone.';
+  if (singOff) return 'You’re offline. Songs of this letter aren’t kept on this phone.';
+  return '';
 }
 
 /**

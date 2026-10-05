@@ -7,6 +7,8 @@
 import { SongKeep } from '../song-keep.js';
 import { NativeAudio, nativeAudioAvailable } from '../native-audio.js';
 import { isVotAudioUrl, normalizeAudioRate } from '../audio-track.js';
+import { NetStatus } from '../net-status.js';
+import { OfflineAudio } from '../offline-audio.js';
 import { _locateTrack } from './catalog.js';
 import {
   _assetUrlFor,
@@ -43,7 +45,7 @@ import {
   _syncMediaSessionPosition,
   _syncMediaSessionState,
 } from './media-session.js';
-import { _downloadedReading, _offlineNotice, _srcFor, _unreachable } from './offline.js';
+import { _downloadedReading, _offlineNotice, _songKept, _srcFor, _unreachable } from './offline.js';
 import {
   _finishedUrl,
   _forgetPosition,
@@ -152,6 +154,8 @@ function _ensureEl() {
   el.addEventListener('playing', () => {
     _setStatus('playing');
     _recordSongStart();
+    // A streamed recording playing is the network answering (NetStatus: the app's own requests are the probe).
+    if (_streamed(_state.queue[_state.qi])) NetStatus.reportOk();
   });
   el.addEventListener('waiting', () => _setStatus('loading'));
   // Only downgrade a genuinely-playing element: our own stop()/track-switch
@@ -310,12 +314,25 @@ function _onError() {
     late.next();
     return;
   }
+  // A streamed recording that failed at the NETWORK (MediaError 2) says the signal is gone even while
+  // navigator.onLine says otherwise (a dead Wi-Fi): the network-only pills go quiet (NetStatus). The player keeps
+  // its own rule (navigator.onLine), so its toast and a retry from the bar are unchanged.
+  const err = _el && /** @type {any} */ (_el).error;
+  if (err && err.code === 2 && _streamed(_state.queue[_state.qi])) NetStatus.reportFailure();
   // Keep queue + qi + position: toggle() retries from here.
   _errorTime = _state.time;
   _setStatus('paused');
   _persist();
   // A downloaded recording failing offline is a load failure, not a missing connection.
   _toast(_unreachable(_state.queue[_state.qi]) ? OFFLINE_MSG : LOAD_FAIL_MSG);
+}
+
+/**
+ * This track loads from the network: not a recording downloaded to the phone, not a kept song.
+ * @param {import('../audio-player.js').Track | null | undefined} track @returns {boolean}
+ */
+function _streamed(track) {
+  return !!track && typeof track.url === 'string' && !OfflineAudio.isSaved(track.url) && !_songKept(track);
 }
 
 /** Load + play queue[qi]. Assumes queue/qi are already set. */

@@ -90,18 +90,28 @@ function useKeepFocus(state) {
   };
 }
 
-/** @returns {boolean} false while the phone has no signal */
+const _noSub = () => () => {};
+const _zero = () => 0;
+
+/**
+ * false while the phone has no signal, or a request just failed at the network: bundle-d's NetStatus global (one
+ * store for the app, 2026-10-05). A host without it (a test) reads navigator.onLine.
+ * @returns {boolean}
+ */
 export function useOnline() {
-  const [online, setOnline] = React.useState(() => typeof navigator === 'undefined' || navigator.onLine !== false);
-  React.useEffect(() => {
-    const up = () => setOnline(true);
-    const down = () => setOnline(false);
-    window.addEventListener('online', up);
-    window.addEventListener('offline', down);
-    setOnline(typeof navigator === 'undefined' || navigator.onLine !== false);
-    return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
-  }, []);
-  return online;
+  const net = typeof NetStatus !== 'undefined' ? NetStatus : null;
+  React.useSyncExternalStore(net ? net.subscribe : _noSub, net ? net.getVersion : _zero);
+  return net ? !net.isOffline() : typeof navigator === 'undefined' || navigator.onLine !== false;
+}
+
+/**
+ * One calm line at the top of a listening screen while network-only features are off (Corbin 2026-10-05: "Disable
+ * certain features when offline"). Renders nothing online.
+ * @param {{ text: string }} props
+ */
+export function OfflineNote({ text }) {
+  if (useOnline()) return null;
+  return <p className="offline-note" role="status">{text}</p>;
 }
 
 /**

@@ -4,7 +4,7 @@
 
 import { savedScrollFor } from '../components/pager-preview.jsx';
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
+import { HeroListen } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { tapToggle } from '../../utils/tap-guard.js';
@@ -15,7 +15,6 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
   const bodyRef = React.useRef(null);
   /* The eyebrow ("Book · Chapter N") is what the narrator says before verse 1:
      the read-along's lead-in (ReadAlongHighlight, 2026-09-22). */
-  const leadRef = React.useRef(null);
   const [activeScripRef, setActiveScripRef] = React.useState(null);
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
   /* C2-C [C2]: this screen said "Matthew" in five places — three of them
@@ -161,7 +160,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
       <header className="hero">
         <div className="hero-bg" />
         <div className="hero-content">
-          <div className="hero-eyebrow" ref={leadRef}>{bookLabel ? <>{bookLabel} {"\xA0\xB7\xA0"} </> : null}Chapter {chapter.num}</div>
+          <div className="hero-eyebrow">{bookLabel ? <>{bookLabel} {"\xA0\xB7\xA0"} </> : null}Chapter {chapter.num}</div>
           <h1 className="hero-title">Chapter {chapter.num}</h1>
           {chapter.title && showChapterTitle && (
             !titleFocusHidden ? (
@@ -193,9 +192,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
               pill, same call, same book/chapter as BibleChapterView's; absent
               when Settings' Bible Audio is off or the edition lacks the book. */}
           {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
-            <div className="hero-play-row">
-              <AudioPlayButton onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label, chapterNum: chapter.num })} />
-            </div>
+            <HeroListen onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label, chapterNum: chapter.num })} canPlay={() => AudioPlayer.playableNow(bibleAudio.volKey, book.id, chapter.num)} />
           )}
         </div>
       </header>
@@ -342,7 +339,6 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
           letterId={book.id}
           chapter={chapter.num}
           mainRef={bodyRef}
-          leadRef={leadRef}
           onListen={AudioPlayer.hasAudio(bibleAudio.volKey, book.id) ? () => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label, chapterNum: chapter.num }) : null}
           hlKeyFn={(bookId, n) => studyHlKey(bookId + '-' + chapter.num, n)}
           readAlongOn={readAlongOn}

@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { AudioPlayButton } from '../components/AudioPlayButton.jsx';
+import { HeroListen } from '../components/AudioPlayButton.jsx';
 import { readingChipWpm, readingMinChip } from '../components/ReadingMinChip.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 
@@ -93,9 +93,7 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
               a book the edition's manifest doesn't carry self-hides the same
               way a letter without a recording does. */}
           {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
-            <div className="hero-play-row">
-              <AudioPlayButton onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label })} />
-            </div>
+            <HeroListen onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label })} canPlay={() => AudioPlayer.playableNow(bibleAudio.volKey, book.id)} />
           )}
           <div className="vol-index-ornament">
             <div className="vol-index-ornament-line" />

@@ -18,7 +18,8 @@ import { songIdOfKey } from '../../utils/audio-track.js';
 import { PlayIcon, PauseIcon } from './AudioShelf.jsx';
 import { SheetHandle } from './SheetHandle.jsx';
 import { SongKeep } from '../../utils/song-keep.js';
-import { KeepIcon } from './SongKeepParts.jsx';
+import { NetStatus, isNetworkError } from '../../utils/net-status.js';
+import { KeepIcon, useSongsOnline } from './SongKeepParts.jsx';
 
 /**
  * A length in seconds as the pictures print it: 4:12 (1:02:05 past an hour).
@@ -125,13 +126,14 @@ export function SongCover({ song, large = false, className = '' }) {
 /**
  * The round ▶ at the right of a song row: 44 px, outlined, FILLED gold while
  * its song plays (then it pauses).
- * @param {{ playing: boolean, label: string, onClick: () => void, className?: string }} props
+ * @param {{ playing: boolean, label: string, onClick: () => void, className?: string, disabled?: boolean }} props
  */
-export function SongPlayButton({ playing, label, onClick, className = '' }) {
+export function SongPlayButton({ playing, label, onClick, className = '', disabled = false }) {
   return (
     <button
       type="button"
       className={'song-play' + (playing ? ' is-playing' : '') + (className ? ' ' + className : '')}
+      disabled={disabled}
       onClick={(event) => { event.stopPropagation(); onClick(); }}
       aria-label={(playing ? 'Pause ' : 'Play ') + label}
       aria-pressed={playing}
@@ -148,7 +150,8 @@ export function SongPlayButton({ playing, label, onClick, className = '' }) {
  * convenience, out of the tab order like the bar's pull-tab). A family with more than one version carries a
  * tappable "N versions ›" in its second line (44 px tall) that opens its song page. `children` sit before the ▶
  * (the Kept list's Remove). A row whose song is kept on this phone leads its second line with a quiet ⤓ "On this
- * phone" (W2-02): offline, those are the rows that play.
+ * phone" (W2-02): offline, those are the rows that play, and every other row is disabled (Corbin 2026-10-05: "Disable
+ * certain features when offline"; NetStatus via useSongsOnline). The row now playing can always pause.
  * @param {{ key?: any, song: any, title: string, line?: string, versions?: number, onVersions?: () => void, len?: string,
  *   current?: boolean, playing?: boolean, onPlay: () => void, children?: any }} props
  */
@@ -156,9 +159,10 @@ export function SongListRow({ song, title, line = '', versions = 0, onVersions, 
   // Each row hears the keep store itself: the letter card and the hub draw rows without subscribing to it.
   React.useSyncExternalStore(SongKeep.subscribe, SongKeep.getVersion);
   const kept = !!(song && song.id) && SongKeep.isKept(song.id);
+  const off = !useSongsOnline() && !kept && !current;
   return (
-    <div className={'songs-row song-tap-row' + (current ? ' is-current' : '')}>
-      <button type="button" className="songs-row-hit" tabIndex={-1} aria-hidden="true" onClick={onPlay} />
+    <div className={'songs-row song-tap-row' + (current ? ' is-current' : '') + (off ? ' is-unavailable' : '')}>
+      <button type="button" className="songs-row-hit" tabIndex={-1} aria-hidden="true" onClick={onPlay} disabled={off} />
       <SongCover song={song} />
       <span className="songs-row-copy">
         <strong>{title}</strong>
@@ -176,7 +180,7 @@ export function SongListRow({ song, title, line = '', versions = 0, onVersions, 
       </span>
       {len ? <span className="songs-row-len">{len}</span> : null}
       {children}
-      <SongPlayButton playing={playing} label={title} onClick={onPlay} />
+      <SongPlayButton playing={playing} label={title} onClick={onPlay} disabled={off} />
     </div>
   );
 }
@@ -270,6 +274,7 @@ export function loadSongLyrics(song) {
     const timer = ctl ? setTimeout(() => ctl.abort(), LYRICS_TIMEOUT_MS) : null;
     try {
       const res = await fetch(SONGS_HOST.origin + '/songs/lyrics/' + id + '.json', { credentials: 'omit', signal: ctl ? ctl.signal : undefined });
+      NetStatus.reportOk();
       if (!res.ok) throw new Error('lyrics ' + res.status);
       const raw = await res.json();
       const lines = (Array.isArray(raw && raw.lines) ? raw.lines : [])
@@ -279,6 +284,7 @@ export function loadSongLyrics(song) {
       // A line is highlighted by its time ONLY when the dual-leg gate passed (lyr 2 = synced true).
       return { synced: raw.synced === true && song.lyr === 2, lines };
     } catch (_e) {
+      if (isNetworkError(_e)) NetStatus.reportFailure();
       _lyrics.delete(id);
       return null;
     } finally { if (timer) clearTimeout(timer); }

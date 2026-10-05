@@ -78,7 +78,7 @@ describe('Library "open the text" on a study recording', () => {
     expect(p.navigateToLink).toHaveBeenCalledTimes(1);
     expect(p.navigateToLink).toHaveBeenCalledWith(
       { type: 'study-letter', studyId: 'purity', studyChapterId: 'purity-ch1' },
-      { sourceLetterTitle: 'Listening Library' },
+      { sourceLetterTitle: 'Listening Library', silent: true },
     );
     // Same tracking as selectStudyChapter (an index open) and the History arm:
     // a Library open must not be distinguishable to the reading dot.
@@ -101,7 +101,7 @@ describe('Library "open the text" on a study recording', () => {
     window.__openAudioText({ key: 'bible-brm-kjv:john', partLabel: 'Chapter 3' });
     expect(p.navigateToLink).toHaveBeenCalledWith(
       { type: 'bible', bookId: 'john', chapter: 3 },
-      { sourceLetterTitle: 'Listening Library' },
+      { sourceLetterTitle: 'Listening Library', silent: true },
     );
   });
 });
@@ -144,12 +144,13 @@ describe('the Studies screen: Read study', () => {
     } finally { delete globalThis.AudioStudiesScreen; }
   };
 
-  it('a multi-chapter study opens its index, the back pill naming Studies', () => {
+  it('a multi-chapter study opens its index; Back returns to Studies with no pill (silent, 2026-10-05)', () => {
     const p = makeRoutes({ getStudyById: vi.fn((id) => (id === 'grace-and-law' ? study('grace-and-law', 7) : null)) });
     readStudyOf(p)('grace-and-law');
     expect(p.pushFromLetter).toHaveBeenCalledWith({
       sourceScreen: 'audio-library-studies', sourceLetterTitle: 'Studies',
       destSnapshot: { screen: 'bible-study-index', studyId: 'grace-and-law' },
+      silent: true,
     });
     expect(p.selectStudy).toHaveBeenCalledWith('grace-and-law');
   });

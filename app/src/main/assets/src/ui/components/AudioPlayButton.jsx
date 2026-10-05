@@ -12,7 +12,13 @@
                  reader attribution)
      'playall' — collection index header pill ("Play All")
      'chip'    — the small per-section chips under a WTLB index
+
+   HeroListen wraps the 'listen' pill in its hero row for the Bible screens:
+   offline (Corbin 2026-10-05) a chapter whose recording is not on the phone
+   gets a disabled pill and one calm line why (NetStatus via useSongsOnline).
    ═══════════════════════════════════════════════════════════════════════ */
+
+import { useSongsOnline } from './SongKeepParts.jsx';
 
 /**
  * @param {object} props
@@ -20,11 +26,12 @@
  * @param {string} [props.label] chip text; on the pills, an aria-label override
  * @param {() => void} [props.onClick]
  * @param {string} [props.className]
+ * @param {boolean} [props.disabled] offline and nothing to play (HeroListen)
  * @param {string|number} [props.key] list key — declared because this repo's
  *   `React` is a global `any`, so JSX adds no React.Attributes of its own and
  *   an undeclared `key=` fails `npm run typecheck`.
  */
-export function AudioPlayButton({ variant = 'listen', label, onClick, className }) {
+export function AudioPlayButton({ variant = 'listen', label, onClick, className, disabled = false }) {
   const chip = variant === 'chip';
   const playAll = variant === 'playall';
   const text = chip ? (label || 'Play') : playAll ? 'Play All' : 'Listen';
@@ -34,6 +41,7 @@ export function AudioPlayButton({ variant = 'listen', label, onClick, className 
       type="button"
       className={(chip ? 'audio-sec-chip' : 'hero-play-pill') + (className ? ' ' + className : '')}
       onClick={onClick}
+      disabled={disabled}
       // A chip's visible text is the section name, so the accessible name says
       // what the tap DOES ("Play Part 3 · 40–59") while still containing the
       // visible label (WCAG 2.5.3). The pills already read as verbs.
@@ -51,6 +59,26 @@ export function AudioPlayButton({ variant = 'listen', label, onClick, className 
       )}
       <span>{text}</span>
     </button>
+  );
+}
+
+/**
+ * The hero row's ▶ Listen for a Bible chapter or book. `canPlay` is asked on every render (and every NetStatus
+ * change): false disables the pill and says why in one line.
+ * @param {object} props
+ * @param {() => void} props.onClick
+ * @param {() => boolean} props.canPlay
+ */
+export function HeroListen({ onClick, canPlay }) {
+  useSongsOnline();
+  const off = !canPlay();
+  return (
+    <>
+      <div className="hero-play-row">
+        <AudioPlayButton onClick={onClick} disabled={off} />
+      </div>
+      {off ? <p className="hero-offline-line" role="status">You’re offline. This recording isn’t on this phone.</p> : null}
+    </>
   );
 }
 

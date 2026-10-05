@@ -19,6 +19,7 @@
 
 import { SongPage } from './SongPage.jsx';
 import { ReadWithMusic, readingLetters } from './ReadWithMusic.jsx';
+import { OfflineNote } from '../components/OfflineAudioControls.jsx';
 
 /** The first chips after All, in the pictures' order; the rest go under More. */
 const PRIMARY_STYLES = ['worship', 'pop', 'hip-hop', 'cinematic', 'folk'];
@@ -352,6 +353,7 @@ export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBack
             <p className="songs-intro">Songs made by members of the flock with Suno, from the words of The Volumes of Truth.</p>
           </header>
         ) : null}
+        <OfflineNote text="You’re offline. Songs kept on this phone still play." />
         {body}
       </div>
     </ScreenLayout>

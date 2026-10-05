@@ -41,7 +41,6 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   const wtlbMainRef = React.useRef(null);
   /* The entry's title: the voice's place before its first timed row (the
      read-along lead-in, 2026-09-22). */
-  const leadRef = React.useRef(null);
   // A LANDING (a search hit's matched words — use-search.js excerptAnchor):
   // find the paragraph whose text holds the excerpt's head in the search
   // index's own domain ({{refs}} removed, whitespace squashed — index-builder
@@ -456,7 +455,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
           <div className="hero-eyebrow">{volKey === 'answers'
             ? ['Answers', answersFiledUnder(entry)].filter(Boolean).join(' · ')
             : <>{partLabel} {" · "} {entry.num}</>}</div>
-          <h1 className="hero-title" ref={leadRef}>{entry.title}</h1>
+          <h1 className="hero-title">{entry.title}</h1>
           {volKey === 'answers' ? <AnswersContentsLine entry={entry} onJump={jumpToPara} /> : null}
           <div className="hero-ornament">
             <div className="hero-ornament-line" />
@@ -597,7 +596,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       {/* Opened from search: every place the words appear, marked, and the pill
           that steps between them. Live pane only, like the read-along. */}
       {!inert && <FindInUnit anchor={surpriseAnchor} unitId={entry.id} mainRef={wtlbMainRef} noun={partLabel === 'Answers' ? 'topic' : 'entry'} keyPrefix={wtlbHlPrefix(entry.id)} />}
-      {!inert && <ReadAlongHighlight volKey={volKey} letterId={entry.id} mainRef={wtlbMainRef} leadRef={leadRef} onListen={AudioPlayer.hasAudio(volKey, entry.id) ? () => AudioPlayer.playLetter({ volKey, letter: entry, collectionLabel: partLabel || null }) : null} hlKeyFn={wtlbHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} offsetMapFn={paraOffsetMap} seekTo={landedPara >= 0 ? wtlbHlKey(entry.id, landedPara) : null} seekOffset={landedOff} />}
+      {!inert && <ReadAlongHighlight volKey={volKey} letterId={entry.id} mainRef={wtlbMainRef} onListen={AudioPlayer.hasAudio(volKey, entry.id) ? () => AudioPlayer.playLetter({ volKey, letter: entry, collectionLabel: partLabel || null }) : null} hlKeyFn={wtlbHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} offsetMapFn={paraOffsetMap} seekTo={landedPara >= 0 ? wtlbHlKey(entry.id, landedPara) : null} seekOffset={landedOff} />}
 
       {/* position:fixed bottom sheet. Skipped in an inert peek (a clone is
           non-interactive and a duplicate sheet in <body> would be wrong); for the

@@ -361,13 +361,14 @@ describe('screen-routes — the Listening Library returns to its actual origin',
     expect(routes['my-progress']().props.onOpenMilestones).toBeUndefined();
   });
 
-  it('Listening Library Text opens with a one-shot return to the shelf', () => {
+  it('Listening Library Text opens with a silent one-shot return to the shelf (no pill, Back still returns)', () => {
     const { routes, props } = makeRoutes();
     routes['audio-library']().props.onOpenTrack({ key: 'one:wide-path' });
     expect(props.pushFromLetter).toHaveBeenCalledWith({
       sourceScreen: 'audio-library',
       sourceLetterTitle: 'Listening Library',
       destSnapshot: { screen: 'vot-one-letter', letterId: 'wide-path' },
+      silent: true,
     });
     expect(props.setScreen).toHaveBeenCalledWith('vot-one-letter');
   });
@@ -377,7 +378,7 @@ describe('screen-routes — the Listening Library returns to its actual origin',
     routes['audio-library']().props.onOpenTrack({ key: 'bible-brm-kjv:jeremiah', partLabel: 'Chapter 46' });
     expect(props.navigateToLink).toHaveBeenCalledWith(
       { type: 'bible', bookId: 'jeremiah', chapter: 46 },
-      { sourceLetterTitle: 'Listening Library' }
+      { sourceLetterTitle: 'Listening Library', silent: true }
     );
     // The letter machinery must not fire for a Bible destination.
     expect(props.pushFromLetter).not.toHaveBeenCalled();
@@ -389,7 +390,7 @@ describe('screen-routes — the Listening Library returns to its actual origin',
     routes['audio-library']().props.onOpenTrack({ key: 'bible-wop-nkjv:matthew', partLabel: null });
     expect(props.navigateToLink).toHaveBeenCalledWith(
       { type: 'bible', bookId: 'matthew', chapter: 1 },
-      { sourceLetterTitle: 'Listening Library' }
+      { sourceLetterTitle: 'Listening Library', silent: true }
     );
   });
 
@@ -445,6 +446,7 @@ describe('screen-routes — the Listening Library returns to its actual origin',
       sourceScreen: 'audio-library-saved',
       sourceLetterTitle: 'Listening Library',
       destSnapshot: { screen: 'vot-one-letter', letterId: 'wide-path' },
+      silent: true,
     });
 
     const collection = nextRoutes['audio-library-collection']();
@@ -453,6 +455,7 @@ describe('screen-routes — the Listening Library returns to its actual origin',
       sourceScreen: 'audio-library-collection',
       sourceLetterTitle: 'Listening Library',
       destSnapshot: { screen: 'vot-one-letter', letterId: 'wide-path' },
+      silent: true,
     });
   });
 });

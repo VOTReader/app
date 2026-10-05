@@ -262,3 +262,18 @@ describe('audio-player on the native player (m3)', () => {
     expect(bridge.setAudioActive).toHaveBeenCalledWith(true);
   });
 });
+
+/* Offline features (Corbin 2026-10-05): the hero Listen pills ask playableNow, the same rule the player refuses by. */
+describe('AudioPlayer.playableNow', () => {
+  it('online, every recorded letter can play', () => {
+    setOnline(true);
+    expect(AudioPlayer.playableNow('vol1', 'letter-a')).toBe(true);
+  });
+
+  it('offline, only a letter with a recording on the phone can play', async () => {
+    await downloaded(['idA2']);
+    setOnline(false);
+    expect(AudioPlayer.playableNow('vol1', 'letter-a')).toBe(true);
+    expect(AudioPlayer.playableNow('vol1', 'letter-c')).toBe(false);
+  });
+});

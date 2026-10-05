@@ -6,7 +6,8 @@ import { showToast, hideToast } from '../toast.js';
 import { OfflineAudio } from '../offline-audio.js';
 import { SongKeep } from '../song-keep.js';
 import { songIdOfKey } from '../audio-track.js';
-import { renditionsFor, _volKeyOf } from './catalog.js';
+import { bibleChapterOfTrack, renditionsFor, _volKeyOf } from './catalog.js';
+import { NetStatus } from '../net-status.js';
 import {
   _isSong,
   _native,
@@ -84,6 +85,25 @@ export function _downloadedReading(track) {
   const item = { id: key.slice(volKey.length + 1), title: (track && track.title) || '' };
   const all = renditionsFor(volKey, item, track ? track.sub : null);
   return all.find((r) => r.tracks.length > 0 && r.tracks.every((t) => !_unreachable(t))) || null;
+}
+
+/**
+ * Can a Listen for this unit make sound right now? Online, yes. Offline (NetStatus: navigator.onLine or a request
+ * that just failed), only when some recording of it is on the phone, the rule _offlineRefuses applies to the queue
+ * the Listen would build. A Bible chapter (`chapterNum`) asks only for that chapter's recording. The hero Listen
+ * pills disable on false (Corbin 2026-10-05: "Disable certain features when offline"). The player itself keeps
+ * navigator.onLine (_offline): a tap that does reach it is the next probe, and its 'playing' clears a failure.
+ * @param {string} volKey
+ * @param {string} id the letter, entry or Bible book
+ * @param {number} [chapterNum]
+ * @returns {boolean}
+ */
+export function playableNow(volKey, id, chapterNum) {
+  if (!NetStatus.isOffline()) return true;
+  return renditionsFor(volKey, { id }, null).some((r) => {
+    const tracks = chapterNum ? r.tracks.filter((t) => bibleChapterOfTrack(t) === chapterNum) : r.tracks;
+    return tracks.some((t) => typeof t.url === 'string' && (OfflineAudio.isSaved(t.url) || _songKept(t)));
+  });
 }
 
 /** The toast a song not kept on this phone raises offline (W2-02); its own id, so its class and button stay its own. */

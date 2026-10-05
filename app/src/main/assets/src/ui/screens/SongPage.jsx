@@ -14,6 +14,8 @@
    GLOBALS from bundle-d, like the rest of the Listening Library.
 */
 
+import { useOnline } from '../components/OfflineAudioControls.jsx';
+
 /** Version rows before "Show all N versions". */
 const VERSIONS_SHOWN = 4;
 /** Lyric lines in the preview before "Show all lyrics". */
@@ -43,6 +45,7 @@ function makersLine(versions) {
  * @param {{ familyId: string, library: any, playingId: string, active: boolean, onPush: (f: any) => void, FamilyRow: any }} props
  */
 export function SongPage({ familyId, library, playingId, active, onPush, FamilyRow }) {
+  const online = useOnline();
   const cat = SongCatalog;
   const fam = cat.familyById(familyId);
   const versions = fam ? cat.versionsOf(fam) : [];
@@ -120,13 +123,15 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
           <div className="song-versions">
             {shownVersions.map((s) => {
               const now = playingId === s.id;
+              // Offline, a version not kept on this phone cannot play (2026-10-05); the one playing can always pause.
+              const off = !online && !now && !(typeof SongKeep !== 'undefined' && SongKeep.isKept(s.id));
               return (
-                <div key={s.id} className={'song-version' + (now ? ' is-current' : '')}>
-                  <button type="button" className="song-version-main" onClick={() => play(s)}>
+                <div key={s.id} className={'song-version' + (now ? ' is-current' : '') + (off ? ' is-unavailable' : '')}>
+                  <button type="button" className="song-version-main" onClick={() => play(s)} disabled={off}>
                     <span className="song-version-label">{s.v || 'Version'}</span>
                     <span className="songs-row-len">{songClock(s.d)}</span>
                   </button>
-                  <SongPlayButton playing={now && active} label={fam.t + ', ' + (s.v || 'version')} onClick={() => play(s)} />
+                  <SongPlayButton playing={now && active} label={fam.t + ', ' + (s.v || 'version')} onClick={() => play(s)} disabled={off} />
                 </div>
               );
             })}

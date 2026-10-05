@@ -84,10 +84,18 @@ describe('W-03: the back pill over a letter opened from songs', () => {
     expect(entry.sourceLetterTitle).toBe('Be Born Again');
   });
 
-  it('the Listening Library still says Listening Library', () => {
+  it('the Listening Library raises no pill (Corbin 2026-10-05: "not a true screen"), but Back still returns there', () => {
     const p = makeRoutes({ screen: 'audio-library' });
     window.__openAudioText({ key: 'two:the-letter', title: 'x' });
-    expect(p.pushFromLetter.mock.calls[0][0].sourceLetterTitle).toBe('Listening Library');
+    const entry = p.pushFromLetter.mock.calls[0][0];
+    expect(entry.silent).toBe(true);
+    expect(entry.sourceScreen).toBe('audio-library');
+  });
+
+  it('the Songs screen and other pages keep their pill (no silent flag)', () => {
+    const p = makeRoutes({ screen: SONGS_SCREEN, audioColKey: encodeSongsRoute([{ k: 'hub' }]) });
+    window.__openAudioText({ key: 'wtlb1:come-love-awaits-you', title: 'x' });
+    expect(p.pushFromLetter.mock.calls[0][0].silent).toBeUndefined();
   });
 });
 

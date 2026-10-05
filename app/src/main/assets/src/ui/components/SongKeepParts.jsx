@@ -25,6 +25,7 @@
 
 import { SongKeep, formatSongBytes, IOS_TAB_TEXT } from '../../utils/song-keep.js';
 import { SongCatalog } from '../../utils/song-catalog.js';
+import { NetStatus } from '../../utils/net-status.js';
 
 /** Re-render on every keep change and every catalog change. @returns {typeof SongKeep} */
 export function useSongKeep() {
@@ -33,17 +34,15 @@ export function useSongKeep() {
   return SongKeep;
 }
 
-/** @returns {boolean} false while the phone has no signal; re-renders when it changes */
+/**
+ * false while network-only features are off: the phone has no signal, or a request just failed at the network
+ * (NetStatus, Corbin 2026-10-05). Re-renders when it changes. The app's one online hook: bundle-d's parts import it,
+ * the lazy screens read it as the useSongsOnline global.
+ * @returns {boolean}
+ */
 export function useSongsOnline() {
-  const [online, setOnline] = React.useState(() => typeof navigator === 'undefined' || navigator.onLine !== false);
-  React.useEffect(() => {
-    const read = () => setOnline(typeof navigator === 'undefined' || navigator.onLine !== false);
-    window.addEventListener('online', read);
-    window.addEventListener('offline', read);
-    read();
-    return () => { window.removeEventListener('online', read); window.removeEventListener('offline', read); };
-  }, []);
-  return online;
+  React.useSyncExternalStore(NetStatus.subscribe, NetStatus.getVersion);
+  return !NetStatus.isOffline();
 }
 
 export function KeepIcon() {

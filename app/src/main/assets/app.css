@@ -1842,6 +1842,15 @@
       .hero-play-pill::after { content: ''; position: absolute; left: 0; right: 0; top: calc(50% - 22px); bottom: calc(50% - 22px); }
       @media (hover: hover) { .hero-play-pill:hover { border-color: var(--gold); transform: translateY(-1px); } }
       .hero-play-pill:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+      /* Offline (2026-10-05): a feature that needs the network is visibly off, with one calm line why
+         (LetterListenRow, HeroListen, OfflineNote, the song and reading rows). Only opacity: the colours stay the
+         theme's, so contrast is unchanged in both themes. */
+      .hero-play-pill:disabled { opacity: .45; cursor: default; transform: none; border-color: var(--gold-border); }
+      .hero-offline-line, .offline-note { margin: .6rem auto 0; max-width: 34rem; color: var(--cream-dim); font-size: var(--fs-14); font-style: italic; line-height: 1.45; text-align: center; }
+      .offline-note { margin: 0 auto 1rem; padding: 0 1rem; }
+      .songs-row.is-unavailable .song-play, .songs-row.is-unavailable .songs-row-copy strong,
+      .song-version.is-unavailable > button, .reading-row.is-unavailable > button { opacity: .45; }
+      .songs-row.is-unavailable .songs-row-hit, .song-version.is-unavailable > button, .reading-row.is-unavailable > button { cursor: default; }
       .audio-sec-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
       .audio-sec-chip {
         display: inline-flex; align-items: center; gap: 0.4em;

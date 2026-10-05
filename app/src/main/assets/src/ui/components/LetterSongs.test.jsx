@@ -4,16 +4,17 @@
    the pill plays in 1 tap; letters without songs show no pill. Plus W3-08:
    both pills show a playing state. */
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 
 const { player, setPlayerState, audio } = vi.hoisted(() => {
   let playerState;
-  const audio = { has: true };
+  const audio = { has: true, playable: true };
   const player = {
     subscribe: () => () => {},
     getVersion: () => 0,
     getState: () => playerState,
     hasAudio: vi.fn(() => audio.has),
+    playableNow: vi.fn(() => audio.playable),
     toggle: vi.fn(),
     playLetter: vi.fn(),
     playSongs: vi.fn(() => true),
@@ -25,6 +26,8 @@ vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
 import { LetterListenRow, LetterSongsCard } from './LetterSongs.jsx';
 import { adoptSongCatalog, _resetSongCatalogForTests } from '../../utils/song-catalog.js';
 import { SONG_FIXTURE, VERBATIM_FIXTURE } from '../../utils/song-catalog.fixture.js';
+import { NetStatus } from '../../utils/net-status.js';
+import { SongKeep } from '../../utils/song-keep.js';
 
 const WTLB = { id: 'come-love-awaits-you', title: 'Come, Love Awaits You' };
 const ONE = { id: 'the-letter', title: 'The Letter' };
@@ -37,6 +40,7 @@ beforeEach(() => {
   _resetSongCatalogForTests();
   adoptSongCatalog(SONG_FIXTURE);
   audio.has = true;
+  audio.playable = true;
   setPlayerState({ queue: [], qi: 0, status: 'idle', time: 0, duration: 0 });
   for (const f of ['hasAudio', 'toggle', 'playLetter', 'playSongs']) player[f].mockClear();
   window.__openSongs = vi.fn();
@@ -44,6 +48,8 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  NetStatus._reset();
+  vi.restoreAllMocks();
   delete window.__openSongs;
   _resetSongCatalogForTests();
 });
@@ -207,5 +213,64 @@ describe('the verbatim gate', () => {
     render(<LetterSongsCard volKey="wtlb1" letterId={WTLB.id} letterTitle={WTLB.title} />);
     expect(Array.from(document.querySelectorAll('.letter-songs-card .songs-row strong')).map((n) => n.textContent)).not.toContain('Extra i1');
     expect(screen.getByRole('button', { name: /All 4 songs of this letter/ })).toBeTruthy();
+  });
+});
+
+/* OFFLINE (Corbin 2026-10-05: "Disable certain features when offline, listen, ai songs, etc"): a pill that cannot
+   make sound with no network is disabled, one calm line says why, and what is on the phone stays live. */
+describe('the hero row offline', () => {
+  it('online, nothing is disabled and no line shows', () => {
+    render(<LetterListenRow volKey="wtlb1" letter={WTLB} collectionLabel="Part One" />);
+    expect(screen.getByRole('button', { name: 'Listen' }).disabled).toBe(false);
+    expect(screen.getByRole('button', { name: 'Hear it sung' }).disabled).toBe(false);
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('offline with nothing on the phone: both pills disabled, one line says why', () => {
+    audio.playable = false;
+    NetStatus.reportFailure();
+    render(<LetterListenRow volKey="wtlb1" letter={WTLB} collectionLabel="Part One" />);
+    expect(screen.getByRole('button', { name: 'Listen' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Hear it sung' }).disabled).toBe(true);
+    expect(screen.getByRole('status').textContent).toBe('You’re offline. This reading and its songs aren’t on this phone.');
+    fireEvent.click(screen.getByRole('button', { name: 'Listen' }));
+    expect(player.playLetter).not.toHaveBeenCalled();
+  });
+
+  it('offline with the reading downloaded: Listen stays live, only the songs go quiet', () => {
+    audio.playable = true;
+    NetStatus.reportFailure();
+    render(<LetterListenRow volKey="wtlb1" letter={WTLB} collectionLabel="Part One" />);
+    expect(screen.getByRole('button', { name: 'Listen' }).disabled).toBe(false);
+    expect(screen.getByRole('button', { name: 'Hear it sung' }).disabled).toBe(true);
+    expect(screen.getByRole('status').textContent).toBe('You’re offline. Songs of this letter aren’t kept on this phone.');
+  });
+
+  it('offline with a song kept: Hear it sung stays live', () => {
+    audio.playable = false;
+    vi.spyOn(SongKeep, 'isKept').mockImplementation((id) => id === 'aaaaaaaaaaa2');
+    NetStatus.reportFailure();
+    render(<LetterListenRow volKey="wtlb1" letter={WTLB} collectionLabel="Part One" />);
+    expect(screen.getByRole('button', { name: 'Hear it sung' }).disabled).toBe(false);
+    expect(screen.getByRole('status').textContent).toBe('You’re offline. This reading isn’t on this phone.');
+  });
+
+  it('the row comes back when the network does', () => {
+    audio.playable = false;
+    NetStatus.reportFailure();
+    render(<LetterListenRow volKey="wtlb1" letter={WTLB} collectionLabel="Part One" />);
+    expect(screen.getByRole('button', { name: 'Listen' }).disabled).toBe(true);
+    audio.playable = true;
+    act(() => { window.dispatchEvent(new Event('online')); });
+    expect(screen.getByRole('button', { name: 'Listen' }).disabled).toBe(false);
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('the reading already playing can always pause', () => {
+    audio.playable = false;
+    setPlayerState({ queue: [{ key: 'wtlb1:come-love-awaits-you' }], qi: 0, status: 'playing', time: 3, duration: 60 });
+    NetStatus.reportFailure();
+    render(<LetterListenRow volKey="wtlb1" letter={WTLB} collectionLabel="Part One" />);
+    expect(screen.getByRole('button', { name: 'Pause the reading' }).disabled).toBe(false);
   });
 });
