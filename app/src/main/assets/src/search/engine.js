@@ -456,6 +456,9 @@ function bestPassageFirst(out, idOf, units, stop, named, kjvHeld) {
 const ORIGINAL_REACH = 10;
 /** How far below an Answers topic a study or Holy Days text that holds the query as well is looked for. */
 const STUDY_REACH = 3;
+/** Named titles read for one the query names more nearly than the first's, and by how much more. */
+const TITLE_REACH = 5;
+const TITLE_NEARER = 0.2;
 /** Who reprints whom: a text yields only to an original of a LOWER tier (Words To Live By excerpts the letters). */
 const ORIGINAL_TIER = { verse: 0, letter: 0, wtlb: 1, blessed: 1, 'holy-day': 2, 'bible-study': 3, answers: 4 };
 const ORIGINAL_KINDS = new Set(['verse', 'letter', 'wtlb', 'blessed']);
@@ -1232,6 +1235,17 @@ async function search(query, options) {
     const tt = kjvEncode(d.title);
     return titleMatch(tt, typedTokens, STOP) > 1 || (keyword && typedContent.length > 0 && typedContent.every((w) => tt.indexOf(w) >= 0));
   };
+  // Two titles the query names: the one it names more nearly leads ("the high holy days" names The Holy Days, not Regarding The Holy Days of God).
+  if (out.length > 1 && out[0].doc.title && !keyword) {
+    const tm = (/** @type {any} */ d) => (d.title ? titleMatch(kjvEncode(d.title), typedTokens, STOP) : 1);
+    const t0 = tm(out[0].doc);
+    if (t0 > 1) {
+      let b = 0;
+      let bt = t0;
+      for (let r = 1; r < Math.min(out.length, TITLE_REACH); r++) { const t = tm(out[r].doc); if (t > bt + TITLE_NEARER) { b = r; bt = t; } }
+      if (b) out.unshift(out.splice(b, 1)[0]);
+    }
+  }
   // A first result holding the typed words in a row, or one word off, is a quote found: no re-ordering.
   const quoted = out.length && (nearOf[idOf.get(out[0]) || ''] || 0) >= NEAR_PHRASE_MIN;
   if (!keyword && !p.phrase && !quoted) bestPassageFirst(out, idOf, units, isStopTerm, named, kjvHeld);
