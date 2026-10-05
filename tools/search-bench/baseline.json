@@ -1,7 +1,7 @@
 {
- "pass": 411,
- "strict": 325,
- "top5": 465,
+ "pass": 412,
+ "strict": 326,
+ "top5": 466,
  "found": 498,
  "style": {
   "crossover": 36,
@@ -11,7 +11,7 @@
   "middle": 49,
   "misremembered": 69,
   "paraphrase": 34,
-  "rare": 43,
+  "rare": 44,
   "title": 30,
   "typos": 23,
   "unitgist": 8
@@ -20,7 +20,7 @@
   "answers": 48,
   "bible": 95,
   "cross": 8,
-  "letters": 163,
+  "letters": 164,
   "studies": 31,
   "words": 66
  }

@@ -34,6 +34,12 @@ describe('expandSnippetTerms (SRCH4)', () => {
     expect(expandSnippetTerms(null, ['x'], MAP, true)).toEqual([]);
   });
 
+  it('marks the run the engine found in a row (textQuery.run) with the real word', () => {
+    const stop = new Set(['for', 'you', 'to', 'me']);
+    expect(expandSnippetTerms({ kind: 'text', run: 'for you to embrace me' }, ['for', 'you', 'to', 'embrace', 'me'], MAP, false, stop))
+      .toEqual(['for you to embrace me', 'embrace']);
+  });
+
   it('returns just the literal terms when synonym search is off', () => {
     expect(expandSnippetTerms({ kind: 'text', phrase: '' }, ['shepherd'], MAP, false))
       .toEqual(['shepherd']);

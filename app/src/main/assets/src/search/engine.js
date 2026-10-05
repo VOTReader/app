@@ -459,6 +459,8 @@ const STUDY_REACH = 3;
 /** Named titles read for one the query names more nearly than the first's, and by how much more. */
 const TITLE_REACH = 5;
 const TITLE_NEARER = 0.2;
+/** Typed words, one of them a content word, that read as a quote when held in a row. */
+const SMALL_RUN_MIN = 4;
 /** Who reprints whom: a text yields only to an original of a LOWER tier (Words To Live By excerpts the letters). */
 const ORIGINAL_TIER = { verse: 0, letter: 0, wtlb: 1, blessed: 1, 'holy-day': 2, 'bible-study': 3, answers: 4 };
 const ORIGINAL_KINDS = new Set(['verse', 'letter', 'wtlb', 'blessed']);
@@ -1154,6 +1156,20 @@ async function search(query, options) {
       if (near >= 0.9 && !keyword && !REPRINT_KINDS.has(d.kind)) scoreMap[id] *= ORIGINAL_BOOST;
     }
   }
+  // One word that means anything among small ones ("for you to embrace me"): the texts holding the typed run exactly.
+  // The card marks the run, so its excerpt and the landing go to it, not the word's first place (textQuery.run).
+  let run = '';
+  if (!p.phrase && required === 1 && typedTokens.length >= SMALL_RUN_MIN) {
+    const cands = rankedIds.slice().sort((a, b) => scoreMap[b] - scoreMap[a]).slice(0, PHRASE_CANDIDATES);
+    for (const id of cands) {
+      const d = docLookup[id];
+      if (!d || !hasTokenRun(docTokens(id, d), typedTokens)) continue;
+      run = query.trim().replace(/\s+/g, ' ').toLowerCase();
+      nearOf[id] = 1;
+      scoreMap[id] *= PHRASE_BOOST;
+      if (!keyword && !REPRINT_KINDS.has(d.kind)) scoreMap[id] *= ORIGINAL_BOOST;
+    }
+  }
   // A quoted phrase: every text shown holds it (the filter below), so the original first.
   if (p.phrase) {
     for (let i = 0; i < rankedIds.length; i++) {
@@ -1280,7 +1296,7 @@ async function search(query, options) {
     const again = await search(String(query).replace(/["\u201C\u201D\u201E\u201F]/g, ' '), { ...options, _unquoted: true });
     if (again.results && again.results.length) return { ...again, unquoted: p.phrase };
   }
-  return { parsed, results: out, parsedTerms: filtered, textQuery: p, capped: Object.keys(capped), truncated: out.length >= limit && h < rankedIds.length, corrections };
+  return { parsed, results: out, parsedTerms: filtered, textQuery: run ? { ...p, run } : p, capped: Object.keys(capped), truncated: out.length >= limit && h < rankedIds.length, corrections };
 }
 
 /**

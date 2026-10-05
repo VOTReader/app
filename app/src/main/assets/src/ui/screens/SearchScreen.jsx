@@ -13,7 +13,7 @@ import { applyCorrections } from '../../search/query-parse.js';
  * unhighlighted. Phrases are exempt (the engine never synonym-expands a phrase).
  * Cross-translation spelling variants (KJV "armour" vs NKJV "armor") have no such
  * map and stay unhighlighted — rare + acceptable. Pure for testability.
- * @param {{kind?:string, phrase?:string}|null} parsed
+ * @param {{kind?:string, phrase?:string, run?:string}|null} parsed
  * @param {string[]} parsedTerms
  * @param {Record<string,string[]>|null|undefined} synMap
  * @param {boolean} synonymsOn
@@ -27,7 +27,8 @@ export function expandSnippetTerms(parsed, parsedTerms, synMap, synonymsOn, stop
   // "1 of 22" on a lone "is").
   const isStop = (/** @type {string} */ t) => { const toks = kjvEncode(t); return !!stop && toks.length > 0 && toks.every((w) => stop.has(w)); };
   const typed = (parsedTerms || []).some((t) => !isStop(t)) ? (parsedTerms || []).filter((t) => !isStop(t)) : (parsedTerms || []);
-  const base = [parsed.phrase].filter(Boolean).concat(typed);
+  // `run`: the engine found the typed words in a row, one real word among small ones ("for you to embrace me").
+  const base = [parsed.phrase, parsed.run].filter(Boolean).concat(typed);
   if (!synonymsOn || !synMap) return base;
   const out = new Set(base);
   for (const t of (parsedTerms || [])) {

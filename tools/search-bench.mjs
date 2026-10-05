@@ -143,7 +143,7 @@ function cardTerms(r) {
   const isStop = (t) => { const toks = kjvEncode(t); return !!stop && toks.length > 0 && toks.every((w) => stop.has(w)); };
   const pt = r.parsedTerms || [];
   const typed = pt.some((t) => !isStop(t)) ? pt.filter((t) => !isStop(t)) : pt;
-  const out = new Set([parsed.phrase].filter(Boolean).concat(typed));
+  const out = new Set([parsed.phrase, parsed.run].filter(Boolean).concat(typed));
   for (const t of pt) { const grp = g.VotSearchData.SYNONYM_MAP[String(t).toLowerCase()]; if (Array.isArray(grp)) grp.forEach((x) => out.add(x)); }
   return [...out];
 }
