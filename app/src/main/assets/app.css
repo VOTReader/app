@@ -1552,6 +1552,8 @@
       .now-playing-text { display: flex; flex-direction: column; gap: 6px; flex: 1 0 7.9rem; min-height: 7.9rem; margin-top: 18px; padding: 0; overflow: hidden; background: none; border: 0;
         color: inherit; font: inherit; font-size: clamp(1.3rem, 5.4vw, 1.55rem); line-height: 1.25; text-align: left; cursor: pointer;
         -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent); mask-image: linear-gradient(to bottom, #000 72%, transparent); }
+      /* flex-shrink 0: the pane is a column that overflows into its fade; a clamped clause (overflow hidden) would shrink to nothing. */
+      .now-playing-text-now, .now-playing-text-next { flex-shrink: 0; }
       .now-playing-text-now { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
       .now-playing-text-next { color: var(--cream-dim); }
       .now-playing-body:has(.now-playing-text) .now-playing-open { margin-top: 18px; }
