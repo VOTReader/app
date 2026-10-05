@@ -67,6 +67,15 @@ describe('typos the way readers make them', () => {
     expect((await VotSearchMini.search('recieve')).corrections).toEqual([{ from: 'recieve', to: 'receive' }]);
   });
 
+  /* A short word misspelt by ear is two edits from its word ("shepard": a missing h and a vowel),
+     beyond one slip, and found nothing (search lane, 2026-10-05). Same first letter and the same
+     consonants once vowels and h are dropped is the same word. */
+  it('a short word spelt by ear finds its word: "shepard" is shepherd', async () => {
+    const r = await VotSearchMini.search('the lord is my shepard');
+    expect(r.corrections).toEqual([{ from: 'shepard', to: 'shepherd' }]);
+    expect(r.results[0].doc.ref).toBe('Psalms 23:1');
+  });
+
   it('the slip readers make first wins over the word in the most texts: "erath" is earth', async () => {
     expect((await VotSearchMini.search('erath')).corrections).toEqual([{ from: 'erath', to: 'earth' }]);
   });

@@ -331,7 +331,8 @@ function searchCorrected(term, opts, keyword) {
   for (const w in docs) {
     if (w === word) continue;
     const rank = slipRank(word, w);
-    if (rank === 4 && budget < 2) continue;   // beyond one slip for a word of seven letters or fewer
+    // beyond one slip for a word of seven letters or fewer, unless it is the same word by ear
+    if (rank === 4 && budget < 2 && !(word[0] === w[0] && skeleton(word) === skeleton(w))) continue;
     if (best === null || rank < bestRank || (rank === bestRank && (docs[w] > docs[best] || (docs[w] === docs[best] && w < best)))) {
       best = w;
       bestRank = rank;
@@ -339,6 +340,11 @@ function searchCorrected(term, opts, keyword) {
   }
   if (best) return { res: searchUnit(best, opts, keyword), to: best };
   return (weakSplit && split()) || { res: [], to: null };
+}
+
+/** A word's consonants as heard: vowels and h dropped, doubles single ("shepard" and "shepherd": sprd). */
+function skeleton(/** @type {string} */ w) {
+  return w.replace(/[aeiouyh]/g, '').replace(/(.)\1+/g, '$1');
 }
 
 /** @type {any} */ let msIndex = null;
