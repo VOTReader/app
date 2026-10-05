@@ -70,8 +70,12 @@ const holders = (sentence) => {
   const out = [];
   proseNorm.forEach((t, i) => {
     if (t.includes(n)) { out.push(proseKeys[i]); return; }
-    if (grams.length < 4 || !probes.some((p) => t.includes(p))) return;
-    if (grams.filter((g) => t.includes(g)).length >= 0.8 * grams.length) out.push(proseKeys[i]);
+    if (grams.length < 4) return;
+    // ...in one place: the 3-grams around a probe's hit, not anywhere in a long letter ("and follow me" is in most).
+    for (const p of probes) for (let at = t.indexOf(p); at >= 0; at = t.indexOf(p, at + 1)) {
+      const win = t.slice(Math.max(0, at - n.length), at + p.length + n.length);
+      if (grams.filter((g) => win.includes(g)).length >= 0.8 * grams.length) { out.push(proseKeys[i]); return; }
+    }
   });
   return out;
 };
