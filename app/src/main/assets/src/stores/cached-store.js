@@ -1305,6 +1305,7 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-last-seen-build',          // utils/update-toast.js — the last build this profile saw
   'vot-diag-ring',                // utils/diagnostic-log.js — storage-health warnings kept across reloads
   'vot-health-skip',              // utils/data-safety.js — an import / Clear All's reload is not a data loss
+  'vot-last-export',              // utils/backup-flow.js LAST_EXPORT_KEY — Your Data's "Last backup" line
 ]);
 
 /** Meta-store key holding the W2.4 cleanup-complete flag. */

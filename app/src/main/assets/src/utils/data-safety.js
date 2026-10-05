@@ -138,7 +138,9 @@ export async function run(opts) {
         return 'damaged';
       }
     }
-    if (!(opts && opts.force) && newest && dayOf(newest.at || snapshotTime(newest.name)) === dayOf(now())) return 'fresh';
+    // An import, a restore of the reader's choosing or a reset (skip) changed the
+    // library on purpose: snapshot it now, not tomorrow.
+    if (!(opts && opts.force) && !skip && newest && dayOf(newest.at || snapshotTime(newest.name)) === dayOf(now())) return 'fresh';
     if (score(summary) === 0 && summary.history === 0) return 'empty';
     const json = JSON.stringify({
       app: 'VOTReader', exportVersion: 3, snapshot: true, exportDate: new Date(now()).toISOString(),
@@ -305,6 +307,18 @@ export async function restoreMissing(opts) {
   return true;
 }
 
+/**
+ * Your Data's "Automatic snapshots" line: where they live, how many, the newest's time.
+ * @param {{ sink?: any }} [opts]
+ * @returns {Promise<{ where: 'phone' | 'browser' | null, count: number, newestAt: number }>}
+ */
+export async function status(opts) {
+  const sink = (opts && opts.sink) || snapshotSink();
+  if (!sink) return { where: null, count: 0, newestAt: 0 };
+  const list = await sink.list();
+  return { where: sink.kind === 'android' ? 'phone' : 'browser', count: list.length, newestAt: list.length ? (list[0].at || snapshotTime(list[0].name)) : 0 };
+}
+
 /** Clear All My Data: the snapshots go with the data they copy. */
 export async function clearSnapshots() {
   _cleared = true;
@@ -315,4 +329,4 @@ export async function clearSnapshots() {
   return ok;
 }
 
-export const DataSafety = { run, restoreMissing, acceptCurrent, clearSnapshots, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY };
+export const DataSafety = { run, restoreMissing, acceptCurrent, clearSnapshots, status, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY };

@@ -82,6 +82,14 @@ export function _savedBackupToast(problems, nearLimit) {
  * @param {(message: string) => Promise<boolean>} ctx.confirmImport  shows the Import & Overwrite sheet and settles once, from any dismiss path
  * @param {any[]} ctx.diagnosticLog  the crash-log snapshot an export carries
  */
+/** localStorage key: when this device last finished an export (Your Data shows it; in LS_SKIP_LIST). */
+export const LAST_EXPORT_KEY = 'vot-last-export';
+
+/** datasafe 10-05: stamp a finished export, for the "Last backup" line in Your Data. */
+function _markExported() {
+  try { localStorage.setItem(LAST_EXPORT_KEY, String(Date.now())); } catch (_e) { /* no storage: the line says never */ }
+}
+
 export function createBackupFlow(ctx) {
   const {
     busyRef: backupBusyRef, reloadPendingRef: backupReloadPendingRef, reloadTimerRef: backupReloadTimerRef,
@@ -387,6 +395,7 @@ export function createBackupFlow(ctx) {
         await writeContainer(built.manifest, built.mediaEntries, sink.write);
         await sink.close();
         hideToast(_TOAST_ID);
+        _markExported();
         const saved = _savedBackupToast(built.problems, built.manifestBytes > MANIFEST_WARN_BYTES);
         if (saved.sticky) _showToast(saved.text, 0); else _showToast(saved.text);
         return true;
@@ -466,6 +475,7 @@ export function createBackupFlow(ctx) {
         mediaEntries: built.mediaEntries,
       });
       hideToast(_TOAST_ID);
+      _markExported();
       const saved = _savedBackupToast(built.problems, built.manifestBytes > MANIFEST_WARN_BYTES);
       if (saved.sticky) _showToast(saved.text, 0); else _showToast(saved.text);
       return true;

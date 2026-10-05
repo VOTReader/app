@@ -503,6 +503,27 @@ function AllProgressClearRow({ totalRead, totalItems, hasPartial, onClearAll }) 
   );
 }
 
+/** "today", "yesterday", or "N days ago" for a past time. @param {number} at */
+function _daysAgo(at) {
+  const day = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  const n = Math.round((day(Date.now()) - day(at)) / 86400000);
+  return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago';
+}
+
+/** datasafe 10-05: when this device last finished an export (backup-flow.js LAST_EXPORT_KEY). */
+function _lastBackupText() {
+  let at = 0;
+  try { at = Number(localStorage.getItem('vot-last-export')) || 0; } catch (_e) { /* no storage */ }
+  return at ? 'Exported ' + _daysAgo(at) : 'Not exported from this device yet';
+}
+
+/** @param {{ where: string | null, count: number, newestAt: number }} st */
+function _snapshotText(st) {
+  if (!st.count) return 'The first is taken shortly after the app opens';
+  const where = st.where === 'phone' ? 'kept on this phone' : 'kept in this browser (cleared with its site data)';
+  return 'Newest ' + _daysAgo(st.newestAt) + ' · ' + st.count + ' ' + where;
+}
+
 function _platformLabel(platform) {
   switch (platform) {
     case 'android-webview': return 'Android (App)';
@@ -612,6 +633,15 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   // not itself inside the hash it is derived from); `server` is a read-only probe
   // of the deployed service-worker.js that installs nothing.
   const [buildInfo, setBuildInfo] = React.useState({ state: 'loading', running: null, server: null });
+  // datasafe 10-05: the automatic snapshots' line in Your Data (DataSafety lives in bundle-b).
+  const [safety, setSafety] = React.useState(/** @type {{ where: string | null, count: number, newestAt: number } | null} */ (null));
+  React.useEffect(() => {
+    let alive = true;
+    if (typeof DataSafety !== 'undefined' && typeof DataSafety.status === 'function') {
+      DataSafety.status().then((st) => { if (alive) setSafety(st); }, () => {});
+    }
+    return () => { alive = false; };
+  }, []);
   const refreshBuildInfo = React.useCallback(async () => {
     setBuildInfo((b) => ({ ...b, state: 'loading' }));
     // typeof guards: these three live in bundle-b and reach this screen (bundle-e)
@@ -1369,6 +1399,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             <DataInfoRow label="Your data" value={userDataDisplayText} />
             {dataSamples.length > 0 && (
               <DataInfoRow label="Growth" value={<StorageTrendValue samples={dataSamples} />} />
+            )}
+            {/* datasafe 10-05: passive, no nag - when this device last exported, and the automatic snapshots. */}
+            <DataInfoRow label="Last backup" value={_lastBackupText()} />
+            {safety && safety.where && (
+              <DataInfoRow label="Automatic snapshots" value={_snapshotText(safety)} />
             )}
             <DataInfoRow label="Protection" value={protectionDisplayText}>
               {showProtectButton && (

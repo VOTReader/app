@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import 'fake-indexeddb/auto';
-import { screen, cleanup, fireEvent, within, act } from '@testing-library/react';
+import { screen, cleanup, fireEvent, within, act, waitFor } from '@testing-library/react';
 import {
   setupSettingsGlobals, teardownSettingsGlobals, renderSettings, rowLabels, row,
   groupHeads, groupHead, groupRowLabels, fakeAudioLibrary,
@@ -1408,5 +1408,25 @@ describe('export escape — the save picker that never settles', () => {
     captured.settle(null);                       // AbortError → cancelled
     await vi.waitFor(() => expect(el.classList.contains('show')).toBe(false));
     expect(captured.escapeTaken).toBe(false);    // it came down, it was not pressed
+  });
+});
+
+describe('Your Data: the last backup and the automatic snapshots (datasafe 10-05)', () => {
+  afterEach(() => { delete /** @type {any} */ (globalThis).DataSafety; localStorage.removeItem('vot-last-export'); });
+
+  it('says when this device last exported, or that it has not', () => {
+    localStorage.removeItem('vot-last-export');      // an earlier case's export stamped it
+    renderSettings();
+    expect(document.body.textContent).toContain('Not exported from this device yet');
+    cleanup();
+    localStorage.setItem('vot-last-export', String(Date.now()));
+    renderSettings();
+    expect(document.body.textContent).toContain('Exported today');
+  });
+
+  it('shows the newest automatic snapshot and where it is kept', async () => {
+    /** @type {any} */ (globalThis).DataSafety = { status: async () => ({ where: 'phone', count: 3, newestAt: Date.now() }) };
+    renderSettings();
+    await waitFor(() => expect(document.body.textContent).toContain('Newest today · 3 kept on this phone'));
   });
 });
