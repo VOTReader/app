@@ -703,7 +703,13 @@ if [ -n "$src_changed" ]; then
   # ln1 (2026-10-05): the hook runs `npm run test:hook` (tools/test-hook.sh): the same suite in vitest's vmThreads pool
   # with no coverage, ~4x faster; CI's test:coverage keeps the floors and gates the deploy. See that script.
   echo "[pre-commit] Source files staged — running vitest (fast mode; CI enforces the coverage floors)..."
-  heavy_run vitest npm run test:hook
+  # core.hooksPath is ABSOLUTE (the primary checkout's copy runs for every worktree), so a worktree branched before
+  # test:hook existed runs this hook too: it keeps its own tree's command.
+  if grep -q '"test:hook"' package.json; then
+    heavy_run vitest npm run test:hook
+  else
+    heavy_run vitest npm run test:coverage
+  fi
   status=$?
   if [ $status -ne 0 ]; then
     echo ""

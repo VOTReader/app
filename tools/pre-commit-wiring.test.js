@@ -187,6 +187,8 @@ describe('pre-commit: one heavy gate run machine-wide (Step 0a, crash brief 2026
   it('vitest and gradle run through heavy_run, and nothing else takes the lock', () => {
     const hook = readFileSync(resolve(root, '.githooks/pre-commit'), 'utf8');
     expect(hook).toMatch(/^\s*heavy_run vitest npm run test:hook$/m);
+    // a worktree branched before test:hook existed runs this (absolute hooksPath) hook with its own older package.json
+    expect(hook).toMatch(/if grep -q '"test:hook"' package\.json; then\n\s*heavy_run vitest npm run test:hook\n\s*else\n\s*heavy_run vitest npm run test:coverage\n/);
     expect(hook).toMatch(/^\s*heavy_run vitest-tools npx vitest run tools\/$/m);
     expect(hook).toMatch(/^\s*heavy_run gradle \$GRADLE_CMD :app:testDebugUnitTest/m);
     const takes = hook.split('\n').filter((l) => /gate_take/.test(l) && !l.trim().startsWith('#'));
