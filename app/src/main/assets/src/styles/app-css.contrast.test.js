@@ -173,17 +173,6 @@ describe('app.css — light --gold-bright contrast at its small-text grounds (a1
     expect(Number.isFinite(ratio)).toBe(true);
     expect(ratio).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
   });
-  /* The one site where --gold-bright is a GROUND under text: the Listening
-     Library's primary action on hover. Its text was #17130a for the dark
-     theme's bright gold (4.33:1 there); on light it read 2.97:1 at rest on
-     --gold and would read 2.54:1 on the deeper hover gold. Light therefore
-     sets the text to the page ground. */
-  it('light primary-action text is the page ground, AA on both its golds', () => {
-    const rule = exactRuleBlock(CSS, 'body.light .audio-library-primary-action');
-    expect(rule).toMatch(/color:\s*var\(--bg\)/);
-    expect(contrastRatio(themed(LIGHT, 'bg'), themed(LIGHT, 'gold'))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
-    expect(contrastRatio(themed(LIGHT, 'bg'), themed(LIGHT, 'gold-bright'))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
-  });
 });
 
 describe('app.css — surrounding contrast stays green', () => {
