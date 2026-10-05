@@ -392,3 +392,33 @@ describe('StorageHealthBanner — shares the strip with the offline library (B5)
     expect(container.querySelector('.sh-banner')).not.toBeNull();
   });
 });
+
+/* ─── Banner: data-missing (datasafe 10-05) ─────────────────────── */
+
+describe('StorageHealthBanner — data-missing (automatic snapshot)', () => {
+  const finding = {
+    name: 'snap-20261001-090000.json', at: new Date(2026, 9, 1, 9).getTime(),
+    then: { highlights: 55, notes: 6, links: 3, bookmarks: 0, journal: 0, notebooks: 1, readMarks: 627, history: 1755 },
+    now: { highlights: 0, notes: 0, links: 0, bookmarks: 0, journal: 0, notebooks: 0, readMarks: 96, history: 172 },
+  };
+
+  it('says what was there, what is there now, and offers a merge Restore', () => {
+    const restoreMissing = vi.fn();
+    /** @type {any} */ (globalThis).DataSafety = { restoreMissing };
+    const { container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY, dataMissing: finding, storesDegraded: true });
+    const banner = container.querySelector('.sh-banner');
+    expect(banner.className).toContain('sh-banner-danger');
+    expect(banner.textContent).toContain('55 highlights, 6 notes, 3 links, 627 read marks');
+    expect(banner.textContent).toContain('now 96 read marks');
+    expect(banner.textContent).toContain('keeps everything you have made since');
+    /** @type {HTMLElement} */ (container.querySelector('.sh-banner-btn-primary')).click();
+    expect(restoreMissing).toHaveBeenCalled();
+    delete /** @type {any} */ (globalThis).DataSafety;
+  });
+
+  it('can be dismissed for the session', () => {
+    StorageHealth.dismissScenario('data-missing');
+    const { container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY, dataMissing: finding });
+    expect(container.querySelector('.sh-banner')).toBeNull();
+  });
+});

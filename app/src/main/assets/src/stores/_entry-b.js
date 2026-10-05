@@ -77,6 +77,7 @@ import { jrnId, JournalStore, JournalNotebookStore } from './journal-store.js';
 import { ExpandableText, JrnExpandable } from '../components/ExpandableText.jsx';
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 import { HydrationGate } from '../components/HydrationGate.jsx';
+import { DataSafety } from '../utils/data-safety.js';
 
 // ── Platform bridge (W1.1) ──────────────────────────────────────────────
 // Single source of truth for platform-conditional behavior. Lives in
@@ -194,6 +195,8 @@ Object.assign(window, {
   CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_SKIP_LIST,
   // v04-02: Clear All (bundle-d) fences every store write until it reloads.
   setStoreWriteFence,
+  // datasafe 10-05: the banner's Restore, Clear All and Import (bundle-d) reach it here.
+  DataSafety,
   showToast, hideToast,
   getBuildVersion, fetchServerBuildVersion, formatBuildVersion,
   navHandoff,

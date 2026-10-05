@@ -45,6 +45,24 @@ class AppInterfaceTest {
         return Triple(app, host, bridge)
     }
 
+    // ─── Rolling snapshots (datasafe 10-05): thin delegations to SnapshotStore ─
+
+    @Test
+    fun `snapshot methods delegate to the view model's SnapshotStore`() {
+        val snaps = mockk<SnapshotStore>()
+        every { snaps.save("{}", any()) } returns true
+        every { snaps.listJson() } returns "[]"
+        every { snaps.read("snap-20261005-030000.json") } returns "{}"
+        every { snaps.clear() } returns true
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.snapshots } returns snaps
+        val (app, _, _) = newSubject(vm = vm)
+        assertEquals(true, app.snapshotSave("{}"))
+        assertEquals("[]", app.snapshotList())
+        assertEquals("{}", app.snapshotRead("snap-20261005-030000.json"))
+        assertEquals(true, app.snapshotClear())
+    }
+
     // ─── The native player (m3): thin delegations to the port ───────────
 
     private class FakePort : NativeAudioPort {

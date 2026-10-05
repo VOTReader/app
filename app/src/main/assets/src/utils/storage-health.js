@@ -117,6 +117,7 @@ const RISK = Object.freeze({
  *   safariGateBlocked: boolean,
  *   storesDegraded: boolean,
  *   versionTooNew: boolean,
+ *   dataMissing: { name: string, at: number, then: any, now: any } | null,
  * }} StorageHealthReport
  */
 
@@ -136,6 +137,7 @@ const _DEFAULT_REPORT = Object.freeze({
   safariGateBlocked: false,
   storesDegraded: false,
   versionTooNew: false,
+  dataMissing: null,
 });
 
 /* ─── Module state ──────────────────────────────────────────────────── */
@@ -174,6 +176,10 @@ let _storesDegraded = false;
 // VersionError). This build can never open it, so the banner stops promising that
 // changes will be saved and says what to do instead. It never clears in a session.
 let _versionTooNew = false;
+/** datasafe 10-05: the library looks much smaller than its newest automatic snapshot
+ *  (utils/data-safety.js) - { name, at, then, now } - or null. */
+/** @type {{ name: string, at: number, then: any, now: any } | null} */
+let _dataMissing = null;
 /** @type {Promise<StorageHealthReport> | null} */
 let _assessInFlight = null;
 /** @type {(() => void) | null} */
@@ -438,6 +444,7 @@ async function _assessImpl() {
       safariGateBlocked: _safariGateBlocked,
       storesDegraded: _storesDegraded,
       versionTooNew: _versionTooNew,
+      dataMissing: _dataMissing,
     });
     _report = fallback;
     _lastAssessedAt = Date.now();
@@ -499,6 +506,7 @@ async function _assessImpl() {
     safariGateBlocked: _safariGateBlocked,
     storesDegraded: _storesDegraded,
     versionTooNew: _versionTooNew,
+      dataMissing: _dataMissing,
   };
 
   _report = report;
@@ -604,6 +612,7 @@ function _onWriteFailure(err) {
       safariGateBlocked: _safariGateBlocked,
       storesDegraded: _storesDegraded,
       versionTooNew: _versionTooNew,
+      dataMissing: _dataMissing,
     };
   }
   _bump();
@@ -760,6 +769,18 @@ function _setVersionTooNew(v) {
 }
 
 /**
+ * datasafe 10-05: set or clear the data-missing finding (utils/data-safety.js).
+ * The banner offers to merge the snapshot back.
+ *
+ * @param {{ name: string, at: number, then: any, now: any } | null} v
+ */
+function _setDataMissing(v) {
+  _dataMissing = v || null;
+  _report = Object.assign({}, _report || _DEFAULT_REPORT, { dataMissing: _dataMissing });
+  _bump();
+}
+
+/**
  * Start periodic health assessment. Called once after hydration
  * completes (from HydrationGate). Kicks off the initial assess(),
  * sets up a 5-minute refresh interval, and listens for visibility
@@ -852,6 +873,7 @@ export const StorageHealth = {
   isDismissed: _isDismissed,
   setStoresDegraded: _setStoresDegraded,
   setVersionTooNew: _setVersionTooNew,
+  setDataMissing: _setDataMissing,
   start: _start,
   stop: _stop,
   _resetForTests: _resetForTests,

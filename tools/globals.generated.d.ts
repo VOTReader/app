@@ -104,6 +104,7 @@ declare const ConfirmStrip: any;
 declare const CoverageBadge: any;
 declare const DEFAULT_HOME_ORDER: any;
 declare const DEFAULT_LIBRARY_ORDER: any;
+declare const DataSafety: any;
 declare const DiagnosticLog: any;
 declare const EXPAND_THRESHOLD: any;
 declare const ErrorBoundary: any;

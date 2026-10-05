@@ -621,6 +621,27 @@ class AppInterface(
         host.clearGardenCache()
     }
 
+    // ─── Automatic snapshots outside the WebView's storage (datasafe 2026-10-05) ─
+    // The page (utils/snapshot-sink.js) calls these directly, guarded, like
+    // setAudioActive; SnapshotStore holds the files and the keep-7-days-and-4-weeks
+    // rule. Binder thread: SnapshotStore is synchronized plain file I/O.
+
+    /** Keep one snapshot (the page's export manifest JSON). False when refused or failed. */
+    @JavascriptInterface
+    fun snapshotSave(json: String?): Boolean = vm.snapshots.save(json)
+
+    /** `[{name, size, at}]`, newest first. */
+    @JavascriptInterface
+    fun snapshotList(): String = vm.snapshots.listJson()
+
+    /** One snapshot's JSON by name, or "". */
+    @JavascriptInterface
+    fun snapshotRead(name: String?): String = vm.snapshots.read(name)
+
+    /** Delete every snapshot (Clear All My Data). */
+    @JavascriptInterface
+    fun snapshotClear(): Boolean = vm.snapshots.clear()
+
     // ─── Downloaded recordings (listening item 8) ───────────────────────
     // JSON in, JSON out. The page's JSON is untrusted; OfflineAudioStore parses it
     // (a bad shape is a quiet no-op). Runs on the binder thread: the store is

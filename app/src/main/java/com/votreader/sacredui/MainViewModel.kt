@@ -65,6 +65,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // counters internally between bridge calls.
     val storage: StorageManager = StorageManager(application)
 
+    // ---- Rolling snapshots of the reader's data in the app's private files
+    // dir, outside the WebView's storage (SnapshotStore, datasafe 2026-10-05).
+    val snapshots: SnapshotStore = SnapshotStore(java.io.File(application.filesDir, "snapshots"))
+
     // ---- v3 streaming backup: the SAF picker is async, so the chosen
     // destination (export) / source (import) URI is stashed here between
     // v3*Open() launching the picker and the binder-thread bridge methods that

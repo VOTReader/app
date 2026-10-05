@@ -101,6 +101,7 @@ export const projectGlobals = {
   CoverageBadge: "readonly",
   DEFAULT_HOME_ORDER: "readonly",
   DEFAULT_LIBRARY_ORDER: "readonly",
+  DataSafety: "readonly",
   DiagnosticLog: "readonly",
   EXPAND_THRESHOLD: "readonly",
   ErrorBoundary: "readonly",

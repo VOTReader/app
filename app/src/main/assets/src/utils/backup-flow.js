@@ -655,6 +655,10 @@ export function createBackupFlow(ctx) {
           localStorage.removeItem(RESTORE_INFLIGHT_KEY);
         }
       } catch (_e) { /* best-effort */ }
+      // datasafe 10-05: the next boot's library is this backup's, by the reader's
+      // choice - the data-health check must not call it a loss against an older
+      // automatic snapshot (utils/data-safety.js HEALTH_SKIP_KEY).
+      try { localStorage.setItem('vot-health-skip', '1'); } catch (_e) { /* no storage: at worst a restore offer */ }
       // A clean import reloads fast; problems get reading time first — a 600ms
       // reload used to wipe the warning toast before anyone could read it.
       _scheduleBackupReload(problems.length ? 5000 : 600);
@@ -1030,6 +1034,13 @@ export function createBackupFlow(ctx) {
       // touched IDB + localStorage). Best-effort + a no-op on web; never block the
       // data wipe on it.
       try { PlatformBridge.clearGardenCache(); } catch (_e) { /* best-effort native cache wipe */ }
+      // datasafe 10-05: the automatic snapshots copy the data being cleared; they
+      // go with it (the phone app keeps them outside the database, so the deletes
+      // below would not reach them).
+      try {
+        const ds = /** @type {any} */ (globalThis).DataSafety;
+        if (ds && typeof ds.clearSnapshots === 'function') await ds.clearSnapshots();
+      } catch (_e) { /* best-effort: never block the data wipe on it */ }
       // W2.4 + W2.4-hotfix: Clear ALL user-data IDB databases. The
       // pre-hotfix version fired deleteDatabase() then reloaded
       // immediately — the deletion is async and the reload raced

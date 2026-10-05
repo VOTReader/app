@@ -110,6 +110,13 @@ class BridgeContractTest {
         "v3ImportClose" to 0,
         "getCrashLog" to 0,
         "clearGardenCache" to 0,
+        // datasafe 10-05: rolling snapshots outside WebView storage. Called directly
+        // (guarded window.AndroidBridge) by src/utils/snapshot-sink.js, like
+        // setAudioActive: no platform-bridge.js mirror.
+        "snapshotSave" to 1,
+        "snapshotList" to 0,
+        "snapshotRead" to 1,
+        "snapshotClear" to 0,
         // sh1: the phone's share sheet. Mirrored by platform-bridge.js androidImpl
         // (utils/copy-share.js calls PlatformBridge.shareText before navigator.share).
         "shareText" to 1,

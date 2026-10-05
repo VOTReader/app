@@ -1206,6 +1206,15 @@ export function hasAnyPendingStores() {
 }
 
 /**
+ * Every registered IDB store (utils/data-safety.js snapshots each one's record).
+ *
+ * @returns {any[]}
+ */
+export function registeredStores() {
+  return Array.from(_idbStoreRegistry);
+}
+
+/**
  * The registered IDB stores that have not loaded their real data yet
  * ('pending' or 'degraded'). HydrationGate watches these after it lets App in
  * on a slow start, and remounts App when they load (datasafe 2026-10-05).
@@ -1292,6 +1301,7 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-restore-inflight',         // use-restore-guard
   'vot-last-seen-build',          // utils/update-toast.js — the last build this profile saw
   'vot-diag-ring',                // utils/diagnostic-log.js — storage-health warnings kept across reloads
+  'vot-health-skip',              // utils/data-safety.js — an import / Clear All's reload is not a data loss
 ]);
 
 /** Meta-store key holding the W2.4 cleanup-complete flag. */

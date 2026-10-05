@@ -44,11 +44,15 @@ import { JournalStore } from '../stores/journal-store.js';
 import { StorageHealth } from '../utils/storage-health.js';
 import { DiagnosticLog } from '../utils/diagnostic-log.js';
 import { showToast } from '../utils/toast.js';
+import { DataSafety } from '../utils/data-safety.js';
 
 const { useState, useEffect } = React;
 
 /** Stores that load within this window of each other cause one remount. */
 export const REMOUNT_COALESCE_MS = 250;
+/** The data-health check and daily snapshot wait this long after every store loads
+ *  (utils/data-safety.js): never on the boot path. */
+export const SAFETY_DELAY_MS = 5000;
 
 /**
  * Wrap the app root. Awaits hydrateAllStores() exactly once at mount;
@@ -103,11 +107,21 @@ export function HydrationGate({ children }) {
     return () => { alive = false; };
   }, []);
 
-  // The late-load remount (header). Armed once, when the gate opens.
+  // The late-load remount (header). Armed once, when the gate opens. The
+  // data-safety pass runs once every store has loaded: at the open, or after
+  // the remount that follows the last late one.
   useEffect(() => {
     if (!hydrated) return undefined;
+    /** @type {any} */ let safetyTimer = null;
+    const scheduleSafety = () => {
+      if (safetyTimer != null) clearTimeout(safetyTimer);
+      safetyTimer = setTimeout(() => { safetyTimer = null; DataSafety.run(); }, SAFETY_DELAY_MS);
+    };
     let waiting = lateRef.current;
-    if (waiting.length === 0) return undefined;
+    if (waiting.length === 0) {
+      scheduleSafety();
+      return () => { if (safetyTimer != null) clearTimeout(safetyTimer); };
+    }
     /** @type {any} */ let timer = null;
     let loadedCount = 0;
     const onChange = () => {
@@ -121,6 +135,7 @@ export function HydrationGate({ children }) {
         if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('hydration', 'remounted App: ' + loadedCount + ' store(s) loaded after the gate opened');
         loadedCount = 0;
         setMountKey((k) => k + 1);
+        if (waiting.length === 0) scheduleSafety();
         // The remount puts the reader back where their saved data says; say why.
         showToast({ id: 'vot-toast-late-load', className: 'vot-toast', text: 'Your saved library has finished loading.', durationMs: 4000 });
       }, REMOUNT_COALESCE_MS);
@@ -130,6 +145,7 @@ export function HydrationGate({ children }) {
     return () => {
       unsubs.forEach((u) => u());
       if (timer != null) clearTimeout(timer);
+      if (safetyTimer != null) clearTimeout(safetyTimer);
     };
   }, [hydrated]);
 

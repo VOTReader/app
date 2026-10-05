@@ -14,6 +14,7 @@
 
    Priority (highest first):
      versionTooNew                        → newer-version (v04-03)
+     dataMissing                          → data-missing (datasafe 10-05)
      READONLY with writeFailedThisSession → scenario 7 (write-failed)
      CRITICAL with privateModeLikely      → scenario 8 (private mode)
      CRITICAL                             → scenario 7 (critical quota)
@@ -72,7 +73,7 @@ export function StorageHealthBanner({ onNavigateSettings }) {
    * @param {import('../../utils/storage-health.js').StorageHealthReport} r
    */
   function _pickScenario(r) {
-    const { tier, remaining, privateModeLikely, writeFailedThisSession, storesDegraded, versionTooNew } = r;
+    const { tier, remaining, privateModeLikely, writeFailedThisSession, storesDegraded, versionTooNew, dataMissing } = r;
 
     // v04-03: a NEWER VOTReader saved this device's data, so this build cannot open
     // it (IDB VersionError). First: it explains every other symptom - the stores are
@@ -89,6 +90,19 @@ export function StorageHealthBanner({ onNavigateSettings }) {
           : "Your library was saved by a newer version of VOTReader, so this version can't open it. Nothing on this device has been lost: reload VOTReader to get the latest version. Changes you make here won't be saved.",
         dismissable: false,
         buttons: android ? [] : [{ label: 'Reload', primary: true, onClick: () => { try { window.location.reload(); } catch (_e) { /* nothing more to do */ } } }],
+      };
+    }
+
+    // datasafe 10-05: the library is much smaller than its newest automatic
+    // snapshot (utils/data-safety.js). Restore MERGES the snapshot back - nothing
+    // made since is dropped - and reloads.
+    if (dataMissing && !StorageHealth.isDismissed('data-missing')) {
+      return {
+        id: 'data-missing',
+        style: 'danger',
+        text: `Some of your data looks missing. On ${_snapDate(dataMissing.at)} you had ${_what(dataMissing.then)}; now ${_what(dataMissing.now)}. Restore adds back what is missing and keeps everything you have made since.`,
+        dismissable: true,
+        buttons: [{ label: 'Restore', primary: true, onClick: () => { if (typeof DataSafety !== 'undefined') DataSafety.restoreMissing(); } }],
       };
     }
 
@@ -159,6 +173,24 @@ export function StorageHealthBanner({ onNavigateSettings }) {
     }
 
     return null;
+  }
+
+  /** @param {number} at */
+  function _snapDate(at) {
+    try { return new Date(at).toLocaleDateString(undefined, { month: 'long', day: 'numeric' }); } catch (_e) { return 'an earlier day'; }
+  }
+
+  /** The counts that matter, in words: "55 highlights, 6 notes, 627 read marks". @param {any} m */
+  function _what(m) {
+    const parts = [];
+    const add = (n, one, many) => { if (n) parts.push(n + ' ' + (n === 1 ? one : many)); };
+    add(m.highlights, 'highlight', 'highlights');
+    add(m.notes, 'note', 'notes');
+    add(m.links, 'link', 'links');
+    add(m.bookmarks, 'bookmark', 'bookmarks');
+    add(m.journal, 'journal entry', 'journal entries');
+    add(m.readMarks, 'read mark', 'read marks');
+    return parts.length ? parts.join(', ') : 'nothing saved';
   }
 
   function _goExport() {
