@@ -529,6 +529,24 @@ export function buildScreenRoutes({
     setNavOrigin({ screen: 'audio-library', returnOrigin: navOrigin || null });
     setScreen(destination);
   };
+  const _openNowPlaying = () => { const open = /** @type {any} */ (window).__openNowPlaying; if (typeof open === 'function') open(); };
+  const _listenRoot = () => typeof ListenRoot !== 'undefined' ? (
+    <ListenRoot
+      onBack={goNavOrigin}
+      backLabel={navOrigin && navOrigin.screen === 'library' ? 'Library' : navOrigin && navOrigin.screen === 'volumes-home' ? 'Volumes' : 'Home'}
+      bibleAudio={settings && settings.bibleAudio}
+      onOpenSource={(key) => { setAudioColKey(key); _enterAudioSub('audio-library-collection'); }}
+      onOpenBible={(vk) => { setAudioColKey(vk); _enterAudioSub('audio-library-collection'); }}
+      onOpenSaved={() => _enterAudioSub('audio-library-saved')}
+      onOpenDownloads={() => _enterAudioSub('audio-library-offline')}
+      onOpenHistory={() => _enterAudioSub('audio-library-history')}
+      onOpenSongs={() => { setAudioColKey(encodeSongsRoute([{ k: 'hub' }])); _enterAudioSub(SONGS_SCREEN); }}
+      onReadStudies={() => _enterAudioSub('audio-library-studies')}
+      onOpenNowPlaying={_openNowPlaying}
+      onSearch={goSearch} onHistory={goHistory} onSettings={goSettings}
+      theme={theme} onThemeChange={setTheme}
+    />
+  ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…');
   // Songs of the Letters (L2): ONE routed screen whose stack of frames (hub, a list, a song) rides the tab's
   // audioColKey (utils/songs-route.js), so no tab field and no app.jsx line. Opening it sets the stack and the
   // origin Back leaves by; Back pops a frame first. Android Back reaches the same pop through __songsBack.
@@ -1151,39 +1169,13 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'audio-library': () => typeof AudioLibraryScreen !== 'undefined' ? (
-      <AudioLibraryScreen
-        onBack={goNavOrigin}
-        backLabel={navOrigin && navOrigin.screen === 'library' ? 'Library'
-          : navOrigin && navOrigin.screen === 'volumes-home' ? 'Volumes'
-          : 'Home'}
-        onOpenCollection={(vk) => { setAudioColKey(vk); _enterAudioSub('audio-library-collection'); }}
-        onOpenVolumes={() => _enterAudioSub('audio-library-volumes')}
-        onOpenSaved={() => _enterAudioSub('audio-library-saved')}
-        onOpenStudies={() => _enterAudioSub('audio-library-studies')}
-        onOpenOffline={() => _enterAudioSub('audio-library-offline')}
-        onOpenSongs={() => { setAudioColKey(encodeSongsRoute([{ k: 'hub' }])); _enterAudioSub(SONGS_SCREEN); }}
-        onOpenTrack={(track) => _openAudioText(track, 'audio-library')}
-        onSearch={goSearch}
-        onHistory={goHistory}
-        onSettings={goSettings}
-        theme={theme} onThemeChange={setTheme}
-      />
-    ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
-    'audio-library-volumes': () => typeof AudioVolumesScreen !== 'undefined' ? (
-      <AudioVolumesScreen
-        onBack={goNavOrigin}
-        backLabel="Listening Library"
-        onOpenCollection={(vk) => {
-          setAudioColKey(vk);
-          setNavOrigin({ screen: 'audio-library-volumes', returnOrigin: navOrigin || null });
-          setScreen('audio-library-collection');
-        }}
-        onSearch={goSearch}
-        onHistory={goHistory}
-        onSettings={goSettings}
-        theme={theme} onThemeChange={setTheme}
-      />
+    // rv1 (overhaul): the Listen tab root replaces the old hub and The Volumes (a stale tab on 'audio-library-volumes'
+    // lands on the root). Play and Resume open the full-screen Now Playing through the bar (__openNowPlaying).
+    'audio-library': () => _listenRoot(),
+    'audio-library-volumes': () => _listenRoot(),
+    'audio-library-history': () => typeof ListenHistory !== 'undefined' ? (
+      <ListenHistory onBack={goNavOrigin} backLabel="Listen" onOpenNowPlaying={_openNowPlaying}
+        onSearch={goSearch} onHistory={goHistory} onSettings={goSettings} theme={theme} onThemeChange={setTheme} />
     ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
     // Downloads to the phone (listening item 8): the hub's "On this phone" row.
     'audio-library-offline': () => typeof AudioOfflineScreen !== 'undefined' ? (
@@ -1230,7 +1222,11 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
-    'audio-library-collection': () => typeof AudioCollectionScreen !== 'undefined' ? (
+    // rv1: a letter collection, a study or a voice opens the Listen tab's Source screen; a Bible edition keeps this one.
+    'audio-library-collection': () => typeof ListenSource !== 'undefined' && !(typeof audioColKey === 'string' && audioColKey.lastIndexOf('bible-', 0) === 0) ? (
+      <ListenSource sourceKey={audioColKey} onBack={goNavOrigin} backLabel="Listen" onOpenNowPlaying={_openNowPlaying}
+        onSearch={goSearch} onHistory={goHistory} onSettings={goSettings} theme={theme} onThemeChange={setTheme} />
+    ) : typeof AudioCollectionScreen !== 'undefined' ? (
       <AudioCollectionScreen
         volKey={audioColKey}
         onBack={goNavOrigin}

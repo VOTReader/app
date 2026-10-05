@@ -110,14 +110,14 @@ describe('Library "open the text" on a study recording', () => {
    returns to the hub), and the route draws it from bundle-h's AudioOfflineScreen. */
 describe('On this phone (item 8): the hub door and the route', () => {
   it('the hub row enters audio-library-offline with the hub as its origin', () => {
-    globalThis.AudioLibraryScreen = () => null;
+    globalThis.ListenRoot = () => null;
     try {
       const p = makeRoutes();
       const routes = buildScreenRoutes(p);
-      routes['audio-library']().props.onOpenOffline();
+      routes['audio-library']().props.onOpenDownloads();
       expect(p.setNavOrigin).toHaveBeenCalledWith({ screen: 'audio-library', returnOrigin: null });
       expect(p.setScreen).toHaveBeenCalledWith('audio-library-offline');
-    } finally { delete globalThis.AudioLibraryScreen; }
+    } finally { delete globalThis.ListenRoot; }
   });
 
   it('the route draws AudioOfflineScreen, whose back is the nav origin', () => {

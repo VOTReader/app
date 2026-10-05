@@ -470,20 +470,20 @@ describe('AudioPlayerBar — the scrub commits on release', () => {
 });
 
 describe('AudioPlayerBar — the listening desk disclosure', () => {
-  it('opens AudioManagerSheet from the summary button, portalled out of the bar', () => {
+  it('opens Now Playing from the summary button, portalled out of the bar (rv1: a reading no longer opens the desk)', () => {
     const { container } = render(<AudioPlayerBar />);
     playSingleLetter();
 
     const summary = screen.getByRole('button', { name: 'Open listening controls' });
     expect(summary.getAttribute('aria-expanded')).toBe('false');
-    expect(document.querySelector('.audio-manager-sheet')).toBeNull();
+    expect(document.querySelector('.now-playing')).toBeNull();
 
     fireEvent.click(summary);
     expect(screen.getByRole('button', { name: 'Open listening controls' }).getAttribute('aria-expanded')).toBe('true');
     const sheet = screen.getByRole('dialog');
-    expect(sheet.classList.contains('audio-manager-sheet')).toBe(true);
+    expect(sheet.classList.contains('now-playing')).toBe(true);
     expect(document.body.contains(sheet)).toBe(true);
-    expect(container.querySelector('.audio-manager-sheet')).toBeNull();   // portal, not a child of the bar
+    expect(container.querySelector('.now-playing')).toBeNull();   // portal, not a child of the bar
     expect(screen.getByRole('heading', { name: 'The Seventh Day' })).toBeTruthy();
   });
 
@@ -504,11 +504,11 @@ describe('AudioPlayerBar — the listening desk disclosure', () => {
     playSingleLetter();
     fireEvent.click(screen.getByRole('button', { name: 'Open listening controls' }));
     expect(screen.getByRole('dialog')).toBeTruthy();
-    expect(modalRegistry.openIds()).toContain('audio-manager-sheet');
+    expect(modalRegistry.openIds()).toContain('now-playing');
 
     drive(() => AudioPlayer.stop());
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(modalRegistry.openIds()).not.toContain('audio-manager-sheet');
+    expect(modalRegistry.openIds()).not.toContain('now-playing');
 
     // …and it does not come back on its own with the next recording.
     playSingleLetter();

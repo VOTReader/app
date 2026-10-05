@@ -1,0 +1,161 @@
+// @ts-nocheck -- classic-global screen contract (bundle-h reads bundle-d as globals), isolated here.
+/* rv1 the Listen tab (overhaul review build): the root's sections and hero, a Source's Play/Resume and rows,
+   a voice's shelves, the offline banner. Built to the Design canvas's words (21a Listen, 21c Volume One). */
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+
+const { player, setPlayerState } = vi.hoisted(() => {
+  let playerState;
+  const player = {
+    subscribe: () => () => {},
+    getVersion: () => 0,
+    getState: () => playerState,
+    collectionHasAudio: vi.fn(() => true),
+    hasAudio: vi.fn(() => true),
+    readerLabel: (code) => ({ B: 'Benjamin', T: 'Timothy' }[code] || null),
+    renditionsFor: vi.fn((volKey, item) => [{ reader: item.id === 'b' ? 'T' : 'B', tracks: [{ key: volKey + ':' + item.id, url: 'u:' + item.id, title: item.title, readerCode: item.id === 'b' ? 'T' : 'B' }] }]),
+    playbackTracks: vi.fn((volKey, item) => [{ key: volKey + ':' + item.id, url: 'u:' + item.id, title: item.title, readerCode: item.id === 'b' ? 'T' : 'B' }]),
+    playTrack: vi.fn(),
+    playCollection: vi.fn(),
+    toggle: vi.fn(),
+  };
+  return { player, setPlayerState: (next) => { playerState = next; } };
+});
+vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
+
+import { ListenRoot, ListenSource, ListenHistory } from './ListenScreens.jsx';
+import * as Shelf from '../components/AudioShelf.jsx';
+import * as AudioTrack from '../../utils/audio-track.js';
+import { listenEyebrow, listenReaderLine } from '../components/NowPlaying.jsx';
+
+const A = { id: 'a', num: 1, title: 'Chosen by God' };
+const B = { id: 'b', num: 2, title: 'Christmas' };
+const COL = { key: 'one', cardId: 'vot-one-index', label: 'Volume One', kind: 'letter' };
+let positions;
+let recent;
+let saved;
+
+function install() {
+  globalThis.ScreenLayout = ({ children }) => <main>{children}</main>;
+  globalThis.LibraryNav = () => null;
+  Object.assign(globalThis, Shelf, AudioTrack, { listenEyebrow, listenReaderLine });
+  globalThis.AudioPlayer = player;
+  globalThis.COLLECTIONS = [COL];
+  globalThis.COL_BY_KEY = new Map([['one', COL]]);
+  globalThis.colLetterArr = () => [A, B];
+  globalThis.colPreface = () => null;
+  globalThis.BIBLE_STUDIES = [];
+  globalThis.AudioLibraryStore = { subscribe: () => () => {}, getVersion: () => 0, recent: () => recent, saved: () => saved };
+  globalThis.AudioPositionsStore = { subscribe: () => () => {}, getVersion: () => 0, getPosition: (t) => positions[t.url || t] || null };
+  globalThis.SongCatalog = { subscribe: () => () => {}, getVersion: () => 0, loaded: true, songs: () => Array.from({ length: 1087 }, () => ({ sh: 1 })), load: vi.fn() };
+}
+
+const rootProps = () => ({
+  onBack: vi.fn(), onOpenSource: vi.fn(), onOpenBible: vi.fn(), onOpenSaved: vi.fn(), onOpenDownloads: vi.fn(), onOpenHistory: vi.fn(),
+  onOpenSongs: vi.fn(), onReadStudies: vi.fn(), onOpenNowPlaying: vi.fn(), onSearch: vi.fn(), onHistory: vi.fn(), onSettings: vi.fn(),
+  theme: 'dark', onThemeChange: vi.fn(), bibleAudio: 'brm-kjv',
+});
+
+beforeEach(() => {
+  positions = {};
+  recent = [];
+  saved = [];
+  setPlayerState({ queue: [], qi: 0, status: 'idle', time: 0, duration: 0 });
+  Object.values(player).forEach((v) => { if (typeof v === 'function' && 'mockClear' in v) v.mockClear(); });
+  install();
+});
+afterEach(() => {
+  cleanup();
+  for (const k of ['ScreenLayout', 'LibraryNav', 'AudioPlayer', 'COLLECTIONS', 'COL_BY_KEY', 'colLetterArr', 'colPreface', 'BIBLE_STUDIES', 'AudioLibraryStore', 'AudioPositionsStore', 'SongCatalog']) delete globalThis[k];
+  Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+});
+
+describe('ListenRoot', () => {
+  it('first run: no empty shelves, a way in to the Letters', () => {
+    const p = rootProps();
+    render(<ListenRoot {...p} />);
+    expect(screen.getByRole('heading', { name: 'Hear the Letters read aloud' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Start with Volume One/ }));
+    expect(p.onOpenSource).toHaveBeenCalledWith('one');
+  });
+
+  it('a returning listener gets the Continue hero: eyebrow, reader, minutes left, Resume opens Now Playing', () => {
+    const track = { key: 'one:b', url: 'u:b', title: 'Christmas', sub: 'Volume One', readerCode: 'T' };
+    recent = [track];
+    positions = { 'u:b': { t: 300, d: 840 } };
+    const p = rootProps();
+    render(<ListenRoot {...p} />);
+    expect(screen.getByRole('heading', { name: 'Christmas' })).toBeTruthy();
+    expect(screen.getByText('Volume One · Letter 2')).toBeTruthy();
+    expect(screen.getByText('Read by Timothy · 9 min left')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Resume/ }));
+    expect(player.playTrack).toHaveBeenCalledWith(track);
+    expect(p.onOpenNowPlaying).toHaveBeenCalled();
+  });
+
+  it('lists the Letters, the Scriptures with Your Bible voice, the Voices, Songs and Your Listening (zero counts shown)', () => {
+    const p = rootProps();
+    render(<ListenRoot {...p} />);
+    expect(screen.getByRole('button', { name: /Volume One\s*2 letters/ })).toBeTruthy();
+    expect(screen.getByText('Your Bible voice')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /^Benjamin/ }));
+    expect(p.onOpenSource).toHaveBeenCalledWith('voice:B');
+    expect(screen.getByRole('button', { name: /Over 1,000 songs/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Saved · 0' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'History' }));
+    expect(p.onOpenHistory).toHaveBeenCalled();
+  });
+
+  it('offline: one calm banner with the way to Downloads', () => {
+    Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+    const p = rootProps();
+    render(<ListenRoot {...p} />);
+    expect(screen.getByRole('status').textContent).toContain('Offline · downloads still play');
+    fireEvent.click(screen.getByRole('button', { name: 'Downloads ›' }));
+    expect(p.onOpenDownloads).toHaveBeenCalled();
+  });
+});
+
+describe('ListenSource', () => {
+  const srcProps = (sourceKey) => ({ sourceKey, onBack: vi.fn(), onOpenNowPlaying: vi.fn(), onSearch: vi.fn(), onHistory: vi.fn(), onSettings: vi.fn(), theme: 'dark', onThemeChange: vi.fn() });
+
+  it('a collection: eyebrow, title, fact line, Play from the top, numbered rows with their reader', () => {
+    const p = srcProps('one');
+    render(<ListenSource {...p} />);
+    expect(screen.getByRole('heading', { name: 'Volume One' })).toBeTruthy();
+    expect(screen.getByText('2 letters · read-along')).toBeTruthy();
+    expect(screen.getByText('Read by Benjamin')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /^Play$/ }));
+    expect(player.playCollection).toHaveBeenCalledWith(expect.objectContaining({ volKey: 'one', startId: 'a' }));
+    expect(p.onOpenNowPlaying).toHaveBeenCalled();
+  });
+
+  it('Resume names the letter in progress and starts there; the row says how much is left', () => {
+    positions = { 'u:b': { t: 120, d: 600 } };
+    render(<ListenSource {...srcProps('one')} />);
+    expect(screen.getByText('Read by Timothy · 8 min left')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Resume · Letter 2/ }));
+    expect(player.playCollection).toHaveBeenCalledWith(expect.objectContaining({ startId: 'b' }));
+  });
+
+  it('a voice: every letter that reader read, shelved by collection, played in that voice', () => {
+    render(<ListenSource {...srcProps('voice:B')} />);
+    expect(screen.getByRole('heading', { name: 'Benjamin' })).toBeTruthy();
+    expect(screen.getByText('Every letter Benjamin has read aloud')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Play Chosen by God' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Play Christmas' })).toBeNull();   // Timothy's reading
+    fireEvent.click(screen.getByRole('button', { name: /Play all/ }));
+    expect(player.playCollection).toHaveBeenCalledWith(expect.objectContaining({ volKey: 'one', startId: 'a', startReader: 'B' }));
+  });
+});
+
+describe('ListenHistory', () => {
+  it('lists what was started, newest first, and plays it', () => {
+    recent = [{ key: 'one:a', url: 'u:a', title: 'Chosen by God', playedAt: Date.now() }];
+    const onOpenNowPlaying = vi.fn();
+    render(<ListenHistory onBack={vi.fn()} onOpenNowPlaying={onOpenNowPlaying} onSearch={vi.fn()} onHistory={vi.fn()} onSettings={vi.fn()} theme="dark" onThemeChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Chosen by God/ }));
+    expect(player.playTrack).toHaveBeenCalled();
+    expect(onOpenNowPlaying).toHaveBeenCalled();
+  });
+});

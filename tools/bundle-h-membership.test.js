@@ -29,7 +29,8 @@ const read = (p) => readFileSync(p, 'utf-8');
    identifier: esbuild minifies each screen's function to a one-letter name, and
    the identifier still appears in bundle-d as the free-global guard
    screen-routes renders behind (`typeof AudioLibraryScreen !== 'undefined'`). */
-const MARKERS = ['AudioLibraryScreen', 'AudioVolumesScreen', 'AudioCollectionScreen', 'AudioSavedScreen', 'AudioStudiesScreen', 'AudioOfflineScreen', 'AudioSongsScreen'];
+// rv1 (overhaul): the Listen tab's three screens replaced the hub (AudioLibraryScreen) and The Volumes.
+const MARKERS = ['ListenRoot', 'ListenSource', 'ListenHistory', 'AudioCollectionScreen', 'AudioSavedScreen', 'AudioStudiesScreen', 'AudioOfflineScreen', 'AudioSongsScreen'];
 /* `name + ':'` alone is not enough, and landing 28 proved it: the minifier
    writes a guarded free-global read as a TERNARY — `typeof X=="function"?X:…`
    — and that colon reads exactly like a definition. A definition is a KEY in
@@ -49,7 +50,7 @@ describe('bundle-h carries the Listening Library, and bundle-d no longer does', 
     for (const name of MARKERS) {
       expect(defines(d, name), `bundle-d.js still defines ${name}`).toBe(false);
     }
-    expect(d.includes('AudioLibraryScreen'), 'bundle-d.js lost its guard on AudioLibraryScreen').toBe(true);
+    expect(d.includes('ListenRoot'), 'bundle-d.js lost its guard on ListenRoot').toBe(true);
   });
 
   // Item 8: the downloads store is ONE object, bundle-d's (the player's offline gate and the page's rows must see the

@@ -103,7 +103,7 @@ function chapterOfTrack(track) {
  * @param {any} current - the playing track
  * @returns {{ kind: 'reader'|'edition', activeLabel: string, chips: Array<{ id: string, label: string, active: boolean, select: () => void }> } | null}
  */
-function voiceChoices(current) {
+export function voiceChoices(current) {
   const split = splitTrackKey(current);
   if (!split) return null;
 

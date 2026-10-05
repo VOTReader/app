@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 614 distinct identifiers.
+// Total: 617 distinct identifiers.
 
 export const projectGlobals = {
   ANSWERS: "readonly",
@@ -28,7 +28,6 @@ export const projectGlobals = {
   AppShellSheets: "readonly",
   ArrowIcon: "readonly",
   AudioCollectionScreen: "readonly",
-  AudioLibraryScreen: "readonly",
   AudioLibraryStore: "readonly",
   AudioManagerSheet: "readonly",
   AudioOfflineScreen: "readonly",
@@ -42,7 +41,6 @@ export const projectGlobals = {
   AudioShelfRow: "readonly",
   AudioSongsScreen: "readonly",
   AudioStudiesScreen: "readonly",
-  AudioVolumesScreen: "readonly",
   AutoScrollContext: "readonly",
   AutoScrollControl: "readonly",
   BIBLE_ASV: "readonly",
@@ -196,6 +194,9 @@ export const projectGlobals = {
   LinkSidebar: "readonly",
   LinkStore: "readonly",
   LinksScreen: "readonly",
+  ListenHistory: "readonly",
+  ListenRoot: "readonly",
+  ListenSource: "readonly",
   MATTHEW: "readonly",
   MATTHEW_NKJV: "readonly",
   MATTHEW_PLAIN: "readonly",
@@ -477,6 +478,8 @@ export const projectGlobals = {
   letterHlKey: "readonly",
   linkPreface: "readonly",
   linkWtlbEntries: "readonly",
+  listenEyebrow: "readonly",
+  listenReaderLine: "readonly",
   lnkId: "readonly",
   loadBibleStudies: "readonly",
   loadSongLyrics: "readonly",

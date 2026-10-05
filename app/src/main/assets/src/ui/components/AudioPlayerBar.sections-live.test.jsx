@@ -74,15 +74,15 @@ describe('a WTLB compilation in the mini-player and the desk', () => {
     expect(barTitle()).toBe('Crowning Glory · Part 1 · Intro–19');
   });
 
-  it('the desk heading is the letter, the section rides the line under it', () => {
+  it('the Now Playing heading is the letter, the section rides the line under it', () => {
     render(<AudioPlayerBar />);
     act(() => { AudioPlayer.playSection('wtlb1', 0, WTLB1.label); });
     tick(63);
     fireEvent.click(document.querySelector('.audio-bar-summary'));
-    const h2 = document.getElementById('audio-manager-title');
+    const h2 = document.getElementById('now-playing-title');
     expect(h2.textContent).toContain('Come, Love Awaits You');
     expect(h2.textContent).not.toContain('Part 1 · Intro–19');
-    expect(h2.parentElement.querySelector('p').textContent).toContain('Part 1 · Intro–19');
+    expect(h2.parentElement.querySelector('.now-playing-section').textContent).toContain('Part 1 · Intro–19');
   });
 
   it('a keyed recording keeps its own title', () => {

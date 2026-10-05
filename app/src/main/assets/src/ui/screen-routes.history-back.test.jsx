@@ -58,8 +58,8 @@ beforeEach(() => {
   /** @type {any} */ (globalThis).MyProgressScreen = () => null;
   // The Listening Library went lazy in landing 24 — its routes render behind a
   // typeof guard, so the origin chain these cases walk needs them defined.
-  /** @type {any} */ (globalThis).AudioLibraryScreen = () => null;
-  /** @type {any} */ (globalThis).AudioVolumesScreen = () => null;
+  /** @type {any} */ (globalThis).ListenRoot = () => null;
+  /** @type {any} */ (globalThis).ListenSource = () => null;
   /** @type {any} */ (globalThis).AudioCollectionScreen = () => null;
   /** @type {any} */ (globalThis).AudioSavedScreen = () => null;
   // The link-out surfaces under navigation-tabs-1. notes/links/bookmarks are
@@ -87,8 +87,8 @@ afterEach(() => {
   delete /** @type {any} */ (globalThis).LibraryScreen;
   delete /** @type {any} */ (globalThis).HomeScreen;
   delete /** @type {any} */ (globalThis).MyProgressScreen;
-  delete /** @type {any} */ (globalThis).AudioLibraryScreen;
-  delete /** @type {any} */ (globalThis).AudioVolumesScreen;
+  delete /** @type {any} */ (globalThis).ListenRoot;
+  delete /** @type {any} */ (globalThis).ListenSource;
   delete /** @type {any} */ (globalThis).AudioCollectionScreen;
   delete /** @type {any} */ (globalThis).AudioSavedScreen;
   delete /** @type {any} */ (globalThis).NotesIndexScreen;
@@ -363,9 +363,9 @@ describe('screen-routes — the Listening Library returns to its actual origin',
 
   it('Listening Library Text opens with a silent one-shot return to the shelf (no pill, Back still returns)', () => {
     const { routes, props } = makeRoutes();
-    routes['audio-library']().props.onOpenTrack({ key: 'one:wide-path' });
+    routes['audio-library-saved']().props.onOpenTrack({ key: 'one:wide-path' });
     expect(props.pushFromLetter).toHaveBeenCalledWith({
-      sourceScreen: 'audio-library',
+      sourceScreen: 'audio-library-saved',
       sourceLetterTitle: 'Listening Library',
       destSnapshot: { screen: 'vot-one-letter', letterId: 'wide-path' },
       silent: true,
@@ -375,7 +375,7 @@ describe('screen-routes — the Listening Library returns to its actual origin',
 
   it('a Bible-edition track jumps to the PLAYING chapter through navigateToLink (2026-08-09 desk-title jump)', () => {
     const { routes, props } = makeRoutes();
-    routes['audio-library']().props.onOpenTrack({ key: 'bible-brm-kjv:jeremiah', partLabel: 'Chapter 46' });
+    routes['audio-library-saved']().props.onOpenTrack({ key: 'bible-brm-kjv:jeremiah', partLabel: 'Chapter 46' });
     expect(props.navigateToLink).toHaveBeenCalledWith(
       { type: 'bible', bookId: 'jeremiah', chapter: 46 },
       { sourceLetterTitle: 'Listening Library', silent: true }
@@ -387,48 +387,42 @@ describe('screen-routes — the Listening Library returns to its actual origin',
 
   it('an unlabeled Bible part lands on chapter 1', () => {
     const { routes, props } = makeRoutes();
-    routes['audio-library']().props.onOpenTrack({ key: 'bible-wop-nkjv:matthew', partLabel: null });
+    routes['audio-library-saved']().props.onOpenTrack({ key: 'bible-wop-nkjv:matthew', partLabel: null });
     expect(props.navigateToLink).toHaveBeenCalledWith(
       { type: 'bible', bookId: 'matthew', chapter: 1 },
       { sourceLetterTitle: 'Listening Library', silent: true }
     );
   });
 
-  it('hub → collection chains the hub (and ITS origin) so back unwinds level by level', () => {
-    // Library → hub already chained; opening a collection pushes a third link.
-    const hubOrigin = { screen: 'library', returnOrigin: null };
-    const { routes, props } = makeRoutes({ navOrigin: hubOrigin });
-    routes['audio-library']().props.onOpenCollection('one');
+  it('Listen root → a source chains the root (and ITS origin) so back unwinds level by level (rv1)', () => {
+    const rootOrigin = { screen: 'library', returnOrigin: null };
+    const { routes, props } = makeRoutes({ navOrigin: rootOrigin });
+    routes['audio-library']().props.onOpenSource('one');
     expect(props.setAudioColKey).toHaveBeenCalledWith('one');
-    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'audio-library', returnOrigin: hubOrigin });
+    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'audio-library', returnOrigin: rootOrigin });
     expect(props.setScreen).toHaveBeenCalledWith('audio-library-collection');
 
-    const { routes: nextRoutes, props: nextProps } = makeRoutes({ navOrigin: { screen: 'audio-library', returnOrigin: hubOrigin } });
-    const collection = nextRoutes['audio-library-collection']();
-    expect(collection.props.onBack).toBe(nextProps.goNavOrigin);
-    expect(collection.props.backLabel).toBe('Listening Library');
+    const { routes: nextRoutes, props: nextProps } = makeRoutes({ audioColKey: 'one', navOrigin: { screen: 'audio-library', returnOrigin: rootOrigin } });
+    const source = nextRoutes['audio-library-collection']();
+    expect(source.props.sourceKey).toBe('one');
+    expect(source.props.onBack).toBe(nextProps.goNavOrigin);
+    expect(source.props.backLabel).toBe('Listen');
   });
 
-  it('hub → The Volumes → collection is a four-deep chain that still unwinds level by level', () => {
-    const hubOrigin = { screen: 'home', returnOrigin: null };
-    const { routes, props } = makeRoutes({ navOrigin: hubOrigin });
-    routes['audio-library']().props.onOpenVolumes();
-    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'audio-library', returnOrigin: hubOrigin });
-    expect(props.setScreen).toHaveBeenCalledWith('audio-library-volumes');
+  it('a voice and a study open the same Source screen; a Bible edition keeps the collection screen (rv1)', () => {
+    const { routes, props } = makeRoutes();
+    routes['audio-library']().props.onOpenSource('voice:B');
+    expect(props.setAudioColKey).toHaveBeenCalledWith('voice:B');
+    expect(makeRoutes({ audioColKey: 'study:purity' }).routes['audio-library-collection']().props.sourceKey).toBe('study:purity');
+    /** @type {any} */ (globalThis).AudioCollectionScreen = () => null;
+    try {
+      expect(makeRoutes({ audioColKey: 'bible-web-ebible' }).routes['audio-library-collection']().props.volKey).toBe('bible-web-ebible');
+    } finally { delete /** @type {any} */ (globalThis).AudioCollectionScreen; }
+  });
 
-    const volumesOrigin = { screen: 'audio-library', returnOrigin: hubOrigin };
-    const { routes: volRoutes, props: volProps } = makeRoutes({ navOrigin: volumesOrigin });
-    const volumes = volRoutes['audio-library-volumes']();
-    expect(volumes.props.onBack).toBe(volProps.goNavOrigin);
-    expect(volumes.props.backLabel).toBe('Listening Library');
-    volumes.props.onOpenCollection('two');
-    expect(volProps.setAudioColKey).toHaveBeenCalledWith('two');
-    expect(volProps.setNavOrigin).toHaveBeenCalledWith({ screen: 'audio-library-volumes', returnOrigin: volumesOrigin });
-    expect(volProps.setScreen).toHaveBeenCalledWith('audio-library-collection');
-
-    // The collection's pill names the volumes list it came from.
-    const { routes: colRoutes } = makeRoutes({ navOrigin: { screen: 'audio-library-volumes', returnOrigin: volumesOrigin } });
-    expect(colRoutes['audio-library-collection']().props.backLabel).toBe('The Volumes');
+  it('a stale tab on The Volumes lands on the Listen root (rv1)', () => {
+    const { routes } = makeRoutes();
+    expect(typeof routes['audio-library-volumes']().props.onOpenSource).toBe('function');
   });
 
   it('hub → saved shelf takes the same chain, and its Text taps name their own screen', () => {
@@ -449,14 +443,18 @@ describe('screen-routes — the Listening Library returns to its actual origin',
       silent: true,
     });
 
-    const collection = nextRoutes['audio-library-collection']();
-    collection.props.onOpenText({ key: 'one:wide-path' });
-    expect(nextProps.pushFromLetter).toHaveBeenCalledWith({
-      sourceScreen: 'audio-library-collection',
-      sourceLetterTitle: 'Listening Library',
-      destSnapshot: { screen: 'vot-one-letter', letterId: 'wide-path' },
-      silent: true,
-    });
+    // A Bible edition still opens the collection screen, whose Text taps name it (rv1: letters open ListenSource).
+    /** @type {any} */ (globalThis).AudioCollectionScreen = () => null;
+    try {
+      const { routes: bibleRoutes, props: bibleProps } = makeRoutes({ audioColKey: 'bible-brm-kjv' });
+      bibleRoutes['audio-library-collection']().props.onOpenText({ key: 'one:wide-path' });
+      expect(bibleProps.pushFromLetter).toHaveBeenCalledWith({
+        sourceScreen: 'audio-library-collection',
+        sourceLetterTitle: 'Listening Library',
+        destSnapshot: { screen: 'vot-one-letter', letterId: 'wide-path' },
+        silent: true,
+      });
+    } finally { delete /** @type {any} */ (globalThis).AudioCollectionScreen; }
   });
 });
 

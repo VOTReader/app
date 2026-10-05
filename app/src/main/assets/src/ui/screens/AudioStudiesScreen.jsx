@@ -16,7 +16,7 @@
    player, one shelf (see _entry-h.js). */
 
 /** @returns {Array<any>} the loaded studies registry, [] until bible-studies.js lands */
-function studiesList() {
+export function studiesList() {
   return typeof BIBLE_STUDIES !== 'undefined' && Array.isArray(BIBLE_STUDIES) ? BIBLE_STUDIES : [];
 }
 
@@ -26,7 +26,7 @@ function studiesList() {
  * @param {any} study
  * @returns {number}
  */
-function studyRecordedCount(study) {
+export function studyRecordedCount(study) {
   const manifest = typeof AUDIO_MANIFEST !== 'undefined' && AUDIO_MANIFEST ? AUDIO_MANIFEST : null;
   if (!manifest || !study || !Array.isArray(study.chapters)) return 0;
   return study.chapters.filter((chapter) => chapter && manifest['study:' + chapter.id]).length;

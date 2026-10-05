@@ -22,6 +22,8 @@ import { useSongsOnline } from './SongKeepParts.jsx';
 import { SongKeep } from '../../utils/song-keep.js';
 import { PlayIcon, PauseIcon } from './AudioShelf.jsx';
 import { AudioManagerSheet } from './AudioManagerSheet.jsx';
+// rv1 (overhaul): a reading opens the full-screen Now Playing; a song keeps the desk.
+import { NowPlayingSheet } from './NowPlaying.jsx';
 import { AudioSeekSlider, formatClock as fmt } from './AudioSeekSlider.jsx';
 
 export function AudioPlayerBar() {
@@ -51,6 +53,14 @@ export function AudioPlayerBar() {
   React.useEffect(() => {
     if (!open) setManagerOpen(false);
   }, [open]);
+
+  // rv1: the Listen screens (bundle-h) open Now Playing after a Play or a Resume. The bar is always mounted
+  // (it renders nothing while idle), so it is the one owner of that state; this is the door to it.
+  React.useEffect(() => {
+    const w = /** @type {any} */ (window);
+    w.__openNowPlaying = () => setManagerOpen(true);
+    return () => { if (w.__openNowPlaying) delete w.__openNowPlaying; };
+  }, []);
 
   if (!open) return null;
 
@@ -225,7 +235,7 @@ export function AudioPlayerBar() {
         </svg>
       </button>
     </div>
-    <AudioManagerSheet open={managerOpen} state={st} onClose={() => setManagerOpen(false)} />
+    <NowPlayingSheet open={managerOpen} state={st} onClose={() => setManagerOpen(false)} />
     </>
   );
 }

@@ -20,8 +20,8 @@
    Pinned in the built bytes by tools/bundle-h-membership.test.js.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
-import { AudioVolumesScreen } from './screens/AudioVolumesScreen.jsx';
+// rv1 (overhaul): the Listen tab replaces the old hub and The Volumes screen.
+import { ListenRoot, ListenSource, ListenHistory } from './screens/ListenScreens.jsx';
 import { AudioCollectionScreen } from './screens/AudioCollectionScreen.jsx';
 import { AudioSavedScreen } from './screens/AudioSavedScreen.jsx';
 import { AudioStudiesScreen } from './screens/AudioStudiesScreen.jsx';
@@ -30,7 +30,7 @@ import { AudioOfflineScreen } from './screens/AudioOfflineScreen.jsx';
 import { AudioSongsScreen, songsFrameTitle } from './screens/AudioSongsScreen.jsx';
 
 Object.assign(window, {
-  AudioLibraryScreen, AudioVolumesScreen, AudioCollectionScreen, AudioSavedScreen, AudioStudiesScreen, AudioOfflineScreen, AudioSongsScreen,
+  ListenRoot, ListenSource, ListenHistory, AudioCollectionScreen, AudioSavedScreen, AudioStudiesScreen, AudioOfflineScreen, AudioSongsScreen,
   // W-03: the back pill over a letter opened from a Songs screen names that screen's top frame (screen-routes).
   songsFrameTitle,
 });

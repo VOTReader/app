@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 614 distinct identifiers.
+// Total: 617 distinct identifiers.
 
 // Cross-bundle bare-name globals — `any` by design, except React and
 // ReactDOM, typed from @types/react 18 (TYPED_GLOBALS in the generator).
@@ -31,7 +31,6 @@ declare const AppShellOverlays: any;
 declare const AppShellSheets: any;
 declare const ArrowIcon: any;
 declare const AudioCollectionScreen: any;
-declare const AudioLibraryScreen: any;
 declare const AudioLibraryStore: any;
 declare const AudioManagerSheet: any;
 declare const AudioOfflineScreen: any;
@@ -45,7 +44,6 @@ declare const AudioSeekSlider: any;
 declare const AudioShelfRow: any;
 declare const AudioSongsScreen: any;
 declare const AudioStudiesScreen: any;
-declare const AudioVolumesScreen: any;
 declare const AutoScrollContext: any;
 declare const AutoScrollControl: any;
 declare const BIBLE_ASV: any;
@@ -199,6 +197,9 @@ declare const LinkRowActionSheet: any;
 declare const LinkSidebar: any;
 declare const LinkStore: any;
 declare const LinksScreen: any;
+declare const ListenHistory: any;
+declare const ListenRoot: any;
+declare const ListenSource: any;
 declare const MATTHEW: any;
 declare const MATTHEW_NKJV: any;
 declare const MATTHEW_PLAIN: any;
@@ -480,6 +481,8 @@ declare const lastVerseOfFirstRange: any;
 declare const letterHlKey: any;
 declare const linkPreface: any;
 declare const linkWtlbEntries: any;
+declare const listenEyebrow: any;
+declare const listenReaderLine: any;
 declare const lnkId: any;
 declare const loadBibleStudies: any;
 declare const loadSongLyrics: any;

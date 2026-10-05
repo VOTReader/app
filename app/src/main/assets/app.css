@@ -1354,6 +1354,88 @@
         position: fixed; inset: 0; z-index: 200; background: rgba(8, 8, 7, 0.72);
         animation: audio-manager-fade 0.16s ease-out;
       }
+      /* rv1 Listen tab (overhaul, review build): the Design canvas's grammar, in theme tokens. Hairline rows (title,
+         second line, right glyph), small-caps gold section labels, one gold pill per screen, an outline Download. */
+      .listen-screen { width: min(100%, 40rem); margin: 0 auto; padding: 0.25rem 1.5rem 2rem; box-sizing: border-box; font-family: var(--font-garamond); color: var(--cream); }
+      .listen-title { margin: 0.25rem 0 0.75rem; font-size: var(--fs-24); font-weight: 400; }
+      .listen-eyebrow { margin: 1.4rem 0 0.15rem; color: var(--gold); font-size: var(--fs-13); letter-spacing: 0.26em; text-transform: uppercase; }
+      .listen-offline { margin: 0 0 0.75rem; padding: 0.6rem 0.8rem; border: 1px solid var(--border); border-radius: 10px; color: var(--cream-dim); font-size: var(--fs-16); }
+      .listen-offline button { margin-left: 0.4rem; background: none; border: 0; padding: 0; color: var(--gold); font: inherit; cursor: pointer; }
+      .listen-hero { padding: 1rem 0 1.1rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+      .listen-hero .listen-eyebrow { margin-top: 0; }
+      .listen-hero-title { margin: 0.45rem 0 0.25rem; font-size: clamp(1.8rem, 8vw, 2.25rem); font-weight: 400; line-height: 1.08; }
+      .listen-hero-line { margin: 0; color: var(--cream-dim); font-size: var(--fs-18); }
+      .listen-progress { height: 2px; margin: 0.75rem 0 0.9rem; background: var(--border); }
+      .listen-progress span { display: block; height: 2px; background: var(--gold); }
+      .listen-pill { display: flex; align-items: center; justify-content: center; gap: 0.7rem; width: 100%; min-height: 52px; border: 0; border-radius: 12px;
+        background: var(--gold); color: var(--bg); font: inherit; font-size: var(--fs-20); font-weight: 500; cursor: pointer; }
+      .listen-pill svg { width: 16px; height: 16px; }
+      .listen-pill:disabled, .listen-outline:disabled { opacity: .5; cursor: default; }
+      .listen-outline { min-height: 50px; border: 1px solid var(--gold); border-radius: 12px; background: none; color: var(--cream); font: inherit; font-size: var(--fs-18); cursor: pointer; }
+      .listen-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 0; border: 0; border-bottom: 1px solid var(--border);
+        background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+      .listen-row-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+      .listen-row-title { font-size: var(--fs-20); line-height: 1.2; }
+      .listen-row-line { color: var(--cream-dim); font-size: var(--fs-16); }
+      .listen-tag { align-self: flex-start; margin-top: 4px; padding: 1px 8px; border-radius: 6px; background: var(--gold-faint); color: var(--gold); font-size: var(--fs-14); }
+      .listen-chevron { width: 18px; height: 18px; flex-shrink: 0; color: var(--cream-dim); }
+      .listen-source-title { margin: 0.35rem 0 0.25rem; font-size: clamp(2.2rem, 10vw, 2.9rem); font-weight: 400; line-height: 1.05; }
+      .listen-source .listen-eyebrow:first-child { margin-top: 0.5rem; }
+      .listen-source-line { margin: 0 0 1rem; color: var(--cream-dim); font-size: var(--fs-18); }
+      .listen-source-actions { display: grid; grid-template-columns: 1.15fr 1fr; gap: 10px; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+      .listen-source-actions .listen-pill { font-size: var(--fs-18); min-height: 50px; }
+      .listen-source-row { display: flex; align-items: center; gap: 8px; min-height: 68px; border-bottom: 1px solid var(--border); }
+      .listen-source-row.is-playing { margin: 0 -1.5rem; padding: 0 1.5rem; background: var(--bg3); }
+      .listen-source-row.is-playing .listen-row-title { color: var(--gold-bright, var(--gold)); }
+      .listen-source-row.is-playing .listen-row-line { color: var(--gold); }
+      .listen-source-row.is-unavailable .listen-source-hit { opacity: .45; cursor: default; }
+      .listen-source-hit { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 10px 0; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+      .listen-num { width: 30px; flex-shrink: 0; color: var(--gold); font-size: var(--fs-24); }
+      .listen-glyph { width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: none; border: 0; color: var(--cream-dim); padding: 0; cursor: pointer; }
+      .listen-glyph svg { width: 20px; height: 20px; }
+      .listen-glyph.is-gold { color: var(--gold); cursor: default; }
+      .listen-ring::before { content: ''; width: 20px; height: 20px; border-radius: 50%;
+        background: conic-gradient(var(--gold) var(--p, 0%), var(--border) 0); -webkit-mask: radial-gradient(circle, transparent 7px, #000 8px); mask: radial-gradient(circle, transparent 7px, #000 8px); }
+      /* rv1 Now Playing (the overhaul's Listen tab, review build): full screen over everything, the reading's
+         typographic cover, the one scrubber, -15 · prev · play · next · +15, one chip row, "Open the reading".
+         Theme tokens only, so the shell's palette restyles it. */
+      .now-playing { position: fixed; inset: 0; z-index: 202; display: flex; flex-direction: column; background: var(--bg);
+        color: var(--cream); font-family: var(--font-garamond); overflow-y: auto; overscroll-behavior: contain;
+        padding: var(--inset-top, 0px) 0 calc(1rem + max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px))); }
+      .now-playing-top { display: flex; align-items: center; min-height: 60px; padding: 0 12px; flex-shrink: 0; }
+      .now-playing-name { flex: 1; text-align: center; font-size: var(--fs-18, 1.15rem); }
+      .now-playing-icon { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: none; border: 0; color: inherit; cursor: pointer; }
+      .now-playing-icon svg { width: 22px; height: 22px; }
+      .now-playing-menu { position: absolute; right: 12px; top: calc(var(--inset-top, 0px) + 56px); z-index: 1; display: flex; flex-direction: column; min-width: 12rem;
+        background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 12px; overflow: hidden; }
+      .now-playing-menu button { min-height: 48px; padding: 0 1rem; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--border); color: inherit; font: inherit; font-size: var(--fs-16); cursor: pointer; }
+      .now-playing-menu button:last-child { border-bottom: 0; }
+      .now-playing-body { flex: 1; display: flex; flex-direction: column; width: min(100%, 34rem); margin: 0 auto; padding: 6px 28px 0; box-sizing: border-box; }
+      .now-playing-cover { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; min-height: 18rem;
+        padding: 28px 24px; border: 1px solid var(--gold-border); border-radius: 6px; background: var(--bg3); box-shadow: inset 0 0 0 6px var(--bg3), inset 0 0 0 7px var(--gold-faint); }
+      .now-playing-eyebrow { color: var(--gold); font-size: var(--fs-13, 0.8rem); letter-spacing: 0.28em; text-transform: uppercase; }
+      .now-playing-rule { width: 28px; height: 1px; background: var(--gold); }
+      .now-playing-title { margin: 0; font-size: clamp(1.6rem, 7vw, 2.1rem); font-weight: 400; line-height: 1.15; }
+      .now-playing-reader { color: var(--cream-dim); font-size: var(--fs-18, 1.1rem); }
+      .now-playing-seek { margin-top: 26px; width: 100%; }
+      .now-playing-times { display: flex; justify-content: space-between; margin-top: 4px; color: var(--cream-dim); font-size: var(--fs-15, 0.95rem); font-variant-numeric: tabular-nums; }
+      .now-playing-transport { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
+      .now-playing-transport button { display: flex; align-items: center; justify-content: center; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; }
+      .now-playing-skip, .now-playing-step { width: 52px; height: 52px; font-size: var(--fs-18, 1.1rem); }
+      .now-playing-step svg { width: 24px; height: 24px; }
+      .now-playing-step:disabled { opacity: .35; cursor: default; }
+      .now-playing-transport .now-playing-play { width: 76px; height: 76px; border-radius: 50%; background: var(--gold); color: var(--bg); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
+      .now-playing-play svg { width: 26px; height: 26px; }
+      .now-playing-chips { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-top: 18px; }
+      .now-playing-chips button, .now-playing-choices button { min-height: 44px; border-radius: 9px; border: 1px solid var(--border); background: none; color: inherit; font: inherit; font-size: var(--fs-16); cursor: pointer; padding: 0 4px; white-space: nowrap; }
+      .now-playing-chips button:disabled { opacity: .4; cursor: default; }
+      .now-playing-panel { margin-top: 10px; }
+      .now-playing-choices { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+      .now-playing-choices button { padding: 0 14px; }
+      .now-playing-choices button.is-active { border-color: var(--gold); color: var(--gold); }
+      .now-playing-open { display: flex; align-items: center; justify-content: space-between; margin-top: auto; min-height: 56px; padding: 0; background: none; border: 0;
+        border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); color: inherit; font: inherit; font-size: var(--fs-20, 1.25rem); text-align: left; cursor: pointer; }
+      .now-playing-open svg { width: 18px; height: 18px; color: var(--cream-dim); }
       .audio-manager-sheet {
         position: fixed; z-index: 201; left: 50%; bottom: max(var(--keyboard-height, 0px), var(--inset-bottom, 0px));
         width: min(720px, 100%); max-height: calc(88vh - var(--inset-top, 0px));
