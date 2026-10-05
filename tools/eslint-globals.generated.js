@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 617 distinct identifiers.
+// Total: 621 distinct identifiers.
 
 export const projectGlobals = {
   ANSWERS: "readonly",
@@ -65,6 +65,7 @@ export const projectGlobals = {
   BOOKS: "readonly",
   BOOKS_RESTORED: "readonly",
   BOOK_ALIASES: "readonly",
+  BOTTOM_TABS: "readonly",
   BibleChapterView: "readonly",
   BibleStudyChapterView: "readonly",
   BibleStudyIndex: "readonly",
@@ -75,6 +76,7 @@ export const projectGlobals = {
   BookmarkRowActionSheet: "readonly",
   BookmarkStore: "readonly",
   BookmarksScreen: "readonly",
+  BottomTabs: "readonly",
   CANON_SUBTITLES: "readonly",
   COLLECTIONS: "readonly",
   COL_BY_CARD: "readonly",
@@ -294,6 +296,7 @@ export const projectGlobals = {
   THUMB_STORE: "readonly",
   TRANSLATION_OPTIONS: "readonly",
   TabActionSheet: "readonly",
+  TabBar: "readonly",
   TabsContext: "readonly",
   TabsNavBtn: "readonly",
   TabsOverview: "readonly",
@@ -573,6 +576,7 @@ export const projectGlobals = {
   useAudioPositions: "readonly",
   useAutoScroll: "readonly",
   useBibleStudies: "readonly",
+  useBottomTabs: "readonly",
   useDesktopKeyboard: "readonly",
   useDocumentTitle: "readonly",
   useDomAnnotationSync: "readonly",

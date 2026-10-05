@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 617 distinct identifiers.
+// Total: 621 distinct identifiers.
 
 // Cross-bundle bare-name globals — `any` by design, except React and
 // ReactDOM, typed from @types/react 18 (TYPED_GLOBALS in the generator).
@@ -68,6 +68,7 @@ declare const BIBLE_YLT: any;
 declare const BOOKS: any;
 declare const BOOKS_RESTORED: any;
 declare const BOOK_ALIASES: any;
+declare const BOTTOM_TABS: any;
 declare const BibleChapterView: any;
 declare const BibleStudyChapterView: any;
 declare const BibleStudyIndex: any;
@@ -78,6 +79,7 @@ declare const BookmarkRow: any;
 declare const BookmarkRowActionSheet: any;
 declare const BookmarkStore: any;
 declare const BookmarksScreen: any;
+declare const BottomTabs: any;
 declare const CANON_SUBTITLES: any;
 declare const COLLECTIONS: any;
 declare const COL_BY_CARD: any;
@@ -297,6 +299,7 @@ declare const THUMB_DB: any;
 declare const THUMB_STORE: any;
 declare const TRANSLATION_OPTIONS: any;
 declare const TabActionSheet: any;
+declare const TabBar: any;
 declare const TabsContext: any;
 declare const TabsNavBtn: any;
 declare const TabsOverview: any;
@@ -572,6 +575,7 @@ declare const translateVerse: any;
 declare const translationLabel: any;
 declare const translationName: any;
 declare const useAudioPositions: any;
+declare const useBottomTabs: any;
 declare const useSongKeep: any;
 declare const useSongLyrics: any;
 declare const useSongsOnline: any;
