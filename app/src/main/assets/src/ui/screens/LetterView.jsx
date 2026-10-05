@@ -177,7 +177,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     // open with the previous block's last words, read-along find 2026-09-22.)
     const excerpt = _squash(surpriseAnchor.text);
     const blocks = letter.blocks || [];
-    const { index: found, off } = excerptLanding(excerpt, blocks.map((b) => _squash(_blockText(b))));
+    const { index: found, off } = excerptLanding(excerpt, blocks.map((b) => _squash(_blockText(b))), surpriseAnchor.find && surpriseAnchor.find.terms);
     if (found < 0) return;
     const hlKey = letterHlKey(letter.id, found);
     setSurpriseBlockKey(hlKey);

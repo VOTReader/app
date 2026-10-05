@@ -157,7 +157,7 @@ function lands(hit, terms, c) {
   const ex = (own.length ? E.matchExcerpt(doc.text, own) : '') || (extra.length ? E.matchExcerpt(doc.text, own.concat(extra)) : '');
   const bl = unitBlocks[unitKey(doc)] || [];
   if (!ex || !bl.length) return false;
-  const { index, off } = excerptLanding(ex, bl.map((b) => b.text));
+  const { index, off } = excerptLanding(ex, bl.map((b) => b.text), own.concat(extra));
   if (index < 0) return false;
   const text = bl[index].text;
   const at = text.indexOf(c.sentence);

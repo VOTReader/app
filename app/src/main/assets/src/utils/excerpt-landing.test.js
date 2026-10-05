@@ -27,6 +27,15 @@ describe('excerptLanding', () => {
     expect(excerptLanding('spoke to him', TEXTS)).toEqual({ index: 2, off: TEXTS[2].indexOf('spoke') });
   });
 
+  it('an excerpt running on into the NEXT block lands on the sentence holding the marked words', () => {
+    const texts = ['For the Word of God is quick, and by it shall the multitudes be divided!', 'Behold, they have divided My Word and made it of none effect.'];
+    const ex = 'multitudes be divided! Behold, they have divided';
+    expect(excerptLanding(ex, texts).index).toBe(1);   // without the words: the 24-char tail, the block after
+    expect(excerptLanding(ex, texts, ['multitudes', 'divided'])).toEqual({ index: 0, off: texts[0].indexOf('multitudes') });
+    // ...and the excerpt opening with the previous block's last words still lands by its words
+    expect(excerptLanding('gate is broad. But the still small voice spoke to him', TEXTS, ['small', 'voice']).index).toBe(2);
+  });
+
   it('nothing holds it: -1', () => {
     expect(excerptLanding('zebra crossing at dawn', TEXTS)).toEqual({ index: -1, off: -1 });
     expect(excerptLanding('', TEXTS)).toEqual({ index: -1, off: -1 });
