@@ -64,11 +64,29 @@ open(os.path.join(site, 'build-sha.txt'), 'w').write(sha + '\n')
 print('[preview] staged %d files (%d runtime src) into %s' % (n, len(runtime), site))
 PY
 node tools/list-runtime-src-assets.js --check --site "$SITE" || exit 3
+# Pages answers /index.html with a 308 to / ("pretty URLs", not switchable). The service worker precaches
+# ./index.html as the CRITICAL shell and serves it to navigations, and a REDIRECTED response used for a navigation
+# fails the load (offline above all). This advanced-mode worker (never served as a file) answers */index.html with
+# the directory's own bytes as a plain 200; everything else is the static asset untouched.
+cat > "$SITE/_worker.js" <<'JS'
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (url.pathname.endsWith('/index.html')) {
+      url.pathname = url.pathname.slice(0, -'index.html'.length);
+      const res = await env.ASSETS.fetch(new Request(url.toString(), request));
+      return new Response(res.body, { status: res.status, statusText: res.statusText, headers: res.headers });
+    }
+    return env.ASSETS.fetch(request);
+  },
+};
+JS
 [ -n "$DRY" ] && { echo "[preview] dry run: $SITE ready, nothing published"; exit 0; }
 
 WR="npx -y wrangler@4"
 if ! $WR pages project list 2>/dev/null | grep -q "$PROJECT"; then
-  $WR pages project create "$PROJECT" --production-branch "$BRANCH" || exit 4
+  # --force: wrangler 4.147+ would otherwise delegate a NEW project to Workers (no pages.dev); only creation needs it.
+  $WR pages project create "$PROJECT" --production-branch "$BRANCH" --force || exit 4
 fi
 $WR pages deploy "$SITE" --project-name "$PROJECT" --branch "$BRANCH" \
   --commit-hash "$(git rev-parse HEAD)" --commit-message "$(git log -1 --format=%s | cut -c1-200)" --commit-dirty=false || exit 4
