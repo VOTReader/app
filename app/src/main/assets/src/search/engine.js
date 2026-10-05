@@ -1202,11 +1202,13 @@ async function search(query, options) {
     idOf.set(entry, id);
     out.push(entry);
   }
-  // A title the query names keeps its place; in a keyword search, a title holding one of its words ("144,000").
+  // A title the query names keeps its place; in a keyword search, a title holding its every word
+  // ("144,000"), not one of two ("lord from aforetime" quotes a letter, not "Regarding the Day of The Lord").
+  const typedContent = typedTokens.filter((w) => !(STOP && STOP.has(w)));
   const named = (/** @type {any} */ d) => {
     if (!d.title) return false;
     const tt = kjvEncode(d.title);
-    return titleMatch(tt, typedTokens, STOP) > 1 || (keyword && typedTokens.some((w) => !(STOP && STOP.has(w)) && tt.indexOf(w) >= 0));
+    return titleMatch(tt, typedTokens, STOP) > 1 || (keyword && typedContent.length > 0 && typedContent.every((w) => tt.indexOf(w) >= 0));
   };
   // A first result holding the typed words in a row, or one word off, is a quote found: no re-ordering.
   const quoted = out.length && (nearOf[idOf.get(out[0]) || ''] || 0) >= NEAR_PHRASE_MIN;
