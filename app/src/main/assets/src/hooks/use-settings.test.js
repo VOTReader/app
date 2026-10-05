@@ -54,7 +54,7 @@ describe('useSettings — defaults + migration', () => {
     const s = result.current.settings;
     expect(s.markAsRead).toBe(true);
     expect(s.translation).toBe('nkjv');
-    expect(s.fontStyle).toBe('classic');
+    expect(s.fontStyle).toBe('modern');   // round 2: the new look reads in EB Garamond
     expect(s.fontScale).toBe('1');
     expect(s.arrowLayout).toBe('off');
     expect(s.autoScroll).toBe(false);
@@ -190,7 +190,7 @@ describe('useSettings — reading-font routing', () => {
   const bodyVar = () => document.documentElement.style.getPropertyValue('--font-body');
 
   it('classic disables the #custom-fonts block (system-serif look)', () => {
-    mount({ savedSettings: { fontStyle: 'classic' } });
+    mount({ savedSettings: { fontStyle: 'classic', touched: { fontStyle: true } } });
     expect(fontsEl().disabled).toBe(true);
   });
 
@@ -239,14 +239,14 @@ describe('useSettings — the 2026-09-10 default flips reach every profile that 
   it('a fresh profile reads the dice, the reading marker and Auto-Continue ON, stamped with the round', () => {
     const s = mount().result.current.settings;
     for (const [k, v] of Object.entries(FLIPPED)) expect(s[k], k).toBe(v);
-    expect(s.defaultsRev).toBe(1);
+    expect(s.defaultsRev).toBe(2);
     expect(s.touched).toEqual({});
   });
 
   it('a profile saved before tonight, still carrying the OLD defaults, is flipped once and stamped; nothing else moves', () => {
     const s = mount({ savedSettings: { showSurpriseButton: false, showReadingDot: false, autoScrollNext: false, translation: 'kjv', autoScroll: false } }).result.current.settings;
     for (const [k, v] of Object.entries(FLIPPED)) expect(s[k], k).toBe(v);
-    expect(s.defaultsRev).toBe(1);
+    expect(s.defaultsRev).toBe(2);
     expect(s.translation).toBe('kjv');
     expect(s.autoScroll).toBe(false);
   });
@@ -268,9 +268,9 @@ describe('useSettings — the 2026-09-10 default flips reach every profile that 
      they exist to go red if a round ever ignores the stamp or rewrites a value already at the
      new default. Their teeth are the bite, not the RED. */
   it('the round runs once: a stamped profile is never re-flipped, touched record or not', () => {
-    const s = mount({ savedSettings: { defaultsRev: 1, showSurpriseButton: false } }).result.current.settings;
+    const s = mount({ savedSettings: { defaultsRev: 2, showSurpriseButton: false } }).result.current.settings;
     expect(s.showSurpriseButton).toBe(false);
-    expect(s.defaultsRev).toBe(1);
+    expect(s.defaultsRev).toBe(2);
   });
 
   it('a profile already at the NEW value is left exactly as it is', () => {
@@ -310,6 +310,19 @@ describe('useSettings — the 2026-09-10 default flips reach every profile that 
     const s = mount({ savedSettings: saved }).result.current.settings;
     expect(s.showSurpriseButton).toBe(false);
     expect(s.showReadingDot).toBe(true);
-    expect(s.defaultsRev).toBe(1);
+    expect(s.defaultsRev).toBe(2);
+  });
+});
+
+describe('useSettings — round 2: the new look reads in EB Garamond (overhaul, 2026-10-05)', () => {
+  it('a profile stamped with round 1 still on the untouched System Serif moves to EB Garamond, once', () => {
+    const s = mount({ savedSettings: { defaultsRev: 1, fontStyle: 'classic' } }).result.current.settings;
+    expect(s.fontStyle).toBe('modern');
+    expect(s.defaultsRev).toBe(2);
+    expect(document.documentElement.style.getPropertyValue('--font-body')).toContain('VOT UI Garamond');
+  });
+  it('System Serif the reader picked stays; any other picked font stays', () => {
+    expect(mount({ savedSettings: { defaultsRev: 1, fontStyle: 'classic', touched: { fontStyle: true } } }).result.current.settings.fontStyle).toBe('classic');
+    expect(mount({ savedSettings: { defaultsRev: 1, fontStyle: 'cardo' } }).result.current.settings.fontStyle).toBe('cardo');
   });
 });

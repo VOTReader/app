@@ -39,7 +39,9 @@
 export const READING_FONTS = [
   // Built-ins.
   { id: 'classic', label: 'System Serif', family: null, css: null, sub: 'Your device’s own serif — the original look', faces: [] },
-  { id: 'modern', label: 'EB Garamond', family: 'EB Garamond', css: "'EB Garamond', serif", sub: 'The app’s classic garamond', faces: [] },
+  // 'VOT UI Garamond' first: the same EB Garamond file, declared always-on for the chrome (app.css, rs1), so the default
+  // reading face never waits on the #custom-fonts block the boot script may still hold disabled.
+  { id: 'modern', label: 'EB Garamond', family: 'EB Garamond', css: "'VOT UI Garamond', 'EB Garamond', serif", sub: 'The app’s garamond, the default', faces: [] },
   // Scripture & classic book faces.
   { id: 'cormorant-garamond', label: 'Cormorant Garamond', family: 'Cormorant Garamond', css: "'Cormorant Garamond', serif", sub: 'Refined garamond, light and graceful', faces: ['cormorant-garamond-latin-400-normal.woff2', 'cormorant-garamond-latin-700-normal.woff2', 'cormorant-garamond-latin-400-italic.woff2'] },
   { id: 'cardo', label: 'Cardo', family: 'Cardo', css: "'Cardo', serif", sub: 'Scholarly face favored for scripture', faces: ['cardo-latin-400-normal.woff2', 'cardo-latin-700-normal.woff2', 'cardo-latin-400-italic.woff2'] },

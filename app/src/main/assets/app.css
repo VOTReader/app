@@ -2180,7 +2180,7 @@
            at normal sizes and wherever 7vw is the larger (tablet, desktop). */
         max-width: 45rem; margin: 0 auto; padding: 2rem min(1.5rem, max(24px, 7vw)) 6rem;
       }
-      .chapter-body { font-size: var(--fs-18); line-height: 1.85; }
+      .chapter-body { font-size: var(--fs-20); line-height: 1.75; }   /* rs2e: as .letter-para */
       /* .section-block and .section-heading defined in Bible reader section below */
       .verses-block { color: var(--cream); }
       /* Standardized per-verse rendering for ALL scripture (Bible + Matthew
@@ -2570,7 +2570,7 @@
     body:not(.arrows-nav):not(.arrows-off) .letter-body { padding-top: 4rem; }
     /* PERF4: defer off-screen paragraph layout/paint on long letters (DOM-preserving —
        the imperative [data-hl-dom] annotation passes + scroll-to-highlight still work). */
-    .letter-para { font-size:var(--fs-18); line-height:1.8; color:var(--cream); margin-bottom:1.8rem; content-visibility:auto; contain-intrinsic-size:auto 140px; }
+    .letter-para { font-size:var(--fs-20); line-height:1.75;   /* rs2e: EB Garamond's small x-height reads at 20 (Corbin's reference) */ color:var(--cream); margin-bottom:1.8rem; content-visibility:auto; contain-intrinsic-size:auto 140px; }
     /* A word wider than the reading column (a letter title in an attribution,
        at a large Text Size) wraps rather than pushing the page sideways — the
        .bottom-nav-card rule of 2026-09-05, for the body text too. */

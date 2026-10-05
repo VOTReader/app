@@ -79,6 +79,9 @@ import { readingFontById, readingFontCss } from '../utils/reading-fonts.js';
    @type {ReadonlyArray<Readonly<Record<string, any[]>>>}  key → [old default, new default] */
 const DEFAULT_FLIPS = Object.freeze([
   Object.freeze({ showSurpriseButton: [false, true], showReadingDot: [false, true], autoScrollNext: [false, true] }),
+  // Round 2 (overhaul review build, hub 2026-10-05, Corbin's reference): the new look reads in EB Garamond. A reader who
+  // picked System Serif (touched) keeps it; one who never opened the picker moves to Garamond.
+  Object.freeze({ fontStyle: ['classic', 'modern'] }),
 ]);
 
 /**
@@ -157,7 +160,7 @@ export function useSettings({ savedSettings, theme }) {
       //  2026-08-04 — the boot backup-freshness toast is retired. Stale keys in
       //  old vot-state blobs are simply unread.)
       scriptureLayout: "genre", gardenTier: GARDEN_DEFAULT_TIER,
-      showSettingsGear: true, translation: "nkjv", restoredNames: true, fontStyle: "classic",
+      showSettingsGear: true, translation: "nkjv", restoredNames: true, fontStyle: "modern",
       // Recorded Bible edition for the whole-book Listen pill ('off' hides it).
       // Values are BIBLE_AUDIO_EDITIONS keys (utils/audio-track.js); an unknown
       // persisted value acts as 'off' (bibleAudioEdition() returns null).
