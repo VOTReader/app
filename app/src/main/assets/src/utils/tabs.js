@@ -154,6 +154,7 @@ export function describeTab(tab) {
   if (s === 'links-index') return { title: 'Links', subtitle: 'Saved links', resolved: true };
   if (s === 'bookmarks-index') return { title: 'Bookmarks', subtitle: 'Saved places', resolved: true };
   if (s === 'highlights-index') return { title: 'Highlights & Underlines', subtitle: 'Marked passages', resolved: true };
+  if (s === 'marks-index') return { title: 'Marks & notes', subtitle: 'Highlights, notes, bookmarks', resolved: true };
   if (s === 'library') return { title: 'Library', subtitle: 'Your saved content', resolved: true };
   if (s === 'my-progress') return { title: 'Progress', subtitle: 'Reading progress', resolved: true };
   if (s === 'about') return { title: 'About', subtitle: 'VOTReader', resolved: true };

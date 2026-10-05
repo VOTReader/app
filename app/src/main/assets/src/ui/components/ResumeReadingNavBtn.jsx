@@ -40,7 +40,7 @@ export const ReadingDotContext = React.createContext(null);
 const DOT_HIDDEN_SCREENS = new Set([
   'matthew-ch', 'bible-ch', 'search', 'garden-view', 'settings', 'history',
   'library', 'my-progress', 'notes-index', 'links-index', 'bookmarks-index',
-  'highlights-index', 'journal-home', 'journal-viewer', 'journal-editor',
+  'highlights-index', 'marks-index', 'journal-home', 'journal-viewer', 'journal-editor',
   'about',
 ]);
 

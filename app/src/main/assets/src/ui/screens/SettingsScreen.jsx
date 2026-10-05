@@ -708,7 +708,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   // The groups showing as a page (rs2). Empty on entry: the screen opens on its root list; a row
   // opens its group. `initialGroups` opens pages at mount (the test harness opens every group at
   // once, which only a search otherwise does). Session-local on purpose.
-  const [openGroups, setOpenGroups] = React.useState(() => new Set(initialGroups || []));
+  const [openGroups, setOpenGroups] = React.useState(() => {
+    // rs3: Library's Backup & restore and Help & about open their page directly (navHandoff 'settingsGroup').
+    const asked = (!initialGroups && typeof window !== 'undefined' && window.navHandoff) ? window.navHandoff.take('settingsGroup') : null;
+    return new Set(initialGroups || (asked && SETTINGS_TOPICS[asked] ? [asked] : []));
+  });
   // Help & about's own pages (About, Credits & licenses, Privacy), over the Help & about page.
   const [infoPage, setInfoPage] = React.useState(/** @type {null | 'about' | 'credits' | 'privacy'} */ (null));
   const [settingsQuery, setSettingsQuery] = React.useState('');

@@ -306,6 +306,7 @@ export function useAndroidBack({
       if (s === "links-index") {goNavOrigin();return "true";} else
       if (s === "bookmarks-index") {goNavOrigin();return "true";} else
       if (s === "highlights-index") {goNavOrigin();return "true";} else
+      if (s === "marks-index") {goNavOrigin();return "true";} else
       if (s === "journal-home") {goNavOrigin();return "true";} else
       // journal-viewer renders ONE pill with a fixed precedence (the viewer's
       // private journal→journal stack first, then the cross-screen back

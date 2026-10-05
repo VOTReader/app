@@ -162,14 +162,26 @@ async function openSeededBookmark(page) {
     const h = document.querySelector('[aria-label="Home"]'); if (h) /** @type {HTMLElement} */ (h).click();
   });
   await sleep(700);
-  need(await clickIf(page, 'Bookmarks'), 'no Bookmarks shortcut on Home');
-  const listed = await page.waitForFunction(() => [...document.querySelectorAll('.bkm-row')].some((r) => /B2 bookmark/.test(r.textContent || '')), { timeout: 8000 }).then(() => true, () => false);
-  if (!listed) return '';
-  await page.evaluate(() => {
-    const row = [...document.querySelectorAll('.bkm-row')].find((r) => /B2 bookmark/.test(r.textContent || ''));
-    const go = row && row.querySelector('.bkm-row-content');
-    if (go) /** @type {HTMLElement} */ (go).click();
-  });
+  // rs3 (overhaul): bookmarks live in Library > Marks & notes; the Bookmarks chip narrows the one list.
+  if (await clickIf(page, 'Marks & notes')) {
+    await sleep(900);
+    need(await clickIf(page, 'Bookmarks'), 'no Bookmarks chip in Marks & notes');
+    const listed = await page.waitForFunction(() => [...document.querySelectorAll('.marks-row')].some((r) => /B2 bookmark/.test(r.textContent || '')), { timeout: 8000 }).then(() => true, () => false);
+    if (!listed) return '';
+    await page.evaluate(() => {
+      const row = [...document.querySelectorAll('.marks-row')].find((r) => /B2 bookmark/.test(r.textContent || ''));
+      if (row) /** @type {HTMLElement} */ (row).click();
+    });
+  } else {
+    need(await clickIf(page, 'Bookmarks'), 'no Bookmarks shortcut on Home');
+    const listed = await page.waitForFunction(() => [...document.querySelectorAll('.bkm-row')].some((r) => /B2 bookmark/.test(r.textContent || '')), { timeout: 8000 }).then(() => true, () => false);
+    if (!listed) return '';
+    await page.evaluate(() => {
+      const row = [...document.querySelectorAll('.bkm-row')].find((r) => /B2 bookmark/.test(r.textContent || ''));
+      const go = row && row.querySelector('.bkm-row-content');
+      if (go) /** @type {HTMLElement} */ (go).click();
+    });
+  }
   await page.waitForFunction(() => /In the beginning/i.test((document.querySelector('.screen-layout') || document.body).textContent || ''), { timeout: 10000 }).catch(() => null);
   await sleep(1200);   // the reading position commits on landing; let the persist debounce write it
   return page.evaluate(() => (document.querySelector('.screen-layout') || document.body).textContent.replace(/\s+/g, ' ').slice(0, 600));

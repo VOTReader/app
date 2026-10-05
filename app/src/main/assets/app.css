@@ -3674,6 +3674,34 @@
     .progress-genre-row { background:var(--bg2); padding-top:0.45rem; padding-bottom:0.45rem; padding-left:2rem; }
     .progress-genre-label { flex:1; font-family:var(--font-ui); font-size:var(--fs-10); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); }
     @media (max-width:520px) { .settings-screen.rs2 { padding-left:16px; padding-right:16px; } }
+    /* ── MARKS & NOTES (rs3, sheet 25 + the canvas's Marks board) ── a search field, gold-filled chips, a
+       quiet sort toggle, then hairline rows: a highlight's colour bar, a bookmark ribbon or a note page, the
+       place in gold capitals, the words, then what it is and when. */
+    .marks-page .marks-title { margin:8px 0 12px; font-weight:400; font-size:var(--fs-30); line-height:1.15; color:var(--cream); }
+    .marks-search { cursor:text; }
+    .marks-search-input { flex:1; min-width:0; height:100%; background:none; border:0; outline:none; color:var(--cream); font-family:var(--font-ui); font-size:var(--fs-18); }
+    .marks-search-input::placeholder { color:var(--cream-muted); opacity:1; }
+    .marks-search:focus-within { border-color:var(--gold); }
+    .marks-chips { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 4px; }
+    .marks-chip { min-height:44px; padding:0 16px; border-radius:22px; border:1px solid var(--input-border); background:none; color:var(--cream); font-family:var(--font-ui); font-size:var(--fs-16); cursor:pointer; }
+    .marks-chip.on { background:var(--pill-fill); border-color:var(--pill-fill); color:var(--on-gold); font-weight:500; }
+    .marks-chip-n { color:inherit; opacity:0.75; }
+    .marks-chip:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+    .marks-sort { display:flex; justify-content:flex-end; }
+    .marks-sort-btn { min-height:44px; padding:0 4px; background:none; border:0; color:var(--cream-dim); font-family:var(--font-ui); font-size:var(--fs-16); cursor:pointer; }
+    .marks-list { margin-top:0; }
+    .marks-row { display:flex; align-items:flex-start; gap:14px; width:100%; padding:14px 0; box-sizing:border-box; background:none; border:0; color:inherit; text-align:left; cursor:pointer; font-family:var(--font-ui); }
+    .marks-row:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; border-radius:6px; }
+    .marks-row-bar { align-self:stretch; width:4px; min-height:40px; margin:0 7px; border-radius:2px; flex-shrink:0; }
+    .marks-row-bar[data-underline] { background:none; border-left:2px dashed var(--gold); width:2px; margin:0 8px; }
+    .marks-row-icon { flex-shrink:0; margin-top:2px; color:var(--gold); }
+    .marks-row-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+    .marks-row-place { font-size:var(--fs-13); letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); }
+    .marks-row-title { font-size:var(--fs-20); line-height:1.35; color:var(--cream); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .marks-row-quote { font-size:var(--fs-16); font-style:italic; line-height:1.4; color:var(--cream-dim); padding-left:10px; border-left:2px solid var(--gold); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .marks-row-sub { font-size:var(--fs-15); color:var(--cream-dim); }
+    .marks-empty { margin:24px 0; font-size:var(--fs-18); line-height:1.45; color:var(--cream-dim); }
+    .marks-tools { margin-top:24px; }
     /* ── Reading Font picker (2026-07-31) ─────────────────────────────────
        A standard SelectField dropdown sheet; option names render in their
        font via the bundled 'p-<id>' preview subsets (name glyphs only —

@@ -49,6 +49,8 @@ import {
   _HL_COLOR_ORDER, _HL_COLOR_HEX, _hlColorHex, _hlColorIndex,
   _collectMarks, HighlightRow, HighlightsScreen,
 } from './screens/HighlightsScreen.jsx';
+// rs3 (overhaul): Marks & notes, the one list over the three screens above.
+import { MarksScreen, collectMarksAndNotes } from './screens/MarksScreen.jsx';
 // NotesIndexScreen's only importer — the export composer is used by nothing
 // else in the app, so it rides with the screen rather than staying behind.
 import { composeNotesExport, notesExportFilename, shareNotesExport } from '../utils/notes-export.js';
@@ -90,6 +92,7 @@ Object.assign(window, {
   LinkRow, LinkRowActionSheet, LinksScreen,
   _HL_COLOR_ORDER, _HL_COLOR_HEX, _hlColorHex, _hlColorIndex,
   _collectMarks, HighlightRow, HighlightsScreen,
+  MarksScreen, collectMarksAndNotes,
   composeNotesExport, notesExportFilename, shareNotesExport,
   JournalInsertSheet, JournalRecordingSheet,
   StudiesHome, BibleStudyIndex, BibleStudyChapterView, MatthewChapterView,

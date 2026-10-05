@@ -958,6 +958,14 @@ export function buildScreenRoutes({
           onSettings={goSettings}
           onAbout={goAbout}
           historyEnabled={settings.historyEnabled !== false}
+          history={readHistory}
+          onOpenMarks={(focusSearch) => {
+            if (focusSearch) window.navHandoff.set('marksFocusSearch', true);
+            if (typeof window.__loadScreensG === 'function') window.__loadScreensG();
+            setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null });
+            setScreen('marks-index');
+          }}
+          onOpenSettingsPage={(group) => { window.navHandoff.set('settingsGroup', group); goSettings(); }}
           theme={theme} onThemeChange={setTheme}
         />
     ),
@@ -1131,6 +1139,25 @@ export function buildScreenRoutes({
         onSearch={goSearch}
         onHistory={goHistory}
         historyEnabled={settings.historyEnabled !== false}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
+    // rs3 (overhaul): Marks & notes. Its tools rows open the per-kind screens with Back returning here.
+    'marks-index': () => typeof MarksScreen !== 'undefined' ? _kickVot(
+      <MarksScreen
+        onBack={goNavOrigin}
+        onNavigateToSource={(endpoint, meta) => {
+          if (endpoint) {
+            navigateToLink(endpoint, meta || { sourceLetterTitle: 'Marks & notes' });
+          }
+        }}
+        onOpenHighlights={() => { setNavOrigin({ screen: 'marks-index', returnOrigin: navOrigin || null }); setScreen('highlights-index'); }}
+        onOpenNotes={() => { window.navHandoff.set('notesReturnCtx', { tab: 'all-notes', drilledNbId: null }); setNavOrigin({ screen: 'marks-index', returnOrigin: navOrigin || null }); setScreen('notes-index'); }}
+        onOpenNotebooks={() => { window.navHandoff.set('notesReturnCtx', { tab: 'notebooks', drilledNbId: null }); setNavOrigin({ screen: 'marks-index', returnOrigin: navOrigin || null }); setScreen('notes-index'); }}
+        onOpenBookmarks={() => { setNavOrigin({ screen: 'marks-index', returnOrigin: navOrigin || null }); setScreen('bookmarks-index'); }}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
         theme={theme} onThemeChange={setTheme}
       />
     ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
