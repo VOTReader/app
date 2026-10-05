@@ -136,6 +136,8 @@ describe('titleMatch with the stop words: a title remembered out of order or in 
     expect(tm('The Days of Noah', 'noah and the flood')).toBe(1);
     expect(tm('Who You Choose', 'it is who you choose')).toBe(1);
     expect(tm('Walking Free', 'free')).toBe(1);
+    expect(tm('False Doctrines Within the Churches of Men Regarding Salvation', 'regarding the churches of men')).toBeLessThan(tm('Regarding the Churches of Men', 'regarding the churches of men'));
+    expect(tm('False Doctrines Within the Churches of Men', 'men churches')).toBe(1);
   });
   it('the title typed whole is still the title', () => {
     expect(tm('Regarding Tithing', 'tithing')).toBe(TITLE_EXACT_BOOST);

@@ -226,6 +226,8 @@ function titleWords(/** @type {string[]} */ titleToks, /** @type {string[]} */ q
   // Every word the reader meant, not most (out of order, most of a title's words are anywhere),
   // and the title give or take a word: "it is who you choose" quotes a letter, not "Who You Choose".
   if (!q.every((w) => t.indexOf(w) >= 0)) return 1;
+  // ...and most of the title: "churches of men" names "Regarding the Churches of Men", not "False Doctrines Within the Churches of Men".
+  if (q.length < TITLE_QUERY_MIN * t.length) return 1;
   const tl = new Set(joinApostropheS(titleToks).map(lemma));
   if (joinApostropheS(qTokens).filter((w) => !TITLE_LEAD.has(w) && !tl.has(lemma(w))).length > 1) return 1;
   return 1 + (TITLE_EXACT_BOOST - 1) * TITLE_BAG_RATE * (0.5 + 0.5 * q.length / t.length);
