@@ -217,3 +217,21 @@ describe('chapterIndexCurrentChapter — reading-dot decouple (route helper)', (
     expect(routes.chapterIndexCurrentChapter('psalms', 'psalms', {})).toBe(null);
   });
 });
+
+describe('ChapterIndex — how much of the book is read (rs2d, design sheet 09)', () => {
+  const subtitle = () => document.querySelector('.vol-index-subtitle').textContent;
+  it('adds "· N of M read" once a chapter is marked read', () => {
+    setupGlobals();
+    renderIndex({ markAsReadEnabled: true, isRead: (n) => n === 2 });
+    expect(subtitle()).toBe('150 Chapters · 1 of 3 read');
+  });
+  it('says nothing with none read, or with Mark as read off', () => {
+    setupGlobals();
+    renderIndex({ markAsReadEnabled: true, isRead: () => false });
+    expect(subtitle()).toBe('150 Chapters');
+    cleanup();
+    setupGlobals();
+    renderIndex({ markAsReadEnabled: false, isRead: () => true });
+    expect(subtitle()).toBe('150 Chapters');
+  });
+});

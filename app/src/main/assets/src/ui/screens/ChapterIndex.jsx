@@ -73,6 +73,9 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
       >{ratio.toFixed(1)}{"\xD7"} notes</span>
     );
   };
+  // "· 3 of 21 read" beside the book's line once a chapter is marked read (design sheet 09).
+  const nRead = markAsReadEnabled && isRead ? book.chapters.filter((ch) => isRead(ch.num)).length : 0;
+  const readOf = nRead > 0 ? nRead + ' of ' + book.chapters.length + ' read' : '';
   return (
     <ScreenLayout
       navChildren={LibraryNav({
@@ -84,7 +87,7 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
         <div className="vol-index-header">
           <div className="vol-index-eyebrow">Scriptures of Truth</div>
           <h1 className="vol-index-title">{book.title}</h1>
-          <div className="vol-index-subtitle">{book.subtitle}</div>
+          <div className="vol-index-subtitle">{book.subtitle}{readOf ? ' · ' + readOf : ''}</div>
           {/* Recorded Bible edition (per-chapter since 2026-08-09; comment
               corrected 2026-08-10). No chapter is named here — this is the
               book index — so the book starts at its first chapter and

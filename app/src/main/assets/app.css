@@ -1208,30 +1208,21 @@
            7.5vw equals 1.5rem on a 320 px phone at scale 1, so nothing changes at 1.0 (a11y-ux-6). */
         max-width: 42.5rem; margin: 0 auto; padding: 2.5rem min(1.5rem, 7.5vw) 5rem;
       }
-      .vol-index-header { text-align: center; margin-bottom: 2.5rem; }
+      /* The new look (rs2d, design sheets 04 + 09): the index header set left like the tab roots — gold capitals,
+         a display title, a plain line, the gold Listen button — and no ornament. */
+      .vol-index-header { text-align: left; margin-bottom: 1rem; }
       .vol-index-eyebrow {
-        font-family: var(--font-ui); font-size:var(--fs-12); letter-spacing:0.18em;
-        text-transform: uppercase; color: var(--gold); opacity: 0.8; margin-bottom: 0.5rem;
+        font-family: var(--font-ui); font-size:var(--fs-13); font-weight: 500; letter-spacing: var(--track-caps);
+        text-transform: uppercase; color: var(--gold); margin-bottom: 0.4rem;
       }
       .vol-index-title {
-        font-family: var(--font-ui); font-size: var(--fs-36);
-        color: var(--cream); margin-bottom: 0.3rem; line-height: 1.2;
+        font-family: var(--font-ui); font-weight: 400; font-size: clamp(var(--fs-36), 11vw, var(--fs-48)); letter-spacing: -0.01em;
+        color: var(--cream); margin-bottom: 0.35rem; line-height: 1.06; text-wrap: balance;
       }
       .vol-index-subtitle {
-        font-size: var(--fs-16); color: var(--cream-muted); font-style: italic; margin-bottom: 1.5rem;
+        font-family: var(--font-ui); font-size: var(--fs-18); color: var(--cream-dim); margin-bottom: 1.25rem; line-height: 1.35;
       }
-      .vol-index-ornament {
-        display: flex; align-items: center; gap: 0.75rem; max-width: 300px; margin: 0 auto;
-      }
-      .vol-index-ornament-line {
-        flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--gold-border), transparent);
-      }
-      .vol-index-ornament-line.r {
-        background: linear-gradient(to left, transparent, var(--gold-border), transparent);
-      }
-      .vol-index-ornament-diamond {
-        width: 7px; height: 7px; background: var(--gold-dim); transform: rotate(45deg); flex-shrink: 0;
-      }
+      .vol-index-ornament { display: none; }
       /* Holy Days' two playlists (the redesign, 2026-09-25). They were two boxed
          tiles ABOVE the page's own title, most of a phone's first screen; now two
          quiet link rows under the title and Play All (VolumeLetterIndex's
@@ -2073,7 +2064,9 @@
          collection index header with its chips wrapping below. */
       .hero-play-row { margin-top: 0; display: flex; justify-content: flex-start; }
       .hero .hero-offline-line { margin-left: 0; text-align: left; }
-      .vol-index-play-row { margin-top: 1.4rem; display: flex; justify-content: center; }
+      .vol-index-play-row { margin-top: 0; display: flex; justify-content: flex-start; }
+      .vol-index-header .audio-sec-chips { justify-content: flex-start; }
+      .vol-index-title + .vol-index-play-row { margin-top: 1rem; }
       .vol-index-play-row + .audio-sec-chips { margin-top: 0.8rem; }
 
       /* ── HERO ── */
@@ -2343,7 +2336,6 @@
       /* ── ANIMATIONS ── */
     
       @media (max-width: 500px) {
-        .vol-index-title { font-size: var(--fs-30); }
         .mode-toggle-wrap { right: 1rem; }
         .mode-btn { padding: 0.5rem 0.75rem; font-size: var(--fs-10); }
       }
@@ -3006,10 +2998,10 @@
        height, each with the pill's 44 px hit band; both show a playing state (W3-08). The songs card is a related card. */
     /* The new look (rs2b, Corbin's reference): a rectangular gold Listen button, title case, play glyph first. */
     .letter-listen-row { flex-wrap:wrap; gap:.75rem; }
-    .hero .hero-play-pill, .letter-listen-row .hero-play-pill { min-height:48px; padding:.5em 1.3em .5em 1em; border-radius:var(--radius-lg); font-size:var(--fs-18); font-weight:500; letter-spacing:.005em; text-transform:none; white-space:nowrap; gap:.6em; }
-    .hero .hero-play-pill svg, .letter-listen-row .hero-play-pill svg { width:1.2em; height:1.2em; }
-    .hero .hero-play-pill:not(.letter-sung-pill) { border-color:var(--pill-fill); background:var(--pill-fill); color:var(--on-gold); }
-    .hero .hero-play-pill.is-playing:not(.letter-sung-pill) { background:var(--gold-bright); border-color:var(--gold-bright); }
+    .hero .hero-play-pill, .vol-index-header .hero-play-pill, .letter-listen-row .hero-play-pill { min-height:48px; padding:.5em 1.3em .5em 1em; border-radius:var(--radius-lg); font-size:var(--fs-18); font-weight:500; letter-spacing:.005em; text-transform:none; white-space:nowrap; gap:.6em; }
+    .hero .hero-play-pill svg, .vol-index-header .hero-play-pill svg, .letter-listen-row .hero-play-pill svg { width:1.2em; height:1.2em; }
+    :is(.hero, .vol-index-header) .hero-play-pill:not(.letter-sung-pill) { border-color:var(--pill-fill); background:var(--pill-fill); color:var(--on-gold); }
+    :is(.hero, .vol-index-header) .hero-play-pill.is-playing:not(.letter-sung-pill) { background:var(--gold-bright); border-color:var(--gold-bright); }
     .letter-listen-row.has-songs .hero-play-pill { flex:0 1 auto; justify-content:center; }
     .letter-listen-pill { border-color:var(--pill-fill); background:var(--pill-fill); color:var(--on-gold); }
     .letter-listen-pill.is-playing { background:var(--gold-bright); border-color:var(--gold-bright); }
@@ -4190,14 +4182,17 @@
        clamps at two lines (owner report 2026-08-09). The two-column grids keep
        their cards. */
     .chapter-cards:not(.two-col) { gap:0; }
-    .chapter-cards:not(.two-col) .chapter-card-btn { background:none; border:0; border-bottom:1px solid var(--border); border-radius:0; padding:0.75rem 0.2rem; }
+    /* rs2d: hairline rows with a large gold numeral and a chevron (design sheets 04 + 09). */
+    .chapter-cards:not(.two-col) { padding-left:0; padding-right:0; border-top:1px solid var(--divider); }
+    .chapter-cards:not(.two-col) .chapter-card-btn { background:none; border:0; border-bottom:1px solid var(--divider); border-radius:0; padding:0.85rem 0.15rem; min-height:64px; }
+    .chapter-cards:not(.two-col) .chapter-card-btn::after { content:''; flex-shrink:0; width:8px; height:8px; margin:0 4px 0 2px; border-top:1.5px solid var(--cream-muted); border-right:1.5px solid var(--cream-muted); transform:rotate(45deg); }
     .chapter-cards:not(.two-col) .chapter-card-btn:active,
     .chapter-cards:not(.two-col) .chapter-card-btn.is-current { background:var(--gold-faint); }
     @media (hover: hover) { .chapter-cards:not(.two-col) .chapter-card-btn:hover .chapter-card-title { color:var(--gold-bright); } }
     .chapter-cards:not(.two-col) .chapter-card-divider { display:none; }
-    .chapter-cards:not(.two-col) .chapter-card-num { font-size:var(--fs-16); font-weight:400; color:var(--gold-dim); font-variant-numeric:tabular-nums; min-width:1.75rem; text-align:right; }
+    .chapter-cards:not(.two-col) .chapter-card-num { font-size:var(--fs-24); font-weight:400; color:var(--gold); font-variant-numeric:tabular-nums; min-width:2.1rem; text-align:left; }
     .chapter-cards:not(.two-col) .chapter-card-btn.is-current .chapter-card-num { color:var(--gold); }
-    .chapter-cards:not(.two-col) .chapter-card-title:not(.untitled) { font-style:normal; color:var(--cream-dim); font-size:var(--fs-18); }
+    .chapter-cards:not(.two-col) .chapter-card-title:not(.untitled) { font-family:var(--font-ui); font-style:normal; color:var(--cream); font-size:var(--fs-18); }
     .chapter-cards:not(.two-col) .chapter-card-label { letter-spacing:0.08em; }
     /* Coverage badge (hub order 2026-09-22) — one word per work: can it be
        read along with, only listened to, or is nothing recorded? It rides the

@@ -295,7 +295,7 @@ describe('app.css — one-column index lists are rows', () => {
     const row = block('.chapter-cards:not(.two-col) .chapter-card-btn');
     expect(row).toMatch(/background:\s*none/);
     expect(row).toMatch(/border:\s*0/);
-    expect(row).toMatch(/border-bottom:\s*1px solid var\(--border\)/);
+    expect(row).toMatch(/border-bottom:\s*1px solid var\(--divider\)/);   // rs2d: the new look's hairline token
     expect(row).toMatch(/border-radius:\s*0/);
     expect(block('.chapter-cards:not(.two-col) .chapter-card-divider')).toMatch(/display:\s*none/);
   });
