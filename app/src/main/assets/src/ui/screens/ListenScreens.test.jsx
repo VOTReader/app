@@ -16,6 +16,10 @@ const { player, setPlayerState } = vi.hoisted(() => {
     renditionsFor: vi.fn((volKey, item) => [{ reader: item.id === 'b' ? 'T' : 'B', tracks: [{ key: volKey + ':' + item.id, url: 'u:' + item.id, title: item.title, readerCode: item.id === 'b' ? 'T' : 'B' }] }]),
     playbackTracks: vi.fn((volKey, item) => [{ key: volKey + ':' + item.id, url: 'u:' + item.id, title: item.title, readerCode: item.id === 'b' ? 'T' : 'B' }]),
     playTrack: vi.fn(),
+    playSection: vi.fn(),
+    sectionsFor: vi.fn(() => []),
+    playBibleBook: vi.fn(),
+    bibleChapterOfTrack: (t) => t.ch,
     playCollection: vi.fn(),
     toggle: vi.fn(),
   };
@@ -23,7 +27,7 @@ const { player, setPlayerState } = vi.hoisted(() => {
 });
 vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
 
-import { ListenRoot, ListenSource, ListenHistory } from './ListenScreens.jsx';
+import { ListenRoot, ListenSource, ListenHistory, ListenBible } from './ListenScreens.jsx';
 import * as Shelf from '../components/AudioShelf.jsx';
 import * as AudioTrack from '../../utils/audio-track.js';
 import { listenEyebrow, listenReaderLine } from '../components/NowPlaying.jsx';
@@ -138,6 +142,15 @@ describe('ListenSource', () => {
     expect(player.playCollection).toHaveBeenCalledWith(expect.objectContaining({ startId: 'b' }));
   });
 
+  it('a collection with compilations offers them, each playing its longer sitting', () => {
+    player.sectionsFor.mockReturnValueOnce([['Part 1 · Intro–19', 's1', 'V'], ['Part 2 · 20–39', 's2', 'V']]);
+    const p = srcProps('one');
+    render(<ListenSource {...p} />);
+    fireEvent.click(screen.getByRole('button', { name: /Part 2 · 20–39/ }));
+    expect(player.playSection).toHaveBeenCalledWith('one', 1, 'Volume One');
+    expect(p.onOpenNowPlaying).toHaveBeenCalled();
+  });
+
   it('a voice: every letter that reader read, shelved by collection, played in that voice', () => {
     render(<ListenSource {...srcProps('voice:B')} />);
     expect(screen.getByRole('heading', { name: 'Benjamin' })).toBeTruthy();
@@ -157,5 +170,42 @@ describe('ListenHistory', () => {
     fireEvent.click(screen.getByRole('button', { name: /Chosen by God/ }));
     expect(player.playTrack).toHaveBeenCalled();
     expect(onOpenNowPlaying).toHaveBeenCalled();
+  });
+});
+
+describe('ListenBible', () => {
+  const chapters = (book, n) => Array.from({ length: n }, (_, i) => ({ key: 'bible-web:' + book, url: 'b:' + book + ':' + (i + 1), ch: i + 1 }));
+  const props = () => ({ volKey: 'bible-web', onBack: vi.fn(), onOpenNowPlaying: vi.fn(), onSearch: vi.fn(), onHistory: vi.fn(), onSettings: vi.fn(), theme: 'dark', onThemeChange: vi.fn() });
+  beforeEach(() => {
+    globalThis.BIBLE_AUDIO_BOOKS = [['genesis', 'Genesis'], ['exodus', 'Exodus'], ['matthew', 'Matthew'], ['john', 'John']];
+    player.playbackTracks.mockImplementation((volKey, item) => chapters(item.id, item.id === 'genesis' ? 50 : 3));
+  });
+  afterEach(() => { delete globalThis.BIBLE_AUDIO_BOOKS; player.playbackTracks.mockReset(); });
+
+  it('books split Old | New Testament; a book opens its chapter grid; a chapter plays and opens Now Playing', () => {
+    const p = props();
+    render(<ListenBible {...p} />);
+    expect(screen.getByRole('heading', { name: 'WEB · World English Bible' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Genesis/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Matthew/ })).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'New Testament' }));
+    expect(screen.getByRole('button', { name: /^Matthew/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: 'Old Testament' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Genesis/ }));
+    expect(screen.getByRole('heading', { name: 'Genesis' })).toBeTruthy();
+    expect(screen.getByText('50 chapters')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Genesis 7' }));
+    expect(player.playBibleBook).toHaveBeenCalledWith(expect.objectContaining({ volKey: 'bible-web', bookId: 'genesis', chapterNum: 7 }));
+    expect(p.onOpenNowPlaying).toHaveBeenCalled();
+  });
+
+  it('Resume names the chapter in progress; heard chapters carry a check', () => {
+    positions = { 'b:genesis:3': { t: 100, d: 300 }, 'b:genesis:1': { t: 299, d: 300 } };
+    render(<ListenBible {...props()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Genesis/ }));
+    expect(screen.getByRole('button', { name: /Resume · Chapter 3/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Genesis 1, heard' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /All books/ }));
+    expect(screen.getByRole('button', { name: /^Genesis/ })).toBeTruthy();
   });
 });

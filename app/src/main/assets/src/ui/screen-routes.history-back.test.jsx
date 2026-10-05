@@ -60,7 +60,7 @@ beforeEach(() => {
   // typeof guard, so the origin chain these cases walk needs them defined.
   /** @type {any} */ (globalThis).ListenRoot = () => null;
   /** @type {any} */ (globalThis).ListenSource = () => null;
-  /** @type {any} */ (globalThis).AudioCollectionScreen = () => null;
+  /** @type {any} */ (globalThis).ListenBible = () => null;
   /** @type {any} */ (globalThis).AudioSavedScreen = () => null;
   // The link-out surfaces under navigation-tabs-1. notes/links/bookmarks are
   // rendered unguarded by their routes, so they must exist as real globals.
@@ -89,7 +89,7 @@ afterEach(() => {
   delete /** @type {any} */ (globalThis).MyProgressScreen;
   delete /** @type {any} */ (globalThis).ListenRoot;
   delete /** @type {any} */ (globalThis).ListenSource;
-  delete /** @type {any} */ (globalThis).AudioCollectionScreen;
+  delete /** @type {any} */ (globalThis).ListenBible;
   delete /** @type {any} */ (globalThis).AudioSavedScreen;
   delete /** @type {any} */ (globalThis).NotesIndexScreen;
   delete /** @type {any} */ (globalThis).LinksScreen;
@@ -414,10 +414,16 @@ describe('screen-routes — the Listening Library returns to its actual origin',
     routes['audio-library']().props.onOpenSource('voice:B');
     expect(props.setAudioColKey).toHaveBeenCalledWith('voice:B');
     expect(makeRoutes({ audioColKey: 'study:purity' }).routes['audio-library-collection']().props.sourceKey).toBe('study:purity');
-    /** @type {any} */ (globalThis).AudioCollectionScreen = () => null;
+    expect(makeRoutes({ audioColKey: 'bible-web' }).routes['audio-library-collection']().props.volKey).toBe('bible-web');
+  });
+
+  it('a Bible edition opens ListenBible once bundle-h has it (rv1)', () => {
+    /** @type {any} */ (globalThis).ListenBible = () => null;
     try {
-      expect(makeRoutes({ audioColKey: 'bible-web-ebible' }).routes['audio-library-collection']().props.volKey).toBe('bible-web-ebible');
-    } finally { delete /** @type {any} */ (globalThis).AudioCollectionScreen; }
+      const view = makeRoutes({ audioColKey: 'bible-web' }).routes['audio-library-collection']();
+      expect(view.type).toBe(/** @type {any} */ (globalThis).ListenBible);
+      expect(view.props.volKey).toBe('bible-web');
+    } finally { delete /** @type {any} */ (globalThis).ListenBible; }
   });
 
   it('a stale tab on The Volumes lands on the Listen root (rv1)', () => {
@@ -443,18 +449,6 @@ describe('screen-routes — the Listening Library returns to its actual origin',
       silent: true,
     });
 
-    // A Bible edition still opens the collection screen, whose Text taps name it (rv1: letters open ListenSource).
-    /** @type {any} */ (globalThis).AudioCollectionScreen = () => null;
-    try {
-      const { routes: bibleRoutes, props: bibleProps } = makeRoutes({ audioColKey: 'bible-brm-kjv' });
-      bibleRoutes['audio-library-collection']().props.onOpenText({ key: 'one:wide-path' });
-      expect(bibleProps.pushFromLetter).toHaveBeenCalledWith({
-        sourceScreen: 'audio-library-collection',
-        sourceLetterTitle: 'Listening Library',
-        destSnapshot: { screen: 'vot-one-letter', letterId: 'wide-path' },
-        silent: true,
-      });
-    } finally { delete /** @type {any} */ (globalThis).AudioCollectionScreen; }
   });
 });
 

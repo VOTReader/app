@@ -15,6 +15,9 @@
                     Play / Resume pill, an outline Download, hairline rows
                     (number, title, "Read by … · status", a state glyph).
      ListenHistory  every recording started, newest first.
+     ListenBible    a Bible edition: its books, Old | New Testament; a book
+                    opens its chapter grid (Codex sheet 37): Resume ·
+                    Chapter N, Download book, chapters heard checked.
 
    No queue (hub 2026-10-05): a Play starts the natural order the player
    already builds. Nothing here writes a store: the rows read the library,
@@ -338,6 +341,8 @@ export function ListenSource(props) {
     for (const item of g.items) { if (tracksOf(g, item).some(inProgress)) { resumeAt = { g, item }; break; } }
     if (resumeAt) break;
   }
+  // WTLB's longer sittings (AUDIO_SECTIONS): the collection screen's Compilations, kept here (audit-listen 5.2).
+  const sections = key.indexOf(':') < 0 && typeof AudioPlayer.sectionsFor === 'function' ? (AudioPlayer.sectionsFor(key) || []) : [];
   const firstGroup = src.groups[0] || null;
   const allTracks = src.groups.flatMap((g) => g.items.map((item) => tracksOf(g, item)));
   const sizeKnown = offline && typeof offline.sizeOf === 'function' ? allTracks.flat().reduce((n, t) => n + (offline.sizeOf(t.url) || 0), 0) : 0;
@@ -368,6 +373,15 @@ export function ListenSource(props) {
             ) : null}
           </div>
         ) : <p className="listen-source-line">Not recorded yet.</p>}
+        {sections.length ? (
+          <section className="listen-source-group" aria-label="Compilations">
+            <Eyebrow>Compilations</Eyebrow>
+            {sections.map((sec, i) => (
+              <ListenRow key={sec[1] || i} title={sec[0]} line="In one longer sitting"
+                onClick={() => { AudioPlayer.playSection(key, i, src.title); props.onOpenNowPlaying(); }} />
+            ))}
+          </section>
+        ) : null}
         {src.groups.map((g) => (
           <section key={g.volKey + g.heading} className="listen-source-group" aria-label={g.heading || src.title}>
             {g.heading ? <Eyebrow>{g.heading}</Eyebrow> : null}
@@ -404,6 +418,107 @@ export function ListenHistory(props) {
           <ListenRow key={t.url} title={trackName(t)} line={[listenEyebrow(t), minutesLeft(t), relativePlayedAt(t.playedAt)].filter(Boolean).join(' · ')}
             onClick={() => { AudioPlayer.playTrack(t); props.onOpenNowPlaying(); }} />
         ))}
+      </div>
+    </ScreenLayout>
+  );
+}
+
+/** The canonical book list ([id, title]); Matthew opens the New Testament. */
+function bibleBooks() {
+  return typeof BIBLE_AUDIO_BOOKS !== 'undefined' && Array.isArray(BIBLE_AUDIO_BOOKS) ? BIBLE_AUDIO_BOOKS : [];
+}
+
+/**
+ * A Bible edition ('bible-*'): its recorded books, Old | New Testament, and a book's chapter grid. The book is this
+ * screen's own state, so the edition stays one route: the nav's back (and "All books") return from a book to the books.
+ * Chapters already heard to the end carry a check.
+ * @param {{ volKey: string, onBack: () => void, backLabel?: string, onOpenNowPlaying: () => void,
+ *   onSearch: () => void, onHistory: () => void, onSettings: () => void, theme: any, onThemeChange: (t: any) => void }} props
+ */
+export function ListenBible(props) {
+  useListenStores();
+  const offline = useOfflineAudio();
+  const online = useOnline();
+  const volKey = props.volKey;
+  const entry = Object.entries(BIBLE_AUDIO_EDITIONS).find(([, e]) => e && e.volKey === volKey) || null;
+  const edition = entry ? /** @type {any} */ (entry[1]) : null;
+  const books = bibleBooks();
+  const ntAt = books.findIndex((b) => b[0] === 'matthew');
+  const recorded = books.map((b, i) => ({ id: b[0], title: b[1], nt: ntAt >= 0 && i >= ntAt })).filter((b) => AudioPlayer.hasAudio(volKey, b.id));
+  const hasOt = recorded.some((b) => !b.nt);
+  const hasNt = recorded.some((b) => b.nt);
+  const [testament, setTestament] = React.useState(hasOt ? 'ot' : 'nt');
+  const [bookId, setBookId] = React.useState(/** @type {string | null} */ (null));
+  const state = AudioPlayer.getState();
+  const current = Array.isArray(state.queue) ? state.queue[state.qi] || null : null;
+  const live = state.status === 'playing' || state.status === 'loading';
+  const label = edition ? edition.label : '';
+  const nav = LibraryNav({
+    onBack: bookId ? () => setBookId(null) : props.onBack, backLabel: bookId ? label : props.backLabel, showHome: false,
+    onSearch: props.onSearch, onHistory: props.onHistory, onSettings: props.onSettings, theme: props.theme, onThemeChange: props.onThemeChange,
+  });
+
+  if (bookId) {
+    const book = recorded.find((b) => b.id === bookId) || { id: bookId, title: bookId, nt: false };
+    const tracks = AudioPlayer.playbackTracks(volKey, { id: book.id, title: book.title }, label);
+    const chapterOf = (/** @type {any} */ t) => AudioPlayer.bibleChapterOfTrack(t) || 1;
+    const going = tracks.find(inProgress) || null;
+    const heard = (/** @type {any} */ t) => { const p = positionOf(t); return !!(p && p.d > 0 && p.t >= p.d * IN_PROGRESS_END); };
+    const playing = (/** @type {any} */ t) => !!(current && live && current.url === t.url);
+    const play = (/** @type {number} */ chapterNum) => { AudioPlayer.playBibleBook({ volKey, bookId: book.id, label, chapterNum }); props.onOpenNowPlaying(); };
+    const size = offline && typeof offline.sizeOf === 'function' ? tracks.reduce((n, t) => n + (offline.sizeOf(t.url) || 0), 0) : 0;
+    const allOnPhone = !!(offline && tracks.length && tracks.every((t) => offline.isSaved(t.url)));
+    return (
+      <ScreenLayout navChildren={nav}>
+        <div className="listen-screen listen-source">
+          <Eyebrow>{label}</Eyebrow>
+          <h1 className="listen-source-title">{book.title}</h1>
+          <p className="listen-source-line">{tracks.length + (tracks.length === 1 ? ' chapter' : ' chapters')}</p>
+          <div className="listen-source-actions">
+            <button type="button" className="listen-pill" onClick={() => play(going ? chapterOf(going) : 1)}><PlayGlyph />{going ? 'Resume · Chapter ' + chapterOf(going) : 'Play'}</button>
+            {offline ? (
+              <button type="button" className="listen-outline" disabled={allOnPhone || !online}
+                onClick={() => offline.download(tracks.map((t) => ({ url: t.url, key: t.key, title: book.title + ' ' + chapterOf(t) })))}>
+                {allOnPhone ? 'Downloaded' : 'Download book' + (size ? ' · ' + formatBytes(size) : '')}
+              </button>
+            ) : null}
+          </div>
+          <div className="listen-grid" role="group" aria-label={book.title + ' chapters'}>
+            {tracks.map((t) => {
+              const n = chapterOf(t);
+              const off = !online && !(offline && offline.isSaved(t.url));
+              return (
+                <button key={t.url} type="button" disabled={off}
+                  className={'listen-grid-cell' + (playing(t) ? ' is-playing' : '') + (heard(t) ? ' is-heard' : '')}
+                  aria-label={book.title + ' ' + n + (heard(t) ? ', heard' : '') + (playing(t) ? ', playing' : '')}
+                  onClick={() => play(n)}>{n}</button>
+              );
+            })}
+          </div>
+          <ListenRow title="All books" onClick={() => setBookId(null)} />
+        </div>
+      </ScreenLayout>
+    );
+  }
+
+  const shown = recorded.filter((b) => (testament === 'nt' ? b.nt : !b.nt));
+  return (
+    <ScreenLayout navChildren={nav}>
+      <div className="listen-screen listen-source">
+        <Eyebrow>The Scriptures</Eyebrow>
+        <h1 className="listen-source-title">{label || 'Recordings'}</h1>
+        {edition && edition.description ? <p className="listen-source-line">{edition.description}</p> : null}
+        {hasOt && hasNt ? (
+          <div className="listen-segment" role="tablist" aria-label="Testament">
+            <button type="button" role="tab" aria-selected={testament === 'ot'} className={testament === 'ot' ? 'is-on' : ''} onClick={() => setTestament('ot')}>Old Testament</button>
+            <button type="button" role="tab" aria-selected={testament === 'nt'} className={testament === 'nt' ? 'is-on' : ''} onClick={() => setTestament('nt')}>New Testament</button>
+          </div>
+        ) : null}
+        {shown.map((b) => {
+          const n = AudioPlayer.playbackTracks(volKey, { id: b.id, title: b.title }, label).length;
+          const here = !!(current && live && typeof current.key === 'string' && current.key === volKey + ':' + b.id);
+          return <ListenRow key={b.id} title={b.title} line={here ? 'playing' : n + (n === 1 ? ' chapter' : ' chapters')} onClick={() => setBookId(b.id)} />;
+        })}
       </div>
     </ScreenLayout>
   );

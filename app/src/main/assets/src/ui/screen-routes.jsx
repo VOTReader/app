@@ -1231,23 +1231,16 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
-    // rv1: a letter collection, a study or a voice opens the Listen tab's Source screen; a Bible edition keeps this one.
-    'audio-library-collection': () => typeof ListenSource !== 'undefined' && !(typeof audioColKey === 'string' && audioColKey.lastIndexOf('bible-', 0) === 0) ? (
+    // rv1: a Bible edition opens its books and chapter grid (ListenBible); a letter collection, a study or a voice the
+    // Source screen (AudioCollectionScreen is retired from the bundle, kept for the cleanup).
+    'audio-library-collection': () => typeof audioColKey === 'string' && audioColKey.lastIndexOf('bible-', 0) === 0 ? (
+      typeof ListenBible !== 'undefined' ? (
+        <ListenBible key={audioColKey} volKey={audioColKey} onBack={goNavOrigin} backLabel="Listen" onOpenNowPlaying={_openNowPlaying}
+          onSearch={goSearch} onHistory={goHistory} onSettings={goSettings} theme={theme} onThemeChange={setTheme} />
+      ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…')
+    ) : typeof ListenSource !== 'undefined' ? (
       <ListenSource sourceKey={audioColKey} onBack={goNavOrigin} backLabel="Listen" onOpenNowPlaying={_openNowPlaying}
         onSearch={goSearch} onHistory={goHistory} onSettings={goSettings} theme={theme} onThemeChange={setTheme} />
-    ) : typeof AudioCollectionScreen !== 'undefined' ? (
-      <AudioCollectionScreen
-        volKey={audioColKey}
-        onBack={goNavOrigin}
-        backLabel={navOrigin && navOrigin.screen === 'audio-library-volumes' ? 'The Volumes'
-          : navOrigin && navOrigin.screen === 'audio-library-studies' ? 'Studies'
-          : 'Listening Library'}
-        onOpenText={(track) => _openAudioText(track, 'audio-library-collection')}
-        onSearch={goSearch}
-        onHistory={goHistory}
-        onSettings={goSettings}
-        theme={theme} onThemeChange={setTheme}
-      />
     ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
     [SONGS_SCREEN]: () => typeof AudioSongsScreen !== 'undefined' ? (
       <AudioSongsScreen

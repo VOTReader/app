@@ -1509,6 +1509,14 @@
       .listen-glyph.is-gold { color: var(--gold); cursor: default; }
       .listen-ring::before { content: ''; width: 20px; height: 20px; border-radius: 50%;
         background: conic-gradient(var(--gold) var(--p, 0%), var(--border) 0); -webkit-mask: radial-gradient(circle, transparent 7px, #000 8px); mask: radial-gradient(circle, transparent 7px, #000 8px); }
+      .listen-segment { display: grid; grid-template-columns: 1fr 1fr; margin: 0.5rem 0 0.75rem; border: 1px solid var(--gold); border-radius: 10px; overflow: hidden; }
+      .listen-segment button { min-height: 44px; border: 0; background: none; color: var(--cream); font: inherit; font-size: var(--fs-16); cursor: pointer; }
+      .listen-segment button.is-on { background: var(--gold); color: var(--bg); }
+      .listen-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin: 1rem 0; }
+      .listen-grid-cell { position: relative; min-height: 44px; border: 1px solid var(--border); border-radius: 8px; background: none; color: var(--cream); font: inherit; font-size: var(--fs-18); cursor: pointer; }
+      .listen-grid-cell.is-heard::after { content: '\2713'; position: absolute; top: 1px; right: 4px; color: var(--gold); font-size: var(--fs-12); }
+      .listen-grid-cell.is-playing { background: var(--gold); color: var(--bg); border-color: var(--gold); }
+      .listen-grid-cell:disabled { opacity: .4; cursor: default; }
       /* rv1 Now Playing (the overhaul's Listen tab, review build): full screen over everything, the reading's
          typographic cover, the one scrubber, -15 · prev · play · next · +15, one chip row, "Open the reading".
          Theme tokens only, so the shell's palette restyles it. */
