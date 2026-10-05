@@ -279,6 +279,102 @@ function docTokens(id, doc) {
 }
 /** The phrase ranking reads at most this many of the best-scored texts. */
 const PHRASE_CANDIDATES = 500;
+
+/* THE ORIGINAL BEFORE ITS REPRINT (search benchmark, 2026-10-05). Answers, Holy Days and
+   the studies reprint letters, Words To Live By and verses word for word, and a long Answers
+   topic holds every word of most queries: a remembered letter sentence came back with the
+   topic that quotes it first and the letter below it (74 of the benchmark's 187 open
+   misses, 9 of them exact quotes). Every sentence of an original text (a verse, a letter,
+   Words To Live By, The Blessed) is keyed by its words; a reprint near the top whose matched
+   sentence is one of them gives its place to that original (ORIGINAL_TIER: who reprints whom). */
+/** Reprints read for an original: the first this many results. */
+const ORIGINAL_REACH = 10;
+/** Who reprints whom: a text yields only to an original of a LOWER tier (Words To Live By excerpts the letters). */
+const ORIGINAL_TIER = { verse: 0, letter: 0, wtlb: 1, blessed: 1, 'holy-day': 2, 'bible-study': 3, answers: 4 };
+const ORIGINAL_KINDS = new Set(['verse', 'letter', 'wtlb', 'blessed']);
+/** @type {Map<string, string[]>|null} sentence key -> original doc ids */ let ORIGINALS = null;
+/** @type {Map<string, any>|null} original doc id -> its stored fields */ let ORIGINAL_DOCS = null;
+/** The sentences of a text, as character spans (a sentence ends at . ! ? ; or a line's end). */
+function sentenceSpans(text) {
+  const out = [];
+  const re = /[^.!?;\n]+[.!?;]*/g;
+  let m;
+  while ((m = re.exec(text))) out.push({ start: m.index, end: m.index + m[0].length, text: m[0] });
+  return out;
+}
+/** A sentence's key: its words as the index reads them; null under five words (too common to mean one text). */
+function sentenceKey(s) {
+  const toks = kjvEncode(s);
+  return toks.length >= 5 ? toks.join(' ') : null;
+}
+function originals() {
+  if (ORIGINALS) return ORIGINALS;
+  ORIGINALS = new Map();
+  ORIGINAL_DOCS = new Map();
+  const ids = msIndex._documentIds;
+  for (const [shortId, f] of msIndex._storedFields) {
+    if (!f || !ORIGINAL_KINDS.has(f.kind) || !f.text) continue;
+    const id = ids.get(shortId);
+    ORIGINAL_DOCS.set(id, f);
+    for (const s of sentenceSpans(f.text)) {
+      const k = sentenceKey(s.text);
+      if (!k) continue;
+      const list = ORIGINALS.get(k);
+      if (!list) ORIGINALS.set(k, [id]);
+      else if (list[list.length - 1] !== id) list.push(id);
+    }
+  }
+  return ORIGINALS;
+}
+/**
+ * Move each original ahead of a reprint of it near the top (in place).
+ * @param {Array<{score:number, doc:any, terms?:string[]}>} out  ranked, best first
+ * @param {Map<any, string>} idOf  each entry's doc id
+ * @param {string[]} terms  the words a landing marks (the query's own)
+ * @param {(doc:any) => boolean} allowed  the search's corpus and scope filters
+ * @param {(doc:any) => boolean} named  the query names this text's title: it keeps its place
+ */
+function originalsFirst(out, idOf, terms, allowed, named) {
+  if (!terms.length) return;
+  let O;
+  try { O = originals(); } catch { return; }
+  const D = /** @type {Map<string, any>} */ (ORIGINAL_DOCS);
+  // The matched sentence must hold a fair share of the query's words, not one word of a title.
+  const words = [...new Set(terms.flatMap((t) => kjvEncode(t)))];
+  const need = Math.min(3, Math.ceil(words.length / 2));
+  for (let i = 0; i < Math.min(out.length, ORIGINAL_REACH); i++) {
+    const e = out[i];
+    const tier = ORIGINAL_TIER[e.doc.kind];
+    if (!tier || !e.doc.text || named(e.doc)) continue;
+    const ex = matchExcerpt(e.doc.text, terms);
+    const at = ex ? e.doc.text.indexOf(ex) : -1;
+    if (at < 0) continue;
+    let found = null;
+    for (const s of sentenceSpans(e.doc.text)) {
+      if (s.end < at || s.start > at + ex.length) continue;
+      const k = sentenceKey(s.text);
+      if (k && words.filter((w) => (' ' + k + ' ').indexOf(' ' + w + ' ') >= 0).length < need) continue;
+      const ids = k && O.get(k);
+      const lower = ids && ids.filter((x) => D.has(x) && ORIGINAL_TIER[D.get(x).kind] < tier);
+      if (lower && lower.length) { found = lower; break; }
+    }
+    if (!found) continue;
+    // The original already ranked highest, else the first that the filters allow.
+    let j = -1;
+    for (let r = 0; r < out.length; r++) if (found.indexOf(idOf.get(out[r]) || '') >= 0) { j = r; break; }
+    if (j >= 0 && j < i) continue;
+    let entry;
+    if (j > i) entry = out.splice(j, 1)[0];
+    else {
+      const id = found.find((x) => D.has(x) && allowed(D.get(x)));
+      if (!id) continue;
+      entry = { score: e.score, doc: reshapeDoc(D.get(id)), terms: e.terms || [] };
+      idOf.set(entry, id);
+    }
+    out.splice(i, 0, entry);
+    i++;   // the reprint now sits under it
+  }
+}
 /** @type {Promise<boolean>|null} */ let building = null;
 let ready = false;
 /** @type {Error|null} */ let buildError = null;
@@ -305,6 +401,8 @@ async function build(options) {
   // ranking's token cache must not outlive the index it was read from
   TOKEN_CACHE.clear();
   tokenCacheSize = 0;
+  ORIGINALS = null;
+  ORIGINAL_DOCS = null;
   const code = options.translation || 'nkjv';
   const sig = dataSignature(code);
 
@@ -669,6 +767,7 @@ async function search(query, options) {
 
   // Post-ranking filters + dedup + cap.
   const out = [];
+  /** @type {Map<any, string>} */ const idOf = new Map();
   const seen = Object.create(null);
   // A quoted phrase and +/- words match WORDS, on the index's own tokens
   // (kjvEncode folds case, accents and both apostrophes, and splits on every
@@ -710,8 +809,18 @@ async function search(query, options) {
     if (seen[dedupKey]) continue;
     seen[dedupKey] = true;
     volCount[vid] = (volCount[vid] || 0) + 1;
-    out.push({ score: scoreMap[id], doc: reshapeDoc(doc), terms: matchedTerms[id] || [] });
+    const entry = { score: scoreMap[id], doc: reshapeDoc(doc), terms: matchedTerms[id] || [] };
+    idOf.set(entry, id);
+    out.push(entry);
   }
+  originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) =>
+    (!corpusFilter || d.corpus === corpusFilter) && (!scopeBookId || d.bookId === scopeBookId) && (!scopeVolumeId || d.volumeId === scopeVolumeId),
+    // A title the query names keeps its place; in a keyword search, a title holding one of its words ("144,000").
+    (d) => {
+      if (!d.title) return false;
+      const tt = kjvEncode(d.title);
+      return titleMatch(tt, typedTokens) > 1 || (keyword && typedTokens.some((w) => !(STOP && STOP.has(w)) && tt.indexOf(w) >= 0));
+    });
 
   /* A QUOTED PHRASE NOTHING HOLDS IS SEARCHED AS ITS WORDS (search audit 2026-09-27).
      A quote remembered one word off ("the earth shall grow old like a garment", where

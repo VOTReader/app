@@ -39,6 +39,8 @@ const GLOBALS = {
     // a topic that reprints the letter, and quotes its passage once more
     { id: 'persecution', num: 2, title: 'Regarding Persecution', paragraphs: [{ text: WATCHMAN + ' To this day you persecute My prophets.' }] },
     { id: 'false-prophets-topic', num: 3, title: 'Regarding False Prophets', paragraphs: [{ text: 'The Lord speaks of false prophets. ' + topic(['watch', 'pray', 'stand', 'endure', 'repent', 'hear', 'obey', 'walk', 'turn', 'love', 'wait', 'seek'], 60) }] },
+    // a topic that reprints the letter and dwells on its words (search benchmark, 2026-10-05)
+    { id: 'late-hour', num: 4, title: 'Regarding the Hour', paragraphs: [{ text: 'The hour is late; turn, and repent, says The Lord. '.repeat(12) + WATCHMAN }] },
   ],
 };
 const refs = (r) => r.results.map((x) => x.doc.ref + (x.doc.kind === 'verse' ? '' : ' · ' + x.doc.title));
@@ -71,6 +73,15 @@ describe('ranking on the audit\u2019s cases', () => {
   it('a passage quoted finds its letter before the topic that reprints it, quoted or not', async () => {
     expect(refs(await VotSearchMini.search('to this day you persecute my prophets'))[0]).toBe('Volume One · Letter 6 · The Watchman');
     expect(refs(await VotSearchMini.search('"to this day you persecute"'))[0]).toBe('Volume One · Letter 6 · The Watchman');
+  });
+
+  /* A remembered sentence came back with the topic that reprints it first (search benchmark
+     2026-10-05: 74 of 187 open misses). The original takes the reprint's place. */
+  it('a quote remembered a word off finds the original before a topic that reprints it and dwells on its words', async () => {
+    const q = 'repent and turn from your paths, for the hour is late';
+    const r = refs(await VotSearchMini.search(q));
+    expect(r[0]).toBe('Volume One · Letter 6 · The Watchman');
+    expect(r).toContain('Answers Only God Can Give · Regarding the Hour');
   });
 
   it('a word or two is a keyword search: the topic titled with them comes first', async () => {
