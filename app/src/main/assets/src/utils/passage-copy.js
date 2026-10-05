@@ -63,6 +63,19 @@
    Bible has no page on the site: a verse copy keeps its reference alone.
    cp3: the quote is the reader's option (Settings › Copy & Share › Highlight
    the Passage, off by default); by default the link names the letter alone.
+
+   THE QUOTE (cp4, Corbin 2026-10-05, from a note he pasted a verse into):
+   a copy that names where it is from reads as a quotation: the words in
+   double quotes, a blank line, then the reference (and the link):
+
+       "For I know that this will turn out for my deliverance ..."
+
+       Philippians 1:19 (NKJV-R)
+
+   A single verse carries no verse number (the reference names it), however
+   it was selected; a run of verses keeps a number on each. A Volumes of
+   Truth copy is quoted the same way. Words with no reference (the reader's
+   own journal) are never quoted.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { _bookmarkSourceLabel } from './bookmark-source.js';
@@ -209,6 +222,18 @@ function answersOrigin(ctx, keys) {
   if (src) return { reference: src.title + ' (' + collectionName(src.collection) + ')', target: sourceTarget(src.title, src.collection), quoteKeys };
   const href = ctx.entry && typeof ctx.entry.siteUrl === 'string' ? ctx.entry.siteUrl : '';
   return { reference: ctx.title + ' (' + ctx.collection + ')', target: href ? { href } : null, quoteKeys };
+}
+
+/** cp4: copied words as a quotation, in ASCII double quotes (as the phone's
+    keyboard types them). Words that are already one quotation (an intro
+    quote copied alone) are not quoted twice.
+    @param {string} body */
+export function quotedPassage(body) {
+  const b = String(body || '').trim();
+  if (!b) return '';
+  const marks = b.match(/["\u201C\u201D]/g) || [];
+  if (marks.length === 2 && /^["\u201C]/.test(b) && /["\u201D]$/.test(b)) return b;
+  return '"' + b + '"';
 }
 
 /** The line a copy of these blocks ends with, or '' for none.
@@ -378,7 +403,9 @@ function verseNumberOf(el) {
  * What a copy of `range` puts on the clipboard, or null when the range holds
  * no reading text (the browser's own copy stands then). `text` is `body`, then
  * `reference` and `link` (its place on thevolumesoftruth.com, cp2) each on its
- * own line. With `numbers` false the verse numbers are left out. The link
+ * own line; with a reference, `text` quotes `body` and leaves a blank line
+ * before the reference (cp4). With `numbers` false the verse numbers are left
+ * out, and a single verse never has one. The link
  * names the letter's page (a compilation entry's section) and quotes the copied
  * words only with `quote` (by default the reader's Highlight the Passage, cp3).
  * @param {Range} range
@@ -401,12 +428,15 @@ export function passageCopy(range, { numbers = true, quote = highlightLinks() } 
     parts.push({ el, key: el.getAttribute('data-hl-key') || '', body, clip, fromTop: !plainText(before.cloneContents()) });
   });
   const ending = (/** @type {string} */ body, /** @type {string} */ reference, /** @type {string} */ link) =>
-    body + (reference ? '\n' + reference : '') + (link ? '\n' + link : '');
+    (reference ? quotedPassage(body) + '\n\n' + reference : body) + (link ? '\n' + link : '');
   if (!parts.length) {
     // No verse block in it: words a page or a sheet declares a reference for
     // (a heading, an intro quote, a footnote's verse), or none of ours.
     const declared = declaredOrigin(range);
-    const words = declared ? plainText(range.cloneContents(), numbers) : '';
+    // A sheet's one verse is named by its reference: no number (cp4).
+    const frag = range.cloneContents();
+    const several = frag.querySelectorAll(VERSE_NUMBER).length > 1;
+    const words = declared ? plainText(frag, numbers && several) : '';
     if (!declared || !words) return null;
     const link = declared.target ? siteUrl(declared.target, quote ? quoteLines([range]) : undefined) : '';
     return { text: ending(words, declared.reference, link), body: words, reference: declared.reference, link, keys: [], isPublic: true };
@@ -420,7 +450,8 @@ export function passageCopy(range, { numbers = true, quote = highlightLinks() } 
       const numClip = clipTo(range, numEl);
       const picked = !!numClip && numClip.toString().trim() !== '';
       const n = (numEl.textContent || '').trim();
-      if (n && (picked || (manyVerses && p.fromTop))) body = n + ' ' + body;
+      // cp4: one verse is named by its reference alone, never numbered.
+      if (n && manyVerses && (picked || p.fromTop)) body = n + ' ' + body;
     }
     if (i > 0) text += isVerseKey(parts[i - 1].key) && isVerseKey(p.key) ? '\n' : '\n\n';
     text += body;

@@ -4,7 +4,7 @@
    takes on every reading surface: a verse per line, its number and a space,
    footnote digits and icons left out, and the reference on the last line. */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { passageCopy, passageLabel, passageReference, readingBlocksIn, isVerseKey, translationTag, sheetReference } from './passage-copy.js';
+import { passageCopy, passageLabel, passageReference, readingBlocksIn, isVerseKey, translationTag, sheetReference, quotedPassage } from './passage-copy.js';
 
 const V37 = 'On the last day, that great day of the feast, YahuShua stood and cried out, saying, “If anyone thirsts, let him come to Me and drink.';
 const V38 = 'He who believes in Me, as the Scripture has said, out of his heart will flow rivers of living water.”';
@@ -53,7 +53,7 @@ describe('passageCopy — a Bible passage (the reader\'s John 7:37-39)', () => {
     const num37 = /** @type {Node} */ (document.querySelector('#v-37 .verse-num')?.firstChild);
     const end = lastText(block('bible:john:7:39'));
     const out = /** @type {any} */ (passageCopy(range(num37, 0, end, end.length)));
-    expect(out.text).toBe(`37 ${V37}\n38 ${V38}\n39 ${V39}\nJohn 7:37-39 (NKJV-R)`);
+    expect(out.text).toBe(`"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nJohn 7:37-39 (NKJV-R)`);
     expect(out.keys).toEqual(['bible:john:7:37', 'bible:john:7:38', 'bible:john:7:39']);
     expect(out.isPublic).toBe(true);
   });
@@ -63,7 +63,7 @@ describe('passageCopy — a Bible passage (the reader\'s John 7:37-39)', () => {
     const start = /** @type {Node} */ (block('bible:john:7:37').firstChild);
     const end = lastText(block('bible:john:7:39'));
     expect(/** @type {any} */ (passageCopy(range(start, 0, end, end.length))).text)
-      .toBe(`37 ${V37}\n38 ${V38}\n39 ${V39}\nJohn 7:37-39 (NKJV-R)`);
+      .toBe(`"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nJohn 7:37-39 (NKJV-R)`);
   });
 
   it('started mid-verse: that part-verse has no number, the rest do, and the reference still names it', () => {
@@ -71,22 +71,22 @@ describe('passageCopy — a Bible passage (the reader\'s John 7:37-39)', () => {
     const start = /** @type {Node} */ (block('bible:john:7:37').firstChild);
     const end = lastText(block('bible:john:7:38'));
     const out = /** @type {any} */ (passageCopy(range(start, V37.indexOf('YahuShua'), end, end.length)));
-    expect(out.text).toBe(`${V37.slice(V37.indexOf('YahuShua'))}\n38 ${V38}\nJohn 7:37-38 (NKJV-R)`);
+    expect(out.text).toBe(`"${V37.slice(V37.indexOf('YahuShua'))}\n38 ${V38}"\n\nJohn 7:37-38 (NKJV-R)`);
   });
 
-  it('one verse: the words and the reference, no number unless the number itself was selected', () => {
+  it('one verse (cp4): the words quoted, a blank line, the reference; no number even when the number was selected', () => {
     bibleChapter([[37, V37], [38, V38]]);
     const t = /** @type {Node} */ (block('bible:john:7:38').firstChild);
-    expect(/** @type {any} */ (passageCopy(range(t, 0, t, 15))).text).toBe('He who believes\nJohn 7:38 (NKJV-R)');
+    expect(/** @type {any} */ (passageCopy(range(t, 0, t, 15))).text).toBe('"He who believes"\n\nJohn 7:38 (NKJV-R)');
     const num = /** @type {Node} */ (document.querySelector('#v-38 .verse-num')?.firstChild);
-    expect(/** @type {any} */ (passageCopy(range(num, 0, t, 15))).text).toBe('38 He who believes\nJohn 7:38 (NKJV-R)');
+    expect(/** @type {any} */ (passageCopy(range(num, 0, t, 15))).text).toBe('"He who believes"\n\nJohn 7:38 (NKJV-R)');
   });
 
   it('a start dropped between the digits of a number still copies the whole number', () => {
     bibleChapter([[37, V37], [38, V38]]);
     const num = /** @type {Node} */ (document.querySelector('#v-37 .verse-num')?.firstChild);
     const end = lastText(block('bible:john:7:38'));
-    expect(/** @type {any} */ (passageCopy(range(num, 1, end, end.length))).text.startsWith('37 On the last day')).toBe(true);
+    expect(/** @type {any} */ (passageCopy(range(num, 1, end, end.length))).text.startsWith('"37 On the last day')).toBe(true);
   });
 
   it('numbers: false gives the words alone, a verse per line, with the reference apart', () => {
@@ -103,14 +103,14 @@ describe('passageCopy — a Bible passage (the reader\'s John 7:37-39)', () => {
     bibleChapter([[37, V37], [38, V38]]);
     const start = /** @type {Node} */ (block('bible:john:7:37').firstChild);
     const num38 = /** @type {Node} */ (document.querySelector('#v-38 .verse-num')?.firstChild);
-    expect(/** @type {any} */ (passageCopy(range(start, 0, num38, 2))).text).toBe(`${V37}\nJohn 7:37 (NKJV-R)`);
+    expect(/** @type {any} */ (passageCopy(range(start, 0, num38, 2))).text).toBe(`"${V37}"\n\nJohn 7:37 (NKJV-R)`);
   });
 
   it('a range across chapters is named as one: "John 7:53-8:1"', () => {
     const a = bibleChapter([[53, 'And everyone went to his own house.']], 'john:7');
     const b = bibleChapter([[1, 'But Jesus went to the Mount of Olives.']], 'john:8');
     const out = /** @type {any} */ (passageCopy(range(a, 0, b, b.childNodes.length)));
-    expect(out.text).toBe('53 And everyone went to his own house.\n1 But Jesus went to the Mount of Olives.\nJohn 7:53-8:1 (NKJV-R)');
+    expect(out.text).toBe('"53 And everyone went to his own house.\n1 But Jesus went to the Mount of Olives."\n\nJohn 7:53-8:1 (NKJV-R)');
   });
 
   it('footnote digits, note icons and link icons never reach the clipboard', () => {
@@ -118,7 +118,7 @@ describe('passageCopy — a Bible passage (the reader\'s John 7:37-39)', () => {
     const b1 = block('bible:john:7:1');
     b1.innerHTML = 'In the <mark class="hl-mark">beginning</mark><span class="fn-ref">3</span> was<span class="hl-note-icon" data-hl-key="bible:john:7:1"><svg></svg></span> the Word';
     const out = /** @type {any} */ (passageCopy(range(b1, 0, b1, b1.childNodes.length)));
-    expect(out.text).toBe('In the beginning was the Word\nJohn 7:1 (NKJV-R)');
+    expect(out.text).toBe('"In the beginning was the Word"\n\nJohn 7:1 (NKJV-R)');
     expect(out.keys).toEqual(['bible:john:7:1']);
   });
 });
@@ -138,7 +138,7 @@ describe('passageCopy — letters and poems', () => {
   it('paragraphs a blank line apart, a poem a line per line, the heading left out, the letter named with its volume', () => {
     const body = letter();
     const out = /** @type {any} */ (passageCopy(range(body, 0, body, body.childNodes.length)));
-    expect(out.text).toBe('Hear the Word of The Lord.\n\nTherefore, turn from this\nWicked way you have chosen!\nThe Wide Path (Volume Two)\n'
+    expect(out.text).toBe('"Hear the Word of The Lord.\n\nTherefore, turn from this\nWicked way you have chosen!"\n\nThe Wide Path (Volume Two)\n'
       + 'https://www.thevolumesoftruth.com/The_Wide_Path');
   });
 
@@ -148,7 +148,7 @@ describe('passageCopy — letters and poems', () => {
     p.innerHTML = 'Take your every thought captive<br><br>That you may be set apart';
     document.body.appendChild(p);
     expect(/** @type {any} */ (passageCopy(range(p, 0, p, p.childNodes.length))).text)
-      .toBe('Take your every thought captive\n\nThat you may be set apart\nFaith (Words To Live By: Part One)\n'
+      .toBe('"Take your every thought captive\n\nThat you may be set apart"\n\nFaith (Words To Live By: Part One)\n'
         + 'https://www.thevolumesoftruth.com/Words_To_Live_By:_Part_One#Faith');
   });
 
@@ -157,7 +157,7 @@ describe('passageCopy — letters and poems', () => {
     c.setAttribute('data-hl-key', 'letter:the-wide-path:3');
     c.innerHTML = '<div class="poem-line"><span class="verse-num">18</span>If anyone adds to these words,</div>';
     document.body.appendChild(c);
-    expect(/** @type {any} */ (passageCopy(range(c, 0, c, c.childNodes.length))).text.split('\n')[0]).toBe('18 If anyone adds to these words,');
+    expect(/** @type {any} */ (passageCopy(range(c, 0, c, c.childNodes.length))).text.split('\n')[0]).toBe('"18 If anyone adds to these words,"');
   });
 
   it('Hidden Manna is named by its title alone', () => {
@@ -166,7 +166,7 @@ describe('passageCopy — letters and poems', () => {
     p.textContent = 'I AM the Bread of Life.';
     document.body.appendChild(p);
     expect(/** @type {any} */ (passageCopy(range(p, 0, p, 1))).text)
-      .toBe('I AM the Bread of Life.\nThe Bread of Life\nhttps://www.thevolumesoftruth.com/The_Bread_of_Life');
+      .toBe('"I AM the Bread of Life."\n\nThe Bread of Life\nhttps://www.thevolumesoftruth.com/The_Bread_of_Life');
   });
 
   it('the reader\'s own journal: the words alone, and not public (the browser keeps its own copy)', () => {
@@ -197,7 +197,7 @@ describe('readingBlocksIn — only the page the reader is on', () => {
     bibleChapter([[1, 'After these things']]);
     const all = range(document.body, 0, document.body, document.body.childNodes.length);
     expect(readingBlocksIn(all).map((e) => e.getAttribute('data-hl-key'))).toEqual(['bible:john:7:1']);
-    expect(/** @type {any} */ (passageCopy(all)).text).toBe('1 After these things\nJohn 7:1 (NKJV-R)');
+    expect(/** @type {any} */ (passageCopy(all)).text).toBe('"After these things"\n\nJohn 7:1 (NKJV-R)');
   });
 });
 
@@ -244,6 +244,14 @@ describe('labels', () => {
     expect(passageReference(['bible:john:7'])).toBe('John 7 (NKJV-R)');
   });
 
+  it('cp4: copied words are quoted once; words already one quotation are not quoted twice', () => {
+    expect(quotedPassage('He who believes')).toBe('"He who believes"');
+    expect(quotedPassage('"Fear not, little flock"')).toBe('"Fear not, little flock"');
+    expect(quotedPassage('\u201CFear not\u201D')).toBe('\u201CFear not\u201D');
+    expect(quotedPassage('"Come," He said, "and see"')).toBe('""Come," He said, "and see""');
+    expect(quotedPassage('  ')).toBe('');
+  });
+
   it('a sheet names its NKJV verse, or keeps the translation its reference already names', () => {
     expect(sheetReference('John 3:16')).toBe('John 3:16 (NKJV)');
     expect(sheetReference('John 14:6 (KJV)')).toBe('John 14:6 (KJV)');
@@ -261,7 +269,7 @@ describe('passageCopy — always ends with where the words are from', () => {
     body.innerHTML = '<div class="section-heading">Rivers of Living Water</div>';
     document.body.appendChild(body);
     const h = /** @type {Element} */ (body.firstElementChild);
-    expect(/** @type {any} */ (passageCopy(range(h, 0, h, 1))).text).toBe('Rivers of Living Water\nJohn 7 (NKJV-R)');
+    expect(/** @type {any} */ (passageCopy(range(h, 0, h, 1))).text).toBe('"Rivers of Living Water"\n\nJohn 7 (NKJV-R)');
   });
 
   it('a footnote sheet\'s verses keep their numbers apart ("19 For", not "19For") and name themselves', () => {
@@ -271,7 +279,14 @@ describe('passageCopy — always ends with where the words are from', () => {
     v.innerHTML = '<span><span><sup class="verse-sup">19</sup>And this is the condemnation. </span><span><sup class="verse-sup">20</sup>For everyone practicing evil hates the light.</span></span>';
     document.body.appendChild(v);
     expect(/** @type {any} */ (passageCopy(range(v, 0, v, v.childNodes.length))).text)
-      .toBe('19 And this is the condemnation. 20 For everyone practicing evil hates the light.\nJohn 3:19-20 (NKJV)');
+      .toBe('"19 And this is the condemnation. 20 For everyone practicing evil hates the light."\n\nJohn 3:19-20 (NKJV)');
+    // A sheet's one verse is named by its reference alone (cp4).
+    const one = document.createElement('div');
+    one.setAttribute('data-copy-ref', 'John 3:16 (NKJV)');
+    one.innerHTML = '<span><sup class="verse-sup">16</sup>For God so loved the world</span>';
+    document.body.appendChild(one);
+    expect(/** @type {any} */ (passageCopy(range(one, 0, one, one.childNodes.length))).text)
+      .toBe('"For God so loved the world"\n\nJohn 3:16 (NKJV)');
   });
 
   it('a block whose entry cannot be named still carries its page\'s name', () => {
@@ -282,7 +297,7 @@ describe('passageCopy — always ends with where the words are from', () => {
     document.body.appendChild(page);
     const p = /** @type {Element} */ (page.firstElementChild);
     expect(/** @type {any} */ (passageCopy(range(p, 0, p, 1))).text)
-      .toBe('Hear the Word of The Lord.\nThe Wide Path (Volume Two)\nhttps://www.thevolumesoftruth.com/The_Wide_Path');
+      .toBe('"Hear the Word of The Lord."\n\nThe Wide Path (Volume Two)\nhttps://www.thevolumesoftruth.com/The_Wide_Path');
   });
 
   it('a control\'s label inside a sheet is not the passage', () => {
@@ -290,7 +305,7 @@ describe('passageCopy — always ends with where the words are from', () => {
     v.setAttribute('data-copy-ref', 'John 3:16 (NKJV)');
     v.innerHTML = '<span>For God so loved the world</span><button>Go to John 3:16</button>';
     document.body.appendChild(v);
-    expect(/** @type {any} */ (passageCopy(range(v, 0, v, v.childNodes.length))).text).toBe('For God so loved the world\nJohn 3:16 (NKJV)');
+    expect(/** @type {any} */ (passageCopy(range(v, 0, v, v.childNodes.length))).text).toBe('"For God so loved the world"\n\nJohn 3:16 (NKJV)');
   });
 
   it('the reader\'s journal gets no page name even inside a named page', () => {
@@ -350,7 +365,7 @@ describe('passageCopy — the link to the passage on thevolumesoftruth.com', () 
     expect(out.reference).toBe('The Wide Path (Volume Two)');
     // "eloved," is not a word the page has; "way. Few" runs across the site's "[3]".
     expect(out.link).toBe(SITE + 'The_Wide_Path#:~:text=walk%20the%20narrow%20way.,they%20who%20find%20it%2E');
-    expect(out.text).toBe(out.body + '\n' + out.reference + '\n' + out.link);
+    expect(out.text).toBe('"' + out.body + '"\n\n' + out.reference + '\n' + out.link);
   });
 
   it('marks left alone past a footnote ("dunghill³...") are not quoted: the quote ends on words', () => {
@@ -366,7 +381,7 @@ describe('passageCopy — the link to the passage on thevolumesoftruth.com', () 
     const w = bibleChapter([[16, 'For God so loved the world']], 'john:3');
     const out = /** @type {any} */ (passageCopy(range(w, 0, w, w.childNodes.length)));
     expect(out.link).toBe('');
-    expect(out.text).toBe('16 For God so loved the world\nJohn 3:16 (NKJV-R)');
+    expect(out.text).toBe('"For God so loved the world"\n\nJohn 3:16 (NKJV-R)');
   });
 
   it('a Holy Days entry taken from Words To Live By links to its section there', () => {
@@ -415,7 +430,7 @@ describe('passageCopy — the link to the passage on thevolumesoftruth.com', () 
     document.body.appendChild(page);
     const h = /** @type {Element} */ (page.firstElementChild);
     const out = /** @type {any} */ (passageCopy(range(h, 0, h, 1)));
-    expect(out.text).toBe('The Wide Path\nThe Wide Path (Volume Two)\n' + SITE + 'The_Wide_Path#:~:text=The%20Wide%20Path');
+    expect(out.text).toBe('"The Wide Path"\n\nThe Wide Path (Volume Two)\n' + SITE + 'The_Wide_Path#:~:text=The%20Wide%20Path');
   });
 
   it('cp3: by default the link names the letter alone (a compilation entry, its section); the setting adds the words', () => {

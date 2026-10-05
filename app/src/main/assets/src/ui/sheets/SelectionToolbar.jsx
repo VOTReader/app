@@ -7,7 +7,7 @@ import { copyText as copyToClipboard, shareText } from '../../utils/copy-share.j
 import { CopyFallbackSheet } from './CopyFallbackSheet.jsx';
 import { withPassageLink } from '../../utils/passage-link.js';
 import { _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
-import { passageCopy, passageLabel, translationTag, readingBlocksIn } from '../../utils/passage-copy.js';
+import { passageCopy, passageLabel, translationTag, readingBlocksIn, quotedPassage } from '../../utils/passage-copy.js';
 import { listenFromTarget, startListenFrom, repeatTarget, startRepeat, REPEAT_TIMES } from '../../utils/listen-from.js';
 // The chrome list is shared with applyDOMHighlights' re-anchor (v05-02): what the recorder leaves out, the re-finder must too.
 import { ANNOTATION_CHROME } from '../../renderer/anchor-view.js';
@@ -584,7 +584,8 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       // formatter, so a Words To Live By poem's <br> lines no longer arrive
       // glued ("captiveThat you may").
       const selShare = (() => {
-        if (copied) return { text: copied.body, keys: copied.keys, reference: copied.reference, siteText: copied.link ? copied.text : '' };
+        // cp4: quoted, as Copy's is, whenever it is named.
+        if (copied) return { text: copied.reference ? quotedPassage(copied.body) : copied.body, keys: copied.keys, reference: copied.reference, siteText: copied.link ? copied.text : '' };
         try {
           const frag = range.cloneContents();
           frag.querySelectorAll('.fn-ref, .hl-note-icon, .verse-num').forEach(function(el) { el.remove(); });

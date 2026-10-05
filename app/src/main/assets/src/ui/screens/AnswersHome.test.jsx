@@ -101,10 +101,10 @@ describe('AnswersHome — the landing', () => {
     const quote = screen.getByRole('dialog').querySelector('.answers-sheet-verse');
     const words = document.createRange();
     words.selectNodeContents(quote.querySelector('p'));
-    expect(passageCopy(words).text).toBe('You shall not murder.\nExodus 20:13 (NKJV)');
+    expect(passageCopy(words).text).toBe('"You shall not murder."\n\nExodus 20:13 (NKJV)');
     const withButton = document.createRange();
     withButton.selectNodeContents(quote);
-    expect(passageCopy(withButton).text).toBe('You shall not murder.\nExodus 20:13 (NKJV)');
+    expect(passageCopy(withButton).text).toBe('"You shall not murder."\n\nExodus 20:13 (NKJV)');
   });
 
   it('asking shows the topic, then where else it is spoken of, and opens on the matching passage', () => {

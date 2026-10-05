@@ -1132,7 +1132,7 @@ describe('SelectionToolbar — Copy / Share outcomes are reported (A15)', () => 
     tapAction('Share');
     await settle();
     expect(sent.length).toBe(1);
-    expect(sent[0].text.startsWith(QUOTE)).toBe(true);
+    expect(sent[0].text.startsWith('"' + QUOTE + '"')).toBe(true);
     expect(sent[0].text).toContain('3:16');
     expect(sent[0].text.endsWith('https://votreader.github.io/app/?p=bible%3Ajohn%3A3%3A16')).toBe(true);
   });
@@ -1409,7 +1409,7 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
   const V37 = 'On the last day, that great day of the feast, YahuShua stood and cried out, saying, “If anyone thirsts, let him come to Me and drink.';
   const V38 = 'He who believes in Me, as the Scripture has said, out of his heart will flow rivers of living water.”';
   const V39 = 'But this He spoke concerning the Spirit, whom those believing in Him would receive; for the Holy Spirit was not yet given, because YahuShua was not yet glorified.';
-  const WANT = `37 ${V37}\n38 ${V38}\n39 ${V39}\nJohn 7:37-39 (NKJV-R)`;
+  const WANT = `"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nJohn 7:37-39 (NKJV-R)`;
   const g = /** @type {any} */ (globalThis);
   /** @type {PropertyDescriptor | undefined} */ let origClipboard;
 
@@ -1502,7 +1502,7 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
         .find((sp) => sp.textContent === 'Share')?.closest('.sel-action-btn'));
       act(() => { fire(shareBtn, 'click'); });
       await act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
-      expect(sent[0].text).toBe(`37 ${V37}\n38 ${V38}\n39 ${V39}\n\nJohn 7:37-39 (NKJV-R)\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A7%3A37`);
+      expect(sent[0].text).toBe(`"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nJohn 7:37-39 (NKJV-R)\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A7%3A37`);
     } finally {
       if (origShare) Object.defineProperty(navigator, 'share', origShare);
       else delete /** @type {any} */ (navigator).share;
@@ -1558,12 +1558,12 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
         .find((sp) => sp.textContent === label)?.closest('.sel-action-btn')), 'click'); });
       raise();
       press('Copy');
-      expect(written).toEqual([words + '\nThe Wide Path (Volume Two)\n'
+      expect(written).toEqual(['"' + words + '"\n\nThe Wide Path (Volume Two)\n'
         + 'https://www.thevolumesoftruth.com/The_Wide_Path']);
       raise();
       press('Share');
       await act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
-      expect(sent[0].text).toBe(words + '\n\nThe Wide Path (Volume Two)\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1');
+      expect(sent[0].text).toBe('"' + words + '"\n\nThe Wide Path (Volume Two)\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1');
     } finally {
       delete g.findEntryContext;
       if (origShare) Object.defineProperty(navigator, 'share', origShare);
@@ -1757,7 +1757,7 @@ describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
     await hold();
     act(() => { fire(choice('Website link'), 'click'); });
     await settle();
-    expect(sent.map((d) => d.text)).toEqual([WORDS + '\nThe Wide Path (Volume Two)\n' + SITE]);
+    expect(sent.map((d) => d.text)).toEqual(['"' + WORDS + '"\n\nThe Wide Path (Volume Two)\n' + SITE]);
     expect(document.querySelector('.sel-toolbar')).toBeNull();
   });
 
@@ -1768,13 +1768,13 @@ describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
     raise('letter:the-wide-path:1', WORDS);
     act(() => { fire(shareBtn(), 'click'); });
     await settle();
-    expect(sent.map((d) => d.text)).toEqual([WORDS + '\nThe Wide Path (Volume Two)\n' + SITE]);
+    expect(sent.map((d) => d.text)).toEqual(['"' + WORDS + '"\n\nThe Wide Path (Volume Two)\n' + SITE]);
     cleanup(); document.body.innerHTML = ''; sent.length = 0;
     g.StateStore = { get: () => ({ settings: { shareLink: 'site', linkHighlight: true } }) };
     raise('letter:the-wide-path:1', WORDS);
     act(() => { fire(shareBtn(), 'click'); });
     await settle();
-    expect(sent.map((d) => d.text)).toEqual([WORDS + '\nThe Wide Path (Volume Two)\n'
+    expect(sent.map((d) => d.text)).toEqual(['"' + WORDS + '"\n\nThe Wide Path (Volume Two)\n'
       + SITE + '#:~:text=Yet%20in%20your%20arrogance%2C,to%20forsake%20your%20Maker%2E']);
   });
 
@@ -1784,7 +1784,7 @@ describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
     expect(choice('App link')).toBeTruthy();
     act(() => { fire(choice('App link'), 'click'); });
     await settle();
-    expect(sent.map((d) => d.text)).toEqual([WORDS + '\n\nThe Wide Path (Volume Two)\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1']);
+    expect(sent.map((d) => d.text)).toEqual(['"' + WORDS + '"\n\nThe Wide Path (Volume Two)\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1']);
   });
 
   it('a hold with no click after it (Android) never swallows the next keyboard or TalkBack Share (cl1 review)', async () => {
@@ -1793,7 +1793,7 @@ describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
     act(() => { fire(choice('Cancel'), 'click'); });
     act(() => { fire(shareBtn(), 'click'); });
     await settle();
-    expect(sent.map((d) => d.text)).toEqual([WORDS + '\n\nThe Wide Path (Volume Two)\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1']);
+    expect(sent.map((d) => d.text)).toEqual(['"' + WORDS + '"\n\nThe Wide Path (Volume Two)\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1']);
   });
 
   it('✕ closes the choice; a passage the website does not have (the Bible) offers none', async () => {
@@ -1807,6 +1807,6 @@ describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
     expect(document.querySelector('.sel-link-choice')).toBeNull();
     act(() => { fire(shareBtn(), 'pointerup'); fire(shareBtn(), 'click'); });
     await settle();
-    expect(sent.map((d) => d.text)).toEqual(['For God so loved the world\n\nJohn 3:16\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A3%3A16']);
+    expect(sent.map((d) => d.text)).toEqual(['"For God so loved the world"\n\nJohn 3:16\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A3%3A16']);
   });
 });
