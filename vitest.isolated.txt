@@ -1,0 +1,19 @@
+# Test files the pre-commit hook's fast vitest mode (VOT_VITEST_FAST=1) runs in the normal forks pool, one fresh process
+# per file. Everything else runs in vmThreads (a fresh VM context per file, jsdom set up once per worker). These fail
+# there - cross-context instanceof, globals the VM context does not carry - and pass in forks. A file that fails only
+# under VOT_VITEST_FAST=1 belongs here. One path per line; see the end of vitest.config.js (network ln1, 2026-10-05).
+app/src/main/assets/lazy-css-loader.test.js
+app/src/main/assets/service-worker-1.contract.test.js
+app/src/main/assets/src/components/ErrorBoundary.test.jsx
+app/src/main/assets/src/ui/components/AudioPlayerBar.songs.test.jsx
+app/src/main/assets/src/ui/components/LetterSongs.test.jsx
+app/src/main/assets/src/ui/screens/AudioSongsScreen.keep.test.jsx
+app/src/main/assets/src/ui/screens/SettingsScreen.reloadtimer.test.jsx
+app/src/main/assets/src/ui/screens/SettingsScreen.test.jsx
+app/src/main/assets/src/ui/screens/SettingsScreen.write-freeze.test.jsx
+app/src/main/assets/src/utils/backup-flow.test.js
+app/src/main/assets/src/utils/offline-audio-web.test.js
+app/src/main/assets/src/utils/platform-bridge.test.js
+app/src/main/assets/src/utils/song-keep.test.js
+app/src/main/assets/src/utils/sw-register.test.js
+tools/smoke-ci.test.js

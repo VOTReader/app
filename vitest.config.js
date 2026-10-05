@@ -12,9 +12,10 @@
    Coverage gate is NOT set yet — Q5.2 (first real test) locks the
    initial value per the regression-gate principle. See PLAN.txt. */
 
-import { defineConfig } from 'vitest/config';
+import { defineConfig, configDefaults } from 'vitest/config';
+import { readFileSync } from 'node:fs';
 
-export default defineConfig({
+const config = defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.js'],
@@ -33,6 +34,10 @@ export default defineConfig({
     // fails a genuine hang rather than waiting on one — this raises the ceiling,
     // it does not remove it.
     testTimeout: 20000,
+    // Off CI, at most 4 workers (VOT_VITEST_WORKERS overrides). Vitest's default is every thread but one, so three
+    // lanes' suites at once held the laptop at 98-100 % CPU (hub, 2026-10-05 03:0x; it bugchecked under that on 09-24).
+    // CI keeps vitest's default: the runner is the job's alone.
+    maxWorkers: process.env.CI ? undefined : Number(process.env.VOT_VITEST_WORKERS || 4),
     include: [
       'app/src/main/assets/src/**/*.test.{js,jsx}',
       'app/src/main/assets/*.test.{js,jsx}', // service-worker.test.js (SW lives at the assets root)
@@ -416,3 +421,26 @@ export default defineConfig({
     },
   },
 });
+
+/* ln1 (2026-10-05): the pre-commit hook's fast mode. Setting up jsdom once per FILE is 59-73 % of a full run.
+   VOT_VITEST_FAST=1 splits the suite into two projects: `fast` runs in the vmThreads pool (each file still gets a fresh
+   VM context, but jsdom is set up once per worker; the whole suite measured 36 s against ~130 s) and `forks` runs the
+   files in vitest.isolated.txt, which fail in a VM context, in the default pool. --no-isolate was measured too and
+   rejected: it was as fast, but which files failed changed from run to run (state leaking in whatever order they ran).
+   Same include, setup, timeout and coverage floors. CI and `npm run test:coverage` without the variable keep the
+   default pool and stay the final word; the hook falls back to that full run when the fast one fails. */
+if (process.env.VOT_VITEST_FAST === '1') {
+  const forks = readFileSync(new URL('./vitest.isolated.txt', import.meta.url), 'utf8')
+    .split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+  // Built by hand, not `extends: true`, and the root include removed: a project otherwise inherits the root include
+  // (arrays concatenate) and every file runs twice.
+  const { environment, setupFiles, testTimeout, include } = config.test;
+  const base = { environment, setupFiles, testTimeout };
+  delete config.test.include;
+  config.test.projects = [
+    { test: { ...base, name: 'fast', pool: 'vmThreads', include, exclude: [...configDefaults.exclude, ...forks] } },
+    { test: { ...base, name: 'forks', include: forks } },
+  ];
+}
+
+export default config;

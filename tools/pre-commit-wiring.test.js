@@ -153,7 +153,7 @@ describe('pre-commit: the S22 measurement is checked at commit time (v12-05)', (
 describe('pre-commit: the bundles are rebuilt before the tests read them (v12-03)', () => {
   it('runs `npm run build` exactly once, before vitest', () => {
     const builds = lines.map((l, i) => (/^\s*npm run build\s*$/.test(l) ? i : -1)).filter((i) => i >= 0);
-    const vitest = lines.findIndex((l) => /^\s*npm run test:coverage\s*$/.test(l));
+    const vitest = lines.findIndex((l) => /^\s*npm run test:hook\s*$/.test(l));
     expect(builds.length, 'one build per commit').toBe(1);
     expect(vitest).toBeGreaterThan(-1);
     expect(builds[0], 'the build must come before the tests that read dist/').toBeLessThan(vitest);
