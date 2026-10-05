@@ -153,7 +153,7 @@ describe('TourOverlay — the card never leaves the screen; the ring is kept on 
   it('a target past the bottom edge: the card is clamped inside the viewport, Skip and Next reachable', () => {
     // The Export button, the stop that found this on a 699 px phone (Listen stops dock now, so the
     // clamp is exercised on a beside-the-ring stop).
-    document.body.innerHTML = '<div id="app"><div data-settings-group="data"><button>Export</button></div></div>';
+    document.body.innerHTML = '<div id="app"><div data-settings-group="data"><button>Back up now</button></div></div>';
     const pill = document.querySelector('[data-settings-group="data"] button');
     pill.getBoundingClientRect = rect(60, vh() + 120, 94, 25);      // below the fold, as Export was
     startAt('backup');
@@ -230,7 +230,7 @@ describe('TourOverlay — the card never leaves the screen; the ring is kept on 
     // arrival (a Settings group finishing its mount, emulator at 1.8, 2026-09-04): the target leaves
     // the screen while scrollTop has not moved. A reader's scroll moves scrollTop; that is left alone.
     vi.useFakeTimers();
-    document.body.innerHTML = '<div id="app"><div class="screen-scroll" style="overflow-y:auto"><div data-settings-group="data"><button>Export</button></div></div></div>';
+    document.body.innerHTML = '<div id="app"><div class="screen-scroll" style="overflow-y:auto"><div data-settings-group="data"><button>Back up now</button></div></div></div>';
     const scroller = /** @type {any} */ (document.querySelector('.screen-scroll'));
     Object.defineProperty(scroller, 'scrollHeight', { value: 4000 });
     Object.defineProperty(scroller, 'clientHeight', { value: vh() - 56 });
