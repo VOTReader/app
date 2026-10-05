@@ -69,7 +69,7 @@ describe('useReadProgress — audio listen bridge', () => {
    RECORDING, not a collection — so a listened chapter used to resolve nothing
    at all. It lands in the same chapter key space BibleChapterView's own
    mark-as-read writes, which is what makes it show a check on the chapter
-   index and count toward the Scripture-chapter milestones. */
+   index and count in My Progress. */
 describe('useReadProgress — audio listen bridge: Bible chapters', () => {
   it('credits the CHAPTER key space and feeds the streak', () => {
     const { result } = renderHook(() => useReadProgress({ savedReadItems: {}, markAsReadEnabled: true }));

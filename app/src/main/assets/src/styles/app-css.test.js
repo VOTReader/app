@@ -2,15 +2,14 @@
    ─────────────────────────────────────────────────────────────────────
    jsdom doesn't compute styles, so these tests read the stylesheet TEXT
    and assert the rules the UI contract depends on actually exist. The
-   flagship case: `.jrn-milestone-toast` lost ALL of its rules when the
+   flagship case: the journal's milestone toast (since removed, 2026-10-05) lost ALL of its rules when the
    journal injected-stylesheet was dismantled (2db70f5) — the toast became
    an unstyled, never-dismissing div while every JS caller kept working.
    A text-level guard would have caught it at commit time.
 
    Covers (Wave-0 STYLES batch):
      1. Every showToast({ className }) literal has a rule in app.css
-        (plan P1-5 guard) + the milestone toast's own gold top-pill rules
-        including a .show state.
+        (plan P1-5 guard).
      2. .ann-hint-pill coach-mark is click-through (pointer-events:none on
         the container, auto restored on the ✕ close only) and its text is
         not selectable (long-press under the pill must not raise the native
@@ -69,25 +68,13 @@ function toastClassNames() {
   return [...found];
 }
 
-describe('app.css — milestone toast (P1-5)', () => {
+describe('app.css — toast rules (P1-5)', () => {
   it('every showToast className literal has a rule in app.css', () => {
     const missing = toastClassNames().filter((c) => ruleBlock(CSS, '.' + c) === null);
     expect(missing).toEqual([]);
   });
-  it('.jrn-milestone-toast is the gold top pill: fixed, themed via vars, hidden by default', () => {
-    const block = ruleBlock(CSS, '.jrn-milestone-toast');
-    expect(block).not.toBeNull();
-    expect(block).toContain('position: fixed');
-    expect(block).toContain('top: 80px');
-    expect(block).toContain('var(--gold)');
-    expect(block).toContain('opacity: 0');
-    expect(block).toContain('pointer-events: none');
-    expect(block).toContain('transition');
-  });
-  it('.jrn-milestone-toast.show is the visible state the utility toggles', () => {
-    const block = ruleBlock(CSS, '.jrn-milestone-toast.show');
-    expect(block).not.toBeNull();
-    expect(block).toContain('opacity: 1');
+  it('carries no milestone rules (Milestones removed 2026-10-05)', () => {
+    expect(CSS).not.toMatch(/\.jrn-milestone-toast|\.milestones-|\.prg-milestone|\.prg-next/);
   });
 });
 
@@ -219,7 +206,7 @@ describe('app.css — the personal-study header starts at one height', () => {
     const m = new RegExp('(?:^|\\n)\\s*' + sel.replace(/[.]/g, '\\.') + ' \\{([^}]*)\\}').exec(bare);
     return m ? m[1] : '';
   };
-  it.each(['.library-screen', '.prg-screen', '.notes-index-screen', '.links-screen', '.bkm-screen', '.milestones-screen', '.plans-screen'])(
+  it.each(['.library-screen', '.prg-screen', '.notes-index-screen', '.links-screen', '.bkm-screen', '.plans-screen'])(
     '%s pads its top 1.25rem', (sel) => {
       expect(block(sel)).toMatch(/padding:\s*1\.25rem\s/);
     });
@@ -323,17 +310,13 @@ describe('app.css — one-column index lists are rows', () => {
 
 /* PROGRESS IS SECTIONS OF ROWS (redesign, 2026-09-25, Codex mockup r5 take 1). Up to eight
    gold-outlined stat boxes and boxed cards became one summary sentence and label / value rows on
-   hairlines; its 10 and 11 px labels grew to 12 or more, and "View all milestones ›" stopped
-   rendering in the browser's sans (a button has no face of its own). */
+   hairlines; its 10 and 11 px labels grew to 12 or more. */
 describe('app.css — Progress is sections of rows, not boxes', () => {
   it('has no stat-box rules left', () => {
     expect(CSS).not.toMatch(/\.prg-hero|\.prg-stat|\.prg-listen-hero/);
   });
   it('sets its rows on hairlines', () => {
     expect(ruleBlock(CSS, '.prg-fact {')).toMatch(/border-bottom:\s*1px solid var\(--border\)/);
-  });
-  it('gives the milestones link the body face', () => {
-    expect(ruleBlock(CSS, '.prg-milestones-all {')).toMatch(/font-family:\s*var\(--font-body\)/);
   });
   it('keeps every Progress type size at 12 px or more', () => {
     const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -784,8 +767,8 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
     '.section-heading', '.compact-list-header',
     // Label pass 2 (2026-09-25): the personal-study screens, the index lists, and the back and Listen pills.
     '.back-hint-pill', '.notes-tab', '.notes-index-sort', '.notes-index-sort-btn', '.note-row-date', '.note-row-nb',
-    '.nb-drilled-action', '.coverage-badge', '.coverage-badge-detail', '.milestones-filter', '.milestones-cat-head span',
-    '.milestones-value.is-earned', '.history-entry-time', '.history-search-count', '.bkm-row-source', '.link-row-date',
+    '.nb-drilled-action', '.coverage-badge', '.coverage-badge-detail',
+    '.history-entry-time', '.history-search-count', '.bkm-row-source', '.link-row-date',
     '.link-row-side-eyebrow', '.link-row-side-cat', '.hero-play-pill', '.chapter-cards.two-col .two-col-num',
     '.part-group-num', '.idx-note-chip',
   ];

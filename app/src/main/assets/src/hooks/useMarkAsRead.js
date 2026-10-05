@@ -122,7 +122,6 @@ export function useMarkAsRead(enabled, onMarkRead, trackKey) {
 import { useRefMirror } from './use-ref-mirror.js';
 import { COL_BY_KEY } from '../data/scripture-resolution.js';
 import { ReadingStreakStore } from '../stores/reading-streak-store.js';
-import { jrnShowMilestoneToast } from '../stores/journal-stats-store.js';
 
 /**
  * App-level read-progress state. Owns readItems (the per-collection
@@ -179,22 +178,12 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
       // Manual toggles are a claim, not a measurement, and skip it.
       if (typeof ReadingStatsStore !== 'undefined' && ReadingStatsStore) {
         try {
-          const newlyUnlocked = ReadingStatsStore.recordCompletion({
+          ReadingStatsStore.recordCompletion({
             key,
             words: payload.words,
             activeMs: payload.activeMs,
             wasReadBefore: !!prev,
           });
-          // BACKLOG [23]: reading milestones reuse the journal's toast, so
-          // a reader who hits both on the same day gets one consistent
-          // treatment rather than two. Only the FIRST is shown — several
-          // can cross at once (a long read can trip a words and an items
-          // threshold together) and stacking toasts would cover the text
-          // the reader just finished.
-          if (Array.isArray(newlyUnlocked) && newlyUnlocked.length &&
-              typeof jrnShowMilestoneToast === 'function') {
-            jrnShowMilestoneToast(newlyUnlocked[0]);
-          }
         } catch (e) { console.warn('reading-stats record failed', e); }
       }
       // Streak coherence (2026-08-03 UX walk): a VERIFIED completed read is
@@ -229,8 +218,8 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
   // COL_BY_KEY, while a Bible edition ('bible-*' volKeys, which COL_BY_KEY has
   // no entry for and never will) lands in the SAME chapter key space
   // BibleChapterView's own mark-as-read writes — `v1:<bookId>:<chapter>` — so
-  // a listened chapter shows a check on the chapter index, counts toward the
-  // Scripture-chapter milestones, and feeds the streak, exactly like a read
+  // a listened chapter shows a check on the chapter index, counts in My
+  // Progress, and feeds the streak, exactly like a read
   // one. The audio manifest's book ids ARE the corpus book ids by
   // construction (BIBLE_AUDIO_BOOKS is generated from books.js).
   React.useEffect(() => {

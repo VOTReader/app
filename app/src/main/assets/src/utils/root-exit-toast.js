@@ -39,9 +39,7 @@
      Module-level state (singleton). DOM manipulation directly into
      document.body so the toast is independent of the React tree — it
      mounts/unmounts based on raw events without going through React.
-     Equivalent to how the existing journal milestone toast works
-     (jrnShowMilestoneToast in journal-stats-store.js), keeping the
-     pattern consistent.
+     The same pattern the generic toast utility (utils/toast.js) uses.
 
    API:
      arm(durationMs = 2000) — show toast, start timer.

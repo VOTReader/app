@@ -7,12 +7,11 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 618 distinct identifiers.
+// Total: 612 distinct identifiers.
 
 // Cross-bundle bare-name globals — `any` by design, except React and
 // ReactDOM, typed from @types/react 18 (TYPED_GLOBALS in the generator).
 // The hooks are declared in hook-globals*.generated.d.ts (hook_global_types).
-declare const ACHIEVEMENT_STORE_NAMES: any;
 declare const ANSWERS: any;
 declare const ARROW_LAYOUT_OPTIONS: any;
 declare const AUDIO_ALTERNATES: any;
@@ -202,12 +201,10 @@ declare const LinksScreen: any;
 declare const MATTHEW: any;
 declare const MATTHEW_NKJV: any;
 declare const MATTHEW_PLAIN: any;
-declare const MILESTONE_DEFS: any;
 declare const MIN_HIDDEN_WORDS: any;
 declare const MONTH_ABBR: any;
 declare const MONTH_NAMES: any;
 declare const MatthewChapterView: any;
-declare const MilestonesScreen: any;
 declare const ModeToggle: any;
 declare const MultiNotePopover: any;
 declare const MyProgressScreen: any;
@@ -398,7 +395,6 @@ declare const bkmId: any;
 declare const blockBoundaryOffsets: any;
 declare const bookCategory: any;
 declare const bookItemsFor: any;
-declare const buildAchievements: any;
 declare const buildExportPayload: any;
 declare const buildNavIndex: any;
 declare const buildNavTree: any;
@@ -415,7 +411,6 @@ declare const clearSuppressNextHistoryPush: any;
 declare const colLetterArr: any;
 declare const colLetters: any;
 declare const colPreface: any;
-declare const collectAchievementSnapshot: any;
 declare const commitReadingNav: any;
 declare const composeNotesExport: any;
 declare const computeEndTarget: any;
@@ -479,7 +474,6 @@ declare const jrnPinIcon: any;
 declare const jrnRefKeyForBookmark: any;
 declare const jrnRefKeyForLetter: any;
 declare const jrnRenderInline: any;
-declare const jrnShowMilestoneToast: any;
 declare const lastVerseOfFirstRange: any;
 declare const letterHlKey: any;
 declare const linkPreface: any;

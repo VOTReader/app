@@ -4,7 +4,7 @@
    Generic show/hide-and-auto-dismiss for in-app toast notifications.
    Consolidates the "create-or-reuse a DOM element + classList.add('show')
    + setTimeout to remove" pattern that previously lived bespoke inside
-   jrnShowMilestoneToast (journal-stats-store.js). The 4 W2.6 alert()
+   the journal's milestone toast (removed 2026-10-05). The 4 W2.6 alert()
    sites (export-success, export-failed, import-not-recognized, import-
    complete) call into the same primitive.
 
@@ -151,11 +151,10 @@ export function _resetToasts() {
   }
   _hideTimers.clear();
   if (typeof document === 'undefined') return;
-  // Remove every toast element matching `[id^="vot-toast"]` AND known
-  // legacy ids (jrn-milestone-toast). Cheaper than tracking all ids.
+  // Remove every toast element matching `[id^="vot-toast"]`. Cheaper than
+  // tracking all ids.
   const selectors = [
     '[id^="vot-toast"]',
-    '#jrn-milestone-toast',
   ];
   for (const sel of selectors) {
     document.querySelectorAll(sel).forEach(function (el) {

@@ -35,10 +35,9 @@ function _saveIfChanged(eid, title, blocks, mood) {
 }
 
 /* P1-5/P1-7 — the New-Entry flow (use-journal-mutations) no longer records
-   stats at creation: the milestone toast fired on the New-Entry tap before a
-   word was written, and a backed-out blank entry still advanced the streak.
+   stats at creation: a backed-out blank entry still advanced the streak.
    Creation now leaves this localStorage marker instead; the editor records
-   stats + fires milestone toasts on the FIRST NON-EMPTY SAVE, and the
+   stats on the FIRST NON-EMPTY SAVE, and the
    prune-on-exit path clears the marker when a blank entry dies. localStorage
    (not a module variable) so the handoff survives a background-kill between
    create and first save. The same key literal lives in use-journal-mutations.js. */
@@ -324,7 +323,7 @@ export function JournalEditorScreen(props) {
     if (loaded.draftAction === 'clear') _clearJournalDraft();
   }, [loaded]);
 
-  // P1-5 — record New-Entry stats + fire milestone toasts on the FIRST
+  // P1-5 — record New-Entry stats (entry count, journal streak) on the FIRST
   // NON-EMPTY save of an entry created via the New-Entry flow (previously
   // fired on the New-Entry tap, before a word was written). Marker-gated
   // (JRN_NEW_ENTRY_STATS_KEY, set by use-journal-mutations) so an old entry
@@ -339,10 +338,7 @@ export function JournalEditorScreen(props) {
       if (!marker || marker !== eid) return;
       if (!(titleNow || '').trim() && !_blocksHaveContent(blocksNow)) return; // still blank — keep waiting
       try { localStorage.removeItem(JRN_NEW_ENTRY_STATS_KEY); } catch (_e) { /* ignore */ }
-      var newly = JournalStatsStore.recordNewEntry(createdRef.current || Date.now());
-      if (newly && newly.length && typeof jrnShowMilestoneToast === 'function') {
-        newly.forEach(function(m) { jrnShowMilestoneToast(m); });
-      }
+      JournalStatsStore.recordNewEntry(createdRef.current || Date.now());
     } catch (_e) { /* never break a save */ }
   }
 

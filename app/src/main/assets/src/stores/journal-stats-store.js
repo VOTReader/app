@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   JOURNAL STATS STORE — streaks + milestones
+   JOURNAL STATS STORE — entry count + streaks
    ═══════════════════════════════════════════════════════════════
    Global-scope module. Bundled into bundle-b via _entry-b.js.
    Depends on: CachedStore (defined earlier in main script block).
@@ -9,7 +9,9 @@
      - currentStreak: consecutive days with at least 1 entry created
      - longestStreak: best streak ever achieved
      - lastEntryDate: ISO date string (timezone-local) of most recent entry
-     - milestonesUnlocked: list of unlocked milestone keys
+     - milestonesUnlocked: the retired milestone ledger (Milestones were
+       removed 2026-10-05). Never read or written now, but kept in the
+       defaults and replaceAll so old backups import and export unchanged.
 
    Streak semantics:
      - "Day" = local-timezone calendar date (YYYY-MM-DD)
@@ -19,19 +21,9 @@
      - On app load (recomputeFromLoad), if today is later than
        lastEntryDate + 1 day, streak is broken (set to 0) — so the hub
        shows "Streak broken, journal today to restart" honestly.
-
-   Milestones (v1 set):
-     first      — first entry ever
-     entries-10 — 10 total entries
-     entries-30 — 30 total
-     entries-100 — 100 total
-     streak-7   — 7-day streak
-     streak-30  — 30-day streak
-     streak-100 — 100-day streak
 ═══════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
-import { showToast } from '../utils/toast.js';
 
 /**
  * On-disk shape.
@@ -43,15 +35,6 @@ import { showToast } from '../utils/toast.js';
  *   lastEntryDate: string | null,
  *   milestonesUnlocked: string[]
  * }} JournalStatsData
- */
-
-/**
- * @typedef {{
- *   key: string,
- *   type: 'entries' | 'streak',
- *   threshold: number,
- *   label: string
- * }} MilestoneDef
  */
 
 /**
@@ -85,17 +68,6 @@ export function _jrnDaysBetween(d1, d2) {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
 
-/** Milestone definitions, evaluated in order. @type {MilestoneDef[]} */
-export var MILESTONE_DEFS = [
-  { key: 'first',        type: 'entries', threshold: 1,    label: 'First entry' },
-  { key: 'entries-10',   type: 'entries', threshold: 10,   label: '10 entries' },
-  { key: 'entries-30',   type: 'entries', threshold: 30,   label: '30 entries' },
-  { key: 'entries-100',  type: 'entries', threshold: 100,  label: '100 entries' },
-  { key: 'streak-7',     type: 'streak',  threshold: 7,    label: '7-day streak' },
-  { key: 'streak-30',    type: 'streak',  threshold: 30,   label: '30-day streak' },
-  { key: 'streak-100',   type: 'streak',  threshold: 100,  label: '100-day streak' }
-];
-
 export var JournalStatsStore = extendStore(
   CachedStore('vot-journal-stats', /** @type {JournalStatsData} */ ({
     totalEntries: 0,
@@ -112,35 +84,14 @@ export var JournalStatsStore = extendStore(
     get() { return this._load(); },
 
     /**
-     * Milestone defs paired with their unlocked flag, in MILESTONE_DEFS order.
-     * @returns {{ key: string, label: string, unlocked: boolean }[]}
-     */
-    milestones() {
-      var data = this._load();
-      var u = data.milestonesUnlocked || [];
-      return MILESTONE_DEFS.map(function(m) {
-        return { key: m.key, label: m.label, unlocked: u.indexOf(m.key) >= 0 };
-      });
-    },
-
-    /**
-     * Only milestones the user has unlocked.
-     * @returns {{ key: string, label: string, unlocked: boolean }[]}
-     */
-    unlockedMilestones() {
-      return this.milestones().filter(function(m) { return m.unlocked; });
-    },
-
-    /**
-     * Record a NEW entry (not edits). Increments total, advances streak
-     * if it's a new calendar day, checks milestones, returns the newly-
-     * unlocked milestones so the caller can fire a toast.
+     * Record a NEW entry (not edits). Increments total and advances the
+     * streak if it's a new calendar day.
      *
      * @param {number} ts  epoch ms (typically Date.now())
-     * @returns {MilestoneDef[]}  newly-unlocked milestones (may be empty)
+     * @returns {void}
      */
     recordNewEntry(ts) {
-      if (this._shouldDefer('recordNewEntry', ts)) return [];
+      if (this._shouldDefer('recordNewEntry', ts)) return;
       var data = this._load();
       var today = _jrnDateStr(ts);
       data.totalEntries = (data.totalEntries || 0) + 1;
@@ -160,9 +111,7 @@ export var JournalStatsStore = extendStore(
       if (data.currentStreak > (data.longestStreak || 0)) {
         data.longestStreak = data.currentStreak;
       }
-      var newlyUnlocked = this._checkMilestones(data);
       this._save();
-      return newlyUnlocked;
     },
 
     /**
@@ -222,29 +171,6 @@ export var JournalStatsStore = extendStore(
       });
       this._save();
       this._bump();
-    },
-
-    /**
-     * Check every milestone def against the current stats; add newly-
-     * met ones to unlocked. Returns the just-added defs (caller fires
-     * toasts).
-     *
-     * @param {JournalStatsData} data
-     * @returns {MilestoneDef[]}
-     */
-    _checkMilestones(data) {
-      var u = data.milestonesUnlocked || (data.milestonesUnlocked = []);
-      /** @type {MilestoneDef[]} */
-      var newly = [];
-      MILESTONE_DEFS.forEach(function(m) {
-        if (u.indexOf(m.key) >= 0) return;
-        var n = (m.type === 'entries') ? data.totalEntries : data.currentStreak;
-        if (n >= m.threshold) {
-          u.push(m.key);
-          newly.push(m);
-        }
-      });
-      return newly;
     }
   }
 );
@@ -266,21 +192,3 @@ JournalStatsStore.recomputeFromLoad();
   });
 })();
 
-/**
- * Pop a small in-app toast at the top of the screen when a milestone
- * unlocks. Delegates DOM lifecycle to the generic `showToast` utility
- * (W2.6 consolidation); milestone-specific concern is just the HTML
- * payload + the existing `.jrn-milestone-toast` CSS class.
- *
- * @param {MilestoneDef | { label?: string, key?: string } | null | undefined} milestone
- * @returns {void}
- */
-export function jrnShowMilestoneToast(milestone) {
-  if (!milestone) return;
-  showToast({
-    id: 'jrn-milestone-toast',
-    className: 'jrn-milestone-toast',
-    html: '<span style="font-size:var(--fsc-14)">✦</span><span>Milestone: ' + (milestone.label || milestone.key) + '</span>',
-    durationMs: 3000,
-  });
-}

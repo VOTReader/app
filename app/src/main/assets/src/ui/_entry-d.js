@@ -49,11 +49,8 @@
 import { bibleHlKey, letterHlKey, wtlbHlKey, studyHlKey } from '../utils/hl-keys.js';
 import { relativeDate, timeAgo } from '../utils/dates.js';
 // Shared with the lazy Personal Study screens (bundle-g), which resolve them as
-// free globals at call time rather than bundling a second copy — see _entry-g.js.
-// ACHIEVEMENT_STORE_NAMES joins the two builders on window for bundle-g's
-// MilestonesScreen — one copy of the table, read across the bundle boundary.
-import { ACHIEVEMENT_STORE_NAMES, buildAchievements, collectAchievementSnapshot } from '../utils/achievements.js';
-// Shared with bundle-g the same way: reduced-motion's scroll law (every
+// free globals at call time rather than bundling a second copy — see _entry-g.js:
+// reduced-motion's scroll law (every
 // reading-path screen imports it here) and the reading-minute chip
 // (HistoryEntryCard / VolumeLetterIndex / ChapterIndex render it here).
 import { scrollBehavior } from '../utils/reduced-motion.js';
@@ -252,7 +249,6 @@ Object.assign(window, {
   // Utilities
   bibleHlKey, letterHlKey, wtlbHlKey, studyHlKey,
   relativeDate, timeAgo,
-  ACHIEVEMENT_STORE_NAMES, buildAchievements, collectAchievementSnapshot,
   scrollBehavior, readingChipWpm, readingMinChip, onIdle, normalizeExcerptDisplay,
   GARDEN_TOTAL, GARDEN_TIERS, GARDEN_DEFAULT_TIER, gardenImageCache, gardenCrawled, GARDEN_CACHE_MAX,
   getGardenTier, gardenUrl, gardenCacheKey, gardenPreload, gardenIsCached, gardenTierLimits, gardenClearCache,

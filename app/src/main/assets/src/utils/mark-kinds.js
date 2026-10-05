@@ -6,7 +6,7 @@
    A note is an annotation too, but it is counted as a note. Squiggle shipped as
    the third style (6705374f) and every tally of marks kept testing
    highlight | underline, so a plain squiggle never reached Highlights &
-   Underlines, the Library's count, My Progress or the achievements: the reader
+   Underlines, the Library's count or My Progress: the reader
    could find it only in the text. One predicate now. Pure, with no state, so
    each bundle that imports it may carry its own copy.
    ═══════════════════════════════════════════════════════════════════════ */

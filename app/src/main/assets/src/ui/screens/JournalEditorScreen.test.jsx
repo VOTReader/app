@@ -242,8 +242,8 @@ describe('JournalEditorScreen — insert never splits (UX-BATCH session 3, item 
          PRUNES: blank title + no block content → remove (skipStats), and
          the first-save stats marker + JRNL-1 draft for that entry die too.
 
-   P1-5  The milestone toast fired on the New-Entry tap, before a word was
-         written. Stats + toasts now wait for the FIRST NON-EMPTY SAVE,
+   P1-5  Stats were recorded on the New-Entry tap, before a word was
+         written. They now wait for the FIRST NON-EMPTY SAVE,
          handed off via the 'vot-journal-new-entry-stats' localStorage
          marker that createAndEditJournal leaves.
    ──────────────────────────────────────────────────────────────────────── */
@@ -388,21 +388,18 @@ describe('JournalEditorScreen — v05-05: leaving an entry unchanged keeps its d
   });
 });
 
-describe('JournalEditorScreen — P1-5: milestone/stats wait for the first non-empty save', () => {
+describe('JournalEditorScreen — P1-5: stats wait for the first non-empty save', () => {
   afterEach(() => {
     delete globalThis.JournalStatsStore;
-    delete globalThis.jrnShowMilestoneToast;
   });
 
-  it('records stats + fires the milestone toast on the FIRST non-empty save, exactly once', () => {
+  it('records stats on the FIRST non-empty save, exactly once', () => {
     const entry = JournalStore.add();
     localStorage.setItem(JRN_STATS_MARKER_KEY, entry.id); // the createAndEditJournal handoff
-    const recordNewEntry = vi.fn(() => [{ key: 'first', label: 'First entry' }]);
+    const recordNewEntry = vi.fn();
     globalThis.JournalStatsStore = { recordNewEntry, recordDeletion: vi.fn() };
-    globalThis.jrnShowMilestoneToast = vi.fn();
-
     render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
-    // The bug: the toast fired at New-Entry tap time. Here, nothing has been
+    // The bug: stats recorded at New-Entry tap time. Here, nothing has been
     // written yet, so nothing may have recorded.
     expect(recordNewEntry).not.toHaveBeenCalled();
 
@@ -414,8 +411,6 @@ describe('JournalEditorScreen — P1-5: milestone/stats wait for the first non-e
 
     expect(recordNewEntry).toHaveBeenCalledTimes(1);
     expect(recordNewEntry).toHaveBeenCalledWith(entry.created);
-    expect(globalThis.jrnShowMilestoneToast).toHaveBeenCalledTimes(1);
-    expect(globalThis.jrnShowMilestoneToast).toHaveBeenCalledWith({ key: 'first', label: 'First entry' });
     expect(localStorage.getItem(JRN_STATS_MARKER_KEY)).toBeNull(); // marker consumed
 
     // A later save (the unmount flush) does NOT re-record.

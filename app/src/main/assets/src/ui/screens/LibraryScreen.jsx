@@ -20,7 +20,6 @@
    React re-renders so the useEffect-only path leaves the refs stale.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { ACHIEVEMENT_STORE_NAMES, buildAchievements, collectAchievementSnapshot } from '../../utils/achievements.js';
 import { isMarkKind } from '../../utils/mark-kinds.js';
 import { createPressDrag } from '../../utils/press-drag.js';
 import { useStoreVersionByName } from '../../hooks/use-store-version.js';
@@ -36,13 +35,14 @@ function _libDragTrace(msg) {
   } catch (_e) { /* ignore */ }
 }
 
+// The stores behind the Notes, Links, Bookmarks, Journal and Highlights counts.
+const LIBRARY_COUNT_STORES = Object.freeze(['NoteStore', 'LinkStore', 'BookmarkStore', 'JournalStore', 'AnnotationStore']);
 
-export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenMilestones, onOpenPlans, readingPlanCount, onOpenScriptureWeb, totalReadCount, readItems, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
-  ACHIEVEMENT_STORE_NAMES.forEach(useStoreVersionByName);   // fixed list — stable hook order
-  // (AudioLibraryStore is in that list — the milestones chip counts listening.
-  // The Listening Library itself moved to a HOME card on 2026-08-09.)
-
-  const milestones = buildAchievements(collectAchievementSnapshot(readItems));
+export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenPlans, readingPlanCount, onOpenScriptureWeb, totalReadCount, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+  // The tile counts below read these stores directly; subscribing to each one is
+  // what keeps a count live while the Library stays open (a note saved in a
+  // sheet, a bookmark removed). Fixed list — stable hook order.
+  LIBRARY_COUNT_STORES.forEach(useStoreVersionByName);
 
   const noteCount      = NoteStore.count();
   const linkCount      = LinkStore.all().length;
@@ -164,19 +164,6 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
       icon: (
         <svg viewBox="0 0 24 24">
           <rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4" />
-        </svg>
-      ),
-    },
-    milestones: {
-      id: 'milestones', title: 'Milestones',
-      count: milestones.earned ? milestones.earned + ' of ' + milestones.total : null, unit: ' reached',
-      empty: 'None reached yet',
-      desc: 'Reading, listening and study',
-      guide: !milestones.earned ? 'Reading, listening, and study all count toward these.' : null,
-      onClick: onOpenMilestones,
-      icon: (
-        <svg viewBox="0 0 24 24">
-          <path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 8.7l5.4-.8z" />
         </svg>
       ),
     },

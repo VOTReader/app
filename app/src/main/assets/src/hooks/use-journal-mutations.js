@@ -8,11 +8,10 @@
    "New entry" button calls: it adds a journal entry via JournalStore and
    navigates to the editor for the new entry.
 
-   P1-5/P1-7 (2026 Wave 0): it no longer records stats / fires milestone
-   toasts here. The toast popped on the New-Entry TAP, before a word was
-   written, and a backed-out blank entry still advanced the streak. Instead
-   it leaves a localStorage marker naming the new entry's id; the editor
-   (JournalEditorScreen) records stats + toasts on the FIRST NON-EMPTY SAVE,
+   P1-5/P1-7 (2026 Wave 0): it no longer records stats here: a backed-out
+   blank entry still advanced the streak. Instead it leaves a localStorage
+   marker naming the new entry's id; the editor (JournalEditorScreen)
+   records stats on the FIRST NON-EMPTY SAVE,
    and its prune-on-exit path clears the marker if the entry dies blank.
 
    OWNS:
@@ -24,7 +23,7 @@
    DOES NOT OWN:
      - JournalStore itself — stays in bundle-b's stores layer (this hook
        just calls JournalStore.add()).
-     - JournalStatsStore — the milestone/stats recording moved into the
+     - JournalStatsStore — the stats recording moved into the
        editor's first non-empty save (see above).
      - The journal editor screen — render tree, stays in ui/screens/.
 

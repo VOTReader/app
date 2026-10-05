@@ -38,7 +38,7 @@ export function _notifyListened() {
   try {
     const track = _state.queue[_state.qi];
     // A SONG IS NOT A READING (README §1.1): a finished song marks no letter
-    // read, feeds no streak or milestone, and is no "recording heard" in My
+    // read, feeds no streak, and is no "recording heard" in My
     // Progress. Its `song:` key would credit nothing at the bridge anyway;
     // returning here keeps the lifetime counter out of it too.
     if (_isSong(track)) return;
@@ -86,7 +86,7 @@ function _countCompletion() {
 }
 
 /**
- * One listening DECISION: one lifetime play (the Milestones tier reads this)
+ * One listening DECISION: one lifetime play (My Progress's "Recordings played" reads this)
  * and one row at the top of the recent shelf. Called only from the four entry
  * points a listener actually taps — never from _start(), which also runs for
  * auto-advance, next/prev, playAt and the boot-resume rebuild.
@@ -118,7 +118,7 @@ export function _countPlay() {
     } catch (_e) { /* recent-history failures must not interfere with listening */ }
     try {
       if (typeof library.countPlay === 'function') library.countPlay();
-    } catch (_e) { /* the milestones counter must never stand between a tap and audio */ }
+    } catch (_e) { /* the plays counter must never stand between a tap and audio */ }
   } catch (_e) { /* no library bridge at all — nothing to record */ }
 }
 

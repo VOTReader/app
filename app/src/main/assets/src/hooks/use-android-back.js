@@ -290,7 +290,6 @@ export function useAndroidBack({
       if (s === "audio-library-offline") {goNavOrigin();return "true";} else
       // Songs of the Letters: Back pops the Songs stack (audioColKey) first, then leaves by the origin (screen-routes owns both).
       if (s === "audio-library-songs") {if (typeof window.__songsBack === "function") window.__songsBack();else goNavOrigin();return "true";} else
-      if (s === "milestones") {goNavOrigin();return "true";} else
       if (s === "reading-plans") {goNavOrigin();return "true";} else
       if (s === "scripture-web") {goNavOrigin();return "true";} else
       // UX3: index/hub screens (reached via goNotesIndex/etc., which _captureOrigin)

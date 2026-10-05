@@ -16,7 +16,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ReadingStatsStore } from './reading-stats-store.js';
-import { FEATURED_UNLOCK_DEFS } from '../utils/achievements.js';
 
 beforeEach(() => {
   localStorage.clear();
@@ -260,68 +259,29 @@ describe('progress frontiers', () => {
   });
 });
 
-/* ── Reading milestones (BACKLOG [23]) ───────────────────────────────────
-   Same contract as the journal's: a static table, a persisted key list, and
-   a check that runs where the number changes. The property that matters is
-   FIRE-ONCE — a toast that repeats every completion past a threshold would
-   be worse than no toast at all. */
-describe('reading milestones', () => {
-  it('unlocks on the crossing completion and returns it for the toast', () => {
-    const newly = ReadingStatsStore.recordCompletion({ key: 'a', words: 50, activeMs: 9000 });
-    const keys = newly.map((m) => m.key);
-    expect(keys).toContain('read-first');
+/* ── The retired milestone ledger (Milestones removed 2026-10-05) ─────────
+   recordCompletion no longer unlocks anything. `milestonesUnlocked` stays in
+   the shape so old backups import and export unchanged. */
+describe('the retired milestone ledger', () => {
+  it('a completion records its numbers, returns nothing, and leaves the ledger alone', () => {
+    ReadingStatsStore.replaceAll({ milestonesUnlocked: ['read-first'] });
+    expect(ReadingStatsStore.recordCompletion({ key: 'a', words: 20000, activeMs: 60000 })).toBeUndefined();
+    const stats = ReadingStatsStore.get();
+    expect(stats.totalWordsRead).toBe(20000);
+    expect(stats.totalCompletions).toBe(1);
+    expect(stats.milestonesUnlocked).toEqual(['read-first']);
   });
 
-  it('fires ONCE — a later completion past the same threshold returns nothing new', () => {
+  it('a fresh store keeps an empty ledger however much is read', () => {
     ReadingStatsStore.recordCompletion({ key: 'a', words: 50, activeMs: 9000 });
-    const again = ReadingStatsStore.recordCompletion({ key: 'b', words: 50, activeMs: 9000 });
-    expect(again.map((m) => m.key)).not.toContain('read-first');
-  });
-
-  it('crosses a WORDS threshold on the completion that reaches it', () => {
-    const first = ReadingStatsStore.recordCompletion({ key: 'a', words: 9999, activeMs: 60000 });
-    expect(first.map((m) => m.key)).not.toContain('words-10k');
-    const second = ReadingStatsStore.recordCompletion({ key: 'b', words: 2, activeMs: 60000 });
-    expect(second.map((m) => m.key)).toContain('words-10k');
-  });
-
-  /* milestones() retired 2026-08-10 — its only caller, My Progress's strip,
-     renders the achievements engine's FEATURED subset now. What this store
-     still owns is the persisted ledger, and the ledger's KEY SPACE is the
-     thing that must not move: those keys are already written into every
-     reader's data, so a rename would re-fire ten toasts on the next
-     completion. */
-  it('persists the LEGACY unlock keys, not the achievement keys', () => {
-    ReadingStatsStore.recordCompletion({ key: 'a', words: 50, activeMs: 9000 });
-    expect(ReadingStatsStore.get().milestonesUnlocked).toContain('read-first');
-    expect(ReadingStatsStore.get().milestonesUnlocked).not.toContain('readings-1');
-  });
-
-  it('drives the ledger from the achievements engine, ten rows, in strip order', () => {
-    expect(FEATURED_UNLOCK_DEFS.length).toBe(10);
-    expect(FEATURED_UNLOCK_DEFS[0].key).toBe('read-first');
-    expect(FEATURED_UNLOCK_DEFS[0].achievementKey).toBe('readings-1');
-    // Every unlock row carries a metric this store actually accrues — the
-    // three fields _checkMilestones knows how to read.
-    for (const def of FEATURED_UNLOCK_DEFS) {
-      expect(['words', 'completions', 'rereads']).toContain(def.metric);
-      expect(def.threshold).toBeGreaterThan(0);
-    }
-  });
-
-  it('ALWAYS returns an array — including the no-words path the caller reads .length on', () => {
-    expect(ReadingStatsStore.recordCompletion({ key: 'x', words: 0, activeMs: 0 })).toEqual([]);
+    expect(ReadingStatsStore.get().milestonesUnlocked).toEqual([]);
   });
 
   it('survives a backup restore: replaceAll carries milestonesUnlocked', () => {
-    ReadingStatsStore.recordCompletion({ key: 'a', words: 50, activeMs: 9000 });
+    ReadingStatsStore.replaceAll({ totalWordsRead: 50, milestonesUnlocked: ['read-first', 'words-10k'] });
     const saved = ReadingStatsStore.get();
-    expect(saved.milestonesUnlocked).toContain('read-first');
     ReadingStatsStore.replaceAll(saved);
-    expect(ReadingStatsStore.get().milestonesUnlocked).toContain('read-first');
-    // …and a restore must not re-fire the toast for something already unlocked.
-    const after = ReadingStatsStore.recordCompletion({ key: 'c', words: 10, activeMs: 9000 });
-    expect(after.map((m) => m.key)).not.toContain('read-first');
+    expect(ReadingStatsStore.get().milestonesUnlocked).toEqual(['read-first', 'words-10k']);
   });
 
   it('drops non-string junk from an imported milestone list', () => {

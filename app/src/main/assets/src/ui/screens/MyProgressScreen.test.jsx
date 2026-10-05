@@ -14,7 +14,6 @@ import { render, cleanup, act } from '@testing-library/react';
 import { MyProgressScreen, _fmtWords } from './MyProgressScreen.jsx';
 import { tallyGroup, countReadFor, mostAnnotatedSources } from '../../utils/progress-stats.js';
 import { countTextWords } from '../../utils/word-count.js';
-import { buildAchievements, collectAchievementSnapshot } from '../../utils/achievements.js';
 import { onIdle } from '../../utils/on-idle.js';
 
 const STUBBED = [
@@ -27,7 +26,7 @@ const STUBBED = [
   // Cross-bundle now: the screen ships in bundle-g and reads these from the
   // window slots bundle-d fills (see src/ui/_entry-g.js), so the test installs
   // the REAL implementations as globals rather than importing them for it.
-  'buildAchievements', 'collectAchievementSnapshot', 'onIdle',
+  'onIdle',
 ];
 
 const mkStore = (over = {}) => ({ subscribe: () => () => {}, getVersion: () => 0, ...over });
@@ -35,8 +34,6 @@ const mkStore = (over = {}) => ({ subscribe: () => () => {}, getVersion: () => 0
 function setupGlobals(over = {}) {
   globalThis.ScreenLayout = ({ children }) => <div data-testid="layout">{children}</div>;
   globalThis.LibraryNav = () => null;
-  globalThis.buildAchievements = buildAchievements;
-  globalThis.collectAchievementSnapshot = collectAchievementSnapshot;
   globalThis.onIdle = onIdle;
   globalThis.NoteStore = mkStore({ count: () => over.notes || 0 });
   globalThis.LinkStore = mkStore({ all: () => new Array(over.links || 0).fill({}) });
@@ -379,93 +376,21 @@ describe('MyProgressScreen — listening block', () => {
   });
 });
 
-/* ── the Milestones strip is a VIEW of the one engine (2026-08-10) ────────
-   It used to render ReadingStatsStore.milestones(), a second ten-row table
-   read against a PERSISTED once-ever unlock ledger — so a reader who cleared
-   their progress kept ✦ marks here while the Milestones screen, which
-   recomputes from the data, showed them unearned. Owner decision: COMBINE.
-   The strip now renders buildAchievements(...).featured — literally the same
-   item objects that screen shows. */
-describe('MyProgressScreen — the Milestones strip', () => {
-  const stripLabels = (container) =>
-    [...container.querySelectorAll('.prg-milestone-label')].map((n) => n.textContent);
-  const reached = (container) =>
-    [...container.querySelectorAll('.prg-milestone.is-unlocked .prg-milestone-label')].map((n) => n.textContent);
-
-  it('renders the featured ten, in strip order, from the achievements engine', () => {
+/* ── Milestones removed 2026-10-05 ("Gut milestones for now") ──────────────
+   The strip, its "Next" row and the "View all milestones" link are gone. The
+   streaks and counts are plain progress and stay. */
+describe('MyProgressScreen — no milestones', () => {
+  it('renders no milestone section, row or link, and keeps the reading facts', () => {
     setupGlobals();
-    const { container } = renderScreen();
-    expect(stripLabels(container)).toEqual([
-      'First reading finished', '10 readings finished', '50 readings finished',
-      '200 readings finished', '10,000 words read', '100,000 words read',
-      '500,000 words read', 'One million words read',
-      'Returned to a reading', '25 re-readings',
-    ]);
-    // A locked milestone is still shown — a goal you cannot see is not a goal.
-    expect(reached(container)).toEqual([]);
-    expect(container.textContent).toContain('0 of 10 reading milestones reached');
-  });
-
-  it('marks reached rows from the LIVE ledger, not a persisted unlock list', () => {
-    setupGlobals();
-    // No milestonesUnlocked anywhere: earned-ness is a fact about the data.
     globalThis.ReadingStatsStore = mkStore({
-      get: () => ({ totalWordsRead: 120000, totalCompletions: 12, rereads: 1 }),
+      get: () => ({ totalWordsRead: 120000, totalCompletions: 12, rereads: 1, milestonesUnlocked: ['read-first'] }),
       measuredWpm: () => null,
       wordsForDays: (n) => Array.from({ length: n }, (_, i) => ({ date: 'd' + i, words: 0 })),
     });
     const { container } = renderScreen();
-    expect(reached(container)).toEqual([
-      'First reading finished', '10 readings finished',
-      '10,000 words read', '100,000 words read', 'Returned to a reading',
-    ]);
-    expect(container.textContent).toContain('5 of 10 reading milestones reached');
-  });
-
-  it('cannot disagree with the Milestones screen — same engine, same snapshot', () => {
-    setupGlobals();
-    const stats = { totalWordsRead: 600000, totalCompletions: 60, rereads: 30 };
-    globalThis.ReadingStatsStore = mkStore({
-      get: () => stats,
-      measuredWpm: () => null,
-      wordsForDays: (n) => Array.from({ length: n }, (_, i) => ({ date: 'd' + i, words: 0 })),
-    });
-    const { container } = renderScreen();
-    // What the full screen would compute for these same ten, from the same
-    // collector this screen used.
-    const built = buildAchievements(collectAchievementSnapshot({}));
-    const expected = built.featured.filter((i) => i.earned).map((i) => i.label);
-    expect(reached(container)).toEqual(expected);
-    // 3 reading tiers (200 unreached) + 3 word tiers (1M unreached) + both
-    // returns. Pinned so a silently-empty `expected` can't make this vacuous.
-    expect(expected.length).toBe(8);
-  });
-
-  it('leads with the nearest unreached milestone as "Next", with its progress', () => {
-    setupGlobals();
-    globalThis.ReadingStatsStore = mkStore({
-      get: () => ({ totalWordsRead: 0, totalCompletions: 7, rereads: 0 }),
-      measuredWpm: () => null,
-      wordsForDays: (n) => Array.from({ length: n }, (_, i) => ({ date: 'd' + i, words: 0 })),
-    });
-    const { container } = renderScreen();
-    const next = container.querySelector('.prg-next');
-    expect(next.querySelector('.prg-row-label').textContent).toBe('Next: 10 readings finished');
-    expect(next.querySelector('.prg-row-tally').textContent).toBe('7 of 10');
-    expect(next.querySelector('.prg-next-fill').style.width).toBe('70%');
-    // The section's figure counts the whole journey, the way the Milestones screen does.
-    const built = buildAchievements(collectAchievementSnapshot({}));
-    expect(container.querySelector('[aria-labelledby="prg-h-milestones"] .prg-section-meta').textContent)
-      .toBe(built.earned + ' of ' + built.total + ' reached');
-  });
-
-  it('keeps the "View all milestones" doorway to the full screen', () => {
-    setupGlobals();
-    const calls = [];
-    const { container } = renderScreen({ onOpenMilestones: () => calls.push(1) });
-    const link = container.querySelector('.prg-milestones-all');
-    expect(link.textContent).toContain('View all milestones');
-    link.click();
-    expect(calls.length).toBe(1);
+    expect(container.querySelector('#prg-h-milestones')).toBeNull();
+    expect(container.querySelector('.prg-milestones, .prg-milestone, .prg-next, .prg-milestones-all')).toBeNull();
+    expect(container.textContent).not.toMatch(/milestone/i);
+    expect(container.textContent).toMatch(/Reading/);
   });
 });

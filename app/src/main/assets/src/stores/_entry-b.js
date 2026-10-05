@@ -61,14 +61,8 @@ import { RecentNavStore } from './recent-nav-store.js';
 import { hlId, lnkId, LinkStore, persistLink } from './link-store.js';
 import { bkmId, BookmarkStore } from './bookmark-store.js';
 import { JournalMediaStore } from './journal-media-store.js';
-import {
-  _jrnDateStr, _jrnDaysBetween, MILESTONE_DEFS,
-  JournalStatsStore, jrnShowMilestoneToast,
-} from './journal-stats-store.js';
+import { _jrnDateStr, _jrnDaysBetween, JournalStatsStore } from './journal-stats-store.js';
 import { ReadingStreakStore } from './reading-streak-store.js';
-/* READING_MILESTONE_DEFS retired 2026-08-10 — the ten-row table folded into
-   utils/achievements.js as its FEATURED subset, so there is nothing left here
-   to publish as a global (the unlock ledger reads FEATURED_UNLOCK_DEFS). */
 import { ReadingStatsStore } from './reading-stats-store.js';
 import { GardenPosStore } from './garden-pos-store.js';
 import { AudioLibraryStore } from './audio-library-store.js';
@@ -170,7 +164,7 @@ import { JournalInboundSheet } from '../ui/sheets/JournalInboundSheet.jsx';
 // The hub, the viewer and the editor left this cluster for the lazy bundle-g
 // on 2026-09-22 (landing 28, -76 KB off every launch): they are screens a
 // reader opens ON PURPOSE, the same shape as My Progress, Notes, Links,
-// Highlights, Bookmarks, Milestones and History before them. Their private
+// Highlights, Bookmarks and History before them. Their private
 // helpers (JournalCardMenu, jrnRenderInline, JournalBlockView, the image and
 // audio blocks, jrnPinIcon) are read by nothing outside those three files, so
 // they travelled too. What did NOT travel is the machinery underneath: the
@@ -217,8 +211,8 @@ Object.assign(window, {
   hlId, lnkId, LinkStore, persistLink,
   bkmId, BookmarkStore,
   JournalMediaStore,
-  _jrnDateStr, _jrnDaysBetween, MILESTONE_DEFS,
-  JournalStatsStore, jrnShowMilestoneToast,
+  _jrnDateStr, _jrnDaysBetween,
+  JournalStatsStore,
   ReadingStreakStore,
   ReadingStatsStore,
   GardenPosStore,

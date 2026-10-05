@@ -11,7 +11,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { act, render, cleanup, fireEvent, screen } from '@testing-library/react';
 import { LibraryScreen } from './LibraryScreen.jsx';
-import { ACHIEVEMENT_TOTAL } from '../../utils/achievements.js';
 import { DEFAULT_LIBRARY_ORDER } from '../../stores/library-order-store.js';
 
 const GLOBALS = ['ScreenLayout', 'LibraryNav', 'NoteStore', 'LinkStore', 'BookmarkStore',
@@ -72,9 +71,7 @@ const renderLibrary = (props = {}) => render(
     onOpenHighlights={() => {}}
     onOpenProgress={() => {}}
     onOpenAudio={() => {}}
-    onOpenMilestones={() => {}}
     totalReadCount={0}
-    readItems={{}}
     theme="dark"
     onThemeChange={() => {}}
     onSearch={() => {}}
@@ -148,11 +145,17 @@ describe('LibraryScreen — a row per thing, the count at the right', () => {
     expect(row.querySelector('.library-tile-guide').textContent).toMatch(/tap Bookmark/i);
   });
 
-  it('Progress and Milestones keep their words on the figure', () => {
+  it('Progress keeps its words on the figure', () => {
     setupGlobals({ NoteStore: fakeStore({ count: () => 1 }) });
     renderLibrary({ totalReadCount: 27 });
     expect(visible(tileEl('Progress').querySelector('.library-tile-detail'))).toBe('27 read');
-    expect(visible(tileEl('Milestones').querySelector('.library-tile-detail'))).toMatch(/^\d+ of \d+$/);
+  });
+
+  it('has no Milestones tile (removed 2026-10-05)', () => {
+    setupGlobals();
+    renderLibrary();
+    expect(tileEl('Milestones')).toBeUndefined();
+    expect(document.body.textContent).not.toMatch(/Milestone/);
   });
 
   it('Scripture Web has no count and no empty state, just its size on the line', () => {
@@ -202,8 +205,7 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     expect(tileEl('Bookmarks').querySelector('.library-tile-guide').textContent).toMatch(/tap Bookmark/i);
     expect(tileEl('Highlights & Underlines').querySelector('.library-tile-guide').textContent).toMatch(/tap a color/i);
     expect(tileEl('Progress').querySelector('.library-tile-guide').textContent).toMatch(/read/i);
-    expect(tileEl('Milestones').querySelector('.library-tile-guide').textContent).toMatch(/listening/i);
-    // The eighth is never empty, so it is the one tile with no guide at all.
+    // The last is never empty, so it is the one tile with no guide at all.
     expect(tileEl('Scripture Web').querySelector('.library-tile-guide')).toBeNull();
   });
 
@@ -212,9 +214,8 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     renderLibrary();
     expect(tileEl('Notes').querySelector('.library-tile-guide')).toBeNull();
     expect(tileEl('Notes').querySelector('.library-tile-detail').textContent).toBe('3 notes');
-    // A first note also earns the matching milestone, so those TWO tiles now
-    // have real content; every other tile keeps its caption.
-    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(EMPTIABLE.length - 2);
+    // Every other tile keeps its caption.
+    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(EMPTIABLE.length - 1);
   });
 
   it('the Progress tile drops its caption once anything is read', () => {
@@ -224,34 +225,43 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(EMPTIABLE.length - 1);
   });
 
-  it('updates the Milestones tile while Library stays open', () => {
+  /* The counts read their stores directly at render; what re-renders the screen when one changes
+     is LibraryScreen's subscription to each of the five. Until 2026-10-05 that subscription rode
+     the milestones engine's store list; with Milestones gone it is the screen's own fixed list, and
+     these cases are what pin it: drop a store from it and its count goes stale while Library is open. */
+  it.each([
+    ['Notes', 'NoteStore', (n) => fakeStore({ count: () => n })],
+    ['Links', 'LinkStore', (n) => fakeStore({ all: () => Array.from({ length: n }, (_, i) => ({ id: 'l' + i })) })],
+    ['Bookmarks', 'BookmarkStore', (n) => fakeStore({ count: () => n })],
+    ['Journal', 'JournalStore', (n) => fakeStore({ count: () => n })],
+    ['Highlights & Underlines', 'AnnotationStore',
+      (n) => fakeStore({ all: () => (n ? { 'v1:john:3': [{ id: 'a1', kind: 'highlight' }] } : {}) })],
+  ])('updates the %s count while Library stays open', (title, storeName, make) => {
     let version = 0;
-    let plays = 0;
+    let n = 0;
     const listeners = new Set();
-    const audio = fakeStore({
+    const live = {
       subscribe: (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
       getVersion: () => version,
-      getPlays: () => plays,
-      saved: () => [],
-    });
-    setupGlobals({ AudioLibraryStore: audio });
+      count: () => make(n).count(),
+      all: () => make(n).all(),
+    };
+    setupGlobals({ [storeName]: live });
     renderLibrary();
-    expect(tileEl('Milestones').querySelector('.library-tile-detail').textContent).toBe('None reached yet');
+    const detail = () => tileEl(title).querySelector('.library-tile-detail').textContent;
+    expect(detail()).toMatch(/^No /);
 
     act(() => {
-      plays = 1;
+      n = 1;
       version++;
       listeners.forEach((cb) => cb());
     });
-    // The TOTAL is whatever the table declares — pinning a literal here made
-    // adding a category a two-file edit for no assertion value.
-    expect(tileEl('Milestones').querySelector('.library-tile-detail').textContent)
-      .toBe('1 of ' + ACHIEVEMENT_TOTAL + ' reached');
+    expect(detail()).toMatch(/^1 /);
   });
 
   it('adopts a restored custom tile order after asynchronous hydration', () => {
     let version = 0;
-    let order = ['notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress', 'milestones'];
+    let order = ['notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress'];
     let listener = null;
     const orderStore = {
       get: () => order,
@@ -264,7 +274,7 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     expect(tileEl('Notes')).toBe(document.querySelector('.library-tile'));
 
     act(() => {
-      order = ['progress', 'notes', 'links', 'journal', 'bookmarks', 'highlights', 'milestones'];
+      order = ['progress', 'notes', 'links', 'journal', 'bookmarks', 'highlights'];
       version++;
       listener();
     });

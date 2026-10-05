@@ -80,7 +80,7 @@ boot. The other seven load the first time something needs them.
 | `bundle-a-vot.js` | `__loadVotCorpus()` | `tools/build.py` | the VOT collections (the volumes, the letters, WTLB, The Blessed) |
 | `bundle-e.js` | `__loadScreensE()` | `src/ui/_entry-e.js` | Settings, Search (the MiniSearch engine and its tables), Garden |
 | `bundle-f.js` | `__loadScreensF()` | `src/ui/_entry-f.js` | the Scripture Web (WebGL) |
-| `bundle-g.js` | `__loadScreensG()` | `src/ui/_entry-g.js` | Personal Study: My Progress, Bookmarks, Milestones, History, Notes, Links, Highlights, the journal screens |
+| `bundle-g.js` | `__loadScreensG()` | `src/ui/_entry-g.js` | Personal Study: My Progress, Bookmarks, History, Notes, Links, Highlights, the journal screens |
 | `bundle-h.js` | `__loadScreensH()` | `src/ui/_entry-h.js` | the Listening Library (hub, Volumes, one collection, saved); the player stays in bundle-d |
 
 - `index.html` makes every loader with `window.__makeLazyLoader(name, path, finishFn)`, which injects the script

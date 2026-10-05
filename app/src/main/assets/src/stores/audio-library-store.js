@@ -48,8 +48,8 @@ const MAX_LIFETIME_COUNT = 10000000;
 
 /** @returns {AudioLibraryData} */
 function _empty() {
-  // `plays` (2026-08-09): lifetime recordings-started counter for the
-  // milestones system. Additive to v1 — older records retain the conservative
+  // `plays` (2026-08-09): lifetime recordings-started counter (My
+  // Progress's "Recordings played"). Additive to v1 — older records retain the conservative
   // lower bound already present in their recent-history shelf.
   // `completions` (2026-08-09): recordings heard all the way to their END,
   // which `plays` cannot express — starting a recording and finishing one are
@@ -288,7 +288,7 @@ export const AudioLibraryStore = extendStore(
       return data.plays;
     },
 
-    /** Lifetime recordings-played count (milestones). @returns {number} */
+    /** Lifetime recordings-played count (My Progress). @returns {number} */
     getPlays() { return this.get().plays; },
 
     /**

@@ -56,7 +56,6 @@ beforeEach(() => {
   /** @type {any} */ (globalThis).LibraryScreen = () => null;
   /** @type {any} */ (globalThis).HomeScreen = () => null;
   /** @type {any} */ (globalThis).MyProgressScreen = () => null;
-  /** @type {any} */ (globalThis).MilestonesScreen = () => null;
   // The Listening Library went lazy in landing 24 — its routes render behind a
   // typeof guard, so the origin chain these cases walk needs them defined.
   /** @type {any} */ (globalThis).AudioLibraryScreen = () => null;
@@ -88,7 +87,6 @@ afterEach(() => {
   delete /** @type {any} */ (globalThis).LibraryScreen;
   delete /** @type {any} */ (globalThis).HomeScreen;
   delete /** @type {any} */ (globalThis).MyProgressScreen;
-  delete /** @type {any} */ (globalThis).MilestonesScreen;
   delete /** @type {any} */ (globalThis).AudioLibraryScreen;
   delete /** @type {any} */ (globalThis).AudioVolumesScreen;
   delete /** @type {any} */ (globalThis).AudioCollectionScreen;
@@ -334,7 +332,7 @@ describe('screen-routes — bible-idx onBack consumes fromSearch', () => {
   });
 });
 
-describe('screen-routes — Listening Library and Milestones return to their actual origin', () => {
+describe('screen-routes — the Listening Library returns to its actual origin', () => {
   it('Home → Listening Library carries Home as the visible and hardware-back origin', () => {
     const { routes, props } = makeRoutes();
     routes.home().props.onOpenAudio();
@@ -356,16 +354,11 @@ describe('screen-routes — Listening Library and Milestones return to their act
     expect(makeRoutes({ navOrigin: { screen: 'volumes-home' } }).routes['audio-library']().props.backLabel).toBe('Volumes');
   });
 
-  it('My Progress → Milestones preserves Progress and its previous origin', () => {
-    const { routes, props } = makeRoutes({ navOrigin: { screen: 'library' } });
-    routes['my-progress']().props.onOpenMilestones();
-    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'my-progress', returnOrigin: { screen: 'library' } });
-    expect(props.setScreen).toHaveBeenCalledWith('milestones');
-
-    const { routes: nextRoutes, props: nextProps } = makeRoutes({ navOrigin: { screen: 'my-progress', returnOrigin: { screen: 'library' } } });
-    const milestones = nextRoutes.milestones();
-    expect(milestones.props.onBack).toBe(nextProps.goNavOrigin);
-    expect(milestones.props.backLabel).toBe('Progress');
+  it('has no Milestones route, and neither Library nor My Progress offers one (removed 2026-10-05)', () => {
+    const { routes } = makeRoutes({ navOrigin: { screen: 'library' } });
+    expect(routes.milestones).toBeUndefined();
+    expect(routes.library().props.onOpenMilestones).toBeUndefined();
+    expect(routes['my-progress']().props.onOpenMilestones).toBeUndefined();
   });
 
   it('Listening Library Text opens with a one-shot return to the shelf', () => {

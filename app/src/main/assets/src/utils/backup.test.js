@@ -56,6 +56,7 @@ import { JournalStore, JournalNotebookStore } from '../stores/journal-store.js';
 import { JournalIndexStore } from '../stores/journal-index-store.js';
 import { JournalStatsStore } from '../stores/journal-stats-store.js';
 import { ReadingStreakStore } from '../stores/reading-streak-store.js';
+import { ReadingStatsStore } from '../stores/reading-stats-store.js';
 import { GardenPosStore } from '../stores/garden-pos-store.js';
 import { RecentNavStore } from '../stores/recent-nav-store.js';
 import { HistoryStore } from '../stores/history-store.js';
@@ -1308,6 +1309,46 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
     expect(rec.width).toBe(4);
     const restoredBytes = new Uint8Array(await rec.blob.arrayBuffer());
     expect(Array.from(restoredBytes)).toEqual(Array.from(mediaBytes));
+  }, 20000);
+
+  /* ms1 (2026-10-05): Milestones were removed, but every backup made before that carries the
+     two stats stores' `milestonesUnlocked` ledgers. Both replaceAll paths still carry the field,
+     so an old backup restores and re-exports byte-for-byte; dropping it from either list would
+     wipe it on the first restore. */
+  it('(ms1) a backup carrying milestone ledgers imports and re-exports them unchanged', async () => {
+    const OLD_JOURNAL = { totalEntries: 31, currentStreak: 2, longestStreak: 8, lastEntryDate: today,
+      milestonesUnlocked: ['first', 'entries-10', 'entries-30', 'streak-7'] };
+    const OLD_READING = { totalWordsRead: 123456, totalActiveMs: 7200000, totalCompletions: 57, rereads: 3,
+      wordsByDay: { [today]: 456 }, wpmSamples: [{ w: 300, ms: 60000 }], progress: {},
+      milestonesUnlocked: ['read-first', 'read-10', 'read-50', 'words-10k', 'words-100k', 'reread-first'] };
+    const map = () => ({ ...storesMap(), 'vot-reading-stats': { store: ReadingStatsStore, method: 'replaceAll' } });
+    const ctx = () => ({ storesMap: map(), flagMap: flagMap(), idbAdapter: IDBAdapter, mediaStore: JournalMediaStore,
+      diagnosticLog: [], nowIso: () => '2026-10-05T03:00:00.000Z', validateStorePayload, validateMediaRecord });
+    ReadingStatsStore._resetForTests({ forceLoaded: true });
+    JournalStatsStore.replaceAll(OLD_JOURNAL);
+    ReadingStatsStore.replaceAll(OLD_READING);
+    await flushAll(); await ReadingStatsStore.whenSaved();
+
+    const first = await buildExportPayload(ctx());
+    expect(first.ok).toBe(true);
+    const file = JSON.parse(JSON.stringify(first.payload));
+    expect(file.stores['vot-journal-stats']).toEqual(OLD_JOURNAL);
+    expect(file.stores['vot-reading-stats']).toEqual(OLD_READING);
+
+    // wipe, restore the file, reload from disk
+    JournalStatsStore.replaceAll(null); ReadingStatsStore.replaceAll(null);
+    await flushAll(); await ReadingStatsStore.whenSaved();
+    expect(ReadingStatsStore.get().milestonesUnlocked).toEqual([]);
+    const res = await applyImportPayload(file, ctx());
+    expect(res).toEqual({ importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] });
+    ALL_STORES.forEach((s) => s._resetForTests()); ReadingStatsStore._resetForTests();
+    IDBAdapter._resetForTests(); await hydrateAllStores();
+
+    expect(JournalStatsStore.get()).toEqual(OLD_JOURNAL);
+    expect(ReadingStatsStore.get()).toEqual(OLD_READING);
+    const second = await buildExportPayload(ctx());
+    expect(second.payload.stores['vot-journal-stats']).toEqual(file.stores['vot-journal-stats']);
+    expect(second.payload.stores['vot-reading-stats']).toEqual(file.stores['vot-reading-stats']);
   }, 20000);
 
   /* "Verify a Backup" said "1 journal entry" whatever the journal held: both

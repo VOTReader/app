@@ -19,7 +19,7 @@ The sections below this one predate several landed systems. This addendum is the
 - **Auto-scroll reading transport** (`hooks/use-autoscroll.js` + `ui/components/AutoScrollControl.jsx`): lines/min over a MEASURED line height, the scrollTop lease, `.reading-end` reading-zone stop, dwell + auto-advance via the pager's own boundary policy. Full map in **§20**.
 - **Reading-measurement engine** (2026-08-03: `utils/word-count.js` + `hooks/use-read-tracker.js` + `stores/reading-stats-store.js`): ONE word-count definition shared by app + the corpus baseline gate; the geometry-sweep read detector (NOT IntersectionObserver — deliberate, see **§21**); count-valued readItems; ReadingStatsStore ledger (IDB v8) + per-item frontiers (recording-only since 2026-08-04 — **scroll-position resume owns reopening**; the frontier jump was retired). Full map in **§21**.
 - **One shared top-nav**: `ui/components/LibraryNav.jsx` renders every screen's nav (2026-07-30; SearchScreen + GardenView are the two documented exceptions). Full map, and its selector/measurement couplings, in **§18.10b**.
-- **Milestones = ONE engine** (2026-08-10 owner decision): `utils/achievements.js` owns every threshold. `MilestonesScreen` renders `buildAchievements(...).categories` (the full ~84); My Progress's compact strip renders `.featured`, the ten items that used to be a second table in `reading-stats-store` — the SAME item objects, so the two surfaces cannot disagree and featuring adds nothing to any total. The store keeps only the persisted once-ever unlock ledger for the toast, driven from `FEATURED_UNLOCK_DEFS` (legacy key space intact, so no saved unlock is invalidated). `achievements.js` is pure and rides bundles b + d, the arrangement `utils/audio-track.js` already has.
+- **Milestones: removed 2026-10-05** (Corbin: "Gut milestones for now, I hate it"). The screen, the Library tile, My Progress's strip, the unlock toasts and `utils/achievements.js` are gone; streaks and reading progress stay. Both stats stores keep `milestonesUnlocked` in their defaults and `replaceAll` (never read or written now) so old backups import and export unchanged; `LibraryOrderStore.get()` drops a saved `'milestones'` id in place.
 - **Audio subsystem** (2026-08-05 → 08-10: `utils/audio-player.js` (the public face; the player is `utils/audio-player/*.js`, one concern a module, since 2026-09-26) + `utils/audio-track.js` + two generated manifests + `AudioPositionsStore`/`AudioLibraryStore` + the native card): 729 letter recordings and three per-chapter Bible editions (1,189 chapters each) stream from immutable GitHub Release assets behind ONE frozen prefix list; forward-only queues, book-scoped Bible queues, durable per-recording resume, listening that earns read credit. Full map in **§23**.
 
 ---
@@ -1000,7 +1000,7 @@ before editing — this section is the map, not the contract):
   (`tools/e2e-read-detector.mjs`, headless compositing Chromium). This drove
   out the IDB-registration P0 the unit suite could not see.
 - Deliberately absent: skim indicator (owner-HELD, BACKLOG [21]);
-  TTS/milestones/year-in-review/etc. (BACKLOG [22]–[26]).
+  TTS/year-in-review/etc. (BACKLOG [22]–[26]); milestones came and were removed 2026-10-05.
 
 ---
 

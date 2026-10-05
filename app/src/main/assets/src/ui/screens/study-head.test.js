@@ -21,7 +21,6 @@ const TITLES = {
   BookmarksScreen: 'Bookmarks',
   LinksScreen: 'Links',
   HighlightsScreen: 'Highlights & Underlines',
-  MilestonesScreen: 'Milestones',
   ReadingPlansScreen: 'Reading plans',   // rp1 (web-builder, 2026-09-25) joined the family
 };
 const RETIRED = [

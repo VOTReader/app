@@ -47,7 +47,7 @@ export function useLazyBundles() {
     React.useCallback((cb) => (typeof window.__screensF !== 'undefined' ? window.__screensF.subscribe(cb) : () => {}), []),
     () => (typeof window.__screensF !== 'undefined' ? window.__screensF.getVersion() : 0)
   );
-  // screens-g (the Personal Study screens, Bookmarks, Milestones, History and
+  // screens-g (the Personal Study screens, Bookmarks, History and
   // the journal) and screens-h (the Listening Library) were added by landings
   // 21-24 and 28 and were NOT subscribed here until 2026-09-22 — the route
   // kept rendering "Loading…" after the bundle had arrived, because nothing

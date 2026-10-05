@@ -25,12 +25,12 @@
       /* Generic .vot-toast — bottom-of-screen transient notification.
          Used by the showToast utility (src/utils/toast.js) for the
          W2.6 export/import success + failure messages. The pattern
-         mirrors the existing .jrn-milestone-toast aesthetic: gold
+         mirrors the old journal milestone pill: gold
          border on a near-black sheet, Cinzel uppercase, fades in/out
          via the .show class.
 
          Callers using showToast({className: 'vot-toast', ...}) inherit
-         this styling. Specialized toasts (milestones, root-exit) keep
+         this styling. Specialized toasts (root-exit) keep
          their own classes for visual differentiation. */
       .vot-toast {
         position: fixed;
@@ -61,32 +61,6 @@
         border-color: rgba(176,144,56,0.5);
         box-shadow: 0 8px 28px rgba(0,0,0,0.18);
       }
-      /* .jrn-milestone-toast — the journal milestone celebration pill
-         (jrnShowMilestoneToast, journal-stats-store.js; lifecycle owned by
-         the showToast utility). Wave-0 (P1-5) RESTORE: these rules were
-         lost when the journal injected-stylesheet was dismantled (2db70f5
-         dropped them from journal-styles.js), leaving the toast an
-         unstyled, never-dismissing div — showToast's `.show` add/remove was
-         a visual no-op. Rules recovered verbatim from 5d518a4 (the original
-         gold TOP pill — vot-toast is the BOTTOM sheet, this one drops in
-         from the top, translateY(-20px) → 0). Theme-safe with no light
-         override: --bg3/--gold are per-theme tokens (light swaps them to
-         cream/olive at :root). prefers-reduced-motion is honored by the
-         global W10-lite block (transitions collapse to 0.01ms, so the
-         pill appears/disappears instantly instead of sliding). */
-      .jrn-milestone-toast {
-        position: fixed; top: 80px; left: 50%;
-        transform: translateX(-50%) translateY(-20px);
-        background: var(--bg3); border: 1px solid var(--gold); color: var(--gold);
-        padding: 10px 18px; border-radius: 999px;
-        font-family: var(--font-cinzel); font-size: var(--fsc-11);
-        text-transform: uppercase; letter-spacing: 0.1em;
-        z-index: 9000; opacity: 0; pointer-events: none;
-        transition: opacity 0.3s, transform 0.3s;
-        display: flex; align-items: center; gap: 8px;
-        box-shadow: 0 4px 18px rgba(0,0,0,0.4);
-      }
-      .jrn-milestone-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
       /* UX7 — tab-close undo toast. Reuses .vot-toast's look but is CLICKABLE
          (base .vot-toast is pointer-events:none), so the Undo control works; it
          already sits at z-index 9998, above the tabs overview (z-index 400). */
@@ -1501,8 +1475,7 @@
       }
 
       /* ── LISTENING LIBRARY — one calm, tactile shelf language shared by the
-         hub, the saved shelf, and a source's recordings screen. Milestones
-         (below) deliberately speaks it too. ── */
+         hub, the saved shelf, and a source's recordings screen. ── */
       .audio-library-screen { width:100%; max-width:860px; margin:0 auto; padding:1.4rem min(1.45rem,5vw) 3rem; background:var(--bg); }
       .audio-library-hero { position:relative; padding:.55rem 0 1.35rem; overflow:hidden; }
       .audio-library-hero::after { content:""; position:absolute; width:20rem; height:20rem; right:-11rem; top:-13rem; border:1px solid rgba(200,164,86,.16); border-radius:50%; box-shadow:0 0 0 1.2rem rgba(200,164,86,.025),0 0 0 3.1rem rgba(200,164,86,.018); pointer-events:none; }
@@ -1812,77 +1785,6 @@
       .reading-along::after { content: ""; position: absolute; left: 0; right: 0; top: calc(50% - 22px); bottom: calc(50% - 22px); }
       .reading-along:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
       @media (max-width: 380px) { .reading-row .songs-row-len { display: none; } }
-
-      /* Milestones — the full achievements ledger. Same restrained shelf
-         language as the Listening Library screens; earned rows carry the ✦. */
-      .milestones-screen { width: 100%; max-width: 720px; margin: 0 auto; padding: 1.25rem min(1.35rem, 5vw) 2.5rem; }
-      /* The count rides the page header now ("4 of 89 reached", .study-head-count);
-         the nearest milestone leads, as a row on a hairline, the Progress screen's
-         "Next" (the redesign, 2026-09-25). */
-      .milestones-summary-count strong { font-weight: 400; color: var(--cream-dim); }
-      .milestones-next { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.2rem 0 0.9rem; margin-bottom: 0.9rem; border-bottom: 1px solid var(--border); }
-      .milestones-next-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: 0.75rem; row-gap: 0.15rem; }
-      .milestones-next-label { min-width: 0; font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-dim); }
-      .milestones-next-tally { margin-left: auto; font-family: var(--font-body); font-size: var(--fs-14); color: var(--cream-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-      .milestones-next-bar { height: 3px; border-radius: 2px; background: var(--gold-faint); overflow: hidden; }
-      .milestones-next-bar > div { height: 100%; border-radius: 2px; background: var(--gold-dim); transition: width 0.3s ease; }
-      /* Controls: the "Hide reached" filter + the per-category jump chips.
-         Compact, but every target keeps the 44px touch floor. */
-      .milestones-controls { display: flex; align-items: center; gap: 0.7rem; margin-top: 1rem; }
-      .milestones-filter {
-        min-height: 44px; padding: 0.3rem 0.85rem;
-        border: 1px solid var(--gold-border); border-radius: 999px;
-        background: transparent; color: var(--cream-dim); cursor: pointer;
-        font-family: 'Cinzel', serif; font-size:var(--fs-12);
-        letter-spacing: 0.12em; text-transform: uppercase;
-        transition: border-color 0.15s, background 0.15s, color 0.15s;
-      }
-      .milestones-filter.is-on { border-color: var(--gold); background: var(--gold-faint); color: var(--gold); }
-      @media (hover: hover) { .milestones-filter:hover { border-color: var(--gold-dim); color: var(--gold); } }
-      .milestones-controls-note { color: var(--cream-muted); font-size: var(--fs-11); font-style: italic; }
-      .milestones-jump {
-        display: flex; flex-wrap: wrap; gap: 0.4rem;
-        margin-top: 0.7rem; padding-bottom: 0.15rem;
-      }
-      .milestones-jump-chip {
-        min-height: 44px; padding: 0.25rem 0.7rem;
-        border: 1px solid var(--gold-border); border-radius: 8px;
-        background: var(--bg2); color: var(--cream-muted); cursor: pointer;
-        font-family: var(--font-body); font-size: var(--fs-11); line-height: 1.2;
-        transition: border-color 0.15s, color 0.15s;
-      }
-      .milestones-jump-chip:active { border-color: var(--gold-dim); color: var(--gold); }
-      @media (hover: hover) { .milestones-jump-chip:hover { border-color: var(--gold-dim); color: var(--gold); } }
-      .milestones-allclear {
-        margin: 1.4rem 0 0; padding: 0.9rem;
-        border: 1px solid var(--gold-border); border-left: 3px solid var(--gold);
-        color: var(--gold-dim); font-size: var(--fs-13); font-style: italic;
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .milestones-filter, .milestones-jump-chip { transition: none; }
-      }
-      .milestones-cat { margin-top: 1.5rem; }
-      .milestones-cat-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.75rem; padding: 0 0.1rem 0.5rem; border-bottom: 1px solid var(--gold-border); }
-      .milestones-cat-head div { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
-      .milestones-cat-head span { color: var(--gold-dim); font-family: 'Cinzel', serif; font-size:var(--fs-12); letter-spacing: 0.12em; text-transform: uppercase; }
-      .milestones-cat-head h2 { margin: 0; color: var(--cream); font-family: 'Cinzel', serif; font-size: var(--fs-16); font-weight: 500; }
-      .milestones-cat-head > strong { color: var(--gold); font-family: 'Cinzel', serif; font-size: var(--fs-13); font-weight: 500; white-space: nowrap; }
-      .milestones-list { margin: 0; padding: 0; list-style: none; }
-      .milestones-list li { display: flex; align-items: center; gap: 0.6rem; min-height: 44px; padding: 0.35rem 0.15rem; border-top: 1px solid rgba(200, 164, 86, 0.12); }
-      .milestones-list li:first-child { border-top: 0; }
-      .milestones-mark { flex: 0 0 1.1rem; color: var(--gold-dim); font-size: var(--fs-13); text-align: center; }
-      .milestones-list li.is-earned .milestones-mark { color: var(--gold); }
-      .milestones-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.22rem; }
-      .milestones-label { color: var(--cream-muted); font-size: var(--fs-13); line-height: 1.3; }
-      .milestones-list li.is-earned .milestones-label { color: var(--cream); }
-      .milestones-bar { display: block; width: min(100%, 14rem); height: 3px; border-radius: 3px; background: rgba(200, 164, 86, 0.14); overflow: hidden; }
-      .milestones-bar > span { display: block; height: 100%; border-radius: 3px; background: var(--gold-dim); }
-      .milestones-value { flex: 0 0 auto; color: var(--cream-dim); font-size: var(--fs-11); font-variant-numeric: tabular-nums; white-space: nowrap; }
-      .milestones-value.is-earned { color: var(--gold); font-family: 'Cinzel', serif; font-size:var(--fs-12); }
-      @media (max-width: 460px) {
-        .milestones-screen { padding-left: 1rem; padding-right: 1rem; }
-        .milestones-value { max-width: 5.5rem; overflow: hidden; text-overflow: ellipsis; }
-      }
 
       /* Listen / Play All pill (AudioPlayButton). In-flow content, so --fs-*:
          these SHOULD scale with Text Size. A faint-gold gradient plate built
@@ -5811,7 +5713,7 @@
     }
     /* ══ THE PERSONAL-STUDY PAGE HEADER (the redesign, 2026-09-25) ══
        Library, Progress, Journal, Notes, Bookmarks, Links, Highlights &
-       Underlines and Milestones had six header styles between them: centred
+       Underlines and Milestones (removed 2026-10-05) had six header styles between them: centred
        under an eyebrow, spaced gold capitals, letter-spaced gold, an eyebrow
        over capitals. Now one, the Settings header's: the name at the left in
        the Library row's words, the count at the right on its baseline, at
@@ -5996,9 +5898,9 @@
       font-family: var(--font-body); font-size: var(--fs-15); color: var(--cream-muted);
       font-variant-numeric: tabular-nums;
     }
-    /* A shelf (and the next milestone): name and tally, a thin bar under them. */
-    .prg-row, .prg-next, .prg-note, .prg-history-row, .prg-src-row { border-bottom: 1px solid var(--border); }
-    .prg-row, .prg-next { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.7rem 0 0.8rem; }
+    /* A shelf: name and tally, a thin bar under them. */
+    .prg-row, .prg-note, .prg-history-row, .prg-src-row { border-bottom: 1px solid var(--border); }
+    .prg-row { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.7rem 0 0.8rem; }
     .prg-row-head {
       display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
       column-gap: 0.75rem; row-gap: 0.15rem;
@@ -6010,8 +5912,8 @@
       font-variant-numeric: tabular-nums; text-align: right;
     }
     .prg-words-note { white-space: nowrap; }
-    .prg-bar, .prg-next-bar { height: 3px; border-radius: 2px; background: var(--gold-faint); overflow: hidden; }
-    .prg-bar-fill, .prg-next-fill { height: 100%; border-radius: 2px; background: var(--gold-dim); }
+    .prg-bar { height: 3px; border-radius: 2px; background: var(--gold-faint); overflow: hidden; }
+    .prg-bar-fill { height: 100%; border-radius: 2px; background: var(--gold-dim); }
     .prg-history-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; padding: 0.7rem 0; }
     .prg-history-label { font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-dim); }
     .prg-note {
@@ -6051,27 +5953,6 @@
       border-radius: 2px 2px 0 0;
       background: var(--gold-dim);
     }
-    /* Milestones (BACKLOG [23]): the featured ten. Locked rows stay visible but
-       recede; an unattainable-looking list is a worse motivator than a dim
-       one. Gold mark + full-strength text on unlock. */
-    .prg-milestones { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.55rem 0 0.2rem; }
-    .prg-milestone {
-      display: flex; align-items: baseline; gap: 0.55rem;
-      font-family: var(--font-body); font-size: var(--fs-15); color: var(--cream-muted); opacity: 0.6;
-      padding: 0.12rem 0;
-    }
-    .prg-milestone.is-unlocked { color: var(--cream); opacity: 1; }
-    .prg-milestone-mark { color: var(--gold-dim); width: 1em; flex-shrink: 0; text-align: center; }
-    .prg-milestone.is-unlocked .prg-milestone-mark { color: var(--gold); }
-    .prg-milestone-label { min-width: 0; }
-    /* A button's face is the browser's sans unless it is given one: this link
-       rendered in Arial until 2026-09-25. */
-    .prg-milestones-all {
-      min-height: 44px; margin-top: 0.2rem; padding: 0.25rem 0;
-      border: 0; background: transparent; cursor: pointer;
-      color: var(--gold); font-family: var(--font-body); font-size: var(--fs-15);
-    }
-    @media (hover: hover) { .prg-milestones-all:hover { color: var(--gold-bright); } }
 
     /* Settings → Your Data → Growth. Same div-bar idiom as the reading-day
        strip above (no SVG, no dependency, theme-aware through --gold-dim),

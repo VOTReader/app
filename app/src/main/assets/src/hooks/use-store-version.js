@@ -6,7 +6,8 @@
    Every store here speaks the same two-method protocol: subscribe(cb) returns
    an unsubscribe, getVersion() returns a number that moves on every change.
    The app had 85 hand-rolled React.useSyncExternalStore pairs over it and two
-   private, identical copies of this hook (LibraryScreen, MilestonesScreen).
+   private, identical copies of this hook (LibraryScreen and the since-removed
+   MilestonesScreen).
    This is the one copy; call sites move to it as they are touched. */
 
 /**

@@ -1,15 +1,15 @@
-/* W2 Tier 2 — JournalStatsStore streak + milestones regression tests.
+/* W2 Tier 2 — JournalStatsStore streak regression tests.
    ────────────────────────────────────────────────────────────────────
    JournalStatsStore tracks totalEntries + currentStreak + longestStreak
-   + lastEntryDate + milestonesUnlocked. The streak math is calendar-
-   day-based (local timezone, YYYY-MM-DD), and the milestone unlock
-   flow is fire-once-per-key.
+   + lastEntryDate (+ milestonesUnlocked, the ledger of the Milestones
+   feature removed 2026-10-05, now carried untouched). The streak math
+   is calendar-day-based (local timezone, YYYY-MM-DD).
 
    Silent-failure modes this suite guards:
      - Same-day double entry advancing the streak (would inflate longest).
      - Two-day gap not breaking the streak (would lie to the user).
      - longestStreak shrinking when currentStreak resets (would lose history).
-     - Duplicate milestone firings (would spam toasts on every save).
+     - The retired milestone ledger being rewritten or dropped.
      - recomputeFromLoad breaking a streak that's still alive (today vs
        yesterday — delta is 0 or 1, not >=2).
      - recordDeletion underflowing totalEntries below 0.
@@ -23,7 +23,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   JournalStatsStore,
-  MILESTONE_DEFS,
   _jrnDateStr,
   _jrnDaysBetween,
 } from './journal-stats-store.js';
@@ -201,98 +200,38 @@ describe('JournalStatsStore — recordNewEntry (streak math)', () => {
   });
 });
 
-describe('JournalStatsStore — recordNewEntry (milestone flow)', () => {
-  it('returns the "first" milestone def on the first entry', () => {
-    const unlocked = JournalStatsStore.recordNewEntry(_tsRelative(0));
-    expect(unlocked.length).toBe(1);
-    expect(unlocked[0].key).toBe('first');
-  });
-
-  it('does NOT re-fire the "first" milestone on the second entry', () => {
-    JournalStatsStore.recordNewEntry(_tsRelative(-1));
-    const unlocked2 = JournalStatsStore.recordNewEntry(_tsRelative(0));
-    // Second call: streak=2, total=2 — no milestone (entries-10 needs
-    // 10 total, streak-7 needs 7).
-    expect(unlocked2).toEqual([]);
-  });
-
-  it('persists milestonesUnlocked across calls (no duplicate keys)', () => {
-    JournalStatsStore.recordNewEntry(_tsRelative(-1));
-    JournalStatsStore.recordNewEntry(_tsRelative(0));
+/* Milestones were removed 2026-10-05. recordNewEntry still counts the entry
+   and advances the streak; it no longer unlocks anything, and a stored
+   ledger from before the removal rides along unchanged. */
+describe('JournalStatsStore — recordNewEntry after the milestone removal', () => {
+  it('counts the entry and returns nothing to toast', () => {
+    expect(JournalStatsStore.recordNewEntry(_tsRelative(0))).toBeUndefined();
     const stats = JournalStatsStore.get();
-    expect(stats.milestonesUnlocked).toEqual(['first']);  // only once
+    expect(stats.totalEntries).toBe(1);
+    expect(stats.currentStreak).toBe(1);
+    expect(stats.milestonesUnlocked).toEqual([]);
   });
 
-  it('fires entries-10 milestone at total=10', () => {
-    // Seed totalEntries=9 and streak state so the next record bumps
-    // total to 10 without also incidentally hitting streak-7. (The
-    // 10-call loop would consume 10 days of real-time offsets, but
-    // we can short-circuit by direct manipulation.)
+  it('leaves an old ledger exactly as stored, past every old threshold', () => {
     const data = JournalStatsStore._load();
     data.totalEntries = 9;
-    data.currentStreak = 1;       // below streak-7 threshold
-    data.longestStreak = 1;
-    data.lastEntryDate = _jrnDateStr(_tsRelative(-1));
-    data.milestonesUnlocked = ['first'];
-    JournalStatsStore._save();
-
-    // Today: total=10, streak=2 → only entries-10 unlocks.
-    const unlocked = JournalStatsStore.recordNewEntry(_tsRelative(0));
-    const keys = unlocked.map(m => m.key);
-    expect(keys).toContain('entries-10');
-    expect(keys).not.toContain('streak-7');
-  });
-
-  it('fires streak-7 milestone at currentStreak=7', () => {
-    // Seed currentStreak=6 with lastEntryDate yesterday so today's
-    // entry advances streak to 7.
-    const data = JournalStatsStore._load();
-    data.totalEntries = 6;
     data.currentStreak = 6;
     data.longestStreak = 6;
     data.lastEntryDate = _jrnDateStr(_tsRelative(-1));
     data.milestonesUnlocked = ['first'];
     JournalStatsStore._save();
 
-    const unlocked = JournalStatsStore.recordNewEntry(_tsRelative(0));
-    const keys = unlocked.map(m => m.key);
-    expect(keys).toContain('streak-7');
+    JournalStatsStore.recordNewEntry(_tsRelative(0));   // total 10, streak 7
+    const stats = JournalStatsStore.get();
+    expect(stats.totalEntries).toBe(10);
+    expect(stats.currentStreak).toBe(7);
+    expect(stats.milestonesUnlocked).toEqual(['first']);
   });
 
-  it('returned milestone defs match MILESTONE_DEFS shape', () => {
-    const unlocked = JournalStatsStore.recordNewEntry(_tsRelative(0));
-    expect(unlocked[0].key).toBe('first');
-    expect(unlocked[0].type).toBe('entries');
-    expect(unlocked[0].threshold).toBe(1);
-    expect(unlocked[0].label).toBe('First entry');
-  });
-});
-
-describe('JournalStatsStore — milestones() and unlockedMilestones()', () => {
-  it('milestones() returns every def with unlocked=false on fresh state', () => {
-    const list = JournalStatsStore.milestones();
-    expect(list.length).toBe(MILESTONE_DEFS.length);
-    for (const m of list) {
-      expect(m.unlocked).toBe(false);
-    }
-  });
-
-  it('milestones() reflects unlocked state after entries', () => {
-    JournalStatsStore.recordNewEntry(_tsRelative(0));
-    const list = JournalStatsStore.milestones();
-    const first = list.find(m => m.key === 'first');
-    expect(first.unlocked).toBe(true);
-    const ten = list.find(m => m.key === 'entries-10');
-    expect(ten.unlocked).toBe(false);
-  });
-
-  it('unlockedMilestones() returns only the unlocked ones', () => {
-    expect(JournalStatsStore.unlockedMilestones()).toEqual([]);
-    JournalStatsStore.recordNewEntry(_tsRelative(0));
-    const unlocked = JournalStatsStore.unlockedMilestones();
-    expect(unlocked.length).toBe(1);
-    expect(unlocked[0].key).toBe('first');
-    expect(unlocked[0].unlocked).toBe(true);
+  it('no longer exposes the milestone API', () => {
+    expect(/** @type {any} */ (JournalStatsStore).milestones).toBeUndefined();
+    expect(/** @type {any} */ (JournalStatsStore).unlockedMilestones).toBeUndefined();
+    expect(/** @type {any} */ (JournalStatsStore)._checkMilestones).toBeUndefined();
   });
 });
 

@@ -10,9 +10,8 @@
         prevent the journal hub from rendering at all.
 
      B) Deferred stats handoff (P1-5/P1-7) — the hook must NOT record
-        stats or fire milestone toasts at creation (that fired the toast
-        on the New-Entry tap, before a word was written, and a backed-out
-        blank entry still advanced the streak). It leaves a localStorage
+        stats at creation (a backed-out blank entry still advanced the
+        streak). It leaves a localStorage
         marker for the editor's first-non-empty-save trigger instead.
 
      C) The setter ordering matters semantically:
@@ -31,23 +30,20 @@ import { useJournalMutations } from './use-journal-mutations.js';
 vi.mock('../stores/journal-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalStore() { return /** @type {any} */ (globalThis).JournalStore; } }; });
 
 // ── Global stubs ────────────────────────────────────────────────────────
-let _prevJournalStore, _prevJournalStatsStore, _prevToast;
+let _prevJournalStore, _prevJournalStatsStore;
 
 beforeEach(() => {
   _prevJournalStore = window.JournalStore;
   _prevJournalStatsStore = window.JournalStatsStore;
-  _prevToast = window.jrnShowMilestoneToast;
   localStorage.clear();
 
   window.JournalStore = { add: vi.fn(() => ({ id: 'jrn-1', created: 1700000000000 })) };
-  window.JournalStatsStore = { recordNewEntry: vi.fn(() => []) };
-  window.jrnShowMilestoneToast = vi.fn();
+  window.JournalStatsStore = { recordNewEntry: vi.fn() };
 });
 
 afterEach(() => {
   window.JournalStore = _prevJournalStore;
   window.JournalStatsStore = _prevJournalStatsStore;
-  window.jrnShowMilestoneToast = _prevToast;
 });
 
 const makeSetters = () => ({
@@ -71,13 +67,11 @@ describe('useJournalMutations — createAndEditJournal', () => {
     expect(setters.setScreen).toHaveBeenCalledWith('journal-editor');
   });
 
-  it('does NOT record stats or fire milestone toasts at creation (P1-5 — deferred to the first non-empty save)', () => {
+  it('does NOT record stats at creation (P1-5 — deferred to the first non-empty save)', () => {
     const { result } = setup();
     act(() => { result.current.createAndEditJournal(); });
-    // The bug: the milestone toast fired on the New-Entry TAP, before a word
-    // was written. Both side-effects now live in the editor's first save.
+    // The stats now live in the editor's first save.
     expect(window.JournalStatsStore.recordNewEntry).not.toHaveBeenCalled();
-    expect(window.jrnShowMilestoneToast).not.toHaveBeenCalled();
   });
 
   it('leaves the first-save stats marker naming the new entry id (editor handoff)', () => {

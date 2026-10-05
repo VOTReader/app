@@ -13,10 +13,9 @@
    _corpusView(window.__screensG, …) until they are defined.
 
    Like bundle-e's screens, these resolve their shared helpers — React,
-   ScreenLayout, buildAchievements, onIdle, normalizeExcerptDisplay — as FREE
-   GLOBALS at call time, from the window slots bundle-d fills. That is what
-   keeps bundle-g small and keeps ONE copy of each law: a second bundled copy
-   of achievements.js would be two module states of one table.
+   ScreenLayout, onIdle, normalizeExcerptDisplay — as FREE GLOBALS at call
+   time, from the window slots bundle-d fills. That is what keeps bundle-g
+   small and keeps ONE copy of each law.
 
    Each screen's private helpers (the link-endpoint predicates, the highlight
    colour table, the mark collector) travel WITH their screen — nothing
@@ -34,11 +33,10 @@
 
 import { MyProgressScreen } from './screens/MyProgressScreen.jsx';
 import { BookmarkRow, BookmarkRowActionSheet, BookmarksScreen } from './screens/BookmarksScreen.jsx';
-// Landing 23: the same law, two more screens — Milestones, the full
-// achievements surface, and History, the reading log. About was tried here too
-// and sent back: use-tabs.js opens a FRESH INSTALL on About, so lazy would have
-// put a bundle fetch in front of a new reader's very first paint.
-import { MilestonesScreen } from './screens/MilestonesScreen.jsx';
+// Landing 23: the same law, one more screen — History, the reading log
+// (Milestones lived here too until it was removed 2026-10-05). About was tried
+// here too and sent back: use-tabs.js opens a FRESH INSTALL on About, so lazy
+// would have put a bundle fetch in front of a new reader's very first paint.
 // rp1: the reading plans live with the other personal-study screens.
 import { ReadingPlansScreen } from './screens/ReadingPlansScreen.jsx';
 import { HistoryScreen } from './screens/HistoryScreen.jsx';
@@ -85,7 +83,7 @@ import { MatthewChapterView } from './screens/MatthewChapterView.jsx';
 Object.assign(window, {
   MyProgressScreen,
   BookmarkRow, BookmarkRowActionSheet, BookmarksScreen,
-  MilestonesScreen, HistoryScreen,
+  HistoryScreen,
   ReadingPlansScreen,
   NotesIndexScreen,
   _linkEndpointCategory, _endpointResolves, _epSearchText,

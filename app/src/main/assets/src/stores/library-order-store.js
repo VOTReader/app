@@ -32,10 +32,11 @@ import { CachedStore, extendStore } from './cached-store.js';
  *  disturbing a saved arrangement. */
 export const DEFAULT_LIBRARY_ORDER = Object.freeze([
   'notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress',
-  'plans', 'milestones', 'scripture-web',
+  'plans', 'scripture-web',
 ]);
 // 'audio' retired 2026-08-09 — the Listening Library became a HOME card;
-// saved orders still carrying it simply drop the id in place.
+// 'milestones' retired 2026-10-05 — the Milestones screen was removed.
+// Saved orders still carrying either simply drop the id in place.
 
 export const LibraryOrderStore = extendStore(
   CachedStore('vot-library-order', /** @type {string[]} */ ([]), { idb: true }),

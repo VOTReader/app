@@ -6,10 +6,9 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 618 distinct identifiers.
+// Total: 612 distinct identifiers.
 
 export const projectGlobals = {
-  ACHIEVEMENT_STORE_NAMES: "readonly",
   ANSWERS: "readonly",
   ARROW_LAYOUT_OPTIONS: "readonly",
   AUDIO_ALTERNATES: "readonly",
@@ -199,12 +198,10 @@ export const projectGlobals = {
   MATTHEW: "readonly",
   MATTHEW_NKJV: "readonly",
   MATTHEW_PLAIN: "readonly",
-  MILESTONE_DEFS: "readonly",
   MIN_HIDDEN_WORDS: "readonly",
   MONTH_ABBR: "readonly",
   MONTH_NAMES: "readonly",
   MatthewChapterView: "readonly",
-  MilestonesScreen: "readonly",
   ModeToggle: "readonly",
   MultiNotePopover: "readonly",
   MyProgressScreen: "readonly",
@@ -395,7 +392,6 @@ export const projectGlobals = {
   blockBoundaryOffsets: "readonly",
   bookCategory: "readonly",
   bookItemsFor: "readonly",
-  buildAchievements: "readonly",
   buildExportPayload: "readonly",
   buildNavIndex: "readonly",
   buildNavTree: "readonly",
@@ -412,7 +408,6 @@ export const projectGlobals = {
   colLetterArr: "readonly",
   colLetters: "readonly",
   colPreface: "readonly",
-  collectAchievementSnapshot: "readonly",
   commitReadingNav: "readonly",
   composeNotesExport: "readonly",
   computeEndTarget: "readonly",
@@ -476,7 +471,6 @@ export const projectGlobals = {
   jrnRefKeyForBookmark: "readonly",
   jrnRefKeyForLetter: "readonly",
   jrnRenderInline: "readonly",
-  jrnShowMilestoneToast: "readonly",
   lastVerseOfFirstRange: "readonly",
   letterHlKey: "readonly",
   linkPreface: "readonly",

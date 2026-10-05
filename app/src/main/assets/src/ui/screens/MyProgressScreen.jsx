@@ -9,7 +9,6 @@
    - Reading: chapters/letters read (mark-as-read), reading streak, words
      read, measured pace, time, re-reads (ReadingStatsStore), then the
      per-collection progress (shared buildProgressGroups table)
-   - Milestones: the nearest one as "Next", then the featured ten
    - Journal: entries, streak, words written (journal text blocks) and
      voice-memo minutes (JournalMediaStore durations)
    - Listening, Your library (notes / marks / bookmarks / links), and
@@ -21,15 +20,14 @@
    honors settings.markAsRead the same way Settings does (hidden behind
    an explanatory line while the toggle is off).
 
-   The Milestones strip is the FEATURED subset of utils/achievements.js
-   (2026-08-10) — the same ten items MilestonesScreen shows among its full
-   set, not a second table. See that module's FEATURED block.
+   The Milestones strip was removed 2026-10-05 with the Milestones screen;
+   the streaks and counts here are plain progress and stay.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { isMarkKind } from '../../utils/mark-kinds.js';
 
 /* Free globals, not imports: this screen ships in bundle-g (the lazy Personal
-   Study bundle) and reads buildAchievements / collectAchievementSnapshot / onIdle from the window slots
+   Study bundle) and reads onIdle from the window slots
    bundle-d fills — one copy of each law, and no second module state. */
 
 /**
@@ -53,7 +51,7 @@ function _fmtDuration(ms) {
   return Math.floor(min / 60) + 'h ' + (min % 60) + 'm';
 }
 
-export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOpenMilestones, theme, onThemeChange, settings, readItems, historyCount, historyEnabled }) {
+export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, theme, onThemeChange, settings, readItems, historyCount, historyEnabled }) {
   // The reading table + most-annotated titles read the lazy corpora
   // (BOOKS for NT/OT totals, VOT for volume totals + letter titles,
   // MATTHEW + BIBLE_STUDIES for the Studies group). Pre-fire every
@@ -300,22 +298,6 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOp
     { label: 'Links', value: linkCount.toLocaleString('en-US') },
   ];
 
-  /* BACKLOG [23] — reading milestones. ONE ENGINE since 2026-08-10: the rows
-     are the FEATURED subset of utils/achievements.js, the same items the
-     Milestones screen renders, so the two cannot disagree about what has been
-     earned. Locked rows are still shown — a milestone you cannot see is not a
-     goal — and since 2026-09-25 the nearest one leads as "Next". Unmemoized:
-     this screen already subscribes to every contributing store, and it
-     renders rarely enough that the snapshot walk is not worth a memo key. */
-  const built = buildAchievements(collectAchievementSnapshot(readItems));
-  const ms = built.featured || [];
-  const msEarned = ms.filter((m) => m.earned);
-  // Most of its way covered; on a tie, the least left to go (MilestonesScreen picks the same way).
-  const next = ms.filter((m) => !m.earned)
-    .reduce((best, m) => (!best || m.fraction > best.fraction
-      || (m.fraction === best.fraction && m.threshold - m.value < best.threshold - best.value) ? m : best),
-    /** @type {any} */ (null));
-
   /** Label / value rows on hairlines. @param {Array<{ label: string, value: string }>} rows */
   const facts = (rows) => (
     <dl className="prg-facts">
@@ -413,40 +395,6 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, onOp
             </div>
           )}
         </section>
-
-        {ms.length > 0 && (
-          <section className="prg-section" aria-labelledby="prg-h-milestones">
-            {head('prg-h-milestones', 'Milestones', built.earned + ' of ' + built.total + ' reached')}
-            {next && (
-              <div className="prg-next">
-                <div className="prg-row-head">
-                  <span className="prg-row-label">Next: {next.label}</span>
-                  <span className="prg-row-tally">{next.value.toLocaleString('en-US')} of {next.threshold.toLocaleString('en-US')}</span>
-                </div>
-                <div className="prg-next-bar" aria-hidden="true">
-                  <div className="prg-next-fill" style={{ width: Math.round(next.fraction * 100) + '%' }} />
-                </div>
-              </div>
-            )}
-            <span className="sr-only">{msEarned.length} of {ms.length} reading milestones reached.</span>
-            <div className="prg-milestones">
-              {ms.map((m) => (
-                <div key={m.key} className={'prg-milestone' + (m.earned ? ' is-unlocked' : '')}>
-                  <span className="prg-milestone-mark" aria-hidden="true">{m.earned ? '✦' : '·'}</span>
-                  <span className="prg-milestone-label">{m.label}</span>
-                  <span className="sr-only">{m.earned ? ' — reached' : ' — not yet reached'}</span>
-                </div>
-              ))}
-            </div>
-            {/* These are the featured ten; the full journey (chapters, letters,
-                streaks, listening, …) lives one tap away. */}
-            {onOpenMilestones && (
-              <button type="button" className="prg-milestones-all" onClick={onOpenMilestones}>
-                View all milestones ›
-              </button>
-            )}
-          </section>
-        )}
 
         <section className="prg-section" aria-labelledby="prg-h-journal">
           {head('prg-h-journal', 'Journal')}

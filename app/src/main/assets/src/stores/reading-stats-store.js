@@ -43,7 +43,6 @@
 
 import { CachedStore, extendStore } from './cached-store.js';
 import { _jrnDateStr } from './journal-stats-store.js';
-import { FEATURED_UNLOCK_DEFS } from '../utils/achievements.js';
 
 /**
  * @typedef {{
@@ -59,30 +58,10 @@ import { FEATURED_UNLOCK_DEFS } from '../utils/achievements.js';
  * }} ReadingStatsData
  */
 
-/**
- * Reading milestones (BACKLOG [23]) — the UNLOCK LEDGER only, since
- * 2026-08-10.
- *
- * This used to be `READING_MILESTONE_DEFS`, a ten-row display table that My
- * Progress rendered as a strip. That made two milestone systems over the same
- * three numbers, and the strip (a persisted once-ever unlock list) could
- * disagree with the Milestones screen (earned-ness recomputed live). Owner
- * decision: COMBINE. The table folded into `utils/achievements.js` as its
- * FEATURED subset — the ten rows were already ten of the achievements, metric
- * for metric and label for label — and both surfaces now render from
- * `buildAchievements`.
- *
- * What remains here is the part that could not fold: a persisted list of keys
- * so a threshold TOASTS exactly once ever. `FEATURED_UNLOCK_DEFS` resolves
- * those rows out of the one definition table (keeping the legacy key space, so
- * no reader's saved unlocks are invalidated and no toast re-fires), which is
- * why the ledger can no longer carry a threshold the display does not have.
- *
- * `utils/achievements.js` is a pure, import-free module and rides both bundles
- * — the same arrangement `utils/audio-track.js` has with the two audio stores.
- *
- * @typedef {{ key: string, achievementKey: string, metric: string, threshold: number, label: string }} ReadingMilestoneDef
- */
+/* Milestones were removed 2026-10-05 (the screen, the Progress strip, the
+   unlock toasts and utils/achievements.js). `milestonesUnlocked` is the old
+   unlock ledger: never read or written now, but kept in the defaults and in
+   replaceAll so old backups import and export unchanged. */
 
 var MAX_DAY_KEYS = 400;
 var MAX_WPM_SAMPLES = 50;
@@ -163,17 +142,13 @@ export var ReadingStatsStore = extendStore(
      *
      * @param {{ key: string, words: number, activeMs: number,
      *           wasReadBefore?: boolean, ts?: number }} args
-     * @returns {ReadingMilestoneDef[]} milestones unlocked BY THIS call —
-     *   always an array, including on the deferred and no-words paths, so
-     *   the caller can read `.length` without a guard.
+     * @returns {void}
      */
     recordCompletion(args) {
-      // Returns the newly-unlocked milestones, so the deferred path must
-      // return an ARRAY too — the caller does `newly.length` on it.
-      if (this._shouldDefer('recordCompletion', args)) return [];
+      if (this._shouldDefer('recordCompletion', args)) return;
       var words = Math.max(0, Math.round((args && args.words) || 0));
       var ms = Math.max(0, Math.round((args && args.activeMs) || 0));
-      if (!words) return [];
+      if (!words) return;
       var data = this._load();
       data.totalWordsRead = (data.totalWordsRead || 0) + words;
       data.totalActiveMs = (data.totalActiveMs || 0) + ms;
@@ -199,10 +174,8 @@ export var ReadingStatsStore = extendStore(
       if (args && args.key && data.progress && data.progress[args.key]) {
         delete data.progress[args.key];
       }
-      var newlyUnlocked = this._checkMilestones(data);
       this._save();
       this._bump();
-      return newlyUnlocked;
     },
 
     /**
@@ -363,39 +336,6 @@ export var ReadingStatsStore = extendStore(
       if (samples.length > MAX_WPM_SAMPLES) samples.splice(0, samples.length - MAX_WPM_SAMPLES);
       this._save();
       this._bump();
-    },
-
-    /* milestones() RETIRED 2026-08-10. Its one caller was My Progress's
-       strip, which now renders `buildAchievements(...).featured` — the same
-       objects the Milestones screen shows, so the two cannot disagree. This
-       store's remaining milestone job is the unlock ledger below. */
-
-    /**
-     * Unlock any milestone whose threshold `data` has just crossed, and
-     * return the newly-unlocked ones so the caller can toast. Mutates
-     * `data.milestonesUnlocked` in place; the caller saves.
-     *
-     * A milestone unlocks exactly ONCE: the persisted key list is the
-     * guard, so re-crossing a threshold (or a restore that already carries
-     * the key) never re-fires the toast.
-     *
-     * @param {ReadingStatsData} data
-     * @returns {ReadingMilestoneDef[]}
-     */
-    _checkMilestones(data) {
-      var u = data.milestonesUnlocked || (data.milestonesUnlocked = []);
-      /** @type {ReadingMilestoneDef[]} */
-      var newly = [];
-      FEATURED_UNLOCK_DEFS.forEach(function(m) {
-        if (u.indexOf(m.key) >= 0) return;
-        // The achievements engine's metric names, mapped onto this store's
-        // own fields — the only three metrics the featured subset uses.
-        var n = m.metric === 'words' ? (data.totalWordsRead || 0)
-              : m.metric === 'rereads' ? (data.rereads || 0)
-              : (data.totalCompletions || 0);
-        if (n >= m.threshold) { u.push(m.key); newly.push(m); }
-      });
-      return newly;
     },
 
     /**

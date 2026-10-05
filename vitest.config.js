@@ -197,7 +197,7 @@ export default defineConfig({
       //   statements 53.57 (2284/4263) | branches 43.31 (1315/3036)
       //   functions  59.32 (506/853)   | lines    57.70 (1849/3204)
       // +230 tests covering: bookmark, journal cascade/prune, journal-
-      // stats streak/milestones, history pruneDay, notebook dedup/
+      // stats streak, history pruneDay, notebook dedup/
       // cascade, home-order schema validation, journal-media blob
       // round-trip/pruneOrphans, replaceAll across 14 stores,
       // migrateAnnotations legacy transformation. Per-store coverage

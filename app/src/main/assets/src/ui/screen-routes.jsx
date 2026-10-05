@@ -919,7 +919,6 @@ export function buildScreenRoutes({
           onOpenJournal={goJournalHub}
           onOpenHighlights={goHighlightsIndex}
           onOpenProgress={goProgress}
-          onOpenMilestones={() => { setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null }); setScreen('milestones'); }}
           onOpenPlans={() => { setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null }); setScreen('reading-plans'); }}
           readingPlanCount={Array.isArray(settings.readingPlans) ? settings.readingPlans.length : 0}
           onOpenScriptureWeb={() => {
@@ -930,7 +929,6 @@ export function buildScreenRoutes({
             setScreen('scripture-web');
           }}
           totalReadCount={Object.keys(readItems || {}).length}
-          readItems={readItems || {}}
           onSearch={goSearch}
           onHistory={goHistory}
           onSettings={goSettings}
@@ -938,7 +936,7 @@ export function buildScreenRoutes({
           theme={theme} onThemeChange={setTheme}
         />
     ),
-    // rp1: the reading plans (bundle-g, like Milestones); back returns to where it was opened
+    // rp1: the reading plans (bundle-g); back returns to where it was opened
     'reading-plans': () => typeof ReadingPlansScreen !== 'undefined' ? (
       <ReadingPlansScreen
         onBack={goNavOrigin}
@@ -954,17 +952,6 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
-    'milestones': () => typeof MilestonesScreen !== 'undefined' ? (
-      <MilestonesScreen
-        onBack={goNavOrigin}
-        backLabel={navOrigin && navOrigin.screen === 'my-progress' ? 'Progress' : 'Library'}
-        readItems={readItems}
-        onSearch={goSearch}
-        onHistory={goHistory}
-        onSettings={goSettings}
-        theme={theme} onThemeChange={setTheme}
-      />
-    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
     // The Personal Study screens live in bundle-g (lazy, PF6 contract):
     // until its IIFE has defined them, the route shows _corpusView's loader and
     // asks for the bundle, exactly as Settings/Search do for bundle-e.
@@ -974,7 +961,6 @@ export function buildScreenRoutes({
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}
-        onOpenMilestones={() => { setNavOrigin({ screen: 'my-progress', returnOrigin: navOrigin || null }); setScreen('milestones'); }}
         settings={settings}
         readItems={readItems}
         historyCount={readHistory.length}
