@@ -24,10 +24,13 @@ PROJECT="${PREVIEW_PROJECT:-votreader-preview}"
 BRANCH="${PREVIEW_BRANCH:-overhaul}"
 cd "$(git rev-parse --show-toplevel)"
 
-[ "$(git rev-parse --abbrev-ref HEAD)" = "$BRANCH" ] || { echo "[preview] not on $BRANCH" >&2; exit 2; }
+# On the branch, or detached at its tip from any lane's own worktree (git worktree add --detach <dir> origin/overhaul):
+# one worktree per lane, so nobody deploys from another lane's checkout.
+HEAD_NAME="$(git rev-parse --abbrev-ref HEAD)"
+[ "$HEAD_NAME" = "$BRANCH" ] || [ "$HEAD_NAME" = "HEAD" ] || { echo "[preview] not on $BRANCH (nor detached)" >&2; exit 2; }
 if ! git diff --quiet || ! git diff --cached --quiet; then echo "[preview] dirty tree: commit first" >&2; exit 2; fi
 git fetch -q origin "$BRANCH" || true
-if [ -z "$DRY" ] && [ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$BRANCH" 2>/dev/null || echo none)" ]; then
+if { [ -z "$DRY" ] || [ "$HEAD_NAME" = "HEAD" ]; } && [ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$BRANCH" 2>/dev/null || echo none)" ]; then
   echo "[preview] HEAD is not origin/$BRANCH: land first (LAND_BRANCH=$BRANCH bash D:/Swarm/tools/land.sh)" >&2; exit 2
 fi
 
