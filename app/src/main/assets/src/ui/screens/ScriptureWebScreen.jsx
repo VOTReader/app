@@ -105,6 +105,14 @@ const DENSITY_HINT = {
    scope the flag means. */
 const CHROME_HIDDEN_KEY = 'vot-sw-chrome-hidden';
 const LIVE_HOLD_MS = 150;
+
+/* Where the reader was when they opened a verse from the web (sw1 B3, 2026-10-05). The screen
+   unmounts while the reader is up, and its camera, focus and card live in refs, so "Back to The
+   Scripture Web" used to land at fit with nothing chosen. In memory only, never stored, and
+   one-shot: the next mount takes it, the way WebFallbackList keeps its chapter. */
+let resumeWeb = null;
+/** Tests only: forget the resume point between cases. */
+export function _resetWebPlace() { resumeWeb = null; }
 const FADE_MS = 250;
 function readChromeHidden() {
   try { return sessionStorage.getItem(CHROME_HIDDEN_KEY) === '1'; } catch (_e) { return false; }
@@ -118,6 +126,9 @@ function readChromeHidden() {
  * @param {(key:string, value:any) => void} props.updateSetting
  */
 export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSetting }) {
+  // Taken once per mount (a ref survives StrictMode's second render; the module slot does not).
+  const resumeRef = React.useRef(/** @type {any} */ (undefined));
+  if (resumeRef.current === undefined) { resumeRef.current = resumeWeb; resumeWeb = null; }
   const glRef = React.useRef(null);
   const uiRef = React.useRef(null);
   const wrapRef = React.useRef(null);
@@ -158,7 +169,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const loc = React.useCallback((e) => (rotatedRef.current
     ? rotatePointer(e.clientX, e.clientY, window.innerWidth)
     : { x: e.clientX, y: e.clientY }), []);
-  const [mode, setMode] = React.useState('canonical');   // 'canonical' | 'personal'
+  const [mode, setMode] = React.useState(() => (resumeRef.current && resumeRef.current.mode) || 'canonical');   // 'canonical' | 'personal'
   // The empty-web notice hands focus back here when it closes, so a keyboard
   // reader stays in the control they were using instead of at the document top.
   const myWebBtnRef = React.useRef(null);
@@ -184,7 +195,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     return DENSITY_STEPS.indexOf(saved) >= 0 ? /** @type {Density} */ (saved) : 'famous';
   };
   const [density, setDensity] = React.useState(storedDensity);
-  const [detail, setDetail] = React.useState(null);      // the open sheet
+  const [detail, setDetail] = React.useState(() => (resumeRef.current && resumeRef.current.detail) || null);      // the open sheet
   const [choices, setChoices] = React.useState(null);    // overlapped line chooser
   const [listOpen, setListOpen] = React.useState(false); // accessible nearby list
   const [chromeHidden, setChromeHidden] = React.useState(readChromeHidden);
@@ -225,7 +236,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const personalRef = React.useRef(null);
   // frame() runs per draw and must stay identity-stable, so it reads the mode
   // from a ref rather than closing over the state value.
-  const modeRef = React.useRef('canonical');
+  const modeRef = React.useRef(mode);
   // The cameras (canon + Volumes rail), the view, the focused thread and the
   // frame maths that reads them (v15-code-health-06).
   const {
@@ -565,7 +576,15 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     }
     if (!renderer) { setNoWebGL(true); return; }
     rendererRef.current = renderer;
-    if (!camRef.current) camRef.current = createCamera(graph.total);
+    if (!camRef.current) {
+      const back = resumeRef.current;
+      if (back && back.cam && back.cam.total === graph.total) {
+        camRef.current = Object.assign({}, back.cam);
+        focusRef.current = Object.assign({}, back.focus);
+      } else {
+        camRef.current = createCamera(graph.total);
+      }
+    }
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 3);
@@ -601,7 +620,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       renderer.dispose();
       rendererRef.current = null;
     };
-  }, [graph, schedule, glRetry, yFrameFor, camRef, viewRef]);
+  }, [graph, schedule, glRetry, yFrameFor, camRef, viewRef, focusRef]);
 
   // ── the personal web ────────────────────────────────────────────────────
   const linkVersion = useLinkVersion();
@@ -1039,8 +1058,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // meta.sourceLetterTitle is what the reader's back pill is labelled with,
     // and the hook snapshots the current screen as the return target — so a
     // jump from here comes back HERE.
+    const cam = camRef.current;
+    resumeWeb = cam ? { mode: modeRef.current, cam: Object.assign({}, cam), focus: Object.assign({}, focusRef.current), detail } : null;
     navigateToLink(endpoint, { sourceLetterTitle: 'The Scripture Web' });
-  }, [navigateToLink]);
+  }, [navigateToLink, camRef, focusRef, modeRef, detail]);
 
   // A bundle's group, chosen in its sheet: the pair of ranges the shader and
   // the picker draw and spotlight (uFocusRange2). Choosing the

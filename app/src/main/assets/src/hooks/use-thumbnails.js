@@ -547,6 +547,11 @@ export function useThumbnails({
     // SCREENSHOT_IGNORE_CLASSES ('tabs-overview-layer'), so capturing under
     // it is safe — and the overview-open heal below depends on it.
     if (tabsOverviewOpenRef.current && isGarden) return;
+    // The Scripture Web is a full-screen WebGL canvas with no .screen-layout: the clone capture
+    // fell back to a zero-height #root, failed "degenerate canvas", and retried three times a
+    // visit, each try cloning the page and stalling on readPixels (sw1 B5, 2026-10-05). Its card
+    // keeps the plain placeholder instead.
+    if (tab.screen === 'scripture-web') return;
     const key = tabContentKey(tab);
     // Re-measure the card aspect now that a real screen is up — the mount
     // effect can fire while a lazy-corpus placeholder (no .screen-layout)

@@ -75,6 +75,7 @@ uniform vec2  uLens;         // the lens: the chapter under the frame's centre (
 uniform float uLensDim;      // what the rest of the web keeps of its alpha under the lens
 uniform float uHoverArc;     // HOVERED instance: brightened only, dims nothing
 uniform float uInstanceBase; // gl_InstanceID offset of this draw range
+uniform float uDpr;          // device px per CSS px: the chosen line's floor width is set in CSS px
 in uint aFrom; in uint aTo; in float aVotes; in float aGenre;
 in float aFanA; in float aFanB; // each foot's departure rank, -0.5..0.5
 out vec4 vCol; out float vEdge; out float vHalfW;
@@ -120,12 +121,16 @@ void main(){
   float strength = clamp(aVotes/70., .30, 1.);
   float wScale = mix(1., mix(${STROKE_MIN_CSS / STROKE_DEEP_CSS}, 1., (strength - .30)/.70), uVoteMix);
   float halfW = uWidth*.5*wScale;
-  float hw = halfW + 1.0;                        // +1px feather skirt
-  p += vec2(-tg.y, tg.x)*side*hw;
 
   float id = float(gl_InstanceID) + uInstanceBase;
   float spot = (uFocusArc >= 0. && abs(id - uFocusArc) < .5) ? 1. : 0.;
   float hovered = (uHoverArc >= 0. && abs(id - uHoverArc) < .5) ? 1. : 0.;
+  // The chosen line reads at every zoom: at least 2.4 CSS px wide (2 for a hovered one). At the
+  // overview the stroke law gives ~0.9 px, and the reader lost the line they had just tapped
+  // (sw1 B2, 2026-10-05). Drawing only; pick.js keeps its own hit width.
+  halfW = max(halfW, max(spot*1.2, hovered*1.)*uDpr);
+  float hw = halfW + 1.0;                        // +1px feather skirt
+  p += vec2(-tg.y, tg.x)*side*hw;
   float a1 = step(uFocusRange.x, a)*step(a, uFocusRange.y);
   float b1 = step(uFocusRange.x, b)*step(b, uFocusRange.y);
   float inRange = (uFocusRange.x <= uFocusRange.y && max(a1, b1) > .5) ? 1. : 0.;
@@ -168,11 +173,13 @@ void main(){
   } else {
     col = genreColor(aGenre);
   }
-  col = mix(col, vec3(1.), bright*.55);
+  col = mix(col, vec3(1.), hovered*(1. - spot)*.55);
+  col = mix(col, vec3(.784, .643, .337), spot);  // the chosen line is the app's gold (#c8a456)
   col *= uLightness;                              // parchment needs darker ink
 
   float aStrength = mix(strength, 1., uVoteMix);
-  vCol = vec4(col, uAlpha*dim*aStrength*mix(1., 3.0, bright));
+  // ...and nearly opaque: uAlpha at the overview is 0.075, so x3 left a tapped line at ~0.12.
+  vCol = vec4(col, max(uAlpha*dim*aStrength*mix(1., 3.0, bright), max(spot*.95, hovered*.7)));
   vEdge = side;
   vHalfW = halfW;
   gl_Position = vec4(p/uRes*2. - 1., 0, 1);
@@ -249,7 +256,7 @@ export function createRenderer(canvas, graph, opts = {}) {
   for (const name of ['uRes', 'uCamX', 'uCamY', 'uPPV', 'uBase', 'uSquash',
     'uLocalize', 'uFlyLocalize', 'uWidth', 'uAlpha', 'uTotal', 'uNT', 'uColorMode',
     'uLightness', 'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
-    'uHoverArc', 'uInstanceBase', 'uFocusRange2', 'uLens', 'uLensDim']) {
+    'uHoverArc', 'uInstanceBase', 'uFocusRange2', 'uLens', 'uLensDim', 'uDpr']) {
     U[name] = gl.getUniformLocation(program, name);
   }
 
@@ -393,6 +400,7 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.uniform1f(U.uLocalize, v.localize);
       gl.uniform1f(U.uFlyLocalize, skyLocalize(v.localize, v.camY > 0 ? v.camY : 0, v.ceil));
       gl.uniform1f(U.uWidth, v.strokeWidth);
+      gl.uniform1f(U.uDpr, v.dpr || 1);
       gl.uniform1f(U.uAlpha, v.alpha);
       gl.uniform1f(U.uTotal, graph.total);
       gl.uniform1f(U.uNT, ntStart);

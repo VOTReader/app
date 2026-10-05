@@ -66,7 +66,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
 
 import { createRenderer } from '../scripture-web/web-renderer.js';
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
-import { ScriptureWebScreen } from './ScriptureWebScreen.jsx';
+import { ScriptureWebScreen, _resetWebPlace } from './ScriptureWebScreen.jsx';
 import { modalRegistry } from '../../hooks/use-modal-registry.js';
 
 const baseProps = () => ({
@@ -83,6 +83,7 @@ const setViewport = (w, h) => {
 
 afterEach(() => {
   cleanup();
+  _resetWebPlace();
   delete window.SCRIPTURE_WEB_DATA;
   vi.unstubAllGlobals();
   setViewport(ORIG_W, ORIG_H);
@@ -420,6 +421,35 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       const last = DRAWN[DRAWN.length - 1];
       expect(last.focusArc).toBe(-1);
       expect(last.focusRange).toBeNull();
+    });
+
+    /* sw1 B3 (audit-web 10-05): opening a verse unmounts the web, and its camera, focus and card lived only in
+       refs, so Back from the reader landed at fit with nothing chosen. */
+    it('coming back from a verse opened on the card keeps the zoom, the place, the chosen line and its card', async () => {
+      const opened = [];
+      const first = await mount({ navigateToLink: (ep) => opened.push(ep) }, threaded);
+      for (let i = 0; i < 40; i++) await pressFrame('+');
+      await pickNearby();
+      const before = DRAWN[DRAWN.length - 1];
+      expect(before.focusArc, 'PRECONDITION: a line is chosen').toBe(0);
+      const go = [...first.container.querySelectorAll('.sw-card')].find((b) => !b.disabled);
+      expect(go, 'PRECONDITION: the card offers a verse to open').toBeTruthy();
+      fireEvent.click(go);
+      expect(opened.length).toBe(1);
+      first.unmount();                       // the reader replaces the web
+      DRAWN.length = 0;
+      const back = await mount({}, threaded); // "Back to The Scripture Web"
+      const now = DRAWN[DRAWN.length - 1];
+      expect(now.ppv).toBeCloseTo(before.ppv, 6);
+      expect(now.camX).toBeCloseTo(before.camX, 6);
+      expect(now.focusArc).toBe(0);
+      expect(back.container.querySelector('.sw-sheet'), 'the card is back up').toBeTruthy();
+      // one-shot: a later visit opens at fit as before
+      back.unmount();
+      DRAWN.length = 0;
+      await mount({}, threaded);
+      expect(zoomText()).toBe('Overview');
+      expect(DRAWN[DRAWN.length - 1].focusArc).toBe(-1);
     });
 
     it('at the ceiling the off-screen foot of the line is written on its body, and the on-screen foot reads off the ruler (book, chapter, verse)', async () => {

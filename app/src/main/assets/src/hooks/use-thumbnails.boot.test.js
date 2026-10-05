@@ -135,3 +135,19 @@ describe('useThumbnails — web boot quiet window', () => {
     expect(takeThemedScreenshot).toHaveBeenCalledTimes(1);
   });
 });
+
+/* sw1 B5 (audit-web 10-05): on the Scripture Web the content capture found no .screen-layout, fell back to a
+   zero-height #root and failed "degenerate canvas" - three retries a visit, each cloning the page and stalling
+   on a WebGL readPixels, for a card that stayed blank anyway. The web's tab is not captured at all. */
+describe('useThumbnails — the Scripture Web is never captured', () => {
+  const webTab = { id: 'w', screen: 'scripture-web' };
+  it.each([[false], [true]])('Android %s: no capture and no retries on the web, and a later tab still captures', async (android) => {
+    bridge.isAndroid = android;
+    const { rerender } = renderHook((p) => useThumbnails(p), { initialProps: hookProps({ tabs: [webTab], activeTab: webTab }) });
+    await advance(WEB_BOOT_CAPTURE_FLOOR_MS * 3);
+    expect(takeThemedScreenshot).not.toHaveBeenCalled();
+    rerender(hookProps({ tabs: [webTab, tabB], activeTabIdx: 1, activeTab: tabB }));
+    await advance(WEB_BOOT_CAPTURE_FLOOR_MS * 2);
+    expect(takeThemedScreenshot).toHaveBeenCalledTimes(1);
+  });
+});
