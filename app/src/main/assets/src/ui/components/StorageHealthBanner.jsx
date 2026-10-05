@@ -102,7 +102,11 @@ export function StorageHealthBanner({ onNavigateSettings }) {
         style: 'danger',
         text: `Some of your data looks missing. On ${_snapDate(dataMissing.at)} you had ${_what(dataMissing.then)}; now ${_what(dataMissing.now)}. Restore adds back what is missing and keeps everything you have made since.`,
         dismissable: true,
-        buttons: [{ label: 'Restore', primary: true, onClick: () => { if (typeof DataSafety !== 'undefined') DataSafety.restoreMissing(); } }],
+        buttons: [
+          { label: 'Restore', primary: true, onClick: () => { if (typeof DataSafety !== 'undefined') Promise.resolve(DataSafety.restoreMissing()).catch(() => {}); } },
+          // The drop was the reader's own (a big delete): stop offering, snapshot what is here now.
+          { label: 'Keep as is', onClick: () => { if (typeof DataSafety !== 'undefined') Promise.resolve(DataSafety.acceptCurrent()).catch(() => {}); } },
+        ],
       };
     }
 

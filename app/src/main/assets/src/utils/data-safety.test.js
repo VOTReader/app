@@ -8,7 +8,7 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { IDBAdapter } from '../stores/idb-adapter.js';
-import { CachedStore, _resetStoreRegistry } from '../stores/cached-store.js';
+import { CachedStore, _resetStoreRegistry, setStoreWriteFence } from '../stores/cached-store.js';
 import { StorageHealth } from './storage-health.js';
 import { DataSafety, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY } from './data-safety.js';
 import { pruneSnapshotNames, snapshotName, snapshotTime, KEEP_DAYS, KEEP_WEEKS } from './snapshot-sink.js';
@@ -50,7 +50,7 @@ beforeEach(async () => {
   StorageHealth.setDataMissing(null);
 });
 
-afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
+afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); setStoreWriteFence(false); });
 
 describe('summarize / score / looksDamaged', () => {
   it('counts what a reader would', () => {
@@ -142,7 +142,8 @@ describe('restoreMissing(): a merge, never a replace', () => {
     expect(Object.keys(st.readItems)).toHaveLength(31);
     expect(st.theme).toBe('light');                    // the live session fields win
     expect(st.tabs).toEqual([{ id: 'now' }]);
-    expect(localStorage.getItem(HEALTH_SKIP_KEY)).toBe('1');
+    // No skip token: the next boot checks the restored library like any other.
+    expect(localStorage.getItem(HEALTH_SKIP_KEY)).toBeNull();
   });
 
   it('does nothing without a finding', async () => {
@@ -173,5 +174,62 @@ describe('pruneSnapshotNames (the web copy of SnapshotStore.prune)', () => {
   it('round-trips a name to its time', () => {
     const t = new Date(2026, 9, 5, 3, 4, 5).getTime();
     expect(snapshotTime(snapshotName(t))).toBe(t);
+  });
+});
+
+describe('refuter findings (datasafe 10-05 second pass)', () => {
+  it('one store lost on its own is damage even when the total holds up', () => {
+    const then = { highlights: 55, notes: 0, links: 0, bookmarks: 0, journal: 0, notebooks: 0, readMarks: 700, history: 0 };
+    const now = { ...then, highlights: 0 };
+    expect(looksDamaged(then, now)).toBe(true);
+  });
+
+  it('streak, stats and audio merge field by field, not live-wins', () => {
+    const streak = mergeForRestore('vot-reading-streak',
+      { currentStreak: 1, longestStreak: 1, lastReadDate: '2026-10-05', totalDays: 1 },
+      { currentStreak: 48, longestStreak: 48, lastReadDate: '2026-09-24', totalDays: 48 });
+    expect(streak).toEqual({ currentStreak: 1, longestStreak: 48, lastReadDate: '2026-10-05', totalDays: 48 });
+    const stats = mergeForRestore('vot-reading-stats',
+      { totalWordsRead: 10, wordsByDay: { '2026-10-05': 10 }, progress: { a: { t: 5, w: 1 } } },
+      { totalWordsRead: 300000, wordsByDay: { '2026-09-24': 900 }, progress: { a: { t: 1, w: 9 }, b: { t: 2, w: 3 } } });
+    expect(stats.totalWordsRead).toBe(300000);
+    expect(stats.wordsByDay).toEqual({ '2026-10-05': 10, '2026-09-24': 900 });
+    expect(stats.progress).toEqual({ a: { t: 5, w: 1 }, b: { t: 2, w: 3 } });
+    const pos = mergeForRestore('vot-audio-positions', { v: 1, positions: { x: { t: 9 } } }, { v: 1, positions: { x: { t: 1 }, y: { t: 2 } } });
+    expect(pos.positions).toEqual({ x: { t: 9 }, y: { t: 2 } });
+  });
+
+  it('Keep as is clears the finding and snapshots the smaller library at once', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    const sink = memorySink();
+    StorageHealth.setDataMissing({ name: 'x', at: 0, then: {}, now: {} });
+    expect(await DataSafety.acceptCurrent({ sink })).toBe('snapshotted');
+    expect(StorageHealth.getReport().dataMissing).toBeNull();
+    expect(sink.files.size).toBe(1);
+  });
+
+  it('a restore whose write fails lifts the fence, changes nothing and keeps the finding', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    const sink = memorySink();
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(Date.now() - 86400000);
+    await DataSafety.run({ sink });
+    vi.useRealTimers();
+    await IDBAdapter.put('vot-annotations', 'v', {});
+    await IDBAdapter.put('vot-notes', 'v', {});
+    await IDBAdapter.put('vot-state', 'v', {});
+    expect(await DataSafety.run({ sink })).toBe('damaged');
+    const { isStoreWriteFenced } = await import('../stores/cached-store.js');
+    vi.spyOn(IDBAdapter, 'put').mockRejectedValue(Object.assign(new Error('quota'), { name: 'QuotaExceededError' }));
+    const reload = vi.fn();
+    expect(await DataSafety.restoreMissing({ sink, reload })).toBe(false);
+    expect(reload).not.toHaveBeenCalled();
+    expect(isStoreWriteFenced()).toBe(false);
+    expect(StorageHealth.getReport().dataMissing).not.toBeNull();
+  });
+
+  it('a progress reset tells the next boot the smaller ledger is the reader\'s own', async () => {
+    const { allowProgressClear } = await import('../stores/store-merge.js');
+    allowProgressClear();
+    expect(localStorage.getItem(HEALTH_SKIP_KEY)).toBe('1');
   });
 });

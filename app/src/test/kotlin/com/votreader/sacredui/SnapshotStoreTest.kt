@@ -92,6 +92,24 @@ class SnapshotStoreTest {
         assertTrue(n.drop(7).all { it < n[6] })
     }
 
+    @Test fun `weekly keepers across a year boundary are one per real week`() {
+        // Daily saves from Dec 1 to Jan 20: the 4 weekly keepers fall in Dec/Jan
+        // and must be 4 distinct Sunday-started weeks (WEEK_OF_YEAR split Dec 27-31).
+        val cal = Calendar.getInstance().apply { clear(); set(2026, 11, 1, 10, 0, 0) }
+        while (cal.get(Calendar.YEAR) == 2026 || cal.get(Calendar.DAY_OF_YEAR) <= 20) {
+            store.save("d", cal.timeInMillis); cal.add(Calendar.DAY_OF_MONTH, 1)
+        }
+        val weekly = names().drop(SnapshotStore.KEEP_DAYS)
+        assertEquals(SnapshotStore.KEEP_WEEKS, weekly.size)
+        val sundays = weekly.map {
+            val c = Calendar.getInstance().apply {
+                clear(); set(it.substring(5, 9).toInt(), it.substring(9, 11).toInt() - 1, it.substring(11, 13).toInt())
+            }
+            c.add(Calendar.DAY_OF_MONTH, Calendar.SUNDAY - c.get(Calendar.DAY_OF_WEEK)); c.timeInMillis
+        }
+        assertEquals(weekly.size, sundays.toSet().size)
+    }
+
     @Test fun `clear removes every snapshot and leaves other files`() {
         store.save("a", at(2026, 10, 1)); store.save("b", at(2026, 10, 2))
         File(File(dir, "snapshots"), "keep.txt").writeText("x")

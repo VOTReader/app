@@ -68,11 +68,14 @@ const _fencedDirty = new Set();
  * no reload): an edit made while the fence was up is still only in memory, so every store whose
  * save was skipped is saved now, or that edit would be lost at the next launch (the rs23
  * refutation's HIGH finding).
+ * `storesOnly` (datasafe 10-05, the snapshot restore): fence the stores but leave the adapter open,
+ * so the restore's own IDBAdapter.put calls land while no store can write over them.
  * @param {boolean} on
+ * @param {{ storesOnly?: boolean }} [opts]
  */
-export function setStoreWriteFence(on) {
+export function setStoreWriteFence(on, opts) {
   _writeFence = !!on;
-  if (typeof IDBAdapter.setWriteFence === 'function') IDBAdapter.setWriteFence(_writeFence);
+  if (!(opts && opts.storesOnly) && typeof IDBAdapter.setWriteFence === 'function') IDBAdapter.setWriteFence(_writeFence);
   if (_writeFence) return;
   const skipped = Array.from(_fencedDirty);
   _fencedDirty.clear();

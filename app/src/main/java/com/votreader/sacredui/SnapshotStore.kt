@@ -114,8 +114,12 @@ class SnapshotStore(private val dir: File) {
             val day = NAME.find(f.name)!!.groupValues[1]
             if (day in days) { f.delete(); continue }
             if (days.size < KEEP_DAYS) { days.add(day); continue }
+            // The week is named by the Sunday it starts on (snapshot-sink.js's rule):
+            // YEAR + WEEK_OF_YEAR splits the week of Dec 27-31 into two keys.
             cal.timeInMillis = stampOf(f.name)
-            val week = "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.WEEK_OF_YEAR)}"
+            cal.set(Calendar.HOUR_OF_DAY, 0)
+            cal.add(Calendar.DAY_OF_MONTH, Calendar.SUNDAY - cal.get(Calendar.DAY_OF_WEEK))
+            val week = "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.DAY_OF_YEAR)}"
             if (week in weeks || weeks.size >= KEEP_WEEKS) { f.delete(); continue }
             weeks.add(week)
             days.add(day)

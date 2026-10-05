@@ -102,6 +102,10 @@ function androidSink() {
 function opfsSink() {
   const nav = /** @type {any} */ (typeof navigator !== 'undefined' ? navigator : null);
   if (!nav || !nav.storage || typeof nav.storage.getDirectory !== 'function') return null;
+  // Without writable streams (Safari before 26, older Chrome) a save could only
+  // create an empty file each day: no sink at all, said once in the log.
+  const FH = /** @type {any} */ (globalThis).FileSystemFileHandle;
+  if (!FH || !FH.prototype || typeof FH.prototype.createWritable !== 'function') return null;
   const dir = async () => (await nav.storage.getDirectory()).getDirectoryHandle(OPFS_DIR, { create: true });
   const names = async () => {
     /** @type {string[]} */ const out = [];
@@ -115,7 +119,6 @@ function opfsSink() {
       try {
         const d = await dir();
         const h = await d.getFileHandle(snapshotName(Date.now()), { create: true });
-        if (typeof h.createWritable !== 'function') return false;
         const w = await h.createWritable();
         await w.write(json);
         await w.close();

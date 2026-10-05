@@ -344,8 +344,12 @@ const PROGRESS_GUARD_MIN_KEYS = 10;
 const PROGRESS_CLEAR_WINDOW_MS = 60000;
 let _progressClearAt = 0;
 
-/** Arm the guard for a deliberate progress clear (good for one minute). */
-export function allowProgressClear() { _progressClearAt = Date.now(); }
+/** Arm the guard for a deliberate progress clear (good for one minute). It also tells the
+ *  next boot's data-health check (utils/data-safety.js) that the smaller ledger is the reader's own. */
+export function allowProgressClear() {
+  _progressClearAt = Date.now();
+  try { localStorage.setItem('vot-health-skip', '1'); } catch (_e) { /* no storage */ }
+}
 
 /** TEST-ONLY: disarm the clear token between cases. */
 export function _resetProgressClearForTests() { _progressClearAt = 0; }
