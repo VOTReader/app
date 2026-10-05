@@ -1,3 +1,6 @@
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.Properties
 
 plugins {
@@ -66,6 +69,26 @@ android {
             .getOrElse("1.0")
     }
 
+    // ln5 (Play, Corbin 2026-10-05 01:5x "just get it there", do not publish): the Play UPLOAD key.
+    // Play App Signing holds the real app-signing key, so a lost upload key is reset in the Play
+    // Console, not fatal. The keystore lives outside git (D:/VOTReader-keys, a copy in OneDrive
+    // Backups); its password is never in a file Gradle reads - tools/play-bundle.ps1 decrypts it from
+    // the DPAPI store into VOT_UPLOAD_PASSWORD for one build. Without both, `upload` does not exist
+    // and the store tasks refuse to run (below), so CI and every other build type are untouched.
+    val uploadStore = file(providers.gradleProperty("vot.uploadStore")
+        .orElse("D:/VOTReader-keys/votreader-upload.jks").get())
+    val uploadPassword = providers.environmentVariable("VOT_UPLOAD_PASSWORD").orNull
+    signingConfigs {
+        if (uploadStore.isFile && !uploadPassword.isNullOrEmpty()) {
+            create("upload") {
+                storeFile = uploadStore
+                storePassword = uploadPassword
+                keyAlias = "upload"
+                keyPassword = uploadPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             // N2.1b: R8 code shrink + obfuscate + optimize. ACTIVATES the dormant
@@ -91,6 +114,17 @@ android {
         create("daily") {
             initWith(getByName("debug"))
             isDebuggable = false
+        }
+        // ln5: the Play Store build - `./gradlew :app:bundleStore` (tools/play-bundle.ps1 wraps it).
+        // release's R8 + shrink, signed with the upload key, and its own applicationId
+        // (com.votreader.app, set in androidComponents below) so it installs BESIDE the daily
+        // (com.votreader.sacredui, debug key): the owner moves his data with Export / Verify / Import
+        // and never uninstalls. Never install a store-signed build on his Pixel by hand.
+        // Its own res (src/store/res) carries the adaptive + monochrome icon slots.
+        create("store") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            signingConfig = signingConfigs.findByName("upload")
         }
     }
 
@@ -226,6 +260,31 @@ android {
 // UP. If a refactor genuinely needs to drop coverage briefly, prove
 // the new floor with the HTML report first, then lower the minimum
 // here in the same commit — never silently relax.
+// ln5: the store build's identity. applicationId is permanent once uploaded; versionCode must rise
+// with every upload, so it is the UTC build hour (yyMMddHH, e.g. 26100512 - fits Play's 2100000000
+// cap until 2100) unless -Pvot.versionCode=<n> pins one. The daily and debug builds keep code 1.
+val storeVersionCode: Int = providers.gradleProperty("vot.versionCode").map(String::toInt).getOrElse(
+    LocalDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyMMddHH")).toInt()
+)
+androidComponents {
+    onVariants(selector().withBuildType("store")) { variant ->
+        variant.applicationId.set("com.votreader.app")
+        variant.outputs.forEach { it.versionCode.set(storeVersionCode) }
+    }
+}
+// An unsigned store bundle is useless to Play: asked for one without the key, fail at the variant's first task, not
+// after R8 and packaging. (A whole-project `assemble`/`build` still makes an unsigned store output, as it does for release.)
+val storeSigned = android.signingConfigs.findByName("upload") != null
+val storeAsked = gradle.startParameter.taskNames.any { it.substringAfterLast(':') in setOf("bundleStore", "assembleStore") }
+tasks.matching { it.name == "preStoreBuild" && storeAsked }.configureEach {
+    doFirst {
+        if (!storeSigned) throw GradleException(
+            "The store build needs the upload key: run tools/play-bundle.ps1 (it sets VOT_UPLOAD_PASSWORD; " +
+            "keystore D:/VOTReader-keys/votreader-upload.jks or -Pvot.uploadStore=<path>). See docs/PLAY.md."
+        )
+    }
+}
+
 jacoco {
     toolVersion = libs.versions.jacoco.get()
 }

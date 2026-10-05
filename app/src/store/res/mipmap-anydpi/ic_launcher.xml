@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ln5: the store build's adaptive icon with all three slots. Background and foreground are main's art
+     until Corbin picks the new icon (overhaul sheet 40); then the foreground becomes a transparent vector
+     inside the 66dp safe zone and the monochrome layer is its one-colour silhouette (Android 13+ themed
+     icons). ic_launcher_monochrome is a placeholder glyph (an open book) so the slot is real today. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@android:color/black"/>
+    <foreground>
+        <bitmap
+            android:gravity="fill"
+            android:src="@drawable/ic_launcher_foreground"/>
+    </foreground>
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome"/>
+</adaptive-icon>
