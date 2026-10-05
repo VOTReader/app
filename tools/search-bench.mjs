@@ -10,8 +10,9 @@
      1. First on screen: a reference card when the query parses as one (SearchScreen directEntries),
         else the engine's first hit (the Best Matches row and the lone-group list both open on it).
      2. It belongs to the target's EQUIVALENCE CLASS: every unit whose text holds the remembered
-        sentence (75-100% of letter sentences are reprinted elsewhere), Matthew Study and plain
-        Matthew c:v as one, a unit-level target's own unit and its same-titled reprints.
+        sentence, or a near copy of it with 80% of its word 3-grams (75-100% of letter sentences are
+        reprinted elsewhere), the verse a sentence quotes, Matthew Study and plain Matthew c:v as
+        one, a unit-level target's own unit and its same-titled reprints.
      3. It is the class's ORIGINAL: no member of a better tier exists (letters > Words To Live By and
         The Blessed > Holy Days > studies > Answers; the verse itself for a verse).
      4. Sentence targets: the landing the screen makes (use-search.js excerptAnchor: matchExcerpt over
@@ -28,7 +29,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { docs as buildDocs, blocks as buildBlocks, engine, unitKey, norm, ASSETS } from './search-bench/corpus.mjs';
+import { docs as buildDocs, blocks as buildBlocks, engine, kjvVerses, unitKey, norm, ASSETS } from './search-bench/corpus.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -61,11 +62,31 @@ const TIER = (uk) => {
 };
 const proseKeys = Object.keys(unitBlocks);
 const proseNorm = proseKeys.map((k) => norm(unitBlocks[k].map((b) => b.text).join(' ')));
-const holders = (sentence) => { const n = norm(sentence); const out = []; proseNorm.forEach((t, i) => { if (t.includes(n)) out.push(proseKeys[i]); }); return out; };
+/** Units holding the sentence: word for word, or a near copy holding 80% of its word 3-grams (search-plan.md §3). */
+const holders = (sentence) => {
+  const n = norm(sentence); const w = n.trim().split(' ');
+  const grams = []; for (let i = 0; i + 3 <= w.length; i++) grams.push(' ' + w.slice(i, i + 3).join(' ') + ' ');
+  const probes = w.length >= 5 ? [0, (w.length - 5) >> 1, w.length - 5].map((i) => ' ' + w.slice(i, i + 5).join(' ') + ' ') : [n];
+  const out = [];
+  proseNorm.forEach((t, i) => {
+    if (t.includes(n)) { out.push(proseKeys[i]); return; }
+    if (grams.length < 4 || !probes.some((p) => t.includes(p))) return;
+    if (grams.filter((g) => t.includes(g)).length >= 0.8 * grams.length) out.push(proseKeys[i]);
+  });
+  return out;
+};
+// A prose sentence that quotes Scripture has the verse as its original (a study or Answers line
+// that is Luke 23:15 word for word): verses whose text holds the sentence, or that it holds whole.
+const verseNorm = D.filter((d) => d.kind === 'verse').map((d) => [unitKey(d), norm(d.text)]);
+// ...in the KJV wording too (a study quotes 1 John 5:3 as "His commandments are not grievous").
+const KJV = kjvVerses();
+for (const [book, chs] of Object.entries(KJV)) for (const [ch, vs] of Object.entries(chs)) for (const v of vs) verseNorm.push(['bible/' + book + ':' + ch + ':' + v.n, norm(v.text)]);
+for (let i = verseNorm.length - 1; i >= 0; i--) if (verseNorm[i][1].split(' ').length < 8) verseNorm.splice(i, 1);
+const versesQuoted = (sentence) => { const n = norm(sentence); return verseNorm.filter(([, t]) => t.includes(n) || n.includes(t)).map(([k]) => k); };
 const titleNorm = {};
 for (const k of proseKeys) { const t = norm(unitBlocks[k][0].title); (titleNorm[t] || (titleNorm[t] = [])).push(k); }
 const matthewTwin = (uk) => {
-  const m = /^(?:bible\/matthew-plain|matthew-study\/matthew):(\d+):(\d+)$/.exec(uk);
+  const m = /^(?:bible\/matthew(?:-plain)?|matthew-study\/matthew):(\d+):(\d+)$/.exec(uk);
   return m ? ['bible/matthew-plain:' + m[1] + ':' + m[2], 'matthew-study/matthew:' + m[1] + ':' + m[2]] : [uk];
 };
 
@@ -81,6 +102,7 @@ function classOf(c) {
     for (const k of titleNorm[norm(c.title)] || []) members.add(k);
   } else {
     for (const k of holders(c.sentence)) members.add(k);
+    if (c.level === 'sentence') for (const k of versesQuoted(c.sentence)) for (const t of matthewTwin(k)) members.add(t);
     members.add(c.uk);
   }
   return { members, best: Math.min(...[...members].map(TIER)) };
@@ -136,10 +158,9 @@ function lands(hit, terms, c) {
   const text = bl[index].text;
   const at = text.indexOf(c.sentence);
   if (at >= 0) return off <= at + c.sentence.length && off + ex.length >= at;
-  // A reprint whose punctuation differs: the block holds the sentence, and the excerpt shares 3 running words with it.
-  if (!norm(text).includes(norm(c.sentence))) return false;
+  // A reprint or near copy worded a little differently: the excerpt shares 4 running words with the sentence.
   const w = norm(ex).trim().split(' ');
-  for (let i = 0; i + 3 <= w.length; i++) if (norm(c.sentence).includes(' ' + w.slice(i, i + 3).join(' ') + ' ')) return true;
+  for (let i = 0; i + 4 <= w.length; i++) if (norm(c.sentence).includes(' ' + w.slice(i, i + 4).join(' ') + ' ')) return true;
   return false;
 }
 

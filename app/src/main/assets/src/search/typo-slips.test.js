@@ -36,6 +36,7 @@ const GLOBALS = {
       { num: 9, sections: [{ heading: '', verses: [verse(28, 'Jesus said to them, Do you believe that I am able to do this?')] }] },
       { num: 11, sections: [{ heading: '', verses: [verse(28, 'Come to Me, all you who labor and are heavy laden, and I will relieve you, and relieve your burden.')] }] },
       { num: 6, sections: [{ heading: '', verses: [verse(7, 'And when you pray, do not use vain repetitions and empty platitudes as the heathen do.')] }] },
+      { num: 8, sections: [{ heading: '', verses: [verse(10, 'Assuredly, I say to you, I have not found such great faith, not even in Israel!'), verse(11, 'For the faith that is real is tried by fire.')] }] },
     ] },
     daniel: { id: 'daniel', title: 'Daniel', chapters: [
       { num: 3, sections: [{ heading: '', verses: [verse(12, 'There are certain Jews: Shadrach, Meshach, and Abed-Nego; these men have not paid due regard to you.')] }] },
@@ -74,6 +75,20 @@ describe('typos the way readers make them', () => {
     const r = await VotSearchMini.search('abednego');
     expect(refs(r)).toContain('Daniel 3:12');
     expect(r.corrections).toEqual([{ from: 'abednego', to: 'abed nego' }]);
+  });
+
+  /* search benchmark 2026-10-05: "abednigo" is the split plus a slip, beyond either alone; "isreal"
+     split into "is real", a stop word and a word, instead of Israel a pair swapped. */
+  it('a name split in the text and typed a letter off is still found', async () => {
+    const r = await VotSearchMini.search('abednigo');
+    expect(refs(r)).toContain('Daniel 3:12');
+    expect(r.corrections).toEqual([{ from: 'abednigo', to: 'abed nego' }]);
+  });
+
+  it('a split into a little word waits for the nearest word: "isreal" is Israel, not "is real"', async () => {
+    const r = await VotSearchMini.search('isreal');
+    expect(r.corrections).toEqual([{ from: 'isreal', to: 'israel' }]);
+    expect(refs(r)[0]).toBe('Matthew 8:10');
   });
 
   it('a corrected query is searched as the query spelled right', async () => {

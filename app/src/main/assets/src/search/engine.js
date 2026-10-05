@@ -226,10 +226,42 @@ function searchCorrected(term, opts, keyword) {
   if (tokens.length !== 1) return { res: searchUnit(term, { ...opts, fuzzy: FUZZY }, keyword), to: null };
   const word = tokens[0];
   const parts = splitCompound(word);
-  if (parts) {
+  // A split into a little word is a guess, not a name typed whole: "isreal" is Israel a letter
+  // swapped, not "is real" (search benchmark, 2026-10-05). The nearest word goes first then.
+  const stop = searchData().STOP_WORDS_TRIMMED;
+  const weakSplit = !!parts && parts.some((w) => w.length <= 2 || (stop && stop.has(w)));
+  const split = () => {
+    if (!parts) return null;
     const res = searchUnit(parts.join(' '), { ...opts, prefix: false, combineWith: 'AND' }, keyword)
       .filter((h) => hasTokenRun(kjvEncode((h.text || '') + ' ' + (h.title || '')), parts));
-    if (res.length) return { res, to: parts.join(' ') };
+    return res.length ? { res, to: parts.join(' ') } : null;
+  };
+  if (!weakSplit) { const s = split(); if (s) return s; }
+  /* A name the text splits, typed whole AND a letter off: "abednigo" (Abed-Nego) is a split
+     plus a slip, beyond either alone (search benchmark, 2026-10-05). Two parts, one of them an
+     indexed word and the other one slip from one, both of three letters or more. */
+  if (word.length >= 7) {
+    for (let i = 3; i <= word.length - 3; i++) {
+      const a = word.slice(0, i);
+      const b = word.slice(i);
+      /** The word itself when indexed, else its one-slip neighbours (nigo: nigh, nego, ...). */
+      const near = (/** @type {string} */ w) => {
+        if (termExists(w)) return [w];
+        const out = [];
+        for (const h of msIndex.search(w, { prefix: false, fuzzy: 1, combineWith: 'OR' }) || []) {
+          for (const t of h.terms || []) if (t !== w && out.indexOf(t) < 0 && slipRank(w, t) < 4) out.push(t);
+          if (out.length >= 8) break;
+        }
+        return out;
+      };
+      if (!termExists(a) && !termExists(b)) continue;
+      for (const pa of near(a)) for (const pb of near(b)) {
+        const run = [pa, pb];
+        const res = searchUnit(run.join(' '), { ...opts, prefix: false, combineWith: 'AND' }, keyword)
+          .filter((h) => hasTokenRun(kjvEncode((h.text || '') + ' ' + (h.title || '')), run));
+        if (res.length) return { res, to: run.join(' ') };
+      }
+    }
   }
   const budget = Math.max(1, Math.min(MS_SEARCH_DEFAULTS.maxFuzzy, Math.round(word.length * FUZZY)));
   // Levenshtein reach one wider than the budget, so a swapped pair (two Levenshtein
@@ -252,7 +284,7 @@ function searchCorrected(term, opts, keyword) {
     }
   }
   if (best) return { res: searchUnit(best, opts, keyword), to: best };
-  return { res: [], to: null };
+  return (weakSplit && split()) || { res: [], to: null };
 }
 
 /** @type {any} */ let msIndex = null;
@@ -307,24 +339,50 @@ function sentenceKey(s) {
   const toks = kjvEncode(s);
   return toks.length >= 5 ? toks.join(' ') : null;
 }
+/* Words To Live By cuts its excerpts mid-sentence and the Answers reprints re-punctuate, so a
+   whole-sentence key misses them: a letter, Words To Live By or Blessed text is also keyed by
+   runs of SHINGLE words, a content-chosen quarter of them (hash % 4 === 0), which both sides
+   pick alike wherever the run falls. Verses are short: their sentence keys suffice. */
+const SHINGLE = 8;
+/** @type {Map<number, string[]>|null} shingle hash -> original doc ids */ let SHINGLES = null;
+/** FNV-1a over a run of tokens. */
+function runHash(toks, from) {
+  let h = 0x811c9dc5;
+  for (let i = from; i < from + SHINGLE; i++) {
+    const t = toks[i];
+    for (let c = 0; c < t.length; c++) h = Math.imul(h ^ t.charCodeAt(c), 16777619);
+    h = Math.imul(h ^ 32, 16777619);
+  }
+  return h >>> 0;
+}
+/** @param {string[]} toks @param {(h:number) => void} each */
+function eachShingle(toks, each) {
+  for (let i = 0; i + SHINGLE <= toks.length; i++) { const h = runHash(toks, i); if (h % 4 === 0) each(h); }
+}
+const addTo = (/** @type {Map<any, string[]>} */ m, /** @type {any} */ k, /** @type {string} */ id) => {
+  const list = m.get(k);
+  if (!list) m.set(k, [id]);
+  else if (list[list.length - 1] !== id) list.push(id);
+};
 function originals() {
   if (ORIGINALS) return ORIGINALS;
-  ORIGINALS = new Map();
+  const O = new Map();
+  const S = new Map();
   ORIGINAL_DOCS = new Map();
   const ids = msIndex._documentIds;
   for (const [shortId, f] of msIndex._storedFields) {
     if (!f || !ORIGINAL_KINDS.has(f.kind) || !f.text) continue;
     const id = ids.get(shortId);
     ORIGINAL_DOCS.set(id, f);
-    for (const s of sentenceSpans(f.text)) {
-      const k = sentenceKey(s.text);
-      if (!k) continue;
-      const list = ORIGINALS.get(k);
-      if (!list) ORIGINALS.set(k, [id]);
-      else if (list[list.length - 1] !== id) list.push(id);
+    for (const sp of sentenceSpans(f.text)) {
+      const k = sentenceKey(sp.text);
+      if (k) addTo(O, k, id);
     }
+    if (f.kind !== 'verse') eachShingle(kjvEncode(f.text), (h) => addTo(S, h, id));
   }
-  return ORIGINALS;
+  SHINGLES = S;
+  ORIGINALS = O;
+  return O;
 }
 /**
  * Move each original ahead of a reprint of it near the top (in place).
@@ -349,14 +407,24 @@ function originalsFirst(out, idOf, terms, allowed, named) {
     const ex = matchExcerpt(e.doc.text, terms);
     const at = ex ? e.doc.text.indexOf(ex) : -1;
     if (at < 0) continue;
+    const lower = (/** @type {string[]|undefined} */ ids) => (ids || []).filter((x) => D.has(x) && ORIGINAL_TIER[D.get(x).kind] < tier);
     let found = null;
-    for (const s of sentenceSpans(e.doc.text)) {
-      if (s.end < at || s.start > at + ex.length) continue;
-      const k = sentenceKey(s.text);
-      if (k && words.filter((w) => (' ' + k + ' ').indexOf(' ' + w + ' ') >= 0).length < need) continue;
-      const ids = k && O.get(k);
-      const lower = ids && ids.filter((x) => D.has(x) && ORIGINAL_TIER[D.get(x).kind] < tier);
-      if (lower && lower.length) { found = lower; break; }
+    for (const sp of sentenceSpans(e.doc.text)) {
+      if (sp.end < at || sp.start > at + ex.length) continue;
+      const k = sentenceKey(sp.text);
+      if (!k || words.filter((w) => (' ' + k + ' ').indexOf(' ' + w + ' ') >= 0).length < need) continue;
+      const l = lower(O.get(k));
+      if (l.length) { found = l; break; }
+    }
+    if (!found) {
+      // The matched place, a little either side (its edge words may be cut), by its shingles.
+      const win = kjvEncode(e.doc.text.slice(Math.max(0, at - 40), at + ex.length + 40)).slice(1, -1);
+      if (words.filter((w) => win.indexOf(w) >= 0).length >= need) {
+        /** @type {Map<string, number>} */ const votes = new Map();
+        eachShingle(win, (h) => { for (const x of lower(/** @type {Map<number, string[]>} */ (SHINGLES).get(h))) votes.set(x, (votes.get(x) || 0) + 1); });
+        for (const [x, n] of votes) if (n < 2) votes.delete(x);   // two runs shared, not one stray run at the window's edge
+        if (votes.size) found = [...votes.keys()].sort((a, b) => /** @type {number} */ (votes.get(b)) - /** @type {number} */ (votes.get(a)));
+      }
     }
     if (!found) continue;
     // The original already ranked highest, else the first that the filters allow.
@@ -403,6 +471,7 @@ async function build(options) {
   tokenCacheSize = 0;
   ORIGINALS = null;
   ORIGINAL_DOCS = null;
+  SHINGLES = null;
   const code = options.translation || 'nkjv';
   const sig = dataSignature(code);
 

@@ -23,11 +23,17 @@ import { createCamera, clampCamera, zoomAbout, xToVerse, squashFactor } from '..
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SCREEN = fs.readFileSync(path.join(HERE, '../screens/ScriptureWebScreen.jsx'), 'utf8');
 
-/** The guide's sky line as the reader reads it (tags stripped). */
-function skyLine() {
-  const guide = SCREEN.slice(SCREEN.indexOf('How to read this web</div>'));
+/** The guide as the reader reads it: its list items, tags stripped. */
+function guideItems() {
+  const guide = SCREEN.slice(SCREEN.indexOf('How to read this web</div>'), SCREEN.indexOf('Got it</button>'));
   const items = guide.match(/<li>[\s\S]*?<\/li>/g) || [];
-  return items.map((s) => s.replace(/<[^>]+>/g, '')).find((s) => /\bsky\b/i.test(s)) || '';
+  return items.map((s) => s.replace(/<[^>]+>/g, ''));
+}
+
+/** The line about looking up at the long threads. It said "the sky" until sw1 (2026-10-05):
+ * Corbin rejected the word, so it now says "look higher". */
+function skyLine() {
+  return guideItems().find((s) => /\blook higher\b/i.test(s)) || '';
 }
 
 /** The finger's direction the sky line names: the first up/down after the verb. */
@@ -72,7 +78,8 @@ const STEP = { down: 150, up: -150 };
 
 describe('the guide names the drag that reaches the sky (ux1)', () => {
   it('the sky line names a direction for the finger', () => {
-    expect(skyLine()).toMatch(/sky/i);
+    expect(skyLine()).toMatch(/look higher, where the long threads cross/i);
+    expect(guideItems().join(' ')).not.toMatch(/\bsky\b/i);
     expect(['up', 'down']).toContain(directionWord(skyLine()));
   });
 

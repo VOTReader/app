@@ -20,3 +20,12 @@
 *.keystore binary
 *.jks      binary
 *.lnk      binary
+
+# Generated output merges without hand-resolving (network ln1 item 5, 2026-10-05). Drivers live in git config:
+# run `sh tools/install-merge-drivers.sh` once per clone (worktrees share it). Without them git merges as text.
+# dist/ and the generated globals: keep ours; the next build (land.sh rebuilds after every rebase) rewrites them.
+app/src/main/assets/dist/** merge=votgen-ours
+tools/*.generated.* merge=votgen-ours
+# Hand-written files with generated lines: merged with CACHE_VERSION / ASSET_INTEGRITY / CSP hashes masked.
+app/src/main/assets/service-worker.js merge=votgen-sw
+app/src/main/assets/index.html merge=votgen-sw
