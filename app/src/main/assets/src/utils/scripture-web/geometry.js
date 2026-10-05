@@ -52,10 +52,29 @@ export const LENS_CONTEXT = 0.35;
  * @param {number} lo @param {number} hi - inclusive verse range
  * @param {(number[]|null)} lens - pick.lensRange()
  */
-export function lensDimFor(lo, hi, lens) {
+export function lensDimFor(lo, hi, lens, share = LENS_CONTEXT) {
   // no lens, or the shader's own "off" spelling (lo > hi, uLens = (1, 0))
   if (!lens || !(lens[0] <= lens[1])) return 1;
-  return hi >= lens[0] && lo <= lens[1] ? 1 : LENS_CONTEXT;
+  return hi >= lens[0] && lo <= lens[1] ? 1 : share;
+}
+
+/** Zoom (x fit) at which the lens has fully set in: the localize span's end, about three + presses
+ * past LOCALIZE_START, so no single press (x1.6) is a visible jump (sw1, 2026-10-05). */
+export const LENS_FULL = 24;
+
+/**
+ * What a thread outside the lens keeps of its alpha at this zoom. The lens used to switch fully on
+ * at LOCALIZE_START, so one + press dropped every other chapter from full ink to LENS_CONTEXT (the
+ * audit measured the frame's mean brightness halving between 4.1x and 6.6x). It now eases in over
+ * the log-zoom from LOCALIZE_START to LENS_FULL: 1 at 6x, LENS_CONTEXT from 24x. Lenses never dim
+ * anything to zero, so what is drawn, tapped and counted is unchanged.
+ * @param {number} zoom - current scale as a multiple of fit-to-width
+ * @returns {number} LENS_CONTEXT..1
+ */
+export function lensShareAt(zoom) {
+  if (!(zoom > LOCALIZE_START)) return 1;
+  const t = (Math.log2(zoom) - Math.log2(LOCALIZE_START)) / (Math.log2(LENS_FULL) - Math.log2(LOCALIZE_START));
+  return 1 - (1 - LENS_CONTEXT) * (t > 1 ? 1 : t);
 }
 
 /** Zoom (× fit) at which the semicircle→ceiling crossover starts and ends. */
