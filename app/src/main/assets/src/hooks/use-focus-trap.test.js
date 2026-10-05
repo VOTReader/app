@@ -77,6 +77,19 @@ describe('useFocusTrap', () => {
     hook.unmount();
   });
 
+  /* sw1 (2026-10-05): the Scripture Web's cards open on a tap; focusing their x put a square gold
+     focus ring on it every time. A [data-focus-self] root takes focus itself, and Tab walks in. */
+  it('[data-focus-self] focuses the container (tabindex -1), and Tab then lands on the first focusable', () => {
+    const { root, buttons } = buildDialog('s');
+    root.setAttribute('data-focus-self', '');
+    const hook = mountTrap(root);
+    expect(document.activeElement).toBe(root);
+    expect(root.getAttribute('tabindex')).toBe('-1');
+    pressTab();
+    expect(document.activeElement).toBe(buttons[0]);
+    hook.unmount();
+  });
+
   it('Tab on the last focusable wraps to the first (and is preventDefaulted)', () => {
     const { root, buttons } = buildDialog('c');
     const hook = mountTrap(root);

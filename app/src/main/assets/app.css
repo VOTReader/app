@@ -7740,6 +7740,9 @@
       background: transparent; border: 0; color: var(--cream-muted); cursor: pointer;
     }
     .sw-sheet-close:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+    /* The cards take focus themselves on open ([data-focus-self], sw1): no ring on the card; its
+       controls keep theirs for the keyboard. */
+    .sw-sheet:focus, .sw-choice:focus, .sw-list:focus { outline: none; }
     .sw-sheet-eyebrow {
       font-family: var(--font-cinzel); font-size: var(--fsc-10); color: var(--gold-dim);
       letter-spacing: 0.16em; text-transform: uppercase;

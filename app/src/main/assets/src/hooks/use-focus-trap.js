@@ -20,7 +20,9 @@
        first element carrying [data-autofocus] (or, when that element is a
        container that cannot take focus, its first focusable), else the
        first focusable, else the container itself (tabIndex -1 is applied
-       if absent).
+       if absent). A root marked [data-focus-self] takes focus itself, so a
+       card opened by a TAP does not open with a focus ring on its first
+       control; Tab still walks into it (the Scripture Web's cards, sw1).
      - Tab on the last focusable wraps to the first; Shift+Tab on the
        first wraps to the last. Focus that escaped the container (e.g.
        a programmatic .focus() elsewhere) is pulled back on the next Tab.
@@ -94,7 +96,7 @@ export function useFocusTrap(active) {
         preferred = /** @type {HTMLElement | null} */ (preferred.querySelector(FOCUSABLE_SELECTOR));
       }
       const list = _focusables(root);
-      const target = preferred || list[0] || root;
+      const target = root.hasAttribute('data-focus-self') ? root : (preferred || list[0] || root);
       if (target === root && !root.hasAttribute('tabindex')) root.setAttribute('tabindex', '-1');
       try { target.focus(); } catch (_e) { /* best-effort */ }
     }
@@ -110,6 +112,8 @@ export function useFocusTrap(active) {
       const last = items[items.length - 1];
       const cur = document.activeElement;
       const inside = cur instanceof Node && root.contains(cur);
+      // the container itself ([data-focus-self]): Tab steps in to the first, Shift+Tab to the last
+      if (cur === root) { e.preventDefault(); (e.shiftKey ? last : first).focus(); return; }
       if (e.shiftKey) {
         if (!inside || cur === first) { e.preventDefault(); last.focus(); }
       } else if (!inside || cur === last) {

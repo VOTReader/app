@@ -372,15 +372,18 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     };
     /* a 2D context that records what is written; every other call is a no-op */
     const TEXTS = [];
+    const RECTS = [];
     const ctx2d = new Proxy({}, {
       get: (t, k) => k === 'measureText' ? (str) => ({ width: 6 * String(str).length })
         : k === 'fillText' ? (str) => { TEXTS.push(String(str)); }
+        : k === 'fillRect' ? (x, y, w, h) => { RECTS.push({ x, y, w, h }); }
         : k === 'canvas' ? null : (typeof k === 'string' ? (t[k] !== undefined ? t[k] : () => {}) : undefined),
       set: (t, k, val) => { t[k] = val; return true; },
     });
     let realGetContext = null;
     beforeEach(() => {
       TEXTS.length = 0;
+      RECTS.length = 0;
       realGetContext = HTMLCanvasElement.prototype.getContext;
       HTMLCanvasElement.prototype.getContext = function (kind) { return kind === '2d' ? ctx2d : null; };
     });
@@ -450,6 +453,17 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       await mount({}, threaded);
       expect(zoomText()).toBe('Overview');
       expect(DRAWN[DRAWN.length - 1].focusArc).toBe(-1);
+    });
+
+    /* sw1 (audit-web 10-05): under the baseline each chapter's bar is as TALL as the chapter is long, and was
+       drawn 0.8 of the chapter WIDE, so zoomed in a long chapter (Psalm 119) became a large grey block. */
+    it('the chapter-length bars stay thin at every zoom below the verse ticks (their height is the length)', async () => {
+      await mount({}, threaded);
+      for (let i = 0; i < 6; i++) await pressFrame('+');
+      const dpr = DRAWN[DRAWN.length - 1].dpr;
+      const bars = RECTS.filter((r) => r.h > 4 * dpr);
+      expect(bars.length, 'PRECONDITION: the bars were drawn').toBeGreaterThan(0);
+      expect(Math.max(...bars.map((r) => r.w))).toBeLessThanOrEqual(3 * dpr);
     });
 
     it('at the ceiling the off-screen foot of the line is written on its body, and the on-screen foot reads off the ruler (book, chapter, verse)', async () => {
@@ -868,6 +882,9 @@ describe('the Nearby list reads the lens (landing 15)', () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     const list = container.querySelector('.sw-list');
     const buttons = [...list.querySelectorAll('button')];
+    // sw1: the panel itself takes focus (no focus ring on its x after a tap); Tab steps in
+    expect(document.activeElement).toBe(list);
+    fireEvent.keyDown(document.activeElement, { key: 'Tab' });
     expect(document.activeElement).toBe(buttons[0]);
     buttons[buttons.length - 1].focus();
     fireEvent.keyDown(document.activeElement, { key: 'Tab' });

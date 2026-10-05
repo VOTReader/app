@@ -1278,7 +1278,9 @@ function drawRuler(canvas, g, cam, view, v, chrome) {
       const x = X(c[2]), x2 = X(c[2] + c[3]);
       if (x2 < -4 || x > W + 4) continue;
       ctx.fillStyle = 'rgba(' + ink + ',' + (c[0] < 39 ? 0.5 : 0.78) + ')';
-      ctx.fillRect(x, base + 2 * DPR, Math.max((x2 - x) * 0.8, 0.7 * DPR), 2 * DPR + c[3] * 0.22 * DPR);
+      // the bar's HEIGHT is the chapter's length; its width only marks where the chapter starts.
+      // 0.8 of the chapter's width turned a long chapter into a grey block once zoomed (sw1).
+      ctx.fillRect(x, base + 2 * DPR, Math.min(Math.max((x2 - x) * 0.8, 0.7 * DPR), 3 * DPR), 2 * DPR + c[3] * 0.22 * DPR);
     }
   } else {
     const v0 = Math.max(0, Math.floor(xToVerse(cam, W, -10)));
@@ -1605,7 +1607,8 @@ function drawThreadRefs(canvas, g, cam, view, v, chrome, density, focusArc) {
       const hw = (Math.abs(Math.cos(rot)) * w + Math.abs(Math.sin(rot)) * fs) / 2;
       const hh = (Math.abs(Math.sin(rot)) * w + Math.abs(Math.cos(rot)) * fs) / 2;
       const box = { x0: cx - hw, x1: cx + hw, y0: cy - hh, y1: cy + hh };
-      if (box.y0 < skyTop - fs || box.y1 > view.base + fs) continue;
+      // clear of the header by 8 px: a label tucked under it ran into the control pills (sw1)
+      if (box.y0 < skyTop + 8 * DPR || box.y1 > view.base + fs) continue;
       // a gap between neighbours, or two labels on one line read as one
       const m = 6 * DPR;
       if (!chosen && placed.some((q) => box.x0 < q.x1 + m && box.x1 > q.x0 - m && box.y0 < q.y1 + m && box.y1 > q.y0 - m)) continue;
@@ -1836,7 +1839,7 @@ function HowToReadGuide({ onClose }) {
         <li>Colour is distance: violet threads join near neighbours, green ones cross the whole Bible. The books run along the bottom.</li>
         <li>Pinch or press <strong>+</strong> to zoom in. Past the overview, the chapter under the middle is lit and the rest stands back.</li>
         <li>Tap a thread to see both ends and follow it. Tap a number under the baseline to list every thread landing on that verse.</li>
-        <li>Drag the web down to look up into the sky, where the long threads live. The ruler on the left names the height; the bar on the right jumps.</li>
+        <li>Drag the web down to look higher, where the long threads cross. The ruler on the left names the height; the bar on the right jumps.</li>
         <li><strong>Reset</strong> brings you home.</li>
       </ul>
       <button type="button" className="sw-sheet-follow sw-guide-close" onClick={onClose}>Got it</button>
@@ -1848,7 +1851,7 @@ function ConnectionChooser({ choices, onChoose, onClose, title, meta }) {
   // v03-03: Tab stays in the panel; closing it hands focus back to the web
   const trapRef = useFocusTrap(true);
   return (
-    <div className="sw-choice" ref={trapRef} role="dialog" aria-modal="false" aria-label={title || 'Connections here'}>
+    <div className="sw-choice" ref={trapRef} data-focus-self="" role="dialog" aria-modal="false" aria-label={title || 'Connections here'}>
       <button type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close connection choices">×</button>
       <div className="sw-sheet-eyebrow">{title || 'Connections here'}</div>
       <div className="sw-sheet-meta">{meta || 'Several threads are close together. Choose the one you meant.'}</div>
@@ -1877,7 +1880,7 @@ function ConnectionList({ items, mode, lensOn, onChoose, onClose }) {
       + ' \u00b7 the strongest ' + (items.length - 1) + ' below; the chapter row lists where they all go.'
     : 'Select a connection to focus it and open its passages.';
   return (
-    <div className="sw-list" ref={trapRef} role="dialog" aria-modal="false" aria-label="Nearby connections" data-lens-on={lensOn ? '1' : '0'}>
+    <div className="sw-list" ref={trapRef} data-focus-self="" role="dialog" aria-modal="false" aria-label="Nearby connections" data-lens-on={lensOn ? '1' : '0'}>
       <button type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close nearby connections">×</button>
       <div className="sw-sheet-eyebrow">{eyebrow}</div>
       <div className="sw-sheet-meta">{meta}</div>
@@ -1918,7 +1921,7 @@ function DetailSheet({ info, onClose, onOpen, onFollow, onGroup }) {
       : info.connections.toLocaleString() + ' connections';
 
   return (
-    <div className="sw-sheet" ref={trapRef} role="dialog" aria-modal="false"
+    <div className="sw-sheet" ref={trapRef} data-focus-self="" role="dialog" aria-modal="false"
       aria-label={eyebrow + ' details'}>
       <button type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 6L6 18M6 6l12 12" /></svg>
