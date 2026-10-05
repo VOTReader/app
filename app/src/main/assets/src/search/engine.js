@@ -454,6 +454,8 @@ function bestPassageFirst(out, idOf, units, stop, named, kjvHeld) {
    sentence is one of them gives its place to that original (ORIGINAL_TIER: who reprints whom). */
 /** Reprints read for an original: the first this many results. */
 const ORIGINAL_REACH = 10;
+/** How far below an Answers topic a study or Holy Days text that holds the query as well is looked for. */
+const STUDY_REACH = 3;
 /** Who reprints whom: a text yields only to an original of a LOWER tier (Words To Live By excerpts the letters). */
 const ORIGINAL_TIER = { verse: 0, letter: 0, wtlb: 1, blessed: 1, 'holy-day': 2, 'bible-study': 3, answers: 4 };
 const ORIGINAL_KINDS = new Set(['verse', 'letter', 'wtlb', 'blessed']);
@@ -706,6 +708,26 @@ function originalsFirst(out, idOf, terms, allowed, named, near) {
       const share = src ? bestWindow(pq.query, docLemmas(id, e.doc.text), pq.span) : 0;
       const own = src ? near(id, e.doc) : 0;
         if (src && share >= 0.5 && holdsAsWell(src, pq, share) && (own < NEAR_PHRASE_MIN || near(src, D.get(src)) >= own - 0.1)) found = [src];
+    }
+    if (!found && e.doc.kind === 'answers') {
+      // A study or Holy Days text just below that holds the query as well, in one passage and in a row: it is what Answers reprints.
+      const id = idOf.get(e) || '';
+      const pq = passageQuery(words);
+      const share = bestWindow(pq.query, docLemmas(id, e.doc.text || ''), pq.span);
+      const own = near(id, e.doc);
+      for (let r = i + 1; r < Math.min(out.length, i + 1 + STUDY_REACH); r++) {
+        const f = out[r];
+        const t = ORIGINAL_TIER[f.doc.kind];
+        if (t === undefined || t >= tier || !f.doc.text) continue;
+        const fid = idOf.get(f) || '';
+        if (bestWindow(pq.query, docLemmas(fid, f.doc.text), pq.span) >= share - REPRINT_COST && near(fid, f.doc) >= own - 0.1) {
+          out.splice(r, 1);
+          out.splice(i, 0, f);
+          i++;
+          break;
+        }
+      }
+      continue;
     }
     if (!found || !found.length) continue;
     // The first original of all: a letter before the Words To Live By entry that condenses it.
