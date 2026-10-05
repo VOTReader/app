@@ -8,7 +8,7 @@ const { player } = vi.hoisted(() => ({
   player: {
     readerLabel: (code) => ({ B: 'Benjamin' }[code] || null),
     getSleepRemainingSeconds: vi.fn(() => 0),
-    liveLetter: vi.fn(() => null),
+    liveLetter: vi.fn(() => null), bibleChapterOfTrack: () => 0, getPreciseTime: () => 30,
     skip: vi.fn(), prev: vi.fn(), next: vi.fn(), toggle: vi.fn(), stop: vi.fn(), playAt: vi.fn(),
     setSleepTimer: vi.fn(), setSleepAtTrackEnd: vi.fn(), clearSleepTimer: vi.fn(), setPlaybackRate: vi.fn(), seek: vi.fn(),
   },

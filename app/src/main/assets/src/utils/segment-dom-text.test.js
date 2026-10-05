@@ -160,3 +160,4 @@ describe('segmentsReadText is the rendered text without its footnote numbers', (
       .toBe('Says The Lord, The One who sees, The One who knows.');
   });
 });
+

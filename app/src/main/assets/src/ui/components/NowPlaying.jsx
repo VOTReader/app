@@ -21,6 +21,7 @@ import { AudioSeekSlider, formatClock } from './AudioSeekSlider.jsx';
 import { AudioSpeedControl } from './AudioSpeedControl.jsx';
 import { hasTextDestination } from './AudioShelf.jsx';
 import { voiceChoices } from './AudioManagerSheet.jsx';
+import { NowPlayingText } from './NowPlayingText.jsx';
 
 /** The sleep panel's minutes (audit-listen 5.7), then the end of this recording and Off. */
 const SLEEP_STEPS = [15, 30, 45, 60];
@@ -133,6 +134,8 @@ export function NowPlaying({ state, current, voices, saved, onToggleSave, onClos
           {liveTitle && current.title ? <span className="now-playing-reader now-playing-section">{current.title}</span> : null}
           {reader ? <span className="now-playing-reader">{reader}</span> : null}
         </div>
+
+        <NowPlayingText state={state} current={current} onOpen={canOpen ? openText : null} />
 
         <AudioSeekSlider className="audio-manager-seek now-playing-seek" ariaLabel="Playback position" time={state.time} duration={state.duration} />
         <div className="now-playing-times"><span>{formatClock(state.time)}</span><span>{duration ? '−' + formatClock(Math.max(0, duration - (state.time || 0))) : ''}</span></div>

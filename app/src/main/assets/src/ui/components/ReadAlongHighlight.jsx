@@ -298,6 +298,35 @@ function _syncFor(key, track, chapter, paintVolKey, sectionKey) {
 }
 
 /**
+ * The rows of the LETTER recording playing, cut to its part: the same choice the
+ * page's wash makes (_syncFor, then the part filter in the component below), for
+ * a surface with no letter screen mounted (Now Playing's live text, rv1). Null
+ * for a Bible chapter or a compilation (their rows need a chapter or the section
+ * under the clock), an alternate with no timeline, or timings not loaded yet.
+ *
+ * @param {any} track
+ * @param {{ queue?: any[], qi?: number }} st  the player state (queue + qi)
+ * @returns {any[] | null}
+ */
+export function letterFragsFor(track, st) {
+  const key = track && typeof track.key === 'string' ? track.key : '';
+  if (!key || key.indexOf(':') < 1 || AudioPlayer.bibleChapterOfTrack(track)) return null;
+  const rows = _syncFor(key, track, 0, '', null);
+  if (!rows || !rows.length) return null;
+  let part = 0;
+  if (rows !== _altRowsFor(track)) {
+    part = _partOf(key, track);
+    if (part < 0) {
+      part = 0;
+      const q = (st && st.queue) || [];
+      for (let j = ((st && st.qi) || 0) - 1; j >= 0 && q[j] && q[j].key === key; j--) part++;
+    }
+  }
+  const only = rows.filter((f) => (f[4] || 0) === part);
+  return only.length ? only : null;
+}
+
+/**
  * Binary search: index of the last fragment whose start ≤ t, or -1 when the
  * clock is still ahead of the first one. Pure — exported for the unit suite.
  *

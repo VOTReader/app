@@ -1544,6 +1544,14 @@
       .now-playing-rule { width: 28px; height: 1px; background: var(--gold); }
       .now-playing-title { margin: 0; font-size: clamp(1.6rem, 7vw, 2.1rem); font-weight: 400; line-height: 1.15; }
       .now-playing-reader { color: var(--cream-dim); font-size: var(--fs-18, 1.1rem); }
+      /* The live text (NowPlayingText): a fixed-height pane, so the controls under it never jump as clauses change length;
+         the cover gives up height when it is there (sheet 37). */
+      .now-playing-body:has(.now-playing-text) .now-playing-cover { min-height: 12.5rem; padding: 20px 24px; }
+      .now-playing-text { display: flex; flex-direction: column; gap: 4px; height: 7.9rem; margin-top: 18px; padding: 0; overflow: hidden; background: none; border: 0;
+        color: inherit; font: inherit; font-size: clamp(1.3rem, 5.4vw, 1.55rem); line-height: 1.25; text-align: left; cursor: pointer;
+        -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent); mask-image: linear-gradient(to bottom, #000 72%, transparent); }
+      .now-playing-text-now { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+      .now-playing-text-next { color: var(--cream-dim); }
       .now-playing-seek { margin-top: 26px; width: 100%; }
       .now-playing-times { display: flex; justify-content: space-between; margin-top: 4px; color: var(--cream-dim); font-size: var(--fs-15, 0.95rem); font-variant-numeric: tabular-nums; }
       .now-playing-transport { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
