@@ -25,6 +25,8 @@ const GLOBALS = {
   // Matthew twice, as the corpus has it: the Study Bible (The Volumes) and the plain chapter (Scriptures)
   MATTHEW: { chapters: [{ num: 7, title: 'Matthew 7', verses: [{ n: 1, text: '“' + JUDGE }] }] },
   BOOKS: {
+    // the NKJV says "begot"; the KJV, which a reader may remember, says "begat" (kjv-alias.js)
+    genesis: { id: 'genesis', title: 'Genesis', chapters: [{ num: 5, sections: [{ heading: '', verses: [{ n: 3, text: 'And Adam lived one hundred and thirty years, and begot a son in his own likeness, after his image, and named him Seth.' }] }] }] },
     'matthew-plain': { id: 'matthew-plain', title: 'Matthew', chapters: [{ num: 7, sections: [{ heading: '', verses: [{ n: 1, text: JUDGE }] }] }] },
     john: { id: 'john', title: 'John', chapters: [{ num: 14, sections: [{ heading: '', verses: [{ n: 6, text: 'Jesus said to him, I am the way, the truth, and the life. No one comes to the Father except through Me.' }].concat(FILLER) }] }] },
   },
@@ -117,6 +119,12 @@ describe('ranking on the audit\u2019s cases', () => {
     expect(all.length).toBe(1);
     const scr = (await VotSearchMini.search('judge not that you be not judged', { corpus: 'scriptures' })).results;
     expect(scr.some((x) => x.doc.bookId === 'matthew-plain')).toBe(true);
+  });
+
+  it('a KJV word no indexed text holds finds the verse the KJV holds it in, and is never "corrected"', async () => {
+    const r = await VotSearchMini.search('begat');
+    expect(refs(r)[0]).toBe('Genesis 5:3');
+    expect(r.corrections || []).toEqual([]);
   });
 
   it('a word or two is a keyword search: the topic titled with them comes first', async () => {

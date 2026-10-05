@@ -55,9 +55,10 @@ export function lemma(t) {
  *   each with its weight (its rarity) and its synonyms' lemmas
  * @param {string[]} textLemmas  the text's tokens, lemmatized
  * @param {number} span  how far either side of an anchor word the window reaches
+ * @param {Set<string>} [held]  query lemmas the text holds in another edition (a KJV word of a verse): in every window
  * @returns {number}
  */
-export function bestWindow(query, textLemmas, span) {
+export function bestWindow(query, textLemmas, span, held) {
   const total = query.reduce((a, q) => a + q.weight, 0);
   if (!total || !textLemmas.length) return 0;
   // A window opens on any word of the query (or a synonym): the reader's rarest words may be the
@@ -72,18 +73,22 @@ export function bestWindow(query, textLemmas, span) {
   let lo = 0;
   let hi = 0;
   let best = 0;
+  let always = 0;
+  if (held) for (const q of query) if (held.has(q.lem)) always += q.weight;
+  if (always) best = always;
   for (let p = 0; p < n; p++) {
     if (!anchors.has(textLemmas[p])) continue;
     const nlo = Math.max(0, p - span);
     const nhi = Math.min(n, p + span + 1);
     for (; hi < nhi; hi++) { const w = textLemmas[hi]; if (anchors.has(w)) inWin.set(w, (inWin.get(w) || 0) + 1); }
     for (; lo < nlo; lo++) { const w = textLemmas[lo]; if (anchors.has(w)) inWin.set(w, /** @type {number} */ (inWin.get(w)) - 1); }
-    let held = 0;
+    let sum = always;
     for (const q of query) {
-      if (has(q.lem)) held += q.weight;
-      else for (const s of q.syn) if (has(s)) { held += 0.5 * q.weight; break; }
+      if (always && /** @type {Set<string>} */ (held).has(q.lem)) continue;
+      if (has(q.lem)) sum += q.weight;
+      else for (const s of q.syn) if (has(s)) { sum += 0.5 * q.weight; break; }
     }
-    if (held > best) { best = held; if (best >= total) break; }
+    if (sum > best) { best = sum; if (best >= total) break; }
   }
   return best / total;
 }

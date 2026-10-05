@@ -104,7 +104,12 @@ const BUDGETS = [
   // dependency. The 09-26 batches (every place in a letter, word forms, Book order, the
   // typo note: 178,486 by their end) and the audit's ranking, typos, passage names and
   // letter and Bible references (+9,168). 187,654 x 1.15 = 215,802 -> the hundred above.
-  { file: 'bundle-e.js', measured: 187654, max: 215900 },   // Settings/Search/Garden + the search tables
+  // 2026-10-05, the search benchmark (S2b..S1c): 187,654 -> 202,385 is the engine's passage,
+  // citation and original-first code, then +108,559 is src/search/kjv-alias.js, generated data:
+  // the 3,067 KJV words no indexed text holds with their verses ("begat", "mitre", "wist" found
+  // nothing in the NKJV and were "corrected" to beat, mire, wits). ~40 KB gzipped, off the cold
+  // boot (this bundle loads with Search). 310,944 x 1.15 = 357,586 -> the hundred above.
+  { file: 'bundle-e.js', measured: 310944, max: 357600 },   // Settings/Search/Garden + the search tables
   // The Scripture Web. Re-baselined 32,447 -> 41,806 when My Web landed, then
   // 41,806 -> 57,610 for s13: Go to/Nearby, dense-line disambiguation,
   // navigable corpus underlay cards, focus-safe dialogs, and orientation UX.

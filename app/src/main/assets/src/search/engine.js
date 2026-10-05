@@ -38,6 +38,7 @@ import {
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
 import { onIdle } from '../utils/on-idle.js';
 import { lemma, bestWindow } from './passage.js';
+import { KJV_ALIAS, KJV_ALIAS_BOOKS } from './kjv-alias.js';
 
 /**
  * The parse kinds a direct-nav card answers ALONE.
@@ -141,6 +142,58 @@ function searchUnit(term, opts, keyword) {
     for (let w = 0; w < t.terms.length; w++) if (b.terms.indexOf(t.terms[w]) < 0) b.terms.push(t.terms[w]);
   }
   return body;
+}
+
+/* A KJV WORD THE INDEX NEVER HEARD (search plan S1, 2026-10-05). The index holds the reader's
+   edition, so "begat", "mitre", "pretence" or "wist" found nothing in the NKJV and the typo
+   fallback turned them into beat, mire, presence and wits. kjv-alias.js (generated from
+   bible-kjv.js) lists each word no indexed text holds with the verses the KJV holds it in; such
+   a word finds those verses, scored as a rare word in a verse, and is never corrected. */
+/** @type {Map<string, string>|null} word -> its encoded verses */ let ALIAS = null;
+/** @type {Map<string, string>|null} 'bookId:c:v' -> the verse's doc id in this index */ let VERSE_IDS = null;
+/**
+ * The verses of this index the KJV holds `term` in, as search hits; null when it is no such word.
+ * @param {string} term
+ * @returns {Array<{id: string, score: number, terms: string[]}>|null}
+ */
+function kjvAliasHits(term) {
+  if (!ALIAS) {
+    ALIAS = new Map();
+    for (const line of KJV_ALIAS.split('\n')) { const t = line.indexOf('\t'); ALIAS.set(line.slice(0, t), line.slice(t + 1)); }
+  }
+  const enc = ALIAS.get(term);
+  if (!enc) return null;
+  if (!VERSE_IDS) {
+    VERSE_IDS = new Map();
+    const ids = msIndex._documentIds;
+    for (const [shortId, f] of msIndex._storedFields) {
+      if (!f || f.kind !== 'verse') continue;
+      // Matthew's plain chapter, not the Study Bible's restored text (both index it)
+      const key = (f.bookId === 'matthew-plain' ? 'matthew' : f.bookId) + ':' + f.chapterNum + ':' + f.verseNum;
+      if (f.bookId !== 'matthew' || !VERSE_IDS.has(key)) VERSE_IDS.set(key, ids.get(shortId));
+    }
+  }
+  const refs = enc.split(',');
+  const n = msIndex.documentCount || 1;
+  const score = Math.log(1 + (n - refs.length + 0.5) / (refs.length + 0.5));
+  const out = [];
+  let book = '';
+  for (const r of refs) {
+    const p = r.split('.');
+    if (p.length === 3) book = KJV_ALIAS_BOOKS[parseInt(p.shift() || '', 36)];
+    const id = VERSE_IDS.get(book + ':' + parseInt(p[0], 36) + ':' + parseInt(p[1], 36));
+    if (id) out.push({ id, score, terms: [term] });
+  }
+  return out;
+}
+
+/** A KJV verb's modern form the index holds: seeth -> sees, cometh -> comes, seest -> see, knowest -> know. */
+function modernForm(/** @type {string} */ t) {
+  const m = /^(.{2,})(eth|est)$/.exec(t);
+  if (!m) return null;
+  const cands = m[2] === 'eth' ? [m[1] + 'es', m[1] + 's'] : [m[1], m[1] + 'e'];
+  for (const c of cands) if (c !== t && termExists(c)) return c;
+  return null;
 }
 
 /** Is `term` a word of the index? (The index's own term map; a search where it lacks one.) */
@@ -347,8 +400,9 @@ function docFreq(term) {
  *   word (literal) with its synonyms, names and forms (same origin)
  * @param {(term:string) => boolean} stop
  * @param {(doc:any) => boolean} named
+ * @param {Record<string, Set<string>>} kjvHeld  a verse found by kjv-alias.js -> the lemmas of the KJV words it holds
  */
-function bestPassageFirst(out, idOf, units, stop, named) {
+function bestPassageFirst(out, idOf, units, stop, named, kjvHeld) {
   const n = msIndex.documentCount || 1;
   const seen = new Set();
   const query = [];
@@ -371,7 +425,7 @@ function bestPassageFirst(out, idOf, units, stop, named) {
   const top = out.slice(0, PASSAGE_REACH).map((e, i) => {
     const id = idOf.get(e) || String(i);
     const lem = docLemmas(id, e.doc.text || '');
-    const share = named(e.doc) ? 2 : bestWindow(query, lem, span);
+    const share = named(e.doc) ? 2 : bestWindow(query, lem, span, kjvHeld[id]);
     return { e, i, share, key: share - PASSAGE_RANK_COST * i - (e.doc.kind === 'answers' && share < 2 ? REPRINT_COST : 0) };
   });
   if (!top.length) return;
@@ -697,6 +751,7 @@ async function build(options) {
   ORIGINAL_DOCS = null;
   SHINGLES = null;
   CITED = null;
+  VERSE_IDS = null;
   LEMMA_CACHE.clear();
   EXCERPT_CACHE.clear();
   SOURCE_CACHE.clear();
@@ -950,13 +1005,34 @@ async function search(query, options) {
     }
   };
   const heard = Object.create(null);   // origin -> some unit of that word found something
+  /** @type {Record<string, string>} a KJV word the index lacks -> the modern form it holds (seeth -> sees) */
+  const modernOf = Object.create(null);
+  /** @type {Record<string, Set<string>>} a verse found by its KJV wording -> the lemmas of those KJV words */
+  const kjvHeld = Object.create(null);
   const unheard = [];                  // literal units that found nothing as typed
   for (let u = 0; u < units.length; u++) {
     const unit = units[u];
     let res;
     try { res = searchUnit(unit.term, unitOpts(unit), keyword); } catch { continue; }
-    if (res && res.length) { heard[unit.origin] = true; accumulate(unit, res); }
-    else if (unit.literal) unheard.push(unit);
+    if (res && res.length) { heard[unit.origin] = true; accumulate(unit, res); continue; }
+    if (unit.literal) {
+      const tok = kjvEncode(unit.term);
+      const alias = tok.length === 1 && !termExists(tok[0]) ? kjvAliasHits(tok[0]) : null;
+      if (alias && alias.length) {
+        for (const h of alias) {
+          if (!docLookup[h.id]) docLookup[h.id] = { id: h.id, ...msIndex.getStoredFields(h.id) };
+          (kjvHeld[h.id] || (kjvHeld[h.id] = new Set())).add(lemma(tok[0]));
+        }
+        heard[unit.origin] = true;
+        accumulate(unit, alias);
+        // ...and its modern form, as a form of the word, which the phrase ranking reads it as
+        const modern = modernForm(tok[0]);
+        if (modern) {
+          modernOf[tok[0]] = modern;
+          try { accumulate({ ...unit, term: modern, literal: false, form: true }, searchUnit(modern, unitOpts(unit), keyword)); } catch { /* the KJV verses suffice */ }
+        }
+      } else unheard.push(unit);
+    }
   }
   /* THE TYPO FALLBACK WAITS FOR THE WHOLE FAMILY (2026-09-26). A typed word that
      finds nothing as typed but whose forms or synonyms do is a real word this
@@ -1026,6 +1102,7 @@ async function search(query, options) {
   /** @type {Record<string, number>} the phrase pass's reading: how nearly a text holds the typed words in a row */
   const nearOf = Object.create(null);
   for (let c = 0; c < corrections.length; c++) fixedTo[corrections[c].from] = corrections[c].to;
+  for (const k in modernOf) fixedTo[k] = modernOf[k];
   const typedTokens = joinApostropheS(kjvEncode(query).map((t) => fixedTo[t] || t));
   const STOP = D.STOP_WORDS_TRIMMED;
   if (!p.phrase && required > 1 && typedTokens.length > 1) {
@@ -1127,7 +1204,7 @@ async function search(query, options) {
   };
   // A first result holding the typed words in a row, or one word off, is a quote found: no re-ordering.
   const quoted = out.length && (nearOf[idOf.get(out[0]) || ''] || 0) >= NEAR_PHRASE_MIN;
-  if (!keyword && !p.phrase && !quoted) bestPassageFirst(out, idOf, units, isStopTerm, named);
+  if (!keyword && !p.phrase && !quoted) bestPassageFirst(out, idOf, units, isStopTerm, named, kjvHeld);
   originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) =>
     (!corpusFilter || d.corpus === corpusFilter) && (!scopeBookId || d.bookId === scopeBookId) && (!scopeVolumeId || d.volumeId === scopeVolumeId),
     named, (id, d) => nearOf[id] ?? (typedTokens.length > 1 ? nearPhrase(docTokens(id, d), typedTokens, STOP) : 0));

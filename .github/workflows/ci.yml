@@ -574,6 +574,10 @@ jobs:
           node-version-file: '.nvmrc'
       - name: Search benchmark
         run: npm run bench:search
+      # src/search/kjv-alias.js is generated from data/bible-kjv.js and the indexed texts:
+      # a corpus change that leaves it stale fails here (rebuild: node tools/build-kjv-alias.mjs).
+      - name: KJV alias is current
+        run: node tools/build-kjv-alias.mjs --check
 
   build:
     name: build + syntax-check
