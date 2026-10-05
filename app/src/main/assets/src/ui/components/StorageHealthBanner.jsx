@@ -150,7 +150,7 @@ export function StorageHealthBanner({ onNavigateSettings }) {
       return {
         id: 'storage-slow',
         style: 'amber',
-        text: 'Storage is slow to load — recent changes are kept on screen and will be saved automatically once it catches up.',
+        text: 'Storage is slow to load. Your saved library will appear once it catches up; your place and settings changed before then may not be kept.',
         dismissable: false,
         buttons: [],
       };

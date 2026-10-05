@@ -314,12 +314,7 @@ export function usePersistedState({
   // Header item 9: decided once, at the first render, and never revisited -
   // the union this mount renders came from what useSavedState read then.
   const unloadedRef = React.useRef(/** @type {boolean | null} */ (null));
-  if (unloadedRef.current === null) {
-    unloadedRef.current = stateStoreUnloaded();
-    if (unloadedRef.current && typeof DiagnosticLog !== 'undefined') {
-      DiagnosticLog.warn('state-guard', 'App mounted before vot-state loaded (' + StateStore.getState() + '): writes held until the remount');
-    }
-  }
+  if (unloadedRef.current === null) unloadedRef.current = stateStoreUnloaded();
   /* n4-05: hand a union to the store; once it is on disk it is the base of the
      next leave record. A later write that lands first is never overtaken by an
      older one. Refs only, so every render's copy is the same function. */
@@ -343,6 +338,9 @@ export function usePersistedState({
 
   // ── Mount-only: install the guaranteed-flush listeners + unmount flush.
   React.useEffect(() => {
+    if (unloadedRef.current && typeof DiagnosticLog !== 'undefined') {
+      DiagnosticLog.warn('state-guard', 'App mounted before vot-state loaded: its writes are held until the remount');
+    }
     /* `patch` is the update reload's door (sw-register's `vot:before-update-reload`):
        a function applied to the LATEST union — pending or already written — and
        written at once. useScrollMemory folds the live scroller position in this

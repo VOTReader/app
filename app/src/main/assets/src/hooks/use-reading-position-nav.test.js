@@ -91,6 +91,16 @@ const setup = (overrides = {}) => {
 // ── prophecyCardStatesRef + saveProphecyCardStates ──────────────────────
 
 describe('useReadingPositionNav — prophecy card state', () => {
+  it('datasafe 10-05: a map read before the store loaded (defaults) is never saved whole', () => {
+    ProphecyCardsStore._resetForTests();          // pending: what a degraded boot serves
+    const setAll = vi.spyOn(ProphecyCardsStore, 'setAll');
+    const { result } = setup();
+    result.current.prophecyCardStatesRef.current['chap-1:0:prophecy'] = true;
+    act(() => { result.current.saveProphecyCardStates(); });
+    expect(setAll).not.toHaveBeenCalled();
+    setAll.mockRestore();
+  });
+
   it('lazy-init: ref.current resolves the factory to an empty object on first render', () => {
     const { result } = setup();
     // After first render, .current is the resolved value (object),

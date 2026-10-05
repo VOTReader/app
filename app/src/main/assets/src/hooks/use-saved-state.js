@@ -148,7 +148,8 @@ export function useSavedState() {
       // Only over a store that really loaded (the n4-05 refuter's F1): a hydration
       // that timed out serves {}, and every key in the base would read as deleted.
       const loaded = typeof StateStore.getState !== 'function' || StateStore.getState() === 'loaded';
-      const raw = resumed ? mergeStateStore(loaded ? resumed.base : null, resumed.state, stored) : stored;
+      // { noGuard }: a clear the leaving page armed is not a wipe to refuse here.
+      const raw = resumed ? mergeStateStore(loaded ? resumed.base : null, resumed.state, stored, { noGuard: true }) : stored;
       // Defensive copy — _validateTabState mutates in place, and the
       // live store cache reference shouldn't be silently rewritten by
       // a read.

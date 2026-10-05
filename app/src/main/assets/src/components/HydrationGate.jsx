@@ -33,13 +33,17 @@
    into one remount (REMOUNT_COALESCE_MS). usePersistedState writes nothing
    from a mount that began before vot-state loaded, so the remount loses no
    saved data; what changes on screen is that the reader's own place and
-   settings come back.
+   settings come back (a toast says so). What the reader did to place, tabs
+   and settings in the unloaded window is not kept: it was built on defaults.
+   An import cannot overlap a remount - it refuses to run until every store
+   has loaded (backup-flow _applyConfirmedImport).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { hydrateAllStores, clearLegacyLs, storesNotLoaded } from '../stores/cached-store.js';
 import { JournalStore } from '../stores/journal-store.js';
 import { StorageHealth } from '../utils/storage-health.js';
 import { DiagnosticLog } from '../utils/diagnostic-log.js';
+import { showToast } from '../utils/toast.js';
 
 const { useState, useEffect } = React;
 
@@ -117,6 +121,8 @@ export function HydrationGate({ children }) {
         if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('hydration', 'remounted App: ' + loadedCount + ' store(s) loaded after the gate opened');
         loadedCount = 0;
         setMountKey((k) => k + 1);
+        // The remount puts the reader back where their saved data says; say why.
+        showToast({ id: 'vot-toast-late-load', className: 'vot-toast', text: 'Your saved library has finished loading.', durationMs: 4000 });
       }, REMOUNT_COALESCE_MS);
     };
     const unsubs = waiting.map((s) => s.subscribe(onChange));

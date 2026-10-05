@@ -304,15 +304,21 @@ function _oursWins(_b, o, _t) { return o; }
  * @param {any} base
  * @param {any} ours
  * @param {any} theirs
+ * @param {{ noGuard?: boolean }} [opts] noGuard: skip the progress-wipe guard (useSavedState's leave-record merge)
  * @returns {Record<string, any>}
  */
-export function mergeStateStore(base, ours, theirs) {
+export function mergeStateStore(base, ours, theirs, opts) {
   const B = _obj(base), O = _obj(ours), T = _obj(theirs);
   // Start from theirs so a field only a sibling knows about (a newer app
   // version's addition) survives, then let ours win every session field.
-  // The progress-wipe guard (below): a write built on defaults loses whole.
-  if (_wipesLedger(O, T)) return Object.assign({}, O, T);
   const out = Object.assign({}, T, O);
+  // The progress-wipe guard (below): a ledger a write would empty keeps the disk copy.
+  if (!(opts && opts.noGuard) && _wipesLedger(B, O, T)) {
+    out.readItems = Object.assign({}, _obj(T.readItems));
+    out.lastReadChapters = mergeMapByKey(null, O.lastReadChapters, T.lastReadChapters, _oursWins);
+    out.lastReadLetterMap = mergeMapByKey(null, O.lastReadLetterMap, T.lastReadLetterMap, _oursWins);
+    return out;
+  }
   out.readItems = mergeMapByKey(B.readItems, O.readItems, T.readItems, _higherCount);
   out.lastReadChapters = mergeMapByKey(B.lastReadChapters, O.lastReadChapters, T.lastReadChapters, _oursWins);
   out.lastReadLetterMap = mergeMapByKey(B.lastReadLetterMap, O.lastReadLetterMap, T.lastReadLetterMap, _oursWins);
@@ -323,13 +329,16 @@ export function mergeStateStore(base, ours, theirs) {
    A write whose read ledger is EMPTY while the disk copy holds a real one is
    how a slow cold start used to erase a reader's data: the App rendered on
    degraded defaults, the store then loaded, and the next write carried the
-   defaults - a 3-way merge reads every key missing from ours as a delete, and
-   ours wins every session field. usePersistedState no longer writes from an
-   unloaded mount; this is the net under it. Only an explicit clear
-   (clearAllProgress / clearReadForBook arm it just before they empty the map)
-   may take a ledger this size to nothing. Any other such write is a write
-   built on defaults, so the disk copy wins it whole - ledger, cursors,
-   settings and tabs - and the diagnostic log says so. useMarkAsRead and this
+   defaults - a 3-way merge reads every key missing from ours as a delete.
+   usePersistedState no longer writes from an unloaded mount; this is the net
+   under it. Only an explicit clear (clearAllProgress / clearReadForBook arm it
+   just before they empty the map) may take a ledger the BASE held (this tab
+   saw it) to nothing. Otherwise the disk ledger is kept whole, the two
+   last-read cursors union, and the session fields merge as usual; the
+   diagnostic log says so. Keyed on the base, not the disk: a tab whose base
+   never had the keys (a sibling's import) deletes nothing and is not refused.
+   useSavedState's leave-record merge passes { noGuard } - the token that
+   armed a clear lived in the page that left. useMarkAsRead and this
    module share bundle-b, so a module-scope token is enough (no window bridge). */
 const PROGRESS_GUARD_MIN_KEYS = 10;
 const PROGRESS_CLEAR_WINDOW_MS = 60000;
@@ -346,14 +355,15 @@ function _progressClearArmed() {
 }
 
 /**
- * True when `ours` would empty a real read ledger with no clear armed.
- * @param {Record<string, any>} O @param {Record<string, any>} T
+ * True when `ours` would empty a read ledger the base held, with no clear armed.
+ * @param {Record<string, any>} B @param {Record<string, any>} O @param {Record<string, any>} T
  */
-function _wipesLedger(O, T) {
-  const theirKeys = Object.keys(_obj(T.readItems)).length;
-  if (theirKeys < PROGRESS_GUARD_MIN_KEYS) return false;
+function _wipesLedger(B, O, T) {
+  const baseKeys = Object.keys(_obj(B.readItems)).length;
+  if (baseKeys < PROGRESS_GUARD_MIN_KEYS) return false;
   if (Object.keys(_obj(O.readItems)).length !== 0) return false;
+  if (Object.keys(_obj(T.readItems)).length === 0) return false;
   if (_progressClearArmed()) return false;
-  try { DiagnosticLog.warn('state-guard', 'refused a vot-state write that would empty ' + theirKeys + ' read marks; kept the saved state'); } catch (_e) { /* logging must never break a save */ }
+  try { DiagnosticLog.warn('state-guard', 'kept ' + Object.keys(_obj(T.readItems)).length + ' read marks a vot-state write would have emptied'); } catch (_e) { /* logging must never break a save */ }
   return true;
 }

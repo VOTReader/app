@@ -131,6 +131,24 @@ describe('a mount that began before vot-state loaded writes nothing', () => {
     expect(disk.readItems).toEqual(REAL.readItems);
   });
 
+  it('a store that never loads: nothing is written all session', async () => {
+    slowFirstStateRead();                         // never released: this read never answers
+    const delays = StateStore._backgroundRetryDelays;
+    StateStore._backgroundRetryDelays = [];
+    const hydration = StateStore._hydrate();
+    await settle(3000);
+    await hydration;
+    const put = vi.spyOn(IDBAdapter, 'put');
+    const { rerender, unmount } = renderHook((u) => usePersistedState(u), { initialProps: DEFAULTS });
+    rerender({ ...DEFAULTS, theme: 'light' });
+    await settle(300);
+    window.dispatchEvent(new Event('pagehide'));
+    unmount();
+    expect(put).not.toHaveBeenCalled();
+    expect(StateStore._queue).toHaveLength(0);
+    StateStore._backgroundRetryDelays = delays;
+  });
+
   it('useSavedState leaves the leave record for the remount when the store is not loaded', async () => {
     sessionStorage.setItem(RESUME_STATE_KEY, JSON.stringify({ at: Date.now(), state: { ...REAL, tabs: [{ id: 't9', screen: 'volumes-home' }] }, base: null }));
     slowFirstStateRead();
@@ -148,8 +166,7 @@ describe('the progress-wipe guard in mergeStateStore', () => {
     const out = mergeStateStore(REAL, DEFAULTS, REAL);
     expect(out.readItems).toEqual(REAL.readItems);
     expect(out.lastReadChapters).toEqual(REAL.lastReadChapters);
-    expect(out.theme).toBe('light');
-    expect(out.tabs).toEqual(REAL.tabs);
+    expect(out.lastReadLetterMap).toEqual(REAL.lastReadLetterMap);
     expect(DiagnosticLog.entries().some((e) => e.tag === 'state-guard')).toBe(true);
   });
 
@@ -164,6 +181,25 @@ describe('the progress-wipe guard in mergeStateStore', () => {
     vi.advanceTimersByTime(61000);
     const out = mergeStateStore(REAL, { ...REAL, readItems: {} }, REAL);
     expect(out.readItems).toEqual(REAL.readItems);
+  });
+
+  it('a tab whose base never had the marks (a sibling imported them) is not refused', () => {
+    const fresh = { ...DEFAULTS, tabs: [{ id: 'x', screen: 'volumes-home' }] };
+    const out = mergeStateStore(DEFAULTS, fresh, REAL);
+    expect(out.readItems).toEqual(REAL.readItems);       // the 3-way merge keeps the sibling's adds
+    expect(out.tabs).toEqual(fresh.tabs);                // and this tab's session fields win as usual
+    expect(DiagnosticLog.entries().some((e) => e.tag === 'state-guard')).toBe(false);
+  });
+
+  it('when it fires it keeps the ledger only; session fields merge as usual', () => {
+    const out = mergeStateStore(REAL, { ...REAL, readItems: {}, tabs: [{ id: 'y', screen: 'home' }] }, REAL);
+    expect(out.readItems).toEqual(REAL.readItems);
+    expect(out.tabs).toEqual([{ id: 'y', screen: 'home' }]);
+  });
+
+  it('the leave-record merge (noGuard) honours a clear the leaving page armed', () => {
+    const out = mergeStateStore(REAL, { ...REAL, readItems: {} }, REAL, { noGuard: true });
+    expect(out.readItems).toEqual({});
   });
 
   it('a small ledger merges as before (unmarking the last few reads works)', () => {
