@@ -229,7 +229,7 @@ function ThemeTiles({ theme, onThemeChange }) {
    Plain words, every claim true of THIS build: the credits list what the app ships (the translations
    in TRANSLATION_OPTIONS, the recorded editions in BIBLE_AUDIO_EDITIONS, the fonts and libraries in
    VENDORED-LIBS.md / fonts/), and the privacy page says what leaves the device and what does not
-   (CLAUDE.md "No usage statistics": the one Cloudflare visit count is the exception, and it is named). */
+   (bc1: the phone app sends nothing; the website counts visits with Cloudflare, and the page says so). */
 function ExternalLink({ href, children }) {
   return (
     <a className="settings-ext-link" href={href} target="_blank" rel="noopener noreferrer">
@@ -318,9 +318,10 @@ function PrivacyPage() {
       <p className="settings-info-display">Your privacy</p>
       <p>VOTReader has no accounts and no sign-in.</p>
       <p>Your notes, highlights, bookmarks, journal and reading record are kept only on this device. Nothing you write is sent anywhere.</p>
-      <p>The app keeps no record of how you use it. The one count it makes: each time it opens while online, it sends one anonymous visit to Cloudflare Web Analytics, with no cookies and nothing you read or write. The numbers stay in the maker&rsquo;s Cloudflare account.</p>
+      <p>The phone app keeps no record of how you use it and sends nothing: no statistics, no analytics, no ads. The website version counts visits with Cloudflare Web Analytics (one anonymous page view per visit, no cookies, nothing you read or write).</p>
       <p>Recordings, songs and Garden pictures stream from the app&rsquo;s own release files when you open them. A recording you save for offline is kept on this device.</p>
       <p>Backups are files you save yourself. The weekly copy, where the phone app makes one, goes to Downloads/VOTReader on this phone.</p>
+      <ExternalLink href="https://votreader.github.io/app/privacy.html">The full privacy policy</ExternalLink>
     </div>
   );
 }

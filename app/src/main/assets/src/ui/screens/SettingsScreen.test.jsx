@@ -1172,7 +1172,8 @@ describe('settings root list and pages (rs2)', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Privacy/ }));
     expect(title()).toBe('Privacy');
     expect(screen.getByText('VOTReader has no accounts and no sign-in.')).toBeTruthy();
-    expect(screen.getByText(/Cloudflare Web Analytics/)).toBeTruthy();
+    expect(screen.getByText(/The phone app keeps no record of how you use it and sends nothing/)).toBeTruthy();   // bc1
+    expect(screen.getByRole('link', { name: /full privacy policy/ }).getAttribute('href')).toBe('https://votreader.github.io/app/privacy.html');
     back();
     expect(title()).toBe('Help & about');
     fireEvent.click(screen.getByRole('button', { name: 'Credits & licenses' }));
