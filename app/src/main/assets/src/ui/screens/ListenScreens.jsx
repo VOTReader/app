@@ -259,10 +259,14 @@ export function ListenRoot(props) {
 }
 
 /**
- * One recording row of a Source: number, title, "Read by … · status", a state glyph that downloads on tap.
- * @param {{ n: any, title: string, tracks: any[], reader: string, playing: boolean, onPlay: () => void, offline: any, online: boolean, name: string }} props
+ * One recording row of a Source: number, title, "Read by … · status", a state glyph that downloads on tap, and the
+ * row's ⋮ (the canvas's): Open the text, Save, Download or Remove, and the other voices it was read in.
+ * @param {{ n: any, title: string, tracks: any[], reader: string, playing: boolean, onPlay: () => void, offline: any, online: boolean, name: string,
+ *   voices?: Array<{ code: string, label: string, play: () => void }> }} props
  */
-function SourceRow({ n, title, tracks, reader, playing, onPlay, offline, online, name }) {
+function SourceRow({ n, title, tracks, reader, playing, onPlay, offline, online, name, voices = [] }) {
+  const [menu, setMenu] = React.useState(false);
+  const library = audioLibraryStore();
   const urls = tracks.map((t) => t.url);
   const status = offline && urls.length ? offline.statusOf(urls[0]) : '';
   const onPhone = !!(offline && urls.length && urls.every((u) => offline.isSaved(u)));
@@ -279,7 +283,11 @@ function SourceRow({ n, title, tracks, reader, playing, onPlay, offline, online,
   else if (onPhone) glyph = <span className="listen-glyph is-gold" aria-label="On this phone"><Check /></span>;
   else if (busy) glyph = <span className="listen-glyph listen-ring" aria-label={'Downloading' + (progress ? ', ' + Math.round(progress * 100) + ' percent' : '')} style={/** @type {any} */ ({ '--p': Math.round(progress * 100) + '%' })} />;
   else if (offline && online) glyph = <button type="button" className="listen-glyph" aria-label={'Download ' + name} onClick={(e) => { e.stopPropagation(); offline.download(tracks.map((t) => ({ url: t.url, key: t.key, title: t.title }))); }}><Down /></button>;
+  const first = tracks[0] || null;
+  const saved = !!(first && library && typeof library.isSaved === 'function' && library.isSaved(first));
+  const openText = typeof window !== 'undefined' ? /** @type {any} */ (window).__openAudioText : null;
   return (
+    <>
     <div className={'listen-source-row' + (playing ? ' is-playing' : '') + (unavailable ? ' is-unavailable' : '')}>
       <button type="button" className="listen-source-hit" onClick={onPlay} disabled={unavailable} aria-label={'Play ' + name}>
         <span className="listen-num">{n}</span>
@@ -289,7 +297,17 @@ function SourceRow({ n, title, tracks, reader, playing, onPlay, offline, online,
         </span>
       </button>
       {glyph}
+      <button type="button" className="listen-glyph listen-more" aria-label={'More for ' + name} aria-expanded={menu} onClick={() => setMenu((v) => !v)}>⋮</button>
     </div>
+    {menu ? (
+      <div className="listen-row-menu" role="group" aria-label={'More for ' + name}>
+        {first && typeof openText === 'function' && hasTextDestination(first) ? <button type="button" onClick={() => { setMenu(false); openText(first); }}>Open the text</button> : null}
+        {first && library && typeof library.toggleSaved === 'function' ? <button type="button" aria-pressed={saved} onClick={() => library.toggleSaved(first)}>{saved ? '★ Saved' : '☆ Save'}</button> : null}
+        {offline && onPhone ? <button type="button" onClick={() => { setMenu(false); offline.remove(tracks.map((t) => t.url)); }}>Remove download</button> : null}
+        {voices.map((v) => <button key={v.code} type="button" onClick={() => { setMenu(false); v.play(); }}>{'Play read by ' + v.label}</button>)}
+      </div>
+    ) : null}
+    </>
   );
 }
 
@@ -343,6 +361,14 @@ export function ListenSource(props) {
   }
   // WTLB's longer sittings (AUDIO_SECTIONS): the collection screen's Compilations, kept here (audit-listen 5.2).
   const sections = key.indexOf(':') < 0 && typeof AudioPlayer.sectionsFor === 'function' ? (AudioPlayer.sectionsFor(key) || []) : [];
+  // The readings of this row in other voices (the canvas's "Play in another voice", in place of the old "2 voices" pill).
+  const otherVoices = (/** @type {any} */ g, /** @type {any} */ item, /** @type {any} */ shown) => AudioPlayer.renditionsFor(g.volKey, item, g.label)
+    .filter((r) => r.reader && !(shown && shown.readerCode === r.reader))
+    .map((r) => ({
+      code: r.reader,
+      label: r.reader === 'V' ? 'the synthesized voice' : AudioPlayer.readerLabel(r.reader) || r.reader,
+      play: () => { AudioPlayer.playCollection({ volKey: g.volKey, items: g.items, collectionLabel: g.label, startId: item.id, startReader: r.reader }); props.onOpenNowPlaying(); },
+    }));
   const firstGroup = src.groups[0] || null;
   const allTracks = src.groups.flatMap((g) => g.items.map((item) => tracksOf(g, item)));
   const sizeKnown = offline && typeof offline.sizeOf === 'function' ? allTracks.flat().reduce((n, t) => n + (offline.sizeOf(t.url) || 0), 0) : 0;
@@ -390,6 +416,7 @@ export function ListenSource(props) {
               const reader = g.reader ? '' : listenReaderLine(tracks[0]);
               return (
                 <SourceRow key={item.id} n={numberOf(g, item, i)} title={item.title || 'Untitled'} tracks={tracks} reader={reader}
+                  voices={g.reader ? [] : otherVoices(g, item, tracks[0])}
                   playing={!!(current && live && current.key === g.volKey + ':' + item.id)} onPlay={() => play(g, item)}
                   offline={offline} online={online} name={item.title || 'this recording'} />
               );

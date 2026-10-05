@@ -142,6 +142,22 @@ describe('ListenSource', () => {
     expect(player.playCollection).toHaveBeenCalledWith(expect.objectContaining({ startId: 'b' }));
   });
 
+  it("a row's ⋮ offers the other voices it was read in, and Save", () => {
+    player.renditionsFor.mockImplementation((volKey, item) => [
+      { reader: 'B', tracks: [{ key: volKey + ':' + item.id, url: 'u:' + item.id, readerCode: 'B' }] },
+      { reader: 'T', tracks: [{ key: volKey + ':' + item.id, url: 't:' + item.id, readerCode: 'T' }] },
+    ]);
+    globalThis.AudioLibraryStore.toggleSaved = vi.fn();
+    globalThis.AudioLibraryStore.isSaved = () => false;
+    render(<ListenSource {...srcProps('one')} />);
+    fireEvent.click(screen.getByRole('button', { name: 'More for Chosen by God' }));
+    fireEvent.click(screen.getByRole('button', { name: '☆ Save' }));
+    expect(globalThis.AudioLibraryStore.toggleSaved).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Play read by Timothy' }));
+    expect(player.playCollection).toHaveBeenCalledWith(expect.objectContaining({ startId: 'a', startReader: 'T' }));
+    player.renditionsFor.mockReset();
+  });
+
   it('a collection with compilations offers them, each playing its longer sitting', () => {
     player.sectionsFor.mockReturnValueOnce([['Part 1 · Intro–19', 's1', 'V'], ['Part 2 · 20–39', 's2', 'V']]);
     const p = srcProps('one');
