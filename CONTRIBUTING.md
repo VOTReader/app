@@ -108,7 +108,8 @@ on them through the same corpus objects. The contract and its one race class are
 |---|---|
 | all JS tests | `npm run test` (vitest; jsdom, fake-indexeddb, Testing Library) |
 | one file | `npx vitest run app/src/main/assets/src/stores/note-store.test.js` |
-| with the coverage floors the hook enforces | `npm run test:coverage` |
+| what `.githooks/pre-push` runs (vmThreads, no coverage) | `npm run test:hook` |
+| with the coverage floors CI enforces | `npm run test:coverage` |
 | the gate scripts' own tests | `npx vitest run tools/` |
 | types | `npm run typecheck` |
 | lint | `npm run lint -- --max-warnings 0` (regenerates the cross-bundle globals, then eslint; this is CI's form) |
