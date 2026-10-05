@@ -45,12 +45,43 @@
 
 import { useRefMirror } from './use-ref-mirror.js';
 import { HistoryStore } from '../stores/history-store.js';
+import { COL_BY_KEY, colLetterArr } from '../data/scripture-resolution.js';
+
+/**
+ * hm1: a Hidden Manna visit, which no list may show (CLAUDE.md: reachable only
+ * through the Matthew study chain). Visits are no longer recorded
+ * (use-nav-history-tracking.js); ones stored before that are filtered here, on
+ * read, never deleted. Hidden Manna is the one collection with no index screen,
+ * so its visits carry `volumeScreen: null`; an older entry without the field is
+ * matched by the Hidden Manna letter ids once that corpus has loaded.
+ * @param {any} e
+ * @returns {boolean}
+ */
+export function isHiddenMannaVisit(e) {
+  if (!e || e.type !== 'letter') return false;
+  const hm = COL_BY_KEY.get('hm');
+  if (!hm) return false;
+  if (e.volumeScreen != null) return false;
+  if (e.volumeScreen === null && !hm.indexScreen) return true;
+  return colLetterArr(hm).some((x) => x && x.id === e.letterId);
+}
 
 // Stable subscribe + getSnapshot for useSyncExternalStore so React
 // doesn't think the source changed each render. Bound at module
 // scope; both functions retain HistoryStore as `this` via the bind.
+// The filtered list is rebuilt only when the store hands out a new array,
+// so the snapshot stays referentially stable between changes.
 const _subscribeHistory = HistoryStore.subscribe.bind(HistoryStore);
-const _getHistorySnapshot = () => HistoryStore.list();
+/** @type {any} */ let _snapSource = null;
+/** @type {HistoryEntry[]} */ let _snapList = [];
+const _getHistorySnapshot = () => {
+  const src = HistoryStore.list();
+  if (src !== _snapSource) {
+    _snapSource = src;
+    _snapList = Array.isArray(src) && src.some(isHiddenMannaVisit) ? src.filter((e) => !isHiddenMannaVisit(e)) : src;
+  }
+  return _snapList;
+};
 
 /**
  * One reading-history entry. The `key` field is computed at add() time

@@ -164,6 +164,10 @@ export function useNavHistoryTracking({
       // and nothing recorded (owner report 2026-08-09; the earlier fixes
       // here all chased lazy-corpus timing, which was a different hole).
       var _hcol = COL_BY_LETTER_SC.get(screen);
+      // hm1: Hidden Manna is reachable only through the Matthew study chain and
+      // never in a public list, so a visit is never recorded (History, and the
+      // Recent / Continue lists built on it). Marked done so it is not retried.
+      if (_hcol.volKey === 'hm') { done(); return; }
       // The VOT corpus is lazy too: an unresolved letter leaves the position
       // unrecorded so a later render can retry it.
       var _he = _findLetter(_hcol.volKey);
