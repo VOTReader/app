@@ -1530,7 +1530,7 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
     const booted = boot(old);
     expect(booted.showSurpriseButton).toBe(true);
     expect(booted.showReadingDot).toBe(true);
-    expect(booted.defaultsRev).toBe(1);
+    expect(booted.defaultsRev).toBe(2);
     expect(booted.translation).toBe('kjv');
 
     // (b) a backup taken after the reader switched the dice off: stamp and choice survive the trip
