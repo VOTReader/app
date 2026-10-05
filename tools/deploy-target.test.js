@@ -51,7 +51,7 @@ describe('pickTarget - the newest green commit on main', () => {
 });
 
 /** A fake GitHub API: history is main's commits oldest-first; compare derives from it. */
-function fakeApi({ history, ciGreen = [], ciRed = [], failCompare = [] }) {
+function fakeApi({ history, ciGreen = [], ciRed = [], failCompare = [], listing = null }) {
   const tip = history[history.length - 1];
   const runs = [
     ...ciGreen.map((sha) => ({ head_sha: sha, conclusion: 'success' })),
@@ -59,7 +59,13 @@ function fakeApi({ history, ciGreen = [], ciRed = [], failCompare = [] }) {
   ].map((r) => ({ ...r, head_repository: { full_name: 'o/r' } }));
   return async (path) => {
     if (path.endsWith('/git/ref/heads/main')) return { object: { sha: tip } };
-    if (path.includes('/workflows/ci.yml/runs')) return { workflow_runs: runs };
+    if (path.includes('/commits?sha=')) return [...history].reverse().map((sha) => ({ sha }));
+    const bySha = /head_sha=([^&]+)/.exec(path);
+    if (bySha) return { workflow_runs: runs.filter((r) => r.head_sha === bySha[1]) };
+    // `listing` stands in for a stale branch listing (2026-10-05): only those runs, whatever CI really holds
+    if (path.includes('/workflows/ci.yml/runs')) {
+      return { workflow_runs: listing ? runs.filter((r) => listing.includes(r.head_sha)) : runs };
+    }
     const cmp = /\/compare\/([^.]+)\.\.\.([^?]+)/.exec(path);
     if (cmp) {
       if (failCompare.includes(cmp[1])) throw new Error('GET compare: 500 diff taking too long');
@@ -91,6 +97,21 @@ describe('findTarget - the gate end to end, on a fake API', () => {
   it('a manual override on a red tip is the floor until something newer goes green', async () => {
     const api = fakeApi({ history: ['T1', 'T2', 'T3'], ciGreen: ['T1'], ciRed: ['T2'] });
     expect(await findTarget({ repo, api, liveSha: 'T2', log: quiet })).toBeNull();
+  });
+
+  it('a stale branch listing cannot hide the newest green commit (2026-10-05, deploys 37286439058 / 37286970281)', async () => {
+    // The listing answered with old runs only; CI by head_sha knows C is green.
+    const api = fakeApi({ history: ['old', 'B', 'C', 'D'], ciGreen: ['old', 'C'], ciRed: ['D'], listing: ['old'] });
+    expect(await findTarget({ repo, api, liveSha: 'B', log: quiet })).toBe('C');
+  });
+
+  it('a commit whose CI cannot be read is skipped, not fatal', async () => {
+    const base = fakeApi({ history: ['A', 'B', 'C'], ciGreen: ['A', 'B'], listing: [] });
+    const api = async (path) => {
+      if (path.includes('head_sha=C')) throw new Error('GET runs: 502');
+      return base(path);
+    };
+    expect(await findTarget({ repo, api, liveSha: 'A', log: quiet })).toBe('B');
   });
 
   it('the pick that is already live publishes nothing', async () => {

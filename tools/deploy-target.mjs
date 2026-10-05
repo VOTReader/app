@@ -87,8 +87,28 @@ export async function findTarget({ repo, api, dispatchSha = '', liveSha = '', lo
   // once returned a stale set (see the header). The branch filter also matches a
   // tag or a fork branch named main; the compare below drops anything not on main.
   const ci = await api(`repos/${repo}/actions/workflows/ci.yml/runs?branch=main&event=push&per_page=30`);
+  const green = (r) => r.conclusion === 'success' && r.head_repository?.full_name === repo;
   for (const r of ci.workflow_runs) {
-    if (r.conclusion === 'success' && r.head_repository?.full_name === repo) shas.add(r.head_sha);
+    if (green(r)) shas.add(r.head_sha);
+  }
+  // The branch listing itself goes stale: on 2026-10-05 ~09:00Z it answered with SEPTEMBER runs (newest 47c6e0c7),
+  // the picker chose commits 6 and 1089 behind, the floor refused both, and nothing went live for ~40 min. So also walk
+  // main's newest commits, newest first, asking CI by head_sha (an exact filter that stayed correct) until one is
+  // green. The walk stops at a commit the listing already knows is green: nothing older can be the pick.
+  try {
+    for (const c of await api(`repos/${repo}/commits?sha=${tip}&per_page=30`)) {
+      if (shas.has(c.sha)) break;
+      let runs;
+      try {
+        runs = (await api(`repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${c.sha}&event=push`)).workflow_runs;
+      } catch (e) {
+        log(`::warning::CI runs of ${c.sha} unreadable, commit skipped: ${String(e.message).slice(0, 200)}`);
+        continue;
+      }
+      if (runs.some(green)) { shas.add(c.sha); break; }
+    }
+  } catch (e) {
+    log(`::warning::main's commit list unreadable, using the run listing alone: ${String(e.message).slice(0, 200)}`);
   }
 
   const compare = async (base, head) => {
