@@ -38,7 +38,8 @@ const val = (f) => { const i = argv.indexOf(f); return i >= 0 ? argv[i + 1] : nu
 const BASELINE = path.join(HERE, 'search-bench/baseline.json');
 const t0 = Date.now();
 
-const { cases } = JSON.parse(fs.readFileSync(path.join(HERE, 'search-bench/cases.json'), 'utf8'));
+// SEARCH_BENCH_CASES: another cases file (the fairness audit tries candidate queries on a copy)
+const { cases } = JSON.parse(fs.readFileSync(process.env.SEARCH_BENCH_CASES || path.join(HERE, 'search-bench/cases.json'), 'utf8'));
 const { E, initMs, meaning } = await engine();
 const { kjvEncode } = await import(pathToFileURL(path.join(ASSETS, 'src/search/tokenize.js')).href);
 const { excerptLanding } = await import(pathToFileURL(path.join(ASSETS, 'src/utils/excerpt-landing.js')).href);
@@ -113,6 +114,36 @@ function classOf(c) {
     members.add(c.uk);
   }
   return { members, best: Math.min(...[...members].map(TIER)) };
+}
+
+/* FAIR TO ASK? (path to 500, step 3, 2026-10-05). `--audit <out.json>`: for every case, the texts outside its
+   equivalence class that hold the typed words word for word (prose units, and every verse in the NKJV and the KJV).
+   A query several unrelated texts hold verbatim has no one right answer: it needs a better query, not a lower bar.
+   Held-out rows carry only their id and counts (their queries are never printed). The engine is not run. */
+if (val('--audit')) {
+  const allVerses = D.filter((d) => d.kind === 'verse').map((d) => [unitKey(d), norm(d.text)]);
+  for (const [book, chs] of Object.entries(KJV)) for (const [ch, vs] of Object.entries(chs)) for (const v of vs) allVerses.push(['bible/' + book + ':' + ch + ':' + v.n, norm(v.text)]);
+  const rows = [];
+  for (const c of cases) {
+    const n = norm(c.q);
+    if (n.trim().split(' ').length < 2) continue;
+    const cls = classOf(c);
+    const inCls = (k) => cls.members.has(k) || matthewTwin(k).some((t) => cls.members.has(t));
+    const out = new Set();
+    // word for word, or nearly: 80% of the query's word 3-grams in one place (the harness's own near-copy rule)
+    const w = n.trim().split(' ');
+    const grams = []; for (let i = 0; i + 3 <= w.length; i++) grams.push(' ' + w.slice(i, i + 3).join(' ') + ' ');
+    const near = (t) => t.includes(n) || (grams.length >= 4 && grams.filter((g) => t.includes(g)).length >= 0.8 * grams.length);
+    for (const k of holders(c.q)) if (!inCls(k)) out.add(k);
+    for (const [k, t] of allVerses) if (near(t) && !inCls(k)) out.add(k.replace('matthew-study/matthew', 'bible/matthew').replace('bible/matthew-plain', 'bible/matthew'));
+    const self = proseNorm.some((t, i) => inCls(proseKeys[i]) && t.includes(n)) || allVerses.some(([k, t]) => inCls(k) && t.includes(n));
+    if (!out.size) continue;
+    rows.push(c.held ? { id: c.id, held: true, style: c.style, outside: out.size, targetHolds: self }
+      : { id: c.id, held: false, style: c.style, q: c.q, target: c.ref || c.uk, outside: out.size, targetHolds: self, others: [...out].slice(0, 8) });
+  }
+  fs.writeFileSync(val('--audit'), JSON.stringify(rows, null, 1));
+  console.log(`audit: ${rows.length} cases whose typed words other texts hold word for word (${rows.filter((r) => r.held).length} held out) -> ${val('--audit')}`);
+  process.exit(0);
 }
 
 /** What the screen shows first: a reference card, or the engine's first hit. */

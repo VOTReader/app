@@ -191,7 +191,11 @@
    "chapter": 24,
    "verse": 18,
    "sentence": "But you shall remember that you were a slave in Egypt, and the LORD your God redeemed you from there; therefore I command you to do this thing.",
-   "q": "remember that thou wast a bondman in egypt"
+   "q": "the lord thy god redeemed thee thence therefore i command thee",
+   "retired": {
+    "q": "remember that thou wast a bondman in egypt",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; deut 16:12 holds the same kjv words; 'redeemed thee thence' is particular to 24:18)"
+   }
   },
   {
    "id": "t013",
@@ -303,7 +307,11 @@
    "chapter": 10,
    "verse": 35,
    "sentence": "They took it on that day and struck it with the edge of the sword; all the people who were in it he utterly destroyed that day, according to all that he had done to Lachish.",
-   "q": "smote it with the edge of the sword and all the souls therein"
+   "q": "he utterly destroyed that day according to all that he had done to lachish",
+   "retired": {
+    "q": "smote it with the edge of the sword and all the souls therein",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; same smite formula repeats through joshua 10; 'done to lachish' pins 10:35)"
+   }
   },
   {
    "id": "t020",
@@ -335,7 +343,11 @@
    "chapter": 7,
    "verse": 71,
    "sentence": "and as the sacrifice of peace offerings: two oxen, five rams, five male goats, and five male lambs in their first year. This was the offering of Ahiezer the son of Ammishaddai.",
-   "q": "two oxen five rams five he goats five lambs of the first year"
+   "q": "this was the offering of ahiezer the son of ammishaddai",
+   "retired": {
+    "q": "two oxen five rams five he goats five lambs of the first year",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; the offering list is identical for every prince; only ahiezer/ammishaddai is particular)"
+   }
   },
   {
    "id": "t022",
@@ -735,7 +747,11 @@
    "chapter": 27,
    "verse": 18,
    "sentence": "For he knew that they had handed Him over because of envy.",
-   "q": "they had handed him over because of envy"
+   "q": "he knew that they had handed him over because of envy",
+   "retired": {
+    "q": "they had handed him over because of envy",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; the parallel verse holds the envy clause; 'he knew that they' wording is particular)"
+   }
   },
   {
    "id": "t047",
@@ -829,7 +845,11 @@
    "chapter": 11,
    "verse": 1,
    "sentence": "Now when they drew near Jerusalem, to Bethphage and Bethany, at the Mount of Olives, He sent two of His disciples;",
-   "q": "bethphage and bethany"
+   "q": "jerusalem to bethphage",
+   "retired": {
+    "q": "bethphage and bethany",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; luke 19:29 parallel holds bethphage and bethany; only mark says jerusalem to bethphage)"
+   }
   },
   {
    "id": "t053",
@@ -2483,7 +2503,11 @@
    "uk": "rebuke/the-cup-of-the-wrath-of-my-fury-is-come-to-the-full",
    "unit": "the-cup-of-the-wrath-of-my-fury-is-come-to-the-full",
    "title": "THE CUP OF THE WRATH OF MY FURY IS COME TO THE FULL",
-   "q": "the cup of my fury is come to the full"
+   "q": "the cup of wrath of my fury",
+   "retired": {
+    "q": "the cup of my fury is come to the full",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; title phrase is a refrain in many letters; kept the full wrath-of-my-fury wording)"
+   }
   },
   {
    "id": "t168",
@@ -2497,7 +2521,11 @@
    "title": "The Generation of Wrath",
    "blockIdx": 0,
    "sentence": "Not one has heard the weeping of The Holy One, no one thirsts.",
-   "q": "no one thirsts"
+   "q": "weeping of the holy one",
+   "retired": {
+    "q": "no one thirsts",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; spiritual-famine also says no one thirsts; the weeping of the holy one is particular)"
+   }
   },
   {
    "id": "t169",
@@ -2525,7 +2553,11 @@
    "title": "THE CUP OF THE WRATH OF MY FURY IS COME TO THE FULL",
    "blockIdx": 39,
    "sentence": "For all those who refuse Me shall die in their uncleanness!",
-   "q": "die in their uncleanness"
+   "q": "refuse me shall die",
+   "retired": {
+    "q": "die in their uncleanness",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; lev 15:31 holds die in their uncleanness; the refusal part is particular (sentence has little else rare))"
+   }
   },
   {
    "id": "t171",
@@ -2731,7 +2763,11 @@
    "title": "Follow Me",
    "blockIdx": 7,
    "sentence": "Therefore listen closely And take My words to heart, All you who call of yourselves Christian: I ask you, do you really love Me?...",
-   "q": "all you who call of yourselves christian"
+   "q": "call of yourselves christian i ask you do you really love me",
+   "retired": {
+    "q": "all you who call of yourselves christian",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; the address is a refrain across letters; the love question after it is particular)"
+   }
   },
   {
    "id": "t186",
@@ -2799,7 +2835,11 @@
    "uk": "v3/hallowed-ground",
    "unit": "hallowed-ground",
    "title": "Hallowed Ground",
-   "q": "holy ground"
+   "q": "hallowed grounds",
+   "retired": {
+    "q": "holy ground",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; 'holy ground' is exodus 3:5 / acts 7:33; hallowed is the memorable title word)"
+   }
   },
   {
    "id": "t191",
@@ -3203,7 +3243,11 @@
    "title": "Woe to the Church Called Roman and Catholic",
    "blockIdx": 3,
    "sentence": "For she is also like Babylon, adorning herself with gold and precious stones and pearls, having in her hand a golden cup full of abominations and the filthiness of her fornications.",
-   "q": "a golden cup full of abominations and the filthiness of her fornications"
+   "q": "she is also like babylon adorning herself with gold and precious stones",
+   "retired": {
+    "q": "a golden cup full of abominations and the filthiness of her fornications",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; revelation's harlot verse holds the cup clause; the babylon adorning lead-in is particular)"
+   }
   },
   {
    "id": "t220",
@@ -3245,7 +3289,11 @@
    "title": "The Mark",
    "blockIdx": 5,
    "sentence": "Call upon My name in sincerity and in truth, and you shall truly be free!",
-   "q": "call upon my name in sincerity and in truth"
+   "q": "in sincerity and in truth and you shall truly be free",
+   "retired": {
+    "q": "call upon my name in sincerity and in truth",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; the call upon my name refrain recurs in many letters; the 'truly be free' ending is particular)"
+   }
   },
   {
    "id": "t223",
@@ -4091,7 +4139,11 @@
    "title": "In Spirit and in Truth",
    "blockIdx": 0,
    "sentence": "Thus says The Holy One of Israel: What is the knowledge of man?",
-   "q": "what is the knowledge of man"
+   "q": "holy one of israel what is the knowledge of man",
+   "retired": {
+    "q": "what is the knowledge of man",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; the short question exists elsewhere; this letter's holy one of israel opener pins it)"
+   }
   },
   {
    "id": "t284",
@@ -4727,7 +4779,11 @@
    "uk": "wtlb2/the-pure-of-heart",
    "unit": "the-pure-of-heart",
    "title": "The Pure of Heart",
-   "q": "pure in heart"
+   "q": "the pure of hearts",
+   "retired": {
+    "q": "pure in heart",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; 'pure in heart' is matthew 5:8 and many letters; slip pulled it onto the famous phrase)"
+   }
   },
   {
    "id": "t330",
@@ -4874,14 +4930,19 @@
    "held": false,
    "group": "words",
    "col": "wtlb2",
-   "style": "rare",
+   "style": "exact",
    "level": "sentence",
    "uk": "wtlb2/the-planting-of-the-lord",
    "unit": "the-planting-of-the-lord",
    "title": "The Planting of The Lord",
    "blockIdx": 1,
    "sentence": "Turn away from this world, and come to Me!",
-   "q": "turn away from this world"
+   "q": "turn away from this world and come to me",
+   "retired": {
+    "q": "world and come to",
+    "style": "rare",
+    "why": "ambiguous: another letter holds \"turn away from this world\" word for word, and the sentence holds no other rare phrase; restyled to exact (fairness audit 2026-10-05)"
+   }
   },
   {
    "id": "t341",
@@ -5129,7 +5190,11 @@
    "title": "Blessed Are Those Who Receive of Me",
    "blockIdx": 0,
    "sentence": "† Blessed be the name of The Lord...",
-   "q": "blessed is the name of the lord"
+   "q": "blessed be the name of our lord",
+   "retired": {
+    "q": "blessed is the name of the lord",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; sentence is only the stock phrase (job 1:21, answers headings); every variant collides, consider dropping target)"
+   }
   },
   {
    "id": "t359",
@@ -5276,14 +5341,19 @@
    "held": false,
    "group": "words",
    "col": "holydays",
-   "style": "rare",
+   "style": "exact",
    "level": "sentence",
    "uk": "holydays/i-am-the-passover-and-the-lamb-the-new-covenant-with-men",
    "unit": "i-am-the-passover-and-the-lamb-the-new-covenant-with-men",
    "title": "I Am The Passover and The Lamb, The New Covenant with Men",
    "blockIdx": 4,
    "sentence": "Then shall you truly know Me, Just as I have always known you, Even from the foundation of the world...",
-   "q": "shall you truly know me"
+   "q": "then shall you truly know me just as i have always known you",
+   "retired": {
+    "q": "shall you truly know me",
+    "style": "rare",
+    "why": "ambiguous: another text holds \"shall you truly know me\", and no 2-4 word phrase of the sentence is its own; restyled to exact (fairness audit 2026-10-05)"
+   }
   },
   {
    "id": "t370",
@@ -5325,7 +5395,11 @@
    "title": "I AM RISEN",
    "blockIdx": 4,
    "sentence": "And all who believe in Me shall not die, but live, For I shall raise them up at the Last Day!...",
-   "q": "i shall raise them up at the last day"
+   "q": "all who believe in me shall not die but live",
+   "retired": {
+    "q": "i shall raise them up at the last day",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; the-victory holds raise them up at the last day verbatim; the believe/not die half is particular)"
+   }
   },
   {
    "id": "t373",
@@ -5819,7 +5893,11 @@
    "title": "Regarding Another Messiah",
    "blockIdx": 75,
    "sentence": "Yet woe to those who hate The Son, Woe to all who turn aside from The Way, For the wrath of God remains upon them!...",
-   "q": "woe to all who turn aside from the way"
+   "q": "yet woe to those who hate the son",
+   "retired": {
+    "q": "woe to all who turn aside from the way",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; the turn-aside clause recurs; the hate-the-son clause beside it is particular)"
+   }
   },
   {
    "id": "t409",
@@ -6587,7 +6665,11 @@
    "title": "Grace AND The Law (Bible/Letter Study) — The Entire Human Race Was on Death Row, But Capital Punishment is Annulled in YahuShua HaMashiach (Jesus The Christ)",
    "blockIdx": 3,
    "sentence": "“All have sinned, and come short of the glory of God.”",
-   "q": "come short"
+   "q": "sinned and come short",
+   "retired": {
+    "q": "come short",
+    "why": "ambiguous: other texts hold these words word for word (fairness audit 2026-10-05; 'come short' is in hebrews 4:1 and 1 cor 1:7; rom 3:23 itself is the quoted source so fine)"
+   }
   },
   {
    "id": "t465",

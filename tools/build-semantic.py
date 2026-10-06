@@ -18,6 +18,9 @@ from tokenizers import BertWordPieceTokenizer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEM = os.path.join(ROOT, 'app', 'src', 'main', 'assets', 'semantic')
+# SEMANTIC_OUT: where the pack goes (default: the shipped semantic/); a trial pack for the benchmark
+# (tools/search-bench/corpus.mjs SEARCH_SEMANTIC_DIR) goes elsewhere
+OUT = os.environ.get('SEMANTIC_OUT') or SEM
 MODEL = 'bge-small-en-v1.5-int8.onnx'
 DIM = 384
 MAX_TOKENS = 256
@@ -57,9 +60,9 @@ def main(units_path):
     blob = q.tobytes() + scale.astype('<f4').tobytes() + key.astype('<u4').tobytes() + start.astype('<i4').tobytes()
     sha = hashlib.sha256(blob).hexdigest()
     units_file = f'units-{sha[:8]}.bin'
-    for old in os.listdir(SEM):
-        if old.startswith('units-') and old.endswith('.bin') and old != units_file: os.remove(os.path.join(SEM, old))
-    with open(os.path.join(SEM, units_file), 'wb') as f: f.write(blob)
+    for old in os.listdir(OUT):
+        if old.startswith('units-') and old.endswith('.bin') and old != units_file: os.remove(os.path.join(OUT, old))
+    with open(os.path.join(OUT, units_file), 'wb') as f: f.write(blob)
     model_sha = hashlib.sha256(open(os.path.join(SEM, MODEL), 'rb').read()).hexdigest()
     man = {
         'version': 1,
@@ -73,10 +76,10 @@ def main(units_path):
         'fingerprint': src['fingerprint'],
         'keys': src['keys'],
     }
-    with open(os.path.join(SEM, 'manifest.json'), 'w', encoding='utf-8', newline='\n') as f:
+    with open(os.path.join(OUT, 'manifest.json'), 'w', encoding='utf-8', newline='\n') as f:
         json.dump(man, f, separators=(',', ':'))
         f.write('\n')
-    print(f'{len(units)} units, {len(blob) / 1e6:.1f} MB, {time.time() - t0:.0f}s -> {SEM}')
+    print(f'{len(units)} units, {len(blob) / 1e6:.1f} MB, {time.time() - t0:.0f}s -> {OUT}')
 
 if __name__ == '__main__':
     if len(sys.argv) != 2: sys.exit('usage: python tools/build-semantic.py <units.json from tools/semantic-units.mjs>')

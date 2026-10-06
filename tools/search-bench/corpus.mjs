@@ -110,7 +110,12 @@ export async function startMeaning() {
   if (process.env.SEARCH_MEANING === 'off') return { status: 'off' };
   S.configureSemantic({
     url: (p) => pathToFileURL(path.join(ASSETS, p)).href,
-    load: async (p) => { const b = fs.readFileSync(path.join(ASSETS, p)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); },
+    // SEARCH_SEMANTIC_DIR: a trial pack (manifest + units) in place of the shipped one; the model and runtime stay shipped
+    load: async (p) => {
+      const alt = process.env.SEARCH_SEMANTIC_DIR && /^semantic\/(manifest\.json|units-[0-9a-f]+\.bin)$/.test(p) ? path.join(process.env.SEARCH_SEMANTIC_DIR, p.slice(9)) : null;
+      const b = fs.readFileSync(alt || path.join(ASSETS, p));
+      return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+    },
     importModule: (p) => import(pathToFileURL(path.join(ASSETS, p)).href),
   });
   await S.startSemantic();
