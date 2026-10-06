@@ -183,9 +183,15 @@ export function wordPieceIds(/** @type {string} */ text, /** @type {Map<string, 
   return out;
 }
 
+/* The model learned His name as "Jesus"; the Volumes and the readers write it restored
+   ("yahushua was left alone" is John 8:9). For the model only, the name reads as it learned it,
+   on the query and on every passage alike (tools/build-semantic.py does the same). */
+const NAME_RESTORED = /\b(?:yahushua|yeshua|yahshua|yahusha|yeshu)\b/gi;
+export const meaningText = (/** @type {string} */ s) => String(s).replace(NAME_RESTORED, 'Jesus');
+
 /** The query's unit-length vector. */
 async function embed(/** @type {string} */ query) {
-  const ids = [CLS].concat(wordPieceIds(man.queryPrefix + query).slice(0, MAX_LEN - 2), [SEP]);
+  const ids = [CLS].concat(wordPieceIds(man.queryPrefix + meaningText(query)).slice(0, MAX_LEN - 2), [SEP]);
   const L = ids.length;
   const big = (/** @type {number[]} */ a) => BigInt64Array.from(a, (x) => BigInt(x));
   const feeds = /** @type {any} */ ({

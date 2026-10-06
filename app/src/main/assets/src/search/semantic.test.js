@@ -9,7 +9,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { wordPieceIds, configureSemantic, startSemantic, semanticDocs, semanticStatus, resetSemantic, docUnitKey } from './semantic.js';
+import { wordPieceIds, configureSemantic, startSemantic, semanticDocs, semanticStatus, resetSemantic, docUnitKey, meaningText } from './semantic.js';
 
 const ASSETS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const vocabMap = new Map(fs.readFileSync(path.join(ASSETS, 'semantic/vocab.txt'), 'utf8').split('\n').filter(Boolean).map((w, i) => [w, i]));
@@ -26,6 +26,11 @@ describe('wordPieceIds: the tokenizer the passage vectors were built with', () =
     ['the lord’s sabbath-day 中文 x', [1996, 2935, 1521, 1055, 19546, 1011, 2154, 1746, 1861, 1060]],
   ];
   for (const [text, ids] of CASES) it(JSON.stringify(text).slice(0, 40), () => expect(wordPieceIds(String(text), vocabMap)).toEqual(ids));
+});
+
+describe('meaningText: His name as the model learned it', () => {
+  it('a restored spelling reads "Jesus" (the model never learned YahuShua)', () => expect(meaningText('went out one by one and YahuShua was left alone')).toBe('went out one by one and Jesus was left alone'));
+  it('every spelling readers use, whole words only', () => expect(meaningText('yeshua, Yahshua and yahusha; yeshurun stays')).toBe('Jesus, Jesus and Jesus; yeshurun stays'));
 });
 
 describe('docUnitKey: how the pack names a document', () => {
