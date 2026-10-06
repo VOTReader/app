@@ -402,6 +402,37 @@ function docFreq(term) {
   return n;
 }
 
+/* WHERE IT LANDS, BY MEANING (path to 500, 2026-10-05). A text the words found opens where the
+   typed words sit thickest (use-search matchExcerpt). For a reader who described the passage,
+   those words can sit in the wrong place: "everyone struggling and burdened come to me for rest"
+   cut its excerpt at a "come" two paragraphs from the passage. The first results open on the
+   passage the model matched instead, when it means the query clearly more nearly than the
+   passage holding the excerpt (LAND_MARGIN). */
+const LAND_REACH = 3;
+const LAND_MARGIN = 0.1;
+/**
+ * @param {Array<{doc:any, placeStart?:number}>} out
+ * @param {Map<any, string>} idOf
+ * @param {Array<{id:string, start:number, passages: () => Array<[number, number]>}>} sem
+ * @param {string[]} terms
+ */
+function meaningLanding(out, idOf, sem, terms) {
+  const byId = new Map(sem.map((s) => [s.id, s]));
+  for (const e of out.slice(0, LAND_REACH)) {
+    if (e.doc.kind === 'verse' || typeof e.placeStart === 'number' || !e.doc.text) continue;
+    const s = byId.get(idOf.get(e) || '');
+    if (!s || s.start < 0) continue;
+    const ex = terms.length ? matchExcerpt(e.doc.text, terms) : '';
+    const at = ex ? e.doc.text.indexOf(ex) : -1;
+    if (at < 0) continue;
+    const ps = s.passages();
+    let lex = null;
+    for (const pp of ps) if (pp[0] <= at) lex = pp;
+    const bestScore = Math.max(...ps.map((pp) => pp[1]));
+    if (lex && bestScore - lex[1] > LAND_MARGIN && s.start !== lex[0]) e.placeStart = s.start;
+  }
+}
+
 /** unitKey -> this index's doc id: how a meaning hit (semantic.js) names its document. */
 function unitId(/** @type {string} */ key) {
   if (!UNIT_IDS) {
@@ -1362,8 +1393,9 @@ async function search(query, options) {
   // A first result holding the typed words in a row, or one word off, is a quote found: no re-ordering.
   const quoted = out.length && (nearOf[idOf.get(out[0]) || ''] || 0) >= NEAR_PHRASE_MIN;
   const held = !keyword && !p.phrase && !quoted ? bestPassageFirst(out, idOf, units, isStopTerm, named, kjvHeld) : 1;
+  /** @type {Awaited<ReturnType<typeof semanticDocs>>} */ let sem = null;
   if (!keyword && !p.phrase && !quoted && parsed.kind === 'text') {
-    const sem = await semanticDocs(String(query), unitId);
+    sem = await semanticDocs(String(query), unitId);
     if (sem && sem.length) meaningFirst(out, idOf, sem, named, held);
   }
   originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) =>
@@ -1387,6 +1419,7 @@ async function search(query, options) {
     }
     out.length = w;
   }
+  if (sem && sem.length) meaningLanding(out, idOf, sem, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))));
 
   /* A QUOTED PHRASE NOTHING HOLDS IS SEARCHED AS ITS WORDS (search audit 2026-09-27).
      A quote remembered one word off ("the earth shall grow old like a garment", where

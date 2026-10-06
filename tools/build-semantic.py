@@ -11,7 +11,7 @@ and manifest.json, which names it. units-*.bin, little-endian, N units, DIM dims
   int8[N*DIM] vectors (each unit-length, scaled by its own max) | float32[N] scale | uint32[N] key index | int32[N] start
 start is the passage's offset in its document's indexed text (-1 for a title). manifest.json names the keys.
 """
-import hashlib, json, os, sys, time
+import hashlib, json, os, re, sys, time
 import numpy as np
 import onnxruntime as ort
 from tokenizers import BertWordPieceTokenizer
@@ -24,6 +24,8 @@ OUT = os.environ.get('SEMANTIC_OUT') or SEM
 MODEL = 'bge-small-en-v1.5-int8.onnx'
 DIM = 384
 MAX_TOKENS = 256
+# The model learned His name as "Jesus": passages read it so, as the query does (semantic.js meaningText).
+NAME_RESTORED = re.compile(r'\b(?:yahushua|yeshua|yahshua|yahusha|yeshu)\b', re.I)
 ORT = 'ort-1.30.0/'  # onnxruntime-web's wasm build, vendored (MIT): ort.wasm.min.mjs, ort-wasm-simd-threaded.mjs/.wasm
 
 def main(units_path):
@@ -35,11 +37,22 @@ def main(units_path):
     so.intra_op_num_threads = max(1, (os.cpu_count() or 4) - 2)
     sess = ort.InferenceSession(os.path.join(SEM, MODEL), so, providers=['CPUExecutionProvider'])
     names = {i.name for i in sess.get_inputs()}
-    texts = [u['t'] for u in units]
+    texts = [NAME_RESTORED.sub('Jesus', u['t']) for u in units]
     vec = np.zeros((len(texts), DIM), np.float32)
-    order = np.argsort([len(t) for t in texts])
+    # SEMANTIC_CACHE (an .npz path): vectors already computed for the same text are reused (trial packs)
+    hashes = [hashlib.sha1(t.encode('utf-8')).hexdigest() for t in texts]
+    cache_path = os.environ.get('SEMANTIC_CACHE')
+    cache = {}
+    if cache_path and os.path.exists(cache_path):
+        z = np.load(cache_path)
+        cache = dict(zip(z['keys'].tolist(), z['vecs']))
+    todo = [i for i, h in enumerate(hashes) if h not in cache]
+    for i, h in enumerate(hashes):
+        if h in cache: vec[i] = cache[h]
+    order = np.array(todo)[np.argsort([len(texts[i]) for i in todo])] if todo else np.array([], int)
     t0 = time.time()
-    for s in range(0, len(texts), 64):
+    print(f'  {len(todo)} of {len(texts)} to embed', flush=True)
+    for s in range(0, len(order), 64):
         idx = order[s:s + 64]
         enc = tok.encode_batch([texts[i] for i in idx])
         L = max(len(e.ids) for e in enc)
@@ -52,7 +65,10 @@ def main(units_path):
         if 'token_type_ids' in names: feed['token_type_ids'] = np.zeros_like(ids)
         h = sess.run(None, feed)[0][:, 0, :]
         vec[idx] = h / np.linalg.norm(h, axis=1, keepdims=True)
-        if s % 6400 == 0: print(f'  {s}/{len(texts)} {time.time() - t0:.0f}s', flush=True)
+        if s % 6400 == 0: print(f'  {s}/{len(order)} {time.time() - t0:.0f}s', flush=True)
+    if cache_path:
+        for i in todo: cache[hashes[i]] = vec[i]
+        np.savez(cache_path, keys=np.array(list(cache.keys())), vecs=np.stack(list(cache.values())))
     scale = (np.abs(vec).max(1) / 127).astype(np.float32)
     q = np.round(vec / scale[:, None]).astype(np.int8)
     key = np.array([u['k'] for u in units], np.uint32)

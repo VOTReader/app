@@ -212,7 +212,7 @@ async function embed(/** @type {string} */ query) {
 /**
  * The documents whose passages mean most nearly what the query says, best first.
  * `idOfKey` maps a unitKey to the engine's document id. Null while the model is not ready.
- * @returns {Promise<Array<{id: string, score: number, start: number}>|null>}
+ * @returns {Promise<Array<{id: string, score: number, start: number, passages: () => Array<[number, number]>}>|null>}
  */
 export async function semanticDocs(/** @type {string} */ query, /** @type {(key: string) => string|undefined} */ idOfKey, limit = 60) {
   if (status !== 'ready' || !session || !V || !SCALE || !KEY || !START) return null;
@@ -223,10 +223,12 @@ export async function semanticDocs(/** @type {string} */ query, /** @type {(key:
   const nk = man.keys.length;
   const best = new Float32Array(nk).fill(-2);
   const bestUnit = new Int32Array(nk).fill(-1);
+  const scores = new Float32Array(n);
   for (let u = 0, b = 0; u < n; u++, b += d) {
     let s = 0;
     for (let k = 0; k < d; k++) s += V[b + k] * q[k];
     s *= SCALE[u];
+    scores[u] = s;
     const key = KEY[u];
     if (s > best[key]) { best[key] = s; bestUnit[key] = u; }
   }
@@ -241,9 +243,18 @@ export async function semanticDocs(/** @type {string} */ query, /** @type {(key:
     top[i] = k;
   }
   const out = [];
+  const keyOf = /** @type {Uint32Array} */ (KEY);
+  const startOf = /** @type {Int32Array} */ (START);
   for (const k of top) {
     const id = idOfKey(man.keys[k]);
-    if (id != null) out.push({ id, score: best[k], start: START[bestUnit[k]] });
+    if (id == null) continue;
+    // every passage of the document with how near it means the query, in text order
+    const passages = () => {
+      /** @type {Array<[number, number]>} */ const r = [];
+      for (let u = 0; u < n; u++) if (keyOf[u] === k && startOf[u] >= 0) r.push([startOf[u], scores[u]]);
+      return r.sort((a, b) => a[0] - b[0]);
+    };
+    out.push({ id, score: best[k], start: START[bestUnit[k]], passages });
   }
   return out;
 }

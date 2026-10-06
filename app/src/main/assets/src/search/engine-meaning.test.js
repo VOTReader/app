@@ -22,6 +22,9 @@ const CREATOR = 'Hear Me, says The Lord. Remember now your Creator in the days o
 // a letter long enough for its runs to be counted, and an Answers topic that reprints it after its own opening
 const VINEYARD = 'Thus says The Lord: I planted a vineyard on a fruitful hill, and I dug it and cleared out its stones, and I built a tower in the midst of it, and I looked for it to bring forth good grapes, but it brought forth wild grapes; therefore I will take away its hedge and break down its wall, and it shall be trampled, and I will lay it waste, and I will command the clouds that they rain no rain upon it, says The Lord of hosts.';
 const TOPIC_OPEN = 'Many have asked about fruit and fields and what is owed for them. ';
+// a letter the typed words find at its opening, whose described passage sits further down
+const REST_OPEN = 'Everyone come, and everyone come again, says the keeper of the gate. ';
+const REST = REST_OPEN + 'The walls are high and the towers are many in that city. '.repeat(8) + 'Lay down the load you carry, and I will give you peace.';
 const GLOBALS = {
   BOOKS: {},
   LETTERS_V1: [
@@ -29,31 +32,34 @@ const GLOBALS = {
     { id: 'creator', num: 2, title: 'In the Days of Your Youth', blocks: [{ segments: [{ v: CREATOR }] }] },
     { id: 'silver', num: 3, title: 'The Silver Cord', blocks: [{ segments: [{ v: 'Hear Me. The silver cord is loosed and the golden bowl is broken, says The Lord.' }] }] },
     { id: 'vineyard', num: 4, title: 'The Vineyard', blocks: [{ segments: [{ v: VINEYARD }] }] },
+    { id: 'rest', num: 5, title: 'The Gate', blocks: [{ segments: [{ v: REST }] }] },
   ],
   ANSWERS: [{ id: 'fields', num: 1, title: 'Regarding Fields', paragraphs: [{ text: TOPIC_OPEN + VINEYARD }] }],
 };
-const STARTS = { garment: 0, creator: CREATOR.indexOf('Remember'), silver: 0, fields: TOPIC_OPEN.length };
-const KEYS = ['v1/garment', 'v1/creator', 'v1/silver', 'answers/fields'];
+const STARTS = { garment: 0, creator: CREATOR.indexOf('Remember'), silver: 0, fields: TOPIC_OPEN.length, gate: 0, peace: REST.indexOf('Lay down') };
+const KEYS = ['v1/garment', 'v1/creator', 'v1/silver', 'answers/fields', 'v1/rest'];
+/** Each passage: its document (index in KEYS), where it starts, and the name a test calls it by. */
+const UNITS = [[0, 'garment'], [1, 'creator'], [2, 'silver'], [3, 'fields'], [4, 'gate'], [4, 'peace']];
 /** What the stand-in model says the query means: the unit (by letter id) it is nearest. */
 const said = { near: 'creator' };
 
 function standInModel() {
-  const dim = 4;
-  const vecs = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
+  const dim = UNITS.length;
+  const vecs = UNITS.map((_, i) => UNITS.map((__, j) => (i === j ? 1 : 0)));
   const q = new Int8Array(vecs.flatMap((v) => v.map((x) => x * 127)));
   const units = Buffer.concat([
-    Buffer.from(q.buffer), Buffer.from(new Float32Array([1 / 127, 1 / 127, 1 / 127, 1 / 127]).buffer),
-    Buffer.from(new Uint32Array([0, 1, 2, 3]).buffer), Buffer.from(new Int32Array([STARTS.garment, STARTS.creator, STARTS.silver, STARTS.fields]).buffer),
+    Buffer.from(q.buffer), Buffer.from(new Float32Array(UNITS.map(() => 1 / 127)).buffer),
+    Buffer.from(new Uint32Array(UNITS.map((u) => u[0])).buffer), Buffer.from(new Int32Array(UNITS.map((u) => STARTS[u[1]])).buffer),
   ]);
   const sha = (/** @type {Buffer} */ b) => crypto.createHash('sha256').update(b).digest('hex');
   const model = Buffer.from('stand-in');
-  const man = { version: 1, model: 'm.onnx', modelSha256: sha(model), queryPrefix: '', dim, count: 4, units: 'u.bin', unitsSha256: sha(units), ort: 'ort/', files: [], keys: KEYS };
+  const man = { version: 1, model: 'm.onnx', modelSha256: sha(model), queryPrefix: '', dim, count: UNITS.length, units: 'u.bin', unitsSha256: sha(units), ort: 'ort/', files: [], keys: KEYS };
   /** @type {Record<string, Buffer>} */
   const files = { 'semantic/manifest.json': Buffer.from(JSON.stringify(man)), 'semantic/vocab.txt': Buffer.from('[PAD]\n'), 'semantic/u.bin': units, 'semantic/m.onnx': model, 'semantic/ort/ort-wasm-simd-threaded.wasm': Buffer.from('') };
   const ort = {
     env: { wasm: {} },
     Tensor: class {},
-    InferenceSession: { create: async () => ({ inputNames: ['input_ids'], outputNames: ['h'], run: async () => ({ h: { data: Float32Array.from(vecs[KEYS.findIndex((k) => k.endsWith('/' + said.near))]) } }) }) },
+    InferenceSession: { create: async () => ({ inputNames: ['input_ids'], outputNames: ['h'], run: async () => ({ h: { data: Float32Array.from(vecs[UNITS.findIndex((u) => u[1] === said.near)]) } }) }) },
   };
   configureSemantic({
     url: (p) => 'mem:' + p,
@@ -97,6 +103,13 @@ describe('meaning first', () => {
     said.near = 'fields';
     const r = await first('a farmer whose crop went sour and so he gave up on his land');
     expect(r.doc.letterId).toBe('vineyard');
+  });
+
+  it('a text the words found opens on the passage the query describes, when the model clearly prefers it', async () => {
+    said.near = 'peace';
+    const r = await first('everyone come here so weary souls find rest after long labor');
+    expect(r.doc.letterId).toBe('rest');
+    expect(r.placeStart).toBe(STARTS.peace);
   });
 
   it('a quote typed nearly word for word stays the words’ find', async () => {
