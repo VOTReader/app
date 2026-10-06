@@ -751,7 +751,8 @@ describe('app.css — the compact top bar and its ⋯ menu', () => {
     expect(ruleBlock(CSS, '.nav-more-btn {')).toMatch(/min-width:\s*44px;[^}]*min-height:\s*44px/);
     expect(ruleBlock(CSS, '.more-menu-item {')).toMatch(/min-height:\s*48px/);
     expect(ruleBlock(CSS, '.more-menu-row {')).toMatch(/min-height:\s*52px/);
-    expect(ruleBlock(CSS, '.more-menu-seg button, .more-menu-step button {')).toMatch(/min-width:\s*44px;\s*min-height:\s*40px/);
+    // 48 x 48 since L3 (zones, 2026-10-05; tools/e2e-phone-fit.mjs T1): A−/A+ measured 46 x 40.
+    expect(ruleBlock(CSS, '.more-menu-seg button, .more-menu-step button {')).toMatch(/min-width:\s*48px;\s*min-height:\s*48px/);
   });
 });
 
