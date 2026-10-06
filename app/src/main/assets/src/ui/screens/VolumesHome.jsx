@@ -30,7 +30,7 @@ export function VolumesHome({ onSelect, onBack, onSearch, onHistory, onSettings,
   { id: "words-to-live-by-1", title: "Words To Live By: Part One", sub: _cnt('wtlb1') > 0 ? `${_cnt('wtlb1')} Entries · Words of Wisdom` : "Words of Wisdom", locked: _locked('wtlb1') },
   { id: "words-to-live-by-2", title: "Words To Live By: Part Two", sub: _cnt('wtlb2') > 0 ? `${_cnt('wtlb2')} Entries · More Words of Wisdom` : "More Words of Wisdom", locked: _locked('wtlb2') },
   { id: "the-blessed", title: "The Blessed", sub: _cnt('blessed') > 0 ? `${_cnt('blessed')} Entries · Blessings & Promises` : "Blessings & Promises", locked: _locked('blessed') },
-  { id: "little-flock", title: "Letters to The Little Flock", sub: _cnt('flock') > 0 ? `${_cnt('flock')} Letters` : "Personal Instruction", locked: _locked('flock') },
+  { id: "little-flock", title: "Letters to The Lord's Little Flock", sub: _cnt('flock') > 0 ? `${_cnt('flock')} Letters` : "Personal Instruction", locked: _locked('flock') },
   { id: "letters-timothy", title: "Letters from Timothy", sub: _cnt('timothy') > 0 ? `${_cnt('timothy')} Letters` : "A Servant's Pen", locked: _locked('timothy') },
   { id: "holy-days", title: "Regarding The Holy Days", sub: _cnt('holydays') > 0 ? `${_cnt('holydays')} Letters · Appointed Times` : "Appointed Times", locked: _locked('holydays') }];
 

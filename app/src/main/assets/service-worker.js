@@ -102,6 +102,7 @@ const CORE_ASSETS = [
   './fonts/cinzel-decorative-latin-700-normal.woff2',
   './fonts/eb-garamond-latin-wght-normal.woff2',
   './fonts/eb-garamond-latin-wght-italic.woff2',
+  './fonts/vot-glyphs.woff2', // the UI's symbols for every family (tools/gen-vot-glyphs.py)
   // (Reading Fonts are NOT here: fonts/reading/ lives in the STABLE
   //  corpus cache — see READING_FONT_PRECACHE — so an app-version bump
   //  doesn't re-download ~1.7 MB of never-changing font files.)
@@ -404,6 +405,7 @@ const ASSET_REVISIONS = {
   './fonts/reading/spectral-latin-600-normal.woff2': 'a07d6ee59b6000b0f26b3fccce9c5865629a38a70956641f39e9e509cf47cd0d',
   './fonts/reading/vollkorn-latin-wght-italic.woff2': '9994058df2f712d8a46363ec5d99d5eaa71736a5773b5d85aa5a248652d3a0cd',
   './fonts/reading/vollkorn-latin-wght-normal.woff2': '40a805a97fee6022c92d8e8741da3a229c70fcc59babe427603604e640e4bc4f',
+  './fonts/vot-glyphs.woff2': '8902e799825d00e497601220a3ae1739544ea6cf1f0bb11437056c903631bdd1',
   './icons/icon-16.png': '8c9f83d5da3cee54f284a9f795b89c038b57b17ec80e2f03e14154ae8064fb41',
   './icons/icon-180.png': 'e070c45a8419afda414dceb5dc040438701c74b7e4fdc6c499b015257ad25a7d',
   './icons/icon-192-maskable.png': '17a386a6187cc94d053c8e8ea6dfb2169c7cec7688cae856c82a09cbdf0229af',

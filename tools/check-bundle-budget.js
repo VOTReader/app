@@ -177,7 +177,10 @@ const BUDGETS = [
   // 2026-09-25 (ai-music, songs-U2..U4): +8,934 B over U1 — the song page (U2) and the Letters read with music
   // screen (U4), both frames of the same Songs screen. The desk's song mode, the bar's song skin, the lyrics loader
   // and the song finder landed in bundle-d beside the player, not here. 66,440 x 1.15 = 76,406 -> the hundred above.
-  { file: 'bundle-h.js', measured: 66440, max: 76500 },     // Listening Library hub / Volumes / Studies / collection / saved / on this phone / songs
+  // 2026-10-05 (zones L4): main had grown to 76,4xx since (Songs and offline work, all screens of this bundle);
+  // L4's count line (the preface named apart from the letters, recordingsLine) took it 33 B past the ceiling.
+  // Re-measured on the built file: 76,533 x 1.15 = 88,013 -> the hundred above. Nothing new came along.
+  { file: 'bundle-h.js', measured: 76533, max: 88100 },     // Listening Library hub / Volumes / Studies / collection / saved / on this phone / songs
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
   { file: 'bundle-a-matthew.js', measured: 546168, max: 628000 },

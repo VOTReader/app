@@ -25,6 +25,7 @@
     "smoke:ci": "node tools/smoke-ci.js",
     "e2e:read": "node tools/e2e-read-detector.mjs",
     "e2e:dock": "node tools/e2e-dock-geometry.mjs",
+    "e2e:phone": "node tools/e2e-phone-fit.mjs",
     "e2e:readalong": "node tools/e2e-readalong.mjs",
     "e2e:restore-fresh": "node tools/e2e-restore-fresh.mjs",
     "e2e:search": "node tools/e2e-search.mjs",

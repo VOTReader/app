@@ -45,7 +45,7 @@ function studyIdOf(volKey) {
  * than throwing — a stale tab must render a way back, not a blank screen.
  *
  * @param {string} volKey
- * @returns {{ label: string, items: Array<any>, col: any }}
+ * @returns {{ label: string, items: Array<any>, col: any, preface?: any }}
  */
 function resolveSource(volKey) {
   const studyId = studyIdOf(volKey);
@@ -67,14 +67,24 @@ function resolveSource(volKey) {
   if (!col) return { label: '', items: [], col: null };
   const preface = typeof colPreface === 'function' ? colPreface(col) : null;
   const letters = typeof colLetterArr === 'function' ? (colLetterArr(col) || []) : [];
-  return { label: col.label || '', items: preface ? [preface, ...letters] : letters, col };
+  return { label: col.label || '', items: preface ? [preface, ...letters] : letters, col, preface };
 }
 
-/** Letters, a study's chapters, or entries for the WTLB/Blessed/Holy-Days families. */
-function itemNoun(col, count) {
+/** Letters, a study's chapters, or entries for the WTLB and Blessed families. The Holy Days hold letters: their
+ *  Read tile says 'N Letters' (VolumesHome), and the two screens name a collection's pieces alike (L4). */
+export function itemNoun(col, count) {
   if (col && col.kind === 'chapter') return count === 1 ? 'chapter' : 'chapters';
-  const entry = !!(col && col.kind && col.kind !== 'letter');
+  const entry = !!(col && col.kind && col.kind !== 'letter' && col.kind !== 'holy-days');
   return count === 1 ? (entry ? 'entry' : 'letter') : (entry ? 'entries' : 'letters');
+}
+
+/** The hero's count line, from the list the Read tile counts (colLetterArr): letters counted as letters and the
+ *  preface named on its own. It said 'All 30 letters have recordings' for Volume One, whose Read tile says
+ *  '29 Letters' - the preface counted as a letter (zones L4, 2026-10-05; VolumesHome.parity.test.jsx). */
+export function recordingsLine(col, items, playable, preface) {
+  const n = items.length - (preface ? 1 : 0);
+  const heard = playable.length - (preface && playable.indexOf(preface) >= 0 ? 1 : 0);
+  return (heard === n ? 'All ' + n : heard + ' of ' + n) + ' ' + itemNoun(col, n) + (heard < playable.length ? ' and the preface' : '') + ' have recordings';
 }
 
 /**
@@ -126,7 +136,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
   // lists 66 books and Psalms alone would put 150 rows on the page uninvited.
   const [openChapters, setOpenChapters] = React.useState(/** @type {string | null} */ (null));
 
-  const { label, items, col } = resolveSource(volKey);
+  const { label, items, col, preface } = resolveSource(volKey);
   const playable = items.filter((item) => item && item.id && AudioPlayer.hasAudio(srcKey, item.id));
   const missing = items.length - playable.length;
   const sections = bible || study ? null : AudioPlayer.sectionsFor(volKey);
@@ -165,9 +175,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
 
   const countLine = bible
     ? (playable.length === 1 ? 'One book' : 'All ' + playable.length + ' books')
-    : (missing === 0
-      ? 'All ' + items.length + ' ' + itemNoun(col, items.length) + ' have recordings'
-      : playable.length + ' of ' + items.length + ' ' + itemNoun(col, items.length) + ' have recordings');
+    : recordingsLine(col, items, playable, preface);
 
   // The reading each row's own Play plays: what a download saves (AudioPlayer.playbackTracks, item 8).
   const ownTracks = (item) => (typeof AudioPlayer.playbackTracks === 'function'

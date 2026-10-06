@@ -502,6 +502,14 @@ jobs:
         # may leave the screen. ~10 s, no server.
         run: npm run e2e:dock
 
+      - name: Phone fit (fonts, highlight bar, touch targets)
+        # tools/e2e-phone-fit.mjs (zones L1-L3, 2026-10-05): the built app walked at 360x800 through 18 screens, each
+        # probed in System Serif and the bundled faces. Chrome (CDP CSS.getPlatformFontsForNode) names the face that
+        # painted every text run: any face the app does not ship (a button's own Arial, a symbol font) fails, and so
+        # does a highlight swatch cut off at 360 or 412, the reading top bar leaving the screen, or a listed control
+        # under 48 x 48. ~40 s.
+        run: npm run e2e:phone
+
       - name: End-to-end read detector
         # e2e-read-detector.mjs proves the read detector end to end in a real
         # compositing Chromium: completion, the ledger, the day bucket, and the
