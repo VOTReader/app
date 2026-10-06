@@ -10,10 +10,27 @@ import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
 import { tapToggle } from '../../utils/tap-guard.js';
 import { bibleHlKey } from '../../utils/hl-keys.js';
-import { translateVerse } from '../../data/translations.js';
+import { translateVerse, loadTranslation, translationLabel } from '../../data/translations.js';
+import { recordingTranslationFor, textForRecording } from '../../utils/audio-text-edition.js';
 
-export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
+export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation: readerTranslation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
   const bodyRef = React.useRef(null);
+  // The words on screen match the voice (critique 2026-10-05 #6): while this
+  // book's recording is loaded, the chapter shows the recording's translation
+  // (utils/audio-text-edition.js). The snapshot is a string, so the clock's
+  // ticks do not re-render the chapter; only a change of recording does.
+  const recording = React.useSyncExternalStore(AudioPlayer.subscribe, () => recordingTranslationFor(AudioPlayer, book.id));
+  const translation = textForRecording(readerTranslation, recording);
+  const matchingRecording = translation !== (readerTranslation || 'nkjv');
+  // An alt edition is a lazy script; translateVerse answers NKJV until it lands,
+  // so its arrival is a render input here (App's own tick follows only Settings).
+  const [, setTextTick] = React.useState(0);
+  React.useEffect(() => {
+    if (!matchingRecording) return undefined;
+    let live = true;
+    loadTranslation(translation).then(() => { if (live) setTextTick((v) => v + 1); });
+    return () => { live = false; };
+  }, [translation, matchingRecording]);
   /* "Book · Chapter N" is what the narrator announces before verse 1: the
      read-along's lead-in sits there (ReadAlongHighlight, 2026-09-22). */
   // The verse-number key builder read-along paints through. useCallback is NOT
@@ -172,6 +189,9 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
             <div className={`hero-bg${OT_BOOK_IDS.has(book.id) ? " ot" : ""}`} />
             <div className="hero-content">
               <div className="hero-eyebrow">{book.title} {"\xA0\xB7\xA0"} Chapter {chapter.num}</div>
+              {matchingRecording && (
+                <div className="hero-audio-text" role="status">{translationLabel(translation)} text, to match the recording</div>
+              )}
               <h1 className="hero-title">
                 {titleIsTappable ? (
                   <button

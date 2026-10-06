@@ -1933,6 +1933,13 @@
         color: var(--gold); opacity: 0.85; margin-bottom: 0.85rem;
         overflow-wrap: break-word; word-wrap: break-word; line-height: 1.6;
       }
+      /* Bible chapter: the text follows the recording's translation while it
+         plays (BibleChapterView); one calm line says so. */
+      .hero-audio-text {
+        font-family: 'EB Garamond', serif; font-style: italic;
+        font-size: var(--fs-14); color: var(--cream-muted);
+        opacity: 0.9; margin: -0.45rem 0 0.7rem;
+      }
       .hero-title {
         font-family: 'Cinzel Decorative', serif;
         /* Standardized reading-title size — gentle responsive scale that sits
