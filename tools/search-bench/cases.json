@@ -2578,12 +2578,17 @@
    "held": false,
    "group": "letters",
    "col": "rebuke",
-   "style": "title",
+   "style": "unitgist",
    "level": "unit",
    "uk": "rebuke/i-am-lord",
    "unit": "i-am-lord",
    "title": "I AM LORD",
-   "q": "i am the lord"
+   "q": "letter where god gives the animals dominion over man",
+   "retired": {
+    "q": "i am the lord",
+    "why": "ambiguous: a loose title query for I AM LORD is another text's title (I Am The Lord's, I Am The Lord, I Do Not Change); restyled to unitgist, written from the letter (fairness audit 2026-10-06)",
+    "style": "title"
+   }
   },
   {
    "id": "t173",
@@ -5741,7 +5746,11 @@
    "uk": "answers/regarding-spiritual-gifts",
    "unit": "regarding-spiritual-gifts",
    "title": "Regarding Spiritual Gifts",
-   "q": "regarding gifts of the spirit"
+   "q": "regarding the spiritual gifts",
+   "retired": {
+    "q": "regarding gifts of the spirit",
+    "why": "ambiguous: the query is another entry's title word for word (Words To Live By: Gifts of the Spirit) (fairness audit 2026-10-06)"
+   }
   },
   {
    "id": "t398",
