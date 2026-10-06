@@ -1,16 +1,16 @@
 {
- "pass": 413,
- "strict": 326,
- "top5": 466,
- "found": 498,
+ "pass": 424,
+ "strict": 335,
+ "top5": 477,
+ "found": 499,
  "style": {
-  "crossover": 36,
+  "crossover": 35,
   "exact": 73,
   "firstwords": 25,
-  "gist": 21,
+  "gist": 22,
   "middle": 49,
-  "misremembered": 70,
-  "paraphrase": 34,
+  "misremembered": 72,
+  "paraphrase": 43,
   "rare": 44,
   "title": 30,
   "typos": 23,
@@ -18,10 +18,10 @@
  },
  "group": {
   "answers": 49,
-  "bible": 95,
+  "bible": 98,
   "cross": 8,
-  "letters": 164,
-  "studies": 31,
-  "words": 66
+  "letters": 167,
+  "studies": 33,
+  "words": 69
  }
 }

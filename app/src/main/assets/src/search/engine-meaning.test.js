@@ -1,0 +1,96 @@
+// @ts-nocheck — reads the shipped model files and builds stand-in packs with node buffers.
+/* MEANING FIRST (engine.js meaningFirst, path to 500 step 1, 2026-10-05): with the on-device
+   model ready, a query that shares no telling word with the passage it describes finds it and
+   opens on the passage the model matched; a quote typed nearly right stays the words' find; and
+   with the model not ready, search is the words engine alone. The model is a stand-in here
+   (semantic.test.js runs the shipped one); what it "means" is set per test. */
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import crypto from 'node:crypto';
+import { Buffer } from 'node:buffer';
+import { VotSearchMini } from './engine.js';
+import { configureSemantic, startSemantic, resetSemantic } from './semantic.js';
+
+const VOT_DATA = {
+  STOP_WORDS_TRIMMED: new Set(['the', 'of', 'and', 'is', 'my', 'a', 'to', 'in', 'he', 'that', 'his', 'for', 'i', 'you', 'it', 'not', 'will', 'your', 'now', 'before', 'who', 'me']),
+  SYNONYM_MAP: {}, BOOK_ABBREVS: {}, BOOK_DISPLAY: {}, NAMED_PASSAGES: [], NAMED_PASSAGE_INDEX: {}, COMMANDS: [], COMMAND_MAP: {},
+  VOLUME_TOKEN_MAP: {},
+  VOLUME_COLLECTIONS: [{ id: 'v1', screen: 'vot-one-letter', dataVar: 'LETTERS_V1', prefaceVar: null, label: 'Volume One' }],
+  OT_BOOK_IDS: [], NT_BOOK_IDS: [], GENRE_GROUPS: {}, WORD_NUMS: {}, ROMAN_NUMS: {},
+};
+const CREATOR = 'Hear Me, says The Lord. Remember now your Creator in the days of your youth, before the difficult days come.';
+const GLOBALS = {
+  BOOKS: {},
+  LETTERS_V1: [
+    { id: 'garment', num: 1, title: 'All Things Pass', blocks: [{ segments: [{ v: 'Hear Me. The earth will grow old like a garment, and all its works shall be burned up, and old age arrives for all.' }] }] },
+    { id: 'creator', num: 2, title: 'In the Days of Your Youth', blocks: [{ segments: [{ v: CREATOR }] }] },
+    { id: 'silver', num: 3, title: 'The Silver Cord', blocks: [{ segments: [{ v: 'Hear Me. The silver cord is loosed and the golden bowl is broken, says The Lord.' }] }] },
+  ],
+};
+const STARTS = { garment: 0, creator: CREATOR.indexOf('Remember'), silver: 0 };
+const KEYS = ['v1/garment', 'v1/creator', 'v1/silver'];
+/** What the stand-in model says the query means: the unit (by letter id) it is nearest. */
+const said = { near: 'creator' };
+
+function standInModel() {
+  const dim = 4;
+  const vecs = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]];
+  const q = new Int8Array(vecs.flatMap((v) => v.map((x) => x * 127)));
+  const units = Buffer.concat([
+    Buffer.from(q.buffer), Buffer.from(new Float32Array([1 / 127, 1 / 127, 1 / 127]).buffer),
+    Buffer.from(new Uint32Array([0, 1, 2]).buffer), Buffer.from(new Int32Array([STARTS.garment, STARTS.creator, STARTS.silver]).buffer),
+  ]);
+  const sha = (/** @type {Buffer} */ b) => crypto.createHash('sha256').update(b).digest('hex');
+  const model = Buffer.from('stand-in');
+  const man = { version: 1, model: 'm.onnx', modelSha256: sha(model), queryPrefix: '', dim, count: 3, units: 'u.bin', unitsSha256: sha(units), ort: 'ort/', files: [], keys: KEYS };
+  /** @type {Record<string, Buffer>} */
+  const files = { 'semantic/manifest.json': Buffer.from(JSON.stringify(man)), 'semantic/vocab.txt': Buffer.from('[PAD]\n'), 'semantic/u.bin': units, 'semantic/m.onnx': model, 'semantic/ort/ort-wasm-simd-threaded.wasm': Buffer.from('') };
+  const ort = {
+    env: { wasm: {} },
+    Tensor: class {},
+    InferenceSession: { create: async () => ({ inputNames: ['input_ids'], outputNames: ['h'], run: async () => ({ h: { data: Float32Array.from(vecs[KEYS.indexOf('v1/' + said.near)]) } }) }) },
+  };
+  configureSemantic({
+    url: (p) => 'mem:' + p,
+    load: async (p) => { const b = files[p]; if (!b) throw new Error('missing ' + p); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); },
+    importModule: async () => ort,
+  });
+}
+
+const first = async (/** @type {string} */ q) => (await VotSearchMini.search(q)).results[0];
+
+describe('meaning first', () => {
+  /** @type {any} */ let prev;
+  beforeAll(async () => {
+    prev = window.VotSearchData;
+    window.VotSearchData = VOT_DATA;
+    for (const k of Object.keys(GLOBALS)) /** @type {any} */ (globalThis)[k] = /** @type {any} */ (GLOBALS)[k];
+    resetSemantic();
+    await VotSearchMini.init();
+  });
+  afterAll(() => {
+    window.VotSearchData = prev;
+    for (const k of Object.keys(GLOBALS)) delete /** @type {any} */ (globalThis)[k];
+    resetSemantic();
+  });
+
+  it('without the model, search is the words engine alone', async () => {
+    const r = await first('honour the one who made you while old age arrives');
+    expect(r.doc.letterId).toBe('garment');
+  });
+
+  it('with it, the passage the query describes leads, and opens where the model matched', async () => {
+    standInModel();
+    expect(await startSemantic()).toBe(true);
+    said.near = 'creator';
+    const r = await first('honour the one who made you while old age arrives');
+    expect(r.doc.letterId).toBe('creator');
+    expect(r.placeStart).toBe(STARTS.creator);
+  });
+
+  it('a quote typed nearly word for word stays the words’ find', async () => {
+    said.near = 'silver';
+    const r = await first('remember now your creator in the days of your youth');
+    expect(r.doc.letterId).toBe('creator');
+    expect(r.placeStart).toBeUndefined();
+  });
+});

@@ -49,6 +49,11 @@ try {
     if (typeof window.loadBibleStudies === 'function') await window.loadBibleStudies();
     await window.VotSearchMini.init();
   });
+  // The on-device meaning model, as the app runs it by default (semantic.js): the cases run with it in,
+  // through the page's own CSP, service-worker-free fetches and onnxruntime-web's wasm.
+  const meaning = await page.evaluate(async () => { await window.VotSearchMini.startMeaning(); return window.VotSearchMini.meaningStatus(); });
+  console.log(`[e2e-search] meaning model: ${meaning.status}${meaning.failure ? ' (' + meaning.failure + ')' : ''}`);
+  if (meaning.status !== 'ready') failed++;
 
   const outcomes = await page.evaluate(async (cases) => {
     const E = window.VotSearchMini;

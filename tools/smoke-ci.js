@@ -48,6 +48,7 @@ const MIME = {
   '.woff2': 'font/woff2',
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
   '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json',
+  '.mjs': 'text/javascript; charset=utf-8', '.wasm': 'application/wasm',
 };
 
 function startServer() {

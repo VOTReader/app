@@ -15,6 +15,9 @@
 *.gif      binary
 *.webp     binary
 *.ico      binary
+*.onnx     binary
+*.wasm     binary
+*.bin      binary
 *.pdf      binary
 *.zip      binary
 *.keystore binary

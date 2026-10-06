@@ -192,3 +192,13 @@ describe('SrchCard for a Bible study chapter', () => {
     expect(container.querySelector('.srch-card-loc').textContent).toBe(study + ' \u00b7 Chapter 3');
   });
 });
+
+it('a text only the meaning search found shows the passage it matched, not its opening (path to 500, 2026-10-05)', () => {
+  /** @type {any} */ (globalThis).SRCH_KIND_LABEL = { letter: { label: 'Letter', cls: '' } };
+  const text = 'An opening line about other things entirely. '.repeat(8) + 'Remember now your Creator in the days of your youth.';
+  const doc = { kind: 'letter', ref: 'Volume One · Letter 2', title: 'Youth', text, volumeId: 'v1', letterId: 'youth' };
+  const { container } = render(
+    <SrchCard entry={{ score: 1, doc, terms: [], placeStart: text.indexOf('Remember') }} terms={['honour', 'maker']} onSelect={() => {}} isDirect={false} />,
+  );
+  expect(container.querySelector('.srch-card-snippet').textContent.startsWith('Remember now your Creator')).toBe(true);
+});

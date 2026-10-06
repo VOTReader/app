@@ -78,7 +78,9 @@ if (hashes.length === 0) {
 // The one external script: Cloudflare Web Analytics' beacon (cfa1, Corbin 2026-09-26 21:3x), loaded by src, so
 // no hash; its host is named here so every re-hash keeps it.
 const SCRIPT_HOSTS = ['https://static.cloudflareinsights.com'];
-const nextDirective = `script-src 'self' ${SCRIPT_HOSTS.join(' ')} ${hashes.join(' ')};`;
+// 'wasm-unsafe-eval' lets WebAssembly compile, nothing else (JS eval stays blocked): the on-device
+// meaning search runs its model on onnxruntime-web's wasm (src/search/semantic.js, Corbin 2026-10-05 21:0x).
+const nextDirective = `script-src 'self' 'wasm-unsafe-eval' ${SCRIPT_HOSTS.join(' ')} ${hashes.join(' ')};`;
 
 // Scope the rewrite to INSIDE the CSP `content="..."` attribute so the word
 // "script-src" in the explanatory <!-- comment --> above the meta tag is never

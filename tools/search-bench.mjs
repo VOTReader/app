@@ -39,7 +39,7 @@ const BASELINE = path.join(HERE, 'search-bench/baseline.json');
 const t0 = Date.now();
 
 const { cases } = JSON.parse(fs.readFileSync(path.join(HERE, 'search-bench/cases.json'), 'utf8'));
-const { E, initMs } = await engine();
+const { E, initMs, meaning } = await engine();
 const { kjvEncode } = await import(pathToFileURL(path.join(ASSETS, 'src/search/tokenize.js')).href);
 const { excerptLanding } = await import(pathToFileURL(path.join(ASSETS, 'src/utils/excerpt-landing.js')).href);
 const D = await buildDocs('nkjv');
@@ -157,7 +157,10 @@ function lands(hit, terms, c) {
   if (doc.kind === 'verse') return true;
   const own = terms;
   const extra = (hit.terms || []).filter((t) => own.indexOf(t) < 0);
-  const ex = (own.length ? E.matchExcerpt(doc.text, own) : '') || (extra.length ? E.matchExcerpt(doc.text, own.concat(extra)) : '');
+  // A hit the meaning found names the passage it matched (use-search.js excerptAnchor: entry.placeStart).
+  const placed = typeof hit.placeStart === 'number' && hit.placeStart >= 0 && hit.placeStart < doc.text.length;
+  const ex = placed ? doc.text.slice(hit.placeStart, hit.placeStart + 48)
+    : (own.length ? E.matchExcerpt(doc.text, own) : '') || (extra.length ? E.matchExcerpt(doc.text, own.concat(extra)) : '');
   const bl = unitBlocks[unitKey(doc)] || [];
   if (!ex || !bl.length) return false;
   const { index, off } = excerptLanding(ex, bl.map((b) => b.text), own.concat(extra));
@@ -207,6 +210,7 @@ const fmt = (s) => `${s.pass}/${s.n} pass  (strict ${s.strict}, top5 ${s.top5}, 
 console.log(`search-bench: ${fmt(all)}`);
 console.log(`  open ${fmt(sum(out.filter((o) => !o.held)))}`);
 console.log(`  held ${fmt(sum(out.filter((o) => o.held)))}`);
+console.log(`  meaning model: ${meaning.status}${meaning.failure ? ' (' + meaning.failure + ')' : ''}`);
 console.log(`  init ${initMs} ms, query median ${pct(0.5)} ms, p95 ${pct(0.95)} ms, max ${sorted[sorted.length - 1]} ms, total ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 const table = (title, o) => { console.log(title); for (const [k, s] of Object.entries(o)) console.log('  ' + k.padEnd(16) + String(s.pass).padStart(4) + ' /' + String(s.n).padStart(4) + '   top5 ' + String(s.top5).padStart(3) + '  found ' + String(s.found).padStart(3)); };
 table('by style', by(out, 'style'));

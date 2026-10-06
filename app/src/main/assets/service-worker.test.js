@@ -925,6 +925,53 @@ describe('service-worker — recordings saved for offline on the web (cf1)', () 
   });
 });
 
+describe('service-worker — the meaning search’s files, kept (path to 500, 2026-10-05)', () => {
+  const MODEL = 'https://app.test/app/semantic/bge-small-en-v1.5-int8.onnx';
+  const MAN = 'https://app.test/app/semantic/manifest.json';
+  const net = (calls) => async (req, _install, init) => {
+    calls.push([req.url, init && init.cache]);
+    return { ok: true, status: 200, redirected: false, body: 'net:' + req.url, clone() { return { ok: true, body: 'stored:' + req.url }; } };
+  };
+
+  it('a file is fetched once, stored, and answered from the store after', async () => {
+    const calls = [];
+    const sw = bootSW({ fetchImpl: net(calls) });
+    const first = await fetchEvent(sw, getReq(MODEL));
+    expect(first.body).toBe('net:' + MODEL);
+    const again = await fetchEvent(sw, getReq(MODEL));
+    expect(again.body).toBe('stored:' + MODEL);
+    expect(calls.map((c) => c[0])).toEqual([MODEL]);
+    expect(await sw.caches.keys()).toContain('vot-semantic-v1');
+  });
+
+  it('the manifest asks the network first, and answers from the store offline', async () => {
+    const calls = [];
+    let online = true;
+    const sw = bootSW({ fetchImpl: async (req, i, init) => { if (!online) throw new Error('offline'); return net(calls)(req, i, init); } });
+    await fetchEvent(sw, getReq(MAN));
+    await fetchEvent(sw, getReq(MAN));
+    expect(calls.filter((c) => c[0] === MAN).length).toBe(2);
+    expect(calls[0][1]).toBe('no-cache');
+    online = false;
+    expect((await fetchEvent(sw, getReq(MAN))).body).toBe('stored:' + MAN);
+    expect((await fetchEvent(sw, getReq('https://app.test/app/semantic/units-00000000.bin'))).status).toBe(503);
+  });
+
+  it('a redirected answer (a captive portal) is passed on, never stored', async () => {
+    const sw = bootSW({ fetchImpl: async (req) => ({ ok: true, status: 200, redirected: true, body: 'portal', clone() { return { body: 'portal' }; } }) });
+    await fetchEvent(sw, getReq(MODEL));
+    expect(await (await sw.caches.open('vot-semantic-v1')).match(MODEL)).toBeUndefined();
+  });
+
+  it('activate never deletes them', async () => {
+    const sw = bootSW();
+    await (await sw.caches.open('vot-semantic-v1')).put(MODEL, { body: 'kept' });
+    await install(sw);
+    await activate(sw);
+    expect(await sw.caches.keys()).toContain('vot-semantic-v1');
+  });
+});
+
 /* B5 (2026-09-22): an incomplete offline install is visible and repairable.
    The page asks CHECK_OFFLINE and gets the truth read back from the caches;
    REPAIR_OFFLINE refetches ONLY what is missing and reports complete only when

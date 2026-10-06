@@ -38,6 +38,7 @@ import {
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
 import { onIdle } from '../utils/on-idle.js';
 import { lemma, bestWindow } from './passage.js';
+import { startSemantic, semanticDocs, semanticStatus, docUnitKey } from './semantic.js';
 import { KJV_ALIAS, KJV_ALIAS_BOOKS } from './kjv-alias.js';
 
 /**
@@ -151,6 +152,7 @@ function searchUnit(term, opts, keyword) {
    a word finds those verses, scored as a rare word in a verse, and is never corrected. */
 /** @type {Map<string, string>|null} word -> its encoded verses */ let ALIAS = null;
 /** @type {Map<string, string>|null} 'bookId:c:v' -> the verse's doc id in this index */ let VERSE_IDS = null;
+/** @type {Map<string, string>|null} unitKey -> doc id in this index: how a meaning hit (semantic.js) names its document */ let UNIT_IDS = null;
 /**
  * The verses of this index the KJV holds `term` in, as search hits; null when it is no such word.
  * @param {string} term
@@ -399,6 +401,77 @@ function docFreq(term) {
   for (const docs of data.values()) if (docs.size > n) n = docs.size;
   return n;
 }
+
+/** unitKey -> this index's doc id: how a meaning hit (semantic.js) names its document. */
+function unitId(/** @type {string} */ key) {
+  if (!UNIT_IDS) {
+    UNIT_IDS = new Map();
+    const ids = msIndex._documentIds;
+    for (const [shortId, f] of msIndex._storedFields) {
+      const k = docUnitKey(f);
+      if (k && !UNIT_IDS.has(k)) UNIT_IDS.set(k, ids.get(shortId));
+    }
+  }
+  return UNIT_IDS.get(key);
+}
+
+/* MEANING FIRST (path to 500, step 1, 2026-10-05). The on-device model (semantic.js)
+   ranks every passage by what it means; the words engine ranks by what it says. Their
+   two orders are fused over the words engine's top MEANING_REACH (reciprocal rank,
+   k = MEANING_K), and the model's own best MEANING_ADD documents join them even when
+   no typed word reaches them ("god says he lives among israel and his people will
+   never be ashamed" -> Joel 2:27). The meaning weighs more the less of the query the
+   words found together in one passage (a quote typed nearly right stays the words'
+   find); a title the query names keeps the lead. A document only the meaning found
+   opens on the passage the model matched (entry.placeStart, which use-search lands
+   on); one the words found too lands where they do. Measured on the benchmark
+   (lanes/search/out/p5): 413 -> 424/500. */
+const MEANING_REACH = 30;
+const MEANING_ADD = 10;
+const MEANING_K = 10;
+/** The meaning's weight when no passage holds any of the query; it falls as the words hold more (1 - held). */
+const MEANING_WEIGHT = 2;
+/**
+ * @param {Array<{score:number, doc:any, terms?:string[], placeStart?:number}>} out
+ * @param {Map<any, string>} idOf
+ * @param {Array<{id:string, score:number, start:number}>} sem  best first
+ * @param {(doc:any) => boolean} named
+ * @param {number} held  the most of the query one passage of the words engine's top holds (bestPassageFirst)
+ */
+function meaningFirst(out, idOf, sem, named, held) {
+  const w = MEANING_WEIGHT * Math.max(0, 1 - held);
+  const semRank = new Map(sem.map((s, i) => [s.id, i]));
+  const semStart = new Map(sem.map((s) => [s.id, s.start]));
+  const top = out.slice(0, MEANING_REACH);
+  const rest = out.slice(MEANING_REACH);
+  const inTop = new Set(top.map((e) => idOf.get(e)));
+  const added = new Set();
+  for (const s of sem.slice(0, MEANING_ADD)) {
+    if (inTop.has(s.id)) continue;
+    const j = rest.findIndex((e) => idOf.get(e) === s.id);
+    let e = j >= 0 ? rest.splice(j, 1)[0] : null;
+    if (!e) {
+      const f = msIndex.getStoredFields(s.id);
+      if (!f) continue;
+      e = { score: 0, doc: reshapeDoc(f), terms: [] };
+      idOf.set(e, s.id);
+    }
+    top.push(e);
+    inTop.add(s.id);
+    added.add(e);
+  }
+  const key = (/** @type {any} */ e, /** @type {number} */ i) => (named(e.doc) ? 1 : 0) + 1 / (MEANING_K + Math.min(i, MEANING_REACH)) +
+    w / (MEANING_K + (semRank.get(idOf.get(e)) ?? 1e6));
+  const keyed = top.map((e, i) => ({ e, i, k: key(e, i) }));
+  keyed.sort((a, b) => b.k - a.k);
+  for (const e of added) {
+    const st = semStart.get(idOf.get(e));
+    if (st != null && st >= 0 && e.doc.kind !== 'verse') e.placeStart = st;
+  }
+  out.length = 0;
+  for (const k of keyed) out.push(k.e);
+  for (const e of rest) out.push(e);
+}
 /**
  * @param {Array<{score:number, doc:any, terms?:string[]}>} out
  * @param {Map<any, string>} idOf
@@ -426,7 +499,7 @@ function bestPassageFirst(out, idOf, units, stop, named, kjvHeld) {
       query.push({ lem, weight: Math.log(1 + (n - df + 0.5) / (df + 0.5)), syn });
     }
   }
-  if (query.length < 3) return;
+  if (query.length < 3) return 0;
   const span = Math.max(12, Math.round(typed * 1.6));
   const top = out.slice(0, PASSAGE_REACH).map((e, i) => {
     const id = idOf.get(e) || String(i);
@@ -434,15 +507,17 @@ function bestPassageFirst(out, idOf, units, stop, named, kjvHeld) {
     const share = named(e.doc) ? 2 : bestWindow(query, lem, span, kjvHeld[id]);
     return { e, i, share, key: share - PASSAGE_RANK_COST * i - (e.doc.kind === 'answers' && share < 2 ? REPRINT_COST : 0) };
   });
-  if (!top.length) return;
+  if (!top.length) return 0;
+  const held = Math.max(...top.map((t) => (t.share < 2 ? t.share : 0)));
   const first = top[0];
   const reprint = first.e.doc.kind === 'answers' && first.share < 2;
-  if (first.share >= PASSAGE_HELD && !reprint) return;
+  if (first.share >= PASSAGE_HELD && !reprint) return held;
   top.sort((a, b) => b.key - a.key);
   // The engine's first is overtaken only by a passage holding clearly more of the query; an
   // Answers topic, by an original holding as much (it reprints them).
   if (top[0] !== first && top[0].share < first.share + (reprint ? -REPRINT_COST : PASSAGE_MARGIN)) { top.splice(top.indexOf(first), 1); top.unshift(first); }
   for (let i = 0; i < top.length; i++) out[i] = top[i].e;
+  return held;
 }
 
 /* THE ORIGINAL BEFORE ITS REPRINT (search benchmark, 2026-10-05). Answers, Holy Days and
@@ -785,6 +860,7 @@ async function build(options) {
   SHINGLES = null;
   CITED = null;
   VERSE_IDS = null;
+  UNIT_IDS = null;
   LEMMA_CACHE.clear();
   EXCERPT_CACHE.clear();
   SOURCE_CACHE.clear();
@@ -854,9 +930,15 @@ function init(options) {
   if (ready && sameTranslation(options)) return Promise.resolve(true);
   if (building) return building;
   building = build(options)
-    .then(() => { building = null; return true; })
+    .then(() => { building = null; startMeaningWhenIdle(); return true; })
     .catch((e) => { building = null; buildError = e; throw e; });
   return building;
+}
+
+/** The meaning search loads once the words index is up, when the page is idle (the browser only: node callers start it). */
+function startMeaningWhenIdle() {
+  if (typeof document === 'undefined') return;
+  onIdle(() => { startSemantic(); }, { timeout: 20000, fallbackDelay: 5000 });
 }
 
 async function ensureReady(options) {
@@ -1264,7 +1346,11 @@ async function search(query, options) {
   }
   // A first result holding the typed words in a row, or one word off, is a quote found: no re-ordering.
   const quoted = out.length && (nearOf[idOf.get(out[0]) || ''] || 0) >= NEAR_PHRASE_MIN;
-  if (!keyword && !p.phrase && !quoted) bestPassageFirst(out, idOf, units, isStopTerm, named, kjvHeld);
+  const held = !keyword && !p.phrase && !quoted ? bestPassageFirst(out, idOf, units, isStopTerm, named, kjvHeld) : 1;
+  if (!keyword && !p.phrase && !quoted && parsed.kind === 'text') {
+    const sem = await semanticDocs(String(query), unitId);
+    if (sem && sem.length) meaningFirst(out, idOf, sem, named, held);
+  }
   originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) =>
     (!corpusFilter || d.corpus === corpusFilter) && (!scopeBookId || d.bookId === scopeBookId) && (!scopeVolumeId || d.volumeId === scopeVolumeId),
     named, (id, d) => nearOf[id] ?? (typedTokens.length > 1 ? nearPhrase(docTokens(id, d), typedTokens, STOP) : 0));
@@ -1378,6 +1464,9 @@ function getStats() {
 
 export const VotSearchMini = {
   init,
+  // the on-device meaning search: its state ({status, failure, units}), and a start for callers that need it now
+  meaningStatus: semanticStatus,
+  startMeaning: startSemantic,
   rebuild,
   parse: parseReference,
   search,

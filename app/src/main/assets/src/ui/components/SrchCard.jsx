@@ -77,9 +77,13 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
     headline = doc.title.slice(cut + 3);
     locLine = study + (num ? ' \u00b7 Chapter ' + num : '');
   }
+  // A text only the meaning search found (engine.js meaningFirst) names the passage the model
+  // matched: the snippet shows that passage, where the reader will land, not the text's opening.
+  const placed = typeof entry.placeStart === 'number' && entry.placeStart > 0 && entry.placeStart < String(doc.text || '').length;
   const body = doc.kind === 'heading' ? (doc.heading || doc.text) :
   (doc.kind === 'chapter-title' || doc.kind === 'letter-title' || doc.kind === 'wtlb-title' || doc.kind === 'blessed-title' || doc.kind === 'holy-day-title' || doc.kind === 'answers-title') ?
   (doc.title || doc.text) :
+  placed ? doc.text.slice(entry.placeStart) :
   doc.text;
   const card = (
     <button className="srch-card" onClick={() => onSelect(entry)}>

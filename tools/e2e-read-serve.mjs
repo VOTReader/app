@@ -47,6 +47,7 @@ const MIME = {
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
   '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
   '.webmanifest': 'application/manifest+json', '.mp3': 'audio/mpeg',
+  '.mjs': 'text/javascript', '.wasm': 'application/wasm',
 };
 
 /* Same shape as e2e-readalong.mjs:108 — port 0 lets the OS pick, so the

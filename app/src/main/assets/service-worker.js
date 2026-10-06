@@ -934,6 +934,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // The on-device meaning search (src/search/semantic.js): its files are kept in their own
+  // cache, fetched once and never again (see SEMANTIC_CACHE).
+  if (SEMANTIC_PATH.test(url.pathname)) {
+    event.respondWith(semanticResponse(event.request, SEMANTIC_MANIFEST.test(url.pathname)));
+    return;
+  }
+
   // Songs of the Letters (2026-09-24, catalog-schema.md "App side"). On the
   // PWA's own origin, beside /app/: the mp3 shards (/songs-<n>/) PASS THROUGH —
   // 3 MB range-requested media the SW must not proxy or pin — and the catalog,
@@ -1123,6 +1130,36 @@ async function corpusFirst(request) {
    asks in byte ranges (Safari's first ask is bytes=0-1, and it will not play a
    file answered without a 206), so a range is cut from the stored bytes. */
 const OFFLINE_AUDIO_CACHE = 'vot-offline-audio-v1';
+
+/* MEANING SEARCH, KEPT (path to 500, 2026-10-05). The on-device model, its runtime and the
+   passage vectors (~70 MB, <scope>/semantic/) are fetched once, in the background
+   (sw-register.js warmMeaningSearch) or when Search first needs them, and kept in their own
+   cache: no deploy deletes it (pruneStale touches only vot-core-* / vot-corpus-*). Every file
+   but the manifest is named by its version or its bytes (units-<sha>.bin), so a stored copy is
+   never stale: cache-first, forever. The manifest names the current ones and is asked of the
+   network first, the stored one answering offline; semantic.js deletes the files it no longer
+   names. */
+const SEMANTIC_CACHE = 'vot-semantic-v1';
+const SEMANTIC_PATH = /\/semantic\/[A-Za-z0-9][A-Za-z0-9._/-]{0,120}$/;
+const SEMANTIC_MANIFEST = /\/semantic\/manifest\.json$/;
+
+/** @param {Request} request @param {boolean} networkFirst */
+async function semanticResponse(request, networkFirst) {
+  const cache = await caches.open(SEMANTIC_CACHE);
+  if (!networkFirst) {
+    const hit = await cache.match(request);
+    if (hit) return hit;
+  }
+  try {
+    const response = await fetch(request, { cache: networkFirst ? 'no-cache' : 'reload' });
+    // a redirect is a captive portal or a proxy, not the file: never pinned (SW-4)
+    if (response && response.ok && !response.redirected) await cache.put(request, response.clone());
+    return response;
+  } catch (_e) {
+    const hit = await cache.match(request);
+    return hit || new Response('Not available offline', { status: 503, statusText: 'Service Unavailable' });
+  }
+}
 const OFFLINE_AUDIO_RELEASES = 'https://github.com/VOTReader/votreader-assets/releases/download/';
 const OFFLINE_AUDIO_PATH = /\/offline-audio\/(audio-[a-z0-9-]{1,40})\/([A-Za-z0-9][A-Za-z0-9_.-]{0,159}\.mp3)$/;
 

@@ -99,7 +99,22 @@ export async function engine() {
   const t0 = Date.now();
   const { VotSearchMini: E } = await import(pathToFileURL(path.join(ASSETS, 'src/search/engine.js')).href);
   await E.init();
-  return { E, initMs: Date.now() - t0 };
+  const meaning = await startMeaning();
+  return { E, initMs: Date.now() - t0, meaning };
+}
+
+/** The on-device meaning model (semantic.js), from the shipped files, as the app runs it by default.
+    SEARCH_MEANING=off measures the words engine alone. */
+export async function startMeaning() {
+  const S = await import(pathToFileURL(path.join(ASSETS, 'src/search/semantic.js')).href);
+  if (process.env.SEARCH_MEANING === 'off') return { status: 'off' };
+  S.configureSemantic({
+    url: (p) => pathToFileURL(path.join(ASSETS, p)).href,
+    load: async (p) => { const b = fs.readFileSync(path.join(ASSETS, p)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); },
+    importModule: (p) => import(pathToFileURL(path.join(ASSETS, p)).href),
+  });
+  await S.startSemantic();
+  return S.semanticStatus();
 }
 
 /** Lowercase letters and digits only, single-spaced: the containment test for equivalence classes. */

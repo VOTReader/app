@@ -31,6 +31,7 @@ import { PlatformBridge } from './platform-bridge.js';
 import { DiagnosticLog } from './diagnostic-log.js';
 import { showToast } from './toast.js';
 import { markUpdateReload } from './update-toast.js';
+import { onIdle } from './on-idle.js';
 
 export function registerServiceWorker() {
   if (PlatformBridge.isAndroid) return;
@@ -160,8 +161,36 @@ export function registerServiceWorker() {
         if (document.visibilityState === 'visible') pokeUpdate();
       });
     }
+    warmMeaningSearch();
   }).catch((err) => {
     console.warn('SW registration failed', err);
     DiagnosticLog.warn('sw', 'registration failed: ' + ((err && err.message) || err));
   });
+}
+
+/* MEANING SEARCH, ONE BACKGROUND DOWNLOAD (path to 500, 2026-10-05). The on-device meaning
+   search (src/search/semantic.js) runs a model of ~70 MB with its runtime and passage vectors.
+   On the web they come once, a minute after the app is up and the page is idle, through the
+   service worker's vot-semantic-v1 cache, where they stay: Search has them offline from its
+   first use, with no setting and no account. Data Saver on: they wait until Search first needs
+   them. A file already stored is answered from the cache, so a later boot costs one manifest. */
+const WARM_AFTER_MS = 60 * 1000;
+export function warmMeaningSearch() {
+  const conn = /** @type {any} */ (navigator).connection;
+  if (conn && conn.saveData) return;
+  setTimeout(() => onIdle(() => { void warmMeaningFiles(); }, { timeout: 30000, fallbackDelay: 1000 }), WARM_AFTER_MS);
+}
+
+export async function warmMeaningFiles() {
+  try {
+    if (navigator.onLine === false) return;
+    const base = new URL('./semantic/', document.baseURI);
+    const r = await fetch(new URL('manifest.json', base));
+    if (!r.ok) return;
+    const man = await r.json();
+    for (const f of (man && man.files) || []) {
+      const res = await fetch(new URL(f, base));
+      if (res.ok) await res.blob(); // read through: the worker stores what passes
+    }
+  } catch (_e) { /* offline or refused: Search fetches them when it first needs them */ }
 }
