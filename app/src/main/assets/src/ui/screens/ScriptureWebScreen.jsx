@@ -23,7 +23,7 @@
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
-  rotatePointer, ribbonStyle, arcShape, maxCamY, ALTITUDE_MARKS, spanAtHeight, lensDimFor, lensShareAt,
+  rotatePointer, ribbonStyle, arcShape, maxCamY, ALTITUDE_MARKS, spanAtHeight, lensDimFor, lensShareAt, overviewShare,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
@@ -491,6 +491,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const lensDim = lens ? lensShareAt(zoom) : 1;
     r.draw(Object.assign({}, base, {
       lens, lensDim,
+      // the overview's ink by length and brightest-wins pass, gone by 4x (geometry.js, THE OVERVIEW)
+      overview: overviewShare(zoom),
       camX: cam.x, ppv: cam.ppv,
       strokeWidth: style.strokeWidthCss * v.DPR,
       alpha: style.alpha,

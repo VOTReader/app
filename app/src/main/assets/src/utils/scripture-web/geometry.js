@@ -486,6 +486,60 @@ float flyOverDim(float anchored, float localize){
 }`;
 
 /**
+ * THE OVERVIEW (sw2, 2026-10-05; plan lanes/myweb/out/sw1-smear-plan.md, Corbin "no smear"). At fit,
+ * 63,418 threads share one phone frame and the old law lit 78 % of the dome's box (every pixel inside
+ * the half-ellipse): ten thousand faint long arcs summed into a wall of colour. Two levers, both gone
+ * by OVERVIEW_END so nothing past 4x changes:
+ *  - each thread's ink by its LENGTH: a long arc covers hundreds of times the pixels of a short one,
+ *    so it keeps (OVERVIEW_SPAN / span)^OVERVIEW_LEN_EXP of its alpha, never below OVERVIEW_LEN_FLOOR;
+ *  - the brightest thread wins a pixel instead of every thread adding into it (a MAX pass on dark,
+ *    MIN on parchment, cross-faded into the normal pass by overviewShare).
+ * Alpha only: pick.js, the chooser and every count are untouched, so every line stays reachable.
+ */
+export const OVERVIEW_END = 4;
+/** Zoom up to which the overview law is fully in force; it eases out from here to OVERVIEW_END. */
+export const OVERVIEW_HOLD = 2;
+/** Arcs spanning at most this share of the canon keep their full ink at the overview. */
+export const OVERVIEW_SPAN = 0.04;
+export const OVERVIEW_LEN_EXP = 0.5;
+export const OVERVIEW_LEN_FLOOR = 0.3;
+/** The overview's stroke, as a share of ribbonStyle's: a thinner thread leaves dark between its neighbours. */
+export const OVERVIEW_STROKE = 0.7;
+/** The brightest-wins pass never sums, so one thread may carry this many times the summing pass's alpha. */
+export const OVERVIEW_GAIN = 6;
+
+/**
+ * How much of the overview law is in force: 1 up to OVERVIEW_HOLD, easing (smoothstep in log-zoom)
+ * to 0 at OVERVIEW_END and staying 0 past it.
+ * @param {number} zoom - multiple of fit-to-width
+ * @returns {number} 0..1
+ */
+export function overviewShare(zoom) {
+  if (!(zoom < OVERVIEW_END)) return 0;
+  return 1 - smoothstep(Math.log2(OVERVIEW_HOLD), Math.log2(OVERVIEW_END), Math.log2(zoom > 1 ? zoom : 1));
+}
+
+/**
+ * The share of its alpha a thread keeps for its length at the overview. NEVER ZERO.
+ * MUST stay identical to lengthShareGLSL.
+ * @param {number} span - |to - from|, verses
+ * @param {number} total - verses in the canon
+ * @param {number} overview - overviewShare()
+ */
+export function lengthShare(span, total, overview) {
+  const f = (span > 1 ? span : 1) / (total > 0 ? total : 1);
+  const k = Math.min(1, Math.max(OVERVIEW_LEN_FLOOR, Math.pow(OVERVIEW_SPAN / f, OVERVIEW_LEN_EXP)));
+  return 1 + (k - 1) * overview;
+}
+
+export const lengthShareGLSL = `
+float lengthShare(float span, float total, float overview){
+  float f = max(span, 1.)/total;
+  float k = clamp(pow(${glslFloat(OVERVIEW_SPAN)}/f, ${glslFloat(OVERVIEW_LEN_EXP)}), ${glslFloat(OVERVIEW_LEN_FLOOR)}, 1.);
+  return mix(1., k, overview);
+}`;
+
+/**
  * Distance in device px from a point to an arc, or Infinity if the point is
  * outside the arc's bounding box. The curve is arcHeightAt's ellipse,
  * written implicitly as F = (v/A)^2 + u^2 - 1 with v the height above the

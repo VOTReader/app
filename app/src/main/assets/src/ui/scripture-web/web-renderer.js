@@ -27,8 +27,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcShapeGLSL, flyOverGLSL, segmentsFor, CLIP_MARGIN,
-  STROKE_MIN_CSS, STROKE_DEEP_CSS, LENS_CONTEXT, skyLocalize,
+  arcShapeGLSL, flyOverGLSL, lengthShareGLSL, segmentsFor, CLIP_MARGIN,
+  STROKE_MIN_CSS, STROKE_DEEP_CSS, LENS_CONTEXT, skyLocalize, OVERVIEW_GAIN, OVERVIEW_STROKE,
 } from '../../utils/scripture-web/geometry.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
 import { bucketDrawCount, fansOf } from '../../utils/scripture-web/decode.js';
@@ -76,11 +76,14 @@ uniform float uLensDim;      // what the rest of the web keeps of its alpha unde
 uniform float uHoverArc;     // HOVERED instance: brightened only, dims nothing
 uniform float uInstanceBase; // gl_InstanceID offset of this draw range
 uniform float uDpr;          // device px per CSS px: the chosen line's floor width is set in CSS px
+uniform float uOverview;     // geometry.overviewShare: 1 at fit, 0 from 4x
+uniform float uPassGain;     // alpha gain of this pass: OVERVIEW_GAIN in the brightest-wins pass, else 1
 in uint aFrom; in uint aTo; in float aVotes; in float aGenre;
 in float aFanA; in float aFanB; // each foot's departure rank, -0.5..0.5
 out vec4 vCol; out float vEdge; out float vHalfW;
 ${arcShapeGLSL}
 ${flyOverGLSL}
+${lengthShareGLSL}
 ${rampGLSL()}
 void main(){
   float a = float(aFrom), b = float(aTo);
@@ -177,9 +180,12 @@ void main(){
   col = mix(col, vec3(.784, .643, .337), spot);  // the chosen line is the app's gold (#c8a456)
   col *= uLightness;                              // parchment needs darker ink
 
-  float aStrength = mix(strength, 1., uVoteMix);
+  // at the overview the votes ride on alpha twice over: the well-attested threads carry the picture
+  float aStrength = mix(strength*mix(1., strength, uOverview), 1., uVoteMix);
+  // the overview's ink by length (geometry.lengthShare); a thread the reader lit keeps all of its own
+  float lenK = mix(lengthShare(abs(b - a), uTotal, uOverview), 1., lit*focusing);
   // ...and nearly opaque: uAlpha at the overview is 0.075, so x3 left a tapped line at ~0.12.
-  vCol = vec4(col, max(uAlpha*dim*aStrength*mix(1., 3.0, bright), max(spot*.95, hovered*.7)));
+  vCol = vec4(col, max(uAlpha*uPassGain*lenK*dim*aStrength*mix(1., 3.0, bright), max(spot*.95, hovered*.7)));
   vEdge = side;
   vHalfW = halfW;
   gl_Position = vec4(p/uRes*2. - 1., 0, 1);
@@ -188,17 +194,55 @@ void main(){
 
 const FRAG = `#version 300 es
 precision highp float;
+uniform vec3 uBg; uniform float uComposite;
 in vec4 vCol; in float vEdge; in float vHalfW; out vec4 o;
 void main(){
   float hw = vHalfW + 1.0;
   float d = abs(vEdge)*hw;
   float aa = 1.0 - smoothstep(vHalfW - .5, vHalfW + .5, d);
   float a = clamp(vCol.a, 0., 1.)*aa;
-  o = vec4(vCol.rgb*a, a);                        // premultiplied
+  // the brightest-wins pass (MAX on dark, MIN on parchment) needs each thread already laid on the ground
+  o = uComposite > .5 ? vec4(mix(uBg, vCol.rgb, a), 1.) : vec4(vCol.rgb*a, a);   // else premultiplied
 }`;
 
+// The overview's cross-fade: the brightest-wins picture, drawn to a texture, laid over the summing
+// one at uMix (geometry.overviewShare). One triangle covers the frame.
+const QUAD_VERT = `#version 300 es
+out vec2 vUv;
+void main(){
+  vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
+  vUv = p; gl_Position = vec4(p*2. - 1., 0., 1.);
+}`;
+const QUAD_FRAG = `#version 300 es
+precision mediump float;
+uniform sampler2D uTex; in vec2 vUv; out vec4 o;
+void main(){ o = vec4(texture(uTex, vUv).rgb, 1.); }`;
+
 /** The shader sources, exported so a test can prove they inline the shared law. */
-export const SHADER_SOURCE = { vertex: VERT, fragment: FRAG };
+export const SHADER_SOURCE = { vertex: VERT, fragment: FRAG, quadVertex: QUAD_VERT, quadFragment: QUAD_FRAG };
+
+function link(gl, vSrc, fSrc) {
+  const program = gl.createProgram();
+  let vs, fs;
+  try {
+    vs = compile(gl, gl.VERTEX_SHADER, vSrc);
+    fs = compile(gl, gl.FRAGMENT_SHADER, fSrc);
+  } catch (e) {
+    gl.deleteProgram(program);
+    throw e;
+  }
+  gl.attachShader(program, vs);
+  gl.attachShader(program, fs);
+  gl.linkProgram(program);
+  gl.deleteShader(vs);
+  gl.deleteShader(fs);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    const log = gl.getProgramInfoLog(program);
+    gl.deleteProgram(program);
+    throw new Error('scripture-web link: ' + log);
+  }
+  return program;
+}
 
 function compile(gl, type, src) {
   const s = gl.createShader(type);
@@ -231,32 +275,15 @@ export function createRenderer(canvas, graph, opts = {}) {
   });
   if (!gl) return null;
 
-  const program = gl.createProgram();
-  let vs, fs;
-  try {
-    vs = compile(gl, gl.VERTEX_SHADER, VERT);
-    fs = compile(gl, gl.FRAGMENT_SHADER, FRAG);
-  } catch (e) {
-    gl.deleteProgram(program);
-    throw e;
-  }
-  gl.attachShader(program, vs);
-  gl.attachShader(program, fs);
-  gl.linkProgram(program);
-  gl.deleteShader(vs);
-  gl.deleteShader(fs);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    const log = gl.getProgramInfoLog(program);
-    gl.deleteProgram(program);
-    throw new Error('scripture-web link: ' + log);
-  }
+  const program = link(gl, VERT, FRAG);
   gl.useProgram(program);
 
   const U = {};
   for (const name of ['uRes', 'uCamX', 'uCamY', 'uPPV', 'uBase', 'uSquash',
     'uLocalize', 'uFlyLocalize', 'uWidth', 'uAlpha', 'uTotal', 'uNT', 'uColorMode',
     'uLightness', 'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
-    'uHoverArc', 'uInstanceBase', 'uFocusRange2', 'uLens', 'uLensDim', 'uDpr']) {
+    'uHoverArc', 'uInstanceBase', 'uFocusRange2', 'uLens', 'uLensDim', 'uDpr',
+    'uOverview', 'uPassGain', 'uBg', 'uComposite']) {
     U[name] = gl.getUniformLocation(program, name);
   }
 
@@ -361,6 +388,31 @@ export function createRenderer(canvas, graph, opts = {}) {
 
   let lastStats = { instances: 0, draws: 0 };
 
+  // The cross-fade's texture and its program, made on the first frame that needs them (1x < zoom < 4x)
+  // and kept at the frame's size.
+  /** @type {{prog:WebGLProgram, uTex:any, vao:WebGLVertexArrayObject, tex:WebGLTexture, fbo:WebGLFramebuffer, w:number, h:number}|null} */
+  let fade = null;
+  const fadeTarget = (w, h) => {
+    if (!fade) {
+      const prog = link(gl, QUAD_VERT, QUAD_FRAG);
+      fade = { prog, uTex: gl.getUniformLocation(prog, 'uTex'), vao: gl.createVertexArray(),
+        tex: gl.createTexture(), fbo: gl.createFramebuffer(), w: 0, h: 0 };
+    }
+    if (fade.w !== w || fade.h !== h) {
+      gl.bindTexture(gl.TEXTURE_2D, fade.tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fade.fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fade.tex, 0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      fade.w = w; fade.h = h;
+    }
+    return fade;
+  };
+
   return {
     gl,
     get contextLost() { return lost; },
@@ -375,23 +427,23 @@ export function createRenderer(canvas, graph, opts = {}) {
      *   density:import('../../utils/scripture-web/decode.js').Density,
      *   light:boolean, bg:string,
      *   focusRange:(number[]|null), focusRange2?:(number[]|null), focusArc:number, hoverArc?:number,
-     *   lens?:(number[]|null), lensDim?:number}} v
+     *   lens?:(number[]|null), lensDim?:number, overview?:number}} v
      *   lens: pick.lensRange(); the chapter under the frame's centre, lit while nothing is tapped
      *   lensDim: what the rest keeps of its alpha under the lens (geometry.lensShareAt; LENS_CONTEXT if absent)
+     *   overview: geometry.overviewShare(zoom); absent or 0 = the summing pass alone, exactly as before sw2
      */
     draw(v) {
       if (lost) return lastStats;
       const bg = cssColorToRGB(v.bg);
+      const ov = v.overview > 0 ? Math.min(1, v.overview) : 0;
       gl.viewport(0, 0, v.width, v.height);
       gl.clearColor(bg[0], bg[1], bg[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      // Premultiplied-over on both themes keeps dense crossings legible. The
-      // old additive dark pass made the 300k tail bloom into neon and exposed
-      // the phone GPU to a needless sustained fill-rate spike.
-      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
       gl.useProgram(program);
       gl.bindVertexArray(vao);
+      gl.uniform3f(U.uBg, bg[0], bg[1], bg[2]);
+      gl.uniform1f(U.uOverview, ov);
       gl.uniform2f(U.uRes, v.width, v.height);
       gl.uniform1f(U.uCamX, v.camX);
       gl.uniform1f(U.uCamY, v.camY > 0 ? v.camY : 0);
@@ -400,7 +452,8 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.uniform1f(U.uSquash, v.squash);
       gl.uniform1f(U.uLocalize, v.localize);
       gl.uniform1f(U.uFlyLocalize, skyLocalize(v.localize, v.camY > 0 ? v.camY : 0, v.ceil));
-      gl.uniform1f(U.uWidth, v.strokeWidth);
+      // the overview's thinner thread, never thinned below one device px (a DPR-1 screen keeps its own)
+      gl.uniform1f(U.uWidth, Math.max(v.strokeWidth * (1 + (OVERVIEW_STROKE - 1) * ov), Math.min(v.strokeWidth, 1)));
       gl.uniform1f(U.uDpr, v.dpr || 1);
       gl.uniform1f(U.uAlpha, v.alpha);
       gl.uniform1f(U.uTotal, graph.total);
@@ -427,51 +480,98 @@ export function createRenderer(canvas, graph, opts = {}) {
       const chunkSize = graph.chunkSize || 256;
 
       let instances = 0, draws = 0;
-      for (let bi = 0; bi < graph.buckets.length; bi++) {
-        const bucket = graph.buckets[bi];
-        const count = bucketDrawCount(bucket, v.density);
-        if (count <= 0) continue;
-        // Segments from what this bucket can put ON SCREEN, not from its span.
-        const segments = segmentsFor(bucket.segments, v.localize,
-          bucketMaxSpan[bi] * v.ppv * 0.5, v.ceil, v.width, v.dpr || 1, v.squash);
-        gl.uniform1f(U.uSegments, segments);
-        const verts = 2 * (segments + 1);
-        // Walk chunks, coalescing adjacent visible ones into single draws.
-        const chunks = bucket.chunks || [];
-        let runStart = -1;
-        const flush = (endExclusive) => {
-          if (runStart < 0) return;
-          const first = runStart;
-          const n = endExclusive - first;
-          if (n > 0) {
-            pointInstances(bucket.off + first);
-            gl.uniform1f(U.uInstanceBase, bucket.off + first);
-            gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, verts, n);
-            instances += n;
+      const pass = () => {
+        for (let bi = 0; bi < graph.buckets.length; bi++) {
+          const bucket = graph.buckets[bi];
+          const count = bucketDrawCount(bucket, v.density);
+          if (count <= 0) continue;
+          // Segments from what this bucket can put ON SCREEN, not from its span.
+          const segments = segmentsFor(bucket.segments, v.localize,
+            bucketMaxSpan[bi] * v.ppv * 0.5, v.ceil, v.width, v.dpr || 1, v.squash);
+          gl.uniform1f(U.uSegments, segments);
+          const verts = 2 * (segments + 1);
+          // Walk chunks, coalescing adjacent visible ones into single draws.
+          const chunks = bucket.chunks || [];
+          let runStart = -1;
+          const flush = (endExclusive) => {
+            if (runStart < 0) return;
+            const first = runStart;
+            const n = endExclusive - first;
+            if (n > 0) {
+              pointInstances(bucket.off + first);
+              gl.uniform1f(U.uInstanceBase, bucket.off + first);
+              gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, verts, n);
+              instances += n;
+              draws++;
+            }
+            runStart = -1;
+          };
+          if (!chunks.length) {
+            pointInstances(bucket.off);
+            gl.uniform1f(U.uInstanceBase, bucket.off);
+            gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, verts, count);
+            instances += count;
             draws++;
+            continue;
           }
-          runStart = -1;
-        };
-        if (!chunks.length) {
-          pointInstances(bucket.off);
-          gl.uniform1f(U.uInstanceBase, bucket.off);
-          gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, verts, count);
-          instances += count;
-          draws++;
-          continue;
+          for (let c = 0; c * chunkSize < count; c++) {
+            const ext = chunks[c];
+            const start = c * chunkSize;
+            const end = Math.min(start + chunkSize, count);
+            // An arc is visible if its span overlaps the viewport at all — the
+            // apex of a long arc can cross the view with both feet off-screen.
+            const visible = !ext || (ext[1] >= viewLo && ext[0] <= viewHi);
+            if (visible) { if (runStart < 0) runStart = start; }
+            else flush(start);
+            if (end >= count) flush(end);
+          }
+          flush(count);
         }
-        for (let c = 0; c * chunkSize < count; c++) {
-          const ext = chunks[c];
-          const start = c * chunkSize;
-          const end = Math.min(start + chunkSize, count);
-          // An arc is visible if its span overlaps the viewport at all — the
-          // apex of a long arc can cross the view with both feet off-screen.
-          const visible = !ext || (ext[1] >= viewLo && ext[0] <= viewHi);
-          if (visible) { if (runStart < 0) runStart = start; }
-          else flush(start);
-          if (end >= count) flush(end);
-        }
-        flush(count);
+      };
+
+      // The summing pass: premultiplied-over on both themes keeps dense crossings legible. The
+      // old additive dark pass made the 300k tail bloom into neon and exposed the phone GPU to a
+      // needless sustained fill-rate spike. From OVERVIEW_END on it is the whole picture.
+      const summing = () => {
+        gl.blendEquation(gl.FUNC_ADD);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        gl.uniform1f(U.uPassGain, 1);
+        gl.uniform1f(U.uComposite, 0);
+        pass();
+      };
+      // The overview's brightest-wins pass: no thread adds into another, so a crowd never sums
+      // into a wall (geometry.js, THE OVERVIEW).
+      const brightest = () => {
+        gl.blendEquation(v.light ? gl.MIN : gl.MAX);
+        gl.uniform1f(U.uPassGain, OVERVIEW_GAIN);
+        gl.uniform1f(U.uComposite, 1);
+        pass();
+      };
+      // A blend weight within 2 % of either end is drawn as that end: one pass, not two.
+      if (ov < 0.02) summing();
+      else if (ov > 0.98) brightest();
+      else {
+        const f = fadeTarget(v.width, v.height);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, f.fbo);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        brightest();
+        const first = draws;
+        instances = 0; draws = 0;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        summing();
+        // lay the brightest-wins picture over the summing one at ov
+        gl.useProgram(f.prog);
+        gl.bindVertexArray(f.vao);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, f.tex);
+        gl.uniform1i(f.uTex, 0);
+        gl.blendEquation(gl.FUNC_ADD);
+        gl.blendColor(0, 0, 0, ov);
+        gl.blendFunc(gl.CONSTANT_ALPHA, gl.ONE_MINUS_CONSTANT_ALPHA);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.useProgram(program);
+        gl.bindVertexArray(vao);
+        draws += first + 1;
       }
       lastStats = { instances, draws };
       return lastStats;
@@ -483,6 +583,11 @@ export function createRenderer(canvas, graph, opts = {}) {
       for (const a of attribs) gl.deleteBuffer(a.buf);
       gl.deleteVertexArray(vao);
       gl.deleteProgram(program);
+      if (fade) {
+        gl.deleteProgram(fade.prog); gl.deleteVertexArray(fade.vao);
+        gl.deleteTexture(fade.tex); gl.deleteFramebuffer(fade.fbo);
+        fade = null;
+      }
       // NOTE: no loseContext() here. A rebuild after a real context loss
       // reuses this same canvas, and force-losing the freshly restored
       // context would kill the replacement renderer as it is being born.

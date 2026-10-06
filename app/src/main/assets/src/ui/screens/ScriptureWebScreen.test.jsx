@@ -56,7 +56,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
       // a line ends up unwitnessed. Recording is additive; no other case reads it.
       draw: (opts) => {
         DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density, camY: opts && opts.camY, camX: opts && opts.camX, lens: opts && opts.lens,
-          focusArc: opts && opts.focusArc, focusRange: opts && opts.focusRange, lensDim: opts && opts.lensDim });
+          focusArc: opts && opts.focusArc, focusRange: opts && opts.focusRange, lensDim: opts && opts.lensDim, overview: opts && opts.overview });
         return { instances: 0, draws: 0 };
       },
       dispose: vi.fn(),
@@ -585,6 +585,14 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       }
       expect(firstLensed, 'PRECONDITION: a press reached the lens').toBeTruthy();
       expect(firstLensed.lensDim).toBeGreaterThan(0.75);
+    });
+
+    it('the overview law (sw2) is whole at fit and gone from 4x: nothing past 4x changes', async () => {
+      await mount();
+      expect(DRAWN[DRAWN.length - 1].overview).toBe(1);
+      await pressFrame('+'); await pressFrame('+'); await pressFrame('+');   // 1.6^3 = 4.1x
+      expect(DRAWN[DRAWN.length - 1].ppv / DRAWN[0].ppv, 'PRECONDITION: three presses passed 4x').toBeGreaterThan(4);
+      expect(DRAWN[DRAWN.length - 1].overview).toBe(0);
     });
 
     it('My Web has no lens: switching at the ceiling clears data-lens and the draw carries null', async () => {
