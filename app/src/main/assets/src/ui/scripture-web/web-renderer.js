@@ -433,7 +433,8 @@ export function createRenderer(canvas, graph, opts = {}) {
      *   overview: geometry.overviewShare(zoom); absent or 0 = the summing pass alone, exactly as before sw2
      */
     draw(v) {
-      if (lost) return lastStats;
+      // isContextLost too: a loss can land before its event, and the cross-fade's program is built mid-frame
+      if (lost || gl.isContextLost()) return lastStats;
       const bg = cssColorToRGB(v.bg);
       const ov = v.overview > 0 ? Math.min(1, v.overview) : 0;
       gl.viewport(0, 0, v.width, v.height);
