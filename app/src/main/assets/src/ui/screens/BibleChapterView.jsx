@@ -24,7 +24,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
   const matchingRecording = translation !== (readerTranslation || 'nkjv');
   // An alt edition is a lazy script; translateVerse answers NKJV until it lands,
   // so its arrival is a render input here (App's own tick follows only Settings).
-  const [, setTextTick] = React.useState(0);
+  const [textTick, setTextTick] = React.useState(0);
   React.useEffect(() => {
     if (!matchingRecording) return undefined;
     let live = true;
@@ -362,6 +362,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
           readAlongOn={readAlongOn}
           readAlongFollow={readAlongFollow}
           seekTo={highlightedVerses.length ? bibleKeyFn(book.id, highlightedVerses[0]) : null}
+          textKey={translation + ':' + textTick}
         />
       )}
     </ScreenLayout>

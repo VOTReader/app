@@ -502,6 +502,32 @@ describe('ReadAlongHighlight — follow-scroll obeys the scrollTop lease', () =>
     expect(scroller.scrollTop).toBe(0);
   });
 
+  it('pays the follow a restore stood down as soon as the restore ends, mid-sentence', () => {
+    // ed1 (emulator 2026-10-05): a Bible chapter opened mid-verse restored its old
+    // scroll under the first paint, and the lit verse stayed off screen until the
+    // next verse, up to 15 s later.
+    mount();
+    document.body.classList.add('scroll-restoring');
+    followOnce();
+    expect(scroller.scrollTop).toBe(0);
+    document.body.classList.remove('scroll-restoring');
+    frame(0);                                         // the frame loop sees the lease gone
+    runGlide();
+    expect(painted()).toBe('Sentence number two.');
+    expect(scroller.scrollTop).toBeCloseTo(EXPECTED_SCROLL, 5);
+  });
+
+  it('owes nothing to a reader who scrolled away themselves', () => {
+    mount();
+    play();
+    clockTo(6);
+    scroller.dispatchEvent(new Event('touchmove'));   // the reader's hand inside the grace
+    runGlide();
+    frame(0);
+    runGlide();
+    expect(scroller.scrollTop).toBe(0);
+  });
+
   it('aborts a glide already in flight the moment auto-scroll takes the lease', () => {
     mount();
     play();

@@ -2794,12 +2794,21 @@
     .ornament-divider + .footnote-list { border-top:none; padding-top:0; margin-top:1.5rem; }
     /* Read-along: the sentence currently being read aloud (CSS Custom
        Highlight API — no DOM mutation; only these properties apply). */
-    ::highlight(vot-reading) { background-color: var(--reading-wash); }
+    /* LITERAL colours in the three ::highlight rules, repeated per theme, never
+       var(): an Android WebView before ~Chrome 118 resolves no custom property
+       inside a highlight pseudo, so var(--reading-wash) went invalid at computed
+       time and the wash painted NOTHING (ed1, emulator WebView 113, 2026-10-05:
+       the verse was lit in the API, blank on screen; the literal painted). Keep
+       them equal to --reading-wash / --find-wash / --find-now above. */
+    ::highlight(vot-reading) { background-color: rgba(214,179,95,0.20); }
+    body.light ::highlight(vot-reading) { background-color: rgba(122,92,16,0.16); }
+    body.light ::highlight(vot-find) { background-color: rgba(122,92,16,0.18); }
+    body.light ::highlight(vot-find-current) { background-color: rgba(122,92,16,0.38); text-decoration-color: #7a5c10; }
     /* Find in the unit (FindInUnit): every place the searched words appear, and,
        stronger and underlined, the place being looked at. Gold like the result
        cards' marks, never a highlighter colour a reader's own marks could wear. */
-    ::highlight(vot-find) { background-color: var(--find-wash); }
-    ::highlight(vot-find-current) { background-color: var(--find-now); text-decoration: underline; text-decoration-color: var(--gold); text-decoration-thickness: 2px; text-underline-offset: 0.2em; }
+    ::highlight(vot-find) { background-color: rgba(200,164,86,0.24); }
+    ::highlight(vot-find-current) { background-color: rgba(214,179,95,0.52); text-decoration: underline; text-decoration-color: #d6b35f; text-decoration-thickness: 2px; text-underline-offset: 0.2em; }
     .wtlb-footnote-list { margin-top:3.5rem; padding-top:2.5rem; }
     .wtlb-footnote-list .footnote-list-item { margin-bottom:1rem; padding:0.7rem 0.9rem; }
     .wtlb-footnote-list .footnote-list-header { margin-bottom:1.5rem; font-size:var(--fs-11); text-align:center; }

@@ -522,29 +522,36 @@ function _glideTo(el, to, glideRef) {
  * @param {{ current: any }} mainRef
  * @param {{ current: number }} userScrollAt
  * @param {{ current: number | null }} glideRef
- * @returns {void}
+ * @returns {boolean} true when ANOTHER WRITER's lease (a scroll restore, the
+ *   auto-scroll) made it stand down: the follow is then OWED, and the caller
+ *   pays it when the lease ends rather than at the next sentence. A Bible verse
+ *   can run 15 s, and opening a chapter mid-verse restores its old scroll under
+ *   the first paint, which left the lit verse off screen for that whole verse
+ *   (ed1, emulator 2026-10-05). The reader's own hand never makes it owed.
  */
 function _follow(range, mainRef, userScrollAt, glideRef) {
-  if (_leaseHeld() || _readerSelecting()) return;
-  if (Date.now() - userScrollAt.current < USER_SCROLL_MS) return;
+  if (_leaseHeld()) return true;
+  if (_readerSelecting()) return false;
+  if (Date.now() - userScrollAt.current < USER_SCROLL_MS) return false;
   const scroller = _scrollerOf(mainRef);
-  if (!scroller) return;
+  if (!scroller) return false;
   const box = scroller.getBoundingClientRect();
-  if (!box.height) return;   // not laid out (hidden tab, jsdom) — nothing to aim at
+  if (!box.height) return false;   // not laid out (hidden tab, jsdom) — nothing to aim at
   // The band is a share of the room the reader can SEE. Whatever sits over the bottom of the
   // scroller declares itself with scroll-padding-bottom (the tour's docked card, 2026-09-04: at
   // 1.8x on a 699 px phone the band's 60 % line sat under a card whose top was at 48 %, and the
   // lit sentence wrapped under it); the same property steers the engine's own scrollIntoView.
   const vis = box.height - _bottomPad(scroller);
-  if (vis <= 0) return;
+  if (vis <= 0) return false;
   const rect = range.getBoundingClientRect();
   const bandTop = box.top + vis * 0.25;
   const bandBot = box.top + vis * 0.6;
-  if (rect.top >= bandTop && rect.bottom <= bandBot) return;
+  if (rect.top >= bandTop && rect.bottom <= bandBot) return false;
   // No manual clamp: each frame is an absolute assignment the engine clamps,
   // and the glide interpolates between two values fixed at its start, so an
   // out-of-range target can never accumulate into drift.
   _glideTo(scroller, (scroller.scrollTop || 0) + (rect.top - (box.top + vis * 0.35)), glideRef);
+  return false;
 }
 
 /** The scroller's scroll-padding-bottom in px: the part of it something else is drawn over. */
@@ -574,12 +581,12 @@ function _bottomPad(scroller) {
  * @param {{ current: number }} userScrollAt
  * @param {{ current: number | null }} glideRef
  * @param {{ current: number }} lastFrag
- * @returns {void}
+ * @returns {boolean} the follow is owed (see _follow)
  */
 function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glideRef, lastFrag, offsetMapFn) {
   lastFrag.current = i;
   const clear = () => { /** @type {any} */ (CSS).highlights.delete(HL_NAME); };
-  if (i < 0) { clear(); return; }
+  if (i < 0) { clear(); return false; }
   const [, bi, cs0, ce0] = frags[i];
   // Format B stores CORPUS offsets, because its rendered text is not its
   // corpus text and the rendered one moves (footnote route, soft line breaks,
@@ -595,20 +602,20 @@ function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScr
   // a confident wrong answer, where nothing reads as honest silence. Only the
   // i < 0 case used to clear, so one unresolvable row froze the wash in place
   // until the next resolvable one.
-  if (!blockEl) { clear(); return; }
+  if (!blockEl) { clear(); return false; }
   let range;
   if (ce0 === -1) {
     // Legacy Format B sentinel — paint the whole paragraph block.
     range = blockEl.ownerDocument.createRange();
-    try { range.selectNodeContents(blockEl); } catch (_e) { clear(); return; }
+    try { range.selectNodeContents(blockEl); } catch (_e) { clear(); return false; }
   } else {
     range = rangeIn(blockEl, cs, ce);
   }
-  if (!range) { clear(); return; }
+  if (!range) { clear(); return false; }
   const H = /** @type {any} */ (globalThis).Highlight;
-  if (typeof H !== 'function') { clear(); return; }
+  if (typeof H !== 'function') { clear(); return false; }
   /** @type {any} */ (CSS).highlights.set(HL_NAME, new H(range));
-  if (readAlongFollow) _follow(range, mainRef, userScrollAt, glideRef);
+  return readAlongFollow ? _follow(range, mainRef, userScrollAt, glideRef) : false;
 }
 
 /**
@@ -701,11 +708,14 @@ export function repeatSpanOf(frags, keys, letterId, hlKeyFn) {
  *   starts, in the rows' own offset domain (Format A: the block's text; Format B:
  *   corpus offsets, unprojected). The fragment holding it, or the last one before
  *   it, is the target; absent (a verse landing), the block's first fragment.
+ * @param {string} [props.textKey] - names the text the host renders (the Bible
+ *   chapter's translation). A change repaints the current fragment on the new
+ *   text and follows it.
  * @param {(() => void) | null} [props.onListen] - the host's own Listen action
  *   (its hero pill's). Given, this unit offers LISTEN FROM HERE through
  *   window.__votListenFrom; absent (no recording), it offers nothing.
  */
-export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0, offsetMapFn = null, seekTo = null, seekOffset = null, onListen = null }) {
+export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0, offsetMapFn = null, seekTo = null, seekOffset = null, onListen = null, textKey = '' }) {
   // Named, not discarded: the two lazy-timing effects below depend on it so a
   // failed fetch is re-asked on transport activity — see read-along-5.
   const playerVersion = React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
@@ -739,6 +749,14 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   const time = st.time;
   const lastFrag = React.useRef(-1);
   const userScrollAt = React.useRef(0);
+  const owed = React.useRef(false);
+  // NEW WORDS UNDER THE SAME CLOCK. When the host swaps the text in place (a
+  // Bible chapter moving to its recording's translation once that edition's
+  // file lands), the painted Range points into text nodes React has replaced:
+  // the wash collapses and the page reflows away from it until the next
+  // sentence. Forgetting the painted fragment makes the next frame (or the
+  // safety net below, which lists textKey) paint and follow it on the new text.
+  React.useEffect(() => { lastFrag.current = -1; }, [textKey]);
   const glide = React.useRef(/** @type {number | null} */ (null));
 
   // Multi-part letters: the part now playing, derived from the ASSET the
@@ -849,7 +867,7 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   React.useEffect(() => {
     const el = _scrollerOf(mainRef);
     if (!el) return undefined;
-    const mark = () => { userScrollAt.current = Date.now(); _cancelGlide(glide); };
+    const mark = () => { userScrollAt.current = Date.now(); owed.current = false; _cancelGlide(glide); };
     const opts = { capture: true, passive: true };
     el.addEventListener('wheel', mark, opts);
     el.addEventListener('touchmove', mark, opts);
@@ -874,7 +892,10 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     const tick = () => {
       id = null;
       const i = fragmentAt(frags, AudioPlayer.getPreciseTime() + LEAD_S);
-      if (i !== lastFrag.current) _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag, offsetMapFn);
+      // An owed follow (a lease stood it down) is paid by repainting the same
+      // fragment the moment the lease is gone.
+      if (owed.current && !_leaseHeld()) { owed.current = false; lastFrag.current = -1; }
+      if (i !== lastFrag.current) owed.current = _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag, offsetMapFn);
       if (!stopped) id = requestAnimationFrame(tick);
     };
     id = requestAnimationFrame(tick);
@@ -896,10 +917,11 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       return undefined;
     }
     const i = fragmentAt(frags, time + LEAD_S);
+    if (owed.current && !_leaseHeld()) { owed.current = false; lastFrag.current = -1; }
     if (i === lastFrag.current) return undefined;
-    _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag, offsetMapFn);
+    owed.current = _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag, offsetMapFn);
     return undefined;
-  }, [frags, time, letterId, hlKeyFn, mainRef, readAlongFollow, offsetMapFn]);
+  }, [frags, time, letterId, hlKeyFn, mainRef, readAlongFollow, offsetMapFn, textKey]);
 
   // TAP A CLAUSE, HEAR IT. The wash itself is a CSS Custom Highlight — a
   // decoration with no box and no events — so the tap is resolved from the
