@@ -87,7 +87,9 @@ const verseNorm = D.filter((d) => d.kind === 'verse').map((d) => [unitKey(d), no
 const KJV = kjvVerses();
 for (const [book, chs] of Object.entries(KJV)) for (const [ch, vs] of Object.entries(chs)) for (const v of vs) verseNorm.push(['bible/' + book + ':' + ch + ':' + v.n, norm(v.text)]);
 for (let i = verseNorm.length - 1; i >= 0; i--) if (verseNorm[i][1].split(' ').length < 8) verseNorm.splice(i, 1);
-const versesQuoted = (sentence) => { const n = norm(sentence); return verseNorm.filter(([, t]) => t.includes(n) || n.includes(t)).map(([k]) => k); };
+// ...with His name restored too: a study quotes Luke 7:9 as "When YahuShua heard these things".
+const named = (t) => t.replace(/ (?:yahushua|yeshua|yahshua|yahusha|yeshu) /g, ' jesus ').replace(/ (?:yahushua|yeshua|yahshua|yahusha|yeshu) /g, ' jesus ');
+const versesQuoted = (sentence) => { const n = named(norm(sentence)); return verseNorm.filter(([, t]) => t.includes(n) || n.includes(t)).map(([k]) => k); };
 const titleNorm = {};
 for (const k of proseKeys) { const t = norm(unitBlocks[k][0].title); (titleNorm[t] || (titleNorm[t] = [])).push(k); }
 const matthewTwin = (uk) => {
@@ -124,8 +126,11 @@ if (val('--audit')) {
   const allVerses = D.filter((d) => d.kind === 'verse').map((d) => [unitKey(d), norm(d.text)]);
   for (const [book, chs] of Object.entries(KJV)) for (const [ch, vs] of Object.entries(chs)) for (const v of vs) allVerses.push(['bible/' + book + ':' + ch + ':' + v.n, norm(v.text)]);
   const rows = [];
+  // a typed slip read as the target's own word (within 2 edits), so 'grat faith' is checked as 'great faith'
+  const lev = (a, b) => { const d = Array.from({ length: b.length + 1 }, (_, j) => j); for (let i = 1; i <= a.length; i++) { let p = d[0]; d[0] = i; for (let j = 1; j <= b.length; j++) { const t = d[j]; d[j] = Math.min(d[j] + 1, d[j - 1] + 1, p + (a[i - 1] === b[j - 1] ? 0 : 1)); p = t; } } return d[b.length]; };
+  const unslip = (q, sentence) => { const sw = norm(sentence).trim().split(' '); return ' ' + norm(q).trim().split(' ').map((w) => sw.includes(w) ? w : (sw.map((x) => [x, lev(w, x)]).filter(([x, d]) => d <= 2 && d < x.length).sort((p, q) => p[1] - q[1] || q[0].length - p[0].length)[0] || [w])[0]).join(' ') + ' '; };
   for (const c of cases) {
-    const n = norm(c.q);
+    const n = c.style === 'typos' && c.sentence ? unslip(c.q, c.sentence) : norm(c.q);
     if (n.trim().split(' ').length < 2) continue;
     const cls = classOf(c);
     const inCls = (k) => cls.members.has(k) || matthewTwin(k).some((t) => cls.members.has(t));
