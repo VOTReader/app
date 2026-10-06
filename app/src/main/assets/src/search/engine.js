@@ -429,10 +429,15 @@ function unitId(/** @type {string} */ key) {
 const MEANING_REACH = 30;
 const MEANING_ADD = 10;
 const MEANING_K = 10;
+/** How much text from a matched passage's start names its original (a unit is three sentences). */
+const MEANING_SPAN = 400;
+/** Runs it must share with an original to be its reprint: more than the typed-words rule's 2, since no typed word
+    vouches for the passage (2 and 3 moved a stray letter up; 4 only true copies, on the benchmark). */
+const MEANING_VOTES = 4;
 /** The meaning's weight when no passage holds any of the query; it falls as the words hold more (1 - held). */
 const MEANING_WEIGHT = 2;
 /**
- * @param {Array<{score:number, doc:any, terms?:string[], placeStart?:number}>} out
+ * @param {Array<{score:number, doc:any, terms?:string[], placeStart?:number, meaningStart?:number}>} out
  * @param {Map<any, string>} idOf
  * @param {Array<{id:string, score:number, start:number}>} sem  best first
  * @param {(doc:any) => boolean} named
@@ -464,9 +469,11 @@ function meaningFirst(out, idOf, sem, named, held) {
     w / (MEANING_K + (semRank.get(idOf.get(e)) ?? 1e6));
   const keyed = top.map((e, i) => ({ e, i, k: key(e, i) }));
   keyed.sort((a, b) => b.k - a.k);
-  for (const e of added) {
+  for (const e of top) {
     const st = semStart.get(idOf.get(e));
-    if (st != null && st >= 0 && e.doc.kind !== 'verse') e.placeStart = st;
+    if (st == null || st < 0 || e.doc.kind === 'verse') continue;
+    e.meaningStart = st; // where the model matched it: originalsFirst reads a reprint's original there
+    if (added.has(e)) e.placeStart = st;
   }
   out.length = 0;
   for (const k of keyed) out.push(k.e);
@@ -734,7 +741,7 @@ function condensedFrom(/** @type {string} */ id, /** @type {string} */ text, /**
 }
 /**
  * Move each original ahead of a reprint of it near the top (in place).
- * @param {Array<{score:number, doc:any, terms?:string[]}>} out  ranked, best first
+ * @param {Array<{score:number, doc:any, terms?:string[], meaningStart?:number}>} out  ranked, best first (meaningStart: meaningFirst's matched passage)
  * @param {Map<any, string>} idOf  each entry's doc id
  * @param {string[]} terms  the words a landing marks (the query's own)
  * @param {(doc:any) => boolean} allowed  the search's corpus and scope filters
@@ -773,6 +780,14 @@ function originalsFirst(out, idOf, terms, allowed, named, near) {
         for (const [x, n] of votes) if (n < 2) votes.delete(x);   // two runs shared, not one stray run at the window's edge
         if (votes.size) found = [...votes.keys()].sort((a, b) => /** @type {number} */ (votes.get(b)) - /** @type {number} */ (votes.get(a)));
       }
+    }
+    // A reprint the meaning brought up (meaningFirst noted the passage it matched): that passage's
+    // own runs name its original, with no typed word in it to cut an excerpt by.
+    if (!found && typeof e.meaningStart === 'number' && e.meaningStart >= 0) {
+      /** @type {Map<string, number>} */ const votes = new Map();
+      eachShingle(kjvEncode(e.doc.text.slice(e.meaningStart, e.meaningStart + MEANING_SPAN)), (h) => { for (const x of lower(/** @type {Map<number, string[]>} */ (SHINGLES).get(h))) votes.set(x, (votes.get(x) || 0) + 1); });
+      for (const [x, n] of votes) if (n < MEANING_VOTES) votes.delete(x);
+      if (votes.size) found = [...votes.keys()].sort((a, b) => /** @type {number} */ (votes.get(b)) - /** @type {number} */ (votes.get(a)));
     }
     if (!found && e.doc.kind === 'answers') {
       const id = idOf.get(e) || '';
