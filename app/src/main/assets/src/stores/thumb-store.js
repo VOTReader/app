@@ -7,9 +7,20 @@
    binding wasn't declared at module scope).
 
    This module does NOT extend CachedStore — it's a thin IDB wrapper for
-   the tab-thumbnail data URLs (each ~30-100 KB; too big for localStorage).
+   the tab-thumbnail data URLs (150-400 KB each since the 1440 px / q90
+   captures, two per tab; too big for localStorage).
    Promise-based to swallow IDB errors as no-ops (we'd rather show a
    blank tab card than crash the overview).
+
+   Writes go through idb-chunks.js (2026-10-11): an entry over the inline
+   line is stored in small pieces across small, explicitly committed
+   transactions, one write at a time - never as a blob file, never as an
+   open transaction a frozen page could leave behind (the shape that made
+   the WebView destroy this origin's whole IndexedDB, idb-chunks.js header).
+   Pieces never show to a caller: idbReadAll joins them, idbAllKeys hides
+   them from the GC sweep, idbDelete takes them with the key. THUMB_DB_VERSION
+   2 keeps a pre-pieces build (which would read a manifest as a thumbnail)
+   out: its open fails and it shows blank cards.
 
    Bundled helpers (P5e):
    - openThumbDB
@@ -18,8 +29,16 @@
    - idbReadAll
    =================================================================== */
 
+import { writeValue, deleteValue, getValue, foldRows, isChunkKey, chunkOwner, writeQueue } from './idb-chunks.js';
+
 /** IDB database name. */
 export const THUMB_DB = 'vot-thumbs';
+
+/** 2: entries may be stored in pieces (header). */
+export const THUMB_DB_VERSION = 2;
+
+/** One write at a time on this database. */
+const _queue = writeQueue();
 
 /** Object-store name inside THUMB_DB. */
 export const THUMB_STORE = 'thumbs';
@@ -39,7 +58,7 @@ export function openThumbDB() {
   if (_thumbDbPromise) return _thumbDbPromise;
   const p = new Promise((resolve) => {
     try {
-      const req = indexedDB.open(THUMB_DB, 1);
+      const req = indexedDB.open(THUMB_DB, THUMB_DB_VERSION);
       req.onupgradeneeded = (e) => {
         const db = /** @type {IDBOpenDBRequest} */ (e.target).result;
         if (!db.objectStoreNames.contains(THUMB_STORE)) db.createObjectStore(THUMB_STORE);
@@ -76,18 +95,10 @@ export function openThumbDB() {
  * @returns {Promise<void>}
  */
 export function idbPut(key, value) {
-  return openThumbDB().then((db) => {
-    if (!db) return;
-    return new Promise((resolve) => {
-      try {
-        const tx = db.transaction(THUMB_STORE, 'readwrite');
-        tx.objectStore(THUMB_STORE).put(value, key);
-        tx.oncomplete = () => resolve(undefined);
-        tx.onerror = () => resolve(undefined);
-        tx.onabort = () => resolve(undefined);
-      } catch (_e) {resolve(undefined);}
-    });
-  });
+  return _queue(() => openThumbDB().then((db) => {
+    if (!db) return undefined;
+    return writeValue(db, THUMB_STORE, key, value).then(() => undefined, () => undefined);
+  }));
 }
 
 /**
@@ -98,17 +109,10 @@ export function idbPut(key, value) {
  * @returns {Promise<void>}
  */
 export function idbDelete(key) {
-  return openThumbDB().then((db) => {
-    if (!db) return;
-    return new Promise((resolve) => {
-      try {
-        const tx = db.transaction(THUMB_STORE, 'readwrite');
-        tx.objectStore(THUMB_STORE).delete(key);
-        tx.oncomplete = () => resolve(undefined);
-        tx.onerror = () => resolve(undefined);
-      } catch (_e) {resolve(undefined);}
-    });
-  });
+  return _queue(() => openThumbDB().then((db) => {
+    if (!db) return undefined;
+    return deleteValue(db, THUMB_STORE, key).then(() => undefined, () => undefined);
+  }));
 }
 
 /**
@@ -152,7 +156,13 @@ export function idbAllKeys() {
       try {
         const tx = db.transaction(THUMB_STORE, 'readonly');
         const req = tx.objectStore(THUMB_STORE).getAllKeys();
-        req.onsuccess = () => resolve((req.result || []).map(String));
+        // Tab keys only: a piece is named by the tab it belongs to, so the GC sweeps
+        // a dead tab's pieces with it - even pieces a kill left with no entry at all.
+        req.onsuccess = () => {
+          const keys = new Set();
+          for (const k of (req.result || [])) keys.add(isChunkKey(k) ? chunkOwner(String(k)) : String(k));
+          resolve(Array.from(keys));
+        };
         req.onerror = () => resolve([]);
       } catch (_e) { resolve([]); }
     });
@@ -181,15 +191,27 @@ export function idbReadAll(liveKeys) {
         const store = tx.objectStore(THUMB_STORE);
         /** @type {Record<string, any>} */
         const out = {};
+        if (keep) {
+          // Only the live rows, each put back together from its pieces when it has
+          // them; one whose pieces do not add up is left out (a blank card that the
+          // next capture heals), never thrown at the overview.
+          const keys = Array.from(keep);
+          Promise.all(keys.map((k) => getValue(store, k).then((v) => { if (v !== undefined) out[k] = v; }, () => {})))
+            .then(() => resolve(out), () => resolve(out));
+          return;
+        }
+        /** @type {Array<[IDBValidKey, any]>} */
+        const rows = [];
         const req = store.openCursor();
         req.onsuccess = (e) => {
           const c = /** @type {IDBRequest<IDBCursorWithValue | null>} */ (e.target).result;
-          if (!c) { resolve(out); return; }
-          const key = String(c.key);
-          if (!keep || keep.has(key)) out[key] = c.value;
+          if (!c) { resolve(Object.assign(out, foldRows(rows, () => {}))); return; }
+          rows.push([c.key, c.value]);
           c.continue();
         };
-        req.onerror = () => resolve(out);
+        req.onerror = () => {
+          try { resolve(Object.assign(out, foldRows(rows, () => {}))); } catch (_e) { resolve(out); }
+        };
       } catch (_e) {resolve(/** @type {Record<string, any>} */ ({}));}
     });
   });

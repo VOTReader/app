@@ -1,9 +1,27 @@
 /* Engine ↔ cache integration: proves init() WARM-RESTORES a serialized index
    (the 30× perf path) instead of rebuilding. Separate file so it gets its own
-   isolated engine-module instance (the engine holds module-level state) with
-   fake-indexeddb available. */
+   isolated engine-module instance (the engine holds module-level state). The
+   warm index lives in the Cache API since 2026-10-11 (search/cache.js), so an
+   in-memory CacheStorage stands in for the browser's. */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import 'fake-indexeddb/auto';
+
+/** CacheStorage in memory, the shape search/cache.js uses. */
+function memoryCaches() {
+  const stores = new Map();
+  const key = (req) => new URL(typeof req === 'string' ? req : req.url, 'https://app.test/').href;
+  return {
+    open: async (name) => {
+      if (!stores.has(name)) stores.set(name, new Map());
+      const m = stores.get(name);
+      return {
+        match: async (req) => { const r = m.get(key(req)); return r ? r.clone() : undefined; },
+        put: async (req, res) => { m.set(key(req), res.clone()); },
+      };
+    },
+    delete: async (name) => stores.delete(name),
+  };
+}
 import MiniSearch from './vendor/minisearch.js';
 import { buildMiniSearchOptions } from './search-config.js';
 import { buildDocs } from './index-builder.js';
@@ -30,7 +48,10 @@ const GLOBALS = {
 
 describe('engine warm-cache restore', () => {
   let prevData;
+  let prevCaches;
   beforeAll(async () => {
+    prevCaches = /** @type {any} */ (globalThis).caches;
+    /** @type {any} */ (globalThis).caches = memoryCaches();
     prevData = window.VotSearchData;
     window.VotSearchData = VOT_DATA;
     for (const k of Object.keys(GLOBALS)) globalThis[k] = GLOBALS[k];
@@ -41,6 +62,7 @@ describe('engine warm-cache restore', () => {
     await saveCached(dataSignature('nkjv'), JSON.stringify(ms));
   });
   afterAll(() => {
+    /** @type {any} */ (globalThis).caches = prevCaches;
     window.VotSearchData = prevData;
     for (const k of Object.keys(GLOBALS)) delete globalThis[k];
   });

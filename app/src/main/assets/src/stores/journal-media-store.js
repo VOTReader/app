@@ -56,6 +56,8 @@
    private state in closure.
 ═══════════════════════════════════════════════════════════════ */
 
+import { commitNow, writeQueue } from './idb-chunks.js';
+
 /**
  * @typedef {{
  *   id: string,
@@ -168,7 +170,14 @@ function sourcePixelSize(blob) {
   }, function() { return null; });
 }
 
+/* 2026-10-11: every readwrite transaction here is committed explicitly once its last
+   request is queued (commitNow). Two readwrite transactions left uncommitted when the
+   app is killed - which a page frozen or stalled in the background does to auto-commit -
+   make the WebView destroy this origin's whole IndexedDB at the next open, the
+   reader's library included (stores/idb-chunks.js header; reproduced on vot_api34). */
 export var JournalMediaStore = (function() {
+  /** One write at a time on this database (the colliding lock is per database). */
+  var _writeQ = writeQueue();
   var DB_NAME = 'vot-journal-media';
   var DB_VERSION = 2;
   var STORE = 'media';
@@ -296,7 +305,7 @@ export var JournalMediaStore = (function() {
    * @returns {Promise<void>}
    */
   function commitStaged(clearLive) {
-    return openDb().then(function(db) {
+    return _writeQ(function() { return openDb().then(function(db) {
       return new Promise(function(resolve, reject) {
         var transaction = db.transaction([STORE, IMPORT_STORE], 'readwrite');
         var live = transaction.objectStore(STORE);
@@ -311,6 +320,7 @@ export var JournalMediaStore = (function() {
           var cursor = /** @type {IDBRequest<IDBCursorWithValue | null>} */ (e.target).result;
           if (!cursor) {
             staged.clear();
+            commitNow(transaction);                  // every request is queued: commit, don't wait
             return;
           }
           live.put(cursor.value);
@@ -322,7 +332,7 @@ export var JournalMediaStore = (function() {
         });
         guardTx(live, reject);
       });
-    });
+    }); });
   }
 
   /**
@@ -331,7 +341,7 @@ export var JournalMediaStore = (function() {
    * @returns {Promise<void>}
    */
   function clearStore(storeName) {
-    return openDb().then(function(db) {
+    return _writeQ(function() { return openDb().then(function(db) {
       return new Promise(function(resolve, reject) {
         var transaction = db.transaction([storeName], 'readwrite');
         var store = transaction.objectStore(storeName);
@@ -339,8 +349,9 @@ export var JournalMediaStore = (function() {
         req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
         transaction.addEventListener('complete', function() { resolve(); });
         guardTx(store, reject);
+        commitNow(transaction);
       });
-    });
+    }); });
   }
 
   return {
@@ -363,7 +374,7 @@ export var JournalMediaStore = (function() {
       if (!record || !record.id || !record.blob || !record.type) {
         return Promise.reject(new Error('Invalid staged media record'));
       }
-      return openDb().then(function(db) {
+      return _writeQ(function() { return openDb().then(function(db) {
         return new Promise(function(resolve, reject) {
           var transaction = db.transaction([IMPORT_STORE], 'readwrite');
           var store = transaction.objectStore(IMPORT_STORE);
@@ -371,8 +382,9 @@ export var JournalMediaStore = (function() {
           req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
           transaction.addEventListener('complete', function() { resolve(record.id); });
           guardTx(store, reject);
+          commitNow(transaction);
         });
-      });
+      }); });
     },
 
     /**
@@ -416,7 +428,7 @@ export var JournalMediaStore = (function() {
       if (!record.created) record.created = Date.now();
       if (!record.size && record.blob.size) record.size = record.blob.size;
       if (!record.mime && record.blob.type) record.mime = record.blob.type;
-      return tx('readwrite').then(function(store) {
+      return _writeQ(function() { return tx('readwrite').then(function(store) {
         return new Promise(function(resolve, reject) {
           var req = store.put(record);
           req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
@@ -430,8 +442,9 @@ export var JournalMediaStore = (function() {
             resolve(record.id);
           });
           guardTx(store, reject);
+          commitNow(store.transaction);
         });
-      });
+      }); });
     },
 
     /**
@@ -463,14 +476,15 @@ export var JournalMediaStore = (function() {
         try { URL.revokeObjectURL(/** @type {string} */ (_urlCache.get(id))); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
         _urlCache.delete(id);
       }
-      return tx('readwrite').then(function(store) {
+      return _writeQ(function() { return tx('readwrite').then(function(store) {
         return new Promise(function(resolve, reject) {
           var req = store.delete(id);
           req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
           store.transaction.addEventListener('complete', function() { resolve(); });
           guardTx(store, reject);
+          commitNow(store.transaction);
         });
-      });
+      }); });
     },
 
     /**

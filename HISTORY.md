@@ -10,6 +10,7 @@ Reverse-chronological; each landed CI-green + deployed. Each landing adds its on
 detailed entry to the "Detailed session log" below. Until 2026-09-22 this index lived in CLAUDE.md; it moved here
 verbatim so the briefing that auto-loads into every session stays short.
 
+- **The WebView's database wipe, reproduced and its class closed** (10-11, dl-1011b) — Corbin: "Do this task here: Keep VOTReader IndexedDB values under 64 KB". Reproduced on vot_api34 with the owner's exact message ("IndexedDB (database was corrupt): Unknown corruption"). The trigger: two readwrite transactions on different stores still uncommitted when the process dies, which a frozen or stalled page does to IndexedDB's auto-commit. At the next open Chromium destroys the whole store. The same attack on the app's own database did not wipe, so the phone's exact sequence is still unproven. Same stall-and-kill test, 8 cycles each: 6 wipes without explicit `commit()`, 0 with it. Now every app write goes one at a time through `stores/idb-chunks.js` and commits explicitly. Big values are stored as small pieces across small transactions (never a blob file, never over LevelDBScopes' 1 MiB flush). The tab thumbnails and journal media follow the same rules, and the 21 MB search index moved to the Cache API. Detail below.
 - **The library survives the WebView throwing its database away** (10-11, dl-1011) — Corbin: "Dataloss for VOTReader just happened again, it flagged it in the app and offered a restore button but it didn't work." Chromium had found the app's IndexedDB corrupt at a cold start and recreated it empty (the second time, after 10-02). The 10-05 safety net (daily snapshots outside WebView storage, the data-missing banner, Restore) caught it, but Restore brought back only the day-old snapshot and kept the wipe's light theme, default translation and single tab. Now the app snapshots from memory every time the reader leaves it, restores an emptied library on its own at once, brings settings, theme and tabs back with it, and logs Chromium's own reason for any fresh or reset database. The owner's library was merged back from every surviving copy, the 10-02 loss included. Detail below.
 - **Milestones come out** (10-05, ms1) — Corbin: "Gut milestones for now, I hate it." No Milestones screen, Library tile, Progress strip ("N of M reached", "Next:", "View all milestones") or unlock toast is left, and the engine behind them (`utils/achievements.js`, the journal's `MILESTONE_DEFS`) is deleted. Streaks, counts and reading progress stay. Stored data is untouched: both stats stores still carry `milestonesUnlocked`, so old backups import and re-export unchanged (a new round-trip test pins it); the Library's Notes / Links / Bookmarks / Journal / Highlights counts stay live through the screen's own store list (they used to ride the engine's).
 - **Share opens the phone's share sheet in the Android app** (09-27, sh1) — Corbin: "Yes, add the native share menu for the APK." The WebView has no `navigator.share`, so the app's Share could only copy the passage and say "Copied instead. Paste the passage where you want to share it." Share (a passage's or a note's) now opens Android's own sheet (Messages, WhatsApp, email…) through a new bridge verb, `AppInterface.shareText` (an `ACTION_SEND` chooser); an empty text or one past 100,000 characters is still copied instead. The web is unchanged.
@@ -115,6 +116,30 @@ verbatim so the briefing that auto-loads into every session stays short.
 ## Detailed session log — 2026-06-12 → present (moved from CLAUDE.md, 2026-07-24)
 
 These are the dated “Current state / Previous state” narrative entries that lived at the top of CLAUDE.md. They were relocated here verbatim (headings demoted one level) to keep CLAUDE.md — which auto-loads into every session's context — lean. New sessions PREPEND their detailed entry here; CLAUDE.md keeps only the short summary, and the one-liner index is the "Closed-phases index" above (moved out of CLAUDE.md 2026-09-22).
+
+### 2026-10-11 — the WebView's database wipe: reproduced, explained, closed (dl-1011b)
+
+**The trigger, reproduced.** Kill-loop harness on vot_api34 (WebView 113): launch the debug APK, write, `kill -9` the app process at a random moment, relaunch and check whether IndexedDB came back empty (the harness is in `D:\VOTReader-backups\pixel-2026-10-11\tools\repro-kill.mjs`).
+
+| What was written when the kill came | Wipes |
+|---|---|
+| One ~300 KB value at a time (each a blob file), 1,022 writes cut off mid-loop | 0 of 30 |
+| Two transactions over 1 MiB each (LevelDBScopes undo log), held open | 7 of 10 |
+| Two transactions with ONE value each (big or small), held open | 9 of 10, 5 of 5 |
+| Two small writes, then the page stalls before auto-commit | **6 of 8** |
+| The same with `tx.commit()` called right after each write | **0 of 8** |
+| The same two raw writes, or two `IDBAdapter.put`s, on the app's own `votreader` database | 0 of 16 |
+
+Every wipe carried the owner's exact message: `dataLoss total: IndexedDB (database was corrupt): Unknown corruption`. Chromium 154's source (read the same day) explains why. A readwrite transaction that reaches disk before commit keeps its locks in LevelDBScopes metadata. At the next open each stored lock is re-taken exclusively, and two of them in one database fail the check ("Invalid locks on disk"). That is a corruption status, and the open destroys the whole origin store. A page that IndexedDB cannot reach (frozen in the background, or busy) never sends its auto-commit, so its transactions stay open until the process dies. Blob files themselves turned out to be crash-safe. **Not proven:** the same attack on the app's own database did not wipe (last row), so which exact app sequence wiped the phone is still open. The phone's own data-health ring will now carry the reason if it happens again. The fix closes the whole class anyway: no transaction can be left uncommitted, and no two are ever open at once.
+
+**What changed:**
+- `stores/idb-chunks.js` (new): every write the app makes to its own data commits explicitly (`tx.commit()`) and goes through a one-at-a-time queue per database. A value whose JSON passes 16,000 characters is stored as JSON pieces of at most 16,000 characters (at most 32,000 bytes, so never compressed or wrapped into a blob file). At most 16 pieces go in one transaction (about 512 KB at worst, half LevelDBScopes' 1 MiB flush line). A bigger value is written under a new generation, and one small final transaction points the key at it and deletes older generations, after checking its own pieces are all there. A reader sees one whole value, old or new. Pieces that don't add up throw a DataError, so a store goes 'degraded' rather than loading empty. Values JSON can't carry exactly (Blobs, Dates…) are stored as before.
+- `stores/idb-adapter.js`: get, put, delete, getAll and commitMigration use it. `DB_VERSION` is 13, so a pre-pieces build meets the "saved by a newer version" banner instead of misreading a manifest.
+- `stores/thumb-store.js`: tab thumbnails (150-400 KB data URLs, two per tab) are stored in pieces through the same path. `THUMB_DB_VERSION` is 2, and the GC sweep never sees the pieces.
+- `stores/journal-media-store.js`: every write path commits explicitly.
+- `search/cache.js`: the ~21 MB warm index moved from IndexedDB to the Cache API (`vot-search-index`). `app.jsx` deletes the old `vot-minisearch-cache` database once, and Clear All clears the new cache.
+
+**Still true:** the 7363259c net (snapshots on every leave, auto-restore) stays. It is what kept the owner's library through the third wipe.
 
 ### 2026-10-11 — the library survives the WebView throwing its database away (dl-1011)
 

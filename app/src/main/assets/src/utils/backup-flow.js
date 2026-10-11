@@ -1081,6 +1081,9 @@ export function createBackupFlow(ctx) {
       // "Clear All" must not fail loud over a database that will just
       // regenerate on next use), but a failure is now at least visible in a
       // diagnostic export instead of invisible.
+      // 2026-10-11: the warm search index left IndexedDB for the Cache API
+      // (search/cache.js); it is a regenerable cache too, cleared best-effort.
+      try { const cs = /** @type {any} */ (globalThis).caches; if (cs && typeof cs.delete === 'function') await cs.delete('vot-search-index'); } catch (_e) { /* best-effort: a cache, not user data */ }
       const failedCaches = NONCRITICAL_DB_NAMES.filter((_name, i) => !deleteResults[2 + i]);
       if (failedCaches.length) {
         console.warn('clear all: non-critical database(s) failed to delete:', failedCaches.join(', '));

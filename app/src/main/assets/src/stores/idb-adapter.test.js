@@ -18,6 +18,7 @@ import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { IDBAdapter } from './idb-adapter.js';
 import { DiagnosticLog } from '../utils/diagnostic-log.js';
+import { CHUNK_CHARS, PIECES_PER_TX } from './idb-chunks.js';
 
 // Reset module-private state + delete the test DB between every test
 // so each spec sees a clean schema.
@@ -85,8 +86,8 @@ describe('IDBAdapter — open + schema', () => {
     expect(IDBAdapter.DB_NAME).not.toBe('vot-thumbs');
   });
 
-  it('DB_VERSION is 12 (v12 kept songs; v11 tour flag; v10 audio positions; v9 audio library)', () => {
-    expect(IDBAdapter.DB_VERSION).toBe(12);
+  it('DB_VERSION is 13 (v13 big values in pieces; v12 kept songs; v11 tour flag; v10 audio positions; v9 audio library)', () => {
+    expect(IDBAdapter.DB_VERSION).toBe(13);
   });
 
   it('offline-songs holds a Blob record and hands it back (K1: kept songs)', async () => {
@@ -541,5 +542,118 @@ describe('a database the browser created fresh, or closed', () => {
     expect(await IDBAdapter.open()).toBe(db);           // a reopen would meet an empty store
     off();
     warn.mockRestore();
+  });
+});
+
+/* 2026-10-11, the trigger reproduced: two readwrite transactions over LevelDBScopes'
+   1 MiB flush line, killed before they commit, make the next open fail "Unknown
+   corruption" and Chromium destroys the origin's whole store (vot_api34: 7 wipes in 10
+   kills, the owner's exact message). So through the adapter: values in pieces far under
+   the 64 KiB wrap threshold, no transaction over PIECES_PER_TX pieces, one write at a
+   time, every write committed explicitly (stores/idb-chunks.js). */
+describe('IDBAdapter - small values, small transactions, one write at a time (idb-chunks)', () => {
+  const history = (n) => Array.from({ length: n }, (_, i) => ({ key: 'bible:john:' + i, ts: 1791749447996 + i, title: 'John ' + i + ' — “In the beginning”' }));
+
+  async function rawRows(store) {
+    const db = await IDBAdapter.open();
+    return new Promise((res) => {
+      const out = [];
+      const rq = db.transaction(store).objectStore(store).openCursor();
+      rq.onsuccess = () => { const c = rq.result; if (!c) { res(out); return; } out.push([c.key, c.value]); c.continue(); };
+    });
+  }
+  async function rawPut(store, key, value) {
+    const db = await IDBAdapter.open();
+    await new Promise((res) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(value, key); tx.oncomplete = res; });
+  }
+
+  it('a big store value round-trips, and every record IndexedDB holds is a small piece or a manifest', async () => {
+    const v = history(3000);
+    await IDBAdapter.put('vot-history', 'v', v);
+    expect(await IDBAdapter.get('vot-history', 'v')).toEqual(v);
+    const rows = await rawRows('vot-history');
+    expect(rows.length).toBeGreaterThan(PIECES_PER_TX);
+    expect(rows[0][1]).toMatchObject({ __votChunks: 1 });
+    for (const [, val] of rows.slice(1)) expect(typeof val === 'string' && val.length <= CHUNK_CHARS).toBe(true);
+  });
+
+  it('getAll puts pieces back together and never shows them as keys', async () => {
+    await IDBAdapter.put('vot-history', 'v', history(3000));
+    expect(await IDBAdapter.getAll('vot-history')).toEqual({ v: history(3000) });
+  });
+
+  it('delete removes the pieces with the key', async () => {
+    await IDBAdapter.put('vot-history', 'v', history(3000));
+    await IDBAdapter.delete('vot-history', 'v');
+    expect(await rawRows('vot-history')).toEqual([]);
+  });
+
+  it('commitMigration makes a big migrated value current together with its schema version', async () => {
+    await IDBAdapter.commitMigration('vot-history', history(3000), 4);
+    expect(await IDBAdapter.get('vot-history', 'v')).toEqual(history(3000));
+    expect(await IDBAdapter.get('meta', 'schema:vot-history')).toBe(4);
+  });
+
+  it('a record written before this change (one big value) still reads, and its next write splits it', async () => {
+    await rawPut('vot-history', 'v', history(3000));
+    expect(await IDBAdapter.get('vot-history', 'v')).toEqual(history(3000));
+    await IDBAdapter.put('vot-history', 'v', history(3001));
+    const rows = await rawRows('vot-history');
+    expect(rows[0][1]).toMatchObject({ __votChunks: 1 });
+    expect(await IDBAdapter.get('vot-history', 'v')).toEqual(history(3001));
+  });
+
+  it('pieces that do not add up are never read as a value: get rejects with a DataError', async () => {
+    await IDBAdapter.put('vot-history', 'v', history(3000));
+    const db = await IDBAdapter.open();
+    await new Promise((res) => { const tx = db.transaction('vot-history', 'readwrite'); tx.objectStore('vot-history').delete(IDBKeyRange.bound('v#chunk:', 'v#chunk:￿')); tx.oncomplete = res; });
+    await expect(IDBAdapter.get('vot-history', 'v')).rejects.toMatchObject({ name: 'DataError' });
+  });
+
+  it('runs one readwrite transaction at a time, however many saves arrive together', async () => {
+    const db = await IDBAdapter.open();
+    const orig = db.transaction.bind(db);
+    let active = 0;
+    let maxActive = 0;
+    vi.spyOn(db, 'transaction').mockImplementation((stores, mode) => {
+      const tx = orig(stores, mode);
+      if (mode === 'readwrite') {
+        active++; maxActive = Math.max(maxActive, active);
+        const done = () => { active--; };
+        tx.addEventListener('complete', done);
+        tx.addEventListener('abort', done);
+      }
+      return tx;
+    });
+    await Promise.all([
+      IDBAdapter.put('vot-history', 'v', history(3000)),
+      IDBAdapter.put('vot-state', 'v', { readItems: { a: 1 } }),
+      IDBAdapter.put('vot-notes', 'v', { n1: { body: 'x' } }),
+      IDBAdapter.delete('vot-links', 'v'),
+      IDBAdapter.commitMigration('vot-bookmarks', [], 3),
+    ]);
+    vi.restoreAllMocks();
+    expect(maxActive).toBe(1);
+    expect(await IDBAdapter.get('vot-history', 'v')).toEqual(history(3000));
+  });
+
+  it('a write still waiting in the queue when the fence rises says WriteFenced, and lands nothing', async () => {
+    const first = IDBAdapter.put('vot-history', 'v', history(3000));     // long: several transactions
+    const second = IDBAdapter.put('vot-state', 'v', { readItems: { a: 1 } });
+    IDBAdapter.setWriteFence(true);
+    try {
+      await first.catch(() => {});
+      await expect(second).rejects.toMatchObject({ name: 'WriteFenced' });
+    } finally { IDBAdapter.setWriteFence(false); }
+    expect(await IDBAdapter.get('vot-state', 'v')).toBeUndefined();
+  });
+
+  it('a write queued behind Clear All\'s fence never reopens the database', async () => {
+    IDBAdapter.setWriteFence(true);
+    try {
+      await IDBAdapter.put('vot-history', 'v', history(3000));
+      await IDBAdapter.put('vot-state', 'v', { a: 1 });
+    } finally { IDBAdapter.setWriteFence(false); }
+    expect(await IDBAdapter.get('vot-history', 'v')).toBeUndefined();
   });
 });

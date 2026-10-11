@@ -194,8 +194,10 @@ function snapshotJson(stores, summary, ms) {
 function _openNote() {
   const info = IDBAdapter.openInfo && IDBAdapter.openInfo();
   if (!info) return '';
-  return '; database ' + (info.oldVersion === 0 ? 'created this boot' : 'reset this boot') +
-    (info.dataLoss ? ', dataLoss ' + info.dataLoss + (info.dataLossMessage ? ' (' + info.dataLossMessage + ')' : '') : '');
+  const lost = !!info.dataLoss && info.dataLoss !== 'none';
+  if (info.oldVersion !== 0 && !lost) return '';            // an ordinary schema upgrade (v12 -> v13)
+  return '; database ' + (info.oldVersion === 0 ? 'created this boot' : 'reset by the browser this boot') +
+    (lost ? ', dataLoss ' + info.dataLoss + (info.dataLossMessage ? ' (' + info.dataLossMessage + ')' : '') : '');
 }
 
 /** May this boot restore `name` on its own? Once an hour per snapshot (5). @param {string} name @param {number} ms */

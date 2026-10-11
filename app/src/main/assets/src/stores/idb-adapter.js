@@ -64,6 +64,7 @@
 ═══════════════════════════════════════════════════════════════ */
 
 import { DiagnosticLog } from '../utils/diagnostic-log.js';
+import { writeValue, deleteValue, getValue, foldRows, writeQueue } from './idb-chunks.js';
 
 /** @typedef {string} StoreName */
 
@@ -108,7 +109,11 @@ export const IDBAdapter = (function () {
   //       (only the list of kept ids travels, as songKept in vot-audio-library)
   //       and outside the "Your Data" size; user-data-parity.test.js exempts it
   //       by name, like meta. Same additive pattern.
-  const DB_VERSION = 12;
+  //  13 — no new store: a value too big to be inline is now stored in pieces
+  //       (idb-chunks.js, 2026-10-11). A v12 build would read the manifest as the
+  //       store's value, so the bump makes it meet a VersionError instead (the
+  //       "saved by a newer version" banner, nothing written, nothing lost).
+  const DB_VERSION = 13;
 
   /**
    * The persistent `vot-*` stores, plus the `meta` store for migration
@@ -330,8 +335,23 @@ export const IDBAdapter = (function () {
    */
   function get(storeName, key) {
     return txStore(storeName, 'readonly').then(function (ctx) {
-      return wrapRequest(ctx.store.get(key));
+      return getValue(ctx.store, key);              // put back together when stored in pieces
     });
+  }
+
+  /** One write at a time on this database (idb-chunks.js header, 4). */
+  const _queue = writeQueue();
+
+  /**
+   * A write that was waiting in the queue when Clear All's fence went up: it did
+   * not land. Its caller was told it was in flight, so it must hear that it was
+   * not saved - CachedStore puts the store back on its fenced-dirty list and saves
+   * it again if the fence comes down without a reload (refuter, 10-11).
+   */
+  function _fencedError() {
+    const e = new Error('write held back by the Clear All fence');
+    e.name = 'WriteFenced';
+    return e;
   }
 
   /**
@@ -356,16 +376,21 @@ export const IDBAdapter = (function () {
   function put(storeName, key, value) {
     if (_writeFence) return Promise.resolve();   // v04-02: nothing reopens a wiped database
     if (value === undefined) return _self.delete(storeName, key);
-    return _self._putOnce(storeName, key, value).catch(function (err) {
-      if (err && err.name === 'AbortError') {
-        return _self._putOnce(storeName, key, value);
-      }
-      throw err;
+    return _queue(function () {
+      if (_writeFence) return Promise.reject(_fencedError());   // the fence went up while this waited
+      return _self._putOnce(storeName, key, value).catch(function (err) {
+        if (err && err.name === 'AbortError') {
+          return _self._putOnce(storeName, key, value);
+        }
+        throw err;
+      });
     });
   }
 
   /**
-   * Single put attempt — the retry wrapper above calls this.
+   * Single put attempt — the retry wrapper above calls this. The value goes
+   * through idb-chunks.js: inline when small, in pieces across small, explicitly
+   * committed transactions when not.
    *
    * @param {StoreName} storeName
    * @param {IDBValidKey} key
@@ -373,33 +398,15 @@ export const IDBAdapter = (function () {
    * @returns {Promise<void>}
    */
   function _putOnce(storeName, key, value) {
-    return txStore(storeName, 'readwrite').then(function (ctx) {
-      return new Promise(function (resolve, reject) {
-        let settled = false;
-        const settle = function (action) { if (!settled) { settled = true; action(); } };
-        let req;
-        try {
-          req = ctx.store.put(value, key);
-        } catch (e) {
-          settle(function () { reject(e); });
-          return;
-        }
-        req.onerror = function () {
-          settle(function () { reject(req.error || _makeAbortError()); });
-        };
-        ctx.tx.oncomplete = function () { settle(function () { resolve(undefined); }); };
-        ctx.tx.onerror = function () {
-          settle(function () { reject(ctx.tx.error || (req && req.error) || _makeAbortError()); });
-        };
-        ctx.tx.onabort = function () {
-          settle(function () { reject(ctx.tx.error || (req && req.error) || _makeAbortError()); });
-        };
-      });
-    });
+    if (!STORE_SET.has(storeName)) {
+      return Promise.reject(new Error('Unknown IDB store: ' + storeName));
+    }
+    return open().then(function (db) { return writeValue(db, storeName, key, value); });
   }
 
   /**
-   * Delete one key. Idempotent (resolves even if the key was absent).
+   * Delete one key and any pieces of its value. Idempotent (resolves even if
+   * the key was absent).
    *
    * @param {StoreName} storeName
    * @param {IDBValidKey} key
@@ -407,23 +414,12 @@ export const IDBAdapter = (function () {
    */
   function del(storeName, key) {
     if (_writeFence) return Promise.resolve();   // v04-02: nothing reopens a wiped database
-    return txStore(storeName, 'readwrite').then(function (ctx) {
-      return new Promise(function (resolve, reject) {
-        let settled = false;
-        const settle = function (action) { if (!settled) { settled = true; action(); } };
-        let req;
-        try {
-          req = ctx.store.delete(key);
-        } catch (e) {
-          settle(function () { reject(e); });
-          return;
-        }
-        req.onerror = function () { settle(function () { reject(req.error || _makeAbortError()); }); };
-        ctx.tx.oncomplete = function () { settle(function () { resolve(undefined); }); };
-        ctx.tx.onabort = function () {
-          settle(function () { reject(ctx.tx.error || (req && req.error) || _makeAbortError()); });
-        };
-      });
+    if (!STORE_SET.has(storeName)) {
+      return Promise.reject(new Error('Unknown IDB store: ' + storeName));
+    }
+    return _queue(function () {
+      if (_writeFence) return Promise.reject(_fencedError());
+      return open().then(function (db) { return deleteValue(db, storeName, key); });
     });
   }
 
@@ -438,16 +434,18 @@ export const IDBAdapter = (function () {
   function getAll(storeName) {
     return txStore(storeName, 'readonly').then(function (ctx) {
       return new Promise(function (resolve, reject) {
-        /** @type {Record<string, any>} */
-        const out = {};
+        /** @type {Array<[IDBValidKey, any]>} */
+        const rows = [];
         const req = ctx.store.openCursor();
         req.onsuccess = function (e) {
           const cursor = /** @type {IDBRequest<IDBCursorWithValue | null>} */ (e.target).result;
           if (cursor) {
-            out[String(cursor.key)] = cursor.value;
+            rows.push([cursor.key, cursor.value]);
             cursor.continue();
           } else {
-            resolve(out);
+            // Pieces join their value and never show as keys; a value whose pieces
+            // do not add up rejects (DataError), never reads as missing.
+            try { resolve(foldRows(rows)); } catch (err) { reject(err); }
           }
         };
         req.onerror = function () { reject(req.error || new Error('cursor failed')); };
@@ -478,21 +476,15 @@ export const IDBAdapter = (function () {
       return Promise.reject(new Error('Unknown IDB store: ' + storeName));
     }
     if (_writeFence) return Promise.resolve();   // v04-02: nothing reopens a wiped database
-    return open().then(function (db) {
-      return new Promise(function (resolve, reject) {
-        let settled = false;
-        const settle = function (action) { if (!settled) { settled = true; action(); } };
-        let tx;
-        try {
-          tx = db.transaction([storeName, 'meta'], 'readwrite');
-        } catch (e) { settle(function () { reject(e); }); return; }
-        tx.oncomplete = function () { settle(function () { resolve(undefined); }); };
-        tx.onerror = function () { settle(function () { reject(tx.error || _makeAbortError()); }); };
-        tx.onabort = function () { settle(function () { reject(tx.error || _makeAbortError()); }); };
-        try {
-          tx.objectStore(storeName).put(dataValue, 'v');
-          tx.objectStore('meta').put(version, 'schema:' + storeName);
-        } catch (e) { settle(function () { reject(e); }); }
+    return _queue(function () {
+      if (_writeFence) return Promise.reject(_fencedError());
+      return open().then(function (db) {
+        // The schema version rides the transaction that makes the data current:
+        // with a big value in pieces, the last of its transactions.
+        return writeValue(db, storeName, 'v', dataValue, {
+          extraStores: ['meta'],
+          inFinal: function (tx) { tx.objectStore('meta').put(version, 'schema:' + storeName); },
+        });
       });
     });
   }

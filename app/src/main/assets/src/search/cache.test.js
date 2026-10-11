@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
-import { dataSignature, loadCached, saveCached, clearCached, openDb, MS_INDEX_VERSION, CORPUS_CONTENT_VERSION } from './cache.js';
+import { dataSignature, loadCached, saveCached, clearCached, SEARCH_CACHE_NAME, LEGACY_SEARCH_DB, MS_INDEX_VERSION, CORPUS_CONTENT_VERSION } from './cache.js';
 
 describe('cache signature', () => {
   beforeEach(() => { for (const k of ['BOOKS', 'MATTHEW', 'LETTERS_V1', 'WTLB_ONE']) delete globalThis[k]; });
@@ -92,13 +92,37 @@ describe('cache signature', () => {
   });
 });
 
-describe('cache IDB round-trip', () => {
-  beforeEach(async () => { await clearCached(); });
+/** CacheStorage in memory: the browser's Cache API shape the module uses. */
+function memoryCaches() {
+  const stores = new Map();
+  const key = (req) => new URL(typeof req === 'string' ? req : req.url, 'https://app.test/').href;
+  const open = async (name) => {
+    if (!stores.has(name)) stores.set(name, new Map());
+    const m = stores.get(name);
+    return {
+      match: async (req) => { const r = m.get(key(req)); return r ? r.clone() : undefined; },
+      put: async (req, res) => { m.set(key(req), res.clone()); },
+      delete: async (req) => m.delete(key(req)),
+    };
+  };
+  return { stores, open, delete: async (name) => stores.delete(name), keys: async () => [...stores.keys()] };
+}
+
+/* 2026-10-11: the warm index is ~21 MB. In IndexedDB that was one value the size of a small
+   library - a blob file in the very store the owner's WebView kept destroying, and the
+   biggest write the app made. It lives in the Cache API now (CacheStorage, its own
+   backend): a lost or broken cache costs one ~10 s rebuild, never the library. */
+describe('the warm index in the Cache API', () => {
+  const GC = /** @type {any} */ (globalThis);
+  let caches0;
+  beforeEach(() => { caches0 = GC.caches; GC.caches = memoryCaches(); });
+  afterEach(() => { GC.caches = caches0; vi.restoreAllMocks(); });
 
   it('returns null on a cold cache, then loads a matching signature', async () => {
     expect(await loadCached('sig-1')).toBeNull();
     expect(await saveCached('sig-1', '{"index":true}')).toBe(true);
     expect(await loadCached('sig-1')).toBe('{"index":true}');
+    expect([...GC.caches.stores.keys()]).toEqual([SEARCH_CACHE_NAME]);
   });
 
   it('returns null for a stale (non-matching) signature', async () => {
@@ -111,26 +135,38 @@ describe('cache IDB round-trip', () => {
     await saveCached('b', '{"b":2}');
     expect(await loadCached('a')).toBeNull();
     expect(await loadCached('b')).toBe('{"b":2}');
+    expect(GC.caches.stores.get(SEARCH_CACHE_NAME).size).toBe(1);
   });
 
   it('clears', async () => {
     await saveCached('s', '{"y":2}');
-    await clearCached();
+    expect(await clearCached()).toBe(true);
     expect(await loadCached('s')).toBeNull();
   });
-});
 
-describe('cache IDB — storage-backup-4 sibling: an open connection must not block Clear All', () => {
-  it('REPRO: deleteDatabase succeeds (not blocked) while a connection from openDb is still live', async () => {
-    const db = await openDb();
-    expect(db).toBeTruthy();
-    const outcome = await new Promise((resolve) => {
-      // Settings -> Clear All My Data's exact call for this database.
-      const req = indexedDB.deleteDatabase('vot-minisearch-cache');
-      req.onsuccess = () => resolve('success');
-      req.onblocked = () => resolve('blocked');
-      req.onerror = () => resolve('error');
-    });
-    expect(outcome).toBe('success');
+  it('never opens IndexedDB', async () => {
+    const open = vi.spyOn(GC.indexedDB || { open() {} }, 'open');
+    await saveCached('s', '{"y":2}');
+    await loadCached('s');
+    await clearCached();
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('without the Cache API there is simply no warm cache (search rebuilds)', async () => {
+    delete GC.caches;
+    expect(await saveCached('s', '{"y":2}')).toBe(false);
+    expect(await loadCached('s')).toBeNull();
+    expect(await clearCached()).toBe(false);
+  });
+
+  it('a failing Cache API is a cold cache, never an error', async () => {
+    GC.caches = { open: async () => { throw new Error('SecurityError'); }, delete: async () => { throw new Error('x'); } };
+    expect(await saveCached('s', '{"y":2}')).toBe(false);
+    expect(await loadCached('s')).toBeNull();
+    expect(await clearCached()).toBe(false);
+  });
+
+  it('names the retired IndexedDB database for the one-time reclaim', () => {
+    expect(LEGACY_SEARCH_DB).toBe('vot-minisearch-cache');
   });
 });

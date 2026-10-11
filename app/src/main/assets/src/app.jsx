@@ -251,16 +251,14 @@ function App() {
   // (hooks/use-translation-loader.js — the effect and its reasons live there).
   useTranslationLoader(settings.translation, setTranslationTick);
 
-  // One-time reclaim of the RETIRED Classic engine's index cache at boot.
-  // The FlexSearch engine is gone (MiniSearch is the only engine now), so
-  // its vot-search-cache DB — which could hold tens of MB of serialized
-  // index on installs that used Classic search — is pure orphaned storage.
-  // Only when it is there (2026-10-11): deleting a missing database still opens the
-  // origin's store and writes and deletes its metadata on every boot, churn a store
-  // the WebView has twice found corrupt does not need. MiniSearch's own
-  // vot-minisearch-cache is version-gated internally and stays.
+  // One-time reclaim of two RETIRED index caches at boot: the Classic engine's
+  // vot-search-cache (tens of MB on installs that used Classic search) and, since
+  // 2026-10-11, MiniSearch's own vot-minisearch-cache, whose ~21 MB value now lives
+  // in the Cache API instead (search/cache.js). Only when there: deleting a missing
+  // database still opens the origin's store and churns its metadata on every boot.
   useEffect(() => {
-    try { indexedDB.databases().then((dbs) => { if (dbs.some((d) => d.name === 'vot-search-cache')) indexedDB.deleteDatabase('vot-search-cache'); }, () => {}); } catch (_e) { /* best-effort reclaim */ }
+    const retired = ['vot-search-cache', 'vot-minisearch-cache'];
+    try { indexedDB.databases().then((dbs) => { for (const d of dbs) if (retired.includes(d.name)) indexedDB.deleteDatabase(d.name); }, () => {}); } catch (_e) { /* best-effort reclaim */ }
   }, []);
 
   // ERR1: shared by the boot effect AND the StudiesHome "Try again" button.

@@ -289,6 +289,28 @@ describe('JournalMediaStore — atomic import replacement', () => {
   });
 });
 
+/* 2026-10-11: two readwrite transactions left uncommitted at a kill make the WebView
+   destroy the origin's whole IndexedDB (stores/idb-chunks.js header). Every write path
+   here commits explicitly once its last request is queued, so a page that freezes right
+   after cannot leave one open. */
+describe('JournalMediaStore — every write commits explicitly', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('put, delete, staging, clearing and the import commit each call commit()', async () => {
+    const commit = vi.spyOn(IDBTransaction.prototype, 'commit');
+    await JournalMediaStore.put({ id: 'c1', type: 'image', blob: makeBlob(8, 'image/jpeg') });
+    expect(commit).toHaveBeenCalledTimes(1);
+    await JournalMediaStore.delete('c1');
+    expect(commit).toHaveBeenCalledTimes(2);
+    await JournalMediaStore.beginImportReplace();
+    await JournalMediaStore.stageImportRecord({ id: 'c2', type: 'image', blob: makeBlob(8, 'image/jpeg') });
+    expect(commit).toHaveBeenCalledTimes(4);
+    await JournalMediaStore.commitImportReplace();
+    expect(commit).toHaveBeenCalledTimes(5);
+    expect(await JournalMediaStore.allIds()).toEqual(['c2']);
+  });
+});
+
 describe('JournalMediaStore — pruneOrphans() — the user-data deleter contract', () => {
   beforeEach(async () => {
     // Seed three media records before each pruneOrphans test.

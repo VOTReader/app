@@ -24,9 +24,7 @@
    too — indexedDB.deleteDatabase('vot-minisearch-cache') — or it warm-restores.
    ═══════════════════════════════════════════════════════════════════════ */
 
-const DB_NAME = 'vot-minisearch-cache';
-const STORE = 'idx';
-const KEY = 'index';
+const DB_NAME = 'vot-minisearch-cache';     // retired 2026-10-11 (below): only reclaimed now
 
 /** Bump on any index-builder doc-shape OR search-config change (busts all caches). */
 /* m2 (2026-08-04): the Matthew Study Bible's 1,071 verses now reach the
@@ -114,34 +112,29 @@ export function dataSignature(translation) {
   ].join('|');
 }
 
-/**
- * Open a fresh connection to the MiniSearch cache DB. Not cached at module
- * scope — every caller below closes its connection as soon as its own
- * transaction completes, unlike thumb-store.js/idb-adapter.js/journal-
- * media-store.js, which hold one connection open for the page's life. That
- * keeps the exposure window narrow, but not zero: a call still in flight
- * when Settings -> Clear All My Data runs
- * indexedDB.deleteDatabase('vot-minisearch-cache') would otherwise fire
- * onblocked with no recovery until reload (storage-backup-4's exact defect,
- * just on a shorter fuse). Exported so the contract is directly testable,
- * same as thumb-store.js's openThumbDB.
- * @returns {Promise<IDBDatabase>}
- */
-export function openDb() {
-  return new Promise((resolve, reject) => {
-    if (typeof indexedDB === 'undefined') { reject(new Error('no-indexeddb')); return; }
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
-    };
-    req.onsuccess = () => {
-      const db = req.result;
-      db.onversionchange = () => { try { db.close(); } catch (_e) { /* best-effort close */ } };
-      resolve(db);
-    };
-    req.onerror = () => reject(req.error);
-  });
+/* ─── Where the warm index lives: the Cache API (2026-10-11) ───────────────
+   It used to be one IndexedDB value of ~21 MB (DB 'vot-minisearch-cache'): a
+   blob file in the same store as the reader's library, which the owner's
+   WebView destroyed three times ("Unknown corruption", stores/idb-chunks.js
+   header), and the biggest write the app made. CacheStorage is a separate
+   backend: whatever happens to it costs one ~10 s rebuild, never the library.
+   One entry, the signature in a header. No Cache API (a non-secure origin, an
+   old engine) means no warm cache: search builds the index each session.
+   app.jsx deletes the retired database once, where it still exists. */
+
+/** The CacheStorage cache holding the warm index. */
+export const SEARCH_CACHE_NAME = 'vot-search-index';
+/** The retired IndexedDB database the index used to live in (app.jsx reclaims it). */
+export const LEGACY_SEARCH_DB = DB_NAME;
+/** The entry's key: a same-origin URL nothing ever fetches. */
+const ENTRY_URL = '/__vot/search-index';
+const SIG_HEADER = 'x-vot-index-sig';
+
+/** @returns {Promise<Cache | null>} */
+async function openCache() {
+  const cs = /** @type {any} */ (globalThis).caches;
+  if (!cs || typeof cs.open !== 'function') return null;
+  return cs.open(SEARCH_CACHE_NAME);
 }
 
 /**
@@ -151,15 +144,12 @@ export function openDb() {
  */
 export async function loadCached(sig) {
   try {
-    const db = await openDb();
-    const entry = await new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readonly');
-      const rq = tx.objectStore(STORE).get(KEY);
-      rq.onsuccess = () => resolve(rq.result);
-      rq.onerror = () => reject(rq.error);
-    });
-    db.close();
-    return (entry && entry.sig === sig && entry.json) ? entry.json : null;
+    const cache = await openCache();
+    if (!cache) return null;
+    const res = await cache.match(ENTRY_URL);
+    if (!res || res.headers.get(SIG_HEADER) !== sig) return null;
+    const json = await res.text();
+    return json || null;
   } catch {
     return null; // unavailable / blocked — fall back to a fresh build
   }
@@ -173,32 +163,21 @@ export async function loadCached(sig) {
  */
 export async function saveCached(sig, json) {
   try {
-    const db = await openDb();
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      tx.objectStore(STORE).put({ sig, json, savedAt: Date.now() }, KEY);
-      tx.oncomplete = () => resolve(true);
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
-    });
-    db.close();
+    const cache = await openCache();
+    if (!cache) return false;
+    await cache.put(ENTRY_URL, new Response(json, { headers: { 'content-type': 'application/json', [SIG_HEADER]: sig } }));
     return true;
   } catch {
     return false; // quota / unavailable — search still works, just rebuilds next time
   }
 }
 
-/** Clear the cache (used by "/rebuild index"). @returns {Promise<boolean>} */
+/** Clear the cache (used by "/rebuild index" and Clear All). @returns {Promise<boolean>} */
 export async function clearCached() {
   try {
-    const db = await openDb();
-    await new Promise((resolve) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      tx.objectStore(STORE).clear();
-      tx.oncomplete = () => resolve(true);
-      tx.onerror = () => resolve(false);
-    });
-    db.close();
+    const cs = /** @type {any} */ (globalThis).caches;
+    if (!cs || typeof cs.delete !== 'function') return false;
+    await cs.delete(SEARCH_CACHE_NAME);
     return true;
   } catch {
     return false;

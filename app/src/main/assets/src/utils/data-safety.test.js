@@ -419,6 +419,24 @@ describe('wipe-proof (2026-10-11: the owner phone lost its database again, and R
     expect(await DataSafety.run({ sink, reload: vi.fn() })).toBe('fresh');
   });
 
+  it('the data-health line names a browser reset with its reason, and leaves an ordinary upgrade alone', async () => {
+    const { DiagnosticLog } = await import('./diagnostic-log.js');
+    const six = Object.fromEntries(Array.from({ length: 6 }, (_, i) => ['bible:ps:2:' + i, [{ id: 'q' + i, groupId: 'q' + i, kind: 'highlight', start: 0, end: 2, created: i, updated: i }]]));
+    const sink = memorySink();
+    await snapshotYesterday(sink, { ...LIBRARY, 'vot-annotations': six });
+    await IDBAdapter.put('vot-annotations', 'v', {});
+    const warn = vi.spyOn(DiagnosticLog, 'warn');
+    const info = vi.spyOn(IDBAdapter, 'openInfo').mockReturnValue({ oldVersion: 12, newVersion: 13, dataLoss: 'none', dataLossMessage: '', at: 1 });
+    expect(await DataSafety.run({ sink, reload: vi.fn() })).toBe('damaged');
+    const upgradeLine = warn.mock.calls.find((c) => /library looks smaller/.test(c[1]))[1];
+    expect(upgradeLine).not.toMatch(/database|reset/);
+    warn.mockClear();
+    DataSafety._resetForTests();
+    info.mockReturnValue({ oldVersion: 0, newVersion: 13, dataLoss: 'total', dataLossMessage: 'IndexedDB (database was corrupt): Unknown corruption', at: 1 });
+    await DataSafety.run({ sink, reload: vi.fn() });
+    expect(warn.mock.calls.find((c) => /library looks smaller/.test(c[1]))[1]).toMatch(/database created this boot, dataLoss total \(IndexedDB \(database was corrupt\): Unknown corruption\)/);
+  });
+
   it('a partial loss still asks (the banner); it never restores on its own', async () => {
     const sink = memorySink();
     const six = Object.fromEntries(Array.from({ length: 6 }, (_, i) => ['bible:ps:1:' + i, [{ id: 'p' + i, groupId: 'p' + i, kind: 'highlight', start: 0, end: 2, created: i, updated: i }]]));

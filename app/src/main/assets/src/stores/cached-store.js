@@ -518,6 +518,10 @@ export function CachedStore(storageKey, defaultVal, opts) {
             // earlier failure — nothing else ever reports a success to it.
             if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteSuccess();
           }, function (err) {
+            // Waited in the adapter's write queue until Clear All's fence rose (refuter
+            // 10-11): not saved, not a storage failure. Saved again if the fence comes
+            // down without a reload, exactly like a save the fence stopped up front.
+            if (err && err.name === 'WriteFenced') { _fencedDirty.add(self); return; }
             console.error('IDB write failed for', idbStoreName, err);
             // W7.4: bare-global (typeof) guard mirrors the StorageHealth line
             // below — cached-store deliberately holds no imports (see header).
@@ -616,6 +620,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
         self._clearWriteRetry();   // STORE-4: merged write durable — cancel any pending retry
         if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteSuccess();
       }, function (err) {
+        if (err && err.name === 'WriteFenced') { _fencedDirty.add(self); return; }   // see _save
         console.error('IDB merged write failed for', name, err);
         if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('store', 'IDB merged write failed: ' + name + ' — ' + ((err && err.name) || err));
         if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);

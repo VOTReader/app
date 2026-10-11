@@ -248,6 +248,62 @@ describe('ThumbStore — transaction failures resolve quietly', () => {
   });
 });
 
+/* 2026-10-11: a tab thumbnail is a 150-400 KB JPEG data URL, two per tab, rewritten on
+   every capture - each one a blob file in the store the WebView kept destroying. Now in
+   pieces through idb-chunks.js (small records, small committed transactions, one write
+   at a time), invisible to every caller and to the GC sweep. */
+describe('ThumbStore — big thumbnails in pieces (idb-chunks)', () => {
+  const dataUrl = (seed) => 'data:image/jpeg;base64,' + Array.from({ length: 30000 }, (_, i) => ((i * 7 + seed) % 64).toString(36)).join('');
+  const entry = () => ({ dark: dataUrl(1), light: dataUrl(2) });
+
+  async function rawRows() {
+    const db = await openThumbDB();
+    return new Promise((res) => {
+      const out = [];
+      const rq = db.transaction(THUMB_STORE).objectStore(THUMB_STORE).openCursor();
+      rq.onsuccess = () => { const c = rq.result; if (!c) { res(out); return; } out.push([c.key, c.value]); c.continue(); };
+    });
+  }
+
+  it('a big entry round-trips, and no record is over a piece', async () => {
+    await idbPut('bible:mark', entry());
+    expect(await idbReadAll()).toEqual({ 'bible:mark': entry() });
+    expect(await idbReadAll(['bible:mark'])).toEqual({ 'bible:mark': entry() });
+    const rows = await rawRows();
+    expect(rows.length).toBeGreaterThan(2);
+    for (const [, v] of rows.slice(1)) expect(typeof v === 'string' && v.length <= 16000).toBe(true);
+  });
+
+  it('the GC sweep only ever sees tab keys, never the pieces', async () => {
+    await idbPut('bible:mark', entry());
+    await idbPut('home', 'data:image/jpeg;base64,xx');
+    expect((await idbAllKeys()).sort()).toEqual(['bible:mark', 'home']);
+  });
+
+  it('pieces a kill left with no entry are named by their tab, so the GC sweeps them', async () => {
+    const db = await openThumbDB();
+    await new Promise((res) => { const tx = db.transaction(THUMB_STORE, 'readwrite'); tx.objectStore(THUMB_STORE).put('stray', 'closed-tab#chunk:0abc:00000'); tx.oncomplete = res; });
+    expect(await idbAllKeys()).toEqual(['closed-tab']);
+    await idbDelete('closed-tab');
+    expect(await rawRows()).toEqual([]);
+  });
+
+  it('idbDelete removes every piece with the key', async () => {
+    await idbPut('bible:mark', entry());
+    await idbDelete('bible:mark');
+    expect(await rawRows()).toEqual([]);
+  });
+
+  it('a live-key read of a thumbnail whose pieces are gone leaves it out instead of throwing', async () => {
+    await idbPut('bible:mark', entry());
+    await idbPut('home', 'small');
+    const db = await openThumbDB();
+    await new Promise((res) => { const tx = db.transaction(THUMB_STORE, 'readwrite'); tx.objectStore(THUMB_STORE).delete(IDBKeyRange.bound('bible:mark#chunk:', 'bible:mark#chunk:￿')); tx.oncomplete = res; });
+    expect(await idbReadAll(['bible:mark', 'home'])).toEqual({ home: 'small' });
+    expect(await idbReadAll()).toEqual({ home: 'small' });
+  });
+});
+
 /* No IDB at all (private mode, a blocked origin): the singleton resolves null and
    every helper degrades to its empty value. Needs a FRESH module instance, since
    the connection promise is cached for the life of the module. */

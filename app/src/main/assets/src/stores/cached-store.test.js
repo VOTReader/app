@@ -734,6 +734,25 @@ describe('CachedStore v04-02 — the Clear-All write fence', () => {
     expect(putSpy.mock.calls[0][2].map((i) => i.id)).toEqual(['a']);
   });
 
+  // Refuter 10-11: the adapter's one-at-a-time queue means a save can be issued before
+  // the fence and still be waiting when it rises; the adapter then refuses it with a
+  // WriteFenced error. That save did not land: no failure banner, and it is saved again
+  // when the fence comes down, exactly like a save the fence stopped up front.
+  it('a save the adapter held back with WriteFenced is saved again when the fence comes down', async () => {
+    const fenced = Object.assign(new Error('fenced'), { name: 'WriteFenced' });
+    const putSpy = vi.spyOn(IDBAdapter, 'put').mockRejectedValueOnce(fenced).mockResolvedValue(undefined);
+    const store = createTestStore('vot-test-fence-queued', { idb: true });
+    store._resetForTests({ forceLoaded: true });
+    store.add({ id: 'q', label: 'Q' });                   // issued before the fence...
+    setStoreWriteFence(true);                              // ...which rises while it waits
+    await Promise.resolve(); await Promise.resolve();
+    expect(window.StorageHealth.onWriteFailure).not.toHaveBeenCalled();
+    setStoreWriteFence(false);                             // the wipe failed: no reload
+    await Promise.resolve();
+    expect(putSpy).toHaveBeenCalledTimes(2);
+    expect(putSpy.mock.calls[1][2].map((i) => i.id)).toEqual(['q']);
+  });
+
   it('CONTROL: a store that did not try to save while fenced is not rewritten when it comes down', async () => {
     const putSpy = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
     const store = createTestStore('vot-test-fence-quiet', { idb: true });
