@@ -51,7 +51,10 @@ const { useState, useEffect } = React;
 /** Stores that load within this window of each other cause one remount. */
 export const REMOUNT_COALESCE_MS = 250;
 /** The data-health check and daily snapshot wait this long after every store loads
- *  (utils/data-safety.js): never on the boot path. */
+ *  (utils/data-safety.js): never on the boot path. Except on a boot whose open had to
+ *  create the database - a first run, or one the browser threw away (2026-10-11) - which
+ *  checks at once, so a thrown-away library comes back before the reader starts on an
+ *  empty one. */
 export const SAFETY_DELAY_MS = 5000;
 
 /**
@@ -115,7 +118,7 @@ export function HydrationGate({ children }) {
     /** @type {any} */ let safetyTimer = null;
     const scheduleSafety = () => {
       if (safetyTimer != null) clearTimeout(safetyTimer);
-      safetyTimer = setTimeout(() => { safetyTimer = null; DataSafety.run(); }, SAFETY_DELAY_MS);
+      safetyTimer = setTimeout(() => { safetyTimer = null; DataSafety.run(); }, DataSafety.freshDatabase() ? 0 : SAFETY_DELAY_MS);
     };
     let waiting = lateRef.current;
     if (waiting.length === 0) {

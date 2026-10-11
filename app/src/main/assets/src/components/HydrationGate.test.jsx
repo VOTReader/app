@@ -10,7 +10,8 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
-import { HydrationGate } from './HydrationGate.jsx';
+import { HydrationGate, SAFETY_DELAY_MS } from './HydrationGate.jsx';
+import { DataSafety } from '../utils/data-safety.js';
 import { CachedStore, _resetStoreRegistry } from '../stores/cached-store.js';
 import { IDBAdapter } from '../stores/idb-adapter.js';
 
@@ -88,6 +89,24 @@ describe('HydrationGate', () => {
       expect(screen.getByTestId('child')).toBeDefined();
     });
     consoleSpy.mockRestore();
+  });
+
+  // 2026-10-11: a boot that had to create the database (a first run, or one the browser
+  // threw away) checks at once, so a thrown-away library comes back before the reader
+  // starts on an empty one; any other boot waits SAFETY_DELAY_MS (off the boot path).
+  it('runs the data-safety pass at once when this boot created the database, else after the delay', async () => {
+    const run = vi.spyOn(DataSafety, 'run').mockResolvedValue('fresh');
+    vi.spyOn(DataSafety, 'freshDatabase').mockReturnValue(true);
+    render(<HydrationGate><div data-testid="child">app content</div></HydrationGate>);
+    await waitFor(() => expect(run).toHaveBeenCalledTimes(1), { timeout: 1000 });
+    cleanup();
+    run.mockClear();
+    vi.spyOn(DataSafety, 'freshDatabase').mockReturnValue(false);
+    render(<HydrationGate><div data-testid="child">app content</div></HydrationGate>);
+    await waitFor(() => expect(screen.getByTestId('child')).toBeDefined());
+    await new Promise((r) => setTimeout(r, 300));
+    expect(run).not.toHaveBeenCalled();
+    expect(SAFETY_DELAY_MS).toBeGreaterThan(1000);
   });
 
   it('has role=status on the splash for screen readers', async () => {

@@ -22,10 +22,11 @@ const NOTES = { a1: { groupId: 'a1', body: 'n1', keys: ['bible:john:3:16'], crea
 const LINKS = [{ id: 'l1', source: { key: 'a' }, target: { key: 'b' }, created: 1 }];
 const STATE = { theme: 'dark', readItems: Object.fromEntries(Array.from({ length: 30 }, (_, i) => ['k' + i, 1])), tabs: [{ id: 't' }] };
 
-/** A sink held in memory, the same shape snapshot-sink returns. */
-function memorySink() {
+/** A sink held in memory, the same shape snapshot-sink returns (the phone app's, unless `kind` says the web's). */
+function memorySink(kind = 'android') {
   const files = new Map();
   return {
+    kind,
     files,
     save: vi.fn(async (json) => { files.set(snapshotName(Date.now() + files.size * 1000), json); return true; }),
     list: async () => [...files.keys()].sort().reverse().map((name) => ({ name, at: snapshotTime(name), size: files.get(name).length })),
@@ -50,6 +51,7 @@ beforeEach(async () => {
     return s;
   });
   StorageHealth.setDataMissing(null);
+  DataSafety._resetForTests();
 });
 
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); setStoreWriteFence(false); });
@@ -94,9 +96,10 @@ describe('run(): the boot pass', () => {
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(yesterday);
     await DataSafety.run({ sink });
     vi.useRealTimers();
-    // The WebView comes back empty.
+    // The WebView comes back nearly empty (one read mark: a TOTAL wipe restores on its
+    // own since 2026-10-11, see 'wipe-proof' below; anything less asks).
     for (const n of ['vot-annotations', 'vot-notes', 'vot-links']) await IDBAdapter.put(n, 'v', n === 'vot-links' ? [] : {});
-    await IDBAdapter.put('vot-state', 'v', { theme: 'dark', readItems: {} });
+    await IDBAdapter.put('vot-state', 'v', { theme: 'dark', readItems: { k0: 1 } });
     expect(await DataSafety.run({ sink })).toBe('damaged');
     expect(sink.files.size).toBe(1);
     const missing = StorageHealth.getReport().dataMissing;
@@ -267,7 +270,7 @@ describe('the weekly copy in Downloads/VOTReader (dl-weekly)', () => {
     const bridge = fakeBridge();
     await runOn(0, sink, bridge);
     for (const n of ['vot-annotations', 'vot-notes', 'vot-links']) await IDBAdapter.put(n, 'v', n === 'vot-links' ? [] : {});
-    await IDBAdapter.put('vot-state', 'v', { theme: 'dark', readItems: {} });
+    await IDBAdapter.put('vot-state', 'v', { theme: 'dark', readItems: { k0: 1 } });
     expect(await runOn(8, sink, bridge)).toBe('damaged');
     expect(bridge.weeklyCopySave).toHaveBeenCalledTimes(1);
   });
@@ -304,5 +307,232 @@ describe('the weekly copy in Downloads/VOTReader (dl-weekly)', () => {
       validateStorePayload: () => [], validateMediaRecord: () => [],
     });
     expect(mediaStore.delete).toHaveBeenCalledWith('photo-1');
+  });
+});
+
+describe('wipe-proof (2026-10-11: the owner phone lost its database again, and Restore left settings and tabs reset)', () => {
+  const SNAP_STATE = {
+    theme: 'dark', settings: { translation: 'rnkjv', fontScale: '0.9' }, activeTabIdx: 1, activeReadKey: 'mark',
+    tabs: [{ screen: 'bible-idx', bookId: 'mark' }, { screen: 'home' }],
+    readItems: Object.fromEntries(Array.from({ length: 30 }, (_, i) => ['k' + i, 1])),
+  };
+  const WIPED_STATE = { theme: 'light', settings: { translation: 'nkjv' }, tabs: [{ screen: 'home' }], activeTabIdx: 0, activeReadKey: null, readItems: {} };
+  const LIBRARY = { 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': SNAP_STATE, 'vot-history': [{ key: 'h1', ts: 1 }] };
+  const byName = (n) => stores.find((s) => s._idbStoreName === n);
+
+  /** Yesterday's healthy boot: a snapshot of `library`. */
+  async function snapshotYesterday(sink, library = LIBRARY) {
+    await seed(library);
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(Date.now() - 86400000);
+    try { expect(await DataSafety.run({ sink })).toBe('snapshotted'); } finally { vi.useRealTimers(); }
+    DataSafety._resetForTests();                       // a new boot
+  }
+  /** The WebView threw the database away: every store back to its default. */
+  async function wipe() {
+    for (const n of ['vot-annotations', 'vot-notes']) await IDBAdapter.put(n, 'v', {});
+    for (const n of ['vot-links', 'vot-history']) await IDBAdapter.put(n, 'v', []);
+    await IDBAdapter.put('vot-state', 'v', WIPED_STATE);
+  }
+  /** Today's healthy boot with LIBRARY in memory (the stores loaded it). */
+  async function healthyBoot(sink) {
+    await seed(LIBRARY);
+    for (const [n, v] of Object.entries(LIBRARY)) byName(n)._cache = JSON.parse(JSON.stringify(v));
+    expect(['snapshotted', 'fresh']).toContain(await DataSafety.run({ sink }));
+  }
+
+  it("Restore after a total wipe takes the snapshot's settings, theme and tabs; a partial loss keeps the live ones", () => {
+    const st = mergeForRestore('vot-state', WIPED_STATE, SNAP_STATE, { wiped: true });
+    expect(st).toMatchObject({ theme: 'dark', settings: SNAP_STATE.settings, tabs: SNAP_STATE.tabs, activeTabIdx: 1, activeReadKey: 'mark' });
+    expect(Object.keys(st.readItems)).toHaveLength(30);
+    expect(mergeForRestore('vot-state', { ...WIPED_STATE, readItems: { x: 1 } }, SNAP_STATE).theme).toBe('light');
+  });
+
+  it('counters keep the higher value, id lists union, and a list of samples is never emptied', () => {
+    const lib = mergeForRestore('vot-audio-library', { v: 3, recent: [], saved: [], plays: 71, completions: 2, rate: 1 },
+      { v: 3, recent: [], saved: [], plays: 416, completions: 765, rate: 1.25 }, { wiped: true });
+    expect(lib).toMatchObject({ plays: 416, completions: 765, rate: 1.25 });
+    expect(mergeForRestore('vot-audio-library', { plays: 1, rate: 1 }, { plays: 5, rate: 1.25 }).rate).toBe(1);
+    const stats = mergeForRestore('vot-reading-stats', { milestonesUnlocked: ['read-first'], wpmSamples: [] },
+      { milestonesUnlocked: ['read-first', 'read-200'], wpmSamples: [210, 230] });
+    expect(stats.milestonesUnlocked).toEqual(['read-first', 'read-200']);
+    expect(stats.wpmSamples).toEqual([210, 230]);
+  });
+
+  it('a total wipe at boot restores on its own, settings and tabs included, and the next boot says from when', async () => {
+    const sink = memorySink();
+    byName('vot-state')._idbLsShim = (v) => ({ theme: v.theme });     // the boot script's copy
+    await snapshotYesterday(sink);
+    await wipe();
+    localStorage.setItem('vot-state', JSON.stringify({ theme: 'light' }));
+    const reload = vi.fn();
+    expect(await DataSafety.run({ sink, reload })).toBe('restored');
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(localStorage.getItem('vot-state')).theme).toBe('dark');   // no light first paint
+    const st = await IDBAdapter.get('vot-state', 'v');
+    expect(st).toMatchObject({ theme: 'dark', tabs: SNAP_STATE.tabs, settings: SNAP_STATE.settings });
+    expect(Object.keys(st.readItems)).toHaveLength(30);
+    expect(Object.keys(await IDBAdapter.get('vot-annotations', 'v')).sort()).toEqual(['bible:john:3:16', 'letter:x:1']);
+    expect(await IDBAdapter.get('vot-history', 'v')).toHaveLength(1);
+    DataSafety._resetForTests();                       // the reload
+    setStoreWriteFence(false);
+    expect(['snapshotted', 'fresh']).toContain(await DataSafety.run({ sink }));
+    expect(document.getElementById('vot-toast-restored').textContent).toMatch(/restored from the copy saved/i);
+    expect(localStorage.getItem('vot-restored-note')).toBeNull();
+  });
+
+  it('restores on its own once per snapshot an hour; if the loss comes back, the banner asks', async () => {
+    const sink = memorySink();
+    await snapshotYesterday(sink);
+    await wipe();
+    expect(await DataSafety.run({ sink, reload: vi.fn() })).toBe('restored');
+    DataSafety._resetForTests(); setStoreWriteFence(false);
+    await wipe();
+    const reload = vi.fn();
+    expect(await DataSafety.run({ sink, reload })).toBe('damaged');
+    expect(reload).not.toHaveBeenCalled();
+    expect(StorageHealth.getReport().dataMissing).not.toBeNull();
+  });
+
+  // Refuter 10-11: an empty library the reader chose (a progress reset, Clear All whose
+  // snapshot delete failed, Keep as is) must be recorded, or the boot after next compares
+  // it with an older full snapshot and restores over the reader's choice.
+  it('a library the reader emptied on purpose (the skip token) is snapshotted, so no later boot restores over it', async () => {
+    const sink = memorySink();
+    await snapshotYesterday(sink);
+    await wipe();                                      // what a reset of everything leaves
+    localStorage.setItem(HEALTH_SKIP_KEY, '1');
+    expect(await DataSafety.run({ sink })).toBe('snapshotted');
+    DataSafety._resetForTests();
+    const reload = vi.fn();
+    expect(await DataSafety.run({ sink, reload })).toBe('fresh');      // the boot after next
+    expect(reload).not.toHaveBeenCalled();
+    expect(StorageHealth.getReport().dataMissing).toBeNull();
+  });
+
+  it('Keep as is on an empty library is recorded too', async () => {
+    const sink = memorySink();
+    await snapshotYesterday(sink);
+    await wipe();
+    StorageHealth.setDataMissing({ name: 'x', at: 0, then: {}, now: {} });
+    expect(await DataSafety.acceptCurrent({ sink })).toBe('snapshotted');
+    DataSafety._resetForTests();
+    expect(await DataSafety.run({ sink, reload: vi.fn() })).toBe('fresh');
+  });
+
+  it('a partial loss still asks (the banner); it never restores on its own', async () => {
+    const sink = memorySink();
+    const six = Object.fromEntries(Array.from({ length: 6 }, (_, i) => ['bible:ps:1:' + i, [{ id: 'p' + i, groupId: 'p' + i, kind: 'highlight', start: 0, end: 2, created: i, updated: i }]]));
+    await snapshotYesterday(sink, { ...LIBRARY, 'vot-annotations': six });
+    await IDBAdapter.put('vot-annotations', 'v', {});  // every highlight gone, notes and read marks intact
+    const reload = vi.fn();
+    expect(await DataSafety.run({ sink, reload })).toBe('damaged');
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  describe('saveLatest: a snapshot every time the reader leaves the app', () => {
+    it("does nothing before this boot's health pass found the library healthy", async () => {
+      expect(await DataSafety.saveLatest({ sink: memorySink() })).toBe('off');
+    });
+
+    it('saves what the stores hold in memory, a save still in flight included', async () => {
+      const sink = memorySink();
+      await healthyBoot(sink);
+      const before = sink.save.mock.calls.length;
+      byName('vot-annotations')._cache = { ...ANN, 'bible:gen:1:1': [{ id: 'a9', groupId: 'a9', kind: 'highlight', start: 0, end: 3, created: 9, updated: 9 }] };
+      expect(await DataSafety.saveLatest({ sink })).toBe('snapshotted');
+      expect(sink.save.mock.calls.length).toBe(before + 1);
+      const snap = JSON.parse(sink.save.mock.calls.at(-1)[0]);
+      expect(Object.keys(snap.stores['vot-annotations'])).toContain('bible:gen:1:1');
+      expect(snap.summary.highlights).toBe(3);
+      expect(await DataSafety.saveLatest({ sink })).toBe('unchanged');
+    });
+
+    it('a library in memory under half of the last snapshot raises the finding and is not saved', async () => {
+      const sink = memorySink();
+      await healthyBoot(sink);
+      const before = sink.save.mock.calls.length;
+      byName('vot-annotations')._cache = {};
+      byName('vot-notes')._cache = {};
+      byName('vot-state')._cache = { ...SNAP_STATE, readItems: {} };
+      expect(await DataSafety.saveLatest({ sink })).toBe('damaged');
+      expect(sink.save.mock.calls.length).toBe(before);
+      expect(StorageHealth.getReport().dataMissing).not.toBeNull();
+      expect(await DataSafety.saveLatest({ sink })).toBe('off');       // nothing more until the reader chooses
+    });
+
+    it('a progress reset the reader asked for (the skip token) is saved, not flagged', async () => {
+      const sink = memorySink();
+      await healthyBoot(sink);
+      byName('vot-state')._cache = { ...SNAP_STATE, readItems: {} };
+      localStorage.setItem(HEALTH_SKIP_KEY, '1');
+      expect(await DataSafety.saveLatest({ sink })).toBe('snapshotted');
+      expect(StorageHealth.getReport().dataMissing).toBeNull();
+    });
+
+    it('never while a restore, an import or Clear All has fenced the stores', async () => {
+      const sink = memorySink();
+      await healthyBoot(sink);
+      byName('vot-notes')._cache = { ...NOTES, a3: { groupId: 'a3', body: 'n3', created: 3, updated: 3 } };
+      setStoreWriteFence(true, { storesOnly: true });
+      expect(await DataSafety.saveLatest({ sink })).toBe('off');
+    });
+
+    it('leaving the app (the page goes hidden) takes one', async () => {
+      const sink = memorySink();
+      await healthyBoot(sink);
+      const before = sink.save.mock.calls.length;
+      byName('vot-notes')._cache = { ...NOTES, a3: { groupId: 'a3', body: 'n3', created: 3, updated: 3 } };
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+      try {
+        document.dispatchEvent(new Event('visibilitychange'));
+        await vi.waitFor(() => expect(sink.save.mock.calls.length).toBe(before + 1));
+      } finally {
+        delete document.visibilityState;
+      }
+    });
+
+    it('a leave while a save is in flight saves again once it lands', async () => {
+      const sink = memorySink();
+      await healthyBoot(sink);
+      const before = sink.save.mock.calls.length;
+      byName('vot-notes')._cache = { ...NOTES, a5: { groupId: 'a5', body: 'n5', created: 5, updated: 5 } };
+      const first = DataSafety.saveLatest({ sink });
+      byName('vot-notes')._cache = { ...NOTES, a5: { groupId: 'a5', body: 'n5', created: 5, updated: 5 }, a6: { groupId: 'a6', body: 'n6', created: 6, updated: 6 } };
+      await DataSafety.saveLatest({ sink });           // the second leave, during the first save
+      await first;
+      await vi.waitFor(() => expect(sink.save.mock.calls.length).toBe(before + 2));
+      expect(Object.keys(JSON.parse(sink.save.mock.calls.at(-1)[0]).stores['vot-notes'])).toContain('a6');
+    });
+
+    it('on the web it snapshots the database, not this tab\'s possibly stale memory', async () => {
+      const sink = memorySink('opfs');
+      await healthyBoot(sink);
+      const before = sink.save.mock.calls.length;
+      // Another tab added a note: it is in the database, not in this tab's memory.
+      await IDBAdapter.put('vot-notes', 'v', { ...NOTES, b1: { groupId: 'b1', body: 'other tab', created: 7, updated: 7 } });
+      expect(await DataSafety.saveLatest({ sink })).toBe('snapshotted');
+      expect(sink.save.mock.calls.length).toBe(before + 1);
+      expect(Object.keys(JSON.parse(sink.save.mock.calls.at(-1)[0]).stores['vot-notes'])).toContain('b1');
+    });
+
+    it('a page whose database another tab deleted or upgraded (versionchange) saves nothing more', async () => {
+      const sink = memorySink();
+      await healthyBoot(sink);
+      byName('vot-notes')._cache = { ...NOTES, a7: { groupId: 'a7', body: 'n7', created: 7, updated: 7 } };
+      const db = await IDBAdapter.open();
+      db.onversionchange(new Event('versionchange'));  // Clear All in another tab deletes the database
+      expect(await DataSafety.saveLatest({ sink })).toBe('off');
+    });
+
+    it('the browser closing the database mid-session takes one from memory at once', async () => {
+      const sink = memorySink();
+      await healthyBoot(sink);
+      const before = sink.save.mock.calls.length;
+      byName('vot-notes')._cache = { ...NOTES, a4: { groupId: 'a4', body: 'n4', created: 4, updated: 4 } };
+      const db = await IDBAdapter.open();
+      db.onclose();                                    // what Chromium does when it finds the store corrupt
+      await vi.waitFor(() => expect(sink.save.mock.calls.length).toBe(before + 1));
+      expect(Object.keys(JSON.parse(sink.save.mock.calls.at(-1)[0]).stores['vot-notes'])).toContain('a4');
+    });
   });
 });

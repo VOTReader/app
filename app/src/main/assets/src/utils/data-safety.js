@@ -27,11 +27,46 @@
       read counts keep the higher, history unions - so nothing made since the
       snapshot is dropped, then reload. Never a replace.
 
-   Never on the boot path: run() is called by HydrationGate after a delay.
+   2026-10-11: the same phone's database was thrown away again (idb-adapter.js
+   header: Chromium found it corrupt at open and recreated it empty). The banner
+   came up and Restore ran, but the reader still lost a day and saw the app
+   reset. So:
+
+   4. A SNAPSHOT EVERY TIME THE READER LEAVES (saveLatest): once this boot's
+      health pass found the library healthy, the page going hidden, pagehide,
+      the browser force-closing the database, and every PERIODIC_MS while
+      visible each save one, if anything changed. On the phone app it is taken
+      from the stores' MEMORY (one page, so memory is the library: no wait on a
+      save the kill may cut short, and it works when the database is failing);
+      on the web from the database (another tab may hold what this one never
+      saw), memory only when that cannot be read. It is judged like the boot
+      pass: a library under half of the last one raises the finding instead.
+      Never while a restore, import or Clear All has fenced the stores, nor
+      after another tab deleted or upgraded the database. The daily prune keeps
+      the newest of each day, so a wipe now costs nothing made before the
+      reader last left the app, instead of up to a day.
+   5. AUTO-RESTORE: a library that comes back with NOTHING in it (no
+      highlights, notes, links, bookmarks, journal, notebooks, read marks or
+      history) beside a snapshot that had something is a thrown-away
+      database, not a reader's choice (Clear All and an import set the skip
+      token; Android's "Clear storage" and an uninstall take the snapshots
+      too). It is restored at once and the page reloads, at most once an hour
+      per snapshot (a store that keeps coming back empty gets the banner, not
+      a reload loop). Any smaller drop still asks. Either restore leaves a
+      note, and the next boot's toast says which copy came back. An empty
+      library the reader chose (the skip token, or Keep as is) IS snapshotted,
+      so no later boot measures it against an older full copy and undoes it.
+   6. A restore after a total wipe takes the snapshot's settings, theme and
+      tabs: the live ones are the wipe's defaults (it was the reader's own
+      translation, dark theme and open tabs that stayed reset on 10-11).
+      Counters keep the higher value and id lists union, field by field.
+
+   Never on the boot path: run() is called by HydrationGate after a delay, or
+   at once when this boot met a freshly created database (freshDatabase()).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { IDBAdapter } from '../stores/idb-adapter.js';
-import { storesNotLoaded, registeredStores, setStoreWriteFence } from '../stores/cached-store.js';
+import { storesNotLoaded, registeredStores, setStoreWriteFence, isStoreWriteFenced } from '../stores/cached-store.js';
 import {
   mergeAnnotationsStore, mergeMapStore, mergeArrayStore, mergeListStore, mergeJournalIndexStore, mergeStateStore,
 } from '../stores/store-merge.js';
@@ -49,6 +84,17 @@ export const MIN_SCORE = 5;
 const MAX_SNAPSHOT_BYTES = 16 * 1024 * 1024;
 /** Stores never snapshotted: song bytes (gigabytes; they come back from the song sites). */
 const SKIP_STORES = new Set(['offline-songs']);
+/** localStorage {name, at} of the last auto-restore: once an hour per snapshot (5). In LS_SKIP_LIST. */
+export const AUTO_RESTORE_KEY = 'vot-auto-restore';
+const AUTO_RESTORE_WINDOW_MS = 3600000;
+/** localStorage {at, auto}: a restore just ran; the next boot's toast says from when. In LS_SKIP_LIST. */
+export const RESTORED_NOTE_KEY = 'vot-restored-note';
+/** A snapshot while the reader is in the app, if anything changed (4). */
+const PERIODIC_MS = 10 * 60000;
+/** Two hidden events this close are one leave (an unchanged library is never saved twice anyway). */
+const HIDDEN_GAP_MS = 2000;
+/** The vot-state fields that describe the reader's setup, not their library (6). */
+const SESSION_FIELDS = ['settings', 'theme', 'tabs', 'activeTabIdx', 'activeReadKey'];
 
 /** @param {any} v */
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
@@ -108,17 +154,85 @@ async function collectStores() {
   return out;
 }
 
+/**
+ * Every registered store's record as the page holds it now (4): what the reader
+ * sees, a save still in flight included, and readable when the database is not.
+ * Null when any store has not loaded its real data (its memory is defaults).
+ * @returns {Record<string, any> | null}
+ */
+function collectMemory() {
+  /** @type {Record<string, any>} */ const out = {};
+  for (const store of registeredStores()) {
+    const name = store._idbStoreName;
+    if (!name || SKIP_STORES.has(name)) continue;
+    if (typeof store.getState === 'function' && store.getState() !== 'loaded') return null;
+    const v = typeof store._load === 'function' ? store._load() : undefined;
+    if (v !== undefined && v !== null) out[name] = v;
+  }
+  return out;
+}
+
+/** Nothing at all in it: the shape of a database the browser threw away (5). @param {ReturnType<typeof summarize>} m */
+function isWiped(m) {
+  return score(m) === 0 && m.readMarks === 0 && m.history === 0;
+}
+
+/** True when this boot's open had to create the database: run the pass at once (HydrationGate). */
+export function freshDatabase() {
+  try { const info = IDBAdapter.openInfo && IDBAdapter.openInfo(); return !!info && info.oldVersion === 0; } catch (_e) { return false; }
+}
+
 /** A local calendar day key. @param {number} ms */
 const dayOf = (ms) => new Date(ms).toDateString();
+
+/** The snapshot manifest. @param {Record<string, any>} stores @param {ReturnType<typeof summarize>} summary @param {number} ms */
+function snapshotJson(stores, summary, ms) {
+  return JSON.stringify({ app: 'VOTReader', exportVersion: 3, snapshot: true, exportDate: new Date(ms).toISOString(), summary, data: {}, media: [], stores });
+}
+
+/** What the database told this boot, for the data-health line. */
+function _openNote() {
+  const info = IDBAdapter.openInfo && IDBAdapter.openInfo();
+  if (!info) return '';
+  return '; database ' + (info.oldVersion === 0 ? 'created this boot' : 'reset this boot') +
+    (info.dataLoss ? ', dataLoss ' + info.dataLoss + (info.dataLossMessage ? ' (' + info.dataLossMessage + ')' : '') : '');
+}
+
+/** May this boot restore `name` on its own? Once an hour per snapshot (5). @param {string} name @param {number} ms */
+function _mayAutoRestore(name, ms) {
+  try {
+    const last = JSON.parse(localStorage.getItem(AUTO_RESTORE_KEY) || 'null');
+    if (last && last.name === name && ms - (+last.at || 0) < AUTO_RESTORE_WINDOW_MS) return false;
+    localStorage.setItem(AUTO_RESTORE_KEY, JSON.stringify({ name, at: ms }));
+    return true;
+  } catch (_e) { return false; }                 // no storage, no guard: never restore on our own
+}
+
+/** The toast after a restore's reload: which copy came back. Shown once. */
+function _showRestoredNote() {
+  /** @type {any} */ let note = null;
+  try {
+    const raw = localStorage.getItem(RESTORED_NOTE_KEY);
+    if (!raw) return;
+    localStorage.removeItem(RESTORED_NOTE_KEY);
+    note = JSON.parse(raw);
+  } catch (_e) { return; }
+  let when = 'earlier';
+  try { if (note && note.at) when = new Date(note.at).toLocaleString(undefined, { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (_e) { /* keep 'earlier' */ }
+  try {
+    showToast({ id: 'vot-toast-restored', className: 'vot-toast', text: 'Your library was restored from the copy saved ' + when + '.', durationMs: 6000 });
+  } catch (_e) { /* no document */ }
+}
 
 /**
  * The boot-time pass: check health, then take today's snapshot. Quiet on every
  * failure. Resolves to what it did, for tests and the diagnostic log.
- * @param {{ now?: () => number, sink?: any, force?: boolean, weeklyBridge?: any }} [opts] force: snapshot now, no comparison (acceptCurrent); weeklyBridge: a stand-in for AndroidBridge (tests)
- * @returns {Promise<'no-sink' | 'not-loaded' | 'damaged' | 'snapshotted' | 'fresh' | 'empty' | 'failed'>}
+ * @param {{ now?: () => number, sink?: any, force?: boolean, weeklyBridge?: any, reload?: () => void }} [opts] force: snapshot now, no comparison (acceptCurrent); weeklyBridge: a stand-in for AndroidBridge (tests); reload: the auto-restore's reload (tests)
+ * @returns {Promise<'no-sink' | 'not-loaded' | 'damaged' | 'restored' | 'snapshotted' | 'fresh' | 'empty' | 'failed'>}
  */
 export async function run(opts) {
   const now = (opts && opts.now) || Date.now;
+  _showRestoredNote();
   let skip = false;
   try { skip = localStorage.getItem(HEALTH_SKIP_KEY) != null; localStorage.removeItem(HEALTH_SKIP_KEY); } catch (_e) { /* no storage */ }
   const sink = (opts && opts.sink) || snapshotSink();
@@ -133,26 +247,41 @@ export async function run(opts) {
       const snap = _parse(await sink.read(newest.name));
       const then = snap ? (snap.summary || summarize(snap.stores)) : null;
       if (then && looksDamaged(then, summary)) {
-        DiagnosticLog.warn('data-health', 'library looks smaller than snapshot ' + newest.name + ': ' + JSON.stringify(then) + ' -> ' + JSON.stringify(summary));
+        DiagnosticLog.warn('data-health', 'library looks smaller than snapshot ' + newest.name + ': ' + JSON.stringify(then) + ' -> ' + JSON.stringify(summary) + _openNote());
         StorageHealth.setDataMissing({ name: newest.name, at: newest.at || snapshotTime(newest.name), then, now: summary });
+        // (5) Nothing at all left: the database was thrown away. Put it back now.
+        if (isWiped(summary) && _mayAutoRestore(newest.name, now())) {
+          if (await restoreMissing({ sink, reload: opts && opts.reload, auto: true })) return 'restored';
+        }
         return 'damaged';
       }
     }
     // An import, a restore of the reader's choosing or a reset (skip) changed the
     // library on purpose: snapshot it now, not tomorrow.
-    if (!(opts && opts.force) && !skip && newest && dayOf(newest.at || snapshotTime(newest.name)) === dayOf(now())) return 'fresh';
-    if (score(summary) === 0 && summary.history === 0) return 'empty';
-    const json = JSON.stringify({
-      app: 'VOTReader', exportVersion: 3, snapshot: true, exportDate: new Date(now()).toISOString(),
-      summary, data: {}, media: [], stores,
-    });
+    if (!(opts && opts.force) && !skip && newest && dayOf(newest.at || snapshotTime(newest.name)) === dayOf(now())) {
+      _arm(sink, summary, '');
+      return 'fresh';
+    }
+    if (score(summary) === 0 && summary.history === 0) {
+      // Emptied on purpose (a reset, Clear All, Keep as is): record it, or the boot after
+      // next would compare it with an older full snapshot and restore over the choice (5).
+      if ((skip || (opts && opts.force)) && newest && !_cleared && await sink.save(snapshotJson(stores, summary, now()))) {
+        _arm(sink, summary, _memoryJson());
+        return 'snapshotted';
+      }
+      _arm(sink, summary, '');
+      return 'empty';
+    }
+    const json = snapshotJson(stores, summary, now());
     if (json.length > MAX_SNAPSHOT_BYTES) return 'failed';
     if (_cleared) return 'empty';                 // Clear All ran while this pass read
     const saved = await sink.save(json);
     // The weekly copy rides the same healthy pass: never from a library that looked
     // damaged or empty above, so a loss can never rotate the good copies out.
     await weeklyCopy({ now, stores, bridge: opts && opts.weeklyBridge });
-    return saved ? 'snapshotted' : 'failed';
+    if (!saved) return 'failed';
+    _arm(sink, summary, _memoryJson());
+    return 'snapshotted';
   } catch (e) {
     DiagnosticLog.warn('data-health', 'snapshot pass failed: ' + ((e && /** @type {any} */ (e).name) || e));
     return 'failed';
@@ -161,6 +290,146 @@ export async function run(opts) {
 
 /** Set by clearSnapshots: a pass already reading must not save a copy of the cleared data. */
 let _cleared = false;
+
+// ─── (4) A snapshot every time the reader leaves the app ─────────────────────
+
+/** This boot's health pass found the library healthy; saveLatest may run. */
+let _healthy = false;
+/** The summary of the last snapshot this page took or judged healthy: the bar saveLatest holds to. */
+let _lastSummary = /** @type {ReturnType<typeof summarize> | null} */ (null);
+/** The stores JSON of the last snapshot this page saved, to skip saving the same thing twice. */
+let _lastStoresJson = '';
+let _lastHiddenSaveAt = 0;
+/** @type {any} */ let _autoSink = null;
+/** @type {Promise<string> | null} */ let _saving = null;
+/** A leave came while a save was in flight: save once more when it lands. */
+let _again = false;
+/** The browser force-closed the database: only memory is left to read. */
+let _dbClosed = false;
+/** @type {(() => void) | null} */ let _disarm = null;
+
+/** The stores in memory as JSON ('' when one has not loaded). */
+function _memoryJson() {
+  const m = collectMemory();
+  return m ? JSON.stringify(m) : '';
+}
+
+/**
+ * The library is healthy: let saveLatest run, against `summary`, and hook the
+ * moments the reader leaves (once per page).
+ * @param {any} sink @param {ReturnType<typeof summarize>} summary @param {string} savedJson
+ */
+function _arm(sink, summary, savedJson) {
+  _healthy = true;
+  _lastSummary = summary;
+  _lastStoresJson = savedJson;
+  _autoSink = sink;
+  if (_disarm || typeof document === 'undefined') return;
+  const hidden = () => {
+    if (document.visibilityState !== 'hidden' || Date.now() - _lastHiddenSaveAt < HIDDEN_GAP_MS) return;
+    _lastHiddenSaveAt = Date.now();
+    saveLatest({ sink: _autoSink });
+  };
+  const pagehide = () => { saveLatest({ sink: _autoSink }); };
+  const timer = setInterval(() => { if (document.visibilityState === 'visible') saveLatest({ sink: _autoSink }); }, PERIODIC_MS);
+  const offClose = typeof IDBAdapter.onBrowserClose === 'function' ? IDBAdapter.onBrowserClose(() => { _dbClosed = true; saveLatest({ sink: _autoSink }); }) : null;
+  // Another tab deleted (Clear All) or upgraded the database: this page's memory is
+  // no longer the library, so it saves nothing more until it reloads.
+  const offVersion = typeof IDBAdapter.onVersionChange === 'function' ? IDBAdapter.onVersionChange(() => { _healthy = false; }) : null;
+  document.addEventListener('visibilitychange', hidden);
+  window.addEventListener('pagehide', pagehide);
+  _disarm = () => {
+    document.removeEventListener('visibilitychange', hidden);
+    window.removeEventListener('pagehide', pagehide);
+    clearInterval(timer);
+    if (offClose) offClose();
+    if (offVersion) offVersion();
+  };
+}
+
+/**
+ * The library to snapshot on a leave. The phone app has one page, so its memory is
+ * the library and is read at once (no wait on a save the kill may cut short). On the
+ * web a second tab may have saved what this tab's memory never saw, so the database
+ * is read, once this tab's own saves have landed; memory only when it cannot be read.
+ * @param {any} sink
+ * @returns {Promise<Record<string, any> | null>}
+ */
+async function _collectForLeave(sink) {
+  if ((sink && sink.kind === 'android') || _dbClosed) return collectMemory();
+  try {
+    await Promise.all(registeredStores().map((s) => (typeof s.whenSaved === 'function' ? s.whenSaved() : true)));
+    return await collectStores();
+  } catch (_e) { return collectMemory(); }
+}
+
+/**
+ * Snapshot the library as the page holds it, if this boot found it healthy and
+ * it changed since the last one (header, 4). Quiet on every failure.
+ * @param {{ sink?: any, now?: () => number }} [opts]
+ * @returns {Promise<'off' | 'no-sink' | 'not-loaded' | 'empty' | 'damaged' | 'unchanged' | 'snapshotted' | 'failed'>}
+ */
+export async function saveLatest(opts) {
+  if (_saving) { _again = true; return /** @type {any} */ (_saving); }
+  const p = _saveLatest(opts);
+  _saving = p;
+  try { return /** @type {any} */ (await p); } finally {
+    if (_saving === p) _saving = null;
+    if (_again) { _again = false; saveLatest(opts); }
+  }
+}
+
+/** @param {{ sink?: any, now?: () => number }} [opts] */
+async function _saveLatest(opts) {
+  const now = (opts && opts.now) || Date.now;
+  if (!_healthy || _cleared || isStoreWriteFenced() || StorageHealth.getReport().dataMissing) return 'off';
+  const sink = (opts && opts.sink) || _autoSink || snapshotSink();
+  if (!sink) return 'no-sink';
+  try {
+    if (storesNotLoaded().length) return 'not-loaded';
+    const stores = await _collectForLeave(sink);
+    if (!stores) return 'not-loaded';
+    if (!_healthy || _cleared || isStoreWriteFenced()) return 'off';     // changed while it read
+    const summary = summarize(stores);
+    let chosen = false;                            // a reset the reader asked for (skip token)
+    try { chosen = localStorage.getItem(HEALTH_SKIP_KEY) != null; } catch (_e) { /* no storage */ }
+    if (score(summary) === 0 && summary.history === 0 && !chosen) return 'empty';
+    if (!chosen && _lastSummary && looksDamaged(_lastSummary, summary)) {
+      _healthy = false;
+      const newest = (await sink.list())[0];
+      DiagnosticLog.warn('data-health', 'library in memory looks smaller than the last snapshot: ' + JSON.stringify(_lastSummary) + ' -> ' + JSON.stringify(summary));
+      if (newest) StorageHealth.setDataMissing({ name: newest.name, at: newest.at || snapshotTime(newest.name), then: _lastSummary, now: summary });
+      return 'damaged';
+    }
+    const storesJson = JSON.stringify(stores);
+    if (storesJson === _lastStoresJson) return 'unchanged';
+    const json = snapshotJson(stores, summary, now());
+    if (json.length > MAX_SNAPSHOT_BYTES) return 'failed';
+    if (_cleared || isStoreWriteFenced()) return 'off';
+    if (!(await sink.save(json))) return 'failed';
+    _lastStoresJson = storesJson;
+    _lastSummary = summary;
+    return 'snapshotted';
+  } catch (e) {
+    DiagnosticLog.warn('data-health', 'leave snapshot failed: ' + ((e && /** @type {any} */ (e).name) || e));
+    return 'failed';
+  }
+}
+
+/** TEST-ONLY: forget this page's state (a new boot). */
+export function _resetForTests() {
+  if (_disarm) _disarm();
+  _disarm = null;
+  _healthy = false;
+  _lastSummary = null;
+  _lastStoresJson = '';
+  _lastHiddenSaveAt = 0;
+  _autoSink = null;
+  _saving = null;
+  _again = false;
+  _dbClosed = false;
+  _cleared = false;
+}
 
 /**
  * The banner's "Keep as is": the smaller library is the reader's own doing.
@@ -191,10 +460,13 @@ function _unionHistory(a, b) {
   return out.sort((x, y) => (y.ts || 0) - (x.ts || 0)).slice(0, 2000);
 }
 
-/** Union two lists by key, the live entry first and winning. @param {any[]} a @param {any[]} b @param {(e: any) => any} key */
+/** Union two lists by key, the live entry first and winning. An entry with no key is
+ *  kept unless the live list holds the same one (one keyless entry must not stand for
+ *  them all). @param {any[]} a @param {any[]} b @param {(e: any) => any} key */
 function _unionBy(a, b, key) {
-  const seen = new Set(a.map(key));
-  return a.concat(b.filter((e) => !seen.has(key(e))));
+  const seen = new Set(a.map(key).filter((k) => k != null));
+  const same = new Set(a.map((e) => JSON.stringify(e)));
+  return a.concat(b.filter((e) => { const k = key(e); return k != null ? !seen.has(k) : !same.has(JSON.stringify(e)); }));
 }
 
 /** A record's time, whatever this store calls it. @param {any} r */
@@ -222,40 +494,78 @@ function _deepUnion(live, snap) {
     else if (v && s && typeof v === 'object' && typeof s === 'object' && !Array.isArray(v) && !Array.isArray(s)) {
       const timed = Object.values(v).concat(Object.values(s)).some((x) => x && typeof x === 'object' && 't' in x);
       out[k] = timed ? _newerByTime(s, v) : _deepUnion(v, s);
+    } else if (Array.isArray(v) && Array.isArray(s)) {
+      // A list of ids (milestones unlocked) unions; any other list (samples) is never
+      // emptied by a wiped live side (6).
+      out[k] = v.concat(s).every((x) => typeof x === 'string') ? Array.from(new Set(v.concat(s))) : (v.length ? v : s);
     } else out[k] = v;
   }
   return out;
 }
 
+/** Whole days from local date `a` to `b` ('YYYY-MM-DD'). @param {string} a @param {string} b */
+function _daysBetween(a, b) {
+  return Math.round((new Date(b + 'T12:00:00').getTime() - new Date(a + 'T12:00:00').getTime()) / 86400000);
+}
+
+/**
+ * The streak after a restore. The later reading day decides the run; when a wipe
+ * cut a run the reader kept up (the live run began the day after the snapshot's
+ * last day), the two runs join, and a wipe's fresh day count adds to the old one.
+ * @param {any} live @param {any} snap @param {boolean} wiped
+ */
+function _mergeStreak(live, snap, wiped) {
+  const L = obj(live), S = obj(snap);
+  const ld = String(L.lastReadDate || ''), sd = String(S.lastReadDate || '');
+  const lc = +L.currentStreak || 0, sc = +S.currentStreak || 0;
+  let currentStreak = lc, lastReadDate = L.lastReadDate;
+  if (!ld || sd > ld) { currentStreak = sc; lastReadDate = S.lastReadDate; }
+  else if (sd === ld) currentStreak = Math.max(lc, sc);
+  else if (sd && lc >= 1 && _daysBetween(sd, ld) - (lc - 1) === 1) currentStreak = sc + lc;
+  const totalDays = wiped && sd && ld > sd ? (+S.totalDays || 0) + (+L.totalDays || 0) : Math.max(+L.totalDays || 0, +S.totalDays || 0);
+  return Object.assign({}, S, L, {
+    currentStreak, lastReadDate,
+    longestStreak: Math.max(+L.longestStreak || 0, +S.longestStreak || 0, currentStreak),
+    totalDays,
+  });
+}
+
 /**
  * One store's restore: the live record (ours) merged with the snapshot's
- * (theirs), base-less, so a record either side has survives.
- * @param {string} name @param {any} live @param {any} snap
+ * (theirs), base-less, so a record either side has survives. `wiped`: the live
+ * library came back with nothing in it, so its setup is the wipe's defaults and
+ * the snapshot's setup wins (header, 6).
+ * @param {string} name @param {any} live @param {any} snap @param {{ wiped?: boolean }} [opts]
  */
-export function mergeForRestore(name, live, snap) {
+export function mergeForRestore(name, live, snap, opts) {
   if (live === undefined || live === null) return snap;
   if (snap === undefined || snap === null) return live;
+  const wiped = !!(opts && opts.wiped);
   switch (name) {
     case 'vot-annotations': return mergeAnnotationsStore(null, live, snap);
     case 'vot-notes': return mergeMapStore(null, live, snap);
     case 'vot-links': case 'vot-bookmarks': return mergeArrayStore(null, live, snap);
     case 'vot-notebooks': case 'vot-journal': case 'vot-journal-notebooks': return mergeListStore(null, live, snap);
     case 'vot-journal-index': return mergeJournalIndexStore(null, live, snap);
-    case 'vot-state': return mergeStateStore(null, live, snap, { noGuard: true });
-    case 'vot-history': return _unionHistory(live, snap);
-    case 'vot-reading-streak': {
-      const later = String(obj(snap).lastReadDate || '') > String(obj(live).lastReadDate || '') ? snap : live;
-      return Object.assign({}, snap, live, {
-        currentStreak: obj(later).currentStreak, lastReadDate: obj(later).lastReadDate,
-        longestStreak: Math.max(+obj(live).longestStreak || 0, +obj(snap).longestStreak || 0, +obj(live).currentStreak || 0, +obj(snap).currentStreak || 0),
-        totalDays: Math.max(+obj(live).totalDays || 0, +obj(snap).totalDays || 0),
-      });
+    case 'vot-state': {
+      const st = mergeStateStore(null, live, snap, { noGuard: true });
+      if (wiped) for (const f of SESSION_FIELDS) if (f in obj(snap)) st[f] = snap[f];
+      return st;
     }
+    case 'vot-history': return _unionHistory(live, snap);
+    case 'vot-reading-streak': return _mergeStreak(live, snap, wiped);
     case 'vot-audio-positions': return Object.assign({}, snap, live, { positions: _newerByTime(obj(snap).positions, obj(live).positions) });
-    case 'vot-audio-library': return Object.assign({}, snap, live, {
-      recent: _unionBy(arr(obj(live).recent), arr(obj(snap).recent), (e) => e && e.key),
-      saved: _unionBy(arr(obj(live).saved), arr(obj(snap).saved), (e) => e && (e.key || e.url)),
-    });
+    case 'vot-audio-library': {
+      const L = obj(live), S = obj(snap);
+      const out = Object.assign({}, S, L, {
+        recent: _unionBy(arr(L.recent), arr(S.recent), (e) => e && e.key),
+        saved: _unionBy(arr(L.saved), arr(S.saved), (e) => e && (e.key || e.url)),
+      });
+      for (const k of ['songSaved', 'songRecent']) if (Array.isArray(L[k]) || Array.isArray(S[k])) out[k] = _unionBy(arr(L[k]), arr(S[k]), (e) => e && (e.key || e.id || e.url));
+      for (const k of ['plays', 'completions']) if (typeof L[k] === 'number' || typeof S[k] === 'number') out[k] = Math.max(+L[k] || 0, +S[k] || 0);
+      if (wiped && 'rate' in S) out.rate = S.rate;            // the reader's speed, not the default
+      return out;
+    }
     default: {
       if (live === true || snap === true) return true;            // a flag either side set
       if (Array.isArray(live) || Array.isArray(snap)) return arr(live).length ? live : snap;
@@ -266,9 +576,23 @@ export function mergeForRestore(name, live, snap) {
 }
 
 /**
- * The banner's Restore: merge the flagged snapshot into the live data and
- * reload. Resolves false (and changes nothing) when there is nothing to restore.
- * @param {{ reload?: () => void, sink?: any }} [opts]
+ * A store's boot-script copy in localStorage (vot-state's theme and font, which the
+ * first paint reads before the database loads), from what a restore just wrote, so
+ * the reload does not open in the wipe's light theme.
+ * @param {string} name @param {any} value
+ */
+function _syncShim(name, value) {
+  for (const s of registeredStores()) {
+    if (s._idbStoreName !== name || typeof s._idbLsShim !== 'function') continue;
+    try { localStorage.setItem(name, JSON.stringify(s._idbLsShim(value))); } catch (_e) { /* the first paint uses the old theme once */ }
+  }
+}
+
+/**
+ * The banner's Restore, and the boot's own after a total wipe (`auto`): merge
+ * the flagged snapshot into the live data and reload. Resolves false (and
+ * changes nothing) when there is nothing to restore.
+ * @param {{ reload?: () => void, sink?: any, auto?: boolean }} [opts]
  * @returns {Promise<boolean>}
  */
 export async function restoreMissing(opts) {
@@ -287,10 +611,11 @@ export async function restoreMissing(opts) {
   try {
     await Promise.all(registeredStores().map((s) => (typeof s.whenSaved === 'function' ? s.whenSaved() : true)));
     const live = await collectStores();
+    const wiped = isWiped(summarize(live));
     for (const name of Object.keys(snap.stores)) {
       if (SKIP_STORES.has(name)) continue;
-      const merged = mergeForRestore(name, live[name], snap.stores[name]);
-      if (merged !== live[name]) await IDBAdapter.put(name, 'v', merged);
+      const merged = mergeForRestore(name, live[name], snap.stores[name], { wiped });
+      if (merged !== live[name]) { await IDBAdapter.put(name, 'v', merged); _syncShim(name, merged); }
     }
   } catch (e) {
     // Nothing reloads: lift the fence and the freeze so this session keeps saving
@@ -304,7 +629,9 @@ export async function restoreMissing(opts) {
     return false;
   }
   setStoreWriteFence(true);
-  DiagnosticLog.warn('data-health', 'restored from ' + missing.name + ' (merge)');
+  _healthy = false;                              // nothing more from this page: it reloads
+  DiagnosticLog.warn('data-health', 'restored from ' + missing.name + ' (merge' + (opts && opts.auto ? ', on its own after a total wipe' : '') + ')');
+  try { localStorage.setItem(RESTORED_NOTE_KEY, JSON.stringify({ at: missing.at || snapshotTime(missing.name), auto: !!(opts && opts.auto) })); } catch (_e) { /* no note, no toast */ }
   // No HEALTH_SKIP_KEY: the next boot checks the restored library like any other,
   // so a restore that missed something is offered again, never buried.
   ((opts && opts.reload) || (() => window.location.reload()))();
@@ -404,4 +731,4 @@ export async function weeklyCopy(p) {
   return 'failed';
 }
 
-export const DataSafety = { weeklyStatus, setWeeklyOn, run, restoreMissing, acceptCurrent, clearSnapshots, status, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY };
+export const DataSafety = { weeklyStatus, setWeeklyOn, run, saveLatest, freshDatabase, restoreMissing, acceptCurrent, clearSnapshots, status, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, _resetForTests };

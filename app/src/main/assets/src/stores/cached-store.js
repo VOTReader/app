@@ -1306,10 +1306,26 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-diag-ring',                // utils/diagnostic-log.js — storage-health warnings kept across reloads
   'vot-health-skip',              // utils/data-safety.js — an import / Clear All's reload is not a data loss
   'vot-last-export',              // utils/backup-flow.js LAST_EXPORT_KEY — Your Data's "Last backup" line
+  // 2026-10-11: the cleanup's done-flag lives in IndexedDB, so a WebView that throws the
+  // database away runs this cleanup again. These must survive that: the reader's weekly-copy
+  // choice, the once-an-hour auto-restore guard (without it a store that keeps coming back
+  // empty would restore and reload forever) and the note that says what was restored.
+  'vot-weekly-copy-off',          // utils/data-safety.js WEEKLY_OFF_KEY
+  'vot-auto-restore',             // utils/data-safety.js AUTO_RESTORE_KEY
+  'vot-restored-note',            // utils/data-safety.js RESTORED_NOTE_KEY
+  'vot-ls-cleanup-done',          // LS_CLEANUP_DONE_KEY below
 ]);
 
 /** Meta-store key holding the W2.4 cleanup-complete flag. */
 const LS_MIGRATION_FLAG_KEY = 'migrated-v1';
+/** The same flag in localStorage (2026-10-11): the meta flag goes with a database the
+ *  WebView throws away, and the cleanup it then re-ran deleted live keys (the reader's
+ *  weekly-copy choice, hint and tour flags). localStorage survives that wipe. */
+const LS_CLEANUP_DONE_KEY = 'vot-ls-cleanup-done';
+
+function _markLsCleanupDone() {
+  try { localStorage.setItem(LS_CLEANUP_DONE_KEY, '1'); } catch (_e) { /* the meta flag still guards */ }
+}
 
 /**
  * One-time legacy LS cleanup. Idempotent — checks the meta-store
@@ -1328,6 +1344,7 @@ const LS_MIGRATION_FLAG_KEY = 'migrated-v1';
  * @returns {Promise<void>}
  */
 export async function clearLegacyLs() {
+  try { if (localStorage.getItem(LS_CLEANUP_DONE_KEY)) return; } catch (_e) { /* no storage: the meta flag decides */ }
   let alreadyDone;
   try {
     alreadyDone = await IDBAdapter.get('meta', LS_MIGRATION_FLAG_KEY);
@@ -1335,7 +1352,7 @@ export async function clearLegacyLs() {
     console.warn('clearLegacyLs: meta read failed; deferring to next boot', e);
     return;
   }
-  if (alreadyDone) return;
+  if (alreadyDone) { _markLsCleanupDone(); return; }
 
   // SAFETY (U19): never wipe legacy LS while any IDB store is still 'pending'.
   // The per-store legacy-LS fallback reads these vot-* keys DURING hydration to
@@ -1368,6 +1385,7 @@ export async function clearLegacyLs() {
 
   try {
     await IDBAdapter.put('meta', LS_MIGRATION_FLAG_KEY, true);
+    _markLsCleanupDone();
   } catch (e) {
     console.warn('clearLegacyLs: meta write failed; will retry next boot', e);
   }
@@ -1380,6 +1398,7 @@ export async function clearLegacyLs() {
  * @returns {Promise<void>}
  */
 export function _resetLegacyLsFlag() {
+  try { localStorage.removeItem(LS_CLEANUP_DONE_KEY); } catch (_e) { /* test helper — best effort */ }
   return IDBAdapter.delete('meta', LS_MIGRATION_FLAG_KEY).catch(function (_e) { /* test helper — best effort */ });
 }
 

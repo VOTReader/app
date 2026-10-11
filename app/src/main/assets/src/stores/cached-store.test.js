@@ -1170,8 +1170,13 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(LS_SKIP_LIST).toContain('vot-diag-ring');            // utils/diagnostic-log.js PERSIST_KEY
     expect(LS_SKIP_LIST).toContain('vot-health-skip');          // utils/data-safety.js HEALTH_SKIP_KEY
     expect(LS_SKIP_LIST).toContain('vot-last-export');          // utils/backup-flow.js LAST_EXPORT_KEY
+    // 2026-10-11: a wiped database re-runs the cleanup; these must outlive it.
+    expect(LS_SKIP_LIST).toContain('vot-weekly-copy-off');      // utils/data-safety.js WEEKLY_OFF_KEY
+    expect(LS_SKIP_LIST).toContain('vot-auto-restore');         // utils/data-safety.js AUTO_RESTORE_KEY
+    expect(LS_SKIP_LIST).toContain('vot-restored-note');        // utils/data-safety.js RESTORED_NOTE_KEY
+    expect(LS_SKIP_LIST).toContain('vot-ls-cleanup-done');      // this cleanup's own done-flag
     expect(LS_SKIP_LIST).not.toContain('vot-ann-migrated');     // W7.1 retired this exception
-    expect(LS_SKIP_LIST.length).toBe(11);
+    expect(LS_SKIP_LIST.length).toBe(15);
     expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
   });
 
@@ -1306,6 +1311,22 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     await clearLegacyLs();
     expect(localStorage.getItem('vot-cleanup-me')).toBeNull();
     expect(idbMeta['migrated-v1']).toBe(true);
+  });
+
+  // 2026-10-11: the meta flag lived only in IndexedDB, so a database the WebView threw
+  // away re-ran the cleanup and it deleted live keys (the reader's weekly-copy choice,
+  // hint and tour flags). The flag now also lives in localStorage, which survives that.
+  it('a database the browser threw away does not re-run it (the done-flag also lives in localStorage)', async () => {
+    /** @type {Record<string, any>} */
+    const idbMeta = { 'migrated-v1': true };
+    vi.spyOn(IDBAdapter, 'get').mockImplementation(async (_s, k) => idbMeta[String(k)]);
+    vi.spyOn(IDBAdapter, 'put').mockImplementation(async (_s, k, v) => { idbMeta[String(k)] = v; });
+    await clearLegacyLs();                             // an install that ran it long ago
+    expect(localStorage.getItem('vot-ls-cleanup-done')).toBe('1');
+    delete idbMeta['migrated-v1'];                     // the wipe
+    localStorage.setItem('vot-tabs-hint-seen', '1');
+    await clearLegacyLs();
+    expect(localStorage.getItem('vot-tabs-hint-seen')).toBe('1');
   });
 });
 

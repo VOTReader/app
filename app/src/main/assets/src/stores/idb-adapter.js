@@ -2,7 +2,7 @@
    IDB ADAPTER — generic IndexedDB CRUD for structured data stores
    ═══════════════════════════════════════════════════════════════
    ES module. Bundled into bundle-b via _entry-b.js.
-   No dependencies — uses only browser IndexedDB.
+   Uses only browser IndexedDB, plus DiagnosticLog for the two events below.
 
    Purpose: W2.1 of the W2 storage-hardening phase. Provides a single
    IndexedDB database "votreader" with one object store per legacy
@@ -19,8 +19,27 @@
      IDBAdapter.setWriteFence(on)               → void  (v04-02: Clear All; via setStoreWriteFence)
      IDBAdapter.isQuotaError(err)               → boolean
      IDBAdapter.isVersionError(err)             → boolean  (v04-03: a newer app's database)
+     IDBAdapter.openInfo()                      → { oldVersion, newVersion, dataLoss, dataLossMessage, at } | null
+     IDBAdapter.onBrowserClose(fn)              → unsubscribe  (2026-10-11, below)
+     IDBAdapter.onVersionChange(fn)             → unsubscribe  (another connection deleted or upgraded it)
+     IDBAdapter.describeUpgrade(event)          → string ('' for an ordinary schema step)
      IDBAdapter.STORE_NAMES                     → readonly string[]
      IDBAdapter.DB_NAME, IDBAdapter.DB_VERSION  → constants
+
+   A database the browser threw away (2026-10-11). Twice the owner's WebView
+   came up with this database gone: Chromium found its LevelDB corrupt at open,
+   destroyed it and made a new empty one, and nothing on the device said so.
+   Chromium does say, on the upgradeneeded of the open that recreated it
+   (dataLoss 'total', dataLossMessage "IndexedDB (database was corrupt): ...",
+   non-standard). Every fresh or reset database is now written to the persisted
+   data-health ring with that reason and the engine version, and openInfo()
+   tells utils/data-safety.js this boot met a new database. A store Chromium
+   finds corrupt mid-session is force-closed (the IDBDatabase close event): that
+   is logged and handed to onBrowserClose listeners (data-safety snapshots the
+   library from memory at once). The connection is NOT reopened: a reopen would
+   meet an empty database, and a store's 3-way merge would read every record
+   missing there as a delete. Saves fail until the app restarts, the restart
+   finds the empty database, and data-safety restores the snapshot.
 
    Design notes:
    - SEPARATE from vot-journal-media (binary blobs) and vot-thumbs
@@ -43,6 +62,8 @@
      objectStoreNames.contains() so future schema bumps (W7.1) are
      additive — no thrown errors on stores that already exist.
 ═══════════════════════════════════════════════════════════════ */
+
+import { DiagnosticLog } from '../utils/diagnostic-log.js';
 
 /** @typedef {string} StoreName */
 
@@ -146,6 +167,60 @@ export const IDBAdapter = (function () {
   /** @param {boolean} on */
   function setWriteFence(on) { _writeFence = !!on; }
 
+  /** What this page's open met when it had to create or reset the database (header); null otherwise.
+   *  @type {{ oldVersion: number, newVersion: number | null, dataLoss: string | null, dataLossMessage: string, at: number } | null} */
+  let _openInfo = null;
+  /** @type {Set<() => void>} */
+  const _closeListeners = new Set();
+  /** Told when another connection deletes or upgrades the database (versionchange). @type {Set<() => void>} */
+  const _versionListeners = new Set();
+
+  /**
+   * The data-health line for an upgradeneeded event: '' for an ordinary schema step, else
+   * what the browser said (header). Exported for tests.
+   * @param {any} ev
+   * @returns {string}
+   */
+  function describeUpgrade(ev) {
+    const e = ev || {};
+    const lost = !!e.dataLoss && e.dataLoss !== 'none';
+    if (e.oldVersion !== 0 && !lost) return '';
+    return (e.oldVersion === 0 ? 'database created fresh' : 'database reset by the browser') +
+      ' (v' + e.oldVersion + ' -> v' + e.newVersion + '); dataLoss ' + (e.dataLoss || 'unreported') +
+      (e.dataLossMessage ? ': ' + e.dataLossMessage : '');
+  }
+
+  /** The engine, for the data-health line: a Chromium version or the bare user agent's first word. */
+  function _engine() {
+    try {
+      const ua = String(navigator.userAgent || '');
+      const m = /Chrome\/[\d.]+/.exec(ua);
+      return m ? m[0] : ua.split(' ')[0] || 'unknown engine';
+    } catch (_e) { return 'unknown engine'; }
+  }
+
+  /** @returns {typeof _openInfo} */
+  function openInfo() { return _openInfo; }
+
+  /**
+   * Called when the browser force-closes the connection (header). Returns the unsubscribe.
+   * @param {() => void} fn
+   */
+  function onBrowserClose(fn) {
+    _closeListeners.add(fn);
+    return function () { _closeListeners.delete(fn); };
+  }
+
+  /**
+   * Called when another connection deletes or upgrades the database (Clear All, a newer
+   * tab): this page's copy of the data is no longer the library. Returns the unsubscribe.
+   * @param {() => void} fn
+   */
+  function onVersionChange(fn) {
+    _versionListeners.add(fn);
+    return function () { _versionListeners.delete(fn); };
+  }
+
   /**
    * Wrap an IDBRequest in a Promise that resolves with `req.result` or
    * rejects with `req.error`. Centralizes the onsuccess/onerror
@@ -186,6 +261,10 @@ export const IDBAdapter = (function () {
       }
       req.onupgradeneeded = function (e) {
         const db = /** @type {IDBOpenDBRequest} */ (e.target).result;
+        const ev = /** @type {any} */ (e);
+        _openInfo = { oldVersion: ev.oldVersion, newVersion: ev.newVersion, dataLoss: ev.dataLoss || null, dataLossMessage: ev.dataLossMessage || '', at: Date.now() };
+        const said = describeUpgrade(ev);
+        if (said) { try { DiagnosticLog.warn('data-health', said + ' [' + _engine() + ']'); } catch (_e) { /* logging never breaks an open */ } }
         for (const name of STORE_NAMES) {
           if (!db.objectStoreNames.contains(name)) {
             db.createObjectStore(name);
@@ -197,6 +276,12 @@ export const IDBAdapter = (function () {
         db.onversionchange = function () {
           try { db.close(); } catch (_e) { /* best-effort close */ }
           if (_dbPromise === p) _dbPromise = null;
+          for (const fn of Array.from(_versionListeners)) { try { fn(); } catch (_e) { /* one listener never stops the next */ } }
+        };
+        // The browser's forced close (header): logged and reported, never reopened.
+        db.onclose = function () {
+          try { DiagnosticLog.warn('data-health', 'the browser closed the database (it found it corrupt, or its storage was cleared); saves fail until the app restarts [' + _engine() + ']'); } catch (_e) { /* logging never breaks a close */ }
+          for (const fn of Array.from(_closeListeners)) { try { fn(); } catch (_e) { /* one listener never stops the next */ } }
         };
         resolve(db);
       };
@@ -459,6 +544,7 @@ export const IDBAdapter = (function () {
    */
   function _resetForTests() {
     _dbPromise = null;
+    _openInfo = null;
   }
 
   const _self = {
@@ -474,6 +560,10 @@ export const IDBAdapter = (function () {
     setWriteFence: setWriteFence,
     isQuotaError: isQuotaError,
     isVersionError: isVersionError,
+    openInfo: openInfo,
+    onBrowserClose: onBrowserClose,
+    onVersionChange: onVersionChange,
+    describeUpgrade: describeUpgrade,
     _putOnce: _putOnce,
     _wrapRequest: wrapRequest,
     _resetForTests: _resetForTests,

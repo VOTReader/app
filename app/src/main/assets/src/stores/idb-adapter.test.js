@@ -17,6 +17,7 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { IDBAdapter } from './idb-adapter.js';
+import { DiagnosticLog } from '../utils/diagnostic-log.js';
 
 // Reset module-private state + delete the test DB between every test
 // so each spec sees a clean schema.
@@ -497,5 +498,48 @@ describe('IDBAdapter — commitMigration (W7.1b: atomic data + version)', () => 
 
   it('rejects an unknown store name (validated before the transaction)', async () => {
     await expect(IDBAdapter.commitMigration('not-a-store', [], 2)).rejects.toThrow(/Unknown IDB store/);
+  });
+});
+
+/* 2026-10-11: the owner's WebView threw the database away a second time and nothing on the
+   device said why. Chromium tells the page on the upgradeneeded of the open that recreated the
+   store (dataLoss / dataLossMessage, non-standard); a store it finds corrupt mid-session is
+   force-closed (IDBDatabase close event). Both now reach the persisted data-health ring. */
+describe('a database the browser created fresh, or closed', () => {
+  it('a fresh database is logged to the data-health ring and reported by openInfo()', async () => {
+    const warn = vi.spyOn(DiagnosticLog, 'warn');
+    await IDBAdapter.get('vot-state', 'v');
+    expect(IDBAdapter.openInfo()).toMatchObject({ oldVersion: 0, newVersion: IDBAdapter.DB_VERSION });
+    expect(warn).toHaveBeenCalledWith('data-health', expect.stringMatching(/^database created fresh \(v0 -> v\d+\); dataLoss /));
+    warn.mockRestore();
+  });
+
+  it('an existing database opens quietly', async () => {
+    await IDBAdapter.get('vot-state', 'v');
+    IDBAdapter._resetForTests();
+    const warn = vi.spyOn(DiagnosticLog, 'warn');
+    await IDBAdapter.get('vot-state', 'v');
+    expect(IDBAdapter.openInfo()).toBeNull();
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("the browser's own reason is kept word for word", () => {
+    expect(IDBAdapter.describeUpgrade({ oldVersion: 0, newVersion: 12, dataLoss: 'total', dataLossMessage: 'IndexedDB (database was corrupt): checksum mismatch' }))
+      .toBe('database created fresh (v0 -> v12); dataLoss total: IndexedDB (database was corrupt): checksum mismatch');
+    expect(IDBAdapter.describeUpgrade({ oldVersion: 11, newVersion: 12 })).toBe('');
+  });
+
+  it('a close the browser forces is logged and handed to the listener; the connection is not reopened', async () => {
+    const seen = vi.fn();
+    const off = IDBAdapter.onBrowserClose(seen);
+    const db = await IDBAdapter.open();
+    const warn = vi.spyOn(DiagnosticLog, 'warn');
+    db.onclose(new Event('close'));
+    expect(seen).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith('data-health', expect.stringMatching(/closed the database/));
+    expect(await IDBAdapter.open()).toBe(db);           // a reopen would meet an empty store
+    off();
+    warn.mockRestore();
   });
 });

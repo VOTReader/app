@@ -255,11 +255,12 @@ function App() {
   // The FlexSearch engine is gone (MiniSearch is the only engine now), so
   // its vot-search-cache DB — which could hold tens of MB of serialized
   // index on installs that used Classic search — is pure orphaned storage.
-  // deleteDatabase is idempotent (a no-op success when the DB doesn't
-  // exist), so every boot may fire it; fire-and-forget. MiniSearch's own
+  // Only when it is there (2026-10-11): deleting a missing database still opens the
+  // origin's store and writes and deletes its metadata on every boot, churn a store
+  // the WebView has twice found corrupt does not need. MiniSearch's own
   // vot-minisearch-cache is version-gated internally and stays.
   useEffect(() => {
-    try { indexedDB.deleteDatabase('vot-search-cache'); } catch (_e) { /* best-effort reclaim */ }
+    try { indexedDB.databases().then((dbs) => { if (dbs.some((d) => d.name === 'vot-search-cache')) indexedDB.deleteDatabase('vot-search-cache'); }, () => {}); } catch (_e) { /* best-effort reclaim */ }
   }, []);
 
   // ERR1: shared by the boot effect AND the StudiesHome "Try again" button.
