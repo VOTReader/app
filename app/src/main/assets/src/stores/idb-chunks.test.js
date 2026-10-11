@@ -146,7 +146,7 @@ describe('writeValue / getValue', () => {
     await writeValue(db, 's', 'v', v);
     expect((await rows()).length).toBe(1);
     const back = await read('v');
-    expect(back.when instanceof Date).toBe(true);
+    expect(Object.prototype.toString.call(back.when)).toBe('[object Date]');   // realm-safe (the fast pool's VM)
     expect(back.big.length).toBe(INLINE_MAX_CHARS * 2);
   });
 

@@ -5,6 +5,7 @@
 app/src/main/assets/lazy-css-loader.test.js
 app/src/main/assets/service-worker-1.contract.test.js
 app/src/main/assets/src/components/ErrorBoundary.test.jsx
+app/src/main/assets/src/search/semantic.test.js
 app/src/main/assets/src/ui/components/AudioPlayerBar.songs.test.jsx
 app/src/main/assets/src/ui/components/LetterSongs.test.jsx
 app/src/main/assets/src/ui/screens/AudioSongsScreen.keep.test.jsx
@@ -15,5 +16,6 @@ app/src/main/assets/src/utils/backup-flow.test.js
 app/src/main/assets/src/utils/offline-audio-web.test.js
 app/src/main/assets/src/utils/platform-bridge.test.js
 app/src/main/assets/src/utils/song-keep.test.js
+app/src/main/assets/src/utils/storage-dataloss-1005.test.jsx
 app/src/main/assets/src/utils/sw-register.test.js
 tools/smoke-ci.test.js
