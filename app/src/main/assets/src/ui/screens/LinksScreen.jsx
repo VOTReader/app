@@ -19,15 +19,52 @@ export function _linkEndpointCategory(ep) {
   return ep.type || '';
 }
 
-/* Cheap "is this endpoint still navigable?" check. We only use
-   already-loaded globals — no extra fetches. Returns true if
-   the endpoint resolves to a known destination. */
-export function _endpointResolves(ep) {
-  if (!ep || !ep.type || !ep.key) return false;
+/* W49: the Bible, the VOT letters and the Bible Studies load lazily. Until the
+   corpus an endpoint lives in has landed it cannot be checked, and an
+   unchecked endpoint counts as fine: a fresh session's Links screen used to
+   call every Bible, letter and study link broken and offer to delete it. */
+function _bibleLoaded(/** @type {any} */ bookId) {
+  if (bookId === 'matthew') return !!((typeof _matthew === 'function') && _matthew());
+  return typeof BOOKS !== 'undefined';
+}
+function _votLoaded() {
+  var c = /** @type {any} */ (window).__votCorpus;
+  return !c || !!c.loaded;   // no lazy loader (an old shell): the letters are there
+}
+function _studiesLoaded() { return typeof BIBLE_STUDIES !== 'undefined'; }
+var STUDIES_PENDING = 'studies-pending';
+
+/* 'ok' | 'broken' | 'unknown' (its corpus has not landed) | STUDIES_PENDING
+   (only the Bible Studies, not loaded yet, can say). Cheap: loaded globals
+   only, no fetches. */
+export function _endpointState(/** @type {any} */ ep) {
+  if (!ep || !ep.type || !ep.key) return 'broken';
   if (ep.type === 'bible') {
     var books = (typeof _allBooks === 'function') ? _allBooks() : {};
-    return !!(ep.bookId && books[ep.bookId]);
+    if (ep.bookId && books[ep.bookId]) return 'ok';
+    return _bibleLoaded(ep.bookId) ? 'broken' : 'unknown';
   }
+  if (ep.type === 'study' || ep.type === 'journal') return _endpointResolvesLoaded(ep) ? 'ok' : 'broken';
+  if (typeof findEntryContext !== 'function') return 'ok';   // can't verify: assume OK
+  var kind = ep.type === 'letter' ? 'letter' : ep.type === 'wtlb' ? 'wtlb' : ep.type === 'blessed' ? 'blessed' : ep.type === 'holy-days' ? 'holy-days' : null;
+  var id = ep.letterId || ep.entryId || (ep.key && ep.key.split(':')[1]) || null;
+  if (!id) return 'broken';
+  if (findEntryContext(id, kind)) return 'ok';
+  // Not found: broken only once every corpus it could live in has landed. A
+  // study chapter (and an untyped or letter end) can be in the Bible Studies.
+  if (ep.type !== 'study-letter' && !_votLoaded()) return 'unknown';
+  if ((ep.type === 'study-letter' || kind === null || kind === 'letter') && !_studiesLoaded()) return STUDIES_PENDING;
+  return 'broken';
+}
+
+/* "Is this endpoint still navigable?" — false only when it is known broken. */
+export function _endpointResolves(/** @type {any} */ ep) {
+  return _endpointState(ep) !== 'broken';
+}
+
+/* The checks for the endpoints whose corpus is always there or that judge
+   their own loading (Matthew, the journal). */
+function _endpointResolvesLoaded(/** @type {any} */ ep) {
   if (ep.type === 'study') {
     var M = (typeof _matthew === 'function') ? _matthew() : null;
     if (!M) return true; // matthew may not be loaded yet — don't mark broken
@@ -39,15 +76,21 @@ export function _endpointResolves(ep) {
     var jid = ep.entryId || (ep.key && ep.key.split(':')[1]) || null;
     return !!(jid && JournalStore.get(jid));
   }
-  // For letter/wtlb/blessed/holy-days, try findEntryContext
-  if (typeof findEntryContext === 'function') {
-    var kind = ep.type === 'letter' ? 'letter' : ep.type === 'wtlb' ? 'wtlb' : ep.type === 'blessed' ? 'blessed' : ep.type === 'holy-days' ? 'holy-days' : null;
-    var id = ep.letterId || ep.entryId || (ep.key && ep.key.split(':')[1]) || null;
-    if (!id) return false;
-    var ctx = findEntryContext(id, kind);
-    return !!ctx;
-  }
-  return true; // can't verify — assume OK
+  return true;
+}
+
+/* Re-render the moment a lazy corpus lands (index.html's __makeLazyLoader
+   objects), so an "unknown" endpoint is checked for real (W49). */
+var LAZY_CORPORA = ['__bibleCorpus', '__matthewCorpus', '__votCorpus'];
+function _subscribeCorpora(/** @type {() => void} */ cb) {
+  var offs = LAZY_CORPORA.map(function(name) {
+    var c = /** @type {any} */ (window)[name];
+    return c && typeof c.subscribe === 'function' ? c.subscribe(cb) : null;
+  });
+  return function() { offs.forEach(function(off) { if (typeof off === 'function') off(); }); };
+}
+function _corpusSignature() {
+  return [_bibleLoaded(null), _bibleLoaded('matthew'), _votLoaded(), _studiesLoaded()].join('|');
 }
 
 /* Build a text string for the search index from an endpoint. */
@@ -283,11 +326,35 @@ export function LinksScreen(props) {
     return filtered;
   }, [allLinks, searchQuery, sortMode]);
 
-  var brokenLinks = useMemo(function() {
-    return allLinks.filter(function(lnk) {
-      return !_endpointResolves(lnk.source) || !_endpointResolves(lnk.target);
+  // W49: an end whose corpus has not landed is unknown, never broken; the
+  // check re-runs when a corpus lands (the signature) or the studies load.
+  var corpusSig = React.useSyncExternalStore(_subscribeCorpora, _corpusSignature);
+  var _st = useState(0);
+  var studiesTick = _st[0];
+  var setStudiesTick = _st[1];
+  var checkKey = corpusSig + '|' + studiesTick;
+  var brokenCheck = useMemo(function() {
+    var broken = [], needsStudies = false;
+    allLinks.forEach(function(lnk) {
+      var s = _endpointState(lnk.source), t = _endpointState(lnk.target);
+      if (s === 'broken' || t === 'broken') broken.push(lnk);
+      else if (s === STUDIES_PENDING || t === STUDIES_PENDING) needsStudies = true;
     });
-  }, [allLinks]);
+    return { broken: broken, needsStudies: needsStudies, checkedAt: checkKey };
+  }, [allLinks, checkKey]);
+  var brokenLinks = brokenCheck.broken;
+  var needsStudies = brokenCheck.needsStudies;
+  // Only the Bible Studies can say whether these study links still lead
+  // somewhere: load them (once per need) and check again.
+  React.useEffect(function() {
+    if (!needsStudies) return undefined;
+    var w = /** @type {any} */ (window);
+    var load = typeof w.loadBibleStudies === 'function' ? w.loadBibleStudies : null;
+    if (!load) return undefined;
+    var live = true;
+    Promise.resolve(load()).then(function() { if (live) setStudiesTick(function(n) { return n + 1; }); });
+    return function() { live = false; };
+  }, [needsStudies, setStudiesTick]);
 
   // (Pre-Q3.3f-dead: var sortLabels = {...} — defined but never referenced.)
 
