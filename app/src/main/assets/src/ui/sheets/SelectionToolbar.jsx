@@ -1420,8 +1420,22 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       role="toolbar"
       aria-label="Text selection actions"
       style={{ left: pos.x, top: pos.y, transform: 'translateY(-100%)' }}
-      onPointerDown={(e) => { e.stopPropagation(); suppressRef.current = true; }}
-      onPointerUp={() => { setTimeout(() => { suppressRef.current = false; }, 300); }}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        suppressRef.current = true;
+        // W54: the press ends wherever the pointer lifts or is cancelled
+        // (dragged off the toolbar, taken by a scroll, or the toolbar gone
+        // with the action it ran). Ended only by the toolbar's own pointerup,
+        // a press elsewhere left suppressRef set and every later selection
+        // was ignored until a reload.
+        const end = () => {
+          document.removeEventListener('pointerup', end, true);
+          document.removeEventListener('pointercancel', end, true);
+          setTimeout(() => { suppressRef.current = false; }, 300);
+        };
+        document.addEventListener('pointerup', end, true);
+        document.addEventListener('pointercancel', end, true);
+      }}
     >
       {/* While confirming a remove, the whole toolbar collapses to the
           ConfirmStrip so the user is focused on the single decision (and
