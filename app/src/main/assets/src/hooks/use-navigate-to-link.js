@@ -58,6 +58,8 @@
      setSurpriseAnchor — tabField setter; scroll-to-verse highlight on
        bible / study endpoints.
      setJournalEntryId — App useState setter; journal endpoints.
+     activeTabIdx     — useTabs; with the nav position, the "has the reader
+       moved on?" check a Bible jump that waits for its corpus makes (W39).
 
    RETURNS: { navigateToLink }   (the stable shell only — _navToLinkRef is
             fully internal; App() consumes navigateToLink, nothing else.)
@@ -68,7 +70,10 @@
      wired (nothing to clean up). The body only SETS the 'pendingScrollHlKey'
      slot, which use-dom-annotation-sync takes post-render to scroll the mark
      into view. (D2 removed the write-only-dead 'pendingLinkExcerpt' slot.)
+     A Bible jump that waits for its corpus sets it with the jump (W39).
    ═══════════════════════════════════════════════════════════════════════ */
+
+import { useRefMirror } from './use-ref-mirror.js';
 
 /**
  * Build the surpriseAnchor for a bible/matthew endpoint's verse target.
@@ -97,6 +102,11 @@ export function verseAnchorFor(endpoint) {
    the top of the deferred body. */
 const _NEEDS_SCREEN = { letter: 1, wtlb: 1, blessed: 1, 'holy-days': 1 };
 
+/* The fields that say where the reader is (W39): the tab plus the 7 nav-position
+   fields the back-stack entry captures. */
+const _PLACE_KEYS = ['tab', 'screen', 'bookId', 'chapterNum', 'letterId', 'studyId', 'studyChapterId', 'journalEntryId'];
+const _samePlace = (a, b) => _PLACE_KEYS.every((k) => a[k] === b[k]);
+
 /**
  * Cross-screen navigation handler. Returns a stable `navigateToLink`
  * function (identity-fresh closure refreshed every render via ref) that
@@ -120,7 +130,8 @@ const _NEEDS_SCREEN = { letter: 1, wtlb: 1, blessed: 1, 'holy-days': 1 };
  *   setStudyId: (val: any) => void,
  *   setStudyChapterId: (val: any) => void,
  *   setSurpriseAnchor: (val: any) => void,
- *   setJournalEntryId: (val: any) => void
+ *   setJournalEntryId: (val: any) => void,
+ *   activeTabIdx?: number
  * }} args
  * @returns {{ navigateToLink: (endpoint: any, meta?: any) => void }}
  */
@@ -128,8 +139,10 @@ export function useNavigateToLink({
   closeLinkSidebar, pushFromLetter,
   screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId,
   setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
-  setSurpriseAnchor, setJournalEntryId,
+  setSurpriseAnchor, setJournalEntryId, activeTabIdx,
 }) {
+  // Where the reader is NOW, read when a deferred Bible jump's corpus lands (W39).
+  const _placeRef = useRefMirror({ tab: activeTabIdx, screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId });
   // Part 1 + 2 of the pattern (see header). The shell has [] deps — stable
   // for the component's lifetime.
   const _navToLinkRef = React.useRef(null);
@@ -162,9 +175,9 @@ export function useNavigateToLink({
     // already scrolled to that mark — no animation, just there. The
     // post-render apply-DOM effect consumes this. Non-Library tap-throughs
     // (footnote letter-links etc.) have no hlKey → null → no behavior change.
-    window.navHandoff.set('pendingScrollHlKey', (endpoint && endpoint.key)
+    const scrollKey = (endpoint && endpoint.key)
       ? String(endpoint.key).replace(/:\d+-\d+$/, '')
-      : null);
+      : null;
     // Compute the destination snapshot based on the endpoint type. Used by
     // backHint + the pruning effect (useFromLetterStack) to detect "user
     // has moved on".
@@ -201,7 +214,7 @@ export function useNavigateToLink({
     } else if (endpoint.screen) {
       destSnapshot = { screen: endpoint.screen, bookId: null, chapterNum: null, letterId: endpoint.letterId || endpoint.entryId || null, studyId: null, studyChapterId: null };
     }
-    pushFromLetter({
+    const backEntry = {
       sourceScreen: screen, sourceLetterId: letterId,
       sourceBookId: bookId, sourceChapterNum: chapterNum,
       sourceStudyId: studyId, sourceStudyChapterId: studyChapterId,
@@ -212,7 +225,7 @@ export function useNavigateToLink({
       // are the one path the owner wants pill-less (see useFromLetterStack).
       silent: !!(meta && meta.silent),
       destSnapshot: destSnapshot
-    });
+    };
     if (endpoint.type === 'bible' && endpoint.bookId && endpoint.bookId !== 'matthew') {
       // The bible corpus (BOOKS, in bundle-a-bible) may not be loaded yet on a
       // direct entry — a Library/LinkSidebar tap straight after a cold boot,
@@ -222,6 +235,8 @@ export function useNavigateToLink({
       // report). Navigate immediately when the corpus is ready; otherwise kick
       // the loader and navigate when it resolves — never drop the intent.
       const goBible = () => {
+        window.navHandoff.set('pendingScrollHlKey', scrollKey);
+        pushFromLetter(backEntry);
         setBookId(endpoint.bookId);
         setChapterNum(endpoint.chapter);
         setScreen('bible-ch');
@@ -230,14 +245,30 @@ export function useNavigateToLink({
       if (_BOOKS && _BOOKS[endpoint.bookId]) {
         goBible();
       } else if (typeof window.__loadBibleCorpus === 'function') {
+        // W39: the back entry, scroll key and jump all wait for the corpus. Pushed
+        // at the tap, the entry's destSnapshot (bible-ch) differed from where the
+        // reader still was, and useFromLetterStack's prune popped it on the next
+        // render: the jump landed with no way back. And the setters write to the
+        // tab active when the corpus lands, so the jump runs only if the reader
+        // is still in the tab and place they tapped from.
+        const tappedAt = _placeRef.current;
         window.__loadBibleCorpus().then(function () {
           // Re-check post-load: a real endpoint resolves; a stale/bogus bookId
           // no-ops with a trace rather than opening an empty chapter.
-          if (typeof BOOKS !== 'undefined' && BOOKS && BOOKS[endpoint.bookId]) goBible();
-          else console.warn('navigateToLink: bible book not found after corpus load', endpoint.bookId);
+          if (!(typeof BOOKS !== 'undefined' && BOOKS && BOOKS[endpoint.bookId])) {
+            console.warn('navigateToLink: bible book not found after corpus load', endpoint.bookId);
+          } else if (!_samePlace(tappedAt, _placeRef.current)) {
+            console.info('navigateToLink: the reader moved on while the Bible loaded; jump dropped', endpoint.bookId);
+          } else {
+            goBible();
+          }
         }).catch(function (e) { console.warn('navigateToLink: bible corpus load failed', e); });
       }
-    } else if (endpoint.type === 'study' || (endpoint.type === 'bible' && endpoint.bookId === 'matthew')) {
+      return;
+    }
+    window.navHandoff.set('pendingScrollHlKey', scrollKey);
+    pushFromLetter(backEntry);
+    if (endpoint.type === 'study' || (endpoint.type === 'bible' && endpoint.bookId === 'matthew')) {
       // MATTHEW lives in bundle-a-matthew — same lazy-corpus race the bible
       // branch above guards. This branch never kicked the loader, so a
       // study-sourced tap made before the corpus resolved landed on the

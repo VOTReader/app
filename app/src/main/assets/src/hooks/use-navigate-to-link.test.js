@@ -79,18 +79,85 @@ describe('useNavigateToLink — bible nav corpus-await', () => {
     expect(p.setScreen).not.toHaveBeenCalled(); // no empty-chapter nav
   });
 
-  it('builds the back-stack destSnapshot without needing the corpus loaded', () => {
+  it('builds the back-stack destSnapshot without needing the corpus loaded', async () => {
     // destSnapshot is pure nav metadata; it must be present so the back-pill
     // can detect "user moved on" even on a pre-load bible jump.
-    window.__loadBibleCorpus = vi.fn(() => Promise.resolve());
-    const p = makeParams();
+    let resolveLoad;
+    window.__loadBibleCorpus = vi.fn(() => new Promise((res) => { resolveLoad = res; }));
+    const p = makeParams({ screen: 'notes-index' });
     const { result } = renderHook(() => useNavigateToLink(p));
     act(() => { result.current.navigateToLink({ type: 'bible', bookId: 'genesis', chapter: 2 }); });
+    window.BOOKS = { genesis: { title: 'Genesis' } };
+    await act(async () => { resolveLoad(); await Promise.resolve(); });
     expect(p.pushFromLetter).toHaveBeenCalledTimes(1);
     const entry = p.pushFromLetter.mock.calls[0][0];
+    expect(entry.sourceScreen).toBe('notes-index');
     expect(entry.destSnapshot).toEqual(
       expect.objectContaining({ screen: 'bible-ch', bookId: 'genesis', chapterNum: 2 }),
     );
+  });
+
+  // W39 (sweep 2026-10-13): the back entry used to be pushed at TAP time while the
+  // jump waited for the corpus. The prune effect (useFromLetterStack) saw its
+  // destSnapshot (bible-ch) differ from where the reader still was and popped it
+  // on the next render, so the jump landed with no way back. And the deferred
+  // setters write to whichever tab is active when the corpus lands, so a tab
+  // switch in between moved the wrong tab.
+  it('W39: a jump that waits for the corpus pushes its back entry with the jump, not at the tap', async () => {
+    let resolveLoad;
+    window.__loadBibleCorpus = vi.fn(() => new Promise((res) => { resolveLoad = res; }));
+    const p = makeParams({ screen: 'notes-index', activeTabIdx: 0 });
+    const { result } = renderHook(() => useNavigateToLink(p));
+    act(() => { result.current.navigateToLink({ type: 'bible', bookId: 'genesis', chapter: 2, key: 'hl:genesis:2:1:0-4' }); });
+    expect(p.pushFromLetter).not.toHaveBeenCalled(); // nothing for the prune effect to pop
+    expect(navHandoff.peek('pendingScrollHlKey')).toBeNull(); // nor a scroll key for some other screen
+    window.BOOKS = { genesis: { title: 'Genesis' } };
+    await act(async () => { resolveLoad(); await Promise.resolve(); });
+    expect(p.pushFromLetter).toHaveBeenCalledTimes(1);
+    expect(p.setScreen).toHaveBeenCalledWith('bible-ch');
+    expect(navHandoff.peek('pendingScrollHlKey')).toBe('hl:genesis:2:1');
+  });
+
+  it('W39: switching tabs while the corpus loads cancels the jump (it would move the other tab)', async () => {
+    let resolveLoad;
+    window.__loadBibleCorpus = vi.fn(() => new Promise((res) => { resolveLoad = res; }));
+    const p = makeParams({ screen: 'notes-index', activeTabIdx: 0 });
+    const { result, rerender } = renderHook((q) => useNavigateToLink(q), { initialProps: p });
+    act(() => { result.current.navigateToLink({ type: 'bible', bookId: 'genesis', chapter: 2, key: 'hl:x' }); });
+    // the reader opens tab 2 (same screen name there, a different tab)
+    rerender({ ...p, activeTabIdx: 1 });
+    window.BOOKS = { genesis: { title: 'Genesis' } };
+    await act(async () => { resolveLoad(); await Promise.resolve(); });
+    expect(p.setScreen).not.toHaveBeenCalled();
+    expect(p.setBookId).not.toHaveBeenCalled();
+    expect(p.pushFromLetter).not.toHaveBeenCalled();
+    expect(navHandoff.peek('pendingScrollHlKey')).toBeNull();
+  });
+
+  it('W39: moving on in the same tab while the corpus loads cancels the jump', async () => {
+    let resolveLoad;
+    window.__loadBibleCorpus = vi.fn(() => new Promise((res) => { resolveLoad = res; }));
+    const p = makeParams({ screen: 'notes-index', activeTabIdx: 0 });
+    const { result, rerender } = renderHook((q) => useNavigateToLink(q), { initialProps: p });
+    act(() => { result.current.navigateToLink({ type: 'bible', bookId: 'genesis', chapter: 2 }); });
+    rerender({ ...p, screen: 'vot-one-letter', letterId: 'L12' });
+    window.BOOKS = { genesis: { title: 'Genesis' } };
+    await act(async () => { resolveLoad(); await Promise.resolve(); });
+    expect(p.setScreen).not.toHaveBeenCalled();
+    expect(p.pushFromLetter).not.toHaveBeenCalled();
+  });
+
+  it('W39: re-renders that leave the reader where they tapped do not cancel the jump', async () => {
+    let resolveLoad;
+    window.__loadBibleCorpus = vi.fn(() => new Promise((res) => { resolveLoad = res; }));
+    const p = makeParams({ screen: 'notes-index', activeTabIdx: 0 });
+    const { result, rerender } = renderHook((q) => useNavigateToLink(q), { initialProps: p });
+    act(() => { result.current.navigateToLink({ type: 'bible', bookId: 'genesis', chapter: 2 }); });
+    rerender({ ...p, closeLinkSidebar: vi.fn() }); // fresh closures, same tab, same place
+    window.BOOKS = { genesis: { title: 'Genesis' } };
+    await act(async () => { resolveLoad(); await Promise.resolve(); });
+    expect(p.setScreen).toHaveBeenCalledWith('bible-ch');
+    expect(p.pushFromLetter).toHaveBeenCalledTimes(1);
   });
 
   it('still routes a matthew bible-endpoint to matthew-ch (not bible-ch)', () => {
@@ -299,7 +366,8 @@ describe('useNavigateToLink — every endpoint kind and the prologue', () => {
     const { result } = renderHook(() => useNavigateToLink(p));
     act(() => { result.current.navigateToLink({ type: 'bible', bookId: 'genesis', chapter: 1 }); });
     expect(p.setScreen).not.toHaveBeenCalled();
-    expect(p.pushFromLetter).toHaveBeenCalledTimes(1);
+    // W39: the back entry goes with the jump; no jump, no junk entry.
+    expect(p.pushFromLetter).not.toHaveBeenCalled();
   });
 
   it('a failed bible corpus load warns instead of throwing or navigating', async () => {
