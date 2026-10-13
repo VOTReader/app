@@ -76,15 +76,36 @@ describe('useRestoreGuard — W7: a restore live in another tab', () => {
   });
 
   it('still warns and consumes the marker when no tab holds the lock (the restoring tab died)', async () => {
-    localStorage.setItem(RESTORE_INFLIGHT_KEY, 'tok-A');
-    lockState(false);
-    const toast = vi.fn();
-    /** @type {any} */ (globalThis).showToast = toast;
+    vi.useFakeTimers();
+    try {
+      localStorage.setItem(RESTORE_INFLIGHT_KEY, 'tok-A');
+      lockState(false);
+      const toast = vi.fn();
+      /** @type {any} */ (globalThis).showToast = toast;
 
-    renderHook(() => useRestoreGuard());
+      renderHook(() => useRestoreGuard());
+      await vi.advanceTimersByTimeAsync(5000);     // two free looks, 2 s apart
 
-    await vi.waitFor(() => expect(toast).toHaveBeenCalledTimes(1));
-    expect(localStorage.getItem(RESTORE_INFLIGHT_KEY)).toBeNull();
+      expect(toast).toHaveBeenCalledTimes(1);
+      expect(localStorage.getItem(RESTORE_INFLIGHT_KEY)).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('round 3: one free look is not enough (a restore lets the lock go a moment before it removes its marker)', async () => {
+    vi.useFakeTimers();
+    try {
+      localStorage.setItem(RESTORE_INFLIGHT_KEY, 'tok-A');
+      lockState(false);                            // the first look lands just after A let the lock go
+      const toast = vi.fn();
+      /** @type {any} */ (globalThis).showToast = toast;
+
+      renderHook(() => useRestoreGuard());
+      await vi.advanceTimersByTimeAsync(2500);
+      localStorage.removeItem(RESTORE_INFLIGHT_KEY); // ... and A finishes cleanly
+      await vi.advanceTimersByTimeAsync(6000);
+
+      expect(toast).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
   });
 });
 
