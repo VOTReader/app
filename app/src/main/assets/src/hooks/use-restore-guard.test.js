@@ -87,3 +87,48 @@ describe('useRestoreGuard — W7: a restore live in another tab', () => {
     expect(localStorage.getItem(RESTORE_INFLIGHT_KEY)).toBeNull();
   });
 });
+
+describe('useRestoreGuard — W7 round 2: the restoring tab dies while this one is open', () => {
+  afterEach(() => { vi.useRealTimers(); delete /** @type {any} */ (navigator.locks).query; });
+  /** @param {() => boolean} held */
+  function lockState(held) {
+    /** @type {any} */ (navigator.locks).query = vi.fn(async () => ({
+      held: held() ? [{ name: 'votreader-backup-import', mode: 'exclusive' }] : [], pending: [],
+    }));
+  }
+
+  it('warns once the lock has stayed free and the marker it saw at boot is still set', async () => {
+    vi.useFakeTimers();
+    localStorage.setItem(RESTORE_INFLIGHT_KEY, 'tok-A');
+    let held = true;
+    lockState(() => held);
+    const toast = vi.fn();
+    /** @type {any} */ (globalThis).showToast = toast;
+
+    renderHook(() => useRestoreGuard());
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(toast).not.toHaveBeenCalled();
+    held = false;                                  // tab A died mid-restore: the browser dropped its lock
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(RESTORE_INFLIGHT_KEY)).toBeNull();
+  });
+
+  it('stays quiet when the restore finished (it removed its own marker)', async () => {
+    vi.useFakeTimers();
+    localStorage.setItem(RESTORE_INFLIGHT_KEY, 'tok-A');
+    let held = true;
+    lockState(() => held);
+    const toast = vi.fn();
+    /** @type {any} */ (globalThis).showToast = toast;
+
+    renderHook(() => useRestoreGuard());
+    await vi.advanceTimersByTimeAsync(5000);
+    held = false;
+    localStorage.removeItem(RESTORE_INFLIGHT_KEY);
+    await vi.advanceTimersByTimeAsync(10000);
+
+    expect(toast).not.toHaveBeenCalled();
+  });
+});

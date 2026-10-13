@@ -36,3 +36,39 @@ export async function backupLockBusy() {
     return true;
   }
 }
+
+/** How often a tab waiting on another tab's backup operation looks at the lock again. */
+export const LOCK_POLL_MS = 2000;
+
+/**
+ * Run `fn` once the backup lock has been free for two looks in a row,
+ * LOCK_POLL_MS apart. A restore that ends normally removes its marker moments
+ * after it lets the lock go, so a marker still set after that belongs to a
+ * restore whose tab died (Codex refuter, W7 round 1: a tab that only looked
+ * once at boot never noticed). Polls for as long as the lock stays held.
+ * Returns a cancel function.
+ * @param {() => void} fn
+ * @returns {() => void}
+ */
+export function whenBackupLockFree(fn) {
+  let stopped = false;
+  let freeOnce = false;
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let timer = null;
+  const look = () => {
+    timer = null;
+    if (stopped) return;
+    void backupLockBusy().then((busy) => {
+      if (stopped) return;
+      if (busy) freeOnce = false;
+      else if (freeOnce) {
+        stopped = true;
+        try { fn(); } catch (_e) { /* the caller's work must not break the poll's caller */ }
+        return;
+      } else freeOnce = true;
+      timer = setTimeout(look, LOCK_POLL_MS);
+    });
+  };
+  timer = setTimeout(look, LOCK_POLL_MS);
+  return () => { stopped = true; if (timer) clearTimeout(timer); };
+}
