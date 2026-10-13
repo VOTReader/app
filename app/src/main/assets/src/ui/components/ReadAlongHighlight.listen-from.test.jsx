@@ -43,24 +43,24 @@ const BLOCK1 = 'Second paragraph, first clause. Second paragraph, second clause.
 const MANIFEST = { ['one:' + ID]: [['idLong', 'B']] };
 const SYNC = { ['one:' + ID]: [[12.0, 0, 0, 28, 0], [30.0, 1, 0, 31, 0], [36.5, 1, 32, 64, 0]] };
 
-function Host({ withListen = true, onListenSpy, readAlongOn = true, refuse = false, partTwoOnly = false }) {
+function Host({ withListen = true, onListenSpy, readAlongOn = true, refuse = false, partTwoOnly = false, id = ID }) {
   const mainRef = React.useRef(null);
   const onListen = React.useCallback(() => {
     if (onListenSpy) onListenSpy();
     if (refuse) return;   // offline with nothing saved: a toast, nothing loads
     if (partTwoOnly) {    // a host whose Listen queues from part 2 (W62's unreachable case)
-      AudioPlayer.playCollection({ volKey: 'one', items: [{ id: ID, title: 'A Long Letter' }], collectionLabel: 'Volume One', startId: ID, startPartIndex: 1 });
+      AudioPlayer.playCollection({ volKey: 'one', items: [{ id, title: 'A Long Letter' }], collectionLabel: 'Volume One', startId: id, startPartIndex: 1 });
       return;
     }
-    AudioPlayer.playLetter({ volKey: 'one', letter: { id: ID, title: 'A Long Letter' }, collectionLabel: 'Volume One' });
-  }, [onListenSpy, refuse, partTwoOnly]);
+    AudioPlayer.playLetter({ volKey: 'one', letter: { id, title: 'A Long Letter' }, collectionLabel: 'Volume One' });
+  }, [onListenSpy, refuse, partTwoOnly, id]);
   return (
     <div className="screen-scroll">
       <div className="letter-body" ref={mainRef}>
-        <p data-hl-key={letterHlKey(ID, 0)}>{BLOCK0}</p>
-        <p data-hl-key={letterHlKey(ID, 1)}>{BLOCK1}</p>
+        <p data-hl-key={letterHlKey(id, 0)}>{BLOCK0}</p>
+        <p data-hl-key={letterHlKey(id, 1)}>{BLOCK1}</p>
       </div>
-      <ReadAlongHighlight volKey="one" letterId={ID} mainRef={mainRef} hlKeyFn={letterHlKey}
+      <ReadAlongHighlight volKey="one" letterId={id} mainRef={mainRef} hlKeyFn={letterHlKey}
         readAlongOn={readAlongOn} readAlongFollow={false} onListen={withListen ? onListen : undefined} />
     </div>
   );
@@ -335,6 +335,27 @@ describe('Listen from here in a multi-part letter lands in the part that holds t
       expect(document.getElementById('vot-repeat-toast')?.textContent || '').toBe('');
       act(() => { vi.advanceTimersByTime(20_001); });
       expect(document.getElementById('vot-repeat-toast')?.textContent).toBe('This passage has no timings to repeat by.');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // W62 refuter round 1: a Repeat armed on letter A (its start refused offline) stayed armed when the pane moved to
+  // letter B, so B's play spoke A's failure: at once when B's timings landed, or when A's wait ran out.
+  it.each([['with timings', true], ['without timings', false]])('a Repeat armed on one letter says nothing on the next letter the pane moves to (%s)', (_label, timed) => {
+    const OTHER = 'another-letter';
+    globalThis.AUDIO_MANIFEST = { ...MANIFEST, ['one:' + OTHER]: [['idOther', 'B']] };
+    globalThis.AUDIO_SYNC = timed ? { ...SYNC, ['one:' + OTHER]: [[5.0, 0, 0, 28, 0]] } : { ...SYNC };
+    delete globalThis.AUDIO_SYNC['one:' + ID];   // A has no timings in memory: the Repeat waits for them
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = render(<Host refuse />);
+      act(() => { LF().repeat([letterHlKey(ID, 1)], 'x', 3); });
+      view.rerender(<Host refuse id={OTHER} />);
+      act(() => { AudioPlayer.playLetter({ volKey: 'one', letter: { id: OTHER, title: 'Another Letter' }, collectionLabel: 'Volume One' }); });
+      act(() => { vi.advanceTimersByTime(20_001); });
+      expect(document.getElementById('vot-repeat-toast')?.textContent || '').toBe('');
+      expect(AudioPlayer.getState().loop || null).toBe(null);
     } finally {
       vi.useRealTimers();
     }

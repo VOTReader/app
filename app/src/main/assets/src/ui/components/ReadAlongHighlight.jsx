@@ -1191,7 +1191,13 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     // `track`: the host's Listen can start the very part that was playing (same rows, same frags), and the landing
     // still has to run to say it could not reach the place.
   }, [loaded, frags, rows, track, letterId, hlKeyFn, offsetMapFn, mainRef]);
-  React.useEffect(() => () => clearTimeout(repeatTimer.current), []);
+  // A Repeat or Listen from here armed for one letter or chapter goes when the pane moves to another: left armed,
+  // the next one's play landed it there or spoke its failure (W62 refuter round 1). Unmount too.
+  React.useEffect(() => () => {
+    pendingRepeat.current = null;
+    pendingListen.current = null;
+    clearTimeout(repeatTimer.current);
+  }, [key, chapter]);
 
   // Unmount / letter change: clear the wash and drop any glide we still own.
   React.useEffect(() => () => {
