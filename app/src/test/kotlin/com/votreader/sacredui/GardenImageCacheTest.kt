@@ -7,6 +7,9 @@ import org.junit.After
 import java.io.File
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -14,21 +17,22 @@ import kotlin.test.assertTrue
 import kotlin.test.assertFalse
 
 /**
- * GardenImageCache — page-key derivation + clear/size.
+ * GardenImageCache — cache names, the hit/miss/store path, the temp sweep, clear/size, and the fetch guards.
  *
- * The behaviour under test is the one the user explicitly required: the
- * SAME Garden page at DIFFERENT quality tiers must map to the SAME cache
- * file, so re-reading at a new tier OVERWRITES rather than accumulating one
- * copy per tier ("the user can't have 5+ copies of the same 200+ images at
- * different quality levels"). That guarantee lives in cacheNameFor(), which
- * strips the tier and keys by page number only.
+ * Two guarantees the owner relies on meet here. A page is served at the quality he picked: the cache name
+ * carries the tier, so a copy stored at another tier is a miss (vs6, sweep 2026-10-13 W6: a quality change
+ * used to do nothing for pages already viewed). And one file per page, never one per tier ("the user can't
+ * have 5+ copies of the same 200+ images at different quality levels"): storing a page deletes its other
+ * tiers' copies.
  *
- * No network / no WebView here — cacheNameFor() is pure string logic, and
- * clear()/sizeBytes() operate on a temp dir. The actual fetch + disk-serve
- * path is exercised on-device (the redirect + HttpURLConnection can't be
- * meaningfully unit-tested without a live network).
+ * No network / no WebView here: open() is the plain-JVM body intercept() wraps, driven through a fake
+ * fetcher; clear()/sizeBytes() operate on a temp dir; the real download runs against loopback servers.
  */
 class GardenImageCacheTest {
+
+    private companion object {
+        const val BASE = "https://github.com/VOTReader/votreader-assets/releases/download"
+    }
 
     private lateinit var tmp: File
     private lateinit var cache: GardenImageCache
@@ -44,36 +48,120 @@ class GardenImageCacheTest {
         tmp.deleteRecursively()
     }
 
-    // ─── page-key derivation (the overwrite-not-accumulate guarantee) ───
+    /** A distinct body per URL, so a test can tell which tier's bytes were served. */
+    private fun bodyFor(url: String): ByteArray = url.toByteArray()
+
+    /** The cached image files for one page, sorted (temp files excluded). */
+    private fun pageFiles(page: String): List<String> =
+        (File(tmp, "garden").listFiles() ?: emptyArray())
+            .map { it.name }.filter { it.startsWith("garden_$page") && it.endsWith(".jpg") }.sorted()
+
+    // ─── cache names: the page AND its tier (vs6) ───
 
     @Test
-    fun `same page at different tiers maps to the same cache file`() {
-        val base = "https://github.com/VOTReader/votreader-assets/releases/download"
-        val mobile   = cache.cacheNameFor("$base/garden-mobile/garden_042.jpg")
-        val standard = cache.cacheNameFor("$base/garden-standard/garden_042.jpg")
-        val native   = cache.cacheNameFor("$base/garden-native/garden_042.jpg")
-        val ultra    = cache.cacheNameFor("$base/garden-ultra/garden_042.jpg")
-        // All four tiers of page 42 → ONE filename → re-read overwrites.
-        assertEquals("garden_042.jpg", mobile)
-        assertEquals(mobile, standard)
-        assertEquals(mobile, native)
-        assertEquals(mobile, ultra)
+    fun `each tier of a page has its own name, so a cached file is only ever served at its own tier`() {
+        val mobile   = cache.cacheNameFor("$BASE/garden-mobile/garden_042.jpg")
+        val standard = cache.cacheNameFor("$BASE/garden-standard/garden_042.jpg")
+        val native   = cache.cacheNameFor("$BASE/garden-native/garden_042.jpg")
+        val ultra    = cache.cacheNameFor("$BASE/garden-ultra/garden_042.jpg")
+        assertEquals("garden_042.mobile.jpg", mobile)
+        assertEquals("garden_042.standard.jpg", standard)
+        assertEquals("garden_042.native.jpg", native)
+        assertEquals("garden_042.ultra.jpg", ultra)
     }
 
     @Test
     fun `different pages map to different cache files`() {
-        val base = "https://github.com/VOTReader/votreader-assets/releases/download/garden-standard"
-        assertEquals("garden_001.jpg", cache.cacheNameFor("$base/garden_001.jpg"))
-        assertEquals("garden_209.jpg", cache.cacheNameFor("$base/garden_209.jpg"))
+        assertEquals("garden_001.standard.jpg", cache.cacheNameFor("$BASE/garden-standard/garden_001.jpg"))
+        assertEquals("garden_209.standard.jpg", cache.cacheNameFor("$BASE/garden-standard/garden_209.jpg"))
     }
 
     @Test
-    fun `matches the redirected release-assets URL too`() {
-        // After the 302, the page number rides in the response-content-
-        // disposition / rscd filename query on the signed asset URL.
+    fun `the redirected release-assets URL names no tier, so it is left to the WebView`() {
+        // After the 302 the page number rides in the rscd filename query, but the tier is gone: caching
+        // or serving it could hand back another tier's file. The app only requests the github.com URL.
         val redirected = "https://release-assets.githubusercontent.com/github-production-release-asset/" +
             "1205622232/abc?rscd=attachment%3B+filename%3Dgarden_017.jpg&sig=XYZ"
-        assertEquals("garden_017.jpg", cache.cacheNameFor(redirected))
+        assertNull(cache.cacheNameFor(redirected))
+        val fetched = mutableListOf<String>()
+        val c = GardenImageCache(tmp) { url, dest -> fetched += url; dest.writeBytes(ByteArray(10)); 10L }
+        assertNull(c.open(redirected))
+        assertTrue(fetched.isEmpty())
+    }
+
+    // ─── vs6: the quality setting reaches pages already viewed ───
+
+    @Test
+    fun `a quality change refetches a viewed page at the new tier and keeps one file per page`() {
+        val fetched = mutableListOf<String>()
+        val c = GardenImageCache(tmp) { url, dest ->
+            fetched += url
+            val body = bodyFor(url)
+            dest.writeBytes(body)
+            body.size.toLong()
+        }
+        val mobile = "$BASE/garden-mobile/garden_042.jpg"
+        val ultra = "$BASE/garden-ultra/garden_042.jpg"
+        assertContentEquals(bodyFor(mobile), c.open(mobile)!!.use { it.readBytes() })
+        // Raising the quality: the page must come back at Ultra, not as the Mobile copy already on disk.
+        assertContentEquals(bodyFor(ultra), c.open(ultra)!!.use { it.readBytes() })
+        assertEquals(listOf(mobile, ultra), fetched)
+        // Ultra is now the cached copy (a hit, no third fetch) ...
+        assertContentEquals(bodyFor(ultra), c.open(ultra)!!.use { it.readBytes() })
+        assertEquals(2, fetched.size)
+        // ... and the only one: the Mobile copy went when Ultra was stored ("no 5 copies").
+        assertEquals(listOf("garden_042.ultra.jpg"), pageFiles("042"))
+    }
+
+    @Test
+    fun `a cached file from before tiers were named is replaced, not served`() {
+        val gdir = File(tmp, "garden")
+        File(gdir, "garden_042.jpg").writeBytes(ByteArray(64) { 0x55 })   // an old install's untiered copy
+        val standard = "$BASE/garden-standard/garden_042.jpg"
+        val c = GardenImageCache(tmp) { url, dest -> dest.writeBytes(bodyFor(url)); bodyFor(url).size.toLong() }
+        assertContentEquals(bodyFor(standard), c.open(standard)!!.use { it.readBytes() })
+        assertEquals(listOf("garden_042.standard.jpg"), pageFiles("042"))
+    }
+
+    // ─── vs6: the temp sweep never deletes a download still being written ───
+
+    @Test
+    fun `the temp sweep leaves another page's in-flight download alone`() {
+        // Two pages miss at once: page 1 is still downloading when page 2 is stored and the cap thread
+        // sweeps temp files (sweepAndCap is that thread's body). Page 1 must still arrive whole and be cached.
+        val full = ByteArray(4096) { (it % 251).toByte() }
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        var fetches = 0
+        val c = GardenImageCache(tmp) { _, dest ->
+            fetches++
+            dest.writeBytes(full.copyOfRange(0, 2048))   // half on disk (stream closed, so any OS can delete it)
+            started.countDown()
+            assertTrue(release.await(10, TimeUnit.SECONDS))
+            dest.appendBytes(full.copyOfRange(2048, full.size))
+            full.size.toLong()
+        }
+        val url = "$BASE/garden-standard/garden_001.jpg"
+        var served: ByteArray? = null
+        val t = thread { served = c.open(url)?.use { it.readBytes() } }
+        assertTrue(started.await(10, TimeUnit.SECONDS))
+        c.sweepAndCap()
+        release.countDown()
+        t.join(10_000)
+        assertContentEquals(full, served)
+        // Cached whole: the next view is a hit.
+        assertContentEquals(full, c.open(url)!!.use { it.readBytes() })
+        assertEquals(1, fetches)
+    }
+
+    @Test
+    fun `the temp sweep still removes a temp file no download owns`() {
+        val gdir = File(tmp, "garden")
+        val orphan = File(gdir, "garden_007.standard.jpg.3.tmp").apply { writeBytes(ByteArray(32)) }
+        val legacyOrphan = File(gdir, "garden_008.jpg.tmp").apply { writeBytes(ByteArray(32)) }
+        cache.sweepAndCap()
+        assertFalse(orphan.exists())
+        assertFalse(legacyOrphan.exists())
     }
 
     @Test
@@ -128,7 +216,9 @@ class GardenImageCacheTest {
         // intercept must return null (→ WebView + CSP handle it) without fetching
         // and without writing any cache file. This is the SSRF guard (U7).
         val gdir = File(tmp, "garden")
-        assertNull(cache.intercept("https://evil.test/garden_001.jpg"))
+        val evil = "https://evil.test/garden-ultra/garden_001.jpg"
+        assertEquals("garden_001.ultra.jpg", cache.cacheNameFor(evil))   // the name matches; only the host check stops it
+        assertNull(cache.intercept(evil))
         assertEquals(0L, cache.sizeBytes())
         assertTrue((gdir.listFiles() ?: emptyArray()).none { it.name.startsWith("garden_") })
     }

@@ -160,8 +160,8 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     // Disk cache for Garden page images (shouldInterceptRequest path). The
     // GitHub release redirect is no-cache, so without this every page turn
     // re-downloaded the image + re-did the redirect hop — visible lag on a
-    // phone. Keyed by page number (tier stripped) so a quality change
-    // overwrites rather than accumulating copies. Lazy: built on first use,
+    // phone. One file per page, named for its tier, so a quality change
+    // refetches at the new tier and replaces the old copy. Lazy: built on first use,
     // survives WebView rebuilds (onRenderProcessGone) since it's Activity-
     // scoped, not WebView-scoped.
     private val gardenCache: GardenImageCache by lazy { GardenImageCache(cacheDir) }
