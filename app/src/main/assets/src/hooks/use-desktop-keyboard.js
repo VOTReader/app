@@ -9,7 +9,10 @@
    it's intentionally NOT handled here.
 
    Shortcuts (ignored whenever the user is typing in an input/textarea/
-   contenteditable, so they never hijack the search box or journal editor):
+   contenteditable, so they never hijack the search box or journal editor;
+   W42: and whenever a sheet or menu is open, a control already handled the
+   key, or focus sits in a dialog/menu/radiogroup/tablist/listbox, whose
+   arrows move within it):
      /  or  Ctrl/Cmd+F   → open the app's full-text search (window.__goSearch)
      ArrowLeft/Right     → previous/next chapter
 
@@ -22,6 +25,11 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { PlatformBridge } from '../utils/platform-bridge.js';
+import { modalRegistry } from './use-modal-registry.js';
+
+/* W42: focus inside a dialog or menu owns every key; inside these groups, the arrows. */
+const _OWNS_ALL_KEYS = '[role="dialog"], [role="alertdialog"], [role="menu"]';
+const _OWNS_ARROWS = '[role="menubar"], [role="radiogroup"], [role="tablist"], [role="listbox"]';
 
 /** @returns {void} */
 export function useDesktopKeyboard() {
@@ -32,6 +40,11 @@ export function useDesktopKeyboard() {
       const el = /** @type {any} */ (e.target);
       const tag = el && el.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (el && el.isContentEditable)) return;
+      // W42: a key a control already handled, or one meant for an open sheet or
+      // menu, never also turns the chapter or opens Search behind it.
+      if (e.defaultPrevented || modalRegistry.isAnyOpen()) return;
+      const inside = (/** @type {string} */ sel) => !!(el && typeof el.closest === 'function' && el.closest(sel));
+      if (inside(_OWNS_ALL_KEYS)) return;
 
       // '/' (vim-style) or Ctrl/Cmd+F → open the app's full-text search.
       if (e.key === '/' || ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F'))) {
@@ -46,6 +59,7 @@ export function useDesktopKeyboard() {
       // arrows. Modified arrows (selection etc.) are left alone.
       if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
           !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        if (inside(_OWNS_ARROWS)) return;
         const nav = document.querySelector('.chapter-nav-sticky');
         if (!nav) return;
         const arrows = nav.querySelectorAll('.chapter-nav-sticky-arrow');

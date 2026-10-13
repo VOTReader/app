@@ -108,7 +108,8 @@ export function AudioSpeedControl({ rate }) {
               onBlur={commitTyped}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') { event.preventDefault(); commitTyped(); }
-                else if (event.key === 'Escape') { event.preventDefault(); setTyped(null); }
+                // W42: Escape cancels the typing only, never also closes the desk around it.
+                else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setTyped(null); }
               }}
             />
           )}
