@@ -683,7 +683,8 @@ describe('applyImportPayload', () => {
   // the prune deleted every photo and memo the device had. Only v1 and v2 belong
   // here; anything else is refused before the first write.
   it('W10: a JSON payload stamped anything but v1/v2 is refused before any write', async () => {
-    for (const exportVersion of [3, 4, '2', 2.5]) {
+    // 0 / null / false: the envelope already calls these invalid (only an ABSENT stamp is v1).
+    for (const exportVersion of [3, 4, '2', 2.5, 0, null, false, '']) {
       const journal = fakeStore('replaceAll');
       const media = mediaOnDevice(['photo', 'memo']);
       localStorage.setItem('vot-state', '{"theme":"light"}');

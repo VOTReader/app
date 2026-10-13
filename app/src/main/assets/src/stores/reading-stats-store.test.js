@@ -313,4 +313,15 @@ describe('pace samples from a damaged import (W10)', () => {
     ReadingStatsStore.get().wpmSamples = /** @type {any} */ ([null, { w: 400, ms: 0 }, { w: 'x' }, { w: 1, ms: 1 }, { w: 1, ms: 1 }]);
     expect(ReadingStatsStore.measuredWpm()).toBeNull();   // two real samples is not enough to say
   });
+
+  it('a sample outside the pace band recordPaceSample keeps is not evidence (no Infinity)', () => {
+    const huge = [1, 2, 3, 4, 5].map(() => ({ w: 1e308, ms: 1e-308 }));     // finite parts, an Infinity pace
+    const fast = [1, 2, 3, 4, 5].map(() => ({ w: 100000, ms: 60000 }));     // 100,000 wpm
+    const slow = [1, 2, 3, 4, 5].map(() => ({ w: 1, ms: 600000 }));         // 0.1 wpm
+    ReadingStatsStore.replaceAll(/** @type {any} */ ({ wpmSamples: [...huge, ...fast, ...slow] }));
+    expect(ReadingStatsStore.get().wpmSamples).toEqual([]);
+    expect(ReadingStatsStore.measuredWpm()).toBeNull();
+    ReadingStatsStore.get().wpmSamples = /** @type {any} */ ([...huge, ...real()]);
+    expect(ReadingStatsStore.measuredWpm()).toBe(200);
+  });
 });

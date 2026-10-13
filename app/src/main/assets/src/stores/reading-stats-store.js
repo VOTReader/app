@@ -75,16 +75,19 @@ var WPM_MAX = 1500;
 var WPM_MIN_SAMPLES = 5;
 
 /**
- * W10: a sample measuredWpm can divide: what recordPaceSample writes, a
- * positive finite word count and time. Imported samples arrived unchecked, and
- * one null or zero-time sample made the pace NaN or a throw on My Progress and
- * the reading-minutes chip.
+ * W10: a sample recordPaceSample would have kept: a positive word count and time
+ * whose pace is inside the WPM_MIN..WPM_MAX band (unchanged since the ledger
+ * began, so every real sample passes). Imported samples arrived unchecked, and
+ * one null, zero-time or absurd sample made the pace NaN, Infinity or a throw on
+ * My Progress and the reading-minutes chip.
  * @param {any} s
  * @returns {boolean}
  */
 function _isPaceSample(s) {
-  return !!s && typeof s === 'object' && typeof s.w === 'number' && typeof s.ms === 'number'
-    && isFinite(s.w) && isFinite(s.ms) && s.w > 0 && s.ms > 0;
+  if (!s || typeof s !== 'object' || typeof s.w !== 'number' || typeof s.ms !== 'number') return false;
+  if (!(s.w > 0) || !(s.ms > 0) || !isFinite(s.w) || !isFinite(s.ms)) return false;
+  var wpm = s.w / s.ms * 60000;
+  return wpm >= WPM_MIN && wpm <= WPM_MAX;
 }
 
 /**
