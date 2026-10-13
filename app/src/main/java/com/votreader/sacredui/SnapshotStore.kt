@@ -4,6 +4,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
 import java.io.File
+import java.io.FileOutputStream
+import java.io.RandomAccessFile
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -29,6 +31,12 @@ import java.util.Locale
  * snapshots still leaves an older good one. A snapshot over [MAX_BYTES] is
  * refused rather than written partly.
  *
+ * W9 (2026-10-13): a snapshot's bytes are forced to the disk before it takes its
+ * name, so a power cut leaves the old set or the new snapshot whole, never a named
+ * one cut short. One broken anyway (empty, or not ending where JSON ends) is never
+ * listed and never keeps its day in [prune]: as the newest of its day it used to push
+ * out the good copy before it. The page walks past one that will not parse, too.
+ *
  * Thread-safe (every entry point is synchronized): bridge calls land on binder
  * threads. Every failure is quiet (false / "" / "[]"), never a throw across the
  * bridge.
@@ -42,6 +50,9 @@ class SnapshotStore(private val dir: File) {
         private val NAME = Regex("""^snap-(\d{8})-(\d{6})\.json$""")
         private fun stampFormat() = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US)
     }
+
+    /** Forces a written file's bytes to the disk (W9); a seam so a test sees it run before the rename. */
+    internal var sync: (FileOutputStream) -> Unit = { it.fd.sync() }
 
     /** Write one snapshot; prunes old ones. False when empty, too big, or the write failed. */
     @Synchronized
@@ -59,7 +70,7 @@ class SnapshotStore(private val dir: File) {
                 name = "snap-" + stampFormat().format(Date(t)) + ".json"
             }
             val tmp = File(dir, "$name.tmp")
-            tmp.writeBytes(bytes)
+            FileOutputStream(tmp).use { out -> out.write(bytes); out.flush(); sync(out) }
             if (!tmp.renameTo(File(dir, name))) { tmp.delete(); return false }
             prune()
             true
@@ -74,6 +85,7 @@ class SnapshotStore(private val dir: File) {
     fun listJson(): String = try {
         val arr = JSONArray()
         for (f in snapshots()) {
+            if (!whole(f)) continue
             arr.put(JSONObject().put("name", f.name).put("size", f.length()).put("at", stampOf(f.name)))
         }
         arr.toString()
@@ -100,6 +112,21 @@ class SnapshotStore(private val dir: File) {
     private fun snapshots(): List<File> =
         (dir.listFiles() ?: emptyArray()).filter { NAME.matches(it.name) }.sortedByDescending { it.name }
 
+    /**
+     * A snapshot whose bytes are all there: the page's JSON (JSON.stringify, no padding)
+     * starts with `{` and ends with `}`. Only the two ends are read, so a list stays
+     * cheap; what a power cut breaks is the tail, or the whole file (empty or zeroed).
+     */
+    private fun whole(f: File): Boolean = try {
+        RandomAccessFile(f, "r").use { r ->
+            val n = r.length()
+            if (n < 2) return@use false
+            val first = r.read()
+            r.seek(n - 1)
+            first == '{'.code && r.read() == '}'.code
+        }
+    } catch (e: Exception) { false }
+
     private fun stampOf(name: String): Long {
         val m = NAME.find(name) ?: return 0L
         return try { stampFormat().parse(m.groupValues[1] + "-" + m.groupValues[2])?.time ?: 0L } catch (e: Exception) { 0L }
@@ -111,6 +138,8 @@ class SnapshotStore(private val dir: File) {
         val weeks = LinkedHashSet<String>()
         val cal = Calendar.getInstance(Locale.US)
         for (f in snapshots()) {
+            // Broken (W9): never this day's keeper; like a leftover .tmp, never a snapshot again.
+            if (!whole(f)) { Timber.w("snapshot %s is broken; removed", f.name); f.delete(); continue }
             val day = NAME.find(f.name)!!.groupValues[1]
             if (day in days) { f.delete(); continue }
             if (days.size < KEEP_DAYS) { days.add(day); continue }

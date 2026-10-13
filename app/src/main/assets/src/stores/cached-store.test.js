@@ -1230,9 +1230,10 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(LS_SKIP_LIST).toContain('vot-last-seen-build');      // utils/update-toast.js
     expect(LS_SKIP_LIST).toContain('vot-diag-ring');            // utils/diagnostic-log.js PERSIST_KEY
     expect(LS_SKIP_LIST).toContain('vot-health-skip');          // utils/data-safety.js HEALTH_SKIP_KEY
+    expect(LS_SKIP_LIST).toContain('vot-health-progress');      // utils/data-safety.js PROGRESS_RESET_KEY (W9)
     expect(LS_SKIP_LIST).toContain('vot-last-export');          // utils/backup-flow.js LAST_EXPORT_KEY
     expect(LS_SKIP_LIST).not.toContain('vot-ann-migrated');     // W7.1 retired this exception
-    expect(LS_SKIP_LIST.length).toBe(11);
+    expect(LS_SKIP_LIST.length).toBe(12);
     expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
   });
 

@@ -535,6 +535,8 @@ describe('Clear All Personal Data', () => {
       .toEqual(['votreader', 'vot-journal-media', 'vot-thumbs', 'vot-search-cache', 'vot-minisearch-cache']);
     expect(localStorage.getItem('vot-state')).toBeNull();
     expect(localStorage.getItem('other')).toBe('kept');
+    // W9: Clear All's token names itself (main ignores any other on the fresh database this wipe made).
+    expect(localStorage.getItem('vot-health-skip')).toBe('clear-all');
     expect(globalThis.setStoreWriteFence).toHaveBeenCalledWith(true);
     expect(globalThis.setStoreWriteFence).not.toHaveBeenCalledWith(false);
     expect(lastToast()).toBe('All personal data cleared. Reloading…');

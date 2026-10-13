@@ -59,16 +59,18 @@ function weekKey(ms) {
 /**
  * The snapshot names to delete: keep the newest of each of the KEEP_DAYS most
  * recent days that have one, then the newest of each of the KEEP_WEEKS weeks
- * before those.
- * @param {string[]} names
+ * before those. W9: a `broken` one (an empty file a killed save left) never
+ * keeps its day - it would push out the good copy before it - and goes.
+ * @param {string[]} names @param {Set<string>} [broken]
  * @returns {string[]}
  */
-export function pruneSnapshotNames(names) {
+export function pruneSnapshotNames(names, broken) {
   const sorted = names.filter((n) => NAME.test(n)).sort().reverse();
   const days = new Set();
   const weeks = new Set();
   /** @type {string[]} */ const drop = [];
   for (const n of sorted) {
+    if (broken && broken.has(n)) { drop.push(n); continue; }
     const day = /** @type {RegExpExecArray} */ (NAME.exec(n))[1];
     if (days.has(day)) { drop.push(n); continue; }
     if (days.size < KEEP_DAYS) { days.add(day); continue; }
@@ -122,7 +124,15 @@ function opfsSink() {
         const w = await h.createWritable();
         await w.write(json);
         await w.close();
-        for (const n of pruneSnapshotNames(await names())) { try { await d.removeEntry(n); } catch (_e) { /* next prune */ } }
+        // W9: getFileHandle creates the file empty and close() swaps the bytes in, so a save
+        // killed between them (a tab closed mid-leave) leaves an empty one. Older than a
+        // minute it is no save still writing in another tab: broken.
+        const all = await names();
+        const broken = new Set();
+        for (const n of all) {
+          try { if (Date.now() - snapshotTime(n) > 60000 && (await (await d.getFileHandle(n)).getFile()).size === 0) broken.add(n); } catch (_e) { /* judged next time */ }
+        }
+        for (const n of pruneSnapshotNames(all, broken)) { try { await d.removeEntry(n); } catch (_e) { /* next prune */ } }
         return true;
       } catch (_e) { return false; }
     },

@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { IDBAdapter } from '../stores/idb-adapter.js';
 import { CachedStore, _resetStoreRegistry, setStoreWriteFence } from '../stores/cached-store.js';
 import { StorageHealth } from './storage-health.js';
-import { DataSafety, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, WEEKLY_OFF_KEY, weeklyCopyJson } from './data-safety.js';
+import { DataSafety, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, PROGRESS_RESET_KEY, WEEKLY_OFF_KEY, weeklyCopyJson } from './data-safety.js';
 import { validateImportEnvelope } from './import-validators.js';
 import { applyImportPayload } from './backup.js';
 import { pruneSnapshotNames, snapshotName, snapshotTime, KEEP_DAYS, KEEP_WEEKS } from './snapshot-sink.js';
@@ -180,6 +180,11 @@ describe('pruneSnapshotNames (the web copy of SnapshotStore.prune)', () => {
   it('round-trips a name to its time', () => {
     const t = new Date(2026, 9, 5, 3, 4, 5).getTime();
     expect(snapshotTime(snapshotName(t))).toBe(t);
+  });
+
+  it('W9: a broken file (a save killed before it wrote) never keeps its day, so the good copy before it stays', () => {
+    const names = ['snap-20261001-090000.json', 'snap-20261001-180000.json', 'snap-20261002-090000.json'];
+    expect(pruneSnapshotNames(names, new Set(['snap-20261001-180000.json']))).toEqual(['snap-20261001-180000.json']);
   });
 });
 
@@ -353,10 +358,84 @@ describe('refuter findings (datasafe 10-05 second pass)', () => {
     expect(putsOutside).toEqual([]);
   });
 
-  it('a progress reset tells the next boot the smaller ledger is the reader\'s own', async () => {
+  it('a progress reset tells the next boot the smaller read ledger is the reader\'s own, with its own token (W9)', async () => {
     const { allowProgressClear } = await import('../stores/store-merge.js');
     allowProgressClear();
-    expect(localStorage.getItem(HEALTH_SKIP_KEY)).toBe('1');
+    expect(localStorage.getItem(PROGRESS_RESET_KEY)).toBe('1');
+    expect(localStorage.getItem(HEALTH_SKIP_KEY)).toBeNull();      // never the whole-library skip
+  });
+});
+
+// W9 (sweep 2026-10-13): one book's progress reset switched the whole check off for the next
+// boot, and an unreadable newest snapshot meant no check at all, so a damaged library became
+// the newest snapshot and the good copies rotated out.
+describe('W9: the check is never switched off, nor anchored to a broken snapshot', () => {
+  const MANY_READ = { ...STATE, readItems: Object.fromEntries(Array.from({ length: 300 }, (_, i) => ['k' + i, 1])) };
+  const SIX = Object.fromEntries(Array.from({ length: 6 }, (_, i) => ['bible:ps:3:' + i, [{ id: 'w' + i, groupId: 'w' + i, kind: 'highlight', start: 0, end: 2, created: i, updated: i }]]));
+  const LIBRARY = { 'vot-annotations': SIX, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE };
+  const progressReset = async () => (await import('../stores/store-merge.js')).allowProgressClear();
+  async function snapshotYesterday(sink, library = LIBRARY) {
+    await seed(library);
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(Date.now() - 86400000);
+    try { expect(await DataSafety.run({ sink })).toBe('snapshotted'); } finally { vi.useRealTimers(); }
+  }
+
+  it("after one book's progress reset, a loss at the next cold start is still found", async () => {
+    const sink = memorySink();
+    await snapshotYesterday(sink);
+    await progressReset();
+    await IDBAdapter.put('vot-annotations', 'v', {});  // every highlight gone
+    expect(await DataSafety.run({ sink })).toBe('damaged');
+    expect(sink.save).toHaveBeenCalledTimes(1);
+  });
+
+  it("a progress reset is still the reader's own: the smaller ledger is recorded, not flagged", async () => {
+    const sink = memorySink();
+    await snapshotYesterday(sink, { ...LIBRARY, 'vot-state': MANY_READ });
+    await IDBAdapter.put('vot-state', 'v', { ...MANY_READ, readItems: {} });
+    await progressReset();
+    expect(await DataSafety.run({ sink })).toBe('snapshotted');
+    expect(StorageHealth.getReport().dataMissing).toBeNull();
+    expect(await DataSafety.run({ sink })).toBe('fresh');
+  });
+
+  it('a newest snapshot cut short (a power cut) is walked past: the library is judged against the newest that reads', async () => {
+    const sink = memorySink();
+    await snapshotYesterday(sink);
+    const good = [...sink.files.keys()][0];
+    sink.files.set(snapshotName(snapshotTime(good) + 3600000), sink.files.get(good).slice(0, 300));
+    await IDBAdapter.put('vot-annotations', 'v', {});
+    const saves = sink.save.mock.calls.length;
+    expect(await DataSafety.run({ sink })).toBe('damaged');
+    expect(StorageHealth.getReport().dataMissing.name).toBe(good);
+    expect(sink.save.mock.calls.length).toBe(saves);
+  });
+
+  it('an empty newest file (a web save killed before it wrote) is walked past too', async () => {
+    const sink = memorySink();
+    await snapshotYesterday(sink);
+    const good = [...sink.files.keys()][0];
+    sink.files.set(snapshotName(snapshotTime(good) + 3600000), '');
+    await IDBAdapter.put('vot-annotations', 'v', {});
+    expect(await DataSafety.run({ sink })).toBe('damaged');
+    expect(StorageHealth.getReport().dataMissing.name).toBe(good);
+  });
+
+  it('a snapshot that could not be read this boot judges nothing and saves nothing', async () => {
+    const sink = memorySink();
+    await snapshotYesterday(sink);
+    sink.read = async () => '';                        // the read failed (the bridge answers '' on an I/O error)
+    await IDBAdapter.put('vot-annotations', 'v', {});
+    const saves = sink.save.mock.calls.length;
+    expect(await DataSafety.run({ sink })).toBe('failed');
+    expect(sink.save.mock.calls.length).toBe(saves);
+  });
+
+  it('when every snapshot is broken for good, the library is saved so a good copy exists again', async () => {
+    const sink = memorySink();
+    sink.files.set(snapshotName(Date.now() - 86400000), '{"app":"VOTReader","stores":{"vot-no');
+    await seed(LIBRARY);
+    expect(await DataSafety.run({ sink })).toBe('snapshotted');
   });
 });
 

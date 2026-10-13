@@ -18,9 +18,12 @@
       (highlights + notes + links + bookmarks + 3 x journal entries + notebooks
       + read marks / 10) and compared with the newest snapshot. Score under
       half of a snapshot that scored at least MIN_SCORE - in total or in any one
-      category - with no import, Clear All or progress reset just done
-      (HEALTH_SKIP_KEY), raises StorageHealth's data-missing banner and a
-      data-health diagnostic line. The banner's "Keep as is" (acceptCurrent)
+      category - with no import or Clear All just done (HEALTH_SKIP_KEY),
+      raises StorageHealth's data-missing banner and a data-health diagnostic
+      line. W9 (2026-10-13): a progress reset leaves out only the read marks
+      (PROGRESS_RESET_KEY), and the newest snapshot is the newest that READS -
+      one a power cut left broken is walked past, and none readable this boot
+      means nothing is judged or saved. The banner's "Keep as is" (acceptCurrent)
       says the drop was the reader's own: today's snapshot is taken at once.
    3. RESTORE (restoreMissing, the banner's button): MERGE the snapshot into
       the live data store by store - record by record, the newer edit wins,
@@ -45,6 +48,11 @@ import { withBackupLockIfFree } from './backup-lock.js';
 /** Set (localStorage) by an import or Clear All just before its reload: the next boot's
  *  smaller library is the reader's own doing, so it is not compared. In LS_SKIP_LIST. */
 export const HEALTH_SKIP_KEY = 'vot-health-skip';
+/** HEALTH_SKIP_KEY's value after Clear All (backup-flow.js); an import's is '1'. */
+export const SKIP_CLEAR_ALL = 'clear-all';
+/** W9: set by a progress reset (store-merge.js allowProgressClear): the next boot does not
+ *  count the read marks it took, and judges everything else. In LS_SKIP_LIST. */
+export const PROGRESS_RESET_KEY = 'vot-health-progress';
 /** A snapshot scoring under this is too small to judge a drop against. */
 export const MIN_SCORE = 5;
 /** Never snapshot a manifest bigger than this (SnapshotStore refuses 24 MB). */
@@ -113,6 +121,29 @@ async function collectStores() {
 /** A local calendar day key. @param {number} ms */
 const dayOf = (ms) => new Date(ms).toDateString();
 
+/** A summary with the read marks left out: a progress reset took them on purpose (W9). @param {ReturnType<typeof summarize>} m */
+const _withoutReadMarks = (m) => Object.assign({}, m, { readMarks: 0 });
+
+/**
+ * The newest snapshot that parses, walking back past broken ones (W9): a power cut or a
+ * killed save can leave the newest empty or cut short, and judging against nothing made
+ * a damaged library the newest snapshot. `failed`: one could not be read at all this
+ * time (the sinks answer '' on an I/O error) and none parsed, so nothing may be judged.
+ * @param {any} sink @param {{ name: string, at?: number, size?: number }[]} list
+ * @returns {Promise<{ entry: { name: string, at?: number } | null, snap: any, failed: boolean }>}
+ */
+async function _newestReadable(sink, list) {
+  let failed = false;
+  for (const entry of list) {
+    if (entry.size === 0) continue;                // broken: a save killed before it wrote
+    const text = await sink.read(entry.name);
+    if (!text) { failed = true; continue; }
+    const snap = _parse(text);
+    if (snap) return { entry, snap, failed: false };
+  }
+  return { entry: null, snap: null, failed };
+}
+
 /**
  * The boot-time pass: check health, then take today's snapshot. Quiet on every
  * failure. Resolves to what it did, for tests and the diagnostic log.
@@ -121,8 +152,13 @@ const dayOf = (ms) => new Date(ms).toDateString();
  */
 export async function run(opts) {
   const now = (opts && opts.now) || Date.now;
+  const force = !!(opts && opts.force);
   let skip = false;
-  try { skip = localStorage.getItem(HEALTH_SKIP_KEY) != null; localStorage.removeItem(HEALTH_SKIP_KEY); } catch (_e) { /* no storage */ }
+  let progressReset = false;
+  try {
+    skip = localStorage.getItem(HEALTH_SKIP_KEY) != null; localStorage.removeItem(HEALTH_SKIP_KEY);
+    progressReset = localStorage.getItem(PROGRESS_RESET_KEY) != null; localStorage.removeItem(PROGRESS_RESET_KEY);
+  } catch (_e) { /* no storage */ }
   const sink = (opts && opts.sink) || snapshotSink();
   if (!sink) return 'no-sink';
   if (storesNotLoaded().length) return 'not-loaded';
@@ -130,19 +166,26 @@ export async function run(opts) {
     const stores = await collectStores();
     const summary = summarize(stores);
     const list = await sink.list();
-    const newest = list[0];
-    if (newest && !skip && !(opts && opts.force)) {
-      const snap = _parse(await sink.read(newest.name));
-      const then = snap ? (snap.summary || summarize(snap.stores)) : null;
-      if (then && looksDamaged(then, summary)) {
+    /** The snapshot this boot is measured against: the newest that reads (W9). */
+    let newest = list[0] || null;
+    if (newest && !skip && !force) {
+      const found = await _newestReadable(sink, list);
+      if (!found.snap && found.failed) {
+        DiagnosticLog.warn('data-health', 'no snapshot could be read (' + list.length + ' listed): nothing judged or saved this boot');
+        return 'failed';
+      }
+      newest = found.entry;                        // null: every one is broken for good, so save a good one
+      const then = found.snap ? (found.snap.summary || summarize(found.snap.stores)) : null;
+      // A progress reset took read marks on purpose: everything else is still judged (W9).
+      if (then && newest && looksDamaged(progressReset ? _withoutReadMarks(then) : then, progressReset ? _withoutReadMarks(summary) : summary)) {
         DiagnosticLog.warn('data-health', 'library looks smaller than snapshot ' + newest.name + ': ' + JSON.stringify(then) + ' -> ' + JSON.stringify(summary));
         StorageHealth.setDataMissing({ name: newest.name, at: newest.at || snapshotTime(newest.name), then, now: summary });
         return 'damaged';
       }
     }
-    // An import, a restore of the reader's choosing or a reset (skip) changed the
-    // library on purpose: snapshot it now, not tomorrow.
-    if (!(opts && opts.force) && !skip && newest && dayOf(newest.at || snapshotTime(newest.name)) === dayOf(now())) return 'fresh';
+    // An import, a restore of the reader's choosing or a reset (skip, or a progress
+    // reset) changed the library on purpose: snapshot it now, not tomorrow.
+    if (!force && !skip && !progressReset && newest && dayOf(newest.at || snapshotTime(newest.name)) === dayOf(now())) return 'fresh';
     if (score(summary) === 0 && summary.history === 0) return 'empty';
     const json = JSON.stringify({
       app: 'VOTReader', exportVersion: 3, snapshot: true, exportDate: new Date(now()).toISOString(),
@@ -453,4 +496,4 @@ export async function weeklyCopy(p) {
   return 'failed';
 }
 
-export const DataSafety = { weeklyStatus, setWeeklyOn, clearWeeklyCopies, run, restoreMissing, acceptCurrent, clearSnapshots, status, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY };
+export const DataSafety = { weeklyStatus, setWeeklyOn, clearWeeklyCopies, run, restoreMissing, acceptCurrent, clearSnapshots, status, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, SKIP_CLEAR_ALL, PROGRESS_RESET_KEY };

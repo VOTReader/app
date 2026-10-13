@@ -345,10 +345,12 @@ const PROGRESS_CLEAR_WINDOW_MS = 60000;
 let _progressClearAt = 0;
 
 /** Arm the guard for a deliberate progress clear (good for one minute). It also tells the
- *  next boot's data-health check (utils/data-safety.js) that the smaller ledger is the reader's own. */
+ *  next boot's data-health check (utils/data-safety.js) that the smaller ledger is the reader's own.
+ *  W9: its own token (data-safety.js PROGRESS_RESET_KEY), which leaves out only the read marks;
+ *  the whole-library skip it used to set hid a wipe at the next cold start. */
 export function allowProgressClear() {
   _progressClearAt = Date.now();
-  try { localStorage.setItem('vot-health-skip', '1'); } catch (_e) { /* no storage */ }
+  try { localStorage.setItem('vot-health-progress', '1'); } catch (_e) { /* no storage */ }
 }
 
 /** TEST-ONLY: disarm the clear token between cases. */
