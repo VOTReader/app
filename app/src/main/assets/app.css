@@ -4076,6 +4076,17 @@
       text-transform:uppercase; color:var(--gold-dim);
       margin:-0.35rem 0 0.9rem; padding-left:0.15rem;
     }
+    /* A broad search draws the newest 100 matches; this draws the rest (sweep W69). The tally's
+       voice (Cinzel caps, dim gold) on a full-width hairline button, 44 px tall for a thumb. */
+    .history-show-all {
+      display:block; width:100%; min-height:44px; margin:1.2rem 0 0.4rem; padding:0.6rem 0.8rem;
+      border:1px solid var(--gold-border); border-radius:10px; background:transparent;
+      font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em; text-transform:uppercase;
+      color:var(--gold-dim); cursor:pointer; -webkit-tap-highlight-color:transparent;
+    }
+    .history-show-all:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+    .history-show-all:active { background:var(--gold-faint); }
+    @media (hover:hover) { .history-show-all:hover { background:var(--gold-faint); color:var(--gold); } }
     /* The shared resume chip on a history row shares the right edge with the
        visit time, so here (unlike an index card) it may shrink and ellipsize
        rather than push the row wide. */

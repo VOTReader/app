@@ -15,6 +15,11 @@
  * @param {any} entry
  * @returns {string}
  */
+/* A broad search draws at most this many matches until the reader asks for the rest (sweep W69): a
+   search opens every group holding a match, and one letter typed into a 2,000-visit history drew
+   nearly all of it at once, a reading chip each. History is newest-first, so these are the newest. */
+const SEARCH_DRAW_CAP = 100;
+
 function _entrySearchText(entry) {
   if (!entry || typeof entry !== 'object') return '';
   const parts = [];
@@ -42,10 +47,15 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
   // render at all and the ones that remain are all matches.
   const [query, setQuery] = React.useState('');
   const q = query.trim().toLowerCase();
+  // Each visit's search text once per history, not once per keystroke (sweep W69).
+  const searchText = React.useMemo(() => history.map(_entrySearchText), [history]);
   const matches = React.useMemo(
-    () => (q ? history.filter((entry) => _entrySearchText(entry).includes(q)) : history),
-    [history, q]
+    () => (q ? history.filter((_entry, i) => searchText[i].includes(q)) : history),
+    [history, searchText, q]
   );
+  const [showAll, setShowAll] = React.useState(false);
+  const capped = !!q && !showAll && matches.length > SEARCH_DRAW_CAP;
+  const drawn = React.useMemo(() => (capped ? matches.slice(0, SEARCH_DRAW_CAP) : matches), [matches, capped]);
 
   // Split history into:
   //   currentDays: array of { day, entries } for entries within the CURRENT month/year (top, no wrapper)
@@ -64,7 +74,7 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
       if (prior) { prior.visits += 1; return; }
       list.push({ ...entry, visits: 1 });
     };
-    for (const entry of matches) {
+    for (const entry of drawn) {
       const d = new Date(entry.ts);
       const y = d.getFullYear(),m = d.getMonth(),day = d.getDate();
       if (y === curY && m === curM) {
@@ -100,7 +110,7 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
       }))
     }));
     return { currentDays, tree: treeArr };
-  }, [matches, curY, curM]);
+  }, [drawn, curY, curM]);
 
   // Most-recent year/month/week of each container default-open; everything else default-closed.
   // Current-month days at top: today + yesterday default-open, others default-closed.
@@ -111,9 +121,15 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
   // reusing it the other way would leave everything flung open after the
   // search box is cleared.
   const [searchOverrides, setSearchOverrides] = React.useState({});
-  // Same-object bail-out when there is nothing to clear, so the reset costs
-  // no render on the common path (typing into an all-default tree).
-  React.useEffect(() => { setSearchOverrides((prev) => (Object.keys(prev).length ? {} : prev)); }, [q]);
+  // A new query starts from its own defaults: no hand-collapsed groups, and capped again. Reset
+  // while rendering (React's adjust-state-on-change pattern), not in an effect, which painted one
+  // frame of the new query under the old query's collapsed groups (sweep W69's History finding).
+  const [searchedQ, setSearchedQ] = React.useState(q);
+  if (searchedQ !== q) {
+    setSearchedQ(q);
+    setSearchOverrides((prev) => (Object.keys(prev).length ? {} : prev));
+    setShowAll(false);
+  }
   const yest = new Date(curY, curM, curD - 1);
   const yestY = yest.getFullYear(), yestM = yest.getMonth(), yestD = yest.getDate();
   const recentYearId = tree.length > 0 ? `y:${tree[0].year}` : null;
@@ -274,7 +290,7 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
           <div className="history-search-count" aria-live="polite">
             {matches.length === 0
               ? 'No visits match'
-              : `${matches.length} ${matches.length === 1 ? 'visit' : 'visits'} match`}
+              : `${matches.length} ${matches.length === 1 ? 'visit' : 'visits'} match` + (capped ? ` · newest ${SEARCH_DRAW_CAP} shown` : '')}
           </div>
         )}
         {history.length === 0 ? (
@@ -334,6 +350,11 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
                 </div>
               );
             })}
+            {capped && (
+              <button type="button" className="history-show-all" onClick={() => setShowAll(true)}>
+                {`Show all ${matches.length} matches`}
+              </button>
+            )}
           </>
         )}
       </div>
