@@ -8,6 +8,12 @@
    =================================================================== */
 
 
+/* One Month-Day formatter for every row: toLocaleDateString with options builds a fresh ICU
+   formatter per call, and the Library lists format thousands of rows per search keystroke (sweep
+   W69). Built on first use, so a page that never shows an old date never pays for it. */
+/** @type {Intl.DateTimeFormat | null} */
+let _monthDay = null;
+
 /**
  * Format a past timestamp as a sentence-cased relative string ("Just now",
  * "5m ago", "3d ago", "Jan 14"). For ages older than ~a month, falls back
@@ -27,8 +33,8 @@ export function relativeDate(ts) {
   const d = Math.floor(hr / 24);
   if (d < 7) return d + 'd ago';
   if (d < 30) return Math.floor(d / 7) + 'w ago';
-  const date = new Date(ts);
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  if (!_monthDay) _monthDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+  return _monthDay.format(ts);
 }
 
 /**

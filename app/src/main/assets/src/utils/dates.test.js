@@ -57,6 +57,22 @@ describe('relativeDate', () => {
     expect(out.length).toBeGreaterThan(0);
     expect(out).not.toMatch(/ago|Just now/);  // not a relative string
   });
+
+  // Sweep W69: toLocaleDateString with options builds a new ICU formatter per call, and the Library
+  // lists call this once per row on every search keystroke (thousands of old rows on a phone).
+  it('formats old dates with one shared Month-Day formatter, not one per row', () => {
+    const Real = Intl.DateTimeFormat;
+    let built = 0;
+    const ctor = vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function (...a) { built++; return new Real(...a); });
+    const perCall = vi.spyOn(Date.prototype, 'toLocaleDateString');
+    try {
+      const outs = [];
+      for (let i = 0; i < 50; i++) outs.push(relativeDate(NOW - (40 + i) * DAY));
+      expect(perCall).not.toHaveBeenCalled();
+      expect(built).toBeLessThanOrEqual(1);
+      expect(outs[0]).toBe(new Real(undefined, { month: 'short', day: 'numeric' }).format(NOW - 40 * DAY));
+    } finally { ctor.mockRestore(); perCall.mockRestore(); }
+  });
 });
 
 describe('timeAgo', () => {
