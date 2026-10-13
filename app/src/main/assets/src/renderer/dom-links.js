@@ -23,6 +23,8 @@
    the main index.html CSS block (part of the const CSS template literal).
 ═══════════════════════════════════════════════════════════════ */
 
+import { chromeAwareView, refindRange } from './anchor-view.js';
+
 /* Inject inline chain icons at the end of each linked text range inside
    [data-hl-dom] containers. Re-runs on store changes. Click → onLinkOpen(blockKey)
    which opens the sidebar showing all links touching that block. */
@@ -57,6 +59,7 @@ export function applyDOMLinks() {
     var hlKey = container.getAttribute('data-hl-key');
     container.querySelectorAll('.inline-link-icon').forEach(function(el) { el.remove(); });
     container.normalize();
+    var view = null;   // chromeAwareView(container), built for the first end with words
 
     var links = LinkStore.getForKeyPrefix(hlKey);
     if (!links.length) return;
@@ -93,14 +96,23 @@ export function applyDOMLinks() {
       [link.source, link.target].forEach(function(ep) {
         if (!ep || !ep.key) return;
         if (ep.key !== hlKey && ep.key.indexOf(keyPrefix) !== 0) return;
-        var endPos = null;
+        var startPos = null, endPos = null;
         var m = ep.key.match(/:(\d+)-(\d+)$/);
         if (m) {
+          startPos = parseInt(m[1], 10);
           endPos = parseInt(m[2], 10);
         } else if (typeof ep.end === 'number') {
+          startPos = typeof ep.start === 'number' ? ep.start : ep.end;
           endPos = ep.end;
         }
         if (endPos == null) return;
+        // W48: an end that recorded its words follows them, as a highlight
+        // does, when text before it was edited; otherwise the stored offset.
+        if (typeof ep.text === 'string' && ep.text) {
+          if (!view) view = chromeAwareView(container);
+          var found = refindRange(view, startPos, endPos, ep.text);
+          if (found) endPos = found.end;
+        }
         var prev = byEndPos[endPos] || { count: 0, anySource: false };
         byEndPos[endPos] = {
           count: prev.count + 1,

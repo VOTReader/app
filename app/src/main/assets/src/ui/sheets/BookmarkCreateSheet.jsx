@@ -94,12 +94,14 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
     // The "thought" free-text feature was removed (owner call, 2026-07-12);
     // an existing thought on a legacy record passes through untouched so an
     // edit never destroys old data.
-    onConfirm({
+    // A new bookmark keeps the words it was made on (W48: its icon follows
+    // them after an edit); an edit leaves the record's own words alone.
+    onConfirm(Object.assign({
       editId: pending.editId || null,
       hlKey: pending.hlKey,
       label: trimmedLabel,
       thought: isEditMode ? (pending.currentThought || '') : ''
-    });
+    }, !isEditMode && typeof pending.text === 'string' && pending.text ? { text: pending.text } : {}));
   }
 
   function handleDelete() {

@@ -14,6 +14,10 @@
                            //   editable from the BookmarkPopover and
                            //   BookmarksScreen rows. Deliberately not called
                            //   "note" — notes are a separate feature.
+       text?:   string,    // the words a ranged bookmark was made on, in
+                           //   hlDisplayText's form (W48, 2026-10-13; older
+                           //   records have none): its icon follows them
+                           //   when text in front of it is edited.
        created: number,    // Date.now() at creation
        updated: number     // Date.now() at last edit
      }>
@@ -41,6 +45,7 @@ import { mergeArrayStore } from './store-merge.js';
  *   hlKey: string,
  *   label: string,
  *   thought?: string,
+ *   text?: string,
  *   created: number,
  *   updated: number
  * }} Bookmark
