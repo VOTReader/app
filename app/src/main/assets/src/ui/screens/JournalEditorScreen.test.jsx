@@ -434,6 +434,24 @@ describe('JournalEditorScreen — P1-5: stats wait for the first non-empty save'
     expect(localStorage.getItem(JRN_STATS_MARKER_KEY)).toBeNull();
   });
 
+  it('W16 refuter: an entry whose stats were recorded, then emptied and pruned, gives its count back', () => {
+    const entry = JournalStore.add();
+    localStorage.setItem(JRN_STATS_MARKER_KEY, entry.id);
+    const recordNewEntry = vi.fn();
+    const recordDeletion = vi.fn();
+    globalThis.JournalStatsStore = { recordNewEntry, recordDeletion };
+    const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    const ta = document.querySelector('.jrn-block-textarea');
+    fireEvent.change(ta, { target: { value: 'first words' } });
+    act(() => { window.dispatchEvent(new Event('pagehide')); });   // saved: counted
+    expect(recordNewEntry).toHaveBeenCalledTimes(1);
+    fireEvent.change(document.querySelector('.jrn-block-textarea'), { target: { value: '' } });
+    unmount();                                                      // blank again: pruned
+
+    expect(JournalStore.get(entry.id)).toBeNull();
+    expect(recordDeletion).toHaveBeenCalledTimes(1);
+  });
+
   it('a marker naming a DIFFERENT entry never triggers recording here', () => {
     const entry = JournalStore.add({ title: 'old entry', blocks: [JournalHelpers.newBlock('p', { text: 'body' })] });
     localStorage.setItem(JRN_STATS_MARKER_KEY, 'j_someone_else_999');

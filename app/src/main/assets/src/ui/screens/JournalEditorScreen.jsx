@@ -180,7 +180,7 @@ export function JournalEditorScreen(props) {
   // W16: how many block-delete Undo windows are still open, and what the exit
   // prune removed while one was. Undo past Done re-adds the entry from it.
   var undoOpenRef = useRef(0);
-  var prunedRef = useRef(/** @type {{ entry: any, newEntry: boolean } | null} */ (null));
+  var prunedRef = useRef(/** @type {{ entry: any, newEntry: boolean, counted: boolean } | null} */ (null));
 
   // Unmount mid-gesture: one call tears down listeners, timers, ghost, and
   // landing. The reorder itself commits SYNCHRONOUSLY at release now, so
@@ -232,6 +232,11 @@ export function JournalEditorScreen(props) {
   // The entry's creation timestamp, captured once — the first-save stats
   // trigger (_maybeRecordNewEntryStats) dates the streak with it.
   var createdRef = useRef((initial && initial.created) || 0);
+  // W16 refuter: is this entry counted in the journal stats? It is when it had
+  // content when opened (counted at creation or at its first non-empty save) or
+  // when this editor recorded it; a blank one never was (an entry orphaned blank
+  // by a kill included), nor one whose New-Entry marker is still pending.
+  var countedRef = useRef(!!initial && (!!(initial.title || '').trim() || _blocksHaveContent(initial.blocks)));
 
   // Auto-save: debounce 1.2s after any title/blocks/mood change. Each
   // render re-runs this effect, capturing the latest state in its closure.
@@ -271,10 +276,12 @@ export function JournalEditorScreen(props) {
       var bs = blocksRef.current;
       // P1-7 prune-on-exit: backing out of a brand-new entry without writing
       // anything must not leave an empty "Untitled" card in the hub. Title
-      // blank AND no block content → remove instead of save. skipStats: the
-      // entry's stats were never recorded (recording moved to the first
-      // non-empty save), so a recordDeletion cascade would under-count the
-      // real entries. The first-save stats marker and any JRNL-1 draft for
+      // blank AND no block content → remove instead of save. skipStats unless
+      // the entry was counted (countedRef): a blank new entry's stats were never
+      // recorded (recording moved to the first non-empty save), so a
+      // recordDeletion would under-count the real entries, while one that was
+      // counted and then emptied gives its count back (W16 refuter). The
+      // first-save stats marker and any JRNL-1 draft for
       // this entry die with it. Deliberately NOT done in the pagehide flush:
       // backgrounding keeps the editor mounted, and removing the entry under
       // it would orphan the user's next keystroke.
@@ -286,9 +293,11 @@ export function JournalEditorScreen(props) {
         var undoOpen = undoOpenRef.current > 0;
         var newEntry = false;
         try { newEntry = localStorage.getItem(JRN_NEW_ENTRY_STATS_KEY) === eid; } catch (_e) { /* best-effort */ }
+        var counted = countedRef.current && !newEntry;
         var gone = undoOpen ? JournalStore.get(eid) : null;
-        if (gone) prunedRef.current = { entry: gone, newEntry: newEntry };
-        JournalStore.remove(eid, { skipStats: true, keepMarks: !!gone });
+        if (gone) prunedRef.current = { entry: gone, newEntry: newEntry, counted: counted };
+        // In an Undo window the count stays until the window closes without one.
+        JournalStore.remove(eid, { skipStats: !counted || !!gone, keepMarks: !!gone });
         try {
           if (newEntry) localStorage.removeItem(JRN_NEW_ENTRY_STATS_KEY);
         } catch (_e) { /* marker cleanup is best-effort */ }
@@ -352,6 +361,7 @@ export function JournalEditorScreen(props) {
       if (!(titleNow || '').trim() && !_blocksHaveContent(blocksNow)) return; // still blank — keep waiting
       try { localStorage.removeItem(JRN_NEW_ENTRY_STATS_KEY); } catch (_e) { /* ignore */ }
       JournalStatsStore.recordNewEntry(createdRef.current || Date.now());
+      countedRef.current = true;
     } catch (_e) { /* never break a save */ }
   }
 
@@ -503,6 +513,9 @@ export function JournalEditorScreen(props) {
         if (!pr || undoOpenRef.current > 0) return;
         prunedRef.current = null;
         try { JournalStore.purgeOrphanMarks(pr.entry.id); } catch (_e) { /* best-effort */ }
+        if (pr.counted && !JournalStore.get(pr.entry.id) && typeof JournalStatsStore !== 'undefined') {
+          try { JournalStatsStore.recordDeletion(); } catch (_e) { /* stats are best-effort */ }
+        }
       }, 6500);
     }, 0);
   }
