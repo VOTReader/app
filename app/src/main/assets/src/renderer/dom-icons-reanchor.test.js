@@ -71,6 +71,30 @@ describe('link icons follow their words (W48)', () => {
     expect(textBefore(c, LINK)).toBe('Now the Lord is my');
   });
 
+  it('an end that kept only its end offset still follows its words', () => {
+    links = [{ source: { key: 'k', end: 9, text: 'Be strong' }, target: { key: 'x:1' } }];
+    const c = setup('<p>Today I read Joshua. Be strong and of good courage.</p>');
+    applyDOMLinks();
+    expect(textBefore(c, LINK)).toBe('Today I read Joshua. Be strong');
+  });
+
+  it('two ends with words in one block each follow their own words', () => {
+    // Made in "Be strong and of good courage." : "Be strong" 0-9, "good courage" 17-29.
+    links = [
+      { source: { key: 'k', start: 0, end: 9, text: 'Be strong' }, target: { key: 'x:1' } },
+      { source: { key: 'x:2' }, target: { key: 'k:17-29', text: 'good courage' } },
+    ];
+    const c = setup('<p>Today I read Joshua. Be strong and of good courage.</p>');
+    applyDOMLinks();
+    const before = [...c.querySelectorAll(LINK)].map((icon) => {
+      const range = document.createRange();
+      range.setStart(c, 0);
+      range.setEndBefore(icon);
+      return range.toString();
+    });
+    expect(before).toEqual(['Today I read Joshua. Be strong', 'Today I read Joshua. Be strong and of good courage.']);
+  });
+
   it('an end with no recorded words, or words that are gone, keeps its offsets', () => {
     links = [
       { source: { key: 'k', start: 0, end: 5 }, target: { key: 'x:1' } },
