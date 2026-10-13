@@ -17,7 +17,7 @@
    TabActionSheet/GARDEN_TIERS/getGardenTier/GardenWarningFlagStore never
    need stubs (their JSX is never evaluated). */
 
-import { it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { AppShellOverlays } from './AppShellOverlays.jsx';
 
@@ -84,4 +84,33 @@ it('marks the overlay a labelled dialog', () => {
   expect(layer.getAttribute('role')).toBe('dialog');
   expect(layer.getAttribute('aria-modal')).toBe('true');
   expect(layer.getAttribute('aria-labelledby')).toBe('tabs-overview-title');
+});
+
+// Sweep low (mw10): the Garden image-quality choice showed the selected tier only by a CSS class.
+describe('Garden tier choice', () => {
+  it('each tier says whether it is the selected one', () => {
+    render(
+      <AppShellOverlays
+        settings={{ tabsEnabled: true, gardenTier: 'standard' }} updateSetting={noop}
+        screen="home"
+        tabsOverviewOpen={false} setTabsOverviewOpen={noop}
+        tabs={[]} activeTabIdx={0} tabThumbnails={{}} MAX_TABS={9}
+        switchToTab={noop} closeTab={noop} openNewTab={noop}
+        closeOtherTabs={noop} closeTabsToTheRight={noop} closeAllTabs={noop}
+        deduplicateTabs={noop} reorderTabs={noop}
+        renameTab={noop} togglePinTab={noop}
+        tabActionIdx={null} setTabActionIdx={noop}
+        lastTabCloseStrikesRef={{ current: 0 }}
+        disableTabsPromptOpen={false} setDisableTabsPromptOpen={noop}
+        gardenWarningOpen={true} setGardenWarningOpen={noop}
+        setScreen={noop}
+      />,
+    );
+    const opts = [...document.querySelectorAll('.garden-tier-option')];
+    expect(opts.length).toBeGreaterThan(1);
+    const pressed = opts.map((b) => b.getAttribute('aria-pressed'));
+    expect(pressed.filter((v) => v === 'true').length).toBe(1);
+    expect(pressed.every((v) => v === 'true' || v === 'false')).toBe(true);
+    expect(opts.every((b) => b.getAttribute('type') === 'button')).toBe(true);
+  });
 });

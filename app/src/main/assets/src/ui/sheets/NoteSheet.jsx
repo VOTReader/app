@@ -209,19 +209,25 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
             <button className="ann-chip-back" onClick={() => setShowColors(false)} title="Back" aria-label="Back">‹</button>
             {curStyle === 'highlight' && (
               <button
+                type="button"
                 className={"ann-chip-color-btn" + (color === 'blank' ? ' active' : '')}
                 data-color="blank"
                 onClick={() => recolor('blank')}
                 title="No color (icon only)"
+                aria-label="No color (icon only)"
+                aria-pressed={color === 'blank'}
               />
             )}
             {HL_COLORS.map(c => (
               <button
                 key={c}
+                type="button"
                 className={"ann-chip-color-btn" + (color === c ? ' active' : '')}
                 data-color={c}
                 onClick={() => recolor(c)}
                 title={c}
+                aria-label={c}
+                aria-pressed={color === c}
               />
             ))}
           </div>
@@ -242,26 +248,32 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
                 with no visual overhead. */}
             {mode === 'edit' && (
               <div className="note-edit-style-row">
-                <button className={"sel-style-btn" + (curStyle === 'highlight' ? ' active' : '')} onClick={() => setStyle('highlight')} title="Highlight">A</button>
-                <button className={"sel-style-btn sel-style-btn-underline" + (curStyle === 'underline' ? ' active' : '')} onClick={() => setStyle('underline')} title="Underline">A</button>
-                <button className={"sel-style-btn sel-style-btn-squiggle" + (curStyle === 'squiggle' ? ' active' : '')} onClick={() => setStyle('squiggle')} title="Squiggle underline">A</button>
+                <button type="button" className={"sel-style-btn" + (curStyle === 'highlight' ? ' active' : '')} onClick={() => setStyle('highlight')} title="Highlight" aria-label="Highlight" aria-pressed={curStyle === 'highlight'}>A</button>
+                <button type="button" className={"sel-style-btn sel-style-btn-underline" + (curStyle === 'underline' ? ' active' : '')} onClick={() => setStyle('underline')} title="Underline" aria-label="Underline" aria-pressed={curStyle === 'underline'}>A</button>
+                <button type="button" className={"sel-style-btn sel-style-btn-squiggle" + (curStyle === 'squiggle' ? ' active' : '')} onClick={() => setStyle('squiggle')} title="Squiggle underline" aria-label="Squiggle underline" aria-pressed={curStyle === 'squiggle'}>A</button>
                 <div className="sel-toolbar-divider" />
                 <div className="sel-toolbar-colors">
                   {curStyle === 'highlight' && (
                     <button
+                      type="button"
                       className={"sel-color-btn" + (color === 'blank' ? ' active' : '')}
                       data-color="blank"
                       onClick={() => recolor('blank')}
                       title="No color (icon only)"
+                      aria-label="No color (icon only)"
+                      aria-pressed={color === 'blank'}
                     />
                   )}
                   {HL_COLORS.map(c => (
                     <button
                       key={c}
+                      type="button"
                       className={"sel-color-btn sel-color-" + curStyle + (color === c ? ' active' : '')}
                       data-color={c}
                       onClick={() => recolor(c)}
                       title={c}
+                      aria-label={c}
+                      aria-pressed={color === c}
                     />
                   ))}
                 </div>

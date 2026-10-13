@@ -187,10 +187,13 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
             {HL_COLORS.map(c => (
               <button
                 key={c}
+                type="button"
                 className={'ann-chip-color-btn' + (ann.color === c ? ' active' : '')}
                 data-color={c}
                 onClick={() => recolor(c)}
                 title={c}
+                aria-label={c}
+                aria-pressed={ann.color === c}
               />
             ))}
           </div>
@@ -198,20 +201,31 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
         {mode === 'style' && (
           <div className="ann-chip-colors">
             <button className="ann-chip-back" onClick={() => setMode('main')} title="Back" aria-label="Back">‹</button>
+            {/* The glyph is the same "A" in three looks, so the name comes from aria-label and the
+                current style from aria-pressed (as in SelectionToolbar). */}
             <button
+              type="button"
               className={'sel-style-btn' + (kind !== 'underline' && kind !== 'squiggle' ? ' active' : '')}
               onClick={() => restyle('highlight')}
               title="Highlight"
+              aria-label="Highlight"
+              aria-pressed={kind !== 'underline' && kind !== 'squiggle'}
             >A</button>
             <button
+              type="button"
               className={'sel-style-btn sel-style-btn-underline' + (kind === 'underline' ? ' active' : '')}
               onClick={() => restyle('underline')}
               title="Underline"
+              aria-label="Underline"
+              aria-pressed={kind === 'underline'}
             >A</button>
             <button
+              type="button"
               className={'sel-style-btn sel-style-btn-squiggle' + (kind === 'squiggle' ? ' active' : '')}
               onClick={() => restyle('squiggle')}
               title="Squiggle underline"
+              aria-label="Squiggle underline"
+              aria-pressed={kind === 'squiggle'}
             >A</button>
           </div>
         )}

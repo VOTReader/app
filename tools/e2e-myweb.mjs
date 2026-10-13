@@ -235,9 +235,9 @@ function diffStats(on, off) {
 }
 async function readBoth(page) {
   const on = await page.evaluate(MEASURE);
-  await clickLabel(page, 'Show the curated corpus connections'); await sleep(500);
+  await clickLabel(page, /^Corpus context/); await sleep(500);
   const off = await page.evaluate(MEASURE);
-  await clickLabel(page, 'Show the curated corpus connections'); await sleep(500);
+  await clickLabel(page, /^Corpus context/); await sleep(500);
   return { on, off, ctx: diffStats(on, off) };
 }
 const COUNTERS = () => {

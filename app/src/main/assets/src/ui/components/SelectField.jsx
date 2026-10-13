@@ -63,13 +63,15 @@ export function SelectField({ eyebrow, title, label, desc, value, options, onCha
                 return (
                   <button
                     key={opt.id}
+                    type="button"
                     className={`select-sheet-option${isSelected ? " selected" : ""}`}
+                    aria-pressed={isSelected}
                     onClick={() => { onChange(opt.id); setOpen(false); }}
                   >
                     <div className="select-sheet-option-main">
                       <span className="select-sheet-option-label" style={opt.labelStyle}>{opt.label}</span>
                       {opt.meta ? <span className="select-sheet-option-meta">{opt.meta}</span> : null}
-                      {isSelected ? <span className="select-sheet-option-check">{"✓"}</span> : null}
+                      {isSelected ? <span className="select-sheet-option-check" aria-hidden="true">{"✓"}</span> : null}
                     </div>
                     {opt.desc ? <div className="select-sheet-option-desc">{opt.desc}</div> : null}
                   </button>
