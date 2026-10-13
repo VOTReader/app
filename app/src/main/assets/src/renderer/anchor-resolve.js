@@ -51,9 +51,6 @@
    reader's own data is the one thing this app must not lose.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/** Cap on scanned occurrences — a pathological repeat can't spin the paint path. */
-var MAX_OCCURRENCES = 64;
-
 /**
  * Fold text for the LOOSE tier: lowercase, drop punctuation that varies
  * between translations, collapse whitespace runs to one space. Returns the
@@ -85,26 +82,23 @@ function fold(src) {
   return { folded: out, map: map };
 }
 
-/** All indices of `needle` in `hay`, bounded. @returns {number[]} */
-function allIndices(hay, needle) {
-  /** @type {number[]} */
-  var hits = [];
-  if (!needle) return hits;
-  var i = hay.indexOf(needle);
-  while (i !== -1 && hits.length < MAX_OCCURRENCES) {
-    hits.push(i);
-    i = hay.indexOf(needle, i + 1);
-  }
-  return hits;
-}
-
-/** The hit nearest `target` — keeps a repeated phrase where the reader put it. */
-function nearest(hits, target) {
-  var best = hits[0];
-  for (var i = 1; i < hits.length; i++) {
-    if (Math.abs(hits[i] - target) < Math.abs(best - target)) best = hits[i];
-  }
-  return best;
+/**
+ * The occurrence of `needle` in `hay` nearest `target`, -1 for none: keeps a
+ * repeated phrase where the reader put it (a tie keeps the earlier one). One
+ * search each way from the target, so a long repeat costs no more than a short
+ * one and a far occurrence is never missed (mw14 refuter: a scan capped at 64
+ * occurrences missed a later, nearer one).
+ * @param {string} hay @param {string} needle @param {number} target
+ * @returns {number}
+ */
+function nearestIndex(hay, needle, target) {
+  if (!needle) return -1;
+  var t = Math.max(0, Math.min(target, hay.length));
+  var after = hay.indexOf(needle, t);
+  var before = t > 0 ? hay.lastIndexOf(needle, t - 1) : -1;
+  if (before < 0) return after;
+  if (after < 0) return before;
+  return t - before <= after - t ? before : after;
 }
 
 /**
@@ -130,24 +124,20 @@ export function resolveAnchor(text, ann) {
   if (!stored) return s < e ? { start: s, end: e, exact: false } : null;
 
   // Tier 2 — exact search.
-  var hits = allIndices(text, stored);
-  if (hits.length) {
-    var at = nearest(hits, s);
-    return { start: at, end: at + stored.length, exact: true };
-  }
+  var at = nearestIndex(text, stored, s);
+  if (at >= 0) return { start: at, end: at + stored.length, exact: true };
 
   // Tier 3 — punctuation/case/whitespace-insensitive search.
   var ft = fold(text);
   var fs = fold(stored);
   if (!fs.folded) return null;
-  var fhits = allIndices(ft.folded, fs.folded);
-  if (!fhits.length) return null;
   // Map the stored offset into folded space so "nearest" stays meaningful. A
   // start past the last letter maps to the END of folded space, not to 0 (sweep
   // mw14: that sent the mark to the first occurrence).
   var foldedTarget = ft.map.length;
   for (var m = 0; m < ft.map.length; m++) { if (ft.map[m] >= s) { foldedTarget = m; break; } }
-  var f = nearest(fhits, foldedTarget);
+  var f = nearestIndex(ft.folded, fs.folded, foldedTarget);
+  if (f < 0) return null;
   var rawStart = ft.map[f];
   var lastIdx = f + fs.folded.length - 1;
   if (rawStart == null || lastIdx >= ft.map.length) return null;

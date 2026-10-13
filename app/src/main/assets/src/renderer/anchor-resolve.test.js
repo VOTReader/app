@@ -97,6 +97,19 @@ describe('resolveAnchor — tier 3: punctuation-insensitive', () => {
     expect(at.start).toBe(text.lastIndexOf('holy'));
     expect(at.exact).toBe(false);
   });
+
+  // mw14 refuter r1: the scan stopped at 64 occurrences, so a later, nearer one was never seen.
+  it('past 64 repeats the nearest occurrence still wins, loose and exact', () => {
+    const text = 'holy! '.repeat(70).trim();
+    const loose = resolveAnchor(text, { start: text.length, end: text.length + 4, text: 'HOLY' });
+    expect(loose.start).toBe(text.lastIndexOf('holy'));
+    const exact = resolveAnchor(text, { start: text.length - 2, end: text.length + 2, text: 'holy' });
+    expect(exact.start).toBe(text.lastIndexOf('holy'));
+    expect(exact.exact).toBe(true);
+    // a tie keeps the earlier occurrence, as before
+    expect(resolveAnchor('ab  ab', { start: 2, end: 2, text: 'ab' }).start).toBe(0);
+    expect(resolveAnchor('xab ab', { start: 2, end: 9, text: 'ab' }).start).toBe(1);
+  });
 });
 
 describe('resolveAnchor — no honest anchor', () => {

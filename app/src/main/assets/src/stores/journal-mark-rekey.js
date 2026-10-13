@@ -238,6 +238,33 @@ function oneEach(list, moved) {
 }
 
 /**
+ * A note's keys in reading order where their keys say it: keys of one entry
+ * that end in a position (<entry>:<n>, a corpus block or a prophecy card's
+ * paragraph) trade places by that position; every other key keeps its place.
+ * A note's icon paints at its last key and the Notes index opens its first
+ * (annotation-engine.jsx ANN1, note-source.js).
+ * @param {string[]} keys
+ * @returns {string[]}
+ */
+function inReadingOrder(keys) {
+  /** @type {Record<string, number[]>} */ var slots = Object.create(null);
+  /** @type {number[]} */ var pos = [];
+  keys.forEach(function(k, i) {
+    var m = /^(.*):(\d+)$/.exec(k);
+    if (!m) return;
+    pos[i] = Number(m[2]);
+    (slots[m[1]] || (slots[m[1]] = [])).push(i);
+  });
+  var out = keys.slice();
+  Object.keys(slots).forEach(function(head) {
+    var at = slots[head];
+    var order = at.slice().sort(function(a, b) { return pos[a] - pos[b] || a - b; });
+    at.forEach(function(slot, j) { out[slot] = keys[order[j]]; });
+  });
+  return out;
+}
+
+/**
  * Move every journal mark still keyed by position onto its block's id.
  *
  * @param {Array<{id: string, blocks?: any[]}>} entries - JournalStore's list
@@ -444,7 +471,7 @@ export function rekeyMarkStores(data, how) {
     Object.keys(notes).forEach(function(gid) {
       var n = notes[gid];
       var keys = n && Array.isArray(n.keys) ? n.keys : [];
-      var changed = false;
+      var changed = false, repaired = false;
       /** @type {string[]} */ var nextKeys = [];
       var keep = function(/** @type {string} */ k) { if (nextKeys.indexOf(k) < 0) nextKeys.push(k); };
       keys.forEach(function(/** @type {string} */ k) {
@@ -460,7 +487,7 @@ export function rekeyMarkStores(data, how) {
         if (held && held.indexOf(k) < 0) {
           var p = parse(k, false);
           if (p && !p.gone) {
-            changed = true;
+            changed = repaired = true;
             out.moved++;
             // the note's own keys that hold segments keep their place in its list
             held.forEach(function(h) { if (keys.indexOf(h) < 0) keep(h); });
@@ -471,6 +498,7 @@ export function rekeyMarkStores(data, how) {
         if (nk) changed = true;
         keep(nk || k);
       });
+      if (repaired) nextKeys = inReadingOrder(nextKeys);
       nextNotes[gid] = changed ? Object.assign({}, n, { keys: nextKeys, updated: stamp(n) + STAMP_STEP }) : n;
       if (changed) notesChanged = true;
     });
