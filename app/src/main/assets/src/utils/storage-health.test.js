@@ -741,6 +741,44 @@ describe('write-path integration', () => {
     await StorageHealth.onWriteSuccess();
     expect(StorageHealth.getVersion()).toBe(vBefore);
   });
+
+  /* W11 (sweep 2026-10-13): one flag for every store let ANY store's landed save lift the
+     "won't be kept" banner while another store's failed write was still only in memory.
+     A store's failure is kept under its name; only its own landed save clears it. */
+  it('W11: one store\'s landed save does not clear another store\'s failed write', async () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: mockStorage() });
+    await StorageHealth.assess();
+    StorageHealth.onWriteFailure(new Error('quota'), 'vot-notes');
+    await StorageHealth.onWriteSuccess('vot-history');
+    expect(StorageHealth.getReport().tier).toBe(TIER.READONLY);
+    expect(StorageHealth.getReport().writeFailedThisSession).toBe(true);
+    expect(StorageHealth.checkBeforeWrite(1).reason).toBe('write-failed');
+    expect(hideToast).not.toHaveBeenCalled();
+    await StorageHealth.onWriteSuccess('vot-notes');
+    expect(StorageHealth.getReport().tier).toBe(TIER.HEALTHY);
+    expect(StorageHealth.getReport().writeFailedThisSession).toBe(false);
+  });
+
+  it('W11: with two stores failing, the banner stays until both have saved', async () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: mockStorage() });
+    await StorageHealth.assess();
+    StorageHealth.onWriteFailure(new Error('quota'), 'vot-notes');
+    StorageHealth.onWriteFailure(new Error('quota'), 'vot-journal');
+    await StorageHealth.onWriteSuccess('vot-notes');
+    expect(StorageHealth.getReport().writeFailedThisSession).toBe(true);
+    await StorageHealth.onWriteSuccess('vot-journal');
+    expect(StorageHealth.getReport().writeFailedThisSession).toBe(false);
+    expect(StorageHealth.getReport().tier).toBe(TIER.HEALTHY);
+  });
+
+  it('W11: a failure no store owns (a journal photo or memo) still clears on the next landed save', async () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: mockStorage() });
+    await StorageHealth.assess();
+    StorageHealth.onWriteFailure(new Error('quota'));
+    await StorageHealth.onWriteSuccess('vot-notes');
+    expect(StorageHealth.getReport().writeFailedThisSession).toBe(false);
+    expect(StorageHealth.getReport().tier).toBe(TIER.HEALTHY);
+  });
 });
 
 /* ═══════════════════════════════════════════════════════════════════
