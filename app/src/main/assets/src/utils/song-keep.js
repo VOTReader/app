@@ -437,7 +437,10 @@ async function _pump() {
     await _keepOne(id);
     _failed.delete(id);
   } catch (e) {
-    const aborted = !!(e && /** @type {any} */ (e).name === 'AbortError');
+    // A store call or hash that rejects after a Cancel or remove skips the keep's own halt checks: it is the cancel
+    // all the same, and a copy already stored goes (W64 refuter round 1).
+    const aborted = _halted || !!(e && /** @type {any} */ (e).name === 'AbortError');
+    if (_halted) { const st = _store(); if (st) { try { await st.delete(id); } catch (_e) { /* gone already */ } } }
     if (!aborted) _failed.set(id, e && /** @type {any} */ (e).message ? String(/** @type {any} */ (e).message) : 'network');
   } finally {
     _active = null;

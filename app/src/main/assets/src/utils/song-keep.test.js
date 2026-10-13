@@ -243,6 +243,22 @@ describe('song-keep on the web — the offline-songs store', () => {
       expect(store.map.has(A1)).toBe(false);
       expect(lib.kept).toEqual([]);
     });
+
+    it('a store read that fails after Cancel is the cancel, not a failure: the stored copy goes', async () => {
+      let rejectGet = null;
+      store.get = vi.fn(() => new Promise((_r, j) => { rejectGet = () => j(new Error('read failed')); }));
+      await SongKeep.keep([A1]);
+      await storing();
+      releasePut();
+      await vi.waitFor(() => expect(rejectGet).toBeTypeOf('function'));
+      SongKeep.cancel([A1]);
+      rejectGet();
+      await settled();
+      expect(SongKeep.statusOf(A1)).toBe('none');
+      expect(store.map.has(A1)).toBe(false);
+      expect(SongKeep.isKept(A1)).toBe(false);
+      expect(lib.kept).toEqual([]);
+    });
   });
 
   it('one object URL alive at a time: the last is revoked when another song plays, and on release', async () => {
