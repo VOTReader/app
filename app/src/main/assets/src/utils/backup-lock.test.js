@@ -1,7 +1,7 @@
 /* backup-lock — W7 (sweep 2026-10-13): the boot hooks ask it whether another tab restores. */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { BACKUP_LOCK, LOCK_POLL_MS, backupLockBusy, canQueryBackupLock, whenBackupLockFree } from './backup-lock.js';
+import { BACKUP_LOCK, LOCK_POLL_MS, backupLockBusy, canQueryBackupLock, whenBackupLockFree, withBackupLockIfFree } from './backup-lock.js';
 
 afterEach(() => { delete /** @type {any} */ (navigator.locks).query; });
 
@@ -74,6 +74,29 @@ describe('whenBackupLockFree (W7 round 2: a restore whose tab dies after this ta
     await vi.advanceTimersByTimeAsync(LOCK_POLL_MS);
     cancel();
     await vi.advanceTimersByTimeAsync(LOCK_POLL_MS * 4);
+    expect(fn).not.toHaveBeenCalled();
+  });
+});
+
+describe('withBackupLockIfFree (W7 round 3: a queued staging clear vs a restore that just started)', () => {
+  /** @type {any} */ let realRequest;
+  afterEach(() => { if (realRequest) { /** @type {any} */ (navigator.locks).request = realRequest; realRequest = null; } });
+
+  it('runs fn holding the backup lock', async () => {
+    realRequest = navigator.locks.request;
+    /** @type {any[]} */ const asked = [];
+    /** @type {any} */ (navigator.locks).request = (/** @type {string} */ name, /** @type {any} */ opts, /** @type {any} */ cb) => { asked.push([name, opts]); return Promise.resolve(cb({ name })); };
+    const fn = vi.fn().mockResolvedValue(undefined);
+    expect(await withBackupLockIfFree(fn)).toBe(true);
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(asked).toEqual([[BACKUP_LOCK, { mode: 'exclusive', ifAvailable: true }]]);
+  });
+
+  it('skips fn when another tab holds the lock', async () => {
+    realRequest = navigator.locks.request;
+    /** @type {any} */ (navigator.locks).request = (/** @type {string} */ _n, /** @type {any} */ _o, /** @type {any} */ cb) => Promise.resolve(cb(null));
+    const fn = vi.fn();
+    expect(await withBackupLockIfFree(fn)).toBe(false);
     expect(fn).not.toHaveBeenCalled();
   });
 });

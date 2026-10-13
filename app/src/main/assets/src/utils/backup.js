@@ -951,6 +951,7 @@ async function _applyV3Unlocked(manifest, entries, ctx) {
   // W7: staging can lose records after they were staged (a second tab's boot
   // sweep). The commit then merged instead of replacing; report what is missing.
   const landed = commit && typeof commit.landed === 'number' ? commit.landed : mediaApplied;
+  const stagedCount = mediaApplied;
   if (landed < mediaApplied) {
     backupWarn('media staging lost', mediaApplied - landed, 'record(s) before the commit; kept the existing media');
     importFailures += mediaApplied - landed;
@@ -976,7 +977,12 @@ async function _applyV3Unlocked(manifest, entries, ctx) {
   );
   const writeFailures = saveResults.filter((ok) => !ok).length;
 
-  return { importFailures, writeFailures, skippedStores, countMismatches: verifyImportCounts(manifest, mediaApplied) };
+  const countMismatches = verifyImportCounts(manifest, mediaApplied);
+  // W7 round 3: a manifest without a counts block still names the media that left staging.
+  if (landed < stagedCount && !countMismatches.some((m) => m.startsWith('media '))) {
+    countMismatches.push(`media ${landed}/${stagedCount}`);
+  }
+  return { importFailures, writeFailures, skippedStores, countMismatches };
 }
 
 /**

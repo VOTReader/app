@@ -72,3 +72,23 @@ export function whenBackupLockFree(fn) {
   timer = setTimeout(look, LOCK_POLL_MS);
   return () => { stopped = true; if (timer) clearTimeout(timer); };
 }
+
+/**
+ * Run `fn` while holding the backup lock, or skip it when another tab holds it.
+ * W7 round 3 (Codex refuter): a staging clear decided on two free looks could
+ * still wait in the media store's write queue and land after another tab's
+ * restore took the lock and staged its first records. Under the lock, no
+ * restore can start until the clear is done (it is told another backup
+ * operation is running). Without Web Locks, `fn` simply runs.
+ * @param {() => any} fn
+ * @returns {Promise<boolean>} whether `fn` ran
+ */
+export function withBackupLockIfFree(fn) {
+  const locks = globalThis.navigator && globalThis.navigator.locks;
+  if (!locks || typeof locks.request !== 'function') return Promise.resolve(fn()).then(() => true);
+  return locks.request(BACKUP_LOCK, { mode: 'exclusive', ifAvailable: true }, async (/** @type {any} */ lock) => {
+    if (!lock) return false;
+    await fn();
+    return true;
+  });
+}

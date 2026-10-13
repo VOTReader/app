@@ -48,7 +48,7 @@
 import { RESTORE_INFLIGHT_KEY } from './use-restore-guard.js';
 import { JournalMediaStore } from '../stores/journal-media-store.js';
 import { JournalStore } from '../stores/journal-store.js';
-import { backupLockBusy, canQueryBackupLock, whenBackupLockFree } from '../utils/backup-lock.js';
+import { backupLockBusy, canQueryBackupLock, whenBackupLockFree, withBackupLockIfFree } from '../utils/backup-lock.js';
 
 /** Whether a restore marker is set now (any tab). */
 function _markerSet() {
@@ -90,8 +90,9 @@ function _sweep(restoreAtBoot, restoreNow, queryable) {
   // different object store) — runs even if JournalStore isn't ready yet.
   try {
     if (typeof JournalMediaStore !== 'undefined') {
+      // Under the backup lock (W7 round 3): a restore that starts meanwhile cannot have its staging cleared.
       const abortStaging = () => {
-        JournalMediaStore.abortImportReplace()
+        withBackupLockIfFree(() => JournalMediaStore.abortImportReplace())
           .catch((e) => console.warn('Stale import-staging sweep failed', e));
       };
       if (!inflight && !restoreNow) abortStaging();
