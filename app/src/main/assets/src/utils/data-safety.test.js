@@ -437,6 +437,13 @@ describe('W9: the check is never switched off, nor anchored to a broken snapshot
     await seed(LIBRARY);
     expect(await DataSafety.run({ sink })).toBe('snapshotted');
   });
+
+  it('every snapshot broken for good beside an empty library: the empty library is saved as the good copy (refuter round 2)', async () => {
+    const sink = memorySink();
+    sink.files.set(snapshotName(Date.now() - 86400000), '{"app":"VOTReader","stores":{"vot-no');
+    expect(await DataSafety.run({ sink })).toBe('snapshotted');
+    expect(sink.save).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('the weekly copy in Downloads/VOTReader (dl-weekly)', () => {
