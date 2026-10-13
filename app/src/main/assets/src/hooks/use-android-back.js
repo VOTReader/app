@@ -152,7 +152,10 @@ import {
 import { modalRegistry } from './use-modal-registry.js';
 import { AboutSeenFlagStore } from '../stores/app-flag-stores.js';
 import { COL_BY_INDEX_SC, COL_BY_LETTER_SC, LETTER_SCREEN_SET } from '../data/scripture-resolution.js';
-import { clearSuppressNextHistoryPush, suppressNextHistoryPush } from './use-history-sync.js';
+import {
+  clearSuppressNextHistoryPush, suppressNextHistoryPush, isHistoryPushSuppressed,
+  keepBackEntry, noteHistoryPop, pushHistoryEntry,
+} from './use-history-sync.js';
 
 /**
  * Wire window.handleAndroidBack — the function Kotlin's MainActivity calls
@@ -295,7 +298,8 @@ export function useAndroidBack({
       if (s === "audio-library-studies") {goNavOrigin();return "true";} else
       if (s === "audio-library-offline") {goNavOrigin();return "true";} else
       // Songs of the Letters: Back pops the Songs stack (audioColKey) first, then leaves by the origin (screen-routes owns both).
-      if (s === "audio-library-songs") {if (typeof window.__songsBack === "function") window.__songsBack();else goNavOrigin();return "true";} else
+      // W38: a popped frame keeps the screen (no nav-key change), so it clears the flag like the other in-place backs.
+      if (s === "audio-library-songs") {if (typeof window.__songsBack === "function") {if (window.__songsBack()) clearSuppressNextHistoryPush();} else goNavOrigin();return "true";} else
       if (s === "reading-plans") {goNavOrigin();return "true";} else
       if (s === "scripture-web") {goNavOrigin();return "true";} else
       // UX3: index/hub screens (reached via goNotesIndex/etc., which _captureOrigin)
@@ -567,6 +571,7 @@ export function useAndroidBack({
       // to home / library / wherever before the app finished mounting.
       if (!window.__historyReady) return;
 
+      noteHistoryPop();
       suppressNextHistoryPush();
       // handleAndroidBack returns the STRING "true" / "false" (not
       // boolean) — it's an @JavascriptInterface return value originally
@@ -577,7 +582,11 @@ export function useAndroidBack({
       if (result !== 'false') {
         // Navigation happened. handleAndroidBack already updated state;
         // useHistorySync's effect will fire next render, see suppress
-        // set, no-op. Nothing more to do here.
+        // set, and add an entry only if the landing screen has none (W38).
+        // A Back that only closed something (sheet, tabs overview, notebook
+        // level, songs frame) cleared the flag itself: the screen stays, and
+        // the entry this pop used was a screen's, so keep it one (W38).
+        if (!isHistoryPushSuppressed()) keepBackEntry(screenRef.current);
         return;
       }
 
@@ -596,15 +605,10 @@ export function useAndroidBack({
       }
 
       // First back at root → push replacement so the app stays mounted,
-      // then arm the toast for 2 seconds.
-      try {
-        history.pushState({}, '', '');
-      } catch (_e) {
-        // Iframe sandbox / unusual hosting may block pushState; the
-        // toast still arms (so a second back will exit cleanly). On
-        // platforms where pushState is blocked, root-back exits on
-        // first press — same as if this code didn't exist. Non-fatal.
-      }
+      // then arm the toast for 2 seconds. Where pushState is blocked
+      // (iframe sandbox) the toast still arms (so a second back will exit
+      // cleanly); root-back exits on first press there. Non-fatal.
+      pushHistoryEntry();
       _rootExitArm();
     }
 
@@ -612,6 +616,7 @@ export function useAndroidBack({
     return () => { window.removeEventListener('popstate', onPopState); };
     // Mount-only — same rationale as the Escape listener above. The
     // closure reads only module-level singletons + the call-time-fresh
-    // window.handleAndroidBack global; no React state in deps.
-  }, []);
+    // window.handleAndroidBack global, and screenRef (W38), a stable
+    // useRefMirror ref read via .current; no React state in deps.
+  }, [screenRef]);
 }

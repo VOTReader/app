@@ -27,6 +27,7 @@ import {
   useHistorySync,
   suppressNextHistoryPush,
   clearSuppressNextHistoryPush,
+  _resetHistoryEntries,
 } from './use-history-sync.js';
 import { PlatformBridge } from '../utils/platform-bridge.js';
 
@@ -45,8 +46,10 @@ beforeEach(() => {
   PlatformBridge.isAndroid = false;
   delete window.AndroidBridge;
   delete window.__historyReady;
-  // Defensively clear any stranded suppress flag from a prior test.
+  // Defensively clear any stranded suppress flag from a prior test, and the
+  // W38 entry count + once-per-page boot seed.
   clearSuppressNextHistoryPush();
+  _resetHistoryEntries();
 });
 
 /** Build a standard nav-key with sensible defaults. */
@@ -70,6 +73,11 @@ describe('useHistorySync — initial mount', () => {
     expect(_pushCalls).toEqual([]);
   });
 
+  it('W38: a first mount on a restored (non-home) screen seeds exactly one entry for its Back', () => {
+    renderHook(() => useHistorySync(nav({ screen: 'bible-ch', bookId: 'genesis', chapterNum: 1 })));
+    expect(_pushCalls.length).toBe(1);
+  });
+
   it('sets window.__historyReady = true after first mount (Firefox guard)', () => {
     renderHook(() => useHistorySync(nav({ screen: 'home' })));
     expect(window.__historyReady).toBe(true);
@@ -91,7 +99,7 @@ describe('useHistorySync — nav-key changes', () => {
       initialProps: { k: nav({ screen: 'bible-ch', bookId: 'genesis', chapterNum: 1 }) },
     });
     rerender({ k: nav({ screen: 'bible-ch', bookId: 'exodus', chapterNum: 1 }) });
-    expect(_pushCalls.length).toBe(1);
+    expect(_pushCalls.length).toBe(2); // the W38 boot seed + this nav
   });
 
   it('pushes on chapterNum change', () => {
@@ -99,7 +107,7 @@ describe('useHistorySync — nav-key changes', () => {
       initialProps: { k: nav({ screen: 'bible-ch', bookId: 'genesis', chapterNum: 1 }) },
     });
     rerender({ k: nav({ screen: 'bible-ch', bookId: 'genesis', chapterNum: 2 }) });
-    expect(_pushCalls.length).toBe(1);
+    expect(_pushCalls.length).toBe(2); // the W38 boot seed + this nav
   });
 
   it('does NOT push when no nav-key field changed (StrictMode safety / re-render no-op)', () => {
@@ -137,32 +145,49 @@ describe('useHistorySync — nav-key changes', () => {
 });
 
 describe('useHistorySync — suppressNextHistoryPush', () => {
+  // The suppressed (back-induced) navs below land on Home, which W38 never
+  // gives an extra entry, so the counts show the suppression alone.
   it('suppresses exactly one push, then resumes normal behavior', () => {
     const { rerender } = renderHook(({ k }) => useHistorySync(k), {
       initialProps: { k: nav({ screen: 'home' }) },
     });
+    rerender({ k: nav({ screen: 'library' }) });
+    expect(_pushCalls.length).toBe(1);
 
     suppressNextHistoryPush();
-    rerender({ k: nav({ screen: 'library' }) });
-    expect(_pushCalls.length).toBe(0); // suppressed
+    rerender({ k: nav({ screen: 'home' }) });
+    expect(_pushCalls.length).toBe(1); // suppressed
 
     rerender({ k: nav({ screen: 'notes-index' }) });
-    expect(_pushCalls.length).toBe(1); // resumed
+    expect(_pushCalls.length).toBe(2); // resumed
   });
 
   it('suppress is idempotent across multiple calls (still one-shot)', () => {
     const { rerender } = renderHook(({ k }) => useHistorySync(k), {
       initialProps: { k: nav({ screen: 'home' }) },
     });
+    rerender({ k: nav({ screen: 'library' }) });
+    expect(_pushCalls.length).toBe(1);
 
     suppressNextHistoryPush();
     suppressNextHistoryPush();
+    suppressNextHistoryPush();
+    rerender({ k: nav({ screen: 'home' }) });
+    expect(_pushCalls.length).toBe(1); // still one push suppressed
+
+    rerender({ k: nav({ screen: 'library' }) });
+    expect(_pushCalls.length).toBe(2); // resumed on the next
+  });
+
+  it('W38: a suppressed nav that lands on a non-home screen with no entry left adds exactly one', () => {
+    const { rerender } = renderHook(({ k }) => useHistorySync(k), {
+      initialProps: { k: nav({ screen: 'home' }) },
+    });
     suppressNextHistoryPush();
     rerender({ k: nav({ screen: 'library' }) });
-    expect(_pushCalls.length).toBe(0); // still one push suppressed
-
-    rerender({ k: nav({ screen: 'home' }) });
-    expect(_pushCalls.length).toBe(1); // resumed on the next
+    expect(_pushCalls.length).toBe(1); // its Back must reach the app, not leave it
+    rerender({ k: nav({ screen: 'notes-index' }) });
+    expect(_pushCalls.length).toBe(2); // the flag was consumed: forward pushes resume
   });
 
   it('clearSuppressNextHistoryPush() prevents stranding when no nav change follows', () => {
@@ -189,22 +214,23 @@ describe('useHistorySync — suppressNextHistoryPush', () => {
     suppressNextHistoryPush();
 
     const { rerender } = renderHook(({ k }) => useHistorySync(k), {
-      initialProps: { k: nav({ screen: 'home' }) },
+      initialProps: { k: nav({ screen: 'library' }) },
     });
-    // Initial mount records the key but doesn't push — and CRITICALLY
-    // shouldn't consume the suppress flag (the flag is meant for
-    // future back-induced navs, not initial mount).
-    expect(_pushCalls).toEqual([]);
+    // Initial mount records the key and pushes only the W38 boot seed
+    // (library is not Home) — and CRITICALLY shouldn't consume the
+    // suppress flag (the flag is meant for future back-induced navs,
+    // not initial mount).
+    expect(_pushCalls.length).toBe(1);
 
-    rerender({ k: nav({ screen: 'library' }) });
+    rerender({ k: nav({ screen: 'home' }) });
     // Hmm — what's the right behavior here? The suppress was called
     // BEFORE the hook mounted. The first dep-change push should
     // consume it. This is a defensible design choice; the test pins
     // the behavior so future changes are deliberate.
-    expect(_pushCalls.length).toBe(0); // suppress consumed
+    expect(_pushCalls.length).toBe(1); // suppress consumed
 
-    rerender({ k: nav({ screen: 'home' }) });
-    expect(_pushCalls.length).toBe(1); // resumed
+    rerender({ k: nav({ screen: 'library' }) });
+    expect(_pushCalls.length).toBe(2); // resumed
   });
 });
 

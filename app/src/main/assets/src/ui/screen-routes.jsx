@@ -537,9 +537,12 @@ export function buildScreenRoutes({
     setNavOrigin({ ...origin, returnOrigin: navOrigin || null });
     setScreen(SONGS_SCREEN);
   };
+  // True when a frame popped and the screen stays (Back's history bookkeeping needs it, W38).
   const _songsBack = () => {
     const popped = popSongsFrame(audioColKey);
-    if (popped) setAudioColKey(popped); else goNavOrigin();
+    if (popped) { setAudioColKey(popped); return true; }
+    goNavOrigin();
+    return false;
   };
   window.__songsBack = screen === SONGS_SCREEN ? _songsBack : null;
   // A letter page's songs card opens a song or the letter's songs; Back returns to this letter.
