@@ -18,7 +18,7 @@ import {
 } from './geometry.js';
 import {
   pickArc, pickArcs, arcsTouching, countTouching, pickChapter, pickVerse,
-  refOfVerse, chapterRange, findWebReference,
+  refOfVerse, chapterRange,
 } from './pick.js';
 import { deltaRuns, bucketDrawCount, minVotesFor, base64ToBytes, decodeGraph, fansOf } from './decode.js';
 
@@ -514,17 +514,6 @@ describe('focus + ruler picking', () => {
     expect(refOfVerse(g, 19).label).toBe('Alpha 2:10');
     expect(refOfVerse(g, 20).label).toBe('Beta 1:1');
     expect(refOfVerse(g, 39)).toMatchObject({ bookId: 'beta', chapter: 2, verse: 10 });
-  });
-
-  it('resolves title and abbreviation references for Go to', () => {
-    expect(findWebReference(g, 'Alp 1:3')).toMatchObject({
-      chapterIndex: 0, verse: 2, hasVerse: true, label: 'Alpha 1:3',
-    });
-    expect(findWebReference(g, 'Beta 2')).toMatchObject({
-      chapterIndex: 3, verse: 30, hasVerse: false, label: 'Beta 2',
-    });
-    expect(findWebReference(g, 'Beta 2:99')).toBeNull();
-    expect(findWebReference(g, 'Nope 1')).toBeNull();
   });
 
   it('reports chapter ranges inclusively', () => {

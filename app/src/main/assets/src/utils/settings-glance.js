@@ -53,7 +53,7 @@ export function settingsGlance(o) {
     topnav: s.compactTopBar !== false ? 'Compact bar with the ⋯ menu' : 'Every icon in the bar',
     features: offs.length === 0 ? 'Search, tabs and history on'
       : offs.length === feats.length ? 'Search, tabs and history off'
-        : feats.map(([n, on]) => n + ' ' + onOff(on)).join(' · ').replace(/^search/, 'Search'),
+        : feats.map(([n, on]) => n + ' ' + onOff(on)).join(' · '),
     garden: (o && o.gardenLabel) || 'Image quality',
     progress: s.markAsRead ? 'Marking chapters as read' : 'Off',
     data: 'Back up, restore & storage',

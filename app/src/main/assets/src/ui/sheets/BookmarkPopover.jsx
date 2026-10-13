@@ -9,7 +9,7 @@
    inside a bundle the reader may never load is a shell that breaks.
 
    Free globals (filled by bundle-d before any lazy bundle loads): React,
-   BookmarkStore, useFocusTrap, relativeDate, ConfirmStrip.
+   BookmarkStore, useFocusTrap, ConfirmStrip (relativeDate is imported).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { relativeDate } from '../../utils/dates.js';
@@ -61,7 +61,7 @@ export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDon
       >
         {bookmarks.map(function(bkm) {
           var isConfirming = confirmingId === bkm.id;
-          var dateStr = (typeof relativeDate === 'function') ? relativeDate(bkm.created) : '';
+          var dateStr = relativeDate(bkm.created);
           var hasThought = !!(bkm.thought && bkm.thought.trim().length);
 
           return (

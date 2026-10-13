@@ -468,38 +468,6 @@ export function chapterRange(g, chapterIndex) {
   return [ch[2], ch[2] + ch[3] - 1];
 }
 
-/**
- * Resolve a short Bible reference against the graph's canonical book table.
- * This deliberately accepts title, abbreviation, or book id and stays local
- * to the already-loaded graph, so Go to never depends on the search bundle.
- *
- * @param {import('./decode.js').ScriptureGraph} g
- * @param {string} input
- * @returns {{chapterIndex:number, verse:number, lo:number, hi:number, hasVerse:boolean, label:string}|null}
- */
-export function findWebReference(g, input) {
-  const m = /^\s*(.+?)\s+(\d+)(?::(\d+))?\s*$/.exec(String(input || ''));
-  if (!m) return null;
-  const clean = (s) => String(s || '').toLowerCase()
-    .replace(/[.'’]/g, '').replace(/\s+/g, ' ').trim();
-  const wanted = clean(m[1]);
-  const bookIndex = g.books.findIndex((book) => [book.id, book.title, book.abbr]
-    .some((name) => clean(name) === wanted));
-  if (bookIndex < 0) return null;
-  const chapterNum = Number(m[2]);
-  const chapterIndex = g.chapters.findIndex((ch) => ch[0] === bookIndex && ch[1] === chapterNum);
-  if (chapterIndex < 0) return null;
-  const [lo, hi] = chapterRange(g, chapterIndex);
-  const requestedVerse = m[3] == null ? 1 : Number(m[3]);
-  if (m[3] != null && (requestedVerse < 1 || requestedVerse > hi - lo + 1)) return null;
-  const verse = lo + requestedVerse - 1;
-  return {
-    chapterIndex, verse, lo, hi,
-    hasVerse: m[3] != null,
-    label: g.books[bookIndex].title + ' ' + chapterNum + (m[3] == null ? '' : ':' + (verse - lo + 1)),
-  };
-}
-
 /** Screen x of a verse — re-exported so callers need only this module. */
 /* ── Convergence (structure-law.md; density-law.md section 2 before it) ──
  *

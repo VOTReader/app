@@ -27,9 +27,9 @@ function srcEndpoint(hlKey) {
 
 /* ── BookmarkRow component ───────────────────────────────────── */
 /**
- * @param {{ key?: any, bkm: any, source?: string, onNavigate: any, onLongPress: any, editingId: any, onEditStart: any, onEditSave: any, onEditCancel: any }} props
+ * @param {{ key?: any, bkm: any, source?: string, onNavigate: any, onLongPress: any, editingId: any, onEditSave: any, onEditCancel: any }} props
  */
-export function BookmarkRow({ bkm, source = '', onNavigate, onLongPress, editingId, onEditStart: _onEditStart, onEditSave, onEditCancel }) {
+export function BookmarkRow({ bkm, source = '', onNavigate, onLongPress, editingId, onEditSave, onEditCancel }) {
   var useState = React.useState;
   var useEffect = React.useEffect;
   var useRef = React.useRef;
@@ -382,7 +382,6 @@ export function BookmarksScreen(props) {
                   onNavigate={navigateToBookmark}
                   onLongPress={function(b) { setActionTarget(b); }}
                   editingId={editingId}
-                  onEditStart={function(id) { setEditingId(id); }}
                   onEditSave={onEditSave}
                   onEditCancel={function() { setEditingId(null); }}
                 />

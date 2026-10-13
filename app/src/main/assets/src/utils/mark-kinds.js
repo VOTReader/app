@@ -19,5 +19,5 @@ export const MARK_KINDS = ['highlight', 'underline', 'squiggle'];
  * @returns {boolean}
  */
 export function isMarkKind(kind) {
-  return kind === 'highlight' || kind === 'underline' || kind === 'squiggle';
+  return MARK_KINDS.includes(kind);
 }
