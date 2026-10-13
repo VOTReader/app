@@ -94,8 +94,9 @@ export function setStoreWriteFence(on, opts) {
 }
 
 /**
- * W8: raise or lower the other tab's fence (see _remoteFence). It always closes the adapter's
- * door too: nothing on this page may write into a library another tab just made.
+ * W8: raise or lower the other tab's fence (see _remoteFence). The adapter refuses every write
+ * while it is up (its hold check, above): nothing on this page may write into a library another
+ * tab is making.
  * @param {boolean} on
  */
 export function setRemoteWriteFence(on) {
@@ -103,9 +104,13 @@ export function setRemoteWriteFence(on) {
   _applyFences();
 }
 
-/** Both fences onto the adapter's door; once neither holds, every save they skipped runs now. */
+/* The other tab's fence reaches the writers that bypass the stores through the adapter's hold
+   check: they are REFUSED (WriteFenced), never resolved unwritten like behind Clear All's door. */
+if (typeof IDBAdapter.setHoldCheck === 'function') IDBAdapter.setHoldCheck(function () { return _remoteFence; });
+
+/** This page's fence onto the adapter's door; once neither fence holds, every save they skipped runs now. */
 function _applyFences() {
-  if (typeof IDBAdapter.setWriteFence === 'function') IDBAdapter.setWriteFence(_writeFenceAtAdapter || _remoteFence);
+  if (typeof IDBAdapter.setWriteFence === 'function') IDBAdapter.setWriteFence(_writeFenceAtAdapter);
   if (_fenced()) return;
   const skipped = Array.from(_fencedDirty);
   _fencedDirty.clear();

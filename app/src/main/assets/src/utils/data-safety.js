@@ -74,7 +74,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
 import { StorageHealth } from './storage-health.js';
 import { snapshotSink, snapshotTime } from './snapshot-sink.js';
 import { showToast } from './toast.js';
-import { announceLibraryChange } from './other-tabs.js';
+import { announceLibraryChange, heldByOtherTab } from './other-tabs.js';
 
 /** Set (localStorage) by an import or Clear All just before its reload: the next boot's
  *  smaller library is the reader's own doing, so it is not compared. In LS_SKIP_LIST. */
@@ -603,6 +603,8 @@ export async function restoreMissing(opts) {
   const sink = (opts && opts.sink) || snapshotSink();
   const missing = StorageHealth.getReport().dataMissing;
   if (!sink || !missing || storesNotLoaded().length) return false;
+  // W8: another tab changed the library under this one: this tab's writes would not land.
+  if (heldByOtherTab()) return false;
   const snap = _parse(await sink.read(missing.name));
   if (!snap) return false;
   const w = /** @type {any} */ (window);

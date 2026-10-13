@@ -11,7 +11,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { IDBAdapter } from '../stores/idb-adapter.js';
 import { CachedStore, _resetStoreRegistry, setStoreWriteFence } from '../stores/cached-store.js';
 import { StorageHealth } from './storage-health.js';
-import { watchOtherTabs, announceLibraryChange, _resetOtherTabsForTests } from './other-tabs.js';
+import { watchOtherTabs, announceLibraryChange, heldByOtherTab, _resetOtherTabsForTests } from './other-tabs.js';
 
 /** An in-memory BroadcastChannel: a message reaches every OTHER channel of the same name, a task later. */
 const bus = new Set();
@@ -93,11 +93,13 @@ describe('W8: another tab cleared everything (the database was deleted under thi
     expect(StorageHealth.getReport().libraryElsewhere).toBe('changed');
   });
 
-  it('CONTROL: this tab\'s own Clear All (its fence goes up first) is not another tab\'s, and a failed one keeps saving', async () => {
+  it('CONTROL: this tab\'s own Clear All (it announces, then fences, then deletes) is not another tab\'s, and a failed one keeps saving', async () => {
+    announceLibraryChange('changing');
     setStoreWriteFence(true);
     await deleteDb();
     expect(StorageHealth.getReport().libraryElsewhere).toBeFalsy();
     setStoreWriteFence(false);                // the wipe "failed": no reload, this session goes on
+    announceLibraryChange('unchanged');
     tabBSaves('h3');
     await history.whenSaved();
     expect(ids(await onDisk('vot-history'))).toEqual(['h1', 'h2', 'h3']);
@@ -172,5 +174,79 @@ describe('W8: a newer build upgraded the database while this (older) tab was ope
     expect(r.writeFailedThisSession, 'no "storage is full" banner').toBe(false);
     expect(r.libraryElsewhere).toBeFalsy();
     newer.close();
+  });
+});
+
+/* W8 self-review (2026-10-13): three tabs, or two tabs both starting a backup operation. The backup
+   Web Lock lets only one import or Clear All run, but every tab that STARTS one announces first. */
+describe('W8: more than one tab announcing', () => {
+  it('one tab\'s cancelled import does not lift the hold another tab\'s import still needs', async () => {
+    const c = new FakeChannel('votreader-library');
+    other.postMessage({ kind: 'changing', from: 'tab-a' });
+    c.postMessage({ kind: 'changing', from: 'tab-c' });      // tab C tries one too; the lock refuses it
+    await tick();
+    c.postMessage({ kind: 'unchanged', from: 'tab-c' });
+    await tick();
+    tabBSaves('h3');
+    await tick();
+    expect(ids(await onDisk('vot-history')), 'tab A is still importing').toEqual(['h1', 'h2']);
+    expect(StorageHealth.getReport().libraryElsewhere).toBe('changing');
+    other.postMessage({ kind: 'unchanged', from: 'tab-a' });
+    await tick();
+    await history.whenSaved();
+    expect(ids(await onDisk('vot-history'))).toEqual(['h1', 'h2', 'h3']);
+    c.close();
+  });
+
+  it('a tab in the middle of its own import is not held by another tab that tries one', async () => {
+    announceLibraryChange('changing');                       // this page's import starts
+    other.postMessage({ kind: 'changing', from: 'tab-b' });  // another tab's starts too (the lock will refuse it)
+    await tick();
+    tabBSaves('h3');                                         // this page's import writes
+    await history.whenSaved();
+    expect(ids(await onDisk('vot-history'))).toEqual(['h1', 'h2', 'h3']);
+    expect(StorageHealth.getReport().libraryElsewhere).toBeFalsy();
+    other.postMessage({ kind: 'unchanged', from: 'tab-b' });
+    await tick();
+    announceLibraryChange('changed');
+  });
+
+  it('a change another tab finished while this page\'s own (refused) import ran still holds this page after it', async () => {
+    other.postMessage({ kind: 'changing', from: 'tab-a' });  // tab A imports...
+    await tick();
+    announceLibraryChange('changing');                       // ...this page starts one (refused below)
+    other.postMessage({ kind: 'changed', from: 'tab-a' });   // ...tab A finishes
+    await tick();
+    announceLibraryChange('unchanged');                      // the lock refused this page's import
+    tabBSaves('h3');
+    await tick();
+    expect(ids(await onDisk('vot-history'))).toEqual(['h1', 'h2']);
+    expect(StorageHealth.getReport().libraryElsewhere).toBe('changed');
+  });
+
+  it('heldByOtherTab says whether another tab is changing or changed the library', async () => {
+    expect(heldByOtherTab()).toBe(false);
+    other.postMessage({ kind: 'changing', from: 'tab-a' });
+    await tick();
+    expect(heldByOtherTab()).toBe(true);
+    other.postMessage({ kind: 'unchanged', from: 'tab-a' });
+    await tick();
+    expect(heldByOtherTab()).toBe(false);
+    await deleteDb();
+    expect(heldByOtherTab()).toBe(true);
+  });
+});
+
+/* W8 refuter round 1, point 3: a writer that bypasses the stores (offline songs, size samples)
+   resolved as if saved while another tab held this one, and was never written. */
+describe('W8: a direct write while another tab holds this one', () => {
+  it('is refused with WriteFenced (its caller can say so), and lands once the hold lifts if retried', async () => {
+    other.postMessage({ kind: 'changing', from: 'tab-a' });
+    await tick();
+    await expect(IDBAdapter.put('offline-songs', 's1', { id: 's1' })).rejects.toMatchObject({ name: 'WriteFenced' });
+    other.postMessage({ kind: 'unchanged', from: 'tab-a' });
+    await tick();
+    await IDBAdapter.put('offline-songs', 's1', { id: 's1' });
+    expect(await IDBAdapter.get('offline-songs', 's1')).toEqual({ id: 's1' });
   });
 });

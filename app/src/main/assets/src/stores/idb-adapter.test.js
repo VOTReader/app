@@ -657,3 +657,47 @@ describe('IDBAdapter - small values, small transactions, one write at a time (id
     expect(await IDBAdapter.get('vot-history', 'v')).toBeUndefined();
   });
 });
+
+/* W8 refuter round 1 (2026-10-13): a write that passed the queue's fence check could still be
+   waiting on open() when a fence rose (another tab's Clear All closed the connection, so the
+   next open recreates the deleted database), and then wrote anyway. And under ANOTHER tab's
+   hold (setHoldCheck), a write that bypasses the stores (offline songs, size samples) resolved
+   as if saved: it must be refused, so its caller knows. */
+describe('IDBAdapter W8 - the fences are checked again right before the transaction', () => {
+  afterEach(() => { IDBAdapter.setWriteFence(false); if (typeof IDBAdapter.setHoldCheck === 'function') IDBAdapter.setHoldCheck(null); });
+
+  it('a write already waiting on open() when Clear All\'s fence rises lands nothing', async () => {
+    IDBAdapter._resetForTests();                       // the connection is gone: open() has to reopen
+    const p = IDBAdapter._putOnce('vot-state', 'v', { stale: true });
+    IDBAdapter.setWriteFence(true);                    // rises while that open is pending
+    await expect(p).rejects.toMatchObject({ name: 'WriteFenced' });
+    IDBAdapter.setWriteFence(false);
+    expect(await IDBAdapter.get('vot-state', 'v')).toBeUndefined();
+  });
+
+  it('the same for another tab\'s hold', async () => {
+    let held = false;
+    IDBAdapter.setHoldCheck(() => held);
+    IDBAdapter._resetForTests();
+    const p = IDBAdapter._putOnce('vot-state', 'v', { stale: true });
+    held = true;
+    await expect(p).rejects.toMatchObject({ name: 'WriteFenced' });
+    held = false;
+    expect(await IDBAdapter.get('vot-state', 'v')).toBeUndefined();
+  });
+
+  it('under another tab\'s hold a direct write, delete or migration commit is refused, not silently dropped', async () => {
+    IDBAdapter.setHoldCheck(() => true);
+    await expect(IDBAdapter.put('offline-songs', 's1', { id: 's1' })).rejects.toMatchObject({ name: 'WriteFenced' });
+    await expect(IDBAdapter.delete('vot-notes', 'v')).rejects.toMatchObject({ name: 'WriteFenced' });
+    await expect(IDBAdapter.commitMigration('vot-bookmarks', [], 3)).rejects.toMatchObject({ name: 'WriteFenced' });
+    IDBAdapter.setHoldCheck(null);
+    expect(await IDBAdapter.get('offline-songs', 's1')).toBeUndefined();
+  });
+
+  it('CONTROL: a hold check that throws never blocks a write', async () => {
+    IDBAdapter.setHoldCheck(() => { throw new Error('bug'); });
+    await IDBAdapter.put('vot-state', 'v', { ok: 1 });
+    expect(await IDBAdapter.get('vot-state', 'v')).toEqual({ ok: 1 });
+  });
+});

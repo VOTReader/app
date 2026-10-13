@@ -672,3 +672,21 @@ describe('W8: the other open tabs hear about Clear All and Import', () => {
     expect(said).toEqual([]);
   });
 });
+
+/* W8 self-review: a tab held by another tab's change writes nothing (its saves are fenced), so an
+   import there would report "Import complete" and reload with nothing imported. Refused instead. */
+describe('W8: an import in a tab whose library another tab changed', () => {
+  it('is refused before any write, with a reload hint, and says "unchanged"', async () => {
+    const said = [];
+    put('announceLibraryChange', (kind) => said.push(kind));
+    put('heldByOtherTab', () => true);
+    bridge.pickImportFile.mockResolvedValue(await votbakFile());
+    await createBackupFlow(ctx).importPersonalData();
+    await settle();
+    expect(globalThis.applyV3).not.toHaveBeenCalled();
+    expect(lastToast()).toMatch(/another tab/i);
+    expect(lastToast()).toMatch(/reload/i);
+    expect(localStorage.getItem('vot-restore-inflight')).toBeNull();
+    expect(said).toEqual(['changing', 'unchanged']);
+  });
+});
