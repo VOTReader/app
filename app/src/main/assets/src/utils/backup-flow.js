@@ -249,6 +249,12 @@ export function createBackupFlow(ctx) {
   // on screen at the same moment, and reusing one element would make the
   // offer overwrite whatever the export was telling the reader.
   const _ESCAPE_TOAST_ID = 'vot-toast-export-escape';
+  // W10: a backup from a newer build was called "not a VOTReader backup", which
+  // tells a reader holding a good backup to throw it away. isNewerBackup is a
+  // bundle-b global (utils/import-validators.js).
+  const _envelopeRefusal = (parsed) => ((typeof isNewerBackup === 'function' && isNewerBackup(parsed))
+    ? 'This backup was made by a newer version of VOTReader. Update the app, then try again.'
+    : 'This file does not look like a VOTReader backup.');
   // SEC1: route through textContent (opts.text), NOT innerHTML. Every caller here
   // passes a runtime-built status string (e.g. 'Import failed: ' + err.message,
   // 'could not read: ' + built.problems.join(', ')). None is trusted static markup,
@@ -741,7 +747,7 @@ export function createBackupFlow(ctx) {
       const envelopeErrors = validateImportEnvelope(manifest);
       if (envelopeErrors.length) {
         backupWarn('import envelope invalid:', envelopeErrors);
-        _showToast('This file does not look like a VOTReader backup.');
+        _showToast(_envelopeRefusal(manifest));
         return;
       }
       await _confirmDegradeApplyReload(manifest, (storesMap, flagMap) => applyV3(manifest, entries, {
@@ -755,10 +761,10 @@ export function createBackupFlow(ctx) {
     const _doImport = async (jsonText) => {
       try {
         const parsed = JSON.parse(jsonText);
-        const envelopeErrors = validateImportEnvelope(parsed);
+        const envelopeErrors = validateImportEnvelope(parsed, { json: true });
         if (envelopeErrors.length) {
           backupWarn('import envelope invalid:', envelopeErrors);
-          _showToast('This file does not look like a VOTReader backup.');
+          _showToast(_envelopeRefusal(parsed));
           return;
         }
         await _confirmDegradeApplyReload(parsed, (storesMap, flagMap) => applyImportPayload(parsed, {
@@ -836,7 +842,7 @@ export function createBackupFlow(ctx) {
       if (envelopeErrors.length) {
         try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
         backupWarn('import envelope invalid:', envelopeErrors);
-        _showToast('This file does not look like a VOTReader backup.');
+        _showToast(_envelopeRefusal(manifest));
         return;
       }
       // 4. Stream the media frames as an async-gen of {id, meta, blob}; applyV3
@@ -932,11 +938,11 @@ export function createBackupFlow(ctx) {
     };
     // Both platforms: envelope-validate the parsed manifest/payload first so a
     // random JSON file reports "not a backup", not a zero-count summary.
-    const _checkEnvelope = (parsed) => {
-      const errs = validateImportEnvelope(parsed);
+    const _checkEnvelope = (parsed, json) => {
+      const errs = validateImportEnvelope(parsed, { json: !!json });
       if (errs.length) {
         backupWarn('verify: envelope invalid', errs);
-        _verifyFail('This file does not look like a VOTReader backup.');
+        _verifyFail(_envelopeRefusal(parsed));
         return false;
       }
       return true;
@@ -965,7 +971,7 @@ export function createBackupFlow(ctx) {
             let parsed;
             try { parsed = JSON.parse(sniff.json); }
             catch (e) { backupWarn('verify legacy parse failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
-            if (!_checkEnvelope(parsed)) return;
+            if (!_checkEnvelope(parsed, true)) return;
             _report(parsed, 'absent', 'legacy');
             return;
           }
@@ -1028,7 +1034,7 @@ export function createBackupFlow(ctx) {
           let parsed;
           try { parsed = JSON.parse(await file.text()); }
           catch (e) { backupWarn('verify legacy parse failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
-          if (!_checkEnvelope(parsed)) return;
+          if (!_checkEnvelope(parsed, true)) return;
           _report(parsed, 'absent', 'legacy');
         }
       } catch (e) {

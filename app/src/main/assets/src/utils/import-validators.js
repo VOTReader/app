@@ -183,14 +183,23 @@ export function validateV3MediaMetadata(media) {
   return errs;
 }
 
+/** The newest exportVersion this build reads (v3 = the .votbak container). */
+const MAX_EXPORT_VERSION = 3;
+
 /**
  * Validate the top-level import envelope (Layer 1). Hard failures mean the
  * file isn't a usable VOTReader backup and import should not proceed.
  *
+ * `json: true` for a plain JSON file (the v1/v2 path). v3 exists only as a
+ * .votbak container whose media bytes are frames after the manifest; a JSON file
+ * stamped 3 is a hand-made or extracted manifest, and the v1/v2 applier read its
+ * media ARRAY as an id map and pruned every attachment on the device (W10).
+ *
  * @param {*} parsed - the JSON.parse'd backup object
+ * @param {{ json?: boolean }} [opts]
  * @returns {string[]} violations (empty = valid envelope)
  */
-export function validateImportEnvelope(parsed) {
+export function validateImportEnvelope(parsed, opts = {}) {
   const errs = [];
   if (!isPlainObject(parsed)) { errs.push('backup is not an object'); return errs; }
   // SE1: hard-refuse a payload carrying a prototype-pollution key anywhere.
@@ -200,7 +209,8 @@ export function validateImportEnvelope(parsed) {
   const ver = parsed.exportVersion === undefined ? 1 : parsed.exportVersion;
   const validVersion = Number.isInteger(ver) && ver >= 1;
   if (!validVersion) errs.push(`invalid exportVersion ${JSON.stringify(parsed.exportVersion)}`);
-  if (validVersion && ver > 3) errs.push(`unsupported exportVersion ${ver}`);
+  if (validVersion && ver > MAX_EXPORT_VERSION) errs.push(`unsupported exportVersion ${ver}`);
+  if (validVersion && ver >= 3 && opts.json) errs.push(`exportVersion ${ver} is a .votbak container, not a JSON file`);
   // Every backup (V1 and V2) carries `data` (the boot-shim LS keys);
   // V2 adds stores + media. `data` is required; stores/media optional.
   if (!isPlainObject(parsed.data)) errs.push('"data" must be an object');
@@ -216,6 +226,19 @@ export function validateImportEnvelope(parsed) {
   return errs;
 }
 
+/**
+ * True for a VOTReader backup stamped with an exportVersion past what this build
+ * reads, so the reader is told to update the app instead of hearing that a good
+ * backup "does not look like a VOTReader backup" (W10).
+ *
+ * @param {*} parsed
+ * @returns {boolean}
+ */
+export function isNewerBackup(parsed) {
+  return isPlainObject(parsed) && parsed.app === 'VOTReader'
+    && Number.isInteger(parsed.exportVersion) && parsed.exportVersion > MAX_EXPORT_VERSION;
+}
+
 // base64 alphabet (standard, with optional trailing padding).
 const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
 // Matches the export-side per-blob guard.
@@ -226,6 +249,11 @@ const MEDIA_MAX_BYTES = 100 * 1024 * 1024;
  * base64 decode happens at write time; here we sanity-check the head and
  * the approximate decoded size so a malformed/oversized blob is skipped
  * before it reaches JournalMediaStore.
+ *
+ * The id, type, mime and size follow validateV3MediaMetadata's rule (size and
+ * mime may be absent here). A record is stored as it arrives and the next
+ * .votbak export writes these fields into its manifest, so a value v3 refuses
+ * made every later backup unimportable (W10).
  *
  * @param {string} id - blob id (key in parsed.media)
  * @param {*} record - { data: base64, mime, type, size, ... }
@@ -250,6 +278,16 @@ export function validateMediaRecord(id, record, maxBytes = MEDIA_MAX_BYTES) {
   const approxBytes = Math.floor(record.data.length * 3 / 4);
   if (approxBytes > maxBytes) {
     errs.push(`media "${id}": decoded size ~${approxBytes} bytes exceeds the limit`);
+  }
+  if (typeof id !== 'string' || id.trim() === '') errs.push('media: "id" must be a non-empty string');
+  if (record.type !== 'image' && record.type !== 'audio') {
+    errs.push(`media "${id}": "type" must be "image" or "audio"`);
+  }
+  if (record.mime !== undefined && (typeof record.mime !== 'string' || record.mime.trim() === '')) {
+    errs.push(`media "${id}": "mime" must be a non-empty string when present`);
+  }
+  if (record.size !== undefined && (!Number.isSafeInteger(record.size) || record.size < 0)) {
+    errs.push(`media "${id}": "size" must be a non-negative safe integer when present`);
   }
   return errs;
 }

@@ -677,6 +677,71 @@ describe('applyImportPayload', () => {
     expect(res.importFailures).toBe(0);
     expect(bkm.calls).toEqual([[{ id: 'b1' }]]);
   });
+
+  // W10 (sweep 2026-10-13): v3 is a .votbak container. A plain JSON file stamped 3
+  // has a media ARRAY, which this applier read as an id map ('0', '1', ...), so
+  // the prune deleted every photo and memo the device had. Only v1 and v2 belong
+  // here; anything else is refused before the first write.
+  it('W10: a JSON payload stamped anything but v1/v2 is refused before any write', async () => {
+    for (const exportVersion of [3, 4, '2', 2.5]) {
+      const journal = fakeStore('replaceAll');
+      const media = mediaOnDevice(['photo', 'memo']);
+      localStorage.setItem('vot-state', '{"theme":"light"}');
+      await expect(applyImportPayload(
+        { app: 'VOTReader', exportVersion, data: { 'vot-state': '{"theme":"dark"}' },
+          stores: { 'vot-journal': { list: [] } }, media: [{ id: 'other', type: 'image', size: 1 }] },
+        {
+          storesMap: { 'vot-journal': { store: journal, method: 'replaceAll' } },
+          flagMap: {}, mediaStore: media,
+          validateStorePayload: okValidate, validateMediaRecord: okValidate,
+        },
+      )).rejects.toThrow(/exportVersion/);
+      expect(journal.calls).toEqual([]);
+      expect(Object.keys(media._store).sort()).toEqual(['memo', 'photo']);
+      expect(localStorage.getItem('vot-state')).toBe('{"theme":"light"}');
+    }
+  });
+
+  // W10: a v1 file carries every vot-* key of its day. Writing them all back to
+  // localStorage left an old copy of each store there for good, and after a later
+  // IndexedDB loss the stores seeded from it: the old library came back instead
+  // of the auto-restore. The stores get their records; LS gets only its own keys.
+  it('W10: a v1 import writes only the boot-state key to localStorage', async () => {
+    const bkm = fakeStore('replaceAll');
+    await applyImportPayload(
+      { exportVersion: 1, data: {
+        'vot-state': '{"theme":"dark"}', 'vot-bookmarks': '[{"id":"b1","hlKey":"k"}]',
+        'vot-history': '[]', 'vot-health-skip': '1',
+      } },
+      {
+        storesMap: { 'vot-bookmarks': { store: bkm, method: 'replaceAll' } },
+        flagMap: {}, mediaStore: emptyMedia,
+        validateStorePayload: okValidate, validateMediaRecord: okValidate,
+      },
+    );
+    expect(bkm.calls).toEqual([[{ id: 'b1', hlKey: 'k' }]]);
+    expect(localStorage.getItem('vot-state')).toBe('{"theme":"dark"}');
+    expect(localStorage.getItem('vot-bookmarks')).toBeNull();
+    expect(localStorage.getItem('vot-history')).toBeNull();
+    expect(localStorage.getItem('vot-health-skip')).toBeNull();
+  });
+
+  it('W10: a v2 record with a type the v3 manifest refuses is skipped, never stored', async () => {
+    const put = vi.fn(async () => {});
+    const res = await applyImportPayload(
+      { exportVersion: 2, stores: {}, media: {
+        m1: { data: 'aGk=', type: 'video', mime: 'video/mp4' },
+        m2: { data: 'aGk=', type: 'image', mime: 'image/png', size: 2 },
+      } },
+      {
+        storesMap: {}, flagMap: {},
+        mediaStore: { allIds: async () => [], delete: async () => {}, put },
+        validateStorePayload: okValidate, validateMediaRecord: validateMediaRecord,
+      },
+    );
+    expect(res.importFailures).toBe(1);
+    expect(put.mock.calls.map((c) => c[0].id)).toEqual(['m2']);
+  });
 });
 
 /* ─────────────────────────────────────────────────────────────────────

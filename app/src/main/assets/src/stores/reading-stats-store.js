@@ -75,6 +75,19 @@ var WPM_MAX = 1500;
 var WPM_MIN_SAMPLES = 5;
 
 /**
+ * W10: a sample measuredWpm can divide: what recordPaceSample writes, a
+ * positive finite word count and time. Imported samples arrived unchecked, and
+ * one null or zero-time sample made the pace NaN or a throw on My Progress and
+ * the reading-minutes chip.
+ * @param {any} s
+ * @returns {boolean}
+ */
+function _isPaceSample(s) {
+  return !!s && typeof s === 'object' && typeof s.w === 'number' && typeof s.ms === 'number'
+    && isFinite(s.w) && isFinite(s.ms) && s.w > 0 && s.ms > 0;
+}
+
+/**
  * Coerce an imported `progress` map into exactly the shape recordProgress
  * writes, dropping anything that can't be made sense of, and keep only the
  * most-recently-touched MAX_PROGRESS_ITEMS. Import validation checks the
@@ -299,7 +312,7 @@ export var ReadingStatsStore = extendStore(
      * @returns {number | null}
      */
     measuredWpm() {
-      var samples = this._load().wpmSamples || [];
+      var samples = (this._load().wpmSamples || []).filter(_isPaceSample);
       if (samples.length < WPM_MIN_SAMPLES) return null;
       var rates = samples.map(function(s) { return s.w / s.ms * 60000; })
         .sort(function(a, b) { return a - b; });
@@ -353,7 +366,7 @@ export var ReadingStatsStore = extendStore(
         totalCompletions: d.totalCompletions || 0,
         rereads: d.rereads || 0,
         wordsByDay: (d.wordsByDay && typeof d.wordsByDay === 'object') ? d.wordsByDay : {},
-        wpmSamples: Array.isArray(d.wpmSamples) ? d.wpmSamples.slice(-MAX_WPM_SAMPLES) : [],
+        wpmSamples: Array.isArray(d.wpmSamples) ? d.wpmSamples.filter(_isPaceSample).slice(-MAX_WPM_SAMPLES) : [],
         // Import is a TRUST BOUNDARY: the envelope validator checks the
         // top-level shape only, so nested per-item progress arrived
         // unchecked and unbounded — a hand-edited or corrupt .votbak could

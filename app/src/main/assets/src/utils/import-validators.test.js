@@ -6,6 +6,7 @@ import {
   validateImportEnvelope,
   validateV3MediaMetadata,
   validateMediaRecord,
+  isNewerBackup,
 } from './import-validators.js';
 
 describe('validateStorePayload', () => {
@@ -195,7 +196,7 @@ describe('validateV3MediaMetadata', () => {
 
 describe('validateMediaRecord', () => {
   it('accepts a valid base64 record', () => {
-    expect(validateMediaRecord('m1', { data: 'QUJDREVG', mime: 'image/png' })).toEqual([]);
+    expect(validateMediaRecord('m1', { data: 'QUJDREVG', type: 'image', mime: 'image/png' })).toEqual([]);
   });
   it('rejects a non-object', () => {
     expect(validateMediaRecord('m1', null)[0]).toContain('not an object');
@@ -215,6 +216,72 @@ describe('validateMediaRecord', () => {
     expect(errs[0]).toContain('exceeds the limit');
   });
   it('accepts data within an explicit limit', () => {
-    expect(validateMediaRecord('m1', { data: 'QUJDREVG' }, 1024)).toEqual([]);
+    expect(validateMediaRecord('m1', { data: 'QUJDREVG', type: 'audio' }, 1024)).toEqual([]);
+  });
+});
+
+// W10 (sweep 2026-10-13): a v2 record is held to the rule the v3 manifest checks.
+// A record this import accepts is written to the device as it is, and the next
+// .votbak export writes its id, type and mime into the manifest; a value v3
+// refuses there made every later backup unimportable.
+describe('validateMediaRecord matches the v3 manifest rule (W10)', () => {
+  const ok = { data: 'aGk=', type: 'image', mime: 'image/png', size: 2 };
+  it('accepts what our own export writes, with or without mime and size', () => {
+    expect(validateMediaRecord('m1', ok)).toEqual([]);
+    expect(validateMediaRecord('m1', { data: 'aGk=', type: 'audio' })).toEqual([]);
+  });
+  it('refuses a type v3 refuses', () => {
+    expect(validateMediaRecord('m1', { ...ok, type: 'video' }).join()).toContain('"type"');
+    expect(validateMediaRecord('m1', { ...ok, type: undefined }).join()).toContain('"type"');
+  });
+  it('refuses a mime v3 refuses', () => {
+    expect(validateMediaRecord('m1', { ...ok, mime: '' }).join()).toContain('"mime"');
+    expect(validateMediaRecord('m1', { ...ok, mime: null }).join()).toContain('"mime"');
+    expect(validateMediaRecord('m1', { ...ok, mime: 7 }).join()).toContain('"mime"');
+  });
+  it('refuses a size v3 refuses', () => {
+    expect(validateMediaRecord('m1', { ...ok, size: -1 }).join()).toContain('"size"');
+    expect(validateMediaRecord('m1', { ...ok, size: 1.5 }).join()).toContain('"size"');
+    expect(validateMediaRecord('m1', { ...ok, size: '2' }).join()).toContain('"size"');
+  });
+  it('refuses an id v3 refuses', () => {
+    expect(validateMediaRecord('', ok).join()).toContain('id');
+    expect(validateMediaRecord('  ', ok).join()).toContain('id');
+  });
+});
+
+// W10: v3 is a .votbak container (the media bytes are frames after the
+// manifest). A plain JSON file stamped 3 has an ARRAY for media, which the v1/v2
+// applier read as an id map; every photo and memo on the device was then pruned.
+describe('validateImportEnvelope on the JSON path (W10)', () => {
+  const v3 = { app: 'VOTReader', exportVersion: 3, data: {}, stores: {}, media: [] };
+  it('a v3 manifest is still valid inside a container', () => {
+    expect(validateImportEnvelope(v3)).toEqual([]);
+  });
+  it('a JSON file stamped 3 is refused', () => {
+    expect(validateImportEnvelope(v3, { json: true }).length).toBeGreaterThan(0);
+  });
+  it('v1 and v2 JSON files still pass', () => {
+    expect(validateImportEnvelope({ app: 'VOTReader', data: {} }, { json: true })).toEqual([]);
+    expect(validateImportEnvelope({ app: 'VOTReader', exportVersion: 2, data: {}, stores: {}, media: {} }, { json: true })).toEqual([]);
+  });
+});
+
+describe('isNewerBackup (W10)', () => {
+  it('names a VOTReader backup stamped past what this build reads', () => {
+    expect(isNewerBackup({ app: 'VOTReader', exportVersion: 4, data: {} })).toBe(true);
+    expect(isNewerBackup({ app: 'VOTReader', exportVersion: 12 })).toBe(true);
+  });
+  it('is false for every version this build reads', () => {
+    expect(isNewerBackup({ app: 'VOTReader', exportVersion: 3, data: {}, media: [] })).toBe(false);
+    expect(isNewerBackup({ app: 'VOTReader', exportVersion: 2, data: {} })).toBe(false);
+    expect(isNewerBackup({ app: 'VOTReader', data: {} })).toBe(false);
+  });
+  it('is false for a stranger or a damaged stamp', () => {
+    expect(isNewerBackup({ exportVersion: 4, data: {} })).toBe(false);
+    expect(isNewerBackup({ app: 'VOTReader', exportVersion: '4' })).toBe(false);
+    expect(isNewerBackup({ app: 'VOTReader', exportVersion: 4.5 })).toBe(false);
+    expect(isNewerBackup(null)).toBe(false);
+    expect(isNewerBackup([])).toBe(false);
   });
 });

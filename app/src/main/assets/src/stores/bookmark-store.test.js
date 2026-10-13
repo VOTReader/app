@@ -321,3 +321,31 @@ describe('BookmarkStore — replaceAll()', () => {
     expect(BookmarkStore.get('b_smuggled')).toBeNull();
   });
 });
+
+// W10 (sweep 2026-10-13): an imported list arrived unchecked, and one null or
+// hlKey-less entry made getForKey/getForKeyPrefix throw while a letter, chapter,
+// study or WTLB screen rendered. replaceAll keeps only what add() would accept;
+// the lookups step over anything an earlier import already stored.
+describe('BookmarkStore — damaged imports (W10)', () => {
+  const good = { id: 'b1', hlKey: 'letter:the-wide-path:2', label: 'A', created: 1, updated: 1 };
+
+  it('replaceAll keeps only entries with an id and a string hlKey', () => {
+    BookmarkStore.replaceAll(/** @type {any} */ ([
+      null, 5, 'x', [], { id: 'b2' }, { hlKey: 'letter:x:1' }, { id: 'b3', hlKey: 42 }, { id: 'b4', hlKey: '' }, good,
+    ]));
+    expect(BookmarkStore.all()).toEqual([good]);
+    expect(BookmarkStore.getForKey('letter:the-wide-path:2')).toEqual([good]);
+  });
+
+  it('the lookups step over damaged entries already in the store', () => {
+    BookmarkStore._cache = /** @type {any} */ ([null, { id: 'b2' }, { id: 'b3', hlKey: 7 }, good]);
+    expect(BookmarkStore.getForKey('letter:the-wide-path:2')).toEqual([good]);
+    expect(BookmarkStore.getForKeyPrefix('letter:the-wide-path')).toEqual([good]);
+    expect(BookmarkStore.get('b1')).toEqual(good);
+    expect(BookmarkStore.get('nope')).toBeNull();
+    BookmarkStore.update('b1', { label: 'B' });
+    expect(BookmarkStore.get('b1').label).toBe('B');
+    BookmarkStore.remove('b1');
+    expect(BookmarkStore.get('b1')).toBeNull();
+  });
+});

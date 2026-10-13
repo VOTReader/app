@@ -138,7 +138,7 @@ import { formatBytes } from '../utils/format-bytes.js';
 import { StorageHealth } from '../utils/storage-health.js';
 import { measureUserData, USER_DATA_STORES, getUserDataSamples, recordUserDataSample } from '../utils/user-data-size.js';
 import { DiagnosticLog } from '../utils/diagnostic-log.js';
-import { validateStorePayload, validateImportEnvelope, validateMediaRecord } from '../utils/import-validators.js';
+import { validateStorePayload, validateImportEnvelope, validateMediaRecord, isNewerBackup } from '../utils/import-validators.js';
 import { registerServiceWorker } from '../utils/sw-register.js';
 import { attachInstallCapture } from '../utils/install-offer.js';
 import { announceUpdateIfAny } from '../utils/update-toast.js';
@@ -287,7 +287,7 @@ Object.assign(window, {
   StorageHealth,
   measureUserData, USER_DATA_STORES, getUserDataSamples, recordUserDataSample,
   DiagnosticLog,
-  validateStorePayload, validateImportEnvelope, validateMediaRecord,
+  validateStorePayload, validateImportEnvelope, validateMediaRecord, isNewerBackup,
   // Data
   JournalHelpers,
   COLLECTIONS, COL_BY_KEY, COL_BY_CARD, COL_BY_LETTER_SC, COL_BY_INDEX_SC,
