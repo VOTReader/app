@@ -287,6 +287,29 @@ describe('JournalMediaStore — atomic import replacement', () => {
     await JournalMediaStore.commitImportReplace();
     expect(await JournalMediaStore.allIds()).toEqual([]);
   });
+
+  it('W7: a replace whose staging came up short (a second tab swept it) keeps live media and merges what is left', async () => {
+    await JournalMediaStore.put({ id: 'live', type: 'image', blob: makeBlob(8, 'image/jpeg') });
+    await JournalMediaStore.beginImportReplace();
+    await JournalMediaStore.stageImportRecord({ id: 'm1', type: 'image', blob: makeBlob(16, 'image/png') });
+    await JournalMediaStore.stageImportRecord({ id: 'm2', type: 'audio', blob: makeBlob(24, 'audio/webm') });
+    await JournalMediaStore.abortImportReplace();          // the other tab's boot sweep
+    await JournalMediaStore.stageImportRecord({ id: 'm3', type: 'image', blob: makeBlob(32, 'image/png') });
+
+    const res = await JournalMediaStore.commitImportReplace(3);
+
+    expect(res).toEqual({ mode: 'merge', landed: 1 });
+    expect(new Set(await JournalMediaStore.allIds())).toEqual(new Set(['live', 'm3']));
+  });
+
+  it('W7: a replace with every staged record present still lands as an exact replacement', async () => {
+    await JournalMediaStore.put({ id: 'stale', type: 'image', blob: makeBlob(8, 'image/jpeg') });
+    await JournalMediaStore.beginImportReplace();
+    await JournalMediaStore.stageImportRecord({ id: 'm1', type: 'image', blob: makeBlob(16, 'image/png') });
+
+    expect(await JournalMediaStore.commitImportReplace(1)).toEqual({ mode: 'replace', landed: 1 });
+    expect(await JournalMediaStore.allIds()).toEqual(['m1']);
+  });
 });
 
 /* 2026-10-11: two readwrite transactions left uncommitted at a kill make the WebView

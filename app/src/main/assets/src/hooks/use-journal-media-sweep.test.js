@@ -146,3 +146,69 @@ describe('useJournalMediaSweep — pre-existing orphan sweep (regression guard)'
     expect(pruneOrphans).toHaveBeenCalledTimes(1);
   });
 });
+
+/* W7 (sweep 2026-10-13): tab A restores a backup with media; tab B opens. Four
+   seconds later B's sweep emptied A's import staging, so A's exact replace
+   cleared live media and copied in only what was left. And B's orphan prune runs
+   on B's journal, loaded before A's entries landed, so it would reclaim A's
+   imported media. The backup Web Lock says a restore is live in another tab. */
+describe('useJournalMediaSweep — W7: a restore live in another tab', () => {
+  afterEach(() => { delete /** @type {any} */ (navigator.locks).query; });
+  /** @param {() => boolean} held */
+  function lockState(held) {
+    /** @type {any} */ (navigator.locks).query = vi.fn(async () => ({
+      held: held() ? [{ name: 'votreader-backup-import', mode: 'exclusive' }] : [], pending: [],
+    }));
+  }
+  function loadedJournal() {
+    return { isReady: () => true, getState: () => 'loaded', collectAllMediaIds: () => ['old'] };
+  }
+  /** Let the sweep's lock look (a microtask chain) settle after the timer fires. */
+  async function settle() { for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(0); }
+
+  it('leaves the staging and the live media alone while another tab holds the backup lock', async () => {
+    lockState(() => true);
+    const abortImportReplace = vi.fn().mockResolvedValue(undefined);
+    const pruneOrphans = vi.fn().mockResolvedValue(0);
+    /** @type {any} */ (globalThis).JournalMediaStore = { abortImportReplace, pruneOrphans };
+    /** @type {any} */ (globalThis).JournalStore = loadedJournal();
+
+    renderHook(() => useJournalMediaSweep());
+    await vi.advanceTimersByTimeAsync(4000);
+    await settle();
+
+    expect(abortImportReplace).not.toHaveBeenCalled();
+    expect(pruneOrphans).not.toHaveBeenCalled();
+  });
+
+  it('skips the orphan prune when a restore was live at boot, even if it ended before the sweep', async () => {
+    let held = true;
+    lockState(() => held);
+    const pruneOrphans = vi.fn().mockResolvedValue(0);
+    /** @type {any} */ (globalThis).JournalMediaStore = { abortImportReplace: vi.fn().mockResolvedValue(undefined), pruneOrphans };
+    /** @type {any} */ (globalThis).JournalStore = loadedJournal();
+
+    renderHook(() => useJournalMediaSweep());
+    await settle();
+    held = false;                      // the other tab's restore finished and it reloaded
+    await vi.advanceTimersByTimeAsync(4000);
+    await settle();
+
+    expect(pruneOrphans).not.toHaveBeenCalled();
+  });
+
+  it('sweeps as before when no tab holds the lock', async () => {
+    lockState(() => false);
+    const abortImportReplace = vi.fn().mockResolvedValue(undefined);
+    const pruneOrphans = vi.fn().mockResolvedValue(0);
+    /** @type {any} */ (globalThis).JournalMediaStore = { abortImportReplace, pruneOrphans };
+    /** @type {any} */ (globalThis).JournalStore = loadedJournal();
+
+    renderHook(() => useJournalMediaSweep());
+    await vi.advanceTimersByTimeAsync(4000);
+    await settle();
+
+    expect(abortImportReplace).toHaveBeenCalledTimes(1);
+    expect(pruneOrphans).toHaveBeenCalledWith(['old'], expect.any(Number));
+  });
+});

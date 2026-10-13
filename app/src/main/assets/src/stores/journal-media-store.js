@@ -301,34 +301,57 @@ export var JournalMediaStore = (function() {
    * clearing live first for an exact REPLACE, or leaving it intact for a
    * salvage MERGE — then empties staging. All-or-nothing either way: any
    * request failure aborts the transaction and live media rolls back.
+   *
+   * W7 (sweep 2026-10-13): `expected` is how many records the importer staged.
+   * A REPLACE that finds any other number in staging (another tab's boot sweep
+   * emptied it) turns into a MERGE inside the same transaction, so live media
+   * is never cleared for a set that is no longer whole. Resolves with what
+   * happened; the importer reports `landed` short of what it staged.
    * @param {boolean} clearLive
-   * @returns {Promise<void>}
+   * @param {number} [expected]
+   * @returns {Promise<{ mode: 'replace' | 'merge', landed: number }>}
    */
-  function commitStaged(clearLive) {
+  function commitStaged(clearLive, expected) {
     return _writeQ(function() { return openDb().then(function(db) {
       return new Promise(function(resolve, reject) {
         var transaction = db.transaction([STORE, IMPORT_STORE], 'readwrite');
         var live = transaction.objectStore(STORE);
         var staged = transaction.objectStore(IMPORT_STORE);
-        if (clearLive) {
-          var clearReq = live.clear();
-          clearReq.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
-        }
-        var cursorReq = staged.openCursor();
-        cursorReq.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
-        cursorReq.onsuccess = function(e) {
-          var cursor = /** @type {IDBRequest<IDBCursorWithValue | null>} */ (e.target).result;
-          if (!cursor) {
-            staged.clear();
-            commitNow(transaction);                  // every request is queued: commit, don't wait
-            return;
+        /** @type {'replace' | 'merge'} */
+        var mode = clearLive ? 'replace' : 'merge';
+        var landed = 0;
+        var land = function() {
+          if (mode === 'replace') {
+            var clearReq = live.clear();
+            clearReq.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
           }
-          live.put(cursor.value);
-          cursor.continue();
+          var cursorReq = staged.openCursor();
+          cursorReq.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
+          cursorReq.onsuccess = function(e) {
+            var cursor = /** @type {IDBRequest<IDBCursorWithValue | null>} */ (e.target).result;
+            if (!cursor) {
+              staged.clear();
+              commitNow(transaction);                  // every request is queued: commit, don't wait
+              return;
+            }
+            live.put(cursor.value);
+            landed += 1;
+            cursor.continue();
+          };
         };
+        if (clearLive && typeof expected === 'number') {
+          var countReq = staged.count();
+          countReq.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
+          countReq.onsuccess = function() {
+            if (countReq.result !== expected) mode = 'merge';
+            land();
+          };
+        } else {
+          land();
+        }
         transaction.addEventListener('complete', function() {
           _dropUrls();
-          resolve();
+          resolve({ mode: mode, landed: landed });
         });
         guardTx(live, reject);
       });
@@ -391,10 +414,13 @@ export var JournalMediaStore = (function() {
      * Atomically replace the live media set with the fully staged import. IDB
      * transactions roll back the clear + every put together if any request or
      * the commit itself fails; the old user media therefore remains intact.
-     * @returns {Promise<void>}
+     * W7: pass how many records were staged; a staging that no longer holds
+     * exactly that many is merged instead (live media kept).
+     * @param {number} [expected]
+     * @returns {Promise<{ mode: 'replace' | 'merge', landed: number }>}
      */
-    commitImportReplace: function() {
-      return commitStaged(true);
+    commitImportReplace: function(expected) {
+      return commitStaged(true, expected);
     },
 
     /**
@@ -402,7 +428,7 @@ export var JournalMediaStore = (function() {
      * clearing or pruning anything. Used when the import stream or manifest was
      * damaged — a partial restore merges what it could read and can never
      * delete existing media.
-     * @returns {Promise<void>}
+     * @returns {Promise<{ mode: 'replace' | 'merge', landed: number }>}
      */
     commitImportMerge: function() {
       return commitStaged(false);

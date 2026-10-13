@@ -15,6 +15,13 @@
    a seconds-wide window on a user-initiated foreground operation; the
    loud prompt is the right-sized version).
 
+   W7 (sweep 2026-10-13): the marker is shared by every tab of the origin, so
+   a tab opened WHILE another tab restores saw a live marker, deleted it and
+   warned falsely. A restore still running holds the backup Web Lock
+   (utils/backup-lock.js), and the browser drops that lock when its tab dies;
+   so a held lock means "leave the marker to the tab that owns it". A browser
+   that cannot query locks keeps the old marker-only behaviour.
+
    PARAMS: none. Reads the `showToast` bare global (typeof-guarded, same
    pattern as useJournalMediaSweep) with SettingsScreen's toast shape.
    ═══════════════════════════════════════════════════════════════════════ */
@@ -23,6 +30,7 @@
  *  (vot-* prefix) and never part of DEFAULT_DATA_LS_KEYS, so a backup can
  *  neither export nor reseed it. */
 import { showToast } from '../utils/toast.js';
+import { backupLockBusy, canQueryBackupLock } from '../utils/backup-lock.js';
 
 export const RESTORE_INFLIGHT_KEY = 'vot-restore-inflight';
 
@@ -32,12 +40,24 @@ export function useRestoreGuard() {
     let pending = null;
     try { pending = localStorage.getItem(RESTORE_INFLIGHT_KEY); } catch (_e) { /* privacy mode */ }
     if (!pending) return;
-    try { localStorage.removeItem(RESTORE_INFLIGHT_KEY); } catch (_e) { /* best-effort */ }
-    if (typeof showToast !== 'function') return;
-    showToast({
-      id: 'vot-restore-guard', className: 'vot-toast',
-      text: 'Your last restore may not have finished. If anything looks missing, import your backup file again (Settings → Your Data).',
-      durationMs: 0,
+    const warn = () => {
+      try { localStorage.removeItem(RESTORE_INFLIGHT_KEY); } catch (_e) { /* best-effort */ }
+      if (typeof showToast !== 'function') return;
+      showToast({
+        id: 'vot-restore-guard', className: 'vot-toast',
+        text: 'Your last restore may not have finished. If anything looks missing, import your backup file again (Settings → Your Data).',
+        durationMs: 0,
+      });
+    };
+    if (!canQueryBackupLock()) { warn(); return; }
+    let live = true;
+    void backupLockBusy().then((busy) => {
+      if (!live || busy) return;
+      // A restore that finished while the lock was being looked at removed its own marker.
+      let still = null;
+      try { still = localStorage.getItem(RESTORE_INFLIGHT_KEY); } catch (_e) { /* privacy mode */ }
+      if (still === pending) warn();
     });
+    return () => { live = false; };
   }, []);
 }

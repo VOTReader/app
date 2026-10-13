@@ -49,3 +49,41 @@ describe('useRestoreGuard', () => {
     expect(localStorage.getItem(RESTORE_INFLIGHT_KEY)).toBeNull();
   });
 });
+
+/* W7 (sweep 2026-10-13): tab A restores; tab B opens. B used to consume A's live
+   marker and show a false "may not have finished" toast. The backup Web Lock says
+   whether a restore is live in another tab (utils/backup-lock.js). */
+describe('useRestoreGuard — W7: a restore live in another tab', () => {
+  afterEach(() => { delete /** @type {any} */ (navigator.locks).query; });
+  /** @param {boolean} held */
+  function lockState(held) {
+    /** @type {any} */ (navigator.locks).query = vi.fn().mockResolvedValue({
+      held: held ? [{ name: 'votreader-backup-import', mode: 'exclusive' }] : [], pending: [],
+    });
+  }
+
+  it('leaves the marker and stays quiet while another tab holds the backup lock', async () => {
+    localStorage.setItem(RESTORE_INFLIGHT_KEY, 'tok-A');
+    lockState(true);
+    const toast = vi.fn();
+    /** @type {any} */ (globalThis).showToast = toast;
+
+    renderHook(() => useRestoreGuard());
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(toast).not.toHaveBeenCalled();
+    expect(localStorage.getItem(RESTORE_INFLIGHT_KEY)).toBe('tok-A');
+  });
+
+  it('still warns and consumes the marker when no tab holds the lock (the restoring tab died)', async () => {
+    localStorage.setItem(RESTORE_INFLIGHT_KEY, 'tok-A');
+    lockState(false);
+    const toast = vi.fn();
+    /** @type {any} */ (globalThis).showToast = toast;
+
+    renderHook(() => useRestoreGuard());
+
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledTimes(1));
+    expect(localStorage.getItem(RESTORE_INFLIGHT_KEY)).toBeNull();
+  });
+});
