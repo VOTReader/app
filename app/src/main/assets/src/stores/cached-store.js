@@ -1361,6 +1361,7 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-last-seen-build',          // utils/update-toast.js — the last build this profile saw
   'vot-diag-ring',                // utils/diagnostic-log.js — storage-health warnings kept across reloads
   'vot-health-skip',              // utils/data-safety.js — an import / Clear All's reload is not a data loss
+  'vot-health-progress',          // utils/data-safety.js PROGRESS_RESET_KEY — a progress reset's read marks (W9)
   'vot-last-export',              // utils/backup-flow.js LAST_EXPORT_KEY — Your Data's "Last backup" line
   // 2026-10-11: the cleanup's done-flag lives in IndexedDB, so a WebView that throws the
   // database away runs this cleanup again. These must survive that: the reader's weekly-copy

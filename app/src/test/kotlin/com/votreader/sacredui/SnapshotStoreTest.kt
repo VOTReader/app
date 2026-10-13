@@ -37,6 +37,9 @@ class SnapshotStoreTest {
     private fun at(y: Int, m: Int, d: Int, h: Int = 12): Long =
         Calendar.getInstance().apply { clear(); set(y, m - 1, d, h, 0, 0) }.timeInMillis
 
+    /** A snapshot's shape: the page always hands over a JSON object. */
+    private fun j(v: String) = """{"v":"$v"}"""
+
     private fun names(): List<String> {
         val arr = JSONArray(store.listJson())
         return (0 until arr.length()).map { arr.getJSONObject(it).getString("name") }
@@ -67,19 +70,19 @@ class SnapshotStoreTest {
 
     @Test fun `two saves in one second both survive the save and the newest wins the day`() {
         val t = at(2026, 10, 3)
-        assertTrue(store.save("one", t))
-        assertTrue(store.save("two", t))
+        assertTrue(store.save(j("one"), t))
+        assertTrue(store.save(j("two"), t))
         // Same day: prune keeps the newest only.
         assertEquals(listOf("snap-20261003-120001.json"), names())
-        assertEquals("two", store.read(names()[0]))
+        assertEquals(j("two"), store.read(names()[0]))
     }
 
     @Test fun `prune keeps one per day for 7 days, then one per week for 4 weeks`() {
         // 60 consecutive days, two saves a day.
         val cal = Calendar.getInstance().apply { clear(); set(2026, 7, 1, 9, 0, 0) }
         repeat(60) {
-            store.save("am", cal.timeInMillis)
-            store.save("pm", cal.timeInMillis + 8 * 3600_000L)
+            store.save(j("am"), cal.timeInMillis)
+            store.save(j("pm"), cal.timeInMillis + 8 * 3600_000L)
             cal.add(Calendar.DAY_OF_MONTH, 1)
         }
         val n = names()
@@ -87,7 +90,7 @@ class SnapshotStoreTest {
         // The newest 7 are 7 distinct consecutive days, each its later (pm) save.
         val days = n.take(7).map { it.substring(5, 13) }
         assertEquals(7, days.toSet().size)
-        assertTrue(n.take(7).all { store.read(it) == "pm" })
+        assertTrue(n.take(7).all { store.read(it) == j("pm") })
         // The 4 weekly ones are all older than the daily ones and in distinct weeks.
         assertTrue(n.drop(7).all { it < n[6] })
     }
@@ -97,7 +100,7 @@ class SnapshotStoreTest {
         // and must be 4 distinct Sunday-started weeks (WEEK_OF_YEAR split Dec 27-31).
         val cal = Calendar.getInstance().apply { clear(); set(2026, 11, 1, 10, 0, 0) }
         while (cal.get(Calendar.YEAR) == 2026 || cal.get(Calendar.DAY_OF_YEAR) <= 20) {
-            store.save("d", cal.timeInMillis); cal.add(Calendar.DAY_OF_MONTH, 1)
+            store.save(j("d"), cal.timeInMillis); cal.add(Calendar.DAY_OF_MONTH, 1)
         }
         val weekly = names().drop(SnapshotStore.KEEP_DAYS)
         assertEquals(SnapshotStore.KEEP_WEEKS, weekly.size)
@@ -111,7 +114,7 @@ class SnapshotStoreTest {
     }
 
     @Test fun `clear removes every snapshot and leaves other files`() {
-        store.save("a", at(2026, 10, 1)); store.save("b", at(2026, 10, 2))
+        store.save(j("a"), at(2026, 10, 1)); store.save(j("b"), at(2026, 10, 2))
         File(File(dir, "snapshots"), "keep.txt").writeText("x")
         assertTrue(store.clear())
         assertEquals(emptyList(), names())
@@ -121,7 +124,32 @@ class SnapshotStoreTest {
     @Test fun `a leftover tmp from a killed save is swept`() {
         File(dir, "snapshots").mkdirs()
         val tmp = File(File(dir, "snapshots"), "snap-20261001-120000.json.tmp").apply { writeText("half") }
-        store.save("whole", at(2026, 10, 2))
+        store.save(j("whole"), at(2026, 10, 2))
         assertFalse(tmp.exists())
+    }
+
+    // W9 (sweep 2026-10-13): a snapshot renamed before its bytes reached the disk could come
+    // back from a power cut empty or cut short, and as the newest of its day it made prune
+    // delete the good copy before it.
+    @Test fun `a snapshot a power cut left broken is never listed and never keeps its day (W9)`() {
+        assertTrue(store.save(j("good"), at(2026, 10, 1, 9)))
+        val snaps = File(dir, "snapshots")
+        File(snaps, "snap-20261001-180000.json").writeText("""{"app":"VOTReader","stores":{"vot-no""")
+        File(snaps, "snap-20261001-190000.json").writeText("")
+        assertEquals(listOf("snap-20261001-090000.json"), names())
+        assertTrue(store.save(j("next"), at(2026, 10, 2)))
+        assertEquals(listOf("snap-20261002-120000.json", "snap-20261001-090000.json"), names())
+        assertEquals(j("good"), store.read("snap-20261001-090000.json"))
+        assertFalse(File(snaps, "snap-20261001-180000.json").exists())   // swept like a leftover .tmp
+        assertFalse(File(snaps, "snap-20261001-190000.json").exists())
+    }
+
+    @Test fun `a snapshot's bytes are forced to the disk before it takes its name (W9)`() {
+        val named = File(File(dir, "snapshots"), "snap-20261001-120000.json")
+        val seen = mutableListOf<Boolean>()
+        store.sync = { out -> seen.add(named.exists()); out.fd.sync() }
+        assertTrue(store.save(j("a"), at(2026, 10, 1)))
+        assertEquals(listOf(false), seen)
+        assertEquals(j("a"), store.read(named.name))
     }
 }

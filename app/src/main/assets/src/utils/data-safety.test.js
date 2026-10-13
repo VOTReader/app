@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { IDBAdapter } from '../stores/idb-adapter.js';
 import { CachedStore, _resetStoreRegistry, setStoreWriteFence } from '../stores/cached-store.js';
 import { StorageHealth } from './storage-health.js';
-import { DataSafety, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, WEEKLY_OFF_KEY, weeklyCopyJson } from './data-safety.js';
+import { DataSafety, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, SKIP_CLEAR_ALL, PROGRESS_RESET_KEY, WEEKLY_OFF_KEY, weeklyCopyJson } from './data-safety.js';
 import { validateImportEnvelope } from './import-validators.js';
 import { applyImportPayload } from './backup.js';
 import { pruneSnapshotNames, snapshotName, snapshotTime, KEEP_DAYS, KEEP_WEEKS } from './snapshot-sink.js';
@@ -48,6 +48,9 @@ beforeEach(async () => {
   localStorage.clear();
   IDBAdapter._resetForTests();
   await new Promise((r) => { const q = indexedDB.deleteDatabase('votreader'); q.onsuccess = q.onerror = q.onblocked = () => r(); });
+  // An ordinary boot: the database was there. (Each case's fake database is created afresh,
+  // which would otherwise read as a database the browser threw away - W9.)
+  vi.spyOn(IDBAdapter, 'openInfo').mockReturnValue(null);
   _resetStoreRegistry();
   stores = ['vot-annotations', 'vot-notes', 'vot-links', 'vot-state', 'vot-history'].map((n) => {
     const s = CachedStore(n, n === 'vot-links' || n === 'vot-history' ? [] : {}, { idb: true });
@@ -183,6 +186,11 @@ describe('pruneSnapshotNames (the web copy of SnapshotStore.prune)', () => {
   it('round-trips a name to its time', () => {
     const t = new Date(2026, 9, 5, 3, 4, 5).getTime();
     expect(snapshotTime(snapshotName(t))).toBe(t);
+  });
+
+  it('W9: a broken file (a save killed before it wrote) never keeps its day, so the good copy before it stays', () => {
+    const names = ['snap-20261001-090000.json', 'snap-20261001-180000.json', 'snap-20261002-090000.json'];
+    expect(pruneSnapshotNames(names, new Set(['snap-20261001-180000.json']))).toEqual(['snap-20261001-180000.json']);
   });
 });
 
@@ -356,10 +364,11 @@ describe('refuter findings (datasafe 10-05 second pass)', () => {
     expect(putsOutside).toEqual([]);
   });
 
-  it('a progress reset tells the next boot the smaller ledger is the reader\'s own', async () => {
+  it('a progress reset tells the next boot the smaller read ledger is the reader\'s own, with its own token (W9)', async () => {
     const { allowProgressClear } = await import('../stores/store-merge.js');
     allowProgressClear();
-    expect(localStorage.getItem(HEALTH_SKIP_KEY)).toBe('1');
+    expect(localStorage.getItem(PROGRESS_RESET_KEY)).toBe('1');
+    expect(localStorage.getItem(HEALTH_SKIP_KEY)).toBeNull();      // never the whole-library skip
   });
 });
 
@@ -627,11 +636,12 @@ describe('wipe-proof (2026-10-11: the owner phone lost its database again, and R
       expect(await DataSafety.saveLatest({ sink })).toBe('off');       // nothing more until the reader chooses
     });
 
-    it('a progress reset the reader asked for (the skip token) is saved, not flagged', async () => {
+    it('a progress reset the reader asked for (its token) is saved, not flagged', async () => {
+      const { allowProgressClear } = await import('../stores/store-merge.js');
       const sink = memorySink();
       await healthyBoot(sink);
       byName('vot-state')._cache = { ...SNAP_STATE, readItems: {} };
-      localStorage.setItem(HEALTH_SKIP_KEY, '1');
+      allowProgressClear();
       expect(await DataSafety.saveLatest({ sink })).toBe('snapshotted');
       expect(StorageHealth.getReport().dataMissing).toBeNull();
     });
@@ -700,6 +710,131 @@ describe('wipe-proof (2026-10-11: the owner phone lost its database again, and R
       db.onclose();                                    // what Chromium does when it finds the store corrupt
       await vi.waitFor(() => expect(sink.save.mock.calls.length).toBe(before + 1));
       expect(Object.keys(JSON.parse(sink.save.mock.calls.at(-1)[0]).stores['vot-notes'])).toContain('a4');
+    });
+  });
+
+  // W9 (sweep 2026-10-13): one book's progress reset switched the whole check off for the next
+  // boot, and an unreadable newest snapshot meant no check at all, so a wipe or a damaged
+  // library became the newest snapshot and the good copies rotated out.
+  describe('W9: wipe detection is never switched off, nor anchored to a broken snapshot', () => {
+    const MANY_READ = { ...SNAP_STATE, readItems: Object.fromEntries(Array.from({ length: 300 }, (_, i) => ['k' + i, 1])) };
+    const SIX = Object.fromEntries(Array.from({ length: 6 }, (_, i) => ['bible:ps:3:' + i, [{ id: 'w' + i, groupId: 'w' + i, kind: 'highlight', start: 0, end: 2, created: i, updated: i }]]));
+    const FRESH = { oldVersion: 0, newVersion: 13, dataLoss: 'total', dataLossMessage: 'IndexedDB (database was corrupt): Unknown corruption', at: 1 };
+    const progressReset = async () => (await import('../stores/store-merge.js')).allowProgressClear();
+
+    it("after one book's progress reset, a wipe at the next cold start still restores on its own", async () => {
+      const sink = memorySink();
+      await snapshotYesterday(sink);
+      await progressReset();                             // then the app is closed
+      await wipe();                                      // and the WebView throws the database away
+      const reload = vi.fn();
+      expect(await DataSafety.run({ sink, reload })).toBe('restored');
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('a progress reset is still the reader\'s own: the smaller ledger is recorded, and no later boot restores over it', async () => {
+      const sink = memorySink();
+      await snapshotYesterday(sink, { ...LIBRARY, 'vot-state': MANY_READ });
+      await IDBAdapter.put('vot-state', 'v', { ...MANY_READ, readItems: {} });   // Clear all progress
+      await progressReset();
+      const reload = vi.fn();
+      expect(await DataSafety.run({ sink, reload })).toBe('snapshotted');
+      expect(StorageHealth.getReport().dataMissing).toBeNull();
+      DataSafety._resetForTests();
+      expect(await DataSafety.run({ sink, reload })).toBe('fresh');
+      expect(reload).not.toHaveBeenCalled();
+    });
+
+    it('a progress reset never hides the loss of anything else when the reader leaves', async () => {
+      const sink = memorySink();
+      await healthyBoot(sink);
+      await progressReset();
+      byName('vot-annotations')._cache = {};
+      byName('vot-notes')._cache = {};
+      byName('vot-links')._cache = [];
+      byName('vot-state')._cache = { ...SNAP_STATE, readItems: {} };
+      const saves = sink.save.mock.calls.length;
+      expect(await DataSafety.saveLatest({ sink })).toBe('damaged');
+      expect(sink.save.mock.calls.length).toBe(saves);
+    });
+
+    it('a database created or reset this boot is a loss whatever the token: an import\'s or a progress reset\'s', async () => {
+      const readsOnly = { 'vot-state': MANY_READ, 'vot-history': [{ key: 'h1', ts: 1 }] };   // mostly read marks
+      for (const token of ['import', 'progress']) {
+        const sink = memorySink();
+        await snapshotYesterday(sink, readsOnly);
+        if (token === 'import') localStorage.setItem(HEALTH_SKIP_KEY, '1'); else await progressReset();
+        await wipe();
+        vi.mocked(IDBAdapter.openInfo).mockReturnValue(FRESH);
+        const reload = vi.fn();
+        expect(await DataSafety.run({ sink, reload }), token).toBe('restored');
+        expect(Object.keys((await IDBAdapter.get('vot-state', 'v')).readItems), token).toHaveLength(300);
+        vi.mocked(IDBAdapter.openInfo).mockReturnValue(null);
+        localStorage.clear(); DataSafety._resetForTests(); setStoreWriteFence(false); StorageHealth.setDataMissing(null);
+      }
+    });
+
+    it("Clear All's own token holds on the fresh database Clear All made (when its snapshot delete failed)", async () => {
+      const sink = memorySink();
+      await snapshotYesterday(sink);
+      await wipe();
+      localStorage.setItem(HEALTH_SKIP_KEY, SKIP_CLEAR_ALL);
+      vi.mocked(IDBAdapter.openInfo).mockReturnValue({ oldVersion: 0, newVersion: 13, dataLoss: 'none', dataLossMessage: '', at: 1 });
+      const reload = vi.fn();
+      expect(await DataSafety.run({ sink, reload })).toBe('snapshotted');
+      expect(reload).not.toHaveBeenCalled();
+      expect(StorageHealth.getReport().dataMissing).toBeNull();
+    });
+
+    it('a newest snapshot cut short (a power cut) is walked past: the library is judged against the newest that reads', async () => {
+      const sink = memorySink();
+      await snapshotYesterday(sink, { ...LIBRARY, 'vot-annotations': SIX });
+      const good = [...sink.files.keys()][0];
+      sink.files.set(snapshotName(snapshotTime(good) + 3600000), sink.files.get(good).slice(0, 300));
+      await IDBAdapter.put('vot-annotations', 'v', {});  // every highlight gone, the rest intact
+      const saves = sink.save.mock.calls.length;
+      expect(await DataSafety.run({ sink, reload: vi.fn() })).toBe('damaged');
+      expect(StorageHealth.getReport().dataMissing.name).toBe(good);
+      expect(sink.save.mock.calls.length).toBe(saves);  // the damaged library never becomes the baseline
+    });
+
+    it('an empty newest file (a web save killed before it wrote) is walked past too', async () => {
+      const sink = memorySink('opfs');
+      await snapshotYesterday(sink, { ...LIBRARY, 'vot-annotations': SIX });
+      const good = [...sink.files.keys()][0];
+      sink.files.set(snapshotName(snapshotTime(good) + 3600000), '');
+      await IDBAdapter.put('vot-annotations', 'v', {});
+      expect(await DataSafety.run({ sink, reload: vi.fn() })).toBe('damaged');
+      expect(StorageHealth.getReport().dataMissing.name).toBe(good);
+    });
+
+    it('a snapshot that could not be read this boot judges nothing and saves nothing', async () => {
+      const sink = memorySink();
+      await snapshotYesterday(sink);
+      sink.read = async () => '';                        // the read failed (the bridge answers '' on an I/O error)
+      await IDBAdapter.put('vot-annotations', 'v', {});
+      const saves = sink.save.mock.calls.length;
+      expect(await DataSafety.run({ sink })).toBe('failed');
+      expect(sink.save.mock.calls.length).toBe(saves);
+    });
+
+    it('when every snapshot is broken for good, the library is saved so a good copy exists again', async () => {
+      const sink = memorySink();
+      sink.files.set(snapshotName(Date.now() - 86400000), '{"app":"VOTReader","stores":{"vot-no');
+      await seed(LIBRARY);
+      expect(await DataSafety.run({ sink })).toBe('snapshotted');
+    });
+
+    it('the leave check offers the newest snapshot that reads', async () => {
+      const sink = memorySink();
+      await healthyBoot(sink);
+      const good = [...sink.files.keys()].sort().reverse()[0];
+      sink.files.set(snapshotName(snapshotTime(good) + 60000), '{"app":"VOTReader","stor');
+      byName('vot-annotations')._cache = {};
+      byName('vot-notes')._cache = {};
+      byName('vot-links')._cache = [];
+      expect(await DataSafety.saveLatest({ sink })).toBe('damaged');
+      expect(StorageHealth.getReport().dataMissing.name).toBe(good);
     });
   });
 });

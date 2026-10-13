@@ -1138,7 +1138,9 @@ export function createBackupFlow(ctx) {
       // dialog. Same toast-then-reload pattern the import path uses: the
       // persistent toast renders first, the 600ms delay lets it paint.
       // datasafe 10-05: the empty library after this reload is the reader's choice.
-      try { localStorage.setItem('vot-health-skip', '1'); } catch (_e) { /* no storage */ }
+      // W9: named, because the next boot meets the fresh database this wipe made, where
+      // any other token is ignored (data-safety.js SKIP_CLEAR_ALL).
+      try { localStorage.setItem('vot-health-skip', 'clear-all'); } catch (_e) { /* no storage */ }
       _showToast('All personal data cleared. Reloading…', 0);
       // Keep the backup controls disabled through the reload window — a new
       // import starting against the just-wiped state would race the teardown.
