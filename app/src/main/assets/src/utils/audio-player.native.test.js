@@ -266,7 +266,10 @@ describe('audio-player on the native player (m3)', () => {
     expect(AudioPlayer.getState().restoring).toBe(true);
     AudioPlayer.toggle();
     await vi.waitFor(() => expect(bridge.audioLoad).toHaveBeenCalled());
-    expect(loads()[0]).toMatchObject({ url: URL_OF('idC'), startMs: 41000 });
+    expect(loads()[0].url).toBe(URL_OF('idC'));
+    // The pause read the running clock a moment after native's 41 s: under load that is 41.001 (fast pool, 10-13).
+    expect(loads()[0].startMs).toBeGreaterThanOrEqual(41000);
+    expect(loads()[0].startMs).toBeLessThan(41100);
     // A 0 from native before metadata is the place it is on its way to, not a place: never the bar's, never saved.
     send({ type: 'state', url: URL_OF('idC'), pos: 0, dur: 0, playing: false, want: false, buffering: true });
     await flush();
