@@ -13,7 +13,7 @@
 # runs every gate again on the pushed tree before the deploy takes it, so this hook is the early warning, not the last.
 #
 # What is tested is the WORKING TREE: the gates read files on disk. So the hook refuses a push whose commit differs
-# from the disk (outside .md/.txt) - check out what you push, or commit/stash the edits. land.sh runs this hook on the
+# from the disk (outside .md/.txt) - check out what you push, or commit the edits (never git stash: one stack for every worktree). land.sh runs this hook on the
 # lane's commits BEFORE its rebase (the tree the lane built and saw) and pushes the rebased result with LAND_GATED_SHA
 # set, so a landing pays for one vitest, not one per retry. A gate that passed is remembered per tree
 # ($GIT_COMMON_DIR/vot-gates/<tree>.<gate>), so pushing the same tree again (a branch, then main) runs nothing twice.
@@ -101,7 +101,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     if [ -n "$differs" ]; then
       echo "[pre-push] FATAL: the working tree is not the commit being pushed (${local_sha%"${local_sha#???????}"} -> $remote_ref):"
       echo "$differs" | head -20 | sed 's/^/    /'
-      echo "  The gates test the files on disk. Check out the commit you push, or commit / stash these edits, then push again."
+      echo "  The gates test the files on disk. Check out the commit you push, or commit these edits (a WIP commit on your branch; not git stash, whose one stack every worktree shares), then push again."
       exit 1
     fi
   fi
