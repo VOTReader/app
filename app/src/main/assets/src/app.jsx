@@ -760,10 +760,7 @@ function App() {
           E4 recovery never fires). Fall back to home (authoritative — the real ROUTES,
           no drift) so the app is always navigable. */}
       <ErrorBoundary key={screen}>{(ROUTES[screen] || ROUTES.home)?.() ?? null}</ErrorBoundary>
-      {/* Streaming audio mini-player: self-subscribed to AudioPlayer, null while idle, mounted here so it survives
-          every screen change. AFTER the screen (sweep W66): fixed to the bottom, it is met after the page's own
-          controls in Tab and screen-reader order, as it sits below them. Its own boundary: a crash in it stays in it,
-          and it comes back on the next screen. */}
+      {/* Audio mini-player (null while idle): after the screen, so Tab and screen readers meet it last (W66). */}
       <ErrorBoundary fallback={null} resetKey={screen}><AudioPlayerBar /></ErrorBoundary>
       <AnnotationDomSync
         screen={screen}
