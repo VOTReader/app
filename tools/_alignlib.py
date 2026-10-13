@@ -468,6 +468,68 @@ def tx_fill_stamp(tx, mn=TX_FILL_MIN):
             "txHoles": len(tx_holes(tx.get("words") or [], tx.get("dur") or 0, mn))}
 
 
+# The fill guard (c67, 2026-09-27; code since 2026-10-13). The fill's new witness words moved 2,324 onsets of
+# 1,218 chapters; a refuter judged 60 raw moves 36 better / 24 worse. Forward moves (8) anchored a later clause
+# where the fill transcript missed or garbled the verse opening ("chapter 18", "New King James Version"); sub-second
+# moves back (16) swapped tA for whisper's tB, 0.26-0.6 s early in the pause or music. Every move back >= 1 s, and
+# every move back off a 30-s seek point (where faster-whisper re-seeks), came out better: round 2 kept 45 of 45.
+# Of the 20 newly lit verses 5 were wrong, all REVIEW guesses: 3 started before the previous verse ended, 2 lay
+# more than 1 s after both legs' starts. So a fill-driven re-belt keeps a moved onset only when it moves BACK
+# (>= FILL_BACK, or off a seek point) and keeps those 5 kinds of new REVIEW guess dark. The shipped c67 belts are
+# exactly this function of the pre-fill and fill belts (lanes/align/tools/test_fill_guard.py replays all of them).
+FILL_GUARD = 1
+FILL_BACK = 1.0
+FILL_SEEK = 30.0
+FILL_SEEK_TOL = 1.0
+
+
+def _fill_move_ok(old_t, new_t):
+    k = round(old_t / FILL_SEEK)
+    return new_t <= old_t - FILL_BACK or (new_t < old_t and k >= 1 and abs(old_t - FILL_SEEK * k) <= FILL_SEEK_TOL)
+
+
+def fill_guard(old_rows, new_rows, prefer_a=None):
+    """-> (rows, report): `new_rows` (a fill-driven re-belt) checked against `old_rows` (the chapter's previous
+    belt, same text, audio and settings). A moved onset that fails _fill_move_ok gets its old row back whole; a
+    verse the old belt left dark stays dark when the new one is a REVIEW guess that starts before the previous
+    verse's end or more than 1 s after both legs. A newly dark row is left as the belt says (counted). When a row
+    was restored, every tEnd is clamped to the next onset, last, so an overlap is judged before the clamp hides it.
+    `prefer_a` (seconds, off by default): on a kept move whose onset is tB with tA within prefer_a after it and
+    still before the old onset, take tA (r2: 6 kept rows had tB early in the pause and tA on the voice). It would
+    move 103 live c67 onsets, so it waits for its own refuter before any re-belt turns it on."""
+    old = {r["n"]: r for r in old_rows}
+    out, rep = [], {"v": FILL_GUARD, "kept": 0, "reverted": 0, "darkKept": [], "tA": [], "newlyDark": 0}
+    for r in new_rows:
+        o, r = old.get(r["n"]), dict(r)
+        if o is not None:
+            ot, nt = o.get("t"), r.get("t")
+            if ot is not None and nt is not None and ot != nt:
+                if _fill_move_ok(ot, nt):
+                    rep["kept"] += 1
+                    ta, tb = r.get("tA"), r.get("tB")
+                    if (prefer_a and ta is not None and tb is not None and abs(nt - tb) < 0.005
+                            and 0 < ta - tb < prefer_a and ta < ot):
+                        r["t"] = round(ta, 2)
+                        rep["tA"].append(r["n"])
+                else:
+                    r = dict(o)
+                    rep["reverted"] += 1
+            elif ot is None and nt is not None and r.get("status") == "REVIEW":
+                prev_end = out[-1].get("tEnd") if out else None
+                legs = [x for x in (r.get("tA"), r.get("tB")) if x is not None]
+                if (prev_end is not None and nt < prev_end - 0.01) or (legs and nt > max(legs) + 1.0):
+                    r = dict(o)
+                    rep["darkKept"].append(r["n"])
+            elif ot is not None and nt is None:
+                rep["newlyDark"] += 1
+        out.append(r)
+    if rep["reverted"]:                     # a restored row may start before its neighbour's new tEnd
+        for a, b in zip(out, out[1:]):
+            if a.get("tEnd") is not None and b.get("t") is not None and a["tEnd"] > b["t"]:
+                a["tEnd"] = b["t"]
+    return out, rep
+
+
 class WhisperLeg:
     """faster-whisper word timestamps — the WITNESS leg.
 

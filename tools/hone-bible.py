@@ -55,6 +55,8 @@ def main():
     ap.add_argument("--lead-in", type=float,
                     help="seconds subtracted from every start (default 0.0 — true onsets)")
     ap.add_argument("--model", help="override the whisper model")
+    ap.add_argument("--no-fill-guard", action="store_true",
+                    help="a deliberate re-belt: let fill-driven onsets replace the previous belt's unchecked")
     a = ap.parse_args()
 
     s = al.settings_for(a.family, whisper_model=a.model, lead_in=a.lead_in)
@@ -62,7 +64,7 @@ def main():
         s["mms_star_gap"] = True
     os.makedirs(BIBLE, exist_ok=True)
 
-    out = run_chapter(a.verses, a.audio, a.out_tag, s)
+    out = run_chapter(a.verses, a.audio, a.out_tag, s, fill_guard=not a.no_fill_guard)
     rows = out["verses"]
     print(f"\n{'v':>3} {'t':>8} {'A':>8} {'B':>8}  {'Δ':>5}  status")
     for r in rows:
@@ -74,7 +76,24 @@ def main():
     return 0
 
 
-def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False):
+def guard_previous(path, out, tx):
+    """-> al.fill_guard(previous belt, this one) as (rows, report), or None when there is nothing to guard: this
+    transcript's fill added no words, there is no readable belt at `path`, or that belt answers other text,
+    audio, settings or witness (then a move is the change asked for, not the fill's). c67's 24/60 worse rows
+    came from exactly this case, a re-belt over cached FILLED transcripts, so a --force re-belt of a shipped
+    chapter keeps the shipped onsets the guard kept (it is idempotent on its own output)."""
+    if not any((h.get("added") or 0) > 0 for h in ((tx.get("fill") or {}).get("holes") or [])):
+        return None
+    try:
+        prev = json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if any(prev.get(k) != out.get(k) for k in ("versesHash", "audioSize", "settings_hash", "witness", "tolerance")):
+        return None
+    return al.fill_guard(prev.get("verses") or [], out["verses"])
+
+
+def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False, fill_guard=True):
     """Align ONE chapter and write its belt. Extracted from main() so the batch
     runner can drive thousands of chapters without shelling out per chapter —
     the whisper and MMS models then load once for the whole run instead of once
@@ -135,9 +154,6 @@ def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False):
     moved = al.tx_anchor(rows, units, tx["words"], names or None, nrm, sil)
     if moved:
         say(f"  transcript anchor moved {len(moved)} onset(s)")
-    n_conf = sum(1 for r in rows if r["status"] == "CONFIRMED")
-    n_probed = sum(1 for r in rows if r["status"].startswith("PROBED"))
-    n_review = sum(1 for r in rows if r["status"] == "REVIEW")
 
     # versesHash + audioSize join settings_hash in the resume key. Settings
     # alone was the 2026-08-12 lesson: the fragment domain changed without the
@@ -152,9 +168,21 @@ def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False):
            "settings": s, "audio": audio, "audioSize": os.path.getsize(audio),
            **al.witness_stamp(s),
            "names": sorted(names), "txAnchor": al.TX_ANCHOR, **al.tx_fill_stamp(tx),
-           "confirmed": n_conf, "probed": n_probed, "review": n_review,
+           "confirmed": 0, "probed": 0, "review": 0,
            "verses": rows}
     path = os.path.join(out_dir, out_tag + ".json")
+    # The fill guard (c67): checked against the belt this run replaces, before it is overwritten.
+    guarded = guard_previous(path, out, tx) if fill_guard else None
+    if guarded:
+        rows, rep = guarded
+        out["verses"] = rows
+        out["fillGuard"] = rep
+        say(f"  fill guard: kept {rep['kept']} moved onset(s), restored {rep['reverted']}, "
+            f"kept {len(rep['darkKept'])} new REVIEW guess(es) dark")
+    n_conf = sum(1 for r in rows if r["status"] == "CONFIRMED")
+    n_probed = sum(1 for r in rows if r["status"].startswith("PROBED"))
+    n_review = sum(1 for r in rows if r["status"] == "REVIEW")
+    out.update(confirmed=n_conf, probed=n_probed, review=n_review)
     json.dump(out, open(path, "w", encoding="utf-8"), indent=1)
     say(f"\nCONFIRMED {n_conf}  PROBED {n_probed}  REVIEW {n_review}  -> {path}")
     # The 16 kHz scratch wav is ~32 kB per second of audio and nothing

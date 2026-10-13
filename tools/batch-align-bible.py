@@ -426,6 +426,8 @@ def main():
     ap.add_argument("--books", help="comma list of book ids — every chapter of each")
     ap.add_argument("--all", action="store_true", help="every chapter of the edition")
     ap.add_argument("--force", action="store_true", help="re-align even when the belt is current")
+    ap.add_argument("--no-fill-guard", action="store_true",
+                    help="a deliberate re-belt: fill-driven onsets replace the previous belt's unchecked (hone-bible)")
     ap.add_argument("--name-tolerant", action="store_true",
                     help="witness may match a near hearing of the chapter's proper nouns "
                          "(name lists the strict witness reads UNSPOKEN); stamped in the belt as witness")
@@ -548,7 +550,8 @@ def main():
             continue
         t0 = time.time()
         try:
-            d = hb.run_chapter(vpath, audio, tag, dict(s), out_dir=belts, quiet=True)
+            d = hb.run_chapter(vpath, audio, tag, dict(s), out_dir=belts, quiet=True,
+                               fill_guard=not a.no_fill_guard)
         except Exception as e:                                      # noqa: BLE001
             print(f"  [{n}/{len(work)}] {tag}  ERROR {str(e).splitlines()[0][:110]}", flush=True)
             failed += 1
