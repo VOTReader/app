@@ -151,10 +151,13 @@ export function JournalHubScreen(props) {
   function recoverUnclaimed(rec) {
     // No samples: the waveform degrades to a flat bar. Inventing samples would
     // draw a picture of audio nobody has measured.
-    JournalStore.add({
+    var e = JournalStore.add({
       title: '',
       blocks: [{ type: 'audio', mediaId: rec.id, duration: rec.duration || 0, samples: null }],
     });
+    // W16 refuter: an entry with content like any other, so it counts once (every
+    // delete or exit prune of a counted entry takes one back).
+    try { if (typeof JournalStatsStore !== 'undefined') JournalStatsStore.recordNewEntry((e && e.created) || Date.now()); } catch (_e) { /* stats are best-effort */ }
     if (JournalMediaStore.markLinked) JournalMediaStore.markLinked(rec.id);
     setUnclaimed(function(list) { return list.filter(function(r) { return r.id !== rec.id; }); });
   }
