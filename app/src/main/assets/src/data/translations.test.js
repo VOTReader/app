@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { translateVerse, releaseTranslationsExcept, _translationLoaded, _translationPromises } from './translations.js';
+import { translateVerse, releaseTranslationsExcept, holdTranslation, _translationLoaded, _translationPromises } from './translations.js';
 
 beforeEach(() => {
   globalThis.BIBLE_KJV = {
@@ -296,6 +296,37 @@ describe('releaseTranslationsExcept (boot-performance-4)', () => {
     releaseTranslationsExcept('web');
     expect(loaded()).toEqual(['web']);
     expect(translateVerse('john', 3, { n: 16, text: 'nkjv16' }, 'web')).toBe('web 16');
+  });
+
+  /* W25: a chapter showing the RECORDING's edition (the words match the voice)
+     holds it, so the sweep the reader's own switch runs cannot free it under the
+     page: the chapter would read NKJV beside "KJV text, to match the recording". */
+  it('W25: a held edition survives the sweep; once let go, the next sweep frees it', () => {
+    const letGo = holdTranslation('asv');
+    releaseTranslationsExcept('nkjv');
+    expect(loaded()).toEqual(['asv']);
+    letGo();
+    letGo();                                                   // a second call is harmless
+    releaseTranslationsExcept('nkjv');
+    expect(loaded()).toEqual([]);
+  });
+
+  it('W25: holding an overlay holds its base too', () => {
+    const letGo = holdTranslation('rkjv');
+    releaseTranslationsExcept('web');
+    expect(loaded().sort()).toEqual(['kjv', 'rkjv', 'web']);
+    letGo();
+  });
+
+  it('W25: two holders of one edition: it stays until both let go', () => {
+    const a = holdTranslation('kjv');
+    const b = holdTranslation('kjv');
+    a();
+    releaseTranslationsExcept('nkjv');
+    expect(loaded()).toEqual(['kjv']);
+    b();
+    releaseTranslationsExcept('nkjv');
+    expect(loaded()).toEqual([]);
   });
 });
 

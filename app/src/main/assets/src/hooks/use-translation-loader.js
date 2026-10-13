@@ -31,6 +31,9 @@
  * @param {(f: (v: number) => number) => void} setTranslationTick
  */
 export function useTranslationLoader(translation, setTranslationTick) {
+  // W25: the selection NOW, for a load that lands after the reader moved on.
+  const selectedRef = React.useRef(translation || 'nkjv');
+  selectedRef.current = translation || 'nkjv';
   React.useEffect(() => {
     const code = translation || 'nkjv';
     /* Free the editions this reader has left behind: each is a ~32 MB global and
@@ -41,11 +44,18 @@ export function useTranslationLoader(translation, setTranslationTick) {
        Switching all the way back to NKJV frees every alt edition, which is why
        this effect no longer returns early on it — that is the one switch with the
        most to free, and it used to be the one that freed nothing. */
-    if (code === 'nkjv') { releaseTranslationsExcept('nkjv'); return; }
+    if (code === 'nkjv') { releaseTranslationsExcept('nkjv'); return undefined; }
+    /* W25: sweep against the CURRENT selection, not the edition this load
+       fetched. Picking ASV then WEB, with WEB landing first, ASV's late callback
+       swept "everything but ASV" and freed BIBLE_WEB: the reader saw NKJV under
+       WEB's label. Swept against WEB, the late ASV frees itself instead; only
+       the live load re-renders. */
+    let live = true;
     loadTranslation(code).then(() => {
-      releaseTranslationsExcept(code);
-      setTranslationTick((v) => v + 1);
+      releaseTranslationsExcept(selectedRef.current);
+      if (live) setTranslationTick((v) => v + 1);
     });
+    return () => { live = false; };
   // The setter is in the deps for exhaustive-deps' sake; App()'s is a useState setter, so
   // it never changes and the effect runs on the translation alone, as it did inline.
   }, [translation, setTranslationTick]);

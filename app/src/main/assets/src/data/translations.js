@@ -173,9 +173,10 @@ const _xlateCacheMax = 8;
  */
 export function releaseTranslationsExcept(selected) {
   const keep = new Set(['nkjv']);
-  if (selected) {
-    keep.add(selected);
-    const base = _baseOf(selected);
+  for (const code of [selected, ...Object.keys(_held)]) {
+    if (!code) continue;
+    keep.add(code);
+    const base = _baseOf(code);
     if (base) keep.add(base);
   }
   const freed = [];
@@ -192,6 +193,42 @@ export function releaseTranslationsExcept(selected) {
   }
   return freed;
 }
+/** W25: editions a mounted view shows besides the reader's own (code -> holders). */
+/** @type {Record<string, number>} */
+const _held = Object.create(null);
+
+/**
+ * Keep an edition (and its base) through releaseTranslationsExcept while a view
+ * shows it (W25). The chapter that matches its words to the loaded RECORDING
+ * shows the recording's edition, not the reader's; the sweep a translation
+ * switch runs used to free it under the page, which then read NKJV beside "KJV
+ * text, to match the recording". Returns the let-go function (call it once; a
+ * second call is harmless). Letting go frees nothing by itself: the next sweep does.
+ * @param {string} code
+ * @returns {() => void}
+ */
+export function holdTranslation(code) {
+  if (!code || code === 'nkjv') return () => {};
+  _held[code] = (_held[code] || 0) + 1;
+  let held = true;
+  return () => {
+    if (!held) return;
+    held = false;
+    if (--_held[code] <= 0) delete _held[code];
+  };
+}
+
+/**
+ * True when the edition's text is in memory (NKJV always is). A view that names
+ * the edition it shows waits for this: until then translateVerse answers NKJV.
+ * @param {string} code
+ * @returns {boolean}
+ */
+export function isTranslationLoaded(code) {
+  if (!code || code === 'nkjv') return true;
+  return !!(/** @type {any} */ (window))['BIBLE_' + code.toUpperCase()];
+}
+
 function _verseIndex(data, translation, bookId, chNum) {
   const key = translation + ':' + bookId + ':' + chNum;
   const hit = _xlateCache.get(key);
