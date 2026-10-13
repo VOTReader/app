@@ -300,6 +300,54 @@ describe('refuter findings (datasafe 10-05 second pass)', () => {
     expect(announceLibraryChange).not.toHaveBeenCalled();
   });
 
+  /* W8 refuter round 2 (2026-10-13): Import and Clear All hold the backup Web Lock, Restore did not,
+     so a Restore in one tab and an Import in another could write the library at once (the Restore's
+     stale read landing over the import). Restore now holds the same lock, or does nothing. */
+  async function damagedWithSnapshot() {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    const sink = memorySink();
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(Date.now() - 86400000);
+    await DataSafety.run({ sink });
+    vi.useRealTimers();
+    await IDBAdapter.put('vot-annotations', 'v', {});
+    await IDBAdapter.put('vot-notes', 'v', {});
+    await IDBAdapter.put('vot-state', 'v', {});
+    expect(await DataSafety.run({ sink })).toBe('damaged');
+    return sink;
+  }
+
+  it('W8: a Restore while another tab holds the backup lock (its Import) writes nothing and announces nothing', async () => {
+    const sink = await damagedWithSnapshot();
+    vi.spyOn(navigator.locks, 'request').mockImplementation((name, o, cb) => Promise.resolve().then(() => cb(null)));
+    vi.mocked(announceLibraryChange).mockReset();
+    const putSpy = vi.spyOn(IDBAdapter, 'put');
+    const reload = vi.fn();
+    expect(await DataSafety.restoreMissing({ sink, reload })).toBe(false);
+    expect(putSpy).not.toHaveBeenCalled();
+    expect(announceLibraryChange).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
+    const { isStoreWriteFenced } = await import('../stores/cached-store.js');
+    expect(isStoreWriteFenced(), 'nothing fenced').toBe(false);
+    expect(StorageHealth.getReport().dataMissing, 'the finding stays up').not.toBeNull();
+  });
+
+  it('W8: a Restore writes only while it holds the backup lock', async () => {
+    const sink = await damagedWithSnapshot();
+    const realRequest = navigator.locks.request.bind(navigator.locks);
+    let inside = 0;
+    const names = [];
+    vi.spyOn(navigator.locks, 'request').mockImplementation((name, o, cb) => {
+      names.push(name);
+      return realRequest(name, o, async (lock) => { inside++; try { return await cb(lock); } finally { inside--; } });
+    });
+    const realPut = IDBAdapter.put;
+    const putsOutside = [];
+    vi.spyOn(IDBAdapter, 'put').mockImplementation((...a) => { if (!inside) putsOutside.push(a[0]); return realPut.apply(IDBAdapter, a); });
+    expect(await DataSafety.restoreMissing({ sink, reload: vi.fn() })).toBe(true);
+    expect(names).toContain('votreader-backup-import');
+    expect(putsOutside).toEqual([]);
+  });
+
   it('a progress reset tells the next boot the smaller ledger is the reader\'s own', async () => {
     const { allowProgressClear } = await import('../stores/store-merge.js');
     allowProgressClear();

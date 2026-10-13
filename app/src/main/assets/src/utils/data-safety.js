@@ -75,6 +75,7 @@ import { StorageHealth } from './storage-health.js';
 import { snapshotSink, snapshotTime } from './snapshot-sink.js';
 import { showToast } from './toast.js';
 import { announceLibraryChange, heldByOtherTab } from './other-tabs.js';
+import { withBackupLockIfFree } from './backup-lock.js';
 
 /** Set (localStorage) by an import or Clear All just before its reload: the next boot's
  *  smaller library is the reader's own doing, so it is not compared. In LS_SKIP_LIST. */
@@ -607,6 +608,30 @@ export async function restoreMissing(opts) {
   if (heldByOtherTab()) return false;
   const snap = _parse(await sink.read(missing.name));
   if (!snap) return false;
+  // W8 refuter round 2: an Import or Clear All in another tab holds the backup Web Lock while it
+  // writes the library; a Restore holds it too, so two tabs never write the library at once (a
+  // Restore's merge read the library before the import and would land over it). Another backup
+  // operation running: nothing happens, the finding stays up and Restore can be tapped again.
+  let restored = false;
+  const ran = await withBackupLockIfFree(async () => {
+    if (heldByOtherTab()) return;                // that operation finished just before the lock came free
+    restored = await _restoreLocked(sink, missing, snap, opts);
+  });
+  if (!ran && !(opts && opts.auto)) {
+    try {
+      showToast({ id: 'vot-toast-restore', className: 'vot-toast', text: 'Another backup operation is running in a different tab. Try again when it has finished.', durationMs: 5000 });
+    } catch (_e) { /* no document */ }
+  }
+  return restored;
+}
+
+/**
+ * restoreMissing's writes, under the backup lock.
+ * @param {any} sink @param {any} missing @param {any} snap
+ * @param {{ reload?: () => void, auto?: boolean }} [opts]
+ * @returns {Promise<boolean>}
+ */
+async function _restoreLocked(sink, missing, snap, opts) {
   const w = /** @type {any} */ (window);
   // The live writers would put their pre-restore state back: flush the persist
   // sink, freeze it, fence every store (not the adapter: the puts below go
