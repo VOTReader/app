@@ -637,6 +637,16 @@ describe('TourOverlay — the highlight stop paints a demonstration and never sa
     expect(annCount()).toBe(before);
   });
 
+  // Sweep low (mw10, WCAG 2.5.3): the names were "Previous stop" / "Leave the tour", so "tap Back" or
+  // "tap Skip" matched nothing for a voice-control user.
+  it('Back and Skip are named starting with the words they show', () => {
+    letterWithParas();
+    startAt('highlight');
+    render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
+    expect(screen.getByRole('button', { name: /^Back\b/ }).textContent).toBe('Back');
+    expect(screen.getByRole('button', { name: /^Skip\b/ }).textContent).toBe('Skip');
+  });
+
   it('Back takes the colour with it too', () => {
     const { on } = letterWithParas();
     startAt('highlight');

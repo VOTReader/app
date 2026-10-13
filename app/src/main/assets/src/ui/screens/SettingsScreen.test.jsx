@@ -158,6 +158,25 @@ describe('auto-scroll settings disclosure', () => {
     for (const label of SUB_ROWS) expect(row(label)).toBeTruthy();
   });
 
+  // Sweep low (mw10): the pause slider's name said "in seconds" while it announced 3000 (ms), and
+  // Text Size announced 1.5 where the row shows 150%.
+  it('the pause and text-size sliders announce what their rows show', () => {
+    const { container } = renderSettings({ autoScroll: true, autoScrollNext: true, autoScrollEndMs: '3000', fontScale: '1.5' });
+    const pause = container.querySelector('input[aria-label^="Pause before continuing"]');
+    expect(pause.getAttribute('aria-valuetext')).toBe('3 seconds');
+    expect(pause.getAttribute('aria-label')).not.toContain('in seconds');
+    expect(container.querySelector('input[aria-label="Text size"]').getAttribute('aria-valuetext')).toBe('150 percent');
+  });
+
+  // Sweep low (mw10): main's Tabs row promised 999 reading places (the cap is 50, use-tab-actions MAX_TABS);
+  // the overhaul copy names no number, and must not bring the 999 back.
+  it('the Tabs row promises no tab count past the real cap', () => {
+    renderSettings({});
+    fireEvent.click(screen.getByRole('button', { name: 'Show description for Tabs' }));
+    expect(screen.queryByText(/999/)).toBeNull();
+    expect(screen.getByText(/Keep several reading places open at once/)).toBeTruthy();
+  });
+
   it('never leaks the nested row when the parent feature is off', () => {
     // A profile imported with autoScrollNext:true must still collapse fully.
     renderSettings({ autoScroll: false, autoScrollNext: true });

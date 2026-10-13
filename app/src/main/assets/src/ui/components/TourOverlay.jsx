@@ -436,9 +436,9 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
           {/* Decorative on purpose: the words below are reachable by scrolling and a screen reader
               already has the whole card, so this says nothing it would have to repeat. */}
           {hasMore && <span className="tour-more" aria-hidden="true" />}
-          <button type="button" className="tour-btn quiet" aria-label="Leave the tour" onClick={() => ctl.skip()}>Skip</button>
+          <button type="button" className="tour-btn quiet" aria-label="Skip, leave the tour" onClick={() => ctl.skip()}>Skip</button>
           <span className="tour-sp" />
-          <button type="button" className="tour-btn" aria-label="Previous stop" disabled={first} onClick={() => ctl.back()}>Back</button>
+          <button type="button" className="tour-btn" aria-label="Back, previous stop" disabled={first} onClick={() => ctl.back()}>Back</button>
           <button type="button" className="tour-btn primary" data-autofocus onClick={() => ctl.next()}>{primary}</button>
         </div>
       </div>

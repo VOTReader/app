@@ -287,7 +287,9 @@ export function AutoScrollControl({ scrollRef, pager, placeKey }) {
             </svg>
           </button>
         ) : null}
-        <span className="ascroll-readout" role="status" aria-live="polite">
+        {/* The running countdown ('~N min left') changes every minute, then every 5 s: it stays out of
+            the live region, which announces the pace and 'End of text'. */}
+        <span className="ascroll-readout" role="status" aria-live={running && !atEnd ? 'off' : 'polite'}>
           {/* [27] wpm leads once measured: pace is a number people know in
               words/min, so ± effectively SETS a wpm target. lines/min stays
               the stored unit (it survives text resizing) and trails. */}

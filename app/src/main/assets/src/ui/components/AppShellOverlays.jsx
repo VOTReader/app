@@ -186,7 +186,9 @@ export function AppShellOverlays({
                 {GARDEN_TIERS.map((t) => (
                   <button
                     key={t.id}
+                    type="button"
                     className={`garden-tier-option${settings.gardenTier === t.id ? " selected" : ""}`}
+                    aria-pressed={settings.gardenTier === t.id}
                     onClick={() => updateSetting("gardenTier", t.id)}>
                     <div className="garden-tier-option-main">
                       <span className="garden-tier-option-name">{t.label}</span>

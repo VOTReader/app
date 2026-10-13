@@ -369,4 +369,14 @@ describe('accessibility', () => {
     // Speed changes are announced politely rather than on every frame.
     expect(screen.getByRole('status').getAttribute('aria-live')).toBe('polite');
   });
+
+  // Sweep low (mw10): while running, the readout is the '~N min left' countdown, which the polite region
+  // re-announced each minute and every 5 s in the last minute.
+  it('the running countdown is not announced; the pace is', () => {
+    mount(makeCfg());
+    const readout = document.querySelector('.ascroll-readout');
+    expect(readout.getAttribute('aria-live')).toBe('polite');   // stopped: the pace, announced
+    fireEvent.click(screen.getByLabelText('Start auto-scroll'));
+    expect(readout.getAttribute('aria-live')).toBe('off');      // running: the countdown, not announced
+  });
 });

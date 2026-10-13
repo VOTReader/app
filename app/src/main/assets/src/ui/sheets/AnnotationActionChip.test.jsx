@@ -45,6 +45,25 @@ function setupStores(ann, { isNote = false } = {}) {
 }
 
 describe('AnnotationActionChip style switcher', () => {
+  // Sweep low (mw10): the three style buttons were all named "A", and the current style and colour
+  // were shown only by colour.
+  it('style buttons are named for their style and say which one is current', () => {
+    setupStores({ id: 'g1', groupId: 'g1', kind: 'underline', color: 'yellow', text: 'hi' });
+    render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
+    fireEvent.click(screen.getByTitle('Style'));
+    expect(screen.getByRole('button', { name: 'Highlight' }).getAttribute('aria-pressed')).toBe('false');
+    expect(screen.getByRole('button', { name: 'Underline' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Squiggle underline' }).getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('colour swatches say which colour is current', () => {
+    setupStores({ id: 'g1', groupId: 'g1', kind: 'highlight', color: 'green', text: 'hi' });
+    render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
+    fireEvent.click(screen.getByTitle('Recolor'));
+    expect(screen.getByRole('button', { name: 'green' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'yellow' }).getAttribute('aria-pressed')).toBe('false');
+  });
+
   it('shows a Style button on the main row', () => {
     setupStores({ id: 'g1', groupId: 'g1', kind: 'highlight', color: 'yellow', text: 'hi' });
     render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);

@@ -1077,6 +1077,14 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     return r;
   };
 
+  // Sweep low (mw10, WCAG 2.5.3): the toggle was named "Show the curated corpus connections", leaving out
+  // the words it shows, "Corpus context".
+  it('the Corpus context toggle is named starting with the words it shows', async () => {
+    await openMyWeb();
+    const btn = await screen.findByRole('button', { name: /^Corpus context/ });
+    expect(btn.textContent.startsWith('Corpus context')).toBe(true);
+  });
+
   // ── My Web visual (design-perf, 2026-09-10; note: myweb-visual-design.md) ──
   // Appended inside the describe that owns openMyWeb(). Both cases are RED on
   // main: the subtitle there is "0 links you have made" and the legend is the

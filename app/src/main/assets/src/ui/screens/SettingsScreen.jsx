@@ -41,6 +41,7 @@ function TextSizeSliderRow({ value, onChange }) {
           value={v}
           onChange={(e) => onChange(String(parseFloat(e.target.value)))}
           aria-label="Text size"
+          aria-valuetext={pct === 100 ? 'Standard' : pct + ' percent'}
         />
         <span className="txtsize-value">{pct}%</span>
         <button
@@ -89,7 +90,8 @@ function AutoScrollDwellRow({ value, onChange }) {
           step="500"
           value={ms}
           onChange={(e) => onChange(String(clampEndDwell(e.target.value)))}
-          aria-label="Pause before continuing to the next page, in seconds"
+          aria-label="Pause before continuing to the next page"
+          aria-valuetext={secs === 0 ? 'No pause' : secs + (secs === 1 ? ' second' : ' seconds')}
         />
         <span className="txtsize-value">{secs === 0 ? '0s' : secs + 's'}</span>
         <button

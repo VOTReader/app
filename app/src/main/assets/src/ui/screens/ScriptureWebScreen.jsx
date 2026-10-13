@@ -1184,7 +1184,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         ) : (
           <button type="button" className={'sw-btn sw-toggle' + (showUnderlay ? ' is-on' : '')} aria-pressed={showUnderlay}
             onClick={() => { setShowUnderlay(!showUnderlay); schedule(); }}
-            aria-label="Show the curated corpus connections">
+            aria-label={'Corpus context · ' + (personalRef.current && personalRef.current.underlay
+              ? personalRef.current.underlay.count.toLocaleString() : '…') + ' curated connections'}>
             Corpus context · {personalRef.current && personalRef.current.underlay
               ? personalRef.current.underlay.count.toLocaleString() : '…'}
           </button>

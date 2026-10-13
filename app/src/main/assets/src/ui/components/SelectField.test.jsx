@@ -67,3 +67,15 @@ describe('SelectField sheet accessibility', () => {
     expect(document.activeElement).toBe(trigger);
   });
 });
+
+// Sweep low (mw10): the sheet's options showed the current one only by a class and a ✓ glyph.
+describe('SelectField options state', () => {
+  it('each option says whether it is the current value; the ✓ is decoration', () => {
+    const { container } = render(<SelectField eyebrow="Test" title="Choose a value" label="Row" desc={null} value="a" options={OPTIONS} onChange={() => {}} />);
+    fireEvent.click(/** @type {HTMLElement} */ (container.querySelector('.settings-select-trigger')));
+    const opts = [...document.querySelectorAll('.select-sheet-option')];
+    expect(opts.map((b) => b.getAttribute('aria-pressed'))).toEqual(OPTIONS.map((o) => String(o.id === 'a')));
+    expect(opts.every((b) => b.getAttribute('type') === 'button')).toBe(true);
+    expect(document.querySelector('.select-sheet-option-check').getAttribute('aria-hidden')).toBe('true');
+  });
+});

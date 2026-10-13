@@ -292,3 +292,15 @@ describe('NoteSheet holds the app-update reload while a note is being typed (ds2
     expect(updateHolds()).toEqual([]);
   });
 });
+
+// Sweep low (mw10): the edit-mode style buttons were all named "A", with no pressed state.
+describe('NoteSheet edit-mode style and colour buttons', () => {
+  it('are named and say which style and colour are current', () => {
+    setupStores();
+    render(<NoteSheet groupId="g1" startInEditMode={true} onClose={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Highlight' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Underline' }).getAttribute('aria-pressed')).toBe('false');
+    expect(screen.getByRole('button', { name: 'Squiggle underline' }).getAttribute('aria-pressed')).toBe('false');
+    expect(screen.getByRole('button', { name: 'yellow' }).getAttribute('aria-pressed')).toBe('true');
+  });
+});
