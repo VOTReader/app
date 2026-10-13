@@ -5,7 +5,7 @@
    behaviour was hidden behind an empty ✓ tap) and that it still persists the
    whole-letter link. Reads bare globals, so we stub them. */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { LetterExcerptPickerScreen } from './LetterExcerptPickerScreen.jsx';
 import { snapSelectionRange } from '../../renderer/annotation-engine.jsx';
@@ -219,5 +219,78 @@ describe('LetterExcerptPickerScreen draws the reader\'s own text', () => {
     const find = container.querySelector('.picker-find');
     expect(find).toBeTruthy();
     expect(container.querySelector('.picker-body').contains(find)).toBe(false);
+  });
+});
+
+/* W50: once text was selected the footer said "Link this excerpt" for good:
+   clearing the selection (a tap in the letter) never gave "Link the whole
+   letter" back, and the stale excerpt was what got linked. A selection the
+   reader collapses in the letter now clears it, except while the footer is
+   pressed (some WebViews collapse the selection on that very tap). */
+describe('LetterExcerptPickerScreen: back to the whole letter (W50)', () => {
+  /** A live stand-in for window.getSelection the test can collapse. */
+  function liveSelection(textNode) {
+    const state = { collapsed: false, anchor: textNode };
+    window.getSelection = /** @type {any} */ (() => ({
+      get isCollapsed() { return state.collapsed; },
+      get rangeCount() { return 1; },
+      get anchorNode() { return state.anchor; },
+      getRangeAt: () => (state.collapsed
+        ? { startContainer: state.anchor, startOffset: 0, toString: () => '' }
+        : { startContainer: textNode, startOffset: 8, toString: () => 'of the earth' }),
+    }));
+    return state;
+  }
+  const settle = () => {
+    act(() => { document.dispatchEvent(new Event('selectionchange')); });
+    act(() => { vi.advanceTimersByTime(200); });
+  };
+  const footer = (c) => c.querySelector('.picker-footer-btn');
+  let getSelectionOrig;
+  beforeEach(() => { vi.useFakeTimers(); stubGlobals(); getSelectionOrig = window.getSelection; });
+  afterEach(() => { window.getSelection = getSelectionOrig; vi.useRealTimers(); });
+
+  it('a tap in the letter that clears the selection offers, and links, the whole letter again', () => {
+    const onClose = vi.fn();
+    const { container } = render(<LetterExcerptPickerScreen {...baseProps} onClose={onClose} />);
+    const textNode = container.querySelector('[data-block-key]').firstChild;
+    const sel = liveSelection(textNode);
+    settle();
+    expect(footer(container).textContent).toBe('Link this excerpt');
+    sel.collapsed = true;                       // the reader taps the letter
+    settle();
+    expect(footer(container).textContent).toBe('Link the whole letter');
+    expect(container.querySelector('.picker-selection-hint-empty')).not.toBeNull();
+    fireEvent.click(footer(container));
+    const target = window.persistLink.mock.calls[0][1];
+    expect(target.key).toBe('letter:the-wide-path');
+    expect(target.partial).toBeUndefined();
+  });
+
+  it('a selection that collapses while the footer is pressed still links the excerpt', () => {
+    const { container } = render(<LetterExcerptPickerScreen {...baseProps} />);
+    const textNode = container.querySelector('[data-block-key]').firstChild;
+    const sel = liveSelection(textNode);
+    settle();
+    fireEvent.pointerDown(footer(container));
+    sel.collapsed = true;                       // the WebView ends the selection on the tap
+    settle();
+    expect(footer(container).textContent).toBe('Link this excerpt');
+    fireEvent.pointerUp(footer(container));
+    fireEvent.click(footer(container));
+    const target = window.persistLink.mock.calls[0][1];
+    expect(target.partial).toBe(true);
+    expect(target.text).toBe('of the earth');
+  });
+
+  it('typing in Find (the selection moves out of the letter) keeps the excerpt', () => {
+    const { container } = render(<LetterExcerptPickerScreen {...baseProps} />);
+    const textNode = container.querySelector('[data-block-key]').firstChild;
+    const sel = liveSelection(textNode);
+    settle();
+    sel.collapsed = true;
+    sel.anchor = container.querySelector('.picker-find-bar');
+    settle();
+    expect(footer(container).textContent).toBe('Link this excerpt');
   });
 });

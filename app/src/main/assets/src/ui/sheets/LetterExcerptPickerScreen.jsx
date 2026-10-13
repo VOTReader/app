@@ -105,6 +105,37 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
   // selection path (long-press, handle drags, mouse, keyboard), so it
   // drives the state commit; debounced because handle drags fire it
   // continuously. The touch/mouse handlers stay as a faster path.
+  // W50: a selection the reader clears (a tap in the letter collapses it)
+  // gives "Link the whole letter" back, and the stale excerpt is no longer
+  // what gets linked. Not while the footer is pressed: some WebViews end the
+  // selection on that very tap, before its click lands. A selection that
+  // moved out of the letter (into Find) leaves the excerpt alone.
+  const footerPressRef = React.useRef(false);
+  const footerReleaseRef = React.useRef(/** @type {any} */ (null));
+  const clearIfCleared = React.useCallback(() => {
+    if (footerPressRef.current) return;
+    const sel = window.getSelection();
+    if (!sel) return;
+    const body = bodyRef.current;
+    const gone = !sel.rangeCount;
+    if (gone || (sel.isCollapsed && body && sel.anchorNode && body.contains(sel.anchorNode))) setSelInfo(null);
+  }, []);
+  const pressFooter = () => {
+    if (footerReleaseRef.current) { clearTimeout(footerReleaseRef.current); footerReleaseRef.current = null; }
+    footerPressRef.current = true;
+  };
+  // Released without a click (a drag off it): look again once the debounced
+  // selection check has had its turn.
+  const releaseFooter = () => {
+    if (footerReleaseRef.current) clearTimeout(footerReleaseRef.current);
+    footerReleaseRef.current = setTimeout(() => {
+      footerReleaseRef.current = null;
+      footerPressRef.current = false;
+      clearIfCleared();
+    }, 200);
+  };
+  React.useEffect(() => () => { if (footerReleaseRef.current) clearTimeout(footerReleaseRef.current); }, []);
+
   React.useEffect(() => {
     let t = null;
     const onSelectionChange = () => {
@@ -113,6 +144,7 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
         t = null;
         const info = captureSelectionSync();
         if (info) setSelInfo(info);
+        else clearIfCleared();
       }, 150);
     };
     document.addEventListener('selectionchange', onSelectionChange);
@@ -120,7 +152,7 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
       document.removeEventListener('selectionchange', onSelectionChange);
       if (t) clearTimeout(t);
     };
-  }, [captureSelectionSync]);
+  }, [captureSelectionSync, clearIfCleared]);
 
   // Find-in-letter — long letters made locating the passage to excerpt a
   // scroll hunt. Typing counts the matching paragraphs; ‹ › cycle through
@@ -253,6 +285,10 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
         <button
           type="button"
           className="picker-footer-btn"
+          onPointerDown={pressFooter}
+          onPointerUp={releaseFooter}
+          onPointerCancel={releaseFooter}
+          onPointerLeave={releaseFooter}
           onClick={confirmLink}
         >{primaryLabel}</button>
       </div>
