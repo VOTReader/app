@@ -2,6 +2,7 @@ package com.votreader.sacredui
 
 import org.json.JSONArray
 import org.json.JSONObject
+import org.json.JSONTokener
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
@@ -33,7 +34,7 @@ import java.util.Locale
  *
  * W9 (2026-10-13): a snapshot's bytes are forced to the disk before it takes its
  * name, so a power cut leaves the old set or the new snapshot whole, never a named
- * one cut short. One broken anyway (empty, or not ending where JSON ends) is never
+ * one cut short. One broken anyway (one that does not parse as a JSON object) is never
  * listed and never keeps its day in [prune]: as the newest of its day it used to push
  * out the good copy before it. The page walks past one that will not parse, too.
  *
@@ -112,20 +113,32 @@ class SnapshotStore(private val dir: File) {
     private fun snapshots(): List<File> =
         (dir.listFiles() ?: emptyArray()).filter { NAME.matches(it.name) }.sortedByDescending { it.name }
 
+    /** [whole]'s verdicts by name, size and time: a named snapshot never changes, so each is parsed once. */
+    private val verdicts = HashMap<String, Boolean>()
+
     /**
-     * A snapshot whose bytes are all there: the page's JSON (JSON.stringify, no padding)
-     * starts with `{` and ends with `}`. Only the two ends are read, so a list stays
-     * cheap; what a power cut breaks is the tail, or the whole file (empty or zeroed).
+     * A snapshot whose bytes are all there: the whole file parses as a JSON object, as the
+     * page's JSON.stringify wrote it. The ends are checked first (what a power cut breaks is
+     * the tail, or the whole file, left empty or zeroed); the full parse runs once per file
+     * per process (W9 refuter: a file broken in the middle passed an ends-only check).
      */
-    private fun whole(f: File): Boolean = try {
-        RandomAccessFile(f, "r").use { r ->
-            val n = r.length()
-            if (n < 2) return@use false
-            val first = r.read()
-            r.seek(n - 1)
-            first == '{'.code && r.read() == '}'.code
-        }
-    } catch (e: Exception) { false }
+    private fun whole(f: File): Boolean {
+        val key = f.name + ":" + f.length() + ":" + f.lastModified()
+        verdicts[key]?.let { return it }
+        val ok = try {
+            val ends = RandomAccessFile(f, "r").use { r ->
+                val n = r.length()
+                if (n < 2) return@use false
+                val first = r.read()
+                r.seek(n - 1)
+                first == '{'.code && r.read() == '}'.code
+            }
+            ends && JSONTokener(f.readText(Charsets.UTF_8)).let { t -> t.nextValue() is JSONObject && t.nextClean() == 0.toChar() }
+        } catch (e: Exception) { false }
+        if (verdicts.size > 64) verdicts.clear()
+        verdicts[key] = ok
+        return ok
+    }
 
     private fun stampOf(name: String): Long {
         val m = NAME.find(name) ?: return 0L
