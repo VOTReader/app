@@ -111,6 +111,23 @@ describe('pre-push: the heavy gates run once per push (ln1 item 6)', () => {
     expect(out).not.toMatch(/would run/);
   }, 60_000);
 
+  it("appends who pushed which commit to the swarm's push log, so a red branch CI pages the pusher (nw12)", () => {
+    const { sha } = commitWith(plus('AGENTS.md', '\n'));
+    const head = git(['rev-parse', 'HEAD']);
+    const log = join(mkdtempSync(join(tmpdir(), 'vot-prepush-log-')), 'pushes.log');
+    const env = { VOT_PUSH_LOG: log, SWARM_LANE: 'readalong' };
+    let r = push(`refs/heads/x ${sha} refs/heads/overhaul ${head}\n`, { env });
+    expect(r.status, r.out).toBe(0);
+    r = push(`(delete) ${ZERO} refs/heads/x ${head}\n`, { env });   // a branch delete pushes nothing: no line
+    expect(r.status, r.out).toBe(0);
+    expect(readFileSync(log, 'utf8')).toMatch(new RegExp(`^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d readalong ${sha} overhaul pre-push\\n$`));
+    const real = 'D:/Swarm/tools/logs/pushes.log';                     // a dry run that names no log leaves the real one alone
+    const size = () => (existsSync(real) ? readFileSync(real, 'utf8').length : -1);
+    const before = size();
+    push(line(sha), { env: { SWARM_LANE: 'readalong', VOT_PUSH_LOG: undefined } });
+    expect(size()).toBe(before);
+  }, 60_000);
+
   it('vitest and gradle run through heavy_run (the machine-wide gates.lock), and the old-branch fallback stays', () => {
     const hook = readFileSync(resolve(root, HOOK), 'utf8');
     expect(hook).toMatch(/if grep -q '"test:hook"' package\.json; then\n\s*heavy_run vitest npm run test:hook\n\s*else\n\s*heavy_run vitest npm run test:coverage\n/);
