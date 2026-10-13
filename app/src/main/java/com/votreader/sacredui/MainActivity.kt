@@ -930,6 +930,24 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                     Timber.w("Refused external URL with disallowed scheme: %s", urlStr)
                     return true
                 }
+                // W57: an address this app claims (the verified App Link) came straight back to it through
+                // ACTION_VIEW, and onNewIntent, finding no ?p= key, dropped it: About's Privacy policy link
+                // showed nothing. A shared passage opens in this page; any other address of ours goes to a browser.
+                if (SharedLink.isAppLink(urlStr)) {
+                    val key = SharedLink.keyOf(urlStr)
+                    if (key != null) {
+                        bridge.callWithResult(SharedLink.openInPageJs(key)) { result ->
+                            if (result != "true") webView.loadUrl(SharedLink.bootUrl(key))
+                        }
+                    } else {
+                        try {
+                            startActivity(BrowserLink.viewIntent(url))
+                        } catch (e: Exception) {
+                            Timber.w(e, "No browser for %s", urlStr)
+                        }
+                    }
+                    return true
+                }
                 try {
                     startActivity(Intent(Intent.ACTION_VIEW, urlStr.toUri()))
                 } catch (e: Exception) {
