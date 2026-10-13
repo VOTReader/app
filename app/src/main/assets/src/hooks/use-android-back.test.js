@@ -741,6 +741,21 @@ describe('useAndroidBack — chapter and study routes', () => {
     expect(props.setScreen).toHaveBeenCalledWith('bible-study-index');
   });
 
+  it('W37: studies that load after the first render still route a multi-chapter chapter back to its index', () => {
+    // App() builds getStudyById over _studies() each render; at the first render the
+    // study corpus has not loaded, so that render's lookup finds nothing. The mount-only
+    // handler kept it, and every back from a study chapter went to the Studies home.
+    const props = baseProps({ screen: 'home', studyId: null, getStudyById: () => null });
+    const h = renderHook((p) => useAndroidBack(p), { initialProps: props });
+    const loaded = vi.fn((id) => (id === 'st1' ? { chapters: [{}, {}] } : null));
+    h.rerender({ ...props, screen: 'bible-study-chapter', studyId: 'st1', getStudyById: loaded });
+    window.handleAndroidBack();
+    expect(loaded).toHaveBeenCalledWith('st1');
+    expect(props.setStudyChapterId).toHaveBeenCalledWith(null);
+    expect(props.setScreen).toHaveBeenCalledWith('bible-study-index');
+    expect(props.goStudiesHome).not.toHaveBeenCalled();
+  });
+
   it('a one-chapter (or unknown) study backs straight to the Studies home', () => {
     for (const study of [{ chapters: [{}] }, null]) {
       const props = baseProps({ screen: 'bible-study-chapter', studyId: 'st1', getStudyById: () => study });
