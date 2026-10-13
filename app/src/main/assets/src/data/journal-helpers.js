@@ -120,6 +120,18 @@ export var JournalHelpers = (function() {
     return out;
   }
 
+  /* Inline marks stripped to the words a reader sees: a scripture chip keeps
+     its reference, link tokens drop, bold/italic keep their text. */
+  function plainInline(text) {
+    return String(text || '')
+      .replace(/\{\{ref:([^}]+)\}\}/g, '$1')
+      .replace(/\[\[(letter|bookmark|journal):[^\]]+\]\]/g, '')
+      .replace(/\*\*(.+?)\*\*/g, '$1')
+      .replace(/_(.+?)_/g, '$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   /* Plain-text preview of an entry — for card previews in the hub.
      Picks the first paragraph or quote block, returns up to ~180 chars
      with markdown stripped. Falls back to the first embed's title. */
@@ -130,13 +142,7 @@ export var JournalHelpers = (function() {
       var b = blocks[i];
       if (b.type === 'p' || b.type === 'quote' || b.type === 'h2') {
         if (b.text && b.text.trim()) {
-          var t = b.text
-            .replace(/\{\{ref:([^}]+)\}\}/g, '$1')
-            .replace(/\[\[(letter|bookmark|journal):[^\]]+\]\]/g, '')
-            .replace(/\*\*(.+?)\*\*/g, '$1')
-            .replace(/_(.+?)_/g, '$1')
-            .replace(/\s+/g, ' ')
-            .trim();
+          var t = plainInline(b.text);
           if (t.length > maxLen) t = t.substring(0, maxLen).trim() + '…';
           return t;
         }
@@ -173,6 +179,27 @@ export var JournalHelpers = (function() {
       if (b2.type === 'divider') continue;
     }
     return '';
+  }
+
+  /* Everything typed into an entry, lowercased, for the hub's search (W36):
+     title, every prose and excerpt block (marks stripped as in previewText),
+     quote cites, photo/recording captions, verse refs and tags. One line per
+     part, so a query never matches across two blocks. The hub used to search
+     previewText(e, 400), the first prose block only. */
+  function searchText(entry) {
+    if (!entry) return '';
+    var parts = [plainInline(entry.title)];
+    var blocks = entry.blocks || [];
+    for (var i = 0; i < blocks.length; i++) {
+      var b = blocks[i];
+      if (!b) continue;
+      if (typeof b.text === 'string') parts.push(plainInline(b.text));
+      if (typeof b.cite === 'string') parts.push(plainInline(b.cite));
+      if (typeof b.caption === 'string') parts.push(plainInline(b.caption));
+      if (b.type === 'verse-block' && typeof b.ref === 'string') parts.push(plainInline(b.ref));
+    }
+    if (entry.tags && entry.tags.length) parts.push(plainInline(entry.tags.join(' ')));
+    return parts.join('\n').toLowerCase();
   }
 
   /* Short summary of embeds for the attachment chip row on entry cards. */
@@ -494,6 +521,7 @@ export var JournalHelpers = (function() {
     moveBlock: moveBlock,
     collectRefs: collectRefs,
     previewText: previewText,
+    searchText: searchText,
     attachmentSummary: attachmentSummary,
     formatDuration: formatDuration,
     resolveLetterCard: resolveLetterCard,

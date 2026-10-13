@@ -217,22 +217,61 @@ export function JournalHubScreen(props) {
     var attachments = JournalHelpers.attachmentSummary(entry);
     var moodClass = entry.mood ? entry.mood : '';
 
+    // W36: the options button is a SIBLING of the role=button open control.
+    // Nested inside it, Enter on the button bubbled to the card's onKeyDown and
+    // opened the entry, and a role=button's children are presentational, so a
+    // screen reader lost the button. A click anywhere on the card still opens.
     return (
       <div
         key={entry.id}
         className={'jrn-card' + (entry.pinned ? ' pinned' : '')}
-        role="button"
-        tabIndex={0}
         onClick={function(e) {
           const t = /** @type {Element} */ (e.target);
           if (t.closest && t.closest('.jrn-card-menu-btn')) return;
           onOpenEntry && onOpenEntry(entry.id);
         }}
-        onKeyDown={function(e) {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenEntry(entry.id); }
-        }}
       >
-        <span className={'jrn-card-mood ' + moodClass} />
+        <div
+          className="jrn-card-open"
+          role="button"
+          tabIndex={0}
+          onKeyDown={function(e) {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenEntry && onOpenEntry(entry.id); }
+          }}
+        >
+          <span className={'jrn-card-mood ' + moodClass} />
+          <div className="jrn-card-row">
+            <h3 className={'jrn-card-title' + (title ? '' : ' untitled')}>{title || 'Untitled'}</h3>
+            <span className="jrn-card-date">
+              {entry.pinned && (
+                <svg className="jrn-card-pin-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-label="Pinned" role="img">
+                  <path d="M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z" />
+                  <path d="M8 12 L3 19" />
+                </svg>
+              )}
+              {JournalHelpers.shortDate(entry.updated || entry.created)}
+              <span className="jrn-card-time">{' · ' + JournalHelpers.shortTime(entry.updated || entry.created)}</span>
+            </span>
+          </div>
+          {preview && <p className="jrn-card-preview">{preview}</p>}
+          {attachments.length > 0 && (
+            <div className="jrn-card-attachments">
+              {attachments.map(function(a, i) {
+                return <span key={i} className="jrn-attach">{a.label}</span>;
+              })}
+            </div>
+          )}
+          {entry.tags && entry.tags.length > 0 && (
+            <div className="jrn-card-meta">
+              <div className="jrn-tags">
+                {entry.tags.slice(0, 4).map(function(t, i) {
+                  return <span key={i} className="jrn-tag">{'#' + t}</span>;
+                })}
+              </div>
+            </div>
+          )}
+        </div>
         <button
           className="jrn-card-menu-btn"
           onClick={function(e) { e.stopPropagation(); setMenuEntry(entry); }}
@@ -247,49 +286,27 @@ export function JournalHubScreen(props) {
             <circle cx="12" cy="19" r="1.6" />
           </svg>
         </button>
-        <div className="jrn-card-row">
-          <h3 className={'jrn-card-title' + (title ? '' : ' untitled')}>{title || 'Untitled'}</h3>
-          <span className="jrn-card-date">
-            {entry.pinned && (
-              <svg className="jrn-card-pin-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-label="Pinned" role="img">
-                <path d="M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z" />
-                <path d="M8 12 L3 19" />
-              </svg>
-            )}
-            {JournalHelpers.shortDate(entry.updated || entry.created)}
-            <span className="jrn-card-time">{' · ' + JournalHelpers.shortTime(entry.updated || entry.created)}</span>
-          </span>
-        </div>
-        {preview && <p className="jrn-card-preview">{preview}</p>}
-        {attachments.length > 0 && (
-          <div className="jrn-card-attachments">
-            {attachments.map(function(a, i) {
-              return <span key={i} className="jrn-attach">{a.label}</span>;
-            })}
-          </div>
-        )}
-        {entry.tags && entry.tags.length > 0 && (
-          <div className="jrn-card-meta">
-            <div className="jrn-tags">
-              {entry.tags.slice(0, 4).map(function(t, i) {
-                return <span key={i} className="jrn-tag">{'#' + t}</span>;
-              })}
-            </div>
-          </div>
-        )}
       </div>
     );
   }
 
   // ─── All-entries / Pinned tabs ──────────────────────────────
+  // W36: search reads the whole entry (JournalHelpers.searchText), built once
+  // per entry per store version: each keystroke re-renders on the same version
+  // and reuses it; any entry mutation bumps the version and rebuilds lazily.
+  var searchCacheRef = React.useRef(/** @type {{ v: number, map: Map<string, string> }} */ ({ v: -1, map: new Map() }));
+  function entrySearchText(e) {
+    var c = searchCacheRef.current;
+    if (c.v !== storeVersion) { c.v = storeVersion; c.map = new Map(); }
+    var t = c.map.get(e.id);
+    if (t === undefined) { t = JournalHelpers.searchText(e); c.map.set(e.id, t); }
+    return t;
+  }
+
   function renderEntries(list, isPinnedTab) {
-    var q = query.trim().toLowerCase();
+    var q = query.trim().toLowerCase().replace(/\s+/g, ' ');
     var filtered = q ? list.filter(function(e) {
-      if ((e.title || '').toLowerCase().indexOf(q) >= 0) return true;
-      var preview = JournalHelpers.previewText(e, 400).toLowerCase();
-      if (preview.indexOf(q) >= 0) return true;
-      if (e.tags && e.tags.join(' ').toLowerCase().indexOf(q) >= 0) return true;
-      return false;
+      return entrySearchText(e).indexOf(q) >= 0;
     }) : list;
     filtered = filtered.slice().sort(function(a, b) {
       var ad = a.updated || a.created || 0;
