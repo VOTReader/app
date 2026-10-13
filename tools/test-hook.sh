@@ -10,10 +10,16 @@
 # A fast run that fails is re-run whole in the default pool: green there means a file that only fails in a VM context
 # (the commit goes through, with a note to list it in vitest.isolated.txt); red there is a real failure.
 # On this machine both runs go through D:/Swarm/tools/heavy.sh (the machine budget); elsewhere they run directly.
+#
+# Red fast, green re-run is a flake or a VM-context-only file, and the push still goes through: tools/record-flakes.js
+# reads the fast run's JSON report, appends each red test to D:/Swarm/flakes.jsonl and pages the pushing lane's inbox
+# once per test, so it gets fixed instead of silently retried (nw9b, network 2026-10-13).
 run() {
   if [ -f D:/Swarm/tools/heavy.sh ]; then bash D:/Swarm/tools/heavy.sh "$1"; else sh -c "$1"; fi
 }
-run "VOT_VITEST_FAST=1 npx vitest run" && exit 0
+report=node_modules/.cache/vot-test-hook/fast-run.json
+rm -f "$report"
+run "VOT_VITEST_FAST=1 npx vitest run --reporter=default --reporter=json --outputFile.json=$report" && exit 0
 echo ""
 echo "[test:hook] the fast run failed; re-running the whole suite in the default pool to tell a real failure from a"
 echo "[test:hook] file that only fails in a VM context..."
@@ -21,4 +27,5 @@ run "npx vitest run" || exit 1
 echo ""
 echo "[test:hook] NOTE: green in the default pool, red in vmThreads. Add the file(s) the fast run named above to"
 echo "[test:hook] vitest.isolated.txt so the next commit stays fast."
+[ -f "$report" ] && node tools/record-flakes.js "$report"
 exit 0
