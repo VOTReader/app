@@ -35,8 +35,8 @@
      StorageHealth.getVersion()              → number
      StorageHealth.getPlatform()             → string
      StorageHealth.checkBeforeWrite(bytes)   → { ok, reason? }
-     StorageHealth.onWriteFailure(err)       → void
-     StorageHealth.onWriteSuccess()          → void
+     StorageHealth.onWriteFailure(err, writer?) → void
+     StorageHealth.onWriteSuccess(writer?)   → void
      StorageHealth.requestPersistence()      → Promise<boolean>
      StorageHealth.checkFirstDataCreation()  → { shouldBlock, reason? }
      StorageHealth.dismissScenario(id)       → void
@@ -153,6 +153,14 @@ let _listeners = null;
 let _platform = null;
 let _writeFailedThisSession = false;
 /**
+ * W11 (sweep 2026-10-13): who has a failed write not yet saved, by name (a store's storage key;
+ * '' for a failure no store owns, a journal photo or memo). _writeFailedThisSession is true while
+ * it holds anyone. One flag for everyone let ANY store's landed save lift the "won't be kept"
+ * banner while another store's failed write was still only in memory.
+ * @type {Set<string>}
+ */
+let _failedWriters = new Set();
+/**
  * D5: timestamp of the last per-action write-failure toast. Used to
  * cooldown-dedup the toast so a BURST of failing writes (e.g. rapid edits
  * while storage is broken) surfaces ONE toast, re-armed at most every
@@ -189,6 +197,10 @@ let _dataMissing = null;
 let _libraryElsewhere = null;
 /** @type {Promise<StorageHealthReport> | null} */
 let _assessInFlight = null;
+/** W11 refuter: the in-flight assessment has already read the flags and published its report.
+ *  A caller after that point (a store's landed save, say) must start a fresh one: joining it
+ *  hands back a report that still counts the failure, and the banner stays up. */
+let _assessPublished = false;
 /** @type {(() => void) | null} */
 let _visibilityHandler = null;
 
@@ -421,11 +433,12 @@ function _logTierTransition(prevTier, newTier, pct) {
  * @returns {Promise<StorageHealthReport>}
  */
 async function _assess() {
-  if (_assessInFlight) return _assessInFlight;
+  if (_assessInFlight && !_assessPublished) return _assessInFlight;
+  _assessPublished = false;
   var p = _assessImpl();
   _assessInFlight = p;
   try { return await p; }
-  finally { _assessInFlight = null; }
+  finally { if (_assessInFlight === p) _assessInFlight = null; }
 }
 
 /** @returns {Promise<StorageHealthReport>} */
@@ -455,6 +468,7 @@ async function _assessImpl() {
       libraryElsewhere: _libraryElsewhere,
     });
     _report = fallback;
+    _assessPublished = true;
     _lastAssessedAt = Date.now();
     _logTierTransition(prevTier, fallback.tier, null);
     _bump();
@@ -519,6 +533,7 @@ async function _assessImpl() {
   };
 
   _report = report;
+  _assessPublished = true;
   _lastAssessedAt = Date.now();
   _logTierTransition(prevTier, tier, pct);
   _bump();
@@ -570,13 +585,6 @@ function _checkBeforeWrite(bytes) {
 }
 
 /**
- * Called from CachedStore._save() and JournalMediaStore.put() catch
- * blocks when an IDB write fails. Immediately transitions the tier to
- * READONLY and kicks off a re-assessment for fresh quota numbers.
- *
- * @param {any} _err
- */
-/**
  * D5: show a cooldown-deduped per-action write-failure toast. The passive
  * StorageHealth banner says storage is unhealthy in general; this tells the
  * user THIS change didn't persist so they can re-try / export a backup.
@@ -598,7 +606,18 @@ function _notifyWriteFailureToast() {
   });
 }
 
-function _onWriteFailure(err) {
+/**
+ * Called from CachedStore._save()/_saveMerged() and the journal photo/memo catch
+ * blocks when an IDB write fails. Immediately transitions the tier to
+ * READONLY and kicks off a re-assessment for fresh quota numbers.
+ *
+ * @param {any} err
+ * @param {string} [writer] the store whose write failed (its storage key). A failure with no
+ *   name (a journal photo or memo: the reader was told, nothing waits in memory) is cleared by
+ *   any landed save, as before W11.
+ */
+function _onWriteFailure(err, writer) {
+  _failedWriters.add(writer || '');
   _writeFailedThisSession = true;
   // v04-03: a newer app's database is not full storage; its own banner explains it.
   if (!(err && /** @type {any} */ (err).name === 'VersionError')) _notifyWriteFailureToast();
@@ -633,9 +652,17 @@ function _onWriteFailure(err) {
  * Called after a successful IDB write when a prior failure was recorded.
  * Clears the READONLY override and re-assesses to compute the real tier
  * from current quota.
+ *
+ * W11: a landed save clears only its own store's failure (plus any unnamed one); the override
+ * stays while another store still holds a failed write.
+ *
+ * @param {string} [writer] the store whose write landed (its storage key)
  */
-function _onWriteSuccess() {
+function _onWriteSuccess(writer) {
   if (!_writeFailedThisSession) return;
+  _failedWriters.delete('');
+  if (writer) _failedWriters.delete(writer);
+  if (_failedWriters.size > 0) return;
   _writeFailedThisSession = false;
   // D5: storage recovered — clear the error toast + reset the cooldown so a
   // genuinely new failure surfaces immediately instead of waiting one out.
@@ -866,6 +893,7 @@ function _resetForTests(opts) {
   _listeners = null;
   _platform = (opts && opts.platform) || null;
   _writeFailedThisSession = false;
+  _failedWriters = new Set();
   _lastWriteFailToastAt = 0;
   _sessionDismissals = new Set();
   _lastAssessedAt = 0;
@@ -875,6 +903,7 @@ function _resetForTests(opts) {
   _versionTooNew = false;
   _libraryElsewhere = null;
   _assessInFlight = null;
+  _assessPublished = false;
   _persistInFlight = false;
   _storageApiOverride = (opts && opts.storageApi) || null;
   _standaloneOverride = (opts && typeof opts.standalone === 'boolean') ? opts.standalone : null;

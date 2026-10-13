@@ -667,6 +667,122 @@ describe('CachedStore STORE-4 — bounded write-retry on a transient failure', (
   });
 });
 
+/* W11 (sweep 2026-10-13): StorageHealth kept one write-failed flag, so any store's landed save
+   lifted the "won't be kept" banner while another store's failed write was still only in
+   memory. Each save now names its store; only that store's own landed save clears its failure. */
+describe('CachedStore W11 — a store\'s save reports under its own name', () => {
+  /** @type {any} */
+  let health;
+  const storageApi = {
+    estimate: async () => ({ quota: 2_000_000_000, usage: 100_000_000 }),
+    persisted: async () => true,
+    persist: async () => true,
+  };
+  beforeEach(async () => {
+    localStorage.clear?.();
+    _resetStoreRegistry();
+    vi.restoreAllMocks();
+    vi.useFakeTimers();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    window.DiagnosticLog = { warn: vi.fn() };
+    health = /** @type {any} */ (await vi.importActual('../utils/storage-health.js')).StorageHealth;
+    health._resetForTests({ platform: health.PLATFORM.CHROME, storageApi });
+    await health.assess();
+    window.StorageHealth = health;
+  });
+  afterEach(() => {
+    setRemoteWriteFence(false);
+    health._resetForTests();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    delete window.StorageHealth;
+    delete window.DiagnosticLog;
+  });
+
+  it('another store\'s landed save leaves the failed one on the report until its own retry lands', async () => {
+    let failNotes = true;
+    vi.spyOn(IDBAdapter, 'put').mockImplementation(async (name) => {
+      if (name === 'vot-test-w11-notes' && failNotes) throw new Error('quota');
+    });
+    const notes = createTestStore('vot-test-w11-notes', { idb: true });
+    const history = createTestStore('vot-test-w11-history', { idb: true });
+    notes._resetForTests({ forceLoaded: true });
+    history._resetForTests({ forceLoaded: true });
+    notes.add({ id: 'n1', label: 'a note only in memory' });
+    await vi.advanceTimersByTimeAsync(0);
+    history.add({ id: 'h1', label: 'a visit that lands' });
+    await vi.advanceTimersByTimeAsync(0);
+    await health.assess();
+    expect(health.getReport().writeFailedThisSession).toBe(true);
+    failNotes = false;
+    await vi.advanceTimersByTimeAsync(5000);            // STORE-4: the notes retry re-flushes and lands
+    await health.assess();
+    expect(health.getReport().writeFailedThisSession).toBe(false);
+  });
+
+  it('the same for a merge store\'s cross-tab save', async () => {
+    let failJournal = true;
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+    vi.spyOn(IDBAdapter, 'put').mockImplementation(async (name) => {
+      if (name === 'vot-test-w11-journal' && failJournal) throw new Error('quota');
+    });
+    const journal = extendStore(
+      CachedStore('vot-test-w11-journal', { list: [] }, { idb: true, crossTabMerge: (_b, ours) => ours }),
+      { add(id) { this._load().list.push(id); this._save(); this._bump(); } }
+    );
+    const history = createTestStore('vot-test-w11-history-2', { idb: true });
+    journal._resetForTests({ forceLoaded: true });
+    history._resetForTests({ forceLoaded: true });
+    journal.add('an entry only in memory');
+    await vi.advanceTimersByTimeAsync(0);
+    history.add({ id: 'h1', label: 'a visit that lands' });
+    await vi.advanceTimersByTimeAsync(0);
+    await health.assess();
+    expect(health.getReport().writeFailedThisSession).toBe(true);
+    failJournal = false;
+    await vi.advanceTimersByTimeAsync(5000);
+    await health.assess();
+    expect(health.getReport().writeFailedThisSession).toBe(false);
+  });
+
+  // Refuter round 1: a merge save waiting on the store's lock when another tab's fence rose
+  // returned from the lock without writing, and that empty return counted as a landed save.
+  it("a merge save the other tab's fence stopped behind the lock is not a landed write", async () => {
+    let failJournal = true;
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+    const putSpy = vi.spyOn(IDBAdapter, 'put').mockImplementation(async (name) => {
+      if (name === 'vot-test-w11-fenced' && failJournal) throw new Error('quota');
+    });
+    const journal = extendStore(
+      CachedStore('vot-test-w11-fenced', { list: [] }, { idb: true, crossTabMerge: (_b, ours) => ours }),
+      { add(id) { this._load().list.push(id); this._save(); this._bump(); } }
+    );
+    journal._resetForTests({ forceLoaded: true });
+    journal.add('an entry only in memory');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(health.getReport().writeFailedThisSession).toBe(true);
+    failJournal = false;
+    /** @type {any} */ let release;
+    /** @type {any} */ let started;
+    const holding = new Promise((r) => { started = r; });
+    const held = navigator.locks.request('vot-store:vot-test-w11-fenced', () => { started(); return new Promise((r) => { release = r; }); });
+    await holding;                                      // a sibling tab is inside the store's lock
+    journal.add('a second entry');                      // this save waits on the lock
+    setRemoteWriteFence(true);                          // another tab's Import/Clear All holds this page
+    release();
+    await held;
+    await vi.advanceTimersByTimeAsync(0);
+    const puts = putSpy.mock.calls.length;
+    await health.assess();
+    expect(health.getReport().writeFailedThisSession).toBe(true);   // nothing landed
+    setRemoteWriteFence(false);                         // the hold lifts without a reload: saved again
+    await vi.advanceTimersByTimeAsync(0);
+    expect(putSpy.mock.calls.length).toBeGreaterThan(puts);
+    await health.assess();
+    expect(health.getReport().writeFailedThisSession).toBe(false);
+  });
+});
+
 /* v04-02 (improvement sweep 2026-09-22): Clear All deletes the databases and
    reloads 600 ms later. Any store write in between reopened 'votreader',
    recreated every store and put back whatever was still in memory, so a wiped
@@ -1313,6 +1429,57 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(localStorage.getItem('vot-bookmarks')).toBe('[{"id":"keep"}]');
     expect(idbMeta['migrated-v1']).toBeUndefined();
     expect(putSpy).not.toHaveBeenCalled();
+  });
+
+  // W11 (sweep 2026-10-13): the guard counted only 'pending' stores. A store whose first
+  // IndexedDB read failed or timed out is 'degraded' and has NOT seeded from its legacy key yet
+  // (its background retry does that later), so the cleanup deleted that store's only copy and
+  // it came back empty for good. Any store not loaded now defers the cleanup to the next boot.
+  it('W11: defers while a store is degraded, so its background retry can still seed from the legacy key', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      localStorage.setItem('vot-test-w11-legacy', JSON.stringify([{ id: 'pre-W2', label: 'old history' }]));
+      /** @type {Record<string, any>} */
+      const idb = {};
+      let firstRead = true;
+      vi.spyOn(IDBAdapter, 'get').mockImplementation(async (s, k) => {
+        if (s === 'vot-test-w11-legacy' && firstRead) { firstRead = false; throw new Error('IDB not ready'); }
+        return idb[s + '/' + String(k)];
+      });
+      vi.spyOn(IDBAdapter, 'put').mockImplementation(async (s, k, v) => { idb[s + '/' + String(k)] = v; });
+
+      const store = createTestStore('vot-test-w11-legacy', { idb: true });
+      await hydrateAllStores();
+      expect(store.getState()).toBe('degraded');
+      expect(hasAnyPendingStores()).toBe(false);
+
+      await clearLegacyLs();                              // HydrationGate runs it right after hydration
+      expect(localStorage.getItem('vot-test-w11-legacy')).not.toBeNull();
+      expect(idb['meta/migrated-v1']).toBeUndefined();    // not done: the next boot tries again
+
+      await vi.advanceTimersByTimeAsync(5000);            // the background retry finds the store empty
+      expect(store.getState()).toBe('loaded');
+      expect(store.all().map((x) => x.id)).toEqual(['pre-W2']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('W11 CONTROL: runs once every registered store has loaded', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    localStorage.setItem('vot-test-w11-loaded', JSON.stringify([{ id: 'pre-W2', label: 'old' }]));
+    /** @type {Record<string, any>} */
+    const idb = {};
+    vi.spyOn(IDBAdapter, 'get').mockImplementation(async (s, k) => idb[s + '/' + String(k)]);
+    vi.spyOn(IDBAdapter, 'put').mockImplementation(async (s, k, v) => { idb[s + '/' + String(k)] = v; });
+    const store = createTestStore('vot-test-w11-loaded', { idb: true });
+    await hydrateAllStores();
+    expect(store.getState()).toBe('loaded');
+    expect(store.all().map((x) => x.id)).toEqual(['pre-W2']);   // seeded before the cleanup
+    await clearLegacyLs();
+    expect(localStorage.getItem('vot-test-w11-loaded')).toBeNull();
+    expect(idb['meta/migrated-v1']).toBe(true);
   });
 
   it('idempotent: second call is a no-op (flag already set)', async () => {

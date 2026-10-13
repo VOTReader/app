@@ -76,6 +76,11 @@ function _fenced() { return _writeFence || _remoteFence; }
 /** @type {Set<any>} */
 const _fencedDirty = new Set();
 
+/** W11 refuter: what a merge save's lock callback returns when the fence stopped it - the save
+ *  settles (whenSaved stays true, as before) but is no landed write, so it never tells
+ *  StorageHealth it succeeded or cancels the STORE-4 retry. */
+const _NOT_WRITTEN = /** @type {any} */ (Object.freeze({ notWritten: true }));
+
 /**
  * Raise or lower the Clear-All write fence - this module's and IDBAdapter's together (the adapter's
  * stops the writers that bypass the stores). Lowered means the wipe did NOT happen (a delete failed,
@@ -564,7 +569,8 @@ export function CachedStore(storageKey, defaultVal, opts) {
             self._clearWriteRetry();
             // A landed write lifts StorageHealth's READONLY override from an
             // earlier failure — nothing else ever reports a success to it.
-            if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteSuccess();
+            // W11: named, so it lifts only this store's failure, never another's.
+            if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteSuccess(storageKey);
           }, function (err) {
             // A fence rose while this write waited on the database's open (W8): not saved, not a
             // storage failure. Saved again when the fences come down, like a save stopped up front.
@@ -575,7 +581,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
             // W7.4: bare-global (typeof) guard mirrors the StorageHealth line
             // below — cached-store deliberately holds no imports (see header).
             if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('store', 'IDB write failed: ' + idbStoreName + ' — ' + ((err && err.name) || err));
-            if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);
+            if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err, storageKey);
             // STORE-4: a fire-and-forget write that fails used to drop the edit
             // silently if no later mutation re-flushed it. Schedule a bounded
             // re-flush of the LATEST cache so a transient quota/abort blip recovers.
@@ -619,9 +625,9 @@ export function CachedStore(storageKey, defaultVal, opts) {
       const p = navigator.locks.request('vot-store:' + name, function () {
         // v04-02: a merge queued behind this lock may run after the fence went
         // up; its get would reopen the deleted database and its put refill it.
-        if (_fenced()) { _fencedDirty.add(self); return undefined; }
+        if (_fenced()) { _fencedDirty.add(self); return _NOT_WRITTEN; }
         return IDBAdapter.get(name, 'v').then(function (theirsRaw) {
-          if (_fenced()) { _fencedDirty.add(self); return undefined; }
+          if (_fenced()) { _fencedDirty.add(self); return _NOT_WRITTEN; }
           const theirs = (theirsRaw === undefined) ? null : theirsRaw;
           // ── synchronous merge + adopt: no `await` between reading `_cache`
           //    and reassigning it, so a concurrent in-place mutation of the old
@@ -665,15 +671,16 @@ export function CachedStore(storageKey, defaultVal, opts) {
         });
       });
       this._lastWrite = p;
-      p.then(function () {
+      p.then(function (r) {
+        if (r === _NOT_WRITTEN) return;   // the fence stopped it: saved again when the fence comes down
         self._clearWriteRetry();   // STORE-4: merged write durable — cancel any pending retry
-        if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteSuccess();
+        if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteSuccess(storageKey);   // W11: this store's only
       }, function (err) {
         if (err && err.name === 'WriteFenced') { _fencedDirty.add(self); return; }   // see _save
         if (_isNewerDatabase(err)) { _reportNewerDatabase(storageKey); return; }        // W8, see _save
         console.error('IDB merged write failed for', name, err);
         if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('store', 'IDB merged write failed: ' + name + ' — ' + ((err && err.name) || err));
-        if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);
+        if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err, storageKey);
         self._scheduleWriteRetry();   // STORE-4: bounded re-flush on a transient failure
       });
     },
@@ -1393,14 +1400,19 @@ export async function clearLegacyLs() {
   }
   if (alreadyDone) return;
 
-  // SAFETY (U19): never wipe legacy LS while any IDB store is still 'pending'.
+  // SAFETY (U19): never wipe legacy LS while any IDB store has not loaded.
   // The per-store legacy-LS fallback reads these vot-* keys DURING hydration to
   // migrate pre-W2.4 data into IDB — clearing them first would destroy it.
   // HydrationGate already awaits hydrateAllStores() before calling us; this
   // turns the "MUST run after hydration" comment into a real guard, so a future
   // reorder fails SAFE (defers to next boot) instead of wiping un-migrated data.
-  if (hasAnyPendingStores()) {
-    console.warn('clearLegacyLs: hydration still pending; deferring cleanup to next boot');
+  // W11 (sweep 2026-10-13): 'degraded' counts too. hydrateAllStores() resolves
+  // with a store degraded when its first read failed or timed out; that store
+  // seeds from its legacy key only when a background retry reads it later, so
+  // the old 'pending'-only guard deleted its one copy and it stayed empty.
+  const notLoaded = storesNotLoaded();
+  if (notLoaded.length > 0) {
+    console.warn('clearLegacyLs: ' + notLoaded.length + ' store(s) not loaded yet; deferring cleanup to next boot');
     return;
   }
 
