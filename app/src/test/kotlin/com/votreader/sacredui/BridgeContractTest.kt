@@ -121,6 +121,7 @@ class BridgeContractTest {
         // directly by src/utils/data-safety.js, guarded.
         "weeklyCopySave" to 1,
         "weeklyCopyStatus" to 0,
+        "weeklyCopyClear" to 0,
         // sh1: the phone's share sheet. Mirrored by platform-bridge.js androidImpl
         // (utils/copy-share.js calls PlatformBridge.shareText before navigator.share).
         "shareText" to 1,

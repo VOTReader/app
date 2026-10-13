@@ -68,11 +68,13 @@ class AppInterfaceTest {
         val copies = mockk<DownloadsCopy>()
         every { copies.save("{}", any()) } returns true
         every { copies.statusJson() } returns "{\"supported\":true,\"count\":1,\"newestAt\":5}"
+        every { copies.clear() } returns true
         val vm = mockk<MainViewModel>(relaxed = true)
         every { vm.weeklyCopies } returns copies
         val (app, _, _) = newSubject(vm = vm)
         assertEquals(true, app.weeklyCopySave("{}"))
         assertEquals("{\"supported\":true,\"count\":1,\"newestAt\":5}", app.weeklyCopyStatus())
+        assertEquals(true, app.weeklyCopyClear())
     }
 
     // ─── The native player (m3): thin delegations to the port ───────────

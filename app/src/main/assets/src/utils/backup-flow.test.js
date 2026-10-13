@@ -542,6 +542,24 @@ describe('Clear All Personal Data', () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
+  it('deletes the snapshots and the weekly copies in Downloads, and a weekly copy turned off stays off (vs3)', async () => {
+    const clearSnapshots = vi.fn(async () => true);
+    const clearWeeklyCopies = vi.fn(() => true);
+    put('DataSafety', { clearSnapshots, clearWeeklyCopies });
+    localStorage.setItem('vot-weekly-copy-off', '1');
+    await createBackupFlow(ctx).clearAllPersonalData();
+    expect(clearSnapshots).toHaveBeenCalledTimes(1);
+    expect(clearWeeklyCopies).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('vot-weekly-copy-off')).toBe('1');
+    expect(lastToast()).toBe('All personal data cleared. Reloading…');
+  });
+
+  it('a weekly copy that will not delete never blocks the wipe', async () => {
+    put('DataSafety', { clearSnapshots: async () => true, clearWeeklyCopies: () => { throw new Error('binder'); } });
+    await createBackupFlow(ctx).clearAllPersonalData();
+    expect(lastToast()).toBe('All personal data cleared. Reloading…');
+  });
+
   it('a user-data database that will not delete fails visibly and lifts the fence', async () => {
     globalThis.indexedDB.deleteDatabase.mockImplementation((name) => {
       const req = {};

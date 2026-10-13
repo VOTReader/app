@@ -320,7 +320,7 @@ function PrivacyPage() {
       <p>Your notes, highlights, bookmarks, journal and reading record are kept only on this device. Nothing you write is sent anywhere.</p>
       <p>The phone app keeps no record of how you use it and sends nothing: no statistics, no analytics, no ads. The website version counts visits with Cloudflare Web Analytics (one anonymous page view per visit, no cookies, nothing you read or write).</p>
       <p>Recordings, songs and Garden pictures stream from the app&rsquo;s own release files when you open them. A recording you save for offline is kept on this device.</p>
-      <p>Backups are files you save yourself. The weekly copy, where the phone app makes one, goes to Downloads/VOTReader on this phone.</p>
+      <p>Backups are files you save yourself. The weekly copy, where the phone app makes one, goes to Downloads/VOTReader on this phone. Clear All My Data deletes those copies; uninstalling the app leaves them, like any backup you saved, until you delete them.</p>
       <ExternalLink href="https://votreader.github.io/app/privacy.html">The full privacy policy</ExternalLink>
     </div>
   );
@@ -1667,7 +1667,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 <div className="note-sheet-title" id="settings-wipe-title">Delete All Personal Data</div>
               </div>
               <p className="settings-sheet-text">
-                This permanently erases every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, and the search cache, then resets all settings to defaults.{' '}
+                This permanently erases every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, the search cache, and the automatic copies of your data{weekly && weekly.supported ? ', including the weekly copies in Downloads/VOTReader' : ''}, then resets all settings to defaults.{' '}
                 <strong className="settings-sheet-warn">This cannot be undone.</strong> Back up first if you want to keep them.
               </p>
               <button type="button" className="settings-sheet-link" disabled={backupBusy} onClick={(e) => { closeWipe(); exportNow(e); }}>Back up now first</button>

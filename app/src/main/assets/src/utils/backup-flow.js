@@ -36,6 +36,10 @@ export function _localStamp(d) {
 // seam — no import path from here; the lifecycle tests pin both sides).
 const RESTORE_INFLIGHT_KEY = 'vot-restore-inflight';
 
+// The reader's "weekly copy off" choice, which Clear All keeps (vs3). Keep the literal
+// in sync with WEEKLY_OFF_KEY in utils/data-safety.js (bundle-b; no import from here).
+const WEEKLY_OFF_KEY = 'vot-weekly-copy-off';
+
 // Android's native import refuses a v3 manifest over MAX_V3_MANIFEST_SIZE
 // (16 MiB, StorageManager.kt). Warn at EXPORT time — while the data still
 // lives on this device — once the manifest crosses 75% of that, so an
@@ -1047,9 +1051,13 @@ export function createBackupFlow(ctx) {
       // datasafe 10-05: the automatic snapshots copy the data being cleared; they
       // go with it (the phone app keeps them outside the database, so the deletes
       // below would not reach them).
+      // vs3: so do the weekly copies in Downloads/VOTReader, which outlive an uninstall.
+      const ds = /** @type {any} */ (globalThis).DataSafety;
       try {
-        const ds = /** @type {any} */ (globalThis).DataSafety;
         if (ds && typeof ds.clearSnapshots === 'function') await ds.clearSnapshots();
+      } catch (_e) { /* best-effort: never block the data wipe on it */ }
+      try {
+        if (ds && typeof ds.clearWeeklyCopies === 'function') ds.clearWeeklyCopies();
       } catch (_e) { /* best-effort: never block the data wipe on it */ }
       // W2.4 + W2.4-hotfix: Clear ALL user-data IDB databases. The
       // pre-hotfix version fired deleteDatabase() then reloaded
@@ -1086,7 +1094,9 @@ export function createBackupFlow(ctx) {
         console.warn('clear all: non-critical database(s) failed to delete:', failedCaches.join(', '));
         try { if (window.DiagnosticLog) window.DiagnosticLog.warn('settings', 'Clear All: failed to delete ' + failedCaches.join(', ')); } catch (_e) { /* best-effort */ }
       }
-      _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ } });
+      // vs3: a weekly copy the reader turned off stays off; a wipe for privacy must not
+      // start writing their data to Downloads again.
+      _collectVotKeys().filter((k) => k !== WEEKLY_OFF_KEY).forEach((k) => { try { localStorage.removeItem(k); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ } });
       // Wave-0: was alert('All personal data cleared…') — a native blocking
       // dialog. Same toast-then-reload pattern the import path uses: the
       // persistent toast renders first, the 600ms delay lets it paint.

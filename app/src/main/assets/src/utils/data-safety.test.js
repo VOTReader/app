@@ -244,6 +244,7 @@ describe('the weekly copy in Downloads/VOTReader (dl-weekly)', () => {
       files,
       weeklyCopySave: vi.fn((json) => { files.push({ json, at: Date.now() }); files.splice(0, Math.max(0, files.length - 4)); return true; }),
       weeklyCopyStatus: () => JSON.stringify({ supported, count: files.length, newestAt: files.length ? files[files.length - 1].at : 0 }),
+      weeklyCopyClear: vi.fn(() => { files.length = 0; return true; }),
     };
   }
   const DAY = 86400000;
@@ -284,6 +285,31 @@ describe('the weekly copy in Downloads/VOTReader (dl-weekly)', () => {
     expect(DataSafety.weeklyStatus({ bridge }).on).toBe(true);
     expect(DataSafety.weeklyStatus({ bridge: fakeBridge(false) }).supported).toBe(false);
     expect(DataSafety.weeklyStatus().supported).toBe(false);          // no AndroidBridge (the web app)
+  });
+
+  it('Clear All deletes every copy, and a pass already saving writes no new one (vs3)', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    const bridge = fakeBridge();
+    for (let day = 0; day < 22; day += 7) await runOn(day, memorySink(), bridge);
+    expect(DataSafety.weeklyStatus({ bridge }).count).toBe(4);
+    // Clear All lands while the day's snapshot is still saving (this module keeps the
+    // cleared mark for the page's life: the wipe reloads it).
+    const sink = memorySink();
+    const save = sink.save;
+    let cleared;
+    sink.save = vi.fn(async (json) => { cleared = DataSafety.clearWeeklyCopies({ bridge }); return save(json); });
+    await runOn(30, sink, bridge);
+    expect(cleared).toBe(true);
+    expect(bridge.weeklyCopyClear).toHaveBeenCalledTimes(1);
+    expect(DataSafety.weeklyStatus({ bridge }).count).toBe(0);
+  });
+
+  it('a copy that will not delete is logged; the web app has none to clear', async () => {
+    const { DiagnosticLog } = await import('./diagnostic-log.js');
+    const warn = vi.spyOn(DiagnosticLog, 'warn');
+    expect(DataSafety.clearWeeklyCopies({ bridge: { ...fakeBridge(), weeklyCopyClear: () => false } })).toBe(false);
+    expect(warn).toHaveBeenCalledWith('data-health', 'Clear All could not delete the weekly copies in Downloads');
+    expect(DataSafety.clearWeeklyCopies()).toBe(true);                // no AndroidBridge (the web app)
   });
 
   it('is a backup Import accepts, and importing it never prunes journal photos', async () => {
