@@ -70,26 +70,34 @@ function _writeJournalDraft(eid, title, blocks, mood) {
 /** Once the store's latest write is on disk, this entry's draft (the one named `n`, or
  *  whichever it holds now) can no longer save anything the store does not: mark it so the
  *  next draft write may drop it. The store's memory then equals its disk only if it is
- *  loaded (else its writes are queued and whenSaved answers for an older one), its writes
- *  are not fenced (a fenced save starts no write, or resolves unwritten; refuter r2), and
- *  no other write started before that one was confirmed (the fence coming down re-saves;
- *  the same guard as use-persisted-state's writeUnion). */
+ *  loaded (else its writes are queued and whenSaved answers for an older one) and its
+ *  writes are not fenced (a fenced save starts no write, or resolves unwritten; refuter
+ *  r2). A write that started meanwhile (the next entry's save, the fence coming down and
+ *  re-saving) writes the whole store, these words included: wait for that one instead
+ *  (refuter r3: giving up there left confirmed drafts behind for good). */
 function _markJournalDraftDurableWhenSaved(eid, n) {
   var store = /** @type {any} */ (JournalStore);
   if (!eid || typeof store.whenSaved !== 'function') return;
-  var fenced = function() { return typeof isStoreWriteFenced === 'function' && isStoreWriteFenced(); };
-  if ((typeof store.isReady === 'function' && !store.isReady()) || fenced()) return;
+  var settled = function() {
+    return !(typeof store.isReady === 'function' && !store.isReady())
+      && !(typeof isStoreWriteFenced === 'function' && isStoreWriteFenced());
+  };
+  if (!settled()) return;
   if (n == null) { var cur = _readJournalDrafts()[eid]; if (!cur || !cur.n) return; n = cur.n; }
-  var lastWrite = store._lastWrite;
-  store.whenSaved().then(function(ok) {
-    if (!ok || fenced() || store._lastWrite !== lastWrite) return;
-    try {
-      var drafts = _readJournalDrafts();
-      if (!drafts[eid] || drafts[eid].n !== n) return; // replaced since: its own write marks it
-      drafts[eid].durable = true;
-      _storeJournalDrafts(drafts);
-    } catch (_e) { /* best-effort */ }
-  }, function() { /* never rejects; nothing to mark */ });
+  var wait = function() {
+    var lastWrite = store._lastWrite;
+    store.whenSaved().then(function(ok) {
+      if (!ok || !settled()) return;
+      if (store._lastWrite !== lastWrite) { wait(); return; }
+      try {
+        var drafts = _readJournalDrafts();
+        if (!drafts[eid] || drafts[eid].n !== n) return; // replaced since: its own write marks it
+        drafts[eid].durable = true;
+        _storeJournalDrafts(drafts);
+      } catch (_e) { /* best-effort */ }
+    }, function() { /* never rejects; nothing to mark */ });
+  };
+  wait();
 }
 function _clearJournalDraft(eid) {
   try {
