@@ -31,6 +31,10 @@ const WAVE_STORE_BARS = 48;
 /** Foreground recording-length cap (NTV-1): the seconds tick auto-stops here.
  *  Bounds the native stop() whole-file read (96 kbps × 5 min ≈ 3.6 MB). */
 const MAX_RECORDING_SECONDS = 300; // 5 min
+// Seconds the scrubber's arrow keys move.
+const SCRUB_STEP_SECONDS = 5;
+// No Try again goes with this: there is no take to fetch again, only a new one to record (W15).
+const NOTHING_RECORDED = 'Nothing was recorded. Close this and record again, speaking after the timer starts.';
 
 /**
  * Max-pool a raw amplitude array down to `buckets` bars (JRNL-3). Peaks survive
@@ -61,10 +65,15 @@ export function JournalRecordingSheet({ onSave, onClose }) {
   var useEffect = React.useEffect;
   var useRef = React.useRef;
 
-  // 'requesting' | 'recording' | 'paused' | 'preview' | 'error'
+  // 'requesting' | 'recording' | 'paused' | 'preview' | 'retrieving' | 'error'
+  // 'retrieving' = Try again is re-fetching a finished take: no recorder is running (W15).
   var _stage = useState('requesting');
   var stage = _stage[0];
   var setStage = _stage[1];
+  // The stage as of the latest render, for code that runs from an older render's closure: the
+  // seconds tick (started at capture or resume) calls stopRecording at the 5-minute cap (W15).
+  var stageRef = useRef(stage);
+  stageRef.current = stage;
 
   var _err = useState(null);
   var error = _err[0];
@@ -238,7 +247,9 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       function finalize(audioBlob) {
         if (cancelled) return;
         if (!audioBlob || audioBlob.size === 0) {
-          setError('Nothing was recorded. Try again and speak after the timer starts.');
+          // Nothing to retry: Try again would fetch the same empty file (W15).
+          retryFetchRef.current = null;
+          setError(NOTHING_RECORDED);
           setStage('error');
           return;
         }
@@ -418,7 +429,8 @@ export function JournalRecordingSheet({ onSave, onClose }) {
                      nothing in it. */
                   if (servedIsEmpty(servedName)) {
                     console.warn('recording recovered as an empty file', servedName);
-                    setError('That recording is empty — nothing was captured. Try again and speak after the timer starts.');
+                    retryFetchRef.current = null;
+                    setError('That recording is empty — nothing was captured. Close this and record again, speaking after the timer starts.');
                     setStage('error');
                     return;
                   }
@@ -597,10 +609,14 @@ export function JournalRecordingSheet({ onSave, onClose }) {
   }
 
   function stopRecording() {
+    // stageRef, not `stage`: the 5-minute auto-stop calls this from the render that started the
+    // tick, whose `stage` is stale, and dropped the running segment (a 5-minute take read 0:01).
+    var cur = stageRef.current;
+    if (cur !== 'recording' && cur !== 'paused') return;   // no recorder is running
     // Snapshot duration BEFORE asking the bridge to stop — its onstop runs
     // async and we want the UI to show the correct elapsed time immediately.
     var totalMs = accumulatedMsRef.current;
-    if (stage === 'recording') totalMs += (Date.now() - startTimeRef.current);
+    if (cur === 'recording') totalMs += (Date.now() - startTimeRef.current);
     previewDurationRef.current = Math.max(1, Math.floor(totalMs / 1000));
     if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = 0; }
     if (ampRef.current) { clearInterval(ampRef.current); ampRef.current = 0; }
@@ -643,7 +659,8 @@ export function JournalRecordingSheet({ onSave, onClose }) {
   function persistRecording() {
     var blob = previewBlobRef.current;
     if (!blob || !blob.size) {
-      setError('Nothing was recorded. Try again and speak after the timer starts.');
+      retryFetchRef.current = null;
+      setError(NOTHING_RECORDED);
       setStage('error');
       return;
     }
@@ -707,17 +724,36 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     setProgress(dur > 0 ? Math.min(1, (a.currentTime || 0) / dur) : 0);
   }
 
-  function seekPreviewFromEvent(e) {
+  function seekPreviewTo(ratio) {
     var a = previewAudioRef.current;
     if (!a) return;
-    var rect = e.currentTarget.getBoundingClientRect();
-    var x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-    var ratio = Math.max(0, Math.min(1, x / rect.width));
+    var r = Math.max(0, Math.min(1, ratio));
     var dur = previewDurationRef.current || a.duration || 0;
     if (dur > 0) {
-      a.currentTime = ratio * dur;
-      setProgress(ratio);
+      try { a.currentTime = r * dur; } catch (_e) { /* not seekable yet: the bar still moves */ }
+      setProgress(r);
     }
+  }
+
+  function seekPreviewFromEvent(e) {
+    var rect = e.currentTarget.getBoundingClientRect();
+    var x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    seekPreviewTo(x / rect.width);
+  }
+
+  // The scrubber's keyboard (W15: role=slider used to have none): arrows step, Home/End jump.
+  function onScrubKey(e) {
+    var dur = previewDurationRef.current || seconds;
+    if (!(dur > 0)) return;
+    var at = (progress || 0) * dur;
+    var to = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? at + SCRUB_STEP_SECONDS
+      : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? at - SCRUB_STEP_SECONDS
+        : e.key === 'Home' ? 0
+          : e.key === 'End' ? dur
+            : null;
+    if (to === null) return;
+    e.preventDefault();
+    seekPreviewTo(to / dur);
   }
 
   var fmtTime = function(s) {
@@ -752,12 +788,20 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         />
       );
     }
+    var dur = previewDurationRef.current || seconds;
+    var nowS = Math.round((prog || 0) * dur);
     return (
       <div
         className="jrn-rec-waveform is-scrubbable"
         onClick={seekPreviewFromEvent}
+        onKeyDown={onScrubKey}
         role="slider"
+        tabIndex={0}
         aria-label="Scrub recording"
+        aria-valuemin={0}
+        aria-valuemax={dur}
+        aria-valuenow={nowS}
+        aria-valuetext={fmtTime(nowS) + ' of ' + fmtTime(dur)}
       >
         {bars}
       </div>
@@ -780,9 +824,20 @@ export function JournalRecordingSheet({ onSave, onClose }) {
             {retryFetchRef.current && (
               <button
                 className="jrn-rec-confirm-btn"
-                onClick={function() { setError(''); setStage('recording'); retryFetchRef.current(); }}
+                onClick={function() { setError(''); setStage('retrieving'); retryFetchRef.current(); }}
               >Try again</button>
             )}
+          </div>
+        </div>
+      );
+    }
+    if (stage === 'retrieving') {
+      // Try again is fetching the finished take; finalize() moves on to the preview or back to error.
+      return (
+        <div className="jrn-rec-content">
+          <div className="jrn-rec-requesting" role="status">Getting your recording…</div>
+          <div className="jrn-rec-actions">
+            <button className="jrn-rec-cancel" onClick={discard}>Close</button>
           </div>
         </div>
       );

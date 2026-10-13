@@ -1007,6 +1007,9 @@ describe('PlatformBridge — Web recording (MediaRecorder + AnalyserNode)', () =
     };
     mockGetUserMedia = vi.fn(() => Promise.resolve(mockStream));
     /** @type {any} */ (globalThis.navigator).mediaDevices = { getUserMedia: mockGetUserMedia };
+    // The bridge's contract: the caller installs __onMicPermissionResult BEFORE asking (the recording
+    // sheet always does). Since W15 a grant with no one waiting is stopped, not stored.
+    /** @type {any} */ (globalThis.window).__onMicPermissionResult = vi.fn();
     // MediaRecorder stub — default to webm/opus supported
     setupMediaRecorderMock(['audio/webm;codecs=opus']);
     // AudioContext + AnalyserNode + MediaStreamSource
@@ -1051,6 +1054,35 @@ describe('PlatformBridge — Web recording (MediaRecorder + AnalyserNode)', () =
     bridge.requestMicPermission();
     await new Promise((r) => setTimeout(r, 0));
     expect(cb).toHaveBeenCalledWith(false);
+  });
+
+  // W15 (sweep 2026-10-13): closing the recording sheet while the browser's mic prompt is up, then
+  // clicking Allow, used to store the stream with nobody to use or stop it: the mic light stayed on.
+  it('a mic stream granted after the sheet stopped waiting is stopped, not stored (W15)', async () => {
+    /** @type {any} */ let grant;
+    mockGetUserMedia.mockImplementation(() => new Promise((r) => { grant = r; }));
+    /** @type {any} */ (globalThis.window).__onMicPermissionResult = vi.fn();
+    bridge.requestMicPermission();
+    delete (/** @type {any} */ (globalThis.window)).__onMicPermissionResult;   // the sheet closed mid-prompt
+    grant(mockStream);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockTracks[0].stop).toHaveBeenCalled();
+    expect(bridge.nativeRecordStart()).toBe('error:no-stream');
+  });
+
+  it('a new grant stops the unused stream it replaces (W15)', async () => {
+    const oldTrack = { stop: vi.fn(), kind: 'audio' };
+    const oldStream = { getTracks: vi.fn(() => [oldTrack]) };
+    mockGetUserMedia.mockImplementationOnce(() => Promise.resolve(oldStream));
+    /** @type {any} */ (globalThis.window).__onMicPermissionResult = vi.fn();
+    bridge.requestMicPermission();
+    await new Promise((r) => setTimeout(r, 0));
+    bridge.requestMicPermission();   // a second ask before anything recorded with the first stream
+    await new Promise((r) => setTimeout(r, 0));
+    expect(oldTrack.stop).toHaveBeenCalled();
+    expect(mockTracks[0].stop).not.toHaveBeenCalled();
+    expect(bridge.nativeRecordStart()).toBe('ok');
+    expect(mockMediaRecorderCtor).toHaveBeenCalledWith(mockStream, { mimeType: 'audio/webm;codecs=opus' });
   });
 
   it('requestMicPermission fires (false) when navigator.mediaDevices is absent', () => {

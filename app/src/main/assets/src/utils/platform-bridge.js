@@ -932,6 +932,15 @@ function webRequestMicPermission() {
   }
   navigator.mediaDevices.getUserMedia({ audio: true })
     .then((/** @type {any} */ stream) => {
+      /** @param {any} s */
+      const stopStream = (s) => { try { s.getTracks().forEach((/** @type {any} */ t) => t.stop()); } catch (_e) { /* best-effort */ } };
+      // W15: nobody is waiting any more (the sheet closed, or its watchdog gave up, while the
+      // browser's prompt was up). Storing the stream left the mic on with no one to stop it.
+      if (typeof (/** @type {any} */ (window))[cbName] !== 'function') { stopStream(stream); return; }
+      // A stream from an earlier ask that never started recording is replaced, so stop it first.
+      if (_webRecorder.mediaStream && _webRecorder.mediaStream !== stream && !_webRecorder.mediaRecorder) {
+        stopStream(_webRecorder.mediaStream);
+      }
       // Store the stream for nativeRecordStart to use
       _webRecorder.mediaStream = stream;
       fire(true);

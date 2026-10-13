@@ -753,3 +753,86 @@ describe('JournalRecordingSheet holds the app-update reload while open (ds2)', (
     expect(updateHolds()).toEqual([]);
   });
 });
+
+/* W15 (sweep 2026-10-13). Try again re-fetches a finished take, yet it put the sheet back in the
+   'recording' stage: Pause, Finish and Cancel were live over a fetch, and Finish ran stopRecording on
+   an idle recorder and jumped to an empty preview. The 5-minute auto-stop read a stale stage and
+   showed a 1-second take. An empty file offered Try again, which only fetched the same empty file.
+   And the scrubber claimed role=slider with no value and no keyboard. */
+describe('JournalRecordingSheet W15: honest stages, copy and scrubber', () => {
+  const realFetch = globalThis.fetch;
+  const realCreate = URL.createObjectURL;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    window.JournalMediaStore = {
+      put: vi.fn(() => Promise.resolve('media-1')),
+      delete: vi.fn(() => Promise.resolve()),
+      markLinked: vi.fn(() => Promise.resolve()),
+    };
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    globalThis.fetch = realFetch;
+    URL.createObjectURL = realCreate;
+    delete window.JournalMediaStore;
+  });
+
+  it('Try again shows the recording being fetched, with no recorder controls over it', async () => {
+    MockBridge.isAndroid = true;
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.reject(new Error('server gone'))));
+    renderRecording(() => {});
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, 'blob:mock/served-file');
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => new Promise(() => {})));   // the retry is still in flight
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Try again' })); });
+    expect(screen.queryByRole('button', { name: 'Finish' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull();
+    expect(screen.queryByText('Recording')).toBeNull();
+    expect(screen.getByText(/getting your recording/i)).toBeTruthy();
+    expect(MockBridge.nativeRecordStop).not.toHaveBeenCalled();
+  });
+
+  it('an empty recording offers no Try again (it would fetch the same empty file) and says to record again', async () => {
+    MockBridge.isAndroid = true;
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob([], { type: 'audio/mp4' })) })));
+    renderRecording(() => {});
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, 'blob:mock/served-file');
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(screen.getByText(/nothing was recorded/i)).toBeTruthy();
+    expect(screen.getByText(/record again/i)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  });
+
+  it('the 5-minute auto-stop shows the whole take, not one second', () => {
+    renderRecording(() => {});
+    act(() => { vi.advanceTimersByTime(300 * 1000); });
+    expect(MockBridge.nativeRecordStop).toHaveBeenCalled();
+    expect(screen.getByText('/ 5:00')).toBeTruthy();
+  });
+
+  it('the scrubber is a real slider: it reports its value and moves with the arrow keys', async () => {
+    URL.createObjectURL = /** @type {any} */ (vi.fn(() => 'blob:mock/preview'));
+    renderRecording(() => {});
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 65000, 'audio/webm', new Blob(['take'], { type: 'audio/webm' }));
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    const slider = screen.getByRole('slider', { name: 'Scrub recording' });
+    expect(slider.getAttribute('tabindex')).toBe('0');
+    expect(slider.getAttribute('aria-valuemin')).toBe('0');
+    expect(slider.getAttribute('aria-valuemax')).toBe('65');
+    expect(slider.getAttribute('aria-valuenow')).toBe('0');
+    expect(slider.getAttribute('aria-valuetext')).toBe('0:00 of 1:05');
+    fireEvent.keyDown(slider, { key: 'ArrowRight' });
+    expect(slider.getAttribute('aria-valuenow')).toBe('5');
+    fireEvent.keyDown(slider, { key: 'End' });
+    expect(slider.getAttribute('aria-valuenow')).toBe('65');
+    fireEvent.keyDown(slider, { key: 'Home' });
+    expect(slider.getAttribute('aria-valuenow')).toBe('0');
+  });
+});
