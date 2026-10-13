@@ -223,6 +223,19 @@ describe('JournalHubScreen — unclaimed recordings are offered back', () => {
     expect(window.JournalMediaStore.markLinked).toHaveBeenCalledWith('m_lost');
   });
 
+  it('W16 refuter: a recovered recording is an entry like any other, so it is counted once', async () => {
+    // Every other entry with content is counted (the New-Entry flow's first save),
+    // and every delete or exit prune of a counted entry takes one back; a recovered
+    // entry that was never counted made a later delete under-count the rest.
+    setupHub({ unclaimed: [{ id: 'm_lost', type: 'audio', duration: 8, created: 1757000000000, unlinked: true }] });
+    window.JournalStatsStore = { recordNewEntry: vi.fn() };
+    try {
+      await act(async () => { render(<JournalHubScreen />); });
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /recover/i })); });
+      expect(window.JournalStatsStore.recordNewEntry).toHaveBeenCalledTimes(1);
+    } finally { delete window.JournalStatsStore; }
+  });
+
   it('renders nothing when there is nothing unclaimed', async () => {
     setupHub({ unclaimed: [] });
     await act(async () => { render(<JournalHubScreen />); });
