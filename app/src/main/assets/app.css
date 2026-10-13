@@ -578,7 +578,6 @@
         /* ── Semantic accent tokens ── */
         --danger:           #ef9a9a;   /* destructive action text/icon color */
         --settings-warning: #d18f2e;   /* warning amber (Clear Progress) */
-        --settings-danger:  #c0392b;   /* danger deep red (Clear All) */
         --input-text:       var(--cream);  /* light mode override below */
         --white:            #ffffff;       /* pure white (theme-agnostic) */
       }
@@ -3721,7 +3720,8 @@
     .settings-clear-btn:disabled { opacity:0.3; cursor:default; pointer-events:none; }
     .settings-clear-btn.warning { color:var(--settings-warning); border-color:var(--settings-warning); font-size:var(--fs-10); }
     @media (hover: hover) { .settings-clear-btn.warning:hover { background:rgba(209,143,46,0.1); } }
-    .settings-clear-btn.danger { color:var(--settings-danger); border-color:var(--settings-danger); font-size:var(--fs-10); }
+    /* W67: was --settings-danger #c0392b, 3.9:1 dark / 4.4:1 light for 10 px text; --danger is AA in both themes. */
+    .settings-clear-btn.danger { color:var(--danger); border-color:var(--danger); font-size:var(--fs-10); }
     @media (hover: hover) { .settings-clear-btn.danger:hover { background:rgba(192,57,43,0.08); } }
     /* (Mark Complete button styles removed 2026-08-02 — the component was retired; zero source refs.) */
     /* ── Progress table ── */
