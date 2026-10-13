@@ -265,6 +265,28 @@ describe('song-keep on the web — the offline-songs store', () => {
       expect(SongKeep.statusOf(A1)).toBe('none');
     });
 
+    // W64 refuter round 3: on a cold start the stored list loads late; a Remove all (or remove) before it landed read
+    // an empty kept list, and the load then brought the song back as kept.
+    it.each([
+      ['Remove all', () => SongKeep.removeAll()],
+      ['remove', () => SongKeep.remove([A1])],
+    ])('%s before the stored list has loaded takes the songs it then finds', async (_label, stop) => {
+      store.map.set(A1, { id: A1, blob: new Blob([bytes(1000)]), bytes: 1000, sha256: '', keptAt: 1 });
+      lib.kept = [A1];
+      let listIn = null;
+      // A read snapshots what is stored when it starts, as an IndexedDB getAll does.
+      store.all = vi.fn(() => { const snap = [...store.map.values()]; return new Promise((r) => { listIn = () => r(snap); }); });
+      void SongKeep.ready();
+      await vi.waitFor(() => expect(listIn).toBeTypeOf('function'));
+      const done = stop();
+      listIn();
+      await done;
+      await SongKeep.ready();   // the late load has landed
+      expect(SongKeep.keptIds()).toEqual([]);
+      expect(store.map.size).toBe(0);
+      expect(lib.kept).toEqual([]);
+    });
+
     it('a Cancel before a later Keep of the same song does not stop that Keep', async () => {
       SongKeep.cancel([A1]);
       await SongKeep.keep([A1]);

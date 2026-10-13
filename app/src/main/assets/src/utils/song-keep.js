@@ -498,6 +498,9 @@ async function remove(ids) {
     _notify();
     return;
   }
+  // A cold start's stored list may still be on its way: it lands first, or it brought the song back after (W64
+  // refuter round 3).
+  await _ensureLoaded();
   const st = _store();
   for (const id of list) {
     _kept.delete(id);
@@ -509,8 +512,9 @@ async function remove(ids) {
 }
 
 /** Every kept song off this phone, and nothing more on its way. */
-function removeAll() {
+async function removeAll() {
   _allStoppedAt = ++_stopSeq;
+  await _ensureLoaded();   // what a cold start's stored list holds is kept too (W64 refuter round 3)
   const busy = _native() ? [] : _queue.concat(_active ? [_active] : []);
   cancel(busy);
   // The song on its way is not kept yet (keptIds), but "remove all" takes it too: off the backup's list (W64).
