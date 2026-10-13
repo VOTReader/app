@@ -90,7 +90,7 @@ function realBytes(url) {
   try { return new Uint8Array(readFileSync(fp)); } catch { return null; }
 }
 
-function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, clientCount = 1, resolveKeys = false, registration = undefined } = {}) {
+function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, clientCount = 1, resolveKeys = false, registration = undefined, scriptPath = undefined } = {}) {
   const handlers = {};
   const cacheModes = [];   // every mode the install precache actually requested
   const attempts = new Map();   // url -> how many times install fetched it
@@ -126,7 +126,8 @@ function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, cli
   }));
   const self = {
     addEventListener: (t, fn) => { handlers[t] = fn; },
-    location: { origin: 'https://app.test' },
+    // scriptPath: where the worker is served (the PWA's is /app/service-worker.js); unset, the location has no path.
+    location: scriptPath ? { origin: 'https://app.test', pathname: scriptPath } : { origin: 'https://app.test' },
     skipWaiting: () => {},
     clients: { claim: async () => { claimed.count += 1; }, matchAll: async () => fakeClients },
     registration,
@@ -483,6 +484,91 @@ describe('service-worker fetch + activate runtime (TEST-2)', () => {
     // keeps the old controller while its old core cache is deleted above —
     // sw-register's reload never happens and the tab 503s offline.
     expect(sw.claimed.count).toBe(1);
+  });
+});
+
+/* THE RETIRED SCREEN BUNDLES ANSWER A RELOAD (lz1, 2026-10-13). bundle-e..h and their screens-e..h.min.css were folded
+   into bundle-d / app.min.css. An OLD page this worker claims still lazy-loads them by name; sw-register reloads a claimed
+   page only when it started controlled, so a page whose FIRST worker claimed it never learns of the takeover, and the
+   server no longer has the files: "Couldn't load this section." with a Try again that 404s forever (lz1 refuter round 1).
+   This worker answers those names itself, offline too: the script reloads the page onto this build, once. */
+describe('service-worker — the retired screen bundles answer a reload (lz1)', () => {
+  const RETIRED = ['bundle-e', 'bundle-f', 'bundle-g', 'bundle-h'];
+
+  it('answers an old page\'s dist/bundle-e..h.js with a reload script, never the network', async () => {
+    for (const name of RETIRED) {
+      const netCalls = [];
+      const fetchImpl = async (r) => { netCalls.push(r.url); return { ok: false, status: 404 }; };
+      const atRoot = bootSW({ fetchImpl });
+      const atApp = bootSW({ fetchImpl, scriptPath: '/app/service-worker.js' });   // the PWA's worker
+      for (const [sw, url] of [[atRoot, 'https://app.test/dist/' + name + '.js'], [atApp, 'https://app.test/app/dist/' + name + '.js?v=1']]) {
+        const res = await fetchEvent(sw, getReq(url));
+        expect(res.status).toBe(200);
+        expect(res.headers.get('Content-Type')).toMatch(/^text\/javascript/);
+        expect(await res.text()).toContain('location.reload()');
+      }
+      expect(netCalls).toEqual([]);
+    }
+  });
+
+  it('touches only its own dist/: the same names in another folder of the origin go to the network', async () => {
+    const netCalls = [];
+    const sw = bootSW({ fetchImpl: async (r) => { netCalls.push(r.url); return { ok: true, status: 200 }; }, scriptPath: '/app/service-worker.js' });
+    for (const url of ['https://app.test/preview/dist/bundle-e.js', 'https://app.test/app/old/dist/bundle-g.js', 'https://app.test/dist/screens-h.min.css']) {
+      await fetchEvent(sw, getReq(url));
+    }
+    expect(netCalls).toHaveLength(3);
+  });
+
+  it('answers the retired screens-e..h.min.css with an empty stylesheet (the old loader waits on it before the script)', async () => {
+    const netCalls = [];
+    const sw = bootSW({ fetchImpl: async (r) => { netCalls.push(r.url); throw new Error('offline'); } });
+    for (const letter of ['e', 'f', 'g', 'h']) {
+      const res = await fetchEvent(sw, getReq('https://app.test/dist/screens-' + letter + '.min.css'));
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Content-Type')).toMatch(/^text\/css/);
+      expect(await res.text()).toBe('');
+    }
+    expect(netCalls).toEqual([]);
+  });
+
+  it('leaves every live dist file to the normal routes', async () => {
+    const netCalls = [];
+    const sw = bootSW({ fetchImpl: async (r) => { netCalls.push(r.url); return { ok: true, status: 200 }; } });
+    for (const url of ['https://app.test/dist/bundle-d.js', 'https://app.test/dist/bundle-a.js', 'https://app.test/dist/app.min.css',
+      'https://app.test/dist/bundle-i.js', 'https://app.test/src/bundle-e.js']) {
+      await fetchEvent(sw, getReq(url));
+    }
+    expect(netCalls).toHaveLength(5);
+  });
+
+  it('the script reloads the page the way an update does, and only once a minute (no loop)', async () => {
+    const sw = bootSW({ fetchImpl: async () => ({ ok: false, status: 404 }) });
+    const src = await (await fetchEvent(sw, getReq('https://app.test/dist/bundle-g.js'))).text();
+    const store = new Map();
+    const sessionStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) };
+    const location = { reload: vi.fn() };
+    const events = [];
+    const win = { dispatchEvent: (e) => events.push(e.type) };
+    const runStub =() => new Function('window', 'sessionStorage', 'location', 'Event', src)(win, sessionStorage, location, Event);
+    runStub();
+    expect(location.reload).toHaveBeenCalledTimes(1);
+    expect(win.__votSwTookOver).toBe(true);                       // any other lazy load in the gap reloads too
+    expect(store.get('vot-update-reload')).toBe('1');             // update-toast.js: "VOTReader was just updated."
+    expect(events).toEqual(['vot:before-update-reload']);         // scroll, tabs and the playing clock are saved first
+    runStub();                                                    // the reloaded page asked again: something is wrong
+    expect(location.reload).toHaveBeenCalledTimes(1);             // no reload loop
+  });
+
+  it('this build neither ships nor precaches any retired name', () => {
+    for (const name of RETIRED) {
+      expect(SW_SRC).not.toContain("'./dist/" + name + ".js'");
+      expect(realBytes('./dist/' + name + '.js')).toBeNull();
+    }
+    for (const letter of ['e', 'f', 'g', 'h']) {
+      expect(SW_SRC).not.toContain("'./dist/screens-" + letter + ".min.css'");
+      expect(realBytes('./dist/screens-' + letter + '.min.css')).toBeNull();
+    }
   });
 });
 
