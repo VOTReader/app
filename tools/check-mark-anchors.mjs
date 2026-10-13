@@ -10,6 +10,9 @@
  * refuses such a regeneration (tools/fetch-answers.py --accept-shift, n5-08);
  * this gate covers every keyed collection, whatever edits it.
  *
+ * Each Bible Study prophecy card's paragraphs are an entry of their own
+ * (<id>:<group block>:<intro|ot|nt|vot>), keyed in the card (ProphecyCard).
+ *
  * It compares each staged keyed data file with HEAD's copy, entry by entry: an
  * unchanged block (same content, found once in each version) at a new index
  * is a shift. Edits in place, and additions or removals after the last
@@ -52,7 +55,20 @@ export function entriesOf(src) {
     seen.add(v);
     if (typeof v.id === 'string') {
       const list = Array.isArray(v.blocks) ? v.blocks : Array.isArray(v.paragraphs) ? v.paragraphs : null;
-      if (list && !out.has(v.id)) { out.set(v.id, list.map((b) => JSON.stringify(b))); return; }
+      if (list && !out.has(v.id)) {
+        out.set(v.id, list.map((b) => JSON.stringify(b)));
+        // A Bible Study prophecy card keys its paragraphs by their index IN THE CARD
+        // (letter:<id>:<group block>:<part>:<n>, ProphecyCard), so each card's list is an
+        // entry of its own: an insert inside a card moves its later paragraphs' marks (sweep mw14).
+        list.forEach((b, bi) => {
+          if (!b || b.type !== 'prophecy-group') return;
+          for (const part of ['intro', 'ot', 'nt', 'vot']) {
+            const inner = part === 'intro' ? b.intro : b[part] && b[part].blocks;
+            if (Array.isArray(inner)) out.set(v.id + ':' + bi + ':' + part, inner.map((x) => JSON.stringify(x)));
+          }
+        });
+        return;
+      }
     }
     for (const k of Object.keys(v)) walk(v[k], depth + 1);
   };
