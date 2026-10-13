@@ -476,6 +476,10 @@ export function useThumbnails({
   // breaking the captureActiveTabThumbnail [tabsEnabled] identity invariant.
   const themeRef = useRefMirror(theme);
   const captureInFlightRef = React.useRef(false);
+  // A capture asked for while one is in flight ({ urgent }), run once that one
+  // ends if the reader has moved to another page or theme meanwhile (sweep mw13:
+  // the bare in-flight return lost a quickly picked tab's capture).
+  const pendingCaptureRef = React.useRef(/** @type {null | { urgent: boolean }} */ (null));
   // Capture sequence + the pending other-theme capture timer. Each primary
   // capture bumps the sequence; the deferred themed capture aborts if a newer
   // primary superseded it (fresh scroll position or content).
@@ -500,7 +504,11 @@ export function useThumbnails({
   // capture comment below.
   const captureActiveTabThumbnail = React.useCallback(/** @param {{ urgent?: boolean }} [opts] */ async (opts) => {
     if (!tabsEnabled) return;
-    if (captureInFlightRef.current) return;
+    if (captureInFlightRef.current) {
+      const was = pendingCaptureRef.current;
+      pendingCaptureRef.current = { urgent: !!((opts && opts.urgent) || (was && was.urgent)) };
+      return;
+    }
     // AUTO-SCROLL SUPPRESSION. A capture is an html2canvas clone render plus a
     // ~900ms-deferred second render for the other theme — main-thread work that
     // competes directly with a main-thread scroll. The after-nav capture fires
@@ -602,11 +610,26 @@ export function useThumbnails({
     // visible page is never touched. (The old `capturing-thumb` body class
     // hid the floating chrome ON SCREEN for the full render — the owner's
     // "dice/dot/arrows blink out for a split second" glitch. Never re-add it.)
+    // When it fires it must still be on the page it belongs to (sweep mw13): a
+    // tab picked or a page turned since (a capture gated off by auto-scroll or
+    // the in-flight check never bumps the sequence) would put that page's
+    // picture under THIS key, and an auto-scroll run that started since is the
+    // main-thread scroll every capture path stays out of. Either way it drops;
+    // the overview falls back to the flip filter, and its open heals the card.
+    // The live check is enough: the clone is taken synchronously right after
+    // the call (html2canvas is loaded by the primary), so the page cannot
+    // change under the render.
+    const onOwnPage = () => {
+      const live = tabsRef.current[activeTabIdxRef.current];
+      return !!live && tabContentKey(live) === key
+        && !(document.body && document.body.classList.contains('autoscroll-running'));
+    };
     const scheduleOtherTheme = (delayMs) => {
       if (isGarden) return;
       variantTimerRef.current = setTimeout(async () => {
         variantTimerRef.current = null;
         if (captureSeqRef.current !== seq) return;        // superseded
+        if (!onOwnPage()) return;
         // Same calm gate as the primary: this render is just as heavy, and
         // 900ms after a capture is prime follow-up-tap territory. Re-defer
         // (seq-guarded) rather than land on an interaction. Urgency does not
@@ -664,6 +687,16 @@ export function useThumbnails({
         if (captureSeqRef.current !== seq) return; // superseded by a newer capture
         captureActiveTabThumbnail();
       }, 2500);
+    }
+    // A request that met the in-flight gate: this capture already covered it
+    // unless the reader moved to another page (or theme) meanwhile. The re-run
+    // bumps the sequence, which also retires any retry armed just above.
+    const pending = pendingCaptureRef.current;
+    pendingCaptureRef.current = null;
+    if (pending) {
+      const live = tabsRef.current[activeTabIdxRef.current];
+      const liveTheme = themeRef.current === 'light' ? 'light' : 'dark';
+      if (live && (tabContentKey(live) !== key || liveTheme !== curTheme)) captureActiveTabThumbnail(pending);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- activeTabIdxRef/tabsOverviewOpenRef/tabsRef are useRef refs read via .current inside the callback — call-time fresh, never stale. The ref objects themselves are stable; inclusion would add noise without changing behavior.
   }, [tabsEnabled]);

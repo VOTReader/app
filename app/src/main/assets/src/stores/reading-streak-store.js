@@ -68,6 +68,9 @@ export var ReadingStreakStore = extendStore(
       var data = this._load();
       var today = _jrnDateStr(ts);
       if (data.lastReadDate === today) return; // same-day — nothing to do
+      // The local date went back (clock or time-zone change): that day is
+      // behind the latest one counted, so the streak and total stand.
+      if (data.lastReadDate && _jrnDaysBetween(data.lastReadDate, today) < 0) return;
       if (!data.lastReadDate) {
         data.currentStreak = 1;
       } else {

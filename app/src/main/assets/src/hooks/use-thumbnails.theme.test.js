@@ -299,3 +299,55 @@ describe('useThumbnails — mount-read is gated + scoped (boot-performance-5)', 
     expect(g.idbReadAll).toHaveBeenCalledWith(['key-a']);
   });
 });
+
+/* sweep mw13 (T3 race). The deferred other-theme render checked only the capture
+   sequence and the calm gate when it fired: (a) it rendered in the middle of an
+   auto-scroll run (every other capture path is suppressed there), and (b) when the
+   reader picked another tab while the primary was still in flight, the new tab's
+   capture returned at the in-flight gate with no sequence bump, so the old
+   capture's variant photographed the NEW tab and stored it under the OLD tab's key
+   (IndexedDB too), and the new tab was never captured. */
+describe('useThumbnails — the other-theme render follows the page it belongs to (sweep mw13)', () => {
+  afterEach(() => { document.body.classList.remove('autoscroll-running'); });
+  const tA = { id: 'a', screen: 'letter', letterId: 'x' };
+  const tB = { id: 'b', screen: 'letter', letterId: 'y' };
+  const twoTabs = (idx) => hookProps({ tabs: [tA, tB], activeTabIdx: idx, activeTab: [tA, tB][idx] });
+
+  it('an auto-scroll run that starts after the primary drops the pending other-theme render', async () => {
+    const { result } = renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
+    await advance(350); // primary (dark) lands, variant armed
+    document.body.classList.add('autoscroll-running');
+    await advance(900);
+    await advance(2000);
+    expect(takeThemedScreenshot.mock.calls.map((c) => c[0])).toEqual(['dark']);
+    expect(result.current.tabThumbnails['key-a']).toEqual({ dark: RENDER_DARK });
+  });
+
+  it('a tab picked while the primary is in flight: no other-theme render under the old key, and the new tab gets its own capture', async () => {
+    let finishA;
+    takeThemedScreenshot.mockImplementationOnce(() => new Promise((res) => { finishA = () => res(RENDER_DARK); }));
+    const { result, rerender } = renderHook((p) => useThumbnails(p), { initialProps: twoTabs(0) });
+    await advance(350);             // tab A's primary starts and stays in flight
+    rerender(twoTabs(1));           // the reader picks tab B
+    await advance(350);             // B's after-nav capture meets the in-flight gate
+    await act(async () => { finishA(); });
+    await flush();
+    await advance(900);
+    await advance(900);
+    expect(result.current.tabThumbnails['key-a']).toEqual({ dark: RENDER_DARK });   // pre-fix: + light (a photo of B)
+    expect(g.idbPut.mock.calls.filter((c) => c[0] === 'key-a').every((c) => !c[1].light)).toBe(true);
+    expect(result.current.tabThumbnails['key-b']).toEqual({ dark: RENDER_DARK, light: RENDER_LIGHT }); // pre-fix: never captured
+  });
+
+  it('control: a second capture request for the SAME page while one is in flight does not render it twice', async () => {
+    let finish;
+    takeThemedScreenshot.mockImplementationOnce(() => new Promise((res) => { finish = () => res(RENDER_DARK); }));
+    const { result } = renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
+    await advance(350); // primary in flight
+    await act(async () => { result.current.captureActiveTabThumbnail({ urgent: true }); }); // goTabs-style heal
+    await act(async () => { finish(); });
+    await flush();
+    await advance(900);
+    expect(takeThemedScreenshot.mock.calls.map((c) => c[0])).toEqual(['dark', 'light']);
+  });
+});

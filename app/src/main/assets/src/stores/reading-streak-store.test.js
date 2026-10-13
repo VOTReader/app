@@ -140,3 +140,17 @@ describe('ReadingStreakStore — replaceAll (import path)', () => {
     expect(ReadingStreakStore.get().currentStreak).toBe(0);
   });
 });
+
+describe('ReadingStreakStore — a local date that went back (sweep mw13)', () => {
+  it('a reading day on an earlier date (clock or time-zone change) keeps the streak, total and the later date', () => {
+    ReadingStreakStore.recordReadingDay(_tsRelative(-1));
+    ReadingStreakStore.recordReadingDay(_tsRelative(0));
+    const before = { ...ReadingStreakStore.get() };
+    expect(before.currentStreak).toBe(2);
+    ReadingStreakStore.recordReadingDay(_tsRelative(-1)); // the device now says yesterday
+    const s = ReadingStreakStore.get();
+    expect(s.currentStreak).toBe(2);
+    expect(s.totalDays).toBe(before.totalDays);
+    expect(s.lastReadDate).toBe(before.lastReadDate);
+  });
+});

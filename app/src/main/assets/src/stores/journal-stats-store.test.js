@@ -370,6 +370,29 @@ describe('JournalStatsStore — recordDeletion', () => {
   });
 });
 
+describe('JournalStatsStore — streak edge days (sweep mw13)', () => {
+  it('a new entry on the same day as a delete-to-zero counts today (streak 1, not 0)', () => {
+    JournalStatsStore.recordNewEntry(_tsRelative(0));
+    JournalStatsStore.recordDeletion(); // J5: total 0, streak 0, lastEntryDate stays today
+    JournalStatsStore.recordNewEntry(_tsRelative(0));
+    const s = JournalStatsStore.get();
+    expect(s.totalEntries).toBe(1);
+    expect(s.currentStreak).toBe(1);
+  });
+
+  it('a local date that went BACK a day (clock or time-zone change) keeps the streak and the later date', () => {
+    JournalStatsStore.recordNewEntry(_tsRelative(-1));
+    JournalStatsStore.recordNewEntry(_tsRelative(0));
+    const today = JournalStatsStore.get().lastEntryDate;
+    expect(JournalStatsStore.get().currentStreak).toBe(2);
+    JournalStatsStore.recordNewEntry(_tsRelative(-1)); // the device now says yesterday
+    const s = JournalStatsStore.get();
+    expect(s.totalEntries).toBe(3);
+    expect(s.currentStreak).toBe(2);
+    expect(s.lastEntryDate).toBe(today);
+  });
+});
+
 describe('JournalStatsStore — replaceAll (import path)', () => {
   it('replaces the whole stats object', () => {
     // Use today's date for lastEntryDate so the module-level
