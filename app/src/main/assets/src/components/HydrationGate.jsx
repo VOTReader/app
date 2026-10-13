@@ -55,6 +55,15 @@ export const REMOUNT_COALESCE_MS = 250;
  *  (utils/data-safety.js): never on the boot path. */
 export const SAFETY_DELAY_MS = 5000;
 
+/* W41: whether the gate will still replace the App it renders, i.e. it is waiting
+   on stores to remount for. Set when it opens (the stores not loaded then) and at
+   each remount (the stores it still waits on), so an App mount reads the gate's
+   own decision at its first render (use-shared-passage-link.js): a store that
+   loads between the open and that render is still remounted for. */
+let _appReplacementPending = false;
+/** @returns {boolean} */
+export function appWillBeReplaced() { return _appReplacementPending; }
+
 /**
  * Wrap the app root. Awaits hydrateAllStores() exactly once at mount;
  * shows a centered "VOTReader" splash until the promise settles.
@@ -105,6 +114,7 @@ export function HydrationGate({ children }) {
           performance.measure('vot-hydration', 'vot-hydration-start', 'vot-hydration-end');
         } catch (_e) { /* perf unsupported */ }
         lateRef.current = storesNotLoaded();
+        _appReplacementPending = lateRef.current.length > 0;
         setHydrated(true);
         if (typeof StorageHealth !== 'undefined') StorageHealth.start();
       });
@@ -138,6 +148,7 @@ export function HydrationGate({ children }) {
         timer = null;
         if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('hydration', 'remounted App: ' + loadedCount + ' store(s) loaded after the gate opened');
         loadedCount = 0;
+        _appReplacementPending = waiting.length > 0;
         setMountKey((k) => k + 1);
         if (waiting.length === 0) scheduleSafety();
         // The remount puts the reader back where their saved data says; say why.

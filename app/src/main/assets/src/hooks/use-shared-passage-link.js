@@ -17,7 +17,7 @@
 import { sharedPassageKey, publicPassageKey } from '../utils/passage-link.js';
 import { buildSourceEndpoint } from '../utils/nav-index.js';
 import { showToast } from '../utils/toast.js';
-import { storesNotLoaded } from '../stores/cached-store.js';
+import { appWillBeReplaced } from '../components/HydrationGate.jsx';
 
 /** @returns {any} */
 function books() { return (typeof BOOKS !== 'undefined') ? BOOKS : null; }
@@ -27,10 +27,11 @@ function books() { return (typeof BOOKS !== 'undefined') ? BOOKS : null; }
    lost with it (an App over an unloaded vot-state writes nothing at all), and the key
    was already off the address. So the key is parked here, in module scope, which
    outlives remounts: every mount opens a parked key (the stores may never load, so
-   the first one opens it too), and only a FINAL mount, one made with every store
-   loaded, which nothing replaces, clears the park once its jump is made or the key
-   proves to open nothing. Whether a mount is final is fixed at its first render
-   (useSharedPassageLink): a store landing before its effect runs still remounts it. */
+   the first one opens it too), and only a FINAL mount, one the gate will not
+   replace, clears the park once its jump is made or the key proves to open
+   nothing. Whether a mount is final is the gate's own decision, read at the
+   mount's first render (useSharedPassageLink): a store that lands after the gate
+   decided, even before App rendered or its effect ran, is still remounted for. */
 /** @type {string | null} */
 let _parkedSharedKey = null;
 
@@ -131,10 +132,10 @@ export function installSharedPassageHook(win, navigateToLink, final = true) {
  * @returns {void}
  */
 export function useSharedPassageLink(navigateToLink) {
-  // W41: final = every store had loaded at this mount's FIRST render. Fixed then:
-  // a store that lands before the effect runs still makes HydrationGate replace it.
+  // W41: final = HydrationGate will not replace this mount, as the gate decided
+  // when it rendered it (read at the FIRST render, never at effect time).
   const finalRef = React.useRef(/** @type {boolean | null} */ (null));
-  if (finalRef.current === null) finalRef.current = storesNotLoaded().length === 0;
+  if (finalRef.current === null) finalRef.current = !appWillBeReplaced();
   React.useEffect(() => {
     const final = finalRef.current !== false;
     installSharedPassageHook(window, navigateToLink, final);
