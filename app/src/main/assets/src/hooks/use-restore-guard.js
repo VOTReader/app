@@ -19,10 +19,10 @@
    a tab opened WHILE another tab restores saw a live marker, deleted it and
    warned falsely. A restore still running holds the backup Web Lock
    (utils/backup-lock.js), and the browser drops that lock when its tab dies;
-   so a held lock means "leave the marker to the tab that owns it", and this
-   tab watches the lock until it is free: a marker still set then is a restore
-   that died, and it warns here after all. A browser that cannot query locks
-   keeps the old marker-only behaviour.
+   so this tab warns only once the lock has stayed free for two looks 2 s
+   apart and the marker it saw at boot is still set: a restore that died (its
+   tab closed before or after this one booted). A browser that cannot query
+   locks keeps the old marker-only behaviour.
 
    PARAMS: none. Reads the `showToast` bare global (typeof-guarded, same
    pattern as useJournalMediaSweep) with SettingsScreen's toast shape.
@@ -32,7 +32,7 @@
  *  (vot-* prefix) and never part of DEFAULT_DATA_LS_KEYS, so a backup can
  *  neither export nor reseed it. */
 import { showToast } from '../utils/toast.js';
-import { backupLockBusy, canQueryBackupLock, whenBackupLockFree } from '../utils/backup-lock.js';
+import { canQueryBackupLock, whenBackupLockFree } from '../utils/backup-lock.js';
 
 export const RESTORE_INFLIGHT_KEY = 'vot-restore-inflight';
 
@@ -53,21 +53,16 @@ export function useRestoreGuard() {
     };
     if (!canQueryBackupLock()) { warn(); return; }
     let live = true;
-    /** @type {(() => void) | null} */
-    let stopWaiting = null;
-    // The marker seen at boot is still there once nothing holds the lock: its restore died.
-    // One that finished removed its own marker; a newer restore wrote a different one.
+    // The marker seen at boot is still there once nothing has held the lock for two looks:
+    // its restore died. One that finished removed its own marker; a newer restore wrote a
+    // different one. Never on one look (Codex refuter, W7 round 2): a restore lets the lock
+    // go a moment BEFORE it removes its marker, and one free look can land in that moment.
     const warnIfStill = () => {
       let still = null;
       try { still = localStorage.getItem(RESTORE_INFLIGHT_KEY); } catch (_e) { /* privacy mode */ }
       if (live && still === pending) warn();
     };
-    void backupLockBusy().then((busy) => {
-      if (!live) return;
-      if (!busy) { warnIfStill(); return; }
-      // Another tab is restoring: watch it, so a restore whose tab dies still warns here.
-      stopWaiting = whenBackupLockFree(warnIfStill);
-    });
-    return () => { live = false; if (stopWaiting) stopWaiting(); };
+    const stopWaiting = whenBackupLockFree(warnIfStill);
+    return () => { live = false; stopWaiting(); };
   }, []);
 }
