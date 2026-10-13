@@ -35,7 +35,10 @@
 
    PARAMS:
      tabState — the whole useTabs() return; tabs / activeTabIdx /
-       setTabs / setActiveTabIdx are pulled from it.
+       setTabs / setActiveTabIdx are pulled from it. Every action writes
+       through the two setters wrapped below, which first tell a Bible jump
+       still waiting for its corpus that its tab may be gone (W39,
+       use-navigate-to-link.js noteTabAction).
      cancelDwell — useReadingDwell (P6f); switchToTab cancels an in-flight
        dwell timer BEFORE flipping tabs so the previous tab's reading-streak
        day-record timer can't credit time spent on the newly-active tab.
@@ -57,6 +60,7 @@
 
 import { DEFAULT_TAB } from './use-tabs.js';
 import { showToast, hideToast } from '../utils/toast.js';
+import { noteTabAction } from './use-navigate-to-link.js';
 
 // Wave 0 tab cap: a HUMANE bound (was 999) with EXPLICIT feedback at the cap
 // instead of a silent no-op — at 999 nothing happened on "new tab" and the
@@ -104,7 +108,13 @@ const _tabCapToast = () => showToast({
  * }}
  */
 export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
-  const { tabs, activeTabIdx, setTabs, setActiveTabIdx } = tabState;
+  const { tabs, activeTabIdx } = tabState;
+  // W39: a tab action drops a Bible jump still waiting for its corpus (closing the
+  // only tab swaps in a fresh Home tab no index or place check can tell apart).
+  // Fresh each render but stale-safe: they call only noteTabAction and the
+  // stable useState setters, so the [] callbacks below may keep the first ones.
+  const setTabs = (/** @type {any} */ v) => { noteTabAction(); tabState.setTabs(v); };
+  const setActiveTabIdx = (/** @type {any} */ v) => { noteTabAction(); tabState.setActiveTabIdx(v); };
 
   const [tabActionIdx, setTabActionIdx] = React.useState(null); // long-press target
   const [disableTabsPromptOpen, setDisableTabsPromptOpen] = React.useState(false);

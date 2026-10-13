@@ -8,6 +8,7 @@ import { renderHook, act } from '@testing-library/react';
 vi.mock('../utils/toast.js', () => ({ showToast: vi.fn(), hideToast: vi.fn() }));
 import { showToast, hideToast } from '../utils/toast.js';
 import { useTabActions } from './use-tab-actions.js';
+import { tabActionCount } from './use-navigate-to-link.js';
 
 const tab = (id) => ({ id });
 const makeTabState = (initial) => ({
@@ -502,5 +503,44 @@ describe('useTabActions — deduplicateTabs', () => {
     const kept = ts.setTabs.mock.calls[0][0](arr);
     expect(kept).toHaveLength(2);
     expect(ts.setActiveTabIdx).toHaveBeenCalledWith(1);
+  });
+});
+
+// W39 (refuter round 2): closing the only tab swaps in a fresh Home tab at the same
+// index, count and place, so a Bible jump waiting for its corpus is told by the
+// action itself (use-navigate-to-link.js noteTabAction) and drops.
+describe('useTabActions — W39: every tab action drops a pending Bible jump', () => {
+  beforeEach(() => { vi.clearAllMocks(); vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); document.body.innerHTML = ''; });
+
+  it('each action that writes tabs or the active index counts as a tab action', () => {
+    const ts = makeTabState([tab('a'), tab('b'), tab('c')]);
+    const { result } = mount(ts);
+    const actions = {
+      openNewTab: (r) => r.openNewTab(),
+      switchToTab: (r) => r.switchToTab(1),
+      closeOnlyOrAny: (r) => r.closeTab(0),
+      closeOtherTabs: (r) => r.closeOtherTabs(0),
+      closeTabsToTheRight: (r) => r.closeTabsToTheRight(0),
+      reorderTabs: (r) => r.reorderTabs(0, 2),
+      togglePinTab: (r) => r.togglePinTab(1),
+      renameTab: (r) => r.renameTab(0, 'x'),
+      closeAllTabs: (r) => r.closeAllTabs(),
+      deduplicateTabs: (r) => r.deduplicateTabs(),
+    };
+    for (const [name, run] of Object.entries(actions)) {
+      const before = tabActionCount();
+      act(() => { run(result.current); });
+      expect([name, tabActionCount() > before]).toEqual([name, true]);
+    }
+  });
+
+  it('closing the only tab counts too (the reset-to-Home path)', () => {
+    const ts = makeTabState([tab('a')]);
+    const { result } = mount(ts);
+    const before = tabActionCount();
+    act(() => { result.current.closeTab(0); });
+    expect(tabActionCount()).toBeGreaterThan(before);
+    expect(ts.setTabs.mock.calls[0][0]([tab('a')])).toHaveLength(1);
   });
 });
