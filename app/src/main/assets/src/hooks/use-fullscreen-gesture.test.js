@@ -122,6 +122,74 @@ describe('useFullscreenGesture', () => {
     expect(first).not.toHaveBeenCalled();     // stale callback never fires
   });
 
+  /* W46: on desktop a double-click on a word selects it. That second click
+     must not also flip the app into fullscreen. Touch keeps its double-tap
+     anywhere outside a control. */
+  function pointer(type, target, pointerType, x = 20, y = 20) {
+    const event = new MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0 });
+    Object.defineProperty(event, 'pointerType', { value: pointerType });
+    target.dispatchEvent(event);
+  }
+  function verse(text = 'In the beginning was the Word') {
+    const el = document.body.appendChild(document.createElement('p'));
+    el.setAttribute('data-hl-key', 'bible:John:1:1');
+    el.textContent = text;
+    return el;
+  }
+
+  it('leaves a desktop double-click on reading text to select the word', () => {
+    mount();
+    const prose = verse();
+    act(() => {
+      pointer('pointerdown', prose, 'mouse');
+      pointer('pointerup', prose, 'mouse');
+      pointer('pointerdown', prose, 'mouse');
+      pointer('pointerup', prose, 'mouse');
+    });
+    expect(PlatformBridge.setImmersiveMode).not.toHaveBeenCalled();
+  });
+
+  it('leaves a desktop double-click that selected text alone anywhere', () => {
+    mount();
+    const heading = document.body.appendChild(document.createElement('h2'));
+    heading.textContent = 'The Hidden Manna';
+    act(() => {
+      pointer('pointerdown', heading, 'mouse');
+      pointer('pointerup', heading, 'mouse');
+      pointer('pointerdown', heading, 'mouse');
+      // The browser selects the word on the second press.
+      const range = document.createRange();
+      range.setStart(heading.firstChild, 4);
+      range.setEnd(heading.firstChild, 10);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+      pointer('pointerup', heading, 'mouse');
+    });
+    expect(PlatformBridge.setImmersiveMode).not.toHaveBeenCalled();
+    window.getSelection().removeAllRanges();
+  });
+
+  it('still toggles on a desktop double-click in an open area, and on a touch double-tap on text', () => {
+    mount();
+    const margin = document.body.appendChild(document.createElement('div'));
+    act(() => {
+      pointer('pointerdown', margin, 'mouse');
+      pointer('pointerup', margin, 'mouse');
+      pointer('pointerdown', margin, 'mouse');
+      pointer('pointerup', margin, 'mouse');
+    });
+    expect(PlatformBridge.setImmersiveMode).toHaveBeenCalledTimes(1);
+
+    const prose = verse();
+    act(() => {
+      pointer('pointerdown', prose, 'touch', 60, 60);
+      pointer('pointerup', prose, 'touch', 60, 60);
+      pointer('pointerdown', prose, 'touch', 60, 60);
+      pointer('pointerup', prose, 'touch', 60, 60);
+    });
+    expect(PlatformBridge.setImmersiveMode).toHaveBeenCalledTimes(2);
+  });
+
   it('stops showing the hint after the first few fullscreen entries', () => {
     const onHintShown = vi.fn();
     mount({ hintCount: 3, onHintShown });
