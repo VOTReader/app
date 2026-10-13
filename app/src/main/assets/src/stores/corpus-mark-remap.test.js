@@ -133,6 +133,31 @@ describe('remapCorpusMarkData - a mark goes back to its words along a proven mov
     expect(out.links[0].target).toBe(link.target);
   });
 
+  it("a note key a stale tab brought back (none of its segments there) follows the segments a past pass moved", () => {
+    // Pass 1 moved g2's segment to P3 and the note with it; a stale tab's body edit (a later whole ms) then won the
+    // merge with keys [P2]. The segment already sits at its own offsets in P3, so nothing moves it again this pass.
+    const a = seg(2, 'some teach, and some serve');
+    const note = { groupId: 'g2', keys: [P + '2'], fullText: a.text, body: 'edited in the old tab', updated: 900 };
+    const out = run(NEW, { annotations: { [P + '3']: [a] }, notes: { g2: note } });
+    expect(out.annotations).toBeUndefined();
+    expect(out.notes.g2.keys).toEqual([P + '3']);
+    expect(out.notes.g2.body).toBe('edited in the old tab');
+    expect(out.notes.g2.updated).toBe(900.5);
+    expect(out.moved).toBe(1);
+    const again = run(NEW, { annotations: { [P + '3']: [a] }, notes: out.notes });
+    expect(again.notes).toBeUndefined();
+  });
+
+  it("controls: a note key that holds its segments, one no listed move covers, or a group with no segments stays", () => {
+    const a = seg(2, 'some teach, and some serve');
+    const held = { groupId: 'g2', keys: [P + '3'], fullText: a.text, body: 'b', updated: 9 };
+    expect(run(NEW, { annotations: { [P + '3']: [a] }, notes: { g2: held } }).notes).toBeUndefined();
+    const unlisted = { groupId: 'g2', keys: [P + '0'], fullText: a.text, body: 'b', updated: 9 };
+    expect(run(NEW, { annotations: { [P + '3']: [a] }, notes: { g2: unlisted } }).notes).toBeUndefined();
+    const bare = { groupId: 'g2', keys: [P + '2'], fullText: a.text, body: 'b', updated: 9 };
+    expect(run(NEW, { annotations: { [P + '3']: [seg(3, 'show a more excellent way')] }, notes: { g2: bare } }).notes).toBeUndefined();
+  });
+
   it('keys of other entries, the journal and the Bible are left alone', () => {
     const a = seg(2, 'some teach, and some serve');
     const out = run(NEW, { annotations: { 'wtlb:other:2': [a], 'journal:j1:2': [a], 'bible:gen:1:2': [a], 'wtlb:gifts-2:2': [a] } });
