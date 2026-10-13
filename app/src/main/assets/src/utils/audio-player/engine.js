@@ -475,10 +475,10 @@ export function _start(placeOf) {
   _notify();
   _mediaSession(track);
   _pauseOtherDomAudio(null);
-  // Native takes the place before its load goes out (play() sends it): a currentTime set now rides the load as
-  // startMs. An element already holding this recording with metadata is seeked by _seekOnMetadata instead.
+  // Native takes the place BEFORE play(): a currentTime set now rides the load as startMs, or, when native already
+  // holds this recording, seeks it first, so not even the place it was paused at sounds (refuter round 2).
   const at = placeOf ? Number(placeOf(track)) || 0 : 0;
-  if (_native && at > 0 && !(el.readyState >= 1)) {
+  if (_native && at > 0) {
     try { el.currentTime = at; } catch (_e) { /* the seek after the load still lands it */ }
   }
   const p = el.play();
@@ -569,21 +569,21 @@ export function _seekOnMetadata(at) {
   _state.time = at;
   _lastTick = Math.floor(at);
   _notify();
-  // HAVE_METADATA (1) or better — duration and the seekable ranges are known,
-  // which is the whole precondition the event was standing in for.
-  if (el.readyState >= 1) {
-    try { /** @type {HTMLAudioElement} */ (el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
-    return;
-  }
   /* NATIVE (m3) NEEDS NO METADATA TO SEEK, and waiting for it was the bug (sweep W4): play() had already begun the
      recording at 0:00, so the opening played and the clock read 0 until metadata. Before its load the place rides
-     it (startMs; Retry assigns src, seeks, then plays); after it, ExoPlayer takes a seek in any state. A load that
-     already carries this place (_start's placeOf) needs nothing: a second seek would only re-buffer. A released
-     element (no src: an offline pause) keeps the deferred seek below, for the load that Play makes. */
+     it (startMs; Retry assigns src, seeks, then plays); after it, ExoPlayer takes a seek in any state. Already there
+     (_start's placeOf put it there) needs nothing: a second seek would only re-buffer. A released element (no src:
+     an offline pause) keeps the deferred seek below, for the load that Play makes. */
   if (_native && el.src) {
     if (Math.abs((el.currentTime || 0) - at) >= 0.01) {
       try { /** @type {HTMLAudioElement} */ (el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
     }
+    return;
+  }
+  // HAVE_METADATA (1) or better — duration and the seekable ranges are known,
+  // which is the whole precondition the event was standing in for.
+  if (el.readyState >= 1) {
+    try { /** @type {HTMLAudioElement} */ (el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
     return;
   }
   /* A DEFERRED SEEK IS A PROMISE ABOUT ONE TRACK, and nothing used to check

@@ -318,6 +318,22 @@ describe('audio-player on the native player (m3)', () => {
     } finally { delete globalThis.AudioPositionsStore; }
   });
 
+  it('(W4) a resume of the recording native already holds seeks before it plays, once (refuter round 2)', async () => {
+    globalThis.AudioPositionsStore = { getPosition: () => ({ t: 125, d: 600 }), setPosition: vi.fn(), clearPosition: vi.fn() };
+    try {
+      AudioPlayer.playCollection({ volKey: 'vol1', items: [{ id: 'letter-c', title: 'Letter C' }], noResume: true });
+      expect(loads()[0].startMs).toBe(0);
+      send({ type: 'state', url: URL_OF('idC'), pos: 3000, dur: 600000, playing: true, want: true });
+      await flush();
+      bridge.audioPlay.mockClear();
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+      expect(bridge.audioLoad).toHaveBeenCalledTimes(1);      // the same recording: kept, not reloaded
+      expect(bridge.audioSeek).toHaveBeenCalledTimes(1);
+      expect(bridge.audioSeek).toHaveBeenCalledWith(120000);
+      expect(bridge.audioSeek.mock.invocationCallOrder[0]).toBeLessThan(bridge.audioPlay.mock.invocationCallOrder[0]);
+    } finally { delete globalThis.AudioPositionsStore; }
+  });
+
   it('(W4) a seek before metadata goes to native at once, and the load\'s first 0 does not undo it', async () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
     expect(loads()[0].startMs).toBe(0);
