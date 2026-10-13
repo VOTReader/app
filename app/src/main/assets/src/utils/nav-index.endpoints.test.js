@@ -160,6 +160,19 @@ describe('navItemToEndpoint — the object LinkStore keeps forever', () => {
     expect(chapter.verse).toBeNull();      // explicit null, never undefined
   });
 
+  /* W51: a picked range ("Genesis 1:1-2") kept only its first verse, so the
+     link opened on verse 1 alone; the endpoint now carries verseEnd, which
+     use-navigate-to-link's verseAnchorFor already spans. */
+  it('keeps the end of a picked verse range (Bible and Matthew study)', () => {
+    const range = navItemToEndpoint({ kind: 'bible-chapter', bookId: 'genesis', chapter: 1, verse: 1, verseEnd: 2, label: 'Genesis 1:1-2' });
+    expect(range).toMatchObject({ key: 'bible:genesis:1:1', verse: 1, verseEnd: 2 });
+    const study = navItemToEndpoint({ kind: 'study-chapter', bookId: 'matthew', chapter: 5, verse: 3, verseEnd: 12, label: 'Matthew 5:3-12' });
+    expect(study).toMatchObject({ key: 'study:matthew-5:3', verse: 3, verseEnd: 12 });
+    // A single verse or a chapter carries no verseEnd at all.
+    expect(navItemToEndpoint({ kind: 'bible-chapter', bookId: 'genesis', chapter: 1, verse: 2, verseEnd: null, label: 'Genesis 1:2' })).not.toHaveProperty('verseEnd');
+    expect(navItemToEndpoint({ kind: 'bible-chapter', bookId: 'genesis', chapter: 1, label: 'Genesis 1' })).not.toHaveProperty('verseEnd');
+  });
+
   it('gives letters and the three entry kinds their own type but a shared key shape', () => {
     expect(navItemToEndpoint({ kind: 'letter', letterId: 'the-wide-path', screen: 'vot-one-letter', collection: 'Volume One', label: 'The Wide Path' }))
       .toMatchObject({ type: 'letter', key: 'letter:the-wide-path:0', letterId: 'the-wide-path' });

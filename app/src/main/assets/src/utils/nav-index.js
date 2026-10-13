@@ -455,6 +455,13 @@ export function navItemPreview(it) {
   return '';
 }
 
+/* W51: a picked range ("John 3:16-18") keeps its last verse, so the link
+   opens on the whole span (use-navigate-to-link verseAnchorFor reads it). A
+   single verse or a chapter gets no verseEnd at all. */
+function verseEndOf(/** @type {any} */ it) {
+  return (it.verse != null && typeof it.verseEnd === 'number' && it.verseEnd > it.verse) ? { verseEnd: it.verseEnd } : {};
+}
+
 /**
  * Convert a NavItem into a link-endpoint object — shape varies by kind
  * (bible / letter / wtlb / blessed / holy-days / study / study-letter).
@@ -471,6 +478,7 @@ export function navItemToEndpoint(it) {
     return {
       type: 'bible', key,
       bookId: it.bookId, chapter: it.chapter, verse: hasVerse ? it.verse : null,
+      ...verseEndOf(it),
       label: it.label, preview: navItemPreview(it)
     };
   }
@@ -495,6 +503,7 @@ export function navItemToEndpoint(it) {
     return {
       type: 'study', key: key,
       bookId: it.bookId, chapter: it.chapter, verse: v,
+      ...verseEndOf(it),
       screen: it.screen || 'matthew-ch',
       label: it.label, preview: navItemPreview(it)
     };
