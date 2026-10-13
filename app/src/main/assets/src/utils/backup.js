@@ -466,7 +466,12 @@ function _whenSaved(s) {
 
 /**
  * Reseed the localStorage shim keys from a backup's `data` map: clear each known
- * key, then restore the string value for any `vot-`-prefixed key.
+ * key, then restore the string value of each one the backup carries.
+ * W10: only those keys. A v1 file carries every vot-* key of its day; writing
+ * them all back left an old copy of each store in localStorage for good, and the
+ * stores seed from that copy when IndexedDB comes back empty, so a later wipe
+ * revived the old library instead of the auto-restore. The stores get their
+ * records from the backup itself (the V1 fallback below).
  * @param {Record<string, any> | null | undefined} dataObj
  * @param {string[]} dataLsKeys
  */
@@ -479,8 +484,8 @@ function _reseedLsData(dataObj, dataLsKeys) {
   // keys get the first, position-aware pass on the boot after the reload.
   try { localStorage.removeItem('vot.journalRekey'); } catch (_e) { /* non-fatal */ }
   const lsData = dataObj || {};
-  Object.keys(lsData).forEach((k) => {
-    if (k.indexOf('vot-') !== 0) return;
+  dataLsKeys.forEach((k) => {
+    if (!Object.prototype.hasOwnProperty.call(lsData, k)) return;
     const v = lsData[k];
     if (typeof v === 'string') {
       try { localStorage.setItem(k, v); } catch (e) { backupWarn('LS write failed for', k, e); }
@@ -643,6 +648,12 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
   } = ctx;
 
   const exportVersion = (parsed && parsed.exportVersion) || 1;
+  // W10: only v1 and v2 are JSON files. A v3 manifest's media is an ARRAY that the
+  // media step below would read as an id map ('0', '1', ...) and then prune every
+  // attachment the device has; v3 goes through applyV3, newer ones nowhere.
+  if (exportVersion !== 1 && exportVersion !== 2) {
+    throw new Error(`applyImportPayload: exportVersion ${JSON.stringify(exportVersion)} is not a v1/v2 backup`);
+  }
   let importFailures = 0;
   let mediaApplied = 0; // BAK3 — media records successfully written (counts check)
   // Stores whose payload failed shape validation — skipped (not written)

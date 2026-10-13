@@ -289,3 +289,28 @@ describe('the retired milestone ledger', () => {
     expect(ReadingStatsStore.get().milestonesUnlocked).toEqual(['read-first']);
   });
 });
+
+// W10 (sweep 2026-10-13): imported pace samples were kept unchecked, so one bad
+// sample turned measuredWpm into NaN or a throw on My Progress and the reading
+// minutes chip. replaceAll keeps only real samples; measuredWpm steps over
+// anything an earlier import already stored.
+describe('pace samples from a damaged import (W10)', () => {
+  const real = () => [1, 2, 3, 4, 5].map(() => ({ w: 400, ms: 120000 }));   // 200 wpm each
+
+  it('replaceAll keeps only samples with a positive word count and time', () => {
+    ReadingStatsStore.replaceAll(/** @type {any} */ ({
+      wpmSamples: [null, 7, { w: 'x', ms: 1000 }, { w: 400, ms: 0 }, { w: 400 }, { w: -5, ms: 1000 },
+        { w: Infinity, ms: 1000 }, { w: 400, ms: NaN }, ...real()],
+    }));
+    expect(ReadingStatsStore.get().wpmSamples).toEqual(real());
+    expect(ReadingStatsStore.measuredWpm()).toBe(200);
+  });
+
+  it('measuredWpm steps over damaged samples already in the store', () => {
+    ReadingStatsStore.replaceAll({});
+    ReadingStatsStore.get().wpmSamples = /** @type {any} */ ([null, { w: 400, ms: 0 }, { w: 'x' }, ...real()]);
+    expect(ReadingStatsStore.measuredWpm()).toBe(200);
+    ReadingStatsStore.get().wpmSamples = /** @type {any} */ ([null, { w: 400, ms: 0 }, { w: 'x' }, { w: 1, ms: 1 }, { w: 1, ms: 1 }]);
+    expect(ReadingStatsStore.measuredWpm()).toBeNull();   // two real samples is not enough to say
+  });
+});

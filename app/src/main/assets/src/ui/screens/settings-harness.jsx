@@ -191,7 +191,7 @@ export function setupSettingsGlobals(overrides = {}) {
   for (const f of ['buildExportPayload', 'applyImportPayload', 'buildV3Manifest', 'applyV3',
     'writeContainer', 'readContainer', 'isContainerMagic', 'runV3AndroidExport',
     'classifyV3ImportBegin', 'v3AndroidImportEntries', 'validateImportEnvelope',
-    'validateStorePayload', 'validateMediaRecord']) put(f, () => {});
+    'validateStorePayload', 'validateMediaRecord', 'isNewerBackup']) put(f, () => {});
   // Pass-through (NOT a no-op): a stubbed lock must still run the operation,
   // or every Export/Verify/Clear press in a test would silently do nothing.
   put('withBackupLock', (op) => op());

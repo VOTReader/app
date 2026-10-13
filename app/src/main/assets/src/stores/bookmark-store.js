@@ -60,6 +60,18 @@ import { mergeArrayStore } from './store-merge.js';
  */
 export function bkmId() { return 'bkm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6); }
 
+/**
+ * W10: what add() accepts (an id and a hlKey), with the hlKey a string the
+ * lookups can split. An import arrived unchecked, and one null or hlKey-less
+ * entry made getForKey throw while a letter, chapter, study or WTLB screen
+ * rendered; the lookups step over any such entry an earlier import stored.
+ * @param {any} b
+ * @returns {boolean}
+ */
+function _isBookmark(b) {
+  return !!b && typeof b === 'object' && !!b.id && typeof b.hlKey === 'string' && b.hlKey !== '';
+}
+
 export const BookmarkStore = extendStore(
   CachedStore('vot-bookmarks', /** @type {Bookmark[]} */ ([]), { idb: true, crossTabMerge: mergeArrayStore }),
   {
@@ -69,7 +81,7 @@ export const BookmarkStore = extendStore(
      * @returns {Bookmark | null}
      */
     get(id) {
-      return this._load().find(function(b) { return b.id === id; }) || null;
+      return this._load().find(function(b) { return !!b && b.id === id; }) || null;
     },
 
     /**
@@ -93,7 +105,7 @@ export const BookmarkStore = extendStore(
      * @returns {Bookmark[]}
      */
     getForKey(key) {
-      return this._load().filter(function(b) { return b.hlKey === key || b.hlKey.split(':').slice(0, -1).join(':') === key; });
+      return this._load().filter(function(b) { return _isBookmark(b) && (b.hlKey === key || b.hlKey.split(':').slice(0, -1).join(':') === key); });
     },
 
     /**
@@ -106,6 +118,7 @@ export const BookmarkStore = extendStore(
      */
     getForKeyPrefix(prefix) {
       return this._load().filter(function(b) {
+        if (!_isBookmark(b)) return false;
         var k = b.hlKey;
         // Exact key or a DESCENDANT (finer) key only. The old reverse branch
         // (stored key coarser than the query) made one chapter-level bookmark
@@ -146,7 +159,7 @@ export const BookmarkStore = extendStore(
     update(id, patch) {
       if (this._shouldDefer('update', id, patch)) return;
       var data = this._load();
-      var idx = data.findIndex(function(b) { return b.id === id; });
+      var idx = data.findIndex(function(b) { return !!b && b.id === id; });
       if (idx < 0) return;
       data[idx] = Object.assign({}, data[idx], patch, { updated: Date.now() });
       this._save();
@@ -160,7 +173,7 @@ export const BookmarkStore = extendStore(
      */
     remove(id) {
       if (this._shouldDefer('remove', id)) return;
-      this._cache = this._load().filter(function(b) { return b.id !== id; });
+      this._cache = this._load().filter(function(b) { return !b || b.id !== id; });
       this._save();
       this._bump();
     },
@@ -172,7 +185,7 @@ export const BookmarkStore = extendStore(
      */
     replaceAll(data) {
       if (this._shouldDefer('replaceAll', data)) return;
-      this._cache = Array.isArray(data) ? data.slice() : [];
+      this._cache = Array.isArray(data) ? data.filter(_isBookmark) : [];
       this._save();
       this._bump();
     }

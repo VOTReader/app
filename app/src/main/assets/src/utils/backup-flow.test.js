@@ -17,7 +17,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createBackupFlow, _savedBackupToast } from './backup-flow.js';
 import { writeContainer, readContainer, isContainerMagic } from './backup-container.js';
-import { validateImportEnvelope } from './import-validators.js';
+import { validateImportEnvelope, isNewerBackup } from './import-validators.js';
 import { summarizeBackupManifest, formatVerifyReport } from './backup-verify.js';
 
 const STORE_NAMES = [
@@ -88,6 +88,7 @@ beforeEach(() => {
   put('readContainer', readContainer);
   put('isContainerMagic', isContainerMagic);
   put('validateImportEnvelope', validateImportEnvelope);
+  put('isNewerBackup', isNewerBackup);
   put('validateStorePayload', () => []);
   put('validateMediaRecord', () => []);
   put('summarizeBackupManifest', summarizeBackupManifest);
@@ -519,6 +520,79 @@ describe('Verify a Backup', () => {
     bridge.v3ImportOpen.mockImplementation(() => { window.__onV3ImportReady('cancelled'); });
     await flow.verifyBackupFile();
     expect(ctx.setVerifyReport).not.toHaveBeenCalled();
+  });
+});
+
+// W10 (sweep 2026-10-13): a backup from a newer build was called "not a VOTReader
+// backup", which tells a reader holding a good backup to throw it away; and a
+// JSON file stamped v3 went to the v1/v2 applier, which read its media list as
+// an id map and pruned every photo and memo on the device.
+describe('Backups this build cannot read (W10)', () => {
+  const NEWER_MSG = 'This backup was made by a newer version of VOTReader. Update the app, then try again.';
+  const NEWER_JSON = JSON.stringify({ ...LEGACY, exportVersion: 4 });
+  const NEWER_MANIFEST = { ...MANIFEST, exportVersion: 4 };
+  const lastReport = () => ctx.setVerifyReport.mock.calls.at(-1)[0];
+
+  it('web import: a newer JSON backup or container says to update the app', async () => {
+    const flow = createBackupFlow(ctx);
+    bridge.pickImportFile.mockResolvedValue(fileOf([NEWER_JSON], 'x.json'));
+    await flow.importPersonalData(); await settle();
+    expect(lastToast()).toBe(NEWER_MSG);
+    bridge.pickImportFile.mockResolvedValue(await votbakFile(NEWER_MANIFEST));
+    await flow.importPersonalData(); await settle();
+    expect(lastToast()).toBe(NEWER_MSG);
+    expect(ctx.confirmImport).not.toHaveBeenCalled();
+    expect(globalThis.applyV3).not.toHaveBeenCalled();
+    expect(globalThis.applyImportPayload).not.toHaveBeenCalled();
+  });
+
+  it('web import: a JSON file stamped v3 never reaches the v1/v2 applier', async () => {
+    bridge.pickImportFile.mockResolvedValue(fileOf([JSON.stringify(MANIFEST)], 'x.json'));
+    await createBackupFlow(ctx).importPersonalData(); await settle();
+    expect(lastToast()).toBe('This file does not look like a VOTReader backup.');
+    expect(ctx.confirmImport).not.toHaveBeenCalled();
+    expect(globalThis.applyImportPayload).not.toHaveBeenCalled();
+  });
+
+  it('Android import: the same answers, and the stream is closed', async () => {
+    bridge.isAndroid = true;
+    const flow = createBackupFlow(ctx);
+    for (const [begin, msg] of [
+      [{ kind: 'legacy', json: NEWER_JSON }, NEWER_MSG],
+      [{ kind: 'v3', manifestJson: JSON.stringify(NEWER_MANIFEST) }, NEWER_MSG],
+      [{ kind: 'legacy', json: JSON.stringify(MANIFEST) }, 'This file does not look like a VOTReader backup.'],
+    ]) {
+      bridge.v3ImportClose.mockClear();
+      bridge.v3ImportBegin.mockReturnValue(begin);
+      await flow.importPersonalData(); await settle();
+      expect(lastToast()).toBe(msg);
+      expect(bridge.v3ImportClose).toHaveBeenCalled();
+    }
+    expect(globalThis.applyV3).not.toHaveBeenCalled();
+    expect(globalThis.applyImportPayload).not.toHaveBeenCalled();
+  });
+
+  it('Verify a Backup gives the same answers on both platforms', async () => {
+    const flow = createBackupFlow(ctx);
+    bridge.pickImportFile.mockResolvedValue(fileOf([NEWER_JSON]));
+    await flow.verifyBackupFile();
+    expect(lastReport()).toEqual({ message: NEWER_MSG, level: 'warn' });
+    bridge.pickImportFile.mockResolvedValue(await votbakFile(NEWER_MANIFEST));
+    await flow.verifyBackupFile();
+    expect(lastReport()).toEqual({ message: NEWER_MSG, level: 'warn' });
+    bridge.pickImportFile.mockResolvedValue(fileOf([JSON.stringify(MANIFEST)]));
+    await flow.verifyBackupFile();
+    expect(lastReport().message).toBe('This file does not look like a VOTReader backup.');
+    bridge.isAndroid = true;
+    for (const [begin, msg] of [
+      [{ kind: 'legacy', json: NEWER_JSON }, NEWER_MSG],
+      [{ kind: 'v3', manifestJson: JSON.stringify(NEWER_MANIFEST) }, NEWER_MSG],
+      [{ kind: 'legacy', json: JSON.stringify(MANIFEST) }, 'This file does not look like a VOTReader backup.'],
+    ]) {
+      bridge.v3ImportBegin.mockReturnValue(begin);
+      await flow.verifyBackupFile();
+      expect(lastReport().message).toBe(msg);
+    }
   });
 });
 
