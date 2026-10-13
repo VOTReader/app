@@ -58,8 +58,9 @@
      setSurpriseAnchor — tabField setter; scroll-to-verse highlight on
        bible / study endpoints.
      setJournalEntryId — App useState setter; journal endpoints.
-     activeTabIdx     — useTabs; with the nav position, the "has the reader
-       moved on?" check a Bible jump that waits for its corpus makes (W39).
+     activeTabIdx, tabCount — useTabs; with the nav position, the "has the
+       reader moved on?" check a Bible jump that waits for its corpus makes
+       (W39: any change of either since the tap = another tab).
 
    RETURNS: { navigateToLink }   (the stable shell only — _navToLinkRef is
             fully internal; App() consumes navigateToLink, nothing else.)
@@ -102,8 +103,8 @@ export function verseAnchorFor(endpoint) {
    the top of the deferred body. */
 const _NEEDS_SCREEN = { letter: 1, wtlb: 1, blessed: 1, 'holy-days': 1 };
 
-/* The fields that say where the reader is (W39): the tab plus the 7 nav-position
-   fields the back-stack entry captures. */
+/* The fields that say where the reader is (W39): the tab epoch plus the 7
+   nav-position fields the back-stack entry captures. */
 const _PLACE_KEYS = ['tab', 'screen', 'bookId', 'chapterNum', 'letterId', 'studyId', 'studyChapterId', 'journalEntryId'];
 const _samePlace = (a, b) => _PLACE_KEYS.every((k) => a[k] === b[k]);
 
@@ -131,7 +132,8 @@ const _samePlace = (a, b) => _PLACE_KEYS.every((k) => a[k] === b[k]);
  *   setStudyChapterId: (val: any) => void,
  *   setSurpriseAnchor: (val: any) => void,
  *   setJournalEntryId: (val: any) => void,
- *   activeTabIdx?: number
+ *   activeTabIdx?: number,
+ *   tabCount?: number
  * }} args
  * @returns {{ navigateToLink: (endpoint: any, meta?: any) => void }}
  */
@@ -139,10 +141,17 @@ export function useNavigateToLink({
   closeLinkSidebar, pushFromLetter,
   screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId,
   setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
-  setSurpriseAnchor, setJournalEntryId, activeTabIdx,
+  setSurpriseAnchor, setJournalEntryId, activeTabIdx, tabCount,
 }) {
+  // W39: tabs carry no id, so "the same tab" is "no tab switched, opened, closed
+  // or moved since the tap": every change of the active index or the tab count
+  // starts a new epoch (closing tab 0 slides tab 1 into index 0; a switch away
+  // and back returns to the same index). Synced during render, like useRefMirror.
+  const _tabEpochRef = React.useRef({ idx: activeTabIdx, n: tabCount, epoch: 0 });
+  const _te = _tabEpochRef.current;
+  if (_te.idx !== activeTabIdx || _te.n !== tabCount) { _te.idx = activeTabIdx; _te.n = tabCount; _te.epoch++; }
   // Where the reader is NOW, read when a deferred Bible jump's corpus lands (W39).
-  const _placeRef = useRefMirror({ tab: activeTabIdx, screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId });
+  const _placeRef = useRefMirror({ tab: _te.epoch, screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId });
   // Part 1 + 2 of the pattern (see header). The shell has [] deps — stable
   // for the component's lifetime.
   const _navToLinkRef = React.useRef(null);
