@@ -23,7 +23,7 @@
 
    The clock: native sends its position with every edge and once a second
    while playing; currentTime runs on from that anchor at the playing speed
-   (at most 1.5 s past it), and 'timeupdate' fires 4x a second while the page
+   (for at most 1.5 s of wall time), and 'timeupdate' fires 4x a second while the page
    is on screen, as <audio> does.
 
    Repeat this passage (ra2): native plays the span round itself
@@ -40,7 +40,9 @@
 /** @typedef {{ url: string, title?: string, artist?: string, album?: string, rate?: number }} NativeNext */
 /** @typedef {{ meta?: (url: string) => NativeMeta, upcoming?: () => NativeNext[] }} NativeHooks */
 
-/** How far currentTime may run on past native's last word before it waits for the next. */
+/** How long (wall seconds) currentTime may run on past native's last word before it waits for the next. Wall time,
+ *  not media time: native speaks once a wall second, so a media cap stood the clock still 0.25 s of every second at
+ *  2x and left it 1.5 s behind at 3x (sweep W59). */
 const MAX_EXTRAPOLATE_S = 1.5;
 /** The most of a native event's delivery time the clock makes up (a stale snapshot is not a slow bridge). */
 const MAX_LAG_MS = 1000;
@@ -191,7 +193,7 @@ class NativeAudio extends EventTarget {
 
   get currentTime() {
     if (!this._playing || !this._anchorAt) return this._pos;
-    const ran = Math.min(MAX_EXTRAPOLATE_S, ((now() - this._anchorAt) / 1000) * this._rate);
+    const ran = Math.min(MAX_EXTRAPOLATE_S, (now() - this._anchorAt) / 1000) * this._rate;
     const t = this._pos + Math.max(0, ran);
     return this._dur > 0 ? Math.min(t, this._dur) : t;
   }
