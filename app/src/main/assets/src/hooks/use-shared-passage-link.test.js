@@ -3,7 +3,8 @@
    the key, and hand navigateToLink a silent jump. A key that names nothing
    leaves the reader where the app restored them. */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { openSharedPassage, installSharedPassageHook } from './use-shared-passage-link.js';
+import { openSharedPassage, installSharedPassageHook, _resetSharedPassagePark } from './use-shared-passage-link.js';
+import { StateStore } from '../stores/state-store.js';
 
 // The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
 vi.mock('../utils/toast.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get showToast() { return /** @type {any} */ (globalThis).showToast; } }; });
@@ -23,6 +24,7 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 afterEach(() => {
   delete /** @type {any} */ (globalThis).BOOKS;
   delete /** @type {any} */ (globalThis).findEntryContext;
+  _resetSharedPassagePark();
 });
 
 describe('openSharedPassage', () => {
@@ -161,5 +163,39 @@ describe('installSharedPassageHook (the APK, app already open)', () => {
     expect(win.__votOpenSharedPassage("bible:john:3:16');x(")).toBe(false);
     await flush();
     expect(nav).not.toHaveBeenCalled();
+  });
+});
+/* W41 (sweep 2026-10-13): when vot-state loads slowly, App mounts once on defaults and
+   HydrationGate remounts it when the store lands, putting the reader back where the
+   record says. The first mount took ?p= off the address and opened it, so the link was
+   lost with that mount. Now that mount opens it (the store may never load) and parks
+   the key; the next mount opens it again; a mount over the loaded store clears it. */
+describe('openSharedPassage — W41: a mount before vot-state loads parks the key for the remount', () => {
+  afterEach(() => { vi.restoreAllMocks(); _resetSharedPassagePark(); });
+
+  it('opens it now, and again on the next mount though ?p= is gone; a loaded mount ends it', async () => {
+    /** @type {any} */ (globalThis).BOOKS = JOHN;
+    const gs = vi.spyOn(StateStore, 'getState').mockReturnValue('pending');
+    const nav1 = vi.fn();
+    const a = fakeWin('?p=bible%3Ajohn%3A3%3A16', { __loadBibleCorpus: () => Promise.resolve() });
+    expect(openSharedPassage(a.win, nav1)).toBe('bible:john:3:16');
+    expect(a.replaced).toHaveLength(1);                 // a reload must not replay it
+    gs.mockReturnValue('loaded');                        // the store lands: HydrationGate remounts App
+    const nav2 = vi.fn();
+    const b = fakeWin('', { __loadBibleCorpus: () => Promise.resolve() });
+    expect(openSharedPassage(b.win, nav2)).toBe('bible:john:3:16');
+    await flush();
+    expect(nav1).toHaveBeenCalledTimes(1);
+    expect(nav2).toHaveBeenCalledTimes(1);
+    expect(nav2.mock.calls[0][0]).toMatchObject({ type: 'bible', bookId: 'john', chapter: 3, verse: 16 });
+    const nav3 = vi.fn();                                // a later mount over the loaded store
+    expect(openSharedPassage(fakeWin('', {}).win, nav3)).toBeNull();
+  });
+
+  it('a mount over a loaded store parks nothing', async () => {
+    /** @type {any} */ (globalThis).BOOKS = JOHN;
+    vi.spyOn(StateStore, 'getState').mockReturnValue('loaded');
+    openSharedPassage(fakeWin('?p=bible%3Ajohn%3A3%3A16', { __loadBibleCorpus: () => Promise.resolve() }).win, vi.fn());
+    expect(openSharedPassage(fakeWin('', {}).win, vi.fn())).toBeNull();
   });
 });

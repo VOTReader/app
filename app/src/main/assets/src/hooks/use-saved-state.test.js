@@ -675,3 +675,50 @@ describe('useSavedState — the update reload record is read first, applied, and
     expect(result.current.tabs[0].screen).toBe('matthew-ch');
   });
 });
+
+/* W41 (sweep 2026-10-13): when vot-state loads slowly, App mounts once on defaults
+   and HydrationGate remounts it when the store lands. That throwaway first mount
+   used to spend the one-shot flags: the crash-recover flag (and the crash counters,
+   so "Reset to Home" was not offered again) and the scroll-heal flag, neither of
+   which had touched the real record. Only a mount over the loaded store consumes them. */
+describe('useSavedState — W41: a mount before vot-state loads spends no one-shot flag', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    try { sessionStorage.clear(); } catch (_e) { /* jsdom always has it */ }
+    StateStore._resetForTests({ forceLoaded: true });
+  });
+
+  it('keeps the crash-recover flag and counters for the loaded mount, which coerces the real record', () => {
+    sessionStorage.setItem('vot-crash-recover', '1');
+    sessionStorage.setItem('vot-crash-count', '3');
+    sessionStorage.setItem('vot-crash-first-ms', String(Date.now()));
+    const gs = vi.spyOn(StateStore, 'getState').mockReturnValue('pending');
+    StateStore._cache = /** @type {any} */ ({});
+    const first = renderHook(() => useSavedState());
+    expect(first.result.current.screen).toBe('home');                 // defaults: home anyway
+    expect(sessionStorage.getItem('vot-crash-recover')).toBe('1');
+    expect(sessionStorage.getItem('vot-crash-count')).toBe('3');
+    gs.mockRestore();
+    // the store lands; the remount reads the crashing screen
+    StateStore._cache = /** @type {any} */ ({ screen: 'bible-ch', bookId: 'genesis', chapterNum: 5,
+      tabs: [{ screen: 'bible-ch', bookId: 'genesis', chapterNum: 5 }] });
+    const second = renderHook(() => useSavedState());
+    expect(second.result.current.screen).toBe('home');
+    expect(second.result.current.tabs[0].screen).toBe('home');
+    expect(sessionStorage.getItem('vot-crash-recover')).toBeNull();
+    expect(sessionStorage.getItem('vot-crash-count')).toBeNull();
+  });
+
+  it('leaves the scroll heal to the loaded mount, which heals the real record', () => {
+    const gs = vi.spyOn(StateStore, 'getState').mockReturnValue('degraded');
+    StateStore._cache = /** @type {any} */ ({});
+    renderHook(() => useSavedState());
+    expect(localStorage.getItem('vot-scrollheal-1')).toBeNull();
+    gs.mockRestore();
+    StateStore._cache = /** @type {any} */ ({ screen: 'home',
+      tabs: [{ screen: 'wtlb-two-entry', letterId: 'a', scrollPositions: { 'wtlb-a': { y: 715 } } }] });
+    const { result } = renderHook(() => useSavedState());
+    expect(result.current.tabs[0].scrollPositions).toEqual({});
+    expect(localStorage.getItem('vot-scrollheal-1')).toBe('1');
+  });
+});

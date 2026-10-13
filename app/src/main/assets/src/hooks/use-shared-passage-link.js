@@ -17,6 +17,7 @@
 import { sharedPassageKey, publicPassageKey } from '../utils/passage-link.js';
 import { buildSourceEndpoint } from '../utils/nav-index.js';
 import { showToast } from '../utils/toast.js';
+import { stateStoreUnloaded } from './use-persisted-state.js';
 
 /** @returns {any} */
 function books() { return (typeof BOOKS !== 'undefined') ? BOOKS : null; }
@@ -28,15 +29,38 @@ function books() { return (typeof BOOKS !== 'undefined') ? BOOKS : null; }
  */
 export function openSharedPassage(win, navigateToLink) {
   const key = sharedPassageKey(win.location && win.location.search);
-  if (!key) return null;
+  if (!key) {
+    // W41: the mount after one made before vot-state loaded: the key is parked.
+    const parked = _parkedSharedKey;
+    if (parked) openAndPark(win, parked, navigateToLink);
+    return parked;
+  }
   try {
     const u = new URL(win.location.href);
     u.searchParams.delete('p');
     win.history.replaceState(win.history.state, '', u.pathname + u.search + u.hash);
   } catch (_e) { /* an address we cannot rewrite still opens the passage */ }
-  openKey(win, key, navigateToLink);
+  openAndPark(win, key, navigateToLink);
   return key;
 }
+
+/* W41: a mount made before vot-state loads is thrown away when it lands
+   (HydrationGate's late-load remount puts the reader back where the saved record
+   says), and with it the jump to a key it opened. Such a mount still opens the key
+   (the store may never load) and parks it here, in module scope, which outlives the
+   remount; the next mount opens it again over the restored place. A mount over the
+   loaded store opens it and clears the park. */
+/** @type {string | null} */
+let _parkedSharedKey = null;
+
+/** @param {any} win @param {string} key @param {(endpoint: any, meta?: any) => void} navigateToLink */
+function openAndPark(win, key, navigateToLink) {
+  _parkedSharedKey = stateStoreUnloaded() ? key : null;
+  openKey(win, key, navigateToLink);
+}
+
+/** Tests only: forget a parked key. */
+export function _resetSharedPassagePark() { _parkedSharedKey = null; }
 
 /**
  * Load the corpus that can resolve a public key, then jump there silently.
@@ -94,7 +118,7 @@ export function installSharedPassageHook(win, navigateToLink) {
   win.__votOpenSharedPassage = (/** @type {unknown} */ k) => {
     const key = publicPassageKey(k);
     if (!key) return false;
-    openKey(win, key, navigateToLink);
+    openAndPark(win, key, navigateToLink); // W41: handed in before vot-state loaded, it outlives the remount too
     return true;
   };
 }
