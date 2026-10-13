@@ -880,6 +880,22 @@ describe('useAndroidBack — W1.5(c) Escape key (web only)', () => {
     } finally { delete /** @type {any} */ (document).fullscreenElement; }
   });
 
+  // W42 (sweep 2026-10-13): Escape in the listening desk's typed-speed field
+  // (it cancels the typing and preventDefaults) also closed the whole desk here.
+  it('W42: an Escape a control already handled dismisses nothing and navigates nowhere', () => {
+    const dismiss = vi.fn();
+    modalRegistry.register({ id: 'listening-desk', dismiss });
+    const props = baseProps({ screen: 'settings' });
+    renderHook(() => useAndroidBack(props));
+    const field = document.createElement('input');
+    document.body.appendChild(field);
+    field.addEventListener('keydown', (ev) => ev.preventDefault());
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true, bubbles: true }));
+    expect(dismiss).not.toHaveBeenCalled();
+    expect(suppress).not.toHaveBeenCalled();
+    expect(props.goNavOrigin).not.toHaveBeenCalled();
+  });
+
   it('an open modal is dismissed alone — never dismiss-AND-navigate', () => {
     const dismiss = vi.fn();
     modalRegistry.register({ id: 'sheet', dismiss });

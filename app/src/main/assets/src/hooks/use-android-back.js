@@ -409,6 +409,7 @@ export function useAndroidBack({
           event.keyCode would also work but is on its way out).
        3. Composition in flight (IME / autocomplete): skip — Escape
           there cancels the composition; let the browser handle it.
+          (W42) Already handled (defaultPrevented) by a control: skip too.
        4. Fullscreen open: skip entirely. The browser exits fullscreen
           natively on Escape. Do NOT preventDefault — that would swallow
           the browser's own behavior.
@@ -448,6 +449,9 @@ export function useAndroidBack({
     function onKeyDown(e) {
       if (e.key !== 'Escape') return;
       if (e.isComposing) return;  // IME composition cancel — browser handles.
+      // W42: a control already handled this Escape (the listening desk's typed-speed
+      // field cancels its typing; a sheet that closes itself) — it is not also a Back.
+      if (e.defaultPrevented) return;
       // Fullscreen exit: let the browser do its native thing. Do NOT
       // preventDefault; do NOT dismiss a modal underneath the fullscreen
       // view. The next Escape press (after fullscreen exits) will be a

@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useDesktopKeyboard } from './use-desktop-keyboard.js';
 import { PlatformBridge } from '../utils/platform-bridge.js';
+import { modalRegistry } from './use-modal-registry.js';
 
 /** @param {string} key @param {any} [opts] */
 function press(key, opts = {}) {
@@ -98,6 +99,57 @@ describe('useDesktopKeyboard — chapter arrows', () => {
   it('no-ops when there is no chapter nav on screen', () => {
     mount();
     expect(() => press('ArrowRight')).not.toThrow();
+  });
+
+  // W42 (sweep 2026-10-13): the arrows turned the chapter behind an open sheet or
+  // menu (a NoteSheet then auto-dismissed, its draft gone) and "/" opened Search
+  // behind it; a key a control had already handled ran again here.
+  describe('W42: keys meant for something else', () => {
+    afterEach(() => { modalRegistry._reset(); });
+
+    it('an open sheet or menu (modal registry) keeps the arrows and "/" from acting behind it', () => {
+      const { next } = mountStickyNav();
+      modalRegistry.register({ id: 'note-sheet', dismiss: vi.fn() });
+      mount();
+      press('ArrowRight');
+      press('/');
+      press('f', { ctrlKey: true });
+      expect(next.click).not.toHaveBeenCalled();
+      expect(window.__goSearch).not.toHaveBeenCalled();
+    });
+
+    it('a key a control already handled (defaultPrevented) is left alone', () => {
+      const { next } = mountStickyNav();
+      const btn = document.createElement('button');
+      document.body.appendChild(btn);
+      btn.addEventListener('keydown', (e) => e.preventDefault());
+      mount();
+      press('ArrowRight', { target: btn });
+      press('/', { target: btn });
+      expect(next.click).not.toHaveBeenCalled();
+      expect(window.__goSearch).not.toHaveBeenCalled();
+    });
+
+    it.each(['dialog', 'menu', 'radiogroup', 'tablist', 'listbox'])('arrows inside a %s move within it, not the chapter', (role) => {
+      const { next } = mountStickyNav();
+      const group = document.createElement('div');
+      group.setAttribute('role', role);
+      const item = document.createElement('button');
+      group.appendChild(item);
+      document.body.appendChild(group);
+      mount();
+      press('ArrowRight', { target: item });
+      expect(next.click).not.toHaveBeenCalled();
+    });
+
+    it('with nothing open, the arrows still turn the chapter from a plain button', () => {
+      const { next } = mountStickyNav();
+      const btn = document.createElement('button');
+      document.body.appendChild(btn);
+      mount();
+      press('ArrowRight', { target: btn });
+      expect(next.click).toHaveBeenCalledTimes(1);
+    });
   });
 });
 
