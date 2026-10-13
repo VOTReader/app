@@ -756,15 +756,12 @@ describe('CachedStore v04-02 — the Clear-All write fence', () => {
     expect(putSpy.mock.calls[0][2].map((i) => i.id)).toEqual(['a']);
   });
 
-  it('W8: the remote fence closes the adapter door too (the writers that bypass the stores)', () => {
+  it('W8: the remote fence refuses the writers that bypass the stores; it never opens Clear All\'s silent door', async () => {
     const doorSpy = vi.spyOn(IDBAdapter, 'setWriteFence');
     setRemoteWriteFence(true);
-    expect(doorSpy).toHaveBeenLastCalledWith(true);
-    setStoreWriteFence(true, { storesOnly: true });        // this page's own snapshot restore...
-    setStoreWriteFence(false);                             // ...that failed
-    expect(doorSpy).toHaveBeenLastCalledWith(true);
+    expect(doorSpy).not.toHaveBeenCalledWith(true);        // that door resolves writes unwritten: for a wipe only
+    await expect(IDBAdapter.put('meta', 'w8-probe', 1)).rejects.toMatchObject({ name: 'WriteFenced' });
     setRemoteWriteFence(false);
-    expect(doorSpy).toHaveBeenLastCalledWith(false);
   });
 
   it('CONTROL: a store that did not try to save while fenced is not rewritten when it comes down', async () => {

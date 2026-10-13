@@ -17,6 +17,7 @@
      IDBAdapter.getAll(storeName)               → Promise<Record<string, any>>
      IDBAdapter.commitMigration(store,data,ver) → Promise<void>  (W7.1b, atomic)
      IDBAdapter.setWriteFence(on)               → void  (v04-02: Clear All; via setStoreWriteFence)
+     IDBAdapter.setHoldCheck(fn)                → void  (W8: another tab's change; writes refused while fn() is true)
      IDBAdapter.isQuotaError(err)               → boolean
      IDBAdapter.isVersionError(err)             → boolean  (v04-03: a newer app's database)
      IDBAdapter.onVersionChange(fn)             → unsubscribe  (W8: another connection deleted or upgraded it)
@@ -146,6 +147,50 @@ export const IDBAdapter = (function () {
 
   /** @param {boolean} on */
   function setWriteFence(on) { _writeFence = !!on; }
+
+  /* W8 (sweep 2026-10-13): ANOTHER tab's Clear All, Import or Restore holds this page's writes
+     (utils/other-tabs.js, through CachedStore). Unlike the wipe's door above, a held write is
+     REFUSED (WriteFenced), never resolved unwritten: the library is not being wiped, so a caller
+     that writes directly (offline songs, size samples) must hear it did not land, and a store
+     saves it again when the hold lifts. A check that throws holds nothing. */
+  /** @type {(() => boolean) | null} */
+  let _holdCheck = null;
+
+  /** @param {(() => boolean) | null} fn */
+  function setHoldCheck(fn) { _holdCheck = typeof fn === 'function' ? fn : null; }
+
+  /** @returns {boolean} */
+  function _held() {
+    if (!_holdCheck) return false;
+    try { return !!_holdCheck(); } catch (_e) { return false; }
+  }
+
+  /** Either fence is up: the write must not land. Checked again after open(), right before the
+   *  transaction (W8 refuter): a write can wait on a reopen while a fence rises. */
+  function _blocked() { return _writeFence || _held(); }
+
+  /** A write a fence stopped: it did not land (CachedStore saves it again when the fences come down). */
+  function _fencedError() {
+    const e = new Error('write held back by a write fence');
+    e.name = 'WriteFenced';
+    return e;
+  }
+
+  /**
+   * A readwrite transaction on one store for a write, unless a fence rose while the open was pending.
+   * @param {StoreName} storeName
+   * @returns {Promise<{ store: IDBObjectStore, tx: IDBTransaction }>}
+   */
+  function _writeTxStore(storeName) {
+    if (!STORE_SET.has(storeName)) {
+      return Promise.reject(new Error('Unknown IDB store: ' + storeName));
+    }
+    return open().then(function (db) {
+      if (_blocked()) throw _fencedError();
+      const tx = db.transaction([storeName], 'readwrite');
+      return { store: tx.objectStore(storeName), tx: tx };
+    });
+  }
 
   /** Told when another connection deletes or upgrades the database (versionchange). @type {Set<(ev: any) => void>} */
   const _versionListeners = new Set();
@@ -287,6 +332,7 @@ export const IDBAdapter = (function () {
    */
   function put(storeName, key, value) {
     if (_writeFence) return Promise.resolve();   // v04-02: nothing reopens a wiped database
+    if (_held()) return Promise.reject(_fencedError());   // W8: another tab's change holds this page
     if (value === undefined) return _self.delete(storeName, key);
     return _self._putOnce(storeName, key, value).catch(function (err) {
       if (err && err.name === 'AbortError') {
@@ -305,7 +351,7 @@ export const IDBAdapter = (function () {
    * @returns {Promise<void>}
    */
   function _putOnce(storeName, key, value) {
-    return txStore(storeName, 'readwrite').then(function (ctx) {
+    return _writeTxStore(storeName).then(function (ctx) {
       return new Promise(function (resolve, reject) {
         let settled = false;
         const settle = function (action) { if (!settled) { settled = true; action(); } };
@@ -339,7 +385,8 @@ export const IDBAdapter = (function () {
    */
   function del(storeName, key) {
     if (_writeFence) return Promise.resolve();   // v04-02: nothing reopens a wiped database
-    return txStore(storeName, 'readwrite').then(function (ctx) {
+    if (_held()) return Promise.reject(_fencedError());   // W8
+    return _writeTxStore(storeName).then(function (ctx) {
       return new Promise(function (resolve, reject) {
         let settled = false;
         const settle = function (action) { if (!settled) { settled = true; action(); } };
@@ -410,7 +457,9 @@ export const IDBAdapter = (function () {
       return Promise.reject(new Error('Unknown IDB store: ' + storeName));
     }
     if (_writeFence) return Promise.resolve();   // v04-02: nothing reopens a wiped database
+    if (_held()) return Promise.reject(_fencedError());   // W8
     return open().then(function (db) {
+      if (_blocked()) throw _fencedError();   // W8: a fence rose while the open was pending
       return new Promise(function (resolve, reject) {
         let settled = false;
         const settle = function (action) { if (!settled) { settled = true; action(); } };
@@ -489,6 +538,7 @@ export const IDBAdapter = (function () {
     getAll: getAll,
     commitMigration: commitMigration,
     setWriteFence: setWriteFence,
+    setHoldCheck: setHoldCheck,
     isQuotaError: isQuotaError,
     isVersionError: isVersionError,
     onVersionChange: onVersionChange,

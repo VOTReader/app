@@ -94,8 +94,9 @@ export function setStoreWriteFence(on, opts) {
 }
 
 /**
- * W8: raise or lower the other tab's fence (see _remoteFence). It always closes the adapter's
- * door too: nothing on this page may write into a library another tab just made.
+ * W8: raise or lower the other tab's fence (see _remoteFence). The adapter refuses every write
+ * while it is up (its hold check, above): nothing on this page may write into a library another
+ * tab is making.
  * @param {boolean} on
  */
 export function setRemoteWriteFence(on) {
@@ -103,9 +104,13 @@ export function setRemoteWriteFence(on) {
   _applyFences();
 }
 
-/** Both fences onto the adapter's door; once neither holds, every save they skipped runs now. */
+/* The other tab's fence reaches the writers that bypass the stores through the adapter's hold
+   check: they are REFUSED (WriteFenced), never resolved unwritten like behind Clear All's door. */
+if (typeof IDBAdapter.setHoldCheck === 'function') IDBAdapter.setHoldCheck(function () { return _remoteFence; });
+
+/** This page's fence onto the adapter's door; once neither fence holds, every save they skipped runs now. */
 function _applyFences() {
-  if (typeof IDBAdapter.setWriteFence === 'function') IDBAdapter.setWriteFence(_writeFenceAtAdapter || _remoteFence);
+  if (typeof IDBAdapter.setWriteFence === 'function') IDBAdapter.setWriteFence(_writeFenceAtAdapter);
   if (_fenced()) return;
   const skipped = Array.from(_fencedDirty);
   _fencedDirty.clear();
@@ -561,6 +566,9 @@ export function CachedStore(storageKey, defaultVal, opts) {
             // earlier failure — nothing else ever reports a success to it.
             if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteSuccess();
           }, function (err) {
+            // A fence rose while this write waited on the database's open (W8): not saved, not a
+            // storage failure. Saved again when the fences come down, like a save stopped up front.
+            if (err && err.name === 'WriteFenced') { _fencedDirty.add(self); return; }
             // W8: a newer build upgraded the database under this tab: its banner, no "storage is full", no retry.
             if (_isNewerDatabase(err)) { _reportNewerDatabase(storageKey); return; }
             console.error('IDB write failed for', idbStoreName, err);
@@ -661,6 +669,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
         self._clearWriteRetry();   // STORE-4: merged write durable — cancel any pending retry
         if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteSuccess();
       }, function (err) {
+        if (err && err.name === 'WriteFenced') { _fencedDirty.add(self); return; }   // see _save
         if (_isNewerDatabase(err)) { _reportNewerDatabase(storageKey); return; }        // W8, see _save
         console.error('IDB merged write failed for', name, err);
         if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('store', 'IDB merged write failed: ' + name + ' — ' + ((err && err.name) || err));

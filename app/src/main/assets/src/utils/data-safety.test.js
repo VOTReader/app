@@ -14,10 +14,10 @@ import { DataSafety, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKI
 import { validateImportEnvelope } from './import-validators.js';
 import { applyImportPayload } from './backup.js';
 import { pruneSnapshotNames, snapshotName, snapshotTime, KEEP_DAYS, KEEP_WEEKS } from './snapshot-sink.js';
-import { announceLibraryChange } from './other-tabs.js';
+import { announceLibraryChange, heldByOtherTab } from './other-tabs.js';
 
 // W8: what this page tells the other open tabs (the channel itself: other-tabs.test.js).
-vi.mock('./other-tabs.js', async (importOriginal) => ({ ...(/** @type {any} */ (await importOriginal())), announceLibraryChange: vi.fn() }));
+vi.mock('./other-tabs.js', async (importOriginal) => ({ ...(/** @type {any} */ (await importOriginal())), announceLibraryChange: vi.fn(), heldByOtherTab: vi.fn(() => false) }));
 
 const ANN = { 'bible:john:3:16': [{ id: 'a1', groupId: 'a1', kind: 'highlight', start: 0, end: 5, color: 'yellow', created: 1, updated: 1 }],
   'letter:x:1': [{ id: 'a2', groupId: 'a2', kind: 'highlight', start: 0, end: 5, color: 'gold', created: 2, updated: 2 }] };
@@ -277,6 +277,24 @@ describe('refuter findings (datasafe 10-05 second pass)', () => {
     putSpy.mockReset().mockImplementationOnce((...a) => realPut.apply(IDBAdapter, a)).mockRejectedValue(quota);
     expect(await DataSafety.restoreMissing({ sink, reload: vi.fn() })).toBe(false);
     expect(said).toEqual(['changing', 'changed']);
+  });
+
+  it('W8: a tab whose library another tab changed restores nothing (its writes would not land)', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    const sink = memorySink();
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(Date.now() - 86400000);
+    await DataSafety.run({ sink });
+    vi.useRealTimers();
+    await IDBAdapter.put('vot-annotations', 'v', {});
+    await IDBAdapter.put('vot-notes', 'v', {});
+    await IDBAdapter.put('vot-state', 'v', {});
+    expect(await DataSafety.run({ sink })).toBe('damaged');
+    vi.mocked(heldByOtherTab).mockReturnValueOnce(true);
+    vi.mocked(announceLibraryChange).mockReset();
+    const reload = vi.fn();
+    expect(await DataSafety.restoreMissing({ sink, reload })).toBe(false);
+    expect(reload).not.toHaveBeenCalled();
+    expect(announceLibraryChange).not.toHaveBeenCalled();
   });
 
   it('a progress reset tells the next boot the smaller ledger is the reader\'s own', async () => {

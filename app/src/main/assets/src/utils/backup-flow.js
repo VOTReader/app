@@ -598,6 +598,15 @@ export function createBackupFlow(ctx) {
         return NOTHING_WRITTEN;
       }
 
+      // W8: another tab changed (or is changing) the library under this one, so this tab's
+      // writes are held (utils/other-tabs.js): an import here would land nothing and still
+      // say "Import complete". Refused before any write; a reload shows the library as it is.
+      if (typeof heldByOtherTab === 'function' && heldByOtherTab()) {
+        hideToast(_TOAST_ID);
+        _showToast('Your library was changed in another tab. Reload this tab, then import again.');
+        return NOTHING_WRITTEN;
+      }
+
       // Restore-inflight marker: set BEFORE the first mutation, removed only on
       // completion. If the process dies anywhere inside applyFn (crash, kill,
       // power loss) the marker survives and useRestoreGuard warns on next boot.
