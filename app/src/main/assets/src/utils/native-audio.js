@@ -99,9 +99,11 @@ class NativeAudio extends EventTarget {
     this._rate = 1;
     this._default = 1;
     this._volume = 1;
-    /** Where this recording's load begins, or a seek before its metadata is headed (ms): until metadata, native's 0
-     *  is the place it has not reached yet, not a place (sweep W4). */
+    /** Where this recording's load begins, or a seek before native's first word is headed (ms): until then, native's
+     *  0 is the place it has not reached yet, not a place (sweep W4). */
     this._startMs = 0;
+    /** Native has reported a duration or a position past 0 since this load: its positions are its word from then on. */
+    this._heard = false;
     this._lastSeq = 0;
     this._upcomingSent = '';
     this._metaSent = '';
@@ -142,8 +144,9 @@ class NativeAudio extends EventTarget {
     this.error = null;
     this._ended = false;
     if (url && url === this._nativeUrl && this._loaded) {
-      // A seam native already crossed: native plays this url now. Adopt it.
+      // A seam native already crossed: native plays this url now. Adopt it (from native's clock: no start pending).
       this._src = url;
+      this._startMs = 0;
       return;
     }
     if (this._loaded && !this._paused) nativeBridge()?.audioPause();
@@ -155,6 +158,7 @@ class NativeAudio extends EventTarget {
     this._buf = 0;
     this._pos = 0;
     this._startMs = 0;
+    this._heard = false;
     this._playing = false;
     // What native wanted was about the recording being left: without this, the new load's first state (not yet
     // playing) read as native's own pause, and the player filed the listener's pause mid-load (refutation M3).
@@ -178,8 +182,8 @@ class NativeAudio extends EventTarget {
     this._ended = false;
     if (this._loaded) {
       nativeBridge()?.audioSeek(Math.round(t * 1000));
-      // Before metadata the load's own events (its first state reads the start it was given) are still on the way.
-      if (this._ready < 1) this._startMs = Math.round(t * 1000);
+      // Before native's first word the load's own events (its first state reads the start it was given) are on the way.
+      if (!this._heard) this._startMs = Math.round(t * 1000);
     } else this._startMs = Math.round(t * 1000);
     const gen = this._gen;
     queueMicrotask(() => { if (gen === this._gen) this._fire('timeupdate'); });
@@ -225,6 +229,7 @@ class NativeAudio extends EventTarget {
     this._ended = false;
     if (!this._loaded) {
       this._loaded = true;
+      this._heard = false;
       this._loadedAt = Date.now();
       this._nativeUrl = this._src;
       const meta = this._meta(this._src);
@@ -340,10 +345,12 @@ class NativeAudio extends EventTarget {
     const wasBuffering = this._buffering;
     const dur = Number(e.dur) > 0 ? Number(e.dur) / 1000 : NaN;
     const pos = Math.max(0, Number(e.pos) || 0) / 1000;
-    // A load headed past 0:00 (a resume): before metadata native's 0 is the place it is on its way to. Read as the
-    // place, the bar showed 0:00 and the boot snapshot and a failed load's retry point were saved at 0 (sweep W4).
-    // With a duration it is native's word (a file it cannot seek in starts at 0).
-    this._pos = pos === 0 && !(dur > 0) && this._ready < 1 && this._startMs > 0 ? this._startMs / 1000 : pos;
+    // A load headed past 0:00 (a resume): until native first reports a duration or a position, its 0 is the place it is
+    // on its way to. Read as the place, the bar showed 0:00 and the boot snapshot and a failed load's retry point were
+    // saved at 0 (sweep W4). A state saying "playing" is not that word (one came with no duration: refuter round 1);
+    // a duration or a position is, after which its 0 is real (a file it cannot seek in plays from its top).
+    if (dur > 0 || pos > 0) this._heard = true;
+    this._pos = !this._heard && this._startMs > 0 ? this._startMs / 1000 : pos;
     // Native read pos at e.at: the bridge took the time since then, and the clock runs on from that moment, not
     // from this one. Anchored at arrival, it lagged native by the bridge's delay and stepped back when one event
     // came quicker than the last (sweep n1-04).

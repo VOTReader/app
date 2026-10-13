@@ -298,6 +298,26 @@ describe('audio-player on the native player (m3)', () => {
     } finally { delete globalThis.AudioPositionsStore; }
   });
 
+  it('(W4) a 0 with no duration stays not-a-place even after a state that says playing (refuter round 1)', async () => {
+    globalThis.AudioPositionsStore = { getPosition: () => ({ t: 125, d: 600 }), setPosition: vi.fn(), clearPosition: vi.fn() };
+    try {
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+      send({ type: 'state', url: URL_OF('idC'), pos: 0, dur: 0, playing: true, want: true });
+      send({ type: 'state', url: URL_OF('idC'), pos: 0, dur: 0, playing: false, want: true, buffering: true });
+      await flush();
+      expect(AudioPlayer.getState().time).toBe(120);
+      send({ type: 'error', url: URL_OF('idC'), code: 2001, name: 'ERROR_CODE_IO_NETWORK_CONNECTION_FAILED' });
+      await flush();
+      expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time).toBe(120);
+      AudioPlayer.toggle();                                  // Retry
+      expect(loads()[1]).toMatchObject({ url: URL_OF('idC'), startMs: 120000 });
+      // Native's own word ends it: a position it reports is where it is (a file it cannot seek in plays from its top).
+      send({ type: 'state', url: URL_OF('idC'), pos: 1000, dur: 0, playing: true, want: true });
+      await flush();
+      expect(Math.round(AudioPlayer.getState().time)).toBe(1);
+    } finally { delete globalThis.AudioPositionsStore; }
+  });
+
   it('(W4) a seek before metadata goes to native at once, and the load\'s first 0 does not undo it', async () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
     expect(loads()[0].startMs).toBe(0);
