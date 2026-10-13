@@ -290,14 +290,15 @@ lifetime rule as §8.
 
 - `__votCorpus` / `__loadVotCorpus` — `index.html:268-269`. Consumers:
   `screen-routes.jsx`, `use-navigate-to-link.js`, `use-surprise.js`,
-  `progress-stats.js`, and every VOT-rendering `*Home.jsx`/`*Screen.jsx`.
+  `progress-stats.js`, `search/engine.js` (init loads every corpus before it builds the index), and
+  every VOT-rendering `*Home.jsx`/`*Screen.jsx`.
 - `__matthewCorpus` / `__loadMatthewCorpus` — `index.html:265-266`. Consumers:
   `screen-routes.jsx`, `use-navigate-to-link.js`, `use-surprise.js`,
-  `ScripturesHome.jsx`, `StudiesHome.jsx`, `MyProgressScreen.jsx`.
+  `ScripturesHome.jsx`, `StudiesHome.jsx`, `MyProgressScreen.jsx`, `search/engine.js`.
 - `__bibleCorpus` / `__loadBibleCorpus` — `index.html:262` (same IIFE).
   Consumers: `screen-routes.jsx`, `use-lazy-bundles.js`,
   `use-dom-annotation-sync.js`, `ScripturesHome.jsx`, `SettingsScreen.jsx`,
-  `MyProgressScreen.jsx`.
+  `MyProgressScreen.jsx`, `search/engine.js`.
 - `__screensE` / `__loadScreensE` — `index.html:274-275` (Settings/Search/Garden).
   Consumers: `screen-routes.jsx`, `use-lazy-bundles.js`, `tour-controller.js`,
   `HomeScreen.jsx`.

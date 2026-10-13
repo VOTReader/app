@@ -907,11 +907,12 @@ describe('SearchScreen (W0 micro-gaps)', () => {
   });
 });
 
-describe('SearchScreen — the index waits for the Bible Studies (v09-perf-01)', () => {
-  /* The screen awaited the Bible, Matthew, VOT and Answers corpora but never the
-     studies, so a reader who went from boot straight to Search built (and cached)
-     an index with no study chapters, and the cache key flipped with whether the
-     Studies screen had been opened first: a ~10 s cold rebuild each flip. */
+describe('SearchScreen — the index is built for the reader (v09-perf-01, sweep W2)', () => {
+  /* The screen awaited the corpora (the studies only since v09-perf-01) and then
+     built with no edition: NKJV for every reader, and a search typed meanwhile
+     built from whatever had loaded. The engine's init now loads every corpus
+     itself (engine-corpora.test.js); the screen asks it for the reader's edition,
+     and an index that is ready but for another edition is not taken as ready. */
   const noop = () => {};
   beforeEach(() => {
     /** @type {any} */ (globalThis).ScreenLayout = ({ children }) => <div>{children}</div>;
@@ -926,21 +927,29 @@ describe('SearchScreen — the index waits for the Bible Studies (v09-perf-01)',
     delete /** @type {any} */ (globalThis).loadBibleStudies;
   });
 
-  it('builds only after loadBibleStudies has settled', async () => {
-    let settle = noop;
-    /** @type {any} */ (globalThis).loadBibleStudies = vi.fn(() => new Promise((r) => { settle = () => r(true); }));
+  it("builds for the reader's edition", async () => {
     const init = vi.fn(() => Promise.resolve());
     /** @type {any} */ (window).VotSearchMini = {
       getState: () => ({ ready: false }), init, suggest: () => [], fuzzyBookSuggest: () => null,
       search: () => Promise.resolve({ parsed: null, results: [], parsedTerms: [] }),
     };
-    render(<SearchScreen query="" onQueryChange={noop} settings={{}} onSettingsChange={noop} onSelect={noop}
+    render(<SearchScreen query="" onQueryChange={noop} settings={{ translation: 'kjv' }} onSettingsChange={noop} onSelect={noop}
       onBack={noop} searchScope={null} searchContext={null} onToggleScope={noop} onCommand={noop} />);
-    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    expect(/** @type {any} */ (globalThis).loadBibleStudies).toHaveBeenCalled();
-    expect(init).not.toHaveBeenCalled();
-    await act(async () => { settle(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
-    expect(init).toHaveBeenCalled();
+    await act(async () => { await Promise.resolve(); });
+    expect(init).toHaveBeenCalledWith(expect.objectContaining({ translation: 'kjv' }));
+  });
+
+  it('an index ready for another edition is built again, behind the progress bar', async () => {
+    const init = vi.fn(() => new Promise(() => {}));
+    /** @type {any} */ (window).VotSearchMini = {
+      getState: () => ({ ready: true, translation: 'nkjv' }), isCurrent: (/** @type {any} */ o) => o.translation === 'nkjv',
+      init, suggest: () => [], fuzzyBookSuggest: () => null,
+      search: () => Promise.resolve({ parsed: null, results: [], parsedTerms: [] }),
+    };
+    render(<SearchScreen query="" onQueryChange={noop} settings={{ translation: 'kjv' }} onSettingsChange={noop} onSelect={noop}
+      onBack={noop} searchScope={null} searchContext={null} onToggleScope={noop} onCommand={noop} />);
+    await act(async () => { await Promise.resolve(); });
+    expect(init).toHaveBeenCalledWith(expect.objectContaining({ translation: 'kjv' }));
   });
 });
 

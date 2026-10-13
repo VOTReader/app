@@ -514,9 +514,12 @@ function originalsFirst(out, idOf, terms, allowed, named) {
   }
 }
 /** @type {Promise<boolean>|null} */ let building = null;
+/** The edition the build under way is for. */
+/** @type {string|null} */ let buildingFor = null;
 let ready = false;
 /** @type {Error|null} */ let buildError = null;
-/** @type {{docCount?:number, buildMs?:number, collectMs?:number, insertMs?:number, cached?:boolean, translation?:string}} */ let stats = {};
+/** `sig`: what the index was built from (cache.js dataSignature), for the check that it still is. */
+/** @type {{docCount?:number, buildMs?:number, collectMs?:number, insertMs?:number, cached?:boolean, translation?:string, sig?:string}} */ let stats = {};
 
 function now() {
   return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -532,17 +535,27 @@ function reshapeDoc(r) {
   return doc;
 }
 
-/** Build the in-memory index for one translation (chunked for onProgress). */
-async function build(options) {
-  options = options || {};
-  // a new index is new texts behind the same ids (a translation change): the phrase
-  // ranking's token cache must not outlive the index it was read from
+/** Put a built or restored index in use. The caches read from the last one go with it: a new index is
+    new texts behind the same ids (a translation change), and the phrase ranking's token cache must not
+    outlive the index it was read from. Cleared here, at the swap, not when the build starts: a search on
+    the old index while the new one builds would fill them again with the old texts. */
+function swapIn(/** @type {any} */ ms, /** @type {typeof stats} */ st) {
   TOKEN_CACHE.clear();
   tokenCacheSize = 0;
   ORIGINALS = null;
   ORIGINAL_DOCS = null;
   SHINGLES = null;
   LEMMA_CACHE.clear();
+  msIndex = ms;
+  ready = true;
+  buildError = null;
+  stats = st;
+}
+
+/** Build the in-memory index for one translation (chunked for onProgress). `persist: false` keeps it
+    out of the warm cache (a corpus failed to load: that index must not replace a whole one there). */
+async function build(options) {
+  options = options || {};
   const code = options.translation || 'nkjv';
   const sig = dataSignature(code);
 
@@ -551,18 +564,19 @@ async function build(options) {
     const cachedJson = await loadCached(sig);
     if (cachedJson) {
       const tc = now();
-      msIndex = MiniSearch.loadJSON(cachedJson, buildMiniSearchOptions());
-      ready = true;
-      buildError = null;
-      stats = { docCount: msIndex.documentCount, buildMs: Math.round(now() - tc), cached: true, translation: code };
-      if (options.onProgress) options.onProgress(stats.docCount, stats.docCount);
+      const ms = MiniSearch.loadJSON(cachedJson, buildMiniSearchOptions());
+      swapIn(ms, { docCount: ms.documentCount, buildMs: Math.round(now() - tc), cached: true, translation: code, sig });
+      if (options.onProgress) options.onProgress(ms.documentCount, ms.documentCount);
       return;
     }
   } catch { /* corrupt / blocked cache — fall through to a fresh build */ }
 
   // Cold build: collect docs (fast, ~55ms) then index (the slow part, ~10s —
-  // chunked so the progress bar animates and the UI stays responsive).
+  // chunked so the progress bar animates and the UI stays responsive). The
+  // signature is read again with the docs, in the same task: a corpus that
+  // arrived while the cache was read is in both or in neither.
   const t0 = now();
+  const builtSig = dataSignature(code);
   const docs = buildDocs({ translation: code });
   const t1 = now();
   const ms = new MiniSearch(buildMiniSearchOptions());
@@ -576,46 +590,83 @@ async function build(options) {
   }
   if (options.onProgress) options.onProgress(docs.length, docs.length);
   const t2 = now();
-  msIndex = ms;
-  ready = true;
-  buildError = null;
-  stats = {
+  swapIn(ms, {
     docCount: docs.length,
     buildMs: Math.round(t2 - t0),
     collectMs: Math.round(t1 - t0), // buildDocs (tokenizer-bound)
     insertMs: Math.round(t2 - t1), // MiniSearch addAll (index-bound)
     cached: false,
     translation: code,
-  };
+    sig: builtSig,
+  });
+  if (options.persist === false) return;
   // Persist for next session (fire-and-forget) once the reader is not waiting on it:
   // serializing the index is one long task (1.7 s on a slow phone), and it ran the
   // moment the build finished, so the first search froze behind it (UI audit
   // 2026-09-27).
-  onIdle(() => { saveCached(sig, JSON.stringify(ms)).catch(() => {}); }, { timeout: 15000, fallbackDelay: 3000 });
+  onIdle(() => { saveCached(builtSig, JSON.stringify(ms)).catch(() => {}); }, { timeout: 15000, fallbackDelay: 3000 });
 }
 
-function sameTranslation(opts) {
-  return !opts || !opts.translation || stats.translation === opts.translation;
+/* EVERY TEXT, FOR THE READER'S EDITION, BEFORE THE INDEX IS BUILT (sweep W2, 2026-10-13). buildDocs
+   reads the lazy corpus globals and skips, silently, any not loaded yet. Search waited for them on
+   mount only, so a query already there ("search this", a restored tab) or typed while they loaded
+   built from what had arrived: VOT letters, Answers or the studies could be missing from every search
+   for the session, and that partial index was cached over the whole one. A mount with no edition
+   built NKJV for a KJV reader, and a search during it was answered in NKJV words. So init loads the
+   corpora itself, whoever calls it, and builds for the edition asked; an index built from other data
+   than the corpora hold now (the signature differs: another edition, a corpus loaded since) is built
+   again, and a build under way for other data is followed by one for this, never returned for it. */
+/** The lazy loaders of every corpus the index reads (index.html, translations.js), each a window global. */
+const CORPUS_LOADERS = ['__loadBibleCorpus', '__loadMatthewCorpus', '__loadVotCorpus', '__loadAnswersCorpus', 'loadBibleStudies'];
+
+/** Load every corpus and the edition's own text. Resolves true when all of them loaded: a failed load
+    leaves its global out, which the signature records, so the index is built again once it loads. */
+function loadCorpora(/** @type {string} */ code) {
+  const w = /** @type {any} */ (globalThis);
+  const call = (/** @type {any} */ fn, /** @type {any[]} */ args) => Promise.resolve().then(() => fn(...args)).then((r) => r !== false, () => false);
+  const loads = CORPUS_LOADERS.filter((n) => typeof w[n] === 'function').map((n) => call(w[n], []));
+  if (code !== 'nkjv' && typeof w.loadTranslation === 'function') {
+    loads.push(call(w.loadTranslation, [code]).then((ok) => ok && !!w['BIBLE_' + code.toUpperCase()]));
+  }
+  return Promise.all(loads).then((oks) => oks.every(Boolean));
+}
+
+/** The edition a call means: the one it names, else the one built or being built, else NKJV. */
+function editionOf(/** @type {{translation?:string}|undefined} */ options) {
+  return (options && options.translation) || buildingFor || stats.translation || 'nkjv';
+}
+
+/** Whether the index in use was built for this edition from the data the corpora hold now. */
+function isCurrent(/** @type {{translation?:string}|undefined} */ options) {
+  const code = editionOf(options);
+  return ready && stats.translation === code && stats.sig === dataSignature(code);
 }
 
 /**
- * Build (or rebuild on translation change) the index. Concurrent calls share
- * one in-flight build. SearchScreen calls this once on mount.
+ * Build (or rebuild) the index for an edition from every corpus. Concurrent calls
+ * for the same data share one build. SearchScreen calls this on mount.
  * @param {{translation?:string, onProgress?:(done:number,total:number)=>void}} [options]
  * @returns {Promise<boolean>}
  */
 function init(options) {
-  options = options || {};
-  if (ready && sameTranslation(options)) return Promise.resolve(true);
-  if (building) return building;
-  building = build(options)
-    .then(() => { building = null; return true; })
-    .catch((e) => { building = null; buildError = e; throw e; });
-  return building;
+  const code = editionOf(options);
+  const opts = { ...options, translation: code };
+  // One build at a time (each swaps in its index): this call is looked at again when it ends.
+  // A build for this edition that fails fails this call; one for another edition does not.
+  if (building) return buildingFor === code ? building.then(() => init(opts)) : building.then(() => init(opts), () => init(opts));
+  return loadCorpora(code).then((all) => {
+    if (building) return init(opts); // another call started one while the corpora loaded
+    if (isCurrent(opts)) return true;
+    buildingFor = code;
+    building = build({ ...opts, persist: all })
+      .then(() => { building = null; buildingFor = null; return true; })
+      .catch((e) => { building = null; buildingFor = null; buildError = e; throw e; });
+    return building;
+  });
 }
 
 async function ensureReady(options) {
-  if (ready && sameTranslation(options)) return;
+  if (isCurrent(options)) return;
   await init(options);
 }
 
@@ -1060,6 +1111,7 @@ function getStats() {
 
 export const VotSearchMini = {
   init,
+  isCurrent,
   rebuild,
   parse: parseReference,
   search,

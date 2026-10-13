@@ -44,6 +44,17 @@ const NAVPICK_CORPUS_SCOPES = [
   { id: 'volumes', label: 'Volumes' },
 ];
 
+/** The reader's edition (Settings), so the picker's index is the one Search builds: one for
+    NKJV here sent the next Search open into a ~10 s rebuild, and the two evicted each other
+    from the warm cache (sweep W2, 2026-10-13). StateStore is a global binding, read by name.
+    @returns {string} */
+function readerTranslation() {
+  try {
+    const s = typeof StateStore !== 'undefined' && StateStore ? StateStore.get() : null;
+    return (s && s.settings && s.settings.translation) || 'nkjv';
+  } catch (_e) { return 'nkjv'; }
+}
+
 export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, onRequestRefine, lastCreatedLink, onLinkCreated, mode, onPickTarget }) {
   const [input, setInput] = React.useState('');
   const [view, setView] = React.useState('search'); // 'search' | 'browse' | 'recent'
@@ -101,7 +112,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
       Promise.all(loaders).then(() => {
         if (cancelled) return;
         const eng = (/** @type {any} */ (window)).VotSearchMini;
-        if (eng && typeof eng.init === 'function') eng.init().catch(() => {});
+        if (eng && typeof eng.init === 'function') eng.init({ translation: readerTranslation() }).catch(() => {});
       });
     }, 400);
     return () => { cancelled = true; clearTimeout(t); };
@@ -141,7 +152,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
       if (!eng) { setContentHits(null); return; }
       try {
         if (!eng.getState().ready) setContentHits('building');
-        const res = await eng.search(q, { limit: 60, corpus: corpusScope });
+        const res = await eng.search(q, { limit: 60, corpus: corpusScope, translation: readerTranslation() });
         if (cancelled) return;
         const seen = new Set();
         const rows = [];
