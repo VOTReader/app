@@ -11,7 +11,7 @@
 
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
-import { render, cleanup, fireEvent } from '@testing-library/react';
+import { render, cleanup, fireEvent, act } from '@testing-library/react';
 import { NotesIndexScreen, filterNotesByQuery } from './NotesIndexScreen.jsx';
 import { NoteRow } from '../components/NoteRow.jsx';
 import { noteSourceSegments } from '../../utils/note-source.js';
@@ -189,5 +189,34 @@ describe('NotesIndexScreen search box', () => {
     const { container, getByText } = render(<NotesIndexScreen {...props} />);
     fireEvent.click(getByText('Faith'));
     expect(container.querySelector('.notes-empty-title').textContent).toBe('Nothing here yet');
+  });
+});
+
+/* Sweep W69: NoteStore.list() builds and sorts a fresh array per call, so memos keyed on its result
+   missed on every keystroke and every row re-sorted and re-counted. The lists are keyed on the store
+   versions now: one list per version, and a write still shows. */
+describe('NotesIndexScreen — large libraries', () => {
+  it('lists notes and notebooks once per store version, not once per keystroke', () => {
+    let lists = 0, nbLists = 0, ver = 1;
+    /** @type {null | (() => void)} */ let ping = null;
+    let notes = NOTES.slice();
+    window.NoteStore = {
+      subscribe: (cb) => { ping = cb; return () => { ping = null; }; },
+      getVersion: () => ver,
+      list: () => { lists++; return notes.slice(); },
+    };
+    window.NotebookStore = { ...window.NotebookStore, list: () => { nbLists++; return NBS.slice(); } };
+    const { container, getByText } = render(<NotesIndexScreen {...props} />);
+    fireEvent.click(getByText('All Notes'));
+    const input = container.querySelector('input.notes-index-search');
+    for (const q of ['c', 'co', 'cov', 'cove']) fireEvent.change(input, { target: { value: q } });
+    expect(container.querySelectorAll('.note-row').length).toBe(2);
+    expect(lists).toBe(1);
+    expect(nbLists).toBe(1);
+    // A write bumps the version: the list is read again and the new note is found.
+    notes = notes.concat([{ groupId: 'g4', color: 'blue', body: 'covenant kept', fullText: '', keys: [], created: 7, updated: 7, notebookIds: [] }]);
+    act(() => { ver = 2; if (ping) ping(); });
+    expect(lists).toBe(2);
+    expect(container.querySelectorAll('.note-row').length).toBe(3);
   });
 });

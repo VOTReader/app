@@ -27,9 +27,9 @@ function srcEndpoint(hlKey) {
 
 /* ── BookmarkRow component ───────────────────────────────────── */
 /**
- * @param {{ key?: any, bkm: any, onNavigate: any, onLongPress: any, editingId: any, onEditStart: any, onEditSave: any, onEditCancel: any }} props
+ * @param {{ key?: any, bkm: any, source?: string, onNavigate: any, onLongPress: any, editingId: any, onEditStart: any, onEditSave: any, onEditCancel: any }} props
  */
-export function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditStart: _onEditStart, onEditSave, onEditCancel }) {
+export function BookmarkRow({ bkm, source = '', onNavigate, onLongPress, editingId, onEditStart: _onEditStart, onEditSave, onEditCancel }) {
   var useState = React.useState;
   var useEffect = React.useEffect;
   var useRef = React.useRef;
@@ -41,7 +41,7 @@ export function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditSta
   var setEditValue = _editState[1];
 
   var isEditing = editingId === bkm.id;
-  var sourceLabel = srcLabel(bkm.hlKey);
+  var sourceLabel = source || srcLabel(bkm.hlKey);
   var date = (typeof relativeDate === 'function') ? relativeDate(bkm.updated || bkm.created) : '';
   var hasThought = !isEditing && bkm.thought && bkm.thought.trim();
 
@@ -214,7 +214,7 @@ export function BookmarksScreen(props) {
   var onHistory = props.onHistory;
 
   // Subscribe to BookmarkStore — re-renders when any bookmark mutates.
-  React.useSyncExternalStore(
+  var bkmVer = React.useSyncExternalStore(
     React.useCallback(function(cb) { return BookmarkStore.subscribe(cb); }, []),
     function() { return BookmarkStore.getVersion(); }
   );
@@ -265,23 +265,31 @@ export function BookmarksScreen(props) {
   var editingId = _ei[0];
   var setEditingId = _ei[1];
 
-  var allBookmarks = BookmarkStore.all().slice();
+  /* One list and one source label per bookmark per store version (sweep W69): a fresh slice per
+     render kept the memo below from ever holding, and the search, the Source A-Z comparator and
+     every row each resolved the label again (a corpus or journal lookup, 2 n log n per sort). */
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the store version: all() is the live array
+  var allBookmarks = useMemo(function() { return BookmarkStore.all().slice(); }, [bkmVer]);
+  var sourceOf = useMemo(function() {
+    var m = new Map();
+    allBookmarks.forEach(function(bkm) { var t = srcLabel(bkm.hlKey); m.set(bkm, { text: t, lower: t.toLowerCase() }); });
+    return m;
+  }, [allBookmarks]);
 
   var displayBookmarks = useMemo(function() {
     var q = searchQuery.trim().toLowerCase();
     var filtered = q
       ? allBookmarks.filter(function(bkm) {
-          var source = srcLabel(bkm.hlKey).toLowerCase();
           var label = (bkm.label || '').toLowerCase();
-          return label.includes(q) || source.includes(q);
+          return label.includes(q) || sourceOf.get(bkm).lower.includes(q);
         })
       : allBookmarks.slice();
 
     filtered.sort(function(a, b) {
       if (sortMode === 'oldest') return (a.created || 0) - (b.created || 0);
       if (sortMode === 'source-az') {
-        var la = srcLabel(a.hlKey).toLowerCase();
-        var lb = srcLabel(b.hlKey).toLowerCase();
+        var la = sourceOf.get(a).lower;
+        var lb = sourceOf.get(b).lower;
         return la < lb ? -1 : la > lb ? 1 : 0;
       }
       if (sortMode === 'label-az') {
@@ -292,7 +300,7 @@ export function BookmarksScreen(props) {
       return (b.updated || b.created || 0) - (a.updated || a.created || 0);
     });
     return filtered;
-  }, [allBookmarks, searchQuery, sortMode]);
+  }, [allBookmarks, sourceOf, searchQuery, sortMode]);
 
   // (Pre-Q3.3f-dead: var sortLabels = {...} — defined but never referenced.)
 
@@ -370,6 +378,7 @@ export function BookmarksScreen(props) {
                 <BookmarkRow
                   key={bkm.id}
                   bkm={bkm}
+                  source={sourceOf.get(bkm).text}
                   onNavigate={navigateToBookmark}
                   onLongPress={function(b) { setActionTarget(b); }}
                   editingId={editingId}

@@ -108,7 +108,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
     React.useCallback((cb) => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.subscribe(cb) : () => {}, []),
     () => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.getVersion() : 0
   );
-  React.useSyncExternalStore(
+  const jrnVer = React.useSyncExternalStore(
     React.useCallback((cb) => (typeof JournalStore !== 'undefined') ? JournalStore.subscribe(cb) : () => {}, []),
     () => (typeof JournalStore !== 'undefined') ? JournalStore.getVersion() : 0
   );
@@ -126,7 +126,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
   React.useEffect(() => {
     if (typeof ReadingStreakStore !== 'undefined') ReadingStreakStore.recomputeFromLoad();
   }, []);
-  React.useSyncExternalStore(
+  const annVer = React.useSyncExternalStore(
     React.useCallback((cb) => (typeof AnnotationStore !== 'undefined') ? AnnotationStore.subscribe(cb) : () => {}, []),
     () => (typeof AnnotationStore !== 'undefined') ? AnnotationStore.getVersion() : 0
   );
@@ -168,18 +168,24 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
   const noteCount = (typeof NoteStore !== 'undefined') ? NoteStore.count() : 0;
   const linkCount = (typeof LinkStore !== 'undefined') ? LinkStore.all().length : 0;
   const bookmarkCount = (typeof BookmarkStore !== 'undefined') ? BookmarkStore.count() : 0;
-  const annData = (typeof AnnotationStore !== 'undefined') ? (AnnotationStore.all() || {}) : {};
-  const markCount = (() => {
-    const seen = {};
-    Object.keys(annData).forEach((k) => (annData[k] || []).forEach((a) => {
-      if (isMarkKind(a.kind)) seen[a.groupId || a.id] = 1;
-    }));
-    return Object.keys(seen).length;
-  })();
   const groups = buildProgressGroups();
   const groupShape = groups
     .flatMap((g) => g.genres.flatMap((genre) => genre.books.map((b) => `${b.id}:${b.total}`)))
     .join('|');
+  /* The whole-library walks, once per version of the stores they read (sweep W69): the screen renders
+     several times on open (voice minutes, word stats) and on every bump of the stores it watches,
+     and each render walked every mark (and resolved a source per key) and counted every journal
+     word. The source titles also come from the journal and the lazy corpora, hence those keys. */
+  const annAgg = React.useMemo(() => {
+    const annData = (typeof AnnotationStore !== 'undefined') ? (AnnotationStore.all() || {}) : {};
+    const seen = {};
+    Object.keys(annData).forEach((k) => (annData[k] || []).forEach((a) => {
+      if (isMarkKind(a.kind)) seen[a.groupId || a.id] = 1;
+    }));
+    return { markCount: Object.keys(seen).length, topSources: mostAnnotatedSources(annData, 5) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the store versions: all() is the live object
+  }, [annVer, jrnVer, groupShape]);
+  const markCount = annAgg.markCount;
   // Words-based bars (2026-08-03): item counts lie by omission (a 16-word
   // verse and a 5,034-word letter both score 1), so the bar FILL weighs
   // words. The first full pass tokenizes the library — deferred to idle so
@@ -211,7 +217,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
     // render, so depending on its identity would re-tokenize every time.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
   }, [groupShape, readItems]);
-  const topSources = mostAnnotatedSources(annData, 5);
+  const topSources = annAgg.topSources;
   const markAsReadOn = !settings || settings.markAsRead !== false;
 
   // Reading-measurement surfaces (ReadingStatsStore, bundle-b). Each is
@@ -223,15 +229,17 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
   // Words WRITTEN — every text-bearing journal block (p / h2 / quote);
   // card excerpts and captions are quoted content, not the user's writing.
   // null (not 0) when the counter or store is absent, so the row hides.
-  let journalWords = null;
-  if (typeof JournalStore !== 'undefined' && typeof JournalStore.all === 'function' && typeof countTextWords === 'function') {
-    journalWords = 0;
+  const journalWords = React.useMemo(() => {
+    if (typeof JournalStore === 'undefined' || typeof JournalStore.all !== 'function' || typeof countTextWords !== 'function') return null;
+    let words = 0;
     (JournalStore.all() || []).forEach((e) => {
       ((e && e.blocks) || []).forEach((b) => {
-        if (b && (b.type === 'p' || b.type === 'h2' || b.type === 'quote')) journalWords += countTextWords(b.text);
+        if (b && (b.type === 'p' || b.type === 'h2' || b.type === 'quote')) words += countTextWords(b.text);
       });
     });
-  }
+    return words;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the store version: all() is the live list
+  }, [jrnVer]);
 
   /* ── The redesign (2026-09-25, Codex mockup r5 take 1) ─────────────────
      This was a grid of up to eight gold-outlined stat boxes, then boxed cards

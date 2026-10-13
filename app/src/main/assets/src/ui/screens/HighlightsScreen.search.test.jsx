@@ -111,3 +111,21 @@ describe('HighlightsScreen — the migrated stylesheet [C9]', () => {
     }
   });
 });
+
+/* Sweep W69: _collectMarks() walked, grouped and sorted the whole AnnotationStore into a fresh
+   array per render, so both memos keyed on it missed, and the search and every row resolved each
+   source label again. Now one walk and one label per mark per store version. */
+describe('HighlightsScreen — large libraries', () => {
+  it('walks the store and resolves each source label once per version, not per keystroke', () => {
+    let walks = 0, resolves = 0;
+    const many = {};
+    for (let i = 0; i < 40; i++) many['bible:john:3:' + (i + 1)] = [{ id: 'x' + i, groupId: 'gx' + i, kind: 'highlight', color: 'yellow', text: 'word ' + i, created: i, updated: i }];
+    globalThis.AnnotationStore = { subscribe: () => () => {}, getVersion: () => 0, all: () => { walks++; return many; } };
+    globalThis._bookmarkSourceLabel = (hlKey) => { resolves++; return hlKey; };
+    show();
+    for (const q of ['w', 'wo', 'wor', 'word']) fireEvent.change(box(), { target: { value: q } });
+    expect(rows().length).toBe(40);
+    expect(walks).toBe(1);
+    expect(resolves).toBe(40);
+  });
+});

@@ -112,3 +112,26 @@ describe('BookmarksScreen — the sort cycle reaches every implemented mode', ()
     expect(labels()).toEqual(['Alpha note', 'Mu note', 'Zeta note']);
   });
 });
+
+/* Sweep W69: the list was a fresh slice per render (so the memo never held), and the search, the
+   Source A-Z comparator and every row each resolved the source label again: a corpus or journal
+   lookup, 2 n log n of them per sort, on every keystroke. Now: one list and one label per bookmark
+   per store version. */
+describe('BookmarksScreen — large libraries', () => {
+  it('reads the store and resolves each source label once per version, not per keystroke', () => {
+    let alls = 0, resolves = 0;
+    const many = [];
+    for (let i = 0; i < 60; i++) many.push({ id: 'm' + i, hlKey: 'bible:' + ['zeta', 'mu', 'alpha'][i % 3] + ':' + (i + 1), label: 'note ' + i, created: i, updated: i });
+    globalThis.BookmarkStore = { ...globalThis.BookmarkStore, all: () => { alls++; return many.slice(); } };
+    globalThis._bookmarkSourceLabel = (k) => { resolves++; return _bookmarkSourceLabel(k); };
+    show();
+    step(); step();
+    expect(sortBtn().textContent).toBe('Sort: Source A-Z');
+    const box = document.querySelector('input.notes-index-search');
+    for (const q of ['n', 'no', 'not', 'note']) fireEvent.change(box, { target: { value: q } });
+    expect(sources().length).toBe(60);
+    expect(sources()[0]).toBe('Alpha 12');   // A-Z on the label text: 'alpha 12' < 'alpha 3'
+    expect(alls).toBe(1);
+    expect(resolves).toBe(60);
+  });
+});
