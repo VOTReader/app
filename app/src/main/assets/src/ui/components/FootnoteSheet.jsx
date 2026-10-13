@@ -12,7 +12,7 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
   // right gutter as a NON-modal panel — no trap, no backdrop, complementary
   // role. Bottom-sheet modality is unchanged below the rail threshold.
   const rail = useRailMode();
-  const trapRef = useFocusTrap(isOpen && !rail);
+  const trapRef = useFocusTrap(isOpen, { modal: !rail });   // rail: no trap, but focus returns on close
   // SC5: fall back to the global BOOKS corpus when this letter's own nkjv dict
   // doesn't carry the ref — the inline ref sheet (LetterView) already does this;
   // the data gate is a backstop, not the sole source.

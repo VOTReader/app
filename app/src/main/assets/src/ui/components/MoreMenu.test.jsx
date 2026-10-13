@@ -104,7 +104,14 @@ describe('MoreMenuBtn — the compact bar', () => {
     cleanup();
     const top = setup({ fontScale: '3' });
     top.open();
-    expect(top.item('Larger text').disabled).toBe(true);
+    // Sweep low (mw10): at the limit the step reads as unavailable but stays focusable (a disabled
+    // button dropped the keyboard focus that had just pressed it, and the menu's keys with it).
+    const larger = top.item('Larger text');
+    expect(larger.disabled).toBe(false);
+    expect(larger.getAttribute('aria-disabled')).toBe('true');
+    expect(top.item('Smaller text').getAttribute('aria-disabled')).toBe('false');
+    act(() => { fireEvent.click(larger); });
+    expect(top.value.onFontScale).not.toHaveBeenCalled();
     expect(document.querySelector('.more-menu-step-value').textContent).toBe('300%');
   });
 

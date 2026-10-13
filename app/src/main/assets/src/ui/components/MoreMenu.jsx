@@ -156,7 +156,8 @@ export function MoreMenuBtn() {
   if (!ctx || !ctx.enabled) return null;
 
   const onKeyDown = (/** @type {any} */ e) => {
-    // A disabled step button (text at its limit) cannot take focus, so it is not a stop.
+    // A step button at its limit is aria-disabled, not disabled: it keeps the focus that just pressed
+    // it, so it stays a stop (as menu items that are unavailable do).
     const items = menuRef.current
       ? /** @type {HTMLElement[]} */ ([...menuRef.current.querySelectorAll(ITEM_SELECTOR)])
           .filter((el) => !(/** @type {HTMLButtonElement} */ (el)).disabled)
@@ -186,6 +187,7 @@ export function MoreMenuBtn() {
     });
   };
   const pct = Math.round(parseFloat(String(ctx.fontScale || '1')) * 100) || 100;
+  const atMin = pct <= MENU_SCALE_MIN * 100, atMax = pct >= MENU_SCALE_MAX * 100;
   const theme = ctx.theme === 'light' ? 'light' : 'dark';
 
   return (
@@ -246,11 +248,11 @@ export function MoreMenuBtn() {
           <div className="more-menu-row" role="group" aria-label="Text size">
             <span className="more-menu-row-label">Text size</span>
             <span className="more-menu-step">
-              <button type="button" role="menuitem" aria-label="Smaller text" disabled={pct <= MENU_SCALE_MIN * 100}
-                onClick={() => ctx.onFontScale(stepFontScale(ctx.fontScale, -1))}>A−</button>
+              <button type="button" role="menuitem" aria-label="Smaller text" aria-disabled={atMin}
+                onClick={() => { if (!atMin) ctx.onFontScale(stepFontScale(ctx.fontScale, -1)); }}>A−</button>
               <span className="more-menu-step-value">{pct === 100 ? 'Standard' : pct + '%'}</span>
-              <button type="button" role="menuitem" aria-label="Larger text" disabled={pct >= MENU_SCALE_MAX * 100}
-                onClick={() => ctx.onFontScale(stepFontScale(ctx.fontScale, 1))}>A+</button>
+              <button type="button" role="menuitem" aria-label="Larger text" aria-disabled={atMax}
+                onClick={() => { if (!atMax) ctx.onFontScale(stepFontScale(ctx.fontScale, 1)); }}>A+</button>
             </span>
           </div>
           <button type="button" role="menuitem" className="more-menu-item" onClick={go(ctx.onSettings)}>

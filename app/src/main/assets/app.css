@@ -756,7 +756,7 @@
       }
       .more-menu-seg button.on { background: var(--gold-faint); border-color: var(--gold); color: var(--gold-bright); }
       .more-menu-step button { color: var(--gold); }
-      .more-menu-step button:disabled { opacity: 0.35; cursor: default; }
+      .more-menu-step button:disabled, .more-menu-step button[aria-disabled="true"] { opacity: 0.35; cursor: default; }
       .more-menu-step-value { min-width: 5.2em; text-align: center; font-size: var(--fsc-15); color: var(--cream-muted); font-variant-numeric: tabular-nums; }
       body.light .more-menu { box-shadow: 0 14px 36px rgba(60,40,10,0.22); }
     

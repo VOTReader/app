@@ -67,11 +67,15 @@ function _focusables(root) {
  *
  * @param {boolean} active - trap engaged while true (same flag that renders
  *   the dialog; the ref must be attached to the dialog's root element).
+ * @param {{ modal?: boolean }} [opts] - `modal: false` (the companion rail's docked
+ *   panels) neither takes focus nor contains Tab; it only returns focus on close
+ *   (see _returnFocusOnClose).
  * @returns {{ current: HTMLDivElement | null }} ref to attach to the dialog root
  *   (every dialog root in the app is a <div>)
  */
-export function useFocusTrap(active) {
+export function useFocusTrap(active, opts) {
   const ref = React.useRef(/** @type {HTMLDivElement | null} */ (null));
+  const modal = !(opts && opts.modal === false);
 
   React.useEffect(() => {
     if (!active) return undefined;
@@ -79,6 +83,7 @@ export function useFocusTrap(active) {
     if (!root) return undefined;
 
     const prev = /** @type {HTMLElement | null} */ (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    if (!modal) return _returnFocusOnClose(root, prev);
     _trapStack.push(root);
 
     // Initial focus: if the dialog already focused something of its own
@@ -131,7 +136,31 @@ export function useFocusTrap(active) {
         try { prev.focus(); } catch (_e) { /* best-effort */ }
       }
     };
-  }, [active]);
+  }, [active, modal]);
 
   return ref;
+}
+
+/* A NON-modal panel (sweep mw10: the rail's docked footnote / scripture panel) takes no focus and traps
+   nothing, but closing it makes it inert, and focus inside an inert panel falls to <body>: the reader
+   loses their place in the Tab order. So when it closes with focus inside it (or lost from inside it),
+   focus goes back to where it was when the panel opened (the marker that opened it). Focus the reader
+   moved elsewhere is left alone.
+   @param {HTMLElement} root @param {HTMLElement | null} prev @returns {() => void} */
+function _returnFocusOnClose(root, prev) {
+  let inside = root.contains(document.activeElement);
+  const onIn = () => { inside = true; };
+  /** @param {FocusEvent} e */
+  const onOut = (e) => { if (e.relatedTarget instanceof Node && !root.contains(e.relatedTarget)) inside = false; };
+  root.addEventListener('focusin', onIn);
+  root.addEventListener('focusout', onOut);
+  return () => {
+    root.removeEventListener('focusin', onIn);
+    root.removeEventListener('focusout', onOut);
+    const cur = document.activeElement;
+    const lost = !cur || cur === document.body || root.contains(cur);
+    if (inside && lost && prev && prev !== document.body && prev.isConnected && !root.contains(prev)) {
+      try { prev.focus({ preventScroll: true }); } catch (_e) { /* best-effort */ }
+    }
+  };
 }
