@@ -63,3 +63,47 @@ describe('useTranslationLoader', () => {
     expect(g().loadTranslation).toHaveBeenLastCalledWith('web');
   });
 });
+
+/* W25 (sweep 10-13): the load's callback had no liveness flag and swept against the
+   edition IT loaded. Picking ASV, then WEB, with WEB landing first: ASV's late
+   callback ran releaseTranslationsExcept('asv') and freed BIBLE_WEB, so the reader
+   saw NKJV under WEB's label until they reselected. A callback now sweeps against
+   the CURRENT selection, and only the live one re-renders. */
+describe('useTranslationLoader — a late load never frees the edition picked after it (W25)', () => {
+  function deferredLoads() {
+    const pending = {};
+    g().loadTranslation = vi.fn((code) => new Promise((r) => { pending[code] = r; }));
+    return pending;
+  }
+
+  it('ASV then WEB, WEB lands first: ASV landing late sweeps against WEB, not ASV', async () => {
+    const pending = deferredLoads();
+    const tick = vi.fn();
+    const { rerender } = renderHook(({ t }) => useTranslationLoader(t, tick), { initialProps: { t: 'asv' } });
+    rerender({ t: 'web' });
+    pending.web(); await flush();
+    pending.asv(); await flush();
+    const swept = g().releaseTranslationsExcept.mock.calls.map((c) => c[0]);
+    expect(swept).not.toContain('asv');
+    expect(swept[swept.length - 1]).toBe('web');
+    expect(tick).toHaveBeenCalledTimes(1);                 // only the live load re-renders
+  });
+
+  it('a load that lands after a switch back to NKJV is swept, not kept', async () => {
+    const pending = deferredLoads();
+    const { rerender } = renderHook(({ t }) => useTranslationLoader(t, vi.fn()), { initialProps: { t: 'asv' } });
+    rerender({ t: 'nkjv' });
+    pending.asv(); await flush();
+    const swept = g().releaseTranslationsExcept.mock.calls.map((c) => c[0]);
+    expect(swept).toEqual(['nkjv', 'nkjv']);                // the late ASV is freed against NKJV
+  });
+
+  it('after unmount a late load still sweeps against the last selection and re-renders nothing', async () => {
+    const pending = deferredLoads();
+    const tick = vi.fn();
+    const { unmount } = renderHook(() => useTranslationLoader('asv', tick));
+    unmount();
+    pending.asv(); await flush();
+    expect(tick).not.toHaveBeenCalled();
+  });
+});
