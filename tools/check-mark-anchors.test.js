@@ -35,6 +35,20 @@ describe('check-mark-anchors', () => {
     expect(s).toEqual([{ id: 'regarding-spiritual-gifts', moved: 1, from: 1, to: 2 }]);
   });
 
+  // sweep mw14: paragraphs inside a Bible Study prophecy card are keyed by their index IN
+  // THE CARD (letter:<id>:<group block>:<intro|ot|nt|vot>:<n>, ProphecyCard), so an insert
+  // inside a card moves every later card paragraph's marks; the gate only compared the
+  // top-level blocks and saw one changed block, no move.
+  it('a paragraph inserted inside a prophecy card is a shift of that card', () => {
+    const group = (ot) => ({ type: 'prophecy-group', label: 'L', intro: [p('i')], ot: { label: 'O', blocks: ot }, nt: { label: 'N', blocks: [p('n')] }, vot: { label: 'V', blocks: [] } });
+    const before = entriesOf(letters([p('top'), group([p('a'), p('b'), p('c')])]));
+    const after = entriesOf(letters([p('top'), group([p('new'), p('a'), p('b'), p('c')])]));
+    expect(before.get('the-wide-path:1:ot')).toHaveLength(3);
+    expect(shiftedEntries(before, after)).toEqual([{ id: 'the-wide-path:1:ot', moved: 3, from: 0, to: 1 }]);
+    // an edit in place inside the card is still no move
+    expect(shiftedEntries(before, entriesOf(letters([p('top'), group([p('a'), p('B fixed'), p('c')])])))).toEqual([]);
+  });
+
   it('covers the keyed collections and leaves the Bible translations out', () => {
     for (const f of ['volume-one', 'lords-rebuke', 'letters-flock', 'wtlb-two', 'the-blessed', 'holy-days', 'answers', 'bible-studies']) {
       expect(KEYED.test('app/src/main/assets/src/data/' + f + '.js'), f).toBe(true);

@@ -80,6 +80,26 @@ describe('remapCorpusMarkData - a mark goes back to its words along a proven mov
     expect(run(NEW, { annotations: { [P + '1']: [off] } }).annotations).toBeUndefined();
   });
 
+  // sweep mw14: the own-block check took ANY occurrence (exact elsewhere, or folded) as proof
+  // the mark was made on today's text, so an old mark on common words stayed in the wrong
+  // paragraph and painted on a neighbour's 'the'. Only the words AT the mark's own offsets
+  // prove that; anything looser goes to the target check.
+  it("an old mark on a common word whose wrong block holds it elsewhere still moves to its words", () => {
+    const the = { id: 'h', groupId: 'g', start: 0, end: 3, text: 'The', created: 1 };   // OLD[1] 'The gifts...'
+    expect(NEW[1].slice(0, 3)).not.toBe('The');                                          // not at its offsets in its key's block
+    expect(/the/i.test(NEW[1])).toBe(true);                                              // ...but there, loosely
+    const out = run(NEW, { annotations: { [P + '1']: [the] } });
+    expect(out.moved).toBe(1);
+    expect(out.annotations[P + '2']).toEqual([the]);
+  });
+
+  it('control: a mark AT its own offsets stays, though a listed target holds the same words there too', () => {
+    const paras = ['x', 'The cat sat.', 'The dog ran.'];
+    const a = { id: 'h', groupId: 'g', start: 0, end: 3, text: 'The', created: 1 };   // made on today's paras[1]
+    const out = remapCorpusMarkData([entry(P, paras)], { annotations: { [P + '1']: [a] } }, { [P]: [1, 2] });
+    expect(out.annotations).toBeUndefined();
+  });
+
   it('R5: two listed targets that both hold the words leave the mark where it is', () => {
     const refrain = 'Says The Lord.';
     const paras = ['New first.', refrain, 'body', refrain];

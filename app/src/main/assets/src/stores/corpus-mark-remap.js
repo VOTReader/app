@@ -22,11 +22,13 @@
    every paint (useDomAnnotationSync) each mark of a listed entry is read
    against the words of its block in the form it was recorded in (anchor-view.js
    chromeAwareView, SelectionToolbar's hlDisplayText form). A mark whose own
-   block still holds its words, moved or re-punctuated (anchor-resolve.js
-   resolveAnchor, all tiers), stays: it was made on today's text. Otherwise it
-   moves along a listed move only to a block that holds its recorded words
-   EXACTLY at the offsets it was made at (the unchanged block holds them
-   there), and only when exactly one such block does. Anything else stays.
+   block still holds its words AT the offsets it was made at stays: it was made
+   on today's text. Otherwise it moves along a listed move only to a block that
+   holds its recorded words EXACTLY at those offsets (the unchanged block holds
+   them there), and only when exactly one such block does. Anything else stays,
+   including a mark its block holds moved or re-punctuated (anchor-resolve.js
+   resolveAnchor, all tiers): an in-place edit since. (Until sweep mw14 that
+   loose hold came first and kept an old mark on 'the' in the wrong paragraph.)
    A block drawn another way than when the mark was made (WTLB footnotes on,
    a mid-paragraph ref drawn as a digit) can fail its own block's check, but
    its listed target is another paragraph, drawn the same way, which does not
@@ -40,10 +42,10 @@
    key (a heading where a paragraph was) goes straight to the target check.
 
    Known and left (refuter r2, low): a block whose index is listed stays listed;
-   a later in-place edit that removes a today-made mark's words from it could
-   send that mark to its listed target if the same words sit there at the same
-   offsets (133 such candidates today, e.g. a lone bullet). The gate lets such
-   an edit through.
+   a later in-place edit that moves a today-made mark's words within it, or
+   removes them, could send that mark to its listed target if the same words
+   sit there at the same offsets (133 such candidates today, e.g. a lone
+   bullet). The gate lets such an edit through.
 
    The store engine is the journal re-key's (journal-mark-rekey.js
    rekeyMarkStores): segments move one by one, a note's keys follow its
@@ -142,13 +144,22 @@ export function remapCorpusMarkData(entries, data, shifts) {
     // A listed position whose block today has no key (a heading now sits where a
     // paragraph was) holds no mark made on today's text: straight to the targets.
     var own = n < e.count ? e.view(n) : null;
-    if (own && resolveAnchor(own.text, { start: viewIndexOf(own.at, at.start), end: viewIndexOf(own.at, at.end), text: words })) return false;
+    /** @param {BlockView} v */
+    var holdsAtOffsets = function(v) { return v.text.slice(viewIndexOf(v.at, at.start), viewIndexOf(v.at, at.end)) === words; };
+    // Its words AT its own offsets: made on today's text, it stays. Only that proves it
+    // (sweep mw14): words found elsewhere in the block or loosely are what an old mark
+    // on 'the' or 'love' finds in the paragraph a shift put under it.
+    if (own && holdsAtOffsets(own)) return false;
     /** @type {number[]} */ var hits = [];
     p.to.forEach(function(t) {
       var v = t < e.count ? e.view(t) : null;
-      if (v && v.text.slice(viewIndexOf(v.at, at.start), viewIndexOf(v.at, at.end)) === words) hits.push(t);
+      if (v && holdsAtOffsets(v)) hits.push(t);
     });
-    return hits.length === 1 ? e.prefix + hits[0] : null;
+    if (hits.length === 1) return e.prefix + hits[0];
+    // No proven place elsewhere: a mark its block still holds, moved or re-punctuated
+    // (an in-place edit since it was made), stays as it is.
+    if (own && resolveAnchor(own.text, { start: viewIndexOf(own.at, at.start), end: viewIndexOf(own.at, at.end), text: words })) return false;
+    return null;
   }
 
   return rekeyMarkStores(data, { parse: parse, place: place });

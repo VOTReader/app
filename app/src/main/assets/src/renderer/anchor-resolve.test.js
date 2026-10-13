@@ -87,6 +87,16 @@ describe('resolveAnchor — tier 3: punctuation-insensitive', () => {
     expect(KJV.slice(at.start, at.end)).toBe('the world, that he gave');
     expect(at.exact).toBe(false);
   });
+
+  // sweep mw14: a stored start at or past the new text's last letter mapped to folded
+  // index 0, so 'nearest' picked the FIRST occurrence instead of the one by the mark.
+  it('a stored start past the last letter keeps the LAST loose occurrence, not the first', () => {
+    const text = 'Holy, holy, holy is the Lord — holy!';
+    const at = resolveAnchor(text, { start: text.length, end: text.length + 5, text: 'HOLY' });
+    expect(at).not.toBeNull();
+    expect(at.start).toBe(text.lastIndexOf('holy'));
+    expect(at.exact).toBe(false);
+  });
 });
 
 describe('resolveAnchor — no honest anchor', () => {

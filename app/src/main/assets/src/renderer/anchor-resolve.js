@@ -142,8 +142,10 @@ export function resolveAnchor(text, ann) {
   if (!fs.folded) return null;
   var fhits = allIndices(ft.folded, fs.folded);
   if (!fhits.length) return null;
-  // Map the stored offset into folded space so "nearest" stays meaningful.
-  var foldedTarget = 0;
+  // Map the stored offset into folded space so "nearest" stays meaningful. A
+  // start past the last letter maps to the END of folded space, not to 0 (sweep
+  // mw14: that sent the mark to the first occurrence).
+  var foldedTarget = ft.map.length;
   for (var m = 0; m < ft.map.length; m++) { if (ft.map[m] >= s) { foldedTarget = m; break; } }
   var f = nearest(fhits, foldedTarget);
   var rawStart = ft.map[f];
