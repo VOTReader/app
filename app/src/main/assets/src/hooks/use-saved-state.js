@@ -91,8 +91,9 @@ export function _validateTabState(s) {
   if (s.screen === "scripture-genre" && !s.genreId) s.screen = "scriptures-home";
   if (s.screen === "bible-study-chapter" && (!s.studyId || !s.studyChapterId)) s.screen = "studies-home";
   if (s.screen === "bible-study-index" && !s.studyId) s.screen = "studies-home";
-  // Journal screens require entryId which lives in local state (not tab
-  // state), so they can't be reliably restored on reload. Bounce to hub.
+  // Journal screens reopen on the hub after a reload: the tab keeps its
+  // journalEntryId (W40), but the entry may be gone and an editor's unsaved
+  // draft has its own recovery path. Bounce to hub.
   if (s.screen === "journal-viewer" || s.screen === "journal-editor") s.screen = "journal-home";
   return s;
 }

@@ -198,7 +198,7 @@ describe('_validateTabState — 13 coercion rules', () => {
   });
 
   // ── Rule 13: journal-viewer/editor ALWAYS → journal-home ─────────
-  describe('Rule 13: journal-viewer / journal-editor → journal-home (entryId lives in local state, not tab state)', () => {
+  describe('Rule 13: journal-viewer / journal-editor → journal-home (the entry may be gone; an editor draft has its own recovery)', () => {
     it('coerces journal-viewer to journal-home unconditionally', () => {
       expect(validate({ screen: 'journal-viewer' }).screen).toBe('journal-home');
       // Even with entryId set, the rule fires — the comment explains why

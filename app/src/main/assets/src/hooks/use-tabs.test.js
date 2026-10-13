@@ -201,3 +201,25 @@ describe('useTabs — behavioral correctness', () => {
     expect(result.current.tabs[1].bookId).toBe('exodus');
   });
 });
+
+// W40 (sweep 2026-10-13): journalEntryId was one App()-wide useState while the
+// journal screens are per tab, so tab A's journal viewer showed the entry last
+// opened in tab B. It is a tab field now, like every other nav-position field.
+describe('useTabs — W40 journalEntryId is per tab', () => {
+  it('DEFAULT_TAB carries journalEntryId: null (old saved tabs default to it)', () => {
+    expect(DEFAULT_TAB.journalEntryId).toBeNull();
+    const { result } = renderHook(() => useTabs(twoTabSaved()));
+    expect(result.current.tabs.map((t) => t.journalEntryId)).toEqual([null, null]);
+  });
+
+  it('an entry opened in one tab does not show in another', () => {
+    const { result } = renderHook(() => useTabs(twoTabSaved()));
+    act(() => { result.current.tabField('journalEntryId')[1]('entry-A'); });
+    expect(result.current.tabField('journalEntryId')[0]).toBe('entry-A');
+    act(() => { result.current.setActiveTabIdx(1); });
+    expect(result.current.tabField('journalEntryId')[0]).toBeNull();
+    act(() => { result.current.tabField('journalEntryId')[1]('entry-B'); });
+    act(() => { result.current.setActiveTabIdx(0); });
+    expect(result.current.tabField('journalEntryId')[0]).toBe('entry-A');
+  });
+});
