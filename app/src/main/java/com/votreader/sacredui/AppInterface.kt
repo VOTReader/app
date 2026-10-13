@@ -347,6 +347,12 @@ class AppInterface(
         }
     }
 
+    /** The activity left the screen (onStop) mid-memo: pause it, since Android hands a backgrounded app a silent
+     *  mic, and tell the page so the sheet shows Paused (sweep W14). */
+    internal fun pauseRecordingForBackground() {
+        if (vm.audioRecorder.pauseIfRecording()) bridge.callOptional(JsEvent.NativeRecordingPaused)
+    }
+
     @JavascriptInterface
     fun nativeRecordPause(): String = when (val r = vm.audioRecorder.pause()) {
         is NativeAudioRecorder.Result.Success -> "ok"

@@ -1436,6 +1436,14 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         if (!vm.streamAudioActive) webView.onPause()
     }
 
+    override fun onStop() {
+        super.onStop()
+        // A memo recording as the app leaves the screen (a lock, Home) pauses, and the sheet shows Paused: a
+        // backgrounded app's mic hears silence, which was saved at full length (sweep W14). onStop, not onPause: a
+        // split-screen app or a permission dialog keeps the activity visible, and the memo goes on.
+        appInterface.pauseRecordingForBackground()
+    }
+
     /**
      * #2: relieve heap pressure by pruning the WebView's IN-MEMORY resource
      * cache on a moderate+ trim signal. clearCache(false) drops only the memory

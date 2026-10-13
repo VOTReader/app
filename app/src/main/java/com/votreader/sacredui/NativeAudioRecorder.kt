@@ -109,6 +109,12 @@ class NativeAudioRecorder(private val context: Context) {
      */
     @Volatile private var autoStopped = false
 
+    /** Makes the MediaRecorder for [start]; a test swaps in one whose prepare() fails. */
+    @VisibleForTesting
+    internal var newRecorder: () -> MediaRecorder = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(context) else @Suppress("DEPRECATION") MediaRecorder()
+    }
+
     /**
      * Begin recording. Returns Success on a healthy start; Failure with a
      * reason on permission denial or MediaRecorder configuration error.
@@ -146,13 +152,15 @@ class NativeAudioRecorder(private val context: Context) {
         recorderFailed = false
         autoStopped = false
 
+        // This try's recorder and file are locals until the start succeeds, so its catch frees them by name: a
+        // half-made MediaRecorder kept the mic busy (the retry failed too) and its votrec_*.m4a stayed (sweep W14).
+        var made: MediaRecorder? = null
+        var file: File? = null
         return try {
             val f = File.createTempFile("votrec_", ".m4a", context.cacheDir)
-            val mr = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                MediaRecorder(context)
-            } else {
-                @Suppress("DEPRECATION") MediaRecorder()
-            }
+            file = f
+            val mr = newRecorder()
+            made = mr
             mr.setAudioSource(MediaRecorder.AudioSource.MIC)
             mr.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             mr.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
@@ -185,9 +193,12 @@ class NativeAudioRecorder(private val context: Context) {
             Result.Success(Unit)
         } catch (e: Exception) {
             Timber.w(e, "nativeRecordStart failed")
-            try { recorder?.release() } catch (_: Exception) {}
+            made?.let {
+                try { it.reset() } catch (_: Exception) {}
+                try { it.release() } catch (_: Exception) {}
+            }
+            file?.let { try { it.delete() } catch (_: Exception) {} }
             recorder = null
-            recordFile?.let { try { it.delete() } catch (_: Exception) {} }
             recordFile = null
             Result.Failure(e.message ?: "start_failed")
         }
@@ -218,6 +229,25 @@ class NativeAudioRecorder(private val context: Context) {
             Result.Success(Unit)
         } catch (e: Exception) {
             Result.Failure(e.message ?: "pause_failed")
+        }
+    }
+
+    /**
+     * The app is leaving the screen mid-memo (sweep W14): Android hands a backgrounded app a silent mic, so the memo
+     * went on recording silence and was saved at full length. Pause it, once; true when this call paused a live memo
+     * (the page is told and shows Paused; Resume carries on). A memo already paused, finished by the backstop or
+     * killed by an error is left alone.
+     */
+    fun pauseIfRecording(): Boolean = synchronized(lock) {
+        val mr = recorder ?: return false
+        if (pauseStartMs > 0L || autoStopped || recorderFailed) return false
+        return try {
+            mr.pause()
+            pauseStartMs = System.currentTimeMillis()
+            true
+        } catch (e: Exception) {
+            Timber.w(e, "pausing the memo as the app left the screen failed")
+            false
         }
     }
 
