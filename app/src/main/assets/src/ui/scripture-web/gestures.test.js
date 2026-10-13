@@ -232,3 +232,35 @@ describe('a swipe across the canon is not a tap (w-sw-zoom-pan, item 1)', () => 
     expect(handlers.tap.mock.calls.length + handlers.doubleTap.mock.calls.length).toBe(2);
   });
 });
+
+/* W52: a finger on a control is the control's for its whole life. Its down was
+   already ignored, but its move, up and cancel were not: while another finger
+   held the canvas, sliding on a button panned the web, lifting off the button
+   tapped the thread beneath it, and a cancel on it dropped the other finger's
+   drag. Events of a pointer the gesture code never registered are ignored. */
+describe('pointers that went down on a control never steer the canvas (W52)', () => {
+  it('a second finger on a button neither pans, taps, nor ends the first finger\'s drag', () => {
+    const { root, listBtn } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const { cam, handlers } = attach(root);
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 1, clientX: 500, clientY: 300 }));
+    listBtn.dispatchEvent(pointerEvent('pointerdown', { pointerId: 2, clientX: 100, clientY: 50 }));
+    const before = cam.x;
+    listBtn.dispatchEvent(pointerEvent('pointermove', { pointerId: 2, clientX: 300, clientY: 50 }));
+    expect(cam.x).toBe(before);
+    listBtn.dispatchEvent(pointerEvent('pointerup', { pointerId: 2, clientX: 300, clientY: 50 }));
+    expect(handlers.tap).not.toHaveBeenCalled();
+    listBtn.dispatchEvent(pointerEvent('pointercancel', { pointerId: 2, clientX: 300, clientY: 50 }));
+    root.dispatchEvent(pointerEvent('pointermove', { pointerId: 1, clientX: 400, clientY: 300 }));
+    expect(cam.x).not.toBe(before);                    // the canvas finger still pans
+    root.dispatchEvent(pointerEvent('pointerup', { pointerId: 1, clientX: 400, clientY: 300 }));
+    expect(handlers.tap).not.toHaveBeenCalled();
+  });
+
+  it('CONTROL: a mouse moving with no button down still hovers the web', () => {
+    const { root } = makeDom();
+    const { handlers } = attach(root);
+    root.dispatchEvent(pointerEvent('pointermove', { pointerId: 7, pointerType: 'mouse', clientX: 420, clientY: 200 }));
+    expect(handlers.hover).toHaveBeenCalledWith(420, 200);
+  });
+});
