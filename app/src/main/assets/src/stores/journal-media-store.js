@@ -48,7 +48,10 @@
    Object-URL cache: created Blob URLs are cached per-id so repeated
    reads inside the same session don't create duplicate URLs. Caller
    should NOT revokeObjectURL on these — the cache handles cleanup
-   on store delete.
+   on store delete. A block that shows or plays one HOLDS it (W17):
+   acquireUrl(id) / releaseUrl(id); the LRU cap and the memory-trim
+   purge never revoke a held URL. A forced drop (delete, Clear All,
+   import) still does, and tells holders through subscribeUrls(fn).
 
    Pattern note: this store does NOT extend CachedStore (it's IDB-backed,
    not localStorage-backed), so the extendStore helper doesn't apply.
@@ -185,23 +188,61 @@ export var JournalMediaStore = (function() {
   /** @type {Map<string, string>} */
   var _urlCache = new Map();
   var URL_CACHE_MAX = 24;
-  function _cacheUrl(id, url) {
-    _urlCache.set(id, url);
-    while (_urlCache.size > URL_CACHE_MAX) {
-      var lruId = _urlCache.keys().next().value;   // first inserted = least-recently-used
-      var victim = _urlCache.get(lruId);
-      _urlCache.delete(lruId);
-      try { URL.revokeObjectURL(/** @type {string} */ (victim)); } catch (_e) { /* best-effort */ }
-    }
+  // W17: how many mounted blocks hold each id's URL (acquireUrl/releaseUrl). The
+  // cap and the trim skip a held id: revoking it broke a photo on screen (an entry
+  // with more than 24 media) or a memo mid-play (Android onTrimMemory).
+  /** @type {Map<string, number>} */
+  var _holds = new Map();
+  /** @type {Set<(ids: string[]) => void>} */
+  var _urlSubs = new Set();
+  /** Tell holders these ids' URLs were revoked under them (they fetch fresh ones). */
+  function _notifyDropped(/** @type {string[]} */ ids) {
+    if (!ids.length) return;
+    _urlSubs.forEach(function(fn) { try { fn(ids.slice()); } catch (_e) { /* a listener never breaks a drop */ } });
   }
-  /** Revoke every cached URL and empty the cache; returns how many it held. */
-  function _dropUrls() {
-    var n = _urlCache.size;
-    _urlCache.forEach(function(url) {
-      try { URL.revokeObjectURL(url); } catch (_e) { /* best-effort */ }
+  /** Revoke + forget the least-recently-used UNHELD URLs until within the cap. */
+  function _evict() {
+    if (_urlCache.size <= URL_CACHE_MAX) return;
+    /** @type {string[]} */
+    var victims = [];
+    var over = _urlCache.size - URL_CACHE_MAX;
+    _urlCache.forEach(function(_url, id) {          // insertion order = LRU order
+      if (victims.length < over && !_holds.has(id)) victims.push(id);
     });
-    _urlCache.clear();
-    return n;
+    victims.forEach(function(id) {
+      var victim = _urlCache.get(id);
+      _urlCache.delete(id);
+      try { URL.revokeObjectURL(/** @type {string} */ (victim)); } catch (_e) { /* best-effort */ }
+    });
+  }
+  function _cacheUrl(id, url) {
+    var old = _urlCache.get(id);
+    _urlCache.delete(id);                           // (re)insert at the MRU end
+    _urlCache.set(id, url);
+    if (old && old !== url) {                       // never two live URLs for one id
+      try { URL.revokeObjectURL(old); } catch (_e) { /* best-effort */ }
+      _notifyDropped([id]);
+    }
+    _evict();
+  }
+  /**
+   * Revoke cached URLs and forget them; returns how many went. `keepHeld` (the
+   * memory trim) spares the ones a mounted block holds; without it (the blobs are
+   * gone or replaced: Clear All, an import commit) every URL goes and holders are told.
+   * @param {boolean} [keepHeld]
+   * @returns {number}
+   */
+  function _dropUrls(keepHeld) {
+    /** @type {string[]} */
+    var gone = [];
+    _urlCache.forEach(function(url, id) {
+      if (keepHeld && _holds.has(id)) return;
+      try { URL.revokeObjectURL(url); } catch (_e) { /* best-effort */ }
+      gone.push(id);
+    });
+    gone.forEach(function(id) { _urlCache.delete(id); });
+    if (!keepHeld) _notifyDropped(gone);
+    return gone.length;
   }
   function _touchUrl(id) {
     var url = /** @type {string} */ (_urlCache.get(id));   // callers touch only a cached id
@@ -452,7 +493,12 @@ export var JournalMediaStore = (function() {
           // blob that a commit-time abort (e.g. quota) actually rolled back — masking
           // the failure for the rest of the session.
           store.transaction.addEventListener('complete', function() {
-            try { _cacheUrl(record.id, URL.createObjectURL(record.blob)); } catch (_e) { /* best-effort; degrade silently if unsupported or quota hit */ }
+            // W17: a re-put of an id already cached (markLinked) keeps its URL: same
+            // media, and a block may be showing or playing it; a second URL leaked.
+            try {
+              if (_urlCache.has(record.id)) _touchUrl(record.id);
+              else _cacheUrl(record.id, URL.createObjectURL(record.blob));
+            } catch (_e) { /* best-effort; degrade silently if unsupported or quota hit */ }
             resolve(record.id);
           });
           guardTx(store, reject);
@@ -488,6 +534,7 @@ export var JournalMediaStore = (function() {
       if (_urlCache.has(id)) {
         try { URL.revokeObjectURL(/** @type {string} */ (_urlCache.get(id))); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
         _urlCache.delete(id);
+        _notifyDropped([id]);                       // W17: a block still on it shows "missing", not a dead URL
       }
       return tx('readwrite').then(function(store) {
         return new Promise(function(resolve, reject) {
@@ -633,12 +680,52 @@ export var JournalMediaStore = (function() {
       if (_urlCache.has(id)) { _touchUrl(id); return Promise.resolve(/** @type {string} */ (_urlCache.get(id))); }
       return this.get(id).then(function(rec) {
         if (!rec || !rec.blob) return null;
+        // W17: another read of this id may have minted one meanwhile; share it.
+        if (_urlCache.has(id)) { _touchUrl(id); return /** @type {string} */ (_urlCache.get(id)); }
         try {
           var url = URL.createObjectURL(rec.blob);
           _cacheUrl(id, url);
           return url;
         } catch (_e) { return null; }
       });
+    },
+
+    /**
+     * objectUrl() for a block that shows or plays the media (W17): the URL is
+     * HELD until releaseUrl(id), so the LRU cap and the memory trim never revoke
+     * it under the block. The hold starts at once (before the URL resolves).
+     * Pair every call with one releaseUrl(id).
+     * @param {string | null | undefined} id
+     * @returns {Promise<string | null>}
+     */
+    acquireUrl: function(id) {
+      if (id) _holds.set(id, (_holds.get(id) || 0) + 1);
+      return this.objectUrl(id);
+    },
+
+    /**
+     * End one acquireUrl(id) hold. When the last goes the URL is an ordinary
+     * cache entry again (evictable). Extra calls are harmless.
+     * @param {string | null | undefined} id
+     * @returns {void}
+     */
+    releaseUrl: function(id) {
+      if (!id || !_holds.has(id)) return;
+      var left = /** @type {number} */ (_holds.get(id)) - 1;
+      if (left > 0) _holds.set(id, left);
+      else { _holds.delete(id); _evict(); }
+    },
+
+    /**
+     * Hear about URLs revoked under their holders (delete, Clear All, an import
+     * commit): fn(ids). A holder of one of them fetches a fresh URL (or learns the
+     * media is gone). Returns the unsubscribe function.
+     * @param {(ids: string[]) => void} fn
+     * @returns {() => void}
+     */
+    subscribeUrls: function(fn) {
+      _urlSubs.add(fn);
+      return function() { _urlSubs.delete(fn); };
     },
 
     /**
@@ -651,7 +738,7 @@ export var JournalMediaStore = (function() {
      * @returns {number}
      */
     releaseObjectUrls: function() {
-      return _dropUrls();
+      return _dropUrls(true);                       // W17: a held URL is on screen or playing
     },
 
     /**
