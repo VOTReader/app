@@ -911,6 +911,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // An older build's page asking for a screen bundle this build folded into bundle-d (lz1): reload it onto this build.
+  if (url.pathname.startsWith(SW_DIR) && RETIRED_SCREEN_FILE.test(url.pathname.slice(SW_DIR.length))) {
+    event.respondWith(retiredScreenResponse(url.pathname));
+    return;
+  }
+
   // Songs of the Letters (2026-09-24, catalog-schema.md "App side"). On the
   // PWA's own origin, beside /app/: the mp3 shards (/songs-<n>/) PASS THROUGH —
   // 3 MB range-requested media the SW must not proxy or pin — and the catalog,
@@ -1129,6 +1135,42 @@ async function semanticResponse(request, networkFirst) {
     const hit = await cache.match(request);
     return hit || new Response('Not available offline', { status: 503, statusText: 'Service Unavailable' });
   }
+}
+
+/* THE RETIRED SCREEN BUNDLES (lz1, 2026-10-13). bundle-e..h.js and screens-e..h.min.css were folded into bundle-d.js
+   and app.min.css; no build after that one asks for them and the server no longer has them. An OLDER build's page that
+   this worker claims still lazy-loads them by name when the reader opens Settings, Search, the Scripture Web, Notes or the
+   Listening Library. sw-register reloads a claimed page only when it started controlled, so a page whose first worker
+   claimed it never learns of the takeover: its loader would get a 404 and show "Couldn't load this section." with a
+   Try again that 404s forever. So this worker answers those names itself, offline too: the stylesheet is empty (the old
+   loader waits on it before the script) and the script does what the old build's own update reload does (sw-register
+   reloadNow: mark it, let the page save, reload), at most once a minute per tab so a page that somehow asks again cannot
+   loop. Only this worker's own dist/ (another folder of the origin keeps its files). Keep it while older builds can still
+   be open; a future file must not reuse these names. */
+const SW_DIR = (self.location.pathname || '/').replace(/[^/]*$/, '');
+const RETIRED_SCREEN_FILE = /^dist\/(?:bundle-[e-h]\.js|screens-[e-h]\.min\.css)$/;
+const RETIRED_BUNDLE_RELOAD = [
+  '(function () {',
+  "  var key = 'vot-retired-bundle-reload';",
+  '  try {',
+  '    if (Date.now() - (Number(sessionStorage.getItem(key)) || 0) < 60000) return;',
+  '    sessionStorage.setItem(key, String(Date.now()));',
+  "    sessionStorage.setItem('vot-update-reload', '1');",
+  '  } catch (_e) {}',
+  '  window.__votSwTookOver = true;',
+  "  try { window.dispatchEvent(new Event('vot:before-update-reload')); } catch (_e) {}",
+  '  location.reload();',
+  '})();',
+  '',
+].join('\n');
+
+/** @param {string} pathname */
+function retiredScreenResponse(pathname) {
+  const css = pathname.endsWith('.css');
+  return new Response(css ? '' : RETIRED_BUNDLE_RELOAD, {
+    status: 200,
+    headers: { 'Content-Type': css ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' },
+  });
 }
 const OFFLINE_AUDIO_RELEASES = 'https://github.com/VOTReader/votreader-assets/releases/download/';
 const OFFLINE_AUDIO_PATH = /\/offline-audio\/(audio-[a-z0-9-]{1,40})\/([A-Za-z0-9][A-Za-z0-9_.-]{0,159}\.mp3)$/;
