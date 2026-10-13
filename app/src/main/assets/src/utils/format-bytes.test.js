@@ -32,6 +32,15 @@ describe('formatBytes', () => {
     expect(formatBytes(1024 * 1024 * 1024 * 1024 * 3.7)).toBe('3.7 TB');
   });
 
+  // Sweep low (mw9): the unit was picked before rounding, so a size a hair under a unit read "1024.0 KB".
+  it('a size that rounds up to 1024 of a unit is shown in the next unit', () => {
+    expect(formatBytes(1048524)).toBe('1023.9 KB');
+    expect(formatBytes(1048525)).toBe('1.0 MB');
+    expect(formatBytes(1048575)).toBe('1.0 MB');
+    expect(formatBytes(1024 * 1024 * 1024 - 1)).toBe('1.0 GB');
+    expect(formatBytes(1024 * 1024 * 1024 * 1024 - 1)).toBe('1.0 TB');
+  });
+
   it('returns "?" for null / undefined / negative / NaN / non-number inputs', () => {
     expect(formatBytes(null)).toBe('?');
     expect(formatBytes(undefined)).toBe('?');

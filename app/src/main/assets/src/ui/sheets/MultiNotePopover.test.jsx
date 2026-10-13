@@ -27,6 +27,18 @@ afterEach(() => {
 });
 
 describe('MultiNotePopover rendering', () => {
+  // Sweep low (mw9): a 'No color (icon only)' note showed a yellow swatch, like a yellow note.
+  it('a blank-colour note shows an empty ring, not the yellow swatch', () => {
+    seed(2);
+    notesById.g2.color = 'blank';
+    render(<MultiNotePopover payload={{ groupIds: ['g1', 'g2'], x: 180, y: 300 }} onClose={() => {}} onPick={() => {}} />);
+    const [yellow, blank] = /** @type {HTMLElement[]} */ ([...document.querySelectorAll('.multinote-row-swatch')]);
+    expect(yellow.classList.contains('is-blank')).toBe(false);
+    expect(yellow.style.background).not.toBe('');
+    expect(blank.classList.contains('is-blank')).toBe(true);
+    expect(blank.style.background).toBe('');
+  });
+
   it('renders every note row + the count header', () => {
     seed(5);
     const payload = { groupIds: ['g1', 'g2', 'g3', 'g4', 'g5'], x: 180, y: 300 };

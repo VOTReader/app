@@ -9,8 +9,8 @@
    only buildProgressGroups is stubbed so the reading rows don't need a
    full 66-book corpus fixture. */
 
-import { describe, it, expect, afterEach } from 'vitest';
-import { render, cleanup, act } from '@testing-library/react';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { render, cleanup, act, fireEvent } from '@testing-library/react';
 import { MyProgressScreen, _fmtWords } from './MyProgressScreen.jsx';
 import { tallyGroup, countReadFor, mostAnnotatedSources } from '../../utils/progress-stats.js';
 import { countTextWords } from '../../utils/word-count.js';
@@ -157,6 +157,10 @@ describe('_fmtWords — compact hero count', () => {
   });
   it('renders one-decimal M from 1M', () => {
     expect(_fmtWords(1234567)).toBe('1.2M');
+    // Sweep low (mw9): 999,950-999,999 rounded to "1000k".
+    expect(_fmtWords(999949)).toBe('999.9k');
+    expect(_fmtWords(999950)).toBe('1M');
+    expect(_fmtWords(999999)).toBe('1M');
   });
 });
 
@@ -280,6 +284,26 @@ describe('MyProgressScreen — reading section', () => {
     const { container } = renderScreen();
     const labels = [...container.querySelectorAll('.prg-row .prg-row-label')].map((n) => n.textContent);
     expect(labels).toEqual(['New Testament']);
+  });
+
+  // Sweep low (mw9): a failed corpus load left "Loading your library…" up for good, with no retry.
+  it('a failed corpus load says so and offers Try again, which re-runs only the failed loader', () => {
+    setupGlobals();
+    const corpus = (error) => ({ error, loaded: false, subscribe: () => () => {}, getVersion: () => 1 });
+    const loadVot = vi.fn(() => Promise.resolve());
+    const loadBible = vi.fn(() => Promise.resolve());
+    Object.assign(window, { __votCorpus: corpus(true), __bibleCorpus: corpus(false), __loadVotCorpus: loadVot, __loadBibleCorpus: loadBible });
+    try {
+      const { container, getByRole } = renderScreen();
+      expect(container.textContent).not.toContain('Loading your library…');
+      expect(container.textContent).toContain('Couldn’t load your library.');
+      const votBefore = loadVot.mock.calls.length, bibleBefore = loadBible.mock.calls.length;
+      fireEvent.click(getByRole('button', { name: 'Try again' }));
+      expect(loadVot.mock.calls.length).toBe(votBefore + 1);
+      expect(loadBible.mock.calls.length).toBe(bibleBefore);
+    } finally {
+      ['__votCorpus', '__bibleCorpus', '__loadVotCorpus', '__loadBibleCorpus'].forEach((k) => { delete window[k]; });
+    }
   });
 });
 

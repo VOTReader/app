@@ -59,7 +59,9 @@ export function MultiNotePopover({ payload, onClose, onPick }) {
       <div ref={popRef} className="multinote-popover" role="dialog" aria-modal="true" aria-labelledby="multinote-title" style={style}>
         <div className="multinote-header" id="multinote-title">{notes.length} notes here</div>
         {notes.map(n => {
-          const swatchBg = ({
+          // 'blank' is "No color (icon only)": an empty ring, never the yellow fallback.
+          const blank = n.color === 'blank';
+          const swatchBg = blank ? null : ({
             yellow: '#ffd700', green: '#76ff03', pink: '#ff4081', red: '#f44336',
             orange: '#ff9100', blue: '#2196f3', purple: '#ba68c8', teal: '#00bcd4',
             brown: '#8d6e63', gray: '#9e9e9e', cyan: '#00bcd4'
@@ -71,7 +73,7 @@ export function MultiNotePopover({ payload, onClose, onPick }) {
               className="multinote-row"
               onClick={() => onPick(n.groupId)}
             >
-              <span className="multinote-row-swatch" style={{ background: swatchBg }} />
+              <span className={'multinote-row-swatch' + (blank ? ' is-blank' : '')} style={swatchBg ? { background: swatchBg } : undefined} />
               <span className="multinote-row-body">
                 <span className="multinote-row-preview">{n.body || (n.fullText ? "“" + normalizeExcerptDisplay(n.fullText) + "”" : 'Empty note')}</span>
                 <span className="multinote-row-meta">

@@ -57,7 +57,8 @@ export function useVolumesSeq(wantsVolumes) {
   return React.useMemo(() => (wantsVolumes ? volumesNow() : []), [wantsVolumes, corpusVersion]);
 }
 
-/** The date, read again whenever the app comes back to the front (the card turns over at midnight). */
+/** The date, read again whenever the app comes back to the front and at local midnight while it stays
+    open (the card turns over at midnight). */
 export function useNow() {
   const [now, setNow] = React.useState(() => new Date());
   React.useEffect(() => {
@@ -65,6 +66,14 @@ export function useNow() {
     document.addEventListener('visibilitychange', onShow);
     return () => document.removeEventListener('visibilitychange', onShow);
   }, []);
+  // Re-armed from each new `now`; setHours(24) is the next local midnight, DST included. A timer that
+  // wakes early reads the same day and simply re-arms.
+  React.useEffect(() => {
+    const midnight = new Date(now.getTime());
+    midnight.setHours(24, 0, 0, 50);
+    const t = setTimeout(() => setNow(new Date()), Math.max(0, midnight.getTime() - Date.now()));
+    return () => clearTimeout(t);
+  }, [now]);
   return now;
 }
 

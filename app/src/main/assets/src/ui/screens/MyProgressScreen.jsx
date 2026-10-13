@@ -39,8 +39,9 @@ import { isMarkKind } from '../../utils/mark-kinds.js';
  */
 export function _fmtWords(n) {
   const v = Math.max(0, Math.round(n || 0));
-  if (v >= 1e6) return (Math.round(v / 1e5) / 10) + 'M';
-  if (v >= 1e4) return (Math.round(v / 100) / 10) + 'k';
+  const k = Math.round(v / 100) / 10;
+  if (k >= 1000) return (Math.round(v / 1e5) / 10) + 'M';   // 999,950 rounds to 1000k: that is 1M
+  if (v >= 1e4) return k + 'k';
   return v.toLocaleString('en-US');
 }
 
@@ -169,6 +170,17 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
   const linkCount = (typeof LinkStore !== 'undefined') ? LinkStore.all().length : 0;
   const bookmarkCount = (typeof BookmarkStore !== 'undefined') ? BookmarkStore.count() : 0;
   const groups = buildProgressGroups();
+  /* The groups need the Bible and VOT corpora (progressCorporaReady). A failed load sets the corpus's
+     error and bumps its version (both are subscribed above), so say so and offer the retry every other
+     corpus-gated screen has, instead of "Loading your library…" for good. Re-calling a loader clears
+     its error and loads again. */
+  const failedLoads = [[window.__bibleCorpus, window.__loadBibleCorpus], [window.__votCorpus, window.__loadVotCorpus]]
+    .filter(([corpus, load]) => corpus && corpus.error && typeof load === 'function')
+    .map(([, load]) => load);
+  const corpusFailed = failedLoads.length > 0;
+  const retryCorpora = () => failedLoads.forEach((load) => {
+    Promise.resolve(load()).catch((e) => console.warn('Corpus retry failed', e));
+  });
   const groupShape = groups
     .flatMap((g) => g.genres.flatMap((genre) => genre.books.map((b) => `${b.id}:${b.total}`)))
     .join('|');
@@ -369,7 +381,14 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
           {!markAsReadOn ? (
             <div className="prg-note">Mark as Read is off — reading progress isn’t being recorded. You can turn it on in Settings.</div>
           ) : groups.length === 0 ? (
-            <div className="prg-note">Loading your library…</div>
+            corpusFailed ? (
+              <div className="prg-note" role="alert">
+                Couldn’t load your library.{' '}
+                <button type="button" className="prg-retry" onClick={retryCorpora}>Try again</button>
+              </div>
+            ) : (
+              <div className="prg-note">Loading your library…</div>
+            )
           ) : (
             groups.map((grp) => {
               const t = tallyGroup(readItems, grp);
