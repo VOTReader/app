@@ -186,6 +186,11 @@ function scrollKeyOf(scr, bid, cnum, lid, sid, scid, jid, songsPlace) {
 // a sticky chapter-nav arrow (neither carries data-hl-key), so a point hit-test
 // finds no anchor — the search finds the nearest verse regardless. Empty key on
 // screens with no data-hl-key (Garden / Settings) → caller falls back to y/pct.
+// Paragraphs inside a collapsed prophecy card (display:none) have an all-zero
+// rect and no place in the order: a probe that lands on one steps to the next
+// laid-out element (sweep mw13: read as 'above the viewport', they sent the
+// search to the first paragraph after the card, far below the reader).
+function hasBox(r) { return r.width > 0 || r.height > 0; }
 function captureAnchor(el) {
   if (!el) return { anchorKey: null, anchorOff: 0 };
   var cRect = el.getBoundingClientRect();
@@ -194,15 +199,17 @@ function captureAnchor(el) {
   var n = list.length;
   if (!n) return { anchorKey: null, anchorOff: 0 };
   var top = cRect.top + 1;
-  var lo = 0, hi = n - 1, found = -1;
+  var lo = 0, hi = n - 1, found = -1, foundRect = null;
   while (lo <= hi) {
     var mid = (lo + hi) >> 1;
-    if (list[mid].getBoundingClientRect().bottom > top) { found = mid; hi = mid - 1; }
-    else { lo = mid + 1; }
+    var j = mid, r = list[j].getBoundingClientRect();
+    while (!hasBox(r) && j < hi) { j++; r = list[j].getBoundingClientRect(); }
+    if (!hasBox(r)) { hi = mid - 1; continue; } // mid..hi all hidden
+    if (r.bottom > top) { found = j; foundRect = r; hi = mid - 1; }
+    else { lo = j + 1; }
   }
   if (found < 0) return { anchorKey: null, anchorOff: 0 }; // scrolled past the last one
-  var anchor = list[found];
-  return { anchorKey: anchor.getAttribute('data-hl-key'), anchorOff: Math.round(cRect.top - anchor.getBoundingClientRect().top) };
+  return { anchorKey: list[found].getAttribute('data-hl-key'), anchorOff: Math.round(cRect.top - foundRect.top) };
 }
 
 // The scroller's position AS IT STANDS: pixel y, fraction, and the content anchor.
@@ -217,20 +224,27 @@ function liveScrollRecord() {
 }
 
 // Content-coordinate Y of an anchor element's top (distance from the top of the
-// scrollable content), or null if it isn't in the DOM yet. Invariant of the
-// current scrollTop because the rect-delta and scrollTop cancel.
+// scrollable content), or null if it isn't in the DOM yet or has no box now (a
+// collapsed card). Invariant of the current scrollTop because the rect-delta
+// and scrollTop cancel.
 function anchorContentTop(el, anchorKey) {
   if (!el || !anchorKey) return null;
   var anchor = el.querySelector('[data-hl-key="' + String(anchorKey).replace(/"/g, '\\"') + '"]');
   if (!anchor) return null;
-  return (anchor.getBoundingClientRect().top - el.getBoundingClientRect().top) + el.scrollTop;
+  var r = anchor.getBoundingClientRect();
+  if (!hasBox(r)) return null;
+  return (r.top - el.getBoundingClientRect().top) + el.scrollTop;
 }
 
-// Is `anchorKey` the FIRST data-hl-key element of the scroller (nothing but the
-// header above it)? Document order is vertical order for reading content.
+// Is `anchorKey` the FIRST laid-out data-hl-key element of the scroller (nothing
+// but the header above it; a collapsed card's paragraphs do not count)?
+// Document order is vertical order for reading content.
 function isFirstContent(el, anchorKey) {
-  var first = el ? el.querySelector('[data-hl-key]') : null;
-  return !!first && first.getAttribute('data-hl-key') === anchorKey;
+  var list = el ? el.querySelectorAll('[data-hl-key]') : [];
+  for (var i = 0; i < list.length; i++) {
+    if (hasBox(list[i].getBoundingClientRect())) return list[i].getAttribute('data-hl-key') === anchorKey;
+  }
+  return false;
 }
 
 // Land a saved position on the current __scrollEl. Returns a cleanup fn.

@@ -504,6 +504,31 @@ describe('useTabActions — deduplicateTabs', () => {
     expect(kept).toHaveLength(2);
     expect(ts.setActiveTabIdx).toHaveBeenCalledWith(1);
   });
+
+  // sweep mw13: the merge kept the first copy and silently dropped a later
+  // copy's rename and pin (no undo), though every bulk close spares pinned tabs.
+  it("a later copy's rename and pin carry over to the copy that is kept", () => {
+    const arr = [at('letter', 'x'), { ...at('letter', 'x'), pinned: true }, { ...at('letter', 'x'), customTitle: 'Sabbath' }, at('home')];
+    const { ts, result } = mountActive(arr, 3);
+    act(() => { result.current.deduplicateTabs(); });
+    const kept = ts.setTabs.mock.calls[0][0](arr);
+    expect(kept).toHaveLength(2);
+    expect(kept[0]).toMatchObject({ screen: 'letter', letterId: 'x', pinned: true, customTitle: 'Sabbath' });
+    expect(arr[0]).toEqual(at('letter', 'x')); // the old tab object is not mutated
+    expect(ts.setActiveTabIdx).toHaveBeenCalledWith(1);
+  });
+
+  it("the kept copy's own rename wins over a later copy's, and an unchanged tab keeps its object", () => {
+    const first = { ...at('letter', 'x'), customTitle: 'Mine' };
+    const home = at('home');
+    const arr = [first, home, { ...at('letter', 'x'), customTitle: 'Other' }];
+    const { ts, result } = mountActive(arr, 0);
+    act(() => { result.current.deduplicateTabs(); });
+    const kept = ts.setTabs.mock.calls[0][0](arr);
+    expect(kept[0].customTitle).toBe('Mine');
+    expect(kept[0].pinned).toBeFalsy();
+    expect(kept[1]).toBe(home);
+  });
 });
 
 // W39 (refuter round 2): closing the only tab swaps in a fresh Home tab at the same

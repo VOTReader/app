@@ -375,6 +375,63 @@ describe('useScrollMemory — content anchor (reflow-proof restore)', () => {
     rerender(baseProps({ letterId: 'beta' }));
     expect(el.scrollTop).toBe(2288);
   });
+
+  // sweep mw13: paragraphs inside a COLLAPSED prophecy card (display:none) have an
+  // all-zero rect, which the binary search read as 'above the viewport' and so
+  // converged on the first paragraph after the card, far below the reader.
+  function addHidden(key) {
+    const a = document.createElement('div');
+    a.setAttribute('data-hl-key', key);
+    el.appendChild(a);
+    a.getBoundingClientRect = () => /** @type {any} */ ({ top: 0, left: 0, width: 0, height: 0, bottom: 0, right: 0 });
+    return a;
+  }
+
+  it('capture skips paragraphs of a collapsed card and keeps the verse the reader is on', () => {
+    stubContainerRect(0);
+    for (let i = 0; i < 10; i++) addAnchor('v' + i, i * 100);
+    for (let i = 10; i < 20; i++) addHidden('v' + i);
+    for (let i = 20; i < 30; i++) addAnchor('v' + i, 1000 + (i - 20) * 100);
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    act(() => { scrollTo(520); vi.advanceTimersByTime(150); });
+    const saved = tab.scrollPositions['letter-alpha'];
+    expect(saved.anchorKey).toBe('v5');   // pre-fix: v20, the paragraph after the card
+    expect(saved.anchorOff).toBe(20);
+  });
+
+  it('capture past the last laid-out paragraph, with only hidden ones below, saves no anchor', () => {
+    stubContainerRect(0);
+    addAnchor('v0', 0);
+    addHidden('v1');
+    addHidden('v2');
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    act(() => { scrollTo(300); vi.advanceTimersByTime(150); });
+    expect(tab.scrollPositions['letter-alpha'].anchorKey).toBe(null);
+  });
+
+  it('restore ignores an anchor that is hidden now (collapsed card) and uses the pixel y', () => {
+    stubContainerRect(0);
+    addAnchor('p1', 100);
+    addHidden('p7');
+    tab.scrollPositions['letter-beta'] = { y: 1500, pct: 0.5, anchorKey: 'p7', anchorOff: 12 };
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    rerender(baseProps({ letterId: 'beta' }));
+    expect(el.scrollTop).toBe(1500);   // pre-fix: 0 - 0 + scrollTop + 12, a place the reader never was
+  });
+
+  it('a card collapsed above the first paragraph does not hide the top-of-page rule', () => {
+    stubContainerRect(0);
+    addHidden('c1');        // a collapsed prophecy card opens the chapter
+    addAnchor('p1', 699);   // the first laid-out paragraph, 99 px lower than at capture
+    tab.scrollPositions['letter-beta'] = { y: 0, pct: 0, anchorKey: 'p1', anchorOff: -600 };
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    rerender(baseProps({ letterId: 'beta' }));
+    expect(el.scrollTop).toBe(0);
+  });
 });
 
 describe('useScrollMemory — journal viewer/editor keys are PER-ENTRY', () => {

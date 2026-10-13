@@ -24,7 +24,7 @@
      - dwellAccRef            (hook-internal ref — accumulated dwell ms)
      - dwellStartRef          (hook-internal ref — last resume timestamp)
      - dwellKeyRef            (hook-internal ref — key being timed)
-     - DWELL_MS()             (hook-internal; reads the dwellMs param)
+     - DWELL_MS()             (hook-internal; reads the latest dwellMs via a ref)
      - cancelDwell            (returned — also used by setActiveReadKey)
      - scheduleDwell          (hook-internal plain arrow fn)
      - pauseDwell             (hook-internal plain arrow fn)
@@ -102,8 +102,12 @@ export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
   const dwellKeyRef = React.useRef(null);
 
   // ── DWELL_MS ───────────────────────────────────────────────────────────
-  // Returns the effective dwell threshold in ms. Reads the dwellMs param.
-  const DWELL_MS = () => dwellMs ? Number(dwellMs) : 20000;
+  // Returns the effective dwell threshold in ms. Reads the dwellMs param
+  // through a ref so the mount-only visibilitychange listener below sees a
+  // setting changed mid-session (sweep mw13: it kept the mount-time value).
+  const dwellMsRef = React.useRef(dwellMs);
+  dwellMsRef.current = dwellMs;
+  const DWELL_MS = () => dwellMsRef.current ? Number(dwellMsRef.current) : 20000;
 
   // ── Plain arrow functions ──────────────────────────────────────────────
   // Local plain functions operating only on the dwell refs via .current —
@@ -158,7 +162,7 @@ export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
     const onVis = () => {if (document.visibilityState === 'hidden') pauseDwell();else scheduleDwell();};
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only listener attach. pauseDwell + scheduleDwell are local plain functions (per the file's "Do NOT useCallback" invariant) whose bodies operate only on dwellTimerRef/dwellAccRef/dwellStartRef/dwellKeyRef/pendingReadCommitRef via .current — stable behavior regardless of identity. Stale-safe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only listener attach. pauseDwell + scheduleDwell are local plain functions (per the file's "Do NOT useCallback" invariant) whose bodies operate only on dwellTimerRef/dwellAccRef/dwellStartRef/dwellKeyRef/dwellMsRef via .current — stable behavior regardless of identity. Stale-safe.
   }, []);
 
   // ── Return ─────────────────────────────────────────────────────────────

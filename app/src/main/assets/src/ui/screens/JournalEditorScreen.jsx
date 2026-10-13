@@ -5,24 +5,72 @@
 /* JRNL-1 — a synchronous localStorage draft of the in-progress entry. localStorage.setItem
    is synchronous and survives a process kill, so it is the only thing that reliably
    persists the last edits when Android OOM-kills a BACKGROUNDED WebView before the async
-   IDB write lands (JournalStore.update -> _save is fire-and-forget). Single slot, keyed
-   internally by entryId; written on background-hide, recovered + consumed on re-open. */
+   IDB write lands (JournalStore.update -> _save is fire-and-forget). Written on
+   background-hide, recovered + consumed on re-open. One draft PER ENTRY under the one key,
+   { v: 2, drafts: { <entryId>: { title, blocks, mood, ts } } } (sweep mw13: a single slot
+   let entry B's background draft overwrite entry A's before A was reopened after a kill,
+   and A's last words were gone). The pre-v2 single-slot shape { entryId, ... } still reads. */
 var JOURNAL_DRAFT_KEY = 'vot-journal-draft';
-function _readJournalDraft() {
-  try { var s = localStorage.getItem(JOURNAL_DRAFT_KEY); return s ? JSON.parse(s) : null; }
-  catch (_e) { return null; }
-}
-function _writeJournalDraft(eid, title, blocks, mood) {
+var JOURNAL_DRAFT_MAX = 8; // bounds the slot: only drafts that can still be recovered are kept
+function _readJournalDrafts() {
   try {
-    localStorage.setItem(JOURNAL_DRAFT_KEY, JSON.stringify({ entryId: eid, title: title, blocks: blocks, mood: mood, ts: Date.now() }));
-  } catch (_e) { /* quota / unavailable — draft recovery is best-effort */ }
+    var o = JSON.parse(localStorage.getItem(JOURNAL_DRAFT_KEY) || 'null');
+    if (o && o.drafts && typeof o.drafts === 'object' && !Array.isArray(o.drafts)) return o.drafts;
+    if (o && typeof o.entryId === 'string') {
+      var one = {};
+      one[o.entryId] = { title: o.title, blocks: o.blocks, mood: o.mood, ts: o.ts };
+      return one;
+    }
+  } catch (_e) { /* unreadable — no drafts */ }
+  return {};
 }
-function _clearJournalDraft() {
-  try { localStorage.removeItem(JOURNAL_DRAFT_KEY); } catch (_e) { /* unavailable */ }
+function _storeJournalDrafts(drafts) {
+  if (!Object.keys(drafts).length) { localStorage.removeItem(JOURNAL_DRAFT_KEY); return; }
+  localStorage.setItem(JOURNAL_DRAFT_KEY, JSON.stringify({ v: 2, drafts: drafts }));
+}
+function _readJournalDraft(eid) {
+  var d = _readJournalDrafts()[eid];
+  return d ? Object.assign({ entryId: eid }, d) : null;
 }
 /** Content signature for draft-vs-stored comparison (title + blocks + mood only). */
 function _journalSig(o) {
   return JSON.stringify([(o && o.title) || '', (o && o.blocks) || [], (o && o.mood) || null]);
+}
+/** A draft is recovered only when it is at least as recent as the entry's last durable
+ *  save AND its content differs. `updated` only grows, so a draft that fails this never
+ *  passes it again. */
+function _journalDraftRecoverable(draft, entry) {
+  return !!entry && (draft.ts || 0) >= (entry.updated || 0) && _journalSig(draft) !== _journalSig(entry);
+}
+function _writeJournalDraft(eid, title, blocks, mood) {
+  var mine = { title: title, blocks: blocks, mood: mood, ts: Date.now() };
+  try {
+    var drafts = _readJournalDrafts();
+    // Other entries keep their drafts while they can still be recovered; one whose
+    // entry is not in the store is kept too (never judge a draft against a store that
+    // has not loaded it), and the cap bounds those.
+    Object.keys(drafts).forEach(function(id) {
+      if (id === eid) return;
+      var entry = JournalStore.get(id);
+      if (entry && !_journalDraftRecoverable(drafts[id], entry)) delete drafts[id];
+    });
+    drafts[eid] = mine;
+    var others = Object.keys(drafts).filter(function(id) { return id !== eid; })
+      .sort(function(x, y) { return (drafts[y].ts || 0) - (drafts[x].ts || 0); });
+    others.slice(JOURNAL_DRAFT_MAX - 1).forEach(function(id) { delete drafts[id]; });
+    _storeJournalDrafts(drafts);
+  } catch (_e) {
+    // Quota / unavailable: the entry on screen comes first (the old single-slot write).
+    try { var only = {}; only[eid] = mine; _storeJournalDrafts(only); } catch (_e2) { /* best-effort */ }
+  }
+}
+function _clearJournalDraft(eid) {
+  try {
+    var drafts = _readJournalDrafts();
+    if (!drafts[eid]) return;
+    delete drafts[eid];
+    _storeJournalDrafts(drafts);
+  } catch (_e) { /* unavailable */ }
 }
 /* v05-05 — the editor flushes on every blur, background, unmount and auto-save tick, and
    JournalStore.update stamps `updated` to now, which is how the hub dates and orders its
@@ -89,11 +137,9 @@ export function JournalEditorScreen(props) {
   var loaded = useMemo(function() {
     var entry = entryId ? JournalStore.get(entryId) : null;
     if (!entryId) return { initial: entry, draftAction: 'none' };
-    var draft = _readJournalDraft();
-    if (!draft || draft.entryId !== entryId) return { initial: entry, draftAction: 'none' };
-    var entryUpdated = (entry && entry.updated) || 0;
-    var hasNewerEdits = !!entry && draft.ts >= entryUpdated && _journalSig(draft) !== _journalSig(entry);
-    if (hasNewerEdits) {
+    var draft = _readJournalDraft(entryId);
+    if (!draft) return { initial: entry, draftAction: 'none' };
+    if (_journalDraftRecoverable(draft, entry)) {
       return { initial: Object.assign({}, entry, { title: draft.title, blocks: draft.blocks, mood: draft.mood }), draftAction: 'keep' };
     }
     return { initial: entry, draftAction: 'clear' };
@@ -312,8 +358,7 @@ export function JournalEditorScreen(props) {
         try {
           if (newEntry) localStorage.removeItem(JRN_NEW_ENTRY_STATS_KEY);
         } catch (_e) { /* marker cleanup is best-effort */ }
-        var d = _readJournalDraft();
-        if (d && d.entryId === eid) _clearJournalDraft();
+        _clearJournalDraft(eid);
         return;
       }
       _saveIfChanged(eid, t, bs, moodRef.current);
@@ -353,8 +398,8 @@ export function JournalEditorScreen(props) {
   // `loaded`) is deliberately KEPT so a kill before the recovered edits are re-saved can
   // recover again; only stale/already-saved drafts for THIS entry are cleared here.
   useEffect(function() {
-    if (loaded.draftAction === 'clear') _clearJournalDraft();
-  }, [loaded]);
+    if (loaded.draftAction === 'clear') _clearJournalDraft(entryId);
+  }, [loaded, entryId]);
 
   // P1-5 — record New-Entry stats (entry count, journal streak) on the FIRST
   // NON-EMPTY save of an entry created via the New-Entry flow (previously

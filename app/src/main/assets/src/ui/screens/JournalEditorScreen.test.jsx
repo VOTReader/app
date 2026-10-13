@@ -130,8 +130,7 @@ describe('JournalEditorScreen — background-kill data safety', () => {
     fireEvent.change(document.querySelector('.jrn-block-textarea'), { target: { value: 'edited body' } });
     act(() => { window.dispatchEvent(new Event('pagehide')); });
 
-    const draft = JSON.parse(localStorage.getItem('vot-journal-draft'));
-    expect(draft.entryId).toBe(entry.id);
+    const draft = JSON.parse(localStorage.getItem('vot-journal-draft')).drafts[entry.id];
     expect(draft.title).toBe('edited title');
     expect(draft.blocks.find((b) => b.type === 'p').text).toBe('edited body');
   });
@@ -166,6 +165,79 @@ describe('JournalEditorScreen — background-kill data safety', () => {
 
     expect(document.querySelector('.jrn-editor-title').value).toBe('current title');
     expect(localStorage.getItem('vot-journal-draft')).toBeNull();
+  });
+});
+
+/* sweep mw13 (T3 data loss): JRNL-1 kept ONE draft slot for every entry. The WebView is
+   killed while entry A is backgrounded, before A's IDB write lands; after the restart the
+   reader opens and backgrounds entry B before going back to A, and B's draft overwrote
+   A's: A's last words were gone. Drafts are now kept per entry under the same key. */
+describe('JournalEditorScreen — JRNL-1 drafts are kept per entry (sweep mw13)', () => {
+  const p = (text) => [JournalHelpers.newBlock('p', { text })];
+  const seedOld = (entry, title, text) => localStorage.setItem('vot-journal-draft', JSON.stringify({
+    entryId: entry.id, title, blocks: p(text), mood: null, ts: (entry.updated || 0) + 5000,
+  }));
+  const hideEdit = (entry, title) => {
+    const r = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: title } });
+    act(() => { window.dispatchEvent(new Event('pagehide')); });
+    r.unmount();
+  };
+
+  it("backgrounding entry B before A is reopened keeps A's unrecovered draft", () => {
+    const a = JournalStore.add({ title: 'A', blocks: p('a body') });
+    const b = JournalStore.add({ title: 'B', blocks: p('b body') });
+    seedOld(a, 'A after the kill', 'the words a kill lost'); // a pre-fix single-slot draft
+    hideEdit(b, 'B edited');
+    render(<JournalEditorScreen entryId={a.id} onBack={() => {}} />);
+    expect(document.querySelector('.jrn-editor-title').value).toBe('A after the kill');
+    expect(document.querySelector('.jrn-block-textarea').value).toBe('the words a kill lost');
+  });
+
+  it("opening an entry consumes only ITS stale draft; another entry's draft stays", () => {
+    const a = JournalStore.add({ title: 'A', blocks: p('a body') });
+    const b = JournalStore.add({ title: 'B', blocks: p('b body') });
+    localStorage.setItem('vot-journal-draft', JSON.stringify({ v: 2, drafts: {
+      [a.id]: { title: 'A lost', blocks: p('a lost'), mood: null, ts: (a.updated || 0) + 5000 },
+      [b.id]: { title: 'B stale', blocks: p('b stale'), mood: null, ts: (b.updated || 0) - 5000 },
+    } }));
+    const rb = render(<JournalEditorScreen entryId={b.id} onBack={() => {}} />);
+    expect(document.querySelector('.jrn-editor-title').value).toBe('B');
+    rb.unmount();
+    const left = JSON.parse(localStorage.getItem('vot-journal-draft')).drafts;
+    expect(Object.keys(left)).toEqual([a.id]);
+    render(<JournalEditorScreen entryId={a.id} onBack={() => {}} />);
+    expect(document.querySelector('.jrn-editor-title').value).toBe('A lost');
+  });
+
+  it('a write drops drafts that can no longer be recovered and keeps at most 8', () => {
+    const entries = Array.from({ length: 10 }, (_, i) => JournalStore.add({ title: 'E' + i, blocks: p('e' + i) }));
+    const drafts = {};
+    entries.forEach((e, i) => {
+      drafts[e.id] = { title: 'lost ' + i, blocks: p('lost ' + i), mood: null, ts: (e.updated || 0) + 1000 + i };
+    });
+    drafts[entries[0].id].ts = (entries[0].updated || 0) - 5000; // older than its save: never recoverable
+    localStorage.setItem('vot-journal-draft', JSON.stringify({ v: 2, drafts }));
+    const x = JournalStore.add({ title: 'X', blocks: p('x') });
+    hideEdit(x, 'X edited');
+    const left = JSON.parse(localStorage.getItem('vot-journal-draft')).drafts;
+    expect(Object.keys(left)).toHaveLength(8);
+    expect(left[x.id].title).toBe('X edited');
+    expect(left[entries[0].id]).toBeUndefined();       // not recoverable: dropped first
+    expect(left[entries[1].id]).toBeUndefined();       // the oldest recoverable one past the cap
+    expect(left[entries[9].id].title).toBe('lost 9');
+  });
+
+  it('the prune of a blank entry removes only its own draft', () => {
+    const a = JournalStore.add({ title: 'A', blocks: p('a body') });
+    const blank = JournalStore.add();
+    localStorage.setItem('vot-journal-draft', JSON.stringify({ v: 2, drafts: {
+      [a.id]: { title: 'A lost', blocks: p('a lost'), mood: null, ts: (a.updated || 0) + 5000 },
+      [blank.id]: { title: '', blocks: p(''), mood: null, ts: (blank.updated || 0) + 5000 },
+    } }));
+    render(<JournalEditorScreen entryId={blank.id} onBack={() => {}} />).unmount();
+    expect(JournalStore.get(blank.id)).toBeNull();
+    expect(Object.keys(JSON.parse(localStorage.getItem('vot-journal-draft')).drafts)).toEqual([a.id]);
   });
 });
 

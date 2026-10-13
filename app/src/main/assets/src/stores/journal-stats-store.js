@@ -95,19 +95,22 @@ export var JournalStatsStore = extendStore(
       var data = this._load();
       var today = _jrnDateStr(ts);
       data.totalEntries = (data.totalEntries || 0) + 1;
+      var delta = data.lastEntryDate ? _jrnDaysBetween(data.lastEntryDate, today) : NaN;
       if (!data.lastEntryDate) {
         data.currentStreak = 1;
+      } else if (delta <= 0) {
+        // Same-day entry, or the local date went back (clock or time-zone
+        // change): the streak stands, and it counts today even after a
+        // delete-to-zero (J5) set it to 0 earlier the same day.
+        data.currentStreak = Math.max(1, data.currentStreak || 0);
+      } else if (delta === 1) {
+        data.currentStreak = (data.currentStreak || 0) + 1;
       } else {
-        var delta = _jrnDaysBetween(data.lastEntryDate, today);
-        if (delta === 0) {
-          // Same-day entry — streak unchanged.
-        } else if (delta === 1) {
-          data.currentStreak = (data.currentStreak || 0) + 1;
-        } else {
-          data.currentStreak = 1;
-        }
+        data.currentStreak = 1;
       }
-      data.lastEntryDate = today;
+      // Never move the last entry date backwards: tomorrow's entry must
+      // still extend the streak from the latest day written.
+      if (!(delta < 0)) data.lastEntryDate = today;
       if (data.currentStreak > (data.longestStreak || 0)) {
         data.longestStreak = data.currentStreak;
       }

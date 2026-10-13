@@ -122,3 +122,34 @@ describe('useReadingDwell → ReadingStreakStore (the dwell-gated half)', () => 
     expect(result.current.activeReadKey).toBe('bible:psalms:23');
   });
 });
+
+describe('useReadingDwell — a mid-session dwell change reaches the resume path (sweep mw13)', () => {
+  let vis = 'visible';
+  let desc;
+  beforeEach(() => {
+    desc = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState');
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => vis });
+  });
+  afterEach(() => {
+    delete /** @type {any} */ (document).visibilityState;
+    if (desc) Object.defineProperty(Document.prototype, 'visibilityState', desc);
+    vis = 'visible';
+  });
+  const setVis = (v) => { vis = v; document.dispatchEvent(new Event('visibilitychange')); };
+
+  it('resuming after the app was hidden times the rest of the dwell from the CURRENT setting', () => {
+    const recordReadingDay = vi.fn();
+    window.ReadingStreakStore = { recordReadingDay };
+    const { result, rerender } = renderHook(({ dwellMs }) => useReadingDwell({ dwellMs, initialActiveReadKey: null }),
+      { initialProps: { dwellMs: 1000 } });
+    act(() => { result.current.setActiveReadKey('bible:psalms:23'); });
+    act(() => { vi.advanceTimersByTime(400); });
+    act(() => { setVis('hidden'); });
+    rerender({ dwellMs: 5000 }); // Settings > Reading Streak Dwell Time changed while away
+    act(() => { setVis('visible'); });
+    act(() => { vi.advanceTimersByTime(1000); }); // the mount-time 1 s would have fired by now
+    expect(recordReadingDay).not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(3700); }); // 400 + 4600 = 5000
+    expect(recordReadingDay).toHaveBeenCalledTimes(1);
+  });
+});

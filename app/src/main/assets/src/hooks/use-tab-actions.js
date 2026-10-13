@@ -324,25 +324,33 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState + setTabThumbnails param (all useState origin); see header above.
   }, []);
-  // Merge duplicates: if two tabs have the same content signature, drop later duplicates
+  // Merge duplicates: if two tabs have the same content signature, drop later
+  // duplicates. A dropped copy's pin and rename carry over to the kept one
+  // (the kept copy's own title wins), since every bulk close spares pins.
   const deduplicateTabs = React.useCallback(() => {
     setTabs((prev) => {
       if (prev.length <= 1) return prev;
-      const seen = new Set();
+      const seen = new Map(); // content key -> index in keep
       const keep = [];
       let activeStillInKept = false;
       let newActiveIdx = 0;
       prev.forEach((t, i) => {
         const k = tabContentKey(t);
         if (!seen.has(k)) {
-          seen.add(k);
+          seen.set(k, keep.length);
           if (i === activeTabIdx) {activeStillInKept = true;newActiveIdx = keep.length;}
           keep.push(t);
-        } else if (i === activeTabIdx && !activeStillInKept) {
-          // Active tab is a duplicate — point at the first kept instance
-          let idx = keep.findIndex((x) => tabContentKey(x) === k);
-          if (idx >= 0) newActiveIdx = idx;
+          return;
         }
+        const j = seen.get(k);
+        const kept = keep[j];
+        if ((t.pinned && !kept.pinned) || (t.customTitle && !kept.customTitle)) {
+          keep[j] = { ...kept, pinned: !!(kept.pinned || t.pinned), customTitle: kept.customTitle || t.customTitle };
+          if (!keep[j].pinned) delete keep[j].pinned;
+          if (!keep[j].customTitle) delete keep[j].customTitle;
+        }
+        // Active tab is a duplicate — point at the first kept instance
+        if (i === activeTabIdx && !activeStillInKept) newActiveIdx = j;
       });
       setActiveTabIdx(newActiveIdx);
       return keep;
