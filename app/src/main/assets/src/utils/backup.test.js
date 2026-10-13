@@ -818,6 +818,26 @@ describe('verifyImportCounts (BAK3)', () => {
     expect(commits).toEqual([['replace', 2]]);
     expect(res.countMismatches).toEqual(['media 0/2']);
   });
+
+  it('W7 round 3: a manifest without a counts block still names media that left staging', async () => {
+    const media = {
+      allIds: async () => [], delete: async () => {}, put: async () => {},
+      beginImportReplace: async () => {}, stageImportRecord: async () => {},
+      commitImportReplace: async () => ({ mode: 'merge', landed: 0 }),
+      commitImportMerge: async () => ({ mode: 'merge', landed: 0 }),
+      abortImportReplace: async () => {},
+    };
+    async function* oneFrame() {
+      yield { id: 'm1', meta: { type: 'image', mime: 'image/png', size: 3 }, blob: new Uint8Array([1, 2, 3]) };
+    }
+    const res = await applyV3(
+      { app: 'VOTReader', exportVersion: 3, data: {}, stores: {}, media: [{ id: 'm1', type: 'image', mime: 'image/png', size: 3 }] },
+      oneFrame(),
+      { storesMap: {}, flagMap: {}, mediaStore: media, validateStorePayload: () => [] },
+    );
+    expect(res.importFailures).toBe(1);
+    expect(res.countMismatches).toEqual(['media 0/1']);
+  });
 });
 
 /* ─────────────────────────────────────────────────────────────────────

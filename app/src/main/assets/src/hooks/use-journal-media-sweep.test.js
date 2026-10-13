@@ -238,3 +238,25 @@ describe('useJournalMediaSweep — W7 round 2: the restoring tab dies while this
     expect(pruneOrphans).not.toHaveBeenCalled();
   });
 });
+
+describe('useJournalMediaSweep — W7 round 3: the staging clear runs under the backup lock', () => {
+  /** @type {any} */ let realRequest = null;
+  afterEach(() => {
+    delete /** @type {any} */ (navigator.locks).query;
+    if (realRequest) { /** @type {any} */ (navigator.locks).request = realRequest; realRequest = null; }
+  });
+
+  it('does not clear staging when another tab took the lock between the look and the clear', async () => {
+    /** @type {any} */ (navigator.locks).query = vi.fn(async () => ({ held: [], pending: [] }));
+    realRequest = navigator.locks.request;
+    /** @type {any} */ (navigator.locks).request = (/** @type {string} */ _n, /** @type {any} */ _o, /** @type {any} */ cb) => Promise.resolve(cb(null));
+    const abortImportReplace = vi.fn().mockResolvedValue(undefined);
+    /** @type {any} */ (globalThis).JournalMediaStore = { abortImportReplace, pruneOrphans: vi.fn().mockResolvedValue(0) };
+
+    renderHook(() => useJournalMediaSweep());
+    await vi.advanceTimersByTimeAsync(4000);
+    for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(0);
+
+    expect(abortImportReplace).not.toHaveBeenCalled();
+  });
+});
