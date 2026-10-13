@@ -62,6 +62,8 @@ let _queue = [];
 let _active = null;
 /** @type {AbortController | null} */
 let _abort = null;
+/** The song being kept (web) was cancelled or removed: its fetch abort covers only the download (sweep W64). */
+let _halted = false;
 /** @type {Map<string, string>} id → why the last try failed (network | size | check | space) */
 const _failed = new Map();
 /** @type {Map<string, string>} a refusal, per asking surface */
@@ -379,23 +381,39 @@ async function _keepOne(id) {
   const expected = s ? Number(s.b) : 0;
   const st = _store();
   if (!url || !(expected > 0) || expected > MAX_SONG_BYTES || !st) throw new Error('network');
+  // Cancelled or removed on its way (sweep W64): the abort reaches only the download, so after every wait the keep
+  // asks again, and a copy it already stored goes. Else it came back as kept and on the backup's list, and a remove
+  // during the store (its delete before the read-back) fetched it all again.
+  const stop = async (/** @type {boolean} */ stored) => {
+    if (stored) { try { await st.delete(id); } catch (_e) { /* gone already */ } }
+    const e = new Error('cancelled');
+    e.name = 'AbortError';
+    throw e;
+  };
   for (let attempt = 0; attempt < 2; attempt++) {
+    if (_halted) await stop(false);
     const ctl = typeof AbortController === 'function' ? new AbortController() : null;
     _abort = ctl;
     const res = await fetch(url, { credentials: 'omit', cache: 'no-store', signal: ctl ? ctl.signal : undefined });
+    if (_halted) await stop(false);
     if (!res.ok) throw new Error('network');
     const buf = await res.arrayBuffer();
+    if (_halted) await stop(false);
     if (buf.byteLength !== expected) { if (attempt) throw new Error('size'); continue; }
     const sha = await _sha256(buf);
+    if (_halted) await stop(false);
     const keptAt = Date.now();
     try {
       await st.put({ id, blob: new Blob([buf], { type: 'audio/mpeg' }), bytes: expected, sha256: sha, keptAt });
     } catch (e) {
+      if (_halted) await stop(false);
       const quota = !!(e && /** @type {any} */ (e).name === 'QuotaExceededError');
       throw new Error(quota ? 'space' : 'check');
     }
+    if (_halted) await stop(true);
     const back = await st.get(id);
     const good = !!back && back.blob.size === expected && (await _sha256(await back.blob.arrayBuffer())) === sha;
+    if (_halted) await stop(true);
     if (!good) {
       try { await st.delete(id); } catch (_e) { /* the next try overwrites it */ }
       if (attempt) throw new Error('check');
@@ -413,6 +431,7 @@ async function _pump() {
   if (_active || !_queue.length) return;
   const id = /** @type {string} */ (_queue.shift());
   _active = id;
+  _halted = false;
   _notify();
   try {
     await _keepOne(id);
@@ -423,6 +442,7 @@ async function _pump() {
   } finally {
     _active = null;
     _abort = null;
+    _halted = false;
     _notify();
   }
   if (_queue.length) void _pump();
@@ -443,7 +463,10 @@ function cancel(ids) {
     return;
   }
   _queue = _queue.filter((id) => !set.has(id));
-  if (_active && set.has(_active) && _abort) { try { _abort.abort(); } catch (_e) { /* done already */ } }
+  if (_active && set.has(_active)) {
+    _halted = true;   // past the download, the keep stops at its next wait (W64)
+    if (_abort) { try { _abort.abort(); } catch (_e) { /* done already */ } }
+  }
   _notify();
 }
 
@@ -475,7 +498,8 @@ async function remove(ids) {
 function removeAll() {
   const busy = _native() ? [] : _queue.concat(_active ? [_active] : []);
   cancel(busy);
-  return remove(keptIds());
+  // The song on its way is not kept yet (keptIds), but "remove all" takes it too: off the backup's list (W64).
+  return remove(keptIds().concat(busy));
 }
 
 /**

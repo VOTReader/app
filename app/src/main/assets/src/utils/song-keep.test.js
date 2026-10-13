@@ -196,6 +196,55 @@ describe('song-keep on the web — the offline-songs store', () => {
     expect(SongKeep.keptIds()).toEqual([A1]);
   });
 
+  /* Sweep W64 (2026-10-13): the abort covered only the fetch, so a song cancelled or removed while it was hashed,
+     stored or read back came back as kept (and on the backup's list); a remove during the store fetched it again. */
+  describe('cancelled or removed while it is being stored (sweep W64)', () => {
+    let releasePut;
+    beforeEach(() => {
+      releasePut = null;
+      store.put = vi.fn((rec) => new Promise((r) => { releasePut = () => { store.map.set(rec.id, rec); r(); }; }));
+    });
+    const storing = () => vi.waitFor(() => expect(releasePut).toBeTypeOf('function'));
+
+    it('Cancel: not kept, nothing stored, not listed, not failed', async () => {
+      await SongKeep.keep([A1]);
+      await storing();
+      SongKeep.cancel([A1]);
+      releasePut();
+      await settled();
+      expect(SongKeep.isKept(A1)).toBe(false);
+      expect(store.map.has(A1)).toBe(false);
+      expect(lib.kept).toEqual([]);
+      expect(SongKeep.statusOf(A1)).toBe('none');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('Remove all: the song on its way goes too', async () => {
+      await SongKeep.keep([A1]);
+      await storing();
+      const done = SongKeep.removeAll();
+      releasePut();
+      await done;
+      await settled();
+      expect(SongKeep.keptIds()).toEqual([]);
+      expect(store.map.size).toBe(0);
+      expect(lib.kept).toEqual([]);
+    });
+
+    it('remove: gone, and not fetched a second time', async () => {
+      await SongKeep.keep([A1]);
+      await storing();
+      const done = SongKeep.remove([A1]);
+      releasePut();
+      await done;
+      await settled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(SongKeep.isKept(A1)).toBe(false);
+      expect(store.map.has(A1)).toBe(false);
+      expect(lib.kept).toEqual([]);
+    });
+  });
+
   it('one object URL alive at a time: the last is revoked when another song plays, and on release', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const made = [];
