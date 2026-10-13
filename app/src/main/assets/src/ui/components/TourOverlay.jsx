@@ -160,7 +160,17 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   const cardRef = React.useRef(/** @type {HTMLElement|null} */ (null));
   // The ringed control, measured each frame while a stop is showing.
   const [rect, setRect] = React.useState(null);
-  const [missing, setMissing] = React.useState(false);
+  const [missing, setMissingState] = React.useState(false);
+  /* W58: the frame loop below is started once per stop, so the `missing` it closed over stays the
+     value of that render (false) and its "clear the hint" never ran: a target that arrived late got
+     its ring under a card still saying it could not be found. The loop reads and writes this ref,
+     and the state follows only on a change (no render per frame). */
+  const missingRef = React.useRef(false);
+  const setMissing = React.useCallback((/** @type {boolean} */ v) => {
+    if (missingRef.current === v) return;
+    missingRef.current = v;
+    setMissingState(v);
+  }, []);
   // The player bar's top edge while it is up (the docked card sits above it), else null.
   const [barTop, setBarTop] = React.useState(/** @type {number|null} */ (null));
   const targetRef = React.useRef(null);
@@ -221,7 +231,7 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
         // The reading column: what the dims leave open and what carries the card's scroll-padding.
         const col = ctl.findTarget({ target: { selector: '.screen-scroll' } });
         if (col) { scrollerRef.current = /** @type {HTMLElement} */ (col); scrollerTopRef.current = Math.max(0, col.getBoundingClientRect().top); }
-        if (missing) setMissing(false);
+        setMissing(false);
       }
       const bar = document.querySelector('.audio-bar');
       const bt = bar ? bar.getBoundingClientRect().top : null;
@@ -277,7 +287,7 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
           try { el.scrollIntoView({ block: block || 'center', inline: 'nearest' }); } catch (_e) { /* jsdom */ }
         }
         if (!_sameRect(r, last)) { last = r; setRect(r); }
-        if (missing) setMissing(false);
+        setMissing(false);
       } else if (ringed && Date.now() - started > waitMs) {
         if (last) { last = null; setRect(null); }
         setMissing(true);

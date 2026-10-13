@@ -134,6 +134,24 @@ describe('TourOverlay — ring and target', () => {
     expect(screen.getByText(/could not find/i)).toBeTruthy();
   });
 
+  /* W58 (sweep 2026-10-13): the frame loop read `missing` from the render that started it
+     (false), so its "clear the hint" never ran: a target that arrived late (a slow screen, a lazy list)
+     got its ring under a card still saying it could not be found. */
+  it('a target that arrives after the hint: the ring appears and the hint goes', async () => {
+    startAt('listen');
+    render(<TourOverlay waitMs={0} />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
+    expect(screen.getByText(/could not find/i)).toBeTruthy();
+    const pill = document.createElement('button');
+    pill.className = 'hero-play-pill';
+    pill.textContent = 'Listen';
+    pill.getBoundingClientRect = rect(133, 271, 94, 25);
+    document.body.appendChild(pill);
+    await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
+    expect(document.querySelector('.tour-ring'), 'the late target is ringed').toBeTruthy();
+    expect(screen.queryByText(/could not find/i), 'and the card stops saying it is missing').toBeNull();
+  });
+
   it('shows a plain waiting line until the lazy bundle is ready', () => {
     window.__loadScreensE = () => new Promise(() => {});
     TourController.attachNav(nav());
