@@ -84,6 +84,9 @@ describe('app.css — the update toast\'s tap (utils/update-toast.js showListeni
     expect(ruleBlock(CSS, '.vot-toast {')).toContain('pointer-events: none');
     expect(ruleBlock(CSS, '.vot-toast-action {')).toContain('pointer-events:auto');
   });
+  it('a FADED action toast is not a target (W55): hideToast only drops .show, the same trap .vot-toast-undo closed', () => {
+    expect(ruleBlock(CSS, '.vot-toast-action:not(.show)')).toContain('pointer-events:none');
+  });
 });
 
 describe('app.css — annotation-hint coach-mark (P1-1)', () => {

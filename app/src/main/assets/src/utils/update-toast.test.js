@@ -333,6 +333,42 @@ describe('offerListeningResume — the update toast carries the tap', () => {
     expect(onTap).toHaveBeenCalledTimes(1);
   });
 
+  /* W55 (sweep 2026-10-13): the two listeners were each { once: true }, so a click left the Enter one armed,
+     and a toast that simply timed out kept both, plus role=button and tabindex=0, on a faded element: a later
+     tap or Enter there called late.toggle() and started (or stopped) playback the reader never asked for. */
+  it('a click then an Enter on the same toast: one offer, one tap', async () => {
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    expect(await announceUpdateIfAny()).toBe('shown');
+    const onTap = vi.fn();
+    offerListeningResume(onTap);
+    const el = document.getElementById(UPDATED_TOAST_ID);
+    el.click();
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(onTap).toHaveBeenCalledTimes(1);
+  });
+
+  it('a toast that timed out is no button any more: a tap or Enter on the faded element does nothing', async () => {
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    expect(await announceUpdateIfAny()).toBe('shown');
+    vi.useFakeTimers();
+    try {
+      const onTap = vi.fn();
+      offerListeningResume(onTap);
+      const el = document.getElementById(UPDATED_TOAST_ID);
+      expect(el.getAttribute('tabindex')).toBe('0');
+      vi.advanceTimersByTime(8000);
+      expect(el.classList.contains('show'), 'timed out').toBe(false);
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      el.click();
+      expect(onTap, 'a faded toast starts or stops nothing').not.toHaveBeenCalled();
+      expect(el.classList.contains('vot-toast-action'), 'pointer-events back to none').toBe(false);
+      expect(el.getAttribute('role'), 'a status line again, not a button').toBe('status');
+      expect(el.hasAttribute('tabindex'), 'out of Tab order').toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('with no new build (same version) an offer shows nothing — the tap rides an update toast or not at all', async () => {
     localStorage.setItem(LAST_SEEN_BUILD_KEY, NEW);
     offerListeningResume(vi.fn());

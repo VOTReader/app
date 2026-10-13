@@ -78,6 +78,9 @@
          44 px box rather than inheriting the text line-height: it is a real
          target the reader hunts for on a stuck screen, not a nicety. */
       .vot-toast-action { pointer-events:auto; }
+      /* W55: the same fade trap as .vot-toast-undo above: a faded "Tap to continue
+         listening." took a late tap and toggled playback. */
+      .vot-toast-action:not(.show) { pointer-events:none; }
       .vot-toast-action .vot-escape-btn { margin-left:0.7em; min-height:44px; display:inline-flex; align-items:center; background:none; border:none; padding:0 4px; color:var(--gold,#ffd78c); font:inherit; font-weight:600; text-decoration:underline; text-underline-offset:2px; cursor:pointer; vertical-align:middle; }
       body.light .vot-toast-action .vot-escape-btn { color:var(--gold-strong,#9a7b2e); }
 

@@ -109,8 +109,25 @@ let announced = false;
 
 /** @param {() => void} onTap */
 function showListeningToast(onTap) {
-  showToast({ id: UPDATED_TOAST_ID, className: 'vot-toast', text: UPDATED_TOAST_LISTEN_TEXT, durationMs: UPDATED_TOAST_LISTEN_MS });
-  const el = document.getElementById(UPDATED_TOAST_ID);
+  /** @type {HTMLElement | null} */
+  let el = null;
+  // W55: the element outlives this showing (toast.js reuses it by id), so when the
+  // showing ends — tap, timer, or the next toast — it stops being a button: both
+  // listeners off together, the class and attributes back to a plain status line.
+  // Else a late tap or Enter on the faded toast toggled playback.
+  const disarm = () => {
+    if (!el) return;
+    el.removeEventListener('click', tap);
+    el.removeEventListener('keydown', onKey);
+    el.classList.remove('vot-toast-action');
+    el.setAttribute('role', 'status');
+    el.removeAttribute('tabindex');
+  };
+  const tap = () => { hideToast(UPDATED_TOAST_ID); onTap(); };
+  /** @param {KeyboardEvent} e */
+  const onKey = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tap(); } };
+  showToast({ id: UPDATED_TOAST_ID, className: 'vot-toast', text: UPDATED_TOAST_LISTEN_TEXT, durationMs: UPDATED_TOAST_LISTEN_MS, onHide: disarm });
+  el = document.getElementById(UPDATED_TOAST_ID);
   if (!el) return;
   // .vot-toast is pointer-events:none (app.css): a toast is not a target. This one
   // is, so it opts in with .vot-toast-action — added HERE, because showToast sets
@@ -120,9 +137,8 @@ function showListeningToast(onTap) {
   el.classList.add('vot-toast-action');
   el.setAttribute('role', 'button');
   el.setAttribute('tabindex', '0');
-  const tap = () => { hideToast(UPDATED_TOAST_ID); onTap(); };
-  el.addEventListener('click', tap, { once: true });
-  el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tap(); } }, { once: true });
+  el.addEventListener('click', tap);
+  el.addEventListener('keydown', onKey);
 }
 
 /**

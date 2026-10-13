@@ -22,14 +22,16 @@
    tidy pass can consolidate it; this utility ignores it for now.
 
    API:
-     showToast({ id, html, className, durationMs, ariaLive })
+     showToast({ id, html, className, durationMs, ariaLive, onHide })
        Show or update a toast. Reuses the DOM element with the given id
        if it already exists; creates it otherwise. After durationMs,
        auto-hides via `.show` class removal. durationMs=0 means show
-       indefinitely (caller must hideToast manually).
+       indefinitely (caller must hideToast manually). onHide runs once
+       when this showing ends (hide, timer, or the next show of the id).
 
      hideToast(id)
        Hide a toast immediately + cancel its pending auto-hide timer.
+       Disables the buttons inside it (a faded toast is no target).
        Idempotent; safe to call on an unknown id.
 
      _resetToasts()
@@ -45,6 +47,24 @@
  * @type {Map<string, ReturnType<typeof setTimeout>>}
  */
 const _hideTimers = new Map();
+
+/**
+ * W55: per-id "this showing ended" callbacks (showToast's opts.onHide). A
+ * toast that IS a control (the update toast's "Tap to continue listening.")
+ * wires its element, and the element outlives the showing; its owner takes
+ * the wiring off here.
+ *
+ * @type {Map<string, () => void>}
+ */
+const _onHide = new Map();
+
+/** @param {string} id */
+function _endShowing(id) {
+  const fn = _onHide.get(id);
+  if (!fn) return;
+  _onHide.delete(id);
+  try { fn(); } catch (_e) { /* one caller's cleanup never breaks the toast */ }
+}
 
 /**
  * Show a transient toast. Creates the DOM element with the given id on
@@ -67,6 +87,9 @@ const _hideTimers = new Map();
  * @param {string} [opts.ariaLive]   - aria-live attribute (default
  *                                     'polite'; pass 'assertive' for
  *                                     errors / urgent notices)
+ * @param {() => void} [opts.onHide] - runs once when this showing ends:
+ *                                     hideToast, the auto-hide timer, or
+ *                                     the next showToast of the same id
  * @returns {void}
  */
 export function showToast(opts) {
@@ -84,6 +107,10 @@ export function showToast(opts) {
   const className = (opts && opts.className) || id;
   const durationMs = (opts && opts.durationMs != null) ? opts.durationMs : 3000;
   const ariaLive = (opts && opts.ariaLive) || 'polite';
+
+  // The previous showing of this id ends here: its content is replaced below.
+  _endShowing(id);
+  if (opts && typeof opts.onHide === 'function') _onHide.set(id, opts.onHide);
 
   let el = document.getElementById(id);
   if (!el) {
@@ -130,7 +157,15 @@ export function showToast(opts) {
 export function hideToast(id) {
   if (typeof document === 'undefined' || !id) return;
   const el = document.getElementById(id);
-  if (el) el.classList.remove('show');
+  if (el) {
+    el.classList.remove('show');
+    // W55: opacity 0 leaves a button in Tab order and under the finger (the CSS
+    // drops the pointer for .vot-toast-action/-undo); disabled takes it out of
+    // both and keeps the text readable. Every show rewrites the content, so the
+    // next showing brings fresh buttons.
+    el.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+  }
+  _endShowing(id);
   const prev = _hideTimers.get(id);
   if (prev != null) {
     clearTimeout(prev);
@@ -150,6 +185,7 @@ export function _resetToasts() {
     if (timer != null) clearTimeout(timer);
   }
   _hideTimers.clear();
+  _onHide.clear();
   if (typeof document === 'undefined') return;
   // Remove every toast element matching `[id^="vot-toast"]`. Cheaper than
   // tracking all ids.
