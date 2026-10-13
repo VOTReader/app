@@ -20,8 +20,9 @@
      before writing anything.
    Told either, tab B raises the remote write fence (stores/cached-store.js): no save
    reaches the database, so nothing old lands on the new library, and StorageHealth's
-   banner asks for a reload. Once every tab that said 'changing' said 'unchanged', the
-   fence comes down and every save it held runs. 'changed' is final for the page. A
+   banner asks for a reload. Every announcement names its operation (one page can start
+   two); once every operation that said 'changing' said 'unchanged', the fence comes down
+   and every save it held runs. 'changed' is final for the page. A
    database a newer build upgraded gets the "newer version" banner instead (v04-03),
    with the same hold.
 
@@ -58,14 +59,17 @@ function _getChannel() {
   return _channel;
 }
 
-/** Tabs that said 'changing' and have not said how it ended, by page id. @type {Set<string>} */
+/** Operations other tabs said were 'changing' and have not ended, as 'pageId|opId'. @type {Set<string>} */
 const _changing = new Set();
 /** Another tab changed the library or deleted the database: final for this page. */
 let _changed = false;
 /** A newer build upgraded the database: this build can never write it again. */
 let _newer = false;
-/** This page is running its own Clear All, Import or Restore (it announced 'changing'). */
-let _ownOp = false;
+/** This page's own running operations (Clear All, Import, Restore), by the id 'changing' returned.
+ *  One page can start two: its Restore holds the backup lock and writes while an Import tapped
+ *  there meanwhile is refused (W8 refuter round 3). @type {Set<string>} */
+const _ownOps = new Set();
+let _opSeq = 0;
 /** What the banner shows now. @type {'changing' | 'changed' | null} */
 let _held = null;
 /** @type {(() => void) | null} */
@@ -73,14 +77,21 @@ let _stop = null;
 
 /**
  * Tell the other open tabs what this one is doing to the library. Never throws.
- * 'changing' also marks this page's own operation as running, until 'changed' or 'unchanged'.
+ * 'changing' starts one of this page's operations and returns its id; 'changed' or 'unchanged'
+ * ends the operation that id names (every one of them when none is given).
  * @param {'changing' | 'changed' | 'unchanged'} kind
+ * @param {string} [op]
+ * @returns {string | undefined}
  */
-export function announceLibraryChange(kind) {
-  _ownOp = kind === 'changing';
+export function announceLibraryChange(kind, op) {
+  let id = op;
+  if (kind === 'changing') { id = _pageId() + '#' + (++_opSeq); _ownOps.add(id); }
+  else if (id) _ownOps.delete(id);
+  else _ownOps.clear();
   const ch = _getChannel();
-  if (ch) { try { ch.postMessage({ kind: kind, from: _pageId() }); } catch (_e) { /* best-effort: their versionchange still covers a Clear All */ } }
-  if (!_ownOp) _sync();   // a hold another tab asked for while this page's operation ran starts now
+  if (ch) { try { ch.postMessage({ kind: kind, from: _pageId(), op: id }); } catch (_e) { /* best-effort: their versionchange still covers a Clear All */ } }
+  if (!_ownOps.size) _sync();   // a hold another tab asked for while this page's operations ran starts now
+  return kind === 'changing' ? id : undefined;
 }
 
 /**
@@ -95,7 +106,7 @@ function _sync() {
   const want = _changed ? 'changed' : (_changing.size ? 'changing' : null);
   // This page's own operation is writing: a hold another tab asks for meanwhile starts when it
   // ends (an import that tab tries is refused by the backup lock); one already up stays up.
-  if (!(_ownOp && _held === null) && want !== _held) {
+  if (!(_ownOps.size && _held === null) && want !== _held) {
     _held = want;
     try { StorageHealth.setLibraryElsewhere(want); } catch (_e) { /* the fence is what matters */ }
     try {
@@ -109,9 +120,15 @@ function _sync() {
 /** @param {any} data */
 function _onMessage(data) {
   if (!data || typeof data !== 'object' || typeof data.from !== 'string' || data.from === _pageId()) return;
-  if (data.kind === 'changing') _changing.add(data.from);
-  else if (data.kind === 'changed') { _changing.delete(data.from); _changed = true; }
-  else if (data.kind === 'unchanged') _changing.delete(data.from);
+  const key = data.from + '|' + (typeof data.op === 'string' ? data.op : '');
+  /** End the operation named, or every one of that page's when none is named. */
+  const end = () => {
+    if (typeof data.op === 'string') { _changing.delete(key); return; }
+    for (const k of Array.from(_changing)) if (k.indexOf(data.from + '|') === 0) _changing.delete(k);
+  };
+  if (data.kind === 'changing') _changing.add(key);
+  else if (data.kind === 'changed') { end(); _changed = true; }
+  else if (data.kind === 'unchanged') end();
   else return;
   _sync();
 }
@@ -127,7 +144,7 @@ function _onVersionChange(ev) {
     return;
   }
   // This page's own Clear All deleted it (it announced 'changing' first): its reload follows.
-  if (_ownOp) return;
+  if (_ownOps.size) return;
   _changed = true;
   _sync();
 }
@@ -160,7 +177,7 @@ export function _resetOtherTabsForTests() {
   _changing.clear();
   _changed = false;
   _newer = false;
-  _ownOp = false;
+  _ownOps.clear();
   _held = null;
   setRemoteWriteFence(false);
 }

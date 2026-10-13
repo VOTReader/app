@@ -328,6 +328,14 @@ describe('refuter findings (datasafe 10-05 second pass)', () => {
     expect(StorageHealth.getReport().dataMissing, 'the finding stays up').not.toBeNull();
   });
 
+  it('W8 refuter round 3: the Restore\'s end names the operation its start returned', async () => {
+    const sink = await damagedWithSnapshot();
+    const calls = [];
+    vi.mocked(announceLibraryChange).mockReset().mockImplementation((kind, op) => { calls.push([kind, op]); return kind === 'changing' ? 'op-r' : undefined; });
+    expect(await DataSafety.restoreMissing({ sink, reload: vi.fn() })).toBe(true);
+    expect(calls).toEqual([['changing', undefined], ['changed', 'op-r']]);
+  });
+
   it('W8: a Restore writes only while it holds the backup lock', async () => {
     const sink = await damagedWithSnapshot();
     const realRequest = navigator.locks.request.bind(navigator.locks);

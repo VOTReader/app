@@ -150,7 +150,7 @@ describe('W8: another tab imported a backup (or restored a snapshot) into the sa
     other.addEventListener('message', (e) => got.push(e.data));
     announceLibraryChange('changing');
     await tick();
-    expect(got).toEqual([{ kind: 'changing', from: expect.any(String) }]);
+    expect(got).toEqual([{ kind: 'changing', from: expect.any(String), op: expect.any(String) }]);
     expect(StorageHealth.getReport().libraryElsewhere).toBeFalsy();
     other.postMessage({ kind: 'changing', from: got[0].from });   // a copy bundled twice speaks with this page's id
     await tick();
@@ -248,5 +248,43 @@ describe('W8: a direct write while another tab holds this one', () => {
     await tick();
     await IDBAdapter.put('offline-songs', 's1', { id: 's1' });
     expect(await IDBAdapter.get('offline-songs', 's1')).toEqual({ id: 's1' });
+  });
+});
+
+/* W8 refuter round 3 (2026-10-13): one page can start two operations - its Restore holds the
+   backup lock and writes, then the reader taps Import there and the lock refuses it. Both spoke
+   with the page's id, so the refused Import's 'unchanged' lifted the other tabs' hold while the
+   Restore was still writing. Every announcement now names its operation. */
+describe('W8: two operations from one page', () => {
+  it('the other tabs stay held until the operation that is writing ends', async () => {
+    other.postMessage({ kind: 'changing', from: 'tab-a', op: 'restore' });   // tab A's Restore writes...
+    other.postMessage({ kind: 'changing', from: 'tab-a', op: 'import' });    // ...its Import starts there too
+    other.postMessage({ kind: 'unchanged', from: 'tab-a', op: 'import' });   // ...and the lock refuses it
+    await tick();
+    tabBSaves('h3');
+    await tick();
+    expect(ids(await onDisk('vot-history')), 'the Restore is still writing').toEqual(['h1', 'h2']);
+    expect(StorageHealth.getReport().libraryElsewhere).toBe('changing');
+    other.postMessage({ kind: 'changed', from: 'tab-a', op: 'restore' });
+    await tick();
+    expect(StorageHealth.getReport().libraryElsewhere).toBe('changed');
+  });
+
+  it('this page: each announcement names its operation, and ending one leaves the other running', async () => {
+    const got = [];
+    other.addEventListener('message', (e) => got.push(e.data));
+    const restore = announceLibraryChange('changing');
+    const imp = announceLibraryChange('changing');
+    expect(restore).toEqual(expect.any(String));
+    expect(imp).not.toBe(restore);
+    other.postMessage({ kind: 'changed', from: 'tab-c', op: 'x' });          // asked while this page writes: deferred
+    await tick();
+    announceLibraryChange('unchanged', imp);
+    await tick();
+    expect(StorageHealth.getReport().libraryElsewhere, 'the Restore is still this page\'s own').toBeFalsy();
+    announceLibraryChange('changed', restore);
+    await tick();
+    expect(StorageHealth.getReport().libraryElsewhere).toBe('changed');
+    expect(got.map((m) => [m.kind, m.op])).toEqual([['changing', restore], ['changing', imp], ['unchanged', imp], ['changed', restore]]);
   });
 });
