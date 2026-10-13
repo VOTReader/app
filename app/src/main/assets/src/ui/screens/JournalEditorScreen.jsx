@@ -177,6 +177,10 @@ export function JournalEditorScreen(props) {
   // so restore() needs this to know which of its two paths to take (see
   // deleteBlock).
   var mountedRef = useRef(true);
+  // W16: how many block-delete Undo windows are still open, and what the exit
+  // prune removed while one was. Undo past Done re-adds the entry from it.
+  var undoOpenRef = useRef(0);
+  var prunedRef = useRef(/** @type {{ entry: any, newEntry: boolean } | null} */ (null));
 
   // Unmount mid-gesture: one call tears down listeners, timers, ghost, and
   // landing. The reorder itself commits SYNCHRONOUSLY at release now, so
@@ -275,9 +279,18 @@ export function JournalEditorScreen(props) {
       // backgrounding keeps the editor mounted, and removing the entry under
       // it would orphan the user's next keystroke.
       if (!(t || '').trim() && !_blocksHaveContent(bs)) {
-        JournalStore.remove(eid, { skipStats: true });
+        // W16: blank because a block delete's Undo is still on screen? Keep what
+        // that Undo needs to re-add the entry (deleteBlock's restore), and leave
+        // its marks until the window closes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- a counter, not a node: the cleanup needs its value AT unmount (a window opened since mount counts)
+        var undoOpen = undoOpenRef.current > 0;
+        var newEntry = false;
+        try { newEntry = localStorage.getItem(JRN_NEW_ENTRY_STATS_KEY) === eid; } catch (_e) { /* best-effort */ }
+        var gone = undoOpen ? JournalStore.get(eid) : null;
+        if (gone) prunedRef.current = { entry: gone, newEntry: newEntry };
+        JournalStore.remove(eid, { skipStats: true, keepMarks: !!gone });
         try {
-          if (localStorage.getItem(JRN_NEW_ENTRY_STATS_KEY) === eid) localStorage.removeItem(JRN_NEW_ENTRY_STATS_KEY);
+          if (newEntry) localStorage.removeItem(JRN_NEW_ENTRY_STATS_KEY);
         } catch (_e) { /* marker cleanup is best-effort */ }
         var d = _readJournalDraft();
         if (d && d.entryId === eid) _clearJournalDraft();
@@ -383,10 +396,11 @@ export function JournalEditorScreen(props) {
     setConfirmDelIdx(null);
     setConfirmAudioDelete(null);
     scheduleSave();
+    undoOpenRef.current++;          // W16: closed by the last timer below
     // Macrotask so React has flushed the splice above (the tab-close idiom).
     setTimeout(function() {
       var removed = removedSnap;
-      if (!removed) return;
+      if (!removed) { undoOpenRef.current--; return; }
       var undone = false;
       var expired = false;          // n4-06: past the window the marks are gone; Undo must not bring back a bare block
       // Splice `removed` back in at its old index, replacing the pristine
@@ -401,9 +415,10 @@ export function JournalEditorScreen(props) {
       };
       var restore = function() {
         if (expired) return;
-        undone = true;               // both paths: the deferred media delete stays skipped
         hideToast('vot-toast-undo');
-        if (mountedRef.current) { setBlocks(withRestored); scheduleSave(); return; }
+        // `undone` only when the block is really back: it skips the deferred
+        // media delete and mark purge, which must still run when nothing was.
+        if (mountedRef.current) { undone = true; setBlocks(withRestored); scheduleSave(); return; }
         // TWO PATHS because the toast outlives the screen BY DESIGN: the
         // reader may tap Done/Home/Search and still reach for Undo over the
         // next screen. This editor is gone, so setBlocks would be a silent
@@ -413,8 +428,22 @@ export function JournalEditorScreen(props) {
         // pre-delete snapshot so nothing written since is clobbered.
         var eid = entryIdRef.current;
         var cur = eid ? JournalStore.get(eid) : null;
-        if (!cur) return;            // entry deleted meanwhile — nothing to restore into
-        JournalStore.update(eid, { blocks: withRestored(cur.blocks) });
+        if (cur) { undone = true; JournalStore.update(eid, { blocks: withRestored(cur.blocks) }); return; }
+        // W16: gone because this editor's exit prune removed it (the delete left
+        // it blank): re-add it, block back in, under its own id and date. Gone
+        // any other way (deleted from the hub): nothing to restore into.
+        var pr = prunedRef.current;
+        if (!eid || !pr || pr.entry.id !== eid) return;
+        prunedRef.current = null;
+        undone = true;
+        var back = withRestored(blocksRef.current);
+        JournalStore.add(Object.assign({}, pr.entry, {
+          title: titleRef.current, blocks: back, mood: moodRef.current, updated: Date.now(),
+        }));
+        if (pr.newEntry) {           // its New-Entry stats were never recorded: the marker waits again
+          try { localStorage.setItem(JRN_NEW_ENTRY_STATS_KEY, eid); } catch (_e) { /* best-effort */ }
+          _maybeRecordNewEntryStats(eid, titleRef.current, back);
+        }
       };
       var label = removed.type === 'audio' ? 'Voice memo removed.'
         : removed.type === 'image' ? 'Image removed.' : 'Block deleted.';
@@ -463,6 +492,18 @@ export function JournalEditorScreen(props) {
           }
         }, 6500);
       }
+      // W16: the window closes (armed last, so it runs after the timers above):
+      // this Undo is dead, and once no window is open an entry the exit prune
+      // removed in one is gone for good, so its kept marks go too.
+      setTimeout(function() {
+        expired = true;
+        if (btn) btn.removeEventListener('click', restore);
+        undoOpenRef.current--;
+        var pr = prunedRef.current;
+        if (!pr || undoOpenRef.current > 0) return;
+        prunedRef.current = null;
+        try { JournalStore.purgeOrphanMarks(pr.entry.id); } catch (_e) { /* best-effort */ }
+      }, 6500);
     }, 0);
   }
   function insertBlockAt(idx, block) {

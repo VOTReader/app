@@ -209,3 +209,100 @@ describe('JournalEditorScreen - a deleted block takes its marks (n4-06)', () => 
     expect(purge).not.toHaveBeenCalled();
   });
 });
+
+/* W16 (sweep 10-13): an untitled entry whose only block was just deleted is blank,
+   so Done prunes it on exit (P1-7) while the Undo toast is still up. Undo then found
+   no entry and did nothing, and because it counted as an undo the deferred media
+   cleanup was skipped: the blob was orphaned. Now the prune keeps what Undo needs,
+   Undo re-adds the entry with its block, and past the window it goes for good. */
+describe('JournalEditorScreen - W16 Undo after Done on an entry the exit prune removed', () => {
+  function openUntitled(blocks) {
+    const entry = JournalStore.add({ title: '', blocks });
+    render(React.createElement(JournalEditorScreen, { entryId: entry.id, onBack: () => {} }));
+    return entry;
+  }
+  const tapUndo = () => act(() => { document.querySelector('#vot-toast-undo .vot-undo-btn').click(); });
+
+  it('Undo brings the pruned entry back with its block, and the block\'s media stays', () => {
+    const entry = openUntitled([{ ...JournalHelpers.newBlock('image', {}), mediaId: 'm9' }]);
+    deleteFirstBlock();
+    cleanup();                                        // Done: the now-blank entry is pruned
+    expect(JournalStore.get(entry.id)).toBeNull();
+    tapUndo();
+    const back = JournalStore.get(entry.id);
+    expect(back && back.blocks.map((b) => b.mediaId)).toEqual(['m9']);
+    expect(back.created).toBe(entry.created);
+    flushTimers(8000);
+    expect(globalThis.JournalMediaStore.delete).not.toHaveBeenCalled();
+    expect(JournalStore.get(entry.id)).not.toBeNull();
+  });
+
+  it('without Undo the entry stays gone and the media goes after the window', () => {
+    const entry = openUntitled([{ ...JournalHelpers.newBlock('image', {}), mediaId: 'm7' }]);
+    deleteFirstBlock();
+    cleanup();
+    flushTimers(8000);
+    expect(JournalStore.get(entry.id)).toBeNull();
+    expect(globalThis.JournalMediaStore.delete).toHaveBeenCalledWith('m7');
+  });
+
+  it('an Undo that finds the entry deleted from the hub restores nothing, and the media still goes', () => {
+    const entry = openEntry([
+      { ...JournalHelpers.newBlock('image', {}), mediaId: 'm8' },
+      JournalHelpers.newBlock('p', { text: 'keep' }),
+    ]);
+    deleteFirstBlock();
+    cleanup();
+    JournalStore.remove(entry.id);                    // deleted from the hub while the toast was up
+    tapUndo();
+    flushTimers(8000);
+    expect(JournalStore.get(entry.id)).toBeNull();
+    expect(globalThis.JournalMediaStore.delete).toHaveBeenCalledWith('m8');
+  });
+
+  it('the entry\'s marks wait for the window: kept on Undo, purged after it when the entry stays gone', () => {
+    const purge = vi.spyOn(JournalStore, '_purgeAssociated');
+    const entry = openUntitled([{ ...JournalHelpers.newBlock('image', {}), mediaId: 'm6' }]);
+    deleteFirstBlock();
+    cleanup();
+    expect(purge).not.toHaveBeenCalled();             // the prune kept them
+    flushTimers(8000);
+    expect(purge.mock.calls.filter((c) => c[0] === entry.id && c[1] == null)).toHaveLength(1);
+  });
+
+  it('an Undo keeps the entry\'s marks past the window', () => {
+    const purge = vi.spyOn(JournalStore, '_purgeAssociated');
+    openUntitled([{ ...JournalHelpers.newBlock('image', {}), mediaId: 'm5' }]);
+    deleteFirstBlock();
+    cleanup();
+    tapUndo();
+    flushTimers(8000);
+    expect(purge).not.toHaveBeenCalled();
+  });
+
+  it('with no Undo window open the exit prune still purges at once (P1-7 unchanged)', () => {
+    const purge = vi.spyOn(JournalStore, '_purgeAssociated');
+    const entry = openUntitled([JournalHelpers.newBlock('p', { text: '' })]);
+    cleanup();
+    expect(JournalStore.get(entry.id)).toBeNull();
+    expect(purge).toHaveBeenCalledWith(entry.id);
+  });
+
+  it('a brand-new entry brought back by Undo records its New-Entry stats once', () => {
+    globalThis.JournalStatsStore = { recordNewEntry: vi.fn(), recordDeletion: vi.fn() };
+    try {
+      const entry = JournalStore.add({ title: '', blocks: [{ ...JournalHelpers.newBlock('image', {}), mediaId: 'm4' }] });
+      localStorage.setItem('vot-journal-new-entry-stats', entry.id);   // set by the New-Entry flow
+      render(React.createElement(JournalEditorScreen, { entryId: entry.id, onBack: () => {} }));
+      deleteFirstBlock();
+      cleanup();
+      expect(globalThis.JournalStatsStore.recordNewEntry).not.toHaveBeenCalled();
+      tapUndo();
+      flushTimers(8000);
+      expect(globalThis.JournalStatsStore.recordNewEntry).toHaveBeenCalledTimes(1);
+      expect(localStorage.getItem('vot-journal-new-entry-stats')).toBeNull();
+    } finally {
+      delete globalThis.JournalStatsStore;
+    }
+  });
+});

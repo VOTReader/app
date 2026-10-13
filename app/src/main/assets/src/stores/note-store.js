@@ -169,14 +169,20 @@ export const NoteStore = extendStore(
       this._bump();
     },
 
+    /**
+     * Strip a deleted notebookId from every note. Not an edit (W16): the
+     * stamp moves 1 ms past the note's own (enough to win the save-time
+     * merge), so the notes list keeps each note's date and order.
+     * @param {string} notebookId
+     * @returns {void}
+     */
     pruneNotebook(notebookId) {
       if (this._shouldDefer('pruneNotebook', notebookId)) return;
       const data = this._load();
-      const ts = Date.now();
       Object.keys(data).forEach(k => {
         const ids = (data[k].notebookIds || []).filter(id => id !== notebookId);
         if (ids.length !== (data[k].notebookIds || []).length) {
-          data[k] = { ...data[k], notebookIds: ids, updated: ts };
+          data[k] = { ...data[k], notebookIds: ids, updated: (data[k].updated || data[k].created || 0) + 1 };
         }
       });
       this._save();

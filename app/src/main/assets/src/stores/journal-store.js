@@ -550,11 +550,14 @@ export var JournalStore = extendStore(
      * delete path (hub card menu, viewer) routes through remove() — it
      * cannot be bypassed.
      * @param {string} id
-     * @param {{ skipStats?: boolean }} [opts]
+     * @param {{ skipStats?: boolean, keepMarks?: boolean }} [opts]
      *   skipStats: omit the JournalStatsStore.recordDeletion() cascade.
      *   Used by the editor's blank-entry prune-on-exit — that entry's
      *   stats were never recorded (recording happens at the first
      *   non-empty save), so a decrement would under-count real entries.
+     *   keepMarks (W16): leave the entry's marks for now. The same prune
+     *   while a block delete's Undo is still on screen: an Undo re-adds the
+     *   entry, and purgeOrphanMarks takes them once the window has closed.
      * @returns {void}
      */
     remove(id, opts) {
@@ -574,7 +577,7 @@ export var JournalStore = extendStore(
       // once, on the loaded path or on queue replay, never during the overlay.
       // The local list mutation below always runs so the overlay still
       // reflects the deletion immediately for the UI.
-      if (!this._applyingPending) this._purgeAssociated(id);
+      if (!this._applyingPending && !(opts && opts.keepMarks)) this._purgeAssociated(id);
       var data = this._load();
       data.list = (data.list || []).filter(function(e) { return e.id !== id; });
       this._save();
@@ -583,6 +586,21 @@ export var JournalStore = extendStore(
         if (typeof JournalIndexStore !== 'undefined') JournalIndexStore.removeEntry(id);
         if (!(opts && opts.skipStats) && typeof JournalStatsStore !== 'undefined') JournalStatsStore.recordDeletion();
       }
+    },
+
+    /**
+     * The marks a remove(id, { keepMarks: true }) left behind (W16): purge
+     * them, unless the entry is back (an Undo re-added it). Same deferral
+     * and overlay rules as remove(): durable only on the loaded path or at
+     * replay, never during the pending overlay.
+     * @param {string} id
+     * @returns {void}
+     */
+    purgeOrphanMarks(id) {
+      if (!id) return;
+      if (this._shouldDefer('purgeOrphanMarks', id)) return;
+      if (this._applyingPending || this.get(id)) return;
+      this._purgeAssociated(id);
     },
 
     /**
@@ -622,7 +640,10 @@ export var JournalStore = extendStore(
 
     /**
      * Strip a deleted notebookId from every entry that referenced it.
-     * Symmetric with NoteStore.pruneNotebook.
+     * Symmetric with NoteStore.pruneNotebook. Not an edit (W16): like a pin
+     * (update's keepDate) the stamp moves 1 ms past the entry's own, so a
+     * year-old entry keeps its date and place in the hub and the change
+     * still wins the save-time merge.
      * @param {string} notebookId
      * @returns {void}
      */
@@ -637,7 +658,7 @@ export var JournalStore = extendStore(
         if (!e.notebookIds || !e.notebookIds.length) continue;
         var before = e.notebookIds.length;
         e.notebookIds = e.notebookIds.filter(function(n) { return n !== notebookId; });
-        if (e.notebookIds.length !== before) { e.updated = Date.now(); changed = true; }
+        if (e.notebookIds.length !== before) { e.updated = (e.updated || e.created || 0) + 1; changed = true; }
       }
       if (changed) { this._save(); this._bump(); }
     },
