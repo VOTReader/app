@@ -28,7 +28,7 @@
      - The journal editor screen — render tree, stays in ui/screens/.
 
    PARAMS:
-     setJournalEntryId   App() useState setter. Tells the editor which
+     setJournalEntryId   tabField setter (W40). Tells the editor which
                          entry to render.
      setScreen           Nav setter. Routes to 'journal-editor'.
 

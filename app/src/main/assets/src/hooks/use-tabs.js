@@ -83,6 +83,7 @@ import { AboutSeenFlagStore } from '../stores/app-flag-stores.js';
  * @property {string | null} letterId
  * @property {string | null} studyId
  * @property {string | null} studyChapterId
+ * @property {string | null} journalEntryId
  * @property {boolean} fromStudies
  * @property {string | null} genreId
  * @property {string | null} audioColKey
@@ -112,6 +113,9 @@ export const DEFAULT_TAB = {
   screen: 'home',
   bookId: null, chapterNum: null, letterId: null,
   studyId: null, studyChapterId: null,
+  // The journal entry the tab's viewer/editor shows (W40: it was one app-wide
+  // value, so tab A's journal viewer showed the entry opened in tab B).
+  journalEntryId: null,
   fromStudies: false, genreId: null,
   audioColKey: null,
   mode: 'pdf', showStudy: true,

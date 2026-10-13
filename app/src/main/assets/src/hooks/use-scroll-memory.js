@@ -35,7 +35,7 @@
      screen, bookId, chapterNum, letterId, studyId, studyChapterId
                      — current navigation state (useTabs via tabField);
                        used as effect deps and passed to getScrollKey.
-     journalEntryId  — App()-local journal nav state; keys the journal
+     journalEntryId  — the tab's journal entry (tabField, W40); keys the journal
                        viewer/editor scroll slots PER-ENTRY (and re-fires
                        the restore effect on entry→entry nav).
      activeTab       — active-tab object (useTabs); scrollPositions are

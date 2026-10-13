@@ -145,8 +145,8 @@ export function describeTab(tab) {
   // Titles match the screens' own H1s (Journal, Notes, Links, Bookmarks,
   // Highlights & Underlines, Library, Progress: the shared personal-study
   // header's words since 2026-09-25, which dropped the "My"). All are
-  // corpus-independent → resolved:true (journalEntryId is App-global, not
-  // tab state, so viewer/editor get an honest generic 'Journal Entry').
+  // corpus-independent → resolved:true (viewer/editor keep the generic
+  // 'Journal Entry'; a reload reopens them on the Journal hub anyway).
   if (s === 'journal-home') return { title: 'Journal', subtitle: 'Journal entries', resolved: true };
   if (s === 'journal-viewer') return { title: 'Journal Entry', subtitle: 'Journal', resolved: true };
   if (s === 'journal-editor') return { title: 'Journal Entry', subtitle: 'Editing · Journal', resolved: true };

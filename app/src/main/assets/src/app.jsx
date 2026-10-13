@@ -195,8 +195,10 @@ function App() {
      (P6i). setFromLetterStack is returned because __goHome and
      handleAndroidBack (both still in App()) mutate the stack directly.
      journalEntryId is declared HERE (not at useScrollMemory below, which
-     also reads it) because it is the 7th tracked back-stack field. */
-  const [journalEntryId, setJournalEntryId] = useState(null);
+     also reads it) because it is the 7th tracked back-stack field. A tab
+     field like the other six (W40: an app-wide useState showed tab B's entry
+     in tab A's journal viewer). */
+  const [journalEntryId, setJournalEntryId] = tabField('journalEntryId');
   const {
     setFromLetterStack, pushFromLetter,
     tapThroughBack, fromLetterRef, backHint, backActive,

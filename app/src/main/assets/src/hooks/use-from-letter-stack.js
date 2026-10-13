@@ -55,8 +55,8 @@
        studyId/studyChapterId) — owned by the tabs block (P6k); received
        here as params (values for reads, setters for tapThroughBack's
        source-restore).
-     - journalEntryId — App()-local useState (NOT a tabField), the 7th
-       tracked position; same param treatment as the six above.
+     - journalEntryId — a tabField too since W40 (it was an App()-wide
+       useState), the 7th tracked position; same param treatment.
 
    PARAMS:
      tabField — the per-tab field accessor from App()'s tabs block; called
