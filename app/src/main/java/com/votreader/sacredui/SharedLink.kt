@@ -26,14 +26,26 @@ object SharedLink {
     )
     private val RANGE = Regex(":\\d+-\\d+$")
 
-    /** The public passage key a shared link carries, or null for any other address. */
-    fun keyOf(url: String?): String? {
+    /**
+     * W57 (sweep 2026-10-13): an address this app claims itself, the manifest's verified App Link (https, [HOST],
+     * /app or /app/...). Android hands any VIEW of one straight back to this package, so the page's own links of
+     * this shape (About's Privacy policy, /app/privacy.html) must open in the page or in a browser, never by a plain
+     * ACTION_VIEW: that looped back to onNewIntent, which found no key and showed nothing.
+     */
+    fun isAppLink(url: String?): Boolean = appLinkUri(url) != null
+
+    private fun appLinkUri(url: String?): URI? {
         if (url.isNullOrBlank()) return null
         val uri = try { URI(url) } catch (_: Exception) { return null }
         if (!"https".equals(uri.scheme, ignoreCase = true)) return null
         if (!HOST.equals(uri.host, ignoreCase = true)) return null
         val path = uri.rawPath ?: ""
-        if (path != "/app" && !path.startsWith("/app/")) return null
+        return if (path == "/app" || path.startsWith("/app/")) uri else null
+    }
+
+    /** The public passage key a shared link carries, or null for any other address. */
+    fun keyOf(url: String?): String? {
+        val uri = appLinkUri(url) ?: return null
         val raw = uri.rawQuery ?: return null
         val p = raw.split('&').firstOrNull { it.startsWith("p=") }?.substring(2) ?: return null
         val key = try { URLDecoder.decode(p, "UTF-8") } catch (_: Exception) { return null }.replace(RANGE, "")

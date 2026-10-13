@@ -43,6 +43,24 @@ class SharedLinkTest {
     }
 
     @Test
+    fun `W57 - every address the manifest claims is an app link, shared or not`() {
+        for (url in listOf(
+            "https://votreader.github.io/app/privacy.html",                       // About's Privacy policy link
+            "https://votreader.github.io/app/",
+            "https://votreader.github.io/app",
+            "https://VOTReader.github.io/app/?p=bible:john:3:16",
+        )) assertTrue(SharedLink.isAppLink(url), "claimed by the manifest: $url")
+        for (url in listOf(
+            null, "", "not a url",
+            "http://votreader.github.io/app/privacy.html",
+            "https://votreader.github.io/songs/",
+            "https://votreader.github.io/appx/",
+            "https://votreader.github.io.evil.example/app/",
+            "https://www.openbible.info/labs/cross-references/",
+        )) assertFalse(SharedLink.isAppLink(url), "not ours to claim: $url")
+    }
+
+    @Test
     fun `the boot URL carries the key the way the page reads it`() {
         assertEquals("https://appassets.androidplatform.net/assets/index.html?p=bible%3Ajohn%3A3%3A16",
             SharedLink.bootUrl("bible:john:3:16"))
