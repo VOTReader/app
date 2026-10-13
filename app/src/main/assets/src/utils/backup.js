@@ -23,6 +23,7 @@
 
 import { validateV3MediaMetadata } from './import-validators.js';
 import { backupWarn } from './backup-warn.js';
+import { BACKUP_LOCK } from './backup-lock.js';
 
 /**
  * @typedef {{ store: any, method: string }} ExportableEntry
@@ -608,7 +609,7 @@ export function verifyImportCounts(manifest, mediaApplied) {
  * @typedef {Object} ApplyImportCtx
  * @property {StoresMap} storesMap
  * @property {FlagMap}   flagMap
- * @property {{ allIds(): Promise<string[]>, delete(id: string): Promise<any>, put(rec: any): Promise<any>, beginImportReplace(): Promise<any>, stageImportRecord(rec: any): Promise<any>, commitImportReplace(): Promise<any>, commitImportMerge(): Promise<any>, abortImportReplace(): Promise<any> }} mediaStore
+ * @property {{ allIds(): Promise<string[]>, delete(id: string): Promise<any>, put(rec: any): Promise<any>, beginImportReplace(): Promise<any>, stageImportRecord(rec: any): Promise<any>, commitImportReplace(expected?: number): Promise<any>, commitImportMerge(): Promise<any>, abortImportReplace(): Promise<any> }} mediaStore
  * @property {(name: string, payload: any) => string[]} validateStorePayload
  * @property {(id: string, record: any) => string[]} validateMediaRecord
  * @property {string[]} [dataLsKeys]
@@ -775,7 +776,7 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
 function _withImportLock(operation) {
   const locks = globalThis.navigator && globalThis.navigator.locks;
   if (!locks || typeof locks.request !== 'function') return _withUpdateHold(operation);
-  return locks.request('votreader-backup-import', { mode: 'exclusive', ifAvailable: true }, (lock) => {
+  return locks.request(BACKUP_LOCK, { mode: 'exclusive', ifAvailable: true }, (lock) => {
     if (!lock) throw new Error('another backup import is already in progress');
     return _withUpdateHold(operation);
   });
@@ -936,15 +937,24 @@ async function _applyV3Unlocked(manifest, entries, ctx) {
     && mediaApplied === expectedMedia.length
     && invalidStores.length === 0
     && !missingJournalStore;
+  let commit;
   try {
-    if (exactRestore) await mediaStore.commitImportReplace();
-    else await mediaStore.commitImportMerge();
+    if (exactRestore) commit = await mediaStore.commitImportReplace(stagedIds.size);
+    else commit = await mediaStore.commitImportMerge();
   } catch (e) {
     // Commit is a single IDB transaction — a failure rolled it back, so live
     // media is untouched. Staging cleanup is best-effort (invisible to reads).
     try { await mediaStore.abortImportReplace(); }
     catch (cleanupError) { backupWarn('media import staging cleanup failed', cleanupError); }
     throw e;
+  }
+  // W7: staging can lose records after they were staged (a second tab's boot
+  // sweep). The commit then merged instead of replacing; report what is missing.
+  const landed = commit && typeof commit.landed === 'number' ? commit.landed : mediaApplied;
+  if (landed < mediaApplied) {
+    backupWarn('media staging lost', mediaApplied - landed, 'record(s) before the commit; kept the existing media');
+    importFailures += mediaApplied - landed;
+    mediaApplied = landed;
   }
 
   // (2) Reseed the LS shim only after the media commit lands. This keeps even

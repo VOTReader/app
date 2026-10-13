@@ -789,6 +789,35 @@ describe('verifyImportCounts (BAK3)', () => {
     expect(commits).toEqual(['merge']);
     expect(res.countMismatches).toEqual(['media 1/2']);
   });
+
+  it('W7: applyV3 reports media that left staging before the commit (a second tab swept it)', async () => {
+    /** @type {any[]} */ const commits = [];
+    const media = {
+      allIds: async () => [], delete: async () => {}, put: async () => {},
+      beginImportReplace: async () => {}, stageImportRecord: async () => {},
+      // The commit found staging empty, so it kept live media and landed nothing.
+      commitImportReplace: async (/** @type {any} */ expected) => { commits.push(['replace', expected]); return { mode: 'merge', landed: 0 }; },
+      commitImportMerge: async () => { commits.push(['merge']); return { mode: 'merge', landed: 0 }; },
+      abortImportReplace: async () => {},
+    };
+    async function* twoFrames() {
+      yield { id: 'm1', meta: { type: 'image', mime: 'image/png', size: 3 }, blob: new Uint8Array([1, 2, 3]) };
+      yield { id: 'm2', meta: { type: 'audio', mime: 'audio/webm', size: 4 }, blob: new Uint8Array([1, 2, 3, 4]) };
+    }
+    const res = await applyV3(
+      {
+        app: 'VOTReader', exportVersion: 3, data: {}, counts: { _media: 2 }, stores: {},
+        media: [
+          { id: 'm1', type: 'image', mime: 'image/png', size: 3 },
+          { id: 'm2', type: 'audio', mime: 'audio/webm', size: 4 },
+        ],
+      },
+      twoFrames(),
+      { storesMap: {}, flagMap: {}, mediaStore: media, validateStorePayload: () => [] },
+    );
+    expect(commits).toEqual([['replace', 2]]);
+    expect(res.countMismatches).toEqual(['media 0/2']);
+  });
 });
 
 /* ─────────────────────────────────────────────────────────────────────
