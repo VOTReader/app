@@ -36,6 +36,8 @@ for (const k of Object.keys(process.env)) {
 import { cleanup } from '@testing-library/react';
 import { modalRegistry, useModalRegistry } from './app/src/main/assets/src/hooks/use-modal-registry.js';
 import { useFocusTrap } from './app/src/main/assets/src/hooks/use-focus-trap.js';
+import { useUpdateHold } from './app/src/main/assets/src/hooks/use-update-hold.js';
+import { holdUpdateReload } from './app/src/main/assets/src/utils/update-hold.js';
 import { useReadTracker } from './app/src/main/assets/src/hooks/use-read-tracker.js';
 import { useRailMode } from './app/src/main/assets/src/hooks/use-rail-mode.js';
 import { suppressNextHistoryPush, clearSuppressNextHistoryPush } from './app/src/main/assets/src/hooks/use-history-sync.js';
@@ -63,6 +65,9 @@ globalThis.modalRegistry = modalRegistry;
 // (1c) [13] — useFocusTrap as a global, same free-variable reality for
 //      every trapped sheet/dialog (NoteSheet, pickers, TabActionSheet…).
 globalThis.useFocusTrap = useFocusTrap;
+// (1c') ds2 — the app-update hold, the same free globals bundle-b hands the sheets and backup.js.
+globalThis.useUpdateHold = useUpdateHold;
+globalThis.holdUpdateReload = holdUpdateReload;
 // (1d) SheetHandle — the shared grabber/close module every bottom sheet
 //      renders as a free variable (same production reality as above).
 globalThis.SheetHandle = SheetHandle;

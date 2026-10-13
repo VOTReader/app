@@ -49,3 +49,4 @@ declare const useTapThrough: any;
 declare const useThumbnails: any;
 declare const useTour: any;
 declare const useTranslationLoader: any;
+declare const useUpdateHold: any;

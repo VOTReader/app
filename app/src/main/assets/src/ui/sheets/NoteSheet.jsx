@@ -54,6 +54,8 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
   // backdrop — a bare setNoteSheetTarget(null) used to strand a fresh
   // never-saved note group ("Save" looked cosmetic; owner-reported).
   useModalRegistry({ id: 'note-sheet', dismiss: () => requestClose() });
+  // ds2: the text being typed lives only here, so an app update waits until the edit ends.
+  useUpdateHold(mode === 'edit', 'note');
   // [13] focus trap — Tab stays inside the sheet (mounted = open).
   const trapRef = useFocusTrap(true);
 

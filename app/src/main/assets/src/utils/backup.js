@@ -774,11 +774,25 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
  */
 function _withImportLock(operation) {
   const locks = globalThis.navigator && globalThis.navigator.locks;
-  if (!locks || typeof locks.request !== 'function') return operation();
+  if (!locks || typeof locks.request !== 'function') return _withUpdateHold(operation);
   return locks.request('votreader-backup-import', { mode: 'exclusive', ifAvailable: true }, (lock) => {
     if (!lock) throw new Error('another backup import is already in progress');
-    return operation();
+    return _withUpdateHold(operation);
   });
+}
+
+/**
+ * ds2: an app-update reload mid-apply aborts an import, or leaves the media replaced
+ * and the stores still old; it waits until the operation settles (utils/update-hold.js,
+ * a bundle-b global; absent in a bare test, where there is no reload to hold).
+ * @template T
+ * @param {() => Promise<T>} operation
+ * @returns {Promise<T>}
+ */
+async function _withUpdateHold(operation) {
+  const hold = /** @type {any} */ (globalThis).holdUpdateReload;
+  const release = typeof hold === 'function' ? hold('backup') : null;
+  try { return await operation(); } finally { if (release) release(); }
 }
 
 /** Apply a legacy v1/v2 import under the same cross-tab lock as v3. */

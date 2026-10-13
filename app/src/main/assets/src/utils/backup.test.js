@@ -1802,3 +1802,18 @@ describe('formatImportSpaceWarning', () => {
     expect(formatImportSpaceWarning(5 * MB, {})).toBe('');
   });
 });
+
+/* ds2 (2026-10-13): an app-update reload mid-apply aborts an import, or leaves the media
+   replaced and the stores still old, so every backup operation holds it until it settles. */
+describe('backup operations hold the app-update reload (ds2)', () => {
+  it('holds while the operation runs, and lets go when it settles or throws', async () => {
+    const { withBackupLock } = await import('./backup.js');
+    const { updateHolds } = await import('./update-hold.js');
+    let during;
+    await withBackupLock(async () => { during = updateHolds(); });
+    expect(during).toEqual(['backup']);
+    expect(updateHolds()).toEqual([]);
+    await expect(withBackupLock(async () => { throw new Error('x'); })).rejects.toThrow('x');
+    expect(updateHolds()).toEqual([]);
+  });
+});

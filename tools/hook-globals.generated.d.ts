@@ -50,3 +50,4 @@ declare const useTapThrough: typeof import('../app/src/main/assets/src/hooks/use
 declare const useThumbnails: typeof import('../app/src/main/assets/src/hooks/use-thumbnails.js').useThumbnails;
 declare const useTour: typeof import('../app/src/main/assets/src/hooks/use-tour.js').useTour;
 declare const useTranslationLoader: typeof import('../app/src/main/assets/src/hooks/use-translation-loader.js').useTranslationLoader;
+declare const useUpdateHold: typeof import('../app/src/main/assets/src/hooks/use-update-hold.js').useUpdateHold;
