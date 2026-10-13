@@ -75,7 +75,19 @@ describe('ErrorBoundary — ERR3 custom fallback (AppShell chrome boundaries)', 
     const { container, queryByText } = render(<ErrorBoundary fallback={null}><Boom /></ErrorBoundary>);
     expect(queryByText('Something went wrong')).toBeNull(); // a crashed sheet/overlay must NOT replace the app
     expect(container.textContent).toBe('');                 // the crashed chrome subtree quietly vanishes
-    expect(sessionStorage.getItem('vot-crash-count')).toBe('1'); // componentDidCatch still ran (logged + counted)
+    expect(sessionStorage.getItem('vot-crash-count')).toBeNull(); // logged, but a quiet chrome crash is not a screen crash-loop (sweep mw12)
+  });
+
+  // Sweep mw12: the crash-loop counter was one sessionStorage count for every boundary, so a crashed sheet
+  // (fallback={null}) and then an unrelated first-time screen crash within 20 s read as 'This screen keeps failing'.
+  it('a crashed sheet does not make the next screen crash look like a loop', () => {
+    const sheet = render(<ErrorBoundary fallback={null}><Boom /></ErrorBoundary>);
+    sheet.unmount();
+    const { getByText, queryByText } = render(<ErrorBoundary><Boom /></ErrorBoundary>);
+    expect(getByText('Something went wrong')).toBeTruthy();
+    expect(queryByText('Reset to Home')).toBeNull();
+    expect(queryByText(/keeps failing/)).toBeNull();
+    expect(sessionStorage.getItem('vot-crash-count')).toBe('1');
   });
 
   it('a custom fallback element renders in place of the crashed child', () => {
@@ -94,7 +106,7 @@ describe('ErrorBoundary — ERR3 custom fallback (AppShell chrome boundaries)', 
 
 /* ERR3-ACK (Wave 0): the AppShellSheets chrome boundary passes onCatch so a
    crashed sheet acknowledges itself with a toast ("That panel hit a problem
-   and closed — your data is safe.") instead of vanishing silently mid-task.
+   and closed. Anything you saved is safe.") instead of vanishing silently mid-task.
    The mechanism is pinned here; the wiring lives in AppShellSheets.jsx. */
 describe('ErrorBoundary — ERR3-ACK onCatch callback', () => {
   it('onCatch fires once with the error while fallback={null} still renders nothing', () => {
@@ -112,7 +124,7 @@ describe('ErrorBoundary — ERR3-ACK onCatch callback', () => {
     const onCatch = () => { throw new Error('bad callback'); };
     const { container } = render(<ErrorBoundary fallback={null} onCatch={onCatch}><Boom /></ErrorBoundary>);
     expect(container.textContent).toBe('');
-    expect(sessionStorage.getItem('vot-crash-count')).toBe('1'); // still counted + logged
+    expect(sessionStorage.getItem('vot-crash-count')).toBeNull(); // logged; only full-panel boundaries count toward the loop
   });
 
   it('no onCatch — behavior is byte-identical to before (default panel path)', () => {

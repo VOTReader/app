@@ -515,7 +515,9 @@ describe('screen-routes — link-outs never overwrite the captured navOrigin (na
       expect(handoff.set).toHaveBeenCalledWith('notesReturnCtx', {
         tab: 'notebooks', drilledNbId: 'nb1', backPill: { title: 'Morning Pages' },
       });
-      expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'journal-viewer' });
+      // Sweep mw12: the hop chains the Journal hub's own origin (returnOrigin, as every sibling hop does), so
+      // after notes-index's Back consumes this one, journal-home's Back still reaches the reading place.
+      expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'journal-viewer', returnOrigin: READING_ORIGIN });
       expect(props.setScreen).toHaveBeenCalledWith('notes-index');
     } finally {
       /** @type {any} */ (window).navHandoff = prev;

@@ -96,6 +96,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
   const cardRefs = React.useRef([]); // DOM refs to each card
   const orderRef = React.useRef(order);
   React.useEffect(() => {orderRef.current = order;}, [order]);
+  const visibleIdsRef = React.useRef(/** @type {string[]} */ ([]));
 
   // Warm only the destination the reader is approaching. Offline precaching
   // remains the service worker's job; opening Home no longer executes corpora.
@@ -162,19 +163,22 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
   // land in ONE paint while the ghost glides into the target slot above the
   // hidden real tile. Tiles are keyed by ID, so the grabbed NODE persists
   // across the reorder — it is the reveal target at landing.
+  // g.idx / g.targetIdx index the VISIBLE tiles (cards, tops), while the saved order also holds a
+  // hidden History: move by id, so the dragged tile is the one that moves (sweep mw12).
   const commitDrop = (g) => {
+    const ids = visibleIdsRef.current;
     const from = g.idx;
-    const to = g.targetIdx >= 0 ? Math.min(g.targetIdx, orderRef.current.length - 1) : from;
+    const to = g.targetIdx >= 0 ? Math.min(g.targetIdx, ids.length - 1) : from;
     clearInlineTransforms();
     setDragIdx(-1);
     setPressingIdx(-1);
     const grabbedEl = g.data.el || null;
     if (grabbedEl) grabbedEl.style.opacity = "0";
     try {
-      if (to !== from && to >= 0) {
-        const newOrder = [...orderRef.current];
-        const [moved] = newOrder.splice(from, 1);
-        newOrder.splice(to, 0, moved);
+      if (to !== from && to >= 0 && ids[from] && ids[to]) {
+        const newOrder = orderRef.current.filter((id) => id !== ids[from]);
+        const at = newOrder.indexOf(ids[to]);
+        newOrder.splice(to > from ? at + 1 : at, 0, ids[from]);
         setOrder(newOrder);
         HomeOrderStore.set(newOrder);
       }
@@ -291,6 +295,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     if (item.id === "history" && historyEnabled === false) return false;
     return true;
   });
+  visibleIdsRef.current = orderedItems.map((item) => item.id);
 
   return (
     <ScreenLayout navChildren={LibraryNav({

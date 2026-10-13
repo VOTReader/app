@@ -170,6 +170,8 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
     if (missingRef.current === v) return;
     missingRef.current = v;
     setMissingState(v);
+    // The controller's Next moves on from a stop whose control is missing (sweep mw12): tell it.
+    if (typeof TourController !== 'undefined' && TourController.targetMissing) TourController.targetMissing(v);
   }, []);
   // The player bar's top edge while it is up (the docked card sits above it), else null.
   const [barTop, setBarTop] = React.useState(/** @type {number|null} */ (null));

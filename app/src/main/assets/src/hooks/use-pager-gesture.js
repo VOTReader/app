@@ -40,9 +40,13 @@
        OS dropped the stream without telling us → the gesture ends NOW with
        the commit decision its frozen position earns (drags commit — same
        policy as press-drag's pointercancel), and traces.
-     - ZOMBIE WATCHDOG: a gesture whose stream has been event-silent >2.5s
-       ends itself the same way (armed per event; a silent gesture can't
-       keep the track translated forever).
+     - ZOMBIE WATCHDOG: a gesture whose stream has been event-silent for
+       15 s ends itself the same way (armed per event; a silent gesture can't
+       keep the track translated forever). Silence alone cannot tell a lost
+       stream from a finger held perfectly still (Blink sends no touchmove for
+       a stationary touch), so it waits that long (sweep mw12: 2.5 s ended a
+       reader's held peek); a real lost stream heals sooner at the next touch,
+       through FORCE-RESET or the vanished-finger move check.
      - FORCE-RESET: a new touchstart while a leaked gesture is live resets
        the track + peeks instantly and starts clean — no wedged state can
        ever refuse the next swipe.
@@ -149,9 +153,12 @@ export function velocityFromSamples(samples) {
  *   trace?: (msg: string) => void
  * }} io
  */
-// A gesture whose stream has produced no events for this long is a zombie
-// (silently-killed touch stream — the on-device WebView failure).
+// A gesture whose stream has produced no events for this long MAY be a zombie
+// (silently-killed touch stream — the on-device WebView failure), or a finger
+// held still: the watchdog keeps checking until SWIPE_GIVEUP_MS.
 const SWIPE_SILENT_MS = 2500;
+// Silent this long, no finger is being held: the stream died. End it.
+const SWIPE_GIVEUP_MS = 15000;
 // Watchdog check delay — re-armed on every event, so when it fires the
 // gesture is guaranteed silent for its full delay.
 const SWIPE_WATCHDOG_MS = 3000;
@@ -246,6 +253,8 @@ export function createPagerGesture(io) {
       if (!s) return;
       const silent = Date.now() - s.lastEventTs;
       if (silent < SWIPE_SILENT_MS) return;
+      // A held finger sends nothing: keep watching (the next event re-arms anyway).
+      if (silent < SWIPE_GIVEUP_MS) { armWatchdog(); return; }
       endGesture('commit-decide', s.axis === 'x' ? 'zombie swipe healed (stream silent ' + silent + 'ms)' : null);
     }, SWIPE_WATCHDOG_MS);
   }

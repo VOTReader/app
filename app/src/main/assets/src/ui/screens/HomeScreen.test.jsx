@@ -12,6 +12,14 @@ import { render, cleanup, fireEvent, screen, act } from '@testing-library/react'
 import { HomeScreen } from './HomeScreen.jsx';
 import { LibraryNav } from '../components/LibraryNav.jsx';
 import { NavButtons } from '../components/NavButtons.jsx';
+
+// The press-drag lifecycle stays real (inert: no gesture is simulated); the reorder test reads the config
+// HomeScreen hands it, to drive its drop commit directly.
+const pressDrag = vi.hoisted(() => ({ cfg: null }));
+vi.mock('../../utils/press-drag.js', async (importOriginal) => {
+  const real = await importOriginal();
+  return { ...real, createPressDrag: (c) => { pressDrag.cfg = c; return real.createPressDrag(c); } };
+});
 import { ThemeBtn } from '../components/ThemeBtn.jsx';
 
 const GLOBALS = ['ScreenLayout', 'ThemeBtn', 'HomeOrderStore', 'createPressDrag', 'translationLabel', 'LibraryNav', 'NavButtons'];
@@ -139,6 +147,21 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     fireEvent.keyDown(card, { key: 'ArrowUp', altKey: true });
     expect(HomeOrderStore.set).toHaveBeenCalledWith(['scriptures', 'history', 'volumes', 'studies', 'listening', 'library', 'settings']);
     expect(document.activeElement).toBe(card);
+  });
+
+  // Sweep mw12: a drag hands commitDrop indices into the VISIBLE tiles, but it spliced the saved order (which
+  // still holds a hidden History) with them, so a different tile moved once History sat above the dragged one.
+  it('a drag reorder with History hidden moves the tile that was dragged', () => {
+    setupGlobals();
+    HomeOrderStore.get = () => ['volumes', 'history', 'scriptures', 'studies', 'listening', 'library', 'settings'];
+    HomeOrderStore.set = vi.fn();
+    renderHome({ historyEnabled: false });
+    // visible: volumes(0) scriptures(1) studies(2) listening(3) library(4) settings(5); drag Studies up to the top
+    act(() => { pressDrag.cfg.onCommit({ idx: 2, targetIdx: 0, data: {} }); });
+    expect(HomeOrderStore.set).toHaveBeenLastCalledWith(['studies', 'volumes', 'history', 'scriptures', 'listening', 'library', 'settings']);
+    // and down: Volumes (now visible 1) to the last visible slot
+    act(() => { pressDrag.cfg.onCommit({ idx: 1, targetIdx: 5, data: {} }); });
+    expect(HomeOrderStore.set).toHaveBeenLastCalledWith(['studies', 'history', 'scriptures', 'listening', 'library', 'settings', 'volumes']);
   });
 
   it('waits for every Surprise source and prevents repeated taps', async () => {

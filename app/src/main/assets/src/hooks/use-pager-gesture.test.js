@@ -392,9 +392,36 @@ describe('createPagerGesture controller', () => {
     expect(calls.commits).toEqual(['next']);
   });
 
+  // Sweep mw12: a finger held perfectly still sends no touchmove, so 3 s of silence ended a swipe the
+  // reader was still holding (peeking at the next page). The watchdog now waits; a real zombie still heals.
+  it('a finger held still past the watchdog keeps its swipe: no commit, and later moves still drive it', () => {
+    let watchdog = null;
+    const { io, calls } = makeIO({
+      schedule: (fn, ms) => { if (ms === 3000) { watchdog = fn; return 1; } fn(); return 0; },
+      cancelScheduled: () => {},
+    });
+    const nowSpy = vi.spyOn(Date, 'now');
+    nowSpy.mockReturnValue(100000);
+    const g = createPagerGesture(io);
+    const t1 = (x) => ({ identifier: 7, clientX: x, clientY: 100 });
+    g.start({ touches: [t1(300)] });
+    g.move({ touches: [t1(250)], timeStamp: 0, cancelable: true, preventDefault: () => {} });
+    g.move({ touches: [t1(120)], timeStamp: 40, cancelable: true, preventDefault: () => {} });
+    nowSpy.mockReturnValue(103100);                       // held still 3.1 s
+    const fire = watchdog; watchdog = null;
+    fire();
+    expect(calls.commits).toEqual([]);                    // the swipe is still the reader's
+    expect(typeof watchdog).toBe('function');             // and still watched
+    nowSpy.mockReturnValue(103200);
+    g.move({ touches: [t1(290)], timeStamp: 3200, cancelable: true, preventDefault: () => {} });   // drags back
+    g.end({ changedTouches: [t1(290)], touches: [] });
+    nowSpy.mockRestore();
+    expect(calls.commits).toEqual([]);                    // released near the start: no page turn
+  });
+
   it('ROBUSTNESS: the zombie watchdog heals a silent gesture with the commit decision', () => {
     // Deferred scheduler so the watchdog check is controllable; fake the
-    // gesture's clock so the check sees a >2.5s-silent stream.
+    // gesture's clock so the check sees a stream silent past the give-up time.
     /** @type {(() => void) | null} */
     let watchdog = null;
     const traces = [];
@@ -411,8 +438,13 @@ describe('createPagerGesture controller', () => {
     g.move({ touches: [t1(250)], timeStamp: 0, cancelable: true, preventDefault: () => {} });
     g.move({ touches: [t1(120)], timeStamp: 40, cancelable: true, preventDefault: () => {} });
     expect(typeof watchdog).toBe('function');
-    nowSpy.mockReturnValue(103100); // 3.1s later, no events since
-    if (watchdog) watchdog();
+    nowSpy.mockReturnValue(103100); // 3.1s later, no events since: maybe a held finger, so it waits
+    let fire = watchdog; watchdog = null;
+    if (fire) fire();
+    expect(calls.commits).toEqual([]);
+    nowSpy.mockReturnValue(115100); // 15.1s of silence: no finger is held that still; the stream died
+    fire = watchdog;
+    if (fire) fire();
     nowSpy.mockRestore();
     expect(calls.commits).toEqual(['next']); // frozen dx was past threshold
     expect(traces.some((m) => m.includes('zombie swipe healed'))).toBe(true);

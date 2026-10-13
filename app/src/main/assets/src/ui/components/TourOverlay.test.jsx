@@ -134,6 +134,17 @@ describe('TourOverlay — ring and target', () => {
     expect(screen.getByText(/could not find/i)).toBeTruthy();
   });
 
+  // Sweep mw12: the hint says 'Press Next to go on', and Next did not: it stayed and showed 'Hear it?'.
+  it('with the hint up, Next goes on to the next stop, with no after-words over nothing', async () => {
+    startAt('listen');
+    render(<TourOverlay waitMs={0} />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
+    expect(screen.getByText(/could not find/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /^Next/ }));
+    expect(TourController.getState().step.id).toBe('highlight');
+    expect(screen.queryByText(/Hear it\?/)).toBeNull();
+  });
+
   /* W58 (sweep 2026-10-13): the frame loop read `missing` from the render that started it
      (false), so its "clear the hint" never ran: a target that arrived late (a slow screen, a lazy list)
      got its ring under a card still saying it could not be found. */

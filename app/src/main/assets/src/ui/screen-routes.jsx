@@ -363,7 +363,8 @@ export function buildScreenRoutes({
     const props = {
       onSelect: nav,
       onSelectPreface: col.prefaceGlobal ? nav : undefined,
-      currentLetter: settings.showReadingDot && activeReadKey === ('vol:' + volKey) ? lastReadLetterMap[volKey] || null : null,
+      // The index marker is not the resume dot (Wave 0 note above; sweep mw12): no showReadingDot here.
+      currentLetter: activeReadKey === ('vol:' + volKey) ? (lastReadLetterMap[volKey] || null) : null,
       isRead: (id) => isRead(col.readKey, id),
       readCount: (id) => Number(readItems[getReadKey(col.readKey, id)]) || 0,
       progressKeyFor: (id) => getReadKey(col.readKey, id),
@@ -1077,7 +1078,8 @@ export function buildScreenRoutes({
           // raises the "Back to My Journal · <title>" pill so this link-out
           // returns in one tap, matching every other journal card.
           window.navHandoff.set('notesReturnCtx', { tab: 'notebooks', drilledNbId: nbId, backPill: sourceTitle ? { title: sourceTitle } : null });
-          setNavOrigin({ screen: 'journal-viewer' });
+          // returnOrigin chains the Journal hub's own origin (sweep mw12), as every sibling hop does.
+          setNavOrigin({ screen: 'journal-viewer', returnOrigin: navOrigin || null });
           setScreen('notes-index');
         }}
         onSearch={goSearch}
@@ -1508,7 +1510,7 @@ export function buildScreenRoutes({
           onSearch={goSearch}
           onHistory={goHistory}
           onSettings={goSettings}
-          currentChapter={settings.showReadingDot && activeReadKey === studyReadKey(study.slug) ? lastReadChapters[studyReadKey(study.slug)] || null : null}
+          currentChapter={chapterIndexCurrentChapter(studyReadKey(study.slug), activeReadKey, lastReadChapters)}
           isRead={(chId) => isRead(studyReadKey(study.slug), chId)}
           readCount={(chId) => Number(readItems[getReadKey(studyReadKey(study.slug), chId)]) || 0}
           markAsReadEnabled={settings.markAsRead}

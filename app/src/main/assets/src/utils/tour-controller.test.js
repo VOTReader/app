@@ -290,6 +290,47 @@ describe('TourController — a Listen stop stays, and the tour ends what it star
     expect(clicks).toHaveBeenCalledTimes(1);
   });
 
+  // Sweep mw12: with the ringed control gone the overlay says 'I could not find it on this screen. Press Next
+  // to go on.', but Next stayed, marked the stop pressed and swapped in the after-words ('Hear it?') over
+  // nothing playing; a second Next was needed. The overlay now tells the controller (targetMissing).
+  it('next() on a Listen stop the overlay could not find moves on, as the card promises', () => {
+    document.body.innerHTML = '';
+    toListen();
+    expect(TourController.getState().step.id).toBe('listen');
+    TourController.targetMissing(true);                              // the overlay waited and gave up
+    TourController.next();
+    expect(TourController.getState().step.id).toBe('highlight');
+    expect(TourController.getState().pressed).toBe(false);
+  });
+
+  it('next() on the highlight stop the overlay could not find moves on too', () => {
+    const el = pill(); el.addEventListener('click', () => {});
+    toListen(); TourController.next(); TourController.next();      // listen pressed, then on to highlight
+    expect(TourController.getState().step.id).toBe('highlight');
+    TourController.targetMissing(true);
+    TourController.next();
+    expect(TourController.getState().step.id).not.toBe('highlight');
+    expect(TourController.getState().pressed).toBe(false);
+  });
+
+  it('an early Next, before the overlay has given up on the control, still stays on the stop', () => {
+    document.body.innerHTML = '';
+    toListen();
+    TourController.next();
+    expect(TourController.getState().step.id).toBe('listen');
+    expect(TourController.getState().pressed).toBe(true);
+  });
+
+  it("the overlay's 'missing' belongs to one stop: the next stop starts with it cleared", () => {
+    document.body.innerHTML = '';
+    TourController.attachNav(nav()); TourController.start('prompt'); TourController.next();
+    TourController.targetMissing(true);
+    TourController.next();                                           // on to the Listen stop
+    expect(TourController.getState().step.id).toBe('listen');
+    TourController.next();                                           // nothing said about THIS stop yet: stays
+    expect(TourController.getState().step.id).toBe('listen');
+  });
+
   it("the reader's own tap on the ringed Listen also stays, marked pressed", () => {
     pill(); toListen();
     TourController.targetPressed();

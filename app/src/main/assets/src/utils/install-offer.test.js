@@ -15,6 +15,8 @@ const UA = {
   winEdge: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36 Edg/154.0.0.0',
   winFirefox: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0',
   facebook: 'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0 Mobile Safari/537.36 [FBAN/EMA;FBAV/400.0]',
+  // Any other app's in-app browser built on the system Android WebView: the '; wv)' token, no app name.
+  webview: 'Mozilla/5.0 (Linux; Android 14; Pixel 7 Build/UQ1A.240205.004; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/120.0.6099.230 Mobile Safari/537.36',
 };
 
 describe('installFlow', () => {
@@ -39,6 +41,8 @@ describe('installFlow', () => {
     expect(installFlow(UA.winFirefox, {})).toBeNull();
     expect(installFlow(UA.macSafari, {})).toBeNull();
     expect(installFlow(UA.facebook, { hasPrompt: true })).toBeNull();
+    // Sweep mw12: a WebView that names no app reached the Android branch and got Chrome's menu steps.
+    expect(installFlow(UA.webview, {})).toBeNull();
   });
 });
 

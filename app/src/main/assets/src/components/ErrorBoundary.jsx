@@ -63,13 +63,15 @@ export class ErrorBoundary extends React.Component {
   }
   componentDidCatch(error) {
     // Count the crash (windowed) and surface the count, then log. Both are
-    // wrapped so storage/logging can never break the boundary itself.
-    var count = _recordCrash();
-    this.setState({ crashCount: count });
+    // wrapped so storage/logging can never break the boundary itself. Only a
+    // boundary that draws the full panel counts (sweep mw12): the count is one
+    // sessionStorage slot, and a quiet chrome crash (fallback given) followed by
+    // a first screen crash read as "This screen keeps failing".
+    if (this.props.fallback === undefined) this.setState({ crashCount: _recordCrash() });
     try { DiagnosticLog.error('render', String(error)); } catch (_e) { /* swallow */ }
     // ERR3-ACK: chrome boundaries (AppShellSheets) pass onCatch so a crashed
     // sheet acknowledges itself with a toast ("That panel hit a problem and
-    // closed — your data is safe.") instead of vanishing silently mid-task.
+    // closed. Anything you saved is safe.") instead of vanishing silently mid-task.
     // Wrapped like everything else here — a broken callback must never
     // break the last line of defense.
     if (typeof this.props.onCatch === 'function') {
