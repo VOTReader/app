@@ -248,4 +248,34 @@ describe('useHistory — Hidden Manna stays out of every list (hm1)', () => {
       expect(result.current.readHistory.map((e) => e.letterId)).toEqual(['the-wide-path']);
     } finally { window.HIDDEN_MANNA = prev; }
   });
+
+  // W43 (sweep 2026-10-13): the snapshot was cached on the store's array alone, so a
+  // list built before the VOT corpus (and its Hidden Manna ids) loaded kept showing
+  // an older Hidden Manna visit after it did.
+  it('W43: drops an older Hidden Manna entry when the VOT corpus lands while the list is showing', () => {
+    const w = /** @type {any} */ (window);
+    const prevHm = w.HIDDEN_MANNA;
+    const prevCorpus = w.__votCorpus;
+    delete w.HIDDEN_MANNA;
+    const listeners = new Set();
+    let version = 0;
+    w.__votCorpus = { subscribe(cb) { listeners.add(cb); return () => { listeners.delete(cb); }; }, getVersion() { return version; } };
+    try {
+      HistoryStore._cache = /** @type {any} */ ([
+        { type: 'letter', letterId: 'woe-to-dallas', key: 'lt:woe-to-dallas', ts: 2 },
+        { type: 'letter', letterId: 'the-wide-path', key: 'lt:the-wide-path', ts: 1 },
+      ]);
+      const { result } = renderHook(() => useHistory(true));
+      expect(result.current.readHistory.map((e) => e.letterId)).toEqual(['woe-to-dallas', 'the-wide-path']); // cannot tell yet
+      act(() => {
+        w.HIDDEN_MANNA = [{ id: 'woe-to-dallas', title: 'Woe to Dallas' }];
+        version += 1;
+        listeners.forEach((cb) => cb());
+      });
+      expect(result.current.readHistory.map((e) => e.letterId)).toEqual(['the-wide-path']);
+    } finally {
+      if (prevHm === undefined) delete w.HIDDEN_MANNA; else w.HIDDEN_MANNA = prevHm;
+      if (prevCorpus === undefined) delete w.__votCorpus; else w.__votCorpus = prevCorpus;
+    }
+  });
 });
