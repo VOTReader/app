@@ -89,9 +89,10 @@ export function playBibleBook(opts) {
  * alternate rendition when the letter has one; with none named, the listener's
  * default voice (settings.letterReader) applies where this letter has a
  * reading by it. No-op when the letter has no audio; leaves state untouched
- * and toasts when offline.
+ * and toasts when offline. `noResume` starts it from the top (the desk's voice
+ * switch), as in playCollection.
  *
- * @param {{ volKey: string, letter: { id?: string, title?: string }, collectionLabel?: string, reader?: string }} opts
+ * @param {{ volKey: string, letter: { id?: string, title?: string }, collectionLabel?: string, reader?: string, noResume?: boolean }} opts
  * @returns {void}
  */
 export function playLetter(opts) {
@@ -106,7 +107,7 @@ export function playLetter(opts) {
   // harnesses) the letter still plays alone.
   const items = o.letter && o.letter.id ? _collectionItems(o.volKey, o.letter.id) : null;
   if (items && items.some((item) => item && item.id === o.letter.id)) {
-    playCollection({ volKey: o.volKey, items, collectionLabel: o.collectionLabel, startId: o.letter.id, startReader: reader });
+    playCollection({ volKey: o.volKey, items, collectionLabel: o.collectionLabel, startId: o.letter.id, startReader: reader, noResume: !!o.noResume });
     return;
   }
   const rendition = _renditionByReader(o.volKey, o.letter, o.collectionLabel, reader);
@@ -121,7 +122,7 @@ export function playLetter(opts) {
   _state.queue = queue;
   _state.qi = 0;
   _countPlay();
-  _startAt(_resumeAt);
+  if (o.noResume) _start(); else _startAt(_resumeAt);
 }
 
 /**

@@ -181,7 +181,9 @@ export function SongLyricsCard({ song, time }) {
   // frame (getPreciseTime, as the read-along does) and re-render only when the
   // line changes; paused, the page's time is exact enough.
   const playing = AudioPlayer.getState().status === 'playing';
-  const [liveLine, setLiveLine] = React.useState(-1);
+  // null = no frame reading yet; -1 is a real answer (a gap between lines) and must not fall back to the page's
+  // older time, which still names the last line for up to a second (sweep 2026-10-13).
+  const [liveLine, setLiveLine] = React.useState(/** @type {number | null} */ (null));
   React.useEffect(() => {
     if (!synced || !playing || typeof requestAnimationFrame !== 'function' || typeof AudioPlayer.getPreciseTime !== 'function') return undefined;
     let raf = 0;
@@ -191,9 +193,9 @@ export function SongLyricsCard({ song, time }) {
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => { cancelAnimationFrame(raf); setLiveLine(-1); };
+    return () => { cancelAnimationFrame(raf); setLiveLine(null); };
   }, [synced, playing, lyrics]);
-  const now = synced ? (playing && liveLine >= 0 ? liveLine : lyricLineAt(lyrics.lines, time)) : -1;
+  const now = synced ? (playing && liveLine !== null ? liveLine : lyricLineAt(lyrics.lines, time)) : -1;
   React.useEffect(() => {
     const box = boxRef.current;
     if (!box || !follow || now < 0) return;

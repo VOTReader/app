@@ -112,7 +112,7 @@ function openSheet(onClose = () => {}) {
 }
 
 const sheetEl = () => document.querySelector('.audio-manager-sheet');
-const headSub = () => document.querySelector('.audio-manager-track-copy p').textContent;
+const headSub = () => document.querySelector('.audio-manager-headline').textContent;
 const timeSpans = () => Array.from(document.querySelectorAll('.audio-manager-time span')).map((s) => s.textContent);
 /* Addressed by NAME, not by position: the Voice tool appears between Speed and
    Sleep only for a recording that has more than one, so an index would drift. */
@@ -899,10 +899,26 @@ describe('AudioManagerSheet — title jump to text (owner request 2026-08-09)', 
     const cue = jump.querySelector('.audio-manager-jump-cue');
     expect(cue).toBeTruthy();
     expect(cue.textContent.trim()).toBe('Open the reading');
-    expect(jump.querySelector('h2').textContent).not.toMatch(/Open the reading/);
-    expect(jump.querySelector('h2').textContent).toContain('A Word of Warning');
+    expect(jump.querySelector('.audio-manager-title').textContent).not.toMatch(/Open the reading/);
+    expect(jump.querySelector('.audio-manager-title').textContent).toContain('A Word of Warning');
     // The accessible name still names the action AND the reading (unchanged).
     expect(jump.getAttribute('aria-label')).toMatch(/^Open the reading — A Word of Warning/);
+  });
+
+  // Sweep 2026-10-13 (readalong low): a button holds phrasing content only; an h2 and a p inside it are invalid HTML
+  // (and a button's children are presentational, so the heading was never one). Spans keep the look and the dialog's name.
+  it('the tappable title holds no heading or paragraph, and still names the dialog', () => {
+    globalThis.COL_BY_KEY = new Map([['vol1', { letterScreen: 'vol1-letter' }]]);
+    window.__openAudioText = vi.fn();
+    startCollection();
+    emit('playing');
+    openSheet();
+    const jump = document.querySelector('.audio-manager-jump');
+    expect(jump).toBeTruthy();
+    expect(jump.querySelector('h1, h2, h3, h4, h5, h6, p, div')).toBeNull();
+    const title = document.getElementById('audio-manager-title');
+    expect(jump.contains(title)).toBe(true);
+    expect(title.textContent).toContain('A Word of Warning');
   });
 
   it('a track with no destination keeps the plain, untappable title', () => {

@@ -238,6 +238,27 @@ describe('the listening desk in song mode (final-04)', () => {
     } finally { keepSpy.mockRestore(); delete globalThis.OfflineSongsStore; SongKeep._reset(); }
   });
 
+  // Sweep 2026-10-13 (readalong low): offline, the row shows "Keeping needs a connection", but its aria-label still
+  // said "Keep … on this phone · 3 MB", so a screen reader never heard why the button was dimmed.
+  it('(K3) offline, the desk Keep row tells a screen reader it needs a connection', async () => {
+    const { SongKeep } = await import('../../utils/song-keep.js');
+    globalThis.OfflineSongsStore = { all: async () => [], get: async () => null, put: async () => {}, delete: async () => {} };
+    if (!globalThis.indexedDB) globalThis.indexedDB = {};
+    SongKeep._reset();
+    await SongKeep.ready();
+    try {
+      act(() => { AudioPlayer.playSongs({ filter: { family: 'fam-b' } }); });
+      Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+      const desk = openDesk();
+      const btn = within(desk).getByRole('button', { name: /needs a connection/ });
+      expect(btn.disabled).toBe(true);
+      expect(btn.getAttribute('aria-label')).toContain('Lead Me To That Place');
+    } finally {
+      Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => true });
+      delete globalThis.OfflineSongsStore; SongKeep._reset();
+    }
+  });
+
   it('the Versions card switches to another version from the start and keeps the queue after it', () => {
     playFamilyA();
     at(40);
@@ -296,6 +317,32 @@ describe('the listening desk in song mode (final-04)', () => {
       el().currentTime = 15.3;                       // no timeupdate yet: the page's clock still says 14
       await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
       expect(desk.querySelector('.song-lyrics-line.is-now').textContent).toBe('The door is open wide');
+    } finally {
+      globalThis.requestAnimationFrame = rafPrev;
+      globalThis.cancelAnimationFrame = cafPrev;
+    }
+  });
+
+  /* Sweep 2026-10-13 (readalong low): the per-frame clock's "between lines" (-1) fell back to the page's
+     once-a-second time, which still named the last line, so the wash lingered up to a second into a gap. */
+  it('the wash leaves a line when the frame clock reaches a gap, not a second later', async () => {
+    const rafPrev = globalThis.requestAnimationFrame;
+    const cafPrev = globalThis.cancelAnimationFrame;
+    globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(Date.now()), 16);
+    globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
+    try {
+      playFamilyA();
+      emit('playing');
+      const desk = openDesk();
+      expect(await within(desk).findByText('Come, love awaits you')).toBeTruthy();
+      at(20);
+      el().readyState = 4;
+      el().currentTime = 20;
+      await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+      expect(desk.querySelector('.song-lyrics-line.is-now').textContent).toBe('The door is open wide');
+      el().currentTime = 21.5;                       // past the last line's breath; the page's clock still says 20
+      await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+      expect(desk.querySelector('.song-lyrics-line.is-now')).toBeNull();
     } finally {
       globalThis.requestAnimationFrame = rafPrev;
       globalThis.cancelAnimationFrame = cafPrev;

@@ -227,7 +227,7 @@ export function SongKeepQuiet({ id, title = '' }) {
   } else {
     body = (
       <button type="button" className="song-keep-quiet song-desk-keep-go" disabled={!online} onClick={() => { void keep.keep(list, noteKey); }}
-        aria-label={'Keep ' + name + ' on this phone · ' + formatSongBytes(p.needBytes)}>
+        aria-label={online ? 'Keep ' + name + ' on this phone · ' + formatSongBytes(p.needBytes) : 'Keeping needs a connection · ' + name}>
         <KeepIcon /><span>{online ? 'Keep on this phone · ' + formatSongBytes(p.needBytes) : 'Keeping needs a connection'}</span>
       </button>
     );

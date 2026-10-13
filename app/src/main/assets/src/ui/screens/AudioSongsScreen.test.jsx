@@ -234,6 +234,22 @@ describe('AudioSongsScreen -- the song page (final-03)', () => {
     expect(library.toggleSongSaved).toHaveBeenCalledWith('aaaaaaaaaaa2');
   });
 
+  // Sweep 2026-10-13 (readalong low): Save said its state twice ("Saved" AND aria-pressed), so a screen reader heard
+  // "Saved, toggle button, pressed". The words carry the state; a toggle whose label changes takes no aria-pressed.
+  it('the page Save names its state in words only', () => {
+    library.isSongSaved = vi.fn(() => false);
+    renderScreen([{ k: 'hub' }, { k: 'song', v: 'fam-a' }]);
+    const save = document.querySelector('.song-page-save');
+    expect(save.textContent).toBe('Save');
+    expect(save.hasAttribute('aria-pressed')).toBe(false);
+    cleanup();
+    library.isSongSaved = vi.fn(() => true);
+    renderScreen([{ k: 'hub' }, { k: 'song', v: 'fam-a' }]);
+    const saved = document.querySelector('.song-page-save');
+    expect(saved.textContent).toBe('Saved');
+    expect(saved.hasAttribute('aria-pressed')).toBe(false);
+  });
+
   it('a row PLAYS on a tap (W-02); N versions opens its song; the page names its versions, its letter and its makers', async () => {
     const { props } = renderScreen([{ k: 'hub' }, { k: 'list', v: 'col:wtlb1' }]);
     fireEvent.click(rowOf('Come, Love Awaits You').querySelector('.songs-row-hit'));

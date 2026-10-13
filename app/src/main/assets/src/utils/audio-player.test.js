@@ -2460,6 +2460,34 @@ describe('audio-player — Media Session', () => {
     }
   });
 
+  // Sweep 2026-10-13 (readalong low): the web card's play/pause went through toggle(), so a hardware Pause key or
+  // Chrome's media hub sending 'pause' while paused STARTED playback. Same rule as the native bridge (v02-audio-02).
+  it('a web Pause while paused stays paused; a web Play while playing keeps playing', () => {
+    const session = {
+      metadata: null, handlers: {}, position: null, playbackState: 'none',
+      setActionHandler(a, h) { this.handlers[a] = h; },
+      setPositionState(state) { this.position = state; },
+    };
+    Object.defineProperty(window.navigator, 'mediaSession', { configurable: true, value: session });
+    try {
+      AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+      el().dispatchEvent(new Event('playing'));
+      session.handlers.pause();
+      expect(AudioPlayer.getState().status).toBe('paused');
+      session.handlers.pause();
+      expect(AudioPlayer.getState().status).toBe('paused');
+      expect(el().paused).toBe(true);
+      session.handlers.play();
+      expect(el().paused).toBe(false);
+      el().dispatchEvent(new Event('playing'));
+      session.handlers.play();
+      expect(AudioPlayer.getState().status).toBe('playing');
+      expect(el().paused).toBe(false);
+    } finally {
+      delete window.navigator.mediaSession;
+    }
+  });
+
   /* Desktop-PWA only in practice: the web MediaSession is inert inside the
      Android WebView (the phone reads the native card instead), so these
      handlers exist for Chrome's own media hub and hardware keys. */
@@ -3058,6 +3086,29 @@ describe('audio-player — prewarm (instant-tap pipe warming)', () => {
       volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' },
       collectionLabel: 'Volume One', reader: 'V', noResume: true,
     });
+    el().duration = 3600;
+    el().dispatchEvent(new Event('loadedmetadata'));
+
+    expect(el().currentTime).toBe(0);
+  });
+
+  // Sweep 2026-10-13 (readalong low): the desk's fallback (no collection registry) went through playLetter, which
+  // dropped noResume, so a voice with its own saved place resumed there instead of starting the letter again.
+  it('playLetter keeps noResume when the chosen voice has a saved place of its own', () => {
+    globalThis.AudioPositionsStore = {
+      getPosition: (value) => {
+        const url = typeof value === 'string' ? value : (value && value.url) || '';
+        return url === URL_OF('idA1v') ? { t: 600, d: 3600 } : null;
+      },
+      setPosition() {},
+      clearPosition() {},
+    };
+
+    AudioPlayer.playLetter({
+      volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' },
+      collectionLabel: 'Volume One', reader: 'V', noResume: true,
+    });
+    expect(el().src).toBe(URL_OF('idA1v'));
     el().duration = 3600;
     el().dispatchEvent(new Event('loadedmetadata'));
 

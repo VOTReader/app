@@ -636,7 +636,6 @@ async function pixelProof(page, label, shotDir) {
     const block = host && host.closest ? host.closest('[data-hl-key]') : null;
     const b = block ? block.getBoundingClientRect() : rect;
     if (!rect.width || !rect.height) return null;
-    r.startContainer.ownerDocument.defaultView.scrollTo;      // no-op; keep the range alive
     return {
       wash: { x: rect.x, y: rect.y, w: rect.width, h: rect.height },
       block: { x: Math.max(0, b.x - 8), y: Math.max(0, b.y - 8), w: b.width + 16, h: b.height + 16 },
