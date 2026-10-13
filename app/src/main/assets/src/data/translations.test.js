@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { translateVerse, releaseTranslationsExcept, holdTranslation, _translationLoaded, _translationPromises } from './translations.js';
+import { translateVerse, releaseTranslationsExcept, holdTranslation, isTranslationLoaded, _translationLoaded, _translationPromises } from './translations.js';
 
 beforeEach(() => {
   globalThis.BIBLE_KJV = {
@@ -316,6 +316,26 @@ describe('releaseTranslationsExcept (boot-performance-4)', () => {
     releaseTranslationsExcept('web');
     expect(loaded().sort()).toEqual(['kjv', 'rkjv', 'web']);
     letGo();
+  });
+
+  it('W25 refuter: an edition its file declares with a top-level var is still freed', () => {
+    /* bible-web.js and the rest start `var BIBLE_WEB = {...}`: a classic script's
+       global var is NON-configurable, so `delete window.BIBLE_WEB` failed quietly
+       and the sweep freed nothing but the bookkeeping. */
+    Object.defineProperty(G, 'BIBLE_VARX', { value: { john: {} }, writable: true, enumerable: true, configurable: false });
+    _translationLoaded.varx = true;
+    releaseTranslationsExcept('nkjv');
+    expect(G.BIBLE_VARX).toBeFalsy();
+    expect(_translationLoaded.varx).toBeUndefined();
+  });
+
+  it('W25 refuter: an overlay is loaded only when its base is too', () => {
+    delete G.BIBLE_KJV;
+    expect(isTranslationLoaded('rkjv')).toBe(false);      // KJV-R's misses would read NKJV
+    G.BIBLE_KJV = { john: {} };
+    expect(isTranslationLoaded('rkjv')).toBe(true);
+    expect(isTranslationLoaded('nkjv')).toBe(true);
+    expect(isTranslationLoaded('zzz')).toBe(false);
   });
 
   it('W25: two holders of one edition: it stays until both let go', () => {

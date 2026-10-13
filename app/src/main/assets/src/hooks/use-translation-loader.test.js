@@ -107,3 +107,12 @@ describe('useTranslationLoader — a late load never frees the edition picked af
     expect(tick).not.toHaveBeenCalled();
   });
 });
+
+describe('useTranslationLoader — the bundle-d helpers are absent (W25 refuter)', () => {
+  it('nothing throws: the hook waits for helpers it cannot reach', () => {
+    delete g().loadTranslation;
+    delete g().releaseTranslationsExcept;
+    expect(() => renderHook(() => useTranslationLoader('nkjv', vi.fn()))).not.toThrow();
+    expect(() => renderHook(() => useTranslationLoader('kjv', vi.fn()))).not.toThrow();
+  });
+});
