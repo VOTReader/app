@@ -3,10 +3,13 @@
    the key, and hand navigateToLink a silent jump. A key that names nothing
    leaves the reader where the app restored them. */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { openSharedPassage, installSharedPassageHook, _resetSharedPassagePark } from './use-shared-passage-link.js';
+import { renderHook } from '@testing-library/react';
+import { openSharedPassage, installSharedPassageHook, useSharedPassageLink, _resetSharedPassagePark } from './use-shared-passage-link.js';
+import { storesNotLoaded } from '../stores/cached-store.js';
 import { StateStore } from '../stores/state-store.js';
 
 // The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
+vi.mock('../stores/cached-store.js', async (importOriginal) => ({ ...(/** @type {any} */ (await importOriginal())), storesNotLoaded: vi.fn(() => []) }));
 vi.mock('../utils/toast.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get showToast() { return /** @type {any} */ (globalThis).showToast; } }; });
 
 function fakeWin(search, extra) {
@@ -165,37 +168,99 @@ describe('installSharedPassageHook (the APK, app already open)', () => {
     expect(nav).not.toHaveBeenCalled();
   });
 });
-/* W41 (sweep 2026-10-13): when vot-state loads slowly, App mounts once on defaults and
-   HydrationGate remounts it when the store lands, putting the reader back where the
-   record says. The first mount took ?p= off the address and opened it, so the link was
-   lost with that mount. Now that mount opens it (the store may never load) and parks
-   the key; the next mount opens it again; a mount over the loaded store clears it. */
-describe('openSharedPassage — W41: a mount before vot-state loads parks the key for the remount', () => {
-  afterEach(() => { vi.restoreAllMocks(); _resetSharedPassagePark(); });
+/* W41 (sweep 2026-10-13): on a slow start HydrationGate lets App in before every
+   store has loaded and remounts it as the late ones land, putting the reader back where
+   the saved record says. The first mount took ?p= off the address and opened it, so the
+   link was lost with that mount. Now the key stays parked until a FINAL mount (every
+   store loaded at its first render, so nothing replaces it) has made the jump. */
+describe('openSharedPassage — W41: the key outlives every mount that is replaced', () => {
+  afterEach(() => { vi.mocked(storesNotLoaded).mockReset(); vi.mocked(storesNotLoaded).mockReturnValue([]); });
 
-  it('opens it now, and again on the next mount though ?p= is gone; a loaded mount ends it', async () => {
+  it('a replaced mount opens it, every later mount opens it again, a final mount settles it', async () => {
     /** @type {any} */ (globalThis).BOOKS = JOHN;
-    const gs = vi.spyOn(StateStore, 'getState').mockReturnValue('pending');
     const nav1 = vi.fn();
     const a = fakeWin('?p=bible%3Ajohn%3A3%3A16', { __loadBibleCorpus: () => Promise.resolve() });
-    expect(openSharedPassage(a.win, nav1)).toBe('bible:john:3:16');
+    expect(openSharedPassage(a.win, nav1, false)).toBe('bible:john:3:16');
     expect(a.replaced).toHaveLength(1);                 // a reload must not replay it
-    gs.mockReturnValue('loaded');                        // the store lands: HydrationGate remounts App
-    const nav2 = vi.fn();
-    const b = fakeWin('', { __loadBibleCorpus: () => Promise.resolve() });
-    expect(openSharedPassage(b.win, nav2)).toBe('bible:john:3:16');
     await flush();
-    expect(nav1).toHaveBeenCalledTimes(1);
+    expect(nav1).toHaveBeenCalledTimes(1);              // the stores may never load: it opens now
+    const nav2 = vi.fn();                                // vot-state landed, another store has not
+    expect(openSharedPassage(fakeWin('', { __loadBibleCorpus: () => Promise.resolve() }).win, nav2, false)).toBe('bible:john:3:16');
+    await flush();
     expect(nav2).toHaveBeenCalledTimes(1);
-    expect(nav2.mock.calls[0][0]).toMatchObject({ type: 'bible', bookId: 'john', chapter: 3, verse: 16 });
-    const nav3 = vi.fn();                                // a later mount over the loaded store
-    expect(openSharedPassage(fakeWin('', {}).win, nav3)).toBeNull();
+    const nav3 = vi.fn();                                // the last store landed: the final mount
+    expect(openSharedPassage(fakeWin('', { __loadBibleCorpus: () => Promise.resolve() }).win, nav3, true)).toBe('bible:john:3:16');
+    await flush();
+    expect(nav3).toHaveBeenCalledTimes(1);
+    expect(nav3.mock.calls[0][0]).toMatchObject({ type: 'bible', bookId: 'john', chapter: 3, verse: 16 });
+    expect(openSharedPassage(fakeWin('', {}).win, vi.fn(), true)).toBeNull(); // settled: nothing left to replay
   });
 
-  it('a mount over a loaded store parks nothing', async () => {
+  it('a replaced mount whose corpus lands late never settles the key for the mount after it', async () => {
     /** @type {any} */ (globalThis).BOOKS = JOHN;
-    vi.spyOn(StateStore, 'getState').mockReturnValue('loaded');
-    openSharedPassage(fakeWin('?p=bible%3Ajohn%3A3%3A16', { __loadBibleCorpus: () => Promise.resolve() }).win, vi.fn());
-    expect(openSharedPassage(fakeWin('', {}).win, vi.fn())).toBeNull();
+    let land;
+    const slow = new Promise((r) => { land = r; });
+    openSharedPassage(fakeWin('?p=bible%3Ajohn%3A3%3A16', { __loadBibleCorpus: () => slow }).win, vi.fn(), false);
+    const nav2 = vi.fn();
+    openSharedPassage(fakeWin('', { __loadBibleCorpus: () => slow }).win, nav2, false);
+    land();
+    await flush();
+    expect(openSharedPassage(fakeWin('', { __loadBibleCorpus: () => Promise.resolve() }).win, vi.fn(), true)).toBe('bible:john:3:16');
+  });
+
+  it('a final mount on a normal boot opens it once and leaves nothing parked', async () => {
+    /** @type {any} */ (globalThis).BOOKS = JOHN;
+    const nav = vi.fn();
+    openSharedPassage(fakeWin('?p=bible%3Ajohn%3A3%3A16', { __loadBibleCorpus: () => Promise.resolve() }).win, nav, true);
+    await flush();
+    expect(nav).toHaveBeenCalledTimes(1);
+    expect(openSharedPassage(fakeWin('', {}).win, vi.fn(), true)).toBeNull();
+  });
+
+  it('a key that opens nothing is settled by a final mount too', async () => {
+    openSharedPassage(fakeWin('?p=bible%3Anotabook%3A1%3A1', { __loadBibleCorpus: () => Promise.resolve() }).win, vi.fn(), true);
+    await flush();
+    expect(openSharedPassage(fakeWin('', {}).win, vi.fn(), true)).toBeNull();
+  });
+
+  it('the APK hand-off to a mount that is then replaced is parked for the next one', async () => {
+    /** @type {any} */ (globalThis).BOOKS = JOHN;
+    const { win } = fakeWin('', { __loadBibleCorpus: () => Promise.resolve() });
+    installSharedPassageHook(win, vi.fn(), false);
+    expect(win.__votOpenSharedPassage('bible:john:3:16')).toBe(true);
+    await flush();
+    const nav2 = vi.fn();
+    expect(openSharedPassage(fakeWin('', { __loadBibleCorpus: () => Promise.resolve() }).win, nav2, true)).toBe('bible:john:3:16');
+    await flush();
+    expect(nav2).toHaveBeenCalledTimes(1);
+  });
+
+  it('useSharedPassageLink fixes "final" at the first render: a store landing before the effect still counts as replaced', async () => {
+    /** @type {any} */ (globalThis).BOOKS = JOHN;
+    // pending at the render, loaded by the time the effect runs (refuter round 1, finding 1)
+    vi.mocked(storesNotLoaded).mockReturnValueOnce([{}]).mockReturnValue([]);
+    const gs = vi.spyOn(StateStore, 'getState').mockReturnValue('loaded'); // vot-state landed before the effect
+    const realLocation = window.location.href;
+    window.history.replaceState(null, '', '/app/?p=bible%3Ajohn%3A3%3A16');
+    const realLoad = /** @type {any} */ (window).__loadBibleCorpus;
+    /** @type {any} */ (window).__loadBibleCorpus = () => Promise.resolve();
+    try {
+      const nav = vi.fn();
+      const hook = renderHook(() => useSharedPassageLink(nav));
+      await flush();
+      expect(nav).toHaveBeenCalledTimes(1);
+      expect(window.location.search).toBe('');
+      hook.unmount();
+      // HydrationGate's remount: the key is still there for it
+      const nav2 = vi.fn();
+      const hook2 = renderHook(() => useSharedPassageLink(nav2));
+      await flush();
+      expect(nav2).toHaveBeenCalledTimes(1);
+      hook2.unmount();
+    } finally {
+      /** @type {any} */ (window).__loadBibleCorpus = realLoad;
+      window.history.replaceState(null, '', realLocation);
+      gs.mockRestore();
+    }
   });
 });

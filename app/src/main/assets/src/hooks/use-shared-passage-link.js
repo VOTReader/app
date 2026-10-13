@@ -17,22 +17,38 @@
 import { sharedPassageKey, publicPassageKey } from '../utils/passage-link.js';
 import { buildSourceEndpoint } from '../utils/nav-index.js';
 import { showToast } from '../utils/toast.js';
-import { stateStoreUnloaded } from './use-persisted-state.js';
+import { storesNotLoaded } from '../stores/cached-store.js';
 
 /** @returns {any} */
 function books() { return (typeof BOOKS !== 'undefined') ? BOOKS : null; }
 
+/* W41: on a slow start HydrationGate lets App in before every store has loaded and
+   remounts it as the late ones land. A jump made by a mount that is then replaced is
+   lost with it (an App over an unloaded vot-state writes nothing at all), and the key
+   was already off the address. So the key is parked here, in module scope, which
+   outlives remounts: every mount opens a parked key (the stores may never load, so
+   the first one opens it too), and only a FINAL mount, one made with every store
+   loaded, which nothing replaces, clears the park once its jump is made or the key
+   proves to open nothing. Whether a mount is final is fixed at its first render
+   (useSharedPassageLink): a store landing before its effect runs still remounts it. */
+/** @type {string | null} */
+let _parkedSharedKey = null;
+
+/** Tests only: forget a parked key. */
+export function _resetSharedPassagePark() { _parkedSharedKey = null; }
+
 /**
  * @param {any} win   window (injected for the tests)
  * @param {(endpoint: any, meta?: any) => void} navigateToLink
+ * @param {boolean} [final]  W41: this mount is not going to be replaced (default: assume so)
  * @returns {string | null} the key it is opening, or null
  */
-export function openSharedPassage(win, navigateToLink) {
+export function openSharedPassage(win, navigateToLink, final = true) {
   const key = sharedPassageKey(win.location && win.location.search);
   if (!key) {
-    // W41: the mount after one made before vot-state loaded: the key is parked.
+    // W41: a mount after one that was replaced: the key it parked.
     const parked = _parkedSharedKey;
-    if (parked) openAndPark(win, parked, navigateToLink);
+    if (parked) openKey(win, parked, navigateToLink, final);
     return parked;
   }
   try {
@@ -40,33 +56,17 @@ export function openSharedPassage(win, navigateToLink) {
     u.searchParams.delete('p');
     win.history.replaceState(win.history.state, '', u.pathname + u.search + u.hash);
   } catch (_e) { /* an address we cannot rewrite still opens the passage */ }
-  openAndPark(win, key, navigateToLink);
+  _parkedSharedKey = key;
+  openKey(win, key, navigateToLink, final);
   return key;
 }
-
-/* W41: a mount made before vot-state loads is thrown away when it lands
-   (HydrationGate's late-load remount puts the reader back where the saved record
-   says), and with it the jump to a key it opened. Such a mount still opens the key
-   (the store may never load) and parks it here, in module scope, which outlives the
-   remount; the next mount opens it again over the restored place. A mount over the
-   loaded store opens it and clears the park. */
-/** @type {string | null} */
-let _parkedSharedKey = null;
-
-/** @param {any} win @param {string} key @param {(endpoint: any, meta?: any) => void} navigateToLink */
-function openAndPark(win, key, navigateToLink) {
-  _parkedSharedKey = stateStoreUnloaded() ? key : null;
-  openKey(win, key, navigateToLink);
-}
-
-/** Tests only: forget a parked key. */
-export function _resetSharedPassagePark() { _parkedSharedKey = null; }
 
 /**
  * Load the corpus that can resolve a public key, then jump there silently.
  * @param {any} win @param {string} key @param {(endpoint: any, meta?: any) => void} navigateToLink
+ * @param {boolean} final  W41: a final mount clears the park once the key is settled
  */
-function openKey(win, key, navigateToLink) {
+function openKey(win, key, navigateToLink, final) {
   const kind = key.split(':')[0];
   // n6-03: a first visit's first screen is the About welcome, and the corpus
   // can take seconds: say at once what is coming, and say it if it cannot.
@@ -88,6 +88,7 @@ function openKey(win, key, navigateToLink) {
     } else if (ep && ep.type !== 'study' && !ep.screen) {
       ok = false;
     }
+    if (final && _parkedSharedKey === key) _parkedSharedKey = null; // W41: settled, by a mount nothing replaces
     if (!ok) { say('That shared passage could not be found.', 4000); return; }
     navigateToLink(ep, { sourceLetterTitle: 'Shared passage', silent: true });
   };
@@ -113,12 +114,14 @@ function openKey(win, key, navigateToLink) {
  * running page here, so nothing reloads (a letter playing keeps playing).
  * True only when the key is a public passage key and is being opened.
  * @param {any} win @param {(endpoint: any, meta?: any) => void} navigateToLink
+ * @param {boolean} [final]  W41: the installing mount is not going to be replaced
  */
-export function installSharedPassageHook(win, navigateToLink) {
+export function installSharedPassageHook(win, navigateToLink, final = true) {
   win.__votOpenSharedPassage = (/** @type {unknown} */ k) => {
     const key = publicPassageKey(k);
     if (!key) return false;
-    openAndPark(win, key, navigateToLink); // W41: handed in before vot-state loaded, it outlives the remount too
+    _parkedSharedKey = key; // W41: handed to a mount that is then replaced, it outlives it too
+    openKey(win, key, navigateToLink, final);
     return true;
   };
 }
@@ -128,6 +131,14 @@ export function installSharedPassageHook(win, navigateToLink) {
  * @returns {void}
  */
 export function useSharedPassageLink(navigateToLink) {
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- once, at boot; navigateToLink never changes identity
-  React.useEffect(() => { installSharedPassageHook(window, navigateToLink); openSharedPassage(window, navigateToLink); }, []);
+  // W41: final = every store had loaded at this mount's FIRST render. Fixed then:
+  // a store that lands before the effect runs still makes HydrationGate replace it.
+  const finalRef = React.useRef(/** @type {boolean | null} */ (null));
+  if (finalRef.current === null) finalRef.current = storesNotLoaded().length === 0;
+  React.useEffect(() => {
+    const final = finalRef.current !== false;
+    installSharedPassageHook(window, navigateToLink, final);
+    openSharedPassage(window, navigateToLink, final);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, at boot; navigateToLink never changes identity
+  }, []);
 }
