@@ -59,8 +59,15 @@ remember() {   # a week of passes is plenty; older ones are pruned here
   return 0
 }
 
+# Who pushed what (nw12, 2026-10-13): one line per pushed ref for D:/Swarm/tools/main-ci-watch.py, which pages the lane
+# whose push turned main or overhaul CI red. land.sh logs its own pushes (landings.log); this catches plain git pushes
+# (half of overhaul's on 10-12/13). A dry run writes only to a log it is given.
+push_log=${VOT_PUSH_LOG:-}
+[ -z "$push_log" ] && [ -z "$VOT_PREPUSH_DRY" ] && [ -d D:/Swarm/tools/logs ] && push_log=D:/Swarm/tools/logs/pushes.log
+
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ "$local_sha" = "$ZERO" ] && continue                        # a branch delete pushes nothing
+  [ -n "$push_log" ] && echo "$(date +%Y-%m-%dT%H:%M:%S) ${SWARM_LANE:-?} $local_sha ${remote_ref#refs/heads/} pre-push" 2>/dev/null >>"$push_log"
   # the files this push changes: from the remote's tip when we have it and it is an ancestor, else every commit that
   # no remote-tracking ref holds yet (a new branch, or a remote we have not fetched)
   if [ "$remote_sha" != "$ZERO" ] && git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
