@@ -89,18 +89,28 @@ object MainActivityLogic {
      */
     const val TRIM_MEMORY_MODERATE_LEVEL = 60
 
+    /** ComponentCallbacks2.TRIM_MEMORY_BACKGROUND (a frozen platform constant == 40). */
+    const val TRIM_MEMORY_BACKGROUND_LEVEL = 40
+
+    /** Android 14 (UPSIDE_DOWN_CAKE): from here onTrimMemory sends only UI_HIDDEN(20) and BACKGROUND(40). */
+    const val SDK_TRIM_LEVELS_REDUCED = 34
+
     /**
      * Decide whether an onTrimMemory([level]) signal is severe enough to drop
-     * the WebView's in-memory resource cache. True only at TRIM_MEMORY_MODERATE
-     * (60) and above — the background LRU-midpoint / COMPLETE(80) states — so the
-     * lighter background signals (UI_HIDDEN 20, BACKGROUND 40) and every
-     * foreground RUNNING_* level (5/10/15) are left alone: clearing the cache
-     * while the app is still interactive would only cost re-fetch jank for no
-     * pressure win. Assets are local (WebViewAssetLoader) so a background drop is
-     * cheap to repopulate on the next foregrounding.
+     * the WebView's in-memory resource cache. Up to Android 13 ([sdkInt] < 34):
+     * true only at TRIM_MEMORY_MODERATE (60) and above — the background
+     * LRU-midpoint / COMPLETE(80) states — so the lighter background signals
+     * (UI_HIDDEN 20, BACKGROUND 40) and every foreground RUNNING_* level
+     * (5/10/15) are left alone: clearing the cache while the app is still
+     * interactive would only cost re-fetch jank for no pressure win.
+     * Android 14+ never sends 60 or 80 (sweep W71: the release never ran there),
+     * so BACKGROUND (40, the process joined the cached list) is the release
+     * point; UI_HIDDEN (20) still is not, so a quick app switch keeps its caches.
+     * Assets are local (WebViewAssetLoader) so a background drop is cheap to
+     * repopulate on the next foregrounding.
      */
-    fun shouldTrimWebViewCache(level: Int): Boolean =
-        level >= TRIM_MEMORY_MODERATE_LEVEL
+    fun shouldTrimWebViewCache(level: Int, sdkInt: Int): Boolean =
+        level >= if (sdkInt >= SDK_TRIM_LEVELS_REDUCED) TRIM_MEMORY_BACKGROUND_LEVEL else TRIM_MEMORY_MODERATE_LEVEL
 
     /** Source crop + final thumbnail dimensions for a screenshot capture. */
     data class ScreenshotGeometry(

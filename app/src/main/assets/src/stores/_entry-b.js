@@ -319,7 +319,7 @@ if (typeof window !== 'undefined' && !(PlatformBridge && PlatformBridge.isAndroi
 
 // ── Memory-pressure trim signal (Android onTrimMemory → JS) ─────────────
 // MainActivity.onTrimMemory calls window.__onTrimMemory on a moderate+ memory-
-// pressure signal (background LRU states). The biggest in-heap wins live on the
+// pressure signal (background LRU states; BACKGROUND on Android 14+). The biggest in-heap wins live on the
 // JS side, not in the native WebView resource cache — so purge the regenerable
 // caches here: the journal media object-URL LRU, where each entry pins a decoded
 // blob in heap, AND the Garden decoded-image cache (gap-garden-viewer-and-image-

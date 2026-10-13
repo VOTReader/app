@@ -159,36 +159,51 @@ class MainActivityLogicTest {
     }
 
     // ── shouldTrimWebViewCache ─────────────────────────────────────────
-    // Prune the WebView in-memory cache only at TRIM_MEMORY_MODERATE(60)+ —
-    // background LRU-midpoint states. Foreground RUNNING_* levels (5/10/15) and
-    // the lighter background UI_HIDDEN(20)/BACKGROUND(40) signals must NOT trim,
-    // or the user gets re-fetch jank mid-read. The 60 boundary is inclusive.
+    // Up to Android 13 (API 33): prune the WebView in-memory cache only at
+    // TRIM_MEMORY_MODERATE(60)+ — background LRU-midpoint states. Foreground
+    // RUNNING_* levels (5/10/15) and the lighter background UI_HIDDEN(20)/
+    // BACKGROUND(40) signals must NOT trim, or the user gets re-fetch jank
+    // mid-read. The 60 boundary is inclusive.
+    // Android 14+ (API 34) delivers only UI_HIDDEN(20) and BACKGROUND(40), so a
+    // 60 gate never fired there (sweep W71): BACKGROUND is the release point.
     @Test
     fun `trims at MODERATE exactly (inclusive boundary)`() {
-        assertTrue(MainActivityLogic.shouldTrimWebViewCache(60))
+        assertTrue(MainActivityLogic.shouldTrimWebViewCache(60, sdkInt = 33))
     }
 
     @Test
     fun `trims at COMPLETE (above MODERATE)`() {
-        assertTrue(MainActivityLogic.shouldTrimWebViewCache(80))
+        assertTrue(MainActivityLogic.shouldTrimWebViewCache(80, sdkInt = 33))
     }
 
     @Test
     fun `does NOT trim just below MODERATE`() {
-        assertFalse(MainActivityLogic.shouldTrimWebViewCache(59))
+        assertFalse(MainActivityLogic.shouldTrimWebViewCache(59, sdkInt = 33))
     }
 
     @Test
-    fun `does NOT trim at BACKGROUND(40) or UI_HIDDEN(20)`() {
-        assertFalse(MainActivityLogic.shouldTrimWebViewCache(40))
-        assertFalse(MainActivityLogic.shouldTrimWebViewCache(20))
+    fun `does NOT trim at BACKGROUND(40) or UI_HIDDEN(20) before Android 14`() {
+        assertFalse(MainActivityLogic.shouldTrimWebViewCache(40, sdkInt = 33))
+        assertFalse(MainActivityLogic.shouldTrimWebViewCache(20, sdkInt = 33))
     }
 
     @Test
     fun `does NOT trim on foreground RUNNING levels (5,10,15)`() {
-        assertFalse(MainActivityLogic.shouldTrimWebViewCache(5))
-        assertFalse(MainActivityLogic.shouldTrimWebViewCache(10))
-        assertFalse(MainActivityLogic.shouldTrimWebViewCache(15))
+        assertFalse(MainActivityLogic.shouldTrimWebViewCache(5, sdkInt = 33))
+        assertFalse(MainActivityLogic.shouldTrimWebViewCache(10, sdkInt = 33))
+        assertFalse(MainActivityLogic.shouldTrimWebViewCache(15, sdkInt = 33))
+    }
+
+    @Test
+    fun `Android 14+ trims at BACKGROUND(40), the strongest level it still sends`() {
+        assertTrue(MainActivityLogic.shouldTrimWebViewCache(40, sdkInt = 34))
+        assertTrue(MainActivityLogic.shouldTrimWebViewCache(40, sdkInt = 36))
+    }
+
+    @Test
+    fun `Android 14+ leaves UI_HIDDEN(20) alone (a quick app switch keeps its caches)`() {
+        assertFalse(MainActivityLogic.shouldTrimWebViewCache(20, sdkInt = 34))
+        assertFalse(MainActivityLogic.shouldTrimWebViewCache(39, sdkInt = 35))
     }
 
     @Test
