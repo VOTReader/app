@@ -261,6 +261,54 @@ describe('JournalEditorScreen — JRNL-1 drafts are kept per entry (sweep mw13)'
     } finally { delete globalThis.isStoreWriteFenced; }
   });
 
+  // Refuter r2: two hides of A in the same millisecond, the first save lands and the second
+  // fails: the first confirmation must not mark the SECOND draft (it named drafts by ts).
+  it("a confirmation of an older save never marks a newer draft of the same entry", async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1800000000000);
+    const confirm = [];
+    JournalStore.whenSaved = () => new Promise((res) => { confirm.push(res); });
+    try {
+      const a = JournalStore.add({ title: 'A', blocks: p('a body') });
+      render(<JournalEditorScreen entryId={a.id} onBack={() => {}} />);
+      fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'A one' } });
+      act(() => { window.dispatchEvent(new Event('pagehide')); });
+      fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'A two' } });
+      act(() => { window.dispatchEvent(new Event('pagehide')); });
+      await act(async () => { confirm[0](true); confirm[1](false); await Promise.resolve(); });
+      const d = JSON.parse(localStorage.getItem('vot-journal-draft')).drafts[a.id];
+      expect(d.title).toBe('A two');
+      expect(d.durable).toBeFalsy();
+    } finally { now.mockRestore(); }
+  });
+
+  // Refuter r2: a save the write fence held resolves 'unwritten' yet whenSaved says true; and
+  // the fence coming down re-saves. Neither may mark a draft durable.
+  it('a fence raised before the save is confirmed, or another write started meanwhile, leaves the draft unmarked', async () => {
+    let fence = false;
+    globalThis.isStoreWriteFenced = () => fence;
+    const confirm = [];
+    JournalStore.whenSaved = () => new Promise((res) => { confirm.push(res); });
+    try {
+      const a = JournalStore.add({ title: 'A', blocks: p('a body') });
+      const other = JournalStore.add({ title: 'O', blocks: p('o') });
+      const durable = () => !!JSON.parse(localStorage.getItem('vot-journal-draft')).drafts[a.id].durable;
+      const r = render(<JournalEditorScreen entryId={a.id} onBack={() => {}} />);
+      fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'A fenced' } });
+      act(() => { window.dispatchEvent(new Event('pagehide')); });
+      fence = true;                                   // another tab's Clear All / Import holds writes
+      await act(async () => { confirm.forEach((res) => res(true)); await Promise.resolve(); });
+      expect(durable()).toBe(false);
+      fence = false;
+      confirm.length = 0;
+      fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'A again' } });
+      act(() => { window.dispatchEvent(new Event('pagehide')); });
+      JournalStore.update(other.id, { title: 'O2' }); // a newer write starts before A's is confirmed
+      await act(async () => { confirm.forEach((res) => res(true)); await Promise.resolve(); });
+      expect(durable()).toBe(false);
+      r.unmount();
+    } finally { delete globalThis.isStoreWriteFenced; }
+  });
+
   it('over the quota the oldest other draft gives way first, and the entry on screen is kept', () => {
     JournalStore.whenSaved = () => new Promise(() => {});
     const a = JournalStore.add({ title: 'A', blocks: p('a body') });
