@@ -55,7 +55,10 @@ class Page {
   url() { return this._url; }
 }
 async function connect() {
-  const pid = sh('pidof', PKG);
+  // toybox pidof exits 1 when nothing matches and adb shell passes that through, so execFileSync throws: read it as
+  // 'not running' rather than letting a raw 'Command failed' stand in for the message below.
+  let pid = '';
+  try { pid = sh('pidof', PKG); } catch (_e) { /* no process */ }
   if (!pid) throw new Error('app not running');
   try { adb('forward', '--remove', `tcp:${PORT}`); } catch (_e) {}
   adb('forward', `tcp:${PORT}`, `localabstract:webview_devtools_remote_${pid}`);
@@ -290,7 +293,6 @@ async function setScale() {
       const overlap = !(f.card.y >= f.ring.y + f.ring.h || f.card.y + f.card.h <= f.ring.y || f.card.x >= f.ring.x + f.ring.w || f.card.x + f.card.w <= f.ring.x);
       if (overlap) fail(`${id}: the card covers the ring`);
     }
-    if (f.card && f.card.y + f.card.h > f.vw * 800 / 360 + 1 && false) fail(`${id}: card off the bottom`);
     shot(`${tag}-1${i}-${id}`);
     if (f.step !== id) fail(`${id}: the tour is at ${f.step}`);
     tapRect(f.primaryRect, `${f.primary} on ${id}`);

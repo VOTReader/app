@@ -109,8 +109,9 @@ function seedPairs(n) {
   const pairs = [];
   const nWithin = Math.round(n * 0.35), nVol = Math.round(n * 0.3), nAcross = n - nWithin - nVol;
   for (let i = 0; i < nWithin; i++) pairs.push([bibleEp(BIBLE[i]), bibleEp(BIBLE[(i + 7) % BIBLE.length])]);
-  // each within-the-Volumes pair joins two DIFFERENT collections; the across links' letter ends rotate through all four
-  for (let i = 0; i < nVol; i++) pairs.push([letterEp(VOL_KEYS[i % VOL_KEYS.length], i), letterEp(VOL_KEYS[(i + 1 + Math.floor(i / VOL_KEYS.length)) % VOL_KEYS.length], i + 2)]);
+  // each within-the-Volumes pair joins two DIFFERENT collections (the second end's offset runs 1..3, never 0 mod 4,
+  // past 12 pairs too); the across links' letter ends rotate through all four
+  for (let i = 0; i < nVol; i++) pairs.push([letterEp(VOL_KEYS[i % VOL_KEYS.length], i), letterEp(VOL_KEYS[(i + 1 + (Math.floor(i / VOL_KEYS.length) % (VOL_KEYS.length - 1))) % VOL_KEYS.length], i + 2)]);
   for (let i = 0; i < nAcross; i++) pairs.push([bibleEp(BIBLE[(i + 3) % BIBLE.length]), letterEp(VOL_KEYS[(i + 2) % VOL_KEYS.length], i + 4)]);
   return pairs;
 }
@@ -179,16 +180,20 @@ async function clearHover(page) {
   if (await page.$('.sw-tip')) note('WARN a hover card is still on screen after Escape');
 }
 
-/** The longest task while the screen redraws once: the launch classification, printed, never gated. */
-async function classify(page) {
-  const longest = await page.evaluate(async () => {
-    let max = 0;
-    const po = new PerformanceObserver((l) => { for (const e of l.getEntries()) max = Math.max(max, e.duration); });
-    po.observe({ entryTypes: ['longtask'] });
-    window.dispatchEvent(new Event('resize'));
-    await new Promise((r) => setTimeout(r, 1200));
-    po.disconnect();
-    return Math.round(max);
+/** The longest task while the screen redraws once: the launch classification, printed, never gated. The redraw
+ *  is settle()'s real frame (a zero-delta wheel over the top rail at `at`); a window 'resize' reaches nothing. */
+async function classify(page, at) {
+  await page.evaluate(() => {
+    const box = { max: 0 };
+    box.po = new PerformanceObserver((l) => { for (const e of l.getEntries()) box.max = Math.max(box.max, e.duration); });
+    box.po.observe({ entryTypes: ['longtask'] });
+    globalThis.__swClassify = box;
+  });
+  await page.mouse.move(at.x, at.y); await page.mouse.wheel({ deltaY: 0 });
+  await sleep(1200);
+  const longest = await page.evaluate(() => {
+    const box = globalThis.__swClassify; box.po.disconnect(); delete globalThis.__swClassify;
+    return Math.round(box.max);
   });
   return { longest, klass: longest >= 100 ? 'software-raster (long task >= 100 ms on a redraw)' : 'accelerated' };
 }
@@ -293,7 +298,7 @@ async function walk(page, url, fname) {
   if (placed < MIN_PLACED) fails.push(`${tag} only ${placed} of ${N_LINKS} seeded links placed on the rails (< ${MIN_PLACED}); the picture is not the 20-link picture`);
   const c = await canvasRect(page);
   const r0 = await rails(page);
-  const cls = await classify(page);
+  const cls = await classify(page, { x: c.l + c.w / 2, y: c.t + r0.topY + 12 });
   note(`${tag} launch: ${cls.klass}, longest task ${cls.longest} ms`);
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(300);
   const dark = await page.screenshot({ encoding: 'base64' });
@@ -349,7 +354,10 @@ async function walk(page, url, fname) {
     // on the plateau leg because the stroke widens 1.43 -> 1.6 px and a wider stroke has more fully-covered
     // core per anti-aliased edge - 10 % is that allowance. The old law (alpha 0.35 -> 0.68 on this leg) must
     // FAIL this gate, or the instrument cannot see the complaint: the BEFORE run is its positive control.
-    const rel = rungs['16'].litMean > 0 ? rungs.ceil.litMean / rungs['16'].litMean : 0;
+    // No ink at either rung is no measurement (the band off-frame, a hover card over it): fail it, never read 0 as flat.
+    const inked = rungs['16'].litMean > 0 && rungs.ceil.litMean > 0;
+    if (!inked) fails.push(`${tag} ladder: no ink measured at ${rungs['16'].litMean > 0 ? 'the ceiling' : '16x'} (lit-pixel mean 0); the plateau gate measured nothing`);
+    const rel = inked ? rungs.ceil.litMean / rungs['16'].litMean : 0;
     const relBand = rungs['16'].meanLum > 0 ? rungs.ceil.meanLum / rungs['16'].meanLum : 0;
     note(`${tag} ladder plateau leg 16x -> ceiling: lit-pixel mean x${rel.toFixed(3)} (the gate: the ink must not brighten; <= 1.10 allows the 1.43 -> 1.6 px width); band mean x${relBand.toFixed(3)} (information: it also counts how many strokes cross the band)`);
     if (rel > 1.10) fails.push(`${tag} ladder: the ink got BRIGHTER from 16x to the ceiling (lit-pixel mean x${rel.toFixed(3)}); the plateau is not holding`);
@@ -365,13 +373,12 @@ async function walk(page, url, fname) {
   const aLo = personalInk(z.zoom, Math.min(...CEILINGS)).context.alpha, aHi = personalInk(z.zoom, Math.max(...CEILINGS)).context.alpha;
   if (!(aHi > aLo)) { note(`${tag} corridor UNRESOLVED on this frame: at ${z.zoom}x fit the context alpha is ${aLo.toFixed(3)} under both ceilings (the law reaches ${Math.min(...CEILINGS)} only deeper); no pair, no gate here`); return; }
   note(`${tag} corridor: context alpha ${aLo.toFixed(3)} @ ${Math.min(...CEILINGS)} vs ${aHi.toFixed(3)} @ ${Math.max(...CEILINGS)} at ${z.zoom}x fit - the ceiling binds, the pair is a measurement`);
-  const rows = {}, shots = {};
+  const rows = {};
   for (const ceil of CEILINGS) {
     await page.evaluate((v) => { globalThis.__swContextCeiling = v; }, ceil);
     await settle(page, { x: c.l + c.w / 2, y: c.t + r0.topY + 12 });
     await clearHover(page);
     const b64 = await page.screenshot({ encoding: 'base64' });
-    shots[ceil] = b64;
     if (OUT) writeFileSync(resolve(OUT, `${fname}-corridor-${ceil}.png`), Buffer.from(b64, 'base64'));
     const x0 = Math.round(Math.max(0, z.band.x0) * f.dpr), x1 = Math.round(Math.min(c.w, z.band.x1) * f.dpr);
     const y0 = Math.round((c.t + r0.topY + 4) * f.dpr), y1 = Math.round((c.t + r0.topY + 44) * f.dpr);

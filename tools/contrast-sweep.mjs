@@ -10,9 +10,11 @@
  *
  * Serves its own tree on an ephemeral port (serveOwnTree), walks the same thirteen screens
  * as e2e-textzoom at 360x800, and on each one finds every rendered element whose computed
- * text colour IS the token's value, then computes its WCAG ratio against the first opaque
- * background behind it (semi-transparent layers blended in order). A ratio is only ever
- * computed from what Chrome resolved, never from a constant someone estimated.
+ * text colour IS the token's value, then computes its WCAG ratio between the text pixel and the
+ * background pixel as painted: every background layer from the element up to the root, each
+ * element's opacity applied to its own group (text at opacity 0.8 grades as the fainter ink it
+ * is; sweep mw11). Text inside a disabled control is skipped, as WCAG 1.4.3 exempts it. A ratio is
+ * only ever computed from what Chrome resolved, never from a constant someone estimated.
  *
  * Reports per screen: elements, the minimum ratio, how many small-text elements (< 18.66 px,
  * or < 24 px when not bold) sit under 4.5:1 and under 3:1. With --min it exits 1 when any
@@ -66,32 +68,45 @@ try {
     const lum = (c) => 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
     const ratio = (a, b) => { const la = lum(a), lb = lum(b); return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05); };
     const blend = (top, under) => ({ r: top.r * top.a + under.r * (1 - top.a), g: top.g * top.a + under.g * (1 - top.a), b: top.b * top.a + under.b * (1 - top.a), a: 1 });
-    // The background behind an element: walk up, blending every translucent layer, until an
-    // opaque one; the html/body ground closes it. Images and gradients are not colours and
-    // are skipped, which is the one estimate in here, named.
-    const behind = (el) => {
-      const layers = [];
+    // 'top' over 'under', both straight (non-premultiplied) alpha; the result may stay translucent.
+    const over = (top, under) => {
+      const a = top.a + under.a * (1 - top.a);
+      if (a <= 0) return { r: 0, g: 0, b: 0, a: 0 };
+      const mix = (k) => (top[k] * top.a + under[k] * under.a * (1 - top.a)) / a;
+      return { r: mix('r'), g: mix('g'), b: mix('b'), a };
+    };
+    // A pixel as painted: start from what the element draws there (its text, or nothing), then walk
+    // up: each element's own background goes under what its subtree drew, and its opacity fades that
+    // whole group before it meets its parent's. The white ground closes it. An opaque background
+    // inside a faded ancestor is not opaque to the eye, so the walk always reaches the root. Images,
+    // gradients and siblings are not followed, which is the one estimate in here, named.
+    const painted = (el, ink) => {
+      let s = ink || { r: 0, g: 0, b: 0, a: 0 };
       for (let n = el; n; n = n.parentElement) {
         const cs = getComputedStyle(n); const c = parse(cs.backgroundColor);
-        if (c && c.a > 0) { layers.push(c); if (c.a >= 1) break; }
+        if (c && c.a > 0) s = over(s, c);
+        const o = parseFloat(cs.opacity);
+        if (o < 1) s = { ...s, a: s.a * o };
       }
-      let bg = { r: 255, g: 255, b: 255, a: 1 };
-      for (let i = layers.length - 1; i >= 0; i--) bg = layers[i].a >= 1 ? layers[i] : blend(layers[i], bg);
-      return bg;
+      return blend(s, { r: 255, g: 255, b: 255, a: 1 });
     };
+    const opacityOf = (el) => { let o = 1; for (let n = el; n; n = n.parentElement) o *= parseFloat(getComputedStyle(n).opacity); return o; };
     const hasText = (el) => [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
     const rows = [];
     for (const el of document.querySelectorAll('body *')) {
       if (!hasText(el)) continue;
       const cs = getComputedStyle(el);
-      if (cs.visibility === 'hidden' || cs.display === 'none' || parseFloat(cs.opacity) === 0) continue;
+      const op = opacityOf(el);
+      if (cs.visibility === 'hidden' || cs.display === 'none' || op === 0) continue;
+      // WCAG 1.4.3 exempts an inactive control's text: a disabled button fades on purpose (Text size Reset at 0.3).
+      if (el.closest(':disabled, [aria-disabled="true"]')) continue;
       const r = el.getBoundingClientRect(); if (r.width <= 0 || r.height <= 0) continue;
       const col = parse(cs.color); if (!same(col)) continue;
-      const bg = behind(el);
+      const bg = painted(el), fg = painted(el, col);
       const size = parseFloat(cs.fontSize); const bold = parseInt(cs.fontWeight, 10) >= 700;
       const large = size >= 24 || (bold && size >= 18.66);
       const sel = el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : '');
-      rows.push({ sel, text: el.textContent.trim().replace(/\s+/g, ' ').slice(0, 28), size: Math.round(size * 10) / 10, bold, large, bg: `rgb(${Math.round(bg.r)},${Math.round(bg.g)},${Math.round(bg.b)})`, ratio: Math.round(ratio(col, bg) * 100) / 100 });
+      rows.push({ sel, text: el.textContent.trim().replace(/\s+/g, ' ').slice(0, 28), size: Math.round(size * 10) / 10, bold, large, bg: `rgb(${Math.round(bg.r)},${Math.round(bg.g)},${Math.round(bg.b)})`, ratio: Math.round(ratio(fg, bg) * 100) / 100, ...(op < 1 ? { opacity: Math.round(op * 100) / 100 } : {}) });
     }
     return { screen: name, theme: document.body.classList.contains('light') ? 'light' : 'dark', token, tokenRgb: `rgb(${target.r},${target.g},${target.b})`, rows };
   }, name, TOKEN);
@@ -140,7 +155,7 @@ for (const r of small) { const k = `${r.sel}|${r.size}|${r.bg}`; const cur = byK
 const worst = [...byKey.values()].sort((a, b) => a.ratio - b.ratio);
 console.log(`\n${THEME} ${TOKEN} = ${all.find((m) => m.tokenRgb)?.tokenRgb || 'unresolved'}: ${rows.length} text elements on ${all.length} screens; small text ${small.length}, under 4.5:1 ${small.filter((r) => r.ratio < 4.5).length}, under 3:1 ${small.filter((r) => r.ratio < 3).length}; distinct small-text sites ${byKey.size}`);
 console.log('worst distinct sites (selector, px, ratio, background, screen):');
-for (const r of worst.slice(0, 12)) console.log(`  ${r.sel.padEnd(40)} ${String(r.size).padStart(5)}px ${r.ratio.toFixed(2)}:1 on ${r.bg} ${r.screen} "${r.text}"`);
+for (const r of worst.slice(0, 12)) console.log(`  ${r.sel.padEnd(40)} ${String(r.size).padStart(5)}px ${r.ratio.toFixed(2)}:1 on ${r.bg}${r.opacity ? ` at opacity ${r.opacity}` : ''} ${r.screen} "${r.text}"`);
 if (OUT) { writeFileSync(resolve(OUT), JSON.stringify({ token: TOKEN, theme: THEME, screens: all }, null, 2) + '\n'); console.log(`wrote ${OUT}`); }
 // A gate that finds nothing has measured nothing: with --min, a token that did not resolve or a walk
 // that met zero elements in its colour is a vacuous pass and fails as such.

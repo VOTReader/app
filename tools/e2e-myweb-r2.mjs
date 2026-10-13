@@ -363,7 +363,6 @@ async function armR(page, tag, fname, c, r0, attempt) {
   // bottom rail (the Study Bible notes), the densest ink on the overview
   const band = r0.bottom.find((b) => b.label === 'Matthew');
   if (!band) { fails.push(`${tag} R: no Matthew band published`); return; }
-  const x0 = Math.max(0, band.x0 - 40), x1 = Math.min(c.w, band.x1 + 40);
   await clickIfPresent(page, 'Reset the view'); await sleep(500);
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(300);
   // THE INSTRUMENT is data-cap-fraction read every animation frame: the
