@@ -660,6 +660,7 @@ describe('PlatformBridge — Web setKeepScreenOn (WakeLock)', () => {
   afterEach(() => {
     warnSpy.mockRestore();
     delete (/** @type {any} */ (globalThis.navigator)).wakeLock;
+    delete (/** @type {any} */ (document)).visibilityState;  // back to jsdom's own getter
   });
 
   it('setKeepScreenOn(true) requests WakeLock for screen, returns void (fire-and-forget)', async () => {
@@ -765,6 +766,100 @@ describe('PlatformBridge — Web setKeepScreenOn (WakeLock)', () => {
     // Now sentinel is held; further calls early-return on "already held"
     bridge.setKeepScreenOn(true);
     expect(mockRequest).toHaveBeenCalledTimes(1);
+  });
+
+  /* W47: the browser drops the screen lock whenever the page is hidden (tab
+     switch, minimise, screen off). Nothing asked for it again, so "Keep screen
+     on" worked only until the first time the reader left the page. */
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  /** Grabs this module's own visibilitychange handler (older imports of the
+      module keep theirs on the shared document, so never dispatch the event). */
+  function visibilityHandler(/** @type {any} */ addSpy) {
+    const call = addSpy.mock.calls.find((/** @type {any[]} */ c) => c[0] === 'visibilitychange');
+    return call ? call[1] : () => {};
+  }
+  function setVisibility(/** @type {string} */ state) {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
+  }
+
+  it('takes the screen lock again when the page is shown after the browser dropped it (W47)', async () => {
+    const add = vi.spyOn(document, 'addEventListener');
+    bridge.setKeepScreenOn(true);
+    await flush();
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+    const onVisibility = visibilityHandler(add);
+
+    setVisibility('hidden');
+    mockSentinel.released = true;              // what the browser does on hide
+    onVisibility();
+    await flush();
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+
+    mockSentinel = { released: false, release: mockRelease };
+    mockRequest.mockImplementation(() => Promise.resolve(mockSentinel));
+    setVisibility('visible');
+    onVisibility();
+    await flush();
+    expect(mockRequest).toHaveBeenCalledTimes(2);
+    add.mockRestore();
+  });
+
+  it('a lock the browser announces as released counts as gone, even without a released flag', async () => {
+    const add = vi.spyOn(document, 'addEventListener');
+    /** @type {any} */ let onRelease = null;
+    const oldSentinel = { release: mockRelease, addEventListener: vi.fn((/** @type {string} */ type, /** @type {any} */ fn) => { if (type === 'release') onRelease = fn; }) };
+    mockRequest.mockImplementation(() => Promise.resolve(oldSentinel));
+    bridge.setKeepScreenOn(true);
+    await flush();
+    onRelease && onRelease();
+    setVisibility('visible');
+    visibilityHandler(add)();
+    await flush();
+    expect(mockRequest).toHaveBeenCalledTimes(2);
+    add.mockRestore();
+  });
+
+  it('does not take the lock again on return once Keep screen on is off', async () => {
+    const add = vi.spyOn(document, 'addEventListener');
+    bridge.setKeepScreenOn(true);
+    await flush();
+    bridge.setKeepScreenOn(false);
+    mockSentinel.released = true;
+    setVisibility('visible');
+    visibilityHandler(add)();
+    await flush();
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+    add.mockRestore();
+  });
+
+  it('releases a lock that arrives after Keep screen on was turned off', async () => {
+    /** @type {(value: any) => void} */ let resolveFn = () => {};
+    mockRequest.mockImplementation(() => new Promise((resolve) => { resolveFn = resolve; }));
+    bridge.setKeepScreenOn(true);
+    bridge.setKeepScreenOn(false);              // turned off while the request is pending
+    resolveFn(mockSentinel);
+    await flush();
+    expect(mockRelease).toHaveBeenCalledTimes(1);
+
+    // Turning it back on asks again rather than trusting the released lock.
+    mockSentinel = { released: false, release: mockRelease };
+    mockRequest.mockImplementation(() => Promise.resolve(mockSentinel));
+    bridge.setKeepScreenOn(true);
+    await flush();
+    expect(mockRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a lock that arrives after off-then-on while the request was pending', async () => {
+    /** @type {(value: any) => void} */ let resolveFn = () => {};
+    mockRequest.mockImplementation(() => new Promise((resolve) => { resolveFn = resolve; }));
+    bridge.setKeepScreenOn(true);
+    bridge.setKeepScreenOn(false);
+    bridge.setKeepScreenOn(true);
+    resolveFn(mockSentinel);
+    await flush();
+    expect(mockRelease).not.toHaveBeenCalled();
+    bridge.setKeepScreenOn(false);
+    expect(mockRelease).toHaveBeenCalledTimes(1);
   });
 
   it('silently no-ops when navigator.wakeLock is absent (older browsers / http://)', async () => {

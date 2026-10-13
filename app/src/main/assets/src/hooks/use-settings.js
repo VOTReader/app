@@ -297,7 +297,7 @@ export function useSettings({ savedSettings, theme }) {
     // Platform mirror — bridge owns the platform branch. Android passes
     // through to native window flags; web is a CSS-only no-op for the
     // status bar + navigator.wakeLock fire-and-forget for the screen-on
-    // flag (auto-releases on tab hide).
+    // flag (the browser drops it on tab hide; the bridge takes it again on show).
     PlatformBridge.setLightStatusBar(theme === "light");
     PlatformBridge.setKeepScreenOn(settings.keepScreenOn !== false);
   }, [theme, settings]);
