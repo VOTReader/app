@@ -403,6 +403,15 @@ export function _start(placeOf) {
       _offlineNotice(track);
       return;
     }
+    // Native already plays the recording it passed over this one for (its upcoming list skips the same way): the page
+    // takes it as it is. For a song the pause below released native at the seam and, 3 s on, loaded that song again
+    // from its top (sweep W60).
+    const el = /** @type {any} */ (_el);
+    if (el && typeof el.crossedInto === 'function' && el.crossedInto(_state.queue[ahead].url)) {
+      _state.qi = ahead;
+      _start(placeOf);
+      return;
+    }
     if (_isSong(track)) {
       // A song not kept on this phone: the bar says "Not on this phone" (paused on it), then the next kept song
       // plays (README 3.5, picture final-08). Any start or stop before then cancels the skip.

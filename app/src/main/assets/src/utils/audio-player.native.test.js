@@ -105,6 +105,39 @@ describe('audio-player on the native player (m3)', () => {
     expect(bridge.audioRelease).toHaveBeenCalled();
   });
 
+  // W62 emulator look: Listen from here moved to part 2 and then seeked, but a seek right after a load fell where the
+  // APK's player could not yet seek and was dropped: part 2 played from its top. The place rides the load now.
+  it('(W62) playAt with a place loads that recording there: native gets it as the load\'s start, no seek after', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    send({ type: 'state', url: URL_OF('idA1'), pos: 1000, dur: 60000, playing: true, want: true });
+    await flush();
+    bridge.audioSeek.mockClear();
+    AudioPlayer.playAt(1, 42.5);
+    const last = loads()[loads().length - 1];
+    expect(last.url).toBe(URL_OF('idA2'));
+    expect(last.startMs).toBe(42500);
+    expect(bridge.audioSeek).not.toHaveBeenCalled();
+    expect(AudioPlayer.getState().time).toBe(42.5);
+  });
+
+  // W62 refuter round 3: offline with only part 2 saved, a place in part 1 made the queue pass over part 1 and carry
+  // part 1's time into part 2. A place belongs to its own recording: one that cannot play is not moved to at all.
+  it('(W62) playAt with a place into a recording not on the phone offline moves nowhere: what plays goes on', async () => {
+    await downloaded(['idA2']);
+    setOnline(false);
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
+    const s0 = AudioPlayer.getState();
+    expect(s0.queue[s0.qi].url).toBe(URL_OF('idA2'));
+    send({ type: 'state', url: URL_OF('idA2'), pos: 5000, dur: 60000, playing: true, want: true });
+    await flush();
+    const n = loads().length;
+    AudioPlayer.playAt(s0.qi - 1, 30);
+    const s = AudioPlayer.getState();
+    expect(s.qi).toBe(s0.qi);
+    expect(loads()).toHaveLength(n);
+    expect(s.status).toBe('playing');
+  });
+
   it('sleep at the end of this recording empties what comes next, so native stops there', () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
     bridge.audioUpcoming.mockClear();
@@ -125,6 +158,69 @@ describe('audio-player on the native player (m3)', () => {
     expect(s.queue[s.qi].url).toBe(URL_OF('idC'));
     expect(s.status).toBe('playing');
     expect(bridge.audioLoad).toHaveBeenCalledTimes(1);   // the page skipped the same way and adopted idC
+  });
+
+  // Sweep W60: native passed over a song not on the phone into the next kept one, but the page then paused on the
+  // skipped song ("Not on this phone"), released native (silence) and 3 s later loaded the kept song from its top.
+  it('(W60) offline songs: native already in the next kept song past one not on the phone is adopted, not stopped and reloaded', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { SONG_FIXTURE } = await import('./song-catalog.fixture.js');
+      (await import('./song-catalog.js')).adoptSongCatalog(SONG_FIXTURE);
+      expect(AudioPlayer.playSongs({ filter: {} })).toBe(true);
+      const order = AudioPlayer.getState().queue.map((t) => t.url);
+      AudioPlayer.stop();
+      bridge.audioLoad.mockClear(); bridge.audioRelease.mockClear();
+      expect(order.length).toBeGreaterThanOrEqual(3);
+      bridge.offlineAudioState = () => JSON.stringify({ items: [order[0], order[2]].map((url) => ({ url, key: '', title: '', bytes: 1, savedAt: 1 })), totalBytes: 2, freeBytes: 1e9, active: null, queued: [] });
+      (await import('./offline-audio.js')).OfflineAudio.refresh();
+      setOnline(false);
+      expect(AudioPlayer.playSongs({ filter: {} })).toBe(true);
+      expect(loads()[0].url).toBe(order[0]);
+      expect(loads()[0].upcoming.map((t) => t.url)).toEqual([order[2]]);   // native passes over order[1]
+      send({ type: 'state', url: order[0], pos: 0, dur: 60000, playing: true, want: true });
+      send({ type: 'transition', from: order[0], url: order[2], seq: 1, pos: 50, dur: 40000, playing: true, want: true });
+      await Promise.resolve();
+      vi.advanceTimersByTime(3500);
+      const s = AudioPlayer.getState();
+      expect(s.queue[s.qi].url).toBe(order[2]);
+      expect(s.status).toBe('playing');
+      expect(bridge.audioRelease).not.toHaveBeenCalled();     // no silence at the seam
+      expect(bridge.audioLoad).toHaveBeenCalledTimes(1);      // no restart from the top
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // Sweep W61: after a load error the page stopped hearing native, but a headset, car or lock-screen Play makes
+  // native prepare the recording it still holds and play it: audio under a paused bar the app ignored.
+  it('(W61) after a load error, a Play native carries out itself is followed by the bar', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    send({ type: 'state', url: URL_OF('idA1'), pos: 0, dur: 60000, playing: true, want: true });
+    send({ type: 'error', url: URL_OF('idA1'), pos: 12000, dur: 60000, playing: false, want: true, code: 2001, name: 'ERROR_CODE_IO_NETWORK_CONNECTION_FAILED' });
+    await flush();
+    expect(AudioPlayer.getState().status).toBe('paused');
+    send({ type: 'state', url: URL_OF('idA1'), pos: 12000, dur: 60000, playing: false, want: true, buffering: true });
+    send({ type: 'state', url: URL_OF('idA1'), pos: 12500, dur: 60000, playing: true, want: true });
+    await flush();
+    const s = AudioPlayer.getState();
+    expect(s.status).toBe('playing');
+    expect(s.time).toBeGreaterThanOrEqual(12.5);
+    expect(bridge.audioLoad).toHaveBeenCalledTimes(1);   // native's own retry, adopted: not loaded again
+    // and the page's pause reaches native again
+    AudioPlayer.toggle();
+    expect(bridge.audioPause).toHaveBeenCalled();
+  });
+
+  it('(W61) after a load error, native\'s idle news does not wake the bar, and the bar\'s Play still reloads', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    send({ type: 'state', url: URL_OF('idA1'), pos: 0, dur: 60000, playing: true, want: true });
+    send({ type: 'error', url: URL_OF('idA1'), pos: 12000, dur: 60000, playing: false, want: true, code: 2001, name: 'x' });
+    send({ type: 'state', url: URL_OF('idA1'), pos: 12000, dur: 60000, playing: false, want: true });
+    await flush();
+    expect(AudioPlayer.getState().status).toBe('paused');
+    AudioPlayer.toggle();
+    expect(bridge.audioLoad).toHaveBeenCalledTimes(2);
   });
 
   it('offline with nothing on the phone ahead, native is told to stop at the end of this one', async () => {

@@ -196,6 +196,123 @@ describe('song-keep on the web — the offline-songs store', () => {
     expect(SongKeep.keptIds()).toEqual([A1]);
   });
 
+  /* Sweep W64 (2026-10-13): the abort covered only the fetch, so a song cancelled or removed while it was hashed,
+     stored or read back came back as kept (and on the backup's list); a remove during the store fetched it again. */
+  describe('cancelled or removed while it is being stored (sweep W64)', () => {
+    let releasePut;
+    beforeEach(() => {
+      releasePut = null;
+      store.put = vi.fn((rec) => new Promise((r) => { releasePut = () => { store.map.set(rec.id, rec); r(); }; }));
+    });
+    const storing = () => vi.waitFor(() => expect(releasePut).toBeTypeOf('function'));
+
+    it('Cancel: not kept, nothing stored, not listed, not failed', async () => {
+      await SongKeep.keep([A1]);
+      await storing();
+      SongKeep.cancel([A1]);
+      releasePut();
+      await settled();
+      expect(SongKeep.isKept(A1)).toBe(false);
+      expect(store.map.has(A1)).toBe(false);
+      expect(lib.kept).toEqual([]);
+      expect(SongKeep.statusOf(A1)).toBe('none');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('Remove all: the song on its way goes too', async () => {
+      await SongKeep.keep([A1]);
+      await storing();
+      const done = SongKeep.removeAll();
+      releasePut();
+      await done;
+      await settled();
+      expect(SongKeep.keptIds()).toEqual([]);
+      expect(store.map.size).toBe(0);
+      expect(lib.kept).toEqual([]);
+    });
+
+    it('remove: gone, and not fetched a second time', async () => {
+      await SongKeep.keep([A1]);
+      await storing();
+      const done = SongKeep.remove([A1]);
+      releasePut();
+      await done;
+      await settled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(SongKeep.isKept(A1)).toBe(false);
+      expect(store.map.has(A1)).toBe(false);
+      expect(lib.kept).toEqual([]);
+    });
+
+    // W64 refuter round 2: a keep still checking for room (before its song is queued) was out of every list a
+    // Cancel or Remove all reads, so the song started after them and came back kept.
+    it.each([
+      ['Remove all', () => SongKeep.removeAll()],
+      ['Cancel', () => SongKeep.cancel([A1])],
+      ['remove', () => SongKeep.remove([A1])],
+    ])('%s while Keep is still checking for room: nothing starts', async (_label, stop) => {
+      let roomIn = null;
+      estimate.mockImplementation(() => new Promise((r) => { roomIn = () => r({ quota: 10e9, usage: 1e6 }); }));
+      const asked = SongKeep.keep([A1]);
+      await vi.waitFor(() => expect(roomIn).toBeTypeOf('function'));
+      await stop();
+      roomIn();
+      await asked;
+      await settled();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(store.map.has(A1)).toBe(false);
+      expect(lib.kept).toEqual([]);
+      expect(SongKeep.statusOf(A1)).toBe('none');
+    });
+
+    // W64 refuter round 3: on a cold start the stored list loads late; a Remove all (or remove) before it landed read
+    // an empty kept list, and the load then brought the song back as kept.
+    it.each([
+      ['Remove all', () => SongKeep.removeAll()],
+      ['remove', () => SongKeep.remove([A1])],
+    ])('%s before the stored list has loaded takes the songs it then finds', async (_label, stop) => {
+      store.map.set(A1, { id: A1, blob: new Blob([bytes(1000)]), bytes: 1000, sha256: '', keptAt: 1 });
+      lib.kept = [A1];
+      let listIn = null;
+      // A read snapshots what is stored when it starts, as an IndexedDB getAll does.
+      store.all = vi.fn(() => { const snap = [...store.map.values()]; return new Promise((r) => { listIn = () => r(snap); }); });
+      void SongKeep.ready();
+      await vi.waitFor(() => expect(listIn).toBeTypeOf('function'));
+      const done = stop();
+      listIn();
+      await done;
+      await SongKeep.ready();   // the late load has landed
+      expect(SongKeep.keptIds()).toEqual([]);
+      expect(store.map.size).toBe(0);
+      expect(lib.kept).toEqual([]);
+    });
+
+    it('a Cancel before a later Keep of the same song does not stop that Keep', async () => {
+      SongKeep.cancel([A1]);
+      await SongKeep.keep([A1]);
+      await storing();
+      releasePut();
+      await settled();
+      expect(SongKeep.isKept(A1)).toBe(true);
+    });
+
+    it('a store read that fails after Cancel is the cancel, not a failure: the stored copy goes', async () => {
+      let rejectGet = null;
+      store.get = vi.fn(() => new Promise((_r, j) => { rejectGet = () => j(new Error('read failed')); }));
+      await SongKeep.keep([A1]);
+      await storing();
+      releasePut();
+      await vi.waitFor(() => expect(rejectGet).toBeTypeOf('function'));
+      SongKeep.cancel([A1]);
+      rejectGet();
+      await settled();
+      expect(SongKeep.statusOf(A1)).toBe('none');
+      expect(store.map.has(A1)).toBe(false);
+      expect(SongKeep.isKept(A1)).toBe(false);
+      expect(lib.kept).toEqual([]);
+    });
+  });
+
   it('one object URL alive at a time: the last is revoked when another song plays, and on release', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const made = [];

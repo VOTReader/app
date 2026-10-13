@@ -114,6 +114,22 @@ describe('native-audio - the <audio> surface', () => {
     expect(el.buffered.end(0)).toBe(30);
   });
 
+  it('runs on at the playing speed through native\'s 1 s tick gap at 2x and 3x (sweep W59)', () => {
+    const el = new NativeAudio();
+    el.src = A;
+    el.play();
+    state({ pos: 10000, dur: 600000, rate: 2, playing: true, want: true });
+    clock += 900;
+    expect(el.currentTime).toBeCloseTo(11.8);   // was 11.5: capped at 1.5 media s, the clock stood still 0.25 s a second
+    clock += 600;
+    expect(el.currentTime).toBeCloseTo(13);     // the cap is 1.5 s of wall time: 3 media s at 2x
+    clock += 5000;
+    expect(el.currentTime).toBeCloseTo(13);     // still capped: native's next word decides
+    state({ type: 'tick', pos: 20000, rate: 3, playing: true, want: true });
+    clock += 1000;
+    expect(el.currentTime).toBeCloseTo(23);     // was 21.5: trailed native by up to 1.5 s at 3x
+  });
+
   it('seeks, rates and volumes go to native once loaded; a pause fires once', async () => {
     const el = new NativeAudio();
     el.src = A;

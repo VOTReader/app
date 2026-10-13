@@ -29,10 +29,11 @@ import {
   _setLastTick,
   _setPrewarmKey,
   _start,
+  _startAt,
 } from './engine.js';
 import { _clearLoop, _clearLoopTimer, LOOP_SLACK_S } from './loop.js';
 import { _clearMediaSession, _setAudioActive, _syncMediaSessionPosition, _syncNative } from './media-session.js';
-import { _holdsOtherForm, _srcFor } from './offline.js';
+import { _holdsOtherForm, _srcFor, _unreachable } from './offline.js';
 import {
   _clearPersist,
   _persist,
@@ -278,15 +279,25 @@ export function setPlaybackRate(rate) {
  * collection source can still be rebuilt on the next app launch.
  *
  * @param {number} index
+ * @param {number} [at] seconds into that recording to start from. The place rides the load, as a resume's does: a
+ *   seek right after it fell where the APK's player cannot yet seek and was dropped, so Listen from here in another
+ *   part of a letter played that part from its top (W62, emulator look).
  * @returns {void}
  */
-export function playAt(index) {
+export function playAt(index, at) {
   if (_pendingRestore || !_state.queue.length) return;
   const nextIndex = Math.floor(Number(index));
   if (!Number.isFinite(nextIndex) || nextIndex < 0 || nextIndex >= _state.queue.length) return;
+  // A place belongs to its own recording. One not on the phone offline would be passed over (or swapped for another
+  // reading) and the place carried into a recording it is not in: no move at all, and what plays goes on (W62
+  // refuter round 3). The caller sees qi unchanged.
+  const place = Number(at);
+  const target = _state.queue[nextIndex];
+  if (place > 0 && _unreachable(target)) return;
   _rememberOutgoingPosition();   // R8 — the jumped-away-from track keeps its clock
   _state.qi = nextIndex;
-  _start();
+  if (place > 0) _startAt((/** @type {any} */ tr) => (tr === target ? place : 0));
+  else _start();
   _setLastPersistSec(-1);
   _persist();
 }

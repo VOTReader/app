@@ -193,6 +193,8 @@ async function _next() {
       },
     }));
     stored = true;
+    // Cancelled (or swept by Remove all) while its last bytes were being stored: it does not stay (sweep W63).
+    if (ctl.signal.aborted) throw new Error('cancelled');
     if (job.bytes !== total) { reason = 'short'; throw new Error('short'); }
     _items.set(it.url, { url: it.url, key: it.key, title: it.title, bytes: total, savedAt });
     await _estimate();
@@ -242,6 +244,9 @@ export const WebOfflineAudio = {
   /** @param {string} json urls, or ['*'] for every one */
   offlineAudioRemove(json) {
     const urls = _list(json);
+    // Every one: what is queued or on its way stops too, as the phone app's removeAll does, or it downloaded on and
+    // came back (sweep W63).
+    if (urls.includes('*')) WebOfflineAudio.offlineAudioCancel(JSON.stringify(['*']));
     const gone = urls.includes('*') ? [..._items.keys()] : urls.filter((u) => _items.has(u));
     if (!gone.length) return;
     for (const u of gone) _items.delete(u);

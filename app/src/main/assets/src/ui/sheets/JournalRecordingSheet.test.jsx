@@ -258,6 +258,23 @@ describe('JournalRecordingSheet pause freezes the timer', () => {
     act(() => { vi.advanceTimersByTime(2000); });
     expect(timeText()).not.toBe(atPause);
   });
+
+  // Sweep W14: a screen locked mid-memo recorded silence (Android gives a backgrounded app a silent mic) and saved
+  // it at full length. The phone now pauses the memo itself when the app leaves the screen and tells the page.
+  it('the phone paused it (the screen locked): Paused shows, the counter freezes, Resume carries on', () => {
+    render(<JournalRecordingSheet onSave={() => {}} onClose={() => {}} />);
+    act(() => { vi.advanceTimersByTime(10); });
+    act(() => { vi.advanceTimersByTime(2000); });
+    const atPause = timeText();
+    act(() => { window.__onNativeRecordingPaused(); });
+    expect(screen.getByText('Paused')).toBeTruthy();
+    expect(MockBridge.nativeRecordPause).not.toHaveBeenCalled();   // the phone paused it already
+    act(() => { vi.advanceTimersByTime(3000); });
+    expect(timeText()).toBe(atPause);
+    fireEvent.click(screen.getByLabelText('Resume'));
+    expect(MockBridge.nativeRecordResume).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Recording')).toBeTruthy();
+  });
 });
 
 describe('JournalRecordingSheet audio-session lifecycle', () => {

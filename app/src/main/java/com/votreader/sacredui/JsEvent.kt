@@ -14,6 +14,7 @@ package com.votreader.sacredui
  *   V3ImportReady         -> SettingsScreen.__onV3ImportReady("ok"|"cancelled"|"error:<reason>")
  *   MicPermissionResult   -> JournalRecordingSheet.__onMicPermissionResult(granted)
  *   NativeRecordingComplete -> JournalRecordingSheet.__onNativeRecordingComplete(b64, durMs, mime)
+ *   NativeRecordingPaused -> JournalRecordingSheet.__onNativeRecordingPaused()
  *   AnnotationTap         -> SelectionToolbar.__nativeTapAnnotation(cssX, cssY)
  *   MediaCommand          -> audio-player.__votMediaCommand(cmd, posMs)
  *   OfflineAudio          -> offline-audio.__votOfflineAudio(json)
@@ -39,6 +40,8 @@ sealed class JsEvent(val fn: String) {
 
     data object MicPermissionResult : JsEvent("__onMicPermissionResult")
     data object NativeRecordingComplete : JsEvent("__onNativeRecordingComplete")
+    // The app paused a memo itself as it left the screen (sweep W14): the sheet shows Paused, Resume carries on.
+    data object NativeRecordingPaused : JsEvent("__onNativeRecordingPaused")
 
     // A confirmed single tap on the WebView. Android WebView swallows taps
     // on selectable <mark> text (the touch is reserved for native text

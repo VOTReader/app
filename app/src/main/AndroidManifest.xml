@@ -82,11 +82,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.VotReader.Splash">
 
+        <!-- configChanges: the page holds the reader's live state (a memo recording, the player). A font size, display
+             size or language change recreated the activity, and its teardown deleted the memo (sweep W14). -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:configChanges="screenSize|orientation|keyboardHidden|smallestScreenSize|uiMode|screenLayout"
+            android:configChanges="screenSize|orientation|keyboardHidden|smallestScreenSize|uiMode|screenLayout|fontScale|density|locale|layoutDirection|keyboard|navigation"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

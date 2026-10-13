@@ -62,6 +62,13 @@ let _queue = [];
 let _active = null;
 /** @type {AbortController | null} */
 let _abort = null;
+/** The song being kept (web) was cancelled or removed: its fetch abort covers only the download (sweep W64). */
+let _halted = false;
+/** Stop stamps (W64 refuter round 2): a keep waits (the store read, the room check) before its songs are queued, out
+ *  of every list Cancel or Remove all reads; it drops a song stopped since it began. */
+let _stopSeq = 0;
+let _allStoppedAt = 0;
+const _stoppedAt = new Map();
 /** @type {Map<string, string>} id → why the last try failed (network | size | check | space) */
 const _failed = new Map();
 /** @type {Map<string, string>} a refusal, per asking surface */
@@ -322,6 +329,7 @@ function _say(key, text) {
  * @returns {Promise<{ ok: boolean, text: string }>}
  */
 async function keep(ids, key = '') {
+  const began = _stopSeq;
   const avail = availability();
   if (avail === 'ios-tab') return _say(key, IOS_TAB_TEXT + '.');
   if (avail === 'none') return _say(key, 'This browser cannot keep songs.');
@@ -344,6 +352,10 @@ async function keep(ids, key = '') {
   if (room >= 0 && need > room) {
     return _say(key, 'Not enough room: needs ' + formatSongBytes(need) + ', ' + formatSongBytes(room) + ' free.');
   }
+  // Cancelled, removed or swept by Remove all while this keep waited: those songs do not start.
+  if (_allStoppedAt > began) return _say(key, '');
+  for (let i = todo.length - 1; i >= 0; i--) if ((_stoppedAt.get(todo[i].id) || 0) > began) todo.splice(i, 1);
+  if (!todo.length) return _say(key, '');
   for (const s of todo) _failed.delete(s.id);
   if (_native()) {
     for (const s of todo) _retried.delete(s.id);
@@ -379,23 +391,39 @@ async function _keepOne(id) {
   const expected = s ? Number(s.b) : 0;
   const st = _store();
   if (!url || !(expected > 0) || expected > MAX_SONG_BYTES || !st) throw new Error('network');
+  // Cancelled or removed on its way (sweep W64): the abort reaches only the download, so after every wait the keep
+  // asks again, and a copy it already stored goes. Else it came back as kept and on the backup's list, and a remove
+  // during the store (its delete before the read-back) fetched it all again.
+  const stop = async (/** @type {boolean} */ stored) => {
+    if (stored) { try { await st.delete(id); } catch (_e) { /* gone already */ } }
+    const e = new Error('cancelled');
+    e.name = 'AbortError';
+    throw e;
+  };
   for (let attempt = 0; attempt < 2; attempt++) {
+    if (_halted) await stop(false);
     const ctl = typeof AbortController === 'function' ? new AbortController() : null;
     _abort = ctl;
     const res = await fetch(url, { credentials: 'omit', cache: 'no-store', signal: ctl ? ctl.signal : undefined });
+    if (_halted) await stop(false);
     if (!res.ok) throw new Error('network');
     const buf = await res.arrayBuffer();
+    if (_halted) await stop(false);
     if (buf.byteLength !== expected) { if (attempt) throw new Error('size'); continue; }
     const sha = await _sha256(buf);
+    if (_halted) await stop(false);
     const keptAt = Date.now();
     try {
       await st.put({ id, blob: new Blob([buf], { type: 'audio/mpeg' }), bytes: expected, sha256: sha, keptAt });
     } catch (e) {
+      if (_halted) await stop(false);
       const quota = !!(e && /** @type {any} */ (e).name === 'QuotaExceededError');
       throw new Error(quota ? 'space' : 'check');
     }
+    if (_halted) await stop(true);
     const back = await st.get(id);
     const good = !!back && back.blob.size === expected && (await _sha256(await back.blob.arrayBuffer())) === sha;
+    if (_halted) await stop(true);
     if (!good) {
       try { await st.delete(id); } catch (_e) { /* the next try overwrites it */ }
       if (attempt) throw new Error('check');
@@ -413,16 +441,21 @@ async function _pump() {
   if (_active || !_queue.length) return;
   const id = /** @type {string} */ (_queue.shift());
   _active = id;
+  _halted = false;
   _notify();
   try {
     await _keepOne(id);
     _failed.delete(id);
   } catch (e) {
-    const aborted = !!(e && /** @type {any} */ (e).name === 'AbortError');
+    // A store call or hash that rejects after a Cancel or remove skips the keep's own halt checks: it is the cancel
+    // all the same, and a copy already stored goes (W64 refuter round 1).
+    const aborted = _halted || !!(e && /** @type {any} */ (e).name === 'AbortError');
+    if (_halted) { const st = _store(); if (st) { try { await st.delete(id); } catch (_e) { /* gone already */ } } }
     if (!aborted) _failed.set(id, e && /** @type {any} */ (e).message ? String(/** @type {any} */ (e).message) : 'network');
   } finally {
     _active = null;
     _abort = null;
+    _halted = false;
     _notify();
   }
   if (_queue.length) void _pump();
@@ -431,6 +464,7 @@ async function _pump() {
 /** Stop keeping `ids` (what waits comes off at once; the one on its way stops). @param {string[]} ids */
 function cancel(ids) {
   const set = new Set(Array.isArray(ids) ? ids : []);
+  for (const id of set) _stoppedAt.set(id, ++_stopSeq);
   if (_native()) {
     const urls = [];
     for (const id of set) {
@@ -443,7 +477,10 @@ function cancel(ids) {
     return;
   }
   _queue = _queue.filter((id) => !set.has(id));
-  if (_active && set.has(_active) && _abort) { try { _abort.abort(); } catch (_e) { /* done already */ } }
+  if (_active && set.has(_active)) {
+    _halted = true;   // past the download, the keep stops at its next wait (W64)
+    if (_abort) { try { _abort.abort(); } catch (_e) { /* done already */ } }
+  }
   _notify();
 }
 
@@ -461,6 +498,9 @@ async function remove(ids) {
     _notify();
     return;
   }
+  // A cold start's stored list may still be on its way: it lands first, or it brought the song back after (W64
+  // refuter round 3).
+  await _ensureLoaded();
   const st = _store();
   for (const id of list) {
     _kept.delete(id);
@@ -472,10 +512,13 @@ async function remove(ids) {
 }
 
 /** Every kept song off this phone, and nothing more on its way. */
-function removeAll() {
+async function removeAll() {
+  _allStoppedAt = ++_stopSeq;
+  await _ensureLoaded();   // what a cold start's stored list holds is kept too (W64 refuter round 3)
   const busy = _native() ? [] : _queue.concat(_active ? [_active] : []);
   cancel(busy);
-  return remove(keptIds());
+  // The song on its way is not kept yet (keptIds), but "remove all" takes it too: off the backup's list (W64).
+  return remove(keptIds().concat(busy));
 }
 
 /**

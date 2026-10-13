@@ -679,6 +679,52 @@ function listenTargetAt(frags, hlKey, offset, letterId, hlKeyFn, offsetMapFn, ma
   return -1;
 }
 
+/**
+ * LISTEN FROM HERE in a multi-part letter (sweep W62): which part holds the place, and its clause there. While a
+ * part plays, `frags` are that part's alone, so a place in another part found no clause (the bar just resumed) or
+ * fell forward to the playing part's next block (the wrong part). Every part's rows are in hand (f[4]): the block's
+ * own timed clause decides (a block running over a part boundary takes the latest clause at or before the offset);
+ * an untimed block falls forward to the next timed block in the page, and parts run in page order, so the lowest
+ * part with one holds the nearest. Null when nothing at or after the place is timed.
+ *
+ * @returns {{ part: number, i: number, frags: any[] } | null}
+ */
+function listenPartTarget(rows, hlKey, offset, letterId, hlKeyFn, offsetMapFn, mainEl) {
+  /** @type {Map<number, any[]>} */
+  const byPart = new Map();
+  for (const f of rows) {
+    const p = f[4] || 0;
+    let list = byPart.get(p);
+    if (!list) byPart.set(p, (list = []));
+    list.push(f);
+  }
+  const parts = Array.from(byPart.keys()).sort((a, b) => a - b);
+  let first = null;
+  let best = null;
+  let bestAt = -1;
+  for (const p of parts) {
+    const fr = /** @type {any[]} */ (byPart.get(p));
+    const i = listenTargetAt(fr, hlKey, offset, letterId, hlKeyFn, offsetMapFn, null);
+    if (i < 0) continue;
+    const hit = { part: p, i, frags: fr };
+    if (!first) first = hit;
+    if (typeof offset !== 'number') continue;
+    const cs0 = fr[i][2];
+    const map = offsetMapFn && offsetMapFn(fr[i][1]);
+    const at = typeof cs0 === 'number' && cs0 >= 0 ? (map ? map(cs0) : cs0) : -1;
+    if (at >= 0 && at <= offset && at >= bestAt) { best = hit; bestAt = at; }
+  }
+  if (best || first) return best || first;
+  if (!mainEl) return null;
+  for (const p of parts) {
+    const fr = /** @type {any[]} */ (byPart.get(p));
+    const i = listenTargetAt(fr, hlKey, offset, letterId, hlKeyFn, offsetMapFn, mainEl);
+    if (i >= 0) return { part: p, i, frags: fr };
+  }
+  return null;
+}
+
+const LISTEN_PART_MSG = 'Could not start the recording at this place.';
 const REPEAT_TOAST_ID = 'vot-repeat-toast';
 const REPEAT_FAIL_MSG = 'This passage has no timings to repeat by.';
 const REPEAT_PART_MSG = 'Repeat works within one part of the recording. Select inside the part that is playing.';
@@ -1021,10 +1067,34 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   const listenOffered = typeof onListen === 'function';
   const onListenRef = React.useRef(onListen);
   onListenRef.current = onListen;
-  const listenCtx = React.useRef(/** @type {{ frags: any, loaded: boolean, status: string }} */ ({ frags: null, loaded: false, status: 'idle' }));
-  listenCtx.current = { frags, loaded, status: st.status };
-  const pendingListen = React.useRef(/** @type {{ hlKey: string, offset: number | null, at: number } | null} */ (null));
+  const listenCtx = React.useRef(/** @type {{ frags: any, loaded: boolean, status: string, rows: any[] | null, part: number, perAsset: boolean, queue: any[] }} */ ({ frags: null, loaded: false, status: 'idle', rows: null, part: 0, perAsset: false, queue: [] }));
+  listenCtx.current = { frags, loaded, status: st.status, rows, part, perAsset, queue: st.queue || [] };
+  const pendingListen = React.useRef(/** @type {{ hlKey: string, offset: number | null, at: number, hops?: number } | null} */ (null));
   const pendingRepeat = React.useRef(/** @type {{ keys: string[], label: string, times: number, at: number } | null} */ (null));
+  /** Land a Listen from here: a seek when the place is in the playing part. In another part of a multi-part letter
+   *  (sweep W62) the queue moves to that part (playAt), starting at the place: 'unreachable' when this queue does
+   *  not hold the part (a start past it), or a move through the host's Listen already happened and missed;
+   *  'none' when nothing at or after the place is timed. */
+  const _land = (/** @type {any} */ c, /** @type {{ hlKey: string, offset: number | null, at: number, hops?: number }} */ p) => {
+    const multi = !c.perAsset && !!c.rows && c.rows.some((/** @type {any[]} */ f) => (f[4] || 0) !== c.part);
+    if (!multi) {
+      const i = c.frags ? listenTargetAt(c.frags, p.hlKey, p.offset, letterId, hlKeyFn, offsetMapFn, mainRef.current) : -1;
+      if (i >= 0) AudioPlayer.seek(c.frags[i][0]);
+      return i >= 0 ? 'seeked' : 'none';
+    }
+    const t = listenPartTarget(c.rows, p.hlKey, p.offset, letterId, hlKeyFn, offsetMapFn, mainRef.current);
+    if (!t) return 'none';
+    if (t.part === c.part) { AudioPlayer.seek(t.frags[t.i][0]); return 'seeked'; }
+    const j = c.queue.findIndex((/** @type {any} */ tr) => !!tr && tr.key === key && _partOf(key, tr) === t.part);
+    if (j < 0 || (p.hops || 0) >= 2) return 'unreachable';
+    // The place rides the part's load: a seek once it loaded fell where the APK's player cannot yet seek and was
+    // dropped, and the part played from its top (emulator look). A boot-restored bar not yet played does not jump.
+    AudioPlayer.playAt(j, t.frags[t.i][0]);
+    return AudioPlayer.getState().qi === j ? 'moved' : 'unreachable';
+  };
+  const landRef = React.useRef(_land);
+  landRef.current = _land;
+  const repeatTimer = React.useRef(/** @type {any} */ (null));
   /** Loop the passage's span (repeatSpanOf) through the player; a paused bar resumes, as start() does. A passage
    *  this recording cannot loop says so (a toast), never nothing: one in, or reaching into, another part of a
    *  multi-part letter (the timings in hand are the playing part's), or one with no timed verse. */
@@ -1057,13 +1127,16 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
         const off = offset == null || !Number.isFinite(Number(offset)) ? null : Number(offset);
         userScrollAt.current = Date.now();
         const c = listenCtx.current;
-        if (c.loaded && c.frags) {
-          const i = listenTargetAt(c.frags, hlKey, off, letterId, hlKeyFn, offsetMapFn, mainRef.current);
-          if (i >= 0) AudioPlayer.seek(c.frags[i][0]);
-          if (c.status === 'paused') AudioPlayer.toggle();
-          return true;
-        }
-        pendingListen.current = { hlKey, offset: off, at: Date.now() };
+        if (c.loaded && (c.frags || (c.rows && c.rows.length))) {
+          const r = landRef.current(c, { hlKey, offset: off, at: Date.now() });
+          if (r === 'moved') return true;   // the part it moved to plays from the place
+          if (r !== 'unreachable') {
+            if (c.status === 'paused') AudioPlayer.toggle();
+            return true;
+          }
+          // The part is not in this queue: the host's Listen queues the whole letter, then the landing moves once.
+          pendingListen.current = { hlKey, offset: off, at: Date.now(), hops: 1 };
+        } else pendingListen.current = { hlKey, offset: off, at: Date.now() };
         const go = onListenRef.current;
         if (typeof go === 'function') go();
         return true;
@@ -1078,7 +1151,16 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
         const c = listenCtx.current;
         if (c.loaded && c.frags) return startRepeatRef.current(c.frags, { keys: mine, label, times }, c.status);
         pendingListen.current = null;
-        pendingRepeat.current = { keys: mine, label, times, at: Date.now() };
+        const armed = { keys: mine, label, times, at: Date.now() };
+        pendingRepeat.current = armed;
+        // Timings that never come drop the Repeat with a word, not silently (sweep W62, low). A start the host
+        // refused (offline) already said why, so the unit must be the loaded one for this one to speak.
+        clearTimeout(repeatTimer.current);
+        repeatTimer.current = setTimeout(() => {
+          if (pendingRepeat.current !== armed) return;
+          pendingRepeat.current = null;
+          if (listenCtx.current.loaded) showToast({ id: REPEAT_TOAST_ID, className: 'vot-toast', text: REPEAT_FAIL_MSG });
+        }, REPEAT_WAIT_MS);
         // Loaded with its timings still on the way: they land in a moment; the unit is not started again.
         if (c.loaded) return true;
         const go = onListenRef.current;
@@ -1106,12 +1188,22 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     // Likewise a Listen from here whose start never came: left armed, it hijacked the next plain Listen of this
     // unit, minutes later, to that old place (sweep n1-11).
     if (p && Date.now() - p.at > REPEAT_WAIT_MS) { pendingListen.current = null; return; }
-    if (!p || !loaded || !frags) return;
+    const c = listenCtx.current;
+    if (!p || !loaded || !(frags || (c.rows && c.rows.length))) return;
     pendingListen.current = null;
-    const i = listenTargetAt(frags, p.hlKey, p.offset, letterId, hlKeyFn, offsetMapFn, mainRef.current);
-    if (i >= 0) AudioPlayer.seek(frags[i][0]);
+    // A move to another part re-arms the landing (_land); a part it cannot reach says so.
+    if (landRef.current(c, p) === 'unreachable') showToast({ id: REPEAT_TOAST_ID, className: 'vot-toast', text: LISTEN_PART_MSG });
     userScrollAt.current = Date.now();
-  }, [loaded, frags, letterId, hlKeyFn, offsetMapFn, mainRef]);
+    // `track`: the host's Listen can start the very part that was playing (same rows, same frags), and the landing
+    // still has to run to say it could not reach the place.
+  }, [loaded, frags, rows, track, letterId, hlKeyFn, offsetMapFn, mainRef]);
+  // A Repeat or Listen from here armed for one letter or chapter goes when the pane moves to another: left armed,
+  // the next one's play landed it there or spoke its failure (W62 refuter round 1). Unmount too.
+  React.useEffect(() => () => {
+    pendingRepeat.current = null;
+    pendingListen.current = null;
+    clearTimeout(repeatTimer.current);
+  }, [key, chapter]);
 
   // Unmount / letter change: clear the wash and drop any glide we still own.
   React.useEffect(() => () => {

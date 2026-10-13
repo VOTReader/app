@@ -43,20 +43,24 @@ const BLOCK1 = 'Second paragraph, first clause. Second paragraph, second clause.
 const MANIFEST = { ['one:' + ID]: [['idLong', 'B']] };
 const SYNC = { ['one:' + ID]: [[12.0, 0, 0, 28, 0], [30.0, 1, 0, 31, 0], [36.5, 1, 32, 64, 0]] };
 
-function Host({ withListen = true, onListenSpy, readAlongOn = true, refuse = false }) {
+function Host({ withListen = true, onListenSpy, readAlongOn = true, refuse = false, partTwoOnly = false, id = ID }) {
   const mainRef = React.useRef(null);
   const onListen = React.useCallback(() => {
     if (onListenSpy) onListenSpy();
     if (refuse) return;   // offline with nothing saved: a toast, nothing loads
-    AudioPlayer.playLetter({ volKey: 'one', letter: { id: ID, title: 'A Long Letter' }, collectionLabel: 'Volume One' });
-  }, [onListenSpy, refuse]);
+    if (partTwoOnly) {    // a host whose Listen queues from part 2 (W62's unreachable case)
+      AudioPlayer.playCollection({ volKey: 'one', items: [{ id, title: 'A Long Letter' }], collectionLabel: 'Volume One', startId: id, startPartIndex: 1 });
+      return;
+    }
+    AudioPlayer.playLetter({ volKey: 'one', letter: { id, title: 'A Long Letter' }, collectionLabel: 'Volume One' });
+  }, [onListenSpy, refuse, partTwoOnly, id]);
   return (
     <div className="screen-scroll">
       <div className="letter-body" ref={mainRef}>
-        <p data-hl-key={letterHlKey(ID, 0)}>{BLOCK0}</p>
-        <p data-hl-key={letterHlKey(ID, 1)}>{BLOCK1}</p>
+        <p data-hl-key={letterHlKey(id, 0)}>{BLOCK0}</p>
+        <p data-hl-key={letterHlKey(id, 1)}>{BLOCK1}</p>
       </div>
-      <ReadAlongHighlight volKey="one" letterId={ID} mainRef={mainRef} hlKeyFn={letterHlKey}
+      <ReadAlongHighlight volKey="one" letterId={id} mainRef={mainRef} hlKeyFn={letterHlKey}
         readAlongOn={readAlongOn} readAlongFollow={false} onListen={withListen ? onListen : undefined} />
     </div>
   );
@@ -242,5 +246,118 @@ describe('window.__votListenFrom.repeat: loop the selected blocks three times', 
     act(() => { ok = LF().repeat(['letter:elsewhere:0'], 'x', 3); });
     expect(ok).toBe(false);
     expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+/* Sweep W62 (2026-10-13): the timings in hand while a part plays are that part's alone, so a Listen from here on a
+   block in the OTHER part found no clause (the bar just resumed) or fell forward to the playing part's next block (the
+   wrong part). Four letters ship in parts (four:obey-god, one:christmas among them). */
+describe('Listen from here in a multi-part letter lands in the part that holds the place (sweep W62)', () => {
+  const twoParts = () => {
+    globalThis.AUDIO_MANIFEST = { ['one:' + ID]: [['idLong1', 'B'], ['idLong2', 'B']] };
+    globalThis.AUDIO_SYNC = { ['one:' + ID]: [[12.0, 0, 0, 28, 0], [3.0, 1, 0, 31, 1], [9.5, 1, 32, 64, 1]] };
+  };
+  const playLetter = () => act(() => { AudioPlayer.playLetter({ volKey: 'one', letter: { id: ID, title: 'A Long Letter' }, collectionLabel: 'Volume One' }); });
+  const playing = () => { const s = AudioPlayer.getState(); return String((s.queue[s.qi] || {}).url || ''); };
+  beforeEach(() => { document.getElementById('vot-repeat-toast')?.remove(); });
+
+  it('part 1 playing, the place in part 2: moves to part 2 and lands on the clause', () => {
+    twoParts();
+    const spy = vi.fn();
+    render(<Host onListenSpy={spy} />);
+    playLetter();
+    tick(13);
+    let ok;
+    act(() => { ok = LF().start(letterHlKey(ID, 1), 40); });
+    expect(ok).toBe(true);
+    expect(spy).not.toHaveBeenCalled();
+    expect(playing()).toMatch(/idLong2/);
+    expect(AudioPlayer.getState().time, 'the second clause, in part 2').toBe(9.5);
+  });
+
+  it('part 2 playing, the place in part 1: moves back to part 1, not to part 2\'s next block', () => {
+    twoParts();
+    render(<Host />);
+    playLetter();
+    tick(13);
+    act(() => { AudioPlayer.playAt(1); });
+    tick(4);
+    expect(playing()).toMatch(/idLong2/);
+    act(() => { LF().start(letterHlKey(ID, 0), 5); });
+    expect(playing()).toMatch(/idLong1/);
+    expect(AudioPlayer.getState().time).toBe(12);
+  });
+
+  it('nothing playing, the place in part 2: the host\'s Listen starts the letter, then it lands in part 2', () => {
+    twoParts();
+    const spy = vi.fn();
+    render(<Host onListenSpy={spy} />);
+    act(() => { LF().start(letterHlKey(ID, 1), 0); });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(playing()).toMatch(/idLong2/);
+    expect(AudioPlayer.getState().time).toBe(3);
+  });
+
+  it('a queue that starts past the part (a part-2 start): the host\'s Listen rebuilds it, then it lands in part 1', () => {
+    twoParts();
+    const spy = vi.fn();
+    render(<Host onListenSpy={spy} />);
+    act(() => { AudioPlayer.playCollection({ volKey: 'one', items: [{ id: ID, title: 'A Long Letter' }], collectionLabel: 'Volume One', startId: ID, startPartIndex: 1 }); });
+    tick(4);
+    expect(AudioPlayer.getState().queue.some((t) => /idLong1/.test(t.url)), 'part 1 is not queued').toBe(false);
+    act(() => { LF().start(letterHlKey(ID, 0), 0); });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(playing()).toMatch(/idLong1/);
+    expect(AudioPlayer.getState().time).toBe(12);
+  });
+
+  it('a part even the host\'s Listen does not queue: one toast, no landing in the wrong part', () => {
+    twoParts();
+    const spy = vi.fn();
+    render(<Host onListenSpy={spy} partTwoOnly />);
+    act(() => { AudioPlayer.playCollection({ volKey: 'one', items: [{ id: ID, title: 'A Long Letter' }], collectionLabel: 'Volume One', startId: ID, startPartIndex: 1 }); });
+    tick(4);
+    act(() => { LF().start(letterHlKey(ID, 0), 0); });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(playing()).toMatch(/idLong2/);
+    expect(AudioPlayer.getState().time, 'not part 2\'s next block (3.0)').not.toBe(3);
+    expect(document.getElementById('vot-repeat-toast')?.textContent).toBe('Could not start the recording at this place.');
+  });
+
+  it('a Repeat whose timings never arrive says so once its wait runs out (W62, low)', () => {
+    globalThis.AUDIO_SYNC = {};   // this unit has a recording but no timings
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      render(<Host />);
+      let ok;
+      act(() => { ok = LF().repeat([letterHlKey(ID, 1)], 'x', 3); });
+      expect(ok).toBe(true);
+      expect(document.getElementById('vot-repeat-toast')?.textContent || '').toBe('');
+      act(() => { vi.advanceTimersByTime(20_001); });
+      expect(document.getElementById('vot-repeat-toast')?.textContent).toBe('This passage has no timings to repeat by.');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // W62 refuter round 1: a Repeat armed on letter A (its start refused offline) stayed armed when the pane moved to
+  // letter B, so B's play spoke A's failure: at once when B's timings landed, or when A's wait ran out.
+  it.each([['with timings', true], ['without timings', false]])('a Repeat armed on one letter says nothing on the next letter the pane moves to (%s)', (_label, timed) => {
+    const OTHER = 'another-letter';
+    globalThis.AUDIO_MANIFEST = { ...MANIFEST, ['one:' + OTHER]: [['idOther', 'B']] };
+    globalThis.AUDIO_SYNC = timed ? { ...SYNC, ['one:' + OTHER]: [[5.0, 0, 0, 28, 0]] } : { ...SYNC };
+    delete globalThis.AUDIO_SYNC['one:' + ID];   // A has no timings in memory: the Repeat waits for them
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = render(<Host refuse />);
+      act(() => { LF().repeat([letterHlKey(ID, 1)], 'x', 3); });
+      view.rerender(<Host refuse id={OTHER} />);
+      act(() => { AudioPlayer.playLetter({ volKey: 'one', letter: { id: OTHER, title: 'Another Letter' }, collectionLabel: 'Volume One' }); });
+      act(() => { vi.advanceTimersByTime(20_001); });
+      expect(document.getElementById('vot-repeat-toast')?.textContent || '').toBe('');
+      expect(AudioPlayer.getState().loop || null).toBe(null);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

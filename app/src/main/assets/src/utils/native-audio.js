@@ -23,7 +23,7 @@
 
    The clock: native sends its position with every edge and once a second
    while playing; currentTime runs on from that anchor at the playing speed
-   (at most 1.5 s past it), and 'timeupdate' fires 4x a second while the page
+   (for at most 1.5 s of wall time), and 'timeupdate' fires 4x a second while the page
    is on screen, as <audio> does.
 
    Repeat this passage (ra2): native plays the span round itself
@@ -40,7 +40,9 @@
 /** @typedef {{ url: string, title?: string, artist?: string, album?: string, rate?: number }} NativeNext */
 /** @typedef {{ meta?: (url: string) => NativeMeta, upcoming?: () => NativeNext[] }} NativeHooks */
 
-/** How far currentTime may run on past native's last word before it waits for the next. */
+/** How long (wall seconds) currentTime may run on past native's last word before it waits for the next. Wall time,
+ *  not media time: native speaks once a wall second, so a media cap stood the clock still 0.25 s of every second at
+ *  2x and left it 1.5 s behind at 3x (sweep W59). */
 const MAX_EXTRAPOLATE_S = 1.5;
 /** The most of a native event's delivery time the clock makes up (a stale snapshot is not a slow bridge). */
 const MAX_LAG_MS = 1000;
@@ -154,6 +156,9 @@ class NativeAudio extends EventTarget {
 
   /* ── the <audio> surface ─────────────────────────────────────────── */
 
+  /** Native crossed a seam into `url` and the page has not taken it yet (sweep W60). @param {string} url */
+  crossedInto(url) { return !!url && this._loaded && url === this._nativeUrl && url !== this._src; }
+
   get src() { return this._src; }
   set src(v) {
     const url = v ? String(v) : '';
@@ -191,7 +196,7 @@ class NativeAudio extends EventTarget {
 
   get currentTime() {
     if (!this._playing || !this._anchorAt) return this._pos;
-    const ran = Math.min(MAX_EXTRAPOLATE_S, ((now() - this._anchorAt) / 1000) * this._rate);
+    const ran = Math.min(MAX_EXTRAPOLATE_S, (now() - this._anchorAt) / 1000) * this._rate;
     const t = this._pos + Math.max(0, ran);
     return this._dur > 0 ? Math.min(t, this._dur) : t;
   }
@@ -382,6 +387,13 @@ class NativeAudio extends EventTarget {
     if (!e || typeof e !== 'object') return;
     if (e.type === 'transition') { this._seam({ seq: e.seq, from: e.from, url: e.url }, !!e.want); }
     const url = typeof e.url === 'string' ? e.url : '';
+    // After a load error native still holds the recording, and a headset, car or lock-screen Play prepares and plays
+    // it with no word from the page: the page follows it as native's own play, else that audio ran under a paused
+    // bar the app ignored (sweep W61). Its idle news (not playing, not on its way) wakes nothing.
+    if (!this._loaded && this.error && e.type !== 'error' && url && url === this._src && e.want && (e.playing || e.buffering)) {
+      this._loaded = true;
+      this.error = null;
+    }
     // Native still on a recording the page has left (a src change it has not heard yet): not this element's news.
     if (!this._loaded || (url && url !== this._src && url !== this._nativeUrl)) return;
     if (e.type === 'error') { this._error(e); return; }
