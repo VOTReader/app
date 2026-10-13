@@ -74,6 +74,10 @@ let _offlineSkipTimer = /** @type {ReturnType<typeof setTimeout> | null} */ (nul
 /* Bumped by every start. A `loadedmetadata` seek captures it when armed and
    refuses to fire once it has moved — see _seekOnMetadata. */
 let _seekGen = 0;
+/** The place _start handed the native element for the track it started (seconds), -1 for none: _startAt's seek is
+ *  then the clock's intent only. Read off the record, not native's running clock, which a slow bridge call moves on
+ *  (refuter round 3: the same seek went out twice). */
+let _nativePlaced = -1;
 /** Last whole second notified — the timeupdate re-render storm guard. */
 export let _lastTick = -1;
 /** Write from another module of the player (the binding is read-only outside this one). @param {typeof _lastTick} v */
@@ -335,11 +339,18 @@ function _streamed(track) {
   return !!track && typeof track.url === 'string' && !OfflineAudio.isSaved(track.url) && !_songKept(track);
 }
 
-/** Load + play queue[qi]. Assumes queue/qi are already set. */
-export function _start() {
+/**
+ * Load + play queue[qi]. Assumes queue/qi are already set. `placeOf` says where in the recording this start lands on
+ * it begins (seconds; 0 or absent = its top): native (m3) loads it THERE (audioLoad's startMs). The seek that waited
+ * for metadata came after play() had begun the recording at 0:00, so every Android resume played its opening first
+ * (sweep W4). Resumes call _startAt, which also gives the clock its intent and seeks <audio>.
+ * @param {(track: import('../audio-player.js').Track) => number} [placeOf]
+ */
+export function _start(placeOf) {
   // Before anything else: whatever this start does, a seek armed for the
   // PREVIOUS track is no longer this element's business.
   _seekGen++;
+  _nativePlaced = -1;
   _clearOfflineSkip();
   _resetSectionFollow();   // a new file: no letter under its clock yet, nothing heard
   const track = _state.queue[_state.qi];
@@ -374,7 +385,7 @@ export function _start() {
       const tail = reading.tracks.slice(first);
       _state.queue = _state.queue.slice(0, a).concat(tail, _state.queue.slice(b + 1));
       _state.qi = a + Math.min(own - first, tail.length - 1);
-      _start();
+      _start(placeOf);
       return;
     }
     const ahead = _state.queue.findIndex((t, i) => i > _state.qi && (!_unreachable(t) || !!_downloadedReading(t)));
@@ -409,7 +420,7 @@ export function _start() {
       return;
     }
     _state.qi = ahead;
-    _start();
+    _start(placeOf);
     return;
   }
   // THE QUEUE IS THE SITE ORDER, ONE UNIT AHEAD (w-audio-continue, 2026-09-11). Crossing into
@@ -469,6 +480,12 @@ export function _start() {
   _notify();
   _mediaSession(track);
   _pauseOtherDomAudio(null);
+  // Native takes the place BEFORE play(): a currentTime set now rides the load as startMs, or, when native already
+  // holds this recording, seeks it first, so not even the place it was paused at sounds (refuter round 2).
+  const at = placeOf ? Number(placeOf(track)) || 0 : 0;
+  if (_native && at > 0) {
+    try { el.currentTime = at; _nativePlaced = at; } catch (_e) { /* the seek after the load still lands it */ }
+  }
   const p = el.play();
   // play() rejects on autoplay policy / load failure; the 'error' listener owns
   // the load-failure message. A policy refusal fires no 'error' at all, so it
@@ -539,10 +556,12 @@ export function prewarm(volKey, letterId) {
  * module goes through here.
  *
  * @param {number} at
+ * @param {boolean} [placed] native already holds this place (_start put it there): only the clock takes it
  * @returns {void}
  */
-export function _seekOnMetadata(at) {
+export function _seekOnMetadata(at, placed = false) {
   if (!(at > 0) || !_el) return;
+  const el = _el;
   /* THE INTENT OF THE SEEK IS THE CLOCK, from this line on — not from whenever
      metadata lands. _start() has just set _state.time = 0, and everything that
      reads the clock before the first timeupdate (the bar, the media-session
@@ -556,10 +575,21 @@ export function _seekOnMetadata(at) {
   _state.time = at;
   _lastTick = Math.floor(at);
   _notify();
+  /* NATIVE (m3) NEEDS NO METADATA TO SEEK, and waiting for it was the bug (sweep W4): play() had already begun the
+     recording at 0:00, so the opening played and the clock read 0 until metadata. Before its load the place rides
+     it (startMs; Retry assigns src, seeks, then plays); after it, ExoPlayer takes a seek in any state. Placed by
+     _start (`placed`) or already there, it needs nothing: a second seek would only re-buffer. A released element (no src:
+     an offline pause) keeps the deferred seek below, for the load that Play makes. */
+  if (_native && el.src) {
+    if (!placed && Math.abs((el.currentTime || 0) - at) >= 0.01) {
+      try { /** @type {HTMLAudioElement} */ (el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
+    }
+    return;
+  }
   // HAVE_METADATA (1) or better — duration and the seekable ranges are known,
   // which is the whole precondition the event was standing in for.
-  if (_el.readyState >= 1) {
-    try { /** @type {HTMLAudioElement} */ (_el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
+  if (el.readyState >= 1) {
+    try { /** @type {HTMLAudioElement} */ (el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
     return;
   }
   /* A DEFERRED SEEK IS A PROMISE ABOUT ONE TRACK, and nothing used to check
@@ -581,10 +611,24 @@ export function _seekOnMetadata(at) {
      more than can be kept in step. `{ once: true }` means a stale listener
      costs one no-op call and then unregisters itself. */
   const gen = _seekGen;
-  _el.addEventListener('loadedmetadata', () => {
+  el.addEventListener('loadedmetadata', () => {
     if (gen !== _seekGen) return;              // a later start owns the element now
-    try { /** @type {HTMLAudioElement} */ (_el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
+    try { /** @type {HTMLAudioElement} */ (el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
   }, { once: true });
+}
+
+/**
+ * Start queue[qi] at the place `placeOf` gives the recording the start lands on (it may pass over one not on the
+ * phone, or swap in a downloaded reading): the one call every resume makes. Native loads it there (_start); the
+ * clock takes it as its intent at once and <audio> seeks at metadata (_seekOnMetadata).
+ * @param {(track: import('../audio-player.js').Track) => number} placeOf
+ * @returns {void}
+ */
+export function _startAt(placeOf) {
+  _start(placeOf);
+  const track = _state.queue[_state.qi];
+  const at = track ? Number(placeOf(track)) || 0 : 0;
+  _seekOnMetadata(at, at > 0 && _nativePlaced === at);
 }
 
 /**

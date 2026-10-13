@@ -588,6 +588,37 @@ describe('songs kept on this phone (K1)', () => {
     } finally { delete window.__openSongs; }
   });
 
+  it('(W5) offline, a restored bar\'s kept song plays from its stored bytes, not the offline refusal', async () => {
+    await keptOnWeb(['aaaaaaaaaaa2']);
+    AudioPlayer.playSongs({ filter: { family: 'fam-a' } });
+    AudioPlayer.next();
+    AudioPlayer.toggle();                                     // paused on the kept take; snapshot written
+    await keptOnWeb(['aaaaaaaaaaa2']);                        // a new session
+    expect(AudioPlayer.getState().restoring).toBe(true);
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    AudioPlayer.toggle();
+    await vi.waitFor(() => expect(AudioPlayer.getState().restoring).toBe(false));
+    expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].key).toBe('song:aaaaaaaaaaa2');
+    expect(el().src).toMatch(/^blob:kept-/);
+  });
+
+  it('(W5) offline, a Versions chip on a restored bar whose song is not kept says so once and stops', async () => {
+    await keptOnWeb([]);
+    AudioPlayer.playSongs({ filter: { family: 'fam-a' } });
+    AudioPlayer.toggle();                                     // paused on a1, not kept
+    await keptOnWeb([]);
+    expect(AudioPlayer.getState().restoring).toBe(true);
+    // A fuse: each rebuild asks navigator.onLine. The bug re-ran the rebuild in an endless microtask chain, which
+    // starves every timer; going "online" after 200 asks lets that chain end so the count can fail the test.
+    let asks = 0;
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => ++asks > 200 });
+    expect(AudioPlayer.switchSongVersion('aaaaaaaaaaa2')).toBe(true);
+    for (let i = 0; i < 50; i++) await Promise.resolve();
+    expect(asks).toBeLessThan(20);
+    expect(AudioPlayer.getState().restoring).toBe(true);     // still the restored bar, nothing started
+    expect(document.getElementById('vot-toast-song-offline').textContent).toContain('This song isn’t on this phone.');
+  });
+
   it('a stop before the skip lands cancels it', async () => {
     vi.useFakeTimers();
     await keptOnWeb(['aaaaaaaaaaa2']);

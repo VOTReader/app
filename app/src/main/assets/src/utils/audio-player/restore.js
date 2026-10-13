@@ -2,7 +2,6 @@
 /* audio-player/restore — the restored bar's real queue, rebuilt on its first tap; and resuming across
    the update's self-reload and a close (the snapshot flushed on hide). */
 
-import { OfflineAudio } from '../offline-audio.js';
 import { AUDIO_BIBLE_RELEASE_PREFIX, normalizeAudioTrack } from '../audio-track.js';
 import { loadSongCatalog, songQueue } from '../song-catalog.js';
 import {
@@ -19,16 +18,14 @@ import {
   _isBibleVol,
   late,
   _manifest,
-  _offline,
-  OFFLINE_MSG,
   _pendingRestore,
   _setPendingRestore,
   _setSource,
   _state,
-  _toast,
   trackUrl,
 } from './core.js';
-import { getPreciseTime, _markPaused, _seekOnMetadata, _start } from './engine.js';
+import { getPreciseTime, _markPaused, _startAt } from './engine.js';
+import { _offlineNotice, _unreachable } from './offline.js';
 import { _persist, _setLastPersistSec } from './persist.js';
 
 /** @typedef {import('../audio-player.js').Track} Track */
@@ -112,14 +109,18 @@ function _migrateWholeBookResume(r, queue) {
 /**
  * Rebuild the full queue a _restoreFromSaved() bar stands in for, then start
  * at the saved track + position. Loads the lazy VOT corpus first when needed
- * (index.html's __loadVotCorpus is idempotent).
- * @returns {Promise<void>}
+ * (index.html's __loadVotCorpus is idempotent). True when it started; false when there was nothing to rebuild or,
+ * offline, the saved recording is not on the phone (the bar stays the restored one: a caller that would act on the
+ * rebuilt queue must not ask again, or it asks forever - W5).
+ * @returns {Promise<boolean>}
  */
 export async function _rebuildRestoredQueue() {
   const r = _pendingRestore;
-  if (!r) return;
-  // Offline, the saved recording itself must be on the phone (item 8).
-  if (_offline() && !(typeof r.url === 'string' && OfflineAudio.isSaved(r.url))) { _toast(OFFLINE_MSG); return; }
+  if (!r) return false;
+  // Offline, the saved recording itself must be on the phone (item 8): downloaded, or a song kept on it (W5: the
+  // gate asked only for downloads, so a kept song was refused on the web). Refused, the bar stays the restored one.
+  const saved = { key: typeof r.key === 'string' ? r.key : '', url: r.url };
+  if (_unreachable(/** @type {any} */ (saved))) { _offlineNotice(saved); return false; }
   _setPendingRestore(null);
   const g = _g();
   if (r.mode === 'songs') {
@@ -231,11 +232,11 @@ export async function _rebuildRestoredQueue() {
     : { mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null, startPartIndex: r.startPartIndex || null });
   _state.queue = queue;
   _state.qi = qi;
-  _start();
   // The snapshot's own clock is authoritative here — it is the freshest thing
   // known about this exact track — so the boot restore does NOT consult the
   // per-recording map. Unchanged behavior; only the seek call is now shared.
-  _seekOnMetadata(resumeAt);
+  _startAt(() => resumeAt);
+  return true;
 }
 
 /* ── resume across the update's self-reload (Corbin, 2026-09-10) ──────────

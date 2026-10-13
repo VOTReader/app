@@ -33,7 +33,7 @@ import {
   _toast,
 } from './core.js';
 import { _countPlay } from './credit.js';
-import { _seekOnMetadata, _start } from './engine.js';
+import { _seekOnMetadata, _start, _startAt } from './engine.js';
 import { _syncMediaSessionActions } from './media-session.js';
 import { _offlineNotice, _offlineRefuses } from './offline.js';
 import { _persist, _rememberOutgoingPosition, _resumeAt } from './persist.js';
@@ -121,8 +121,7 @@ export function playLetter(opts) {
   _state.queue = queue;
   _state.qi = 0;
   _countPlay();
-  _start();
-  _seekOnMetadata(_resumeAt(_state.queue[_state.qi]));
+  _startAt(_resumeAt);
 }
 
 /**
@@ -191,13 +190,12 @@ export function playCollection(opts) {
   _state.queue = queue;
   _state.qi = 0;
   _countPlay();
-  _start();
   // Durable resume consults the STARTING track only: everything queued behind
   // it is being reached in order, from its beginning. `noResume` exists for
   // the desk's voice switch — its promise is "starts this again", and a
   // remembered position in the OTHER voice would drop the listener
   // mid-sentence in a recording with different pacing.
-  if (!o.noResume) _seekOnMetadata(_resumeAt(_state.queue[_state.qi]));
+  if (o.noResume) _start(); else _startAt(_resumeAt);
   return true;
 }
 
@@ -226,10 +224,9 @@ export function playSection(volKey, index, collectionLabel) {
   _state.queue = queue;
   _state.qi = 0;
   _countPlay();
-  _start();
   // Section compilations (the 2-hour WTLB parts) are the best resume case of
   // all — same consult as every other entry point.
-  _seekOnMetadata(_resumeAt(_state.queue[0]));
+  _startAt(_resumeAt);
 }
 
 /**
@@ -299,10 +296,9 @@ export function playTrack(track) {
   _state.queue = [normalized];
   _state.qi = 0;
   _countPlay();
-  _start();
   // What makes every unresolvable Listening Library row still pick up where the
   // reader left off instead of restarting from zero.
-  _seekOnMetadata(_resumeAt(normalized));
+  _startAt(_resumeAt);
 }
 
 /* ── the site order (w-audio-continue, 2026-09-11) ──────────────────────────
