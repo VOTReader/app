@@ -334,6 +334,20 @@ describe('audio-player on the native player (m3)', () => {
     } finally { delete globalThis.AudioPositionsStore; }
   });
 
+  it('(W4) a slow bridge play does not send the place twice (refuter round 3)', async () => {
+    globalThis.AudioPositionsStore = { getPosition: () => ({ t: 125, d: 600 }), setPosition: vi.fn(), clearPosition: vi.fn() };
+    let clock = 1000;
+    vi.spyOn(performance, 'now').mockImplementation(() => clock);
+    try {
+      AudioPlayer.playCollection({ volKey: 'vol1', items: [{ id: 'letter-c', title: 'Letter C' }], noResume: true });
+      send({ type: 'state', url: URL_OF('idC'), pos: 3000, dur: 600000, playing: true, want: true });
+      await flush();
+      bridge.audioPlay.mockImplementation(() => { clock += 25; });   // the bridge call takes 25 ms while native plays on
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+      expect(bridge.audioSeek.mock.calls).toEqual([[120000]]);
+    } finally { delete globalThis.AudioPositionsStore; }
+  });
+
   it('(W4) a seek before metadata goes to native at once, and the load\'s first 0 does not undo it', async () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
     expect(loads()[0].startMs).toBe(0);

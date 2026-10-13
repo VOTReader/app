@@ -74,6 +74,10 @@ let _offlineSkipTimer = /** @type {ReturnType<typeof setTimeout> | null} */ (nul
 /* Bumped by every start. A `loadedmetadata` seek captures it when armed and
    refuses to fire once it has moved — see _seekOnMetadata. */
 let _seekGen = 0;
+/** The place _start handed the native element for the track it started (seconds), -1 for none: _startAt's seek is
+ *  then the clock's intent only. Read off the record, not native's running clock, which a slow bridge call moves on
+ *  (refuter round 3: the same seek went out twice). */
+let _nativePlaced = -1;
 /** Last whole second notified — the timeupdate re-render storm guard. */
 export let _lastTick = -1;
 /** Write from another module of the player (the binding is read-only outside this one). @param {typeof _lastTick} v */
@@ -346,6 +350,7 @@ export function _start(placeOf) {
   // Before anything else: whatever this start does, a seek armed for the
   // PREVIOUS track is no longer this element's business.
   _seekGen++;
+  _nativePlaced = -1;
   _clearOfflineSkip();
   _resetSectionFollow();   // a new file: no letter under its clock yet, nothing heard
   const track = _state.queue[_state.qi];
@@ -479,7 +484,7 @@ export function _start(placeOf) {
   // holds this recording, seeks it first, so not even the place it was paused at sounds (refuter round 2).
   const at = placeOf ? Number(placeOf(track)) || 0 : 0;
   if (_native && at > 0) {
-    try { el.currentTime = at; } catch (_e) { /* the seek after the load still lands it */ }
+    try { el.currentTime = at; _nativePlaced = at; } catch (_e) { /* the seek after the load still lands it */ }
   }
   const p = el.play();
   // play() rejects on autoplay policy / load failure; the 'error' listener owns
@@ -551,9 +556,10 @@ export function prewarm(volKey, letterId) {
  * module goes through here.
  *
  * @param {number} at
+ * @param {boolean} [placed] native already holds this place (_start put it there): only the clock takes it
  * @returns {void}
  */
-export function _seekOnMetadata(at) {
+export function _seekOnMetadata(at, placed = false) {
   if (!(at > 0) || !_el) return;
   const el = _el;
   /* THE INTENT OF THE SEEK IS THE CLOCK, from this line on — not from whenever
@@ -571,11 +577,11 @@ export function _seekOnMetadata(at) {
   _notify();
   /* NATIVE (m3) NEEDS NO METADATA TO SEEK, and waiting for it was the bug (sweep W4): play() had already begun the
      recording at 0:00, so the opening played and the clock read 0 until metadata. Before its load the place rides
-     it (startMs; Retry assigns src, seeks, then plays); after it, ExoPlayer takes a seek in any state. Already there
-     (_start's placeOf put it there) needs nothing: a second seek would only re-buffer. A released element (no src:
+     it (startMs; Retry assigns src, seeks, then plays); after it, ExoPlayer takes a seek in any state. Placed by
+     _start (`placed`) or already there, it needs nothing: a second seek would only re-buffer. A released element (no src:
      an offline pause) keeps the deferred seek below, for the load that Play makes. */
   if (_native && el.src) {
-    if (Math.abs((el.currentTime || 0) - at) >= 0.01) {
+    if (!placed && Math.abs((el.currentTime || 0) - at) >= 0.01) {
       try { /** @type {HTMLAudioElement} */ (el).currentTime = at; } catch (_e) { /* unseekable — start over */ }
     }
     return;
@@ -621,7 +627,8 @@ export function _seekOnMetadata(at) {
 export function _startAt(placeOf) {
   _start(placeOf);
   const track = _state.queue[_state.qi];
-  _seekOnMetadata(track ? Number(placeOf(track)) || 0 : 0);
+  const at = track ? Number(placeOf(track)) || 0 : 0;
+  _seekOnMetadata(at, at > 0 && _nativePlaced === at);
 }
 
 /**
