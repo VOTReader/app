@@ -239,8 +239,10 @@ const v3AndroidOnly = (name) => () => {
 //
 // Semantic note: Android's setKeepScreenOn sets a window flag the OS respects
 // until the app is backgrounded. The Web WakeLock API auto-releases the
-// sentinel when the document is hidden (tab switch, minimize). Same intent
-// (don't dim while user is reading); slightly different release trigger.
+// sentinel when the document is hidden (tab switch, minimize), so the wanted
+// state is kept here and the lock is asked for again each time the page is
+// shown (W47: it used to stop for good after the first hide). A sentinel that
+// arrives after the setting was turned off is released at once.
 //
 // De-dup: the consuming useSettings effect fires on every [theme, settings]
 // change. If WakeLock keeps failing for the same reason (e.g. iframe / not
@@ -259,23 +261,52 @@ function _warnWakeLock(/** @type {string} */ tag, /** @type {any} */ e) {
     console.warn(`[PlatformBridge] setKeepScreenOn(${tag}) failed:`, reason);
   }
 }
+/** @type {boolean} */ let _webWakeLockWanted = false;
+/** @type {boolean} */ let _webWakeLockWatchingVisibility = false;
+/** @param {any} wakeLock */
+function _requestWebWakeLock(wakeLock) {
+  if (_webWakeLockSentinel && !_webWakeLockSentinel.released) return;  // already held
+  if (_webWakeLockRequestInFlight) return;  // request pending; don't pile up
+  _webWakeLockRequestInFlight = true;
+  wakeLock.request('screen').then((/** @type {any} */ sentinel) => {
+    if (!_webWakeLockWanted) {  // turned off while the request was pending
+      try {
+        const p = sentinel.release();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch { /* already gone */ }
+      return;
+    }
+    _webWakeLockSentinel = sentinel;
+    _webWakeLockLastWarnedReason = null;  // success → reset the de-dup flag
+    // Browsers without the `released` flag still fire 'release' on hide.
+    if (typeof sentinel.addEventListener === 'function') {
+      sentinel.addEventListener('release', () => {
+        if (_webWakeLockSentinel === sentinel) _webWakeLockSentinel = null;
+      });
+    }
+  }).catch((/** @type {any} */ e) => {
+    _warnWakeLock('true', e);
+  }).finally(() => {
+    _webWakeLockRequestInFlight = false;
+  });
+}
+function _onWakeLockVisibility() {
+  if (!_webWakeLockWanted || document.visibilityState !== 'visible') return;
+  const wakeLock = /** @type {any} */ (navigator).wakeLock;
+  if (wakeLock && typeof wakeLock.request === 'function') _requestWebWakeLock(wakeLock);
+}
 /** @param {boolean} enabled */
 function webSetKeepScreenOn(enabled) {
   try {
     const wakeLock = /** @type {any} */ (navigator).wakeLock;
     if (!wakeLock || typeof wakeLock.request !== 'function') return;  // API absent
+    _webWakeLockWanted = !!enabled;
     if (enabled) {
-      if (_webWakeLockSentinel && !_webWakeLockSentinel.released) return;  // already held
-      if (_webWakeLockRequestInFlight) return;  // request pending; don't pile up
-      _webWakeLockRequestInFlight = true;
-      wakeLock.request('screen').then((/** @type {any} */ sentinel) => {
-        _webWakeLockSentinel = sentinel;
-        _webWakeLockLastWarnedReason = null;  // success → reset the de-dup flag
-      }).catch((/** @type {any} */ e) => {
-        _warnWakeLock('true', e);
-      }).finally(() => {
-        _webWakeLockRequestInFlight = false;
-      });
+      if (!_webWakeLockWatchingVisibility && typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', _onWakeLockVisibility);
+        _webWakeLockWatchingVisibility = true;
+      }
+      _requestWebWakeLock(wakeLock);
     } else if (_webWakeLockSentinel) {
       const s = _webWakeLockSentinel;
       _webWakeLockSentinel = null;
