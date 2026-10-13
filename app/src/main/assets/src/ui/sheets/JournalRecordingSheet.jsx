@@ -185,6 +185,13 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     //  • Android (legacy/fallback): passes base64 (1st arg) which we decode here.
     // Either way we end with one audio Blob and transition to preview (or auto-
     // save if Save was tapped while still recording).
+    // __onNativeRecordingPaused (sweep W14): the phone paused the memo itself as the app left the screen (a locked
+    // screen), where Android hands a backgrounded app a silent mic; the sheet shows Paused and Resume carries on.
+    window.__onNativeRecordingPaused = function() {
+      if (cancelled || stageRef.current !== 'recording') return;
+      freezeForPause();
+    };
+
     window.__onNativeRecordingComplete = function(b64, durMs, mime, blob, url) {
       if (cancelled) return;
       try { if (ampRef.current) clearInterval(ampRef.current); } catch (_e) { /* best-effort */ }
@@ -548,6 +555,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       if (permTimer) { clearTimeout(permTimer); permTimer = 0; }
       try { delete window.__onMicPermissionResult; } catch (_e) { window.__onMicPermissionResult = undefined; }
       try { delete window.__onNativeRecordingComplete; } catch (_e) { window.__onNativeRecordingComplete = undefined; }
+      try { delete window.__onNativeRecordingPaused; } catch (_e) { window.__onNativeRecordingPaused = undefined; }
       cleanup();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: one recording session per sheet open. setError/setSeconds/setStage/setWaveFinal/setWaveLive are useState setters (identity-stable); persistRecording/stopRecording are local functions whose closure reads the same setters + refs that this effect's closure does — same lifecycle, no stale-value risk.
@@ -590,6 +598,11 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     if (stage !== 'recording') return;
     var res = PlatformBridge.nativeRecordPause();
     if (res !== 'ok') return;
+    freezeForPause();
+  }
+
+  // Refs and a setter only: the mount effect's __onNativeRecordingPaused calls this from the first render.
+  function freezeForPause() {
     accumulatedMsRef.current += (Date.now() - startTimeRef.current);
     // Freeze the UI timers while paused — the recorder is paused, so the seconds
     // counter + waveform must stop too. Both are restarted in resumeRecording.
