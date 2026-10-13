@@ -142,7 +142,11 @@ export function useSavedState() {
       // store otherwise. Read-and-clear is one call.
       // usePersistedState item 9: an unloaded mount writes nothing and is
       // remounted once the store loads, so it leaves the record for that mount.
-      const resumed = takeResumeRecord({ keep: stateStoreUnloaded() });
+      // W41: the same rule for the two one-shot flags below. A mount before the
+      // store loads is thrown away when it lands (HydrationGate's remount), so
+      // it leaves them for the mount that reads the real record.
+      const unloaded = stateStoreUnloaded();
+      const resumed = takeResumeRecord({ keep: unloaded });
       const stored = StateStore.get();
       // n4-05: the record's base (the union this tab last saw land) makes it a
       // 3-way merge: a read mark another tab cleared stays cleared.
@@ -163,9 +167,11 @@ export function useSavedState() {
       // the loop. Wrapped — sessionStorage may be unavailable.
       try {
         if (sessionStorage.getItem('vot-crash-recover')) {
-          sessionStorage.removeItem('vot-crash-recover');
-          sessionStorage.removeItem('vot-crash-count');
-          sessionStorage.removeItem('vot-crash-first-ms');
+          if (!unloaded) {
+            sessionStorage.removeItem('vot-crash-recover');
+            sessionStorage.removeItem('vot-crash-count');
+            sessionStorage.removeItem('vot-crash-first-ms');
+          }
           s.screen = 'home';
           if (Array.isArray(s.tabs)) s.tabs.forEach((t) => { t.screen = 'home'; });
         }
@@ -185,7 +191,7 @@ export function useSavedState() {
       // is harmless. The mount-time usePersistedState write re-persists the
       // cleared shape immediately, and the flag prevents a re-run.
       try {
-        if (!localStorage.getItem('vot-scrollheal-1')) {
+        if (!unloaded && !localStorage.getItem('vot-scrollheal-1')) {
           localStorage.setItem('vot-scrollheal-1', '1');
           if (s.scrollPositions) s.scrollPositions = {};
           if (Array.isArray(s.tabs)) s.tabs.forEach((t) => { if (t && t.scrollPositions) t.scrollPositions = {}; });
