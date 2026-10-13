@@ -1065,8 +1065,8 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   const pendingListen = React.useRef(/** @type {{ hlKey: string, offset: number | null, at: number, hops?: number } | null} */ (null));
   const pendingRepeat = React.useRef(/** @type {{ keys: string[], label: string, times: number, at: number } | null} */ (null));
   /** Land a Listen from here: a seek when the place is in the playing part. In another part of a multi-part letter
-   *  (sweep W62) the queue moves to that part (playAt) and the landing stays armed for that part's timings, once:
-   *  'unreachable' when this queue does not hold the part (a start past it) or a move already happened and missed;
+   *  (sweep W62) the queue moves to that part (playAt), starting at the place: 'unreachable' when this queue does
+   *  not hold the part (a start past it), or a move through the host's Listen already happened and missed;
    *  'none' when nothing at or after the place is timed. */
   const _land = (/** @type {any} */ c, /** @type {{ hlKey: string, offset: number | null, at: number, hops?: number }} */ p) => {
     const multi = !c.perAsset && !!c.rows && c.rows.some((/** @type {any[]} */ f) => (f[4] || 0) !== c.part);
@@ -1080,11 +1080,10 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     if (t.part === c.part) { AudioPlayer.seek(t.frags[t.i][0]); return 'seeked'; }
     const j = c.queue.findIndex((/** @type {any} */ tr) => !!tr && tr.key === key && _partOf(key, tr) === t.part);
     if (j < 0 || (p.hops || 0) >= 2) return 'unreachable';
-    pendingListen.current = { hlKey: p.hlKey, offset: p.offset, at: Date.now(), hops: (p.hops || 0) + 1 };
-    AudioPlayer.playAt(j);
-    if (AudioPlayer.getState().qi === j) return 'moved';
-    pendingListen.current = null;   // a boot-restored bar not yet played does not jump (playAt): the host's Listen does
-    return 'unreachable';
+    // The place rides the part's load: a seek once it loaded fell where the APK's player cannot yet seek and was
+    // dropped, and the part played from its top (emulator look). A boot-restored bar not yet played does not jump.
+    AudioPlayer.playAt(j, t.frags[t.i][0]);
+    return AudioPlayer.getState().qi === j ? 'moved' : 'unreachable';
   };
   const landRef = React.useRef(_land);
   landRef.current = _land;

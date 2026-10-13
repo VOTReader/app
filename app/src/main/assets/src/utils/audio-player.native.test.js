@@ -105,6 +105,21 @@ describe('audio-player on the native player (m3)', () => {
     expect(bridge.audioRelease).toHaveBeenCalled();
   });
 
+  // W62 emulator look: Listen from here moved to part 2 and then seeked, but a seek right after a load fell where the
+  // APK's player could not yet seek and was dropped: part 2 played from its top. The place rides the load now.
+  it('(W62) playAt with a place loads that recording there: native gets it as the load\'s start, no seek after', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    send({ type: 'state', url: URL_OF('idA1'), pos: 1000, dur: 60000, playing: true, want: true });
+    await flush();
+    bridge.audioSeek.mockClear();
+    AudioPlayer.playAt(1, 42.5);
+    const last = loads()[loads().length - 1];
+    expect(last.url).toBe(URL_OF('idA2'));
+    expect(last.startMs).toBe(42500);
+    expect(bridge.audioSeek).not.toHaveBeenCalled();
+    expect(AudioPlayer.getState().time).toBe(42.5);
+  });
+
   it('sleep at the end of this recording empties what comes next, so native stops there', () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
     bridge.audioUpcoming.mockClear();
