@@ -120,6 +120,24 @@ describe('audio-player on the native player (m3)', () => {
     expect(AudioPlayer.getState().time).toBe(42.5);
   });
 
+  // W62 refuter round 3: offline with only part 2 saved, a place in part 1 made the queue pass over part 1 and carry
+  // part 1's time into part 2. A place belongs to its own recording: one that cannot play is not moved to at all.
+  it('(W62) playAt with a place into a recording not on the phone offline moves nowhere: what plays goes on', async () => {
+    await downloaded(['idA2']);
+    setOnline(false);
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
+    const s0 = AudioPlayer.getState();
+    expect(s0.queue[s0.qi].url).toBe(URL_OF('idA2'));
+    send({ type: 'state', url: URL_OF('idA2'), pos: 5000, dur: 60000, playing: true, want: true });
+    await flush();
+    const n = loads().length;
+    AudioPlayer.playAt(s0.qi - 1, 30);
+    const s = AudioPlayer.getState();
+    expect(s.qi).toBe(s0.qi);
+    expect(loads()).toHaveLength(n);
+    expect(s.status).toBe('playing');
+  });
+
   it('sleep at the end of this recording empties what comes next, so native stops there', () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
     bridge.audioUpcoming.mockClear();
