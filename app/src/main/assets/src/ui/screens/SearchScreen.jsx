@@ -252,11 +252,14 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   const [confirmRecent, setConfirmRecent] = React.useState(null);
   const debounceRef = React.useRef(null);
 
-  // Build the index on mount. The engine reads the lazy corpus globals
-  // (BOOKS / MATTHEW / VOT / ANSWERS); building before they arrive yields an
-  // empty index, so load every corpus first, then build. A warm boot restores the
-  // serialized index from the vot-minisearch-cache IDB (~0.3s) instead of
-  // rebuilding (~10s) behind the progress bar.
+  // Build the index on mount, for the reader's edition. The engine loads every
+  // corpus it reads before it builds (engine.js init, sweep W2): a query already
+  // here ("search this", a restored tab) or typed meanwhile waits in the engine
+  // for the same whole index, rather than building one from what had loaded. A
+  // warm boot restores the serialized index from the Cache API (~0.3s) instead
+  // of rebuilding (~10s) behind the progress bar. A change of edition here
+  // builds again behind it.
+  const translation = settings.translation || 'nkjv';
   React.useEffect(() => {
     const E = pickEngine();
     if (!E) {
@@ -264,27 +267,21 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       setBuildInfo({ ready: false, building: false, progress: null, error: "Search couldn't start. Try closing and reopening the app — your data is safe." });
       return undefined;
     }
-    if (E.getState().ready) {setBuildInfo({ ready: true, building: false, progress: null });return undefined;}
+    // Ready is not enough: an index for another edition, or from fewer texts than are loaded now, is built again.
+    if (E.getState().ready && (typeof E.isCurrent !== 'function' || E.isCurrent({ translation }))) {setBuildInfo({ ready: true, building: false, progress: null });return undefined;}
     // A cold build runs ~10s; backing out of Search mid-build must not keep
     // reporting progress into an unmounted screen. The build itself continues
     // (the engine caches it for the next open) — only the setState stops.
     let cancelled = false;
     setBuildInfo({ ready: false, building: true, progress: null });
-    const loadBible = (typeof window.__loadBibleCorpus === 'function') ? window.__loadBibleCorpus().catch(() => {}) : Promise.resolve();
-    const loadMatthew = (typeof window.__loadMatthewCorpus === 'function') ? window.__loadMatthewCorpus().catch(() => {}) : Promise.resolve();
-    const loadVot = (typeof window.__loadVotCorpus === 'function') ? window.__loadVotCorpus().catch(() => {}) : Promise.resolve();
-    const loadAnswers = (typeof window.__loadAnswersCorpus === 'function') ? window.__loadAnswersCorpus().catch(() => {}) : Promise.resolve();
-    // The studies too (v09-perf-01): without them a boot-then-Search index had no
-    // study chapters, and the cache key flipped on whether Studies had been opened.
-    const loadStudies = (typeof loadBibleStudies === 'function') ? Promise.resolve(loadBibleStudies()).catch(() => {}) : Promise.resolve();
-    Promise.all([loadBible, loadMatthew, loadVot, loadAnswers, loadStudies])
-      .then(() => E.init({
-        onProgress: (done, total) => { if (!cancelled) setBuildInfo((b) => ({ ...b, progress: { done, total } })); }
-      }))
+    E.init({
+      translation,
+      onProgress: (done, total) => { if (!cancelled) setBuildInfo((b) => ({ ...b, progress: { done, total } })); }
+    })
       .then(() => { if (!cancelled) setBuildInfo({ ready: true, building: false, progress: null }); })
       .catch((err) => { if (!cancelled) setBuildInfo({ ready: false, building: false, progress: null, error: err?.message || String(err) }); });
     return () => { cancelled = true; };
-  }, []);
+  }, [translation]);
 
   // Focus input on mount
   React.useEffect(() => {

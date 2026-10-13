@@ -459,6 +459,8 @@ function unitId(/** @type {string} */ key) {
    (lanes/search/out/p5): 413 -> 424/500. */
 const MEANING_REACH = 30;
 const MEANING_ADD = 10;
+/** How many of the model's best documents a search kept to a collection or scope reads (else semanticDocs' 60). */
+const MEANING_FILTERED = 300;
 const MEANING_K = 10;
 /** How much text from a matched passage's start names its original (a unit is three sentences). */
 const MEANING_SPAN = 400;
@@ -473,8 +475,9 @@ const MEANING_WEIGHT = 2;
  * @param {Array<{id:string, score:number, start:number}>} sem  best first
  * @param {(doc:any) => boolean} named
  * @param {number} held  the most of the query one passage of the words engine's top holds (bestPassageFirst)
+ * @param {(doc:any) => boolean} admit  marks a document the meaning adds shown: false for a text already shown
  */
-function meaningFirst(out, idOf, sem, named, held) {
+function meaningFirst(out, idOf, sem, named, held, admit) {
   const w = MEANING_WEIGHT * Math.max(0, 1 - held);
   const semRank = new Map(sem.map((s, i) => [s.id, i]));
   const semStart = new Map(sem.map((s) => [s.id, s.start]));
@@ -488,7 +491,7 @@ function meaningFirst(out, idOf, sem, named, held) {
     let e = j >= 0 ? rest.splice(j, 1)[0] : null;
     if (!e) {
       const f = msIndex.getStoredFields(s.id);
-      if (!f) continue;
+      if (!f || !admit(f)) continue;
       e = { score: 0, doc: reshapeDoc(f), terms: [] };
       idOf.set(e, s.id);
     }
@@ -876,9 +879,12 @@ function originalsFirst(out, idOf, terms, allowed, named, near) {
   }
 }
 /** @type {Promise<boolean>|null} */ let building = null;
+/** The edition the build under way is for. */
+/** @type {string|null} */ let buildingFor = null;
 let ready = false;
 /** @type {Error|null} */ let buildError = null;
-/** @type {{docCount?:number, buildMs?:number, collectMs?:number, insertMs?:number, cached?:boolean, translation?:string}} */ let stats = {};
+/** `sig`: what the index was built from (cache.js dataSignature), for the check that it still is. */
+/** @type {{docCount?:number, buildMs?:number, collectMs?:number, insertMs?:number, cached?:boolean, translation?:string, sig?:string}} */ let stats = {};
 
 function now() {
   return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -894,11 +900,11 @@ function reshapeDoc(r) {
   return doc;
 }
 
-/** Build the in-memory index for one translation (chunked for onProgress). */
-async function build(options) {
-  options = options || {};
-  // a new index is new texts behind the same ids (a translation change): the phrase
-  // ranking's token cache must not outlive the index it was read from
+/** Put a built or restored index in use. The caches read from the last one go with it: a new index is
+    new texts behind the same ids (a translation change), and the phrase ranking's token cache must not
+    outlive the index it was read from. Cleared here, at the swap, not when the build starts: a search on
+    the old index while the new one builds would fill them again with the old texts. */
+function swapIn(/** @type {any} */ ms, /** @type {typeof stats} */ st) {
   TOKEN_CACHE.clear();
   tokenCacheSize = 0;
   ORIGINALS = null;
@@ -910,6 +916,16 @@ async function build(options) {
   LEMMA_CACHE.clear();
   EXCERPT_CACHE.clear();
   SOURCE_CACHE.clear();
+  msIndex = ms;
+  ready = true;
+  buildError = null;
+  stats = st;
+}
+
+/** Build the in-memory index for one translation (chunked for onProgress). `persist: false` keeps it
+    out of the warm cache (a corpus failed to load: that index must not replace a whole one there). */
+async function build(options) {
+  options = options || {};
   const code = options.translation || 'nkjv';
   const sig = dataSignature(code);
 
@@ -918,18 +934,19 @@ async function build(options) {
     const cachedJson = await loadCached(sig);
     if (cachedJson) {
       const tc = now();
-      msIndex = MiniSearch.loadJSON(cachedJson, buildMiniSearchOptions());
-      ready = true;
-      buildError = null;
-      stats = { docCount: msIndex.documentCount, buildMs: Math.round(now() - tc), cached: true, translation: code };
-      if (options.onProgress) options.onProgress(stats.docCount, stats.docCount);
+      const ms = MiniSearch.loadJSON(cachedJson, buildMiniSearchOptions());
+      swapIn(ms, { docCount: ms.documentCount, buildMs: Math.round(now() - tc), cached: true, translation: code, sig });
+      if (options.onProgress) options.onProgress(ms.documentCount, ms.documentCount);
       return;
     }
   } catch { /* corrupt / blocked cache — fall through to a fresh build */ }
 
   // Cold build: collect docs (fast, ~55ms) then index (the slow part, ~10s —
-  // chunked so the progress bar animates and the UI stays responsive).
+  // chunked so the progress bar animates and the UI stays responsive). The
+  // signature is read again with the docs, in the same task: a corpus that
+  // arrived while the cache was read is in both or in neither.
   const t0 = now();
+  const builtSig = dataSignature(code);
   const docs = buildDocs({ translation: code });
   const t1 = now();
   const ms = new MiniSearch(buildMiniSearchOptions());
@@ -943,42 +960,79 @@ async function build(options) {
   }
   if (options.onProgress) options.onProgress(docs.length, docs.length);
   const t2 = now();
-  msIndex = ms;
-  ready = true;
-  buildError = null;
-  stats = {
+  swapIn(ms, {
     docCount: docs.length,
     buildMs: Math.round(t2 - t0),
     collectMs: Math.round(t1 - t0), // buildDocs (tokenizer-bound)
     insertMs: Math.round(t2 - t1), // MiniSearch addAll (index-bound)
     cached: false,
     translation: code,
-  };
+    sig: builtSig,
+  });
+  if (options.persist === false) return;
   // Persist for next session (fire-and-forget) once the reader is not waiting on it:
   // serializing the index is one long task (1.7 s on a slow phone), and it ran the
   // moment the build finished, so the first search froze behind it (UI audit
   // 2026-09-27).
-  onIdle(() => { saveCached(sig, JSON.stringify(ms)).catch(() => {}); }, { timeout: 15000, fallbackDelay: 3000 });
+  onIdle(() => { saveCached(builtSig, JSON.stringify(ms)).catch(() => {}); }, { timeout: 15000, fallbackDelay: 3000 });
 }
 
-function sameTranslation(opts) {
-  return !opts || !opts.translation || stats.translation === opts.translation;
+/* EVERY TEXT, FOR THE READER'S EDITION, BEFORE THE INDEX IS BUILT (sweep W2, 2026-10-13). buildDocs
+   reads the lazy corpus globals and skips, silently, any not loaded yet. Search waited for them on
+   mount only, so a query already there ("search this", a restored tab) or typed while they loaded
+   built from what had arrived: VOT letters, Answers or the studies could be missing from every search
+   for the session, and that partial index was cached over the whole one. A mount with no edition
+   built NKJV for a KJV reader, and a search during it was answered in NKJV words. So init loads the
+   corpora itself, whoever calls it, and builds for the edition asked; an index built from other data
+   than the corpora hold now (the signature differs: another edition, a corpus loaded since) is built
+   again, and a build under way for other data is followed by one for this, never returned for it. */
+/** The lazy loaders of every corpus the index reads (index.html, translations.js), each a window global. */
+const CORPUS_LOADERS = ['__loadBibleCorpus', '__loadMatthewCorpus', '__loadVotCorpus', '__loadAnswersCorpus', 'loadBibleStudies'];
+
+/** Load every corpus and the edition's own text. Resolves true when all of them loaded: a failed load
+    leaves its global out, which the signature records, so the index is built again once it loads. */
+function loadCorpora(/** @type {string} */ code) {
+  const w = /** @type {any} */ (globalThis);
+  const call = (/** @type {any} */ fn, /** @type {any[]} */ args) => Promise.resolve().then(() => fn(...args)).then((r) => r !== false, () => false);
+  const loads = CORPUS_LOADERS.filter((n) => typeof w[n] === 'function').map((n) => call(w[n], []));
+  if (code !== 'nkjv' && typeof w.loadTranslation === 'function') {
+    loads.push(call(w.loadTranslation, [code]).then((ok) => ok && !!w['BIBLE_' + code.toUpperCase()]));
+  }
+  return Promise.all(loads).then((oks) => oks.every(Boolean));
+}
+
+/** The edition a call means: the one it names, else the one built or being built, else NKJV. */
+function editionOf(/** @type {{translation?:string}|undefined} */ options) {
+  return (options && options.translation) || buildingFor || stats.translation || 'nkjv';
+}
+
+/** Whether the index in use was built for this edition from the data the corpora hold now. */
+function isCurrent(/** @type {{translation?:string}|undefined} */ options) {
+  const code = editionOf(options);
+  return ready && stats.translation === code && stats.sig === dataSignature(code);
 }
 
 /**
- * Build (or rebuild on translation change) the index. Concurrent calls share
- * one in-flight build. SearchScreen calls this once on mount.
+ * Build (or rebuild) the index for an edition from every corpus. Concurrent calls
+ * for the same data share one build. SearchScreen calls this on mount.
  * @param {{translation?:string, onProgress?:(done:number,total:number)=>void}} [options]
  * @returns {Promise<boolean>}
  */
 function init(options) {
-  options = options || {};
-  if (ready && sameTranslation(options)) return Promise.resolve(true);
-  if (building) return building;
-  building = build(options)
-    .then(() => { building = null; startMeaningWhenIdle(); return true; })
-    .catch((e) => { building = null; buildError = e; throw e; });
-  return building;
+  const code = editionOf(options);
+  const opts = { ...options, translation: code };
+  // One build at a time (each swaps in its index): this call is looked at again when it ends.
+  // A build for this edition that fails fails this call; one for another edition does not.
+  if (building) return buildingFor === code ? building.then(() => init(opts)) : building.then(() => init(opts), () => init(opts));
+  return loadCorpora(code).then((all) => {
+    if (building) return init(opts); // another call started one while the corpora loaded
+    if (isCurrent(opts)) return true;
+    buildingFor = code;
+    building = build({ ...opts, persist: all })
+      .then(() => { building = null; buildingFor = null; startMeaningWhenIdle(); return true; })
+      .catch((e) => { building = null; buildingFor = null; buildError = e; throw e; });
+    return building;
+  });
 }
 
 /** The meaning search loads once the words index is up, when the page is idle (the browser only: node callers start it). */
@@ -988,7 +1042,7 @@ function startMeaningWhenIdle() {
 }
 
 async function ensureReady(options) {
-  if (ready && sameTranslation(options)) return;
+  if (isCurrent(options)) return;
   await init(options);
 }
 
@@ -1344,28 +1398,41 @@ async function search(query, options) {
   const volCount = Object.create(null);
   const capped = Object.create(null);
 
+  /* ONE TEST OF WHAT A SEARCH MAY SHOW (sweep W1, 2026-10-13). After this loop the meaning search
+     adds the model's best texts and originalsFirst puts an original above its reprint, and both took
+     documents straight from the index: a Scriptures-only search, a book or volume scope, the link
+     picker's corpus chip or a -word let up to ten texts from outside it into the top 30. Every
+     document a search shows passes `allowed` (the reader's collection and scope, and the quoted, +
+     and - words), and shows once; what the meaning and originalsFirst add counts in its collection's cap. */
+  const inScope = (/** @type {any} */ d) => (!corpusFilter || d.corpus === corpusFilter) &&
+    (!scopeBookId || d.bookId === scopeBookId) && (!scopeVolumeId || d.volumeId === scopeVolumeId);
+  const holdsWords = (/** @type {any} */ d) => {
+    if (!phraseToks && !hasMust && !hasMustNot) return true;
+    const toks = kjvEncode((d.text || '') + ' ' + (d.title || '') + ' ' + (d.heading || '') + ' ' + (d.ref || ''));
+    if (phraseToks && !hasTokenRun(toks, phraseToks)) return false;
+    if (hasMust && !mustToks.every((run) => hasTokenRun(toks, run))) return false;
+    return !mustNotToks.some((run) => hasTokenRun(toks, run));
+  };
+  const allowed = (/** @type {any} */ d) => inScope(d) && holdsWords(d);
+  /** A text not shown yet, marked shown (the dedup). */
+  const fresh = (/** @type {any} */ d) => {
+    const dedupKey = d.kind + '|' + (d.ref || '') + '|' + (d.text || '').slice(0, 60);
+    if (seen[dedupKey]) return false;
+    seen[dedupKey] = true;
+    return true;
+  };
+
   let h = 0;
   for (; h < rankedIds.length && out.length < limit; h++) {
     const id = rankedIds[h];
     const doc = docLookup[id];
-    if (!doc) continue;
-    if (corpusFilter && doc.corpus !== corpusFilter) continue;
-    if (scopeBookId && doc.bookId !== scopeBookId) continue;
-    if (scopeVolumeId && doc.volumeId !== scopeVolumeId) continue;
+    if (!doc || !inScope(doc)) continue;
     // Before the word filters, which tokenise the whole doc: a full collection
     // costs nothing more to pass over. (A doc the filters would have refused can
     // mark its collection capped, so "400+" may mean exactly 400; never fewer.)
     const vid = doc.volumeId || '';
     if (perVolume && (volCount[vid] || 0) >= perVolume) { capped[vid] = true; continue; }
-    if (phraseToks || hasMust || hasMustNot) {
-      const toks = kjvEncode((doc.text || '') + ' ' + (doc.title || '') + ' ' + (doc.heading || '') + ' ' + (doc.ref || ''));
-      if (phraseToks && !hasTokenRun(toks, phraseToks)) continue;
-      if (hasMust && !mustToks.every((run) => hasTokenRun(toks, run))) continue;
-      if (mustNotToks.some((run) => hasTokenRun(toks, run))) continue;
-    }
-    const dedupKey = doc.kind + '|' + (doc.ref || '') + '|' + (doc.text || '').slice(0, 60);
-    if (seen[dedupKey]) continue;
-    seen[dedupKey] = true;
+    if (!holdsWords(doc) || !fresh(doc)) continue;
     volCount[vid] = (volCount[vid] || 0) + 1;
     const entry = { score: scoreMap[id], doc: reshapeDoc(doc), terms: matchedTerms[id] || [] };
     idOf.set(entry, id);
@@ -1394,13 +1461,33 @@ async function search(query, options) {
   const quoted = out.length && (nearOf[idOf.get(out[0]) || ''] || 0) >= NEAR_PHRASE_MIN;
   const held = !keyword && !p.phrase && !quoted ? bestPassageFirst(out, idOf, units, isStopTerm, named, kjvHeld) : 1;
   /** @type {Awaited<ReturnType<typeof semanticDocs>>} */ let sem = null;
+  // The index the words were read from. While the model runs, a build for another edition (the reader
+  // changed translation) can swap its own in: from then on this search reads nothing more by id, since
+  // that index would hand back the other edition's text. The words' results stand alone.
+  const inUse = msIndex;
   if (!keyword && !p.phrase && !quoted && parsed.kind === 'text') {
-    sem = await semanticDocs(String(query), unitId);
-    if (sem && sem.length) meaningFirst(out, idOf, sem, named, held);
+    // The model reads what the reader wants, not what they ruled out: no -word, and +word as the word.
+    const meant = hasMust || hasMustNot
+      ? String(query).split(/\s+/).filter((t) => !(t.length > 1 && t[0] === '-')).map((t) => (t.length > 1 && t[0] === '+' ? t.slice(1) : t)).join(' ')
+      : String(query);
+    // Kept to a collection or scope, the model's best of everything may hold few of its texts: it reads further.
+    sem = await semanticDocs(meant, unitId, corpusFilter || scopeBookId || scopeVolumeId ? MEANING_FILTERED : undefined);
+    if (msIndex !== inUse) sem = null;
+    if (sem) sem = sem.filter((s) => { const f = msIndex.getStoredFields(s.id); return !!f && allowed(f); });
+    if (sem && sem.length) meaningFirst(out, idOf, sem, named, held, fresh);
   }
-  originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) =>
-    (!corpusFilter || d.corpus === corpusFilter) && (!scopeBookId || d.bookId === scopeBookId) && (!scopeVolumeId || d.volumeId === scopeVolumeId),
+  if (msIndex === inUse) originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) => allowed(d) && fresh(d),
     named, (id, d) => nearOf[id] ?? (typedTokens.length > 1 ? nearPhrase(docTokens(id, d), typedTokens, STOP) : 0));
+  // What those two added counts in its collection. A full one does not refuse it (the words' 400th
+  // verse is no reason to drop the model's best text or an original): its last text gives way.
+  if (perVolume) {
+    const n = Object.create(null);
+    for (const e of out) n[e.doc.volumeId || ''] = (n[e.doc.volumeId || ''] || 0) + 1;
+    for (let r = out.length - 1; r >= 0; r--) {
+      const v = out[r].doc.volumeId || '';
+      if (n[v] > perVolume) { n[v]--; capped[v] = true; out.splice(r, 1); }
+    }
+  }
   /* MATTHEW ONCE (search plan S1, 2026-10-05). Matthew is in the corpus twice, the Study Bible's
      restored text under The Volumes and the plain chapter under Scriptures, so "judge not" showed
      Matthew 7:1 twice, one under the other. Across both collections a verse shows once, as whichever
@@ -1512,6 +1599,7 @@ function getStats() {
 
 export const VotSearchMini = {
   init,
+  isCurrent,
   // the on-device meaning search: its state ({status, failure, units}), and a start for callers that need it now
   meaningStatus: semanticStatus,
   startMeaning: startSemantic,

@@ -118,4 +118,36 @@ describe('meaning first', () => {
     expect(r.doc.letterId).toBe('creator');
     expect(r.placeStart).toBeUndefined();
   });
+
+  /* THE READER'S FILTERS HOLD FOR WHAT THE MEANING ADDS (sweep W1, 2026-10-13). The model's best
+     texts joined the top 30 straight from the index, past the collection, the scope, the -word and
+     the +word the reader set. Each case would show the creator letter, which the model prefers. */
+  const QUERY = 'honour the one who made you while still a child';
+  const ids = async (/** @type {string} */ q, /** @type {any} */ opts) => (await VotSearchMini.search(q, opts)).results.map((r) => r.doc.letterId);
+
+  it('the meaning keeps to the collection asked for', async () => {
+    said.near = 'creator';
+    expect(await ids(QUERY)).toContain('creator'); // the model does add it, with nothing set
+    const r = (await VotSearchMini.search(QUERY, { corpus: 'scriptures' })).results;
+    expect(r.filter((e) => e.doc.corpus !== 'scriptures')).toEqual([]);
+  });
+
+  it('the meaning keeps to a volume scope', async () => {
+    said.near = 'creator';
+    const r = (await VotSearchMini.search(QUERY + ' fields', { scope: { volumeId: 'answers' } })).results;
+    expect(r.length).toBeGreaterThan(0);
+    expect(r.filter((e) => e.doc.volumeId !== 'answers')).toEqual([]);
+  });
+
+  it('a text holding a -word the reader ruled out is not added, nor one missing a +word', async () => {
+    said.near = 'creator';
+    expect(await ids(QUERY + ' -youth')).not.toContain('creator');
+    expect(await ids(QUERY + ' +garment')).not.toContain('creator');
+  });
+
+  it("a collection's cap holds for what the meaning adds", async () => {
+    said.near = 'creator';
+    const r = (await VotSearchMini.search(QUERY, { perVolume: 1 })).results;
+    expect(r.filter((e) => e.doc.volumeId === 'v1').length).toBeLessThanOrEqual(1);
+  });
 });
