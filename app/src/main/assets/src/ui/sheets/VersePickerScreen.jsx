@@ -298,7 +298,14 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
             >
               <span
                 className="picker-verse-num"
+                role="button"
+                tabIndex={0}
+                aria-label={"Select verse " + v.n}
                 onClick={function(e) { e.stopPropagation(); handleVerseTap(v.n); }}
+                onKeyDown={function(e) {
+                  if (e.key !== 'Enter' && e.key !== ' ') return;
+                  e.preventDefault(); e.stopPropagation(); handleVerseTap(v.n);
+                }}
               >{v.n + " "}</span>
               <span className="picker-verse-text">{v.text}</span>
             </p>

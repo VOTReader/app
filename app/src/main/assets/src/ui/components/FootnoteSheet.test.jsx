@@ -129,3 +129,32 @@ it('rail live region exists BEFORE content opens (closed panel keeps aria-live)'
     expect(panel.getAttribute('aria-hidden')).toBe('true');
   } finally { vi.unstubAllGlobals(); }
 });
+
+/* Sweep low (mw10): the docked rail panel takes no focus and traps nothing, but closing it from inside
+   (its ‹ Close) made it inert with focus inside, so focus fell to <body>. */
+it('rail: closing the panel from inside returns focus to what opened it', () => {
+  vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} })));
+  const opener = document.body.appendChild(document.createElement('button'));
+  try {
+    opener.focus();
+    const { rerender } = render(<Sheet num={1} fn={fn} nkjv={{}} footnotes={{ '1': fn }} onClose={() => {}} />);
+    expect(document.activeElement).toBe(opener);   // non-modal: opening does not take focus
+    /** @type {HTMLElement} */ (document.querySelector('.fn-sheet button')).focus();
+    rerender(<Sheet num={null} fn={null} nkjv={{}} footnotes={{}} onClose={() => {}} />);
+    expect(document.activeElement).toBe(opener);
+  } finally { opener.remove(); vi.unstubAllGlobals(); }
+});
+
+it('rail: focus the reader moved elsewhere is left where it is when the panel closes', () => {
+  vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} })));
+  const opener = document.body.appendChild(document.createElement('button'));
+  const other = document.body.appendChild(document.createElement('button'));
+  try {
+    opener.focus();
+    const { rerender } = render(<Sheet num={1} fn={fn} nkjv={{}} footnotes={{ '1': fn }} onClose={() => {}} />);
+    /** @type {HTMLElement} */ (document.querySelector('.fn-sheet button')).focus();
+    other.focus();
+    rerender(<Sheet num={null} fn={null} nkjv={{}} footnotes={{}} onClose={() => {}} />);
+    expect(document.activeElement).toBe(other);
+  } finally { opener.remove(); other.remove(); vi.unstubAllGlobals(); }
+});

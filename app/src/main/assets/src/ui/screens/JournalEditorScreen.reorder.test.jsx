@@ -14,7 +14,7 @@
    rects are all zeros otherwise. */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup, act } from '@testing-library/react';
+import { render, cleanup, act, fireEvent } from '@testing-library/react';
 import { JournalEditorScreen } from './JournalEditorScreen.jsx';
 import { JournalStore } from '../../stores/journal-store.js';
 import { JournalHelpers } from '../../data/journal-helpers.js';
@@ -119,6 +119,25 @@ describe('journal block drag-to-reorder', () => {
     JournalStore._resetForTests({ forceLoaded: true });
     renderEditor(['only']);
     expect(document.querySelectorAll('.jrn-block-drag-btn').length).toBe(0);
+  });
+
+  // Sweep low (mw10): the grip took focus as "Drag to reorder" but only a pointer could move a block.
+  it('the grip moves its block with the Up and Down arrow keys, and focus follows the block', () => {
+    const entry = renderEditor(['a', 'b', 'c']);
+    const grips = () => /** @type {HTMLElement[]} */ ([...document.querySelectorAll('.jrn-block-drag-btn')]);
+    act(() => { grips()[0].focus(); });
+    act(() => { fireEvent.keyDown(grips()[0], { key: 'ArrowDown' }); });
+    act(() => { vi.advanceTimersByTime(1500); });
+    expect(storedTexts(entry.id)).toEqual(['b', 'a', 'c']);
+    expect(document.activeElement).toBe(grips()[1]);
+    act(() => { fireEvent.keyDown(grips()[1], { key: 'ArrowUp' }); });
+    act(() => { vi.advanceTimersByTime(1500); });
+    expect(storedTexts(entry.id)).toEqual(['a', 'b', 'c']);
+    expect(document.activeElement).toBe(grips()[0]);
+    // the first block has nowhere further up to go
+    act(() => { fireEvent.keyDown(grips()[0], { key: 'ArrowUp' }); });
+    act(() => { vi.advanceTimersByTime(1500); });
+    expect(storedTexts(entry.id)).toEqual(['a', 'b', 'c']);
   });
 
   it('dragging a block down by its grip commits the new order SYNCHRONOUSLY at release', () => {

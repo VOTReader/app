@@ -181,7 +181,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     // eslint-disable-next-line react-hooks/exhaustive-deps -- entry.id is the identity; volKey/inert are fixed per mount site
   }, [entry.id]);
   const railMode = useRailMode();   // companion rail — inline scripture sheet docks too
-  const scripTrapRef = useFocusTrap(!!scriptureRef && !railMode);  // dialog semantics — see LetterView
+  const scripTrapRef = useFocusTrap(!!scriptureRef, { modal: !railMode });  // dialog semantics — see LetterView
 
   React.useEffect(() => { setScriptureRef(null); setScriptureText(null); setHighlightedFn(null); }, [entry.id]);
 

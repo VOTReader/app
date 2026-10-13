@@ -8,7 +8,7 @@ import { sheetReference } from '../../utils/passage-copy.js';
 export function ScriptureSheet({ activeRef, onClose, onGoToRef }) {
   const isOpen = activeRef != null;
   const rail = useRailMode();   // companion-rail fork — see FootnoteSheet
-  const trapRef = useFocusTrap(isOpen && !rail);
+  const trapRef = useFocusTrap(isOpen, { modal: !rail });   // rail: no trap, but focus returns on close
   const verseText = activeRef ? MATTHEW_NKJV[activeRef.cite] : null;
   // position:fixed sheet — portal to <body> so it anchors to the viewport, NOT to
   // the reading screen's `.pager-track`. During a page-swipe settle the track

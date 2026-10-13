@@ -219,7 +219,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   };
 
   const [scripRef, setScripRef] = React.useState(null);
-  const scripTrapRef = useFocusTrap(!!scripRef && !railMode);
+  const scripTrapRef = useFocusTrap(!!scripRef, { modal: !railMode });   // rail: no trap, but focus returns on close
   const handleScripClick = (ref) => {
     setScripRef(ref);
   };

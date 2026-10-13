@@ -169,6 +169,17 @@ export function JournalEditorScreen(props) {
   var dragZoneRef = useRef({ top: 0, bottom: 800, zone: 110 });  // visible scroll box + zone size, derived per move
   var dragZoneEnterTsRef = useRef(0);   // when the finger entered the current edge zone (speed ramp)
   var dragCtl = useRef(null);           // the shared createPressDrag instance
+  // Keyboard reorder (sweep mw10): an arrow key on a grip moves its block one place; focus follows
+  // the moved block's grip once the new order has rendered.
+  var gripFocusRef = useRef(-1);
+  React.useLayoutEffect(function() {
+    var i = gripFocusRef.current;
+    if (i < 0) return;
+    gripFocusRef.current = -1;
+    var el = blockRefs.current[i];
+    var grip = el && el.querySelector('.jrn-block-drag-btn');
+    if (grip && document.activeElement !== grip) grip.focus();
+  }, [blocks]);
 
   // Is this screen still on-screen? The block-delete Undo toast is body-level
   // and lives 6 s, so it OUTLIVES the editor whenever the reader taps Done /
@@ -933,6 +944,18 @@ export function JournalEditorScreen(props) {
   // least two — a lone block has nowhere to go). Opposite corner from
   // the delete x, mirroring the tab cards' grab-left / destroy-right
   // separation. Grabbing it starts the drag immediately (no long-press).
+  function moveBlockByKey(idx, delta) {
+    if (dragIdxRef.current >= 0) return; // a pointer drag owns the order until it lands
+    var to = idx + delta;
+    var moved = JournalHelpers.moveBlock(blocksRef.current, idx, to);
+    if (moved === blocksRef.current) return; // already at the top or bottom
+    blocksRef.current = moved;               // same synchronous commit as a drag release
+    setBlocks(moved);
+    activeTextareaRef.current = null;        // caret index is stale after a move
+    gripFocusRef.current = to;
+    scheduleSave();
+  }
+
   function blockDragUI(idx) {
     if (blocks.length < 2) return null;
     return (
@@ -946,8 +969,14 @@ export function JournalEditorScreen(props) {
         }}
         onDragStart={function(e) { e.preventDefault(); }}
         onClick={function(e) { e.stopPropagation(); e.preventDefault(); }}
+        onKeyDown={function(e) {
+          if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+          e.preventDefault(); e.stopPropagation();
+          moveBlockByKey(idx, e.key === 'ArrowUp' ? -1 : 1);
+        }}
         title="Drag to reorder"
         aria-label="Drag to reorder"
+        aria-keyshortcuts="ArrowUp ArrowDown"
       >
         <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
           <circle cx="9" cy="6" r="1.7" /><circle cx="15" cy="6" r="1.7" />

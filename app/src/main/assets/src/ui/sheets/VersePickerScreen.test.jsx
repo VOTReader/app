@@ -57,6 +57,20 @@ describe('VersePickerScreen breadcrumb + footer', () => {
     expect(btn.textContent).toBe('Select a verse to continue');
   });
 
+  // Sweep low (mw10): the verse number (the hint's 'tap a verse number to grab the whole verse') took
+  // no focus and no key, so a keyboard reader had no way to pick a verse.
+  it('a verse number is a keyboard control: Enter picks the whole verse', () => {
+    stubGlobals();
+    const { container } = render(<VersePickerScreen {...baseProps} onClose={vi.fn()} />);
+    const num = /** @type {HTMLElement} */ (container.querySelector('.picker-verse-num'));
+    expect(num.getAttribute('role')).toBe('button');
+    expect(num.tabIndex).toBe(0);
+    expect(num.getAttribute('aria-label')).toMatch(/^Select verse \d+$/);
+    fireEvent.keyDown(num, { key: 'Enter' });
+    const btn = /** @type {HTMLButtonElement} */ (container.querySelector('.picker-footer-btn'));
+    expect(btn.disabled).toBe(false);
+  });
+
   it('tapping a verse number enables the footer + confirms the link', () => {
     stubGlobals();
     const onClose = vi.fn();
