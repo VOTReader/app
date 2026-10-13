@@ -506,3 +506,66 @@ describe('native-audio - the seam', () => {
     expect(JSON.parse(bridge.audioLoad.mock.calls.at(-1)[0]).upcoming).toEqual([]);
   });
 });
+
+/* Repeat this passage (ra2, 2026-10-13): native plays the span round itself; the element carries the span to native
+   (after the load, which ends any loop native had) and native's word on it back. */
+describe('native-audio - repeat this passage (ra2)', () => {
+  const loops = () => bridge.audioLoop.mock.calls.map((c) => (c[0] ? JSON.parse(c[0]) : null));
+
+  it('hands native the span at once when loaded; Infinity is the recording\'s end; null ends it', async () => {
+    bridge.audioLoop = vi.fn();
+    const { nativeLoopAvailable } = await import('./native-audio.js');
+    expect(nativeLoopAvailable()).toBe(true);
+    const el = new NativeAudio();
+    el.src = A;
+    el.play();
+    expect(el.setLoop({ id: 4, start: 12.3456, end: 20, times: 3, pass: 1 })).toBe(true);
+    expect(el.setLoop({ id: 5, start: 50, end: Infinity, times: 2, pass: 1 })).toBe(true);
+    expect(el.setLoop(null)).toBe(true);
+    expect(loops()).toEqual([
+      { url: A, id: 4, startMs: 12346, endMs: 20000, times: 3, pass: 1 },
+      { url: A, id: 5, startMs: 50000, endMs: -1, times: 2, pass: 1 },
+      null,
+    ]);
+  });
+
+  it('a span set before the load goes to native right after it, and a new recording drops it', () => {
+    bridge.audioLoop = vi.fn();
+    const el = new NativeAudio();
+    el.src = A;
+    el.setLoop({ id: 1, start: 40, end: 60, times: 3, pass: 1 });
+    expect(bridge.audioLoop).not.toHaveBeenCalled();
+    el.play();
+    expect(bridge.audioLoad.mock.invocationCallOrder[0]).toBeLessThan(bridge.audioLoop.mock.invocationCallOrder[0]);
+    expect(loops()).toEqual([{ url: A, id: 1, startMs: 40000, endMs: 60000, times: 3, pass: 1 }]);
+    el.setLoop({ id: 2, start: 40, end: 60, times: 3, pass: 1 });
+    el.src = B;                                   // another recording: the passage was A's
+    bridge.audioLoop.mockClear();
+    el.play();
+    expect(bridge.audioLoop).not.toHaveBeenCalled();
+  });
+
+  it('reads native\'s word on the loop from every event, before the events it fires', () => {
+    bridge.audioLoop = vi.fn();
+    const el = new NativeAudio();
+    el.src = A;
+    el.play();
+    let seenAtEnd = 'unset';
+    el.addEventListener('ended', () => { seenAtEnd = el.loopState; });
+    state({ playing: true, want: true, loop: { id: 3, pass: 2, times: 3 } });
+    expect(el.loopState).toEqual({ id: 3, pass: 2 });
+    state({ playing: true, want: true });          // an event with no word on it (an older APK) leaves it
+    expect(el.loopState).toEqual({ id: 3, pass: 2 });
+    state({ pos: 60000, ended: true, loop: null });
+    expect(seenAtEnd).toBeNull();
+  });
+
+  it('an APK from before it has no loop: setLoop says so and sends nothing', async () => {
+    const { nativeLoopAvailable } = await import('./native-audio.js');
+    expect(nativeLoopAvailable()).toBe(false);
+    const el = new NativeAudio();
+    el.src = A;
+    el.play();
+    expect(el.setLoop({ id: 1, start: 1, end: 2, times: 3, pass: 1 })).toBe(false);
+  });
+});

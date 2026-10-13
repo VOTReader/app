@@ -66,7 +66,7 @@ import {
 import { _g, getState, getVersion, subscribe } from './audio-player/core.js';
 import { playableNow } from './audio-player/offline.js';
 import { getPreciseTime, prewarm } from './audio-player/engine.js';
-import { clearLoop, isNative, setLoop } from './audio-player/loop.js';
+import { canLoop, clearLoop, isNative, setLoop } from './audio-player/loop.js';
 import { _onVisible, syncKeepAlive } from './audio-player/media-session.js';
 import { _adoptDurableSnapshot, _restoreFromSaved } from './audio-player/persist.js';
 import {
@@ -129,7 +129,7 @@ import {
  * @property {boolean} shuffle - a songs queue plays in a seeded shuffle (songs only)
  * @property {'off'|'one'|'all'} repeat - a songs queue replays its song or wraps
  *   at its end; reset to 'off' by any queue that is not songs, so a letter never loops
- * @property {{ url: string, start: number, end: number, times: number, pass: number, label: string, waits: boolean } | null} loop
+ * @property {{ id: number, url: string, start: number, end: number, times: number, pass: number, label: string, waits: boolean } | null} loop
  *   - REPEAT THIS PASSAGE (setLoop): the span of the playing recording heard `times` times; null when none
  */
 
@@ -189,6 +189,7 @@ export const AudioPlayer = {
   setRepeat,
   setLoop,
   clearLoop,
+  canLoop,
   isNative,
   bibleChapterStart,
   bibleChapterOfTrack,

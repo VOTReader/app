@@ -736,6 +736,10 @@ class AppInterface(
     @JavascriptInterface
     fun audioUpcoming(json: String?) { native { it.upcoming(json) } }
 
+    /** Repeat this passage (ra2): {id, url, startMs, endMs (-1: to the end), times, pass}, or "" to end it. */
+    @JavascriptInterface
+    fun audioLoop(json: String?) { native { it.loop(json) } }
+
     @JavascriptInterface
     fun audioRelease() { vm.streamAudioActive = false; native { it.release() } }
 

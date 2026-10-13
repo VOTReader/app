@@ -1068,10 +1068,10 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
         if (typeof go === 'function') go();
         return true;
       },
-      // REPEAT THIS PASSAGE (rp1 part 3): loop these blocks `times` times under `label`. Offered on the web
-      // player only: native (the APK) plays on between the page's ticks and has no loop yet. And only with the
+      // REPEAT THIS PASSAGE (rp1 part 3): loop these blocks `times` times under `label`. Offered wherever the
+      // player can loop: the web's, and the APK's native one since ra2 (an older APK's cannot). And only with the
       // read-along on: the span comes from the timings, which are not fetched with it off.
-      repeat: (AudioPlayer.isNative() || !readAlongOn) ? undefined : (/** @type {string[]} */ keys, /** @type {string} */ label, /** @type {number} */ times) => {
+      repeat: (!AudioPlayer.canLoop() || !readAlongOn) ? undefined : (/** @type {string[]} */ keys, /** @type {string} */ label, /** @type {number} */ times) => {
         const mine = (Array.isArray(keys) ? keys : []).filter(has);
         if (!mine.length) return false;
         userScrollAt.current = Date.now();

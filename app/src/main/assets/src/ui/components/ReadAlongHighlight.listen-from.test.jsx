@@ -190,6 +190,19 @@ describe('window.__votListenFrom.repeat: loop the selected blocks three times', 
     expect(AudioPlayer.getState().time).toBe(30);
   });
 
+  it('in the APK, Repeat is offered where its native player loops (ra2), and not on an older one', () => {
+    window.AndroidBridge = { audioLoad() {}, audioJournal() { return ''; } };   // native audio, no loop yet
+    try {
+      render(<Host />);
+      expect(LF().has(letterHlKey(ID, 1))).toBe(true);
+      expect(LF().repeat).toBeUndefined();
+      cleanup();
+      window.AndroidBridge.audioLoop = () => {};
+      render(<Host />);
+      expect(typeof LF().repeat).toBe('function');
+    } finally { delete window.AndroidBridge; }
+  });
+
   it('no Repeat with the read-along off (the span comes from the timings it does not fetch)', () => {
     render(<Host readAlongOn={false} />);
     expect(LF().has(letterHlKey(ID, 1))).toBe(true);

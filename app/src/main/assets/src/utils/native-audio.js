@@ -26,10 +26,13 @@
    (at most 1.5 s past it), and 'timeupdate' fires 4x a second while the page
    is on screen, as <audio> does.
 
+   Repeat this passage (ra2): native plays the span round itself
+   (audioLoop) and every event says which pass it is on.
+
    Bridge: window.AndroidBridge.audioLoad / audioPlay / audioPause /
    audioSeek / audioRate / audioVolume / audioUpcoming / audioRelease /
-   audioJournal, called directly (the setAudioActive pattern;
-   BridgeContractTest pins the nine). Events: window.__votNativeAudio(json)
+   audioJournal / audioLoop, called directly (the setAudioActive pattern;
+   BridgeContractTest pins them). Events: window.__votNativeAudio(json)
    (JsEvent.NativeAudio).
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -66,6 +69,15 @@ function nativeAudioAvailable() {
   let choice = null;
   try { choice = typeof localStorage !== 'undefined' ? localStorage.getItem('vot.audioEngine') : null; } catch (_e) { /* storage off */ }
   return choice !== 'html';
+}
+
+/**
+ * Can the native player play a passage round (ra2)? An APK from before it has no audioLoop: Repeat is not offered.
+ * @returns {boolean}
+ */
+function nativeLoopAvailable() {
+  const b = nativeBridge();
+  return !!b && typeof b.audioLoop === 'function';
 }
 
 /** The one live instance (the player makes one element per page). */
@@ -105,6 +117,12 @@ class NativeAudio extends EventTarget {
     /** Native has reported a duration or a position past 0 since this load: its positions are its word from then on. */
     this._heard = false;
     this._lastSeq = 0;
+    /** The passage native is to play round (ra2): sent at once when loaded, else right after the load.
+     *  @type {{ id: number, startMs: number, endMs: number, times: number, pass: number } | null} */
+    this._loop = null;
+    /** Native's word on that passage, from its last event: the loop it runs (id, pass), null for none.
+     *  @type {{ id: number, pass: number } | null} */
+    this.loopState = null;
     this._upcomingSent = '';
     this._metaSent = '';
     /**
@@ -143,6 +161,8 @@ class NativeAudio extends EventTarget {
     this._gen++;
     this.error = null;
     this._ended = false;
+    this._loop = null;   // a passage belongs to its recording
+    this.loopState = null;
     if (url && url === this._nativeUrl && this._loaded) {
       // A seam native already crossed: native plays this url now. Adopt it (from native's clock: no start pending).
       this._src = url;
@@ -242,6 +262,7 @@ class NativeAudio extends EventTarget {
       }));
       this._pos = this._startMs / 1000;
       this._anchorAt = now();
+      if (this._loop) this._sendLoop();   // after the load, which ends any loop native had
     }
     if (hold) return Promise.resolve();
     this._expect = true;
@@ -299,6 +320,32 @@ class NativeAudio extends EventTarget {
     if (b && typeof b.audioPrewarm === 'function') b.audioPrewarm();
   }
 
+  /**
+   * REPEAT THIS PASSAGE (ra2): native plays [start, end) of this recording round `times` times and pauses at the
+   * span's end, by itself: with the screen off the page sleeps, and its 1 Hz ticks would wrap a second late. null
+   * ends it. Before the load it waits for it (a load ends whatever loop native had).
+   * @param {{ id: number, start: number, end: number, times: number, pass: number } | null} span seconds; an end of
+   *   Infinity runs to the recording's end
+   * @returns {boolean} false when this APK's player has no loop (one from before ra2)
+   */
+  setLoop(span) {
+    if (!nativeLoopAvailable()) return false;
+    this._loop = span ? {
+      id: Number(span.id) || 0,
+      startMs: Math.max(0, Math.round(Number(span.start) * 1000) || 0),
+      endMs: Number.isFinite(Number(span.end)) ? Math.round(Number(span.end) * 1000) : -1,
+      times: Number(span.times) || 1,
+      pass: Number(span.pass) || 1,
+    } : null;
+    if (this._loaded) this._sendLoop();
+    return true;
+  }
+
+  _sendLoop() {
+    const b = nativeBridge();
+    if (b && typeof b.audioLoop === 'function') b.audioLoop(this._loop ? JSON.stringify({ url: this._src, ...this._loop }) : '');
+  }
+
   /* ── the seam ────────────────────────────────────────────────────── */
 
   /** Tell native what plays after this recording (only when it changed). The player calls this at each start and
@@ -339,6 +386,11 @@ class NativeAudio extends EventTarget {
     if (!this._loaded || (url && url !== this._src && url !== this._nativeUrl)) return;
     if (e.type === 'error') { this._error(e); return; }
     if (url === this._nativeUrl && url !== this._src) return;   // crossed a seam the page has not adopted yet
+    // Before the events below: the player's 'ended' and 'timeupdate' read it (ra2).
+    if ('loop' in e) {
+      const lp = e.loop;
+      this.loopState = lp && typeof lp === 'object' ? { id: Number(lp.id) || 0, pass: Number(lp.pass) || 0 } : null;
+    }
     const wasPlaying = this._playing;
     const wasWant = this._want;
     const wasHeld = this._held;
@@ -527,4 +579,4 @@ function now() {
   return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
 }
 
-export { NativeAudio, nativeAudioAvailable };
+export { NativeAudio, nativeAudioAvailable, nativeLoopAvailable };

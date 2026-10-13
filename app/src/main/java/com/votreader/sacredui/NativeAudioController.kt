@@ -29,6 +29,9 @@ import timber.log.Timber
  * The seam: the page hands over the recordings to play next ([upcoming]); ExoPlayer moves into the next one by itself,
  * and this reports a `transition` (and journals it) so the page files the finished recording as heard and adopts the
  * new one. Played items are dropped from the front, so the player's list is always [current, upcoming...].
+ *
+ * Repeat this passage (ra2): a span the page hands over ([loop]) goes round here, timed on the main looper from the
+ * player's own clock, so it keeps its verse with the screen off; the page's bar follows the pass in every event.
  */
 class NativeAudioController(
     private val context: Context,
@@ -46,6 +49,8 @@ class NativeAudioController(
     private val cursor = NativeAudioLogic.Cursor()
     private var serial = 0L
     private var reason = 0
+    /** The passage playing round (ra2), or null. Main looper only. */
+    private var loop: NativeAudioLogic.Loop? = null
 
     @Volatile private var snapshot = ""
     /** The Activity is gone ([shutdown]): a late call must not connect a controller nothing would release (n1-08). */
@@ -65,6 +70,7 @@ class NativeAudioController(
         onMain { c ->
             journal.clear()
             rates.clear()
+            endLoop()
             (listOf(track) + next).forEach { rates[it.url] = it.rate }
             val items = (listOf(track) + next).map(::item)
             cursor.load(items[0].mediaId, track.url)
@@ -135,11 +141,29 @@ class NativeAudioController(
     }
 
     override fun release() = onMain { c ->
+        endLoop()
         c.stop()
         c.clearMediaItems()
         rates.clear()
         cursor.clear()
         state(c, "state")
+    }
+
+    override fun loop(json: String?) {
+        val o = parse(json)
+        val next = o?.let {
+            NativeAudioLogic.loopOf(
+                it.optLong("id"), it.optString("url"), it.optDouble("startMs", Double.NaN), it.optDouble("endMs", Double.NaN),
+                it.optInt("times", 1), it.optInt("pass", 1),
+            )
+        }
+        onMain { c ->
+            endLoop()
+            // Only the recording loaded: a loop for one the player has left is stale.
+            loop = next?.takeIf { it.url == cursor.url }
+            armLoop(c)
+            state(c, "state")
+        }
     }
 
     override fun journal(): String = snapshot
@@ -153,6 +177,7 @@ class NativeAudioController(
     fun shutdown() = main.post {
         closed = true
         main.removeCallbacks(ticker)
+        endLoop()
         controller?.let { it.removeListener(listener); it.stop(); it.clearMediaItems() }
         future?.let { MediaController.releaseFuture(it) }
         future = null
@@ -206,10 +231,39 @@ class NativeAudioController(
         }
     }
 
+    // ── repeat this passage (ra2) ─────────────────────────────────────
+
+    private val loopCheck = Runnable { controller?.let(::armLoop) }
+
+    /** Time the wrap of a passage playing round: re-run at every player edge, so a pause, a seek or a new speed
+     *  re-times it. On time it reads the clock again and goes round only when the clock is there. */
+    private fun armLoop(c: MediaController) {
+        main.removeCallbacks(loopCheck)
+        val lp = loop ?: return
+        if (lp.toEnd || !c.isPlaying) return   // a span to the end goes round from its end (onEvents)
+        val due = lp.dueInMs(c.currentPosition, c.playbackParameters.speed)
+        if (due > 0L) main.postDelayed(loopCheck, due) else wrapLoop(c, lp, false)
+    }
+
+    /** The end of a pass: round again from the start, or after the last, pause there and end the loop. */
+    private fun wrapLoop(c: MediaController, lp: NativeAudioLogic.Loop, ended: Boolean) {
+        val next = lp.next()
+        loop = next   // before the seek: its discontinuity lands at the start, inside the passage
+        if (next == null) { c.pause(); return }
+        c.seekTo(lp.startMs)
+        if (ended) c.play()
+    }
+
+    private fun endLoop() {
+        loop = null
+        main.removeCallbacks(loopCheck)
+    }
+
     private val listener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, why: Int) {
             val c = controller ?: return
             val url = mediaItem?.let(::urlOf)
+            if (loop != null && loop?.url != url) endLoop()
             val auto = why == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || why == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT
             val from = cursor.enter(mediaItem?.mediaId, url, auto) ?: return
             if (url == null) return
@@ -226,7 +280,10 @@ class NativeAudioController(
          *  with it, and a jump is never heard time (sweep n1-07: a scrub credited the letters it skipped). */
         override fun onPositionDiscontinuity(old: Player.PositionInfo, new: Player.PositionInfo, why: Int) {
             val c = controller ?: return
-            if (why == Player.DISCONTINUITY_REASON_SEEK || why == Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT) state(c, "seeked")
+            if (why == Player.DISCONTINUITY_REASON_SEEK || why == Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT) {
+                if (loop?.holds(new.positionMs) == false) endLoop()   // a seek out of the passage ends it (ra2)
+                state(c, "seeked")
+            }
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -236,6 +293,14 @@ class NativeAudioController(
 
         override fun onEvents(player: Player, events: Player.Events) {
             val c = controller ?: return
+            // A passage that runs to the recording's end (or past it: timings a little long) goes round from the end,
+            // before the page hears one (ra2; no upcoming while it plays, so the end is an end, not a seam). Its last
+            // pass ends as any recording does.
+            val lp = loop
+            if (lp != null && c.playbackState == Player.STATE_ENDED && events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED)) {
+                if (lp.pass < lp.times) { wrapLoop(c, lp, true); return }
+                endLoop()
+            }
             if (events.containsAny(
                     Player.EVENT_IS_PLAYING_CHANGED, Player.EVENT_PLAYBACK_STATE_CHANGED,
                     Player.EVENT_PLAY_WHEN_READY_CHANGED, Player.EVENT_PLAYBACK_PARAMETERS_CHANGED,
@@ -247,6 +312,7 @@ class NativeAudioController(
             if (c.playbackState == Player.STATE_ENDED && c.playWhenReady) c.pause()
             main.removeCallbacks(ticker)
             if (c.isPlaying) main.postDelayed(ticker, TICK_MS)
+            armLoop(c)
         }
     }
 
@@ -269,6 +335,8 @@ class NativeAudioController(
             "idle" to (c.playbackState == Player.STATE_IDLE),
             "reason" to reason,
             "last" to journal.last(),
+            // The passage playing round, or null (ra2): the page's bar shows its pass, and its end.
+            "loop" to loop?.let { NativeAudioLogic.RawJson(obj("id" to it.id, "pass" to it.pass, "times" to it.times)) },
             // When pos was read (epoch ms): the page adds the bridge's delivery time to it (sweep n1-04).
             "at" to System.currentTimeMillis(),
         )
