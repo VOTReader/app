@@ -78,6 +78,7 @@ import { ExpandableText, JrnExpandable } from '../components/ExpandableText.jsx'
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 import { HydrationGate } from '../components/HydrationGate.jsx';
 import { DataSafety } from '../utils/data-safety.js';
+import { announceLibraryChange } from '../utils/other-tabs.js';
 
 // ── Platform bridge (W1.1) ──────────────────────────────────────────────
 // Single source of truth for platform-conditional behavior. Lives in
@@ -200,6 +201,8 @@ Object.assign(window, {
   setStoreWriteFence,
   // datasafe 10-05: the banner's Restore, Clear All and Import (bundle-d) reach it here.
   DataSafety,
+  // W8: Clear All and Import (bundle-d) tell the other open tabs (utils/other-tabs.js).
+  announceLibraryChange,
   showToast, hideToast,
   getBuildVersion, fetchServerBuildVersion, formatBuildVersion,
   navHandoff,

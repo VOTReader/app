@@ -422,3 +422,33 @@ describe('StorageHealthBanner — data-missing (automatic snapshot)', () => {
     expect(container.querySelector('.sh-banner')).toBeNull();
   });
 });
+
+/* W8 (sweep 2026-10-13): another tab cleared the library or imported a backup. This tab's
+   copy is old and its saves are held (utils/other-tabs.js); the banner says so and reloads. */
+describe('StorageHealthBanner - W8: the library was changed in another tab', () => {
+  const buttons = (c) => [...c.querySelectorAll('.sh-banner button')].map((b) => b.textContent);
+
+  it('"changed": says so, says edits here are not kept, offers Reload, cannot be dismissed', () => {
+    const { container } = renderBanner({ libraryElsewhere: 'changed' });
+    const text = container.querySelector('.sh-banner').textContent;
+    expect(text).toMatch(/changed in another tab/);
+    expect(text).toMatch(/won't be saved/);
+    expect(buttons(container).some((b) => /Reload/.test(b))).toBe(true);
+    expect(container.querySelector('.sh-banner-dismiss')).toBeNull();
+  });
+
+  it('"changing": says it is being changed there', () => {
+    const { container } = renderBanner({ libraryElsewhere: 'changing' });
+    expect(container.querySelector('.sh-banner').textContent).toMatch(/being changed in another tab/);
+  });
+
+  it('comes before "storage is full": a save held back here is not full storage', () => {
+    const { container } = renderBanner({ libraryElsewhere: 'changed', tier: StorageHealth.TIER.READONLY, writeFailedThisSession: true });
+    expect(container.querySelector('.sh-banner').textContent).not.toMatch(/storage is full/);
+  });
+
+  it('a newer version still comes first (its banner explains the rest)', () => {
+    const { container } = renderBanner({ libraryElsewhere: 'changed', versionTooNew: true });
+    expect(container.querySelector('.sh-banner').textContent).toMatch(/newer version of VOTReader/);
+  });
+});

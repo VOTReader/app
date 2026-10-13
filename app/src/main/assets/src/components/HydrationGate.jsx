@@ -45,6 +45,7 @@ import { StorageHealth } from '../utils/storage-health.js';
 import { DiagnosticLog } from '../utils/diagnostic-log.js';
 import { showToast } from '../utils/toast.js';
 import { DataSafety } from '../utils/data-safety.js';
+import { watchOtherTabs } from '../utils/other-tabs.js';
 
 const { useState, useEffect } = React;
 
@@ -76,6 +77,9 @@ export function HydrationGate({ children }) {
     // If the budget is exceeded in real-device testing, split hot-store
     // hydration into two waves (state+annotations first, then notes+
     // links+history after first paint) per PLAN W2.3 Tier 3.
+    // W8: from before the first store loads, another tab's Clear All, Import or Restore holds
+    // this page's saves (its memory is the old library) and asks for a reload.
+    watchOtherTabs();
     try { performance.mark('vot-hydration-start'); } catch (_e) { /* perf unsupported */ }
     const startMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     hydrateAllStores()

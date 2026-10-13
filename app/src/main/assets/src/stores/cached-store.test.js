@@ -32,7 +32,7 @@ import {
   CachedStore, extendStore,
   hydrateAllStores, hasAnyPendingStores, _resetStoreRegistry,
   clearLegacyLs, _resetLegacyLsFlag, LS_SKIP_LIST,
-  setStoreWriteFence, isStoreWriteFenced,
+  setStoreWriteFence, isStoreWriteFenced, setRemoteWriteFence,
 } from './cached-store.js';
 import { IDBAdapter } from './idb-adapter.js';
 
@@ -685,6 +685,7 @@ describe('CachedStore v04-02 — the Clear-All write fence', () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     delete window.StorageHealth;
+    if (typeof setRemoteWriteFence === 'function') setRemoteWriteFence(false);
     setStoreWriteFence(false);   // last: nothing after it may be skipped if it throws
   });
 
@@ -732,6 +733,38 @@ describe('CachedStore v04-02 — the Clear-All write fence', () => {
     await Promise.resolve();
     expect(putSpy).toHaveBeenCalledTimes(1);
     expect(putSpy.mock.calls[0][2].map((i) => i.id)).toEqual(['a']);
+  });
+
+  /* W8 (sweep 2026-10-13): another tab's Clear All or Import holds this page's saves through a
+     second fence (utils/other-tabs.js). This page's own Clear All and Restore raise and lower
+     theirs without ever lowering the other tab's hold, and the other way round. */
+  it('W8: the remote fence holds saves on its own; this page\'s fence coming down does not lift it', async () => {
+    const putSpy = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const store = createTestStore('vot-test-remote-fence', { idb: true });
+    store._resetForTests({ forceLoaded: true });
+    setRemoteWriteFence(true);
+    expect(isStoreWriteFenced()).toBe(true);
+    store.add({ id: 'a', label: 'A' });
+    setStoreWriteFence(true);                              // this page's own Clear All...
+    setStoreWriteFence(false);                             // ...that failed
+    await Promise.resolve();
+    expect(putSpy, 'the other tab still holds it').not.toHaveBeenCalled();
+    expect(isStoreWriteFenced()).toBe(true);
+    setRemoteWriteFence(false);                            // the other tab's import was cancelled
+    await Promise.resolve();
+    expect(putSpy).toHaveBeenCalledTimes(1);
+    expect(putSpy.mock.calls[0][2].map((i) => i.id)).toEqual(['a']);
+  });
+
+  it('W8: the remote fence closes the adapter door too (the writers that bypass the stores)', () => {
+    const doorSpy = vi.spyOn(IDBAdapter, 'setWriteFence');
+    setRemoteWriteFence(true);
+    expect(doorSpy).toHaveBeenLastCalledWith(true);
+    setStoreWriteFence(true, { storesOnly: true });        // this page's own snapshot restore...
+    setStoreWriteFence(false);                             // ...that failed
+    expect(doorSpy).toHaveBeenLastCalledWith(true);
+    setRemoteWriteFence(false);
+    expect(doorSpy).toHaveBeenLastCalledWith(false);
   });
 
   it('CONTROL: a store that did not try to save while fenced is not rewritten when it comes down', async () => {
@@ -787,6 +820,37 @@ describe('CachedStore v04-03 - a database saved by a newer VOTReader is terminal
     await vi.advanceTimersByTimeAsync(600000);
     expect(getSpy.mock.calls.length, 'one hung read + one retry, then it stops').toBe(2);
     expect(window.StorageHealth.setVersionTooNew).toHaveBeenCalledWith(true);
+  });
+
+  /* W8 (sweep 2026-10-13): the SAVE paths had no VersionError branch. A tab left open on an old
+     build after a newer one upgraded the database met a VersionError on every edit; each was a
+     failed write (banner: "storage is full", offer: Export) and was retried four times. */
+  it('W8: a save that meets a VersionError says "newer version", is no write failure, and is not retried', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const putSpy = vi.spyOn(IDBAdapter, 'put').mockRejectedValue(versionError());
+    const store = createTestStore('vot-test-newer-save', { idb: true });
+    store._resetForTests({ forceLoaded: true });
+    store.add({ id: 'a', label: 'A' });
+    await vi.advanceTimersByTimeAsync(120000);             // the whole STORE-4 retry schedule
+    expect(window.StorageHealth.setVersionTooNew).toHaveBeenCalledWith(true);
+    expect(window.StorageHealth.onWriteFailure).not.toHaveBeenCalled();
+    expect(putSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('W8: the same for a merge store\'s cross-tab save', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+    const putSpy = vi.spyOn(IDBAdapter, 'put').mockRejectedValue(versionError());
+    const store = extendStore(
+      CachedStore('vot-test-newer-merge', { list: [] }, { idb: true, crossTabMerge: (_b, ours) => ours }),
+      { add(id) { this._load().list.push(id); this._save(); this._bump(); } }
+    );
+    store._resetForTests({ forceLoaded: true });
+    store.add('a');
+    await vi.advanceTimersByTimeAsync(120000);
+    expect(window.StorageHealth.setVersionTooNew).toHaveBeenCalledWith(true);
+    expect(window.StorageHealth.onWriteFailure).not.toHaveBeenCalled();
+    expect(putSpy).toHaveBeenCalledTimes(1);
   });
 
   it('CONTROL: any other hydration failure keeps retrying (the slow-storage path is unchanged)', async () => {

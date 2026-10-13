@@ -1222,3 +1222,20 @@ describe('_resetForTests', () => {
     expect(r.usage).toBe(111);
   });
 });
+
+/* W8 (sweep 2026-10-13): another tab cleared the library or imported a backup (utils/other-tabs.js).
+   The flag rides every report, built before the first assess or after it. */
+describe('W8: the library was changed in another tab', () => {
+  it('setLibraryElsewhere puts it on the report, before and after an assess and a failed write', async () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: mockStorage() });
+    StorageHealth.setLibraryElsewhere('changing');
+    expect(StorageHealth.getReport().libraryElsewhere, 'no assess yet').toBe('changing');
+    await StorageHealth.assess();
+    expect(StorageHealth.getReport().libraryElsewhere).toBe('changing');
+    StorageHealth.setLibraryElsewhere('changed');
+    StorageHealth.onWriteFailure(new Error('x'));
+    expect(StorageHealth.getReport().libraryElsewhere).toBe('changed');
+    StorageHealth.setLibraryElsewhere(null);
+    expect(StorageHealth.getReport().libraryElsewhere).toBeNull();
+  });
+});

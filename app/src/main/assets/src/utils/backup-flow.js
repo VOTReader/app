@@ -94,6 +94,9 @@ function _markExported() {
   try { localStorage.setItem(LAST_EXPORT_KEY, String(Date.now())); } catch (_e) { /* no storage: the line says never */ }
 }
 
+/** What an import or Clear All returns when it stopped before its first write to the library (W8). */
+const NOTHING_WRITTEN = 'nothing-written';
+
 export function createBackupFlow(ctx) {
   const {
     busyRef: backupBusyRef, reloadPendingRef: backupReloadPendingRef, reloadTimerRef: backupReloadTimerRef,
@@ -132,23 +135,38 @@ export function createBackupFlow(ctx) {
    * failed, cancelled) — the pending-reload ref is the same flag the unmount
    * effect above fires on — so a session that stays up keeps saving.
    *
+   * W8 (sweep 2026-10-13): the OTHER open tabs are live writers too, and their
+   * memory is the old library: their next save recreated a deleted database or
+   * wrote the old copy over the import. They hear 'changing' before the first
+   * write (they hold their saves) and 'changed' after it (they ask for a reload),
+   * or 'unchanged' when `operation` returned NOTHING_WRITTEN (they save again).
+   * A failed write still says 'changed': part of the import may have landed.
+   *
    * @param {() => Promise<any>} operation
    * @param {{ fenceStores?: boolean }} [opts]
    */
   const _withLiveWritersFrozen = async (operation, opts) => {
     const fenceStores = !!(opts && opts.fenceStores);
     const w = /** @type {any} */ (window);
+    _announce('changing');
     if (typeof w.__flushPersistState === 'function') w.__flushPersistState();
     if (typeof w.__freezePersistState === 'function') w.__freezePersistState(true);
     if (fenceStores && typeof setStoreWriteFence === 'function') setStoreWriteFence(true);
+    let result;
     try {
-      return await operation();
+      result = await operation();
+      return result;
     } finally {
       if (!backupReloadPendingRef.current) {
         if (fenceStores && typeof setStoreWriteFence === 'function') setStoreWriteFence(false);
         if (typeof w.__freezePersistState === 'function') w.__freezePersistState(false);
       }
+      _announce(!backupReloadPendingRef.current && result === NOTHING_WRITTEN ? 'unchanged' : 'changed');
     }
+  };
+  /** @param {'changing' | 'changed' | 'unchanged'} kind */
+  const _announce = (kind) => {
+    try { if (typeof announceLibraryChange === 'function') announceLibraryChange(kind); } catch (_e) { /* best-effort: never blocks the operation */ }
   };
   const _runBackupOperation = async (operation) => {
     if (backupBusyRef.current) return;
@@ -577,7 +595,7 @@ export function createBackupFlow(ctx) {
       if (hasUnavailableStore) {
         hideToast(_TOAST_ID);
         _showToast('Storage is temporarily unavailable. Please try again in a moment.');
-        return;
+        return NOTHING_WRITTEN;
       }
 
       // Restore-inflight marker: set BEFORE the first mutation, removed only on
@@ -614,7 +632,7 @@ export function createBackupFlow(ctx) {
           } catch (_e) { /* best-effort */ }
           hideToast(_TOAST_ID);
           _showToast('Another backup operation is running in a different tab. Please wait for it to finish.');
-          return;
+          return NOTHING_WRITTEN;
         }
         throw e;
       }
@@ -1034,6 +1052,8 @@ export function createBackupFlow(ctx) {
 
   // The wipe itself. clearAllPersonalData (below) runs it with every live writer frozen.
   const _wipeAllPersonalData = async () => {
+    // W8: whether the library database went (the other tabs' fence stays up if it did).
+    let libraryDeleted = false;
     try {
       // v04-02: a PLAYING recording is a live writer — its position every 5 s and
       // again on the reload's pagehide, into the database being deleted. stop()
@@ -1078,6 +1098,7 @@ export function createBackupFlow(ctx) {
         _deleteIdbDatabase('vot-journal-media', true),
         ...NONCRITICAL_DB_NAMES.map((name) => _deleteIdbDatabase(name, false)),
       ]);
+      libraryDeleted = !!deleteResults[0];
       if (!deleteResults[0] || !deleteResults[1]) {
         throw new Error('A personal-data database could not be deleted');
       }
@@ -1112,7 +1133,9 @@ export function createBackupFlow(ctx) {
       // dialog + dev-speak. The diagnostics still go to console.warn above;
       // the user gets an actionable message, not a pointer to tooling.
       _showToast('Clear did not finish. Please try again.');
+      if (!libraryDeleted) return NOTHING_WRITTEN;
     }
+    return undefined;
   };
   // Runs via _runLockedBackupOperation (mutex + cross-tab lock live there).
   // v04-02: the persist sink AND every store write stay frozen from before the

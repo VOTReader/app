@@ -57,6 +57,20 @@ const _idbStoreRegistry = new Set();
  * publishes; the flag itself lives here, in the one bundle that has stores.
  */
 let _writeFence = false;
+/** Whether this page's own fence also closes the adapter's door (not for the snapshot restore's storesOnly). */
+let _writeFenceAtAdapter = false;
+
+/**
+ * W8 (sweep 2026-10-13): the fence ANOTHER tab raised. Its Clear All, Import or snapshot Restore
+ * made the database the library, and this page's memory is the old one: a whole-value save
+ * from here recreated a deleted database or wrote the old copy over the import.
+ * utils/other-tabs.js raises it (and lowers it when that operation wrote nothing). It is held
+ * apart from this page's own fence, so neither page's operation can lower the other's.
+ */
+let _remoteFence = false;
+
+/** Is any save held: this page's Clear All / Restore, or another tab's change? */
+function _fenced() { return _writeFence || _remoteFence; }
 
 /** Stores whose save the fence skipped: each is saved again the moment the fence comes down. */
 /** @type {Set<any>} */
@@ -75,8 +89,24 @@ const _fencedDirty = new Set();
  */
 export function setStoreWriteFence(on, opts) {
   _writeFence = !!on;
-  if (!(opts && opts.storesOnly) && typeof IDBAdapter.setWriteFence === 'function') IDBAdapter.setWriteFence(_writeFence);
-  if (_writeFence) return;
+  _writeFenceAtAdapter = _writeFence && !(opts && opts.storesOnly);
+  _applyFences();
+}
+
+/**
+ * W8: raise or lower the other tab's fence (see _remoteFence). It always closes the adapter's
+ * door too: nothing on this page may write into a library another tab just made.
+ * @param {boolean} on
+ */
+export function setRemoteWriteFence(on) {
+  _remoteFence = !!on;
+  _applyFences();
+}
+
+/** Both fences onto the adapter's door; once neither holds, every save they skipped runs now. */
+function _applyFences() {
+  if (typeof IDBAdapter.setWriteFence === 'function') IDBAdapter.setWriteFence(_writeFenceAtAdapter || _remoteFence);
+  if (_fenced()) return;
   const skipped = Array.from(_fencedDirty);
   _fencedDirty.clear();
   for (const store of skipped) {
@@ -84,8 +114,8 @@ export function setStoreWriteFence(on, opts) {
   }
 }
 
-/** @returns {boolean} */
-export function isStoreWriteFenced() { return _writeFence; }
+/** Is any save held (this page's fence or another tab's)? @returns {boolean} */
+export function isStoreWriteFenced() { return _fenced(); }
 
 /**
  * v04-03: a store met a database that a NEWER VOTReader upgraded (IDB VersionError).
@@ -96,7 +126,20 @@ export function isStoreWriteFenced() { return _writeFence; }
  */
 function _reportNewerDatabase(storageKey) {
   if (typeof StorageHealth !== 'undefined' && typeof StorageHealth.setVersionTooNew === 'function') StorageHealth.setVersionTooNew(true);
+  if (_toldNewer.has(storageKey)) return;
+  _toldNewer.add(storageKey);
   if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('hydration', storageKey + ': the database was saved by a newer VOTReader (IDB VersionError); no retry');
+}
+/** The stores already traced for a newer database (W8: a save meets it on every edit). */
+const _toldNewer = new Set();
+
+/**
+ * W8: did this write meet a database a newer VOTReader upgraded? That is not full storage
+ * and a retry can never land (v04-03), so a save says so once and stops.
+ * @param {unknown} err
+ */
+function _isNewerDatabase(err) {
+  return typeof IDBAdapter.isVersionError === 'function' && IDBAdapter.isVersionError(err);
 }
 
 /**
@@ -479,7 +522,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
      * store ([D4]), so the LS branch is no longer exclusive to this one.
      */
     _save() {
-      if (_writeFence) { _fencedDirty.add(this); return; }   // v04-02: nothing may land between Clear All's deletes and its reload
+      if (_fenced()) { _fencedDirty.add(this); return; }   // v04-02 + W8: nothing may land between Clear All's deletes and its reload, or over another tab's
       if (this._replaying || this._applyingPending) return;
       if (useIdb) {
         // The boot-script copy is written SYNCHRONOUSLY here, before either
@@ -518,6 +561,8 @@ export function CachedStore(storageKey, defaultVal, opts) {
             // earlier failure — nothing else ever reports a success to it.
             if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteSuccess();
           }, function (err) {
+            // W8: a newer build upgraded the database under this tab: its banner, no "storage is full", no retry.
+            if (_isNewerDatabase(err)) { _reportNewerDatabase(storageKey); return; }
             console.error('IDB write failed for', idbStoreName, err);
             // W7.4: bare-global (typeof) guard mirrors the StorageHealth line
             // below — cached-store deliberately holds no imports (see header).
@@ -557,7 +602,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
       // replaceExact, not in the lock callback that runs later.
       const exact = this._exactNextSave;
       this._exactNextSave = false;
-      if (_writeFence) { _fencedDirty.add(this); return; }
+      if (_fenced()) { _fencedDirty.add(this); return; }
       // ...and take the data NOW: a save already waiting on the lock merges
       // into `_cache` (and replaces it) before this callback gets its turn.
       const exactData = exact ? _cloneSnapshot(this._cache) : null;
@@ -566,9 +611,9 @@ export function CachedStore(storageKey, defaultVal, opts) {
       const p = navigator.locks.request('vot-store:' + name, function () {
         // v04-02: a merge queued behind this lock may run after the fence went
         // up; its get would reopen the deleted database and its put refill it.
-        if (_writeFence) { _fencedDirty.add(self); return undefined; }
+        if (_fenced()) { _fencedDirty.add(self); return undefined; }
         return IDBAdapter.get(name, 'v').then(function (theirsRaw) {
-          if (_writeFence) { _fencedDirty.add(self); return undefined; }
+          if (_fenced()) { _fencedDirty.add(self); return undefined; }
           const theirs = (theirsRaw === undefined) ? null : theirsRaw;
           // ── synchronous merge + adopt: no `await` between reading `_cache`
           //    and reassigning it, so a concurrent in-place mutation of the old
@@ -616,6 +661,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
         self._clearWriteRetry();   // STORE-4: merged write durable — cancel any pending retry
         if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteSuccess();
       }, function (err) {
+        if (_isNewerDatabase(err)) { _reportNewerDatabase(storageKey); return; }        // W8, see _save
         console.error('IDB merged write failed for', name, err);
         if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('store', 'IDB merged write failed: ' + name + ' — ' + ((err && err.name) || err));
         if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);

@@ -50,7 +50,11 @@ const BUDGETS = [
   // painted into reading text and wears jrn- CSS), JournalInboundSheet,
   // JournalChip, JournalHelpers and every journal store. Re-baselined DOWN by
   // the c43 rule: 269,918 x 1.15 = 310,405.7 -> the hundred above.
-  { file: 'bundle-b.js', measured: 269918, max: 310500 },   // stores/hooks/journal machinery/bridge
+  // 2026-10-13, W8 (overhaul port of main 5ad1b7e0): utils/other-tabs.js and the remote
+  // write fence (another tab's Clear All / Import holds this tab's saves) live with the
+  // stores, +2,395 B (309,874 -> 312,269); the bundle had grown to the old ceiling. Main
+  // re-baselined the same bundle in dl-1011. 312,269 x 1.15 = 359,109.4 -> the hundred above.
+  { file: 'bundle-b.js', measured: 312269, max: 359200 },   // stores/hooks/journal machinery/bridge
   { file: 'bundle-c.js', measured: 19014, max: 22000 },    // renderer
   // 2026-09-22, landing 21: the four Personal Study screens (My Progress,
   // Notes, Links, Highlights) LEFT this bundle for bundle-g, -46,043 B off the
