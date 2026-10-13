@@ -640,7 +640,7 @@ async function _restoreLocked(sink, missing, snap, opts) {
   if (typeof w.__freezePersistState === 'function') w.__freezePersistState(true);
   setStoreWriteFence(true, { storesOnly: true });
   // W8: the other open tabs hold their saves from here (their old copy would land on the restore).
-  announceLibraryChange('changing');
+  const op = announceLibraryChange('changing');
   let wrote = false;
   try {
     await Promise.all(registeredStores().map((s) => (typeof s.whenSaved === 'function' ? s.whenSaved() : true)));
@@ -655,7 +655,7 @@ async function _restoreLocked(sink, missing, snap, opts) {
     // Nothing reloads: lift the fence and the freeze so this session keeps saving
     // (an edit the fence held is saved now), and say so. The finding stays up.
     // The other tabs save again too, unless part of the restore landed.
-    announceLibraryChange(wrote ? 'changed' : 'unchanged');
+    announceLibraryChange(wrote ? 'changed' : 'unchanged', op);
     setStoreWriteFence(false);
     if (typeof w.__freezePersistState === 'function') w.__freezePersistState(false);
     DiagnosticLog.warn('data-health', 'restore from ' + missing.name + ' failed: ' + ((e && /** @type {any} */ (e).name) || e));
@@ -665,7 +665,7 @@ async function _restoreLocked(sink, missing, snap, opts) {
     return false;
   }
   setStoreWriteFence(true);
-  announceLibraryChange('changed');              // W8: the other tabs ask for a reload too
+  announceLibraryChange('changed', op);          // W8: the other tabs ask for a reload too
   _healthy = false;                              // nothing more from this page: it reloads
   DiagnosticLog.warn('data-health', 'restored from ' + missing.name + ' (merge' + (opts && opts.auto ? ', on its own after a total wipe' : '') + ')');
   try { localStorage.setItem(RESTORED_NOTE_KEY, JSON.stringify({ at: missing.at || snapshotTime(missing.name), auto: !!(opts && opts.auto) })); } catch (_e) { /* no note, no toast */ }

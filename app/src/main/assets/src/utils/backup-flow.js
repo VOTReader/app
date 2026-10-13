@@ -148,7 +148,7 @@ export function createBackupFlow(ctx) {
   const _withLiveWritersFrozen = async (operation, opts) => {
     const fenceStores = !!(opts && opts.fenceStores);
     const w = /** @type {any} */ (window);
-    _announce('changing');
+    const op = _announce('changing');
     if (typeof w.__flushPersistState === 'function') w.__flushPersistState();
     if (typeof w.__freezePersistState === 'function') w.__freezePersistState(true);
     if (fenceStores && typeof setStoreWriteFence === 'function') setStoreWriteFence(true);
@@ -161,12 +161,16 @@ export function createBackupFlow(ctx) {
         if (fenceStores && typeof setStoreWriteFence === 'function') setStoreWriteFence(false);
         if (typeof w.__freezePersistState === 'function') w.__freezePersistState(false);
       }
-      _announce(!backupReloadPendingRef.current && result === NOTHING_WRITTEN ? 'unchanged' : 'changed');
+      _announce(!backupReloadPendingRef.current && result === NOTHING_WRITTEN ? 'unchanged' : 'changed', op);
     }
   };
-  /** @param {'changing' | 'changed' | 'unchanged'} kind */
-  const _announce = (kind) => {
-    try { if (typeof announceLibraryChange === 'function') announceLibraryChange(kind); } catch (_e) { /* best-effort: never blocks the operation */ }
+  /**
+   * 'changing' returns the operation's id; the end names it (one page can run two: W8 round 3).
+   * @param {'changing' | 'changed' | 'unchanged'} kind @param {string} [op] @returns {string | undefined}
+   */
+  const _announce = (kind, op) => {
+    try { if (typeof announceLibraryChange === 'function') return announceLibraryChange(kind, op); } catch (_e) { /* best-effort: never blocks the operation */ }
+    return undefined;
   };
   const _runBackupOperation = async (operation) => {
     if (backupBusyRef.current) return;

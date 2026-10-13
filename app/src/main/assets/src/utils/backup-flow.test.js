@@ -690,3 +690,14 @@ describe('W8: an import in a tab whose library another tab changed', () => {
     expect(said).toEqual(['changing', 'unchanged']);
   });
 });
+
+describe('W8 refuter round 3: the end of an operation names the operation its start returned', () => {
+  it('Import: the start\'s id comes back with "changed"', async () => {
+    const calls = [];
+    put('announceLibraryChange', (kind, op) => { calls.push([kind, op]); return kind === 'changing' ? 'op-7' : undefined; });
+    bridge.pickImportFile.mockResolvedValue(await votbakFile());
+    await createBackupFlow(ctx).importPersonalData();
+    await settle();
+    expect(calls).toEqual([['changing', undefined], ['changed', 'op-7']]);
+  });
+});
