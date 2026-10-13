@@ -195,6 +195,20 @@ describe('journal marks: the refutation of the first cut', () => {
     expect(r.notes.g.keys).toEqual(['journal:j_1:b_a', 'journal:j_1:b_c']);
   });
 
+  it("a note whose position keys hold none of its segments (a stale tab's edit brought them back) follows the segments", () => {
+    const r = rekeyJournalMarks(ENTRIES, {
+      annotations: {
+        'journal:j_1:b_b': [ann('s_a', 'upon every remembrance', { groupId: 'g' })],
+        'journal:j_1:b_c': [ann('s_b', 'Always', { groupId: 'g' })],
+      },
+      notes: { g: { groupId: 'g', keys: ['journal:j_1:1', 'journal:j_1:2'], fullText: 'upon every remembrance\nAlways', body: 'old tab', updated: 70 } },
+      noPosition: true,
+    });
+    expect(r.annotations).toBeUndefined();
+    expect(r.notes.g.keys).toEqual(['journal:j_1:b_b', 'journal:j_1:b_c']);
+    expect(r.notes.g.updated).toBe(70.5);
+  });
+
   it('F5: a note keeps its old key while one of its segments could not move', () => {
     const r = rekeyJournalMarks(ENTRIES, {
       annotations: { 'journal:j_1:0': [ann('s_a', 'Grace to you', { groupId: 'g' }), ann('s_b', 'edited away', { groupId: 'g' })] },

@@ -420,6 +420,23 @@ export function rekeyMarkStores(data, how) {
     }
   }
 
+  // Where each group's segments sit once this pass is done, moved or not. A note
+  // key this pass claims that holds none of them, while others do, goes to those
+  // (sweep mw14): a stale tab's body edit, a later whole millisecond, wins the
+  // cross-tab merge with the key a past pass moved the segments off, and no later
+  // pass moves those segments again to take the note along.
+  /** @type {Record<string, string[]>} */ var groupAt = Object.create(null);
+  var annNow = out.annotations || ann;
+  if (annNow) {
+    Object.keys(annNow).forEach(function(k) {
+      (Array.isArray(annNow[k]) ? annNow[k] : []).forEach(function(a) {
+        if (!a || !a.groupId) return;
+        var at = groupAt[a.groupId] || (groupAt[a.groupId] = []);
+        if (at.indexOf(k) < 0) at.push(k);
+      });
+    });
+  }
+
   const notes = data && data.notes;
   if (notes) {
     /** @type {Record<string, any>} */ var nextNotes = {};
@@ -438,6 +455,17 @@ export function rekeyMarkStores(data, how) {
           to.forEach(keep);
           if (groupStays[gid + '\n' + k]) keep(k);
           return;
+        }
+        var held = groupAt[gid];
+        if (held && held.indexOf(k) < 0) {
+          var p = parse(k, false);
+          if (p && !p.gone) {
+            changed = true;
+            out.moved++;
+            // the note's own keys that hold segments keep their place in its list
+            held.forEach(function(h) { if (keys.indexOf(h) < 0) keep(h); });
+            return;
+          }
         }
         var nk = move(k, keys.length === 1 ? n.fullText : null, null, false);
         if (nk) changed = true;
