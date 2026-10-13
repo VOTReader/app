@@ -42,8 +42,9 @@ function makeRoutes(overrides = {}) {
     isRead: () => false, getReadKey: (rk, id) => `${rk}:${id}`,
     goHome: vi.fn(), goSearch: vi.fn(), goSettings: vi.fn(), goHistory: vi.fn(), goStudiesHome: vi.fn(),
     studyId: 'purity', studyChapterId: 'purity-ch1',
-    getStudyById: () => ({ id: 'purity', slug: 'purity', chapters: [] }),
-    getStudyChapter: () => null,
+    // a study and a part that resolve (W28: a route whose part does not resolve shows its own way back)
+    getStudyById: () => ({ id: 'purity', slug: 'purity', chapters: [{ id: 'purity-ch1' }] }),
+    getStudyChapter: (study, chId) => (study.chapters.find((c) => c.id === chId) || null),
     studyReadKey: (slug) => 'bible-study-' + slug,
     UNIFIED_CHAIN: [],
     bibleAudioFor: () => null,

@@ -608,6 +608,40 @@ export function buildScreenRoutes({
    * @param {string} volKey
    * @returns {any} never null
    */
+  /**
+   * W28: a study route whose study (or part) does not resolve rendered null: no
+   * header, no back, no retry, and the persisted tab repeated it on reload. The
+   * _deadLetter rule, for studies: chrome plus a way out, and a fallback that
+   * cannot fail. Still loading, or not asked for yet (App's effect starts the
+   * load after the first render; bible-studies.js defines BIBLE_STUDIES) ->
+   * Loading. The load failed -> Try again. Loaded and the id is stale -> a way back.
+   *
+   * @param {boolean} [partGone] the study is there, the part is not
+   * @returns {any} never null
+   */
+  const _deadStudy = (partGone) => {
+    const loading = <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>Loading…</div>;
+    const failed = studiesError && !studiesLoading;
+    if (!failed && (studiesLoading || typeof BIBLE_STUDIES === 'undefined')) return loading;
+    const say = failed ? 'Couldn’t load studies.' : partGone ? 'This part is no longer available.' : 'This study is no longer available.';
+    const label = failed ? 'Try again' : partGone ? 'Back to the study' : 'Back to Studies';
+    const go = failed ? retryStudies : partGone ? () => setScreen('bible-study-index') : goStudiesHome;
+    const body = (
+      <div className="sc-sheet-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '14px', textAlign: 'center', padding: '0 24px' }}>
+        <div>{say}</div>
+        <button type="button" onClick={go} style={{ padding: '8px 20px', borderRadius: '999px', border: '1px solid currentColor', background: 'transparent', color: 'inherit', font: 'inherit', cursor: 'pointer', opacity: 0.85 }}>{label}</button>
+      </div>
+    );
+    const nav = (typeof LibraryNav === 'function') ? LibraryNav({
+      onBack: goStudiesHome, backLabel: 'Studies',
+      onSettings: goSettings, onHistory: goHistory, onSearch: goSearch,
+      theme, onThemeChange: setTheme,
+    }) : null;
+    return (typeof ScreenLayout === 'function')
+      ? <ScreenLayout navChildren={nav}>{body}</ScreenLayout>
+      : body;
+  };
+
   const _deadLetter = (volKey) => {
     const col = (typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY.get) ? COL_BY_KEY.get(volKey) : null;
     const idxScreen = (col && col.indexScreen) || 'volumes-home';
@@ -1460,10 +1494,9 @@ export function buildScreenRoutes({
     },
 
     'bible-study-index': () => {
-      if (!studyId) return null;
       if (typeof BibleStudyIndex === 'undefined') return _corpusView(window.__screensG, window.__loadScreensG, 'Loading…');
-      const study = getStudyById(studyId);
-      if (!study) return studiesLoading ? <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>Loading…</div> : null;
+      const study = studyId ? getStudyById(studyId) : null;
+      if (!study) return _deadStudy();   // W28
       return (
         <BibleStudyIndex
           study={study}
@@ -1482,39 +1515,46 @@ export function buildScreenRoutes({
       );
     },
 
-    'bible-study-chapter': () => typeof BibleStudyChapterView !== 'undefined' ? (
-      <BibleStudyChapterView
-        studyId={studyId}
-        studyChapterId={studyChapterId}
-        getStudyById={getStudyById}
-        getStudyChapter={getStudyChapter}
-        studiesLoading={studiesLoading}
-        prevChainEntry={prevChainEntry}
-        nextChainEntry={nextChainEntry}
-        goToChainEntryFirst={goToChainEntryFirst}
-        goToChainEntryLast={goToChainEntryLast}
-        setStudyChapterId={setStudyChapterId}
-        setScreen={setScreen}
-        setBookId={setBookId}
-        setChapterNum={setChapterNum}
-        setFromStudies={setFromStudies}
-        setLetterId={setLetterId}
-        setActiveReadKey={setActiveReadKey}
-        setSurpriseAnchor={setSurpriseAnchor}
-        markRead={markRead}
-        getReadKey={getReadKey}
-        unmarkRead={unmarkRead}
-        isRead={isRead}
-        studyReadKey={studyReadKey}
-        prophecyCardStatesRef={prophecyCardStatesRef}
-        saveProphecyCardStates={saveProphecyCardStates}
-        selectStudy={selectStudy}
-        selectStudyChapter={selectStudyChapter}
-        goStudiesHome={goStudiesHome}
-        pushFromLetter={pushFromLetter}
-        sharedViewProps={sharedViewProps}
-      />
-    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
+    'bible-study-chapter': () => {
+      if (typeof BibleStudyChapterView === 'undefined') return _corpusView(window.__screensG, window.__loadScreensG, 'Loading…');
+      // W28: the view returned null for a study or part that does not resolve.
+      const study = studyId ? getStudyById(studyId) : null;
+      if (!study) return _deadStudy();
+      if (!studyChapterId || !getStudyChapter(study, studyChapterId)) return _deadStudy(true);
+      return (
+        <BibleStudyChapterView
+          studyId={studyId}
+          studyChapterId={studyChapterId}
+          getStudyById={getStudyById}
+          getStudyChapter={getStudyChapter}
+          studiesLoading={studiesLoading}
+          prevChainEntry={prevChainEntry}
+          nextChainEntry={nextChainEntry}
+          goToChainEntryFirst={goToChainEntryFirst}
+          goToChainEntryLast={goToChainEntryLast}
+          setStudyChapterId={setStudyChapterId}
+          setScreen={setScreen}
+          setBookId={setBookId}
+          setChapterNum={setChapterNum}
+          setFromStudies={setFromStudies}
+          setLetterId={setLetterId}
+          setActiveReadKey={setActiveReadKey}
+          setSurpriseAnchor={setSurpriseAnchor}
+          markRead={markRead}
+          getReadKey={getReadKey}
+          unmarkRead={unmarkRead}
+          isRead={isRead}
+          studyReadKey={studyReadKey}
+          prophecyCardStatesRef={prophecyCardStatesRef}
+          saveProphecyCardStates={saveProphecyCardStates}
+          selectStudy={selectStudy}
+          selectStudyChapter={selectStudyChapter}
+          goStudiesHome={goStudiesHome}
+          pushFromLetter={pushFromLetter}
+          sharedViewProps={sharedViewProps}
+        />
+      );
+    },
 
     'holy-days-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
