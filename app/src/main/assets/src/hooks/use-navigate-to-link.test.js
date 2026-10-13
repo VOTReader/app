@@ -9,7 +9,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useNavigateToLink, verseAnchorFor } from './use-navigate-to-link.js';
+import { useNavigateToLink, verseAnchorFor, noteTabAction } from './use-navigate-to-link.js';
 import { navHandoff } from '../utils/nav-handoff.js';
 
 function makeParams(over) {
@@ -176,6 +176,36 @@ describe('useNavigateToLink — bible nav corpus-await', () => {
     await act(async () => { resolveLoad(); await Promise.resolve(); });
     expect(p.setScreen).not.toHaveBeenCalled();
     expect(p.pushFromLetter).not.toHaveBeenCalled();
+  });
+
+  // W39 refuter round 2: the check compared only the values at the tap and at load.
+  it('W39: leaving and coming back to the same place while the corpus loads cancels the jump', async () => {
+    let resolveLoad;
+    window.__loadBibleCorpus = vi.fn(() => new Promise((res) => { resolveLoad = res; }));
+    const p = makeParams({ screen: 'bookmarks', activeTabIdx: 0, tabCount: 1 });
+    const { result, rerender } = renderHook((q) => useNavigateToLink(q), { initialProps: p });
+    act(() => { result.current.navigateToLink({ type: 'bible', bookId: 'genesis', chapter: 2 }); });
+    rerender({ ...p, screen: 'home' });
+    rerender({ ...p });
+    window.BOOKS = { genesis: { title: 'Genesis' } };
+    await act(async () => { resolveLoad(); await Promise.resolve(); });
+    expect(p.setScreen).not.toHaveBeenCalled();
+    expect(p.pushFromLetter).not.toHaveBeenCalled();
+  });
+
+  it('W39: any tab action while the corpus loads cancels the jump (closing the only tab swaps in a fresh Home tab)', async () => {
+    let resolveLoad;
+    window.__loadBibleCorpus = vi.fn(() => new Promise((res) => { resolveLoad = res; }));
+    const p = makeParams({ screen: 'home', activeTabIdx: 0, tabCount: 1 });
+    const { result, rerender } = renderHook((q) => useNavigateToLink(q), { initialProps: p });
+    act(() => { result.current.navigateToLink({ type: 'bible', bookId: 'genesis', chapter: 2, key: 'hl:x' }); });
+    noteTabAction(); // use-tab-actions: the only tab closed, reset to Home (same index, count and place)
+    rerender({ ...p });
+    window.BOOKS = { genesis: { title: 'Genesis' } };
+    await act(async () => { resolveLoad(); await Promise.resolve(); });
+    expect(p.setScreen).not.toHaveBeenCalled();
+    expect(p.pushFromLetter).not.toHaveBeenCalled();
+    expect(navHandoff.peek('pendingScrollHlKey')).toBeNull();
   });
 
   it('W39: re-renders that leave the reader where they tapped do not cancel the jump', async () => {

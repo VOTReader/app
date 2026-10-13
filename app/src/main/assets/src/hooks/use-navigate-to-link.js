@@ -60,10 +60,12 @@
      setJournalEntryId — App useState setter; journal endpoints.
      activeTabIdx, tabCount — useTabs; with the nav position, the "has the
        reader moved on?" check a Bible jump that waits for its corpus makes
-       (W39: any change of either since the tap = another tab).
+       (W39: any change of any of them since the tap drops the jump).
 
    RETURNS: { navigateToLink }   (the stable shell only — _navToLinkRef is
             fully internal; App() consumes navigateToLink, nothing else.)
+   ALSO EXPORTS: noteTabAction / tabActionCount — use-tab-actions.js calls
+            noteTabAction on every tab action; a pending Bible jump drops (W39).
 
    STORAGE: none.
 
@@ -73,8 +75,6 @@
      into view. (D2 removed the write-only-dead 'pendingLinkExcerpt' slot.)
      A Bible jump that waits for its corpus sets it with the jump (W39).
    ═══════════════════════════════════════════════════════════════════════ */
-
-import { useRefMirror } from './use-ref-mirror.js';
 
 /**
  * Build the surpriseAnchor for a bible/matthew endpoint's verse target.
@@ -103,10 +103,15 @@ export function verseAnchorFor(endpoint) {
    the top of the deferred body. */
 const _NEEDS_SCREEN = { letter: 1, wtlb: 1, blessed: 1, 'holy-days': 1 };
 
-/* The fields that say where the reader is (W39): the tab epoch plus the 7
-   nav-position fields the back-stack entry captures. */
-const _PLACE_KEYS = ['tab', 'screen', 'bookId', 'chapterNum', 'letterId', 'studyId', 'studyChapterId', 'journalEntryId'];
-const _samePlace = (a, b) => _PLACE_KEYS.every((k) => a[k] === b[k]);
+/* W39: every tab action (use-tab-actions.js: open, switch, close, move, pin,
+   rename, reset, undo) calls noteTabAction. Tabs carry no id, and closing the
+   only tab swaps in a fresh Home tab at the same index, count and place, so a
+   Bible jump waiting for its corpus runs only if no tab action ran since the
+   tap. One app, one tab set: module scope (both live in bundle-b). */
+let _navLinkTabActions = 0;
+export function noteTabAction() { _navLinkTabActions++; }
+/** @returns {number} */
+export function tabActionCount() { return _navLinkTabActions; }
 
 /**
  * Cross-screen navigation handler. Returns a stable `navigateToLink`
@@ -143,15 +148,15 @@ export function useNavigateToLink({
   setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
   setSurpriseAnchor, setJournalEntryId, activeTabIdx, tabCount,
 }) {
-  // W39: tabs carry no id, so "the same tab" is "no tab switched, opened, closed
-  // or moved since the tap": every change of the active index or the tab count
-  // starts a new epoch (closing tab 0 slides tab 1 into index 0; a switch away
-  // and back returns to the same index). Synced during render, like useRefMirror.
-  const _tabEpochRef = React.useRef({ idx: activeTabIdx, n: tabCount, epoch: 0 });
-  const _te = _tabEpochRef.current;
-  if (_te.idx !== activeTabIdx || _te.n !== tabCount) { _te.idx = activeTabIdx; _te.n = tabCount; _te.epoch++; }
-  // Where the reader is NOW, read when a deferred Bible jump's corpus lands (W39).
-  const _placeRef = useRefMirror({ tab: _te.epoch, screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId });
+  // W39: "has the reader moved since the tap?" counts moves, not end states:
+  // every render where the active tab index, the tab count or any of the 7
+  // nav-position fields differs from the last one bumps the count (closing tab 0
+  // slides tab 1 into index 0; a switch away and back, or Home and back, ends
+  // where it started). Synced during render, like useRefMirror.
+  const _place = [activeTabIdx, tabCount, screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId];
+  const _movesRef = React.useRef({ last: _place, count: 0 });
+  const _mv = _movesRef.current;
+  if (_place.some((v, i) => v !== _mv.last[i])) { _mv.last = _place; _mv.count++; }
   // Part 1 + 2 of the pattern (see header). The shell has [] deps — stable
   // for the component's lifetime.
   const _navToLinkRef = React.useRef(null);
@@ -259,14 +264,15 @@ export function useNavigateToLink({
         // reader still was, and useFromLetterStack's prune popped it on the next
         // render: the jump landed with no way back. And the setters write to the
         // tab active when the corpus lands, so the jump runs only if the reader
-        // is still in the tab and place they tapped from.
-        const tappedAt = _placeRef.current;
+        // has not moved and no tab action ran since the tap.
+        const movesAtTap = _movesRef.current.count;
+        const tabActionsAtTap = _navLinkTabActions;
         window.__loadBibleCorpus().then(function () {
           // Re-check post-load: a real endpoint resolves; a stale/bogus bookId
           // no-ops with a trace rather than opening an empty chapter.
           if (!(typeof BOOKS !== 'undefined' && BOOKS && BOOKS[endpoint.bookId])) {
             console.warn('navigateToLink: bible book not found after corpus load', endpoint.bookId);
-          } else if (!_samePlace(tappedAt, _placeRef.current)) {
+          } else if (_movesRef.current.count !== movesAtTap || _navLinkTabActions !== tabActionsAtTap) {
             console.info('navigateToLink: the reader moved on while the Bible loaded; jump dropped', endpoint.bookId);
           } else {
             goBible();
