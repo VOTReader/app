@@ -288,6 +288,36 @@ describe('JournalEditorScreen - W16 Undo after Done on an entry the exit prune r
     expect(purge).toHaveBeenCalledWith(entry.id);
   });
 
+  it('refuter: a counted entry pruned in the window gives its count back only when the window closes without Undo', () => {
+    globalThis.JournalStatsStore = { recordNewEntry: vi.fn(), recordDeletion: vi.fn() };
+    try {
+      const entry = openUntitled([{ ...JournalHelpers.newBlock('image', {}), mediaId: 'm3' }]);   // no marker: counted
+      deleteFirstBlock();
+      cleanup();
+      expect(JournalStore.get(entry.id)).toBeNull();
+      expect(globalThis.JournalStatsStore.recordDeletion).not.toHaveBeenCalled();   // Undo may still bring it back
+      flushTimers(8000);
+      expect(globalThis.JournalStatsStore.recordDeletion).toHaveBeenCalledTimes(1);
+    } finally {
+      delete globalThis.JournalStatsStore;
+    }
+  });
+
+  it('refuter: Undo keeps a counted entry counted', () => {
+    globalThis.JournalStatsStore = { recordNewEntry: vi.fn(), recordDeletion: vi.fn() };
+    try {
+      openUntitled([{ ...JournalHelpers.newBlock('image', {}), mediaId: 'm2' }]);
+      deleteFirstBlock();
+      cleanup();
+      tapUndo();
+      flushTimers(8000);
+      expect(globalThis.JournalStatsStore.recordDeletion).not.toHaveBeenCalled();
+      expect(globalThis.JournalStatsStore.recordNewEntry).not.toHaveBeenCalled();
+    } finally {
+      delete globalThis.JournalStatsStore;
+    }
+  });
+
   it('a brand-new entry brought back by Undo records its New-Entry stats once', () => {
     globalThis.JournalStatsStore = { recordNewEntry: vi.fn(), recordDeletion: vi.fn() };
     try {
