@@ -175,6 +175,27 @@ describe('app.css — light --gold-bright contrast at its small-text grounds (a1
   });
 });
 
+/* W67 (sweep 2026-10-13): the danger buttons (Clear All My Data, the wipe dialog's Delete Everything, Import &
+   Overwrite) painted 10 px uppercase text in --settings-danger #c0392b: 3.86:1 on the dark ground, 4.4:1 on light,
+   under AA in both themes. They take --danger, the destructive-text token both themes already tune. */
+describe('app.css — the Settings danger buttons reach AA in both themes (W67)', () => {
+  const rule = exactRuleBlock(CSS, '.settings-clear-btn.danger');
+  const colorToken = () => {
+    const m = rule && rule.match(/(?:^|;)\s*color:\s*var\(--([\w-]+)\)/);
+    return m ? m[1] : null;
+  };
+  it('the text colour is a token (so each theme can tune it)', () => {
+    expect(rule).not.toBeNull();
+    expect(colorToken()).toBe('danger');
+  });
+  it.each([['--bg', 'bg'], ['--bg2', 'bg2'], ['--bg3', 'bg3']])('dark, against %s', (_label, bgKey) => {
+    expect(contrastRatio(themed(ROOT, colorToken()), themed(ROOT, bgKey))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+  });
+  it.each([['--bg', 'bg'], ['--bg2', 'bg2'], ['--bg3', 'bg3']])('light, against %s', (_label, bgKey) => {
+    expect(contrastRatio(themed(LIGHT, colorToken()), themed(LIGHT, bgKey))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+  });
+});
+
 describe('app.css — surrounding contrast stays green', () => {
   it('dark --danger still reaches WCAG AA against dark --bg3 (untouched)', () => {
     const ratio = contrastRatio(themed(ROOT, 'danger'), themed(ROOT, 'bg3'));
