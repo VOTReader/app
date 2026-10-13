@@ -2,8 +2,8 @@
 /* TodayCard (rp1): the reader's plans for today on Home, built to the round-2
    mockups (lanes/myweb/out/mockups/rp1/r2-home-one.png, r2-home-two.png). */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, cleanup, fireEvent, screen } from '@testing-library/react';
-import { TodayCard } from './TodayCard.jsx';
+import { render, cleanup, fireEvent, screen, act } from '@testing-library/react';
+import { TodayCard, useNow } from './TodayCard.jsx';
 
 afterEach(cleanup);
 
@@ -59,5 +59,30 @@ describe('TodayCard', () => {
   it('a Volumes plan waiting for the letters to load says so', () => {
     render(<TodayCard rows={[row({ id: 'volumes', name: 'The Volumes in Order', loading: true, label: '', next: null })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} markAsReadEnabled />);
     expect(screen.getByText('Loading the Volumes…')).toBeTruthy();
+  });
+});
+
+// Sweep low (mw9): the date was read again only on a return to the front, so a Home screen left open
+// across midnight kept yesterday's portion, day number and 'behind' count.
+describe('useNow', () => {
+  function NowProbe() { return <span data-testid="now">{useNow().getDate()}</span>; }
+
+  it('turns over at local midnight while the app stays open, and drops its timer on unmount', () => {
+    vi.useFakeTimers({ now: new Date(2026, 9, 13, 23, 59, 30), toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const { unmount } = render(<NowProbe />);
+      expect(screen.getByTestId('now').textContent).toBe('13');
+      act(() => { vi.advanceTimersByTime(29_000); });
+      expect(screen.getByTestId('now').textContent).toBe('13');
+      act(() => { vi.advanceTimersByTime(2_000); });
+      expect(screen.getByTestId('now').textContent).toBe('14');
+      // ... and again the next night.
+      act(() => { vi.advanceTimersByTime(24 * 3600_000); });
+      expect(screen.getByTestId('now').textContent).toBe('15');
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -131,6 +131,26 @@ describe('BookmarkCreateSheet — thought field removed', () => {
     fireEvent.change(container.querySelector('.bkm-create-label-input'), { target: { value: 'Different' } });
     expect(save.disabled).toBe(false);
   });
+
+  // Sweep low (mw9): clearing the label enabled Save, and the commit fell back to the same label (a no-op
+  // write that only bumped 'updated').
+  it('EDIT-mode Save stays disabled while the label is empty or blank', () => {
+    const onConfirm = vi.fn();
+    const { container } = render(
+      <BookmarkCreateSheet
+        pending={{ editId: 'b1', hlKey: 'k', currentLabel: 'Same', defaultLabel: 'Same', currentThought: '' }}
+        onConfirm={onConfirm} onCancel={() => {}}
+      />
+    );
+    const save = /** @type {HTMLButtonElement} */ (container.querySelector('.navpick-confirm-green'));
+    const input = container.querySelector('.bkm-create-label-input');
+    fireEvent.change(input, { target: { value: '' } });
+    expect(save.disabled).toBe(true);
+    fireEvent.change(input, { target: { value: '   ' } });
+    expect(save.disabled).toBe(true);
+    fireEvent.click(save);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
 });
 
 describe('BookmarkRowActionSheet — thought actions removed', () => {

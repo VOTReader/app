@@ -6294,6 +6294,10 @@
       padding: 0.8rem 0;
       font-family: var(--font-body); font-size: var(--fs-15); color: var(--cream-muted); line-height: 1.5;
     }
+    .prg-retry {
+      margin-left: 0.25rem; min-height: 44px; padding: 0 1.2rem; border-radius: 999px;
+      border: 1px solid var(--gold-border); background: transparent; color: var(--cream); font: inherit; cursor: pointer;
+    }
     .prg-src-row { display: flex; align-items: baseline; gap: 0.75rem; padding: 0.7rem 0; }
     .prg-src-main { flex: 1; display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
     .prg-src-title {
@@ -6925,6 +6929,8 @@
       border: 1.5px solid rgba(255,255,255,0.10);
     }
     body.light .multinote-row-swatch { border-color: rgba(0,0,0,0.10); }
+    /* A "No color (icon only)" note: an empty ring, like the blank colour button. */
+    .multinote-row-swatch.is-blank, body.light .multinote-row-swatch.is-blank { background: transparent; border-color: var(--cream-dim); }
     .multinote-row-body {
       flex: 1; min-width: 0;
       display: flex; flex-direction: column; gap: 2px;

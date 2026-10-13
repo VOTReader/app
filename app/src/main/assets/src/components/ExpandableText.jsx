@@ -14,7 +14,11 @@ export function ExpandableText(props) {
     // Nothing to collapse — render plain so taps reach the parent card.
     return <div className={className}>{text}</div>;
   }
-  var head = text.slice(0, threshold).trim();
+  // Never cut between the two halves of an emoji (a lone half draws as a replacement glyph).
+  var end = threshold;
+  var last = text.charCodeAt(end - 1);
+  if (last >= 0xD800 && last <= 0xDBFF) end--;
+  var head = text.slice(0, end).trim();
   function toggle(e) {
     if (e) { e.stopPropagation(); e.preventDefault(); }
     setExpanded(function(v) { return !v; });

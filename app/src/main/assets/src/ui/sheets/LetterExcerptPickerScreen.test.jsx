@@ -76,6 +76,16 @@ describe('LetterExcerptPickerScreen breadcrumb + footer', () => {
     stubGlobals();
     const { container } = render(<LetterExcerptPickerScreen {...baseProps} returnTargetInsteadOfLink={true} />);
     expect(container.querySelector('.picker-footer-btn').textContent).toBe('Insert the whole letter');
+    // Sweep low (mw9): the empty-selection hint said "link" beside an Insert button.
+    const hint = container.querySelector('.picker-selection-hint-empty').textContent;
+    expect(hint).toContain('insert the whole letter');
+    expect(hint).not.toContain('link');
+  });
+
+  it('link mode keeps "link the whole letter" in the hint', () => {
+    stubGlobals();
+    const { container } = render(<LetterExcerptPickerScreen {...baseProps} />);
+    expect(container.querySelector('.picker-selection-hint-empty').textContent).toContain('link the whole letter');
   });
 
   it('find-in-letter counts matching paragraphs and washes the current hit', () => {

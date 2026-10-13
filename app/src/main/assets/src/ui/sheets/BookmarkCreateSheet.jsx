@@ -68,12 +68,13 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
 
   // canSave drives both the visual disabled state and the keyboard-shortcut
   // guard. EDIT-mode: only if the label differs from what we opened with
-  // (whitespace-tolerant). CREATE-mode: a non-empty label is enough — the
+  // (whitespace-tolerant) and is not empty (commit would fall back to the
+  // old label: a no-op write). CREATE-mode: a non-empty label is enough — the
   // auto-derived default satisfies this on first render so the fast
   // "highlight → ✓" path stays one tap.
   var canSave;
   if (isEditMode) {
-    canSave = label.trim() !== initialRef.current.label.trim();
+    canSave = label.trim().length > 0 && label.trim() !== initialRef.current.label.trim();
   } else {
     canSave = label.trim().length > 0;
   }

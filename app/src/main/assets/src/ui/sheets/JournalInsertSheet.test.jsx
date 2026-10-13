@@ -115,6 +115,16 @@ describe('bookmark drill', () => {
     expect(screen.queryByText('Psalm 23')).toBeNull();
     expect(screen.getByText('Isaiah 40')).toBeTruthy();
   });
+
+  // Sweep low (mw9): the picker sorted the store's own live array (all() is the cache; _save persists it).
+  it('lists newest first and leaves the live store array in its order', () => {
+    const live = [{ id: 'old', label: 'Older', updated: 1 }, { id: 'new', label: 'Newer', updated: 9 }];
+    window.BookmarkStore = { all: () => live };
+    mountSheet();
+    fireEvent.click(screen.getByText('Bookmark'));
+    expect([...document.querySelectorAll('.jrn-picker-label')].map((n) => n.textContent)).toEqual(['Newer', 'Older']);
+    expect(live.map((b) => b.id)).toEqual(['old', 'new']);
+  });
 });
 
 describe('note drill', () => {
@@ -230,6 +240,15 @@ describe('notebook drill', () => {
     const block = onInsertBlock.mock.calls[0][0];
     expect(block.type).toBe('notebook-card');
     expect(block.notebookId).toBe('uncategorized');
+  });
+
+  // Sweep low (mw9): the notebook picker's search box said "Search notes…" but matches notebook names.
+  it('the search box names what it searches: notebooks', () => {
+    window.NotebookStore = { list: () => [{ id: 'nb1', name: 'Prayers' }] };
+    window.NoteStore = { list: () => [] };
+    mountSheet();
+    fireEvent.click(screen.getByText('Notebook'));
+    expect(screen.getByPlaceholderText('Search notebooks…')).toBeTruthy();
   });
 
   // Sweep W69: every notebook row re-listed (and re-sorted) every note to count its own.

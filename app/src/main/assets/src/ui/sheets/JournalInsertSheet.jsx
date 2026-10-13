@@ -302,6 +302,7 @@ export function JournalInsertSheet(props) {
           autoFocus
           placeholder={mode === 'pick-journal' ? 'Search journal entries…'
             : mode === 'pick-bookmark' ? 'Search bookmarks…'
+            : mode === 'pick-notebook' ? 'Search notebooks…'
             : 'Search notes…'}
           value={query}
           onChange={function(e) { setQuery(e.target.value); }}
@@ -320,7 +321,8 @@ export function JournalInsertSheet(props) {
   }
 
   function renderBookmarkPicker() {
-    var bms = (typeof BookmarkStore !== 'undefined') ? BookmarkStore.all() : [];
+    // A copy: all() is the store's live cache, and its next save would persist this order.
+    var bms = (typeof BookmarkStore !== 'undefined') ? BookmarkStore.all().slice() : [];
     bms.sort(function(a, b) { return (b.updated || b.created || 0) - (a.updated || a.created || 0); });
     var sourceLabel = (typeof _bookmarkSourceLabel === 'function') ? _bookmarkSourceLabel : function() { return ''; };
     var filtered = filterByText(bms, function(b) {
