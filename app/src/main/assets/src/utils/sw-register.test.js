@@ -19,6 +19,14 @@ import { registerServiceWorker } from './sw-register.js';
 import { DiagnosticLog } from './diagnostic-log.js';
 import { _resetToasts } from './toast.js';
 import { UPDATE_RELOAD_FLAG } from './update-toast.js';
+import { holdUpdateReload, _resetForTests as _resetHolds } from './update-hold.js';
+
+// ds2: a held reload waits for the stores' writes; the cases below hand it their own.
+const mockStores = vi.hoisted(() => ({ list: /** @type {any[]} */ ([]) }));
+vi.mock('../stores/cached-store.js', async (importOriginal) => ({
+  .../** @type {any} */ (await importOriginal()),
+  registeredStores: () => mockStores.list,
+}));
 
 describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
   let controllerChangeHandler;
@@ -152,6 +160,117 @@ describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
     setVisibility('visible');
     registerServiceWorker();
     expect(spy).toHaveBeenCalledWith('./service-worker.js', { updateViaCache: 'none' });
+  });
+});
+
+/* THE HOLD (ds2, 2026-10-13). The reload lands wherever the reader is, but a note being typed,
+   a voice memo and a backup import cannot ride it: while one is open it waits, then reloads
+   once the last lets go, a beat later and after the closing save's write has landed. */
+describe('registerServiceWorker — the update reload waits for unsaved work (ds2)', () => {
+  let controllerChangeHandler, reloadSpy, origSW, origLocation;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    _resetHolds();
+    mockStores.list = [];
+    controllerChangeHandler = null;
+    reloadSpy = vi.fn();
+    delete window.__votSwTookOver;
+    origSW = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: {
+      controller: {},
+      addEventListener: (type, cb) => { if (type === 'controllerchange') controllerChangeHandler = cb; },
+      register: () => Promise.resolve({ waiting: null, installing: null, addEventListener: () => {}, update: () => {} }),
+    } });
+    origLocation = Object.getOwnPropertyDescriptor(window, 'location');
+    Object.defineProperty(window, 'location', { configurable: true, value: { reload: reloadSpy } });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    _resetHolds();
+    mockStores.list = [];
+    delete window.__votSwTookOver;
+    if (origSW) Object.defineProperty(navigator, 'serviceWorker', origSW);
+    if (origLocation) Object.defineProperty(window, 'location', origLocation);
+    vi.restoreAllMocks();
+  });
+
+  it('waits while a note and a voice memo are open; the restore record is written at the reload, not before', async () => {
+    let events = 0;
+    const onBefore = () => { events += 1; };
+    window.addEventListener('vot:before-update-reload', onBefore);
+    try {
+      registerServiceWorker();
+      const releaseNote = holdUpdateReload('note');
+      const releaseMemo = holdUpdateReload('recording');
+      controllerChangeHandler();
+      expect(reloadSpy).not.toHaveBeenCalled();
+      expect(window.__votSwTookOver, 'a lazy load in the wait still refuses to mix builds').toBe(true);
+      expect(events).toBe(0);
+      releaseNote();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(reloadSpy, 'the memo still holds it').not.toHaveBeenCalled();
+      releaseMemo();
+      await vi.advanceTimersByTimeAsync(399);
+      expect(reloadSpy, 'a beat for the closing save to issue its write').not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(reloadSpy).toHaveBeenCalledTimes(1);
+      expect(events).toBe(1);
+      expect(sessionStorage.getItem(UPDATE_RELOAD_FLAG)).toBeTruthy();
+      controllerChangeHandler();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(reloadSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener('vot:before-update-reload', onBefore);
+      try { sessionStorage.removeItem(UPDATE_RELOAD_FLAG); } catch (_e) { /* jsdom */ }
+    }
+  });
+
+  it('the note Save closed lands before the reload (it waits for the store write, up to 3 s)', async () => {
+    let landed;
+    mockStores.list = [{ whenSaved: () => new Promise((r) => { landed = () => r(true); }) }];
+    registerServiceWorker();
+    const release = holdUpdateReload('note');
+    controllerChangeHandler();
+    release();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(reloadSpy).not.toHaveBeenCalled();
+    landed();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('a write that never settles holds the reload no longer than the cap', async () => {
+    mockStores.list = [{ whenSaved: () => new Promise(() => {}) }];
+    registerServiceWorker();
+    const release = holdUpdateReload('backup');
+    controllerChangeHandler();
+    release();
+    await vi.advanceTimersByTimeAsync(400 + 2999);
+    expect(reloadSpy).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('a hold taken in the beat after the last release waits again', async () => {
+    registerServiceWorker();
+    const release = holdUpdateReload('note');
+    controllerChangeHandler();
+    release();
+    await vi.advanceTimersByTimeAsync(200);
+    const again = holdUpdateReload('note');
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(reloadSpy).not.toHaveBeenCalled();
+    again();
+    await vi.advanceTimersByTimeAsync(400);
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('nothing open: the reload is immediate, as before', () => {
+    registerServiceWorker();
+    controllerChangeHandler();
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -276,3 +276,19 @@ describe('NoteSheet Share outcome (A15)', () => {
     expect(/** @type {any} */ (globalThis).showToast).not.toHaveBeenCalled();
   });
 });
+
+/* ds2 (2026-10-13): the text being typed lives only in this sheet's state, so an app update
+   waits while it is in edit mode (sw-register.js reloads once the hold lets go). */
+describe('NoteSheet holds the app-update reload while a note is being typed (ds2)', () => {
+  it('edit mode holds it; read mode does not; closing lets go', async () => {
+    const { updateHolds } = await import('../../utils/update-hold.js');
+    setupStores({ body: 'Saved note' });
+    const read = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+    expect(updateHolds()).toEqual([]);
+    read.unmount();
+    const edit = render(<NoteSheet groupId="g1" startInEditMode={true} onClose={() => {}} />);
+    expect(updateHolds()).toEqual(['note']);
+    edit.unmount();
+    expect(updateHolds()).toEqual([]);
+  });
+});

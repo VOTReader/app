@@ -105,6 +105,8 @@ import { usePersistedState } from '../hooks/use-persisted-state.js';
 import { useAndroidBack } from '../hooks/use-android-back.js';
 import { modalRegistry, useModalRegistry } from '../hooks/use-modal-registry.js';
 import { useFocusTrap } from '../hooks/use-focus-trap.js';
+import { useUpdateHold } from '../hooks/use-update-hold.js';
+import { holdUpdateReload } from '../utils/update-hold.js';
 import { useHistorySync, suppressNextHistoryPush, clearSuppressNextHistoryPush } from '../hooks/use-history-sync.js';
 import { useNavHistoryTracking } from '../hooks/use-nav-history-tracking.js';
 import { useNav } from '../hooks/use-nav.js';
@@ -248,6 +250,8 @@ Object.assign(window, {
   useAndroidBack,
   modalRegistry, useModalRegistry,
   useFocusTrap,
+  // ds2: the app-update reload waits while a note, a voice memo or a backup is open
+  useUpdateHold, holdUpdateReload,
   useHistorySync, suppressNextHistoryPush, clearSuppressNextHistoryPush,
   useNavHistoryTracking,
   useNav,

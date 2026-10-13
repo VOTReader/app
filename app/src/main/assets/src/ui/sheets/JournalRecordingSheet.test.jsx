@@ -738,3 +738,18 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
   expect(MockBridge.nativeDeleteRecording).not.toHaveBeenCalled();
   });
 });
+
+/* ds2 (2026-10-13): a take lives in memory until it is saved, so an app update waits while
+   the sheet is open (sw-register.js reloads once the hold lets go). */
+describe('JournalRecordingSheet holds the app-update reload while open (ds2)', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { cleanup(); vi.useRealTimers(); });
+
+  it('holds from mount to unmount', async () => {
+    const { updateHolds } = await import('../../utils/update-hold.js');
+    const utils = renderRecording(() => {});
+    expect(updateHolds()).toEqual(['recording']);
+    utils.unmount();
+    expect(updateHolds()).toEqual([]);
+  });
+});

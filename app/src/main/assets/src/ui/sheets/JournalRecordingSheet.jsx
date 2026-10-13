@@ -108,6 +108,8 @@ export function JournalRecordingSheet({ onSave, onClose }) {
   // destroyed an in-progress take silently. The sheet only exists while
   // mounted, so the registration needs no `active` gate.
   useModalRegistry({ id: 'journal-recording-sheet', dismiss: function() { requestDiscard(); } });
+  // ds2: a take lives in memory until it is saved, so an app update waits while the sheet is open.
+  useUpdateHold(true, 'recording');
   // [13] focus trap — Tab stays inside the sheet (mounted = open).
   const trapRef = useFocusTrap(true);
 

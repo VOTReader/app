@@ -31,6 +31,20 @@ import { PlatformBridge } from './platform-bridge.js';
 import { DiagnosticLog } from './diagnostic-log.js';
 import { showToast } from './toast.js';
 import { markUpdateReload } from './update-toast.js';
+import { updateHolds, whenUpdateUnheld } from './update-hold.js';
+import { registeredStores } from '../stores/cached-store.js';
+
+/** After the last hold lets go: long enough for the closing save's effects to issue their writes. */
+const HOLD_SETTLE_MS = 400;
+/** The most a held reload waits for those writes to land. */
+const HOLD_WRITES_CAP_MS = 3000;
+
+/** Every store's newest write has landed or failed, or the cap passed. Never rejects. */
+function _writesLanded() {
+  /** @type {Promise<any>[]} */ let waits = [];
+  try { waits = registeredStores().map((s) => s.whenSaved()); } catch (_e) { /* no stores: nothing to wait for */ }
+  return Promise.race([Promise.all(waits), new Promise((r) => setTimeout(r, HOLD_WRITES_CAP_MS))]).catch(() => {});
+}
 
 export function registerServiceWorker() {
   if (PlatformBridge.isAndroid) return;
@@ -63,16 +77,38 @@ export function registerServiceWorker() {
   // position through the persist flush, the audio player with the element's
   // exact clock. Corbin: "land reader back exactly where they were" — exactly,
   // not as of the last 120 ms + 250 ms debounce or the last 5 s snapshot.
+  //
+  // THE HOLD (ds2, 2026-10-13): a note being typed, a voice memo or a backup
+  // import cannot ride the reload (utils/update-hold.js). While one is open the
+  // reload waits; the flag is still set at once, so a lazy load in the wait
+  // reloads rather than mixing builds. When the last hold lets go, the save
+  // that closed it is often still in flight (Save closes the note sheet in the
+  // same commit), so the reload waits a beat and for the stores' writes to land.
   let refreshing = false;
-  const doReload = () => {
-    if (refreshing) return;
-    refreshing = true;
-    window.__votSwTookOver = true;
+  const reloadNow = () => {
     // The document that follows toasts on this, not on the profile's last-seen key
     // (update-toast.js): the reload is the evidence, and it is this tab's own.
     markUpdateReload();
     try { window.dispatchEvent(new Event('vot:before-update-reload')); } catch (_e) { /* a listener's throw must not stop the reload */ }
     window.location.reload();
+  };
+  const reloadWhenUnheld = () => whenUpdateUnheld(() => {
+    setTimeout(() => {
+      if (updateHolds().length) { reloadWhenUnheld(); return; }
+      void _writesLanded().then(() => {
+        if (updateHolds().length) { reloadWhenUnheld(); return; }
+        reloadNow();
+      });
+    }, HOLD_SETTLE_MS);
+  });
+  const doReload = () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.__votSwTookOver = true;
+    const held = updateHolds();
+    if (!held.length) { reloadNow(); return; }
+    DiagnosticLog.warn('sw', 'update reload waits for: ' + held.join(', '));
+    reloadWhenUnheld();
   };
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hadController) return;   // first controller — nothing stale to reload onto
