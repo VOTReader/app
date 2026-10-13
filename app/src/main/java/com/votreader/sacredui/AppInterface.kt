@@ -650,6 +650,10 @@ class AppInterface(
     @JavascriptInterface
     fun weeklyCopyStatus(): String = vm.weeklyCopies.statusJson()
 
+    /** Delete every weekly copy this app wrote (Clear All My Data). True when none is left. */
+    @JavascriptInterface
+    fun weeklyCopyClear(): Boolean = vm.weeklyCopies.clear()
+
     // ─── Downloaded recordings (listening item 8) ───────────────────────
     // JSON in, JSON out. The page's JSON is untrusted; OfflineAudioStore parses it
     // (a bad shape is a quiet no-op). Runs on the binder thread: the store is

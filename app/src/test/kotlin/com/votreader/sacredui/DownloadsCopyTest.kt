@@ -66,6 +66,29 @@ class DownloadsCopyTest {
         assertEquals("""{"supported":false,"count":0,"newestAt":0}""", DownloadsCopy(null).statusJson())
     }
 
+    @Test fun `clear deletes every weekly copy and nothing else (vs3)`() {
+        val folder = FakeFolder()
+        folder.files.add(DownloadsCopy.Entry(999, "votreader-backup-2026-09-01.votbak", 0))
+        val copy = DownloadsCopy(folder)
+        for (week in 0 until 4) {
+            folder.clock = at(2026, 9, 1) + week * 7L * 86_400_000
+            copy.save("{\"journal\":\"private\"}", folder.clock)
+        }
+        assertTrue(copy.clear())
+        assertEquals(listOf("votreader-backup-2026-09-01.votbak"), folder.files.map { it.name })
+        assertEquals("""{"supported":true,"count":0,"newestAt":0}""", copy.statusJson())
+        assertTrue(DownloadsCopy(null).clear())
+    }
+
+    @Test fun `clear says false when a copy will not delete`() {
+        val folder = object : DownloadsCopy.Folder {
+            override fun write(name: String, bytes: ByteArray) = true
+            override fun list() = listOf(DownloadsCopy.Entry(1, "votreader-weekly-2026-10-05.votbak", 0))
+            override fun delete(id: Long) = false
+        }
+        assertFalse(DownloadsCopy(folder).clear())
+    }
+
     @Test fun `status counts this app's copies and names the newest`() {
         val folder = FakeFolder()
         val copy = DownloadsCopy(folder)

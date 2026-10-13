@@ -279,8 +279,9 @@ export async function run(opts) {
     if (_cleared) return 'empty';                 // Clear All ran while this pass read
     const saved = await sink.save(json);
     // The weekly copy rides the same healthy pass: never from a library that looked
-    // damaged or empty above, so a loss can never rotate the good copies out.
-    await weeklyCopy({ now, stores, bridge: opts && opts.weeklyBridge });
+    // damaged or empty above, so a loss can never rotate the good copies out. Nor
+    // after a Clear All that landed while the snapshot saved (vs3).
+    if (!_cleared) await weeklyCopy({ now, stores, bridge: opts && opts.weeklyBridge });
     if (!saved) return 'failed';
     _arm(sink, summary, _memoryJson());
     return 'snapshotted';
@@ -716,6 +717,20 @@ export function weeklyCopyJson(stores, nowMs) {
 }
 
 /**
+ * Clear All My Data (vs3): the weekly copies in Downloads hold the same journal, notes and
+ * highlights, and outlive an uninstall, so they go too. True when none is left (and off the
+ * phone app, where there are none). @param {{ bridge?: any }} [opts]
+ */
+export function clearWeeklyCopies(opts) {
+  _cleared = true;
+  const b = weeklyBridge(opts && opts.bridge);
+  if (!b || typeof b.weeklyCopyClear !== 'function') return true;
+  try { if (b.weeklyCopyClear()) return true; } catch (_e) { /* logged below */ }
+  DiagnosticLog.warn('data-health', 'Clear All could not delete the weekly copies in Downloads');
+  return false;
+}
+
+/**
  * Write this week's copy when one is due. Returns 'off' | 'unsupported' | 'recent' | 'written' | 'failed'.
  * @param {{ now: () => number, stores: Record<string, any>, bridge?: any }} p
  */
@@ -733,4 +748,4 @@ export async function weeklyCopy(p) {
   return 'failed';
 }
 
-export const DataSafety = { weeklyStatus, setWeeklyOn, run, saveLatest, freshDatabase, restoreMissing, acceptCurrent, clearSnapshots, status, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, _resetForTests };
+export const DataSafety = { weeklyStatus, setWeeklyOn, clearWeeklyCopies, run, saveLatest, freshDatabase, restoreMissing, acceptCurrent, clearSnapshots, status, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, _resetForTests };

@@ -1478,7 +1478,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             <DataActionRow
               className="danger-zone"
               label="Clear All Personal Data"
-              desc="Removes every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, tab thumbnail, and search cache. App settings will reset to defaults. This cannot be undone — export first if you want a backup."
+              desc={`Removes every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, tab thumbnail, search cache, and the automatic copies of your data${weekly && weekly.supported ? ' (the weekly copies in Downloads/VOTReader too)' : ''}. App settings will reset to defaults. This cannot be undone — export first if you want a backup.`}
             >
               <button className="settings-clear-btn danger" disabled={backupBusy} onClick={(e) => { e.stopPropagation(); setWipeText(''); setWipeConfirm(true); }}>Clear All My Data</button>
             </DataActionRow>
@@ -1505,7 +1505,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                         <div className="note-sheet-title" id="settings-wipe-title">Delete All Personal Data</div>
                       </div>
                       <div style={{ color: "var(--cream)", fontSize: "var(--fs-14)", lineHeight: "1.5", marginBottom: "14px" }}>
-                        This permanently erases every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, and the search cache, then resets all settings to defaults.{' '}
+                        This permanently erases every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, the search cache, and the automatic copies of your data{weekly && weekly.supported ? ', including the weekly copies in Downloads/VOTReader' : ''}, then resets all settings to defaults.{' '}
                         <strong style={{ color: "#c0392b" }}>This cannot be undone.</strong> Export your data first if you want a backup.
                       </div>
                       <div style={{ color: "var(--cream-muted)", fontSize: "var(--fs-12)", letterSpacing: "0.04em", marginBottom: "8px" }}>

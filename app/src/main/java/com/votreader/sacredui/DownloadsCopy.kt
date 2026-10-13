@@ -18,7 +18,7 @@ import java.util.Locale
  * plain file the reader can see, share and import: it survives an uninstall, and it carries the data
  * across to another build of the app (the future Play build has its own storage). Once a week the page
  * hands it the same JSON a snapshot holds (no photos or recordings: Export carries those), and the newest
- * [KEEP] copies this app wrote are kept; older ones are deleted. Files are
+ * [KEEP] copies this app wrote are kept; older ones are deleted, and Clear All My Data deletes them all. Files are
  * `votreader-weekly-yyyy-MM-dd.votbak`; Import reads them like any backup (the native import sniffs JSON).
  *
  * Android 10+ only: before that a Downloads write needs a storage permission the app does not ask for,
@@ -72,6 +72,22 @@ class DownloadsCopy(private val folder: Folder?) {
             true
         } catch (e: Exception) {
             Timber.w(e, "weekly copy failed")
+            false
+        }
+    }
+
+    /**
+     * Clear All My Data (vs3): every copy this app wrote goes with the data it holds. True when none
+     * is left; true where there is no folder (nothing was ever written). Other files are left alone.
+     */
+    @Synchronized
+    fun clear(): Boolean {
+        val f = folder ?: return true
+        return try {
+            for (e in f.list()) if (isCopyName(e.name)) f.delete(e.id)
+            f.list().none { isCopyName(it.name) }
+        } catch (e: Exception) {
+            Timber.w(e, "weekly copy clear failed")
             false
         }
     }
