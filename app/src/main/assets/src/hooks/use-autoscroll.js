@@ -225,6 +225,16 @@ const END_STOP_FRACTION = 2 / 3;
  * far just bottoms out) and to 0. Falls back to the scroll maximum on
  * screens with no sentinel.
  */
+/**
+ * W45: a touchend/touchcancel ends the reader's touch only when no other finger
+ * is still down (lifting one of two must not start the resume countdown).
+ * @param {any} e
+ * @returns {boolean}
+ */
+export function touchLiftEnds(e) {
+  return !(e && e.touches && e.touches.length > 0);
+}
+
 export function computeEndTarget(el) {
   if (!el) return 0;
   const max = Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0));
@@ -285,6 +295,9 @@ export function createAutoScroll(io) {
   let lineHeight = 0;
   let endTarget = 0;
   let metricsAt = 0;
+  // W45: this run began below the end of the text (the reader was in the
+  // footnotes): it runs on to the real bottom instead of clamping back up.
+  let pastEnd = false;
 
   // Advance bookkeeping
   let pageStartedAt = 0;
@@ -344,6 +357,14 @@ export function createAutoScroll(io) {
     const lh = measureLineHeight(el);
     if (lh) lineHeight = lh;
     endTarget = computeEndTarget(el);
+    if (pastEnd) endTarget = Math.max(endTarget, Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0)));
+  }
+
+  /** Metrics for a run starting at `pos` (W45: below the text's end = run to the bottom). */
+  function startMetrics(el) {
+    pastEnd = false;
+    refreshMetrics(el, true);
+    if (pos > endTarget + 1) { pastEnd = true; refreshMetrics(el, true); }
   }
 
   function pxPerSec() {
@@ -357,7 +378,7 @@ export function createAutoScroll(io) {
     lastWritten = pos;
     lastTs = null;
     metricsAt = 0;
-    refreshMetrics(el, true);
+    startMetrics(el);
     pageStartedAt = io.now();
   }
 
@@ -369,7 +390,7 @@ export function createAutoScroll(io) {
     pos = el.scrollTop || 0;
     lastWritten = pos;
     lastTs = null;
-    refreshMetrics(el, true);
+    startMetrics(el);
     // The FIRST page needs its clock started here too. resetForPage() stamps
     // this for every auto-advanced page, but start() comes through
     // beginRunning(), which left pageStartedAt at its 0 initializer — so
@@ -469,6 +490,9 @@ export function createAutoScroll(io) {
   function doAdvance() {
     dwellToken = null;
     if (destroyed || state !== 'enddwell') return;
+    // W45: never turn the page behind a sheet or menu opened during the dwell, or
+    // under a live selection: the same hard pause a resume would take.
+    if (io.isModalOpen() || io.hasSelection()) { setState('paused', 'blocked'); return; }
     chain += 1;
     setState('advancing');
     try {
@@ -830,7 +854,7 @@ export function useAutoScroll(scrollRef, opts) {
     }
 
     const onDown = () => ctrl.pointerDown();
-    const onUp = () => ctrl.pointerUp();
+    const onUp = (/** @type {any} */ e) => { if (touchLiftEnds(e)) ctrl.pointerUp(); }; // W45: not while a finger is still down
     const onVis = () => { if (document.visibilityState === 'hidden') ctrl.hidden(); };
     // Capture phase, passive: the yield must not be starvable by the pager's
     // or the tap-suppressor's own handlers, and it never needs to cancel.
