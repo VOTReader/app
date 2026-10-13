@@ -10,6 +10,8 @@
    back to a textContent offset. Pure DOM reading; no state.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { resolveAnchor } from './anchor-resolve.js';
+
 /** Decoration inside reading text that is not reading text: footnote marker
     digits and the note / link / bookmark icon glyphs. One list for the
     recorder (SelectionToolbar) and the re-finder (applyDOMHighlights). */
@@ -69,4 +71,23 @@ export function viewIndexOf(at, tcOffset) {
     if (at[mid] < tcOffset) lo = mid + 1; else hi = mid;
   }
   return lo;
+}
+
+/**
+ * Where a stored range's recorded words sit in the container now, as
+ * applyDOMHighlights re-finds a mark (W48: the link and bookmark icons).
+ * `start`/`end` are the textContent offsets it was made at, `text` the words in
+ * hlDisplayText's form. Returns textContent offsets, or null when there are no
+ * words or they are nowhere (the caller keeps the stored offsets).
+ * @param {{ text: string, at: number[] }} view - chromeAwareView(container)
+ * @param {number} start
+ * @param {number} end
+ * @param {unknown} text
+ * @returns {{ start: number, end: number } | null}
+ */
+export function refindRange(view, start, end, text) {
+  if (typeof text !== 'string' || !text) return null;
+  var r = resolveAnchor(view.text, { start: viewIndexOf(view.at, start), end: viewIndexOf(view.at, end), text: text });
+  if (!r || !(r.end > r.start)) return null;
+  return { start: view.at[r.start], end: view.at[r.end - 1] + 1 };
 }

@@ -1353,6 +1353,11 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       excerpt = selInfo.text;
     }
     if (excerpt.length > 220) excerpt = excerpt.slice(0, 217) + '...';
+    // W48: the words themselves, in the form applyDOMBookmarks re-finds them
+    // (as a highlight's `text`), so the icon follows them after an edit.
+    var anchorText = (container && snap.end > snap.start)
+      ? hlDisplayText(container, containerText, snap.start, snap.end)
+      : '';
 
     // Source label: re-use the same derivation that BookmarksScreen rows do.
     var sourceLabel = (typeof _bookmarkSourceLabel === 'function')
@@ -1367,20 +1372,20 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     // auto-derived label BEFORE persisting, then commits on its own
     // (App-level onConfirm wires the store write).
     if (typeof window.__bookmarkCreate === 'function') {
-      window.__bookmarkCreate({
+      window.__bookmarkCreate(Object.assign({
         hlKey: storedKey,
         sourceLabel: sourceLabel,
         excerpt: excerpt,
         defaultLabel: labelText
-      });
+      }, anchorText ? { text: anchorText } : {}));
     } else {
       // Fallback: defensive path if the App-level bridge wasn't installed
       // yet — directly persist so we never lose the user's intent.
-      BookmarkStore.add({
+      BookmarkStore.add(Object.assign({
         id: (typeof bkmId === 'function') ? bkmId() : ('bkm_' + Date.now()),
         hlKey: storedKey, label: labelText, thought: '',
         created: Date.now(), updated: Date.now()
-      });
+      }, anchorText ? { text: anchorText } : {}));
     }
     if (typeof onBookmarkRequest === 'function') onBookmarkRequest(storedKey);
   }, [selInfo, onBookmarkRequest]);

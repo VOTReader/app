@@ -25,6 +25,8 @@
    Tap opens the bookmark popover via window.__openBookmarkPopover(ids, x, y).
 ═══════════════════════════════════════════════════════════════ */
 
+import { chromeAwareView, refindRange } from './anchor-view.js';
+
 /* Window (ms) during which a freshly-created bookmark gets the .just-created
    class so its icon plays the creation-pulse animation. Re-renders of the
    same icon (after the window expires) drop the class. */
@@ -49,6 +51,7 @@ export function applyDOMBookmarks() {
     // each position so the tap handler can surface all of them.
     var keyPrefix = hlKey + ':';
     var byEndPos = {}; // endPos → [bkmId, ...]
+    var view = null;   // chromeAwareView(container), built for the first bookmark with words
     bookmarks.forEach(function(bkm) {
       if (!bkm.hlKey) return;
       var k = bkm.hlKey;
@@ -58,6 +61,15 @@ export function applyDOMBookmarks() {
       var m = k.match(/:(\d+)-(\d+)$/);
       if (m) {
         endPos = parseInt(m[2], 10);
+        // W48: a bookmark that recorded its words (`text`, since W48) follows
+        // them when text before it was edited, as a highlight does. Older
+        // bookmarks have only offsets (their label may be the reader's own
+        // words, so it is never searched for).
+        if (typeof bkm.text === 'string' && bkm.text) {
+          if (!view) view = chromeAwareView(container);
+          var found = refindRange(view, parseInt(m[1], 10), endPos, bkm.text);
+          if (found) endPos = found.end;
+        }
       }
       // Bookmarks without a ":start-end" suffix land at end-of-block
       if (endPos == null) {

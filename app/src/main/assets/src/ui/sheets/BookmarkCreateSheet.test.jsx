@@ -93,6 +93,32 @@ describe('BookmarkCreateSheet — thought field removed', () => {
     });
   });
 
+  /* W48: the words a bookmark was made on ride to the store, so its icon can
+     follow them after an edit; an edit never touches the record's own words. */
+  it('CREATE commit passes the recorded words through; EDIT sends none', () => {
+    const onConfirm = vi.fn();
+    const { container, unmount } = render(
+      <BookmarkCreateSheet
+        pending={{ hlKey: 'bible:psalms:23:1:4-15', defaultLabel: 'Lord is my', text: 'Lord is my' }}
+        onConfirm={onConfirm} onCancel={() => {}}
+      />
+    );
+    fireEvent.click(container.querySelector('.navpick-confirm-green'));
+    expect(onConfirm).toHaveBeenLastCalledWith(expect.objectContaining({ editId: null, text: 'Lord is my' }));
+    unmount();
+
+    const onEdit = vi.fn();
+    const edit = render(
+      <BookmarkCreateSheet
+        pending={{ editId: 'b1', hlKey: 'bible:psalms:23:1:4-15', currentLabel: 'Mine', text: 'Lord is my' }}
+        onConfirm={onEdit} onCancel={() => {}}
+      />
+    );
+    fireEvent.change(edit.container.querySelector('.bkm-create-label-input'), { target: { value: 'Renamed' } });
+    fireEvent.click(edit.container.querySelector('.navpick-confirm-green'));
+    expect(onEdit.mock.calls[0][0]).not.toHaveProperty('text');
+  });
+
   it('EDIT-mode Save stays disabled until the label actually changes', () => {
     const { container } = render(
       <BookmarkCreateSheet

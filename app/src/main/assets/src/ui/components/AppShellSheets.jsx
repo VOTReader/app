@@ -336,6 +336,7 @@ export function AppShellSheets({
                 hlKey: bkm.hlKey,
                 label: bkm.label,
                 thought: bkm.thought || '',
+                ...(bkm.text ? { text: bkm.text } : {}),   // W48: the words it was made on
                 created: Date.now(),
                 updated: Date.now()
               });
