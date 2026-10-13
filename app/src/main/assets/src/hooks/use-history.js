@@ -67,17 +67,34 @@ export function isHiddenMannaVisit(e) {
 }
 
 // Stable subscribe + getSnapshot for useSyncExternalStore so React
-// doesn't think the source changed each render. Bound at module
-// scope; both functions retain HistoryStore as `this` via the bind.
-// The filtered list is rebuilt only when the store hands out a new array,
-// so the snapshot stays referentially stable between changes.
-const _subscribeHistory = HistoryStore.subscribe.bind(HistoryStore);
+// doesn't think the source changed each render. Defined at module
+// scope; both call HistoryStore's methods on HistoryStore itself.
+// The filtered list is rebuilt only when the store hands out a new array
+// (or the corpus version moves, W43), so the snapshot stays referentially
+// stable between changes.
+// W43: an older Hidden Manna entry is known only by the letter ids the VOT corpus
+// brings, so the snapshot is also keyed on that corpus's version (index.html's lazy
+// loader, window.__votCorpus), and the hook listens to it: a list built before the
+// corpus landed is rebuilt when it does, even while History is showing.
+/** @returns {any} */
+const _votCorpus = () => (typeof window !== 'undefined' && /** @type {any} */ (window).__votCorpus) || null;
+/** @param {() => void} cb @returns {() => void} */
+const _subscribeHistory = (cb) => {
+  const offStore = HistoryStore.subscribe(cb);
+  const corpus = _votCorpus();
+  const offCorpus = corpus && typeof corpus.subscribe === 'function' ? corpus.subscribe(cb) : null;
+  return () => { offStore(); if (typeof offCorpus === 'function') offCorpus(); };
+};
 /** @type {any} */ let _snapSource = null;
+/** @type {any} */ let _snapCorpus = null;
 /** @type {HistoryEntry[]} */ let _snapList = [];
 const _getHistorySnapshot = () => {
   const src = HistoryStore.list();
-  if (src !== _snapSource) {
+  const corpus = _votCorpus();
+  const corpusVersion = corpus && typeof corpus.getVersion === 'function' ? corpus.getVersion() : null;
+  if (src !== _snapSource || corpusVersion !== _snapCorpus) {
     _snapSource = src;
+    _snapCorpus = corpusVersion;
     _snapList = Array.isArray(src) && src.some(isHiddenMannaVisit) ? src.filter((e) => !isHiddenMannaVisit(e)) : src;
   }
   return _snapList;
