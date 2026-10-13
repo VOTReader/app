@@ -825,6 +825,13 @@ describe('wipe-proof (2026-10-11: the owner phone lost its database again, and R
       expect(await DataSafety.run({ sink })).toBe('snapshotted');
     });
 
+    it('every snapshot broken for good beside an empty library: the empty library is saved as the good copy (refuter round 2)', async () => {
+      const sink = memorySink();
+      sink.files.set(snapshotName(Date.now() - 86400000), '{"app":"VOTReader","stores":{"vot-no');
+      expect(await DataSafety.run({ sink })).toBe('snapshotted');
+      expect(sink.save).toHaveBeenCalledTimes(1);
+    });
+
     it('the leave check offers the newest snapshot that reads', async () => {
       const sink = memorySink();
       await healthyBoot(sink);

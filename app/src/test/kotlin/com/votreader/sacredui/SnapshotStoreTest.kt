@@ -37,8 +37,8 @@ class SnapshotStoreTest {
     private fun at(y: Int, m: Int, d: Int, h: Int = 12): Long =
         Calendar.getInstance().apply { clear(); set(y, m - 1, d, h, 0, 0) }.timeInMillis
 
-    /** A snapshot's shape: the page always hands over a JSON object. */
-    private fun j(v: String) = """{"v":"$v"}"""
+    /** A snapshot's shape: the page always hands over a JSON object with its stores. */
+    private fun j(v: String) = """{"app":"VOTReader","stores":{"v":"$v"}}"""
 
     private fun names(): List<String> {
         val arr = JSONArray(store.listJson())
@@ -46,11 +46,11 @@ class SnapshotStoreTest {
     }
 
     @Test fun `save then list and read round-trips, newest first`() {
-        assertTrue(store.save("""{"a":1}""", at(2026, 10, 1)))
-        assertTrue(store.save("""{"a":2}""", at(2026, 10, 2)))
+        assertTrue(store.save(j("1"), at(2026, 10, 1)))
+        assertTrue(store.save(j("2"), at(2026, 10, 2)))
         val n = names()
         assertEquals(listOf("snap-20261002-120000.json", "snap-20261001-120000.json"), n)
-        assertEquals("""{"a":2}""", store.read(n[0]))
+        assertEquals(j("2"), store.read(n[0]))
         assertEquals(at(2026, 10, 2), JSONArray(store.listJson()).getJSONObject(0).getLong("at"))
     }
 
@@ -152,6 +152,26 @@ class SnapshotStoreTest {
         assertTrue(store.save(j("next"), at(2026, 10, 2)))
         assertEquals(j("good"), store.read("snap-20261001-090000.json"))
         assertEquals(listOf("snap-20261002-120000.json", "snap-20261001-090000.json"), names())
+    }
+
+    @Test fun `a snapshot the page could not read never keeps its day (lenient JSON, or no stores) (W9 refuter round 2)`() {
+        assertTrue(store.save(j("good"), at(2026, 10, 1, 9)))
+        val snaps = File(dir, "snapshots")
+        File(snaps, "snap-20261001-180000.json").writeText("""{"stores":foo}""")
+        File(snaps, "snap-20261001-190000.json").writeText("""{'stores':{}}""")
+        File(snaps, "snap-20261001-200000.json").writeText("""{"app":"VOTReader"}""")
+        File(snaps, "snap-20261001-210000.json").writeText("""{"stores":{}} {}""")
+        assertEquals(listOf("snap-20261001-090000.json"), names())
+        assertTrue(store.save(j("next"), at(2026, 10, 2)))
+        assertEquals(j("good"), store.read("snap-20261001-090000.json"))
+        assertEquals(listOf("snap-20261002-120000.json", "snap-20261001-090000.json"), names())
+    }
+
+    @Test fun `a real snapshot's JSON reads (numbers, escapes, nesting, unicode)`() {
+        val json = """{"app":"VOTReader","exportVersion":3,"summary":{"highlights":2,"x":-1.5e-3,"y":0,"z":10E+2},""" +
+            """"stores":{"vot-notes":{"a1":{"body":"line\n\"quoted\" é \\ é ✝","keys":["bible:john:3:16",[]],"n":null,"t":true,"f":false}},"vot-links":[]}}"""
+        assertTrue(store.save(json, at(2026, 10, 1)))
+        assertEquals(listOf("snap-20261001-120000.json"), names())
     }
 
     @Test fun `a snapshot's bytes are forced to the disk before it takes its name (W9)`() {

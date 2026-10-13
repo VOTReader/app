@@ -298,13 +298,15 @@ export async function run(opts) {
     const list = await sink.list();
     /** The snapshot this boot is measured against: the newest that reads (W9). */
     let newest = list[0] || null;
+    let allBroken = false;                         // every snapshot is broken for good: save a good one
     if (newest && !skip && !force) {
       const found = await _newestReadable(sink, list);
       if (!found.snap && found.failed) {
         DiagnosticLog.warn('data-health', 'no snapshot could be read (' + list.length + ' listed): nothing judged or saved this boot');
         return 'failed';
       }
-      newest = found.entry;                        // null: every one is broken for good, so save a good one
+      newest = found.entry;
+      allBroken = !newest;
       const then = found.snap ? (found.snap.summary || summarize(found.snap.stores)) : null;
       // A progress reset took read marks on purpose: everything else is still judged (W9).
       if (then && newest && looksDamaged(progressReset ? _withoutReadMarks(then) : then, progressReset ? _withoutReadMarks(summary) : summary)) {
@@ -327,7 +329,8 @@ export async function run(opts) {
     if (score(summary) === 0 && summary.history === 0) {
       // Emptied on purpose (a reset, Clear All, Keep as is): record it, or the boot after
       // next would compare it with an older full snapshot and restore over the choice (5).
-      if ((chosen || force) && newest && !_cleared && await sink.save(snapshotJson(stores, summary, now()))) {
+      // Every snapshot broken (W9): the empty library is the good copy there is.
+      if ((((chosen || force) && newest) || allBroken) && !_cleared && await sink.save(snapshotJson(stores, summary, now()))) {
         _arm(sink, summary, _memoryJson());
         return 'snapshotted';
       }

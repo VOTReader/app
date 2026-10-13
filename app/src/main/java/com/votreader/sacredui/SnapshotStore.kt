@@ -2,11 +2,9 @@ package com.votreader.sacredui
 
 import org.json.JSONArray
 import org.json.JSONObject
-import org.json.JSONTokener
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
-import java.io.RandomAccessFile
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -34,9 +32,9 @@ import java.util.Locale
  *
  * W9 (2026-10-13): a snapshot's bytes are forced to the disk before it takes its
  * name, so a power cut leaves the old set or the new snapshot whole, never a named
- * one cut short. One broken anyway (one that does not parse as a JSON object) is never
- * listed and never keeps its day in [prune]: as the newest of its day it used to push
- * out the good copy before it. The page walks past one that will not parse, too.
+ * one cut short. One broken anyway (one the page could not restore from: not strict JSON,
+ * or no stores) is never listed and never keeps its day in [prune]: as the newest of its
+ * day it used to push out the good copy before it. The page walks past one, too.
  *
  * Thread-safe (every entry point is synchronized): bridge calls land on binder
  * threads. Every failure is quiet (false / "" / "[]"), never a throw across the
@@ -86,7 +84,7 @@ class SnapshotStore(private val dir: File) {
     fun listJson(): String = try {
         val arr = JSONArray()
         for (f in snapshots()) {
-            if (!whole(f)) continue
+            if (whole(f) == false) continue          // broken; one unreadable this time is listed (the page walks past it)
             arr.put(JSONObject().put("name", f.name).put("size", f.length()).put("at", stampOf(f.name)))
         }
         arr.toString()
@@ -113,28 +111,21 @@ class SnapshotStore(private val dir: File) {
     private fun snapshots(): List<File> =
         (dir.listFiles() ?: emptyArray()).filter { NAME.matches(it.name) }.sortedByDescending { it.name }
 
-    /** [whole]'s verdicts by name, size and time: a named snapshot never changes, so each is parsed once. */
+    /** [whole]'s verdicts by name, size and time: a named snapshot never changes, so each is read once. */
     private val verdicts = HashMap<String, Boolean>()
 
     /**
-     * A snapshot whose bytes are all there: the whole file parses as a JSON object, as the
-     * page's JSON.stringify wrote it. The ends are checked first (what a power cut breaks is
-     * the tail, or the whole file, left empty or zeroed); the full parse runs once per file
-     * per process (W9 refuter: a file broken in the middle passed an ends-only check).
+     * Whether the page can restore from this snapshot: the whole file is one JSON object, read
+     * as strictly as the page's JSON.parse reads it, with a "stores" object at its top (W9 and
+     * its refuter: an ends-only check passed a file broken in the middle, and org.json reads
+     * JSON the page cannot). Null when the file could not be read this time: never cached,
+     * never a reason to delete. Each file is read once per process.
      */
-    private fun whole(f: File): Boolean {
+    private fun whole(f: File): Boolean? {
         val key = f.name + ":" + f.length() + ":" + f.lastModified()
         verdicts[key]?.let { return it }
-        val ok = try {
-            val ends = RandomAccessFile(f, "r").use { r ->
-                val n = r.length()
-                if (n < 2) return@use false
-                val first = r.read()
-                r.seek(n - 1)
-                first == '{'.code && r.read() == '}'.code
-            }
-            ends && JSONTokener(f.readText(Charsets.UTF_8)).let { t -> t.nextValue() is JSONObject && t.nextClean() == 0.toChar() }
-        } catch (e: Exception) { false }
+        val text = try { f.readText(Charsets.UTF_8) } catch (e: Exception) { return null }
+        val ok = StrictSnapshotJson(text).readable()
         if (verdicts.size > 64) verdicts.clear()
         verdicts[key] = ok
         return ok
@@ -152,7 +143,12 @@ class SnapshotStore(private val dir: File) {
         val cal = Calendar.getInstance(Locale.US)
         for (f in snapshots()) {
             // Broken (W9): never this day's keeper; like a leftover .tmp, never a snapshot again.
-            if (!whole(f)) { Timber.w("snapshot %s is broken; removed", f.name); f.delete(); continue }
+            // Unreadable this time: never this day's keeper either, and left alone.
+            when (whole(f)) {
+                false -> { Timber.w("snapshot %s is broken; removed", f.name); f.delete(); continue }
+                null -> continue
+                true -> {}
+            }
             val day = NAME.find(f.name)!!.groupValues[1]
             if (day in days) { f.delete(); continue }
             if (days.size < KEEP_DAYS) { days.add(day); continue }
@@ -169,4 +165,105 @@ class SnapshotStore(private val dir: File) {
         // A save the process died inside leaves a .tmp: never a snapshot, always garbage.
         (dir.listFiles() ?: emptyArray()).filter { it.name.endsWith(".json.tmp") }.forEach { it.delete() }
     }
+}
+
+/**
+ * A strict JSON syntax check (RFC 8259, what JavaScript's JSON.parse accepts) for one snapshot:
+ * one object with nothing after it, and a "stores" object among its top-level keys, which
+ * data-safety.js needs to restore from it. Android's org.json is lenient (unquoted and
+ * single-quoted strings, comments), so it cannot answer for the page. Builds nothing but the
+ * top-level keys.
+ */
+internal class StrictSnapshotJson(private val s: String) {
+    private var i = 0
+    private var hasStores = false
+
+    fun readable(): Boolean = try {
+        space()
+        obj(top = true)
+        space()
+        i == s.length && hasStores
+    } catch (e: IllegalArgumentException) { false } catch (e: StackOverflowError) { false }
+
+    private fun peek(): Char = if (i < s.length) s[i] else END
+    private fun bad(): Nothing = throw IllegalArgumentException("not JSON at $i")
+    private fun take(c: Char) { if (peek() != c) bad(); i++ }
+    private fun space() { while (i < s.length && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r')) i++ }
+
+    private fun value() {
+        space()
+        val c = peek()
+        when {
+            c == '{' -> obj(top = false)
+            c == '[' -> arr()
+            c == '"' -> str(keep = false)
+            c == 't' -> word("true")
+            c == 'f' -> word("false")
+            c == 'n' -> word("null")
+            c == '-' || c in '0'..'9' -> num()
+            else -> bad()
+        }
+    }
+
+    private fun obj(top: Boolean) {
+        take('{'); space()
+        if (peek() == '}') { i++; return }
+        while (true) {
+            space()
+            val key = str(keep = top)
+            space(); take(':'); space()
+            if (top && key == "stores" && peek() == '{') hasStores = true
+            value(); space()
+            if (peek() == ',') { i++; continue }
+            take('}'); return
+        }
+    }
+
+    private fun arr() {
+        take('['); space()
+        if (peek() == ']') { i++; return }
+        while (true) {
+            value(); space()
+            if (peek() == ',') { i++; continue }
+            take(']'); return
+        }
+    }
+
+    /** A string; its text only when [keep] and it has no escapes (a top-level key). */
+    private fun str(keep: Boolean): String? {
+        take('"')
+        val start = i
+        var plain = true
+        while (true) {
+            if (i >= s.length) bad()
+            val c = s[i]
+            when {
+                c == '"' -> { val out = if (keep && plain) s.substring(start, i) else null; i++; return out }
+                c == '\\' -> {
+                    plain = false
+                    i++
+                    when (peek()) {
+                        '"', '\\', '/', 'b', 'f', 'n', 'r', 't' -> i++
+                        'u' -> { i++; repeat(4) { if (Character.digit(peek(), 16) < 0) bad(); i++ } }
+                        else -> bad()
+                    }
+                }
+                c < ' ' -> bad()
+                else -> i++
+            }
+        }
+    }
+
+    private fun num() {
+        if (peek() == '-') i++
+        if (peek() == '0') i++ else digits()
+        if (peek() == '.') { i++; digits() }
+        if (peek() == 'e' || peek() == 'E') { i++; if (peek() == '+' || peek() == '-') i++; digits() }
+    }
+
+    private fun digits() { if (peek() !in '0'..'9') bad(); while (peek() in '0'..'9') i++ }
+
+    private fun word(w: String) { if (!s.startsWith(w, i)) bad(); i += w.length }
+
+    private companion object { const val END = '\u0000' }
 }
