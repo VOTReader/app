@@ -394,6 +394,9 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
     cardTop = Math.min(Math.max(cardTop, CARD_EDGE), Math.max(CARD_EDGE, vh - CARD_EDGE - h));
   }
   const clear = !docked && ring ? (cardTop >= ring.top + ring.height || cardTop + h <= ring.top) : false;
+  // A docked card names the scroller top its room was measured from: tools/dp-tourclip.mjs's growth arm
+  // checks the card took that room (it measured the retired 55 % share before, sweep W77).
+  const dockedTop = docked ? scrollerTopRef.current : undefined;
   const cardStyle = docked ? { bottom: Math.round(dockBottom) + 'px', maxHeight: Math.round(cap) + 'px' }
     : ring ? { top: Math.round(cardTop) + 'px', maxHeight: Math.round(cap) + 'px' } : { bottom: '16px' };
   // What the dims leave open: the ringed control, or, once Listen is pressed, the reading column
@@ -422,7 +425,7 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
       ))}
       {ring && !opened && <div className="tour-ring" aria-hidden="true" style={{ left: px(ring.left), top: px(ring.top), width: px(ring.width), height: px(ring.height) }} />}
       {ring && clear && <div className={'tour-arrow ' + (below ? 'up' : 'down')} aria-hidden="true" style={{ left: px(ring.left + ring.width / 2 - 10), top: below ? px(cardTop - 20) : px(cardTop + h) }} />}
-      <div className={'tour-card' + (docked ? ' docked' : '') + (hasMore ? ' has-more' : '')} ref={setCardEl} role="dialog" aria-modal="true" aria-labelledby="tour-title" style={cardStyle} onScroll={checkMore}>
+      <div className={'tour-card' + (docked ? ' docked' : '') + (hasMore ? ' has-more' : '')} ref={setCardEl} role="dialog" aria-modal="true" aria-labelledby="tour-title" style={cardStyle} data-scroller-top={dockedTop} onScroll={checkMore}>
         <div className="tour-eyebrow">{step.eyebrow}</div>
         <h2 className="tour-title" id="tour-title">{step.title}</h2>
         <div aria-live="polite">
