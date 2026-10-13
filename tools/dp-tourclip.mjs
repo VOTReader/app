@@ -39,6 +39,12 @@
 //           that the end is REACHABLE and clear, plus the affordance saying so. A card that FITS is
 //           held to the gap at first view, which is the original defect. Both numbers print either
 //           way, so the softer arm cannot hide a regression.
+//   v4  the growth arm's room is the app's column rule (DOCK_OPEN_PX = 120 px of the reading column
+//       open below its scroller's top, TourOverlay since 2026-09-13), not the retired 55 % share of the
+//       screen, which graded every card against a room the app no longer gives (sweep W77). The
+//       scroller top is the one the card was sized from (`data-scroller-top` on a docked card), so the
+//       probe never re-guesses which scroller the ringed target lives in. The room is floored to the
+//       last whole line the way TourOverlay floors its cap, so a line kept whole is not called waste.
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
@@ -175,6 +181,29 @@ try {
         lowest, lineCount: lines.length,
         affordance: { klass: card.classList.contains('has-more'), chevron: moreShown, fade: fadeShown },
         barTop: (() => { const b = document.querySelector('.audio-bar'); return b ? b.getBoundingClientRect().top : null; })(),
+        // The card's own lines and its row's offset from the card's bottom, the way TourOverlay's _lineGeom
+        // reads them: what its cap is floored against so the row's edge never runs through a line.
+        rowOff: card.getBoundingClientRect().bottom - rowR.top,
+        capLines: (() => {
+          const cr = card.getBoundingClientRect();
+          const ls = [];
+          for (const el of card.querySelectorAll('.tour-eyebrow, .tour-title, .tour-text, .tour-tip')) {
+            const rg = document.createRange(); rg.selectNodeContents(el);
+            for (const r of rg.getClientRects()) if (r.width > 0) ls.push({ t: r.top - cr.top + card.scrollTop, b: r.bottom - cr.top + card.scrollTop });
+          }
+          ls.sort((a, c) => a.t - c.t);
+          const merged = [];
+          for (const ln of ls) { const last = merged[merged.length - 1]; if (last && ln.t < last.b) last.b = Math.max(last.b, ln.b); else merged.push({ ...ln }); }
+          return merged;
+        })(),
+        // The scroller top the docked card's room came from; an older build without the attribute is read
+        // from the reading column itself.
+        scrollerTop: (() => {
+          const v = parseFloat(card.dataset.scrollerTop || '');
+          if (Number.isFinite(v)) return v;
+          const col = document.querySelector('.screen-scroll');
+          return col ? Math.max(0, col.getBoundingClientRect().top) : 0;
+        })(),
         coveredLines: covered.map((l) => ({ text: l.text, bottom: Math.round(l.bottom), over: Math.round(l.bottom - rowR.top) })),
       };
       function cardR(el) { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height }; }
@@ -246,21 +275,28 @@ try {
        gave 230, with 390 px of room standing unused.
 
        THE ROOM is the rule the tour stack landed: the card may take what its content needs, and
-       never past the line that keeps DOCK_OPEN_FRAC (55 %) of the screen open above it — less
-       when the player bar is up. So room = vh - dockBottom - 0.55*vh, the same arithmetic
-       TourOverlay does. Growth available and not taken is a FAULT; room 390 against card 343 is
-       47 px left on the table (RED), 276 against 276 is a card that took everything there was
-       (green). Docked cards only: a card placed beside a ring is capped by the ring, not by
-       this rule, and it says so rather than passing silently. */
+       never past the line that keeps DOCK_OPEN_PX (120 px) of the reading column open below its
+       scroller's top — less room when the player bar is up. So room = vh - dockBottom -
+       (scrollerTop + 120), the same arithmetic TourOverlay does (until 2026-09-13 it was 55 % of the
+       screen, and this arm kept grading against that, sweep W77). Growth available and not taken is
+       a FAULT; room 390 against card 343 is 47 px left on the table (RED), 276 against 276 is a card
+       that took everything there was (green). Docked cards only: a card placed beside a ring is
+       capped by the ring, not by this rule, and it says so rather than passing silently. */
     if (overflows && m.docked) {
-      const CARD_EDGE = 12, DOCK_OPEN_FRAC = 0.55, SLACK = 4;
+      const CARD_EDGE = 12, DOCK_OPEN_PX = 120, SLACK = 4;
       const dockBottom = CARD_EDGE + (m.barTop != null && m.barTop > 0 && m.barTop < m.vh ? m.vh - m.barTop : 0);
-      const room = Math.floor(m.vh - dockBottom - m.vh * DOCK_OPEN_FRAC);
+      const room = Math.floor(m.vh - dockBottom - (m.scrollerTop + DOCK_OPEN_PX));
+      /* A room whose row edge would run through a line is floored to the gap above that line (the
+         Verifier's gate-cut, TourOverlay's _floorCapToLines since 2026-09-13): that height is the rule
+         keeping a line whole, not room left on the table. Through the first line the room stands. */
+      const edge = room - m.rowOff;
+      const cut = m.capLines.findIndex((ln) => edge > ln.t && edge < ln.b);
+      const fit = cut > 0 ? Math.floor(room - (edge - (m.capLines[cut - 1].b + m.capLines[cut].t) / 2)) : room;
       const took = Math.round(m.card.height);
-      const spare = room - took;
-      console.log(`  growth: room ${room} px, card ${took} px, bar ${m.barTop == null ? 'none' : Math.round(m.barTop)}`);
-      if (spare > SLACK) fail(`${tag}: the card scrolls with ${spare} px of room it did not take (room ${room}, card ${took}) — the reader is scrolling for nothing`);
-      else ok(`${tag}: it scrolls because it must — room ${room} px, card ${took} px, nothing left on the table`);
+      const spare = fit - took;
+      console.log(`  growth: room ${room} px${fit !== room ? ` (${fit} at the last whole line)` : ''}, card ${took} px, bar ${m.barTop == null ? 'none' : Math.round(m.barTop)}, scroller top ${Math.round(m.scrollerTop)}`);
+      if (spare > SLACK) fail(`${tag}: the card scrolls with ${spare} px of room it did not take (room ${fit}, card ${took}) — the reader is scrolling for nothing`);
+      else ok(`${tag}: it scrolls because it must — room ${fit} px, card ${took} px, nothing left on the table`);
     } else if (overflows && !m.docked) {
       console.log(`  growth: not checked — this card is placed beside its ring, so the ring caps it, not the open-space rule`);
     }

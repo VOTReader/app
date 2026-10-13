@@ -366,6 +366,8 @@ describe('TourOverlay — Listen stops dock at the bottom and open the reading c
         render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
         const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
         expect(parseFloat(card.style.maxHeight)).toBe(640 - 12 - (56 + 120));            // 452, the room; 55 % left 276
+        // The scroller top the room was measured from, for tools/dp-tourclip.mjs's growth arm (sweep W77).
+        expect(card.dataset.scrollerTop).toBe('56');
       } finally { Object.defineProperty(HTMLElement.prototype, 'scrollHeight', proto || { configurable: true, get() { return 0; } }); globalThis.ResizeObserver = ro0; }
     } finally { window.innerHeight = vh0; }
   });
