@@ -209,6 +209,25 @@ describe('journal marks: the refutation of the first cut', () => {
     expect(r.notes.g.updated).toBe(70.5);
   });
 
+  it("mw14 r2: a segment that could not be placed never draws its note; one pass settles it", () => {
+    const E = { id: 'e', blocks: [{ id: 'b0', type: 'p', text: 'First.' }, { id: 'b1', type: 'p', text: 'The marked words here.' }] };
+    const data = {
+      annotations: { 'journal:e:1': [{ id: 's', groupId: 'g', kind: 'note', start: 4, end: 16 }] },   // no words: it stays, left
+      notes: { g: { groupId: 'g', keys: ['journal:e:2'], fullText: 'marked words', body: 'x', updated: 5 } },
+      noPosition: true,
+    };
+    const r = rekeyJournalMarks([E], data);
+    expect(r.notes.g.keys).toEqual(['journal:e:b1']);
+    expect(rekeyJournalMarks([E], { ...data, notes: r.notes }).notes).toBeUndefined();
+    // F5's note keeps the key its left segment holds on every later pass, too
+    const f5 = rekeyJournalMarks(ENTRIES, {
+      annotations: { 'journal:j_1:0': [ann('s_a', 'Grace to you', { groupId: 'g' }), ann('s_b', 'edited away', { groupId: 'g' })] },
+      notes: { g: { groupId: 'g', keys: ['journal:j_1:0'], fullText: 'Grace to you\nedited away', body: 'both' } },
+    });
+    const again = rekeyJournalMarks(ENTRIES, { annotations: f5.annotations, notes: f5.notes, noPosition: true });
+    expect(again.notes).toBeUndefined();
+  });
+
   it('F5: a note keeps its old key while one of its segments could not move', () => {
     const r = rekeyJournalMarks(ENTRIES, {
       annotations: { 'journal:j_1:0': [ann('s_a', 'Grace to you', { groupId: 'g' }), ann('s_b', 'edited away', { groupId: 'g' })] },
