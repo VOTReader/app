@@ -64,6 +64,11 @@ let _active = null;
 let _abort = null;
 /** The song being kept (web) was cancelled or removed: its fetch abort covers only the download (sweep W64). */
 let _halted = false;
+/** Stop stamps (W64 refuter round 2): a keep waits (the store read, the room check) before its songs are queued, out
+ *  of every list Cancel or Remove all reads; it drops a song stopped since it began. */
+let _stopSeq = 0;
+let _allStoppedAt = 0;
+const _stoppedAt = new Map();
 /** @type {Map<string, string>} id → why the last try failed (network | size | check | space) */
 const _failed = new Map();
 /** @type {Map<string, string>} a refusal, per asking surface */
@@ -324,6 +329,7 @@ function _say(key, text) {
  * @returns {Promise<{ ok: boolean, text: string }>}
  */
 async function keep(ids, key = '') {
+  const began = _stopSeq;
   const avail = availability();
   if (avail === 'ios-tab') return _say(key, IOS_TAB_TEXT + '.');
   if (avail === 'none') return _say(key, 'This browser cannot keep songs.');
@@ -346,6 +352,10 @@ async function keep(ids, key = '') {
   if (room >= 0 && need > room) {
     return _say(key, 'Not enough room: needs ' + formatSongBytes(need) + ', ' + formatSongBytes(room) + ' free.');
   }
+  // Cancelled, removed or swept by Remove all while this keep waited: those songs do not start.
+  if (_allStoppedAt > began) return _say(key, '');
+  for (let i = todo.length - 1; i >= 0; i--) if ((_stoppedAt.get(todo[i].id) || 0) > began) todo.splice(i, 1);
+  if (!todo.length) return _say(key, '');
   for (const s of todo) _failed.delete(s.id);
   if (_native()) {
     for (const s of todo) _retried.delete(s.id);
@@ -454,6 +464,7 @@ async function _pump() {
 /** Stop keeping `ids` (what waits comes off at once; the one on its way stops). @param {string[]} ids */
 function cancel(ids) {
   const set = new Set(Array.isArray(ids) ? ids : []);
+  for (const id of set) _stoppedAt.set(id, ++_stopSeq);
   if (_native()) {
     const urls = [];
     for (const id of set) {
@@ -499,6 +510,7 @@ async function remove(ids) {
 
 /** Every kept song off this phone, and nothing more on its way. */
 function removeAll() {
+  _allStoppedAt = ++_stopSeq;
   const busy = _native() ? [] : _queue.concat(_active ? [_active] : []);
   cancel(busy);
   // The song on its way is not kept yet (keptIds), but "remove all" takes it too: off the backup's list (W64).

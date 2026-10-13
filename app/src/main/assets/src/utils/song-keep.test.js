@@ -244,6 +244,36 @@ describe('song-keep on the web — the offline-songs store', () => {
       expect(lib.kept).toEqual([]);
     });
 
+    // W64 refuter round 2: a keep still checking for room (before its song is queued) was out of every list a
+    // Cancel or Remove all reads, so the song started after them and came back kept.
+    it.each([
+      ['Remove all', () => SongKeep.removeAll()],
+      ['Cancel', () => SongKeep.cancel([A1])],
+      ['remove', () => SongKeep.remove([A1])],
+    ])('%s while Keep is still checking for room: nothing starts', async (_label, stop) => {
+      let roomIn = null;
+      estimate.mockImplementation(() => new Promise((r) => { roomIn = () => r({ quota: 10e9, usage: 1e6 }); }));
+      const asked = SongKeep.keep([A1]);
+      await vi.waitFor(() => expect(roomIn).toBeTypeOf('function'));
+      await stop();
+      roomIn();
+      await asked;
+      await settled();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(store.map.has(A1)).toBe(false);
+      expect(lib.kept).toEqual([]);
+      expect(SongKeep.statusOf(A1)).toBe('none');
+    });
+
+    it('a Cancel before a later Keep of the same song does not stop that Keep', async () => {
+      SongKeep.cancel([A1]);
+      await SongKeep.keep([A1]);
+      await storing();
+      releasePut();
+      await settled();
+      expect(SongKeep.isKept(A1)).toBe(true);
+    });
+
     it('a store read that fails after Cancel is the cancel, not a failure: the stored copy goes', async () => {
       let rejectGet = null;
       store.get = vi.fn(() => new Promise((_r, j) => { rejectGet = () => j(new Error('read failed')); }));
