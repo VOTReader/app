@@ -33,6 +33,7 @@
    internal to the renderer, so it stays a real import. */
 import { resolveAnchor } from './anchor-resolve.js';
 import { chromeAwareView, viewIndexOf } from './anchor-view.js';
+import { makeIconButton, iconButtonProps, iconPoint } from './icon-button.js';
 
 /* Snap an annotation's range to whole WORDS — so a highlight/underline/note never
    lands mid-word, and never swallows the trailing comma/colon/period the drag
@@ -279,6 +280,7 @@ function renderNoteIcon(segIdx, entries, hlKey) {
     else if (window.__openNote) window.__openNote(gids[0]);
   };
   return (
+    // W65 (sweep 2026-10-13): a named button; Enter/Space open what a tap opens, a list under the icon (renderer/icon-button.js).
     <span
       key={'ni' + segIdx}
       className={'hl-note-icon' + color + (multi ? ' hl-note-icon-badge' : '')}
@@ -288,8 +290,9 @@ function renderNoteIcon(segIdx, entries, hlKey) {
       data-count={multi ? String(gids.length) : undefined}
       title={multi ? gids.length + ' notes here' : 'Open note'}
       onClick={(e) => { e.stopPropagation(); open(e.clientX, e.clientY); }}
+      {...iconButtonProps(multi ? 'Open ' + gids.length + ' notes' : 'Open note', (e) => { const p = iconPoint(e.currentTarget); open(p.x, p.y); })}
     >
-      <svg viewBox="0 0 24 24" style={nbColor ? { stroke: 'var(--hl-' + nbColor + ')' } : undefined}>
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" style={nbColor ? { stroke: 'var(--hl-' + nbColor + ')' } : undefined}>
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
         <polyline points="14 2 14 8 20 8" />
         <line x1="8" y1="13" x2="16" y2="13" />
@@ -567,6 +570,11 @@ export function applyNoteIcons() {
     icon.addEventListener('click', function(e) {
       e.stopPropagation();
       _openIcon(e.clientX, e.clientY);
+    });
+    // W65: a named button; Enter/Space open what a tap opens, a list under the icon (renderer/icon-button.js).
+    makeIconButton(icon, entries.length > 1 ? 'Open ' + entries.length + ' notes' : 'Open note', function() {
+      var p = iconPoint(icon);
+      _openIcon(p.x, p.y);
     });
     const ip = primary.ip;
     const ipUsable = ip.kind === 'beforeNode' && ip.node && ip.node.parentNode

@@ -24,6 +24,7 @@
 ═══════════════════════════════════════════════════════════════ */
 
 import { chromeAwareView, refindRange } from './anchor-view.js';
+import { makeIconButton } from './icon-button.js';
 
 /* Inject inline chain icons at the end of each linked text range inside
    [data-hl-dom] containers. Re-runs on store changes. Click → onLinkOpen(blockKey)
@@ -157,6 +158,8 @@ function _buildLinkIcon(hlKey, count, isSource) {
     if (window.__openLinkSidebar) window.__openLinkSidebar(hlKey);
   };
   icon.addEventListener('click', openSidebar);
+  // W65: a named button, Enter/Space opening what a tap opens (renderer/icon-button.js).
+  makeIconButton(icon, count === 1 ? 'Open link' : 'Open ' + count + ' links', openSidebar);
   return icon;
 }
 

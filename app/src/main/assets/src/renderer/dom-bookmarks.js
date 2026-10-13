@@ -26,6 +26,7 @@
 ═══════════════════════════════════════════════════════════════ */
 
 import { chromeAwareView, refindRange } from './anchor-view.js';
+import { makeIconButton } from './icon-button.js';
 
 /* Window (ms) during which a freshly-created bookmark gets the .just-created
    class so its icon plays the creation-pulse animation. Re-renders of the
@@ -154,6 +155,8 @@ function _buildBookmarkIcon(hlKey, bkmIds) {
     }
   };
   icon.addEventListener('click', openIcon);
+  // W65: a named button, Enter/Space opening what a tap opens (renderer/icon-button.js).
+  makeIconButton(icon, count === 1 ? 'Open bookmark' : 'Open ' + count + ' bookmarks', openIcon);
   return icon;
 }
 
