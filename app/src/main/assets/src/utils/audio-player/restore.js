@@ -24,7 +24,7 @@ import {
   _state,
   trackUrl,
 } from './core.js';
-import { getPreciseTime, _markPaused, _seekOnMetadata, _start } from './engine.js';
+import { getPreciseTime, _markPaused, _startAt } from './engine.js';
 import { _offlineNotice, _unreachable } from './offline.js';
 import { _persist, _setLastPersistSec } from './persist.js';
 
@@ -232,11 +232,10 @@ export async function _rebuildRestoredQueue() {
     : { mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null, startPartIndex: r.startPartIndex || null });
   _state.queue = queue;
   _state.qi = qi;
-  _start();
   // The snapshot's own clock is authoritative here — it is the freshest thing
   // known about this exact track — so the boot restore does NOT consult the
   // per-recording map. Unchanged behavior; only the seek call is now shared.
-  _seekOnMetadata(resumeAt);
+  _startAt(() => resumeAt);
   return true;
 }
 

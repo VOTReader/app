@@ -99,6 +99,8 @@ class NativeAudio extends EventTarget {
     this._rate = 1;
     this._default = 1;
     this._volume = 1;
+    /** Where this recording's load begins, or a seek before its metadata is headed (ms): until metadata, native's 0
+     *  is the place it has not reached yet, not a place (sweep W4). */
     this._startMs = 0;
     this._lastSeq = 0;
     this._upcomingSent = '';
@@ -174,8 +176,11 @@ class NativeAudio extends EventTarget {
     this._pos = t;
     this._anchorAt = now();
     this._ended = false;
-    if (this._loaded) nativeBridge()?.audioSeek(Math.round(t * 1000));
-    else this._startMs = Math.round(t * 1000);
+    if (this._loaded) {
+      nativeBridge()?.audioSeek(Math.round(t * 1000));
+      // Before metadata the load's own events (its first state reads the start it was given) are still on the way.
+      if (this._ready < 1) this._startMs = Math.round(t * 1000);
+    } else this._startMs = Math.round(t * 1000);
     const gen = this._gen;
     queueMicrotask(() => { if (gen === this._gen) this._fire('timeupdate'); });
   }
@@ -334,7 +339,11 @@ class NativeAudio extends EventTarget {
     const wasHeld = this._held;
     const wasBuffering = this._buffering;
     const dur = Number(e.dur) > 0 ? Number(e.dur) / 1000 : NaN;
-    this._pos = Math.max(0, Number(e.pos) || 0) / 1000;
+    const pos = Math.max(0, Number(e.pos) || 0) / 1000;
+    // A load headed past 0:00 (a resume): before metadata native's 0 is the place it is on its way to. Read as the
+    // place, the bar showed 0:00 and the boot snapshot and a failed load's retry point were saved at 0 (sweep W4).
+    // With a duration it is native's word (a file it cannot seek in starts at 0).
+    this._pos = pos === 0 && !(dur > 0) && this._ready < 1 && this._startMs > 0 ? this._startMs / 1000 : pos;
     // Native read pos at e.at: the bridge took the time since then, and the clock runs on from that moment, not
     // from this one. Anchored at arrival, it lagged native by the bridge's delay and stepped back when one event
     // came quicker than the last (sweep n1-04).

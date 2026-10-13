@@ -252,6 +252,66 @@ describe('audio-player on the native player (m3)', () => {
     expect(AudioPlayer.getState().status).toBe('paused');
   });
 
+  it('(W4) a restored bar resumes AT its place: native loads it there, and the clock never reads 0', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    send({ type: 'state', url: URL_OF('idC'), pos: 41000, dur: 600000, playing: true, want: true });
+    await flush();
+    AudioPlayer.toggle();                                    // paused at 0:41: the snapshot is written
+    send({ type: 'state', url: URL_OF('idC'), pos: 41000, dur: 600000, playing: false, want: false });
+    await flush();
+    vi.resetModules();                                       // a new session
+    bridge.audioLoad.mockClear();
+    bridge.audioSeek.mockClear();
+    AudioPlayer = (await import('./audio-player.js')).AudioPlayer;
+    expect(AudioPlayer.getState().restoring).toBe(true);
+    AudioPlayer.toggle();
+    await vi.waitFor(() => expect(bridge.audioLoad).toHaveBeenCalled());
+    expect(loads()[0]).toMatchObject({ url: URL_OF('idC'), startMs: 41000 });
+    // A 0 from native before metadata is the place it is on its way to, not a place: never the bar's, never saved.
+    send({ type: 'state', url: URL_OF('idC'), pos: 0, dur: 0, playing: false, want: false, buffering: true });
+    await flush();
+    expect(Math.round(AudioPlayer.getState().time)).toBe(41);
+    AudioPlayer.toggle();                                    // a pause while it loads saves the place, not 0
+    await flush();
+    expect(Math.round(JSON.parse(localStorage.getItem('vot-audio-pos')).time)).toBe(41);
+    AudioPlayer.toggle();
+    send({ type: 'state', url: URL_OF('idC'), pos: 41000, dur: 600000, playing: true, want: true });
+    await flush();
+    expect(bridge.audioSeek).not.toHaveBeenCalled();         // the load carried it: no second seek at metadata
+    expect(Math.round(AudioPlayer.getState().time)).toBe(41);
+  });
+
+  it('(W4) a remembered place goes in with the load; a load that fails first keeps it for Retry and the next boot', async () => {
+    globalThis.AudioPositionsStore = { getPosition: () => ({ t: 125, d: 600 }), setPosition: vi.fn(), clearPosition: vi.fn() };
+    try {
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+      expect(loads()[0]).toMatchObject({ url: URL_OF('idC'), startMs: 120000 });   // 125 s less the 5 s rewind
+      send({ type: 'state', url: URL_OF('idC'), pos: 0, dur: 0, playing: false, want: false, buffering: true });
+      send({ type: 'error', url: URL_OF('idC'), code: 2001, name: 'ERROR_CODE_IO_NETWORK_CONNECTION_FAILED' });
+      await flush();
+      expect(AudioPlayer.getState().status).toBe('paused');
+      expect(AudioPlayer.getState().time).toBe(120);
+      expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time).toBe(120);
+      AudioPlayer.toggle();                                  // Retry
+      expect(loads()).toHaveLength(2);
+      expect(loads()[1]).toMatchObject({ url: URL_OF('idC'), startMs: 120000 });
+    } finally { delete globalThis.AudioPositionsStore; }
+  });
+
+  it('(W4) a seek before metadata goes to native at once, and the load\'s first 0 does not undo it', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    expect(loads()[0].startMs).toBe(0);
+    AudioPlayer.seek(100);
+    expect(bridge.audioSeek).toHaveBeenCalledWith(100000);
+    send({ type: 'state', url: URL_OF('idC'), pos: 0, dur: 0, playing: false, want: false, buffering: true });
+    await flush();
+    expect(AudioPlayer.getState().time).toBe(100);
+    send({ type: 'state', url: URL_OF('idC'), pos: 100000, dur: 600000, playing: true, want: true });
+    await flush();
+    expect(bridge.audioSeek).toHaveBeenCalledTimes(1);
+    expect(Math.round(AudioPlayer.getState().time)).toBe(100);
+  });
+
   it('with the way back chosen (html), it is the WebView <audio>, keep-alive and all', async () => {
     localStorage.setItem('vot.audioEngine', 'html');
     vi.resetModules();
