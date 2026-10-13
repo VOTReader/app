@@ -108,9 +108,17 @@ export function attachWebGestures(el, deps) {
       drag = { x: pt.x, y: pt.y, camx: dc.x, camy: dc.y || 0, cam: dc, lift: liftAt(pt.x, pt.y) };
     }
   };
+  // W52: a pointer that went down on the chrome (or anywhere this code did
+  // not register it) is the chrome's for its whole life: its move must not
+  // pan, its up must not tap, and its cancel must not end another finger's
+  // drag. A mouse moving with no button down still hovers the web.
   const move = (e) => {
     const pt = loc(e);
-    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, pt);
+    if (!pointers.has(e.pointerId)) {
+      if (!drag && !pinch && e.pointerType === 'mouse') handlers().hover(pt.x, pt.y);
+      return;
+    }
+    pointers.set(e.pointerId, pt);
     const W = view().W;
     if (pinch && pointers.size === 2) {
       const c = pinch.cam;
@@ -157,6 +165,7 @@ export function attachWebGestures(el, deps) {
     if (e.pointerType === 'mouse') handlers().hover(pt.x, pt.y);
   };
   const up = (e) => {
+    if (!pointers.has(e.pointerId)) return;
     pointers.delete(e.pointerId);
     if (pointers.size < 2) pinch = null;
     if (drag && drag.lift) {
@@ -171,7 +180,10 @@ export function attachWebGestures(el, deps) {
     }
     drag = null;
   };
-  const cancel = (e) => { pointers.delete(e.pointerId); drag = null; pinch = null; };
+  const cancel = (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.delete(e.pointerId); drag = null; pinch = null;
+  };
   const wheel = (e) => {
     // A panel with its own scroll must scroll (or its text must select)
     // natively — the old unconditional preventDefault zoomed the canon out

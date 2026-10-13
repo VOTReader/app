@@ -666,9 +666,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // Wiring itself lives in gestures.js (attachWebGestures) — a pure move, so
   // it can be exercised with real dispatched DOM events instead of only a
   // screenshot. This effect just owns the mount guard and hands over refs.
+  // W52: noWebGL and glRetry are deps because the fallback unmounts .sw-root
+  // and Try again mounts a NEW one; without them the listeners stayed on the
+  // first, detached root and the web came back dead to every drag and pinch.
   React.useEffect(() => {
     const el = wrapRef.current;
-    if (!el || !graph) return;
+    if (!el || !graph || noWebGL) return;
     return attachWebGestures(el, {
       loc, dpr: () => viewRef.current.DPR, cam: () => camRef.current, camFor,
       view: () => viewRef.current, handlers: () => handlersRef.current,
@@ -676,7 +679,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       schedule, maxZoom: (c) => zoomCapFor(c || camRef.current), clampCamera, zoomAbout, xToVerse,
       yFrame: yFrameFor, lift: liftAt,
     });
-  }, [graph, schedule, loc, camFor, zoomCapFor, live, dropHover, yFrameFor, liftAt, viewRef, camRef]);
+  }, [graph, noWebGL, glRetry, schedule, loc, camFor, zoomCapFor, live, dropHover, yFrameFor, liftAt, viewRef, camRef]);
 
   // Verse and chapter candidates carry no distance: they only ever come alone.
   const hitCandidatesAt = React.useCallback(/** @returns {Array<{ kind: string, distance?: number } & Record<string, any>>} */ (cx, cy) => {
