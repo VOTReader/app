@@ -24,6 +24,26 @@ const _squash = (s) => String(s || '').replace(/\s+/g, ' ').trim();
     words it came from. Headings carry no hl-key (nothing to land on). */
 const _blockText = blockReadText;
 
+/**
+ * W44: the saved-state key of every prophecy card a letter renders, under the
+ * same rules ProphecyGroup uses to render a card (a part with content).
+ * @param {{ id: string, blocks: any[] }} letter
+ * @returns {string[]}
+ */
+export function prophecyCardKeysOf(letter) {
+  /** @type {string[]} */
+  const keys = [];
+  letter.blocks.forEach((b, bi) => {
+    if (!b || b.type !== "prophecy-group") return;
+    const g = letter.id + ":" + bi;
+    if (b.intro && b.intro.length > 0) keys.push(g + ":intro");
+    if (b.ot && b.ot.blocks && b.ot.blocks.length > 0) keys.push(g + ":ot");
+    if (b.nt && b.nt.blocks && b.nt.blocks.length > 0) keys.push(g + ":nt");
+    if (b.vot && b.vot.blocks && b.vot.blocks.length > 0) keys.push(g + ":vot");
+  });
+  return keys;
+}
+
 export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, resolvePeek = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [sheetFn, setSheetFn] = React.useState(null);
@@ -33,6 +53,9 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   const [expandSignal, setExpandSignal] = React.useState(0);
   const [allExpanded, setAllExpanded] = React.useState(true);
   const hasProphecyGroups = letter.blocks.some((b) => b.type === "prophecy-group");
+  // W44: an expand/collapse-all belongs to the letter it was pressed on. This view
+  // stays mounted from one letter (or study chapter) to the next.
+  React.useEffect(() => { setExpandSignal(0); setAllExpanded(true); }, [letter.id]);
 
   const mainRef = React.useRef(null);
   /* The title is what the reader says before the body's first timed row
@@ -712,10 +735,9 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
             setAllExpanded(expand);
             setExpandSignal(expand ? expandSignal >= 0 ? expandSignal + 1 : 1 : expandSignal <= 0 ? expandSignal - 1 : -1);
             if (prophecyCardStatesRef) {
-              const prefix = letter.id + ":";
-              Object.keys(prophecyCardStatesRef.current).forEach((k) => {
-                if (k.startsWith(prefix)) prophecyCardStatesRef.current[k] = expand;
-              });
+              // W44: every card of this letter, not only the keys already saved (the
+              // cards someone toggled by hand): untouched ones came back expanded.
+              prophecyCardKeysOf(letter).forEach((k) => { prophecyCardStatesRef.current[k] = expand; });
               saveProphecyCardStates && saveProphecyCardStates();
             }
           }}
