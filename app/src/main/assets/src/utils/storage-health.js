@@ -118,6 +118,7 @@ const RISK = Object.freeze({
  *   storesDegraded: boolean,
  *   versionTooNew: boolean,
  *   dataMissing: { name: string, at: number, then: any, now: any } | null,
+ *   libraryElsewhere: 'changing' | 'changed' | null,
  * }} StorageHealthReport
  */
 
@@ -138,6 +139,7 @@ const _DEFAULT_REPORT = Object.freeze({
   storesDegraded: false,
   versionTooNew: false,
   dataMissing: null,
+  libraryElsewhere: null,
 });
 
 /* ─── Module state ──────────────────────────────────────────────────── */
@@ -180,6 +182,11 @@ let _versionTooNew = false;
  *  (utils/data-safety.js) - { name, at, then, now } - or null. */
 /** @type {{ name: string, at: number, then: any, now: any } | null} */
 let _dataMissing = null;
+/** W8 (sweep 2026-10-13): another tab is changing ('changing') or changed ('changed') the
+ *  library - Clear All, Import, a snapshot Restore - so this tab's saves are held and it
+ *  should reload (utils/other-tabs.js). */
+/** @type {'changing' | 'changed' | null} */
+let _libraryElsewhere = null;
 /** @type {Promise<StorageHealthReport> | null} */
 let _assessInFlight = null;
 /** @type {(() => void) | null} */
@@ -445,6 +452,7 @@ async function _assessImpl() {
       storesDegraded: _storesDegraded,
       versionTooNew: _versionTooNew,
       dataMissing: _dataMissing,
+      libraryElsewhere: _libraryElsewhere,
     });
     _report = fallback;
     _lastAssessedAt = Date.now();
@@ -507,6 +515,7 @@ async function _assessImpl() {
     storesDegraded: _storesDegraded,
     versionTooNew: _versionTooNew,
       dataMissing: _dataMissing,
+      libraryElsewhere: _libraryElsewhere,
   };
 
   _report = report;
@@ -613,6 +622,7 @@ function _onWriteFailure(err) {
       storesDegraded: _storesDegraded,
       versionTooNew: _versionTooNew,
       dataMissing: _dataMissing,
+      libraryElsewhere: _libraryElsewhere,
     };
   }
   _bump();
@@ -781,6 +791,20 @@ function _setDataMissing(v) {
 }
 
 /**
+ * W8: set or clear "the library was changed in another tab" (utils/other-tabs.js). The
+ * banner asks for a reload; this tab's saves are held meanwhile.
+ *
+ * @param {'changing' | 'changed' | null} v
+ */
+function _setLibraryElsewhere(v) {
+  var next = v || null;
+  if (next === _libraryElsewhere) return;
+  _libraryElsewhere = next;
+  _report = Object.assign({}, _report || _DEFAULT_REPORT, { libraryElsewhere: next });
+  _bump();
+}
+
+/**
  * Start periodic health assessment. Called once after hydration
  * completes (from HydrationGate). Kicks off the initial assess(),
  * sets up a 5-minute refresh interval, and listens for visibility
@@ -849,6 +873,7 @@ function _resetForTests(opts) {
   _safariGateBlocked = false;
   _storesDegraded = false;
   _versionTooNew = false;
+  _libraryElsewhere = null;
   _assessInFlight = null;
   _persistInFlight = false;
   _storageApiOverride = (opts && opts.storageApi) || null;
@@ -873,6 +898,7 @@ export const StorageHealth = {
   isDismissed: _isDismissed,
   setStoresDegraded: _setStoresDegraded,
   setVersionTooNew: _setVersionTooNew,
+  setLibraryElsewhere: _setLibraryElsewhere,
   setDataMissing: _setDataMissing,
   start: _start,
   stop: _stop,

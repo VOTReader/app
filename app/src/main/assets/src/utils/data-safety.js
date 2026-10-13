@@ -74,6 +74,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
 import { StorageHealth } from './storage-health.js';
 import { snapshotSink, snapshotTime } from './snapshot-sink.js';
 import { showToast } from './toast.js';
+import { announceLibraryChange } from './other-tabs.js';
 
 /** Set (localStorage) by an import or Clear All just before its reload: the next boot's
  *  smaller library is the reader's own doing, so it is not compared. In LS_SKIP_LIST. */
@@ -611,6 +612,9 @@ export async function restoreMissing(opts) {
   if (typeof w.__flushPersistState === 'function') w.__flushPersistState();
   if (typeof w.__freezePersistState === 'function') w.__freezePersistState(true);
   setStoreWriteFence(true, { storesOnly: true });
+  // W8: the other open tabs hold their saves from here (their old copy would land on the restore).
+  announceLibraryChange('changing');
+  let wrote = false;
   try {
     await Promise.all(registeredStores().map((s) => (typeof s.whenSaved === 'function' ? s.whenSaved() : true)));
     const live = await collectStores();
@@ -618,11 +622,13 @@ export async function restoreMissing(opts) {
     for (const name of Object.keys(snap.stores)) {
       if (SKIP_STORES.has(name)) continue;
       const merged = mergeForRestore(name, live[name], snap.stores[name], { wiped });
-      if (merged !== live[name]) { await IDBAdapter.put(name, 'v', merged); _syncShim(name, merged); }
+      if (merged !== live[name]) { await IDBAdapter.put(name, 'v', merged); wrote = true; _syncShim(name, merged); }
     }
   } catch (e) {
     // Nothing reloads: lift the fence and the freeze so this session keeps saving
     // (an edit the fence held is saved now), and say so. The finding stays up.
+    // The other tabs save again too, unless part of the restore landed.
+    announceLibraryChange(wrote ? 'changed' : 'unchanged');
     setStoreWriteFence(false);
     if (typeof w.__freezePersistState === 'function') w.__freezePersistState(false);
     DiagnosticLog.warn('data-health', 'restore from ' + missing.name + ' failed: ' + ((e && /** @type {any} */ (e).name) || e));
@@ -632,6 +638,7 @@ export async function restoreMissing(opts) {
     return false;
   }
   setStoreWriteFence(true);
+  announceLibraryChange('changed');              // W8: the other tabs ask for a reload too
   _healthy = false;                              // nothing more from this page: it reloads
   DiagnosticLog.warn('data-health', 'restored from ' + missing.name + ' (merge' + (opts && opts.auto ? ', on its own after a total wipe' : '') + ')');
   try { localStorage.setItem(RESTORED_NOTE_KEY, JSON.stringify({ at: missing.at || snapshotTime(missing.name), auto: !!(opts && opts.auto) })); } catch (_e) { /* no note, no toast */ }

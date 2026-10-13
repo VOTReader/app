@@ -586,3 +586,89 @@ describe('Clear All Personal Data', () => {
     expect(lastToast()).toBe('All personal data cleared. Reloading…');
   });
 });
+
+/* W8 (sweep 2026-10-13): another open tab kept saving its old copy over a Clear All or an Import
+   (an import writes into the same database, so the other tabs get no versionchange). This tab
+   now tells them on a channel (utils/other-tabs.js): 'changing' before its first write, then
+   'changed' - or 'unchanged' when it stopped before writing anything, so they save again. */
+describe('W8: the other open tabs hear about Clear All and Import', () => {
+  /** @type {string[]} */
+  let said;
+  beforeEach(() => { said = []; put('announceLibraryChange', (kind) => said.push(kind)); });
+
+  it('Clear All: "changing" before the first delete, "changed" with the reload', async () => {
+    globalThis.indexedDB.deleteDatabase.mockImplementation((name) => {
+      said.push('delete ' + name);
+      const req = {};
+      queueMicrotask(() => req.onsuccess && req.onsuccess());
+      return req;
+    });
+    await createBackupFlow(ctx).clearAllPersonalData();
+    expect(said[0]).toBe('changing');
+    expect(said).toContain('delete votreader');
+    expect(said.at(-1)).toBe('changed');
+  });
+
+  it('a Clear All whose library delete did not go through: "unchanged" (the other tabs save again)', async () => {
+    globalThis.indexedDB.deleteDatabase.mockImplementation((name) => {
+      const req = {};
+      queueMicrotask(() => (name === 'votreader' ? req.onblocked() : req.onsuccess()));
+      return req;
+    });
+    await createBackupFlow(ctx).clearAllPersonalData();
+    expect(said).toEqual(['changing', 'unchanged']);
+  });
+
+  it('a Clear All whose library went but whose media did not: "changed"', async () => {
+    globalThis.indexedDB.deleteDatabase.mockImplementation((name) => {
+      const req = {};
+      queueMicrotask(() => (name === 'vot-journal-media' ? req.onblocked() : req.onsuccess()));
+      return req;
+    });
+    await createBackupFlow(ctx).clearAllPersonalData();
+    expect(lastToast()).toBe('Clear did not finish. Please try again.');
+    expect(said).toEqual(['changing', 'changed']);
+  });
+
+  it('Import: "changing" before the apply, "changed" with the reload', async () => {
+    globalThis.applyV3.mockImplementation(async () => { said.push('apply'); return { importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] }; });
+    bridge.pickImportFile.mockResolvedValue(await votbakFile());
+    await createBackupFlow(ctx).importPersonalData();
+    await settle();
+    expect(said).toEqual(['changing', 'apply', 'changed']);
+  });
+
+  it('an import with a failed write keeps this page up, but part of it landed: "changed"', async () => {
+    globalThis.applyV3.mockResolvedValue({ importFailures: 0, writeFailures: 1, skippedStores: [], countMismatches: [] });
+    bridge.pickImportFile.mockResolvedValue(await votbakFile());
+    await createBackupFlow(ctx).importPersonalData();
+    await settle();
+    expect(ctx.reloadPendingRef.current).toBe(false);
+    expect(said).toEqual(['changing', 'changed']);
+  });
+
+  it('an import refused before its first write (a store still loading): "unchanged"', async () => {
+    put('NoteStore', { getState: () => 'pending' });
+    bridge.pickImportFile.mockResolvedValue(await votbakFile());
+    await createBackupFlow(ctx).importPersonalData();
+    await settle();
+    expect(globalThis.applyV3).not.toHaveBeenCalled();
+    expect(said).toEqual(['changing', 'unchanged']);
+  });
+
+  it('an import that met another tab\'s backup (nothing ran here): "unchanged"', async () => {
+    globalThis.applyV3.mockRejectedValue(new Error('backup already in progress'));
+    bridge.pickImportFile.mockResolvedValue(await votbakFile());
+    await createBackupFlow(ctx).importPersonalData();
+    await settle();
+    expect(said).toEqual(['changing', 'unchanged']);
+  });
+
+  it('declining the sheet says nothing at all', async () => {
+    ctx.confirmImport.mockResolvedValue(false);
+    bridge.pickImportFile.mockResolvedValue(await votbakFile());
+    await createBackupFlow(ctx).importPersonalData();
+    await settle();
+    expect(said).toEqual([]);
+  });
+});

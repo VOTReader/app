@@ -73,7 +73,7 @@ export function StorageHealthBanner({ onNavigateSettings }) {
    * @param {import('../../utils/storage-health.js').StorageHealthReport} r
    */
   function _pickScenario(r) {
-    const { tier, remaining, privateModeLikely, writeFailedThisSession, storesDegraded, versionTooNew, dataMissing } = r;
+    const { tier, remaining, privateModeLikely, writeFailedThisSession, storesDegraded, versionTooNew, dataMissing, libraryElsewhere } = r;
 
     // v04-03: a NEWER VOTReader saved this device's data, so this build cannot open
     // it (IDB VersionError). First: it explains every other symptom - the stores are
@@ -90,6 +90,22 @@ export function StorageHealthBanner({ onNavigateSettings }) {
           : "Your library was saved by a newer version of VOTReader, so this version can't open it. Nothing on this device has been lost: reload VOTReader to get the latest version. Changes you make here won't be saved.",
         dismissable: false,
         buttons: android ? [] : [{ label: 'Reload', primary: true, onClick: () => { try { window.location.reload(); } catch (_e) { /* nothing more to do */ } } }],
+      };
+    }
+
+    // W8 (sweep 2026-10-13): another tab cleared the library, imported a backup or restored a
+    // snapshot. This tab's copy is the old one, so its saves are held (utils/other-tabs.js) -
+    // they would write it back over the new library - and a save held here is not full storage.
+    // Only the web has other tabs; a reload shows the library as it is now.
+    if (libraryElsewhere) {
+      return {
+        id: 'library-elsewhere',
+        style: 'danger',
+        text: libraryElsewhere === 'changing'
+          ? "Your library is being changed in another tab (a backup restore or Clear All). Changes you make here won't be saved. Reload this tab when it's done."
+          : "Your library was changed in another tab. Reload to see it. Changes you make here won't be saved.",
+        dismissable: false,
+        buttons: [{ label: 'Reload', primary: true, onClick: () => { try { window.location.reload(); } catch (_e) { /* nothing more to do */ } } }],
       };
     }
 

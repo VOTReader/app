@@ -14,6 +14,10 @@ import { DataSafety, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKI
 import { validateImportEnvelope } from './import-validators.js';
 import { applyImportPayload } from './backup.js';
 import { pruneSnapshotNames, snapshotName, snapshotTime, KEEP_DAYS, KEEP_WEEKS } from './snapshot-sink.js';
+import { announceLibraryChange } from './other-tabs.js';
+
+// W8: what this page tells the other open tabs (the channel itself: other-tabs.test.js).
+vi.mock('./other-tabs.js', async (importOriginal) => ({ ...(/** @type {any} */ (await importOriginal())), announceLibraryChange: vi.fn() }));
 
 const ANN = { 'bible:john:3:16': [{ id: 'a1', groupId: 'a1', kind: 'highlight', start: 0, end: 5, color: 'yellow', created: 1, updated: 1 }],
   'letter:x:1': [{ id: 'a2', groupId: 'a2', kind: 'highlight', start: 0, end: 5, color: 'gold', created: 2, updated: 2 }] };
@@ -230,6 +234,52 @@ describe('refuter findings (datasafe 10-05 second pass)', () => {
     expect(reload).not.toHaveBeenCalled();
     expect(isStoreWriteFenced()).toBe(false);
     expect(StorageHealth.getReport().dataMissing).not.toBeNull();
+  });
+
+  /* W8 (sweep 2026-10-13): a Restore writes into the database the other tabs keep open, so they
+     get no versionchange; they hear it on the channel, or their next save writes the old copy
+     back over the restored stores. */
+  it('W8: the other open tabs hear "changing" before the first write and "changed" with the reload', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    const sink = memorySink();
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(Date.now() - 86400000);
+    await DataSafety.run({ sink });
+    vi.useRealTimers();
+    await IDBAdapter.put('vot-annotations', 'v', {});
+    await IDBAdapter.put('vot-notes', 'v', {});
+    await IDBAdapter.put('vot-state', 'v', {});
+    expect(await DataSafety.run({ sink })).toBe('damaged');
+    const order = [];
+    vi.mocked(announceLibraryChange).mockReset().mockImplementation((kind) => { order.push(kind); });
+    const realPut = IDBAdapter.put;
+    vi.spyOn(IDBAdapter, 'put').mockImplementation((...a) => { order.push('put'); return realPut.apply(IDBAdapter, a); });
+    expect(await DataSafety.restoreMissing({ sink, reload: vi.fn() })).toBe(true);
+    expect(order[0]).toBe('changing');
+    expect(order).toContain('put');
+    expect(order.at(-1)).toBe('changed');
+  });
+
+  it('W8: a restore whose first write fails tells them "unchanged" (they save again); one that wrote some says "changed"', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    const sink = memorySink();
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(Date.now() - 86400000);
+    await DataSafety.run({ sink });
+    vi.useRealTimers();
+    await IDBAdapter.put('vot-annotations', 'v', {});
+    await IDBAdapter.put('vot-notes', 'v', {});
+    await IDBAdapter.put('vot-state', 'v', {});
+    expect(await DataSafety.run({ sink })).toBe('damaged');
+    const said = [];
+    vi.mocked(announceLibraryChange).mockReset().mockImplementation((kind) => { said.push(kind); });
+    const quota = Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
+    const realPut = IDBAdapter.put;
+    const putSpy = vi.spyOn(IDBAdapter, 'put').mockRejectedValue(quota);
+    expect(await DataSafety.restoreMissing({ sink, reload: vi.fn() })).toBe(false);
+    expect(said).toEqual(['changing', 'unchanged']);
+    said.length = 0;
+    putSpy.mockReset().mockImplementationOnce((...a) => realPut.apply(IDBAdapter, a)).mockRejectedValue(quota);
+    expect(await DataSafety.restoreMissing({ sink, reload: vi.fn() })).toBe(false);
+    expect(said).toEqual(['changing', 'changed']);
   });
 
   it('a progress reset tells the next boot the smaller ledger is the reader\'s own', async () => {

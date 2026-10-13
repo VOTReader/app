@@ -177,7 +177,7 @@ export const IDBAdapter = (function () {
   let _openInfo = null;
   /** @type {Set<() => void>} */
   const _closeListeners = new Set();
-  /** Told when another connection deletes or upgrades the database (versionchange). @type {Set<() => void>} */
+  /** Told when another connection deletes or upgrades the database (versionchange). @type {Set<(ev: any) => void>} */
   const _versionListeners = new Set();
 
   /**
@@ -219,7 +219,9 @@ export const IDBAdapter = (function () {
   /**
    * Called when another connection deletes or upgrades the database (Clear All, a newer
    * tab): this page's copy of the data is no longer the library. Returns the unsubscribe.
-   * @param {() => void} fn
+   * The listener gets the event: `newVersion` is null for a delete, else the version a
+   * newer build is upgrading to (utils/other-tabs.js tells the two apart).
+   * @param {(ev: { newVersion?: number | null }) => void} fn
    */
   function onVersionChange(fn) {
     _versionListeners.add(fn);
@@ -278,10 +280,10 @@ export const IDBAdapter = (function () {
       };
       req.onsuccess = function (e) {
         const db = /** @type {IDBOpenDBRequest} */ (e.target).result;
-        db.onversionchange = function () {
+        db.onversionchange = function (ev) {
           try { db.close(); } catch (_e) { /* best-effort close */ }
           if (_dbPromise === p) _dbPromise = null;
-          for (const fn of Array.from(_versionListeners)) { try { fn(); } catch (_e) { /* one listener never stops the next */ } }
+          for (const fn of Array.from(_versionListeners)) { try { fn(ev || {}); } catch (_e) { /* one listener never stops the next */ } }
         };
         // The browser's forced close (header): logged and reported, never reopened.
         db.onclose = function () {
