@@ -60,7 +60,7 @@
        dashboard. The service worker never caches it (cross-origin). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-Eeh01SK8uypEtKAtRbV1aRd2sSX2sGVP4u/jOl0Sv38=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-CSTsiXpSL6PrFbnnOKxr26HHhI6qbL1gLcEyixUvtIU=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-mAlLZyzgv5j3ckXsVbEHAdVurjqzQko87dljHD/9BUY=';
+    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-NpW/ShmQFkCof3AXi7n2zYO8aQB6icDMEZclJ+DDWrk=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-CSTsiXpSL6PrFbnnOKxr26HHhI6qbL1gLcEyixUvtIU=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-mAlLZyzgv5j3ckXsVbEHAdVurjqzQko87dljHD/9BUY=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     font-src 'self' data:;
@@ -205,43 +205,7 @@
          __votCorpus     / __loadVotCorpus     (Q8.3) — 14 VOT corpora
        -->
   <script>
-  window.__makeLazyLoader = function(name, bundlePath, finishFnName, cssPath) {
-    // cssPath (n7-08, 2026-09-25): a lazy SCREEN bundle's own stylesheet, the
-    // rules of app.css only its screens use (tools/split-lazy-css.mjs moves them
-    // out of the render-blocking dist/app.min.css). The script runs only once
-    // its stylesheet has landed, so the screen never draws unstyled. A
-    // stylesheet that fails, or has not landed in 8 s, does not hold the screen
-    // back: it draws with the boot sheet alone (a late sheet still applies).
-    var cssDone = null;
-    var loadCss = function() {
-      if (!cssPath) return Promise.resolve();
-      if (cssDone) return cssDone;
-      cssDone = new Promise(function(done) {
-        var link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = cssPath;
-        link.setAttribute('data-lazy-css', '');
-        setTimeout(done, 8000);   // a stalled request: the screen waits no longer than this
-        link.onload = function() { done(); };
-        link.onerror = function() {
-          if (link.parentNode) link.parentNode.removeChild(link);
-          cssDone = null;
-          if (window.DiagnosticLog && typeof window.DiagnosticLog.error === 'function') {
-            try { window.DiagnosticLog.error('corpus', 'failed to load ' + cssPath); } catch (_e) {}
-          }
-          done();
-        };
-        // Right after the boot sheet (and any lazy sheet before it), never at
-        // the end of <head>: the <style> blocks the journal and the highlights
-        // screen inject at run time came after these rules when they lived in
-        // app.min.css, and must still come after them.
-        var lazies = document.querySelectorAll('link[data-lazy-css]');
-        var anchor = lazies.length ? lazies[lazies.length - 1] : document.querySelector('link[href="dist/app.min.css"]');
-        if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(link, anchor.nextSibling);
-        else document.head.appendChild(link);
-      });
-      return cssDone;
-    };
+  window.__makeLazyLoader = function(name, bundlePath, finishFnName) {
     var corpus = {
       loaded: false,
       error: false,           // E1: set when the bundle fails to load (offline / 404 / old-WebView parse error)
@@ -285,16 +249,6 @@
       if (corpus.error) { corpus.error = false; corpus._bump(); }
       corpus._promise = new Promise(function(resolve, reject) {
         var t0 = Date.now();
-        // The routes draw a lazy screen the moment its component exists, not on
-        // the notify below: so the script RUNS only after its stylesheet has
-        // landed, while a preload fetches it alongside.
-        if (cssPath && !document.querySelector('link[rel="preload"][href="' + bundlePath + '"]')) {
-          var pre = document.createElement('link');
-          pre.rel = 'preload';
-          pre.setAttribute('as', 'script');
-          pre.href = bundlePath;
-          document.head.appendChild(pre);
-        }
         var script = document.createElement('script');
         script.src = bundlePath;
         script.async = false;
@@ -332,13 +286,7 @@
           }
           reject(new Error('Failed to load ' + bundlePath));
         };
-        if (!cssPath) document.head.appendChild(script);
-        else loadCss().then(function() {
-          // A new worker may have claimed the page while the stylesheet was on
-          // its way: the script would be the NEW build's (the guard above).
-          if (window.__votSwTookOver) { window.location.reload(); return; }
-          document.head.appendChild(script);
-        });
+        document.head.appendChild(script);
       });
       return corpus._promise;
     };
@@ -354,31 +302,8 @@
     var vot = window.__makeLazyLoader('vot', 'dist/bundle-a-vot.js', '__finishVotInit');
     window.__votCorpus = vot.corpus;
     window.__loadVotCorpus = vot.load;
-    // PF6: the lazy SCREEN bundle (Settings/Search/Garden split out of bundle-d).
-    // No finishFnInit — bundle-e's IIFE Object.assigns the screens onto window
-    // before _notify() fires, so they're defined the moment the route re-renders.
-    var screensE = window.__makeLazyLoader('screens-e', 'dist/bundle-e.js', null, 'dist/screens-e.min.css');
-    window.__screensE = screensE.corpus;
-    window.__loadScreensE = screensE.load;
-    // The Scripture Web (bundle-f) — its own lazy bundle rather than a lodger
-    // in bundle-e: a WebGL renderer plus its geometry has no business on the
-    // cold-boot path, and bundle-e is near its byte ceiling. Same no-finishFn
-    // contract as screens-e.
-    var screensF = window.__makeLazyLoader('screens-f', 'dist/bundle-f.js', null, 'dist/screens-f.min.css');
-    window.__screensF = screensF.corpus;
-    window.__loadScreensF = screensF.load;
-    // The Personal Study screens (My Progress / Notes / Links / Highlights) —
-    // opened on purpose, never on the way to a chapter, so they pay nothing on
-    // cold boot. Same no-finishFn contract as screens-e and screens-f.
-    var screensG = window.__makeLazyLoader('screens-g', 'dist/bundle-g.js', null, 'dist/screens-g.min.css');
-    window.__screensG = screensG.corpus;
-    window.__loadScreensG = screensG.load;
-    // The Listening Library (hub, Volumes, a collection, saved) — the PLAYER
-    // stays in bundle-d and plays on every screen; only the browsing surface
-    // is lazy. Same no-finishFn contract as screens-e/-f/-g.
-    var screensH = window.__makeLazyLoader('screens-h', 'dist/bundle-h.js', null, 'dist/screens-h.min.css');
-    window.__screensH = screensH.corpus;
-    window.__loadScreensH = screensH.load;
+    // Only DATA loads lazily. The screens rode four lazy bundles (e-h) until
+    // lz1 (2026-10-13) and now ship in bundle-d with the rest of the code.
     // The read-along timing files (src/data/audio-sync.js and the per-edition
     // bible-sync-<edition>.js) are lazy too, but their loaders live in
     // src/utils/sync-loaders.js (bundle-d), NOT here: the deploy and the APK

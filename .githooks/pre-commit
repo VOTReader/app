@@ -147,8 +147,8 @@ fi
 
 # ─── Step 0b1: no CRLF copies of LF files under the build's inputs (2026-10-05) ──
 # Python's text-mode writes on Windows leave CRLF on disk; `* text=auto eol=lf` stores LF and git status calls the file
-# clean, but the build reads the bytes: tools/split-lazy-css measures distance in characters, so a CRLF app.css built a
-# dist/ that differed from CI's and main's "committed bundles match source" gate went red three times (02424434..af12783a).
+# clean, but the build reads the bytes: tools/split-lazy-css (retired by lz1, 2026-10-13) measured distance in characters,
+# so a CRLF app.css built a dist/ that differed from CI's and main's "committed bundles match source" gate went red three times (02424434..af12783a).
 # Stripping the CRs changes nothing git stores, so rewrite them here, before Step 1z builds. (D:/Swarm/tools/land.sh does
 # the same before its rebuild.) Python writers: open(path, 'w', encoding='utf-8', newline='\n').
 crlf_copies=$(git ls-files --eol -- app/src/main/assets tools | awk -F'\t' '{ split($1, a, " "); if (a[1] == "i/lf" && a[2] == "w/crlf") print $2 }')
@@ -717,8 +717,8 @@ if [ -n "$bundle_source_changed" ]; then
   # corpus) regenerates those, and they're tracked, so they must be
   # re-staged or the committed bundle goes stale (CI bundle-match fails +
   # the app ships old data). `git add` of an unchanged bundle is a no-op,
-  # so listing them is safe on non-corpus commits. The lazy screen bundles
-  # g and h were missing here for a day (pc1); tools/pre-commit-wiring.test.js
+  # so listing them is safe on non-corpus commits. (The lazy screen bundles
+  # e-h, folded into d by lz1, were once missing here for a day, pc1.) tools/pre-commit-wiring.test.js
   # now holds this list to `git ls-files dist/` and package.json's --outfile set.
   git add app/src/main/assets/dist/bundle-a.js \
           app/src/main/assets/dist/bundle-a-bible.js \
@@ -727,15 +727,7 @@ if [ -n "$bundle_source_changed" ]; then
           app/src/main/assets/dist/bundle-b.js \
           app/src/main/assets/dist/bundle-c.js \
           app/src/main/assets/dist/bundle-d.js \
-          app/src/main/assets/dist/bundle-e.js \
-          app/src/main/assets/dist/bundle-f.js \
-          app/src/main/assets/dist/bundle-g.js \
-          app/src/main/assets/dist/bundle-h.js \
           app/src/main/assets/dist/app.min.css \
-          app/src/main/assets/dist/screens-e.min.css \
-          app/src/main/assets/dist/screens-f.min.css \
-          app/src/main/assets/dist/screens-g.min.css \
-          app/src/main/assets/dist/screens-h.min.css \
           app/src/main/assets/index.html \
           app/src/main/assets/service-worker.js
   # index.html is re-staged because `npm run build` runs build:csp, which

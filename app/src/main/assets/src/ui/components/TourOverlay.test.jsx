@@ -11,8 +11,8 @@
      D) With the target on the page: four dims, one ring around it, and the
         target itself is described by the card and still receives a tap,
         which moves the tour on. Without it: no ring, an honest hint.
-     E) It renders nothing while the tour is inactive, and nothing while the
-        lazy bundle has not arrived (ready=false) except a plain waiting line.
+     E) It renders nothing while the tour is inactive, and the card at once
+        when it starts (the overlay rode lazy bundle-e and waited for it until lz1).
 */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
@@ -134,13 +134,12 @@ describe('TourOverlay — ring and target', () => {
     expect(screen.getByText(/could not find/i)).toBeTruthy();
   });
 
-  it('shows a plain waiting line until the lazy bundle is ready', () => {
-    window.__loadScreensE = () => new Promise(() => {});
+  it('shows the card at once: the overlay ships in bundle-d, nothing to wait for (lz1)', () => {
     TourController.attachNav(nav());
     TourController.start('settings');
     render(<TourOverlay />);
-    expect(screen.getByText(/one moment/i)).toBeTruthy();
-    expect(document.querySelector('.tour-card')).toBeNull();
+    expect(screen.queryByText(/one moment/i)).toBeNull();
+    expect(document.querySelector('.tour-card')).toBeTruthy();
   });
 });
 

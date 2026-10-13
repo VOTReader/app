@@ -15,8 +15,8 @@ window-globalized export, run `npm run lint:globals` and stage the
 regenerated files yourself; CI's smoke-lite gate fails on a stale copy.
 
 Sources scanned:
-  1. Every file in ENTRY_FILES below (_entry-b.js, _entry.js, _entry-d.js
-     through _entry-h.js) — Object.assign(window, {...}) blocks (the
+  1. Every file in ENTRY_FILES below (_entry-b.js, _entry.js, _entry-d.js;
+     _entry-e..h folded into d by lz1) — Object.assign(window, {...}) blocks (the
      canonical export point for each bundle's modules).
   2. index.html — top-level `const|let|var|function|class NAME` declarations
      inside the inline <script> blocks (TabsContext, BIBLE_BOOK_LIST,
@@ -45,17 +45,6 @@ ENTRY_FILES = [
     ROOT / 'app/src/main/assets/src/stores/_entry-b.js',
     ROOT / 'app/src/main/assets/src/renderer/_entry.js',
     ROOT / 'app/src/main/assets/src/ui/_entry-d.js',
-    # PF6: bundle-e's lazy screens (Settings/Search/Garden) are window-globalized
-    # here too, so they're recognized as globals at their typeof-guarded route
-    # call sites in screen-routes.jsx.
-    ROOT / 'app/src/main/assets/src/ui/_entry-e.js',
-    # bundle-f — The Scripture Web, same typeof-guarded route call site.
-    ROOT / 'app/src/main/assets/src/ui/_entry-f.js',
-    # bundle-g — the Personal Study screens (My Progress / Notes / Links /
-    # Highlights), same typeof-guarded route call site.
-    ROOT / 'app/src/main/assets/src/ui/_entry-g.js',
-    # bundle-h — the Listening Library, same typeof-guarded route call site.
-    ROOT / 'app/src/main/assets/src/ui/_entry-h.js',
 ]
 INDEX_HTML = ROOT / 'app/src/main/assets/index.html'
 DATA_DIR = ROOT / 'app/src/main/assets/src/data'

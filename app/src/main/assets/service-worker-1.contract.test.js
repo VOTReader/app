@@ -40,7 +40,7 @@ import { registerServiceWorker } from './src/utils/sw-register.js';
 const INDEX = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), './index.html'), 'utf8');
 
 /** index.html's inline lazy-loader factory + the IIFE that builds the app's
-    loaders (bible / matthew / vot / screens-e / screens-f), evaluated as the
+    loaders (bible / matthew / vot), evaluated as the
     page evaluates it. */
 function installIndexLoaders() {
   const m = INDEX.match(/<script>\s*(window\.__makeLazyLoader = function[\s\S]*?)<\/script>/);
@@ -90,7 +90,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
-  for (const k of ['__makeLazyLoader', '__bibleCorpus', '__loadBibleCorpus', '__matthewCorpus', '__loadMatthewCorpus', '__votCorpus', '__loadVotCorpus', '__screensE', '__loadScreensE', '__screensF', '__loadScreensF',
+  for (const k of ['__makeLazyLoader', '__bibleCorpus', '__loadBibleCorpus', '__matthewCorpus', '__loadMatthewCorpus', '__votCorpus', '__loadVotCorpus',
     // sw-register's takeover flag: left set, the next test's loader believes a
     // new worker already claimed the page and refuses every lazy load (the
     // CONTROL test failed whenever the RED test ran first, --sequence.seed=11).
@@ -109,14 +109,10 @@ describe('service-worker-1 — a visible reader on old eager bundles after a new
     installIndexLoaders();
     registerServiceWorker();
     await vi.advanceTimersByTimeAsync(13000);
-    window.__loadScreensE().catch(() => {});          // jsdom never fires onload; fine
+    // lz1 (2026-10-13): the screens ship in bundle-d; the lazy loads left are the corpora.
+    window.__loadVotCorpus().catch(() => {});          // jsdom never fires onload; fine
     await vi.advanceTimersByTimeAsync(0);
-    // n7-08: the screen's stylesheet first (jsdom never loads it: fire its load by hand), then the script.
-    const css = document.head.querySelector('link[data-lazy-css]');
-    expect(css && css.getAttribute('href')).toBe('dist/screens-e.min.css');
-    css.onload();
-    await vi.advanceTimersByTimeAsync(0);
-    expect(injectedLazyScripts()).toEqual(['dist/bundle-e.js']);
+    expect(injectedLazyScripts()).toEqual(['dist/bundle-a-vot.js']);
     expect(reload).not.toHaveBeenCalled();
   });
 
@@ -132,12 +128,12 @@ describe('service-worker-1 — a visible reader on old eager bundles after a new
     await vi.advanceTimersByTimeAsync(0);
     expect(reload, 'a controlled page reloads at once when a new worker takes over, visible or not').toHaveBeenCalledTimes(1);
 
-    // The reader taps Settings / Search / the Garden in the gap between
-    // reload() and the unload: bundle-e is lazy, and every byte of it would
-    // now come from the NEW build. The loader must refuse to append it.
-    window.__loadScreensE().catch(() => {});
+    // The reader opens a letter in the gap between reload() and the unload:
+    // the VOT corpus is lazy, and every byte of it would now come from the
+    // NEW build. The loader must refuse to append it.
+    window.__loadVotCorpus().catch(() => {});
     await vi.advanceTimersByTimeAsync(4000);          // longer than the GET_VERSION ask timeout
-    expect(injectedLazyScripts(), 'bundle-e from the NEW build was injected into a page still running the OLD bundle-a..d: '
-      + 'the takeover flag (window.__votSwTookOver) is what makes the loader refuse in that gap').not.toContain('dist/bundle-e.js');
+    expect(injectedLazyScripts(), 'bundle-a-vot from the NEW build was injected into a page still running the OLD bundle-a..d: '
+      + 'the takeover flag (window.__votSwTookOver) is what makes the loader refuse in that gap').not.toContain('dist/bundle-a-vot.js');
   });
 });

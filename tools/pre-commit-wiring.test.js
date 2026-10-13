@@ -254,10 +254,10 @@ describe('pre-commit gate wiring', () => {
     }
     const tracked = execFileSync('git', ['ls-files', 'app/src/main/assets/dist/'], { cwd: root, encoding: 'utf8' })
       .split('\n').map((s) => s.trim()).filter(Boolean);
-    expect(tracked.length).toBeGreaterThan(10);
+    expect(tracked.length).toBeGreaterThanOrEqual(8);   // a, a-bible, a-matthew, a-vot, b, c, d, app.min.css (lz1)
     const scripts = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).scripts;
     const outfiles = Object.values(scripts).flatMap((s) => [...String(s).matchAll(/--outfile=(\S+)/g)].map((m) => m[1]));
-    expect(outfiles.length).toBeGreaterThan(5);
+    expect(outfiles.length).toBeGreaterThanOrEqual(3);   // bundle-b, -c, -d (lz1 folded e-h into d)
     for (const f of new Set([...tracked, ...outfiles])) {
       expect(staged, `${f} is built and tracked but Step 5 never re-stages it`).toContain(f);
     }
