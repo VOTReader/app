@@ -8,7 +8,7 @@
  * output, so a "helpful" move back to the cold-boot path fails a test.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -53,7 +53,7 @@ describe('matthew-nkjv.js rides the lazy Matthew bundle, not the cold-boot bundl
    vendored source carried it in a plain `/* … *\/` banner, which is exactly
    the form esbuild's default `legal-comments=eof` does NOT keep — it keeps
    `/*!`, `//!`, `@license` and `@preserve` — so the notice was silently
-   dropped from `dist/bundle-e.js`, and from the live site, for as long as
+   dropped from `dist/bundle-e.js` (bundle-d since lz1), and from the live site, for as long as
    search has shipped. Verified against the live bundle: zero hits for
    `Ongaro`, `@license` or `Copyright`.
 
@@ -73,13 +73,14 @@ describe('vendored MIT notices survive into the shipped bundles', () => {
     expect(/^\/\*!/.test(src), 'the banner is not in a form esbuild keeps (needs /*! or @license)').toBe(true);
   });
 
-  it('...and it is still there in dist/bundle-e.js, which is what ships', () => {
-    const built = readFileSync(resolve(DIST, 'bundle-e.js'), 'utf-8');
-    expect(/Luca Ongaro/.test(built), 'dist/bundle-e.js ships without MiniSearch\'s MIT notice').toBe(true);
-    // The control: bundle-e really is the minified artifact, so the assertion
+  it('...and it is still there in dist/bundle-d.js, which is what ships', () => {
+    // bundle-d since lz1 (2026-10-13); search rode lazy bundle-e before.
+    const built = readFileSync(resolve(DIST, 'bundle-d.js'), 'utf-8');
+    expect(/Luca Ongaro/.test(built), 'dist/bundle-d.js ships without MiniSearch\'s MIT notice').toBe(true);
+    // The control: bundle-d really is the minified artifact, so the assertion
     // above is not passing because someone pointed it at an unminified file.
-    expect(built.length > 50000, 'bundle-e.js is smaller than expected — wrong file?').toBe(true);
-    expect(/\n\s{2,}\S/.test(built.slice(0, 4000)), 'bundle-e.js head looks unminified').toBe(false);
+    expect(built.length > 50000, 'bundle-d.js is smaller than expected — wrong file?').toBe(true);
+    expect(/\n\s{2,}\S/.test(built.slice(0, 4000)), 'bundle-d.js head looks unminified').toBe(false);
 
     /* ...and ONLY the notice ships. The vendored file's maintenance notes sit in
        a plain comment that esbuild strips -- but only while they avoid NAMING the
@@ -89,48 +90,32 @@ describe('vendored MIT notices survive into the shipped bundles', () => {
        mentioning neither is stripped. The first draft of those notes named both
        and shipped ~800 bytes of build instructions to every reader. This is the
        assertion that caught it. */
-    expect(/Regenerate:/.test(built), 'bundle-e.js is shipping the vendor file build instructions').toBe(false);
+    expect(/Regenerate:/.test(built), 'bundle-d.js is shipping the vendor file build instructions').toBe(false);
   });
 });
 
 
-/* THE STUDIES SCREENS AND THE MATTHEW CHAPTER VIEW LEAVE THE COLD-BOOT BUNDLE.
+/* THE STUDIES SCREENS AND THE MATTHEW CHAPTER VIEW: ONE COPY, IN BUNDLE-D.
    ─────────────────────────────────────────────────────────────────────
-   docs/perf/lighthouse-2026-09.md item 5: Lighthouse found 136-142 KB of
-   bundle-d's 185 KB (gzip) not executed at load. StudiesHome, BibleStudyIndex,
-   BibleStudyChapterView and MatthewChapterView are reached only by navigation
-   (a restored tab lands on them through the same lazy route), so they ride
-   bundle-g, behind __loadScreensG, as the Personal Study screens do.
-   screen-routes.lazy-studies.test.jsx pins the routes' loading behaviour; this
-   pins the BUILT bytes, so a helpful re-import into bundle-d fails a test.
-   The marker is the Object.assign KEY after `{` or `,` (a definition), not the
-   bare name bundle-d keeps in its `typeof X` guard (see bundle-g-membership). */
-describe('the Studies screens and the Matthew chapter view ride bundle-g, not bundle-d', () => {
-  const LAZY_STUDY = ['StudiesHome', 'BibleStudyIndex', 'BibleStudyChapterView', 'MatthewChapterView'];
+   They rode lazy bundle-g from 2026-09-28 (docs/perf/lighthouse-2026-09.md
+   item 5) until lz1 (2026-10-13) folded bundles e-h back into bundle-d
+   (D:/AgentBackbone/reports/lazy-loading-2026-10-13/REPORT.md). This pins the
+   BUILT bytes: bundle-d defines them and the screen bundles are gone.
+   The marker is the Object.assign KEY after `{` or `,` (a definition). */
+describe('the Studies screens and the Matthew chapter view ship in bundle-d (lz1)', () => {
+  const STUDY = ['StudiesHome', 'BibleStudyIndex', 'BibleStudyChapterView', 'MatthewChapterView'];
   const defines = (bundle, name) => new RegExp('[{,]\\s*' + name + ':').test(bundle);
   const d = readFileSync(resolve(DIST, 'bundle-d.js'), 'utf-8');
-  const g = readFileSync(resolve(DIST, 'bundle-g.js'), 'utf-8');
 
-  it('bundle-g defines them', () => {
-    for (const name of LAZY_STUDY) expect(defines(g, name), `bundle-g.js lacks ${name}`).toBe(true);
-  });
-
-  it('bundle-d no longer defines them, and still asks for them', () => {
-    for (const name of LAZY_STUDY) {
-      expect(defines(d, name), `bundle-d.js still defines ${name}`).toBe(false);
-      expect(d.includes(name), `bundle-d.js lost its guard on ${name}`).toBe(true);
+  it('bundle-d defines them, and the reading path they share with it, once', () => {
+    for (const name of [...STUDY, 'LetterView', 'ChapterView', 'ChapterIndex']) {
+      expect(defines(d, name), `bundle-d.js lacks ${name}`).toBe(true);
     }
-    // The control: the regex does find a definition bundle-d still owns.
-    expect(defines(d, 'BibleChapterView'), 'defines() found nothing in bundle-d — wrong pattern?').toBe(true);
   });
 
-  it('what the reading path shares with them stays in bundle-d, one copy', () => {
-    // BibleStudyChapterView renders LetterView and ChapterView over a study
-    // chapter, and both are boot-path screens: bundle-g must read them as
-    // free globals rather than carry a second copy.
-    for (const name of ['LetterView', 'ChapterView', 'ChapterIndex']) {
-      expect(defines(d, name), `bundle-d.js no longer defines ${name}`).toBe(true);
-      expect(defines(g, name), `bundle-g.js ships its own ${name}`).toBe(false);
+  it('no lazy screen bundle is built any more', () => {
+    for (const f of ['bundle-e.js', 'bundle-f.js', 'bundle-g.js', 'bundle-h.js']) {
+      expect(existsSync(resolve(DIST, f)), `dist/${f} is back: lz1 folded it into bundle-d`).toBe(false);
     }
   });
 });

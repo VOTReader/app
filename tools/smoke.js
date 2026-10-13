@@ -315,28 +315,23 @@
   // Best-effort — distinguishes "couldn't find the entry point" (reached
   // =false) from "navigated but the screen crashed" (crashed=true), which
   // is the signal that matters for a modularization regression.
-  /* ── The lazy screens must ARRIVE, not just load ──────────────────────
+  /* ── The screens must ARRIVE, not just load ──────────────────────────
      A lazy bundle that lands but never re-renders the app is a screen that
      never appears. That shipped on 2026-09-22: useLazyBundles subscribed
-     App() to screens-e and screens-f only, so a screen from bundle-g or
-     bundle-h could sit on "Loading…" with its bundle on the page and its
-     component defined on window. The walk below never saw it, because the
-     run PRELOADS every lazy bundle before it starts — the screens are
-     already there by the time anything clicks.
+     App() to two of the four lazy SCREEN bundles, so a screen from the other
+     two could sit on "Loading…" with its component defined on window.
 
-     So this leg runs FIRST, before any preload, and it settles every
-     scripture corpus before it opens anything: a corpus version bump
-     re-renders App, and that is precisely what masked the bug (opening a
-     personal-study screen usually also kicks the VOT corpus). After the
-     click it does not touch the page again — the screen has to appear on
-     its bundle's own signal, which is the thing being tested.
+     lz1 (2026-10-13) folded the screen bundles e-h into bundle-d, so these
+     four screens now draw at once; the leg stays as the proof that they do
+     (a leg that sees "Loading…" or never arrives is a regression). The data
+     corpora are still lazy, and use-lazy-bundles.test.jsx holds every loader
+     index.html registers to a subscription. This leg runs FIRST, before the
+     walk, and settles every corpus before it opens anything; after the click
+     it does not touch the page again.
 
-     Reading a failure: a stuck leg strands the walker on a "Loading…" route
-     with no Home button, so every leg after it fails too. The FIRST bundle in
-     the FAIL list is the one to look at. Proved red against the real defect
-     on 2026-09-22 — with the two subscriptions removed the line reads
-     `lazyArrival FAIL:__screensG,__screensH,__screensE,__screensF`, and with
-     them back it reads `lazyArrival ok`. */
+     Reading a failure: a stuck leg strands the walker on a route with no Home
+     button, so every leg after it fails too. The FIRST screen in the FAIL list
+     is the one to look at. */
   async function lazyArrival() {
     var out = { ok: true, legs: [] };
     var corpusLoaders = ['__loadVotCorpus', '__loadBibleCorpus', '__loadMatthewCorpus', '__loadAnswersCorpus'];
@@ -348,7 +343,7 @@
     await sleep(250);
 
     var LEGS = [
-      { bundle: '__screensG', label: 'Personal Study → My Notes (bundle-g)',
+      { screen: 'notes-index', label: 'Personal Study → My Notes',
         open: async function () { await goHome(); clickByText(/Personal Study/); await sleep(340); return clickByText(/My Notes|^\s*Notes(?![a-z])/); },
         // The shared personal-study header titles the screen "Notes" (2026-09-25); any
         // pager peek of the Library beside it is titled "Library", so match the title exactly.
@@ -356,21 +351,19 @@
           return [].slice.call(document.querySelectorAll('.study-head-title'))
             .some(function (h) { return (h.textContent || '').trim() === 'Notes'; });
         } },
-      { bundle: '__screensH', label: 'Audio Readings → Listening Library (bundle-h)',
+      { screen: 'audio-library', label: 'Audio Readings → Listening Library',
         open: async function () { await goHome(); return clickByText(/Audio Readings/); },
         there: function () { return /Saved recordings/.test(document.body.textContent || ''); } },
-      { bundle: '__screensE', label: 'App Configuration → Settings (bundle-e)',
+      { screen: 'settings', label: 'App Configuration → Settings',
         open: async function () { await goHome(); return clickByText(/App Configuration|^Settings/); },
         there: function () { return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data/.test(document.body.textContent || ''); } },
-      { bundle: '__screensF', label: 'Personal Study → Scripture Web (bundle-f)',
+      { screen: 'scripture-web', label: 'Personal Study → Scripture Web',
         open: async function () { await goHome(); clickByText(/Personal Study/); await sleep(340); return clickByText(/Scripture Web/); },
         there: function () { return !!document.querySelector('.sw-root'); } },
     ];
 
     for (var i = 0; i < LEGS.length; i++) {
       var leg = LEGS[i];
-      var corpus = root[leg.bundle];
-      var preloaded = !!(corpus && corpus.loaded);
       var opened = await leg.open();
       var arrived = false;
       var sawLoading = false;
@@ -381,8 +374,7 @@
         await sleep(150);
       }
       out.legs.push({
-        bundle: leg.bundle, label: leg.label,
-        preloaded: preloaded,      // true means this leg proved nothing this run
+        screen: leg.screen, label: leg.label,
         opened: opened, arrived: arrived, sawLoading: sawLoading,
       });
       if (!arrived) out.ok = false;
@@ -920,20 +912,10 @@
     var report = { startedAt: new Date().toISOString() };
     try {
       report.appMounted = appMounted();
-      // BEFORE any preload: every lazy screen must appear on its own bundle's
-      // signal, with the corpora already settled. See lazyArrival's header.
+      // FIRST: every screen must appear at once, with the corpora settled.
+      // See lazyArrival's header. (Until lz1 the screen bundles e-h were
+      // preloaded here for the audit and the walk; they ship in bundle-d now.)
       report.lazyArrival = walk ? await lazyArrival() : 'skipped';
-      // PF6: Settings/Search/Garden are code-split into the lazy bundle-e; load
-      // it so the globals audit + the screen walk below see those globals
-      // (they're no longer defined at boot).
-      if (typeof root.__loadScreensE === 'function') { try { await root.__loadScreensE(); } catch (_e) {} }
-      // Same for bundle-g (My Progress / Notes / Links / Highlights, split out
-      // of bundle-d on 2026-09-22): the audit and the walk below expect those
-      // screens as globals, and they arrive with the bundle, not with boot.
-      if (typeof root.__loadScreensG === 'function') { try { await root.__loadScreensG(); } catch (_e) {} }
-      // …and bundle-h (the Listening Library, split out on 2026-09-22): the
-      // screen walk below opens the library, which no longer exists at boot.
-      if (typeof root.__loadScreensH === 'function') { try { await root.__loadScreensH(); } catch (_e) {} }
       report.globals = auditGlobals();
       report.dataWiring = auditDataWiring();
       report.screens = walk ? await walkScreens() : 'skipped';
@@ -985,7 +967,7 @@
       ' | lazyArrival ' + (report.lazyArrival === 'skipped' ? 'skipped'
         : (report.lazyArrival.ok ? 'ok'
           : 'FAIL:' + report.lazyArrival.legs.filter(function (l) { return !l.arrived; })
-              .map(function (l) { return l.bundle; }).join(','))) +
+              .map(function (l) { return l.screen; }).join(','))) +
       ' | console.error ' + report.console.errorsSeen +
       ' | resource404 ' + report.resourceErrors.total +
       ' | ' + Math.round(now() - t0) + 'ms';

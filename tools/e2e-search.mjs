@@ -42,9 +42,9 @@ try {
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0; });
-  // Every corpus, the search bundle and the studies, then the index: what SearchScreen does on mount.
+  // Every corpus and the studies, then the index: what SearchScreen does on mount.
   await page.evaluate(async () => {
-    const loaders = ['__loadBibleCorpus', '__loadMatthewCorpus', '__loadVotCorpus', '__loadAnswersCorpus', '__loadScreensE'];
+    const loaders = ['__loadBibleCorpus', '__loadMatthewCorpus', '__loadVotCorpus', '__loadAnswersCorpus'];
     await Promise.all(loaders.map((n) => (typeof window[n] === 'function' ? window[n]() : null)));
     if (typeof window.loadBibleStudies === 'function') await window.loadBibleStudies();
     await window.VotSearchMini.init();

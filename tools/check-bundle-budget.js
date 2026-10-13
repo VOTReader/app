@@ -85,107 +85,21 @@ const BUDGETS = [
   // 2026-09-28, Lighthouse item 5 (docs/perf/lighthouse-2026-09.md): StudiesHome, BibleStudyIndex,
   // BibleStudyChapterView and MatthewChapterView leave for bundle-g. Today's tree measured 675,690 before
   // the move and 663,792 after. The ceiling is NOT loosened to 663,792 x 1.15: the room stays unclaimed.
-  { file: 'bundle-d.js', measured: 663792, max: 718300 },   // most screens/sheets/utils
+  // 2026-10-13, lz1 (D:/AgentBackbone/reports/lazy-loading-2026-10-13/REPORT.md): bundles e-h (Settings/Search/
+  // Garden + the search tables, the Scripture Web, the Personal Study + journal + Studies screens, the
+  // Listening Library) fold back into this bundle: 663,792 -> 1,313,034. The ceiling is the SUM of the five
+  // old ceilings (718,300 + 357,600 + 101,200 + 193,600 + 88,100), so the merge claims no new room.
+  { file: 'bundle-d.js', measured: 1313034, max: 1458800 },   // every screen/sheet/util (bundles e-h folded in by lz1)
   // Re-baselined 2026-09-22 (292,190 B): the Answers landing's rules (~8 KB) and the
   // month's large-text / tap-target fixes, on top of 253,510 B measured 09-01.
   // 2026-09-25 (n7-08): the tree had grown to 335,980 B, 20 under this ceiling. Measured first: 91.5 KB
   // of it styled only lazy screens. tools/split-lazy-css.mjs now moves the rules only bundle-e/-f/-g/-h
   // can use, whose move provably keeps the cascade, into dist/screens-X.min.css (50 KB), loaded
   // beside each bundle. Re-baselined DOWN to what stays render-blocking: 285,867 x 1.15 -> 328,800.
-  { file: 'app.min.css', measured: 285867, max: 328800 },   // render-blocking <link> in index.html
-  { file: 'screens-e.min.css', measured: 8156, max: 9400 },   // Settings/Search/Garden rules, loaded with bundle-e
-  { file: 'screens-f.min.css', measured: 15359, max: 17700 }, // the Scripture Web's rules, with bundle-f
-  { file: 'screens-g.min.css', measured: 15900, max: 17600 }, // the Personal Study and Studies screens' rules, with bundle-g
-  { file: 'screens-h.min.css', measured: 11473, max: 13200 },   // the Listening Library's and Songs' rules, with bundle-h
+  // 2026-10-13, lz1: tools/split-lazy-css.mjs is retired and its four screens-X.min.css sheets come back here:
+  // 370,199 B. Ceiling = the sum of the five old ceilings (328,800 + 9,400 + 17,700 + 17,600 + 13,200), no new room.
+  { file: 'app.min.css', measured: 370199, max: 386700 },   // render-blocking <link> in index.html
   // ── lazy, but still fetched + parsed on the reader's device ──
-  // Re-baselined 114,137 -> 131,027 on 2026-09-11 (landing 89's tree): eight landings of
-  // Settings/Search work since the last baseline had eaten the margin down to 973 bytes,
-  // and a ceiling that fails the next honest change is a gate nobody can land under.
-  // 2026-09-22, landing 27: search-data.js ARRIVES here (+29,263 minified; it
-  // was 42,753 raw in bundle-a), with SearchScreen and the engine that read it.
-  // This is the deliberate other side of a cold-boot saving, not growth:
-  // 161,860 x 1.15 = 186,139 -> the hundred above.
-  // 2026-09-27, the search audit: 161,860 -> 187,654 is search code, not a pulled-in
-  // dependency. The 09-26 batches (every place in a letter, word forms, Book order, the
-  // typo note: 178,486 by their end) and the audit's ranking, typos, passage names and
-  // letter and Bible references (+9,168). 187,654 x 1.15 = 215,802 -> the hundred above.
-  // 2026-10-05, the search benchmark (S2b..S1c): 187,654 -> 202,385 is the engine's passage,
-  // citation and original-first code, then +108,559 is src/search/kjv-alias.js, generated data:
-  // the 3,067 KJV words no indexed text holds with their verses ("begat", "mitre", "wist" found
-  // nothing in the NKJV and were "corrected" to beat, mire, wits). ~40 KB gzipped, off the cold
-  // boot (this bundle loads with Search). 310,944 x 1.15 = 357,586 -> the hundred above.
-  { file: 'bundle-e.js', measured: 310944, max: 357600 },   // Settings/Search/Garden + the search tables
-  // The Scripture Web. Re-baselined 32,447 -> 41,806 when My Web landed, then
-  // 41,806 -> 57,610 for s13: Go to/Nearby, dense-line disambiguation,
-  // navigable corpus underlay cards, focus-safe dialogs, and orientation UX.
-  // Deliberate — this is the feature's lazy bundle, not the cold boot path.
-  //
-  // 2026-09-10, landing 70: 66,400 -> 76,100, and `measured` to the size true at
-  // that landing. THE CEILING WAS RAISED BECAUSE IT HAD 265 BYTES LEFT, not
-  // because anything grew unexpectedly. Three Scripture Web landings walked the
-  // margin down 1,272 -> 857 -> 694 -> 265 — 79% of the original headroom — and
-  // 265 B is about three lines of minified JS, so the next ordinary change here
-  // trips a COLLAPSE detector over something that is not a collapse.
-  //   measured 66,135 x 1.15 = 76,055.25, rounded up to the hundred = 76,100.
-  // The percentage this file prints never left +0.7% through any of those three,
-  // because it is computed against `measured` and `measured` had drifted 7,933 B
-  // stale. That is fixed here for this row and in the next commit for the
-  // sentences; the OTHER rows' `measured` values are still stale and are left
-  // alone deliberately, because the headroom line landing next prints size and
-  // max directly and a stale baseline can no longer be the only number a reader
-  // gets. `measured` is in no comparison in this file — the only test is
-  // `size > b.max` — so nothing above can change a gate outcome except the
-  // ceiling itself.
-  // l8 (2026-09-22): the density law's table, level, stand-ins and "x n" badges deleted under the structure law; ceiling re-set to ~+15%.
-  // l18 (2026-09-22 03:1x): 91,700 -> 101,200 with 3,715 B (4 %) left after landings 9-17 - the lens,
-  // sky navigation (ruler + elevator), the counts under the lens, the how-to-read card, the Nearby
-  // list - added 8,322 B in one night: the landing-70 rule (a ceiling that fails the next honest change
-  // is a gate nobody can land under; measured x 1.15 rounded up to the hundred: 87,985 x 1.15 =
-  // 101,182.75 -> 101,200). Lazy bundle, not cold boot; the 16-day trend of every bundle is in
-  // D:\Swarm\lanes\myweb\out\perf-bundle-trend-2026-09-22.md (cold-boot path +1.8 % in 16 days).
-  { file: 'bundle-f.js', measured: 87985, max: 101200 },
-  // The Personal Study screens, split out of bundle-d on 2026-09-22 (landing
-  // 21): opened on purpose, never on the way to a chapter, so they are fetched
-  // and parsed only when one is. Landing 22 added the fifth, My Bookmarks
-  // (+7,985 B), which is the whole point of the bundle rather than a collapse:
-  // 54,571 x 1.15 = 62,757 -> the hundred above.
-  // Landing 23 added Milestones and History — the same law, two more screens:
-  // 65,601 x 1.15 = 75,441 -> the hundred above.
-  // 2026-09-22, landing 28: the journal screens arrive (+78,397 B, almost
-  // exactly what bundle-b lost — platform-bridge.js is read as a free global
-  // by JournalRecordingSheet instead of imported, so no second copy of the
-  // bridge came with them). 143,998 x 1.15 = 165,597.7 -> the hundred above.
-  // 2026-09-28, Lighthouse item 5: the Studies hub, a study's index and chapter and the Matthew chapter
-  // view arrive from bundle-d (+12,428 B on today's 155,845; they read their shared helpers as bundle-d
-  // globals, so nothing is shipped twice). 168,273 x 1.15 = 193,513.95 -> the hundred above.
-  { file: 'bundle-g.js', measured: 168273, max: 193600 },   // Personal Study + journal + Studies/Matthew screens
-  // The Listening Library, split out on 2026-09-22 (landing 24): the browsing
-  // surface only. audio-player.js, AudioShelf, AudioSeekSlider and CoverageBadge
-  // stay in bundle-d for the shell's player bar, so this stays SMALL - a jump
-  // here means the player came along. 24,353 x 1.15 = 28,006 -> the hundred above.
-  // 2026-09-22 (readalong, listening item 4): +4,578 B for a FIFTH screen, the
-  // Bible/Letter Studies doorway (AudioStudiesScreen 3.0 KB minified) plus the hub
-  // row and the collection screen's 'study:<id>' source; `esbuild --analyze` shows
-  // the five screens and nothing else (the player did not come along).
-  // 28,931 x 1.15 = 33,270.65 -> the hundred above.
-  // 2026-09-24 (readalong, listening items 4b + 8): +11,849 B. 4b's honest Studies
-  // copy and Back pill (+867 B, 29,798 on main), then item 8's SIXTH screen, "On this
-  // phone" (AudioOfflineScreen), and the downloads controls on every recordings row
-  // (OfflineAudioControls: the row line, Download all and its size confirm). The
-  // downloads STORE stays in bundle-d beside the player (bundle-h-membership pins
-  // '__votOfflineAudio' out of bundle-h). 40,780 x 1.15 = 46,897 -> the hundred above.
-  // 2026-09-25 (ai-music, songs-U1 / L2): +16,178 B for a SEVENTH screen, Songs of the
-  // Letters (AudioSongsScreen: the hub, its Find box and chips, the collection tiles and
-  // shelves, the list screen). The catalog store, the song pieces (cover, round play,
-  // choice sheet) and the route helpers stay in bundle-d beside the player that the bar
-  // and desk share. 57,506 x 1.15 = 66,132 -> the hundred above.
-  // 2026-09-25 (ai-music, songs-U2..U4): +8,934 B over U1 — the song page (U2) and the Letters read with music
-  // screen (U4), both frames of the same Songs screen. The desk's song mode, the bar's song skin, the lyrics loader
-  // and the song finder landed in bundle-d beside the player, not here. 66,440 x 1.15 = 76,406 -> the hundred above.
-  // 2026-10-05 (zones L4): main had grown to 76,4xx since (Songs and offline work, all screens of this bundle);
-  // L4's count line (the preface named apart from the letters, recordingsLine) took it 33 B past the ceiling.
-  // Re-measured on the built file: 76,533 x 1.15 = 88,013 -> the hundred above. Nothing new came along.
-  { file: 'bundle-h.js', measured: 76533, max: 88100 },     // Listening Library hub / Volumes / Studies / collection / saved / on this phone / songs
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
   { file: 'bundle-a-matthew.js', measured: 546168, max: 628000 },

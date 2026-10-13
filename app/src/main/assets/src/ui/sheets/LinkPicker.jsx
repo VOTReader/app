@@ -89,8 +89,8 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
   // Warm everything the picker's three modes depend on. The corpora loaders
   // are idempotent + async-notify-only (Q8 contract); buildNavIndex re-derives
   // when they land (signature memo), so Browse/Search fill in as data arrives.
-  // bundle-e carries the MiniSearch engine — kick it plus a deferred index
-  // init so the "In the text" group is warm by the time the user has typed.
+  // A deferred MiniSearch index init keeps the "In the text" group warm by the
+  // time the user has typed.
   React.useEffect(() => {
     let cancelled = false;
     // AWAIT the corpora before init(): the engine indexes whatever is loaded
@@ -105,7 +105,6 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
     // Awaited with the corpora (v09-perf-01): an index built without the studies
     // is cached under a different key than one built with them.
     try { if (typeof loadBibleStudies === 'function') loaders.push(Promise.resolve(loadBibleStudies()).catch(() => {})); } catch (_e) { /* best-effort */ }
-    if (typeof (/** @type {any} */ (window)).__loadScreensE === 'function') (/** @type {any} */ (window)).__loadScreensE();
     // The 400ms floor stays: it keeps a cold ~10s index build off the picker's
     // own first paint. The corpora simply have to be in as WELL.
     const t = setTimeout(() => {
@@ -137,7 +136,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
   const rowKey = (it) => it.kind + '|' + (it.bookId || '') + '|' + (it.chapter || '') + '|' + (it.verse || '')
     + '|' + (it.letterId || it.entryId || '') + '|' + (it.studyChapterId || '');
 
-  // Full-text search — debounced; rides the MiniSearch engine (bundle-e).
+  // Full-text search — debounced; rides the MiniSearch engine.
   // Runs ONLY in the 'text' scope (the toggle keeps the two searches
   // predictable and separate). Structured/reference queries return no text
   // results by design — the empty state points back to Titles & refs.

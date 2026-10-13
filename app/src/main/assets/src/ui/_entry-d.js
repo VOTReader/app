@@ -48,8 +48,8 @@
 // ── Utilities ───────────────────────────────────────────────────────────
 import { bibleHlKey, letterHlKey, wtlbHlKey, studyHlKey } from '../utils/hl-keys.js';
 import { relativeDate, timeAgo } from '../utils/dates.js';
-// Shared with the lazy Personal Study screens (bundle-g), which resolve them as
-// free globals at call time rather than bundling a second copy — see _entry-g.js:
+// Shared with the Personal Study screens, which resolve them as free globals at
+// call time (a habit from when they were lazy bundle-g, until lz1):
 // reduced-motion's scroll law (every
 // reading-path screen imports it here) and the reading-minute chip
 // (HistoryEntryCard / VolumeLetterIndex / ChapterIndex render it here).
@@ -89,8 +89,8 @@ import { writeContainer, readContainer, isContainerMagic } from '../utils/backup
 import { runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries } from '../utils/backup-android.js';
 import { summarizeBackupManifest, formatVerifyReport } from '../utils/backup-verify.js';
 import { AudioPlayer, trackUrl as audioTrackUrl } from '../utils/audio-player.js';
-// Downloads to the phone (listening item 8): ONE store, here beside the player that consults it offline; bundle-h's
-// rows and "On this phone" read it as the OfflineAudio global (tools/bundle-h-membership.test.js pins that).
+// Downloads to the phone (listening item 8): ONE store, here beside the player that consults it offline; the
+// Listening Library's rows and "On this phone" read it as the OfflineAudio global.
 import { OfflineAudio } from '../utils/offline-audio.js';
 // Songs of the Letters (2026-09-24): ONE catalog store, here beside the player that queues from it; the lazy Songs
 // screens read it as the SongCatalog global, never by import (a second bundled copy would be a second catalog).
@@ -210,14 +210,11 @@ import { VolumesHome } from './screens/VolumesHome.jsx';
 
 import { AboutScreen } from './screens/AboutScreen.jsx';
 import { HomeScreen } from './screens/HomeScreen.jsx';
-// StudiesHome, BibleStudyIndex, BibleStudyChapterView and MatthewChapterView
-// ride bundle-g (docs/perf/lighthouse-2026-09.md item 5): reached only by
-// navigation, their routes wait for it as the other bundle-g routes do.
 import { ChapterIndex } from './screens/ChapterIndex.jsx';
 import { ScriptureGenre } from './screens/ScriptureGenre.jsx';
 import { ScripturesHome } from './screens/ScripturesHome.jsx';
-// BookmarksScreen itself now rides in bundle-g; these two are what the
-// always-present app shell mounts and must never be lazy.
+// What the always-present app shell mounts (BookmarksScreen is imported below
+// with the other screens you go to).
 import { _bookmarkSourceLabel, _bookmarkSourceEndpoint } from '../utils/bookmark-source.js';
 import { BookmarkPopover } from './sheets/BookmarkPopover.jsx';
 
@@ -234,6 +231,61 @@ import { LinkSidebar } from './sheets/LinkSidebar.jsx';
 import { SelectionToolbar } from './sheets/SelectionToolbar.jsx';
 import { AnnotationActionChip } from './sheets/AnnotationActionChip.jsx';
 import { BookmarkCreateSheet } from './sheets/BookmarkCreateSheet.jsx';
+
+// ── The screens you go TO (were bundles e-h until lz1, 2026-10-13) ─────
+// Settings, Search, Garden, the tour overlay, the Scripture Web, the personal
+// study screens, the journal, the Studies and the Listening Library were
+// code-split into four lazy bundles from 2026-07 to 2026-10. That bought
+// about 0.06 s per Android cold start and cost a shipped "Loading..." bug, two
+// mixed-build races and an 8 s stylesheet hang
+// (D:/AgentBackbone/reports/lazy-loading-2026-10-13/REPORT.md), so the code
+// came back here. DATA still loads on demand: the corpora, studies,
+// translations, read-along timings and the meaning-search model.
+// The search tables (stop words, synonyms, book abbreviations, named passages,
+// slash-commands): a classic IIFE that ends in `window.VotSearchData = {…}`;
+// every consumer reads it off window at call time.
+import '../../search-data.js';
+import { SettingsScreen } from './screens/SettingsScreen.jsx';
+import { SearchScreen } from './screens/SearchScreen.jsx';
+import { GARDEN_PRELOAD_AHEAD, GARDEN_CRAWL_DELAY, GardenView } from './screens/GardenView.jsx';
+import { TourOverlay } from './components/TourOverlay.jsx';
+// The MiniSearch engine, THE app's search engine (Classic/FlexSearch retired 2026-07-02).
+import { VotSearchMini } from '../search/engine.js';
+import { getRecentSearches, addRecentSearch, removeRecentSearch, clearRecentSearches } from '../search/recent-searches.js';
+import { ScriptureWebScreen, ensureScriptureWebData } from './screens/ScriptureWebScreen.jsx';
+import { MyProgressScreen } from './screens/MyProgressScreen.jsx';
+import { BookmarkRow, BookmarkRowActionSheet, BookmarksScreen } from './screens/BookmarksScreen.jsx';
+import { ReadingPlansScreen } from './screens/ReadingPlansScreen.jsx';
+import { HistoryScreen } from './screens/HistoryScreen.jsx';
+import { NotesIndexScreen } from './screens/NotesIndexScreen.jsx';
+import {
+  _linkEndpointCategory, _endpointResolves, _epSearchText,
+  LinkRow, LinkRowActionSheet, LinksScreen,
+} from './screens/LinksScreen.jsx';
+import {
+  _HL_COLOR_ORDER, _HL_COLOR_HEX, _hlColorHex, _hlColorIndex,
+  _collectMarks, HighlightRow, HighlightsScreen,
+} from './screens/HighlightsScreen.jsx';
+import { composeNotesExport, notesExportFilename, shareNotesExport } from '../utils/notes-export.js';
+// The wildcard imports carry each journal screen's private helpers (JournalCardMenu,
+// jrnRenderInline, JournalBlockView, the image and audio blocks, jrnPinIcon), which the
+// other two screens reach by bare name.
+import * as JournalHub from './screens/JournalHubScreen.jsx';
+import * as JournalViewer from './screens/JournalViewerScreen.jsx';
+import * as JournalEditor from './screens/JournalEditorScreen.jsx';
+import { JournalInsertSheet } from './sheets/JournalInsertSheet.jsx';
+import { JournalRecordingSheet } from './sheets/JournalRecordingSheet.jsx';
+import { StudiesHome } from './screens/StudiesHome.jsx';
+import { BibleStudyIndex } from './screens/BibleStudyIndex.jsx';
+import { BibleStudyChapterView } from './screens/BibleStudyChapterView.jsx';
+import { MatthewChapterView } from './screens/MatthewChapterView.jsx';
+import { AudioLibraryScreen } from './screens/AudioLibraryScreen.jsx';
+import { AudioVolumesScreen } from './screens/AudioVolumesScreen.jsx';
+import { AudioCollectionScreen } from './screens/AudioCollectionScreen.jsx';
+import { AudioSavedScreen } from './screens/AudioSavedScreen.jsx';
+import { AudioStudiesScreen } from './screens/AudioStudiesScreen.jsx';
+import { AudioOfflineScreen } from './screens/AudioOfflineScreen.jsx';
+import { AudioSongsScreen, songsFrameTitle } from './screens/AudioSongsScreen.jsx';
 
 // ── App — the composition root ──────────────────────────────────────────
 // Extracted from index.html in Q2.7-1 as a verbatim move (still uses
@@ -334,6 +386,32 @@ Object.assign(window, {
   LinkPicker, LinkSidebar,
   SelectionToolbar, AnnotationActionChip,
   BookmarkCreateSheet,
+  // The screens you go TO (bundles e-h until lz1)
+  SettingsScreen, SearchScreen,
+  GARDEN_PRELOAD_AHEAD, GARDEN_CRAWL_DELAY, GardenView,
+  TourOverlay,
+  VotSearchMini,
+  getRecentSearches, addRecentSearch, removeRecentSearch, clearRecentSearches,
+  ScriptureWebScreen, ensureScriptureWebData,
+  MyProgressScreen,
+  BookmarkRow, BookmarkRowActionSheet, BookmarksScreen,
+  HistoryScreen,
+  ReadingPlansScreen,
+  NotesIndexScreen,
+  _linkEndpointCategory, _endpointResolves, _epSearchText,
+  LinkRow, LinkRowActionSheet, LinksScreen,
+  _HL_COLOR_ORDER, _HL_COLOR_HEX, _hlColorHex, _hlColorIndex,
+  _collectMarks, HighlightRow, HighlightsScreen,
+  composeNotesExport, notesExportFilename, shareNotesExport,
+  JournalInsertSheet, JournalRecordingSheet,
+  StudiesHome, BibleStudyIndex, BibleStudyChapterView, MatthewChapterView,
+  AudioLibraryScreen, AudioVolumesScreen, AudioCollectionScreen, AudioSavedScreen, AudioStudiesScreen, AudioOfflineScreen, AudioSongsScreen,
+  // W-03: the back pill over a letter opened from a Songs screen names that screen's top frame (screen-routes).
+  songsFrameTitle,
   // App (composition root)
   App,
 });
+
+// The three journal screens, spread whole: the wildcard keeps every export,
+// including the internal helpers the other two screens reach by bare name.
+Object.assign(window, JournalHub, JournalViewer, JournalEditor);

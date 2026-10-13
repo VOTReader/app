@@ -12,8 +12,10 @@
  * behind __loadScreensE. So every reader parsed the search tables on
  * every cold start, and only a reader who opened Search ever used them.
  *
- * The tables now ride bundle-e, loaded by the same trigger as the screen
- * that reads them. `window.VotSearchData` is still how they are reached —
+ * The tables rode lazy bundle-e from then until lz1 (2026-10-13) folded
+ * bundles e-h back into bundle-d (D:/AgentBackbone/reports/lazy-loading-
+ * 2026-10-13/REPORT.md): they ship in bundle-d now, still out of bundle-a,
+ * and still once. `window.VotSearchData` is still how they are reached —
  * the file is a side-effect import, not an ES module — so nothing that
  * reads it had to change.
  *
@@ -36,11 +38,11 @@ const read = (p) => readFileSync(p, 'utf-8');
    test cannot pass on a partial move. */
 const MARKERS = ['/rebuild index', 'Clear search history', 'VotSearchData'];
 
-describe('search-data.js rides bundle-e, not the boot path', () => {
-  it('bundle-e carries the search tables', () => {
-    const e = read(resolve(DIST, 'bundle-e.js'));
+describe('search-data.js rides bundle-d (since lz1), not bundle-a', () => {
+  it('bundle-d carries the search tables', () => {
+    const d = read(resolve(DIST, 'bundle-d.js'));
     for (const m of MARKERS) {
-      expect(e.includes(m), `bundle-e.js lacks ${m}`).toBe(true);
+      expect(d.includes(m), `bundle-d.js lacks ${m}`).toBe(true);
     }
   });
 
@@ -60,9 +62,8 @@ describe('search-data.js rides bundle-e, not the boot path', () => {
   });
 
   it('no bundle ships the tables twice', () => {
-    const copies = ['bundle-a.js', 'bundle-b.js', 'bundle-c.js', 'bundle-d.js',
-      'bundle-e.js', 'bundle-f.js', 'bundle-g.js', 'bundle-h.js']
+    const copies = ['bundle-a.js', 'bundle-b.js', 'bundle-c.js', 'bundle-d.js']
       .filter((f) => read(resolve(DIST, f)).includes('/rebuild index'));
-    expect(copies).toEqual(['bundle-e.js']);
+    expect(copies).toEqual(['bundle-d.js']);
   });
 });

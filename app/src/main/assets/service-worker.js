@@ -60,39 +60,15 @@ const CORE_ASSETS = [
   './dist/bundle-b.js',
   './dist/bundle-c.js',
   './dist/bundle-d.js',
-  // PF6: bundle-e (lazy Settings/Search/Garden screens, split out of bundle-d).
-  // Precached so those screens work OFFLINE, and content-hashed into
-  // CACHE_VERSION (sync-sw-version reads this list) so a code change busts it
-  // like any other bundle. Deliberately NOT in CRITICAL_ASSETS: boot does not
-  // need it (it loads lazily on first navigation), so a deploy hiccup on
-  // bundle-e must not abort the whole SW install — the route degrades to the
-  // _corpusView "Try again" affordance instead.
-  './dist/bundle-e.js',
-  // bundle-f (The Scripture Web). Same contract as bundle-e: precached so the
-  // screen works offline, content-hashed into CACHE_VERSION, and deliberately
-  // NOT in CRITICAL_ASSETS — boot never needs it.
-  './dist/bundle-f.js',
-  // bundle-g (the Personal Study screens). Same contract as bundle-e/-f:
-  // precached so the route opens offline, non-fatal if the fetch fails.
-  './dist/bundle-g.js',
-  // bundle-h (the Listening Library). Same contract: precached so the library
-  // opens offline, non-fatal if the fetch fails, never in CRITICAL_ASSETS.
-  './dist/bundle-h.js',
-  // The lazy screens' own stylesheets (n7-08, tools/split-lazy-css.mjs): the
-  // rules of app.css only bundle-e/-f/-g/-h use, loaded beside each bundle.
-  // Same contract as the bundles: precached so the screens open offline
-  // styled, hashed into CACHE_VERSION, never in CRITICAL_ASSETS.
-  './dist/screens-e.min.css',
-  './dist/screens-f.min.css',
-  './dist/screens-g.min.css',
-  './dist/screens-h.min.css',
+  // The screens bundles e-h and their four screens-*.min.css sheets were
+  // lazy and precached best-effort here until lz1 (2026-10-13); their code is
+  // in bundle-d and their rules in app.min.css again, both CRITICAL below, so
+  // a screen can no longer be missing offline while the shell boots.
   // U18: react.min.js / react-dom.min.js are NOT listed — they are
   // CONCATENATED into bundle-a.js (build.py) and never loaded standalone, so
   // precaching them was pure double-caching + extra install-failure surface
   // (addAll is all-or-nothing). search-data.js is in the same position for the
-  // same reason, but since landing 27 (2026-09-22) it is bundled into
-  // bundle-e.js instead — off the cold-boot path, still never fetched on its
-  // own.
+  // same reason: it is bundled into bundle-d.js, never fetched on its own.
   // html2canvas.min.js STAYS: U13 moved it OUT of bundle-a to a lazy <script>,
   // so this precache is what keeps the first web screenshot instant + offline.
   './html2canvas.min.js',
@@ -316,14 +292,6 @@ const ASSET_INTEGRITY = {
   './dist/bundle-b.js': '9b78e8467fd34ebecd5616091e6246c4f33fa3a10e0a893ab65aae3de9fcc997',
   './dist/bundle-c.js': 'd63d87e8fdb5e61adf34032b171734c026813b3f3eb1fc8689774661540b369b',
   './dist/bundle-d.js': 'cbbb180a0b67dba8e8cea2f1fa6276c2f75d7c62cd37216c6162621ea7161340',
-  './dist/bundle-e.js': '2547ea5b37d7244cc315c95bf705c2a1ef9d4171b4b29b48cb8274225a406680',
-  './dist/bundle-f.js': 'd67afc2220d28438c7b26d753f274e321d2e7fa142ef6ab295e118a3bd9e4805',
-  './dist/bundle-g.js': '5dacf92708e2ef2bd7532277a3337a748e33737927bbf26bffed08b5cd041326',
-  './dist/bundle-h.js': '0809c47238099bca404939911e649e25ae5c5cf5abb8c5c9f72484bb479d046b',
-  './dist/screens-e.min.css': '9ae523ae03af6b60cbd2784901300500cbdc89834c018ce5acee364ff080ab41',
-  './dist/screens-f.min.css': '80fb10dcf5fe56079387aab2db0c5cb8b7a341643f77f4202fb2e7c6921d0ee1',
-  './dist/screens-g.min.css': '1235a3a43e7a90e0391b3d788ab82a98029eabc3bdbb25c1652fb9910ded1b43',
-  './dist/screens-h.min.css': '2b83f87c6384ee347d72809447db99638edd1800a7e9622688f5a0a95390a908',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
   './index.html': 'e38f00f265a47edc41c4de256bd4a9790351f40b93b21217e3ff470fdb9ddd06',
   './manifest.json': '5483690fc42f1d3738c0fbc96cd41b04eb3ce26ad15d9e5684a71c9e75745052',
@@ -607,15 +575,15 @@ async function installCore() {
   // Everything else — best-effort, so a single 404 (e.g. a partial deploy or
   // a renamed asset) doesn't abort the install and silently pin the old SW.
   // NOTE: an integrity failure here does NOT fail the install — addVerified
-  // throws and allSettled turns it into the warning below. Deliberate: bundle-e/-f
-  // and offline.html are not needed to boot, so refusing a whole good update over
+  // throws and allSettled turns it into the warning below. Deliberate: the fonts,
+  // html2canvas and offline.html are not needed to boot, so refusing a whole good update over
   // one of them would trade a working new build for a broken screen.
   //
   // BE HONEST ABOUT THE COST, because it is not "no consequence": coreFirst is
   // cache-first with NO cache-on-use, so an asset skipped here stays uncached for
   // the ENTIRE life of this CACHE_VERSION. Online it is refetched from the network
-  // every time (slower, but correct). OFFLINE it is simply unavailable, so the
-  // lazy screens degrade to the _corpusView "Try again" affordance and
+  // every time (slower, but correct). OFFLINE it is simply unavailable, so a
+  // font falls back, a screenshot cannot load html2canvas and
   // offline.html falls back to the 503 branch in coreFirst. The next deploy
   // re-attempts it. That is the right trade for a non-boot asset, but it is a real
   // degradation and not a silent no-op — which is why it is warned, loudly.

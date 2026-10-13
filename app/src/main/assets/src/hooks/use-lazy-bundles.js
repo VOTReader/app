@@ -1,17 +1,17 @@
-/* useLazyBundles — subscribe App() to every lazily-loaded bundle's load signal
-   so its routes re-evaluate the moment a corpus or a lazy screen bundle (PF6)
-   arrives. Each is a __makeLazyLoader corpus object on window (the three
-   scripture corpora + every screens-* bundle); every access is typeof-guarded so the hook is
-   inert when a loader isn't registered (e.g. unit tests, or before index.html's
-   loader IIFE has run). Folds the three corpus subscriptions that used to live
-   inline in App() and ADDS the bundle-e one — keeping App() under its 800-line
-   canary while still re-rendering on a lazy-screen load.
+/* useLazyBundles — subscribe App() to every lazily-loaded corpus's load signal
+   so its routes re-evaluate the moment a corpus arrives. Each is a
+   __makeLazyLoader corpus object on window (the three scripture corpora, plus
+   Answers from utils/sync-loaders.js); every access is typeof-guarded so the
+   hook is inert when a loader isn't registered (e.g. unit tests, or before
+   index.html's loader IIFE has run). Folds the corpus subscriptions that used
+   to live inline in App(), keeping App() under its 800-line canary.
 
    Q8 lazy-load: BOOKS / MATTHEW / the VOT corpora may be undefined until their
-   __load*Corpus() loaders resolve; PF6: SettingsScreen / SearchScreen /
-   GardenView likewise until __loadScreensE() resolves. Subscribing here makes
-   App() re-render when any of them flips, so the loading routes swap to the real
-   screen. */
+   __load*Corpus() loaders resolve. Subscribing here makes App() re-render when
+   any of them flips, so the loading routes swap to the real screen. (The four
+   lazy SCREEN bundles e-h had subscriptions here too until lz1, 2026-10-13,
+   folded their code into bundle-d; use-lazy-bundles.test.jsx reads index.html's
+   loaders so a NEW lazy bundle fails until it is taught here.) */
 export function useLazyBundles() {
   // #1: signal the native splash to release the frame the React tree first paints —
   // a DETERMINISTIC app-ready handshake (AppInterface.onAppReady), replacing the
@@ -38,31 +38,6 @@ export function useLazyBundles() {
   React.useSyncExternalStore(
     React.useCallback((cb) => (typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.subscribe(cb) : () => {}), []),
     () => (typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0)
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__screensE !== 'undefined' ? window.__screensE.subscribe(cb) : () => {}), []),
-    () => (typeof window.__screensE !== 'undefined' ? window.__screensE.getVersion() : 0)
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__screensF !== 'undefined' ? window.__screensF.subscribe(cb) : () => {}), []),
-    () => (typeof window.__screensF !== 'undefined' ? window.__screensF.getVersion() : 0)
-  );
-  // screens-g (the Personal Study screens, Bookmarks, History and
-  // the journal) and screens-h (the Listening Library) were added by landings
-  // 21-24 and 28 and were NOT subscribed here until 2026-09-22 — the route
-  // kept rendering "Loading…" after the bundle had arrived, because nothing
-  // told App. It looked fine because opening those screens usually also kicks
-  // the VOT corpus, whose bump re-renders the tree; a reader who opens My
-  // Notes after the corpus has settled just sat there. One subscription per
-  // lazy bundle, and use-lazy-bundles.test.jsx reads index.html's loaders so a
-  // NEW bundle fails this file until it is taught here.
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__screensG !== 'undefined' ? window.__screensG.subscribe(cb) : () => {}), []),
-    () => (typeof window.__screensG !== 'undefined' ? window.__screensG.getVersion() : 0)
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__screensH !== 'undefined' ? window.__screensH.subscribe(cb) : () => {}), []),
-    () => (typeof window.__screensH !== 'undefined' ? window.__screensH.getVersion() : 0)
   );
   // Answers Only God Can Give (src/data/answers.js). Its loader is not in
   // index.html: utils/sync-loaders.js creates it as bundle-d evaluates and

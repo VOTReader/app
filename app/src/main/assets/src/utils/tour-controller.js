@@ -21,10 +21,10 @@
    the overlay telling us the reader tapped the control themselves: move on,
    act nothing — the app already did what the tap does.
 
-   The lazy bundle: the overlay lives in bundle-e. start() asks
-   window.__loadScreensE (index.html's screens-e loader) for it and flips
-   `ready` when it resolves; App re-renders on that load signal already
-   (use-lazy-bundles), so the overlay appears without anyone polling.
+   The overlay ships in bundle-d (it rode lazy bundle-e until lz1,
+   2026-10-13, when start() waited for that bundle); `ready` stays in the
+   state, always true from start(), so the overlay's "One moment…" branch
+   is only a guard.
 
    Leaving — skip(), finish(), dismissPrompt('never') — records
    TourDoneFlagStore, the one durable byte. dismissPrompt('later') snoozes
@@ -269,13 +269,7 @@ export const TourController = {
 
   /** Begin at the welcome card. `from` is where the reader started it ('prompt' | 'settings'), for the closing words and the tests. */
   start(from) {
-    let ready = true;
-    const loader = (typeof window !== 'undefined' && typeof window.__loadScreensE === 'function') ? window.__loadScreensE : null;
-    if (loader && typeof window.TourOverlay === 'undefined') {
-      ready = false;
-      Promise.resolve(loader()).then(() => { state = { ...state, ready: true }; bump(); }, () => { state = { ...state, ready: true }; bump(); });
-    }
-    state = { ...state, active: true, index: 0, from: from || null, ready };
+    state = { ...state, active: true, index: 0, from: from || null, ready: true };
     runEnter(TOUR_STEPS[0]);
     bump();
   },
