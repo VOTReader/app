@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  createAutoScroll, clampLpm, computeEndTarget, measureLineHeight,
+  createAutoScroll, clampLpm, computeEndTarget, measureLineHeight, touchLiftEnds,
 } from './use-autoscroll.js';
 
 // ── Harness ────────────────────────────────────────────────────────────
@@ -673,4 +673,72 @@ describe('reduced motion', () => {
 
 describe('vi sanity', () => {
   it('has no leaked fake timers', () => { expect(vi.isFakeTimers()).toBe(false); });
+});
+
+// W45 (sweep 2026-10-13): auto-scroll pulled the reader back up from the footnotes
+// (a start or resume below the end-of-text point clamped to it, then ended or turned
+// the page), turned the page behind a sheet or menu opened during the end dwell, and
+// resumed when one of two fingers lifted.
+describe('W45: footnotes, an open menu, a second finger', () => {
+  it('a start below the end of the text runs on to the real bottom, never back up', () => {
+    const { io, state } = makeIo();
+    state.el = makeEl({ scrollHeight: 5000, clientHeight: 800, endTop: 900 }); // text end rests at 367; bottom 4200
+    state.el.scrollTop = 2000;                                                // reading the footnotes
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 20, 50);
+    expect(state.el.scrollTop).toBeGreaterThanOrEqual(2000);
+    runFrames(state, 6000, 50);
+    expect(state.el.scrollTop).toBe(4200);
+    expect(ctrl.getState().state).toBe('ended');
+    ctrl.destroy();
+  });
+
+  it('a touch resume below the end of the text keeps going down too', () => {
+    const { io, state } = makeIo();
+    state.el = makeEl({ scrollHeight: 5000, clientHeight: 800, endTop: 900 });
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 5, 50);
+    ctrl.pointerDown();
+    state.el.scrollTop = 1500;                                                // the reader drags into the footnotes
+    ctrl.pointerUp();
+    runTimers(state, 5000);
+    expect(ctrl.getState().state).toBe('running');
+    runFrames(state, 20, 50);
+    expect(state.el.scrollTop).toBeGreaterThanOrEqual(1500);
+    ctrl.destroy();
+  });
+
+  it('a run that starts above the end still stops at the end of the text', () => {
+    const { io, state } = makeIo();
+    state.el = makeEl({ scrollHeight: 5000, clientHeight: 800, endTop: 900 });
+    state.el.scrollTop = 100;
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 900, 50);
+    expect(state.el.scrollTop).toBe(367);
+    ctrl.destroy();
+  });
+
+  it.each([['an open sheet or menu', 'modal'], ['a live selection', 'selection']])('the end dwell does not turn the page behind %s', (_label, key) => {
+    const { io, state } = makeIo();
+    state.autoNext = true;
+    state.el = makeEl({ scrollHeight: 5000, clientHeight: 800, endTop: 900 });
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 900, 50);
+    expect(ctrl.getState().state).toBe('enddwell');
+    state[key] = true;                                                        // opened during the countdown
+    runTimers(state, 6000);
+    expect(state.advanced).toBe(0);
+    expect(ctrl.getState().state).toBe('paused');
+    ctrl.destroy();
+  });
+
+  it('a finger lifting while another is still down is not the end of the touch', () => {
+    expect(touchLiftEnds({ touches: [{}] })).toBe(false);
+    expect(touchLiftEnds({ touches: [] })).toBe(true);
+    expect(touchLiftEnds({})).toBe(true);                                     // mouseup
+  });
 });
