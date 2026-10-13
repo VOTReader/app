@@ -56,3 +56,34 @@ describe('TabActionSheet bulk-close confirm gates', () => {
     expect(screen.getByText('Close tabs to the right')).toBeTruthy();
   });
 });
+
+/* W53: pinned tabs survive every bulk close (use-tab-actions), yet the sheet
+   counted them: "Close 3 other tabs?" closed one, and with only pinned tabs
+   left the option still offered to close them. Counts now skip pinned tabs,
+   the option is off at zero, and the sheet says pinned tabs stay open. */
+describe('TabActionSheet counts only the tabs a bulk close will close (W53)', () => {
+  const T = (pinned = false) => ({ screen: 'home', pinned });
+
+  it('"Close other tabs" counts the unpinned others and says pinned tabs stay open', () => {
+    const p = renderSheet({ idx: 1, total: 4, tabs: [T(true), T(), T(), T(true)] });
+    expect(screen.getByText(/1 other tab will be closed\. Pinned tabs stay open\./)).toBeTruthy();
+    fireEvent.click(screen.getByText('Close other tabs'));
+    expect(screen.getByText('Close 1 other tab?')).toBeTruthy();
+    fireEvent.click(screen.getByText('Yes, close them'));
+    expect(p.onCloseOthers).toHaveBeenCalledTimes(1);
+  });
+
+  it('"Close tabs to the right" skips a pinned tab to the right', () => {
+    renderSheet({ idx: 1, total: 4, tabs: [T(), T(), T(), T(true)] });
+    expect(screen.getByText(/Close 1 tab after this one\. Pinned tabs stay open\./)).toBeTruthy();
+  });
+
+  it('with only pinned tabs besides this one, both bulk closes are off', () => {
+    renderSheet({ idx: 1, total: 3, tabs: [T(true), T(), T(true)] });
+    const others = screen.getByText('Close other tabs').closest('button');
+    const right = screen.getByText('Close tabs to the right').closest('button');
+    expect(others.disabled).toBe(true);
+    expect(right.disabled).toBe(true);
+    expect(screen.getByText(/No other tabs to close: pinned tabs stay open\./)).toBeTruthy();
+  });
+});

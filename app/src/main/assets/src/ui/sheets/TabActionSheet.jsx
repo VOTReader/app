@@ -2,7 +2,7 @@
    TabActionSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function TabActionSheet({ idx, total, tab, onCloseOthers, onCloseToRight, onRename, onTogglePin, onDismiss }) {
+export function TabActionSheet({ idx, total, tabs = null, tab, onCloseOthers, onCloseToRight, onRename, onTogglePin, onDismiss }) {
   // Both actions here close SEVERAL tabs at once with no undo snapshot
   // (unlike the single × close, which gets an Undo toast) — so each is
   // confirm-gated in place, consistent with the app-wide ConfirmStrip
@@ -28,10 +28,18 @@ export function TabActionSheet({ idx, total, tab, onCloseOthers, onCloseToRight,
   const trapRef = useFocusTrap(idx != null);
   if (idx == null) return null;
   const tabNum = idx + 1;
-  const hasOthers = total > 1;
-  const hasRightTabs = idx < total - 1;
-  const othersCount = total - 1;
-  const rightCount = total - tabNum;
+  // W53: pinned tabs survive both bulk closes (use-tab-actions), so the counts
+  // are of the UNPINNED tabs they will close, and an action with none is off.
+  const list = Array.isArray(tabs) ? tabs : null;
+  const closable = (/** @type {(i: number) => boolean} */ pick) => (list
+    ? list.filter((t, i) => pick(i) && !(t && t.pinned)).length
+    : Array.from({ length: total }, (_, i) => i).filter(pick).length);
+  const pinnedWhere = (/** @type {(i: number) => boolean} */ pick) => !!list && list.some((t, i) => pick(i) && !!(t && t.pinned));
+  const othersCount = closable((i) => i !== idx);
+  const rightCount = closable((i) => i > idx);
+  const hasOthers = othersCount > 0;
+  const hasRightTabs = rightCount > 0;
+  const pinnedNote = (/** @type {(i: number) => boolean} */ pick) => (pinnedWhere(pick) ? ' Pinned tabs stay open.' : '');
   return (
     <>
       <div className="select-sheet-backdrop open" aria-hidden="true" onClick={onDismiss} />
@@ -96,7 +104,9 @@ export function TabActionSheet({ idx, total, tab, onCloseOthers, onCloseToRight,
               <div className="select-sheet-option-main">
                 <span className="select-sheet-option-label">Close other tabs</span>
               </div>
-              <div className="select-sheet-option-desc">Keep only this tab open. {hasOthers ? `${othersCount} other ${othersCount === 1 ? 'tab' : 'tabs'} will be closed.` : 'No other tabs to close.'}</div>
+              <div className="select-sheet-option-desc">{hasOthers
+                ? `Keep only this tab open. ${othersCount} other ${othersCount === 1 ? 'tab' : 'tabs'} will be closed.${pinnedNote((i) => i !== idx)}`
+                : (pinnedWhere((i) => i !== idx) ? 'No other tabs to close: pinned tabs stay open.' : 'No other tabs to close.')}</div>
             </button>
           )}
           {confirming === 'right' ? (
@@ -116,7 +126,9 @@ export function TabActionSheet({ idx, total, tab, onCloseOthers, onCloseToRight,
               <div className="select-sheet-option-main">
                 <span className="select-sheet-option-label">Close tabs to the right</span>
               </div>
-              <div className="select-sheet-option-desc">{hasRightTabs ? `Close ${rightCount} ${rightCount === 1 ? 'tab' : 'tabs'} after this one.` : 'No tabs to the right.'}</div>
+              <div className="select-sheet-option-desc">{hasRightTabs
+                ? `Close ${rightCount} ${rightCount === 1 ? 'tab' : 'tabs'} after this one.${pinnedNote((i) => i > idx)}`
+                : (pinnedWhere((i) => i > idx) ? 'Only pinned tabs to the right; they stay open.' : 'No tabs to the right.')}</div>
             </button>
           )}
           <button

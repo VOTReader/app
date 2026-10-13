@@ -128,6 +128,7 @@ export function AppShellOverlays({
             <TabActionSheet
               idx={tabActionIdx}
               total={tabs.length}
+              tabs={tabs}
               tab={tabs[tabActionIdx] || null}
               onCloseOthers={() => {closeOtherTabs(tabActionIdx);lastTabCloseStrikesRef.current = 0;}}
               onCloseToRight={() => {closeTabsToTheRight(tabActionIdx);lastTabCloseStrikesRef.current = 0;}}
