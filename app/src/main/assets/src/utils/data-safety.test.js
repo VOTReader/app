@@ -411,6 +411,16 @@ describe('W9: the check is never switched off, nor anchored to a broken snapshot
     expect(sink.save.mock.calls.length).toBe(saves);
   });
 
+  it('a newest snapshot whose stores is no object is walked past, as SnapshotStore.kt judges it (refuter round 3)', async () => {
+    const sink = memorySink();
+    await snapshotYesterday(sink);
+    const good = [...sink.files.keys()][0];
+    sink.files.set(snapshotName(snapshotTime(good) + 3600000), '{"app":"VOTReader","stores":[1]}');
+    await IDBAdapter.put('vot-annotations', 'v', {});
+    expect(await DataSafety.run({ sink })).toBe('damaged');
+    expect(StorageHealth.getReport().dataMissing.name).toBe(good);
+  });
+
   it('an empty newest file (a web save killed before it wrote) is walked past too', async () => {
     const sink = memorySink();
     await snapshotYesterday(sink);

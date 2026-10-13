@@ -222,9 +222,10 @@ export async function acceptCurrent(opts) {
   return run({ sink: opts && opts.sink, force: true });
 }
 
-/** @param {string} text */
+/** A snapshot to restore from: a JSON object whose `stores` is an object (what SnapshotStore.kt's
+ *  StrictSnapshotJson also requires, so the two sides agree on what reads, W9). @param {string} text */
 function _parse(text) {
-  try { const o = JSON.parse(text); return o && typeof o === 'object' && o.stores ? o : null; } catch (_e) { return null; }
+  try { const o = JSON.parse(text); return o && typeof o === 'object' && obj(o.stores) === o.stores ? o : null; } catch (_e) { return null; }
 }
 
 /** Newest wins by `ts`, de-duplicated by key + time. @param {any} a @param {any} b */

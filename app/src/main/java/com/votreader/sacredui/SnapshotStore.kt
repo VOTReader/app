@@ -172,7 +172,7 @@ class SnapshotStore(private val dir: File) {
  * one object with nothing after it, and a "stores" object among its top-level keys, which
  * data-safety.js needs to restore from it. Android's org.json is lenient (unquoted and
  * single-quoted strings, comments), so it cannot answer for the page. Builds nothing but the
- * top-level keys.
+ * top-level keys, decoded, the last of a repeated one counting (W9 refuter round 3).
  */
 internal class StrictSnapshotJson(private val s: String) {
     private var i = 0
@@ -212,7 +212,7 @@ internal class StrictSnapshotJson(private val s: String) {
             space()
             val key = str(keep = top)
             space(); take(':'); space()
-            if (top && key == "stores" && peek() == '{') hasStores = true
+            if (top && key == "stores") hasStores = peek() == '{'     // JSON.parse keeps the last of a repeated key
             value(); space()
             if (peek() == ',') { i++; continue }
             take('}'); return
@@ -229,27 +229,37 @@ internal class StrictSnapshotJson(private val s: String) {
         }
     }
 
-    /** A string; its text only when [keep] and it has no escapes (a top-level key). */
+    /** A string; its text, escapes decoded as JSON.parse decodes them, only when [keep] (a top-level key). */
     private fun str(keep: Boolean): String? {
         take('"')
-        val start = i
-        var plain = true
+        val out = if (keep) StringBuilder() else null
         while (true) {
             if (i >= s.length) bad()
             val c = s[i]
             when {
-                c == '"' -> { val out = if (keep && plain) s.substring(start, i) else null; i++; return out }
+                c == '"' -> { i++; return out?.toString() }
                 c == '\\' -> {
-                    plain = false
                     i++
-                    when (peek()) {
-                        '"', '\\', '/', 'b', 'f', 'n', 'r', 't' -> i++
-                        'u' -> { i++; repeat(4) { if (Character.digit(peek(), 16) < 0) bad(); i++ } }
+                    val e = peek()
+                    when (e) {
+                        '"', '\\', '/' -> out?.append(e)
+                        'b' -> out?.append('\b')
+                        'f' -> out?.append(12.toChar())
+                        'n' -> out?.append('\n')
+                        'r' -> out?.append('\r')
+                        't' -> out?.append('\t')
+                        'u' -> {
+                            if (i + 4 >= s.length) bad()
+                            for (k in 1..4) if (Character.digit(s[i + k], 16) < 0) bad()
+                            out?.append(s.substring(i + 1, i + 5).toInt(16).toChar())
+                            i += 4
+                        }
                         else -> bad()
                     }
+                    i++
                 }
                 c < ' ' -> bad()
-                else -> i++
+                else -> { out?.append(c); i++ }
             }
         }
     }
