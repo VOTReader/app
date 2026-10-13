@@ -387,6 +387,13 @@ class NativeAudio extends EventTarget {
     if (!e || typeof e !== 'object') return;
     if (e.type === 'transition') { this._seam({ seq: e.seq, from: e.from, url: e.url }, !!e.want); }
     const url = typeof e.url === 'string' ? e.url : '';
+    // After a load error native still holds the recording, and a headset, car or lock-screen Play prepares and plays
+    // it with no word from the page: the page follows it as native's own play, else that audio ran under a paused
+    // bar the app ignored (sweep W61). Its idle news (not playing, not on its way) wakes nothing.
+    if (!this._loaded && this.error && e.type !== 'error' && url && url === this._src && e.want && (e.playing || e.buffering)) {
+      this._loaded = true;
+      this.error = null;
+    }
     // Native still on a recording the page has left (a src change it has not heard yet): not this element's news.
     if (!this._loaded || (url && url !== this._src && url !== this._nativeUrl)) return;
     if (e.type === 'error') { this._error(e); return; }

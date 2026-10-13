@@ -159,6 +159,37 @@ describe('audio-player on the native player (m3)', () => {
     }
   });
 
+  // Sweep W61: after a load error the page stopped hearing native, but a headset, car or lock-screen Play makes
+  // native prepare the recording it still holds and play it: audio under a paused bar the app ignored.
+  it('(W61) after a load error, a Play native carries out itself is followed by the bar', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    send({ type: 'state', url: URL_OF('idA1'), pos: 0, dur: 60000, playing: true, want: true });
+    send({ type: 'error', url: URL_OF('idA1'), pos: 12000, dur: 60000, playing: false, want: true, code: 2001, name: 'ERROR_CODE_IO_NETWORK_CONNECTION_FAILED' });
+    await flush();
+    expect(AudioPlayer.getState().status).toBe('paused');
+    send({ type: 'state', url: URL_OF('idA1'), pos: 12000, dur: 60000, playing: false, want: true, buffering: true });
+    send({ type: 'state', url: URL_OF('idA1'), pos: 12500, dur: 60000, playing: true, want: true });
+    await flush();
+    const s = AudioPlayer.getState();
+    expect(s.status).toBe('playing');
+    expect(s.time).toBeGreaterThanOrEqual(12.5);
+    expect(bridge.audioLoad).toHaveBeenCalledTimes(1);   // native's own retry, adopted: not loaded again
+    // and the page's pause reaches native again
+    AudioPlayer.toggle();
+    expect(bridge.audioPause).toHaveBeenCalled();
+  });
+
+  it('(W61) after a load error, native\'s idle news does not wake the bar, and the bar\'s Play still reloads', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    send({ type: 'state', url: URL_OF('idA1'), pos: 0, dur: 60000, playing: true, want: true });
+    send({ type: 'error', url: URL_OF('idA1'), pos: 12000, dur: 60000, playing: false, want: true, code: 2001, name: 'x' });
+    send({ type: 'state', url: URL_OF('idA1'), pos: 12000, dur: 60000, playing: false, want: true });
+    await flush();
+    expect(AudioPlayer.getState().status).toBe('paused');
+    AudioPlayer.toggle();
+    expect(bridge.audioLoad).toHaveBeenCalledTimes(2);
+  });
+
   it('offline with nothing on the phone ahead, native is told to stop at the end of this one', async () => {
     await downloaded(['idA1']);
     setOnline(false);
