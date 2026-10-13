@@ -2595,9 +2595,12 @@
     .bold-italic { font-weight:600; font-style:italic; }
     .italic-text { font-style:italic; color:var(--cream-dim); }
     /* ── FOOTNOTE BUBBLE ── */
-    .fn-ref { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; font-family:'Cinzel',serif; font-size:var(--fs-10); font-weight:600; color:var(--tap-ref); border:1px solid var(--tap-ref-sub); border-radius:50%; cursor:pointer; vertical-align:super; margin:0 1px; line-height:1; transition:all 0.18s ease; background:rgba(200,164,86,0.06); position:relative; top:-2px; }
-    /* The marker is DRAWN 18 px but a finger needs 24 (WCAG 2.2 2.5.8): a transparent ring grows the HIT area to 30 px
-       and changes nothing the eye sees. tools/smoke-ci.js probes what a finger lands on at 360x800 (2026-09-22). */
+    /* The ring is sized in em of its own digits (sweep mw10): 1.8em is the old 18 px at standard text size, and it
+       grows with Text Size, where a fixed 18 px ring let the digits spill out (30 px type at 3x). Wider numbers
+       make it a pill (min-width + padding, radius half the height). */
+    .fn-ref { display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; min-width:1.8em; height:1.8em; padding:0 0.25em; font-family:'Cinzel',serif; font-size:var(--fs-10); font-weight:600; color:var(--tap-ref); border:1px solid var(--tap-ref-sub); border-radius:0.9em; cursor:pointer; vertical-align:super; margin:0 1px; line-height:1; transition:all 0.18s ease; background:rgba(200,164,86,0.06); position:relative; top:-2px; }
+    /* The marker is DRAWN 18 px (standard text size) but a finger needs 24 (WCAG 2.2 2.5.8): a transparent ring grows the
+       HIT area to 30 px and changes nothing the eye sees. tools/smoke-ci.js probes what a finger lands on at 360x800 (2026-09-22). */
     .fn-ref::after { content:''; position:absolute; inset:-6px; border-radius:50%; }
     .fn-ref.active { background:var(--gold); color:var(--bg); border-color:var(--gold); box-shadow:0 0 8px var(--gold-glow); }
     @media (hover: hover) { .fn-ref:hover { background:var(--gold); color:var(--bg); border-color:var(--gold); box-shadow:0 0 8px var(--gold-glow); } }
@@ -4325,6 +4328,14 @@
       padding:0.6rem 0.75rem 0.7rem;
       z-index:2;
     }
+    /* The card's keyboard / screen-reader control (TabsOverview): above the thumbnail, under the body
+       text (z 2) and the menu / close buttons (z 3). The card clips its overflow, so the ring sits inside. */
+    .tab-card-open {
+      position:absolute; inset:0; z-index:1;
+      margin:0; padding:0; border:0; background:transparent;
+      cursor:pointer; -webkit-tap-highlight-color:transparent;
+    }
+    .tab-card .tab-card-open:focus-visible { outline-offset:-2px; border-radius:10px; }
     .tab-card:active { background:var(--gold-faint); transform:scale(0.99); }
     @media (hover:hover) { .tab-card:hover { border-color:var(--gold-dim); background:var(--bg3); } }
 
@@ -6385,6 +6396,16 @@
     }
     @media (hover: hover) { .note-row:hover { border-color: var(--gold); background: var(--gold-faint); } }
     .note-row:active { transform: scale(0.99); }
+    /* The row's keyboard / screen-reader control (NoteRow): a full-row button laid under the text; the
+       segment buttons and the expandable preview sit above it (positioned, later in the flow). */
+    .note-row { position: relative; }
+    .note-row-open {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      margin: 0; padding: 0; border: 0; border-radius: 10px; background: transparent;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .note-row .note-row-open:focus-visible { outline-offset: 2px; border-radius: 10px; }
+    .note-row-source-seg, .note-row-preview-expandable, .note-row-anchor-expandable { position: relative; }
     .note-row-swatch {
       flex-shrink: 0;
       width: 12px; height: 12px;
@@ -6569,6 +6590,14 @@
       transition: background 0.12s, border-color 0.12s;
     }
     .nb-picker-row:active { background: var(--gold-faint); }
+    /* The row's toggle (a checkbox button holding the box and the name; Delete is its sibling). */
+    .nb-picker-row-toggle {
+      flex: 1; min-width: 0;
+      display: flex; align-items: center; gap: 12px;
+      margin: 0; padding: 0; border: 0; background: transparent;
+      color: inherit; font: inherit; text-align: left;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
     @media (hover: hover) { .nb-picker-row:hover { background: var(--gold-faint); } }
     .nb-picker-row.checked { background: var(--gold-faint); border-color: var(--gold-border); }
     .nb-picker-check {

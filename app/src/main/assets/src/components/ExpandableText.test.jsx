@@ -3,7 +3,7 @@
    surrogate, drawn as a replacement glyph) before the ellipsis. */
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, fireEvent } from '@testing-library/react';
 import { ExpandableText } from './ExpandableText.jsx';
 
 afterEach(cleanup);
@@ -28,5 +28,27 @@ describe('ExpandableText — collapsed preview', () => {
     const { container } = render(<ExpandableText text={'short \u{1F600}'} threshold={10} />);
     expect(container.textContent).toBe('short \u{1F600}');
     expect(container.querySelector('button')).toBeNull();
+  });
+});
+
+/** Any interactive element inside another (axe nested-interactive). */
+const nestedInteractive = (root) => root.querySelectorAll(
+  'button button, button [role="button"], [role="button"] button, [role="button"] [role="button"], '
+  + 'button [tabindex="0"], [role="button"] [tabindex="0"]').length;
+
+// Sweep low (mw10): with tapToToggle the wrapper was role=button around the real Show more button.
+describe('ExpandableText — tapToToggle', () => {
+  it('has one control, the Show more button, which says whether the text is expanded; a tap anywhere still toggles', () => {
+    const { container } = render(<ExpandableText text={'word '.repeat(80)} threshold={40} tapToToggle={true} />);
+    const wrap = /** @type {HTMLElement} */ (container.firstChild);
+    expect(wrap.getAttribute('role')).toBeNull();
+    expect(wrap.hasAttribute('tabindex')).toBe(false);
+    expect(nestedInteractive(container)).toBe(0);
+    const btn = container.querySelector('button');
+    expect(btn.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(wrap);
+    expect(btn.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(btn);
+    expect(btn.getAttribute('aria-expanded')).toBe('false');
   });
 });

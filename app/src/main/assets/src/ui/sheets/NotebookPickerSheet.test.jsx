@@ -61,10 +61,17 @@ describe('NotebookPickerSheet — buffered toggles', () => {
     setupStores();
     render(<NotebookPickerSheet groupId="g1" onClose={() => {}} />);
     const dialog = screen.getByRole('dialog', { name: 'Add to Notebook' });
-    const row = screen.getByRole('button', { name: /Psalms Study/ });
     expect(dialog.getAttribute('aria-modal')).toBe('true');
-    fireEvent.keyDown(row, { key: ' ' });
+    // Sweep low (mw10): the row was role=button around its Delete button (axe nested-interactive). The
+    // toggle is now its own native checkbox button (Enter / Space are the browser's), Delete its sibling.
+    const box = screen.getByRole('checkbox', { name: 'Psalms Study' });
+    const row = box.closest('.nb-picker-row');
+    expect(row.getAttribute('role')).toBeNull();
+    expect(box.contains(row.querySelector('.nb-picker-row-delete'))).toBe(false);
+    expect(box.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(box);
     expect(row.className).toContain('checked');
+    expect(box.getAttribute('aria-checked')).toBe('true');
   });
 
   it('tapping a notebook row does NOT write to the store (buffered until Save)', () => {

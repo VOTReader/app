@@ -36,14 +36,16 @@ export function NoteRow({ note, onTap, onTapSegment, hideNotebookId }) {
   const Exp = typeof JrnExpandable !== 'undefined' ? JrnExpandable : null;
   const bodyText = note.body || '';
   const anchorText = normalizeExcerptDisplay(note.fullText);
+  // The row was role=button around its segment buttons (a nested control, sweep mw10). Now the row only
+  // keeps the pointer tap, and .note-row-open, a full-row button laid behind the segment and Show more
+  // buttons, is the keyboard / screen-reader control; its click bubbles to the row's onClick.
   return (
     <div
       className="note-row"
-      role="button"
-      tabIndex={0}
       onClick={() => onTap(note)}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTap(note); } }}
     >
+      <button type="button" className="note-row-open"
+        aria-label={'Open note: ' + (segments.length > 0 ? segments.map((seg) => seg.label).join(' · ') : sourceLabel)} />
       <span className="note-row-swatch" style={{ background: swatchBg }} />
       <span className="note-row-body">
         <span className="note-row-source-line">
@@ -57,10 +59,6 @@ export function NoteRow({ note, onTap, onTapSegment, hideNotebookId }) {
                     className="note-row-source-seg"
                     title={"Go to " + seg.label}
                     onClick={(e) => tapSegment(e, seg.nav)}
-                    // The row wrapper is role=button with its own Enter/Space
-                    // handler; a native button already activates on those keys,
-                    // so stop the keydown here or the row fires a second time.
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
                   >{seg.label}</button>
                 </React.Fragment>
               ))}

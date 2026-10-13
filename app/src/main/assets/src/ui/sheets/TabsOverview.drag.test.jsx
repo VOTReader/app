@@ -239,3 +239,18 @@ describe('TabsOverview drag v2 — reorder + seamless drop', () => {
     expect(document.body.querySelector('.drag-flying')).toBeNull();
   });
 });
+
+// Sweep low (mw10): a tab card took no focus and no key; only its menu and close buttons did.
+describe('tab card keyboard access', () => {
+  it('each card has a Switch button that selects its tab; the active one is marked current', () => {
+    const { props, cards } = renderOverview();
+    const open = cards.map((c) => /** @type {HTMLButtonElement} */ (c.querySelector('.tab-card-open')));
+    expect(open.every(Boolean)).toBe(true);
+    expect(open[2].getAttribute('aria-label')).toMatch(/^Switch to /);
+    expect(open[0].getAttribute('aria-current')).toBe('true');
+    expect(open[2].getAttribute('aria-current')).toBeNull();
+    open[2].click();
+    expect(props.onSelect).toHaveBeenCalledTimes(1);
+    expect(props.onSelect).toHaveBeenCalledWith(2);
+  });
+});

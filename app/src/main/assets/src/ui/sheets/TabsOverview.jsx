@@ -356,6 +356,11 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
               }}
               onDragStart={(e) => e.preventDefault()}
             >
+              {/* The card took no focus and no key (sweep mw10). This full-card button is its keyboard /
+                  screen-reader control: no onClick of its own, its click bubbles to the card's (which
+                  also keeps the long-press drag); the menu and close buttons sit above it. */}
+              <button type="button" className="tab-card-open" aria-label={'Switch to ' + title}
+                aria-current={isActive ? 'true' : undefined} />
               <button
                 className="tab-card-menu"
                 onClick={(e) => {e.stopPropagation();onMenu && onMenu(i);}}
