@@ -5,11 +5,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { openSharedPassage, installSharedPassageHook, useSharedPassageLink, _resetSharedPassagePark } from './use-shared-passage-link.js';
-import { storesNotLoaded } from '../stores/cached-store.js';
+import { appWillBeReplaced } from '../components/HydrationGate.jsx';
 import { StateStore } from '../stores/state-store.js';
 
 // The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
-vi.mock('../stores/cached-store.js', async (importOriginal) => ({ ...(/** @type {any} */ (await importOriginal())), storesNotLoaded: vi.fn(() => []) }));
+vi.mock('../components/HydrationGate.jsx', () => ({ appWillBeReplaced: vi.fn(() => false) }));
 vi.mock('../utils/toast.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get showToast() { return /** @type {any} */ (globalThis).showToast; } }; });
 
 function fakeWin(search, extra) {
@@ -174,7 +174,7 @@ describe('installSharedPassageHook (the APK, app already open)', () => {
    link was lost with that mount. Now the key stays parked until a FINAL mount (every
    store loaded at its first render, so nothing replaces it) has made the jump. */
 describe('openSharedPassage — W41: the key outlives every mount that is replaced', () => {
-  afterEach(() => { vi.mocked(storesNotLoaded).mockReset(); vi.mocked(storesNotLoaded).mockReturnValue([]); });
+  afterEach(() => { vi.mocked(appWillBeReplaced).mockReset(); vi.mocked(appWillBeReplaced).mockReturnValue(false); });
 
   it('a replaced mount opens it, every later mount opens it again, a final mount settles it', async () => {
     /** @type {any} */ (globalThis).BOOKS = JOHN;
@@ -235,10 +235,10 @@ describe('openSharedPassage — W41: the key outlives every mount that is replac
     expect(nav2).toHaveBeenCalledTimes(1);
   });
 
-  it('useSharedPassageLink fixes "final" at the first render: a store landing before the effect still counts as replaced', async () => {
+  it('useSharedPassageLink takes "final" from the gate at the first render, never at effect time', async () => {
     /** @type {any} */ (globalThis).BOOKS = JOHN;
-    // pending at the render, loaded by the time the effect runs (refuter round 1, finding 1)
-    vi.mocked(storesNotLoaded).mockReturnValueOnce([{}]).mockReturnValue([]);
+    // the gate will replace this mount; by the effect every store has landed (refuter rounds 1 and 2)
+    vi.mocked(appWillBeReplaced).mockReturnValueOnce(true).mockReturnValue(false);
     const gs = vi.spyOn(StateStore, 'getState').mockReturnValue('loaded'); // vot-state landed before the effect
     const realLocation = window.location.href;
     window.history.replaceState(null, '', '/app/?p=bible%3Ajohn%3A3%3A16');
