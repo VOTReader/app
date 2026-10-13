@@ -90,9 +90,18 @@ export function trackSearchText(track) {
     .filter(Boolean).join(' ').toLocaleLowerCase();
 }
 
-/** @param {number} stamp @returns {string} */
+// No play time here is older than this (2020-01-01): a smaller stamp is a malformed import, not a date (sweep 2026-10-13).
+const PLAYED_AT_FLOOR = 1577836800000;
+
+/** @param {any} stamp @returns {boolean} */
+function playedAtKnown(stamp) {
+  return typeof stamp === 'number' && stamp >= PLAYED_AT_FLOOR;
+}
+
+/** @param {any} stamp @returns {string} '' when the play time is unknown */
 export function relativePlayedAt(stamp) {
-  const delta = Math.max(0, Date.now() - (Number(stamp) || 0));
+  if (!playedAtKnown(stamp)) return '';
+  const delta = Math.max(0, Date.now() - stamp);
   const minutes = Math.floor(delta / 60000);
   if (minutes < 1) return 'Just now';
   if (minutes < 60) return minutes + ' min ago';
@@ -224,9 +233,9 @@ export function AudioShelfRow({ track, source, onOpenTrack, onRemove }) {
       </div>
       <div className="audio-library-row-actions">
         {remaining
-          ? <span className="audio-library-remaining" title={source === 'recent' ? relativePlayedAt(track.playedAt) : undefined}>{remaining}</span>
+          ? <span className="audio-library-remaining" title={source === 'recent' ? relativePlayedAt(track.playedAt) || undefined : undefined}>{remaining}</span>
           : source === 'recent'
-            ? <span title={new Date(track.playedAt).toLocaleString()}>{relativePlayedAt(track.playedAt)}</span>
+            ? <span title={playedAtKnown(track.playedAt) ? new Date(track.playedAt).toLocaleString() : undefined}>{relativePlayedAt(track.playedAt)}</span>
             : <span>{isSaved ? 'Saved' : ''}</span>}
         {canOpenText ? <button type="button" className="audio-library-icon-button" onClick={() => onOpenTrack(track)} aria-label={'Open text for ' + trackName(track)} title="Open text"><TextIcon /></button> : null}
         <button

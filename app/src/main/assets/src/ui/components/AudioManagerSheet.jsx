@@ -158,7 +158,7 @@ export function voiceChoices(current) {
         }
         AudioPlayer.playLetter({
           volKey: split.volKey, letter: { id: split.id, title: current.title },
-          collectionLabel: current.sub, reader: rendition.reader,
+          collectionLabel: current.sub, reader: rendition.reader, noResume: true,
         });
       },
     })),
@@ -345,16 +345,17 @@ export function AudioManagerSheet({ open, state, onClose }) {
             >
               {/* '›' — the same go-to cue the home cards carry; marks the
                   title as the tap that opens the text. */}
-              <h2 id="audio-manager-title">{trackLabel(heading)} <span className="audio-manager-jump-chevron" aria-hidden="true">›</span></h2>
-              <p>{headLine}</p>
+              {/* Spans, not h2/p: a button holds phrasing content only (sweep 2026-10-13); the CSS draws them alike. */}
+              <span className="audio-manager-title" id="audio-manager-title">{trackLabel(heading)} <span className="audio-manager-jump-chevron" aria-hidden="true">›</span></span>
+              <span className="audio-manager-headline">{headLine}</span>
               {/* The words, drawn (2026-09-12): the Settings row sends a reader here
                   by name, and a phone shows neither the tooltip nor the aria-label. */}
               <span className="audio-manager-jump-cue">Open the reading</span>
             </button>
           ) : (
           <div className="audio-manager-track-copy">
-            <h2 id="audio-manager-title">{trackLabel(heading)}</h2>
-            <p>{headLine}</p>
+            <h2 className="audio-manager-title" id="audio-manager-title">{trackLabel(heading)}</h2>
+            <p className="audio-manager-headline">{headLine}</p>
           </div>
           )}
           <button

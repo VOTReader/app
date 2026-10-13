@@ -55,9 +55,12 @@ sealed class JsEvent(val fn: String) {
     // A transport command from the SYSTEM media surface (QS media card, lock
     // screen, headset buttons) routed through AudioKeepAliveService's
     // MediaSessionCompat callbacks / notification actions. cmd is one of
-    // "toggle" | "play" | "pause" | "next" | "prev" | "seekTo"; posMs is the
-    // seek target in ms (0 for everything else). audio-player.js installs the
-    // receiver and drives its own toggle()/next()/prev()/seek().
+    // "toggle" | "play" | "pause" | "next" | "prev" | "seekTo" | "refused"; posMs
+    // is the seek target in ms (0 for everything else). "refused" is no button:
+    // AudioKeepAliveService sends it (CMD_REFUSED) when Android refuses its
+    // foreground start from the background, and the page pauses honestly (sf1).
+    // audio-player.js installs the receiver and drives its own
+    // toggle()/next()/prev()/seek().
     data object MediaCommand : JsEvent("__votMediaCommand")
     // A downloaded-recordings event from OfflineAudioStore (listening item 8):
     // one JSON string, {type: queued|progress|done|failed|cancelled|removed,

@@ -110,7 +110,7 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
         <button type="button" className="songs-shuffle song-page-play" onClick={() => (isCurrent ? AudioPlayer.toggle() : play(lead))}>
           {isCurrent && active ? <PauseIcon /> : <PlayIcon />}<span>{isCurrent && active ? 'Pause' : 'Play'}</span>
         </button>
-        <button type="button" className={'songs-outline-action song-page-save' + (saved ? ' is-saved' : '')} aria-pressed={saved} onClick={toggleSave}>
+        <button type="button" className={'songs-outline-action song-page-save' + (saved ? ' is-saved' : '')} onClick={toggleSave}>
           <StarIcon filled={saved} /><span>{saved ? 'Saved' : 'Save'}</span>
         </button>
       </div>

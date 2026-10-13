@@ -155,8 +155,9 @@ export function _mediaSession(track) {
     if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
     const ms = /** @type {any} */ (navigator).mediaSession;
     _setCardMetadata(ms, track);
-    _setAction(ms, 'play', () => late.toggle());
-    _setAction(ms, 'pause', () => late.toggle());
+    // Idempotent, as on the native bridge below (v02-audio-02): a hardware Pause key while paused must not play.
+    _setAction(ms, 'play', () => { if (_state.status === 'paused') late.toggle(); });
+    _setAction(ms, 'pause', () => late.pauseIfPlaying());
     _setAction(ms, 'seekto', (/** @type {any} */ d) => late.seek((d && d.seekTime) || 0));
     // Desktop-PWA reach: Chrome's own media hub and hardware media keys
     // offer these three; the phone reads the NATIVE card instead (the web
