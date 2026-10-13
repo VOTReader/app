@@ -148,6 +148,16 @@ describe('remapCorpusMarkData - a mark goes back to its words along a proven mov
     expect(again.notes).toBeUndefined();
   });
 
+  it("a two-paragraph note brought back stale keeps its keys in reading order (its icon paints at the last)", () => {
+    // Pass 1 moved old 2 -> 3 and old 3 -> 4; the stale tab's copy says [P2, P3]. The store lists P4's bucket first.
+    const a = seg(2, 'some teach, and some serve', { groupId: 'g' });
+    const b = seg(3, 'show a more excellent way', { id: 'h3b', groupId: 'g' });
+    const note = { groupId: 'g', keys: [P + '2', P + '3'], fullText: a.text + '\n' + b.text, body: 'two', updated: 40 };
+    const out = run(NEW, { annotations: { [P + '4']: [b], [P + '3']: [a] }, notes: { g: note } });
+    expect(out.annotations).toBeUndefined();
+    expect(out.notes.g.keys).toEqual([P + '3', P + '4']);
+  });
+
   it("controls: a note key that holds its segments, one no listed move covers, or a group with no segments stays", () => {
     const a = seg(2, 'some teach, and some serve');
     const held = { groupId: 'g2', keys: [P + '3'], fullText: a.text, body: 'b', updated: 9 };
