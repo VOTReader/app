@@ -45,11 +45,14 @@ function _journalSig(o) {
 function _journalDraftRecoverable(draft, entry) {
   return !!entry && (draft.ts || 0) >= (entry.updated || 0) && _journalSig(draft) !== _journalSig(entry);
 }
-/** Writes this entry's draft; returns its ts (0 when nothing could be stored). */
+/** Writes this entry's draft; returns its token `n` ('' when nothing could be stored). The
+ *  token, not the ts, names one write: two hides can share a millisecond (refuter r2). */
+var _journalDraftSeq = 0;
 function _writeJournalDraft(eid, title, blocks, mood) {
-  var mine = { title: title, blocks: blocks, mood: mood, ts: Date.now() };
+  var mine = { title: title, blocks: blocks, mood: mood, ts: Date.now(),
+    n: Date.now().toString(36) + '.' + (++_journalDraftSeq) + '.' + Math.random().toString(36).slice(2, 8) };
   var drafts;
-  try { drafts = _readJournalDrafts(); } catch (_e) { return 0; }
+  try { drafts = _readJournalDrafts(); } catch (_e) { return ''; }
   Object.keys(drafts).forEach(function(id) { if (id !== eid && drafts[id].durable) delete drafts[id]; });
   drafts[eid] = mine;
   // Over the quota: give up the oldest other draft and try again; the entry on screen
@@ -57,31 +60,36 @@ function _writeJournalDraft(eid, title, blocks, mood) {
   var others = Object.keys(drafts).filter(function(id) { return id !== eid; })
     .sort(function(x, y) { return (drafts[x].ts || 0) - (drafts[y].ts || 0); });
   for (;;) {
-    try { _storeJournalDrafts(drafts); return mine.ts; }
+    try { _storeJournalDrafts(drafts); return mine.n; }
     catch (_e) {
-      if (!others.length) return 0; // quota / unavailable — draft recovery is best-effort
+      if (!others.length) return ''; // quota / unavailable — draft recovery is best-effort
       delete drafts[others.shift()];
     }
   }
 }
-/** Once the store's latest write is on disk, this entry's draft (the one with `ts`, or
+/** Once the store's latest write is on disk, this entry's draft (the one named `n`, or
  *  whichever it holds now) can no longer save anything the store does not: mark it so the
- *  next draft write may drop it. Never while the store is not loaded (its writes are
- *  queued, so whenSaved would answer for an older one) or its writes are fenced. */
-function _markJournalDraftDurableWhenSaved(eid, ts) {
-  if (!eid || typeof JournalStore.whenSaved !== 'function') return;
-  if (typeof JournalStore.isReady === 'function' && !JournalStore.isReady()) return;
-  if (typeof isStoreWriteFenced === 'function' && isStoreWriteFenced()) return;
-  if (ts == null) { var cur = _readJournalDrafts()[eid]; if (!cur) return; ts = cur.ts; }
-  JournalStore.whenSaved().then(function(ok) {
-    if (!ok) return;
+ *  next draft write may drop it. The store's memory then equals its disk only if it is
+ *  loaded (else its writes are queued and whenSaved answers for an older one), its writes
+ *  are not fenced (a fenced save starts no write, or resolves unwritten; refuter r2), and
+ *  no other write started before that one was confirmed (the fence coming down re-saves;
+ *  the same guard as use-persisted-state's writeUnion). */
+function _markJournalDraftDurableWhenSaved(eid, n) {
+  var store = /** @type {any} */ (JournalStore);
+  if (!eid || typeof store.whenSaved !== 'function') return;
+  var fenced = function() { return typeof isStoreWriteFenced === 'function' && isStoreWriteFenced(); };
+  if ((typeof store.isReady === 'function' && !store.isReady()) || fenced()) return;
+  if (n == null) { var cur = _readJournalDrafts()[eid]; if (!cur || !cur.n) return; n = cur.n; }
+  var lastWrite = store._lastWrite;
+  store.whenSaved().then(function(ok) {
+    if (!ok || fenced() || store._lastWrite !== lastWrite) return;
     try {
       var drafts = _readJournalDrafts();
-      if (!drafts[eid] || drafts[eid].ts !== ts) return; // replaced since: its own write marks it
+      if (!drafts[eid] || drafts[eid].n !== n) return; // replaced since: its own write marks it
       drafts[eid].durable = true;
       _storeJournalDrafts(drafts);
     } catch (_e) { /* best-effort */ }
-  });
+  }, function() { /* never rejects; nothing to mark */ });
 }
 function _clearJournalDraft(eid) {
   try {
@@ -404,8 +412,8 @@ export function JournalEditorScreen(props) {
       commitSave();
       var eid = entryIdRef.current;
       if (!eid) return;
-      var ts = _writeJournalDraft(eid, titleRef.current, blocksRef.current, moodRef.current);
-      if (ts) _markJournalDraftDurableWhenSaved(eid, ts);
+      var n = _writeJournalDraft(eid, titleRef.current, blocksRef.current, moodRef.current);
+      if (n) _markJournalDraftDurableWhenSaved(eid, n);
     }
     function onVisibility() { if (document.visibilityState === 'hidden') onHide(); }
     window.addEventListener('pagehide', onHide);
