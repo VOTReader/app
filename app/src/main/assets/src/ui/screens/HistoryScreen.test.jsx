@@ -508,3 +508,49 @@ describe('HistoryScreen — repeats collapse into one row per reading per day', 
     expect(rowVisits()).toEqual(['3 visits', '']);
   });
 });
+
+/* Sweep W69: a search opens every group that holds a match, so one letter typed into a 2,000-visit
+   history drew nearly all of it at once (a chip each), and every keystroke rebuilt every visit's
+   search text. The newest 100 matches draw; "Show all N matches" draws the rest, until the query
+   changes. */
+describe('HistoryScreen — a broad search in a long history', () => {
+  const LONG = Array.from({ length: 250 }, (_, i) => chapter('psalms', 'Psalms', i + 1, today(i + 1)));
+  const shown = () => document.querySelectorAll('.chapter-card-title').length;
+  const more = () => document.querySelector('.history-show-all');
+
+  it('draws the newest 100 matches and offers the rest', () => {
+    setupGlobals();
+    renderScreen(LONG);
+    type('psalms');
+    expect(shown()).toBe(100);
+    expect(document.querySelector('.history-search-count').textContent).toBe('250 visits match · newest 100 shown');
+    expect(cardTitles()[0]).toBe('Chapter 1');   // the newest visit (Psalm 1, a minute ago)
+    expect(more().textContent).toBe('Show all 250 matches');
+    fireEvent.click(more());
+    expect(shown()).toBe(250);
+    expect(more()).toBeNull();
+    // A new query starts capped again.
+    type('psalms 1');
+    expect(shown()).toBe(100);
+  });
+
+  it('draws everything, with no offer, when the matches fit', () => {
+    setupGlobals();
+    renderScreen(LONG);
+    type('psalms 2');   // 2, 20-29, 200-250 = 62
+    expect(shown()).toBe(62);
+    expect(more()).toBeNull();
+    expect(document.querySelector('.history-search-count').textContent).toBe('62 visits match');
+  });
+
+  it('builds each visit\'s search text once, not once per keystroke', () => {
+    setupGlobals();
+    let reads = 0;
+    const counted = LONG.map((e) => { const c = { ...e }; Object.defineProperty(c, 'bookTitle', { get() { reads++; return e.bookTitle; }, enumerable: true }); return c; });
+    renderScreen(counted);
+    const before = reads;
+    for (const q of ['p', 'ps', 'psa', 'psal']) type(q);
+    // Building one visit's text reads bookTitle twice; the 100 drawn cards read it again.
+    expect(reads - before).toBeLessThanOrEqual(2 * LONG.length + 4 * 100 * 2);
+  });
+});
