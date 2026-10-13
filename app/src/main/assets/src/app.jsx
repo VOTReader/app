@@ -757,11 +757,9 @@ function App() {
           inner boundary, the only recovery is reload. With it, the
           user can navigate away to a working screen and either clear
           the bad data via Settings or re-import a good backup. */}
-      {/* SCRIP-1: an unknown/legacy persisted screen (IDB schema skew, a removed
-          route) isn't caught by _validateTabState's rules; without a fallback it
-          renders null — a permanently blank, unrecoverable screen (blank ≠ crash, so
-          E4 recovery never fires). Fall back to home (authoritative — the real ROUTES,
-          no drift) so the app is always navigable. */}
+      {/* SCRIP-1: an unknown/legacy persisted screen (IDB schema skew, a removed route) isn't caught by
+          _validateTabState's rules; without a fallback it renders null — a permanently blank screen (blank ≠
+          crash, so E4 recovery never fires). Fall back to home (the real ROUTES) so the app is always navigable. */}
       <ErrorBoundary key={screen}><RouteSlot route={ROUTES[screen] || ROUTES.home} /></ErrorBoundary>
       {/* Audio mini-player (null while idle): after the screen, so Tab and screen readers meet it last (W66). */}
       <ErrorBoundary fallback={null} resetKey={screen}><AudioPlayerBar /></ErrorBoundary>
