@@ -381,6 +381,7 @@ describe('JournalStore.pruneNotebook — cascade from journal-notebook deletion'
     const j_wrong = JournalStore.add({ notebookIds: ['nb_b'] });
     const j_empty = JournalStore.add({});  // defaults to []
 
+    const with_before = JournalStore.get(j_with.id).updated;
     const wrong_before = JournalStore.get(j_wrong.id).updated;
     const empty_before = JournalStore.get(j_empty.id).updated;
 
@@ -389,9 +390,9 @@ describe('JournalStore.pruneNotebook — cascade from journal-notebook deletion'
 
     JournalStore.pruneNotebook('nb_a');
 
-    // j_with: nb_a was removed → updated bumped.
+    // j_with: nb_a was removed → updated bumped (1 ms past its own, W16: not to now).
     expect(JournalStore.get(j_with.id).notebookIds).toEqual([]);
-    expect(JournalStore.get(j_with.id).updated).toBeGreaterThan(wrong_before);
+    expect(JournalStore.get(j_with.id).updated).toBe(with_before + 1);
 
     // j_wrong + j_empty: untouched — `updated` unchanged.
     expect(JournalStore.get(j_wrong.id).notebookIds).toEqual(['nb_b']);
@@ -560,6 +561,62 @@ describe('JournalStore — pinning keeps the entry\'s date (v05-05)', () => {
     }] });
     expect(JournalStore.get('j_old').pinned).toBe(true);
     expect(keptDate(JournalStore.get('j_old'))).toBe(true);
+  });
+});
+
+/* W16 (sweep 10-13): deleting a notebook re-dated every entry in it. pruneNotebook
+   stamped Date.now(), so year-old entries jumped to the top of the hub dated today.
+   Dropping a deleted notebook's id is not an edit: like a pin (v05-05) the stamp
+   moves 1 ms past the entry's own, which still wins the save-time merge. */
+describe('JournalStore.pruneNotebook keeps the entry\'s date (W16)', () => {
+  const YEAR_AGO = Date.now() - 365 * 24 * 3600 * 1000;
+
+  it('a year-old entry keeps its date and its place in the hub', () => {
+    const old = JournalStore.add({ title: 'old', notebookIds: ['nb_a'], created: YEAR_AGO, updated: YEAR_AGO });
+    JournalStore.add({ title: 'recent' });
+    JournalStore.pruneNotebook('nb_a');
+    expect(JournalStore.get(old.id).notebookIds).toEqual([]);
+    expect(JournalStore.get(old.id).updated).toBe(YEAR_AGO + 1);
+    expect(JournalStore.all().map((e) => e.title)).toEqual(['recent', 'old']);
+  });
+
+  it('the prune survives the save-time merge with the stored copy', () => {
+    const old = JournalStore.add({ title: 'old', notebookIds: ['nb_a', 'nb_b'], created: YEAR_AGO, updated: YEAR_AGO });
+    const stored = { list: [JSON.parse(JSON.stringify(JournalStore.get(old.id)))] };   // on disk before the prune
+    JournalStore.pruneNotebook('nb_a');
+    const merged = mergeListStore(stored, { list: [JournalStore.get(old.id)] }, stored);
+    expect(merged.list[0].notebookIds).toEqual(['nb_b']);
+  });
+});
+
+/* W16: the editor's exit prune can run while a block delete's Undo is still on
+   screen. It removes the blank entry with keepMarks (the entry's marks wait, so an
+   Undo that re-adds the entry finds them); purgeOrphanMarks takes them once the
+   window has closed, and only if the entry is still gone. */
+describe('JournalStore.remove keepMarks + purgeOrphanMarks (W16)', () => {
+  it('remove(id, { keepMarks: true }) removes the entry and leaves its marks', () => {
+    const e = JournalStore.add({ title: '' });
+    BookmarkStore.add({ id: 'bk_w16', hlKey: 'journal:' + e.id + ':1', label: 'b' });
+    JournalStore.remove(e.id, { skipStats: true, keepMarks: true });
+    expect(JournalStore.get(e.id)).toBeNull();
+    expect(BookmarkStore.get('bk_w16')).not.toBeNull();
+  });
+
+  it('purgeOrphanMarks takes the marks of an entry that is gone', () => {
+    const e = JournalStore.add({ title: '' });
+    BookmarkStore.add({ id: 'bk_w16', hlKey: 'journal:' + e.id + ':1', label: 'b' });
+    JournalStore.remove(e.id, { skipStats: true, keepMarks: true });
+    JournalStore.purgeOrphanMarks(e.id);
+    expect(BookmarkStore.get('bk_w16')).toBeNull();
+  });
+
+  it('purgeOrphanMarks leaves the marks of an entry that is back', () => {
+    const e = JournalStore.add({ title: '' });
+    BookmarkStore.add({ id: 'bk_w16', hlKey: 'journal:' + e.id + ':1', label: 'b' });
+    JournalStore.remove(e.id, { skipStats: true, keepMarks: true });
+    JournalStore.add({ id: e.id, title: 'back', created: e.created });
+    JournalStore.purgeOrphanMarks(e.id);
+    expect(BookmarkStore.get('bk_w16')).not.toBeNull();
   });
 });
 

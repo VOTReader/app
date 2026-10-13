@@ -228,6 +228,23 @@ describe('NoteStore — pruneNotebook cascade (prune-one-too-many guard)', () =>
     expect(NoteStore.get('g_with').notebookIds).toEqual([]);
   });
 
+  it('W16: keeps the note\'s date - a year-old note stays a year old and below newer ones', () => {
+    // The notes list and its rows sort and date by `updated`; dropping a deleted
+    // notebook's id is not an edit, so the stamp moves 1 ms past the note's own
+    // (enough to win the save-time merge), never to now.
+    const YEAR_AGO = Date.now() - 365 * 24 * 3600 * 1000;
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(YEAR_AGO);
+    NoteStore.set('g_old', { body: 'old', notebookIds: ['nb_a'] });
+    nowSpy.mockRestore();
+    NoteStore.set('g_new', { body: 'new' });
+
+    NoteStore.pruneNotebook('nb_a');
+
+    expect(NoteStore.get('g_old').notebookIds).toEqual([]);
+    expect(NoteStore.get('g_old').updated).toBe(YEAR_AGO + 1);
+    expect(NoteStore.list().map((n) => n.groupId)).toEqual(['g_new', 'g_old']);
+  });
+
   it('is a no-op when no note references the notebookId', () => {
     NoteStore.set('g_1', { body: 'A', notebookIds: ['nb_a'] });
 
