@@ -84,8 +84,9 @@
        narrow signature would be a lie.
      - cancelDwell (useReadingDwell), fromLetterRef + setFromLetterStack
        (useFromLetterStack), the nav setters (useTabs) — all params.
-     - LETTER_SCREEN_SET / COL_BY_LETTER_SC / COL_BY_INDEX_SC / BOOKS /
-       getStudyById — module globals, used by bare name.
+     - LETTER_SCREEN_SET / COL_BY_LETTER_SC / COL_BY_INDEX_SC / BOOKS —
+       module globals, used by bare name. getStudyById is an App()-local
+       param, mirrored (W37: the first render's copy saw no studies).
 
    FIXED HERE — a pre-existing stale-closure bug, surfaced by the P6l
    recon and fixed in the immediate follow-up:
@@ -202,6 +203,11 @@ export function useAndroidBack({
   // runs (both come from useFromLetterStack).
   const backActiveRef = useRefMirror(backActive);
   const tapThroughBackRef = useRefMirror(tapThroughBack);
+  // W37: App() rebuilds getStudyById over _studies() each render, and at the first
+  // render the study corpus has not loaded, so that render's lookup finds nothing.
+  // Mirrored so the handler asks the latest one (a chapter of a multi-chapter study
+  // backs to the study's index, not the Studies home).
+  const getStudyByIdRef = useRefMirror(getStudyById);
 
   // All letter-style screens that can be a tap-through destination. When
   // the user entered via an in-app footnote link, Android back pops the
@@ -340,7 +346,7 @@ export function useAndroidBack({
       if (s === "matthew-idx") {if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else if (fromStudiesRef.current) {setFromStudies(false);goStudiesHome();} else if (genreIdRef.current) {setScreen("scripture-genre");} else {goScripturesHome();}return "true";} else
       if (s === "studies-home") {goHome();return "true";} else
       if (s === "bible-study-index") {goStudiesHome();return "true";} else
-      if (s === "bible-study-chapter") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");return "true";}const cur = getStudyById(studyIdRef.current);if (cur && cur.chapters && cur.chapters.length > 1) {setStudyChapterId(null);setScreen("bible-study-index");} else {goStudiesHome();}return "true";} else
+      if (s === "bible-study-chapter") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");return "true";}const cur = getStudyByIdRef.current(studyIdRef.current);if (cur && cur.chapters && cur.chapters.length > 1) {setStudyChapterId(null);setScreen("bible-study-index");} else {goStudiesHome();}return "true";} else
       if (s === "bible-ch") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromWtlbRef.current) {const ret = fromWtlbRef.current;setFromWtlb(null);setScreen(ret);return "true";}if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else {const bid = bookIdRef.current;
         /* Q8 lazy: BOOKS lives in bundle-a-bible. If the user is on bible-ch
            via saved-tab cold-boot before __loadBibleCorpus resolves, BOOKS
@@ -373,7 +379,7 @@ export function useAndroidBack({
       goHome();return "true";
     };
     return () => {delete window.handleAndroidBack;};
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: handler reads ALL nav state through useRefMirror refs (screenRef/bookIdRef/genreIdRef/fromSearchRef/fromStudiesRef/fromMatthewChRef/studyIdRef/fromWtlbRef/fromSurpriseRef/tabsOverviewOpenRef/journalEntryIdRef/backActiveRef/tapThroughBackRef + fromLetterRef from useFromLetterStack — all 14 read via .current inside the handler, call-time fresh); useState setters are stable; nav-helper params (goHome/goNavOrigin/goSearchOrigin/goScripturesHome/goStudiesHome/goVolumesHome/goJournalViewer) close only over stable setters and refs (audited app.jsx:509-905); cancelDwell/getStudyById same shape. Re-running on dep changes would pointlessly re-wire window.handleAndroidBack. See file header §"Call-time mirrors".
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: handler reads ALL nav state through useRefMirror refs (screenRef/bookIdRef/genreIdRef/fromSearchRef/fromStudiesRef/fromMatthewChRef/studyIdRef/fromWtlbRef/fromSurpriseRef/tabsOverviewOpenRef/journalEntryIdRef/backActiveRef/tapThroughBackRef + getStudyByIdRef (W37) + fromLetterRef from useFromLetterStack — all 15 read via .current inside the handler, call-time fresh); useState setters are stable; nav-helper params (goHome/goNavOrigin/goSearchOrigin/goScripturesHome/goStudiesHome/goVolumesHome/goJournalViewer) close only over stable setters and refs (audited app.jsx:509-905); cancelDwell same shape. Re-running on dep changes would pointlessly re-wire window.handleAndroidBack. See file header §"Call-time mirrors".
   }, []);
 
   /* ═══════════════════════════════════════════════════════════════════════
