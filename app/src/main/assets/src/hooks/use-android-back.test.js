@@ -10,11 +10,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useAndroidBack } from './use-android-back.js';
 import { modalRegistry } from './use-modal-registry.js';
-import { useHistorySync, suppressNextHistoryPush, clearSuppressNextHistoryPush } from './use-history-sync.js';
+import { useHistorySync, suppressNextHistoryPush, clearSuppressNextHistoryPush, _resetHistoryEntries } from './use-history-sync.js';
 import { PlatformBridge } from '../utils/platform-bridge.js';
 
 // The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
-vi.mock('./use-history-sync.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get clearSuppressNextHistoryPush() { return 'clearSuppressNextHistoryPush' in globalThis ? /** @type {any} */ (globalThis).clearSuppressNextHistoryPush : real.clearSuppressNextHistoryPush; }, get suppressNextHistoryPush() { return 'suppressNextHistoryPush' in globalThis ? /** @type {any} */ (globalThis).suppressNextHistoryPush : real.suppressNextHistoryPush; } }; });
+vi.mock('./use-history-sync.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get clearSuppressNextHistoryPush() { return 'clearSuppressNextHistoryPush' in globalThis ? /** @type {any} */ (globalThis).clearSuppressNextHistoryPush : real.clearSuppressNextHistoryPush; }, get suppressNextHistoryPush() { return 'suppressNextHistoryPush' in globalThis ? /** @type {any} */ (globalThis).suppressNextHistoryPush : real.suppressNextHistoryPush; }, get isHistoryPushSuppressed() { return 'isHistoryPushSuppressed' in globalThis ? /** @type {any} */ (globalThis).isHistoryPushSuppressed : real.isHistoryPushSuppressed; } }; });
 vi.mock('../data/scripture-resolution.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get COL_BY_INDEX_SC() { return /** @type {any} */ (globalThis).COL_BY_INDEX_SC; }, get COL_BY_LETTER_SC() { return /** @type {any} */ (globalThis).COL_BY_LETTER_SC; }, get LETTER_SCREEN_SET() { return /** @type {any} */ (globalThis).LETTER_SCREEN_SET; } }; });
 vi.mock('../stores/app-flag-stores.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get AboutSeenFlagStore() { return /** @type {any} */ (globalThis).AboutSeenFlagStore; } }; });
 
@@ -454,6 +454,7 @@ describe('useAndroidBack — history-push suppress flag (navigation-tabs-2)', ()
     PlatformBridge.isAndroid = false;
     delete window.__historyReady;
     clearSuppressNextHistoryPush();
+    _resetHistoryEntries();
   });
   afterEach(() => {
     history.pushState = _origPushState;
@@ -468,6 +469,7 @@ describe('useAndroidBack — history-push suppress flag (navigation-tabs-2)', ()
 
   it('closing the Tabs overview does not strand the flag onto the next real navigation', () => {
     const sync = renderHook(({ k }) => useHistorySync(k), { initialProps: { k: navKey('library') } });
+    const booted = _pushCalls.length; // the W38 boot seed (library is not Home)
     const props = baseProps({ screen: 'library', tabsOverviewOpen: true });
     renderHook(() => useAndroidBack(props));
 
@@ -481,11 +483,12 @@ describe('useAndroidBack — history-push suppress flag (navigation-tabs-2)', ()
     // A LATER, real navigation must still push — the flag must not have
     // stranded onto it.
     sync.rerender({ k: navKey('home') });
-    expect(_pushCalls.length).toBe(1);
+    expect(_pushCalls.length - booted).toBe(1);
   });
 
   it('a registered modal dismiss does not strand the flag either', () => {
     const sync = renderHook(({ k }) => useHistorySync(k), { initialProps: { k: navKey('library') } });
+    const booted = _pushCalls.length;
     const props = baseProps({ screen: 'library' });
     renderHook(() => useAndroidBack(props));
     modalRegistry.register({ id: 'note-sheet', dismiss: vi.fn() });
@@ -494,7 +497,7 @@ describe('useAndroidBack — history-push suppress flag (navigation-tabs-2)', ()
     expect(window.handleAndroidBack()).toBe('true');
 
     sync.rerender({ k: navKey('home') });
-    expect(_pushCalls.length).toBe(1);
+    expect(_pushCalls.length - booted).toBe(1);
   });
 });
 
@@ -928,11 +931,14 @@ describe('useAndroidBack — W1.5(d) popstate + root double-tap exit (web only)'
     PlatformBridge.isAndroid = false;
     const toast = await import('../utils/root-exit-toast.js');
     toast._reset();
-    suppress = vi.fn(); clear = vi.fn();
+    let armed = false;
+    suppress = vi.fn(() => { armed = true; }); clear = vi.fn(() => { armed = false; });
     /** @type {any} */ (globalThis).__origSuppress = /** @type {any} */ (globalThis).suppressNextHistoryPush;
     /** @type {any} */ (globalThis).__origClear = /** @type {any} */ (globalThis).clearSuppressNextHistoryPush;
     /** @type {any} */ (globalThis).suppressNextHistoryPush = suppress;
     /** @type {any} */ (globalThis).clearSuppressNextHistoryPush = clear;
+    /** @type {any} */ (globalThis).isHistoryPushSuppressed = () => armed;
+    _resetHistoryEntries();
     pushSpy = vi.spyOn(history, 'pushState');
     window.__historyReady = true;
   });
@@ -941,6 +947,7 @@ describe('useAndroidBack — W1.5(d) popstate + root double-tap exit (web only)'
     /** @type {any} */ (globalThis).suppressNextHistoryPush = /** @type {any} */ (globalThis).__origSuppress;
     /** @type {any} */ (globalThis).clearSuppressNextHistoryPush = /** @type {any} */ (globalThis).__origClear;
     delete /** @type {any} */ (globalThis).__origSuppress; delete /** @type {any} */ (globalThis).__origClear;
+    delete /** @type {any} */ (globalThis).isHistoryPushSuppressed;
     delete window.__historyReady;
   });
 
@@ -1005,5 +1012,133 @@ describe('useAndroidBack — W1.5(d) popstate + root double-tap exit (web only)'
       pop();
       expect(suppress).not.toHaveBeenCalled();
     } finally { PlatformBridge.isAndroid = false; }
+  });
+});
+
+describe('useAndroidBack + useHistorySync — W38 browser Back never runs out on a non-home screen (web only)', () => {
+  // The browser's Back only reaches the app while the page has an entry above its own
+  // to pop; at the page's own entry it leaves the PWA. Forward navs push one entry each,
+  // but a boot onto a restored screen pushed none, and a Back that only closed something
+  // (a sheet, the tabs overview, a notebook level, a songs frame) used up an entry that
+  // belonged to a screen. So Back left the app while the reader was still screens deep.
+  const _orig = history.pushState;
+  let pushes = 0;
+  beforeEach(() => {
+    pushes = 0;
+    history.pushState = function (state, title, url) { pushes++; return _orig.call(history, state, title, url); };
+    PlatformBridge.isAndroid = false;
+    delete window.__historyReady;
+    clearSuppressNextHistoryPush();
+    _resetHistoryEntries();
+  });
+  afterEach(() => {
+    history.pushState = _orig;
+    delete window.__historyReady;
+    delete window.__songsBack;
+  });
+
+  const navKey = (screen) => ({
+    screen, bookId: null, chapterNum: null, letterId: null,
+    studyId: null, studyChapterId: null, genreId: null, gardenPage: null,
+  });
+  const pop = () => window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+
+  it('booting onto a restored screen seeds one entry; booting on Home seeds none', () => {
+    const a = renderHook(({ k }) => useHistorySync(k), { initialProps: { k: navKey('home') } });
+    expect(pushes).toBe(0);
+    a.unmount();
+    // the app's real mount after a throwaway first one, now on the restored screen
+    const b = renderHook(({ k }) => useHistorySync(k), { initialProps: { k: navKey('bible-ch') } });
+    expect(pushes).toBe(1);
+    b.unmount();
+    renderHook(({ k }) => useHistorySync(k), { initialProps: { k: navKey('bible-ch') } });
+    expect(pushes).toBe(1); // once per page
+  });
+
+  it('a deep boot backs one level at a time all the way Home, never out of the app', () => {
+    const sync = renderHook(({ k }) => useHistorySync(k), { initialProps: { k: navKey('bible-ch') } });
+    expect(pushes).toBe(1);
+    const props = baseProps({ screen: 'bible-ch', bookId: 'genesis' });
+    const back = renderHook((p) => useAndroidBack(p), { initialProps: props });
+
+    pop(); // uses the seeded entry; the app routes bible-ch -> bible-idx
+    expect(props.setScreen).toHaveBeenCalledWith('bible-idx');
+    sync.rerender({ k: navKey('bible-idx') });
+    back.rerender({ ...props, screen: 'bible-idx' });
+    expect(pushes).toBe(2); // no entry left on a non-home screen: one more for its Back
+
+    pop(); // bible-idx -> the Scriptures home
+    expect(props.goScripturesHome).toHaveBeenCalledTimes(1);
+    sync.rerender({ k: navKey('scriptures-home') });
+    back.rerender({ ...props, screen: 'scriptures-home' });
+    expect(pushes).toBe(3);
+
+    pop(); // -> Home: the root needs no extra entry (its own exit flow takes over)
+    sync.rerender({ k: navKey('home') });
+    expect(pushes).toBe(3);
+  });
+
+  it('entries the reader already has are used first: no extra entry while one is left', () => {
+    const sync = renderHook(({ k }) => useHistorySync(k), { initialProps: { k: navKey('home') } });
+    sync.rerender({ k: navKey('bible-idx') });
+    sync.rerender({ k: navKey('bible-ch') });
+    expect(pushes).toBe(2);
+    const props = baseProps({ screen: 'bible-ch', bookId: 'genesis' });
+    renderHook((p) => useAndroidBack(p), { initialProps: props });
+    pop();
+    sync.rerender({ k: navKey('bible-idx') });
+    expect(pushes).toBe(2);
+  });
+
+  it('a Back that only closes a sheet gives the screen back the entry it used', () => {
+    const sync = renderHook(({ k }) => useHistorySync(k), { initialProps: { k: navKey('home') } });
+    sync.rerender({ k: navKey('library') });
+    expect(pushes).toBe(1);
+    const props = baseProps({ screen: 'library' });
+    renderHook((p) => useAndroidBack(p), { initialProps: props });
+    const dismiss = vi.fn();
+    modalRegistry.register({ id: 'note-sheet', dismiss });
+    pop();
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    expect(props.goNavOrigin).not.toHaveBeenCalled();
+    expect(pushes).toBe(2);
+  });
+
+  it('a Back that closes a sheet on Home adds nothing (Home keeps its exit flow)', () => {
+    const sync = renderHook(({ k }) => useHistorySync(k), { initialProps: { k: navKey('library') } });
+    sync.rerender({ k: navKey('home') });
+    const before = pushes;
+    renderHook((p) => useAndroidBack(p), { initialProps: baseProps({ screen: 'home' }) });
+    modalRegistry.register({ id: 'note-sheet', dismiss: vi.fn() });
+    pop();
+    expect(pushes).toBe(before);
+  });
+
+  it('popping a Songs frame keeps the screen an entry and does not strand the push flag', () => {
+    const sync = renderHook(({ k }) => useHistorySync(k), { initialProps: { k: navKey('home') } });
+    sync.rerender({ k: navKey('audio-library-songs') });
+    expect(pushes).toBe(1);
+    renderHook((p) => useAndroidBack(p), { initialProps: baseProps({ screen: 'audio-library-songs' }) });
+    window.__songsBack = vi.fn(() => true); // a frame popped; the screen stays
+    pop();
+    expect(window.__songsBack).toHaveBeenCalledTimes(1);
+    expect(pushes).toBe(2);
+    // the next real navigation still pushes its own entry
+    sync.rerender({ k: navKey('settings') });
+    expect(pushes).toBe(3);
+  });
+
+  it('leaving Songs by its origin is a navigation like any other', () => {
+    const sync = renderHook(({ k }) => useHistorySync(k), { initialProps: { k: navKey('home') } });
+    sync.rerender({ k: navKey('audio-library') });
+    sync.rerender({ k: navKey('audio-library-songs') });
+    expect(pushes).toBe(2);
+    renderHook((p) => useAndroidBack(p), { initialProps: baseProps({ screen: 'audio-library-songs' }) });
+    window.__songsBack = vi.fn(() => false); // no frame left: it went to the origin
+    pop();
+    sync.rerender({ k: navKey('audio-library') });
+    expect(pushes).toBe(2); // one entry still left: nothing added, and the flag was consumed
+    sync.rerender({ k: navKey('settings') });
+    expect(pushes).toBe(3);
   });
 });

@@ -82,6 +82,16 @@ import { PlatformBridge } from '../utils/platform-bridge.js';
 // effect always reads-and-clears in one step so a stale flag can't strand.
 let _suppressNextPush = false;
 
+// W38: entries this page pushed above its own that no popstate has used yet.
+// The browser's Back reaches the app only while one is left; at the page's own
+// entry it leaves the PWA. A forward nav pushes one, but a boot onto a restored
+// screen pushed none and a Back that only closed something used up a screen's,
+// so Back left the app from screens deep. A count, not history.length (that
+// also holds forward entries and the pages before the app). A reload restarts
+// it at 0 with entries behind: a surplus costs presses at Home, never an exit.
+let _ownEntries = 0;
+let _bootSeeded = false;
+
 /**
  * Suppress the NEXT pushState that would otherwise fire from the
  * useHistorySync effect. Call this immediately BEFORE invoking a back-
@@ -117,6 +127,65 @@ export function suppressNextHistoryPush() {
  */
 export function clearSuppressNextHistoryPush() {
   _suppressNextPush = false;
+}
+
+/**
+ * Whether a back-induced navigation is still waiting to consume the flag.
+ * popstate reads it right after handleAndroidBack: a branch that only closed
+ * something (a sheet, the tabs overview, a notebook level, a songs frame)
+ * cleared it itself, so the screen stayed put (W38).
+ *
+ * @returns {boolean}
+ */
+export function isHistoryPushSuppressed() {
+  return _suppressNextPush;
+}
+
+/**
+ * Push one empty in-app entry (Option B) and count it. False when the host
+ * blocks pushState (iframe sandbox): the app works on, without browser Back.
+ *
+ * @returns {boolean}
+ */
+export function pushHistoryEntry() {
+  try {
+    history.pushState({}, '', '');
+  } catch (_e) {
+    return false;
+  }
+  _ownEntries++;
+  return true;
+}
+
+/**
+ * A popstate used one of the page's entries (W38 count). Forward-button pops
+ * count too (the app treats them as Back): the count can only run low, which
+ * adds an entry, never runs out early.
+ *
+ * @returns {void}
+ */
+export function noteHistoryPop() {
+  if (_ownEntries > 0) _ownEntries--;
+}
+
+/**
+ * W38: a Back that leaves the reader on `screen` with no entry left gets one,
+ * so the next browser Back reaches the app instead of leaving it. Home is the
+ * root: its Back runs the root-exit flow (W1.5(d)) and needs no extra entry.
+ *
+ * @param {string | null | undefined} screen
+ * @returns {void}
+ */
+export function keepBackEntry(screen) {
+  if (!screen || screen === 'home' || _ownEntries > 0) return;
+  pushHistoryEntry();
+}
+
+/** Test seam: forget the page's entry count, boot seed and flag. @returns {void} */
+export function _resetHistoryEntries() {
+  _suppressNextPush = false;
+  _ownEntries = 0;
+  _bootSeeded = false;
 }
 
 /**
@@ -169,6 +238,13 @@ export function useHistorySync({
       // popstate-on-load (older HTML5 spec interpretation).
       lastKeyRef.current = key;
       window.__historyReady = true;
+      // W38: booted onto a restored screen (not Home), the page's own entry
+      // was the only one, so the first Back left the app. Seed one, once per
+      // page (a throwaway first mount and the real one share it).
+      if (!_bootSeeded && screen && screen !== 'home') {
+        _bootSeeded = true;
+        pushHistoryEntry();
+      }
       return;
     }
 
@@ -183,7 +259,9 @@ export function useHistorySync({
     if (_suppressNextPush) {
       // This nav was triggered by Escape or popstate via handleAndroidBack
       // (W1.5(c)/(d)). Don't double-push or back would require N+1 presses.
+      // W38: but where it lands with no entry left, add the one its Back needs.
       _suppressNextPush = false;
+      keepBackEntry(screen);
       return;
     }
 
@@ -195,12 +273,9 @@ export function useHistorySync({
     // because the earlier timer was still armed.
     _disarmRootExit();
 
-    try {
-      history.pushState({}, '', '');
-    } catch (_e) {
-      // Iframe sandbox / unusual hosting may block pushState. Non-fatal:
-      // the app continues to work, just without browser-back support
-      // (handleAndroidBack still routes via the in-app back affordances).
-    }
+    // Iframe sandbox / unusual hosting may block pushState. Non-fatal:
+    // the app continues to work, just without browser-back support
+    // (handleAndroidBack still routes via the in-app back affordances).
+    pushHistoryEntry();
   }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, genreId, gardenPage]);
 }
