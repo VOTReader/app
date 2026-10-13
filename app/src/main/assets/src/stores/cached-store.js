@@ -76,6 +76,11 @@ function _fenced() { return _writeFence || _remoteFence; }
 /** @type {Set<any>} */
 const _fencedDirty = new Set();
 
+/** W11 refuter: what a merge save's lock callback returns when the fence stopped it - the save
+ *  settles (whenSaved stays true, as before) but is no landed write, so it never tells
+ *  StorageHealth it succeeded or cancels the STORE-4 retry. */
+const _NOT_WRITTEN = /** @type {any} */ (Object.freeze({ notWritten: true }));
+
 /**
  * Raise or lower the Clear-All write fence - this module's and IDBAdapter's together (the adapter's
  * stops the writers that bypass the stores). Lowered means the wipe did NOT happen (a delete failed,
@@ -621,9 +626,9 @@ export function CachedStore(storageKey, defaultVal, opts) {
       const p = navigator.locks.request('vot-store:' + name, function () {
         // v04-02: a merge queued behind this lock may run after the fence went
         // up; its get would reopen the deleted database and its put refill it.
-        if (_fenced()) { _fencedDirty.add(self); return undefined; }
+        if (_fenced()) { _fencedDirty.add(self); return _NOT_WRITTEN; }
         return IDBAdapter.get(name, 'v').then(function (theirsRaw) {
-          if (_fenced()) { _fencedDirty.add(self); return undefined; }
+          if (_fenced()) { _fencedDirty.add(self); return _NOT_WRITTEN; }
           const theirs = (theirsRaw === undefined) ? null : theirsRaw;
           // ── synchronous merge + adopt: no `await` between reading `_cache`
           //    and reassigning it, so a concurrent in-place mutation of the old
@@ -667,7 +672,8 @@ export function CachedStore(storageKey, defaultVal, opts) {
         });
       });
       this._lastWrite = p;
-      p.then(function () {
+      p.then(function (r) {
+        if (r === _NOT_WRITTEN) return;   // the fence stopped it: saved again when the fence comes down
         self._clearWriteRetry();   // STORE-4: merged write durable — cancel any pending retry
         if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteSuccess(storageKey);   // W11: this store's only
       }, function (err) {

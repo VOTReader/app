@@ -197,6 +197,10 @@ let _dataMissing = null;
 let _libraryElsewhere = null;
 /** @type {Promise<StorageHealthReport> | null} */
 let _assessInFlight = null;
+/** W11 refuter: the in-flight assessment has already read the flags and published its report.
+ *  A caller after that point (a store's landed save, say) must start a fresh one: joining it
+ *  hands back a report that still counts the failure, and the banner stays up. */
+let _assessPublished = false;
 /** @type {(() => void) | null} */
 let _visibilityHandler = null;
 
@@ -429,11 +433,12 @@ function _logTierTransition(prevTier, newTier, pct) {
  * @returns {Promise<StorageHealthReport>}
  */
 async function _assess() {
-  if (_assessInFlight) return _assessInFlight;
+  if (_assessInFlight && !_assessPublished) return _assessInFlight;
+  _assessPublished = false;
   var p = _assessImpl();
   _assessInFlight = p;
   try { return await p; }
-  finally { _assessInFlight = null; }
+  finally { if (_assessInFlight === p) _assessInFlight = null; }
 }
 
 /** @returns {Promise<StorageHealthReport>} */
@@ -463,6 +468,7 @@ async function _assessImpl() {
       libraryElsewhere: _libraryElsewhere,
     });
     _report = fallback;
+    _assessPublished = true;
     _lastAssessedAt = Date.now();
     _logTierTransition(prevTier, fallback.tier, null);
     _bump();
@@ -527,6 +533,7 @@ async function _assessImpl() {
   };
 
   _report = report;
+  _assessPublished = true;
   _lastAssessedAt = Date.now();
   _logTierTransition(prevTier, tier, pct);
   _bump();
@@ -896,6 +903,7 @@ function _resetForTests(opts) {
   _versionTooNew = false;
   _libraryElsewhere = null;
   _assessInFlight = null;
+  _assessPublished = false;
   _persistInFlight = false;
   _storageApiOverride = (opts && opts.storageApi) || null;
   _standaloneOverride = (opts && typeof opts.standalone === 'boolean') ? opts.standalone : null;

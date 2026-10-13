@@ -691,6 +691,7 @@ describe('CachedStore W11 — a store\'s save reports under its own name', () =>
     window.StorageHealth = health;
   });
   afterEach(() => {
+    setRemoteWriteFence(false);
     health._resetForTests();
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -740,6 +741,43 @@ describe('CachedStore W11 — a store\'s save reports under its own name', () =>
     expect(health.getReport().writeFailedThisSession).toBe(true);
     failJournal = false;
     await vi.advanceTimersByTimeAsync(5000);
+    await health.assess();
+    expect(health.getReport().writeFailedThisSession).toBe(false);
+  });
+
+  // Refuter round 1: a merge save waiting on the store's lock when another tab's fence rose
+  // returned from the lock without writing, and that empty return counted as a landed save.
+  it("a merge save the other tab's fence stopped behind the lock is not a landed write", async () => {
+    let failJournal = true;
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+    const putSpy = vi.spyOn(IDBAdapter, 'put').mockImplementation(async (name) => {
+      if (name === 'vot-test-w11-fenced' && failJournal) throw new Error('quota');
+    });
+    const journal = extendStore(
+      CachedStore('vot-test-w11-fenced', { list: [] }, { idb: true, crossTabMerge: (_b, ours) => ours }),
+      { add(id) { this._load().list.push(id); this._save(); this._bump(); } }
+    );
+    journal._resetForTests({ forceLoaded: true });
+    journal.add('an entry only in memory');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(health.getReport().writeFailedThisSession).toBe(true);
+    failJournal = false;
+    /** @type {any} */ let release;
+    /** @type {any} */ let started;
+    const holding = new Promise((r) => { started = r; });
+    const held = navigator.locks.request('vot-store:vot-test-w11-fenced', () => { started(); return new Promise((r) => { release = r; }); });
+    await holding;                                      // a sibling tab is inside the store's lock
+    journal.add('a second entry');                      // this save waits on the lock
+    setRemoteWriteFence(true);                          // another tab's Import/Clear All holds this page
+    release();
+    await held;
+    await vi.advanceTimersByTimeAsync(0);
+    const puts = putSpy.mock.calls.length;
+    await health.assess();
+    expect(health.getReport().writeFailedThisSession).toBe(true);   // nothing landed
+    setRemoteWriteFence(false);                         // the hold lifts without a reload: saved again
+    await vi.advanceTimersByTimeAsync(0);
+    expect(putSpy.mock.calls.length).toBeGreaterThan(puts);
     await health.assess();
     expect(health.getReport().writeFailedThisSession).toBe(false);
   });

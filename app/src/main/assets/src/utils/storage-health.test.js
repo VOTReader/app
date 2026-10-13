@@ -771,6 +771,31 @@ describe('write-path integration', () => {
     expect(StorageHealth.getReport().tier).toBe(TIER.HEALTHY);
   });
 
+  // Refuter round 1: a health check already running when the failure came in finished first
+  // (it still counted the failure) and the store's put landed in the same turn; the success
+  // joined that finished check instead of starting a fresh one, and the banner stayed up.
+  it('W11: a landed save right after a health check counted its failure still clears it', async () => {
+    /** @type {any} */ let held = null;
+    const api = {
+      estimate: vi.fn().mockResolvedValue({ quota: 2_000_000_000, usage: 100_000_000 }),
+      persisted: vi.fn(() => (held ? held.promise : Promise.resolve(true))),
+      persist: vi.fn().mockResolvedValue(true),
+    };
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: api });
+    await StorageHealth.assess();
+    /** @type {any} */ let resolvePersisted;
+    held = { promise: new Promise((r) => { resolvePersisted = r; }) };
+    StorageHealth.onWriteFailure(new Error('quota'), 'vot-notes');   // its check waits on persisted()
+    for (let i = 0; i < 10 && api.persisted.mock.calls.length < 2; i++) await Promise.resolve();
+    expect(api.persisted).toHaveBeenCalledTimes(2);
+    held = null;
+    resolvePersisted(true);                                          // the check finishes first ...
+    const landed = Promise.resolve().then(() => StorageHealth.onWriteSuccess('vot-notes'));   // ... then the put lands
+    await landed;
+    expect(StorageHealth.getReport().writeFailedThisSession).toBe(false);
+    expect(StorageHealth.getReport().tier).toBe(TIER.HEALTHY);
+  });
+
   it('W11: a failure no store owns (a journal photo or memo) still clears on the next landed save', async () => {
     StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: mockStorage() });
     await StorageHealth.assess();
