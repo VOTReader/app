@@ -66,7 +66,7 @@ describe('NoteRow notebook chips', () => {
    The source line used to be one inert string over a row that always navigated
    to keys[0], so on "John 3:16 · John 4:1-2" the second passage was dead text.
    Each chapter-group is now its own tap target with its own endpoint — and it
-   must NOT also fire the row tap (the row wrapper is role=button). */
+   must NOT also fire the row tap. */
 describe('NoteRow source segments', () => {
   const multi = {
     ...note,
@@ -118,5 +118,29 @@ describe('NoteRow source segments', () => {
     const { container } = render(<NoteRow note={multi} onTap={() => {}} />);
     expect(container.querySelector('.note-row-source-seg')).toBeNull();
     expect(container.querySelector('.note-row-source').textContent).toBe('Psalms 144:2');
+  });
+});
+
+/** Any interactive element inside another (axe nested-interactive). */
+const nestedInteractive = (root) => root.querySelectorAll(
+  'button button, button [role="button"], [role="button"] button, [role="button"] [role="button"], '
+  + 'button [tabindex="0"], [role="button"] [tabindex="0"]').length;
+
+// Sweep low (mw10): the row was role=button around its segment buttons (axe nested-interactive).
+describe('NoteRow — one control per action', () => {
+  it('opens the note from its own button; nothing interactive sits inside another', () => {
+    setupGlobals();
+    const multi = { ...note, keys: ['bible:john:3:16', 'bible:john:4:1', 'bible:john:4:2'], notebookIds: [] };
+    const onTap = vi.fn();
+    const { container } = render(<NoteRow note={multi} onTap={onTap} onTapSegment={vi.fn()} />);
+    const row = container.querySelector('.note-row');
+    expect(row.getAttribute('role')).toBeNull();
+    expect(row.hasAttribute('tabindex')).toBe(false);
+    expect(nestedInteractive(container)).toBe(0);
+    const open = /** @type {HTMLButtonElement} */ (container.querySelector('.note-row-open'));
+    expect(open.getAttribute('aria-label')).toBe('Open note: John 3:16 · John 4:1-2');
+    open.click();
+    expect(onTap).toHaveBeenCalledTimes(1);
+    expect(onTap).toHaveBeenCalledWith(multi);
   });
 });

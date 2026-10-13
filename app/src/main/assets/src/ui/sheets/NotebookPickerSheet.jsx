@@ -141,25 +141,24 @@ export function NotebookPickerSheet({ groupId, onClose }) {
                 }
                 const checked = selected.has(nb.id);
                 return (
+                  // The row was role=button around its Delete button (a nested control, sweep mw10): the
+                  // toggle is now its own checkbox button and Delete its sibling. The row keeps the
+                  // pointer tap for its padding; the checkbox's click bubbles to it.
                   <div
                     key={nb.id}
                     className={"nb-picker-row" + (checked ? ' checked' : '')}
                     onClick={() => toggle(nb.id)}
-                    onKeyDown={(e) => {
-                      if (e.target !== e.currentTarget) return;
-                      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(nb.id); }
-                    }}
-                    role="button"
-                    tabIndex={0}
                   >
-                    <span className="nb-picker-check">
-                      {checked && (
-                        <svg viewBox="0 0 24 24">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </span>
-                    <span className="nb-picker-name">{nb.name}</span>
+                    <button type="button" className="nb-picker-row-toggle" role="checkbox" aria-checked={checked}>
+                      <span className="nb-picker-check" aria-hidden="true">
+                        {checked && (
+                          <svg viewBox="0 0 24 24">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </span>
+                      <span className="nb-picker-name">{nb.name}</span>
+                    </button>
                     <button
                       className="nb-picker-row-delete"
                       onClick={(e) => { e.stopPropagation(); setConfirmDeleteNb(nb.id); }}

@@ -25,10 +25,10 @@ export function ExpandableText(props) {
   }
   var divProps = { className: className + (expanded ? ' is-expanded' : ' is-collapsed') };
   if (tapToToggle) {
+    // A tap anywhere on the text toggles it, but the wrapper is no control of its own: the Show more
+    // button is the one keyboard / screen-reader control (a role=button wrapper around it was a nested
+    // control, sweep mw10).
     divProps.onClick = toggle;
-    divProps.role = 'button';
-    divProps.tabIndex = 0;
-    divProps.onKeyDown = function(e) { if (e.key === 'Enter' || e.key === ' ') toggle(e); };
     divProps.style = { cursor: 'pointer' };
     divProps.title = expanded ? 'Tap to collapse' : 'Tap to read more';
   }
@@ -36,7 +36,7 @@ export function ExpandableText(props) {
     <div {...divProps}>
       {expanded ? text : head + '…'}
       {' '}
-      <button type="button" className="jrn-expand-toggle" onClick={toggle}>
+      <button type="button" className="jrn-expand-toggle" aria-expanded={expanded} onClick={toggle}>
         {expanded ? 'Show less' : 'Show more'}
       </button>
     </div>
