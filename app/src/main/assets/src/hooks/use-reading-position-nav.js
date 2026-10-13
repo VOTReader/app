@@ -92,9 +92,10 @@
    }
 
    STORAGE:
-     - 'vot-prophecy-cards' localStorage key (the prophecy card
-       expand/collapse map). Owned here entirely — read at hook init,
-       written by saveProphecyCardStates.
+     - 'vot-prophecy-cards' via ProphecyCardsStore (an IDB-backed
+       CachedStore; the prophecy card expand/collapse map). Owned here
+       entirely — hydrated on the first read of prophecyCardStatesRef,
+       written by saveProphecyCardStates through setAll().
 
    WINDOW: none.
 

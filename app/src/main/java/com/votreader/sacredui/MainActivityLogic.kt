@@ -141,9 +141,9 @@ object MainActivityLogic {
         maxDim: Int
     ): ScreenshotGeometry? {
         if (viewWidth <= 0 || viewHeight <= 0) return null
+        // The crop leaves at least one row (coerceIn to viewHeight - 1), so srcH >= 1.
         val topCropPx = (topCropDp * density).toInt().coerceIn(0, viewHeight - 1)
         val srcH = viewHeight - topCropPx
-        if (srcH <= 0) return null
         val longest = maxOf(viewWidth, srcH)
         val scale = if (longest > maxDim) maxDim.toFloat() / longest else 1f
         return ScreenshotGeometry(

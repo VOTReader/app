@@ -3450,11 +3450,12 @@
         transition:transform 0.2s ease;
       }
       /* Wave 0 — visible caption under the dice; matches the aria-label
-         (label-in-name). Styled after .home-rearrange-hint. */
+         (label-in-name). Styled after .home-rearrange-hint. Full --gold-dim, no fade: at opacity 0.8 the
+         10 px caption read 3.77:1 on light --bg (contrast-sweep once it counted opacity, sweep mw11). */
       .surprise-fab-caption {
         font-family:var(--font-ui);
         font-size:var(--fs-10); letter-spacing:0.22em; text-transform:uppercase;
-        color:var(--gold-dim); opacity:0.8;
+        color:var(--gold-dim);
         pointer-events:none;
       }
       .surprise-fab svg {

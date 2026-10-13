@@ -164,8 +164,8 @@ export function clampEndDwell(v) {
  * Resolve the reading line height (px) for a scroll container.
  *
  * Speed is stored as lines/minute, never px/second: this app has a
- * continuous 80–160% text-size slider, and a px/s speed would silently
- * change reading pace by up to 2× when the reader resizes text. Deriving
+ * continuous 80–300% text-size slider, and a px/s speed would silently
+ * change reading pace by up to 3.75× when the reader resizes text. Deriving
  * px from a MEASURED line height keeps the stored speed scale-invariant.
  *
  * Probes `[data-hl-key]` — the annotation engine's marker, carried by body

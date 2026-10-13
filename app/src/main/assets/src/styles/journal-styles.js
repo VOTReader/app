@@ -69,21 +69,6 @@
   R('.jrn-card-menu-btn:active { transform: scale(0.92); }');
   R('.jrn-card-menu-btn svg { width: 18px; height: 18px; }');
 
-  // Edit-mode controls on each card: small X in the upper right; when tapped,
-  // an inline confirm strip takes its place. Both stop propagation so the
-  // card body click (which opens the entry) is unaffected.
-  R('.jrn-card.edit-mode { padding-right: 44px; }');
-  R('.jrn-card-del-x { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%; background: rgba(199, 92, 74, 0.12); border: 1px solid rgba(199, 92, 74, 0.45); color: #c75c4a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: background 0.12s, color 0.12s, transform 0.1s; z-index: 2; }');
-  R('.jrn-card-del-x:hover { background: #c75c4a; color: white; }');
-  R('.jrn-card-del-x:active { transform: scale(0.92); }');
-  R('.jrn-card-del-x svg { width: 14px; height: 14px; }');
-  R('.jrn-card-confirm { position: absolute; top: 8px; right: 8px; display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: rgba(199, 92, 74, 0.16); border: 1px solid rgba(199, 92, 74, 0.5); border-radius: 999px; z-index: 3; }');
-  R('.jrn-card-confirm-q { font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.08em; color: #c75c4a; padding: 0 2px; }');
-  R('.jrn-card-confirm-cancel { background: none; border: none; color: var(--cream-dim); width: 22px; height: 22px; border-radius: 50%; cursor: pointer; font-size: var(--fs-14); line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0; }');
-  R('.jrn-card-confirm-cancel:hover { background: var(--bg3); color: var(--cream); }');
-  R('.jrn-card-confirm-yes { background: #c75c4a; border: none; color: white; width: 22px; height: 22px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }');
-  R('.jrn-card-confirm-yes svg { width: 13px; height: 13px; }');
-  R('.jrn-card-confirm-yes:hover { background: #b04d3d; }');
   R('.jrn-card-mood { position: absolute; left: 8px; top: 14px; bottom: 14px; width: 3px; border-radius: 2px; background: var(--gold); }');
   R('.jrn-card-mood.silver { background: #b8b8b8; }');
   R('.jrn-card-mood.deep { background: #a8543f; }');
@@ -108,28 +93,6 @@
   R('.jrn-empty-title { font-family: var(--font-cinzel); color: var(--gold); font-size: var(--fs-18); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }');
   R('.jrn-empty-hint { font-family: var(--font-garamond); font-style: italic; color: var(--cream-dim); font-size: var(--fs-15); line-height: 1.5; max-width: 320px; margin: 0 auto; }');
 
-  // Notebook tab
-  R('.jrn-nb-grid { padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }');
-  R('.jrn-nb-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 18px 16px; cursor: pointer; min-height: 120px; display: flex; flex-direction: column; justify-content: space-between; transition: border-color 0.15s, background 0.15s; }');
-  R('body.light .jrn-nb-card { background: #faf5e7; }');
-  R('.jrn-nb-card:hover { border-color: var(--gold-border); background: var(--bg3); }');
-  R('.jrn-nb-card.uncategorized { border-style: dashed; border-color: var(--gold-dim); }');
-  R('.jrn-nb-card.new { border-style: dashed; border-color: var(--gold-dim); align-items: center; justify-content: center; color: var(--gold-dim); }');
-  R('.jrn-nb-card.new .plus { font-size: var(--fs-30); color: var(--gold-dim); font-family: var(--font-cinzel); margin-bottom: 4px; line-height: 1; }');
-  R('.jrn-nb-card.new .label { font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold-dim); }');
-  R('.jrn-nb-eyebrow { font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); }');
-  R('.jrn-nb-title { font-family: var(--font-cinzel); color: var(--gold); font-size: var(--fs-15); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin: 8px 0; }');
-  R('.jrn-nb-count { font-family: var(--font-garamond); font-style: italic; color: var(--cream-dim); font-size: var(--fs-13); }');
-  R('.jrn-nb-drill-header { display: flex; align-items: center; gap: 10px; padding: 12px 18px 4px; }');
-  R('.jrn-nb-drill-title { font-family: var(--font-cinzel); color: var(--gold); font-size: var(--fs-18); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; flex: 1; }');
-  R('.jrn-nb-action { background: none; border: 1px solid var(--gold-border); color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-10); padding: 5px 12px; border-radius: 999px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.08em; }');
-  R('.jrn-nb-action:hover { background: var(--gold-faint); }');
-  R('.jrn-nb-action.danger { color: #c75c4a; border-color: rgba(199, 92, 74, 0.3); }');
-  R('.jrn-nb-action.danger:hover { background: rgba(199, 92, 74, 0.1); }');
-  R('.jrn-inline-confirm { display: flex; gap: 8px; align-items: center; padding: 8px 18px; background: rgba(199, 92, 74, 0.08); border-top: 1px solid rgba(199, 92, 74, 0.2); border-bottom: 1px solid rgba(199, 92, 74, 0.2); font-family: var(--font-garamond); font-size: var(--fs-13); color: var(--cream-dim); }');
-  R('.jrn-inline-confirm-q { flex: 1; }');
-  R('.jrn-inline-confirm button { background: none; border: 1px solid var(--gold-dim); color: var(--gold-dim); padding: 4px 12px; border-radius: 999px; font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; }');
-  R('.jrn-inline-confirm button.danger { background: #c75c4a; color: white; border-color: #c75c4a; }');
   R('.jrn-rename-input { width: 100%; background: var(--bg3); border: 1px solid var(--gold); color: var(--cream); font-family: var(--font-cinzel); font-size: var(--fs-16); padding: 8px 14px; border-radius: 6px; outline: none; text-transform: uppercase; letter-spacing: 0.04em; }');
   R('body.light .jrn-rename-input { background: white; color: #2a2520; }');
 
@@ -204,9 +167,6 @@
   // "Show more" button — so reset wrapping for the expandable case.
   R('.jrn-emb-body.is-collapsed, .jrn-emb-body.is-expanded { display: block; -webkit-line-clamp: unset; overflow: visible; }');
   R('.jrn-emb-date { position: absolute; top: 12px; right: 14px; font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold-dim); }');
-  R('.jrn-emb-delete { position: absolute; bottom: 6px; right: 6px; background: none; border: none; color: var(--gold-dim); width: 26px; height: 26px; border-radius: 50%; cursor: pointer; font-size: var(--fs-14); display: none; align-items: center; justify-content: center; }');
-  R('.jrn-block:hover .jrn-emb-delete { display: flex; }');
-  R('.jrn-emb-delete:hover { background: rgba(199, 92, 74, 0.15); color: #c75c4a; }');
   R('.jrn-embed-verse { background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 8px; padding: 14px 38px 14px 16px; position: relative; transition: border-color 0.15s; }');
   R('body.light .jrn-embed-verse { background: #f3ecdc; }');
   R('.jrn-embed-verse[role="button"]:hover { border-color: var(--gold); }');
@@ -489,7 +449,6 @@
   // Floating Action Buttons
   //   .jrn-fab            — base FAB (gold filled, bottom-right by default)
   //   .jrn-fab-plus       — editor's + insert button (bottom-right)
-  //   .jrn-fab-mic        — editor's mic record button (bottom-left, outlined)
   R('.jrn-fab { position: fixed; bottom: calc(24px + var(--dock-sys, env(safe-area-inset-bottom, 0px)) + var(--dock-player, 0px)); right: calc(22px + env(safe-area-inset-right)); width: 56px; height: 56px; border-radius: 50%; background: var(--gold); color: var(--bg); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(212, 183, 114, 0.4); z-index: 35; transition: transform 0.15s, background 0.15s, box-shadow 0.15s; padding: 0; }');
   R('.jrn-fab:hover { transform: scale(1.05); }');
   R('.jrn-fab:active { transform: scale(0.96); }');
@@ -497,9 +456,6 @@
   // W3-01 (songs walk, 2026-09-25): the mini-player (z 150, ~70 px) covered the FAB. It rides the bottom dock
   // (app.css, cz1): --dock-player is the bar plus its pull tab while one is open, --dock-sys the gesture bar.
   R('.jrn-fab-plus { right: calc(22px + env(safe-area-inset-right)); left: auto; }');
-  R('.jrn-fab-mic { left: calc(22px + env(safe-area-inset-left)); right: auto; background: var(--bg3); color: var(--gold); border: 2px solid var(--gold); box-shadow: 0 6px 18px rgba(0,0,0,0.35); }');
-  R('.jrn-fab-mic:hover { background: var(--gold-faint); }');
-  R('body.light .jrn-fab-mic { background: #fbf6e8; }');
   // "New Entry" pill — the hub's primary create action. Wider than a round
   // FAB so the label reads clearly; the "+" insert FAB lives only in the
   // editor now.

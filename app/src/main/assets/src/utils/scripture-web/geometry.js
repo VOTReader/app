@@ -388,22 +388,6 @@ void arcAt(float tau, float left, float right, float A, out float x, out float h
   tg = vec2(r*sin(tau), -A*cos(tau));
 }`;
 /**
- * Height of a QUARTER above the baseline, `d` px in from its foot: the
- * quarter-ellipse both feet stand on. Past R it reads A, the join; the run
- * between the joins is arcHeightAt's dome, not this. arcDistance hit-tests
- * the quarters with it and the vertex shader draws them with its twin.
- *
- * @param {number} d - distance in x from the foot, device px
- * @param {number} R - this foot's quarter radius from arcShape()
- * @param {number} A - apex height from arcShape()
- */
-export function arcHeight(d, R, A) {
-  if (!(R > 0) || !(A > 0)) return 0;
-  const s = d <= 0 ? 0 : (d >= R ? 1 : d / R);
-  const u = 1 - s;
-  return A * Math.sqrt(1 - u * u);
-}
-/**
  * How far outside the viewport a foot may sit and still count as anchoring
  * its arc to the passage on screen. Device px, matching uRes.x's frame.
  */

@@ -44,7 +44,9 @@
    │ 11. a letter screen (COL_BY_LETTER_SC)    → fromMatthew / fromSearch  │
    │                                             / fromStudies / index     │
    │ 12. an index screen / garden-view         → goVolumesHome             │
-   │ 13. anything else                         → "false" (Android exits)   │
+   │ 13. home                                  → "false" (native finish /  │
+   │                                             web root-exit toast)      │
+   │ 14. anything else                         → goHome ("true")           │
    └───────────────────────────────────────────────────────────────────────┘
 
    (1a) MODAL REGISTRY (NAV1) — BEFORE step 1, handleAndroidBack consults the

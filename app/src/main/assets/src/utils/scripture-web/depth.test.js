@@ -16,10 +16,15 @@
 */
 import { describe, it, expect } from 'vitest';
 import {
-  arcShape, arcHeight, maxZoomFor, PPV_MAX_CSS,
+  arcShape, arcHeightAt, maxZoomFor, PPV_MAX_CSS,
   ribbonStyle, segmentsFor, visibleWindow, localizeFactor, squashFactor,
   ALPHA_DEEP, arcTauOf, arcPointAt, footX,
 } from './geometry.js';
+
+// Rise of an arc of half-span R, `d` px in from its left foot, flat at the apex height A past R: the
+// drawn ellipse (arcHeightAt) read from the foot. geometry.js's arcHeight did this until the sweep
+// found it dead outside these tests (mw11).
+const arcHeight = (d, R, A) => arcHeightAt(Math.min(Math.max(d, 0), R), 0, 2 * R, A);
 
 // design-perf's phoneLand frame, in DEVICE px (the shader's frame).
 const DPR = 2;

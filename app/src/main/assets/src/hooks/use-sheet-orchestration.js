@@ -151,7 +151,7 @@ export function useSheetOrchestration({
   // populated so the sheet renders preloaded.
   React.useEffect(() => {
     window.__bookmarkEdit = (bkmId, opts) => {
-      if (!bkmId || typeof BookmarkStore === 'undefined') return;
+      if (!bkmId) return;
       const bkm = BookmarkStore.get(bkmId);
       if (!bkm) return;
       // Source label reuses the BookmarksScreen helper for consistency.

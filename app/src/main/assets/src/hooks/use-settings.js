@@ -198,10 +198,10 @@ export function useSettings({ savedSettings, theme }) {
       linkHighlight: false,
       showScrollNotch: true,
       arrowLayout: "off", // "split" | "right" | "left" | "nav" | "off"
-      fontScale: "1", // WL1 — text-size multiplier ("1" | "1.15" | "1.3" | "1.5"); drives --font-scale on <html>
+      fontScale: "1", // WL1 — text-size multiplier, a continuous 0.8–3 (the Settings slider); drives --font-scale on <html>
       // Autoscroll. Speed is stored in LINES PER MINUTE, never px/s: the text-
-      // size slider spans 80–160%, and a px/s speed would silently change
-      // reading pace by up to 2× when the reader resizes text. The controller
+      // size slider spans 80–300%, and a px/s speed would silently change
+      // reading pace by up to 3.75× when the reader resizes text. The controller
       // derives px from a measured line height, so this value is scale-
       // invariant. Off by default — the pill is chrome on every reading screen.
       // Auto-Continue is ON (round 1): it means nothing until the reader has
