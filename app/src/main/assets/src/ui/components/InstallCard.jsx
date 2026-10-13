@@ -20,7 +20,7 @@
    (the PWA does not keep recordings the way the APK does).
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { installFlow, shouldOffer, dismiss, hasInstallPrompt, subscribeInstall, promptInstall } from '../../utils/install-offer.js';
+import { installFlow, shouldOffer, dismiss, hasInstallPrompt, wasInstalled, subscribeInstall, promptInstall } from '../../utils/install-offer.js';
 
 const STATE_KEY = 'vot-install-offer';
 
@@ -117,7 +117,8 @@ export function InstallCard({ unitKey, inert = false }) {
   const flow = inert ? null : _flow();
   const engaged = reachedEnd || _readCount() > 0;
   const otherUnit = _sessionUnit != null && _sessionUnit !== unitKey;
-  const show = !gone && !otherUnit && shouldOffer(state, { flow, engaged, shownThisSession: false, now: Date.now() });
+  const installed = React.useSyncExternalStore(subscribeInstall, wasInstalled);
+  const show = !gone && !installed && !otherUnit && shouldOffer(state, { flow, engaged, shownThisSession: false, now: Date.now() });
 
   // Mark-as-read off leaves no read item: arriving at this chapter's end after scrolling is the finished chapter.
   React.useEffect(() => {
@@ -150,6 +151,14 @@ export function InstallCard({ unitKey, inert = false }) {
     setStepsFor(null);
     setGone(true);
   }, []);
+
+  /* W56: an install from the browser's own menu (or the address-bar icon) fires appinstalled and nothing
+     else; the card only lost its event and fell back to SHOW ME HOW for an app already installed, then asked
+     again in the browser tab every session. An install this window saw hides the card at once (`show`) and
+     ends the offer for good, here or on the next card to mount. */
+  React.useEffect(() => {
+    if (installed && !inert && !state.never) end('installed');
+  }, [installed, inert, state.never, end]);
 
   const onPrimary = React.useCallback(async () => {
     if (flow !== 'prompt') { setStepsFor(flow); return; }

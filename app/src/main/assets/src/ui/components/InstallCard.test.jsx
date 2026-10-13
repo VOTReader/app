@@ -127,6 +127,34 @@ describe('InstallCard: the browser\'s own install', () => {
     expect(card(container)).toBeNull();
     expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ never: true });
   });
+
+  /* W56 (sweep 2026-10-13): an install from the browser's own menu (or the address-bar icon) fires appinstalled
+     and nothing else. The card only lost its event, so it fell back to SHOW ME HOW for an app already on the
+     home screen, and with nothing stored it asked again in the browser tab every session. */
+  it('installed from the browser menu while the card is up: it goes, and later sessions never ask', () => {
+    ua = UA.android;
+    attachInstallCapture(window);
+    const e = new Event('beforeinstallprompt');
+    e.prompt = vi.fn(() => Promise.resolve()); e.userChoice = Promise.resolve({ outcome: 'accepted' });
+    act(() => { window.dispatchEvent(e); });
+    let v = render(<InstallCard unitKey="a" />);
+    expect(card(v.container).querySelector('.install-card-primary').textContent).toBe('Install VOTReader');
+    act(() => { window.dispatchEvent(new Event('appinstalled')); });
+    expect(card(v.container), 'no SHOW ME HOW for an app already installed').toBeNull();
+    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ never: true });
+    cleanup(); _resetInstallCardSession(); _resetInstallCapture();
+    v = render(<InstallCard unitKey="b" />);
+    expect(card(v.container), 'the browser tab, next session').toBeNull();
+  });
+
+  it('installed while no card was on screen: the next card to mount records it and stays away', () => {
+    ua = UA.android;
+    attachInstallCapture(window);
+    act(() => { window.dispatchEvent(new Event('appinstalled')); });
+    const v = render(<InstallCard unitKey="a" />);
+    expect(card(v.container)).toBeNull();
+    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ never: true });
+  });
 });
 
 describe('InstallCard: saying no', () => {
