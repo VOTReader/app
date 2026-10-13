@@ -155,6 +155,49 @@ describe('offline-audio-web (cf1)', () => {
     await vi.waitFor(() => expect(OfflineAudio.items()).toHaveLength(0));
   });
 
+  // Sweep W63: on the web Remove all removed only what was saved; what was queued or on its way went on
+  // downloading, so removed recordings came back. The phone app's removeAll cancels first.
+  it('Remove all stops what is queued and on its way too: nothing comes back', async () => {
+    await ready();
+    OfflineAudio.download([{ url: URL_OF('s1'), key: 'k', title: 't' }]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('s1'))).toBe(true));
+    let release;
+    fetchMock.mockImplementationOnce((_u, init) => new Promise((r, j) => {
+      release = () => r(relayResponse(5000));
+      if (init && init.signal) init.signal.addEventListener('abort', () => j(new DOMException('aborted', 'AbortError')));
+    }));
+    OfflineAudio.download([1, 2].map((i) => ({ url: URL_OF('w' + i), key: 'k', title: 't' })));
+    await vi.waitFor(() => expect(OfflineAudio.statusOf(URL_OF('w1'))).toBe('downloading'));
+    OfflineAudio.removeAll();
+    release();
+    await vi.waitFor(() => expect(OfflineAudio.items()).toHaveLength(0));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(OfflineAudio.items()).toHaveLength(0);
+    expect(OfflineAudio.statusOf(URL_OF('w1'))).toBe('none');
+    expect(OfflineAudio.statusOf(URL_OF('w2'))).toBe('none');
+    expect((await (await caches.open(OFFLINE_AUDIO_CACHE)).keys())).toEqual([]);
+    expect(fetchMock.mock.calls.filter((c) => !(c[1] && c[1].method === 'HEAD'))).toHaveLength(2);   // s1, w1: w2 never
+  });
+
+  it('a download whose cancel lands as its last bytes are stored does not stay saved', async () => {
+    await ready();
+    let put;
+    const cache = await caches.open(OFFLINE_AUDIO_CACHE);
+    const realOpen = caches.open;
+    caches.open = async (name) => {
+      const b = await realOpen(name);
+      return { ...b, put: (r, res) => new Promise((ok) => { put = async () => { await b.put(r, res); ok(undefined); }; }) };
+    };
+    OfflineAudio.download([{ url: URL_OF('x1'), key: 'k', title: 't' }]);
+    await vi.waitFor(() => expect(put).toBeTypeOf('function'));
+    OfflineAudio.cancel([URL_OF('x1')]);
+    await put();
+    caches.open = realOpen;
+    await vi.waitFor(() => expect(OfflineAudio.statusOf(URL_OF('x1'))).toBe('none'));
+    expect(OfflineAudio.isSaved(URL_OF('x1'))).toBe(false);
+    expect(await cache.match(URL_OF('x1'))).toBeUndefined();
+  });
+
   it('looks sizes up with HEAD through the relay', async () => {
     await ready();
     OfflineAudio.requestSizes([URL_OF('s1'), URL_OF('s2')]);
