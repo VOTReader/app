@@ -147,6 +147,43 @@ describe('smoke-ci: every control a phone reader taps is at least 24 px', () => 
     expect(probeTapTargets(TAP_TARGET_MIN_PX)).toEqual({ probed: 0, offenders: [] });
   });
 
+  it('skips a card scrolled half under a fixed bar, and still flags a small control in that bar', () => {
+    // ra3 (2026-10-13): on overhaul Search's 360 x 94 "1 John 4:11" card sat with its lower edge
+    // under the fixed tab bar; the 3 lower points hit the bar and the walk called the card too
+    // small (overhaul CI red from 10-06). A point under a fixed or sticky bar the control is not
+    // part of is off-screen at that scroll, like a point past the viewport edge.
+    document.body.innerHTML = '';
+    const card = el('<button class="srch-card">1 John 4:11</button>');
+    const bar = el('<nav class="tabbar" style="position:fixed"></nav>');
+    const tab = document.createElement('button');
+    tab.setAttribute('aria-label', 'Home'); bar.appendChild(tab);
+    const dot = document.createElement('button');
+    dot.setAttribute('aria-label', 'Tiny'); bar.appendChild(dot);
+    layout([
+      { el: card, drawn: { x: 0, y: 584, w: 360, h: 94 } },
+      { el: bar, drawn: { x: 0, y: 635, w: 360, h: 65 } },
+      { el: tab, drawn: { x: 10, y: 645, w: 60, h: 48 } },
+      { el: dot, drawn: { x: 200, y: 660, w: 14, h: 14 } },
+    ]);
+    const r = probeTapTargets(TAP_TARGET_MIN_PX);
+    expect(r.offenders.map((o) => o.label)).toEqual(['Tiny']);
+    expect(r.probed).toBe(2);
+  });
+
+  it('still flags a thin control in one fixed bar whose circle runs onto another (it never scrolls clear)', () => {
+    document.body.innerHTML = '';
+    const mini = el('<div class="audio-bar" style="position:fixed"></div>');
+    const seek = document.createElement('button');
+    seek.setAttribute('aria-label', 'Seek'); mini.appendChild(seek);
+    const tabs = el('<nav class="tabbar" style="position:fixed"></nav>');
+    layout([
+      { el: mini, drawn: { x: 0, y: 560, w: 360, h: 75 } },
+      { el: seek, drawn: { x: 20, y: 625, w: 320, h: 14 } },
+      { el: tabs, drawn: { x: 0, y: 635, w: 360, h: 65 } },
+    ]);
+    expect(probeTapTargets(TAP_TARGET_MIN_PX).offenders.map((o) => o.label)).toEqual(['Seek']);
+  });
+
   it('folds offenders into a FAIL that names screen, label and size; a clean audit into ok', () => {
     const bad = foldTapTargets(passingReport(), { probed: 9, offenders: [{ screen: 'letter', label: 'Footnote 1', w: 18, h: 18, missed: 8 }] });
     expect(bad.ok).toBe(false);

@@ -146,7 +146,9 @@ async function auditCompactReadingNav(page) {
 // rule allows or as a finger cannot reach: display:inline targets in running text
 // (the inline exception), disabled or inert controls, a control whose centre is
 // covered by something else (a sheet, the nav), and one whose circle leaves the
-// viewport. Runs IN THE PAGE (page.evaluate), so it may use only page globals.
+// viewport or runs under a fixed or sticky bar it is not part of (ra3: a list card
+// scrolled half under the tab bar is off-screen there, not small; a small control
+// IN the bar is still judged). Runs IN THE PAGE (page.evaluate), so it may use only page globals.
 // `rootSel` (optional) probes only the controls inside that element - the
 // read-along e2e uses it for the player bar (ux2, 2026-09-22).
 export const TAP_TARGET_MIN_PX = 24;
@@ -156,6 +158,15 @@ export function probeTapTargets(minPx, rootSel) {
     'input:not([type="hidden"]), select, textarea';
   var out = { probed: 0, offenders: [] };
   function lands(el, x, y) { var h = document.elementFromPoint(x, y); return !!h && (h === el || el.contains(h)); }
+  function pinned(n) {
+    for (; n && n !== document.body && n !== document.documentElement; n = n.parentElement) {
+      var p = getComputedStyle(n).position;
+      if (p === 'fixed' || p === 'sticky') return n;
+    }
+    return null;
+  }
+  // A point on a bar that scrolled content passes under; a control in a bar itself never scrolls clear of another.
+  function underBar(el, h) { var bar = pinned(h); return !!bar && !bar.contains(el) && !pinned(el); }
   var root = rootSel ? document.querySelector(rootSel) : document;
   if (!root) return out;
   var els = root.querySelectorAll(sel);
@@ -169,12 +180,15 @@ export function probeTapTargets(minPx, rootSel) {
     var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
     if (cx - R < 0 || cy - R < 0 || cx + R > innerWidth || cy + R > innerHeight) continue;
     if (!lands(el, cx, cy)) continue;
-    out.probed++;
-    var missed = 0;
+    var missed = 0, barred = false;
     for (var k = 0; k < 8; k++) {
       var a = k * Math.PI / 4;
-      if (!lands(el, cx + R * Math.cos(a), cy + R * Math.sin(a))) missed++;
+      var h = document.elementFromPoint(cx + R * Math.cos(a), cy + R * Math.sin(a));
+      if (h && (h === el || el.contains(h))) continue;
+      if (underBar(el, h)) barred = true; else missed++;
     }
+    if (barred) continue;
+    out.probed++;
     if (missed) {
       out.offenders.push({
         label: String(el.getAttribute('aria-label') || el.textContent || el.className || el.tagName).trim().slice(0, 40),
