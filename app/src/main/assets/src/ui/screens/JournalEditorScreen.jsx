@@ -9,9 +9,13 @@
    background-hide, recovered + consumed on re-open. One draft PER ENTRY under the one key,
    { v: 2, drafts: { <entryId>: { title, blocks, mood, ts } } } (sweep mw13: a single slot
    let entry B's background draft overwrite entry A's before A was reopened after a kill,
-   and A's last words were gone). The pre-v2 single-slot shape { entryId, ... } still reads. */
+   and A's last words were gone). The pre-v2 single-slot shape { entryId, ... } still reads.
+   A draft is dropped for another entry's sake only once it is marked `durable`: the save
+   issued with it was confirmed on disk (JournalStore.whenSaved). The store's memory is no
+   proof: JournalStore.update changes it at once while its IDB write is still in flight or
+   failing (refuter r1). Until then a draft goes only when the quota leaves no room,
+   oldest first, the entry on screen last. */
 var JOURNAL_DRAFT_KEY = 'vot-journal-draft';
-var JOURNAL_DRAFT_MAX = 8; // bounds the slot: only drafts that can still be recovered are kept
 function _readJournalDrafts() {
   try {
     var o = JSON.parse(localStorage.getItem(JOURNAL_DRAFT_KEY) || 'null');
@@ -36,33 +40,48 @@ function _readJournalDraft(eid) {
 function _journalSig(o) {
   return JSON.stringify([(o && o.title) || '', (o && o.blocks) || [], (o && o.mood) || null]);
 }
-/** A draft is recovered only when it is at least as recent as the entry's last durable
- *  save AND its content differs. `updated` only grows, so a draft that fails this never
- *  passes it again. */
+/** A draft is recovered only when it is at least as recent as the entry's last save AND
+ *  its content differs (the open-time rule). */
 function _journalDraftRecoverable(draft, entry) {
   return !!entry && (draft.ts || 0) >= (entry.updated || 0) && _journalSig(draft) !== _journalSig(entry);
 }
+/** Writes this entry's draft; returns its ts (0 when nothing could be stored). */
 function _writeJournalDraft(eid, title, blocks, mood) {
   var mine = { title: title, blocks: blocks, mood: mood, ts: Date.now() };
-  try {
-    var drafts = _readJournalDrafts();
-    // Other entries keep their drafts while they can still be recovered; one whose
-    // entry is not in the store is kept too (never judge a draft against a store that
-    // has not loaded it), and the cap bounds those.
-    Object.keys(drafts).forEach(function(id) {
-      if (id === eid) return;
-      var entry = JournalStore.get(id);
-      if (entry && !_journalDraftRecoverable(drafts[id], entry)) delete drafts[id];
-    });
-    drafts[eid] = mine;
-    var others = Object.keys(drafts).filter(function(id) { return id !== eid; })
-      .sort(function(x, y) { return (drafts[y].ts || 0) - (drafts[x].ts || 0); });
-    others.slice(JOURNAL_DRAFT_MAX - 1).forEach(function(id) { delete drafts[id]; });
-    _storeJournalDrafts(drafts);
-  } catch (_e) {
-    // Quota / unavailable: the entry on screen comes first (the old single-slot write).
-    try { var only = {}; only[eid] = mine; _storeJournalDrafts(only); } catch (_e2) { /* best-effort */ }
+  var drafts;
+  try { drafts = _readJournalDrafts(); } catch (_e) { return 0; }
+  Object.keys(drafts).forEach(function(id) { if (id !== eid && drafts[id].durable) delete drafts[id]; });
+  drafts[eid] = mine;
+  // Over the quota: give up the oldest other draft and try again; the entry on screen
+  // is the last thing given up.
+  var others = Object.keys(drafts).filter(function(id) { return id !== eid; })
+    .sort(function(x, y) { return (drafts[x].ts || 0) - (drafts[y].ts || 0); });
+  for (;;) {
+    try { _storeJournalDrafts(drafts); return mine.ts; }
+    catch (_e) {
+      if (!others.length) return 0; // quota / unavailable — draft recovery is best-effort
+      delete drafts[others.shift()];
+    }
   }
+}
+/** Once the store's latest write is on disk, this entry's draft (the one with `ts`, or
+ *  whichever it holds now) can no longer save anything the store does not: mark it so the
+ *  next draft write may drop it. Never while the store is not loaded (its writes are
+ *  queued, so whenSaved would answer for an older one) or its writes are fenced. */
+function _markJournalDraftDurableWhenSaved(eid, ts) {
+  if (!eid || typeof JournalStore.whenSaved !== 'function') return;
+  if (typeof JournalStore.isReady === 'function' && !JournalStore.isReady()) return;
+  if (typeof isStoreWriteFenced === 'function' && isStoreWriteFenced()) return;
+  if (ts == null) { var cur = _readJournalDrafts()[eid]; if (!cur) return; ts = cur.ts; }
+  JournalStore.whenSaved().then(function(ok) {
+    if (!ok) return;
+    try {
+      var drafts = _readJournalDrafts();
+      if (!drafts[eid] || drafts[eid].ts !== ts) return; // replaced since: its own write marks it
+      drafts[eid].durable = true;
+      _storeJournalDrafts(drafts);
+    } catch (_e) { /* best-effort */ }
+  });
 }
 function _clearJournalDraft(eid) {
   try {
@@ -362,6 +381,8 @@ export function JournalEditorScreen(props) {
         return;
       }
       _saveIfChanged(eid, t, bs, moodRef.current);
+      // Everything this entry holds is in that save: its draft goes once it is on disk.
+      _markJournalDraftDurableWhenSaved(eid);
     };
   }, []);
 
@@ -382,7 +403,9 @@ export function JournalEditorScreen(props) {
     function onHide() {
       commitSave();
       var eid = entryIdRef.current;
-      if (eid) _writeJournalDraft(eid, titleRef.current, blocksRef.current, moodRef.current);
+      if (!eid) return;
+      var ts = _writeJournalDraft(eid, titleRef.current, blocksRef.current, moodRef.current);
+      if (ts) _markJournalDraftDurableWhenSaved(eid, ts);
     }
     function onVisibility() { if (document.visibilityState === 'hidden') onHide(); }
     window.addEventListener('pagehide', onHide);
