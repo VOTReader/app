@@ -647,10 +647,11 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
     mediaTotalLimitBytes = DEFAULT_MEDIA_LIMIT_BYTES,
   } = ctx;
 
-  const exportVersion = (parsed && parsed.exportVersion) || 1;
   // W10: only v1 and v2 are JSON files. A v3 manifest's media is an ARRAY that the
   // media step below would read as an id map ('0', '1', ...) and then prune every
-  // attachment the device has; v3 goes through applyV3, newer ones nowhere.
+  // attachment the device has; v3 goes through applyV3, newer ones nowhere. An
+  // ABSENT stamp is v1, as validateImportEnvelope reads it; 0, null or '' is not.
+  const exportVersion = (parsed && parsed.exportVersion !== undefined) ? parsed.exportVersion : 1;
   if (exportVersion !== 1 && exportVersion !== 2) {
     throw new Error(`applyImportPayload: exportVersion ${JSON.stringify(exportVersion)} is not a v1/v2 backup`);
   }
