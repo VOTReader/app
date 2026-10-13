@@ -31,19 +31,23 @@ export function filterNotesByQuery(notes, query) {
 export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNavigateToSource, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
   // Subscribe to NoteStore + NotebookStore mutations so the index re-renders
   // on any add/remove/rename/membership change.
-  React.useSyncExternalStore(
+  const noteVer = React.useSyncExternalStore(
     React.useCallback((cb) => NoteStore.subscribe(cb), []),
     () => NoteStore.getVersion()
   );
-  React.useSyncExternalStore(
+  const nbVer = React.useSyncExternalStore(
     React.useCallback((cb) => NotebookStore.subscribe(cb), []),
     () => NotebookStore.getVersion()
   );
   // All notes — annotations on letters, scripture, AND journal paragraphs.
   // Notes from inside journal entries are real annotations and belong here,
-  // labeled with their journal source via noteSourceLabel.
-  const allNotes = NoteStore.list();
-  const notebooks = NotebookStore.list();
+  // labeled with their journal source via noteSourceLabel. list() builds and
+  // sorts a fresh array per call, so both lists are keyed on their store's
+  // version: every memo below used to miss on every keystroke (sweep W69).
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the store version: list() is a fresh array per call
+  const allNotes = React.useMemo(() => NoteStore.list(), [noteVer]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the store version: list() is a fresh array per call
+  const notebooks = React.useMemo(() => NotebookStore.list(), [nbVer]);
   // Restore the user's place (tab + drilled notebook) when returning from a
   // source tap-through. The navHandoff 'notesReturnCtx' slot is set in onRowTap
   // before we navigate away and consumed on this mount, so the back-pill ("Back

@@ -113,7 +113,7 @@ export function _collectMarks() {
    highlight text is short by nature; the source IS the full context). */
 export function HighlightRow(props) {
   var m = props.mark;
-  var sourceLabel = (typeof _bookmarkSourceLabel === 'function') ? _bookmarkSourceLabel(m.hlKey) : m.hlKey;
+  var sourceLabel = props.source || ((typeof _bookmarkSourceLabel === 'function') ? _bookmarkSourceLabel(m.hlKey) : m.hlKey);
   var date = (typeof relativeDate === 'function') ? relativeDate(m.updated || m.created) : '';
   var hex = _hlColorHex(m.color);
   var isUnderline = m.kind === 'underline';
@@ -156,7 +156,7 @@ export function HighlightsScreen(props) {
 
   // Subscribe to AnnotationStore — highlights are AnnotationStore entries
   // with kind=highlight or kind=underline.
-  React.useSyncExternalStore(
+  var annVer = React.useSyncExternalStore(
     React.useCallback(function(cb) { return AnnotationStore.subscribe(cb); }, []),
     function() { return AnnotationStore.getVersion(); }
   );
@@ -169,7 +169,18 @@ export function HighlightsScreen(props) {
   var _tf = useState('all'); var typeFilter = _tf[0]; var setTypeFilter = _tf[1];
   var _cf = useState(null); var colorFilter = _cf[0]; var setColorFilter = _cf[1];
 
-  var marks = _collectMarks();
+  /* One walk of the store and one source label per mark per store version (sweep W69): a fresh
+     _collectMarks() per render kept both memos below from ever holding, and the search and every
+     row resolved each label again (a corpus or journal lookup). */
+  var marks = useMemo(_collectMarks, [annVer]);
+  var sourceOf = useMemo(function() {
+    var m = new Map();
+    marks.forEach(function(mk) {
+      var t = (typeof _bookmarkSourceLabel === 'function') ? (_bookmarkSourceLabel(mk.hlKey) || '') : '';
+      m.set(mk, { text: t, lower: t.toLowerCase() });
+    });
+    return m;
+  }, [marks]);
 
   // Distinct colors present, in palette order — drives the filter dots.
   var presentColors = useMemo(function() {
@@ -181,8 +192,7 @@ export function HighlightsScreen(props) {
   var sorted = useMemo(function() {
     var q = query.trim().toLowerCase();
     var list = q ? marks.filter(function(m) {
-      var lbl = (typeof _bookmarkSourceLabel === 'function') ? _bookmarkSourceLabel(m.hlKey) : '';
-      return (m.text || '').toLowerCase().indexOf(q) >= 0 || (lbl || '').toLowerCase().indexOf(q) >= 0;
+      return (m.text || '').toLowerCase().indexOf(q) >= 0 || sourceOf.get(m).lower.indexOf(q) >= 0;
     }) : marks.slice();
     if (typeFilter !== 'all') {
       list = list.filter(function(m) { return m.kind === typeFilter; });
@@ -207,7 +217,7 @@ export function HighlightsScreen(props) {
       return sortNewest ? cmp : -cmp;
     });
     return list;
-  }, [marks, sortNewest, query, typeFilter, colorFilter]);
+  }, [marks, sourceOf, sortNewest, query, typeFilter, colorFilter]);
 
   function navigate(m) {
     var ep = (typeof _bookmarkSourceEndpoint === 'function') ? _bookmarkSourceEndpoint(m.hlKey) : null;
@@ -304,7 +314,7 @@ export function HighlightsScreen(props) {
           : (
               <div className="hlx-list">
                 {sorted.map(function(m) {
-                  return <HighlightRow key={m.groupId} mark={m} onNavigate={navigate} />;
+                  return <HighlightRow key={m.groupId} mark={m} source={sourceOf.get(m).text} onNavigate={navigate} />;
                 })}
               </div>
             )

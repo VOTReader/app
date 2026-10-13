@@ -231,6 +231,24 @@ describe('notebook drill', () => {
     expect(block.type).toBe('notebook-card');
     expect(block.notebookId).toBe('uncategorized');
   });
+
+  // Sweep W69: every notebook row re-listed (and re-sorted) every note to count its own.
+  it('counts each notebook from one note list per render, a repeated id once', () => {
+    let lists = 0;
+    window.NotebookStore = { list: () => [{ id: 'nb1', name: 'Prayers' }, { id: 'nb2', name: 'Psalms' }, { id: 'nb3', name: 'Empty' }] };
+    window.NoteStore = { list: () => { lists++; return [
+      { groupId: 'a', notebookIds: ['nb1'] }, { groupId: 'b', notebookIds: ['nb1', 'nb2'] },
+      { groupId: 'c', notebookIds: [] }, { groupId: 'd' }, { groupId: 'e', notebookIds: ['nb2', 'nb2'] },
+    ]; } };
+    mountSheet();
+    fireEvent.click(screen.getByText('Notebook'));
+    const count = (name) => screen.getByText(name).parentElement.querySelector('.jrn-picker-cat').textContent;
+    expect(count('Uncategorized')).toBe('2 notes');
+    expect(count('Prayers')).toBe('2 notes');
+    expect(count('Psalms')).toBe('2 notes');
+    expect(count('Empty')).toBe('0 notes');
+    expect(lists).toBe(1);
+  });
 });
 
 describe('LinkPicker bridge → targetToJournalBlock mapping', () => {

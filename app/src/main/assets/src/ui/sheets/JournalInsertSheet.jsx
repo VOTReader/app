@@ -499,13 +499,21 @@ export function JournalInsertSheet(props) {
   // ── Notebook picker — Uncategorized + every user notebook ──
   function renderNotebookPicker() {
     var nbs = (typeof NotebookStore !== 'undefined') ? NotebookStore.list() : [];
-    var noteCount = function(nbId) {
-      try {
-        var all = (typeof NoteStore !== 'undefined') ? NoteStore.list() : [];
-        if (nbId === 'uncategorized') return all.filter(function(n) { return !n.notebookIds || n.notebookIds.length === 0; }).length;
-        return all.filter(function(n) { return (n.notebookIds || []).indexOf(nbId) >= 0; }).length;
-      } catch (_e) { return 0; }
-    };
+    // One note list per render, counted into every notebook at once: each row used to re-list (and
+    // re-sort) every note to count its own (sweep W69). A note lists a notebook once however often
+    // its ids repeat it, as the old indexOf test did.
+    /** @type {Map<string, number>} */
+    var counts = new Map();
+    var uncategorized = 0;
+    try {
+      var all = (typeof NoteStore !== 'undefined') ? NoteStore.list() : [];
+      all.forEach(function(n) {
+        var ids = n.notebookIds || [];
+        if (ids.length === 0) uncategorized++;
+        else new Set(ids).forEach(function(id) { counts.set(id, (counts.get(id) || 0) + 1); });
+      });
+    } catch (_e) { counts = new Map(); uncategorized = 0; }
+    var noteCount = function(nbId) { return nbId === 'uncategorized' ? uncategorized : (counts.get(nbId) || 0); };
     var rows = [{ id: 'uncategorized', name: 'Uncategorized' }].concat(nbs);
     var q = query.trim().toLowerCase();
     if (q) rows = rows.filter(function(nb) { return (nb.name || '').toLowerCase().indexOf(q) >= 0; });

@@ -394,3 +394,30 @@ describe('MyProgressScreen — no milestones', () => {
     expect(container.textContent).toMatch(/Reading/);
   });
 });
+
+/* Sweep W69: the mark count, the most-annotated list and the journal word count walked the whole
+   library in render, and the screen renders several times on open (voice minutes, word stats) and
+   on every bump of the eight stores it watches. Each is computed once per version of its stores. */
+describe('MyProgressScreen — large libraries', () => {
+  it('walks the annotations and the journal once per store version, not on every render', () => {
+    setupGlobals({
+      ann: { 'bible:psalms:23:1': [{ id: 'a', groupId: 'a', kind: 'highlight' }] },
+      entries: [{ blocks: [{ type: 'p', text: 'one two three' }] }],
+    });
+    let annWalks = 0, jrnWalks = 0;
+    const annAll = globalThis.AnnotationStore.all, jrnAll = globalThis.JournalStore.all;
+    globalThis.AnnotationStore.all = () => { annWalks++; return annAll(); };
+    globalThis.JournalStore.all = () => { jrnWalks++; return jrnAll(); };
+    const at = (n) => (
+      <MyProgressScreen onBack={noop} onSearch={noop} onHistory={noop} onSettings={noop} theme="dark" onThemeChange={noop}
+        settings={{ markAsRead: true }} readItems={{}} historyCount={n} historyEnabled={true} />
+    );
+    const { container, rerender } = render(at(0));
+    for (let n = 1; n <= 3; n++) rerender(at(n));
+    expect(annWalks).toBe(1);
+    expect(jrnWalks).toBe(1);
+    expect(fact(container, 'Highlights & Underlines')).toBe('1');
+    expect(fact(container, 'Words written')).toBe(_fmtWords(3));
+    expect(container.querySelectorAll('.prg-src-row').length).toBe(1);
+  });
+});
