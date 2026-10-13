@@ -281,9 +281,10 @@ describe('JournalEditorScreen — JRNL-1 drafts are kept per entry (sweep mw13)'
     } finally { now.mockRestore(); }
   });
 
-  // Refuter r2: a save the write fence held resolves 'unwritten' yet whenSaved says true; and
-  // the fence coming down re-saves. Neither may mark a draft durable.
-  it('a fence raised before the save is confirmed, or another write started meanwhile, leaves the draft unmarked', async () => {
+  // Refuter r2: a save the write fence held resolves 'unwritten' yet whenSaved says true, so
+  // a fence up at the confirmation leaves the draft unmarked. Refuter r3: a write that started
+  // meanwhile is waited for (it writes the whole store), never a reason to give up for good.
+  it('a fence up at the confirmation leaves the draft unmarked; a newer write is waited for, then it marks', async () => {
     let fence = false;
     globalThis.isStoreWriteFenced = () => fence;
     const confirm = [];
@@ -303,8 +304,12 @@ describe('JournalEditorScreen — JRNL-1 drafts are kept per entry (sweep mw13)'
       fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'A again' } });
       act(() => { window.dispatchEvent(new Event('pagehide')); });
       JournalStore.update(other.id, { title: 'O2' }); // a newer write starts before A's is confirmed
-      await act(async () => { confirm.forEach((res) => res(true)); await Promise.resolve(); });
-      expect(durable()).toBe(false);
+      const pending = confirm.splice(0);
+      await act(async () => { pending.forEach((res) => res(true)); await Promise.resolve(); });
+      expect(durable()).toBe(false);                  // not yet: the newer write is not confirmed
+      expect(confirm).toHaveLength(1);                // ...and it is being waited for
+      await act(async () => { confirm[0](true); await Promise.resolve(); });
+      expect(durable()).toBe(true);
       r.unmount();
     } finally { delete globalThis.isStoreWriteFenced; }
   });
