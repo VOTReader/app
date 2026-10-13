@@ -1466,7 +1466,8 @@ class MainActivity : AppCompatActivity(), BridgeHost {
      * #2: relieve heap pressure by pruning the WebView's IN-MEMORY resource
      * cache on a moderate+ trim signal. clearCache(false) drops only the memory
      * cache — never disk, and never DOM storage (where every journal / note /
-     * bookmark / link record lives). Gated to TRIM_MEMORY_MODERATE+ via
+     * bookmark / link record lives). Gated to TRIM_MEMORY_MODERATE+ (BACKGROUND+ on
+     * Android 14+, which sends nothing higher) via
      * MainActivityLogic.shouldTrimWebViewCache so a foreground low-memory signal
      * doesn't cost re-fetch jank mid-read; assets are local, so a background
      * drop repopulates cheaply on the next foregrounding. Modest by design —
@@ -1476,7 +1477,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
      */
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        if (MainActivityLogic.shouldTrimWebViewCache(level) && ::webView.isInitialized) {
+        if (MainActivityLogic.shouldTrimWebViewCache(level, Build.VERSION.SDK_INT) && ::webView.isInitialized) {
             webView.clearCache(false)
             // Also tell the JS layer to shed its own regenerable caches (the
             // journal media object-URL LRU) — the biggest in-heap wins live on the
