@@ -30,6 +30,7 @@
 import { CachedStore, extendStore } from './cached-store.js';
 import { mergeArrayStore } from './store-merge.js';
 import { HOLY_DAYS_LETTER_IDS } from '../utils/hl-keys.js';
+import { recordsAlongKey } from './key-prefix-index.js';
 
 /**
  * A link endpoint (either source or target). The `key` is the hlKey
@@ -82,6 +83,12 @@ export function hlId() { return 'hl_' + Date.now() + '_' + Math.random().toStrin
  */
 export function lnkId() { return 'lnk_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
 
+
+/** A link's two endpoint keys; none for a link missing either (it never matches a prefix). @param {any} lnk */
+function _linkKeys(lnk) {
+  const s = lnk && lnk.source, t = lnk && lnk.target;
+  return s && s.key && t && t.key ? [s.key, t.key] : [];
+}
 export const LinkStore = extendStore(
   CachedStore('vot-links', /** @type {Link[]} */ ([]), { idb: true, crossTabMerge: mergeArrayStore }),
   {
@@ -175,17 +182,14 @@ export const LinkStore = extendStore(
      * All links touching `prefix` (or having `prefix` as a key prefix)
      * on either endpoint. Bidirectional prefix-match — useful for the
      * inline link icon scan in LetterView/WtlbEntryView where block-
-     * level keys may have selection-range suffixes.
+     * level keys may have selection-range suffixes. Answered from an index
+     * rebuilt once per store version (key-prefix-index.js): the reading view
+     * asks once per paragraph on every page turn (sweep W69).
      * @param {string} prefix
      * @returns {Link[]}
      */
     getForKeyPrefix(prefix) {
-      return this._load().filter(lnk => {
-        if (!lnk.source || !lnk.source.key || !lnk.target || !lnk.target.key) return false;
-        const srcMatch = lnk.source.key === prefix || lnk.source.key.startsWith(prefix + ':') || prefix.startsWith(lnk.source.key + ':');
-        const tgtMatch = lnk.target.key === prefix || lnk.target.key.startsWith(prefix + ':') || prefix.startsWith(lnk.target.key + ':');
-        return srcMatch || tgtMatch;
-      });
+      return recordsAlongKey(this, _linkKeys, prefix);
     },
 
     /**

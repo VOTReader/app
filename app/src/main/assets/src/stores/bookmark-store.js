@@ -36,6 +36,7 @@
 
 import { CachedStore, extendStore } from './cached-store.js';
 import { mergeArrayStore } from './store-merge.js';
+import { recordsAtOrBelow } from './key-prefix-index.js';
 
 /**
  * A bookmark record — see the file header schema for field semantics.
@@ -72,6 +73,9 @@ function _isBookmark(b) {
   return !!b && typeof b === 'object' && !!b.id && typeof b.hlKey === 'string' && b.hlKey !== '';
 }
 
+
+/** A bookmark's key; none for a malformed record (it never matches a prefix). @param {any} b */
+function _bookmarkKeys(b) { return _isBookmark(b) ? [b.hlKey] : []; }
 export const BookmarkStore = extendStore(
   CachedStore('vot-bookmarks', /** @type {Bookmark[]} */ ([]), { idb: true, crossTabMerge: mergeArrayStore }),
   {
@@ -117,17 +121,15 @@ export const BookmarkStore = extendStore(
      * @returns {Bookmark[]}
      */
     getForKeyPrefix(prefix) {
-      return this._load().filter(function(b) {
-        if (!_isBookmark(b)) return false;
-        var k = b.hlKey;
-        // Exact key or a DESCENDANT (finer) key only. The old reverse branch
-        // (stored key coarser than the query) made one chapter-level bookmark
-        // match every verse container beneath it, flooding the reading view
-        // with a flag icon per verse (owner report 2026-08-09). Coarse
-        // bookmarks surface at their own level: the chapter header button
-        // (getForKey) and the chapter index indicator.
-        return k === prefix || k.indexOf(prefix + ':') === 0;
-      });
+      // Exact key or a DESCENDANT (finer) key only. The old reverse branch
+      // (stored key coarser than the query) made one chapter-level bookmark
+      // match every verse container beneath it, flooding the reading view
+      // with a flag icon per verse (owner report 2026-08-09). Coarse
+      // bookmarks surface at their own level: the chapter header button
+      // (getForKey) and the chapter index indicator. Answered from an index
+      // rebuilt once per store version (key-prefix-index.js): the reading
+      // view asks once per paragraph on every page turn (sweep W69).
+      return recordsAtOrBelow(this, _bookmarkKeys, prefix);
     },
 
     /**
