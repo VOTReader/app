@@ -402,6 +402,7 @@ export function rekeyMarkStores(data, how) {
   // block they went to, and the old key too while one of them stays there.
   /** @type {Record<string, string[]>} */ var groupTo = Object.create(null);
   /** @type {Record<string, boolean>} */ var groupStays = Object.create(null);
+  var unplaced = new Set();   // segments this pass counts as left: painted nowhere
   const ann = data && data.annotations;
   if (ann) {
     /** @type {Record<string, any[]>} */ var nextAnn = Object.create(null);
@@ -415,7 +416,7 @@ export function rekeyMarkStores(data, how) {
     Object.keys(ann).forEach(function(k) {
       var list = Array.isArray(ann[k]) ? ann[k] : [];
       var p = list.length ? parse(k, false) : null;
-      if (p && p.gone) out.left += list.length;
+      if (p && p.gone) { out.left += list.length; list.forEach(function(a) { unplaced.add(a); }); }
       if (!p || p.gone) {
         // nothing here moves; an empty bucket stays empty and never replaces one a moved mark went into
         if (own[k]) list.forEach(function(a) { nextAnn[k].push(a); });
@@ -426,7 +427,7 @@ export function rekeyMarkStores(data, how) {
         var to = how.place(p, a && a.text, a ? { start: a.start, end: a.end, text: a.text } : null);
         var gk = a && a.groupId ? a.groupId + '\n' + k : null;
         if (!to || to === k) {
-          if (to === null) out.left++;
+          if (to === null) { out.left++; unplaced.add(a); }
           if (gk) groupStays[gk] = true;
           put(k, a);
           return;
@@ -448,16 +449,21 @@ export function rekeyMarkStores(data, how) {
   }
 
   // Where each group's segments sit once this pass is done, moved or not. A note
-  // key this pass claims that holds none of them, while others do, goes to those
-  // (sweep mw14): a stale tab's body edit, a later whole millisecond, wins the
-  // cross-tab merge with the key a past pass moved the segments off, and no later
-  // pass moves those segments again to take the note along.
-  /** @type {Record<string, string[]>} */ var groupAt = Object.create(null);
+  // key this pass claims that holds none of them goes to the buckets holding one
+  // this pass placed (sweep mw14): a stale tab's body edit, a later whole
+  // millisecond, wins the cross-tab merge with the key a past pass moved the
+  // segments off, and no later pass moves those segments again to take the note
+  // along. A segment counted left (painted nowhere) keeps its own key in the note
+  // but never draws the note to it (mw14 refuter r2: that took two passes to settle).
+  /** @type {Record<string, string[]>} */ var groupAt = Object.create(null);    // buckets holding a placed segment
+  /** @type {Record<string, boolean>} */ var groupHas = Object.create(null);    // groupId + '\n' + bucket: holds any segment
   var annNow = out.annotations || ann;
   if (annNow) {
     Object.keys(annNow).forEach(function(k) {
       (Array.isArray(annNow[k]) ? annNow[k] : []).forEach(function(a) {
         if (!a || !a.groupId) return;
+        groupHas[a.groupId + '\n' + k] = true;
+        if (unplaced.has(a)) return;
         var at = groupAt[a.groupId] || (groupAt[a.groupId] = []);
         if (at.indexOf(k) < 0) at.push(k);
       });
@@ -484,7 +490,7 @@ export function rekeyMarkStores(data, how) {
           return;
         }
         var held = groupAt[gid];
-        if (held && held.indexOf(k) < 0) {
+        if (held && !groupHas[gid + '\n' + k]) {
           var p = parse(k, false);
           if (p && !p.gone) {
             changed = repaired = true;
