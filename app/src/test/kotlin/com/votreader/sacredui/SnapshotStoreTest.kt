@@ -144,6 +144,16 @@ class SnapshotStoreTest {
         assertFalse(File(snaps, "snap-20261001-190000.json").exists())
     }
 
+    @Test fun `a snapshot broken in the middle is caught too, not only at its ends (W9 refuter)`() {
+        assertTrue(store.save(j("good"), at(2026, 10, 1, 9)))
+        val snaps = File(dir, "snapshots")
+        File(snaps, "snap-20261001-180000.json").writeText("""{"stores":}""")
+        assertEquals(listOf("snap-20261001-090000.json"), names())
+        assertTrue(store.save(j("next"), at(2026, 10, 2)))
+        assertEquals(j("good"), store.read("snap-20261001-090000.json"))
+        assertEquals(listOf("snap-20261002-120000.json", "snap-20261001-090000.json"), names())
+    }
+
     @Test fun `a snapshot's bytes are forced to the disk before it takes its name (W9)`() {
         val named = File(File(dir, "snapshots"), "snap-20261001-120000.json")
         val seen = mutableListOf<Boolean>()
