@@ -145,6 +145,7 @@ class BridgeContractTest {
         "audioRate" to 1,
         "audioVolume" to 1,
         "audioUpcoming" to 1,
+        "audioLoop" to 1,
         "audioRelease" to 0,
         "audioJournal" to 0,
         "audioAskNotifications" to 0,

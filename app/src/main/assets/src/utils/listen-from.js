@@ -57,7 +57,7 @@ export function startListenFrom(target) {
 }
 
 /* REPEAT THIS PASSAGE (rp1 part 3, 2026-09-25): the selected blocks, looped three times by the pane
-   (window.__votListenFrom.repeat). A pane with no repeat (the APK's native player) offers no button. */
+   (window.__votListenFrom.repeat). A pane with no repeat (an APK whose native player cannot loop) offers no button. */
 
 /** How many times REPEAT plays the passage. */
 export const REPEAT_TIMES = 3;

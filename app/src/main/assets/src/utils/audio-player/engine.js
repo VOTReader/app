@@ -31,7 +31,7 @@ import {
   _toast,
 } from './core.js';
 import { _notifyListened, _recordSongStart } from './credit.js';
-import { _clearLoop, _loopEnded, _loopTick } from './loop.js';
+import { _clearLoop, _loopEnded, _loopTick, _loopToNative } from './loop.js';
 import {
   _cardAlbum,
   _cardArtist,
@@ -244,11 +244,12 @@ function _ensureEl() {
  * What native plays after this recording without the page: exactly what the 'ended' handler would start, when that
  * is a plain step it can take alone. Nothing when the end must stop (sleep at the end of this recording, the end of
  * the order) or needs the page (a recording not on the phone while offline: the page substitutes or pauses).
- * Repeat 'one' is this recording again. A song plays at 1x; a reading at the reading speed.
+ * Repeat 'one' is this recording again. A song plays at 1x; a reading at the reading speed. Nothing while a passage
+ * repeats (ra2): one that runs to the recording's end goes round from there, it does not cross into the next.
  * @returns {{ url: string, title: string, artist: string, album: string, rate: number }[]}
  */
 function _nativeUpcoming() {
-  if (_state.sleepAtTrackEnd || _pendingRestore) return [];
+  if (_state.sleepAtTrackEnd || _pendingRestore || _state.loop) return [];
   const cur = _state.queue[_state.qi];
   if (!cur) return [];
   let t = null;
@@ -486,6 +487,8 @@ export function _start(placeOf) {
   if (_native && at > 0) {
     try { el.currentTime = at; _nativePlaced = at; } catch (_e) { /* the seek after the load still lands it */ }
   }
+  // A restored bar's repeated passage (setLoop's `waits`, taken above): native gets it with this load (ra2).
+  if (_native && _state.loop) _loopToNative();
   const p = el.play();
   // play() rejects on autoplay policy / load failure; the 'error' listener owns
   // the load-failure message. A policy refusal fires no 'error' at all, so it

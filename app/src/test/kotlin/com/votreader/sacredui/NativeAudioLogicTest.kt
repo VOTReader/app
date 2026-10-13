@@ -132,4 +132,53 @@ class NativeAudioLogicTest {
         assertNull(c.url)
         assertEquals("", c.enter("6|D", "D", auto = true))        // after a release the same id is new again
     }
+
+    // ─── Repeat this passage (ra2) ────────────────────────────────────
+
+    @Test
+    fun `the page's loop is read as given, an end of -1 or Infinity runs to the end, and a bad one is none`() {
+        val lp = NativeAudioLogic.loopOf(7, "U", 12_000.4, 15_500.0, 3, 1)!!
+        assertEquals(NativeAudioLogic.Loop(7, "U", 12_000, 15_500, 3, 1), lp)
+        assertFalse(lp.toEnd)
+        assertTrue(NativeAudioLogic.loopOf(7, "U", 0.0, -1.0, 2, 1)!!.toEnd)
+        assertTrue(NativeAudioLogic.loopOf(7, "U", 0.0, Double.POSITIVE_INFINITY, 2, 1)!!.toEnd)
+        assertNull(NativeAudioLogic.loopOf(7, "", 0.0, 1_000.0, 3, 1))                 // no url
+        assertNull(NativeAudioLogic.loopOf(7, null, 0.0, 1_000.0, 3, 1))
+        assertNull(NativeAudioLogic.loopOf(7, "U", -5.0, 1_000.0, 3, 1))               // a start before 0
+        assertNull(NativeAudioLogic.loopOf(7, "U", Double.NaN, 1_000.0, 3, 1))
+        assertNull(NativeAudioLogic.loopOf(7, "U", 2_000.0, 2_000.0, 3, 1))            // an end not after the start
+        assertNull(NativeAudioLogic.loopOf(7, "U", 2_000.0, Double.NaN, 3, 1))         // no end at all ("" json)
+        assertEquals(1, NativeAudioLogic.loopOf(7, "U", 0.0, 1_000.0, 0, 1)!!.times)   // times held to 1..99
+        assertEquals(99, NativeAudioLogic.loopOf(7, "U", 0.0, 1_000.0, 500, 1)!!.times)
+        assertEquals(3, NativeAudioLogic.loopOf(7, "U", 0.0, 1_000.0, 3, 9)!!.pass)    // pass held to 1..times
+        assertEquals(1, NativeAudioLogic.loopOf(7, "U", 0.0, 1_000.0, 3, -2)!!.pass)
+    }
+
+    @Test
+    fun `the wrap is timed from the clock at the playing speed, just before the end`() {
+        val lp = NativeAudioLogic.Loop(1, "U", 10_000, 20_000, 3, 1)
+        assertEquals(9_970L, lp.dueInMs(10_000, 1f))
+        assertEquals(4_985L, lp.dueInMs(10_000, 2f))   // twice the speed, half the wall time
+        assertEquals(19_940L, lp.dueInMs(10_000, 0.5f))
+        assertEquals(9_970L, lp.dueInMs(10_000, Float.NaN))   // a bad speed counts as 1x
+        assertEquals(0L, lp.dueInMs(19_970, 1f))       // due now: within LOOP_EPS_MS of the end
+        assertEquals(0L, lp.dueInMs(25_000, 1f))       // past it (a late timer)
+        assertEquals(1L, lp.dueInMs(19_969, 1.5f))     // never 0 early: rounds up
+    }
+
+    @Test
+    fun `each pass goes round until the last, and only a seek out of the passage leaves it`() {
+        val lp = NativeAudioLogic.Loop(1, "U", 10_000, 20_000, 3, 1)
+        assertEquals(2, lp.next()!!.pass)
+        assertEquals(3, lp.next()!!.next()!!.pass)
+        assertNull(lp.next()!!.next()!!.next())        // after the third: pause, the loop is over
+        assertTrue(lp.holds(10_000))
+        assertTrue(lp.holds(9_600))                    // a tap on the first word lands just before it
+        assertTrue(lp.holds(20_400))
+        assertFalse(lp.holds(9_400))
+        assertFalse(lp.holds(20_600))
+        val toEnd = NativeAudioLogic.Loop(1, "U", 10_000, NativeAudioLogic.TO_END, 2, 1)
+        assertTrue(toEnd.holds(3_600_000))
+        assertFalse(toEnd.holds(5_000))
+    }
 }

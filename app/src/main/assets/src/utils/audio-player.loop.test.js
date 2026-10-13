@@ -134,8 +134,9 @@ describe('setLoop plays a span three times, then pauses at its end', () => {
     expect(loop()).toBeNull();
   });
 
-  it('says whether the recording plays natively (the web loop only: native hides REPEAT)', () => {
+  it('says whether the recording plays natively, and that the web player can loop', () => {
     expect(AudioPlayer.isNative()).toBe(false);
+    expect(AudioPlayer.canLoop()).toBe(true);
   });
 
   it('a new play of the same recording ends the loop (Listen again is not the passage)', () => {

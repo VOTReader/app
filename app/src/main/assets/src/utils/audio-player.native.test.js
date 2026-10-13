@@ -45,7 +45,7 @@ beforeEach(async () => {
     setAudioActive: vi.fn(() => true), setAudioNowPlaying: vi.fn(),
     audioLoad: vi.fn(), audioPlay: vi.fn(), audioPause: vi.fn(), audioSeek: vi.fn(), audioRate: vi.fn(),
     audioVolume: vi.fn(), audioUpcoming: vi.fn(), audioRelease: vi.fn(), audioJournal: vi.fn(() => ''),
-    audioAskNotifications: vi.fn(), audioMeta: vi.fn(),
+    audioAskNotifications: vi.fn(), audioMeta: vi.fn(), audioLoop: vi.fn(),
   };
   window.AndroidBridge = bridge;
   vi.resetModules();
@@ -385,5 +385,138 @@ describe('AudioPlayer.playableNow', () => {
     setOnline(false);
     expect(AudioPlayer.playableNow('vol1', 'letter-a')).toBe(true);
     expect(AudioPlayer.playableNow('vol1', 'letter-c')).toBe(false);
+  });
+});
+
+/* Repeat this passage on the APK's native player (ra2, 2026-10-13; Corbin uses it daily, and it was gone from the APK
+   since m3): native plays the span round itself, so it keeps its verse with the screen off and the page asleep; the
+   bar follows native's word on the pass. */
+describe('repeat this passage on the native player (ra2)', () => {
+  const loopsSent = () => bridge.audioLoop.mock.calls.map((c) => (c[0] ? JSON.parse(c[0]) : null));
+  const upcomingUrls = () => JSON.parse(bridge.audioUpcoming.mock.calls.at(-1)[0]).map((t) => t.url);
+  async function playing(id = 'letter-a', url = URL_OF('idA1')) {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id, title: 'L' } });
+    send({ type: 'state', url, pos: 5000, dur: 600000, playing: true, want: true });
+    await flush();
+  }
+
+  it('is offered, and native gets the span after the seek to its start, with nothing to play after it', async () => {
+    await playing();
+    expect(AudioPlayer.canLoop()).toBe(true);
+    bridge.audioUpcoming.mockClear();
+    expect(AudioPlayer.setLoop({ start: 40, end: 60.5, times: 3, label: 'Verse 4' })).toBe(true);
+    expect(bridge.audioSeek).toHaveBeenLastCalledWith(40000);
+    expect(bridge.audioSeek.mock.invocationCallOrder.at(-1)).toBeLessThan(bridge.audioLoop.mock.invocationCallOrder[0]);
+    const { id } = AudioPlayer.getState().loop;
+    expect(loopsSent()).toEqual([{ url: URL_OF('idA1'), id, startMs: 40000, endMs: 60500, times: 3, pass: 1 }]);
+    expect(upcomingUrls()).toEqual([]);   // part 2 waits: a span to the end ends there, it does not cross
+  });
+
+  it('an APK from before it cannot loop: not offered, nothing moves', async () => {
+    delete bridge.audioLoop;
+    await playing();
+    expect(AudioPlayer.canLoop()).toBe(false);
+    bridge.audioSeek.mockClear();
+    expect(AudioPlayer.setLoop({ start: 40, end: 60, times: 3, label: 'x' })).toBe(false);
+    expect(bridge.audioSeek).not.toHaveBeenCalled();
+    expect(AudioPlayer.getState().loop).toBeNull();
+  });
+
+  it('the bar follows native\'s pass; native pausing after the last ends the loop, and what comes next is back', async () => {
+    await playing();
+    AudioPlayer.setLoop({ start: 40, end: 60, times: 3, label: 'x' });
+    const { id } = AudioPlayer.getState().loop;
+    const at = (pos, loop, more = {}) => send({ type: 'state', url: URL_OF('idA1'), pos, dur: 600000, playing: true, want: true, loop, ...more });
+    at(40000, { id, pass: 1, times: 3 });
+    expect(AudioPlayer.getState().loop.pass).toBe(1);
+    at(40000, { id, pass: 2, times: 3 }, { type: 'seeked' });
+    expect(AudioPlayer.getState().loop.pass).toBe(2);
+    at(40000, { id, pass: 3, times: 3 }, { type: 'seeked' });
+    expect(AudioPlayer.getState().loop.pass).toBe(3);
+    bridge.audioUpcoming.mockClear();
+    at(59970, null, { playing: false, want: false });   // the last pass: native paused at the span's end
+    await flush();
+    const s = AudioPlayer.getState();
+    expect(s.loop).toBeNull();
+    expect(s.status).toBe('paused');
+    expect(s.qi).toBe(0);
+    expect(upcomingUrls()).toEqual([URL_OF('idA2')]);
+  });
+
+  it('native\'s word about the loop it had does not end a new one it has not taken yet', async () => {
+    await playing();
+    AudioPlayer.setLoop({ start: 40, end: 60, times: 3, label: 'x' });
+    const first = AudioPlayer.getState().loop.id;
+    const at = (pos, loop, more = {}) => send({ type: 'state', url: URL_OF('idA1'), pos, dur: 600000, playing: true, want: true, loop, ...more });
+    at(45000, { id: first, pass: 2, times: 3 });
+    AudioPlayer.setLoop({ start: 100, end: 120, times: 3, label: 'y' });   // another passage while the first plays
+    const second = AudioPlayer.getState().loop.id;
+    expect(second).not.toBe(first);
+    at(46000, { id: first, pass: 2, times: 3 });   // in flight before native heard of the new one
+    expect(AudioPlayer.getState().loop).toMatchObject({ id: second, start: 100, pass: 1 });
+    at(100000, null, { type: 'seeked' });          // native's own seek out of the old span ended it
+    expect(AudioPlayer.getState().loop).toMatchObject({ id: second });
+    at(100000, { id: second, pass: 1, times: 3 });
+    at(101000, null, { type: 'seeked' });          // taken: now native's silence is the loop's end (a lock-screen seek)
+    expect(AudioPlayer.getState().loop).toBeNull();
+  });
+
+  it('a span to the recording\'s end goes round on native; the end it lets through is the last pass: paused, no credit', async () => {
+    const listened = vi.fn();
+    globalThis.__votAudioListened = listened;
+    await playing('letter-c', URL_OF('idC'));
+    AudioPlayer.setLoop({ start: 590, end: Infinity, times: 2, label: 'x' });
+    const { id } = AudioPlayer.getState().loop;
+    expect(loopsSent().at(-1)).toMatchObject({ startMs: 590000, endMs: -1, times: 2, pass: 1 });
+    const at = (pos, loop, more = {}) => send({ type: 'state', url: URL_OF('idC'), pos, dur: 600000, playing: true, want: true, loop, ...more });
+    at(590000, { id, pass: 1, times: 2 });
+    // An end still naming a pass to come is native on its way round: the page leaves it be.
+    at(600000, { id, pass: 1, times: 2 }, { playing: false, ended: true });
+    await flush();
+    expect(AudioPlayer.getState().loop).toMatchObject({ id });
+    at(590000, { id, pass: 2, times: 2 }, { type: 'seeked' });
+    await flush();
+    expect(AudioPlayer.getState().loop.pass).toBe(2);
+    expect(AudioPlayer.getState().status).toBe('playing');
+    at(600000, null, { playing: false, ended: true });   // the last pass ran to the end
+    await flush();
+    const s = AudioPlayer.getState();
+    expect(s.loop).toBeNull();
+    expect(s.status).toBe('paused');
+    expect(s.qi).toBe(0);
+    expect(listened).not.toHaveBeenCalled();
+    expect(bridge.audioRelease).not.toHaveBeenCalled();
+  });
+
+  it('a page seek out of the passage ends it on native too, and what comes next is back', async () => {
+    await playing();
+    AudioPlayer.setLoop({ start: 40, end: 60, times: 3, label: 'x' });
+    bridge.audioLoop.mockClear();
+    bridge.audioUpcoming.mockClear();
+    AudioPlayer.seek(200);
+    expect(AudioPlayer.getState().loop).toBeNull();
+    expect(bridge.audioLoop).toHaveBeenCalledWith('');
+    expect(upcomingUrls()).toEqual([URL_OF('idA2')]);
+  });
+
+  it('a restored bar\'s passage goes to native with its first load, after it, at the span\'s start', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    send({ type: 'state', url: URL_OF('idC'), pos: 41000, dur: 600000, playing: true, want: true });
+    await flush();
+    AudioPlayer.toggle();
+    send({ type: 'state', url: URL_OF('idC'), pos: 41000, dur: 600000, playing: false, want: false });
+    await flush();
+    vi.resetModules();                                       // a new session: the bar is restored, no load yet
+    bridge.audioLoad.mockClear();
+    bridge.audioLoop.mockClear();
+    AudioPlayer = (await import('./audio-player.js')).AudioPlayer;
+    expect(AudioPlayer.getState().restoring).toBe(true);
+    expect(AudioPlayer.setLoop({ start: 30, end: 50, times: 3, label: 'x' })).toBe(true);
+    expect(bridge.audioLoop).not.toHaveBeenCalled();         // nothing loaded to loop yet
+    AudioPlayer.toggle();
+    await vi.waitFor(() => expect(bridge.audioLoad).toHaveBeenCalled());
+    expect(loads()[0]).toMatchObject({ url: URL_OF('idC'), startMs: 30000, upcoming: [] });
+    expect(bridge.audioLoad.mock.invocationCallOrder[0]).toBeLessThan(bridge.audioLoop.mock.invocationCallOrder[0]);
+    expect(loopsSent()).toEqual([{ url: URL_OF('idC'), id: AudioPlayer.getState().loop.id, startMs: 30000, endMs: 50000, times: 3, pass: 1 }]);
   });
 });

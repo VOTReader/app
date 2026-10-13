@@ -1,5 +1,7 @@
 package com.votreader.sacredui
 
+import kotlin.math.ceil
+
 /**
  * m3 (2026-09-24): the page's recording plays in ExoPlayer, not the WebView's <audio>. utils/native-audio.js is a
  * stand-in element the player drives exactly as it drove <audio>; this is the native end of that element, reached
@@ -26,6 +28,11 @@ interface NativeAudioPort {
     fun journal(): String
     /** Get ready to play (bind the service) without playing: a letter with a recording opened (sweep n1-05). */
     fun prewarm() {}
+    /**
+     * REPEAT THIS PASSAGE (ra2): {id, url, startMs, endMs, times, pass} plays that span of the loaded recording round
+     * by itself (endMs -1 runs to its end), then pauses at its end; "" or anything unreadable ends it.
+     */
+    fun loop(json: String?) {}
 }
 
 /**
@@ -137,6 +144,50 @@ object NativeAudioLogic {
             return if (auto && url != null) from ?: "" else null
         }
     }
+
+    /**
+     * REPEAT THIS PASSAGE (ra2): [startMs, endMs) of recording [url] heard [times] times, then paused at its end; this
+     * is pass [pass]. Native runs it, not the page: with the screen off the page sleeps, and its 1 Hz ticks would
+     * carry a verse a second into the next. [endMs] [TO_END] runs to the recording's end. [id] is the page's, echoed
+     * in every event so the page tells its loop from one it replaced.
+     */
+    data class Loop(val id: Long, val url: String, val startMs: Long, val endMs: Long, val times: Int, val pass: Int) {
+        val toEnd: Boolean get() = endMs == TO_END
+
+        /** Wall ms from [posMs] until the wrap is due at [speed] (0: due now). A span to the end wraps at the end instead. */
+        fun dueInMs(posMs: Long, speed: Float): Long {
+            val left = endMs - LOOP_EPS_MS - posMs
+            if (left <= 0L) return 0L
+            val s = if (speed.isFinite() && speed > 0f) speed else 1f
+            return ceil(left / s.toDouble()).toLong()
+        }
+
+        /** The next pass, or null after the last (the player pauses at the span's end). */
+        fun next(): Loop? = if (pass < times) copy(pass = pass + 1) else null
+
+        /** A seek to [posMs] that stays in the passage; a tap on its first word may land just before it. */
+        fun holds(posMs: Long): Boolean = posMs >= startMs - LOOP_SLACK_MS && (toEnd || posMs <= endMs + LOOP_SLACK_MS)
+    }
+
+    /** The page's loop, or null when it names none that can play: no url, a bad start, an end not after the start. */
+    fun loopOf(id: Long, url: String?, startMs: Double, endMs: Double, times: Int, pass: Int): Loop? {
+        if (url.isNullOrEmpty() || !startMs.isFinite() || startMs < 0.0 || endMs.isNaN()) return null
+        val end = when {
+            endMs < 0.0 || endMs.isInfinite() -> TO_END
+            endMs > startMs -> endMs.toLong()
+            else -> return null
+        }
+        val t = times.coerceIn(1, MAX_LOOP_TIMES)
+        return Loop(id, url, startMs.toLong(), end, t, pass.coerceIn(1, t))
+    }
+
+    /** A [Loop] that runs to the recording's end. */
+    const val TO_END = -1L
+    /** The wrap is due this far before the end (the page's LOOP_EPS_S). */
+    const val LOOP_EPS_MS = 30L
+    /** A seek this far outside the span still stays in it (the page's LOOP_SLACK_S). */
+    const val LOOP_SLACK_MS = 500L
+    const val MAX_LOOP_TIMES = 99
 
     /** A JSON string literal; the event and journal JSON is built by hand so this stays plain JVM. */
     fun quote(s: String): String {
