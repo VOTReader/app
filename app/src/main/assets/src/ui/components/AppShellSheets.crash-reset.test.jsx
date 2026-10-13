@@ -77,6 +77,9 @@ describe('AppShellSheets: a crashed sheet does not take the others down (v15-01)
     expect(screen.getByTestId('toolbar')).toBeTruthy();
     quietly(() => act(() => { api.setNoteSheetTarget({ groupId: 'g1' }); }));
     expect(G.showToast).toHaveBeenCalledTimes(1);          // the reader is still told the panel closed
+    // ...and promised only what holds (sweep mw12): a note being typed lived in the sheet's state and is
+    // gone; what was saved is safe.
+    expect(G.showToast.mock.calls[0][0].text).toBe('That panel hit a problem and closed. Anything you saved is safe.');
     expect(screen.getByTestId('toolbar')).toBeTruthy();     // RED before: gone until restart
     act(() => { api.setBookmarkPopoverPayload({ id: 'bk1' }); });
     expect(screen.getByTestId('bookmark-popover')).toBeTruthy();

@@ -14,8 +14,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <!-- SEC-1: this is the one served HTML document outside index.html's hash-locked
        CSP. It renders zero dynamic content and loads nothing external, so lock it down
-       hard — no scripts at all (the retry control is a plain link, below). -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" />
+       hard — no scripts at all (the retry control is a plain link, below). No frame-ancestors:
+       browsers ignore it in a meta tag (it is header-only), so it promised nothing (sweep mw12). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'" />
   <title>VOTReader — Offline</title>
   <style>
     body {

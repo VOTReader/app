@@ -321,7 +321,7 @@ function PrivacyPage() {
       <p>VOTReader has no accounts and no sign-in.</p>
       <p>Your notes, highlights, bookmarks, journal and reading record are kept only on this device. Nothing you write is sent anywhere.</p>
       <p>The phone app keeps no record of how you use it and sends nothing: no statistics, no analytics, no ads. The website version counts visits with Cloudflare Web Analytics (one anonymous page view per visit, no cookies, nothing you read or write).</p>
-      <p>Recordings, songs and Garden pictures stream from the app&rsquo;s own release files when you open them. A recording you save for offline is kept on this device.</p>
+      <p>Recordings, songs and Garden pictures stream from the app&rsquo;s own release files when you open them. Letter pages also load the song list and the covers of a letter&rsquo;s songs (Show songs on letter pages). A recording you save for offline is kept on this device.</p>
       <p>Backups are files you save yourself. The weekly copy, where the phone app makes one, goes to Downloads/VOTReader on this phone. Clear All My Data deletes those copies; uninstalling the app leaves them, like any backup you saved, until you delete them.</p>
       <ExternalLink href="https://votreader.github.io/app/privacy.html">The full privacy policy</ExternalLink>
     </div>

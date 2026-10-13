@@ -804,6 +804,19 @@ describe('the Nearby list reads the lens (landing 15)', () => {
     if (prevDecode) vi.mocked(decodeGraph).mockImplementation(prevDecode);
   });
 
+  // Sweep mw12: My Web's list is the reader's links in store order (up to 36), wherever the camera is;
+  // its header said 'Your nearby links' and its empty line 'No nearby connections at this location.'
+  it('on My Web the list says what it is: your links, with no "nearby" and no "at this location"', async () => {
+    const { container } = await mountList();
+    fireEvent.click(screen.getByRole('button', { name: /my web/i }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+    fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
+    const list = container.querySelector('.sw-list');
+    expect(list.querySelector('.sw-sheet-eyebrow').textContent).toBe('Your links');
+    expect(list.textContent).not.toMatch(/nearby links|at this location/i);
+    expect(list.querySelector('.sw-list-empty').textContent).toBe('You have no links on the web yet.');
+  });
+
   it('leads with the chapter row (where its threads go), then the threads strongest first; at the overview the header says Nearby', async () => {
     const { container } = await mountList();
     fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));

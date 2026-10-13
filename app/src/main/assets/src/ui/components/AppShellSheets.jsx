@@ -148,7 +148,8 @@ export function AppShellSheets({
           showToast({
             id: 'vot-toast-sheet-crash',
             className: 'vot-toast',
-            text: 'That panel hit a problem and closed — your data is safe.',
+            // Not 'your data is safe': a note being typed lives in the sheet's state and closes with it (sweep mw12).
+            text: 'That panel hit a problem and closed. Anything you saved is safe.',
             durationMs: 4500,
             ariaLive: 'assertive',
           });

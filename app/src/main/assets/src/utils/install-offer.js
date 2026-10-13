@@ -28,8 +28,10 @@ const MAX_DISMISSALS = 3;
 export function installFlow(ua, env) {
   if (env.isApk || env.standalone) return null;
   ua = ua || '';
-  // In-app webviews (Facebook, Instagram, Gmail's GSA, WeChat, Line) cannot install anything.
+  // In-app webviews (Facebook, Instagram, Gmail's GSA, WeChat, Line) cannot install anything; nor can any
+  // other app's browser built on the system Android WebView, which names no app but carries '; wv)'.
   if (/FBAN|FBAV|FB_IAB|Instagram|GSA\/|MicroMessenger|\bLine\//i.test(ua)) return null;
+  if (/Android/.test(ua) && /;\s*wv\)/.test(ua)) return null;
   if (env.hasPrompt) return 'prompt';
   if (/SamsungBrowser\//.test(ua)) return 'samsung';
   const ios = /iPhone|iPad|iPod/.test(ua) || !!env.touchMac;

@@ -54,6 +54,8 @@ const listeners = new Set();
 let version = 0;
 let nav = {};
 let pressing = false;
+// The overlay's word that this stop's control could not be found (it waited and gave up); reset per stop.
+let targetGone = false;
 let state = fresh();
 
 function fresh() {
@@ -211,6 +213,7 @@ function seekTourStart(step) {
   attempt();
 }
 function goTo(index, skipEnter) {
+  targetGone = false;
   leaveStop(index);
   clearTourHighlight();
   state = { ...state, index, pressed: false };
@@ -275,6 +278,7 @@ export const TourController = {
       ready = false;
       Promise.resolve(loader()).then(() => { state = { ...state, ready: true }; bump(); }, () => { state = { ...state, ready: true }; bump(); });
     }
+    targetGone = false;
     state = { ...state, active: true, index: 0, from: from || null, ready };
     runEnter(TOUR_STEPS[0]);
     bump();
@@ -286,6 +290,14 @@ export const TourController = {
     if (!state.active) return;
     const step = TOUR_STEPS[state.index];
     if (state.index >= TOUR_STEPS.length - 1) { end(true); return; }
+    // A press or highlight stop whose control the overlay gave up on (its card says 'I could not find it on
+    // this screen. Press Next to go on.') has nothing to show, so Next goes on (sweep mw12), rather than
+    // staying with the after-words ('Hear it?') over nothing. Only once the overlay said so: a control
+    // still rendering when Next is tapped early is pressed as before.
+    if ((step.act === 'press' || step.act === 'highlightDemo') && !state.pressed && targetGone) {
+      goTo(nextIndex(state.index));
+      return;
+    }
     if (step.act === 'press' && !state.pressed) {
       // The overlay listens on the ringed control to notice the reader's own tap; this click is
       // ours, so it is fenced off or the tour would advance twice (seen in the browser walk).
@@ -319,6 +331,9 @@ export const TourController = {
   /** The reader tapped the ringed control themselves: move on without acting again. The next
       stop's `enter` still runs — a tap on the Letters tile lands on the Volumes index, and the
       tour promised to open a letter from there. */
+  /** The overlay could not find this stop's control (true, after its wait) or found it again (false). */
+  targetMissing(v) { targetGone = !!v; },
+
   targetPressed() {
     if (!state.active) return;
     if (state.index >= TOUR_STEPS.length - 1) { end(); return; }
@@ -357,5 +372,5 @@ export const TourController = {
     return true;
   },
 
-  _resetForTests() { clearTourHighlight(); if (cancelListen) cancelListen(); if (cancelSeek) cancelSeek(); state = fresh(); nav = {}; pressing = false; listeners.clear(); version = 0; },
+  _resetForTests() { clearTourHighlight(); if (cancelListen) cancelListen(); if (cancelSeek) cancelSeek(); state = fresh(); nav = {}; pressing = false; targetGone = false; listeners.clear(); version = 0; },
 };

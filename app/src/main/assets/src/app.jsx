@@ -19,6 +19,7 @@
    clarity so this file reads as self-contained.
    ═══════════════════════════════════════════════════════════════════════ */
 import { buildScreenRoutes } from './ui/screen-routes.jsx';
+import { RouteSlot } from './components/RouteSlot.jsx';
 
 const { useState, useEffect } = React;
 
@@ -761,7 +762,7 @@ function App() {
           renders null — a permanently blank, unrecoverable screen (blank ≠ crash, so
           E4 recovery never fires). Fall back to home (authoritative — the real ROUTES,
           no drift) so the app is always navigable. */}
-      <ErrorBoundary key={screen}>{(ROUTES[screen] || ROUTES.home)?.() ?? null}</ErrorBoundary>
+      <ErrorBoundary key={screen}><RouteSlot route={ROUTES[screen] || ROUTES.home} /></ErrorBoundary>
       {/* Audio mini-player (null while idle): after the screen, so Tab and screen readers meet it last (W66). */}
       <ErrorBoundary fallback={null} resetKey={screen}><AudioPlayerBar /></ErrorBoundary>
       <AnnotationDomSync

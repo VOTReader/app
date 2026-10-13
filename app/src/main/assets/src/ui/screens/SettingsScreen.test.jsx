@@ -1192,6 +1192,8 @@ describe('settings root list and pages (rs2)', () => {
     expect(title()).toBe('Privacy');
     expect(screen.getByText('VOTReader has no accounts and no sign-in.')).toBeTruthy();
     expect(screen.getByText(/The phone app keeps no record of how you use it and sends nothing/)).toBeTruthy();   // bc1
+    // Sweep mw12: a letter page loads the song list and its songs' covers before anything is opened.
+    expect(screen.getByText(/Letter pages also load the song list and the covers of a letter.s songs \(Show songs on letter pages\)/)).toBeTruthy();
     expect(screen.getByRole('link', { name: /full privacy policy/ }).getAttribute('href')).toBe('https://votreader.github.io/app/privacy.html');
     back();
     expect(title()).toBe('Help & about');

@@ -1880,7 +1880,9 @@ function ConnectionList({ items, mode, lensOn, onChoose, onClose }) {
   const trapRef = useFocusTrap(true);
   // the canon list leads with the chapter it reads (landing 15)
   const chapter = mode !== 'personal' && items[0] && items[0].kind === 'chapter' ? items[0] : null;
-  const eyebrow = mode === 'personal' ? 'Your nearby links'
+  // My Web lists the reader's own links (up to 36, store order) wherever the camera is: no 'nearby'
+  // promise there (sweep mw12). The canon list does read the view (the lit chapter, its threads).
+  const eyebrow = mode === 'personal' ? 'Your links'
     : chapter ? (lensOn ? 'Under the lens \u00b7 ' : 'Nearby \u00b7 ') + chapter.book.title + ' ' + chapter.chapter
     : 'Nearby connections';
   const meta = chapter
@@ -1901,7 +1903,7 @@ function ConnectionList({ items, mode, lensOn, onChoose, onClose }) {
             </button>
           ))}
         </div>
-      ) : <div className="sw-list-empty">No nearby connections at this location.</div>}
+      ) : <div className="sw-list-empty">{mode === 'personal' ? 'You have no links on the web yet.' : 'No nearby connections at this location.'}</div>}
     </div>
   );
 }
