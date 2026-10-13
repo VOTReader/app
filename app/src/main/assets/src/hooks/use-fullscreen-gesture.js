@@ -36,14 +36,26 @@ function distance(a, b) {
 }
 
 /* A mouse or pen double-click on words selects them: that is the reader
-   picking text, not asking for fullscreen. Touch keeps its double-tap on
-   text (a touch double-tap selects nothing). */
+   picking text, not asking for fullscreen (W46). Touch keeps its double-tap on
+   text (a touch double-tap selects nothing). A selection counts only where it
+   is drawn under the pointer: Chrome answers a double-click on blank margin by
+   selecting the nearest word, and that margin is still an open area. */
+const PICK_SLOP_PX = 4;
 function isTextPick(event) {
   if (event.pointerType !== 'mouse' && event.pointerType !== 'pen') return false;
   const target = /** @type {any} */ (event.target);
   if (target && typeof target.closest === 'function' && target.closest('[data-hl-key]')) return true;
   const selection = typeof window.getSelection === 'function' ? window.getSelection() : null;
-  return !!(selection && !selection.isCollapsed && String(selection).trim());
+  if (!selection || selection.isCollapsed || !selection.rangeCount || !String(selection).trim()) return false;
+  const range = selection.getRangeAt(0);
+  if (typeof range.getClientRects !== 'function') return true;   // cannot tell where: leave it to the selection
+  const rects = range.getClientRects();
+  for (let i = 0; i < rects.length; i += 1) {
+    const r = rects[i];
+    if (event.clientX >= r.left - PICK_SLOP_PX && event.clientX <= r.right + PICK_SLOP_PX
+      && event.clientY >= r.top - PICK_SLOP_PX && event.clientY <= r.bottom + PICK_SLOP_PX) return true;
+  }
+  return false;
 }
 
 /** Returns true only for an open, non-control part of the current screen. */

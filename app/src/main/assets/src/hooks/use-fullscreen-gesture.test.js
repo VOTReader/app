@@ -149,7 +149,17 @@ describe('useFullscreenGesture', () => {
     expect(PlatformBridge.setImmersiveMode).not.toHaveBeenCalled();
   });
 
-  it('leaves a desktop double-click that selected text alone anywhere', () => {
+  /** The browser selecting a word on the second press; its box is where it is drawn. */
+  function selectWord(node, start, end, box) {
+    const range = document.createRange();
+    range.setStart(node, start);
+    range.setEnd(node, end);
+    range.getClientRects = () => [box];
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+  }
+
+  it('leaves a desktop double-click that selected the word under the pointer alone anywhere', () => {
     mount();
     const heading = document.body.appendChild(document.createElement('h2'));
     heading.textContent = 'The Hidden Manna';
@@ -157,15 +167,29 @@ describe('useFullscreenGesture', () => {
       pointer('pointerdown', heading, 'mouse');
       pointer('pointerup', heading, 'mouse');
       pointer('pointerdown', heading, 'mouse');
-      // The browser selects the word on the second press.
-      const range = document.createRange();
-      range.setStart(heading.firstChild, 4);
-      range.setEnd(heading.firstChild, 10);
-      window.getSelection().removeAllRanges();
-      window.getSelection().addRange(range);
+      selectWord(heading.firstChild, 4, 10, { left: 10, right: 60, top: 10, bottom: 30 });
       pointer('pointerup', heading, 'mouse');
     });
     expect(PlatformBridge.setImmersiveMode).not.toHaveBeenCalled();
+    window.getSelection().removeAllRanges();
+  });
+
+  /* Chrome answers a double-click on blank margin by selecting the nearest
+     word (measured: the chapter heading, 500 px away). That is still the open
+     area the reader double-clicked. */
+  it('still toggles when the double-click on the margin selected a word somewhere else', () => {
+    mount();
+    const margin = document.body.appendChild(document.createElement('div'));
+    const heading = document.body.appendChild(document.createElement('h2'));
+    heading.textContent = 'NICODEMUS';
+    act(() => {
+      pointer('pointerdown', margin, 'mouse');
+      pointer('pointerup', margin, 'mouse');
+      pointer('pointerdown', margin, 'mouse');
+      selectWord(heading.firstChild, 0, 9, { left: 500, right: 640, top: 200, bottom: 230 });
+      pointer('pointerup', margin, 'mouse');
+    });
+    expect(PlatformBridge.setImmersiveMode).toHaveBeenCalledTimes(1);
     window.getSelection().removeAllRanges();
   });
 
