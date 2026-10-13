@@ -37,7 +37,7 @@
 import '../styles/journal-styles.js';
 
 // ── Stores ──────────────────────────────────────────────────────────────
-import { CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_SKIP_LIST, setStoreWriteFence } from './cached-store.js';
+import { CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_SKIP_LIST, setStoreWriteFence, isStoreWriteFenced } from './cached-store.js';
 import { showToast, hideToast } from '../utils/toast.js';
 // Build identity (2026-08-11) — Settings' "App version" row asks the service
 // worker which build is actually serving the page, and the server what the
@@ -198,6 +198,8 @@ Object.assign(window, {
   CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_SKIP_LIST,
   // v04-02: Clear All (bundle-d) fences every store write until it reloads.
   setStoreWriteFence,
+  // mw13: the journal editor marks a draft durable only while writes are not fenced.
+  isStoreWriteFenced,
   // datasafe 10-05: the banner's Restore, Clear All and Import (bundle-d) reach it here.
   DataSafety,
   // W8: Clear All and Import (bundle-e) tell the other open tabs, and an Import in a tab
