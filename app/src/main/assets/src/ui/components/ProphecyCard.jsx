@@ -45,7 +45,13 @@ export function ProphecyCard({ type, tag, label, blocks, fnProps, stateKey, stat
     });
   };
   // React to external expand/collapse all signal
+  // W44: only to a signal that changes while this card is mounted. LetterView
+  // outlives a letter, so a card of the next one used to mount under the old
+  // collapse-all and apply it over its own saved state.
+  const seenSignalRef = React.useRef(expandSignal);
   React.useEffect(() => {
+    if (expandSignal === seenSignalRef.current) return;
+    seenSignalRef.current = expandSignal;
     if (expandSignal !== undefined && expandSignal !== null && expandSignal !== 0) {
       const newVal = expandSignal > 0;
       setExpandedRaw(newVal);

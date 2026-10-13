@@ -2,6 +2,8 @@
    ProphecyGroup — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* The card rules below (a part renders a card when it has content) are mirrored
+   by LetterView's prophecyCardKeysOf (W44: expand/collapse-all saves every card). */
 export function ProphecyGroup({ block, fnProps, expandSignal, groupKey, statesRef, onSaveStates }) {
   return (
     <div className="prophecy-group">
