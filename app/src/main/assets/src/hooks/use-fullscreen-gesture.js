@@ -35,6 +35,17 @@ function distance(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+/* A mouse or pen double-click on words selects them: that is the reader
+   picking text, not asking for fullscreen. Touch keeps its double-tap on
+   text (a touch double-tap selects nothing). */
+function isTextPick(event) {
+  if (event.pointerType !== 'mouse' && event.pointerType !== 'pen') return false;
+  const target = /** @type {any} */ (event.target);
+  if (target && typeof target.closest === 'function' && target.closest('[data-hl-key]')) return true;
+  const selection = typeof window.getSelection === 'function' ? window.getSelection() : null;
+  return !!(selection && !selection.isCollapsed && String(selection).trim());
+}
+
 /** Returns true only for an open, non-control part of the current screen. */
 export function isFullscreenGestureTarget(target) {
   if (!target || typeof /** @type {any} */ (target).closest !== 'function') return false;
@@ -100,6 +111,10 @@ export function useFullscreenGesture({ enabled, hintCount, onHintShown }) {
       pointerDownRef.current = null;
       if (down && (down.pointerId == null || event.pointerId == null || down.pointerId === event.pointerId)
         && distance(down, point) > MAX_DRAG_DISTANCE_PX) {
+        previousTapRef.current = null;
+        return;
+      }
+      if (isTextPick(event)) {
         previousTapRef.current = null;
         return;
       }
