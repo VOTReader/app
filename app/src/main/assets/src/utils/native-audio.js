@@ -156,6 +156,9 @@ class NativeAudio extends EventTarget {
 
   /* ── the <audio> surface ─────────────────────────────────────────── */
 
+  /** Native crossed a seam into `url` and the page has not taken it yet (sweep W60). @param {string} url */
+  crossedInto(url) { return !!url && this._loaded && url === this._nativeUrl && url !== this._src; }
+
   get src() { return this._src; }
   set src(v) {
     const url = v ? String(v) : '';

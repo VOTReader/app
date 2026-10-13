@@ -127,6 +127,38 @@ describe('audio-player on the native player (m3)', () => {
     expect(bridge.audioLoad).toHaveBeenCalledTimes(1);   // the page skipped the same way and adopted idC
   });
 
+  // Sweep W60: native passed over a song not on the phone into the next kept one, but the page then paused on the
+  // skipped song ("Not on this phone"), released native (silence) and 3 s later loaded the kept song from its top.
+  it('(W60) offline songs: native already in the next kept song past one not on the phone is adopted, not stopped and reloaded', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { SONG_FIXTURE } = await import('./song-catalog.fixture.js');
+      (await import('./song-catalog.js')).adoptSongCatalog(SONG_FIXTURE);
+      expect(AudioPlayer.playSongs({ filter: {} })).toBe(true);
+      const order = AudioPlayer.getState().queue.map((t) => t.url);
+      AudioPlayer.stop();
+      bridge.audioLoad.mockClear(); bridge.audioRelease.mockClear();
+      expect(order.length).toBeGreaterThanOrEqual(3);
+      bridge.offlineAudioState = () => JSON.stringify({ items: [order[0], order[2]].map((url) => ({ url, key: '', title: '', bytes: 1, savedAt: 1 })), totalBytes: 2, freeBytes: 1e9, active: null, queued: [] });
+      (await import('./offline-audio.js')).OfflineAudio.refresh();
+      setOnline(false);
+      expect(AudioPlayer.playSongs({ filter: {} })).toBe(true);
+      expect(loads()[0].url).toBe(order[0]);
+      expect(loads()[0].upcoming.map((t) => t.url)).toEqual([order[2]]);   // native passes over order[1]
+      send({ type: 'state', url: order[0], pos: 0, dur: 60000, playing: true, want: true });
+      send({ type: 'transition', from: order[0], url: order[2], seq: 1, pos: 50, dur: 40000, playing: true, want: true });
+      await Promise.resolve();
+      vi.advanceTimersByTime(3500);
+      const s = AudioPlayer.getState();
+      expect(s.queue[s.qi].url).toBe(order[2]);
+      expect(s.status).toBe('playing');
+      expect(bridge.audioRelease).not.toHaveBeenCalled();     // no silence at the seam
+      expect(bridge.audioLoad).toHaveBeenCalledTimes(1);      // no restart from the top
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('offline with nothing on the phone ahead, native is told to stop at the end of this one', async () => {
     await downloaded(['idA1']);
     setOnline(false);
