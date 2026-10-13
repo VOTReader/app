@@ -33,7 +33,9 @@
    the live marker, and four seconds later this sweep emptied the staging the
    other tab was about to commit. Both halves now also look at the backup Web
    Lock (utils/backup-lock.js), which a restoring tab holds until it is done:
-   held now = touch nothing. And the orphan prune is skipped for this session
+   held now = touch nothing yet: the staging sweep waits until the lock has
+   been free a while (a restore whose tab died leaves its staging behind;
+   one that finished left it empty). And the orphan prune is skipped for this session
    whenever a restore was live at boot (lock or marker): this tab's journal
    was loaded before that restore's entries landed, so "unreferenced" would
    mean "just imported". A browser that cannot query locks keeps the
@@ -46,7 +48,7 @@
 import { RESTORE_INFLIGHT_KEY } from './use-restore-guard.js';
 import { JournalMediaStore } from '../stores/journal-media-store.js';
 import { JournalStore } from '../stores/journal-store.js';
-import { backupLockBusy, canQueryBackupLock } from '../utils/backup-lock.js';
+import { backupLockBusy, canQueryBackupLock, whenBackupLockFree } from '../utils/backup-lock.js';
 
 /** Whether a restore marker is set now (any tab). */
 function _markerSet() {
@@ -60,37 +62,50 @@ export function useJournalMediaSweep() {
     const markerAtBoot = _markerSet();
     const queryable = canQueryBackupLock();
     const lockAtBoot = queryable ? backupLockBusy() : Promise.resolve(false);
+    let live = true;
+    /** @type {(() => void) | null} */
+    let stopWaiting = null;
     const t = setTimeout(() => {
-      if (!queryable) { _sweep(markerAtBoot, false); return; }
-      void Promise.all([lockAtBoot, backupLockBusy()])
-        .then(([atBoot, now]) => _sweep(markerAtBoot || atBoot, now));
+      if (!queryable) { _sweep(markerAtBoot, false, false); return; }
+      void Promise.all([lockAtBoot, backupLockBusy()]).then(([atBoot, now]) => {
+        if (live) stopWaiting = _sweep(markerAtBoot || atBoot, now, true);
+      });
     }, 4000);
-    return () => clearTimeout(t);
+    return () => { live = false; clearTimeout(t); if (stopWaiting) stopWaiting(); };
   }, []);
 }
 
 /**
  * @param {boolean} restoreAtBoot - a restore was live when this tab booted
  * @param {boolean} restoreNow - another tab holds the backup lock right now
+ * @param {boolean} queryable - this browser can say who holds the lock
+ * @returns {(() => void) | null} stops a staging sweep still waiting on the lock
  */
-function _sweep(restoreAtBoot, restoreNow) {
+function _sweep(restoreAtBoot, restoreNow, queryable) {
   const inflight = _markerSet();
+  /** @type {(() => void) | null} */
+  let stopWaiting = null;
   // storage-backup-5: stale import-staging left by a restore that never
   // reached its commit. Independent of the orphan sweep below (a
   // different object store) — runs even if JournalStore isn't ready yet.
   try {
-    if (typeof JournalMediaStore !== 'undefined' && !inflight && !restoreNow) {
-      JournalMediaStore.abortImportReplace()
-        .catch((e) => console.warn('Stale import-staging sweep failed', e));
+    if (typeof JournalMediaStore !== 'undefined') {
+      const abortStaging = () => {
+        JournalMediaStore.abortImportReplace()
+          .catch((e) => console.warn('Stale import-staging sweep failed', e));
+      };
+      if (!inflight && !restoreNow) abortStaging();
+      // W7: a restore is live (or its marker is): sweep once the lock has stayed free.
+      else if (queryable) stopWaiting = whenBackupLockFree(abortStaging);
     }
   } catch (e) { console.warn('Stale import-staging sweep threw', e); }
 
   try {
-    if (typeof JournalStore === 'undefined' || typeof JournalMediaStore === 'undefined') return;
+    if (typeof JournalStore === 'undefined' || typeof JournalMediaStore === 'undefined') return stopWaiting;
     // W7: media a restore brought in is unreferenced in a journal loaded before it landed.
     if (restoreAtBoot || restoreNow || inflight) {
       console.info('Journal media orphan sweep skipped — a restore was in progress');
-      return;
+      return stopWaiting;
     }
     // U1: only sweep when the journal store is fully hydrated. If it is
     // still pending/degraded (slow IDB, or a fresh import that hasn't
@@ -100,7 +115,7 @@ function _sweep(restoreAtBoot, restoreNow) {
     // a later boot once the store loads in time.
     if (!JournalStore.isReady()) {
       console.info('Journal media orphan sweep skipped — store not ready (' + JournalStore.getState() + ')');
-      return;
+      return stopWaiting;
     }
     // STORE-2: stamp the snapshot moment and pass it as the prune cutoff so a
     // blob captured AFTER this snapshot (but read by prune's async IDB pass)
@@ -111,4 +126,5 @@ function _sweep(restoreAtBoot, restoreNow) {
       if (n) console.info('Journal media orphan sweep removed', n, 'blob(s)');
     }).catch((e) => console.warn('Journal media orphan sweep failed', e));
   } catch (e) { console.warn('Journal media orphan sweep threw', e); }
+  return stopWaiting;
 }

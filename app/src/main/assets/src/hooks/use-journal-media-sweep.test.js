@@ -212,3 +212,29 @@ describe('useJournalMediaSweep — W7: a restore live in another tab', () => {
     expect(pruneOrphans).toHaveBeenCalledWith(['old'], expect.any(Number));
   });
 });
+
+describe('useJournalMediaSweep — W7 round 2: the restoring tab dies while this one is open', () => {
+  afterEach(() => { delete /** @type {any} */ (navigator.locks).query; });
+
+  it('sweeps the staging a dead restore left once the lock has stayed free; the orphan prune stays off', async () => {
+    localStorage.setItem(RESTORE_INFLIGHT_KEY, 'tok-A');
+    let held = true;
+    /** @type {any} */ (navigator.locks).query = vi.fn(async () => ({
+      held: held ? [{ name: 'votreader-backup-import', mode: 'exclusive' }] : [], pending: [],
+    }));
+    const abortImportReplace = vi.fn().mockResolvedValue(undefined);
+    const pruneOrphans = vi.fn().mockResolvedValue(0);
+    /** @type {any} */ (globalThis).JournalMediaStore = { abortImportReplace, pruneOrphans };
+    /** @type {any} */ (globalThis).JournalStore = { isReady: () => true, getState: () => 'loaded', collectAllMediaIds: () => [] };
+
+    renderHook(() => useJournalMediaSweep());
+    await vi.advanceTimersByTimeAsync(4000);
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(abortImportReplace).not.toHaveBeenCalled();
+    held = false;                                  // tab A died: its marker stays, its staging is stale
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(abortImportReplace).toHaveBeenCalledTimes(1);
+    expect(pruneOrphans).not.toHaveBeenCalled();
+  });
+});
