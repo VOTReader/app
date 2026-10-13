@@ -296,6 +296,46 @@ describe('LinkPicker search scope toggle (Titles & refs / Full text)', () => {
   });
 });
 
+/* W51: Enter in Full text linked the top hit of the PREVIOUS query: the text
+   search is debounced and async, so for a moment after typing the list (and
+   Enter) still held the old query's hits. Enter now acts only on hits made
+   for the words in the box. */
+describe('LinkPicker Full text: Enter acts on the words in the box (W51)', () => {
+  it('ignores Enter while the hits still belong to the previous query, then links the new top hit', async () => {
+    vi.useFakeTimers();
+    stubGlobals();
+    window.navItemToEndpoint = (item) => ({ type: 'bible', key: 'k', label: item.label, verse: item.verse || null });
+    window.contentDocToNavItem = (doc) => ({ kind: 'bible-chapter', bookId: doc.bookId, chapter: doc.chapterNum, verse: doc.verseNum, label: doc.ref, title: doc.ref });
+    const DOCS = {
+      'god so loved': { bookId: 'john', chapterNum: 3, verseNum: 16, ref: 'John 3:16', text: 'For God so loved the world' },
+      'narrow is the way': { bookId: 'matthew', chapterNum: 7, verseNum: 14, ref: 'Matthew 7:14', text: 'narrow is the way' },
+    };
+    window.VotSearchMini = {
+      getState: () => ({ ready: true }),
+      snippet: (text) => text,
+      search: vi.fn(async (q) => ({ parsedTerms: q.split(' '), results: [{ score: 1, doc: { kind: 'verse', ...DOCS[q] } }] })),
+    };
+    const { container } = render(<LinkPicker {...baseProps} />);
+    try {
+      fireEvent.click(screen.getByRole('radio', { name: 'Full text' }));
+      const box = container.querySelector('.navpick-search-input');
+      fireEvent.change(box, { target: { value: 'god so loved' } });
+      await act(async () => { vi.advanceTimersByTime(300); });
+      await act(async () => { await Promise.resolve(); });
+      fireEvent.change(box, { target: { value: 'narrow is the way' } });
+      fireEvent.keyDown(box, { key: 'Enter' });            // before the new search has run
+      expect(window.persistLink).not.toHaveBeenCalled();
+      await act(async () => { vi.advanceTimersByTime(300); });
+      await act(async () => { await Promise.resolve(); });
+      fireEvent.keyDown(box, { key: 'Enter' });
+      expect(window.persistLink).toHaveBeenCalledTimes(1);
+      expect(window.persistLink.mock.calls[0][1].label).toBe('Matthew 7:14');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 /* ── Corpus scope (All / Scriptures / Volumes) ──────────────────────────────
    The picker's Full-text scope searched every corpus at once with no way to
    narrow, so a remembered scripture phrase competed with 350+ letters for the
