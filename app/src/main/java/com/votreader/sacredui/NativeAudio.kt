@@ -183,8 +183,12 @@ object NativeAudioLogic {
 
     /** A [Loop] that runs to the recording's end. */
     const val TO_END = -1L
-    /** The wrap is due this far before the end (the page's LOOP_EPS_S). */
-    const val LOOP_EPS_MS = 30L
+    /**
+     * The wrap is asked for this far before the end. The controller's seek or pause reaches ExoPlayer 75-140 ms after
+     * the clock says due (emulator, ra2 look: a span ending at 36.0 s stopped at 36.05-36.155 s with 30 ms), and the
+     * breath before the next verse is safer to cut than that verse's first word.
+     */
+    const val LOOP_EPS_MS = 120L
     /** A seek this far outside the span still stays in it (the page's LOOP_SLACK_S). */
     const val LOOP_SLACK_MS = 500L
     const val MAX_LOOP_TIMES = 99

@@ -157,13 +157,13 @@ class NativeAudioLogicTest {
     @Test
     fun `the wrap is timed from the clock at the playing speed, just before the end`() {
         val lp = NativeAudioLogic.Loop(1, "U", 10_000, 20_000, 3, 1)
-        assertEquals(9_970L, lp.dueInMs(10_000, 1f))
-        assertEquals(4_985L, lp.dueInMs(10_000, 2f))   // twice the speed, half the wall time
-        assertEquals(19_940L, lp.dueInMs(10_000, 0.5f))
-        assertEquals(9_970L, lp.dueInMs(10_000, Float.NaN))   // a bad speed counts as 1x
-        assertEquals(0L, lp.dueInMs(19_970, 1f))       // due now: within LOOP_EPS_MS of the end
+        assertEquals(9_880L, lp.dueInMs(10_000, 1f))   // LOOP_EPS_MS (120) ahead: the seek takes that long to land
+        assertEquals(4_940L, lp.dueInMs(10_000, 2f))   // twice the speed, half the wall time
+        assertEquals(19_760L, lp.dueInMs(10_000, 0.5f))
+        assertEquals(9_880L, lp.dueInMs(10_000, Float.NaN))   // a bad speed counts as 1x
+        assertEquals(0L, lp.dueInMs(19_880, 1f))       // due now: within LOOP_EPS_MS of the end
         assertEquals(0L, lp.dueInMs(25_000, 1f))       // past it (a late timer)
-        assertEquals(1L, lp.dueInMs(19_969, 1.5f))     // never 0 early: rounds up
+        assertEquals(1L, lp.dueInMs(19_879, 1.5f))     // never 0 early: rounds up
     }
 
     @Test
