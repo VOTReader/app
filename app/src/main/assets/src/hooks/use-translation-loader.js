@@ -44,6 +44,9 @@ export function useTranslationLoader(translation, setTranslationTick) {
        Switching all the way back to NKJV frees every alt edition, which is why
        this effect no longer returns early on it — that is the one switch with the
        most to free, and it used to be the one that freed nothing. */
+    // The helpers are bundle-d globals: a bundle-b render that runs without them
+    // waits for the next switch rather than throwing (W25 refuter).
+    if (typeof releaseTranslationsExcept !== 'function' || typeof loadTranslation !== 'function') return undefined;
     if (code === 'nkjv') { releaseTranslationsExcept('nkjv'); return undefined; }
     /* W25: sweep against the CURRENT selection, not the edition this load
        fetched. Picking ASV then WEB, with WEB landing first, ASV's late callback

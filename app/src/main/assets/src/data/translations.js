@@ -182,7 +182,12 @@ export function releaseTranslationsExcept(selected) {
   const freed = [];
   for (const code of Object.keys(_translationLoaded)) {
     if (keep.has(code)) continue;
-    try { delete (/** @type {any} */ (window))['BIBLE_' + code.toUpperCase()]; } catch (_e) { /* a non-configurable global stays; the rest of the sweep still runs */ }
+    // W25 refuter: each edition file starts `var BIBLE_<CODE> = {...}`, and a classic
+    // script's global var is NON-configurable: `delete` failed quietly and freed only
+    // the bookkeeping. The binding is writable, so dropping the reference frees the
+    // ~32 MB; every reader tests the global for truthiness, and a re-open reloads.
+    try { (/** @type {any} */ (window))['BIBLE_' + code.toUpperCase()] = undefined; } catch (_e) { /* the rest of the sweep still runs */ }
+    try { delete (/** @type {any} */ (window))['BIBLE_' + code.toUpperCase()]; } catch (_e) { /* a configurable one goes entirely */ }
     delete _translationLoaded[code];
     delete _translationPromises[code];
     const prefix = code + ':';
@@ -226,7 +231,12 @@ export function holdTranslation(code) {
  */
 export function isTranslationLoaded(code) {
   if (!code || code === 'nkjv') return true;
-  return !!(/** @type {any} */ (window))['BIBLE_' + code.toUpperCase()];
+  const w = /** @type {any} */ (window);
+  if (!w['BIBLE_' + code.toUpperCase()]) return false;
+  // A sparse overlay (KJV-R) is its base wherever it is silent: without the base
+  // those verses read NKJV (W25 refuter).
+  const base = _baseOf(code);
+  return !base || base === 'nkjv' || !!w['BIBLE_' + base.toUpperCase()];
 }
 
 function _verseIndex(data, translation, bookId, chNum) {
