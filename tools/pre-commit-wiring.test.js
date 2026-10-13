@@ -300,3 +300,32 @@ describe('pre-commit: Python steps run the pinned 3.13, not the first python on 
     expect(status, out.slice(-800)).toBe(0);
   }, 120_000);
 });
+
+/* nw11 (network 2026-10-13): the stage guard told lanes to `git stash push -- <file>`, but a repo keeps ONE stash stack
+   for all its worktrees, and readalong's `stash pop` applied myweb's W25 work in progress. The guard now prints a patch
+   kept in this worktree's own git dir. This RUNS the printed commands in a temp repo (GIT_* stripped: inside a hook git
+   exports GIT_DIR, and a test repo would otherwise write to the real one). */
+describe('the stage guard sets unstaged edits aside per worktree, never in git stash (nw11)', () => {
+  it('its printed recipe round-trips the edits through a patch and leaves the stash empty', () => {
+    const lines = readFileSync(resolve(root, '.githooks/pre-commit'), 'utf8').split('\n');
+    const hooksAdvice = [...lines, ...readFileSync(resolve(root, '.githooks/pre-push'), 'utf8').split('\n')]
+      .filter((l) => /^\s*echo /.test(l)).join('\n');
+    expect(hooksAdvice).not.toMatch(/git stash (push|save)|commit ?\/ ?stash|or stash/);
+    const echoed = (l) => l.trim().replace(/^echo "/, '').replace(/"$/, '').replace(/\\(["$])/g, '$1').replace(/<file>/g, 'a.txt');
+    const aside = echoed(lines.find((l) => l.includes('git diff -- <file> >'))).trim();
+    const back = echoed(lines.find((l) => l.includes('after the commit: git apply'))).replace(/^.*after the commit: /, '');
+    const dir = mkdtempSync(join(tmpdir(), 'vot-aside-'));
+    const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
+    Object.assign(env, { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@invalid', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@invalid' });
+    const sh = (cmd) => execFileSync('sh', ['-c', cmd], { cwd: dir, env, encoding: 'utf8' });
+    const disk = () => readFileSync(join(dir, 'a.txt'), 'utf8');
+    sh('git init -q && git config core.autocrlf false && printf "one\\n" > a.txt && git add a.txt && git commit -qm base');
+    sh('printf "one\\ntwo\\n" > a.txt && git add a.txt && printf "one\\ntwo\\nthree\\n" > a.txt');   // staged: two; not: three
+    sh(aside);
+    expect(disk()).toBe('one\ntwo\n');
+    sh('git commit -qm staged');
+    sh(back);
+    expect(disk()).toBe('one\ntwo\nthree\n');
+    expect(sh('git stash list')).toBe('');
+  }, 60_000);
+});

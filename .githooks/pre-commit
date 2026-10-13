@@ -140,7 +140,10 @@ if [ -z "$VOT_HOOK_TEST_NO_STAGE_GUARD" ]; then
     echo "$unstaged_sources" | sed 's/^/    /'
     echo "  Every gate and the dist/ rebuild read the working tree, so this commit"
     echo "  would ship bundles built from code it does not contain. Stage them"
-    echo "  (git add <file>) or set them aside (git stash push -- <file>), then retry."
+    echo "  (git add <file>), or set them aside in a patch only this worktree keeps:"
+    echo "    git diff -- <file> > \"\$(git rev-parse --git-dir)/aside.patch\" && git restore -- <file>"
+    echo "  then retry, and after the commit: git apply \"\$(git rev-parse --git-dir)/aside.patch\""
+    echo "  (not git stash: one stash stack serves every worktree, so a pop can apply another lane's work)."
     exit 1
   fi
 fi

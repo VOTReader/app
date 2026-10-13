@@ -134,7 +134,8 @@ on them through the same corpus objects. The contract and its one race class are
 `.githooks/pre-commit` runs only what the staged files need, in this order:
 
 0. always first: it **refuses a commit whose bundle sources have unstaged edits** (every gate and the rebuild read
-   the working tree, so the commit would ship bundles built from code it does not contain: stage or stash them);
+   the working tree, so the commit would ship bundles built from code it does not contain: stage them, or set them
+   aside in the per-worktree patch the hook prints; never `git stash`, whose one stack every worktree shares);
    staged Scripture Web source runs `check:s22`, which **warns** on a stale S22 measurement (CI only warns too;
    re-measure when the phone is on adb) and fails on a scene over budget;
 1. data files: `check_balance.py`, `tools/validate-schemas.js --strict`, the read-along offset and Bible-timing
