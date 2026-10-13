@@ -149,13 +149,8 @@ describe('Scripture Web is offered from Home again, and still reached by drillin
      web returns to Home. The Library entry and the deep link were never touched and stay. */
   it('the Home route opens Scripture Web from Home and back returns through the captured origin', () => {
     const { routes, props } = makeRoutes();
-    // The entry warms bundle-f on the tap, as the Library's does — witnessed, because a warm call
-    // that quietly stopped firing would only show as a "Loading…" frame nobody measures.
-    window.__loadScreensF = vi.fn();
-    try {
-      routes.home().props.onScriptureWeb();
-      expect(window.__loadScreensF).toHaveBeenCalledTimes(1);
-    } finally { delete window.__loadScreensF; }
+    // (Until lz1 the entry also warmed lazy bundle-f; the Scripture Web ships in bundle-d now.)
+    routes.home().props.onScriptureWeb();
     expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'home', returnOrigin: null });
     expect(props.setScreen).toHaveBeenCalledWith('scripture-web');
 
@@ -167,11 +162,7 @@ describe('Scripture Web is offered from Home again, and still reached by drillin
 
   it('the Library entry still opens it, and back returns through the origin', () => {
     const { routes, props } = makeRoutes();
-    window.__loadScreensF = vi.fn();
-    try {
-      routes.library().props.onOpenScriptureWeb();
-      expect(window.__loadScreensF).toHaveBeenCalledTimes(1);
-    } finally { delete window.__loadScreensF; }
+    routes.library().props.onOpenScriptureWeb();
     expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'library', returnOrigin: null });
     expect(props.setScreen).toHaveBeenCalledWith('scripture-web');
 

@@ -209,8 +209,8 @@ export function AppShellOverlays({
           </div>
         );
       })()}
-      {/* "Show me around": the strip on Home (bundle-d) and the tour itself (bundle-e, lazy;
-          undefined until TourController.start() has loaded it). */}
+      {/* "Show me around": the strip on Home and the tour itself, both bundle-d free globals
+          (guarded like every shell free global: unit tests render the shell without them). */}
       {typeof TourPrompt !== 'undefined' ? <TourPrompt screen={screen} /> : null}
       {typeof TourOverlay !== 'undefined' ? <TourOverlay /> : null}
     </>

@@ -80,15 +80,15 @@ A = [
     # Bible-edition audio manifest (~4 KB minified): whole-book audiobook rows
     # keyed "bible-<edition>:<bookId>". Rides the CRITICAL path deliberately —
     # the Listen pill + boot resume must work on matthew-idx (bundle-a-matthew)
-    # and Settings (bundle-e) without forcing the 5 MB a-bible load.
+    # and Settings without forcing the 5 MB a-bible load.
     'src/data/bible-audio-manifest.js',
     # search-data.js LEFT this list 2026-09-22 (landing 27, −42,753 B off every
     # cold start). It is the window.VotSearchData tables — stop words, synonyms,
     # book abbreviations, named passages, slash-commands — and every consumer
-    # (src/search/engine.js, ref-parser.js, index-builder.js, SearchScreen) is
-    # reachable only from src/ui/_entry-e.js, which is lazy behind
-    # __loadScreensE. It is now a side-effect import there, so it is parsed by
-    # the reader who opens Search and by nobody else. The Classic engine
+    # (src/search/engine.js, ref-parser.js, index-builder.js, SearchScreen) was
+    # reachable only from the lazy bundle-e; it is a side-effect import in
+    # src/ui/_entry-d.js since lz1 (2026-10-13) folded e-h into bundle-d, still
+    # never in bundle-a. The Classic engine
     # (search.js) + its flexsearch.min.js vendor were RETIRED 2026-07-02 (owner
     # A/B kept MiniSearch) — ~97 KB off the cold-boot critical path then.
 ]

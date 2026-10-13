@@ -102,7 +102,6 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
   // remains the service worker's job; opening Home no longer executes corpora.
   const warmDestination = (id) => {
     const load = id === 'scriptures' ? window.__loadBibleCorpus
-      : id === 'settings' ? window.__loadScreensE
       : id === 'answers' ? window.__loadAnswersCorpus
       : ['volumes', 'studies', 'library', 'listening', 'songs'].includes(id) ? window.__loadVotCorpus : null;
     if (typeof load === 'function') load().catch((e) => console.warn('Destination pre-load failed', e));

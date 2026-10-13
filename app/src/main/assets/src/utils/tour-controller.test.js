@@ -1,9 +1,9 @@
 /* tour-controller — the one object that runs the tour.
    ──────────────────────────────────────────────────────
    RED first (review-tutorial, 2026-09-04). Locks down:
-     A) start() makes the tour active at the welcome card, asks the lazy
-        bundle-e loader for the overlay, and runs the stop's `enter`
-        through the nav the app attached.
+     A) start() makes the tour active at the welcome card, ready at once
+        (the overlay ships in bundle-d since lz1), and runs the stop's
+        `enter` through the nav the app attached.
      B) next() performs the stop's act (press the target / navigate) and
         moves on; targetPressed() moves on WITHOUT acting again (the reader
         already tapped the control); back() re-enters the previous stop;
@@ -58,22 +58,12 @@ describe('TourController — start', () => {
     expect(cb).toHaveBeenCalled();
   });
 
-  it('asks the lazy screens-e loader for the overlay and is ready when it resolves', async () => {
-    let resolve;
-    window.__loadScreensE = vi.fn(() => new Promise((r) => { resolve = r; }));
-    TourController.attachNav(nav());
-    TourController.start('settings');
-    expect(window.__loadScreensE).toHaveBeenCalledTimes(1);
-    expect(TourController.getState().ready).toBe(false);
-    resolve();
-    await Promise.resolve(); await Promise.resolve();
-    expect(TourController.getState().ready).toBe(true);
-  });
-
-  it('is ready at once when there is no loader (tests, or the bundle already present)', () => {
+  it('is ready at once and asks no loader: the overlay ships in bundle-d (lz1)', () => {
+    window.__loadScreensE = vi.fn(() => new Promise(() => {}));
     TourController.attachNav(nav());
     TourController.start('settings');
     expect(TourController.getState().ready).toBe(true);
+    expect(window.__loadScreensE).not.toHaveBeenCalled();
   });
 
   it('runs the welcome stop\'s enter (go Home) so a tour started from Settings begins on Home', () => {

@@ -446,7 +446,7 @@ export function buildScreenRoutes({
   // continues across the jump.
   // W-03 (walk 2026-09-25): the back pill over a letter opened from a recording names where it RETURNS. It said
   // "Listening Library" from everywhere, the Songs screens and the listening desk included. The Songs screens name
-  // their top frame (the song, the list, the hub; bundle-h's songsFrameTitle), the Library screens the Library, and
+  // their top frame (the song, the list, the hub; AudioSongsScreen's songsFrameTitle), the Library screens the Library, and
   // any other page the desk was opened over its own title (the tab title the headers set).
   const _audioTextFrom = (sourceScreen) => {
     if (sourceScreen === SONGS_SCREEN) {
@@ -834,7 +834,7 @@ export function buildScreenRoutes({
 
     // ── AppShell / settings / search / home / library (P8b — 20 medium
     //    prop-threading screens folded in; same pattern as P8a). ──
-    'settings': () => (typeof SettingsScreen !== 'undefined') ? (
+    'settings': () => (
       <SettingsScreen
         settings={settings}
         onToggle={toggleSetting}
@@ -849,8 +849,8 @@ export function buildScreenRoutes({
         historyCount={readHistory.length}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensE, window.__loadScreensE, 'Loading…'),
-    'search': () => (typeof SearchScreen !== 'undefined') ? (
+    ),
+    'search': () => (
       <SearchScreen
         query={searchQuery}
         onQueryChange={setSearchQuery}
@@ -864,7 +864,7 @@ export function buildScreenRoutes({
         onToggleScope={() => setSearchScope((prev) => prev ? null : searchContext)}
         onOpenSongs={(q) => _openSongs([{ k: 'hub', q }], { screen: 'search' })}
       />
-    ) : _corpusView(window.__screensE, window.__loadScreensE, 'Loading…'),
+    ),
     'home': () => (
       <HomeScreen
         onSelect={handleSelect}
@@ -878,9 +878,7 @@ export function buildScreenRoutes({
         onNotes={goNotesIndex}
         onBookmarks={goBookmarksIndex}
         onScriptureWeb={() => {
-          // Same entry as the Library's: warm bundle-f so the "Loading…" frame is usually
-          // skipped, capture Home as the origin so back returns here.
-          if (typeof window.__loadScreensF === 'function') window.__loadScreensF();
+          // Same entry as the Library's: capture Home as the origin so back returns here.
           setNavOrigin({ screen: 'home', returnOrigin: navOrigin || null });
           setScreen('scripture-web');
         }}
@@ -907,7 +905,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'history': () => typeof HistoryScreen !== 'undefined' ? (
+    'history': () => (
       <HistoryScreen
         history={readHistory}
         onBack={goNavOrigin}
@@ -953,7 +951,7 @@ export function buildScreenRoutes({
         onHistory={goHistory}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
+    ),
     'library': () => _kickVot(
         <LibraryScreen
           onBack={goHome}
@@ -966,9 +964,6 @@ export function buildScreenRoutes({
           onOpenPlans={() => { setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null }); setScreen('reading-plans'); }}
           readingPlanCount={Array.isArray(settings.readingPlans) ? settings.readingPlans.length : 0}
           onOpenScriptureWeb={() => {
-            // Kick bundle-f before the route renders so the "Loading…" frame
-            // is usually skipped entirely.
-            if (typeof window.__loadScreensF === 'function') window.__loadScreensF();
             setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null });
             setScreen('scripture-web');
           }}
@@ -980,8 +975,8 @@ export function buildScreenRoutes({
           theme={theme} onThemeChange={setTheme}
         />
     ),
-    // rp1: the reading plans (bundle-g); back returns to where it was opened
-    'reading-plans': () => typeof ReadingPlansScreen !== 'undefined' ? (
+    // rp1: the reading plans; back returns to where it was opened
+    'reading-plans': () => (
       <ReadingPlansScreen
         onBack={goNavOrigin}
         backLabel={navOrigin && navOrigin.screen === 'home' ? 'Home' : 'Library'}
@@ -995,11 +990,9 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
-    // The Personal Study screens live in bundle-g (lazy, PF6 contract):
-    // until its IIFE has defined them, the route shows _corpusView's loader and
-    // asks for the bundle, exactly as Settings/Search do for bundle-e.
-    'my-progress': () => typeof MyProgressScreen !== 'undefined' ? _kickVot(
+    ),
+    // The Personal Study screens.
+    'my-progress': () => _kickVot(
       <MyProgressScreen
         onBack={goNavOrigin}
         onSearch={goSearch}
@@ -1011,7 +1004,7 @@ export function buildScreenRoutes({
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
+    ),
     // Link-outs from the index / viewer / web screens do NOT write navOrigin.
     // These screens' own Back IS goNavOrigin, and goHighlightsIndex & friends
     // already snapshotted the reading position there when the index opened —
@@ -1020,7 +1013,7 @@ export function buildScreenRoutes({
     // press, then Home). navigateToLink owns the destination's return path
     // through the fromLetter entry it pushes (the pill / tapThroughBack /
     // handleAndroidBack), so there is nothing here for navOrigin to carry.
-    'highlights-index': () => typeof HighlightsScreen !== 'undefined' ? _kickVot(
+    'highlights-index': () => _kickVot(
       <HighlightsScreen
         onSettings={goSettings}
         onBack={goNavOrigin}
@@ -1035,8 +1028,8 @@ export function buildScreenRoutes({
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
-    'journal-home': () => typeof JournalHubScreen !== 'undefined' ? _kickVot(
+    ),
+    'journal-home': () => _kickVot(
       <JournalHubScreen
         onSettings={goSettings}
         onBack={goNavOrigin}
@@ -1049,13 +1042,13 @@ export function buildScreenRoutes({
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
+    ),
     // backHint/tapThroughBack: the cross-screen pill. A note in a notebook, a
     // Links/Bookmarks/Highlights row whose source is a journal paragraph, or a
     // journal card from another entry all land HERE and used to have no way
     // back. The viewer renders exactly ONE pill — its private journal→journal
     // stack first, this one otherwise.
-    'journal-viewer': () => typeof JournalViewerScreen !== 'undefined' ? _kickVot(
+    'journal-viewer': () => _kickVot(
       <JournalViewerScreen
         onSettings={goSettings}
         entryId={journalEntryId}
@@ -1087,8 +1080,8 @@ export function buildScreenRoutes({
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
-    'journal-editor': () => typeof JournalEditorScreen !== 'undefined' ? _kickVot(
+    ),
+    'journal-editor': () => _kickVot(
       <JournalEditorScreen
         onSettings={goSettings}
         entryId={journalEntryId}
@@ -1099,8 +1092,8 @@ export function buildScreenRoutes({
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
-    'notes-index': () => typeof NotesIndexScreen !== 'undefined' ? _kickVot(
+    ),
+    'notes-index': () => _kickVot(
       <NotesIndexScreen
         onSettings={goSettings}
         onBack={goNavOrigin}
@@ -1116,8 +1109,8 @@ export function buildScreenRoutes({
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
-    'links-index': () => typeof LinksScreen !== 'undefined' ? _kickVot(
+    ),
+    'links-index': () => _kickVot(
       <LinksScreen
         onSettings={goSettings}
         onBack={goNavOrigin}
@@ -1137,8 +1130,8 @@ export function buildScreenRoutes({
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
-    'bookmarks-index': () => typeof BookmarksScreen !== 'undefined' ? _kickVot(
+    ),
+    'bookmarks-index': () => _kickVot(
       <BookmarksScreen
         onSettings={goSettings}
         onBack={goNavOrigin}
@@ -1153,7 +1146,7 @@ export function buildScreenRoutes({
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
+    ),
     'scriptures-home': () => (
       <ScripturesHome
         onSelect={(/** @type {[id: string, clearGenre?: boolean]} */ ...a) => { _startNewTrail(); handleScriptureSelect(...a); }}
@@ -1190,7 +1183,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'audio-library': () => typeof AudioLibraryScreen !== 'undefined' ? (
+    'audio-library': () => (
       <AudioLibraryScreen
         onBack={goNavOrigin}
         backLabel={navOrigin && navOrigin.screen === 'library' ? 'Library'
@@ -1208,8 +1201,8 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
-    'audio-library-volumes': () => typeof AudioVolumesScreen !== 'undefined' ? (
+    ),
+    'audio-library-volumes': () => (
       <AudioVolumesScreen
         onBack={goNavOrigin}
         backLabel="Listening Library"
@@ -1223,9 +1216,9 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
+    ),
     // Downloads to the phone (listening item 8): the hub's "On this phone" row.
-    'audio-library-offline': () => typeof AudioOfflineScreen !== 'undefined' ? (
+    'audio-library-offline': () => (
       <AudioOfflineScreen
         onBack={goNavOrigin}
         backLabel="Listening Library"
@@ -1234,8 +1227,8 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
-    'audio-library-studies': () => typeof AudioStudiesScreen !== 'undefined' ? (
+    ),
+    'audio-library-studies': () => (
       <AudioStudiesScreen
         onBack={goNavOrigin}
         backLabel="Listening Library"
@@ -1268,8 +1261,8 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
-    'audio-library-collection': () => typeof AudioCollectionScreen !== 'undefined' ? (
+    ),
+    'audio-library-collection': () => (
       <AudioCollectionScreen
         volKey={audioColKey}
         onBack={goNavOrigin}
@@ -1282,8 +1275,8 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
-    [SONGS_SCREEN]: () => typeof AudioSongsScreen !== 'undefined' ? (
+    ),
+    [SONGS_SCREEN]: () => (
       <AudioSongsScreen
         route={decodeSongsRoute(audioColKey)}
         onPush={(frame) => setAudioColKey(pushSongsFrame(audioColKey, frame))}
@@ -1299,8 +1292,8 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
-    'audio-library-saved': () => typeof AudioSavedScreen !== 'undefined' ? (
+    ),
+    'audio-library-saved': () => (
       <AudioSavedScreen
         onBack={goNavOrigin}
         backLabel="Listening Library"
@@ -1310,7 +1303,7 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensH, window.__loadScreensH, 'Loading…'),
+    ),
     'matthew-idx': () => {
       // Q8.2: MATTHEW lazy-loaded — show loading (or a retry on failure, E1).
       if (typeof MATTHEW === 'undefined') return _corpusView(window.__matthewCorpus, window.__loadMatthewCorpus, 'Loading Matthew…');
@@ -1348,11 +1341,7 @@ export function buildScreenRoutes({
         />
       );
     },
-    // StudiesHome, BibleStudyIndex, BibleStudyChapterView and MatthewChapterView
-    // live in bundle-g (Lighthouse item 5): until its IIFE has defined them,
-    // each route shows _corpusView's loader and asks for the bundle, exactly as
-    // the Personal Study routes above do.
-    'studies-home': () => typeof StudiesHome !== 'undefined' ? (
+    'studies-home': () => (
       <StudiesHome
         studies={UNIFIED_CHAIN}
         studiesLoading={studiesLoading}
@@ -1373,7 +1362,7 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         theme={theme} onThemeChange={setTheme}
       />
-    ) : _corpusView(window.__screensG, window.__loadScreensG, 'Loading…'),
+    ),
     'bible-idx': () => {
       // Wave 0: the index back goes to the GENRE screen when one is active
       // (scripture-genre), otherwise to Scriptures — name that destination
@@ -1459,11 +1448,7 @@ export function buildScreenRoutes({
     //    components in src/ui/screens/. ──
     'matthew-ch': () => {
       // Q8.2: MATTHEW lazy-loaded — show loading (or a retry on failure, E1).
-      // Ask for bundle-g (the view itself) alongside the corpus rather than after
-      // it: idempotent and async-notify-only, like every _corpusView kick.
-      if (typeof MatthewChapterView === 'undefined' && typeof window.__loadScreensG === 'function') window.__loadScreensG();
       if (typeof MATTHEW === 'undefined') return _corpusView(window.__matthewCorpus, window.__loadMatthewCorpus, 'Loading Matthew…');
-      if (typeof MatthewChapterView === 'undefined') return _corpusView(window.__screensG, window.__loadScreensG, 'Loading…');
       // The Matthew study cards cross-reference VOT letters; resolveVotLetter only
       // resolves once the VOT corpus has loaded and __finishVotInit has rebuilt
       // VOT_LETTER_REGISTRY. On a cold-boot restore STRAIGHT into Matthew, nothing
@@ -1499,7 +1484,6 @@ export function buildScreenRoutes({
     },
 
     'bible-study-index': () => {
-      if (typeof BibleStudyIndex === 'undefined') return _corpusView(window.__screensG, window.__loadScreensG, 'Loading…');
       const study = studyId ? getStudyById(studyId) : null;
       if (!study) return _deadStudy();   // W28
       return (
@@ -1521,7 +1505,6 @@ export function buildScreenRoutes({
     },
 
     'bible-study-chapter': () => {
-      if (typeof BibleStudyChapterView === 'undefined') return _corpusView(window.__screensG, window.__loadScreensG, 'Loading…');
       // W28: the view returned null for a study or part that does not resolve.
       const study = studyId ? getStudyById(studyId) : null;
       if (!study) return _deadStudy();
@@ -1636,7 +1619,7 @@ export function buildScreenRoutes({
       return <LetterView {...sharedViewProps} {...colReadNavProps('hm')} letter={letterShim} volumeLabel="Hidden Manna" onHome={goHomeFromHM} onNavigate={(id) => { setLetterId(id); }} />;
     },
 
-    'garden-view': () => (typeof GardenView !== 'undefined') ? (
+    'garden-view': () => (
       <GardenView
         page={gardenPage}
         onPageChange={(p) => setGardenPage(p)}
@@ -1644,16 +1627,15 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
         tier={settings.gardenTier || GARDEN_DEFAULT_TIER}
       />
-    ) : _corpusView(window.__screensE, window.__loadScreensE, 'Loading…'),
+    ),
 
-    // The Scripture Web rides its own lazy bundle (bundle-f). Both corpora are
-    // kicked in the background on the same render-phase contract as _kickVot:
+    // The Scripture Web. Both corpora are kicked in the background on the same render-phase contract as _kickVot:
     // the Bible corpus backs the verse previews in the detail sheet, the VOT
     // corpus backs the personal web's top rail. Neither blocks the drawing.
     'scripture-web': () => {
       if (typeof window.__loadBibleCorpus === 'function') window.__loadBibleCorpus();
       if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus();
-      return (typeof ScriptureWebScreen !== 'undefined') ? (
+      return (
         <ScriptureWebScreen
           navigateToLink={(endpoint, meta) => {
             if (!endpoint) return;
@@ -1663,7 +1645,7 @@ export function buildScreenRoutes({
           settings={settings}
           updateSetting={updateSetting}
         />
-      ) : _corpusView(window.__screensF, window.__loadScreensF, 'Loading…');
+      );
     },
   };
 }

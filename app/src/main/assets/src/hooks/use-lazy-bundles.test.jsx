@@ -1,20 +1,17 @@
-/* useLazyBundles tests (PF6).
+/* useLazyBundles tests (PF6, rewritten for lz1 2026-10-13).
    ──────────────────────────
    The hook subscribes App() to EVERY __makeLazyLoader corpus object on window
-   — the three scripture corpora and every lazy SCREEN bundle — so a lazy load
-   re-renders App and its loading route swaps to the real screen. React is a
-   test global (vitest.setup.js).
+   — the three scripture corpora and Answers — so a lazy load re-renders App
+   and its loading route swaps to the real screen. React is a test global
+   (vitest.setup.js).
 
    THE BUG THIS GREW TO COVER (found 2026-09-22, landing 28). The hook knew
-   about screens-e and screens-f only. Landings 21-24 added screens-g (the
-   Personal Study screens, Bookmarks, Milestones, History) and screens-h (the
-   Listening Library) and nobody taught it those two, so when one of them
-   arrived nothing told App. The route kept rendering "Loading…" until some
-   OTHER state change happened to re-render the tree. It looked fine in
-   testing because opening those screens usually also kicks the VOT corpus,
-   whose bump does re-render — but a reader who opens My Notes after the
-   corpus has already settled just sits there. A lazy bundle without a
-   subscription is a screen that never arrives.
+   about two of the four lazy SCREEN bundles; when one of the other two
+   arrived nothing told App, and the route kept rendering "Loading…" until
+   some OTHER state change re-rendered the tree. A lazy bundle without a
+   subscription is a screen that never arrives. The screen bundles are gone
+   (lz1 folded e-h into bundle-d), but the law holds for every loader
+   index.html still registers, so the list below is read from index.html.
 */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -30,17 +27,15 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { useLazyBundles } from './use-lazy-bundles.js';
 
-// __answersCorpus is published by utils/sync-loaders.js, not index.html.
-const CORPORA = ['__bibleCorpus', '__matthewCorpus', '__votCorpus', '__answersCorpus'];
-/* READ FROM index.html, not typed here: every `window.__screensX =` the loader
-   IIFE registers. A new lazy bundle therefore fails this file on the day it is
-   created, until useLazyBundles subscribes to it — which is the only thing
-   that makes its screens appear when the bundle lands. */
+/* READ FROM index.html, not typed here: every `window.__X = <loader>.corpus`
+   the loader IIFE registers. A new lazy bundle therefore fails this file on
+   the day it is created, until useLazyBundles subscribes to it. */
 const INDEX_HTML = readFileSync(
   resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'index.html'), 'utf-8');
-const SCREEN_BUNDLES = [...new Set(
-  [...INDEX_HTML.matchAll(/window\.(__screens[A-Z])\s*=/g)].map((m) => m[1]))];
-const GLOBALS = [...CORPORA, ...SCREEN_BUNDLES];
+const INDEX_LOADERS = [...new Set(
+  [...INDEX_HTML.matchAll(/window\.(__\w+)\s*=\s*\w+\.corpus\b/g)].map((m) => m[1]))];
+// __answersCorpus is published by utils/sync-loaders.js, not index.html.
+const GLOBALS = [...new Set([...INDEX_LOADERS, '__answersCorpus'])];
 
 function makeCorpus() {
   let v = 0;
@@ -67,9 +62,13 @@ afterEach(() => {
 });
 
 describe('useLazyBundles (PF6)', () => {
-  it('found the lazy screen bundles in index.html', () => {
+  it('found the corpus loaders in index.html', () => {
     // A derivation that quietly found nothing would make every test below pass.
-    expect(SCREEN_BUNDLES.length).toBeGreaterThanOrEqual(4);
+    expect(INDEX_LOADERS).toEqual(expect.arrayContaining(['__bibleCorpus', '__matthewCorpus', '__votCorpus']));
+  });
+
+  it('index.html registers no lazy SCREEN bundle (lz1: screen code ships in bundle-d)', () => {
+    expect(INDEX_HTML).not.toMatch(/__screens[A-Z]|__loadScreens[A-Z]|bundle-[e-h]\.js|screens-[e-h]\.min\.css/);
   });
 
   it('subscribes to every lazy-bundle global', () => {
@@ -77,29 +76,15 @@ describe('useLazyBundles (PF6)', () => {
     GLOBALS.forEach((g) => { expect(corpora[g].subscribe, g + ' is not subscribed').toHaveBeenCalled(); });
   });
 
-  it.each(SCREEN_BUNDLES)('re-renders when %s arrives — the route is waiting on it', (name) => {
+  it.each(GLOBALS)('re-renders when %s arrives — the route is waiting on it', (name) => {
     render(<Probe />);
     const before = renders;
     act(() => { corpora[name].bump(); });
     expect(renders, name + ' bumped and App did not re-render').toBeGreaterThan(before);
   });
 
-  it('re-renders when the Answers topics land — the Answers routes wait on them', () => {
-    render(<Probe />);
-    const before = renders;
-    act(() => { corpora.__answersCorpus.bump(); });
-    expect(renders).toBeGreaterThan(before);
-  });
-
-  it('still re-renders when a scripture corpus bumps (folded-in behavior preserved)', () => {
-    render(<Probe />);
-    const before = renders;
-    act(() => { corpora.__bibleCorpus.bump(); });
-    expect(renders).toBeGreaterThan(before);
-  });
-
   it('is inert (no throw) when a loader global is absent', () => {
-    delete window.__screensE;
+    delete window.__bibleCorpus;
     expect(() => render(<Probe />)).not.toThrow();
   });
 });

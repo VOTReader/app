@@ -19,11 +19,8 @@ const SRC = 'app/src/main/assets/src/';
 // entry (relative to src/) → the least module count a live scan reads
 const ENTRIES = {
   'stores/_entry-b.js': 80,
-  'ui/_entry-d.js': 100,
-  'ui/_entry-e.js': 5,
-  'ui/_entry-f.js': 1,
-  'ui/_entry-g.js': 10,
-  'ui/_entry-h.js': 5,
+  // lz1 (2026-10-13): bundles e-h folded into d, so d's scan reads their screens too.
+  'ui/_entry-d.js': 130,
 };
 const SKIP = JSON.parse(readFileSync(join(ROOT, 'tools/bridge-skip.json'), 'utf8'));
 
