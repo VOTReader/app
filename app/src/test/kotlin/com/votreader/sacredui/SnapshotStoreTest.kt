@@ -161,6 +161,7 @@ class SnapshotStoreTest {
         File(snaps, "snap-20261001-190000.json").writeText("""{'stores':{}}""")
         File(snaps, "snap-20261001-200000.json").writeText("""{"app":"VOTReader"}""")
         File(snaps, "snap-20261001-210000.json").writeText("""{"stores":{}} {}""")
+        File(snaps, "snap-20261001-220000.json").writeText("""{"stores":{},"stores":null}""")   // JSON.parse keeps the last
         assertEquals(listOf("snap-20261001-090000.json"), names())
         assertTrue(store.save(j("next"), at(2026, 10, 2)))
         assertEquals(j("good"), store.read("snap-20261001-090000.json"))
@@ -169,9 +170,13 @@ class SnapshotStoreTest {
 
     @Test fun `a real snapshot's JSON reads (numbers, escapes, nesting, unicode)`() {
         val json = """{"app":"VOTReader","exportVersion":3,"summary":{"highlights":2,"x":-1.5e-3,"y":0,"z":10E+2},""" +
-            """"stores":{"vot-notes":{"a1":{"body":"line\n\"quoted\" é \\ é ✝","keys":["bible:john:3:16",[]],"n":null,"t":true,"f":false}},"vot-links":[]}}"""
+            """"stores":{"vot-notes":{"a1":{"body":"line\n\"quoted\" \u00e9 \\ é ✝","keys":["bible:john:3:16",[]],"n":null,"t":true,"f":false}},"vot-links":[]}}"""
         assertTrue(store.save(json, at(2026, 10, 1)))
         assertEquals(listOf("snap-20261001-120000.json"), names())
+        // A key the page reads as "stores" through an escape, and a later duplicate that fixes an earlier bad one.
+        File(File(dir, "snapshots"), "snap-20261001-130000.json").writeText("""{"\u0073tores":{}}""")
+        File(File(dir, "snapshots"), "snap-20261002-130000.json").writeText("""{"stores":null,"stores":{"v":1}}""")
+        assertEquals(listOf("snap-20261002-130000.json", "snap-20261001-130000.json", "snap-20261001-120000.json"), names())
     }
 
     @Test fun `a snapshot's bytes are forced to the disk before it takes its name (W9)`() {

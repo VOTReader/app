@@ -798,6 +798,16 @@ describe('wipe-proof (2026-10-11: the owner phone lost its database again, and R
       expect(sink.save.mock.calls.length).toBe(saves);  // the damaged library never becomes the baseline
     });
 
+    it('a newest snapshot whose stores is no object is walked past, as SnapshotStore.kt judges it (refuter round 3)', async () => {
+      const sink = memorySink();
+      await snapshotYesterday(sink, { ...LIBRARY, 'vot-annotations': SIX });
+      const good = [...sink.files.keys()][0];
+      sink.files.set(snapshotName(snapshotTime(good) + 3600000), '{"app":"VOTReader","stores":[1]}');
+      await IDBAdapter.put('vot-annotations', 'v', {});
+      expect(await DataSafety.run({ sink, reload: vi.fn() })).toBe('damaged');
+      expect(StorageHealth.getReport().dataMissing.name).toBe(good);
+    });
+
     it('an empty newest file (a web save killed before it wrote) is walked past too', async () => {
       const sink = memorySink('opfs');
       await snapshotYesterday(sink, { ...LIBRARY, 'vot-annotations': SIX });
