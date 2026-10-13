@@ -477,7 +477,7 @@ function App() {
     closeLinkSidebar, pushFromLetter,
     screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId,
     setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
-    setSurpriseAnchor, setJournalEntryId, activeTabIdx,
+    setSurpriseAnchor, setJournalEntryId, activeTabIdx, tabCount: tabs.length,
   });
   // A8: a shared link (…/app/?p=<public passage key>) opens that passage once,
   // at boot, over whatever route the app restored.

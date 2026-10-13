@@ -147,6 +147,37 @@ describe('useNavigateToLink — bible nav corpus-await', () => {
     expect(p.pushFromLetter).not.toHaveBeenCalled();
   });
 
+  // W39 refuter round 1: tabs carry no id, so index + place alone let a jump into
+  // another tab that happened to sit at the same index and place.
+  it('W39: closing the tapped tab while the corpus loads cancels the jump (the next tab slides into its index)', async () => {
+    let resolveLoad;
+    window.__loadBibleCorpus = vi.fn(() => new Promise((res) => { resolveLoad = res; }));
+    const p = makeParams({ screen: 'notes-index', activeTabIdx: 0, tabCount: 2 });
+    const { result, rerender } = renderHook((q) => useNavigateToLink(q), { initialProps: p });
+    act(() => { result.current.navigateToLink({ type: 'bible', bookId: 'genesis', chapter: 2, key: 'hl:x' }); });
+    // tab 0 closed: tab 1 (also on notes-index) is now index 0
+    rerender({ ...p, tabCount: 1 });
+    window.BOOKS = { genesis: { title: 'Genesis' } };
+    await act(async () => { resolveLoad(); await Promise.resolve(); });
+    expect(p.setScreen).not.toHaveBeenCalled();
+    expect(p.pushFromLetter).not.toHaveBeenCalled();
+    expect(navHandoff.peek('pendingScrollHlKey')).toBeNull();
+  });
+
+  it('W39: switching to another tab and back while the corpus loads cancels the jump', async () => {
+    let resolveLoad;
+    window.__loadBibleCorpus = vi.fn(() => new Promise((res) => { resolveLoad = res; }));
+    const p = makeParams({ screen: 'notes-index', activeTabIdx: 0, tabCount: 2 });
+    const { result, rerender } = renderHook((q) => useNavigateToLink(q), { initialProps: p });
+    act(() => { result.current.navigateToLink({ type: 'bible', bookId: 'genesis', chapter: 2 }); });
+    rerender({ ...p, activeTabIdx: 1 });
+    rerender({ ...p, activeTabIdx: 0 });
+    window.BOOKS = { genesis: { title: 'Genesis' } };
+    await act(async () => { resolveLoad(); await Promise.resolve(); });
+    expect(p.setScreen).not.toHaveBeenCalled();
+    expect(p.pushFromLetter).not.toHaveBeenCalled();
+  });
+
   it('W39: re-renders that leave the reader where they tapped do not cancel the jump', async () => {
     let resolveLoad;
     window.__loadBibleCorpus = vi.fn(() => new Promise((res) => { resolveLoad = res; }));
