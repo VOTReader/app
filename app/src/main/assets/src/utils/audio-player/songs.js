@@ -138,8 +138,9 @@ export function setRepeat(mode) {
 export function switchSongVersion(id) {
   if (!isSongId(id)) return false;
   if (_pendingRestore) {
-    // The restored bar stands in for a queue not built yet: build it, then switch in it.
-    void late._rebuildRestoredQueue().then(() => { switchSongVersion(id); });
+    // The restored bar stands in for a queue not built yet: build it, then switch in it. Only once it is built: a
+    // rebuild refused offline leaves the bar restored, and asking again looped forever (W5).
+    void late._rebuildRestoredQueue().then((built) => { if (built) switchSongVersion(id); });
     return true;
   }
   const src = _source;
