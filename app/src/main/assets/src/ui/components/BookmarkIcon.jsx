@@ -2,6 +2,8 @@
    BookmarkIcon — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { iconButtonProps } from '../../renderer/icon-button.js';
+
 export function BookmarkIcon({ hlKey }) {
   // Subscribe to BookmarkStore mutations — re-renders this component
   // whenever a bookmark is added / removed / updated.
@@ -31,12 +33,14 @@ export function BookmarkIcon({ hlKey }) {
   };
 
   return (
+    // W65 (sweep 2026-10-13): a named button; Enter/Space open what a tap opens (renderer/icon-button.js).
     <span
       className={"inline-bookmark-icon" + (ids.length > 1 ? " inline-bookmark-icon-multi" : "")}
       onClick={open}
       title={ids.length === 1 ? "Bookmark" : ids.length + " bookmarks"}
+      {...iconButtonProps(ids.length === 1 ? "Open bookmark" : "Open " + ids.length + " bookmarks", open)}
     >
-      <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor">
+      <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" aria-hidden="true" focusable="false">
         <path
           fill="currentColor"
           stroke="currentColor"
