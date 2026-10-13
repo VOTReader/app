@@ -240,3 +240,68 @@ describe('JournalHubScreen — unclaimed recordings are offered back', () => {
     expect(window.JournalMediaStore.delete).toHaveBeenCalledWith('m_lost');
   });
 });
+
+/* W17 (sweep 10-13): useMediaUrl cached the URL once, keyed on the id alone, so
+   the store's LRU (24 URLs) or the Android memory-trim purge revoked a URL a
+   mounted photo or memo was still showing or playing. A block now holds its URL
+   while mounted (acquireUrl/releaseUrl: the store never evicts a held one) and
+   fetches a fresh one when the store says it dropped that id anyway (delete,
+   Clear All, import: subscribeUrls). */
+describe('Journal media blocks hold their URL while mounted (W17)', () => {
+  function setupHolding(urls) {
+    let i = 0;
+    /** @type {Array<(ids: string[]) => void>} */
+    const listeners = [];
+    window.JournalMediaStore = {
+      acquireUrl: vi.fn(() => Promise.resolve(urls[Math.min(i++, urls.length - 1)])),
+      releaseUrl: vi.fn(),
+      objectUrl: vi.fn(() => Promise.resolve(urls[0])),
+      get: vi.fn(() => Promise.resolve(null)),
+      subscribeUrls: vi.fn((fn) => { listeners.push(fn); return () => { listeners.splice(listeners.indexOf(fn), 1); }; }),
+    };
+    window.JournalHelpers = { formatDuration: () => '0:00' };
+    window.ConfirmStrip = () => null;
+    return { drop: (ids) => listeners.slice().forEach((fn) => fn(ids)), listeners };
+  }
+
+  it('an image block acquires its URL on mount and releases it on unmount', async () => {
+    setupHolding(['blob:a']);
+    const { container, unmount } = await renderSettled(<JournalImageBlock mediaId="m1" caption="" />);
+    expect(window.JournalMediaStore.acquireUrl).toHaveBeenCalledWith('m1');
+    expect(container.querySelector('img').getAttribute('src')).toBe('blob:a');
+    expect(window.JournalMediaStore.releaseUrl).not.toHaveBeenCalled();
+    unmount();
+    expect(window.JournalMediaStore.releaseUrl).toHaveBeenCalledTimes(1);
+    expect(window.JournalMediaStore.releaseUrl).toHaveBeenCalledWith('m1');
+  });
+
+  it('a memo block holds its URL too', async () => {
+    setupHolding(['blob:memo']);
+    const { container, unmount } = await renderSettled(<JournalAudioBlock mediaId="m2" duration={5} />);
+    expect(window.JournalMediaStore.acquireUrl).toHaveBeenCalledWith('m2');
+    expect(container.querySelector('audio').getAttribute('src')).toBe('blob:memo');
+    unmount();
+    expect(window.JournalMediaStore.releaseUrl).toHaveBeenCalledWith('m2');
+  });
+
+  it('when the store drops its URL anyway, the block fetches a fresh one (holds stay balanced)', async () => {
+    const h = setupHolding(['blob:old', 'blob:new']);
+    const { container, unmount } = await renderSettled(<JournalImageBlock mediaId="m3" caption="" />);
+    expect(container.querySelector('img').getAttribute('src')).toBe('blob:old');
+    await act(async () => { h.drop(['m3']); });
+    expect(container.querySelector('img').getAttribute('src')).toBe('blob:new');
+    expect(window.JournalMediaStore.acquireUrl).toHaveBeenCalledTimes(2);
+    expect(window.JournalMediaStore.releaseUrl).toHaveBeenCalledTimes(1);
+    unmount();
+    expect(window.JournalMediaStore.releaseUrl).toHaveBeenCalledTimes(2);
+    expect(h.listeners).toHaveLength(0);
+  });
+
+  it('a drop of another id leaves the block alone', async () => {
+    const h = setupHolding(['blob:a', 'blob:b']);
+    const { container } = await renderSettled(<JournalImageBlock mediaId="m4" caption="" />);
+    await act(async () => { h.drop(['other']); });
+    expect(window.JournalMediaStore.acquireUrl).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('img').getAttribute('src')).toBe('blob:a');
+  });
+});

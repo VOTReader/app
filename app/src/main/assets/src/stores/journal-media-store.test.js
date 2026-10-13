@@ -559,6 +559,94 @@ describe('JournalMediaStore — objectUrl LRU cap (PERF2)', () => {
   });
 });
 
+/* W17 (sweep 10-13): the 24-entry LRU and the Android memory-trim purge revoked
+   URLs that mounted photo and memo blocks were still showing or playing (an entry
+   with more than 24 media showed broken images; a trim could kill a memo mid-play),
+   a re-put (markLinked) leaked the URL it replaced, and two first reads of one id
+   minted two URLs. A block now HOLDS its URL (acquireUrl/releaseUrl): eviction and
+   the trim skip held ids; a forced drop (delete, Clear All, import) tells holders
+   through subscribeUrls so they fetch a fresh one. */
+describe('JournalMediaStore — a URL on screen is never revoked under it (W17)', () => {
+  let created; let revoked; let n; let origCreate; let origRevoke;
+  beforeEach(() => {
+    JournalMediaStore.releaseObjectUrls();
+    created = []; revoked = []; n = 0;
+    origCreate = URL.createObjectURL; origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = () => { const u = 'blob:w17-' + (++n); created.push(u); return u; };
+    URL.revokeObjectURL = (u) => { revoked.push(u); };
+  });
+  afterEach(() => {
+    URL.createObjectURL = origCreate; URL.revokeObjectURL = origRevoke;
+  });
+  const live = () => created.filter((u) => !revoked.includes(u));
+
+  it('a held URL outlives the LRU cap; unheld ones are evicted instead', async () => {
+    await JournalMediaStore.put({ id: 'held0', type: 'image', blob: makeBlob(4, 'image/jpeg') });
+    const u0 = await JournalMediaStore.acquireUrl('held0');
+    try {
+      for (let i = 0; i < 30; i++) {
+        await JournalMediaStore.put({ id: 'w17lru' + i, type: 'image', blob: makeBlob(4, 'image/jpeg') });
+      }
+      expect(revoked).not.toContain(u0);
+      expect(revoked.length).toBe(7);                     // 31 cached, 24 kept: the 7 oldest UNHELD went
+      expect(await JournalMediaStore.objectUrl('held0')).toBe(u0);
+    } finally { JournalMediaStore.releaseUrl('held0'); }
+  });
+
+  it('the memory-trim purge spares held URLs and frees the rest', async () => {
+    await JournalMediaStore.put({ id: 'tA', type: 'audio', blob: makeBlob(4, 'audio/webm') });
+    await JournalMediaStore.put({ id: 'tB', type: 'image', blob: makeBlob(4, 'image/jpeg') });
+    const uA = await JournalMediaStore.acquireUrl('tA');            // a memo playing
+    const uB = await JournalMediaStore.objectUrl('tB');
+    try {
+      expect(JournalMediaStore.releaseObjectUrls()).toBe(1);
+      expect(revoked).toEqual([uB]);
+      expect(await JournalMediaStore.objectUrl('tA')).toBe(uA);
+    } finally { JournalMediaStore.releaseUrl('tA'); }
+  });
+
+  it('a re-put of a cached id (markLinked) leaves one live URL, not two', async () => {
+    await JournalMediaStore.put({ id: 'rp1', type: 'audio', blob: makeBlob(4, 'audio/webm'), unlinked: true });
+    await JournalMediaStore.markLinked('rp1');                       // get + put the same record again
+    expect(live().length).toBe(1);
+    expect(await JournalMediaStore.objectUrl('rp1')).toBe(live()[0]);
+  });
+
+  it('two first reads of one id share one URL', async () => {
+    await JournalMediaStore.put({ id: 'cc1', type: 'image', blob: makeBlob(4, 'image/jpeg') });
+    JournalMediaStore.releaseObjectUrls();
+    created.length = 0; revoked.length = 0;
+    const [a, b] = await Promise.all([JournalMediaStore.objectUrl('cc1'), JournalMediaStore.objectUrl('cc1')]);
+    expect(a).toBe(b);
+    expect(live()).toEqual([a]);
+  });
+
+  it('a forced drop tells the holders: delete names the id, an import commit names every dropped id', async () => {
+    const heard = [];
+    const off = JournalMediaStore.subscribeUrls((ids) => { heard.push(ids.slice().sort()); });
+    try {
+      await JournalMediaStore.put({ id: 'fd1', type: 'image', blob: makeBlob(4, 'image/jpeg') });
+      await JournalMediaStore.put({ id: 'fd2', type: 'image', blob: makeBlob(4, 'image/jpeg') });
+      await JournalMediaStore.delete('fd1');
+      expect(heard).toEqual([['fd1']]);
+      await JournalMediaStore.beginImportReplace();
+      await JournalMediaStore.stageImportRecord({ id: 'fd2', type: 'image', blob: makeBlob(8, 'image/jpeg') });
+      await JournalMediaStore.commitImportReplace();
+      expect(heard[1]).toContain('fd2');
+    } finally { off(); }
+  });
+
+  it('releaseUrl below zero is harmless and an unheld id is evictable again', async () => {
+    JournalMediaStore.releaseUrl('never-held');
+    await JournalMediaStore.put({ id: 'rel1', type: 'image', blob: makeBlob(4, 'image/jpeg') });
+    const u = await JournalMediaStore.acquireUrl('rel1');
+    JournalMediaStore.releaseUrl('rel1');
+    JournalMediaStore.releaseUrl('rel1');
+    expect(JournalMediaStore.releaseObjectUrls()).toBe(1);
+    expect(revoked).toEqual([u]);
+  });
+});
+
 describe('JournalMediaStore — compressImage() (journal-5: decode-time downscale + byte ceiling)', () => {
   /** @type {any} */
   let fakeCanvas;

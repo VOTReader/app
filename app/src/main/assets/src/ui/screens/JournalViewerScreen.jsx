@@ -372,12 +372,24 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
  */
 function useMediaUrl(mediaId) {
   const [state, setState] = React.useState({ url: null, missing: false });
+  // W17: bumped when the store revokes this id's URL under us (delete, Clear All,
+  // an import), so the lookup below runs again for a fresh one.
+  const [dropped, setDropped] = React.useState(0);
+  React.useEffect(function() {
+    if (!mediaId || typeof JournalMediaStore === 'undefined' || !JournalMediaStore.subscribeUrls) return undefined;
+    return JournalMediaStore.subscribeUrls(function(ids) {
+      if (ids.indexOf(mediaId) >= 0) setDropped(function(n) { return n + 1; });
+    });
+  }, [mediaId]);
   React.useEffect(function() {
     var cancelled = false;
     if (!mediaId) { setState({ url: null, missing: true }); return undefined; }
     if (typeof JournalMediaStore === 'undefined') { setState({ url: null, missing: false }); return undefined; }
     setState({ url: null, missing: false });   // a new id is loading again, not missing
-    JournalMediaStore.objectUrl(mediaId).then(function(url) {
+    // W17: HOLD the URL while this block shows or plays it, so the store's LRU cap
+    // and the memory-trim purge never revoke it under the <img>/<audio>.
+    var holds = !!(JournalMediaStore.acquireUrl && JournalMediaStore.releaseUrl);
+    (holds ? JournalMediaStore.acquireUrl(mediaId) : JournalMediaStore.objectUrl(mediaId)).then(function(url) {
       if (cancelled) return undefined;
       if (url) { setState({ url: url, missing: false }); return undefined; }
       return JournalMediaStore.get(mediaId).then(function(rec) {
@@ -390,8 +402,11 @@ function useMediaUrl(mediaId) {
       // An IDB error tells us about the database, not about the recording.
       if (!cancelled) { console.warn('journal media lookup failed', mediaId, e); setState({ url: null, missing: false }); }
     });
-    return function() { cancelled = true; };
-  }, [mediaId]);
+    return function() {
+      cancelled = true;
+      if (holds) JournalMediaStore.releaseUrl(mediaId);
+    };
+  }, [mediaId, dropped]);
   return state;
 }
 
