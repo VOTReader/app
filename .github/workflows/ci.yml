@@ -236,9 +236,11 @@ jobs:
         # aligner and the release mirror keep whole files only (a .part renamed when complete), a
         # truncated transcript's unheard tail is REVIEW and its belt never current, and hone-verify
         # measures the shipped onset of the right recording. Stubs only: no model, no network.
+        # test_build_semantic.py rides the same call (2026-10-14, sr8): a meaning-pack rebuild keeps
+        # every unchanged passage's shipped vector (reuse_plan, plain Python: no model, no numpy).
         run: |
           pip install -r requirements-dev.txt
-          python -m unittest test_check_balance test_preview_server test_requirements test_batch_align_ship test_batch_align_bible_ship test_batch_align_bible_drive_index test_batch_align_sections test_align_pipeline test_align_commit test_fetch_answers -v
+          python -m unittest test_check_balance test_preview_server test_requirements test_batch_align_ship test_batch_align_bible_ship test_batch_align_bible_drive_index test_batch_align_sections test_align_pipeline test_align_commit test_fetch_answers test_build_semantic -v
           python check_balance.py --strict
 
       - name: Check App() size budget (P11 canary)
