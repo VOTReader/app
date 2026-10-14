@@ -15,7 +15,7 @@ import { kjvEncode } from './tokenize.js';
  * @property {'text'} kind
  * @property {string|null} phrase    quoted exact phrase (or null)
  * @property {string} cleanQuery
- * @property {string[]} must         +required terms
+ * @property {string[]} must         +required terms, and each quoted phrase after the first (a run of words)
  * @property {string[]} mustNot      -excluded terms
  * @property {string[]} terms        remaining bare terms
  */
@@ -41,7 +41,15 @@ export function parseTextQuery(q) {
   const parts = q.match(/"[^"]+"|\S+/g) || [];
   for (let i = 0; i < parts.length; i++) {
     const p = parts[i];
-    if (p.charAt(0) === '"' && p.charAt(p.length - 1) === '"') { phrase = p.slice(1, -1); continue; }
+    // The first quoted phrase is THE phrase; a later one replaced it (sweep low, REPORT.md:646) and is a run the
+    // text must hold now, as a +word is (the engine reads each `must` entry as a run of words).
+    if (p.charAt(0) === '"' && p.charAt(p.length - 1) === '"') {
+      const ph = p.slice(1, -1).trim();
+      if (!ph) continue;
+      if (phrase === null) phrase = ph;
+      else must.push(ph.toLowerCase());
+      continue;
+    }
     if (p.charAt(0) === '-' && p.length > 1) { mustNot.push(p.slice(1).toLowerCase()); continue; }
     if (p.charAt(0) === '+' && p.length > 1) { must.push(p.slice(1).toLowerCase()); continue; }
     const up = p.toUpperCase();

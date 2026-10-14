@@ -84,6 +84,15 @@ describe('search: phrases and +/- words match words, not letters inside words (v
     expect(refs(inOrder)).toEqual(['Psalms 23:1']);
   });
 
+  /* A second quoted phrase replaced the first (sweep low, REPORT.md:646): the search held only the last. */
+  it('two quoted phrases: a text must hold both', async () => {
+    const both = await VotSearchMini.search('"the lord is my shepherd" "shall not want"', { synonyms: false });
+    expect(both.unquoted).toBeUndefined();
+    expect(refs(both)).toEqual(['Psalms 23:1']);
+    const apart = await VotSearchMini.search('"he leads me" "the lord is my shepherd"', { synonyms: false });
+    expect(apart.unquoted, 'no text holds both phrases').toBe('he leads me');
+  });
+
   it('"heart -art" keeps the verse about a heart: art is not a word in it', async () => {
     const r = await VotSearchMini.search('heart -art', { synonyms: false });
     expect(refs(r)).toContain('Psalms 51:10');

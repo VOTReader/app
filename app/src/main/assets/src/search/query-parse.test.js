@@ -32,6 +32,15 @@ describe('parseTextQuery', () => {
     expect(r.terms).toEqual(['elijah']);
   });
 
+  /* A second quoted phrase replaced the first (sweep low, REPORT.md:646): '"still small voice" "mount horeb"'
+     searched only "mount horeb". The first stays the phrase; each later one is a run the text must hold. */
+  it('keeps every quoted phrase: the first is the phrase, a later one is required', () => {
+    const r = parseTextQuery('"still small voice" "mount horeb" elijah');
+    expect(r.phrase).toBe('still small voice');
+    expect(r.must).toEqual(['mount horeb']);
+    expect(r.terms).toEqual(['elijah']);
+  });
+
   it('always reports kind text + a cleanQuery', () => {
     const r = parseTextQuery('Love One Another');
     expect(r.kind).toBe('text');
