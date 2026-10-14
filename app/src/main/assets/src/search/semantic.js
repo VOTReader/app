@@ -19,7 +19,17 @@
    A passage ("unit") is a verse, three sentences of any other text, or a title;
    it names its document by unitKey and where it starts in the document's
    indexed text, so a hit the meaning found can land on that passage.
+
+   THE MODEL RUNS ON THE SEARCH WORKER (sr9, 2026-10-14). Loading it and
+   embedding a query then scoring all 52,854 passages held the page's thread
+   (69-143 ms a query on a desktop). In a page that can have the search worker
+   (worker-client.js) it all runs there; the page asks for the best documents
+   and gets them by unitKey. A worker that cannot load the model (or dies)
+   hands it to this thread for the rest of the session, which loads it as
+   before.
    ═══════════════════════════════════════════════════════════════════════ */
+
+import { searchWorker } from './worker-client.js';
 
 const SEM_DIR = 'semantic/';
 const CLS = 101;
@@ -35,12 +45,14 @@ export async function fetchSemanticFile(/** @type {string} */ p) {
   return r.arrayBuffer();
 }
 
-/** @type {{url: (p: string) => string, load: (p: string) => Promise<ArrayBuffer>, importModule: (p: string) => Promise<any>}} */
+/** @type {{url: (p: string) => string, load: (p: string) => Promise<ArrayBuffer>, importModule: (p: string) => Promise<any>, worker: () => any}} */
 const io = {
   // bundle-d is a classic script: a path resolves against the page, never the bundle
   url: (p) => String(new URL(p, document.baseURI)),
   load: fetchSemanticFile,
   importModule: (p) => import(/* @vite-ignore */ io.url(p)),
+  // the search worker the model runs on, or null to run it on this thread
+  worker: () => searchWorker(),
 };
 
 /** How the files are reached: the page's own base by default; node passes file loaders (the benchmark, tests). */
@@ -61,8 +73,13 @@ let starting = null;
 /** @type {Uint32Array|null} */ let KEY = null;
 /** @type {Int32Array|null} */ let START = null;
 /** @type {string|null} */ let failure = null;
+/** Where the model is: on the search worker, or on this thread. */
+/** @type {'worker'|'page'} */ let where = 'page';
+/** The worker could not hold it: this thread does, for the session. */
+let pageOnly = false;
+let workerUnits = 0;
 
-export function semanticStatus() { return { status, failure, units: man ? man.count : 0 }; }
+export function semanticStatus() { return { status, failure, units: man ? man.count : workerUnits, where }; }
 
 /* A FAILED START IS NOT FOR THE PAGE'S LIFE (sweep W35, 2026-10-13): a dropped download or a refused
    store used to turn meaning search off until the next boot. The next start (an index build, a search
@@ -77,6 +94,21 @@ let retryAt = 0;
 export function startSemantic() {
   if (starting) return starting;
   if (status === 'failed' && Date.now() < retryAt) return Promise.resolve(false);
+  const w = pageOnly ? null : io.worker();
+  if (w) {
+    status = 'loading';
+    const run = w.request('meaning-start', { base: io.url('') }).then((/** @type {any} */ r) => {
+      if (!r.ok) throw new Error(r.failure || 'semantic: the worker could not load the model');
+      where = 'worker';
+      status = 'ready';
+      failure = null;
+      workerUnits = r.units || 0;
+      return true;
+    }).catch(() => toPage());
+    starting = run;
+    void run.then((ok) => { if (!ok && starting === run) starting = null; });
+    return run;
+  }
   status = 'loading';
   let arrived = false;
   const run = (async () => {
@@ -129,6 +161,15 @@ export function startSemantic() {
   return run;
 }
 
+/** The worker could not load the model, or died: this thread loads it, from now on. */
+function toPage() {
+  pageOnly = true;
+  where = 'page';
+  status = 'off';
+  starting = null;
+  return startSemantic();
+}
+
 /** True when the bytes are the ones named (no Web Crypto: trusted, as the APK's own assets are). */
 async function sha256(/** @type {ArrayBuffer} */ buf, /** @type {string} */ want) {
   const subtle = typeof crypto !== 'undefined' && crypto.subtle;
@@ -139,9 +180,9 @@ async function sha256(/** @type {ArrayBuffer} */ buf, /** @type {string} */ want
   return hex === want;
 }
 
-/** The service worker's stored copy of the meaning files (vot-semantic-v1), when there is one. */
+/** The service worker's stored copy of the meaning files (vot-semantic-v1), when there is one (the page or the search worker). */
 async function storedCache() {
-  try { return typeof caches !== 'undefined' && typeof document !== 'undefined' ? await caches.open('vot-semantic-v1') : null; } catch { return null; }
+  try { return typeof caches !== 'undefined' ? await caches.open('vot-semantic-v1') : null; } catch { return null; }
 }
 
 /** Drop stored files by name (bad bytes). */
@@ -233,16 +274,12 @@ async function embed(/** @type {string} */ query) {
   return v;
 }
 
-/**
- * The documents whose passages mean most nearly what the query says, best first.
- * `idOfKey` maps a unitKey to the engine's document id. Null while the model is not ready.
- * @returns {Promise<Array<{id: string, score: number, start: number, passages: () => Array<[number, number]>}>|null>}
- */
-export async function semanticDocs(/** @type {string} */ query, /** @type {(key: string) => string|undefined} */ idOfKey, limit = 60) {
-  if (status === 'failed' && Date.now() >= retryAt) void startSemantic(); // behind this search, never in its way
-  if (status !== 'ready' || !session || !V || !SCALE || !KEY || !START) return null;
-  let q;
-  try { q = await embed(query); } catch { return null; }
+/** The `limit` documents (key indexes) whose passages mean most nearly the query, best first, with every passage's score. */
+async function nearest(/** @type {string} */ query, /** @type {number} */ limit) {
+  const q = await embed(query);
+  const vec = /** @type {Int8Array} */ (V);
+  const scale = /** @type {Float32Array} */ (SCALE);
+  const keyOf = /** @type {Uint32Array} */ (KEY);
   const n = man.count;
   const d = man.dim;
   const nk = man.keys.length;
@@ -251,10 +288,10 @@ export async function semanticDocs(/** @type {string} */ query, /** @type {(key:
   const scores = new Float32Array(n);
   for (let u = 0, b = 0; u < n; u++, b += d) {
     let s = 0;
-    for (let k = 0; k < d; k++) s += V[b + k] * q[k];
-    s *= SCALE[u];
+    for (let k = 0; k < d; k++) s += vec[b + k] * q[k];
+    s *= scale[u];
     scores[u] = s;
-    const key = KEY[u];
+    const key = keyOf[u];
     if (s > best[key]) { best[key] = s; bestUnit[key] = u; }
   }
   // the `limit` best documents: a bounded insertion list (limit << documents)
@@ -267,21 +304,81 @@ export async function semanticDocs(/** @type {string} */ query, /** @type {(key:
     while (i > 0 && best[top[i - 1]] < s) { top[i] = top[i - 1]; i--; }
     top[i] = k;
   }
-  const out = [];
+  return { top, best, bestUnit, scores };
+}
+
+/** The model is loaded here, on this thread. */
+const loadedHere = () => status === 'ready' && !!session && !!V && !!SCALE && !!KEY && !!START;
+
+/**
+ * The documents whose passages mean most nearly what the query says, best first.
+ * `idOfKey` maps a unitKey to the engine's document id. Null while the model is not ready.
+ * @returns {Promise<Array<{id: string, score: number, start: number, passages: () => Array<[number, number]>}>|null>}
+ */
+export async function semanticDocs(/** @type {string} */ query, /** @type {(key: string) => string|undefined} */ idOfKey, limit = 60) {
+  if (where === 'worker') {
+    const w = io.worker();
+    /** @type {any} */ let r = null;
+    try {
+      if (!w) throw new Error('search worker gone');
+      r = await w.request('meaning', { query, limit });
+    } catch {
+      void toPage(); // the worker died: this thread loads the model, behind this search
+      return null;
+    }
+    if (!r.docs) return null;
+    const out = [];
+    for (const doc of r.docs) {
+      const id = idOfKey(doc.key);
+      if (id == null) continue;
+      out.push({ id, score: doc.score, start: doc.start, passages: () => doc.passages });
+    }
+    return out;
+  }
+  if (status === 'failed' && Date.now() >= retryAt) void startSemantic(); // behind this search, never in its way
+  if (!loadedHere()) return null;
+  /** @type {Awaited<ReturnType<typeof nearest>>} */ let r;
+  try { r = await nearest(query, limit); } catch { return null; }
+  const { top, best, bestUnit, scores } = r;
+  const n = man.count;
   const keyOf = /** @type {Uint32Array} */ (KEY);
   const startOf = /** @type {Int32Array} */ (START);
+  const out = [];
   for (const k of top) {
     const id = idOfKey(man.keys[k]);
     if (id == null) continue;
     // every passage of the document with how near it means the query, in text order
     const passages = () => {
-      /** @type {Array<[number, number]>} */ const r = [];
-      for (let u = 0; u < n; u++) if (keyOf[u] === k && startOf[u] >= 0) r.push([startOf[u], scores[u]]);
-      return r.sort((a, b) => a[0] - b[0]);
+      /** @type {Array<[number, number]>} */ const p = [];
+      for (let u = 0; u < n; u++) if (keyOf[u] === k && startOf[u] >= 0) p.push([startOf[u], scores[u]]);
+      return p.sort((a, b) => a[0] - b[0]);
     };
-    out.push({ id, score: best[k], start: START[bestUnit[k]], passages });
+    out.push({ id, score: best[k], start: startOf[bestUnit[k]], passages });
   }
   return out;
+}
+
+/**
+ * semanticDocs as the search worker answers it: the documents by unitKey, each with its passages read now
+ * (a function does not cross to the page). Null while the model is not ready.
+ * @returns {Promise<Array<{key: string, score: number, start: number, passages: Array<[number, number]>}>|null>}
+ */
+export async function semanticKeys(/** @type {string} */ query, limit = 60) {
+  if (status === 'failed' && Date.now() >= retryAt) void startSemantic();
+  if (!loadedHere()) return null;
+  const { top, best, bestUnit, scores } = await nearest(query, limit);
+  const n = man.count;
+  const keyOf = /** @type {Uint32Array} */ (KEY);
+  const startOf = /** @type {Int32Array} */ (START);
+  /** @type {Map<number, Array<[number, number]>>} */ const passagesOf = new Map(top.map((k) => [k, []]));
+  for (let u = 0; u < n; u++) {
+    const list = passagesOf.get(keyOf[u]);
+    if (list && startOf[u] >= 0) list.push([startOf[u], scores[u]]);
+  }
+  return top.map((k) => ({
+    key: man.keys[k], score: best[k], start: startOf[bestUnit[k]],
+    passages: /** @type {Array<[number, number]>} */ (passagesOf.get(k)).sort((a, b) => a[0] - b[0]),
+  }));
 }
 
 /** The unitKey of an engine document: what the pack names documents by (tools/search-bench/corpus.mjs unitKey). */
@@ -296,4 +393,5 @@ export function docUnitKey(/** @type {any} */ doc) {
 export function resetSemantic() {
   status = 'off'; starting = null; session = null; ort = null; vocab = null; man = null;
   V = null; SCALE = null; KEY = null; START = null; failure = null; retryMs = 0; retryAt = 0;
+  where = 'page'; pageOnly = false; workerUnits = 0;
 }

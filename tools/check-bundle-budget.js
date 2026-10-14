@@ -90,6 +90,9 @@ const BUDGETS = [
   // Listening Library) fold back into this bundle: 663,792 -> 1,313,034. The ceiling is the SUM of the five
   // old ceilings (718,300 + 357,600 + 101,200 + 193,600 + 88,100), so the merge claims no new room.
   { file: 'bundle-d.js', measured: 1313034, max: 1458800 },   // every screen/sheet/util (bundles e-h folded in by lz1)
+  // 2026-10-14, sr9: the search worker (src/search/worker.js): the warm-index read and the meaning model, off the
+  // page's thread. 7,967 B measured x 1.15. onnxruntime-web is not in it: the worker imports the vendored copy.
+  { file: 'bundle-w.js', measured: 7967, max: 9200 },
   // Re-baselined 2026-09-22 (292,190 B): the Answers landing's rules (~8 KB) and the
   // month's large-text / tap-target fixes, on top of 253,510 B measured 09-01.
   // 2026-09-25 (n7-08): the tree had grown to 335,980 B, 20 under this ceiling. Measured first: 91.5 KB

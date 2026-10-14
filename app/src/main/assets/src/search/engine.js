@@ -40,6 +40,8 @@ import { onIdle } from '../utils/on-idle.js';
 import { lemma, bestWindow } from './passage.js';
 import { startSemantic, semanticDocs, semanticStatus, docUnitKey } from './semantic.js';
 import { KJV_ALIAS, KJV_ALIAS_BOOKS } from './kjv-alias.js';
+import { searchWorker } from './worker-client.js';
+import { indexAssembler } from './index-transfer.js';
 
 /**
  * The parse kinds a direct-nav card answers ALONE.
@@ -958,7 +960,8 @@ function originalsFirst(out, idOf, terms, allowed, named, near) {
 let ready = false;
 /** @type {Error|null} */ let buildError = null;
 /** `sig`: what the index was built from (cache.js dataSignature), for the check that it still is. */
-/** @type {{docCount?:number, buildMs?:number, collectMs?:number, insertMs?:number, cached?:boolean, translation?:string, sig?:string}} */ let stats = {};
+/** `restoredIn`: where a warm index was read, the search worker or the page (sr9). */
+/** @type {{docCount?:number, buildMs?:number, collectMs?:number, insertMs?:number, cached?:boolean, translation?:string, sig?:string, restoredIn?:string}} */ let stats = {};
 
 function now() {
   return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -999,6 +1002,31 @@ function swapIn(/** @type {any} */ ms, /** @type {typeof stats} */ st) {
   if (typeof document !== 'undefined') onIdle(() => { warmOriginals().then(() => warmExcerpts(ms)).catch(() => {}); }, { timeout: 2000, fallbackDelay: 300 });
 }
 
+/* THE WARM INDEX IS READ ON THE SEARCH WORKER (sr9, 2026-10-14). MiniSearch.loadJSON restored it in one block on
+   the page's thread: JSON.parse of ~21 MB, then a Map per document field and per term, 244-262 ms on the S22
+   inside init. The search worker (worker-client.js) reads and parses it and hands it over in parts
+   (index-transfer.js), each received in a short task here. Where there is no worker (node, a WebView that does
+   not hand one the app's files, a worker that failed or does not answer) the page reads it, as before. */
+const RESTORE_TIMEOUT_MS = 20000;
+/** The cached index for `sig`, or null when there is none. @returns {Promise<{ms: any, where: string}|null>} */
+async function restoreIndex(/** @type {string} */ sig) {
+  const w = searchWorker();
+  if (w) {
+    try {
+      /** @type {ReturnType<typeof indexAssembler>|null} */ let asm = null;
+      const r = await w.request('restore', { sig }, (/** @type {any} */ m) => {
+        if (m.head) asm = indexAssembler(MiniSearch, m.head, buildMiniSearchOptions());
+        else if (asm) asm.add(m.part, m.entries);
+        else throw new Error('search worker: a part before the head');
+      }, RESTORE_TIMEOUT_MS);
+      // a miss is checked here too: a worker with no Cache API sees none where the page has one
+      if (!r.miss && asm) return { ms: /** @type {any} */ (asm).ms, where: 'worker' };
+    } catch { /* the page reads it */ }
+  }
+  const json = await loadCached(sig);
+  return json ? { ms: MiniSearch.loadJSON(json, buildMiniSearchOptions()), where: 'page' } : null;
+}
+
 /** Build the in-memory index for one translation (chunked for onProgress). `persist: false` keeps it
     out of the warm cache (a corpus failed to load: that index must not replace a whole one there). */
 async function build(options) {
@@ -1008,11 +1036,11 @@ async function build(options) {
 
   // Warm cache: restore the serialized index (~0.3s) instead of rebuilding (~10s).
   try {
-    const cachedJson = await loadCached(sig);
-    if (cachedJson) {
-      const tc = now();
-      const ms = MiniSearch.loadJSON(cachedJson, buildMiniSearchOptions());
-      swapIn(ms, { docCount: ms.documentCount, buildMs: Math.round(now() - tc), cached: true, translation: code, sig });
+    const tc = now();
+    const restored = await restoreIndex(sig);
+    if (restored) {
+      const ms = restored.ms;
+      swapIn(ms, { docCount: ms.documentCount, buildMs: Math.round(now() - tc), cached: true, translation: code, sig, restoredIn: restored.where });
       if (options.onProgress) options.onProgress(ms.documentCount, ms.documentCount);
       return;
     }
