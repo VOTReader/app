@@ -27,15 +27,19 @@ const SEP = 102;
 const UNK = 100;
 const MAX_LEN = 64; // a query is a sentence or two; the model's own limit is 512
 
+/** A file of the pack, fetched. A redirected answer is a captive portal or a proxy, not the file (the worker
+ *  never stores one either): a failed load, tried again later, never bytes that make a failure final (W35 refuter r2). */
+export async function fetchSemanticFile(/** @type {string} */ p) {
+  const r = await fetch(io.url(p));
+  if (!r.ok || r.redirected) throw new Error('semantic: ' + p + ' ' + (r.redirected ? 'redirected' : r.status));
+  return r.arrayBuffer();
+}
+
 /** @type {{url: (p: string) => string, load: (p: string) => Promise<ArrayBuffer>, importModule: (p: string) => Promise<any>}} */
 const io = {
   // bundle-d is a classic script: a path resolves against the page, never the bundle
   url: (p) => String(new URL(p, document.baseURI)),
-  load: async (p) => {
-    const r = await fetch(io.url(p));
-    if (!r.ok) throw new Error('semantic: ' + p + ' ' + r.status);
-    return r.arrayBuffer();
-  },
+  load: fetchSemanticFile,
   importModule: (p) => import(/* @vite-ignore */ io.url(p)),
 };
 

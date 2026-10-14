@@ -9,7 +9,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { wordPieceIds, configureSemantic, startSemantic, semanticDocs, semanticStatus, resetSemantic, docUnitKey, meaningText } from './semantic.js';
+import { wordPieceIds, configureSemantic, startSemantic, semanticDocs, semanticStatus, resetSemantic, docUnitKey, meaningText, fetchSemanticFile } from './semantic.js';
 
 const ASSETS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const vocabMap = new Map(fs.readFileSync(path.join(ASSETS, 'semantic/vocab.txt'), 'utf8').split('\n').filter(Boolean).map((w, i) => [w, i]));
@@ -139,6 +139,18 @@ describe('semanticDocs over a pack', () => {
       expect(await startSemantic()).toBe(true);
     } finally {
       vi.useRealTimers();
+    }
+  });
+  it('a redirected answer (a captive portal) is a failed load, never the file (W35 refuter r2)', async () => {
+    configureSemantic({ url: (p) => 'https://app.test/' + p });
+    const real = globalThis.fetch;
+    try {
+      globalThis.fetch = /** @type {any} */ (async () => ({ ok: true, status: 200, redirected: true, arrayBuffer: async () => new ArrayBuffer(4) }));
+      await expect(fetchSemanticFile('semantic/ort/ort-wasm-simd-threaded.mjs')).rejects.toThrow('redirected');
+      globalThis.fetch = /** @type {any} */ (async () => ({ ok: true, status: 200, redirected: false, arrayBuffer: async () => new ArrayBuffer(4) }));
+      expect((await fetchSemanticFile('semantic/vocab.txt')).byteLength).toBe(4);
+    } finally {
+      globalThis.fetch = real;
     }
   });
   it('a device that cannot run the model (every file in, no session) is not asked again', async () => {
