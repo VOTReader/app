@@ -326,6 +326,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     // cleanup runs on every dep change, marking this effect's in-flight
     // promise stale — only the latest query's resolution commits.
     let stale = false;
+    // ...and the engine stops ranking for it at its next turn (sr7): typing a burst no longer ranks every prefix in full.
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
     debounceRef.current = setTimeout(() => {
       // W0 (micro-gap c): mark the search in-flight so the UI shows a
       // live-region indicator until the engine resolves. Prior results stay
@@ -339,7 +341,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         corpus: settings.searchCorpus || 'all',
         limit: SEARCH_TOTAL_LIMIT,
         perVolume: SEARCH_LIMIT,
-        allWords: allWordsFor === q
+        allWords: allWordsFor === q,
+        signal: ctl ? ctl.signal : undefined
       }).then((r) => {
         if (stale) return;
         // SRCH4: include the matched synonyms (when synonym search is on) so the
@@ -363,6 +366,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     }, 140);
     return () => {
       stale = true;
+      if (ctl) ctl.abort();
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [query, buildInfo.ready, settings.translation, settings.searchUseStopWords, settings.searchSynonyms, settings.searchCorpus, searchScope, allWordsFor, memo]);

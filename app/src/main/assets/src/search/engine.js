@@ -647,12 +647,13 @@ function originals() {
 /* THE ORIGINALS ARE READ A SLICE AT A TIME (sweep W68, 2026-10-14). Reading them is one pass over
    every verse and letter, 440-500 ms on a desktop and seconds on a phone, and the first search after
    each build made it in one block: the page froze under the reader's typing. In a browser they are
-   read from an idle moment after the index swaps in, ORIGINALS_SLICE_MS at a time with the page
+   read from an idle moment after the index swaps in, SLICE_MS at a time with the page
    running between slices, and a search that comes first waits for that read before it ranks (the
    Answers coverage reads them as well as originalsFirst). They take effect whole, at the end: CITED
    is built once from ORIGINAL_DOCS and must not be built from a half. Node (the bench, the tools)
    reads them in one pass, as before. */
-const ORIGINALS_SLICE_MS = 8;
+/** How long a sliced read or ranking holds the page before it gives it a turn (W68, sr7). */
+const SLICE_MS = 8;
 /** @type {{ms: any, done: Promise<void>}|null} the read under way and the index it reads */ let ORIGINALS_BUILD = null;
 /** Give the page a turn: scheduler.yield where the browser has it, else a timer. */
 function yieldToPage() {
@@ -668,7 +669,7 @@ async function readOriginals(/** @type {any} */ ms) {
   const it = ms._storedFields[Symbol.iterator]();
   let step = it.next();
   while (!step.done) {
-    const end = now() + ORIGINALS_SLICE_MS;
+    const end = now() + SLICE_MS;
     for (; !step.done && now() < end; step = it.next()) addOriginal(O, S, D, ids.get(step.value[0]), step.value[1]);
     if (step.done) break;
     await yieldToPage();
@@ -678,6 +679,27 @@ async function readOriginals(/** @type {any} */ ms) {
   ORIGINAL_DOCS = D;
   SHINGLES = S;
   ORIGINALS = O;
+}
+/* THE ANSWERS EXCERPTS ARE READ AT IDLE TOO (sr7, 2026-10-14). A first search split every Answers topic
+   it touched into its excerpts (excerptCover reads a topic one excerpt at a time): 64-140 ms of a first
+   search's ranking on a desktop, 1-3 ms of a later one's. After the originals they are read the same way,
+   a slice at a time from the idle read; a search that comes first reads those it needs in its own slices.
+   The first search filled this cache anyway: a session holds no more than it did. */
+/** @type {any} the index whose Answers excerpts are read, or being read */ let EXCERPTS_FOR = null;
+async function warmExcerpts(/** @type {any} */ ms) {
+  if (EXCERPTS_FOR === ms || msIndex !== ms) return;
+  EXCERPTS_FOR = ms;
+  const ids = ms._documentIds;
+  let end = now() + SLICE_MS;
+  for (const [shortId, f] of ms._storedFields) {
+    if (!f || f.kind !== 'answers' || !f.text) continue;
+    if (now() >= end) {
+      await yieldToPage();
+      if (msIndex !== ms) return;
+      end = now() + SLICE_MS;
+    }
+    excerpts(ids.get(shortId), f.text);
+  }
 }
 /** Resolves once the index in use has its originals read (or has been replaced); never rejects. */
 function warmOriginals() {
@@ -961,6 +983,7 @@ function swapIn(/** @type {any} */ ms, /** @type {typeof stats} */ st) {
   tokenCacheSize = 0;
   ORIGINALS = null;
   ORIGINALS_BUILD = null;
+  EXCERPTS_FOR = null;
   ORIGINAL_DOCS = null;
   SHINGLES = null;
   CITED = null;
@@ -973,7 +996,7 @@ function swapIn(/** @type {any} */ ms, /** @type {typeof stats} */ st) {
   ready = true;
   buildError = null;
   stats = st;
-  if (typeof document !== 'undefined') onIdle(() => { warmOriginals(); }, { timeout: 2000, fallbackDelay: 300 });
+  if (typeof document !== 'undefined') onIdle(() => { warmOriginals().then(() => warmExcerpts(ms)).catch(() => {}); }, { timeout: 2000, fallbackDelay: 300 });
 }
 
 /** Build the in-memory index for one translation (chunked for onProgress). `persist: false` keeps it
@@ -1109,10 +1132,11 @@ async function ensureReady(options) {
  * "lord" 125 of 890, with no sign anything was missing. `capped` names every
  * collection that hit its cap (it may hold more), `truncated` says the total did.
  * `_corrected` is the engine's own: this search is a corrected query's re-run.
- * @param {{translation?:string, useStopWords?:boolean, synonyms?:boolean, scope?:{bookId?:string,volumeId?:string}|null, corpus?:string, limit?:number, perVolume?:number, allWords?:boolean, _corrected?:boolean, _unquoted?:boolean}} [options]
+ * @param {{translation?:string, useStopWords?:boolean, synonyms?:boolean, scope?:{bookId?:string,volumeId?:string}|null, corpus?:string, limit?:number, perVolume?:number, allWords?:boolean, _corrected?:boolean, _unquoted?:boolean, signal?:{aborted:boolean}}} [options]
+ * `signal`: when it is aborted the search stops at its next turn and returns `aborted: true`, no results (sr7).
  * `corrections` lists each typed word that found nothing of its own and was
  * searched as the nearest indexed word instead ({ from: 'shephard', to: 'shepherd' }).
- * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>, stopWordsOnly?:boolean, unquoted?:string}>}
+ * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>, stopWordsOnly?:boolean, unquoted?:string, aborted?:boolean}>}
  */
 async function search(query, options) {
   options = options || {};
@@ -1142,6 +1166,25 @@ async function search(query, options) {
 
   await ensureReady(options);
   await warmOriginals();
+
+  /* THE RANKING GIVES THE PAGE TURNS (sr7, 2026-10-14). With the originals read, a first search still
+     ranked in one block: 110-400 ms on a desktop, about 350 ms on the S22, under the reader's typing. In
+     a browser it gives the page a turn whenever SLICE_MS is spent, in its loops over units, hits and
+     candidates (node, the bench and the tools, ranks in one pass). An index swapped in meanwhile (another
+     edition) starts the search over on it; a search the screen has moved past (`signal` aborted) stops
+     at its next turn instead of ranking for nobody. */
+  const inUse = msIndex;
+  const sliced = typeof document !== 'undefined';
+  let sliceEnd = now() + SLICE_MS;
+  const spent = () => sliced && now() >= sliceEnd;
+  /** The page's turn: null to go on, else what this search returns (stopped, or run again on the new index). */
+  const pause = async () => {
+    await yieldToPage();
+    sliceEnd = now() + SLICE_MS;
+    if (options.signal && options.signal.aborted) return { parsed, results: [], aborted: true };
+    if (msIndex !== inUse) return search(query, options);
+    return null;
+  };
 
   /* search-2— A BARE BOOK NAME AND A NAMED-PASSAGE KEY KEEP THEIR CARD AND ALSO
      RUN THE TEXT PIPELINE. Until now every non-text parse returned `results: []`,
@@ -1281,6 +1324,7 @@ async function search(query, options) {
   const kjvHeld = Object.create(null);
   const unheard = [];                  // literal units that found nothing as typed
   for (let u = 0; u < units.length; u++) {
+    if (spent()) { const r = await pause(); if (r) return r; }
     const unit = units[u];
     let res;
     try { res = searchUnit(unit.term, unitOpts(unit), keyword); } catch { continue; }
@@ -1318,6 +1362,7 @@ async function search(query, options) {
   for (let u = 0; u < (navAlso ? 0 : unheard.length); u++) {
     const unit = unheard[u];
     if (heard[unit.origin]) continue;
+    if (spent()) { const r = await pause(); if (r) return r; }
     if (/\d/.test(unit.term)) continue;   // a number is not a typo: "316" is not "16"
     let fixed;
     try { fixed = searchCorrected(unit.term, unitOpts(unit), keyword); } catch { continue; }
@@ -1357,6 +1402,7 @@ async function search(query, options) {
   }
   // Coverage multiplier (distinct original terms matched); an Answers topic's, within one excerpt.
   for (let i = 0; i < rankedIds.length; i++) {
+    if (spent()) { const r = await pause(); if (r) return r; }
     const id = rankedIds[i];
     const cc = answersHits[id] ? excerptCover(id, docLookup[id].text || '', answersHits[id]) : popcount(termMask[id] || 0);
     if (cc > 1) scoreMap[rankedIds[i]] *= coverageMultiplier(cc);
@@ -1381,6 +1427,7 @@ async function search(query, options) {
       .sort((a, b) => scoreMap[b] - scoreMap[a])
       .slice(0, PHRASE_CANDIDATES);
     for (const id of cands) {
+      if (spent()) { const r = await pause(); if (r) return r; }
       const d = docLookup[id];
       if (!d) continue;
       const toks = docTokens(id, d);
@@ -1399,6 +1446,7 @@ async function search(query, options) {
   if (!p.phrase && required === 1 && typedTokens.length >= SMALL_RUN_MIN) {
     const cands = rankedIds.slice().sort((a, b) => scoreMap[b] - scoreMap[a]).slice(0, PHRASE_CANDIDATES);
     for (const id of cands) {
+      if (spent()) { const r = await pause(); if (r) return r; }
       const d = docLookup[id];
       if (!d || !hasTokenRun(docTokens(id, d), typedTokens)) continue;
       run = query.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -1417,6 +1465,7 @@ async function search(query, options) {
   // A title typed whole, or a run of it, ranks its unit up (ranking.js titleMatch).
   if (typedTokens.length) {
     for (let i = 0; i < rankedIds.length; i++) {
+      if (spent()) { const r = await pause(); if (r) return r; }
       const d = docLookup[rankedIds[i]];
       if (!d || !d.title || d.kind === 'verse') continue;
       const tm = titleMatch(kjvEncode(d.title), typedTokens, STOP);
@@ -1479,6 +1528,7 @@ async function search(query, options) {
 
   let h = 0;
   for (; h < rankedIds.length && out.length < limit; h++) {
+    if (spent()) { const r = await pause(); if (r) return r; }
     const id = rankedIds[h];
     const doc = docLookup[id];
     if (!doc || !inScope(doc)) continue;
@@ -1519,7 +1569,6 @@ async function search(query, options) {
   // The index the words were read from. While the model runs, a build for another edition (the reader
   // changed translation) can swap its own in: from then on this search reads nothing more by id, since
   // that index would hand back the other edition's text. The words' results stand alone.
-  const inUse = msIndex;
   if (!keyword && !p.phrase && !quoted && parsed.kind === 'text') {
     // The model reads what the reader wants, not what they ruled out: no -word, and +word as the word.
     const meant = hasMust || hasMustNot

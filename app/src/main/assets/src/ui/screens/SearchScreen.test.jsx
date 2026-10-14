@@ -463,6 +463,25 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 
+  /* sr7: the engine ranks in slices now; a search the reader has typed past is told to stop at its next turn. */
+  it('a newer query aborts the search it replaces', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: null, results: [], parsedTerms: [] }));
+    try {
+      const props = baseProps();
+      const { rerender } = render(<SearchScreen {...props} />);
+      rerender(<SearchScreen {...props} query="love" />);
+      act(() => { vi.advanceTimersByTime(200); });
+      await act(async () => { await Promise.resolve(); });
+      const first = /** @type {any} */ (window).VotSearchMini.search.mock.calls[0][1].signal;
+      expect(first && first.aborted).toBe(false);
+      rerender(<SearchScreen {...props} query="love one" />);
+      expect(first.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("a capped collection's group is told so, by its group key", async () => {
     vi.useFakeTimers();
     /** @type {any} */ (globalThis).srchGroupKey = (doc) => (doc.volumeId === 'matthew-study' ? 'matthew' : doc.volumeId);
