@@ -1006,8 +1006,10 @@ function swapIn(/** @type {any} */ ms, /** @type {typeof stats} */ st) {
    the page's thread: JSON.parse of ~21 MB, then a Map per document field and per term, 244-262 ms on the S22
    inside init. The search worker (worker-client.js) reads and parses it and hands it over in parts
    (index-transfer.js), each received in a short task here. Where there is no worker (node, a WebView that does
-   not hand one the app's files, a worker that failed or does not answer) the page reads it, as before. */
-const RESTORE_TIMEOUT_MS = 20000;
+   not hand one the app's files, a worker that failed or does not answer) the page reads it, as before.
+   The worker is given up when it sends nothing for RESTORE_QUIET_MS: each part starts the wait again, so a slow
+   phone's restore is never cut off while its parts are still coming (sr9 refuter r1). */
+const RESTORE_QUIET_MS = 20000;
 /** The cached index for `sig`, or null when there is none. @returns {Promise<{ms: any, where: string}|null>} */
 async function restoreIndex(/** @type {string} */ sig) {
   const w = searchWorker();
@@ -1018,7 +1020,7 @@ async function restoreIndex(/** @type {string} */ sig) {
         if (m.head) asm = indexAssembler(MiniSearch, m.head, buildMiniSearchOptions());
         else if (asm) asm.add(m.part, m.entries);
         else throw new Error('search worker: a part before the head');
-      }, RESTORE_TIMEOUT_MS);
+      }, RESTORE_QUIET_MS);
       // a miss is checked here too: a worker with no Cache API sees none where the page has one
       if (!r.miss && asm) return { ms: /** @type {any} */ (asm).ms, where: 'worker' };
     } catch { /* the page reads it */ }

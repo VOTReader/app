@@ -8,12 +8,16 @@
      embed a query and score it against every passage; the page gets the best
      documents by unitKey, each with its passages' scores.
    Every request is answered by one message with `done: true` (and `error` when
-   it failed); a restore posts its parts before that. worker.js wires this to
-   the worker's onmessage; tests call it directly. */
+   it failed); a restore posts its parts before that, a meaning-start `alive`
+   every ALIVE_MS (the page gives up a worker that goes quiet, worker-client.js).
+   worker.js wires this to the worker's onmessage; tests call it directly. */
 
 import { loadCached } from './cache.js';
 import { postIndexParts } from './index-transfer.js';
 import { configureSemantic, startSemantic, semanticStatus, semanticKeys } from './semantic.js';
+
+/** How often a meaning-start says it is alive; semantic.js gives up after several of these go missing. */
+const ALIVE_MS = 5000;
 
 /**
  * @param {any} data  {id, op, ...}
@@ -33,7 +37,10 @@ export async function handleWorkerMessage(data, post) {
     if (op === 'meaning-start') {
       // the files resolve against the page's base; this worker never starts another
       configureSemantic({ url: (p) => String(new URL(p, data.base)), worker: () => null });
-      const ok = await startSemantic();
+      // a download on a slow line can take minutes: the page waits while this says it is alive
+      const beat = setInterval(() => reply({ alive: true }), ALIVE_MS);
+      let ok = false;
+      try { ok = await startSemantic(); } finally { clearInterval(beat); }
       return reply({ done: true, ok, ...semanticStatus() });
     }
     if (op === 'meaning') return reply({ done: true, docs: await semanticKeys(data.query, data.limit) });

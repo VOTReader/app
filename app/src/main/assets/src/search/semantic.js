@@ -90,6 +90,12 @@ const RETRY_MAX_MS = 10 * 60 * 1000;
 let retryMs = 0;
 let retryAt = 0;
 
+/* A WORKER THAT GOES QUIET IS GIVEN UP (sr9 refuter r1): a start is waited for while the worker says it is
+   alive (every 5 s, worker-ops.js), however long the download; a query it has not answered in QUERY_WAIT_MS
+   (a few hundred ms on the S22) is a worker that will not. Either way this thread takes the model. */
+const START_QUIET_MS = 30 * 1000;
+const QUERY_WAIT_MS = 10 * 1000;
+
 /** Load the model and the passage vectors, once. Resolves true when meaning search is ready. */
 export function startSemantic() {
   if (starting) return starting;
@@ -97,7 +103,7 @@ export function startSemantic() {
   const w = pageOnly ? null : io.worker();
   if (w) {
     status = 'loading';
-    const run = w.request('meaning-start', { base: io.url('') }).then((/** @type {any} */ r) => {
+    const run = w.request('meaning-start', { base: io.url('') }, undefined, START_QUIET_MS).then((/** @type {any} */ r) => {
       if (!r.ok) throw new Error(r.failure || 'semantic: the worker could not load the model');
       where = 'worker';
       status = 'ready';
@@ -321,7 +327,7 @@ export async function semanticDocs(/** @type {string} */ query, /** @type {(key:
     /** @type {any} */ let r = null;
     try {
       if (!w) throw new Error('search worker gone');
-      r = await w.request('meaning', { query, limit });
+      r = await w.request('meaning', { query, limit }, undefined, QUERY_WAIT_MS);
     } catch {
       void toPage(); // the worker died: this thread loads the model, behind this search
       return null;

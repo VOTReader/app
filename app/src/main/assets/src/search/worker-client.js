@@ -8,8 +8,9 @@
    node and jsdom (no Worker), a worker that fails to load (an engine without
    module workers, a WebView that does not hand a worker the app's files) or
    that does not answer its first message within HELLO_TIMEOUT_MS, or one that
-   dies. Every request it had open is refused then, so each caller falls back
-   at once instead of waiting on an answer that will not come. */
+   dies or goes quiet on a request past that request's limit. Every request it
+   had open is refused then, so each caller falls back at once instead of
+   waiting on an answer that will not come. */
 
 const WORKER_URL = 'dist/bundle-w.js';
 const HELLO_TIMEOUT_MS = 8000;
@@ -17,7 +18,7 @@ const HELLO_TIMEOUT_MS = 8000;
 /** @type {Worker|null} */ let worker = null;
 let broken = false;
 let seq = 0;
-/** @type {Map<number, {resolve: (m: any) => void, reject: (e: Error) => void, onPart: (m: any) => void}>} */
+/** @type {Map<number, {resolve: (m: any) => void, reject: (e: Error) => void, onPart: (m: any) => void, heard: () => void}>} */
 const pending = new Map();
 
 function fail(/** @type {string} */ why) {
@@ -33,17 +34,24 @@ function fail(/** @type {string} */ why) {
  * @param {string} op
  * @param {Record<string, any>} [data]
  * @param {(m: any) => void} [onPart]
- * @param {number} [timeoutMs]  refuse it (and give up the worker) when no answer has come by then
+ * @param {number} [quietMs]  refuse it (and give up the worker) when the worker has sent nothing for it this
+ *   long: every part, and every `alive` a long job sends (worker-ops.js), starts the wait again, so a slow
+ *   phone's restore or a slow line's model download is not cut off while it is still coming (sr9 refuter r1)
  * @returns {Promise<any>}
  */
-function request(op, data, onPart, timeoutMs) {
+function request(op, data, onPart, quietMs) {
   return new Promise((resolve, reject) => {
     if (!worker) { reject(new Error('search worker gone')); return; }
     const id = ++seq;
     let timer = 0;
+    const heard = () => {
+      if (!quietMs) return;
+      if (timer) clearTimeout(timer);
+      timer = /** @type {any} */ (setTimeout(() => { if (pending.has(id)) fail('search worker: no answer to ' + op); }, quietMs));
+    };
     const settle = (/** @type {Function} */ f) => (/** @type {any} */ v) => { if (timer) clearTimeout(timer); f(v); };
-    pending.set(id, { resolve: settle(resolve), reject: settle(reject), onPart: onPart || (() => {}) });
-    if (timeoutMs) timer = /** @type {any} */ (setTimeout(() => { if (pending.has(id)) fail('search worker: no answer to ' + op); }, timeoutMs));
+    pending.set(id, { resolve: settle(resolve), reject: settle(reject), onPart: onPart || (() => {}), heard });
+    heard();
     worker.postMessage({ id, op, ...(data || {}) });
   });
 }
@@ -65,6 +73,8 @@ export function searchWorker() {
       const p = pending.get(m.id);
       if (!p) return;
       if (!m.done) {
+        p.heard();
+        if (m.alive) return;
         // a part the caller cannot take ends its request: it must not finish on a half-built index
         try { p.onPart(m); } catch (err) { pending.delete(m.id); p.reject(/** @type {Error} */ (err)); }
         return;
