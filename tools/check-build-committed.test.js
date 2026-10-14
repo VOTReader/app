@@ -17,8 +17,13 @@ import { buildDrift } from './check-build-committed.mjs';
 const TOOL = resolve(dirname(fileURLToPath(import.meta.url)), 'check-build-committed.mjs');
 const ASSETS = 'app/src/main/assets';
 
+// Every git call gets an env with no GIT_* in it, on top of vitest.setup.js's scrub: inside a hook git
+// exports GIT_DIR / GIT_INDEX_FILE, and a temp-repo `git init` / `git config` that inherited them would
+// rewrite the real repository (network ln1, 2026-10-05).
+const ENV = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
+
 let repo;
-const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' });
+const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', env: ENV });
 const put = (rel, text) => {
   mkdirSync(dirname(join(repo, rel)), { recursive: true });
   writeFileSync(join(repo, rel), text);
@@ -40,29 +45,29 @@ afterEach(() => rmSync(repo, { recursive: true, force: true }));
 
 describe('buildDrift', () => {
   it('finds nothing in a tree that matches the commit', () => {
-    expect(buildDrift([ASSETS], repo)).toEqual({ changed: [], untracked: [] });
+    expect(buildDrift([ASSETS], repo, ENV)).toEqual({ changed: [], untracked: [] });
   });
 
   it('finds a new build output that was never committed, which git diff --exit-code passes', () => {
     put(`${ASSETS}/dist/bundle-f.js`, 'f\n');
-    expect(spawnSync('git', ['diff', '--exit-code', `${ASSETS}/dist/`], { cwd: repo }).status).toBe(0);
-    expect(buildDrift([ASSETS], repo)).toEqual({ changed: [], untracked: [`${ASSETS}/dist/bundle-f.js`] });
+    expect(spawnSync('git', ['diff', '--exit-code', `${ASSETS}/dist/`], { cwd: repo, env: ENV }).status).toBe(0);
+    expect(buildDrift([ASSETS], repo, ENV)).toEqual({ changed: [], untracked: [`${ASSETS}/dist/bundle-f.js`] });
   });
 
   it('finds a committed file the build rewrote', () => {
     put(`${ASSETS}/index.html`, '<html>new csp</html>\n');
-    expect(buildDrift([ASSETS], repo)).toEqual({ changed: [`${ASSETS}/index.html`], untracked: [] });
+    expect(buildDrift([ASSETS], repo, ENV)).toEqual({ changed: [`${ASSETS}/index.html`], untracked: [] });
   });
 
   it('ignores gitignored files and paths outside the ones asked about', () => {
     put(`${ASSETS}/dist/ignored.js`, 'x\n');
     put('tools/scratch.js', 'x\n');
-    expect(buildDrift([ASSETS], repo)).toEqual({ changed: [], untracked: [] });
+    expect(buildDrift([ASSETS], repo, ENV)).toEqual({ changed: [], untracked: [] });
   });
 });
 
 describe('check-build-committed CLI', () => {
-  const run = () => spawnSync(process.execPath, [TOOL], { cwd: repo, encoding: 'utf8' });
+  const run = () => spawnSync(process.execPath, [TOOL], { cwd: repo, encoding: 'utf8', env: ENV });
 
   it('exits 0 on a clean tree', () => {
     const r = run();

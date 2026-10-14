@@ -23,10 +23,11 @@ export const BUILD_PATHS = ['app/src/main/assets/'];
  * deleted) and `untracked` (new and not gitignored).
  * @param {string[]} [paths]
  * @param {string} [cwd]
+ * @param {NodeJS.ProcessEnv} [env]
  * @returns {{ changed: string[], untracked: string[] }}
  */
-export function buildDrift(paths = BUILD_PATHS, cwd = process.cwd()) {
-  const out = execFileSync('git', ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', ...paths], { cwd, encoding: 'utf8' });
+export function buildDrift(paths = BUILD_PATHS, cwd = process.cwd(), env = process.env) {
+  const out = execFileSync('git', ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', ...paths], { cwd, encoding: 'utf8', env });
   const changed = [];
   const untracked = [];
   const entries = out.split('\0').filter(Boolean);
