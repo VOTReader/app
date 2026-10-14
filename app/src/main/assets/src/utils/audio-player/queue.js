@@ -171,9 +171,11 @@ export function playLetter(opts) {
  * (owner directive 2026-08-09) sets a FORWARD-ONLY horizon: the queue holds
  * the chosen letter and what follows it, never the letters behind it. A
  * reader stepping backward past where they began is disorienting; prev()
- * simply clamps at the chosen start. `startReader` swaps the START letter (and
- * only that letter) for another reader's complete rendition of it — the rest
- * of the collection keeps the manifest's primary reading.
+ * simply clamps at the chosen start. Every letter is queued in the listener's
+ * Letter Voice where that reader recorded it, else its primary reading
+ * (playbackTracks; ra5, Corbin 2026-10-14: the start letter alone used to get
+ * it). `startReader` swaps the START letter (and only that letter) for another
+ * reader's complete rendition of it.
  *
  * `startPartIndex` advances the horizon INTO the start item's parts (a
  * per-chapter Bible edition choosing chapter N) — same forward-only rule,
@@ -188,7 +190,7 @@ export function playCollection(opts) {
   /** @type {Track[]} */
   let queue = [];
   for (const item of items) {
-    const tracks = _tracksFor(o.volKey, item, o.collectionLabel);
+    const tracks = playbackTracks(o.volKey, item, o.collectionLabel);
     for (const t of tracks) queue.push(t);
   }
   if (!queue.length) return false;
@@ -445,7 +447,8 @@ function _extendQueue() {
   for (const unit of units) {
     /** @type {Track[]} */
     const tracks = [];
-    for (const item of unit.items) for (const t of _tracksFor(unit.volKey, item, unit.label)) tracks.push(t);
+    // In the listener's Letter Voice where that reader recorded it, as playCollection queues (ra5).
+    for (const item of unit.items) for (const t of playbackTracks(unit.volKey, item, unit.label)) tracks.push(t);
     if (!tracks.length) continue;   // carded, but nothing recorded yet — pass over it
     _state.queue = _state.queue.concat(tracks);
     return true;

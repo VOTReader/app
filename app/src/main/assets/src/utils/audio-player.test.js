@@ -1545,15 +1545,18 @@ describe('audio-player — reader-alternate renditions', () => {
 });
 
 /* settings.letterReader (owner directive 2026-08-09): one preferred voice for
-   the whole Letters corpus, consulted only where the caller named none. */
+   the whole Letters corpus, consulted only where the caller named none. Since
+   ra5 (Corbin 2026-10-14, brief design-5) it is the voice of EVERY letter that
+   reader recorded: the start, the letters queued behind it, the next collection
+   the queue grows into, and the queue a reboot rebuilds. */
 describe('audio-player — the default letter reader', () => {
   afterEach(() => AudioPlayer.setPreferredReader('auto'));
 
-  it('starts a collection on the preferred reader when that letter has one', () => {
+  it('starts a collection on the preferred reader, and every letter after it that reader read follows in that voice', () => {
     AudioPlayer.setPreferredReader('V');
     AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a' });
     const s = AudioPlayer.getState();
-    expect(s.queue.map((t) => t.url)).toEqual([URL_OF('idA1v'), URL_OF('idA2v'), URL_OF('idC')]);
+    expect(s.queue.map((t) => t.url)).toEqual([URL_OF('idA1v'), URL_OF('idA2v'), URL_OF('idCv')]);
     // …and it is recorded, so a reboot resumes on the same voice.
     el().dispatchEvent(new Event('playing'));
     el().currentTime = 10;
@@ -1584,11 +1587,87 @@ describe('audio-player — the default letter reader', () => {
     }
   });
 
-  it('leaves Play All alone — the preference picks a START, not a whole queue', () => {
+  it('applies to Play All: each letter that reader read plays in their voice, the rest keep the primary', () => {
     AudioPlayer.setPreferredReader('V');
     AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
     expect(AudioPlayer.getState().queue.map((t) => t.url))
-      .toEqual([URL_OF('idPreface'), URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
+      .toEqual([URL_OF('idPreface'), URL_OF('idA1v'), URL_OF('idA2v'), URL_OF('idCv')]);
+  });
+
+  it('a voice named for the start letter picks that letter only; the letters after it follow the preference', () => {
+    AudioPlayer.setPreferredReader('V');
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a', startReader: 'B' });
+    expect(AudioPlayer.getState().queue.map((t) => t.url)).toEqual([URL_OF('idA1'), URL_OF('idA2'), URL_OF('idCv')]);
+    // A library row naming a voice and a part (playTrack) opens on exactly those, and the queue behind it follows the preference.
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1', label: 'Volume One' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      AudioPlayer.playTrack({ key: 'vol1:letter-a', title: 'Letter A', sub: 'Volume One', url: URL_OF('idA2'), readerCode: 'B', partLabel: 'Part 2' });
+      expect(AudioPlayer.getState().queue.map((t) => t.url)).toEqual([URL_OF('idA2'), URL_OF('idCv')]);
+    } finally {
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
+    }
+  });
+
+  it('a reboot rebuilds the queue in the preferred voice, not just the letter that was playing', async () => {
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1', label: 'Volume One' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      AudioPlayer.setPreferredReader('V');
+      AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a' });
+      el().dispatchEvent(new Event('playing'));
+      el().currentTime = 10;
+      el().dispatchEvent(new Event('timeupdate'));
+
+      await load();   // the reboot; the app pushes the setting again as it renders (screen-routes)
+      AudioPlayer.setPreferredReader('V');
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      const st = AudioPlayer.getState();
+      expect(st.queue.map((t) => t.url)).toEqual([URL_OF('idA1v'), URL_OF('idA2v'), URL_OF('idCv')]);
+      expect(st.qi).toBe(0);
+      expect(el().src).toBe(URL_OF('idA1v'));
+    } finally {
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
+    }
+  });
+
+  it('a reboot keeps the voice named for the start letter, and the letters after it follow the preference', async () => {
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1', label: 'Volume One' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      AudioPlayer.setPreferredReader('V');
+      AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a', startReader: 'B' });
+      el().dispatchEvent(new Event('playing'));
+      el().currentTime = 10;
+      el().dispatchEvent(new Event('timeupdate'));
+      AudioPlayer.next();
+      AudioPlayer.next();   // on to Letter C in V: the saved track is past the start letter, so only startReader names its voice
+      expect(el().src).toBe(URL_OF('idCv'));
+      el().dispatchEvent(new Event('playing'));
+      el().currentTime = 10;
+      el().dispatchEvent(new Event('timeupdate'));
+
+      await load();
+      AudioPlayer.setPreferredReader('V');
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      const st = AudioPlayer.getState();
+      expect(st.queue.map((t) => t.url)).toEqual([URL_OF('idA1'), URL_OF('idA2'), URL_OF('idCv')]);
+      expect(st.qi).toBe(2);
+      expect(el().src).toBe(URL_OF('idCv'));
+    } finally {
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
+    }
   });
 });
 
@@ -1854,6 +1933,25 @@ describe('audio-player — offline, recordings downloaded to the phone (item 8)'
     } finally { AudioPlayer.setPreferredReader('auto'); }
     expect(AudioPlayer.playbackTracks('vol1', { id: 'letter-c', title: 'Letter C' }, 'Volume One').map((t) => t.url)).toEqual([URL_OF('idC')]);
     expect(AudioPlayer.playbackTracks('vol1', { id: 'letter-b', title: 'Letter B' }, 'Volume One')).toEqual([]);
+  });
+
+  it('with no signal, a letter queued in the preferred voice plays the primary when only that is on the phone (ra5)', async () => {
+    await downloaded(['idA1v', 'idA2v', 'idC']);   // Letter A in V; Letter C only in its primary reading (T)
+    setOnline(false);
+    AudioPlayer.setPreferredReader('V');
+    try {
+      AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a' });
+      expect(el().src).toBe(URL_OF('idA1v'));
+      el().dispatchEvent(new Event('playing'));
+      el().dispatchEvent(new Event('ended'));
+      expect(el().src).toBe(URL_OF('idA2v'));
+      el().dispatchEvent(new Event('playing'));
+      el().dispatchEvent(new Event('ended'));
+      const s = AudioPlayer.getState();
+      expect(s.queue[s.qi].url).toBe(URL_OF('idC'));
+      expect(el().src).toBe(URL_OF('idC'));
+      expect(document.getElementById(AUDIO_TOAST_ID)).toBe(null);
+    } finally { AudioPlayer.setPreferredReader('auto'); }
   });
 
   it('with no signal, a letter queued in one reading plays the reading that IS on the phone', async () => {

@@ -1193,7 +1193,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               eyebrow="Listening"
               title="Letter Voice"
               label="Letter Voice"
-              desc="Preferred reader for the recorded Letters. Automatic uses each recording's own primary reading; choosing a reader starts every letter THEY have recorded in their voice, and letters they haven't keep the primary one. You can always switch voice for the recording that is playing from the listening desk."
+              desc="Preferred reader for the recorded Letters. Automatic uses each recording's own primary reading; choosing a reader plays every letter THEY have recorded in their voice, including the letters that play next, and letters they haven't keep the primary one. You can always switch voice for the recording that is playing from the listening desk."
               value={settings.letterReader || "auto"}
               options={[
                 { id: "auto", label: "Automatic", desc: "Each recording's primary reading" },

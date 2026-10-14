@@ -5,11 +5,12 @@
 import { AUDIO_BIBLE_RELEASE_PREFIX, normalizeAudioTrack } from '../audio-track.js';
 import { loadSongCatalog, songQueue } from '../song-catalog.js';
 import {
+  playbackTracks,
+  _renditionByReader,
   renditionsFor,
   sectionsFor,
   _slicePartHorizon,
   _songTracks,
-  _tracksFor,
 } from './catalog.js';
 import {
   _bibleManifest,
@@ -59,6 +60,21 @@ function _withRestoredAlternate(restore, queue) {
     while (end < queue.length && queue[end].key === restore.key) end++;
     return queue.slice(0, at).concat(rendition.tracks, queue.slice(end));
   } catch (_e) { return queue; }
+}
+
+/**
+ * One item's tracks in the rebuilt queue, in the reading the play that built the queue gave it: the start letter in
+ * the voice it was started in (startReader), every other letter in the listener's Letter Voice where that reader
+ * recorded it, else its primary reading (playbackTracks, as playCollection and _extendQueue queue; ra5).
+ *
+ * @param {any} r - the pending-restore descriptor
+ * @param {{ id: string, title?: string }} item
+ * @returns {Track[]}
+ */
+function _rebuiltTracks(r, item) {
+  const start = r.startReader && r.startKey === r.volKey + ':' + item.id
+    ? _renditionByReader(r.volKey, item, r.label, r.startReader) : null;
+  return start ? start.tracks : playbackTracks(r.volKey, item, r.label);
 }
 
 /**
@@ -154,7 +170,7 @@ export async function _rebuildRestoredQueue() {
       .filter((b) => r.key === r.volKey + ':' + b[0])
       .map((b) => ({ id: b[0], title: b[1] }));
     for (const item of items) {
-      for (const t of _tracksFor(r.volKey, item, r.label)) queue.push(t);
+      for (const t of _rebuiltTracks(r, item)) queue.push(t);
     }
   } else {
     const col = (typeof g.COL_BY_KEY !== 'undefined') ? g.COL_BY_KEY.get(r.volKey) : null;
@@ -164,7 +180,7 @@ export async function _rebuildRestoredQueue() {
       ? [pref, ...arr].filter((i) => i && (r.key === r.volKey + ':' + i.id))
       : (pref ? [pref, ...arr] : arr);
     for (const item of items) {
-      for (const t of _tracksFor(r.volKey, item, r.label)) queue.push(t);
+      for (const t of _rebuiltTracks(r, item)) queue.push(t);
     }
   }
   // Forward-only horizon (owner directive 2026-08-09): a queue that began at
@@ -192,9 +208,10 @@ export async function _rebuildRestoredQueue() {
   if (migrated) resumeAt = migrated.time;
   let qi = migrated ? migrated.qi : (r.url ? queue.findIndex((item) => item.url === r.url) : -1);
   if (qi < 0 && r.key) {
-    // A rebuilt queue always holds each letter's PRIMARY rendition, so a
-    // listener resuming an alternate reader finds no url match. Swap that one
-    // letter for the rendition that actually contains the saved track.
+    // A rebuilt queue holds each letter in the reading a fresh play would queue
+    // (_rebuiltTracks), so a listener resuming another reading of it (a voice
+    // switch, a Letter Voice changed since, an offline swap) finds no url match.
+    // Swap that one letter for the rendition that actually contains the saved track.
     queue = _withRestoredAlternate(r, queue);
     qi = r.url ? queue.findIndex((item) => item.url === r.url) : -1;
   }

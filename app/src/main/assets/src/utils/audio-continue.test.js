@@ -154,6 +154,17 @@ describe('w-audio-continue — the queue is the site order, one unit ahead', () 
     } finally { delete globalThis.AUDIO_SECTIONS; }
   });
 
+  it('the next collection joins in the listener\'s Letter Voice where that reader recorded it (ra5)', () => {
+    globalThis.AUDIO_ALTERNATES = { 'vol2:solo': [['V', [['idSoloV']]]] };
+    try {
+      AudioPlayer.setPreferredReader('V');
+      AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS.vol1, collectionLabel: 'Volume One', startId: 'letter-c' });
+      expect(urls()).toEqual([URL_OF('idC'), URL_OF('idSoloV')]);   // C has no V reading: its primary; Solo has one
+      ended();
+      expect(el().src).toBe(URL_OF('idSoloV'));
+    } finally { delete globalThis.AUDIO_ALTERNATES; }
+  });
+
   it('a single letter played alone (no registry) still ends cleanly — nothing to continue into', () => {
     delete globalThis.COLLECTIONS; delete globalThis.COL_BY_KEY; delete globalThis.colLetterArr; delete globalThis.colPreface;
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });

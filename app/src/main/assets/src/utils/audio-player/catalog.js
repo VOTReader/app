@@ -172,8 +172,9 @@ export function readerLabel(code) {
 /* ── preferred reader (settings.letterReader) ─────────────────────────────
    'auto' (the default) means the manifest's own choice — Benjamin supersedes,
    then reader rank. A listener who prefers one voice sets it once in Settings
-   and every letter that HAS a reading by that reader starts with it; letters
-   that don't simply keep the primary. App keeps this in step through
+   and every letter that HAS a reading by that reader plays in it, the letters a
+   queue plays next included (playbackTracks, ra5); letters that don't simply
+   keep the primary. App keeps this in step through
    AudioPlayer.setPreferredReader (screen-routes), so the player never reaches
    into React state. */
 
