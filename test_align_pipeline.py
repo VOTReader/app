@@ -473,5 +473,38 @@ class VerifyMeasuresTheShippedOnsetOfTheRightRecording(_Tmp):
         self.assertNotEqual(hv.audio_tag(c), ta, "same name, different bytes, same cache")
 
 
+class FillGuardTakesLegAOnAKeptMoveBack(unittest.TestCase):
+    """al4 (2026-10-14, c69): a fill re-belt's kept move lands on whisper's tB, which starts early in the pause
+    (a blind refuter on 40 of the 103 c67 rows: tB 0.46 s before the voice, tA 0.02 s after it). The guard now
+    takes tA - PREFER_A_BACK, never before tB, only on a move it keeps, and only with tA close after tB."""
+
+    @staticmethod
+    def row(n, t, tA=None, tB=None, status="CONFIRMED", tEnd=None):
+        return {"n": n, "t": t, "tA": tA, "tB": tB, "status": status, "tEnd": tEnd}
+
+    def guard(self, old_t, new, **kw):
+        out, rep = al.fill_guard([self.row(1, old_t)], [new], **kw)
+        return out[0]["t"], rep["tA"]
+
+    def test_a_kept_move_on_tB_takes_tA_less_the_back_off(self):
+        self.assertEqual(self.guard(30.05, self.row(1, 26.68, tA=27.18, tB=26.68)), (27.14, [1]))
+
+    def test_never_before_tB(self):
+        self.assertEqual(self.guard(30.0, self.row(1, 26.68, tA=26.70, tB=26.68)), (26.68, []))
+
+    def test_tA_too_far_after_tB_or_not_before_the_old_onset_keeps_tB(self):
+        self.assertEqual(self.guard(30.0, self.row(1, 26.0, tA=26.8, tB=26.0)), (26.0, []))
+        self.assertEqual(self.guard(28.0, self.row(1, 26.9, tA=28.1, tB=26.9)), (26.9, []))
+
+    def test_an_onset_that_is_not_tB_is_left_alone(self):
+        self.assertEqual(self.guard(30.0, self.row(1, 26.5, tA=26.9, tB=26.2)), (26.5, []))
+
+    def test_a_reverted_move_never_takes_tA(self):
+        self.assertEqual(self.guard(4.92, self.row(1, 10.49, tA=10.8, tB=10.49)), (4.92, []))
+
+    def test_prefer_a_none_turns_it_off(self):
+        self.assertEqual(self.guard(30.05, self.row(1, 26.68, tA=27.18, tB=26.68), prefer_a=None), (26.68, []))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -532,10 +532,17 @@ def tx_fill_stamp(tx, mn=TX_FILL_MIN):
 # more than 1 s after both legs' starts. So a fill-driven re-belt keeps a moved onset only when it moves BACK
 # (>= FILL_BACK, or off a seek point) and keeps those 5 kinds of new REVIEW guess dark. The shipped c67 belts are
 # exactly this function of the pre-fill and fill belts (lanes/align/tools/test_fill_guard.py replays all of them).
-FILL_GUARD = 1
+# v2 (al4, 2026-10-14, c69): on a kept move whose onset is whisper's tB with leg A's tA under PREFER_A after it, the
+# onset is tA - PREFER_A_BACK (never before tB). 103 c67 rows; a blind refuter (40 stratified, audio envelope +
+# silencedetect + a small.en cut test, which leg was which hidden) put the true onset at tA + 0.02 s median and tB
+# 0.46 s early (7 of 40 on the previous word's final s/t). tA itself was late > 0.06 s on 5 soft s/th/f/dj starts;
+# the 0.04 s back leaves 33 better / 6 same / 1 worse (Job 22:6, tA on the second word) against the live tB.
+FILL_GUARD = 2
 FILL_BACK = 1.0
 FILL_SEEK = 30.0
 FILL_SEEK_TOL = 1.0
+PREFER_A = 0.7
+PREFER_A_BACK = 0.04
 
 
 def _fill_move_ok(old_t, new_t):
@@ -543,15 +550,15 @@ def _fill_move_ok(old_t, new_t):
     return new_t <= old_t - FILL_BACK or (new_t < old_t and k >= 1 and abs(old_t - FILL_SEEK * k) <= FILL_SEEK_TOL)
 
 
-def fill_guard(old_rows, new_rows, prefer_a=None):
+def fill_guard(old_rows, new_rows, prefer_a=PREFER_A):
     """-> (rows, report): `new_rows` (a fill-driven re-belt) checked against `old_rows` (the chapter's previous
     belt, same text, audio and settings). A moved onset that fails _fill_move_ok gets its old row back whole; a
     verse the old belt left dark stays dark when the new one is a REVIEW guess that starts before the previous
     verse's end or more than 1 s after both legs. A newly dark row is left as the belt says (counted). When a row
     was restored, every tEnd is clamped to the next onset, last, so an overlap is judged before the clamp hides it.
-    `prefer_a` (seconds, off by default): on a kept move whose onset is tB with tA within prefer_a after it and
-    still before the old onset, take tA (r2: 6 kept rows had tB early in the pause and tA on the voice). It would
-    move 103 live c67 onsets, so it waits for its own refuter before any re-belt turns it on."""
+    `prefer_a` (seconds; None turns it off): on a kept move whose onset is tB with tA within prefer_a after it and
+    still before the old onset, the onset becomes tA - PREFER_A_BACK, never before tB (whisper's start sits early in
+    the pause, leg A's on the voice; see FILL_GUARD v2 above)."""
     old = {r["n"]: r for r in old_rows}
     out, rep = [], {"v": FILL_GUARD, "kept": 0, "reverted": 0, "darkKept": [], "tA": [], "newlyDark": 0}
     for r in new_rows:
@@ -563,8 +570,8 @@ def fill_guard(old_rows, new_rows, prefer_a=None):
                     rep["kept"] += 1
                     ta, tb = r.get("tA"), r.get("tB")
                     if (prefer_a and ta is not None and tb is not None and abs(nt - tb) < 0.005
-                            and 0 < ta - tb < prefer_a and ta < ot):
-                        r["t"] = round(ta, 2)
+                            and 0 < ta - tb < prefer_a and ta < ot and round(max(tb, ta - PREFER_A_BACK), 2) != nt):
+                        r["t"] = round(max(tb, ta - PREFER_A_BACK), 2)
                         rep["tA"].append(r["n"])
                 else:
                     r = dict(o)
