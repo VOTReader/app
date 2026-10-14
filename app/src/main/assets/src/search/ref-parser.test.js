@@ -83,6 +83,13 @@ describe('parseReference', () => {
     expect(parseReference('gen 1-3')).toMatchObject({ kind: 'ref-bible', chapter: 1, chapterEnd: 3 });
   });
 
+  it('a range across chapters keeps its end verse, in the end chapter (sweep W32)', () => {
+    expect(parseReference('John 14:1-16:33')).toMatchObject({ kind: 'ref-bible', bookId: 'john', chapter: 14, verseStart: 1, chapterEnd: 16, verseEnd: 33 });
+    const same = parseReference('John 14:5-14:20');
+    expect(same).toMatchObject({ kind: 'ref-bible', chapter: 14, verseStart: 5, verseEnd: 20 });
+    expect(same.chapterEnd).toBeUndefined();
+  });
+
   it('parses a book-only ref', () => {
     expect(parseReference('john')).toEqual({ kind: 'ref-book', bookId: 'john', bookTitle: 'John' });
   });

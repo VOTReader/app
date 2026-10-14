@@ -702,6 +702,15 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 
+  it('a range across chapters is labelled with both ends (sweep W32)', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).SrchCard = ({ entry, isDirect }) => (isDirect ? <div className="stub-direct">{entry.__label}</div> : null);
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: { kind: 'ref-bible', bookId: 'john', bookTitle: 'John', chapter: 14, verseStart: 1, chapterEnd: 16, verseEnd: 33 }, results: [], parsedTerms: [] }));
+    await typeAndWait(baseProps(), 'John 14:1-16:33');
+    expect(document.querySelector('.stub-direct').textContent).toBe('John 14:1-16:33');
+    vi.useRealTimers();
+  });
+
   it('no correction, no note', async () => {
     vi.useFakeTimers();
     /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({

@@ -5,6 +5,7 @@
    search runs. Returns one of:
      { kind:'command', action, label }
      { kind:'ref-bible', bookId, bookTitle, chapter, verseStart?, verseEnd?, chapterEnd? }
+       (with chapterEnd, verseEnd is a verse of chapterEnd: "John 14:1-16:33")
      { kind:'ref-letter', volumeId, letterNum?, letterId?, label, ... }
      { kind:'ref-book', bookId, bookTitle }
      { kind:'named-passage', bookId, bookTitle, chapter, ... , label }
@@ -449,7 +450,11 @@ export function parseReference(query, parseOpts) {
         return { kind: 'ref-bible', bookId, bookTitle, chapter: ch, verseStart: vs, verseEnd: ch2v };
       }
       if (vs !== null && ch2v !== null && vs2 !== null) {
-        return { kind: 'ref-bible', bookId, bookTitle, chapter: ch, verseStart: vs, chapterEnd: ch2v, verseEndChapter: vs2 };
+        // Its end verse was returned as verseEndChapter, which nothing read: the card said
+        // "John 14-16:1" and lit 14:1 alone (sweep W32). "John 14:5-14:20" is one chapter.
+        return ch2v === ch
+          ? { kind: 'ref-bible', bookId, bookTitle, chapter: ch, verseStart: vs, verseEnd: vs2 }
+          : { kind: 'ref-bible', bookId, bookTitle, chapter: ch, verseStart: vs, chapterEnd: ch2v, verseEnd: vs2 };
       }
       if (vs !== null && ch2v === null) {
         return { kind: 'ref-bible', bookId, bookTitle, chapter: ch, verseStart: vs };

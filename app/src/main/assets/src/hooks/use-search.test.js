@@ -406,6 +406,20 @@ describe('useSearch — handleSearchSelect (__direct refs)', () => {
     expect(props.setSurpriseAnchor).toHaveBeenCalledWith({ type: 'verse', verses: [3, 4, 5] });
   });
 
+  it('a range across chapters lights its first chapter from the start verse to the end (sweep W32)', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({
+      __direct: true, __corpus: 'volumes',
+      ref: { kind: 'ref-bible', bookId: 'john', chapter: 14, verseStart: 20, chapterEnd: 15, verseEnd: 3 },
+    }); });
+    expect(props.setChapterNum).toHaveBeenCalledWith(14);
+    const calls = props.setSurpriseAnchor.mock.calls;
+    const anchor = calls[calls.length - 1][0];
+    // John 14 ends at verse 31; verseEnd 3 is in chapter 15, not a bound on chapter 14.
+    expect(anchor.type).toBe('verse');
+    expect(anchor.verses.slice(0, 12)).toEqual([20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]);
+  });
+
   it('ref-bible without verseStart clears surpriseAnchor', () => {
     const { result, props } = setup();
     act(() => { result.current.handleSearchSelect({

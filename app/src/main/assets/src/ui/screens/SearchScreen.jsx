@@ -431,7 +431,10 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     const allowLetter = curCorpus === 'all' || curCorpus === 'volumes';
     const out = [];
     if ((p.kind === 'ref-bible' || p.kind === 'named-passage') && allowBible) {
-      const lbl = p.bookTitle + ' ' + p.chapter + (p.chapterEnd ? '-' + p.chapterEnd : '') + (p.verseStart ? ':' + p.verseStart + (p.verseEnd ? '-' + p.verseEnd : '') : '');
+      // A range across chapters names both ends, "John 14:1-16:33" (sweep W32); a chapter range is "Matthew 5-7".
+      const lbl = p.bookTitle + ' ' + (p.chapterEnd && p.verseStart
+        ? p.chapter + ':' + p.verseStart + '-' + p.chapterEnd + (p.verseEnd ? ':' + p.verseEnd : '')
+        : p.chapter + (p.chapterEnd ? '-' + p.chapterEnd : '') + (p.verseStart ? ':' + p.verseStart + (p.verseEnd ? '-' + p.verseEnd : '') : ''));
       out.push({ __direct: true, __corpus: curCorpus, __label: lbl, __sub: p.kind === 'named-passage' ? 'Named passage — open' : 'Open chapter', ref: p });
     } else if (p.kind === 'ref-letter' && allowLetter) {
       const lr = letterRefCards(p, /** @type {any} */ (window).VotSearchData, window);

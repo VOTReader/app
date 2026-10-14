@@ -420,7 +420,10 @@ export function useSearch({
         setChapterNum(r.chapter);
         if (r.verseStart) {
           const vs = [];
-          const vEnd = r.verseEnd || r.verseStart;
+          // Across chapters ("John 14:20-15:3") verseEnd is in the end chapter, so the first chapter
+          // lights from the start verse to its end (sweep W32): 176 verses is the longest chapter
+          // (Psalm 119), and a number past the last verse lights nothing.
+          const vEnd = r.chapterEnd > r.chapter ? r.verseStart + 175 : (r.verseEnd || r.verseStart);
           for (let v = r.verseStart; v <= vEnd; v++) vs.push(v);
           setSurpriseAnchor({ type: 'verse', verses: vs });
         } else {
