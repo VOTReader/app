@@ -122,6 +122,12 @@ coordinate with that lane before starting them.
 > 2026-10-13 (lz1): reversed, not done. Bundles e-h were folded INTO bundle-d: on Android the split saved ~60 ms
 > and cost a shipped bug and two mixed-build races; the phone A/B of the merge was +4 ms (Home) and +10 ms (a
 > saved reader tab). Do not split code again without a phone A/B that shows more (ARCHITECTURE.md, "Lazy corpora").
+>
+> The price is paid once, on a website first visit. 2026-10-14, Lighthouse 13.5 mobile (simulated slow 4G, 4x CPU,
+> cold profile), main 54302e32 vs lz1 4c386280 served alike, median of 3 each, interleaved: Home LCP 3.97 -> 5.07 s
+> (+1.1 s), Performance 86 -> 80, 493 -> 709 KB; a shared John 3:16 link LCP 11.5 -> 12.6 s (+1.1 s). The live
+> site measured the same (Home LCP 5.1 s, Performance 78). The memo's estimate of the real cost was about +1.3 s.
+> Repeat visits come from the service-worker cache.
 
 - **Evidence.** `unused-javascript` flags 136 to 142 KB of the 185 KB gzip `bundle-d.js` (653 KB raw) as not
   executed during load on every page, which Lighthouse estimates at about 1.1 s. bundle-b has another 37 KB unused.
