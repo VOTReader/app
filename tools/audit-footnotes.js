@@ -1,5 +1,6 @@
 /* ─────────────────────────────────────────────────────────────────────────
-   audit-footnotes.js — READ-ONLY diagnostic (not wired into any gate).
+   audit-footnotes.js — READ-ONLY diagnostic; with --check, a CI gate
+   (`npm run check:footnotes`, ci.yml "Audit footnote rendering").
 
    Runs the REAL renderer logic (parseRefRange + splitIntoVerses from
    scripture-parse.js) over every Format A footnote `nkjv` value across the
@@ -21,7 +22,9 @@
    list, so its 21 values (18 of them in the two Passover entries) went
    unchecked; it is mixed-format, so the walk reads `nkjv` or `scriptures`.
 
-   Usage: node tools/audit-footnotes.js
+   A data file that fails to load fails --check: its values went unchecked.
+
+   Usage: node tools/audit-footnotes.js [--check]
    ───────────────────────────────────────────────────────────────────────── */
 
 import { readFileSync } from 'fs';
@@ -30,7 +33,9 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { parseRefRange, splitIntoVerses } from '../app/src/main/assets/src/utils/scripture-parse.js';
 
-const dataDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'app', 'src', 'main', 'assets', 'src', 'data');
+// AUDIT_FOOTNOTES_DATA_DIR points the walk at another data directory (the tests' stubs).
+const dataDir = process.env.AUDIT_FOOTNOTES_DATA_DIR
+  || resolve(dirname(fileURLToPath(import.meta.url)), '..', 'app', 'src', 'main', 'assets', 'src', 'data');
 
 // CORP6: `--check` turns this read-only diagnostic into a CI gate — concise output,
 // exit 1 if any footnote renders with a duplicated or white verse number (the
@@ -96,12 +101,15 @@ function categorize(ref, text) {
 }
 
 let total = 0;
+// A file that fails to load hides every value in it, so it fails the gate (W74):
+// logging it and moving on let a deleted or unparsable volume pass with exit 0.
+let loadFailures = 0;
 for (const f of FILES) {
   let letters, preface = null;
   try {
     letters = loadVar(f.file, f.arrayVar);
     if (f.prefaceVar) preface = loadVar(f.file, f.prefaceVar);
-  } catch (e) { console.error(`LOAD ERROR ${f.file}: ${e.message}`); continue; }
+  } catch (e) { console.error(`LOAD ERROR ${f.file}: ${e.message}`); loadFailures++; continue; }
   const all = Array.isArray(letters) ? letters.slice() : [];
   if (preface && typeof preface === 'object') all.push(preface);
   for (const letter of all) {
@@ -137,8 +145,8 @@ const dictCats = {};
 for (const src of DICT_SOURCES) {
   const c = { single: 0, compound: 0, goldMarkers: 0, goldHeuristic: 0, dup: 0, whiteBadKey: 0, whiteFallback: 0 };
   let dict;
-  try { dict = loadVar(src.file, src.varName); } catch (e) { console.error(`LOAD ERROR ${src.file}: ${e.message}`); continue; }
-  if (!dict || typeof dict !== 'object') { console.error(`  (${src.label}: ${src.varName} not an object)`); continue; }
+  try { dict = loadVar(src.file, src.varName); } catch (e) { console.error(`LOAD ERROR ${src.file}: ${e.message}`); loadFailures++; continue; }
+  if (!dict || typeof dict !== 'object') { console.error(`LOAD ERROR ${src.file}: ${src.varName} is not an object`); loadFailures++; continue; }
   for (const ref of Object.keys(dict)) {
     const cat = categorize(ref, dict[ref]);
     c[cat]++;
@@ -148,18 +156,19 @@ for (const src of DICT_SOURCES) {
   }
   dictCats[src.label] = c;
 }
+// The dict pass pushes its hard rows into `cats` too, so `problems` already
+// holds them; adding the per-dict counts again counted each one twice (W74).
 const problems = cats.dup.length + cats.whiteBadKey.length + cats.whiteFallback.length;
 const fixable = cats.goldHeuristic.length;
-let dictHard = 0;
-for (const label of Object.keys(dictCats)) {
-  const c = dictCats[label];
-  dictHard += c.dup + c.whiteBadKey + c.whiteFallback;
-}
-const hardTotal = problems + dictHard;
+const hardTotal = problems;
 
 // CORP6 gate: concise output + nonzero exit on any hard problem.
 if (CHECK) {
   console.log(`audit-footnotes: ${total} Format A values + ${Object.keys(dictCats).length} dict sources — hard problems (dup + white): ${hardTotal}`);
+  if (loadFailures > 0) {
+    console.error(`audit-footnotes: FAIL — ${loadFailures} data file(s) did not load, so their footnotes went unchecked.`);
+    process.exit(1);
+  }
   if (hardTotal > 0) {
     console.error('audit-footnotes: FAIL — ' + hardTotal + ' footnote value(s) render a duplicated or white verse number.');
     console.error('Run `node tools/audit-footnotes.js` (no --check) for the full worklist, then fix the DATA (markers / keys).');
@@ -173,6 +182,7 @@ const order = ['goldMarkers', 'goldHeuristic', 'single', 'compound', 'dup', 'whi
 for (const k of order) console.log(`  ${k.padEnd(15)} ${String(cats[k].length).padStart(4)}`);
 console.log(`\n  → hard problems (dup + white): ${problems}`);
 console.log(`  → soft (gold but heuristic/marker-less): ${fixable}\n`);
+if (loadFailures > 0) console.log(`  → ${loadFailures} data file(s) did not load (LOAD ERROR above): their values are not counted\n`);
 
 console.log('Other dict sources (same VerseWithNumbers render path):');
 for (const label of Object.keys(dictCats)) {
