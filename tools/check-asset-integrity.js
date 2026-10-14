@@ -13,7 +13,7 @@
  *   - A later build then runs the OLD generator, which does not know the marker
  *     block, so it rewrites CACHE_VERSION and leaves the map untouched. The map now
  *     describes the PREVIOUS bundles.
- *   - `git diff --exit-code service-worker.js` after a build (ci.yml + deploy-web.yml)
+ *   - The rebuild-matches-commit check after a build (check:build-committed, ci.yml + deploy-web.yml)
  *     does NOT catch this: the old generator produced exactly the committed file, so
  *     there is no diff. The gate is structurally blind to which generator ran.
  *   - Every client then fails install and is pinned on its old build forever, which

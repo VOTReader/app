@@ -265,10 +265,13 @@ jobs:
         # After `npm run build` regenerates dist/, the CSP script-src hashes
         # (build:csp → index.html), and the SW CACHE_VERSION (build:sw), the
         # working tree should be byte-identical to the committed copies. Any
-        # diff = committed dist/ bundles, index.html (stale CSP hashes), or
+        # change = committed dist/ bundles, index.html (stale CSP hashes), or
         # service-worker.js are stale relative to source. Catches what the hook
-        # misses. index.html is included because build:csp may rewrite its CSP.
-        run: git diff --exit-code app/src/main/assets/dist/ app/src/main/assets/index.html app/src/main/assets/service-worker.js
+        # misses. tools/check-build-committed.mjs (W73) also fails on a NEW
+        # untracked file under app/src/main/assets/ — a build output nobody
+        # committed reaches the PWA (deploy-web rsyncs the tree) but not the APK;
+        # the `git diff --exit-code` this replaced could not see one.
+        run: npm run check:build-committed
 
       - name: Verify CSP script-src hashes match inline scripts (U10)
         # --check (never writes): fails if index.html's committed script-src

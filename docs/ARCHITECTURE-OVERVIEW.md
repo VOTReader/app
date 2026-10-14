@@ -203,7 +203,8 @@ every runtime asset survives the APK's ignore list.
   match what is staged and rebuilds `dist/` when a bundle source is staged. CONTRIBUTING.md §5 lists them in order.
 - **CI** (`.github/workflows/ci.yml`) runs on every push. The `build` job runs lint, schema validation, the
   read-along and audio-manifest checks, footnote audit, `check_balance.py`, the app-size canary, typecheck,
-  smoke-lite, vitest with coverage floors, a rebuild with `git diff --exit-code` on `dist/`, and then the CSP,
+  smoke-lite, vitest with coverage floors, a rebuild that must leave `app/src/main/assets/` exactly as committed
+  (`check:build-committed`: no changed file and no new untracked one), and then the CSP,
   corpus-version, asset-integrity, search-index, runtime-asset, APK-asset, CSS-token, bundle-budget, S22
   frame-time and type-scale gates, followed by `smoke:ci` and three e2e runs (read detector, read-along, restore).
   The `kotlin-tests` job runs JUnit 5 with Robolectric and Android Lint.

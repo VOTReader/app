@@ -255,11 +255,16 @@ describe('pre-commit gate wiring', () => {
     const tracked = execFileSync('git', ['ls-files', 'app/src/main/assets/dist/'], { cwd: root, encoding: 'utf8' })
       .split('\n').map((s) => s.trim()).filter(Boolean);
     expect(tracked.length).toBeGreaterThanOrEqual(8);   // a, a-bible, a-matthew, a-vot, b, c, d, app.min.css (lz1)
+    // W73 (sweep 2026-10-13): a build output that was never committed is neither tracked nor an
+    // --outfile (tools/build.py and minify-bundle write theirs), so it slipped past this list. After a
+    // local build it sits in dist/ untracked; hold the hook to it too.
+    const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard', 'app/src/main/assets/dist/'], { cwd: root, encoding: 'utf8' })
+      .split('\n').map((s) => s.trim()).filter(Boolean);
     const scripts = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).scripts;
     const outfiles = Object.values(scripts).flatMap((s) => [...String(s).matchAll(/--outfile=(\S+)/g)].map((m) => m[1]));
     expect(outfiles.length).toBeGreaterThanOrEqual(3);   // bundle-b, -c, -d (lz1 folded e-h into d)
-    for (const f of new Set([...tracked, ...outfiles])) {
-      expect(staged, `${f} is built and tracked but Step 5 never re-stages it`).toContain(f);
+    for (const f of new Set([...tracked, ...untracked, ...outfiles])) {
+      expect(staged, `${f} is built (tracked, untracked in dist/, or an --outfile) but Step 5 never re-stages it`).toContain(f);
     }
   });
 

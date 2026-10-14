@@ -46,7 +46,8 @@
     "check:runtime-assets": "node tools/list-runtime-src-assets.js --check",
     "check:live": "node tools/check-live-version.js",
     "check:search-index": "node tools/check-search-index-version.js --check",
-    "check:asset-integrity": "node tools/check-asset-integrity.js"
+    "check:asset-integrity": "node tools/check-asset-integrity.js",
+    "check:build-committed": "node tools/check-build-committed.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

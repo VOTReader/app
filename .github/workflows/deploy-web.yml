@@ -217,7 +217,12 @@ jobs:
         #
         # index.html is included because build:csp may rewrite its CSP script-src
         # hashes; service-worker.js because build:sw rewrites CACHE_VERSION.
-        run: git diff --exit-code app/src/main/assets/dist/ app/src/main/assets/index.html app/src/main/assets/service-worker.js
+        # tools/check-build-committed.mjs (W73) checks the whole of
+        # app/src/main/assets/, the tree the rsync below publishes, and fails on a
+        # NEW untracked file too: the `git diff --exit-code` it replaced passed a
+        # build output that was never committed, which then went to the web and
+        # not into the APK. ci.yml runs the same script.
+        run: npm run check:build-committed
 
       - name: Verify ASSET_INTEGRITY describes what is about to be published
         # The last gate before staging, and the one the diff above cannot replace.
