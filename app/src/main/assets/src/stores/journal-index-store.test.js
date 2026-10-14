@@ -25,8 +25,9 @@
      - Idempotency / null-input guards
 */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { JournalIndexStore } from './journal-index-store.js';
+import { IDBAdapter } from './idb-adapter.js';
 
 beforeEach(() => {
   localStorage.clear();
@@ -296,5 +297,53 @@ describe('JournalIndexStore — multi-entry / multi-rebuild scenarios', () => {
 
     expect(JournalIndexStore.entriesReferencing('chapter:matthew:5')).toEqual([]);
     expect(JournalIndexStore.entriesReferencing('verse:matthew:5:3')).toEqual(['j_a']);
+  });
+});
+
+// W70 (sweep 2026-10-13): the journal editor re-syncs an entry's refs on every save; refs that did
+// not change still ran a full read-merge-write of the whole index and woke every subscriber.
+describe('JournalIndexStore — rebuildForEntry with unchanged refs (W70)', () => {
+  beforeEach(() => { vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined); vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined); });
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+
+  // W70 refuter r1: the skip may not strand an index whose last write failed for good.
+  it('after the write and every STORE-4 retry failed, the same refs save again so the index recovers', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const put = /** @type {any} */ (IDBAdapter.put);
+    put.mockRejectedValue(new Error('quota'));
+    JournalIndexStore.rebuildForEntry('e1', ['k']);
+    await vi.advanceTimersByTimeAsync(120000);   // the write and the whole retry schedule (5+10+30+60 s) fail
+    expect(JournalIndexStore._writeRetryTimer).toBeNull();   // retries spent: nothing else will save it
+    const failedPuts = put.mock.calls.length;
+    put.mockResolvedValue(undefined);             // storage is back
+    JournalIndexStore.rebuildForEntry('e1', ['k']);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(put.mock.calls.length).toBe(failedPuts + 1);
+    expect(put.mock.calls[put.mock.calls.length - 1][2]).toEqual({ k: ['e1'] });
+    // ...and once that write has landed, unchanged refs are skipped again.
+    JournalIndexStore.rebuildForEntry('e1', ['k']);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(put.mock.calls.length).toBe(failedPuts + 1);
+  });
+
+  it('writes nothing and wakes nobody when the entry already points at exactly these refs', async () => {
+    JournalIndexStore.rebuildForEntry('e1', ['vol-two:1', 'vol-two:2']);
+    await JournalIndexStore.whenSaved();
+    const save = vi.spyOn(JournalIndexStore, '_save');
+    const before = JournalIndexStore.getVersion();
+    JournalIndexStore.rebuildForEntry('e1', ['vol-two:2', 'vol-two:1']);   // same set, other order
+    await JournalIndexStore.whenSaved();
+    expect(save).not.toHaveBeenCalled();
+    expect(JournalIndexStore.getVersion()).toBe(before);
+  });
+
+  it('control: a real change (one ref dropped, one added) is saved', () => {
+    JournalIndexStore.rebuildForEntry('e1', ['vol-two:1', 'vol-two:2']);
+    const save = vi.spyOn(JournalIndexStore, '_save');
+    JournalIndexStore.rebuildForEntry('e1', ['vol-two:2', 'vol-two:3']);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(JournalIndexStore.entriesReferencing('vol-two:1')).toEqual([]);
+    expect(JournalIndexStore.entriesReferencing('vol-two:3')).toEqual(['e1']);
   });
 });

@@ -40,6 +40,7 @@ import { renderHook, act } from '@testing-library/react';
 import { usePersistedState, RESUME_STATE_KEY, RESUME_STATE_MAX_AGE_MS, takeResumeState } from './use-persisted-state.js';
 import { useSavedState } from './use-saved-state.js';
 import { StateStore } from '../stores/state-store.js';
+import { IDBAdapter } from '../stores/idb-adapter.js';
 
 /** Build a full 8-value union with overridable fields. */
 function makeState(overrides) {
@@ -416,6 +417,35 @@ describe('usePersistedState — the reload record (sessionStorage)', () => {
     await act(async () => {});
     act(() => { /** @type {any} */ (window).__flushPersistState(undefined, { reload: true }); });
     expect(JSON.parse(/** @type {string} */ (sessionStorage.getItem(RESUME_STATE_KEY))).base).toBe(null);
+  });
+
+  /* W70 refuter r2: the store folds a save into the one already waiting for its lock. That
+     waiting save carries the folded union, so once it lands the union is the base; else a
+     read mark another tab cleared meanwhile came back at the next boot. Real store here. */
+  it('a set the store folded into its queued save is the base once that save lands (W70)', async () => {
+    vi.useRealTimers();
+    setSpy.mockRestore();
+    StateStore._resetForTests({ forceLoaded: true });
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+    const put = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    /** @type {any} */ let release;
+    /** @type {any} */ let started;
+    const holding = new Promise((r) => { started = r; });
+    const held = navigator.locks.request('vot-store:vot-state', () => { started(); return new Promise((r) => { release = r; }); });
+    await holding;                                              // another tab holds vot-state's lock
+    const { rerender } = renderHook((p) => usePersistedState(p), { initialProps: makeState({ readItems: {} }) });   // mount write: queued
+    rerender(makeState({ readItems: { a: 1 } }));
+    act(() => { /** @type {any} */ (window).__flushPersistState(); });   // folded into the queued mount write
+    release();
+    await held;
+    await act(async () => { await StateStore.whenSaved(); });
+    const mine = put.mock.calls.filter((c) => c[0] === 'vot-state');
+    expect(mine).toHaveLength(1);
+    expect(mine[0][2].readItems).toEqual({ a: 1 });             // the one write carried the folded union
+    act(() => { /** @type {any} */ (window).__flushPersistState(undefined, { reload: true }); });
+    const rec = JSON.parse(/** @type {string} */ (sessionStorage.getItem(RESUME_STATE_KEY)));
+    expect(rec.base.readItems).toEqual({ a: 1 });
+    StateStore._resetForTests({ forceLoaded: true });
   });
 
   it('CONTROL: a patched flush WITHOUT the reload option writes no record', () => {

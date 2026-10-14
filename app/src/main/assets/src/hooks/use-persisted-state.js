@@ -322,11 +322,15 @@ export function usePersistedState({
     writtenRef.current = union;
     const store = /** @type {any} */ (StateStore);
     const before = store._lastWrite;
+    const foldedBefore = store._foldedSaves;
     StateStore.set(union);
     const seq = ++writeSeqRef.current;
     // A set that started no write of its own (queued while the store loads,
     // held by Clear All's fence) would have whenSaved report the one before it.
-    if (typeof StateStore.whenSaved !== 'function' || !store._lastWrite || store._lastWrite === before) return;
+    // W70: a set the store folded into its save still waiting for the lock is
+    // carried by that save, which _lastWrite already is.
+    const folded = store._foldedSaves !== foldedBefore;
+    if (typeof StateStore.whenSaved !== 'function' || !store._lastWrite || (store._lastWrite === before && !folded)) return;
     StateStore.whenSaved().then((ok) => {
       // Only the maps a base decides (mergeStateStore): the record stays small.
       if (ok && seq > landedSeqRef.current) {

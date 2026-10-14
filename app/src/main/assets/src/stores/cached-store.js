@@ -275,6 +275,9 @@ function _cloneSnapshot(v) {
  *   _clearWriteRetry(): void,
  *   _writeRetryTimer: any,
  *   _writeRetryAttempt: number,
+ *   _mergeQueued: object | null,
+ *   _foldedSaves: number,
+ *   _lastWriteFailed: boolean,
  *   _resetForTests(opts?: { forceLoaded?: boolean }): void,
  * }} CachedStoreBase
  */
@@ -466,6 +469,19 @@ export function CachedStore(storageKey, defaultVal, opts) {
      *  clears it. Null when no retry is pending. */
     _writeRetryTimer: /** @type {any} */ (null),
     _writeRetryAttempt: 0,
+    /** W70: the ordinary merge save of this store that is waiting for its lock
+     *  and has not begun, or null. That save reads `_cache` when its turn comes,
+     *  so every edit until then rides on it (see _saveMerged). */
+    _mergeQueued: /** @type {object | null} */ (null),
+    /** W70: how many saves were folded into that queued save. A caller that asks
+     *  whether its edit started a write (usePersistedState) counts a fold as one:
+     *  the queued save, which `_lastWrite` already is, carries the edit. */
+    _foldedSaves: 0,
+    /** W70: the last write of this store that settled failed (a storage error, not
+     *  the fence), so IndexedDB may lack what `_cache` holds. A method that skips
+     *  an unchanged save must save anyway while this is set, as every call did
+     *  before W70; once the STORE-4 retries are spent, nothing else will. */
+    _lastWriteFailed: false,
 
     /**
      * Sync read. LS-mode: lazy init from localStorage. IDB-mode loaded:
@@ -567,6 +583,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
           writePromise.then(function () {
             // STORE-4: the latest cache is durable — cancel any pending failure-retry.
             self._clearWriteRetry();
+            self._lastWriteFailed = false;
             // A landed write lifts StorageHealth's READONLY override from an
             // earlier failure — nothing else ever reports a success to it.
             // W11: named, so it lifts only this store's failure, never another's.
@@ -583,6 +600,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
             // below — cached-store deliberately holds no imports (see header).
             if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('store', 'IDB write failed: ' + idbStoreName + ' — ' + ((err && err.name) || err));
             if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err, storageKey);
+            self._lastWriteFailed = true;   // W70
             // STORE-4: a fire-and-forget write that fails used to drop the edit
             // silently if no later mutation re-flushed it. Schedule a bounded
             // re-flush of the LATEST cache so a transient quota/abort blip recovers.
@@ -618,12 +636,28 @@ export function CachedStore(storageKey, defaultVal, opts) {
       const exact = this._exactNextSave;
       this._exactNextSave = false;
       if (_fenced()) { _fencedDirty.add(this); return; }
+      // W70 (sweep 2026-10-13): an ordinary save of this store already waiting
+      // for the lock has not read `_cache` yet; it reads it when its turn comes,
+      // so it carries this edit too. N edits in one tick (a highlight across N
+      // verses, a journal entry's delete cascade) are one read-merge-write of
+      // the whole store, not N. Never an exact save: it writes the snapshot it
+      // takes here, so nothing may ride on it, and it is never absorbed.
+      if (!exact && this._mergeQueued) { this._foldedSaves += 1; return; }
       // ...and take the data NOW: a save already waiting on the lock merges
       // into `_cache` (and replaces it) before this callback gets its turn.
       const exactData = exact ? _cloneSnapshot(this._cache) : null;
       const self = this;
       const name = idbStoreName;
+      // An exact save leaves nothing queued to ride on: an edit after it gets a
+      // save of its own, queued behind it.
+      const ticket = exact ? null : {};
+      this._mergeQueued = ticket;
+      /** This save no longer carries later edits: it has begun, or it settled without running. */
+      const begun = function () { if (ticket && self._mergeQueued === ticket) self._mergeQueued = null; };
       const p = navigator.locks.request('vot-store:' + name, function () {
+        // From here the merge below may already have read `_cache`: an edit made
+        // now needs a save of its own (W70).
+        begun();
         // v04-02: a merge queued behind this lock may run after the fence went
         // up; its get would reopen the deleted database and its put refill it.
         if (_fenced()) { _fencedDirty.add(self); return _NOT_WRITTEN; }
@@ -673,15 +707,19 @@ export function CachedStore(storageKey, defaultVal, opts) {
       });
       this._lastWrite = p;
       p.then(function (r) {
+        begun();   // a request the lock settled without running its callback must not keep absorbing edits
         if (r === _NOT_WRITTEN) return;   // the fence stopped it: saved again when the fence comes down
         self._clearWriteRetry();   // STORE-4: merged write durable — cancel any pending retry
+        self._lastWriteFailed = false;
         if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteSuccess(storageKey);   // W11: this store's only
       }, function (err) {
+        begun();   // W70: e.g. an aborted lock request - the edits it absorbed are saved by the retry below
         if (err && err.name === 'WriteFenced') { _fencedDirty.add(self); return; }   // see _save
         if (_isNewerDatabase(err)) { _reportNewerDatabase(storageKey); return; }        // W8, see _save
         console.error('IDB merged write failed for', name, err);
         if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('store', 'IDB merged write failed: ' + name + ' — ' + ((err && err.name) || err));
         if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err, storageKey);
+        self._lastWriteFailed = true;   // W70
         self._scheduleWriteRetry();   // STORE-4: bounded re-flush on a transient failure
       });
     },
@@ -1082,7 +1120,10 @@ export function CachedStore(storageKey, defaultVal, opts) {
       } else {
         this._replayQueueOnto();
       }
-      // Flush the rebased state (single batched save).
+      // Flush the rebased state (single batched save). Even with nothing queued
+      // it is load-bearing (W70 refuter r3): it gives a store never written its
+      // IndexedDB record, which a backup needs to carry the blank store, and it
+      // goes through _save's write fence, the boot-script copy included.
       this._save();
       // Single batched bump. _replayQueueOnto already cleared _replaying,
       // so a plain _bump() would work, but we go through the manual
@@ -1144,6 +1185,8 @@ export function CachedStore(storageKey, defaultVal, opts) {
       this._base = null;          // STORE-1: clear the merge ancestor
       if (this._writeRetryTimer != null) { clearTimeout(this._writeRetryTimer); this._writeRetryTimer = null; }  // STORE-4
       this._writeRetryAttempt = 0;
+      this._mergeQueued = null;   // W70
+      this._lastWriteFailed = false;
       const forceLoaded = opts && opts.forceLoaded === true;
       this._state = (forceLoaded || !useIdb) ? 'loaded' : 'pending';
     },

@@ -2019,3 +2019,201 @@ describe('CachedStore U1 — whenSaved() durability barrier', () => {
     await expect(barrier).resolves.toEqual([true, true]);
   });
 });
+
+/* W70 (sweep 2026-10-13): saves were not coalesced. A highlight across N verses
+   (SelectionToolbar adds one segment per verse), a journal entry's delete cascade
+   and every other loop of store edits ran N full read-merge-writes of the whole
+   store under its lock (each one a chunked multi-transaction write since 10-11).
+   The sweep also named the cold start's write-back of every store it had just read;
+   refuter r3 showed that write is load-bearing (a record for every store, the write
+   fence), so it stays. */
+describe('CachedStore W70 — a burst of edits is one write; the cold start still writes back', () => {
+  beforeEach(() => { localStorage.clear?.(); _resetStoreRegistry(); vi.restoreAllMocks(); });
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+
+  /** A merge store shaped like the journal ({ list }), with an exact-replace method. */
+  function mergeStore(/** @type {string} */ name) {
+    return extendStore(
+      CachedStore(name, { list: /** @type {string[]} */ ([]) }, { idb: true, legacyLsKey: null, crossTabMerge: (_b, ours) => ours }),
+      {
+        add(/** @type {string} */ id) { if (this._shouldDefer('add', id)) return; this._load().list.push(id); this._save(); this._bump(); },
+        replaceAll(/** @type {any} */ data) { if (this._shouldDefer('replaceAll', data)) return; this._cache = data; this._save(); this._bump(); },
+      }
+    );
+  }
+  const putsOf = (/** @type {any} */ spy, /** @type {string} */ name) => spy.mock.calls.filter((/** @type {any[]} */ c) => c[0] === name);
+
+  it('five edits in one tick on a merge store are ONE read-merge-write that holds all five', async () => {
+    const get = vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+    const put = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const s = mergeStore('vot-test-w70-burst');
+    s._resetForTests({ forceLoaded: true });
+    for (let i = 0; i < 5; i++) s.add('v' + i);
+    expect(await s.whenSaved()).toBe(true);
+    expect(putsOf(put, 'vot-test-w70-burst')).toHaveLength(1);
+    expect(putsOf(put, 'vot-test-w70-burst')[0][2].list).toEqual(['v0', 'v1', 'v2', 'v3', 'v4']);
+    expect(putsOf(get, 'vot-test-w70-burst')).toHaveLength(1);
+  });
+
+  // Refuter r1: a skipped unchanged save (JournalIndexStore.rebuildForEntry) reads this flag.
+  it('_lastWriteFailed follows the last settled write, on the plain and the merge write path', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+    const put = vi.spyOn(IDBAdapter, 'put').mockRejectedValue(new Error('quota'));
+    const blind = createTestStore('vot-test-w70-flag-blind', { idb: true });
+    const merged = mergeStore('vot-test-w70-flag-merge');
+    blind._resetForTests({ forceLoaded: true });
+    merged._resetForTests({ forceLoaded: true });
+    expect(blind._lastWriteFailed).toBe(false);
+    blind.add({ id: 'a', label: 'A' });
+    merged.add('a');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(blind._lastWriteFailed).toBe(true);
+    expect(merged._lastWriteFailed).toBe(true);
+    put.mockResolvedValue(undefined);
+    blind.add({ id: 'b', label: 'B' });
+    merged.add('b');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(blind._lastWriteFailed).toBe(false);
+    expect(merged._lastWriteFailed).toBe(false);
+  });
+
+  it('the real AnnotationStore: a highlight across five verses is one write', async () => {
+    const { AnnotationStore } = await import('./annotation-store.js');
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+    const put = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    AnnotationStore._resetForTests({ forceLoaded: true });
+    for (let i = 1; i <= 5; i++) {
+      AnnotationStore.add('vol-two:1:' + i, { id: 'a' + i, groupId: 'g1', start: 0, end: 4 });
+    }
+    expect(await AnnotationStore.whenSaved()).toBe(true);
+    const mine = putsOf(put, 'vot-annotations');
+    expect(mine).toHaveLength(1);
+    expect(Object.keys(mine[0][2]).sort()).toEqual(['vol-two:1:1', 'vol-two:1:2', 'vol-two:1:3', 'vol-two:1:4', 'vol-two:1:5']);
+  });
+
+  it('an edit made after the queued save began is never folded into it: it gets a write of its own', async () => {
+    /** @type {any} */ let resolveFirstGet;
+    let gets = 0;
+    vi.spyOn(IDBAdapter, 'get').mockImplementation(() => (gets++ === 0 ? new Promise((r) => { resolveFirstGet = r; }) : Promise.resolve(undefined)));
+    const put = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const s = mergeStore('vot-test-w70-late');
+    s._resetForTests({ forceLoaded: true });
+    s.add('a');
+    await vi.waitFor(() => expect(gets).toBe(1));   // the save holds the lock and is reading
+    s.add('b');
+    resolveFirstGet(undefined);
+    expect(await s.whenSaved()).toBe(true);
+    const mine = putsOf(put, 'vot-test-w70-late');
+    expect(mine.length).toBeGreaterThanOrEqual(1);
+    expect(mine[mine.length - 1][2].list).toEqual(['a', 'b']);
+  });
+
+  it('a lock request that fails before it runs does not swallow the saves after it', async () => {
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+    const put = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const realRequest = navigator.locks.request.bind(navigator.locks);
+    let failNext = true;
+    vi.spyOn(navigator.locks, 'request').mockImplementation(/** @type {any} */ ((/** @type {any[]} */ ...args) => {
+      if (failNext) { failNext = false; return Promise.reject(new DOMException('lock request aborted', 'AbortError')); }
+      return /** @type {any} */ (realRequest)(...args);
+    }));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const s = mergeStore('vot-test-w70-abort');
+    s._resetForTests({ forceLoaded: true });
+    s.add('a');
+    expect(await s.whenSaved()).toBe(false);
+    s.add('b');
+    expect(await s.whenSaved()).toBe(true);
+    const mine = putsOf(put, 'vot-test-w70-abort');
+    expect(mine[mine.length - 1][2].list).toEqual(['a', 'b']);
+  });
+
+  it('an Import & Overwrite (exact) save is never folded into a queued ordinary save', async () => {
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue({ list: ['on-disk'] });
+    const put = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const s = mergeStore('vot-test-w70-exact');
+    s._resetForTests({ forceLoaded: true });
+    /** @type {any} */ let release;
+    /** @type {any} */ let started;
+    const holding = new Promise((r) => { started = r; });
+    const held = navigator.locks.request('vot-store:vot-test-w70-exact', () => { started(); return new Promise((r) => { release = r; }); });
+    await holding;
+    s.add('ordinary');                                    // queued behind the sibling
+    s.replaceExact('replaceAll', { list: ['restored'] }); // must get its own exact write
+    release();
+    await held;
+    expect(await s.whenSaved()).toBe(true);
+    const mine = putsOf(put, 'vot-test-w70-exact');
+    expect(mine[mine.length - 1][2]).toEqual({ list: ['restored'] });
+  });
+
+  /* Refuter r3: a cold start that wrote nothing back left a store that was never written with
+     no IndexedDB record, so a backup left it out, and Import & Overwrite of that backup kept
+     the other phone's data in it instead of the blank. The cold-start write stays. */
+  it('a cold start still writes the store back, so a store never written gets its record', async () => {
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+    const put = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const p = createTestStore('vot-test-w70-cold-blank', { idb: true, legacyLsKey: null });
+    await p._hydrate();
+    expect(await p.whenSaved()).toBe(true);
+    expect(putsOf(put, 'vot-test-w70-cold-blank')).toHaveLength(1);
+    expect(putsOf(put, 'vot-test-w70-cold-blank')[0][2]).toEqual([]);
+  });
+
+  /* Refuter r3: the boot-script copy written straight from the load went past the write
+     fence, so a load ending while another tab imported put the old theme back over it. */
+  it('a cold start ending under the write fence writes no boot-script copy', async () => {
+    /** @type {any} */ let resolveGet;
+    vi.spyOn(IDBAdapter, 'get').mockReturnValue(new Promise((r) => { resolveGet = r; }));
+    const put = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const s = extendStore(CachedStore('vot-state-w70-fence', {}, { idb: true, legacyLsKey: null, lsShim: (/** @type {any} */ full) => ({ theme: full && full.theme }) }), {});
+    const hydrated = s._hydrate();
+    localStorage.setItem('vot-state-w70-fence', JSON.stringify({ theme: 'imported' }));
+    setRemoteWriteFence(true);                         // another tab's import holds this page
+    try {
+      resolveGet({ theme: 'old' });
+      await hydrated;
+      expect(JSON.parse(localStorage.getItem('vot-state-w70-fence') || 'null')).toEqual({ theme: 'imported' });
+      expect(putsOf(put, 'vot-state-w70-fence')).toHaveLength(0);
+    } finally { setRemoteWriteFence(false); }
+  });
+
+  it('control: a cold start that replays an edit made before the load writes it, once', async () => {
+    /** @type {any} */ let resolveGet;
+    vi.spyOn(IDBAdapter, 'get').mockReturnValue(new Promise((r) => { resolveGet = r; }));
+    const put = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const s = mergeStore('vot-test-w70-replay');
+    const hydrated = s._hydrate();
+    s.add('made-while-loading');
+    resolveGet({ list: ['old'] });
+    await hydrated;
+    expect(await s.whenSaved()).toBe(true);
+    const mine = putsOf(put, 'vot-test-w70-replay');
+    expect(mine).toHaveLength(1);
+    expect(mine[0][2].list).toEqual(['old', 'made-while-loading']);
+  });
+
+  it('control: a store seeded from its legacy localStorage key is still saved by the store (retry-backed)', async () => {
+    localStorage.setItem('vot-test-w70-seed', JSON.stringify([{ id: 'legacy', label: 'only in LS' }]));
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+    let puts = 0;
+    const put = vi.spyOn(IDBAdapter, 'put').mockImplementation(async () => { if (puts++ === 0) throw new Error('the seed put failed'); });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const s = createTestStore('vot-test-w70-seed', { idb: true });
+    await s._hydrate();
+    expect(await s.whenSaved()).toBe(true);
+    const mine = putsOf(put, 'vot-test-w70-seed');
+    expect(mine.length).toBeGreaterThanOrEqual(2);
+    expect(mine[mine.length - 1][2]).toEqual([{ id: 'legacy', label: 'only in LS' }]);
+  });
+
+  it('the vot-state boot-script copy is refreshed on a cold start', async () => {
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue({ theme: 'light', other: 1 });
+    vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const s = extendStore(CachedStore('vot-state-w70', {}, { idb: true, legacyLsKey: null, lsShim: (/** @type {any} */ full) => ({ theme: full && full.theme }) }), {});
+    await s._hydrate();
+    expect(JSON.parse(localStorage.getItem('vot-state-w70') || 'null')).toEqual({ theme: 'light' });
+  });
+});

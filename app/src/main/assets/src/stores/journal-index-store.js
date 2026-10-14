@@ -89,6 +89,7 @@ export var JournalIndexStore = extendStore(
       /** @type {Record<string, boolean>} */
       var newSet = {};
       (refs || []).forEach(function(r) { newSet[r] = true; });
+      var changed = false;
       // Pass 1: remove entryId from any refKey not in newSet
       var keys = Object.keys(data);
       for (var i = 0; i < keys.length; i++) {
@@ -99,14 +100,20 @@ export var JournalIndexStore = extendStore(
         var idx = list.indexOf(entryId);
         if (idx >= 0) {
           list.splice(idx, 1);
+          changed = true;
           if (list.length === 0) delete data[k];
         }
       }
       // Pass 2: add entryId to every new refKey
       Object.keys(newSet).forEach(function(k) {
-        if (!Array.isArray(data[k])) data[k] = [];
-        if (data[k].indexOf(entryId) < 0) data[k].push(entryId);
+        if (!Array.isArray(data[k])) { data[k] = []; changed = true; }
+        if (data[k].indexOf(entryId) < 0) { data[k].push(entryId); changed = true; }
       });
+      // W70: the journal editor re-syncs an entry's refs on every save; refs
+      // that did not move are no reason to rewrite the whole index or wake
+      // every subscriber - unless the index's last write failed, when this
+      // save is what puts it back on disk.
+      if (!changed && !this._lastWriteFailed) return;
       this._save();
       this._bump();
     },

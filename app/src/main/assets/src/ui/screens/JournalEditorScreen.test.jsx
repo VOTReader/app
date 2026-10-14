@@ -303,6 +303,9 @@ describe('JournalEditorScreen — JRNL-1 drafts are kept per entry (sweep mw13)'
       confirm.length = 0;
       fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'A again' } });
       act(() => { window.dispatchEvent(new Event('pagehide')); });
+      // W70: an edit made while A's save still waits for its lock rides on that save (next
+      // test); this one comes after A's save has run, so it starts a write of its own.
+      await act(async () => { await Promise.resolve(/** @type {any} */ (JournalStore)._lastWrite).catch(() => {}); });
       JournalStore.update(other.id, { title: 'O2' }); // a newer write starts before A's is confirmed
       const pending = confirm.splice(0);
       await act(async () => { pending.forEach((res) => res(true)); await Promise.resolve(); });
@@ -312,6 +315,26 @@ describe('JournalEditorScreen — JRNL-1 drafts are kept per entry (sweep mw13)'
       expect(durable()).toBe(true);
       r.unmount();
     } finally { delete globalThis.isStoreWriteFenced; }
+  });
+
+  // W70: the store folds an edit made while its save waits for the lock into that save, which
+  // then writes both. No second write starts, so the draft is marked when that one lands.
+  it('an edit folded into the save carrying the draft: marked once that save is confirmed', async () => {
+    const confirm = [];
+    JournalStore.whenSaved = () => new Promise((res) => { confirm.push(res); });
+    const a = JournalStore.add({ title: 'A', blocks: p('a body') });
+    const other = JournalStore.add({ title: 'O', blocks: p('o') });
+    await act(async () => { await Promise.resolve(/** @type {any} */ (JournalStore)._lastWrite).catch(() => {}); });
+    const durable = () => !!JSON.parse(localStorage.getItem('vot-journal-draft')).drafts[a.id].durable;
+    const r = render(<JournalEditorScreen entryId={a.id} onBack={() => {}} />);
+    fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'A folded' } });
+    act(() => { window.dispatchEvent(new Event('pagehide')); });
+    const carrier = /** @type {any} */ (JournalStore)._lastWrite;
+    JournalStore.update(other.id, { title: 'O2' });  // still queued: folded, no write of its own
+    expect(/** @type {any} */ (JournalStore)._lastWrite).toBe(carrier);
+    await act(async () => { confirm.splice(0).forEach((res) => res(true)); await Promise.resolve(); });
+    expect(durable()).toBe(true);
+    r.unmount();
   });
 
   it('over the quota the oldest other draft gives way first, and the entry on screen is kept', () => {
