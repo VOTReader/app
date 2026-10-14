@@ -93,7 +93,7 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
               a book the edition's manifest doesn't carry self-hides the same
               way a letter without a recording does. */}
           {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
-            <HeroListen onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label })} canPlay={() => AudioPlayer.playableNow(bibleAudio.volKey, book.id)} />
+            <HeroListen onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label })} canPlay={() => AudioPlayer.playableNow(bibleAudio.volKey, book.id)} resume={() => AudioPlayer.listenResume({ volKey: bibleAudio.volKey, bookId: book.id })} />
           )}
           <div className="vol-index-ornament">
             <div className="vol-index-ornament-line" />

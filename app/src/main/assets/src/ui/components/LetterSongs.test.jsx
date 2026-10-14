@@ -18,6 +18,7 @@ const { player, setPlayerState, audio } = vi.hoisted(() => {
     toggle: vi.fn(),
     playLetter: vi.fn(),
     playSongs: vi.fn(() => true),
+    listenResume: vi.fn(() => null),
   };
   return { player, setPlayerState: (next) => { playerState = next; }, audio };
 });
@@ -43,6 +44,8 @@ beforeEach(() => {
   audio.playable = true;
   setPlayerState({ queue: [], qi: 0, status: 'idle', time: 0, duration: 0 });
   for (const f of ['hasAudio', 'toggle', 'playLetter', 'playSongs']) player[f].mockClear();
+  player.listenResume.mockReset();
+  player.listenResume.mockReturnValue(null);
   window.__openSongs = vi.fn();
 });
 
@@ -272,5 +275,52 @@ describe('the hero row offline', () => {
     NetStatus.reportFailure();
     render(<LetterListenRow volKey="wtlb1" letter={WTLB} collectionLabel="Part One" />);
     expect(screen.getByRole('button', { name: 'Pause the reading' }).disabled).toBe(false);
+  });
+});
+
+/* ra4 (Corbin 2026-10-14): Listen becomes "Resume · N min left" when a Listen tap would pick the reading up
+   part-way. The player answers what the tap would resume (listenResume); a reading already loaded and paused
+   here resumes from the bar's own clock. */
+describe('the hero row: RESUME · N MIN LEFT (ra4)', () => {
+  it('a saved place relabels LISTEN with the minutes left, and the tap still plays the letter', () => {
+    player.listenResume.mockReturnValue({ at: 595, left: 1205 });
+    render(<LetterListenRow volKey="one" letter={ONE} collectionLabel="Volume One" />);
+    expect(player.listenResume).toHaveBeenCalledWith({ volKey: 'one', letter: ONE, collectionLabel: 'Volume One' });
+    const pill = screen.getByRole('button', { name: 'Resume · 20 min left' });
+    expect(pill.textContent).toBe('Resume · 20 min left');
+    expect(pill.className).toContain('letter-listen-pill');
+    fireEvent.click(pill);
+    expect(player.playLetter).toHaveBeenCalledWith({ volKey: 'one', letter: ONE, collectionLabel: 'Volume One' });
+  });
+
+  it('under a minute left still says 1 min; a length never learned says Resume alone', () => {
+    player.listenResume.mockReturnValue({ at: 100, left: 20 });
+    render(<LetterListenRow volKey="one" letter={ONE} collectionLabel="Volume One" />);
+    expect(screen.getByRole('button', { name: 'Resume · 1 min left' })).toBeTruthy();
+    cleanup();
+    player.listenResume.mockReturnValue({ at: 100, left: 0 });
+    render(<LetterListenRow volKey="one" letter={ONE} collectionLabel="Volume One" />);
+    expect(screen.getByRole('button', { name: 'Resume' })).toBeTruthy();
+  });
+
+  it('no saved place keeps the plain LISTEN', () => {
+    player.listenResume.mockReturnValue(null);
+    render(<LetterListenRow volKey="one" letter={ONE} collectionLabel="Volume One" />);
+    expect(screen.getByRole('button', { name: 'Listen' })).toBeTruthy();
+  });
+
+  it('this reading loaded and paused part-way resumes from the bar\'s clock, and the tap un-pauses it', () => {
+    setPlayerState({ queue: [{ key: 'one:the-letter' }], qi: 0, status: 'paused', time: 300, duration: 900 });
+    render(<LetterListenRow volKey="one" letter={ONE} collectionLabel="Volume One" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Resume · 10 min left' }));
+    expect(player.toggle).toHaveBeenCalledTimes(1);
+    expect(player.playLetter).not.toHaveBeenCalled();
+  });
+
+  it('playing still shows Pause', () => {
+    player.listenResume.mockReturnValue({ at: 595, left: 1205 });
+    setPlayerState({ queue: [{ key: 'one:the-letter' }], qi: 0, status: 'playing', time: 300, duration: 900 });
+    render(<LetterListenRow volKey="one" letter={ONE} collectionLabel="Volume One" />);
+    expect(screen.getByRole('button', { name: 'Pause the reading' }).textContent).toBe('Pause');
   });
 });

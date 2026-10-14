@@ -8,6 +8,7 @@ import {
   bibleChapterStart,
   _collectionItems,
   _locateTrack,
+  playbackTracks,
   _preferredReaderFor,
   _renditionByReader,
   sectionTracks,
@@ -26,6 +27,7 @@ import {
   _notify,
   OFFLINE_MSG,
   _pendingRestore,
+  _positions,
   _setPendingRestore,
   _setSource,
   _source,
@@ -80,6 +82,43 @@ export function playBibleBook(opts) {
   // actually tapped outranks a remembered position: playCollection queued its
   // resume listener first, so this one — added second — wins the assignment.
   _seekOnMetadata(bibleChapterStart(o.volKey, o.bookId, o.chapterNum));
+}
+
+/**
+ * What a Listen tap on this letter or Bible chapter would pick up (ra4, Corbin 2026-10-14: the pill becomes
+ * "Resume · N min left"): the place it resumes at and the seconds left from there (0 when the recording's
+ * length was never learned), or null when Listen starts from the top. It reads the same first track
+ * playLetter / playBibleBook queue (playbackTracks: the default reader's reading where it exists) and the
+ * same _resumeAt they start with, so the pill can never promise a resume the tap does not make. A recording
+ * already playing is no pick-up: null.
+ *
+ * @param {{ volKey: string, letter?: { id?: string, title?: string } | null, bookId?: string, chapterNum?: number | null, collectionLabel?: string | null }} opts
+ * @returns {{ at: number, left: number } | null}
+ */
+export function listenResume(opts) {
+  const o = opts || /** @type {any} */ ({});
+  /** @type {Track | null} */
+  let track = null;
+  if (o.bookId) {
+    const books = Array.isArray(_g().BIBLE_AUDIO_BOOKS) ? _g().BIBLE_AUDIO_BOOKS : [];
+    if (!books.some((b) => b[0] === o.bookId)) return null;
+    const parts = playbackTracks(o.volKey, { id: o.bookId }, o.collectionLabel);
+    // The retired whole-book shape seeks to the tapped chapter, which outranks a remembered place.
+    if (parts.length < 2) return null;
+    const n = Math.floor(Number(o.chapterNum) || 1);
+    track = parts[Math.max(0, Math.min(n - 1, parts.length - 1))];
+  } else {
+    track = playbackTracks(o.volKey, o.letter, o.collectionLabel)[0] || null;
+  }
+  if (!track) return null;
+  const cur = _state.queue[_state.qi];
+  if (cur && cur.url === track.url && (_state.status === 'playing' || _state.status === 'loading')) return null;
+  const at = _resumeAt(track);
+  if (!(at > 0)) return null;
+  const store = _positions();
+  const saved = store && typeof store.getPosition === 'function' ? store.getPosition(track.url) : null;
+  const d = saved ? Number(saved.d) || 0 : 0;
+  return { at, left: d > at ? d - at : 0 };
 }
 
 /* ── playback entry points ────────────────────────────────────────────── */

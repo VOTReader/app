@@ -231,7 +231,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
                   letter hero pill; inert peeks keep it (same
                   pointer-events:none contract). */}
               {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
-                <HeroListen onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label, chapterNum: chapter.num })} canPlay={() => AudioPlayer.playableNow(bibleAudio.volKey, book.id, chapter.num)} />
+                <HeroListen onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label, chapterNum: chapter.num })} canPlay={() => AudioPlayer.playableNow(bibleAudio.volKey, book.id, chapter.num)} resume={() => AudioPlayer.listenResume({ volKey: bibleAudio.volKey, bookId: book.id, chapterNum: chapter.num })} />
               )}
             </div>
           </header>

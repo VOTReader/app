@@ -7,9 +7,10 @@
 
    Three variants, one component because they differ only in text, glyph
    and box:
-     'listen'  — letter / WTLB hero pill (always exactly "▶ Listen" —
-                 owner directive 2026-08-06; the player bar carries the
-                 reader attribution)
+     'listen'  — letter / WTLB hero pill: "▶ Listen", or "▶ Resume · N min
+                 left" when a Listen tap would pick the recording up part-way
+                 (Corbin 2026-10-14, ra4, replacing the 2026-08-06 "always
+                 exactly Listen"; the player bar carries the reader attribution)
      'playall' — collection index header pill ("Play All")
      'chip'    — the small per-section chips under a WTLB index
 
@@ -18,7 +19,21 @@
    gets a disabled pill and one calm line why (NetStatus via useSongsOnline).
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { AudioPlayer } from '../../utils/audio-player.js';
+import { useAudioPositions } from './AudioShelf.jsx';
 import { useSongsOnline } from './SongKeepParts.jsx';
+
+/**
+ * The Listen pill's words when a tap would resume (ra4): "Resume · N min left", N the nearest whole minute
+ * and never 0 (the approved mock: 3:11 left reads "3 min left"), or "Resume" alone when the recording's
+ * length was never learned, because a guessed number would be worse than none.
+ * @param {{ at: number, left: number }} resume
+ * @returns {string}
+ */
+export function resumePillText(resume) {
+  const left = Number(resume && resume.left) || 0;
+  return left > 0 ? 'Resume · ' + Math.max(1, Math.round(left / 60)) + ' min left' : 'Resume';
+}
 
 /**
  * @param {object} props
@@ -27,14 +42,15 @@ import { useSongsOnline } from './SongKeepParts.jsx';
  * @param {() => void} [props.onClick]
  * @param {string} [props.className]
  * @param {boolean} [props.disabled] offline and nothing to play (HeroListen)
+ * @param {{ at: number, left: number } | null} [props.resume] the 'listen' pill reads Resume · N min left
  * @param {string|number} [props.key] list key — declared because this repo's
  *   `React` is a global `any`, so JSX adds no React.Attributes of its own and
  *   an undeclared `key=` fails `npm run typecheck`.
  */
-export function AudioPlayButton({ variant = 'listen', label, onClick, className, disabled = false }) {
+export function AudioPlayButton({ variant = 'listen', label, onClick, className, disabled = false, resume = null }) {
   const chip = variant === 'chip';
   const playAll = variant === 'playall';
-  const text = chip ? (label || 'Play') : playAll ? 'Play All' : 'Listen';
+  const text = chip ? (label || 'Play') : playAll ? 'Play All' : resume ? resumePillText(resume) : 'Listen';
 
   return (
     <button
@@ -64,18 +80,23 @@ export function AudioPlayButton({ variant = 'listen', label, onClick, className,
 
 /**
  * The hero row's ▶ Listen for a Bible chapter or book. `canPlay` is asked on every render (and every NetStatus
- * change): false disables the pill and says why in one line.
+ * change): false disables the pill and says why in one line. `resume` (ra4) is asked the same way, and on every
+ * player or saved-place change: a place to pick up turns the pill into Resume · N min left.
  * @param {object} props
  * @param {() => void} props.onClick
  * @param {() => boolean} props.canPlay
+ * @param {() => ({ at: number, left: number } | null)} [props.resume]
  */
-export function HeroListen({ onClick, canPlay }) {
+export function HeroListen({ onClick, canPlay, resume }) {
   useSongsOnline();
+  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  useAudioPositions();
   const off = !canPlay();
+  const pickUp = !off && resume ? resume() : null;
   return (
     <>
       <div className="hero-play-row">
-        <AudioPlayButton onClick={onClick} disabled={off} />
+        <AudioPlayButton onClick={onClick} disabled={off} resume={pickUp} />
       </div>
       {off ? <p className="hero-offline-line" role="status">You’re offline. This recording isn’t on this phone.</p> : null}
     </>

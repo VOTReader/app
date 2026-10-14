@@ -33,7 +33,9 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { isSongKey, songIdOfKey } from '../../utils/audio-track.js';
+import { AUDIO_RESUME_END_FRACTION, AUDIO_RESUME_MIN_SEC, isSongKey, songIdOfKey } from '../../utils/audio-track.js';
+import { resumePillText } from './AudioPlayButton.jsx';
+import { useAudioPositions } from './AudioShelf.jsx';
 import { SongCatalog } from '../../utils/song-catalog.js';
 import { SongListRow, songCountLabel, currentSongId, playerIsActive, ChevronRightIcon } from './SongParts.jsx';
 import { SongKeepAction, useSongsOnline } from './SongKeepParts.jsx';
@@ -65,6 +67,7 @@ const PAUSE = <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><p
 export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = true }) {
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
   React.useSyncExternalStore(SongKeep.subscribe, SongKeep.getVersion);
+  useAudioPositions();
   const online = useSongsOnline();
   useSongCatalog(showSongs);
   const letterKey = volKey + ':' + letter.id;
@@ -91,13 +94,20 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
   const listenOff = recorded && !readingHere && !AudioPlayer.playableNow(volKey, letter.id);
   const singOff = songs.length > 0 && !online && !songHere && !songs.some((s) => SongKeep.isKept(s.id));
   const offLine = offlineLine(listenOff, singOff);
+  // ra4: "Resume · N min left" when the tap picks the reading up part-way. Loaded and paused here, the tap
+  // un-pauses at the bar's own clock (the player's resume thresholds still apply); otherwise the player says
+  // what a Listen would resume.
+  const resume = !recorded || listening || listenOff ? null
+    : readingHere ? pausedHere(st)
+      : AudioPlayer.listenResume({ volKey, letter, collectionLabel });
+  const listenText = listening ? 'Pause' : resume ? resumePillText(resume) : 'Listen';
 
   return (
     <>
       <div className={'hero-play-row letter-listen-row' + (songs.length ? ' has-songs' : '')}>
         {recorded ? (
-          <button type="button" className={'hero-play-pill letter-listen-pill' + (listening ? ' is-playing' : '')} onClick={listen} disabled={listenOff} aria-pressed={listening} aria-label={listening ? 'Pause the reading' : 'Listen'}>
-            {listening ? PAUSE : PLAY}<span>{listening ? 'Pause' : 'Listen'}</span>
+          <button type="button" className={'hero-play-pill letter-listen-pill' + (listening ? ' is-playing' : '')} onClick={listen} disabled={listenOff} aria-pressed={listening} aria-label={listening ? 'Pause the reading' : listenText}>
+            {listening ? PAUSE : PLAY}<span>{listenText}</span>
           </button>
         ) : null}
         {songs.length ? (
@@ -109,6 +119,18 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
       {offLine ? <p className="hero-offline-line" role="status">{offLine}</p> : null}
     </>
   );
+}
+
+/**
+ * The reading loaded and paused on this letter as a resume, or null: the same thresholds as the player's own
+ * resume (from AUDIO_RESUME_MIN_SEC in until AUDIO_RESUME_END_FRACTION of the way through).
+ * @param {any} st the player's state @returns {{ at: number, left: number } | null}
+ */
+function pausedHere(st) {
+  const t = Number(st && st.time) || 0;
+  const d = Number(st && st.duration) || 0;
+  if (!st || st.status !== 'paused' || t < AUDIO_RESUME_MIN_SEC || (d > 0 && t >= d * AUDIO_RESUME_END_FRACTION)) return null;
+  return { at: t, left: d > t ? d - t : 0 };
 }
 
 /**
