@@ -15,6 +15,8 @@ import {
   validateFootnoteMarkers,
   validateStudyBible,
   validateTranslationCompleteness,
+  formatCChapterKeys,
+  formatCChromeWords,
 } from './validate-schemas.js';
 
 // ── helpers ──────────────────────────────────────────────────────
@@ -1513,5 +1515,59 @@ describe('validateTranslationCompleteness — CORP2', () => {
     const r = validateTranslationCompleteness({ genesis: {} }, null);
     expect(r.errors).toEqual([]);
     expect(r.warnings.length).toBe(1);
+  });
+});
+
+// W75 (sweep 2026-10-13): the word ledger keyed Format C chapters `${b.id || '?'}:${num}`
+// off Object.values, so books-restored.js (an object keyed by book, no `id` on
+// each book) collapsed its 1189 chapters onto 150 keys "?:1".."?:150", and an
+// edit to any chapter but the last book to reach that number went unseen.
+describe('formatCChapterKeys (word-ledger keys, W75)', () => {
+  const ch = (num) => ({ num, title: `Chapter ${num}` });
+
+  it('keys an object keyed by book (books-restored.js) by the object key', () => {
+    const books = { genesis: { chapters: [ch(1), ch(2)] }, exodus: { chapters: [ch(1)] } };
+    expect(formatCChapterKeys(books).map(([k]) => k)).toEqual(['genesis:1', 'genesis:2', 'exodus:1']);
+  });
+
+  it('prefers a book id, and keys an array of books by id', () => {
+    expect(formatCChapterKeys({ x: { id: 'ruth', chapters: [ch(1)] } }).map(([k]) => k)).toEqual(['ruth:1']);
+    expect(formatCChapterKeys([{ id: 'ruth', chapters: [ch(1)] }]).map(([k]) => k)).toEqual(['ruth:1']);
+  });
+
+  it('keys a single-book file (matthew-plain.js) by its id', () => {
+    expect(formatCChapterKeys({ id: 'matthew-plain', chapters: [ch(1)] }).map(([k]) => k)).toEqual(['matthew-plain:1']);
+  });
+
+  it('gives every chapter its own key, and hands back the chapter', () => {
+    const books = { genesis: { chapters: [ch(1)] }, exodus: { chapters: [ch(1)] }, ruth: { chapters: [ch(1)] } };
+    const entries = formatCChapterKeys(books);
+    expect(new Set(entries.map(([k]) => k)).size).toBe(3);
+    expect(entries[1][1]).toBe(books.exodus.chapters[0]);
+  });
+
+  it('skips a book without chapters', () => {
+    expect(formatCChapterKeys({ genesis: null, exodus: { title: 'x' } })).toEqual([]);
+  });
+});
+
+// W75 part 2: books-restored.js is chrome only (titles + section headings), and
+// countItemWords counts verse text only (headings are chrome since 2026-08-04),
+// so every restored chapter weighed 0 words and a chrome edit moved no number.
+describe('formatCChromeWords (restored chrome in the word ledger, W75)', () => {
+  it('counts the chapter title and every section heading', () => {
+    const ch = { num: 22, title: 'The Binding of Isaac', sections: [{ heading: 'YAHUWAH Provides the Ram' }, { heading: 'Rebekah' }] };
+    expect(formatCChromeWords(ch)).toBe(4 + 4 + 1);
+  });
+
+  it('moves when a heading changes', () => {
+    const before = { num: 1, title: 'A', sections: [{ heading: 'The Lord Provides' }] };
+    const after = { num: 1, title: 'A', sections: [{ heading: 'YAHUWAH Provides the Ram' }] };
+    expect(formatCChromeWords(after)).not.toBe(formatCChromeWords(before));
+  });
+
+  it('is 0 for an empty or malformed chapter', () => {
+    expect(formatCChromeWords(null)).toBe(0);
+    expect(formatCChromeWords({ num: 1, sections: [null, { heading: '' }] })).toBe(0);
   });
 });
