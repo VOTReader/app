@@ -17,8 +17,10 @@ Sweep 2026-10-13 (D:/AgentBackbone/reports/votreader-sweep-2026-10-13/REPORT.md)
 
 No model, no GPU, no network: subprocess, urllib and the whisper legs are stubs.
 """
+import contextlib
 import hashlib
 import importlib.util
+import io
 import json
 import os
 import struct
@@ -504,6 +506,174 @@ class FillGuardTakesLegAOnAKeptMoveBack(unittest.TestCase):
 
     def test_prefer_a_none_turns_it_off(self):
         self.assertEqual(self.guard(30.05, self.row(1, 26.68, tA=27.18, tB=26.68), prefer_a=None), (26.68, []))
+
+
+class HoneTranscriptCacheKeysTheDecodeKnobs(unittest.TestCase):
+    """al5 (sweep 2026-10-13, low): hone-align's transcript cache was keyed on model + file id only, so a run with
+    --beam or --no-prompt read back the family's default transcript and honed against words it never decoded."""
+
+    def test_the_family_default_keeps_its_old_path(self):
+        s = al.settings_for("letters-A", whisper_model="large-v3")
+        self.assertEqual(ha.tx_cache("F1", s), os.path.join(ha.WORK, "tx-hone", "large-v3", "F1.json"))
+
+    def test_beam_and_prompt_each_get_their_own_cache(self):
+        base = al.settings_for("letters-A", whisper_model="large-v3")
+        beam = al.settings_for("letters-A", whisper_model="large-v3", beam_size=base["beam_size"] + 3)
+        noprompt = dict(base, initial_prompt=None)
+        paths = {ha.tx_cache("F1", s) for s in (base, beam, noprompt)}
+        self.assertEqual(len(paths), 3)
+        self.assertEqual(ha.tx_cache("F1", beam), ha.tx_cache("F1", dict(beam)))
+
+
+sc = _load("study_cut", "study-cut.py")
+
+
+class StudyCutNeverCrashesOnAnOddChapter(unittest.TestCase):
+    """al5 (sweep 2026-10-13, low): a chapter the belt has no row for raised KeyError (by_ch[ci]), and a read chapter
+    with no anchored row raised ValueError (min of nothing). The first is unread; the second keeps its cleared rows
+    but is untrusted, so the boundary is a DISAGREE that `cut` refuses until a person looks."""
+
+    @staticmethod
+    def r(t, status):
+        return {"t": t, "status": status}
+
+    def test_no_rows_is_unread(self):
+        self.assertIsNone(sc.chapter_rows([], []))
+
+    def test_under_half_cleared_is_unread(self):
+        rows = [self.r(1.0, "CONFIRMED"), self.r(None, "UNSPOKEN"), self.r(None, "UNSPOKEN")]
+        self.assertIsNone(sc.chapter_rows(rows, rows[:1]))
+
+    def test_anchored_rows_are_trusted(self):
+        rows = [self.r(5.0, "REVIEW"), self.r(6.0, "PROBED_A")]
+        self.assertEqual(sc.chapter_rows(rows, rows), ([rows[1]], True))
+
+    def test_a_read_chapter_with_no_anchor_falls_back_untrusted(self):
+        rows = [self.r(5.0, "REVIEW"), self.r(6.0, "REVIEW")]
+        self.assertEqual(sc.chapter_rows(rows, rows), (rows, False))
+
+
+sup = _load("align_supervisor", "align-supervisor.py")
+
+
+class SupervisorNeverRelaunchesUnchanged(unittest.TestCase):
+    """al5 (sweep 2026-10-13, low): a memory kill before the aligner named a unit banned "?", and a unit killed a
+    second time printed "giving up" and relaunched anyway; both relaunches were identical, so the same kill repeated
+    until max_restarts. A relaunch must change something: a newly banned, named unit."""
+
+    def test_a_named_unit_is_banned_for_the_relaunch(self):
+        self.assertEqual(sup.after_kill("acts_008", {"john_001"}), {"john_001", "acts_008"})
+
+    def test_an_unnamed_or_already_banned_unit_stops(self):
+        self.assertIsNone(sup.after_kill("?", set()))
+        self.assertIsNone(sup.after_kill("acts_008", {"acts_008"}))
+
+
+class StudyReCutsGetNewAssetNames(unittest.TestCase):
+    """al5 (sweep 2026-10-13, low): `cut` named every chapter <sourceId>_ch<NN>, so a re-cut at new points wrote new
+    bytes under the old release name, and every phone's saved copy (keyed by that name) silently kept the old cut."""
+
+    def test_a_first_cut_keeps_the_plain_name(self):
+        self.assertEqual(sc.cut_asset("SRC", 3, 342.77, 899.89, None), "SRC_ch03")
+
+    def test_the_same_bounds_keep_the_recorded_name(self):
+        prev = {"asset": "SRC_ch03", "startSec": 342.77, "endSec": 899.89}
+        self.assertEqual(sc.cut_asset("SRC", 3, 342.77, 899.89, prev), "SRC_ch03")
+
+    def test_new_bounds_get_a_new_name(self):
+        prev = {"asset": "SRC_ch03", "startSec": 342.77, "endSec": 899.89}
+        moved = sc.cut_asset("SRC", 3, 342.9, 899.89, prev)
+        self.assertTrue(moved.startswith("SRC_ch03_") and moved != "SRC_ch03")
+        self.assertEqual(moved, sc.cut_asset("SRC", 3, 342.9, 899.89, prev))
+        self.assertNotEqual(sc.cut_asset("SRC", 14, 3134.98, None, {"asset": "SRC_ch14", "startSec": 3134.98,
+                                                                      "endSec": 3200.0}), "SRC_ch14")
+
+    def test_cut_refuses_an_unanchored_boundary(self):
+        chapters = [{"id": "a", "startSec": 0.0, "evidence": {}},
+                    {"id": "b", "startSec": 9.0, "evidence": {"noAnchor": True}}]
+        self.assertEqual(sc.unresolved(chapters), ["b"])
+
+
+class AnErrorWithNoMessageStillLogs(unittest.TestCase):
+    """al5 (sweep 2026-10-13, low): `str(e).splitlines()[0]` raised IndexError on an exception with no message (a
+    bare assert), inside the very handler meant to log it, and took the whole batch down with it."""
+
+    def test_err_line(self):
+        self.assertEqual(al.err_line(AssertionError()), "AssertionError")
+        self.assertEqual(al.err_line(RuntimeError("  \n")), "RuntimeError")
+        self.assertEqual(al.err_line(RuntimeError("first\nsecond")), "first")
+        self.assertEqual(al.err_line(RuntimeError("x" * 300), 5), "xxxxx")
+
+
+var = _load("verify_audio_release", "verify-audio-release.py")
+
+
+class RepairCountsOnlyWhatItDeleted(unittest.TestCase):
+    """al5 (sweep 2026-10-13, low): verify-audio-release --repair printed "deleted N" whatever gh answered, so a
+    refused delete looked done and the mirror's re-upload then skipped an asset that was still broken."""
+
+    def test_a_refused_delete_is_named_not_counted(self):
+        assets = {"a.mp3": {"id": 1}, "b.mp3": {"id": 2}}
+        calls = []
+
+        def fake_run(args, **kw):
+            calls.append(args[-1])
+            ok = args[-1].endswith("/1")
+            return subprocess.CompletedProcess(args, 0 if ok else 1, "", "" if ok else "HTTP 403: Forbidden")
+        deleted, failed = var.delete_assets([("a.mp3", 404, False), ("b.mp3", 404, False)], assets, run=fake_run)
+        self.assertEqual(deleted, ["a.mp3"])
+        self.assertEqual(failed, [("b.mp3", "HTTP 403: Forbidden")])
+        self.assertEqual(len(calls), 2)
+
+
+aa = _load("align_audio", "align-audio.py")
+
+
+class RetiredAlignAudioRefusesToRun(_Tmp):
+    """al5 (sweep 2026-10-13, low): the retired align-audio.py still ran, and its main() rewrites audio-sync.js
+    whole from the 2026-08 greedy matcher, over everything batch-align.py ships. It now stops with a pointer."""
+
+    def test_main_stops_before_touching_anything(self):
+        for name, rel in (("WORK", ""), ("AUDIO", "audio"), ("TX", "tx"), ("OUT_JS", "audio-sync.js")):
+            self.patch(aa, name, os.path.join(self.d, rel) if rel else self.d)
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(aa.main(), 2)
+        self.assertIn("batch-align.py", err.getvalue())
+        self.assertEqual(os.listdir(self.d), [])
+
+
+vbs = _load("validate_bible_sync", "validate-bible-sync.py")
+
+
+class BibleValidatorNeverCrashesOrSkipsQuietly(_Tmp):
+    """al5 (sweep 2026-10-13, low): validate-bible-sync crashed on an empty belt (max of nothing) and on a missing
+    belt folder, skipped its past-the-end check whenever ffprobe could not read the length, and left a temp folder
+    behind on every run. It also rebuilt a pinned chapter's REVIEW rows, which ship() now keeps dark."""
+
+    def test_an_empty_belt_rebuilds_to_nothing(self):
+        self.assertEqual(vbs.rebuild({"verses": []}), [])
+
+    def test_a_pinned_rebuild_keeps_review_rows_dark(self):
+        belt = {"verses": [{"n": 1, "t": 1.0, "status": "CONFIRMED"}, {"n": 2, "t": 2.0, "status": "REVIEW"},
+                           {"n": 3, "t": 3.0, "status": "PROBED_B"}]}
+        self.assertEqual(vbs.rebuild(belt), [100, 200, 300])
+        self.assertEqual(vbs.rebuild(belt, pinned=True), [100, 0, 300])
+
+    def test_a_missing_belt_folder_is_no_belts(self):
+        self.assertEqual(list(vbs.belts_on_disk(os.path.join(self.d, "nope"))), [])
+
+    def test_an_unreadable_audio_length_is_a_problem(self):
+        self.assertIn("length", vbs.audio_end_problem(12.0, None))
+        self.assertIsNone(vbs.audio_end_problem(12.0, 30.0))
+        self.assertIn("past the audio end", vbs.audio_end_problem(31.0, 30.0))
+
+    def test_a_run_leaves_no_temp_folder(self):
+        env = dict(os.environ, TEMP=self.d, TMP=self.d, TMPDIR=self.d)
+        r = subprocess.run([sys.executable, os.path.join(TOOLS, "validate-bible-sync.py"), "--structural",
+                            "--edition", "web-ebible"], capture_output=True, text=True, env=env, timeout=300)
+        self.assertEqual(r.returncode, 0, r.stdout[-400:] + r.stderr[-400:])
+        self.assertEqual([n for n in os.listdir(self.d) if n.startswith("bible-sync-validate-")], [])
 
 
 if __name__ == "__main__":

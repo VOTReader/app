@@ -51,6 +51,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -262,24 +263,72 @@ def is_current(belt_path, want_settings, verses_path, audio_path, witness="stric
         return False
     if d.get("audioSize") != os.path.getsize(audio_path):
         return False
-    v = json.load(open(verses_path, encoding="utf-8"))["verses"]
-    want = al.sha10(json.dumps([[x["n"], x["text"]] for x in v],
-                               ensure_ascii=False, separators=(",", ":")))
-    return d.get("versesHash") == want
+    return d.get("versesHash") == verses_hash(verses_path)
+
+
+def verses_hash(verses_path):
+    """The belt's versesHash for a chapter's reference text file, as run_belt stamps it."""
+    return rows_hash(json.load(open(verses_path, encoding="utf-8"))["verses"])
+
+
+def rows_hash(verses):
+    return al.sha10(json.dumps([[x["n"], x["text"]] for x in verses], ensure_ascii=False, separators=(",", ":")))
+
+
+def extract_all(translation, tmp):
+    """Every chapter of a translation from ONE extractor run (its --all mode): the
+    same readers as the per-chapter call, so nkjv (books.js) and vot-matthew cost one
+    node spawn instead of one per chapter (sweep-2 n7-04: 1,217 spawns, 152 s of CI).
+    Keyed by audio-manifest id. None when the run fails; the caller then falls back
+    to per-chapter extraction, which names the failing chapter."""
+    path = os.path.join(tmp, f"all.{translation}.json")
+    r = subprocess.run(["node", os.path.join(BASE, "extract-bible-verses.mjs"), "--all", path,
+                        "--translation", translation],
+                       capture_output=True, encoding="utf-8", errors="replace", cwd=ROOT)
+    if r.returncode != 0 or not os.path.exists(path):
+        return None
+    return json.load(open(path, encoding="utf-8"))
+
+
+def current_text(ed, verses_dir):
+    """(book, chapter) -> the chapter's reference verses as the corpus has them NOW: one extractor --all run for
+    the whole edition, the per-chapter cache (verses_json) only for a chapter that run did not return."""
+    with tempfile.TemporaryDirectory(prefix="bible-ship-text-") as tmp:
+        every = extract_all(EDITIONS[ed]["translation"], tmp)
+
+    def text_of(book_id, chapter):
+        if every is not None and str(chapter) in every.get(book_id, {}):
+            return every[book_id][str(chapter)]
+        return json.load(open(verses_json(ed, book_id, chapter, verses_dir), encoding="utf-8"))["verses"]
+    return text_of
+
+
+def is_proven(row):
+    return row.get("status") == "CONFIRMED" or str(row.get("status", "")).startswith("PROBED")
 
 
 def proven_share(belt):
     rows = belt.get("verses") or []
     if not rows:
         return 0.0
-    ok = sum(1 for r in rows
-             if r.get("status") in ("CONFIRMED",) or str(r.get("status", "")).startswith("PROBED"))
-    return ok / len(rows)
+    return sum(1 for r in rows if is_proven(r)) / len(rows)
 
 
-def chapters_for(args, idx, books_meta):
-    """The (bookId, chapter) work list, in canonical Bible order."""
-    order = {b: i for i, b in enumerate(books_meta)}
+# Canonical order, app book ids (the audio index's keys). The work order came from sorted(book ids), so a full
+# run began with 1 Chronicles (sweep 2026-10-13, low; al5).
+BIBLE_BOOKS = (
+    "genesis", "exodus", "leviticus", "numbers", "deuteronomy", "joshua", "judges", "ruth", "1samuel", "2samuel",
+    "1kings", "2kings", "1chronicles", "2chronicles", "ezra", "nehemiah", "esther", "job", "psalms", "proverbs",
+    "ecclesiastes", "songofsolomon", "isaiah", "jeremiah", "lamentations", "ezekiel", "daniel", "hosea", "joel",
+    "amos", "obadiah", "jonah", "micah", "nahum", "habakkuk", "zephaniah", "haggai", "zechariah", "malachi",
+    "matthew", "mark", "luke", "john", "acts", "romans", "1corinthians", "2corinthians", "galatians", "ephesians",
+    "philippians", "colossians", "1thessalonians", "2thessalonians", "1timothy", "2timothy", "titus", "philemon",
+    "hebrews", "james", "1peter", "2peter", "1john", "2john", "3john", "jude", "revelation")
+
+
+def chapters_for(args, idx):
+    """The (bookId, chapter) work list, in canonical Bible order (an unknown id sorts last)."""
+    order = {b: i for i, b in enumerate(BIBLE_BOOKS)}
     if args.chapters:
         want = []
         for spec in args.chapters.split(","):
@@ -290,7 +339,7 @@ def chapters_for(args, idx, books_meta):
         want = [(b, c) for (b, c) in idx if b in names]
     else:
         want = list(idx)
-    return sorted(set(want), key=lambda bc: (order.get(bc[0], 999), bc[1]))
+    return sorted(set(want), key=lambda bc: (order.get(bc[0], 999), bc[0], bc[1]))
 
 
 def partial_books(shipped, idx):
@@ -310,7 +359,7 @@ def partial_books(shipped, idx):
             if set(chs) != want.get(b, set())}
 
 
-def ship(ed, belts_dir, want_settings=None, idx=None):
+def ship(ed, belts_dir, want_settings=None, idx=None, text_of=None):
     """Rebuild src/data/bible-sync-<edition>.js from the CURRENT belts on disk.
 
     A belt ships only when it was made with today's settings AND describes the
@@ -318,10 +367,15 @@ def ship(ed, belts_dir, want_settings=None, idx=None):
     Before 2026-09-01 the shipper took every belt it found, so a settings
     change followed by a partial run, or a re-cut chapter that had not been
     re-belted yet, would have shipped timings for audio nobody would hear.
-    Dropped belts are counted by reason so a short ship is never silent."""
+    Dropped belts are counted by reason so a short ship is never silent.
+
+    `text_of` (main passes current_text()) also holds back a belt aligned to
+    older text than the corpus has now: ship() used to check settings
+    and audio but never the text, and only the validator caught it, after the
+    timings were written (sweep 2026-10-13, low; al5)."""
     table = {}
     kept = dropped = verses_timed = verses_total = 0
-    stale_settings = stale_audio = no_audio = 0
+    stale_settings = stale_audio = no_audio = stale_text = 0
     pinned = []                 # chapters shipped below the gate by GATE_PINS, named on their own line
     for name in sorted(os.listdir(belts_dir)):
         # Belts only. The same directory holds each chapter's cached whisper
@@ -348,15 +402,26 @@ def ship(ed, belts_dir, want_settings=None, idx=None):
             if d.get("audioSize") != os.path.getsize(entry[0]):
                 stale_audio += 1
                 continue
+        if text_of is not None:
+            try:
+                fresh = rows_hash(text_of(book_id, chapter))
+            except (RuntimeError, OSError, ValueError, KeyError, TypeError):
+                fresh = None
+            if d.get("versesHash") != fresh:
+                stale_text += 1
+                continue
         if not clears_gate(ed, d):
             dropped += 1
             continue
-        if proven_share(d) < MIN_PROVEN:
+        below = proven_share(d) < MIN_PROVEN
+        if below:
             pinned.append(f"{book_id} {chapter} ({proven_share(d):.3f}: {gate_pin(ed, d)})")
         n_max = max(r["n"] for r in rows)
         arr = [0] * n_max
         for r in rows:
             t = r.get("t")
+            if below and not is_proven(r):
+                continue                # a pin ships its proven rows only, the rest dark (al5)
             if t is not None and r.get("status") != "UNSPOKEN":
                 # 1, never 0, for a proven row: the renderer reads 0 as "unproven"
                 # (`if (cs[i] > 0)`), so a verse the recording opens on (2 Samuel
@@ -415,6 +480,7 @@ def ship(ed, belts_dir, want_settings=None, idx=None):
     size = os.path.getsize(path)
     print(f"\nship: {kept} chapters ({dropped} below the {MIN_PROVEN:.0%} proven gate; "
           f"not shipped: {stale_settings} other settings, {stale_audio} audio changed since the belt, "
+          f"{stale_text} text changed since the belt, "
           f"{no_audio} no local audio; held back as partial books: "
           + (", ".join(f"{b} {h} of {w}" for b, (h, w) in sorted(held.items())) or "none") + "), "
           f"{verses_timed}/{verses_total} verses timed -> {path} ({size // 1024} KB)")
@@ -466,8 +532,7 @@ def main():
         json.dump(out, open(path, "w", encoding="utf-8"), indent=0)
         print(f"wrote {len(out)} entries -> {path}")
         return 0
-    books_meta = sorted({b for b, _ in idx})
-    work = chapters_for(a, idx, books_meta)
+    work = chapters_for(a, idx)
     if a.limit:
         work = work[:a.limit]
     print(f"batch-align-bible {ed}: {len(work)} chapters  family {cfg['family']}  settings {want_settings}  "
@@ -557,7 +622,7 @@ def main():
             d = hb.run_chapter(vpath, audio, tag, dict(s), out_dir=belts, quiet=True,
                                fill_guard=not a.no_fill_guard)
         except Exception as e:                                      # noqa: BLE001
-            print(f"  [{n}/{len(work)}] {tag}  ERROR {str(e).splitlines()[0][:110]}", flush=True)
+            print(f"  [{n}/{len(work)}] {tag}  ERROR {al.err_line(e)}", flush=True)
             failed += 1
             note(book_id, "failed")
             checkpoint(tag)
@@ -602,7 +667,7 @@ def main():
         for tag, share in sorted(review, key=lambda r: r[1]):
             print(f"  {share:.3f}  {tag}")
     if not a.no_ship:
-        ship(ed, belts, want_settings, idx)
+        ship(ed, belts, want_settings, idx, current_text(ed, verses_dir))
     return 1 if failed else 0
 
 

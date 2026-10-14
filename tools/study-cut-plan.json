@@ -34,6 +34,7 @@
      "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch01",
      "bytes": 2570613,
      "durationSec": 183.56,
+     "startSec": 0.0,
      "endSec": 183.55
     }
    },
@@ -66,6 +67,7 @@
      "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch02",
      "bytes": 2229766,
      "durationSec": 159.22,
+     "startSec": 183.55,
      "endSec": 342.77
     }
    },
@@ -98,6 +100,7 @@
      "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch03",
      "bytes": 7800327,
      "durationSec": 557.11,
+     "startSec": 342.77,
      "endSec": 899.89
     }
    },
@@ -130,6 +133,7 @@
      "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch04",
      "bytes": 4361881,
      "durationSec": 311.51,
+     "startSec": 899.89,
      "endSec": 1211.38
     }
    },
@@ -162,6 +166,7 @@
      "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch05",
      "bytes": 3035069,
      "durationSec": 216.74,
+     "startSec": 1211.38,
      "endSec": 1428.14
     }
    },
@@ -194,6 +199,7 @@
      "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch06",
      "bytes": 3731390,
      "durationSec": 266.48,
+     "startSec": 1428.14,
      "endSec": 1694.6
     }
    },
@@ -226,6 +232,7 @@
      "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch07",
      "bytes": 3323983,
      "durationSec": 237.37,
+     "startSec": 1694.6,
      "endSec": 1931.97
     }
    },
@@ -258,6 +265,7 @@
      "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch08",
      "bytes": 825058,
      "durationSec": 58.88,
+     "startSec": 1931.97,
      "endSec": 1990.85
     }
    },
@@ -290,6 +298,7 @@
      "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch09",
      "bytes": 2312053,
      "durationSec": 165.09,
+     "startSec": 1990.85,
      "endSec": 2155.95
     }
    },
@@ -322,6 +331,7 @@
      "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch10",
      "bytes": 1779938,
      "durationSec": 127.09,
+     "startSec": 2155.95,
      "endSec": 2283.04
     }
    },
@@ -354,6 +364,7 @@
      "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch11",
      "bytes": 5344555,
      "durationSec": 381.7,
+     "startSec": 2283.04,
      "endSec": 2664.75
     }
    },
@@ -386,6 +397,7 @@
      "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch12",
      "bytes": 4464646,
      "durationSec": 318.85,
+     "startSec": 2664.75,
      "endSec": 2983.58
     }
    },
@@ -418,6 +430,7 @@
      "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch13",
      "bytes": 2120053,
      "durationSec": 151.38,
+     "startSec": 2983.58,
      "endSec": 3134.98
     }
    },
@@ -461,6 +474,7 @@
      "asset": "1jVmEvQUK5zSYJQKJxtyyTGfqr1slxsGY_ch14",
      "bytes": 1559412,
      "durationSec": 111.23,
+     "startSec": 3134.98,
      "endSec": null
     }
    }

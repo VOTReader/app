@@ -206,10 +206,6 @@ def _skel(f):
     return f[0] + re.sub(r"[aeiou']", "", f[1:])
 
 
-def _name_skel(w):
-    return _skel(_name_fold(w))
-
-
 def name_alike(a, b, iah=True):
     """True when a spoken token is a plausible hearing of the name `b`: same
     consonant skeleton after folding ("pashur"/"pashhur", "malak"/"malluch"), or
@@ -327,6 +323,12 @@ def load_json(path):
             return json.load(f)
     except (OSError, ValueError):
         return None
+
+
+def err_line(e, n=110):
+    """An exception's first message line, or its type when it has none. `str(e).splitlines()[0]` raised IndexError
+    on a bare assert inside the very handler meant to log it, and took the batch down (sweep 2026-10-13; al5)."""
+    return ((str(e).strip().splitlines() or [type(e).__name__])[0])[:n]
 
 
 def wav_complete(path):

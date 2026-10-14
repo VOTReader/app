@@ -144,8 +144,21 @@ def ensure_wav(fid):
     return wav
 
 
+# What whisper decodes with (WhisperLeg.transcribe_words). --beam and --no-prompt change these, and the cache was keyed on
+# model + file id alone, so such a run read back the default transcript (sweep 2026-10-13, low; al5).
+TX_KNOBS = ("beam_size", "temperature", "condition_on_previous_text", "initial_prompt", "vad_filter",
+            "hallucination_silence_threshold")
+
+
 def tx_cache(fid, s):
-    return os.path.join(WORK, "tx-hone", s["whisper_model"], fid + ".json")
+    """The family's own decode knobs keep the original path (every cache on disk stays valid); any other set gets
+    a folder named for it."""
+    d = os.path.join(WORK, "tx-hone", s["whisper_model"])
+    knobs = {k: s.get(k) for k in TX_KNOBS}
+    base = al.settings_for(s["family"], whisper_model=s["whisper_model"])
+    if knobs != {k: base.get(k) for k in TX_KNOBS}:
+        d = os.path.join(d, "knobs-" + al.sha10(json.dumps(knobs, sort_keys=True, default=str)))
+    return os.path.join(d, fid + ".json")
 
 
 _FRAGS_ALL = {}

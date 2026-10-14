@@ -85,21 +85,6 @@ def flat_translation_map(translation):
     return json.loads(body[:-1])
 
 
-def extract_all(translation, tmp):
-    """Every chapter of a translation from ONE extractor run (its --all mode): the
-    same readers as the per-chapter call, so nkjv (books.js) and vot-matthew cost one
-    node spawn instead of one per chapter (sweep-2 n7-04: 1,217 spawns, 152 s of CI).
-    Keyed by audio-manifest id. None when the run fails; the caller then falls back
-    to per-chapter extraction, which names the failing chapter."""
-    path = os.path.join(tmp, f"all.{translation}.json")
-    r = subprocess.run(["node", os.path.join(BASE, "extract-bible-verses.mjs"), "--all", path,
-                        "--translation", translation],
-                       capture_output=True, encoding="utf-8", errors="replace", cwd=ROOT)
-    if r.returncode != 0 or not os.path.exists(path):
-        return None
-    return json.load(open(path, encoding="utf-8"))
-
-
 def fresh_verses(bab, ed, book, ch, tmp, flat=None, every=None):
     if flat is not None:
         rows = flat.get("matthew-plain" if book == "matthew" else book, {}).get(str(ch))
@@ -117,13 +102,19 @@ def fresh_verses(bab, ed, book, ch, tmp, flat=None, every=None):
     return json.load(open(path, encoding="utf-8"))["verses"]
 
 
-def rebuild(belt):
-    """ship()'s per-chapter array, re-derived independently."""
-    rows = belt["verses"]
+def rebuild(belt, pinned=False):
+    """ship()'s per-chapter array, re-derived independently. A chapter shipped below the gate by a pin keeps only
+    its proven rows (CONFIRMED / PROBED*), the rest dark. An empty belt is an empty array, never a crash (al5)."""
+    rows = belt.get("verses") or []
+    if not rows:
+        return []
     arr = [0] * max(r["n"] for r in rows)
     for r in rows:
         t = r.get("t")
-        if t is not None and r.get("status") != "UNSPOKEN":
+        status = str(r.get("status", ""))
+        if pinned and not (status == "CONFIRMED" or status.startswith("PROBED")):
+            continue
+        if t is not None and status != "UNSPOKEN":
             arr[r["n"] - 1] = max(1, int(round(t * 100)))   # 1, never 0: 0 reads as unproven (ship())
     last = 0
     for i, v in enumerate(arr):
@@ -134,8 +125,35 @@ def rebuild(belt):
     return arr
 
 
+def audio_end_problem(last_s, dur):
+    """The past-the-end check's verdict. ffprobe failing used to SKIP the check silently (al5)."""
+    if dur is None:
+        return "could not read the audio's length (ffprobe), so the last onset is unchecked"
+    if last_s >= dur:
+        return f"last onset {last_s:.2f}s is past the audio end {dur:.2f}s"
+    return None
+
+
+def belts_on_disk(belts_dir):
+    """Every belt dict in an edition's folder; none (not a crash) when the folder is missing (al5)."""
+    if not os.path.isdir(belts_dir):
+        return
+    for name in sorted(os.listdir(belts_dir)):
+        if not name.endswith(".json") or name.endswith(".tx.json") or ".wav." in name or name.startswith(("CAMPAIGN", "progress", "audio-index")):
+            continue
+        d = json.load(open(os.path.join(belts_dir, name), encoding="utf-8"))
+        if isinstance(d, dict) and "verses" in d:
+            yield d
+
+
 def check(ed, a):
-    """Validate ONE edition's data file. Returns 0 when it is clean."""
+    """Validate ONE edition's data file. Returns 0 when it is clean. The extractor's temp folder is removed after
+    every run (it was left behind each time; al5)."""
+    with tempfile.TemporaryDirectory(prefix="bible-sync-validate-") as tmp:
+        return _check(ed, a, tmp)
+
+
+def _check(ed, a, tmp):
     bab = load(os.path.join(BASE, "batch-align-bible.py"), "batch_align_bible")
     if ed not in bab.EDITIONS:
         print(f"FAIL: src/data/bible-sync-{ed}.js exists but {ed!r} is not a known edition "
@@ -146,8 +164,7 @@ def check(ed, a):
     idx = {} if structural else bab.audio_index(ed)
     belts_dir = os.path.join(BASE, "_align-work", "bible", ed)
     flat = flat_translation_map(bab.EDITIONS[ed]["translation"])
-    tmp = tempfile.mkdtemp(prefix="bible-sync-validate-")
-    every = extract_all(bab.EDITIONS[ed]["translation"], tmp) if flat is None else None
+    every = bab.extract_all(bab.EDITIONS[ed]["translation"], tmp) if flat is None else None
     data_path = a.data or os.path.join(DATA, f"bible-sync-{ed}.js")
     src = open(data_path, encoding="utf-8").read()
     var = "BIBLE_SYNC_" + ed.upper().replace("-", "_")
@@ -227,9 +244,9 @@ def check(ed, a):
             if not entry:
                 problems.append((tag, "no local audio for this chapter"))
                 continue
-            dur = ffprobe_dur(entry[0])
-            if dur is not None and last / 100.0 >= dur:
-                problems.append((tag, f"last onset {last / 100:.2f}s is past the audio end {dur:.2f}s"))
+            end_problem = audio_end_problem(last / 100.0, ffprobe_dur(entry[0]))
+            if end_problem:
+                problems.append((tag, end_problem))
             bp = os.path.join(belts_dir, tag + ".json")
             if not os.path.exists(bp):
                 problems.append((tag, "no belt on disk"))
@@ -251,7 +268,7 @@ def check(ed, a):
                 problems.append((tag, f"GATE_PINS lists this chapter but it clears the gate on its own ({bab.proven_share(belt):.3f}); retire the pin"))
             elif pin is not None:
                 pinned.append(f"{tag} ({bab.proven_share(belt):.3f}: {pin})")
-            if rebuild(belt) != arr:
+            if rebuild(belt, pinned=pin is not None and bab.proven_share(belt) < bab.MIN_PROVEN) != arr:
                 problems.append((tag, "shipped array != rebuilt from belt"))
     # every gate-clearing current belt must be in the file -- unless its BOOK is
     # partial (ship() holds a half-aligned book back whole, by the same
@@ -261,12 +278,9 @@ def check(ed, a):
     # shipper without the rule.
     missing = []
     clearing = {}
-    for name in ([] if structural else os.listdir(belts_dir)):
-        if not name.endswith(".json") or name.endswith(".tx.json") or ".wav." in name or name.startswith(("CAMPAIGN", "progress", "audio-index")):
-            continue
-        d = json.load(open(os.path.join(belts_dir, name), encoding="utf-8"))
-        if not isinstance(d, dict) or "verses" not in d:
-            continue
+    if not structural and not os.path.isdir(belts_dir):
+        problems.append((ed, f"no belt folder {belts_dir}"))
+    for d in ([] if structural else belts_on_disk(belts_dir)):
         key = (d.get("bookId"), d.get("chapter"))
         entry = idx.get(key)
         if (d.get("settings_hash") == want and entry and d.get("audioSize") == os.path.getsize(entry[0])

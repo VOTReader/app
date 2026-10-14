@@ -37,7 +37,8 @@ the runner-up, the words spoken on either side of the cut) in the plan beside
 it, and the console prints the words on both sides so a reader can see
 "...volume 2 | saturday evening at sundown..." without opening anything.
 
-`cut` writes <sourceId>_ch<NN>.mp3 for every chapter with a numeric startSec —
+`cut` writes <sourceId>_ch<NN>.mp3 for every chapter with a numeric startSec (a RE-cut at new bounds is
+<sourceId>_ch<NN>_<hash>.mp3, a new release asset; the generator emits the name the plan's `cut` records) —
 `-c copy`, audio stream only (the cover art is not fifteen copies of itself),
 each chapter to the next chapter's start, the last to the end of the file — into
 tools/_audio-mirror-staging/, where mirror-audio-release.py picks them up once
@@ -124,6 +125,41 @@ def front_matter_tokens(study, chapter_id):
     raise SystemExit(f"study {study!r} is not in bible-studies.js")
 
 
+def anchored(r):
+    return r.get("t") is not None and r["status"] in ANCHORED
+
+
+def chapter_rows(all_rows, cleared):
+    """(anchors, trusted) for one chapter, or None when it was not read: fewer than half its fragments cleared, or
+    the belt has no row for it at all (by_ch[ci] used to raise KeyError). A read chapter with no anchored row (min()
+    of nothing used to raise) falls back to its cleared rows, untrusted: its boundary is a DISAGREE, which `cut`
+    refuses until a person looks (al5, sweep 2026-10-13)."""
+    total = len(all_rows)
+    if not total or len(cleared) < 0.5 * total:
+        return None
+    anchors = [r for r in all_rows if anchored(r)]
+    return (anchors, True) if anchors else (list(cleared), False)
+
+
+def cut_asset(source_id, i, start, end, prev):
+    """The release asset name for chapter i's cut. A first cut is <sourceId>_ch<NN>; a RE-cut at other bounds gets a
+    new name (a hash of the bounds), because the release asset and every phone's saved copy are keyed by name, and
+    new bytes under the old name shifted every saved copy silently (al5, sweep 2026-10-13). The same bounds keep the
+    name the last cut recorded."""
+    bounds = [round(start, 2), None if end is None else round(end, 2)]
+    if prev is None:
+        return f"{source_id}_ch{i:02d}"
+    if [prev.get("startSec"), prev.get("endSec")] == bounds:
+        return prev["asset"]
+    return f"{source_id}_ch{i:02d}_{al.sha10(json.dumps(bounds))[:6]}"
+
+
+def unresolved(chapters):
+    """Chapters `cut` refuses: two readers disagree on the boundary, or no anchored onset backs it (al5)."""
+    return [ch["id"] for ch in chapters
+            if ch.get("evidence", {}).get("frontMatterAgrees") is False or ch.get("evidence", {}).get("noAnchor")]
+
+
 def load_plan():
     return json.load(open(PLAN, encoding="utf-8"))
 
@@ -191,9 +227,6 @@ def points(study):
     def cleared(r):
         return (r.get("t") is not None and r["status"] != "UNSPOKEN"
                 and r["tokens"] and r["hit"] / r["tokens"] >= s["min_frag_hit"])
-
-    def anchored(r):
-        return r.get("t") is not None and r["status"] in ANCHORED
     placed = {ci: [r for r in rs if cleared(r)] for ci, rs in by_ch.items()}
     omitted = set(plan.get("omitted", []))
     notes = dict(plan.get("omittedNotes", {}))
@@ -204,7 +237,8 @@ def points(study):
         rs = placed.get(ci, [])
         total = len(by_ch.get(ci, []))
         ev = {"cleared": len(rs), "fragments": total}
-        if len(rs) < 0.5 * total:
+        got = chapter_rows(by_ch.get(ci, []), rs)
+        if got is None:
             ch["startSec"] = None
             ch.pop("cut", None)
             ev["unspoken"] = sum(1 for r in by_ch.get(ci, []) if r["status"] == "UNSPOKEN")
@@ -214,7 +248,7 @@ def points(study):
                                f"({ev['unspoken']} UNSPOKEN); a read chapter clears at least half")
             print(f"{ch['id']:18} {len(rs):4}/{total:<4}  {'-':>8} {'-':>8}  {'null':>8}  UNREAD ({ev['unspoken']} UNSPOKEN) -> omitted")
             continue
-        anchors = [r for r in by_ch[ci] if anchored(r)]
+        anchors, trusted = got
         first_t = min(r["t"] for r in anchors)
         ev["firstOnset"] = round(first_t, 2)
         sil_txt = ""
@@ -263,6 +297,11 @@ def points(study):
             after = [w for w, s0, _ in words if start <= s0 < first_t + 0.5]
             ev.update({"wordsBefore": " ".join(before[-8:]), "wordsAfter": " ".join(after[:8])})
             rule += f"   ...{' '.join(before[-5:])} | {' '.join(after[:6])}..."
+        if not trusted:
+            ev["noAnchor"] = True
+            rule = "DISAGREE (no anchored onset, REVIEW rows only) " + rule
+            if ch["id"] not in disagree:
+                disagree.append(ch["id"])
         ch["startSec"] = round(start, 2)
         ev["rule"] = rule
         ch["evidence"] = ev
@@ -318,11 +357,14 @@ def cut(study):
     chapters = [(i, ch) for i, ch in enumerate(plan["chapters"]) if isinstance(ch.get("startSec"), (int, float))]
     if not chapters:
         raise SystemExit("no chapter has a startSec — run `points` first")
-    bad = [ch["id"] for _, ch in chapters if ch.get("evidence", {}).get("frontMatterAgrees") is False]
+    bad = unresolved([ch for _, ch in chapters])
     if bad:
         raise SystemExit(f"refusing to cut: `points` left {len(bad)} boundaries where its two readers disagree "
                          f"({', '.join(bad)}); resolve them in the plan's evidence first")
-    names = [f"{plan['sourceId']}_ch{i:02d}.mp3" for i, _ in chapters]
+    bounds = [(ch["startSec"], chapters[k + 1][1]["startSec"] if k + 1 < len(chapters) else None)
+              for k, (_, ch) in enumerate(chapters)]
+    names = [cut_asset(plan["sourceId"], i, b[0], b[1], ch.get("cut")) + ".mp3"
+             for (i, ch), b in zip(chapters, bounds)]
     print("BEFORE:")
     for n in names:
         p = os.path.join(STAGING, n)
@@ -339,7 +381,7 @@ def cut(study):
         d = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", out],
                                  capture_output=True, text=True).stdout.strip())
         ch["cut"] = {"asset": names[idx][:-4], "bytes": os.path.getsize(out), "durationSec": round(d, 2),
-                     "endSec": end}
+                     "startSec": round(start, 2), "endSec": end}
     save_plan(plan_all)
     print("AFTER:")
     total_b = total_d = 0

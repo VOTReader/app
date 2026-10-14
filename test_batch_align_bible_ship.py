@@ -28,6 +28,7 @@ trailing zeros is harmless -- an absent slot and a zero slot both paint nothing 
 so pinning the length would fail a change that costs the reader nothing. The one
 property that must hold is that no index ever carries another verse's time.
 """
+import argparse
 import importlib.util
 import json
 import os
@@ -141,6 +142,39 @@ class ShipIndexesByVerseNumber(unittest.TestCase):
         self.assertEqual(table["nehemiah"]["10"][28:30], [2900, 3000])
         self.assertNotIn("ezra", table, "the same share unpinned ships nothing")
         self.assertIsNone(bab.gate_pin("brm-kjv", low), "a pin names its edition too")
+
+    def test_a_pinned_chapter_ships_no_review_row(self):
+        # al5 (sweep 2026-10-13, low): "proven rows only" was the pin's promise, but a REVIEW row with a time shipped too.
+        low = {**belt("nehemiah", 10, [1, 2]), "verseCount": 39, "confirmed": 2, "probed": 0}
+        low["verses"] += [{"n": 3, "t": 3.0, "status": "REVIEW"}, {"n": 4, "t": 4.0, "status": "PROBED-near"}]
+        low["verses"] += [{"n": n, "t": None, "status": "UNSPOKEN"} for n in (5, 6, 7, 8)]
+        self._saved_pins = dict(bab.GATE_PINS)
+        self.addCleanup(lambda: (bab.GATE_PINS.clear(), bab.GATE_PINS.update(self._saved_pins)))
+        bab.GATE_PINS.clear()
+        bab.GATE_PINS[("web-ebible", "nehemiah", 10)] = "test pin"
+        self.assertEqual(self._ship(low)["nehemiah"]["10"][:4], [100, 200, 0, 400])
+
+    def test_a_belt_aligned_to_older_text_does_not_ship(self):
+        # al5 (sweep 2026-10-13, low): ship() checked settings and audio bytes, never the text; the validator caught
+        # a text change only after the shipper had already written timings for words the app no longer shows.
+        text = {1: [{"n": 1, "text": "In the beginning was the Word"}], 2: [{"n": 1, "text": "On the third day"}]}
+        same = {**belt("john", 1, [1]), "versesHash": bab.rows_hash(text[1])}
+        old = {**belt("john", 2, [1]), "versesHash": "0ldtext000"}
+        gone = {**belt("john", 3, [1]), "versesHash": "anything00"}      # the corpus no longer has the chapter
+        for d in (same, old, gone):
+            with open(os.path.join(self.belts, "%s_%03d.json" % (d["bookId"], d["chapter"])), "w", encoding="utf-8") as fh:
+                json.dump(d, fh)
+        bab.ship("web-ebible", self.belts, text_of=lambda book, ch: text[ch])
+        src = open(os.path.join(bab.DATA, "bible-sync-web-ebible.js"), encoding="utf-8").read()
+        table = json.loads(re.search(r"var BIBLE_SYNC_WEB_EBIBLE = (\{.*\});\s*$", src, re.S).group(1))
+        self.assertEqual(list(table["john"]), ["1"])
+
+    def test_work_runs_in_bible_order_not_alphabetical(self):
+        # al5 (sweep 2026-10-13, low): the order came from sorted(book ids), so a full run began with 1 Chronicles.
+        idx = {("acts", 1): None, ("exodus", 2): None, ("genesis", 1): None, ("exodus", 1): None, ("1chronicles", 1): None}
+        args = argparse.Namespace(chapters=None, books=None)
+        self.assertEqual(bab.chapters_for(args, idx),
+                         [("genesis", 1), ("exodus", 1), ("exodus", 2), ("1chronicles", 1), ("acts", 1)])
 
     def test_a_proven_verse_the_recording_opens_on_ships_as_one_centisecond_not_zero(self):
         # 2 Samuel 20:1 in the WOP belts is CONFIRMED at t = 0.00 (the only such

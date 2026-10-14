@@ -180,6 +180,18 @@ def skipped_keys(path):
         return set()
 
 
+def letters_to_belt(keys, path, force):
+    """The candidate letters minus those the last run found the reader skips. --force forgets that finding (the
+    sidecar used to stick through --force, so a clean re-run still dropped what an older recording skipped; al5)
+    and this run's own finding replaces it."""
+    if force:
+        if os.path.exists(path + ".skipped.json"):
+            os.remove(path + ".skipped.json")
+        return list(keys), set()
+    skipped = skipped_keys(path)
+    return [k for k in keys if k[0] not in skipped], skipped
+
+
 def belt_path(fid):
     return os.path.join(ha.HONE, f"sections__{fid}.large-v3.json")
 
@@ -205,11 +217,14 @@ def main():
         for label, fid, reader in rows:
             if only and fid not in only:
                 continue
-            keys = candidates(vol, label, last_hi, manifest)
             vkey = f"sections:{fid}"
             path = belt_path(fid)
-            skipped = skipped_keys(path)               # letters the reader skips, from the last run
-            keys = [k for k in keys if k[0] not in skipped]
+            # letters the reader skips, from the last run (forgotten under --force)
+            keys, skipped = letters_to_belt(candidates(vol, label, last_hi, manifest), path, a.force)
+            if not keys:                               # keys[0] below used to crash the whole run (al5)
+                failures.append((fid, "no letter to belt (no candidates, or the reader skips them all)"))
+                print(f"[{vol}] {label}  {fid}  ERROR no letter to belt", flush=True)
+                continue
             frags, owner = virtual_letter(keys)
             # ponytail: run_belt resolves fragments and tracks by KEY through two
             # module-level caches; a virtual key injected into both is the whole
@@ -227,7 +242,7 @@ def main():
                 try:
                     d = ha.run_belt(vkey, dict(s), None)
                 except Exception as e:                                   # noqa: BLE001
-                    failures.append((fid, str(e).splitlines()[0][:110]))
+                    failures.append((fid, al.err_line(e)))
                     print(f"  ERROR {e}")
                     al.release_caches()
                     continue
@@ -242,12 +257,16 @@ def main():
                 print(f"  reader skips {', '.join(sorted(skipped))}: second belt without them", flush=True)
                 json.dump(sorted(skipped), open(path + ".skipped.json", "w", encoding="utf-8"))
                 keys = [k for k in keys if k[0] not in skipped]
+                if not keys:
+                    failures.append((fid, "the reader skips every letter"))
+                    print("  ERROR the reader skips every letter")
+                    continue
                 frags, owner = virtual_letter(keys)
                 ha._FRAGS_ALL[vkey] = {"fragments": frags, "format": "B"}
                 try:
                     d = ha.run_belt(vkey, dict(s), None)
                 except Exception as e:                                   # noqa: BLE001
-                    failures.append((fid, str(e).splitlines()[0][:110]))
+                    failures.append((fid, al.err_line(e)))
                     print(f"  ERROR {e}")
                     al.release_caches()
                     continue

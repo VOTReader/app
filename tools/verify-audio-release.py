@@ -73,12 +73,24 @@ def main():
 
     if repair and bad:
         print("deleting broken assets so the mirror re-uploads them…")
-        for name, _s, _m in bad:
-            subprocess.run([GH, "api", "--method", "DELETE",
-                            f"repos/{REPO}/releases/assets/{assets[name]['id']}"],
-                           capture_output=True, text=True)
-        print(f"deleted {len(bad)} — run: python tools/mirror-audio-release.py --until-done")
+        deleted, failed = delete_assets(bad, assets)
+        for name, why in failed:
+            print(f"  NOT DELETED {name}: {why}")
+        print(f"deleted {len(deleted)} of {len(bad)} — run: python tools/mirror-audio-release.py --until-done")
     return 1 if (bad or missing) else 0
+
+
+def delete_assets(bad, assets, run=subprocess.run):
+    """(deleted names, [(name, why)] refused). The count used to be len(bad) whatever gh answered (al5)."""
+    deleted, failed = [], []
+    for name, _s, _m in bad:
+        r = run([GH, "api", "--method", "DELETE", f"repos/{REPO}/releases/assets/{assets[name]['id']}"],
+                capture_output=True, text=True)
+        if r.returncode == 0:
+            deleted.append(name)
+        else:
+            failed.append((name, ((r.stderr or "").strip().splitlines() or [f"rc {r.returncode}"])[-1][:160]))
+    return deleted, failed
 
 
 if __name__ == "__main__":

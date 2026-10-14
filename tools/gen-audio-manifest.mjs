@@ -529,8 +529,11 @@ for (const [study, plan] of Object.entries(CUT_PLAN)) {
     if (typeof ch.startSec !== 'number') { studyPending++; return; }
     const key = 'study:' + ch.id;
     if (manifest.has(key)) { studyClashes.push(`${ch.id} <- cut ${i} of ${study}`); return; }
-    // <sourceId>_ch<NN>: a re-cut is NEW ids, never silently shifted times.
-    manifest.set(key, [[`${plan.sourceId}_ch${String(i).padStart(2, '0')}`, plan.reader || 'V']]);
+    // The name the last `cut` recorded: study-cut gives a re-cut at new bounds a NEW name, never new bytes under
+    // the old one (al5: this used to rebuild <sourceId>_ch<NN> here, which no re-cut could change). Before the
+    // first cut, the name that cut will write.
+    const asset = (ch.cut && ch.cut.asset) || `${plan.sourceId}_ch${String(i).padStart(2, '0')}`;
+    manifest.set(key, [[asset, plan.reader || 'V']]);
     studyCut++;
   });
 }

@@ -353,7 +353,7 @@ def main():
                         else:
                             _download_gdown(fid, dst)
                     except Exception as e:
-                        print(f"  [{n}/{len(todo)}] download error {fid} (attempt {attempt}): {str(e).splitlines()[0][:120]}")
+                        print(f"  [{n}/{len(todo)}] download error {fid} (attempt {attempt}): {(str(e).strip().splitlines() or [type(e).__name__])[0][:120]}")
                     if os.path.exists(dst):
                         why = why_not(dst)
                         if not why:

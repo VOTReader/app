@@ -83,9 +83,14 @@ if (missingAudio.length) throw new Error('incomplete corpus — missing from inv
    offsets are what turn it into a chapter + an offset inside that chapter).
    Emitted only for books whose scan is complete AND monotonic; a book without
    rows migrates to its chapter 1 instead. Retire after the next release. */
-const CHAPTERS_JSON = 'D:/BibleAudio/brm-kjv-chapters.json';
+const CHAPTERS_JSON = process.env.BIBLE_CHAPTERS_JSON || 'D:/BibleAudio/brm-kjv-chapters.json';
 const chapterRows = [];
-if (fs.existsSync(CHAPTERS_JSON)) {
+// A missing scan used to ship the table EMPTY, silently (al5, sweep 2026-10-13): restore.js still reads it.
+if (!fs.existsSync(CHAPTERS_JSON)) {
+  throw new Error(`${CHAPTERS_JSON} is missing: BIBLE_AUDIO_CHAPTERS would ship empty and a pre-switch BRM resume ` +
+    'snapshot could no longer migrate (restore.js). Restore the scan, or retire the table on purpose.');
+}
+{
   const scanned = JSON.parse(fs.readFileSync(CHAPTERS_JSON, 'utf8'));
   for (const [id, slug] of BOOKS66) {
     const book = scanned[slug];

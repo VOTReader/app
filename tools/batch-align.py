@@ -177,7 +177,7 @@ def main():
                 try:
                     d = ha.run_belt(key, dict(s), asset)
                 except Exception as e:
-                    failures.append((label, str(e).splitlines()[0][:110]))
+                    failures.append((label, al.err_line(e)))
                     print(f"  [{n}/{len(keys)}] {label}  ERROR {e}")
                     continue
             cov, unspoken = metrics(d)

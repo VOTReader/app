@@ -196,6 +196,15 @@ def kill_tree(p):
         p.kill()
 
 
+def after_kill(unit, banned):
+    """The banned set for the relaunch after a memory kill, or None when a relaunch would change nothing and so
+    repeat the same kill: the unit is unknown ("?": the kill came before the aligner named one) or was already
+    banned (its skip did not take). Both used to relaunch unchanged until max_restarts (al5, sweep 2026-10-13)."""
+    if unit == "?" or unit in banned:
+        return None
+    return set(banned) | {unit}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ceiling-gb", type=float, default=6.0)
@@ -279,12 +288,16 @@ def main():
             u, g, cm = over
             killed.append({"unit": u, "rssGb": round(g, 2), "commitGb": round(cm, 2),
                            "when": time.strftime("%Y-%m-%d %H:%M:%S")})
-            if u in banned:
-                print(f"supervisor: {u} exceeded the ceiling twice — giving up on it", flush=True)
-            banned.add(u)
             if a.record:
                 with open(a.record, "w", encoding="utf-8") as f:
                     json.dump(killed, f, indent=1)
+            nxt = after_kill(u, banned)
+            if nxt is None:
+                why = ("before the aligner named a unit" if u == "?"
+                       else f"on {u}, which was already skipped")
+                print(f"supervisor: killed at {g:.2f} GB {why}; a relaunch would change nothing, stopping", flush=True)
+                return 2
+            banned = nxt
             restarts += 1
             if restarts > a.max_restarts:
                 print(f"supervisor: {restarts} restarts, stopping", flush=True)

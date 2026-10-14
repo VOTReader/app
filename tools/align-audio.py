@@ -1,7 +1,7 @@
 """align-audio — full-catalog forced alignment for the read-along feature.
 
   node tools/extract-audio-fragments.mjs        # corpus fragments
-  python tools/align-audio.py [--cpu] [--limit N]
+  python tools/align-audio.py   # RETIRED (al5): exits 2 and names batch-align.py
 
 Per manifest track: download from the audio-v1 release (cache) -> ffmpeg to
 16k mono wav (cache; several 2022-era TTS mp3s truncate in whisper's direct
@@ -166,6 +166,16 @@ def align_part(words, frags, first_window):
 
 
 def main():
+    """RETIRED. This main() rewrote audio-sync.js whole from the 2026-08 greedy matcher, over every belt
+    batch-align.py ships (sweep 2026-10-13, low; al5). The functions stay as the record hone-align's legacy
+    column copies (align_greedy); the old run is _retired_main(), reachable only by importing it on purpose."""
+    print("align-audio.py is retired: it would overwrite audio-sync.js with the old greedy matcher's output.\n"
+          "Letters align with: python tools/batch-align.py (see its docstring); one letter: tools/hone-align.py.",
+          file=sys.stderr)
+    return 2
+
+
+def _retired_main():
     cpu = "--cpu" in sys.argv
     limit = int(sys.argv[sys.argv.index("--limit") + 1]) if "--limit" in sys.argv else 0
     only = None  # --volkeys one,two,…  (owner: volume-by-volume, QA each step)

@@ -7,7 +7,8 @@
  * Verse text with gold sup numbers and section headings, audio embedded as a
  * data URI, karaoke highlight driven by the belt-verified verse starts.
  * Status legend: solid gold = CONFIRMED (both aligners agree), amber = probe-
- * adjudicated, dotted = REVIEW (no shipped timing). QA artifact, not app code.
+ * adjudicated, dashed = REVIEW (ships, unproven), dotted = no timing shipped
+ * (UNSPOKEN or never placed). QA artifact, not app code.
  */
 import { readFileSync, writeFileSync } from 'fs';
 
@@ -36,8 +37,11 @@ const byN = new Map(tdata.verses.map((r) => [r.n, r]));
 let body = '';
 for (const v of vdata.verses) {
   const r = byN.get(v.n) || {};
-  const has = r.t != null;
-  const cls = !has ? 'verse miss' : (r.status === 'CONFIRMED' ? 'verse' : 'verse probed');
+  // ship() ships a time for every row but UNSPOKEN; a REVIEW time ships too, unproven (al5: it was painted amber,
+  // as probe-adjudicated, and an UNSPOKEN row with a time lit up).
+  const has = r.t != null && r.status !== 'UNSPOKEN';
+  const st = String(r.status || '');
+  const cls = !has ? 'verse miss' : st === 'CONFIRMED' ? 'verse' : st.startsWith('PROBED') ? 'verse probed' : 'verse review';
   const tAttr = has ? ` data-t="${r.t}"` : '';
   body += `<span class="${cls}" data-n="${v.n}"${tAttr}><sup>${v.n}</sup>${esc(v.text)}</span> `;
 }
@@ -66,6 +70,8 @@ const html = `<!doctype html>
   .verse.on { background: #d4af5f; color: #191505; }
   .verse.on sup { color: #191505; }
   .verse.probed.on { background: #c29a45; }
+  .verse.review { text-decoration: underline dashed #8a7a55; text-underline-offset: 4px; }
+  .verse.review.on { background: #8a7a55; }
   .verse.miss { text-decoration: underline dotted #7a5c5c; text-underline-offset: 4px; }
   .legend { font-size: 12px; color: #9a8f74; margin-top: 6px; }
   .legend b { color: #d4af5f; }
@@ -74,7 +80,7 @@ const html = `<!doctype html>
   <h1>${esc(vdata.book)} ${vdata.chapter}${editionTitle ? ' — ' + esc(editionTitle) : ''}</h1>
   <div class="meta">${conf} confirmed by both aligners · ${probed} probe-adjudicated · ${review} review · click any verse to seek</div>
   <audio id="a" controls preload="metadata" src="${dataUri}"></audio>
-  <div class="legend"><b>gold</b> = now playing · amber = probe-adjudicated timing · dotted = no timing shipped</div>
+  <div class="legend"><b>gold</b> = now playing · amber = probe-adjudicated timing · dashed = REVIEW (ships, unproven) · dotted = no timing shipped</div>
 </header>
 <main>
 ${body}

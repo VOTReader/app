@@ -121,6 +121,29 @@ class AssetErrors(unittest.TestCase):
         self.assertEqual(bas.asset_errors(keys, last, dict(spoken, c=(0.0, 1.0, 0, 4))), [])
 
 
+class ForceForgetsTheSkippedLetters(unittest.TestCase):
+    """al5 (sweep 2026-10-13, low): the .skipped.json sidecar stuck through --force, so a re-run meant to start clean
+    still dropped the letters an older recording skipped; and a section with no letter left crashed on keys[0]."""
+
+    def test_force_forgets_the_sidecar_and_a_plain_run_honours_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "sections__F1.json")
+            with open(path + ".skipped.json", "w", encoding="utf-8") as fh:
+                json.dump(["b"], fh)
+            keys = [("a", 1), ("b", 2), ("c", 3)]
+            self.assertEqual(bas.letters_to_belt(keys, path, force=False), ([("a", 1), ("c", 3)], {"b"}))
+            self.assertEqual(bas.letters_to_belt(keys, path, force=True), (keys, set()))
+            self.assertFalse(os.path.exists(path + ".skipped.json"), "a forced run's own finding replaces the old one")
+
+    def test_no_letter_left_is_a_failure_line_not_a_crash(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "sections__F1.json")
+            with open(path + ".skipped.json", "w", encoding="utf-8") as fh:
+                json.dump(["a"], fh)
+            self.assertEqual(bas.letters_to_belt([("a", 1)], path, force=False), ([], {"a"}))
+            self.assertEqual(bas.letters_to_belt([], path, force=False), ([], {"a"}))
+
+
 class GateSeesSectionOrder(unittest.TestCase):
     """tools/check-audio-sync.js on the committed fixture, both arms (~4 s each)."""
 
