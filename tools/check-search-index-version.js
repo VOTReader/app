@@ -115,7 +115,18 @@ if (existsSync(lockPath)) {
 
 // In sync.
 if (lock && lock.hash === digest) {
-  if (lock.version !== indexVersion && !checkOnly) {
+  // A version bumped with no code change, committed without the hook that syncs the lock, left the lock a
+  // version behind; the next UNBUMPED change to this code then read as "bumped" (lock.version differs from
+  // cache.js's below) and went through (sweep low, REPORT.md:649). The lock that reaches main names the
+  // version its code shipped under.
+  if (lock.version !== indexVersion && checkOnly) {
+    fail(
+      `Search-index lock out of sync: it names MS_INDEX_VERSION='${lock.version}' but cache.js says '${indexVersion}'\n` +
+      '    (the index-shaping code is unchanged). Run `node tools/check-search-index-version.js` locally and\n' +
+      '    commit the updated tools/search-index-version.lock.'
+    );
+  }
+  if (lock.version !== indexVersion) {
     writeLock();
     console.log(`[search-index-version] MS_INDEX_VERSION=${indexVersion} (search code unchanged) — lock version synced.`);
   } else {
