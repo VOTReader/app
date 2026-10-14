@@ -268,17 +268,21 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                 const key = srcKey + ':' + item.id;
                 const renditions = AudioPlayer.renditionsFor(srcKey, item, label);
                 const primary = renditions[0] || null;
+                // The reading the row's own Play plays and its Download saves (the Letter Voice where that reader
+                // recorded it, ra5): the row names ITS reader, parts and time left, not the manifest primary's.
+                const plays = ownTracks(item);
+                const reading = (plays[0] && renditions.find((r) => r.tracks[0] && r.tracks[0].url === plays[0].url)) || primary;
                 const isCurrent = !!(current && current.key === key);
                 const rowPlaying = isCurrent && live;
-                const parts = primary ? primary.tracks.length : 0;
-                const reader = primary ? AudioPlayer.readerLabel(primary.reader) : null;
+                const parts = reading ? reading.tracks.length : 0;
+                const reader = reading ? AudioPlayer.readerLabel(reading.reader) : null;
                 // A Bible book's "parts" ARE its chapters — every shipped
                 // edition is recorded one chapter at a time — and the row's own
                 // disclosure below already calls them that (B2, 2026-08-10).
                 const meta = [parts > 1 ? parts + (bible ? ' chapters' : ' parts') : null, reader].filter(Boolean).join(' · ');
-                const remaining = primary ? renditionRemainingLabel(primary.tracks) : '';
+                const remaining = reading ? renditionRemainingLabel(reading.tracks) : '';
                 const voicesOpen = openVoices === item.id;
-                const own = offline ? ownTracks(item) : [];
+                const own = offline ? plays : [];
                 // No signal and not on the phone: the row cannot play (item 8).
                 const unavailable = !!offline && !online && !(own.length && own.every((t) => offline.isSaved(t.url)));
                 // A per-chapter Bible book is a list of recordings, not one:

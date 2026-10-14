@@ -282,6 +282,27 @@ describe('AudioCollectionScreen -- a Bible edition', () => {
   });
 });
 
+/* ra5 follow-up (2026-10-14): with a Letter Voice chosen, a row's Play plays that reader's reading where they recorded
+   it (and its Download saves it), so the row names THAT reader, its parts and its time, never the primary's. */
+describe('AudioCollectionScreen -- the row names the reading its Play plays', () => {
+  afterEach(() => AudioPlayer.setPreferredReader('auto'));
+
+  it('names the Letter Voice reader where that reader recorded the letter, the primary elsewhere', () => {
+    AudioPlayer.setPreferredReader('V');
+    renderScreen('one');
+    const metas = [...document.querySelectorAll('.audio-library-row-copy small')].map((e) => e.textContent);
+    expect(metas).toEqual(['Read by Benjamin', '2 parts · Text-to-speech']);
+    fireEvent.click(screen.getByRole('button', { name: 'Play Letter C' }));
+    expect(AudioPlayer.getState().queue[0].readerCode).toBe('V');   // what the row said
+  });
+
+  it('Automatic names the primary reading', () => {
+    renderScreen('one');
+    const metas = [...document.querySelectorAll('.audio-library-row-copy small')].map((e) => e.textContent);
+    expect(metas).toEqual(['Read by Benjamin', '2 parts · Read by Timothy']);
+  });
+});
+
 describe('AudioCollectionScreen -- defensive states', () => {
   it('an unknown volKey renders a way back instead of a blank screen', () => {
     renderScreen('nine');
