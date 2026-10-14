@@ -501,11 +501,12 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   }, [query]);
 
   // Record a query as "recent" only on an explicit commit (Enter or tapping a
-  // result) — never per keystroke. Needs >=2 alphanumerics + history enabled.
+  // result) — never per keystroke. Needs >=2 letters or digits (any script: a Greek or Hebrew word
+  // counted none under [a-z0-9] and was never kept, sweep low) + history enabled.
   const recordSearch = () => {
     if (settings.historyEnabled === false) return;
     const q = (query || '').trim();
-    if (q.replace(/[^a-z0-9]/gi, '').length < 2) return;
+    if (q.replace(/[^\p{L}\p{N}]/gu, '').length < 2) return;
     if (typeof window.addRecentSearch === 'function') setRecents(window.addRecentSearch(q));
   };
 

@@ -812,6 +812,25 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     expect(screen.getByText('mercy')).toBeTruthy();
   });
 
+  /* Recent searches dropped any query without two ASCII letters (sweep low, REPORT.md:647): a Greek or
+     Hebrew word, typed and committed, was never kept. Letters and digits of any script count. */
+  it('a committed query in another script is kept as a recent search', () => {
+    const add = vi.fn((q) => [q]);
+    /** @type {any} */ (window).addRecentSearch = add;
+    try {
+      render(<SearchScreen {...baseProps()} query="ἀγάπη" settings={{ historyEnabled: true }} />);
+      fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' });
+      expect(add).toHaveBeenCalledWith('ἀγάπη');
+      add.mockClear();
+      cleanup();
+      render(<SearchScreen {...baseProps()} query="? !" settings={{ historyEnabled: true }} />);
+      fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' });
+      expect(add, 'punctuation alone is still not a search to keep').not.toHaveBeenCalled();
+    } finally {
+      delete /** @type {any} */ (window).addRecentSearch;
+    }
+  });
+
   it('a slow older query resolving late cannot overwrite the newer results (stale guard)', async () => {
     vi.useFakeTimers();
     // Per-query controllable promises: "mercy" is held open, "grace" resolves
