@@ -250,5 +250,15 @@ def main():
         return 1
 
 
+RETIRED = """flock-audio-sync.py is RETIRED (2026-10-14, al3; sweep 2026-10-13 low item).
+Its scheduled task 'vot-audio-app-sync' no longer exists and its last run was 2026-09-01. Audio intake
+runs through D:/FlockSync/audio_watch.py (task vot-audio-watch: sweep, verify, upload) and the align
+lane's D:/Swarm/lanes/align/tools/audio_rewatch.py (task vot-audio-rewatch: re-mirror and re-time a
+changed file in one data commit), which land through D:/Swarm/tools/land.sh. Left runnable, this
+script would commit to main outside that path and abort on its own coverage sidecar
+(tools/audio-manifest-coverage.json is not in OWN_PATHS). Its helpers stay importable."""
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    print(RETIRED, file=sys.stderr)
+    sys.exit(2)

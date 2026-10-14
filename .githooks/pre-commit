@@ -16,6 +16,9 @@
 #      can LAN-expose the tree is a defect. CI runs this on every push.
 #   1d. test_batch_align_ship.py + test_batch_align_bible_ship.py when either
 #      shipper or either test changes.
+#      test_align_pipeline.py rides along (2026-10-14, al3): the aligner's and
+#      the release mirror's caches keep whole files only, a truncated
+#      transcript's tail is REVIEW and its belt never current.
 #      batch-align.py's ship() rebuilds audio-sync.js from its run report, so
 #      a letter that raised — or that align-supervisor.py skipped for memory —
 #      used to be deleted from the shipped file. Coverage only goes up.
@@ -492,10 +495,10 @@ fi
 # ReadAlongHighlight._bibleRowsFor reads position i back as verse NUMBER i + 1,
 # so the two ends meet by verse identity. Re-indexing that array by position
 # shifts every verse after a gap by one for the rest of the chapter, silently.
-ship_changed=$(echo "$staged" | grep -E '^(tools/batch-align\.py|test_batch_align_ship\.py|tools/batch-align-bible\.py|test_batch_align_bible_ship\.py|test_batch_align_bible_drive_index\.py|tools/batch-align-sections\.py|test_batch_align_sections\.py|tools/check-audio-sync\.js|tools/fixtures/audio-sync-sections\.fixture\.js|tools/_alignlib\.py)$' || true)
+ship_changed=$(echo "$staged" | grep -E '^(tools/batch-align\.py|test_batch_align_ship\.py|tools/batch-align-bible\.py|test_batch_align_bible_ship\.py|test_batch_align_bible_drive_index\.py|tools/batch-align-sections\.py|test_batch_align_sections\.py|tools/check-audio-sync\.js|tools/fixtures/audio-sync-sections\.fixture\.js|tools/_alignlib\.py|tools/hone-align\.py|tools/hone-bible\.py|tools/hone-verify\.py|tools/mirror-audio-release\.py|test_align_pipeline\.py)$' || true)
 if [ -n "$ship_changed" ]; then
   echo "[pre-commit] Read-along shipper changed — running the shipper tests..."
-  $PYBIN -m unittest test_batch_align_ship test_batch_align_bible_ship test_batch_align_bible_drive_index test_batch_align_sections
+  $PYBIN -m unittest test_batch_align_ship test_batch_align_bible_ship test_batch_align_bible_drive_index test_batch_align_sections test_align_pipeline
   status=$?
   if [ $status -ne 0 ]; then
     echo ""

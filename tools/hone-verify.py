@@ -125,18 +125,25 @@ def load_belt(path):
     else:
         raise SystemExit("hone-verify: %s has neither 'verses' nor 'results'" % path)
 
+    # Letters ship 'ship_t' -- the belt's 't' after run_belt's per-part monotonic
+    # clamp -- and read it here first (W72, sweep 2026-10-13): reading 't' measured
+    # an onset the app never paints on every clamped row. A row with no ship_t in a
+    # belt that has them did not ship. Belts written before ship_t existed, and the
+    # Bible's (which ship 't'), keep the old reading.
+    has_ship_t = kind == "letters" and any(isinstance(r, dict) and "ship_t" in r for r in rows)
     units = []
     for i, r in enumerate(rows):
         if not isinstance(r, dict):
             continue
         label = r.get(label_key, r.get("n", r.get("fi", i)))
-        # shipped onset: bible ships 't'; letters ship 'ship_t' (falls back to
-        # the raw leg onset on legacy rows written before ship_t existed).
-        t = r.get("t")
-        if t is None:
+        if has_ship_t:
             t = r.get("ship_t")
-        if t is None:
-            t = r.get("start")
+        else:
+            t = r.get("t")
+            if t is None:
+                t = r.get("ship_t")
+            if t is None:
+                t = r.get("start")
         tA, tB = r.get("tA"), r.get("tB")
         delta = r.get("delta")
         if delta is None and tA is not None and tB is not None:
@@ -331,6 +338,14 @@ def run(cmd):
                          % (p.returncode, " ".join(str(c) for c in cmd),
                             p.stderr.decode("utf-8", "replace")[-2000:]))
     return p
+
+
+def audio_tag(audio):
+    """The probe cache's name for ONE recording: its file name plus its byte size.
+    It was taken from base_wav's output, which is "_base.16k.wav" for every run,
+    so a part-1 run replayed part-0's clip transcripts (W72, sweep 2026-10-13)."""
+    p = Path(audio)
+    return "%s_%x" % (re.sub(r"[^A-Za-z0-9]+", "", p.stem)[-24:], p.stat().st_size)
 
 
 def base_wav(ffmpeg, audio, tmpdir):
@@ -568,7 +583,7 @@ def probe_units(args, kind, chosen, tmpdir):
         # Cache key MUST carry the audio identity: multi-part letters verify the
         # same unit labels against different recordings (a same-key replay once
         # served part-0 clips to a part-1 run and faked a 70% miss rate).
-        aud_tag = re.sub(r"[^A-Za-z0-9]+", "", Path(src).stem)[-24:]
+        aud_tag = audio_tag(args.audio)
         cache = cache_dir / ("u%s_%s_%s_%.2f.json" % (u["label_key"], u["label"], aud_tag, start))
         tx = leg.transcribe_words(str(clip), str(cache))
         words = (tx or {}).get("words") or []
