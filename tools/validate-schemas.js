@@ -32,7 +32,7 @@ import { splitFormatBInline } from '../app/src/main/assets/src/utils/format-b-in
 import { deltaRuns } from './scripture-web-lib.mjs';
 // The SAME counting module the app ships (word-count.js) — the baseline gate
 // and every in-app display derive from one definition, so they cannot drift.
-import { countItemWords } from '../app/src/main/assets/src/utils/word-count.js';
+import { countItemWords, countTextWords } from '../app/src/main/assets/src/utils/word-count.js';
 
 // Consume Format B inline markup the SAME way WtlbEntryView.renderLine does
 // (same splitter → no drift), returning the VISIBLE text. A leftover `_` or `**`
@@ -2081,6 +2081,46 @@ function emit(result, label, count, noun, extra) {
    plus the NKJV base + matthew-plain + books-restored text. Generated
    translation maps are excluded — validateTranslationCompleteness
    already guards those, and their generator owns their content. */
+/**
+ * Word-ledger keys for a Format C file: `[bookKey:chapterNum, chapter]` per
+ * chapter. A file is an array of books, one book (matthew-plain.js), or an
+ * object keyed by book id whose books carry no `id` (books-restored.js), so
+ * the key is the book's id, else its object key (W75: Object.values dropped
+ * the key and every restored chapter collapsed onto "?:N").
+ * @param {any} books
+ * @returns {Array<[string, any]>}
+ */
+export function formatCChapterKeys(books) {
+  /** @type {Array<[string, any]>} */
+  const out = [];
+  if (!books || typeof books !== 'object') return out;
+  /** @type {Array<[string, any]>} */
+  const pairs = Array.isArray(books) ? books.map((b) => [b && b.id, b])
+    : books.chapters ? [[books.id, books]]
+    : Object.entries(books);
+  for (const [key, b] of pairs) {
+    if (!b || !Array.isArray(b.chapters)) continue;
+    const bookKey = b.id || key || '?';
+    for (const ch of b.chapters) out.push([`${bookKey}:${ch && ch.num}`, ch]);
+  }
+  return out;
+}
+
+/**
+ * Words of a Format C chapter's chrome: its title plus every section heading.
+ * The ledger's measure for chromeOnly files (books-restored.js), whose
+ * chapters hold no verses; countItemWords counts verse text only, so it
+ * weighed every restored chapter 0 and no chrome edit moved the gate (W75).
+ * @param {any} ch
+ * @returns {number}
+ */
+export function formatCChromeWords(ch) {
+  if (!ch || typeof ch !== 'object') return 0;
+  let n = countTextWords(ch.title);
+  if (Array.isArray(ch.sections)) for (const s of ch.sections) n += countTextWords(s && s.heading);
+  return n;
+}
+
 function _createWordLedger() {
   /** @type {Record<string, Record<string, number>>} */
   const byCollection = {};
@@ -2228,14 +2268,11 @@ function runCli() {
     const n = Array.isArray(books) ? books.length : (books.chapters ? 1 : Object.keys(books).length);
     add(result, n);
     emit(result, label, n, 'books', entry.chromeOnly ? ' (chrome)' : '');
-    // Word ledger: one entry per chapter (chromeOnly files count their
-    // heading/title chrome — that overlay text is audited content too).
-    {
-      const bookArr = Array.isArray(books) ? books : (books.chapters ? [books] : Object.values(books));
-      for (const b of bookArr) {
-        if (!b || !Array.isArray(b.chapters)) continue;
-        for (const ch of b.chapters) wordLedger.add(label, `${b.id || '?'}:${ch && ch.num}`, countItemWords(ch));
-      }
+    // Word ledger: one entry per chapter. chromeOnly files count their
+    // title/heading chrome (that overlay text is audited content too), which
+    // countItemWords leaves out, so they go through formatCChromeWords.
+    for (const [key, ch] of formatCChapterKeys(books)) {
+      wordLedger.add(label, key, entry.chromeOnly ? formatCChromeWords(ch) : countItemWords(ch));
     }
   }
 
