@@ -33,6 +33,8 @@ import hashlib
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import urllib.request
 
@@ -59,51 +61,77 @@ def js_object(name):
     return _JS[name]
 
 
-_RELEASE_SIZE = {}
+GH = shutil.which("gh") or r"C:\Program Files\GitHub CLI\gh.exe"
+REPO, TAG = "VOTReader/votreader-assets", "audio-v1"
+_RELEASE = {}
 
 
-def release_size(fid):
-    """Byte size of the audio-v1 asset `fid` (one HEAD per asset per process):
-    the identity every per-asset cache here is stamped with. An asset can be
-    REPLACED under its own name (the align lane's re-upload chain deletes and
-    re-uploads it), and these caches were keyed by the name alone, so a re-time
-    after a replace read the old mp3, wav and transcript back and timed the new
-    recording with the old one's clock (W22, sweep 2026-10-13)."""
-    if fid not in _RELEASE_SIZE:
-        req = urllib.request.Request(RELEASE + fid + ".mp3", method="HEAD")
-        with urllib.request.urlopen(req, timeout=60) as r:
-            n = r.headers.get("Content-Length")
-        if not n or int(n) <= 0:
-            raise RuntimeError(f"release asset {fid}.mp3 gave no Content-Length")
-        _RELEASE_SIZE[fid] = int(n)
-    return _RELEASE_SIZE[fid]
+def _list_release():
+    rid = subprocess.run([GH, "api", f"repos/{REPO}/releases/tags/{TAG}", "--jq", ".id"],
+                         capture_output=True, text=True, timeout=120)
+    if rid.returncode != 0 or not (rid.stdout or "").strip():
+        raise RuntimeError(f"cannot read release {TAG}: {(rid.stderr or '').strip()[:160]}")
+    r = subprocess.run([GH, "api", "--paginate", f"repos/{REPO}/releases/{rid.stdout.strip()}/assets?per_page=100",
+                        "--jq", '.[] | [.name, .size, (.digest // "")] | @tsv'],
+                       capture_output=True, text=True, timeout=300)
+    if r.returncode != 0:
+        raise RuntimeError(f"cannot list release {TAG}: {(r.stderr or '').strip()[:160]}")
+    for line in r.stdout.splitlines():
+        name, size, digest = (line.split("\t") + ["", ""])[:3]
+        if name.endswith(".mp3") and digest.startswith("sha256:"):
+            _RELEASE[name[:-4]] = {"size": int(size), "sha256": digest[len("sha256:"):]}
+
+
+def release_asset(fid):
+    """{"size", "sha256"} of audio-v1's <fid>.mp3 -- GitHub's own digest of its
+    bytes, read from one listing of the release per process (again only for an
+    id that listing lacked). The digest is the identity every per-asset cache
+    here is stamped with. An asset can be REPLACED under its own name (the align
+    lane's re-upload chain deletes and re-uploads it), and these caches were
+    keyed by the name alone, so a re-time after a replace read the old mp3, wav
+    and transcript back and timed the new recording with the old one's clock
+    (W22, sweep 2026-10-13). A byte size was not enough: a same-length re-encode
+    keeps it (refuter r1)."""
+    if fid not in _RELEASE:
+        _list_release()
+    if fid not in _RELEASE:
+        raise RuntimeError(f"{fid}.mp3 is not on {TAG} with a digest: nothing vouches for its bytes")
+    return _RELEASE[fid]
+
+
+def _sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def ensure_wav(fid):
     """16k mono wav for a release asset id, downloading the mp3 if we lack it.
 
-    Whole files only (W22): the mp3 downloads to a .part and is renamed only at
-    the release's byte size, and to_wav16k does the same for the wav. They used
-    to write the final paths, and anything over 0 / 44 bytes was reused on every
-    later run -- an interrupted download aligned that letter against cut-off
-    audio for good, its tail dark. The wav (and its silence map) is trusted only
-    beside <fid>.src.json naming the mp3 size it was made from, so a replaced
-    release asset rebuilds every cache made from the old bytes."""
+    Whole files only (W22): the mp3 downloads to a .part and is renamed only when
+    it hashes to the release's digest, and to_wav16k does the same for the wav.
+    They used to write the final paths, and anything over 0 / 44 bytes was reused
+    on every later run -- an interrupted download aligned that letter against
+    cut-off audio for good, its tail dark. The wav (and its silence map) is
+    trusted only beside <fid>.src.json naming the digest of the mp3 it was made
+    from, so a replaced release asset rebuilds every cache made from the old bytes."""
     os.makedirs(AUDIO, exist_ok=True)
-    size = release_size(fid)
+    want = release_asset(fid)
     mp3 = os.path.join(AUDIO, fid + ".mp3")
     wav = os.path.join(AUDIO, fid + ".wav")
     src = os.path.join(AUDIO, fid + ".src.json")
-    if (al.load_json(src) or {}).get("size") == size and al.wav_complete(wav):
+    if (al.load_json(src) or {}).get("sha256") == want["sha256"] and al.wav_complete(wav):
         return wav
-    if not (os.path.exists(mp3) and os.path.getsize(mp3) == size):
+    if not (os.path.exists(mp3) and os.path.getsize(mp3) == want["size"] and _sha256(mp3) == want["sha256"]):
         print(f"  downloading {fid}.mp3 ...")
         part = mp3 + ".part"
         try:
             urllib.request.urlretrieve(RELEASE + fid + ".mp3", part)   # ContentTooShortError on a short read
             got = os.path.getsize(part)
-            if got != size:
-                raise RuntimeError(f"{fid}.mp3: downloaded {got} B, the release serves {size} B")
+            if got != want["size"] or _sha256(part) != want["sha256"]:
+                raise RuntimeError(f"{fid}.mp3: downloaded {got} B that do not hash to the release digest")
             os.replace(part, mp3)
         finally:
             if os.path.exists(part):
@@ -112,7 +140,7 @@ def ensure_wav(fid):
         if os.path.exists(stale):
             os.remove(stale)
     al.to_wav16k(mp3, wav, rebuild=True)
-    al.dump_json(src, {"size": size})
+    al.dump_json(src, {"sha256": want["sha256"], "size": want["size"]})
     return wav
 
 
@@ -258,7 +286,7 @@ def run_legacy(key, s):
     results, tuples = [], []
     for part, (fid, _label) in enumerate(tracks):
         wav = ensure_wav(fid)
-        tx = whisper.transcribe_words(wav, tx_cache(fid, s), stamp=release_size(fid))
+        tx = whisper.transcribe_words(wav, tx_cache(fid, s), stamp=release_asset(fid)["sha256"])
         words = tx["words"]
         nrm = al.match_normalizer(s, words)
         cols, owner = [], []
@@ -360,7 +388,7 @@ def run_belt(key, s, asset=None):
         A = mms.align(wav, units)
         print(f"    {len(A)}/{len(units)} placed")
         print(f"  leg B: {s['whisper_model']} + global match ...")
-        stamp = release_size(fid)            # the caches answer for THIS release's bytes (W22)
+        stamp = release_asset(fid)["sha256"]   # the caches answer for THIS release's bytes (W22)
         tx = whisper.transcribe_words(wav, tx_cache(fid, s), stamp=stamp)
         nrm = al.match_normalizer(s, tx["words"])
         cols, owners = [], []

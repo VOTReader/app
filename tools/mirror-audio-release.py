@@ -56,9 +56,44 @@ def find_rclone():
 
 RCLONE = find_rclone()
 
+# The daily Drive sweep (D:/FlockSync/audio_watch.py: rclone lsjson --hash, 05:30): size and md5 of every
+# file, the same record the live intake and the align lane's re-upload chain verify against.
+DRIVE_LISTING = os.environ.get("VOT_DRIVE_LISTING", r"D:\FlockSync\audio-watch\listing.json")
+
+
+def drive_files():
+    """{fid: {"size", "md5", ...}} from the sweep listing, or {} when it is missing or unreadable."""
+    try:
+        files = json.load(open(DRIVE_LISTING, encoding="utf-8")).get("files") or {}
+    except (OSError, ValueError, AttributeError):
+        return {}
+    return {fid: f for fid, f in files.items() if isinstance(f, dict) and f.get("size")}
+
+
+def _md5(path):
+    import hashlib
+    h = hashlib.md5()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def not_drives_file(path, want):
+    """None when `path` is byte for byte the Drive file `want` describes, else why not. This, not a
+    decode, is what stops a cut-off file: ffmpeg decodes an mp3 cut at 5,000,000 of its 11,914,052
+    bytes without one error and reports a plausible duration (refuter r1, 2026-10-14)."""
+    got = os.path.getsize(path)
+    if got != want["size"]:
+        return f"{got} B staged vs {want['size']} B on Drive"
+    if want.get("md5") and _md5(path) != want["md5"]:
+        return "same size, but not Drive's md5"
+    return None
+
 # EVERY downloader below writes <fid>.mp3.part and renames it to <fid>.mp3 only
-# when the transfer finished whole, and main() uploads a staged file only once it
-# decodes end to end (_playable). They used to write <fid>.mp3 directly and count
+# when the transfer finished whole, and main() uploads a staged file only once it is
+# Drive's file byte for byte (size and md5 from the sweep listing: not_drives_file)
+# and decodes end to end (_playable). They used to write <fid>.mp3 directly and count
 # any size > 0 as done, so a transfer cut off part-way -- or a third failed retry
 # that left half a file -- could go up to audio-v1, which is append-only: readers
 # would hear that letter stop early, and the next run would skip it as mirrored
@@ -266,22 +301,30 @@ def main():
         todo.reverse()
     if limit:
         todo = todo[:limit]
-    print(f"to mirror: {len(todo)}{' (dry run)' if dry else ''}")
-    if not todo:
+    # Nothing goes up that the Drive sweep cannot vouch for byte for byte.
+    drive = drive_files()
+    unknown = [f for f in todo if f not in drive]
+    for f in unknown:
+        print(f"  REFUSING {f}: the Drive sweep listing ({DRIVE_LISTING}) has no size for it, so a whole "
+              "copy cannot be told from a cut-off one -- wait for the next sweep")
+    todo = [f for f in todo if f in drive]
+    print(f"to mirror: {len(todo)}{' (dry run)' if dry else ''}"
+          + (f"; {len(unknown)} refused (not in the Drive sweep)" if unknown else ""))
+    if not todo and not unknown:
         print("NOTHING TO MIRROR — every id in this tree's manifest is already on the release.")
         print("  If you expected uploads, check you are in the worktree whose manifest")
         print("  carries the new ids; this tool reads the tree it runs in.")
     if dry:
         for i in todo[:10]:
             print("  would mirror", i)
-        return 0
+        return 2 if unknown else 0
 
     os.makedirs(STAGING, exist_ok=True)
     rid = release_id()
     use_rclone = os.path.exists(RCLONE)
     session = None if use_rclone else _cookie_session()
     print("downloader: " + ("rclone (owner OAuth)" if use_rclone else "authed cookies" if session else "anonymous gdown"))
-    ok = fail = 0
+    ok, fail = 0, len(unknown)
     n = 0
     BATCH = 10
     for b in range(0, len(todo), BATCH):
@@ -292,8 +335,12 @@ def main():
         for fid in batch:
             n += 1
             dst = os.path.join(STAGING, fid + ".mp3")
-            if os.path.exists(dst) and not _playable(dst):
-                print(f"  [{n}/{len(todo)}] staged {fid} does not decode whole -- fetching it again")
+
+            def why_not(path):
+                return not_drives_file(path, drive[fid]) or (None if _playable(path) else "does not decode whole")
+            why = os.path.exists(dst) and why_not(dst)
+            if why:
+                print(f"  [{n}/{len(todo)}] staged {fid}: {why} -- fetching it again")
                 os.remove(dst)
             if not os.path.exists(dst):
                 # rclone missed it (or non-rclone path) — per-file fallback.
@@ -308,9 +355,10 @@ def main():
                     except Exception as e:
                         print(f"  [{n}/{len(todo)}] download error {fid} (attempt {attempt}): {str(e).splitlines()[0][:120]}")
                     if os.path.exists(dst):
-                        if _playable(dst):
+                        why = why_not(dst)
+                        if not why:
                             break
-                        print(f"  [{n}/{len(todo)}] {fid} (attempt {attempt}) does not decode whole")
+                        print(f"  [{n}/{len(todo)}] {fid} (attempt {attempt}): {why}")
                         os.remove(dst)
                     time.sleep(5 * attempt)
                 if not os.path.exists(dst):
