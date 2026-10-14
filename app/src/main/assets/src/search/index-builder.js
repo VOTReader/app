@@ -80,6 +80,9 @@ function collectStudyText(node, out) {
     // segment's `v` put footnote numbers in the body and left out every
     // letter-link's label (109 in study paragraphs).
     if (node.segments) out.push(segmentsReadText(node.segments));
+    // A poetry block reads line by line, as a letter's does: 71 study poems were on screen and
+    // unsearchable, since nothing walked their `lines` (sweep W30).
+    if (node.lines) out.push(blockReadText({ lines: node.lines }));
     if (node.v && node.t !== 'fn') out.push(node.v);
   }
 }

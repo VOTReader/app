@@ -50,7 +50,10 @@ const GLOBALS = {
   // segments with `v`), never `content`. The old `content: [{ text }]` fixture
   // was a shape bible-studies.js never had, so every study doc's body was EMPTY
   // in the real index (title-only hits) while this suite stayed green.
-  BIBLE_STUDIES: [{ id: 'study-faith', slug: 'study-faith', title: 'On Faith', chapters: [{ id: 'study-faith-ch1', num: 1, title: 'Beginnings', blocks: [{ type: 'para', segments: [{ t: 'text', v: 'Faith is the substance of things hoped for.' }] }] }] }],
+  BIBLE_STUDIES: [{ id: 'study-faith', slug: 'study-faith', title: 'On Faith', chapters: [{ id: 'study-faith-ch1', num: 1, title: 'Beginnings', blocks: [{ type: 'para', segments: [{ t: 'text', v: 'Faith is the substance of things hoped for.' }] },
+    // a poem, as 71 study chapters carry them (sweep W30)
+    { type: 'poetry', lines: [[{ t: 'text', v: 'Come, all those who know not My ways;' }], [{ t: 'text', v: '' }], [{ t: 'text', v: 'I will show you.' }, { t: 'fn', v: '3' }]] },
+    { type: 'para', segments: [{ t: 'text', v: 'And so it ends.' }] }] }] }],
 };
 
 describe('buildDocs (narrow index scope)', () => {
@@ -176,6 +179,11 @@ describe('buildDocs (narrow index scope)', () => {
     // `id` ('study-faith-ch1'), not by number — a hit dispatched on `chapterNum`
     // alone opened nothing (read-along find, 2026-09-22).
     expect(study.studyChapterId).toBe('study-faith-ch1');
+  });
+
+  it('a study chapter’s poem is in its body, line by line in reading order (sweep W30)', () => {
+    const study = docs.find((d) => d.kind === 'bible-study');
+    expect(study.text).toBe('Faith is the substance of things hoped for. Come, all those who know not My ways; I will show you. And so it ends.');
   });
 });
 
