@@ -17,6 +17,7 @@ Sweep 2026-10-13 (D:/AgentBackbone/reports/votreader-sweep-2026-10-13/REPORT.md)
 
 No model, no GPU, no network: subprocess, urllib and the whisper legs are stubs.
 """
+import hashlib
 import importlib.util
 import json
 import os
@@ -115,60 +116,78 @@ class ToWavNeverReusesHalfAWav(_Tmp):
 
 
 class EnsureWavTrustsOnlyTheReleasesBytes(_Tmp):
-    SIZE = 1000
+    """The release asset's identity is GitHub's sha256 digest of its bytes (refuter r1: a byte
+    size misses a same-length re-encode, which audio_rewatch re-uploads under the same name)."""
+    BYTES = b"m" * 1000
 
     def setUp(self):
         super().setUp()
         self.patch(ha, "AUDIO", self.d)
-        self.patch(ha, "release_size", lambda fid: self.SIZE)
+        self.want = {"size": len(self.BYTES), "sha256": hashlib.sha256(self.BYTES).hexdigest()}
+        self.real_release_asset = ha.release_asset
+        self.patch(ha, "release_asset", lambda fid: self.want)
         self.ff = FakeFfmpeg()
         self.patch(al.subprocess, "run", self.ff)
         self.downloads = []
+        self.served = self.BYTES
 
-        def fetch(url, path, n=self.SIZE):
+        def fetch(url, path):
             self.downloads.append(path)
-            open(path, "wb").write(b"m" * self.fetch_size)
+            open(path, "wb").write(self.served)
             return path, {}
-        self.fetch_size = self.SIZE
         self.patch(ha.urllib.request, "urlretrieve", fetch)
         self.mp3, self.wav = os.path.join(self.d, "F.mp3"), os.path.join(self.d, "F.wav")
+        self.src = os.path.join(self.d, "F.src.json")
 
     def test_a_partial_mp3_at_the_final_path_is_fetched_again(self):
-        open(self.mp3, "wb").write(b"m" * 400)
+        open(self.mp3, "wb").write(self.BYTES[:400])
         ha.ensure_wav("F")
         self.assertEqual(len(self.downloads), 1, "a cut-off mp3 was converted as it was")
-        self.assertEqual(os.path.getsize(self.mp3), self.SIZE)
+        self.assertEqual(open(self.mp3, "rb").read(), self.BYTES)
         self.assertNotEqual(self.downloads[0], self.mp3, "the download wrote the final path directly")
 
-    def test_a_short_download_raises_and_leaves_nothing(self):
-        self.fetch_size = 600
-        with self.assertRaises(Exception):
-            ha.ensure_wav("F")
-        self.assertEqual(os.listdir(self.d), [], "a short download stayed where the next run trusts it")
+    def test_a_short_or_wrong_download_raises_and_leaves_nothing(self):
+        for served in (self.BYTES[:600], b"n" * 1000):
+            self.served = served
+            with self.assertRaises(Exception):
+                ha.ensure_wav("F")
+            self.assertEqual(os.listdir(self.d), [], "a download that is not the release's bytes stayed")
 
     def test_a_stamped_cache_of_the_same_release_is_reused(self):
-        open(self.mp3, "wb").write(b"m" * self.SIZE)
+        open(self.mp3, "wb").write(self.BYTES)
         open(self.wav, "wb").write(wav_bytes())
-        json.dump({"size": self.SIZE}, open(os.path.join(self.d, "F.src.json"), "w"))
+        json.dump({"sha256": self.want["sha256"]}, open(self.src, "w"))
         self.assertEqual(ha.ensure_wav("F"), self.wav)
         self.assertEqual((self.downloads, self.ff.calls), ([], []))
 
     def test_a_replaced_release_asset_rebuilds_every_cache(self):
-        open(self.mp3, "wb").write(b"m" * 900)                 # the recording before the replace
+        old = b"o" * 1000                                       # same length: a re-encode, re-uploaded
+        open(self.mp3, "wb").write(old)
         open(self.wav, "wb").write(wav_bytes(2.0))
         open(self.wav + ".sil.json", "w").write("[[0.0, 1.0]]")
-        json.dump({"size": 900}, open(os.path.join(self.d, "F.src.json"), "w"))
+        json.dump({"sha256": hashlib.sha256(old).hexdigest()}, open(self.src, "w"))
         ha.ensure_wav("F")
-        self.assertEqual(len(self.downloads), 1)
+        self.assertEqual(len(self.downloads), 1, "the old recording's mp3 was kept: same size, other bytes")
         self.assertEqual(len(self.ff.calls), 1, "the old recording's wav was kept")
         self.assertFalse(os.path.exists(self.wav + ".sil.json"), "the old recording's silence map was kept")
-        self.assertEqual(json.load(open(os.path.join(self.d, "F.src.json")))["size"], self.SIZE)
+        self.assertEqual(json.load(open(self.src))["sha256"], self.want["sha256"])
 
     def test_an_unstamped_wav_is_not_trusted(self):
-        open(self.mp3, "wb").write(b"m" * self.SIZE)
+        open(self.mp3, "wb").write(self.BYTES)
         open(self.wav, "wb").write(wav_bytes(2.0))
         ha.ensure_wav("F")
         self.assertEqual(len(self.ff.calls), 1, "a wav nothing ties to these bytes was reused")
+
+    def test_the_release_listing_gives_size_and_digest(self):
+        listing = "\n".join(["A.mp3\t1000\tsha256:" + "a" * 64, "B.mp3\t5\t", "notes.txt\t3\tsha256:" + "b" * 64])
+
+        def gh(argv, **k):
+            return subprocess.CompletedProcess(argv, 0, "77\n" if argv[-1] == ".id" else listing + "\n", "")
+        self.patch(ha.subprocess, "run", gh)
+        self.patch(ha, "_RELEASE", {})
+        self.assertEqual(self.real_release_asset("A"), {"size": 1000, "sha256": "a" * 64})
+        with self.assertRaises(RuntimeError):
+            self.real_release_asset("B")                               # no digest: nothing to vouch for its bytes
 
 
 # ---------------------------------------------- W22 + W23: the belt's wiring --
@@ -202,7 +221,7 @@ class RunBeltStampsWhatItHeard(_Tmp):
         self.patch(ha, "js_object", lambda name: {"AUDIO_MANIFEST": {"one:x": [["F", "B"]]},
                                                    "AUDIO_ALTERNATES": {}}[name])
         self.patch(ha, "ensure_wav", lambda fid: os.path.join(self.d, fid + ".wav"))
-        self.patch(ha, "release_size", lambda fid: 1234)
+        self.patch(ha, "release_asset", lambda fid: {"size": 1234, "sha256": "d1g"})
         self.whisper = FakeWhisper(tx)
         self.patch(ha, "_legs", lambda s: (self.whisper, FakeMMS([1.0, 4.0, 9.0, 12.0])))
         self.sil = []
@@ -212,8 +231,8 @@ class RunBeltStampsWhatItHeard(_Tmp):
 
     def test_the_caches_are_asked_for_this_release(self):
         d = self._run({"words": [["alpha", 1.0, 1.3], ["beta", 1.3, 1.6], ["gamma", 1.6, 2.0]], "dur": 14.0})
-        self.assertEqual(self.whisper.calls[0]["stamp"], 1234, "the transcript cache was read by asset id alone")
-        self.assertEqual(self.sil, [1234], "the silence map was read by wav path alone")
+        self.assertEqual(self.whisper.calls[0]["stamp"], "d1g", "the transcript cache was read by asset id alone")
+        self.assertEqual(self.sil, ["d1g"], "the silence map was read by wav path alone")
         self.assertEqual(d["tracks"], ["F"])
         self.assertFalse(d.get("txTruncated"))
 
@@ -314,8 +333,13 @@ mar = _load("mirror_audio_release", "mirror-audio-release.py")
 
 
 class MirrorUploadsOnlyWholeFiles(_Tmp):
-    """main() over stub downloaders and a stub upload: nothing short of a whole,
-    decodable file reaches the append-only release."""
+    """main() over stub downloaders and a stub upload: nothing but Drive's own bytes,
+    by size and md5 from the daily sweep listing, reaches the append-only release.
+    _playable is a stub that passes everything: refuter r1 cut a real release mp3 to
+    5,000,000 of its 11,914,052 bytes and ffmpeg decoded it without one error, so the
+    decode check cannot be what stops a truncated file."""
+    WHOLE = b"x" * 1000
+
     def setUp(self):
         super().setUp()
         self.uploads = []
@@ -328,9 +352,19 @@ class MirrorUploadsOnlyWholeFiles(_Tmp):
         self.patch(mar.time, "sleep", lambda s: None)
         self.patch(mar, "RCLONE", os.path.join(self.d, "no-rclone.exe"))
         self.patch(mar, "_cookie_session", lambda: None)
-        self.patch(mar, "_playable", lambda p: os.path.getsize(p) == 1000)
+        self.patch(mar, "_playable", lambda p: True)
+        self.drive = {"FID": {"size": 1000, "md5": hashlib.md5(self.WHOLE).hexdigest()}}
+        self.patch(mar, "drive_files", lambda: self.drive)
         self.patch(sys, "argv", ["mirror-audio-release.py"])
         self.dst = os.path.join(self.d, "FID.mp3")
+        self.got = []
+
+    def _serve(self, body):
+        def download(id=None, output=None, quiet=True):
+            self.got.append(output)
+            open(output, "wb").write(body)
+            return output
+        self.patch(mar.gdown, "download", download)
 
     def test_a_download_that_dies_part_way_is_never_uploaded(self):
         def dies(id=None, output=None, quiet=True):
@@ -342,25 +376,33 @@ class MirrorUploadsOnlyWholeFiles(_Tmp):
         self.assertEqual(os.listdir(self.d), [], "the partial file stayed in staging")
 
     def test_a_whole_download_is_uploaded(self):
-        def whole(id=None, output=None, quiet=True):
-            open(output, "wb").write(b"x" * 1000)
-            return output
-        self.patch(mar.gdown, "download", whole)
+        self._serve(self.WHOLE)
         self.assertEqual(mar.main(), 0)
-        self.assertEqual([len(b) for _p, b in self.uploads], [1000])
+        self.assertEqual([b for _p, b in self.uploads], [self.WHOLE])
 
-    def test_a_staged_file_that_does_not_decode_whole_is_fetched_again(self):
-        open(self.dst, "wb").write(b"x" * 400)                   # left by an older, interrupted run
-        got = []
+    def test_a_cut_off_download_that_still_decodes_is_never_uploaded(self):
+        self._serve(self.WHOLE[:600])                            # gdown returned cleanly with 600 B
+        self.assertEqual(mar.main(), 2)
+        self.assertEqual(self.uploads, [], "a truncated file went up because it decoded")
+        self.assertEqual(os.listdir(self.d), [])
 
-        def whole(id=None, output=None, quiet=True):
-            got.append(output)
-            open(output, "wb").write(b"x" * 1000)
-            return output
-        self.patch(mar.gdown, "download", whole)
+    def test_a_staged_leftover_that_is_not_drives_file_is_fetched_again(self):
+        open(self.dst, "wb").write(self.WHOLE[:400])             # left by an older, in-place writer
+        self._serve(self.WHOLE)
         self.assertEqual(mar.main(), 0)
-        self.assertEqual(len(got), 1, "a cut-off staged file was trusted")
-        self.assertEqual([len(b) for _p, b in self.uploads], [1000])
+        self.assertEqual(len(self.got), 1, "a cut-off staged file was trusted")
+        self.assertEqual([b for _p, b in self.uploads], [self.WHOLE])
+
+    def test_same_size_other_bytes_is_not_drives_file(self):
+        self._serve(b"y" * 1000)
+        self.assertEqual(mar.main(), 2)
+        self.assertEqual(self.uploads, [])
+
+    def test_an_id_the_sweep_has_no_size_for_is_refused_before_any_download(self):
+        self.drive = {}
+        self._serve(self.WHOLE)
+        self.assertEqual(mar.main(), 2)
+        self.assertEqual((self.got, self.uploads), ([], []), "uploaded bytes nothing could vouch for")
 
 
 class MirrorDownloadersPromoteOnlyACompleteTransfer(_Tmp):
@@ -387,6 +429,14 @@ class MirrorDownloadersPromoteOnlyACompleteTransfer(_Tmp):
         self.patch(mar.subprocess, "run", rclone)
         self.assertEqual(mar._rclone_batch(["A", "B"]), [])
         self.assertEqual(os.listdir(self.d), [], "a cut-off rclone transfer was kept")
+
+    def test_drive_files_reads_the_sweep_listing(self):
+        p = os.path.join(self.d, "listing.json")
+        json.dump({"swept": "x", "files": {"A": {"size": 5, "md5": "m"}, "B": {"path": "no size"}}}, open(p, "w"))
+        self.patch(mar, "DRIVE_LISTING", p)
+        self.assertEqual(mar.drive_files(), {"A": {"size": 5, "md5": "m"}})
+        self.patch(mar, "DRIVE_LISTING", os.path.join(self.d, "absent.json"))
+        self.assertEqual(mar.drive_files(), {})
 
     def test_rclone_is_found_on_the_path(self):
         self.patch(mar.shutil, "which", lambda name: r"C:\tools\rclone.exe" if name == "rclone" else None)

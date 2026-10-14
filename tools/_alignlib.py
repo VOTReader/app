@@ -648,8 +648,8 @@ class WhisperLeg:
         is ignored and rewritten. Without it a re-cut chapter -- same tag, new
         bytes -- was re-belted (audioSize is in the resume key) but leg B read
         the old transcript back and every stamp it produced described audio
-        that no longer existed. The letters pass the release asset's byte size
-        (hone-align.release_size): an asset can be REPLACED under its own name.
+        that no longer existed. The letters pass the release asset's sha256
+        (hone-align.release_asset): an asset can be REPLACED under its own name.
 
         A TRUNCATED transcript (below) is returned with `truncated` and `cut`, the
         end of the last word heard, and is never cached; the belt built on it says
