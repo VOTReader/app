@@ -269,7 +269,8 @@ export function useSearch({
       ctx = { kind: 'book', bookId, label: bk ? bk.title : bookId };
     } else {
       const _scCol = COL_BY_LETTER_SC.get(screen) || COL_BY_INDEX_SC.get(screen);
-      if (_scCol) ctx = { kind: 'volume', volumeId: _scCol.searchVolId, label: _scCol.label };
+      // A collection search never indexes offers no scope: kept to it, every search found nothing (sweep W34).
+      if (_scCol && _scCol.indexed !== false) ctx = { kind: 'volume', volumeId: _scCol.searchVolId, label: _scCol.label };
     }
     setSearchContext(ctx);
     setSearchScope(null);

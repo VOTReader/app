@@ -83,6 +83,7 @@ beforeEach(() => {
   };
   window.COL_BY_LETTER_SC = new Map([
     ['vol-two-letter', { volKey: 'two', searchVolId: 'vot-two', label: 'Volume Two' }],
+    ['hm-letter', { volKey: 'hm', searchVolId: 'hidden-manna', label: 'Hidden Manna', indexed: false }],
   ]);
   // [9] index screens offer the scope chip too.
   window.COL_BY_INDEX_SC = new Map([
@@ -223,6 +224,14 @@ describe('useSearch — goSearch', () => {
     act(() => { result.current.goSearch(); });
     const [, setSearchContext] = tabField('searchContext');
     expect(setSearchContext).toHaveBeenCalledWith({ kind: 'volume', volumeId: 'vot-two', label: 'Volume Two' });
+  });
+
+  it('offers no scope from a collection search never indexes (sweep W34)', () => {
+    const tabField = makeTabField();
+    const { result } = setup({ tabField, screen: 'hm-letter' });
+    act(() => { result.current.goSearch(); });
+    const [, setSearchContext] = tabField('searchContext');
+    expect(setSearchContext).toHaveBeenCalledWith(null);
   });
 
   it('[9] builds a book-context from the bible-idx chapter list', () => {

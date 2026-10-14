@@ -106,6 +106,9 @@ describe('COLLECTIONS registry', () => {
     expect(COL_BY_READ_KEY.get('hidden-manna').volKey).toBe('hm');
     expect(COL_BY_SEARCH_ID.get('v2').volKey).toBe('two');
   });
+  it('Hidden Manna, never indexed, is the one collection a search cannot be kept to (sweep W34)', () => {
+    expect(COLLECTIONS.filter(c => c.indexed === false).map(c => c.volKey)).toEqual(['hm']);
+  });
   it('attaches short / shortFromOutside at module load', () => {
     expect(COL_BY_KEY.get('flock').short).toBe('Little Flock');
     expect(COL_BY_KEY.get('one').short).toBe('Volume One'); // default to label

@@ -34,6 +34,8 @@
    Every volume/letter-collection/entry-collection is defined here
    once; all navigation, back-routing, search, last-read tracking,
    and data loading derive from this table.
+   indexed: false = search never indexes it (Hidden Manna, owner policy), so a search
+   opened there offers no "In <collection>" scope (sweep W34).
 ═══════════════════════════════════════════════════════════════ */
 export const COLLECTIONS = [
   { volKey: 'one',     cardId: 'volume-one',        readKey: 'volume-one',      globalName: 'LETTERS_V1',      prefaceGlobal: 'LETTERS_V1_PREFACE',      letterScreen: 'vot-one-letter',     indexScreen: 'vot-one-index',     label: 'Volume One',                                              registryLabel: 'Volume One',                                              searchVolId: 'v1',            kind: 'letter',     surpriseType: 'vot-one' },
@@ -51,7 +53,7 @@ export const COLLECTIONS = [
   { volKey: 'blessed', cardId: 'the-blessed',       readKey: 'the-blessed',     globalName: 'THE_BLESSED',     prefaceGlobal: null,                       letterScreen: 'blessed-entry',      indexScreen: 'blessed-index',     label: 'The Blessed',                                             registryLabel: 'The Blessed',                                             searchVolId: 'blessed',       kind: 'blessed',    surpriseType: 'blessed' },
   { volKey: 'holydays',cardId: 'holy-days',         readKey: 'holy-days',       globalName: 'HOLY_DAYS',       prefaceGlobal: null,                       letterScreen: 'holy-days-entry',    indexScreen: 'holy-days-index',   label: 'Regarding The Holy Days',                                 registryLabel: 'Regarding The Holy Days',                                 searchVolId: 'holydays',      kind: 'holy-days',  surpriseType: 'holydays' },
   { volKey: 'answers', cardId: null,                readKey: 'answers',         globalName: 'ANSWERS',         prefaceGlobal: null,                       letterScreen: 'answers-entry',      indexScreen: 'answers-home',      label: 'Answers Only God Can Give',                               registryLabel: 'Answers Only God Can Give',                               searchVolId: 'answers',       kind: 'wtlb',       surpriseType: null },
-  { volKey: 'hm',      cardId: null,                readKey: 'hidden-manna',    globalName: 'HIDDEN_MANNA',    prefaceGlobal: null,                       letterScreen: 'hm-letter',          indexScreen: null,                label: 'Hidden Manna',                                            registryLabel: 'Hidden Manna',                                            searchVolId: 'hidden-manna',  kind: 'letter',     surpriseType: null }
+  { volKey: 'hm',      cardId: null,                readKey: 'hidden-manna',    globalName: 'HIDDEN_MANNA',    prefaceGlobal: null,                       letterScreen: 'hm-letter',          indexScreen: null,                label: 'Hidden Manna',                                            registryLabel: 'Hidden Manna',                                            searchVolId: 'hidden-manna',  kind: 'letter',     surpriseType: null, indexed: false }
 ];
 
 export const COL_BY_KEY       = new Map(COLLECTIONS.map(c => [c.volKey, c]));
