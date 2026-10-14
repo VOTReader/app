@@ -60,11 +60,22 @@ let starting = null;
 
 export function semanticStatus() { return { status, failure, units: man ? man.count : 0 }; }
 
+/* A FAILED START IS NOT FOR THE PAGE'S LIFE (sweep W35, 2026-10-13): a dropped download or a refused
+   store used to turn meaning search off until the next boot. The next start (an index build, a search
+   past the wait) tries again, after a wait that doubles from 30 s up to 10 min. A runtime that cannot
+   make a session of files that all arrived (a device that cannot run them) is not asked again. */
+const RETRY_FIRST_MS = 30 * 1000;
+const RETRY_MAX_MS = 10 * 60 * 1000;
+let retryMs = 0;
+let retryAt = 0;
+
 /** Load the model and the passage vectors, once. Resolves true when meaning search is ready. */
 export function startSemantic() {
   if (starting) return starting;
+  if (status === 'failed' && Date.now() < retryAt) return Promise.resolve(false);
   status = 'loading';
-  starting = (async () => {
+  let arrived = false;
+  const run = (async () => {
     try {
       const [manBuf, vocabBuf] = await Promise.all([io.load(SEM_DIR + 'manifest.json'), io.load(SEM_DIR + 'vocab.txt')]);
       man = JSON.parse(new TextDecoder().decode(manBuf));
@@ -91,18 +102,24 @@ export function startSemantic() {
       ort.env.wasm.numThreads = 1;
       ort.env.wasm.wasmBinary = await io.load(ortDir + 'ort-wasm-simd-threaded.wasm');
       ort.env.wasm.wasmPaths = { mjs: io.url(ortDir + 'ort-wasm-simd-threaded.mjs') };
+      arrived = true;
       session = await ort.InferenceSession.create(new Uint8Array(modelBuf), { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
       status = 'ready';
+      retryMs = 0;
       pruneStored();
       return true;
     } catch (e) {
       status = 'failed';
       failure = String((e && /** @type {any} */ (e).message) || e);
       session = null;
+      retryMs = Math.min(RETRY_MAX_MS, retryMs ? retryMs * 2 : RETRY_FIRST_MS);
+      retryAt = arrived ? Infinity : Date.now() + retryMs;
       return false;
     }
   })();
-  return starting;
+  starting = run;
+  void run.then((ok) => { if (!ok && starting === run) starting = null; });
+  return run;
 }
 
 /** True when the bytes are the ones named (no Web Crypto: trusted, as the APK's own assets are). */
@@ -215,6 +232,7 @@ async function embed(/** @type {string} */ query) {
  * @returns {Promise<Array<{id: string, score: number, start: number, passages: () => Array<[number, number]>}>|null>}
  */
 export async function semanticDocs(/** @type {string} */ query, /** @type {(key: string) => string|undefined} */ idOfKey, limit = 60) {
+  if (status === 'failed' && Date.now() >= retryAt) void startSemantic(); // behind this search, never in its way
   if (status !== 'ready' || !session || !V || !SCALE || !KEY || !START) return null;
   let q;
   try { q = await embed(query); } catch { return null; }
@@ -270,5 +288,5 @@ export function docUnitKey(/** @type {any} */ doc) {
 /** For tests: forget everything loaded. */
 export function resetSemantic() {
   status = 'off'; starting = null; session = null; ort = null; vocab = null; man = null;
-  V = null; SCALE = null; KEY = null; START = null; failure = null;
+  V = null; SCALE = null; KEY = null; START = null; failure = null; retryMs = 0; retryAt = 0;
 }

@@ -1126,15 +1126,20 @@ async function semanticResponse(request, networkFirst) {
     const hit = await cache.match(request);
     if (hit) return hit;
   }
+  let response;
   try {
-    const response = await fetch(request, { cache: networkFirst ? 'no-cache' : 'reload' });
-    // a redirect is a captive portal or a proxy, not the file: never pinned (SW-4)
-    if (response && response.ok && !response.redirected) await cache.put(request, response.clone());
-    return response;
+    response = await fetch(request, { cache: networkFirst ? 'no-cache' : 'reload' });
   } catch (_e) {
     const hit = await cache.match(request);
     return hit || new Response('Not available offline', { status: 503, statusText: 'Service Unavailable' });
   }
+  // a redirect is a captive portal or a proxy, not the file: never pinned (SW-4). A store that refuses the
+  // copy (full storage, common on iOS) loses only the copy: the page still gets the good download, which
+  // used to become a 503 and turn meaning search off for the session (sweep W35)
+  if (response && response.ok && !response.redirected) {
+    try { await cache.put(request, response.clone()); } catch (_e) { /* full store: served, not kept */ }
+  }
+  return response;
 }
 
 /* THE RETIRED SCREEN BUNDLES (lz1, 2026-10-13). bundle-e..h.js and screens-e..h.min.css were folded into bundle-d.js

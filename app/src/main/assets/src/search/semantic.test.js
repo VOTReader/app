@@ -3,7 +3,7 @@
    matches the one the passage vectors were built with (tools/build-semantic.py, HF tokenizers),
    a small pack ranks by meaning and names where the passage starts, bad stored bytes are
    refused, and the shipped model finds a verse no typed word names. */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -40,7 +40,7 @@ describe('docUnitKey: how the pack names a document', () => {
 });
 
 /** A three-unit pack in 4 dimensions and a stand-in runtime whose "model" says what the test tells it to. */
-function tinyPack(/** @type {{badUnits?: boolean}} */ o = {}) {
+function tinyPack(/** @type {{badUnits?: boolean, failLoads?: number, noSession?: boolean}} */ o = {}) {
   const dim = 4;
   const vecs = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0.6, 0.8, 0]];
   const q = new Int8Array(vecs.flatMap((v) => v.map((x) => Math.round(x * 127))));
@@ -59,11 +59,15 @@ function tinyPack(/** @type {{badUnits?: boolean}} */ o = {}) {
   const ort = {
     env: { wasm: {} },
     Tensor: class { constructor(/** @type {string} */ t, /** @type {any} */ d, /** @type {number[]} */ s) { Object.assign(this, { t, d, s }); } },
-    InferenceSession: { create: async () => ({ inputNames: ['input_ids', 'attention_mask'], outputNames: ['h'], run: async () => ({ h: { data: Float32Array.from(said.vec) } }) }) },
+    InferenceSession: { create: async () => (o.noSession ? Promise.reject(new Error('no wasm')) : { inputNames: ['input_ids', 'attention_mask'], outputNames: ['h'], run: async () => ({ h: { data: Float32Array.from(said.vec) } }) }) },
   };
   configureSemantic({
     url: (p) => 'mem:' + p,
-    load: async (p) => { if (!files[p]) throw new Error('missing ' + p); return buf(files[p]); },
+    load: async (p) => {
+      if (o.failLoads && p.endsWith('manifest.json')) { o.failLoads--; throw new Error('semantic: ' + p + ' 503'); }
+      if (!files[p]) throw new Error('missing ' + p);
+      return buf(files[p]);
+    },
     importModule: async () => ort,
   });
   return said;
@@ -103,6 +107,40 @@ describe('semanticDocs over a pack', () => {
   it('starts once', async () => {
     tinyPack();
     expect(startSemantic()).toBe(startSemantic());
+  });
+  // sweep W35 (2026-10-13): one failed start (a dropped download, a 503) turned meaning search off for the page's life
+  it('a failed start is tried again after a wait, and a search past the wait starts it', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      tinyPack({ failLoads: 2 });
+      expect(await startSemantic()).toBe(false);
+      expect(semanticStatus().status).toBe('failed');
+      expect(await startSemantic()).toBe(false);          // within the wait: not asked again
+      vi.setSystemTime(Date.now() + 31 * 1000);
+      expect(await startSemantic()).toBe(false);          // the second try fails too: the wait doubles
+      vi.setSystemTime(Date.now() + 31 * 1000);
+      expect(await semanticDocs('q', (k) => k)).toBeNull();
+      expect(semanticStatus().status).toBe('failed');
+      vi.setSystemTime(Date.now() + 31 * 1000);
+      expect(await semanticDocs('q', (k) => k)).toBeNull(); // answers now, and starts it again behind the search
+      expect(await startSemantic()).toBe(true);
+      expect(semanticStatus().status).toBe('ready');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('a device that cannot run the model (every file in, no session) is not asked again', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      tinyPack({ noSession: true });
+      expect(await startSemantic()).toBe(false);
+      vi.setSystemTime(Date.now() + 24 * 3600 * 1000);
+      expect(await semanticDocs('q', (k) => k)).toBeNull();
+      expect(await startSemantic()).toBe(false);
+      expect(semanticStatus().failure).toContain('no wasm');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

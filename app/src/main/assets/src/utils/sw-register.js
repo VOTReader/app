@@ -209,23 +209,39 @@ export function registerServiceWorker() {
    On the web they come once, a minute after the app is up and the page is idle, through the
    service worker's vot-semantic-v1 cache, where they stay: Search has them offline from its
    first use, with no setting and no account. Data Saver on: they wait until Search first needs
-   them. A file already stored is answered from the cache, so a later boot costs one manifest. */
+   them. A file already stored is not asked for, so a later boot costs one manifest.
+   ONLY THROUGH THE WORKER (sweep W35, 2026-10-13): a page it does not control (the first visit
+   before its claim, a hard reload) read ~55 MB the worker never saw, and the worker fetched them
+   all again later. Such a page warms when the worker takes it over, or not at all. */
 const WARM_AFTER_MS = 60 * 1000;
+const SEMANTIC_STORE = 'vot-semantic-v1';
 export function warmMeaningSearch() {
   const conn = /** @type {any} */ (navigator).connection;
   if (conn && conn.saveData) return;
-  setTimeout(() => onIdle(() => { void warmMeaningFiles(); }, { timeout: 30000, fallbackDelay: 1000 }), WARM_AFTER_MS);
+  const warm = () => onIdle(() => { void warmMeaningFiles(); }, { timeout: 30000, fallbackDelay: 1000 });
+  setTimeout(() => {
+    const sw = navigator.serviceWorker;
+    if (!sw) return;
+    if (sw.controller) warm();
+    else sw.addEventListener('controllerchange', warm, { once: true });
+  }, WARM_AFTER_MS);
 }
 
 export async function warmMeaningFiles() {
   try {
     if (navigator.onLine === false) return;
+    if (!navigator.serviceWorker || !navigator.serviceWorker.controller) return;
     const base = new URL('./semantic/', document.baseURI);
     const r = await fetch(new URL('manifest.json', base));
     if (!r.ok) return;
     const man = await r.json();
+    /** @type {Cache|null} */ let store = null;
+    try { store = typeof caches !== 'undefined' ? await caches.open(SEMANTIC_STORE) : null; } catch (_e) { /* no store to ask */ }
     for (const f of (man && man.files) || []) {
-      const res = await fetch(new URL(f, base));
+      const url = new URL(f, base);
+      // stored already: the worker answers it from there, and reading it through re-read ~55 MB every boot
+      if (store && await store.match(String(url)).catch(() => undefined)) continue;
+      const res = await fetch(url);
       if (res.ok) await res.blob(); // read through: the worker stores what passes
     }
   } catch (_e) { /* offline or refused: Search fetches them when it first needs them */ }

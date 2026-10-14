@@ -1051,6 +1051,19 @@ describe('service-worker — the meaning search’s files, kept (path to 500, 20
     expect(await (await sw.caches.open('vot-semantic-v1')).match(MODEL)).toBeUndefined();
   });
 
+  // sweep W35 (2026-10-13): a store that refused the copy (full storage, common on iOS) turned the good download into
+  // a 503, and the page's meaning search failed for the session.
+  it('a full store keeps the download: the page gets the file, only the copy is lost', async () => {
+    const calls = [];
+    const sw = bootSW({ fetchImpl: net(calls) });
+    const store = await sw.caches.open('vot-semantic-v1');
+    store.put = async () => { const e = new Error('The quota has been exceeded.'); e.name = 'QuotaExceededError'; throw e; };
+    const got = await fetchEvent(sw, getReq(MODEL));
+    expect(got.status).toBe(200);
+    expect(got.body).toBe('net:' + MODEL);
+    expect((await fetchEvent(sw, getReq(MAN))).body).toBe('net:' + MAN);
+  });
+
   it('activate never deletes them', async () => {
     const sw = bootSW();
     await (await sw.caches.open('vot-semantic-v1')).put(MODEL, { body: 'kept' });
