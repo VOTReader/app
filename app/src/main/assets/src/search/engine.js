@@ -621,25 +621,76 @@ const addTo = (/** @type {Map<any, string[]>} */ m, /** @type {any} */ k, /** @t
   if (!list) m.set(k, [id]);
   else if (list[list.length - 1] !== id) list.push(id);
 };
+/** Key one stored doc if it is an original: its sentences and, past a verse, its runs of words. */
+function addOriginal(/** @type {Map<string, string[]>} */ O, /** @type {Map<number, string[]>} */ S, /** @type {Map<string, any>} */ D, /** @type {string} */ id, /** @type {any} */ f) {
+  if (!f || !ORIGINAL_KINDS.has(f.kind) || !f.text) return;
+  D.set(id, f);
+  for (const sp of sentenceSpans(f.text)) {
+    const k = sentenceKey(sp.text);
+    if (k) addTo(O, k, id);
+  }
+  if (f.kind !== 'verse') eachShingle(kjvEncode(f.text), (h) => addTo(S, h, id));
+}
+/** The originals, read in one pass if they are not read yet (node; a search that raced a swap). */
 function originals() {
   if (ORIGINALS) return ORIGINALS;
   const O = new Map();
   const S = new Map();
-  ORIGINAL_DOCS = new Map();
+  const D = new Map();
   const ids = msIndex._documentIds;
-  for (const [shortId, f] of msIndex._storedFields) {
-    if (!f || !ORIGINAL_KINDS.has(f.kind) || !f.text) continue;
-    const id = ids.get(shortId);
-    ORIGINAL_DOCS.set(id, f);
-    for (const sp of sentenceSpans(f.text)) {
-      const k = sentenceKey(sp.text);
-      if (k) addTo(O, k, id);
-    }
-    if (f.kind !== 'verse') eachShingle(kjvEncode(f.text), (h) => addTo(S, h, id));
-  }
+  for (const [shortId, f] of msIndex._storedFields) addOriginal(O, S, D, ids.get(shortId), f);
+  ORIGINAL_DOCS = D;
   SHINGLES = S;
   ORIGINALS = O;
   return O;
+}
+/* THE ORIGINALS ARE READ A SLICE AT A TIME (sweep W68, 2026-10-14). Reading them is one pass over
+   every verse and letter, 440-500 ms on a desktop and seconds on a phone, and the first search after
+   each build made it in one block: the page froze under the reader's typing. In a browser they are
+   read from an idle moment after the index swaps in, ORIGINALS_SLICE_MS at a time with the page
+   running between slices, and a search that comes first waits for that read before it ranks (the
+   Answers coverage reads them as well as originalsFirst). They take effect whole, at the end: CITED
+   is built once from ORIGINAL_DOCS and must not be built from a half. Node (the bench, the tools)
+   reads them in one pass, as before. */
+const ORIGINALS_SLICE_MS = 8;
+/** @type {{ms: any, done: Promise<void>}|null} the read under way and the index it reads */ let ORIGINALS_BUILD = null;
+/** Give the page a turn: scheduler.yield where the browser has it, else a timer. */
+function yieldToPage() {
+  const s = /** @type {any} */ (globalThis).scheduler;
+  return s && typeof s.yield === 'function' ? s.yield() : new Promise((r) => setTimeout(r, 0));
+}
+/** Read the originals of `ms` in slices; dropped when another index swaps in or a one-pass read finished first. */
+async function readOriginals(/** @type {any} */ ms) {
+  const O = new Map();
+  const S = new Map();
+  const D = new Map();
+  const ids = ms._documentIds;
+  const it = ms._storedFields[Symbol.iterator]();
+  let step = it.next();
+  while (!step.done) {
+    const end = now() + ORIGINALS_SLICE_MS;
+    for (; !step.done && now() < end; step = it.next()) addOriginal(O, S, D, ids.get(step.value[0]), step.value[1]);
+    if (step.done) break;
+    await yieldToPage();
+    if (msIndex !== ms || ORIGINALS) return;
+  }
+  if (msIndex !== ms || ORIGINALS) return;
+  ORIGINAL_DOCS = D;
+  SHINGLES = S;
+  ORIGINALS = O;
+}
+/** Resolves once the index in use has its originals read (or has been replaced); never rejects. */
+function warmOriginals() {
+  if (ORIGINALS || !msIndex) return Promise.resolve();
+  if (typeof document === 'undefined') {
+    try { originals(); } catch { /* read again, and caught, where they are used */ }
+    return Promise.resolve();
+  }
+  if (ORIGINALS_BUILD && ORIGINALS_BUILD.ms === msIndex) return ORIGINALS_BUILD.done;
+  const ms = msIndex;
+  const done = readOriginals(ms).catch(() => { if (ORIGINALS_BUILD && ORIGINALS_BUILD.done === done) ORIGINALS_BUILD = null; });
+  ORIGINALS_BUILD = { ms, done };
+  return done;
 }
 /* AN ANSWERS EXCERPT NAMES ITS LETTER (search benchmark, 2026-10-05). An Answers topic is a
    chain of letter excerpts, each closed by its source: "~ [From “The Alarm of War” ~ Volume 7]"
@@ -909,6 +960,7 @@ function swapIn(/** @type {any} */ ms, /** @type {typeof stats} */ st) {
   TOKEN_CACHE.clear();
   tokenCacheSize = 0;
   ORIGINALS = null;
+  ORIGINALS_BUILD = null;
   ORIGINAL_DOCS = null;
   SHINGLES = null;
   CITED = null;
@@ -921,6 +973,7 @@ function swapIn(/** @type {any} */ ms, /** @type {typeof stats} */ st) {
   ready = true;
   buildError = null;
   stats = st;
+  if (typeof document !== 'undefined') onIdle(() => { warmOriginals(); }, { timeout: 2000, fallbackDelay: 300 });
 }
 
 /** Build the in-memory index for one translation (chunked for onProgress). `persist: false` keeps it
@@ -1088,8 +1141,9 @@ async function search(query, options) {
   if (NAV_ONLY_KINDS.has(parsed.kind)) return { parsed, results: [], parsedTerms: [], textQuery: null };
 
   await ensureReady(options);
+  await warmOriginals();
 
-  /* search-2 — A BARE BOOK NAME AND A NAMED-PASSAGE KEY KEEP THEIR CARD AND ALSO
+  /* search-2— A BARE BOOK NAME AND A NAMED-PASSAGE KEY KEEP THEIR CARD AND ALSO
      RUN THE TEXT PIPELINE. Until now every non-text parse returned `results: []`,
      so a reader who typed "Revelation" got a card to the book and not one verse
      containing the word. The cost landed on the book names that are also ordinary
@@ -1591,6 +1645,8 @@ function getState() {
     error: buildError ? buildError.message : null,
     docCount: stats.docCount || 0,
     translation: stats.translation || null,
+    // the originals (originalsFirst): read, being read a slice at a time, or not yet
+    originals: ORIGINALS ? 'ready' : (ORIGINALS_BUILD && ORIGINALS_BUILD.ms === msIndex ? 'building' : 'none'),
   };
 }
 
