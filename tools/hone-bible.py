@@ -148,7 +148,8 @@ def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False, fill_
     sil = al.silence_intervals(wav, stamp=stamp)
     snap = al.make_snap(sil)
     rows = al.belt(A, B, units, s, lambda t, txt: al.probe(wav, t, txt, s, wl, names or None),
-                   snap_fn=snap, end_t=tx.get("dur"))
+                   snap_fn=snap, end_t=tx.get("dur"),
+                   tx_cut=tx.get("cut") if tx.get("truncated") else None)
     # The transcript anchor (tx_anchor, 2026-09-26): a name-list opening leg B skipped, and a
     # REVIEW guess the transcript can place, move to the words heard. Stamped below (txAnchor).
     moved = al.tx_anchor(rows, units, tx["words"], names or None, nrm, sil)
@@ -170,6 +171,11 @@ def run_chapter(verses_path, audio, out_tag, s, out_dir=None, quiet=False, fill_
            "names": sorted(names), "txAnchor": al.TX_ANCHOR, **al.tx_fill_stamp(tx),
            "confirmed": 0, "probed": 0, "review": 0,
            "verses": rows}
+    if tx.get("truncated"):
+        # Not cached, so the next run hears the whole chapter -- if a run comes:
+        # batch-align-bible.is_current never calls this belt current (W23).
+        out["txTruncated"] = True
+        say(f"  leg B TRUNCATED at {tx.get('cut')}s: verses past it are REVIEW, the belt is not current")
     path = os.path.join(out_dir, out_tag + ".json")
     # The fill guard (c67): checked against the belt this run replaces, before it is overwritten.
     guarded = guard_previous(path, out, tx) if fill_guard else None

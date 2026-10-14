@@ -243,12 +243,16 @@ def is_current(belt_path, want_settings, verses_path, audio_path, witness="stric
     """The resume key: settings, the reference text, the recording's bytes, and
     the witness mode (strict or name-tolerant -- outside settings_hash by design,
     see _alignlib.settings_hash; a belt written before the field exists is strict),
-    and for a tolerant belt the version of the tolerant witness that made it (no stamp = 1)."""
+    and for a tolerant belt the version of the tolerant witness that made it (no stamp = 1).
+    A belt built on a TRUNCATED transcript is never current (W23, sweep 2026-10-13): the
+    transcript is not cached, so only a re-run can hear the rest of the chapter."""
     if not os.path.exists(belt_path):
         return False
     try:
         d = json.load(open(belt_path, encoding="utf-8"))
     except (OSError, ValueError):
+        return False
+    if d.get("txTruncated"):
         return False
     if d.get("settings_hash") != want_settings:
         return False

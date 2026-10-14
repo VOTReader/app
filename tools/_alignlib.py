@@ -310,13 +310,68 @@ def nw_rows(words, cols, owners, col2word):
 
 # ------------------------------------------------------------------ audio ---
 
-def to_wav16k(src, dest):
-    """ffmpeg -> 16 kHz mono s16le wav (the one shape both legs read)."""
+def dump_json(path, data, **kw):
+    """Write a cache whole or not at all: a .part beside it, then one rename. A
+    cache written in place and cut short by a crash parsed as an error on every
+    later run, failing its unit for good (sweep 2026-10-13)."""
+    part = path + ".part"
+    with open(part, "w", encoding="utf-8") as f:
+        json.dump(data, f, **kw)
+    os.replace(part, path)
+
+
+def load_json(path):
+    """A cache's contents, or None when it is missing or unreadable (a miss, never a crash)."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def wav_complete(path):
+    """True when `path` is a RIFF/WAVE file whose header ffmpeg finished: the RIFF
+    and data sizes are patched in only when it closes the file, so a conversion
+    killed part-way leaves them disagreeing with the bytes on disk."""
+    import struct
+    try:
+        size = os.path.getsize(path)
+        with open(path, "rb") as f:
+            head = f.read(12)
+            if len(head) < 12 or head[:4] != b"RIFF" or head[8:12] != b"WAVE":
+                return False
+            if struct.unpack("<I", head[4:8])[0] != size - 8:
+                return False
+            pos = 12
+            while pos + 8 <= size:
+                f.seek(pos)
+                cid, csz = f.read(4), struct.unpack("<I", f.read(4))[0]
+                if cid == b"data":
+                    return pos + 8 + csz == size
+                pos += 8 + csz + (csz & 1)
+    except OSError:
+        return False
+    return False
+
+
+def to_wav16k(src, dest, rebuild=False):
+    """ffmpeg -> 16 kHz mono s16le wav (the one shape both legs read).
+
+    A finished wav at `dest` is reused unless `rebuild`. ffmpeg writes a .part
+    beside it, renamed only on success (W22, sweep 2026-10-13): it used to write
+    `dest` itself, and any file over 44 bytes counted as done, so a conversion
+    killed part-way aligned that letter against cut-off audio on every run."""
     os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
-    if os.path.exists(dest) and os.path.getsize(dest) > 44:
+    if not rebuild and wav_complete(dest):
         return dest
-    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", src,
-                    "-ar", "16000", "-ac", "1", dest], check=True)
+    part = dest + ".part.wav"            # ffmpeg picks the muxer from the extension
+    try:
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", src,
+                        "-ar", "16000", "-ac", "1", part], check=True)
+        os.replace(part, dest)
+    finally:
+        if os.path.exists(part):
+            os.remove(part)
     return dest
 
 
@@ -593,11 +648,15 @@ class WhisperLeg:
         is ignored and rewritten. Without it a re-cut chapter -- same tag, new
         bytes -- was re-belted (audioSize is in the resume key) but leg B read
         the old transcript back and every stamp it produced described audio
-        that no longer existed. Callers with immutable inputs (the letters,
-        keyed by release asset id) pass nothing and keep the old behaviour."""
-        if cache_path and os.path.exists(cache_path):
-            cached = json.load(open(cache_path, encoding="utf-8"))
-            if stamp is None or cached.get("stamp") == stamp:
+        that no longer existed. The letters pass the release asset's byte size
+        (hone-align.release_size): an asset can be REPLACED under its own name.
+
+        A TRUNCATED transcript (below) is returned with `truncated` and `cut`, the
+        end of the last word heard, and is never cached; the belt built on it says
+        so (txTruncated) and calls what lies past the cut REVIEW, not UNSPOKEN."""
+        if cache_path:
+            cached = load_json(cache_path)
+            if isinstance(cached, dict) and (stamp is None or cached.get("stamp") == stamp):
                 return cached
         s = self.s
         segs, info = self.model().transcribe(
@@ -633,11 +692,12 @@ class WhisperLeg:
             data["stamp"] = stamp
         if truncated:
             data["truncated"] = True
+            data["cut"] = words[-1][2] if words else 0.0
         elif fill_min:
             self.fill(data, wav_path, fill_min)
         if cache_path and not truncated:
             os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-            json.dump(data, open(cache_path, "w", encoding="utf-8"))
+            dump_json(cache_path, data)
         return data
 
     def transcribe_probe(self, clip):
@@ -1177,8 +1237,14 @@ def release_caches():
         pass
 
 
-def belt(A, B, units, s, probe_fn, snap_fn=None, end_t=None):
+def belt(A, B, units, s, probe_fn, snap_fn=None, end_t=None, tx_cut=None):
     """Adjudicate leg A against leg B, unit by unit.
+
+    tx_cut: where a TRUNCATED transcript stopped (transcribe_words' `cut`), else
+    None. Leg B cannot have heard a unit whose leg-A onset lies past it (or that
+    leg A did not place), so such a unit is REVIEW -- spread across its gap like
+    any unproven clause -- not UNSPOKEN, which is never painted and never flagged
+    (W23, sweep 2026-10-13: the unheard tail went dark for good).
 
     A: MMSLeg.align output, B: nw_rows output, both keyed by unit['owner'].
     probe_fn(t, expect_text) -> (ok, heard).
@@ -1267,6 +1333,9 @@ def belt(A, B, units, s, probe_fn, snap_fn=None, end_t=None):
                 # is not misaligned — it is not in the audio. Terminal, never
                 # painted, never interpolated, and not a QA flag.
                 unspoken = b_ratio < 0.3
+                if unspoken and tx_cut is not None and (tA is None or tA >= tx_cut):
+                    unspoken = False                 # past the transcript's end: unheard, not absent
+                    row["pastTxCut"] = True
                 row.update(t=None, status="UNSPOKEN" if unspoken else "REVIEW",
                            prevAnchor=prev_t, probeMisses=misses)
         rows.append(row)
@@ -1306,8 +1375,8 @@ def silence_intervals(wav, noise_db=-32, min_d=0.25, stamp=None):
     shape is still honoured when no stamp is asked for."""
     import subprocess
     cache = wav + ".sil.json"
-    if os.path.exists(cache):
-        cached = json.load(open(cache, encoding="utf-8"))
+    cached = load_json(cache)
+    if cached is not None:
         if isinstance(cached, dict):
             if stamp is None or cached.get("stamp") == stamp:
                 return cached.get("ivals", [])
@@ -1324,11 +1393,13 @@ def silence_intervals(wav, noise_db=-32, min_d=0.25, stamp=None):
                         f"silencedetect=noise={noise_db}dB:d={min_d}", "-f", "null", "-"],
                        capture_output=True, encoding="utf-8", errors="replace")
     err = r.stderr or ""
+    if r.returncode != 0:
+        # An empty map from a failed run used to be cached as "no silences" for good.
+        raise RuntimeError(f"silencedetect failed (rc {r.returncode}) on {wav}: {err.strip()[-200:]}")
     starts = [float(m) for m in re.findall(r"silence_start: ([0-9.]+)", err)]
     ends = [float(m) for m in re.findall(r"silence_end: ([0-9.]+)", err)]
     ivals = [[s0, e0] for s0, e0 in zip(starts, ends) if e0 > s0]
-    json.dump({"stamp": stamp, "ivals": ivals} if stamp is not None else ivals,
-              open(cache, "w", encoding="utf-8"))
+    dump_json(cache, {"stamp": stamp, "ivals": ivals} if stamp is not None else ivals)
     return ivals
 
 

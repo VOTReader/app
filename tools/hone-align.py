@@ -33,7 +33,6 @@ import hashlib
 import json
 import os
 import re
-import subprocess
 import sys
 import urllib.request
 
@@ -60,18 +59,60 @@ def js_object(name):
     return _JS[name]
 
 
+_RELEASE_SIZE = {}
+
+
+def release_size(fid):
+    """Byte size of the audio-v1 asset `fid` (one HEAD per asset per process):
+    the identity every per-asset cache here is stamped with. An asset can be
+    REPLACED under its own name (the align lane's re-upload chain deletes and
+    re-uploads it), and these caches were keyed by the name alone, so a re-time
+    after a replace read the old mp3, wav and transcript back and timed the new
+    recording with the old one's clock (W22, sweep 2026-10-13)."""
+    if fid not in _RELEASE_SIZE:
+        req = urllib.request.Request(RELEASE + fid + ".mp3", method="HEAD")
+        with urllib.request.urlopen(req, timeout=60) as r:
+            n = r.headers.get("Content-Length")
+        if not n or int(n) <= 0:
+            raise RuntimeError(f"release asset {fid}.mp3 gave no Content-Length")
+        _RELEASE_SIZE[fid] = int(n)
+    return _RELEASE_SIZE[fid]
+
+
 def ensure_wav(fid):
-    """16k mono wav for a release asset id, downloading the mp3 if we lack it."""
+    """16k mono wav for a release asset id, downloading the mp3 if we lack it.
+
+    Whole files only (W22): the mp3 downloads to a .part and is renamed only at
+    the release's byte size, and to_wav16k does the same for the wav. They used
+    to write the final paths, and anything over 0 / 44 bytes was reused on every
+    later run -- an interrupted download aligned that letter against cut-off
+    audio for good, its tail dark. The wav (and its silence map) is trusted only
+    beside <fid>.src.json naming the mp3 size it was made from, so a replaced
+    release asset rebuilds every cache made from the old bytes."""
     os.makedirs(AUDIO, exist_ok=True)
-    wav = os.path.join(AUDIO, fid + ".wav")
-    if os.path.exists(wav) and os.path.getsize(wav) > 44:
-        return wav
+    size = release_size(fid)
     mp3 = os.path.join(AUDIO, fid + ".mp3")
-    if not (os.path.exists(mp3) and os.path.getsize(mp3) > 0):
+    wav = os.path.join(AUDIO, fid + ".wav")
+    src = os.path.join(AUDIO, fid + ".src.json")
+    if (al.load_json(src) or {}).get("size") == size and al.wav_complete(wav):
+        return wav
+    if not (os.path.exists(mp3) and os.path.getsize(mp3) == size):
         print(f"  downloading {fid}.mp3 ...")
-        urllib.request.urlretrieve(RELEASE + fid + ".mp3", mp3)
-    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", mp3,
-                    "-ar", "16000", "-ac", "1", wav], check=True)
+        part = mp3 + ".part"
+        try:
+            urllib.request.urlretrieve(RELEASE + fid + ".mp3", part)   # ContentTooShortError on a short read
+            got = os.path.getsize(part)
+            if got != size:
+                raise RuntimeError(f"{fid}.mp3: downloaded {got} B, the release serves {size} B")
+            os.replace(part, mp3)
+        finally:
+            if os.path.exists(part):
+                os.remove(part)
+    for stale in (src, wav + ".sil.json"):
+        if os.path.exists(stale):
+            os.remove(stale)
+    al.to_wav16k(mp3, wav, rebuild=True)
+    al.dump_json(src, {"size": size})
     return wav
 
 
@@ -217,7 +258,7 @@ def run_legacy(key, s):
     results, tuples = [], []
     for part, (fid, _label) in enumerate(tracks):
         wav = ensure_wav(fid)
-        tx = whisper.transcribe_words(wav, tx_cache(fid, s))
+        tx = whisper.transcribe_words(wav, tx_cache(fid, s), stamp=release_size(fid))
         words = tx["words"]
         nrm = al.match_normalizer(s, words)
         cols, owner = [], []
@@ -296,6 +337,7 @@ def run_belt(key, s, asset=None):
     print(f"family {s['family']}  settings {al.settings_hash(s)}  lead_in {s['lead_in']}")
 
     assigned, cleared, part_rows = {}, {}, []
+    tx_truncated = []                    # parts whose transcript stopped early (W23)
     cursor = 0
     for part, (fid, label) in enumerate(tracks):
         if cursor >= n:
@@ -318,7 +360,8 @@ def run_belt(key, s, asset=None):
         A = mms.align(wav, units)
         print(f"    {len(A)}/{len(units)} placed")
         print(f"  leg B: {s['whisper_model']} + global match ...")
-        tx = whisper.transcribe_words(wav, tx_cache(fid, s))
+        stamp = release_size(fid)            # the caches answer for THIS release's bytes (W22)
+        tx = whisper.transcribe_words(wav, tx_cache(fid, s), stamp=stamp)
         nrm = al.match_normalizer(s, tx["words"])
         cols, owners = [], []
         for u in units:
@@ -327,10 +370,15 @@ def run_belt(key, s, asset=None):
                 owners.append(u["owner"])
         B = al.nw_rows(tx["words"], cols, owners, al.nw_align(tx["words"], cols, s))
         print(f"    {len(B)}/{len(units)} placed  (transcript {len(tx['words'])} words, {tx['dur']}s)")
+        if tx.get("truncated"):
+            tx_truncated.append(part)
+            print(f"    leg B TRUNCATED at {tx.get('cut')}s: what lies past it is REVIEW, and the belt "
+                  "is not current, so the next run hears the whole recording")
 
-        snap = al.make_snap(al.silence_intervals(wav))
+        snap = al.make_snap(al.silence_intervals(wav, stamp=stamp))
         rows = al.belt(A, B, units, s, lambda t, txt: al.probe(wav, t, txt, s, whisper),
-                       snap_fn=snap, end_t=tx.get("dur"))
+                       snap_fn=snap, end_t=tx.get("dur"),
+                       tx_cut=tx.get("cut") if tx.get("truncated") else None)
         ratio = {}
         for u in units:
             b = B.get(u["owner"])
@@ -396,7 +444,7 @@ def run_belt(key, s, asset=None):
             for k in ("hit", "tokens", "ratio", "status", "tA", "tB", "t", "tEnd",
                       "score", "part", "delta", "probe", "prevAnchor", "skippedPrefix",
                       "interpolated", "clamped", "contested", "contestResolved",
-                      "probeMisses", "snapped_from"):
+                      "probeMisses", "snapped_from", "pastTxCut"):
                 if k in r:
                     row[k] = r[k]
         if row["t"] is not None and toks[fi]:
@@ -450,7 +498,12 @@ def run_belt(key, s, asset=None):
            "coverage": round(cov, 3), "coverageAll": round(cov_all, 3),
            "unspokenShare": unspoken_share, "fragments": n, "shipped": len(tuples),
            "confirmed": n_conf, "probed": n_probed, "review": n_review,
+           # every track resolved, in part order -- `parts` stops at the last one
+           # consumed; batch-align.is_current compares this to the manifest (W21)
+           "tracks": [fid for fid, _label in tracks],
            "parts": part_rows, "results": results, "tuples": tuples}
+    if tx_truncated:
+        out["txTruncated"] = tx_truncated    # batch-align.is_current: never current (W23)
     os.makedirs(HONE, exist_ok=True)
     path = os.path.join(HONE, name)
     json.dump(out, open(path, "w", encoding="utf-8"), indent=1)

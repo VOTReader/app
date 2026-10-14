@@ -84,8 +84,11 @@ function readGlobal(file, name) {
   return ctx[name] || null;
 }
 
-const AUDIO_SYNC = readGlobal('audio-sync.js', 'AUDIO_SYNC') || {};
-const AUDIO_SYNC_ALT = readGlobal('audio-sync.js', 'AUDIO_SYNC_ALT') || {};
+// AUDIO_SYNC_FILE points the gate at a fixture (tests only; test_batch_align_ship.py),
+// as AUDIO_SYNC_SECTIONS_FILE does below. The coverage floor still reads git HEAD.
+const SYNC_FILE = process.env.AUDIO_SYNC_FILE || 'audio-sync.js';
+const AUDIO_SYNC = readGlobal(SYNC_FILE, 'AUDIO_SYNC') || {};
+const AUDIO_SYNC_ALT = readGlobal(SYNC_FILE, 'AUDIO_SYNC_ALT') || {};
 const manifestCtx = {};
 runInNewContext(readFileSync(resolve(DATA, 'audio-manifest.js'), 'utf8'), manifestCtx, { filename: 'audio-manifest.js' });
 const AUDIO_MANIFEST = manifestCtx.AUDIO_MANIFEST || {};
@@ -387,12 +390,16 @@ for (const [assetId, letters] of Object.entries(AUDIO_SYNC_SECTIONS)) {
  * that to what AUDIO_MANIFEST plays today. A key the sidecar cannot vouch for
  * fails too: unknown provenance is the state the bug hid in.
  */
-const PROV_PATH = resolve(HERE, 'audio-sync-provenance.json');
+const PROV_PATH = resolve(HERE, process.env.AUDIO_SYNC_PROVENANCE_FILE || 'audio-sync-provenance.json');
 let provenanceChecked = 0;
+// The shipper's deliberate drops (sidecar `excluded`): read by the coverage floor below.
+let EXCLUDED = {};
 if (!existsSync(PROV_PATH)) {
   note(failures, 'provenance', 'NO-PROVENANCE-SIDECAR', { detail: 'tools/audio-sync-provenance.json is missing; batch-align.py ship() writes it' });
 } else {
-  const prov = JSON.parse(readFileSync(PROV_PATH, 'utf8')).primary || {};
+  const sidecar = JSON.parse(readFileSync(PROV_PATH, 'utf8'));
+  const prov = sidecar.primary || {};
+  EXCLUDED = sidecar.excluded || {};
   for (const key of Object.keys(AUDIO_SYNC)) {
     const manifest = (AUDIO_MANIFEST[key] || []).map((r) => r[0]);
     const belt = prov[key];
@@ -425,6 +432,13 @@ if (!existsSync(PROV_PATH)) {
  * A timeline may only leave together with the reason it existed: its
  * audio-manifest entry. A letter pulled from the corpus drops freely; a letter
  * still on offer that lost its timings is the regression, and fails here.
+ *
+ * Or with the shipper's recorded reason (W20, 2026-10-13): batch-align.py drops
+ * an EXCLUDED unit on purpose (owner policy: never a wrong highlight) and a
+ * re-run with no rows, for primaries and alternates alike, and names each in the
+ * sidecar's `excluded`. Without that record this floor refused every such drop,
+ * so the shipper's own policy could never pass pre-commit. A hand edit cannot
+ * hide behind it without writing the sidecar too, and both sit in the diff.
  */
 function lostTimings() {
   let head;
@@ -438,10 +452,10 @@ function lostTimings() {
   runInNewContext(head, ctx, { filename: 'audio-sync.js@HEAD' });
   const lost = [];
   for (const k of Object.keys(ctx.AUDIO_SYNC || {})) {
-    if (!(k in AUDIO_SYNC) && k in AUDIO_MANIFEST) lost.push(k);
+    if (!(k in AUDIO_SYNC) && k in AUDIO_MANIFEST && !(k in EXCLUDED)) lost.push(k);
   }
   for (const a of Object.keys(ctx.AUDIO_SYNC_ALT || {})) {
-    if (!(a in AUDIO_SYNC_ALT) && ALT_OWNER.has(a)) lost.push('alt:' + a);
+    if (!(a in AUDIO_SYNC_ALT) && ALT_OWNER.has(a) && !(('alt:' + a) in EXCLUDED)) lost.push('alt:' + a);
   }
   // The compilations ride the same floor: a letter timed at HEAD under an asset
   // AUDIO_SECTIONS still plays must still be timed (its own file, own HEAD read).

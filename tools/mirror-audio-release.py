@@ -27,7 +27,7 @@ so a manifest regen needs NO url rewrites here.
 
 Needs: gdown (pip) + gh CLI authed as VOTReader.
 """
-import json, os, re, subprocess, sys, time
+import json, os, re, shutil, subprocess, sys, time
 
 import gdown
 import requests
@@ -45,25 +45,50 @@ COOKIES = os.path.join(HERE, "_drive-cookies.json")  # from tools/drive-login.mj
 # is what finally beat Drive's anonymous per-IP download wall. NOTE: uses
 # rclone's shared client_id (retires during 2026) — fine for this mirror; make
 # a personal client_id if this pipeline is still pulling from Drive by then.
-RCLONE = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet", "Packages",
-                      "Rclone.Rclone_Microsoft.Winget.Source_8wekyb3d8bbwe",
-                      "rclone-v1.75.0-windows-amd64", "rclone.exe")
+def find_rclone():
+    """rclone on PATH, else the winget install this pipeline was first set up with.
+    The versioned folder alone meant an rclone upgrade silently fell back to the
+    cookie path (sweep 2026-10-13, W18)."""
+    return shutil.which("rclone") or os.path.join(
+        os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet", "Packages",
+        "Rclone.Rclone_Microsoft.Winget.Source_8wekyb3d8bbwe", "rclone-v1.75.0-windows-amd64", "rclone.exe")
+
+
+RCLONE = find_rclone()
+
+# EVERY downloader below writes <fid>.mp3.part and renames it to <fid>.mp3 only
+# when the transfer finished whole, and main() uploads a staged file only once it
+# decodes end to end (_playable). They used to write <fid>.mp3 directly and count
+# any size > 0 as done, so a transfer cut off part-way -- or a third failed retry
+# that left half a file -- could go up to audio-v1, which is append-only: readers
+# would hear that letter stop early, and the next run would skip it as mirrored
+# (W18, sweep 2026-10-13).
+
+
+def _drop(path):
+    if os.path.exists(path):
+        os.remove(path)
 
 
 def _rclone_batch(fids):
     """Download a batch of file ids into STAGING via one rclone invocation.
-    Returns the subset that landed with bytes."""
+    Returns the subset that landed whole. A batch rclone reports as failed
+    promotes nothing: which of its transfers finished is not knowable from
+    here, and the per-file fallback in main() fetches each one again."""
     args = [RCLONE, "backend", "copyid", "gdrive:"]
     for fid in fids:
-        args += [fid, os.path.join(STAGING, fid + ".mp3")]
+        args += [fid, os.path.join(STAGING, fid + ".mp3.part")]
     r = subprocess.run(args, capture_output=True, text=True)
     if r.returncode != 0:
-        print("  rclone batch stderr: " + (r.stderr or "").strip().splitlines()[-1][:160] if r.stderr else "  rclone batch failed")
+        tail = (r.stderr or "").strip().splitlines()
+        print("  rclone batch failed: " + (tail[-1][:160] if tail else f"rc {r.returncode}"))
     got = []
     for fid in fids:
-        dst = os.path.join(STAGING, fid + ".mp3")
-        if os.path.exists(dst) and os.path.getsize(dst) > 0:
+        part, dst = (os.path.join(STAGING, fid + ext) for ext in (".mp3.part", ".mp3"))
+        if r.returncode == 0 and os.path.exists(part) and os.path.getsize(part) > 0:
+            os.replace(part, dst)
             got.append(fid)
+        _drop(part)
     return got
 
 
@@ -96,10 +121,50 @@ def _download_authed(session, fid, dst):
         r = session.get(url, params=params, stream=True, timeout=120)
         if r.headers.get("Content-Type", "").startswith("text/html"):
             return False
-    with open(dst, "wb") as f:
-        for chunk in r.iter_content(1 << 18):
-            f.write(chunk)
-    return os.path.getsize(dst) > 0
+    part = dst + ".part"
+    try:
+        with open(part, "wb") as f:
+            for chunk in r.iter_content(1 << 18):
+                f.write(chunk)
+        got, want = os.path.getsize(part), r.headers.get("Content-Length")
+        if got == 0 or (want and not r.headers.get("Content-Encoding") and got != int(want)):
+            print(f"  short transfer {fid}: {got} of {want or '?'} B")
+            return False
+        os.replace(part, dst)
+        return True
+    finally:
+        _drop(part)
+
+
+def _download_gdown(fid, dst):
+    """Anonymous gdown into a .part, renamed only when gdown returns cleanly."""
+    part = dst + ".part"
+    try:
+        got = gdown.download(id=fid, output=part, quiet=True)
+        if got and os.path.exists(part) and os.path.getsize(part) > 0:
+            os.replace(part, dst)
+            return True
+        return False
+    finally:
+        _drop(part)
+
+
+def _playable(path):
+    """True when ffmpeg decodes the whole file without an error and it lasts at
+    least a second: the last check before an upload that can never be taken back.
+    No ffmpeg on PATH is a refusal, not a pass."""
+    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+        print("  REFUSING to upload: ffmpeg/ffprobe not on PATH, so the file cannot be checked")
+        return False
+    dur = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path],
+                         capture_output=True, text=True, encoding="utf-8", errors="replace")
+    dec = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-f", "null", "-"],
+                         capture_output=True, text=True, encoding="utf-8", errors="replace")
+    try:
+        d = float((dur.stdout or "").strip() or 0)
+    except ValueError:
+        d = 0.0
+    return dec.returncode == 0 and not (dec.stderr or "").strip() and d >= 1
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -227,28 +292,30 @@ def main():
         for fid in batch:
             n += 1
             dst = os.path.join(STAGING, fid + ".mp3")
-            if not (os.path.exists(dst) and os.path.getsize(dst) > 0):
+            if os.path.exists(dst) and not _playable(dst):
+                print(f"  [{n}/{len(todo)}] staged {fid} does not decode whole -- fetching it again")
+                os.remove(dst)
+            if not os.path.exists(dst):
                 # rclone missed it (or non-rclone path) — per-file fallback.
-                got = None
                 for attempt in (1, 2, 3):
                     try:
                         if use_rclone:
-                            got = _rclone_batch([fid]) and dst
+                            _rclone_batch([fid])
                         elif session:
-                            got = _download_authed(session, fid, dst) and dst
+                            _download_authed(session, fid, dst)
                         else:
-                            got = gdown.download(id=fid, output=dst, quiet=True)
+                            _download_gdown(fid, dst)
                     except Exception as e:
                         print(f"  [{n}/{len(todo)}] download error {fid} (attempt {attempt}): {str(e).splitlines()[0][:120]}")
-                        got = None
-                    if got and os.path.exists(dst) and os.path.getsize(dst) > 0:
-                        break
+                    if os.path.exists(dst):
+                        if _playable(dst):
+                            break
+                        print(f"  [{n}/{len(todo)}] {fid} (attempt {attempt}) does not decode whole")
+                        os.remove(dst)
                     time.sleep(5 * attempt)
-                if not os.path.exists(dst) or os.path.getsize(dst) == 0:
+                if not os.path.exists(dst):
                     print(f"  [{n}/{len(todo)}] DOWNLOAD FAILED {fid}")
                     fail += 1
-                    if os.path.exists(dst):
-                        os.remove(dst)
                     continue
             r = upload_asset(rid, dst, fid + ".mp3")
             if r.returncode != 0:
