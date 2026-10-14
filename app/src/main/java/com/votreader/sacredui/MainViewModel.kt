@@ -80,6 +80,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // thread and the @JavascriptInterface methods read on a binder thread.
     @Volatile var pendingV3ExportUri: Uri? = null
     @Volatile var pendingV3ImportUri: Uri? = null
+    // True from launchV3ExportPicker until its answer lands. A fresh process (Android
+    // killed the app while the picker was open) has it false, so the answer is known
+    // to have no page waiting and its empty .votbak is deleted (W12).
+    @Volatile var v3ExportRequested: Boolean = false
 
     // ---- Renderer-crash recovery (60-second sliding window) ----
     var renderRecoveryCount: Int = 0

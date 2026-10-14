@@ -603,14 +603,33 @@ describe('PlatformBridge — Web saveToFile (Blob + anchor → __onExportComplet
     expect(cb).toHaveBeenCalledWith('ok');
   });
 
-  it('revokes the object URL after click (deferred via setTimeout 0)', async () => {
+  // W12 (sweep 2026-10-13): the URL was revoked 0 ms after the click while 'ok' was
+  // already reported. WebKit starts the download asynchronously, so the file could
+  // fail after the success message. It now lives for a minute.
+  it('keeps the object URL alive for a minute after the click, then revokes it', () => {
+    vi.useFakeTimers();
+    try {
+      /** @type {any} */ (globalThis.window).__onExportComplete = vi.fn();
+      bridge.saveToFile('backup.json', '{}');
+      vi.advanceTimersByTime(0);
+      expect(revokeObjectURLSpy).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(59_000);
+      expect(revokeObjectURLSpy).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1_000);
+      expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:mock-url');
+      expect(anchorRemoveSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // W12: the Blob type follows the name, so a notes export (.md) is a Markdown file.
+  it('a .md name downloads as text/markdown; a .json name as application/json', () => {
     /** @type {any} */ (globalThis.window).__onExportComplete = vi.fn();
+    bridge.saveToFile('Matthew notes 2026-10-14.md', '# Notes');
+    expect(createObjectURLSpy.mock.calls[0][0].type).toBe('text/markdown');
     bridge.saveToFile('backup.json', '{}');
-    // The setTimeout 0 hasn't fired yet
-    expect(revokeObjectURLSpy).not.toHaveBeenCalled();
-    await new Promise((r) => setTimeout(r, 0));
-    expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:mock-url');
-    expect(anchorRemoveSpy).toHaveBeenCalledTimes(1);
+    expect(createObjectURLSpy.mock.calls[1][0].type).toBe('application/json');
   });
 
   it('reports "error:<reason>" via __onExportComplete when Blob construction throws', () => {
@@ -1510,6 +1529,26 @@ describe('PlatformBridge — v3 backup I/O (web)', () => {
       expect(captured).toBeInstanceOf(Blob);
       expect(Array.from(new Uint8Array(await captured.arrayBuffer()))).toEqual([10, 20, 30]);
     } finally {
+      URL.createObjectURL = origCreate; URL.revokeObjectURL = origRevoke;
+    }
+  });
+
+  it('the Blob-download fallback keeps its object URL for a minute (W12)', async () => {
+    const origCreate = URL.createObjectURL; const origRevoke = URL.revokeObjectURL;
+    const revoke = vi.fn();
+    URL.createObjectURL = vi.fn(() => 'blob:fake');
+    URL.revokeObjectURL = revoke;
+    try {
+      const sink = await bridge.openExportSink('b.votbak');
+      await sink.write(new Uint8Array([1]));
+      vi.useFakeTimers();
+      await sink.close();
+      vi.advanceTimersByTime(59_000);
+      expect(revoke).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1_000);
+      expect(revoke).toHaveBeenCalledWith('blob:fake');
+    } finally {
+      vi.useRealTimers();
       URL.createObjectURL = origCreate; URL.revokeObjectURL = origRevoke;
     }
   });
