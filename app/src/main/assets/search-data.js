@@ -588,23 +588,27 @@ for (var _c = 0; _c < COMMANDS.length; _c++) {
 }
 
 // ─── Export ───
+/* EVERY TABLE A TABLE OF ITS OWN KEYS (sweep W24, 2026-10-13). A plain object answers for
+   Object.prototype's keys too: 'constructor' read Object's function as a book, a synonym group and a
+   command, and search crashed or garbled its results. Readers get null-prototype copies. */
+function _bare(o) { return Object.assign(Object.create(null), o); }
 window.VotSearchData = {
   STOP_WORDS: STOP_WORDS,
   STOP_WORDS_TRIMMED: STOP_WORDS_TRIMMED,
-  SYNONYM_MAP: SYNONYM_MAP,   // SR4: scripture-aware synonym expansion (opt-in via settings.searchSynonyms)
-  BOOK_ABBREVS: BOOK_ABBREVS,
-  BOOK_DISPLAY: BOOK_DISPLAY,
+  SYNONYM_MAP: _bare(SYNONYM_MAP),   // SR4: scripture-aware synonym expansion (opt-in via settings.searchSynonyms)
+  BOOK_ABBREVS: _bare(BOOK_ABBREVS),
+  BOOK_DISPLAY: _bare(BOOK_DISPLAY),
   NAMED_PASSAGES: NAMED_PASSAGES,
-  NAMED_PASSAGE_INDEX: NAMED_PASSAGE_INDEX,
-  WORD_NUMS: WORD_NUMS,
-  ROMAN_NUMS: ROMAN_NUMS,
+  NAMED_PASSAGE_INDEX: _bare(NAMED_PASSAGE_INDEX),
+  WORD_NUMS: _bare(WORD_NUMS),
+  ROMAN_NUMS: _bare(ROMAN_NUMS),
   VOLUME_COLLECTIONS: VOLUME_COLLECTIONS,
-  VOLUME_TOKEN_MAP: VOLUME_TOKEN_MAP,
+  VOLUME_TOKEN_MAP: _bare(VOLUME_TOKEN_MAP),
   OT_BOOK_IDS: OT_BOOK_IDS,
   NT_BOOK_IDS: NT_BOOK_IDS,
-  GENRE_GROUPS: GENRE_GROUPS,
+  GENRE_GROUPS: _bare(GENRE_GROUPS),
   COMMANDS: COMMANDS,
-  COMMAND_MAP: COMMAND_MAP
+  COMMAND_MAP: _bare(COMMAND_MAP)
 };
 
 })();

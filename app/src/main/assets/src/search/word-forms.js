@@ -27,7 +27,8 @@
    so "wept" reaches weep and "weep" reaches wept. Left out on purpose, for the
    other word each form also is: ground (grind), left (leave), lay (lie), tore
    (tear, of weeping), born (bear, of animals). */
-const IRREGULAR = {
+/* A table of its own keys: a plain object gave 'constructor' Object's function as its forms (sweep W24). */
+const IRREGULAR = Object.assign(Object.create(null), {
   weep: ['wept'], flee: ['fled'], speak: ['spake', 'spoke', 'spoken'], give: ['gave', 'given'],
   take: ['took', 'taken'], forsake: ['forsook', 'forsaken'], shake: ['shook', 'shaken'],
   eat: ['ate', 'eaten'], fall: ['fell', 'fallen'], rise: ['rose', 'risen'], arise: ['arose', 'arisen'],
@@ -46,7 +47,7 @@ const IRREGULAR = {
   hear: ['heard'], find: ['found'], bind: ['bound'], win: ['won'], shine: ['shone'],
   draw: ['drew', 'drawn'], fly: ['flew', 'flown'], sink: ['sank', 'sunk'],
   cling: ['clung'], sting: ['stung'], swing: ['swung'], strike: ['struck'], dig: ['dug'], spin: ['spun'],
-};
+});
 const IRREGULAR_BASE = (() => {
   const m = Object.create(null);
   for (const base in IRREGULAR) for (const f of IRREGULAR[base]) (m[f] = m[f] || []).push(base);

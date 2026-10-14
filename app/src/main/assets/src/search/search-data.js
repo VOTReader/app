@@ -34,25 +34,28 @@
  * @property {Object<string,Object>} COMMAND_MAP
  */
 
+/** A table of its own keys: no 'constructor' (sweep W24). */
+const bare = () => Object.create(null);
+
 /** Empty fallback so callers never crash if the classic data bundle is absent. */
 /** @type {SearchData} */
 const EMPTY = {
   STOP_WORDS: new Set(),
   STOP_WORDS_TRIMMED: new Set(),
-  SYNONYM_MAP: {},
-  BOOK_ABBREVS: {},
-  BOOK_DISPLAY: {},
+  SYNONYM_MAP: bare(),
+  BOOK_ABBREVS: bare(),
+  BOOK_DISPLAY: bare(),
   NAMED_PASSAGES: [],
-  NAMED_PASSAGE_INDEX: {},
-  WORD_NUMS: {},
-  ROMAN_NUMS: {},
+  NAMED_PASSAGE_INDEX: bare(),
+  WORD_NUMS: bare(),
+  ROMAN_NUMS: bare(),
   VOLUME_COLLECTIONS: [],
-  VOLUME_TOKEN_MAP: {},
+  VOLUME_TOKEN_MAP: bare(),
   OT_BOOK_IDS: [],
   NT_BOOK_IDS: [],
-  GENRE_GROUPS: {},
+  GENRE_GROUPS: bare(),
   COMMANDS: [],
-  COMMAND_MAP: {},
+  COMMAND_MAP: bare(),
 };
 
 /**

@@ -25,9 +25,10 @@
  * the NKJV text word for word and the phrase ranking can see it. General
  * verb-form stemming (saith/says, cometh/comes) stays out: it would cost precision
  * for little gain, and search/word-forms.js reaches those families at query time.
+ * A table of its own keys: a plain object turned the token 'constructor' into Object's function (sweep W24).
  * @type {Object<string,string>}
  */
-export const ARCHAIC_NORMALIZE = {
+export const ARCHAIC_NORMALIZE = Object.assign(Object.create(null), {
   thee: 'you',
   thou: 'you',
   ye: 'you',
@@ -43,7 +44,7 @@ export const ARCHAIC_NORMALIZE = {
   dost: 'do',
   didst: 'did',
   canst: 'can',
-};
+});
 
 /**
  * Tokenize + fold a string into normalized tokens.
@@ -79,7 +80,7 @@ export function kjvEncode(str) {
  */
 export const ARCHAIC_EXPAND = (function () {
   /** @type {Object<string,string[]>} */
-  const m = {};
+  const m = Object.create(null);
   const pairs = Object.keys(ARCHAIC_NORMALIZE);
   for (let i = 0; i < pairs.length; i++) {
     const archaic = pairs[i];

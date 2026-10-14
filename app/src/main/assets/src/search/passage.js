@@ -13,12 +13,12 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 /** Irregular forms and archaic words, to one root each. */
-const LEX = {
+const LEX = Object.assign(Object.create(null), {
   saith: 'say', says: 'say', said: 'say', spake: 'speak', spoke: 'speak', spoken: 'speak', unto: 'to', upon: 'on',
   shew: 'show', begat: 'beget', art: 'are', wast: 'was', men: 'man', children: 'child', brethren: 'brother',
   feet: 'foot', went: 'go', gone: 'go', goes: 'go', came: 'come', comes: 'come', gave: 'give', given: 'give',
   took: 'take', taken: 'take', knew: 'know', known: 'know', saw: 'see', seen: 'see', made: 'make', heard: 'hear', an: 'a',
-};
+});
 const KEEP_EST = /(rest|best|test|west|nest|feast|beast|least|priest|forest|honest|harvest)$/;
 /** @type {Map<string, string>} */
 const LEMMAS = new Map();
