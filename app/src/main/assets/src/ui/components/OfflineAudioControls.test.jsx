@@ -100,6 +100,32 @@ describe('a recording row: what the phone holds, and the next step', () => {
     expect(s.cancel).toHaveBeenCalledWith([U('a')]);
   });
 
+  // ra6: Download only on Wi-Fi holds what is queued on mobile data; the row says why it is not moving.
+  it('queued while downloads wait for Wi-Fi, the row says Waiting for Wi-Fi, and Cancel still stops it', () => {
+    const s = fakeStore();
+    s.waiting = () => true;
+    s.st.status.set(U('a'), 'queued');
+    const { container, getByRole } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
+    expect(container.textContent).toMatch(/Waiting for Wi-Fi/);
+    expect(container.textContent).not.toMatch(/Downloading/);
+    fireEvent.click(getByRole('button', { name: /cancel/i }));
+    expect(s.cancel).toHaveBeenCalledWith([U('a')]);
+    // One of the unit's parts on its way: it is downloading, whatever waits behind it.
+    s.st.status.set(U('a'), 'downloading');
+    act(() => s.bump());
+    expect(container.textContent).toMatch(/Downloading 0%/);
+  });
+
+  it('Download all waiting for Wi-Fi says so with the count', () => {
+    const s = fakeStore();
+    s.waiting = () => true;
+    s.st.status.set(U('a'), 'queued');
+    s.st.status.set(U('b'), 'queued');
+    save(s, 'c', 1000);
+    const { container } = render(<OfflineCollectionAction units={[[T('a')], [T('b')], [T('c')]]} label="Volume One" />);
+    expect(container.textContent).toMatch(/Waiting for Wi-Fi · 1 of 3 on this phone/);
+  });
+
   it('says On this phone with the size once every part is there', () => {
     const s = fakeStore();
     save(s, 'a', 16_000_000);

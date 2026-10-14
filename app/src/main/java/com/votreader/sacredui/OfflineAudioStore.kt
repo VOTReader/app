@@ -19,6 +19,9 @@ import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 /**
  * Recordings downloaded to the phone (listening item 8; Corbin 2026-09-22: "yes after reset" - one recording, a
@@ -41,6 +44,11 @@ import java.util.concurrent.Executors
  *
  * Every state change goes to JS as one JSON event through [emit] (JsEvent.OfflineAudio): queued, progress (throttled),
  * done, failed(reason: network | space | short | size | disk), cancelled, removed.
+ *
+ * Download only on Wi-Fi (ra6, Corbin 2026-10-14): with the page's switch on ([setWifiOnly]) and the network metered
+ * ([unmetered] false: mobile data, a metered hotspot, or none), a download waits in the queue, and one on its way
+ * stops, throws its partial bytes away and waits at the head of the queue; on an unmetered network it starts again
+ * from the top. The state says `waiting`, and each change of the gate sends `checked`, so the rows re-read.
  */
 class OfflineAudioStore(
     root: File,
@@ -52,6 +60,7 @@ class OfflineAudioStore(
     private val sizeLister: (String) -> Map<String, Long>? = ::listReleaseSizes,
     private val headSize: (String) -> Long? = ::headLength,
     private val sizeExecutor: Executor = Executors.newSingleThreadExecutor { r -> Thread(r, "offline-audio-sizes").apply { isDaemon = true } },
+    private val unmetered: () -> Boolean = { true },
 ) {
     /**
      * One recording to download: its release URL, the player key it plays under, and a title for the shelf. [update]:
@@ -83,6 +92,14 @@ class OfflineAudioStore(
     private val queued = LinkedHashSet<String>()                  // guarded by lock
     private val cancelled: MutableSet<String> = ConcurrentHashMap.newKeySet()
     @Volatile private var active: Active? = null
+
+    // Download only on Wi-Fi (ra6): the page's switch, and the worker's wait for an unmetered network.
+    @Volatile private var wifiOnly = false
+    private val gateLock = ReentrantLock()
+    private val gateMoved = gateLock.newCondition()
+
+    /** A download on its way stopped for a metered network: it goes back to the queue (never a failure). */
+    private class HeldForWifi : Exception()
 
     // Release sizes (bytes) per tag: tag -> (fetchedAt, asset name -> bytes), kept in sizes.json for [SIZE_TTL].
     private val sizesFile = File(dir, "sizes.json")
@@ -281,6 +298,31 @@ class OfflineAudioStore(
         return out
     }
 
+    /** The page's Download only on Wi-Fi switch (AppInterface.offlineAudioWifiOnly; the page pushes it as it renders). */
+    fun setWifiOnly(on: Boolean) {
+        if (wifiOnly == on) return
+        wifiOnly = on
+        gateChanged()
+    }
+
+    /** The network or the switch changed (MeteredWatch, [setWifiOnly]): a waiting download re-checks, the rows re-read. */
+    fun gateChanged() {
+        wake()
+        send(JSONObject().put("type", "checked").toString())
+    }
+
+    /** Downloads wait now: the switch is on and the network is metered. */
+    fun waiting(): Boolean = wifiOnly && !runCatching { unmetered() }.getOrDefault(false)
+
+    private fun wake() = gateLock.withLock { gateMoved.signalAll() }
+
+    /** Hold the worker while downloads wait, as long as [url] is still queued (a cancel or Remove all ends the wait). */
+    private fun awaitGate(url: String) {
+        while (waiting() && synchronized(lock) { queued.contains(url) }) {
+            gateLock.withLock { if (waiting()) gateMoved.await(GATE_RECHECK_MS, TimeUnit.MILLISECONDS) }
+        }
+    }
+
     /** True when [url] is on the phone (whole, indexed). */
     fun isSaved(url: String): Boolean = synchronized(lock) { entries.containsKey(url) }
 
@@ -305,6 +347,8 @@ class OfflineAudioStore(
         // One event for the batch, before any worker starts on it: a Download all of 150 re-drew the screen 150 times
         // (sweep n2-03). `url` names the first, for a page that reads only that.
         send(JSONObject().put("type", "queued").put("url", fresh[0].first.url).put("urls", JSONArray(fresh.map { it.first.url })).toString())
+        // Download only on Wi-Fi: held on a metered network, the rows re-read the state and say Waiting for Wi-Fi.
+        if (waiting()) send(JSONObject().put("type", "checked").toString())
         for ((item, name) in fresh) executor.execute { download(item, name) }
     }
 
@@ -321,6 +365,7 @@ class OfflineAudioStore(
             }
         }
         for (u in dropped) send(event("cancelled", u).toString())
+        if (dropped.isNotEmpty()) wake()
     }
 
     /** Stop everything queued or downloading. */
@@ -332,6 +377,7 @@ class OfflineAudioStore(
             active?.let { cancelled.add(it.url) }
         }
         for (u in dropped) send(event("cancelled", u).toString())
+        wake()
     }
 
     /** Take [urls] off the phone (file and index entry), and stop an update of any of them on its way. */
@@ -386,6 +432,7 @@ class OfflineAudioStore(
             .put("freeBytes", runCatching { freeBytes() }.getOrDefault(-1L))
             .put("active", if (a == null) JSONObject.NULL else JSONObject().put("url", a.url).put("bytes", a.bytes).put("total", a.total))
             .put("queued", JSONArray(queued.toList()))
+            .put("waiting", queued.isNotEmpty() && waiting())
             .toString()
     }
 
@@ -422,10 +469,16 @@ class OfflineAudioStore(
     // ── download ──────────────────────────────────────────────────────
 
     private fun download(item: Item, name: String) {
+        // Download only on Wi-Fi: wait (still queued) while metered; one stopped on its way waits again and restarts.
+        do { awaitGate(item.url) } while (attempt(item, name))
+    }
+
+    /** One try at [item]. True when it stopped for a metered network and is queued again (Download only on Wi-Fi). */
+    private fun attempt(item: Item, name: String): Boolean {
         val act = Active(item.url)
         synchronized(lock) {
             // Cancelled (or removed by Remove all) while it waited: its 'cancelled' was already sent.
-            if (!queued.remove(item.url)) return
+            if (!queued.remove(item.url)) return false
             cancelled.remove(item.url)
             active = act
         }
@@ -433,11 +486,11 @@ class OfflineAudioStore(
         var opened: Opened? = null
         try {
             opened = opener(item.url)
-            if (opened == null) { fail(item.url, "network"); return }
+            if (opened == null) { fail(item.url, "network"); return false }
             val length = opened.length
             act.total = length
-            if (length > MAX_BYTES) { fail(item.url, "size"); return }
-            if (length > 0 && length + SPACE_MARGIN > freeBytes()) { fail(item.url, "space"); return }
+            if (length > MAX_BYTES) { fail(item.url, "size"); return false }
+            if (length > 0 && length + SPACE_MARGIN > freeBytes()) { fail(item.url, "space"); return false }
             send(progress(act).toString())
             var total = 0L
             var lastEmit = clock()
@@ -445,11 +498,12 @@ class OfflineAudioStore(
                 opened.stream.use { input ->
                     val buf = ByteArray(64 * 1024)
                     while (true) {
-                        if (cancelled.remove(item.url)) { out.close(); part.delete(); active = null; send(event("cancelled", item.url).toString()); return }
+                        if (cancelled.remove(item.url)) { out.close(); part.delete(); active = null; send(event("cancelled", item.url).toString()); return false }
+                        if (waiting()) throw HeldForWifi()
                         val n = input.read(buf)
                         if (n < 0) break
                         total += n
-                        if (total > MAX_BYTES) { fail(item.url, "size"); return }
+                        if (total > MAX_BYTES) { fail(item.url, "size"); return false }
                         out.write(buf, 0, n)
                         act.bytes = total
                         val now = clock()
@@ -458,9 +512,9 @@ class OfflineAudioStore(
                     out.fd.sync()
                 }
             }
-            if (total <= 0L || (length > 0 && total != length)) { fail(item.url, "short"); return }
+            if (total <= 0L || (length > 0 && total != length)) { fail(item.url, "short"); return false }
             // A chunked answer declared no length: its room is checked now, before the move.
-            if (length <= 0 && freeBytes() < SPACE_MARGIN) { fail(item.url, "space"); return }
+            if (length <= 0 && freeBytes() < SPACE_MARGIN) { fail(item.url, "space"); return false }
             val target = File(dir, name)
             // Cancel and Remove all take this lock too: the last cancellation check, the move into place and the index
             // entry happen under ONE hold of it, so neither can land in between. A Remove all during the final read or
@@ -485,6 +539,16 @@ class OfflineAudioStore(
                 "cancelled" -> send(event("cancelled", item.url).toString())
                 else -> fail(item.url, outcome)
             }
+        } catch (_: HeldForWifi) {
+            // Stopped for a metered network: back in the queue (a cancel that landed meanwhile wins), its .part gone in
+            // the finally below; the worker waits for Wi-Fi and starts it again from the top.
+            val requeued = synchronized(lock) {
+                active = null
+                if (cancelled.remove(item.url)) false else { queued.add(item.url); true }
+            }
+            if (requeued) send(JSONObject().put("type", "checked").toString())
+            else send(event("cancelled", item.url).toString())
+            return requeued
         } catch (e: Exception) {
             Timber.w(e, "offline audio: download of %s failed", item.url)
             fail(item.url, "network")
@@ -493,6 +557,7 @@ class OfflineAudioStore(
             try { opened?.onClose?.invoke() } catch (_: Exception) { /* release best-effort */ }
             active = null
         }
+        return false
     }
 
     /**
@@ -614,8 +679,13 @@ class OfflineAudioStore(
          */
         fun shared(context: Context): OfflineAudioStore =
             sharedStore ?: synchronized(this) {
-                sharedStore ?: OfflineAudioStore(context.applicationContext.filesDir, emit = { json -> eventSink?.invoke(json) })
-                    .also { sharedStore = it }
+                sharedStore ?: run {
+                    val app = context.applicationContext
+                    // Download only on Wi-Fi (ra6): the store asks the watch, and each flip wakes a waiting download.
+                    val watch = MeteredWatch(app)
+                    OfflineAudioStore(app.filesDir, emit = { json -> eventSink?.invoke(json) }, unmetered = watch::unmetered)
+                        .also { store -> sharedStore = store; watch.start { store.gateChanged() } }
+                }
             }
 
         const val DIR_NAME = "offline-audio"
@@ -630,6 +700,8 @@ class OfflineAudioStore(
         // Room kept free on the phone beyond the recording itself.
         private const val SPACE_MARGIN = 200L * 1024 * 1024
         private const val PROGRESS_MS = 500L
+        /** A waiting download re-checks the gate this often even unwoken (a lost network callback costs one wait). */
+        private const val GATE_RECHECK_MS = 5_000L
         private const val MAX_TEXT = 240
 
         // The release host and the asset hosts its 302 goes to (GardenImageCache's allowlist), and the Songs of the

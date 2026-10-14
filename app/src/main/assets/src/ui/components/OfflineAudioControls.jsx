@@ -159,6 +159,17 @@ export function unitState(off, urls) {
   };
 }
 
+/** Download only on Wi-Fi (ra6): queued on mobile data, a download waits for Wi-Fi. */
+const WAITING_WORDS = 'Waiting for Wi-Fi';
+
+/**
+ * The unit's downloads are held for Wi-Fi: the store says it waits, and none of them is on its way.
+ * @param {any} off the store @param {string[]} urls @returns {boolean}
+ */
+function waitsForWifi(off, urls) {
+  return typeof off.waiting === 'function' && off.waiting() && !urls.some((u) => off.statusOf(u) === 'downloading');
+}
+
 /** @param {any} t a player Track @param {string} name the row's title */
 function _item(t, name) {
   const part = t && t.partLabel ? ' · ' + t.partLabel : '';
@@ -206,7 +217,7 @@ export function OfflineRowStatus({ tracks, name }) {
   if (u.status === 'downloading') {
     return (
       <div className="offline-row is-busy" {...focus}>
-        <span className="offline-row-label"><DownloadIcon /><span>{'Downloading ' + u.percent + '%'}</span></span>
+        <span className="offline-row-label"><DownloadIcon /><span>{waitsForWifi(off, urls) ? WAITING_WORDS : 'Downloading ' + u.percent + '%'}</span></span>
         <button type="button" className="offline-row-link" onClick={() => off.cancel(urls)} aria-label={'Cancel the download of ' + name}>Cancel</button>
         <span className="offline-row-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={u.percent}
           aria-label={'Downloading ' + name}><span style={{ width: u.percent + '%' }} /></span>
@@ -251,7 +262,7 @@ export function OfflineCollectionAction({ units, label }) {
   if (u.status === 'downloading') {
     return (
       <p className="offline-collection is-busy" {...focus}>
-        <DownloadIcon /><span>{'Downloading · ' + u.saved + ' of ' + u.count + ' on this phone'}</span>
+        <DownloadIcon /><span>{(waitsForWifi(off, urls) ? WAITING_WORDS : 'Downloading') + ' · ' + u.saved + ' of ' + u.count + ' on this phone'}</span>
         <button type="button" className="offline-row-link" onClick={() => off.cancel(urls)}>Cancel</button>
       </p>
     );

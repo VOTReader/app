@@ -41,6 +41,7 @@
    as a pure helper so the decoupling is pinned by test
    (ChapterIndex.test.jsx). */
 import { AudioPlayer } from '../utils/audio-player.js';
+import { setWifiOnly } from '../utils/download-gate.js';
 import { bibleAudioEdition, bibleAudioOffered, resolveBibleAudio } from '../utils/audio-track.js';
 import { textKeyOf } from './components/AudioShelf.jsx';
 import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop } from '../utils/songs-route.js';
@@ -325,6 +326,8 @@ export function buildScreenRoutes({
   // it, idempotently, from the same render that owns the setting. 'auto' and
   // any unknown code both resolve to "use the manifest's primary reading".
   AudioPlayer.setPreferredReader(settings.letterReader);
+  // Download only on Wi-Fi (ra6): pushed the same way, to the download stores and the phone app's.
+  setWifiOnly(settings.downloadWifiOnly === true);
   /* ─────────────────────────────────────────────────────────────────────
      Built-in prop-builder helpers. Previously defined inside App() and
      threaded as 5 props (colIdxProps, colReadNavProps, _idxNav,

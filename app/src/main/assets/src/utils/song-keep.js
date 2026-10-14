@@ -40,6 +40,7 @@
 import { songById, songAssetUrl, SongCatalog } from './song-catalog.js';
 import { isSongId, isSongUrl } from './audio-track.js';
 import { OfflineAudio } from './offline-audio.js';
+import { downloadsWait, onGateChange } from './download-gate.js';
 
 /** Permanent Rule 5's guard: a song is 2-7 MB; nothing larger is ever read into memory to be kept. */
 const MAX_SONG_BYTES = 40e6;
@@ -64,6 +65,10 @@ let _active = null;
 let _abort = null;
 /** The song being kept (web) was cancelled or removed: its fetch abort covers only the download (sweep W64). */
 let _halted = false;
+/** The song on its way was stopped for mobile data (Download only on Wi-Fi, ra6): it goes back to the head of the queue. */
+let _held = false;
+/** @type {(() => void) | null} */
+let _unhookGate = null;
 /** Stop stamps (W64 refuter round 2): a keep waits (the store read, the room check) before its songs are queued, out
  *  of every list Cancel or Remove all reads; it drops a song stopped since it began. */
 let _stopSeq = 0;
@@ -436,12 +441,35 @@ async function _keepOne(id) {
   }
 }
 
+/**
+ * Download only on Wi-Fi (ra6, download-gate.js): on mobile data the web's queue waits, and the song on its way stops
+ * and waits at the head of it; back on Wi-Fi the queue goes on. The phone app's store gates its own downloads.
+ */
+function _onGate() {
+  if (downloadsWait()) {
+    if (_active && !_halted && !_held) {
+      _held = true;
+      if (_abort) { try { _abort.abort(); } catch (_e) { /* done already */ } }
+    }
+  } else void _pump();
+  _notify();
+}
+
+/** @returns {boolean} songs to keep wait for Wi-Fi now */
+function waiting() {
+  if (_native()) return OfflineAudio.waiting();
+  return !!_queue.length && downloadsWait();
+}
+
 /** Keep the next waiting song (web), one at a time. */
 async function _pump() {
   if (_active || !_queue.length) return;
+  if (!_unhookGate) _unhookGate = onGateChange(_onGate);
+  if (downloadsWait()) { _notify(); return; }
   const id = /** @type {string} */ (_queue.shift());
   _active = id;
   _halted = false;
+  _held = false;
   _notify();
   try {
     await _keepOne(id);
@@ -451,11 +479,14 @@ async function _pump() {
     // all the same, and a copy already stored goes (W64 refuter round 1).
     const aborted = _halted || !!(e && /** @type {any} */ (e).name === 'AbortError');
     if (_halted) { const st = _store(); if (st) { try { await st.delete(id); } catch (_e) { /* gone already */ } } }
+    // Stopped for mobile data, not cancelled: it waits at the head of the queue for Wi-Fi.
+    else if (_held && aborted) _queue.unshift(id);
     if (!aborted) _failed.set(id, e && /** @type {any} */ (e).message ? String(/** @type {any} */ (e).message) : 'network');
   } finally {
     _active = null;
     _abort = null;
     _halted = false;
+    _held = false;
     _notify();
   }
   if (_queue.length) void _pump();
@@ -600,13 +631,16 @@ export const SongKeep = {
   releaseObjectUrl,
   noteFor,
   clearNote,
+  waiting,
   /** Resolves once the web's kept songs are read (tests, the boot restore). */
   ready: () => _ensureLoaded(),
   /** Tests only. */
   _reset() {
     _listeners.clear();
     _kept.clear(); _failed.clear(); _notes.clear(); _retried.clear(); _listed.clear(); _dropping.clear(); _redo.clear();
-    _queue = []; _active = null; _abort = null; _live = null;
+    _queue = []; _active = null; _abort = null; _live = null; _held = false;
+    if (_unhookGate) _unhookGate();
+    _unhookGate = null;
     _loaded = false; _loading = null; _nativeHooked = false; _nativeIndex = null; _version = 0;
   },
 };

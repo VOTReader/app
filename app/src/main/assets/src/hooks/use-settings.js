@@ -225,6 +225,8 @@ export function useSettings({ savedSettings, theme }) {
       // Songs of the Letters (L4): the HEAR IT SUNG pill and the SONGS FROM THIS LETTER card. Default ON, stated
       // (not left to `!== false`) so toggleSetting's first tap turns it OFF — the audioTurnPage lesson above.
       showLetterSongs: true,
+      // Download only on Wi-Fi (ra6): off by default, stated for toggleSetting as above.
+      downloadWifiOnly: false,
       ...savedS,
       ...migrated // migration wins over stale saved values
     };

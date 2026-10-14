@@ -38,6 +38,8 @@ let _version = 0;
 let _saved = new Map();
 let _totalBytes = 0;
 let _freeBytes = -1;
+/** Download only on Wi-Fi (ra6): what is queued waits for Wi-Fi now (the store's state says so). */
+let _waiting = false;
 /** @type {Set<string>} */
 let _queued = new Set();
 /** @type {{ url: string, bytes: number, total: number } | null} */
@@ -128,6 +130,7 @@ function refresh() {
   }
   _totalBytes = Number(s.totalBytes) || 0;
   _freeBytes = typeof s.freeBytes === 'number' ? s.freeBytes : -1;
+  _waiting = s.waiting === true;
   _queued = new Set((Array.isArray(s.queued) ? s.queued : []).filter((u) => typeof u === 'string'));
   const a = s.active;
   _active = a && typeof a.url === 'string' ? { url: a.url, bytes: Number(a.bytes) || 0, total: Number(a.total) || -1 } : null;
@@ -316,6 +319,8 @@ export const OfflineAudio = {
     return Math.max(0, _totalBytes - songs);
   },
   freeBytes: () => { if (!_loaded) refresh(); return _freeBytes; },
+  /** @returns {boolean} downloads wait for Wi-Fi now (Download only on Wi-Fi is on and the phone is on mobile data) */
+  waiting: () => { if (!_loaded) refresh(); return _waiting; },
   /**
    * Download each of `list` to the phone (queued one at a time, natively or in the web store).
    * @param {Array<{ url: string, key: string, title: string }>} list
@@ -393,7 +398,7 @@ export const OfflineAudio = {
     _listeners.clear();
     _saved = new Map(); _queued = new Set(); _failed = new Map(); _sizes = new Map(); _sizesAsked = new Set(); _asked = new Map();
     _sizesToSend = new Set(); _sizesFlushQueued = false; _news = { seq: 0, text: '' };
-    _active = null; _totalBytes = 0; _freeBytes = -1; _loaded = false; _version = 0;
+    _active = null; _totalBytes = 0; _freeBytes = -1; _waiting = false; _loaded = false; _version = 0;
     _install();
   },
 };

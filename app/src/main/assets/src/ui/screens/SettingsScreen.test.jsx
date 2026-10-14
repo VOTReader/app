@@ -329,6 +329,35 @@ describe('Listening group', () => {
     expect(value('Your data')).toContain('Kept songs are not in it');
   });
 
+  // ra6 (Corbin 2026-10-14, brief design-10, the mock's place): under Songs kept on this phone, off by default.
+  it('Download only on Wi-Fi sits under Songs kept on this phone, off by default, and toggles its own key', () => {
+    window.AndroidBridge = { offlineAudioState: () => '{}', offlineAudioWifiOnly: vi.fn() };
+    const onToggle = vi.fn();
+    try {
+      renderSettings({}, { onToggle });
+      const labels = groupRowLabels('Listening');
+      expect(labels).toContain('Download only on Wi-Fi');
+      expect(labels.indexOf('Download only on Wi-Fi')).toBe(labels.indexOf('Turn the Page with the Audio') - 1);
+      const sw = within(row('Download only on Wi-Fi')).getByRole('switch');
+      expect(sw.getAttribute('aria-checked')).toBe('false');
+      fireEvent.click(sw);
+      expect(onToggle).toHaveBeenCalledWith('downloadWifiOnly');
+    } finally { delete window.AndroidBridge; }
+  });
+
+  it('Download only on Wi-Fi: a browser that cannot tell Wi-Fi from mobile data says so; none where nothing downloads', () => {
+    window.AndroidBridge = { offlineAudioState: () => '{}' };   // a store, but no way to tell (as a desktop browser)
+    try {
+      renderSettings({ downloadWifiOnly: true });
+      expect(within(row('Download only on Wi-Fi')).getByRole('switch').getAttribute('aria-checked')).toBe('true');
+      fireEvent.click(within(row('Download only on Wi-Fi')).getByRole('button', { name: /show description/i }));
+      expect(row('Download only on Wi-Fi').textContent).toContain('This browser cannot tell Wi-Fi from mobile data');
+    } finally { delete window.AndroidBridge; }
+    cleanup();
+    renderSettings();
+    expect(groupRowLabels('Listening')).not.toContain('Download only on Wi-Fi');
+  });
+
   it('no keep store on this browser, no Songs kept row', () => {
     renderSettings();
     expect(groupRowLabels('Listening')).not.toContain('Songs kept on this phone');

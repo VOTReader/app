@@ -690,6 +690,10 @@ class AppInterface(
     @JavascriptInterface
     fun offlineAudioCheck() { host.offlineAudio?.checkSavedJson() }
 
+    /** Settings > Download only on Wi-Fi (ra6): on, downloads wait while the network is metered. */
+    @JavascriptInterface
+    fun offlineAudioWifiOnly(on: Boolean) { host.offlineAudio?.setWifiOnly(on) }
+
     // ─── The native player (m3) ─────────────────────────────────────────
     // utils/native-audio.js, the page's stand-in <audio>, drives ExoPlayer through these. Binder thread: the port
     // posts its work to the main looper and never throws; each call is wrapped anyway, because a throw across the

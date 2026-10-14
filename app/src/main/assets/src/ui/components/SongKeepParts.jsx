@@ -60,8 +60,16 @@ function KeepBar({ kept, total }) {
 }
 
 /** "Keeping 3 of 19…" — or "Keeping…" for one song. @param {{ kept: number, total: number }} p */
-function keepingWords(p) {
+function keepingWords(p, keep) {
+  if (waitsForWifi(keep)) return WAITING_WORDS;
   return p.total > 1 ? 'Keeping ' + Math.min(p.total, p.kept + 1) + ' of ' + p.total + '…' : 'Keeping…';
+}
+
+/** Download only on Wi-Fi (ra6): what is on its way waits while the phone is on mobile data. */
+const WAITING_WORDS = 'Waiting for Wi-Fi';
+/** @param {any} keep @returns {boolean} */
+function waitsForWifi(keep) {
+  return !!keep && typeof keep.waiting === 'function' && keep.waiting();
 }
 
 /**
@@ -114,11 +122,11 @@ export function SongKeepCard({ ids, noteKey, versions = 1, title = '' }) {
   if (p.busy) {
     return (
       <section className="song-keep-card is-busy" aria-labelledby={noteKey + '-h'}>
-        <h2 id={noteKey + '-h'} className="song-keep-head">Keeping…</h2>
+        <h2 id={noteKey + '-h'} className="song-keep-head">{waitsForWifi(keep) ? WAITING_WORDS : 'Keeping…'}</h2>
         <div className="song-keep-body">
           <span className="song-keep-icon"><KeepIcon /></span>
           <div className="song-keep-copy">
-            <p className="song-keep-text" role="status">{keepingWords(p)}</p>
+            <p className="song-keep-text" role="status">{keepingWords(p, keep)}</p>
             <div className="song-keep-progress">
               <KeepBar kept={p.kept} total={p.total} />
               <button type="button" className="song-keep-cancel" onClick={() => keep.cancel(list)}>Cancel</button>
@@ -171,7 +179,7 @@ export function SongKeepAction({ ids, noteKey, label }) {
   } else if (p.busy) {
     body = (
       <div className="song-keep-line is-busy">
-        <span className="song-keep-line-label" role="status"><KeepIcon /><span>{keepingWords(p)}</span></span>
+        <span className="song-keep-line-label" role="status"><KeepIcon /><span>{keepingWords(p, keep)}</span></span>
         <button type="button" className="song-keep-cancel" onClick={() => keep.cancel(list)}>Cancel</button>
         <KeepBar kept={p.kept} total={p.total} />
       </div>
@@ -220,7 +228,7 @@ export function SongKeepQuiet({ id, title = '' }) {
   } else if (p.busy) {
     body = (
       <>
-        <span className="song-desk-keep-state" role="status"><KeepIcon /><span>Keeping…</span></span>
+        <span className="song-desk-keep-state" role="status"><KeepIcon /><span>{waitsForWifi(keep) ? WAITING_WORDS : 'Keeping…'}</span></span>
         <button type="button" className="song-keep-quiet" onClick={() => keep.cancel(list)}>Cancel</button>
       </>
     );

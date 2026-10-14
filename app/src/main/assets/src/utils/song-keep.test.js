@@ -422,3 +422,64 @@ describe('song-keep in the phone app — the native store', () => {
     expect(res.text).toMatch(/^Not enough room: needs /);
   });
 });
+
+/* ra6 (Corbin 2026-10-14, brief design-10): Download only on Wi-Fi holds a keep while the phone is on mobile data. */
+describe('song-keep on the web — Download only on Wi-Fi (ra6)', () => {
+  let gate;
+  let conn;
+  beforeEach(async () => {
+    gate = await import('./download-gate.js');   // the instance song-keep.js imported (load() reset the modules)
+    conn = new EventTarget();
+    conn.type = 'cellular';
+    conn.move = (t) => { conn.type = t; conn.dispatchEvent(new Event('change')); };
+    Object.defineProperty(window.navigator, 'connection', { configurable: true, value: conn });
+  });
+  afterEach(() => {
+    gate._resetDownloadGate();
+    delete window.navigator.connection;
+  });
+
+  it('on mobile data a keep waits and says so, then goes on by itself on Wi-Fi', async () => {
+    gate.setWifiOnly(true);
+    await SongKeep.keep([A1]);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(SongKeep.statusOf(A1)).toBe('queued');
+    expect(SongKeep.waiting()).toBe(true);
+    conn.move('wifi');
+    await settled();
+    expect(SongKeep.isKept(A1)).toBe(true);
+    expect(SongKeep.waiting()).toBe(false);
+  });
+
+  it('a song on its way stops on mobile data and waits at the head of the queue, not as a failure', async () => {
+    conn.type = 'wifi';
+    gate.setWifiOnly(true);
+    fetchMock.mockImplementationOnce((_u, init) => new Promise((_r, j) => {
+      init.signal.addEventListener('abort', () => j(new DOMException('aborted', 'AbortError')));
+    }));
+    await SongKeep.keep([A1, A2]);
+    await vi.waitFor(() => expect(SongKeep.statusOf(A1)).toBe('keeping'));
+    conn.move('cellular');
+    await vi.waitFor(() => expect(SongKeep.statusOf(A1)).toBe('queued'));
+    expect(SongKeep.waiting()).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    conn.move('wifi');
+    await settled();
+    expect(SongKeep.isKept(A1)).toBe(true);
+    expect(SongKeep.isKept(A2)).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[0][0]).toBe(SONG_URL(1, A1));
+    expect(fetchMock.mock.calls[1][0]).toBe(SONG_URL(1, A1));   // A1 again first, from the top
+  });
+
+  it('a cancel while it waits wins: Wi-Fi afterwards fetches nothing', async () => {
+    gate.setWifiOnly(true);
+    await SongKeep.keep([A1]);
+    SongKeep.cancel([A1]);
+    expect(SongKeep.statusOf(A1)).toBe('none');
+    conn.move('wifi');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

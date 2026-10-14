@@ -26,7 +26,13 @@
    Not on an iPhone or iPad in a Safari TAB: Safari clears a site's storage
    after about a week unused, so a save there would silently vanish; added
    to the Home Screen it is kept (song-keep.js follows the same rule).
+
+   Download only on Wi-Fi (ra6, download-gate.js): on mobile data the queue
+   waits, and one on its way stops, goes back to the head of the queue and
+   starts again from the top once the phone is on Wi-Fi.
    ═══════════════════════════════════════════════════════════════════════ */
+
+import { downloadsWait, onGateChange } from './download-gate.js';
 
 export const RELAY = 'https://audio.votreader.workers.dev/';
 export const OFFLINE_AUDIO_CACHE = 'vot-offline-audio-v1';
@@ -41,8 +47,10 @@ const PROGRESS_MS = 250;
 let _items = new Map();
 /** @type {Array<{ url: string, key: string, title: string }>} */
 let _queue = [];
-/** @type {{ url: string, bytes: number, total: number, ctl: AbortController } | null} */
+/** @type {{ url: string, bytes: number, total: number, ctl: AbortController, held: boolean } | null} */
 let _active = null;
+/** @type {(() => void) | null} */
+let _unhookGate = null;
 let _free = -1;
 let _loaded = false;
 /** @type {Promise<void> | null} */
@@ -140,6 +148,8 @@ function _state() {
     freeBytes: _free,
     queued: _queue.map((t) => t.url),
     active: _active ? { url: _active.url, bytes: _active.bytes, total: _active.total } : null,
+    // Download only on Wi-Fi: what is queued waits for it (the rows say so).
+    waiting: !!_queue.length && downloadsWait(),
   };
 }
 
@@ -148,11 +158,28 @@ function _list(json) {
   try { const v = JSON.parse(json); return Array.isArray(v) ? v : []; } catch (_e) { return []; }
 }
 
+/**
+ * The gate opened or closed (the switch, or the phone moved between Wi-Fi and mobile data). Closed, the download on
+ * its way stops and goes back to the head of the queue (_next's catch); open, the queue goes on. The rows re-read.
+ */
+function _onGate() {
+  if (downloadsWait()) {
+    if (_active && !_active.held) { _active.held = true; _active.ctl.abort(); }
+  } else _next();
+  _emit({ type: 'checked' });
+}
+
+function _hookGate() {
+  if (!_unhookGate) _unhookGate = onGateChange(_onGate);
+}
+
 async function _next() {
   if (_active || !_queue.length) return;
+  // Download only on Wi-Fi: on mobile data the queue waits (the rows re-read, and say so); _onGate starts it on Wi-Fi.
+  if (downloadsWait()) { _emit({ type: 'checked' }); return; }
   const it = /** @type {{ url: string, key: string, title: string }} */ (_queue.shift());
   const ctl = new AbortController();
-  const job = { url: it.url, bytes: 0, total: -1, ctl };
+  const job = { url: it.url, bytes: 0, total: -1, ctl, held: false };
   _active = job;
   _emit({ type: 'progress', url: it.url, bytes: 0, total: -1 });
   let reason = 'network';
@@ -206,6 +233,8 @@ async function _next() {
     // before it is untouched.)
     if (stored) { try { await (await caches.open(OFFLINE_AUDIO_CACHE)).delete(it.url); } catch (_e) { /* gone already */ } }
     if (_items.has(it.url)) _emit({ type: 'done', url: it.url });
+    // Stopped for mobile data: back at the head of the queue, from the top (its bytes are gone), waiting for Wi-Fi.
+    else if (job.held) { _queue.unshift(it); _emit({ type: 'checked' }); }
     else if (ctl.signal.aborted) _emit({ type: 'cancelled', url: it.url });
     else {
       if (e && /** @type {any} */ (e).name === 'QuotaExceededError') reason = 'space';
@@ -227,6 +256,7 @@ export const WebOfflineAudio = {
   offlineAudioSave(json) {
     // Before the cache has been read nothing looks saved: a save then would fetch again what is already kept.
     if (!_loaded) { _load().then(() => WebOfflineAudio.offlineAudioSave(json)); return; }
+    _hookGate();
     const busy = new Set(_queue.map((t) => t.url).concat(_active ? [_active.url] : []));
     /** @type {string[]} */
     const queued = [];
@@ -266,7 +296,8 @@ export const WebOfflineAudio = {
     const dropped = _queue.filter((t) => all || urls.includes(t.url));
     _queue = _queue.filter((t) => !dropped.includes(t));
     for (const t of dropped) _emit({ type: 'cancelled', url: t.url });
-    if (_active && (all || urls.includes(_active.url))) _active.ctl.abort();
+    // A cancel outranks a stop for mobile data that has not landed yet: it is cancelled, not queued again.
+    if (_active && (all || urls.includes(_active.url))) { _active.held = false; _active.ctl.abort(); }
   },
   /** @param {string} json urls whose sizes the page wants (answered by one 'sizes' event) */
   offlineAudioSizes(json) {
@@ -308,6 +339,8 @@ export const WebOfflineAudio = {
   /** Tests only. */
   _reset() {
     if (_active) _active.ctl.abort();
+    if (_unhookGate) _unhookGate();
+    _unhookGate = null;
     _items = new Map(); _queue = []; _active = null; _free = -1; _loaded = false; _loading = null; _persistAsked = false;
   },
 };

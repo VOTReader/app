@@ -241,3 +241,84 @@ describe('offline-audio-web (cf1)', () => {
     expect(OfflineAudio.webSrc(URL_OF('w'))).toBe(URL_OF('w'));
   });
 });
+
+/* ra6 (Corbin 2026-10-14, brief design-10): Download only on Wi-Fi. Chrome on Android reports
+   navigator.connection.type; on 'cellular' with the switch on, the queue waits and the rows say so. */
+describe('offline-audio-web: Download only on Wi-Fi (ra6)', () => {
+  let gate;
+  let conn;
+  beforeEach(async () => {
+    gate = await import('./download-gate.js');
+    gate._resetDownloadGate();
+    conn = new EventTarget();
+    conn.type = 'cellular';
+    conn.move = (t) => { conn.type = t; conn.dispatchEvent(new Event('change')); };
+    define(navigator, 'connection', conn);
+  });
+  afterEach(() => { gate._resetDownloadGate(); });
+  const gets = () => fetchMock.mock.calls.filter((c) => !(c[1] && c[1].method === 'HEAD'));
+
+  it('on mobile data a download waits, the rows hear it waits, and it goes on by itself on Wi-Fi', async () => {
+    await ready();
+    gate.setWifiOnly(true);
+    OfflineAudio.download([{ url: URL_OF('m1'), key: 'one:m1', title: 'M1' }]);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(gets()).toHaveLength(0);
+    expect(OfflineAudio.statusOf(URL_OF('m1'))).toBe('queued');
+    await vi.waitFor(() => expect(OfflineAudio.waiting()).toBe(true));
+    conn.move('wifi');
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('m1'))).toBe(true));
+    expect(OfflineAudio.waiting()).toBe(false);
+  });
+
+  it('off (the default), mobile data downloads as before', async () => {
+    await ready();
+    OfflineAudio.download([{ url: URL_OF('m2'), key: 'k', title: 't' }]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('m2'))).toBe(true));
+    expect(OfflineAudio.waiting()).toBe(false);
+  });
+
+  it('turning the switch off lets a waiting download go on', async () => {
+    await ready();
+    gate.setWifiOnly(true);
+    OfflineAudio.download([{ url: URL_OF('m3'), key: 'k', title: 't' }]);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(gets()).toHaveLength(0);
+    gate.setWifiOnly(false);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('m3'))).toBe(true));
+  });
+
+  it('one on its way stops when the phone moves to mobile data, keeps nothing, and starts again from the top on Wi-Fi', async () => {
+    conn.type = 'wifi';
+    await ready();
+    gate.setWifiOnly(true);
+    fetchMock.mockImplementationOnce((_u, init) => new Promise((r, j) => {
+      if (init && init.signal) init.signal.addEventListener('abort', () => j(new DOMException('aborted', 'AbortError')));
+    }));
+    OfflineAudio.download([{ url: URL_OF('m4'), key: 'k', title: 't' }, { url: URL_OF('m5'), key: 'k', title: 't' }]);
+    await vi.waitFor(() => expect(OfflineAudio.statusOf(URL_OF('m4'))).toBe('downloading'));
+    conn.move('cellular');
+    await vi.waitFor(() => expect(OfflineAudio.statusOf(URL_OF('m4'))).toBe('queued'));
+    expect(OfflineAudio.waiting()).toBe(true);
+    expect(OfflineAudio.failureOf(URL_OF('m4'))).toBe(null);
+    expect(gets()).toHaveLength(1);   // m5 never started on mobile data
+    expect((await (await caches.open(OFFLINE_AUDIO_CACHE)).keys())).toEqual([]);
+    conn.move('wifi');
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('m5'))).toBe(true));
+    expect(OfflineAudio.isSaved(URL_OF('m4'))).toBe(true);
+    // Back at the head of the queue: m4 again before m5.
+    expect(gets().map((c) => c[0])).toEqual([RELAY + 'audio-v1/m4.mp3', RELAY + 'audio-v1/m4.mp3', RELAY + 'audio-v1/m5.mp3']);
+  });
+
+  it('a cancel while it waits takes it off the queue: Wi-Fi afterwards fetches nothing', async () => {
+    await ready();
+    gate.setWifiOnly(true);
+    OfflineAudio.download([{ url: URL_OF('m6'), key: 'k', title: 't' }]);
+    await vi.waitFor(() => expect(OfflineAudio.statusOf(URL_OF('m6'))).toBe('queued'));
+    OfflineAudio.cancel([URL_OF('m6')]);
+    await vi.waitFor(() => expect(OfflineAudio.statusOf(URL_OF('m6'))).toBe('none'));
+    conn.move('wifi');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(gets()).toHaveLength(0);
+  });
+});
