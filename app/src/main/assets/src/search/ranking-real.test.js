@@ -27,7 +27,11 @@ const GLOBALS = {
   BOOKS: {
     // the NKJV says "begot"; the KJV, which a reader may remember, says "begat" (kjv-alias.js)
     genesis: { id: 'genesis', title: 'Genesis', chapters: [{ num: 5, sections: [{ heading: '', verses: [{ n: 3, text: 'And Adam lived one hundred and thirty years, and begot a son in his own likeness, after his image, and named him Seth.' }] }] }] },
-    'matthew-plain': { id: 'matthew-plain', title: 'Matthew', chapters: [{ num: 7, sections: [{ heading: '', verses: [{ n: 1, text: JUDGE }] }] }] },
+    'matthew-plain': { id: 'matthew-plain', title: 'Matthew', chapters: [
+      // the KJV's "begat" and its "Emmanuel" (a word only Matthew holds) find these (sweep W29)
+      { num: 1, sections: [{ heading: '', verses: [{ n: 2, text: 'Abraham begot Isaac, Isaac begot Jacob, and Jacob begot Judah and his brothers.' }, { n: 23, text: 'Behold, the virgin shall be with child, and bear a Son, and they shall call His name Immanuel.' }] }] },
+      { num: 7, sections: [{ heading: '', verses: [{ n: 1, text: JUDGE }] }] },
+    ] },
     john: { id: 'john', title: 'John', chapters: [{ num: 14, sections: [{ heading: '', verses: [{ n: 6, text: 'Jesus said to him, I am the way, the truth, and the life. No one comes to the Father except through Me.' }].concat(FILLER) }] }] },
   },
   LETTERS_V1: [
@@ -125,6 +129,12 @@ describe('ranking on the audit\u2019s cases', () => {
     const r = await VotSearchMini.search('begat');
     expect(refs(r)[0]).toBe('Genesis 5:3');
     expect(r.corrections || []).toEqual([]);
+  });
+
+  // sweep W29 (2026-10-13): the alias names Matthew's verses 'matthew-plain', the index keys them 'matthew'
+  it('a KJV word finds its Matthew verses too, and a word only Matthew holds finds Matthew', async () => {
+    expect(refs(await VotSearchMini.search('begat'))).toContain('Matthew 1:2');
+    expect(refs(await VotSearchMini.search('emmanuel'))[0]).toBe('Matthew 1:23');
   });
 
   it('a word or two is a keyword search: the topic titled with them comes first', async () => {

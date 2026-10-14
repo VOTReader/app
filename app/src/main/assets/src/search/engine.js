@@ -182,7 +182,8 @@ function kjvAliasHits(term) {
   let book = '';
   for (const r of refs) {
     const p = r.split('.');
-    if (p.length === 3) book = KJV_ALIAS_BOOKS[parseInt(p.shift() || '', 36)];
+    // the alias names Matthew's verses by the plain chapter's book id; VERSE_IDS keys them 'matthew' (sweep W29)
+    if (p.length === 3) { book = KJV_ALIAS_BOOKS[parseInt(p.shift() || '', 36)]; if (book === 'matthew-plain') book = 'matthew'; }
     const id = VERSE_IDS.get(book + ':' + parseInt(p[0], 36) + ':' + parseInt(p[1], 36));
     if (id) out.push({ id, score, terms: [term] });
   }
