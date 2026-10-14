@@ -9,10 +9,9 @@
 
 import { PlatformBridge } from '../utils/platform-bridge.js';
 import { showToast } from '../utils/toast.js';
+import { DOUBLE_TAP_MS, MAX_TAP_DISTANCE_PX, FULLSCREEN_GESTURE_EVENT } from '../utils/fullscreen-gesture-event.js';
 import { useRefMirror } from './use-ref-mirror.js';
 
-const DOUBLE_TAP_MS = 420;
-const MAX_TAP_DISTANCE_PX = 32;
 const MAX_DRAG_DISTANCE_PX = 18;
 const FULLSCREEN_HINT_LIMIT = 3;
 
@@ -139,6 +138,9 @@ export function useFullscreenGesture({ enabled, hintCount, onHintShown }) {
       }
 
       previousTapRef.current = null;
+      // The first tap may have jumped the audio (tap-to-seek seeks at once);
+      // the read-along undoes that jump when it hears this (ra3).
+      document.dispatchEvent(new CustomEvent(FULLSCREEN_GESTURE_EVENT, { detail: point }));
       const entering = PlatformBridge.isAndroid
         ? !androidFullscreenRef.current
         : !document.fullscreenElement;

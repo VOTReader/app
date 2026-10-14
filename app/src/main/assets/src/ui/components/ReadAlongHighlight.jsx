@@ -99,6 +99,7 @@ import { bibleSyncGlobalFor, resolveBibleAudio } from '../../utils/audio-track.j
 import { loadAudioSync, audioSyncStore, loadBibleSync, bibleSyncStore, audioSyncSectionsStore } from '../../utils/sync-loaders.js';
 import { prefersReducedMotion } from '../../utils/reduced-motion.js';
 import { showToast } from '../../utils/toast.js';
+import { DOUBLE_TAP_MS, MAX_TAP_DISTANCE_PX, FULLSCREEN_GESTURE_EVENT } from '../../utils/fullscreen-gesture-event.js';
 
 const HL_NAME = 'vot-reading';
 /** How long a deliberate user scroll suspends follow-scroll. */
@@ -979,10 +980,22 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   // and any interactive descendant (footnote bubbles, scripture and letter
   // links). Seek only — the transport keeps whatever play/pause state the
   // reader chose.
+  //
+  // A DOUBLE-TAP IS FULLSCREEN, AND IT WINS (ra3, Corbin 2026-10-14). The tap
+  // jumps at once, with no wait to see whether a second tap follows; the jump
+  // is kept for one double-tap window, and when the fullscreen gesture fires
+  // (FULLSCREEN_GESTURE_EVENT, after the second pointerup) it is undone to
+  // where the reader would have been without it, and that second tap's click
+  // jumps nothing. If the second click gets here first, it chains onto the
+  // first jump, so the undo still goes back before the first tap.
   React.useEffect(() => {
     const el = mainRef.current;
     if (!frags || !el) return undefined;
     let downX = 0, downY = 0, downHadSelection = false;
+    /** @type {{ from: number, at: number, last: number, playing: boolean, rate: number, qi: number } | null} */
+    let jump = null;
+    /** @type {{ until: number, x: number, y: number } | null} */
+    let swallow = null;
     const selectionLive = () => {
       try {
         const s = el.ownerDocument.getSelection();
@@ -994,6 +1007,10 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       downHadSelection = selectionLive();
     };
     const onClick = (e) => {
+      const now = Date.now();
+      const sw = swallow;
+      swallow = null;
+      if (sw && now <= sw.until && Math.hypot(e.clientX - sw.x, e.clientY - sw.y) <= MAX_TAP_DISTANCE_PX) return;   // the double-tap's second click
       if (downHadSelection || selectionLive()) return;           // selecting, or dismissing one
       if (Math.abs(e.clientX - downX) > 10 || Math.abs(e.clientY - downY) > 10) return;   // drag/scroll
       // The three icon classes are NOT decoration. LinkIcon, BookmarkIcon and
@@ -1006,13 +1023,30 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
           && e.target.closest('a, button, [role="button"], [role="link"], .fn-ref, .letter-link-ref, .inline-scrip-ref, .verse-link-icon, .inline-bookmark-icon, .hl-note-icon')) return;
       const i = fragmentAtPoint(frags, el, letterId, hlKeyFn, e.clientX, e.clientY, offsetMapFn);
       if (i < 0) return;                                          // untimed text — stay silent
+      if (jump && now - jump.last <= DOUBLE_TAP_MS) jump.last = now;
+      else {
+        const st = AudioPlayer.getState();
+        jump = { from: AudioPlayer.getPreciseTime(), at: now, last: now, playing: st.status === 'playing', rate: st.rate || 1, qi: st.qi };
+      }
       AudioPlayer.seek(frags[i][0]);
+    };
+    const onFullscreenGesture = (e) => {
+      const now = Date.now();
+      const d = (e && e.detail) || {};
+      swallow = { until: now + DOUBLE_TAP_MS, x: Number(d.x) || 0, y: Number(d.y) || 0 };
+      const j = jump;
+      jump = null;
+      if (!j || now - j.last > DOUBLE_TAP_MS || AudioPlayer.getState().qi !== j.qi) return;
+      AudioPlayer.seek(j.from + (j.playing ? ((now - j.at) / 1000) * j.rate : 0));
     };
     el.addEventListener('pointerdown', onDown, { passive: true });
     el.addEventListener('click', onClick);
+    const doc = el.ownerDocument;
+    doc.addEventListener(FULLSCREEN_GESTURE_EVENT, onFullscreenGesture);
     return () => {
       el.removeEventListener('pointerdown', onDown);
       el.removeEventListener('click', onClick);
+      doc.removeEventListener(FULLSCREEN_GESTURE_EVENT, onFullscreenGesture);
     };
   }, [frags, mainRef, letterId, hlKeyFn, offsetMapFn]);
 
