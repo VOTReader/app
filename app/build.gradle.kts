@@ -120,7 +120,7 @@ android {
         // (com.votreader.app, set in androidComponents below) so it installs BESIDE the daily
         // (com.votreader.sacredui, debug key): the owner moves his data with Export / Verify / Import
         // and never uninstalls. Never install a store-signed build on his Pixel by hand.
-        // Its own res (src/store/res) carries the adaptive + monochrome icon slots.
+        // Its icon is main's (src/main/res: adaptive, vector foreground, monochrome layer; 2026-10-14).
         create("store") {
             initWith(getByName("release"))
             matchingFallbacks += listOf("release")

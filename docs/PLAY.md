@@ -13,7 +13,7 @@ This page is the handover: what is built, how to build it, and what is left that
 | Upload key | `D:\VOTReader-keys\votreader-upload.jks` (PKCS12, alias `upload`, RSA 4096, valid to 2054). Copy: `%USERPROFILE%\OneDrive\Backups\VOTReader\votreader-upload.jks`. SHA-256 `E3:F7:43:E7:51:5E:17:C7:59:90:24:38:B5:5E:ED:9C:A5:1D:9F:C3:72:C5:4C:FF:46:44:96:F7:F1:F6:1C:5C`. |
 | Key password | Stored in the DPAPI secret store `D:\AgentBackbone\secrets\secrets.xml` as `VOT_UPLOAD_PASSWORD`. Only Corbin's Windows account on this laptop can decrypt it. Not in git, not in any doc. |
 | Privacy policy | https://votreader.github.io/app/privacy.html (`app/src/main/assets/privacy.html`, pp1). |
-| Icon slots | The store build's adaptive icon has background, foreground and a monochrome (themed icon) layer (`app/src/store/res/`). The monochrome layer is a placeholder open book until the new icon is picked. |
+| Icon | The slender flame (Corbin 2026-10-14). Both builds use `app/src/main/res/`: an adaptive icon with a background, a transparent vector foreground inside the 66 dp safe zone, and a one-colour monochrome layer (Android 13+ themed icons). The store build has no icon of its own. |
 | Already compliant | targetSdk/compileSdk 36 (Play's API 36 rule from 2026-08-31), edge-to-edge, predictive back, POST_NOTIFICATIONS asked in context, both media services typed `mediaPlayback`, no native libraries (16 KB pages fine), cleartext off, backup off. |
 
 ## Build the bundle
@@ -55,7 +55,7 @@ The phone app sends nothing since bc1 (992bf257): the Cloudflare visit count loa
 2. **12 testers** (personal account only): their Gmail addresses for the closed-test list.
 3. **Upload the first bundle** to Internal testing, enroll in **Play App Signing** with a Google-generated app key (the default). Then a lost upload key is reset by Google support, not fatal.
 4. **Save the key password in Bitwarden too.** The DPAPI copy dies with this laptop's Windows profile. An agent can copy it in with `D:\AgentBackbone\secrets\Invoke-WithSecret.ps1` once the vault is unlocked (`Unlock-Bitwarden.ps1` asks for the master password).
-5. **Icon.** Pick one of the flat gold-on-charcoal options (overhaul sheet 40). Then the foreground becomes a transparent vector inside the 66 dp safe zone, the monochrome layer its silhouette, and the 512 px store icon comes from the same art.
+5. **Icon.** Done 2026-10-14: the slender flame is in both builds (see Icon above). The 512 px store icon comes from the same art when the listing is made (`assets/icons/icon-512.png` is the website's, a circle on transparent).
 6. **Listing text.** Name `VOTReader`. Short description draft (68 of 80): "Read and listen to Scripture and The Volumes of Truth, fully offline." Full description (up to 4000), category Books & Reference, and a **public contact email** (required).
 7. **Screenshots and feature graphic.** 4 to 8 phone shots (1080x1920 or larger, 9:16) and a 1024x500 feature graphic; tablet shots only for a large-screen listing. The design lane makes these after the redesign pick.
 8. **Copyrighted content** (hub default, synthesis decision 6): the NKJV and NKJV-R text, Word of Promise audio and the Gospel of John film audio are not covered by Timothy's permission. Default: a store build without them, KJV with BRM audio, until licenses arrive in writing. Not built yet; say yes/no.
