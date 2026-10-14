@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   scripture-web/web-renderer — Cluster F (esbuild bundle-f.js)
+   scripture-web/web-renderer — Cluster F (bundle-d since lz1; lazy bundle-f before)
 
    The GPU side of The Scripture Web.
 
@@ -57,7 +57,7 @@ export const DENSITY_STEPS = ['essential', 'famous'];
 //
 // This lives out here, not beside the line, because a template literal ships its comments
 // verbatim: inside the shader these twelve lines were 821 B of the 917 B that put bundle-f
-// over its byte ceiling. esbuild strips them here and the shipped shader is unchanged.
+// (lazy until lz1) over its byte ceiling. esbuild strips them here and the shipped shader is unchanged.
 
 const VERT = `#version 300 es
 precision highp float;

@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   scripture-web/palette — Cluster F (esbuild bundle-f.js)
+   scripture-web/palette — Cluster F (bundle-d since lz1; lazy bundle-f before)
 
    Colour in this view always ENCODES something. Three modes, each answering
    a different question about the same ~64,000 shipped connections:

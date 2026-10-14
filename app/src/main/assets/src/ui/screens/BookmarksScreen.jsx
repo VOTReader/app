@@ -1,22 +1,23 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   BookmarksScreen — Cluster G (esbuild bundle-g.js, lazy)
+   BookmarksScreen — Cluster G (bundle-d since lz1; lazy bundle-g before)
    ═══════════════════════════════════════════════════════════════════════
    My Bookmarks is a screen a reader opens on purpose, never on boot, so it
-   travels with the other Personal Study screens in bundle-g rather than
-   costing every launch its parse (lanes/myweb/out/perf-report-2026-09-22.md
-   §6). Two pieces of this file could not come along and now live in
-   bundle-d, where the always-present app shell can always reach them:
+   travelled with the other Personal Study screens in lazy bundle-g rather
+   than costing every launch its parse (lanes/myweb/out/perf-report-2026-09-22.md
+   §6) until lz1 (2026-10-13) folded bundle-g into bundle-d. Two pieces of
+   this file could not come along then and live in the app shell's own
+   files, where the always-present shell can always reach them:
    BookmarkPopover (ui/sheets/BookmarkPopover.jsx) and the two hlKey
    derivations (utils/bookmark-source.js).
 
-   Which is why the screen asks for those derivations the way every lazy
-   bundle asks bundle-d for a shared law — as a free global at call time,
-   through the two guards below. BookmarkRow and its action sheet have no
+   Which is why the screen still asks for those derivations the way every
+   lazy bundle once asked bundle-d for a shared law — as a free global at
+   call time, through the two guards below. BookmarkRow and its action sheet have no
    reader outside this file, so they ride with the screen.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* The bundle-d slots, guarded so that rendering this screen alone (a test,
-   or a bundle-g that somehow arrived first) degrades to the raw key rather
+   or a host without bundle-d's slots) degrades to the raw key rather
    than throwing. */
 function srcLabel(hlKey) {
   return (typeof _bookmarkSourceLabel === 'function') ? _bookmarkSourceLabel(hlKey) : String(hlKey || 'Bookmark');

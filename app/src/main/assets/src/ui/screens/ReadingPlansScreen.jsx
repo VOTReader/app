@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    ReadingPlansScreen — start, follow and stop a reading plan (rp1)
    ═══════════════════════════════════════════════════════════════════════
-   Cluster G (lazy bundle-g), like the other personal-study screens. Built to
+   Cluster G (bundle-d since lz1), like the other personal-study screens. Built to
    the round-2 mockup (lanes/myweb/out/mockups/rp1/r2-plans.png): the plans
    not started as cards with Start (the Volumes with a pace), then each plan
    that runs: its day, a thin progress line, this month's days (done, missed,

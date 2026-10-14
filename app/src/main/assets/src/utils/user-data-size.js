@@ -171,7 +171,7 @@ export async function measureUserData() {
    store would have measured itself.
 
    Sampling happens only where measureUserData ALREADY runs: the Settings
-   mount effect, which lives in the lazily-loaded bundle-e. Zero boot cost,
+   mount effect, which runs only when Settings opens. Zero boot cost,
    no timer, at most one sample per day (a same-day revisit overwrites, so
    the point stays fresh rather than duplicating). */
 

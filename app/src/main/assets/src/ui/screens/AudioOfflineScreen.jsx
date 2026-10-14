@@ -6,8 +6,8 @@
    Library hub's "On this phone" row opens it; it exists where downloads are possible (the Android app, or a browser that keeps recordings: cf1).
 */
 
-/* Cluster H (esbuild bundle-h.js, lazy), with the other Listening Library screens. OfflineAudio and AudioPlayer stay
-   in bundle-d and are read as free globals at call time - one store, one player (see _entry-h.js). */
+/* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13), lazy bundle-h before. OfflineAudio and AudioPlayer
+   live in bundle-d too and are read as free globals at call time - one store, one player (see _entry-d.js). */
 
 import { useOfflineAudio, formatBytes } from '../components/OfflineAudioControls.jsx';
 

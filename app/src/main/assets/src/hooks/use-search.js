@@ -77,7 +77,7 @@
                                            per-render identity churn).
 
    DOES NOT OWN:
-     - The search engine itself (window.VotSearchMini) — that's bundle-e's
+     - The search engine itself (window.VotSearchMini) — that's search/'s
        responsibility. handleSearchCommand's 'rebuild-index' action
        calls into it, but the engine is external.
      - The SearchScreen component — render tree, stays in ui/screens/.
@@ -161,7 +161,7 @@
                                 letterNum → letterId resolution.
      window.VotSearchMini       For handleSearchCommand's 'rebuild-index'
                                 action (delegates to the search engine
-                                in bundle-e).
+                                in bundle-d since lz1).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
@@ -359,7 +359,7 @@ export function useSearch({
   // hits already carry a verse anchor and take the same seek. `terms` are the
   // query's (SearchScreen); `entry.terms` the engine's per-hit matched words
   // (a typo-corrected match), merged the way SrchCard merges them for <mark>.
-  // The engine is bundle-e (lazy): without it, no excerpt — the letter opens
+  // The engine is a window global (bundle-d): without it, no excerpt — the letter opens
   // at the top exactly as before, never a thrown dispatch.
   // `letterId` names the unit the excerpt was cut from: the consumers land it
   // ONLY on that unit, so an anchor that outlives the landing (the follower
@@ -503,15 +503,15 @@ export function useSearch({
     if (action === 'volumes') { setScreen('volumes-home'); return; }
     if (action === 'clear-history') {
       // Wires the long-dormant "/clear history" command to the recent-searches
-      // store (window-exposed by bundle-e). Guarded: bundle-e is loaded whenever
-      // this fires (the command is typed in SearchScreen, which lives there).
+      // store (window-exposed by bundle-d, which loads at cold boot). Guarded
+      // anyway (the command is typed in SearchScreen, in the same bundle).
       if (typeof window.clearRecentSearches === 'function') window.clearRecentSearches();
       return;
     }
     if (action === 'clear-query') { setSearchQuery(''); return; }
     if (action === 'rebuild-index') {
-      // Guarded: the engine lives in bundle-e, loaded whenever this fires
-      // (the command is typed in SearchScreen, which lives there too).
+      // Guarded: the engine lives in bundle-d (cold boot since lz1), with
+      // SearchScreen, where the command is typed.
       if (window.VotSearchMini) window.VotSearchMini.rebuild().catch(() => {});
       return;
     }

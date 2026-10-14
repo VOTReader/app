@@ -2,8 +2,8 @@
    HighlightsScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* Free globals, not imports: this screen ships in bundle-g (the lazy Personal
-   Study bundle) and reads normalizeExcerptDisplay from the window slots
+/* Free globals, not imports: this screen ships in bundle-d (the lazy Personal
+   Study bundle-g until lz1) and reads normalizeExcerptDisplay from the window slots
    bundle-d fills — one copy of each law, and no second module state.
    mark-kinds.js is the exception: pure, stateless, a few lines (v05-04). */
 import { isMarkKind } from '../../utils/mark-kinds.js';

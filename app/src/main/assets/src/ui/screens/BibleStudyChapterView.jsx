@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   BibleStudyChapterView — lazy bundle-g (esbuild bundle-g.js)
+   BibleStudyChapterView — Cluster G (bundle-d since lz1; lazy bundle-g before)
    ═══════════════════════════════════════════════════════════════════════
    The study-chapter screen — extracted from the inline `bible-study-chapter`
    ROUTES entry in app.jsx (Phase 2 P9a). Wraps LetterView with study-

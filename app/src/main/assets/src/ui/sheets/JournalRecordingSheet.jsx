@@ -18,7 +18,7 @@
 
 /* PlatformBridge is read as a FREE GLOBAL, not imported — the same contract
    GardenView, SettingsScreen and ScriptureWebScreen keep. This sheet moved to
-   the lazy bundle-g with the journal editor that renders it (landing 28), and
+   the lazy bundle-g with the journal editor that renders it (landing 28; bundle-d since lz1), and
    an ES import would have bundled a SECOND copy of platform-bridge.js there:
    two module states of one bridge, one of them holding the native recorder's
    session. bundle-b puts the real one on window before any journal screen can

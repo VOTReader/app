@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
    useWebCamera — the Scripture Web's cameras, view and focus.
-   Cluster F (bundle-f), used by ui/screens/ScriptureWebScreen.jsx.
+   Cluster F (bundle-d since lz1), used by ui/screens/ScriptureWebScreen.jsx.
    ═══════════════════════════════════════════════════════════════════════
 
    Split out of ScriptureWebScreen (v15-code-health-06): the per-frame state

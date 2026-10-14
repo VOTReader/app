@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   scripture-web/pick — Cluster F (esbuild bundle-f.js)
+   scripture-web/pick — Cluster F (bundle-d since lz1; lazy bundle-f before)
 
    "Tap any point on any line, whether at the peak of the curve or the
    beginning or ending" — this is that.

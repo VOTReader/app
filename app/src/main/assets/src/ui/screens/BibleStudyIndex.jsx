@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   BibleStudyIndex — lazy bundle-g (esbuild bundle-g.js)
+   BibleStudyIndex — Cluster G (bundle-d since lz1; lazy bundle-g before)
    ═══════════════════════════════════════════════════════════════════════
    scrollBehavior is a bundle-d global, read at call time rather than
-   imported, as the other bundle-g screens do. */
+   imported, as the other Cluster G screens do. */
 
 export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, markAsReadEnabled, backHint = null, onTapThroughBack }) {
   const currentRef = React.useRef(null);

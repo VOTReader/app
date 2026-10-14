@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   scripture-web/personal-graph — Cluster F (esbuild bundle-f.js)
+   scripture-web/personal-graph — Cluster F (bundle-d since lz1; lazy bundle-f before)
 
    Turns the reader's own links into the dual-rail web.
 

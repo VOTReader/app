@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   StudiesHome — lazy bundle-g (esbuild bundle-g.js)
+   StudiesHome — Cluster G (bundle-d since lz1; lazy bundle-g before)
    ═══════════════════════════════════════════════════════════════════════
    studyCoverage, studyCoverageDetail and CoverageBadge are bundle-d globals,
-   read at call time rather than imported: a bundled copy would ship twice. */
+   read at call time rather than imported (in lazy bundle-g a bundled copy
+   would have shipped twice). */
 
 export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, onSelectStudy, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   // Q8.2: pre-fire the Matthew Study Bible corpus load. By the time the

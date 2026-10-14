@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
    backup-flow — the Settings backup flows: Export, Import, Verify a Backup
-   and Clear All Personal Data. Cluster E (bundle-e), imported by
+   and Clear All Personal Data. Cluster E (bundle-d since lz1), imported by
    ui/screens/SettingsScreen.jsx.
    ═══════════════════════════════════════════════════════════════════════
 
@@ -15,7 +15,7 @@
 
    The data plane stays where it was: utils/backup.js, backup-container.js,
    backup-android.js and backup-verify.js ride bundle-d and are reached here as
-   the same window globals the screen used, so bundle-e never carries a second
+   the same window globals the screen used, so this file never bundles a second
    copy of withBackupLock's lock or the stores. The one import, backup-warn.js,
    is stateless. The warnings that already write their own DiagnosticLog line
    (integrity, Clear All's caches) keep console.warn, so nothing logs twice. */

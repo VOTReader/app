@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   scripture-web/geometry — Cluster F (esbuild bundle-f.js)
+   scripture-web/geometry — Cluster F (bundle-d since lz1; lazy bundle-f before)
 
    THE height law and the camera, in one place.
 

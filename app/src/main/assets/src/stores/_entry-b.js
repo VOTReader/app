@@ -161,12 +161,12 @@ import { votNoteVolLabel } from '../data/vot-note-label.js';
 // JournalInboundSheet on every screen ("entries linked to this ref"), so it is
 // app-shell weight the way BookmarkPopover was in landing 22. The two sheets
 // the EDITOR alone renders — JournalInsertSheet and JournalRecordingSheet —
-// went to bundle-g with it (landing 28).
+// went to bundle-g with it (landing 28; bundle-d since lz1, 2026-10-13).
 import { JournalInboundSheet } from '../ui/sheets/JournalInboundSheet.jsx';
 
 // ── Journal UI (screens) ────────────────────────────────────────────────
 // The hub, the viewer and the editor left this cluster for the lazy bundle-g
-// on 2026-09-22 (landing 28, -76 KB off every launch): they are screens a
+// on 2026-09-22 (landing 28, -76 KB off every launch; bundle-d since lz1): they are screens a
 // reader opens ON PURPOSE, the same shape as My Progress, Notes, Links,
 // Highlights, Bookmarks and History before them. Their private
 // helpers (JournalCardMenu, jrnRenderInline, JournalBlockView, the image and
@@ -202,7 +202,7 @@ Object.assign(window, {
   isStoreWriteFenced,
   // datasafe 10-05: the banner's Restore, Clear All and Import (bundle-d) reach it here.
   DataSafety,
-  // W8: Clear All and Import (bundle-e) tell the other open tabs, and an Import in a tab
+  // W8: Clear All and Import (bundle-d) tell the other open tabs, and an Import in a tab
   // whose library another tab changed is refused (utils/other-tabs.js).
   announceLibraryChange, heldByOtherTab,
   showToast, hideToast,
@@ -298,7 +298,7 @@ Object.assign(window, {
   findEntryContext, lookupVersesFromBooks,
   linkWtlbEntries, linkPreface, resolveVotLetter, isHiddenManna,
   votNoteVolLabel,
-  // Journal UI (sheets) — the shell's one; the editor's two are in bundle-g
+  // Journal UI (sheets) — the shell's one; the editor's two are in bundle-d
   JournalInboundSheet,
   // Renderer
   JournalChip,

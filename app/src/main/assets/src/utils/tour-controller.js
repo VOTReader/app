@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════
    TourController — runs "Show me around"
    ═══════════════════════════════════════════════════════════════════════
-   ES module, bundle-b (window-exposed by _entry-b so the Home strip in
-   bundle-d, Settings in bundle-e and the overlay in bundle-e all talk to the
+   ES module, bundle-b (window-exposed by _entry-b so the Home strip,
+   Settings and the overlay, all bundle-d since lz1, talk to the
    same one). A tiny store in the shape of every other store here: subscribe /
    getVersion / getState, read by React with useSyncExternalStore.
 
@@ -256,7 +256,7 @@ export const TourController = {
   /** The minutes the same sentences promise ("about three minutes"), owned by tour-steps.js like the count. */
   minutesWord() { return TOUR_MINUTES_WORD; },
 
-  /** The control a stop rings, if it is on screen (bundle-e's overlay reaches findTarget through here). */
+  /** The control a stop rings, if it is on screen (the overlay reaches findTarget through here). */
   findTarget(step) { return findTarget(step); },
 
   /** Press the Bible screen's Listen pill unless the tour's book is already up — the `ensureListening`

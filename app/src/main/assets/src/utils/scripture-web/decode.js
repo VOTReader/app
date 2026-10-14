@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   scripture-web/decode — Cluster F (esbuild bundle-f.js)
+   scripture-web/decode — Cluster F (bundle-d since lz1; lazy bundle-f before)
 
    Turns the shipped SCRIPTURE_WEB_DATA global into typed arrays the renderer
    can hand straight to WebGL.

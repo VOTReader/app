@@ -40,7 +40,7 @@ export function expandSnippetTerms(parsed, parsedTerms, synMap, synonymsOn, stop
 
 // MiniSearch is THE engine (the owner A/B'd it against the retired FlexSearch
 // Classic and kept it — typo tolerance, BM25 ranking, recent searches, warm IDB
-// cache). It ships in bundle-e alongside this screen, so it's always loaded by
+// cache). It ships in bundle-d alongside this screen, so it's always loaded by
 // the time this renders; pickEngine still guards for a hypothetical load failure.
 function pickEngine() {
   return window.VotSearchMini;

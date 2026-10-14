@@ -10,10 +10,10 @@
    each opening the recordings screen a collection opens ('study:<id>').
 */
 
-/* Cluster H (esbuild bundle-h.js, lazy), with the other Listening Library
-   screens. AudioPlayer, CoverageBadge, ArrowIcon and the COVERAGE_* states
-   stay in bundle-d and are read here as free globals at call time — one
-   player, one shelf (see _entry-h.js). */
+/* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13); it
+   rode lazy bundle-h before. AudioPlayer, CoverageBadge, ArrowIcon and the
+   COVERAGE_* states live in bundle-d too and are read here as free globals at
+   call time — one player, one shelf (see _entry-d.js). */
 
 /** @returns {Array<any>} the loaded studies registry, [] until bible-studies.js lands */
 function studiesList() {

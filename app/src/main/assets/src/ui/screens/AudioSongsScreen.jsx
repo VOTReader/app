@@ -11,7 +11,8 @@
    read credit or touches a letter's key. Every sound goes through the one
    player (AudioPlayer.playSongs); every row's ▶ reads the player's state.
 
-   Cluster H (bundle-h.js, lazy) with the rest of the Listening Library. The
+   Cluster H (bundle-d since lz1; lazy bundle-h before) with the rest of the
+   Listening Library. The
    catalog store, the player, the song pieces (cover, round play, clock,
    icons, choice sheet) and the route helpers stay in bundle-d and are read
    here as FREE GLOBALS — one catalog, one player.

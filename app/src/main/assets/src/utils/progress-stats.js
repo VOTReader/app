@@ -3,8 +3,8 @@
    SettingsScreen (Mark as Read table) and MyProgressScreen (dashboard)
    ===================================================================
    Global-scope module. Bundled into bundle-d via _entry-d.js and
-   window-exposed so bundle-e's SettingsScreen reaches it as a free
-   global (bundle-e loads after d).
+   window-exposed so SettingsScreen (bundle-d too since lz1) reaches it
+   as a free global.
 
    Bundled helpers:
    - READ_VERSION_ID

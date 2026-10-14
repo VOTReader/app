@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   ScriptureWebScreen — Cluster F (esbuild bundle-f.js)
+   ScriptureWebScreen — Cluster F (bundle-d since lz1; lazy bundle-f before)
    ═══════════════════════════════════════════════════════════════════════
    The Scripture Web: every cross-reference in scripture as one zoomable,
    tappable instrument — and the same instrument turned on the reader's own
@@ -16,8 +16,8 @@
    that genuinely change the UI (mode, density, the open sheet).
 
    Free globals (PlatformBridge, ScreenLayout, LinkStore, …) are resolved at
-   call time, the same cross-bundle pattern bundle-d and bundle-e use, so
-   bundle-f carries only this feature's own code.
+   call time, the free-global pattern the other bundle-d screens use (from
+   when this rode lazy bundle-f), so this file imports only the feature's own code.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { decodeGraph } from '../../utils/scripture-web/decode.js';

@@ -5,7 +5,7 @@
    Global-scope module. Bundled into bundle-d via _entry-d.js.
 
    These two derivations lived inside BookmarksScreen.jsx until the screen
-   left the cold-boot path for the lazy bundle-g. They cannot travel with it:
+   left the cold-boot path for the lazy bundle-g (until lz1, 2026-10-13). They could not travel with it:
    the app shell (AppShellSheets), SelectionToolbar, JournalInsertSheet,
    journal-helpers and HighlightsScreen all read them as free globals, on
    screens a reader reaches without ever opening My Bookmarks. They are the

@@ -109,7 +109,7 @@ import { SongKeep, formatSongBytes } from '../utils/song-keep.js';
 // Is the network there (2026-10-05): ONE store beside the player; the lazy screens read the NetStatus global.
 import { NetStatus } from '../utils/net-status.js';
 import { SongKeepCard, SongKeepAction, useSongKeep, useSongsOnline, KeepIcon, KeptIcon } from './components/SongKeepParts.jsx';
-/* The Listening Library screens went lazy (bundle-h, landing 24) while all of
+/* The Listening Library screens went lazy (bundle-h, landing 24, until lz1) while all of
    this stayed here, because AudioPlayerBar and AudioManagerSheet are mounted in
    the always-present shell and play on every screen. The library reads these
    across the bundle boundary: a second bundled copy of audio-player.js would be
@@ -334,10 +334,10 @@ Object.assign(window, {
   loadSongLyrics, useSongLyrics, lyricLineAt, findSongFamilies, songLyricsFoot,
   SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop,
   SongKeep, formatSongBytes, NetStatus, SongKeepCard, SongKeepAction, useSongKeep, useSongsOnline, KeepIcon, KeptIcon,
-  // …and the shelf parts + audio tables bundle-h reads as free globals.
+  // …and the shelf parts + audio tables the Listening Library reads as free globals.
   BIBLE_AUDIO_EDITIONS, audioReaderLabel, bibleAudioOffered,
   COVERAGE_NONE, COVERAGE_READ_ALONG, bibleEditionCoverage, AudioSeekSlider, CoverageBadge,
-  // …and StudiesHome (bundle-g) reads the study coverage pair.
+  // …and StudiesHome (Cluster G) reads the study coverage pair.
   studyCoverage, studyCoverageDetail,
   ArrowIcon, AudioShelfRow, ChevronIcon, CloseIcon, PauseIcon, PlayIcon, SearchIcon,
   StarIcon, TextIcon, audioLibraryStore, audioPositionsStore, hasTextDestination,

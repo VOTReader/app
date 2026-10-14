@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   OfflineAudioControls — Cluster H (esbuild bundle-h.js): downloads to the phone
+   OfflineAudioControls — Cluster H (bundle-d since lz1): downloads to the phone
    ═══════════════════════════════════════════════════════════════════════
    Listening item 8 (Corbin 2026-09-22 "yes after reset"), built to Codex's
    mockup round 1, option 1 (lanes/readalong/out/mockups/offline/r1-1.png):
@@ -12,7 +12,7 @@
    recordings (the PWA; an iPhone only from its Home Screen): OfflineAudio
    (utils/offline-audio.js) and AudioPlayer live in bundle-d and are read here
    as FREE GLOBALS: one store and one player for the whole app (see
-   _entry-h.js). Where no store exists, nothing here renders.
+   _entry-d.js). Where no store exists, nothing here renders.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /** The phone keeps this much free beyond a download (OfflineAudioStore's SPACE_MARGIN). */

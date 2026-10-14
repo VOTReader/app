@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   HistoryScreen — Cluster G (esbuild bundle-g.js, lazy)
+   HistoryScreen — Cluster G (bundle-d since lz1; lazy bundle-g before)
    ═══════════════════════════════════════════════════════════════════════
    Lazy since 2026-09-22 (landing 23). ReadingMinChip stays in bundle-d —
    HistoryEntryCard, VolumeLetterIndex and ChapterIndex all render it on the

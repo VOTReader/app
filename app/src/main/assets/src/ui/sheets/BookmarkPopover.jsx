@@ -5,10 +5,11 @@
    glyph in a chapter, a letter or the margin opens it through
    window.__openBookmarkPopover, on screens that have nothing to do with My
    Bookmarks. So when the screen left the cold-boot path for the lazy
-   bundle-g, the popover stayed behind — a shell that reaches for a symbol
-   inside a bundle the reader may never load is a shell that breaks.
+   bundle-g (2026-09-22 until lz1, 2026-10-13), the popover stayed behind —
+   a shell that reaches for a symbol inside a bundle the reader may never
+   load is a shell that breaks.
 
-   Free globals (filled by bundle-d before any lazy bundle loads): React,
+   Free globals (filled before bundle-d's screens render): React,
    BookmarkStore, useFocusTrap, ConfirmStrip (relativeDate is imported).
    ═══════════════════════════════════════════════════════════════════════ */
 

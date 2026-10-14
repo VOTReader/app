@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
    scripture-web/chapter-connections — the Scripture Web as a list (A7)
-   Cluster F (esbuild bundle-f.js). Pure.
+   Cluster F (bundle-d since lz1). Pure.
 
    A device that cannot draw the web (no WebGL2, or a GPU reset Chrome never
    restores) used to get a dead end: "The web can't be drawn right now", Try

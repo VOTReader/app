@@ -8,8 +8,9 @@
    screen-routes remains the source of truth for text destinations.
 */
 
-/* Cluster H (esbuild bundle-h.js, lazy) since 2026-09-22, landing 24. The
-   player itself does NOT come along: AudioPlayer, the AudioShelf rows, icons
+/* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13); it
+   rode lazy bundle-h from 2026-09-22, landing 24, and the player itself did
+   NOT come along: AudioPlayer, the AudioShelf rows, icons
    and position hook, AudioSeekSlider, CoverageBadge and the audio tables stay
    in bundle-d, where AudioPlayerBar and AudioManagerSheet reach them on every
    screen. This file reads them as free globals at call time — one player, one

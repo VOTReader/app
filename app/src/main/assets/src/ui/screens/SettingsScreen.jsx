@@ -663,7 +663,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   }, []);
   const refreshBuildInfo = React.useCallback(async () => {
     setBuildInfo((b) => ({ ...b, state: 'loading' }));
-    // typeof guards: these three live in bundle-b and reach this screen (bundle-e)
+    // typeof guards: these three live in bundle-b and reach this screen (bundle-d)
     // as ambient globals, so they are absent in any host that renders Settings
     // without the stores bundle — the vitest harness does exactly that. An
     // unguarded call throws inside a passive effect, which surfaces as an
@@ -754,7 +754,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const [userData, setUserData] = React.useState(/** @type {null | {total:number,structured:number,media:number,mediaCount:number}} */ (null));
   // BACKLOG [30]: the same measurement also feeds the growth series. Sampling
   // rides this existing effect deliberately — one sample per Settings mount,
-  // never a timer and never at boot (this screen is in the lazy bundle-e), so
+  // never a timer and never at boot (the effect runs only when Settings mounts), so
   // the trend costs nothing beyond what the "Your data" row already spends.
   const [dataSamples, setDataSamples] = React.useState(/** @type {Array<{d:string,b:number}>} */ ([]));
   React.useEffect(() => {

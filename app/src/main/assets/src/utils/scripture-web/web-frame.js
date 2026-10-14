@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
    web-frame — the Scripture Web's frame and render arguments, pure.
-   Cluster F (bundle-f), used by ui/scripture-web/use-web-camera.js.
+   Cluster F (bundle-d since lz1), used by ui/scripture-web/use-web-camera.js.
    ═══════════════════════════════════════════════════════════════════════
 
    These were callbacks inside ScriptureWebScreen (the app's hottest file,

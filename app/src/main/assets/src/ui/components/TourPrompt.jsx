@@ -3,8 +3,8 @@
    ═══════════════════════════════════════════════════════════════════════
    The quiet strip at the foot of Home that offers "Show me around" once,
    after About: Show me around · Maybe later · Don't show this again. A few
-   hundred bytes on the boot path; the tour itself (TourOverlay) rides the
-   lazy bundle-e and is loaded by TourController.start().
+   hundred bytes on the boot path; the tour itself (TourOverlay) ships in
+   bundle-d too (it rode lazy bundle-e until lz1, 2026-10-13).
 
    Shows only when TourController.shouldPrompt says so: Home, About seen,
    the durable flag unset, the tour not running, and not within three days

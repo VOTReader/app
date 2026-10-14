@@ -4,8 +4,8 @@
    The cover, the round play button, the length clock, the icons and the
    select sheet every songs surface draws with. They live HERE, beside the
    player, because the mini-player bar and the listening desk (both in the
-   always-mounted shell) draw a song with them too; the lazy Songs screens
-   (bundle-h) read them as free globals, one copy of each.
+   always-mounted shell) draw a song with them too; the Songs screens
+   (lazy bundle-h until lz1) read them as free globals, one copy of each.
 
    The build rules come from the approved pictures (calls/ai-music/mockups,
    "Build rules taken from the pictures"): covers with a radius and a gold

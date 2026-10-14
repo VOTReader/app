@@ -19,8 +19,8 @@
    phone", never "Save" (the listener's favourites) nor "Download" (the
    recordings' own words).
 
-   Cluster D beside the bar and the letter card; the lazy Songs screens
-   (bundle-h) read these as globals.
+   Cluster D beside the bar and the letter card; the Songs screens
+   (lazy bundle-h until lz1) read these as globals.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { SongKeep, formatSongBytes, IOS_TAB_TEXT } from '../../utils/song-keep.js';

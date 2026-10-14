@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   scripture-web/gestures — Cluster F (esbuild bundle-f.js)
+   scripture-web/gestures — Cluster F (bundle-d since lz1; lazy bundle-f before)
 
    The pointer/wheel wiring for the Scripture Web's pan/pinch/tap/zoom
    surface. Extracted verbatim out of ScriptureWebScreen's gesture effect

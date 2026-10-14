@@ -29,7 +29,7 @@ const MAX_LEN = 64; // a query is a sentence or two; the model's own limit is 51
 
 /** @type {{url: (p: string) => string, load: (p: string) => Promise<ArrayBuffer>, importModule: (p: string) => Promise<any>}} */
 const io = {
-  // bundle-e is a classic script: a path resolves against the page, never the bundle
+  // bundle-d is a classic script: a path resolves against the page, never the bundle
   url: (p) => String(new URL(p, document.baseURI)),
   load: async (p) => {
     const r = await fetch(io.url(p));

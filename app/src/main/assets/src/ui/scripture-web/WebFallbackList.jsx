@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
    WebFallbackList — the Scripture Web read as a list (A7, 2026-09-22)
-   Cluster F (esbuild bundle-f.js). Rendered by ScriptureWebScreen when the
+   Cluster F (bundle-d since lz1). Rendered by ScriptureWebScreen when the
    device cannot draw the web (no WebGL2, or a GPU reset that never restores).
 
    It used to be a dead end ("The web can't be drawn right now", Try again,

@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    backup-warn — a backup-path warning that reaches the reader's diagnostic log.
-   Imported by utils/backup.js (bundle-d) and utils/backup-flow.js (bundle-e);
-   stateless, so each bundle carrying its own copy is harmless.
+   Imported by utils/backup.js and utils/backup-flow.js (both bundle-d since
+   lz1, so one copy); stateless, so a copy per bundle was harmless anyway.
    ═══════════════════════════════════════════════════════════════════════
 
    Backup, import and restore warnings went to the console only

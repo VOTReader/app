@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   TourOverlay — Cluster E (esbuild bundle-e.js, lazy)
+   TourOverlay — Cluster E (bundle-d since lz1; lazy bundle-e before)
    ═══════════════════════════════════════════════════════════════════════
    "Show me around", drawn over the real screen: four dim panes around the
    ringed control (not one sheet with a hole — so the control itself still

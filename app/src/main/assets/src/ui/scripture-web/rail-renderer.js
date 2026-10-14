@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   scripture-web/rail-renderer — Cluster F (esbuild bundle-f.js)
+   scripture-web/rail-renderer — Cluster F (bundle-d since lz1; lazy bundle-f before)
 
    "My web" — the reader's own links, drawn as a dual rail.
 
