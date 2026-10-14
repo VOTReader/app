@@ -66,33 +66,30 @@ docs/                         subsystem docs; docs/archive/ holds finished plans
 
 ## The bundle map
 
-`npm run build` writes eleven bundles and `app.min.css` to `app/src/main/assets/dist/`. Four bundles load on cold
-boot. The other seven load the first time something needs them.
+`npm run build` writes seven bundles and `app.min.css` to `app/src/main/assets/dist/`. Four bundles load on cold
+boot. The other three, the corpora, load the first time something needs them.
 
 | Bundle | Loads | Built from | Holds |
 |---|---|---|---|
 | `bundle-a.js` | cold boot | `tools/build.py` | React, ReactDOM, the Bible audio manifest |
 | `bundle-b.js` | cold boot | `src/stores/_entry-b.js` | stores, hooks, the journal machinery, the platform bridge |
 | `bundle-c.js` | cold boot | `src/renderer/_entry.js` | the annotation renderer |
-| `bundle-d.js` | cold boot | `src/ui/_entry-d.js` | `App`, the app shell, the reading screens, sheets, the audio player |
+| `bundle-d.js` | cold boot | `src/ui/_entry-d.js` | `App`, the app shell, every screen (Settings, Search and the MiniSearch engine, Garden, the tour, the Scripture Web, Personal Study and the journal, Studies and Matthew, the Listening Library), sheets, the audio player |
 | `bundle-a-bible.js` | `__loadBibleCorpus()` | `tools/build.py` | the Bible corpora |
 | `bundle-a-matthew.js` | `__loadMatthewCorpus()` | `tools/build.py` | the Matthew Study Bible |
 | `bundle-a-vot.js` | `__loadVotCorpus()` | `tools/build.py` | the VOT collections (the volumes, the letters, WTLB, The Blessed) |
-| `bundle-e.js` | `__loadScreensE()` | `src/ui/_entry-e.js` | Settings, Search (the MiniSearch engine and its tables), Garden |
-| `bundle-f.js` | `__loadScreensF()` | `src/ui/_entry-f.js` | the Scripture Web (WebGL) |
-| `bundle-g.js` | `__loadScreensG()` | `src/ui/_entry-g.js` | Personal Study: My Progress, Bookmarks, History, Notes, Links, Highlights, the journal screens |
-| `bundle-h.js` | `__loadScreensH()` | `src/ui/_entry-h.js` | the Listening Library (hub, Volumes, one collection, saved); the player stays in bundle-d |
 
-- `index.html` makes every loader with `window.__makeLazyLoader(name, path, finishFn)`, which injects the script
-  once and wakes the views waiting on it. A route to a lazy screen (`src/ui/screen-routes.jsx`) renders
-  `_corpusView(window.__screensG, window.__loadScreensG, 'Loading…')` until the bundle has put the screen on `window`.
+- Code is not split; data is. The screen bundles e-h were folded into bundle-d on 2026-10-13 (lz1; the measurements
+  and the reasons are in ARCHITECTURE.md, "Lazy corpora"). An old page that asks the service worker for a retired
+  `bundle-[e-h].js` gets a one-time reload onto the new build.
+- `index.html` makes each corpus loader with `window.__makeLazyLoader(name, path, finishFn)`, which injects the
+  script once and wakes the views waiting on it. A route that needs a corpus (`src/ui/screen-routes.jsx`) renders
+  `_corpusView(window.__bibleCorpus, window.__loadBibleCorpus, 'Loading Bible…')` until it has landed.
 - `dist/app.min.css` is a plain stylesheet link in `<head>`, so it blocks first paint too.
-- The lazy screen bundles import none of the shared code. They read React and bundle-d's helpers as free globals at
-  call time, so each module has exactly one copy of its state. `tools/gen-eslint-globals.py` generates the lint
-  globals that make this legal.
+- The screens that came from the old lazy bundles still read some shared helpers as free globals at call time.
+  `tools/gen-eslint-globals.py` generates the lint globals that make this legal.
 - Membership tests pin what lives where, in the built bytes: `tools/bundle-membership.test.js`,
-  `tools/bundle-a-search-data.test.js`, `tools/bundle-g-membership.test.js`, `tools/bundle-g-journal.test.js`,
-  `tools/bundle-h-membership.test.js`. `tools/check-bundle-budget.js` holds a byte ceiling for each file.
+  `tools/bundle-a-search-data.test.js`. `tools/check-bundle-budget.js` holds a byte ceiling for each file.
 - The read-along timing files (`src/data/audio-sync.js`, `src/data/bible-sync-<edition>.js`) are not bundled.
   `src/utils/sync-loaders.js` fetches them when a recording plays.
 - Sizes change with every landing. Measure them: `ls -l app/src/main/assets/dist/`.

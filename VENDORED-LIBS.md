@@ -31,7 +31,7 @@ cd app/src/main/assets && sha256sum react.min.js react-dom.min.js html2canvas.mi
 | `react.min.js` | 18.2.0 | 10737 | build input → `dist/bundle-a.js` | `4b4969fa4ef3594324da2c6d78ce8766fbbc2fd121fff395aedf997db0a99a06` |
 | `react-dom.min.js` | 18.2.0-next-9e3b772b8-20220608 | 131882 | build input → `dist/bundle-a.js` | `21758ed084cd0e37e735722ee4f3957ea960628a29dfa6c3ce1a1d47a2d6e4f7` |
 | `html2canvas.min.js` | 1.4.1 | 198689 | **shipped standalone** — lazy `<script>` load | `e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb` |
-| `src/search/vendor/minisearch.js` | 7.2.0 | 65444 | build input → esbuild into `dist/bundle-e.js` | `aa85ecc7032cfb5f8cd9b3af3efdc1de09b3f60fe8af4b01946eeb11c6f9cbd9` |
+| `src/search/vendor/minisearch.js` | 7.2.0 | 65444 | build input → esbuild into `dist/bundle-d.js` | `aa85ecc7032cfb5f8cd9b3af3efdc1de09b3f60fe8af4b01946eeb11c6f9cbd9` |
 
 Versions are self-reported by each blob (the `version="…"` / header string
 each library embeds). Notes per blob:

@@ -299,11 +299,9 @@ lifetime rule as §8.
   Consumers: `screen-routes.jsx`, `use-lazy-bundles.js`,
   `use-dom-annotation-sync.js`, `ScripturesHome.jsx`, `SettingsScreen.jsx`,
   `MyProgressScreen.jsx`, `search/engine.js`.
-- `__screensE` / `__loadScreensE` — `index.html:274-275` (Settings/Search/Garden).
-  Consumers: `screen-routes.jsx`, `use-lazy-bundles.js`, `tour-controller.js`,
-  `HomeScreen.jsx`.
-- `__screensF` / `__loadScreensF` — `index.html:281-282` (Scripture Web).
-  Consumers: `screen-routes.jsx`, `use-lazy-bundles.js`, `_entry-f.js`.
+- The four screen loaders `__screensE`..`__screensH` / `__loadScreensE`..`H` were retired on 2026-10-13 (lz1):
+  their screens ship in bundle-d. The service worker answers an old page's request for a retired
+  `bundle-[e-h].js` with a one-time reload onto the new build.
 - `__loadBibleSync(<key>)` — per-edition audio-sync loader, called from each
   `data/bible-sync-*.js` header the first time that edition's recording
   plays. A function bridge only, not a data shadow.

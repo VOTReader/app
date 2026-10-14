@@ -75,27 +75,20 @@ committed bytes differ from what the source builds.
 
 README.md has the table. What follows is what you do with it.
 
-**Adding a screen that readers open on purpose** (it should cost nothing at boot):
+**Adding a screen:**
 
 1. Write it under `src/ui/screens/`, with a colocated `*.test.jsx`.
-2. Import it in the lazy entry that fits (`src/ui/_entry-g.js` for Personal Study, `_entry-h.js` for the
-   Listening Library, `_entry-e.js` for settings and search) and add it to that file's `Object.assign(window, {...})`.
-3. Route it in `src/ui/screen-routes.jsx` through `_corpusView(window.__screensG, window.__loadScreensG, 'Loading…')`,
-   which shows a loader until the bundle has defined the screen.
-4. Read shared helpers as free globals from bundle-d, as the other lazy screens do. Never import an eager module
-   into a lazy entry: esbuild would bundle a second copy, and two copies of a module are two states of one table.
-5. Pin it in that bundle's membership test (`tools/bundle-g-membership.test.js`, `tools/bundle-h-membership.test.js`):
-   the lazy bundle defines it and bundle-d only asks for it. These tests read the built bytes, so `npm run build`
-   before you run them.
-6. Re-measure: `npm run check:bundle-budget`. Raising a ceiling is a deliberate edit to
+2. Import it in `src/ui/_entry-d.js` and add it to that file's `Object.assign(window, {...})`. Every screen ships in
+   bundle-d: code is not split since lz1 (2026-10-13; the measurements and the reasons are in ARCHITECTURE.md,
+   "Lazy corpora").
+3. Route it in `src/ui/screen-routes.jsx`. A screen that reads a corpus waits for it the way the reading screens do:
+   `_corpusView(window.__votCorpus, window.__loadVotCorpus, 'Loading…')` (or `_kickVot`) until it has landed.
+4. Re-measure: `npm run check:bundle-budget`. Raising a ceiling is a deliberate edit to
    `tools/check-bundle-budget.js`, justified in the commit.
 
-**Adding a whole new lazy bundle** touches every place that knows the list (bundle-g's first commit is the worked
-example: `git log --reverse -- app/src/main/assets/src/ui/_entry-g.js`):
-an esbuild script in `package.json` plus a step in its `build` chain; a `__makeLazyLoader` call and the two window
-slots in `index.html`; `ENTRY_FILES` in `tools/gen-eslint-globals.py`; the lazy preload in `tools/smoke.js`; the
-precache list in `service-worker.js`; a row in `tools/check-bundle-budget.js`; the re-stage list in
-`.githooks/pre-commit`; and a membership test.
+**A new lazy code bundle** was the e-h design from 2026-08 to 2026-10, and it was reversed: it saved ~60 ms on Android
+and cost a shipped bug, two mixed-build races and an 8 s stylesheet stall. Do not split code again without a phone A/B
+that shows more than that. New DATA (a corpus, a translation, a model) stays lazy, through the loaders below.
 
 **The corpora** load through `__loadBibleCorpus()`, `__loadMatthewCorpus()` and `__loadVotCorpus()`. Screens wait
 on them through the same corpus objects. The contract and its one race class are in ARCHITECTURE.md, "Lazy corpora".

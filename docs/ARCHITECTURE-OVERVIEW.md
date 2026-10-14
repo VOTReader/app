@@ -33,10 +33,10 @@ the user-owned export file (Settings, "Your Data"). Recorded audio streams from 
              ┌──────────────────────── assets/index.html ─────────────────────────┐
   cold boot  │ app.min.css (render-blocking) → bundle-a → bundle-b → bundle-c → d │
              │ inline boot scripts: data constants, __makeLazyLoader, CSP-hashed  │
-             └──────────────┬──────────────────────────────┬──────────────────────┘
-                            │ on demand                    │ on demand
-            corpora: bundle-a-bible / -matthew / -vot   screens: bundle-e / f / g / h
-            + src/data/*.js fetched raw (studies,       (+ their screens-X.min.css)
+             └──────────────┬─────────────────────────────────────────────────────┘
+                            │ on demand (data only: every screen is in bundle-d since lz1, 2026-10-13)
+            corpora: bundle-a-bible / -matthew / -vot
+            + src/data/*.js fetched raw (studies,
               translations, read-along timings)
                             │
    App() (src/app.jsx) → hooks → stores (CachedStore) → IndexedDB "votreader" + localStorage
@@ -56,27 +56,26 @@ the user-owned export file (Settings, "Your Data"). Recorded audio streams from 
 | `src/hooks/` | App()'s hooks: navigation, tabs, pager, autoscroll, read tracking, thumbnails | bundle-b |
 | `src/stores/` | the persistence layer (section 3) | bundle-b |
 | `src/renderer/` | the annotation engine: highlights, underlines, notes and links painted onto text | bundle-c |
-| `src/search/` | the MiniSearch engine, query parsing, ranking | bundle-e |
+| `src/search/` | the MiniSearch engine, query parsing, ranking | bundle-d |
 | `src/utils/` | pure helpers, backup, the audio player, the platform bridge | mostly b and d |
 | `src/data/` | corpora and `scripture-resolution.js` (the COLLECTIONS registry) | bundle-a*, or fetched raw |
 
 **Bundles.** `npm run build` (see `package.json`) runs `tools/build.py` for the corpus bundles (`bundle-a*.js`,
 concatenated, then minified by `tools/minify-bundle.mjs`) and esbuild for the module bundles, each from its own
-entry: `src/stores/_entry-b.js`, `src/renderer/_entry.js`, `src/ui/_entry-d.js`, `src/ui/_entry-e.js` through
-`src/ui/_entry-h.js`. README.md "The bundle map" is the authoritative table of what each bundle holds and when it
+entry: `src/stores/_entry-b.js`, `src/renderer/_entry.js`, `src/ui/_entry-d.js` (the screen entries e-h were folded into
+d on 2026-10-13, lz1). README.md "The bundle map" is the authoritative table of what each bundle holds and when it
 loads. Four facts that surprise newcomers:
 
 - **The bundles share code through `window`, not imports.** Each `_entry-*.js` copies its exports onto `window`,
   and later bundles read them as bare globals at call time, so each module has exactly one copy of its state.
   `tools/gen-eslint-globals.py` generates the lint globals that make this legal. The contract is in `BRIDGES.md`.
-- **Lazy loading is one primitive.** `index.html` builds every loader with `window.__makeLazyLoader(name, path,
-  finishFn, css)`. A route to a lazy screen renders `_corpusView(...)` (a loading placeholder) until the bundle has
-  put the screen on `window`. Read-along timings and the Answers corpus load through `src/utils/sync-loaders.js`.
+- **Lazy loading is for data only.** `index.html` builds each corpus loader with `window.__makeLazyLoader(name,
+  path, finishFn)`. A route that needs a corpus renders `_corpusView(...)` (a loading placeholder) until it has
+  landed. Code is not split (lz1, 2026-10-13; ARCHITECTURE.md "Lazy corpora" has the numbers). Read-along timings and the Answers corpus load through `src/utils/sync-loaders.js`.
 - **`--target=chrome108` is a hard contract** (CLAUDE.md, Permanent Rule 6). esbuild lowers syntax, but a runtime
   API newer than Chromium 108 needs feature detection.
 - **Membership and size are gated.** `tools/bundle-membership.test.js` and its siblings pin which module lives in
   which bundle, in the built bytes. `tools/check-bundle-budget.js` holds a byte ceiling per file.
-  `tools/split-lazy-css.mjs` moves CSS that only a lazy bundle uses out of the render-blocking sheet.
 
 `dist/` is committed and CI fails if it differs from a fresh build, so every source change ships with its rebuilt
 bundles.
@@ -130,7 +129,7 @@ Audio has one engine and one queue. The deep references are ARCHITECTURE.md §23
 the read-along wash is §22.
 
 ```
- Listen button / Listening Library (bundle-h) / mini-player (bundle-d)
+ Listen button / Listening Library / mini-player (all bundle-d)
         │
  src/utils/audio-player.js           the public face; the player is src/utils/audio-player/*.js,
         │                            one concern per module: queue, transport, sections, credit,

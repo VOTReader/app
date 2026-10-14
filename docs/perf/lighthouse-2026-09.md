@@ -101,6 +101,9 @@ coordinate with that lane before starting them.
 
 ### 4. Reduce render-blocking CSS and the synchronous bundle-a
 
+> 2026-10-13 (lz1): the CSS half no longer applies. Code splitting was cut, `split-lazy-css.mjs` is retired and
+> the screens' rules are back in `app.min.css` (ARCHITECTURE.md, "Lazy corpora", has the measurements).
+
 - **Evidence.** Lighthouse estimates 570 to 760 ms of render-blocking savings on Home and Bible.
   `dist/app.min.css` is 288 KB raw and 47 KB gzip, and `dist/bundle-a.js` (155 KB raw, 53 KB gzip) is a
   synchronous `<script>` at `index.html:184`, ahead of first paint.
@@ -115,6 +118,10 @@ coordinate with that lane before starting them.
   guarantees.
 
 ### 5. Move screens that are not needed at boot out of bundle-d
+
+> 2026-10-13 (lz1): reversed, not done. Bundles e-h were folded INTO bundle-d: on Android the split saved ~60 ms
+> and cost a shipped bug and two mixed-build races; the phone A/B of the merge was +4 ms (Home) and +10 ms (a
+> saved reader tab). Do not split code again without a phone A/B that shows more (ARCHITECTURE.md, "Lazy corpora").
 
 - **Evidence.** `unused-javascript` flags 136 to 142 KB of the 185 KB gzip `bundle-d.js` (653 KB raw) as not
   executed during load on every page, which Lighthouse estimates at about 1.1 s. bundle-b has another 37 KB unused.
