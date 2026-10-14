@@ -58,9 +58,28 @@ export function Safari7DayModal() {
   );
 }
 
+/** Its own localStorage key (a vot-* key, so Clear All wipes it and no backup carries it). */
+var WELCOMED_KEY = 'vot-ios-pwa-welcomed';
+
+/** True when the card was answered before - or when storage throws, since then a skip could
+ *  never be remembered and the card would come back on every launch. */
+function _alreadyWelcomed() {
+  try { return !!localStorage.getItem(WELCOMED_KEY); } catch (_e) { return true; }
+}
+
+function _rememberWelcomed() {
+  try { localStorage.setItem(WELCOMED_KEY, '1'); } catch (_e) { /* no storage: the session state hides it */ }
+}
+
 /**
  * Full-screen welcome card for iOS PWA with empty storage.
- * Shows once — gated by StateStore meta flag 'ios-pwa-welcomed'.
+ * Shows once — gated by its own localStorage key, WELCOMED_KEY.
+ *
+ * W13 (sweep 2026-10-13): it was gated on StateStore.get('ios-pwa-welcomed'),
+ * but StateStore.get() takes no key and returns the whole vot-state (always
+ * truthy), so the card never showed; and StateStore.set('ios-pwa-welcomed',
+ * true) replaces the whole vot-state, so fixing only the guard would have
+ * turned the reader's tabs, settings and read marks into a string.
  *
  * @param {{ onNavigateSettings: () => void }} props
  */
@@ -69,17 +88,13 @@ export function IosPwaWelcomeCard({ onNavigateSettings }) {
   var [dismissed, setDismissed] = React.useState(false);
 
   var isIosPwa = platform === 'safari-pwa';
-  var hasData = _hasAnyUserData();
-  var flagKey = 'ios-pwa-welcomed';
-  var alreadyWelcomed = (typeof StateStore !== 'undefined') && StateStore.get(flagKey);
-
-  var visible = isIosPwa && !hasData && !alreadyWelcomed && !dismissed;
+  var visible = isIosPwa && !dismissed && !_alreadyWelcomed() && _knownEmpty();
   var trapRef = useFocusTrap(visible);
 
   useModalRegistry({ id: 'ios-pwa-welcome', dismiss: _skip, active: visible });
 
   function _skip() {
-    if (typeof StateStore !== 'undefined') StateStore.set(flagKey, true);
+    _rememberWelcomed();
     setDismissed(true);
   }
 
@@ -116,18 +131,41 @@ export function IosPwaWelcomeCard({ onNavigateSettings }) {
   );
 }
 
-function _hasAnyUserData() {
+/**
+ * True only when every data store has really loaded and holds nothing. A store
+ * that is still pending or degraded reads as its empty default, which says
+ * nothing about the reader's data, so the card waits (HydrationGate remounts
+ * the app when a late store loads, and this runs again). A missing store is
+ * unknown, not empty. (W13: this used to call a getAll() no store has.)
+ */
+function _knownEmpty() {
   var stores = [
-    typeof AnnotationStore !== 'undefined' && AnnotationStore,
-    typeof BookmarkStore !== 'undefined' && BookmarkStore,
-    typeof JournalStore !== 'undefined' && JournalStore,
-    typeof NoteStore !== 'undefined' && NoteStore,
+    typeof AnnotationStore !== 'undefined' ? AnnotationStore : null,
+    typeof BookmarkStore !== 'undefined' ? BookmarkStore : null,
+    typeof JournalStore !== 'undefined' ? JournalStore : null,
+    typeof NoteStore !== 'undefined' ? NoteStore : null,
   ];
   for (var s of stores) {
-    if (s && typeof s.getAll === 'function') {
-      var data = s.getAll();
-      if (data && Object.keys(data).length > 0) return true;
-    }
+    if (!s || typeof s.raw !== 'function') return false;
+    if (typeof s.isReady === 'function' && !s.isReady()) return false;
+    if (_hasEntries(s.raw())) return false;
   }
-  return false;
+  return true;
+}
+
+/**
+ * Does a store's snapshot hold anything? Each shape the data stores use:
+ * an array (bookmarks), `{ list: [] }` (journal), or a map whose values are
+ * arrays (annotations per verse key) or records (notes).
+ * @param {any} v
+ * @returns {boolean}
+ */
+function _hasEntries(v) {
+  if (!v || typeof v !== 'object') return false;
+  if (Array.isArray(v)) return v.length > 0;
+  if (Array.isArray(v.list)) return v.list.length > 0;
+  return Object.keys(v).some(function (k) {
+    var x = v[k];
+    return Array.isArray(x) ? x.length > 0 : x != null;
+  });
 }
