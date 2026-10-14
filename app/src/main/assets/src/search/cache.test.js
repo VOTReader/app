@@ -170,3 +170,35 @@ describe('the warm index in the Cache API', () => {
     expect(LEGACY_SEARCH_DB).toBe('vot-minisearch-cache');
   });
 });
+
+/* W27 (sweep 2026-10-13): offline, an incomplete corpus update reads the previous library's files, and right
+   after a deploy the network can hand a page the next build's. The service worker marks every corpus file it
+   serves from another build (window.__votOtherCorpus). An index built from one is that session's alone: its
+   signature says so, and it is never kept, so the reader's whole warm index survives and no later session
+   searches the other build's wording under this build's name. */
+describe('an index built from another build\'s corpus', () => {
+  const GC = /** @type {any} */ (globalThis);
+  let caches0;
+  beforeEach(() => { caches0 = GC.caches; GC.caches = memoryCaches(); delete GC.__votOtherCorpus; });
+  afterEach(() => { GC.caches = caches0; delete GC.__votOtherCorpus; });
+
+  it('CONTROL: nothing marked, the signature is the one every client already holds', () => {
+    const clean = dataSignature('nkjv');
+    GC.__votOtherCorpus = [];
+    expect(dataSignature('nkjv')).toBe(clean);
+  });
+
+  it('a marked file changes the signature, so neither index is ever taken for the other', () => {
+    const clean = dataSignature('nkjv');
+    GC.__votOtherCorpus = ['./src/data/answers.js'];
+    expect(dataSignature('nkjv')).not.toBe(clean);
+  });
+
+  it('is never kept: the whole index already saved stays', async () => {
+    const clean = dataSignature('nkjv');
+    await saveCached(clean, '{"whole":true}');
+    GC.__votOtherCorpus = ['./dist/bundle-a-bible.js'];
+    expect(await saveCached(dataSignature('nkjv'), '{"other":true}')).toBe(false);
+    expect(await loadCached(clean)).toBe('{"whole":true}');
+  });
+});

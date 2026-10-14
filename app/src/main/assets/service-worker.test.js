@@ -5,7 +5,7 @@
 // the registered handlers, and drive 'install'.
 import { describe, it, expect, vi } from 'vitest';
 // Node's Blob: jsdom's replaces the global one, and Node's Response cannot read a jsdom Blob (cf1's range tests).
-import { Blob as NodeBlob } from 'buffer';
+import { Blob as NodeBlob, Buffer } from 'buffer';
 import { readFileSync } from 'fs';
 import { webcrypto } from 'crypto';
 import { resolve, dirname } from 'path';
@@ -88,6 +88,32 @@ function realBytes(url) {
   const rel = url === './' ? 'index.html' : url.slice(2);
   const fp = resolve(dirname(swPath), rel);
   try { return new Uint8Array(readFileSync(fp)); } catch { return null; }
+}
+
+/** A response carrying these bytes, readable once on itself and on its clone, like a real one. */
+function bytesResp(bytes, extra = {}) {
+  const ab = async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  return { ok: true, status: 200, statusText: 'OK', redirected: false, headers: { 'content-type': 'text/javascript' }, arrayBuffer: ab, clone: () => ({ arrayBuffer: ab }), ...extra };
+}
+/** Another build's copy of a file: its real bytes and one more. */
+function otherBuildBytes(url) {
+  const b = realBytes(url);
+  const t = new Uint8Array(b.length + 1);
+  t.set(b);
+  t[b.length] = 0x21;
+  return t;
+}
+/** Whether a body starts with these bytes. */
+async function startsWith(res, bytes) {
+  const got = new Uint8Array(await res.clone().arrayBuffer());
+  return got.length >= bytes.length && Buffer.from(got.subarray(0, bytes.length)).equals(Buffer.from(bytes));
+}
+/** What the page's window.__votOtherCorpus holds after running whatever the worker appended past `len` bytes. */
+async function otherCorpusAfter(res, len) {
+  const all = new Uint8Array(await res.arrayBuffer());
+  const win = {};
+  new Function('window', new TextDecoder().decode(all.subarray(len)))(win);
+  return win.__votOtherCorpus;
 }
 
 function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, clientCount = 1, resolveKeys = false, registration = undefined, scriptPath = undefined } = {}) {
@@ -401,7 +427,7 @@ describe('service-worker fetch + activate runtime (TEST-2)', () => {
   });
 
   it('fetches a corpus bundle on miss and caches it (cache-on-use)', async () => {
-    const fetched = { ok: true, redirected: false, clone: () => ({ body: 'corpus' }) };
+    const fetched = bytesResp(realBytes('./dist/bundle-a-bible.js'));
     const sw = bootSW({ fetchImpl: async () => fetched });
     const res = await fetchEvent(sw, getReq('https://app.test/dist/bundle-a-bible.js'));
     expect(res).toBe(fetched);
@@ -415,7 +441,7 @@ describe('service-worker fetch + activate runtime (TEST-2)', () => {
     // pinned under vot-corpus-<CORPUS_VERSION> like every other corpus asset —
     // which is also why tools/check-corpus-version.js fingerprints it — and
     // never land in a core bucket the CACHE_VERSION hash cannot see.
-    const fetched = { ok: true, redirected: false, clone: () => ({ body: 'timings' }) };
+    const fetched = bytesResp(realBytes('./src/data/audio-sync.js'));
     const sw = bootSW({ fetchImpl: async () => fetched });
     const res = await fetchEvent(sw, getReq('https://app.test/src/data/audio-sync.js'));
     expect(res).toBe(fetched);
@@ -579,7 +605,7 @@ describe('service-worker — an incomplete install keeps the previous library (v
   const BIBLE_URL = 'https://app.test/dist/bundle-a-bible.js';
   async function seedOld(sw) {
     const oldCorpus = await sw.caches.open('vot-corpus-OLD');
-    await oldCorpus.put(BIBLE_URL, { body: 'old-bible' });
+    await oldCorpus.put(BIBLE_URL, bytesResp(otherBuildBytes(BIBLE)));
     const oldCore = await sw.caches.open('vot-core-OLD');
     await oldCore.put('https://app.test/html2canvas.min.js', { body: 'old-e' });
     return { oldCorpus, oldCore };
@@ -604,11 +630,13 @@ describe('service-worker — an incomplete install keeps the previous library (v
     await activate(sw);
     offline = true;
     const res = await fetchEvent(sw, getReq(BIBLE_URL));
-    expect(res.body).toBe('old-bible');
+    expect(await startsWith(res, otherBuildBytes(BIBLE)), 'the previous corpus\'s own bytes').toBe(true);
+    // W27: and marked as another build's, so search never keeps an index built from it under this build's name
+    expect(await otherCorpusAfter(res, otherBuildBytes(BIBLE).length)).toEqual(['./dist/bundle-a-bible.js']);
   });
 
   it('online, a file the new bucket lacks comes from the network, never the old build', async () => {
-    const net = { ok: true, redirected: false, body: 'new-bible', clone: () => ({ body: 'new-bible' }) };
+    const net = bytesResp(realBytes(BIBLE));
     let installed = false;
     const sw = bootSW({ fail: [BIBLE], resolveKeys: true, fetchImpl: async (r, inst) => (installed ? net : inst(r)) });
     await seedOld(sw);
@@ -635,14 +663,14 @@ describe('service-worker — an incomplete install keeps the previous library (v
   });
 
   it('once a repair makes the new library whole, the previous one is deleted', async () => {
-    const sw = bootSW({ fail: [BIBLE], resolveKeys: true });
+    const fail = [BIBLE];
+    const sw = bootSW({ fail, resolveKeys: true });
     await seedOld(sw);
     await install(sw);
     await activate(sw);
     expect(await sw.caches.keys()).toContain('vot-corpus-OLD');
     // the network is back: the repair fetches the Bible into the new bucket
-    const corpus = await sw.caches.open(CURRENT_CORPUS);
-    corpus._fetch = async () => ({ ok: true, status: 200, body: 'bible' });
+    fail.length = 0;
     let reply;
     sw.handlers.message({ data: { type: 'REPAIR_OFFLINE' }, ports: [{ postMessage: (m) => { reply = m; } }], waitUntil: () => {} });
     await vi.waitFor(() => expect(reply).toBeTruthy());
@@ -1176,5 +1204,119 @@ describe('service-worker offline library — status and repair (B5)', () => {
     const res = await fetchEvent(sw, getReq('https://app.test/dist/bundle-a-vot.js'));
     expect(res.status).not.toBe(503);
     expect(res.body).toBe('./dist/bundle-a-vot.js');
+  });
+});
+
+/* THIS BUILD'S CODE AND TIMINGS, NEVER ANOTHER'S (sweep W27, 2026-10-13). A file this worker's buckets lack went to
+   the network and was served, and corpus files were kept, with no check of their bytes: right after a deploy the
+   network holds the NEXT build, so another build's code could run inside this page and another generation's
+   timings could be kept under this one's name; offline, an older library's timings painted over a new recording.
+   Every file the build names a hash for (ASSET_INTEGRITY, ASSET_REVISIONS) is served from the network only when
+   its bytes are this build's; a mismatch is never kept, and the worker looks for its update at once. */
+describe('service-worker — this build\'s code and timings only (W27)', () => {
+  const H2C = './html2canvas.min.js';
+  const H2C_URL = 'https://app.test/html2canvas.min.js';
+  const TIMINGS = './src/data/audio-sync.js';
+  const TIMINGS_URL = 'https://app.test/src/data/audio-sync.js';
+  const KJV = './src/data/bible-kjv.js';
+  const KJV_URL = 'https://app.test/src/data/bible-kjv.js';
+  const updates = () => { const reg = { count: 0, update: async () => { reg.count += 1; } }; return reg; };
+
+  it('a code file this build lacks: another build\'s bytes from the network answer 503, are never kept, and the worker looks for its update', async () => {
+    const registration = updates();
+    const sw = bootSW({ fail: [H2C], resolveKeys: true, registration, fetchImpl: async (r, inst) => (r.url === H2C_URL ? bytesResp(otherBuildBytes(H2C)) : inst(r)) });
+    await install(sw);
+    await activate(sw);
+    const res = await fetchEvent(sw, getReq(H2C_URL));
+    expect(res.status).toBe(503);
+    expect(await (await sw.caches.open(CURRENT_CORE)).match(H2C)).toBeFalsy();
+    expect(registration.count).toBe(1);
+  });
+
+  it('a code file this build lacks: its own bytes from the network are served and kept', async () => {
+    const net = bytesResp(realBytes(H2C));
+    const sw = bootSW({ fail: [H2C], resolveKeys: true, fetchImpl: async (r, inst) => (r.url === H2C_URL ? net : inst(r)) });
+    await install(sw);
+    const res = await fetchEvent(sw, getReq(H2C_URL));
+    expect(res).toBe(net);
+    expect(await (await sw.caches.open(CURRENT_CORE)).match(H2C)).toBeTruthy();
+  });
+
+  it('online, a share link with a query (?p=) boots the cached shell, not the network\'s (another build after a deploy)', async () => {
+    const net = [];
+    const sw = bootSW({ resolveKeys: true, fetchImpl: async (r, inst) => { if (/^https:/.test(r.url)) net.push(r.url); return inst(r); } });
+    await install(sw);
+    const res = await fetchEvent(sw, { url: 'https://app.test/?p=abc', method: 'GET', mode: 'navigate' });
+    expect(net).toEqual([]);
+    expect(res).toBe(await (await sw.caches.open(CURRENT_CORE)).match('./'));
+  });
+
+  it('online, another build\'s timings are refused (503) and never kept', async () => {
+    const registration = updates();
+    const sw = bootSW({ resolveKeys: true, registration, fetchImpl: async () => bytesResp(otherBuildBytes(TIMINGS)) });
+    const res = await fetchEvent(sw, getReq(TIMINGS_URL));
+    expect(res.status).toBe(503);
+    expect(await (await sw.caches.open(CURRENT_CORPUS)).match(TIMINGS)).toBeFalsy();
+    expect(registration.count).toBe(1);
+  });
+
+  it('online, another build\'s corpus text is served for now, never kept, and marked for search', async () => {
+    const registration = updates();
+    const sw = bootSW({ resolveKeys: true, registration, fetchImpl: async () => bytesResp(otherBuildBytes(KJV)) });
+    const res = await fetchEvent(sw, getReq(KJV_URL));
+    expect(res.status).toBe(200);
+    expect(await startsWith(res, otherBuildBytes(KJV))).toBe(true);
+    expect(await otherCorpusAfter(res, otherBuildBytes(KJV).length)).toEqual([KJV]);
+    expect(await (await sw.caches.open(CURRENT_CORPUS)).match(KJV)).toBeFalsy();
+    expect(registration.count).toBe(1);
+  });
+
+  it('this build\'s own corpus bytes carry no mark', async () => {
+    const sw = bootSW({ resolveKeys: true, fetchImpl: async () => bytesResp(realBytes(KJV)) });
+    const res = await fetchEvent(sw, getReq(KJV_URL));
+    expect(await otherCorpusAfter(res, realBytes(KJV).length)).toBeUndefined();
+    expect(await (await sw.caches.open(CURRENT_CORPUS)).match(KJV)).toBeTruthy();
+  });
+
+  it('offline, an older library\'s timings are served only when they are this build\'s bytes', async () => {
+    const offline = async () => { throw new TypeError('Failed to fetch'); };
+    const changed = bootSW({ resolveKeys: true, fetchImpl: offline });
+    await (await changed.caches.open('vot-corpus-OLD')).put(TIMINGS, bytesResp(otherBuildBytes(TIMINGS)));
+    await changed.caches.open(CURRENT_CORPUS);
+    expect((await fetchEvent(changed, getReq(TIMINGS_URL))).status, 'old timings over a new recording').toBe(503);
+
+    const same = bootSW({ resolveKeys: true, fetchImpl: offline });
+    await (await same.caches.open('vot-corpus-OLD')).put(TIMINGS, bytesResp(realBytes(TIMINGS)));
+    await same.caches.open(CURRENT_CORPUS);
+    const res = await fetchEvent(same, getReq(TIMINGS_URL));
+    expect(res.status).toBe(200);
+    expect(await startsWith(res, realBytes(TIMINGS))).toBe(true);
+    expect(await (await same.caches.open(CURRENT_CORPUS)).match(TIMINGS), 'and carried into this build\'s bucket').toBeTruthy();
+  });
+
+  it('install: a corpus file whose bytes are another build\'s is fetched once more, then left out and reported', async () => {
+    const answers = './src/data/answers.js';
+    const sw = bootSW({ corrupt: [answers] });
+    await install(sw);
+    expect(sw.attempts.get(answers)).toBe(2);
+    expect(await (await sw.caches.open(CURRENT_CORPUS)).match(answers)).toBeFalsy();
+    const incomplete = sw.postedMessages.find((m) => m.type === 'PRECACHE_INCOMPLETE');
+    expect(incomplete && incomplete.urls).toContain(answers);
+  });
+
+  it('a repair never keeps another build\'s corpus bytes either', async () => {
+    const answers = './src/data/answers.js';
+    const fail = [answers];
+    const corrupt = [];
+    const sw = bootSW({ fail, corrupt });
+    await install(sw);
+    fail.length = 0;
+    corrupt.push(answers);
+    let reply;
+    let work;
+    sw.handlers.message({ data: { type: 'REPAIR_OFFLINE' }, ports: [{ postMessage: (m) => { reply = m; } }], waitUntil: (p) => { work = p; } });
+    await work;
+    expect(reply.complete).toBe(false);
+    expect(reply.missing).toEqual([answers]);
   });
 });

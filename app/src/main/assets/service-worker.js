@@ -277,7 +277,9 @@ const freshReq = (url) => new Request(url, { cache: 'reload' });
  *     fonts/reading all live in the STABLE bucket that CACHE_VERSION has no
  *     authority over. Their staleness contract is CORPUS_VERSION, enforced by
  *     tools/check-corpus-version.js — which is also what covers them being pinned
- *     the LONGEST of anything here.
+ *     the LONGEST of anything here. Since W27 (2026-10-13) a corpus file is also
+ *     kept only when its bytes match ASSET_REVISIONS (install, repair, cache-on-use),
+ *     but a mismatch there only leaves it out: it never refuses the install.
  *
  * FAILURE DIRECTION IS THE POINT. On a mismatch we refetch once, and if it still
  * disagrees we THROW, which fails the install. The old service worker stays in
@@ -450,7 +452,7 @@ async function copyForward(cache, url, prefix, current) {
 /** addVerified, from the previous bucket when the bytes are unchanged. */
 async function addCore(cache, url) {
   if (await copyForward(cache, url, 'vot-core-', CORE_CACHE)) return;
-  await addVerified(cache, url);
+  await addVerified(cache, url, ASSET_INTEGRITY[url]);
 }
 
 /**
@@ -479,16 +481,16 @@ async function sha256Stripped(buf) {
 }
 
 /**
- * Fetch one core asset, verify it against ASSET_INTEGRITY when we have an
- * expectation for it, and put it in the cache. Returns nothing; THROWS if the
- * bytes cannot be made to match (see FAILURE DIRECTION above).
+ * Fetch one asset, verify it against the hash this build names for it (ASSET_INTEGRITY for a core asset,
+ * ASSET_REVISIONS for a corpus file since W27) when there is one, and put it in the cache. Returns nothing;
+ * THROWS if the bytes cannot be made to match (see FAILURE DIRECTION above).
  *
  * @param {Cache} cache
  * @param {string} url
+ * @param {string | undefined} expected
  * @returns {Promise<void>}
  */
-async function addVerified(cache, url) {
-  const expected = ASSET_INTEGRITY[url];
+async function addVerified(cache, url, expected) {
   if (!expected) {
     // No expectation (binary asset, or an older SW's map): behave as before.
     await cache.add(freshReq(url));
@@ -628,7 +630,7 @@ async function installCore() {
       const url = precacheQueue[precacheIdx++];
       try {
         if (!(await corpus.match(url)) && !(await copyForward(corpus, url, 'vot-corpus-', CORPUS_CACHE))) {
-          await corpus.add(freshReq(url));
+          await addVerified(corpus, url, ASSET_REVISIONS[url]);   // never another build's bytes (W27)
         }
       } catch (_e) {
         corpusFailed.push(url); // best-effort — corpusFirst still caches on first use
@@ -669,11 +671,11 @@ async function installCore() {
 // under storage pressure shows up as incomplete too). CRITICAL assets are included: install
 // already guarantees them, and counting them costs one match each and catches an eviction.
 
-/** Every file the offline library needs, and the cache it belongs in. */
+/** Every file the offline library needs, the cache it belongs in, and the hash its bytes must match (if any). */
 function offlineLibraryPlan() {
-  return CORE_ASSETS.map((url) => ({ url, bucket: CORE_CACHE, verified: true }))
+  return CORE_ASSETS.map((url) => ({ url, bucket: CORE_CACHE, hash: ASSET_INTEGRITY[url] }))
     .concat(CORPUS_PRECACHE.concat(READING_FONT_PRECACHE)
-      .map((url) => ({ url, bucket: CORPUS_CACHE, verified: false })));
+      .map((url) => ({ url, bucket: CORPUS_CACHE, hash: ASSET_REVISIONS[url] })));
 }
 
 /** The plan entries whose cache does not hold them right now. */
@@ -734,8 +736,7 @@ async function repairMissing() {
         const cache = await caches.open(item.bucket);
         const prefix = item.bucket === CORE_CACHE ? 'vot-core-' : 'vot-corpus-';
         if (await copyForward(cache, item.url, prefix, item.bucket)) continue;
-        if (item.verified) await addVerified(cache, item.url);
-        else await cache.add(freshReq(item.url));
+        await addVerified(cache, item.url, item.hash);
       } catch (_e) {
         // Reported by the status below: a file that is still not in its cache is still missing.
       }
@@ -831,6 +832,59 @@ async function matchCurrent(request, opts) {
     hazard index.html's own reload guards). */
 function oldCopyServes(url) {
   return /\.(jpe?g|png|webp|gif|svg|ico|woff2?|ttf|otf)$/i.test(url) || /\/offline\.html$/.test(url);
+}
+
+/* ── THIS BUILD'S BYTES, OR NOT KEPT (sweep W27, 2026-10-13) ──
+   A file this worker's buckets lack goes to the network, and right after a deploy the network holds the NEXT
+   build: its code ran inside this page, and its corpus files were kept under this build's name. Now every
+   file the build names a hash for (ASSET_INTEGRITY for code, ASSET_REVISIONS for the corpus, the timings and
+   the reading fonts) is kept only when its bytes are this build's. Another build's are never kept, and the
+   worker asks for its own update at once, so the page reloads onto that build (sw-register) instead of at the
+   next hourly check. Until then: code and timings answer 503 (another build's code is a crash at best, and
+   timings belong to the recordings list of the build that made them: over another build's they light the
+   wrong words), and corpus text is the other build's for now, marked (otherBuildCopy) so search never keeps
+   an index built from it. Offline, an older library's file stands in the same way: carried into this
+   build's bucket when its bytes are this build's, else text marked and timings refused. */
+
+/** The read-along timing files (src/data/audio-sync*.js, bible-sync-<edition>.js). */
+const TIMING_FILE = /\/src\/data\/(?:audio-sync(?:-[a-z0-9-]+)?|bible-sync-[a-z0-9-]+)\.js$/;
+
+/** A request's './path' under this worker's folder, the hash maps' key; null outside it. */
+function scopeKey(url) {
+  const path = new URL(url, self.location.origin).pathname;
+  return path.startsWith(SW_DIR) ? './' + path.slice(SW_DIR.length) : null;
+}
+
+/** Whether a response's bytes are `want` (read from a clone: the response itself stays unread). */
+async function isThisBuilds(response, want) {
+  return (await sha256Stripped(await response.clone().arrayBuffer())) === want;
+}
+
+/** The network holds another build: look for it now, not at the page's next check. At most once a minute. */
+let _updateAskedAt = 0;
+function askForUpdate() {
+  const reg = self.registration;
+  if (!reg || typeof reg.update !== 'function' || Date.now() - _updateAskedAt < 60 * 1000) return;
+  _updateAskedAt = Date.now();
+  try { Promise.resolve(reg.update()).catch(() => { /* offline: the page's own check finds it later */ }); } catch (_e) { /* likewise */ }
+}
+
+/**
+ * Another build's corpus file, for this page to read for now: its bytes and one more line, which puts its path on
+ * window.__votOtherCorpus (search/cache.js: an index built from it is never kept). Not a script: served as it is.
+ * @param {Response} response
+ * @param {string} key  its scopeKey
+ */
+async function otherBuildCopy(response, key) {
+  if (!/\.js$/.test(key)) return response;
+  const body = new Uint8Array(await response.arrayBuffer());
+  const line = new TextEncoder().encode('\n;(window.__votOtherCorpus = window.__votOtherCorpus || []).push(' + JSON.stringify(key) + ');\n');
+  const out = new Uint8Array(body.length + line.length);
+  out.set(body);
+  out.set(line, body.length);
+  const headers = new Headers(response.headers);
+  headers.delete('content-length');
+  return new Response(out, { status: response.status, statusText: response.statusText, headers });
 }
 
 // ── Message: page-triggered activation (belt-and-suspenders) ────
@@ -971,11 +1025,26 @@ self.addEventListener('fetch', (event) => {
 });
 
 async function coreFirst(request) {
-  const cached = await matchCurrent(request);
+  const navigate = request.mode === 'navigate';
+  // A navigation with a query (a ?p= share link, a ?utm= tag) boots this build's cached shell online too
+  // (W27): the network's index.html may be the next build's, next to this build's cached bundles.
+  const cached = await matchCurrent(request, navigate ? { ignoreSearch: true } : undefined);
   if (cached) return cached;
 
   try {
     const response = await fetch(request);
+    // W27: code this build names a hash for is this build's bytes, kept, or a 503 (THIS BUILD'S BYTES above).
+    // Not a navigation: install guarantees this build's shell in its bucket, and a document the network
+    // answered is reloaded onto its own worker when that worker claims it (sw-register).
+    const key = navigate ? null : scopeKey(request.url);
+    const want = key && ASSET_INTEGRITY[key];
+    if (want && response.ok && !response.redirected) {
+      if (!(await isThisBuilds(response, want))) {
+        askForUpdate();
+        return new Response('Another build', { status: 503, statusText: 'Service Unavailable' });
+      }
+      try { await (await caches.open(CORE_CACHE)).put(request, response.clone()); } catch (_e) { /* quota: still serve */ }
+    }
     return response;
   } catch (_e) {
     // Offline: an older build's copy of a picture or font, kept while this build's library is
@@ -1071,6 +1140,8 @@ async function networkFirstCatalog(event) {
 async function corpusFirst(request) {
   const cached = await matchCurrent(request);
   if (cached) return cached;
+  const key = scopeKey(request.url);
+  const want = key && (ASSET_INTEGRITY[key] || ASSET_REVISIONS[key]);
 
   try {
     // cache:'reload' for the same reason the install precache uses it — this
@@ -1082,6 +1153,12 @@ async function corpusFirst(request) {
     // (a captive portal / proxy); caching it would pin the wrong bytes under the
     // corpus URL. response.ok already excludes 4xx/5xx.
     if (response.ok && !response.redirected) {
+      // W27: another build's bytes are never kept under this build's name (THIS BUILD'S BYTES above).
+      if (want && !(await isThisBuilds(response, want))) {
+        askForUpdate();
+        if (TIMING_FILE.test(key)) return new Response('Another build\'s timings', { status: 503, statusText: 'Service Unavailable' });
+        return otherBuildCopy(response, key);
+      }
       const cache = await caches.open(CORPUS_CACHE);
       // SW2: await the put so respondWith keeps the SW alive until the corpus
       // bytes are committed — a fire-and-forget put can be killed mid-write,
@@ -1091,9 +1168,19 @@ async function corpusFirst(request) {
     }
     return response;
   } catch (_e) {
-    // Offline: the previous corpus, kept while this one is incomplete (pruneStale), still reads.
-    const kept = await caches.match(request);
-    if (kept) return kept;
+    // Offline: the previous corpus, kept while this one is incomplete (pruneStale), still reads. A file whose
+    // bytes are this build's is carried into this build's bucket; another build's text is marked, and its
+    // timings never paint over this build's recordings (W27).
+    try {
+      if (want && await copyForward(await caches.open(CORPUS_CACHE), key, 'vot-corpus-', CORPUS_CACHE)) {
+        const carried = await matchCurrent(request);
+        if (carried) return carried;
+      }
+      if (!(key && TIMING_FILE.test(key))) {
+        const kept = await caches.match(request);
+        if (kept) return want ? await otherBuildCopy(kept, key) : kept;
+      }
+    } catch (_e2) { /* a copy that cannot be read: not available */ }
     return new Response('Corpus not available offline', {
       status: 503,
       statusText: 'Service Unavailable',
@@ -1149,10 +1236,10 @@ async function semanticResponse(request, networkFirst) {
 /* THE RETIRED SCREEN BUNDLES (lz1, 2026-10-13). bundle-e..h.js and screens-e..h.min.css were folded into bundle-d.js
    and app.min.css; no build after that one asks for them and the server no longer has them. An OLDER build's page that
    this worker claims still lazy-loads them by name when the reader opens Settings, Search, the Scripture Web, Notes or the
-   Listening Library. sw-register reloads a claimed page only when it started controlled, so a page whose first worker
-   claimed it never learns of the takeover: its loader would get a 404 and show "Couldn't load this section." with a
-   Try again that 404s forever. So this worker answers those names itself, offline too: the stylesheet is empty (the old
-   loader waits on it before the script) and the script does what the old build's own update reload does (sw-register
+   Listening Library. Their sw-register reloads a claimed page only when it started controlled (this one's also when
+   another build claims it, sweep W26), so a page whose first worker claimed it never learns of the takeover: its loader
+   would get a 404 and show "Couldn't load this section." with a Try again that 404s forever. So this worker answers
+   those names itself, offline too: the stylesheet is empty (the old loader waits on it before the script) and the script does what the old build's own update reload does (sw-register
    reloadNow: mark it, let the page save, reload), at most once a minute per tab so a page that somehow asks again cannot
    loop. Only this worker's own dist/ (another folder of the origin keeps its files). Keep it while older builds can still
    be open; a future file must not reuse these names. */

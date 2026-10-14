@@ -15,7 +15,7 @@
  *   2. The SW calls self.skipWaiting() on install, so a new SW takes over
  *      immediately rather than waiting for all tabs to close.
  *   3. 'controllerchange' fires here → we reload the page onto the new build,
- *      but ONLY for a page that already had a controller (see below) —
+ *      except at the first claim of a page its own build loaded (SW-CLAIM below) —
  *      immediately, wherever the reader is. Until 2026-09-10 a visible
  *      mid-session page waited for backgrounding or a Reload tap; Corbin:
  *      "toast and update should happen no matter what screen user happens
@@ -61,8 +61,17 @@ export function registerServiceWorker() {
   // destroyed the smoke harness's execution context mid-walk (smoke:ci failed
   // all 3 attempts with "Execution context was destroyed"). Captured BEFORE
   // register() so claim() can't flip it first.
+  //
+  // ONLY THAT FIRST CLAIM (sweep W26, 2026-10-13). This was a const read once,
+  // so every later change was skipped too: a first-visit tab left open across a
+  // deploy kept the old build while its lazy loads came from the new one. The
+  // controller is followed instead, and only a change FROM none is skipped,
+  // and only when it is the page's own build claiming it: a HARD RELOAD loads
+  // uncontrolled while a worker is already active (activeAtLoad), so the first
+  // claim it sees is the next build's, and that one reloads like any other.
   const controllerAtRegistration = navigator.serviceWorker.controller;
-  const hadController = !!controllerAtRegistration;
+  let controllerNow = controllerAtRegistration;
+  /** @type {ServiceWorker | null} */ let activeAtLoad = null;
 
   // RELOAD WHEREVER THE READER IS (Corbin, 2026-09-10). This used to defer a
   // visible mid-session reload until the app was backgrounded, or offer a
@@ -112,7 +121,10 @@ export function registerServiceWorker() {
     reloadWhenUnheld();
   };
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!hadController) return;   // first controller — nothing stale to reload onto
+    const from = controllerNow;
+    controllerNow = navigator.serviceWorker.controller;
+    // first controller, and the build the page loaded: nothing stale to reload onto
+    if (!from && (!activeAtLoad || controllerNow === activeAtLoad)) return;
     doReload();
   });
   // THE EARLY CLAIM (w-toast-reload-flag, 2026-09-11). index.html captures the
@@ -165,6 +177,8 @@ export function registerServiceWorker() {
   // difference between "checked for an update" and "reused a 10-minute-old
   // copy, found it identical, skipped the update".
   navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'none' }).then((reg) => {
+    // The worker already active while this page is uncontrolled (a hard reload): see SW-CLAIM above.
+    if (!controllerNow) activeAtLoad = reg.active || null;
     // Belt-and-suspenders: a SW may already be waiting from a prior visit
     // (installed before skipWaiting was adopted). Kick it immediately.
     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });

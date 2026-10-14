@@ -139,6 +139,52 @@ describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
     expect(reloadSpy).not.toHaveBeenCalled();
   });
 
+  /* W26 (sweep 2026-10-13): the first claim is skipped, and that used to be every change for the life of the
+     tab: hadController was a const read once, so a first-visit tab left open across a deploy kept the old
+     code while its lazy loads came from the new build. Only the change FROM no controller is skipped now. */
+  it('a first-visit tab: no reload when its own worker claims it, a reload when the NEXT build takes over', async () => {
+    const sw = navigator.serviceWorker;
+    Object.defineProperty(sw, 'controller', { configurable: true, writable: true, value: null });
+    setVisibility('visible');
+    registerServiceWorker();
+    await Promise.resolve(); await Promise.resolve();   // register() resolves with nothing active yet (installing)
+    sw.controller = { id: 'A' };                         // A's activate claims the page: it is already A's build
+    controllerChangeHandler();
+    expect(reloadSpy).not.toHaveBeenCalled();
+    sw.controller = { id: 'B' };                         // a deploy: B claims it
+    controllerChangeHandler();
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
+  });
+
+  /* A HARD RELOAD bypasses the worker: the page loads uncontrolled although a worker (A) is active, and the
+     next worker's claim is the page's first. That page is A's build at best, so B's claim must reload it;
+     only a first claim by the worker that was active when the page registered is A's own and skipped. */
+  it('a hard-reloaded tab (a worker active, none controlling): the next build\'s first claim reloads it', async () => {
+    const sw = navigator.serviceWorker;
+    const A = { id: 'A' };
+    Object.defineProperty(sw, 'controller', { configurable: true, writable: true, value: null });
+    sw.register = () => Promise.resolve({ active: A, waiting: null, installing: null, addEventListener: () => {}, update: () => {} });
+    setVisibility('visible');
+    registerServiceWorker();
+    await Promise.resolve(); await Promise.resolve();
+    sw.controller = { id: 'B' };
+    controllerChangeHandler();
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('a hard-reloaded tab claimed by the worker that was already active: no reload (the same build)', async () => {
+    const sw = navigator.serviceWorker;
+    const A = { id: 'A' };
+    Object.defineProperty(sw, 'controller', { configurable: true, writable: true, value: null });
+    sw.register = () => Promise.resolve({ active: A, waiting: null, installing: null, addEventListener: () => {}, update: () => {} });
+    setVisibility('visible');
+    registerServiceWorker();
+    await Promise.resolve(); await Promise.resolve();
+    sw.controller = A;
+    controllerChangeHandler();
+    expect(reloadSpy).not.toHaveBeenCalled();
+  });
+
   it('reloads a long-backgrounded app immediately (past the boot window, still hidden)', () => {
     vi.useFakeTimers();
     try {

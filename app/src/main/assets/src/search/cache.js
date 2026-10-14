@@ -76,12 +76,28 @@ function baseFlag(translation) {
   return '+' + (g('BIBLE_' + String(base).toUpperCase()) ? '1' : '0');
 }
 
+/* ANOTHER BUILD'S CORPUS (sweep W27, 2026-10-13). Offline, an incomplete corpus update reads the
+   previous library's files, and right after a deploy the network can hand this page the next build's.
+   The service worker marks every corpus file it serves from another build: the file runs one more
+   line, pushing its path onto window.__votOtherCorpus (service-worker.js otherBuildCopy). An index
+   built from one carries the count in its signature and is never kept (saveCached), so no later
+   session searches that wording under this build's name, and the whole index already kept survives.
+   Nothing marked: the signature is unchanged, so no client rebuilds for this. */
+const OTHER_BUILD = '|ob:';
+
 /**
  * Structural cache signature for the current corpus + translation.
  * @param {string} translation
  * @returns {string}
  */
 export function dataSignature(translation) {
+  const other = g('__votOtherCorpus');
+  const sig = baseSignature(translation);
+  return Array.isArray(other) && other.length ? sig + OTHER_BUILD + other.length : sig;
+}
+
+/** @param {string} translation @returns {string} */
+function baseSignature(translation) {
   const MATTHEW = g('MATTHEW');
   return [
     'v:' + MS_INDEX_VERSION,
@@ -162,6 +178,7 @@ export async function loadCached(sig) {
  * @returns {Promise<boolean>}
  */
 export async function saveCached(sig, json) {
+  if (sig.indexOf(OTHER_BUILD) >= 0) return false;   // built from another build's corpus: this session's alone
   try {
     const cache = await openCache();
     if (!cache) return false;
