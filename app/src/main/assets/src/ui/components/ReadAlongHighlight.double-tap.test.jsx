@@ -89,7 +89,13 @@ const caretAtChar = (charOffset) => {
 
 let now;
 const body = () => document.querySelector('.letter-body');
-const ev = (type) => new MouseEvent(type, { bubbles: true, cancelable: true, clientX: 10, clientY: 10, button: 0 });
+/* The gesture times taps by event.timeStamp. In the vmThreads pool jsdom stamps events from its own
+   realm's clock, which the Date.now spy does not reach, so each event carries the test's clock. */
+const ev = (type) => {
+  const e = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: 10, clientY: 10, button: 0 });
+  Object.defineProperty(e, 'timeStamp', { value: now });
+  return e;
+};
 const down = () => act(() => { body().dispatchEvent(ev('pointerdown')); });
 const up = () => act(() => { body().dispatchEvent(ev('pointerup')); });
 const click = () => act(() => { body().dispatchEvent(ev('click')); });
