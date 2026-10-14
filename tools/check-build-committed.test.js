@@ -4,9 +4,11 @@
  * `git diff --exit-code`, which cannot see an untracked file, so a build output
  * that was never committed reached the PWA (rsync publishes the working tree)
  * and not the APK built from git: the bundle-f.js split again.
- * Each case runs against a throwaway git repo.
+ * The cases share one throwaway git repo; each puts the tree back with plain file
+ * operations. A repo per case was 7 git spawns each, and under a loaded pre-push
+ * (4 lanes on gates.lock) one case took 23 s and timed out (datasafe, 10-14 01:27).
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { execFileSync, spawnSync } from 'child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
@@ -16,11 +18,21 @@ import { buildDrift } from './check-build-committed.mjs';
 
 const TOOL = resolve(dirname(fileURLToPath(import.meta.url)), 'check-build-committed.mjs');
 const ASSETS = 'app/src/main/assets';
+// Each case spawns git (and the CLI cases node); give a loaded machine room.
+const SLOW = 60_000;
 
 // Every git call gets an env with no GIT_* in it, on top of vitest.setup.js's scrub: inside a hook git
 // exports GIT_DIR / GIT_INDEX_FILE, and a temp-repo `git init` / `git config` that inherited them would
 // rewrite the real repository (network ln1, 2026-10-05).
 const ENV = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
+
+const COMMITTED = {
+  [`${ASSETS}/dist/bundle-a.js`]: 'a\n',
+  [`${ASSETS}/index.html`]: '<html></html>\n',
+  '.gitignore': 'ignored.js\n',
+};
+// Everything a case may add, removed after each one.
+const SCRATCH = [`${ASSETS}/dist/bundle-f.js`, `${ASSETS}/dist/ignored.js`, 'tools'];
 
 let repo;
 const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', env: ENV });
@@ -29,21 +41,23 @@ const put = (rel, text) => {
   writeFileSync(join(repo, rel), text);
 };
 
-beforeEach(() => {
+beforeAll(() => {
   repo = mkdtempSync(join(tmpdir(), 'build-committed-'));
   git('init', '-q');
   git('config', 'user.email', 'test@example.invalid');
   git('config', 'user.name', 'test');
   git('config', 'core.autocrlf', 'false');
-  put(`${ASSETS}/dist/bundle-a.js`, 'a\n');
-  put(`${ASSETS}/index.html`, '<html></html>\n');
-  put('.gitignore', 'ignored.js\n');
+  for (const [rel, text] of Object.entries(COMMITTED)) put(rel, text);
   git('add', '-A');
   git('commit', '-q', '--no-verify', '-m', 'init');
+}, SLOW);
+afterEach(() => {
+  for (const [rel, text] of Object.entries(COMMITTED)) put(rel, text);
+  for (const rel of SCRATCH) rmSync(join(repo, rel), { recursive: true, force: true });
 });
-afterEach(() => rmSync(repo, { recursive: true, force: true }));
+afterAll(() => rmSync(repo, { recursive: true, force: true }));
 
-describe('buildDrift', () => {
+describe('buildDrift', { timeout: SLOW }, () => {
   it('finds nothing in a tree that matches the commit', () => {
     expect(buildDrift([ASSETS], repo, ENV)).toEqual({ changed: [], untracked: [] });
   });
@@ -66,7 +80,7 @@ describe('buildDrift', () => {
   });
 });
 
-describe('check-build-committed CLI', () => {
+describe('check-build-committed CLI', { timeout: SLOW }, () => {
   const run = () => spawnSync(process.execPath, [TOOL], { cwd: repo, encoding: 'utf8', env: ENV });
 
   it('exits 0 on a clean tree', () => {
