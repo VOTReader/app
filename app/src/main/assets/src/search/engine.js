@@ -30,7 +30,7 @@ import { parseTextQuery, applyCorrections } from './query-parse.js';
 import { expandQueryTerms } from './synonyms.js';
 import { wordForms } from './word-forms.js';
 import { kjvEncode } from './tokenize.js';
-import { snippet, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
+import { snippet, snippetAt, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
 import {
   KIND_BOOST, coverageMultiplier, popcount, PHRASE_BOOST, SYNONYM_DEMOTION,
   BM25_PARAMS, KEYWORD_BM25, KEYWORD_CONTENT_WORDS, KEYWORD_WORDS, joinApostropheS, SYNONYM_WEIGHT, FORM_WEIGHT, NEAR_PHRASE_MIN, ORIGINAL_BOOST, REPRINT_KINDS, nearPhrase, titleMatch,
@@ -1608,6 +1608,7 @@ export const VotSearchMini = {
   search,
   suggest,
   snippet,
+  snippetAt,
   matchExcerpt,
   morePlaces,
   findPlaces,

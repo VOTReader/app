@@ -220,6 +220,25 @@ export function snippet(text, terms, maxLen) {
 }
 
 /**
+ * The ~maxLen-char excerpt that OPENS at `start`: a card whose tap lands on a
+ * named place (entry.placeStart, a passage start) quotes that place, not the
+ * typed words' densest window further on (sweep W33). Closed between words,
+ * with an ellipsis when it cuts the text short.
+ * @param {string} text
+ * @param {number} start
+ * @param {number} [maxLen=180]
+ * @returns {string}
+ */
+export function snippetAt(text, start, maxLen) {
+  maxLen = maxLen || 180;
+  if (!text) return '';
+  start = Math.max(0, Math.min(start, text.length));
+  const end = closeBetweenWords(text, start, Math.min(text.length, start + maxLen), start);
+  const clip = text.slice(start, end).trim();
+  return end < text.length ? clip + '…' : clip;
+}
+
+/**
  * The ~maxLen-char excerpt centred on a matched span, opened and closed between
  * words, with an ellipsis on each cut side.
  * @param {string} text
@@ -364,16 +383,22 @@ const SHOWN_FROM = 60;
  * Each place carries `start` (its first hit, a word start: the landing reads
  * text.slice(start, start + 48), as matchExcerpt does) and `clip`, the
  * between-words excerpt centred on it.
+ *
+ * `shownAt` is where a placed card's snippet opens (snippetAt): the words'
+ * best place, which that card does not quote, is offered like any other
+ * (placesBesides, sweep W33).
  * @param {string} text
  * @param {string[]} terms
  * @param {number} [maxLen=120]
+ * @param {number} [shownAt]
  * @returns {Array<{ start: number, clip: string }>}
  */
-export function morePlaces(text, terms, maxLen) {
+export function morePlaces(text, terms, maxLen, shownAt) {
   maxLen = maxLen || 120;
   const occ = occurrences(text, terms);
   if (!occ.length) return [];
   const freq = familyCounts(occ);
+  if (typeof shownAt === 'number') return placesBesides(text, occ, freq, maxLen, shownAt);
   const best = bestIn(occ, 180);
   const shownFrom = best ? best.start - SHOWN_BEFORE : -1;
   const shownTo = best ? best.start + SHOWN_FROM : -1;
@@ -382,6 +407,30 @@ export function morePlaces(text, terms, maxLen) {
   // the snippet holds every word, the one-word leftovers are not places
   const most = mostOf(cluster(occ, maxLen, freq));
   return keep(cluster(rest, maxLen, freq), freq, most)
+    .map((p) => ({ start: p.start, clip: clipAround(text, p, maxLen) }));
+}
+
+/**
+ * morePlaces for a card whose snippet opens at `shownAt` (snippetAt): every place
+ * worth a tap but one the box already shows whole. The box holds about three
+ * lines of the window, centred on its first hit where the window allows; the
+ * words' best place is not the card's here, so a place only partly on screen
+ * is still offered, never split into leftovers too small to keep.
+ * @param {string} text
+ * @param {Array<{ idx: number, len: number, term: string, primary: boolean }>} occ
+ * @param {Record<string, number>} freq
+ * @param {number} maxLen
+ * @param {number} shownAt
+ * @returns {Array<{ start: number, clip: string }>}
+ */
+function placesBesides(text, occ, freq, maxLen, shownAt) {
+  const places = cluster(occ, maxLen, freq);
+  const first = occ.find((o) => o.idx >= shownAt && o.idx + o.len <= shownAt + 180);
+  const box = SHOWN_BEFORE + SHOWN_FROM;
+  const top = first ? Math.max(shownAt, Math.min(first.idx - SHOWN_BEFORE, shownAt + 180 - box)) : -1;
+  const shown = (/** @type {{ idx: number, len: number }} */ h) => top >= 0 && h.idx >= top && h.idx + h.len <= top + box;
+  return keep(places, freq, mostOf(places))
+    .filter((p) => !p.hits.every(shown))
     .map((p) => ({ start: p.start, clip: clipAround(text, p, maxLen) }));
 }
 

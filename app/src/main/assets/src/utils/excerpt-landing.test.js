@@ -36,6 +36,18 @@ describe('excerptLanding', () => {
     expect(excerptLanding('gate is broad. But the still small voice spoke to him', TEXTS, ['small', 'voice']).index).toBe(2);
   });
 
+  // sweep W33 (2026-10-13): the pieces were folded and the words were not, so "word." and a straight "god's"
+  // (the text has God’s) counted nothing, and the sentence holding fewer of them landed it.
+  it('the marked words count however they are typed: punctuation, either apostrophe, accents', () => {
+    const texts = ['It was told of old in the law.', 'It is God’s word to the naïve and the blasé.'];
+    const ex = 'told of old in the law. It is God’s word to the naïve';
+    expect(excerptLanding(ex, texts, ['law', "god's", 'word.']).index).toBe(1);
+    expect(excerptLanding(ex, texts, ['law', 'naive', 'blase']).index).toBe(1);
+    // a word in curly single quotes is still the word, not the word with an apostrophe on it
+    const quoted = ['He went down to the river.', 'And He said, ‘Hear Me.’ And they heard.'];
+    expect(excerptLanding('down to the river. And He said, ‘Hear Me', quoted, ['river', 'hear', 'me']).index).toBe(1);
+  });
+
   it('nothing holds it: -1', () => {
     expect(excerptLanding('zebra crossing at dawn', TEXTS)).toEqual({ index: -1, off: -1 });
     expect(excerptLanding('', TEXTS)).toEqual({ index: -1, off: -1 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { snippet, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
+import { snippet, snippetAt, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
 
 describe('snippet', () => {
   it('returns short text unchanged when no terms', () => {
@@ -197,6 +197,30 @@ describe('morePlaces — every other place a unit matches', () => {
     for (const p of morePlaces(TEXT, ['flood'], 120)) {
       expect(TEXT.slice(p.start).startsWith('flood')).toBe(true);
     }
+  });
+});
+
+/* sweep W33 (2026-10-13): a card the meaning search placed quotes the window that opens at its place (snippetAt), and
+   its places list is every place but one that window's box already shows whole (refuter repros, round 1). */
+describe('a placed card: snippetAt and morePlaces(..., shownAt)', () => {
+  it('snippetAt opens at the place and closes between words, an ellipsis only where it cuts', () => {
+    const t = 'Preface. Remember now your Creator in the days of your youth.';
+    expect(snippetAt(t, 9, 30)).toBe('Remember now your Creator in…');
+    expect(snippetAt(t, 9, 180)).toBe('Remember now your Creator in the days of your youth.');
+    expect(snippetAt(t, 0, 180)).toBe(t);
+  });
+  it('a hit the box shows is not offered again', () => {
+    const t = 'Preface. ' + 'alpha ' + 'x '.repeat(35) + 'alpha ' + 'x '.repeat(60);
+    expect(morePlaces(t, ['alpha'], undefined, 9)).toEqual([]);
+  });
+  it('the words’ best place, only partly in the window, is offered whole, not split away', () => {
+    const t = 'Preface. ' + 'x '.repeat(78) + 'alpha ' + 'x '.repeat(17) + 'beta gamma ' + 'x '.repeat(60);
+    const p = morePlaces(t, ['alpha', 'beta', 'gamma'], undefined, 9);
+    expect(p.map((x) => x.start)).toEqual([t.indexOf('alpha')]);
+  });
+  it('a card placed at the opening offers what lies past its window', () => {
+    const t = 'alpha ' + 'x '.repeat(100) + 'beta';
+    expect(morePlaces(t, ['beta'], undefined, 0).map((x) => x.start)).toEqual([t.indexOf('beta')]);
   });
 });
 

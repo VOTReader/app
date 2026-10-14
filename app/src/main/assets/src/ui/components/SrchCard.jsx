@@ -33,12 +33,17 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
   const unit = doc ? PLACE_UNIT[doc.kind] : undefined;
   const placeText = unit ? doc.text || '' : '';
   const termsKey = (hlTerms || []).join('\u0001');
+  // A text only the meaning search found (engine.js meaningFirst) names the passage the model
+  // matched: the snippet quotes the window that opens there, where the reader will land, and
+  // not the typed words' densest window further on (sweep W33), which the places list offers.
+  const placeStart = doc && typeof entry.placeStart === 'number' && entry.placeStart >= 0 &&
+    entry.placeStart < String(doc.text || '').length ? entry.placeStart : undefined;
   const places = React.useMemo(() => {
     const sm = /** @type {any} */ (window).VotSearchMini;
     if (!placeText || !sm || typeof sm.morePlaces !== 'function') return [];
-    return sm.morePlaces(placeText, hlTerms || []);
+    return sm.morePlaces(placeText, hlTerms || [], undefined, typeof sm.snippetAt === 'function' ? placeStart : undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- termsKey is hlTerms by value; the array is rebuilt every render.
-  }, [placeText, termsKey]);
+  }, [placeText, termsKey, placeStart]);
   // `memo` names the search: a "more places" list the reader opened is open again on Back.
   // `where` is the row the card sits in: a letter in Best Matches and in its group is two
   // cards, and opening one opened both on Back.
@@ -77,13 +82,10 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
     headline = doc.title.slice(cut + 3);
     locLine = study + (num ? ' \u00b7 Chapter ' + num : '');
   }
-  // A text only the meaning search found (engine.js meaningFirst) names the passage the model
-  // matched: the snippet shows that passage, where the reader will land, not the text's opening.
-  const placed = typeof entry.placeStart === 'number' && entry.placeStart > 0 && entry.placeStart < String(doc.text || '').length;
+  const titled = doc.kind === 'heading' || doc.kind === 'chapter-title' || doc.kind === 'letter-title' || doc.kind === 'wtlb-title' ||
+    doc.kind === 'blessed-title' || doc.kind === 'holy-day-title' || doc.kind === 'answers-title';
   const body = doc.kind === 'heading' ? (doc.heading || doc.text) :
-  (doc.kind === 'chapter-title' || doc.kind === 'letter-title' || doc.kind === 'wtlb-title' || doc.kind === 'blessed-title' || doc.kind === 'holy-day-title' || doc.kind === 'answers-title') ?
-  (doc.title || doc.text) :
-  placed ? doc.text.slice(entry.placeStart) :
+  titled ? (doc.title || doc.text) :
   doc.text;
   const card = (
     <button className="srch-card" onClick={() => onSelect(entry)}>
@@ -99,7 +101,7 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
       </div>
       {locLine && <div className="srch-card-loc">{locLine}</div>}
       <div className="srch-card-snippet">
-        <SrchSnippet text={body || ''} terms={hlTerms} />
+        <SrchSnippet text={body || ''} terms={hlTerms} start={titled ? undefined : placeStart} />
       </div>
     </button>
   );

@@ -2,7 +2,8 @@
    SrchSnippet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function SrchSnippet({ text, terms, maxLen = 180 }) {
+/** `start` (a placed hit's placeStart): the snippet opens there, where the tap lands (sweep W33). */
+export function SrchSnippet({ text, terms, maxLen = 180, start = undefined }) {
   const ref = React.useRef(null);
 
   // Scroll the first <mark> to the vertical center of the fixed-height
@@ -22,7 +23,10 @@ export function SrchSnippet({ text, terms, maxLen = 180 }) {
   });
 
   if (!text) return null;
-  const snippet = window.VotSearchMini.snippet(text, terms || [], maxLen);
+  const sm = window.VotSearchMini;
+  const snippet = typeof start !== 'number' ? sm.snippet(text, terms || [], maxLen) :
+    typeof sm.snippetAt === 'function' ? sm.snippetAt(text, start, maxLen) :
+    sm.snippet(text.slice(start), terms || [], maxLen);
   const spans = window.VotSearchMini.highlightSpans(snippet, terms || []);
   return (
     <div ref={ref} className="srch-snippet-scroll">

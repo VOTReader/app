@@ -11,7 +11,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { SrchCard } from './SrchCard.jsx';
 import { SrchSnippet } from './SrchSnippet.jsx';
-import { snippet, highlightSpans, morePlaces } from '../../search/snippet.js';
+import { snippet, snippetAt, highlightSpans, morePlaces } from '../../search/snippet.js';
 
 beforeEach(() => {
   // SrchCard / SrchSnippet read these as free-var globals (window-attached in prod).
@@ -190,6 +190,48 @@ describe('SrchCard for a Bible study chapter', () => {
     const { container } = render(<SrchCard entry={e} terms={['passover']} onSelect={() => {}} isDirect={false} />);
     expect(container.querySelector('.srch-card-ref').textContent).toBe('Tuesday Night, Passover');
     expect(container.querySelector('.srch-card-loc').textContent).toBe(study + ' \u00b7 Chapter 3');
+  });
+});
+
+/* sweep W33 (2026-10-13): a placed card quoted the densest window of the typed words anywhere after placeStart, so
+   it could show a passage the tap does not open. It quotes the window that opens at placeStart, and the place it no
+   longer shows is offered under it. */
+describe('SrchCard for a hit placed where the tap lands (sweep W33)', () => {
+  const filler = 'An opening line about other things entirely. ';
+  const text = filler.repeat(4) + 'Remember now your Creator in the days of your youth, before the difficult days come. ' +
+    filler.repeat(6) + 'Honour the Maker, honour the Maker of all, and the Maker will honour you. ' + filler.repeat(2);
+  const doc = { kind: 'letter', ref: 'Volume One · Letter 2', title: 'Youth', text, volumeId: 'v1', letterId: 'youth' };
+  const placed = { score: 1, doc, terms: [], placeStart: text.indexOf('Remember') };
+  beforeEach(() => {
+    /** @type {any} */ (globalThis).SRCH_KIND_LABEL = { letter: { label: 'Letter', cls: '' } };
+    /** @type {any} */ (globalThis).VotSearchMini = { snippet, snippetAt, highlightSpans, morePlaces };
+  });
+
+  it('quotes the passage the tap opens, not the densest window after it', () => {
+    const { container } = render(<SrchCard entry={placed} terms={['honour', 'maker']} onSelect={() => {}} isDirect={false} />);
+    const shown = container.querySelector('.srch-card-snippet').textContent;
+    expect(shown.startsWith('Remember now your Creator')).toBe(true);
+    expect(shown).not.toContain('Honour');
+    expect(shown.endsWith('…')).toBe(true);
+  });
+
+  it('a hit placed at the text’s opening (placeStart 0) quotes the opening, where the tap lands', () => {
+    const at0 = { score: 1, doc: { ...doc, text: 'alpha ' + 'x '.repeat(100) + 'beta' }, terms: [], placeStart: 0 };
+    const { container } = render(<SrchCard entry={at0} terms={['beta']} onSelect={() => {}} isDirect={false} />);
+    const shown = container.querySelector('.srch-card-snippet').textContent;
+    expect(shown.startsWith('alpha')).toBe(true);
+    expect(shown).not.toContain('beta');
+  });
+
+  it('offers the words’ own place, which the card no longer shows, under it', () => {
+    const picked = [];
+    const { container } = render(<SrchCard entry={placed} terms={['honour', 'maker']} onSelect={(e) => picked.push(e)} isDirect={false} />);
+    fireEvent.click(container.querySelector('.srch-places-toggle'));
+    const rows = [...container.querySelectorAll('.srch-place')];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain('Honour the Maker');
+    fireEvent.click(rows[0]);
+    expect(text.slice(picked[0].placeStart).startsWith('Honour the Maker')).toBe(true);
   });
 });
 

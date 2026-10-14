@@ -30,10 +30,23 @@
 /** The lengths tried, longest first — the same ladder the consumers used. */
 const LENGTHS = [40, 24, 12];
 
+/** A piece or a marked word as its words: any case, accents folded the way the index folds them (tokenize.js),
+ *  either apostrophe inside a word, punctuation and quote marks a space (sweep W33: "word." and a straight
+ *  "god's" against the text's God’s used to count nothing). */
+function wordsOf(/** @type {string} */ s) {
+  let t = String(s).toLowerCase();
+  if (/[^ -~]/.test(t)) t = t.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  return t.replace(/[‘’]/g, "'").split(/[^a-z0-9']+/)
+    .map((w) => w.replace(/^'+|'+$/g, '')).filter(Boolean).join(' ');
+}
+
 /** How many of `terms` a piece of text holds (whole words, any case). */
 function termsIn(/** @type {string} */ piece, /** @type {string[]} */ terms) {
-  const p = ' ' + piece.toLowerCase().replace(/[^a-z0-9']+/g, ' ') + ' ';
-  return terms.filter((t) => t && p.indexOf(' ' + String(t).toLowerCase() + ' ') >= 0).length;
+  const p = ' ' + wordsOf(piece) + ' ';
+  return terms.filter((t) => {
+    const w = t ? wordsOf(t) : '';
+    return w && p.indexOf(' ' + w + ' ') >= 0;
+  }).length;
 }
 
 /**
