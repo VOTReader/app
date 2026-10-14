@@ -73,6 +73,26 @@ describe('searchAnswers', () => {
   it('an empty query is no search', () => {
     expect(searchAnswers(INDEX, '  ')).toBeNull();
   });
+  // sweep W31 (2026-10-13): the passages after a topic's last attribution were never searched
+  // (regarding-sin, regarding-spiritual-warfare, adultery of the heart); its link sections still are not.
+  it('searches the passage after the last attribution, never the links that close a topic', () => {
+    const index = buildAnswersIndex([topic('regarding-sin', 'Regarding Sin', [
+      '"The wages of sin is death."',
+      '~ [From “Wages” ~ Volume 1]',
+      '✦',
+      '_4/14/10_ **_From YahuShua HaMashiach_**',
+      '**_Thus says The Lord YahuShua:_** Why withhold, My son? Why do you suppress that which is revealed?',
+      '**From:** Poured Out',
+      '**Also See**',
+      '• The Holidays of Men Desecrate the Name of The Lord',
+      '📖 Grace AND The Law (Bible/Letter Study)',
+      'https://www.youtube.com/watch?v=3lbNY--MIvY',
+    ])]);
+    const r = searchAnswers(index, 'withhold suppress');
+    expect(r.mentions.map((t) => t.entry.id)).toEqual(['regarding-sin']);
+    expect(r.mentions[0].firstPara).toBe(4);
+    for (const q of ['also see', 'holidays desecrate', 'grace law', 'youtube']) expect(searchAnswers(index, q).mentions).toEqual([]);
+  });
 });
 
 describe('answersSnippet', () => {

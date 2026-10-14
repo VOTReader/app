@@ -64,6 +64,8 @@ function aliasesFor(id) {
 
 const HEADER_RE = /^_\d{1,2}\/\d{1,2}\/\d{2,4}_/;
 const DIVIDER_RE = /^\s*(?:✦|~|†)\s*$/;
+/** A topic's closing links: a bold heading alone ("**Also See**", "**Audio**"), a link line ("• …", "📖 …"), a bare URL. */
+const NAV_PARA_RE = /^\s*(?:\*\*[^*]+\*\*|(?:•|\u{1F4D6}).*|https?:\/\/\S+)\s*$/u;
 
 /** Display text for a Format B paragraph: {{markers}} out, **bold** / _italic_ marks out. */
 export function answersPlainText(text) {
@@ -113,8 +115,14 @@ export function buildAnswersIndex(entries) {
       const plain = answersPlainText(raw);
       if (plain) cur.paras.push({ index: i, plain, fold: answersFold(plain) });
     });
-    // A page of prose with no attributions still searches as one passage.
+    // A page of prose with no attributions still searches as one passage. After the last
+    // attribution, the passage is searched too (sweep W31: "Why withhold, My son?" closes three
+    // topics, unsearchable), but not the link section many topics close with.
     if (cur.paras.length && passages.length === 0) passages.push(cur);
+    else {
+      const tail = cur.paras.filter((p) => !NAV_PARA_RE.test(entry.paragraphs[p.index].text));
+      if (tail.length) passages.push({ paras: tail });
+    }
     out.push({ entry, short: answersShortTitle(entry.title), titleFold: answersFold(entry.title),
       aliasFolds: aliasesFor(entry.id).map((a) => answersFold(a)), passages });
   }
