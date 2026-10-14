@@ -6,6 +6,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, act } from '@testing-library/react';
 import { Safari7DayModal, IosPwaWelcomeCard } from './SafariFlows.jsx';
+import { StateStore } from '../../stores/state-store.js';
+import { AnnotationStore } from '../../stores/annotation-store.js';
+import { BookmarkStore } from '../../stores/bookmark-store.js';
+import { JournalStore } from '../../stores/journal-store.js';
+import { NoteStore } from '../../stores/note-store.js';
 
 let _listeners;
 let _version;
@@ -46,11 +51,15 @@ beforeEach(() => {
 
   /** @type {any} */ (globalThis).useModalRegistry = vi.fn();
 
-  /** @type {any} */ (globalThis).AnnotationStore = { getAll: () => ({}) };
-  /** @type {any} */ (globalThis).BookmarkStore = { getAll: () => ({}) };
-  /** @type {any} */ (globalThis).JournalStore = { getAll: () => ({}) };
-  /** @type {any} */ (globalThis).NoteStore = { getAll: () => ({}) };
-  /** @type {any} */ (globalThis).StateStore = { get: vi.fn(() => false), set: vi.fn() };
+  // W13 (sweep 2026-10-13): the REAL stores, not mocks of an API none of them has. The old mocks
+  // gave StateStore a keyed get/set and the data stores a getAll(); the real StateStore.get()
+  // returns the whole vot-state and set() replaces it, and no store has getAll().
+  for (const s of [StateStore, AnnotationStore, BookmarkStore, JournalStore, NoteStore]) {
+    s._resetForTests({ forceLoaded: true });
+  }
+  Object.assign(globalThis, { StateStore, AnnotationStore, BookmarkStore, JournalStore, NoteStore });
+  StateStore.set(/** @type {any} */ ({ theme: 'dark', fontStyle: 'serif', tabs: [{ key: 'vol-two:1' }], read: { 'vol-two:1': 1 } }));
+  try { localStorage.removeItem('vot-ios-pwa-welcomed'); } catch (_e) { /* jsdom always has it */ }
 });
 
 afterEach(() => {
@@ -124,18 +133,48 @@ describe('IosPwaWelcomeCard', () => {
     expect(container.querySelector('.sh-welcome-card')).toBeNull();
   });
 
-  it('renders nothing when safari-pwa but has data', () => {
+  it.each([
+    ['a highlight', () => AnnotationStore.replaceAll(/** @type {any} */ ({ 'vol-two:1': [{ id: 'a1', type: 'highlight' }] }))],
+    ['a bookmark', () => BookmarkStore.replaceAll(/** @type {any} */ ([{ id: 'b1', hlKey: 'vol-two:1' }]))],
+    ['a journal entry', () => JournalStore.replaceAll(/** @type {any} */ ({ list: [{ id: 'j1', created: 1 }] }))],
+    ['a note', () => NoteStore.replaceAll(/** @type {any} */ ({ g1: { id: 'g1', text: 'x' } }))],
+  ])('renders nothing on safari-pwa when the reader already has %s', (_what, seed) => {
     _report = _makeReport({ platform: 'safari-pwa' });
-    /** @type {any} */ (globalThis).AnnotationStore = { getAll: () => ({ key1: [{ id: 'a1' }] }) };
+    seed();
+    var { container } = render(<IosPwaWelcomeCard onNavigateSettings={() => {}} />);
+    expect(container.querySelector('.sh-welcome-card')).toBeNull();
+  });
+
+  it('an empty journal ({ list: [] }) and empty maps are not data: the card shows', () => {
+    _report = _makeReport({ platform: 'safari-pwa' });
+    AnnotationStore.replaceAll(/** @type {any} */ ({ 'vol-two:1': [] }));
+    var { container } = render(<IosPwaWelcomeCard onNavigateSettings={() => {}} />);
+    expect(container.querySelector('.sh-welcome-card')).not.toBeNull();
+  });
+
+  it('renders nothing while a data store has not really loaded (degraded reads as empty, not as no data)', () => {
+    _report = _makeReport({ platform: 'safari-pwa' });
+    /** @type {any} */ (JournalStore)._state = 'degraded';
     var { container } = render(<IosPwaWelcomeCard onNavigateSettings={() => {}} />);
     expect(container.querySelector('.sh-welcome-card')).toBeNull();
   });
 
   it('renders nothing when safari-pwa but already welcomed', () => {
     _report = _makeReport({ platform: 'safari-pwa' });
-    /** @type {any} */ (globalThis).StateStore = { get: vi.fn(() => true), set: vi.fn() };
+    localStorage.setItem('vot-ios-pwa-welcomed', '1');
     var { container } = render(<IosPwaWelcomeCard onNavigateSettings={() => {}} />);
     expect(container.querySelector('.sh-welcome-card')).toBeNull();
+  });
+
+  it('renders nothing when localStorage throws (it could not remember a skip)', () => {
+    _report = _makeReport({ platform: 'safari-pwa' });
+    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('SecurityError'); });
+    try {
+      var { container } = render(<IosPwaWelcomeCard onNavigateSettings={() => {}} />);
+      expect(container.querySelector('.sh-welcome-card')).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('renders welcome card when safari-pwa + empty + not welcomed', () => {
@@ -148,26 +187,35 @@ describe('IosPwaWelcomeCard', () => {
     expect(dialog.contains(document.activeElement)).toBe(true);
   });
 
-  it('"skip" sets StateStore flag and hides card', () => {
+  it('"skip" remembers itself in its own key, hides the card, and leaves vot-state exactly as it was', () => {
     _report = _makeReport({ platform: 'safari-pwa' });
+    const before = JSON.parse(JSON.stringify(StateStore.get()));
     var { container } = render(<IosPwaWelcomeCard onNavigateSettings={() => {}} />);
     var skipBtn = Array.from(container.querySelectorAll('.sh-modal-btn')).find(
       (b) => b.textContent.includes('skip')
     );
     act(() => { /** @type {HTMLElement} */ (skipBtn).click(); });
-    expect(/** @type {any} */ (globalThis).StateStore.set).toHaveBeenCalledWith('ios-pwa-welcomed', true);
     expect(container.querySelector('.sh-welcome-card')).toBeNull();
+    expect(localStorage.getItem('vot-ios-pwa-welcomed')).toBe('1');
+    // set('ios-pwa-welcomed', true) on the real StateStore would have made vot-state a string,
+    // losing the reader's tabs, settings and read marks.
+    expect(StateStore.get()).toEqual(before);
+    cleanup();
+    var again = render(<IosPwaWelcomeCard onNavigateSettings={() => {}} />);
+    expect(again.container.querySelector('.sh-welcome-card')).toBeNull();
   });
 
-  it('"import" sets flag and calls onNavigateSettings', () => {
+  it('"import" remembers itself, leaves vot-state alone and calls onNavigateSettings', () => {
     _report = _makeReport({ platform: 'safari-pwa' });
+    const before = JSON.parse(JSON.stringify(StateStore.get()));
     var nav = vi.fn();
     var { container } = render(<IosPwaWelcomeCard onNavigateSettings={nav} />);
     var importBtn = Array.from(container.querySelectorAll('.sh-modal-btn')).find(
       (b) => b.textContent.includes('import')
     );
     act(() => { /** @type {HTMLElement} */ (importBtn).click(); });
-    expect(/** @type {any} */ (globalThis).StateStore.set).toHaveBeenCalledWith('ios-pwa-welcomed', true);
+    expect(localStorage.getItem('vot-ios-pwa-welcomed')).toBe('1');
+    expect(StateStore.get()).toEqual(before);
     expect(nav).toHaveBeenCalled();
   });
 
