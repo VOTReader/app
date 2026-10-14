@@ -103,6 +103,15 @@ describe('ranking on the audit\u2019s cases', () => {
     expect(r).toContain('Answers Only God Can Give · Regarding the Hour');
   });
 
+  /* An original brought in from outside the results was one text more than the search's limit (sweep
+     low, REPORT.md:645): limit 1 came back with two. The last text gives way, and the result says so. */
+  it('an original brought above its reprint keeps the search within its limit', async () => {
+    const q = 'repent and turn from your paths, for the hour is late';
+    const one = await VotSearchMini.search(q, { limit: 1 });
+    expect(refs(one)).toEqual(['Volume One · Letter 6 · The Watchman']);
+    expect(one.truncated).toBe(true);
+  });
+
   /* A remembered sentence in the reader's own words: a long topic holds its few words, far apart, and
      outscored the short letter holding them together (search benchmark 2026-10-05). */
   it('a sentence put in other words finds the passage holding its words together, not a topic scattering them', async () => {

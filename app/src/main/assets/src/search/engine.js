@@ -1561,6 +1561,10 @@ async function search(query, options) {
     }
     out.length = w;
   }
+  // And in all: an original originalsFirst brought in from outside the results (or the model's best text) was one
+  // text past the limit (sweep low, REPORT.md:645). The last gives way, and the result says texts were left.
+  const over = out.length > limit;
+  if (over) out.length = limit;
   if (sem && sem.length) meaningLanding(out, idOf, sem, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))));
 
   /* A QUOTED PHRASE NOTHING HOLDS IS SEARCHED AS ITS WORDS (search audit 2026-09-27).
@@ -1572,7 +1576,7 @@ async function search(query, options) {
     const again = await search(String(query).replace(/["\u201C\u201D\u201E\u201F]/g, ' '), { ...options, _unquoted: true });
     if (again.results && again.results.length) return { ...again, unquoted: p.phrase };
   }
-  return { parsed, results: out, parsedTerms: filtered, textQuery: run ? { ...p, run } : p, capped: Object.keys(capped), truncated: out.length >= limit && h < rankedIds.length, corrections };
+  return { parsed, results: out, parsedTerms: filtered, textQuery: run ? { ...p, run } : p, capped: Object.keys(capped), truncated: over || (out.length >= limit && h < rankedIds.length), corrections };
 }
 
 /**
