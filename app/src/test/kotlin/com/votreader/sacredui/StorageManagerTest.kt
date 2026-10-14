@@ -2,6 +2,7 @@ package com.votreader.sacredui
 
 import android.content.ContentResolver
 import android.content.Context
+import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
 import android.os.Build
@@ -24,6 +25,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -492,7 +494,7 @@ class StorageManagerTest {
     fun `v3 export writes the exact on-disk framing (magic + BE lengths + raw bytes)`() {
         val uri = Uri.parse("content://test/v3-export")
         val sink = ByteArrayOutputStream()
-        every { cr.openOutputStream(uri) } returns sink
+        every { cr.openOutputStream(uri, "wt") } returns sink
 
         val manifest = "{\"app\":\"VOTReader\",\"exportVersion\":3}".toByteArray(Charsets.UTF_8)
         val blob1 = byteArrayOf(1, 2, 3, 0xFF.toByte())
@@ -522,11 +524,27 @@ class StorageManagerTest {
     }
 
     @Test
+    fun `v3 export truncates the chosen document so an overwritten longer backup keeps no old tail`() {
+        // W12 (sweep 2026-10-13): beginV3Export opened with the default "w", which a SAF
+        // provider need not truncate (Android 10+). Saving over a larger same-day .votbak
+        // then left the old file's tail after the new trailer, and Verify and Import called
+        // a good backup corrupt. "wt" is the mode writeTextToUri already uses.
+        val uri = Uri.parse("content://test/v3-overwrite")
+        every { cr.openOutputStream(uri, "wt") } returns ByteArrayOutputStream()
+        every { cr.openOutputStream(uri) } returns ByteArrayOutputStream()
+        assertIs<StorageManager.Result.Success<Unit>>(
+            storage.beginV3Export(uri, "{}".toByteArray(Charsets.UTF_8))
+        )
+        verify(exactly = 1) { cr.openOutputStream(uri, "wt") }
+        verify(exactly = 0) { cr.openOutputStream(uri) }
+    }
+
+    @Test
     fun `v3 round-trips manifest + media bytes exactly (write then read back)`() {
         // WRITE a container to a buffer.
         val exportUri = Uri.parse("content://test/v3-exp")
         val sink = ByteArrayOutputStream()
-        every { cr.openOutputStream(exportUri) } returns sink
+        every { cr.openOutputStream(exportUri, "wt") } returns sink
         val manifestJson = "{\"exportVersion\":3,\"media\":[{\"id\":\"m1\",\"size\":4},{\"id\":\"m2\",\"size\":5}]}"
         val m1 = byteArrayOf(0, 1, 2, 0x80.toByte())            // includes a high byte
         val m2 = byteArrayOf(9, 8, 7, 6, 5)
@@ -768,7 +786,7 @@ class StorageManagerTest {
     @Test
     fun `v3 export rejects a short final frame on commit`() {
         val uri = Uri.parse("content://test/short")
-        every { cr.openOutputStream(uri) } returns ByteArrayOutputStream()
+        every { cr.openOutputStream(uri, "wt") } returns ByteArrayOutputStream()
         storage.beginV3Export(uri, "{}".toByteArray(Charsets.UTF_8))
         storage.v3ExportWriteBlobHeader(5L)
         storage.v3ExportWriteChunk(byteArrayOf(1, 2, 3))         // only 3 of 5
@@ -790,7 +808,7 @@ class StorageManagerTest {
         // the failure only surfaces when flush() pushes the buffer through —
         // exactly like a disk-full at commit time.
         val uri = Uri.parse("content://test/v3-flush-fail")
-        every { cr.openOutputStream(uri) } returns object : OutputStream() {
+        every { cr.openOutputStream(uri, "wt") } returns object : OutputStream() {
             override fun write(b: Int) = throw IOException("disk full")
             override fun write(b: ByteArray, off: Int, len: Int) =
                 throw IOException("disk full")
@@ -815,7 +833,7 @@ class StorageManagerTest {
     @Test
     fun `v3 export refuses to overflow a frame`() {
         val uri = Uri.parse("content://test/overflow")
-        every { cr.openOutputStream(uri) } returns ByteArrayOutputStream()
+        every { cr.openOutputStream(uri, "wt") } returns ByteArrayOutputStream()
         storage.beginV3Export(uri, "{}".toByteArray(Charsets.UTF_8))
         storage.v3ExportWriteBlobHeader(2L)
         val r = storage.v3ExportWriteChunk(byteArrayOf(1, 2, 3, 4, 5))  // 5 > 2
@@ -826,13 +844,44 @@ class StorageManagerTest {
     @Test
     fun `v3 export rejects a new blob header before the prior frame completes`() {
         val uri = Uri.parse("content://test/incomplete")
-        every { cr.openOutputStream(uri) } returns ByteArrayOutputStream()
+        every { cr.openOutputStream(uri, "wt") } returns ByteArrayOutputStream()
         storage.beginV3Export(uri, "{}".toByteArray(Charsets.UTF_8))
         storage.v3ExportWriteBlobHeader(5L)
         storage.v3ExportWriteChunk(byteArrayOf(1, 2, 3))         // frame not done
         val r = storage.v3ExportWriteBlobHeader(2L)              // illegal: prior frame open
         assertIs<StorageManager.Result.Failure>(r)
         assertEquals("frame_incomplete", r.reason)
+    }
+
+    // ── deleteIfEmpty (W12): the orphan a picker made for a save that died with the app ──
+
+    private fun sizeCursor(size: Long?): Cursor = MatrixCursor(arrayOf(OpenableColumns.SIZE)).apply {
+        addRow(arrayOf<Any?>(size))
+    }
+
+    @Test
+    fun `deleteIfEmpty deletes a zero-byte document`() {
+        val uri = Uri.parse("content://test/orphan")
+        every { cr.query(uri, any(), null, null, null) } returns sizeCursor(0L)
+        every { cr.call(any<String>(), any(), any(), any()) } returns Bundle()
+        assertTrue(storage.deleteIfEmpty(uri))
+        verify(exactly = 1) { cr.call(eq("test"), eq("android:deleteDocument"), isNull(), any()) }
+    }
+
+    @Test
+    fun `deleteIfEmpty leaves a document that holds bytes (a file the reader chose to overwrite)`() {
+        val uri = Uri.parse("content://test/older-backup")
+        every { cr.query(uri, any(), null, null, null) } returns sizeCursor(4096L)
+        assertFalse(storage.deleteIfEmpty(uri))
+        verify(exactly = 0) { cr.call(any<String>(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `deleteIfEmpty leaves a document whose size the provider will not say`() {
+        val uri = Uri.parse("content://test/unknown-size")
+        every { cr.query(uri, any(), null, null, null) } returns sizeCursor(null)
+        assertFalse(storage.deleteIfEmpty(uri))
+        verify(exactly = 0) { cr.call(any<String>(), any(), any(), any()) }
     }
 
     @Test

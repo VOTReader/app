@@ -434,6 +434,35 @@ function webOpenFilePicker() {
 // the Android saveToFile contract: fires window.__onExportComplete with
 // "ok" / "error:<reason>" instead of returning a value.
 /**
+ * How long a download's object URL stays alive after the click (W12, sweep
+ * 2026-10-13). The browser starts the download asynchronously; WebKit in
+ * particular can still be reading the Blob after click() returns, so revoking at
+ * 0 ms could fail the file after 'ok' was already reported. A minute is far past
+ * any download start and frees the Blob soon after.
+ */
+const DOWNLOAD_URL_TTL_MS = 60_000;
+
+/**
+ * Hand [blob] to the browser's download manager as [name]: an object URL on a
+ * clicked <a download>, revoked DOWNLOAD_URL_TTL_MS later. Throws what Blob URL
+ * creation throws; the callers report it.
+ * @param {Blob} blob
+ * @param {string} name
+ * @returns {void}
+ */
+function webDownloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    try { URL.revokeObjectURL(url); a.remove(); } catch (_e) { /* DOM teardown best-effort */ }
+  }, DOWNLOAD_URL_TTL_MS);
+}
+
+/**
  * @param {string} suggestedName
  * @param {string} content
  * @returns {void}
@@ -445,16 +474,9 @@ function webSaveToFile(suggestedName, content) {
     if (typeof cb === 'function') cb(result);
   };
   try {
-    const blob = new Blob([content], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = suggestedName;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      try { URL.revokeObjectURL(url); a.remove(); } catch (_e) { /* DOM teardown best-effort */ }
-    }, 0);
+    // The type follows the name (W12): the notes export is a .md file, not JSON.
+    const type = /\.md$/i.test(suggestedName) ? 'text/markdown' : 'application/json';
+    webDownloadBlob(new Blob([content], { type }), suggestedName);
     report('ok');
   } catch (e) {
     report('error:' + (/** @type {any} */ (e) && /** @type {any} */ (e).message || e));
@@ -506,13 +528,7 @@ function webBlobExportSink(suggestedName) {
       try {
         // Cast: TS lib types Uint8Array as Uint8Array<ArrayBufferLike>, which it
         // won't accept as a BlobPart (wants ArrayBuffer-backed) — a runtime no-op.
-        const blob = new Blob(/** @type {any} */ (chunks), { type: 'application/octet-stream' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = suggestedName;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => { try { URL.revokeObjectURL(url); a.remove(); } catch (_e) { /* DOM teardown best-effort */ } }, 0);
+        webDownloadBlob(new Blob(/** @type {any} */ (chunks), { type: 'application/octet-stream' }), suggestedName);
       } catch (e) { return Promise.reject(e); }
       return Promise.resolve();
     },

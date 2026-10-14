@@ -269,8 +269,17 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // layout never moved. Ask for the pass explicitly.
         if (::webView.isInitialized) ViewCompat.requestApplyInsets(webView)
     }
+    // W12: every picker launch is guarded. With no document picker app on the device
+    // (some kiosk / work-profile / stripped builds) launch() throws
+    // ActivityNotFoundException out of the UI-thread post and crashes the app; each
+    // launch answers JS with the same result its own failure path already sends.
     override fun launchFilePicker() {
-        filePickerLauncher.launch("application/json")
+        try {
+            filePickerLauncher.launch("application/json")
+        } catch (e: Exception) {
+            Timber.w(e, "Import picker launch failed")
+            bridge.callOptional(JsEvent.ImportFile, null)
+        }
     }
     override fun launchExportPicker(suggestedName: String, content: String) {
         // Double-launch guard: pendingExportContent doubles as the in-flight
@@ -300,12 +309,27 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         }
     }
     override fun launchV3ExportPicker(suggestedName: String) {
-        v3ExportPickerLauncher.launch(suggestedName)
+        // The request lives in the ViewModel: a picker answer that arrives in a
+        // process that never asked (Android killed the app while the picker was
+        // open) finds it false and cleans up the empty document (W12).
+        vm.v3ExportRequested = true
+        try {
+            v3ExportPickerLauncher.launch(suggestedName)
+        } catch (e: Exception) {
+            vm.v3ExportRequested = false
+            Timber.w(e, "v3 export picker launch failed")
+            bridge.callOptional(JsEvent.V3ExportReady, "error:launch_failed")
+        }
     }
     override fun launchV3ImportPicker() {
         // "*/*" so a .votbak (octet-stream) container OR a legacy .json backup
         // are both visible; the native magic-sniff distinguishes them.
-        v3ImportPickerLauncher.launch(arrayOf("*/*"))
+        try {
+            v3ImportPickerLauncher.launch(arrayOf("*/*"))
+        } catch (e: Exception) {
+            Timber.w(e, "v3 import picker launch failed")
+            bridge.callOptional(JsEvent.V3ImportReady, "error:launch_failed")
+        }
     }
     override fun launchMicPermissionRequest() {
         micPrepLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -418,9 +442,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // ("ok" / "error:<reason>" / "cancelled"). pendingExportContent is
         // ALWAYS cleared first, so a cancelled or failed export never leaves
         // the (potentially large) payload dangling in memory.
-        exportPickerLauncher = registerForActivityResult(
-            ActivityResultContracts.CreateDocument("application/json")
-        ) { uri ->
+        exportPickerLauncher = registerForActivityResult(CreateExportDocument()) { uri ->
             val content = pendingExportContent
             // Clear the in-flight flag SYNCHRONOUSLY (before the async write) so
             // the launchExportPicker double-launch guard sees the picker as done
@@ -429,7 +451,15 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             pendingExportContent = null
             when {
                 uri == null -> bridge.callOptional(JsEvent.ExportComplete, "cancelled")
-                content == null -> bridge.callOptional(JsEvent.ExportComplete, "error:no_content")
+                content == null -> {
+                    // The payload lived only in this Activity: an answer that lands
+                    // after Android killed the app (or recreated the Activity) has
+                    // nothing to write, and the picker already created the file.
+                    // Delete it if it is still empty (W12); a file the reader chose
+                    // to overwrite has bytes and stays untouched.
+                    lifecycleScope.launch(Dispatchers.IO) { vm.storage.deleteIfEmpty(uri) }
+                    bridge.callOptional(JsEvent.ExportComplete, "error:no_content")
+                }
                 // #1: write the (potentially large) payload OFF the Main thread.
                 else -> lifecycleScope.launch {
                     val r = withContext(Dispatchers.IO) { vm.storage.writeTextToUri(uri, content) }
@@ -448,6 +478,16 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         v3ExportPickerLauncher = registerForActivityResult(
             ActivityResultContracts.CreateDocument("application/octet-stream")
         ) { uri ->
+            if (!vm.v3ExportRequested) {
+                // This process never launched the picker: Android killed the app
+                // while it was open, and the page that asked is gone. Nobody will
+                // stream into the .votbak it created, and an empty one reads as a
+                // corrupt backup in Verify and Import: delete it while it is still
+                // empty (W12). Nothing is stashed and no page is told.
+                if (uri != null) lifecycleScope.launch(Dispatchers.IO) { vm.storage.deleteIfEmpty(uri) }
+                return@registerForActivityResult
+            }
+            vm.v3ExportRequested = false
             vm.pendingV3ExportUri = uri
             bridge.callOptional(JsEvent.V3ExportReady, if (uri != null) "ok" else "cancelled")
         }
@@ -1525,4 +1565,20 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         super.onDestroy()
     }
 
+}
+
+/**
+ * The create-document picker for saveToFile, with a MIME type that follows the
+ * suggested name (W12). A provider checks the name's extension against the MIME
+ * type and appends the type's own extension on a mismatch, so the notes export
+ * asked for as application/json landed as "… notes 2026-10-14.md.json".
+ */
+internal class CreateExportDocument : ActivityResultContracts.CreateDocument("application/json") {
+    override fun createIntent(context: Context, input: String): Intent =
+        super.createIntent(context, input).setType(exportMimeFor(input))
+
+    companion object {
+        fun exportMimeFor(name: String): String =
+            if (name.endsWith(".md", ignoreCase = true)) "text/markdown" else "application/json"
+    }
 }

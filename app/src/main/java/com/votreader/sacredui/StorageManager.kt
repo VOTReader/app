@@ -230,7 +230,11 @@ class StorageManager(private val context: Context) {
     fun beginV3Export(uri: Uri, manifestBytes: ByteArray): Result<Unit> = synchronized(v3Lock) {
         closeExportQuietly()
         return try {
-            val raw = context.contentResolver.openOutputStream(uri)
+            // "wt", never the default "w": a SAF provider need not truncate on "w"
+            // (Android 10+), so saving over a larger same-day .votbak kept the old
+            // file's tail after the new trailer and Verify / Import then called a good
+            // backup corrupt (W12, sweep 2026-10-13). writeTextToUri uses "wt" too.
+            val raw = context.contentResolver.openOutputStream(uri, "wt")
                 ?: return Result.Failure("no_output_stream")
             val out = DataOutputStream(BufferedOutputStream(raw))
             out.write(CONTAINER_MAGIC)
@@ -540,6 +544,19 @@ class StorageManager(private val context: Context) {
     }
 
     /** Best-effort delete of a SAF document we created (used on a failed/aborted export). */
+    /**
+     * Delete [uri] only when it is EMPTY: the document a create-document picker made
+     * for a save that can no longer happen (Android killed the app while the picker
+     * was open, so the payload or the export session died with it). A document with
+     * bytes, or one whose size the provider will not say, is a file the reader chose
+     * to overwrite: it stays exactly as it is. Returns true when it was deleted. (W12)
+     */
+    fun deleteIfEmpty(uri: Uri): Boolean {
+        if (queryFileSize(uri) != 0L) return false
+        return try { DocumentsContract.deleteDocument(context.contentResolver, uri) }
+        catch (e: Exception) { Timber.w(e, "deleteIfEmpty failed for %s", uri); false }
+    }
+
     private fun deleteDocumentQuietly(uri: Uri) {
         try { DocumentsContract.deleteDocument(context.contentResolver, uri) }
         catch (e: Exception) { Timber.w(e, "deleteDocument (abort cleanup) failed for %s", uri) }
