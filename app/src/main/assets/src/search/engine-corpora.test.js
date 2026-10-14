@@ -157,7 +157,7 @@ function meaningOf(/** @type {any} */ S, /** @type {string} */ key, /** @type {(
   // no sha256 named: the loader checks none
   const man = { version: 1, model: 'm.onnx', queryPrefix: '', dim: 1, count: 1, units: 'u.bin', ort: 'ort/', files: [], keys: [key] };
   /** @type {Record<string, Uint8Array>} */
-  const files = { 'semantic/manifest.json': text(JSON.stringify(man)), 'semantic/vocab.txt': text('[PAD]\n'), 'semantic/u.bin': units, 'semantic/m.onnx': text('stand-in'), 'semantic/ort/ort-wasm-simd-threaded.wasm': new Uint8Array(0) };
+  const files = { 'semantic/manifest.json': text(JSON.stringify(man)), 'semantic/vocab.txt': text('[PAD]\n'), 'semantic/u.bin': units, 'semantic/m.onnx': text('stand-in'), 'semantic/ort/ort-wasm-simd-threaded.wasm': new Uint8Array(0), 'semantic/ort/ort-wasm-simd-threaded.mjs': new Uint8Array(0) };
   const run = async () => {
     const h = holdOf();
     if (h) { h.called.resolve(); await h.held.promise; }

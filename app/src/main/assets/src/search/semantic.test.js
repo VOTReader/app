@@ -40,7 +40,7 @@ describe('docUnitKey: how the pack names a document', () => {
 });
 
 /** A three-unit pack in 4 dimensions and a stand-in runtime whose "model" says what the test tells it to. */
-function tinyPack(/** @type {{badUnits?: boolean, failLoads?: number, noSession?: boolean}} */ o = {}) {
+function tinyPack(/** @type {{badUnits?: boolean, failLoads?: number, failGlue?: number, noSession?: boolean}} */ o = {}) {
   const dim = 4;
   const vecs = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0.6, 0.8, 0]];
   const q = new Int8Array(vecs.flatMap((v) => v.map((x) => Math.round(x * 127))));
@@ -54,7 +54,7 @@ function tinyPack(/** @type {{badUnits?: boolean, failLoads?: number, noSession?
     unitsSha256: o.badUnits ? '0'.repeat(64) : sha(units), ort: 'ort/', files: [], keys: ['bible/joel:2:27', 'v1/letter'],
   };
   /** @type {Record<string, Buffer>} */
-  const files = { 'semantic/manifest.json': Buffer.from(JSON.stringify(man)), 'semantic/vocab.txt': Buffer.from('[PAD]\n'), 'semantic/u.bin': units, 'semantic/m.onnx': model, 'semantic/ort/ort-wasm-simd-threaded.wasm': Buffer.from('') };
+  const files = { 'semantic/manifest.json': Buffer.from(JSON.stringify(man)), 'semantic/vocab.txt': Buffer.from('[PAD]\n'), 'semantic/u.bin': units, 'semantic/m.onnx': model, 'semantic/ort/ort-wasm-simd-threaded.wasm': Buffer.from(''), 'semantic/ort/ort-wasm-simd-threaded.mjs': Buffer.from('') };
   const said = { vec: [0, 0, 1, 0] };
   const ort = {
     env: { wasm: {} },
@@ -65,6 +65,7 @@ function tinyPack(/** @type {{badUnits?: boolean, failLoads?: number, noSession?
     url: (p) => 'mem:' + p,
     load: async (p) => {
       if (o.failLoads && p.endsWith('manifest.json')) { o.failLoads--; throw new Error('semantic: ' + p + ' 503'); }
+      if (o.failGlue && p.endsWith('threaded.mjs')) { o.failGlue--; throw new Error('semantic: ' + p + ' 503'); }
       if (!files[p]) throw new Error('missing ' + p);
       return buf(files[p]);
     },
@@ -125,6 +126,17 @@ describe('semanticDocs over a pack', () => {
       expect(await semanticDocs('q', (k) => k)).toBeNull(); // answers now, and starts it again behind the search
       expect(await startSemantic()).toBe(true);
       expect(semanticStatus().status).toBe('ready');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('the runtime’s glue file failing to arrive is a load, tried again (W35 refuter r1)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      tinyPack({ failGlue: 1 });
+      expect(await startSemantic()).toBe(false);
+      vi.setSystemTime(Date.now() + 31 * 1000);
+      expect(await startSemantic()).toBe(true);
     } finally {
       vi.useRealTimers();
     }

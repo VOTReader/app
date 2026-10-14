@@ -102,6 +102,9 @@ export function startSemantic() {
       ort.env.wasm.numThreads = 1;
       ort.env.wasm.wasmBinary = await io.load(ortDir + 'ort-wasm-simd-threaded.wasm');
       ort.env.wasm.wasmPaths = { mjs: io.url(ortDir + 'ort-wasm-simd-threaded.mjs') };
+      // the runtime imports this glue inside create(): read first, a failed download of it is a load
+      // that is tried again, not a device that cannot run the model (W35 refuter r1)
+      await io.load(ortDir + 'ort-wasm-simd-threaded.mjs');
       arrived = true;
       session = await ort.InferenceSession.create(new Uint8Array(modelBuf), { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
       status = 'ready';
