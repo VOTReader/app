@@ -35,6 +35,7 @@ import { resolve, dirname, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import puppeteer from 'puppeteer';
+import { exitAfterThrow } from './e2e-exit.mjs';
 
 const argv = process.argv.slice(2);
 const shotsDir = argv.includes('--shots') ? argv[argv.indexOf('--shots') + 1] : null;
@@ -290,7 +291,9 @@ try {
   }
   if (errors.length) note(`page errors: ${JSON.stringify(errors)}`); else note('no page errors');
 } catch (e) {
-  if (exitCode !== 2) { fail('bench could not be driven: ' + (e && e.stack || e)); exitCode = 2; }
+  const code = exitAfterThrow(exitCode, failures.length);
+  if (!exitCode) fail(`bench ${code === 2 ? 'could not be driven' : 'stopped after the FAIL above'}: ${e && e.stack || e}`);
+  exitCode = code;
 } finally {
   await browser.close().catch(() => {});
   server.close();
