@@ -10,6 +10,7 @@ import { gateMarks } from './notes-facts.js';
 import { GATE_CHOSEN } from './search-facts.js';
 import { gateListening, gateData } from './settings-pages.js';
 import { gateDownloads } from './offline-facts.js';
+import { gatePlans } from './plans-facts.js';
 
 /** The website readers use: the hook never acts there. */
 export const LIVE_HOSTS = ['votreader.github.io'];
@@ -182,6 +183,9 @@ export const GATE_STATES = {
     facts: { offline: true },
     open: { toast: 'offline-listen' },
   },
+  // states.json 9a-plans (zv1): Reading plans from Home; Bible in a Year on day 40 of 365 (Numbers 11-13, a day to catch
+  // up, 11 % done), the Volumes in Order not started with 2 a day chosen.
+  '9a-plans': { stack: [{ place: 'home' }, { place: 'reading-plans' }], facts: { plans: gatePlans() } },
 };
 
 /**

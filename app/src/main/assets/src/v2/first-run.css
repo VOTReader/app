@@ -1,0 +1,5 @@
+/* first-run.css - Reading plans, the welcome and the install offer (zv1 group 10; pictures 9a-plans, 8a-welcome,
+   8b-install). The pictures' own rules are screens.css's; these are what the app adds around them. */
+
+/* 9a: Stop sits under the cards as a quiet line, its tap area only as wide as its words */
+.plans > .stop { align-self: flex-start; }

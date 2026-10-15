@@ -11,3 +11,4 @@ import './BibleChapterScreen.jsx';
 import './NoteEditor.jsx';
 import './BibleScreen.jsx';
 import './SettingsPages.jsx';
+import './PlansScreen.jsx';
