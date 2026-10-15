@@ -15,6 +15,7 @@ import { useFullScreen, FullScreenToast } from './player/full-screen.jsx';
 import { SheetLayer, closeTopSheet } from './Sheet.jsx';
 import { AaSheet } from './screens/AaSheet.jsx';
 import { applyLook, savedLook, saveLook, gateLook, sizeWord } from './look.js';
+import { useReadingRecord } from './reading-record.js';
 import './screens/index.js';
 
 const g = /** @type {any} */ (globalThis);
@@ -177,6 +178,9 @@ export function V2App({ gateId = readGateId() }) {
     const s = e.currentTarget.scrollTop > 0;
     setScrolled((was) => (was === s ? was : s));
   }, []);
+
+  // What the reader reads is kept as main keeps it (reading-record.js): history, place, read marks. Never on a gate boot.
+  useReadingRecord({ route, ready, scrollRef, live: !gate });
 
   let screen;
   let contentClass = 'content';

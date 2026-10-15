@@ -163,6 +163,18 @@ describe('Home on the screen', () => {
     expect(container.querySelector('.recent')).toBe(null);
   });
 
+  it('a real boot keeps the letter Start reading opens as main does: its history entry and the place', () => {
+    let state = { theme: 'dark' };
+    g.StateStore = { isReady: () => true, get: () => state, set: vi.fn((s) => { state = s; }) };
+    g.HistoryStore = { isReady: () => true, list: () => [], add: vi.fn() };
+    const { container } = render(<V2App gateId={null} />);
+    expect(g.HistoryStore.add).not.toHaveBeenCalled();
+    click(container.querySelector('.pill.block'));
+    expect(container.querySelector('h1').textContent).toBe('Chosen by God');
+    expect(g.HistoryStore.add).toHaveBeenCalledWith({ type: 'letter', letterId: 'one-1', letterTitle: 'Chosen by God', letterNum: 1, volumeScreen: 'vot-one-index' });
+    expect(state).toEqual({ theme: 'dark', activeReadKey: 'vol:one', lastReadLetterMap: { one: 'one-1' } });
+  });
+
   it('Continue opens the letter under its volume; the gear opens Settings; a volume opens its page; Back says Home', () => {
     const { container } = render(<V2App gateId="0a-home" />);
     click(container.querySelector('.pill.block'));

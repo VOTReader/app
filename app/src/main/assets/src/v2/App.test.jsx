@@ -72,14 +72,23 @@ describe('a gate boot', () => {
     const before = JSON.stringify(Object.entries({ ...localStorage }).sort());
     const writes = [vi.spyOn(Storage.prototype, 'setItem'), vi.spyOn(Storage.prototype, 'removeItem'), vi.spyOn(Storage.prototype, 'clear')];
     const idbOpen = g.indexedDB ? vi.spyOn(g.indexedDB, 'open') : null;
+    // main's stores loaded and writable: a gate boot still records no reading (reading-record.js) and holds no bridge
+    g.StateStore = { isReady: () => true, get: () => ({}), set: vi.fn() };
+    g.HistoryStore = { isReady: () => true, list: () => [], add: vi.fn() };
+    const bridges = [g.__onReadingComplete, g.__votAudioListened];
     for (const id of Object.keys(GATE_STATES)) {
       delete html.dataset.gate;
       render(<V2App gateId={id} />);
       await waitFor(() => expect(html.dataset.gate).toBe('ready'));
+      expect([id, g.__onReadingComplete, g.__votAudioListened]).toEqual([id, ...bridges]);
       cleanup();
     }
     writes.forEach((w) => expect(w).not.toHaveBeenCalled());
     if (idbOpen) expect(idbOpen).not.toHaveBeenCalled();
+    expect(g.StateStore.set).not.toHaveBeenCalled();
+    expect(g.HistoryStore.add).not.toHaveBeenCalled();
+    delete g.StateStore;
+    delete g.HistoryStore;
     expect(JSON.stringify(Object.entries({ ...localStorage }).sort())).toBe(before);
   });
 });

@@ -136,7 +136,7 @@ export function BibleChapterScreen({ route, facts, replace, onReady }) {
     }
     return (
       <React.Fragment key={v.n}>
-        <span className={'v' + (hit ? ' hit-v' : '')} id={'v-' + v.n}>
+        <span className={'v' + (hit ? ' hit-v' : '')} id={'v-' + v.n} data-read-seg={'v' + v.n}>
           <span className="vn">{v.n}</span>{words}
         </span>{' '}
       </React.Fragment>
