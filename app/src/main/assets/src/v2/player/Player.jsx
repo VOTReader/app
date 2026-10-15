@@ -235,6 +235,49 @@ export function NowPlaying({ player, desktop, go }) {
   return <div className="np-screen" role="dialog" aria-label="Now playing">{tb}<div className="content g np">{body}</div></div>;
 }
 
+/**
+ * A typed speed as a rate, or null for "keep it" (empty, not a number). A whole number past the range is a percentage
+ * ("125" = 1.25x); anything else outside it clamps.
+ * @param {string} typed
+ */
+export function typedRate(typed) {
+  const s = String(typed).trim().replace(/[×x%]$/i, '').trim();
+  const n = s === '' ? NaN : Number(s);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return clampRate(n > RATE_MAX && Number.isInteger(n) && n >= 10 ? n / 100 : n);
+}
+
+/**
+ * 6a's big number: tap it to type a speed (main's speed readout does the same). The box opens empty with the speed as
+ * its placeholder, as main's does (Chrome gives a number box no selection, so a pre-filled "1.5" read "1.535" typed over).
+ * @param {{ rate: number, onRate: (r: number) => void }} props
+ */
+function SpeedValue({ rate, onRate }) {
+  const [typed, setTyped] = React.useState(/** @type {string | null} */ (null));
+  // The box's text as last typed, and null once it is done: a blur that follows Enter or Escape (a removed box can
+  // still blur) then finds nothing to set.
+  const live = React.useRef(/** @type {string | null} */ (null));
+  const open = () => { live.current = ''; setTyped(''); };
+  const close = () => { live.current = null; setTyped(null); };
+  const commit = () => {
+    const r = live.current == null ? null : typedRate(live.current);
+    close();
+    if (r != null) onRate(r);
+  };
+  if (typed == null) {
+    return <button type="button" className="v num" aria-label={'Speed ' + rateLabel(rate) + ', tap to type a value'} onClick={open}>{rateLabel(rate)}</button>;
+  }
+  return (
+    <input type="number" inputMode="decimal" className="v num" aria-label="Speed" min={RATE_MIN} max={RATE_MAX} step={0.01}
+      value={typed} placeholder={String(rate)} autoFocus
+      onChange={(e) => { live.current = e.target.value; setTyped(e.target.value); }} onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+        else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+      }} />
+  );
+}
+
 /** @param {{ player: PlayerModel }} props */
 function SpeedSheet({ player }) {
   const { st, source } = player;
@@ -244,7 +287,7 @@ function SpeedSheet({ player }) {
       <div className="sh">Speed</div>
       <div className="spd-now">
         <button type="button" className="stepb" aria-label="Slower by 1 %" onClick={() => source.setRate(clampRate(rate - 0.01))}><Icon name="minus" /></button>
-        <div className="v num">{rateLabel(rate)}</div>
+        <SpeedValue rate={rate} onRate={(r) => source.setRate(r)} />
         <button type="button" className="stepb" aria-label="Faster by 1 %" onClick={() => source.setRate(clampRate(rate + 0.01))}><Icon name="plus" /></button>
       </div>
       <p className="spd-s">{speedWords(rate)}</p>
@@ -339,20 +382,32 @@ function QueueRow({ row, player }) {
       onPointerDown={row.current ? undefined : start('swipe')} onPointerMove={move} onPointerUp={end}
       onPointerCancel={() => { drag.current = null; setShift({ x: 0, y: 0 }); }}>
       <span className="no">{row.no}</span>
-      <div className="tx">
+      {/* Keys and screen readers reach what a finger does by tap or swipe: the words play the row (a pointer's tap is
+          the row's own; detail 0 is a click no pointer made), the grip moves it or Deletes it, a hidden Remove button. */}
+      <div className="tx" {...(row.current ? {} : {
+        role: 'button', tabIndex: 0, 'aria-label': 'Play now: ' + row.title,
+        onClick: (e) => { if (e.detail === 0) source.playAt(row.index); },
+        onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); source.playAt(row.index); } },
+      })}>
         <div className="t">{row.title}</div>
         <div className="s">{row.current && <span className="eq"><i style={{ height: 7 }} /><i style={{ height: 12 }} /><i style={{ height: 9 }} /></span>}{row.sub}</div>
       </div>
       {!row.current && (
-        <button type="button" className="ic grip" aria-label={'Move ' + row.title}
+        <button type="button" className="ic grip" aria-label={'Move ' + row.title} aria-keyshortcuts="ArrowUp ArrowDown Delete"
           onPointerDown={start('grip')} onPointerMove={move} onPointerUp={end}
           onKeyDown={(e) => {
+            if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); source.remove(row.index); return; }
             const by = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
             const to = row.index + by;
             if (by && to > st.qi && to < st.queue.length) { e.preventDefault(); source.move(row.index, to); }
           }}>
           <Icon name="grip" />
         </button>
+      )}
+      {!row.current && (
+        <button type="button" className="rm" aria-label={'Remove ' + row.title + ' from up next'}
+          onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}
+          onClick={() => source.remove(row.index)}>Remove</button>
       )}
     </div>
   );

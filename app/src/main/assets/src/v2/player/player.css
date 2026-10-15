@@ -15,6 +15,17 @@
 .rows.q .num-row { touch-action: pan-y; background: var(--raised); }
 .ic.grip { touch-action: none; cursor: grab; }
 .upn-h .textbtn:disabled { opacity: .38; cursor: default; }
+/* a row's Remove is for keys and screen readers (a finger swipes): drawn only while it has the keyboard's focus */
+.rows.q .rm { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.rows.q .rm:focus-visible { position: static; width: auto; height: 44px; clip-path: none; align-self: center; padding: 0 8px;
+  color: var(--accent); font-size: var(--fs-s); }
+
+/* 6a's big number turns into a box to type in: the kit's .spd-now .v gives it the number's size and colour; no spinner */
+.spd-now input.v { width: 110px; min-width: 0; height: 44px; box-sizing: border-box; line-height: 1; padding: 0; border: 0; border-bottom: 1px solid var(--edge); border-radius: 0;
+  background: none; font-family: inherit; font-weight: inherit; -moz-appearance: textfield; appearance: textfield; }
+.spd-now input.v::placeholder { color: var(--t2); }
+.spd-now input.v::-webkit-inner-spin-button, .spd-now input.v::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.spd-now input.v:focus { outline: none; border-bottom-color: var(--accent); }
 
 /* laptop: the bar's open button points up; the docked panel scrolls inside itself */
 .pbar button.now { text-align: left; }

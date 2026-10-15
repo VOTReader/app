@@ -1,7 +1,7 @@
 /* The v2 player in the shell (rv1): the gate rows 2b, 6a, 6b, 6c and 9b, the mini player, the laptop's bar and panel,
    Android's back, full screen by double-tap, and the real engine reached through bundle-d's globals. */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, cleanup, waitFor, act } from '@testing-library/react';
+import { render, cleanup, waitFor, act, fireEvent } from '@testing-library/react';
 import { V2App } from '../App.jsx';
 import { resetHints, HINT } from './full-screen.jsx';
 import { FULLSCREEN_GESTURE_EVENT } from '../../utils/fullscreen-gesture-event.js';
@@ -127,6 +127,38 @@ describe('gate 6a-speed', () => {
     expect(c.querySelector('.sheet')).toBeNull();
     expect(c.querySelector('.np-screen')).not.toBeNull();
   });
+
+  it('the big number takes a typed speed (v2-gaps 31, main types one too): Enter or leaving sets it, empty or Escape keeps it', () => {
+    const { container: c } = render(<V2App gateId="6a-speed" />);
+    const type = (value, how) => {
+      click(c.querySelector('.spd-now button.v'));
+      const input = /** @type {HTMLInputElement} */ (c.querySelector('.spd-now input.v'));
+      expect(input.getAttribute('inputmode')).toBe('decimal');
+      expect(input.value).toBe('');
+      fireEvent.change(input, { target: { value } });
+      if (how === 'blur') fireEvent.blur(input); else key(input, how);
+    };
+    expect(el(c, '.spd-now button.v').getAttribute('aria-label')).toBe('Speed 1.25×, tap to type a value');
+    type('1.4', 'Enter');
+    expect(c.querySelector('.spd-now input')).toBeNull();
+    expect(text(c, '.spd-now .v')).toBe('1.4×');
+    expect(text(c, '.np-chips .chip')).toBe('1.4× speed');
+    type('0.9', 'blur');
+    expect(text(c, '.spd-now .v')).toBe('0.9×');
+    expect(text(c, '.spd-s')).toBe('Slower than recorded');
+    type('125', 'Enter'); // a whole number past 3 is a percentage
+    expect(text(c, '.spd-now .v')).toBe('1.25×');
+    expect(text(c, '.spd-chips .chip.on')).toBe('1.25×');
+    type('7', 'Enter'); // past the range: the top of it
+    expect(text(c, '.spd-now .v')).toBe('3×');
+    type('0.2', 'Enter');
+    expect(text(c, '.spd-now .v')).toBe('0.5×');
+    type('', 'Enter');
+    expect(text(c, '.spd-now .v')).toBe('0.5×');
+    type('2', 'Escape');
+    expect(text(c, '.spd-now .v')).toBe('0.5×');
+    expect(c.querySelector('.sheet.spd')).not.toBeNull();
+  });
 });
 
 describe('gate 6b-sleep', () => {
@@ -181,6 +213,27 @@ describe('gate 6c-up-next', () => {
     pointer(row(), 'pointerup', { x: 52, y: 301 });
     expect(text(c, '.upn-h .cnt')).toBe('2 of 28');
     expect(text(c, '.np-t')).toBe('Letter 3');
+  });
+
+  it('with no swipe (keys, a screen reader): Delete on the grip or the Remove button takes a row out; a row plays from Enter', () => {
+    const { container: c } = render(<V2App gateId="6c-up-next" />);
+    const row = () => [...c.querySelectorAll('.rows.q .num-row')][1];
+    expect([...c.querySelectorAll('.rows.q .num-row')][0].querySelector('button.rm')).toBeNull();
+    key(row().querySelector('.grip'), 'Delete');
+    expect(c.querySelectorAll('.rows.q .num-row')).toHaveLength(28);
+    expect(text(row(), '.t')).toBe('Letter 3');
+    const rm = row().querySelector('button.rm');
+    expect(rm.getAttribute('aria-label')).toBe('Remove Letter 3 from up next');
+    pointer(rm, 'pointerdown', { x: 50, y: 300 }); // a finger on it is not also a tap on the row
+    pointer(rm, 'pointerup', { x: 50, y: 300 });
+    click(rm);
+    expect(c.querySelectorAll('.rows.q .num-row')).toHaveLength(27);
+    expect(text(c, '.upn-h .cnt')).toBe('1 of 27');
+    const play = row().querySelector('.tx');
+    expect([play.getAttribute('role'), play.getAttribute('aria-label')]).toEqual(['button', 'Play now: Letter 4']);
+    key(play, 'Enter');
+    expect(text(c, '.upn-h .cnt')).toBe('2 of 27');
+    expect(text(c, '.np-t')).toBe('Letter 4');
   });
 });
 
