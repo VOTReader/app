@@ -8,8 +8,8 @@
 import { Icon } from './Icon.jsx';
 import { readGateId, gateState, markGate, whenPainted } from './gate.js';
 import { savedFacts } from './settings-facts.js';
-import { SettingsScreen } from './screens/SettingsScreen.jsx';
-import { LetterScreen, collectionOf, letterAt } from './screens/LetterScreen.jsx';
+import { collectionOf } from './screens/LetterScreen.jsx';
+import { bookTitle } from './home-facts.js';
 import { placeFor } from './places.js';
 import './screens/index.js';
 
@@ -32,45 +32,56 @@ export function useDesktop() {
   return React.useSyncExternalStore(subscribe, () => !!(mq && mq.matches));
 }
 
-/** What a route is called: its own title, and what Back says on the page above it. @param {import('./gate.js').Route} r */
+/** The names of places no screen file has registered yet (a registered place's title() wins). */
+const PLACE_TITLES = {
+  home: 'Home', search: 'Search', notes: 'Notes', settings: 'Settings',
+  bible: 'The Bible', studies: 'Studies', 'reading-plans': 'Reading plans',
+  songs: 'Songs of the Letters', garden: 'Return to the Garden', 'scripture-web': 'The Scripture Web',
+  'settings/text': 'Text and theme', 'settings/reading': 'Reading', 'settings/listening': 'Listening',
+  'settings/downloads': 'Downloads', 'settings/your-data': 'Your data', 'settings/help': 'Help and about',
+};
+
+/** What a route is called: its own title, and what Back says on the page above it. @param {import('./gate.js').Route & Record<string, any>} r */
 export function routeTitle(r) {
   if (!r) return '';
   const def = placeFor(r.place);
   if (def && def.title) return def.title(r);
-  if (r.place === 'home') return 'Home';
-  if (r.place === 'settings') return 'Settings';
-  if (r.place === 'search') return 'Search';
-  if (r.place === 'notes') return 'Notes';
-  if (r.place === 'collection' || r.place === 'letter') {
+  if (Object.prototype.hasOwnProperty.call(PLACE_TITLES, r.place)) return PLACE_TITLES[r.place];
+  if (r.place === 'collection') {
     const col = collectionOf(r.collection);
-    if (r.place === 'collection') return col ? col.label : '';
-    const list = col && Array.isArray(g[col.globalName]) ? g[col.globalName] : null;
-    const letter = list ? letterAt(list, r.n) : null;
-    return letter ? letter.title : (col ? col.label : '');
+    return col ? col.label : '';
   }
+  if (r.place === 'bible-book') return bookTitle({ book: r.book });
+  if (r.place === 'bible-chapter') return bookTitle({ book: r.book }) + ' ' + r.chapter;
   return '';
 }
 
-function TopBar({ back, onBack, actions }) {
+/**
+ * Scrolls `el` so the gate's `scroll` holds: a number is px from the top; a selector puts that element's top right under
+ * the top bar (the phone's bar sits above the scroller; the laptop's is sticky inside it).
+ * @param {HTMLElement} el @param {number | string} scroll
+ */
+export function applyGateScroll(el, scroll) {
+  if (typeof scroll === 'number') { el.scrollTop = scroll; return; }
+  const target = /** @type {HTMLElement | null} */ (el.querySelector(scroll));
+  if (!target) return;
+  const bar = el.querySelector(':scope > .col > .tb');
+  const top = bar ? bar.getBoundingClientRect().bottom : el.getBoundingClientRect().top;
+  el.scrollTop += target.getBoundingClientRect().top - top;
+}
+
+function TopBar({ back, onBack, actions, scrolled }) {
   if (!back) {
-    return <div className="tb"><span className="appname">VOTReader</span>{actions}</div>;
+    return <div className={'tb' + (scrolled ? ' scrolled' : '')}><span className="appname">VOTReader</span>{actions}</div>;
   }
   return (
-    <div className="tb has-back">
+    <div className={'tb has-back' + (scrolled ? ' scrolled' : '')}>
       <button type="button" className="ic" aria-label={'Back to ' + back} onClick={onBack}><Icon name="arrowL" /></button>
       <span className="title">{back}</span>
       {actions}
     </div>
   );
 }
-
-const LETTER_ACTIONS = (
-  <>
-    <button type="button" className="ic" aria-label="Bookmark"><Icon name="bookmark" /></button>
-    <button type="button" className="ic" aria-label="Text and theme"><Icon name="aa" /></button>
-    <button type="button" className="ic" aria-label="More"><Icon name="more" /></button>
-  </>
-);
 
 /** A place v2 has not built yet: says so plainly, keeps the shell usable. */
 function NotYet({ title, onReady }) {
@@ -83,31 +94,13 @@ function NotYet({ title, onReady }) {
   );
 }
 
-function HomeScreen({ go, onReady }) {
-  React.useEffect(() => { if (onReady) onReady(); }, [onReady]);
-  return (
-    <>
-      <div className="page-head g"><h1 className="display">Home</h1><p className="lede">The v2 build: Home is next.</p></div>
-      <div className="rows end">
-        <button type="button" className="row" onClick={() => go({ place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 })}>
-          <span className="tx"><span className="t">Chosen by God</span><span className="s">Volume One · Letter 1</span></span>
-          <span className="chev"><Icon name="chev" /></span>
-        </button>
-        <button type="button" className="row" onClick={() => go({ place: 'settings' })}>
-          <span className="tx"><span className="t">Settings</span><span className="s">Text, reading, listening, your data</span></span>
-          <span className="chev"><Icon name="chev" /></span>
-        </button>
-      </div>
-    </>
-  );
-}
-
 /** @param {{ gateId?: string | null }} props */
 export function V2App({ gateId = readGateId() }) {
   const gate = gateId ? gateState(gateId) : null;
   const [stack, setStack] = React.useState(() => (gate ? gate.stack.slice() : [{ place: 'home' }]));
   const [facts] = React.useState(() => (gate && gate.facts ? gate.facts : savedFacts()));
   const [ready, setReady] = React.useState(false);
+  const [scrolled, setScrolled] = React.useState(false);
   const desktop = useDesktop();
   const scrollRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const route = stack[stack.length - 1];
@@ -125,6 +118,8 @@ export function V2App({ gateId = readGateId() }) {
     if (!gateId) return undefined;
     if (!gate) { markGate('unknown'); return undefined; }
     if (!ready) { markGate('waiting'); return undefined; }
+    const el = scrollRef.current;
+    if (el && gate.scroll != null) { applyGateScroll(el, gate.scroll); setScrolled(el.scrollTop > 0); }
     let live = true;
     whenPainted().then(() => { if (live) markGate('ready'); });
     return () => { live = false; };
@@ -141,8 +136,12 @@ export function V2App({ gateId = readGateId() }) {
     return () => { delete g.handleAndroidBack; };
   }, [pop]);
 
-  // A new page starts at its top.
-  React.useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [route]);
+  // A new page starts at its top; the top bar draws its hairline once the page has scrolled under it.
+  React.useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; setScrolled(false); }, [route]);
+  const onScroll = React.useCallback((e) => {
+    const s = e.currentTarget.scrollTop > 0;
+    setScrolled((was) => (was === s ? was : s));
+  }, []);
 
   let screen;
   let contentClass = 'content';
@@ -155,15 +154,6 @@ export function V2App({ gateId = readGateId() }) {
     actions = def.actions ? def.actions({ route, go, desktop, device }) : null;
     screen = <Screen route={route} facts={facts} gate={gate} desktop={desktop} device={device}
       go={go} pop={pop} replace={replace} openTab={openTab} onReady={onReady} />;
-  } else if (route.place === 'settings') {
-    screen = <SettingsScreen facts={facts} device={desktop ? 'computer' : 'phone'} onReady={onReady} />;
-  } else if (route.place === 'letter') {
-    contentClass = 'content reader';
-    actions = LETTER_ACTIONS;
-    const openLetter = (n) => { setReady(false); setStack((s) => s.slice(0, -1).concat({ place: 'letter', collection: route.collection, n })); };
-    screen = <LetterScreen key={route.collection + '/' + route.n} collection={route.collection} n={route.n} onReady={onReady} onOpenLetter={openLetter} />;
-  } else if (route.place === 'home') {
-    screen = <HomeScreen go={go} onReady={onReady} />;
   } else {
     screen = <NotYet title={routeTitle(route)} onReady={onReady} />;
   }
@@ -174,14 +164,14 @@ export function V2App({ gateId = readGateId() }) {
       <Icon name={t.icon} on={t.id === tab} />{t.label}
     </button>
   ));
-  const bar = <TopBar back={back} onBack={pop} actions={actions} />;
+  const bar = <TopBar back={back} onBack={pop} actions={actions} scrolled={scrolled} />;
 
   if (desktop) {
     return (
       <div className="v2 dk">
         <nav className="rail" data-zone="rail" aria-label="Places">{tabs}</nav>
         <div className="pane">
-          <div className="main" ref={scrollRef}>
+          <div className="main" ref={scrollRef} onScroll={onScroll}>
             <div className="col" data-zone="col">
               {bar}
               <div className={contentClass}>{screen}</div>
@@ -194,7 +184,7 @@ export function V2App({ gateId = readGateId() }) {
   return (
     <div className="v2 v2-phone">
       {bar}
-      <div className={contentClass} ref={scrollRef}>{screen}</div>
+      <div className={contentClass} ref={scrollRef} onScroll={onScroll}>{screen}</div>
       <nav className="tabbar" aria-label="Places">{tabs}</nav>
     </div>
   );

@@ -17,13 +17,42 @@ const DAY = 24 * 3600 * 1000;
 
 /**
  * One gate state: `stack` is the history the hook fakes (its last entry is the place shown; the one before names Back),
- * `facts` what the screen would otherwise read from storage.
+ * `facts` what the screen would otherwise read from storage, `scroll` where the page sits (px, or a selector whose
+ * element's top goes right under the top bar), `playing` the recording loaded (states.json's playing: item, reader code,
+ * at/length in seconds, paused; the player reads it, agreed with readalong 10-14).
  * @typedef {{ place: string, collection?: string, n?: number, kind?: string, id?: string }} Route
- * @typedef {{ stack: Route[], facts?: Record<string, any> }} GateState
+ * @typedef {{ item: Record<string, any>, reader: string, at: number, length: number, paused: boolean } & Record<string, any>} GatePlaying
+ * @typedef {{ stack: Route[], facts?: Record<string, any>, scroll?: number | string, playing?: GatePlaying | null,
+ *   player?: Record<string, any> }} GateState
  */
+
+/** Letter 1 of Volume One loaded at 3:51 of 10:08, read by Benjamin (states.json 0a, 0b, 2a, 1b). */
+const LETTER1_AT_351 = { item: { collection: 'one', n: 1 }, reader: 'B', at: 231, length: 608 };
+
+/** Home's seeded saved data (states.json 0a/0b data): Continue is Letter 1; Recent is John 3, then Letter 2. */
+const HOME_FACTS = {
+  home: {
+    continue: { kind: 'letter', collection: 'one', n: 1 },
+    recent: [{ kind: 'chapter', book: 'john', bookTitle: 'John', chapter: 3 }, { kind: 'letter', collection: 'one', n: 2 }],
+  },
+};
 
 /** @type {Record<string, GateState>} */
 export const GATE_STATES = {
+  // states.json 0a-home: Home at the top, Home lit; Continue reading Letter 1, Recent John 3 + Letter 2; Letter 1 paused.
+  '0a-home': {
+    stack: [{ place: 'home' }],
+    facts: HOME_FACTS,
+    playing: { ...LETTER1_AT_351, paused: true },
+  },
+  // states.json 0b-home-more: Home scrolled 500 px (as the picture was drawn): Volume Four's row just under the top bar,
+  // whose hairline shows.
+  '0b-home-more': {
+    stack: [{ place: 'home' }],
+    facts: HOME_FACTS,
+    scroll: 500,
+    playing: { ...LETTER1_AT_351, paused: true },
+  },
   // states.json 4a-settings: Settings from Home; one recording saved (48 MB), exported 2 days ago, Benjamin first, KJV
   // Bible audio, 1x, standard size, Slate, comfortable lines, NKJV.
   '4a-settings': {

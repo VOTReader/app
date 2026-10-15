@@ -3,6 +3,7 @@
    letter's text is on the page. */
 import { Icon } from '../Icon.jsx';
 import { LetterBlock, titleClass } from '../letter-text.jsx';
+import { definePlace } from '../places.js';
 
 const g = /** @type {any} */ (globalThis);
 
@@ -72,3 +73,30 @@ export function LetterScreen({ collection, n, onReady, onOpenLetter }) {
     </>
   );
 }
+
+const LETTER_ACTIONS = (
+  <>
+    <button type="button" className="ic" aria-label="Bookmark"><Icon name="bookmark" /></button>
+    <button type="button" className="ic" aria-label="Text and theme"><Icon name="aa" /></button>
+    <button type="button" className="ic" aria-label="More"><Icon name="more" /></button>
+  </>
+);
+
+/** The letter place: the next-letter card replaces this letter, so Back still names the collection. */
+function LetterPlace({ route, replace, onReady }) {
+  const openLetter = (n) => replace({ place: 'letter', collection: route.collection, n });
+  return <LetterScreen key={route.collection + '/' + route.n} collection={route.collection} n={route.n} onReady={onReady} onOpenLetter={openLetter} />;
+}
+
+definePlace('letter', {
+  Screen: LetterPlace,
+  // Back on the page above a letter says its title (or the collection's name until the volume has loaded)
+  title: (r) => {
+    const col = collectionOf(r.collection);
+    const list = col && Array.isArray(g[col.globalName]) ? g[col.globalName] : null;
+    const letter = list ? letterAt(list, r.n) : null;
+    return letter ? letter.title : (col ? col.label : '');
+  },
+  actions: () => LETTER_ACTIONS,
+  contentClass: 'content reader',
+});
