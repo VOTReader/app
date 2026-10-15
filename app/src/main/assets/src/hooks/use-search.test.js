@@ -218,6 +218,42 @@ describe('useSearch — goSearch', () => {
     expect(setSearchContext).toHaveBeenCalledWith({ kind: 'book', bookId: 'unknown', label: 'unknown' });
   });
 
+  describe('before the Bible corpus loads (BOOKS ships in the lazy bundle-a-bible) (sweep v012)', () => {
+    let _prevGenres;
+    beforeEach(() => {
+      // Undeclared, as in production until bundle-a-bible runs: a bare BOOKS read is a ReferenceError.
+      delete window.BOOKS;
+      _prevGenres = window.SCRIPTURE_GENRES;
+      // index.html's boot constant: book titles are known before the corpus is.
+      window.SCRIPTURE_GENRES = {
+        ot: [{ id: 'history', books: [{ id: '1samuel', title: '1 Samuel' }] }],
+        nt: [{ id: 'gospels', books: [{ id: 'mark', title: 'Mark' }] }],
+      };
+    });
+    afterEach(() => {
+      if (_prevGenres === undefined) delete window.SCRIPTURE_GENRES; else window.SCRIPTURE_GENRES = _prevGenres;
+    });
+
+    it("'/' or Ctrl+F on a bible-idx still showing \"Loading Bible\" opens Search", () => {
+      const tabField = makeTabField();
+      const { props } = setup({ tabField, screen: 'bible-idx', bookId: '1samuel' });
+      // The desktop shortcut's path (use-desktop-keyboard.js calls window.__goSearch on any screen).
+      expect(() => act(() => { window.__goSearch(); })).not.toThrow();
+      expect(props.setScreen).toHaveBeenCalledWith('search');
+      const [, setSearchContext] = tabField('searchContext');
+      expect(setSearchContext).toHaveBeenCalledWith({ kind: 'book', bookId: '1samuel', label: '1 Samuel' });
+    });
+
+    it('opens Search from a bible-ch the corpus never reached, the chip labelled by the id when no title is known', () => {
+      const tabField = makeTabField();
+      const { result, props } = setup({ tabField, screen: 'bible-ch', bookId: 'matthew-plain' });
+      expect(() => act(() => { result.current.goSearch(); })).not.toThrow();
+      expect(props.setScreen).toHaveBeenCalledWith('search');
+      const [, setSearchContext] = tabField('searchContext');
+      expect(setSearchContext).toHaveBeenCalledWith({ kind: 'book', bookId: 'matthew-plain', label: 'matthew-plain' });
+    });
+  });
+
   it('builds a volume-context when on a letter screen registered in COL_BY_LETTER_SC', () => {
     const tabField = makeTabField();
     const { result } = setup({ tabField, screen: 'vol-two-letter' });

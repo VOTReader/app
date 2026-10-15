@@ -150,7 +150,10 @@
 
    READS FROM GLOBAL SCOPE (cross-bundle):
      BOOKS                      For goSearch's context computation
-                                (book title lookup).
+                                (book title lookup). Lazy (bundle-a-bible):
+                                read only through scopeBookTitle's guard.
+     SCRIPTURE_GENRES           index.html boot constant: the book title
+                                while BOOKS has not loaded.
      COL_BY_LETTER_SC           For goSearch's volume-context lookup
                                 from the current screen.
      COL_BY_INDEX_SC            [9] same lookup for volume INDEX screens
@@ -166,6 +169,27 @@
 
 import { useRefMirror } from './use-ref-mirror.js';
 import { COL_BY_INDEX_SC, COL_BY_LETTER_SC, COL_BY_SEARCH_ID, colLetterArr, colPreface } from '../data/scripture-resolution.js';
+
+/**
+ * The "In {Book}" scope chip's label for a Bible book. BOOKS ships in the lazy
+ * bundle-a-bible, and bible-idx is opened on purpose before it lands (the
+ * "Loading Bible" view, which stays up if the load fails), so a bare BOOKS read
+ * there threw and the '/' or Ctrl+F shortcut never opened Search (sweep v012).
+ * Until the corpus lands, the title comes from index.html's SCRIPTURE_GENRES.
+ * @param {string} bookId
+ * @returns {string}
+ */
+function scopeBookTitle(bookId) {
+  const bk = typeof BOOKS !== 'undefined' && BOOKS ? BOOKS[bookId] : null;
+  if (bk) return bk.title;
+  if (typeof SCRIPTURE_GENRES !== 'undefined' && SCRIPTURE_GENRES) {
+    for (const g of [...SCRIPTURE_GENRES.ot, ...SCRIPTURE_GENRES.nt]) {
+      const b = g.books.find((x) => x.id === bookId);
+      if (b) return b.title;
+    }
+  }
+  return bookId;
+}
 
 /**
  * Search domain hook. Owns search state (4 tabFields), the
@@ -265,8 +289,7 @@ export function useSearch({
       // list) is just as clear a "search HERE" context as reading it.
       ctx = { kind: 'book', bookId: 'matthew', label: 'Matthew' };
     } else if ((screen === 'bible-ch' || screen === 'bible-idx') && bookId) {
-      const bk = BOOKS[bookId];
-      ctx = { kind: 'book', bookId, label: bk ? bk.title : bookId };
+      ctx = { kind: 'book', bookId, label: scopeBookTitle(bookId) };
     } else {
       const _scCol = COL_BY_LETTER_SC.get(screen) || COL_BY_INDEX_SC.get(screen);
       // A collection search never indexes offers no scope: kept to it, every search found nothing (sweep W34).
