@@ -78,6 +78,24 @@ export function applyGateScroll(el, scroll, desktop = false) {
   el.scrollTop += target.getBoundingClientRect().top - top - gap;
 }
 
+/**
+ * applyGateScroll, kept true while the gate's page lives: 'end' stays the end when the scroller or its page changes size
+ * after it (the APK sets --inset-top / --inset-bottom when the page has loaded, on the S22 after the gate's scroll; the
+ * shell's padding then shrinks the scroller and a page left at the old scrollTop stops ~80 px short). `after` runs after
+ * each placing. Returns the stop.
+ * @param {HTMLElement} el @param {Parameters<typeof applyGateScroll>[1]} scroll @param {boolean} desktop
+ * @param {() => void} after
+ */
+export function holdGateScroll(el, scroll, desktop, after) {
+  const place = () => { applyGateScroll(el, scroll, desktop); after(); };
+  place();
+  if (scroll !== 'end' || typeof ResizeObserver === 'undefined') return () => {};
+  const ro = new ResizeObserver(() => { if (el.scrollTop + el.clientHeight < el.scrollHeight - 1) place(); });
+  ro.observe(el);
+  for (const child of Array.from(el.children)) ro.observe(child);
+  return () => ro.disconnect();
+}
+
 function TopBar({ back, onBack, actions, scrolled }) {
   if (!back) {
     return <div className={'tb' + (scrolled ? ' scrolled' : '')}><span className="appname">VOTReader</span>{actions}</div>;
@@ -150,10 +168,12 @@ export function V2App({ gateId = readGateId() }) {
     if (!gate) { markGate('unknown'); return undefined; }
     if (!ready || !player.ready) { markGate('waiting'); return undefined; }
     const el = scrollRef.current;
-    if (el && gate.scroll != null) { applyGateScroll(el, gate.scroll, desktop); setScrolled(el.scrollTop > 0); barsRef.current.check(); }
+    const stop = el && gate.scroll != null
+      ? holdGateScroll(el, gate.scroll, desktop, () => { setScrolled(el.scrollTop > 0); barsRef.current.check(); })
+      : () => {};
     let live = true;
     whenPainted().then(() => { if (live) markGate('ready'); });
-    return () => { live = false; };
+    return () => { live = false; stop(); };
   }, [gateId, gate, ready, player.ready, desktop]);
 
   // Android's back (MainActivity calls window.handleAndroidBack): close an open sheet, else pop the stack, or let Android

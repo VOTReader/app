@@ -10,7 +10,7 @@ import { formatBDomText, formatBRefScan } from '../../utils/format-b-dom-text.js
 import { footnoteItems, passages, translationOf, findChapterRoute } from '../footnotes.js';
 import { OVERLAYS, placeFor } from '../places.js';
 import { GATE_STATES } from '../gate.js';
-import { applyGateScroll } from '../App.jsx';
+import { applyGateScroll, holdGateScroll } from '../App.jsx';
 import './CollectionScreen.jsx';
 
 const g = /** @type {any} */ (globalThis);
@@ -310,6 +310,39 @@ describe('the gate rows for dz13', () => {
     const el = /** @type {any} */ ({ scrollTop: 0, scrollHeight: 2400 });
     applyGateScroll(el, 'end');
     expect(el.scrollTop).toBe(2400);
+  });
+
+  it("'end' stays the end when the phone's bars land after the gate's scroll (S22: the scroller shrinks ~80 px)", () => {
+    const realRO = globalThis.ResizeObserver;
+    /** @type {(() => void)[]} */
+    const fire = [];
+    const watched = [];
+    globalThis.ResizeObserver = /** @type {any} */ (class {
+      constructor(cb) { fire.push(cb); }
+      observe(t) { watched.push(t); }
+      disconnect() { fire.length = 0; }
+    });
+    try {
+      const page = {};
+      // a browser clamps scrollTop to scrollHeight - clientHeight
+      const el = /** @type {any} */ ({ children: [page], scrollHeight: 2400, clientHeight: 700, top: 0,
+        get scrollTop() { return this.top; }, set scrollTop(v) { this.top = Math.min(v, this.scrollHeight - this.clientHeight); } });
+      const after = vi.fn();
+      const stop = holdGateScroll(el, 'end', false, after);
+      expect(el.scrollTop).toBe(1700);
+      expect(watched).toEqual([el, page]);
+      el.clientHeight = 620;                  // the insets arrive: the scroller is 80 px shorter, the page left 80 px short
+      fire.forEach((cb) => cb());
+      expect(el.scrollTop).toBe(1780);
+      expect(after).toHaveBeenCalledTimes(2);
+      stop();
+      expect(fire).toHaveLength(0);
+      // a number or a selector is not held: the system moved every line with the edge
+      holdGateScroll(el, 300, false, after);
+      expect(fire).toHaveLength(0);
+    } finally {
+      globalThis.ResizeObserver = realRO;
+    }
   });
 
   it('a gate boot draws the open sheet and the mark, and a tap acts on nothing', () => {
