@@ -9,6 +9,8 @@ import { GATE_NOW } from '../gate.js';
 import { askVotCorpus, askAudioSyncSections } from '../corpus.js';
 import { KINDS, LEDES, EMPTY, EMPTY_ALL, kindOf, marksOfKind, metaLine, readMarks } from '../notes-facts.js';
 
+const g = /** @type {any} */ (globalThis);
+
 /** @param {{ mark: import('../notes-facts.js').Mark, now: number, onOpen: (m: any) => void }} props */
 function MarkRow({ mark: m, now, onOpen }) {
   const open = m.open ? () => onOpen(m.open) : undefined;
@@ -28,16 +30,26 @@ function MarkRow({ mark: m, now, onOpen }) {
 
 /** What Notes shows, and whether the letters behind some titles are still loading. */
 function useMarks(gate) {
-  const [state, setState] = React.useState(() => (gate ? { marks: (gate.facts && gate.facts.marks) || [], pending: false } : readMarks()));
+  const [state, setState] = React.useState(() => (gate ? { marks: (gate.facts && gate.facts.marks) || [], pending: false, unnamed: false } : readMarks()));
   const waiting = state.pending;
   React.useEffect(() => {
     if (!waiting) return undefined;
     let live = true;
-    const settle = () => { if (live) setState({ marks: readMarks().marks, pending: false }); };
-    // the letters, and a compilation's timings (its first entry), each load on their own; one wait, then the rows as they are
-    Promise.all([askVotCorpus(), askAudioSyncSections()].map((p) => p.catch(() => undefined))).then(settle, settle);
+    const settle = () => { if (live) setState({ ...readMarks(), pending: false }); };
+    const load = g.__loadVotCorpus;
+    Promise.resolve(typeof load === 'function' ? load() : null).then(settle, settle);
     return () => { live = false; };
   }, [waiting]);
+  // a saved Words To Live By compilation is named by its first entry once the VOT corpus (the section list) and the
+  // compilation timings are here: ask for both and read again when they land, never holding Notes' ready (v2g11b)
+  const unnamed = state.unnamed;
+  React.useEffect(() => {
+    if (!unnamed) return undefined;
+    let live = true;
+    const named = () => { if (live) setState((s) => ({ ...readMarks(), pending: s.pending, unnamed: false })); };
+    Promise.all([askVotCorpus(), askAudioSyncSections()].map((p) => p.catch(() => undefined))).then(named, named);
+    return () => { live = false; };
+  }, [unnamed]);
   return state;
 }
 

@@ -126,11 +126,15 @@ describe('readMarks: main saved data, re-shown read only', () => {
     const t = { key: null, title: 'Part 1 · Intro–19', url: 'u/wtlb1-part1.mp3' };
     const AUDIO_SECTIONS = { wtlb1: [['Part 1 · Intro–19', 'wtlb1-part1', 'V']] };
     const unknown = { sectionOpeningKey: () => null };
-    // the section list (it rides the VOT corpus) or the timings file not here yet: wait
-    expect(recordingPlace(t, { ...e, AudioPlayer: unknown })).toMatchObject({ open: null, pending: true });
-    expect(recordingPlace(t, { ...e, AUDIO_SECTIONS, AudioPlayer: unknown })).toMatchObject({ open: null, pending: true });
-    // a recording that is no compilation: nothing to wait for
-    expect(recordingPlace({ ...t, url: 'u/other.mp3' }, { ...e, AUDIO_SECTIONS, AudioPlayer: unknown })).toMatchObject({ open: null, pending: false });
+    // the section list (it rides the VOT corpus) or the timings file not here yet: named later, and Notes never waits on it
+    // (a key-null recording may be no compilation at all: refuter, v2g11b)
+    expect(recordingPlace(t, { ...e, AudioPlayer: unknown })).toMatchObject({ open: null, pending: false, unnamed: true });
+    expect(recordingPlace(t, { ...e, AUDIO_SECTIONS, AudioPlayer: unknown })).toMatchObject({ open: null, pending: false, unnamed: true });
+    const other = { key: null, url: 'audio/other.mp3', title: 'Other' };
+    expect(readMarks({ ...e, AudioLibraryStore: { saved: () => [other] }, AudioPlayer: unknown })).toMatchObject({ pending: false, unnamed: true });
+    // the section list says it is no compilation: nothing to name
+    expect(recordingPlace(other, { ...e, AUDIO_SECTIONS, AudioPlayer: unknown })).toMatchObject({ open: null, pending: false, unnamed: false });
+    expect(readMarks({ ...e, AUDIO_SECTIONS, AudioLibraryStore: { saved: () => [other] }, AudioPlayer: unknown })).toMatchObject({ pending: false, unnamed: false });
     // both here: the player names the entry, and the row opens it
     const player = { sectionOpeningKey: (x) => (x.url === t.url ? 'wtlb1:w-12' : null) };
     expect(recordingPlace(t, { ...e, AUDIO_SECTIONS, AUDIO_SYNC_SECTIONS: {}, AudioPlayer: player }))
@@ -151,7 +155,7 @@ describe('readMarks: main saved data, re-shown read only', () => {
   });
 
   it('no stores at all (a shell without bundle-b) is simply nothing marked', () => {
-    expect(readMarks({})).toEqual({ marks: [], pending: false });
+    expect(readMarks({})).toEqual({ marks: [], pending: false, unnamed: false });
   });
 
   it('places: a preface, a journal block, an unknown key', () => {

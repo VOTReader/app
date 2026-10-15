@@ -166,10 +166,11 @@ function letterPlace(col, id, env) {
  * Where a saved recording's text is, read as main opens it from the library (screen-routes.jsx _openAudioText): a
  * 'bible-<edition>:<book>' track at its "Chapter N", a 'study:<id>-chN' track at that study chapter, else the letter
  * '<volKey>:<letter id>' of that collection (`pending` while that collection's letters have not loaded); a Words To
- * Live By compilation (key null) at its section's first entry, as main's AudioShelf textKeyOf asks the player (`pending`
- * until the player has the section list, which rides the VOT corpus, and the compilation timings file).
+ * Live By compilation (key null) at its section's first entry, as main's AudioShelf textKeyOf asks the player (`unnamed`
+ * until the player has the section list, which rides the VOT corpus, and the compilation timings file: Notes asks for
+ * both and reads again, never waiting, since a key-null recording may be no compilation at all).
  * @param {{ key?: string | null, title?: string, partLabel?: string | null, url?: string }} t @param {any} env
- * @returns {{ where: string, title: string, open: Record<string, any> | null, pending?: boolean }}
+ * @returns {{ where: string, title: string, open: Record<string, any> | null, pending?: boolean, unnamed?: boolean }}
  */
 export function recordingPlace(t, env) {
   let key = String((t && t.key) || '');
@@ -182,7 +183,7 @@ export function recordingPlace(t, env) {
       const sections = env.AUDIO_SECTIONS;
       const asset = String(t.url || '').replace(/^.*\//, '').replace(/\.mp3$/i, '');
       const section = !sections || Object.values(sections).some((list) => Array.isArray(list) && list.some((s) => s && s[1] === asset));
-      return { ...none, pending: section && !(sections && env.AUDIO_SYNC_SECTIONS) };
+      return { ...none, pending: false, unnamed: section && !(sections && env.AUDIO_SYNC_SECTIONS) };
     }
   }
   const i = key.indexOf(':');
@@ -230,14 +231,15 @@ const clip = (s, n) => (s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, '') 
 
 /**
  * Every saved item main's stores hold, as Marks (read only). `pending` is true while a mark's letter title waits for
- * the lazy corpus.
+ * the lazy corpus; `unnamed` while a saved compilation waits for its section list and timings (asked for, not waited on).
  * @param {any} [env] the globals (bundle-b's stores, bundle-d's helpers)
- * @returns {{ marks: Mark[], pending: boolean }}
+ * @returns {{ marks: Mark[], pending: boolean, unnamed: boolean }}
  */
 export function readMarks(env = globalThis) {
   /** @type {Mark[]} */
   const marks = [];
   let pending = false;
+  let unnamed = false;
   const at = (key) => { const p = placeOfKey(key, env); if (p.pending) pending = true; return p; };
   const J = env.JournalStore;
   if (J && typeof J.all === 'function') {
@@ -283,6 +285,7 @@ export function readMarks(env = globalThis) {
       if (!t || !t.url) continue;
       const p = recordingPlace(t, env);
       if (p.pending) pending = true;
+      if (p.unnamed) unnamed = true;
       const title = (t.title && String(t.title).trim()) || p.title || 'Recording';
       marks.push({ kind: 'bookmark', label: 'Saved recording', id: 'rec:' + t.url, at: t.savedAt || 0, title,
         where: p.where === title ? '' : p.where, open: p.open });
@@ -299,7 +302,7 @@ export function readMarks(env = globalThis) {
         title: from + ', joined to ' + t, where: s.where === from ? '' : s.where, open: s.open });
     }
   }
-  return { marks, pending };
+  return { marks, pending, unnamed };
 }
 
 /** Seeds for the gate pictures: 'now' minus whole days (so the day words match on any clock). */
