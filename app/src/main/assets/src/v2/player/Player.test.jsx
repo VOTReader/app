@@ -237,6 +237,183 @@ describe('gate 6c-up-next', () => {
   });
 });
 
+/** bundle-d's AudioPlayer as far as the ⋮ reads it: Chosen by God has Benjamin's reading and a text-to-speech one. */
+const twoVoices = () => {
+  g.AudioPlayer = {
+    renditionsFor: vi.fn(() => [{ reader: 'B' }, { reader: 'V' }]),
+    readerLabel: (r) => ({ B: 'Read by Benjamin', V: 'Text-to-speech' })[r] || null,
+  };
+};
+const voiceRows = (c) => [...c.querySelectorAll('.opts.mv .srow.opt')];
+
+describe('gate 2f-player-more (the ⋮ in Now playing)', () => {
+  it('phone: a sheet titled by the recording: Save recording, then Voice with Benjamin ticked, main\'s note, Cancel', async () => {
+    twoVoices();
+    const { container: c } = render(<V2App gateId="2f-player-more" />);
+    const sheet = c.querySelector('.sheet.mor');
+    expect(sheet.getAttribute('role')).toBe('dialog');
+    expect(sheet.getAttribute('aria-label')).toBe('More');
+    expect(c.querySelector('.scrim.light')).not.toBeNull();
+    expect(text(sheet, '.sh')).toBe('Chosen by God');
+    const save = sheet.querySelector('.srow.act');
+    expect(text(save, '.t')).toBe('Save recording');
+    expect(save.getAttribute('aria-pressed')).toBe('false');
+    expect(save.querySelector('.lead svg')).not.toBeNull();
+    expect(text(sheet, '.mlab')).toBe('Voice');
+    expect(sheet.querySelector('.opts.mv').getAttribute('role')).toBe('radiogroup');
+    const rows = voiceRows(sheet);
+    expect(rows.map((r) => r.textContent)).toEqual(['Read by Benjamin', 'Text-to-speech']);
+    expect(rows.map((r) => [r.getAttribute('role'), r.getAttribute('aria-checked'), r.classList.contains('on'), !!r.querySelector('.ck')]))
+      .toEqual([['radio', 'true', true, true], ['radio', 'false', false, false]]);
+    expect(text(sheet, '.fine.mvn')).toBe('Switches this recording — starts it again, and the queue follows.');
+    expect(text(sheet, '.textbtn.cancel')).toBe('Cancel');
+    const more = c.querySelector('.np-screen .np-tb [aria-label="More"]');
+    expect(more.getAttribute('aria-expanded')).toBe('true');
+    expect(more.classList.contains('opn')).toBe(false);
+    await waitFor(() => expect(html.dataset.gate).toBe('ready'));
+    expect(localStorage.length).toBe(0);
+    click(sheet.querySelector('.textbtn.cancel'));
+    expect(c.querySelector('.sheet')).toBeNull();
+    expect(c.querySelector('.np-screen')).not.toBeNull();
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    click(more);
+    expect(c.querySelector('.sheet.mor')).not.toBeNull();
+    click(c.querySelector('.scrim'));
+    expect(c.querySelector('.sheet')).toBeNull();
+  });
+
+  it('Save flips to Remove from saved recordings and keeps the sheet open; Android back closes it', () => {
+    twoVoices();
+    const { container: c } = render(<V2App gateId="2f-player-more" />);
+    click(c.querySelector('.sheet.mor .srow.act'));
+    const save = c.querySelector('.sheet.mor .srow.act');
+    expect(text(save, '.t')).toBe('Remove from saved recordings');
+    expect(save.getAttribute('aria-pressed')).toBe('true');
+    expect(save.classList.contains('on')).toBe(true);
+    click(save);
+    expect(text(c, '.sheet.mor .srow.act .t')).toBe('Save recording');
+    expect(androidBack()).toBe('true');
+    expect(c.querySelector('.sheet')).toBeNull();
+    expect(c.querySelector('.np-screen')).not.toBeNull();
+  });
+
+  it('picking Text-to-speech starts the recording again in that voice and closes; the ticked voice only closes', () => {
+    twoVoices();
+    const { container: c } = render(<V2App gateId="2f-player-more" />);
+    click(voiceRows(c)[0]);
+    expect(c.querySelector('.sheet')).toBeNull();
+    expect(text(c, '.np-s')).toBe('Read by Benjamin·On this phone');
+    expect(text(c, '.np-screen .times span')).toBe('3:51');
+    click(c.querySelector('.np-tb [aria-label="More"]'));
+    click(voiceRows(c)[1]);
+    expect(c.querySelector('.sheet')).toBeNull();
+    expect(text(c, '.np-t')).toBe('Chosen by God');
+    expect(text(c, '.np-s')).toBe('Text-to-speech');
+    expect(text(c, '.np-screen .times span')).toBe('0:00');
+    expect(c.querySelector('.bigplay').getAttribute('aria-label')).toBe('Pause');
+    click(c.querySelector('.np-tb [aria-label="More"]'));
+    expect(voiceRows(c).map((r) => r.getAttribute('aria-checked'))).toEqual(['false', 'true']);
+  });
+
+  it('with up next changed by hand, a voice asks first (main\'s confirm strip); Yes, switch rebuilds the queue', () => {
+    twoVoices();
+    const { container: c } = render(<V2App gateId="2f-player-more" />);
+    click(c.querySelector('.sheet.mor .textbtn.cancel'));
+    click(c.querySelector('.np-tb [aria-label="Up next"]'));
+    click([...c.querySelectorAll('.rows.q button.rm')][0]);
+    expect(text(c, '.upn-h .cnt')).toBe('1 of 28');
+    click(c.querySelector('.scrim'));
+    click(c.querySelector('.np-tb [aria-label="More"]'));
+    click(voiceRows(c)[1]);
+    const sheet = c.querySelector('.sheet.mor');
+    expect(sheet).not.toBeNull();
+    expect(text(sheet, '.fine.mvn')).toBe('Switching voice rebuilds this queue and drops your changes to it. Continue?');
+    const [yes, no] = [...sheet.querySelectorAll('.mvc button')];
+    expect([yes.textContent, no.textContent]).toEqual(['Yes, switch', 'Cancel']);
+    expect(document.activeElement).toBe(yes);
+    expect(text(c, '.np-s')).toBe('Read by Benjamin·On this phone');
+    click(no);
+    expect(text(c, '.sheet.mor .fine.mvn')).toBe('Switches this recording — starts it again, and the queue follows.');
+    expect(c.querySelector('.sheet.mor .mvc')).toBeNull();
+    click(voiceRows(c)[1]);
+    click(c.querySelector('.sheet.mor .mvc button'));
+    expect(c.querySelector('.sheet')).toBeNull();
+    expect(text(c, '.np-s')).toBe('Text-to-speech');
+    click(c.querySelector('.np-tb [aria-label="Up next"]'));
+    expect(text(c, '.upn-h .cnt')).toBe('1 of 29');
+  });
+
+  it('one voice only: no Voice group, Save alone', () => {
+    g.AudioPlayer = { renditionsFor: () => [{ reader: 'B' }], readerLabel: () => 'Read by Benjamin' };
+    const { container: c } = render(<V2App gateId="2f-player-more" />);
+    expect(text(c, '.sheet.mor .srow.act .t')).toBe('Save recording');
+    expect(c.querySelector('.sheet.mor .mlab')).toBeNull();
+    expect(c.querySelector('.sheet.mor .opts')).toBeNull();
+    expect(c.querySelector('.sheet.mor .mvn')).toBeNull();
+  });
+
+  it('laptop (D6): a menu under the ⋮ inside the panel, no scrim, title or Cancel; keys move; Escape or a press outside closes', () => {
+    desktop(true);
+    twoVoices();
+    const { container: c } = render(<V2App gateId="2f-player-more" />);
+    const panel = c.querySelector('.pane > aside.panel.anc');
+    const menu = () => panel.querySelector(':scope > .menu.np');
+    expect(menu().getAttribute('role')).toBe('menu');
+    expect(menu().getAttribute('aria-label')).toBe('More');
+    expect(menu().getAttribute('data-zone')).toBe('menu');
+    expect(c.querySelector('.scrim')).toBeNull();
+    expect(c.querySelector('.sheet, .dlg')).toBeNull();
+    expect(menu().querySelector('.sh, .cancel, .handle')).toBeNull();
+    const more = panel.querySelector('.np-tb [aria-label="More"]');
+    expect(more.classList.contains('opn')).toBe(true);
+    expect(more.getAttribute('aria-expanded')).toBe('true');
+    expect(more.getAttribute('aria-haspopup')).toBe('menu');
+    const items = () => [...menu().querySelectorAll('[role^="menuitem"]')];
+    expect(items().map((i) => [i.getAttribute('role'), i.textContent])).toEqual([
+      ['menuitem', 'Save recording'], ['menuitemradio', 'Read by Benjamin'], ['menuitemradio', 'Text-to-speech']]);
+    expect(items().map((i) => i.getAttribute('aria-checked'))).toEqual([null, 'true', 'false']);
+    expect(text(menu(), '.mlab')).toBe('Voice');
+    expect(text(menu(), '.fine.mvn')).toBe('Switches this recording — starts it again, and the queue follows.');
+    // A gate boot draws it open without moving focus (no ring in the picture); a click on the ⋮ moves it in.
+    click(more);
+    expect(menu()).toBeNull();
+    expect(more.classList.contains('opn')).toBe(false);
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    click(more);
+    expect(document.activeElement).toBe(items()[0]);
+    key(items()[0], 'ArrowDown');
+    expect(document.activeElement).toBe(items()[1]);
+    key(items()[1], 'End');
+    expect(document.activeElement).toBe(items()[2]);
+    key(items()[2], 'ArrowDown');
+    expect(document.activeElement).toBe(items()[0]);
+    key(items()[0], 'ArrowUp');
+    expect(document.activeElement).toBe(items()[2]);
+    key(items()[2], 'Home');
+    expect(document.activeElement).toBe(items()[0]);
+    click(items()[0]);
+    expect(menu()).not.toBeNull();
+    expect(items()[0].textContent).toBe('Remove from saved recordings');
+    key(document.activeElement, 'Escape');
+    expect(menu()).toBeNull();
+    expect(document.activeElement).toBe(more);
+    click(more);
+    pointer(panel.querySelector('.np-t'), 'pointerdown');
+    expect(menu()).toBeNull();
+    expect(panel.isConnected).toBe(true);
+    click(more);
+    act(() => { window.dispatchEvent(new Event('resize')); });
+    expect(menu()).toBeNull();
+    click(more);
+    act(() => { panel.querySelector(':scope > .np').dispatchEvent(new Event('scroll')); });
+    expect(menu()).toBeNull();
+    click(more);
+    click(items()[2]);
+    expect(menu()).toBeNull();
+    expect(text(panel, '.np-s')).toBe('Text-to-speech');
+  });
+});
+
 describe('the mini player and Android back', () => {
   it('opens Now playing; back closes the sheet, then the player, then the page', () => {
     const { container: c } = render(<V2App gateId="6a-speed" />);
@@ -376,5 +553,92 @@ describe('the real engine (bundle-d globals)', () => {
     act(() => { e.state.status = 'idle'; e.emit(); });
     expect(c.querySelector('.np-screen')).toBeNull();
     expect(c.querySelector('.mini')).toBeNull();
+  });
+
+  /** The engine with main's voice calls and bundle-b's AudioLibraryStore. */
+  function voicedEngine(over) {
+    const e = fakeEngine(over);
+    Object.assign(e.api, {
+      renditionsFor: vi.fn(() => [{ reader: 'B' }, { reader: 'V' }]),
+      readerLabel: (r) => ({ B: 'Read by Benjamin', V: 'Text-to-speech' })[r] || null,
+      hasAudio: vi.fn((volKey) => volKey === 'bible-wop-nkjv' || volKey === 'bible-brm-kjv'),
+      playCollection: vi.fn(), playLetter: vi.fn(), playBibleBook: vi.fn(),
+    });
+    g.AudioPlayer = e.api;
+    const saved = new Set();
+    let v = 0;
+    const listeners = new Set();
+    g.AudioLibraryStore = {
+      subscribe: (cb) => { listeners.add(cb); return () => listeners.delete(cb); }, getVersion: () => v,
+      isSaved: (t) => saved.has(t.key),
+      toggleSaved: vi.fn((t) => { if (saved.has(t.key)) saved.delete(t.key); else saved.add(t.key); v += 1; listeners.forEach((cb) => cb()); }),
+    };
+    return e;
+  }
+  const openMore = (c) => { click(c.querySelector('.mini')); click(c.querySelector('.np-tb [aria-label="More"]')); };
+
+  it('the ⋮: voices from AudioPlayer.renditionsFor; a pick plays the collection from this letter in that voice', () => {
+    const e = voicedEngine();
+    const items = [{ id: 'chosen-by-god', title: 'Chosen by God' }, { id: 'honor', title: 'Honor' }];
+    g.colLetterArr = vi.fn(() => items);
+    const { container: c } = render(<V2App gateId={null} />);
+    openMore(c);
+    expect(e.api.renditionsFor).toHaveBeenCalledWith('one', { id: 'chosen-by-god', title: 'Chosen by God' }, 'Volume One');
+    expect(voiceRows(c).map((r) => r.textContent)).toEqual(['Read by Benjamin', 'Text-to-speech']);
+    click(voiceRows(c)[1]);
+    expect(e.api.playCollection).toHaveBeenCalledWith({ volKey: 'one', items, collectionLabel: 'Volume One',
+      startId: 'chosen-by-god', startReader: 'V', noResume: true });
+    expect(c.querySelector('.sheet')).toBeNull();
+    delete g.colLetterArr; delete g.AudioLibraryStore;
+  });
+
+  it('the ⋮: without the collection loaded a pick plays the letter alone; a changed queue asks first', () => {
+    const e = voicedEngine({ sourceMode: 'custom', queue: [
+      { key: 'one:chosen-by-god', title: 'Chosen by God', sub: 'Volume One', url: 'u1', readerCode: 'B' },
+      { key: 'one:honor', title: 'Honor', sub: 'Volume One', url: 'u2', readerCode: 'B' }] });
+    const { container: c } = render(<V2App gateId={null} />);
+    openMore(c);
+    click(voiceRows(c)[1]);
+    expect(e.api.playLetter).not.toHaveBeenCalled();
+    expect(text(c, '.sheet.mor .fine.mvn')).toBe('Switching voice rebuilds this queue and drops your changes to it. Continue?');
+    click(c.querySelector('.sheet.mor .mvc button'));
+    expect(e.api.playLetter).toHaveBeenCalledWith({ volKey: 'one', letter: { id: 'chosen-by-god', title: 'Chosen by God' },
+      collectionLabel: 'Volume One', reader: 'V', noResume: true });
+    delete g.AudioLibraryStore;
+  });
+
+  it('the ⋮: a lone changed recording says it becomes a full queue (main\'s words)', () => {
+    voicedEngine({ sourceMode: 'custom' });
+    const { container: c } = render(<V2App gateId={null} />);
+    openMore(c);
+    click(voiceRows(c)[1]);
+    expect(text(c, '.sheet.mor .fine.mvn')).toBe('Switching voice rebuilds this into a full queue. Continue?');
+    delete g.AudioLibraryStore;
+  });
+
+  it('the ⋮: Save calls AudioLibraryStore.toggleSaved and follows the store', () => {
+    voicedEngine();
+    const { container: c } = render(<V2App gateId={null} />);
+    openMore(c);
+    click(c.querySelector('.sheet.mor .srow.act'));
+    expect(g.AudioLibraryStore.toggleSaved).toHaveBeenCalledWith(expect.objectContaining({ key: 'one:chosen-by-god', url: 'u1' }));
+    expect(text(c, '.sheet.mor .srow.act .t')).toBe('Remove from saved recordings');
+    delete g.AudioLibraryStore;
+  });
+
+  it('the ⋮ on a Bible chapter: Audio Bible lists the offered editions that have the book; a pick plays it there and becomes the setting', () => {
+    const e = voicedEngine({ queue: [{ key: 'bible-wop-nkjv:john', title: 'John 3', sub: 'NKJV', url: 'b3', readerCode: null,
+      partLabel: 'Chapter 3' }] });
+    g.__setBibleAudioEdition = vi.fn();
+    const { container: c } = render(<V2App gateId={null} />);
+    openMore(c);
+    expect(text(c, '.sheet.mor .mlab')).toBe('Audio Bible');
+    expect(voiceRows(c).map((r) => [r.textContent, r.getAttribute('aria-checked')])).toEqual([['KJV · BRM', 'false'], ['NKJV · Dramatized', 'true']]);
+    expect(text(c, '.sheet.mor .fine.mvn')).toBe('Switches this chapter — starts it again, and the queue follows.');
+    click(voiceRows(c)[0]);
+    expect(e.api.playBibleBook).toHaveBeenCalledWith({ volKey: 'bible-brm-kjv', bookId: 'john', chapterNum: 3,
+      label: 'KJV · Biblical Restoration Ministries', noResume: true });
+    expect(g.__setBibleAudioEdition).toHaveBeenCalledWith('brm-kjv');
+    delete g.__setBibleAudioEdition; delete g.AudioLibraryStore;
   });
 });

@@ -25,7 +25,8 @@ const DAY = 24 * 3600 * 1000;
  * as it goes, or a selector whose element's top goes right under the top bar), `playing` the recording loaded (states.json's playing: item, reader code,
  * at/length in seconds, paused; the player reads it, agreed with readalong 10-14). rv1 adds optional playing.rate,
  * playing.sleep ({ minutes, left } in min / s, or 'end') and playing.saved (true = saved on this device), and `player`:
- * open ('now-playing', or a sheet: 'speed' | 'sleep' | 'up-next'), full (full screen) and toast (the hint drawn).
+ * open ('now-playing', or a sheet: 'speed' | 'sleep' | 'up-next' | 'more'), full (full screen) and toast (the hint drawn).
+ * playing.savedRecording: the recording is in the Listening Library's Saved (2f's Save; default not).
  * @typedef {{ place: string, collection?: string, n?: number, kind?: string, id?: string, book?: string, chapter?: number | string,
  *   verse?: number, match?: string[] }} Route
  * @typedef {{ item: Record<string, any>, reader: string, at: number, length: number, paused: boolean } & Record<string, any>} GatePlaying
@@ -151,6 +152,7 @@ export const GATE_STATES = {
   '6a-speed': { stack: OVER_VOLUME_ONE, playing: { ...LETTER_ONE_PLAYING, rate: 1.25 }, player: { open: 'speed' } },
   '6b-sleep': { stack: OVER_VOLUME_ONE, playing: { ...LETTER_ONE_PLAYING, sleep: { minutes: 30, left: 24 * 60 } }, player: { open: 'sleep' } },
   '6c-up-next': { stack: OVER_VOLUME_ONE, playing: LETTER_ONE_PLAYING, player: { open: 'up-next' } },
+  '2f-player-more': { stack: OVER_VOLUME_ONE, playing: LETTER_ONE_PLAYING, player: { open: 'more' } },
   // states.json 9b-full-screen: Letter 2 full screen (every bar hidden), paragraph 1 at the top, the hint showing.
   '9b-full-screen': {
     stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 2 }],

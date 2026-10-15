@@ -1,8 +1,10 @@
 /* player/Player.jsx - the v2 player (rv1, 2026-10-14): the mini player every phone screen shares, Now playing (a
    full screen on the phone, a panel docked right on the laptop, D3), its three sheets (speed, sleep timer, up next;
-   dialogs on the laptop, D4) and the laptop's player bar. Pictures: design's v2-step2 gate-refs 2b, 6a, 6b, 6c, 2a,
-   desktop/2b and desktop/1b (the bar). The player is shell chrome, not a place: V2App renders these in its slots. */
+   dialogs on the laptop, D4), its ... (2f: a sheet on the phone, D6's menu in the laptop's panel) and the laptop's player
+   bar. Pictures: design's v2-step2 gate-refs 2b, 2f, 6a, 6b, 6c, 2a, desktop/2b, desktop/2f and desktop/1b (the bar).
+   The player is shell chrome, not a place: V2App renders these in its slots. */
 import { Icon } from '../Icon.jsx';
+import { Menu } from '../Menu.jsx';
 import { askVotCorpus } from '../corpus.js';
 import { realSource, fakeSource, silentSource } from './source.js';
 import { stillWashes } from './read-along.jsx';
@@ -15,7 +17,7 @@ import {
 export const SWIPE_REMOVE_PX = 96;
 
 /**
- * @typedef {{ np: boolean, sheet: null | 'speed' | 'sleep' | 'up-next' }} PlayerUi
+ * @typedef {{ np: boolean, sheet: null | 'speed' | 'sleep' | 'up-next' | 'more' }} PlayerUi
  * @typedef {{ source: import('./source.js').PlayerSource, st: import('./source.js').PlayerState, track: any,
  *   ui: PlayerUi, ready: boolean, playing: boolean,
  *   openNp: () => void, closeNp: () => void, openSheet: (s: PlayerUi['sheet']) => void, closeSheet: () => void,
@@ -24,7 +26,7 @@ export const SWIPE_REMOVE_PX = 96;
 
 /** @param {any} open the gate row's player.open @returns {PlayerUi} */
 function seedUi(open) {
-  if (open === 'speed' || open === 'sleep' || open === 'up-next') return { np: true, sheet: open };
+  if (open === 'speed' || open === 'sleep' || open === 'up-next' || open === 'more') return { np: true, sheet: open };
   return { np: open === 'now-playing', sheet: null };
 }
 
@@ -183,7 +185,12 @@ export function readAlongRoute(info, track) {
  */
 export function NowPlaying({ player, desktop, go }) {
   const { st, track, source, playing, ui } = player;
+  const moreRef = React.useRef(/** @type {HTMLButtonElement | null} */ (null));
+  // A gate boot draws the laptop's menu open with no tap: focus stays put (no ring in the picture).
+  const seeded = React.useRef(ui.sheet === 'more');
   if (!ui.np || !track) return null;
+  const moreOpen = ui.sheet === 'more';
+  const toggleMore = () => { seeded.current = false; if (moreOpen) player.closeSheet(); else player.openSheet('more'); };
   const info = trackInfo(track);
   const saved = source.isSaved(track.url);
   const left = source.sleepLeft();
@@ -193,7 +200,8 @@ export function NowPlaying({ player, desktop, go }) {
       <button type="button" className="ic" aria-label="Close the player" onClick={player.closeNp}><Icon name="down2" /></button>
       <span className="title np-title">Now playing</span>
       <button type="button" className="ic" aria-label="Up next" onClick={() => player.openSheet('up-next')}><Icon name="queue" /></button>
-      <button type="button" className="ic" aria-label="More"><Icon name="more" /></button>
+      <button ref={moreRef} type="button" className={'ic' + (desktop && moreOpen ? ' opn' : '')} aria-label="More"
+        aria-haspopup={desktop ? 'menu' : 'dialog'} aria-expanded={moreOpen} onClick={toggleMore}><Icon name="more" /></button>
     </div>
   );
   const body = (
@@ -231,7 +239,19 @@ export function NowPlaying({ player, desktop, go }) {
       )}
     </>
   );
-  if (desktop) return <aside className="panel" data-zone="panel">{tb}<div className="g np">{body}</div></aside>;
+  if (desktop) {
+    // D6: the ... hangs its menu inside the panel; a pick hands focus back to the ... (APG's menu button).
+    const closeMenu = () => { player.closeSheet(); if (moreRef.current) moreRef.current.focus(); };
+    return (
+      <aside className="panel anc" data-zone="panel">{tb}<div className="g np">{body}</div>
+        {moreOpen && (
+          <Menu label="More" anchorRef={moreRef} onClose={player.closeSheet} className="np" focusFirst={!seeded.current}>
+            <MoreItems player={player} menu close={closeMenu} />
+          </Menu>
+        )}
+      </aside>
+    );
+  }
   return <div className="np-screen" role="dialog" aria-label="Now playing">{tb}<div className="content g np">{body}</div></div>;
 }
 
@@ -428,10 +448,88 @@ function UpNextSheet({ player }) {
   );
 }
 
+/** Main's confirm strip words: a voice rebuilds the queue, so a queue changed by hand (or one lone recording) asks first. */
+const VOICE_ASK = 'Switching voice rebuilds this queue and drops your changes to it. Continue?';
+const VOICE_ASK_ONE = 'Switching voice rebuilds this into a full queue. Continue?';
+
+/**
+ * The ...'s items (2f; main's AudioManagerSheet): Save recording, then the voices when there are two or more. A voice
+ * starts the recording again in it, the queue following; with up next changed by hand it asks first. `menu`: the
+ * laptop's D6 menu (menu item roles), else the phone sheet's toggle button and radio group (main's semantics).
+ * @param {{ player: PlayerModel, menu?: boolean, close: () => void }} props
+ */
+function MoreItems({ player, menu = false, close }) {
+  const { source, st } = player;
+  const [pending, setPending] = React.useState(/** @type {string | null} */ (null));
+  const yesRef = React.useRef(/** @type {HTMLButtonElement | null} */ (null));
+  const rows = React.useRef(/** @type {Record<string, HTMLButtonElement | null>} */ ({}));
+  React.useEffect(() => { if (pending && yesRef.current) yesRef.current.focus(); }, [pending]);
+  const saved = source.recordingSaved();
+  const voices = source.voices();
+  const edition = !!voices && voices.kind === 'edition';
+  const asking = pending && voices ? voices.choices.find((c) => c.id === pending) || null : null;
+  const item = menu ? { role: 'menuitem', tabIndex: -1 } : {};
+  const pick = (c) => {
+    if (c.active) { close(); return; }
+    if (source.voiceNeedsConfirm()) { setPending(c.id); return; }
+    source.pickVoice(c.id);
+    close();
+  };
+  const keep = () => { const row = pending ? rows.current[pending] : null; setPending(null); if (row) row.focus(); };
+  return (
+    <>
+      <button type="button" className={'srow act' + (saved ? ' on' : '')} {...(menu ? item : { 'aria-pressed': saved })}
+        onClick={() => source.toggleRecordingSaved()}>
+        <span className="lead"><Icon name="bookmark" /></span>
+        <span className="tx"><span className="t">{saved ? 'Remove from saved recordings' : 'Save recording'}</span></span>
+      </button>
+      {voices && (
+        <>
+          <span className="label mlab">{edition ? 'Audio Bible' : 'Voice'}</span>
+          <div className="opts mv" role={menu ? 'group' : 'radiogroup'} aria-label={edition ? 'Recorded edition for this chapter' : 'Reader for this recording'}>
+            {voices.choices.map((c) => (
+              <button key={c.id} ref={(el) => { rows.current[c.id] = el; }} type="button" className={'srow opt' + (c.active ? ' on' : '')}
+                role={menu ? 'menuitemradio' : 'radio'} aria-checked={c.active} tabIndex={menu ? -1 : undefined} onClick={() => pick(c)}>
+                <span className="tx"><span className="t">{c.label}</span></span>
+                {c.active && <span className="ck"><Icon name="check" /></span>}
+              </button>
+            ))}
+          </div>
+          {asking ? (
+            <>
+              <p className="fine mvn" id="v2-mvq">{st.queue.length < 2 ? VOICE_ASK_ONE : VOICE_ASK}</p>
+              <div className="mvc">
+                <button ref={yesRef} type="button" className="pill sm" {...item} aria-describedby="v2-mvq"
+                  onClick={() => { setPending(null); source.pickVoice(asking.id); close(); }}>Yes, switch</button>
+                <button type="button" className="btn2 sm" {...item} onClick={keep}>Cancel</button>
+              </div>
+            </>
+          ) : (
+            <p className="fine mvn">Switches this {edition ? 'chapter' : 'recording'} — starts it again, and the queue follows.</p>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+/** The phone's ... sheet: titled by the recording, Cancel at its foot. @param {{ player: PlayerModel }} props */
+function MoreSheet({ player }) {
+  return (
+    <>
+      <div className="sh">{trackInfo(player.track).title}</div>
+      <MoreItems player={player} close={player.closeSheet} />
+      <button type="button" className="textbtn cancel" onClick={player.closeSheet}>Cancel</button>
+    </>
+  );
+}
+
+/** @type {Record<string, { cls: string, label: string, Body: (props: { player: PlayerModel }) => any, scrim?: string }>} */
 const SHEETS = {
   speed: { cls: 'spd', label: 'Speed', Body: SpeedSheet },
   sleep: { cls: 'slp', label: 'Sleep timer', Body: SleepSheet },
   'up-next': { cls: 'tall upn', label: 'Up next', Body: UpNextSheet },
+  more: { cls: 'mor', label: 'More', Body: MoreSheet, scrim: 'light' },
 };
 
 /**
@@ -440,11 +538,12 @@ const SHEETS = {
  */
 export function PlayerSheet({ player, desktop }) {
   const sheet = player.ui.sheet ? SHEETS[player.ui.sheet] : null;
-  if (!sheet || !player.track) return null;
+  // The laptop's ... is D6's menu in Now playing's panel, not a dialog.
+  if (!sheet || !player.track || (desktop && player.ui.sheet === 'more')) return null;
   const { Body } = sheet;
   return (
     <>
-      <div className="scrim" onClick={player.closeSheet} />
+      <div className={'scrim' + (sheet.scrim ? ' ' + sheet.scrim : '')} onClick={player.closeSheet} />
       <div className={(desktop ? 'dlg ' : 'sheet ') + sheet.cls} role="dialog" aria-modal="true" aria-label={sheet.label}>
         {!desktop && <div className="handle" />}
         <Body player={player} />

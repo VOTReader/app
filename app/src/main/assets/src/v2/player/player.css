@@ -50,3 +50,9 @@
 
 /* Listen on a letter: a longer word ("Resume · 12 min left") widens the round play pill */
 .pill.play.wide { width: auto; padding-right: 22px; }
+/* 2f, the ... (sheet on the phone, D6 menu on the laptop): a saved recording's bookmark fills in the accent, as the letter's
+   Bookmark does; main's confirm strip under the voices is the kit's gold pill then its outline button. */
+.srow.act.on .lead { color: var(--accent); }
+.srow.act.on .lead svg { fill: currentColor; }
+.mvc { display: flex; gap: 10px; margin: 2px 0 10px; }
+.menu .mvc { padding: 0 16px 6px; }
