@@ -16,6 +16,7 @@ import { act, cleanup, render } from '@testing-library/react';
 import React from 'react';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { letterHlKey } from '../../utils/hl-keys.js';
+import { listenFromTarget, startListenFrom, repeatTarget } from '../../utils/listen-from.js';
 import { ReadAlongHighlight, repeatSpanOf } from './ReadAlongHighlight.jsx';
 
 class FakeAudio extends EventTarget {
@@ -150,6 +151,30 @@ describe('window.__votListenFrom: play the unit on screen from a chosen clause',
     act(() => { LF().start(letterHlKey(ID, 0), 5); });
     expect(AudioPlayer.getState().time).toBe(30);
   });
+
+  /* Sweep v23: the place is found in the timings, and with the read-along off they are never fetched. The toolbar
+     still offered Listen from here; start() could only fall back to the host's plain Listen, so the voice began at
+     the top (or the resume point), and on a unit already playing it restarted it. The waiting landing then lapsed
+     with no word. Turning the read-along back on offers it again. */
+  it('read-along off: the toolbar gets no Listen from here to offer (sweep v23)', () => {
+    const spy = vi.fn();
+    const view = render(<Host onListenSpy={spy} readAlongOn={false} />);
+    const block = document.querySelector('[data-hl-key="' + letterHlKey(ID, 1) + '"]');
+    const sel = document.getSelection();
+    const r = document.createRange();
+    r.setStart(block.firstChild, 40); r.setEnd(block.firstChild, 50);
+    sel.removeAllRanges(); sel.addRange(r);
+    try {
+      expect(listenFromTarget(sel), 'nothing to offer with the timings unfetched').toBeNull();
+      act(() => { expect(startListenFrom({ hlKey: letterHlKey(ID, 1), offset: 40 })).toBe(false); });
+      expect(spy).not.toHaveBeenCalled();
+      expect(AudioPlayer.getState().status).toBe('idle');
+      view.rerender(<Host onListenSpy={spy} />);
+      expect(listenFromTarget(sel), 'offered again with the read-along on').toEqual({ hlKey: letterHlKey(ID, 1), offset: 40 });
+    } finally {
+      sel.removeAllRanges();
+    }
+  });
 });
 
 /* REPEAT THIS PASSAGE (rp1 part 3, 2026-09-25): repeat(keys, label, times) loops the selected blocks. The span is
@@ -209,8 +234,7 @@ describe('window.__votListenFrom.repeat: loop the selected blocks three times', 
 
   it('no Repeat with the read-along off (the span comes from the timings it does not fetch)', () => {
     render(<Host readAlongOn={false} />);
-    expect(LF().has(letterHlKey(ID, 1))).toBe(true);
-    expect(LF().repeat).toBeUndefined();
+    expect(repeatTarget([letterHlKey(ID, 1)])).toBeNull();
   });
 
   it('Listen from here ends a repeating passage', () => {
