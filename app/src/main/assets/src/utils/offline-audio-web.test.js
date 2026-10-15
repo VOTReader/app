@@ -58,6 +58,14 @@ afterEach(() => {
 const ready = () => vi.waitFor(() => expect(OfflineAudio.freeBytes()).toBeGreaterThan(0));
 
 describe('offline-audio-web (cf1)', () => {
+  it('reading the cache at boot tells a screen reader nothing: no "Download finished" with nothing downloaded', async () => {
+    const heard = vi.fn();
+    OfflineAudio.subscribe(heard);
+    expect(OfflineAudio.items()).toEqual([]);
+    await ready();
+    expect(heard).toHaveBeenCalled();             // the screens still hear that the store has read its cache
+    expect(OfflineAudio.news().seq).toBe(0);
+  });
   it('maps only votreader-assets audio releases to the relay', () => {
     expect(relayUrl(URL_OF('abc'))).toBe(RELAY + 'audio-v1/abc.mp3');
     expect(relayUrl('https://github.com/VOTReader/votreader-songs/releases/download/songs-v1/a.mp3')).toBeNull();
