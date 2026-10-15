@@ -9,6 +9,7 @@
 import { gateMarks } from './notes-facts.js';
 import { GATE_CHOSEN } from './search-facts.js';
 import { gateListening, gateData } from './settings-pages.js';
+import { gateReading } from './reading-settings.js';
 import { gateDownloads } from './offline-facts.js';
 import { gatePlans } from './plans-facts.js';
 import { gateShelf } from './downloads-facts.js';
@@ -186,6 +187,14 @@ export const GATE_STATES = {
   '7b-your-data': { stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/your-data' }], facts: { data: gateData(GATE_NOW) } },
   // states.json 7c-help: Help and about; the version line is this build's own.
   '7c-help': { stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/help' }], facts: {} },
+  // states.json 7d-reading (mw7, v2-gaps 14): Settings > Reading from Home: NKJV, main's defaults (Auto-scroll and Highlight
+  // the passage off, the rest on), 42 places in the reading history, the app link.
+  '7d-reading': { stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/reading' }], facts: { reading: gateReading() } },
+  // states.json 7e-translation: Bible translation from Reading, NKJV chosen; main's eleven, English then Espanol.
+  '7e-translation': {
+    stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/reading' }, { place: 'settings/translation' }],
+    facts: { translation: 'nkjv' },
+  },
   // states.json 7f-downloads (v2lis B1, dz16): Settings > Downloads from Home: Letters 1-3 of Volume One (Letter 3 with an
   // update) and John 1-3 as one row, 6 recordings · 40.4 MB, 2 more on their way; Wi-Fi only off; 2 songs kept; Standard.
   '7f-downloads': { stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/downloads' }], facts: { shelf: gateShelf(GATE_NOW) } },

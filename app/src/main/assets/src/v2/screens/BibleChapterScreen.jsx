@@ -18,6 +18,7 @@ import { LayerToast } from '../Sheet.jsx';
 import { TOAST_MS, useMainMarks } from './LetterScreen.jsx';
 import { ChapterListenPill, chapterAudio, startChapter } from '../player/listen.jsx';
 import { ChapterReadAlong } from '../player/read-along.jsx';
+import { translationOptions } from '../reading-settings.js';
 
 const g = /** @type {any} */ (globalThis);
 /** @type {string[]} */
@@ -56,6 +57,8 @@ function useTranslation(tr) {
   return {
     text: (book, ch, v) => (tr && tr !== 'nkjv' && typeof g.translateVerse === 'function' ? g.translateVerse(book.id, ch.num, v, tr) : v.text),
     label: typeof g.translationLabel === 'function' ? g.translationLabel(tr || 'nkjv') : String(tr || 'nkjv').toUpperCase(),
+    /** a Spanish edition's verses say so once its words are on the page (main's translationLang; English until then) */
+    lang: tick > 0 ? (translationOptions().find((o) => o.id === tr) || {}).lang : undefined,
     /** changes whenever the words on the page do */
     words: (tr || 'nkjv') + ':' + tick,
   };
@@ -93,11 +96,22 @@ function nextOf(book, n) {
   return nb && nb.chapters && nb.chapters.length ? { book: nb, chapter: nb.chapters[0].num, label: 'Next book' } : null;
 }
 
+/** main's Restored-Name chrome for a chapter (books-restored.js, in main's Bible bundle: its title and section headings,
+ *  never its verses), or null when the reader turned Restored Names off or the chapter has none. */
+export function restoredChapter(bookId, num, on) {
+  const b = on && g.BOOKS_RESTORED ? g.BOOKS_RESTORED[bookId] : null;
+  return (b && Array.isArray(b.chapters) && b.chapters.find((c) => c.num === num)) || null;
+}
+
 /** @param {import('../places.js').PlaceProps} props */
 export function BibleChapterScreen({ route, facts, gate = null, replace, onReady }) {
   const book = useBook(route.book);
   const tr = useTranslation((facts && facts.translation) || 'nkjv');
   const ch = book ? book.chapters.find((c) => c.num === route.chapter) || null : null;
+  // main's Bible chrome settings (Settings > Reading; each on unless the reader turned it off)
+  const on = (k) => !facts || facts[k] !== false;
+  const rch = book && ch ? restoredChapter(book.id, ch.num, on('restoredNames')) : null;
+  const title = ch && on('showChapterTitle') ? (rch && rch.title) || ch.title || null : null;
   const matchRef = React.useRef(/** @type {HTMLElement | null} */ (null));
   const bodyRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const terms = route.match ? [].concat(route.match).filter(Boolean) : [];
@@ -131,6 +145,7 @@ export function BibleChapterScreen({ route, facts, gate = null, replace, onReady
     <div className="page-head g reader-head">
       <span className="overline eyebrow">The Scriptures of Truth · {tr.label}</span>
       <h1 className="display">{book ? book.title : bookTitle({ book: route.book })} {route.chapter}</h1>
+      {title ? <p className="lede">{title}</p> : null}
       {ch && audio ? <ChapterListenPill gate={gate} book={book.id} chapter={ch.num} volKey={audio.volKey} label={audio.label} onToast={setToast} /> : null}
     </div>
   );
@@ -146,7 +161,7 @@ export function BibleChapterScreen({ route, facts, gate = null, replace, onReady
     // (2c), and main's read tracker counts only the outermost keyed element, once per verse.
     return (
       <React.Fragment key={v.n}>
-        <span className={'v' + (hit ? ' hit-v' : '')} id={'v-' + v.n} data-read-seg={'v' + v.n} data-hl-key={hlKey}>
+        <span className={'v' + (hit ? ' hit-v' : '')} id={'v-' + v.n} lang={tr.lang} data-read-seg={'v' + v.n} data-hl-key={hlKey}>
           <span className="vn">{v.n}</span>
           <VerseWords key={tr.words + (hit ? '|' + termsKey : '')} hlKey={hlKey} text={tr.text(book, ch, v)} terms={vt} matchRef={hit ? matchRef : null} />
         </span>{' '}
@@ -157,12 +172,15 @@ export function BibleChapterScreen({ route, facts, gate = null, replace, onReady
     <>
       {head}
       <div className={'body g bible' + (POETIC_BOOKS.has(book.id) ? ' poetry' : '')} ref={bodyRef}>
-        {ch.sections.map((sec, si) => (
-          <React.Fragment key={si}>
-            {sec.heading || sec.letter ? <div className="sec-h">{[sec.letter, sec.heading].filter(Boolean).join(' ')}</div> : null}
-            <p>{sec.verses.map(verse)}</p>
-          </React.Fragment>
-        ))}
+        {on('showSectionHeadings') ? ch.sections.map((sec, si) => {
+          const heading = (rch && rch.sections && rch.sections[si] && rch.sections[si].heading) || sec.heading;
+          return (
+            <React.Fragment key={si}>
+              {heading || sec.letter ? <div className="sec-h">{[sec.letter, heading].filter(Boolean).join(' ')}</div> : null}
+              <p>{sec.verses.map(verse)}</p>
+            </React.Fragment>
+          );
+        }) : <p>{ch.sections.flatMap((sec) => sec.verses).map(verse)}</p>}
         <span className="reading-end" aria-hidden="true" />
         {next && (
           <button type="button" className="nextcard" onClick={() => replace({ place: 'bible-chapter', book: next.book.id, chapter: next.chapter })}>

@@ -113,7 +113,23 @@ export function writeSetting(key, val, gl = g) {
   const prev = st.settings || {};
   store.set({ ...st, settings: { ...prev, [key]: val, touched: { ...(prev.touched || {}), [key]: true } } });
   if (key === 'letterReader' || key === 'downloadWifiOnly') pushListening(gl);
+  settingsChanged();
   return true;
+}
+
+/* The settings' version: StateStore says nothing when it changes, so writeSetting (v2's one writer of main's settings)
+   says so here, and the shell reads its facts again (the translation a Bible chapter shows, the Settings list's lines). */
+let version = 0;
+const listeners = new Set();
+/** @param {() => void} cb @returns {() => void} */
+export function subscribeSettings(cb) {
+  listeners.add(cb);
+  return () => { listeners.delete(cb); };
+}
+export const settingsVersion = () => version;
+function settingsChanged() {
+  version += 1;
+  listeners.forEach((cb) => cb());
 }
 
 /**

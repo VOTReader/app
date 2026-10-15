@@ -19,6 +19,13 @@ input.wipe:focus { border-color: var(--accent); outline: 0; }
 .report.warn .fine { color: var(--danger); }
 .report .textbtn { flex: none; }
 
+/* Settings > Reading (7d): Clear reading history's confirm, main's ConfirmStrip under its row ("Clear all reading
+   history?" Cancel / Yes, clear) */
+.cfs { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px;
+  padding: 4px 0 14px; }
+.cfs .fine { margin: 0; color: var(--t1); }
+.cfs .cfb { display: flex; gap: 10px; margin-left: auto; }
+
 /* Credits */
 .credits { margin-top: 18px; }
 .credits p { font-size: var(--fs-s); line-height: 1.5; color: var(--t1); margin: 0 0 14px; }

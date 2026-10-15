@@ -8,6 +8,7 @@
 import { Icon } from './Icon.jsx';
 import { readGateId, gateState, markGate, whenPainted } from './gate.js';
 import { savedFacts } from './settings-facts.js';
+import { subscribeSettings, settingsVersion } from './settings-pages.js';
 import { bookTitle } from './home-facts.js';
 import { placeFor, startStack, OVERLAYS } from './places.js';
 import { usePlayer, MiniPlayer, NowPlaying, PlayerSheet, PlayerBar } from './player/Player.jsx';
@@ -146,6 +147,8 @@ export function V2App({ gateId = readGateId() }) {
   // a real boot opens where a registered start says (places.js: the welcome on a first visit), else Home
   const [stack, setStack] = React.useState(() => (gate ? gate.stack.slice() : startStack() || [{ place: 'home' }]));
   const [savedFactsAtBoot] = React.useState(() => (gate && gate.facts ? gate.facts : savedFacts()));
+  // read again each time a Settings page changes one of main's settings (a gate boot keeps its picture's)
+  const settingsVer = React.useSyncExternalStore(subscribeSettings, settingsVersion);
   // The reader's text and page (look.js): shown on <html> at once, kept in main's vot-state (never on a gate boot).
   const [look, setLook] = React.useState(() => (gate ? gateLook(gate) : savedLook()));
   const [shellSheet, setShellSheet] = React.useState(() => (gate && gate.open && gate.open.sheet === 'text-and-theme' ? 'text-and-theme' : null));
@@ -155,7 +158,13 @@ export function V2App({ gateId = readGateId() }) {
   React.useLayoutEffect(() => { applyLook(look, gate ? { bridge: null } : undefined); }, [look, gate]);
   const changeLook = React.useCallback((next) => { setLook(next); if (!gate) saveLook(next); }, [gate]);
   const facts = React.useMemo(() => (gate ? savedFactsAtBoot
-    : { ...savedFactsAtBoot, textSize: sizeWord(look.scale), page: look.page, lines: look.lines }), [gate, savedFactsAtBoot, look]);
+    : { ...(settingsVer ? savedFacts() : savedFactsAtBoot), textSize: sizeWord(look.scale), page: look.page, lines: look.lines }),
+  [gate, savedFactsAtBoot, look, settingsVer]);
+  // main's Keep the screen on (Settings > Reading; main's use-settings effect): the app holds the screen awake while open
+  React.useEffect(() => {
+    const pb = gate ? null : g.PlatformBridge;
+    if (pb && typeof pb.setKeepScreenOn === 'function') pb.setKeepScreenOn(facts.keepScreenOn !== false);
+  }, [gate, facts.keepScreenOn]);
   const [ready, setReady] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
   const [layer, setLayer] = React.useState(/** @type {HTMLElement | null} */ (null));

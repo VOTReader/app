@@ -241,3 +241,63 @@ describe('loading', () => {
     expect(props.onReady).toHaveBeenCalled();
   });
 });
+
+describe("main's Bible chrome settings (Settings > Reading, v2-gaps 14; design dz21)", () => {
+  const TITLED = { id: 'john', title: 'John', chapters: [{ num: 3, title: "Nicodemus and the New Birth · John the Baptist's Final Witness", sections: [
+    { heading: 'Nicodemus and the New Birth', verses: [v(1, 'There was a man.'), v(16, 'For God so loved the world.')] },
+    { heading: 'Jesus Christ Is Lord', verses: [v(22, 'After these things.')] },
+  ] }] };
+  const RESTORED = { john: { chapters: [{ num: 3, title: 'Nicodemus and the New Birth · YahuShua Is Lord', sections: [{}, { heading: 'YahuShua HaMashiach Is Lord' }] }] } };
+  const open = (facts) => render(
+    <BibleChapterScreen route={{ place: 'bible-chapter', book: 'john', chapter: 3 }} facts={facts} gate={null} replace={() => {}} onReady={() => {}} />);
+  afterEach(() => { delete g.BOOKS_RESTORED; delete g.TRANSLATION_OPTIONS; });
+
+  it('the chapter title is the lede under the number, above the pill (2c, 5g: on unless turned off); off, it is gone', async () => {
+    g.BOOKS = { john: TITLED };
+    g.BIBLE_AUDIO_MANIFEST = JOHN_AUDIO;
+    const { container, unmount } = render(<V2App gateId="2c-john3-playing" />);
+    await waitFor(() => expect(html.dataset.gate).toBe('ready'));
+    const lede = container.querySelector('.reader-head h1 + p.lede');
+    expect(lede.textContent).toBe("Nicodemus and the New Birth · John the Baptist's Final Witness");
+    expect(lede.nextElementSibling.classList.contains('play')).toBe(true);
+    unmount();
+    const off = open({ showChapterTitle: false });
+    expect(off.container.querySelector('.reader-head .lede')).toBe(null);
+    expect(off.container.querySelector('.reader-head h1').textContent).toBe('John 3');
+  });
+
+  it("Restored Names (on by default) put books-restored's title and headings in place of the standard ones; the verses never change", () => {
+    g.BOOKS = { john: TITLED };
+    g.BOOKS_RESTORED = RESTORED;
+    const { container, unmount } = open({});
+    expect(container.querySelector('.reader-head .lede').textContent).toBe('Nicodemus and the New Birth · YahuShua Is Lord');
+    // a section the restored chrome has no heading for keeps its own
+    expect(texts(container, '.bible .sec-h')).toEqual(['Nicodemus and the New Birth', 'YahuShua HaMashiach Is Lord']);
+    expect(container.querySelector('#v-16').textContent).toBe('16For God so loved the world.');
+    unmount();
+    const off = open({ restoredNames: false });
+    expect(off.container.querySelector('.reader-head .lede').textContent).toBe("Nicodemus and the New Birth · John the Baptist's Final Witness");
+    expect(texts(off.container, '.bible .sec-h')).toEqual(['Nicodemus and the New Birth', 'Jesus Christ Is Lord']);
+  });
+
+  it('Section headings off: no headings, the verses run on as one paragraph (main\'s flat render)', () => {
+    g.BOOKS = { john: TITLED };
+    const { container } = open({ showSectionHeadings: false });
+    expect(container.querySelector('.bible .sec-h')).toBe(null);
+    expect(container.querySelectorAll('.bible p').length).toBe(1);
+    expect(texts(container, '.bible .v .vn')).toEqual(['1', '16', '22']);
+  });
+
+  it('a Spanish edition\'s verses carry lang="es" once its words have loaded; English ones carry none', async () => {
+    g.BOOKS = { john: TITLED };
+    g.TRANSLATION_OPTIONS = [{ id: 'nkjv', label: 'NKJV', desc: 'New King James Version — default' },
+      { id: 'rvr', label: 'RVR1960', lang: 'es', desc: 'Reina-Valera 1960 (Español) — the Spanish Bible' }];
+    g.loadTranslation = vi.fn(() => Promise.resolve());
+    g.translateVerse = (book, ch, verse) => 'ES ' + verse.text;
+    const { container, unmount } = open({ translation: 'rvr' });
+    await waitFor(() => expect(container.querySelector('#v-1').getAttribute('lang')).toBe('es'));
+    unmount();
+    const en = open({ translation: 'nkjv' });
+    expect(en.container.querySelector('#v-1').hasAttribute('lang')).toBe(false);
+  });
+});

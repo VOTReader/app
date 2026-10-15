@@ -590,3 +590,188 @@
 .aa.pg .seg { margin-top: 8px; }
 .aa-pv { font-size: var(--fs-m); line-height: 1.4; color: var(--t-body); margin: 10px 0 0; }
 .g.settings.aax { margin-top: 18px; }
+/* dz17 (2026-10-15): v2-gaps 16, the Answers home (main's AnswersHome.jsx) to Corbin's pick (the middle phone of
+   corbin-style-ref.png): title, lede, field, a hairline, The Ten Commandments in the kit's .grid2, Browse by subject rows. */
+.content.ans .page-head .field { margin-top: 22px; }
+.content.ans .page-head .field .ph { color: var(--t3); }
+.ans-sec { margin: 26px var(--gut) 0; padding-top: 20px; border-top: 1px solid var(--line); }
+.grid2.cmds .col { align-content: start; max-width: none; margin: 0; }   /* not the desktop page .col (D2), as .grid2.vols */
+.ans-sec .h2 { margin-bottom: 8px; }
+.grid2.cmds .n.on, .grid2.cmds .c.on { background: rgba(var(--gold-rgb), .08); }
+.sec.ans-subj { padding-top: 28px; }
+.sec.ans-subj + .rows { margin-top: 4px; }
+.row.ans-t .ans-n { flex: none; font-size: var(--fs-xs); color: var(--t2); }
+.row.ans-t .chev { flex: none; }
+.ans-src { margin: 18px 0 28px; }
+.ans-lab { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 22px 0 6px; }
+.ans-lab .ans-k { font-size: var(--fs-xs); color: var(--t2); }
+.ans-list .row:first-child { border-top: 0; }
+.ans-list.end .row:last-child { border-bottom: 1px solid var(--line); }
+.sheet.cmd, .dlg.cmd { max-height: 76%; overflow: hidden; }
+.cmd .ref-v { font-style: italic; }
+.cmd .cmd-go { height: 40px; gap: 6px; font-size: var(--fs-s); margin-top: 6px; }
+.cmd .cmd-go svg { width: 16px; height: 16px; }
+.cmd .ans-lab { margin-top: 12px; }
+.ans-res { padding-bottom: 24px; }
+.ans-res .grp { padding-top: 26px; }
+.ans .hit.ans-hit .ex { -webkit-line-clamp: 4; }
+.hit.ans-hit .src { font-size: var(--fs-xs); color: var(--t3); margin-top: 6px; }
+.sec.ans-also { padding-top: 22px; }
+.ans-sum { font-size: var(--fs-s); color: var(--t2); margin: 6px 0 4px; }
+.azj { display: grid; grid-template-columns: repeat(8, 1fr); margin: 18px -6px 4px; }
+.azj button { height: 44px; display: grid; place-items: center; font-size: var(--fs-m); color: var(--accent); }
+.label.az-l { display: block; margin: 22px 0 2px; color: var(--accent); font-size: var(--fs-s); }
+/* dz18 (2026-10-15): the Matthew Study Bible (main's ChapterIndex, ChapterView, StudyPanels, InlineNotes, ModeToggle).
+   The index is 2e's numbered rows with main's minutes and notes weight; the chapter sets its verses as v2's Bible (2c); the study
+   panels are kit cards; Study notes (PDF | Inline | Off) floats bottom right over the page, as main's does, and stays there. */
+.content.mtx { padding-bottom: 120px; }
+.mti .row.stc .s { font-size: var(--fs-s); }
+.mtx .page-head .pill.play { margin-top: 22px; }
+.mtx .page-head + .rows { margin-top: 28px; }
+.mtb.inline p + p { margin-top: 0; }
+.spn { padding-top: 6px; }
+.spg { margin-top: 34px; }
+.spg > .label { display: block; margin: 0 0 12px; }
+.spc { border: 1px solid var(--edge); border-radius: var(--r); background: var(--raised); overflow: hidden; }
+.spc > * + * { border-top: 1px solid var(--line); }
+.sref { display: flex; align-items: baseline; gap: 12px; width: 100%; min-height: 52px; padding: 14px 14px 13px 16px; text-align: left; }
+.sref .tag, .vnote .tag { flex: none; min-width: 52px; font-size: var(--fs-s); color: var(--tgold-hi); font-variant-numeric: lining-nums; }
+.sref .ct { flex: 1; min-width: 0; font-size: var(--fs-m); line-height: 1.3; color: var(--t1); }
+.sref .chev, .vnote .chev { flex: none; align-self: center; color: var(--t2); }
+.sref .chev svg, .vnote .chev svg { width: 18px; height: 18px; }
+.sref.pl .ct { font-size: var(--fs-s); line-height: 1.45; color: var(--t2); }
+.vnote { display: block; width: 100%; padding: 14px 14px 16px 16px; text-align: left; }
+.vnote .vh { display: flex; align-items: baseline; gap: 12px; }
+.vnote .vol { flex: 1; min-width: 0; font-size: var(--fs-xs); letter-spacing: .02em; color: var(--t2); }
+.vnote .vh .chev { margin-left: auto; }
+.vnote .vt { display: block; font-size: var(--fs-m); line-height: 1.25; color: var(--t1); margin-top: 6px; }
+.vnote .vx { font-size: var(--fs-s); line-height: 1.45; color: var(--t2); margin-top: 6px;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.slink { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 13px 14px 13px 16px; color: var(--accent); font-size: var(--fs-m); line-height: 1.3; text-decoration: none; }
+.slink .t { flex: 1; min-width: 0; }
+.slink svg { width: 18px; height: 18px; color: var(--t2); }
+/* Inline: a note block under its verse, a gold rule like a study's opening words (.sintro); the pill points back to a note above */
+.mtb .inl { margin: 12px 0 16px; padding-left: 14px; border-left: 2px solid rgba(var(--gold-rgb), .55); font-size: 1rem; line-height: 1.3; }
+.mtb .inl .sref { min-height: 44px; padding: 8px 0 9px; }
+.mtb .inl .vnote { padding: 9px 0 12px; }
+.mtb .inl > * + * { border-top: 1px solid var(--line); }
+.mtb .echo { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px 0 7px; margin-left: 2px; vertical-align: 2px;
+  border: 1px solid var(--tgold-ghost); border-radius: 13px; font-size: var(--fs-xs); line-height: 1; color: var(--accent); font-variant-numeric: lining-nums; }
+.mtb .echo svg { width: 14px; height: 14px; }
+/* Study notes: main's ModeToggle, a raised card bottom right above the tab bar (hidden only while auto-scroll's pill is open) */
+.msw { position: absolute; z-index: 3; right: 16px; bottom: calc(var(--tabbar) + 48px + 14px); padding: 9px 5px 5px;
+  border-radius: calc(var(--r) + 4px); background: var(--raised); border: 1px solid var(--edge); box-shadow: var(--shadow-sheet); }
+.msw > .label { display: block; padding: 0 9px 8px; }
+.msw .seg { height: 44px; }
+.msw .seg > button { display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: calc(var(--r) - 4px); color: var(--t2); font-size: var(--fs-s); }
+.msw .seg > button svg { width: 18px; height: 18px; }
+.msw .seg > button.on { background: var(--input); color: var(--t1); box-shadow: inset 0 0 0 1px var(--edge); }
+.msw .seg > button.on svg { color: var(--accent); }
+.dk > .msw { right: 28px; bottom: 28px; }
+/* dz19 (2026-10-15): Search catches up with main (v2-gaps 26-28): the count, Relevance | Book order, Best matches,
+   more places, Book order's closest matches, the corrections note, Recent, the scope chip. */
+.sr-sum { font-size: var(--fs-s); color: var(--t2); margin: 22px 0 0; }
+.sr-sum b { color: var(--t1); font-weight: 500; }
+.seg.sr-seg { height: 40px; margin-top: 10px; }
+.sr-nt { font-size: var(--fs-xs); color: var(--t3); font-style: italic; margin: 8px 0 0; letter-spacing: .01em; }
+.sr-more { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: var(--fs-xs); color: var(--tgold); letter-spacing: .02em; }
+.sr-more svg { width: 14px; height: 14px; }
+.sr-col { display: flex; align-items: baseline; gap: 6px; margin: 14px 0 0; font-size: var(--fs-s); color: var(--t1); }
+.sr-col .n { color: var(--t2); }
+.sr-col + .hit { border-top: 0; padding-top: 6px; }
+.btn2.sr-part { width: 100%; justify-content: center; height: 44px; margin-top: 16px; font-size: var(--fs-s); }
+.sr-fix { font-size: var(--fs-s); line-height: 1.45; color: var(--t2); margin: 16px 0 0; }
+.sr-fix button { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; font: inherit; padding: 0; }
+.label.rec { display: block; margin: 28px 0 12px; }
+.chip.rc { padding-right: 2px; }
+.chip.rc .x { width: 30px; height: 30px; display: grid; place-items: center; color: var(--t2); margin-left: -2px; }
+.chip.rc .x svg { width: 14px; height: 14px; }
+.chip.on.rc .x { color: var(--accent); }
+/* dz20 (2026-10-15): Notes catches up with main (v2-gaps 29-30): notebooks on the Notes chip, a notebook page and its ...,
+   name and colour, a note's notebooks; the journal entry with what Insert adds (cards, a memo, a divider, a picture), the Insert
+   sheet, the voice recorder. The entry's title and words sit on the page, not in boxes: the inserted cards are the only boxes. */
+.label.nbl { display: block; margin: 26px 0 12px; }
+.nbg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.nbc { min-height: 64px; border: 1px solid var(--line); border-radius: var(--r); background: var(--raised); padding: 10px 12px; display: flex; flex-direction: column; justify-content: center; text-align: left; min-width: 0; }
+.nbc .nbn { font-size: var(--fs-m); color: var(--t1); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nbc .nbk { display: flex; align-items: center; gap: 7px; font-size: var(--fs-xs); color: var(--t2); margin-top: 5px; letter-spacing: .02em; }
+.nbc.nbnew { flex-direction: row; align-items: center; gap: 6px; background: none; border: 1px dashed var(--tgold-ghost); color: var(--accent); font-size: var(--fs-s); }
+.nbc.nbnew svg { width: 18px; height: 18px; }
+.nbdot { width: 10px; height: 10px; border-radius: 50%; background: var(--nbc); flex: none; }
+.nbdot.un { background: none; box-shadow: inset 0 0 0 1.5px var(--t3); }   /* Uncategorized: a hollow dot */
+.nbdot.gold { --nbc: #C9A96A; } .nbdot.sage { --nbc: #8FB39A; } .nbdot.rose { --nbc: #C98B8B; } .nbdot.blue { --nbc: #8AA9C9; } .nbdot.plum { --nbc: #A68ABE; }
+.nbm .mq { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.overline.nbo { display: flex; align-items: center; gap: 8px; }
+.nbbar { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+.nbbar .nbct { font-size: var(--fs-s); color: var(--t2); }
+.nbsort { display: inline-flex; align-items: center; gap: 6px; height: 40px; color: var(--accent); font-size: var(--fs-s); margin-right: -4px; }
+.nbsort svg { width: 18px; height: 18px; }
+.nbbar + .marks { margin-top: 2px; }
+.nbs .field { margin-top: 4px; }
+.label.nbl2 { display: block; margin: 22px 0 0; }
+.nbs .swatches { margin: 12px 0 22px; }
+.dlg.nbs .sh, .dlg.ins .sh { margin-right: 40px; }
+.nbpn { font-size: var(--fs-xs); color: var(--t2); margin: -4px 0 6px; }
+.srow.opt.nbr { gap: 14px; }
+.srow.opt.nbr .nbdot { width: 12px; height: 12px; }
+.srow.opt.nbr .s { font-size: var(--fs-xs); }
+.cbx { width: 24px; height: 24px; border-radius: 6px; border: 1.5px solid var(--t3); display: grid; place-items: center; flex: none; }
+.cbx.on { background: var(--accent); border-color: var(--accent); color: var(--on-pill); }
+.cbx svg { width: 16px; height: 16px; }
+.srow.opt.nbadd .t { color: var(--accent); }
+.srow.opt.nbadd .lead { width: 24px; height: 24px; border: 0; color: var(--accent); margin-left: -6px; }
+.sheet.nbp .done, .sheet.nbs .pill { margin-top: 14px; }
+.nbin { display: inline-flex; align-items: center; gap: 8px; margin-top: 22px; height: 40px; padding: 0 8px 0 12px; border-radius: var(--r-s); border: 1px solid var(--edge); color: var(--t1); font-size: var(--fs-s); }
+.nbin svg { width: 18px; height: 18px; color: var(--tgold-hi); }
+.nbin svg:last-child { color: var(--t2); width: 16px; height: 16px; }
+/* the journal entry (v2's JournalEditor, .jed): the page is the writing surface */
+.jed { padding-top: 6px; padding-bottom: 32px; }
+.jed .jdate { margin: 0 0 6px; }
+.jed .nq { margin: 6px 0 0; padding-left: 12px; border-left: 2px solid var(--line); color: var(--t2); font-style: italic; font-size: var(--fs-s); line-height: 1.45; }
+.jed .jt { font-size: var(--fs-l); line-height: 1.25; color: var(--t-hero); padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.jed .jp { font-size: var(--fs-m); line-height: 1.5; color: var(--t-body); margin: 12px 0 0; }
+.jcard { margin: 14px 0 0; padding: 11px 14px 12px; border-radius: var(--r); background: var(--raised); border: 1px solid var(--line); }
+.jcard .je { font-size: var(--fs-xs); letter-spacing: var(--track-caps); text-transform: uppercase; color: var(--tgold); line-height: 1; }
+.jcard .jh { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--fs-m); color: var(--t1); margin-top: 8px; line-height: 1.2; }
+.jcard .jh svg { width: 18px; height: 18px; color: var(--t2); flex: none; }
+.tb .btn2.tbj.jins { margin-right: 12px; }
+.jcard .jq, .jcard .jv { font-size: var(--fs-s); line-height: 1.45; color: var(--t-body); margin-top: 6px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.jcard .jq { font-style: italic; }
+.jcard .jm { font-size: var(--fs-xs); color: var(--t2); margin-top: 6px; letter-spacing: .02em; }
+.jmemo { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; padding: 10px 14px 10px 10px; border-radius: var(--r); background: var(--raised); border: 1px solid var(--line); }
+.jplay { width: 44px; height: 44px; border-radius: 50%; background: var(--pill); color: var(--on-pill); display: grid; place-items: center; flex: none; }
+.jplay svg { width: 20px; height: 20px; }
+.jmb { flex: 1; min-width: 0; }
+.jwav { display: flex; align-items: center; gap: 2px; height: 28px; overflow: hidden; }
+.jwav span { width: 3px; flex: none; border-radius: 2px; background: var(--t3); }
+.jwav span.p { background: var(--accent); }
+.jmt { display: flex; justify-content: space-between; gap: 8px; font-size: var(--fs-xs); color: var(--t2); margin-top: 5px; }
+.jdiv { text-align: center; color: var(--tgold); font-size: var(--fs-s); letter-spacing: .5em; margin: 22px 0 0; }
+.jimg { margin: 16px 0 0; }
+.jimg img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--r); }
+.jimg figcaption { font-size: var(--fs-s); color: var(--t2); font-style: italic; margin-top: 8px; }
+/* Insert: main's four groups as two-column tiles */
+.label.ins-l { display: block; margin: 16px 0 8px; }
+.ins .sh + .ins-l { margin-top: 6px; }
+.insg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.it { display: block; min-height: 60px; border: 1px solid var(--line); border-radius: var(--r); padding: 9px 12px; text-align: left; min-width: 0; }
+.it .itt { display: flex; align-items: center; gap: 9px; font-size: var(--fs-s); color: var(--t1); line-height: 1.2; }
+.it .itt svg { width: 20px; height: 20px; color: var(--tgold-hi); flex: none; }
+.it .its { display: block; font-size: var(--fs-xs); color: var(--t2); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* the voice recorder (main's JournalRecordingSheet) */
+.sheet.rec { text-align: center; }
+.sheet.rec .sh { text-align: left; }
+.recst { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-s); color: var(--t1); margin-top: 8px; }
+.recdot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px rgba(var(--gold-rgb), .22); }
+.rect { font-size: 52px; line-height: 1; color: var(--t-hero); margin-top: 12px; }
+.recw { display: flex; align-items: center; justify-content: center; gap: 3px; height: 48px; margin: 18px 0 0; }
+.recw span { width: 3px; border-radius: 2px; background: var(--accent); }
+.recn { margin: 12px 0 0; font-size: var(--fs-xs); color: var(--t3); letter-spacing: .02em; }
+.recb { display: flex; justify-content: space-around; align-items: flex-end; margin: 20px 0 4px; }
+.rb { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: var(--fs-xs); color: var(--t2); min-width: 76px; }
+.rb .rc { width: 56px; height: 56px; border-radius: 50%; border: 1px solid var(--edge); display: grid; place-items: center; color: var(--t1); }
+.rb.main .rc { width: 68px; height: 68px; background: var(--pill); border: 0; color: var(--on-pill); }
+.rb svg { width: 24px; height: 24px; }
+/* dz21 (2026-10-15): a chapter's title as the lede under its number, then the pill (Matthew's spacing, .mtx) */
+.page-head .lede + .pill.play { margin-top: 22px; }
+.at-match { margin-top: -440.7px; }   /* 5c: the head grew by the title's two lines and a 9 px gap, less 2 (57.7 px); the match stays where it was */
