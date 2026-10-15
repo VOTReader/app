@@ -10,6 +10,7 @@ import crypto from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { wordPieceIds, configureSemantic, startSemantic, semanticDocs, semanticStatus, resetSemantic, docUnitKey, meaningText, fetchSemanticFile } from './semantic.js';
+import { searchWorker } from './worker-client.js';
 
 const ASSETS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const vocabMap = new Map(fs.readFileSync(path.join(ASSETS, 'semantic/vocab.txt'), 'utf8').split('\n').filter(Boolean).map((w, i) => [w, i]));
@@ -40,7 +41,7 @@ describe('docUnitKey: how the pack names a document', () => {
 });
 
 /** A three-unit pack in 4 dimensions and a stand-in runtime whose "model" says what the test tells it to. */
-function tinyPack(/** @type {{badUnits?: boolean, failLoads?: number, failGlue?: number, noSession?: boolean}} */ o = {}) {
+function tinyPack(/** @type {{badUnits?: boolean, failLoads?: number, failGlue?: number, noSession?: boolean, loads?: {manifest: number}}} */ o = {}) {
   const dim = 4;
   const vecs = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0.6, 0.8, 0]];
   const q = new Int8Array(vecs.flatMap((v) => v.map((x) => Math.round(x * 127))));
@@ -64,6 +65,7 @@ function tinyPack(/** @type {{badUnits?: boolean, failLoads?: number, failGlue?:
   configureSemantic({
     url: (p) => 'mem:' + p,
     load: async (p) => {
+      if (o.loads && p.endsWith('manifest.json')) o.loads.manifest++;
       if (o.failLoads && p.endsWith('manifest.json')) { o.failLoads--; throw new Error('semantic: ' + p + ' 503'); }
       if (o.failGlue && p.endsWith('threaded.mjs')) { o.failGlue--; throw new Error('semantic: ' + p + ' 503'); }
       if (!files[p]) throw new Error('missing ' + p);
@@ -117,6 +119,26 @@ describe('semanticDocs over a pack', () => {
     const run = startSemantic();
     expect(startSemantic()).toBe(run);
     expect(await run).toBe(true); // ends here, not in a later test (the afterEach above)
+  });
+  /* A worker that goes quiet under several searches (sweep 2026-10-14 v017): each waiting search fell back to this
+     thread, and each fallback dropped the load already under way and started another, a copy of the ~70 MB model
+     per search in a 2-3 GB phone's heap. One load serves them all. */
+  it('a worker that dies under several searches gives this thread one load of the model', async () => {
+    const loads = { manifest: 0 };
+    tinyPack({ loads });
+    const quiet = { request: (/** @type {string} */ op) => (op === 'meaning-start' ? Promise.resolve({ ok: true, units: 3 }) : Promise.reject(new Error('search worker quiet'))) };
+    configureSemantic({ worker: () => quiet });
+    try {
+      expect(await startSemantic()).toBe(true);
+      expect(semanticStatus().where).toBe('worker');
+      const waiting = [semanticDocs('q', (k) => k), semanticDocs('q', (k) => k), semanticDocs('q', (k) => k)];
+      expect(await Promise.all(waiting)).toEqual([null, null, null]);
+      expect(await startSemantic()).toBe(true);
+      expect(semanticStatus()).toMatchObject({ status: 'ready', where: 'page' });
+      expect(loads.manifest, 'loads of the model on this thread').toBe(1);
+    } finally {
+      configureSemantic({ worker: () => searchWorker() });
+    }
   });
   // sweep W35 (2026-10-13): one failed start (a dropped download, a 503) turned meaning search off for the page's life
   it('a failed start is tried again after a wait, and a search past the wait starts it', async () => {

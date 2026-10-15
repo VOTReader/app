@@ -75,4 +75,19 @@ describe('engine warm-cache restore', () => {
     expect(r.results.length).toBeGreaterThan(0);
     expect(r.results[0].doc.ref).toBe('Psalms 23:1');
   });
+
+  /* "Rebuild the index" dropped the warm cache without waiting (sweep 2026-10-14 v100): the build it started read
+     the cache before the delete landed and swapped the same index back in, so nothing was built again. */
+  it('rebuild() builds the index again instead of restoring the cache it drops', async () => {
+    const cs = /** @type {any} */ (globalThis).caches;
+    const del = cs.delete;
+    cs.delete = async (/** @type {string} */ name) => { await new Promise((r) => setTimeout(r, 20)); return del(name); };
+    try {
+      await VotSearchMini.rebuild();
+    } finally {
+      cs.delete = del;
+    }
+    expect(VotSearchMini.getStats().cached).toBe(false);
+    expect((await VotSearchMini.search('shepherd')).results[0].doc.ref).toBe('Psalms 23:1');
+  });
 });

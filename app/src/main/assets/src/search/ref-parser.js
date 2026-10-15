@@ -350,7 +350,12 @@ export function parseLetterRef(lv) {
     if (!cm) continue;
     const vc = D.VOLUME_COLLECTIONS.find((v) => v.id === c.id);
     const r = vc && letterIn(vc, cm[1], ' ');
-    if (r) return r;
+    if (!r) continue;
+    /* A number in words with no "letter" before it may be words of a text too (sweep 2026-10-14 v102): "the
+       blessed one", "rebuke one" (Proverbs 19:25), "flock two" were letters only, and no text was searched. The
+       card stays first and the words are searched as well, as for a book name that is also a word. */
+    const before = lv.slice(0, lv.length - cm[1].length).trim().split(' ').pop();
+    return !r.isPreface && !/^\d+$/.test(cm[1]) && !/^(?:letter|ltr|l|entry)$/.test(before || '') ? { ...r, alsoText: true } : r;
   }
   m = lv.match(/^(?:wtlb|words to live by) ?(?:part ?)?(1|2|one|two|i|ii) (?:(?:section|sec|entry) ?)?(\d+)$/)
     || lv.match(/^(?:wtlb|words to live by) (?:(?:section|sec|entry) ?)?()(\d+)$/);

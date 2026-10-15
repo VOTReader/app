@@ -108,6 +108,10 @@ function withoutPossessive(term) {
   const toks = kjvEncode(term);
   return toks.length >= 2 && toks[toks.length - 1] === 's' ? toks.slice(0, -1).join(' ') : term;
 }
+/** The query without its -words, each +word as its word: what the reader wants found. @param {string} q */
+function wantedQuery(q) {
+  return String(q).split(/\s+/).filter((t) => !(t.length > 1 && t[0] === '-')).map((t) => (t.length > 1 && t[0] === '+' ? t.slice(1) : t)).join(' ');
+}
 /* A negative contraction is its two words, as the text mostly spells them: "don't
    look back" found its letter at #119, "do not look back" at #1. */
 const NT_BASE = { wo: 'will', sha: 'shall', ai: 'am' };   // the base the pattern leaves: wo|n't, sha|n't
@@ -1068,6 +1072,10 @@ function swapIn(/** @type {any} */ ms, /** @type {typeof stats} */ st) {
    The worker is given up when it sends nothing for RESTORE_QUIET_MS: each part starts the wait again, so a slow
    phone's restore is never cut off while its parts are still coming (sr9 refuter r1). */
 const RESTORE_QUIET_MS = 20000;
+/* "REBUILD THE INDEX" BUILDS IT (sweep 2026-10-14 v100). rebuild() dropped the warm cache without waiting, and the
+   build it started read the cache before the delete landed and swapped the same index back in. The next build
+   after a rebuild() reads no cache, whichever call starts it (a search waiting on the index can). */
+let coldNext = false;
 /** The cached index for `sig`, or null when there is none. @returns {Promise<{ms: any, where: string}|null>} */
 async function restoreIndex(/** @type {string} */ sig) {
   const w = searchWorker();
@@ -1094,17 +1102,21 @@ async function build(options) {
   const code = options.translation || 'nkjv';
   const sig = dataSignature(code);
 
-  // Warm cache: restore the serialized index (~0.3s) instead of rebuilding (~10s).
-  try {
-    const tc = now();
-    const restored = await restoreIndex(sig);
-    if (restored) {
-      const ms = restored.ms;
-      swapIn(ms, { docCount: ms.documentCount, buildMs: Math.round(now() - tc), cached: true, translation: code, sig, restoredIn: restored.where });
-      if (options.onProgress) options.onProgress(ms.documentCount, ms.documentCount);
-      return;
-    }
-  } catch { /* corrupt / blocked cache — fall through to a fresh build */ }
+  // Warm cache: restore the serialized index (~0.3s) instead of rebuilding (~10s), unless rebuild() asked.
+  const cold = coldNext;
+  coldNext = false;
+  if (!cold) {
+    try {
+      const tc = now();
+      const restored = await restoreIndex(sig);
+      if (restored) {
+        const ms = restored.ms;
+        swapIn(ms, { docCount: ms.documentCount, buildMs: Math.round(now() - tc), cached: true, translation: code, sig, restoredIn: restored.where });
+        if (options.onProgress) options.onProgress(ms.documentCount, ms.documentCount);
+        return;
+      }
+    } catch { /* corrupt / blocked cache — fall through to a fresh build */ }
+  }
 
   // Cold build: collect docs (fast, ~55ms) then index (the slow part, ~10s —
   // chunked so the progress bar animates and the UI stays responsive). The
@@ -1250,10 +1262,13 @@ async function search(query, options) {
   if (!parsed) return { parsed: null, results: [] };
   // Command + structured references (bible / book / letter / named-passage) are
   // answered by a direct-nav card built in the UI — skip text search entirely.
-  if (NAV_ONLY_KINDS.has(parsed.kind)) return { parsed, results: [], parsedTerms: [], textQuery: null };
+  // ...unless the reference may be words too ("rebuke one": ref-parser's alsoText), which are searched under the card.
+  if (NAV_ONLY_KINDS.has(parsed.kind) && !parsed.alsoText) return { parsed, results: [], parsedTerms: [], textQuery: null };
 
   await ensureReady(options);
   await warmOriginals();
+  // rebuild() dropped the index while this search waited (sweep 2026-10-14 v061): it waits for the new one
+  if (!msIndex) return search(query, options);
 
   /* THE RANKING GIVES THE PAGE TURNS (sr7, 2026-10-14). With the originals read, a first search still
      ranked in one block: 110-400 ms on a desktop, about 350 ms on the S22, under the reader's typing. In
@@ -1290,15 +1305,23 @@ async function search(query, options) {
      pipeline needs the same query parsed as TEXT, which is what `p` is. Two
      readings of one query, and the return carries both. */
   const navAlso = parsed.kind !== 'text';
-  const p = navAlso ? parseTextQuery(query) : parsed;
+  const useStop = options.useStopWords !== false;
+  const read = navAlso ? parseTextQuery(query) : parsed;
+  /* A BARE WORD BESIDE A QUOTED PHRASE IS A WORD THE TEXT HOLDS (sweep 2026-10-14 v001). Only the phrase was
+     searched, so '"love one another" brethren' showed every text holding the phrase, ranked and marked as if
+     "brethren" was never typed. It narrows the phrase as a +word does (a small word aside); a phrase and word
+     no text holds together fall back to the words unquoted, as a quote nothing holds does. */
+  const p = read.phrase && read.terms && read.terms.length
+    ? { ...read, must: read.must.concat(read.terms.map(withoutPossessive).filter((t) => !(useStop && isStopTerm(t)))), terms: [] }
+    : read;
   // `allWords`: the reader asked for every match under the card (SearchScreen).
   if (navAlso && !options.allWords) limit = Math.min(limit, NAV_TEXT_LIMIT);
   const D = searchData();
   const terms = (p.phrase ? p.phrase.split(/\s+/) : p.terms.map(withoutPossessive)).concat(p.must);
-  const useStop = options.useStopWords !== false;
 
-  // All-stop-word query → no searchable content.
-  if (useStop && terms.length && terms.every(isStopTerm)) {
+  // All-stop-word query → no searchable content. Not a quoted phrase: "and it was so" (Genesis 1), quoted,
+  // means those words in that order, which the phrase filter checks (sweep 2026-10-14 v016).
+  if (useStop && !p.phrase && terms.length && terms.every(isStopTerm)) {
     return { parsed, results: [], parsedTerms: [], textQuery: null, stopWordsOnly: true };
   }
   let filtered;
@@ -1507,7 +1530,11 @@ async function search(query, options) {
   const nearOf = Object.create(null);
   for (let c = 0; c < corrections.length; c++) fixedTo[corrections[c].from] = corrections[c].to;
   for (const k in modernOf) fixedTo[k] = modernOf[k];
-  const typedTokens = joinApostropheS(kjvEncode(query).map((t) => fixedTo[t] || t));
+  /* What the reader wants found: a -word is ruled out, not typed, and a +word is its word (sweep 2026-10-14 v002).
+     Read as typed, "Q -x" asked the texts to hold the run "Q x", so the passage quoted lost its phrase and
+     original boosts to a word the reader excluded. */
+  const wanted = (p.must && p.must.length) || (p.mustNot && p.mustNot.length) ? wantedQuery(query) : query;
+  const typedTokens = joinApostropheS(kjvEncode(wanted).map((t) => fixedTo[t] || t));
   const STOP = D.STOP_WORDS_TRIMMED;
   if (!p.phrase && required > 1 && typedTokens.length > 1) {
     const needCover = required >= 3 ? required - 1 : required;
@@ -1537,7 +1564,7 @@ async function search(query, options) {
       if (spent()) { const r = await pause(); if (r) return r; }
       const d = docLookup[id];
       if (!d || !hasTokenRun(docTokens(id, d), typedTokens)) continue;
-      run = query.trim().replace(/\s+/g, ' ').toLowerCase();
+      run = wanted.trim().replace(/\s+/g, ' ').toLowerCase();
       nearOf[id] = 1;
       scoreMap[id] *= PHRASE_BOOST;
       if (!keyword && !REPRINT_KINDS.has(d.kind)) scoreMap[id] *= ORIGINAL_BOOST;
@@ -1661,9 +1688,7 @@ async function search(query, options) {
   // that index would hand back the other edition's text. The words' results stand alone.
   if (!keyword && !p.phrase && !quoted && parsed.kind === 'text') {
     // The model reads what the reader wants, not what they ruled out: no -word, and +word as the word.
-    const meant = hasMust || hasMustNot
-      ? String(query).split(/\s+/).filter((t) => !(t.length > 1 && t[0] === '-')).map((t) => (t.length > 1 && t[0] === '+' ? t.slice(1) : t)).join(' ')
-      : String(query);
+    const meant = String(wanted);
     // Kept to a collection or scope, the model's best of everything may hold few of its texts: it reads further.
     sem = await semanticDocs(meant, unitId, corpusFilter || scopeBookId || scopeVolumeId ? MEANING_FILTERED : undefined);
     if (msIndex !== inUse) sem = null;
@@ -1750,9 +1775,10 @@ function suggest(query, opts) {
   opts = opts || {};
   const max = opts.max || 10;
   const out = [];
-  if (!query || query.length < 1) return out;
+  // trimmed first: a space alone was a prefix of every key (sweep 2026-10-14 v053)
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return out;
   const D = searchData();
-  const q = query.trim().toLowerCase();
 
   for (let i = 0; i < D.NAMED_PASSAGES.length && out.length < max; i++) {
     const np = D.NAMED_PASSAGES[i];
@@ -1793,12 +1819,13 @@ function suggest(query, opts) {
   return out;
 }
 
-/** Drop the in-memory index and rebuild for the active (or given) translation. */
+/** Drop the in-memory index and the warm cache, and build again for the active (or given) translation. */
 function rebuild(options) {
   options = options || {};
   const code = options.translation || stats.translation || 'nkjv';
   ready = false;
   msIndex = null;
+  coldNext = true;
   clearCached().catch(() => {});
   return init({ translation: code });
 }

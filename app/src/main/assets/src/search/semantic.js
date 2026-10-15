@@ -167,8 +167,11 @@ export function startSemantic() {
   return run;
 }
 
-/** The worker could not load the model, or died: this thread loads it, from now on. */
+/** The worker could not load the model, or died: this thread loads it, from now on. Once: every search waiting
+ *  on a worker that went quiet comes here, and each one starting its own load held a copy of the model per
+ *  search (sweep 2026-10-14 v017). */
 function toPage() {
+  if (pageOnly && starting) return starting;
   pageOnly = true;
   where = 'page';
   status = 'off';

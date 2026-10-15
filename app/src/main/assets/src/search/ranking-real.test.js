@@ -127,6 +127,19 @@ describe('ranking on the audit\u2019s cases', () => {
     expect(r).toContain('Answers Only God Can Give · Regarding Silver');
   });
 
+  /* A -word was read as one of the typed words (sweep 2026-10-14 v002): "Q -x" asked the texts to hold the run "Q x",
+     so the passage quoted lost its phrase and original boosts and the order changed. Ruling out a word no text holds
+     changes nothing, not even a score. */
+  it('a -word only removes the texts holding it: the rest keep their order and scores', async () => {
+    for (const q of ['to this day you persecute my prophets', 'repent and turn from your paths, for the hour is late',
+      'I am the way, the truth, and the life: no man cometh unto the Father, but by me', 'The earth shall grow old like a garment']) {
+      const plain = await VotSearchMini.search(q);
+      const minus = await VotSearchMini.search(q + ' -zebra');
+      expect(refs(minus), q).toEqual(refs(plain));
+      expect(minus.results.map((x) => Math.round(x.score)), q).toEqual(plain.results.map((x) => Math.round(x.score)));
+    }
+  });
+
   it('a Matthew verse shows once across both collections, and in either one kept to itself', async () => {
     const all = (await VotSearchMini.search('judge not that you be not judged')).results.filter((x) => x.doc.kind === 'verse' && x.doc.chapterNum === 7);
     expect(all.length).toBe(1);

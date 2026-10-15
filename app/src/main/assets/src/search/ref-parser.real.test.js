@@ -83,6 +83,18 @@ describe('letters as readers name them', () => {
     expect(letter('blessed letter 4')).toBe('blessed 4');
   });
 
+  /* "the blessed one", "rebuke one", "flock two" read as letters only, and no text was searched (sweep 2026-10-14
+     v102). A number in words with no "letter" before it is a letter and words too; "letter" or digits, a letter. */
+  it('a collection and a number in words, no "letter": a letter, and its words searched too', () => {
+    const kind = (/** @type {string} */ q) => { const p = /** @type {any} */ (parseReference(q, { corpus: 'all' })) || {}; return p.kind + (p.alsoText ? ' +text' : ''); };
+    expect(kind('the blessed one')).toBe('ref-letter +text');
+    expect(kind('rebuke one')).toBe('ref-letter +text');
+    expect(kind('flock two')).toBe('ref-letter +text');
+    expect(kind('blessed letter one')).toBe('ref-letter');
+    expect(kind('the blessed 1')).toBe('ref-letter');
+    expect(kind('Rebuke letter 1')).toBe('ref-letter');
+  });
+
   it('Words To Live By with its part, or without it (Part One’s)', () => {
     expect(letter('WTLB 95')).toBe('wtlb1 95');
     expect(letter('WTLB Part One 95')).toBe('wtlb1 95');
