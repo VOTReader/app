@@ -112,7 +112,11 @@ const BUDGETS = [
   // module, no corpus; the largest inputs are main's backup-flow.js 17.9 KB for Your data, icons 14.4 KB, the player
   // 14.0 KB). About two thirds of the screens are in, so ~250 KB is projected at the end: ceiling 280 KB, still far under
   // a corpus or a v1 bundle.
-  { file: 'bundle-v2.js', measured: 200502, max: 280000 },
+  // zones v2p5 2026-10-15 (Studies 2d/2e, after v2lis 2f's ... menu): 283,568 B, nothing pulled in (esbuild metafile: the
+  // largest inputs are still Player.jsx 18.6 KB, backup-flow.js 17.9 KB, icons 15.7 KB; Studies adds 3.9 KB + main's
+  // audio-coverage.js 1.3 KB). Still to come: the study chapter, Matthew, Songs, the Garden, the Scripture Web host (~8 KB
+  // each): ceiling 340 KB, far under a corpus or a v1 bundle (MBs).
+  { file: 'bundle-v2.js', measured: 283568, max: 340000 },
   // v2.min.css the same way (zv1 group 8, Settings pages, 2026-10-14): 36458 B with Search, Notes, the player and Settings in
   // (+5.5 KB over the first kit build, nothing pulled in: each screen's own sheet is 1-3 KB); the ceiling covers the
   // rest of the build-out and still catches app.min.css (370 KB) or a font pulled in. Re-baseline with bundle-v2.js.
