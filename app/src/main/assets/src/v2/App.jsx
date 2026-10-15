@@ -220,7 +220,7 @@ export function V2App({ gateId = readGateId() }) {
   if (def) {
     const Screen = def.Screen;
     contentClass = def.contentClass || 'content';
-    actions = def.actions ? def.actions({ route, go, desktop, device, open: setShellSheet }) : null;
+    actions = def.actions ? def.actions({ route, go, desktop, device, open: setShellSheet, gate }) : null;
     screen = <Screen route={route} facts={facts} gate={gate} desktop={desktop} device={device}
       go={go} pop={pop} replace={replace} openTab={openTab} onReady={onReady} />;
   } else {

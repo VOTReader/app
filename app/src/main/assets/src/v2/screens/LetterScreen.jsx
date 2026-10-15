@@ -40,6 +40,8 @@ const LANDED = new WeakSet();
 const cssValue = (v) => String(v).replace(/["\\]/g, '\\$&');
 /** How long a toast stays (main's confirmCopied). */
 export const TOAST_MS = 2600;
+/** How long a toast that can Undo stays: long enough to read it and reach the button. */
+export const UNDO_MS = 6000;
 
 /** @param {string} key */
 export function collectionOf(key) {
@@ -491,11 +493,81 @@ function listenHere(live, col, letter, onToast) {
   return () => startListening(A, { volKey: col.volKey, letter, collectionLabel: col.label }, onToast);
 }
 
-/** The letter's top bar: Bookmark, Aa (the shell's Text and theme sheet), More. @param {{ open?: (sheet: string) => void }} ctx */
-function letterActions({ open }) {
+/**
+ * The key main bookmarks a whole letter by: LetterView's 'letter:<id>'; a Format B entry (Words To Live By, The Blessed,
+ * Holy Days) 'wtlb:<id>', the prefix of its paragraphs' keys, which main's findEntryContext resolves for each of them.
+ * @param {{ id: string }} letter
+ */
+export function letterBookmarkKey(letter) {
+  return (isFormatB(letter) ? 'wtlb:' : 'letter:') + letter.id;
+}
+
+const noStore = () => () => {};
+const zero = () => 0;
+function subscribeBookmarks(cb) {
+  const B = g.BookmarkStore;
+  return B && typeof B.subscribe === 'function' ? B.subscribe(cb) : noStore();
+}
+function bookmarksVersion() {
+  const B = g.BookmarkStore;
+  return B && typeof B.getVersion === 'function' ? B.getVersion() : 0;
+}
+
+/**
+ * The letter's Bookmark (v2-gaps 12; main's ChapterBookmarkBtn): a tap saves the whole letter as main's BookmarkStore
+ * keeps it (shown in Notes, and in main's Bookmarks), filled while it is saved; a second tap takes it out again with an
+ * Undo (main asked "delete?" first; the kit's toast undoes instead). Only the whole-letter bookmark counts: a bookmark on
+ * one of its paragraphs is its own. The first save of a Safari tab waits on the 7-day notice (main drops that tap too).
+ * A gate boot draws the empty icon and touches nothing.
+ * @param {{ route: any, gate: any }} props
+ */
+export function LetterBookmark({ route, gate }) {
+  const live = !gate;
+  const col = collectionOf(route.collection);
+  const letters = useLetters(col);
+  const letter = letters && col ? (route.preface ? prefaceOf(col) : letterAt(letters, route.n)) : null;
+  React.useSyncExternalStore(live ? subscribeBookmarks : noStore, live ? bookmarksVersion : zero);
+  const [toast, setToast] = React.useState(/** @type {null | { text: string, icon?: string, act?: string, onAct?: () => void }} */ (null));
+  React.useEffect(() => {
+    if (!toast) return undefined;
+    const t = setTimeout(() => setToast(null), toast.act ? UNDO_MS : TOAST_MS);
+    return () => clearTimeout(t);
+  }, [toast]);
+  const B = live ? g.BookmarkStore : null;
+  const key = letter ? letterBookmarkKey(letter) : null;
+  const saved = B && key && typeof B.all === 'function' ? (B.all() || []).filter((b) => b && b.hlKey === key) : [];
+  const on = saved.length > 0;
+  const onClick = () => {
+    if (!B || !key || !letter) return;
+    if (on) {
+      const gone = saved.map((b) => ({ ...b }));
+      for (const b of gone) B.remove(b.id);
+      setToast({ text: 'Bookmark removed.', act: 'Undo', onAct: () => {
+        for (const b of gone) if (!(typeof B.get === 'function' && B.get(b.id))) B.add({ ...b });
+        setToast(null);
+      } });
+      return;
+    }
+    if (firstSaveWaits()) return;
+    const now = Date.now();
+    const id = typeof g.bkmId === 'function' ? g.bkmId() : 'bkm_' + now + '_' + Math.random().toString(36).slice(2, 6);
+    B.add({ id, hlKey: key, label: letter.title || 'Letter bookmark', thought: '', created: now, updated: now });
+    setToast({ text: 'Bookmarked. It is in Notes.', icon: 'bookmark' });
+  };
   return (
     <>
-      <button type="button" className="ic" aria-label="Bookmark"><Icon name="bookmark" /></button>
+      <button type="button" className="ic" aria-label={on ? 'Remove bookmark' : 'Bookmark this letter'} aria-pressed={on}
+        onClick={onClick}><Icon name="bookmark" /></button>
+      <LayerToast text={toast && toast.text} icon={toast && toast.icon} act={toast && toast.act} onAct={toast && toast.onAct} />
+    </>
+  );
+}
+
+/** The letter's top bar: Bookmark, Aa (the shell's Text and theme sheet), More. @param {{ route: any, gate?: any, open?: (sheet: string) => void }} ctx */
+function letterActions({ route, gate, open }) {
+  return (
+    <>
+      <LetterBookmark route={route} gate={gate} />
       <button type="button" className="ic" aria-label="Text and theme" onClick={() => open && open('text-and-theme')}><Icon name="aa" /></button>
       <button type="button" className="ic" aria-label="More"><Icon name="more" /></button>
     </>

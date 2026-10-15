@@ -22,7 +22,7 @@
  * @typedef {{ Screen: (props: PlaceProps) => any,
  *   title?: (route: any) => string,
  *   actions?: (ctx: { route: any, go: (...routes: any[]) => void, desktop: boolean, device: 'phone' | 'computer',
- *     open?: (sheet: string) => void }) => any,
+ *     open?: (sheet: string) => void, gate?: any }) => any,
  *   contentClass?: string, bare?: boolean }} PlaceDef
  * `bare` draws the place alone in the window: no top bar, player, tab bar or rail (8a-welcome). It still calls onReady.
  */

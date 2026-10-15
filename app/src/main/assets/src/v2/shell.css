@@ -77,3 +77,12 @@ html, body { background: var(--bg); height: 100%; overflow: hidden; overscroll-b
    name on the page colour, so a real boot opens on the slate instead of a blank black window */
 .hydration-loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); }
 .hydration-loading-text { font-family: var(--font); font-size: var(--fs-title); color: var(--t2); }
+
+/* The poetic books (mw6, v2-gaps 10; main's is-poetry): each verse on its own line, its number hung in the margin. Kept
+   here, not in screens.css: that file is the design kit's copy, rewritten whole by tools/sync-v2-kit.py. */
+.v2 .body.bible.poetry .v { display: block; position: relative; padding-left: 1.4em; margin-bottom: .35em; }
+.v2 .body.bible.poetry .v > .vn { position: absolute; left: 0; top: 0; line-height: inherit; vertical-align: baseline; margin: 0; }
+
+/* A saved page's Bookmark (mw6, v2-gaps 12): the kit's bookmark filled in the accent, as a lit tab wears it (Notes). */
+.v2 .tb .ic[aria-pressed="true"] { color: var(--accent); }
+.v2 .tb .ic[aria-pressed="true"] svg path { fill: currentColor; }
