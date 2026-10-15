@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { translateVerse, releaseTranslationsExcept, holdTranslation, isTranslationLoaded, _translationLoaded, _translationPromises } from './translations.js';
+import { translateVerse, releaseTranslationsExcept, holdTranslation, isTranslationLoaded, translationLang, _translationLoaded, _translationPromises } from './translations.js';
 
 beforeEach(() => {
   globalThis.BIBLE_KJV = {
@@ -377,5 +377,28 @@ describe('App() calls the translation loader (boot-performance-4 / w-evict-hook,
   it('the effect itself has left App() - the sweep is called from the hook, never inline', () => {
     expect(stripped).not.toContain('releaseTranslationsExcept(');
     expect(stripped).not.toContain('loadTranslation(code)');
+  });
+});
+
+/* es1 (2026-10-14): the Reina-Valera 1960 is the first edition whose verse text
+   is not English. Its registry row says so (lang: 'es') and the reader puts that
+   on each verse, so a screen reader speaks it in Spanish; English editions name
+   no language and their verses inherit the page's lang="en". */
+describe('translationLang (es1)', () => {
+  afterEach(() => { delete globalThis.TRANSLATION_OPTIONS; });
+  it("names a non-English edition's language from the registry, and nothing for an English one", () => {
+    globalThis.TRANSLATION_OPTIONS = [
+      { id: 'nkjv', label: 'NKJV', desc: 'x' },
+      { id: 'kjv', label: 'KJV', desc: 'x' },
+      { id: 'rvr', label: 'RVR1960', lang: 'es', desc: 'x' },
+    ];
+    expect(translationLang('rvr')).toBe('es');
+    expect(translationLang('kjv')).toBeUndefined();
+    expect(translationLang('nkjv')).toBeUndefined();
+    expect(translationLang('zzz')).toBeUndefined();
+    expect(translationLang(undefined)).toBeUndefined();
+  });
+  it('answers nothing when the registry is not loaded', () => {
+    expect(translationLang('rvr')).toBeUndefined();
   });
 });

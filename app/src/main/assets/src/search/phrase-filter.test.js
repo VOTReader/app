@@ -31,6 +31,7 @@ const GLOBALS = {
       { num: 23, sections: [{ heading: '', verses: [
         verse(1, 'The LORD is my shepherd; I shall not want.'),
         verse(3, 'He restores my soul; He leads me in the paths of righteousness For His name’s sake.'),
+        verse(6, 'Surely goodness and mercy shall follow me All the days of my life; And I will dwell in the house of the LORD Forever.'),
       ] }] },
       { num: 51, sections: [{ heading: '', verses: [verse(10, 'Create in me a clean heart, O God, And renew a steadfast spirit within me.')] }] },
     ] },
@@ -102,5 +103,26 @@ describe('search: phrases and +/- words match words, not letters inside words (v
     const r = await VotSearchMini.search('+rest', { synonyms: false });
     expect(refs(r)).toContain('Matthew 11:28');
     expect(refs(r)).not.toContain('Psalms 23:3');
+  });
+
+  /* A bare word beside a quoted phrase was dropped (sweep 2026-10-14 v001): '"the lord" shepherd' showed every text
+     holding "the lord", ranked as if the word was never typed, and the word was not marked. It is a word the text holds. */
+  it('a bare word beside a quoted phrase narrows it, and is marked', async () => {
+    const all = await VotSearchMini.search('"the lord"', { synonyms: false });
+    expect(refs(all)).toContain('Psalms 23:6');
+    const r = await VotSearchMini.search('"the lord" shepherd', { synonyms: false });
+    expect(r.unquoted).toBeUndefined();
+    expect(refs(r)).toEqual(['Psalms 23:1']);
+    expect(r.parsedTerms).toContain('shepherd');
+  });
+
+  /* A quoted phrase of small words met the "stop words only" guard (sweep 2026-10-14 v016): the corpus's
+     "and it was so" (Genesis 1) found nothing. Quoted, the reader means those words in that order. */
+  it('a quoted phrase made only of small words is searched; the bare words stay "stop words only"', async () => {
+    const r = await VotSearchMini.search('"is my"', { synonyms: false });
+    expect(r.stopWordsOnly).toBeFalsy();
+    expect(refs(r)).toEqual(['Psalms 23:1']);
+    const bare = await VotSearchMini.search('is my', { synonyms: false });
+    expect(bare.stopWordsOnly).toBe(true);
   });
 });

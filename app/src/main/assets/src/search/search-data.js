@@ -20,6 +20,7 @@
  * @property {Set<string>} STOP_WORDS_TRIMMED
  * @property {Object<string,string[]>} SYNONYM_MAP
  * @property {Object<string,string>} BOOK_ABBREVS
+ * @property {Object<string,string>} [BOOK_NAMES_ES]  Spanish book names, exact lookup only (es1)
  * @property {Object<string,string>} BOOK_DISPLAY
  * @property {Array<Object>} NAMED_PASSAGES
  * @property {Object<string,Object>} NAMED_PASSAGE_INDEX
@@ -44,6 +45,7 @@ const EMPTY = {
   STOP_WORDS_TRIMMED: new Set(),
   SYNONYM_MAP: bare(),
   BOOK_ABBREVS: bare(),
+  BOOK_NAMES_ES: bare(),
   BOOK_DISPLAY: bare(),
   NAMED_PASSAGES: [],
   NAMED_PASSAGE_INDEX: bare(),

@@ -35,9 +35,20 @@ const NOW = new Date(2026, 9, 13, 4, 12, 0);
 describe('failedTests', () => {
   it('names each red test by repo-relative file and full name; a file that failed to load counts once', () => {
     expect(failedTests(report, ROOT)).toEqual([
-      { file: 'app/src/main/assets/src/audio/restore.test.jsx', test: 'W4 restored bar takes the saved place' },
-      { file: 'app/src/main/assets/src/notes/load.test.js', test: '(file failed: Error: Cannot find module ./x)' },
+      { file: 'app/src/main/assets/src/audio/restore.test.jsx', test: 'W4 restored bar takes the saved place', error: 'expected 41001 to be 41000' },
+      { file: 'app/src/main/assets/src/notes/load.test.js', test: '(file failed: Error: Cannot find module ./x)', error: 'Error: Cannot find module ./x' },
     ]);
+  });
+
+  // nw27: flakes.jsonl named the merge-generated flake (myweb 10-14 22:37) but not why it failed, so nobody could
+  // tell a timeout from a wrong merge. The first line of the first failure message is the evidence the next hunt needs.
+  it('keeps the first non-empty line of the first failure message, cut to 200 characters', () => {
+    const r = { testResults: [{ name: `${ROOT}/tools/m.test.js`, status: 'failed', assertionResults: [
+      { fullName: 'slow', status: 'failed', failureMessages: ['\nError: Test timed out in 30000ms.\nIf this is a long-running test, pass a timeout', 'second'] },
+      { fullName: 'long', status: 'failed', failureMessages: ['x'.repeat(500)] },
+      { fullName: 'bare', status: 'failed' },
+    ] }] };
+    expect(failedTests(r, ROOT).map((t) => t.error)).toEqual(['Error: Test timed out in 30000ms.', 'x'.repeat(200), '']);
   });
 
   it('an empty or green report names nothing', () => {
@@ -54,9 +65,9 @@ describe('recordFlakes', () => {
     const r = recordFlakes({ tests, lane: 'readalong', sha: 'b48c6908aa', branch: 'ra3', swarmDir: dir, now: NOW });
     expect(r).toMatchObject({ recorded: 2, paged: 2 });
     const rows = lines(join(dir, 'flakes.jsonl')).map((l) => JSON.parse(l));
-    expect(rows.map((x) => [x.lane, x.sha, x.branch, x.file, x.test])).toEqual([
-      ['readalong', 'b48c6908aa', 'ra3', tests[0].file, tests[0].test],
-      ['readalong', 'b48c6908aa', 'ra3', tests[1].file, tests[1].test],
+    expect(rows.map((x) => [x.lane, x.sha, x.branch, x.file, x.test, x.error])).toEqual([
+      ['readalong', 'b48c6908aa', 'ra3', tests[0].file, tests[0].test, 'expected 41001 to be 41000'],
+      ['readalong', 'b48c6908aa', 'ra3', tests[1].file, tests[1].test, 'Error: Cannot find module ./x'],
     ]);
     expect(rows[0].at).toBe('2026-10-13T04:12:00');
     const inbox = lines(join(dir, 'lanes', 'readalong', 'inbox.md'));

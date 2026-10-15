@@ -33,7 +33,7 @@ import { kjvEncode } from './tokenize.js';
 import { snippet, snippetAt, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
 import {
   KIND_BOOST, coverageMultiplier, popcount, PHRASE_BOOST, SYNONYM_DEMOTION,
-  BM25_PARAMS, KEYWORD_BM25, KEYWORD_CONTENT_WORDS, KEYWORD_WORDS, joinApostropheS, SYNONYM_WEIGHT, FORM_WEIGHT, NEAR_PHRASE_MIN, ORIGINAL_BOOST, REPRINT_KINDS, nearPhrase, titleMatch,
+  BM25_PARAMS, KEYWORD_BM25, KEYWORD_CONTENT_WORDS, KEYWORD_WORDS, joinApostropheS, SYNONYM_WEIGHT, FORM_WEIGHT, NEAR_PHRASE_MIN, ORIGINAL_BOOST, REPRINT_KINDS, nearPhrase, titleMatch, TITLE_EXACT_BOOST,
 } from './ranking.js';
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
 import { onIdle } from '../utils/on-idle.js';
@@ -107,6 +107,10 @@ function isStopTerm(term) {
 function withoutPossessive(term) {
   const toks = kjvEncode(term);
   return toks.length >= 2 && toks[toks.length - 1] === 's' ? toks.slice(0, -1).join(' ') : term;
+}
+/** The query without its -words, each +word as its word: what the reader wants found. @param {string} q */
+function wantedQuery(q) {
+  return String(q).split(/\s+/).filter((t) => !(t.length > 1 && t[0] === '-')).map((t) => (t.length > 1 && t[0] === '+' ? t.slice(1) : t)).join(' ');
 }
 /* A negative contraction is its two words, as the text mostly spells them: "don't
    look back" found its letter at #119, "do not look back" at #1. */
@@ -376,6 +380,8 @@ function docTokens(id, doc) {
 }
 /** The phrase ranking reads at most this many of the best-scored texts. */
 const PHRASE_CANDIDATES = 500;
+/** A close match holds this share of the query's content words in one passage, rare words weighing most (sr13). */
+const CLOSE_SHARE = 0.75;
 
 /* THE BEST PASSAGE (search benchmark, 2026-10-05). A remembered sentence in the reader's own words
    shares only a few words with the text, and a long topic holds those few somewhere, far apart: it
@@ -410,11 +416,32 @@ function docFreq(term) {
    those words can sit in the wrong place: "everyone struggling and burdened come to me for rest"
    cut its excerpt at a "come" two paragraphs from the passage. The first results open on the
    passage the model matched instead, when it means the query clearly more nearly than the
-   passage holding the excerpt (LAND_MARGIN). */
+   passage holding the excerpt (LAND_MARGIN). A passage is three sentences and the reader's words
+   point at one of them (search sr10, 2026-10-14): a text opened on a passage opens on the sentence
+   of it holding most of the typed words, not on its first ("every preacher speaks blasphemy and
+   every church altar is corrupted" opened a sentence above "blasphemy is heard from every pulpit"). */
 const LAND_REACH = 3;
 const LAND_MARGIN = 0.1;
+/** The sentences of a matched passage read for the one the typed words point at. */
+const LAND_SENTENCES = 3;
 /**
- * @param {Array<{doc:any, placeStart?:number}>} out
+ * The start of the sentence, among a passage's first LAND_SENTENCES, holding most of the typed words
+ * (the first of equals); the passage's own start when none holds one.
+ * @param {string} text
+ * @param {number} start  the passage's start
+ * @param {Set<string>} words  the typed content words, as lemmas
+ */
+function sentenceAt(text, start, words) {
+  let best = start;
+  let most = 0;
+  for (const sp of sentenceSpans(text.slice(start, start + MEANING_SPAN)).slice(0, LAND_SENTENCES)) {
+    const held = new Set(kjvEncode(sp.text).map(lemma).filter((l) => words.has(l))).size;
+    if (held > most) { most = held; best = start + sp.start + (sp.text.length - sp.text.trimStart().length); }
+  }
+  return best;
+}
+/**
+ * @param {Array<{doc:any, placeStart?:number, terms?:string[]}>} out
  * @param {Map<any, string>} idOf
  * @param {Array<{id:string, start:number, passages: () => Array<[number, number]>}>} sem
  * @param {string[]} terms
@@ -425,7 +452,7 @@ function meaningLanding(out, idOf, sem, terms) {
     if (e.doc.kind === 'verse' || typeof e.placeStart === 'number' || !e.doc.text) continue;
     const s = byId.get(idOf.get(e) || '');
     if (!s || s.start < 0) continue;
-    const ex = terms.length ? matchExcerpt(e.doc.text, terms) : '';
+    const ex = terms.length ? matchExcerpt(e.doc.text, terms, undefined, e.terms) : '';
     const at = ex ? e.doc.text.indexOf(ex) : -1;
     if (at < 0) continue;
     const ps = s.passages();
@@ -433,6 +460,12 @@ function meaningLanding(out, idOf, sem, terms) {
     for (const pp of ps) if (pp[0] <= at) lex = pp;
     const bestScore = Math.max(...ps.map((pp) => pp[1]));
     if (lex && bestScore - lex[1] > LAND_MARGIN && s.start !== lex[0]) e.placeStart = s.start;
+  }
+  // Every text opened on a matched passage (here, or meaningFirst's own finds): on its sentence the words point at.
+  const words = new Set(terms.flatMap((t) => kjvEncode(t)).filter((w) => !isStopTerm(w)).map(lemma));
+  if (!words.size) return;
+  for (const e of out) {
+    if (typeof e.placeStart === 'number' && e.placeStart >= 0 && e.doc.text) e.placeStart = sentenceAt(e.doc.text, e.placeStart, words);
   }
 }
 
@@ -459,7 +492,13 @@ function unitId(/** @type {string} */ key) {
    find); a title the query names keeps the lead. A document only the meaning found
    opens on the passage the model matched (entry.placeStart, which use-search lands
    on); one the words found too lands where they do. Measured on the benchmark
-   (lanes/search/out/p5): 413 -> 424/500. */
+   (lanes/search/out/p5): 413 -> 424/500.
+   SURE AND UNSURE (search sr10, 2026-10-14). The model's score says how sure it is. Its clear
+   first (MEANING_SURE ahead of the next text it ranks) leads, unless a named title does or the
+   words hold the whole query in one passage: on the benchmark its right picks led by 0.05-0.09
+   (Joel 2:27 for the query above came 3rd, behind letters holding its words) and its wrong ones
+   by 0-0.02. Two texts it ranks within MEANING_TIE it cannot tell apart: the original kind goes
+   first (ORIGINAL_TIER), as a reprint gives way to its original. 440 -> 445/500, none lost. */
 const MEANING_REACH = 30;
 const MEANING_ADD = 10;
 /** How many of the model's best documents a search kept to a collection or scope reads (else semanticDocs' 60). */
@@ -472,6 +511,14 @@ const MEANING_SPAN = 400;
 const MEANING_VOTES = 4;
 /** The meaning's weight when no passage holds any of the query; it falls as the words hold more (1 - held). */
 const MEANING_WEIGHT = 2;
+/** How far (cosine) the model's first must lead the next text it ranks to lead the results: 0.025-0.05 gained the same on the benchmark. */
+const MEANING_SURE = 0.04;
+/** What a clear first adds to its key: past any order the two ranks give (at most 0.1 + 0.2), short of a named title's 1. */
+const MEANING_SURE_LEAD = 0.5;
+/** Texts the model ranks this near (cosine) it cannot tell apart: 0.006-0.014 gained, none lost, on the benchmark. */
+const MEANING_TIE = 0.012;
+/** Two copies of one passage score alike to the float: a reprint is no next text. */
+const MEANING_SAME = 1e-4;
 /**
  * @param {Array<{score:number, doc:any, terms?:string[], placeStart?:number, meaningStart?:number}>} out
  * @param {Map<any, string>} idOf
@@ -482,7 +529,21 @@ const MEANING_WEIGHT = 2;
  */
 function meaningFirst(out, idOf, sem, named, held, admit) {
   const w = MEANING_WEIGHT * Math.max(0, 1 - held);
-  const semRank = new Map(sem.map((s, i) => [s.id, i]));
+  // The model's clear first: far enough ahead of the next text it ranks (its own copies aside).
+  let sure = '';
+  if (w > 0 && sem.length) {
+    const next = sem.find((s) => sem[0].score - s.score > MEANING_SAME);
+    if (!next || sem[0].score - next.score >= MEANING_SURE) sure = sem[0].id;
+  }
+  // Its order, with texts it cannot tell apart taken original first.
+  const tierOf = (/** @type {string} */ id) => { const f = msIndex.getStoredFields(id); return (f && ORIGINAL_TIER[f.kind]) ?? 5; };
+  const order = sem.map((s) => ({ s, t: tierOf(s.id) }));
+  for (let j = 1; j < order.length; j++) {
+    for (let r = j; r > 0 && order[r - 1].s.score - order[r].s.score <= MEANING_TIE && order[r].t < order[r - 1].t; r--) {
+      const x = order[r]; order[r] = order[r - 1]; order[r - 1] = x;
+    }
+  }
+  const semRank = new Map(order.map((o, i) => [o.s.id, i]));
   const semStart = new Map(sem.map((s) => [s.id, s.start]));
   const top = out.slice(0, MEANING_REACH);
   const rest = out.slice(MEANING_REACH);
@@ -503,7 +564,7 @@ function meaningFirst(out, idOf, sem, named, held, admit) {
     added.add(e);
   }
   const key = (/** @type {any} */ e, /** @type {number} */ i) => (named(e.doc) ? 1 : 0) + 1 / (MEANING_K + Math.min(i, MEANING_REACH)) +
-    w / (MEANING_K + (semRank.get(idOf.get(e)) ?? 1e6));
+    w / (MEANING_K + (semRank.get(idOf.get(e)) ?? 1e6)) + (idOf.get(e) === sure ? MEANING_SURE_LEAD : 0);
   const keyed = top.map((e, i) => ({ e, i, k: key(e, i) }));
   keyed.sort((a, b) => b.k - a.k);
   for (const e of top) {
@@ -593,9 +654,14 @@ function sentenceSpans(text) {
   while ((m = re.exec(text))) out.push({ start: m.index, end: m.index + m[0].length, text: m[0] });
   return out;
 }
-/** A sentence's key: its words as the index reads them; null under five words (too common to mean one text). */
+/* HIS NAME AS THE EDITIONS PRINT IT (sr11, 2026-10-15). The studies and the Matthew Study Bible restore His name
+   in the verses they quote ("When YahuShua heard these things, He marveled at him"), and the edition the index
+   holds prints "Jesus" (Luke 7:9): the study's sentence never met its verse's key, and the study led the verse. */
+const RESTORED_NAME = /^(?:yahushua|yeshua|yahshua|yahusha|yeshu)$/;
+const nameAsPrinted = (/** @type {string} */ t) => (RESTORED_NAME.test(t) ? 'jesus' : t);
+/** A sentence's key: its words as the index reads them, His name as printed; null under five words (too common to mean one text). */
 function sentenceKey(s) {
-  const toks = kjvEncode(s);
+  const toks = kjvEncode(s).map(nameAsPrinted);
   return toks.length >= 5 ? toks.join(' ') : null;
 }
 /* Words To Live By cuts its excerpts mid-sentence and the Answers reprints re-punctuate, so a
@@ -784,13 +850,14 @@ function excerptCover(id, text, hits) {
   }
   return best;
 }
-/** The query's content words as bestWindow reads them, rare words weighing more, and the window's reach. */
-function passageQuery(/** @type {string[]} */ words) {
+/** The query's content words as bestWindow reads them, rare words weighing more, and the window's reach;
+    `asTyped`: the words themselves, to read a text's tokens (docTokens) rather than its lemmas. */
+function passageQuery(/** @type {string[]} */ words, asTyped = false) {
   const n = msIndex.documentCount || 1;
   const seen = new Set();
   const query = [];
   for (const w of words) {
-    const lem = lemma(w);
+    const lem = asTyped ? w : lemma(w);
     if (seen.has(lem)) continue;
     seen.add(lem);
     const df = docFreq(w);
@@ -849,37 +916,108 @@ function condensedFrom(/** @type {string} */ id, /** @type {string} */ text, /**
   SOURCE_CACHE.set(id, src);
   return src;
 }
+/* A QUOTE THAT NAMES ITS VERSE (sr11, 2026-10-15). A study quotes Scripture as the KJV words it (“All have sinned,
+   and come short of the glory of God.” – Romans 3:23) and the edition the index holds words it otherwise ("fall
+   short"), so no key of the verse meets the study's sentence: the reference the study writes after it does. */
+const CITED_AFTER = /^[\s"'“”‘’)]*[–—-]\s*((?:[1-3]\s?)?[A-Z][A-Za-z]+(?: of [A-Z][a-z]+| [A-Z][a-z]+)?\.? \d{1,3}:\d{1,3}(?:\s?[-–]\s?\d{1,3})?)/;
+/** How many verses of a cited range are read for the one the sentence quotes. */
+const CITED_RANGE = 12;
+/**
+ * The verse a sentence's citation names, when it holds `need` of the query's words; else null.
+ * @param {string} after  the text just after the sentence
+ * @param {string[]} words  the query's words, encoded
+ * @param {number} need
+ */
+function citedVerse(after, words, need) {
+  const m = CITED_AFTER.exec(after);
+  if (!m) return null;
+  let p;
+  try { p = parseReference(m[1]); } catch { return null; }
+  if (!p || p.kind !== 'ref-bible' || !p.bookId || !p.chapter || !p.verseStart) return null;
+  const D = /** @type {Map<string, any>} */ (ORIGINAL_DOCS);
+  const books = p.bookId === 'matthew' || p.bookId === 'matthew-plain' ? ['matthew-study/matthew', 'bible/matthew-plain'] : ['bible/' + p.bookId];
+  let best = null;
+  let most = need - 1;
+  const last = Math.min(p.verseEnd || p.verseStart, p.verseStart + CITED_RANGE - 1);
+  for (let v = p.verseStart; v <= last; v++) {
+    for (const b of books) {
+      const id = unitId(b + ':' + p.chapter + ':' + v);
+      const f = id && D.get(id);
+      if (!f || f.kind !== 'verse') continue;
+      const toks = new Set(kjvEncode(f.text).map(nameAsPrinted));
+      const held = words.filter((w) => toks.has(w)).length;
+      if (held > most) { most = held; best = id; }
+    }
+  }
+  return best;
+}
+/**
+ * The originals of the sentence(s) an excerpt falls in: the sentence's key, or the verse it cites.
+ * @param {string} text
+ * @param {string} ex  the excerpt
+ * @param {number} at  where it starts
+ * @param {Map<string, string[]>} O
+ * @param {(ids: string[]|undefined) => string[]} lower  the ids of a lower tier than the reprint's
+ * @param {string[]} keyWords  the query's words as a key reads them
+ * @param {number} need
+ * @param {boolean} cite  the reader typed the quote's words in a row: the verse it cites is its original
+ * @returns {string[]|null}
+ */
+function sentenceOriginal(text, ex, at, O, lower, keyWords, need, cite) {
+  if (at < 0) return null;
+  for (const sp of sentenceSpans(text)) {
+    if (sp.end < at || sp.start > at + ex.length) continue;
+    const k = sentenceKey(sp.text);
+    if (!k || keyWords.filter((w) => (' ' + k + ' ').indexOf(' ' + w + ' ') >= 0).length < need) continue;
+    const l = lower(O.get(k));
+    if (l.length) return l;
+    if (!cite) continue;
+    const v = citedVerse(text.slice(sp.end, sp.end + 48), keyWords, need);
+    if (v && lower([v]).length) return [v];
+  }
+  return null;
+}
 /**
  * Move each original ahead of a reprint of it near the top (in place).
  * @param {Array<{score:number, doc:any, terms?:string[], meaningStart?:number}>} out  ranked, best first (meaningStart: meaningFirst's matched passage)
  * @param {Map<any, string>} idOf  each entry's doc id
  * @param {string[]} terms  the words a landing marks (the query's own)
  * @param {(doc:any) => boolean} allowed  the search's corpus and scope filters
- * @param {(doc:any) => boolean} named  the query names this text's title: it keeps its place
+ * @param {(doc:any) => boolean} named  the query names this text's title so: it keeps its place
  * @param {(id:string, doc:any) => number} near  how nearly a text holds the typed words in a row (0..1)
+ * @param {string[]} [typed]  every typed word, the small ones too: a quote's excerpt is cut by them
  */
-function originalsFirst(out, idOf, terms, allowed, named, near) {
+function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
   if (!terms.length) return;
   let O;
   try { O = originals(); } catch { return; }
   const D = /** @type {Map<string, any>} */ (ORIGINAL_DOCS);
   // The matched sentence must hold a fair share of the query's words, not one word of a title.
   const words = [...new Set(terms.flatMap((t) => kjvEncode(t)))];
+  const keyWords = words.map(nameAsPrinted);
   const need = Math.min(3, Math.ceil(words.length / 2));
   for (let i = 0; i < Math.min(out.length, ORIGINAL_REACH); i++) {
     const e = out[i];
     const tier = ORIGINAL_TIER[e.doc.kind];
     if (!tier || !e.doc.text || named(e.doc)) continue;
-    const ex = matchExcerpt(e.doc.text, terms);
-    const at = ex ? e.doc.text.indexOf(ex) : -1;
+    // The typed words alone here, not their engine-matched forms the landing reads too: a form tipped one
+    // reprint's tie onto a sentence of another letter and the original lost first place (sr11, t158).
+    let ex = matchExcerpt(e.doc.text, terms);
+    let at = ex ? e.doc.text.indexOf(ex) : -1;
     const lower = (/** @type {string[]|undefined} */ ids) => (ids || []).filter((x) => D.has(x) && ORIGINAL_TIER[D.get(x).kind] < tier);
-    let found = null;
-    if (at >= 0) for (const sp of sentenceSpans(e.doc.text)) {
-      if (sp.end < at || sp.start > at + ex.length) continue;
-      const k = sentenceKey(sp.text);
-      if (!k || words.filter((w) => (' ' + k + ' ').indexOf(' ' + w + ' ') >= 0).length < need) continue;
-      const l = lower(O.get(k));
-      if (l.length) { found = l; break; }
+    // A study's citation names the original of a quote of it, not of a passage described in other words
+    // ("passover study about the lamb when god struck the egyptians" asks for the study, not Exodus 12:27).
+    const quoted = near(idOf.get(e) || '', e.doc) >= NEAR_PHRASE_MIN;
+    let found = sentenceOriginal(e.doc.text, ex, at, O, lower, keyWords, need, quoted);
+    // A quote held nearly word for word sits where its small words are too ("blessed be the name of our lord":
+    // the content words sit thickest in "Blessed are those who Bless the name of The Lord", a line above it).
+    if (!found && typed.length > terms.length && quoted) {
+      const ex2 = matchExcerpt(e.doc.text, typed);
+      const at2 = ex2 ? e.doc.text.indexOf(ex2) : -1;
+      if (at2 >= 0 && at2 !== at) {
+        found = sentenceOriginal(e.doc.text, ex2, at2, O, lower, keyWords, need, true);
+        if (found) { ex = ex2; at = at2; }
+      }
     }
     if (!found && at >= 0) {
       // The matched place, a little either side (its edge words may be cut), by its shingles.
@@ -912,7 +1050,10 @@ function originalsFirst(out, idOf, terms, allowed, named, near) {
       const pq = passageQuery(words);
       const share = src ? bestWindow(pq.query, docLemmas(id, e.doc.text), pq.span) : 0;
       const own = src ? near(id, e.doc) : 0;
-        if (src && share >= 0.5 && holdsAsWell(src, pq, share) && (own < NEAR_PHRASE_MIN || near(src, D.get(src)) >= own - 0.1)) found = [src];
+      // The entry is cut from its letter: whatever of the query it holds, a letter holding as much comes first
+      // (sr11, 2026-10-15: a bar of half the query kept "history has an end and christ is coming" on the entry at
+      // 0.46 with its letter holding the same 0.46; Corbin, DECISIONS 10-14: the original first, the reprint second).
+      if (src && share > 0 && holdsAsWell(src, pq, share) && (own < NEAR_PHRASE_MIN || near(src, D.get(src)) >= own - 0.1)) found = [src];
     }
     if (!found && e.doc.kind === 'answers') {
       // A study or Holy Days text just below that holds the query as well, in one passage and in a row: it is what Answers reprints.
@@ -952,6 +1093,40 @@ function originalsFirst(out, idOf, terms, allowed, named, near) {
     }
     out.splice(i, 0, entry);
     i++;   // the reprint now sits under it
+  }
+}
+/* THE REPRINT RIGHT AFTER ITS ORIGINAL (sr11, 2026-10-15). Corbin (DECISIONS 10-14) on a letter that Words To Live
+   By later excerpts: "what surfaces first? The original, yes. But both should surface, with WTLB being second."
+   With the original first, a reprint of the passage it was found by sat anywhere below it (#7, #15, #100 on the
+   benchmark). The first text below that holds the passage's words in a row comes up second. A verse first keeps
+   its order: the letters quoting it are no reprints of it. */
+/** How far below the first result a reprint of its passage is looked for. */
+const REPRINT_REACH = 200;
+/** Words in a row a reprint shares with the passage (fewer when the sentence is shorter, five at least). */
+const REPRINT_RUN = 8;
+/**
+ * @param {Array<{doc:any, placeStart?:number, terms?:string[]}>} out  ranked, best first
+ * @param {string[]} terms  the words a landing marks
+ */
+function reprintSecond(out, terms) {
+  if (out.length < 3 || !terms.length) return;
+  const first = out[0];
+  const d = first.doc;
+  if (!d.text || !(d.kind === 'letter' || d.kind === 'wtlb' || d.kind === 'blessed')) return;
+  // the passage it was found by: the sentence it opens on, else the one where the typed words sit thickest
+  let st = typeof first.placeStart === 'number' && first.placeStart >= 0 ? first.placeStart : -1;
+  if (st < 0) { const ex = matchExcerpt(d.text, terms, undefined, first.terms); st = ex ? d.text.indexOf(ex) : -1; }
+  if (st < 0) return;
+  const sp = sentenceSpans(d.text).find((x) => x.end > st);
+  const toks = sp ? kjvEncode(sp.text) : [];
+  if (toks.length < 5) return;
+  const runs = toks.length <= REPRINT_RUN ? [toks] : [0, (toks.length - REPRINT_RUN) >> 1, toks.length - REPRINT_RUN].map((i) => toks.slice(i, i + REPRINT_RUN));
+  const esc = (/** @type {string} */ t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const res = runs.map((run) => new RegExp('(?:^|[^a-z0-9])' + run.map(esc).join('[^a-z0-9]+') + '(?![a-z0-9])', 'i'));
+  for (let r = 1; r < Math.min(out.length, REPRINT_REACH); r++) {
+    const t = out[r].doc.text;
+    if (!t || out[r].doc.kind === 'verse') continue;
+    if (res.some((re) => re.test(t))) { if (r > 1) out.splice(1, 0, out.splice(r, 1)[0]); return; }
   }
 }
 /** @type {Promise<boolean>|null} */ let building = null;
@@ -1010,6 +1185,10 @@ function swapIn(/** @type {any} */ ms, /** @type {typeof stats} */ st) {
    The worker is given up when it sends nothing for RESTORE_QUIET_MS: each part starts the wait again, so a slow
    phone's restore is never cut off while its parts are still coming (sr9 refuter r1). */
 const RESTORE_QUIET_MS = 20000;
+/* "REBUILD THE INDEX" BUILDS IT (sweep 2026-10-14 v100). rebuild() dropped the warm cache without waiting, and the
+   build it started read the cache before the delete landed and swapped the same index back in. The next build
+   after a rebuild() reads no cache, whichever call starts it (a search waiting on the index can). */
+let coldNext = false;
 /** The cached index for `sig`, or null when there is none. @returns {Promise<{ms: any, where: string}|null>} */
 async function restoreIndex(/** @type {string} */ sig) {
   const w = searchWorker();
@@ -1036,17 +1215,21 @@ async function build(options) {
   const code = options.translation || 'nkjv';
   const sig = dataSignature(code);
 
-  // Warm cache: restore the serialized index (~0.3s) instead of rebuilding (~10s).
-  try {
-    const tc = now();
-    const restored = await restoreIndex(sig);
-    if (restored) {
-      const ms = restored.ms;
-      swapIn(ms, { docCount: ms.documentCount, buildMs: Math.round(now() - tc), cached: true, translation: code, sig, restoredIn: restored.where });
-      if (options.onProgress) options.onProgress(ms.documentCount, ms.documentCount);
-      return;
-    }
-  } catch { /* corrupt / blocked cache — fall through to a fresh build */ }
+  // Warm cache: restore the serialized index (~0.3s) instead of rebuilding (~10s), unless rebuild() asked.
+  const cold = coldNext;
+  coldNext = false;
+  if (!cold) {
+    try {
+      const tc = now();
+      const restored = await restoreIndex(sig);
+      if (restored) {
+        const ms = restored.ms;
+        swapIn(ms, { docCount: ms.documentCount, buildMs: Math.round(now() - tc), cached: true, translation: code, sig, restoredIn: restored.where });
+        if (options.onProgress) options.onProgress(ms.documentCount, ms.documentCount);
+        return;
+      }
+    } catch { /* corrupt / blocked cache — fall through to a fresh build */ }
+  }
 
   // Cold build: collect docs (fast, ~55ms) then index (the slow part, ~10s —
   // chunked so the progress bar animates and the UI stays responsive). The
@@ -1166,7 +1349,7 @@ async function ensureReady(options) {
  * `signal`: when it is aborted the search stops at its next turn and returns `aborted: true`, no results (sr7).
  * `corrections` lists each typed word that found nothing of its own and was
  * searched as the nearest indexed word instead ({ from: 'shephard', to: 'shepherd' }).
- * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>, stopWordsOnly?:boolean, unquoted?:string, aborted?:boolean}>}
+ * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[], close?:boolean}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>, stopWordsOnly?:boolean, unquoted?:string, aborted?:boolean}>}
  */
 async function search(query, options) {
   options = options || {};
@@ -1192,10 +1375,13 @@ async function search(query, options) {
   if (!parsed) return { parsed: null, results: [] };
   // Command + structured references (bible / book / letter / named-passage) are
   // answered by a direct-nav card built in the UI — skip text search entirely.
-  if (NAV_ONLY_KINDS.has(parsed.kind)) return { parsed, results: [], parsedTerms: [], textQuery: null };
+  // ...unless the reference may be words too ("rebuke one": ref-parser's alsoText), which are searched under the card.
+  if (NAV_ONLY_KINDS.has(parsed.kind) && !parsed.alsoText) return { parsed, results: [], parsedTerms: [], textQuery: null };
 
   await ensureReady(options);
   await warmOriginals();
+  // rebuild() dropped the index while this search waited (sweep 2026-10-14 v061): it waits for the new one
+  if (!msIndex) return search(query, options);
 
   /* THE RANKING GIVES THE PAGE TURNS (sr7, 2026-10-14). With the originals read, a first search still
      ranked in one block: 110-400 ms on a desktop, about 350 ms on the S22, under the reader's typing. In
@@ -1232,15 +1418,23 @@ async function search(query, options) {
      pipeline needs the same query parsed as TEXT, which is what `p` is. Two
      readings of one query, and the return carries both. */
   const navAlso = parsed.kind !== 'text';
-  const p = navAlso ? parseTextQuery(query) : parsed;
+  const useStop = options.useStopWords !== false;
+  const read = navAlso ? parseTextQuery(query) : parsed;
+  /* A BARE WORD BESIDE A QUOTED PHRASE IS A WORD THE TEXT HOLDS (sweep 2026-10-14 v001). Only the phrase was
+     searched, so '"love one another" brethren' showed every text holding the phrase, ranked and marked as if
+     "brethren" was never typed. It narrows the phrase as a +word does (a small word aside); a phrase and word
+     no text holds together fall back to the words unquoted, as a quote nothing holds does. */
+  const p = read.phrase && read.terms && read.terms.length
+    ? { ...read, must: read.must.concat(read.terms.map(withoutPossessive).filter((t) => !(useStop && isStopTerm(t)))), terms: [] }
+    : read;
   // `allWords`: the reader asked for every match under the card (SearchScreen).
   if (navAlso && !options.allWords) limit = Math.min(limit, NAV_TEXT_LIMIT);
   const D = searchData();
   const terms = (p.phrase ? p.phrase.split(/\s+/) : p.terms.map(withoutPossessive)).concat(p.must);
-  const useStop = options.useStopWords !== false;
 
-  // All-stop-word query → no searchable content.
-  if (useStop && terms.length && terms.every(isStopTerm)) {
+  // All-stop-word query → no searchable content. Not a quoted phrase: "and it was so" (Genesis 1), quoted,
+  // means those words in that order, which the phrase filter checks (sweep 2026-10-14 v016).
+  if (useStop && !p.phrase && terms.length && terms.every(isStopTerm)) {
     return { parsed, results: [], parsedTerms: [], textQuery: null, stopWordsOnly: true };
   }
   let filtered;
@@ -1449,7 +1643,11 @@ async function search(query, options) {
   const nearOf = Object.create(null);
   for (let c = 0; c < corrections.length; c++) fixedTo[corrections[c].from] = corrections[c].to;
   for (const k in modernOf) fixedTo[k] = modernOf[k];
-  const typedTokens = joinApostropheS(kjvEncode(query).map((t) => fixedTo[t] || t));
+  /* What the reader wants found: a -word is ruled out, not typed, and a +word is its word (sweep 2026-10-14 v002).
+     Read as typed, "Q -x" asked the texts to hold the run "Q x", so the passage quoted lost its phrase and
+     original boosts to a word the reader excluded. */
+  const wanted = (p.must && p.must.length) || (p.mustNot && p.mustNot.length) ? wantedQuery(query) : query;
+  const typedTokens = joinApostropheS(kjvEncode(wanted).map((t) => fixedTo[t] || t));
   const STOP = D.STOP_WORDS_TRIMMED;
   if (!p.phrase && required > 1 && typedTokens.length > 1) {
     const needCover = required >= 3 ? required - 1 : required;
@@ -1479,7 +1677,7 @@ async function search(query, options) {
       if (spent()) { const r = await pause(); if (r) return r; }
       const d = docLookup[id];
       if (!d || !hasTokenRun(docTokens(id, d), typedTokens)) continue;
-      run = query.trim().replace(/\s+/g, ' ').toLowerCase();
+      run = wanted.trim().replace(/\s+/g, ' ').toLowerCase();
       nearOf[id] = 1;
       scoreMap[id] *= PHRASE_BOOST;
       if (!keyword && !REPRINT_KINDS.has(d.kind)) scoreMap[id] *= ORIGINAL_BOOST;
@@ -1573,6 +1771,8 @@ async function search(query, options) {
     idOf.set(entry, id);
     out.push(entry);
   }
+  /** What the words found; the meaning and originalsFirst bring in more below. */
+  const byWords = new Set(out);
   // A title the query names keeps its place; in a keyword search, a title holding its every word
   // ("144,000"), not one of two ("lord from aforetime" quotes a letter, not "Regarding the Day of The Lord").
   const typedContent = typedTokens.filter((w) => !(STOP && STOP.has(w)));
@@ -1601,17 +1801,35 @@ async function search(query, options) {
   // that index would hand back the other edition's text. The words' results stand alone.
   if (!keyword && !p.phrase && !quoted && parsed.kind === 'text') {
     // The model reads what the reader wants, not what they ruled out: no -word, and +word as the word.
-    const meant = hasMust || hasMustNot
-      ? String(query).split(/\s+/).filter((t) => !(t.length > 1 && t[0] === '-')).map((t) => (t.length > 1 && t[0] === '+' ? t.slice(1) : t)).join(' ')
-      : String(query);
+    const meant = String(wanted);
     // Kept to a collection or scope, the model's best of everything may hold few of its texts: it reads further.
     sem = await semanticDocs(meant, unitId, corpusFilter || scopeBookId || scopeVolumeId ? MEANING_FILTERED : undefined);
     if (msIndex !== inUse) sem = null;
     if (sem) sem = sem.filter((s) => { const f = msIndex.getStoredFields(s.id); return !!f && allowed(f); });
     if (sem && sem.length) meaningFirst(out, idOf, sem, named, held, fresh);
   }
+  const nearTyped = (/** @type {string} */ id, /** @type {any} */ d) => nearOf[id] ?? (typedTokens.length > 1 ? nearPhrase(docTokens(id, d), typedTokens, STOP) : 0);
+  /* A TITLE NAMED IN PASSING (sr11, 2026-10-15). A title the query names keeps its text's place, but a Words To
+     Live By entry's title is often a line of the letter it condenses: a reader quoting the letter ("attained by
+     human means": the entry "Not By Human Means") or describing it ("letter explaining that history has an end and
+     christ is coming": "History Has an End") named the entry and got it above its letter. Corbin (DECISIONS
+     10-14): the original first, the reprint second. A title typed whole, or one the query is mostly made of, still
+     keeps its text's place; one the query holds beside more of its own words, or that a quote of the text's own
+     words runs through (the text holds more of the query in a row than the title does), does not. */
+  const namedSo = (/** @type {any} */ d) => {
+    if (!named(d)) return false;
+    const tt = kjvEncode(d.title);
+    if (titleMatch(tt, typedTokens, STOP) >= TITLE_EXACT_BOOST) return true;
+    const tl = new Set(tt.map(lemma));
+    const inTitle = typedContent.filter((w) => tl.has(lemma(w))).length;
+    const beside = typedContent.length - inTitle;
+    if (beside > inTitle) return false;
+    if (!beside) return true;
+    const body = nearPhrase(kjvEncode(d.text || ''), typedTokens, STOP);
+    return !(body >= NEAR_PHRASE_MIN && body > nearPhrase(tt, typedTokens, STOP));
+  };
   if (msIndex === inUse) originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) => allowed(d) && fresh(d),
-    named, (id, d) => nearOf[id] ?? (typedTokens.length > 1 ? nearPhrase(docTokens(id, d), typedTokens, STOP) : 0));
+    namedSo, nearTyped, typedTokens);
   // What those two added counts in its collection. A full one does not refuse it (the words' 400th
   // verse is no reason to drop the model's best text or an original): its last text gives way.
   if (perVolume) {
@@ -1645,6 +1863,30 @@ async function search(query, options) {
   const over = out.length > limit;
   if (over) out.length = limit;
   if (sem && sem.length) meaningLanding(out, idOf, sem, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))));
+  // ...by the passage the screen lands on: the card marks the phrase or the typed run with the words (textQuery.run).
+  reprintSecond(out, (p.phrase ? [p.phrase] : run ? [run] : []).concat(filtered.filter((t) => !isStopTerm(t))));
+
+  /* CLOSE MATCHES (sr13, 2026-10-15). Book order lists the results in reading order, and most of a passage
+     search's results hold a word or two of it: "I am The Lord and I do not change" found 1,344 texts, and Book
+     order opened on Genesis 4:9 ("Am I my brother's keeper?"). Each result of a passage search says whether it
+     holds the typed words together: most of them in a row (nearPhrase, as the phrase ranking reads it, so one
+     word off still counts) and most of their weight in one place (bestWindow: "I am the LORD, and there is no
+     other" holds the run's start but not "change", the word that names the saying; a word no text holds, one the
+     reader misremembered, weighs nothing). The screen lists the close ones first. A keyword search and a quoted
+     phrase mark none: every text they show holds what was typed. Read where the phrase ranking read (its 500 best
+     holding the words, nearOf) and on what the meaning and originalsFirst brought in (a reprint's original sits
+     with it); past that reach a text holds the words apart, as the ranking scored it. */
+  if (!keyword && !p.phrase && typedTokens.length > 1 && typedContent.length) {
+    // on the tokens the phrase ranking read (docTokens: cached, the title's words in them)
+    const pq = passageQuery(typedContent.filter((w) => docFreq(w) > 0), true);
+    for (const e of out) {
+      if (spent()) { const r = await pause(); if (r) return r; }
+      const id = /** @type {string} */ (idOf.get(e));
+      let near = nearOf[id];
+      if (near === undefined) near = byWords.has(e) ? 0 : nearPhrase(docTokens(id, e.doc), typedTokens, STOP);
+      /** @type {{close?: boolean}} */ (e).close = near >= NEAR_PHRASE_MIN && bestWindow(pq.query, docTokens(id, e.doc), pq.span) >= CLOSE_SHARE;
+    }
+  }
 
   /* A QUOTED PHRASE NOTHING HOLDS IS SEARCHED AS ITS WORDS (search audit 2026-09-27).
      A quote remembered one word off ("the earth shall grow old like a garment", where
@@ -1668,9 +1910,10 @@ function suggest(query, opts) {
   opts = opts || {};
   const max = opts.max || 10;
   const out = [];
-  if (!query || query.length < 1) return out;
+  // trimmed first: a space alone was a prefix of every key (sweep 2026-10-14 v053)
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return out;
   const D = searchData();
-  const q = query.trim().toLowerCase();
 
   for (let i = 0; i < D.NAMED_PASSAGES.length && out.length < max; i++) {
     const np = D.NAMED_PASSAGES[i];
@@ -1711,12 +1954,13 @@ function suggest(query, opts) {
   return out;
 }
 
-/** Drop the in-memory index and rebuild for the active (or given) translation. */
+/** Drop the in-memory index and the warm cache, and build again for the active (or given) translation. */
 function rebuild(options) {
   options = options || {};
   const code = options.translation || stats.translation || 'nkjv';
   ready = false;
   msIndex = null;
+  coldNext = true;
   clearCached().catch(() => {});
   return init({ translation: code });
 }

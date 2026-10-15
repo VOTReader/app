@@ -2,15 +2,17 @@
  * hone-bible-sample (al5, sweep 2026-10-13, low): the QA preview painted a REVIEW verse in the probe-adjudicated
  * amber, i.e. as proven, and would light an UNSPOKEN row that carries a time, which ship() never ships. A REVIEW
  * verse ships (loose over dark, 2026-08-26) but is unproven: it gets its own class and legend entry.
+ *
+ * The tool runs in-process, through its exported main(). The hook used to spawn a fresh node for it, all of it charged
+ * to vitest's 10 s hook timeout: 0.1 s alone, up to 2 s beside two other suites, and past 10 s in a loaded pre-push
+ * (readalong rv1-listening, 2026-10-14).
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve, dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { main } from './hone-bible-sample.mjs';
 
-const TOOL = resolve(dirname(fileURLToPath(import.meta.url)), 'hone-bible-sample.mjs');
 let tmp;
 let html;
 const cls = (n) => (html.match(new RegExp(`<span class="([^"]+)" data-n="${n}"`)) || [])[1];
@@ -32,7 +34,12 @@ beforeAll(() => {
       { n: 4, t: 4.0, status: 'UNSPOKEN' },
     ],
   }));
-  execFileSync(process.execPath, [TOOL, join(tmp, 'v.json'), join(tmp, 't.json'), join(tmp, 'out.html')]);
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {}); // its "wrote <path>" line
+  try {
+    expect(main([join(tmp, 'v.json'), join(tmp, 't.json'), join(tmp, 'out.html')])).toBe(0);
+  } finally {
+    log.mockRestore();
+  }
   html = readFileSync(join(tmp, 'out.html'), 'utf-8');
 });
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));

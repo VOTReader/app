@@ -83,6 +83,18 @@ describe('letters as readers name them', () => {
     expect(letter('blessed letter 4')).toBe('blessed 4');
   });
 
+  /* "the blessed one", "rebuke one", "flock two" read as letters only, and no text was searched (sweep 2026-10-14
+     v102). A number in words with no "letter" before it is a letter and words too; "letter" or digits, a letter. */
+  it('a collection and a number in words, no "letter": a letter, and its words searched too', () => {
+    const kind = (/** @type {string} */ q) => { const p = /** @type {any} */ (parseReference(q, { corpus: 'all' })) || {}; return p.kind + (p.alsoText ? ' +text' : ''); };
+    expect(kind('the blessed one')).toBe('ref-letter +text');
+    expect(kind('rebuke one')).toBe('ref-letter +text');
+    expect(kind('flock two')).toBe('ref-letter +text');
+    expect(kind('blessed letter one')).toBe('ref-letter');
+    expect(kind('the blessed 1')).toBe('ref-letter');
+    expect(kind('Rebuke letter 1')).toBe('ref-letter');
+  });
+
   it('Words To Live By with its part, or without it (Part One’s)', () => {
     expect(letter('WTLB 95')).toBe('wtlb1 95');
     expect(letter('WTLB Part One 95')).toBe('wtlb1 95');
@@ -139,5 +151,38 @@ describe('Bible references as readers type them', () => {
     expect(at('son 3')).toBe('text');
     expect(at('rome')).toBe('text');
     expect(at('vol 7', 'scriptures')).toBe('text');
+  });
+});
+
+describe('Spanish book names (Reina-Valera 1960, es1)', () => {
+  it('a reference typed in Spanish opens the verse, accents or not', () => {
+    expect(at('Juan 3:16')).toBe('john 3:16');
+    expect(at('Salmos 23')).toBe('psalms 23');
+    expect(at('Salmo 23:1')).toBe('psalms 23:1');
+    expect(at('Génesis 1:1')).toBe('genesis 1:1');
+    expect(at('Isaías 53:5')).toBe('isaiah 53:5');
+    expect(at('isaias 53:5')).toBe('isaiah 53:5');
+    expect(at('Éxodo 20')).toBe('exodus 20');
+    expect(at('Mateo 5:3')).toBe('matthew 5:3');
+    expect(at('Hechos 2:38')).toBe('acts 2:38');
+    expect(at('1 Corintios 13:4')).toBe('1corinthians 13:4');
+    expect(at('1 Juan 4:8')).toBe('1john 4:8');
+    expect(at('Apocalipsis 21:4')).toBe('revelation 21:4');
+    expect(at('Cantar de los Cantares 2:1')).toBe('songofsolomon 2:1');
+    expect(at('Santiago 1:5')).toBe('james 1:5');
+  });
+
+  it('Judas, Jonas and Lucas are books only before a chapter: alone they are the names in the English text', () => {
+    expect(at('Lucas 2:10')).toBe('luke 2:10');
+    expect(at('Jonas 1')).toBe('jonah 1');
+    expect(at('Judas 3')).toBe('jude 1:3');
+    expect(at('judas')).toBe('text');
+    expect(at('jonas')).toBe('text');   // "the sign of the prophet Jonas" (Matthew 12:39)
+    expect(at('lucas')).toBe('text');   // Philemon 24
+  });
+
+  it('never a near miss: an English slip keeps its English book', () => {
+    expect(at('judgs 3')).toBe('judges 3');       // one edit from "judas" too
+    expect(at('deuter 3')).toBe('deuteronomy 3'); // two from "ester"
   });
 });

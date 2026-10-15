@@ -21,6 +21,7 @@ import * as KeepParts from '../components/SongKeepParts.jsx';
 import { SongKeep, formatSongBytes } from '../../utils/song-keep.js';
 import { SongCatalog, adoptSongCatalog, _resetSongCatalogForTests } from '../../utils/song-catalog.js';
 import { SONG_FIXTURE } from '../../utils/song-catalog.fixture.js';
+import { NetStatus } from '../../utils/net-status.js';
 
 let store;
 let library;
@@ -70,6 +71,11 @@ function renderScreen(route, onPush = vi.fn()) {
 beforeEach(() => {
   _resetSongCatalogForTests();
   adoptSongCatalog(SONG_FIXTURE);
+  // A song page fetches its lyrics once per module and a failed fetch marks the network down: start every test with
+  // no lyrics cached, the network up, and a fetch that never answers (no real request), in whatever order they run.
+  Parts._resetSongLyricsForTests();
+  NetStatus._reset();
+  globalThis.fetch = vi.fn(() => new Promise(() => {}));
   Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => true });
   Object.defineProperty(window.navigator, 'storage', { configurable: true, value: { estimate: async () => ({ quota: 1e10, usage: 0 }), persist: async () => true } });
 });
@@ -111,11 +117,11 @@ describe('Keep on this phone -- the song page card (r2-more-screens, third panel
   it('refuses early, in words, when the phone lacks the room', async () => {
     await install();
     Object.defineProperty(window.navigator, 'storage', { configurable: true, value: { estimate: async () => ({ quota: 4e6, usage: 0 }), persist: async () => true } });
-    globalThis.fetch = vi.fn();
     renderScreen([{ k: 'song', v: 'fam-a' }]);
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Keep · 6 MB' })); });
     expect(screen.getByRole('status').textContent).toBe('Not enough room: needs 6 MB, 4 MB free.');
-    expect(globalThis.fetch).not.toHaveBeenCalled();
+    // The page's own lyrics request aside, nothing was fetched: no song started downloading.
+    expect(globalThis.fetch.mock.calls.map(([url]) => String(url)).filter((u) => !u.includes('/songs/lyrics/'))).toEqual([]);
   });
 
   it('an iPhone in a Safari tab is told to add the app to its Home Screen', async () => {

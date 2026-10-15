@@ -576,13 +576,14 @@ jobs:
         run: npm run e2e:search
 
   search-bench:
-    name: Search benchmark (500 remembered queries)
+    name: Search benchmark (500 remembered queries + the fresh 100)
     runs-on: ubuntu-latest
-    timeout-minutes: 5   # ~65 s locally: corpus load, index build, 500 queries
+    timeout-minutes: 5   # ~85 s locally: corpus load, index build, 600 queries
     # tools/search-bench.mjs (search lane, 2026-10-05): 500 things readers remember, each
     # with the query a blind writer typed for it, run through the shipped engine in plain
-    # node. Fails when the pass count, or any style or collection, falls below the floor in
-    # tools/search-bench/baseline.json. It needs no npm install (node built-ins and the
+    # node, and 100 more written by another model family (fresh-cases.json, 2026-10-15).
+    # Fails when the pass count, the fresh count, or any style or collection falls below
+    # the floor in tools/search-bench/baseline.json. It needs no npm install (node built-ins and the
     # repo's own source only), so it finishes well inside the other jobs.
     if: >-
       github.event_name != 'pull_request' ||

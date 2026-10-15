@@ -9,6 +9,7 @@
  *   node tools/e2e-readalong.mjs --keys study:purity-ch1   # a Bible/Letter Study chapter
  *   node tools/e2e-readalong.mjs --pixel-proof        # also prove it RENDERS
  *   node tools/e2e-readalong.mjs --synth --keys ...   # no cached audio needed (CI): silent audio of the right length
+ *   node tools/e2e-readalong.mjs --hold-hydration 2500 ...  # the app mounts late (see holdHydration)
  *
  * THE HEADLINE ASSERTION is not the one you would guess. `rangeIn` walks the
  * same textContent the offsets index, so "the painted text equals
@@ -175,6 +176,27 @@ function startServer(syncHits) {
   return new Promise((r) => server.listen(0, '127.0.0.1', () => r(server)));
 }
 
+/**
+ * `--hold-hydration <ms>`: every IndexedDB open answers that much later, so
+ * HydrationGate holds App back the way a slow disk or a busy machine does
+ * (under its 3 s store timeout, so nothing degrades). It is the regression
+ * knob for the race CI hit by chance (rv2, 2026-10-15): App mounted after a
+ * corpus finished loading, and an opener that read `__openAudioText` once
+ * found it missing.
+ */
+function holdHydration(page, ms) {
+  return page.evaluateOnNewDocument((hold) => {
+    const open = IDBFactory.prototype.open;
+    IDBFactory.prototype.open = function (...a) {
+      const req = open.apply(this, a);
+      let handler = null;
+      req.addEventListener('success', (e) => { if (handler) setTimeout(() => handler.call(req, e), hold); });
+      Object.defineProperty(req, 'onsuccess', { get: () => handler, set: (fn) => { handler = fn; } });
+      return req;
+    };
+  }, ms);
+}
+
 /** Serve the release bytes from disk without changing the URL the page asked for. */
 function interceptAudio(page, misses) {
   return page.setRequestInterception(true).then(() => {
@@ -301,6 +323,26 @@ const CORPUS_GLOBALS = {
   holydays: ['HOLY_DAYS'],
 };
 
+/**
+ * Wait for App to hand out its audio-to-text bridge before a NAV step plays
+ * anything. `__openAudioText` is assigned while App renders (screen-routes.jsx),
+ * and App renders only once HydrationGate's stores settle. The boot wait proves
+ * nothing here: index.html ships a splash inside #root, so "#root has children"
+ * holds before React mounts, and a corpus can finish loading before App does
+ * (rv2: CI's Bible arm, which runs first, failed "__openAudioText missing").
+ * Waiting before playLetter, not just before the open, also means App's mount
+ * never lands between queueing the track and opening its text.
+ */
+async function waitForAudioTextBridge(page) {
+  const ms = 30000;
+  try {
+    await page.waitForFunction("typeof window.__openAudioText === 'function'", { timeout: ms });
+    return { ok: true, reason: '' };
+  } catch (_e) {
+    return { ok: false, reason: '__openAudioText missing after ' + ms / 1000 + ' s (App never mounted)' };
+  }
+}
+
 /** WTLB One/Two, The Blessed, and the paragraph-shaped Holy Days entries. */
 const FORMAT_B_VOLS = new Set(['wtlb1', 'wtlb2', 'blessed']);
 
@@ -322,6 +364,8 @@ async function openEntry(page, volKey, entryId) {
     return false;
   }, entryId, CORPUS_GLOBALS[volKey] || []);
   if (!found) return { ok: false, reason: 'entry not in corpus (or has no paragraphs)' };
+  const bridge = await waitForAudioTextBridge(page);
+  if (!bridge.ok) return bridge;
   const queued = await page.evaluate((vk) => {
     AudioPlayer.playLetter({ volKey: vk, letter: window.__votE2EEntry, collectionLabel: 'e2e' });
     const st = AudioPlayer.getState();
@@ -354,6 +398,8 @@ async function openLetter(page, volKey, letterId) {
     return false;
   }, letterId, CORPUS_GLOBALS[volKey] || []);
   if (!found) return { ok: false, reason: 'letter not in corpus' };
+  const bridge = await waitForAudioTextBridge(page);
+  if (!bridge.ok) return bridge;
   // Start the audio, then use the app's OWN bridge to jump the reader to the
   // text that is playing — the listening desk's title button. Reaching the
   // reading screen the way a listener does beats inventing a nav path here.
@@ -405,6 +451,8 @@ async function openStudyChapter(page, chapterId) {
     return false;
   }, chapterId);
   if (!found) return { ok: false, reason: 'chapter not in BIBLE_STUDIES (or renders no blocks)' };
+  const bridge = await waitForAudioTextBridge(page);
+  if (!bridge.ok) return bridge;
   const queued = await page.evaluate(() => {
     AudioPlayer.playLetter({ volKey: 'study', letter: window.__votE2ELetter, collectionLabel: 'e2e' });
     const st = AudioPlayer.getState();
@@ -436,6 +484,8 @@ async function openStudyChapter(page, chapterId) {
 async function openBibleChapter(page, edition, bookId, chapterNum) {
   await page.evaluate(() => { window.__loadBibleCorpus(); });
   await page.waitForFunction('window.__bibleCorpus && window.__bibleCorpus.loaded', { timeout: 30000 });
+  const bridge = await waitForAudioTextBridge(page);
+  if (!bridge.ok) return bridge;
   const ok = await page.evaluate((ed, id, ch) => {
     window.__setBibleAudioEdition && window.__setBibleAudioEdition(ed);
     // BOOKS is an object keyed by book id, not an array.
@@ -714,6 +764,8 @@ async function run() {
     await page.setViewport({ width: 1280, height: 900 });
     const misses = new Set();
     await interceptAudio(page, misses);
+    const holdMs = Number(opt('hold-hydration', '0'));
+    if (holdMs > 0) await holdHydration(page, holdMs);
     page.on('pageerror', (e) => failures.push({ kind: 'PAGE-ERROR', detail: String(e).slice(0, 160) }));
     await page.goto(base + '/index.html', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction('document.querySelector("#root") && document.querySelector("#root").children.length > 0', { timeout: 30000 });

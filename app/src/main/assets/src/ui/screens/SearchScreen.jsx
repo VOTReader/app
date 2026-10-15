@@ -110,6 +110,8 @@ export function letterRefCards(p, D, win) {
 // a cap as the full count).
 export const SEARCH_LIMIT = 400;
 export const SEARCH_TOTAL_LIMIT = 6000;
+// Book order opens every collection; each shows its first ten in reading order (sr12).
+const SRCH_BOOK_FIRST_PAGE = 10;
 
 /* SEARCH COMES BACK AS THE READER LEFT IT (search audit 2026-09-27). Back from a
    result re-ran the search from nothing, and the screen's scroll was restored
@@ -385,8 +387,13 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // that sat beside it (All / Scriptures / Volumes / WTLB / Studies) were the
   // corpus row said twice on one screen, and the one place the app wrote
   // "WTLB"; deleted 2026-09-13 (catalogue SR1 + SR2).
+  // It used to re-sort inside the groups only: a long result set opens with every
+  // group closed under Best Matches, the one row it never touched, so the switch
+  // changed nothing a reader could see (Corbin 2026-10-14, sr12). Book order now
+  // drops Best Matches (relevance's row) and opens every collection in reading order.
   const [sortMode, setSortMode] = React.useState('relevance'); // 'relevance' | 'canonical'
   React.useEffect(() => { setSortMode('relevance'); }, [query]);
+  const bookOrder = sortMode === 'canonical';
   // Canonical book positions: the CONSTANT map (utils/search.js) — never
   // the lazy corpus, which usually isn't loaded on this screen (the first
   // cut read Object.keys(BOOKS) and silently no-opped; owner-caught).
@@ -415,13 +422,59 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // collection's letters, entries and topics by their number (Brianna,
   // 2026-09-26: the volumes in order, and the letters in each).
   const visibleGroups = React.useMemo(() => {
-    if (sortMode !== 'canonical') return grouped;
+    if (!bookOrder) return grouped;
     return grouped.map((g) => ({ key: g.key, items: srchSortCanonical(g.items, bookIndex) }));
-  }, [grouped, sortMode, bookIndex]);
-  // The toggle only matters when some group has two or more results to order.
-  const sortToggleVisible = React.useMemo(
-    () => visibleGroups.some((g) => g.items.length > 1),
-    [visibleGroups]
+  }, [grouped, bookOrder, bookIndex]);
+
+  // Book order on a passage search (sr13, the S22 10-14): "I am The Lord and I do not change" opened on
+  // Genesis 4:9, one of 1,344 texts holding a few of its words, all listed in reading order. The engine
+  // marks such a search's results `close` (the typed words together) or not: Book order lists the close
+  // ones, each collection in reading order, and the rest behind one line. A search with nothing marked
+  // (a keyword, a quote), or with every result on one side, lists them all as before.
+  const [showLoose, setShowLoose] = React.useState(false);
+  React.useEffect(() => { setShowLoose(false); }, [query]);
+  const closeSplit = React.useMemo(() => {
+    if (!bookOrder) return null;
+    const isClose = (/** @type {any} */ e) => e.close === true;
+    if (!state.results.some(isClose) || !state.results.some((/** @type {any} */ e) => e.close === false)) return null;
+    const part = (/** @type {boolean} */ want) => visibleGroups
+      .map((g) => ({ key: g.key, items: g.items.filter((e) => isClose(e) === want) }))
+      .filter((g) => g.items.length > 0);
+    const loose = part(false);
+    return { close: part(true), loose, looseCount: loose.reduce((n, g) => n + g.items.length, 0) };
+  }, [bookOrder, state.results, visibleGroups]);
+
+  /** One list of collections. `view` names the order and the list (each remembers its own open groups);
+      `capped`: the list can say a collection holds more than it shows ("400+"), which a close list never does. */
+  const renderGroups = (/** @type {Array<{key: string, items: any[]}>} */ groups, /** @type {string} */ view, /** @type {boolean} */ capped) => (
+    <div className="srch-groups">
+      {groups.map((g) => (
+        <SrchGroup
+          /* Keyed by the search: narrowed to Scriptures, the one group left
+             opens as a lone group does, not closed as the All list had it.
+             And by the order: each order opens with its own state, and the
+             group remembers each (a group opened under Relevance is open
+             again after a trip to Book order). */
+          key={g.key + '|' + memo + '|' + view}
+          gkey={g.key}
+          items={g.items}
+          capped={capped && cappedGroups.has(g.key)}
+          terms={state.terms}
+          onSelect={handleSelect}
+          memo={memo}
+          view={view}
+          /* Book order opens every collection with its first ten, so a phone
+             draws a few cards per collection, not fifty each. */
+          page={bookOrder && groups.length > 1 ? SRCH_BOOK_FIRST_PAGE : undefined}
+          /* A long result set opens as a contents list, every collection
+             closed under Best Matches, so the reader picks the collection;
+             opening the first five used to open whichever five ranked
+             highest, which in the site's order would be the Bible and
+             Volumes One to Four whatever the query. */
+          defaultOpen={bookOrder || groups.length === 1 || state.results.length <= 30}
+        />
+      ))}
+    </div>
   );
 
   // Build "direct" fake entries from parsed ref/passage/book (shown at top before results).
@@ -480,6 +533,9 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     }
     return top;
   }, [state.results, grouped.length, directEntries.length]);
+  // The switch matters when some group has two or more results to order, or when
+  // there is a Best Matches row for Book order to set aside.
+  const sortToggleVisible = topResults.length > 0 || visibleGroups.some((g) => g.items.length > 1);
 
   // Fuzzy book suggestion for did-you-mean — very conservative.
   // Only fires when the query is a SHORT single-token that plausibly looks
@@ -769,18 +825,21 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </div>
         )}
 
-        {/* [8] the relevance/book-order sort toggle for verse results — the row's one button. */}
+        {/* [8] the order switch: both orders named, the one in use lit, and a line saying what it does
+            (the old single button showed the OTHER order's name, which read as the current one). */}
         {sortToggleVisible && (
           <div className="srch-filter-row">
-            <button
-              className="srch-sort-btn"
-              aria-label={sortMode === 'relevance' ? 'Sort results in book order' : 'Sort results by relevance'}
-              onClick={() => setSortMode(sortMode === 'relevance' ? 'canonical' : 'relevance')}
-            >{sortMode === 'relevance' ? 'Book order' : 'Relevance'}</button>
+            <span className="srch-sort-note">{bookOrder ? 'Genesis to Revelation, then Volume One onward' : 'Best matches first'}</span>
+            <div className="srch-sort" role="group" aria-label="Order results">
+              <button type="button" className={'srch-sort-btn' + (bookOrder ? '' : ' active')} aria-pressed={!bookOrder}
+                onClick={() => setSortMode('relevance')}>Relevance</button>
+              <button type="button" className={'srch-sort-btn' + (bookOrder ? ' active' : '')} aria-pressed={bookOrder}
+                onClick={() => setSortMode('canonical')}>Book order</button>
+            </div>
           </div>
         )}
 
-        {topResults.length > 0 && (
+        {!bookOrder && topResults.length > 0 && (
           <div className="srch-top-results">
             <div className="srch-section-label">Best Matches</div>
             {topResults.map((entry, i) => (
@@ -789,31 +848,22 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </div>
         )}
 
-        {visibleGroups.length > 0 && (
-          <div className="srch-groups">
-            {visibleGroups.map((g) => (
-              <SrchGroup
-                /* Not keyed by the sort: toggling Book order must not close
-                   the group the reader opened (cards carry stable keys). */
-                /* ...but keyed by the search: narrowed to Scriptures, the one group left
-                   opens as a lone group does, not closed as the All list had it. */
-                key={g.key + '|' + memo}
-                gkey={g.key}
-                items={g.items}
-                capped={cappedGroups.has(g.key)}
-                terms={state.terms}
-                onSelect={handleSelect}
-                memo={memo}
-                /* A long result set opens as a contents list, every collection
-                   closed under Best Matches, so the reader picks the collection;
-                   opening the first five used to open whichever five ranked
-                   highest, which in the site's order would be the Bible and
-                   Volumes One to Four whatever the query. */
-                defaultOpen={visibleGroups.length === 1 || state.results.length <= 30}
-              />
-            ))}
-          </div>
-        )}
+        {closeSplit ? (
+          <>
+            <div className="srch-section-label srch-close-label">Closest matches</div>
+            {renderGroups(closeSplit.close, 'book', false)}
+            {showLoose ? (
+              <>
+                <div className="srch-section-label srch-loose-label">Partial matches</div>
+                {renderGroups(closeSplit.loose, 'book-more', true)}
+              </>
+            ) : (
+              <button type="button" className="srch-group-more srch-loose-more" onClick={() => setShowLoose(true)}>
+                Show {matchCountLabel(closeSplit.looseCount, state.capped.length > 0 || state.truncated)} partial {closeSplit.looseCount === 1 ? 'match' : 'matches'}
+              </button>
+            )}
+          </>
+        ) : visibleGroups.length > 0 && renderGroups(visibleGroups, bookOrder ? 'book' : 'relevance', true)}
 
         {query && state.phase === 'done' && letterRefMissing && (
           <div className="srch-corrected">{letterRefMissing}</div>

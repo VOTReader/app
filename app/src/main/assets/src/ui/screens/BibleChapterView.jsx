@@ -10,7 +10,7 @@ import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
 import { tapToggle } from '../../utils/tap-guard.js';
 import { bibleHlKey } from '../../utils/hl-keys.js';
-import { translateVerse, loadTranslation, translationLabel, holdTranslation, isTranslationLoaded } from '../../data/translations.js';
+import { translateVerse, loadTranslation, translationLabel, translationLang, holdTranslation, isTranslationLoaded } from '../../data/translations.js';
 import { recordingTranslationFor, textForRecording } from '../../utils/audio-text-edition.js';
 
 export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation: readerTranslation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
@@ -252,11 +252,14 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
 
           {(() => {
             const headingsVisible = showSectionHeadings && !headingsFocusHidden;
+            // A Spanish edition's verses carry lang="es" once its text is on the page
+            // (until then translateVerse answers with the English NKJV).
+            const verseLang = isTranslationLoaded(translation) ? translationLang(translation) : undefined;
             const renderVerse = (v, vi) => {
               const vHlKey = bibleHlKey(book.id, chapter.num, v.n);
               const vText = translateVerse(book.id, chapter.num, v, translation);
               return (
-                <span key={vi} id={`v-${v.n}`} className={`verse${highlightedVerses.includes(v.n) ? " verse-surprise" : ""}`}>
+                <span key={vi} id={`v-${v.n}`} lang={verseLang} className={`verse${highlightedVerses.includes(v.n) ? " verse-surprise" : ""}`}>
                   <span className="verse-num">{v.n}</span>
                   <HighlightableText text={vText} hlKey={vHlKey} />
                   <LinkIcon hlKey={vHlKey} onClick={onLinkOpen} />

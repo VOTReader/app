@@ -18,17 +18,23 @@ import { pathToFileURL } from 'node:url';
 
 const slash = (p) => String(p || '').replace(/\\/g, '/');
 
-/** The red tests in a vitest JSON report: [{file (repo-relative), test (full name)}]; a file that failed to load is one entry. */
+const firstLine = (s) => (String(s || '').split('\n').find((l) => l.trim()) || '').trim();
+
+/** The red tests in a vitest JSON report: [{file (repo-relative), test (full name), error (the first line of the first
+ *  failure message, so the next flake hunt can tell a timeout from a wrong value; nw27)}]; a file that failed to load
+ *  is one entry. */
 export function failedTests(report, root) {
   const base = slash(root || process.cwd()).replace(/\/$/, '') + '/';   // no resolve(): CI on Linux reads Windows paths too
   const rel = (f) => { const s = slash(f); return s.toLowerCase().startsWith(base.toLowerCase()) ? s.slice(base.length) : s; };
   const out = [];
   for (const file of report?.testResults || []) {
     const red = (file.assertionResults || []).filter((a) => a.status === 'failed');
-    for (const a of red) out.push({ file: rel(file.name), test: a.fullName || a.title || '(unnamed test)' });
+    for (const a of red) {
+      out.push({ file: rel(file.name), test: a.fullName || a.title || '(unnamed test)', error: firstLine((a.failureMessages || [])[0]).slice(0, 200) });
+    }
     if (!red.length && file.status === 'failed') {
-      const why = String(file.message || '').split('\n').find((l) => l.trim()) || 'no message';
-      out.push({ file: rel(file.name), test: `(file failed: ${why.trim().slice(0, 160)})` });
+      const why = firstLine(file.message) || 'no message';
+      out.push({ file: rel(file.name), test: `(file failed: ${why.slice(0, 160)})`, error: why.slice(0, 200) });
     }
   }
   return out;
@@ -53,7 +59,7 @@ export function recordFlakes({ tests, lane, sha, branch, swarmDir, now = new Dat
   const fresh = canPage ? [...new Map(tests.filter((t) => !seen.has(key(t))).map((t) => [key(t), t])).values()] : [];
   const pagedKeys = new Set(fresh.map(key));
   appendFileSync(log, tests.map((t) => JSON.stringify({
-    at: stamp(now), lane: lane || null, sha, branch, file: t.file, test: t.test, paged: pagedKeys.has(key(t)),
+    at: stamp(now), lane: lane || null, sha, branch, file: t.file, test: t.test, error: t.error || '', paged: pagedKeys.has(key(t)),
   }) + '\n').join(''));
   if (fresh.length) {
     const named = fresh.slice(0, 3).map(key).join('; ') + (fresh.length > 3 ? `; +${fresh.length - 3} more` : '');

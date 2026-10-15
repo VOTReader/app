@@ -11,7 +11,8 @@
         else the engine's first hit (the Best Matches row and the lone-group list both open on it).
      2. It belongs to the target's EQUIVALENCE CLASS: every unit whose text holds the remembered
         sentence, or a near copy of it with 80% of its word 3-grams (75-100% of letter sentences are
-        reprinted elsewhere), the verse a sentence quotes, Matthew Study and plain Matthew c:v as
+        reprinted elsewhere), the verse a sentence quotes (word for word or such a near copy),
+        Matthew Study and plain Matthew c:v as
         one, a unit-level target's own unit and its same-titled reprints.
      3. It is the class's ORIGINAL: no member of a better tier exists (letters > Words To Live By and
         The Blessed > Holy Days > studies > Answers; the verse itself for a verse).
@@ -20,6 +21,9 @@
         holding the sentence, and the excerpt overlaps the sentence. A verse lands on itself.
    STRICT: a pass whose first hit is the target's own unit. Also reported: the class's best rank,
    top 5, found. 100 cases are HELD OUT: counted, never printed (tuning must not read them).
+   FRESH: 100 more (search-bench/fresh-cases.json, make-fresh.mjs), written by another model family that
+   never saw the engine or this bench, sealed the same way and scored on their own line (path to ~475,
+   2026-10-15): a change ships only when the unseen sets, held + fresh, rise with it.
 
      node tools/search-bench.mjs              run, print the score, failures of the open cases
      node tools/search-bench.mjs --json out   also write every case's outcome
@@ -30,6 +34,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { docs as buildDocs, blocks as buildBlocks, engine, kjvVerses, unitKey, norm, ASSETS } from './search-bench/corpus.mjs';
+import { heldShare, recurring, reprintShown } from './search-bench/rules.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -40,6 +45,8 @@ const t0 = Date.now();
 
 // SEARCH_BENCH_CASES: another cases file (the fairness audit tries candidate queries on a copy)
 const { cases } = JSON.parse(fs.readFileSync(process.env.SEARCH_BENCH_CASES || path.join(HERE, 'search-bench/cases.json'), 'utf8'));
+const FRESH = path.join(HERE, 'search-bench/fresh-cases.json');
+if (!process.env.SEARCH_BENCH_CASES && fs.existsSync(FRESH)) for (const c of JSON.parse(fs.readFileSync(FRESH, 'utf8')).cases) cases.push({ ...c, held: true, set: 'fresh' });
 const { E, initMs, meaning } = await engine();
 const { kjvEncode } = await import(pathToFileURL(path.join(ASSETS, 'src/search/tokenize.js')).href);
 const { excerptLanding } = await import(pathToFileURL(path.join(ASSETS, 'src/utils/excerpt-landing.js')).href);
@@ -89,7 +96,20 @@ for (const [book, chs] of Object.entries(KJV)) for (const [ch, vs] of Object.ent
 for (let i = verseNorm.length - 1; i >= 0; i--) if (verseNorm[i][1].split(' ').length < 8) verseNorm.splice(i, 1);
 // ...with His name restored too: a study quotes Luke 7:9 as "When YahuShua heard these things".
 const named = (t) => t.replace(/ (?:yahushua|yeshua|yahshua|yahusha|yeshu) /g, ' jesus ').replace(/ (?:yahushua|yeshua|yahshua|yahusha|yeshu) /g, ' jesus ');
-const versesQuoted = (sentence) => { const n = named(norm(sentence)); return verseNorm.filter(([, t]) => t.includes(n) || n.includes(t)).map(([k]) => k); };
+// ...or as a near copy, the same 80%-of-3-grams rule as a prose holder, either way round (a study quotes Acts 20:16 as
+// "for he hurried" where the KJV has "for he hasted"; a sentence holds a verse with a word changed). sr11, 2026-10-15.
+const verseWords = verseNorm.map(([, t]) => t.trim().split(' '));
+const verseGrams = new Map();
+verseWords.forEach((w, i) => { for (let j = 0; j + 3 <= w.length; j++) { const g = w[j] + ' ' + w[j + 1] + ' ' + w[j + 2]; const a = verseGrams.get(g); if (!a) verseGrams.set(g, [i]); else if (a[a.length - 1] !== i) a.push(i); } });
+const versesQuoted = (sentence) => {
+  const n = named(norm(sentence));
+  const out = new Set(verseNorm.filter(([, t]) => t.includes(n) || n.includes(t)).map(([k]) => k));
+  const w = n.trim().split(' ');
+  const shared = new Map();
+  for (const g of new Set(w.slice(0, -2).map((x, j) => x + ' ' + w[j + 1] + ' ' + w[j + 2]))) for (const i of verseGrams.get(g) || []) shared.set(i, (shared.get(i) || 0) + 1);
+  for (const [i, k] of shared) if (k >= 4 && (heldShare(w, verseWords[i]) >= 0.8 || heldShare(verseWords[i], w) >= 0.8)) out.add(verseNorm[i][0]);
+  return [...out];
+};
 const titleNorm = {};
 for (const k of proseKeys) { const t = norm(unitBlocks[k][0].title); (titleNorm[t] || (titleNorm[t] = [])).push(k); }
 const matthewTwin = (uk) => {
@@ -97,25 +117,47 @@ const matthewTwin = (uk) => {
   return m ? ['bible/matthew-plain:' + m[1] + ':' + m[2], 'matthew-study/matthew:' + m[1] + ':' + m[2]] : [uk];
 };
 
-/** The target's equivalence class and the tier its original sits in. */
+// CONTAINMENT (rules.mjs): the texts holding 80% of a whole-text target asked for by its subject. Candidates first: texts holding 80% of its
+// distinct words found in under a tenth of the texts, then the 3-gram window rule on those.
+const proseWords = proseNorm.map((t) => t.trim().split(' '));
+const wordUnits = new Map();
+proseWords.forEach((ws, i) => { for (const x of new Set(ws)) { const a = wordUnits.get(x); if (a) a.push(i); else wordUnits.set(x, [i]); } });
+const containers = (uk) => {
+  const at = proseKeys.indexOf(uk);
+  if (at < 0) return [];
+  const rare = [...new Set(proseWords[at])].filter((x) => wordUnits.get(x).length < proseKeys.length / 10);
+  const n = new Map();
+  for (const x of rare) for (const i of wordUnits.get(x)) if (i !== at) n.set(i, (n.get(i) || 0) + 1);
+  return [...n].filter(([i, k]) => k >= 0.8 * rare.length && heldShare(proseWords[at], proseWords[i]) >= 0.8).map(([i]) => proseKeys[i]);
+};
+const isVerseKey = (k) => /^(bible|matthew-study)\//.test(k);
+const isLetterKey = (k) => /^(v[1-7]|timothy|flock|rebuke)\//.test(k);
+
+/** The target's equivalence class, the tier its original sits in, and whether it has one original at all. */
 function classOf(c) {
   const members = new Set();
   if (c.level === 'verse') {
     for (const k of matthewTwin(c.uk)) members.add(k);
-    return { members, best: 0 };
+    return { members, best: 0, recurring: false };
   }
   if (c.level === 'unit') {
     members.add(c.uk);
     for (const k of titleNorm[norm(c.title)] || []) members.add(k);
+    // ...by its subject, any copy of it answers; a title names its own text (same-titled reprints above)
+    if (c.style === 'unitgist') for (const k of containers(c.uk)) members.add(k);
   } else {
     for (const k of holders(c.sentence)) members.add(k);
     if (c.level === 'sentence') for (const k of versesQuoted(c.sentence)) for (const t of matthewTwin(k)) members.add(t);
     // An Answers heading that cites a letter ("Excerpt from: Let All in the Earth Be Brought into...") has that letter as its original.
     const cited = /^excerpt from:\s*(.+)$/i.exec(c.sentence.trim());
     if (cited) for (const k of titleNorm[norm(cited[1])] || []) members.add(k);
+    // So does a heading that is a text's own title, with or without a note after it ("Stop Lying to Your Children
+    // (Regarding Santa, the Easter Bunny...)" heads the Words To Live By entry the topic reprints under it).
+    const head = norm(c.sentence.trim().replace(/\s*\([^()]*\)$/, ''));
+    if (head.trim().split(' ').length >= 3) for (const k of titleNorm[head] || []) if (k !== c.uk) members.add(k);
     members.add(c.uk);
   }
-  return { members, best: Math.min(...[...members].map(TIER)) };
+  return { members, best: Math.min(...[...members].map(TIER)), recurring: recurring(members, isVerseKey, isLetterKey) };
 }
 
 /* FAIR TO ASK? (path to 500, step 3, 2026-10-05). `--audit <out.json>`: for every case, the texts outside its
@@ -196,7 +238,7 @@ function lands(hit, terms, c) {
   // A hit the meaning found names the passage it matched (use-search.js excerptAnchor: entry.placeStart).
   const placed = typeof hit.placeStart === 'number' && hit.placeStart >= 0 && hit.placeStart < doc.text.length;
   const ex = placed ? doc.text.slice(hit.placeStart, hit.placeStart + 48)
-    : (own.length ? E.matchExcerpt(doc.text, own) : '') || (extra.length ? E.matchExcerpt(doc.text, own.concat(extra)) : '');
+    : (own.length ? E.matchExcerpt(doc.text, own, undefined, extra) : '') || (extra.length ? E.matchExcerpt(doc.text, own.concat(extra)) : '');
   const bl = unitBlocks[unitKey(doc)] || [];
   if (!ex || !bl.length) return false;
   const { index, off } = excerptLanding(ex, bl.map((b) => b.text), own.concat(extra));
@@ -228,42 +270,51 @@ for (const c of cases) {
   else if (f.card) { pass = cardPasses(f, c); strict = pass; if (!pass) why = 'a ' + f.card + ' card leads'; }
   else {
     const k = unitKey(f.hit.doc);
+    const card = (d) => (d.title || d.ref || '') + '|' + String(d.text || '').slice(0, 80);
+    const twin = (a, b) => matthewTwin(a).includes(b);
     if (!cls.members.has(k)) why = 'first hit is not the target (' + (f.hit.doc.ref || k) + ')';
-    else if (TIER(k) > cls.best) why = 'a reprint leads the original (' + (f.hit.doc.ref || k) + ')';
+    else if (!cls.recurring && TIER(k) > cls.best) why = 'a reprint leads the original (' + (f.hit.doc.ref || k) + ')';
     else if (c.level === 'sentence' && !lands(f.hit, cardTerms(r), c)) why = 'lands off the sentence';
+    else if (!cls.recurring && !reprintShown(res.map((h) => ({ key: unitKey(h.doc), card: card(h.doc) })), cls.members, k, twin)) why = 'its reprint is not in the Best Matches';
     else { pass = true; strict = matthewTwin(c.uk).includes(k) || k === c.uk; }
   }
-  out.push({ id: c.id, held: !!c.held, group: c.group, col: c.col, style: c.style, q: c.q, pass, strict, rank, top5: !!rank && rank <= 5, found: !!rank, why, ms: times[times.length - 1] });
+  // the rank of the class's next text after the first hit (its reprint, when the original leads)
+  const next = f && f.hit ? (res.findIndex((h, i) => i > 0 && cls.members.has(unitKey(h.doc)) && !matthewTwin(unitKey(h.doc)).includes(unitKey(f.hit.doc))) + 1) || null : null;
+  out.push({ id: c.id, held: !!c.held, set: c.set || 'bench', next, members: cls.members.size, recurring: cls.recurring, group: c.group, col: c.col, style: c.style, q: c.set === 'fresh' ? undefined : c.q, pass, strict, rank, top5: !!rank && rank <= 5, found: !!rank, why, ms: times[times.length - 1] });
 }
 
 // ── report ──
 const sum = (rows) => ({ n: rows.length, pass: rows.filter((o) => o.pass).length, strict: rows.filter((o) => o.strict).length, top5: rows.filter((o) => o.top5).length, found: rows.filter((o) => o.found).length });
 const by = (rows, k) => Object.fromEntries([...new Set(rows.map((o) => o[k]))].sort().map((v) => [v, sum(rows.filter((o) => o[k] === v))]));
-const all = sum(out);
+const bench = out.filter((o) => o.set !== 'fresh');
+const fresh = out.filter((o) => o.set === 'fresh');
+const all = sum(bench);
 const sorted = times.slice().sort((a, b) => a - b);
 const pct = (p) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
 const fmt = (s) => `${s.pass}/${s.n} pass  (strict ${s.strict}, top5 ${s.top5}, found ${s.found})`;
 console.log(`search-bench: ${fmt(all)}`);
-console.log(`  open ${fmt(sum(out.filter((o) => !o.held)))}`);
-console.log(`  held ${fmt(sum(out.filter((o) => o.held)))}`);
+console.log(`  open ${fmt(sum(bench.filter((o) => !o.held)))}`);
+console.log(`  held ${fmt(sum(bench.filter((o) => o.held)))}`);
+if (fresh.length) console.log(`  fresh ${fmt(sum(fresh))}  (sealed, another writer)`);
 console.log(`  meaning model: ${meaning.status}${meaning.failure ? ' (' + meaning.failure + ')' : ''}`);
 console.log(`  init ${initMs} ms, query median ${pct(0.5)} ms, p95 ${pct(0.95)} ms, max ${sorted[sorted.length - 1]} ms, total ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 const table = (title, o) => { console.log(title); for (const [k, s] of Object.entries(o)) console.log('  ' + k.padEnd(16) + String(s.pass).padStart(4) + ' /' + String(s.n).padStart(4) + '   top5 ' + String(s.top5).padStart(3) + '  found ' + String(s.found).padStart(3)); };
-table('by style', by(out, 'style'));
-table('by collection', by(out, 'group'));
+table('by style', by(bench, 'style'));
+table('by collection', by(bench, 'group'));
 if (!flag('--quiet')) {
   console.log('failures (open cases only):');
   for (const o of out.filter((x) => !x.pass && !x.held)) console.log(`  ${o.id} [${o.style}/${o.col}] ${JSON.stringify(o.q)} -> ${o.why}${o.rank ? ' (target at #' + o.rank + ')' : ' (not found)'}`);
 }
 if (val('--json')) fs.writeFileSync(val('--json'), JSON.stringify(out, null, 1));
 
-const score = { pass: all.pass, strict: all.strict, top5: all.top5, found: all.found, style: Object.fromEntries(Object.entries(by(out, 'style')).map(([k, s]) => [k, s.pass])), group: Object.fromEntries(Object.entries(by(out, 'group')).map(([k, s]) => [k, s.pass])) };
+const score = { pass: all.pass, strict: all.strict, top5: all.top5, found: all.found, style: Object.fromEntries(Object.entries(by(bench, 'style')).map(([k, s]) => [k, s.pass])), group: Object.fromEntries(Object.entries(by(bench, 'group')).map(([k, s]) => [k, s.pass])), ...(fresh.length ? { fresh: sum(fresh).pass } : {}) };
 if (flag('--record')) { fs.writeFileSync(BASELINE, JSON.stringify(score, null, 1) + '\n'); console.log('recorded the floor:', BASELINE); process.exit(0); }
 if (!out.length) { console.error('NOTHING-CHECKED'); process.exit(1); }
 if (fs.existsSync(BASELINE)) {
   const floor = JSON.parse(fs.readFileSync(BASELINE, 'utf8'));
   const drops = [];
   if (score.pass < floor.pass) drops.push(`pass ${score.pass} < floor ${floor.pass}`);
+  if (floor.fresh != null && fresh.length && score.fresh < floor.fresh) drops.push(`fresh ${score.fresh} < floor ${floor.fresh}`);
   for (const sec of ['style', 'group']) for (const [k, n] of Object.entries(floor[sec] || {})) if ((score[sec][k] || 0) < n) drops.push(`${sec} ${k} ${score[sec][k] || 0} < ${n}`);
   if (drops.length) { console.error('search-bench FAILED: ' + drops.join('; ')); process.exit(1); }
   console.log(`floor held (pass ${floor.pass})${score.pass > floor.pass ? `; raised by ${score.pass - floor.pass}: run with --record to keep it` : ''}`);

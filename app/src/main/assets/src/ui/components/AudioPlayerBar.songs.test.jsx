@@ -311,9 +311,13 @@ describe('the listening desk in song mode (final-04)', () => {
       emit('playing');
       const desk = openDesk();
       expect(await within(desk).findByText('Come, love awaits you')).toBeTruthy();
+      // CI's order (flaked 10-15, run 38702531793): a frame lands before the page's clock moves, so the card
+      // already holds a frame reading (-1 at 0 s) and keeps it until its next frame reads the new time.
+      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
       at(14);
+      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
       expect(desk.querySelector('.song-lyrics-line.is-now').textContent).toBe('Come, love awaits you');
-      el().readyState = 4;                           // a playing element has its metadata (getPreciseTime reads it then)
+      el().readyState = 4;                         // a playing element has its metadata (getPreciseTime reads it then)
       el().currentTime = 15.3;                       // no timeupdate yet: the page's clock still says 14
       await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
       expect(desk.querySelector('.song-lyrics-line.is-now').textContent).toBe('The door is open wide');

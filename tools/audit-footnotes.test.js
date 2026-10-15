@@ -3,17 +3,15 @@
  * load must fail the gate, and a dict problem counts once. Before the fix a
  * LOAD ERROR was logged and skipped, so a deleted or unparsable volume passed
  * with exit 0, and a bad dict value was counted in both `problems` and
- * `dictHard`. Each case runs the real CLI against a stub data directory
- * (AUDIT_FOOTNOTES_DATA_DIR) of empty collections.
+ * `dictHard`. Each case runs the tool's main() in-process against a stub data
+ * directory of empty collections: a cold node per case (5 per file) timed out
+ * under a loaded pre-push (nw27, as hone-bible-sample in bc06316c3).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { spawnSync } from 'child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
-import { join, resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-const TOOL = resolve(dirname(fileURLToPath(import.meta.url)), 'audit-footnotes.js');
+import { join } from 'path';
+import { main } from './audit-footnotes.js';
 
 // Every file and global the tool reads, as an empty collection.
 const STUBS = {
@@ -42,10 +40,9 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 function check() {
-  return spawnSync(process.execPath, [TOOL, '--check'], {
-    encoding: 'utf-8',
-    env: { ...process.env, AUDIT_FOOTNOTES_DATA_DIR: dir },
-  });
+  let stdout = '', stderr = '';
+  const status = main(['--check'], { dataDir: dir, log: (s) => { stdout += s + '\n'; }, error: (s) => { stderr += s + '\n'; } });
+  return { status, stdout, stderr };
 }
 
 describe('audit-footnotes --check', () => {

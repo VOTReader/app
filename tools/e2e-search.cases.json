@@ -53,6 +53,10 @@
     { "q": "Volume Seven, Letter 55", "parse": { "kind": "ref-letter", "volumeId": "v7", "letterNum": 55 }, "why": "search audit: a letter named with words and a comma" },
     { "q": "v7 55", "parse": { "kind": "ref-letter", "volumeId": "v7", "letterNum": 55 }, "why": "search audit: a letter named fast" },
     { "q": "words to live by 95", "parse": { "kind": "ref-letter", "volumeId": "wtlb1", "letterNum": 95 }, "why": "search audit: read Part Two ([12one two] took the space)" },
-    { "q": "letter 55", "parse": { "kind": "ref-letter", "anyVolume": true, "letterNum": 55 }, "why": "search audit: the card went to Volume Two's Letter 55, which does not exist" }
+    { "q": "letter 55", "parse": { "kind": "ref-letter", "anyVolume": true, "letterNum": 55 }, "why": "search audit: the card went to Volume Two's Letter 55, which does not exist" },
+    { "q": "I am The Lord and I do not change", "close": ["Malachi 3:6", "Volume One · Letter 14", "Volume Seven · Letter 64"], "loose": ["Genesis 4:9", "Isaiah 45:5", "Exodus 6:7"], "why": "sr13, the S22 10-14: Book order opened on Genesis 4:9 (a few of its words); it lists the close matches first" },
+    { "q": "\"love one another\" brethren", "top": 1, "ref": "1 Peter 1:22", "why": "sweep 10-14 v001: the bare word beside the quoted phrase was ignored (25 texts, none with brethren)" },
+    { "q": "\"and it was so\"", "top": 1, "ref": "Genesis 1:7", "why": "sweep 10-14 v016: a quoted phrase of small words found nothing ('stop words only')" },
+    { "q": "rebuke one", "parse": { "kind": "ref-letter", "volumeId": "rebuke", "letterNum": 1 }, "top": 1, "ref": "Proverbs 19:25", "why": "sweep 10-14 v102: read as a letter only, the verse holding the words was never searched" }
   ]
 }

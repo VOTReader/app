@@ -19,6 +19,8 @@
      corrected  the word a typo must be corrected to; null = no correction at all
      places     { minimum: n }: the intended result's text must hold at least n
                 find-bar places for the card's terms (what the reader steps through)
+     close / loose  refs that must be among the results marked close (the typed words
+                together: Book order lists them first) / marked not close (sr13)
      why        who found it, or what it guards
    A run that checks nothing fails. Exit 1 on any failing case, with a line each.
 
@@ -78,7 +80,7 @@ try {
             if (p[k] !== c.parse[k]) res.problems.push('parse.' + k + ' = ' + JSON.stringify(p[k]) + ', want ' + JSON.stringify(c.parse[k]));
           }
         }
-        if (c.top || c.corrected !== undefined || c.places) {
+        if (c.top || c.corrected !== undefined || c.places || c.close || c.loose) {
           const r = await E.search(c.q, { limit: 6000, perVolume: 400, corpus: c.corpus || 'all' });
           const results = r.results || [];
           const at = (c.ref || c.title || c.letterId) ? results.findIndex((x) => matches(x.doc, c)) : -1;
@@ -88,6 +90,13 @@ try {
           if (c.corrected !== undefined) {
             const got = (r.corrections || []).map((x) => x.to);
             if (c.corrected === null ? got.length : got[0] !== c.corrected) res.problems.push('corrected to ' + JSON.stringify(got) + ', want ' + JSON.stringify(c.corrected));
+          }
+          for (const [want, refs] of [[true, c.close || []], [false, c.loose || []]]) {
+            for (const ref of refs) {
+              const hit = results.find((x) => x.doc.ref === ref);
+              if (!hit) res.problems.push(ref + ' absent');
+              else if (hit.close !== want) res.problems.push(ref + ' close=' + hit.close + ', want ' + want);
+            }
           }
           if (c.places) {
             const hit = at >= 0 ? results[at] : null;

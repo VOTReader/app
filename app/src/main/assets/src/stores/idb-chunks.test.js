@@ -11,6 +11,9 @@ import {
   INLINE_MAX_CHARS, CHUNK_CHARS, PIECES_PER_TX, isChunkKey, chunkOwner, isManifest, jsonExact, chunkText,
   writeValue, deleteValue, getValue, assemble, foldRows, writeQueue,
 } from './idb-chunks.js';
+// Static, so the spy below is on the copy idb-chunks.js logs through: a test further down calls vi.resetModules(),
+// after which a dynamic import would hand back a fresh copy that no write uses.
+import { DiagnosticLog } from '../utils/diagnostic-log.js';
 
 const DB = 'idb-chunks-test';
 let db;
@@ -185,7 +188,6 @@ describe('refuter findings (10-11)', () => {
   });
 
   it('a big value JSON would not carry exactly is logged once, then stored whole', async () => {
-    const { DiagnosticLog } = await import('../utils/diagnostic-log.js');
     const warn = vi.spyOn(DiagnosticLog, 'warn');
     const v = { big: 'x'.repeat(INLINE_MAX_CHARS * 2), when: new Date(5) };
     await writeValue(db, 's', 'odd', v);

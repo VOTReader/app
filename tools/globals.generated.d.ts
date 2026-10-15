@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 615 distinct identifiers.
+// Total: 616 distinct identifiers.
 
 // Cross-bundle bare-name globals — `any` by design, except React and
 // ReactDOM, typed from @types/react 18 (TYPED_GLOBALS in the generator).
@@ -60,6 +60,7 @@ declare const BIBLE_KJV: any;
 declare const BIBLE_LSV: any;
 declare const BIBLE_RKJV: any;
 declare const BIBLE_RNKJV: any;
+declare const BIBLE_RVR: any;
 declare const BIBLE_STUDIES: any;
 declare const BIBLE_SYNC_BRM_KJV: any;
 declare const BIBLE_SYNC_TSOT_MATTHEW: any;

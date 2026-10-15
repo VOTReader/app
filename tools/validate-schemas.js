@@ -2034,6 +2034,8 @@ const FORMAT_E_TRANSLATIONS = [
   { file: 'bible-lsv.js', varName: 'BIBLE_LSV' },
   { file: 'bible-web.js', varName: 'BIBLE_WEB' },
   { file: 'bible-ylt.js', varName: 'BIBLE_YLT' },
+  // Reina-Valera 1960, Spanish (tools/regen-rvr.js, es1 2026-10-14): KJV verse numbering, every verse.
+  { file: 'bible-rvr.js', varName: 'BIBLE_RVR' },
   // Restored-Name NT overlays (tools/gen-restored-nt.mjs) — sparse: only
   // changed verses; completeness is skipped, subset-vs-reference is enforced.
   { file: 'bible-rnkjv.js', varName: 'BIBLE_RNKJV', sparse: true },

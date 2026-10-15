@@ -186,6 +186,23 @@ describe('VotSearchMini engine', () => {
     const { results } = await VotSearchMini.search('shepherd');
     expect(results.length).toBeGreaterThan(0);
   });
+
+  /* A search past its wait for the index when "rebuild the index" dropped it (sweep 2026-10-14 v061) went on with
+     no index: no results, or a TypeError on a word. It waits for the new index instead. */
+  it('a search under way when rebuild() drops the index answers from the new one', async () => {
+    const pending = VotSearchMini.search('shepherd');
+    const rebuilt = VotSearchMini.rebuild();
+    const { results } = await pending;
+    await rebuilt;
+    expect(results.length).toBeGreaterThan(0);
+  });
+
+  /* A space alone filled the suggestions with every named passage and book (sweep 2026-10-14 v053): it was
+     checked for emptiness before it was trimmed. */
+  it('suggest() offers nothing for a query of spaces', () => {
+    expect(VotSearchMini.suggest(' ')).toEqual([]);
+    expect(VotSearchMini.suggest('   ')).toEqual([]);
+  });
 });
 
 /* search-6 — THE PARSE NEEDS NO INDEX AND MUST NOT WAIT FOR ONE.

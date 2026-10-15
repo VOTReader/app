@@ -90,6 +90,19 @@ describe('matchExcerpt — where a search hit LANDS in its letter', () => {
     expect(matchExcerpt('', ['still'])).toBe('');
     expect(matchExcerpt(text, [])).toBe('');
   });
+  // search sr11 (2026-10-15, bench t238): "gods people obey his commandments and enjoy keeping the sabbath" found
+  // the letter by "keep", but the excerpt counted only the typed spellings, so "keeping" met nothing and the line
+  // holding "obey" (rarer) opened instead of "My people are those who keep My Commandments".
+  it('counts the engine\'s matched words that are another form of a typed word, not its prefix finds', () => {
+    const letter = 'For those who obey My Commandments remain in My love, and those who remember My Sabbaths keep My company. '
+      + 'Why, O churches of men, do you forsake My Sabbaths? For My people are those who keep My Commandments and take pleasure in My Sabbaths.';
+    const typed = ['people', 'obey', 'commandments', 'keeping'];
+    expect(matchExcerpt(letter, typed).startsWith('obey My Commandments')).toBe(true);   // the typed spellings alone
+    expect(matchExcerpt(letter, typed, undefined, ['keep', 'god']).startsWith('people are those who keep')).toBe(true);
+    // a prefix find of a typed word ("these" for "the") is no form of it and counts nothing
+    const t2 = 'these are they. And the voice said: the end is near.';
+    expect(matchExcerpt(t2, ['the', 'voice'], 12, ['these'])).toBe(matchExcerpt(t2, ['the', 'voice'], 12));
+  });
 });
 
 /* Whole words only (2026-09-22). The reader audit searched "love one another" at

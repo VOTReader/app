@@ -36,6 +36,7 @@ beforeEach(() => {
   globalThis.AUDIO_MANIFEST = { 'one:a': [['idA', 'B']], 'one:b': [['idB', 'B']] };
   localStorage.removeItem('vot-audio-pos');
   AudioPlayer.stop();
+  AudioPlayer.setPlaybackRate(1);   // the reading speed outlives stop(): one test plays at 2x
 });
 afterEach(() => {
   AudioPlayer.stop();

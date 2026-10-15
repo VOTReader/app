@@ -8,31 +8,26 @@
    client that had built an index under that version kept restoring it. `--check` now refuses a lock
    whose version is not cache.js's, so the version a lock names is always the one its code shipped under.
 
-   HOW: the check-corpus-version.test.js harness: the gate resolves its paths from import.meta.url and
-   exports nothing, so each case mirrors it into a throwaway tree and runs it as a child process. */
+   HOW: each case builds a throwaway tree and runs the gate's main() in-process against it (root option). It
+   used to copy the gate there and spawn a cold node per run, and those spawns timed out under a loaded
+   pre-push (nw27, as hone-bible-sample in bc06316c3). */
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { spawnSync } from 'child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync, appendFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, appendFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { join, resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const GATE = resolve(HERE, 'check-search-index-version.js');
+import { join } from 'path';
+import { main } from './check-search-index-version.js';
 
 const mirrors = [];
 afterEach(() => { for (const m of mirrors.splice(0)) rmSync(m, { recursive: true, force: true }); });
 
 const cacheJs = (v) => `export const MS_INDEX_VERSION = '${v}';\nexport const sig = () => 'v:' + MS_INDEX_VERSION;\n`;
 
-/** A throwaway tree: the real gate, a cache.js at `version`, and a stub of every index-shaping file. */
+/** A throwaway tree: a cache.js at `version`, a stub of every index-shaping file, and tools/ for the lock. */
 function mirror(version) {
   const root = mkdtempSync(join(tmpdir(), 'vot-search-index-version-'));
   mirrors.push(root);
-  writeFileSync(join(root, 'package.json'), '{ "type": "module" }\n');
   mkdirSync(join(root, 'tools'), { recursive: true });
-  copyFileSync(GATE, join(root, 'tools', 'check-search-index-version.js'));
   const src = join(root, 'app', 'src', 'main', 'assets', 'src');
   mkdirSync(join(src, 'search', 'vendor'), { recursive: true });
   mkdirSync(join(src, 'utils'), { recursive: true });
@@ -43,8 +38,9 @@ function mirror(version) {
 }
 
 function runGate(root, args = []) {
-  const r = spawnSync(process.execPath, [join(root, 'tools', 'check-search-index-version.js'), ...args], { encoding: 'utf8', cwd: root });
-  return { status: r.status, all: (r.stdout || '') + (r.stderr || '') };
+  let all = '';
+  const out = (s) => { all += s + '\n'; };
+  return { status: main(args, { root, log: out, error: out }), all };
 }
 
 describe('check-search-index-version', () => {

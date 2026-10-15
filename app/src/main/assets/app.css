@@ -3794,10 +3794,14 @@
        hidden scrollbar, where a reader at 1.8x could not know a third chip existed (a11y-ux-6). */
     .srch-filter-row { display:flex; flex-wrap:wrap; gap:0.35rem; padding:0.55rem 1.2rem 0.15rem; overflow-x:auto; scrollbar-width:none; align-items:center; }
     .srch-filter-row::-webkit-scrollbar { display:none; }
-    .srch-sort-btn { flex:0 0 auto; margin-left:auto; background:none; border:none; border-bottom:1px dashed var(--gold-border); padding:0.3rem 0.1rem; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); cursor:pointer; white-space:nowrap; }
-    .srch-sort-btn { position:relative; }
-    .srch-sort-btn::after { content:''; position:absolute; inset:-6px -4px; } /* 22 px tall drawn, 34 px to a finger (see .fn-ref::after) */
-    .srch-sort-btn:active { color:var(--gold); }
+    /* The order switch (sr12): both orders named, the one in use lit like the corpus pills, a line
+       on the left saying what it does. Each half is a real 28 px pill, so the two never share a finger. */
+    .srch-sort-note { flex:1 1 8rem; min-width:0; font-family:var(--font-garamond); font-style:italic; font-size:var(--fs-13); color:var(--cream-muted); }
+    .srch-sort { flex:0 0 auto; margin-left:auto; display:inline-flex; border:1px solid var(--gold-border); border-radius:20px; overflow:hidden; }
+    .srch-sort-btn { flex:0 0 auto; background:transparent; border:none; padding:0.45rem 0.75rem; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--cream-muted); cursor:pointer; white-space:nowrap; transition:background 0.18s, color 0.18s; }
+    .srch-sort-btn + .srch-sort-btn { border-left:1px solid var(--gold-border); }
+    .srch-sort-btn.active { background:var(--gold-faint); color:var(--gold-bright); }
+    .srch-sort-btn:active { background:rgba(200,164,86,0.15); }
 
     /* ── SEARCH v2 (Orama) ── */
 
@@ -3908,6 +3912,8 @@
     .srch-clear-btn:active { color:var(--gold); }
 
     .srch-section-label { padding:0.45rem 1rem 0.2rem; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); }
+    /* Book order's two lists on a passage search (sr13): the loose matches start under a rule, as Best Matches ends on one */
+    .srch-loose-label, .srch-loose-more { border-top:2px solid var(--gold-border); margin-top:0.3rem; }
     .nav-search-btn { background:none; border:none; cursor:pointer; color:var(--gold); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; flex-shrink:0; }
     .top-nav :is(.nav-search-btn,.settings-gear-btn,.nav-theme-btn):active { background:var(--gold-faint); }
     @media (hover:hover) { .top-nav :is(.nav-search-btn,.settings-gear-btn,.nav-theme-btn):hover { background:var(--gold-faint); color:var(--gold-bright); } }

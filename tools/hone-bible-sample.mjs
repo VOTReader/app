@@ -11,46 +11,34 @@
  * (UNSPOKEN or never placed). QA artifact, not app code.
  */
 import { readFileSync, writeFileSync } from 'fs';
+import { resolve } from 'path';
+import { fileURLToPath } from 'url';
 
 const USAGE = 'usage: node tools/hone-bible-sample.mjs <verses.json> <timings.json> <out-html> [--edition-title <str>]';
-let editionTitle = 'The Word of Promise (dramatized NKJV)';
-const pos = [];
-const argv = process.argv.slice(2);
-for (let i = 0; i < argv.length; i++) {
-  const a = argv[i];
-  if (a === '--edition-title') editionTitle = argv[++i] || '';
-  else if (a.startsWith('--edition-title=')) editionTitle = a.slice('--edition-title='.length);
-  else pos.push(a);
-}
-const [versesPath, timingsPath, outPath] = pos;
-if (!versesPath || !timingsPath || !outPath) {
-  console.error(USAGE);
-  process.exit(1);
-}
-const vdata = JSON.parse(readFileSync(versesPath, 'utf8'));
-const tdata = JSON.parse(readFileSync(timingsPath, 'utf8'));
-const mp3 = readFileSync(tdata.audio);
-const dataUri = 'data:audio/mpeg;base64,' + mp3.toString('base64');
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-const byN = new Map(tdata.verses.map((r) => [r.n, r]));
-let body = '';
-for (const v of vdata.verses) {
-  const r = byN.get(v.n) || {};
-  // ship() ships a time for every row but UNSPOKEN; a REVIEW time ships too, unproven (al5: it was painted amber,
-  // as probe-adjudicated, and an UNSPOKEN row with a time lit up).
-  const has = r.t != null && r.status !== 'UNSPOKEN';
-  const st = String(r.status || '');
-  const cls = !has ? 'verse miss' : st === 'CONFIRMED' ? 'verse' : st.startsWith('PROBED') ? 'verse probed' : 'verse review';
-  const tAttr = has ? ` data-t="${r.t}"` : '';
-  body += `<span class="${cls}" data-n="${v.n}"${tAttr}><sup>${v.n}</sup>${esc(v.text)}</span> `;
-}
+/** The page for one chapter: `vdata` is { book, chapter, verses: [{ n, text }] }, `tdata` is { verses: [{ n, t, status }] },
+ *  `mp3` the recording's bytes. */
+export function renderSample(vdata, tdata, mp3, editionTitle) {
+  const dataUri = 'data:audio/mpeg;base64,' + mp3.toString('base64');
+  const byN = new Map(tdata.verses.map((r) => [r.n, r]));
+  let body = '';
+  for (const v of vdata.verses) {
+    const r = byN.get(v.n) || {};
+    // ship() ships a time for every row but UNSPOKEN; a REVIEW time ships too, unproven (al5: it was painted amber,
+    // as probe-adjudicated, and an UNSPOKEN row with a time lit up).
+    const has = r.t != null && r.status !== 'UNSPOKEN';
+    const st = String(r.status || '');
+    const cls = !has ? 'verse miss' : st === 'CONFIRMED' ? 'verse' : st.startsWith('PROBED') ? 'verse probed' : 'verse review';
+    const tAttr = has ? ` data-t="${r.t}"` : '';
+    body += `<span class="${cls}" data-n="${v.n}"${tAttr}><sup>${v.n}</sup>${esc(v.text)}</span> `;
+  }
 
-const conf = tdata.verses.filter((r) => r.status === 'CONFIRMED').length;
-const probed = tdata.verses.filter((r) => r.status && r.status.startsWith('PROBED')).length;
-const review = tdata.verses.filter((r) => r.status === 'REVIEW').length;
+  const conf = tdata.verses.filter((r) => r.status === 'CONFIRMED').length;
+  const probed = tdata.verses.filter((r) => r.status && r.status.startsWith('PROBED')).length;
+  const review = tdata.verses.filter((r) => r.status === 'REVIEW').length;
 
-const html = `<!doctype html>
+  return `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(vdata.book)} ${vdata.chapter} — read-along sample</title>
@@ -108,5 +96,32 @@ ${body}
     s.addEventListener('click', () => { audio.currentTime = +s.dataset.t + 0.01; audio.play(); }));
 </script>
 `;
-writeFileSync(outPath, html);
-console.log('wrote ' + outPath + ' (' + Math.round(html.length / 1024) + ' KB)');
+}
+
+/** The CLI; returns its exit code. Exported so the test runs the tool in-process: a fresh node per run, spawned from the
+ *  test's beforeAll, took 0.1 s alone, 2 s beside two other suites, and past vitest's 10 s hook timeout in a loaded
+ *  pre-push (flake 2026-10-14). */
+export function main(argv) {
+  let editionTitle = 'The Word of Promise (dramatized NKJV)';
+  const pos = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--edition-title') editionTitle = argv[++i] || '';
+    else if (a.startsWith('--edition-title=')) editionTitle = a.slice('--edition-title='.length);
+    else pos.push(a);
+  }
+  const [versesPath, timingsPath, outPath] = pos;
+  if (!versesPath || !timingsPath || !outPath) {
+    console.error(USAGE);
+    return 1;
+  }
+  const vdata = JSON.parse(readFileSync(versesPath, 'utf8'));
+  const tdata = JSON.parse(readFileSync(timingsPath, 'utf8'));
+  const html = renderSample(vdata, tdata, readFileSync(tdata.audio), editionTitle);
+  writeFileSync(outPath, html);
+  console.log('wrote ' + outPath + ' (' + Math.round(html.length / 1024) + ' KB)');
+  return 0;
+}
+
+const isMain = process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
+if (isMain) process.exitCode = main(process.argv.slice(2));

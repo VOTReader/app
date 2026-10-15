@@ -225,6 +225,39 @@ function ShareLinkChoice({ onApp, onSite, onCancel }) {
   );
 }
 
+/** The recolour step of applyHighlight: what happens to the groups whose range
+    exactly matches the new selection. A recolour never deletes a note (sr14,
+    sweep batch 2026-10-14 #0: notes are keyed by groupId, and removing the group
+    with its note emptied My Notes of it). An unnoted group is replaced, as
+    before. A noted group whose marks ARE the new marks takes the new style and
+    colour in place, as the mark's own recolour chip does (AnnotationActionChip),
+    so its id and note survive. A noted group that only partly matches (a wider
+    selection, or a note running past it) is left as it is: the new mark, made
+    after it, paints over it and the note's icon stays.
+    @param {Set<string>} groupIds  exact-range matches, read before any change
+    @param {{ key: string, start: number, end: number }[]} planned  the new group's marks
+    @param {string} kind @param {string} color
+    @returns {boolean} true when a noted group took the style (make no new group) */
+function recolourExactGroups(groupIds, planned, kind, color) {
+  let restyled = false;
+  groupIds.forEach(function(gid) {
+    if (!(typeof NoteStore !== 'undefined' && NoteStore.get(gid))) {
+      AnnotationStore.removeGroup(gid);
+      return;
+    }
+    const segs = AnnotationStore.getByGroup(gid);
+    const same = planned.length > 0 && segs.length === planned.length && planned.every(function(p) {
+      return segs.some(function(s) { return s.key === p.key && s.ann.start === p.start && s.ann.end === p.end; });
+    });
+    if (!same) return;
+    AnnotationStore.convertGroup(gid, kind);
+    AnnotationStore.recolorGroup(gid, color);
+    NoteStore.update(gid, { color: color });
+    restyled = true;
+  });
+  return restyled;
+}
+
 export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkRequest }) {
   const [visible, setVisible] = React.useState(false);
   // cp1 sweep: true while a RAISED toolbar's selection is being changed — the
@@ -928,23 +961,13 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       const containers = selInfo.multiContainers ||
         (range ? readingBlocksIn(range) : []);
       const groupId = hlId();
-      // Recolor semantics: only remove groups whose range EXACTLY matches
-      // the new selection in this container — partial overlap is preserved
-      // so users can layer highlights/underlines/notes.
+      // Recolor semantics: only groups whose range EXACTLY matches the new
+      // selection in this container are recoloured — partial overlap is
+      // preserved so users can layer highlights/underlines/notes. Each
+      // container's range snaps to word boundaries for the new group's marks.
       const groupsToRemove = new Set();
-      containers.forEach(function(container) {
-        var hlKey = container.dataset.hlKey;
-        var containerLen = container.textContent.length;
-        var start = range && container.contains(range.startContainer)
-          ? computeOffset(container, range.startContainer, range.startOffset) : 0;
-        var end = range && container.contains(range.endContainer)
-          ? computeOffset(container, range.endContainer, range.endOffset) : containerLen;
-        AnnotationStore.get(hlKey).forEach(function(h) {
-          if (h.start === start && h.end === end && h.groupId) groupsToRemove.add(h.groupId);
-        });
-      });
-      groupsToRemove.forEach(function(gid) { AnnotationStore.removeGroup(gid); NoteStore.remove(gid); });
-      // Now add the new group — snap each container's range to word boundaries
+      /** @type {{ key: string, start: number, end: number, text: string }[]} */
+      const planned = [];
       containers.forEach(function(container) {
         var hlKey = container.dataset.hlKey;
         var containerText = container.textContent;
@@ -953,15 +976,24 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           ? computeOffset(container, range.startContainer, range.startOffset) : 0;
         var rawEnd = range && container.contains(range.endContainer)
           ? computeOffset(container, range.endContainer, range.endOffset) : containerLen;
+        AnnotationStore.get(hlKey).forEach(function(h) {
+          if (h.start === rawStart && h.end === rawEnd && h.groupId) groupsToRemove.add(h.groupId);
+        });
         var snap = snapSelectionRange(container, containerText, rawStart, rawEnd);
         if (snap.start >= snap.end) return;
-        AnnotationStore.add(hlKey, {
-          id: hlId(), groupId: groupId, kind: kind,
-          start: snap.start, end: snap.end, color: color,
-          text: hlDisplayText(container, containerText, snap.start, snap.end),
-          created: Date.now()
-        });
+        planned.push({ key: hlKey, start: snap.start, end: snap.end,
+          text: hlDisplayText(container, containerText, snap.start, snap.end) });
       });
+      if (!recolourExactGroups(groupsToRemove, planned, kind, color)) {
+        planned.forEach(function(p) {
+          AnnotationStore.add(p.key, {
+            id: hlId(), groupId: groupId, kind: kind,
+            start: p.start, end: p.end, color: color,
+            text: p.text,
+            created: Date.now()
+          });
+        });
+      }
     } else {
       // Single container — only remove EXACT-RANGE matches (recolor flow).
       // Partial overlap stacks: the user can layer multiple highlights,
@@ -986,14 +1018,15 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       existing.forEach(h => {
         if (h.start === snap.start && h.end === snap.end && h.groupId) groupsToRemove.add(h.groupId);
       });
-      groupsToRemove.forEach(gid => { AnnotationStore.removeGroup(gid); NoteStore.remove(gid); });
-      const id = hlId();
-      AnnotationStore.add(selInfo.hlKey, {
-        id: id, groupId: id, kind: kind,
-        start: snap.start, end: snap.end,
-        color: color, text: hlDisplayText(container, containerText, snap.start, snap.end),
-        created: Date.now()
-      });
+      if (!recolourExactGroups(groupsToRemove, [{ key: selInfo.hlKey, start: snap.start, end: snap.end }], kind, color)) {
+        const id = hlId();
+        AnnotationStore.add(selInfo.hlKey, {
+          id: id, groupId: id, kind: kind,
+          start: snap.start, end: snap.end,
+          color: color, text: hlDisplayText(container, containerText, snap.start, snap.end),
+          created: Date.now()
+        });
+      }
     }
     window.getSelection().removeAllRanges();
     setVisible(false);
