@@ -452,8 +452,24 @@ export function JournalAudioBlock(props) {
   function toggle(e) {
     if (e) { e.stopPropagation(); }
     if (!audioRef.current) return;
-    if (playing) audioRef.current.pause();
-    else audioRef.current.play();
+    if (playing) { audioRef.current.pause(); return; }
+    // play() returns a promise that rejects when the memo cannot play: a codec
+    // this WebView cannot decode (a backup made on another device), a broken
+    // file. Dropped, the rejection went unhandled, the 'play' event already
+    // fired left the button on Pause over silence, and the reader was told
+    // nothing (v070). An AbortError only means a pause or a new load cut the
+    // start short, so it resets the button without a message.
+    var p = audioRef.current.play();
+    if (p && typeof p.catch === 'function') {
+      p.catch(function(err) {
+        setPlaying(false);
+        if (err && err.name === 'AbortError') return;
+        console.warn('journal memo: play failed', mediaId, err);
+        if (typeof showToast === 'function') {
+          showToast({ id: 'vot-toast-memo-play', className: 'vot-toast', text: 'This voice memo can’t be played on this device.', ariaLive: 'assertive' });
+        }
+      });
+    }
   }
 
   function onTimeUpdate() {
