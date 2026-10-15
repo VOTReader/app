@@ -245,6 +245,12 @@ class AudioKeepAliveService : Service() {
             noisyRegistered = false
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
+        // A PAUSED card was detached (see onStartCommand): it belongs to the notification manager now, and the REMOVE
+        // above leaves it up, a stale Play for a session with no player behind it (sweep v039). Every stop path
+        // (stopService, stopEverything's stopSelf, onTaskRemoved) ends here, so the card goes with the service.
+        try {
+            getSystemService(NotificationManager::class.java)?.cancel(NOTIFICATION_ID)
+        } catch (_: Exception) { /* teardown best-effort */ }
         try { session?.release() } catch (_: Exception) { /* teardown best-effort */ }
         session = null
         super.onDestroy()
