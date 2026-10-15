@@ -6,9 +6,8 @@
 import { Icon } from '../Icon.jsx';
 import { definePlace } from '../places.js';
 import { GATE_NOW } from '../gate.js';
+import { askVotCorpus, askAudioSyncSections } from '../corpus.js';
 import { KINDS, LEDES, EMPTY, EMPTY_ALL, kindOf, marksOfKind, metaLine, readMarks } from '../notes-facts.js';
-
-const g = /** @type {any} */ (globalThis);
 
 /** @param {{ mark: import('../notes-facts.js').Mark, now: number, onOpen: (m: any) => void }} props */
 function MarkRow({ mark: m, now, onOpen }) {
@@ -34,9 +33,9 @@ function useMarks(gate) {
   React.useEffect(() => {
     if (!waiting) return undefined;
     let live = true;
-    const load = g.__loadVotCorpus;
     const settle = () => { if (live) setState({ marks: readMarks().marks, pending: false }); };
-    Promise.resolve(typeof load === 'function' ? load() : null).then(settle, settle);
+    // the letters, and a compilation's timings (its first entry), each load on their own; one wait, then the rows as they are
+    Promise.all([askVotCorpus(), askAudioSyncSections()].map((p) => p.catch(() => undefined))).then(settle, settle);
     return () => { live = false; };
   }, [waiting]);
   return state;

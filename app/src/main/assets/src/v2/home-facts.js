@@ -240,14 +240,22 @@ function shortCol(col) {
   return SHORT[col.volKey] || col.label;
 }
 
-const titleCase = (id) => String(id).replace(/(^|[-\s])([a-z])/g, (_m, p, c) => (p === '-' ? ' ' : p) + c.toUpperCase());
+/* Main's book ids are the names lower-cased with the spaces dropped, all 66 but one (checked against books.js titles,
+   v2g11b): a tab or a recording names its book by id alone, and v2's Home has no Bible loaded to ask. */
+const BOOK_NAMES = /** @type {Record<string, string>} */ ({ songofsolomon: 'Song of Solomon', 'matthew-plain': 'Matthew' });
 
-/** A Bible book's name: the item's own, the loaded Bible's, else its id in title case ('1john' -> '1john'). */
+/** A Bible book's name from main's id with no Bible loaded ('1john' -> '1 John', 'songofsolomon' -> 'Song of Solomon'). */
+export function bookName(id) {
+  const s = String(id || '');
+  return BOOK_NAMES[s] || s.replace(/^(\d)(?=[a-z])/, '$1 ').replace(/(^|[-\s])([a-z])/g, (_m, p, c) => (p === '-' ? ' ' : p) + c.toUpperCase());
+}
+
+/** A Bible book's name: the item's own, the loaded Bible's, else read from its id (bookName). */
 export function bookTitle(it, gl = g) {
   if (it.bookTitle) return it.bookTitle;
   const books = gl.__ALL_BOOKS || gl.BOOKS;
   const b = books && books[it.book];
-  return b && b.title ? b.title : titleCase(it.book);
+  return b && b.title ? b.title : bookName(it.book);
 }
 
 /**

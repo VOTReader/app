@@ -18,6 +18,7 @@ import {
   loadAudioSync, audioSyncStore,
   loadBibleSync, bibleSyncStore,
   loadAnswers,
+  loadAudioSyncSections, audioSyncSectionsStore,
   resetSyncLoadersForTests,
 } from './sync-loaders.js';
 
@@ -56,6 +57,13 @@ describe('sync-loaders — without the factory', () => {
     const un = audioSyncStore.subscribe(() => {});
     expect(typeof un).toBe('function');
     un();
+  });
+});
+
+describe('sync-loaders — the compilation timings on window (v2g11b)', () => {
+  it('publishes the store and the ask for bundle-v2, as the module evaluates, without creating a loader', () => {
+    expect(/** @type {any} */ (globalThis).__audioSyncSectionsStore).toBe(audioSyncSectionsStore);
+    expect(/** @type {any} */ (globalThis).__loadAudioSyncSections).toBe(loadAudioSyncSections);
   });
 });
 

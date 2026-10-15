@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, waitFor, act } from '@testing-library/react';
 import { V2App, applyGateScroll } from './App.jsx';
-import { continueFromState, itemFromHistory, itemFromTab, itemFromTrack, recentItems, describeItem, itemRoutes, savedHome } from './home-facts.js';
+import { continueFromState, itemFromHistory, itemFromTab, itemFromTrack, recentItems, describeItem, itemRoutes, savedHome, bookName, bookTitle } from './home-facts.js';
 
 const g = /** @type {any} */ (globalThis);
 const html = document.documentElement;
@@ -114,6 +114,15 @@ describe('saved data, re-shown (read only)', () => {
     expect(itemFromTrack({ key: null, url: 'c' })).toEqual({ kind: 'letter', collection: 'wtlb1', letterId: 'wtlb1-4' });
     expect(itemFromTrack({ key: null, url: 'd' })).toBe(null);
     delete g.AudioPlayer;
+  });
+
+  it("a Bible book main names by id alone reads as the book with no Bible loaded; a loaded Bible's own name first (v2g11b)", () => {
+    expect(['john', '1john', '2corinthians', 'songofsolomon', 'matthew-plain', 'psalms'].map(bookName))
+      .toEqual(['John', '1 John', '2 Corinthians', 'Song of Solomon', 'Matthew', 'Psalms']);
+    expect(describeItem(itemFromTrack({ key: 'bible-brm-kjv:1john', url: 'b', partLabel: 'Chapter 4' })).chip).toBe('1 John 4');
+    expect(describeItem(itemFromTab({ screen: 'bible-ch', bookId: 'songofsolomon', chapterNum: 2 })).chip).toBe('Song of Solomon 2');
+    expect(bookTitle({ book: 'psalms' }, { BOOKS: { psalms: { title: 'The Psalms' } } })).toBe('The Psalms');
+    expect(bookTitle({ book: '1john', bookTitle: 'First John' }, {})).toBe('First John');
   });
 
   it("main's recently played recordings come into Recent by time with the history (a tie: history first), once each, never Continue's", () => {

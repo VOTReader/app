@@ -6,6 +6,8 @@
    Mark; the gate hook seeds Marks directly. Everything else here is pure: the six kinds, the line under
    each kind's title, the day words ("Today", "Sunday", "Oct 9") and each row's meta line. No storage writes, no DOM. */
 
+import { bookName } from './home-facts.js';
+
 const DAY = 24 * 3600 * 1000;
 
 /**
@@ -163,14 +165,27 @@ function letterPlace(col, id, env) {
 /**
  * Where a saved recording's text is, read as main opens it from the library (screen-routes.jsx _openAudioText): a
  * 'bible-<edition>:<book>' track at its "Chapter N", a 'study:<id>-chN' track at that study chapter, else the letter
- * '<volKey>:<letter id>' of that collection (`pending` while that collection's letters have not loaded).
- * @param {{ key?: string | null, title?: string, partLabel?: string | null }} t @param {any} env
+ * '<volKey>:<letter id>' of that collection (`pending` while that collection's letters have not loaded); a Words To
+ * Live By compilation (key null) at its section's first entry, as main's AudioShelf textKeyOf asks the player (`pending`
+ * until the player has the section list, which rides the VOT corpus, and the compilation timings file).
+ * @param {{ key?: string | null, title?: string, partLabel?: string | null, url?: string }} t @param {any} env
  * @returns {{ where: string, title: string, open: Record<string, any> | null, pending?: boolean }}
  */
 export function recordingPlace(t, env) {
-  const key = String((t && t.key) || '');
-  const i = key.indexOf(':');
+  let key = String((t && t.key) || '');
   const none = { where: '', title: (t && t.title) || '', open: null };
+  if (!key && t && t.key == null) {
+    const A = env.AudioPlayer;
+    try { key = (A && typeof A.sectionOpeningKey === 'function' && A.sectionOpeningKey(t)) || ''; } catch (_e) { key = ''; }
+    if (!key) {
+      // AUDIO_SECTIONS: volKey -> [[label, asset id, reader], ...]; the asset id is the url's file name
+      const sections = env.AUDIO_SECTIONS;
+      const asset = String(t.url || '').replace(/^.*\//, '').replace(/\.mp3$/i, '');
+      const section = !sections || Object.values(sections).some((list) => Array.isArray(list) && list.some((s) => s && s[1] === asset));
+      return { ...none, pending: section && !(sections && env.AUDIO_SYNC_SECTIONS) };
+    }
+  }
+  const i = key.indexOf(':');
   if (i < 1 || i >= key.length - 1) return none;
   const volKey = key.slice(0, i);
   const id = key.slice(i + 1);
@@ -194,7 +209,7 @@ function bookTitle(bookId, env) {
   const list = env.BIBLE_BOOK_LIST;
   const b = Array.isArray(list) ? list.find((x) => x && x.id === bookId) : null;
   if (b && b.title) return b.title;
-  return String(bookId || '').split('-').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+  return bookName(bookId);
 }
 
 /** A journal entry's own title (blank when it has none). */

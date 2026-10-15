@@ -121,6 +121,28 @@ describe('readMarks: main saved data, re-shown read only', () => {
     expect(recordingPlace({ key: 'one:honor-not' }, { ...e, LETTERS_V1: undefined, __votCorpus: { loaded: false } })).toMatchObject({ where: 'Volume One', pending: true });
   });
 
+  it('a saved Words To Live By compilation (key null) is its first entry once the player knows it, pending until then (v2g11b)', () => {
+    const e = env();
+    const t = { key: null, title: 'Part 1 · Intro–19', url: 'u/wtlb1-part1.mp3' };
+    const AUDIO_SECTIONS = { wtlb1: [['Part 1 · Intro–19', 'wtlb1-part1', 'V']] };
+    const unknown = { sectionOpeningKey: () => null };
+    // the section list (it rides the VOT corpus) or the timings file not here yet: wait
+    expect(recordingPlace(t, { ...e, AudioPlayer: unknown })).toMatchObject({ open: null, pending: true });
+    expect(recordingPlace(t, { ...e, AUDIO_SECTIONS, AudioPlayer: unknown })).toMatchObject({ open: null, pending: true });
+    // a recording that is no compilation: nothing to wait for
+    expect(recordingPlace({ ...t, url: 'u/other.mp3' }, { ...e, AUDIO_SECTIONS, AudioPlayer: unknown })).toMatchObject({ open: null, pending: false });
+    // both here: the player names the entry, and the row opens it
+    const player = { sectionOpeningKey: (x) => (x.url === t.url ? 'wtlb1:w-12' : null) };
+    expect(recordingPlace(t, { ...e, AUDIO_SECTIONS, AUDIO_SYNC_SECTIONS: {}, AudioPlayer: player }))
+      .toMatchObject({ where: 'Words to Live By One', title: 'On Prayer', open: { place: 'letter', collection: 'wtlb1', n: 12 } });
+  });
+
+  it("a Bible book main names by id reads as the book when the Bible is not loaded ('1john' is 1 John) (v2g11b)", () => {
+    const e = { ...env(), BIBLE_BOOK_LIST: [] };
+    expect(recordingPlace({ key: 'bible-brm-kjv:1john', partLabel: 'Chapter 4' }, e)).toMatchObject({ where: '1 John 4' });
+    expect(placeOfKey('bible:songofsolomon:2:4', e)).toMatchObject({ where: 'Song of Solomon 2:4' });
+  });
+
   it('a letter whose volume has not loaded yet is pending (its title comes after the load)', () => {
     const e = { ...env(), LETTERS_V1: undefined, __votCorpus: { loaded: false }, _bookmarkSourceLabel: (k) => k.split(':')[1] };
     const { marks, pending } = readMarks(e);

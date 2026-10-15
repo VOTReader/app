@@ -221,6 +221,12 @@ export const audioSyncSectionsStore = {
   },
 };
 
+/* v2 (bundle-v2) names a played or saved compilation by its first entry through AudioPlayer.sectionOpeningKey, which
+   asks for this file; it re-renders on this store when the file lands, so the store and the ask are published on
+   window (the Answers corpus below is published the same way). Publishing creates and fetches nothing. */
+/** @type {any} */ (globalThis).__audioSyncSectionsStore = audioSyncSectionsStore;
+/** @type {any} */ (globalThis).__loadAudioSyncSections = loadAudioSyncSections;
+
 /* ── Answers Only God Can Give — src/data/answers.js (ANSWERS, ~2.5 MB) ──
    Not a timing file, but the same shape for the same reasons: one raw
    src/data file, fetched the first time a reader opens Answers, shipped by

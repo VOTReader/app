@@ -5,7 +5,7 @@
    the top bar. Numbers and titles come from the corpus itself (corpus.js); the screen is ready once it has loaded. */
 import { Icon } from '../Icon.jsx';
 import { definePlace } from '../places.js';
-import { useVotCorpus, useAnswersCorpusVersion, askAnswersCorpus } from '../corpus.js';
+import { useVotCorpus, useAnswersCorpusVersion, askAnswersCorpus, useAudioSyncSectionsVersion } from '../corpus.js';
 import { VOLUMES, MORE_LETTERS, savedHome, describeItem, itemRoutes, letterCount, colOf, wantsAnswers } from '../home-facts.js';
 
 /** Where a reader with nothing read yet starts. @type {import('../home-facts.js').HomeItem} */
@@ -55,11 +55,13 @@ function VolumeCells({ vol, last, count, onOpen }) {
 export function HomeScreen({ gate, facts, go, onReady }) {
   const corpus = useVotCorpus();
   const answers = useAnswersCorpusVersion();
+  const sections = useAudioSyncSectionsVersion();
   const home = React.useMemo(
     () => (gate ? (gate.facts && gate.facts.home) || { continue: null, recent: [] } : savedHome()),
-    // the corpus landing turns letter ids into numbers and titles
+    // the corpus landing turns letter ids into numbers and titles; the compilations' timings (the player asks for them
+    // when a played one is read) turn a Words To Live By compilation into its first entry
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [gate, corpus, answers],
+    [gate, corpus, answers, sections],
   );
   // an Answers topic in Continue or Recent asks for its own corpus (a gate boot's facts never hold one)
   React.useEffect(() => {

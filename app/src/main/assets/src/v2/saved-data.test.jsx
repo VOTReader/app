@@ -22,6 +22,8 @@ import { applyDOMHighlights } from '../renderer/annotation-engine.jsx';
 import { _bookmarkSourceLabel } from '../utils/bookmark-source.js';
 import { normalizeExcerptDisplay } from '../utils/excerpt-display.js';
 import { AUDIO_RELEASE_PREFIX } from '../utils/audio-track.js';
+import { sectionOpeningKey } from '../utils/audio-player/sections.js';
+import { resetSyncLoadersForTests } from '../utils/sync-loaders.js';
 import { COLLECTIONS, COL_BY_KEY, COL_BY_LETTER_SC, COL_BY_INDEX_SC } from '../data/scripture-resolution.js';
 
 const g = /** @type {any} */ (globalThis);
@@ -208,5 +210,78 @@ describe("main's saved data, found in v2", () => {
       expect(container.querySelector('#v-16 .vn').textContent).toBe('16');
       expect(container.querySelectorAll('mark.hl-dom').length).toBe(1);
     } finally { delete g.BOOKS; delete g.BIBLE_BOOK_LIST; }
+  });
+});
+
+/** index.html's __makeLazyLoader in small: one corpus object per file; load() lands the file's globals a moment later. */
+function installLoaders(files) {
+  const asked = [];
+  g.__makeLazyLoader = (_name, path) => {
+    const listeners = new Set();
+    const corpus = { loaded: false, error: false, version: 0,
+      subscribe(cb) { listeners.add(cb); return () => listeners.delete(cb); }, getVersion() { return corpus.version; } };
+    let landing = null;
+    const load = () => landing || (asked.push(path), landing = new Promise((done) => setTimeout(() => {
+      Object.assign(g, files[path] || {});
+      corpus.loaded = true; corpus.version += 1; listeners.forEach((cb) => cb()); done(undefined);
+    }, 5)));
+    return { corpus, load };
+  };
+  return asked;
+}
+
+describe("main's Words To Live By compilations and Bible books, found in v2 (v2g11b)", () => {
+  // a compilation is one recording of many entries: main keeps key null and finds the entry from the timings file
+  const SEC = 'wtlb1-part1';
+  const COMPILATION = { key: null, title: 'Part 1 · Intro–19', sub: 'Words To Live By: Part One', url: AUDIO_RELEASE_PREFIX + SEC + '.mp3', readerCode: 'V', partLabel: null };
+  const SEEK = { id: 'w-1', num: 1, title: 'Seek First the Kingdom', paragraphs: [{ align: 'left', text: 'Seek first.' }] };
+  /** @type {string[]} */
+  let asked = [];
+  beforeEach(() => {
+    resetSyncLoadersForTests();
+    asked = installLoaders({ 'src/data/audio-sync-sections.js': { AUDIO_SYNC_SECTIONS: { [SEC]: { 'wtlb1:w-1': [[2.5, 0, 0, 11, 0]], 'wtlb1:w-12': [[60, 0, 0, 12, 0]] } } } });
+    g.WTLB_ONE = [SEEK, ...CORPUS.WTLB_ONE];
+    g.AUDIO_SECTIONS = { wtlb1: [['Part 1 · Intro–19', SEC, 'V']] };   // rides the VOT corpus (audio-manifest.js)
+    g.AudioPlayer.sectionOpeningKey = sectionOpeningKey;                // main's own (AudioShelf textKeyOf)
+  });
+  afterEach(() => {
+    for (const k of ['__makeLazyLoader', 'AUDIO_SECTIONS', 'AUDIO_SYNC_SECTIONS']) delete g[k];
+    resetSyncLoadersForTests();
+  });
+
+  it('Home: a compilation main played is in Recent at its first entry once the timings land, and opens it', async () => {
+    await new Promise((r) => setTimeout(r, 2));
+    AudioLibraryStore.recordPlayed(COMPILATION);
+    await AudioLibraryStore.whenSaved();
+    const { container } = render(<V2App gateId={null} />);
+    expect(asked).toEqual(['src/data/audio-sync-sections.js']);   // a lazy file: Home asks for it once
+    await waitFor(() => expect(texts(container, '.recent .chip')[0]).toBe('Seek First the Kingdom'));
+    expect(texts(container, '.recent .chip')).toEqual(['Seek First the Kingdom', 'Vol. One, Letter 2', 'John 3', 'On Prayer', 'Vol. One, Letter 3', 'Vol. One, Preface']);
+    await click([...container.querySelectorAll('.recent .chip')][0]);
+    await waitFor(() => expect(container.querySelector('h1').textContent).toBe('Seek First the Kingdom'));
+  });
+
+  it('Notes: a compilation main saved names its collection and opens its first entry', async () => {
+    AudioLibraryStore.toggleSaved(COMPILATION);
+    await AudioLibraryStore.whenSaved();
+    const { container } = render(<V2App gateId={null} />);
+    await click([...container.querySelectorAll('.tab')].find((t) => t.textContent === 'Notes'));
+    const row = () => [...container.querySelectorAll('.marks .mark')].find((m) => m.textContent.startsWith('Part 1 · Intro–19'));
+    await waitFor(() => expect(row() && row().textContent).toBe('Part 1 · Intro–19Saved recording · Words To Live By: Part One · Today'));
+    await click(row());
+    await waitFor(() => expect(container.querySelector('h1').textContent).toBe('Seek First the Kingdom'));
+  });
+
+  it("Home and Notes: a Bible book main names by id reads as the book ('1john' is 1 John) with no Bible loaded", async () => {
+    await new Promise((r) => setTimeout(r, 2));
+    AudioLibraryStore.recordPlayed({ key: 'bible-brm-kjv:1john', title: '1 John 4', sub: 'King James Version', url: AUDIO_RELEASE_PREFIX + 'kjv-1john-4.mp3', readerCode: 'B', partLabel: 'Chapter 4' });
+    AudioLibraryStore.toggleSaved({ key: 'bible-brm-kjv:songofsolomon', title: 'Song of Solomon 2', sub: 'King James Version', url: AUDIO_RELEASE_PREFIX + 'kjv-song-2.mp3', readerCode: 'B', partLabel: 'Chapter 2' });
+    StateStore.set({ ...StateStore.get(), tabs: [...StateStore.get().tabs, { screen: 'bible-ch', bookId: '2corinthians', chapterNum: 5 }] });
+    await Promise.all([AudioLibraryStore.whenSaved(), StateStore.whenSaved()]);
+    expect(g.BOOKS || g.__ALL_BOOKS || g.BIBLE_BOOK_LIST).toBe(undefined);
+    const { container } = render(<V2App gateId={null} />);
+    expect(texts(container, '.recent .chip')).toEqual(['1 John 4', 'Vol. One, Letter 2', 'John 3', 'On Prayer', 'Vol. One, Letter 3', 'Vol. One, Preface', '2 Corinthians 5']);
+    await click([...container.querySelectorAll('.tab')].find((t) => t.textContent === 'Notes'));
+    await waitFor(() => expect(texts(container, '.marks .mark')).toContain('Song of Solomon 2Saved recording · Today'));
   });
 });

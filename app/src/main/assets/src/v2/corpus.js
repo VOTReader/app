@@ -68,3 +68,26 @@ export function askAnswersCorpus(gl = g) {
   if ((c && c.loaded) || typeof gl.__loadAnswersCorpus !== 'function') return Promise.resolve();
   return Promise.resolve(gl.__loadAnswersCorpus());
 }
+
+/* The Words To Live By compilations' timings (src/data/audio-sync-sections.js) name each compilation's first entry, and
+   load on their own as well: main's AudioPlayer.sectionOpeningKey asks for them, and bundle-d's utils/sync-loaders.js
+   publishes their store and loader as window.__audioSyncSectionsStore / __loadAudioSyncSections (v2g11b). */
+const subscribeSections = (cb) => {
+  const s = g.__audioSyncSectionsStore;
+  return s && typeof s.subscribe === 'function' ? s.subscribe(cb) : () => {};
+};
+const sectionsVersion = () => {
+  const s = g.__audioSyncSectionsStore;
+  return s && typeof s.getVersion === 'function' ? s.getVersion() : 0;
+};
+
+/** Re-renders when the compilations' timings land; the number changes each time. @returns {number} */
+export function useAudioSyncSectionsVersion() {
+  return React.useSyncExternalStore(subscribeSections, sectionsVersion);
+}
+
+/** Asks for the compilations' timings unless they are here (one fetch per page; resolves on failure). @returns {Promise<void>} */
+export function askAudioSyncSections(gl = g) {
+  if (gl.AUDIO_SYNC_SECTIONS || typeof gl.__loadAudioSyncSections !== 'function') return Promise.resolve();
+  return Promise.resolve(gl.__loadAudioSyncSections());
+}
