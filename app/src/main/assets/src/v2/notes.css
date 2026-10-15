@@ -1,0 +1,15 @@
+/* notes.css - v2 Notes screens beyond the kit (zv1). The marks list and chips are the kit's own (screens.css .marks, .mark,
+   .chips.kinds); this adds only what has no picture: a mark is tappable, and the journal editor's fields (the kit's
+   field colours: --input fill, --edge border, --accent on focus). */
+.v2 .mark[role="button"] { cursor: pointer; }
+.v2 .mark[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.jed { padding-top: 6px; padding-bottom: 32px; }
+.jed .jdate { margin: 0 0 10px; }
+.jed .jt, .jed .jb { display: block; width: 100%; box-sizing: border-box; font-family: var(--font); color: var(--t1);
+  background: var(--input); border: 1px solid var(--edge); border-radius: var(--r); padding: 12px 14px; }
+.jed .jt { font-size: var(--fs-l); line-height: 1.25; }
+.jed .jb { margin-top: 12px; min-height: 42vh; font-size: var(--fs-body); line-height: var(--lh-body); color: var(--t-body); resize: vertical; }
+.jed .jt:focus, .jed .jb:focus { border-color: var(--accent); outline: 0; }
+.jed .jt::placeholder, .jed .jb::placeholder { color: #A7AEB0; }
+.jed .jother { margin: 12px 0 0; padding-left: 12px; border-left: 2px solid var(--line); }

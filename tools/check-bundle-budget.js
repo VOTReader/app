@@ -104,7 +104,7 @@ const BUDGETS = [
   { file: 'app.min.css', measured: 370199, max: 386700 },   // render-blocking <link> in index.html
   // Branch v2 (mw4, 2026-10-14): the v2 shell and the design kit's stylesheet (kit + screens + shell), which replaces
   // app.min.css as the render-blocking <link> on v2. Ceilings ~+15 % over the first build; they grow as screens land.
-  { file: 'bundle-v2.js', measured: 27859, max: 32000 },
+  { file: 'bundle-v2.js', measured: 40619, max: 46700 },  // zv1 Notes + journal editor + place registry (v2 grows per screen group)
   { file: 'v2.min.css', measured: 30927, max: 35600 },
   // ── lazy, but still fetched + parsed on the reader's device ──
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },

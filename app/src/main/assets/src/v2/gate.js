@@ -6,6 +6,8 @@
    it is inert on the live website; an id this build does not know yet sets data-gate="unknown" (the shooter then fails by
    name). Each entry below is the states.json row for that id, in the app's terms; add one per screen as it is built. */
 
+import { gateMarks } from './notes-facts.js';
+
 /** The website readers use: the hook never acts there. */
 export const LIVE_HOSTS = ['votreader.github.io'];
 
@@ -16,7 +18,7 @@ const DAY = 24 * 3600 * 1000;
 /**
  * One gate state: `stack` is the history the hook fakes (its last entry is the place shown; the one before names Back),
  * `facts` what the screen would otherwise read from storage.
- * @typedef {{ place: string, collection?: string, n?: number }} Route
+ * @typedef {{ place: string, collection?: string, n?: number, kind?: string, id?: string }} Route
  * @typedef {{ stack: Route[], facts?: Record<string, any> }} GateState
  */
 
@@ -39,6 +41,13 @@ export const GATE_STATES = {
   '1a-letter': {
     stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],
   },
+  // states.json 3c-notes (zv1): the Notes tab, All; a journal entry, a highlight and a note today/yesterday, a bookmark
+  // Sunday, a link Oct 9.
+  '3c-notes': { stack: [{ place: 'notes', kind: 'all' }], facts: { marks: gateMarks(GATE_NOW).slice(0, 5), now: GATE_NOW } },
+  // states.json 3d-notes-journal: the same tab on Journal: 3c's marks plus two older entries; only the three entries show.
+  '3d-notes-journal': { stack: [{ place: 'notes', kind: 'journal' }], facts: { marks: gateMarks(GATE_NOW), now: GATE_NOW } },
+  // states.json 8c-notes-empty: nothing marked yet.
+  '8c-notes-empty': { stack: [{ place: 'notes', kind: 'all' }], facts: { marks: [], now: GATE_NOW } },
 };
 
 /**

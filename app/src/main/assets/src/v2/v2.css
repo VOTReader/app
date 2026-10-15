@@ -1,4 +1,5 @@
 /* v2.css - the v2 stylesheet: the kit, its layout recipes, then the app frame (esbuild bundles this into dist/v2.min.css) */
 @import './kit.css';
 @import './screens.css';
+@import './notes.css';
 @import './shell.css';

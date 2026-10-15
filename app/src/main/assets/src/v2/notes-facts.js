@@ -1,0 +1,252 @@
+/* notes-facts.js - what v2's Notes tab lists (zv1; pictures 3c-notes, 3d-notes-journal, 8c-notes-empty).
+
+   Saved data is re-shown, never migrated (v2 build plan rule 5): readMarks() reads main's own stores read-only
+   (JournalStore, AnnotationStore through bundle-d's _collectMarks, NoteStore, BookmarkStore, LinkStore) and turns every
+   item into one Mark; the gate hook seeds Marks directly. Everything else here is pure: the six kinds, the line under
+   each kind's title, the day words ("Today", "Sunday", "Oct 9") and each row's meta line. No storage writes, no DOM. */
+
+const DAY = 24 * 3600 * 1000;
+
+/**
+ * One row in Notes.
+ * @typedef {{ kind: 'journal' | 'highlight' | 'note' | 'bookmark' | 'link', id: string, at: number,
+ *   title?: string, text?: string, quote?: string, note?: string, colour?: string, where?: string,
+ *   open?: Record<string, any> | null }} Mark
+ */
+
+/** The chips, in the picture's order (Journal second: Corbin asked how to reach his journal, 10-14 17:4x). */
+export const KINDS = [
+  { id: 'all', label: 'All' },
+  { id: 'journal', label: 'Journal' },
+  { id: 'highlight', label: 'Highlights' },
+  { id: 'note', label: 'Notes' },
+  { id: 'bookmark', label: 'Bookmarks' },
+  { id: 'link', label: 'Links' },
+];
+
+/** The line under "Notes" for each chip (All and Journal as drawn). */
+export const LEDES = {
+  all: 'Everything you marked, newest first',
+  journal: 'Your own entries, newest first',
+  highlight: 'Words you highlighted, newest first',
+  note: 'Your notes on the text, newest first',
+  bookmark: 'Places you saved, newest first',
+  link: 'Passages you joined, newest first',
+};
+
+/** What a chip with nothing in it says (the whole tab empty is EMPTY_ALL). */
+export const EMPTY = {
+  journal: 'No journal entries yet',
+  highlight: 'No highlights yet',
+  note: 'No notes yet',
+  bookmark: 'No bookmarks yet',
+  link: 'No links yet',
+};
+export const EMPTY_ALL = {
+  title: 'Nothing marked yet',
+  text: 'Tap a paragraph while you read to highlight it, add a note or bookmark it. Journal entries and links gather here too.',
+};
+
+const KIND_NAME = { journal: 'Journal', highlight: 'Highlight', note: 'Note', bookmark: 'Bookmark', link: 'Link' };
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** main's highlight colours -> the kit's five (kit.css .hl.*). */
+const COLOUR = { yellow: 'gold', orange: 'gold', gold: 'gold', green: 'sage', teal: 'sage', cyan: 'sage', blue: 'blue', pink: 'rose', red: 'rose', purple: 'plum' };
+/** @param {string | undefined} c */
+export function kitColour(c) { return (c && COLOUR[c]) || 'gold'; }
+
+/** Local midnight before `ts`. */
+function dayStart(ts) { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); }
+
+/**
+ * The day words a row ends with: Today, Yesterday, a weekday within this week (weeks start on Sunday), else "Oct 9"
+ * ("Oct 9, 2025" in another year).
+ * @param {number} ts @param {number} now
+ */
+export function dayLabel(ts, now) {
+  if (!ts) return '';
+  const daysAgo = Math.round((dayStart(now) - dayStart(ts)) / DAY);   // round: a DST day is 23 or 25 hours
+  if (daysAgo === 0) return 'Today';
+  if (daysAgo === 1) return 'Yesterday';
+  if (daysAgo > 1 && daysAgo <= new Date(now).getDay()) return WEEKDAYS[new Date(ts).getDay()];
+  const d = new Date(ts);
+  const md = MONTHS[d.getMonth()] + ' ' + d.getDate();
+  return d.getFullYear() === new Date(now).getFullYear() ? md : md + ', ' + d.getFullYear();
+}
+
+/** "Highlight · Volume One · Letter 1 · Today". @param {Mark} m @param {number} now */
+export function metaLine(m, now) {
+  return [KIND_NAME[m.kind], m.where, dayLabel(m.at, now)].filter(Boolean).join(' · ');
+}
+
+/** The rows a chip shows, newest first. @param {Mark[]} marks @param {string} kind */
+export function marksOfKind(marks, kind) {
+  const list = kind && kind !== 'all' ? marks.filter((m) => m.kind === kind) : marks.slice();
+  return list.sort((a, b) => (b.at || 0) - (a.at || 0));
+}
+
+/** @param {string} kind @returns {string} a known chip id ('all' for anything else) */
+export function kindOf(kind) {
+  return KINDS.some((k) => k.id === kind) ? kind : 'all';
+}
+
+/* ---- reading main's stores (a real boot) ---------------------------------------------------------------------- */
+
+/** The collections main knows (scripture-resolution.js COLLECTIONS, or COL_BY_KEY's values). */
+function collections(env) {
+  if (Array.isArray(env.COLLECTIONS)) return env.COLLECTIONS;
+  const map = env.COL_BY_KEY;
+  return map && typeof map.values === 'function' ? Array.from(map.values()) : [];
+}
+
+/**
+ * Where a key points: `where` for the meta line, `title` of the thing itself, `open` the v2 route that shows it,
+ * `pending` while the letters it needs have not loaded (index.html's lazy corpus).
+ * @param {string} key @param {any} env
+ * @returns {{ where: string, title: string, open: Record<string, any> | null, pending?: boolean }}
+ */
+export function placeOfKey(key, env) {
+  const parts = String(key || '').split(':');
+  const kind = parts[0];
+  if (kind === 'bible' || kind === 'study') {
+    let bookId = parts[1] || '';
+    let chapter = parseInt(parts[2] || '', 10);
+    let verse = parseInt(parts[3] || '', 10);
+    if (kind === 'study') {
+      const m = bookId.match(/^(.+)-(\d+)$/);
+      if (m) { bookId = m[1]; verse = parseInt(parts[2] || '', 10); chapter = parseInt(m[2], 10); }
+    }
+    const book = bookTitle(bookId, env);
+    const ref = book + (chapter ? ' ' + chapter + (verse ? ':' + verse : '') : '');
+    return { where: ref, title: ref, open: chapter ? { place: 'bible-chapter', book: bookId, chapter, verse: verse || null } : null };
+  }
+  if (kind === 'letter' || kind === 'wtlb' || kind === 'blessed' || kind === 'holy-days') {
+    const id = parts[1];
+    for (const col of collections(env)) {
+      const arr = col && env[col.globalName];
+      const pref = col && col.prefaceGlobal ? env[col.prefaceGlobal] : null;
+      if (pref && pref.id === id) return { where: col.label, title: pref.title || col.label, open: null };
+      if (!Array.isArray(arr)) continue;
+      const e = arr.find((x) => x && x.id === id);
+      if (!e) continue;
+      const numbered = typeof e.num === 'number' && /^vot-/.test(col.letterScreen || '');
+      return {
+        where: numbered ? col.label + ' · Letter ' + e.num : col.label,
+        title: e.title || id,
+        open: numbered ? { place: 'letter', collection: col.volKey, n: e.num } : null,
+      };
+    }
+    const label = typeof env._bookmarkSourceLabel === 'function' ? env._bookmarkSourceLabel(key) : id;
+    const corpus = env.__votCorpus;
+    return { where: '', title: label || id, open: null, pending: !!(corpus && !corpus.loaded) };
+  }
+  if (kind === 'journal') {
+    const entry = env.JournalStore && typeof env.JournalStore.get === 'function' ? env.JournalStore.get(parts[1]) : null;
+    const t = entry ? journalTitle(entry) || 'Untitled' : 'Journal entry';
+    return { where: 'Journal · ' + t, title: t, open: entry ? { place: 'journal-entry', id: entry.id } : null };
+  }
+  return { where: '', title: String(key || ''), open: null };
+}
+
+function bookTitle(bookId, env) {
+  const list = env.BIBLE_BOOK_LIST;
+  const b = Array.isArray(list) ? list.find((x) => x && x.id === bookId) : null;
+  if (b && b.title) return b.title;
+  return String(bookId || '').split('-').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+}
+
+/** A journal entry's own title (blank when it has none). */
+function journalTitle(entry) {
+  if (entry.title && String(entry.title).trim()) return String(entry.title).trim();
+  return '';
+}
+
+/** A journal entry's words: its text blocks in order, one space apart. */
+export function journalText(entry) {
+  const blocks = Array.isArray(entry && entry.blocks) ? entry.blocks : [];
+  return blocks.map((b) => (b && typeof b.text === 'string' ? b.text : '')).filter((s) => s.trim())
+    .join(' ').replace(/\s+/g, ' ').trim();
+}
+
+const curly = (s) => '“' + s + '”';
+const clip = (s, n) => (s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, '') + '…' : s);
+
+/**
+ * Every saved item main's stores hold, as Marks (read only). `pending` is true while a mark's letter title waits for
+ * the lazy corpus.
+ * @param {any} [env] the globals (bundle-b's stores, bundle-d's helpers)
+ * @returns {{ marks: Mark[], pending: boolean }}
+ */
+export function readMarks(env = globalThis) {
+  /** @type {Mark[]} */
+  const marks = [];
+  let pending = false;
+  const at = (key) => { const p = placeOfKey(key, env); if (p.pending) pending = true; return p; };
+  const J = env.JournalStore;
+  if (J && typeof J.all === 'function') {
+    for (const e of J.all() || []) {
+      if (!e || !e.id) continue;
+      const title = journalTitle(e);
+      const text = journalText(e);
+      marks.push({ kind: 'journal', id: 'journal:' + e.id, at: e.updated || e.created || 0,
+        title: title || clip(text, 60) || 'Untitled', text: title ? clip(text, 160) : '', open: { place: 'journal-entry', id: e.id } });
+    }
+  }
+  if (typeof env._collectMarks === 'function') {
+    for (const g of env._collectMarks() || []) {
+      if (!g || !g.text) continue;
+      const p = at(g.hlKey);
+      marks.push({ kind: 'highlight', id: 'hl:' + g.groupId, at: g.created || g.updated || 0, text: g.text,
+        colour: kitColour(g.color), where: p.where, open: p.open });
+    }
+  }
+  const N = env.NoteStore;
+  if (N && typeof N.list === 'function') {
+    for (const n of N.list() || []) {
+      if (!n) continue;
+      const p = at((n.keys || [])[0]);
+      const quote = String(n.fullText || '').replace(/\s+/g, ' ').trim();
+      marks.push({ kind: 'note', id: 'note:' + n.groupId, at: n.updated || n.created || 0,
+        quote: quote ? curly(clip(quote, 160)) : '', note: String(n.body || '').trim(), where: p.where, open: p.open });
+    }
+  }
+  const B = env.BookmarkStore;
+  if (B && typeof B.all === 'function') {
+    for (const b of B.all() || []) {
+      if (!b) continue;
+      const p = at(b.hlKey);
+      const title = (b.label && String(b.label).trim()) || p.title;
+      marks.push({ kind: 'bookmark', id: 'bkm:' + b.id, at: b.created || b.updated || 0, title,
+        where: p.where === title ? '' : p.where, open: p.open });
+    }
+  }
+  const L = env.LinkStore;
+  if (L && typeof L.all === 'function') {
+    for (const l of L.all() || []) {
+      if (!l || !l.source || !l.target) continue;
+      const s = at(l.source.key);
+      const t = l.target.label || placeOfKey(l.target.key, env).title;
+      const from = l.source.label || s.title;
+      marks.push({ kind: 'link', id: 'lnk:' + l.id, at: l.created || l.updated || 0,
+        title: from + ', joined to ' + t, where: s.where === from ? '' : s.where, open: s.open });
+    }
+  }
+  return { marks, pending };
+}
+
+/** Seeds for the gate pictures: 'now' minus whole days (so the day words match on any clock). */
+export function gateMarks(now) {
+  const d = (n) => now - n * DAY;
+  const all = [
+    { kind: 'journal', id: 'journal:g1', at: d(0), title: 'On being set apart', text: 'What “set apart for My glory” asks of me this week.' },
+    { kind: 'highlight', id: 'hl:g1', at: d(0) - 60000, colour: 'gold', where: 'Volume One · Letter 1',
+      text: 'Many things you must overcome in the years ahead; many things will I show you, many things will I teach you.' },
+    { kind: 'note', id: 'note:g1', at: d(1), quote: curly('Timothy, write as I speak.'), note: 'Read this again on Sunday.', where: 'Volume One · Letter 1' },
+    { kind: 'bookmark', id: 'bkm:g1', at: d(3), title: 'Honor Not the Day of the Dead... Honor God', where: 'Volume One · Letter 2' },
+    { kind: 'link', id: 'lnk:g1', at: d(5), title: 'Chosen by God, joined to John 15:16', where: 'Volume One · Letter 1' },
+    { kind: 'journal', id: 'journal:g2', at: d(3) - 60000, title: 'Sunday with the family', text: 'We read Letter 2 aloud after dinner. Talked about what to keep.' },
+    { kind: 'journal', id: 'journal:g3', at: d(12), title: 'Questions for this month', text: 'Read the Answers on the Sabbath, then John 3 again.' },
+  ];
+  return /** @type {Mark[]} */ (all);
+}
