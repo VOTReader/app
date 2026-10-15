@@ -82,7 +82,7 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
                 <div className="about-body about-features">
                   <p className="about-subhead">The Library</p>
                   <p>The complete Volumes of Truth corpus.</p>
-                  <p>The entire Bible in ten translations, including two custom Restored Name editions.</p>
+                  <p>The entire Bible in eleven translations, including two custom Restored Name editions and the Spanish Reina-Valera 1960.</p>
                   <p>Every PDF, Bible study, and letter study.</p>
                   <p>A Listening Library — the Letters and the Bible, read aloud.</p>
                   <p className="about-subhead">Your Tools</p>

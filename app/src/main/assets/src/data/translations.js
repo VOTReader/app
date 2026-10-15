@@ -22,7 +22,7 @@ export function loadTranslation(code) {
   // only a bare lowercase token so a crafted value can never shape the URL
   // (path traversal, a second origin via "//host", a query/fragment). Every
   // real id (TRANSLATION_OPTIONS in index.html: web/bsb/hnv/kjv/asv/lsv/ylt/
-  // rnkjv/rkjv) is 2–5 lowercase letters; an unknown-but-safe code just 404s
+  // rnkjv/rkjv/rvr) is 2–5 lowercase letters; an unknown-but-safe code just 404s
   // → NKJV fallback. Defense-in-depth over script-src 'self' + the
   // same-origin string wrap.
   if (!/^[a-z]{2,8}$/.test(code)) return Promise.resolve();
@@ -326,6 +326,20 @@ export function translationLabel(code) {
   const opts = (typeof TRANSLATION_OPTIONS !== 'undefined') ? TRANSLATION_OPTIONS : null;
   const found = opts && opts.find((o) => o.id === (code || 'nkjv'));
   return found ? found.label : 'NKJV';
+}
+
+/**
+ * The language of a translation's verse text when it is not English, e.g.
+ * "rvr" -> "es" (registry `lang`), else undefined. The reader puts it on each
+ * verse as the HTML lang attribute, so a screen reader speaks the Reina-Valera
+ * in Spanish while the menus around it stay English.
+ * @param {string} [code] settings.translation id
+ * @returns {string|undefined}
+ */
+export function translationLang(code) {
+  const opts = (typeof TRANSLATION_OPTIONS !== 'undefined') ? TRANSLATION_OPTIONS : null;
+  const found = opts && opts.find((o) => o.id === code);
+  return (found && found.lang) || undefined;
 }
 
 /**

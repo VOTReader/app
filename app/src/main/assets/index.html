@@ -60,7 +60,7 @@
        dashboard. The service worker never caches it (cross-origin). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-NpW/ShmQFkCof3AXi7n2zYO8aQB6icDMEZclJ+DDWrk=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-CSTsiXpSL6PrFbnnOKxr26HHhI6qbL1gLcEyixUvtIU=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-mAlLZyzgv5j3ckXsVbEHAdVurjqzQko87dljHD/9BUY=';
+    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-NpW/ShmQFkCof3AXi7n2zYO8aQB6icDMEZclJ+DDWrk=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-NJVgxbdmErm0m3DDvjIOVC32V+pEtLgRrhrdBwpYaFw=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-mAlLZyzgv5j3ckXsVbEHAdVurjqzQko87dljHD/9BUY=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     font-src 'self' data:;
@@ -499,7 +499,8 @@ const TRANSLATION_OPTIONS = [
 { id: 'rkjv', label: 'KJV-R', desc: 'KJV Restored Name — His true Name restored in the New Testament: YahuShua HaMashiach', base: 'kjv' },
 { id: 'asv', label: 'ASV', desc: 'American Standard Version 1901 — classical literal · ~2% longer than NKJV' },
 { id: 'lsv', label: 'LSV', desc: 'Literal Standard Version — uses YHWH for the Name · ~3% longer than NKJV' },
-{ id: 'ylt', label: 'YLT', desc: "Young's Literal Translation 1898 — hyper-literal · ~3% longer than NKJV" }];
+{ id: 'ylt', label: 'YLT', desc: "Young's Literal Translation 1898 — hyper-literal · ~3% longer than NKJV" },
+{ id: 'rvr', label: 'RVR1960', lang: 'es', desc: 'Reina-Valera 1960 (Español) — the Spanish Bible most Spanish-speaking churches read · book names, headings and menus stay in English' }];
 
 const SCRIPTURE_LAYOUT_OPTIONS = [
 { id: 'genre', label: 'Genre Grid', desc: 'Books grouped by genre with collapsible sections (default)' },

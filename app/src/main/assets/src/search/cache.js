@@ -43,7 +43,7 @@ export const MS_INDEX_VERSION = 'm16';  // m16: a Bible Study chapter's poems ar
 
 /** MUST equal service-worker.js CORPUS_VERSION — gate-enforced (SRCH1, see
  *  header). Busts the cached index on content-only corpus edits. */
-export const CORPUS_CONTENT_VERSION = 'c69';
+export const CORPUS_CONTENT_VERSION = 'c70';
 
 function ln(v) { return (v && typeof v.length === 'number') ? v.length : 0; }
 function kc(v) { return (v && typeof v === 'object') ? Object.keys(v).length : 0; }
