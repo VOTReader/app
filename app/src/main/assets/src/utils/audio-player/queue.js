@@ -364,6 +364,10 @@ export function playTrack(track) {
  * crossing), and the first keyed track of the next collection turns it into that collection's
  * run. Without that, _extendQueue kept reading the section's static volKey and appended the
  * same next collection again at each of its last tracks, for ever (sweep v7).
+ * The collection run keeps the section descriptor it came from (`fromSection`), and a compilation
+ * part starting again (Prev or a queue tap back over the seam) hands the run back to it. Without
+ * that the snapshot named Volume Two with Part 2's url, a restart rebuilt Volume Two, found no
+ * match, and Play started Volume Two's first letter at 0 under a bar showing Part 2 (sweep v7).
  *
  * @param {Track} track
  * @returns {void}
@@ -371,8 +375,14 @@ export function playTrack(track) {
 function _crossInto(track) {
   if (!_source || (_source.mode !== 'collection' && _source.mode !== 'section')) return;
   const volKey = _volKeyOf(track.key);
-  if (!volKey || volKey === _source.volKey) return;
-  _setSource({ mode: 'collection', volKey, label: track.sub || null, startKey: null, startReader: null, startPartIndex: 0 });
+  const back = _source.fromSection;
+  if (!volKey) {
+    if (back && sectionTracks(back.volKey, back.label).some((t) => t.url === track.url)) _setSource(back);
+    return;
+  }
+  if (volKey === _source.volKey) return;
+  _setSource({ mode: 'collection', volKey, label: track.sub || null, startKey: null, startReader: null, startPartIndex: 0,
+    fromSection: _source.mode === 'section' ? _source : back || null });
 }
 
 /**
