@@ -10,6 +10,7 @@ import { Icon } from '../Icon.jsx';
 import { definePlace } from '../places.js';
 import { whenPainted } from '../gate.js';
 import { bookTitle } from '../home-facts.js';
+import { POETIC_BOOKS } from '../bible-facts.js';
 import { highlightSpans } from '../../search/snippet.js';
 import { placeAtThird } from '../search-landing.js';
 import { bibleHlKey } from '../../utils/hl-keys.js';
@@ -155,7 +156,7 @@ export function BibleChapterScreen({ route, facts, gate = null, replace, onReady
   return (
     <>
       {head}
-      <div className="body g bible" ref={bodyRef}>
+      <div className={'body g bible' + (POETIC_BOOKS.has(book.id) ? ' poetry' : '')} ref={bodyRef}>
         {ch.sections.map((sec, si) => (
           <React.Fragment key={si}>
             {sec.heading || sec.letter ? <div className="sec-h">{[sec.letter, sec.heading].filter(Boolean).join(' ')}</div> : null}

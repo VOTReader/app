@@ -78,6 +78,9 @@
 /* Bible chapter */
 .body.bible { margin-top: 24px; }
 .body.bible p { margin: 0; }
+/* the poetic books (main's is-poetry): each verse on its own line, its number hung in the margin */
+.body.bible.poetry .v { display: block; position: relative; padding-left: 1.4em; margin-bottom: .35em; }
+.body.bible.poetry .v > .vn { position: absolute; left: 0; top: 0; line-height: inherit; vertical-align: baseline; margin: 0; }
 
 /* search */
 .tabroot .field { margin-top: 18px; }

@@ -195,6 +195,26 @@ describe('2c-john3-playing', () => {
   });
 });
 
+describe("the poetic books (v2-gaps 10: main's is-poetry)", () => {
+  const PSALMS = { id: 'psalms', title: 'Psalms', chapters: [{ num: 23, sections: [{ heading: 'The Lord the Shepherd of His People', verses: [
+    v(1, 'The Lord is my shepherd; I shall not want.'), v(2, 'He makes me to lie down in green pastures.')] }] }] };
+  const open = (book, chapter) => render(
+    <BibleChapterScreen route={{ place: 'bible-chapter', book, chapter }} facts={{}} gate={null} replace={() => {}} onReady={() => {}} />);
+
+  it("Psalms, Proverbs, Ecclesiastes, Song of Solomon and Lamentations set each verse on its own line; John stays prose", () => {
+    for (const id of ['psalms', 'proverbs', 'ecclesiastes', 'songofsolomon', 'lamentations']) {
+      g.BOOKS = { [id]: { ...PSALMS, id } };
+      const { container, unmount } = open(id, 23);
+      expect(container.querySelector('.body.bible').classList.contains('poetry')).toBe(true);
+      expect(texts(container, '.body .v .vn')).toEqual(['1', '2']);
+      unmount();
+    }
+    g.BOOKS = { john: JOHN };
+    const { container } = open('john', 3);
+    expect(container.querySelector('.body.bible').classList.contains('poetry')).toBe(false);
+  });
+});
+
 describe('loading', () => {
   it('loads main\'s Bible on first use, then shows the chapter', async () => {
     g.__loadBibleCorpus = vi.fn(() => { g.BOOKS = { john: JOHN }; return Promise.resolve(); });

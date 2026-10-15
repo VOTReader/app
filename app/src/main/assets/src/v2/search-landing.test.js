@@ -1,7 +1,7 @@
 /* search-landing.js (v2-gaps 9): which block a search hit opens on, and its words marked there as the Bible page marks
    a verse hit (mark.qm). Fixtures copy the corpus's shapes (volume-one.js Letter 9's first paragraph, wtlb-one.js 46). */
 import { describe, it, expect } from 'vitest';
-import { landingOf, markWords, unmarkWords } from './search-landing.js';
+import { landingOf, markWords, unmarkWords, placeAtThird } from './search-landing.js';
 
 const NAME = { id: 'whats-in-a-name', blocks: [
   { type: 'heading', text: 'Section One' },
@@ -83,5 +83,34 @@ describe('markWords', () => {
     expect(markWords(p, ['gallows'], 0)).toBeNull();
     expect(markWords(p, [], 0)).toBeNull();
     expect(p.querySelector('mark')).toBeNull();
+  });
+});
+
+describe('placeAtThird', () => {
+  /** A phone page 780 px tall: a paragraph at 400, the hit's verse at 500 (verses above it end with a gap), the mark at 530. */
+  function page(verseDisplay) {
+    const sc = document.createElement('div');
+    sc.className = 'content';
+    sc.innerHTML = '<p style="line-height: 30px"><span class="v" style="display: ' + verseDisplay + '; line-height: 30px"><mark class="qm">waters</mark></span></p>';
+    document.body.appendChild(sc);
+    let top = 0;
+    Object.defineProperty(sc, 'scrollTop', { get: () => top, set: (x) => { top = x; } });
+    const box = (el, t, b) => { el.getBoundingClientRect = () => /** @type {any} */ ({ top: t, bottom: b, left: 0, right: 360 }); };
+    box(sc, 0, 780);
+    box(sc.querySelector('p'), 400, 700);
+    box(sc.querySelector('.v'), 500, 590);
+    box(sc.querySelector('mark'), 532, 558);
+    placeAtThird(/** @type {HTMLElement} */ (sc.querySelector('mark')));
+    return top;
+  }
+
+  it("puts the hit's line on the whole-line row a third of the way down, counting lines from its paragraph", () => {
+    // prose: the lines run from the paragraph's top (400 + 4 x 30 = 520) to row 8 (240)
+    expect(page('inline')).toBe(520 - 240);
+  });
+
+  it('a verse set on its own lines (the poetic books) counts its lines from the verse, not the paragraph', () => {
+    // the verse's second line (500 + 30 = 530), not the paragraph's grid (520), to row 8 (240)
+    expect(page('block')).toBe(530 - 240);
   });
 });

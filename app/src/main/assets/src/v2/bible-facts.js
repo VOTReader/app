@@ -11,6 +11,9 @@ import { continueFromState } from './home-facts.js';
 /** Genesis to Malachi: the first 39 books of the canon table. */
 export const OT_COUNT = 39;
 
+/** The books main sets as poetry, each verse on its own line (BibleChapterView.jsx POETIC_BOOKS, `is-poetry`). */
+export const POETIC_BOOKS = new Set(['psalms', 'proverbs', 'songofsolomon', 'lamentations', 'ecclesiastes']);
+
 /** @typedef {{ id: string, title: string, chapters: number, testament: 'old' | 'new' }} Book */
 
 /** @type {Book[]} */

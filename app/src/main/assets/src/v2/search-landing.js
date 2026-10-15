@@ -108,7 +108,9 @@ export function placeAtThird(el) {
   const bottom = Math.min(s.bottom, tabs ? tabs.getBoundingClientRect().top : s.bottom);
   const r = el.getBoundingClientRect();
   const mid = (r.top + r.bottom) / 2;
-  const p = el.closest('p');
+  // the lines run from the top of the paragraph, or of the verse when it is set on its own lines (the poetic books)
+  const v = el.closest('.v');
+  const p = v && getComputedStyle(v).display === 'block' ? v : el.closest('p');
   const L = p ? parseFloat(getComputedStyle(p).lineHeight) : NaN;
   if (!p || !Number.isFinite(L) || L <= 0) { sc.scrollTop += mid - (top + (bottom - top) / 3); return; }
   // the match's line box (the mark's own box sits off its line's centre), moved to the whole-line row a third of the way down
