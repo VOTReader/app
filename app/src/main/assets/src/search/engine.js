@@ -1550,6 +1550,11 @@ async function search(query, options) {
   // A stop word the reader typed among real words ranks, but is not a word to mark:
   // its matches do not ride on the result for the snippet and the find bar.
   const contentTyped = units.some((u) => u.literal && !isStopTerm(u.term));
+  /* What the reader wants found: a -word is ruled out, not typed, and a +word is its word (sweep 2026-10-14 v002).
+     Read as typed, "Q -x" asked the texts to hold the run "Q x", so the passage quoted lost its phrase and
+     original boosts to a word the reader excluded; and the -word counted toward the words that make a keyword
+     search, so "to the false prophets -x" was searched as a passage. */
+  const wanted = (p.must && p.must.length) || (p.mustNot && p.mustNot.length) ? wantedQuery(query) : query;
   /* A word or two is a keyword search, and a word in a title is the strongest sign of
      the text meant ("144000", "false prophets"). More is a passage or a title typed out,
      and the original of a passage comes before the texts that reprint it. */
@@ -1557,7 +1562,7 @@ async function search(query, options) {
   const contentWords = p.phrase
     ? kjvEncode(p.phrase).filter((t) => !(STOP_TRIMMED && STOP_TRIMMED.has(t))).length
     : units.filter((u) => u.literal && !isStopTerm(u.term)).length;
-  const keyword = contentWords <= KEYWORD_CONTENT_WORDS && kjvEncode(p.phrase || query).length <= KEYWORD_WORDS;
+  const keyword = contentWords <= KEYWORD_CONTENT_WORDS && kjvEncode(p.phrase || wanted).length <= KEYWORD_WORDS;
   /** @param {any} unit @param {any[]} res */
   const accumulate = (unit, res) => {
     const weight = unit.literal || unit.joined ? 1 : unit.form ? FORM_WEIGHT : SYNONYM_WEIGHT;
@@ -1693,10 +1698,6 @@ async function search(query, options) {
   const nearOf = Object.create(null);
   for (let c = 0; c < corrections.length; c++) fixedTo[corrections[c].from] = corrections[c].to;
   for (const k in modernOf) fixedTo[k] = modernOf[k];
-  /* What the reader wants found: a -word is ruled out, not typed, and a +word is its word (sweep 2026-10-14 v002).
-     Read as typed, "Q -x" asked the texts to hold the run "Q x", so the passage quoted lost its phrase and
-     original boosts to a word the reader excluded. */
-  const wanted = (p.must && p.must.length) || (p.mustNot && p.mustNot.length) ? wantedQuery(query) : query;
   const typedTokens = joinApostropheS(kjvEncode(wanted).map((t) => fixedTo[t] || t));
   const STOP = D.STOP_WORDS_TRIMMED;
   if (!p.phrase && required > 1 && typedTokens.length > 1) {

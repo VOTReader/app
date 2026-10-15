@@ -140,6 +140,19 @@ describe('ranking on the audit\u2019s cases', () => {
     }
   });
 
+  /* The same on a short query: the -word was counted among the typed words that make a query a keyword search
+     (KEYWORD_WORDS), so "to the false prophets -zebra" was searched as a passage (BM25 without the keyword floor,
+     a title holding its words no longer named, the meaning model asked), where "to the false prophets" is a
+     keyword search. */
+  it('a -word does not turn a keyword search into a passage search', async () => {
+    for (const q of ['to the false prophets', 'in the silver cord']) {
+      const plain = await VotSearchMini.search(q);
+      const minus = await VotSearchMini.search(q + ' -zebra');
+      expect(refs(minus), q).toEqual(refs(plain));
+      expect(minus.results.map((x) => Math.round(x.score)), q).toEqual(plain.results.map((x) => Math.round(x.score)));
+    }
+  });
+
   it('a Matthew verse shows once across both collections, and in either one kept to itself', async () => {
     const all = (await VotSearchMini.search('judge not that you be not judged')).results.filter((x) => x.doc.kind === 'verse' && x.doc.chapterNum === 7);
     expect(all.length).toBe(1);
