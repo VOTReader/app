@@ -4,7 +4,8 @@
    Route: { place: 'bible-chapter', book, chapter, verse?, match? } with book = main's BOOKS key ('john'). The chapter is
    read from main's Bible (bundle-a-bible.js, loaded on first use) in the reader's translation (main's translateVerse;
    NKJV until another edition has loaded). Opened from a search, `verse` is placed a third of the way down the page with
-   `match` underlined in it (5c), and Back returns to the results. */
+   `match` underlined in it (5c), and Back returns to the results. A verse main's reader highlighted (bible:<book>:<c>:<v>)
+   shows it here, painted by main's own painter as a letter's are (v2g11: saved data shows up in the new places). */
 import { Icon } from '../Icon.jsx';
 import { definePlace } from '../places.js';
 import { whenPainted } from '../gate.js';
@@ -12,11 +13,13 @@ import { bookTitle } from '../home-facts.js';
 import { highlightSpans } from '../../search/snippet.js';
 import { bibleHlKey } from '../../utils/hl-keys.js';
 import { LayerToast } from '../Sheet.jsx';
-import { TOAST_MS } from './LetterScreen.jsx';
+import { TOAST_MS, useMainMarks } from './LetterScreen.jsx';
 import { ChapterListenPill, chapterAudio, startChapter } from '../player/listen.jsx';
 import { ChapterReadAlong } from '../player/read-along.jsx';
 
 const g = /** @type {any} */ (globalThis);
+/** @type {string[]} */
+const NO_TERMS = [];
 
 /** main's Bible when it has loaded, else null. */
 function booksNow() {
@@ -40,7 +43,7 @@ export function useBook(id) {
 
 /** The reader's translation for verse text: held while shown, and the page redrawn once it has loaded (main's pattern). */
 function useTranslation(tr) {
-  const [, setTick] = React.useState(0);
+  const [tick, setTick] = React.useState(0);
   React.useEffect(() => {
     if (!tr || tr === 'nkjv' || typeof g.loadTranslation !== 'function') return undefined;
     let live = true;
@@ -51,8 +54,32 @@ function useTranslation(tr) {
   return {
     text: (book, ch, v) => (tr && tr !== 'nkjv' && typeof g.translateVerse === 'function' ? g.translateVerse(book.id, ch.num, v, tr) : v.text),
     label: typeof g.translationLabel === 'function' ? g.translationLabel(tr || 'nkjv') : String(tr || 'nkjv').toUpperCase(),
+    /** changes whenever the words on the page do */
+    words: (tr || 'nkjv') + ':' + tick,
   };
 }
+
+/**
+ * A verse's words, the box main's painter marks (data-hl-key + data-hl-dom over the words alone, as main's
+ * HighlightableText holds them). Keyed by the words' version where it is used, so new words are a new box and React
+ * never rewrites text the painter has split; memoised against the page's other renders.
+ * @param {{ hlKey: string, text: string, terms: string[], matchRef: { current: HTMLElement | null } | null }} props
+ */
+function Words({ hlKey, text, terms, matchRef }) {
+  /** @type {any} */
+  let words = text;
+  if (terms.length) {
+    let first = true;
+    words = highlightSpans(text, terms).map((s, i) => {
+      if (!s.hit) return <React.Fragment key={i}>{s.text}</React.Fragment>;
+      const ref = first ? matchRef : undefined;
+      first = false;
+      return <mark key={i} ref={ref} className="qm">{s.text}</mark>;
+    });
+  }
+  return <span className="vt" data-hl-key={hlKey} data-hl-dom="true">{words}</span>;
+}
+const VerseWords = React.memo(Words, (a, b) => a.hlKey === b.hlKey && a.text === b.text && a.terms.join('\u0001') === b.terms.join('\u0001'));
 
 /** The element that scrolls this page: the laptop's .main, or the phone's .content. */
 function scrollerOf(el) {
@@ -102,6 +129,9 @@ export function BibleChapterScreen({ route, facts, gate = null, replace, onReady
   const matchRef = React.useRef(/** @type {HTMLElement | null} */ (null));
   const bodyRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const terms = route.match ? [].concat(route.match).filter(Boolean) : [];
+  const termsKey = terms.join('\u0001');
+  // main's highlights on the verses, painted again when the words, the match or main's marks change (never on a gate boot)
+  useMainMarks(!gate, book && ch ? [book.id, ch.num, tr.words, route.verse || '', termsKey].join('|') : null);
   // the reader's Bible audio for this book (readalong rv1 2c); null = no recording, so no pill and no read-along
   const audio = React.useMemo(() => chapterAudio(route.book, gate), [route.book, gate]);
   // Listen's offline line, as the letter's (a gate's stays: it is the picture)
@@ -137,22 +167,16 @@ export function BibleChapterScreen({ route, facts, gate = null, replace, onReady
   if (!book || !ch) return <>{head}<div className="g"><div className="empty"><div className="t">This chapter could not be opened.</div></div></div></>;
   const next = nextOf(book, ch.num);
   const verse = (v) => {
-    const text = tr.text(book, ch, v);
     const hit = v.n === route.verse;
-    let words = text;
-    if (hit && terms.length) {
-      let first = true;
-      words = highlightSpans(text, terms).map((s, i) => {
-        if (!s.hit) return <React.Fragment key={i}>{s.text}</React.Fragment>;
-        const ref = first ? matchRef : undefined;
-        first = false;
-        return <mark key={i} ref={ref} className="qm">{s.text}</mark>;
-      });
-    }
+    const hlKey = bibleHlKey(book.id, ch.num, v.n);
+    const vt = hit ? terms : NO_TERMS;
+    // The verse keeps the key too: the read-along lights the first element keyed so, the whole verse with its number
+    // (2c), and main's read tracker counts only the outermost keyed element, once per verse.
     return (
       <React.Fragment key={v.n}>
-        <span className={'v' + (hit ? ' hit-v' : '')} id={'v-' + v.n} data-read-seg={'v' + v.n} data-hl-key={bibleHlKey(book.id, ch.num, v.n)}>
-          <span className="vn">{v.n}</span>{words}
+        <span className={'v' + (hit ? ' hit-v' : '')} id={'v-' + v.n} data-read-seg={'v' + v.n} data-hl-key={hlKey}>
+          <span className="vn">{v.n}</span>
+          <VerseWords key={tr.words + (hit ? '|' + termsKey : '')} hlKey={hlKey} text={tr.text(book, ch, v)} terms={vt} matchRef={hit ? matchRef : null} />
         </span>{' '}
       </React.Fragment>
     );

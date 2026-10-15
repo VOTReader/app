@@ -81,8 +81,11 @@ function useStoreVersion(store) {
   return React.useSyncExternalStore(subscribe, () => (store && typeof store.getVersion === 'function' ? store.getVersion() : 0));
 }
 
-/** main's painter over this page's blocks, again whenever a highlight or a note changes. Off for a gate boot. */
-function useMainMarks(on, letterId) {
+/**
+ * main's painter over this page's blocks, again whenever a highlight or a note changes or `letterId` (any key for what
+ * the page shows) does. Off for a gate boot. The Bible chapter page uses it too.
+ */
+export function useMainMarks(on, letterId) {
   const A = on ? g.AnnotationStore : null;
   const annV = useStoreVersion(A);
   const noteV = useStoreVersion(on ? g.NoteStore : null);

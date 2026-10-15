@@ -4,6 +4,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, waitFor, act } from '@testing-library/react';
 import { V2App } from '../App.jsx';
 import { BibleChapterScreen as Screen } from './BibleChapterScreen.jsx';
+import { applyDOMHighlights } from '../../renderer/annotation-engine.jsx';
 
 /** The screen without the shell: the tests pass only the PlaceProps it reads. */
 const BibleChapterScreen = /** @type {any} */ (Screen);
@@ -33,7 +34,8 @@ const ACTS = { id: 'acts', title: 'Acts', chapters: [{ num: 1, sections: [{ vers
 
 afterEach(() => {
   cleanup();
-  for (const k of ['BOOKS', 'BIBLE_BOOK_LIST', '__loadBibleCorpus', 'translateVerse', 'translationLabel', 'loadTranslation', 'ReadAlongHighlight', 'AudioPlayer', 'BIBLE_AUDIO_MANIFEST']) delete g[k];
+  for (const k of ['BOOKS', 'BIBLE_BOOK_LIST', '__loadBibleCorpus', 'translateVerse', 'translationLabel', 'loadTranslation', 'ReadAlongHighlight', 'AudioPlayer', 'BIBLE_AUDIO_MANIFEST',
+    'AnnotationStore', 'applyDOMHighlights']) delete g[k];
   delete html.dataset.gate;
   vi.restoreAllMocks();
 });
@@ -83,6 +85,48 @@ describe('5c-search-match', () => {
   });
 });
 
+/** main's AnnotationStore as far as its painter and useMainMarks read it (get + version), holding `data`. */
+function fakeAnnotations(/** @type {Record<string, any[]>} */ data) {
+  const ls = new Set();
+  let ver = 0;
+  return {
+    get: (k) => data[k] || [],
+    add: (k, a) => { (data[k] = data[k] || []).push(a); ver += 1; ls.forEach((cb) => cb()); },
+    subscribe: (cb) => { ls.add(cb); return () => ls.delete(cb); },
+    getVersion: () => ver,
+  };
+}
+const hl = (id, start, end, text) => ({ id, groupId: id, kind: 'highlight', start, end, color: 'yellow', text, created: 1 });
+
+describe("main's marks on a chapter (v2g11 gap d)", () => {
+  it("a verse main's reader highlighted shows it on the verse's words, by main's painter; the number stays out of it", async () => {
+    g.BOOKS = { john: JOHN };
+    // main anchors a verse's marks to its words alone (BibleChapterView's HighlightableText): offsets count from 'D'
+    g.AnnotationStore = fakeAnnotations({ 'bible:john:3:7': [hl('h7', 0, 13, 'Do not marvel')] });
+    g.applyDOMHighlights = vi.fn(applyDOMHighlights);
+    const { container } = render(
+      <BibleChapterScreen route={{ place: 'bible-chapter', book: 'john', chapter: 3 }} facts={{}} replace={() => {}} onReady={() => {}} />,
+    );
+    await waitFor(() => expect(texts(container, 'mark.hl-dom')).toEqual(['Do not marvel']));
+    expect(container.querySelector('mark.hl-dom').closest('.v').id).toBe('v-7');
+    expect(container.querySelector('#v-7 .vn').textContent).toBe('7');
+    // one made later (in either app) shows at once
+    act(() => { g.AnnotationStore.add('bible:john:3:2', hl('h2', 5, 8, 'man')); });
+    await waitFor(() => expect(texts(container, 'mark.hl-dom')).toEqual(['man', 'Do not marvel']));
+  });
+
+  it('a gate boot never paints (the picture is the gate)', () => {
+    g.BOOKS = { john: JOHN };
+    g.AnnotationStore = fakeAnnotations({ 'bible:john:3:7': [hl('h7', 0, 13, 'Do not marvel')] });
+    g.applyDOMHighlights = vi.fn(applyDOMHighlights);
+    const { container } = render(
+      <BibleChapterScreen route={{ place: 'bible-chapter', book: 'john', chapter: 3 }} facts={{}} gate={{}} replace={() => {}} onReady={() => {}} />,
+    );
+    expect(g.applyDOMHighlights).not.toHaveBeenCalled();
+    expect(container.querySelector('mark.hl-dom')).toBe(null);
+  });
+});
+
 describe('2c-john3-playing', () => {
   it('each verse carries main\'s verse key beside its read segment, so the read-along and read marks key it as main does', () => {
     g.BOOKS = { john: JOHN };
@@ -92,8 +136,15 @@ describe('2c-john3-playing', () => {
     const v7 = container.querySelector('#v-7');
     expect(v7.getAttribute('data-hl-key')).toBe('bible:john:3:7');
     expect(v7.getAttribute('data-read-seg')).toBe('v7');
-    expect([...container.querySelectorAll('.bible [data-hl-key]')].map((n) => n.getAttribute('data-hl-key')))
+    expect([...container.querySelectorAll('.bible .v')].map((n) => n.getAttribute('data-hl-key')))
       .toEqual(['bible:john:3:1', 'bible:john:3:2', 'bible:john:3:3', 'bible:john:3:7']);
+    // the read-along finds a verse by its key and lights it whole, number in (2c's picture): the first element keyed so
+    expect(container.querySelector('[data-hl-key="bible:john:3:7"]')).toBe(v7);
+    // main's marks live on the words alone, inside the verse (the read tracker counts the outer one, once per verse)
+    const words = v7.querySelector('[data-hl-dom]');
+    expect(words.getAttribute('data-hl-key')).toBe('bible:john:3:7');
+    expect(words.textContent).toBe('Do not marvel that I said to you, You must be born again.');
+    expect(container.querySelectorAll('.bible [data-hl-dom]').length).toBe(4);
   });
 
   it('the gate picture: John 3 from Home > The Bible > John at its top; Back says John, Home stays lit', async () => {
