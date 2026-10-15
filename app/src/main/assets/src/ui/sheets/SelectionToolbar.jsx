@@ -318,18 +318,22 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
    * Characters before `node` in the container's text, walking the same
    * SHOW_TEXT order that applyDOMHighlights indexes by.
    *
-   * An ELEMENT is located by its first text node, so `contains` is the test —
-   * a text walker can never equal an element.
+   * The walk stops at the first text node that is `node` itself or comes
+   * after its start in document order (a descendant counts: the DOM reports
+   * it as FOLLOWING too). sweep v49: an element was found by "contains the
+   * walker's node", which a child with no text (a WTLB <br>, an SVG-only link
+   * or note icon) never does, so the boundary before it fell through to the
+   * container's whole length and a highlight ran to the paragraph's end.
    */
   const textPosBefore = React.useCallback((container, node) => {
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
     let charPos = 0;
     while (walker.nextNode()) {
       const cur = walker.currentNode;
-      if (cur === node || (node.nodeType === 1 && node.contains(cur))) return charPos;
+      if (cur === node || (node.compareDocumentPosition(cur) & Node.DOCUMENT_POSITION_FOLLOWING)) return charPos;
       charPos += cur.textContent.length;
     }
-    return charPos;   // no text under `node`: it sits at the end
+    return charPos;   // no text at or after `node`: it sits at the end
   }, []);
 
   /**

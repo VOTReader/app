@@ -114,3 +114,71 @@ describe('REPRO annotation-selection-8: Chrome triple-click (end boundary = next
     }));
   });
 });
+
+/* sweep v49 (2026-10-14 batch): an element boundary just before a child with NO text (a Words To Live By
+   <br>, or an inline icon span holding only an SVG, e.g. dom-links' inline-link-icon) was located by
+   "does this node contain the walker's text node", which a text-less child never does, so textPosBefore
+   fell through to the container's whole length: a selection ENDING there ran to the end of the
+   paragraph, and one STARTING there gave start >= end and the toolbar never rose. */
+describe('sweep v49: an element boundary before a text-less child', () => {
+  /** Raise the toolbar on `range` and press Link; returns the Link request (or undefined). */
+  function linkFor(container, range) {
+    range.getBoundingClientRect = () => ({ left: 10, top: 100, right: 200, bottom: 120, width: 190, height: 20 });
+    window.getSelection = () => ({
+      isCollapsed: false,
+      rangeCount: 1,
+      getRangeAt: () => range,
+      removeAllRanges: vi.fn(),
+      toString: () => range.toString(),
+    });
+    const onLinkRequest = vi.fn();
+    render(<SelectionToolbar onLinkRequest={onLinkRequest} />);
+    fireEvent.contextMenu(container, { clientX: 20, clientY: 100 });
+    const linkBtn = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Link');
+    if (!linkBtn) return undefined;
+    fireEvent.click(linkBtn);
+    return onLinkRequest.mock.calls[0] && onLinkRequest.mock.calls[0][0];
+  }
+
+  afterEach(() => { document.body.innerHTML = ''; });
+
+  it('a selection ending just before a <br> ends at that line, not at the paragraph end', () => {
+    const p = document.createElement('p');
+    p.dataset.hlKey = 'wtlb:poem:1';
+    p.innerHTML = 'Wait on the Lord<br>and be of good courage';
+    document.body.appendChild(p);
+    const range = document.createRange();
+    range.setStart(p.firstChild, 0);
+    range.setEnd(p, 1);                       // element boundary: before child 1, the <br>
+    const req = linkFor(p, range);
+    expect(req).toEqual(expect.objectContaining({ hlKey: 'wtlb:poem:1', start: 0, end: 'Wait on the Lord'.length }));
+  });
+
+  it('a selection starting just before a <br> starts at the next line, and the toolbar rises', () => {
+    const p = document.createElement('p');
+    p.dataset.hlKey = 'wtlb:poem:2';
+    p.innerHTML = 'Wait on the Lord<br>and be of good courage';
+    document.body.appendChild(p);
+    const second = p.lastChild;
+    const range = document.createRange();
+    range.setStart(p, 1);                     // before the <br>
+    range.setEnd(second, second.length);
+    const req = linkFor(p, range);
+    expect(req, 'no Link action: start resolved past the end and the toolbar stayed down').toBeTruthy();
+    expect(req).toEqual(expect.objectContaining({ start: 'Wait on the Lord'.length, end: p.textContent.length }));
+  });
+
+  it('a selection ending just before an inline link icon (an SVG-only span) ends there', () => {
+    const p = document.createElement('p');
+    p.dataset.hlKey = 'vol2:letter:3';
+    p.innerHTML = 'Behold, I am coming quickly'
+      + '<span class="inline-link-icon"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54"/></svg></span>'
+      + ', and My reward is with Me.';
+    document.body.appendChild(p);
+    const range = document.createRange();
+    range.setStart(p.firstChild, 0);
+    range.setEnd(p, 1);                       // before the icon span
+    const req = linkFor(p, range);
+    expect(req).toEqual(expect.objectContaining({ start: 0, end: 'Behold, I am coming quickly'.length }));
+  });
+});
