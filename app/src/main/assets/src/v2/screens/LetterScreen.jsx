@@ -38,24 +38,32 @@ export function letterAt(letters, n) {
   return letters.find((l) => l && l.num === n) || null;
 }
 
+/** The collection's preface (Volume One's "A Word of Warning"), or null. */
+export function prefaceOf(col) {
+  const p = col && col.prefaceGlobal ? g[col.prefaceGlobal] : null;
+  return p && p.id ? p : null;
+}
+
 /**
- * @param {{ collection: string, n: number, onReady?: () => void, onOpenLetter?: (n: number) => void }} props
+ * One letter, or with `preface` the collection's preface (its next card is Letter 1).
+ * @param {{ collection: string, n?: number, preface?: boolean, onReady?: () => void, onOpenLetter?: (n: number) => void }} props
  */
-export function LetterScreen({ collection, n, onReady, onOpenLetter }) {
+export function LetterScreen({ collection, n = 0, preface = false, onReady, onOpenLetter }) {
   const col = collectionOf(collection);
   const letters = useLetters(col);
-  const letter = letters ? letterAt(letters, n) : null;
+  const letter = letters ? (preface ? prefaceOf(col) : letterAt(letters, n)) : null;
   React.useEffect(() => { if (letters && onReady) onReady(); }, [letters, onReady]);
   if (!letters) return null;
   if (!col || !letter) {
     return <div className="empty"><div className="t">This letter could not be opened.</div></div>;
   }
-  const next = letterAt(letters, n + 1);
+  const nextN = preface ? 1 : n + 1;
+  const next = letterAt(letters, nextN);
   const meta = [letter.date, letter.from, letter.spoken, letter.forLine].filter(Boolean);
   return (
     <>
       <div className="page-head g reader-head">
-        <span className="overline eyebrow">{col.label} · Letter {n}</span>
+        <span className="overline eyebrow">{col.label} · {preface ? 'Preface' : 'Letter ' + n}</span>
         <h1 className={titleClass(letter.title)}>{letter.title}</h1>
         <button type="button" className="pill play"><Icon name="playBig" />Listen</button>
         {meta.length > 0 && <div className="meta">{meta.map((m, i) => <React.Fragment key={i}>{i > 0 && <br />}{m}</React.Fragment>)}</div>}
@@ -64,8 +72,8 @@ export function LetterScreen({ collection, n, onReady, onOpenLetter }) {
       <div className="body g first">
         {(letter.blocks || []).map((b, i) => <LetterBlock key={i} block={b} />)}
         {next && (
-          <button type="button" className="nextcard" onClick={() => onOpenLetter && onOpenLetter(n + 1)}>
-            <span className="tx"><span className="k">Next · Letter {n + 1}</span><span className="t">{next.title}</span></span>
+          <button type="button" className="nextcard" onClick={() => onOpenLetter && onOpenLetter(nextN)}>
+            <span className="tx"><span className="k">Next · Letter {nextN}</span><span className="t">{next.title}</span></span>
             <span className="chev"><Icon name="chev" /></span>
           </button>
         )}
@@ -85,7 +93,8 @@ const LETTER_ACTIONS = (
 /** The letter place: the next-letter card replaces this letter, so Back still names the collection. */
 function LetterPlace({ route, replace, onReady }) {
   const openLetter = (n) => replace({ place: 'letter', collection: route.collection, n });
-  return <LetterScreen key={route.collection + '/' + route.n} collection={route.collection} n={route.n} onReady={onReady} onOpenLetter={openLetter} />;
+  return <LetterScreen key={route.collection + '/' + (route.preface ? 'P' : route.n)} collection={route.collection} n={route.n}
+    preface={!!route.preface} onReady={onReady} onOpenLetter={openLetter} />;
 }
 
 definePlace('letter', {
@@ -94,7 +103,7 @@ definePlace('letter', {
   title: (r) => {
     const col = collectionOf(r.collection);
     const list = col && Array.isArray(g[col.globalName]) ? g[col.globalName] : null;
-    const letter = list ? letterAt(list, r.n) : null;
+    const letter = list ? (r.preface ? prefaceOf(col) : letterAt(list, r.n)) : null;
     return letter ? letter.title : (col ? col.label : '');
   },
   actions: () => LETTER_ACTIONS,

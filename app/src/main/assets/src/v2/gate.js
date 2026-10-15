@@ -66,6 +66,13 @@ export const GATE_STATES = {
       now: GATE_NOW,
     },
   },
+  // states.json 2a-collection: Volume One from Home, at the top; Letter 1 playing at 3:51, Letter 2 finished, Letter 3 with
+  // 6 minutes left (progress keys are <collection>/<n>, collection-facts.js).
+  '2a-collection': {
+    stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }],
+    facts: { progress: { 'one/2': { finished: true }, 'one/3': { leftMin: 6 } } },
+    playing: { ...LETTER1_AT_351, paused: false },
+  },
   // states.json 1a-letter: Volume One, Letter 1 (Chosen by God), top of the page, not playing; Back says Volume One.
   '1a-letter': {
     stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],

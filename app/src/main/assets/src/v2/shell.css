@@ -22,6 +22,9 @@ html, body { background: var(--bg); height: 100%; overflow: hidden; overscroll-b
 .v2 button.srow, .v2 button.row, .v2 button.nextcard { width: 100%; text-align: left; }
 .v2 button .tx, .v2 button .t, .v2 button .s, .v2 button .k { display: block; }
 .v2 .tabbar .tab, .v2 .rail .tab { width: 100%; }
+/* a numbered row's text is its own button (the row also holds a play button): text left, the title still clamps at 2 */
+.v2 .row > button.tx { text-align: left; }
+.v2 .num-row button .t { display: -webkit-box; }
 .v2 .stanza-break { display: block; height: .75em; }
 .v2 .caps { font-weight: 600; letter-spacing: .03em; }
 

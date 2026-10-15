@@ -8,7 +8,6 @@
 import { Icon } from './Icon.jsx';
 import { readGateId, gateState, markGate, whenPainted } from './gate.js';
 import { savedFacts } from './settings-facts.js';
-import { collectionOf } from './screens/LetterScreen.jsx';
 import { bookTitle } from './home-facts.js';
 import { placeFor } from './places.js';
 import './screens/index.js';
@@ -47,10 +46,6 @@ export function routeTitle(r) {
   const def = placeFor(r.place);
   if (def && def.title) return def.title(r);
   if (Object.prototype.hasOwnProperty.call(PLACE_TITLES, r.place)) return PLACE_TITLES[r.place];
-  if (r.place === 'collection') {
-    const col = collectionOf(r.collection);
-    return col ? col.label : '';
-  }
   if (r.place === 'bible-book') return bookTitle({ book: r.book });
   if (r.place === 'bible-chapter') return bookTitle({ book: r.book }) + ' ' + r.chapter;
   return '';
