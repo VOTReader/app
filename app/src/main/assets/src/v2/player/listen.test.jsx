@@ -320,4 +320,13 @@ describe('chapterAudio', () => {
     expect(chapterAudio('john')).toMatchObject({ volKey: 'bible-brm-kjv' });
     expect(chapterAudio('luke')).toBe(null);
   });
+
+  it("a gate boot reads the row's facts, never the reader's storage", () => {
+    g.BIBLE_AUDIO_MANIFEST = { 'bible-brm-kjv:john': [['a', '', 'Chapter 1']], [WOP + ':john']: [['b', '', 'Chapter 1']] };
+    const get = vi.fn(() => ({ settings: { bibleAudio: 'brm-kjv' } }));
+    g.StateStore = { isReady: () => true, get };
+    expect(chapterAudio('john', { facts: { bibleAudio: 'wop-nkjv' } })).toMatchObject({ volKey: WOP });
+    expect(chapterAudio('john', { facts: {} })).toMatchObject({ volKey: 'bible-brm-kjv' });
+    expect(get).not.toHaveBeenCalled();
+  });
 });

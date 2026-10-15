@@ -49,11 +49,13 @@ export function startChapter(engine, { volKey, book, chapter, label = null }, on
 /**
  * The edition a chapter's Listen plays and its read-along paints: main's resolveBibleAudio over the reader's saved
  * settings (the chosen edition when it carries the book, else the default), null when none does (no pill, no wash).
- * @param {string} bookId @returns {{ volKey: string, label: string } | null}
+ * A gate boot reads its own facts, never the reader's storage (places.js).
+ * @param {string} bookId @param {any} [gate] @returns {{ volKey: string, label: string } | null}
  */
-export function chapterAudio(bookId, gl = g) {
+export function chapterAudio(bookId, gate = null, gl = g) {
   // listeningFacts fills main's default (brm-kjv) for a store that never saved the setting
-  const ed = resolveBibleAudio({ settings: { bibleAudio: listeningFacts(savedSettings(gl)).bibleAudio }, bookId }).offer;
+  const saved = gate ? (gate.facts || {}) : savedSettings(gl);
+  const ed = resolveBibleAudio({ settings: { bibleAudio: listeningFacts(saved).bibleAudio }, bookId }).offer;
   return ed ? { volKey: ed.volKey, label: ed.label } : null;
 }
 
