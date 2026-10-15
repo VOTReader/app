@@ -154,6 +154,27 @@ describe('w-audio-continue — the queue is the site order, one unit ahead', () 
     } finally { delete globalThis.AUDIO_SECTIONS; }
   });
 
+  it('a range-compilation run that crossed into the next collection walks on from THAT collection, never re-appending it (sweep v7)', () => {
+    globalThis.AUDIO_SECTIONS = { vol1: [['Part 1 · Intro–19', 'idPart1', 'V'], ['Part 2 · 20–39', 'idPart2', 'V']] };
+    try {
+      AudioPlayer.playSection('vol1', 1, 'Volume One');
+      ended();                                                  // → Volume Two's only (so last) track starts
+      expect(el().src).toBe(URL_OF('idSolo'));
+      // Its last track starting appended what comes AFTER Volume Two (silent skipped), not Volume Two again.
+      expect(urls()).toEqual([URL_OF('idPart2'), URL_OF('idSolo'), URL_OF('idLast')]);
+      // The run crossed into Volume Two: the descriptor follows it, as a collection run's does.
+      expect(AudioPlayer.getState().sourceMode).toBe('collection');
+      const snap = JSON.parse(localStorage.getItem('vot-audio-pos'));
+      expect(snap.volKey).toBe('vol2');
+      expect(snap.key).toBe('vol2:solo');
+      ended();
+      expect(el().src).toBe(URL_OF('idLast'));
+      ended();                                                  // the order ends at vol3: stop(), no loop
+      expect(AudioPlayer.getState().status).toBe('idle');
+      expect(el().srcHistory.filter((u) => u === URL_OF('idSolo'))).toHaveLength(1);
+    } finally { delete globalThis.AUDIO_SECTIONS; }
+  });
+
   it('the next collection joins in the listener\'s Letter Voice where that reader recorded it (ra5)', () => {
     globalThis.AUDIO_ALTERNATES = { 'vol2:solo': [['V', [['idSoloV']]]] };
     try {

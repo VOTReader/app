@@ -360,12 +360,16 @@ export function playTrack(track) {
  * A track from another collection is starting: the descriptor follows it, with the horizon
  * cleared (the start key belonged to the collection being left). Bible books share one volKey
  * per edition, so a book boundary changes nothing here — the snapshot's `key` names the book.
+ * A range-compilation run crosses the same way: its own tracks carry key null (no volKey, so no
+ * crossing), and the first keyed track of the next collection turns it into that collection's
+ * run. Without that, _extendQueue kept reading the section's static volKey and appended the
+ * same next collection again at each of its last tracks, for ever (sweep v7).
  *
  * @param {Track} track
  * @returns {void}
  */
 function _crossInto(track) {
-  if (!_source || _source.mode !== 'collection') return;
+  if (!_source || (_source.mode !== 'collection' && _source.mode !== 'section')) return;
   const volKey = _volKeyOf(track.key);
   if (!volKey || volKey === _source.volKey) return;
   _setSource({ mode: 'collection', volKey, label: track.sub || null, startKey: null, startReader: null, startPartIndex: 0 });
