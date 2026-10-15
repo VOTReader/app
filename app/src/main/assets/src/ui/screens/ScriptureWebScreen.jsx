@@ -1003,6 +1003,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
   // ── keyboard (PWA desktop) ──────────────────────────────────────────────
   const onKeyDown = React.useCallback((e) => {
+    // The web's keys are the web's while the web itself has focus. Keydown bubbles here from
+    // every control inside .sw-root: ArrowRight on the density <select> panned the camera and
+    // preventDefault cancelled the select's own change, and a Nearby row's arrows panned the web
+    // behind the list (sweep v72). Escape is the one key taken from anywhere: it closes the top
+    // layer, or leaves.
+    if (e.key !== 'Escape' && e.target !== e.currentTarget) return;
     const v = viewRef.current;
     // r2: the keys drive the rail the pointer last touched (the Bible rail
     // until a gesture says otherwise); Reset (0) resets both

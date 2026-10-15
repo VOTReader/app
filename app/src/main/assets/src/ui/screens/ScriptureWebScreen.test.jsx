@@ -757,6 +757,50 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       // the camera sits at the fitted centre of the five-letter rail: position 2.5 rounds to 3
       expect(live()).toBe('The Fourth, Rebuke');
     });
+
+    /* v72: onKeyDown sits on .sw-root and read every keydown that bubbled up to it. A keyboard
+       reader on the density <select> pressed ArrowRight / ArrowDown: the web panned and
+       preventDefault cancelled the select's own option change. The rows of the Nearby list
+       panned the web behind them the same way. */
+    it('v72: keys pressed on the density select or a list row stay theirs; Escape still reaches the web', async () => {
+      const onBack = vi.fn();
+      const { container } = await mount({ onBack }, threaded);
+      const root = container.querySelector('.sw-root');
+      for (let i = 0; i < 6; i++) { fireEvent.keyDown(root, { key: '+' }); await settle(20); }
+      const lastDraw = () => DRAWN[DRAWN.length - 1];
+      // CONTROL: on the web itself the arrow is the web's: cancelled, and the camera pans
+      let before = lastDraw();
+      expect(fireEvent.keyDown(root, { key: 'ArrowRight' }), 'CONTROL: the web takes its own key').toBe(false);
+      await settle(20);
+      expect(lastDraw().camX, 'CONTROL: the web panned').not.toBeCloseTo(before.camX, 3);
+
+      const select = screen.getByLabelText('Connection density');
+      select.focus();
+      before = lastDraw();
+      for (const key of ['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', '+', '-', '0']) {
+        expect(fireEvent.keyDown(select, { key }), key + ' on the select is not cancelled').toBe(true);
+        await settle(20);
+      }
+      expect(lastDraw().camX, 'the web did not pan under the select').toBeCloseTo(before.camX, 6);
+      expect(lastDraw().ppv, 'nor zoom').toBeCloseTo(before.ppv, 6);
+      expect(lastDraw().camY, 'nor climb').toBe(before.camY);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
+      await settle(20);
+      const row = container.querySelector('.sw-list .sw-choice-row');
+      expect(row, 'PRECONDITION: the list has a row').toBeTruthy();
+      expect(fireEvent.keyDown(row, { key: 'ArrowLeft' }), 'ArrowLeft on a row is not cancelled').toBe(true);
+      await settle(20);
+      expect(lastDraw().camX, 'the web did not pan behind the list').toBeCloseTo(before.camX, 6);
+
+      // Escape is the web's from anywhere: from the row it closes the list, from the select it leaves
+      fireEvent.keyDown(row, { key: 'Escape' });
+      await settle(20);
+      expect(container.querySelector('.sw-list')).toBeNull();
+      expect(onBack).not.toHaveBeenCalled();
+      fireEvent.keyDown(select, { key: 'Escape' });
+      expect(onBack).toHaveBeenCalledTimes(1);
+    });
   });
 });
 
