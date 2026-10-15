@@ -122,15 +122,54 @@ function _migrateWholeBookResume(r, queue) {
   return { qi: first + chapter, time: Math.max(0, saved - (Number(secs[chapter]) || 0)) };
 }
 
+/* THE PLACEHOLDER OUTLIVES ITS DESCRIPTOR while a rebuild waits for the lazy corpus or the song catalog. The
+   descriptor is consumed before that wait, so a second tap cannot start a second rebuild; but until the real queue
+   lands, the bar still holds its ONE placeholder track. A Next tapped in that window read the placeholder as the end
+   of a queue of one and stopped the session (sweep v021). `_rebuilding` is that window, for the transport to wait
+   on: set only while a rebuild is waiting, cleared once it has installed the queue or given up. A rebuild that
+   needs no wait (the corpus already in memory, a custom queue) finishes inside the call and never opens it. */
+/** What a rebuild did: 'queue' installed the real queue; 'placeholder' found nothing to rebuild from (the corpus
+ *  failed to load, or the saved letter is gone) and resumed the bar's own one track; false started nothing.
+ *  @typedef {'queue' | 'placeholder' | false} RebuildOutcome */
+let _rebuilding = /** @type {Promise<RebuildOutcome> | null} */ (null);
+let _waiting = false;
+
+/** The rebuild a restored bar's tap started, while it still waits for a corpus; null otherwise. @returns {Promise<RebuildOutcome> | null} */
+export function _rebuildInFlight() { return _rebuilding; }
+
 /**
  * Rebuild the full queue a _restoreFromSaved() bar stands in for, then start
  * at the saved track + position. Loads the lazy VOT corpus first when needed
  * (index.html's __loadVotCorpus is idempotent). True when it started; false when there was nothing to rebuild or,
  * offline, the saved recording is not on the phone (the bar stays the restored one: a caller that would act on the
- * rebuilt queue must not ask again, or it asks forever - W5).
+ * rebuilt queue must not ask again, or it asks forever - W5). Called again while a rebuild still waits for its
+ * corpus, it answers with that same rebuild.
  * @returns {Promise<boolean>}
  */
-export async function _rebuildRestoredQueue() {
+export function _rebuildRestoredQueue() {
+  return _rebuildRestored().then((outcome) => outcome !== false);
+}
+
+/**
+ * The same rebuild, saying WHICH queue it started. A caller that would step through the rebuilt queue (Next) needs
+ * that: the placeholder fallback is the saved recording alone, and stepping past its one track ends the session and
+ * erases the resume snapshot, so one Next with no corpus lost the listener's place (sweep v021's refutation).
+ * @returns {Promise<RebuildOutcome>}
+ */
+export function _rebuildRestored() {
+  if (_rebuilding) return _rebuilding;
+  const p = _rebuild();
+  if (_waiting) {
+    _rebuilding = p;
+    // Registered before any caller's own .then, so a caller acting on the result finds the window closed.
+    const done = () => { if (_rebuilding === p) _rebuilding = null; };
+    p.then(done, done);
+  }
+  return p;
+}
+
+/** @returns {Promise<RebuildOutcome>} */
+async function _rebuild() {
   const r = _pendingRestore;
   if (!r) return false;
   // Offline, the saved recording itself must be on the phone (item 8): downloaded, or a song kept on it (W5: the
@@ -138,19 +177,29 @@ export async function _rebuildRestoredQueue() {
   const saved = { key: typeof r.key === 'string' ? r.key : '', url: r.url };
   if (_unreachable(/** @type {any} */ (saved))) { _offlineNotice(saved); return false; }
   _setPendingRestore(null);
-  // The bar this rebuild stands in for. Every queue change makes a new array (stop()'s ✕, next() ending the
-  // one-track placeholder, any new play), so a different one after the awaits below means the reader has moved
-  // on while the corpus loaded: the rebuild is void, never a resurrection of a bar they closed (sweep v82).
+  // The bar this rebuild stands in for. Every queue change makes a new array (stop()'s ✕, any new play; a Next
+  // in the wait joins this rebuild instead, sweep v021), so a different one after the awaits below means the reader
+  // has moved on while the corpus loaded: the rebuild is void, never a resurrection of a bar they closed (sweep v82).
   const placeholder = _state.queue;
   const g = _g();
-  if (r.mode === 'songs') {
-    try { await loadSongCatalog(); } catch (_e) { /* no catalog — fall through to the placeholder track */ }
-  } else if (r.mode !== 'custom') {
-    try {
-    if (_isBibleVol(r.volKey)) {
-      if (!_bibleManifest() && typeof g.__loadBibleCorpus === 'function') await g.__loadBibleCorpus();
-    } else if (!_manifest() && typeof g.__loadVotCorpus === 'function') await g.__loadVotCorpus();
-  } catch (_e) { /* corpus load failed — fall through to the placeholder track */ }
+  // Only the awaits below can open the window: the wrapper reads `_waiting` the moment this returns to it. While
+  // it is open the bar is still the restored one, so it keeps saying so: Next stays shown on the bar and live on
+  // the desk, not hidden again by the one-track placeholder for as long as the corpus takes (sweep v021).
+  _waiting = true;
+  _state.restoring = true;
+  try {
+    if (r.mode === 'songs') {
+      try { await loadSongCatalog(); } catch (_e) { /* no catalog — fall through to the placeholder track */ }
+    } else if (r.mode !== 'custom') {
+      try {
+        if (_isBibleVol(r.volKey)) {
+          if (!_bibleManifest() && typeof g.__loadBibleCorpus === 'function') await g.__loadBibleCorpus();
+        } else if (!_manifest() && typeof g.__loadVotCorpus === 'function') await g.__loadVotCorpus();
+      } catch (_e) { /* corpus load failed — fall through to the placeholder track */ }
+    }
+  } finally {
+    _waiting = false;
+    _state.restoring = !!_pendingRestore;
   }
   if (_state.queue !== placeholder) return false;
   /** @type {Track[]} */
@@ -201,7 +250,8 @@ export async function _rebuildRestoredQueue() {
     queue = _slicePartHorizon(queue, r.startKey, r.startPartIndex);
   }
   let resumeAt = r.time || 0;
-  if (!queue.length) {
+  const fellBack = !queue.length;
+  if (fellBack) {
     // Corpus/manifest unavailable (or the letter vanished) — play the
     // placeholder track the bar is already showing; it has a real URL.
     queue = _state.queue.slice();
@@ -258,7 +308,7 @@ export async function _rebuildRestoredQueue() {
   // known about this exact track — so the boot restore does NOT consult the
   // per-recording map. Unchanged behavior; only the seek call is now shared.
   _startAt(() => resumeAt);
-  return true;
+  return fellBack ? 'placeholder' : 'queue';
 }
 
 /* ── resume across the update's self-reload (Corbin, 2026-09-10) ──────────

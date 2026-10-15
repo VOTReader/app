@@ -269,6 +269,27 @@ describe('the boot snapshot of a songs queue', () => {
     expect(s.repeat).toBe('all');
   });
 
+  it('Next on a restored bar paused on the LAST song (repeat off) resumes it, not an end that erases the place (sweep v021)', async () => {
+    // The restored bar offers Next. A songs queue never extends, so a step past its last song ended the session
+    // and cleared the boot snapshot: one tap and the listener's place was gone.
+    await load(bigSongCatalog(3));
+    AudioPlayer.playSongs({ filter: {} });
+    const original = AudioPlayer.getState().queue.map((t) => t.url);
+    AudioPlayer.next(); AudioPlayer.next();
+    AudioPlayer.toggle();                          // paused on the last song; snapshot written
+
+    await load(bigSongCatalog(3));
+    expect(AudioPlayer.getState().restoring).toBe(true);
+    AudioPlayer.next();
+    await vi.waitFor(() => expect(AudioPlayer.getState().sourceMode).toBe('songs'));
+    await new Promise((r) => setTimeout(r, 20));
+    const s = AudioPlayer.getState();
+    expect(s.status).not.toBe('idle');
+    expect(s.qi).toBe(2);
+    expect(el().src).toBe(original[2]);
+    expect(localStorage.getItem('vot-audio-pos')).not.toBe(null);
+  });
+
   it('a restored songs bar still plays at 1× over a stored 1.5 reading speed', async () => {
     AudioPlayer.playSongs({ filter: { family: 'fam-a' } });
     AudioPlayer.toggle();

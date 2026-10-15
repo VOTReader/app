@@ -20,6 +20,7 @@ import * as ReactDOM from 'react-dom';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AUDIO_PLAYBACK_RATES } from '../../utils/audio-track.js';
 import { AudioManagerSheet } from './AudioManagerSheet.jsx';
+import { SongTransport } from './SongDeskParts.jsx';
 
 /** Mimics the bits of HTMLAudioElement the player touches (see audio-player.test.js). */
 class FakeAudio extends EventTarget {
@@ -1060,6 +1061,27 @@ describe('AudioManagerSheet — a restored bar describes nothing it does not kno
     expect(screen.getByRole('button', { name: 'Previous track' })).toBeTruthy();
     // …and no "1 of 1", which would be a claim about a queue nobody has built.
     expect(headSub()).toBe('Volume One · Read by Benjamin');
+  });
+
+  /* sweep v021: Next keyed on the placeholder's length, so it was greyed out over a
+     queue that may run on for a whole book. The tap has to reach the player, which
+     rebuilds the queue and then steps past the saved recording. */
+  it('leaves Next live, since the queue it would step through is not built yet (sweep v021)', () => {
+    const { unmount } = render(<AudioManagerSheet open state={restoredState()} onClose={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Next track' }).disabled).toBe(false);
+    unmount();
+    // CONTROL: a genuine queue of one still has nowhere to go.
+    render(<AudioManagerSheet open state={restoredState({ restoring: false, sourceMode: 'custom' })} onClose={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Next track' }).disabled).toBe(true);
+  });
+
+  it('the song desk leaves Next song live over a restored songs session too (sweep v021)', () => {
+    const song = { key: 'song:aaaaaaaaaaa1', title: 'Come, Love Awaits You', sub: 'Songs of the Letters', url: URL_OF('idSong'), readerCode: '', partLabel: null };
+    const { unmount } = render(<SongTransport state={restoredState({ queue: [song], sourceMode: 'songs', repeat: 'off' })} />);
+    expect(screen.getByRole('button', { name: 'Next song' }).disabled).toBe(false);
+    unmount();
+    render(<SongTransport state={restoredState({ queue: [song], sourceMode: 'songs', repeat: 'off', restoring: false })} />);
+    expect(screen.getByRole('button', { name: 'Next song' }).disabled).toBe(true);
   });
 
   it('calls a genuine queue of one what it is', () => {

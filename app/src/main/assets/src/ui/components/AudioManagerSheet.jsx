@@ -446,7 +446,8 @@ export function AudioManagerSheet({ open, state, onClose }) {
           >
             {active ? <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M6.5 4h4v16h-4zM13.5 4h4v16h-4z" /></svg> : <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M7 4v16l13-8z" /></svg>}
           </button>
-          <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.next()} disabled={state.qi + 1 >= queue.length} aria-label="Next track">
+          {/* Live while restoring: the placeholder's length says nothing about the queue the tap rebuilds (sweep v021). */}
+          <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.next()} disabled={!restoring && state.qi + 1 >= queue.length} aria-label="Next track">
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7" /><path d="M5 5v14" /></svg>
           </button>
           <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.skip(15)} aria-label="Forward 15 seconds">+15</button>
