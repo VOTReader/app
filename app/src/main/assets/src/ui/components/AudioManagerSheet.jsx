@@ -299,8 +299,10 @@ export function AudioManagerSheet({ open, state, onClose }) {
   // collection. Plain, unedited queues rebuild to themselves and switch
   // immediately; only these two ask first (owner directive 2026-08-10).
   const needsVoiceConfirm = state.sourceMode === 'custom';
+  // A pending choice that has since become the voice playing (the queue moved
+  // under the open confirm) has nothing left to confirm.
   const pendingChip = needsVoiceConfirm && voices
-    ? voices.chips.find((chip) => chip.id === pendingVoice) || null
+    ? voices.chips.find((chip) => chip.id === pendingVoice && !chip.active) || null
     : null;
 
   // The window. Only a genuinely long queue is paged; everything else renders
@@ -397,7 +399,14 @@ export function AudioManagerSheet({ open, state, onClose }) {
                   role="radio"
                   className={chip.active ? 'is-active' : ''}
                   aria-checked={chip.active}
-                  onClick={() => { if (needsVoiceConfirm) setPendingVoice(chip.id); else chip.select(); }}
+                  onClick={() => {
+                    // The checked chip is the voice already playing: a tap on it
+                    // switches nothing. select() is a REBUILD from the top of the
+                    // letter (sweep v003: Part 2 at minute 2 went back to Part 1,
+                    // 0:00), and on an edited queue it would ask to drop the edits.
+                    if (chip.active) return;
+                    if (needsVoiceConfirm) setPendingVoice(chip.id); else chip.select();
+                  }}
                 >{chip.label}</button>
               ))}
             </div>
