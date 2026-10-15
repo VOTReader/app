@@ -14,8 +14,8 @@
    check) and a ResizeObserver on it (the inset changes its height) keep both current. The move starts from the scrollTop
    read with that edge, not the one after the toggle: near a page's end the grown scroller has already clamped it. */
 
-/** The pages that read (a letter, a Bible chapter). */
-export const READING_PLACES = ['letter', 'bible-chapter'];
+/** The pages that read (a letter, a Bible chapter, a Bible study's chapter: main reads it as a letter). */
+export const READING_PLACES = ['letter', 'bible-chapter', 'study-chapter'];
 
 /**
  * True when the page head's bottom is at or above `line` (the top bar's bottom edge on the screen), i.e. the head has

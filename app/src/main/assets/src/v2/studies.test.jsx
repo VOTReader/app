@@ -441,3 +441,43 @@ describe("a study's chapter (5d) and its prophecy cards (5f)", () => {
     expect(visitOf({ place: 'study-chapter', study: 'more-than-a-man', chapter: CH2 }, {})).toBe(null);
   });
 });
+
+describe('auto-scroll on a study chapter (main reads it as a letter)', () => {
+  /** A real boot on a study's chapter with main's Auto-scroll setting on and no pause before the next page. */
+  function autoAt(study, chapter) {
+    g.BIBLE_STUDIES = withChapter2();
+    let st = { settings: { autoScroll: true, autoScrollEndMs: '0' } };
+    g.StateStore = { isReady: () => true, get: () => st, set: (next) => { st = next; } };
+    undo.push(defineStart(() => [{ place: 'home' }, { place: 'study', study }, { place: 'study-chapter', study, chapter }]));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date', 'requestAnimationFrame', 'cancelAnimationFrame'] });
+    const view = render(<V2App gateId={null} />);
+    const pill = () => view.container.querySelector('.v2-phone > .asp');
+    const play = () => click(pill().querySelector('.pp'));
+    const wait = (ms) => act(async () => { vi.advanceTimersByTime(ms); });
+    return { ...view, pill, play, wait };
+  }
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("the pill waits on the chapter; at the end it turns to the next chapter on the Next card and runs on", async () => {
+    const v = autoAt('more-than-a-man', CH2);
+    await v.wait(50);
+    expect(v.pill().querySelector('.pp').getAttribute('aria-label')).toBe('Start auto-scroll');
+    await v.play();
+    await v.wait(200);
+    expect(v.pill().querySelector('.asp-r').textContent).toMatch(/^Next in [34]$/);
+    await v.wait(4500);
+    expect(v.container.querySelector('.reader-head h1').textContent).toBe('Section Three: The Lineage of YahuShua The Messiah');
+    expect(v.container.querySelector('.tb .ic').getAttribute('aria-label')).toBe('Back to YAHUSHUA More Than a Man');
+    expect(v.pill().querySelector('.pp').getAttribute('aria-label')).toBe('Pause auto-scroll');
+  });
+
+  it('the last chapter of the last study has no Next card: the pill stops at "End of text"', async () => {
+    const v = autoAt('odds-chart', 'odds-chart-ch1');
+    await v.wait(50);
+    expect(v.container.querySelector('.nextcard')).toBe(null);
+    await v.play();
+    await v.wait(6000);
+    expect(v.pill().querySelector('.asp-r').textContent).toBe('End of text');
+    expect(v.pill().querySelector('.pp').getAttribute('aria-label')).toBe('Start auto-scroll');
+  });
+});
