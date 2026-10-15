@@ -56,6 +56,7 @@ import {
   _setLastPersistSec,
 } from './persist.js';
 import { _maybePrefetchNext } from './prefetch.js';
+import { _seamStop, _seamTick } from './seam.js';
 import { _followSectionLetter, _resetSectionFollow, _setSecLastT } from './sections.js';
 import { _sleepAtTrackEndFire, _sleepTimerFire, _syncSleepVolume } from './sleep.js';
 
@@ -124,6 +125,7 @@ function _setStatus(next) {
   // the tour raises the ask as before. TourController is a bundle-b global; absent on a bare host.
   if (next === 'playing') _raiseKeepAlive();
   else if (next === 'idle') _setAudioActive(false);
+  if (next === 'paused' || next === 'idle') _seamStop();   // nothing to bridge into (rv4)
   _syncMediaSessionState(next);
   _notify();
 }
@@ -188,6 +190,7 @@ function _ensureEl() {
     if (_state.loop && _loopTick()) return;   // a repeated passage wrapped (or ended): the seek notified
     _syncSleepVolume();       // the sleep fade (a no-op unless a sleep mode is in its last stretch)
     _followSectionLetter();   // a compilation: name the letter, credit the one heard (cheap: ~30 keys)
+    _seamTick(el);            // Chrome on Android: hold the media session across the coming seam (rv4)
     // timeupdate fires ~4x/second. Only re-render subscribers when the
     // displayed (whole-second) clock actually changes.
     const sec = Math.floor(_state.time);

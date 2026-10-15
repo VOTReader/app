@@ -43,6 +43,7 @@ import {
 } from './persist.js';
 import { _stopWarming } from './prefetch.js';
 import { _rebuildRestoredQueue } from './restore.js';
+import { _seamStop } from './seam.js';
 import { _resetSectionFollow, _setSecLastT } from './sections.js';
 import { _clearSleepTimer } from './sleep.js';
 import { _repeatMode } from './songs.js';
@@ -324,6 +325,7 @@ export function stop() {
   _clearOfflineSkip();
   _setSongRecordPending(false);
   _clearLoop(false);
+  _seamStop();
   if (_el) {
     try { _el.pause(); } catch (_e) { /* already detached */ }
     _el.src = '';
