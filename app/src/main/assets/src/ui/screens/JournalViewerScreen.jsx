@@ -138,10 +138,16 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
   if (b.type === 'quote') {
     var qText = b.text || '';
     var qLong = qText.length > 240;
+    // A long quote folds away behind Show more, but it is drawn by the same
+    // inline renderer inside the same annotation container as a short one:
+    // without both it printed raw **bold** / {{ref:}} markers and its marks
+    // never painted (v047). ExpandableText's whole-text mode keeps the full
+    // quote in that container and clamps it visually.
     return (
       <div className="jrn-block-quote">
         {qLong
-          ? <JrnExpandable text={qText} threshold={240} className="jrn-block-quote-body" />
+          ? <JrnExpandable text={qText} threshold={240} className="jrn-block-quote-body"
+              bodyProps={hlProps} renderText={function(t) { return jrnRenderInline(t, callbacks); }} />
           : <div className="jrn-block-quote-body" {...hlProps}>{jrnRenderInline(qText, callbacks)}</div>}
         {b.cite && <div className="jrn-block-quote-cite">{b.cite}</div>}
       </div>
