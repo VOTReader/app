@@ -695,6 +695,34 @@ export function buildScreenRoutes({
   };
 
   /**
+   * What the Bible routes (bible-idx, bible-ch) render when the corpus IS loaded
+   * and the bookId does not resolve: a persisted tab whose book was renamed or
+   * dropped between builds, or a deep link to one (sweep v109). Both routes
+   * returned null there - no header, no nav - and the persisted tab repeated it
+   * on every reload. _validateTabState cannot catch it: it only checks that
+   * bookId is truthy, because the Bible corpus is lazy and absent at boot (the
+   * _deadLetter reasoning). Chrome plus the way back to the Scriptures, and,
+   * like every fallback here, unable to fail.
+   * @returns {any} never null
+   */
+  const _missingBook = () => {
+    const body = (
+      <div className="sc-sheet-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '14px', textAlign: 'center', padding: '0 24px' }}>
+        <div>This book is no longer available.</div>
+        <button type="button" onClick={goScripturesHome} style={{ padding: '8px 20px', borderRadius: '999px', border: '1px solid currentColor', background: 'transparent', color: 'inherit', font: 'inherit', cursor: 'pointer', opacity: 0.85 }}>Back to Scriptures</button>
+      </div>
+    );
+    const nav = (typeof LibraryNav === 'function') ? LibraryNav({
+      onBack: goScripturesHome, backLabel: 'Scriptures',
+      onSettings: goSettings, onHistory: goHistory, onSearch: goSearch,
+      theme, onThemeChange: setTheme,
+    }) : null;
+    return (typeof ScreenLayout === 'function')
+      ? <ScreenLayout navChildren={nav}>{body}</ScreenLayout>
+      : body;
+  };
+
+  /**
    * @param {any} jsx     the route's element, or falsy when the letter did not resolve
    * @param {string} [volKey] the collection, for the dead-letter fallback. Pass it
    *   on every letter/entry route; index routes have no letter to lose.
@@ -1403,7 +1431,8 @@ export function buildScreenRoutes({
       if (bookId && typeof window.__bibleCorpus !== 'undefined' && !window.__bibleCorpus.loaded) {
         return _corpusView(window.__bibleCorpus, window.__loadBibleCorpus, 'Loading Bible…');
       }
-      return null;
+      // The corpus is in and the bookId did not resolve (v109): a way out, not nothing.
+      return _missingBook();
     },
     'bible-ch': () => {
       if (book && chapter) return (
@@ -1446,7 +1475,8 @@ export function buildScreenRoutes({
       }
       // The corpus is in and the book resolved, but not this chapter: a way out, not nothing.
       if (book && !chapter) return _missingChapter(book, chapterNum);
-      return null;
+      // The corpus is in and the book itself did not resolve (v109).
+      return _missingBook();
     },
 
     // ── IIFE screens — render-time-derived locals (study lookups,
