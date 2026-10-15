@@ -978,6 +978,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     schedule();
   }, [focusRef, schedule]);
 
+  /** Scripture / My web. The chosen line goes with the cards: a link's index and a canon thread's
+   * index number two different graphs, so a focus kept across the switch spotlit an unrelated
+   * line in the other web, with nothing open for Escape or Back to close (sweep v5, 2026-10-14). */
+  const switchMode = React.useCallback((next) => {
+    closeCards();
+    setMode(next);
+  }, [closeCards]);
+
   /** Close whatever is on top of the web, one layer a call: the guide, then
    * the empty-web notice, then the panels and the hover chip together.
    * Escape and Android Back both come here (v08-03), so they agree.
@@ -1158,9 +1166,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       <div className="sw-controls">
         <div className="sw-seg" role="group" aria-label="Which web">
           <button type="button" className={'sw-seg-btn' + (mode === 'canonical' ? ' is-on' : '')}
-            aria-pressed={mode === 'canonical'} onClick={() => { setMode('canonical'); setDetail(null); setChoices(null); setListOpen(false); }}>Scripture</button>
+            aria-pressed={mode === 'canonical'} onClick={() => switchMode('canonical')}>Scripture</button>
           <button type="button" ref={myWebBtnRef} className={'sw-seg-btn' + (mode === 'personal' ? ' is-on' : '')}
-            aria-pressed={mode === 'personal'} onClick={() => { setMode('personal'); setDetail(null); setChoices(null); setListOpen(false); }}>My web</button>
+            aria-pressed={mode === 'personal'} onClick={() => switchMode('personal')}>My web</button>
         </div>
         <button type="button" className={'sw-btn' + (listOpen ? ' is-on' : '')}
           onClick={() => { setListOpen(!listOpen); setChoices(null); }}
