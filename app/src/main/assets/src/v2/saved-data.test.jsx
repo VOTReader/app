@@ -2,7 +2,7 @@
    REAL stores (installed on window as bundle-b's _entry-b.js does) are filled by main's own writers in main's own shapes,
    then v2 boots for real and every item is found where v2 shows it: Continue, Recent (history and the open pages),
    Notes (journal, highlights, notes, bookmarks, saved recordings, links), a collection's read marks and minutes left, and
-   main's highlight on the letter's text. Looking writes nothing: every store write path is watched. */
+   main's highlights on a letter's text and a Bible chapter's verse. Looking writes nothing: every store write path is watched. */
 import 'fake-indexeddb/auto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, waitFor, act } from '@testing-library/react';
@@ -133,7 +133,7 @@ describe("main's saved data, found in v2", () => {
     // Words To Live By's entry
     await click([...container.querySelectorAll('.recent .chip')][2]);
     await waitFor(() => expect(container.querySelector('h1').textContent).toBe('On Prayer'));
-    expect(container.querySelector('.tb .title').textContent).toBe('Words To Live By: Part One');
+    expect(container.querySelector('.tb .title').textContent).toBe('Words To Live By');   // picture 1d's bar (dz13)
   });
 
   it("Home: the volume's preface left open is in Recent and opens", async () => {
@@ -195,5 +195,18 @@ describe("main's saved data, found in v2", () => {
     expect(StateStore.get().readItems).toEqual({ 'v1:volume-one:honor-not': 1 });
     expect(AnnotationStore.get('letter:chosen-by-god:1').map((a) => a.id)).toEqual(['h1']);
     expect(AudioLibraryStore.saved().map((t) => t.key)).toEqual(['one:honor-not']);
+  });
+
+  it("a Bible chapter shows main's verse highlight on its words (not its number)", async () => {
+    const john = { id: 'john', title: 'John', chapters: [{ num: 3, sections: [{ verses: [{ n: 16, text: 'For God so loved the world' }, { n: 17, text: 'For God did not send' }] }] }] };
+    Object.assign(g, { BOOKS: { john }, BIBLE_BOOK_LIST: [john] });
+    AnnotationStore.add('bible:john:3:16', { id: 'h3', groupId: 'h3', kind: 'highlight', start: 0, end: 16, color: 'yellow', text: 'For God so loved', created: Date.now() });
+    try {
+      const { container } = render(<V2App gateId={null} />);
+      await click([...container.querySelectorAll('.recent .chip')].find((c) => c.textContent === 'John 3'));
+      await waitFor(() => expect(texts(container, '[data-hl-key="bible:john:3:16"] mark.hl-dom')).toEqual(['For God so loved']));
+      expect(container.querySelector('#v-16 .vn').textContent).toBe('16');
+      expect(container.querySelectorAll('mark.hl-dom').length).toBe(1);
+    } finally { delete g.BOOKS; delete g.BIBLE_BOOK_LIST; }
   });
 });
