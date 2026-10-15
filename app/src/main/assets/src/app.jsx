@@ -202,7 +202,7 @@ function App() {
   const [journalEntryId, setJournalEntryId] = tabField('journalEntryId');
   const {
     setFromLetterStack, pushFromLetter,
-    tapThroughBack, fromLetterRef, backHint, backActive,
+    tapThroughBack, fromLetterRef, backHint, backActive, retargetTop,
   } = useFromLetterStack({
     tabField,
     screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId,
@@ -450,8 +450,8 @@ function App() {
   });
   // "Show me around" (review-tutorial): the tour's five navigation verbs, kept current every render.
   useTour({ goHome, goJournalHub, goSettings, setScreen, setLetterId, setBookId, setChapterNum });
-  // The reading pane moves with the audio at each unit boundary (w-audio-continue; live-pane rule in the hook).
-  useAudioFollow({ enabled: settings.audioTurnPage !== false, screen, letterId, bookId, chapterNum, studyId, studyChapterId, setLetterId, setBookId, setChapterNum, setScreen, setStudyId, setStudyChapterId });
+  // The reading pane moves with the audio at each unit boundary (w-audio-continue; live-pane rule in the hook), carrying the tap-through back entry along (retargetTop, sweep v041).
+  useAudioFollow({ enabled: settings.audioTurnPage !== false, screen, letterId, bookId, chapterNum, studyId, studyChapterId, setLetterId, setBookId, setChapterNum, setScreen, setStudyId, setStudyChapterId, retargetTop });
 
   /* W1.5(b) — History API sync. Watches the per-active-tab nav-key tuple
      and pushes an empty-state history entry on every change. Required

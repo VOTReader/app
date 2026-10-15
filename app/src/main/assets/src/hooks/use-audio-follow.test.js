@@ -15,6 +15,7 @@ vi.mock('./use-history-sync.js', () => ({ suppressNextHistoryPush: vi.fn() }));
 import { suppressNextHistoryPush } from './use-history-sync.js';
 import { modalRegistry } from './use-modal-registry.js';
 import { useAudioFollow } from './use-audio-follow.js';
+import { useFromLetterStack } from './use-from-letter-stack.js';
 
 const LETTER = (volKey, id, sub) => ({ key: volKey + ':' + id, title: id, sub, url: 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/' + id + '.mp3', readerCode: 'B', partLabel: null });
 const CHAPTER = (bookId, n) => ({ key: 'bible-brm-kjv:' + bookId, title: bookId, sub: 'KJV', url: 'https://github.com/VOTReader/votreader-assets/releases/download/audio-brm-v1/brm1_' + bookId + '_00' + n + '.mp3', readerCode: '', partLabel: 'Chapter ' + n });
@@ -230,5 +231,111 @@ describe('WTLB compilations — the letter comes from the clock', () => {
     const m = mount(player, { screen: 'home', letterId: null, bookId: null, chapterNum: null });
     act(() => player.tick(2)); act(() => player.tick(10)); act(() => player.tick(61)); act(() => player.tick(120));
     expect(m.setScreen).not.toHaveBeenCalled();
+  });
+});
+
+/* THE FOLLOW KEEPS THE WAY BACK (sweep v041, 2026-10-15). A reading reached by a
+   tap-through (a note in My Notes, the desk's "Open the reading", a Library row)
+   carries a back-stack entry whose destSnapshot names that reading. The follow
+   moves the pane in place, and useFromLetterStack's prune effect evicts any top
+   whose destSnapshot no longer matches the pane: before the fix the "Back to …"
+   pill vanished at the first boundary, and hardware Back (which pops that stack)
+   went to the collection index instead of where the reader came from. The
+   header's promise is that one Back from the followed reading goes where one
+   Back from the original would have gone. These mount the REAL stack hook beside
+   the follower on one shared nav state, as App() does. */
+describe("the follow carries the reader's way back to the new reading", () => {
+  let prevHandoff;
+  beforeEach(() => {
+    prevHandoff = window.navHandoff;
+    window.navHandoff = { clear: vi.fn() };
+    globalThis.BIBLE_STUDIES = [{ id: 'lamb', title: 'The Lamb of God', chapters: [{ id: 'lamb-ch1' }, { id: 'lamb-ch2' }] }];
+  });
+  afterEach(() => { window.navHandoff = prevHandoff; delete globalThis.BIBLE_STUDIES; });
+
+  const NOWHERE = { screen: 'home', bookId: null, chapterNum: null, letterId: null, studyId: null, studyChapterId: null, journalEntryId: null };
+
+  /** App()'s wiring in miniature: one nav state, the tap-through stack, and the follower. */
+  function mountApp(player, nav0, stack0) {
+    globalThis.AudioPlayer = player;
+    return renderHook(() => {
+      const [nav, setNav] = React.useState({ ...NOWHERE, ...nav0 });
+      const [stack, setStack] = React.useState(stack0);
+      const set = (k) => (v) => setNav((n) => ({ ...n, [k]: typeof v === 'function' ? v(n[k]) : v }));
+      const setters = {
+        setScreen: set('screen'), setBookId: set('bookId'), setChapterNum: set('chapterNum'), setLetterId: set('letterId'),
+        setStudyId: set('studyId'), setStudyChapterId: set('studyChapterId'), setJournalEntryId: set('journalEntryId'),
+      };
+      const tabField = (key) => { if (key !== 'fromLetterStack') throw new Error('unexpected tabField: ' + key); return [stack, setStack]; };
+      const fls = useFromLetterStack({ tabField, ...nav, ...setters });
+      useAudioFollow({ enabled: true, ...nav, ...setters, retargetTop: fls.retargetTop });
+      return { nav, fls };
+    });
+  }
+
+  it("the finding's repro: My Notes -> Volume Two letter 5, the audio turns to letter 6; the pill stays and Back returns to My Notes", () => {
+    const player = fakePlayer([LETTER('two', 'letter-5', 'Volume Two'), LETTER('two', 'letter-6', 'Volume Two')]);
+    // navigateToLink's entry for a note tapped in the Notes index (use-navigate-to-link.js backEntry).
+    const fromNotes = {
+      sourceScreen: 'notes-index', sourceBookId: null, sourceChapterNum: null, sourceLetterId: null,
+      sourceStudyId: null, sourceStudyChapterId: null, sourceJournalEntryId: null,
+      sourceLetterTitle: 'My Notes', sourceVolumeLabel: null, silent: false,
+      destSnapshot: { screen: 'vot-two-letter', bookId: null, chapterNum: null, letterId: 'letter-5', studyId: null, studyChapterId: null },
+    };
+    const { result } = mountApp(player, { screen: 'vot-two-letter', letterId: 'letter-5' }, [fromNotes]);
+    expect(result.current.fls.backHint).toEqual({ title: 'My Notes', volumeLabel: null });
+    act(() => player.advance());
+    expect(result.current.nav).toMatchObject({ screen: 'vot-two-letter', letterId: 'letter-6' });
+    expect(result.current.fls.fromLetterStack, 'the prune effect must not evict the entry the follow carried').toHaveLength(1);
+    expect(result.current.fls.backHint, 'the "Back to My Notes" pill is still there').toEqual({ title: 'My Notes', volumeLabel: null });
+    expect(result.current.fls.backActive).toBe(true);
+    act(() => result.current.fls.tapThroughBack());
+    expect(result.current.nav.screen, 'one Back from the followed reading goes where one Back from the original would have').toBe('notes-index');
+  });
+
+  it.each([
+    ['a Bible chapter (the desk\'s silent "Open the reading")',
+      [CHAPTER('jonah', 4), CHAPTER('micah', 1)],
+      { screen: 'bible-ch', bookId: 'jonah', chapterNum: 4 },
+      { screen: 'bible-ch', bookId: 'jonah', chapterNum: 4, letterId: null, studyId: null, studyChapterId: null },
+      { screen: 'bible-ch', bookId: 'micah', chapterNum: 1 }],
+    ['a study chapter',
+      [STUDY_CH('lamb-ch1'), STUDY_CH('lamb-ch2')],
+      { screen: 'bible-study-chapter', studyId: 'lamb', studyChapterId: 'lamb-ch1' },
+      { screen: 'bible-study-chapter', bookId: null, chapterNum: null, letterId: null, studyId: 'lamb', studyChapterId: 'lamb-ch1' },
+      { screen: 'bible-study-chapter', studyId: 'lamb', studyChapterId: 'lamb-ch2' }],
+    ['a letter into another volume (site order)',
+      [LETTER('one', 'last', 'Volume One'), LETTER('two', 'first', 'Volume Two')],
+      { screen: 'vot-one-letter', letterId: 'last' },
+      { screen: 'vot-one-letter', letterId: 'last' },
+      { screen: 'vot-two-letter', letterId: 'first' }],
+  ])('%s: the live back target survives the follow, still silent, still pointing home', (_kind, queue, nav0, dest, landed) => {
+    const player = fakePlayer(queue);
+    const fromHome = { sourceScreen: 'home', sourceLetterTitle: 'Home', silent: true, destSnapshot: dest };
+    const { result } = mountApp(player, nav0, [fromHome]);
+    expect(result.current.fls.backActive).toBe(true);
+    act(() => player.advance());
+    expect(result.current.nav).toMatchObject(landed);
+    expect(result.current.fls.backActive, 'hardware Back still returns to Home').toBe(true);
+    expect(result.current.fls.backHint, 'a silent entry stays pill-less').toBeNull();
+    expect(result.current.fls.fromLetterStack[0]).toMatchObject({ sourceScreen: 'home', sourceLetterTitle: 'Home', silent: true });
+  });
+
+  it('a top entry with no destSnapshot (the letter->letter chain) is left exactly as it was', () => {
+    const player = fakePlayer([LETTER('one', 'last', 'Volume One'), LETTER('two', 'first', 'Volume Two')]);
+    const legacy = { sourceScreen: 'vot-one-letter', sourceLetterId: 'other', sourceLetterTitle: 'Other' };
+    const { result } = mountApp(player, { screen: 'vot-one-letter', letterId: 'last' }, [legacy]);
+    act(() => player.advance());
+    expect(result.current.nav).toMatchObject({ screen: 'vot-two-letter', letterId: 'first' });
+    expect(result.current.fls.fromLetterStack).toEqual([legacy]);
+  });
+
+  it('with no back target at all the follow adds none', () => {
+    const player = fakePlayer([LETTER('one', 'last', 'Volume One'), LETTER('two', 'first', 'Volume Two')]);
+    const { result } = mountApp(player, { screen: 'vot-one-letter', letterId: 'last' }, []);
+    act(() => player.advance());
+    expect(result.current.nav.letterId).toBe('first');
+    expect(result.current.fls.fromLetterStack).toEqual([]);
+    expect(result.current.fls.backHint).toBeNull();
   });
 });

@@ -33,7 +33,11 @@
    (use-history-sync.js, the handshake use-android-back uses) so no history
    entry is pushed per reading the audio walks: one Back from the followed
    reading goes where one Back from the original would have gone, never back
-   through every chapter.
+   through every chapter. A reading reached by a tap-through (a note in My
+   Notes, the desk's "Open the reading") carries a back-stack entry naming
+   that reading; the follow hands it on with useFromLetterStack's retargetTop,
+   so its pill (if it had one) and hardware Back's target survive the move
+   instead of being pruned as stale (sweep v041).
 
    The player is reached by the BARE global `AudioPlayer` that _entry-d.js
    attaches — never by import: this module rides bundle-b and the player rides
@@ -144,33 +148,37 @@ function bibleScreenFor(bookId) {
 
 /**
  * Open a unit's reading screen — the tour's own recipes (use-tour.js attachNav).
+ * Returns where it put the pane, in the back-stack's destSnapshot shape
+ * (use-from-letter-stack.js; an absent field = don't care), or null when it
+ * could not open the unit and nothing moved.
  *
  * @param {any} pane
  * @param {Unit} unit
- * @returns {void}
+ * @returns {{ screen: string, letterId?: string, bookId?: string, chapterNum?: number, studyId?: string, studyChapterId?: string } | null}
  */
 function openReading(pane, unit) {
   if (unit.kind === 'letter') {
     const col = colOf(unit.volKey);
-    if (!col || !col.letterScreen) return;
+    if (!col || !col.letterScreen) return null;
     if (typeof pane.setLetterId === 'function') pane.setLetterId(unit.id);
     if (typeof pane.setScreen === 'function') pane.setScreen(col.letterScreen);
-    return;
+    return { screen: col.letterScreen, letterId: unit.id };
   }
   if (unit.kind === 'study') {
     // BibleStudyChapterView's own recipe (selectStudyChapter): the study AND the chapter.
     const sid = studyIdOf(unit.id);
-    if (!sid) return;
+    if (!sid) return null;
     if (typeof pane.setStudyId === 'function') pane.setStudyId(sid);
     if (typeof pane.setStudyChapterId === 'function') pane.setStudyChapterId(unit.id);
     if (typeof pane.setScreen === 'function') pane.setScreen('bible-study-chapter');
-    return;
+    return { screen: 'bible-study-chapter', studyId: sid, studyChapterId: unit.id };
   }
   // Matthew's corpus is its own lazy bundle (navigateToLink kicks it the same way).
   if (unit.bookId === 'matthew' && typeof /** @type {any} */ (globalThis).__loadMatthewCorpus === 'function') /** @type {any} */ (globalThis).__loadMatthewCorpus();
   if (typeof pane.setBookId === 'function') pane.setBookId(unit.bookId);
   if (typeof pane.setChapterNum === 'function') pane.setChapterNum(unit.chapter);
   if (typeof pane.setScreen === 'function') pane.setScreen(bibleScreenFor(unit.bookId));
+  return { screen: bibleScreenFor(unit.bookId), bookId: unit.bookId, chapterNum: unit.chapter };
 }
 
 /** @returns {boolean} a sheet other than the listening desk is open */
@@ -182,7 +190,9 @@ function heldByOverlay() {
  * @param {{ enabled?: boolean, screen: string, letterId?: string | null, bookId?: string | null, chapterNum?: number | null,
  *   studyId?: string | null, studyChapterId?: string | null,
  *   setLetterId?: Function, setBookId?: Function, setChapterNum?: Function, setScreen?: Function,
- *   setStudyId?: Function, setStudyChapterId?: Function }} p
+ *   setStudyId?: Function, setStudyChapterId?: Function,
+ *   retargetTop?: (dest: any) => void }} p
+ *   retargetTop — useFromLetterStack's: carries a live tap-through back entry to the reading the follow opens.
  * @returns {void}
  */
 export function useAudioFollow(p) {
@@ -206,7 +216,14 @@ export function useAudioFollow(p) {
       if (!from || !paneShows(pane, from)) return;   // the live-pane rule
       if (heldByOverlay()) return;
       suppressNextHistoryPush();
-      openReading(pane, cur);
+      const dest = openReading(pane, cur);
+      // The reader's way back rides along (sweep v041): a tap-through entry
+      // whose destSnapshot names the reading just left would otherwise be
+      // pruned as "navigated away", taking the pill and hardware Back's
+      // target with it. Both updates land in one render (createRoot batches
+      // this callback), so the prune effect sees the moved pane and the
+      // carried entry together.
+      if (dest && typeof pane.retargetTop === 'function') pane.retargetTop(dest);
     });
     return unsub;
   }, []);
