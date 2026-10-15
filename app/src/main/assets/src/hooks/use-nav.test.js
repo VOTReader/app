@@ -94,6 +94,8 @@ const makeSetters = () => ({
   setFromSearch: vi.fn(),
   setFromWtlb: vi.fn(),
   setFromSurprise: vi.fn(),
+  setFromStudies: vi.fn(),
+  setFromMatthewCh: vi.fn(),
   setFromLetterStack: vi.fn(),
   setJournalEntryId: vi.fn(),
   setGardenPage: vi.fn(),
@@ -201,6 +203,19 @@ describe('useNav — goHome (multi-state reset)', () => {
     const { result } = setup({ setFromSurprise });
     result.current.goHome();
     expect(setFromSurprise).toHaveBeenCalledWith(false);
+  });
+
+  it('clears the Studies and Matthew-chapter breadcrumbs, so Back from Matthew reached later cannot jump into an old study (sweep v093)', () => {
+    // Sweep 2026-10-14, v093: a Studies chain entry into the Matthew Study Bible sets fromStudies, and a
+    // tap-through from a Matthew chapter sets fromMatthewCh. Home cleared neither, so Studies -> Matthew ->
+    // Home -> Scriptures -> Matthew -> Back landed on Studies Home, and a letter reached later went Back to
+    // the old Matthew chapter (both flags outrank the index fallback in that Back).
+    const setFromStudies = vi.fn();
+    const setFromMatthewCh = vi.fn();
+    const { result } = setup({ setFromStudies, setFromMatthewCh });
+    result.current.goHome();
+    expect(setFromStudies).toHaveBeenCalledWith(false);
+    expect(setFromMatthewCh).toHaveBeenCalledWith(null);
   });
 
   it('does NOT touch navOrigin (goHome means "really home", not "snapshot for back")', () => {

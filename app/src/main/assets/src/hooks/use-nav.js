@@ -27,7 +27,8 @@
         lives in one module.
 
    OWNED HELPERS:
-     - goHome              clears search + wtlb + letter-stack + scroll
+     - goHome              clears search + wtlb + letter-stack + surprise +
+                           studies + matthew-ch breadcrumbs and the scroll
                            bridges, sets screen=home + bookId/chapter=null
      - goScripturesHome    setScreen + clear book/chapter/genre
      - goScriptureGenre    setGenreId + setScreen
@@ -80,7 +81,8 @@
      navigation setters:   setScreen, setBookId, setChapterNum,
                            setLetterId, setGenreId.
      coordination setters: setNavOrigin (capture target),
-                           setFromSearch, setFromWtlb, setFromLetterStack
+                           setFromSearch, setFromWtlb, setFromLetterStack,
+                           setFromSurprise, setFromStudies, setFromMatthewCh
                              (cleared by goHome — the user explicitly
                               going Home means breaking out of any
                               tap-through / search-result chain),
@@ -122,6 +124,8 @@
  *   setFromWtlb: (v: any) => void,
  *   setFromLetterStack: (v: any) => void,
  *   setFromSurprise?: (v: boolean) => void,
+ *   setFromStudies?: (v: boolean) => void,
+ *   setFromMatthewCh?: (v: { chapterNum: number | null } | null) => void,
  *   setJournalEntryId: (v: any) => void,
  *   setGardenPage: (v: any) => void
  * }} args
@@ -156,6 +160,7 @@ export function useNav({
   screen, bookId, chapterNum, letterId, studyId, studyChapterId,
   setScreen, setBookId, setChapterNum, setGenreId,
   setNavOrigin, setFromSearch, setFromWtlb, setFromLetterStack, setFromSurprise,
+  setFromStudies, setFromMatthewCh,
   setJournalEntryId, setGardenPage,
 }) {
   // Snapshot the current reading position so "Back" from the destination
@@ -174,6 +179,11 @@ export function useNav({
     // v01-04: and the Surprise breadcrumb, or a letter reached later (Library, an
     // index) still sent Back Home - it outranks every other branch in that Back.
     if (typeof setFromSurprise === 'function') setFromSurprise(false);
+    // v093: and the Studies and Matthew-chapter breadcrumbs. Both outrank the index
+    // fallback in Back, so Studies -> Matthew -> Home -> Scriptures -> Matthew -> Back
+    // landed on Studies Home, and a letter reached later went Back to the old chapter.
+    if (typeof setFromStudies === 'function') setFromStudies(false);
+    if (typeof setFromMatthewCh === 'function') setFromMatthewCh(null);
     window.navHandoff.clear('pendingHighlight');
     window.navHandoff.clear('pendingScrollHlKey');
     setScreen('home');

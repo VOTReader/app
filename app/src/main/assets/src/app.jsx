@@ -446,7 +446,7 @@ function App() {
     screen, bookId, chapterNum, letterId, studyId, studyChapterId,
     setScreen, setBookId, setChapterNum, setGenreId,
     setNavOrigin, setFromSearch, setFromWtlb, setFromLetterStack, setFromSurprise,
-    setJournalEntryId, setGardenPage,
+    setFromStudies, setFromMatthewCh, setJournalEntryId, setGardenPage,
   });
   // "Show me around" (review-tutorial): the tour's five navigation verbs, kept current every render.
   useTour({ goHome, goJournalHub, goSettings, setScreen, setLetterId, setBookId, setChapterNum });
