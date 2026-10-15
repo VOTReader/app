@@ -370,6 +370,40 @@ describe('useNavigateToLink — every endpoint kind and the prologue', () => {
     });
   });
 
+  // sweep v046: a journal→journal frame left over from an earlier card tap
+  // (A → B) made B show "Back to A" over this jump's own back pill, and sent
+  // the back arrow to A. Opening B from outside drops that frame.
+  it('a journal endpoint drops a stale journal→journal back frame', () => {
+    window.__journalBackStack = [{ destId: 'e42', fromId: 'e1', fromTitle: 'Morning' }];
+    try {
+      const p = makeParams();
+      const { result } = renderHook(() => useNavigateToLink(p));
+      act(() => { result.current.navigateToLink({ type: 'journal', entryId: 'e42' }); });
+      expect(p.setScreen).toHaveBeenCalledWith('journal-viewer');
+      expect(window.__journalBackStack).toEqual([]);
+    } finally {
+      delete window.__journalBackStack;
+    }
+  });
+
+  // ...but only the frames INTO that entry. A -> B by card, then B -> a Bible
+  // chapter -> entry C from the chapter's journal chip: B's frame must outlive
+  // the jump to C, so the reader who comes back through the chapter to B still
+  // sees "Back to A" (the first v046 fix emptied the whole stack here).
+  it('a journal endpoint keeps the back frames of other entries', () => {
+    const frameB = { destId: 'eB', fromId: 'eA', fromTitle: 'Entry A' };
+    window.__journalBackStack = [frameB];
+    try {
+      const p = makeParams({ screen: 'bible-ch' });
+      const { result } = renderHook(() => useNavigateToLink(p));
+      act(() => { result.current.navigateToLink({ type: 'journal', entryId: 'eC' }); });
+      expect(p.setScreen).toHaveBeenCalledWith('journal-viewer');
+      expect(window.__journalBackStack).toEqual([frameB]);
+    } finally {
+      delete window.__journalBackStack;
+    }
+  });
+
   it('a screen-driven endpoint opens that screen with its letterId', () => {
     const p = makeParams();
     const { result } = renderHook(() => useNavigateToLink(p));

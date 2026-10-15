@@ -101,8 +101,20 @@ export function JournalHubScreen(props) {
   var useState = React.useState;
 
   var onBack = props.onBack;
-  var onOpenEntry = props.onOpenEntry;
-  var onEditEntry = props.onEditEntry;
+  // Opening or editing an entry from the hub is not a card tap, so drop the
+  // journal→journal back frames (JournalViewerScreen's onJournalCard) that
+  // lead INTO it: a stale one made the entry show "Back to <the entry it was
+  // once linked from>" and sent back there (v046). Not on mount: another tab
+  // sitting on journal-home mounts the hub on a tab switch, and this tab's
+  // chain must survive that. Same drop as navigateToLink's journal branch.
+  function dropBackFramesInto(eid) {
+    var jst = (typeof window !== 'undefined') ? window.__journalBackStack : null;
+    if (!jst || !jst.length) return;
+    var kept = jst.filter(function(f) { return !f || f.destId !== eid; });
+    if (kept.length !== jst.length) { jst.length = 0; Array.prototype.push.apply(jst, kept); }
+  }
+  var onOpenEntry = props.onOpenEntry && function(eid) { dropBackFramesInto(eid); props.onOpenEntry(eid); };
+  var onEditEntry = props.onEditEntry && function(eid) { dropBackFramesInto(eid); props.onEditEntry(eid); };
   var onCreateEntry = props.onCreateEntry;
 
   // Subscribe to JournalStore — hub re-renders on any entry mutation.

@@ -320,6 +320,17 @@ export function useNavigateToLink({
       setBookId(null); setChapterNum(null);
       setStudyId(null); setStudyChapterId(null);
       setLetterId(null);
+      // A jump from outside is not a card tap: drop the frames an earlier card
+      // tap left INTO this entry, or "Back to <that entry's old parent>"
+      // outranks this jump's own back pill (v046). Frames into other entries
+      // stay: A → B by card, B → a chapter → this entry, then back through the
+      // chapter to B must still show "Back to A". In place: the viewer holds
+      // the same array.
+      const jst = window.__journalBackStack;
+      if (jst && jst.length) {
+        const kept = jst.filter(function (f) { return !f || f.destId !== endpoint.entryId; });
+        if (kept.length !== jst.length) { jst.length = 0; Array.prototype.push.apply(jst, kept); }
+      }
       setJournalEntryId(endpoint.entryId);
       setScreen('journal-viewer');
     } else if (endpoint.screen) {
