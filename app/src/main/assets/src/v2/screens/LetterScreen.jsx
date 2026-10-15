@@ -223,13 +223,16 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
   );
 }
 
-const LETTER_ACTIONS = (
-  <>
-    <button type="button" className="ic" aria-label="Bookmark"><Icon name="bookmark" /></button>
-    <button type="button" className="ic" aria-label="Text and theme"><Icon name="aa" /></button>
-    <button type="button" className="ic" aria-label="More"><Icon name="more" /></button>
-  </>
-);
+/** The letter's top bar: Bookmark, Aa (the shell's Text and theme sheet), More. @param {{ open?: (sheet: string) => void }} ctx */
+function letterActions({ open }) {
+  return (
+    <>
+      <button type="button" className="ic" aria-label="Bookmark"><Icon name="bookmark" /></button>
+      <button type="button" className="ic" aria-label="Text and theme" onClick={() => open && open('text-and-theme')}><Icon name="aa" /></button>
+      <button type="button" className="ic" aria-label="More"><Icon name="more" /></button>
+    </>
+  );
+}
 
 /** The letter place: the next-letter card replaces this letter, so Back still names the collection. */
 function LetterPlace({ route, replace, go, onReady, gate, desktop, facts }) {
@@ -249,6 +252,6 @@ definePlace('letter', {
     const letter = list ? (r.preface ? prefaceOf(col) : letterAt(list, r.n)) : null;
     return letter ? letter.title : (col ? col.label : '');
   },
-  actions: () => LETTER_ACTIONS,
+  actions: letterActions,
   contentClass: 'content reader',
 });

@@ -45,7 +45,7 @@
 .steps::before { content: ''; position: absolute; left: 4px; right: 4px; top: 11px; height: 2px; background: var(--edge); }
 .steps i { width: 10px; height: 10px; border-radius: 50%; background: var(--raised); border: 2px solid var(--edge); position: relative; }
 .steps i.lit { background: var(--accent); border-color: var(--accent); }
-.steps i.on { width: 20px; height: 20px; background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 4px rgba(196, 164, 105, .18); }
+.steps i.on { width: 20px; height: 20px; background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 4px rgba(var(--gold-rgb), .18); }
 .looks { display: flex; gap: 12px; margin-top: 8px; }
 .look { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: var(--fs-s); color: var(--t2); }
 .look .sw { width: 100%; height: 54px; border-radius: var(--r-s); display: grid; place-items: center; font-size: 22px; border: 1px solid var(--edge); }
@@ -106,8 +106,8 @@
 .settings .label + .srow { border-top: 0; }
 
 /* mark-this-paragraph */
-.scrim.light { background: rgba(4, 7, 8, .38); }
-.marked .tapped { box-shadow: inset 3px 0 0 var(--accent); background: rgba(196, 164, 105, .08); margin: 0 calc(var(--gut) * -1); padding: 6px var(--gut) 8px; }
+.scrim.light { background: var(--scrim-light); }
+.marked .tapped { box-shadow: inset 3px 0 0 var(--accent); background: rgba(var(--gold-rgb), .08); margin: 0 calc(var(--gut) * -1); padding: 6px var(--gut) 8px; }
 .swatches { display: flex; gap: 16px; margin: 6px 0 12px; }
 .swatch.gold { background: #C9A96A; } .swatch.sage { background: #8FB39A; } .swatch.rose { background: #C98B8B; }
 .swatch.blue { background: #8AA9C9; } .swatch.plum { background: #A68ABE; }
@@ -142,7 +142,7 @@
 .chgrid .ch.cur::before { content: ''; position: absolute; width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--accent); left: 50%; top: 50%; margin: -20px 0 0 -20px; }
 .cover.s40.sm .cn { font-size: 14px; letter-spacing: .06em; }
 /* a search match inside the reader: the results' gold underline, on a soft wash so it is found at a glance */
-.reader .body mark.qm { background: var(--wash); color: var(--t-hero); box-shadow: inset 0 -2px 0 rgba(196, 164, 105, .85); border-radius: 2px; padding: 0 1px; }
+.reader .body mark.qm { background: var(--wash); color: var(--t-hero); box-shadow: inset 0 -2px 0 rgba(var(--gold-rgb), .85); border-radius: 2px; padding: 0 1px; }
 
 /* the player's sheets */
 .spd-now { display: flex; align-items: center; justify-content: center; gap: 22px; margin-top: 2px; }
@@ -176,7 +176,7 @@
 .settings.cats .srow { min-height: 72px; }
 .settings.cats .srow:first-child { border-top: 0; }
 .safe { display: flex; gap: 14px; align-items: center; padding: 16px; border: 1px solid var(--edge); border-radius: var(--r); margin-top: 22px; }
-.safe .si { width: 44px; height: 44px; border-radius: 50%; background: rgba(196, 164, 105, .12); color: var(--accent); display: grid; place-items: center; flex: none; }
+.safe .si { width: 44px; height: 44px; border-radius: 50%; background: rgba(var(--gold-rgb), .12); color: var(--accent); display: grid; place-items: center; flex: none; }
 .safe .si svg { width: 24px; height: 24px; }
 .safe .t { font-size: var(--fs-row1); line-height: 1.2; }
 .safe .s { font-size: var(--fs-s); color: var(--t2); margin-top: 3px; line-height: 1.3; }
@@ -223,7 +223,7 @@
 /* full screen and the offline note */
 .reader.full .body { padding-top: 44px; }
 .toast-wrap.hi { bottom: 40px; }
-.toast svg { width: 20px; height: 20px; color: var(--t2); flex: none; }
+.toast svg { width: 20px; height: 20px; color: var(--on-toast-2); flex: none; }
 .content.reader .toast-wrap { bottom: 14px; }
 .at-match { margin-top: -383px; }   /* John 3 opened at 'born again': the match line a third down (line 6 of 16), a whole line
                                        right under the top bar (measured with Range.getClientRects: line tops 0, 36, 71 ... match 177) */
@@ -246,7 +246,7 @@
 .rail { border-right: 1px solid var(--line); display: flex; flex-direction: column; padding-top: 8px; }
 .rail .tab { height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5.5px;
   color: var(--t2); font-size: var(--fs-xs); line-height: 1; }
-.rail .tab svg { width: var(--ic-tab); height: var(--ic-tab); color: #BCC3C5; }
+.rail .tab svg { width: var(--ic-tab); height: var(--ic-tab); color: var(--t-tab); }
 .rail .tab.on, .rail .tab.on svg { color: var(--accent); }
 .pane { position: relative; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr) auto; }
 .main { grid-column: 1; grid-row: 1; position: relative; overflow: hidden; scrollbar-gutter: stable both-edges; }
@@ -282,7 +282,7 @@
 /* D4: dialogs (the phone's sheets) */
 .dk > .scrim { z-index: 5; }
 .dlg { position: absolute; z-index: 6; top: 50%; left: calc(var(--rail) + (100% - var(--rail)) / 2); width: var(--dlg); transform: translate(-50%, -50%);
-  background: var(--raised); border-radius: var(--r); padding: 22px var(--gut) var(--gut); box-shadow: 0 24px 64px rgba(0, 0, 0, .5); }
+  background: var(--raised); border-radius: var(--r); padding: 22px var(--gut) var(--gut); box-shadow: var(--shadow-dialog); }
 .dlg .sh { font-size: var(--fs-m); color: var(--t1); margin-bottom: 10px; }
 .dlg.aa .aa-row { margin-top: 12px; }
 .dlg.aa .seg { margin-top: 8px; }

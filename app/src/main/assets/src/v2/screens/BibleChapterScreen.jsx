@@ -163,12 +163,15 @@ export function BibleChapterScreen({ route, facts, replace, onReady }) {
   );
 }
 
-const CHAPTER_ACTIONS = (
-  <>
-    <button type="button" className="ic" aria-label="Text and theme"><Icon name="aa" /></button>
-    <button type="button" className="ic" aria-label="More"><Icon name="more" /></button>
-  </>
-);
+/** Aa opens the shell's Text and theme sheet (myweb 1c). @param {{ open?: (sheet: string) => void }} ctx */
+function chapterActions({ open }) {
+  return (
+    <>
+      <button type="button" className="ic" aria-label="Text and theme" onClick={() => open && open('text-and-theme')}><Icon name="aa" /></button>
+      <button type="button" className="ic" aria-label="More"><Icon name="more" /></button>
+    </>
+  );
+}
 
 /** A new chapter (the next-chapter card) is a new page: keyed so its book loads and it opens at its top. */
 function ChapterPlace(props) {
@@ -179,6 +182,6 @@ function ChapterPlace(props) {
 definePlace('bible-chapter', {
   Screen: ChapterPlace,
   title: (r) => bookTitle({ book: r.book }) + ' ' + r.chapter,
-  actions: () => CHAPTER_ACTIONS,
+  actions: chapterActions,
   contentClass: 'content reader',
 });

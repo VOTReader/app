@@ -4,6 +4,8 @@
    settingsRows() turns them into the six rows. Pure: no storage writes, no DOM. Labels follow the design's copy
    (v2-step2/screens/ref-4a-settings.html): "Standard size · Slate · comfortable lines", "Benjamin first · KJV Bible audio · 1×". */
 
+import { lookOf, sizeWord } from './look.js';
+
 const DAY = 24 * 3600 * 1000;
 
 /** Reader codes (utils/audio-track.js AUDIO_READERS). 'auto' plays Benjamin's reading wherever one exists (the manifest's
@@ -22,12 +24,10 @@ const SIZE_LABEL = { smaller: 'Smaller size', standard: 'Standard size', larger:
 /** The facts the reader's saved settings give (vot-state.settings); unknown ones stay undefined. @returns {SettingsFacts} */
 export function readFacts(saved, { theme, speed } = /** @type {{ theme?: string, speed?: number }} */ ({})) {
   const s = saved && typeof saved === 'object' ? saved : {};
-  const scale = parseFloat(String(s.fontScale ?? '1'));
-  const textSize = !Number.isFinite(scale) || Math.abs(scale - 1) < 0.005 ? 'standard' : scale < 1 ? 'smaller' : 'larger';
-  // main's themes are dark and light only (settings.trueBlack is an ignored orphan there: ui/screens/SettingsScreen.jsx).
-  const page = theme === 'light' ? 'paper' : 'slate';
+  // the text and page as look.js reads them (main's theme + fontScale; trueBlack and lineSpacing are v2's Black / Relaxed)
+  const look = lookOf({ theme, settings: s });
   return {
-    textSize, page, lines: 'comfortable',
+    textSize: sizeWord(look.scale), page: look.page, lines: look.lines,
     translation: typeof s.translation === 'string' ? s.translation : 'nkjv',
     doubleTapFullscreen: s.doubleTapFullscreen !== false,
     // main's read-along switches (Settings > Reading), read by the v2 letter's wash (rv1 1b)

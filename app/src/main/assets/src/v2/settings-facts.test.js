@@ -46,8 +46,10 @@ describe('readFacts', () => {
     ]);
     expect(readFacts({ fontScale: '0.9' }).textSize).toBe('smaller');
   });
-  it("ignores main's orphan trueBlack key (main has dark and light only)", () => {
-    expect(readFacts({ trueBlack: true }, { theme: 'dark' }).page).toBe('slate');
+  it("Black is dark + settings.trueBlack (main's orphan key, v2's Black page: 1c); light is Paper whatever trueBlack says", () => {
+    expect(readFacts({ trueBlack: true }, { theme: 'dark' }).page).toBe('black');
+    expect(readFacts({ trueBlack: true }, { theme: 'light' }).page).toBe('paper');
+    expect(readFacts({}, { theme: 'dark' }).page).toBe('slate');
   });
 });
 

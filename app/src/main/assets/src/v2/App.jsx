@@ -13,6 +13,8 @@ import { placeFor } from './places.js';
 import { usePlayer, MiniPlayer, NowPlaying, PlayerSheet, PlayerBar } from './player/Player.jsx';
 import { useFullScreen, FullScreenToast } from './player/full-screen.jsx';
 import { SheetLayer, closeTopSheet } from './Sheet.jsx';
+import { AaSheet } from './screens/AaSheet.jsx';
+import { applyLook, savedLook, saveLook, gateLook, sizeWord } from './look.js';
 import './screens/index.js';
 
 const g = /** @type {any} */ (globalThis);
@@ -99,7 +101,14 @@ function NotYet({ title, onReady }) {
 export function V2App({ gateId = readGateId() }) {
   const gate = gateId ? gateState(gateId) : null;
   const [stack, setStack] = React.useState(() => (gate ? gate.stack.slice() : [{ place: 'home' }]));
-  const [facts] = React.useState(() => (gate && gate.facts ? gate.facts : savedFacts()));
+  const [savedFactsAtBoot] = React.useState(() => (gate && gate.facts ? gate.facts : savedFacts()));
+  // The reader's text and page (look.js): shown on <html> at once, kept in main's vot-state (never on a gate boot).
+  const [look, setLook] = React.useState(() => (gate ? gateLook(gate) : savedLook()));
+  const [shellSheet, setShellSheet] = React.useState(() => (gate && gate.open && gate.open.sheet === 'text-and-theme' ? 'text-and-theme' : null));
+  React.useLayoutEffect(() => { applyLook(look, gate ? { bridge: null } : undefined); }, [look, gate]);
+  const changeLook = React.useCallback((next) => { setLook(next); if (!gate) saveLook(next); }, [gate]);
+  const facts = React.useMemo(() => (gate ? savedFactsAtBoot
+    : { ...savedFactsAtBoot, textSize: sizeWord(look.scale), page: look.page, lines: look.lines }), [gate, savedFactsAtBoot, look]);
   const [ready, setReady] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
   const [layer, setLayer] = React.useState(/** @type {HTMLElement | null} */ (null));
@@ -176,7 +185,7 @@ export function V2App({ gateId = readGateId() }) {
   if (def) {
     const Screen = def.Screen;
     contentClass = def.contentClass || 'content';
-    actions = def.actions ? def.actions({ route, go, desktop, device }) : null;
+    actions = def.actions ? def.actions({ route, go, desktop, device, open: setShellSheet }) : null;
     screen = <Screen route={route} facts={facts} gate={gate} desktop={desktop} device={device}
       go={go} pop={pop} replace={replace} openTab={openTab} onReady={onReady} />;
   } else {
@@ -191,8 +200,14 @@ export function V2App({ gateId = readGateId() }) {
   ));
   const bar = <TopBar back={back} onBack={pop} actions={actions} scrolled={scrolled} />;
 
-  // the layer sheets and dialogs portal into (Sheet.jsx): over the whole window, outside the scrolling page
-  const layerHost = <div className="v2-layer" ref={setLayer} />;
+  // the layer sheets and dialogs portal into (Sheet.jsx): over the whole window, outside the scrolling page; the shell's
+  // own sheet (Text and theme, from a reading page's Aa) goes there too
+  const layerHost = (
+    <>
+      <div className="v2-layer" ref={setLayer} />
+      {shellSheet === 'text-and-theme' && <AaSheet look={look} desktop={desktop} onChange={changeLook} onClose={() => setShellSheet(null)} />}
+    </>
+  );
 
   if (desktop) {
     return (

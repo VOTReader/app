@@ -123,7 +123,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 /* search field */
 .field { height: 52px; border-radius: var(--r); background: var(--input); border: 1px solid var(--edge); display: flex; align-items: center; padding: 0 5px 0 14px; gap: 10px; }
-.field .ph { flex: 1; font-size: var(--fs-ui); color: #A7AEB0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.field .ph { flex: 1; font-size: var(--fs-ui); color: var(--t-ph); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .field .q { flex: 1; font-size: var(--fs-ui); color: var(--t1); white-space: nowrap; overflow: hidden; }
 .field svg { width: 24px; height: 24px; color: var(--t1); }
 
@@ -135,7 +135,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .grid2 .col { display: grid; grid-template-columns: max-content 1fr; column-gap: 17px; }
 .grid2 .n, .grid2 .c { height: 47.2px; display: flex; align-items: center; border-bottom: 1px solid var(--line); }
 .grid2 .n { color: var(--tgold-hi); font-size: 17.5px; font-weight: 600; }
-.grid2 .c { font-size: var(--fs-cell); font-weight: 500; color: #CBD0D1; }
+.grid2 .c { font-size: var(--fs-cell); font-weight: 500; color: var(--t-cell); }
 .grid2 .last { border-bottom: 0; }
 
 /* letter header meta + reading text */
@@ -146,7 +146,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 /* tab bar */
 .tabbar { height: var(--tabbar); flex: none; border-top: 1px solid var(--line); display: flex; background: var(--bg); }
 .tabbar .tab { flex: 1; display: flex; flex-direction: column; align-items: center; padding-top: 12px; gap: 5.5px; color: var(--t2); font-size: var(--fs-xs); line-height: 1; }
-.tabbar .tab svg { width: var(--ic-tab); height: var(--ic-tab); color: #BCC3C5; }
+.tabbar .tab svg { width: var(--ic-tab); height: var(--ic-tab); color: var(--t-tab); }
 .tabbar .tab.on, .tabbar .tab.on svg { color: var(--accent); }
 .homeind { position: absolute; left: 50%; bottom: 13px; width: 132px; margin-left: -66px; height: 5px; border-radius: 3px; background: #F4F6F6; }
 .navbar { height: 48px; flex: none; background: #000; display: flex; justify-content: space-around; align-items: center; color: #DADDDD; }
@@ -163,7 +163,83 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   --hl-gold: rgba(201, 152, 54, .32); --hl-sage: rgba(143, 179, 154, .28); --hl-rose: rgba(201, 139, 139, .28);
   --hl-blue: rgba(138, 169, 201, .28); --hl-plum: rgba(166, 138, 190, .28);
   --mini: 56px;           /* mini player: under the 64 px ceiling */
+  /* dz12: every colour a component used as a literal is a token, so a page (Slate / Paper / Black) is one block */
+  --gold-rgb: 196, 164, 105;   /* gold tints: rgba(var(--gold-rgb), a) for selected fills, focus rings, underlines */
+  --t-ph: #A7AEB0;        /* search placeholder */
+  --t-cell: #CBD0D1;      /* compact two-column cells */
+  --t-tab: #BCC3C5;       /* idle tab and rail icons */
+  --pill-press: #A88A57;  /* pressed primary button */
+  --cover-bg: linear-gradient(160deg, #233033 0%, #1A2426 55%, #151D1F 100%);
+  --cover-edge: rgba(192, 170, 140, .35);
+  --scrim: rgba(4, 7, 8, .58); --scrim-light: rgba(4, 7, 8, .38);
+  --shadow-sheet: 0 -10px 30px rgba(0, 0, 0, .35);
+  --shadow-toast: 0 8px 22px rgba(0, 0, 0, .4);
+  --shadow-dialog: 0 24px 64px rgba(0, 0, 0, .5);
+  --toast: #2B3537; --on-toast: #E9EEEF; --on-toast-2: #B7BFC1; --toast-act: #C4A469;
+  --skel: #222B2D;
+  --swatch-edge: rgba(255, 255, 255, .18);
+  /* window / status bar colour (meta theme-color, Android system bars): Slate #172022, Paper #F2EDE2 (dark icons), Black #000000 */
 }
+
+/* ---------- dz12: the Text and theme sheet (1c) - Page, Line spacing, Text size ----------
+   Page applies to the whole app (Settings > Text and theme says "Standard size - Slate - comfortable lines"): set
+   data-page="paper" | "black" on <html> (no attribute = Slate). Every token is restated in each block, with no var()
+   chains, so the attribute also works on an inner element. Paper's ink and Black's ink are the sheet's swatches.
+   Contrast on the page (WCAG): Paper body 12.7, t2 7.7, t3 5.5, gold labels 5.5, accent 5.7, Done label on the pill 5.2;
+   Black body 15.3, t3 6.8, gold labels 8.1. */
+[data-page="paper"] {
+  --bg: #F2EDE2; --raised: #F8F5EE; --input: #E8E1D3; --line: #DDD5C6; --edge: #B9AE9A;
+  --t-hero: #1E1A15; --t1: #26221C; --t-body: #2B2721; --t-sub: #433D34; --t2: #4F483E; --t3: #665E52;
+  --pill: #85662C; --on-pill: #FFFBF3; --accent: #765819; --tgold: #6A5E43; --tgold-hi: #6E5528;
+  --tgold-ghost: rgba(118, 88, 25, .45);
+  --danger: #9A3A24; --press: rgba(43, 39, 33, .06); --wash: rgba(190, 145, 50, .22);
+  --hl-gold: rgba(214, 160, 40, .30); --hl-sage: rgba(110, 160, 125, .28); --hl-rose: rgba(205, 120, 120, .26);
+  --hl-blue: rgba(100, 145, 195, .26); --hl-plum: rgba(150, 115, 185, .24);
+  --gold-rgb: 126, 95, 34;
+  --t-ph: #665E52; --t-cell: #3A342C; --t-tab: #4A443A; --pill-press: #765A25;
+  --cover-bg: linear-gradient(160deg, #EAE3D5 0%, #E2D9C8 55%, #DAD0BD 100%);
+  --cover-edge: rgba(110, 85, 40, .35);
+  --scrim: rgba(38, 31, 20, .40); --scrim-light: rgba(38, 31, 20, .24);
+  --shadow-sheet: 0 -8px 28px rgba(70, 52, 20, .16);
+  --shadow-toast: 0 8px 22px rgba(40, 30, 10, .22);
+  --shadow-dialog: 0 24px 64px rgba(60, 45, 20, .22);
+  --toast: #2B2721; --on-toast: #F2EDE2; --on-toast-2: #B5AD9F; --toast-act: #D2B57A;   /* the toast inverts: dark on the light page */
+  --skel: #E3DCCD;
+  --swatch-edge: rgba(43, 39, 33, .22);
+}
+/* Paper asks the system for dark status and nav bar icons (Android: APPEARANCE_LIGHT_STATUS_BARS + LIGHT_NAVIGATION_BARS);
+   these lines only recolour the kit's stand-ins for those bars. */
+[data-page="paper"] .sb, [data-page="paper"] .nav3 { color: #2B2721; }
+[data-page="black"] {
+  --bg: #000000; --raised: #0E1213; --input: #161B1C; --line: #1F2526; --edge: #353E40;
+  --t-hero: #ECEEEC; --t1: #E2E6E6; --t-body: #D9DDDD; --t-sub: #BDC3C4; --t2: #AEB5B7; --t3: #8C9497;
+  --pill: #BB9B64; --on-pill: #1A1206; --accent: #C4A469; --tgold: #A9A188; --tgold-hi: #C0AA8C;
+  --tgold-ghost: rgba(196, 164, 105, .38);
+  --danger: #D88A73; --press: rgba(255, 255, 255, .06); --wash: rgba(196, 164, 105, .18);
+  --hl-gold: rgba(201, 152, 54, .32); --hl-sage: rgba(143, 179, 154, .28); --hl-rose: rgba(201, 139, 139, .28);
+  --hl-blue: rgba(138, 169, 201, .28); --hl-plum: rgba(166, 138, 190, .28);
+  --gold-rgb: 196, 164, 105;
+  --t-ph: #9DA4A6; --t-cell: #C4C9CA; --t-tab: #B3BABC; --pill-press: #A88A57;
+  --cover-bg: linear-gradient(160deg, #182022 0%, #101618 55%, #0B1011 100%);
+  --cover-edge: rgba(192, 170, 140, .35);
+  --scrim: rgba(0, 0, 0, .66); --scrim-light: rgba(0, 0, 0, .44);
+  --shadow-sheet: 0 -1px 0 #283032, 0 -10px 30px rgba(0, 0, 0, .6);   /* a hairline: a sheet on black has no shadow to show */
+  --shadow-toast: 0 0 0 1px #283032, 0 8px 22px rgba(0, 0, 0, .6);
+  --shadow-dialog: 0 0 0 1px #283032, 0 24px 64px rgba(0, 0, 0, .7);
+  --toast: #1F2627; --on-toast: #E2E6E6; --on-toast-2: #AEB5B7; --toast-act: #C4A469;
+  --skel: #161B1C;
+  --swatch-edge: rgba(255, 255, 255, .2);
+}
+/* Line spacing: Comfortable = --lh-body 1.535 (as drawn); Relaxed = 1.75 (23 on 40.3 px). data-lines="relaxed" on <html>. */
+[data-lines="relaxed"] { --lh-body: 1.75; }
+/* Text size: six steps, a multiplier on the READING text only (chrome stays px). Step 3 = 1 = 23 px as drawn.
+     TEXT_STEPS = [0.8, 0.9, 1, 1.3, 1.75, 2.4]   ->   18.4 / 20.7 / 23 / 29.9 / 40.3 / 55.2 px
+   Fine steps under standard, big ones above it: step 6 matches main's 300 % cap on a phone (3 x 18 = 54 px), which
+   Corbin asked for when 160 % was too little on his PC. Set --text-scale on <html> from settings.fontScale.
+   Main's stored value is "1 = standard" there too, so read it as is (do not convert px): a value between steps shows
+   on the nearest dot by ratio - min over i of |ln(TEXT_STEPS[i] / v)| - and a tap writes that step's value.
+   overflow-wrap only acts when one word is wider than the column (step 6 on a 360 px phone), so normal sizes are untouched. */
+:root { --text-scale: 1; }
 .num { font-variant-numeric: lining-nums tabular-nums; }
 
 /* Android system bars (drawn by the system over the app's own plane: edge to edge) */
@@ -172,11 +248,11 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .nav3 svg { width: 22px; height: 22px; }
 
 /* states shared by every control */
-.pill.pressed { background: #A88A57; }
+.pill.pressed { background: var(--pill-press); }
 .pill.disabled, .btn2.disabled { opacity: .38; }
 .focus { outline: 2px solid var(--accent); outline-offset: 3px; }
 .row.pressed { background: var(--press); margin: 0 calc(var(--gut) * -1); padding-left: var(--gut); padding-right: var(--gut); }
-.btn2.pressed { background: rgba(196, 164, 105, .10); }
+.btn2.pressed { background: rgba(var(--gold-rgb), .10); }
 .btn2.sm, .pill.sm { height: 40px; padding: 0 16px; font-size: var(--fs-s); gap: 8px; }
 .pill.sm svg, .btn2.sm svg { width: 18px; height: 18px; }
 .textbtn { height: 48px; display: inline-flex; align-items: center; color: var(--accent); font-size: var(--fs-m); font-weight: 500; }
@@ -190,7 +266,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .row .no { width: 34px; flex: none; color: var(--tgold-hi); font-size: 17.5px; font-weight: 600; font-variant-numeric: lining-nums; align-self: flex-start; padding-top: 3px; }
 .row .rp { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--edge); display: grid; place-items: center; color: var(--t1); flex: none; }
 .row .rp svg { width: 16px; height: 16px; }
-.row .rp.on { border-color: var(--accent); color: var(--accent); background: rgba(196, 164, 105, .10); }
+.row .rp.on { border-color: var(--accent); color: var(--accent); background: rgba(var(--gold-rgb), .10); }
 .row.playing .t { color: var(--accent); }
 .row .s .bad { color: var(--danger); }
 .row .st { display: inline-flex; align-items: center; gap: 4px; vertical-align: -2px; }
@@ -204,7 +280,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .chip { height: 36px; border-radius: var(--r-s); border: 1px solid var(--edge); color: var(--t1); display: inline-flex; align-items: center; gap: 6px;
   padding: 0 13px; font-size: var(--fs-s); white-space: nowrap; flex: none; }
 .chip svg { width: 16px; height: 16px; color: var(--t2); }
-.chip.on { border-color: var(--accent); color: var(--accent); background: rgba(196, 164, 105, .12); }
+.chip.on { border-color: var(--accent); color: var(--accent); background: rgba(var(--gold-rgb), .12); }
 .chip.on svg { color: var(--accent); }
 
 /* search field states */
@@ -220,7 +296,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .hit .where { font-size: var(--fs-xs); color: var(--tgold); letter-spacing: .02em; }
 .hit .tt { font-size: var(--fs-row1); line-height: 1.2; margin-top: 3px; }
 .hit .ex { font-size: var(--fs-s); line-height: 1.4; color: var(--t2); margin-top: 4px; }
-.hit mark { background: none; color: var(--t1); box-shadow: inset 0 -2px 0 rgba(196, 164, 105, .75); }
+.hit mark { background: none; color: var(--t1); box-shadow: inset 0 -2px 0 rgba(var(--gold-rgb), .75); }
 
 /* switch and segmented control */
 .switch { width: 52px; height: 32px; border-radius: 16px; background: var(--input); border: 1px solid var(--edge); position: relative; flex: none; }
@@ -249,9 +325,9 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .mini .ic svg { width: 24px; height: 24px; }
 
 /* cover: typographic, one per collection (no stock photos) */
-.cover { position: relative; background: linear-gradient(160deg, #233033 0%, #1A2426 55%, #151D1F 100%); border-radius: var(--r-s); flex: none;
+.cover { position: relative; background: var(--cover-bg); border-radius: var(--r-s); flex: none;
   display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--tgold-hi); overflow: hidden; }
-.cover::before { content: ''; position: absolute; inset: 7%; border: 1px solid rgba(192, 170, 140, .35); border-radius: 3px; }
+.cover::before { content: ''; position: absolute; inset: 7%; border: 1px solid var(--cover-edge); border-radius: 3px; }
 .cover .cn { line-height: 1; font-weight: 500; }
 .cover .cl { letter-spacing: .16em; text-transform: uppercase; color: var(--tgold); }
 .cover.s40 { width: 40px; height: 40px; }
@@ -274,13 +350,13 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .bigplay svg { width: 32px; height: 32px; }
 
 /* sheets, scrim, toast */
-.scrim { position: absolute; inset: 0; background: rgba(4, 7, 8, .58); }
-.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--raised); border-radius: var(--r) var(--r) 0 0; padding: 8px var(--gut) 12px; box-shadow: 0 -10px 30px rgba(0, 0, 0, .35); }
+.scrim { position: absolute; inset: 0; background: var(--scrim); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--raised); border-radius: var(--r) var(--r) 0 0; padding: 8px var(--gut) 12px; box-shadow: var(--shadow-sheet); }
 .sheet .handle { width: 36px; height: 4px; border-radius: 2px; background: var(--edge); margin: 0 auto 18px; }
 .sheet .sh { font-size: var(--fs-m); color: var(--t1); margin-bottom: 10px; }
-.toast { min-height: 48px; border-radius: var(--r-s); background: #2B3537; color: var(--t1); display: flex; align-items: center; gap: 10px; padding: 0 4px 0 16px; font-size: var(--fs-s);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, .4); text-wrap: balance; }   /* two lines split evenly, never one word alone */
-.toast .act { margin-left: auto; color: var(--accent); font-weight: 500; padding: 0 12px; height: 48px; display: grid; place-items: center; }
+.toast { min-height: 48px; border-radius: var(--r-s); background: var(--toast); color: var(--on-toast); display: flex; align-items: center; gap: 10px; padding: 0 4px 0 16px; font-size: var(--fs-s);
+  box-shadow: var(--shadow-toast); text-wrap: balance; }   /* two lines split evenly, never one word alone */
+.toast .act { margin-left: auto; color: var(--toast-act); font-weight: 500; padding: 0 12px; height: 48px; display: grid; place-items: center; }
 
 /* empty, loading, error */
 .empty { text-align: center; padding: 44px 8px 24px; }
@@ -289,10 +365,10 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .empty .t { font-size: var(--fs-m); color: var(--t1); }
 .empty .s { font-size: var(--fs-s); color: var(--t2); margin: 8px auto 0; line-height: 1.45; max-width: 280px; }
 .empty .pill, .empty .btn2 { margin-top: 22px; }
-.skel { background: #222B2D; border-radius: var(--r-s); height: 12px; }
+.skel { background: var(--skel); border-radius: var(--r-s); height: 12px; }
 
 /* reading */
-.reader .body { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--t-body); }
+.reader .body { font-size: calc(var(--fs-body) * var(--text-scale)); line-height: var(--lh-body); color: var(--t-body); overflow-wrap: break-word; }
 .reader .body p { margin: 0 0 .62em; }
 .reader .body .q { font-style: italic; color: var(--t-sub); }
 .vn { font-size: var(--fs-xs); font-weight: 500; color: var(--tgold); vertical-align: .42em; line-height: 0; margin-right: 3px; font-variant-numeric: lining-nums; }
@@ -308,4 +384,4 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .nextcard .tx { flex: 1; }
 .nextcard .k { font-size: var(--fs-xs); color: var(--tgold); letter-spacing: .02em; }
 .nextcard .t { font-size: var(--fs-row1); margin-top: 3px; line-height: 1.2; }
-.swatch { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .18); }
+.swatch { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--swatch-edge); }

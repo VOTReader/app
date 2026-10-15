@@ -18,7 +18,8 @@
 /**
  * @typedef {{ Screen: (props: PlaceProps) => any,
  *   title?: (route: any) => string,
- *   actions?: (ctx: { route: any, go: (...routes: any[]) => void, desktop: boolean, device: 'phone' | 'computer' }) => any,
+ *   actions?: (ctx: { route: any, go: (...routes: any[]) => void, desktop: boolean, device: 'phone' | 'computer',
+ *     open?: (sheet: string) => void }) => any,
  *   contentClass?: string }} PlaceDef
  */
 

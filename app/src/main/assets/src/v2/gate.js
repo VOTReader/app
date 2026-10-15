@@ -27,9 +27,11 @@ const DAY = 24 * 3600 * 1000;
  * @typedef {{ place: string, collection?: string, n?: number, kind?: string, id?: string, book?: string, chapter?: number | string,
  *   verse?: number, match?: string[] }} Route
  * @typedef {{ item: Record<string, any>, reader: string, at: number, length: number, paused: boolean } & Record<string, any>} GatePlaying
- * `open` names a sheet the screen opens on the gate boot ({ sheet: 'mark-paragraph', para, colour } on a letter).
+ * `open` names a sheet the screen opens on the gate boot ({ sheet: 'mark-paragraph', para, colour } on a letter; the
+ * shell's { sheet: 'text-and-theme' }); `look` the text and page shown (look.js: { scale, page, lines }; Slate otherwise).
  * @typedef {{ stack: Route[], facts?: Record<string, any>, scroll?: number | string | { to: string, gap?: number },
- *   playing?: GatePlaying | null, player?: Record<string, any>, open?: Record<string, any> }} GateState
+ *   playing?: GatePlaying | null, player?: Record<string, any>, open?: Record<string, any>,
+ *   look?: { scale?: number, page?: string, lines?: string } }} GateState
  */
 
 /** Letter 1 of Volume One loaded at 3:51 of 10:08, read by Benjamin (states.json 0a, 0b, 2a, 1b). */
@@ -84,6 +86,12 @@ export const GATE_STATES = {
   // states.json 1a-letter: Volume One, Letter 1 (Chosen by God), top of the page, not playing; Back says Volume One.
   '1a-letter': {
     stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],
+  },
+  // states.json 1c-aa-sheet: Letter 1 at its top, Text and theme open: standard size (step 3 of 6), Slate, Comfortable.
+  '1c-aa-sheet': {
+    stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],
+    open: { sheet: 'text-and-theme' },
+    look: { scale: 1, page: 'slate', lines: 'comfortable' },
   },
   // states.json 4b-mark-paragraph: Letter 1's first paragraph tapped (its gold bar just under the top bar, the head
   // scrolled away), "Mark this paragraph" open with gold ringed; nothing playing.
