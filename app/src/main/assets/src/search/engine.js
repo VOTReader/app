@@ -38,7 +38,7 @@ import {
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
 import { onIdle } from '../utils/on-idle.js';
 import { lemma, bestWindow } from './passage.js';
-import { startSemantic, semanticDocs, semanticStatus, docUnitKey } from './semantic.js';
+import { startSemantic, semanticDocs, semanticStatus, semanticReady, docUnitKey } from './semantic.js';
 import { KJV_ALIAS, KJV_ALIAS_BOOKS } from './kjv-alias.js';
 import { searchWorker } from './worker-client.js';
 import { indexAssembler } from './index-transfer.js';
@@ -1358,7 +1358,8 @@ async function ensureReady(options) {
  * `signal`: when it is aborted the search stops at its next turn and returns `aborted: true`, no results (sr7).
  * `corrections` lists each typed word that found nothing of its own and was
  * searched as the nearest indexed word instead ({ from: 'shephard', to: 'shepherd' }).
- * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[], close?:boolean}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>, stopWordsOnly?:boolean, unquoted?:string, aborted?:boolean}>}
+ * `meaningLater`: a text search the meaning model was not ready for ran on the words alone; whenMeaningReady() says when to ask again.
+ * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[], close?:boolean}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>, stopWordsOnly?:boolean, unquoted?:string, aborted?:boolean, meaningLater?:boolean}>}
  */
 async function search(query, options) {
   options = options || {};
@@ -1805,6 +1806,8 @@ async function search(query, options) {
   const quoted = out.length && (nearOf[idOf.get(out[0]) || ''] || 0) >= NEAR_PHRASE_MIN;
   const held = !keyword && !p.phrase && !quoted ? bestPassageFirst(out, idOf, units, isStopTerm, named, kjvHeld) : 1;
   /** @type {Awaited<ReturnType<typeof semanticDocs>>} */ let sem = null;
+  // A search the model was not ready for: its words' order stands, and says the meaning comes later (semanticReady).
+  let meaningLater = false;
   // The index the words were read from. While the model runs, a build for another edition (the reader
   // changed translation) can swap its own in: from then on this search reads nothing more by id, since
   // that index would hand back the other edition's text. The words' results stand alone.
@@ -1813,6 +1816,7 @@ async function search(query, options) {
     const meant = String(wanted);
     // Kept to a collection or scope, the model's best of everything may hold few of its texts: it reads further.
     sem = await semanticDocs(meant, unitId, corpusFilter || scopeBookId || scopeVolumeId ? MEANING_FILTERED : undefined);
+    meaningLater = !sem && semanticStatus().status !== 'ready';
     if (msIndex !== inUse) sem = null;
     if (sem) sem = sem.filter((s) => { const f = msIndex.getStoredFields(s.id); return !!f && allowed(f); });
     if (sem && sem.length) meaningFirst(out, idOf, sem, named, held, fresh);
@@ -1906,7 +1910,7 @@ async function search(query, options) {
     const again = await search(String(query).replace(/["\u201C\u201D\u201E\u201F]/g, ' '), { ...options, _unquoted: true });
     if (again.results && again.results.length) return { ...again, unquoted: p.phrase };
   }
-  return { parsed, results: out, parsedTerms: filtered, textQuery: run ? { ...p, run } : p, capped: Object.keys(capped), truncated: over || (out.length >= limit && h < rankedIds.length), corrections };
+  return { parsed, results: out, parsedTerms: filtered, textQuery: run ? { ...p, run } : p, capped: Object.keys(capped), truncated: over || (out.length >= limit && h < rankedIds.length), corrections, meaningLater };
 }
 
 /**
@@ -1996,6 +2000,7 @@ export const VotSearchMini = {
   // the on-device meaning search: its state ({status, failure, units}), and a start for callers that need it now
   meaningStatus: semanticStatus,
   startMeaning: startSemantic,
+  whenMeaningReady: semanticReady,
   rebuild,
   parse: parseReference,
   search,

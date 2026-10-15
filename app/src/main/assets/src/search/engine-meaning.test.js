@@ -131,6 +131,35 @@ describe('meaning first', () => {
     expect(r.placeStart).toBe(STARTS.creator);
   });
 
+  /* THE MODEL CAN ARRIVE AFTER THE FIRST SEARCH (sr11 S22 look, 2026-10-15). The model starts once the page is idle,
+     so a search typed in a session's first seconds runs on the words alone; the screen kept that list until the query
+     changed ('stay alert because nobody knows when the lord will come back' led with an unrelated letter on the S22,
+     the engine asked again led with "Keep Watch"). Such a search says the meaning comes later, and the screen can
+     wait for the model without starting it. */
+  it('a text search run before the model is ready says the meaning comes later; the wait for it starts nothing', async () => {
+    resetSemantic();
+    standInModel();
+    said.near = 'creator';
+    const q = 'honour the one who made you while still a child';
+    const before = await VotSearchMini.search(q);
+    expect(before.meaningLater).toBe(true);
+    expect(before.results[0].doc.letterId).not.toBe('creator');
+    let ready = false;
+    const wait = VotSearchMini.whenMeaningReady().then((ok) => { ready = ok; });
+    await new Promise((res) => setTimeout(res, 0));
+    expect(ready).toBe(false);
+    expect(VotSearchMini.meaningStatus().status).toBe('off');
+    expect(await startSemantic()).toBe(true);
+    await wait;
+    expect(ready).toBe(true);
+    const after = await VotSearchMini.search(q);
+    expect(after.meaningLater).toBe(false);
+    expect(after.results[0].doc.letterId).toBe('creator');
+    // a quote the words find by themselves never waits on the model
+    resetSemantic();
+    expect((await VotSearchMini.search('"made you"')).meaningLater).toBe(false);
+  });
+
   it('a reprint the meaning found gives its place to the original its matched passage copies', async () => {
     said.near = 'fields';
     const r = await first('a farmer whose crop went sour and so he gave up on his land');
