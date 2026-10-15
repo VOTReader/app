@@ -96,6 +96,11 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
   // and inline highlight/link/bookmark icons before and after the swipe commits
   // (no more "section headings pop in after release"). Render-affecting settings
   // are threaded so the clone matches exactly what the committed chapter shows.
+  // The clone gets the READER's translation, not this page's resolved one: it
+  // works out its own recording match for its own book (sweep v068). Handed
+  // the resolved KJV of Genesis's recording, a peek into Exodus stayed KJV and
+  // switched to NKJV the moment the swipe settled; a same-book peek still
+  // resolves to the recording's edition, "to match the recording" line and all.
   const _versesPeek = (bk, ch) => ({
     kind: 'screen',
     el: (
@@ -103,7 +108,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
       <BibleChapterView
         book={bk}
         chapter={ch}
-        translation={translation}
+        translation={readerTranslation}
         restoredNames={restoredNames}
         showChapterTitle={showChapterTitle}
         showSectionHeadings={showSectionHeadings}
