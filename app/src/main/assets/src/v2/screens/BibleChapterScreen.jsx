@@ -103,7 +103,7 @@ export function BibleChapterScreen({ route, facts, gate = null, replace, onReady
   const bodyRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const terms = route.match ? [].concat(route.match).filter(Boolean) : [];
   // the reader's Bible audio for this book (readalong rv1 2c); null = no recording, so no pill and no read-along
-  const audio = React.useMemo(() => chapterAudio(route.book), [route.book]);
+  const audio = React.useMemo(() => chapterAudio(route.book, gate), [route.book, gate]);
   // Listen's offline line, as the letter's (a gate's stays: it is the picture)
   const [toast, setToast] = React.useState(/** @type {import('../player/listen.jsx').Toast | null} */ (null));
   React.useEffect(() => {
