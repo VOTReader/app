@@ -97,6 +97,13 @@ function _markExported() {
 /** What an import or Clear All returns when it stopped before its first write to the library (W8). */
 const NOTHING_WRITTEN = 'nothing-written';
 
+/** How long Clear All waits for a user-data database to go (sweep v033: 3 s cut a slow phone short). */
+const CRITICAL_DELETE_WAIT_MS = 30000;
+/** How long it waits for a regenerable cache database. */
+const CACHE_DELETE_WAIT_MS = 1000;
+/** Reading time for "Clear did not finish. Reloading…" before the reload. */
+const CLEAR_UNFINISHED_RELOAD_MS = 2500;
+
 export function createBackupFlow(ctx) {
   const {
     busyRef: backupBusyRef, reloadPendingRef: backupReloadPendingRef, reloadTimerRef: backupReloadTimerRef,
@@ -1045,34 +1052,49 @@ export function createBackupFlow(ctx) {
   };
 
   /**
-   * Wrap `indexedDB.deleteDatabase(name)` in a Promise that resolves
-   * with whether deletion actually succeeded. Critical deletes get a
-   * longer timeout because hanging on those is worse than hanging
-   * on a cache database.
+   * Wrap `indexedDB.deleteDatabase(name)` in a Promise that resolves with
+   * what became of the delete:
+   *   'deleted' — onsuccess: the database is gone.
+   *   'failed'  — onerror, or the call threw: the request is over and the
+   *               database is still there.
+   *   'pending' — no answer by the deadline. sweep v033: neither 'blocked'
+   *               nor a deadline cancels the request. The browser keeps it
+   *               queued until the other connections close, then deletes, and
+   *               a slow delete of a large library on a budget phone simply
+   *               finishes late. So a delete still running is not a failure:
+   *               the database may still go at any moment.
+   * A user-data database is waited on for up to 30 s, a blocked one included
+   * (`onBlocked` lets the reader know why). A cache gets 1 s and is never
+   * waited on once blocked, as nothing depends on it going.
    *
    * @param {string} name
    * @param {boolean} critical
-   * @returns {Promise<boolean>} true only when deletion completed
+   * @param {() => void} [onBlocked]
+   * @returns {Promise<'deleted' | 'failed' | 'pending'>}
    */
-  const _deleteIdbDatabase = (name, critical) => new Promise((resolve) => {
+  const _deleteIdbDatabase = (name, critical, onBlocked) => new Promise((resolve) => {
     let settled = false;
-    const finish = (ok) => { if (!settled) { settled = true; resolve(ok); } };
+    let timer = 0;
+    /** @param {'deleted' | 'failed' | 'pending'} r */
+    const finish = (r) => { if (!settled) { settled = true; if (timer) clearTimeout(timer); resolve(r); } };
     try {
       const req = indexedDB.deleteDatabase(name);
-      req.onsuccess = () => finish(true);
-      req.onerror = () => finish(false);
-      req.onblocked = () => finish(false); // open connections should close on
-                                           // versionchange; otherwise fail visibly.
-      // Timeout fallback so a stuck deletion doesn't block the UI
-      // forever. 3s for user-data DBs, 1s for caches.
-      setTimeout(() => finish(false), critical ? 3000 : 1000);
-    } catch (_e) { finish(false); }
+      req.onsuccess = () => finish('deleted');
+      req.onerror = () => finish('failed');
+      req.onblocked = () => {
+        if (!critical) { finish('pending'); return; }
+        try { if (onBlocked) onBlocked(); } catch (_e) { /* a toast never stops the wait */ }
+      };
+      timer = /** @type {any} */ (setTimeout(() => finish('pending'), critical ? CRITICAL_DELETE_WAIT_MS : CACHE_DELETE_WAIT_MS));
+    } catch (_e) { finish('failed'); }
   });
 
   // The wipe itself. clearAllPersonalData (below) runs it with every live writer frozen.
   const _wipeAllPersonalData = async () => {
     // W8: whether the library database went (the other tabs' fence stays up if it did).
     let libraryDeleted = false;
+    // v033: a user-data delete the browser is still running when the wait ends.
+    let stillDeleting = false;
     try {
       // v04-02: a PLAYING recording is a live writer — its position every 5 s and
       // again on the reload's pagehide, into the database being deleted. stop()
@@ -1107,19 +1129,27 @@ export function createBackupFlow(ctx) {
       //
       // Fix: await the critical deletions (votreader = 19 stores of
       // user data; vot-journal-media = audio + images) before
-      // reload. Each delete has a 3s timeout fallback so a stuck
-      // onblocked never hangs the UI; vot-thumbs + the two search-index
-      // caches (Classic + MiniSearch) are regenerable caches and get a
-      // 1s timeout each.
+      // reload. vot-thumbs + the two search-index caches (Classic +
+      // MiniSearch) are regenerable caches and get a 1s timeout each.
+      // v033: a user-data delete is waited on through 'blocked' and for up to
+      // 30 s (3 s cut a large delete on a slow phone short), and one still
+      // running then is 'pending', not failed (_deleteIdbDatabase).
       const NONCRITICAL_DB_NAMES = ['vot-thumbs', 'vot-search-cache', 'vot-minisearch-cache'];
+      let toldBlocked = false;
+      const onBlocked = () => {
+        if (toldBlocked) return;
+        toldBlocked = true;
+        _showToast('Clearing… close VOTReader in any other tab so it can finish.', 0);
+      };
       const deleteResults = await Promise.all([
-        _deleteIdbDatabase('votreader', true),
-        _deleteIdbDatabase('vot-journal-media', true),
+        _deleteIdbDatabase('votreader', true, onBlocked),
+        _deleteIdbDatabase('vot-journal-media', true, onBlocked),
         ...NONCRITICAL_DB_NAMES.map((name) => _deleteIdbDatabase(name, false)),
       ]);
-      libraryDeleted = !!deleteResults[0];
-      if (!deleteResults[0] || !deleteResults[1]) {
-        throw new Error('A personal-data database could not be deleted');
+      libraryDeleted = deleteResults[0] === 'deleted';
+      stillDeleting = deleteResults[0] === 'pending' || deleteResults[1] === 'pending';
+      if (deleteResults[0] !== 'deleted' || deleteResults[1] !== 'deleted') {
+        throw new Error('A personal-data database could not be deleted' + (stillDeleting ? ' in time' : ''));
       }
       // storage-backup-4: indexes 2+ (the regenerable caches) used to be
       // discarded outright — a silently-surviving database (e.g. an open
@@ -1132,7 +1162,7 @@ export function createBackupFlow(ctx) {
       // 2026-10-11: the warm search index left IndexedDB for the Cache API
       // (search/cache.js); it is a regenerable cache too, cleared best-effort.
       try { const cs = /** @type {any} */ (globalThis).caches; if (cs && typeof cs.delete === 'function') await cs.delete('vot-search-index'); } catch (_e) { /* best-effort: a cache, not user data */ }
-      const failedCaches = NONCRITICAL_DB_NAMES.filter((_name, i) => !deleteResults[2 + i]);
+      const failedCaches = NONCRITICAL_DB_NAMES.filter((_name, i) => deleteResults[2 + i] !== 'deleted');
       if (failedCaches.length) {
         console.warn('clear all: non-critical database(s) failed to delete:', failedCaches.join(', '));
         try { if (window.DiagnosticLog) window.DiagnosticLog.warn('settings', 'Clear All: failed to delete ' + failedCaches.join(', ')); } catch (_e) { /* best-effort */ }
@@ -1153,6 +1183,19 @@ export function createBackupFlow(ctx) {
       _scheduleBackupReload(600);
     } catch (e) {
       backupWarn('clear all personal data failed', e);
+      if (stillDeleting) {
+        // v033: the browser is still deleting a user-data database and cannot be
+        // called off, so the database may go any moment. Lifting the fence now
+        // would let a save recreate it with whatever this page holds in memory,
+        // so every writer stays frozen (the reload is pending) and this page
+        // reboots. The wipe is not finished: no Clear All token and the vot-*
+        // keys stay, so the next boot judges what it finds (a library the
+        // delete took is a loss to it like any other), and the reader runs
+        // Clear All again.
+        _showToast('Clear did not finish. Reloading… then please try again.', 0);
+        _scheduleBackupReload(CLEAR_UNFINISHED_RELOAD_MS);
+        return undefined;
+      }
       // Wave-0: was alert('Clear failed. See console for details.') — native
       // dialog + dev-speak. The diagnostics still go to console.warn above;
       // the user gets an actionable message, not a pointer to tooling.

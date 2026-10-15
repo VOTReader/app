@@ -735,12 +735,14 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
     await vi.waitFor(() => expect(window.location.reload).toHaveBeenCalledTimes(1));
   });
 
-  it('reports a blocked personal-data deletion as failure and does not reload', async () => {
+  it('reports a failed personal-data deletion as failure and does not reload', async () => {
+    // A failed delete (onerror). A blocked one is still running, not failed (sweep v033:
+    // backup-flow.test.js).
     const toastSpy = vi.fn();
     const deleteSpy = vi.spyOn(indexedDB, 'deleteDatabase').mockImplementation((name) => {
       const req = {};
       queueMicrotask(() => {
-        if (name === 'vot-journal-media') req.onblocked && req.onblocked();
+        if (name === 'vot-journal-media') req.onerror && req.onerror();
         else req.onsuccess && req.onsuccess();
       });
       return req;
