@@ -127,3 +127,24 @@ describe('the desk’s Song page link', () => {
     expect(p.setNavOrigin).toHaveBeenCalledWith(expect.objectContaining({ screen: 'wtlb-entry', letterId: 'be-born-again', label: 'Be Born Again' }));
   });
 });
+
+describe('(sweep v066) opening a list from the hub keeps the hub’s Find words and chip', () => {
+  // The Songs screen's `open` writes the hub's frame (onReplaceTop) and then pushes the list (onPush) in one
+  // handler, before any re-render. Both writes must build on the stack as the first one left it; built from the
+  // same render's audioColKey, the push dropped the hub's q/st and Back returned to the old results.
+  it('the push lands on top of the replaced hub frame, not on the stale stack', () => {
+    let tabKey = encodeSongsRoute([{ k: 'hub' }]);
+    // The tab field's setter as useTabs builds it: a value replaces, a function updates from the current value.
+    const setAudioColKey = vi.fn((val) => { tabKey = typeof val === 'function' ? val(tabKey) : val; });
+    const p = makeRoutes({ screen: SONGS_SCREEN, audioColKey: tabKey, setAudioColKey });
+    globalThis.AudioSongsScreen = () => null;
+    try {
+      const el = buildScreenRoutes(p)[SONGS_SCREEN]();
+      el.props.onReplaceTop({ k: 'hub', q: 'consider my love', st: 'hymn' });
+      el.props.onPush({ k: 'list', v: 'col:wtlb1' });
+    } finally {
+      delete globalThis.AudioSongsScreen;
+    }
+    expect(decodeSongsRoute(tabKey)).toEqual([{ k: 'hub', q: 'consider my love', st: 'hymn' }, { k: 'list', v: 'col:wtlb1' }]);
+  });
+});

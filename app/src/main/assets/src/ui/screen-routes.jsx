@@ -1283,8 +1283,10 @@ export function buildScreenRoutes({
     [SONGS_SCREEN]: () => (
       <AudioSongsScreen
         route={decodeSongsRoute(audioColKey)}
-        onPush={(frame) => setAudioColKey(pushSongsFrame(audioColKey, frame))}
-        onReplaceTop={(frame) => setAudioColKey(replaceSongsTop(audioColKey, frame))}
+        // Functional writes: the hub's `open` replaces its frame and pushes the list in one handler, so the push
+        // must build on the replaced stack, not this render's audioColKey (sweep v066).
+        onPush={(frame) => setAudioColKey((key) => pushSongsFrame(key, frame))}
+        onReplaceTop={(frame) => setAudioColKey((key) => replaceSongsTop(key, frame))}
         onBack={_songsBack}
         rootBackLabel={navOrigin && navOrigin.label ? navOrigin.label
           : !navOrigin || navOrigin.screen === 'home' ? 'Home'
