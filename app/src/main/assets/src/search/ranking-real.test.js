@@ -161,4 +161,34 @@ describe('ranking on the audit\u2019s cases', () => {
   it('a one-word title typed whole ranks its letter above a text rich in its synonyms', async () => {
     expect(refs(await VotSearchMini.search('Wisdom'))[0]).toBe('Volume One · Letter 3 · Wisdom');
   });
+
+  /* sr13 (the S22, 2026-10-14): Book order lists every result in reading order, and most of a passage search's
+     results hold a word or two of it, so "I am The Lord and I do not change" opened on Genesis 4:9. A passage
+     search says of each result whether it holds the typed words together (most of them in a row, its rare words
+     among them), so the screen can list those first. A keyword search and a quoted phrase say nothing: every text
+     they show holds what was typed. */
+  it('a passage search marks the results holding its words together, a word off too, and not those holding a word or two', async () => {
+    const r = await VotSearchMini.search('to this day you persecute my prophets');
+    const close = (t) => r.results.find((x) => (x.doc.title || x.doc.ref) === t)?.close;
+    expect(close('The Watchman')).toBe(true);
+    expect(close('Regarding Persecution')).toBe(true);
+    expect(close('Regarding the Hour')).toBe(true);
+    expect(close('False Prophets Among You'), 'holds "prophets" alone').toBe(false);
+    expect(r.results.every((x) => typeof x.close === 'boolean'), 'every result says').toBe(true);
+    // one word swapped ("shall" for "will") is still the passage
+    const g = await VotSearchMini.search('The earth shall grow old like a garment');
+    expect(g.results.find((x) => x.doc.title === 'All Things Pass')?.close).toBe(true);
+    // an original brought in above its reprint is marked too
+    const one = await VotSearchMini.search('repent and turn from your paths, for the hour is late', { limit: 1 });
+    expect(refs(one)).toEqual(['Volume One · Letter 6 · The Watchman']);
+    expect(one.results[0].close).toBe(true);
+  });
+
+  it('a keyword search and a quoted phrase mark no result close or loose', async () => {
+    for (const q of ['humility', 'false prophets', '"to this day you persecute"']) {
+      const r = await VotSearchMini.search(q);
+      expect(r.results.length, q).toBeGreaterThan(0);
+      expect(r.results.some((x) => 'close' in x), q).toBe(false);
+    }
+  });
 });

@@ -376,6 +376,8 @@ function docTokens(id, doc) {
 }
 /** The phrase ranking reads at most this many of the best-scored texts. */
 const PHRASE_CANDIDATES = 500;
+/** A close match holds this share of the query's content words in one passage, rare words weighing most (sr13). */
+const CLOSE_SHARE = 0.75;
 
 /* THE BEST PASSAGE (search benchmark, 2026-10-05). A remembered sentence in the reader's own words
    shares only a few words with the text, and a long topic holds those few somewhere, far apart: it
@@ -839,13 +841,14 @@ function excerptCover(id, text, hits) {
   }
   return best;
 }
-/** The query's content words as bestWindow reads them, rare words weighing more, and the window's reach. */
-function passageQuery(/** @type {string[]} */ words) {
+/** The query's content words as bestWindow reads them, rare words weighing more, and the window's reach;
+    `asTyped`: the words themselves, to read a text's tokens (docTokens) rather than its lemmas. */
+function passageQuery(/** @type {string[]} */ words, asTyped = false) {
   const n = msIndex.documentCount || 1;
   const seen = new Set();
   const query = [];
   for (const w of words) {
-    const lem = lemma(w);
+    const lem = asTyped ? w : lemma(w);
     if (seen.has(lem)) continue;
     seen.add(lem);
     const df = docFreq(w);
@@ -1221,7 +1224,7 @@ async function ensureReady(options) {
  * `signal`: when it is aborted the search stops at its next turn and returns `aborted: true`, no results (sr7).
  * `corrections` lists each typed word that found nothing of its own and was
  * searched as the nearest indexed word instead ({ from: 'shephard', to: 'shepherd' }).
- * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>, stopWordsOnly?:boolean, unquoted?:string, aborted?:boolean}>}
+ * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[], close?:boolean}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>, stopWordsOnly?:boolean, unquoted?:string, aborted?:boolean}>}
  */
 async function search(query, options) {
   options = options || {};
@@ -1628,6 +1631,8 @@ async function search(query, options) {
     idOf.set(entry, id);
     out.push(entry);
   }
+  /** What the words found; the meaning and originalsFirst bring in more below. */
+  const byWords = new Set(out);
   // A title the query names keeps its place; in a keyword search, a title holding its every word
   // ("144,000"), not one of two ("lord from aforetime" quotes a letter, not "Regarding the Day of The Lord").
   const typedContent = typedTokens.filter((w) => !(STOP && STOP.has(w)));
@@ -1700,6 +1705,28 @@ async function search(query, options) {
   const over = out.length > limit;
   if (over) out.length = limit;
   if (sem && sem.length) meaningLanding(out, idOf, sem, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))));
+
+  /* CLOSE MATCHES (sr13, 2026-10-15). Book order lists the results in reading order, and most of a passage
+     search's results hold a word or two of it: "I am The Lord and I do not change" found 1,344 texts, and Book
+     order opened on Genesis 4:9 ("Am I my brother's keeper?"). Each result of a passage search says whether it
+     holds the typed words together: most of them in a row (nearPhrase, as the phrase ranking reads it, so one
+     word off still counts) and most of their weight in one place (bestWindow: "I am the LORD, and there is no
+     other" holds the run's start but not "change", the word that names the saying; a word no text holds, one the
+     reader misremembered, weighs nothing). The screen lists the close ones first. A keyword search and a quoted
+     phrase mark none: every text they show holds what was typed. Read where the phrase ranking read (its 500 best
+     holding the words, nearOf) and on what the meaning and originalsFirst brought in (a reprint's original sits
+     with it); past that reach a text holds the words apart, as the ranking scored it. */
+  if (!keyword && !p.phrase && typedTokens.length > 1 && typedContent.length) {
+    // on the tokens the phrase ranking read (docTokens: cached, the title's words in them)
+    const pq = passageQuery(typedContent.filter((w) => docFreq(w) > 0), true);
+    for (const e of out) {
+      if (spent()) { const r = await pause(); if (r) return r; }
+      const id = /** @type {string} */ (idOf.get(e));
+      let near = nearOf[id];
+      if (near === undefined) near = byWords.has(e) ? 0 : nearPhrase(docTokens(id, e.doc), typedTokens, STOP);
+      /** @type {{close?: boolean}} */ (e).close = near >= NEAR_PHRASE_MIN && bestWindow(pq.query, docTokens(id, e.doc), pq.span) >= CLOSE_SHARE;
+    }
+  }
 
   /* A QUOTED PHRASE NOTHING HOLDS IS SEARCHED AS ITS WORDS (search audit 2026-09-27).
      A quote remembered one word off ("the earth shall grow old like a garment", where

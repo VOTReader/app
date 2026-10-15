@@ -34,9 +34,10 @@ function cardKey(entry, i) {
    they paged it, are open and paged again when the screen comes back to it.
    `view` is the order the screen shows ('relevance' | 'book'): Book order opens every
    group with a short first `page`, and each order remembers its own open and paged
-   state, so a group opened under Relevance is open again after a trip to Book order (sr12). */
+   state, so a group opened under Relevance is open again after a trip to Book order (sr12);
+   'book-more' is Book order's second list, the loose matches of a passage search (sr13). */
 export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = false, memo = '', view = 'relevance', page = SRCH_GROUP_PAGE }) {
-  const slot = 'group|' + gkey + (view === 'book' ? '|book' : '');
+  const slot = 'group|' + gkey + (view === 'relevance' ? '' : '|' + view);
   const was = recall(memo, slot);
   const [open, setOpen] = React.useState(was ? was.open : defaultOpen !== false);
   const [shown, setShown] = React.useState(was ? was.shown : page);

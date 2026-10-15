@@ -426,6 +426,57 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     return grouped.map((g) => ({ key: g.key, items: srchSortCanonical(g.items, bookIndex) }));
   }, [grouped, bookOrder, bookIndex]);
 
+  // Book order on a passage search (sr13, the S22 10-14): "I am The Lord and I do not change" opened on
+  // Genesis 4:9, one of 1,344 texts holding a few of its words, all listed in reading order. The engine
+  // marks such a search's results `close` (the typed words together) or not: Book order lists the close
+  // ones, each collection in reading order, and the rest behind one line. A search with nothing marked
+  // (a keyword, a quote), or with every result on one side, lists them all as before.
+  const [showLoose, setShowLoose] = React.useState(false);
+  React.useEffect(() => { setShowLoose(false); }, [query]);
+  const closeSplit = React.useMemo(() => {
+    if (!bookOrder) return null;
+    const isClose = (/** @type {any} */ e) => e.close === true;
+    if (!state.results.some(isClose) || !state.results.some((/** @type {any} */ e) => e.close === false)) return null;
+    const part = (/** @type {boolean} */ want) => visibleGroups
+      .map((g) => ({ key: g.key, items: g.items.filter((e) => isClose(e) === want) }))
+      .filter((g) => g.items.length > 0);
+    const loose = part(false);
+    return { close: part(true), loose, looseCount: loose.reduce((n, g) => n + g.items.length, 0) };
+  }, [bookOrder, state.results, visibleGroups]);
+
+  /** One list of collections. `view` names the order and the list (each remembers its own open groups);
+      `capped`: the list can say a collection holds more than it shows ("400+"), which a close list never does. */
+  const renderGroups = (/** @type {Array<{key: string, items: any[]}>} */ groups, /** @type {string} */ view, /** @type {boolean} */ capped) => (
+    <div className="srch-groups">
+      {groups.map((g) => (
+        <SrchGroup
+          /* Keyed by the search: narrowed to Scriptures, the one group left
+             opens as a lone group does, not closed as the All list had it.
+             And by the order: each order opens with its own state, and the
+             group remembers each (a group opened under Relevance is open
+             again after a trip to Book order). */
+          key={g.key + '|' + memo + '|' + view}
+          gkey={g.key}
+          items={g.items}
+          capped={capped && cappedGroups.has(g.key)}
+          terms={state.terms}
+          onSelect={handleSelect}
+          memo={memo}
+          view={view}
+          /* Book order opens every collection with its first ten, so a phone
+             draws a few cards per collection, not fifty each. */
+          page={bookOrder && groups.length > 1 ? SRCH_BOOK_FIRST_PAGE : undefined}
+          /* A long result set opens as a contents list, every collection
+             closed under Best Matches, so the reader picks the collection;
+             opening the first five used to open whichever five ranked
+             highest, which in the site's order would be the Bible and
+             Volumes One to Four whatever the query. */
+          defaultOpen={bookOrder || groups.length === 1 || state.results.length <= 30}
+        />
+      ))}
+    </div>
+  );
+
   // Build "direct" fake entries from parsed ref/passage/book (shown at top before results).
   // Engine-gated: Scriptures corpus shows only bible/book/named-passage refs;
   // Volumes corpus shows only letter refs. No crossover.
@@ -797,36 +848,22 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </div>
         )}
 
-        {visibleGroups.length > 0 && (
-          <div className="srch-groups">
-            {visibleGroups.map((g) => (
-              <SrchGroup
-                /* Keyed by the search: narrowed to Scriptures, the one group left
-                   opens as a lone group does, not closed as the All list had it.
-                   And by the order: each order opens with its own state, and the
-                   group remembers each (a group opened under Relevance is open
-                   again after a trip to Book order). */
-                key={g.key + '|' + memo + '|' + sortMode}
-                gkey={g.key}
-                items={g.items}
-                capped={cappedGroups.has(g.key)}
-                terms={state.terms}
-                onSelect={handleSelect}
-                memo={memo}
-                view={bookOrder ? 'book' : 'relevance'}
-                /* Book order opens every collection with its first ten, so a phone
-                   draws a few cards per collection, not fifty each. */
-                page={bookOrder && visibleGroups.length > 1 ? SRCH_BOOK_FIRST_PAGE : undefined}
-                /* A long result set opens as a contents list, every collection
-                   closed under Best Matches, so the reader picks the collection;
-                   opening the first five used to open whichever five ranked
-                   highest, which in the site's order would be the Bible and
-                   Volumes One to Four whatever the query. */
-                defaultOpen={bookOrder || visibleGroups.length === 1 || state.results.length <= 30}
-              />
-            ))}
-          </div>
-        )}
+        {closeSplit ? (
+          <>
+            <div className="srch-section-label srch-close-label">Closest matches</div>
+            {renderGroups(closeSplit.close, 'book', false)}
+            {showLoose ? (
+              <>
+                <div className="srch-section-label srch-loose-label">Partial matches</div>
+                {renderGroups(closeSplit.loose, 'book-more', true)}
+              </>
+            ) : (
+              <button type="button" className="srch-group-more srch-loose-more" onClick={() => setShowLoose(true)}>
+                Show {matchCountLabel(closeSplit.looseCount, state.capped.length > 0 || state.truncated)} partial {closeSplit.looseCount === 1 ? 'match' : 'matches'}
+              </button>
+            )}
+          </>
+        ) : visibleGroups.length > 0 && renderGroups(visibleGroups, bookOrder ? 'book' : 'relevance', true)}
 
         {query && state.phase === 'done' && letterRefMissing && (
           <div className="srch-corrected">{letterRefMissing}</div>

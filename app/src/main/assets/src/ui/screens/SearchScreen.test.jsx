@@ -588,6 +588,92 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 
+  /* sr13 (the S22, 10-14): Book order on "I am The Lord and I do not change" opened on Genesis 4:9 ("Am I my brother's
+     keeper?"), a verse holding a few of its words, because it listed all 1,344 loose matches in reading order. The
+     engine marks a passage search's results `close` (the typed words together) or not: Book order lists the close ones
+     first, each collection in reading order, and the rest behind one line. */
+  it('Book order on a passage search opens on the close matches in reading order, the loose ones behind a line', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchGroup = ({ gkey, items, defaultOpen, page, view, capped }) => (
+      <div className="stub-group" data-key={gkey} data-open={String(defaultOpen)} data-page={String(page)} data-view={String(view)} data-capped={String(capped)}>
+        {items.map((e) => e.doc.ref).join(',')}
+      </div>
+    );
+    /** @type {any} */ (globalThis).SrchCard = ({ entry }) => <div className="stub-card">{entry.doc.ref}</div>;
+    const V = (bookId, c, v, score, close) => ({ score, close, doc: { kind: 'verse', g: 'bible', volumeId: 'bible', bookId, chapterNum: c, verseNum: v, ref: bookId + ' ' + c + ':' + v, text: 't' } });
+    const L = (g, num, score, close) => ({ score, close, doc: { kind: g === 'wtlb1' ? 'wtlb' : 'letter', g, volumeId: g, letterNum: num, ref: g + '#' + num, title: g + num, text: 'l' + num } });
+    // Relevance order, as the engine hands it over: the close ones lead, the original letter before its WTLB reprint.
+    const results = [L('v1', 30, 50, true), V('malachi', 3, 6, 49, true), L('v1', 14, 48, true), L('wtlb1', 88, 47, true), V('genesis', 4, 9, 46, false), V('exodus', 6, 2, 45, false)];
+    for (let i = 0; i < 20; i++) results.push(V('psalms', 100 - i, 1, 40 - i, false));
+    for (let i = 0; i < 12; i++) results.push(L('v1', 29 - i, 20 - i, false));
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: null, results, parsedTerms: [], capped: ['bible'], truncated: false }));
+    const props = baseProps();
+    const { rerender } = render(<SearchScreen {...props} />);
+    rerender(<SearchScreen {...props} query="I am the Lord and I do not change" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    const groups = () => [...document.querySelectorAll('.stub-group')];
+    const sw = (name) => [...document.querySelectorAll('.srch-sort-btn')].find((b) => b.textContent === name);
+    const more = () => document.querySelector('.srch-loose-more');
+    // Relevance is untouched: Best Matches, every result in its collection, no line.
+    expect(document.querySelector('.srch-top-results')).toBeTruthy();
+    expect(groups().map((g) => g.textContent.split(',').length)).toEqual([23, 14, 1]);
+    expect(more()).toBeNull();
+    const relevanceShows = document.body.textContent;
+    fireEvent.click(sw('Book order'));
+    expect(document.querySelector('.srch-top-results')).toBeNull();
+    // The close matches only, each collection in reading order, the original before its reprint.
+    expect(groups().map((g) => g.getAttribute('data-key'))).toEqual(['bible', 'v1', 'wtlb1']);
+    expect(groups().map((g) => g.textContent)).toEqual(['malachi 3:6', 'v1#14,v1#30', 'wtlb1#88']);
+    expect(groups().map((g) => g.getAttribute('data-open'))).toEqual(['true', 'true', 'true']);
+    expect(groups().map((g) => g.getAttribute('data-view'))).toEqual(['book', 'book', 'book']);
+    // A close list is all its collection holds closely: no "400+" on it.
+    expect(groups().map((g) => g.getAttribute('data-capped'))).toEqual(['false', 'false', 'false']);
+    expect(document.querySelector('.srch-close-label').textContent).toMatch(/closest matches/i);
+    expect(document.body.textContent).not.toMatch(/genesis 4:9/);
+    // The rest are one tap away, counted.
+    expect(more().textContent).toMatch(/Show 34\+ partial matches/);
+    fireEvent.click(more());
+    expect(more(), 'the line goes once the loose ones show').toBeNull();
+    expect(document.querySelector('.srch-loose-label').textContent).toMatch(/partial matches/i);
+    const loose = groups().filter((g) => g.getAttribute('data-view') === 'book-more');
+    expect(loose.map((g) => g.getAttribute('data-key'))).toEqual(['bible', 'v1']);
+    expect(loose[0].textContent.split(',').slice(0, 3)).toEqual(['genesis 4:9', 'exodus 6:2', 'psalms 81:1']);
+    expect(loose[0].getAttribute('data-capped'), 'the capped collection says so on its loose list').toBe('true');
+    expect(loose[1].textContent.split(',').slice(0, 2)).toEqual(['v1#18', 'v1#19']);
+    // A new search starts with the line again; back to Relevance shows relevance's screen.
+    fireEvent.click(sw('Relevance'));
+    expect(document.body.textContent).toBe(relevanceShows);
+    vi.useRealTimers();
+  });
+
+  it('Book order lists every result when the engine marks none loose, or none close', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchGroup = ({ gkey, items }) => <div className="stub-group" data-key={gkey}>{items.map((e) => e.doc.ref).join(',')}</div>;
+    /** @type {any} */ (globalThis).SrchCard = ({ entry }) => <div className="stub-card">{entry.doc.ref}</div>;
+    const V = (bookId, c, close) => ({ score: 1, close, doc: { kind: 'verse', g: 'bible', bookId, chapterNum: c, verseNum: 1, ref: bookId + ' ' + c, text: 't' } });
+    const L = (num, close) => ({ score: 1, close, doc: { kind: 'letter', g: 'v1', letterNum: num, ref: 'v1#' + num, title: 'L', text: 'l' + num } });
+    for (const mark of [true, false]) {
+      const results = [L(9, mark), V('john', 3, mark), V('genesis', 1, mark), L(2, mark)];
+      /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: null, results, parsedTerms: [] }));
+      const props = baseProps();
+      const { rerender, unmount } = render(<SearchScreen {...props} />);
+      rerender(<SearchScreen {...props} query={'a passage typed out ' + mark} />);
+      act(() => { vi.advanceTimersByTime(200); });
+      await act(async () => { await Promise.resolve(); });
+      fireEvent.click([...document.querySelectorAll('.srch-sort-btn')].find((b) => b.textContent === 'Book order'));
+      expect([...document.querySelectorAll('.stub-group')].map((g) => g.textContent), String(mark)).toEqual(['genesis 1,john 3', 'v1#2,v1#9']);
+      expect(document.querySelector('.srch-loose-more'), String(mark)).toBeNull();
+      expect(document.querySelector('.srch-close-label'), String(mark)).toBeNull();
+      unmount();
+    }
+    vi.useRealTimers();
+  });
+
   it('a corrected typo is said out loud, and the corrected query is one tap into the box', async () => {
     vi.useFakeTimers();
     const onQueryChange = vi.fn();
