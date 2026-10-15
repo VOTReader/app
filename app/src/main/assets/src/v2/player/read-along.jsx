@@ -3,8 +3,11 @@
    double-tap rule as the v1 letter. Importing it here would bundle a second AudioPlayer into bundle-v2, so it is read
    from window at render time. A gate boot never touches the engine: it paints a still wash at the row's playing.at
    through main's paintReadAlongAt (the live wash's own paint path) and holds the gate until the wash is on the page.
-   A Bible chapter (2c) is the same over main's chapter path: the whole verse lit, keys bible:<book>:<ch>:<v>. */
-import { bibleHlKey } from '../../utils/hl-keys.js';
+   A Bible chapter (2c) is the same over main's chapter path: the whole verse lit, keys bible:<book>:<ch>:<v>. A Format B
+   entry (Words To Live By, The Blessed, Holy Days) is keyed and mapped as main's WtlbEntryView does it. */
+import { bibleHlKey, wtlbHlKey } from '../../utils/hl-keys.js';
+import { formatBOffsetMap } from '../../utils/format-b-dom-text.js';
+import { formatBFootnotesMode } from '../../utils/excerpt-pieces.js';
 import { gateBibleVolKey } from './source.js';
 
 const g = /** @type {any} */ (globalThis);
@@ -43,16 +46,41 @@ const noSubscribe = () => () => {};
 const noVersion = () => 0;
 
 /**
- * Lights the sentence being read on a letter body. `bodyRef` holds the element whose [data-hl-key] blocks carry the
- * letter's text (LetterBlock), the same contract as v1's .letter-body.
- * @param {{ gate: any, collection: string, n: number, volKey: string, letterId: string,
- *   bodyRef: { current: HTMLElement | null }, on?: boolean, follow?: boolean, onListen?: (() => void) | null }} props
+ * main's offsetMapFn for a Format B entry (WtlbEntryView's paraOffsetMap): a paragraph's timings are corpus offsets, and
+ * this projects them onto the text v2 draws for it (letter-text.jsx renderFormatB replays format-b-dom-text's rules with
+ * the same reference scan), so the wash lights the clause being read, not some other words.
+ * @param {Array<{ text?: string }>} paragraphs @param {{ perParagraph: any[] }} scan @param {string} volKey
+ * @returns {(pi: number) => ((off: number, isEnd?: boolean) => number) | null}
  */
-export function LetterReadAlong({ gate, collection, n, volKey, letterId, bodyRef, on = true, follow = true, onListen = null }) {
+export function formatBOffsetMaps(paragraphs, scan, volKey) {
+  const footnotesMode = formatBFootnotesMode(volKey);
+  const cache = new Map();
+  return (pi) => {
+    if (cache.has(pi)) return cache.get(pi);
+    const p = paragraphs[pi];
+    const fn = p ? formatBOffsetMap(p.text, { refs: scan.perParagraph[pi] || [], footnotesMode }).toDom : null;
+    cache.set(pi, fn);
+    return fn;
+  };
+}
+
+/**
+ * Lights the sentence being read on a letter body. `bodyRef` holds the element whose [data-hl-key] blocks carry the
+ * letter's text (LetterBlock), the same contract as v1's .letter-body. A Format B entry passes its `paragraphs` and the
+ * reference `scan` they were drawn with (footnotes.js formatBRefs): its blocks are main's wtlb:<id>:<i>, mapped.
+ * @param {{ gate: any, collection: string, n: number, volKey: string, letterId: string,
+ *   bodyRef: { current: HTMLElement | null }, on?: boolean, follow?: boolean, onListen?: (() => void) | null,
+ *   paragraphs?: any[] | null, scan?: { perParagraph: any[] } | null }} props
+ */
+export function LetterReadAlong({ gate, collection, n, volKey, letterId, bodyRef, on = true, follow = true, onListen = null,
+  paragraphs = null, scan = null }) {
+  const offsetMapFn = React.useMemo(() => (paragraphs && scan ? formatBOffsetMaps(paragraphs, scan, volKey) : null),
+    [paragraphs, scan, volKey]);
   if (gate) return <StillWash at={on ? gateAt(gate, collection, n) : null} volKey={volKey} letterId={letterId} bodyRef={bodyRef} />;
   const RA = g.ReadAlongHighlight;
-  if (typeof RA !== 'function' || typeof g.letterHlKey !== 'function' || !volKey || !letterId) return null;
-  return <RA volKey={volKey} letterId={letterId} mainRef={bodyRef} hlKeyFn={g.letterHlKey}
+  const hlKeyFn = offsetMapFn ? wtlbHlKey : g.letterHlKey;
+  if (typeof RA !== 'function' || typeof hlKeyFn !== 'function' || !volKey || !letterId) return null;
+  return <RA volKey={volKey} letterId={letterId} mainRef={bodyRef} hlKeyFn={hlKeyFn} offsetMapFn={offsetMapFn}
     readAlongOn={on} readAlongFollow={follow} onListen={onListen} />;
 }
 

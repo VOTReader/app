@@ -434,7 +434,8 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
       </div>
       {/* the sentence being read, lit (readalong rv1 1b): main's read-along over the body's [data-hl-key] blocks */}
       <LetterReadAlong gate={gate} collection={collection} n={n} volKey={col.volKey} letterId={letter.id} bodyRef={bodyRef}
-        on={facts.readAlong !== false} follow={facts.readAlongFollow !== false} onListen={listenHere(live, col, letter, setToast)} />
+        on={facts.readAlong !== false} follow={facts.readAlongFollow !== false} onListen={listenHere(live, col, letter, setToast)}
+        paragraphs={scan ? letter.paragraphs : null} scan={scan} />
       {sheet && !held && (
         <MarkSheet colour={sheet.colour} marked={sheet.marked} desktop={desktop} onColour={onColour} onNote={onAddNote}
           onCopy={onCopy} onShare={onShare} onClose={close} />

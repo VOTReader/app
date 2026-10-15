@@ -4,6 +4,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import { LetterReadAlong, ChapterReadAlong, gateAt, gateChapterAt, stillWashes } from './read-along.jsx';
+import { LetterScreen } from '../screens/LetterScreen.jsx';
+import { wtlbHlKey } from '../../utils/hl-keys.js';
 
 const g = /** @type {any} */ (globalThis);
 const PLAYING = { item: { collection: 'one', n: 1 }, reader: 'B', at: 231, length: 608, paused: false };
@@ -60,10 +62,64 @@ describe('a real boot: main\'s ReadAlongHighlight over the one engine', () => {
     expect(p.mainRef.current.className).toBe('body');
   });
 
+  it('a Format A letter keeps main\'s letter keys and offsets as they are (no map)', () => {
+    const seen = [];
+    g.ReadAlongHighlight = (p) => { seen.push(p); return null; };
+    render(<Host gate={null} />);
+    expect(seen[seen.length - 1].offsetMapFn).toBe(null);
+  });
+
   it('renders nothing when bundle-d did not load (no component on window)', () => {
     const { container } = render(<Host gate={null} />);
     expect(container.querySelector('.body')).not.toBe(null);
     expect(stillWashes.pending()).toBe(0);
+  });
+});
+
+describe("a Format B entry (Words To Live By, The Blessed, Holy Days) on a real boot: keyed and mapped as main's WtlbEntryView", () => {
+  /** wtlb-one.js entry 46's second paragraph as the corpus keeps it: a chapter link, two references, blank lines. */
+  const GALLOWS = { id: 'building-the-gallows', num: 46, title: 'Building the Gallows', paragraphs: [
+    { align: 'center', text: 'Vanity is a rope, and pride builds the gallows;' },
+    { align: 'center', text: 'Therefore, beware of the thoughts of your heart,\n\nLest you follow in Haman’s error {{nav:esther:7}}\n\nAnd walk in the way of Cain, {{ref:1 John 3:12}} · {{ref:Genesis 4:8}}\n\nTo your own demise, says The Lord.' },
+  ] };
+  /** A Holy Days entry: its collection draws a non-trailing reference as a footnote number (main's footnotes mode). */
+  const FEAST = { id: 'the-feasts', num: 3, title: 'The Feasts', paragraphs: [
+    { align: 'left', text: '**Keep** the feast {{ref:Leviticus 23:4}} with joy,\nand _remember_ Me.' },
+  ] };
+  const seeded = ['COL_BY_KEY', 'WTLB_ONE', 'HOLY_DAYS'];
+  afterEach(() => { for (const k of seeded) delete g[k]; });
+
+  /** The words a timings row [t, para, cs, ce] (corpus offsets) lights on the paragraph v2 drew, through what main got. */
+  function lit(container, p, id, para, raw, phrase) {
+    const cs = raw.indexOf(phrase);
+    const block = container.querySelector('[data-hl-key="' + p.hlKeyFn(id, para) + '"]');
+    const map = p.offsetMapFn && p.offsetMapFn(para);
+    return block && map ? block.textContent.slice(map(cs), map(cs + phrase.length, true)) : null;
+  }
+
+  it("passes main's wtlb:<id>:<i> keys and a corpus-to-page map, so a row lights its own words on the page", () => {
+    g.COL_BY_KEY = new Map([
+      ['wtlb1', { volKey: 'wtlb1', globalName: 'WTLB_ONE', prefaceGlobal: null, label: 'Words To Live By: Part One', kind: 'wtlb' }],
+      ['holydays', { volKey: 'holydays', globalName: 'HOLY_DAYS', prefaceGlobal: null, label: 'Regarding The Holy Days', kind: 'holy-days' }],
+    ]);
+    g.WTLB_ONE = [GALLOWS];
+    g.HOLY_DAYS = [FEAST];
+    const seen = [];
+    g.ReadAlongHighlight = (p) => { seen.push(p); return null; };
+    const a = render(<LetterScreen collection="wtlb1" n={46} />);
+    let p = seen[seen.length - 1];
+    expect(p.hlKeyFn).toBe(wtlbHlKey);
+    expect(p.mainRef.current.querySelector('[data-hl-key="wtlb:building-the-gallows:1"]')).not.toBe(null);
+    const raw = GALLOWS.paragraphs[1].text;
+    expect(lit(a.container, p, GALLOWS.id, 1, raw, 'And walk in the way of Cain,')).toBe('And walk in the way of Cain,');
+    expect(lit(a.container, p, GALLOWS.id, 1, raw, 'To your own demise')).toBe('To your own demise');
+    a.unmount();
+    // footnotes mode: the reference is drawn as its number, and the map knows it
+    const b = render(<LetterScreen collection="holydays" n={3} />);
+    p = seen[seen.length - 1];
+    expect(b.container.querySelector('[data-hl-key="wtlb:the-feasts:0"]').textContent).toBe('Keep the feast 1 with joy,and remember Me.');
+    expect(lit(b.container, p, FEAST.id, 0, FEAST.paragraphs[0].text, 'with joy,')).toBe('with joy,');
+    expect(lit(b.container, p, FEAST.id, 0, FEAST.paragraphs[0].text, 'remember')).toBe('remember');
   });
 });
 
