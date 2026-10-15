@@ -1047,6 +1047,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     clampCamera(cam, v.W, ceiling, yf);
     const centre = Math.round(cam.x);
     if (atCeiling) setAnnounce(ZOOM_MAX_MESSAGE);
+    // the Volumes rail's x is a rail position, not a verse id: name its own node (sweep v55)
+    else if (onTop) {
+      const name = votNodeName(personalRef.current && personalRef.current.votRail, centre);
+      if (name) setAnnounce(name);
+    }
     else if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
     schedule();
   }, [viewRef, lastRailRef, camVRef, camRef, zoomCapFor, yFrameFor, graph, schedule, resetView, closeTopOverlay, onBack, dropHover]);
@@ -2111,6 +2116,14 @@ function graphStats(graph, density) {
     shown += density === 'essential' ? b.off20 : b.off10;
   }
   return { shown, total: graph.count };
+}
+
+/** The Volumes rail's node at a rail position, with its Volume ("The Bride, Volume Two"); '' off the rail. */
+function votNodeName(votRail, pos) {
+  const node = votRail && pos >= 0 && pos < votRail.total ? votRail.nodes[pos] : null;
+  if (!node) return '';
+  const seg = votRail.segments.find((s) => s.volKey === node.volKey);
+  return node.title + (seg ? ', ' + seg.label : '');
 }
 
 /** A LinkEndpoint's own label, falling back to its key. */

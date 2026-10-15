@@ -733,6 +733,30 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(last.focusArc, 'the canon frame after the switch spotlights nothing').toBe(-1);
       expect(last.focusRange).toBeNull();
     });
+
+    /* v55: the keys drive the rail last touched, but the live region always read the camera's x
+       as a Bible verse id. On the Volumes rail x is a rail position (0..5 here), so ArrowRight
+       announced "Genesis 1:4" while the reader moved through Rebuke. */
+    it('v55: an arrow key on the Volumes rail announces the Volumes node there, never a Bible verse', async () => {
+      stubMyWeb();
+      const { container } = await mount({ settings: seen });
+      fireEvent.click(screen.getByRole('button', { name: 'My web' }));
+      await settle(60);
+      const root = container.querySelector('.sw-root');
+      const live = () => container.querySelector('.sw-live').textContent;
+      // CONTROL: the Bible rail (the default) still announces its verse
+      fireEvent.keyDown(root, { key: 'ArrowRight' });
+      await settle(20);
+      expect(live(), 'CONTROL: the Bible rail names a verse').toMatch(/^Genesis 1:\d+$/);
+      // touch the top half: the Volumes rail is the one the keys drive now
+      const ev = (type) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 31, pointerType: 'touch', clientX: 400, clientY: 10 });
+      await act(async () => { root.dispatchEvent(ev('pointerdown')); root.dispatchEvent(ev('pointerup')); await new Promise((r) => setTimeout(r, 40)); });
+      fireEvent.keyDown(root, { key: 'ArrowRight' });
+      await settle(20);
+      expect(live(), 'the top rail is not a Bible verse').not.toMatch(/Genesis/);
+      // the camera sits at the fitted centre of the five-letter rail: position 2.5 rounds to 3
+      expect(live()).toBe('The Fourth, Rebuke');
+    });
   });
 });
 
