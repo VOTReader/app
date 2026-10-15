@@ -28,7 +28,9 @@ import {
 } from '../marks.js';
 import { kitColour } from '../notes-facts.js';
 import { DOUBLE_TAP_MS, FULLSCREEN_GESTURE_EVENT } from '../../utils/fullscreen-gesture-event.js';
-import { ListenPill, gateListenToast, startListening } from '../player/listen.jsx';
+import { ListenPill, gateListenToast, startListening, listenRowFor } from '../player/listen.jsx';
+import { readerLine } from '../player/view.js';
+import { REPEAT_TIMES } from '../../utils/listen-from.js';
 import { LetterReadAlong } from '../player/read-along.jsx';
 import { landingOf, markWords, unmarkWords, placeAtThird } from '../search-landing.js';
 import { whenPainted } from '../gate.js';
@@ -451,6 +453,27 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
     close();
     if (live) shareParagraph(el).then((words) => { if (words) setToast({ text: words }); });
   };
+  // Listen from here (4b, dz16): main's read-along on this page (window.__votListenFrom) plays the letter from the
+  // paragraph, or loops it 3 times (Repeat) under main's label for it; a gate draws its row from the page alone.
+  const listenFrom = () => (live ? g.__votListenFrom : null);
+  const listenRow = !sheet || !letter ? null
+    : gateOpen ? (gateOpen.listen ? { reader: readerLine(gateOpen.listen), repeat: true } : null)
+    : listenRowFor(listenFrom(), g.AudioPlayer, sheet.para.key, { volKey, letter, collectionLabel: col.label });
+  const onListen = () => {
+    if (!sheet) return;
+    const key = sheet.para.key;
+    close();
+    const lf = listenFrom();
+    if (lf) lf.start(key, null);
+  };
+  const onRepeat = () => {
+    if (!sheet) return;
+    const key = sheet.para.key;
+    close();
+    const lf = listenFrom();
+    const label = typeof g._bookmarkSourceLabel === 'function' ? g._bookmarkSourceLabel(key) : letter.title;
+    if (lf && typeof lf.repeat === 'function') lf.repeat([key], label, REPEAT_TIMES);
+  };
   const onAddNote = () => {
     if (!sheet) return;
     if (live && firstSaveWaits()) { setHeld(true); return; }
@@ -512,7 +535,7 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
         paragraphs={scan ? letter.paragraphs : null} scan={scan} />
       {sheet && !held && (
         <MarkSheet colour={sheet.colour} marked={sheet.marked} desktop={desktop} onColour={onColour} onNote={onAddNote}
-          onCopy={onCopy} onShare={onShare} onClose={close} />
+          onCopy={onCopy} onShare={onShare} onClose={close} listen={listenRow} onListen={onListen} onRepeat={onRepeat} />
       )}
       {refOpen && (
         <RefSheet open={refOpen} letter={letter} items={items} desktop={desktop} onClose={closeRef}

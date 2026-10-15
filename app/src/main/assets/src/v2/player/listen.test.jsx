@@ -7,7 +7,7 @@ import { render, cleanup, act, waitFor } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import {
   resumeText, pausedAt, listenPill, ListenPill, offlineToast, gateListenToast, startListening,
-  ChapterListenPill, startChapter, chapterAudio,
+  ChapterListenPill, startChapter, chapterAudio, listenRowFor,
 } from './listen.jsx';
 import { OFFLINE_LISTEN } from '../offline-facts.js';
 import { GATE_STATES } from '../gate.js';
@@ -328,5 +328,47 @@ describe('chapterAudio', () => {
     expect(chapterAudio('john', { facts: { bibleAudio: 'wop-nkjv' } })).toMatchObject({ volKey: WOP });
     expect(chapterAudio('john', { facts: {} })).toMatchObject({ volKey: 'bible-brm-kjv' });
     expect(get).not.toHaveBeenCalled();
+  });
+});
+
+describe("listenRowFor (4b: Mark this paragraph's Listen row)", () => {
+  const KEY = 'letter:chosen-by-god:0';
+  const what = { volKey: 'one', letter: { id: 'chosen-by-god' }, collectionLabel: 'Volume One' };
+  const pane = (over = {}) => ({ has: vi.fn((k) => k === KEY), start: vi.fn(() => true), repeat: vi.fn(() => true), ...over });
+  const engine = (over = {}) => ({
+    getState: () => ({ status: 'idle', queue: [], qi: 0 }),
+    playbackTracks: vi.fn(() => [{ key: 'one:chosen-by-god', readerCode: 'B' }]),
+    ...over,
+  });
+
+  it("no row without main's pane (no recording), or when it does not hold the paragraph", () => {
+    expect(listenRowFor(null, engine(), KEY, what)).toBe(null);
+    expect(listenRowFor({ has: () => true }, engine(), KEY, what)).toBe(null);
+    expect(listenRowFor(pane(), engine(), 'letter:chosen-by-god:9', what)).toBe(null);
+    expect(listenRowFor(pane(), engine(), '', what)).toBe(null);
+  });
+
+  it('the reader its Listen would start (the favourite where they read it), with Repeat where the pane can loop', () => {
+    const e = engine();
+    expect(listenRowFor(pane(), e, KEY, what)).toEqual({ reader: 'Read by Benjamin', repeat: true });
+    expect(e.playbackTracks).toHaveBeenCalledWith('one', what.letter, 'Volume One');
+    expect(listenRowFor(pane({ repeat: undefined }), e, KEY, what)).toEqual({ reader: 'Read by Benjamin', repeat: false });
+    const tim = engine({ playbackTracks: () => [{ key: 'one:chosen-by-god', readerCode: 'T' }] });
+    expect(listenRowFor(pane(), tim, KEY, what).reader).toBe('Read by Timothy');
+  });
+
+  it('the playing reader when this letter is the loaded track; another letter loaded asks what Listen would start', () => {
+    const playing = engine({ getState: () => ({ status: 'paused', qi: 1, queue: [{ key: 'one:x' }, { key: 'one:chosen-by-god', readerCode: 'V' }] }) });
+    expect(listenRowFor(pane(), playing, KEY, what)).toEqual({ reader: 'Text-to-speech', repeat: true });
+    expect(playing.playbackTracks).not.toHaveBeenCalled();
+    const other = engine({ getState: () => ({ status: 'playing', qi: 0, queue: [{ key: 'one:honor-god', readerCode: 'T' }] }) });
+    expect(listenRowFor(pane(), other, KEY, what).reader).toBe('Read by Benjamin');
+  });
+
+  it('no engine, an older one, or an unknown reader: the row without its reader line', () => {
+    expect(listenRowFor(pane(), null, KEY, what)).toEqual({ reader: null, repeat: true });
+    expect(listenRowFor(pane(), { getState: () => { throw new Error('old'); } }, KEY, what)).toEqual({ reader: null, repeat: true });
+    expect(listenRowFor(pane(), engine({ playbackTracks: () => [] }), KEY, what).reader).toBe(null);
+    expect(listenRowFor(pane(), engine({ playbackTracks: () => [{ readerCode: 'Z' }] }), KEY, what).reader).toBe(null);
   });
 });

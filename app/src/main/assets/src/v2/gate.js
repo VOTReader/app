@@ -143,11 +143,12 @@ export const GATE_STATES = {
     look: { scale: 1, page: 'slate', lines: 'comfortable' },
   },
   // states.json 4b-mark-paragraph: Letter 1's first paragraph tapped (its gold bar just under the top bar, the head
-  // scrolled away), "Mark this paragraph" open with gold ringed; nothing playing.
+  // scrolled away), "Mark this paragraph" open with gold ringed; nothing playing. Letter 1 is recorded and timed: the
+  // Listen row (dz16) says Read by Benjamin, with Repeat.
   '4b-mark-paragraph': {
     stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],
     scroll: { to: '.body [data-hl-key$=":0"]', gap: 20 },
-    open: { sheet: 'mark-paragraph', para: 0, colour: 'gold' },
+    open: { sheet: 'mark-paragraph', para: 0, colour: 'gold', listen: 'B' },
   },
   // states.json 3c-notes (zv1): the Notes tab, All; a journal entry, a highlight and a note today/yesterday, a bookmark
   // Sunday, a link Oct 9.

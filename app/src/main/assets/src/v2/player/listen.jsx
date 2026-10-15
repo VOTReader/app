@@ -9,6 +9,7 @@ import { Icon } from '../Icon.jsx';
 import { AUDIO_RESUME_MIN_SEC, AUDIO_RESUME_END_FRACTION, resolveBibleAudio } from '../../utils/audio-track.js';
 import { OFFLINE_LISTEN, offlineListenWords, offlineChapterWords } from '../offline-facts.js';
 import { savedSettings, listeningFacts } from '../settings-pages.js';
+import { readerLine } from './view.js';
 
 const g = /** @type {any} */ (globalThis);
 const NONE = () => () => {};
@@ -33,6 +34,31 @@ export function startListening(engine, { volKey, letter, collectionLabel = null 
   const words = offlineListenWords(volKey, letter.id);
   if (words) { if (onToast) onToast(offlineToast(words)); return; }
   engine.playLetter({ volKey, letter, collectionLabel });
+}
+
+/**
+ * The Listen row of Mark this paragraph (4b, v2-gaps 23; main's SelectionToolbar listen row), or null for none. Main's
+ * read-along on the page registers window.__votListenFrom while the letter has a recording: the row shows when it holds
+ * this paragraph, and Repeat only where it can loop one (main's pane: the player loops and the read-along is on). The
+ * reader is the playing one when this letter is the loaded track, else the one its Listen would start (the favourite
+ * where they read it, else the manifest's first); no engine, no reader line.
+ * @param {any} lf window.__votListenFrom @param {any} engine AudioPlayer @param {string} hlKey
+ * @param {{ volKey: string, letter: { id: string }, collectionLabel?: string | null }} what
+ * @returns {{ reader: string | null, repeat: boolean } | null}
+ */
+export function listenRowFor(lf, engine, hlKey, { volKey, letter, collectionLabel = null }) {
+  if (!lf || typeof lf.has !== 'function' || typeof lf.start !== 'function' || !hlKey || !lf.has(hlKey)) return null;
+  let code = null;
+  try {
+    const st = engine ? engine.getState() : null;
+    const cur = st && Array.isArray(st.queue) ? st.queue[st.qi] : null;
+    if (cur && cur.key === volKey + ':' + letter.id) code = cur.readerCode || null;
+    else if (engine && typeof engine.playbackTracks === 'function') {
+      const tracks = engine.playbackTracks(volKey, letter, collectionLabel);
+      code = (tracks && tracks[0] && tracks[0].readerCode) || null;
+    }
+  } catch (_e) { /* an older engine: the row without its reader line */ }
+  return { reader: readerLine(code), repeat: typeof lf.repeat === 'function' };
 }
 
 /**

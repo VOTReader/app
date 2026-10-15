@@ -276,6 +276,59 @@ describe('the sheet on the letter page', () => {
   });
 });
 
+describe("the sheet's Listen row (4b, dz16): main's Listen from here on the page", () => {
+  /** main's read-along registers this while the letter has a recording (ReadAlongHighlight's window.__votListenFrom) */
+  const pane = (over = {}) => ({ has: vi.fn((k) => k.startsWith('letter:chosen-by-god:')), start: vi.fn(() => true),
+    repeat: vi.fn(() => true), ...over });
+  afterEach(() => { delete g.__votListenFrom; delete g._bookmarkSourceLabel; });
+  const rows = (dlg) => [...dlg.querySelectorAll('.srow')].map((r) => r.textContent);
+
+  it('no recording on the page (no pane): no row, as before', () => {
+    const { container, getByRole } = page();
+    click(block(container, 0).querySelector('i'));
+    expect(rows(getByRole('dialog', { name: 'Mark this paragraph' }))).toEqual(['Add a note', 'Copy', 'Share a link']);
+  });
+
+  it("a recorded paragraph: the row after the swatches; Listen closes the sheet and plays from the paragraph's start", () => {
+    g.__votListenFrom = pane();
+    const { container, getByRole } = page();
+    click(block(container, 0).querySelector('i'));
+    const dlg = getByRole('dialog', { name: 'Mark this paragraph' });
+    expect(rows(dlg)).toEqual(['Listen from hereRepeat', 'Add a note', 'Copy', 'Share a link']);
+    expect(dlg.querySelector('.swatches').nextElementSibling.className).toBe('srow act lis');
+    expect(g.__votListenFrom.has).toHaveBeenCalledWith(KEY0);
+    click(dlg.querySelector('.lis-go'));
+    expect(container.querySelector('[role="dialog"]')).toBe(null);
+    expect(g.__votListenFrom.start).toHaveBeenCalledWith(KEY0, null);
+    expect(g.__votListenFrom.repeat).not.toHaveBeenCalled();
+    expect(g.AnnotationStore.data[KEY0]).toBeUndefined();
+  });
+
+  it("Repeat closes the sheet and loops the paragraph 3 times under main's label for it", () => {
+    g.__votListenFrom = pane();
+    g._bookmarkSourceLabel = vi.fn(() => 'Chosen by God');
+    const { container, getByRole } = page();
+    click(block(container, 0).querySelector('i'));
+    click(getByRole('button', { name: 'Repeat this passage 3 times' }));
+    expect(container.querySelector('[role="dialog"]')).toBe(null);
+    expect(g._bookmarkSourceLabel).toHaveBeenCalledWith(KEY0);
+    expect(g.__votListenFrom.repeat).toHaveBeenCalledWith([KEY0], 'Chosen by God', 3);
+    expect(g.__votListenFrom.start).not.toHaveBeenCalled();
+  });
+
+  it("a pane that cannot loop (the read-along off, an older APK) offers Listen without Repeat; one that lacks the paragraph, no row", () => {
+    g.__votListenFrom = pane({ repeat: undefined });
+    const first = page();
+    click(block(first.container, 0).querySelector('i'));
+    expect(rows(first.getByRole('dialog', { name: 'Mark this paragraph' }))).toEqual(['Listen from here', 'Add a note', 'Copy', 'Share a link']);
+    cleanup();
+    g.__votListenFrom = pane({ has: vi.fn(() => false) });
+    const second = page();
+    click(block(second.container, 0).querySelector('i'));
+    expect(rows(second.getByRole('dialog', { name: 'Mark this paragraph' }))).toEqual(['Add a note', 'Copy', 'Share a link']);
+  });
+});
+
 describe('the 4b gate and closing the sheet', () => {
   it('4b-mark-paragraph: paragraph 1 tapped, gold ringed, Back says Volume One; reads and paints nothing', async () => {
     const { container, getByRole } = render(<V2App gateId="4b-mark-paragraph" />);
@@ -285,7 +338,9 @@ describe('the 4b gate and closing the sheet', () => {
     expect(sheet.className).toBe('sheet para');
     expect(sheet.parentElement.className).toBe('v2-layer');
     expect(sheet.querySelector('.swatch.on').className).toBe('swatch gold on');
-    expect([...sheet.querySelectorAll('.srow')].map((r) => r.textContent)).toEqual(['Add a note', 'Copy', 'Share a link']);
+    expect([...sheet.querySelectorAll('.srow')].map((r) => r.textContent))
+      .toEqual(['Listen from hereRead by BenjaminRepeat', 'Add a note', 'Copy', 'Share a link']);
+    expect(sheet.querySelector('.srow.act.lis .btn2.sm.rpt').getAttribute('aria-label')).toBe('Repeat this passage 3 times');
     expect(block(container, 0).classList.contains('tapped')).toBe(true);
     expect(g.AnnotationStore.get).not.toHaveBeenCalled();
     expect(g.applyDOMHighlights).not.toHaveBeenCalled();

@@ -56,3 +56,6 @@
 .srow.act.on .lead svg { fill: currentColor; }
 .mvc { display: flex; gap: 10px; margin: 2px 0 10px; }
 .menu .mvc { padding: 0 16px 6px; }
+/* 4b's Listen row (dz16, v2-gaps 23): the kit draws .srow.act.lis as one row; its Listen half is a button of its own here,
+   so the outline Repeat can sit beside it (a button cannot hold a button) */
+.srow.act.lis .lis-go { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 12px; text-align: left; }
