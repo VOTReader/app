@@ -430,6 +430,65 @@ describe('JournalEditorScreen — insert never splits (UX-BATCH session 3, item 
   });
 });
 
+/* sweep v4 / v24 (data loss): onFileChosen belongs to the render in which the photo was
+   picked, and the insert ran only after the async compressImage + put chain. insertBlockBelow
+   built the new list from that render's `blocks` and set it whole, so anything typed, moved or
+   deleted while the photo saved was replaced by the pre-pick snapshot, and the immediate save
+   then wrote that snapshot to the store. The insert now builds on the live list. */
+describe('JournalEditorScreen — an image insert keeps edits made while it saved (sweep v4/v24)', () => {
+  function pickPhotoAndHold() {
+    let finish;
+    globalThis.JournalMediaStore.compressImage.mockImplementation(() => new Promise((res) => { finish = res; }));
+    globalThis.JournalMediaStore.put.mockImplementation(() => Promise.resolve('m_img'));
+    const input = document.querySelector('input[type="file"]');
+    fireEvent.change(input, { target: { files: [new File(['x'], 'photo.jpg', { type: 'image/jpeg' })] } });
+    expect(globalThis.JournalMediaStore.compressImage).toHaveBeenCalledTimes(1);
+    // The photo lands later: compressImage, then put, then the insert.
+    return async () => {
+      await act(async () => {
+        finish({ blob: new Blob(['y'], { type: 'image/jpeg' }), width: 10, height: 10 });
+        await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+      });
+    };
+  }
+
+  it('text typed into the paragraph while the photo saved survives the insert, on screen and in the store', async () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'first' })] });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    const ta = document.querySelector('.jrn-block-textarea');
+    ta.setSelectionRange(5, 5);
+    fireEvent.focus(ta);
+
+    const land = pickPhotoAndHold();
+    fireEvent.change(ta, { target: { value: 'first, and a sentence typed meanwhile' } });
+    await land();
+
+    const saved = JournalStore.get(entry.id);
+    expect(saved.blocks.map((b) => b.type)).toEqual(['p', 'image', 'p']);
+    expect(saved.blocks[1].mediaId).toBe('m_img');
+    expect(saved.blocks[0].text).toBe('first, and a sentence typed meanwhile');
+    expect(document.querySelectorAll('.jrn-block-textarea')[0].value).toBe('first, and a sentence typed meanwhile');
+  });
+
+  it('a block moved while the photo saved keeps its new place after the insert', async () => {
+    const entry = JournalStore.add({
+      title: 't',
+      blocks: [JournalHelpers.newBlock('p', { text: 'A' }), JournalHelpers.newBlock('p', { text: 'B' })],
+    });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+
+    const land = pickPhotoAndHold();
+    act(() => { fireEvent.keyDown(document.querySelectorAll('.jrn-block-drag-btn')[0], { key: 'ArrowDown' }); });
+    await land();
+
+    const saved = JournalStore.get(entry.id);
+    expect(saved.blocks.map((b) => b.type === 'p' ? b.text : b.type)).toEqual(['B', 'A', 'image', '']);
+    // The writing caret still lands in the new trailing paragraph below the photo.
+    const tas = document.querySelectorAll('.jrn-block-textarea');
+    expect(document.activeElement).toBe(tas[tas.length - 1]);
+  });
+});
+
 /* ────────────────────────────────────────────────────────────────────────
    Wave 0 journal UX fixes (P1-5 / P1-6 / P1-7).
 
