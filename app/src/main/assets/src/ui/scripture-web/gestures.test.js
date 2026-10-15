@@ -264,3 +264,59 @@ describe('pointers that went down on a control never steer the canvas (W52)', ()
     expect(handlers.hover).toHaveBeenCalledWith(420, 200);
   });
 });
+
+/* sweep v074: after a pinch, the finger still down could no longer pan. The
+   second finger's down nulls `drag` (the pinch owns both); lifting one finger
+   cleared `pinch` and then nulled `drag` again, so the remaining finger was in
+   `pointers` with neither a pinch nor a drag: every move took no branch and the
+   canvas sat still until every finger lifted and the reader pressed again. The
+   finger left behind now picks up a pan from where it is, and its lift is not a tap. */
+describe('a pinch that ends with one finger still down hands the pan to that finger (sweep v074)', () => {
+  /** Two fingers down at x 400 / 600, spread to 300 / 700 (zoom in), then pointer 2 ends by `end`. */
+  function pinchThenRelease(end) {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const rig = attach(root);
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 1, clientX: 400, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 2, clientX: 600, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointermove', { pointerId: 1, clientX: 300, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointermove', { pointerId: 2, clientX: 700, clientY: 300 }));
+    expect(rig.cam.ppv, 'the spread zoomed in').toBeGreaterThan(10);
+    root.dispatchEvent(pointerEvent(end, { pointerId: 2, clientX: 700, clientY: 300 }));
+    return { root, ...rig };
+  }
+
+  for (const end of ['pointerup', 'pointercancel']) {
+    it(`RED today: after the other finger's ${end}, dragging the remaining finger pans from where it is, and its lift is not a tap`, () => {
+      const { root, cam, handlers } = pinchThenRelease(end);
+      const x0 = cam.x, ppv = cam.ppv;
+      // the remaining finger (pointer 1, resting at x 300) drags 100 px left
+      root.dispatchEvent(pointerEvent('pointermove', { pointerId: 1, clientX: 200, clientY: 300 }));
+      expect(cam.x - x0, 'the remaining finger pans by its own travel from where it rested, with no jump').toBeCloseTo(100 / ppv, 6);
+      expect(cam.ppv, 'one finger pans, it does not zoom').toBe(ppv);
+      root.dispatchEvent(pointerEvent('pointerup', { pointerId: 1, clientX: 200, clientY: 300 }));
+      expect(handlers.tap, 'the end of a pinch is never a tap').not.toHaveBeenCalled();
+      expect(handlers.doubleTap).not.toHaveBeenCalled();
+    });
+  }
+
+  it('the remaining finger lifting without moving is still not a tap (the pinch already moved)', () => {
+    const { root, handlers } = pinchThenRelease('pointerup');
+    root.dispatchEvent(pointerEvent('pointerup', { pointerId: 1, clientX: 300, clientY: 300 }));
+    expect(handlers.tap).not.toHaveBeenCalled();
+    expect(handlers.doubleTap).not.toHaveBeenCalled();
+  });
+
+  it('CONTROL: once every finger has lifted, a fresh press pans and a fresh tap taps as before', () => {
+    const { root, cam, handlers } = pinchThenRelease('pointerup');
+    root.dispatchEvent(pointerEvent('pointerup', { pointerId: 1, clientX: 300, clientY: 300 }));
+    const x0 = cam.x, ppv = cam.ppv;
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 3, clientX: 500, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointermove', { pointerId: 3, clientX: 400, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointerup', { pointerId: 3, clientX: 400, clientY: 300 }));
+    expect(cam.x - x0).toBeCloseTo(100 / ppv, 6);
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 4, clientX: 500, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointerup', { pointerId: 4, clientX: 500, clientY: 300 }));
+    expect(handlers.tap).toHaveBeenCalledTimes(1);
+  });
+});

@@ -164,9 +164,24 @@ export function attachWebGestures(el, deps) {
     }
     if (e.pointerType === 'mouse') handlers().hover(pt.x, pt.y);
   };
+  // sweep v074: a pinch that ends with one finger still down hands the pan
+  // to that finger. down() nulled `drag` when the pinch began, so the finger
+  // left behind sat in `pointers` with neither a pinch nor a drag, and every
+  // move it made did nothing until all fingers lifted and the reader pressed
+  // again. It picks up from where it rests now (no jump), on the camera
+  // under it, the shape down() seeds; never on the elevator (a pinch is not
+  // a press on the track), and with `moved` set so its lift is not a tap.
+  const handOff = (wasPinch) => {
+    if (!wasPinch || pointers.size !== 1) return;
+    const [pt] = Array.from(pointers.values());
+    const dc = camAt(pt.y);
+    drag = { x: pt.x, y: pt.y, camx: dc.x, camy: dc.y || 0, cam: dc, lift: null };
+    moved = true;
+  };
   const up = (e) => {
     if (!pointers.has(e.pointerId)) return;
     pointers.delete(e.pointerId);
+    const wasPinch = !!pinch;
     if (pointers.size < 2) pinch = null;
     if (drag && drag.lift) {
       // a tap on the track jumps there; never a web tap, never a double-tap zoom
@@ -179,10 +194,13 @@ export function attachWebGestures(el, deps) {
       else { lastTap = now; handlers().tap(pt.x, pt.y); }
     }
     drag = null;
+    handOff(wasPinch);
   };
   const cancel = (e) => {
     if (!pointers.has(e.pointerId)) return;
+    const wasPinch = !!pinch;
     pointers.delete(e.pointerId); drag = null; pinch = null;
+    handOff(wasPinch);
   };
   const wheel = (e) => {
     // A panel with its own scroll must scroll (or its text must select)
