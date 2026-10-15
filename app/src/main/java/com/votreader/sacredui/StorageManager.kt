@@ -345,10 +345,15 @@ class StorageManager(private val context: Context) {
     fun beginV3Import(uri: Uri): Result<String> = synchronized(v3Lock) {
         closeImportQuietly()
         importTotalSize = queryFileSize(uri)   // -1 if the provider doesn't declare it
+        // Held outside the try so the catch can close it: a throw before the
+        // session is handed to importIn (a file cut inside the manifest length or
+        // the manifest, a legacy read fault) left nothing else holding the stream.
+        var raw: InputStream? = null
         return try {
-            val raw = context.contentResolver.openInputStream(uri)
+            val opened = context.contentResolver.openInputStream(uri)
                 ?: return Result.Failure("no_input_stream")
-            val bis = BufferedInputStream(raw)
+            raw = opened
+            val bis = BufferedInputStream(opened)
             bis.mark(CONTAINER_MAGIC.size + 8)
             val head = ByteArray(CONTAINER_MAGIC.size)
             val n = readUpTo(bis, head)
@@ -400,7 +405,11 @@ class StorageManager(private val context: Context) {
             }
         } catch (e: Exception) {
             Timber.w(e, "beginV3Import failed")
+            // closeImportQuietly() only reaches a stream already handed to importIn;
+            // close the picked one too, or each Import/Verify of a cut backup leaks a
+            // provider file descriptor. A second close of the same stream is a no-op.
             closeImportQuietly()
+            try { raw?.close() } catch (_: Exception) { /* best-effort */ }
             Result.Failure(e.message ?: "begin_failed")
         }
     }
