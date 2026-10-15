@@ -186,6 +186,11 @@ export const GATE_STATES = {
   // states.json 9a-plans (zv1): Reading plans from Home; Bible in a Year on day 40 of 365 (Numbers 11-13, a day to catch
   // up, 11 % done), the Volumes in Order not started with 2 a day chosen.
   '9a-plans': { stack: [{ place: 'home' }, { place: 'reading-plans' }], facts: { plans: gatePlans() } },
+  // states.json 8a-welcome (zv1): the welcome a first visit opens on; no tab, no Back, no bars.
+  '8a-welcome': { stack: [{ place: 'welcome' }] },
+  // states.json 8b-install (zv1): Volume One from Home in a browser on the second visit, the offer open; this browser
+  // handed over its install event, so the button is the browser's own Install.
+  '8b-install': { stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }], open: { sheet: 'install' }, facts: { install: { flow: 'prompt' } } },
 };
 
 /**

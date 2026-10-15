@@ -209,12 +209,13 @@ describe('Your data, real boot', () => {
 });
 
 describe('Help and about, real boot', () => {
-  it('Show me around opens the welcome; Credits opens its page; an unknown build says so', async () => {
+  it('Show me around goes Home for the tour; Credits opens its page; an unknown build says so', async () => {
     g.getBuildVersion = () => Promise.resolve(null);
     const go = vi.fn();
-    const { container } = bare(Help, { go });
+    const openTab = vi.fn();
+    const { container } = bare(Help, { go, openTab });
     await click(rowByTitle(container, 'Show me around'));
-    expect(go).toHaveBeenCalledWith({ place: 'welcome' });
+    expect(openTab).toHaveBeenCalledWith('home');
     await click(rowByTitle(container, 'Credits'));
     expect(go).toHaveBeenCalledWith({ place: 'settings/credits' });
     await waitFor(() => expect(container.querySelector('.ver > div').textContent).toBe('Not known on this phone'));

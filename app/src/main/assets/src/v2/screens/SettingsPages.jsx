@@ -10,6 +10,7 @@ import { definePlace } from '../places.js';
 import { GATE_NOW } from '../gate.js';
 import { Sheet } from '../Sheet.jsx';
 import { createBackupFlow } from '../../utils/backup-flow.js';
+import { startTour } from './WelcomeScreen.jsx';
 import {
   READERS, PLAY_SWITCHES, SONG_SWITCH, liveListening, readerLine, editionOptions, editionLine, rateLabel, rateOptions,
   writeSetting, writeRate, liveData, here, safeCard, weeklyLine, versionLine, readVersion, updateLine, gateListening, gateData,
@@ -208,7 +209,7 @@ export function YourDataPage({ gate, device, desktop, onReady }) {
 }
 
 /** @param {import('../places.js').PlaceProps} props */
-export function HelpPage({ gate, device, go, onReady }) {
+export function HelpPage({ gate, device, go, openTab, onReady }) {
   const [ver, setVer] = React.useState(/** @type {string | null | undefined} */ (undefined));
   React.useEffect(() => {
     let live = true;
@@ -225,7 +226,7 @@ export function HelpPage({ gate, device, go, onReady }) {
         <p className="lede">The Volumes of Truth are the Word of The Lord, given through His servant Timothy.</p>
       </div>
       <div className="g settings">
-        <OpenRow t="Show me around" s="A short tour that points at the real buttons" onOpen={() => go({ place: 'welcome' })} />
+        <OpenRow t="Show me around" s="A short tour that points at the real buttons" onOpen={() => { if (!gate) { openTab('home'); startTour(); } }} />
         <OpenRow t="Privacy" s={'Nothing you write leaves ' + here(device)} onOpen={() => open(PRIVACY_URL)} />
         <OpenRow t="Credits" s="OpenBible.info, and the songs of the flock" onOpen={() => go({ place: 'settings/credits' })} />
       </div>

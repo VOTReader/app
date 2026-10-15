@@ -3,3 +3,30 @@
 
 /* 9a: Stop sits under the cards as a quiet line, its tap area only as wide as its words */
 .plans > .stop { align-self: flex-start; }
+
+/* 8a: on a computer the welcome stands in the middle of the window, as wide as a dialog (the picture is the phone's) */
+.v2.dk.bare .col { min-height: 100%; display: flex; flex-direction: column; justify-content: center; max-width: calc(var(--dlg) + 2 * var(--gut)); }
+.v2.dk.bare .content.welcome { justify-content: center; padding-top: 26px; }
+
+/* 8a: Show me around - a ring round the real control and a card beside it, over the whole window */
+.tour { position: fixed; inset: 0; z-index: 8; }
+.tour-ring { position: fixed; border: 2px solid var(--accent); border-radius: var(--r); box-shadow: 0 0 0 100vmax var(--scrim);
+  pointer-events: none; transition: left .2s, top .2s, width .2s, height .2s; }
+.tour-card { position: fixed; left: var(--gut); right: var(--gut); background: var(--raised); border: 1px solid var(--edge);
+  border-radius: var(--r); padding: 16px; box-shadow: var(--shadow-dialog); }
+.tour-card .t { font-size: var(--fs-l); color: var(--t-hero); margin-top: 10px; }
+.tour-card .s { font-size: var(--fs-s); color: var(--t2); margin: 6px 0 0; }
+.tour-card .actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 12px; }
+.v2.dk .tour-card { left: calc(var(--rail) + 16px); right: auto; width: var(--dlg); }   /* never a .dk of its own: the kit's .dk is the laptop frame (opaque) */
+@media (prefers-reduced-motion: reduce) { .tour-ring { transition: none; } }
+
+/* 8b: Show me how - main's steps, a number, the words, then the step's picture full width */
+.sheet.inst-steps { overflow-y: auto; }
+.dlg.inst-steps { max-height: 80vh; overflow-y: auto; }
+.inst-steps { list-style: none; margin: 0; padding: 0; }
+.inst-steps li { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.inst-steps .n { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--edge); color: var(--tgold); font-size: var(--fs-xs);
+  display: inline-flex; align-items: center; justify-content: center; }
+.inst-steps .t { font-size: var(--fs-s); color: var(--t1); }
+.inst-steps .s { font-size: var(--fs-xs); color: var(--t2); margin-top: 4px; line-height: 1.4; }
+.inst-steps img { grid-column: 2; max-width: 100%; height: auto; margin-top: 10px; border-radius: var(--r-s); }
