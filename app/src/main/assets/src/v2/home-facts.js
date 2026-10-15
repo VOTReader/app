@@ -5,7 +5,8 @@
    history (HistoryStore) and its recently played recordings (AudioLibraryStore.recent(), the Listening Library's
    shelf), newest first by time, with main's open pages (vot-state tabs). v2 has neither tabs nor a library page:
    Corbin's v2-map calls let Open pages and Your Listening go only if they show up in the new places, and Recent on
-   Home is that place. A gate boot seeds the same shapes in memory. Everything here is read only.
+   Home is that place. A gate boot seeds the same shapes in memory. Everything here is read only. A place is a letter, a
+   collection's preface, an Answers topic (its corpus is asked for when one is there), a Bible chapter or a study chapter.
 
    An item is one place a reader was:
      { kind: 'letter', collection, n } or { kind: 'letter', collection, letterId } (main stores letter ids)
@@ -217,11 +218,16 @@ export function savedHome(gl = g) {
   return { continue: cont, recent: recentItems(entries, cont, RECENT_MAX, gl, tabs, played) };
 }
 
-/** The letter an item points at, once its corpus is loaded: { col, letter } (letter null when not found). */
+/**
+ * The letter an item points at, once its corpus is loaded: { col, letter } (letter null when not found), or the
+ * collection's preface by its id ({ col, letter, preface: true }: main keeps it outside the letters, colPreface).
+ */
 export function resolveLetter(it, gl = g) {
   const col = colOf(it.collection, gl);
-  const list = lettersOf(col, gl);
   if (!col) return null;
+  const pref = it.letterId && col.prefaceGlobal ? gl[col.prefaceGlobal] : null;
+  if (pref && pref.id === it.letterId) return { col, letter: pref, preface: true };
+  const list = lettersOf(col, gl);
   if (!list) return { col, letter: null };
   const letter = (it.letterId && list.find((l) => l && l.id === it.letterId))
     || (it.n != null && list.find((l) => l && l.num === it.n)) || null;
@@ -261,6 +267,7 @@ export function describeItem(it, gl = g) {
   }
   const r = resolveLetter(it, gl);
   if (!r || !r.letter) return null;
+  if (r.preface) return { title: r.letter.title || r.col.label, where: r.col.label + ', Preface', chip: shortCol(r.col) + ', Preface' };
   const n = r.letter.num;
   if (r.col.kind === 'letter') {
     return { title: r.letter.title, where: r.col.label + ', Letter ' + n, chip: shortCol(r.col) + ', Letter ' + n };
@@ -278,8 +285,18 @@ export function itemRoutes(it, gl = g) {
   }
   if (it.kind === 'study') return [{ place: 'study-chapter', study: it.studyId, chapter: it.chapterId }];
   const r = resolveLetter(it, gl);
+  if (r && r.preface) return [{ place: 'collection', collection: it.collection }, { place: 'letter', collection: it.collection, preface: true }];
   const n = r && r.letter ? r.letter.num : it.n;
   return [{ place: 'collection', collection: it.collection }, { place: 'letter', collection: it.collection, n }];
+}
+
+/**
+ * Whether Home must ask for Answers Only God Can Give: it loads on its own (bundle-d's __loadAnswersCorpus, not the
+ * VOT corpus), so a topic main read stays out of Continue and Recent until it is in memory. @param {HomeFacts} home
+ */
+export function wantsAnswers(home, gl = g) {
+  const items = home ? [home.continue].concat(home.recent || []) : [];
+  return items.some((it) => it && it.kind === 'letter' && it.collection === 'answers') && !lettersOf(colOf('answers', gl), gl);
 }
 
 /** A collection's letter count once loaded (Home's numbers come from the corpus itself), else null. */

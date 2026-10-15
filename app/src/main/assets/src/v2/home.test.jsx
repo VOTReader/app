@@ -18,11 +18,13 @@ const COLS = [
   ['timothy', 'Letters from Timothy', 'LETTERS_TIMOTHY', 'vot-timothy-index'], ['flock', "Letters to The Lord's Little Flock", 'LETTERS_FLOCK', 'vot-flock-index'],
   ['rebuke', "The Lord's Rebuke", 'LETTERS_REBUKE', 'vot-rebuke-index'], ['wtlb1', 'Words To Live By: Part One', 'WTLB_ONE', 'wtlb-one-index'],
   ['wtlb2', 'Words To Live By: Part Two', 'WTLB_TWO', 'wtlb-two-index'], ['blessed', 'The Blessed', 'THE_BLESSED', 'blessed-index'],
-  ['holydays', 'Regarding The Holy Days', 'HOLY_DAYS', 'holy-days-index'], ['hm', 'Hidden Manna', 'HIDDEN_MANNA', null],
+  ['holydays', 'Regarding The Holy Days', 'HOLY_DAYS', 'holy-days-index'], ['answers', 'Answers Only God Can Give', 'ANSWERS', 'answers-home'],
+  ['hm', 'Hidden Manna', 'HIDDEN_MANNA', null],
 ].map(([volKey, label, globalName, indexScreen]) => ({
-  volKey, label, globalName, indexScreen, kind: ['wtlb1', 'wtlb2'].includes(volKey) ? 'wtlb' : volKey === 'blessed' ? 'blessed' : volKey === 'holydays' ? 'holy-days' : 'letter',
+  volKey, label, globalName, indexScreen, prefaceGlobal: volKey === 'one' ? 'LETTERS_V1_PREFACE' : null,
+  kind: ['wtlb1', 'wtlb2', 'answers'].includes(volKey) ? 'wtlb' : volKey === 'blessed' ? 'blessed' : volKey === 'holydays' ? 'holy-days' : 'letter',
 }));
-const COUNTS = { one: 29, two: 29, three: 30, four: 29, five: 29, six: 31, seven: 67, timothy: 14, flock: 61, rebuke: 30, wtlb1: 149, wtlb2: 203, blessed: 8, holydays: 16, hm: 3 };
+const COUNTS = { one: 29, two: 29, three: 30, four: 29, five: 29, six: 31, seven: 67, timothy: 14, flock: 61, rebuke: 30, wtlb1: 149, wtlb2: 203, blessed: 8, holydays: 16, answers: 3, hm: 3 };
 const TITLES = { 1: 'Chosen by God', 2: 'Honor Not the Day of the Dead... Honor God' };
 const letters = (key, n) => Array.from({ length: n }, (_x, i) => ({ id: key + '-' + (i + 1), num: i + 1, title: (key === 'one' && TITLES[i + 1]) || key + ' letter ' + (i + 1), blocks: [] }));
 
@@ -31,6 +33,7 @@ function installCorpus() {
   g.COL_BY_KEY = new Map(COLS.map((c) => [c.volKey, c]));
   g.COL_BY_INDEX_SC = new Map(COLS.filter((c) => c.indexScreen).map((c) => [c.indexScreen, c]));
   for (const c of COLS) g[c.globalName] = letters(c.volKey, COUNTS[c.volKey]);
+  g.LETTERS_V1_PREFACE = { id: 'a-word-of-warning', title: 'A Word of Warning', blocks: [] };
 }
 
 /** index.html's lazy loader, held until the test lets it land. */
@@ -48,7 +51,7 @@ beforeEach(() => { installCorpus(); });
 afterEach(() => {
   cleanup();
   for (const c of COLS) delete g[c.globalName];
-  for (const k of ['COLLECTIONS', 'COL_BY_KEY', 'COL_BY_INDEX_SC', '__votCorpus', '__loadVotCorpus', 'StateStore', 'HistoryStore', 'AudioLibraryStore', 'AudioPlayer', 'matchMedia']) delete g[k];
+  for (const k of ['COLLECTIONS', 'COL_BY_KEY', 'COL_BY_INDEX_SC', 'LETTERS_V1_PREFACE', '__votCorpus', '__loadVotCorpus', '__answersCorpus', '__loadAnswersCorpus', 'StateStore', 'HistoryStore', 'AudioLibraryStore', 'AudioPlayer', 'matchMedia']) delete g[k];
   delete html.dataset.gate;
   localStorage.clear();
   vi.restoreAllMocks();
@@ -163,6 +166,22 @@ describe('saved data, re-shown (read only)', () => {
     expect(savedHome().continue).toBe(null);
   });
 
+  it("a volume's preface is a place too (main keeps it outside the letters): from the history, an open page, a recording, Continue", () => {
+    const pre = /** @type {import('./home-facts.js').HomeItem} */ ({ kind: 'letter', collection: 'one', letterId: 'a-word-of-warning' });
+    expect(describeItem(pre)).toEqual({ title: 'A Word of Warning', where: 'Volume One, Preface', chip: 'Vol. One, Preface' });
+    expect(itemRoutes(pre)).toEqual([{ place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', preface: true }]);
+    g.COL_BY_LETTER_SC = new Map([['vot-one-letter', g.COL_BY_KEY.get('one')]]);
+    const hist = [{ type: 'letter', letterId: 'a-word-of-warning', letterTitle: 'A Word of Warning', letterNum: null, volumeScreen: 'vot-one-index', ts: 9 }];
+    const played = [{ key: 'one:a-word-of-warning', url: 'p', partLabel: null, playedAt: 5 }];
+    for (const [h, tabs, pl] of [[hist, [], []], [[], [{ screen: 'vot-one-letter', letterId: 'a-word-of-warning' }], []], [[], [], played],
+      [hist, [{ screen: 'vot-one-letter', letterId: 'a-word-of-warning' }], played]]) {
+      expect(recentItems(h, null, 8, g, tabs, pl).map((it) => describeItem(it).chip)).toEqual(['Vol. One, Preface']);
+    }
+    expect(recentItems(hist, continueFromState({ activeReadKey: 'vol:one', lastReadLetterMap: { one: 'a-word-of-warning' } }), 8, g, [], played)).toEqual([]);
+    expect(describeItem(continueFromState({ activeReadKey: 'vol:one', lastReadLetterMap: { one: 'a-word-of-warning' } })).where).toBe('Volume One, Preface');
+    delete g.COL_BY_LETTER_SC;
+  });
+
   it('labels and routes: a letter under its collection, a chapter under The Bible and its book, an entry by its title', () => {
     expect(itemRoutes({ kind: 'letter', collection: 'one', letterId: 'one-2' })).toEqual([
       { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 2 }]);
@@ -216,6 +235,28 @@ describe('Home on the screen', () => {
     expect(container.querySelector('h1.display.xl')).not.toBe(null);
     expect(container.querySelector('.vols .cnt')).toBe(null);
     await waitFor(() => expect(html.dataset.gate).toBe('ready'));
+  });
+
+  it("an Answers topic main read comes into Recent once its own corpus lands (asked only when one is there), and opens it", async () => {
+    delete g.ANSWERS;
+    const listeners = new Set();
+    const corpus = { loaded: false, v: 0, subscribe: (cb) => { listeners.add(cb); return () => listeners.delete(cb); }, getVersion: () => corpus.v };
+    g.__answersCorpus = corpus;
+    g.__loadAnswersCorpus = vi.fn(() => Promise.resolve());
+    g.StateStore = { isReady: () => true, get: () => ({}) };
+    g.HistoryStore = { isReady: () => true, list: () => [] };
+    const first = render(<V2App gateId={null} />);
+    expect(g.__loadAnswersCorpus).not.toHaveBeenCalled();
+    first.unmount();
+    g.HistoryStore = { isReady: () => true, list: () => [{ type: 'letter', letterId: 'answers-2', letterTitle: 'answers letter 2', letterNum: 2, volumeScreen: 'answers-home', ts: 5 },
+      { type: 'chapter', bookId: 'john', bookTitle: 'John', chapterNum: 3, ts: 4 }] };
+    const { container } = render(<V2App gateId={null} />);
+    expect([...container.querySelectorAll('.recent .chip')].map((c) => c.textContent)).toEqual(['John 3']);
+    expect(g.__loadAnswersCorpus).toHaveBeenCalledTimes(1);
+    await act(async () => { g.ANSWERS = letters('answers', 3); corpus.loaded = true; corpus.v += 1; listeners.forEach((cb) => cb()); });
+    expect([...container.querySelectorAll('.recent .chip')].map((c) => c.textContent)).toEqual(['answers letter 2', 'John 3']);
+    await click(container.querySelector('.recent .chip'));
+    await waitFor(() => expect(container.querySelector('h1').textContent).toBe('answers letter 2'));
   });
 
   it('a reader with nothing read yet starts at Letter 1', () => {

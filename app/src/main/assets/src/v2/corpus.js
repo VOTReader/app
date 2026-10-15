@@ -45,3 +45,26 @@ export function useVotCorpus() {
   }, []);
   return votCorpusStatus();
 }
+
+/* Answers Only God Can Give loads on its own: bundle-d's utils/sync-loaders.js publishes window.__answersCorpus and
+   __loadAnswersCorpus (main's screen-routes gates its Answers routes on the same pair). */
+const subscribeAnswers = (cb) => {
+  const c = g.__answersCorpus;
+  return c && typeof c.subscribe === 'function' ? c.subscribe(cb) : () => {};
+};
+const answersVersion = () => {
+  const c = g.__answersCorpus;
+  return c && typeof c.getVersion === 'function' ? c.getVersion() : 0;
+};
+
+/** Re-renders when the Answers corpus lands or fails; the number changes each time. @returns {number} */
+export function useAnswersCorpusVersion() {
+  return React.useSyncExternalStore(subscribeAnswers, answersVersion);
+}
+
+/** Asks for the Answers corpus unless it is here (the loader shares one fetch and retries after a failure). @returns {Promise<void>} */
+export function askAnswersCorpus(gl = g) {
+  const c = gl.__answersCorpus;
+  if ((c && c.loaded) || typeof gl.__loadAnswersCorpus !== 'function') return Promise.resolve();
+  return Promise.resolve(gl.__loadAnswersCorpus());
+}

@@ -5,8 +5,8 @@
    the top bar. Numbers and titles come from the corpus itself (corpus.js); the screen is ready once it has loaded. */
 import { Icon } from '../Icon.jsx';
 import { definePlace } from '../places.js';
-import { useVotCorpus } from '../corpus.js';
-import { VOLUMES, MORE_LETTERS, savedHome, describeItem, itemRoutes, letterCount, colOf } from '../home-facts.js';
+import { useVotCorpus, useAnswersCorpusVersion, askAnswersCorpus } from '../corpus.js';
+import { VOLUMES, MORE_LETTERS, savedHome, describeItem, itemRoutes, letterCount, colOf, wantsAnswers } from '../home-facts.js';
 
 /** Where a reader with nothing read yet starts. @type {import('../home-facts.js').HomeItem} */
 const FIRST = { kind: 'letter', collection: 'one', n: 1 };
@@ -54,12 +54,17 @@ function VolumeCells({ vol, last, count, onOpen }) {
 /** @param {import('../places.js').PlaceProps} props */
 export function HomeScreen({ gate, facts, go, onReady }) {
   const corpus = useVotCorpus();
+  const answers = useAnswersCorpusVersion();
   const home = React.useMemo(
     () => (gate ? (gate.facts && gate.facts.home) || { continue: null, recent: [] } : savedHome()),
     // the corpus landing turns letter ids into numbers and titles
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [gate, corpus],
+    [gate, corpus, answers],
   );
+  // an Answers topic in Continue or Recent asks for its own corpus (a gate boot's facts never hold one)
+  React.useEffect(() => {
+    if (!gate && wantsAnswers(home)) askAnswersCorpus().catch(() => { /* the loader flags the error; the topic stays out */ });
+  }, [gate, home]);
   React.useEffect(() => { if (corpus !== 'loading') onReady(); }, [corpus, onReady]);
 
   const contDesc = home.continue ? describeItem(home.continue) : null;

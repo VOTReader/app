@@ -49,11 +49,12 @@ const THIRD_URL = AUDIO_RELEASE_PREFIX + 'v1-03.mp3';
 
 /** Main's writers, main's shapes (the comments name where main writes each one). */
 function seed() {
-  // usePersistedState: vot-state whole; the reader is on Letter 1 with five pages open (main's tabs)
+  // usePersistedState: vot-state whole; the reader is on Letter 1 with six pages open (main's tabs; the preface too)
   StateStore.set({
     activeReadKey: 'vol:one', lastReadLetterMap: { one: 'chosen-by-god' }, readItems: { 'v1:volume-one:honor-not': 1 },
     tabs: [{ screen: 'vot-one-letter', letterId: 'chosen-by-god' }, { screen: 'bible-ch', bookId: 'john', chapterNum: 3 },
-      { screen: 'wtlb-one-entry', letterId: 'w-12' }, { screen: 'vot-one-letter', letterId: 'one-3' }, { screen: 'home' }],
+      { screen: 'wtlb-one-entry', letterId: 'w-12' }, { screen: 'vot-one-letter', letterId: 'one-3' }, { screen: 'home' },
+      { screen: 'vot-one-letter', letterId: 'v1-preface' }],
     activeTabIdx: 0,
   });
   // use-nav-history-tracking: newest first
@@ -120,7 +121,7 @@ describe("main's saved data, found in v2", () => {
     const { container } = render(<V2App gateId={null} />);
     expect(container.querySelector('.pill.block').textContent.trim()).toBe('Continue reading');
     expect(container.querySelector('.cont-where').textContent).toBe('Chosen by God · Volume One, Letter 1');
-    expect(texts(container, '.recent .chip')).toEqual(['Vol. One, Letter 4', 'Vol. One, Letter 2', 'John 3', 'On Prayer', 'Vol. One, Letter 3']);
+    expect(texts(container, '.recent .chip')).toEqual(['Vol. One, Letter 4', 'Vol. One, Letter 2', 'John 3', 'On Prayer', 'Vol. One, Letter 3', 'Vol. One, Preface']);
     expect(writes()).toEqual([]);
     // a recording played opens its letter
     await click([...container.querySelectorAll('.recent .chip')][0]);
@@ -133,6 +134,13 @@ describe("main's saved data, found in v2", () => {
     await click([...container.querySelectorAll('.recent .chip')][2]);
     await waitFor(() => expect(container.querySelector('h1').textContent).toBe('On Prayer'));
     expect(container.querySelector('.tb .title').textContent).toBe('Words To Live By: Part One');
+  });
+
+  it("Home: the volume's preface left open is in Recent and opens", async () => {
+    const { container } = render(<V2App gateId={null} />);
+    expect(texts(container, '.recent .chip')).toEqual(['Vol. One, Letter 2', 'John 3', 'On Prayer', 'Vol. One, Letter 3', 'Vol. One, Preface']);
+    await click([...container.querySelectorAll('.recent .chip')][4]);
+    await waitFor(() => expect(container.querySelector('h1').textContent).toBe('A Word of Warning'));
   });
 
   it('Notes: every journal entry, highlight, note, bookmark, saved recording and link, each opening its place', async () => {
@@ -183,7 +191,7 @@ describe("main's saved data, found in v2", () => {
     await click(container.querySelector('.pill.block'));
     await waitFor(() => expect(container.querySelector('h1').textContent).toBe('Chosen by God'));
     await waitFor(() => expect(texts(container, '[data-hl-key="letter:chosen-by-god:1"] mark.hl-dom')).toEqual(['Many things you']));
-    expect(StateStore.get().tabs.length).toBe(5);
+    expect(StateStore.get().tabs.length).toBe(6);
     expect(StateStore.get().readItems).toEqual({ 'v1:volume-one:honor-not': 1 });
     expect(AnnotationStore.get('letter:chosen-by-god:1').map((a) => a.id)).toEqual(['h1']);
     expect(AudioLibraryStore.saved().map((t) => t.key)).toEqual(['one:honor-not']);
