@@ -684,7 +684,19 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         if (allHlContainers.length === 0) { setVisible(false); return; }
         // REPEAT THIS PASSAGE (rp1 part 3): the blocks the pane can loop, taken with Listen's target.
         const repeat = listen ? repeatTarget(allHlContainers.map((c) => c.getAttribute('data-hl-key') || '')) : null;
-        setSelInfo({ hlKey: null, start: 0, end: 0, text, copyText: selCopyText, shareText: selShareText, share: selShare, existingHl: null, multiVerse: true, multiContainers: allHlContainers, listen, repeat });
+        // sweep v32: each block's part of the selection, measured NOW, as the
+        // single-block path keeps start/end. A tap on the toolbar can collapse
+        // the live selection before its click runs (onSelectionChange's 150 ms
+        // wait expects that, and Remove takes a second tap on its confirm), and
+        // read again then, every block fell back to 0..its length: Highlight and
+        // Note took the whole first and last verse, Remove every group in them.
+        const multiSpans = allHlContainers.map((c) => ({
+          container: c,
+          key: c.getAttribute('data-hl-key') || '',
+          start: c.contains(range.startContainer) ? computeOffset(c, range.startContainer, range.startOffset) : 0,
+          end: c.contains(range.endContainer) ? computeOffset(c, range.endContainer, range.endOffset) : c.textContent.length,
+        }));
+        setSelInfo({ hlKey: null, start: 0, end: 0, text, copyText: selCopyText, shareText: selShareText, share: selShare, existingHl: null, multiVerse: true, multiContainers: allHlContainers, multiSpans, listen, repeat });
       } else {
         const hlKey = container.dataset.hlKey;
         const start = computeOffset(container, range.startContainer, range.startOffset);
@@ -959,11 +971,9 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     const kind = activeStyle === 'underline' ? 'underline'
       : activeStyle === 'squiggle' ? 'squiggle' : 'highlight';
     if (selInfo.multiVerse) {
-      // Multi-container: all spans share ONE groupId so they act as one annotation
-      const sel = window.getSelection();
-      const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-      const containers = selInfo.multiContainers ||
-        (range ? readingBlocksIn(range) : []);
+      // Multi-container: all spans share ONE groupId so they act as one
+      // annotation. Each block's offsets are the ones measured when the
+      // toolbar rose (selInfo.multiSpans, sweep v32), never the live selection.
       const groupId = hlId();
       // Recolor semantics: only groups whose range EXACTLY matches the new
       // selection in this container are recoloured — partial overlap is
@@ -972,14 +982,12 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       const groupsToRemove = new Set();
       /** @type {{ key: string, start: number, end: number, text: string }[]} */
       const planned = [];
-      containers.forEach(function(container) {
-        var hlKey = container.dataset.hlKey;
+      (selInfo.multiSpans || []).forEach(function(span) {
+        var container = span.container;
+        var hlKey = span.key;
         var containerText = container.textContent;
-        var containerLen = containerText.length;
-        var rawStart = range && container.contains(range.startContainer)
-          ? computeOffset(container, range.startContainer, range.startOffset) : 0;
-        var rawEnd = range && container.contains(range.endContainer)
-          ? computeOffset(container, range.endContainer, range.endOffset) : containerLen;
+        var rawStart = span.start;
+        var rawEnd = span.end;
         AnnotationStore.get(hlKey).forEach(function(h) {
           if (h.start === rawStart && h.end === rawEnd && h.groupId) groupsToRemove.add(h.groupId);
         });
@@ -1035,37 +1043,30 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     window.getSelection().removeAllRanges();
     setVisible(false);
     setTimeout(() => { suppressRef.current = false; }, 300);
-  }, [selInfo, activeStyle, computeOffset]);
+  }, [selInfo, activeStyle]);
 
   // The groupIds whose annotation overlaps the current selection, across every
   // touched container. Shared by removeHighlight (what to delete) and the remove
-  // confirm's note-count (ANN2 disclosure) so the two can't drift.
+  // confirm's note-count (ANN2 disclosure) so the two can't drift. Both read the
+  // offsets measured when the toolbar rose (sweep v32): the confirm is a second
+  // tap, and the live selection may be gone by then.
   const selectionGroups = React.useCallback(() => {
     /** @type {Set<string>} */
     const groups = new Set();
     if (!selInfo) return groups;
-    const sel = window.getSelection();
-    const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-    const containers = selInfo.multiVerse
-      ? (selInfo.multiContainers ||
-          (range ? readingBlocksIn(range) : []))
-      : [document.querySelector('[data-hl-key="' + (selInfo.hlKey || '').replace(/"/g, '\\"') + '"]')].filter(Boolean);
-    containers.forEach(function(container) {
-      if (!container) return;
-      var hlKey = container.dataset.hlKey;
-      var containerLen = container.textContent.length;
-      var start = selInfo.multiVerse
-        ? (range && container.contains(range.startContainer) ? computeOffset(container, range.startContainer, range.startOffset) : 0)
-        : selInfo.start;
-      var end = selInfo.multiVerse
-        ? (range && container.contains(range.endContainer) ? computeOffset(container, range.endContainer, range.endOffset) : containerLen)
-        : selInfo.end;
-      AnnotationStore.get(hlKey).forEach(function(h) {
-        if (h.start < end && h.end > start && h.groupId) groups.add(h.groupId);
+    /** @type {{ key: string, start: number, end: number }[]} */
+    const spans = selInfo.multiVerse
+      ? (selInfo.multiSpans || [])
+      : [document.querySelector('[data-hl-key="' + (selInfo.hlKey || '').replace(/"/g, '\\"') + '"]')]
+          .filter(Boolean)
+          .map((container) => ({ key: container.getAttribute('data-hl-key') || '', start: selInfo.start, end: selInfo.end }));
+    spans.forEach(function(span) {
+      AnnotationStore.get(span.key).forEach(function(h) {
+        if (h.start < span.end && h.end > span.start && h.groupId) groups.add(h.groupId);
       });
     });
     return groups;
-  }, [selInfo, computeOffset]);
+  }, [selInfo]);
 
   const removeHighlight = React.useCallback(() => {
     if (!selInfo) return;
@@ -1121,30 +1122,23 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     const def = (typeof NoteDefaultStore !== 'undefined')
       ? NoteDefaultStore.get() : { style: 'highlight', color: 'blank' };
     const _hasNote = (gid) => typeof NoteStore !== 'undefined' && !!NoteStore.get(gid);
-    const sel = window.getSelection();
-    const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
     let groupId;
     // True when THIS flow creates the annotation group (vs attaching note-ness
     // to an existing mark). The NoteSheet needs it so discarding a never-saved
     // note removes exactly what this flow created — never a pre-existing mark.
     let createdGroup = false;
     if (selInfo.multiVerse) {
-      const containers = selInfo.multiContainers ||
-        (range ? readingBlocksIn(range) : []);
+      // Each block's offsets as measured when the toolbar rose (sweep v32).
+      /** @type {{ container: HTMLElement, key: string, start: number, end: number }[]} */
+      const spans = selInfo.multiSpans || [];
       // Attach to an OVERLAPPING group that doesn't already have a note (keeps
       // its existing style/color); otherwise create a new group at the default.
       let attachTarget = null;
-      containers.forEach(function(container) {
+      spans.forEach(function(span) {
         if (attachTarget) return;
-        var hlKey = container.dataset.hlKey;
-        var containerLen = container.textContent.length;
-        var start = range && container.contains(range.startContainer)
-          ? computeOffset(container, range.startContainer, range.startOffset) : 0;
-        var end = range && container.contains(range.endContainer)
-          ? computeOffset(container, range.endContainer, range.endOffset) : containerLen;
-        AnnotationStore.get(hlKey).forEach(function(h) {
+        AnnotationStore.get(span.key).forEach(function(h) {
           if (attachTarget) return;
-          if (h.start < end && h.end > start && h.groupId && !_hasNote(h.groupId)) {
+          if (h.start < span.end && h.end > span.start && h.groupId && !_hasNote(h.groupId)) {
             attachTarget = h.groupId;
           }
         });
@@ -1154,15 +1148,11 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       } else {
         groupId = hlId();
         createdGroup = true;
-        containers.forEach(function(container) {
-          var hlKey = container.dataset.hlKey;
+        spans.forEach(function(span) {
+          var container = span.container;
+          var hlKey = span.key;
           var containerText = container.textContent;
-          var containerLen = containerText.length;
-          var rawStart = range && container.contains(range.startContainer)
-            ? computeOffset(container, range.startContainer, range.startOffset) : 0;
-          var rawEnd = range && container.contains(range.endContainer)
-            ? computeOffset(container, range.endContainer, range.endOffset) : containerLen;
-          var snap = snapSelectionRange(container, containerText, rawStart, rawEnd);
+          var snap = snapSelectionRange(container, containerText, span.start, span.end);
           if (snap.start >= snap.end) return;
           AnnotationStore.add(hlKey, {
             id: hlId(), groupId: groupId, kind: def.style,
@@ -1225,7 +1215,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     window.getSelection().removeAllRanges();
     setVisible(false);
     onNoteRequest && onNoteRequest(groupId, /*startInEditMode=*/true, /*freshGroup=*/createdGroup);
-  }, [selInfo, onNoteRequest, computeOffset]);
+  }, [selInfo, onNoteRequest]);
 
   const handleShare = React.useCallback((/** @type {'app' | 'site'} */ which) => {
     if (!selInfo) return;
