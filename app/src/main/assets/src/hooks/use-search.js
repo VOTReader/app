@@ -99,6 +99,11 @@
        chapterNum, letterId   context-snapshot logic AND by
                               goSearchOrigin's snapshot-restore
                               comparison.
+     studyId, studyChapterId  The open Bible Study + chapter. Captured
+                              into searchOrigin with the rest of the
+                              position: a bible-study hit overwrites
+                              them, so Back from Search must put them
+                              back (sweep v060).
      setScreen, setBookId,    Nav setters. Used by goSearch (sets to
        setChapterNum,         'search'), goSearchOrigin (restores
        setLetterId,           captured position), handleSearchSelect
@@ -210,6 +215,8 @@ function scopeBookTitle(bookId) {
  *   bookId: string | null,
  *   chapterNum: number | null,
  *   letterId: string | null,
+ *   studyId: string | null,
+ *   studyChapterId: string | null,
  *   setScreen: (v: any) => void,
  *   setBookId: (v: any) => void,
  *   setChapterNum: (v: any) => void,
@@ -256,7 +263,7 @@ export function studyChapterIdByNum(studyId, num) {
 
 export function useSearch({
   tabField,
-  screen, bookId, chapterNum, letterId,
+  screen, bookId, chapterNum, letterId, studyId, studyChapterId,
   setScreen, setBookId, setChapterNum, setLetterId,
   setStudyId, setStudyChapterId, setSurpriseAnchor, setFromSearch, setFromSurprise, setGenreId,
   setActiveReadKey, setLastReadForVol,
@@ -277,7 +284,10 @@ export function useSearch({
   // Opens the search screen with a computed context snapshot. Takes the
   // navHandoff 'pendingSearchQuery' one-shot to pre-fill from SelectionToolbar.
   const goSearch = () => {
-    setSearchOrigin({ screen, bookId, chapterNum, letterId });
+    // The study fields ride along: a bible-study hit overwrites them, and Back
+    // to a 'bible-study-chapter' origin would otherwise open the hit's study
+    // (sweep v060).
+    setSearchOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });
     // Compute the reading-position context so SearchScreen can offer an
     // optional "In {Book/Volume}" scope chip. null = opened outside a
     // reading screen (home/indexes/settings) → no chip shown.
@@ -329,6 +339,9 @@ export function useSearch({
       if (o.bookId !== undefined) setBookId(o.bookId);
       if (o.chapterNum !== undefined) setChapterNum(o.chapterNum);
       if (o.letterId !== undefined) setLetterId(o.letterId);
+      // An origin persisted before v060 has no study keys: leave the study alone.
+      if (o.studyId !== undefined) setStudyId(o.studyId);
+      if (o.studyChapterId !== undefined) setStudyChapterId(o.studyChapterId);
     } else {
       goHome();
     }

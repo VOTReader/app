@@ -28,8 +28,8 @@
         means SearchScreen shows the wrong scope chip; tests assert
         the shape per source screen.
 
-     D) goSearchOrigin's restore vs fallback. Has-origin restores all
-        4 fields; no-origin falls back to goHome. Wrong fallback =
+     D) goSearchOrigin's restore vs fallback. Has-origin restores the
+        position fields (the study ones too, v060); no-origin falls back to goHome. Wrong fallback =
         Back from search loses the user's place.
 
      E) The Matthew dual-routing in handleSearchSelect. Volumes corpus
@@ -149,6 +149,8 @@ const baseProps = () => ({
   bookId: null,
   chapterNum: null,
   letterId: null,
+  studyId: null,
+  studyChapterId: null,
   setScreen: vi.fn(),
   setBookId: vi.fn(),
   setChapterNum: vi.fn(),
@@ -398,6 +400,41 @@ describe('useSearch — goSearchOrigin', () => {
     expect(props.goHome).toHaveBeenCalledTimes(1);
     expect(props.setScreen).not.toHaveBeenCalled();  // no restore happened
     expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null); // UX2: cleared on the fallback path too
+  });
+
+  it('Back from Search returns to the Bible Study chapter it was opened from, not the study hit the reader visited (sweep v060)', () => {
+    // Study X chapter 2 → Search → a hit in Study Y chapter 5 (handleSearchSelect
+    // overwrites studyId/studyChapterId) → Back to the results → Back again.
+    // The restored screen is 'bible-study-chapter'; without the study fields
+    // in the origin it reads whatever study the hit left behind.
+    const tabField = makeTabField();
+    const onStudy = { ...baseProps(), tabField, screen: 'bible-study-chapter', studyId: 'study-x', studyChapterId: 'x-ch2' };
+    const { result, rerender } = renderHook((p) => useSearch(p), { initialProps: onStudy });
+    act(() => { result.current.goSearch(); });
+    const onSearch = { ...baseProps(), tabField, screen: 'search', studyId: 'study-x', studyChapterId: 'x-ch2' };
+    rerender(onSearch);
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'bible-study', letterId: 'study-y', chapterNum: 5, studyChapterId: 'y-ch5' } }); });
+    expect(onSearch.setStudyId).toHaveBeenLastCalledWith('study-y');
+    // Back from the hit lands on the results (use-android-back); the study
+    // fields still name the hit.
+    const backOnSearch = { ...baseProps(), tabField, screen: 'search', studyId: 'study-y', studyChapterId: 'y-ch5' };
+    rerender(backOnSearch);
+    act(() => { result.current.goSearchOrigin(); });
+    expect(backOnSearch.setScreen).toHaveBeenCalledWith('bible-study-chapter');
+    expect(backOnSearch.setStudyId).toHaveBeenLastCalledWith('study-x');
+    expect(backOnSearch.setStudyChapterId).toHaveBeenLastCalledWith('x-ch2');
+  });
+
+  it('an origin saved before the study fields existed leaves the study untouched (persisted tab state)', () => {
+    const tabField = makeTabField();
+    const [, setSearchOrigin] = tabField('searchOrigin');
+    setSearchOrigin({ screen: 'vol-two-letter', bookId: null, chapterNum: null, letterId: 'wide-path' });
+    const props = { ...baseProps(), tabField, screen: 'search' };
+    const { result } = renderHook((p) => useSearch(p), { initialProps: props });
+    act(() => { result.current.goSearchOrigin(); });
+    expect(props.setScreen).toHaveBeenCalledWith('vol-two-letter');
+    expect(props.setStudyId).not.toHaveBeenCalled();
+    expect(props.setStudyChapterId).not.toHaveBeenCalled();
   });
 });
 
