@@ -1333,22 +1333,28 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     var snap = (typeof snapSelectionRange === 'function')
       ? snapSelectionRange(container, containerText, selInfo.start || 0, selInfo.end || 0)
       : { start: selInfo.start || 0, end: selInfo.end || 0 };
+    // The snapped words as the reader sees them. containerText is the raw
+    // textContent, which carries footnote bubble digits and icon glyphs
+    // ("Lord1 is my"); hlDisplayText leaves that chrome out and breaks the
+    // line between blocks. The label, the excerpt and the stored `text` all
+    // read from it (sweep v080; W48 for `text`).
+    var shownText = (container && snap.end > snap.start)
+      ? hlDisplayText(container, containerText, snap.start, snap.end)
+      : '';
 
     // Derive label from the highlighted text. Two-strategy approach so the
     // label is reliably the user's actual selection across every selection
     // shape:
     //   1. Container slice with word-boundary snap — preferred when we have
     //      the source container and a valid offset range. Keeps the label
-    //      tidy when the user's drag ends mid-word.
+    //      tidy when the user's drag ends mid-word. A label is one line, so
+    //      a block break reads as a space.
     //   2. Raw selInfo.text fallback — needed for multi-container
     //      selections (start/end are 0 in that branch) and for the rare case
     //      where the container DOM has unmounted between selection and tap.
     //   3. Source-style fallback ("Bookmark in <Title>") only if both
     //      above produced nothing — defensive last resort.
-    var labelText = '';
-    if (container && snap.end > snap.start) {
-      labelText = containerText.slice(snap.start, snap.end).trim();
-    }
+    var labelText = shownText.split('\n').map(function(line) { return line.trim(); }).join(' ').trim();
     if (!labelText && selInfo.text) {
       labelText = selInfo.text.trim();
     }
@@ -1376,19 +1382,14 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
 
     // Excerpt: same two-strategy pattern as labelText so the preview block
     // in the BookmarkCreateSheet always shows the actual highlight.
-    var excerpt = '';
-    if (container && snap.end > snap.start) {
-      excerpt = containerText.slice(snap.start, snap.end);
-    }
+    var excerpt = shownText;
     if (!excerpt && selInfo.text) {
       excerpt = selInfo.text;
     }
     if (excerpt.length > 220) excerpt = excerpt.slice(0, 217) + '...';
     // W48: the words themselves, in the form applyDOMBookmarks re-finds them
     // (as a highlight's `text`), so the icon follows them after an edit.
-    var anchorText = (container && snap.end > snap.start)
-      ? hlDisplayText(container, containerText, snap.start, snap.end)
-      : '';
+    var anchorText = shownText;
 
     // Source label: re-use the same derivation that BookmarksScreen rows do.
     var sourceLabel = (typeof _bookmarkSourceLabel === 'function')
