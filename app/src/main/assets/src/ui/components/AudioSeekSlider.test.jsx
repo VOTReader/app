@@ -95,6 +95,42 @@ describe('AudioSeekSlider — a drag previews, a release commits', () => {
     expect(seek).toHaveBeenCalledTimes(1);
   });
 
+  it('does NOT seek on a tap that never moves the thumb (sweep v063)', () => {
+    // Pressing the thumb itself fires no change, so there is no preview to
+    // commit. The input's value is the FLOORED clock, so committing it on
+    // release seeked a recording at 1:23.8 back to 1:23.0 (and wrote the
+    // durable position) for a touch that was not a seek.
+    paint({ time: 83.8 });
+    fireEvent.pointerDown(slider());
+    fireEvent.pointerUp(slider());
+    fireEvent.lostPointerCapture(slider());
+    expect(seek).not.toHaveBeenCalled();
+    // The tap still ends the gesture: the keyboard path seeks at once again.
+    fireEvent.change(slider(), { target: { value: '90' } });
+    expect(seek).toHaveBeenCalledTimes(1);
+    expect(seek).toHaveBeenCalledWith(90);
+  });
+
+  it('does NOT seek when a tap ends in lost capture instead of a pointerup', () => {
+    paint({ time: 83.8 });
+    fireEvent.pointerDown(slider());
+    fireEvent.lostPointerCapture(slider());
+    expect(seek).not.toHaveBeenCalled();
+    fireEvent.change(slider(), { target: { value: '90' } });
+    expect(seek).toHaveBeenCalledWith(90);
+  });
+
+  it('still commits the next drag after a tap that did not move', () => {
+    paint({ time: 83.8 });
+    fireEvent.pointerDown(slider());
+    fireEvent.pointerUp(slider());
+    fireEvent.pointerDown(slider());
+    fireEvent.change(slider(), { target: { value: '200' } });
+    fireEvent.pointerUp(slider());
+    expect(seek).toHaveBeenCalledTimes(1);
+    expect(seek).toHaveBeenCalledWith(200);
+  });
+
   it('drops the preview on a cancelled gesture without seeking anywhere', () => {
     const { rerender } = paint({ time: 10 });
     fireEvent.pointerDown(slider());
