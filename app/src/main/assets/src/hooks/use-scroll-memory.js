@@ -38,6 +38,11 @@
      journalEntryId  — the tab's journal entry (tabField, W40); keys the journal
                        viewer/editor scroll slots PER-ENTRY (and re-fires
                        the restore effect on entry→entry nav).
+     genreId         — the tab's genre (tabField); keys the genre page
+                       (scripture-genre) per genre. Read only there, so the
+                       sticky value changing under another screen re-fires
+                       nothing. bible-idx keys per bookId, bible-study-index
+                       per studyId (sweep v119).
      activeTab       — active-tab object (useTabs); scrollPositions are
                        read from here to restore scroll on screen change.
                        On the Songs screen its audioColKey names the frame
@@ -111,8 +116,15 @@ function mergeScrollPosition(map, key, record) {
 // ── Module-private helper ──────────────────────────────────────────────────
 // Derives a stable localStorage / scrollPositions key for the current
 // screen. COL_BY_LETTER_SC is a bare-name window global (bundle-b.js).
-function getScrollKey(scr, bid, cnum, lid, sid, scid, jid) {
+function getScrollKey(scr, bid, cnum, lid, sid, scid, jid, gid) {
   if (scr === "matthew-ch" || scr === "bible-ch") return bid + '-' + cnum;
+  // Index screens are PER-ITEM too (sweep v119): with the bare screen name every
+  // book's chapter grid shared one slot, so Psalms' 150-chapter grid left scrolled
+  // down restored onto Genesis's grid. Same for each study's index and each
+  // genre's book list. (matthew-idx has one book; Songs key per frame below.)
+  if (scr === "bible-idx") return scr + '-' + (bid || '');
+  if (scr === "bible-study-index") return scr + '-' + (sid || '');
+  if (scr === GENRE_SCREEN_NAME) return scr + '-' + (gid || '');
   if (scr === "bible-study-chapter") return 'study-' + (sid || '') + '-' + (scid || '');
   if (scr === "hm-letter") return 'entry-' + lid;
   // Journal viewer/editor keys are PER-ENTRY: with the bare screen name,
@@ -143,6 +155,8 @@ function getScrollKey(scr, bid, cnum, lid, sid, scid, jid) {
 // restore). A new frame has nothing saved, so it opens at the top; Back finds
 // the frame below where it was left. Unreadable stacks read as the hub.
 const SONGS_SCREEN_NAME = 'audio-library-songs';
+// The genre page (a genre's book list): its genreId keys its scroll place.
+const GENRE_SCREEN_NAME = 'scripture-genre';
 
 /** @param {unknown} colKey @returns {string} */
 function songsPlaceOf(colKey) {
@@ -158,8 +172,8 @@ function songsPlaceOf(colKey) {
 }
 
 /** The scroll key of what is on screen: getScrollKey, with the Songs frame appended on the Songs screen. */
-function scrollKeyOf(scr, bid, cnum, lid, sid, scid, jid, songsPlace) {
-  var key = getScrollKey(scr, bid, cnum, lid, sid, scid, jid);
+function scrollKeyOf(scr, bid, cnum, lid, sid, scid, jid, songsPlace, genrePlace) {
+  var key = getScrollKey(scr, bid, cnum, lid, sid, scid, jid, genrePlace);
   return scr === SONGS_SCREEN_NAME ? key + '|' + songsPlace : key;
 }
 
@@ -345,6 +359,7 @@ function startRestore(saved) {
  *   studyId: string | null,
  *   studyChapterId: string | null,
  *   journalEntryId?: string | null,
+ *   genreId?: string | null,
  *   activeTab: any,
  *   activeTabIdx: number,
  *   updateActiveTab: (patchOrFn: any) => void,
@@ -356,6 +371,7 @@ function startRestore(saved) {
 export function useScrollMemory({
   screen, bookId, chapterNum, letterId, studyId, studyChapterId,
   journalEntryId,
+  genreId,
   activeTab,
   activeTabIdx,
   updateActiveTab,
@@ -364,8 +380,11 @@ export function useScrollMemory({
 }) {
   // The Songs screen's frame (W2-01): '' elsewhere, so no other screen's restore re-fires on an audioColKey change.
   const songsPlace = screen === SONGS_SCREEN_NAME ? songsPlaceOf(activeTab && activeTab.audioColKey) : '';
+  // The genre page's genre: '' elsewhere, because genreId is sticky on the tab (useSearch clears it on a result,
+  // the book and chapter screens keep it for their back link), so its change must re-fire no other screen's restore.
+  const genrePlace = screen === GENRE_SCREEN_NAME ? (genreId || '') : '';
   // ── Refs ───────────────────────────────────────────────────────────────
-  const scrollKeyRef = React.useRef(scrollKeyOf(screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId, songsPlace));
+  const scrollKeyRef = React.useRef(scrollKeyOf(screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId, songsPlace, genrePlace));
   const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
   // Last REAL scroll position, stamped on every scroll event. The debounced
   // flush only fires 120 ms after scrolling STOPS — navigating inside that
@@ -476,7 +495,7 @@ export function useScrollMemory({
   // shifted the offset — async content / images). Cleanup cancels a stale rAF so a
   // rapid re-fire can't fight the next restore.
   React.useLayoutEffect(() => {
-    const key = scrollKeyOf(screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId, songsPlace);
+    const key = scrollKeyOf(screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId, songsPlace, genrePlace);
     // NAV-TIME EXACT CAPTURE: commit the live stash for the key being LEFT,
     // before the new screen's restore runs. The debounced flush alone loses
     // any scrolling done within 120 ms of the nav tap (its timeout fires
@@ -520,7 +539,7 @@ export function useScrollMemory({
     // supersedes the restore.
     return startRestore(saved);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- effect intent: restore-saved-scroll on nav-key change. activeTab derives from tabs[activeTabIdx]; activeTabIdx is already in deps so tab-switch correctly re-runs. surpriseAnchor is read as a guard (early-return when set) but should NOT trigger re-fire — only nav changes drive scroll restoration. updateActiveTab is useCallback([activeTabIdx]) — its identity only changes with activeTabIdx, which IS a dep, so the closure is never stale.
-  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId, songsPlace, activeTabIdx]);
+  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId, songsPlace, genrePlace, activeTabIdx]);
 
   // ── Effect 4: publish saved positions for the pager's inert neighbor peek ─
   // The finger-follow swipe's neighbor peek (ScreenLayout `inert`) renders the

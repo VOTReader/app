@@ -243,6 +243,10 @@ export function scrollKeyForTab(tab) {
   const s = tab.screen;
   if (s === 'matthew-ch' || s === 'bible-ch') return `${tab.bookId}-${tab.chapterNum}`;
   if (s === 'bible-study-chapter') return `study-${tab.studyId || ''}-${tab.studyChapterId || ''}`;
+  // Index screens key per book / study / genre, as useScrollMemory saves them (sweep v119).
+  if (s === 'bible-idx') return `bible-idx-${tab.bookId || ''}`;
+  if (s === 'bible-study-index') return `bible-study-index-${tab.studyId || ''}`;
+  if (s === 'scripture-genre') return `scripture-genre-${tab.genreId || ''}`;
   if (s === 'hm-letter') return `entry-${tab.letterId}`;
   if (s === 'answers-subject') return `answers-subject-${tab.letterId || ''}`;
   const _sc = COL_BY_LETTER_SC.get(s);

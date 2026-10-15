@@ -479,6 +479,74 @@ describe('useScrollMemory — journal viewer/editor keys are PER-ENTRY', () => {
   });
 });
 
+describe('useScrollMemory — index screens key per book / study / genre (sweep v119)', () => {
+  // The bare screen name made every book's chapter grid share ONE slot: Psalms'
+  // 150-chapter grid left scrolled down restored its offset onto Genesis's grid.
+  // Same for each study's index and each genre's book list.
+  const idx = (over) => baseProps({ letterId: null, ...over });
+
+  it('a book chapter grid opens at the top after another book was scrolled, and each book keeps its own place', () => {
+    const { rerender } = renderHook((p) => useScrollMemory(p), {
+      initialProps: idx({ screen: 'bible-idx', bookId: 'psalms' }),
+    });
+    settleRestoreRaf();
+    act(() => { scrollTo(900); vi.advanceTimersByTime(150); });
+
+    rerender(idx({ screen: 'scriptures-home', bookId: 'psalms' }));
+    settleRestoreRaf();
+    rerender(idx({ screen: 'bible-idx', bookId: 'genesis' }));
+    settleRestoreRaf();
+    expect(el.scrollTop).toBe(0); // Genesis was never scrolled, NOT Psalms' 900
+
+    act(() => { scrollTo(200); vi.advanceTimersByTime(150); });
+    rerender(idx({ screen: 'bible-idx', bookId: 'psalms' }));
+    settleRestoreRaf();
+    expect(el.scrollTop).toBe(900);
+    expect(tab.scrollPositions['bible-idx-psalms']).toMatchObject({ y: 900 });
+    expect(tab.scrollPositions['bible-idx-genesis']).toMatchObject({ y: 200 });
+    expect(tab.scrollPositions['bible-idx']).toBeUndefined();
+  });
+
+  it('each study index keeps its own place', () => {
+    const { rerender } = renderHook((p) => useScrollMemory(p), {
+      initialProps: idx({ screen: 'bible-study-index', studyId: 'purity' }),
+    });
+    settleRestoreRaf();
+    act(() => { scrollTo(650); vi.advanceTimersByTime(150); });
+
+    rerender(idx({ screen: 'bible-study-index', studyId: 'faith' }));
+    settleRestoreRaf();
+    expect(el.scrollTop).toBe(0);
+    expect(tab.scrollPositions['bible-study-index-purity']).toMatchObject({ y: 650 });
+  });
+
+  it('each genre page keeps its own place (genreId is threaded in)', () => {
+    const { rerender } = renderHook((p) => useScrollMemory(p), {
+      initialProps: idx({ screen: 'scripture-genre', genreId: 'law' }),
+    });
+    settleRestoreRaf();
+    act(() => { scrollTo(500); vi.advanceTimersByTime(150); });
+
+    rerender(idx({ screen: 'scripture-genre', genreId: 'prophets' }));
+    settleRestoreRaf();
+    expect(el.scrollTop).toBe(0);
+    expect(tab.scrollPositions['scripture-genre-law']).toMatchObject({ y: 500 });
+  });
+
+  it('a sticky genreId changing under another screen re-fires no restore there', () => {
+    tab.scrollPositions['genesis-1'] = { y: 700, pct: 0.5, anchorKey: null, anchorOff: 0 };
+    const { rerender } = renderHook((p) => useScrollMemory(p), {
+      initialProps: idx({ screen: 'bible-ch', bookId: 'genesis', chapterNum: 1, genreId: 'law' }),
+    });
+    settleRestoreRaf();
+    expect(el.scrollTop).toBe(700);
+    el.scrollTop = 1100; // the reader moved on; no flush yet
+    rerender(idx({ screen: 'bible-ch', bookId: 'genesis', chapterNum: 1, genreId: null }));
+    settleRestoreRaf();
+    expect(el.scrollTop).toBe(1100);
+  });
+});
+
 describe('useScrollMemory — scrollPositions LRU bound (Wave 0)', () => {
   // The map grew MONOTONICALLY forever: every screen ever scrolled added a
   // key, and the whole tabs array (scrollPositions included) is persisted to

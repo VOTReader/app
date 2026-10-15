@@ -313,10 +313,10 @@ function App() {
   /* useScrollMemory — per-tab/per-screen scroll position capture +
      restore (P6e). The journal viewer/editor scroll keys are PER-ENTRY —
      one shared key made every entry restore the previous entry's offset —
-     so journalEntryId (declared up at useFromLetterStack) is threaded in. */
+     so journalEntryId (declared up at useFromLetterStack) is threaded in; genreId keys the genre page (v119). */
   const { flushScrollToActiveTab } = useScrollMemory({
     screen, bookId, chapterNum, letterId, studyId, studyChapterId,
-    journalEntryId,
+    journalEntryId, genreId,
     activeTab, activeTabIdx,
     updateActiveTab,
     surpriseAnchor,

@@ -107,6 +107,11 @@ describe('scrollKeyForTab', () => {
     expect(scrollKeyForTab({ screen: 'holyday-entry', letterId: 'passover' })).toBe('holyday-passover');
     expect(scrollKeyForTab({ screen: 'blessed-entry', letterId: 'intro' })).toBe('blessed-intro');
   });
+  it('index screens key per book / study / genre, as useScrollMemory saves them (sweep v119)', () => {
+    expect(scrollKeyForTab({ screen: 'bible-idx', bookId: 'psalms' })).toBe('bible-idx-psalms');
+    expect(scrollKeyForTab({ screen: 'bible-study-index', studyId: 'purity' })).toBe('bible-study-index-purity');
+    expect(scrollKeyForTab({ screen: 'scripture-genre', genreId: 'law' })).toBe('scripture-genre-law');
+  });
   it('hm-letter keys by entry; unknown screens fall back to the screen name (or home)', () => {
     expect(scrollKeyForTab({ screen: 'hm-letter', letterId: 'woe' })).toBe('entry-woe');
     expect(scrollKeyForTab({ screen: 'settings' })).toBe('settings');
