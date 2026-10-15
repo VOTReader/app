@@ -2,9 +2,10 @@
 
    Saved data is re-shown, never migrated (v2-build-plan rule 5): Continue is main's "you are here" (StateStore's
    activeReadKey with lastReadLetterMap / lastReadChapters, as goToLastRead resumes it) and Recent is main's reading
-   history (HistoryStore, newest first) with main's open pages (vot-state tabs: v2 has no tabs, so the pages a reader
-   kept open come back here; Corbin's v2-map call let Open pages go only if they show up in the new places). A gate boot
-   seeds the same shapes in memory. Everything here is read only.
+   history (HistoryStore) and its recently played recordings (AudioLibraryStore.recent(), the Listening Library's
+   shelf), newest first by time, with main's open pages (vot-state tabs). v2 has neither tabs nor a library page:
+   Corbin's v2-map calls let Open pages and Your Listening go only if they show up in the new places, and Recent on
+   Home is that place. A gate boot seeds the same shapes in memory. Everything here is read only.
 
    An item is one place a reader was:
      { kind: 'letter', collection, n } or { kind: 'letter', collection, letterId } (main stores letter ids)
@@ -116,12 +117,43 @@ export function itemFromTab(t, gl = g) {
 }
 
 /**
- * Recent: the newest distinct places in the history, not the one Continue already offers, `max` of them plus any
- * further back that is an open page; then the open pages never in the history, in main's tab order.
- * @param {any[]} entries newest first @param {HomeItem | null} cont @param {number} [max] @param {any} [gl]
- * @param {any[]} [tabs] main's open pages (vot-state tabs)
+ * A recently played recording (an AudioLibraryStore.recent() row) as the place its text is, read as main opens it
+ * (screen-routes.jsx _openAudioText over AudioShelf's textKeyOf): a 'bible-<edition>:<book>' track at its "Chapter N"
+ * (else 1), a 'study:<id>-chN' track at that study chapter, a '<volKey>:<letter id>' track at that letter; a Words To
+ * Live By compilation (key null) at its section's first letter once the player knows it. Null for Hidden Manna and
+ * anything else. @returns {HomeItem | null}
  */
-export function recentItems(entries, cont, max = RECENT_MAX, gl = g, tabs = []) {
+export function itemFromTrack(t, gl = g) {
+  if (!t || typeof t !== 'object') return null;
+  let key = typeof t.key === 'string' ? t.key : '';
+  if (!key && t.key == null && gl.AudioPlayer && typeof gl.AudioPlayer.sectionOpeningKey === 'function') {
+    try { key = gl.AudioPlayer.sectionOpeningKey(t) || ''; } catch (_e) { key = ''; }
+  }
+  const i = key.indexOf(':');
+  if (i < 1 || i >= key.length - 1) return null;
+  const volKey = key.slice(0, i);
+  const id = key.slice(i + 1);
+  if (volKey.startsWith('bible-')) {
+    const m = typeof t.partLabel === 'string' ? t.partLabel.match(/^Chapter (\d+)$/) : null;
+    return { kind: 'chapter', book: id, chapter: m ? Number(m[1]) : 1 };
+  }
+  if (volKey === 'study') {
+    const stem = id.match(/^(.+)-ch\d+$/);
+    return stem ? { kind: 'study', studyId: stem[1], chapterId: id, title: t.title || undefined } : null;
+  }
+  const col = colOf(volKey, gl);
+  if (!col || col.volKey === 'hm') return null;
+  return { kind: 'letter', collection: col.volKey, letterId: id };
+}
+
+/**
+ * Recent: the newest distinct places in the history and the recordings played (merged by time, a tie read first),
+ * not the one Continue already offers, `max` of them plus any further back that is an open page; then the open pages
+ * never among them, in main's tab order.
+ * @param {any[]} entries newest first @param {HomeItem | null} cont @param {number} [max] @param {any} [gl]
+ * @param {any[]} [tabs] main's open pages (vot-state tabs) @param {any[]} [played] recently played, newest first
+ */
+export function recentItems(entries, cont, max = RECENT_MAX, gl = g, tabs = [], played = []) {
   const out = [];
   const seen = new Set();
   const contKeys = cont ? sameKeys(cont, gl) : [];
@@ -132,14 +164,23 @@ export function recentItems(entries, cont, max = RECENT_MAX, gl = g, tabs = []) 
     keys.forEach((k) => seen.add(k));
     out.push(it);
   };
-  for (const e of Array.isArray(entries) ? entries : []) {
-    const it = itemFromHistory(e, gl);
-    if (!it) continue;
+  for (const it of byTime(entries, played, gl)) {
     const keys = sameKeys(it, gl);
     if (out.length >= max && !keys.some((k) => openKeys.has(k))) continue;
     add(it, keys);
   }
   for (const it of open) add(it, sameKeys(it, gl));
+  return out;
+}
+
+/** History and recordings played, each newest first, as one list by time (history entry ts, track playedAt). */
+function byTime(entries, played, gl) {
+  const a = (Array.isArray(entries) ? entries : []).map((e) => ({ at: Number(e && e.ts) || 0, it: itemFromHistory(e, gl) })).filter((x) => x.it);
+  const b = (Array.isArray(played) ? played : []).map((t) => ({ at: Number(t && t.playedAt) || 0, it: itemFromTrack(t, gl) })).filter((x) => x.it);
+  const out = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length || j < b.length) out.push(j >= b.length || (i < a.length && a[i].at >= b[j].at) ? a[i++].it : b[j++].it);
   return out;
 }
 
@@ -154,10 +195,11 @@ function sameKeys(it, gl) {
   return keys.length ? keys : [itemKey(it)];
 }
 
-/** The reader's saved Continue + Recent (history and open pages), read only (a real boot, under HydrationGate). @returns {HomeFacts} */
+/** The reader's saved Continue + Recent (history, recordings played, open pages), read only (a real boot, under HydrationGate). @returns {HomeFacts} */
 export function savedHome(gl = g) {
   let state = null;
   let entries = [];
+  let played = [];
   try {
     const store = gl.StateStore;
     if (store && typeof store.isReady === 'function' && store.isReady()) state = store.get();
@@ -166,9 +208,13 @@ export function savedHome(gl = g) {
     const hist = gl.HistoryStore;
     if (hist && typeof hist.isReady === 'function' && hist.isReady()) entries = hist.list() || [];
   } catch (_e) { /* no history: no Recent row */ }
+  try {
+    const lib = gl.AudioLibraryStore;
+    if (lib && typeof lib.isReady === 'function' && lib.isReady() && typeof lib.recent === 'function') played = lib.recent() || [];
+  } catch (_e) { played = []; /* no library: the history alone */ }
   const cont = continueFromState(state);
   const tabs = state && Array.isArray(state.tabs) ? state.tabs : [];
-  return { continue: cont, recent: recentItems(entries, cont, RECENT_MAX, gl, tabs) };
+  return { continue: cont, recent: recentItems(entries, cont, RECENT_MAX, gl, tabs, played) };
 }
 
 /** The letter an item points at, once its corpus is loaded: { col, letter } (letter null when not found). */

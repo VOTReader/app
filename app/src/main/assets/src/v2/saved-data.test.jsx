@@ -38,6 +38,7 @@ const CORPUS = {
     { id: 'chosen-by-god', num: 1, title: 'Chosen by God', date: '8/31/04', blocks: [para('Thus says The Lord to His servant:'), para('Many things you must overcome in the years ahead.')] },
     { id: 'honor-not', num: 2, title: 'Honor Not the Day of the Dead... Honor God', date: '10/6/04', blocks: [para('Honor not the day of the dead.')] },
     { id: 'one-3', num: 3, title: 'The Third Letter', date: '10/7/04', blocks: [para('A third letter.')] },
+    { id: 'one-4', num: 4, title: 'The Fourth Letter', date: '10/8/04', blocks: [para('A fourth letter.')] },
   ],
   LETTERS_V1_PREFACE: { id: 'v1-preface', title: 'A Word of Warning', blocks: [para('Hear.')] },
   WTLB_ONE: [{ id: 'w-12', num: 12, title: 'On Prayer', paragraphs: [{ align: 'left', text: 'Pray always.' }] }],
@@ -110,14 +111,25 @@ afterEach(() => {
 });
 
 describe("main's saved data, found in v2", () => {
-  it('Home: Continue is the letter main left open; Recent is the history, newest first, then the open pages', async () => {
+  it('Home: Continue is the letter main left open; Recent is the history and the recordings played, newest first, then the open pages', async () => {
+    // the player, a moment after the reading: Letter 4's recording started (main's AudioPlayer calls recordPlayed)
+    await new Promise((r) => setTimeout(r, 2));
+    AudioLibraryStore.recordPlayed({ key: 'one:one-4', title: 'The Fourth Letter', sub: null, url: AUDIO_RELEASE_PREFIX + 'v1-04.mp3', readerCode: 'benjamin', partLabel: null });
+    await AudioLibraryStore.whenSaved();
     const writes = watchWrites();
     const { container } = render(<V2App gateId={null} />);
     expect(container.querySelector('.pill.block').textContent.trim()).toBe('Continue reading');
     expect(container.querySelector('.cont-where').textContent).toBe('Chosen by God · Volume One, Letter 1');
-    expect(texts(container, '.recent .chip')).toEqual(['Vol. One, Letter 2', 'John 3', 'On Prayer', 'Vol. One, Letter 3']);
+    expect(texts(container, '.recent .chip')).toEqual(['Vol. One, Letter 4', 'Vol. One, Letter 2', 'John 3', 'On Prayer', 'Vol. One, Letter 3']);
     expect(writes()).toEqual([]);
-    // an open page opens where it was: Words To Live By's entry, under its collection
+    // a recording played opens its letter
+    await click([...container.querySelectorAll('.recent .chip')][0]);
+    await waitFor(() => expect(container.querySelector('h1').textContent).toBe('The Fourth Letter'));
+  });
+
+  it('Home: an open page opens where it was, under its collection', async () => {
+    const { container } = render(<V2App gateId={null} />);
+    // Words To Live By's entry
     await click([...container.querySelectorAll('.recent .chip')][2]);
     await waitFor(() => expect(container.querySelector('h1').textContent).toBe('On Prayer'));
     expect(container.querySelector('.tb .title').textContent).toBe('Words To Live By: Part One');

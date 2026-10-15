@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, waitFor, act } from '@testing-library/react';
 import { V2App, applyGateScroll } from './App.jsx';
-import { continueFromState, itemFromHistory, itemFromTab, recentItems, describeItem, itemRoutes, savedHome } from './home-facts.js';
+import { continueFromState, itemFromHistory, itemFromTab, itemFromTrack, recentItems, describeItem, itemRoutes, savedHome } from './home-facts.js';
 
 const g = /** @type {any} */ (globalThis);
 const html = document.documentElement;
@@ -48,7 +48,7 @@ beforeEach(() => { installCorpus(); });
 afterEach(() => {
   cleanup();
   for (const c of COLS) delete g[c.globalName];
-  for (const k of ['COLLECTIONS', 'COL_BY_KEY', 'COL_BY_INDEX_SC', '__votCorpus', '__loadVotCorpus', 'StateStore', 'HistoryStore', 'matchMedia']) delete g[k];
+  for (const k of ['COLLECTIONS', 'COL_BY_KEY', 'COL_BY_INDEX_SC', '__votCorpus', '__loadVotCorpus', 'StateStore', 'HistoryStore', 'AudioLibraryStore', 'AudioPlayer', 'matchMedia']) delete g[k];
   delete html.dataset.gate;
   localStorage.clear();
   vi.restoreAllMocks();
@@ -98,6 +98,41 @@ describe('saved data, re-shown (read only)', () => {
     delete g.COL_BY_LETTER_SC;
   });
 
+  it("a recently played recording as a place, read as main opens its text: a letter, a Bible chapter, a study chapter; never Hidden Manna", () => {
+    expect(itemFromTrack({ key: 'one:one-4', url: 'u4', partLabel: null, playedAt: 5 })).toEqual({ kind: 'letter', collection: 'one', letterId: 'one-4' });
+    expect(itemFromTrack({ key: 'bible-kjv:john', url: 'b', partLabel: 'Chapter 3' })).toEqual({ kind: 'chapter', book: 'john', chapter: 3 });
+    expect(itemFromTrack({ key: 'bible-kjv:john', url: 'b', partLabel: null })).toEqual({ kind: 'chapter', book: 'john', chapter: 1 });
+    expect(itemFromTrack({ key: 'study:hosea-ch2', url: 's', title: 'Hosea 2' })).toEqual({ kind: 'study', studyId: 'hosea', chapterId: 'hosea-ch2', title: 'Hosea 2' });
+    for (const t of [{ key: 'hm:hm-1', url: 'h' }, { key: 'nope:x', url: 'n' }, { key: 'study:hosea', url: 's' }, { key: null, url: 'c' }, { key: 'one:', url: 'e' }, null]) {
+      expect(itemFromTrack(t)).toBe(null);
+    }
+    // a Words To Live By compilation (key null) is its section's first letter, once the player knows it (AudioShelf textKeyOf)
+    g.AudioPlayer = { sectionOpeningKey: (t) => (t.url === 'c' ? 'wtlb1:wtlb1-4' : null) };
+    expect(itemFromTrack({ key: null, url: 'c' })).toEqual({ kind: 'letter', collection: 'wtlb1', letterId: 'wtlb1-4' });
+    expect(itemFromTrack({ key: null, url: 'd' })).toBe(null);
+    delete g.AudioPlayer;
+  });
+
+  it("main's recently played recordings come into Recent by time with the history (a tie: history first), once each, never Continue's", () => {
+    const hist = [{ type: 'letter', letterId: 'one-2', letterNum: 2, volumeScreen: 'vot-one-index', ts: 30 },
+      { type: 'chapter', bookId: 'john', bookTitle: 'John', chapterNum: 3, ts: 10 }];
+    const played = [{ key: 'one:one-6', url: 'a', playedAt: 40 }, { key: 'one:one-2', url: 'b', playedAt: 20 },
+      { key: 'one:one-4', url: 'c', playedAt: 10 }, { key: 'one:one-1', url: 'd', playedAt: 9 }, { key: 'hm:hm-1', url: 'e', playedAt: 8 },
+      { key: 'bible-kjv:john', url: 'f', partLabel: 'Chapter 3', playedAt: 7 }, { key: 'one:one-7', url: 'g', playedAt: 5 }];
+    const cont = /** @type {import('./home-facts.js').HomeItem} */ ({ kind: 'letter', collection: 'one', letterId: 'one-1' });
+    expect(recentItems(hist, cont, 8, g, [], played).map((it) => describeItem(it).chip))
+      .toEqual(['Vol. One, Letter 6', 'Vol. One, Letter 2', 'John 3', 'Vol. One, Letter 4', 'Vol. One, Letter 7']);
+    // only a recording, nothing read: it still shows
+    expect(recentItems([], null, 8, g, [], [{ key: 'one:one-4', url: 'u4', partLabel: null, playedAt: 5 }]).map((it) => describeItem(it).chip))
+      .toEqual(['Vol. One, Letter 4']);
+    // the eight are counted over both; an open page further back still comes in
+    g.COL_BY_LETTER_SC = new Map([['vot-one-letter', g.COL_BY_KEY.get('one')]]);
+    const many = Array.from({ length: 10 }, (_x, i) => ({ key: 'one:one-' + (i + 2), url: 'm' + i, playedAt: 100 - i }));
+    const recent = recentItems(hist, null, 8, g, [{ screen: 'vot-one-letter', letterId: 'one-11' }], many);
+    expect(recent.map((it) => describeItem(it).chip)).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 11].map((n) => 'Vol. One, Letter ' + n));
+    delete g.COL_BY_LETTER_SC;
+  });
+
   it("an open page as a place: a chapter (Matthew's plain text too), a letter by its letter screen, a study chapter; never Hidden Manna", () => {
     g.COL_BY_LETTER_SC = new Map([['vot-one-letter', g.COL_BY_KEY.get('one')], ['hm-letter', g.COL_BY_KEY.get('hm')]]);
     expect(itemFromTab({ screen: 'bible-ch', bookId: 'john', chapterNum: 3 })).toEqual({ kind: 'chapter', book: 'john', chapter: 3 });
@@ -110,14 +145,20 @@ describe('saved data, re-shown (read only)', () => {
     delete g.COL_BY_LETTER_SC;
   });
 
-  it('savedHome reads StateStore and HistoryStore once loaded and writes nothing', () => {
+  it('savedHome reads StateStore, HistoryStore and the recently played once loaded and writes nothing', () => {
     const set = vi.fn();
     g.StateStore = { isReady: () => true, get: () => ({ activeReadKey: 'vol:one', lastReadLetterMap: { one: 'one-1' } }), set };
-    g.HistoryStore = { isReady: () => true, list: () => [{ type: 'chapter', bookId: 'john', bookTitle: 'John', chapterNum: 3 }], add: set };
+    g.HistoryStore = { isReady: () => true, list: () => [{ type: 'chapter', bookId: 'john', bookTitle: 'John', chapterNum: 3, ts: 10 }], add: set };
+    g.AudioLibraryStore = { isReady: () => true, recent: () => [{ key: 'one:one-4', url: 'u4', partLabel: null, playedAt: 20 }], recordPlayed: set };
     const home = savedHome();
     expect(describeItem(home.continue)).toEqual({ title: 'Chosen by God', where: 'Volume One, Letter 1', chip: 'Vol. One, Letter 1' });
-    expect(home.recent).toEqual([{ kind: 'chapter', book: 'john', bookTitle: 'John', chapter: 3 }]);
+    expect(home.recent).toEqual([{ kind: 'letter', collection: 'one', letterId: 'one-4' }, { kind: 'chapter', book: 'john', bookTitle: 'John', chapter: 3 }]);
     expect(set).not.toHaveBeenCalled();
+    g.AudioLibraryStore.isReady = () => false;
+    expect(savedHome().recent).toEqual([{ kind: 'chapter', book: 'john', bookTitle: 'John', chapter: 3 }]);
+    g.AudioLibraryStore.recent = () => { throw new Error('no store'); };
+    g.AudioLibraryStore.isReady = () => true;
+    expect(savedHome().recent).toEqual([{ kind: 'chapter', book: 'john', bookTitle: 'John', chapter: 3 }]);
     g.StateStore.isReady = () => false;
     expect(savedHome().continue).toBe(null);
   });
