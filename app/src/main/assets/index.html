@@ -60,7 +60,7 @@
        dashboard. The service worker never caches it (cross-origin). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-NpW/ShmQFkCof3AXi7n2zYO8aQB6icDMEZclJ+DDWrk=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-NJVgxbdmErm0m3DDvjIOVC32V+pEtLgRrhrdBwpYaFw=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-mAlLZyzgv5j3ckXsVbEHAdVurjqzQko87dljHD/9BUY=';
+    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-sNpUxC4C46R0hGLLIVQie9ZIFxi/SQ4pDWVfdCZzHUw=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-NJVgxbdmErm0m3DDvjIOVC32V+pEtLgRrhrdBwpYaFw=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-mAlLZyzgv5j3ckXsVbEHAdVurjqzQko87dljHD/9BUY=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     font-src 'self' data:;
@@ -195,9 +195,23 @@
        lazy bundle file. The corpus object exposes useSyncExternalStore-
        compatible subscribe/getVersion. The loader returns a cached Promise
        — subsequent calls share one in-flight download. On script load,
-       runs the named __finish*Init() hook (which wires the corpus globals
-       into any cross-corpus registries that depended on them at boot
-       time) + notifies subscribers + resolves.
+       checks the bundle actually ran, runs the named __finish*Init() hook
+       (which wires the corpus globals into any cross-corpus registries that
+       depended on them at boot time) + notifies subscribers + resolves.
+
+       requiredGlobals (optional): the globals the bundle defines, one per
+       file it concatenates (tools/build.py A_BIBLE / A_MATTHEW / A_VOT;
+       lazy-loader-ran.test.js pins the match). A script's `load` event also
+       fires when its body failed to parse or threw part-way (those errors go
+       to window.onerror, never to script.onerror), so `load` alone is no
+       proof the corpus is on the page. One still undefined at load means the
+       bundle did not run: that is a failed load (E1 retry), not a corpus
+       (sweep v009). One exception: another build's copy, which the service
+       worker serves offline or just after a deploy (service-worker.js
+       otherBuildCopy), may concatenate other files than this build names. The
+       worker appends one line to its very end that pushes './' + bundlePath
+       onto window.__votOtherCorpus, so a new push during this load proves the
+       copy ran to its last line, and it counts as run.
 
        Used by:
          __bibleCorpus   / __loadBibleCorpus   (Q8.1) — books.js
@@ -205,10 +219,10 @@
          __votCorpus     / __loadVotCorpus     (Q8.3) — 14 VOT corpora
        -->
   <script>
-  window.__makeLazyLoader = function(name, bundlePath, finishFnName) {
+  window.__makeLazyLoader = function(name, bundlePath, finishFnName, requiredGlobals) {
     var corpus = {
       loaded: false,
-      error: false,           // E1: set when the bundle fails to load (offline / 404 / old-WebView parse error)
+      error: false,           // E1: set when the bundle fails to load (offline / 404) or loads without running (parse error, a throw)
       _promise: null,
       _version: 0,            // monotonic; bumps on load OR error so useSyncExternalStore re-renders for both
       _listeners: new Set(),
@@ -253,8 +267,18 @@
         script.src = bundlePath;
         script.async = false;
         script.onload = function() { finish(); };
+        // How many times another build's copy of this bundle has run to its end (the worker's appended line).
+        var otherCopiesRun = function() {
+          var marks = window.__votOtherCorpus;
+          return Array.isArray(marks) ? marks.filter(function(k) { return k === './' + bundlePath; }).length : 0;
+        };
+        var otherRunsBefore = otherCopiesRun();
         var finish = function() {
           try {
+            var missing = (requiredGlobals || []).filter(function(g) { return typeof window[g] === 'undefined'; });
+            if (missing.length && otherCopiesRun() <= otherRunsBefore) {
+              throw new Error(bundlePath + ' loaded but did not run (' + missing.join(', ') + ' undefined)');
+            }
             if (typeof window[finishFnName] === 'function') window[finishFnName]();
             corpus._notify();
             // W7.4: record the lazy-load duration (download + parse + finishInit)
@@ -265,11 +289,11 @@
             }
             resolve();
           } catch (e) {
-            // Script loaded but its finishInit threw — same recovery path.
+            // Script loaded but did not run, or its finishInit threw — same recovery path.
             corpus._promise = null;
             corpus._setError();
             if (window.DiagnosticLog && typeof window.DiagnosticLog.error === 'function') {
-              try { window.DiagnosticLog.error('corpus', 'init failed for ' + name); } catch (_e2) {}
+              try { window.DiagnosticLog.error('corpus', 'init failed for ' + name + ': ' + ((e && e.message) || e)); } catch (_e2) {}
             }
             reject(e);
           }
@@ -293,13 +317,23 @@
     return { corpus: corpus, load: load };
   };
   (function() {
-    var bible = window.__makeLazyLoader('bible', 'dist/bundle-a-bible.js', '__finishBibleInit');
+    // The last argument names one global per file of the bundle, in
+    // tools/build.py's order (A_BIBLE / A_MATTHEW / A_VOT). A file added to or
+    // moved out of a list changes it here too; lazy-loader-ran.test.js fails
+    // until it does.
+    var bible = window.__makeLazyLoader('bible', 'dist/bundle-a-bible.js', '__finishBibleInit',
+      ['BOOKS', 'BOOKS_RESTORED', 'MATTHEW_PLAIN']);
     window.__bibleCorpus = bible.corpus;
     window.__loadBibleCorpus = bible.load;
-    var matthew = window.__makeLazyLoader('matthew', 'dist/bundle-a-matthew.js', '__finishMatthewInit');
+    var matthew = window.__makeLazyLoader('matthew', 'dist/bundle-a-matthew.js', '__finishMatthewInit',
+      ['MATTHEW', 'MATTHEW_NKJV']);
     window.__matthewCorpus = matthew.corpus;
     window.__loadMatthewCorpus = matthew.load;
-    var vot = window.__makeLazyLoader('vot', 'dist/bundle-a-vot.js', '__finishVotInit');
+    var vot = window.__makeLazyLoader('vot', 'dist/bundle-a-vot.js', '__finishVotInit', [
+      'LETTERS_V1', 'LETTERS', 'LETTERS_V3', 'LETTERS_V4', 'LETTERS_V5', 'LETTERS_V6', 'LETTERS_V7',
+      'LETTERS_TIMOTHY', 'LETTERS_FLOCK', 'LETTERS_REBUKE',
+      'WTLB_ONE', 'WTLB_TWO', 'WTLB_SCRIPTURES', 'THE_BLESSED', 'HOLY_DAYS', 'HIDDEN_MANNA',
+      'AUDIO_MANIFEST']);
     window.__votCorpus = vot.corpus;
     window.__loadVotCorpus = vot.load;
     // Only DATA loads lazily. The screens rode four lazy bundles (e-h) until
