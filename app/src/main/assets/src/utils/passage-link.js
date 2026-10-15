@@ -15,7 +15,11 @@
 
 export const PUBLIC_APP_URL = 'https://votreader.github.io/app/';
 
-const PUBLIC_KEY = /^(?:bible:[a-z0-9-]{2,40}:\d{1,3}:\d{1,3}|study:[a-z0-9-]{2,60}:[a-z0-9-]{1,16}|(?:letter|wtlb|blessed|holy-days):[A-Za-z0-9._-]{1,120}:\d{1,4})$/;
+// An entry id is a title slug, and the longest run to 149 characters (Volume
+// Seven; the Holy Days "I Shall Remove My Hand..." letter is 139). The cap only
+// bounds a hostile ?p=; passage-link.corpus.test.js holds every corpus id under
+// it, and holds the APK's copy of this rule (SharedLink.kt) to the same ids.
+const PUBLIC_KEY = /^(?:bible:[a-z0-9-]{2,40}:\d{1,3}:\d{1,3}|study:[a-z0-9-]{2,60}:[a-z0-9-]{1,16}|(?:letter|wtlb|blessed|holy-days):[A-Za-z0-9._-]{1,200}:\d{1,4})$/;
 
 /**
  * The key a link may carry, or null. A trailing character range

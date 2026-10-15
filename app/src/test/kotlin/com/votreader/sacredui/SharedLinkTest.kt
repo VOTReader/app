@@ -22,6 +22,17 @@ class SharedLinkTest {
     }
 
     @Test
+    fun `sweep v008 - a long-titled letter's link opens the app, and an id is still capped`() {
+        // Volume Seven's 149-character id (the corpus's longest) and the Holy Days letter's 139-character one.
+        for (key in listOf(
+            "letter:the-prophets-are-sent-out-true-and-false-the-high-minded-abased-the-lowly-uplifted-the-great-and-terrible-day-of-the-lord-is-near-and-who-shall-stand:4",
+            "letter:i-shall-remove-my-hand-and-my-spirit-shall-be-withdrawn-and-that-purposed-from-the-beginning-shall-be-done-it-shall-be-accomplished-swiftly:0",
+            "letter:" + "a".repeat(200) + ":1",
+        )) assertEquals(key, SharedLink.keyOf("https://votreader.github.io/app/?p=" + key.replace(":", "%3A")), key)
+        assertNull(SharedLink.keyOf("https://votreader.github.io/app/?p=letter:" + "a".repeat(201) + ":1"))
+    }
+
+    @Test
     fun `a selection range on the key is dropped, as the page drops it`() {
         assertEquals("bible:john:3:16", SharedLink.keyOf("https://votreader.github.io/app/?p=bible:john:3:16:4-20"))
     }

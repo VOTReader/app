@@ -12,6 +12,15 @@ describe('passage-link: which keys may travel', () => {
     }
   });
 
+  it('accepts the longest corpus ids and still caps an id (sweep v008)', () => {
+    // The longest letter id is Volume Seven's, 149 characters; every corpus id: passage-link.corpus.test.js.
+    const longest = 'letter:the-prophets-are-sent-out-true-and-false-the-high-minded-abased-the-lowly-uplifted-the-great-and-terrible-day-of-the-lord-is-near-and-who-shall-stand:4';
+    expect(publicPassageKey(longest)).toBe(longest);
+    expect(publicPassageKey(longest + ':10-42')).toBe(longest);
+    expect(publicPassageKey('letter:' + 'a'.repeat(200) + ':1')).not.toBeNull();
+    expect(publicPassageKey('letter:' + 'a'.repeat(201) + ':1')).toBeNull();
+  });
+
   it('drops a character range and keeps the block', () => {
     expect(publicPassageKey('bible:john:3:16:4-19')).toBe('bible:john:3:16');
     expect(publicPassageKey('letter:the-wide-path:3:10-42')).toBe('letter:the-wide-path:3');
