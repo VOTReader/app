@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 612 distinct identifiers.
+// Total: 615 distinct identifiers.
 
 export const projectGlobals = {
   ANSWERS: "readonly",
@@ -234,6 +234,7 @@ export const projectGlobals = {
   READ_VERSION_ID: "readonly",
   React: "readonly",
   ReactDOM: "readonly",
+  ReadAlongHighlight: "readonly",
   ReadingChromeProvider: "readonly",
   ReadingDotContext: "readonly",
   ReadingPlansScreen: "readonly",
@@ -398,6 +399,7 @@ export const projectGlobals = {
   clampLpm: "readonly",
   classifyV3ImportBegin: "readonly",
   clearLegacyLs: "readonly",
+  clearReadAlong: "readonly",
   clearRecentSearches: "readonly",
   clearSuppressNextHistoryPush: "readonly",
   colLetterArr: "readonly",
@@ -495,6 +497,7 @@ export const projectGlobals = {
   notesExportFilename: "readonly",
   onIdle: "readonly",
   openThumbDB: "readonly",
+  paintReadAlongAt: "readonly",
   parseRefRange: "readonly",
   parseRefRanges: "readonly",
   parseRefStr: "readonly",

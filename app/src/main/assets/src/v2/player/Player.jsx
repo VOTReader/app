@@ -5,6 +5,7 @@
 import { Icon } from '../Icon.jsx';
 import { askVotCorpus } from '../corpus.js';
 import { realSource, fakeSource, silentSource } from './source.js';
+import { stillWashes } from './read-along.jsx';
 import {
   trackInfo, miniLine, clock, timeLeft, progressPct, rateLabel, speedWords, ratePct, clampRate, sleepChip, sleepChoice,
   upNextRows, RATE_MIN, RATE_MAX, RATE_PICKS, SLEEP_OPTIONS,
@@ -41,18 +42,21 @@ export function usePlayer(gate) {
   // A gate's playing letter lives in a lazy volume: ask for it (one ask with the screen's), then build the queue. A load
   // that fails or lands without the letter leaves nothing playing, and the player says ready all the same.
   const [asked, setAsked] = React.useState(false);
-  const ready = source.ready() || asked;
+  // ...and a gate letter's still wash (read-along.jsx) holds it until the lit sentence is on the page.
+  const washing = React.useSyncExternalStore(stillWashes.subscribe, stillWashes.pending) > 0;
+  const sourceReady = source.ready() || asked;
+  const ready = sourceReady && !washing;
   React.useEffect(() => {
-    if (ready) return undefined;
+    if (sourceReady) return undefined;
     let live = true;
     const settle = () => { if (live) setAsked(true); };
     askVotCorpus().then(settle, settle);
     return () => { live = false; };
-  }, [ready]);
+  }, [sourceReady]);
   const st = source.state();
   const track = st.status !== 'idle' ? st.queue[st.qi] || null : null;
   // Playback that ends closes its player.
-  React.useEffect(() => { if (!track && ready) setUi((u) => (u.np || u.sheet ? { np: false, sheet: null } : u)); }, [track, ready]);
+  React.useEffect(() => { if (!track && sourceReady) setUi((u) => (u.np || u.sheet ? { np: false, sheet: null } : u)); }, [track, sourceReady]);
   const uiRef = React.useRef(ui);
   uiRef.current = ui;
   return {

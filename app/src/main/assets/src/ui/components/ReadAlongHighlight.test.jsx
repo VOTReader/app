@@ -31,7 +31,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 
 import { AudioPlayer, trackUrl } from '../../utils/audio-player.js';
 import { letterHlKey } from '../../utils/hl-keys.js';
-import { ReadAlongHighlight, fragmentAt, rangeIn, offsetIn, fragmentAtPoint } from './ReadAlongHighlight.jsx';
+import { ReadAlongHighlight, fragmentAt, rangeIn, offsetIn, fragmentAtPoint, paintReadAlongAt, clearReadAlong } from './ReadAlongHighlight.jsx';
 import { formatBOffsetMap, formatBDomText } from '../../utils/format-b-dom-text.js';
 import { resetSyncLoadersForTests } from '../../utils/sync-loaders.js';
 
@@ -1325,5 +1325,89 @@ describe('seekTo + seekOffset — the landing seeks to the clause that holds the
     play(); clockTo(0.5);
     act(() => { out.rerender(<Host seekTo={letterHlKey('letter-a', 1)} seekOffset={0} />); });
     expect(AudioPlayer.getState().time).toBe(10);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   v2 (rv1 1b): a still wash for gate boots, and v2's scroll pane
+   ═══════════════════════════════════════════════════════════════════════ */
+describe('paintReadAlongAt - the still wash a v2 gate draws (no engine, no clock)', () => {
+  /** A body like v2's LetterBlock renders: [data-hl-key] blocks in the textContent domain the timings measure. */
+  const body = () => {
+    const el = document.createElement('div');
+    el.innerHTML = '<p data-hl-key="' + letterHlKey('letter-a', 0) + '">' + BLOCK0 + '</p>'
+      + '<p data-hl-key="' + letterHlKey('letter-a', 1) + '">' + BLOCK1 + '</p>';
+    document.body.appendChild(el);
+    return el;
+  };
+  const paint = (el, time, part) => paintReadAlongAt({ mainEl: el, volKey: 'vol1', letterId: 'letter-a', hlKeyFn: letterHlKey, time, part });
+
+  it('paints the clause under the time, through the live wash rows, and never touches the player', () => {
+    const el = body();
+    expect(paint(el, 6)).toBe('painted');
+    expect(painted()).toBe('Sentence number two.');
+    expect(paint(el, 11)).toBe('painted');
+    expect(painted()).toBe('Second block sentence.');
+    expect(AudioPlayer.getState().status).toBe('idle');
+    clearReadAlong();
+    expect(painted()).toBe(null);
+    el.remove();
+  });
+
+  it('paints nothing before the first timed clause, for an untimed letter, or when the block is not on the page', () => {
+    const el = body();
+    expect(paint(el, 0.5)).toBe('none');
+    expect(painted()).toBe(null);
+    globalThis.AUDIO_SYNC = { 'vol1:other': SYNC['vol1:letter-a'] };
+    expect(paint(el, 6)).toBe('none');
+    globalThis.AUDIO_SYNC = SYNC;
+    el.innerHTML = '';
+    expect(paint(el, 6)).toBe('none');
+    expect(painted()).toBe(null);
+    el.remove();
+  });
+
+  it('says waiting while the timings file is not in memory yet', () => {
+    resetSyncLoadersForTests();
+    delete globalThis.AUDIO_SYNC;
+    const el = body();
+    expect(paint(el, 6)).toBe('waiting');
+    expect(painted()).toBe(null);
+    el.remove();
+    resetSyncLoadersForTests();
+  });
+
+  it('reads only the asked part of a multi-part letter', () => {
+    globalThis.AUDIO_SYNC = { 'vol1:letter-a': [[2, 0, 0, 14, 0], [3, 1, 0, 22, 1]] };
+    const el = body();
+    expect(paint(el, 6, 0)).toBe('painted');
+    expect(painted()).toBe('Sentence one. ');
+    expect(paint(el, 6, 1)).toBe('painted');
+    expect(painted()).toBe('Second block sentence.');
+    el.remove();
+  });
+});
+
+describe('ReadAlongHighlight - follows inside a v2 scroll pane ([data-scroller])', () => {
+  it('glides the spoken sentence into the reading band of the nearest [data-scroller] when there is no .screen-scroll', () => {
+    function V2Host() {
+      const mainRef = React.useRef(null);
+      return (
+        <div className="content" data-scroller="">
+          <div className="body" ref={mainRef}>
+            <p data-hl-key={letterHlKey('letter-a', 0)}>{BLOCK0}</p>
+            <p data-hl-key={letterHlKey('letter-a', 1)}>{BLOCK1}</p>
+          </div>
+          <ReadAlongHighlight volKey="vol1" letterId="letter-a" mainRef={mainRef} hlKeyFn={letterHlKey} />
+        </div>
+      );
+    }
+    const out = render(<V2Host />);
+    const pane = out.container.querySelector('[data-scroller]');
+    pane.getBoundingClientRect = () => BOX;
+    Object.defineProperty(pane, 'scrollTop', { value: 0, writable: true, configurable: true });
+    play(); clockTo(6); runGlide();
+    expect(painted()).toBe('Sentence number two.');
+    expect(pane.scrollTop).toBeCloseTo(EXPECTED_SCROLL, 5);
   });
 });

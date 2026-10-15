@@ -443,7 +443,9 @@ export function fragmentAtPoint(frags, mainEl, letterId, hlKeyFn, x, y, offsetMa
  */
 function _scrollerOf(mainRef) {
   const el = mainRef && mainRef.current;
-  return (el && typeof el.closest === 'function') ? el.closest('.screen-scroll') : null;
+  if (!el || typeof el.closest !== 'function') return null;
+  // v2 (rv1 1b) marks its scroll pane with data-scroller: the phone's .content, the laptop's .main.
+  return el.closest('.screen-scroll') || el.closest('[data-scroller]');
 }
 
 /** Another writer holds the container's scrollTop right now. */
@@ -617,6 +619,35 @@ function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScr
   if (typeof H !== 'function') { clear(); return false; }
   /** @type {any} */ (CSS).highlights.set(HL_NAME, new H(range));
   return readAlongFollow ? _follow(range, mainRef, userScrollAt, glideRef) : false;
+}
+
+/**
+ * A STILL WASH (v2 rv1 1b): paint the clause under `time` in this letter's primary recording, part `part`, with no
+ * clock, no follow and no engine. v2's gate boots draw 1b-letter-playing with it (a gate never touches AudioPlayer);
+ * the paint itself is _paintAt, the same path the live wash takes, so the picture and the app cannot disagree.
+ * 'waiting' = the timings file is not in memory yet (asked for here; audioSyncStore bumps when it lands);
+ * 'none' = no timed clause at that time, no rows for the letter, or the block is not on the page.
+ *
+ * @param {{ mainEl: Element | null, volKey: string, letterId: string, hlKeyFn: (id: string, i: number) => string,
+ *   time: number, part?: number }} o
+ * @returns {'painted' | 'waiting' | 'none'}
+ */
+export function paintReadAlongAt({ mainEl, volKey, letterId, hlKeyFn, time, part = 0 }) {
+  const supported = typeof CSS !== 'undefined' && /** @type {any} */ (CSS).highlights;
+  if (!supported || !mainEl) return 'none';
+  const g = /** @type {any} */ (globalThis);
+  if (!g.AUDIO_SYNC) { loadAudioSync(); return 'waiting'; }
+  const rows = g.AUDIO_SYNC[volKey + ':' + letterId];
+  const frags = Array.isArray(rows) ? rows.filter((f) => (f[4] || 0) === part) : [];
+  const i = frags.length ? fragmentAt(frags, time + LEAD_S) : -1;
+  const last = { current: -1 };
+  _paintAt(frags, i, { current: mainEl }, letterId, hlKeyFn, false, { current: 0 }, { current: null }, last, null);
+  return i >= 0 && /** @type {any} */ (CSS).highlights.has(HL_NAME) ? 'painted' : 'none';
+}
+
+/** Takes the wash off the page (a v2 gate letter unmounting). */
+export function clearReadAlong() {
+  if (typeof CSS !== 'undefined' && /** @type {any} */ (CSS).highlights) /** @type {any} */ (CSS).highlights.delete(HL_NAME);
 }
 
 /**

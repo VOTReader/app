@@ -117,6 +117,8 @@ import { SongKeepCard, SongKeepAction, useSongKeep, useSongsOnline, KeepIcon, Ke
 import { BIBLE_AUDIO_EDITIONS, audioReaderLabel, bibleAudioOffered } from '../utils/audio-track.js';
 import { COVERAGE_NONE, COVERAGE_READ_ALONG, bibleEditionCoverage, studyCoverage, studyCoverageDetail } from '../utils/audio-coverage.js';
 import { AudioSeekSlider } from './components/AudioSeekSlider.jsx';
+// v2 (rv1 1b) paints read-along on its own letter body through main's component: one engine, one wash.
+import { ReadAlongHighlight, paintReadAlongAt, clearReadAlong } from './components/ReadAlongHighlight.jsx';
 import { CoverageBadge } from './components/CoverageBadge.jsx';
 import {
   ArrowIcon, AudioShelfRow, ChevronIcon, CloseIcon, PauseIcon, PlayIcon, SearchIcon,
@@ -368,6 +370,7 @@ Object.assign(window, {
   SettingsRow, SelectField, FontPickerRow, VolumeLetterIndex, HistoryEntryCard,
   NoteRow, LinkCard, LinkIcon, BookmarkIcon, HolyDaysPlaylistHeader,
   AudioPlayerBar, AudioManagerSheet, AudioPlayButton, AudioSectionChips,
+  ReadAlongHighlight, paintReadAlongAt, clearReadAlong,
   StorageHealthBanner, useStorageHealth, Safari7DayModal, IosPwaWelcomeCard,
   AppShellOverlays, AppShellSheets, AnnotationDomSync, TourPrompt,
   buildScreenRoutes,

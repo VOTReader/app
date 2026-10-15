@@ -29,3 +29,7 @@
 .v2-phone.full { padding-top: 0; padding-bottom: 0; }
 .v2-phone > .content.reader.full .body { padding-top: max(44px, var(--v2-top)); }
 .v2-phone .toast-wrap { z-index: 2; }
+
+/* read-along on a v2 letter (rv1 1b): main's ReadAlongHighlight paints ::highlight(vot-reading); the kit's .ra wash and
+   hero ink, literal (an older Android WebView resolves no var() inside ::highlight). */
+.v2 ::highlight(vot-reading) { background-color: rgba(196, 164, 105, .16); color: #F5F5F3; }

@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 612 distinct identifiers.
+// Total: 615 distinct identifiers.
 
 // Cross-bundle bare-name globals — `any` by design, except React and
 // ReactDOM, typed from @types/react 18 (TYPED_GLOBALS in the generator).
@@ -237,6 +237,7 @@ declare const READING_SCREENS: any;
 declare const READ_VERSION_ID: any;
 declare const React: typeof import('react');
 declare const ReactDOM: typeof import('react-dom') & typeof import('react-dom/client');
+declare const ReadAlongHighlight: any;
 declare const ReadingChromeProvider: any;
 declare const ReadingDotContext: any;
 declare const ReadingPlansScreen: any;
@@ -401,6 +402,7 @@ declare const clampEndDwell: any;
 declare const clampLpm: any;
 declare const classifyV3ImportBegin: any;
 declare const clearLegacyLs: any;
+declare const clearReadAlong: any;
 declare const clearRecentSearches: any;
 declare const clearSuppressNextHistoryPush: any;
 declare const colLetterArr: any;
@@ -498,6 +500,7 @@ declare const noteSourceSegments: any;
 declare const notesExportFilename: any;
 declare const onIdle: any;
 declare const openThumbDB: any;
+declare const paintReadAlongAt: any;
 declare const parseRefRange: any;
 declare const parseRefRanges: any;
 declare const parseRefStr: any;
