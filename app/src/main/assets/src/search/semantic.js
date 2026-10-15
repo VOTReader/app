@@ -26,7 +26,8 @@
    (worker-client.js) it all runs there; the page asks for the best documents
    and gets them by unitKey. A worker that cannot load the model (or dies)
    hands it to this thread for the rest of the session, which loads it as
-   before.
+   before; one that cannot run a query is given up first, so the two never
+   hold a copy each.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { searchWorker } from './worker-client.js';
@@ -347,7 +348,10 @@ export async function semanticDocs(/** @type {string} */ query, /** @type {(key:
       if (!w) throw new Error('search worker gone');
       r = await w.request('meaning', { query, limit }, undefined, QUERY_WAIT_MS);
     } catch {
-      void toPage(); // the worker died: this thread loads the model, behind this search
+      // the worker died, went quiet, or answered that it could not run the model. One that answered is alive and still
+      // holds its copy: it is given up first, so this thread's copy never sits beside it (sweep 2026-10-14 v017)
+      if (w && w.close) w.close('search worker: could not run the meaning model');
+      void toPage(); // this thread loads the model, behind this search
       return null;
     }
     if (!r.docs) return null;
