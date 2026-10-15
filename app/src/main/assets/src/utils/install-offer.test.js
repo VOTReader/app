@@ -70,16 +70,19 @@ describe('shouldOffer + dismiss', () => {
 });
 
 describe('capture', () => {
-  beforeEach(() => { _resetInstallCapture(); delete window.__votInstallCapture; });
+  // A fresh target per test: the capture's listeners cannot be removed, so on the shared window every earlier
+  // test's listeners would also fire (3 calls instead of 1 when this file runs shuffled).
+  /** @type {any} */ let win;
+  beforeEach(() => { _resetInstallCapture(); win = new EventTarget(); });
 
   it('keeps the browser\'s event (and its mini-infobar away), then prompts once', async () => {
-    attachInstallCapture(window);
-    attachInstallCapture(window);                      // idempotent
+    attachInstallCapture(win);
+    attachInstallCapture(win);                      // idempotent
     const seen = vi.fn(); subscribeInstall(seen);
     const ev = /** @type {any} */ (new Event('beforeinstallprompt', { cancelable: true }));
     ev.prompt = vi.fn(() => Promise.resolve());
     ev.userChoice = Promise.resolve({ outcome: 'accepted' });
-    window.dispatchEvent(ev);
+    win.dispatchEvent(ev);
     expect(ev.defaultPrevented).toBe(true);
     expect(hasInstallPrompt()).toBe(true);
     expect(seen).toHaveBeenCalledTimes(1);
@@ -90,17 +93,17 @@ describe('capture', () => {
   });
 
   it('appinstalled drops the prompt and remembers the install', () => {
-    attachInstallCapture(window);
+    attachInstallCapture(win);
     const ev = /** @type {any} */ (new Event('beforeinstallprompt', { cancelable: true }));
-    window.dispatchEvent(ev);
-    window.dispatchEvent(new Event('appinstalled'));
+    win.dispatchEvent(ev);
+    win.dispatchEvent(new Event('appinstalled'));
     expect(hasInstallPrompt()).toBe(false);
     expect(wasInstalled()).toBe(true);
   });
 
   it('a second copy of this module (another bundle) sees the event the first copy captured', async () => {
-    attachInstallCapture(window);
-    window.dispatchEvent(/** @type {any} */ (new Event('beforeinstallprompt', { cancelable: true })));
+    attachInstallCapture(win);
+    win.dispatchEvent(/** @type {any} */ (new Event('beforeinstallprompt', { cancelable: true })));
     vi.resetModules();
     const other = await import('./install-offer.js');
     expect(other.hasInstallPrompt()).toBe(true);

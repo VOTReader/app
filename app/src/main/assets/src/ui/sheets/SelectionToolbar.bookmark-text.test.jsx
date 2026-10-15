@@ -70,6 +70,8 @@ describe('a new bookmark records its words (W48)', () => {
   });
 
   it('stores them on the direct-save fallback too', () => {
+    // No App bridge: vitest.setup.js stubs __bookmarkCreate, so this test must not lean on the test above deleting it.
+    delete window.__bookmarkCreate;
     bookmarkLordIsMy();
     expect(globalThis.BookmarkStore.add).toHaveBeenCalledWith(expect.objectContaining({
       hlKey: 'bible:psalms:23:1:4-15',
