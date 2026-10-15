@@ -1482,8 +1482,10 @@ async function search(query, options) {
   const terms = (p.phrase ? p.phrase.split(/\s+/) : p.terms.map(withoutPossessive)).concat(p.must);
 
   // All-stop-word query → no searchable content. Not a quoted phrase: "and it was so" (Genesis 1), quoted,
-  // means those words in that order, which the phrase filter checks (sweep 2026-10-14 v016).
-  if (useStop && !p.phrase && terms.length && terms.every(isStopTerm)) {
+  // means those words in that order, which the phrase filter checks (sweep 2026-10-14 v016). One small word
+  // in quotes ("the") is no run of words: it is in nearly every verse, quoted or not.
+  const quotedRun = !!p.phrase && kjvEncode(p.phrase).length >= 2;
+  if (useStop && !quotedRun && terms.length && terms.every(isStopTerm)) {
     return { parsed, results: [], parsedTerms: [], textQuery: null, stopWordsOnly: true };
   }
   let filtered;
