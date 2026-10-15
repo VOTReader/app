@@ -25,6 +25,9 @@ const TOPIC_OPEN = 'Many have asked about fruit and fields and what is owed for 
 // a letter the typed words find at its opening, whose described passage sits further down
 const REST_OPEN = 'Everyone come, and everyone come again, says the keeper of the gate. ';
 const REST = REST_OPEN + 'The walls are high and the towers are many in that city. '.repeat(8) + 'Lay down the load you carry, and I will give you peace.';
+// a letter the typed words find at its opening, whose described passage opens on a sentence that holds none of them
+const HARVEST_OPEN = 'Bring the wheat, bring the sheaves, bring the barn doors near, says the steward. ';
+const HARVEST = HARVEST_OPEN + 'The towers are many in that city. '.repeat(6) + 'The season turns at last. Gather My sheaves before the rain. The year is old.';
 const GLOBALS = {
   BOOKS: {},
   LETTERS_V1: [
@@ -33,15 +36,29 @@ const GLOBALS = {
     { id: 'silver', num: 3, title: 'The Silver Cord', blocks: [{ segments: [{ v: 'Hear Me. The silver cord is loosed and the golden bowl is broken, says The Lord.' }] }] },
     { id: 'vineyard', num: 4, title: 'The Vineyard', blocks: [{ segments: [{ v: VINEYARD }] }] },
     { id: 'rest', num: 5, title: 'The Gate', blocks: [{ segments: [{ v: REST }] }] },
+    { id: 'harvest', num: 6, title: 'The Steward', blocks: [{ segments: [{ v: HARVEST }] }] },
   ],
-  ANSWERS: [{ id: 'fields', num: 1, title: 'Regarding Fields', paragraphs: [{ text: TOPIC_OPEN + VINEYARD }] }],
+  ANSWERS: [
+    { id: 'fields', num: 1, title: 'Regarding Fields', paragraphs: [{ text: TOPIC_OPEN + VINEYARD }] },
+    { id: 'lamps', num: 2, title: 'Regarding Lamps', paragraphs: [{ text: 'Many have asked about lamps and oil and the hour of the night watch.' }] },
+  ],
 };
-const STARTS = { garment: 0, creator: CREATOR.indexOf('Remember'), silver: 0, fields: TOPIC_OPEN.length, gate: 0, peace: REST.indexOf('Lay down') };
-const KEYS = ['v1/garment', 'v1/creator', 'v1/silver', 'answers/fields', 'v1/rest'];
+const STARTS = { garment: 0, creator: CREATOR.indexOf('Remember'), silver: 0, fields: TOPIC_OPEN.length, gate: 0, peace: REST.indexOf('Lay down'),
+  steward: 0, season: HARVEST.indexOf('The season'), lamps: 0 };
+const KEYS = ['v1/garment', 'v1/creator', 'v1/silver', 'answers/fields', 'v1/rest', 'v1/harvest', 'answers/lamps'];
 /** Each passage: its document (index in KEYS), where it starts, and the name a test calls it by. */
-const UNITS = [[0, 'garment'], [1, 'creator'], [2, 'silver'], [3, 'fields'], [4, 'gate'], [4, 'peace']];
-/** What the stand-in model says the query means: the unit (by letter id) it is nearest. */
+const UNITS = [[0, 'garment'], [1, 'creator'], [2, 'silver'], [3, 'fields'], [4, 'gate'], [4, 'peace'], [5, 'steward'], [5, 'season'], [6, 'lamps']];
+/** What the stand-in model says the query means: the unit (by name) it is nearest, or how near it is to several ({name: weight}). */
+/** @type {{near: string|Record<string, number>}} */
 const said = { near: 'creator' };
+
+/** The stand-in's query vector: one unit's, or a weighted mix (semantic.js scales it to unit length). */
+function meantVector() {
+  const v = new Float32Array(UNITS.length);
+  const mix = typeof said.near === 'string' ? { [said.near]: 1 } : said.near;
+  for (const [name, w] of Object.entries(mix)) v[UNITS.findIndex((u) => u[1] === name)] = w;
+  return v;
+}
 
 function standInModel() {
   const dim = UNITS.length;
@@ -59,7 +76,7 @@ function standInModel() {
   const ort = {
     env: { wasm: {} },
     Tensor: class {},
-    InferenceSession: { create: async () => ({ inputNames: ['input_ids'], outputNames: ['h'], run: async () => ({ h: { data: Float32Array.from(vecs[UNITS.findIndex((u) => u[1] === said.near)]) } }) }) },
+    InferenceSession: { create: async () => ({ inputNames: ['input_ids'], outputNames: ['h'], run: async () => ({ h: { data: meantVector() } }) }) },
   };
   configureSemantic({
     url: (p) => 'mem:' + p,
@@ -117,6 +134,31 @@ describe('meaning first', () => {
     const r = await first('remember now your creator in the days of your youth');
     expect(r.doc.letterId).toBe('creator');
     expect(r.placeStart).toBeUndefined();
+  });
+
+  /* THE MODEL SURE, UNSURE, AND WHERE IT LANDS (search sr10, 2026-10-14). Its clear first leads even
+     when no typed word reaches it ("god says he lives among israel and his people will never be ashamed"
+     came 3rd behind letters holding its words; the model had Joel 2:27 first by 0.056); two texts it
+     can hardly tell apart (within 0.012) go original first, as a reprint gives way to its original;
+     and a text opened on the passage the model matched opens on the sentence of it that holds the
+     reader's words, not on the passage's first sentence. */
+  it("the model's clear first leads the words' partial find", async () => {
+    said.near = { creator: 1, silver: 0.5 };
+    const r = await first('a cord loosed and a bowl broken when a young one forgets his maker');
+    expect(r.doc.letterId).toBe('creator');
+  });
+
+  it('two texts the model can hardly tell apart: the original kind leads', async () => {
+    said.near = { lamps: 1.01, garment: 1 };
+    const r = await first('lamps and oil for quokkas juggling xylophones');
+    expect(r.doc.letterId).toBe('garment');
+  });
+
+  it('a text opened on the passage the model matched opens on the sentence holding the typed words', async () => {
+    said.near = 'season';
+    const r = await first('bring sheaves into the barn before rain comes');
+    expect(r.doc.letterId).toBe('harvest');
+    expect(r.placeStart).toBe(HARVEST.indexOf('Gather My sheaves'));
   });
 
   /* THE READER'S FILTERS HOLD FOR WHAT THE MEANING ADDS (sweep W1, 2026-10-13). The model's best

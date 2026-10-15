@@ -113,6 +113,10 @@ function classOf(c) {
     // An Answers heading that cites a letter ("Excerpt from: Let All in the Earth Be Brought into...") has that letter as its original.
     const cited = /^excerpt from:\s*(.+)$/i.exec(c.sentence.trim());
     if (cited) for (const k of titleNorm[norm(cited[1])] || []) members.add(k);
+    // So does a heading that is a text's own title, with or without a note after it ("Stop Lying to Your Children
+    // (Regarding Santa, the Easter Bunny...)" heads the Words To Live By entry the topic reprints under it).
+    const head = norm(c.sentence.trim().replace(/\s*\([^()]*\)$/, ''));
+    if (head.trim().split(' ').length >= 3) for (const k of titleNorm[head] || []) if (k !== c.uk) members.add(k);
     members.add(c.uk);
   }
   return { members, best: Math.min(...[...members].map(TIER)) };

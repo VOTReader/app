@@ -410,9 +410,30 @@ function docFreq(term) {
    those words can sit in the wrong place: "everyone struggling and burdened come to me for rest"
    cut its excerpt at a "come" two paragraphs from the passage. The first results open on the
    passage the model matched instead, when it means the query clearly more nearly than the
-   passage holding the excerpt (LAND_MARGIN). */
+   passage holding the excerpt (LAND_MARGIN). A passage is three sentences and the reader's words
+   point at one of them (search sr10, 2026-10-14): a text opened on a passage opens on the sentence
+   of it holding most of the typed words, not on its first ("every preacher speaks blasphemy and
+   every church altar is corrupted" opened a sentence above "blasphemy is heard from every pulpit"). */
 const LAND_REACH = 3;
 const LAND_MARGIN = 0.1;
+/** The sentences of a matched passage read for the one the typed words point at. */
+const LAND_SENTENCES = 3;
+/**
+ * The start of the sentence, among a passage's first LAND_SENTENCES, holding most of the typed words
+ * (the first of equals); the passage's own start when none holds one.
+ * @param {string} text
+ * @param {number} start  the passage's start
+ * @param {Set<string>} words  the typed content words, as lemmas
+ */
+function sentenceAt(text, start, words) {
+  let best = start;
+  let most = 0;
+  for (const sp of sentenceSpans(text.slice(start, start + MEANING_SPAN)).slice(0, LAND_SENTENCES)) {
+    const held = new Set(kjvEncode(sp.text).map(lemma).filter((l) => words.has(l))).size;
+    if (held > most) { most = held; best = start + sp.start + (sp.text.length - sp.text.trimStart().length); }
+  }
+  return best;
+}
 /**
  * @param {Array<{doc:any, placeStart?:number}>} out
  * @param {Map<any, string>} idOf
@@ -433,6 +454,12 @@ function meaningLanding(out, idOf, sem, terms) {
     for (const pp of ps) if (pp[0] <= at) lex = pp;
     const bestScore = Math.max(...ps.map((pp) => pp[1]));
     if (lex && bestScore - lex[1] > LAND_MARGIN && s.start !== lex[0]) e.placeStart = s.start;
+  }
+  // Every text opened on a matched passage (here, or meaningFirst's own finds): on its sentence the words point at.
+  const words = new Set(terms.flatMap((t) => kjvEncode(t)).filter((w) => !isStopTerm(w)).map(lemma));
+  if (!words.size) return;
+  for (const e of out) {
+    if (typeof e.placeStart === 'number' && e.placeStart >= 0 && e.doc.text) e.placeStart = sentenceAt(e.doc.text, e.placeStart, words);
   }
 }
 
@@ -459,7 +486,13 @@ function unitId(/** @type {string} */ key) {
    find); a title the query names keeps the lead. A document only the meaning found
    opens on the passage the model matched (entry.placeStart, which use-search lands
    on); one the words found too lands where they do. Measured on the benchmark
-   (lanes/search/out/p5): 413 -> 424/500. */
+   (lanes/search/out/p5): 413 -> 424/500.
+   SURE AND UNSURE (search sr10, 2026-10-14). The model's score says how sure it is. Its clear
+   first (MEANING_SURE ahead of the next text it ranks) leads, unless a named title does or the
+   words hold the whole query in one passage: on the benchmark its right picks led by 0.05-0.09
+   (Joel 2:27 for the query above came 3rd, behind letters holding its words) and its wrong ones
+   by 0-0.02. Two texts it ranks within MEANING_TIE it cannot tell apart: the original kind goes
+   first (ORIGINAL_TIER), as a reprint gives way to its original. 440 -> 445/500, none lost. */
 const MEANING_REACH = 30;
 const MEANING_ADD = 10;
 /** How many of the model's best documents a search kept to a collection or scope reads (else semanticDocs' 60). */
@@ -472,6 +505,14 @@ const MEANING_SPAN = 400;
 const MEANING_VOTES = 4;
 /** The meaning's weight when no passage holds any of the query; it falls as the words hold more (1 - held). */
 const MEANING_WEIGHT = 2;
+/** How far (cosine) the model's first must lead the next text it ranks to lead the results: 0.025-0.05 gained the same on the benchmark. */
+const MEANING_SURE = 0.04;
+/** What a clear first adds to its key: past any order the two ranks give (at most 0.1 + 0.2), short of a named title's 1. */
+const MEANING_SURE_LEAD = 0.5;
+/** Texts the model ranks this near (cosine) it cannot tell apart: 0.006-0.014 gained, none lost, on the benchmark. */
+const MEANING_TIE = 0.012;
+/** Two copies of one passage score alike to the float: a reprint is no next text. */
+const MEANING_SAME = 1e-4;
 /**
  * @param {Array<{score:number, doc:any, terms?:string[], placeStart?:number, meaningStart?:number}>} out
  * @param {Map<any, string>} idOf
@@ -482,7 +523,21 @@ const MEANING_WEIGHT = 2;
  */
 function meaningFirst(out, idOf, sem, named, held, admit) {
   const w = MEANING_WEIGHT * Math.max(0, 1 - held);
-  const semRank = new Map(sem.map((s, i) => [s.id, i]));
+  // The model's clear first: far enough ahead of the next text it ranks (its own copies aside).
+  let sure = '';
+  if (w > 0 && sem.length) {
+    const next = sem.find((s) => sem[0].score - s.score > MEANING_SAME);
+    if (!next || sem[0].score - next.score >= MEANING_SURE) sure = sem[0].id;
+  }
+  // Its order, with texts it cannot tell apart taken original first.
+  const tierOf = (/** @type {string} */ id) => { const f = msIndex.getStoredFields(id); return (f && ORIGINAL_TIER[f.kind]) ?? 5; };
+  const order = sem.map((s) => ({ s, t: tierOf(s.id) }));
+  for (let j = 1; j < order.length; j++) {
+    for (let r = j; r > 0 && order[r - 1].s.score - order[r].s.score <= MEANING_TIE && order[r].t < order[r - 1].t; r--) {
+      const x = order[r]; order[r] = order[r - 1]; order[r - 1] = x;
+    }
+  }
+  const semRank = new Map(order.map((o, i) => [o.s.id, i]));
   const semStart = new Map(sem.map((s) => [s.id, s.start]));
   const top = out.slice(0, MEANING_REACH);
   const rest = out.slice(MEANING_REACH);
@@ -503,7 +558,7 @@ function meaningFirst(out, idOf, sem, named, held, admit) {
     added.add(e);
   }
   const key = (/** @type {any} */ e, /** @type {number} */ i) => (named(e.doc) ? 1 : 0) + 1 / (MEANING_K + Math.min(i, MEANING_REACH)) +
-    w / (MEANING_K + (semRank.get(idOf.get(e)) ?? 1e6));
+    w / (MEANING_K + (semRank.get(idOf.get(e)) ?? 1e6)) + (idOf.get(e) === sure ? MEANING_SURE_LEAD : 0);
   const keyed = top.map((e, i) => ({ e, i, k: key(e, i) }));
   keyed.sort((a, b) => b.k - a.k);
   for (const e of top) {
