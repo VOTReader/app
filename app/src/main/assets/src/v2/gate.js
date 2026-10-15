@@ -21,8 +21,8 @@ const DAY = 24 * 3600 * 1000;
 
 /**
  * One gate state: `stack` is the history the hook fakes (its last entry is the place shown; the one before names Back),
- * `facts` what the screen would otherwise read from storage, `scroll` where the page sits (px, or a selector whose
- * element's top goes right under the top bar), `playing` the recording loaded (states.json's playing: item, reader code,
+ * `facts` what the screen would otherwise read from storage, `scroll` where the page sits (px, 'end' = scrolled as far
+ * as it goes, or a selector whose element's top goes right under the top bar), `playing` the recording loaded (states.json's playing: item, reader code,
  * at/length in seconds, paused; the player reads it, agreed with readalong 10-14). rv1 adds optional playing.rate,
  * playing.sleep ({ minutes, left } in min / s, or 'end') and playing.saved (true = saved on this device), and `player`:
  * open ('now-playing', or a sheet: 'speed' | 'sleep' | 'up-next'), full (full screen) and toast (the hint drawn).
@@ -48,6 +48,10 @@ const HOME_FACTS = {
   },
 };
 const OVER_VOLUME_ONE = [{ place: 'home' }, { place: 'collection', collection: 'one' }];
+/** Words To Live By, Part One, Entry 46 from its collection page (1d, 1e). */
+const WTLB_46 = [{ place: 'home' }, { place: 'collection', collection: 'wtlb1' }, { place: 'letter', collection: 'wtlb1', n: 46 }];
+/** Volume One, Letter 9 (1f, 1g). */
+const LETTER_9 = [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 9 }];
 const LETTER_ONE_PLAYING = { item: { collection: 'one', n: 1 }, reader: 'B', at: 231, length: 608, paused: false, saved: true };
 
 /** @type {Record<string, GateState>} */
@@ -192,6 +196,29 @@ export const GATE_STATES = {
   // states.json 8b-install (zv1): Volume One from Home in a browser on the second visit, the offer open; this browser
   // handed over its install event, so the button is the browser's own Install.
   '8b-install': { stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }], open: { sheet: 'install' }, facts: { install: { flow: 'prompt' } } },
+  // dz13 (myweb's v2-gaps 1-4). states.json 1d-wtlb-entry: Words To Live By, Part One, Entry 46 (Building the Gallows)
+  // scrolled to its end: [Esther 7], (1 John 3:12) and (Genesis 4:8) in gold, the Next card; Back says Words To Live By.
+  // The laptop's whole entry fits, so its end is its top.
+  '1d-wtlb-entry': { stack: WTLB_46, scroll: 'end' },
+  // states.json 1e-ref-sheet: 1d with (1 John 3:12) tapped: its sheet (the laptop's dialog), the cite washed.
+  '1e-ref-sheet': { stack: WTLB_46, scroll: 'end', open: { sheet: 'ref', ref: '1 John 3:12' } },
+  // states.json 1f-footnotes: Volume One, Letter 9 (What's In a Name) at its end: the Footnotes list (two notes, then
+  // Revelation 3:5) above the Next card.
+  '1f-footnotes': { stack: LETTER_9, scroll: 'end' },
+  // states.json 1g-footnote-sheet (phone): Letter 9 with footnote 1 tapped, its number 190 px below the screen's top (the
+  // scroller starts under the 27 px status bar and the 56 px top bar: 190 - 83), Footnote 1 of 3 open, the number ringed.
+  '1g-footnote-sheet': {
+    stack: LETTER_9,
+    scroll: { to: '.body .fn-ref[data-fn-num="1"]', gap: 107, phone: true },
+    open: { sheet: 'footnote', num: '1' },
+  },
+  // states.json 8d-safari-notice (phone): Letter 1 in a Safari tab, paragraph 1 tapped as in 4b: the first save of the
+  // session waits on the 7-day notice (the hook draws it; no Safari, no StorageHealth needed).
+  '8d-safari-notice': {
+    stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],
+    scroll: { to: '.body [data-hl-key$=":0"]', gap: 20 },
+    open: { sheet: 'safari-7day', para: 0 },
+  },
 };
 
 /**

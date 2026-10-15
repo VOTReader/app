@@ -309,3 +309,54 @@
 .grid2.vols .c { justify-content: space-between; gap: 8px; }
 .grid2.vols .cnt { font-size: var(--fs-xs); color: var(--t2); font-weight: 400; font-variant-numeric: lining-nums; }
 .home-rows { margin-top: 22px; }
+
+/* dz13 (2026-10-15): the four v2 gaps myweb found (lanes/myweb/out/mw5/v2-gaps.md). New classes only: no earlier picture changes.
+   A Format B entry (Words To Live By, The Blessed): a head with no meta lines; a blank line in the corpus is a paragraph gap */
+.page-head.fb-head { padding-bottom: 24px; }   /* no meta lines under Listen: the gap 1a's meta keeps */
+.reader .body .pb { display: block; height: .3em; }   /* a line inside a stanza: a small gap tells a new line from a wrap */
+.reader .body p:has(> .pb) { margin-bottom: 1.1em; }   /* a stanza (a paragraph of lines) ends with a clear gap */
+.reader .body .poetry { margin: 0 0 .62em; }                  /* as v2's shell.css */
+/* references (1 John 3:12) and chapter links [Esther 7]: the reading size, gold, a dotted underline; tapped = the wash */
+.reader .body .cite { color: var(--accent); text-decoration: underline dotted rgba(var(--gold-rgb), .75); text-decoration-thickness: 1.5px;
+  text-underline-offset: 5px; cursor: pointer; white-space: nowrap; }
+.reader .body .cite.on { background: var(--wash); border-radius: 3px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+/* a footnote number is a 44 px target; tapped = a gold ring */
+.reader .body .fn { position: relative; }
+.reader .body .fn.on { background: var(--wash); border-radius: 50%; padding: 2px 5px; box-shadow: 0 0 0 1.5px rgba(var(--gold-rgb), .8); }
+/* the reference / footnote sheet (phone) and dialog (laptop) */
+.sheet.ref { padding-bottom: 16px; }
+.ref .overline { display: block; }
+.ref-top { display: flex; align-items: center; justify-content: space-between; min-height: 40px; margin-top: -6px; }
+.ref-top .overline { display: inline; }
+.fn-nav { display: flex; gap: 10px; }
+.fn-nav .ic { width: 40px; height: 40px; border: 1px solid var(--edge); border-radius: 50%; display: grid; place-items: center; color: var(--t1); }
+.fn-nav .ic svg { width: 18px; height: 18px; }
+.fn-nav .ic[disabled] { opacity: .38; }
+.ref-h { font-size: var(--fs-l); color: var(--t-hero); line-height: 1.15; margin: 12px 0 10px; }
+.ref-v { font-size: 20px; line-height: 1.5; color: var(--t-body); margin: 0; }
+.ref-v .vn { margin-right: 4px; }
+.ref-tr { font-size: var(--fs-xs); color: var(--t3); letter-spacing: var(--track-caps); margin: 10px 0 18px; }
+.ref-note { font-size: 20px; line-height: 1.45; color: var(--t-body); margin: 12px 0 6px; }
+.ref-src { font-size: var(--fs-s); color: var(--t2); margin: 0 0 18px; }
+.dlg.ref { padding-top: 26px; }
+.dlg .x { position: absolute; top: 10px; right: 10px; width: 44px; height: 44px; display: grid; place-items: center; color: var(--t2); }
+.dlg .x svg { width: 22px; height: 22px; }
+/* the footnotes at the foot of a letter (main's FootnoteListSection) */
+.fnl { margin-top: 28px; border-top: 1px solid var(--line); padding-top: 22px; }
+.fnl > .label { display: block; margin-bottom: 4px; }
+.fni { display: flex; gap: 12px; padding: 14px 0 6px; border-bottom: 1px solid var(--line); }
+.fni:last-child { border-bottom: 0; }
+.fni .n { flex: none; min-width: 16px; font-size: var(--fs-s); line-height: 1.45; color: var(--tgold-hi); font-variant-numeric: lining-nums; }
+.fni .tx { flex: 1; min-width: 0; }
+.fni .t { font-size: var(--fs-ui); line-height: 1.4; color: var(--t1); }
+.fni .v { font-size: var(--fs-s); line-height: 1.5; color: var(--t2); margin-top: 4px; }
+.fni .textbtn.sm { height: 40px; font-size: var(--fs-s); gap: 2px; }
+.fni .textbtn.sm svg { width: 16px; height: 16px; }
+.fnl + .nextcard { margin-top: 18px; }
+/* Safari's 7-day notice: the install sheet's look, with Safari's own two steps */
+.howto { list-style: none; margin: 0 0 20px; padding: 0; }
+.howto li { display: flex; align-items: center; gap: 12px; min-height: 44px; font-size: var(--fs-m); color: var(--t1); }
+.howto li + li { border-top: 1px solid var(--line); }
+.howto .sn { width: 26px; height: 26px; flex: none; border-radius: 50%; border: 1px solid var(--tgold-ghost); color: var(--accent); display: grid; place-items: center;
+  font-size: var(--fs-xs); font-variant-numeric: lining-nums; }
+.howto svg.ios { width: 22px; height: 22px; color: var(--accent); margin-left: 2px; }

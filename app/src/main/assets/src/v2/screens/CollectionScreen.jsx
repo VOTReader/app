@@ -208,10 +208,10 @@ const COLLECTION_ACTIONS = <button type="button" className="ic" aria-label="More
 
 definePlace('collection', {
   Screen: CollectionScreen,
-  // Back on a letter says the collection's name
+  // Back on a letter says the collection's name as its page heads it ("Words To Live By" for either part, picture 1d)
   title: (r) => {
     const col = collectionOf(r.collection);
-    return col ? col.label : '';
+    return col ? collectionHead(col).title : '';
   },
   actions: () => COLLECTION_ACTIONS,
 });

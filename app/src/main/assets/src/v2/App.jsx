@@ -67,6 +67,7 @@ export function routeTitle(r) {
  */
 export function applyGateScroll(el, scroll, desktop = false) {
   if (typeof scroll === 'number') { el.scrollTop = scroll; return; }
+  if (scroll === 'end') { el.scrollTop = el.scrollHeight; return; }
   if (typeof scroll === 'object' && scroll.phone && desktop) return;
   const sel = typeof scroll === 'string' ? scroll : scroll.to;
   const gap = typeof scroll === 'string' ? 0 : scroll.gap || 0;

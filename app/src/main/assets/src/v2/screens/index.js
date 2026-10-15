@@ -14,3 +14,4 @@ import './SettingsPages.jsx';
 import './PlansScreen.jsx';
 import './WelcomeScreen.jsx';
 import './InstallOffer.jsx';
+import './SafariNotice.jsx';

@@ -22,10 +22,12 @@ export function closeTopSheet() {
 }
 
 /**
- * @param {{ kind: string, label: string, onClose: () => void, desktop?: boolean, scrim?: string, children?: any }} props
- *   kind the kit's sheet class ('aa', 'para'); scrim an extra scrim class ('light')
+ * @param {{ kind: string, label: string, onClose: () => void, desktop?: boolean, scrim?: string, closeX?: boolean,
+ *   children?: any }} props
+ *   kind the kit's sheet class ('aa', 'para'); scrim an extra scrim class ('light'); closeX the laptop dialog's own close
+ *   button at its top right (picture desk 1e)
  */
-export function Sheet({ kind, label, onClose, desktop = false, scrim = '', children }) {
+export function Sheet({ kind, label, onClose, desktop = false, scrim = '', closeX = false, children }) {
   const layer = React.useContext(SheetLayer);
   const closeRef = React.useRef(onClose);
   closeRef.current = onClose;
@@ -45,6 +47,9 @@ export function Sheet({ kind, label, onClose, desktop = false, scrim = '', child
       <div className={'scrim' + (scrim ? ' ' + scrim : '')} onClick={() => closeRef.current()} />
       <div className={(desktop ? 'dlg ' : 'sheet ') + kind} role="dialog" aria-modal="true" aria-label={label}>
         {!desktop && <div className="handle" />}
+        {desktop && closeX && (
+          <button type="button" className="ic x" aria-label="Close" onClick={() => closeRef.current()}><Icon name="close" /></button>
+        )}
         {children}
       </div>
     </>

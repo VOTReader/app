@@ -16,7 +16,8 @@ export function iconSvg(name, { on = false, size } = {}) {
   return v;
 }
 
-/** @param {{ name: string, on?: boolean, size?: number }} props */
-export function Icon({ name, on, size }) {
-  return <span className="v2i" aria-hidden="true" dangerouslySetInnerHTML={{ __html: iconSvg(name, { on, size }) }} />;
+/** @param {{ name: string, on?: boolean, size?: number, flip?: boolean }} props  flip: turned round (the kit's svg.flip: a back chevron) */
+export function Icon({ name, on, size, flip = false }) {
+  const svg = iconSvg(name, { on, size });
+  return <span className="v2i" aria-hidden="true" dangerouslySetInnerHTML={{ __html: flip ? svg.replace('<svg', '<svg class="flip"') : svg }} />;
 }

@@ -10,12 +10,23 @@
 import { segmentRenderText } from '../utils/segment-dom-text.js';
 import { splitFormatBInline } from '../utils/format-b-inline.js';
 
+/**
+ * A footnote number (main's .fn-ref chrome: its recorder, re-finder and copy leave it out). It opens its footnote: the
+ * letter's body listens (LetterScreen), so a block drawn once never needs new handlers. A Format B reference drawn as a
+ * number (Holy Days, Answers) also names its reference.
+ * @param {{ num: string | number, cite?: string }} props
+ */
+function FootnoteMark({ num, cite }) {
+  return <sup className="fn fn-ref" data-fn-num={String(num)} data-ref={cite} role="button" tabIndex={0}
+    aria-label={'Footnote ' + num}>{num}</sup>;
+}
+
 /** @param {any[]} segments */
 export function renderSegments(segments) {
   return segments.map((seg, i) => {
     if (!seg) return null;
     if (seg.t === 'stanza-break') return <span key={i} className="stanza-break" />;
-    if (seg.t === 'fn') return <sup key={i} className="fn fn-ref">{seg.v}</sup>;
+    if (seg.t === 'fn') return <FootnoteMark key={i} num={seg.v} />;
     const v = segmentRenderText(segments, i);
     if (seg.t === 'bold-italic') return <i key={i} className="lead-in">{v}</i>;
     if (seg.t === 'italic') return <i key={i}>{v}</i>;
@@ -61,44 +72,70 @@ function navBookTitle(id) {
   return (g.BOOKS && g.BOOKS[id] && g.BOOKS[id].title) || String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-/** Plain text with its soft breaks as <br> (no character in the DOM text, as main's renderText). @param {string} s */
+/**
+ * Plain text with its breaks: a blank line (\n\n, the corpus's next line of a stanza) as a small gap (.pb), a single \n
+ * as <br>. Neither puts a character in the DOM text (format-b-dom-text counts each \n as a seam), so marks and the
+ * read-along address the same words as main's.
+ * @param {string} s
+ */
 function withBreaks(s) {
   if (s.indexOf('\n') < 0) return s;
-  return s.split('\n').flatMap((part, i) => (i > 0 ? [<br key={'b' + i} />, part] : [part])).filter((x) => x !== '');
+  return s.split(/(\n\n|\n)/).map((part, i) => {
+    if (part === '\n\n') return <span key={'p' + i} className="pb" />;
+    if (part === '\n') return <br key={'b' + i} />;
+    return part;
+  }).filter((x) => x !== '');
 }
 
 /**
- * A Format B paragraph's inline markup, drawn as main's WtlbEntryView draws it (outside footnotes mode): **bold**,
- * _italics_, {{ref:R}} as "(R)", {{nav:book:n}} as "[Book n]", a [From "..." ~ ...] source line as written, soft breaks
- * as <br>. So its DOM text is format-b-dom-text's, which main's marks and the read-along address.
- * @param {string} text @param {(id: string) => string} [bookTitle] @returns {any[]}
+ * A Format B paragraph's inline markup, drawn as main's WtlbEntryView draws it: **bold**, _italics_, {{ref:R}} as a
+ * tappable "(R)" (in footnotes mode a non-trailing one as its number), {{nav:book:n}} as a tappable "[Book n]", a
+ * [From "..." ~ ...] source line as written, breaks as above. So its DOM text is format-b-dom-text's, which main's marks
+ * and the read-along address. `refs` is the paragraph's row of formatBRefScan (its references in order, numbered in
+ * footnotes mode); none = every reference a cite.
+ * @param {string} text @param {(id: string) => string} [bookTitle]
+ * @param {Array<{ ref: string, trailing: boolean, num: number | null }> | null} [refs] @returns {any[]}
  */
-export function renderFormatB(text, bookTitle = navBookTitle) {
+export function renderFormatB(text, bookTitle = navBookTitle, refs = null) {
+  return drawFormatB(text, bookTitle, { list: refs || [], i: 0 });
+}
+
+/** @param {string} text @param {(id: string) => string} bookTitle @param {{ list: any[], i: number }} cur */
+function drawFormatB(text, bookTitle, cur) {
   return splitFormatBInline(text).map((seg, i) => {
     if (!seg) return null;
-    if (seg.startsWith('**') && seg.endsWith('**') && seg.length >= 4) return <strong key={i}>{renderFormatB(seg.slice(2, -2), bookTitle)}</strong>;
-    if (seg.startsWith('_') && seg.endsWith('_') && seg.length >= 2) return <em key={i}>{renderFormatB(seg.slice(1, -1), bookTitle)}</em>;
+    if (seg.startsWith('**') && seg.endsWith('**') && seg.length >= 4) return <strong key={i}>{drawFormatB(seg.slice(2, -2), bookTitle, cur)}</strong>;
+    if (seg.startsWith('_') && seg.endsWith('_') && seg.length >= 2) return <em key={i}>{drawFormatB(seg.slice(1, -1), bookTitle, cur)}</em>;
     const ref = /^\{\{ref:(.+)\}\}$/.exec(seg);
-    if (ref) return <span key={i} className="cite">({ref[1].trim()})</span>;
+    if (ref) {
+      const cite = ref[1].trim();
+      const info = cur.list[cur.i++];
+      if (info && !info.trailing && info.num != null) return <FootnoteMark key={i} num={info.num} cite={cite} />;
+      return <a key={i} className="cite" href="#" data-ref={cite}>({cite})</a>;
+    }
     const nav = /^\{\{nav:([^:]+):(\d+)\}\}$/.exec(seg);
-    if (nav) return <span key={i} className="cite">[{bookTitle(nav[1]) + ' ' + Number(nav[2])}]</span>;
+    if (nav) {
+      return <a key={i} className="cite nav" href="#" data-nav={nav[1] + ':' + Number(nav[2])}>[{bookTitle(nav[1]) + ' ' + Number(nav[2])}]</a>;
+    }
     return <React.Fragment key={i}>{withBreaks(seg)}</React.Fragment>;
   });
 }
 
 /**
  * One Format B paragraph (Words To Live By, The Blessed, some Holy Days pages keep `paragraphs` of { align, text }, not
- * blocks), with main's anchor (`hlKey`: wtlb:<id>:<index>, utils/hl-keys.js) so marks show in both apps.
- * @param {{ para: { align?: string, text?: string }, hlKey?: string | null, bookTitle?: (id: string) => string }} props
+ * blocks), with main's anchor (`hlKey`: wtlb:<id>:<index>, utils/hl-keys.js) so marks show in both apps. `refs`: its row
+ * of formatBRefScan (renderFormatB).
+ * @param {{ para: { align?: string, text?: string }, hlKey?: string | null, bookTitle?: (id: string) => string,
+ *   refs?: Array<{ ref: string, trailing: boolean, num: number | null }> | null }} props
  */
-function FormatB({ para, hlKey = null, bookTitle }) {
+function FormatB({ para, hlKey = null, bookTitle, refs = null }) {
   const anchor = hlKey ? { 'data-hl-key': hlKey, 'data-hl-dom': 'true' } : {};
   const align = para && (para.align === 'center' || para.align === 'right')
     ? { textAlign: /** @type {'center' | 'right'} */ (para.align) } : undefined;
-  return <p style={align} {...anchor}>{renderFormatB((para && para.text) || '', bookTitle)}</p>;
+  return <p style={align} {...anchor}>{renderFormatB((para && para.text) || '', bookTitle, refs)}</p>;
 }
 
-export const FormatBBlock = React.memo(FormatB, (a, b) => a.para === b.para && a.hlKey === b.hlKey);
+export const FormatBBlock = React.memo(FormatB, (a, b) => a.para === b.para && a.hlKey === b.hlKey && a.refs === b.refs);
 
 /** The kit's title step: 52 px, long titles 44 (".display.long"), very long 36 (".longer"). */
 export function titleClass(title) {
