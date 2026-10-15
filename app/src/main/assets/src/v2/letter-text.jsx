@@ -21,13 +21,42 @@ function FootnoteMark({ num, cite }) {
     aria-label={'Footnote ' + num}>{num}</sup>;
 }
 
+/**
+ * A text's {{ref:R}} tokens as gold cites that open R's sheet (the page's body listens), R bare in the DOM text as
+ * main's renderTextWithScripRefs draws it, so marks address the same words. The Bible studies write their references
+ * this way; the letters do not.
+ * @param {string} v
+ */
+function withRefs(v) {
+  if (v.indexOf('{{ref:') < 0) return v;
+  return v.split(/(\{\{ref:[^}]+\}\})/g).map((part, i) => {
+    const m = /^\{\{ref:(.+)\}\}$/.exec(part);
+    if (!m) return part ? <React.Fragment key={i}>{part}</React.Fragment> : null;
+    const ref = m[1].trim();
+    return <a key={i} className="cite" href="#" data-ref={ref}>{ref}</a>;
+  });
+}
+
+/**
+ * A letter the text names (main's letter-link: its label, by { collection, letterTitle } or a letter id), a gold cite
+ * the page's body opens; an outside page (main's link) opens in the browser.
+ * @param {any} seg @param {number} i
+ */
+function linkOf(seg, i) {
+  if (seg.t === 'link') return <a key={i} className="cite" href={seg.url} data-url={seg.url}>{seg.label}</a>;
+  const to = seg.link || {};
+  return <a key={i} className="cite" href="#" data-letter={seg.letterId || ''} data-col={to.collection || ''}
+    data-title={to.letterTitle || ''}>{seg.label}</a>;
+}
+
 /** @param {any[]} segments */
 export function renderSegments(segments) {
   return segments.map((seg, i) => {
     if (!seg) return null;
     if (seg.t === 'stanza-break') return <span key={i} className="stanza-break" />;
     if (seg.t === 'fn') return <FootnoteMark key={i} num={seg.v} />;
-    const v = segmentRenderText(segments, i);
+    if (seg.t === 'letter-link' || seg.t === 'link') return linkOf(seg, i);
+    const v = withRefs(segmentRenderText(segments, i));
     if (seg.t === 'bold-italic') return <i key={i} className="lead-in">{v}</i>;
     if (seg.t === 'italic') return <i key={i}>{v}</i>;
     if (seg.t === 'caps') return <span key={i} className="caps">{v}</span>;
@@ -56,6 +85,18 @@ function Block({ block, hlKey = null }) {
         {block.lines.map((line, i) => (Array.isArray(line) && line.length === 1 && line[0].t === 'stanza-break')
           ? <div key={i} className="stanza-break" />
           : <div key={i} className="poem">{renderSegments(Array.isArray(line) ? line : [])}</div>)}
+      </div>
+    );
+  }
+  // a poem kept as one segment per line (some Bible studies): each its own line, its leading break dropped, as main's
+  if (block && block.type === 'poetry' && Array.isArray(block.segments)) {
+    return (
+      <div className="poetry" {...anchor}>
+        {block.segments.map((seg, i) => (
+          <div key={i} className="poem">
+            {renderSegments([seg && typeof seg.v === 'string' ? { ...seg, v: seg.v.replace(/^\n/, '') } : seg])}
+          </div>
+        ))}
       </div>
     );
   }

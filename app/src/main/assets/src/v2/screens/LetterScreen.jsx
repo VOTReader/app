@@ -187,36 +187,64 @@ function Addendum({ letter, onGo }) {
   return <span className="addendum">Addendum to {link}</span>;
 }
 
+/** Where a study's section intro names its source: "(An excerpt from <letter>)" (5d). */
+const SOURCE = '(An excerpt from';
+
+/**
+ * A study intro paragraph's words, its source (from "(An excerpt from" to the end) set apart as 5d draws it: roman,
+ * smaller, the letter's name a gold cite. The DOM text is unchanged (only a span is added).
+ * @param {any[]} segments
+ */
+export function withSource(segments) {
+  const at = segments.findIndex((x) => x && typeof x.v === 'string' && x.v.indexOf(SOURCE) >= 0);
+  if (at < 0) return renderSegments(segments);
+  const v = /** @type {string} */ (segments[at].v);
+  const cut = v.indexOf(SOURCE);
+  // the words before the source keep their own segment's look; the source begins at its parenthesis
+  const head = renderSegments([...segments.slice(0, at), { ...segments[at], v: v.slice(0, cut) }]);
+  const tail = renderSegments([{ t: 'text', v: v.slice(cut) }, ...segments.slice(at + 1)]);
+  return <>{head}<span className="src">{tail}</span></>;
+}
+
 /**
  * The section intro quote above a letter's text (main's section-intro-quote). Its lines carry main's read-tracker marks
- * (data-read-seg: the read detector counts these words), never a mark anchor (main keeps it out of highlights).
- * @param {{ blocks: any[] }} props
+ * (data-read-seg: the read detector counts these words), never a mark anchor (main keeps it out of highlights). A
+ * study's (`study`) is 5d's: a gold rule at its left and its source set apart.
+ * @param {{ blocks: any[], study?: boolean }} props
  */
-const SectionIntro = React.memo(/** @param {{ blocks: any[] }} props */ function SectionIntro({ blocks }) {
+const SectionIntro = React.memo(/** @param {{ blocks: any[], study?: boolean }} props */ function SectionIntro({ blocks, study = false }) {
   return (
-    <div className="intro-quote">
+    <div className={study ? 'sintro' : 'intro-quote'}>
       {blocks.map((b, i) => {
         if (b && b.type === 'heading') return <h3 key={i} className="sec-h" data-read-seg={'intro-h:' + i}>{b.text}</h3>;
         if (!b || !Array.isArray(b.segments)) return null;
-        return <p key={i} data-read-seg={'intro-p:' + i}>{renderSegments(b.segments)}</p>;
+        return <p key={i} data-read-seg={'intro-p:' + i}>{study ? withSource(b.segments) : renderSegments(b.segments)}</p>;
       })}
     </div>
   );
 });
 
 /**
- * One letter, or with `preface` the collection's preface (its next card is Letter 1).
+ * Another page's text read through this one (a study chapter, StudyChapterScreen): the item itself and what the page
+ * says about it, in place of a collection's letter. `recorded: false`: a gate's page with no recording (no Listen).
+ * @typedef {{ letter: any, volKey: string, label: string, eyebrow: string, titleCls?: string, study?: boolean,
+ *   body?: any, next?: { k: string, t: string, open: () => void } | null, recorded?: boolean }} PageDoc
+ */
+
+/**
+ * One letter, or with `preface` the collection's preface (its next card is Letter 1), or with `doc` another page's text
+ * read the same way (marks, references, footnotes, Listen and the read-along are the letter's).
  * `onGo` opens another letter as a new page (an addendum's).
  * @param {{ collection: string, n?: number, preface?: boolean, onReady?: () => void, onOpenLetter?: (n: number) => void,
  *   gate?: import('../gate.js').GateState | null, desktop?: boolean, waitDoubleTap?: boolean,
  *   onNote?: (target: Record<string, any>) => void, facts?: import('../settings-facts.js').SettingsFacts,
- *   onGo?: (route: any) => void, landAt?: { excerpt: string, match?: string[] } | null }} props
+ *   onGo?: (route: any) => void, landAt?: { excerpt: string, match?: string[] } | null, doc?: PageDoc | null }} props
  */
 export function LetterScreen({ collection, n = 0, preface = false, onReady, onOpenLetter, gate = null, desktop = false,
-  waitDoubleTap = false, onNote, facts = {}, onGo, landAt = null }) {
-  const col = collectionOf(collection);
+  waitDoubleTap = false, onNote, facts = {}, onGo, landAt = null, doc = null }) {
+  const col = doc ? null : collectionOf(collection);
   const letters = useLetters(col);
-  const letter = letters ? (preface ? prefaceOf(col) : letterAt(letters, n)) : null;
+  const letter = doc ? doc.letter : letters ? (preface ? prefaceOf(col) : letterAt(letters, n)) : null;
   const bodyRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const headRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const [sheet, setSheet] = React.useState(
@@ -233,7 +261,7 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
   React.useEffect(() => {
     if (live && held && !noticeUp) { setHeld(false); setSheet(null); }
   }, [live, held, noticeUp]);
-  const volKey = col ? col.volKey : '';
+  const volKey = doc ? doc.volKey : col ? col.volKey : '';
   const scan = React.useMemo(() => (letter && isFormatB(letter) ? formatBRefs(letter, volKey) : null), [letter, volKey]);
   const items = React.useMemo(() => footnoteItems(letter, volKey, scan), [letter, volKey, scan]);
 
@@ -309,6 +337,12 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
   const openMark = (el) => {
     const h = /** @type {HTMLElement} */ (el).dataset || {};
     if (el.classList.contains('fn-ref')) { if (h.fnNum) setRefOpen({ kind: 'fn', num: h.fnNum }); return; }
+    // a letter the text names (a study's letter-link), or an outside page
+    if (h.url) { window.open(h.url, '_blank', 'noopener'); return; }
+    if (h.col || h.letter) {
+      openLetterLink(h.col && h.title ? { collection: h.col, letterTitle: h.title } : { id: h.letter }, null, onGo);
+      return;
+    }
     if (h.nav) {
       const [book, ch] = h.nav.split(':');
       if (onGo) onGo({ place: 'bible-chapter', book, chapter: Number(ch) });
@@ -427,11 +461,11 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
   };
 
   if (!letters) return null;
-  if (!col || !letter) {
+  if ((!doc && !col) || !letter) {
     return <div className="empty"><div className="t">This letter could not be opened.</div></div>;
   }
   const nextN = preface ? 1 : n + 1;
-  const next = letterAt(letters, nextN);
+  const next = doc ? null : letterAt(letters, nextN);
   // a Format B entry (Words To Live By, The Blessed): its part and number above the title, no header lines (1d)
   const fb = isFormatB(letter);
   const unit = fb ? (col.volKey === 'answers' ? 'Topic' : 'Entry') : 'Letter';
@@ -440,35 +474,41 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
   if (filled(letter.noteLine)) meta.push(<span className="note">{lineOf(letter.noteLine)}</span>);
   if (filled(letter.metaAddendum)) meta.push(<Addendum letter={letter} onGo={onGo} />);
   const intro = Array.isArray(letter.sectionIntro) ? letter.sectionIntro : [];
+  const label = doc ? doc.label : col.label;
+  const card = doc ? doc.next || null
+    : next ? { k: 'Next · ' + unit + ' ' + nextN, t: next.title, open: () => onOpenLetter && onOpenLetter(nextN) } : null;
   return (
     <>
       <div className={'page-head g reader-head' + (fb ? ' fb-head' : '')} ref={headRef} onClick={onHeadClick} onKeyDown={onBodyKey}>
-        <span className="overline eyebrow">{fb ? entryEyebrow(col, n) : col.label + ' · ' + (preface ? 'Preface' : 'Letter ' + n)}</span>
-        <h1 className={titleClass(letter.title)}>{letter.title}</h1>
-        <ListenPill gate={gate} collection={collection} n={n} volKey={col.volKey} letter={letter} collectionLabel={col.label}
-          onToast={setToast} />
+        {doc ? <span className="overline eyebrow wrap">{doc.eyebrow}</span>
+          : <span className="overline eyebrow">{fb ? entryEyebrow(col, n) : col.label + ' · ' + (preface ? 'Preface' : 'Letter ' + n)}</span>}
+        <h1 className={(doc && doc.titleCls) || titleClass(letter.title)}>{letter.title}</h1>
+        {!(doc && doc.recorded === false) && (
+          <ListenPill gate={gate} collection={collection} n={n} volKey={volKey} letter={letter} collectionLabel={label}
+            onToast={setToast} />
+        )}
         {meta.length > 0 && <div className="meta">{meta.map((m, i) => <React.Fragment key={i}>{i > 0 && <br />}{m}</React.Fragment>)}</div>}
         {/* the question put to The Lord that the letter answers */}
         {filled(letter.preamble) && <p className="preamble">{lineOf(letter.preamble)}</p>}
       </div>
       <div className="hair" />
-      <div className={'body g first' + (fb ? ' fb' : '') + (sheet ? ' marked' : '')} ref={bodyRef} onClick={onBodyClick}
-        onKeyDown={onBodyKey}>
-        {intro.length > 0 && <SectionIntro blocks={intro} />}
-        <LetterBody letter={letter} scan={scan} />
+      <div className={'body g first' + (fb ? ' fb' : '') + (doc && doc.study ? ' study' : '') + (sheet ? ' marked' : '')}
+        ref={bodyRef} onClick={onBodyClick} onKeyDown={onBodyKey}>
+        {intro.length > 0 && <SectionIntro blocks={intro} study={!!(doc && doc.study)} />}
+        {doc && doc.body ? doc.body : <LetterBody letter={letter} scan={scan} />}
         {/* the end of the text (main's sentinel): auto-scroll comes to rest here, before the footnotes */}
         <span className="reading-end" aria-hidden="true" />
         <FootnoteList items={items} letter={letter} onGo={live ? goToRef : () => {}} onRead={live ? readLink : () => {}} />
-        {next && (
-          <button type="button" className="nextcard" onClick={() => onOpenLetter && onOpenLetter(nextN)}>
-            <span className="tx"><span className="k">Next · {unit} {nextN}</span><span className="t">{next.title}</span></span>
+        {card && (
+          <button type="button" className="nextcard" onClick={card.open}>
+            <span className="tx"><span className="k">{card.k}</span><span className="t">{card.t}</span></span>
             <span className="chev"><Icon name="chev" /></span>
           </button>
         )}
       </div>
       {/* the sentence being read, lit (readalong rv1 1b): main's read-along over the body's [data-hl-key] blocks */}
-      <LetterReadAlong gate={gate} collection={collection} n={n} volKey={col.volKey} letterId={letter.id} bodyRef={bodyRef}
-        on={facts.readAlong !== false} follow={facts.readAlongFollow !== false} onListen={listenHere(live, col, letter, setToast)}
+      <LetterReadAlong gate={gate} collection={collection} n={n} volKey={volKey} letterId={letter.id} bodyRef={bodyRef}
+        on={facts.readAlong !== false} follow={facts.readAlongFollow !== false} onListen={listenHere(live, { volKey, label }, letter, setToast)}
         paragraphs={scan ? letter.paragraphs : null} scan={scan} />
       {sheet && !held && (
         <MarkSheet colour={sheet.colour} marked={sheet.marked} desktop={desktop} onColour={onColour} onNote={onAddNote}
@@ -486,7 +526,7 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
 
 /**
  * main's Listen for this letter (Listen from here plays it first; offline it says why, as the pill does), or null when
- * it has no recording or on a gate.
+ * it has no recording or on a gate. `col`: its { volKey, label }.
  * @param {(t: import('../player/listen.jsx').Toast) => void} onToast
  */
 function listenHere(live, col, letter, onToast) {
@@ -520,14 +560,15 @@ function bookmarksVersion() {
  * keeps it (shown in Notes, and in main's Bookmarks), filled while it is saved; a second tap takes it out again with an
  * Undo (main asked "delete?" first; the kit's toast undoes instead). Only the whole-letter bookmark counts: a bookmark on
  * one of its paragraphs is its own. The first save of a Safari tab waits on the 7-day notice (main drops that tap too).
- * A gate boot draws the empty icon and touches nothing.
- * @param {{ route: any, gate: any }} props
+ * A gate boot draws the empty icon and touches nothing. `item`: another page's text read as a letter (a study chapter,
+ * main's same 'letter:<id>' bookmark), `noun` what it is called.
+ * @param {{ route: any, gate: any, item?: any, noun?: string }} props
  */
-export function LetterBookmark({ route, gate }) {
+export function LetterBookmark({ route, gate, item = null, noun = 'letter' }) {
   const live = !gate;
-  const col = collectionOf(route.collection);
+  const col = item ? null : collectionOf(route.collection);
   const letters = useLetters(col);
-  const letter = letters && col ? (route.preface ? prefaceOf(col) : letterAt(letters, route.n)) : null;
+  const letter = item || (letters && col ? (route.preface ? prefaceOf(col) : letterAt(letters, route.n)) : null);
   React.useSyncExternalStore(live ? subscribeBookmarks : noStore, live ? bookmarksVersion : zero);
   const [toast, setToast] = React.useState(/** @type {null | { text: string, icon?: string, act?: string, onAct?: () => void }} */ (null));
   React.useEffect(() => {
@@ -558,7 +599,7 @@ export function LetterBookmark({ route, gate }) {
   };
   return (
     <>
-      <button type="button" className="ic" aria-label={on ? 'Remove bookmark' : 'Bookmark this letter'} aria-pressed={on}
+      <button type="button" className="ic" aria-label={on ? 'Remove bookmark' : 'Bookmark this ' + noun} aria-pressed={on}
         onClick={onClick}><Icon name="bookmark" /></button>
       <LayerToast text={toast && toast.text} icon={toast && toast.icon} act={toast && toast.act} onAct={toast && toast.onAct} />
     </>

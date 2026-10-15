@@ -11,3 +11,16 @@
 .v2 button.row.stc.cur { width: calc(100% + 14px); }
 /* main's "Some studies couldn't load." and its Try again */
 .empty.stu-err { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
+/* A study chapter (5d, 5f): the kit's .sintro and prophecy cards (screens.css); these place what the kit has no recipe for.
+   An Introduction card (main draws one before a prophecy when the group has words for it) is neutral, not tinted. */
+.pcard.intro { --pc-edge: var(--edge); --pc-bg: transparent; --pc-ink: var(--t2); }
+.v2 .pcard .pc-h { color: inherit; }
+/* a study's own headings: a section (level 2) at the kit's .h2, a sub-heading (3, and in cards) at .sec-h */
+.reader .body .st-h { margin: 1.4em 0 .5em; color: var(--t1); }
+.reader .body .st-h3 { margin: 1.2em 0 .45em; }
+.reader .body .pc-b .st-h3:first-child { margin-top: 0; }
+/* the study's cover and its pictures: the column's width, the kit's corners; a caption under its picture */
+.reader .body .st-fig { margin: 1.1em 0 .5em; }
+.reader .body .st-fig img { display: block; width: 100%; height: auto; border-radius: var(--r); }
+.reader .body .st-cap { font-size: var(--fs-s); color: var(--t2); text-align: center; }

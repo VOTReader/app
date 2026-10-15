@@ -56,6 +56,13 @@ const WTLB_46 = [{ place: 'home' }, { place: 'collection', collection: 'wtlb1' }
 const WTLB_76 = [{ place: 'home' }, { place: 'collection', collection: 'wtlb1' }, { place: 'letter', collection: 'wtlb1', n: 76 }];
 /** Volume One, Letter 9 (1f, 1g). */
 const LETTER_9 = [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 9 }];
+/** YAHUSHUA More Than a Man's chapter 2 from Home > Studies > the study (5d, 5f). */
+const STUDY_CH2 = [{ place: 'home' }, { place: 'studies' }, { place: 'study', study: 'more-than-a-man' },
+  { place: 'study-chapter', study: 'more-than-a-man', chapter: 'more-than-a-man-ch2' }];
+/** Its first prophecy group's cards as 5f draws them (main's card keys: '<chapter>:<block>:<kind>'). */
+const CH2_CARDS = { 'more-than-a-man-ch2:0:nt': false, 'more-than-a-man-ch2:0:vot': false };
+/** What the chapter's page reads on 5d / 5f: no recording (no Listen), its cards as drawn. */
+const CH2_FACTS = { studies: { recorded: false, cards: CH2_CARDS } };
 const LETTER_ONE_PLAYING = { item: { collection: 'one', n: 1 }, reader: 'B', at: 231, length: 608, paused: false, saved: true };
 
 /** @type {Record<string, GateState>} */
@@ -255,6 +262,13 @@ export const GATE_STATES = {
     stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],
     open: { sheet: 'auto-scroll' },
   },
+  // states.json 5d-study-chapter: YAHUSHUA More Than a Man, chapter 2 (Section Two) from the study's page, at the top; no
+  // recording, so no Listen. Its first group's cards as 5f (the laptop shows the first card).
+  '5d-study-chapter': { stack: STUDY_CH2, facts: CH2_FACTS },
+  // states.json 5f-prophecy-cards: the same chapter scrolled so the first group's label sits 92 px below the screen top
+  // (the scroller starts under the 27 px status bar and the 56 px top bar: 92 - 83), the Old Testament card open, the
+  // New Testament and Volumes of Truth cards closed (main opens every card; the gate closes these two).
+  '5f-prophecy-cards': { stack: STUDY_CH2, facts: CH2_FACTS, scroll: { to: '.body .pgrp', gap: 9 } },
 };
 
 /**

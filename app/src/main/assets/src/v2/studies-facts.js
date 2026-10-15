@@ -191,3 +191,81 @@ export function askMatthew(gl = g) {
   if (gl.MATTHEW || typeof gl.__loadMatthewCorpus !== 'function') return Promise.resolve();
   return Promise.resolve(gl.__loadMatthewCorpus()).then(() => {}, () => {});
 }
+
+/* ── A study's chapter (5d, 5f; main's BibleStudyChapterView through LetterView) ─────────────────────────────────── */
+
+/** A chapter of a study by its id (a Matthew chapter by its number), or null. */
+export function chapterOf(s, id) {
+  if (!s || id == null || !Array.isArray(s.chapters)) return null;
+  return s.chapters.find((c) => c && chapterId(s, c) === String(id)) || null;
+}
+
+/** The chapter's eyebrow (main's "<study> · Chapter n", "Preface" for a study's preface; the study by design's title rule). */
+export function chapterEyebrow(s, c) {
+  return splitStudyTitle(s.title).title + ' · ' + (c.num === 0 ? 'Preface' : 'Chapter ' + c.num);
+}
+
+/**
+ * Where the chapter's Next card goes (main's bottom nav, onward only): the study's next chapter, which takes this one's
+ * place so Back still names the study; after its last, the first chapter of the next study in main's chain (main's
+ * "Next · <study>"), a new page. Null at the chain's end.
+ * @returns {{ k: string, t: string, route: any, replace: boolean } | null}
+ */
+export function chapterNext(s, c, studies = g.BIBLE_STUDIES, matthew = g.MATTHEW) {
+  const list = Array.isArray(s.chapters) ? s.chapters : [];
+  const i = list.indexOf(c);
+  const nx = i >= 0 ? list[i + 1] : null;
+  if (nx) {
+    return { k: 'Next · ' + (nx.num === 0 ? 'Preface' : 'Chapter ' + nx.num), t: curly(nx.title || 'Chapter ' + nx.num),
+      route: { place: 'study-chapter', study: s.id, chapter: chapterId(s, nx) }, replace: true };
+  }
+  const chain = studyChain(studies, matthew);
+  const j = chain.findIndex((x) => x.id === s.id);
+  const ns = j >= 0 ? chain[j + 1] : null;
+  if (!ns) return null;
+  const first = ns.chapters[0];
+  const route = ns.isMatthewStudy ? { place: 'study-chapter', study: ns.id, chapter: '1' }
+    : { place: 'study-chapter', study: ns.id, chapter: first.id };
+  return { k: 'Next · ' + splitStudyTitle(ns.title).title, t: ns.isMatthewStudy ? 'Chapter 1' : curly(first.title || ''),
+    route, replace: false };
+}
+
+/** main's prophecy cards in a group, in main's order with main's tags (ProphecyGroup.jsx); an Introduction only when it
+ *  has words. @returns {Array<{ kind: string, tag: string, label: string | null, blocks: any[] }>} */
+export function groupCards(block) {
+  /** @type {Array<{ kind: string, tag: string, label: string | null, blocks: any[] }>} */
+  const out = [];
+  if (Array.isArray(block.intro) && block.intro.length) out.push({ kind: 'intro', tag: 'Introduction', label: null, blocks: block.intro });
+  for (const [kind, tag] of [['ot', 'Old Testament Prophecy'], ['nt', 'Fulfilled in the New Testament'],
+    ['vot', 'Fulfillment in the Volumes of Truth']]) {
+    const c = block[kind];
+    if (c) out.push({ kind, tag, label: c.label || null, blocks: Array.isArray(c.blocks) ? c.blocks : [] });
+  }
+  return out;
+}
+
+/** A card's key in main's saved card states (ProphecyCardsStore) and the stem of its paragraphs' mark keys. */
+export const cardKey = (/** @type {string} */ chapterIdOf, /** @type {number} */ block, /** @type {string} */ kind) =>
+  chapterIdOf + ':' + block + ':' + kind;
+
+/** Every card of a chapter that has words (main's prophecyCardKeysOf: what Collapse / Open all cards changes). */
+export function chapterCardKeys(c) {
+  /** @type {string[]} */
+  const keys = [];
+  (c && Array.isArray(c.blocks) ? c.blocks : []).forEach((b, bi) => {
+    if (!b || b.type !== 'prophecy-group') return;
+    for (const card of groupCards(b)) if (card.blocks.length) keys.push(cardKey(c.id, bi, card.kind));
+  });
+  return keys;
+}
+
+/** A closed card's count: "n passages" (its paragraphs and poems). */
+export function passagesWords(blocks) {
+  const n = (blocks || []).filter((b) => b && (b.type === 'para' || b.type === 'poetry')).length;
+  return n + (n === 1 ? ' passage' : ' passages');
+}
+
+/** True when a card is open: main's saved state, else open (main opens every card). */
+export function cardOpen(states, key) {
+  return !(states && Object.prototype.hasOwnProperty.call(states, key)) || !!states[key];
+}

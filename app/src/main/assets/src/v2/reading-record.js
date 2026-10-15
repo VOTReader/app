@@ -64,6 +64,20 @@ export function visitOf(route, gl = g) {
       entry: { type: 'chapter', bookId, bookTitle: book.title || bookId, chapterNum: n, chapterTitle: ch.title || null },
     };
   }
+  // a Bible study's chapter (main's selectStudyChapter + use-nav-history-tracking): the study's read key
+  // 'bible-study-<slug>' is the place, lastReadChapters under it the chapter's id, read marks 'v1:bible-study-<slug>:<id>'
+  if (route.place === 'study-chapter') {
+    const studies = Array.isArray(gl.BIBLE_STUDIES) ? gl.BIBLE_STUDIES : [];
+    const study = studies.find((s) => s && s.id === route.study) || null;
+    const ch = study && Array.isArray(study.chapters) ? study.chapters.find((c) => c && c.id === String(route.chapter)) : null;
+    if (!ch) return null;
+    const key = 'bible-study-' + study.slug;
+    return {
+      key: 'st:' + study.id + ':' + ch.id, active: key, slot: 'lastReadChapters', at: key, value: ch.id, read: readKey(key, ch.id),
+      entry: { type: 'study-chapter', studyId: study.id, studyChapterId: ch.id, studyTitle: study.title, studySlug: study.slug,
+        chapterTitle: ch.title, chapterNum: ch.num },
+    };
+  }
   return null;
 }
 

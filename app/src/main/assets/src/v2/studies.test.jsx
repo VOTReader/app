@@ -4,9 +4,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, waitFor, act } from '@testing-library/react';
 import { V2App } from './App.jsx';
+import { StudyChapterScreen } from './screens/StudyChapterScreen.jsx';
+import { defineStart } from './places.js';
+import { visitOf } from './reading-record.js';
 import {
   splitStudyTitle, studyChain, studyRow, coverageWords, studyEntries, studyHead, studyRoute, savedStudyPlace, partHolding,
-  curly,
+  curly, chapterOf, chapterEyebrow, chapterNext, groupCards, chapterCardKeys, passagesWords, cardOpen,
 } from './studies-facts.js';
 
 const g = /** @type {any} */ (globalThis);
@@ -46,18 +49,23 @@ function studies() {
 const MATTHEW = { chapters: Array.from({ length: 28 }, (_x, i) => ({ num: i + 1, title: 'Matthew ' + (i + 1), verses: [] })) };
 
 /** main's lazy loaders as index.html + translations.js give them: the studies and Matthew land on the first ask. */
-function installLoaders({ fail = false } = {}) {
+function installLoaders({ fail = false, make = studies } = {}) {
   g.loadBibleStudies = vi.fn(() => {
     if (fail) return Promise.resolve(false);
-    g.BIBLE_STUDIES = studies();
+    g.BIBLE_STUDIES = make();
     return Promise.resolve(true);
   });
   g.__loadMatthewCorpus = vi.fn(() => { g.MATTHEW = MATTHEW; return Promise.resolve(); });
 }
 
+/** @type {Array<() => void>} */
+const undo = [];
+
 afterEach(() => {
   cleanup();
-  for (const k of ['BIBLE_STUDIES', 'MATTHEW', 'loadBibleStudies', '__loadMatthewCorpus', 'StateStore', 'AUDIO_MANIFEST', 'matchMedia']) delete g[k];
+  for (const k of ['BIBLE_STUDIES', 'MATTHEW', 'loadBibleStudies', '__loadMatthewCorpus', 'StateStore', 'AUDIO_MANIFEST', 'matchMedia',
+    'ProphecyCardsStore', 'COL_BY_KEY', 'V2_LETTERS']) delete g[k];
+  while (undo.length) undo.pop()();
   delete html.dataset.gate;
   localStorage.clear();
   vi.restoreAllMocks();
@@ -201,5 +209,235 @@ describe("a study's page (2e)", () => {
     expect(container.querySelectorAll('.pch').length).toBe(1);
     await click(container.querySelectorAll('.pch .row.stc')[2]);
     await waitFor(() => expect(container.querySelector('.tb .ic').getAttribute('aria-label')).toBe('Back to YAHUSHUA More Than a Man'));
+  });
+});
+
+const sg = (v, t = 'text') => ({ t, v });
+const para = (...segments) => ({ type: 'para', segments });
+const named = (title, col) => ({ t: 'letter-link', letterId: 'x-' + title.length, label: '"' + title + '" - ' + col,
+  link: { collection: col, letterTitle: title } });
+/** main's chapter 2, cut down: its section intro and source, its first prophecy group as shipped (Old Testament with
+ *  {{ref}}s, New Testament with a heading, Volumes of Truth naming a letter), a heading, a paragraph and a poem kept a
+ *  line a segment (as chapter 13's). */
+function chapter2() {
+  return ch('more-than-a-man-ch2', 2, 'Section Two: YahuShua The Messiah, The Son of God', {
+    sectionIntro: [para(sg('Therefore, remember My words and have peace, says The Lord. (An excerpt from '),
+      named('The Truth Absolute', 'Volume Three'), sg(')'))],
+    blocks: [
+      { type: 'prophecy-group', label: 'YahuShua Is The Son of God', intro: [],
+        ot: { label: 'The Messiah Would Be The Son of God', blocks: [
+          para(sg('"Yet I have set My King on My holy hill of Zion." - {{ref:Psalm 2:6-8}}')),
+          para(sg('Also I will make him '), sg('My Firstborn,', 'bold-italic'), sg(' the highest of the kings of the earth. - {{ref:Psalm 89:27}}')),
+        ] },
+        nt: { label: 'YahuShua Is The Son of God', blocks: [
+          para(sg('And suddenly a voice came from Heaven. - {{ref:Matthew 3:17}}')),
+          { type: 'heading', text: 'YAHUSHUA' },
+          para(sg('Truly You are The Son of God. - {{ref:Matthew 14:33}}')),
+        ] },
+        vot: { label: 'YahuShua Is The Son of God', blocks: [para(sg('For I had sent to you My Son ('), named('Hearts Changed', 'Volume Two'), sg(')'))] } },
+      { type: 'heading', level: 2, text: 'The Son of God' },
+      para(sg('Thus says The Lord.')),
+      { type: 'poetry', segments: [sg('I carried the weight of the world’s sin to the cross,', 'italic'),
+        sg('\nAnd crucified sin through My suffering;', 'italic')] },
+    ],
+  });
+}
+const withChapter2 = () => { const s = studies(); s[0].chapters[2] = chapter2(); return s; };
+const CH2 = 'more-than-a-man-ch2';
+
+/**
+ * main's ProphecyCardsStore as v2 reads it. `keepsClosed: false` is main's store today: setAll drops every false, so a
+ * closed card is never kept.
+ */
+function cardStore(init = {}, { keepsClosed = true } = {}) {
+  let map = { ...init };
+  let v = 0;
+  const subs = new Set();
+  return {
+    getAll: () => ({ ...map }),
+    setAll: vi.fn((m) => {
+      map = Object.fromEntries(Object.entries(m).filter(([, x]) => keepsClosed || x));
+      v++;
+      subs.forEach((f) => f());
+    }),
+    subscribe: (f) => { subs.add(f); return () => subs.delete(f); },
+    getVersion: () => v,
+  };
+}
+
+/** The chapter's page on a real boot, with what it was handed. */
+function openChapter(chapter = CH2, store = cardStore()) {
+  g.BIBLE_STUDIES = withChapter2();
+  g.ProphecyCardsStore = store;
+  const go = vi.fn();
+  const replace = vi.fn();
+  const r = render(<StudyChapterScreen route={{ place: 'study-chapter', study: 'more-than-a-man', chapter }} gate={null}
+    go={go} replace={replace} pop={vi.fn()} openTab={vi.fn()} onReady={() => {}} desktop={false} device="phone"
+    facts={{ doubleTapFullscreen: false }} />);
+  return { ...r, go, replace, store };
+}
+const cardsOf = (root) => [...root.querySelectorAll('.pgrp .pcard')].map((c) => ({
+  kind: c.className.replace(/^pcard /, '').replace(/ open$/, ''), open: c.classList.contains('open'),
+  n: c.querySelector('.pc-n') ? c.querySelector('.pc-n').textContent : null }));
+const menuRows = () => [...document.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent);
+const menuRow = (t) => [...document.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent === t);
+
+describe("a study's chapter (5d) and its prophecy cards (5f)", () => {
+  it("the chapter's facts: by id, its eyebrow, main's cards in main's order, what Collapse all changes", () => {
+    const [mtam] = withChapter2();
+    const c = chapterOf(mtam, CH2);
+    expect(c.title).toBe('Section Two: YahuShua The Messiah, The Son of God');
+    expect(chapterOf(mtam, 'nope')).toBe(null);
+    expect(chapterEyebrow(mtam, c)).toBe('YAHUSHUA More Than a Man · Chapter 2');
+    expect(chapterEyebrow(mtam, mtam.chapters[0])).toBe('YAHUSHUA More Than a Man · Preface');
+    const group = c.blocks[0];
+    expect(groupCards(group).map((x) => [x.kind, x.tag])).toEqual([['ot', 'Old Testament Prophecy'],
+      ['nt', 'Fulfilled in the New Testament'], ['vot', 'Fulfillment in the Volumes of Truth']]);
+    // an Introduction card only when it has words
+    expect(groupCards({ ...group, intro: [para(sg('First.'))] })[0]).toMatchObject({ kind: 'intro', tag: 'Introduction' });
+    expect(chapterCardKeys(c)).toEqual([CH2 + ':0:ot', CH2 + ':0:nt', CH2 + ':0:vot']);
+    expect(passagesWords(group.nt.blocks)).toBe('2 passages');
+    expect(passagesWords(group.vot.blocks)).toBe('1 passage');
+    // none saved = open (main's default); a saved false closes it
+    expect(cardOpen({}, CH2 + ':0:nt')).toBe(true);
+    expect(cardOpen({ [CH2 + ':0:nt']: false }, CH2 + ':0:nt')).toBe(false);
+    expect(cardOpen({ [CH2 + ':0:nt']: true }, CH2 + ':0:nt')).toBe(true);
+  });
+
+  it("Next: the study's next chapter in place; after its last, the next study's first chapter (Matthew's by number) as a new page", () => {
+    const list = withChapter2();
+    const [mtam, , lamb] = list;
+    expect(chapterNext(mtam, mtam.chapters[2], list, MATTHEW)).toEqual({ k: 'Next · Chapter 3',
+      t: 'Section Three: The Lineage of YahuShua The Messiah', route: { place: 'study-chapter', study: 'more-than-a-man', chapter: 'more-than-a-man-ch3' },
+      replace: true });
+    expect(chapterNext(mtam, mtam.chapters[0], list, MATTHEW).k).toBe('Next · Chapter 1');
+    expect(chapterNext(mtam, mtam.chapters[30], list, MATTHEW)).toEqual({ k: 'Next · The Volumes of Truth New Testament Study Bible',
+      t: 'Chapter 1', route: { place: 'study-chapter', study: 'matthew-study', chapter: '1' }, replace: false });
+    expect(chapterNext(lamb, lamb.chapters[15], list, MATTHEW)).toMatchObject({ k: 'Next · The False Doctrine of “The Trinity” Exposed',
+      route: { place: 'study-chapter', study: 'trinity-exposed', chapter: 'tr-ch1' }, replace: false });
+    const odds = list.find((s) => s.id === 'odds-chart');
+    expect(chapterNext(odds, odds.chapters[0], list, MATTHEW)).toBe(null);
+  });
+
+  it("5d from the gate: the eyebrow, the title, the intro's source set apart, no Listen; Back names the study", async () => {
+    installLoaders({ make: withChapter2 });
+    const store = cardStore();
+    g.ProphecyCardsStore = store;
+    const { container } = render(<V2App gateId="5d-study-chapter" />);
+    await waitFor(() => expect(html.dataset.gate).toBe('ready'));
+    expect(container.querySelector('.reader-head .eyebrow').textContent).toBe('YAHUSHUA More Than a Man · Chapter 2');
+    expect(container.querySelector('.reader-head h1.display.longer').textContent).toBe('Section Two: YahuShua The Messiah, The Son of God');
+    expect(container.querySelector('.tb .ic').getAttribute('aria-label')).toBe('Back to YAHUSHUA More Than a Man');
+    expect(container.querySelector('.pill.play')).toBe(null);
+    const intro = container.querySelector('.body.study .sintro p');
+    // the DOM text is main's; only a span sets the source apart
+    expect(intro.textContent).toBe('Therefore, remember My words and have peace, says The Lord. (An excerpt from "The Truth Absolute" - Volume Three)');
+    const src = intro.querySelector('span.src');
+    expect(src.textContent).toBe('(An excerpt from "The Truth Absolute" - Volume Three)');
+    const cite = src.querySelector('a.cite');
+    expect([cite.getAttribute('data-col'), cite.getAttribute('data-title')]).toEqual(['Volume Three', 'The Truth Absolute']);
+    // the cards as 5f draws them: the Old Testament open, the other two closed with their counts; nothing saved
+    expect(cardsOf(container)).toEqual([{ kind: 'ot', open: true, n: null }, { kind: 'nt', open: false, n: '2 passages' },
+      { kind: 'vot', open: false, n: '1 passage' }]);
+    expect(container.querySelector('.pcard.ot .pc-sub').textContent).toBe('The Messiah Would Be The Son of God');
+    expect(store.setAll).not.toHaveBeenCalled();
+    expect(localStorage.length).toBe(0);
+  });
+
+  it("a gate's ... opens every card without saving; then it offers Collapse all cards", async () => {
+    installLoaders({ make: withChapter2 });
+    const store = cardStore();
+    g.ProphecyCardsStore = store;
+    const { container } = render(<V2App gateId="5f-prophecy-cards" />);
+    await waitFor(() => expect(html.dataset.gate).toBe('ready'));
+    await click(container.querySelector('.tb [aria-label="More"]'));
+    expect(menuRows()).toEqual(['Find in this chapter', 'Open all cards']);
+    await click(menuRow('Open all cards'));
+    expect(cardsOf(container).every((c) => c.open)).toBe(true);
+    await click(container.querySelector('.tb [aria-label="More"]'));
+    expect(menuRows()).toEqual(['Find in this chapter', 'Collapse all cards']);
+    expect(store.setAll).not.toHaveBeenCalled();
+  });
+
+  it("a real boot: every card open with none saved, a saved false closed; a tap saves it as main does", () => {
+    const { container, store } = openChapter(CH2, cardStore({ [CH2 + ':0:vot']: false, other: true }));
+    expect(cardsOf(container).map((c) => c.open)).toEqual([true, true, false]);
+    const nt = container.querySelector('.pcard.nt .pc-h');
+    expect(nt.getAttribute('aria-expanded')).toBe('true');
+    // an open card's paragraphs keep main's mark keys; a closed card's text is not drawn (Find does not count it)
+    expect([...container.querySelectorAll('.pcard.nt [data-hl-key]')].map((p) => p.getAttribute('data-hl-key')))
+      .toEqual(['letter:' + CH2 + ':0:nt:0', 'letter:' + CH2 + ':0:nt:2']);
+    expect(container.querySelector('.pcard.nt h3.sec-h').textContent).toBe('YAHUSHUA');
+    expect(container.querySelector('.pcard.vot .pc-b')).toBe(null);
+    click(nt);
+    expect(store.setAll).toHaveBeenLastCalledWith({ [CH2 + ':0:vot']: false, other: true, [CH2 + ':0:nt']: false });
+    expect(cardsOf(container)[1]).toEqual({ kind: 'nt', open: false, n: '2 passages' });
+    click(container.querySelector('.pcard.vot .pc-h'));
+    expect(store.setAll).toHaveBeenLastCalledWith({ [CH2 + ':0:vot']: true, other: true, [CH2 + ':0:nt']: false });
+    expect(container.querySelector('.pcard.vot').textContent).toContain('For I had sent to you My Son (');
+  });
+
+  it("with main's store as it is (it keeps no closed card), a closed card stays closed and the ... offers Open all cards", async () => {
+    installLoaders({ make: withChapter2 });
+    const store = cardStore({}, { keepsClosed: false });
+    g.ProphecyCardsStore = store;
+    undo.push(defineStart(() => [{ place: 'home' }, { place: 'study', study: 'more-than-a-man' },
+      { place: 'study-chapter', study: 'more-than-a-man', chapter: CH2 }]));
+    const { container } = render(<V2App gateId={null} />);
+    await waitFor(() => expect(container.querySelector('.pgrp')).not.toBe(null));
+    await click(container.querySelector('.pcard.ot .pc-h'));
+    expect(store.getAll()).toEqual({});
+    expect(cardsOf(container).map((c) => c.open)).toEqual([false, true, true]);
+    await click(container.querySelector('.tb [aria-label="More"]'));
+    expect(menuRows()).toEqual(['Find in this chapter', 'Open all cards']);
+    await click(menuRow('Open all cards'));
+    expect(cardsOf(container).map((c) => c.open)).toEqual([true, true, true]);
+    expect(store.setAll).toHaveBeenLastCalledWith({ [CH2 + ':0:ot']: true, [CH2 + ':0:nt']: true, [CH2 + ':0:vot']: true });
+    await click(container.querySelector('.tb [aria-label="More"]'));
+    await click(menuRow('Collapse all cards'));
+    expect(cardsOf(container).map((c) => c.open)).toEqual([false, false, false]);
+  });
+
+  it("references and named letters as main draws them: {{ref}} a gold cite with main's words; a named letter opens it", () => {
+    g.COL_BY_KEY = new Map([['two', { volKey: 'two', globalName: 'V2_LETTERS', prefaceGlobal: null, label: 'Volume Two' }]]);
+    g.V2_LETTERS = [{ id: 'hearts-changed', num: 5, title: 'Hearts Changed', blocks: [] }];
+    const { container, go } = openChapter();
+    const ot = container.querySelector('.pcard.ot [data-hl-key="letter:' + CH2 + ':0:ot:0"]');
+    expect(ot.textContent).toBe('"Yet I have set My King on My holy hill of Zion." - Psalm 2:6-8');
+    expect(ot.querySelector('a.cite').getAttribute('data-ref')).toBe('Psalm 2:6-8');
+    const named2 = container.querySelector('.pcard.vot a.cite[data-col]');
+    expect(named2.textContent).toBe('"Hearts Changed" - Volume Two');
+    click(named2);
+    expect(go).toHaveBeenCalledWith({ place: 'letter', collection: 'two', n: 5 });
+    // a poem kept a line a segment: each its own line, its leading break dropped
+    expect([...container.querySelectorAll('.body .poetry .poem')].map((p) => p.textContent)).toEqual([
+      'I carried the weight of the world’s sin to the cross,', 'And crucified sin through My suffering;']);
+    expect(container.querySelector('.body h2.st-h').textContent).toBe('The Son of God');
+  });
+
+  it('the Next card: the next chapter in place; after the last, the next study as a new page', () => {
+    const one = openChapter();
+    const card = one.container.querySelector('.nextcard');
+    expect(card.textContent).toBe('Next · Chapter 3Section Three: The Lineage of YahuShua The Messiah');
+    click(card);
+    expect(one.replace).toHaveBeenCalledWith({ place: 'study-chapter', study: 'more-than-a-man', chapter: 'more-than-a-man-ch3' });
+    expect(one.go).not.toHaveBeenCalled();
+    cleanup();
+    const last = openChapter('more-than-a-man-ch30');
+    click(last.container.querySelector('.nextcard'));
+    expect(last.go).toHaveBeenCalledWith({ place: 'study-chapter', study: 'matthew-study', chapter: '1' });
+    expect(last.replace).not.toHaveBeenCalled();
+  });
+
+  it("main's reading record for a study chapter: the study's read key, its chapter, main's history entry", () => {
+    const gl = { BIBLE_STUDIES: withChapter2() };
+    expect(visitOf({ place: 'study-chapter', study: 'more-than-a-man', chapter: CH2 }, gl)).toEqual({
+      key: 'st:more-than-a-man:' + CH2, active: 'bible-study-more-than-a-man', slot: 'lastReadChapters',
+      at: 'bible-study-more-than-a-man', value: CH2, read: 'v1:bible-study-more-than-a-man:' + CH2,
+      entry: { type: 'study-chapter', studyId: 'more-than-a-man', studyChapterId: CH2,
+        studyTitle: withChapter2()[0].title, studySlug: 'more-than-a-man',
+        chapterTitle: 'Section Two: YahuShua The Messiah, The Son of God', chapterNum: 2 } });
+    expect(visitOf({ place: 'study-chapter', study: 'more-than-a-man', chapter: 'nope' }, gl)).toBe(null);
+    expect(visitOf({ place: 'study-chapter', study: 'more-than-a-man', chapter: CH2 }, {})).toBe(null);
   });
 });
