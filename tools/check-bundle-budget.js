@@ -116,7 +116,12 @@ const BUDGETS = [
   // largest inputs are still Player.jsx 18.6 KB, backup-flow.js 17.9 KB, icons 15.7 KB; Studies adds 3.9 KB + main's
   // audio-coverage.js 1.3 KB). Still to come: the study chapter, Matthew, Songs, the Garden, the Scripture Web host (~8 KB
   // each): ceiling 340 KB, far under a corpus or a v1 bundle (MBs).
-  { file: 'bundle-v2.js', measured: 283568, max: 340000 },
+  // myweb mw7 2026-10-15 (Settings > Reading + Bible translation 7d/7e, over zones' study chapter and readalong's coverage
+  // mark): 340,478 B, nothing pulled in (esbuild metafile: Player.jsx 18.6 KB, backup-flow.js 17.9 KB, icons 17.8 KB the
+  // largest; Reading 4.3 KB + its facts 3.9 KB). Still to come: the ... menus, Matthew, Songs, the Garden, the Scripture
+  // Web host, notebooks (dz20), links (dz22), storage banners (~8 KB each): ceiling 400 KB, far under a corpus or a v1
+  // bundle (MBs).
+  { file: 'bundle-v2.js', measured: 340478, max: 400000 },
   // v2.min.css the same way (zv1 group 8, Settings pages, 2026-10-14): 36458 B with Search, Notes, the player and Settings in
   // (+5.5 KB over the first kit build, nothing pulled in: each screen's own sheet is 1-3 KB); the ceiling covers the
   // rest of the build-out and still catches app.min.css (370 KB) or a font pulled in. Re-baseline with bundle-v2.js.
@@ -125,7 +130,10 @@ const BUDGETS = [
   // songs, Garden, Scripture Web chrome, banners, the ... menu, Find, auto-scroll), nothing pulled in. The kit now holds
   // every drawn screen's recipe, so what is left is each screen's own small sheet: ceiling 76 KB, still far under
   // app.min.css (370 KB) or a font.
-  { file: 'v2.min.css', measured: 60957, max: 76000 },
+  // myweb mw7 2026-10-15: 75,818 B after syncing design's dz17-dz21 recipes (+185 lines: the Answers home, notebooks, the
+  // chapter title lede), nothing pulled in. Notebooks (dz20) and links (dz22) recipes still to sync: ceiling 92 KB, still
+  // far under app.min.css (370 KB) or a font.
+  { file: 'v2.min.css', measured: 75818, max: 92000 },
   // ── lazy, but still fetched + parsed on the reader's device ──
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
