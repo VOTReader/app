@@ -11,6 +11,10 @@ import { whenPainted } from '../gate.js';
 import { bookTitle } from '../home-facts.js';
 import { highlightSpans } from '../../search/snippet.js';
 import { bibleHlKey } from '../../utils/hl-keys.js';
+import { LayerToast } from '../Sheet.jsx';
+import { TOAST_MS } from './LetterScreen.jsx';
+import { ChapterListenPill, chapterAudio, startChapter } from '../player/listen.jsx';
+import { ChapterReadAlong } from '../player/read-along.jsx';
 
 const g = /** @type {any} */ (globalThis);
 
@@ -91,12 +95,22 @@ function nextOf(book, n) {
 }
 
 /** @param {import('../places.js').PlaceProps} props */
-export function BibleChapterScreen({ route, facts, replace, onReady }) {
+export function BibleChapterScreen({ route, facts, gate = null, replace, onReady }) {
   const book = useBook(route.book);
   const tr = useTranslation((facts && facts.translation) || 'nkjv');
   const ch = book ? book.chapters.find((c) => c.num === route.chapter) || null : null;
   const matchRef = React.useRef(/** @type {HTMLElement | null} */ (null));
+  const bodyRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const terms = route.match ? [].concat(route.match).filter(Boolean) : [];
+  // the reader's Bible audio for this book (readalong rv1 2c); null = no recording, so no pill and no read-along
+  const audio = React.useMemo(() => chapterAudio(route.book), [route.book]);
+  // Listen's offline line, as the letter's (a gate's stays: it is the picture)
+  const [toast, setToast] = React.useState(/** @type {import('../player/listen.jsx').Toast | null} */ (null));
+  React.useEffect(() => {
+    if (!toast || gate) return undefined;
+    const t = setTimeout(() => setToast(null), TOAST_MS);
+    return () => clearTimeout(t);
+  }, [toast, gate]);
 
   React.useEffect(() => {
     if (book === undefined) return undefined;
@@ -115,7 +129,7 @@ export function BibleChapterScreen({ route, facts, replace, onReady }) {
     <div className="page-head g reader-head">
       <span className="overline eyebrow">The Scriptures of Truth · {tr.label}</span>
       <h1 className="display">{book ? book.title : bookTitle({ book: route.book })} {route.chapter}</h1>
-      {ch ? <button type="button" className="pill play"><Icon name="playBig" />Listen</button> : null}
+      {ch && audio ? <ChapterListenPill gate={gate} book={book.id} chapter={ch.num} volKey={audio.volKey} label={audio.label} onToast={setToast} /> : null}
     </div>
   );
   // the heading at once; the verses when main's Bible has loaded
@@ -146,7 +160,7 @@ export function BibleChapterScreen({ route, facts, replace, onReady }) {
   return (
     <>
       {head}
-      <div className="body g bible">
+      <div className="body g bible" ref={bodyRef}>
         {ch.sections.map((sec, si) => (
           <React.Fragment key={si}>
             {sec.heading || sec.letter ? <div className="sec-h">{[sec.letter, sec.heading].filter(Boolean).join(' ')}</div> : null}
@@ -160,6 +174,13 @@ export function BibleChapterScreen({ route, facts, replace, onReady }) {
           </button>
         )}
       </div>
+      {/* the verse being read, lit (readalong rv1 2c): main's read-along over the verses' [data-hl-key] */}
+      {audio && (
+        <ChapterReadAlong gate={gate} book={book.id} chapter={ch.num} volKey={audio.volKey} bodyRef={bodyRef}
+          on={facts.readAlong !== false} follow={facts.readAlongFollow !== false} textKey={tr.label}
+          onListen={gate ? null : () => startChapter(g.AudioPlayer, { volKey: audio.volKey, book: book.id, chapter: ch.num, label: audio.label }, setToast)} />
+      )}
+      <LayerToast text={toast && toast.text} icon={toast && toast.icon} />
     </>
   );
 }

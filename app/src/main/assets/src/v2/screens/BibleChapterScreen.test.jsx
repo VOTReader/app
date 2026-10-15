@@ -27,11 +27,13 @@ const JOHN = {
     { num: 4, sections: [{ heading: '', verses: [v(1, 'When the Lord knew.')] }] },
   ],
 };
+/** main's Bible audio manifest with John in its default edition (brm-kjv): chapterAudio('john') finds a recording. */
+const JOHN_AUDIO = { 'bible-brm-kjv:john': [['a', '', 'Chapter 3']] };
 const ACTS = { id: 'acts', title: 'Acts', chapters: [{ num: 1, sections: [{ verses: [v(1, 'The former account.')] }] }] };
 
 afterEach(() => {
   cleanup();
-  for (const k of ['BOOKS', 'BIBLE_BOOK_LIST', '__loadBibleCorpus', 'translateVerse', 'translationLabel', 'loadTranslation']) delete g[k];
+  for (const k of ['BOOKS', 'BIBLE_BOOK_LIST', '__loadBibleCorpus', 'translateVerse', 'translationLabel', 'loadTranslation', 'ReadAlongHighlight', 'AudioPlayer', 'BIBLE_AUDIO_MANIFEST']) delete g[k];
   delete html.dataset.gate;
   vi.restoreAllMocks();
 });
@@ -96,6 +98,7 @@ describe('2c-john3-playing', () => {
 
   it('the gate picture: John 3 from Home > The Bible > John at its top; Back says John, Home stays lit', async () => {
     g.BOOKS = { john: JOHN };
+    g.BIBLE_AUDIO_MANIFEST = JOHN_AUDIO;
     const { container } = render(<V2App gateId="2c-john3-playing" />);
     await waitFor(() => expect(html.dataset.gate).toBe('ready'));
     expect(container.querySelector('.tb .title').textContent).toBe('John');
@@ -103,6 +106,41 @@ describe('2c-john3-playing', () => {
     expect(container.querySelector('.reader-head h1').textContent).toBe('John 3');
     expect(container.querySelector('.reader-head .eyebrow').textContent).toBe('The Scriptures of Truth · NKJV');
     expect(container.querySelector('mark.qm')).toBe(null);
+    // readalong's chapter pill in the head, saying Pause (John 3 plays): the static Listen is gone
+    expect(texts(container, '.reader-head .pill')).toEqual(['Pause']);
+  });
+
+  it('live: main\'s read-along gets the chapter body, this chapter and its verse keys; the pill plays this chapter', () => {
+    g.BOOKS = { john: JOHN };
+    g.BIBLE_AUDIO_MANIFEST = JOHN_AUDIO;
+    const seen = [];
+    g.ReadAlongHighlight = (p) => { seen.push(p); return null; };
+    g.AudioPlayer = {
+      subscribe: () => () => {}, getVersion: () => 0, getState: () => ({ status: 'idle', queue: [], qi: 0 }),
+      bibleChapterOfTrack: () => null, hasAudio: () => true, playableNow: () => true, listenResume: () => null,
+      toggle: vi.fn(), playBibleBook: vi.fn(),
+    };
+    const { container } = render(
+      <BibleChapterScreen route={{ place: 'bible-chapter', book: 'john', chapter: 3 }} facts={{}} gate={null} replace={() => {}} onReady={() => {}} />,
+    );
+    const p = seen[seen.length - 1];
+    expect(p.mainRef.current).toBe(container.querySelector('.body.bible'));
+    expect(p.letterId).toBe('john');
+    expect(p.chapter).toBe(3);
+    expect(p.hlKeyFn('john', 2)).toBe('bible:john:3:2');
+    expect(p.readAlongOn).toBe(true);
+    click(container.querySelector('.reader-head .pill'));
+    expect(g.AudioPlayer.playBibleBook).toHaveBeenCalledWith(expect.objectContaining({ bookId: 'john', chapterNum: 3 }));
+  });
+
+  it('a book with no recording has no pill and no read-along', () => {
+    g.BOOKS = { john: JOHN };
+    g.ReadAlongHighlight = vi.fn(() => null);
+    const { container } = render(
+      <BibleChapterScreen route={{ place: 'bible-chapter', book: 'john', chapter: 3 }} facts={{}} gate={null} replace={() => {}} onReady={() => {}} />,
+    );
+    expect(container.querySelector('.reader-head .pill')).toBe(null);
+    expect(g.ReadAlongHighlight).not.toHaveBeenCalled();
   });
 });
 
