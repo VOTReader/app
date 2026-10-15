@@ -105,13 +105,13 @@ export const GATE_STATES = {
   // states.json 1b-letter-playing: Letter 1 playing, scrolled into the text with the bars stepped aside (reading-bars.js),
   // one clause lit, the mini player. The picture's 3:51 of 10:08 was drawn, not measured: Letter 1's recording runs 75 s
   // and 0:47 lights "For the years draw short, Timothy," (readalong 10-15; the app lights a clause, never the whole
-  // sentence). Phone only: paragraph 1 starts 93 px above where the top bar ends before it steps aside (the shift keeps
-  // lines still), so line 2 sits right under the status bar as drawn (measured against the picture with measure.py);
-  // the laptop stays at the top, bars shown.
+  // sentence). Phone only: paragraph 1 starts 118 px above where the top bar ends before it steps aside (the shift keeps
+  // lines still, whenever the phone's inset arrives), so it sits 35 px above the screen's top as drawn and line 2 sits
+  // right under the status bar (measured against the picture with measure.py); the laptop stays at the top, bars shown.
   '1b-letter-playing': {
     stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],
     playing: { ...LETTER_ONE_PLAYING, at: 47, length: 75 },
-    scroll: { to: '.body [data-hl-key$=":0"]', gap: -93, phone: true },
+    scroll: { to: '.body [data-hl-key$=":0"]', gap: -118, phone: true },
   },
   // states.json 2c-john3-playing: John 3 from Home > The Bible > John, at its top (bars shown: the head is in view),
   // playing at 0:46 of 6:24 with verse 2 lit; Back says John.

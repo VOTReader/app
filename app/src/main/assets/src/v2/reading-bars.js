@@ -6,7 +6,13 @@
    No jump: when the top bar goes or comes, the page moves by exactly what the scroller's top edge moved, so every line
    stays where it was on the screen (and the read-along's follow sees no lurch). The head is always judged against one
    line - where the top bar's bottom edge is when it shows - so the move itself can never flip the bars back. A new page
-   starts with the bars shown and is never moved. */
+   starts with the bars shown and is never moved.
+
+   The edge can also move with no toggle: the APK sets --inset-top when the page has loaded (on the S22 after a gate's
+   scroll), and a phone turns. Then the page is not moved (the system did it, every line went with the edge), but the
+   edge the next toggle measures from must be the new one, and the line moves with it: the scroller's own reads (each
+   check) and a ResizeObserver on it (the inset changes its height) keep both current. The move starts from the scrollTop
+   read with that edge, not the one after the toggle: near a page's end the grown scroller has already clamped it. */
 
 /** The pages that read (a letter, a Bible chapter). */
 export const READING_PLACES = ['letter', 'bible-chapter'];
@@ -35,26 +41,47 @@ export function useReadingBars({ scrollRef, on, page }) {
   const hidden = on && st.page === page && st.hidden;
   const line = React.useRef(/** @type {number | null} */ (null));
   const top = React.useRef(/** @type {number | null} */ (null));
+  const at = React.useRef(/** @type {number | null} */ (null));
   const shownOn = React.useRef(page);
+
+  // the edge moved with no toggle: note where it is now; a line measured earlier moves with it
+  const follow = React.useCallback((/** @type {HTMLElement} */ el) => {
+    const now = el.getBoundingClientRect().top;
+    if (top.current != null && line.current != null) line.current += now - top.current;
+    top.current = now;
+    at.current = el.scrollTop;
+  }, []);
 
   const check = React.useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
+    follow(el);
     // the line is measured while the bars show: the scroller then starts right under the top bar
-    if (!hidden) line.current = el.getBoundingClientRect().top;
+    if (!hidden) line.current = top.current;
     const gone = on && line.current != null && headGone(el, line.current);
     setSt((s) => (s.page === page && s.hidden === gone ? s : { page, hidden: gone }));
-  }, [scrollRef, on, page, hidden]);
+  }, [scrollRef, on, page, hidden, follow]);
 
   // the bars went or came on this page: move the page by what its top edge moved (a new page is never moved)
   React.useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const now = el.getBoundingClientRect().top;
-    if (shownOn.current === page && top.current != null && now !== top.current) el.scrollTop += now - top.current;
+    if (shownOn.current === page && top.current != null && now !== top.current) {
+      el.scrollTop = (at.current ?? el.scrollTop) + now - top.current;
+    }
     shownOn.current = page;
     top.current = now;
+    at.current = el.scrollTop;
   }, [hidden, page, scrollRef]);
+
+  React.useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => follow(el));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [scrollRef, follow]);
 
   // playing starts or stops while the page sits still
   React.useEffect(() => { check(); }, [on]); // eslint-disable-line react-hooks/exhaustive-deps
