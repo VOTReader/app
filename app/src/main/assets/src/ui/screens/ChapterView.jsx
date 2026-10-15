@@ -117,6 +117,14 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
   // An inert clone (a swipe peek) must never claim __onReadingComplete.
   useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead, readTrackKey);
   const hasLinks = chapter.links && chapter.links.length > 0;
+  // The verse key builder read-along paints through (sweep v025). Memoized for
+  // the reason BibleChapterView gives: hlKeyFn sits in the dependency arrays of
+  // ReadAlongHighlight's rAF loop, safety-net repaint, tap-to-seek and seek
+  // effects, so a fresh arrow per render re-ran all four on every render.
+  const studyKeyFn = React.useCallback(
+    (bookId, n) => studyHlKey(bookId + '-' + chapter.num, n),
+    [chapter.num],
+  );
 
   return (
     <ScreenLayout
@@ -340,7 +348,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
           chapter={chapter.num}
           mainRef={bodyRef}
           onListen={AudioPlayer.hasAudio(bibleAudio.volKey, book.id) ? () => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label, chapterNum: chapter.num }) : null}
-          hlKeyFn={(bookId, n) => studyHlKey(bookId + '-' + chapter.num, n)}
+          hlKeyFn={studyKeyFn}
           readAlongOn={readAlongOn}
           readAlongFollow={readAlongFollow}
           seekTo={highlightedVerses.length ? studyHlKey(book.id + '-' + chapter.num, highlightedVerses[0]) : null}
