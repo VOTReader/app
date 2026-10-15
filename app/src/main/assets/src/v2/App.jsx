@@ -9,7 +9,7 @@ import { Icon } from './Icon.jsx';
 import { readGateId, gateState, markGate, whenPainted } from './gate.js';
 import { savedFacts } from './settings-facts.js';
 import { bookTitle } from './home-facts.js';
-import { placeFor } from './places.js';
+import { placeFor, startStack, OVERLAYS } from './places.js';
 import { usePlayer, MiniPlayer, NowPlaying, PlayerSheet, PlayerBar } from './player/Player.jsx';
 import { useFullScreen, FullScreenToast } from './player/full-screen.jsx';
 import { SheetLayer, closeTopSheet } from './Sheet.jsx';
@@ -100,7 +100,8 @@ function NotYet({ title, onReady }) {
 /** @param {{ gateId?: string | null }} props */
 export function V2App({ gateId = readGateId() }) {
   const gate = gateId ? gateState(gateId) : null;
-  const [stack, setStack] = React.useState(() => (gate ? gate.stack.slice() : [{ place: 'home' }]));
+  // a real boot opens where a registered start says (places.js: the welcome on a first visit), else Home
+  const [stack, setStack] = React.useState(() => (gate ? gate.stack.slice() : startStack() || [{ place: 'home' }]));
   const [savedFactsAtBoot] = React.useState(() => (gate && gate.facts ? gate.facts : savedFacts()));
   // The reader's text and page (look.js): shown on <html> at once, kept in main's vot-state (never on a gate boot).
   const [look, setLook] = React.useState(() => (gate ? gateLook(gate) : savedLook()));
@@ -182,6 +183,7 @@ export function V2App({ gateId = readGateId() }) {
   let actions = null;
   const device = desktop ? 'computer' : 'phone';
   const def = placeFor(route.place);
+  const bare = !!(def && def.bare);
   if (def) {
     const Screen = def.Screen;
     contentClass = def.contentClass || 'content';
@@ -205,6 +207,10 @@ export function V2App({ gateId = readGateId() }) {
   const layerHost = (
     <>
       <div className="v2-layer" ref={setLayer} />
+      {Object.keys(OVERLAYS).map((id) => {
+        const Overlay = OVERLAYS[id];
+        return <Overlay key={id} route={route} gate={gate} desktop={desktop} go={go} openTab={openTab} />;
+      })}
       {shellSheet === 'text-and-theme' && <AaSheet look={look} desktop={desktop} onChange={changeLook} onClose={() => setShellSheet(null)} />}
     </>
   );
@@ -212,16 +218,16 @@ export function V2App({ gateId = readGateId() }) {
   if (desktop) {
     return (
       <SheetLayer.Provider value={layer}>
-        <div className="v2 dk">
-          <nav className="rail" data-zone="rail" aria-label="Places">{tabs}</nav>
+        <div className={'v2 dk' + (bare ? ' bare' : '')}>
+          {!bare && <nav className="rail" data-zone="rail" aria-label="Places">{tabs}</nav>}
           <div className="pane">
             <div className="main" ref={scrollRef} onScroll={onScroll}>
               <div className="col" data-zone="col">
-                {bar}
+                {!bare && bar}
                 <div className={contentClass}>{screen}</div>
               </div>
             </div>
-            <PlayerBar player={player} />
+            {!bare && <PlayerBar player={player} />}
             <NowPlaying player={player} desktop go={go} />
           </div>
           <PlayerSheet player={player} desktop />
@@ -232,11 +238,11 @@ export function V2App({ gateId = readGateId() }) {
   }
   return (
     <SheetLayer.Provider value={layer}>
-      <div className={'v2 v2-phone' + (fs.full ? ' full' : '')}>
-        {!fs.full && bar}
+      <div className={'v2 v2-phone' + (fs.full ? ' full' : '') + (bare ? ' bare' : '')}>
+        {!fs.full && !bare && bar}
         <div className={contentClass + (fs.full ? ' full' : '')} ref={scrollRef} onScroll={onScroll}>{screen}<FullScreenToast text={fs.full ? fs.toast : null} /></div>
-        {!fs.full && <MiniPlayer player={player} />}
-        {!fs.full && <nav className="tabbar" aria-label="Places">{tabs}</nav>}
+        {!fs.full && !bare && <MiniPlayer player={player} />}
+        {!fs.full && !bare && <nav className="tabbar" aria-label="Places">{tabs}</nav>}
         <NowPlaying player={player} desktop={false} go={go} />
         <PlayerSheet player={player} desktop={false} />
         {layerHost}

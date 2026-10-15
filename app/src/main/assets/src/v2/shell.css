@@ -17,6 +17,8 @@ html, body { background: var(--bg); height: 100%; overflow: hidden; overscroll-b
 /* desktop: the picture's .dk at the window's size, the page scrolling in .main (D2) */
 .v2.dk { position: fixed; inset: 0; width: auto; height: auto; color: var(--t1); font-family: var(--font); }
 .v2.dk .main { overflow-y: auto; }
+/* a bare place (places.js: 8a's welcome) fills the window alone: no rail column */
+.v2.dk.bare { grid-template-columns: minmax(0, 1fr); }
 
 /* rows the app makes tappable are buttons: full width, text left, their lines blocks as the kit's divs are */
 .v2 button.srow, .v2 button.row, .v2 button.nextcard { width: 100%; text-align: left; }
