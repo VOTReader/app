@@ -752,8 +752,10 @@ function peekNext(p) {
  *   endDwellMs: number,
  *   keepScreenOnPref: boolean,
  *   placeKey: string,
- *   pager: any
- * }} opts
+ *   pager: any,
+ *   io?: Record<string, any>
+ * }} opts  io: any of the controller's I/O swapped by a host with its own frame (v2's shell: its sheets, its
+ *   page-ready wait, a gate boot's frozen run); read once, when the controller is made
  */
 export function useAutoScroll(scrollRef, opts) {
   const optsRef = React.useRef(opts);
@@ -842,6 +844,7 @@ export function useAutoScroll(scrollRef, opts) {
           }
         } catch (_e) { /* ignore */ }
       },
+      ...(optsRef.current.io || {}),
     });
     ctrlRef.current = ctrl;
 

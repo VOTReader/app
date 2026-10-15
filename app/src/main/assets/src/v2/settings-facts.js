@@ -17,7 +17,7 @@ const SIZE_LABEL = { smaller: 'Smaller size', standard: 'Standard size', larger:
 /**
  * @typedef {{ textSize?: string, page?: string, lines?: string, translation?: string, doubleTapFullscreen?: boolean,
  *   reader?: string, bibleAudio?: string, speed?: number, downloads?: { count: number, bytes: number } | null,
- *   readAlong?: boolean, readAlongFollow?: boolean,
+ *   readAlong?: boolean, readAlongFollow?: boolean, autoScroll?: boolean,
  *   lastExportAt?: number | null, now?: number }} SettingsFacts
  */
 
@@ -32,6 +32,8 @@ export function readFacts(saved, { theme, speed } = /** @type {{ theme?: string,
     doubleTapFullscreen: s.doubleTapFullscreen !== false,
     // main's read-along switches (Settings > Reading), read by the v2 letter's wash (rv1 1b)
     readAlong: s.readAlongHighlight !== false, readAlongFollow: s.readAlongFollow !== false,
+    // main's Auto-scroll switch (off by default): on, the pill waits on every reading page, as main's
+    autoScroll: s.autoScroll === true,
     reader: typeof s.letterReader === 'string' ? s.letterReader : 'auto',
     bibleAudio: typeof s.bibleAudio === 'string' ? s.bibleAudio : 'brm-kjv',
     speed: typeof speed === 'number' && speed > 0 ? speed : 1,

@@ -13,6 +13,11 @@ export const SheetLayer = React.createContext(/** @type {HTMLElement | null} */ 
 /** Open sheets' closers, the newest last: Android's Back closes the top one before it pops a page. */
 const open = [];
 
+/** True while any sheet is open (auto-scroll stops under one, as main's under its modals). */
+export function anySheetOpen() {
+  return open.length > 0;
+}
+
 /** Closes the top open sheet; false when none is open. */
 export function closeTopSheet() {
   const close = open[open.length - 1];

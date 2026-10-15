@@ -163,6 +163,7 @@ export function BibleChapterScreen({ route, facts, gate = null, replace, onReady
             <p>{sec.verses.map(verse)}</p>
           </React.Fragment>
         ))}
+        <span className="reading-end" aria-hidden="true" />
         {next && (
           <button type="button" className="nextcard" onClick={() => replace({ place: 'bible-chapter', book: next.book.id, chapter: next.chapter })}>
             <span className="tx"><span className="k">{next.label}</span><span className="t">{next.book.title} {next.chapter}</span></span>

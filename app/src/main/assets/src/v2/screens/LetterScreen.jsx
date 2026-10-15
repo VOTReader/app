@@ -456,6 +456,8 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
         onKeyDown={onBodyKey}>
         {intro.length > 0 && <SectionIntro blocks={intro} />}
         <LetterBody letter={letter} scan={scan} />
+        {/* the end of the text (main's sentinel): auto-scroll comes to rest here, before the footnotes */}
+        <span className="reading-end" aria-hidden="true" />
         <FootnoteList items={items} letter={letter} onGo={live ? goToRef : () => {}} onRead={live ? readLink : () => {}} />
         {next && (
           <button type="button" className="nextcard" onClick={() => onOpenLetter && onOpenLetter(nextN)}>

@@ -15,6 +15,7 @@ import { useFullScreen, FullScreenToast } from './player/full-screen.jsx';
 import { SheetLayer, closeTopSheet } from './Sheet.jsx';
 import { AaSheet } from './screens/AaSheet.jsx';
 import { FindStrip } from './FindStrip.jsx';
+import { AutoScrollPill } from './AutoScrollPill.jsx';
 import { applyLook, savedLook, saveLook, gateLook, sizeWord } from './look.js';
 import { useReadingRecord } from './reading-record.js';
 import { useReadingBars, READING_PLACES } from './reading-bars.js';
@@ -122,14 +123,21 @@ function NotYet({ title, onReady }) {
 }
 
 /**
- * The page tool a gate state opens with (1i: Find with its word typed), on the gate's own page.
+ * The page tool a gate state opens with (1i: Find with its word typed; 1j: auto-scroll running), on the gate's own page.
  * @param {import('./gate.js').GateState | null} gate
  * @returns {({ kind: string, route: any } & Record<string, any>) | null}
  */
 function gateTool(gate) {
   const o = gate && gate.open;
-  if (!o || o.sheet !== 'find') return null;
-  return { kind: 'find', q: o.q || '', route: gate.stack[gate.stack.length - 1] };
+  const route = gate ? gate.stack[gate.stack.length - 1] : null;
+  if (o && o.sheet === 'find') return { kind: 'find', q: o.q || '', route };
+  if (o && o.sheet === 'auto-scroll') return { kind: 'auto-scroll', run: true, route };
+  return null;
+}
+
+/** A page's identity for auto-scroll (a page the reader turned to by hand stops it, as main's). @param {Record<string, any>} r */
+function placeKeyOf(r) {
+  return [r.place, r.collection, r.n, r.book, r.chapter, r.preface ? 'preface' : ''].join(':');
 }
 
 /** @param {{ gateId?: string | null }} props */
@@ -141,7 +149,8 @@ export function V2App({ gateId = readGateId() }) {
   // The reader's text and page (look.js): shown on <html> at once, kept in main's vot-state (never on a gate boot).
   const [look, setLook] = React.useState(() => (gate ? gateLook(gate) : savedLook()));
   const [shellSheet, setShellSheet] = React.useState(() => (gate && gate.open && gate.open.sheet === 'text-and-theme' ? 'text-and-theme' : null));
-  // A page tool the ... opens over the page it was opened on (1i Find): it goes with that page.
+  // A page tool the ... opens over the page it was opened on (1i Find, 1j auto-scroll): it goes with that page; auto-scroll
+  // goes on to the page its Next card turns to (main's pill stays across a turn).
   const [tool, setTool] = React.useState(() => gateTool(gate));
   React.useLayoutEffect(() => { applyLook(look, gate ? { bridge: null } : undefined); }, [look, gate]);
   const changeLook = React.useCallback((next) => { setLook(next); if (!gate) saveLook(next); }, [gate]);
@@ -154,10 +163,13 @@ export function V2App({ gateId = readGateId() }) {
   const scrollRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const route = stack[stack.length - 1];
   const tab = stack[0].place;
+  const stackRef = React.useRef(stack);
+  stackRef.current = stack;
   const pageTool = tool && tool.route === route ? tool : null;
   /** The shell's own sheet (Aa's Text and theme) or a page tool on this page ('find', with { q, near } from a landing). */
   const openShell = React.useCallback((/** @type {string} */ name, /** @type {Record<string, any>} */ opts = {}) => {
     if (name === 'find') setTool({ ...opts, kind: 'find', route });
+    else if (name === 'auto-scroll') setTool({ kind: 'auto-scroll', run: true, route });
     else setShellSheet(name);
   }, [route]);
   const back = stack.length > 1 ? routeTitle(stack[stack.length - 2]) : null;
@@ -176,11 +188,18 @@ export function V2App({ gateId = readGateId() }) {
   const onReady = React.useCallback(() => setReady(true), []);
   const go = React.useCallback((...routes) => {
     setReady(false);
+    // auto-scroll stops on a page the reader leaves: back on it, its pill waits paused
+    setTool((t) => (t && t.kind === 'auto-scroll' && t.run ? { ...t, run: false } : t));
     setStack((s) => { kept.current[s.length - 1] = scrollRef.current ? scrollRef.current.scrollTop : 0; return s.concat(routes); });
   }, []);
   const pop = React.useCallback(() => { setReady(false); popped.current = true; setStack((s) => (s.length > 1 ? s.slice(0, -1) : s)); }, []);
   const openTab = React.useCallback((id) => { setReady(false); kept.current = []; setStack([{ place: id }]); }, []);
-  const replace = React.useCallback((r) => { setReady(false); setStack((s) => s.slice(0, -1).concat(r)); }, []);
+  const replace = React.useCallback((r) => {
+    setReady(false);
+    const was = stackRef.current[stackRef.current.length - 1];
+    setTool((t) => (t && t.kind === 'auto-scroll' && t.route === was ? { ...t, route: r } : t));
+    setStack((s) => s.slice(0, -1).concat(r));
+  }, []);
 
   // The gate: an unknown id says so at once; a known one is ready once its screen has said so and that is painted.
   React.useEffect(() => {
@@ -198,8 +217,6 @@ export function V2App({ gateId = readGateId() }) {
 
   // Android's back (MainActivity calls window.handleAndroidBack): close an open sheet, else pop the stack, or let Android
   // leave at a root.
-  const stackRef = React.useRef(stack);
-  stackRef.current = stack;
   const chromeRef = React.useRef({ player, fs, pageTool });
   chromeRef.current = { player, fs, pageTool };
   React.useEffect(() => {
@@ -260,6 +277,13 @@ export function V2App({ gateId = readGateId() }) {
     ? <FindStrip key={stack.length + ':' + (pageTool.near ? 'l' : 'm')} rootRef={scrollRef} noun={noun} start={{ q: pageTool.q, near: pageTool.near }}
         gate={gate} onClose={() => setTool(null)} />
     : null;
+  // auto-scroll (1j): opened by the ...; with main's Auto-scroll setting on it waits on every reading page; Stop closes it
+  const autoOn = !bare && !fs.full && (pageTool ? pageTool.kind === 'auto-scroll'
+    : !!facts.autoScroll && READING_PLACES.includes(route.place));
+  const autoPill = autoOn
+    ? <AutoScrollPill scrollRef={scrollRef} placeKey={placeKeyOf(route)} ready={ready} run={!!(pageTool && pageTool.run)} gate={gate}
+        onClose={() => setTool({ kind: 'closed', route })} />
+    : null;
 
   // the layer sheets and dialogs portal into (Sheet.jsx): over the whole window, outside the scrolling page; the shell's
   // own sheet (Text and theme, from a reading page's Aa) goes there too
@@ -288,6 +312,7 @@ export function V2App({ gateId = readGateId() }) {
               </div>
             </div>
             {!bare && <PlayerBar player={player} />}
+            {autoPill}
             <NowPlaying player={player} desktop go={go} />
           </div>
           <PlayerSheet player={player} desktop />
@@ -303,6 +328,7 @@ export function V2App({ gateId = readGateId() }) {
         {!fs.full && !bare && findStrip}
         <div className={contentClass + (fs.full ? ' full' : '')} ref={scrollRef} onScroll={onScroll} data-scroller="">{screen}<FullScreenToast text={fs.full ? fs.toast : null} /></div>
         {!fs.full && !bare && <MiniPlayer player={player} />}
+        {autoPill}
         {!fs.full && !bare && !bars.hidden && <nav className="tabbar" aria-label="Places">{tabs}</nav>}
         <NowPlaying player={player} desktop={false} go={go} />
         <PlayerSheet player={player} desktop={false} />

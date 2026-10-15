@@ -101,3 +101,24 @@ html, body { background: var(--bg); height: 100%; overflow: hidden; overscroll-b
 .v2 .fnd .fld input.q::-webkit-search-cancel-button { display: none; }
 .v2 .fnd .fld .ic:disabled { color: var(--t3); }
 .v2.dk .col > .fnd { position: sticky; top: var(--bar); z-index: 2; background: var(--bg); }
+/* Auto-scroll (mw7, 1j; screens.css .asp draws it): 14 px above the tab bar (and the mini player when one shows), inside
+   the system bars; on the laptop under the column, above the player bar. Main's Pause row floats above the pill. It fades
+   while it runs, as main; toasts rise above it. */
+.v2-phone > .asp { --asp-b: calc(var(--tabbar) + 14px + var(--v2-bottom)); bottom: var(--asp-b); }
+.v2-phone > .mini ~ .asp { --asp-b: calc(var(--tabbar) + var(--mini) + 14px + var(--v2-bottom)); }
+.v2-phone.bars-off > .asp { --asp-b: calc(14px + var(--v2-bottom)); }
+.v2-phone.bars-off > .mini ~ .asp { --asp-b: calc(var(--mini) + 14px + var(--v2-bottom)); }
+.v2.dk .pane > .asp { --asp-b: 24px; bottom: var(--asp-b); }
+.v2.dk .pane > .pbar ~ .asp { --asp-b: calc(var(--pbar) + 24px); }
+.v2 .asp.dw { bottom: calc(var(--asp-b) + 60px); padding: 0 4px 0 10px; }
+.v2 .asp { transition: opacity .4s ease; max-width: calc(100% - 24px); }
+.v2 .asp > button { flex: none; }
+.v2 .asp .asp-r { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.v2 .asp .asp-r.st { display: flex; flex-direction: column; align-items: center; line-height: 1.2; }
+.v2 .asp .asp-r.st .sub { font-size: var(--fs-xs); color: var(--t2); }
+.v2 .asp.dim { opacity: .35; }
+.v2 .asp .ic:disabled { color: var(--t3); }
+.v2 .asp .ic.opn { background: radial-gradient(circle, var(--input) 0 17.5px, transparent 18.5px); }
+.v2 .asp .asp-x { height: 44px; padding: 0 10px 0 0; font-size: var(--fs-s); color: var(--tgold); }
+.v2-phone:has(> .asp) > .v2-layer > .toast-wrap { bottom: calc(var(--tabbar) + 80px + var(--v2-bottom)); }
+.v2-phone:has(> .asp) > .content.reader .toast-wrap { bottom: 80px; }
