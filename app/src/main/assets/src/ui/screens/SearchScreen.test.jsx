@@ -232,6 +232,19 @@ describe('useImeHideBlur (W0: blur when the IME hides)', () => {
    ScreenLayout / SrchCard / SrchGroup / the SRCH_* registries resolve as free
    globals in prod (bundle-d + index.html lexical bindings); stub them here the
    same way SrchCard.test.jsx does. */
+/* The screen's grouping and sort globals (index.html's classic scripts). Every block that renders the screen sets
+   them in its own beforeEach, so none leans on another block having run first (nw27: the suite run shuffled). */
+function setScreenGlobals() {
+  /** @type {any} */ (globalThis).SrchCard = () => null;
+  /** @type {any} */ (globalThis).SrchGroup = () => null;
+  /** @type {any} */ (globalThis).SRCH_GROUP_META = {};
+  /** @type {any} */ (globalThis).SRCH_KIND_LABEL = {};
+  /** @type {any} */ (globalThis).srchGroupKey = () => 'g';
+  // [8] the sort helper — a pure fn; the real one so the screen's memo behaves.
+  /** @type {any} */ (globalThis).srchSortCanonical = realSrchSortCanonical;
+  /** @type {any} */ (globalThis).SRCH_CANONICAL_BOOK_INDEX = realCanonIndex;
+}
+
 describe('SearchScreen (W0 micro-gaps)', () => {
   const noop = () => {};
   const baseProps = () => ({
@@ -244,16 +257,9 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     /** @type {any} */ (globalThis).ScreenLayout = ({ navChildren, children }) => (
       <div>{navChildren}{children}</div>
     );
-    /** @type {any} */ (globalThis).SrchCard = () => null;
-    /** @type {any} */ (globalThis).SrchGroup = () => null;
+    setScreenGlobals();
     /** @type {any} */ (globalThis).ConfirmStrip = ConfirmStrip;
     /** @type {any} */ (globalThis).SRCH_QUICK_PICKS = [];
-    /** @type {any} */ (globalThis).SRCH_GROUP_META = {};
-    /** @type {any} */ (globalThis).SRCH_KIND_LABEL = {};
-    /** @type {any} */ (globalThis).srchGroupKey = () => 'g';
-    // [8] the sort helper — a pure fn; the real one so the screen's memo behaves.
-    /** @type {any} */ (globalThis).srchSortCanonical = realSrchSortCanonical;
-    /** @type {any} */ (globalThis).SRCH_CANONICAL_BOOK_INDEX = realCanonIndex;
     /** @type {any} */ (window).VotSearchMini = {
       getState: () => ({ ready: true }),
       init: () => Promise.resolve(),
@@ -1110,6 +1116,7 @@ describe('SearchScreen — the index is built for the reader (v09-perf-01, sweep
      and an index that is ready but for another edition is not taken as ready. */
   const noop = () => {};
   beforeEach(() => {
+    setScreenGlobals();
     /** @type {any} */ (globalThis).ScreenLayout = ({ children }) => <div>{children}</div>;
     /** @type {any} */ (globalThis).ConfirmStrip = ConfirmStrip;
     /** @type {any} */ (globalThis).SRCH_QUICK_PICKS = [];
@@ -1165,6 +1172,7 @@ describe('SearchScreen — the songs shortcut row', () => {
     /** @type {any} */ (globalThis).SRCH_QUICK_PICKS = [];
     /** @type {any} */ (globalThis).SongCatalog = Songs.SongCatalog;
     /** @type {any} */ (globalThis).findSongFamilies = Parts.findSongFamilies;
+    setScreenGlobals();
     /** @type {any} */ (window).VotSearchData = { BOOK_DISPLAY: {}, SYNONYM_MAP: {} };
     /** @type {any} */ (window).getRecentSearches = () => [];
     /** @type {any} */ (window).VotSearchMini = {

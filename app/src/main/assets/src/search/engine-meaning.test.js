@@ -4,7 +4,7 @@
    opens on the passage the model matched; a quote typed nearly right stays the words' find; and
    with the model not ready, search is the words engine alone. The model is a stand-in here
    (semantic.test.js runs the shipped one); what it "means" is set per test. */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import crypto from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import { VotSearchMini } from './engine.js';
@@ -101,13 +101,21 @@ describe('meaning first', () => {
     for (const k of Object.keys(GLOBALS)) delete /** @type {any} */ (globalThis)[k];
     resetSemantic();
   });
+  // Every test starts with the stand-in model ready (startSemantic is idempotent), so none leans on an earlier one
+  // having started it: the file passes in any order (nw27, --sequence.shuffle).
+  beforeEach(async () => {
+    standInModel();
+    await startSemantic();
+  });
 
   it('without the model, search is the words engine alone', async () => {
+    resetSemantic();
     const r = await first('honour the one who made you while still a child');
     expect(r.doc.letterId).not.toBe('creator');
   });
 
   it('with it, the passage the query describes leads, and opens where the model matched', async () => {
+    resetSemantic();
     standInModel();
     expect(await startSemantic()).toBe(true);
     said.near = 'creator';
