@@ -490,16 +490,16 @@ function App() {
      (Revelation → V1 → ... → Garden) + within-Bible book prev/next.
      The Revelation → Volume One bridge is the load-bearing intersection
      (Bible side's `next from Rev last` → chain side's `Volume One first`).
-     All deps in scope by here: book/chapter (above), setActiveReadKey
-     (useReadingDwell), setLastReadForVol (useReadingPositionNav),
-     goToGardenFirst (useNav). */
+     The place + tab fields let a jump that waits for the VOT letters drop
+     if the reader moved meanwhile (sweep v013). setActiveReadKey (useReadingDwell),
+     setLastReadForVol (useReadingPositionNav), goToGardenFirst (useNav). */
   const {
     boundaryConfig,
     bcvPrevBook, bcvOnPrevBook, bcvPrevBoundaryTitle,
     bcvNextBook, bcvOnNextBook, bcvNextBoundaryTitle,
   } = useReadingChainNav({
-    book, chapter, bookId,
-    setBookId, setChapterNum, setScreen, setLetterId,
+    book, chapter, bookId, screen, chapterNum, letterId, studyId, studyChapterId, journalEntryId,
+    activeTabIdx, tabCount: tabs.length, setBookId, setChapterNum, setScreen, setLetterId,
     setActiveReadKey, setLastReadForVol, goToGardenFirst,
   });
 
