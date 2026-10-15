@@ -132,6 +132,13 @@ describe('a real boot records the visit', () => {
     render(<Harness route={LETTER} />);
     expect(g.StateStore.set).not.toHaveBeenCalled();
     cleanup();
+    // the history loaded but vot-state not (a degraded load): its saved "history off" is unknown, so no entry
+    install({ settings: { historyEnabled: false } });
+    g.StateStore.isReady = () => false;
+    render(<Harness route={JOHN3} />);
+    expect(g.HistoryStore.add).not.toHaveBeenCalled();
+    expect(g.StateStore.set).not.toHaveBeenCalled();
+    cleanup();
     install();
     g.__onReadingComplete = null;
     g.__votAudioListened = null;

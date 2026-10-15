@@ -118,9 +118,16 @@ function readingDay(gl) {
   try { if (store && typeof store.recordReadingDay === 'function') store.recordReadingDay(Date.now()); } catch (_e) { /* the streak waits */ }
 }
 
-/** The history entry for a visit, unless the reader turned history off. @param {Visit} v */
+/**
+ * The history entry for a visit, unless the reader turned history off; nothing until vot-state has loaded, since
+ * "history off" lives there (a loaded history beside an unloaded vot-state would write past it).
+ * @param {Visit} v
+ */
 export function recordVisit(v, gl = g) {
-  if (!v.entry || settingsOf(gl).historyEnabled === false) return false;
+  let s = null;
+  try { s = loadedState(gl); } catch (_e) { /* not loaded */ }
+  if (!v.entry || !s) return false;
+  if (s.settings && typeof s.settings === 'object' && s.settings.historyEnabled === false) return false;
   const hist = gl.HistoryStore;
   if (!hist || typeof hist.add !== 'function') return false;
   try { hist.add(v.entry); return true; } catch (_e) { return false; }
