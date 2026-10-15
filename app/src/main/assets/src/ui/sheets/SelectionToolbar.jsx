@@ -1205,6 +1205,16 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       setVisible(false);
       return;
     }
+    // In reading order: getByGroup lists a group's marks in the order their
+    // blocks were FIRST annotated, so a 3:15-17 note made after 3:16 had a
+    // highlight was quoted "3:16 … 3:15 … 3:17". The selection's blocks come
+    // in page order; a mark outside them keeps its place after them.
+    if (selInfo.multiVerse) {
+      const order = (selInfo.multiSpans || []).map((s) => s.key);
+      /** @param {string} k */
+      const rank = (k) => { const i = order.indexOf(k); return i < 0 ? order.length : i; };
+      segs.sort((a, b) => rank(a.key) - rank(b.key));
+    }
     // Normalize at WRITE time too: ann.text captured before the TreeWalker
     // poetry fix can carry collapsed line joins — don't bake them into a
     // fresh note record.

@@ -204,3 +204,19 @@ describe('SelectionToolbar — a multi-verse note lands on the whole selection (
     expect([...new Set(AnnotationStore.get(K15).map((h) => h.groupId))]).toEqual(['g_wide']);
   });
 });
+
+/* Found while fixing v31: the note's quote (fullText) and keys came from AnnotationStore.getByGroup, which
+   lists a group's marks in the order their verses were FIRST annotated. A 3:15-17 note made after 3:16 had
+   a highlight was quoted "3:16 … 3:15 … 3:17" in the NoteSheet and My Notes. */
+describe('SelectionToolbar — a multi-verse note quotes its verses in reading order', () => {
+  it('3:16 highlighted first, then a 3:15-17 note: keys and quote run 3:15, 3:16, 3:17', () => {
+    const LOVED = V16.indexOf('loved');
+    AnnotationStore.add(K16, { id: 'g_word', groupId: 'g_word', kind: 'highlight', color: 'yellow', start: LOVED, end: LOVED + 5, text: 'loved', created: 900 });
+    selectAndRaise(K15, 5, K17, 7);
+    tap(button('Note'));
+    const note = NoteStore.get(onNoteRequest.mock.calls[0][0]);
+    expect(note.keys).toEqual([K15, K16, K17]);
+    expect(note.fullText.startsWith('whosoever believeth')).toBe(true);
+    expect(note.fullText.endsWith('For God')).toBe(true);
+  });
+});
