@@ -77,6 +77,20 @@ class NativeAudioRecorderBackstopTest {
     private fun servedRecordings(): List<File> =
         File(application.cacheDir, NativeAudioRecorder.RECORDINGS_DIR).listFiles()?.toList().orEmpty()
 
+    /**
+     * Let [ms] of wall time pass since start(). stop() measures a memo on
+     * System.currentTimeMillis(), which Robolectric's shadow clock does not drive
+     * here (NativeAudioRecorderTest.advanceHours measured it moving 0 ms), so the
+     * start mark moves back instead.
+     */
+    private fun backdateStart(ms: Long) {
+        val field = NativeAudioRecorder::class.java.getDeclaredField("startMs")
+        field.isAccessible = true
+        val before = field.getLong(recorder)
+        assertTrue(before > 0L, "start() must have set its start mark before a test moves it")
+        field.setLong(recorder, before - ms)
+    }
+
     @Test
     fun `a recording the backstop stopped is kept, not deleted by a second stop`() {
         assertIs<NativeAudioRecorder.Result.Success<Unit>>(recorder.start())
@@ -103,6 +117,45 @@ class NativeAudioRecorderBackstopTest {
         assertTrue(
             servedRecordings().any { it.name == result.value.fileName },
             "the finished memo must still exist on disk for JS to fetch"
+        )
+    }
+
+    @Test
+    fun `a memo the backstop stopped is as long as its audio, not as the wait for stop`() {
+        // Sweep v091. The backstop fires only when the JS 300 s timer has stalled, so
+        // the stop() that collects the memo comes whenever the page wakes: here ten
+        // minutes after start. The file holds MAX_DURATION_MS of audio and nothing
+        // after it, and the journal shows the memo's length from this durationMs.
+        assertIs<NativeAudioRecorder.Result.Success<Unit>>(recorder.start())
+        val mr = liveMediaRecorder()
+        backdateStart(600_000L)
+        mr.stop()
+        recorder.onRecorderInfo(MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED)
+
+        val result = recorder.stop()
+
+        assertIs<NativeAudioRecorder.Result.Success<NativeAudioRecorder.RecordingResult>>(result)
+        assertEquals(
+            NativeAudioRecorder.MAX_DURATION_MS.toLong(), result.value.durationMs,
+            "the recorder stopped itself at the backstop; the minutes between that and " +
+                "stop() are not in the file and must not be in the memo's length"
+        )
+    }
+
+    @Test
+    fun `a memo stopped by the user keeps its measured length`() {
+        // The other side of v091: only a backstop stop is pinned to the cap. A
+        // two-minute memo stopped normally is two minutes, not 330 s.
+        assertIs<NativeAudioRecorder.Result.Success<Unit>>(recorder.start())
+        backdateStart(120_000L)
+
+        val result = recorder.stop()
+
+        assertIs<NativeAudioRecorder.Result.Success<NativeAudioRecorder.RecordingResult>>(result)
+        val dur = result.value.durationMs
+        assertTrue(
+            dur in 120_000L..130_000L,
+            "a memo the user stopped is measured from start to stop (got $dur ms for a two-minute memo)"
         )
     }
 

@@ -317,7 +317,12 @@ class NativeAudioRecorder(private val context: Context) {
             }
         }
         try { mr.release() } catch (_: Exception) {}
-        val safeDur = if (durMs < 0L) 0L else durMs
+        // A backstop memo is MAX_DURATION_MS of audio (sweep v091). The backstop fires
+        // only when the JS timer has stalled, so this stop() can come minutes later, and
+        // the wall time since start() counts minutes the file does not hold. No memo
+        // from this recorder is longer than the cap, so the cap bounds every length.
+        val maxDur = MAX_DURATION_MS.toLong()
+        val safeDur = if (autoStopped) maxDur else durMs.coerceIn(0L, maxDur)
         // #1 (fetch bridge): move the finished recording into the served
         // recordings/ dir under a uuid name and hand JS a URL to fetch, instead of
         // base64-inflating the whole file through the string bridge (a 5-min memo
