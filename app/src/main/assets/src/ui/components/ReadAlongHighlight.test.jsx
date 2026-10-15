@@ -747,6 +747,24 @@ describe('tap-to-seek', () => {
     expect(AudioPlayer.getState().time).toBe(2);
   });
 
+  it('a tap that seeks says so (defaultPrevented), so a page that also acts on taps stands down; with nothing loaded it does not', () => {
+    mount(); play(); clockTo(2);
+    caretAtChar(0, 20);
+    const body = document.querySelector('.letter-body');
+    let prevented = null;
+    const after = (e) => { prevented = e.defaultPrevented; };
+    document.addEventListener('click', after);
+    fireEvent.pointerDown(body, { clientX: 10, clientY: 10 });
+    fireEvent.click(body, { clientX: 10, clientY: 10 });
+    expect(AudioPlayer.getState().time).toBe(5);
+    expect(prevented).toBe(true);
+    act(() => AudioPlayer.stop());            // the letter is no longer loaded: a tap is the page's again
+    fireEvent.pointerDown(body, { clientX: 10, clientY: 10 });
+    fireEvent.click(body, { clientX: 10, clientY: 10 });
+    document.removeEventListener('click', after);
+    expect(prevented).toBe(false);
+  });
+
   it('works while PAUSED and does not start playback', () => {
     mount(); play(); clockTo(2);
     act(() => AudioPlayer.toggle());

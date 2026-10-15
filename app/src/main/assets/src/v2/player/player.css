@@ -30,6 +30,12 @@
 .v2-phone > .content.reader.full .body { padding-top: max(44px, var(--v2-top)); }
 .v2-phone .toast-wrap { z-index: 2; }
 
-/* read-along on a v2 letter (rv1 1b): main's ReadAlongHighlight paints ::highlight(vot-reading); the kit's .ra wash and
-   hero ink, literal (an older Android WebView resolves no var() inside ::highlight). */
+/* read-along on a v2 letter (rv1 1b): main's ReadAlongHighlight paints ::highlight(vot-reading) in the kit's .ra look,
+   each page's --wash and --t-hero (kit.css), written out because an older Android WebView resolves no var() inside
+   ::highlight. player-css.test.js holds these to the kit's values. */
 .v2 ::highlight(vot-reading) { background-color: rgba(196, 164, 105, .16); color: #F5F5F3; }
+[data-page="paper"] .v2 ::highlight(vot-reading) { background-color: rgba(190, 145, 50, .22); color: #1E1A15; }
+[data-page="black"] .v2 ::highlight(vot-reading) { background-color: rgba(196, 164, 105, .18); color: #ECEEEC; }
+
+/* Listen on a letter: a longer word ("Resume · 12 min left") widens the round play pill */
+.pill.play.wide { width: auto; padding-right: 22px; }

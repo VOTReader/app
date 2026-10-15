@@ -17,6 +17,8 @@ import {
 } from '../marks.js';
 import { kitColour } from '../notes-facts.js';
 import { DOUBLE_TAP_MS, FULLSCREEN_GESTURE_EVENT } from '../../utils/fullscreen-gesture-event.js';
+import { ListenPill, gateListenToast, startListening } from '../player/listen.jsx';
+import { LetterReadAlong } from '../player/read-along.jsx';
 
 const g = /** @type {any} */ (globalThis);
 /** How long a toast stays (main's confirmCopied). */
@@ -85,17 +87,18 @@ const LetterBody = React.memo(/** @param {{ letter: any }} props */ function Let
  * One letter, or with `preface` the collection's preface (its next card is Letter 1).
  * @param {{ collection: string, n?: number, preface?: boolean, onReady?: () => void, onOpenLetter?: (n: number) => void,
  *   gate?: import('../gate.js').GateState | null, desktop?: boolean, waitDoubleTap?: boolean,
- *   onNote?: (target: Record<string, any>) => void }} props
+ *   onNote?: (target: Record<string, any>) => void, facts?: import('../settings-facts.js').SettingsFacts }} props
  */
 export function LetterScreen({ collection, n = 0, preface = false, onReady, onOpenLetter, gate = null, desktop = false,
-  waitDoubleTap = false, onNote }) {
+  waitDoubleTap = false, onNote, facts = {} }) {
   const col = collectionOf(collection);
   const letters = useLetters(col);
   const letter = letters ? (preface ? prefaceOf(col) : letterAt(letters, n)) : null;
   const bodyRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const [sheet, setSheet] = React.useState(
     /** @type {null | { el: Element, para: import('../marks.js').Para, colour: string, marked: boolean }} */ (null));
-  const [toast, setToast] = React.useState(/** @type {string | null} */ (null));
+  // One toast at a time: Copy's and Share's words, or Listen's offline line (on a gate boot, 9c's from the page alone).
+  const [toast, setToast] = React.useState(/** @type {import('../player/listen.jsx').Toast | null} */ (gateListenToast(gate)));
   const live = !gate;
   useMainMarks(live, letter ? letter.id : null);
 
@@ -118,12 +121,12 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
     return () => sheet.el.classList.remove('tapped');
   }, [sheet]);
 
-  // The toast goes by itself.
+  // The toast goes by itself (a gate's stays: it is the picture).
   React.useEffect(() => {
-    if (!toast) return undefined;
+    if (!toast || gate) return undefined;
     const t = setTimeout(() => setToast(null), TOAST_MS);
     return () => clearTimeout(t);
-  }, [toast]);
+  }, [toast, gate]);
 
   /** Opens the sheet for a block, ringing its own highlight's colour, else the last one used. @param {Element} el */
   const openFor = React.useCallback((el) => {
@@ -173,13 +176,13 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
     if (!sheet) return;
     const el = sheet.el;
     close();
-    if (live) copyParagraph(el).then((words) => { if (words) setToast(words); });
+    if (live) copyParagraph(el).then((words) => { if (words) setToast({ text: words }); });
   };
   const onShare = () => {
     if (!sheet) return;
     const el = sheet.el;
     close();
-    if (live) shareParagraph(el).then((words) => { if (words) setToast(words); });
+    if (live) shareParagraph(el).then((words) => { if (words) setToast({ text: words }); });
   };
   const onAddNote = () => {
     if (!sheet) return;
@@ -201,7 +204,8 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
       <div className="page-head g reader-head">
         <span className="overline eyebrow">{col.label} · {preface ? 'Preface' : 'Letter ' + n}</span>
         <h1 className={titleClass(letter.title)}>{letter.title}</h1>
-        <button type="button" className="pill play"><Icon name="playBig" />Listen</button>
+        <ListenPill gate={gate} collection={collection} n={n} volKey={col.volKey} letter={letter} collectionLabel={col.label}
+          onToast={setToast} />
         {meta.length > 0 && <div className="meta">{meta.map((m, i) => <React.Fragment key={i}>{i > 0 && <br />}{m}</React.Fragment>)}</div>}
       </div>
       <div className="hair" />
@@ -214,13 +218,27 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
           </button>
         )}
       </div>
+      {/* the sentence being read, lit (readalong rv1 1b): main's read-along over the body's [data-hl-key] blocks */}
+      <LetterReadAlong gate={gate} collection={collection} n={n} volKey={col.volKey} letterId={letter.id} bodyRef={bodyRef}
+        on={facts.readAlong !== false} follow={facts.readAlongFollow !== false} onListen={listenHere(live, col, letter, setToast)} />
       {sheet && (
         <MarkSheet colour={sheet.colour} marked={sheet.marked} desktop={desktop} onColour={onColour} onNote={onAddNote}
           onCopy={onCopy} onShare={onShare} onClose={close} />
       )}
-      <LayerToast text={toast} />
+      <LayerToast text={toast && toast.text} icon={toast && toast.icon} />
     </>
   );
+}
+
+/**
+ * main's Listen for this letter (Listen from here plays it first; offline it says why, as the pill does), or null when
+ * it has no recording or on a gate.
+ * @param {(t: import('../player/listen.jsx').Toast) => void} onToast
+ */
+function listenHere(live, col, letter, onToast) {
+  const A = live ? g.AudioPlayer : null;
+  if (!A || typeof A.hasAudio !== 'function' || !A.hasAudio(col.volKey, letter.id)) return null;
+  return () => startListening(A, { volKey: col.volKey, letter, collectionLabel: col.label }, onToast);
 }
 
 /** The letter's top bar: Bookmark, Aa (the shell's Text and theme sheet), More. @param {{ open?: (sheet: string) => void }} ctx */
@@ -240,7 +258,7 @@ function LetterPlace({ route, replace, go, onReady, gate, desktop, facts }) {
   const openNote = (target) => go({ place: 'note', ...target });
   return <LetterScreen key={route.collection + '/' + (route.preface ? 'P' : route.n)} collection={route.collection} n={route.n}
     preface={!!route.preface} onReady={onReady} onOpenLetter={openLetter} gate={gate} desktop={desktop}
-    waitDoubleTap={!desktop && !(facts && facts.doubleTapFullscreen === false)} onNote={openNote} />;
+    waitDoubleTap={!desktop && !(facts && facts.doubleTapFullscreen === false)} onNote={openNote} facts={facts || {}} />;
 }
 
 definePlace('letter', {

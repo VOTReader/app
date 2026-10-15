@@ -1060,6 +1060,9 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
         jump = { from: AudioPlayer.getPreciseTime(), at: now, last: now, playing: st.status === 'playing', rate: st.rate || 1, qi: st.qi };
       }
       AudioPlayer.seek(frags[i][0]);
+      // The tap was a seek: a page that also acts on a tap (v2's Mark this paragraph sheet, a React onClick that
+      // runs after this native listener) sees defaultPrevented and stands down (Corbin 10-14: a single tap jumps).
+      e.preventDefault();
     };
     const onFullscreenGesture = (e) => {
       const now = Date.now();

@@ -221,7 +221,7 @@ export function V2App({ gateId = readGateId() }) {
         <div className={'v2 dk' + (bare ? ' bare' : '')}>
           {!bare && <nav className="rail" data-zone="rail" aria-label="Places">{tabs}</nav>}
           <div className="pane">
-            <div className="main" ref={scrollRef} onScroll={onScroll}>
+            <div className="main" ref={scrollRef} onScroll={onScroll} data-scroller="">
               <div className="col" data-zone="col">
                 {!bare && bar}
                 <div className={contentClass}>{screen}</div>
@@ -240,7 +240,7 @@ export function V2App({ gateId = readGateId() }) {
     <SheetLayer.Provider value={layer}>
       <div className={'v2 v2-phone' + (fs.full ? ' full' : '') + (bare ? ' bare' : '')}>
         {!fs.full && !bare && bar}
-        <div className={contentClass + (fs.full ? ' full' : '')} ref={scrollRef} onScroll={onScroll}>{screen}<FullScreenToast text={fs.full ? fs.toast : null} /></div>
+        <div className={contentClass + (fs.full ? ' full' : '')} ref={scrollRef} onScroll={onScroll} data-scroller="">{screen}<FullScreenToast text={fs.full ? fs.toast : null} /></div>
         {!fs.full && !bare && <MiniPlayer player={player} />}
         {!fs.full && !bare && <nav className="tabbar" aria-label="Places">{tabs}</nav>}
         <NowPlaying player={player} desktop={false} go={go} />
