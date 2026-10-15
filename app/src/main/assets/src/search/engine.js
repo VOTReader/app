@@ -689,15 +689,23 @@ const addTo = (/** @type {Map<any, string[]>} */ m, /** @type {any} */ k, /** @t
   if (!list) m.set(k, [id]);
   else if (list[list.length - 1] !== id) list.push(id);
 };
+/* A LETTER'S HEADING IS NO ONE'S WORDS (sr11, 2026-10-15). Every Answers excerpt opens with the heading of the letter
+   it comes from ("1/29/05 From The Lord, Our God and Savior The Word of The Lord Spoken to Timothy For The Lord's
+   Little Flock, and For All Those Who Have Ears to Hear"), and a letter with an addendum or a second word holds one in
+   its text (Volume One's "Christmas", Volume Four's "Obey God"). Keyed, that heading's runs named "Obey God" the
+   original of any Answers passage the model matched next to a heading, and it led searches about other things
+   (benchmark t320 "keep watch", t401 "come out of the churches"). A heading is never keyed. */
+const HEADING = /(?:\d{1,2}\/\d{1,2}\/\d{2,4}\s+)?(?:From [^.!?\n]{0,80}?Savior\s+)?[^.!?\n]{0,40}?(?:to|from) Timothy\s+For [^.!?\n]{0,120}?Ears to Hear/gi;
 /** Key one stored doc if it is an original: its sentences and, past a verse, its runs of words. */
 function addOriginal(/** @type {Map<string, string[]>} */ O, /** @type {Map<number, string[]>} */ S, /** @type {Map<string, any>} */ D, /** @type {string} */ id, /** @type {any} */ f) {
   if (!f || !ORIGINAL_KINDS.has(f.kind) || !f.text) return;
   D.set(id, f);
-  for (const sp of sentenceSpans(f.text)) {
+  const text = f.kind !== 'verse' && /ears to hear/i.test(f.text) ? f.text.replace(HEADING, '\n') : f.text;
+  for (const sp of sentenceSpans(text)) {
     const k = sentenceKey(sp.text);
     if (k) addTo(O, k, id);
   }
-  if (f.kind !== 'verse') eachShingle(kjvEncode(f.text), (h) => addTo(S, h, id));
+  if (f.kind !== 'verse') eachShingle(kjvEncode(text), (h) => addTo(S, h, id));
 }
 /** The originals, read in one pass if they are not read yet (node; a search that raced a swap). */
 function originals() {

@@ -28,6 +28,11 @@ const REST = REST_OPEN + 'The walls are high and the towers are many in that cit
 // a letter the typed words find at its opening, whose described passage opens on a sentence that holds none of them
 const HARVEST_OPEN = 'Bring the wheat, bring the sheaves, bring the barn doors near, says the steward. ';
 const HARVEST = HARVEST_OPEN + 'The towers are many in that city. '.repeat(6) + 'The season turns at last. Gather My sheaves before the rain. The year is old.';
+// a letter's heading: every Answers excerpt opens with one, and a letter with a second word in it holds one in its text
+const HEADING = 'From The Lord, Our God and Savior The Word of The Lord Spoken to Timothy For The Lord’s Little Flock, and For All Those Who Have Ears to Hear';
+const OBEY = 'Hear Me, O children: honor your father and your mother in all things that are right. Says The Lord. 3/2/06 ' +
+  HEADING.replace('The Lord, Our God', 'YahuShua HaMashiach, Our Lord') + ' Thus says The Lord: My sons and daughters, walk in My ways and live.';
+const WATCH = 'Stay awake through the night and guard the door, for the master returns at an hour no one expects. ✦ 1/29/05 ' + HEADING + ' The towers of the proud shall fall.';
 const GLOBALS = {
   BOOKS: {},
   LETTERS_V1: [
@@ -37,17 +42,19 @@ const GLOBALS = {
     { id: 'vineyard', num: 4, title: 'The Vineyard', blocks: [{ segments: [{ v: VINEYARD }] }] },
     { id: 'rest', num: 5, title: 'The Gate', blocks: [{ segments: [{ v: REST }] }] },
     { id: 'harvest', num: 6, title: 'The Steward', blocks: [{ segments: [{ v: HARVEST }] }] },
+    { id: 'obey', num: 7, title: 'Obey God', blocks: [{ segments: [{ v: OBEY }] }] },
   ],
   ANSWERS: [
     { id: 'fields', num: 1, title: 'Regarding Fields', paragraphs: [{ text: TOPIC_OPEN + VINEYARD }] },
     { id: 'lamps', num: 2, title: 'Regarding Lamps', paragraphs: [{ text: 'Many have asked about lamps and oil and the hour of the night watch.' }] },
+    { id: 'watch', num: 3, title: 'Regarding the Night Watch', paragraphs: [{ text: WATCH }] },
   ],
 };
 const STARTS = { garment: 0, creator: CREATOR.indexOf('Remember'), silver: 0, fields: TOPIC_OPEN.length, gate: 0, peace: REST.indexOf('Lay down'),
-  steward: 0, season: HARVEST.indexOf('The season'), lamps: 0 };
-const KEYS = ['v1/garment', 'v1/creator', 'v1/silver', 'answers/fields', 'v1/rest', 'v1/harvest', 'answers/lamps'];
+  steward: 0, season: HARVEST.indexOf('The season'), lamps: 0, obey: 0, watch: 0 };
+const KEYS = ['v1/garment', 'v1/creator', 'v1/silver', 'answers/fields', 'v1/rest', 'v1/harvest', 'answers/lamps', 'v1/obey', 'answers/watch'];
 /** Each passage: its document (index in KEYS), where it starts, and the name a test calls it by. */
-const UNITS = [[0, 'garment'], [1, 'creator'], [2, 'silver'], [3, 'fields'], [4, 'gate'], [4, 'peace'], [5, 'steward'], [5, 'season'], [6, 'lamps']];
+const UNITS = [[0, 'garment'], [1, 'creator'], [2, 'silver'], [3, 'fields'], [4, 'gate'], [4, 'peace'], [5, 'steward'], [5, 'season'], [6, 'lamps'], [7, 'obey'], [8, 'watch']];
 /** What the stand-in model says the query means: the unit (by name) it is nearest, or how near it is to several ({name: weight}). */
 /** @type {{near: string|Record<string, number>}} */
 const said = { near: 'creator' };
@@ -128,6 +135,15 @@ describe('meaning first', () => {
     said.near = 'fields';
     const r = await first('a farmer whose crop went sour and so he gave up on his land');
     expect(r.doc.letterId).toBe('vineyard');
+  });
+
+  /* A LETTER'S HEADING IS NO ONE'S WORDS (sr11, 2026-10-15). The passage the model matched in an Answers topic ran on
+     into the next excerpt's heading, and a letter holding a heading in its text (Volume Four's "Obey God") took the
+     topic's place as its "original": it led searches about other things (benchmark t320, t401). */
+  it("a reprint's passage that runs into the next excerpt's heading names no letter by that heading", async () => {
+    said.near = 'watch';
+    const r = await first('stay awake on guard before dawn');
+    expect(r.doc.title).toBe('Regarding the Night Watch');
   });
 
   it('a text the words found opens on the passage the query describes, when the model clearly prefers it', async () => {
