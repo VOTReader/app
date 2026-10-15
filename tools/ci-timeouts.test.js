@@ -52,6 +52,11 @@ describe('the required check covers every CI job (ln1)', () => {
   it('needs gates, vitest, browser and search-bench, and runs when one of them fails', () => {
     expect(build).toMatch(/\n {4}needs: \[gates, vitest, browser, search-bench\]\n/);
     expect(build).toMatch(/\n {4}if: >-\n {6}always\(\) &&/);
-    expect(build).toMatch(/\[ "\$r" = success \] \|\| exit 1/);
+    // Any result but success fails it; the one exception is branch v2, where the browser job is skipped on purpose
+    // (its suites drive the v1 screens v2 does not mount; mw4) and `skipped` counts there only.
+    expect(build).toMatch(/\[ "\$r" = success \] \|\| \{ \[ "\$r" = skipped \] && \[ "\$GITHUB_REF" = refs\/heads\/v2 \]; \} \|\| exit 1/);
+  });
+  it('the browser job is skipped on branch v2 only', () => {
+    expect(jobs(wf('ci.yml')).browser).toMatch(/\n {4}if: >-\n {6}github\.ref != 'refs\/heads\/v2' && \(/);
   });
 });

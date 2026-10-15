@@ -735,6 +735,8 @@ if [ -n "$bundle_source_changed" ]; then
           app/src/main/assets/dist/bundle-d.js \
           app/src/main/assets/dist/bundle-w.js \
           app/src/main/assets/dist/app.min.css \
+          app/src/main/assets/dist/bundle-v2.js \
+          app/src/main/assets/dist/v2.min.css \
           app/src/main/assets/index.html \
           app/src/main/assets/service-worker.js
   # index.html is re-staged because `npm run build` runs build:csp, which
