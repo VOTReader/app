@@ -754,6 +754,116 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
     expect(window.JournalMediaStore.put.mock.calls[0][0].sourceName).toBeUndefined();
   expect(MockBridge.nativeDeleteRecording).not.toHaveBeenCalled();
   });
+
+  /* Sweep v028/v029. Finish moves the sheet to the preview at once, but the take is committed by an
+     async put. A discard confirmed inside that window found no committed id and deleted nothing; the
+     editor then unmounted the sheet, and the put's .then returned early on `cancelled`. The take the
+     reader threw away stayed in the store marked unlinked, came back as an unclaimed recording in the
+     Hub, and native never released the served file. The editor's own open/close is modelled here
+     (onClose sets showRec false), so the unmount is the real one and not a test shortcut. */
+  function EditorHost() {
+    const [show, setShow] = React.useState(true);
+    return show ? <JournalRecordingSheet onSave={() => {}} onClose={() => setShow(false)} /> : null;
+  }
+
+  /** Mount through the editor host, record, tap Finish, and land the take with its put still open. */
+  async function finishWithPutInFlight() {
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.resolve({
+      ok: true, blob: () => Promise.resolve(new Blob(['audio'], { type: 'audio/mp4' })),
+    })));
+    let settlePut;
+    window.JournalMediaStore.put = vi.fn(() => new Promise((res) => { settlePut = () => res('media-1'); }));
+    const utils = render(<EditorHost />);
+    act(() => { vi.advanceTimersByTime(10); });
+    act(() => { vi.advanceTimersByTime(1300); });
+    fireEvent.click(screen.getByLabelText('Finish'));
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, SERVED);
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(window.JournalMediaStore.put).toHaveBeenCalledTimes(1);
+    return { utils, settlePut };
+  }
+
+  it('a discard confirmed while the take is still committing deletes it when the commit lands (sweep v028, v029)', async () => {
+    const { settlePut } = await finishWithPutInFlight();
+  // The preview is already up (Finish moved it there eagerly), so the reader can discard now.
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
+    fireEvent.click(screen.getByText('Yes, discard'));
+    expect(screen.queryByRole('dialog')).toBeNull();   // the editor closed the sheet
+
+    await act(async () => { settlePut(); await vi.advanceTimersByTimeAsync(100); });
+  // The bug: nothing was deleted, so the discarded take sat in the Hub as an unclaimed recording.
+    expect(window.JournalMediaStore.delete).toHaveBeenCalledWith('media-1');
+  // And native lets go of the served file: the reader said they do not want these bytes.
+    expect(MockBridge.nativeDeleteRecording).toHaveBeenCalledWith(SERVED_NAME);
+  });
+
+  it('CONTROL: the sheet closing WITHOUT a discard keeps the take (the trade documented at finalize)', async () => {
+    const { utils, settlePut } = await finishWithPutInFlight();
+    utils.unmount();   // gone some other way than the reader's discard
+    await act(async () => { settlePut(); await vi.advanceTimersByTimeAsync(100); });
+    expect(window.JournalMediaStore.delete).not.toHaveBeenCalled();
+  });
+
+  /* One step earlier in the same window: the discard is confirmed while the fetch is still
+     bringing the take in. Nothing may be committed for a take the reader threw away, and native
+     lets go of the served file instead of holding it until its sweep. */
+  it('a discard confirmed while the take is still being fetched commits nothing and releases the file (sweep v028)', async () => {
+    let settleFetch;
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => new Promise((res) => {
+      settleFetch = () => res({ ok: true, blob: () => Promise.resolve(new Blob(['audio'], { type: 'audio/mp4' })) });
+    })));
+    render(<EditorHost />);
+    act(() => { vi.advanceTimersByTime(10); });
+    act(() => { vi.advanceTimersByTime(1300); });
+    fireEvent.click(screen.getByLabelText('Finish'));
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, SERVED);
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
+    fireEvent.click(screen.getByText('Yes, discard'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    await act(async () => { settleFetch(); await vi.advanceTimersByTimeAsync(100); });
+    expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
+    expect(MockBridge.nativeDeleteRecording).toHaveBeenCalledWith(SERVED_NAME);
+  });
+
+  /* CONTROL for what counts as a discard. Close on the retrieving stage asks the reader nothing,
+     and they have not heard the take yet: a commit that lands after it keeps the take, unlinked,
+     for the Hub banner (the trade documented at finalize). Only "Yes, discard" drops it. */
+  it('CONTROL: Close while Try again is still committing the take keeps it', async () => {
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.reject(new Error('blip'))));
+    let settlePut;
+    window.JournalMediaStore.put = vi.fn(() => new Promise((res) => { settlePut = () => res('media-1'); }));
+    render(<EditorHost />);
+    act(() => { vi.advanceTimersByTime(10); });
+    act(() => { vi.advanceTimersByTime(1300); });
+    fireEvent.click(screen.getByLabelText('Finish'));
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, SERVED);
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+    // Every attempt failed; this time the fetch works, and the commit stays open.
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.resolve({
+      ok: true, blob: () => Promise.resolve(new Blob(['audio'], { type: 'audio/mp4' })),
+    })));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(window.JournalMediaStore.put).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/Getting your recording/)).toBeTruthy();   // still retrieving
+    fireEvent.click(screen.getByText('Close'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    await act(async () => { settlePut(); await vi.advanceTimersByTimeAsync(100); });
+    expect(window.JournalMediaStore.delete).not.toHaveBeenCalled();
+    expect(MockBridge.nativeDeleteRecording).not.toHaveBeenCalled();
+  });
 });
 
 /* ds2 (2026-10-13): a take lives in memory until it is saved, so an app update waits while

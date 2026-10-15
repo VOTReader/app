@@ -138,6 +138,11 @@ export function JournalRecordingSheet({ onSave, onClose }) {
   // journal-3 (a): the id of the record committed at finalize(), before the
   // user has seen anything. Save links it; Discard deletes it.
   var committedIdRef = useRef(null);
+  // Sweep v028/v029: the reader tapped "Yes, discard". Finish shows the preview before the take is
+  // fetched and committed, so a discard can come while no id exists yet; finalize() and the put's
+  // .then read this and drop what arrives. Not `cancelled`: an unmount WITHOUT a confirmed discard
+  // (Close on the retrieving stage asks nothing) keeps the take, the trade documented at finalize().
+  var discardedRef = useRef(false);
   // journal-3: re-runs the fetch that failed, from attempt 0, against the same
   // served url. Set only on the Android fetch path -- the file is still on disk
   // for the TTL window, so this is a real second chance, not a re-record.
@@ -225,6 +230,16 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         servedName = nameMatch ? nameMatch[1] : null;
       } catch (_e) { servedName = null; }
 
+      // A take the reader discarded while it was still on its way in (sweep v028/v029): discard()
+      // found no committed id, so what arrives is dropped here -- the record if the put already
+      // wrote one, and native's served file, since the reader said they do not want these bytes.
+      function dropDiscarded(id) {
+        if (id && JournalMediaStore.delete) JournalMediaStore.delete(id);
+        if (servedName) {
+          try { PlatformBridge.nativeDeleteRecording(servedName); } catch (_e) { /* housekeeping only */ }
+        }
+      }
+
       // Common tail: given the resolved audio Blob, preview it (or auto-save).
       // journal-3 clause (a): COMMIT, THEN PREVIEW. The durability line is
       // JournalMediaStore.put() resolving -- STORE-3 makes it resolve on the
@@ -252,6 +267,8 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       // Each call issues a NEW put, so a failed commit cannot resolve from a
       // cached promise and look durable; the transaction is real every time.
       function finalize(audioBlob) {
+        // Before `cancelled`: the confirmed discard is what unmounted the sheet.
+        if (discardedRef.current) { dropDiscarded(null); return; }
         if (cancelled) return;
         if (!audioBlob || audioBlob.size === 0) {
           // Nothing to retry: Try again would fetch the same empty file (W15).
@@ -273,11 +290,14 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         // a key holding a non-name would make an unclaimed file look claimed.
         if (servedName) record.sourceName = servedName;
         JournalMediaStore.put(record).then(function(id) {
+          // Discarded while this commit was in flight: delete what it just wrote (sweep v028/v029).
+          if (discardedRef.current) { dropDiscarded(id); return; }
           if (cancelled) return;
           committedIdRef.current = id;
           /* THE HANDSHAKE (clause (d)): native stops holding the bytes because
-             JS SAID IT HAS THEM, not because a timer guessed. This is the only
-             caller of nativeDeleteRecording; before it, the sole thing that
+             JS SAID IT HAS THEM, not because a timer guessed. This and
+             dropDiscarded() (the reader threw the take away) are the only
+             callers of nativeDeleteRecording; before them, the sole thing that
              ever removed a served file was NativeAudioRecorder's own TTL sweep.
 
              AFTER the put resolves, never before. put() resolving IS the
@@ -660,6 +680,14 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     onClose && onClose();
   }
 
+  // "Yes, discard" (sweep v028/v029): the reader's confirmed choice to throw the take away, so a
+  // fetch or commit still in flight drops what it brings in (finalize). The unconfirmed closes
+  // (requesting, error, retrieving) call discard() alone and keep anything that lands later.
+  function confirmDiscard() {
+    discardedRef.current = true;
+    discard();
+  }
+
   // Confirm-gate the discard whenever real audio would be lost: a take in
   // progress (any recorded seconds) or a finished recording under review.
   // The requesting/error stages hold nothing, so they still close instantly.
@@ -878,7 +906,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
               question="Discard this recording?"
               yesLabel="Yes, discard"
               onCancel={function() { setConfirmingDiscard(false); }}
-              onConfirm={discard}
+              onConfirm={confirmDiscard}
             />
           ) : (
           <div className="jrn-rec-actions">
@@ -930,7 +958,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
             question="Discard this recording?"
             yesLabel="Yes, discard"
             onCancel={function() { setConfirmingDiscard(false); }}
-            onConfirm={discard}
+            onConfirm={confirmDiscard}
           />
         ) : (
         <div className="jrn-rec-actions jrn-rec-review-actions">
