@@ -765,7 +765,7 @@ function App() {
       <ErrorBoundary fallback={null} resetKey={screen}><AudioPlayerBar /></ErrorBoundary>
       <AnnotationDomSync
         screen={screen}
-        letterId={letterId}
+        letterId={letterId} studiesLoading={studiesLoading}
         placeKey={[screen, bookId, chapterNum, letterId, studyId, studyChapterId].join('|')}
         noteSheetTarget={noteSheetTarget}
         setNoteSheetTarget={setNoteSheetTarget}

@@ -272,6 +272,61 @@ describe('useDomAnnotationSync — apply pass', () => {
       expect(el.scrollIntoView).toHaveBeenCalledTimes(1);
     });
 
+    it('never yanks the reader back when a later store bump finds a mark that mounted unseen (refuter repro)', () => {
+      // Cold start, Library -> a mark in a Bible Study chapter before
+      // bible-studies.js loaded: the first pass misses on "Loading…". The
+      // chapter then renders with no pass to see it, the reader reads on, and
+      // their next annotation re-runs the pass. Scrolling then would yank them
+      // back to the Library target long after the page opened.
+      window.AnnotationStore = makeMutableStore();
+      const ann = /** @type {any} */ (window.AnnotationStore);
+      navHandoff.set('pendingScrollHlKey', 'study:purity:ch1:p7');
+      renderHook(() => useDomAnnotationSync(baseProps({ screen: 'bible-study-chapter', placeKey: 'bible-study-chapter|||purity|purity-ch1' })));
+      act(() => { vi.advanceTimersByTime(0); });
+      act(() => { vi.advanceTimersByTime(70); });               // placeholder miss
+      const el = mountMark('study:purity:ch1:p7');
+      act(() => { vi.advanceTimersByTime(5000); });             // the reader has the page a while
+      expect(el.scrollIntoView).not.toHaveBeenCalled();
+      act(() => { ann.bump(); });                                // their next annotation
+      act(() => { vi.advanceTimersByTime(0); });
+      act(() => { vi.advanceTimersByTime(70); });
+      expect(el.scrollIntoView).not.toHaveBeenCalled();
+      expect(navHandoff.peek('pendingScrollHlKey')).toBe(null);  // the stale jump is dropped, not left armed
+    });
+
+    it('scrolls a study chapter opened cold once the studies finish loading', () => {
+      // bible-studies.js is not a lazy corpus: App's studiesLoading flag is the
+      // signal, and its flip re-runs the pass as the chapter's blocks mount.
+      navHandoff.set('pendingScrollHlKey', 'study:purity:ch1:p7');
+      const props = baseProps({ screen: 'bible-study-chapter', placeKey: 'bible-study-chapter|||purity|purity-ch1', studiesLoading: true });
+      const { rerender } = renderHook((p) => useDomAnnotationSync(p), { initialProps: props });
+      act(() => { vi.advanceTimersByTime(0); });
+      act(() => { vi.advanceTimersByTime(70); });               // "Loading…" placeholder: waits
+      expect(navHandoff.peek('pendingScrollHlKey')).toBe('study:purity:ch1:p7');
+
+      const el = mountMark('study:purity:ch1:p7');                // studies land -> chapter mounts
+      rerender({ ...props, studiesLoading: false });
+      act(() => { vi.advanceTimersByTime(0); });
+      act(() => { vi.advanceTimersByTime(70); });
+      expect(el.scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(el.scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+      expect(navHandoff.peek('pendingScrollHlKey')).toBe(null);
+    });
+
+    it('drops the wait once the reader scrolls the page themselves', () => {
+      navHandoff.set('pendingScrollHlKey', 'matthew:5:12');
+      renderHook(() => useDomAnnotationSync(baseProps({ screen: 'matthew-ch', placeKey: 'matthew-ch|matthew|5||||' })));
+      act(() => { vi.advanceTimersByTime(0); });
+      act(() => { vi.advanceTimersByTime(70); });               // missed: waits
+      window.dispatchEvent(new Event('touchmove'));              // the reader scrolls
+      expect(navHandoff.peek('pendingScrollHlKey')).toBe(null);
+      const el = mountMark('matthew:5:12');
+      act(() => { window.__matthewCorpus.bump(); });             // even a load re-run no longer jumps
+      act(() => { vi.advanceTimersByTime(0); });
+      act(() => { vi.advanceTimersByTime(70); });
+      expect(el.scrollIntoView).not.toHaveBeenCalled();
+    });
+
     it('a pending timer acts only on the key still in the slot (a newer jump, goHome)', () => {
       const mark = mountMark('k1');
       navHandoff.set('pendingScrollHlKey', 'k1');
