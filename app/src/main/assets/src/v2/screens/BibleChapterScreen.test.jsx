@@ -81,6 +81,31 @@ describe('5c-search-match', () => {
   });
 });
 
+describe('2c-john3-playing', () => {
+  it('each verse carries main\'s verse key beside its read segment, so the read-along and read marks key it as main does', () => {
+    g.BOOKS = { john: JOHN };
+    const { container } = render(
+      <BibleChapterScreen route={{ place: 'bible-chapter', book: 'john', chapter: 3 }} facts={{}} replace={() => {}} onReady={() => {}} />,
+    );
+    const v7 = container.querySelector('#v-7');
+    expect(v7.getAttribute('data-hl-key')).toBe('bible:john:3:7');
+    expect(v7.getAttribute('data-read-seg')).toBe('v7');
+    expect([...container.querySelectorAll('.bible [data-hl-key]')].map((n) => n.getAttribute('data-hl-key')))
+      .toEqual(['bible:john:3:1', 'bible:john:3:2', 'bible:john:3:3', 'bible:john:3:7']);
+  });
+
+  it('the gate picture: John 3 from Home > The Bible > John at its top; Back says John, Home stays lit', async () => {
+    g.BOOKS = { john: JOHN };
+    const { container } = render(<V2App gateId="2c-john3-playing" />);
+    await waitFor(() => expect(html.dataset.gate).toBe('ready'));
+    expect(container.querySelector('.tb .title').textContent).toBe('John');
+    expect(container.querySelector('.tab[aria-current="page"]').textContent).toBe('Home');
+    expect(container.querySelector('.reader-head h1').textContent).toBe('John 3');
+    expect(container.querySelector('.reader-head .eyebrow').textContent).toBe('The Scriptures of Truth · NKJV');
+    expect(container.querySelector('mark.qm')).toBe(null);
+  });
+});
+
 describe('loading', () => {
   it('loads main\'s Bible on first use, then shows the chapter', async () => {
     g.__loadBibleCorpus = vi.fn(() => { g.BOOKS = { john: JOHN }; return Promise.resolve(); });

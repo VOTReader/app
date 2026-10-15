@@ -112,6 +112,13 @@ export const GATE_STATES = {
     playing: { ...LETTER_ONE_PLAYING, at: 47, length: 75 },
     scroll: { to: '.body [data-hl-key$=":0"]', gap: -93, phone: true },
   },
+  // states.json 2c-john3-playing: John 3 from Home > The Bible > John, at its top (bars shown: the head is in view),
+  // playing at 0:46 of 6:24 with verse 2 lit; Back says John.
+  '2c-john3-playing': {
+    stack: [{ place: 'home' }, { place: 'bible' }, { place: 'bible-book', book: 'john' }, { place: 'bible-chapter', book: 'john', chapter: 3 }],
+    facts: { translation: 'nkjv' },
+    playing: { item: { book: 'john', chapter: 3 }, reader: 'B', at: 46, length: 384, paused: false },
+  },
   // states.json 1c-aa-sheet: Letter 1 at its top, Text and theme open: standard size (step 3 of 6), Slate, Comfortable.
   '1c-aa-sheet': {
     stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],

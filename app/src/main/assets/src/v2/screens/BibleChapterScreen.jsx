@@ -10,6 +10,7 @@ import { definePlace } from '../places.js';
 import { whenPainted } from '../gate.js';
 import { bookTitle } from '../home-facts.js';
 import { highlightSpans } from '../../search/snippet.js';
+import { bibleHlKey } from '../../utils/hl-keys.js';
 
 const g = /** @type {any} */ (globalThis);
 
@@ -136,7 +137,7 @@ export function BibleChapterScreen({ route, facts, replace, onReady }) {
     }
     return (
       <React.Fragment key={v.n}>
-        <span className={'v' + (hit ? ' hit-v' : '')} id={'v-' + v.n} data-read-seg={'v' + v.n}>
+        <span className={'v' + (hit ? ' hit-v' : '')} id={'v-' + v.n} data-read-seg={'v' + v.n} data-hl-key={bibleHlKey(book.id, ch.num, v.n)}>
           <span className="vn">{v.n}</span>{words}
         </span>{' '}
       </React.Fragment>
