@@ -258,6 +258,8 @@ function _send(urls, method) {
 export const OfflineAudio = {
   subscribe,
   getVersion: () => _version,
+  /** @returns {boolean} the store has said what it holds (the web store reads its cache first): until then items() is [] */
+  loaded: () => { if (!_loaded) refresh(); return _loaded; },
   /** The latest news for a screen reader: { seq, text } (seq 0 = none yet). */
   news: () => _news,
   /** @returns {boolean} true where recordings can be kept: the phone app, or a browser with the web store (cf1) */

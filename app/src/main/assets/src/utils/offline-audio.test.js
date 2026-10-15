@@ -42,6 +42,16 @@ describe('offline-audio — on the web (no bridge)', () => {
   });
 });
 
+describe('offline-audio — loaded()', () => {
+  it('is false until a store has said what it holds, then true (v2 Settings keeps its plain line till then)', () => {
+    expect(OfflineAudio.loaded()).toBe(false);
+    const b = fakeBridge([]);
+    b.offlineAudioState.mockReturnValueOnce(null);
+    expect(OfflineAudio.loaded()).toBe(false);
+    expect(OfflineAudio.loaded()).toBe(true);
+  });
+});
+
 describe('offline-audio — in the phone app', () => {
   it('reads what is on the phone from the native store', () => {
     fakeBridge([{ url: U1, key: 'one:christmas', title: 'Christmas', bytes: 6_000_000, savedAt: 1 }]);

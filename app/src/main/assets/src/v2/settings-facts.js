@@ -59,6 +59,21 @@ export function savedFacts(g = /** @type {any} */ (globalThis)) {
   return readFacts(state && state.settings, { theme: state ? state.theme : undefined, speed });
 }
 
+/**
+ * The Downloads row's facts on a real boot: the recordings main's OfflineAudio keeps on this device and their bytes
+ * (kept songs left out, as main's "On this phone" counts them). null where nothing can be kept (no store: a Safari tab, a
+ * private window) or before the store has read what it holds, so the row keeps its plain line rather than flash "Nothing
+ * saved". Read only.
+ * @returns {{ count: number, bytes: number } | null}
+ */
+export function downloadFacts(g = /** @type {any} */ (globalThis)) {
+  const off = g.OfflineAudio;
+  try {
+    if (!off || !off.available() || !off.loaded()) return null;
+    return { count: off.items().length, bytes: Math.max(0, Number(off.totalBytes()) || 0) };
+  } catch (_e) { return null; }
+}
+
 /** "1×", "1.25×" */
 export function speedLabel(rate) {
   const r = Math.round((Number(rate) || 1) * 100) / 100;

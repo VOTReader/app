@@ -1,6 +1,6 @@
 /* SettingsScreen - v2 Settings: six pages, each row saying what it holds (picture 4a-settings, kit .settings.cats). */
 import { Icon } from '../Icon.jsx';
-import { settingsRows } from '../settings-facts.js';
+import { settingsRows, downloadFacts } from '../settings-facts.js';
 import { definePlace } from '../places.js';
 
 /** Each row's page (states.json place names; builder B registers them). */
@@ -31,9 +31,22 @@ export function SettingsScreen({ facts, device, onOpen, onReady }) {
   );
 }
 
+const NO_SUB = () => () => {};
+const ZERO = () => 0;
+
+/** The facts with the Downloads row's read live from main's OfflineAudio on a real boot, again each time the store
+ *  changes (v2lis, v2-gaps 15); a gate boot keeps its picture's. */
+function useDownloads(facts, gate) {
+  const off = gate ? null : /** @type {any} */ (globalThis).OfflineAudio;
+  const live = !!(off && typeof off.subscribe === 'function' && typeof off.getVersion === 'function');
+  React.useSyncExternalStore(live ? off.subscribe : NO_SUB, live ? off.getVersion : ZERO);
+  return live ? { ...facts, downloads: downloadFacts() } : facts;
+}
+
 /** The settings place: a row opens its page. */
-function SettingsPlace({ facts, device, go, onReady }) {
-  return <SettingsScreen facts={facts} device={device} onReady={onReady} onOpen={(id) => go({ place: SETTINGS_PAGES[id] })} />;
+export function SettingsPlace({ facts, device, gate, go, onReady }) {
+  const shown = useDownloads(facts, gate);
+  return <SettingsScreen facts={shown} device={device} onReady={onReady} onOpen={(id) => go({ place: SETTINGS_PAGES[id] })} />;
 }
 
 definePlace('settings', { Screen: SettingsPlace, title: () => 'Settings' });
