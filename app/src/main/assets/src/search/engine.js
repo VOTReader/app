@@ -123,6 +123,13 @@ export function expandContractions(q) {
     return (NT_BASE[b] || base) + ' not';
   });
 }
+/* A negative contraction typed without its apostrophe ("dont") is no typo (sr11 t216): it
+   may be read as the word a text's own contraction leaves ("don't" -> don + t), never as
+   another word. The corrector read "cant" as "chant", "wasnt" as "want", "shouldnt" as
+   "should", "arent" as "parent", said so ("Showing results for chant"), and the meaning
+   model was asked the same. Read as two words instead it lost a sealed query whose text
+   contracts. "wont" is no such word here: the KJV's ("the ox was wont to gore"). */
+const NT_BARE = /^(ca|do|does|did|is|are|was|were|has|have|had|could|would|should|must|need|sha|ai)nt$/;
 
 /**
  * One unit's BM25 search, the body and the title scored apart and summed per text:
@@ -1601,8 +1608,9 @@ async function search(query, options) {
     let fixed;
     try { fixed = searchCorrected(unit.term, unitOpts(unit), keyword); } catch { continue; }
     if (!fixed.res.length) continue;
-    accumulate(unit, fixed.res);
     const typed = kjvEncode(unit.term);
+    if (typed.length === 1 && NT_BARE.test(typed[0]) && fixed.to !== typed[0].slice(0, -1)) continue;
+    accumulate(unit, fixed.res);
     if (fixed.to && typed.length === 1 && typed[0] !== fixed.to) corrections.push({ from: typed[0], to: fixed.to });
   }
   /* A CORRECTED QUERY IS SEARCHED AS THAT QUERY (2026-09-27). "Showing results for
