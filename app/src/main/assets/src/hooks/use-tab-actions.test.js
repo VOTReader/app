@@ -518,6 +518,18 @@ describe('useTabActions — deduplicateTabs', () => {
     expect(ts.setActiveTabIdx).toHaveBeenCalledWith(1);
   });
 
+  // sweep v38: the content key left out the search words, so Dedupe folded a
+  // "mercy" search tab into a "grace" one and the reader lost a tab.
+  it('keeps search tabs for different words, and folds the same search', () => {
+    const search = (q) => ({ screen: 'search', searchQuery: q });
+    const arr = [search('grace'), search('mercy'), search('grace')];
+    const { ts, result } = mountActive(arr, 1);
+    act(() => { result.current.deduplicateTabs(); });
+    const kept = ts.setTabs.mock.calls[0][0](arr);
+    expect(kept.map((t) => t.searchQuery)).toEqual(['grace', 'mercy']);
+    expect(ts.setActiveTabIdx).toHaveBeenCalledWith(1);
+  });
+
   it("the kept copy's own rename wins over a later copy's, and an unchanged tab keeps its object", () => {
     const first = { ...at('letter', 'x'), customTitle: 'Mine' };
     const home = at('home');

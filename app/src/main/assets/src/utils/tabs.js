@@ -10,6 +10,7 @@
    =================================================================== */
 
 import { answersSubjectById } from './answers-shelves.js';
+import { SONGS_SCREEN, decodeSongsRoute } from './songs-route.js';
 
 /**
  * The tab-state shape these helpers consume. Sourced from useTabs (P6k-A)
@@ -26,7 +27,10 @@ import { answersSubjectById } from './answers-shelves.js';
  *   studyChapterId?: string | null,
  *   genreId?: string | null,
  *   gardenPage?: number | null,
- *   searchQuery?: string | null
+ *   searchQuery?: string | null,
+ *   searchScope?: unknown,
+ *   audioColKey?: string | null,
+ *   journalEntryId?: string | null
  * }} TabState
  */
 
@@ -163,16 +167,55 @@ export function describeTab(tab) {
 }
 
 /**
+ * What a few screens show that the fixed key fields do not hold: the search
+ * words and scope, the collection or Songs page in audioColKey, the journal
+ * entry. Read only on the screen that shows it, so a value left over from
+ * another screen never splits a real duplicate; '' when there is nothing, so
+ * those tabs keep the key (and the stored thumbnail) they always had.
+ *
+ * @param {TabState} tab
+ * @param {string} screen
+ * @returns {string}
+ */
+function screenContentPart(tab, screen) {
+  if (screen === 'search') {
+    const q = typeof tab.searchQuery === 'string' ? tab.searchQuery.trim() : '';
+    // searchScope is the scope chip's context ({ kind, bookId | volumeId, label }) or null.
+    const sc = /** @type {{ kind?: string, bookId?: string, volumeId?: string } | null} */ (
+      tab.searchScope && typeof tab.searchScope === 'object' ? tab.searchScope : null);
+    const scope = sc ? `${sc.kind || ''}:${sc.bookId || sc.volumeId || ''}` : '';
+    return q || scope ? `${scope}|${q}` : '';
+  }
+  if (screen === 'audio-library-collection') return tab.audioColKey || '';
+  if (screen === SONGS_SCREEN) {
+    // The page on screen is the top frame; the frames under it are Back's path,
+    // which no other screen's key holds either. The bare hub adds nothing.
+    const frames = decodeSongsRoute(tab.audioColKey);
+    const top = frames[frames.length - 1];
+    return top.k === 'hub' && !top.q && !top.st ? '' : JSON.stringify(top);
+  }
+  if (screen === 'journal-viewer' || screen === 'journal-editor') return tab.journalEntryId || '';
+  return '';
+}
+
+/**
  * Build the dedup key for a tab — used by `deduplicateTabs` to fold tabs
- * whose visible content matches into a single entry. Pipe-separated field
- * concatenation; unset numerics serialize as empty (so chapter=0 and
- * chapter=undefined would collide, but chapter is 1-indexed in this app).
+ * whose visible content matches into a single entry, by the Tabs overview's
+ * duplicate count, and as the tab's thumbnail id (use-thumbnails.js).
+ * Pipe-separated field concatenation; unset numerics serialize as empty (so
+ * chapter=0 and chapter=undefined would collide, but chapter is 1-indexed in
+ * this app). A screen whose content lives elsewhere appends it as a last
+ * segment (screenContentPart), newlines folded to spaces: use-thumbnails joins
+ * the live keys with newlines.
  *
  * @param {TabState} tab
  * @returns {string}
  */
 export function tabContentKey(tab) {
-  return `${tab.screen || 'home'}|${tab.bookId || ''}|${tab.chapterNum ?? ''}|${tab.letterId || ''}|${tab.studyId || ''}|${tab.studyChapterId || ''}|${tab.genreId || ''}|${tab.gardenPage ?? ''}`;
+  const screen = tab.screen || 'home';
+  const base = `${screen}|${tab.bookId || ''}|${tab.chapterNum ?? ''}|${tab.letterId || ''}|${tab.studyId || ''}|${tab.studyChapterId || ''}|${tab.genreId || ''}|${tab.gardenPage ?? ''}`;
+  const part = screenContentPart(tab, screen).replace(/[\r\n]+/g, ' ');
+  return part ? `${base}|${part}` : base;
 }
 
 /**
