@@ -9,6 +9,11 @@ vi.mock('../utils/toast.js', () => ({ showToast: vi.fn(), hideToast: vi.fn() }))
 import { showToast, hideToast } from '../utils/toast.js';
 import { useTabActions } from './use-tab-actions.js';
 import { tabActionCount } from './use-navigate-to-link.js';
+import { useReadingDwell } from './use-reading-dwell.js';
+
+// useReadingDwell reads ReadingStreakStore as a global; the sweep v098 tests stub it
+// (the same idiom as use-reading-dwell.test.js).
+vi.mock('../stores/reading-streak-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get ReadingStreakStore() { return /** @type {any} */ (globalThis).ReadingStreakStore; } }; });
 
 const tab = (id) => ({ id });
 const makeTabState = (initial) => ({
@@ -249,7 +254,7 @@ describe('useTabActions — [7] rename + pin', () => {
     act(() => { result.current.closeAllTabs(); });
     apply(ts, [tab('a'), { ...tab('p1'), pinned: true }]);
     expect(setTabThumbnails).not.toHaveBeenCalled();
-    expect(ts.setActiveTabIdx).toHaveBeenCalledWith(0);
+    expect(ts.setActiveTabIdx.mock.calls[0][0](0)).toBe(0); // index 0 comes on screen
     apply(ts, [tab('a'), tab('b')]);
     expect(setTabThumbnails).toHaveBeenCalledWith({});
   });
@@ -438,7 +443,7 @@ describe('useTabActions — switch, close and bulk-close edges', () => {
     const { result } = mount(ts);
     act(() => { result.current.closeOtherTabs(2); });
     apply(ts, [{ ...tab('p'), pinned: true }, tab('a'), tab('b')]);
-    expect(ts.setActiveTabIdx).toHaveBeenCalledWith(1);
+    expect(ts.setActiveTabIdx.mock.calls[0][0](0)).toBe(1); // [p, b]: b, wherever the active index was
   });
 
   it('closeTabsToTheRight is a no-op at the last tab or when all to the right are pinned', () => {
@@ -579,5 +584,109 @@ describe('useTabActions — W39: every tab action drops a pending Bible jump', (
     act(() => { result.current.closeTab(0); });
     expect(tabActionCount()).toBeGreaterThan(before);
     expect(ts.setTabs.mock.calls[0][0]([tab('a')])).toHaveLength(1);
+  });
+});
+
+/* Sweep v098: the close paths changed which tab is on screen without the dwell
+   cancel switchToTab does, and nothing else cancels it on an active-tab change, so
+   the closed page's streak timer ran on and could record a reading day for a page
+   no longer open. A close that takes the tab on screen away cancels the dwell; a
+   close that leaves it on screen must not (its dwell is still honest). */
+describe('useTabActions — closing the tab on screen cancels its reading dwell (sweep v098)', () => {
+  beforeEach(() => { vi.clearAllMocks(); vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  const pin = (t) => ({ ...t, pinned: true });
+  // Runs one action with tab `cur` on screen, applies the tabs and active-index
+  // updaters the way React would, and returns how often the dwell was cancelled.
+  const cancels = (arr, cur, action) => {
+    const cancelDwell = vi.fn();
+    const ts = { ...makeTabState(arr), activeTabIdx: cur };
+    const { result } = renderHook(() => useTabActions({ tabState: ts, cancelDwell, setTabThumbnails: vi.fn() }));
+    act(() => { action(result.current); });
+    act(() => {
+      for (const [upd] of ts.setTabs.mock.calls) if (typeof upd === 'function') upd(arr);
+      for (const [v] of ts.setActiveTabIdx.mock.calls) if (typeof v === 'function') v(cur);
+    });
+    return cancelDwell.mock.calls.length;
+  };
+
+  it('closeTab on the tab on screen cancels the dwell, including the only tab going back to Home', () => {
+    expect(cancels([tab('a'), tab('b'), tab('c')], 1, (r) => r.closeTab(1))).toBeGreaterThan(0);
+    expect(cancels([tab('a'), tab('b'), tab('c')], 2, (r) => r.closeTab(2))).toBeGreaterThan(0);
+    expect(cancels([tab('only')], 0, (r) => r.closeTab(0))).toBeGreaterThan(0);
+  });
+
+  it('closeTab on a tab in the background leaves the dwell running', () => {
+    expect(cancels([tab('a'), tab('b'), tab('c')], 1, (r) => r.closeTab(0))).toBe(0);
+    expect(cancels([tab('a'), tab('b'), tab('c')], 1, (r) => r.closeTab(2))).toBe(0);
+  });
+
+  it('closeOtherTabs cancels when the kept tab is not the one on screen, even a pinned one that stays', () => {
+    expect(cancels([tab('a'), tab('b'), tab('c')], 0, (r) => r.closeOtherTabs(2))).toBeGreaterThan(0);
+    expect(cancels([pin(tab('p')), tab('a'), tab('b')], 0, (r) => r.closeOtherTabs(2))).toBeGreaterThan(0);
+  });
+
+  it('closeOtherTabs keeping the tab on screen, or closing nothing, leaves the dwell running', () => {
+    expect(cancels([tab('a'), tab('b'), tab('c')], 1, (r) => r.closeOtherTabs(1))).toBe(0);
+    expect(cancels([tab('a'), pin(tab('p'))], 1, (r) => r.closeOtherTabs(0))).toBe(0);
+  });
+
+  it('closeTabsToTheRight cancels when it closes the tab on screen', () => {
+    expect(cancels([tab('a'), tab('b'), tab('c')], 2, (r) => r.closeTabsToTheRight(0))).toBeGreaterThan(0);
+  });
+
+  it('closeTabsToTheRight leaves the dwell running when the tab on screen survives', () => {
+    expect(cancels([tab('a'), tab('b'), tab('c')], 0, (r) => r.closeTabsToTheRight(0))).toBe(0);
+    expect(cancels([tab('a'), tab('b'), pin(tab('p'))], 2, (r) => r.closeTabsToTheRight(0))).toBe(0);
+  });
+
+  it('closeAllTabs cancels unless the tab on screen is the first pinned tab, which stays on screen', () => {
+    expect(cancels([tab('a'), tab('b')], 1, (r) => r.closeAllTabs())).toBeGreaterThan(0);
+    expect(cancels([pin(tab('p1')), pin(tab('p2'))], 1, (r) => r.closeAllTabs())).toBeGreaterThan(0);
+    expect(cancels([pin(tab('p')), tab('a')], 0, (r) => r.closeAllTabs())).toBe(0);
+  });
+
+  // The finding's repro with the real dwell hook and real tab state: read a letter
+  // for under the 20 s dwell, close its tab with the x, and no reading day lands.
+  describe('end to end with useReadingDwell', () => {
+    let saved;
+    beforeEach(() => { saved = /** @type {any} */ (globalThis).ReadingStreakStore; });
+    afterEach(() => { /** @type {any} */ (globalThis).ReadingStreakStore = saved; });
+
+    const mountReader = () => renderHook(() => {
+      const [tabs, setTabs] = React.useState([tab('home'), tab('letter')]);
+      const [activeTabIdx, setActiveTabIdx] = React.useState(1);
+      const dwell = useReadingDwell({ dwellMs: 20000, initialActiveReadKey: null });
+      const actions = useTabActions({
+        tabState: { tabs, activeTabIdx, setTabs, setActiveTabIdx },
+        cancelDwell: dwell.cancelDwell, setTabThumbnails: () => {},
+      });
+      return { tabs, activeTabIdx, ...dwell, ...actions };
+    });
+
+    it('closing the letter on screen before the dwell ends records no reading day', () => {
+      const recordReadingDay = vi.fn();
+      /** @type {any} */ (globalThis).ReadingStreakStore = { recordReadingDay };
+      const { result } = mountReader();
+      act(() => { result.current.setActiveReadKey('vol:letters'); });
+      act(() => { vi.advanceTimersByTime(5000); });
+      act(() => { result.current.closeTab(1); });
+      expect(result.current.tabs.map((t) => t.id)).toEqual(['home']);
+      act(() => { vi.advanceTimersByTime(20000); });
+      expect(recordReadingDay).not.toHaveBeenCalled();
+    });
+
+    it('closing a tab in the background still lets the letter on screen earn its day', () => {
+      const recordReadingDay = vi.fn();
+      /** @type {any} */ (globalThis).ReadingStreakStore = { recordReadingDay };
+      const { result } = mountReader();
+      act(() => { result.current.setActiveReadKey('vol:letters'); });
+      act(() => { result.current.closeTab(0); });
+      expect(result.current.tabs.map((t) => t.id)).toEqual(['letter']);
+      expect(result.current.activeTabIdx).toBe(0);
+      act(() => { vi.advanceTimersByTime(20000); });
+      expect(recordReadingDay).toHaveBeenCalledTimes(1);
+    });
   });
 });
