@@ -3,7 +3,7 @@
    matches the one the passage vectors were built with (tools/build-semantic.py, HF tokenizers),
    a small pack ranks by meaning and names where the passage starts, bad stored bytes are
    refused, and the shipped model finds a verse no typed word names. */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -76,6 +76,13 @@ function tinyPack(/** @type {{badUnits?: boolean, failLoads?: number, failGlue?:
 
 describe('semanticDocs over a pack', () => {
   beforeEach(() => resetSemantic());
+  /* A start still running when its test ends goes on in the next one: resetSemantic() cannot stop it, and every
+     load after its next await goes through the module's io, which the next test's tinyPack() has replaced. CI run
+     38677036479 (2026-10-14): 'starts once' left its start waiting on the sha-256 check, it woke inside the glue
+     test, read the runtime's glue file first and used up that test's one failed download (failGlue), and the
+     glue test's own start then loaded it and answered true (--sequence.shuffle, which can put the two side by side,
+     failed 9 runs in 50 the same way). So every start ends inside the test that made it. */
+  afterEach(() => expect(semanticStatus().status, 'a start is still running after its test').not.toBe('loading'));
   it('answers null until the model is ready', async () => {
     tinyPack();
     expect(await semanticDocs('anything', (k) => k)).toBeNull();
@@ -107,7 +114,9 @@ describe('semanticDocs over a pack', () => {
   });
   it('starts once', async () => {
     tinyPack();
-    expect(startSemantic()).toBe(startSemantic());
+    const run = startSemantic();
+    expect(startSemantic()).toBe(run);
+    expect(await run).toBe(true); // ends here, not in a later test (the afterEach above)
   });
   // sweep W35 (2026-10-13): one failed start (a dropped download, a 503) turned meaning search off for the page's life
   it('a failed start is tried again after a wait, and a search past the wait starts it', async () => {
