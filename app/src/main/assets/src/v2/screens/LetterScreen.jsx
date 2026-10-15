@@ -7,7 +7,8 @@
    whenever its stores change. On the phone the sheet waits out a double tap (DOUBLE_TAP_MS): two taps are full screen
    (readalong's useFullScreen; Corbin 10-14: the double tap wins). A gate boot paints nothing and writes nothing. */
 import { Icon } from '../Icon.jsx';
-import { LetterBlock, titleClass, isMarkable } from '../letter-text.jsx';
+import { LetterBlock, FormatBBlock, titleClass, isMarkable } from '../letter-text.jsx';
+import { wtlbHlKey } from '../../utils/hl-keys.js';
 import { definePlace } from '../places.js';
 import { LayerToast } from '../Sheet.jsx';
 import { MarkSheet } from './MarkSheet.jsx';
@@ -80,6 +81,10 @@ function useMainMarks(on, letterId) {
 
 /** The body's blocks: memoised, so React never re-renders text main's painter has split. */
 const LetterBody = React.memo(/** @param {{ letter: any }} props */ function LetterBody({ letter }) {
+  // Words To Live By, The Blessed and some Holy Days pages keep Format B `paragraphs`, anchored as main's wtlb:<id>:<i>
+  if (!Array.isArray(letter.blocks) && Array.isArray(letter.paragraphs)) {
+    return letter.paragraphs.map((p, i) => <FormatBBlock key={i} para={p} hlKey={wtlbHlKey(letter.id, i)} />);
+  }
   return (letter.blocks || []).map((b, i) => <LetterBlock key={i} block={b} hlKey={isMarkable(b) ? paraKey(letter.id, i) : null} />);
 });
 

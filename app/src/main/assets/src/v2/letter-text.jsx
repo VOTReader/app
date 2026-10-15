@@ -8,6 +8,7 @@
    and copy leave out) and a poem's lines are block elements (a line break between them, as main's <div> lines). A block
    never re-renders once drawn (memo): main's painter splits its text nodes. */
 import { segmentRenderText } from '../utils/segment-dom-text.js';
+import { splitFormatBInline } from '../utils/format-b-inline.js';
 
 /** @param {any[]} segments */
 export function renderSegments(segments) {
@@ -53,6 +54,51 @@ function Block({ block, hlKey = null }) {
 }
 
 export const LetterBlock = React.memo(Block, (a, b) => a.block === b.block && a.hlKey === b.hlKey);
+
+/** A book's name for a {{nav:}} cite: the loaded Bible's, else its id in words (format-b-dom-text's default). @param {string} id */
+function navBookTitle(id) {
+  const g = /** @type {any} */ (globalThis);
+  return (g.BOOKS && g.BOOKS[id] && g.BOOKS[id].title) || String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+/** Plain text with its soft breaks as <br> (no character in the DOM text, as main's renderText). @param {string} s */
+function withBreaks(s) {
+  if (s.indexOf('\n') < 0) return s;
+  return s.split('\n').flatMap((part, i) => (i > 0 ? [<br key={'b' + i} />, part] : [part])).filter((x) => x !== '');
+}
+
+/**
+ * A Format B paragraph's inline markup, drawn as main's WtlbEntryView draws it (outside footnotes mode): **bold**,
+ * _italics_, {{ref:R}} as "(R)", {{nav:book:n}} as "[Book n]", a [From "..." ~ ...] source line as written, soft breaks
+ * as <br>. So its DOM text is format-b-dom-text's, which main's marks and the read-along address.
+ * @param {string} text @param {(id: string) => string} [bookTitle] @returns {any[]}
+ */
+export function renderFormatB(text, bookTitle = navBookTitle) {
+  return splitFormatBInline(text).map((seg, i) => {
+    if (!seg) return null;
+    if (seg.startsWith('**') && seg.endsWith('**') && seg.length >= 4) return <strong key={i}>{renderFormatB(seg.slice(2, -2), bookTitle)}</strong>;
+    if (seg.startsWith('_') && seg.endsWith('_') && seg.length >= 2) return <em key={i}>{renderFormatB(seg.slice(1, -1), bookTitle)}</em>;
+    const ref = /^\{\{ref:(.+)\}\}$/.exec(seg);
+    if (ref) return <span key={i} className="cite">({ref[1].trim()})</span>;
+    const nav = /^\{\{nav:([^:]+):(\d+)\}\}$/.exec(seg);
+    if (nav) return <span key={i} className="cite">[{bookTitle(nav[1]) + ' ' + Number(nav[2])}]</span>;
+    return <React.Fragment key={i}>{withBreaks(seg)}</React.Fragment>;
+  });
+}
+
+/**
+ * One Format B paragraph (Words To Live By, The Blessed, some Holy Days pages keep `paragraphs` of { align, text }, not
+ * blocks), with main's anchor (`hlKey`: wtlb:<id>:<index>, utils/hl-keys.js) so marks show in both apps.
+ * @param {{ para: { align?: string, text?: string }, hlKey?: string | null, bookTitle?: (id: string) => string }} props
+ */
+function FormatB({ para, hlKey = null, bookTitle }) {
+  const anchor = hlKey ? { 'data-hl-key': hlKey, 'data-hl-dom': 'true' } : {};
+  const align = para && (para.align === 'center' || para.align === 'right')
+    ? { textAlign: /** @type {'center' | 'right'} */ (para.align) } : undefined;
+  return <p style={align} {...anchor}>{renderFormatB((para && para.text) || '', bookTitle)}</p>;
+}
+
+export const FormatBBlock = React.memo(FormatB, (a, b) => a.para === b.para && a.hlKey === b.hlKey);
 
 /** The kit's title step: 52 px, long titles 44 (".display.long"), very long 36 (".longer"). */
 export function titleClass(title) {

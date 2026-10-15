@@ -1,8 +1,10 @@
 /* v2 letter text (picture 1a-letter): the kit's pieces, and the same DOM text the read-along timings were cut against. */
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
-import { LetterBlock, titleClass } from './letter-text.jsx';
+import { LetterBlock, FormatBBlock, titleClass } from './letter-text.jsx';
 import { segmentsDomText } from '../utils/segment-dom-text.js';
+import { formatBDomText } from '../utils/format-b-dom-text.js';
+import { LetterScreen } from './screens/LetterScreen.jsx';
 
 describe('LetterBlock', () => {
   it('a paragraph: the lead-in in italics, segments spaced by the read-along rule', () => {
@@ -31,6 +33,41 @@ describe('LetterBlock', () => {
     const p = container.querySelector('div.poetry');
     expect([...p.children].map((c) => c.tagName + '.' + c.className)).toEqual(['DIV.poem', 'DIV.stanza-break', 'DIV.poem']);
     expect(p.textContent).toBe('For in My loveWere you created');
+  });
+});
+
+describe('Format B (Words To Live By, The Blessed, some Holy Days pages: `paragraphs` of { align, text })', () => {
+  const TEXT = '**Thus says The Lord:** Come,\nLove awaits you _in every\nhour_ {{ref:John 3:16}} and {{nav:john:3}} [From "Chosen by God" ~ Volume One]';
+  it("draws main's markup (bold, italics, line breaks, cites) with main's DOM text, so marks and read-along address it", () => {
+    const { container } = render(<FormatBBlock para={{ align: 'left', text: TEXT }} hlKey="wtlb:wtlb1-001:0" bookTitle={() => 'John'} />);
+    const p = container.querySelector('p');
+    expect(p.textContent).toBe(formatBDomText(TEXT, { bookTitle: () => 'John' }));
+    expect(p.querySelector('strong').textContent).toBe('Thus says The Lord:');
+    expect(p.querySelector('em').textContent).toBe('in everyhour');
+    expect(p.querySelectorAll('br').length).toBe(2);
+    expect(p.textContent).toContain('(John 3:16) and [John 3] [From "Chosen by God" ~ Volume One]');
+    expect(p.getAttribute('data-hl-key')).toBe('wtlb:wtlb1-001:0');
+    expect(p.getAttribute('data-hl-dom')).toBe('true');
+  });
+  it("an entry's page shows every paragraph (they were blank: the page read only `blocks`)", async () => {
+    const g = /** @type {any} */ (globalThis);
+    g.COL_BY_KEY = new Map([['wtlb1', { volKey: 'wtlb1', readKey: 'wtlb-one', globalName: 'WTLB_ONE', prefaceGlobal: null,
+      label: 'Words To Live By: Part One', kind: 'wtlb', indexScreen: 'wtlb-one-index' }]]);
+    g.WTLB_ONE = [{ id: 'wtlb1-001', num: 1, title: 'Introduction', paragraphs: [{ align: 'left', text: 'Come, _My_ children.' },
+      { align: 'center', text: 'Love awaits\nyou' }] }];
+    try {
+      const { container } = render(<LetterScreen collection="wtlb1" n={1} />);
+      const ps = [...container.querySelectorAll('[data-hl-key]')];
+      expect(ps.map((p) => [p.getAttribute('data-hl-key'), p.textContent])).toEqual([
+        ['wtlb:wtlb1-001:0', 'Come, My children.'], ['wtlb:wtlb1-001:1', 'Love awaitsyou']]);
+    } finally {
+      delete g.COL_BY_KEY;
+      delete g.WTLB_ONE;
+    }
+  });
+  it('a centred paragraph stays centred', () => {
+    const { container } = render(<FormatBBlock para={{ align: 'center', text: 'Blessed are they' }} hlKey="wtlb:b:1" />);
+    expect(container.querySelector('p').style.textAlign).toBe('center');
   });
 });
 
