@@ -157,6 +157,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 /* ---------- components added for the shared screens (step 2) ---------- */
 :root {
+  --warn: #D9A55B;        /* warnings only: storage running low or slow (amber; main's sh-banner-amber) */
   --danger: #D88A73;      /* failures only: a download that failed, a destructive confirm (6.2:1 on --bg) */
   --press: rgba(255, 255, 255, .045);   /* pressed rows and icon buttons */
   --wash: rgba(196, 164, 105, .16);     /* read-along: the line being read */
@@ -192,7 +193,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   --t-hero: #1E1A15; --t1: #26221C; --t-body: #2B2721; --t-sub: #433D34; --t2: #4F483E; --t3: #665E52;
   --pill: #85662C; --on-pill: #FFFBF3; --accent: #765819; --tgold: #6A5E43; --tgold-hi: #6E5528;
   --tgold-ghost: rgba(118, 88, 25, .45);
-  --danger: #9A3A24; --press: rgba(43, 39, 33, .06); --wash: rgba(190, 145, 50, .22);
+  --danger: #9A3A24; --warn: #85570F; --press: rgba(43, 39, 33, .06); --wash: rgba(190, 145, 50, .22);
   --hl-gold: rgba(214, 160, 40, .30); --hl-sage: rgba(110, 160, 125, .28); --hl-rose: rgba(205, 120, 120, .26);
   --hl-blue: rgba(100, 145, 195, .26); --hl-plum: rgba(150, 115, 185, .24);
   --gold-rgb: 126, 95, 34;
@@ -215,7 +216,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   --t-hero: #ECEEEC; --t1: #E2E6E6; --t-body: #D9DDDD; --t-sub: #BDC3C4; --t2: #AEB5B7; --t3: #8C9497;
   --pill: #BB9B64; --on-pill: #1A1206; --accent: #C4A469; --tgold: #A9A188; --tgold-hi: #C0AA8C;
   --tgold-ghost: rgba(196, 164, 105, .38);
-  --danger: #D88A73; --press: rgba(255, 255, 255, .06); --wash: rgba(196, 164, 105, .18);
+  --danger: #D88A73; --warn: #D9A55B; --press: rgba(255, 255, 255, .06); --wash: rgba(196, 164, 105, .18);
   --hl-gold: rgba(201, 152, 54, .32); --hl-sage: rgba(143, 179, 154, .28); --hl-rose: rgba(201, 139, 139, .28);
   --hl-blue: rgba(138, 169, 201, .28); --hl-plum: rgba(166, 138, 190, .28);
   --gold-rgb: 196, 164, 105;

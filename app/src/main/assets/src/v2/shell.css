@@ -86,3 +86,10 @@ html, body { background: var(--bg); height: 100%; overflow: hidden; overscroll-b
 /* A saved page's Bookmark (mw6, v2-gaps 12): the kit's bookmark filled in the accent, as a lit tab wears it (Notes). */
 .v2 .tb .ic[aria-pressed="true"] { color: var(--accent); }
 .v2 .tb .ic[aria-pressed="true"] svg path { fill: currentColor; }
+
+/* Home's Recent scrolls sideways edge to edge (v2g11: history and main's open pages; kit .chips.scroll's bleed), its bar
+   hidden. Kept here, not in screens.css (the kit's copy, rewritten whole by tools/sync-v2-kit.py). */
+.v2 .recent { display: flex; align-items: center; gap: 8px; margin: 16px calc(var(--gut) * -1) 0; padding: 0 var(--gut);
+  overflow-x: auto; scrollbar-width: none; }
+.v2 .recent::-webkit-scrollbar { display: none; }
+.v2 .recent .label { margin-right: 4px; flex: none; }

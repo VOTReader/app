@@ -117,7 +117,11 @@ const BUDGETS = [
   // (+5.5 KB over the first kit build, nothing pulled in: each screen's own sheet is 1-3 KB); the ceiling covers the
   // rest of the build-out and still catches app.min.css (370 KB) or a font pulled in. Re-baseline with bundle-v2.js.
   // mw5 1c (dz12): the kit restates every token for Paper and Black ([data-page]) and the text steps: ~40 KB with both.
-  { file: 'v2.min.css', measured: 36458, max: 60000 },
+  // zones v2p5 2026-10-15: 60,957 B after syncing design's dz14 + dz15 recipes into screens.css (+232 lines: Studies,
+  // songs, Garden, Scripture Web chrome, banners, the ... menu, Find, auto-scroll), nothing pulled in. The kit now holds
+  // every drawn screen's recipe, so what is left is each screen's own small sheet: ceiling 76 KB, still far under
+  // app.min.css (370 KB) or a font.
+  { file: 'v2.min.css', measured: 60957, max: 76000 },
   // ── lazy, but still fetched + parsed on the reader's device ──
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.

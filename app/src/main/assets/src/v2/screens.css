@@ -302,11 +302,8 @@
 .home .subtitle { margin-top: 7px; }
 .home .pill.block { margin-top: 22px; }
 .cont-where { font-size: var(--fs-s); color: var(--t2); margin-top: 10px; line-height: 1.3; }
-/* Recent scrolls sideways edge to edge (history and main's open pages; kit .chips.scroll's bleed), its bar hidden */
-.recent { display: flex; align-items: center; gap: 8px; margin: 16px calc(var(--gut) * -1) 0; padding: 0 var(--gut);
-  overflow-x: auto; scrollbar-width: none; }
-.recent::-webkit-scrollbar { display: none; }
-.recent .label { margin-right: 4px; flex: none; }
+.recent { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+.recent .label { margin-right: 4px; }
 .grid2.vols { margin-top: 4px; }
 .grid2.vols .col { align-content: start; max-width: none; margin: 0; }   /* align-content: the right column's three rows keep the left's lines; max-width/margin: not the desktop page .col (D2) */
 .grid2.vols .c { justify-content: space-between; gap: 8px; }
@@ -363,3 +360,233 @@
 .howto .sn { width: 26px; height: 26px; flex: none; border-radius: 50%; border: 1px solid var(--tgold-ghost); color: var(--accent); display: grid; place-items: center;
   font-size: var(--fs-xs); font-variant-numeric: lining-nums; }
 .howto svg.ios { width: 22px; height: 22px; color: var(--accent); margin-left: 2px; }
+/* dz14 (2026-10-15): five places v2 links to that said "Not built yet in v2". New classes only: no earlier picture changes.
+   Return to the Garden: the first-visit notice (a kit sheet over Home) and the page viewer (full screen, like 9b) */
+.sheet.gdn .overline { display: block; margin-top: 2px; }
+.sheet.gdn .sh, .dlg.gdn .sh { font-size: var(--fs-l); line-height: 1.15; color: var(--t-hero); margin: 10px 0 0; }
+.gdn-p { font-size: var(--fs-s); line-height: 1.45; color: var(--t2); margin: 10px 0 18px; }
+.gdn-l { padding-bottom: 8px; }
+.gdn-l .label { display: block; }
+.gdn-h { display: block; font-size: var(--fs-xs); color: var(--t3); margin-top: 6px; }
+.srow.opt.gt { min-height: 62px; padding-top: 8px; padding-bottom: 8px; border-top: 1px solid var(--line); }
+.srow.opt.gt:first-child { border-top: 1px solid var(--line); }
+.srow.opt.gt .t { display: flex; align-items: baseline; gap: 10px; line-height: 1.15; }
+.srow.opt.gt .sz { font-size: var(--fs-xs); color: var(--t2); letter-spacing: .02em; }
+.srow.opt.gt.on .sz { color: var(--accent); }
+.srow.opt.gt .s { font-size: 15px; line-height: 1.3; margin-top: 3px; }
+.gdn-a { display: flex; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.gdn-a .pill { flex: 1; justify-content: center; }
+.gv { position: absolute; inset: 0; background: #000; }
+.gv-img { position: absolute; left: 0; top: 50%; width: 100%; height: auto; transform: translateY(-50%); display: block; }
+.gv-top, .gv-bot { position: absolute; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; z-index: 2; }
+.gv-top { top: 0; height: 88px; padding-top: 18px; background: linear-gradient(rgba(0,0,0,.72), rgba(0,0,0,0)); }
+.gv-bot { bottom: 0; height: 112px; padding: 0 20px 20px; background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.72)); }
+.gv .ic { width: 48px; height: 48px; display: grid; place-items: center; color: #F2F4F4; }
+.gv .ic svg { width: var(--ic); height: var(--ic); }
+.gv-n { height: 40px; padding: 0 14px; border-radius: 20px; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.22); color: #F2F4F4;
+  font-size: var(--fs-s); margin-right: 8px; }
+.gv-ar { width: 52px; height: 52px; border-radius: 50%; border: 1px solid rgba(255,255,255,.32); background: rgba(0,0,0,.40); color: #F2F4F4; display: grid; place-items: center; }
+.gv-ar svg { width: 22px; height: 22px; }
+/* Songs of the Letters: the hub (main's AudioSongsScreen order) and a song page (SongPage) */
+.content.songs .page-head .display { font-size: 44px; line-height: 1.05; text-wrap: balance; }   /* "Songs of / the Letters": two even lines, as .display.long */
+.content.songs .pill.sm2 { padding: 0 22px 0 18px; gap: 10px; }
+.content.songs .actions { margin-top: 18px; }
+.content.songs .field { margin-top: 18px; }
+.chips.wrap { margin-top: 12px; }
+.chip.more svg { margin-right: -3px; transform: rotate(90deg); }   /* More ▾: the kit's chevron turned down */
+.sec.sec-a { display: flex; align-items: center; justify-content: space-between; padding-top: 18px; }
+.sec.sec-a .label { margin: 0; }
+.see { display: inline-flex; align-items: center; gap: 2px; height: 44px; color: var(--accent); font-size: var(--fs-s); }
+.see svg { width: 16px; height: 16px; }
+.row.song { gap: 12px; padding: 10px 0 11px; min-height: 72px; }
+.row.song .sc, .stile img { display: block; object-fit: cover; background: var(--input); }
+.row.song .sc { width: 52px; height: 52px; border-radius: var(--r-s); flex: none; }
+.row.song .t { font-size: var(--fs-row1); line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.song .s i { font-style: italic; }
+.row.song .vers { display: inline-flex; align-items: center; gap: 2px; color: var(--t2); }
+.row.song .vers svg { width: 14px; height: 14px; }
+.row .ln { font-size: var(--fs-xs); color: var(--t2); flex: none; }
+.content.songs .row .cnt { font-size: var(--fs-s); color: var(--t2); flex: none; }
+.content.songs .row:not(.song) { min-height: 60px; padding: 10px 0 11px; }
+.content.songs .row:not(.song) .t { font-size: var(--fs-row1); }
+.stiles { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 12px; margin-top: 12px; }
+.stile .mos { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; border-radius: var(--r-s); overflow: hidden; aspect-ratio: 1; }
+.stile .mos img { width: 100%; height: 100%; }
+.stile .tx { display: block; margin-top: 8px; }
+.stile .t { display: block; font-size: var(--fs-m); line-height: 1.15; color: var(--t1); }
+.stile .s { display: block; font-size: var(--fs-xs); color: var(--t2); margin-top: 3px; }
+.see.more-c { margin-top: 6px; }
+.sp-cover { display: block; width: 152px; height: 152px; border-radius: var(--r); object-fit: cover; margin: 4px 0 18px; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
+.content.sp .page-head .display { font-size: var(--fs-title); line-height: 1.02; }
+.content.sp .eyebrow { margin-bottom: 10px; }
+.sp-from { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; margin-top: 4px; color: var(--accent); font-size: var(--fs-m); }
+.sp-from svg { width: 18px; height: 18px; }
+.sp-meta { font-size: var(--fs-s); line-height: 1.4; color: var(--t2); margin: 2px 0 0; }
+.keep { display: flex; align-items: center; gap: 12px; margin-top: 18px; min-height: 64px; padding: 8px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }   /* one hairline row: Versions stay close */
+.keep > svg { width: 24px; height: 24px; color: var(--accent); }
+.keep .tx { flex: 1; min-width: 0; }
+.keep .t { font-size: var(--fs-s); color: var(--t1); line-height: 1.25; }
+.keep .s { font-size: var(--fs-xs); color: var(--t2); line-height: 1.3; margin-top: 2px; }
+.keep .btn2.sm { padding: 0 16px; }
+.row.ver { min-height: 56px; padding: 6px 0 7px; }
+.row.ver .t { font-size: var(--fs-m); }
+.row.ver.on .t { color: var(--accent); }
+.row.ver .rp { width: 40px; height: 40px; }
+.lyr p { font-style: italic; font-size: var(--fs-m); line-height: 1.45; color: var(--t-body); margin: 8px 0 0; }
+.lyr .fine { font-style: normal; }
+/* Studies: the list (2d), a study's parts and chapters (2e), a chapter's section intro and prophecy cards (5d, 5f) */
+.row.stu { padding: 13px 0 14px; }
+.row.stu .s .st.cov { color: var(--accent); }
+.eyebrow.wrap { white-space: normal; line-height: 1.6; }   /* a study's name + chapter: two lines rather than off the edge */
+.row.stu.ext .no svg { width: 18px; height: 18px; color: var(--tgold-hi); margin-top: 2px; }
+.row.part { align-items: center; padding: 14px 0 15px; }
+.row.part .overline { display: block; margin-bottom: 7px; }
+.row.part .t { font-size: var(--fs-row1); line-height: 1.18; }
+.row.part .chev svg { transform: rotate(90deg); }          /* closed: points down, opens below */
+.row.part.open .chev svg { transform: rotate(-90deg); }    /* open: points up */
+.pch { margin-left: 14px; }                                 /* a part's chapters sit under it, a step in */
+.pch .row.stc:first-child { border-top: 1px solid var(--line); }
+.row.stc { padding: 12px 0 13px; min-height: 64px; }
+.row.stc .t { font-size: var(--fs-m); line-height: 1.22; }
+.row.stc.cur { background: rgba(var(--gold-rgb), .08); box-shadow: inset 3px 0 0 var(--accent); margin-left: -14px; padding-left: 14px; }
+.row.stc.cur .t { color: var(--accent); }
+.row .rd { color: var(--t2); flex: none; }
+.row .rd svg { width: 18px; height: 18px; }
+.reader .body.study .sintro { border-left: 2px solid rgba(var(--gold-rgb), .55); padding-left: 16px; margin: 0 0 8px; }
+.reader .body.study .sintro p { font-style: italic; font-size: .9em; color: var(--t-body); }
+.reader .body.study .sintro .src { font-style: normal; font-size: .82em; color: var(--t2); }
+.reader .body.study .sintro .src .cite { font-size: 1em; }
+.pgrp { margin: 30px 0 12px; }
+.pg-l { display: flex; align-items: center; justify-content: center; min-height: 32px; margin-bottom: 12px; }
+.pg-l .label { white-space: normal; text-align: center; line-height: 1.4; }
+.pcard { border: 1px solid var(--pc-edge); background: var(--pc-bg); border-radius: var(--r); margin-bottom: 10px; overflow: hidden; }
+.pcard.ot { --pc-edge: rgba(226, 160, 110, .42); --pc-bg: rgba(226, 160, 110, .05); --pc-ink: #E2A87E; }
+.pcard.nt { --pc-edge: rgba(var(--gold-rgb), .40); --pc-bg: rgba(var(--gold-rgb), .05); --pc-ink: var(--accent); }
+.pcard.vot { --pc-edge: rgba(150, 180, 235, .40); --pc-bg: rgba(150, 180, 235, .05); --pc-ink: #A9C0EA; }
+.pc-h { width: 100%; min-height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 14px 0 16px; text-align: left; }
+.pc-tag { flex: 1; font-size: var(--fs-xs); letter-spacing: var(--track-caps); text-transform: uppercase; color: var(--pc-ink); line-height: 1.3; }
+.pc-n { font-size: var(--fs-xs); color: var(--t2); }
+.pc-h svg { width: 18px; height: 18px; color: var(--t2); transform: rotate(90deg); }
+.pcard.open .pc-h svg { transform: rotate(-90deg); }
+.pc-b { padding: 0 16px 6px; }
+.pc-sub { font-size: 22px; font-style: italic; color: var(--t1); line-height: 1.3; margin: -2px 0 12px; }   /* r1 (Codex): the prophecy is the card's heading */
+.reader .body .pc-b p { font-size: 20px; line-height: 1.5; margin: 0 0 .8em; }
+/* The Scripture Web: main's screen hosted whole; only its DOM chrome is restyled (kit type, slate glass fills, hairline edges, gold for on) */
+.content.web { background: #000; }
+.sw2-img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+.sw2 { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.sw2 > * { pointer-events: auto; }
+.sw2.rot { inset: auto; left: 0; top: 0; width: 705px; height: 360px; transform-origin: 0 0; transform: matrix(0, 1, -1, 0, 360, 0); }   /* main's portrait turn */
+.sw2-top { position: absolute; left: 12px; top: 10px; display: flex; align-items: center; gap: 10px; }
+.sw2 .ic, .sw2-r { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--t1);
+  background: rgba(23, 32, 34, .78); border: 1px solid var(--edge); }
+.sw2 .ic svg { width: 22px; height: 22px; }
+.sw2-t h1 { margin: 0; font-size: var(--fs-ui); font-weight: 400; line-height: 1.1; color: var(--t-hero); text-shadow: 0 1px 6px rgba(0,0,0,.8); }
+.sw2-t .s { font-size: var(--fs-xs); color: var(--t2); margin-top: 3px; text-shadow: 0 1px 6px rgba(0,0,0,.8); }
+.sw2-ctl { position: absolute; right: 12px; top: 12px; display: flex; gap: 8px; align-items: center; }
+.sw2-seg { display: inline-flex; height: 40px; border: 1px solid var(--edge); border-radius: var(--r-s); overflow: hidden; background: rgba(23, 32, 34, .78); }
+.sw2-seg button { padding: 0 13px; font-size: var(--fs-s); color: var(--t1); }
+.sw2-seg button + button { border-left: 1px solid var(--edge); }
+.sw2-seg button.on { color: var(--accent); background: rgba(var(--gold-rgb), .16); }
+.sw2-b { height: 40px; padding: 0 13px; border: 1px solid var(--edge); border-radius: var(--r-s); background: rgba(23, 32, 34, .78); color: var(--t1);
+  font-size: var(--fs-s); display: inline-flex; align-items: center; gap: 4px; }
+.sw2-b svg { width: 14px; height: 14px; transform: rotate(90deg); color: var(--t2); }
+.sw2-leg { position: absolute; left: 14px; bottom: 10px; display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--t2); pointer-events: none;
+  text-shadow: 0 1px 4px #000; }
+.sw2-leg .ramp { width: 46px; height: 5px; border-radius: 3px; }
+.sw2-leg .sep { color: var(--t3); }
+.sw2-br { position: absolute; right: 12px; bottom: 8px; display: flex; gap: 10px; }
+.sw2-r { font-size: 21px; color: var(--t1); }
+.sw2-r svg { width: 20px; height: 20px; }
+.main.web-pane { background: #000; }
+.web-pane .sw2-top { left: 16px; top: 14px; } .web-pane .sw2-ctl { right: 16px; top: 16px; }
+/* desktop: the Garden fills the window's height; the arrows sit at the sides */
+.dk.gvd { display: block; background: #000; }
+.dk.gvd .gv-img { width: auto; height: 100%; left: 50%; top: 0; transform: translateX(-50%); }
+.dk.gvd .gv-top { padding: 0 16px; height: 76px; }
+.dk.gvd .gv-bot { top: 50%; bottom: auto; height: 0; padding: 0 28px; background: none; }
+.dk .stiles { grid-template-columns: repeat(4, 1fr); }
+/* r1 (Codex): Your songs rows carry their icon in the action-row ring (.srow .lead), at action-row size */
+.content.songs .row.mine { gap: 14px; min-height: 56px; padding: 8px 0; }
+.content.songs .row.mine .t { font-size: var(--fs-m); }
+.content.songs .row.mine .lead { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--edge); display: grid; place-items: center; color: var(--tgold-hi); flex: none; }
+.content.songs .row.mine .lead svg { width: 20px; height: 20px; }
+
+/* dz15 (2026-10-15): storage health banners (main's StorageHealthBanner): one strip under the top bar, in the flow (it pushes the
+   page down, so Back and the top bar stay usable), app-wide, the most serious one only. Danger = data at risk now; warn = act soon.
+   A tint of its colour over the page, hairlines above and below, its icon in its colour; the text in the page's ink. */
+.shb { --sh: var(--danger); flex: none; display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 12px; align-items: start;
+  padding: 13px var(--gut) 15px; background: color-mix(in srgb, var(--sh) 13%, var(--bg));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--sh) 40%, transparent), inset 0 -1px 0 color-mix(in srgb, var(--sh) 40%, transparent); }
+.shb.warn { --sh: var(--warn); }
+.shb.dis { grid-template-columns: 22px minmax(0, 1fr) 44px; padding-right: 4px; }
+.shb > svg { width: 22px; height: 22px; color: var(--sh); margin-top: 1px; }
+.shb .shb-t { font-size: var(--fs-s); line-height: 1.42; color: var(--t-sub); }
+.shb .shb-h { display: block; font-size: var(--fs-ui); line-height: 1.3; color: var(--t1); margin-bottom: 3px; }
+.shb .shb-a { grid-column: 2; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.shb .shb-a .pill, .shb .shb-a .btn2 { height: 40px; padding: 0 16px; font-size: var(--fs-s); }
+.shb .x { grid-column: 3; grid-row: 1; width: 44px; height: 44px; margin-top: -11px; display: grid; place-items: center; color: var(--t2); }
+.shb .x svg { width: 20px; height: 20px; }
+/* v2-gaps 14: the translation page: its group labels sit in the gutter, its rows reuse the Garden's tier rows (.srow.opt.gt) */
+.g.trn .label { display: block; margin: 22px 0 4px; }
+.opts.trn .srow.opt.gt:first-child { border-top: 0; }
+.fine.trf { margin-top: 18px; }
+/* v2-gaps 13: the ... menu. Phone = a sheet of action rows (4b's), titled by the page; laptop = D6. Each item shows only where it
+   applies (Find, Auto-scroll, Hear it sung, Copy website link; Now playing: Voice + Save recording). A page with nothing to hold
+   has no ... at all. */
+.sheet.mor .mlab { display: block; margin: 0; padding: 14px 0 2px; border-top: 1px solid var(--line); }
+.sheet.mor .fine.mvn { margin: 6px 0 4px; }
+/* D6 (dz15): a menu opens anchored under its ... (right edges flush, 4 px below the button): no scrim, no title, no Cancel; a click
+   outside, Escape or a scroll closes it. Same rows as the phone's sheet, without hairlines between them. */
+.col.anc, .panel.anc { position: relative; }
+.menu { position: absolute; z-index: 6; top: 52px; right: 0; width: 320px; padding: 6px 0; background: var(--raised);
+  border: 1px solid var(--edge); border-radius: var(--r); box-shadow: var(--shadow-dialog); }
+.panel .menu { right: 4px; }
+.menu .srow { border-top: 0; padding-left: 16px; padding-right: 16px; }
+.menu .opts { margin: 0; }
+.menu .mlab { display: block; margin: 4px 0 0; padding: 12px 16px 0; border-top: 1px solid var(--line); }
+.menu .fine.mvn { margin: 4px 16px 8px; }
+/* Find in this <page>: a strip under the top bar, in the flow (main's FindInUnit with a field): word, 'N of M', up / down, close */
+/* r1 (Codex): one rounded control holds it all, as a browser's find bar: the word, the count, up / down, a divider, close */
+.fnd { flex: none; padding: 6px 16px 8px; }
+.fnd .fld { height: 48px; display: flex; align-items: center; gap: 8px; padding: 0 2px 0 12px; border-radius: var(--r);
+  background: var(--input); border: 1px solid var(--accent); }
+.fnd .fld svg { width: 20px; height: 20px; color: var(--t2); flex: none; }
+.fnd .fld .q { font-size: var(--fs-ui); color: var(--t1); white-space: nowrap; overflow: hidden; }
+.fnd .fld .caret { width: 1.5px; height: 22px; background: var(--accent); margin-left: -6px; }
+.fnd .cnt { font-size: var(--fs-xs); color: var(--t2); white-space: nowrap; margin: 0 2px 0 auto; padding-left: 8px; }
+.fnd .ic { width: 38px; height: 44px; display: grid; place-items: center; color: var(--t1); flex: none; }
+.fnd .sep, .asp .sep { width: 1px; height: 24px; background: var(--edge); flex: none; }   /* r1 (Codex): dividers group the controls */
+.fnd .ic svg { width: 22px; height: 22px; }
+.reader .body mark.qm2 { background: transparent; color: inherit; box-shadow: inset 0 -2px 0 rgba(var(--gold-rgb), .5); border-radius: 2px; padding: 0 1px; }
+/* Auto-scroll: main's reading pill, floating above the tab bar (it fades while it runs; drawn at full strength) */
+.asp { position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); bottom: calc(var(--tabbar) + 48px + 14px); height: 52px;
+  display: flex; align-items: center; gap: 0; padding: 0 4px; border-radius: 26px; background: var(--raised); border: 1px solid var(--edge);
+  box-shadow: var(--shadow-sheet); white-space: nowrap; }
+.asp .ic { width: 40px; height: 44px; display: grid; place-items: center; color: var(--t1); }
+.asp .ic svg { width: 21px; height: 21px; }
+.asp .pp { width: 40px; height: 40px; border-radius: 50%; background: var(--pill); color: var(--on-pill); display: grid; place-items: center; }
+.asp .pp svg { width: 20px; height: 20px; }
+.asp .asp-r { font-size: var(--fs-s); color: var(--t1); padding: 0 10px; }
+.asp .sep { height: 22px; margin: 0 2px; }
+/* r1 (Codex): on the laptop the ... wears a round wash while its menu is open */
+.tb .ic.opn { background: radial-gradient(circle, var(--input) 0 19.5px, transparent 20.5px); }
+/* dz16 (2026-10-15): v2-gaps 25 + 23. A collection's coverage is one mark in its head (main's CoverageBadge words, utils/audio-coverage.js):
+   "Read-along" when every item is recorded and timed, "Read-along · n of m" when some are; a row with no recording says
+   "No recording" in its sub-line and has no Play. The mark sheet's Listen row: Listen from here + an outline Repeat. */
+.lede .st.cov { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); vertical-align: -1px; }
+.lede .st.cov svg { width: 18px; height: 18px; }
+.srow.act.lis .btn2.rpt { height: 40px; padding: 0 14px 0 10px; gap: 6px; font-size: var(--fs-s); flex: none; }
+.srow.act.lis .btn2.rpt svg { width: 18px; height: 18px; }
+/* v2-gaps 15: Settings > Downloads (main's "On this phone" shelf as a page) and Text and theme (the Aa sheet as a page) */
+.dls { padding-top: 0; padding-bottom: 4px; }
+.label.dll { display: block; margin: 18px 0 2px; }
+.row.dlr { gap: 4px; }
+.row.dlr .ic { width: 44px; height: 44px; display: grid; place-items: center; color: var(--t2); flex: none; margin-right: -10px; }
+.row.dlr .ic svg { width: 21px; height: 21px; }
+.row.dlr .textbtn.sm { flex: none; }
+.g.dla { padding-top: 22px; padding-bottom: 28px; }
+.aa.pg .aa-row { margin-top: 18px; }
+.aa.pg .seg { margin-top: 8px; }
+.aa-pv { font-size: var(--fs-m); line-height: 1.4; color: var(--t-body); margin: 10px 0 0; }
+.g.settings.aax { margin-top: 18px; }
