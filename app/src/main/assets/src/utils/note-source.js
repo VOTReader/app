@@ -104,6 +104,21 @@ function _chapterGroups(keys, kind) {
 }
 
 /**
+ * Label for one chapter group: "Matthew 22:37-38", or the bare chapter
+ * "Matthew 22" when the group has no real verse. A whole-chapter key parses
+ * to verse 0 and a study chapter-panel key ("panel-s0") to NaN; both are
+ * dropped here, and an empty range must not leave a dangling ":" (sweep v087).
+ * Shared by noteSourceLabel and noteSourceSegments so the two never drift.
+ *
+ * @param {{ title: string, chap: string, verses: number[] }} g
+ * @returns {string}
+ */
+function _chapterGroupLabel(g) {
+  const range = _verseRangeLabel(g.verses.filter(Boolean));
+  return g.title + ' ' + g.chap + (range ? ':' + range : '');
+}
+
+/**
  * Human-readable label for a note's source — e.g. "Genesis 1:1-3, 5" for a
  * Bible annotation, "The Wide Path" for a Letter, "Journal · Title" for a
  * journal-block annotation. Multi-key notes spanning multiple chapters
@@ -121,7 +136,7 @@ export function noteSourceLabel(note) {
   const kind = parts0[0];
   if (kind === 'bible' || kind === 'study') {
     return _chapterGroups(keys, kind)
-      .map(g => g.title + ' ' + g.chap + ':' + _verseRangeLabel(g.verses.filter(Boolean)))
+      .map(_chapterGroupLabel)
       .join(' · ');
   }
   if (kind === 'letter' || kind === 'wtlb' || kind === 'blessed' || kind === 'holy-days') {
@@ -239,7 +254,7 @@ export function noteSourceSegments(note) {
         nav.verse = verses[0];
         if (verses[verses.length - 1] > verses[0]) nav.verseEnd = verses[verses.length - 1];
       }
-      segs.push({ label: g.title + ' ' + g.chap + ':' + _verseRangeLabel(verses), nav });
+      segs.push({ label: _chapterGroupLabel(g), nav });
     });
     return segs;
   }
