@@ -40,7 +40,7 @@
      pendingOpenNote    string (groupId) | null
         writer: NotesIndexScreen (tap-through to a note's source)
         reader: use-dom-annotation-sync (take → open the NoteSheet)
-     notesReturnCtx     {tab, drilledNbId} | null
+     notesReturnCtx     {tab, drilledNbId, backPill?: {title, origin?} | null} | null
         writer: NotesIndexScreen / screen-routes (drill into a notebook)
         reader: NotesIndexScreen (peek on render; clear on mount)
 

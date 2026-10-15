@@ -1100,6 +1100,7 @@ export function buildScreenRoutes({
       <NotesIndexScreen
         onSettings={goSettings}
         onBack={goNavOrigin}
+        navOrigin={navOrigin}
         onHome={goHome}
         onOpenNote={(gid) => setNoteSheetTarget({ groupId: gid, startInEditMode: false })}
         onNavigateToSource={(endpoint, meta) => {

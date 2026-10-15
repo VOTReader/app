@@ -28,7 +28,7 @@ export function filterNotesByQuery(notes, query) {
   );
 }
 
-export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNavigateToSource, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNavigateToSource, navOrigin = null, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
   // Subscribe to NoteStore + NotebookStore mutations so the index re-renders
   // on any add/remove/rename/membership change.
   const noteVer = React.useSyncExternalStore(
@@ -58,8 +58,16 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   // "Back to <source>" pill — set when this screen was opened as a link-out
   // (e.g. a journal entry's Notebook card). Mirrors the reading screens'
   // fromLetterStack pill so every journal card returns to its source in one
-  // tap. Lives in component state (resets on unmount = single-shot).
-  const [backPill, setBackPill] = React.useState((_notesRet && _notesRet.backPill) || null);
+  // tap. Lives in component state (resets on unmount = single-shot), and a
+  // note tap-through carries it in notesReturnCtx so the return trip keeps it
+  // (sweep v027). Its one tap IS onBack (goNavOrigin), so the stash stamps the
+  // navOrigin it was raised under and the pill comes back only while that is
+  // still the origin: reopened some other way (top-nav Notes from the passage,
+  // another tab) it would name a place Back no longer goes. The journal card's
+  // own link-out stamps none; its slot is consumed by the mount that follows.
+  const _retPill = _notesRet && _notesRet.backPill;
+  const [backPill, setBackPill] = React.useState(
+    (_retPill && (_retPill.origin === undefined || _retPill.origin === navOrigin)) ? _retPill : null);
   React.useEffect(() => { if (typeof window !== 'undefined' && window.navHandoff) window.navHandoff.clear('notesReturnCtx'); }, []);
   const [newNbInline, setNewNbInline] = React.useState(false);
   const [newNbName, setNewNbName] = React.useState('');
@@ -94,8 +102,9 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   const navToSource = (note, nav) => {
     window.navHandoff.set('pendingOpenNote', note.groupId);
     // Remember which tab/notebook we're in so the back-pill returns the
-    // user to the exact list they tapped from (consumed on next mount).
-    window.navHandoff.set('notesReturnCtx', { tab: tab, drilledNbId: drilledNbId });
+    // user to the exact list they tapped from (consumed on next mount), and
+    // the live "Back to <source>" pill with the origin its tap leads to.
+    window.navHandoff.set('notesReturnCtx', { tab: tab, drilledNbId: drilledNbId, backPill: backPill && { title: backPill.title, origin: navOrigin } });
     onNavigateToSource(nav, { sourceLetterTitle: currentSourceTitle() });
   };
 
