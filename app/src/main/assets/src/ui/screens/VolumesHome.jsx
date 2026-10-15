@@ -67,6 +67,7 @@ export function VolumesHome({ onSelect, onBack, onSearch, onHistory, onSettings,
                 key={v.id}
                 className={`genre-tile${v.locked ? " locked" : ""}`}
                 onClick={() => !v.locked && onSelect(v.id)}
+                disabled={v.locked}
               >
                 <div className="genre-tile-title">{v.title}</div>
                 {(v.detail || v.sub) && <div className="genre-tile-sub">{[v.detail, v.sub].filter(Boolean).join(" · ")}</div>}
@@ -81,6 +82,7 @@ export function VolumesHome({ onSelect, onBack, onSearch, onHistory, onSettings,
                 key={b.id}
                 className={`genre-tile${b.locked ? " locked" : ""}`}
                 onClick={() => !b.locked && onSelect(b.id)}
+                disabled={b.locked}
               >
                 <div className="genre-tile-title">{b.title}</div>
                 {b.sub && <div className="genre-tile-sub">{b.sub}</div>}
