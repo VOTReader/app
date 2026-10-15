@@ -480,7 +480,7 @@ function SectionClearBtn({ label, disabled, onClear }) {
   );
 }
 
-function AllProgressClearRow({ totalRead, totalItems, hasPartial, onClearAll }) {
+function AllProgressClearRow({ totalRead, totalItems, hasMarks, hasPartial, onClearAll }) {
   const [confirming, setConfirming] = React.useState(false);
   return (
     <>
@@ -490,7 +490,7 @@ function AllProgressClearRow({ totalRead, totalItems, hasPartial, onClearAll }) 
         {!confirming && (
           <button
             className="settings-clear-btn"
-            disabled={totalRead === 0 && !hasPartial}
+            disabled={!hasMarks && !hasPartial}
             onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
           >Clear All</button>
         )}
@@ -926,8 +926,13 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     .filter((key) => key.indexOf(`${READ_VERSION_ID}:`) === 0);
   const hasFrontierFor = (bid) => frontierKeys.some((key) => key.indexOf(`${READ_VERSION_ID}:${bid}:`) === 0);
   const allBooks = PROGRESS_GROUPS.flatMap((g) => g.genres.flatMap((gr) => gr.books));
-  const totalRead = Object.keys(readItems).length;
+  // The numerator counts the same books the denominator sums. Answers and Hidden Manna marks
+  // (v1:answers:*, v1:hidden-manna:*) have no row here, so counting every readItems key let
+  // "All Scriptures" pass the sum of the rows, and even its own total (sweep v075).
+  const totalRead = allBooks.reduce((s, b) => s + countFor(b.id), 0);
   const totalItems = allBooks.reduce((s, b) => s + b.total, 0);
+  // Clear All wipes every read mark, off-table ones too, so it stays live while any exists.
+  const hasAnyMark = Object.keys(readItems || {}).length > 0;
   const sectionBooks = (grp) => grp.genres.flatMap((gr) => gr.books);
   const sectionRead = (grp) => sectionBooks(grp).reduce((s, b) => s + countFor(b.id), 0);
   const sectionTotal = (grp) => sectionBooks(grp).reduce((s, b) => s + b.total, 0);
@@ -1658,7 +1663,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 );
               })}
               <div className="progress-divider" />
-              <AllProgressClearRow totalRead={totalRead} totalItems={totalItems} hasPartial={frontierKeys.length > 0} onClearAll={onClearAll} />
+              <AllProgressClearRow totalRead={totalRead} totalItems={totalItems} hasMarks={hasAnyMark} hasPartial={frontierKeys.length > 0} onClearAll={onClearAll} />
             </div>
           )}
         </SettingsGroup>
