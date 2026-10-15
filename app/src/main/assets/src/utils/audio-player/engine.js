@@ -659,11 +659,13 @@ export function _startAt(placeOf) {
  * intent is already the store's clock (_seekOnMetadata). A null must not
  * impersonate a value; the frame loop would paint sentence one for the
  * length of the metadata gap. HAVE_METADATA (1) is the same line
- * _seekOnMetadata draws for the seek itself.
+ * _seekOnMetadata draws for the seek itself. And while the bar is a restored
+ * one: an element there (a prewarm the durable snapshot was adopted over)
+ * holds another recording, never the bar's (sweep v83).
  *
  * @returns {number}
  */
-export function getPreciseTime() { return _el && _el.readyState >= 1 ? (_el.currentTime || 0) : _state.time; }
+export function getPreciseTime() { return _el && !_pendingRestore && _el.readyState >= 1 ? (_el.currentTime || 0) : _state.time; }
 
 
 // This module's verbs that the modules below it call (core.js `late`).

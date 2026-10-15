@@ -168,7 +168,7 @@ export function seek(seconds) {
   _clearLoopTimer();   // the timed wrap was for the old clock; the next timeupdate re-arms it
   const lp = _state.loop;
   if (lp && !(seconds >= lp.start - LOOP_SLACK_S && seconds <= lp.end + LOOP_SLACK_S)) _clearLoop(false);   // left the passage
-  if (!_el) {
+  if (!_el || _pendingRestore) {
     /* THE BOOT-RESTORED BAR HAS NO ELEMENT YET, and returning silently here
        was read-along-4: a reader who opens a timed chapter after a cold boot
        and taps a verse got NOTHING. The bar is real, the timings are real,
@@ -190,7 +190,14 @@ export function seek(seconds) {
        of the recording: a wrong answer in place of no answer, which is the
        worse trade. The real ceiling is applied by the element itself when
        metadata arrives (_seekOnMetadata), and the only live caller reads its
-       target out of that recording's own timings file. */
+       target out of that recording's own timings file.
+
+       A RESTORED BAR CAN HAVE AN ELEMENT, just never its own: the durable (IDB)
+       copy is adopted while the player is merely idle, and a prewarm leaves it
+       idle with an element pointed at another recording. Taking the element
+       branch then seeked that recording and left the descriptor's clock where
+       it was, so Play resumed at the old place (sweep v83). Every play path
+       clears _pendingRestore first, so while it is set this branch is the bar. */
     if (!_pendingRestore) return;          // idle: no element and nothing to restore
     const at = Math.max(0, Math.floor(seconds || 0));
     _pendingRestore.time = at;

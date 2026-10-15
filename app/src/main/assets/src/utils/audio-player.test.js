@@ -2424,6 +2424,78 @@ describe('audio-player — a seek on the boot-restored bar (read-along-4)', () =
   });
 });
 
+describe('audio-player — a seek on a restored bar whose element holds a prewarm (sweep v83)', () => {
+  /* The restored bar USUALLY has no element, and seek() chose its branch by that alone. But the durable (IDB) copy
+     is adopted whenever the player is merely idle, and a letter screen's prewarm leaves it idle with an element
+     pointed at ANOTHER recording. Boot with no LS copy (the kill case the durable copy exists for), a prewarm before
+     the IDB read lands, and a verse tap or a desk +15 then seeks the prewarmed element: the descriptor the rebuild
+     resumes from keeps the old clock, so Play starts at the old place, and read-along reads the wrong clock. */
+  const SNAP = {
+    v: 2, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 0, key: 'vol1:preface', time: 90,
+    track: { key: 'vol1:preface', title: 'Preface', sub: 'Volume One', url: URL_OF('idPreface'), readerCode: 'B', partLabel: null },
+  };
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  /** Cold boot, no LS copy; a letter screen prewarms Letter A; then the IDB read lands the snapshot. */
+  async function prewarmedThenAdopted() {
+    let land = () => {};
+    globalThis.IDBAdapter = {
+      put: vi.fn(async () => {}), delete: vi.fn(async () => {}),
+      get: vi.fn(() => new Promise((res) => { land = () => res({ ...SNAP, at: Date.now() }); })),
+    };
+    await load();
+    AudioPlayer.prewarm('vol1', 'letter-a');
+    el().duration = 300;     // preload='metadata' has loaded the prewarmed recording's header
+    el().readyState = 1;
+    land();
+    await flush();
+  }
+
+  afterEach(() => {
+    delete globalThis.IDBAdapter;
+    delete globalThis.COL_BY_KEY;
+    delete globalThis.colPreface;
+    delete globalThis.colLetterArr;
+  });
+
+  it('PRECONDITION: the durable copy restores the bar while the element still holds the other letter\'s prewarm', async () => {
+    await prewarmedThenAdopted();
+    const st = AudioPlayer.getState();
+    expect(st.restoring).toBe(true);
+    expect(st.time).toBe(90);
+    expect(el()).not.toBe(null);
+    expect(el().src).toBe(URL_OF('idA1'));
+  });
+
+  it('THE READER-FACING CONSEQUENCE: Play after the seek starts at the place sought, not the snapshot\'s', async () => {
+    await prewarmedThenAdopted();
+    AudioPlayer.seek(150);
+    expect(AudioPlayer.getState().time).toBe(150);
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    AudioPlayer.toggle();
+    await flush();
+    expect(el().src).toBe(URL_OF('idPreface'));
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(150);
+  });
+
+  it('the prewarmed element is left alone: the seek is a place in the restored recording, not in the warmed one', async () => {
+    await prewarmedThenAdopted();
+    AudioPlayer.seek(150);
+    expect(el().src).toBe(URL_OF('idA1'));
+    expect(el().currentTime).toBe(0);
+  });
+
+  it('read-along reads the restored clock, not the prewarmed element\'s', async () => {
+    await prewarmedThenAdopted();
+    expect(AudioPlayer.getPreciseTime()).toBe(90);
+    AudioPlayer.seek(150);
+    expect(AudioPlayer.getPreciseTime()).toBe(150);
+  });
+});
+
 describe('audio-player — Android keep-alive bridge', () => {
   it('activates on the first Listen, HOLDS through pause, deactivates on stop', () => {
     // Media-card rework 2026-08-09: pause no longer releases the anchor —
