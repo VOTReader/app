@@ -31,12 +31,16 @@ function cardKey(entry, i) {
 }
 
 /* `memo` names the search (SearchScreen): a group the reader opened, and how far
-   they paged it, are open and paged again when the screen comes back to it. */
-export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = false, memo = '' }) {
-  const was = recall(memo, 'group|' + gkey);
+   they paged it, are open and paged again when the screen comes back to it.
+   `view` is the order the screen shows ('relevance' | 'book'): Book order opens every
+   group with a short first `page`, and each order remembers its own open and paged
+   state, so a group opened under Relevance is open again after a trip to Book order (sr12). */
+export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = false, memo = '', view = 'relevance', page = SRCH_GROUP_PAGE }) {
+  const slot = 'group|' + gkey + (view === 'book' ? '|book' : '');
+  const was = recall(memo, slot);
   const [open, setOpen] = React.useState(was ? was.open : defaultOpen !== false);
-  const [shown, setShown] = React.useState(was ? was.shown : SRCH_GROUP_PAGE);
-  React.useEffect(() => { remember(memo, 'group|' + gkey, { open, shown }); }, [memo, gkey, open, shown]);
+  const [shown, setShown] = React.useState(was ? was.shown : page);
+  React.useEffect(() => { remember(memo, slot, { open, shown }); }, [memo, slot, open, shown]);
   const meta = SRCH_GROUP_META[gkey] || { label: gkey };
   const unit = (GROUP_UNIT[gkey] || ['match', 'matches'])[items.length === 1 && !capped ? 0 : 1];
   const left = items.length - shown;

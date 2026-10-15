@@ -380,11 +380,11 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     expect(document.body.textContent).not.toMatch(/\bWTLB\b/);
     // The corpus row is THE chip row: three pills, once.
     expect([...document.querySelectorAll('.srch-corpus-btn')].map((b) => b.textContent)).toEqual(['All', 'Scriptures', 'Volumes']);
-    // Two verses in a scripture group: the sort toggle shows, alone in its row.
+    // Two verses in a scripture group: the order switch shows, alone in its row, both orders named (sr12).
     const row = document.querySelector('.srch-filter-row');
     expect(row, 'the sort row').toBeTruthy();
-    expect([...row.querySelectorAll('button')].map((b) => b.className)).toEqual(['srch-sort-btn']);
-    expect(row.querySelector('.srch-sort-btn').textContent).toBe('Book order');
+    expect([...row.querySelectorAll('button')].map((b) => b.className)).toEqual(['srch-sort-btn active', 'srch-sort-btn']);
+    expect([...row.querySelectorAll('.srch-sort-btn')].map((b) => b.textContent)).toEqual(['Relevance', 'Book order']);
     vi.useRealTimers();
   });
 
@@ -504,16 +504,13 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 
-  it('Book order shows for a letters-only search and puts each volume’s letters in number order, without closing the group', async () => {
+  it('Book order shows for a letters-only search and puts each volume’s letters in number order, the lone group open with its full page', async () => {
     vi.useFakeTimers();
     /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.volumeId;
     /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
-    let mounts = 0;
-    function MountCountingGroup({ gkey, items }) {
-      React.useEffect(() => { mounts++; }, []);
-      return <div className="stub-group" data-key={gkey}>{items.map((e) => e.doc.letterNum).join(',')}</div>;
-    }
-    /** @type {any} */ (globalThis).SrchGroup = MountCountingGroup;
+    /** @type {any} */ (globalThis).SrchGroup = ({ gkey, items, defaultOpen, page }) => (
+      <div className="stub-group" data-key={gkey} data-open={String(defaultOpen)} data-page={String(page)}>{items.map((e) => e.doc.letterNum).join(',')}</div>
+    );
     const L = (num, score) => ({ score, doc: { kind: 'letter', volumeId: 'v7', letterNum: num, title: 'L' + num, ref: 'Volume Seven · Letter ' + num, text: 't' + num } });
     /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: null, results: [L(55, 9), L(9, 8), L(53, 7), L(37, 6)], parsedTerms: [] }));
     const props = { ...baseProps(), settings: { searchCorpus: 'volumes' } };
@@ -522,13 +519,72 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     act(() => { vi.advanceTimersByTime(200); });
     await act(async () => { await Promise.resolve(); });
     expect(document.querySelector('.stub-group').textContent).toBe('55,9,53,37');   // relevance
-    const btn = document.querySelector('.srch-sort-btn');
+    const btn = [...document.querySelectorAll('.srch-sort-btn')].find((b) => b.textContent === 'Book order');
     expect(btn, 'the toggle shows for letters alone').toBeTruthy();
-    expect(btn.getAttribute('aria-label')).toBe('Sort results in book order');
-    const before = mounts;
+    expect(btn.getAttribute('aria-pressed')).toBe('false');
     fireEvent.click(btn);
     expect(document.querySelector('.stub-group').textContent).toBe('9,37,53,55');
-    expect(mounts, 'the group was re-sorted in place, not re-mounted (a reader’s open group stays open)').toBe(before);
+    expect(btn.getAttribute('aria-pressed')).toBe('true');
+    // A lone group keeps its full page (the short first page is for several collections at once).
+    expect(document.querySelector('.stub-group').getAttribute('data-open')).toBe('true');
+    expect(document.querySelector('.stub-group').getAttribute('data-page')).toBe('undefined');
+    vi.useRealTimers();
+  });
+
+  /* sr12, Corbin 10-14 20:2x: "the current button 'relevance' vs 'book order' doesn't seem to actually do anything".
+     It re-sorted inside the groups only, and a long result set opens with every group closed under Best Matches,
+     the one row the switch never touched: the reader saw the button's label flip and nothing else. Book order
+     must change what is on screen: Best Matches (relevance's row) goes, every collection opens in reading order. */
+  it('Book order changes what a long result set shows: Best Matches goes, every collection opens in reading order', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchGroup = ({ gkey, items, defaultOpen, page, view }) => (
+      <div className="stub-group" data-key={gkey} data-open={String(defaultOpen)} data-page={String(page)} data-view={String(view)}>
+        {items.map((e) => e.doc.ref).join(',')}
+      </div>
+    );
+    /** @type {any} */ (globalThis).SrchCard = ({ entry }) => <div className="stub-card">{entry.doc.ref}</div>;
+    const V = (bookId, c, v, score) => ({ score, doc: { kind: 'verse', g: 'bible', bookId, chapterNum: c, verseNum: v, ref: bookId + ' ' + c + ':' + v, text: 't' } });
+    const L = (g, num, score) => ({ score, doc: { kind: g === 'wtlb1' ? 'wtlb' : 'letter', g, letterNum: num, ref: g + '#' + num, title: g + num, text: 'l' + num } });
+    // Relevance order, as the engine hands it over: Malachi first, the original letter before its WTLB reprint.
+    const results = [V('malachi', 3, 6, 50), L('v1', 14, 49), L('wtlb1', 88, 48), V('genesis', 15, 7, 47), V('exodus', 6, 2, 46)];
+    for (let i = 0; i < 20; i++) results.push(V('psalms', 100 - i, 1, 40 - i));
+    for (let i = 0; i < 12; i++) results.push(L('v1', 30 - i, 20 - i));
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: null, results, parsedTerms: [] }));
+    const props = baseProps();
+    const { rerender } = render(<SearchScreen {...props} />);
+    rerender(<SearchScreen {...props} query="I am the Lord and I do not change" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    const groups = () => [...document.querySelectorAll('.stub-group')];
+    const sw = (name) => [...document.querySelectorAll('.srch-sort-btn')].find((b) => b.textContent === name);
+    // Relevance: Best Matches leads, the 37 results open as a closed contents list.
+    expect([...document.querySelectorAll('.srch-sort-btn')].map((b) => b.textContent), 'both orders are named in the switch').toEqual(['Relevance', 'Book order']);
+    expect(sw('Relevance').getAttribute('aria-pressed')).toBe('true');
+    expect(sw('Book order').getAttribute('aria-pressed')).toBe('false');
+    expect(document.querySelector('.srch-top-results'), 'Best Matches').toBeTruthy();
+    expect(groups().map((g) => g.getAttribute('data-open'))).toEqual(['false', 'false', 'false']);
+    const relevanceShows = document.body.textContent;
+    fireEvent.click(sw('Book order'));
+    // Book order: what the reader sees changes.
+    expect(document.body.textContent).not.toBe(relevanceShows);
+    expect(sw('Book order').getAttribute('aria-pressed')).toBe('true');
+    expect(document.querySelector('.srch-top-results'), 'no relevance row under Book order').toBeNull();
+    expect(document.querySelector('.srch-sort-note').textContent).toMatch(/Genesis to Revelation/);
+    expect(groups().map((g) => g.getAttribute('data-key')), 'the original before its reprint').toEqual(['bible', 'v1', 'wtlb1']);
+    expect(groups().map((g) => g.getAttribute('data-open')), 'every collection open').toEqual(['true', 'true', 'true']);
+    expect(groups().map((g) => g.getAttribute('data-view'))).toEqual(['book', 'book', 'book']);
+    expect(groups().map((g) => g.getAttribute('data-page')), 'a short first page each, so a phone draws 3 lists, not 3 x 50 cards').toEqual(['10', '10', '10']);
+    const bible = groups()[0].textContent.split(',');
+    expect(bible.slice(0, 3)).toEqual(['genesis 15:7', 'exodus 6:2', 'psalms 81:1']);
+    expect(bible[bible.length - 1]).toBe('malachi 3:6');
+    expect(groups()[1].textContent.split(',').slice(0, 3)).toEqual(['v1#14', 'v1#19', 'v1#20']);
+    // And back: relevance's screen again.
+    fireEvent.click(sw('Relevance'));
+    expect(document.querySelector('.srch-top-results')).toBeTruthy();
+    expect(groups().map((g) => g.getAttribute('data-open'))).toEqual(['false', 'false', 'false']);
+    expect(document.body.textContent).toBe(relevanceShows);
     vi.useRealTimers();
   });
 

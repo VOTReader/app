@@ -99,4 +99,23 @@ describe('SrchGroup remembers, for one search, what the reader opened', () => {
     const other = render(<SrchGroup gkey="v7" items={items} terms={[]} onSelect={() => {}} defaultOpen={false} memo="rain" />);
     expect(other.container.querySelectorAll('.stub-card')).toHaveLength(0);
   });
+
+  /* sr12: Book order opens every group (SearchScreen re-mounts them per order); each order keeps its own memory,
+     so a group the reader opened under Relevance is open again after a trip to Book order and back. */
+  it('remembers each order on its own: Relevance as the reader left it, Book order open with a short first page', () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({ doc: { title: 'L' + i } }));
+    const rel = render(<SrchGroup gkey="v7" items={many} terms={[]} onSelect={() => {}} defaultOpen={false} memo="lord" />);
+    fireEvent.click(rel.getByRole('button'));
+    rel.unmount();
+    const book = render(<SrchGroup gkey="v7" items={many} terms={[]} onSelect={() => {}} defaultOpen={true} memo="lord" view="book" page={10} />);
+    expect(book.container.querySelectorAll('.stub-card')).toHaveLength(10);
+    expect(book.container.querySelector('.srch-group-more').textContent).toBe('Show 20 more');
+    fireEvent.click(book.container.querySelector('.srch-group-header'));   // closed under Book order
+    book.unmount();
+    const back = render(<SrchGroup gkey="v7" items={many} terms={[]} onSelect={() => {}} defaultOpen={false} memo="lord" />);
+    expect(back.container.querySelectorAll('.stub-card'), 'Relevance as the reader left it: open').toHaveLength(30);
+    back.unmount();
+    const bookAgain = render(<SrchGroup gkey="v7" items={many} terms={[]} onSelect={() => {}} defaultOpen={true} memo="lord" view="book" page={10} />);
+    expect(bookAgain.container.querySelectorAll('.stub-card'), 'Book order as the reader left it: closed').toHaveLength(0);
+  });
 });
