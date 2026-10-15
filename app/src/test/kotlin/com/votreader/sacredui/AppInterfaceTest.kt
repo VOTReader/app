@@ -45,6 +45,29 @@ class AppInterfaceTest {
         return Triple(app, host, bridge)
     }
 
+    /** The device-global audio mode as one stored value: a test reads what the last write left. */
+    private class DeviceMode(var value: Int) {
+        operator fun invoke(): Int = value
+        fun set(mode: Int) { value = mode }
+    }
+
+    private fun audioManagerWithMode(initial: Int): Pair<AudioManager, DeviceMode> {
+        val mode = DeviceMode(initial)
+        val am = mockk<AudioManager>(relaxed = true)
+        every { am.mode } answers { mode.value }
+        every { am.mode = any() } answers { mode.value = firstArg() }
+        return am to mode
+    }
+
+    /** A relaxed view model whose previousAudioMode keeps what startAudioSession saves. */
+    private fun vmWithStoredPreviousMode(): MainViewModel {
+        val vm = mockk<MainViewModel>(relaxed = true)
+        var previous = AudioManager.MODE_NORMAL
+        every { vm.previousAudioMode } answers { previous }
+        every { vm.previousAudioMode = any() } answers { previous = firstArg() }
+        return vm
+    }
+
     // ─── Rolling snapshots (datasafe 10-05): thin delegations to SnapshotStore ─
 
     @Test
@@ -234,6 +257,25 @@ class AppInterfaceTest {
 
     @Test
     fun `teardown during a live session restores the audio mode`() {
+        val (am, mode) = audioManagerWithMode(AudioManager.MODE_NORMAL)
+        val host = FakeBridgeHost().apply { audioSystemService = am }
+        val vm = vmWithStoredPreviousMode()
+        every { vm.audioFocusRequest } returns null
+        every { vm.audioRecorder.cancel() } just Runs
+        val (app, _, _) = newSubject(host = host, vm = vm)
+
+        app.startAudioSession()
+        assertEquals(AudioManager.MODE_IN_COMMUNICATION, mode())
+        app.stopAudioCaptureForTeardown()
+
+        assertEquals(AudioManager.MODE_NORMAL, mode())
+    }
+
+    @Test
+    fun `teardown with no session of ours leaves another app's call in communication mode`() {
+        // sweep v120: the mode alone is no sign of OUR session. A VoIP call in
+        // another app holds MODE_IN_COMMUNICATION too, and an app exit must not
+        // force that call back to NORMAL.
         val am = mockk<AudioManager>(relaxed = true)
         every { am.mode } returns AudioManager.MODE_IN_COMMUNICATION
         val host = FakeBridgeHost().apply { audioSystemService = am }
@@ -245,7 +287,7 @@ class AppInterfaceTest {
 
         app.stopAudioCaptureForTeardown()
 
-        verify { am.mode = AudioManager.MODE_NORMAL }
+        verify(exactly = 0) { am.mode = any() }
     }
 
     @Test
@@ -663,8 +705,42 @@ class AppInterfaceTest {
 
     @Test
     fun `endAudioSession restores vm previousAudioMode`() {
+        val (am, mode) = audioManagerWithMode(AudioManager.MODE_NORMAL)
+        val host = FakeBridgeHost().apply { audioSystemService = am }
+        val vm = vmWithStoredPreviousMode()
+        val (app, _, _) = newSubject(host = host, vm = vm)
+
+        app.startAudioSession()
+        app.endAudioSession()
+
+        assertEquals(AudioManager.MODE_NORMAL, mode())
+    }
+
+    @Test
+    fun `endAudioSession is synchronous with native start instead of queued to UI`() {
+        val (am, mode) = audioManagerWithMode(AudioManager.MODE_NORMAL)
+        val host = FakeBridgeHost().apply {
+            audioSystemService = am
+            executePostedImmediately = false
+        }
+        val vm = vmWithStoredPreviousMode()
+        val (app, _, _) = newSubject(host = host, vm = vm)
+
+        app.startAudioSession()
+        app.endAudioSession()
+
+        assertEquals(AudioManager.MODE_NORMAL, mode())
+        assertTrue(host.postedActions.isEmpty())
+    }
+
+    @Test
+    fun `endAudioSession with no live session leaves another app's call in communication mode`() {
+        // sweep v120: JournalRecordingSheet's cleanup() calls endAudioSession()
+        // on every exit, including a sheet opened and closed with no recording.
+        // The audio mode is device-global: writing the stale previousAudioMode
+        // (NORMAL) here forces a VoIP call in another app off its routing.
         val am = mockk<AudioManager>(relaxed = true)
-        every { am.mode = any() } just Runs
+        every { am.mode } returns AudioManager.MODE_IN_COMMUNICATION
         val host = FakeBridgeHost().apply { audioSystemService = am }
         val vm = mockk<MainViewModel>(relaxed = true)
         every { vm.previousAudioMode } returns AudioManager.MODE_NORMAL
@@ -672,25 +748,45 @@ class AppInterfaceTest {
 
         app.endAudioSession()
 
-        verify { am.mode = AudioManager.MODE_NORMAL }
+        verify(exactly = 0) { am.mode = any() }
     }
 
     @Test
-    fun `endAudioSession is synchronous with native start instead of queued to UI`() {
-        val am = mockk<AudioManager>(relaxed = true)
-        every { am.mode = any() } just Runs
-        val host = FakeBridgeHost().apply {
-            audioSystemService = am
-            executePostedImmediately = false
-        }
-        val vm = mockk<MainViewModel>(relaxed = true)
-        every { vm.previousAudioMode } returns AudioManager.MODE_NORMAL
+    fun `cleanup's second endAudioSession after a memo does not write the mode again`() {
+        // sweep v120: stop ends the session (entering preview), then cleanup()
+        // ends it again when the sheet closes. If a call started in another app
+        // in between, that second end must not force the mode back to NORMAL.
+        val (am, mode) = audioManagerWithMode(AudioManager.MODE_NORMAL)
+        val host = FakeBridgeHost().apply { audioSystemService = am }
+        val vm = vmWithStoredPreviousMode()
         val (app, _, _) = newSubject(host = host, vm = vm)
 
+        app.startAudioSession()
+        assertEquals(AudioManager.MODE_IN_COMMUNICATION, mode())
+        app.endAudioSession()                       // stop -> preview
+        assertEquals(AudioManager.MODE_NORMAL, mode())
+
+        mode.set(AudioManager.MODE_IN_COMMUNICATION) // another app's VoIP call begins
+        app.endAudioSession()                       // the sheet closes: cleanup()
+
+        assertEquals(AudioManager.MODE_IN_COMMUNICATION, mode())
+    }
+
+    @Test
+    fun `a new session after an ended one restores the mode again`() {
+        val (am, mode) = audioManagerWithMode(AudioManager.MODE_NORMAL)
+        val host = FakeBridgeHost().apply { audioSystemService = am }
+        val vm = vmWithStoredPreviousMode()
+        val (app, _, _) = newSubject(host = host, vm = vm)
+
+        app.startAudioSession()
+        app.endAudioSession()
+        app.endAudioSession()
+        app.startAudioSession()
+        assertEquals(AudioManager.MODE_IN_COMMUNICATION, mode())
         app.endAudioSession()
 
-        verify { am.mode = AudioManager.MODE_NORMAL }
-        assertTrue(host.postedActions.isEmpty())
+        assertEquals(AudioManager.MODE_NORMAL, mode())
     }
 
     // ─── Keep-screen-on toggle ────────────────────────────────────────
