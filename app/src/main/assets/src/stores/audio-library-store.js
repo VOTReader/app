@@ -227,22 +227,43 @@ export const AudioLibraryStore = extendStore(
       // stays right for songs, and the 100 recordings slots stay the readings'.
       const songId = songIdOfKey(normalized.key);
       if (songId) return this.toggleSongSaved(songId);
-      const wasSaved = this.isSaved(normalized);
-      if (this._shouldDefer('toggleSaved', normalized)) return !wasSaved;
+      // The flip is decided HERE, from the star the reader sees, and handed on
+      // as a value (sweep v018). Before the library loads, that star reads the
+      // empty overlay; a queued flip would replay onto the real library and
+      // take an already-saved recording off. A queued set lands as tapped.
+      return this.setSaved(normalized, !this.isSaved(normalized));
+    },
+
+    /**
+     * Put a recording on the saved shelf (on: true) or take it off (on: false).
+     * Idempotent, so it is what a tap queues while the store is still loading:
+     * replayed onto the real library it sets the state the reader chose, and a
+     * recording already saved keeps its row and its savedAt.
+     *
+     * @param {unknown} track
+     * @param {boolean} on
+     * @returns {boolean} whether it is saved after the call
+     */
+    setSaved(track, on) {
+      const normalized = normalizeAudioTrack(track);
+      if (!normalized) return false;
+      const songId = songIdOfKey(normalized.key);
+      if (songId) return this.setSongSaved(songId, on);
+      const want = !!on;
+      if (this._shouldDefer('setSaved', normalized, want)) return want;
       const data = _writeableData(this);
       const at = data.saved.findIndex((item) => item.url === normalized.url);
-      if (at >= 0) {
+      if ((at >= 0) === want && !this._lastWriteFailed) return want;   // already so (W70: unless a write failed)
+      if (want && at < 0) {
+        data.saved.unshift({ ...normalized, savedAt: Date.now() });
+        data.saved = data.saved.slice(0, MAX_SAVED_AUDIO_TRACKS);
+      } else if (!want && at >= 0) {
         data.saved.splice(at, 1);
-        this._save();
-        this._bump();
-        return false;
       }
-      data.saved.unshift({ ...normalized, savedAt: Date.now() });
-      data.saved = data.saved.slice(0, MAX_SAVED_AUDIO_TRACKS);
       this._cache = data;
       this._save();
       this._bump();
-      return true;
+      return want;
     },
 
     /**
@@ -364,17 +385,31 @@ export const AudioLibraryStore = extendStore(
      */
     toggleSongSaved(id) {
       if (!isSongId(id)) return false;
+      // Decided from what the reader sees, handed on as a value (see toggleSaved, sweep v018).
+      return this.setSongSaved(id, !this.isSongSaved(id));
+    },
+
+    /**
+     * Save a song (on: true) or remove it (on: false). Idempotent, like
+     * setSaved, so a tap queued before the library loads lands as tapped.
+     * @param {unknown} id
+     * @param {boolean} on
+     * @returns {boolean} whether it is saved after the call
+     */
+    setSongSaved(id, on) {
+      if (!isSongId(id)) return false;
       const songId = /** @type {string} */ (id);
-      const wasSaved = this.isSongSaved(songId);
-      if (this._shouldDefer('toggleSongSaved', songId)) return !wasSaved;
+      const want = !!on;
+      if (this._shouldDefer('setSongSaved', songId, want)) return want;
       const data = _writeableData(this);
       const at = data.songSaved.indexOf(songId);
-      if (at >= 0) data.songSaved.splice(at, 1);
-      else data.songSaved = [songId].concat(data.songSaved).slice(0, MAX_SAVED_SONGS);
+      if ((at >= 0) === want && !this._lastWriteFailed) return want;   // already so (W70: unless a write failed)
+      if (want && at < 0) data.songSaved = [songId].concat(data.songSaved).slice(0, MAX_SAVED_SONGS);
+      else if (!want && at >= 0) data.songSaved.splice(at, 1);
       this._cache = data;
       this._save();
       this._bump();
-      return at < 0;
+      return want;
     },
 
     /**

@@ -11,6 +11,7 @@ import {
   normalizeAudioLibrary,
 } from './audio-library-store.js';
 import { AUDIO_RELEASE_PREFIX } from '../utils/audio-track.js';
+import { IDBAdapter } from './idb-adapter.js';
 
 /** @param {number} id */
 function track(id) {
@@ -290,5 +291,70 @@ describe('AudioLibraryStore — Songs of the Letters shelves (2026-09-24)', () =
     AudioLibraryStore.replaceAll({ songSaved: [sid(9)], songRecent: [sid(8), sid(9)] });
     expect(AudioLibraryStore.songSaved()).toEqual([sid(9)]);
     expect(AudioLibraryStore.songRecent()).toEqual([sid(8), sid(9)]);
+  });
+});
+
+/* sweep v018: before the library has loaded (IndexedDB slow, store 'degraded'),
+   every star reads empty, because the overlay starts from defaults. A tap there
+   means "save this", and it must still mean that once the real library lands:
+   the queued op has to SET the starred state, not flip it again on real data,
+   where it would take a recording or song the reader had already saved OFF. */
+describe('AudioLibraryStore — a star tapped before the library has loaded (sweep v018)', () => {
+  const sid = (n) => n.toString(16).padStart(12, '0');
+  const song = (n) => ({ key: 'song:' + sid(n), title: 'Song ' + n, sub: null, url: 'https://votreader.github.io/songs-1/' + sid(n) + '.mp3', readerCode: '', partLabel: 'Pop' });
+
+  /** @type {any} */ let putSpy;
+
+  /** Boot the store into 'degraded' with IndexedDB's answer held back.
+   *  @returns {Promise<(data: any) => Promise<void>>} lands the given record */
+  async function degradedBoot() {
+    /** @type {(v: any) => void} */ let answer = () => {};
+    vi.spyOn(IDBAdapter, 'get').mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }));
+    putSpy = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    AudioLibraryStore._resetForTests();
+    const hydrated = AudioLibraryStore._hydrate();
+    await vi.advanceTimersByTimeAsync(3000);
+    await hydrated;
+    expect(AudioLibraryStore.getState()).toBe('degraded');
+    return async (data) => { answer(data); await vi.advanceTimersByTimeAsync(0); };
+  }
+
+  /** The record the rebase wrote to IndexedDB. */
+  const persisted = () => putSpy.mock.calls.filter((c) => c[0] === 'vot-audio-library').pop()[2];
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('a saved recording starred again while degraded stays saved', async () => {
+    const land = await degradedBoot();
+    expect(AudioLibraryStore.isSaved(track(1))).toBe(false);   // the empty star the reader sees
+    expect(AudioLibraryStore.toggleSaved(track(1))).toBe(true);
+    await land({ v: 1, saved: [{ ...track(1), savedAt: 111 }], recent: [], rate: 1, plays: 0, completions: 0 });
+    expect(AudioLibraryStore.getState()).toBe('loaded');
+    expect(AudioLibraryStore.isSaved(track(1))).toBe(true);
+    expect(AudioLibraryStore.saved().map((t) => [t.url, t.savedAt])).toEqual([[track(1).url, 111]]);
+    expect(persisted().saved.map((t) => t.url)).toEqual([track(1).url]);
+  });
+
+  it('a saved song starred again while degraded stays saved (song id and song track)', async () => {
+    const land = await degradedBoot();
+    expect(AudioLibraryStore.isSongSaved(sid(5))).toBe(false);
+    expect(AudioLibraryStore.toggleSongSaved(sid(5))).toBe(true);
+    expect(AudioLibraryStore.isSaved(song(6))).toBe(false);
+    expect(AudioLibraryStore.toggleSaved(song(6))).toBe(true);
+    await land({ v: 1, saved: [], recent: [], songSaved: [sid(6), sid(5)] });
+    expect(AudioLibraryStore.songSaved()).toEqual([sid(6), sid(5)]);
+    expect(persisted().songSaved).toEqual([sid(6), sid(5)]);
+  });
+
+  it('the last state the reader saw is the one that lands', async () => {
+    const land = await degradedBoot();
+    AudioLibraryStore.toggleSaved(track(2));   // starred ...
+    AudioLibraryStore.toggleSaved(track(2));   // ... and un-starred again
+    AudioLibraryStore.toggleSaved(track(3));   // starred, and not saved before
+    AudioLibraryStore.toggleSongSaved(sid(7));
+    AudioLibraryStore.toggleSongSaved(sid(7));
+    await land({ v: 1, saved: [{ ...track(2), savedAt: 5 }], recent: [], songSaved: [sid(7)] });
+    expect(AudioLibraryStore.saved().map((t) => t.url)).toEqual([track(3).url]);
+    expect(AudioLibraryStore.songSaved()).toEqual([]);
   });
 });
