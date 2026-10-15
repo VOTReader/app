@@ -554,10 +554,15 @@ function _unionBy(a, b, key) {
 /** A record's time, whatever this store calls it. @param {any} r */
 const _t = (r) => (r && (r.t || r.updatedAt || r.updated || r.at || r.savedAt)) || 0;
 
-/** Key-wise, the record with the later time wins (b on a tie). @param {any} a @param {any} b */
-function _newerByTime(a, b) {
+/** An audio position's time: `at`, its last touch. Its `t` is seconds into the recording,
+ *  so `_t` would keep whichever side got further, not the newer one (sweep v084). @param {any} r */
+const _audioAt = (r) => (r && +r.at) || 0;
+
+/** Key-wise, the record with the later time wins (b on a tie).
+ *  @param {any} a @param {any} b @param {(r: any) => number} [time] reads a record's time; `_t` by default */
+function _newerByTime(a, b, time = _t) {
   const out = Object.assign({}, obj(a));
-  for (const [k, v] of Object.entries(obj(b))) if (!(k in out) || _t(v) >= _t(out[k])) out[k] = v;
+  for (const [k, v] of Object.entries(obj(b))) if (!(k in out) || time(v) >= time(out[k])) out[k] = v;
   return out;
 }
 
@@ -636,7 +641,7 @@ export function mergeForRestore(name, live, snap, opts) {
     }
     case 'vot-history': return _unionHistory(live, snap);
     case 'vot-reading-streak': return _mergeStreak(live, snap, wiped);
-    case 'vot-audio-positions': return Object.assign({}, snap, live, { positions: _newerByTime(obj(snap).positions, obj(live).positions) });
+    case 'vot-audio-positions': return Object.assign({}, snap, live, { positions: _newerByTime(obj(snap).positions, obj(live).positions, _audioAt) });
     case 'vot-audio-library': {
       const L = obj(live), S = obj(snap);
       const out = Object.assign({}, S, L, {

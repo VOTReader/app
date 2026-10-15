@@ -217,6 +217,18 @@ describe('refuter findings (datasafe 10-05 second pass)', () => {
     expect(pos.positions).toEqual({ x: { t: 9 }, y: { t: 2 } });
   });
 
+  it('an audio position restore keeps the newer place, not the one further into the recording (sweep v084)', () => {
+    // The store's records are { t: seconds into the recording, d, at: last touch }.
+    // The snapshot holds minute 40 from yesterday; the reader restarted and is at minute 5 now.
+    const live = { v: 1, positions: { x: { t: 300, d: 3600, at: 2000 } } };
+    const snap = { v: 1, positions: { x: { t: 2400, d: 3600, at: 1000 }, y: { t: 60, d: 900, at: 500 } } };
+    expect(mergeForRestore('vot-audio-positions', live, snap).positions)
+      .toEqual({ x: { t: 300, d: 3600, at: 2000 }, y: { t: 60, d: 900, at: 500 } });
+    // And the other way: a snapshot touched later than the live row wins, even at an earlier second.
+    const newerSnap = { v: 1, positions: { x: { t: 120, d: 3600, at: 3000 } } };
+    expect(mergeForRestore('vot-audio-positions', live, newerSnap).positions.x).toEqual({ t: 120, d: 3600, at: 3000 });
+  });
+
   it('Keep as is clears the finding and snapshots the smaller library at once', async () => {
     await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
     const sink = memorySink();
