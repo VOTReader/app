@@ -3,7 +3,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   READERS, readerLine, listeningFacts, liveListening, editionOptions, editionLine, rateLabel, rateOptions, writeSetting,
-  writeRate, daysAgo, liveData, safeCard, weeklyLine, versionLine, readVersion, updateLine, gateListening, gateData,
+  writeRate, daysAgo, liveData, safeCard, weeklyLine, versionLine, readVersion, updateLine, gateListening, gateData, pushListening,
 } from './settings-pages.js';
 
 const DAY = 24 * 3600 * 1000;
@@ -77,6 +77,30 @@ describe('writers', () => {
     writeSetting('letterReader', 'T', gl);
     expect(setPreferredReader).toHaveBeenCalledWith('T');
     expect(gl.StateStore.st.settings).toEqual({ letterReader: 'T', touched: { letterReader: true } });
+  });
+
+  it('Download only on Wi-Fi also reaches the download stores (bundle-d\'s DownloadGate), as main\'s App pushed it', () => {
+    const setWifiOnly = vi.fn();
+    const gl = { StateStore: fakeStore({}), DownloadGate: { setWifiOnly } };
+    writeSetting('downloadWifiOnly', true, gl);
+    expect(setWifiOnly).toHaveBeenCalledWith(true);
+    expect(gl.StateStore.st.settings).toEqual({ downloadWifiOnly: true, touched: { downloadWifiOnly: true } });
+  });
+
+  it('pushListening hands the saved favourite reader and Wi-Fi switch to bundle-d (a v2 boot; main\'s screen-routes did it as it rendered)', () => {
+    const setPreferredReader = vi.fn();
+    const setWifiOnly = vi.fn();
+    pushListening({ StateStore: fakeStore({ settings: { letterReader: 'T', downloadWifiOnly: true } }), AudioPlayer: { setPreferredReader }, DownloadGate: { setWifiOnly } });
+    expect(setPreferredReader).toHaveBeenCalledWith('T');
+    expect(setWifiOnly).toHaveBeenCalledWith(true);
+    // nothing saved: main's defaults (the manifest's own reading; downloads on any network)
+    pushListening({ StateStore: fakeStore({}), AudioPlayer: { setPreferredReader }, DownloadGate: { setWifiOnly } });
+    expect(setPreferredReader).toHaveBeenLastCalledWith(undefined);
+    expect(setWifiOnly).toHaveBeenLastCalledWith(false);
+    // before the store has loaded, or without bundle-d: nothing to say, nothing thrown
+    expect(() => pushListening({ StateStore: { isReady: () => false }, AudioPlayer: { setPreferredReader } })).not.toThrow();
+    expect(setPreferredReader).toHaveBeenCalledTimes(2);
+    expect(() => pushListening({})).not.toThrow();
   });
 
   it('writes nothing while the store has not loaded', () => {

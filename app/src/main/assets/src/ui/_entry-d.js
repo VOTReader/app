@@ -106,6 +106,9 @@ import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSo
 // Keep on this phone (K1): ONE keep store beside the player that plays kept songs from it; the lazy Songs screens and
 // Settings read it and its controls as globals.
 import { SongKeep, formatSongBytes } from '../utils/song-keep.js';
+// Download only on Wi-Fi (ra6): v2 (bundle-v2) sets the switch and asks whether this browser can tell, through this one instance.
+import { setWifiOnly, canTell } from '../utils/download-gate.js';
+const DownloadGate = { setWifiOnly, canTell };
 // Is the network there (2026-10-05): ONE store beside the player; the lazy screens read the NetStatus global.
 import { NetStatus } from '../utils/net-status.js';
 import { SongKeepCard, SongKeepAction, useSongKeep, useSongsOnline, KeepIcon, KeptIcon } from './components/SongKeepParts.jsx';
@@ -330,7 +333,7 @@ Object.assign(window, {
   writeContainer, readContainer, isContainerMagic,
   runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries,
   summarizeBackupManifest, formatVerifyReport,
-  AudioPlayer, audioTrackUrl, OfflineAudio, SongCatalog,
+  AudioPlayer, audioTrackUrl, OfflineAudio, SongCatalog, DownloadGate,
   songClock, songCountLabel, currentSongId, playerIsActive, songLetterOf, familyIsPlaying, songFamilyTitle,
   SongCover, SongPlayButton, SongListRow, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, RecentIcon, ChevronRightIcon, ChoiceSheet,
   loadSongLyrics, useSongLyrics, lyricLineAt, findSongFamilies, songLyricsFoot,

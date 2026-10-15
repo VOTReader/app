@@ -40,7 +40,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   delete g.COL_BY_KEY; delete g.LETTERS_V1; delete g.__loadVotCorpus; delete g.__votCorpus; delete g.matchMedia; delete g.AudioPlayer;
-  delete g.OfflineAudio; delete g.PlatformBridge;
+  delete g.OfflineAudio; delete g.PlatformBridge; delete g.DownloadGate; delete g.StateStore;
   delete html.dataset.gate;
   localStorage.clear();
   vi.restoreAllMocks();
@@ -553,6 +553,28 @@ describe('the real engine (bundle-d globals)', () => {
     act(() => { e.state.status = 'idle'; e.emit(); });
     expect(c.querySelector('.np-screen')).toBeNull();
     expect(c.querySelector('.mini')).toBeNull();
+  });
+
+  it("a real boot hands bundle-d the saved favourite reader and Download only on Wi-Fi, as main's App did while it rendered", () => {
+    const e = fakeEngine();
+    const setPreferredReader = vi.fn();
+    g.AudioPlayer = { ...e.api, setPreferredReader };
+    g.DownloadGate = { setWifiOnly: vi.fn() };
+    g.StateStore = { isReady: () => true, get: () => ({ settings: { letterReader: 'T', downloadWifiOnly: true } }), set: vi.fn() };
+    render(<V2App gateId={null} />);
+    expect(setPreferredReader).toHaveBeenCalledWith('T');
+    expect(g.DownloadGate.setWifiOnly).toHaveBeenCalledWith(true);
+    expect(g.StateStore.set).not.toHaveBeenCalled();
+  });
+
+  it("a gate boot hands bundle-d nothing (its state is the picture's, never the reader's)", () => {
+    const setPreferredReader = vi.fn();
+    g.AudioPlayer = { setPreferredReader };
+    g.DownloadGate = { setWifiOnly: vi.fn() };
+    g.StateStore = { isReady: () => true, get: () => ({ settings: { letterReader: 'T', downloadWifiOnly: true } }), set: vi.fn() };
+    render(<V2App gateId="7a-listening" />);
+    expect(setPreferredReader).not.toHaveBeenCalled();
+    expect(g.DownloadGate.setWifiOnly).not.toHaveBeenCalled();
   });
 
   /** The engine with main's voice calls and bundle-b's AudioLibraryStore. */

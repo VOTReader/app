@@ -112,10 +112,24 @@ export function writeSetting(key, val, gl = g) {
   const st = store.get() || {};
   const prev = st.settings || {};
   store.set({ ...st, settings: { ...prev, [key]: val, touched: { ...(prev.touched || {}), [key]: true } } });
-  if (key === 'letterReader' && gl.AudioPlayer && typeof gl.AudioPlayer.setPreferredReader === 'function') {
-    gl.AudioPlayer.setPreferredReader(val);
-  }
+  if (key === 'letterReader' || key === 'downloadWifiOnly') pushListening(gl);
   return true;
+}
+
+/**
+ * Hands bundle-d the saved settings its plain-module stores act on: the favourite reader (AudioPlayer) and Download only
+ * on Wi-Fi (download-gate.js, through its DownloadGate global). Main's App pushed both as it rendered (screen-routes);
+ * v2 never renders that App, so the player pushes them once a real boot has read the saved settings, and writeSetting
+ * again on each change. Nothing is said before the store has loaded.
+ */
+export function pushListening(gl = g) {
+  const store = gl.StateStore;
+  if (!store || typeof store.isReady !== 'function' || !store.isReady()) return;
+  const s = savedSettings(gl);
+  try {
+    if (gl.AudioPlayer && typeof gl.AudioPlayer.setPreferredReader === 'function') gl.AudioPlayer.setPreferredReader(s.letterReader);
+    if (gl.DownloadGate && typeof gl.DownloadGate.setWifiOnly === 'function') gl.DownloadGate.setWifiOnly(s.downloadWifiOnly === true);
+  } catch (_e) { /* an older bundle-d: its own defaults */ }
 }
 
 /** The starting speed, as main's Default Speed sets it (the player when there is one, else the library). */

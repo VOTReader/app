@@ -6,6 +6,7 @@
 import { Icon } from '../Icon.jsx';
 import { Menu } from '../Menu.jsx';
 import { askVotCorpus } from '../corpus.js';
+import { pushListening } from '../settings-pages.js';
 import { realSource, fakeSource, silentSource } from './source.js';
 import { stillWashes } from './read-along.jsx';
 import {
@@ -40,6 +41,8 @@ export function usePlayer(gate) {
     return realSource() || silentSource();
   });
   React.useSyncExternalStore(source.subscribe, source.version);
+  // a real boot hands the engine and the download stores the saved favourite reader and Wi-Fi switch (main's App did)
+  React.useEffect(() => { if (!gate) pushListening(); }, [gate]);
   const [ui, setUi] = React.useState(() => seedUi(gate && gate.player ? gate.player.open : null));
   // A gate's playing letter lives in a lazy volume: ask for it (one ask with the screen's), then build the queue. A load
   // that fails or lands without the letter leaves nothing playing, and the player says ready all the same.
