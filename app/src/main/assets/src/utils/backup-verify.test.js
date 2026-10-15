@@ -37,7 +37,9 @@ describe('summarizeBackupManifest', () => {
     expect(s.mediaCount).toBe(2);
     expect(s.mediaBytes).toBe(3500);
     expect(s.notes).toBe(12);
-    expect(s.annotations).toBe(40);
+    // Declared counts hold passages, not marks: no stores block, no highlight count.
+    expect(s.annotatedPassages).toBe(40);
+    expect(s.highlights).toBe(0);
     expect(s.journal).toBe(5);
     expect(s.bookmarks).toBe(3);
     expect(s.date).toBe('2026-07-01T12:00:00.000Z');
@@ -70,7 +72,7 @@ describe('formatVerifyReport', () => {
     const r = formatVerifyReport(s, 'ok', 'v3');
     expect(r.level).toBe('ok');
     expect(r.message).toContain('12 notes');
-    expect(r.message).toContain('40 highlights');
+    expect(r.message).toContain('40 annotated passages');
     expect(r.message).toContain('5 journal entries');
     expect(r.message).toContain('67 records across 5 data stores');
     expect(r.message).toContain('2 media files');
@@ -326,5 +328,68 @@ describe('Verify counts the journal a real export carries', () => {
     const r = formatVerifyReport(summarizeBackupManifest(old), 'absent', 'v3');
     expect(r.message).toContain('5 journal entries');
     expect(r.message).toContain('10 records across 4 data stores');
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   vot-annotations persists hlKey → [marks] (annotation-store.js). The store
+   rule counts that map's KEYS, one per annotated passage, and Verify printed
+   the figure as "highlights": five highlights across two verses verified as
+   "2 highlights" (sweep v057), the wrong answer to the one question an owner
+   brings to an only backup. The library's own count of the same data
+   (data-safety summarize, which the storage banner prints) sums the lists.
+   ───────────────────────────────────────────────────────────────────────── */
+describe('Verify counts the highlights a real export carries', () => {
+  const mark = (id) => ({
+    id, groupId: id, kind: 'highlight', color: 'yellow', start: 0, end: 5, text: 'grace', created: 1, updated: 1,
+  });
+  const saved = {
+    'vot-annotations': {
+      'bible:john:3:16': [mark('a1'), mark('a2'), mark('a3')],
+      'bible:john:3:17': [mark('a4'), mark('a5')],
+    },
+  };
+  const exportCtx = () => ({
+    storesMap: Object.fromEntries(Object.keys(saved).map((k) => [k, { store: {}, method: 'replaceAll' }])),
+    flagMap: {},
+    idbAdapter: { get: async (name) => saved[name] },
+    mediaStore: { allIds: async () => [], get: async () => null },
+    storageEstimate: async () => ({ quota: null, usage: null }),
+    nowIso: () => '2026-09-25T12:00:00.000Z',
+  });
+
+  it('v3: five highlights in two verses verify as 5 highlights, not 2', async () => {
+    const built = await buildV3Manifest(exportCtx());
+    if (!built.ok) throw new Error('export failed');
+    const chunks = [];
+    await writeContainer(built.manifest, built.mediaEntries, (u8) => { chunks.push(u8.slice()); });
+    const read = await readContainer(new Blob(chunks));
+
+    const r = formatVerifyReport(summarizeBackupManifest(read.manifest), read.integrity, 'v3');
+    expect(r.message).toContain('Backup from ');
+    expect(r.message).toContain(': 5 highlights — ');
+    // The record total stays the store rule the counts block and import
+    // reconciliation use: one record per annotated passage.
+    expect(r.message).toContain('2 records across 1 data store');
+  });
+
+  it('legacy v2: the same library verifies as 5 highlights', async () => {
+    const built = await buildExportPayload(exportCtx());
+    if (!built.ok) throw new Error('export failed');
+    const r = formatVerifyReport(summarizeBackupManifest(JSON.parse(JSON.stringify(built.payload))), 'absent', 'legacy');
+    expect(r.message).toContain(': 5 highlights — ');
+  });
+
+  it('one mark is one highlight; a key with no list adds none', () => {
+    const s = summarizeBackupManifest({ stores: { 'vot-annotations': { k1: [mark('a1')], k2: null, k3: 'junk' } } });
+    expect(formatVerifyReport(s, 'ok', 'v3').message).toContain(': 1 highlight — ');
+  });
+
+  it('a file that only declares counts says passages, the unit those counts are in', () => {
+    const many = formatVerifyReport(summarizeBackupManifest({ counts: { 'vot-annotations': 12 } }), 'absent', 'v3');
+    expect(many.message).toContain(': 12 annotated passages — ');
+    expect(many.message).not.toContain('highlight');
+    const one = formatVerifyReport(summarizeBackupManifest({ counts: { 'vot-annotations': 1 } }), 'absent', 'v3');
+    expect(one.message).toContain(': 1 annotated passage — ');
   });
 });
