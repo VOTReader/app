@@ -11,5 +11,5 @@
 .jed .jt { font-size: var(--fs-l); line-height: 1.25; }
 .jed .jb { margin-top: 12px; min-height: 42vh; font-size: var(--fs-body); line-height: var(--lh-body); color: var(--t-body); resize: vertical; }
 .jed .jt:focus, .jed .jb:focus { border-color: var(--accent); outline: 0; }
-.jed .jt::placeholder, .jed .jb::placeholder { color: #A7AEB0; }
+.jed .jt::placeholder, .jed .jb::placeholder { color: var(--t-ph); }
 .jed .jother { margin: 12px 0 0; padding-left: 12px; border-left: 2px solid var(--line); }
