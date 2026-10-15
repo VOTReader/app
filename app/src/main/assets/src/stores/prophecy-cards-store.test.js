@@ -1,8 +1,9 @@
 /* ProphecyCardsStore — getAll/getOne/setOne/setAll tests.
    ──────────────────────────────────────────────────────────
-   Record<string, boolean> map where truthy = expanded, absent =
-   collapsed. setAll() filters falsy values so the persisted map stays
-   minimal. getAll() returns a defensive copy.
+   Record<string, boolean> map where true = expanded, false = collapsed
+   by hand, absent = expanded (ProphecyCard's default). setAll() keeps
+   true and false and drops other falsy values. getAll() returns a
+   defensive copy.
 */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -67,10 +68,11 @@ describe('ProphecyCardsStore — setOne()', () => {
     expect(ProphecyCardsStore.getOne('card1')).toBe(true);
   });
 
-  it('deletes a key when value is false', () => {
+  it('keeps false: a card collapsed by hand stays collapsed (absent would reopen it)', () => {
     ProphecyCardsStore.setOne('card1', true);
     ProphecyCardsStore.setOne('card1', false);
-    expect(ProphecyCardsStore.getAll()).toEqual({});
+    expect(ProphecyCardsStore.getAll()).toEqual({ card1: false });
+    expect(ProphecyCardsStore.getOne('card1')).toBe(false);
   });
 
   it('deletes a key when value is 0', () => {
@@ -107,7 +109,7 @@ describe('ProphecyCardsStore — setOne()', () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════
-   setAll() — full replacement with falsy filtering
+   setAll() — full replacement; keeps true and false
    ═══════════════════════════════════════════════════════════════════ */
 
 describe('ProphecyCardsStore — setAll()', () => {
@@ -118,10 +120,10 @@ describe('ProphecyCardsStore — setAll()', () => {
     expect(ProphecyCardsStore.getOne('newKey')).toBe(true);
   });
 
-  it('filters falsy values', () => {
+  it('keeps true and false, drops other falsy values', () => {
     // @ts-expect-error — testing defensive falsy filtering
     ProphecyCardsStore.setAll({ a: true, b: false, c: true, d: 0, e: null, f: undefined });
-    expect(ProphecyCardsStore.getAll()).toEqual({ a: true, c: true });
+    expect(ProphecyCardsStore.getAll()).toEqual({ a: true, b: false, c: true });
   });
 
   it('setAll(null) becomes {}', () => {

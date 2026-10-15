@@ -111,8 +111,7 @@ describe('useReadingPositionNav — prophecy card state', () => {
 
   it('hydrates from ProphecyCardsStore on init', () => {
     // Pre-populate the store directly (in IDB-mode 'loaded' state,
-    // setOne is a normal write-through; ProphecyCardsStore.setAll
-    // filters falsy so we set only the truthy keys).
+    // setOne is a normal write-through).
     ProphecyCardsStore.setAll({ 'chap-1:0:prophecy': true });
     const { result } = setup();
     expect(result.current.prophecyCardStatesRef.current).toEqual({ 'chap-1:0:prophecy': true });
@@ -124,6 +123,16 @@ describe('useReadingPositionNav — prophecy card state', () => {
     ProphecyCardsStore._cache = /** @type {any} */ ({});
     const { result } = setup();
     expect(result.current.prophecyCardStatesRef.current).toEqual({});
+  });
+
+  it('a card closed by hand is still closed when the reader comes back (setAll used to drop false; ProphecyCard opens a card with nothing saved)', () => {
+    const first = setup();
+    first.result.current.prophecyCardStatesRef.current['chap-1:0:ot'] = false;
+    first.result.current.prophecyCardStatesRef.current['chap-1:0:nt'] = true;
+    act(() => { first.result.current.saveProphecyCardStates(); });
+    expect(ProphecyCardsStore.getAll()).toEqual({ 'chap-1:0:ot': false, 'chap-1:0:nt': true });
+    const again = setup();
+    expect(again.result.current.prophecyCardStatesRef.current).toEqual({ 'chap-1:0:ot': false, 'chap-1:0:nt': true });
   });
 
   it('saveProphecyCardStates writes the ref to ProphecyCardsStore', () => {
