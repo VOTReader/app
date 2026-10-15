@@ -808,6 +808,26 @@ describe('tap-to-seek', () => {
     },
   );
 
+  /* Sweep v44: a highlight or note MARK is an annotation's own tap target (SelectionToolbar's routeAnnotationTap
+     opens the action chip, or the note). That listener sits on the document, so this component's native click on
+     the reading body ran first and moved the audio as well: recolouring a highlight, or opening a note, while
+     listening jumped the recording to that clause. The mark wraps the clause's own words, as the engine paints it. */
+  it.each([['highlight', 'hl-mark hl-dom hl-yellow'], ['note', 'hl-mark hl-dom hl-blank hl-note']])(
+    'a tap on a %s mark does not seek the audio (sweep v44)', (_kind, cls) => {
+      mount(); play(); clockTo(2);
+      const block = document.querySelectorAll('[data-hl-key]')[0];
+      const clause = block.firstChild.splitText(14);           // "Sentence number two."
+      const mark = document.createElement('mark');
+      mark.className = cls;
+      mark.setAttribute('data-group-id', 'g-1');
+      clause.replaceWith(mark);
+      mark.appendChild(clause);
+      document.caretRangeFromPoint = () => ({ startContainer: clause, startOffset: 6 });
+      tapBody(mark);
+      expect(AudioPlayer.getState().time).toBe(2);
+    },
+  );
+
   it('a tap in another block seeks to that block clause', () => {
     mount(); play(); clockTo(2);
     caretAtChar(1, 3);

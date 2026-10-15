@@ -1020,8 +1020,12 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       // event — dispatched from React's root container, long after the native
       // click has bubbled past this listener. So the seek fires first and
       // cannot be stopped: tapping a note icon jumped the audio.
+      // An annotation's MARK is the same case (sweep v44): a tap on a highlight
+      // opens its action chip and one on a note mark opens the note, through
+      // SelectionToolbar's routeAnnotationTap on the document, after this
+      // listener. `mark.hl-mark` is the selector that router matches.
       if (e.target && e.target.closest
-          && e.target.closest('a, button, [role="button"], [role="link"], .fn-ref, .letter-link-ref, .inline-scrip-ref, .verse-link-icon, .inline-bookmark-icon, .hl-note-icon')) return;
+          && e.target.closest('a, button, [role="button"], [role="link"], .fn-ref, .letter-link-ref, .inline-scrip-ref, .verse-link-icon, .inline-bookmark-icon, .hl-note-icon, mark.hl-mark')) return;
       const i = fragmentAtPoint(frags, el, letterId, hlKeyFn, e.clientX, e.clientY, offsetMapFn);
       if (i < 0) return;                                          // untimed text — stay silent
       if (jump && now - jump.last <= DOUBLE_TAP_MS) jump.last = now;
