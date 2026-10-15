@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useNavigateToLink, verseAnchorFor, noteTabAction } from './use-navigate-to-link.js';
 import { navHandoff } from '../utils/nav-handoff.js';
+import { _resetToasts } from '../utils/toast.js';
 
 function makeParams(over) {
   return {
@@ -442,5 +443,29 @@ describe('useNavigateToLink — every endpoint kind and the prologue', () => {
     });
     expect(p.setScreen).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledWith('navigateToLink: bible corpus load failed', expect.any(Error));
+  });
+
+  // sweep v059: the sidebar shuts at the tap, and a load that fails (offline,
+  // Bible never cached) never reaches goBible, so the bible-ch route's retry
+  // view never mounts. Before the fix the only trace was a console warning:
+  // the reader saw the sidebar close and nothing open.
+  it('v059: a Bible link whose corpus fails to load tells the reader why nothing opened', async () => {
+    _resetToasts();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    window.__loadBibleCorpus = vi.fn(() => Promise.reject(new Error('Failed to load dist/bundle-a-bible.js')));
+    const p = makeParams({ screen: 'vot-one-letter', letterId: 'L12', activeTabIdx: 0 });
+    const { result } = renderHook(() => useNavigateToLink(p));
+    await act(async () => {
+      result.current.navigateToLink({ type: 'bible', bookId: 'genesis', chapter: 1 });
+      await Promise.resolve(); await Promise.resolve();
+    });
+    expect(p.closeLinkSidebar).toHaveBeenCalledTimes(1);
+    expect(p.setScreen).not.toHaveBeenCalled();
+    const toast = document.getElementById('vot-toast-bible-load');
+    expect(toast).not.toBeNull();
+    expect(toast.classList.contains('show')).toBe(true);
+    expect(toast.textContent).toMatch(/Couldn.t load the Bible/);
+    expect(toast.getAttribute('aria-live')).toBe('assertive');
+    _resetToasts();
   });
 });
