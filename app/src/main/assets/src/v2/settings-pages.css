@@ -29,7 +29,7 @@ input.wipe:focus { border-color: var(--accent); outline: 0; }
 .vot-toast { position: fixed; z-index: 10; left: 12px; right: 12px; bottom: calc(64px + 12px + var(--v2-bottom, 0px));
   min-height: 48px; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 12px 16px;
   border-radius: var(--r-s); background: var(--toast); color: var(--on-toast); font-family: var(--font); font-size: var(--fs-s);
-  line-height: 1.35; box-shadow: 0 8px 24px rgba(0, 0, 0, .35); pointer-events: none; opacity: 0; transition: opacity 220ms ease-out; }
+  line-height: 1.35; box-shadow: var(--shadow-toast); pointer-events: none; opacity: 0; transition: opacity 220ms ease-out; }
 .vot-toast.show { opacity: 1; }
 .vot-toast-action.show { pointer-events: auto; }
 .vot-toast button { margin-left: auto; flex: none; color: var(--toast-act); font: inherit; font-weight: 500; background: none;

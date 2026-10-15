@@ -3,6 +3,8 @@
    layer (App.jsx renders the host inside .v2-phone / .dk), so it covers the whole window above the tab bar and the page,
    never scrolling with the page. The scrim, Escape and Android's Back close the top sheet. */
 
+import { Icon } from './Icon.jsx';
+
 const g = /** @type {any} */ (globalThis);
 
 /** The shell's layer element (App.jsx provides it). */
@@ -56,9 +58,21 @@ function inLayer(layer, content) {
   return g.ReactDOM.createPortal(content, layer);
 }
 
-/** The kit's toast over the page, above the tab bar ("Copied"); nothing when `text` is empty. @param {{ text: string | null }} props */
-export function LayerToast({ text }) {
+/**
+ * The kit's toast over the page, above the tab bar ("Copied"); nothing when `text` is empty. `icon` draws a kit icon
+ * before the words (9c's cloudOff); `act` + `onAct` the toast's own button at its end (4c's "OK").
+ * @param {{ text: string | null, icon?: string, act?: string, onAct?: () => void }} props
+ */
+export function LayerToast({ text, icon, act, onAct }) {
   const layer = React.useContext(SheetLayer);
   if (!text) return null;
-  return inLayer(layer, <div className="toast-wrap" role="status"><div className="toast">{text}</div></div>);
+  return inLayer(layer, (
+    <div className="toast-wrap" role="status">
+      <div className="toast">
+        {icon ? <Icon name={icon} /> : null}
+        {text}
+        {act ? <button type="button" className="act" onClick={onAct}>{act}</button> : null}
+      </div>
+    </div>
+  ));
 }
