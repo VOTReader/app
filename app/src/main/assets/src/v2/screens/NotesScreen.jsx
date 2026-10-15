@@ -5,7 +5,8 @@
    stores read only (notes-facts.js readMarks); a gate boot shows the seeded marks. */
 import { Icon } from '../Icon.jsx';
 import { definePlace } from '../places.js';
-import { GATE_NOW } from '../gate.js';
+import { GATE_NOW, readGateId } from '../gate.js';
+import { firstSaveWaits } from '../safari-gate.js';
 import { askVotCorpus, askAudioSyncSections } from '../corpus.js';
 import { KINDS, LEDES, EMPTY, EMPTY_ALL, kindOf, marksOfKind, metaLine, readMarks } from '../notes-facts.js';
 
@@ -60,7 +61,7 @@ export function NotesScreen({ route, gate, go, replace, onReady }) {
   const now = gate ? ((gate.facts && gate.facts.now) || GATE_NOW) : Date.now();
   const rows = marksOfKind(marks, kind);
   React.useEffect(() => { if (!pending) onReady(); }, [onReady, pending, kind]);
-  const newEntry = () => go({ place: 'journal-entry' });
+  const newEntry = () => newJournalEntry(go, !gate);
   const head = (
     <div className="page-head g tabroot">
       <h1 className="display">Notes</h1>
@@ -109,11 +110,21 @@ export function NotesScreen({ route, gate, go, replace, onReady }) {
   );
 }
 
+/**
+ * A new journal entry, as main's createAndEditJournal: the first save of a session in a Safari tab waits on the 7-day
+ * notice (safari-gate.js; the shell draws it) and the tap opens nothing; after "Got it" the next tap opens the editor.
+ * Never asked on a gate boot. @param {(r: any) => void} go @param {boolean} live
+ */
+function newJournalEntry(go, live) {
+  if (live && firstSaveWaits()) return;
+  go({ place: 'journal-entry' });
+}
+
 /** The top bar on Notes: "+ Journal entry" in words (one tap) and More (Settings). */
 function NotesActions({ go }) {
   return (
     <>
-      <button type="button" className="btn2 sm tbj" onClick={() => go({ place: 'journal-entry' })}><Icon name="plus" />Journal entry</button>
+      <button type="button" className="btn2 sm tbj" onClick={() => newJournalEntry(go, !readGateId())}><Icon name="plus" />Journal entry</button>
       <button type="button" className="ic" aria-label="More" onClick={() => go({ place: 'settings' })}><Icon name="more" /></button>
     </>
   );

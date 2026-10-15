@@ -12,7 +12,7 @@ const texts = (root, sel) => [...root.querySelectorAll(sel)].map((n) => n.textCo
 
 afterEach(() => {
   cleanup();
-  for (const k of ['JournalStore', 'NoteStore', 'BookmarkStore', 'LinkStore', '_collectMarks', 'COLLECTIONS', 'COL_BY_KEY', 'LETTERS_V1', 'JournalHelpers']) delete g[k];
+  for (const k of ['JournalStore', 'NoteStore', 'BookmarkStore', 'LinkStore', '_collectMarks', 'COLLECTIONS', 'COL_BY_KEY', 'LETTERS_V1', 'JournalHelpers', 'StorageHealth']) delete g[k];
   delete html.dataset.gate;
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -158,4 +158,47 @@ describe('the journal editor (real boot)', () => {
     expect(id).toBe('j1');
     expect(patch.blocks).toEqual([{ id: 'b1', type: 'p', text: 'One' }, { id: 'b2', type: 'image', mediaId: 'm1' }, { id: 'b3', type: 'p', text: 'Two, edited' }]);
   });
+});
+
+describe("Safari's 7-day notice before a first journal entry (myweb's ask; main's createAndEditJournal)", () => {
+  /** main's StorageHealth gate, in memory: the first save of the session in a Safari tab trips it (as RefSheet.test). */
+  function health() {
+    let blocked = false, dismissed = false, version = 0, first = true;
+    const subs = new Set();
+    const bump = () => { version++; subs.forEach((cb) => cb()); };
+    return {
+      checkFirstDataCreation: vi.fn(() => {
+        if (!first || dismissed) return { shouldBlock: false };
+        first = false; blocked = true; bump();
+        return { shouldBlock: true, reason: 'safari-7day' };
+      }),
+      getReport: () => ({ safariGateBlocked: blocked }),
+      isDismissed: () => dismissed,
+      dismissScenario: vi.fn(() => { dismissed = true; blocked = false; bump(); }),
+      subscribe: (cb) => { subs.add(cb); return () => subs.delete(cb); },
+      getVersion: () => version,
+    };
+  }
+
+  for (const [where, find] of /** @type {Array<[string, (c: any) => any]>} */ ([
+    ['the top bar', (c) => c.querySelector('.tb .btn2.tbj')],
+    ['the empty Notes page', (c) => [...c.querySelectorAll('button.btn2')].find((b) => b.textContent === 'New journal entry')],
+  ])) {
+    it(`+ Journal entry from ${where}: the first tap of a Safari session shows the notice and opens nothing; after Got it the next tap opens the editor`, async () => {
+      g.StorageHealth = health();
+      g.JournalStore = { all: () => [], add: vi.fn(), update: vi.fn(), get: vi.fn() };
+      const { container } = render(<V2App gateId={null} />);
+      await click([...container.querySelectorAll('.tabbar .tab')][2]);
+      await click(find(container));
+      expect(g.StorageHealth.checkFirstDataCreation).toHaveBeenCalledTimes(1);
+      expect(container.querySelector('.jed')).toBe(null);
+      const notice = document.querySelector('.sheet.safari');
+      expect(notice && notice.querySelector('.sh').textContent).toBe('Keep your notes safe');
+      await click(notice.querySelector('button.done'));
+      expect(document.querySelector('.sheet.safari')).toBe(null);
+      await click(find(container));
+      expect(container.querySelector('.jed textarea.jb')).not.toBe(null);
+      expect(g.JournalStore.add).not.toHaveBeenCalled();   // nothing is written before words
+    });
+  }
 });
