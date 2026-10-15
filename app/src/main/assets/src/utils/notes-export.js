@@ -160,26 +160,23 @@ export function notesExportFilename(title, now) {
   return base + ' ' + stamp + '.md';
 }
 
+const _FAILED_TOAST = { id: 'vot-toast-info', className: 'vot-toast', text: 'Export failed. Please try again.', ariaLive: 'assertive' };
+
+/** Toast the export failure, when the host has a toast. */
+function _toastFailed() {
+  if (typeof showToast !== 'undefined') showToast(_FAILED_TOAST);
+}
+
 /**
- * Hand a composed document to the platform: navigator.share where the
- * host provides it (mobile browsers; the Android WebView doesn't expose
- * it), else PlatformBridge.saveToFile — the SAF create-document picker
- * on Android, a Blob download on web. The save path registers a
- * one-shot window.__onExportComplete (the saveToFile contract; nothing
- * else registers it) to toast the outcome; a user cancel stays silent.
+ * Save through PlatformBridge.saveToFile, registering the one-shot
+ * window.__onExportComplete (the saveToFile contract; nothing else
+ * registers it) that toasts the outcome; a user cancel stays silent.
+ * The caller has checked that PlatformBridge exists.
  *
- * @param {object} opts
- * @param {string} opts.title     - share-sheet title
- * @param {string} opts.filename  - suggested filename for the save path
- * @param {string} opts.text      - the composed document
- * @returns {'share' | 'file' | 'none'} which delivery path ran
+ * @param {string} filename
+ * @param {string} text
  */
-export function shareNotesExport({ title, filename, text }) {
-  if (typeof navigator !== 'undefined' && navigator.share) {
-    navigator.share({ title, text }).catch(() => {});
-    return 'share';
-  }
-  if (typeof PlatformBridge === 'undefined') return 'none';
+function _saveToFile(filename, text) {
   if (typeof window !== 'undefined') {
     /** @type {any} */ (window).__onExportComplete = (/** @type {string} */ result) => {
       /** @type {any} */ (window).__onExportComplete = null;
@@ -187,10 +184,45 @@ export function shareNotesExport({ title, filename, text }) {
       if (result === 'ok') {
         showToast({ id: 'vot-toast-info', className: 'vot-toast', text: 'Notes exported.' });
       } else if (result !== 'cancelled') {
-        showToast({ id: 'vot-toast-info', className: 'vot-toast', text: 'Export failed. Please try again.', ariaLive: 'assertive' });
+        showToast(_FAILED_TOAST);
       }
     };
   }
   PlatformBridge.saveToFile(filename, text);
+}
+
+/**
+ * Hand a composed document to the platform: navigator.share where the
+ * host provides it (mobile browsers; the Android WebView doesn't expose
+ * it), else PlatformBridge.saveToFile — the SAF create-document picker
+ * on Android, a Blob download on web — which toasts its outcome.
+ *
+ * A share the user dismisses (AbortError) stays silent. Any other share
+ * rejection (NotAllowedError when activation lapsed or policy blocks it;
+ * DataError / TypeError when the text is too large for the target) falls
+ * back to the save path, or toasts "Export failed" when there is none, so
+ * a refused share never leaves the reader with nothing (sweep v086).
+ *
+ * @param {object} opts
+ * @param {string} opts.title     - share-sheet title
+ * @param {string} opts.filename  - suggested filename for the save path
+ * @param {string} opts.text      - the composed document
+ * @returns {'share' | 'file' | 'none'} which delivery path ran first
+ */
+export function shareNotesExport({ title, filename, text }) {
+  if (typeof navigator !== 'undefined' && navigator.share) {
+    navigator.share({ title, text }).catch((/** @type {unknown} */ err) => {
+      if (err && /** @type {{ name?: string }} */ (err).name === 'AbortError') return;
+      try {
+        if (typeof PlatformBridge !== 'undefined') _saveToFile(filename, text);
+        else _toastFailed();
+      } catch (_e) {
+        _toastFailed();
+      }
+    });
+    return 'share';
+  }
+  if (typeof PlatformBridge === 'undefined') return 'none';
+  _saveToFile(filename, text);
   return 'file';
 }
