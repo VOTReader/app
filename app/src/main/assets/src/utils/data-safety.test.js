@@ -15,6 +15,7 @@ import { validateImportEnvelope } from './import-validators.js';
 import { applyImportPayload } from './backup.js';
 import { pruneSnapshotNames, snapshotName, snapshotTime, KEEP_DAYS, KEEP_WEEKS } from './snapshot-sink.js';
 import { announceLibraryChange, heldByOtherTab } from './other-tabs.js';
+import { createBackupFlow } from './backup-flow.js';
 
 // W8: what this page tells the other open tabs (the channel itself: other-tabs.test.js).
 vi.mock('./other-tabs.js', async (importOriginal) => ({ ...(/** @type {any} */ (await importOriginal())), announceLibraryChange: vi.fn(), heldByOtherTab: vi.fn(() => false) }));
@@ -852,6 +853,97 @@ describe('wipe-proof (2026-10-11: the owner phone lost its database again, and R
       byName('vot-links')._cache = [];
       expect(await DataSafety.saveLatest({ sink })).toBe('damaged');
       expect(StorageHealth.getReport().dataMissing.name).toBe(good);
+    });
+  });
+
+  // sweep v034: Clear All deleted the safety copies before its database deletes and left this
+  // page marked cleared, so one whose library delete failed left the library on the device with
+  // no copy of it, and none taken again until a reload.
+  describe('sweep v034: Clear All is marked before its deletes, and one that fails is not', () => {
+    const NOTE8 = { ...NOTES, a8: { groupId: 'a8', body: 'n8', created: 8, updated: 8 } };
+    /** A delete's versionchange (newVersion null), or an upgrade's. @param {number | null} newVersion */
+    const versionChange = (newVersion) => Object.assign(new Event('versionchange'), { newVersion });
+
+    it('nothing is saved while Clear All runs; once it fails, the session saves again', async () => {
+      const sink = memorySink();
+      await healthyBoot(sink);
+      byName('vot-notes')._cache = NOTE8;
+      DataSafety.beginClear();
+      expect(await DataSafety.saveLatest({ sink })).toBe('off');
+      // Its own deleteDatabase told this page's connection to close before it failed.
+      (await IDBAdapter.open()).onversionchange(versionChange(null));
+      DataSafety.abortClear();
+      expect(await DataSafety.saveLatest({ sink })).toBe('snapshotted');
+    });
+
+    it('a boot pass already reading when Clear All begins saves nothing', async () => {
+      await seed(LIBRARY);
+      const sink = memorySink();
+      const list = sink.list;
+      sink.list = async () => { DataSafety.beginClear(); return list(); };
+      expect(await DataSafety.run({ sink })).toBe('empty');
+      expect(sink.save).not.toHaveBeenCalled();
+    });
+
+    it('a newer version upgrading the database meanwhile still stops the saves', async () => {
+      const sink = memorySink();
+      await healthyBoot(sink);
+      byName('vot-notes')._cache = NOTE8;
+      DataSafety.beginClear();
+      (await IDBAdapter.open()).onversionchange(versionChange(IDBAdapter.DB_VERSION + 1));
+      DataSafety.abortClear();
+      expect(await DataSafety.saveLatest({ sink })).toBe('off');
+    });
+
+    describe('end to end, through the Clear All flow on the phone app', () => {
+      /** SnapshotStore.kt and DownloadsCopy.kt in memory, behind the AndroidBridge methods the sinks call. */
+      function phoneBridge() {
+        const snaps = new Map();
+        const weekly = [];
+        return {
+          snaps, weekly,
+          snapshotSave: (json) => { snaps.set(snapshotName(Date.now() + snaps.size * 1000), json); return true; },
+          snapshotList: () => JSON.stringify([...snaps.keys()].sort().reverse().map((name) => ({ name, at: snapshotTime(name), size: snaps.get(name).length }))),
+          snapshotRead: (name) => snaps.get(name) || '',
+          snapshotClear: () => { snaps.clear(); return true; },
+          weeklyCopySave: (json) => { weekly.push({ json, at: Date.now() }); return true; },
+          weeklyCopyStatus: () => JSON.stringify({ supported: true, count: weekly.length, newestAt: weekly.length ? weekly[weekly.length - 1].at : 0 }),
+          weeklyCopyClear: () => { weekly.length = 0; return true; },
+        };
+      }
+      const GLOBALS = ['AndroidBridge', 'DataSafety', 'showToast', 'setStoreWriteFence'];
+      afterEach(() => { for (const g of GLOBALS) delete globalThis[g]; });
+
+      it('a library delete that fails leaves the library, its snapshots and its weekly copy, and the next leave snapshots it', async () => {
+        const bridge = phoneBridge();
+        Object.assign(globalThis, { AndroidBridge: bridge, DataSafety, showToast: vi.fn(), setStoreWriteFence });
+        await healthyBoot(undefined);                  // the phone app's own sinks
+        expect(bridge.snaps.size).toBe(1);
+        expect(bridge.weekly.length).toBe(1);
+        // The library's delete closes this page's own connection (versionchange), then fails.
+        const db = await IDBAdapter.open();
+        vi.spyOn(indexedDB, 'deleteDatabase').mockImplementation((name) => {
+          const req = {};
+          queueMicrotask(() => {
+            if (name !== 'votreader') { req.onsuccess(); return; }
+            db.onversionchange(versionChange(null));
+            req.onerror();
+          });
+          return req;
+        });
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const flow = createBackupFlow({
+          busyRef: { current: false }, reloadPendingRef: { current: false }, reloadTimerRef: { current: 0 },
+          setBusy: () => {}, setVerifyReport: () => {}, confirmImport: async () => true, diagnosticLog: [],
+        });
+        await flow.clearAllPersonalData();
+        expect(globalThis.showToast).toHaveBeenLastCalledWith(expect.objectContaining({ text: 'Clear did not finish. Please try again.' }));
+        expect(bridge.snaps.size).toBe(1);
+        expect(bridge.weekly.length).toBe(1);
+        byName('vot-notes')._cache = NOTE8;
+        expect(await DataSafety.saveLatest()).toBe('snapshotted');
+        expect(bridge.snaps.size).toBe(2);
+      });
     });
   });
 });

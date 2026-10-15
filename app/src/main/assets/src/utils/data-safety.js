@@ -354,7 +354,11 @@ export async function run(opts) {
   }
 }
 
-/** Set by clearSnapshots: a pass already reading must not save a copy of the cleared data. */
+/**
+ * Clear All is running on this page, or ran (beginClear, clearSnapshots, clearWeeklyCopies):
+ * a pass already reading must not save a copy of the data being cleared. Lifted only by
+ * abortClear, when the wipe failed and the library is still here (sweep v034).
+ */
 let _cleared = false;
 
 // ─── (4) A snapshot every time the reader leaves the app ─────────────────────
@@ -400,8 +404,14 @@ function _arm(sink, summary, savedJson) {
   const timer = setInterval(() => { if (document.visibilityState === 'visible') saveLatest({ sink: _autoSink }); }, PERIODIC_MS);
   const offClose = typeof IDBAdapter.onBrowserClose === 'function' ? IDBAdapter.onBrowserClose(() => { _dbClosed = true; saveLatest({ sink: _autoSink }); }) : null;
   // Another tab deleted (Clear All) or upgraded the database: this page's memory is
-  // no longer the library, so it saves nothing more until it reloads.
-  const offVersion = typeof IDBAdapter.onVersionChange === 'function' ? IDBAdapter.onVersionChange(() => { _healthy = false; }) : null;
+  // no longer the library, so it saves nothing more until it reloads. A delete while
+  // this page's own Clear All runs is that Clear All's (the backup lock keeps every
+  // other tab's out): _cleared already holds the saves, and a failed one lifts it
+  // (abortClear), so the library that survived it is snapshotted again (sweep v034).
+  const offVersion = typeof IDBAdapter.onVersionChange === 'function' ? IDBAdapter.onVersionChange((/** @type {any} */ ev) => {
+    if (_cleared && !(ev && typeof ev.newVersion === 'number')) return;
+    _healthy = false;
+  }) : null;
   document.addEventListener('visibilitychange', hidden);
   window.addEventListener('pagehide', pagehide);
   _disarm = () => {
@@ -754,6 +764,23 @@ export async function status(opts) {
   return { where: sink.kind === 'android' ? 'phone' : 'browser', count: list.length, newestAt: list.length ? (list[0].at || snapshotTime(list[0].name)) : 0 };
 }
 
+/**
+ * Clear All My Data is about to delete the databases: from now on no pass saves a copy
+ * of what it reads (sweep v034). The copies themselves go only once the databases did
+ * (clearSnapshots, clearWeeklyCopies).
+ */
+export function beginClear() {
+  _cleared = true;
+}
+
+/**
+ * Clear All My Data failed and the library is still on the device (sweep v034): its
+ * snapshots and weekly copies were kept, and this page snapshots it again.
+ */
+export function abortClear() {
+  _cleared = false;
+}
+
 /** Clear All My Data: the snapshots go with the data they copy. */
 export async function clearSnapshots() {
   _cleared = true;
@@ -849,4 +876,4 @@ export async function weeklyCopy(p) {
   return 'failed';
 }
 
-export const DataSafety = { weeklyStatus, setWeeklyOn, clearWeeklyCopies, run, saveLatest, freshDatabase, restoreMissing, acceptCurrent, clearSnapshots, status, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, SKIP_CLEAR_ALL, PROGRESS_RESET_KEY, _resetForTests };
+export const DataSafety = { weeklyStatus, setWeeklyOn, clearWeeklyCopies, run, saveLatest, freshDatabase, restoreMissing, acceptCurrent, beginClear, abortClear, clearSnapshots, status, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, SKIP_CLEAR_ALL, PROGRESS_RESET_KEY, _resetForTests };

@@ -737,6 +737,70 @@ describe('sweep v033: a user-data delete that is blocked or slow is still runnin
   });
 });
 
+/* sweep v034: Clear All deleted the automatic snapshots and the weekly copies in Downloads
+   BEFORE the database deletes, which can still fail, and both calls marked DataSafety cleared
+   for the rest of the session. So a failed Clear All left the library on the device with every
+   safety copy of it gone, and no new one taken until a reload. */
+describe('sweep v034: the safety copies go only once the library has', () => {
+  let order;
+  let ds;
+  beforeEach(() => {
+    order = [];
+    ds = {
+      beginClear: vi.fn(() => { order.push('beginClear'); }),
+      abortClear: vi.fn(() => { order.push('abortClear'); }),
+      clearSnapshots: vi.fn(async () => { order.push('clearSnapshots'); return true; }),
+      clearWeeklyCopies: vi.fn(() => { order.push('clearWeeklyCopies'); return true; }),
+    };
+    put('DataSafety', ds);
+  });
+  /** deleteDatabase answering answer(name) ('onsuccess' | 'onerror', or null for no answer at all). */
+  const deletes = (answer) => globalThis.indexedDB.deleteDatabase.mockImplementation((name) => {
+    order.push('delete ' + name);
+    const req = {};
+    queueMicrotask(() => { const a = answer(name); if (a) req[a](); });
+    return req;
+  });
+
+  it('Clear All is marked before the first delete; the copies go after both user-data databases did', async () => {
+    deletes(() => 'onsuccess');
+    await createBackupFlow(ctx).clearAllPersonalData();
+    expect(order).toEqual(['beginClear',
+      'delete votreader', 'delete vot-journal-media', 'delete vot-thumbs', 'delete vot-search-cache', 'delete vot-minisearch-cache',
+      'clearSnapshots', 'clearWeeklyCopies']);
+    expect(lastToast()).toBe('All personal data cleared. Reloading…');
+  });
+
+  it('a library that will not delete keeps its snapshots and weekly copies, and DataSafety saves again', async () => {
+    deletes((name) => (name === 'votreader' ? 'onerror' : 'onsuccess'));
+    await createBackupFlow(ctx).clearAllPersonalData();
+    expect(lastToast()).toBe('Clear did not finish. Please try again.');
+    expect(ds.clearSnapshots).not.toHaveBeenCalled();
+    expect(ds.clearWeeklyCopies).not.toHaveBeenCalled();
+    expect(ds.abortClear).toHaveBeenCalledTimes(1);
+  });
+
+  it('media that will not delete keeps the copies too; the library went, so DataSafety stays marked', async () => {
+    deletes((name) => (name === 'vot-journal-media' ? 'onerror' : 'onsuccess'));
+    await createBackupFlow(ctx).clearAllPersonalData();
+    expect(lastToast()).toBe('Clear did not finish. Please try again.');
+    expect(ds.clearSnapshots).not.toHaveBeenCalled();
+    expect(ds.clearWeeklyCopies).not.toHaveBeenCalled();
+    expect(ds.abortClear).not.toHaveBeenCalled();
+  });
+
+  it('a delete still running at the deadline keeps the copies, and DataSafety marked until the reload', async () => {
+    deletes((name) => (name === 'votreader' ? null : 'onsuccess'));
+    const done = createBackupFlow(ctx).clearAllPersonalData();
+    await vi.advanceTimersByTimeAsync(30000);
+    await done;
+    expect(ctx.reloadPendingRef.current).toBe(true);
+    expect(ds.clearSnapshots).not.toHaveBeenCalled();
+    expect(ds.clearWeeklyCopies).not.toHaveBeenCalled();
+    expect(ds.abortClear).not.toHaveBeenCalled();
+  });
+});
+
 /* W8 (sweep 2026-10-13): another open tab kept saving its old copy over a Clear All or an Import
    (an import writes into the same database, so the other tabs get no versionchange). This tab
    now tells them on a channel (utils/other-tabs.js): 'changing' before its first write, then

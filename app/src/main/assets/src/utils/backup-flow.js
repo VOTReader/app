@@ -1095,6 +1095,8 @@ export function createBackupFlow(ctx) {
     let libraryDeleted = false;
     // v033: a user-data delete the browser is still running when the wait ends.
     let stillDeleting = false;
+    // The automatic snapshots and the weekly copies (bundle-b's DataSafety).
+    const ds = /** @type {any} */ (globalThis).DataSafety;
     try {
       // v04-02: a PLAYING recording is a live writer — its position every 5 s and
       // again on the reload's pagehide, into the database being deleted. stop()
@@ -1109,17 +1111,12 @@ export function createBackupFlow(ctx) {
       // touched IDB + localStorage). Best-effort + a no-op on web; never block the
       // data wipe on it.
       try { PlatformBridge.clearGardenCache(); } catch (_e) { /* best-effort native cache wipe */ }
-      // datasafe 10-05: the automatic snapshots copy the data being cleared; they
-      // go with it (the phone app keeps them outside the database, so the deletes
-      // below would not reach them).
-      // vs3: so do the weekly copies in Downloads/VOTReader, which outlive an uninstall.
-      const ds = /** @type {any} */ (globalThis).DataSafety;
+      // v034: from here no snapshot pass saves a copy of what it reads (one
+      // already reading included). The copies themselves go below, only once
+      // both user-data databases did; a failed wipe un-marks it (catch).
       try {
-        if (ds && typeof ds.clearSnapshots === 'function') await ds.clearSnapshots();
-      } catch (_e) { /* best-effort: never block the data wipe on it */ }
-      try {
-        if (ds && typeof ds.clearWeeklyCopies === 'function') ds.clearWeeklyCopies();
-      } catch (_e) { /* best-effort: never block the data wipe on it */ }
+        if (ds && typeof ds.beginClear === 'function') ds.beginClear();
+      } catch (_e) { /* best-effort: the store write fence still holds */ }
       // W2.4 + W2.4-hotfix: Clear ALL user-data IDB databases. The
       // pre-hotfix version fired deleteDatabase() then reloaded
       // immediately — the deletion is async and the reload raced
@@ -1151,6 +1148,18 @@ export function createBackupFlow(ctx) {
       if (deleteResults[0] !== 'deleted' || deleteResults[1] !== 'deleted') {
         throw new Error('A personal-data database could not be deleted' + (stillDeleting ? ' in time' : ''));
       }
+      // datasafe 10-05: the automatic snapshots copy the data being cleared; they
+      // go with it (the phone app keeps them outside the database, so the deletes
+      // above did not reach them).
+      // vs3: so do the weekly copies in Downloads/VOTReader, which outlive an uninstall.
+      // v034: only now. Taken before the deletes, a delete that then failed left the
+      // library on the device with every copy of it gone.
+      try {
+        if (ds && typeof ds.clearSnapshots === 'function') await ds.clearSnapshots();
+      } catch (_e) { /* best-effort: never block the data wipe on it */ }
+      try {
+        if (ds && typeof ds.clearWeeklyCopies === 'function') ds.clearWeeklyCopies();
+      } catch (_e) { /* best-effort: never block the data wipe on it */ }
       // storage-backup-4: indexes 2+ (the regenerable caches) used to be
       // discarded outright — a silently-surviving database (e.g. an open
       // connection blocking the delete with no onversionchange to close it,
@@ -1190,8 +1199,9 @@ export function createBackupFlow(ctx) {
         // so every writer stays frozen (the reload is pending) and this page
         // reboots. The wipe is not finished: no Clear All token and the vot-*
         // keys stay, so the next boot judges what it finds (a library the
-        // delete took is a loss to it like any other), and the reader runs
-        // Clear All again.
+        // delete took is a loss to it like any other, and v034 kept the
+        // snapshots to restore it from), and the reader runs Clear All again.
+        // DataSafety stays marked: this page saves no copy before the reload.
         _showToast('Clear did not finish. Reloading… then please try again.', 0);
         _scheduleBackupReload(CLEAR_UNFINISHED_RELOAD_MS);
         return undefined;
@@ -1200,7 +1210,12 @@ export function createBackupFlow(ctx) {
       // dialog + dev-speak. The diagnostics still go to console.warn above;
       // the user gets an actionable message, not a pointer to tooling.
       _showToast('Clear did not finish. Please try again.');
-      if (!libraryDeleted) return NOTHING_WRITTEN;
+      if (!libraryDeleted) {
+        // v034: the library is still here, and so are its snapshots and weekly
+        // copies (they go only after the deletes). This session snapshots it again.
+        try { if (ds && typeof ds.abortClear === 'function') ds.abortClear(); } catch (_e) { /* best-effort */ }
+        return NOTHING_WRITTEN;
+      }
     }
     return undefined;
   };
