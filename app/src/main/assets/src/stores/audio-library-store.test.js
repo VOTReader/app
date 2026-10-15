@@ -358,3 +358,59 @@ describe('AudioLibraryStore — a star tapped before the library has loaded (swe
     expect(AudioLibraryStore.songSaved()).toEqual([]);
   });
 });
+
+/* sweep v019: a Listening Library or Songs screen reads the store once per row
+   (isSaved for each star). Each read re-normalized the whole library, and the
+   kept-song ids were deduped with a linear search per id, so one render cost
+   rows x (kept ids)^2. Timed for real, with wide margins both ways: the old
+   code took over a second here on a desktop, the fixed one about a millisecond. */
+describe('AudioLibraryStore — per-row reads on a full library (sweep v019)', () => {
+  const sid = (n) => n.toString(16).padStart(12, '0');
+  const song = (n) => ({ key: 'song:' + sid(n), title: 'Song ' + n, sub: null, url: 'https://votreader.github.io/songs-1/' + sid(n) + '.mp3', readerCode: '', partLabel: 'Pop' });
+  const keptIds = () => Array.from({ length: MAX_KEPT_SONGS }, (_u, i) => sid(i + 1));
+
+  it('a screen of stars reads fast with every song kept', () => {
+    vi.useRealTimers();
+    AudioLibraryStore.replaceAll({
+      saved: Array.from({ length: MAX_SAVED_AUDIO_TRACKS }, (_u, i) => ({ ...track(i + 1), savedAt: i + 1 })),
+      songSaved: Array.from({ length: MAX_SAVED_SONGS }, (_u, i) => sid(i + 1)),
+      songKept: keptIds(),
+    });
+    const started = performance.now();
+    for (let row = 1; row <= 40; row++) {
+      expect(AudioLibraryStore.isSaved(song(row))).toBe(true);
+      expect(AudioLibraryStore.isSaved(track(row))).toBe(true);
+    }
+    expect(performance.now() - started).toBeLessThan(250);
+  });
+
+  it('normalizing a full kept list is linear in its length', () => {
+    vi.useRealTimers();
+    const ids = keptIds().flatMap((id) => [id, id]);   // every id twice: the dedupe has work to do
+    // The best of five rounds, so a busy machine cannot fail it: a load spike slows a round, not all five.
+    let best = Infinity;
+    for (let round = 0; round < 5; round++) {
+      const started = performance.now();
+      for (let i = 0; i < 10; i++) expect(normalizeAudioLibrary({ songKept: ids }).songKept).toHaveLength(MAX_KEPT_SONGS);
+      best = Math.min(best, performance.now() - started);
+    }
+    expect(best).toBeLessThan(150);
+  });
+
+  it('the rows read what was just written, and nobody can change what they read', () => {
+    expect(AudioLibraryStore.isSongSaved(sid(1))).toBe(false);
+    AudioLibraryStore.toggleSongSaved(sid(1));
+    expect(AudioLibraryStore.isSongSaved(sid(1))).toBe(true);
+    AudioLibraryStore.setSongsKept([sid(2)], true);
+    expect(AudioLibraryStore.songKept()).toEqual([sid(2)]);
+    AudioLibraryStore.toggleSaved(track(1));
+    expect(AudioLibraryStore.isSaved(track(1))).toBe(true);
+    AudioLibraryStore.replaceAll({ songSaved: [sid(3)] });
+    expect(AudioLibraryStore.isSongSaved(sid(1))).toBe(false);
+    expect(AudioLibraryStore.isSongSaved(sid(3))).toBe(true);
+    expect(AudioLibraryStore.isSaved(track(1))).toBe(false);
+    AudioLibraryStore.get().songSaved.push(sid(4));   // get() hands out a copy
+    AudioLibraryStore.songSaved().push(sid(5));       // and so do the list readers
+    expect(AudioLibraryStore.songSaved()).toEqual([sid(3)]);
+  });
+});

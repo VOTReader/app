@@ -71,14 +71,16 @@ function _empty() {
  * @param {unknown} value @param {number} maximum @returns {string[]}
  */
 function _songIds(value, maximum) {
-  /** @type {string[]} */
-  const out = [];
-  if (!Array.isArray(value)) return out;
+  if (!Array.isArray(value)) return [];
+  // A Set, not out.indexOf: the kept list runs to thousands of ids, and a
+  // linear search per id made this dedupe quadratic (sweep v019).
+  /** @type {Set<string>} */
+  const seen = new Set();
   for (const id of value) {
-    if (isSongId(id) && out.indexOf(id) < 0) out.push(id);
-    if (out.length >= maximum) break;
+    if (isSongId(id)) seen.add(id);
+    if (seen.size >= maximum) break;
   }
-  return out;
+  return Array.from(seen);
 }
 
 /** @param {unknown} value @returns {number} */
@@ -188,29 +190,57 @@ function _writeableData(store) {
   return data;
 }
 
+/**
+ * The normalized library the read accessors share (sweep v019). Rows ask
+ * isSaved / isSongSaved once each, and a full normalize per ask made one
+ * render cost rows x library. The view is rebuilt when the record behind it
+ * is a different object or the store has bumped: every mutator writes through
+ * _writeableData (a fresh object) and ends in _bump, and a rebase both swaps
+ * the record and bumps. A queue replay suppresses _bump, so reads inside a
+ * replay (or an overlay apply) are built fresh. Mutators read before their
+ * _writeableData, never between it and their _bump. The view is never handed
+ * out: the accessors return copies or primitives, and get() builds its own.
+ *
+ * @param {any} store
+ * @returns {AudioLibraryData}
+ */
+function _readView(store) {
+  const source = store._load();
+  if (store._replaying || store._applyingPending) return normalizeAudioLibrary(source);
+  const memo = store._view;
+  if (memo && memo.source === source && memo.version === store._version) return memo.data;
+  const data = normalizeAudioLibrary(source);
+  store._view = { source, version: store._version, data };
+  return data;
+}
+
 export const AudioLibraryStore = extendStore(
   CachedStore('vot-audio-library', /** @type {AudioLibraryData} */ (_empty()), { idb: true }),
   {
-    /** @returns {AudioLibraryData} */
+    /** _readView's memo: the record it normalized, at which _version, and the result.
+     *  @type {{ source: unknown, version: number, data: AudioLibraryData } | null} */
+    _view: null,
+
+    /** A fresh normalized copy, the caller's to keep or change. @returns {AudioLibraryData} */
     get() {
       return normalizeAudioLibrary(this._load());
     },
 
     /** @returns {SavedAudioTrack[]} */
-    saved() { return this.get().saved.map((track) => ({ ...track })); },
+    saved() { return _readView(this).saved.map((track) => ({ ...track })); },
 
     /** @returns {RecentAudioTrack[]} */
-    recent() { return this.get().recent.map((track) => ({ ...track })); },
+    recent() { return _readView(this).recent.map((track) => ({ ...track })); },
 
     /** @returns {number} */
-    getPlaybackRate() { return this.get().rate; },
+    getPlaybackRate() { return _readView(this).rate; },
 
     /** @param {unknown} track @returns {boolean} */
     isSaved(track) {
       const normalized = normalizeAudioTrack(track);
       const songId = normalized ? songIdOfKey(normalized.key) : '';
       if (songId) return this.isSongSaved(songId);   // a song's star is the songs shelf's
-      return !!normalized && this.get().saved.some((item) => item.url === normalized.url);
+      return !!normalized && _readView(this).saved.some((item) => item.url === normalized.url);
     },
 
     /**
@@ -300,7 +330,7 @@ export const AudioLibraryStore = extendStore(
      * @returns {number} the lifetime count after this play
      */
     countPlay() {
-      if (this._shouldDefer('countPlay')) return this.get().plays;
+      if (this._shouldDefer('countPlay')) return _readView(this).plays;
       const data = _writeableData(this);
       data.plays = Math.min(MAX_LIFETIME_COUNT, data.plays + 1);
       this._cache = data;
@@ -310,7 +340,7 @@ export const AudioLibraryStore = extendStore(
     },
 
     /** Lifetime recordings-played count (My Progress). @returns {number} */
-    getPlays() { return this.get().plays; },
+    getPlays() { return _readView(this).plays; },
 
     /**
      * Count one recording heard to its END. Fired from the player's
@@ -325,7 +355,7 @@ export const AudioLibraryStore = extendStore(
      * @returns {number} the lifetime count after this completion
      */
     countCompletion() {
-      if (this._shouldDefer('countCompletion')) return this.get().completions;
+      if (this._shouldDefer('countCompletion')) return _readView(this).completions;
       const data = _writeableData(this);
       data.completions = Math.min(MAX_LIFETIME_COUNT, data.completions + 1);
       this._cache = data;
@@ -335,7 +365,7 @@ export const AudioLibraryStore = extendStore(
     },
 
     /** Lifetime recordings-heard-to-the-end count. @returns {number} */
-    getCompletions() { return this.get().completions; },
+    getCompletions() { return _readView(this).completions; },
 
     /**
      * Drop ONE recording from the recent shelf, by its immutable release URL —
@@ -370,13 +400,13 @@ export const AudioLibraryStore = extendStore(
     },
 
     /** Saved song ids, newest first. @returns {string[]} */
-    songSaved() { return this.get().songSaved.slice(); },
+    songSaved() { return _readView(this).songSaved.slice(); },
 
     /** Recently played song ids, newest first. @returns {string[]} */
-    songRecent() { return this.get().songRecent.slice(); },
+    songRecent() { return _readView(this).songRecent.slice(); },
 
     /** @param {unknown} id @returns {boolean} */
-    isSongSaved(id) { return isSongId(id) && this.get().songSaved.indexOf(/** @type {string} */ (id)) >= 0; },
+    isSongSaved(id) { return isSongId(id) && _readView(this).songSaved.indexOf(/** @type {string} */ (id)) >= 0; },
 
     /**
      * Save a song, or remove it if already saved. True when it is saved after.
@@ -445,7 +475,7 @@ export const AudioLibraryStore = extendStore(
     },
 
     /** The songs kept on this phone, as the backup lists them (newest first). @returns {string[]} */
-    songKept() { return this.get().songKept.slice(); },
+    songKept() { return _readView(this).songKept.slice(); },
 
     /**
      * Mark songs kept on this phone (on: true, newest first) or not (on: false). The list the
