@@ -111,6 +111,15 @@ export const REPRINT_KINDS = new Set(['answers', 'holy-day', 'bible-study']);
  * swapped or added word or two), each pair weighted 1, or 0.35 when both words are
  * stop words ("of the" is everywhere). 1 = every pair; a phrase one word off keeps
  * most of them.
+ * The pairs count only IN ORDER (sr11 t042): the heaviest chain of found pairs that
+ * moves forward in both the text and the query. Counted in any order, Matthew 23:26
+ * ("the inside of the cup and dish, that the outside of them") held as much of "you
+ * clean the outside of the cup and plate" as 23:25's straight run. The chain fixes no
+ * offsets, so a reader who drops a middle stretch keeps its credit (a fixed offset band
+ * lost two such queries). And a typed word met as another FORM of itself between two
+ * typed words that are met ("you cleanse the" for "you clean the": both 4+ letters, one
+ * the other's prefix) earns its two pairs at half weight; any other word in that place
+ * earns none (crediting any swap lost 5 queries).
  * @param {string[]} toks  the text's tokens (kjvEncode)
  * @param {string[]} qTokens  the query's tokens (kjvEncode)
  * @param {Set<string>} stop
@@ -121,6 +130,8 @@ export function nearPhrase(toks, qTokens, stop) {
   if (!toks || m < 2) return 0;
   /** @type {Map<string, number[]>} */
   const pairAt = new Map();
+  /** @type {Map<string, number[]>} the typed word at i, for a form of i + 1 met before i + 2 */
+  const bridgeAt = new Map();
   const weight = [];
   let total = 0;
   for (let i = 0; i + 1 < m; i++) {
@@ -130,34 +141,54 @@ export function nearPhrase(toks, qTokens, stop) {
     const key = qTokens[i] + ' ' + qTokens[i + 1];
     const list = pairAt.get(key);
     if (list) list.push(i); else pairAt.set(key, [i]);
+    if (i + 2 < m) {
+      const from = bridgeAt.get(qTokens[i]);
+      if (from) from.push(i); else bridgeAt.set(qTokens[i], [i]);
+    }
   }
-  /** @type {Array<[number, number]>} */
+  /** @type {Array<{j: number, i: number, w: number}>} text pair j holds typed pair i, worth w */
   const found = [];
+  let bridged = false;
   for (let j = 0; j + 1 < toks.length; j++) {
     const list = pairAt.get(toks[j] + ' ' + toks[j + 1]);
-    if (list) for (const i of list) found.push([j, i]);
+    if (list) for (const i of list) found.push({ j, i, w: weight[i] });
+    const from = j + 2 < toks.length ? bridgeAt.get(toks[j]) : undefined;
+    if (from) {
+      for (const i of from) {
+        if (toks[j + 2] !== qTokens[i + 2] || !isForm(toks[j + 1], qTokens[i + 1])) continue;
+        found.push({ j, i, w: weight[i] / 2 }, { j: j + 1, i: i + 1, w: weight[i + 1] / 2 });
+        bridged = true;
+      }
+    }
   }
   if (!found.length) return 0;
+  if (bridged) found.sort((a, b) => a.j - b.j || a.i - b.i);
   const span = m + 4;
+  // A stretch opens at a content pair (at any pair when the phrase has none), backed
+  // up to the pairs just before it, and runs a little longer than the phrase.
+  const content = found.some((f) => f.w === 1);
   let best = 0;
-  let lo = 0;
-  /** @type {Map<number, number>} */
-  const inWin = new Map();
-  let sum = 0;
-  for (let hi = 0; hi < found.length; hi++) {
-    const [jh, ih] = found[hi];
-    inWin.set(ih, (inWin.get(ih) || 0) + 1);
-    if (inWin.get(ih) === 1) sum += weight[ih];
-    while (found[lo][0] < jh - span) {
-      const il = found[lo][1];
-      const n = /** @type {number} */ (inWin.get(il)) - 1;
-      inWin.set(il, n);
-      if (n === 0) sum -= weight[il];
-      lo++;
+  for (let a = 0; a < found.length; a++) {
+    if (content && found[a].w !== 1) continue;
+    let s = a;
+    while (s > 0 && found[s - 1].j >= found[a].j - 2) s--;
+    /** @type {number[]} the heaviest in-order chain ending at found[s + n] */
+    const chain = [];
+    for (let k = s; k < found.length && found[k].j <= found[s].j + span; k++) {
+      let before = 0;
+      for (let l = s; l < k; l++) {
+        if (found[l].j < found[k].j && found[l].i < found[k].i && chain[l - s] > before) before = chain[l - s];
+      }
+      chain.push(before + found[k].w);
+      if (chain[k - s] > best) best = chain[k - s];
     }
-    if (sum > best) best = sum;
   }
-  return total ? best / total : 0;
+  return Math.min(1, best / total);
+}
+
+/** Two forms of one word ("clean", "cleanse"): both 4+ letters, one the other's prefix. */
+function isForm(a, b) {
+  return a !== b && a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a));
 }
 
 /**
