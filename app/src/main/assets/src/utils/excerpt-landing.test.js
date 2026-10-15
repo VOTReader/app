@@ -36,6 +36,20 @@ describe('excerptLanding', () => {
     expect(excerptLanding('gate is broad. But the still small voice spoke to him', TEXTS, ['small', 'voice']).index).toBe(2);
   });
 
+  // search sr11 (2026-10-15, bench t411 "men - section one"): the excerpt ran from a section heading into the
+  // next block's date line, a line the topic also opens with, and the 24-char tail landed the reader on that first
+  // date line, 141 blocks above the heading.
+  it('an excerpt straddling two blocks lands on the pair it straddles, on the side holding the marked words', () => {
+    const date = '8/19/10 From The Lord, Our God and Savior The Word of The Lord Spoken to Timothy';
+    const texts = ['I Am Calling You Out', date, '"Thus says The Lord God: Beloved children, I am calling you out."',
+      '~ [From “Adorn Yourself with The Word of God” ~ Letters to The Lord\'s Little Flock]',
+      'Come Out of the Churches of Men - Section One', date, '"Thus says The Lord God: Beloved children."'];
+    const ex = 'Men - Section One 8/19/10 From The Lord, Our God';
+    expect(excerptLanding(ex, texts, ['men', '-', 'section', 'one', 'ones'])).toEqual({ index: 4, off: texts[4].indexOf('Men - Section One') });
+    // the marked words on the date line's side: the block after the heading, at its start
+    expect(excerptLanding(ex, texts, ['lord', 'god'])).toEqual({ index: 5, off: 0 });
+  });
+
   // sweep W33 (2026-10-13): the pieces were folded and the words were not, so "word." and a straight "god's"
   // (the text has God’s) counted nothing, and the sentence holding fewer of them landed it.
   it('the marked words count however they are typed: punctuation, either apostrophe, accents', () => {

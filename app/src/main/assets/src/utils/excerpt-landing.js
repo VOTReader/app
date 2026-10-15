@@ -25,6 +25,13 @@
    24-char tail landed on the block after the sentence meant. Given the words
    the card marked, such an excerpt is split at its sentence ends and the
    piece holding most of them lands it, before the shorter heads and tails.
+
+   THE PAIR IT STRADDLES (search sr11, 2026-10-15). A run from a heading into
+   the next block's date line ("Men - Section One 8/19/10 From The Lord, Our
+   God") has no sentence end to split at, and its 24-char tail is a date line
+   the topic opens with too: the tail landed 141 blocks above the heading. An
+   excerpt that ends one block and starts the next lands on that pair first,
+   on the side holding more of the marked words.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /** The lengths tried, longest first — the same ladder the consumers used. */
@@ -50,6 +57,26 @@ function termsIn(/** @type {string} */ piece, /** @type {string[]} */ terms) {
 }
 
 /**
+ * The block the excerpt's head piece ENDS and the next block (headings, '', skipped) its rest STARTS.
+ * @param {string} ex
+ * @param {string[]} texts
+ * @returns {{ i: number, j: number, a: string, b: string } | null}
+ */
+function straddle(ex, texts) {
+  for (let p = ex.indexOf(' '); p > 0 && p < ex.length - 1; p = ex.indexOf(' ', p + 1)) {
+    const a = ex.slice(0, p);
+    const b = ex.slice(p + 1);
+    for (let i = 0; i < texts.length; i++) {
+      if (!texts[i] || !texts[i].endsWith(a)) continue;
+      let j = i + 1;
+      while (j < texts.length && !texts[j]) j++;
+      if (j < texts.length && texts[j].startsWith(b)) return { i, j, a, b };
+    }
+  }
+  return null;
+}
+
+/**
  * @param {string} excerpt  the anchor's text, already squashed
  * @param {string[]} texts  the unit's block texts, squashed the same way
  *   (a block that cannot be landed on — a heading — is an empty string)
@@ -60,7 +87,15 @@ export function excerptLanding(excerpt, texts, terms) {
   const ex = String(excerpt || '');
   for (const len of LENGTHS) {
     if (len === LENGTHS[1] && terms && terms.length) {
-      // Neither 40-char end sits in one block: the sentence of the excerpt holding most of the marked words.
+      // Neither 40-char end sits in one block: the two blocks it runs across, when the words pick a side.
+      const s = straddle(ex, texts);
+      if (s) {
+        const na = termsIn(s.a, terms);
+        const nb = termsIn(s.b, terms);
+        if (na > nb) return { index: s.i, off: texts[s.i].length - s.a.length };
+        if (nb > na) return { index: s.j, off: 0 };
+      }
+      // Else the sentence of the excerpt holding most of the marked words.
       const pieces = ex.split(/(?<=[.!?]["”’)]?)\s+/).filter((x) => x.length >= LENGTHS[2]);
       if (pieces.length > 1) {
         const best = pieces.map((x) => ({ x, n: termsIn(x, terms) })).sort((a, b) => b.n - a.n || b.x.length - a.x.length)[0];

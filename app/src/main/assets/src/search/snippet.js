@@ -109,7 +109,7 @@ const FAMILY_CACHE = new Map();
  * up before the word that told the unit apart ("shepherd") was scanned at all.
  * @param {string} text
  * @param {string[]} terms
- * @returns {Array<{ idx: number, len: number, term: string, primary: boolean }>}
+ * @returns {Array<{ idx: number, len: number, term: string, primary: boolean, form?: boolean }>}
  */
 function occurrences(text, terms) {
   if (!text || !terms || !terms.length) return [];
@@ -163,8 +163,10 @@ export function bestMatch(text, terms, maxLen) {
 }
 
 /**
- * Every window: the hits from each one to maxLen past its start, scored.
- * @param {Array<{ idx: number, len: number, term: string, primary: boolean }>} occ
+ * Every window: the hits from each one to maxLen past its start, scored. `count` is the
+ * words held by a hit that is no `form` (matchExcerpt's engine-matched forms); `forms`
+ * the words held counting those too, which only breaks a tie (equal to count without them).
+ * @param {Array<{ idx: number, len: number, term: string, primary: boolean, form?: boolean }>} occ
  * @param {number} maxLen
  * @param {Record<string, number>} freq
  */
@@ -173,23 +175,26 @@ function windows(occ, maxLen, freq) {
   for (let s = 0; s < occ.length; s++) {
     const winStart = occ[s].idx;
     const seen = Object.create(null);
+    const own = Object.create(null);
     let count = 0;
+    let forms = 0;
     let weight = 0;
     let primary = false;
     let spanEnd = winStart + occ[s].len;
     for (let e = s; e < occ.length && (occ[e].idx + occ[e].len) <= winStart + maxLen; e++) {
-      if (!seen[occ[e].term]) { seen[occ[e].term] = true; count++; weight += 1 / freq[occ[e].term]; }
+      if (!seen[occ[e].term]) { seen[occ[e].term] = true; forms++; weight += 1 / freq[occ[e].term]; }
+      if (!occ[e].form && !own[occ[e].term]) { own[occ[e].term] = true; count++; }
       if (occ[e].primary) primary = true;
       spanEnd = occ[e].idx + occ[e].len;
     }
-    out.push({ s, start: winStart, span: spanEnd - winStart, count, weight, primary });
+    out.push({ s, start: winStart, span: spanEnd - winStart, count, forms, weight, primary });
   }
   return out;
 }
 
-/** Better window first: more typed words, rarer ones, the typed word itself, earlier. */
+/** Better window first: more typed words, then more with their forms, rarer ones, the typed word itself, earlier. */
 function better(a, b) {
-  return (b.count - a.count) || (b.weight - a.weight) || ((b.primary ? 1 : 0) - (a.primary ? 1 : 0)) || (a.start - b.start);
+  return (b.count - a.count) || (b.forms - a.forms) || (b.weight - a.weight) || ((b.primary ? 1 : 0) - (a.primary ? 1 : 0)) || (a.start - b.start);
 }
 
 /** bestMatch over an occurrence list already made. */
@@ -286,15 +291,37 @@ function closeBetweenWords(text, start, end, floor) {
  * its head against each block's text (LetterView / WtlbEntryView excerpt
  * anchor), so the block that holds the matched word holds this string's head.
  * '' when no term occurs — the letter then opens at the top, as before.
+ * `hitTerms` (the engine's per-hit matched words) count only where one is another
+ * FORM of a typed word: "keep" for a typed "keeping" (search sr11, 2026-10-15),
+ * never a prefix find ("these" for "the"), which crowded the typed phrase out; and
+ * a form only breaks a tie between windows holding as many typed words.
  * @param {string} text
  * @param {string[]} terms
  * @param {number} [len=48]
+ * @param {string[]} [hitTerms]
  * @returns {string}
  */
-export function matchExcerpt(text, terms, len) {
+export function matchExcerpt(text, terms, len, hitTerms) {
   len = len || 48;
-  const m = bestMatch(text, terms, len);
+  const forms = formsAmong(terms, hitTerms);
+  const occ = occurrences(text, terms.concat(forms));
+  if (forms.length) {
+    const isForm = new Set(forms.map((f) => String(f).toLowerCase()));
+    for (const o of occ) if (isForm.has(text.slice(o.idx, o.idx + o.len).toLowerCase())) o.form = true;
+  }
+  const m = bestIn(occ, len);
   return m ? text.slice(m.start, m.start + len) : '';
+}
+
+/** The words of `hitTerms` that are another form of a typed word and no extension of one. */
+function formsAmong(/** @type {string[]} */ terms, /** @type {string[]|undefined} */ hitTerms) {
+  if (!hitTerms || !hitTerms.length) return [];
+  const typed = terms.map((t) => String(t || '').toLowerCase());
+  return hitTerms.filter((h) => {
+    const x = String(h || '').toLowerCase();
+    return typed.indexOf(x) < 0 && typed.every((w) => !x.startsWith(w))
+      && typed.some((w) => wordForms(w).indexOf(x) >= 0 || wordForms(x).indexOf(w) >= 0);
+  });
 }
 
 /**

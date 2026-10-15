@@ -238,7 +238,7 @@ function lands(hit, terms, c) {
   // A hit the meaning found names the passage it matched (use-search.js excerptAnchor: entry.placeStart).
   const placed = typeof hit.placeStart === 'number' && hit.placeStart >= 0 && hit.placeStart < doc.text.length;
   const ex = placed ? doc.text.slice(hit.placeStart, hit.placeStart + 48)
-    : (own.length ? E.matchExcerpt(doc.text, own) : '') || (extra.length ? E.matchExcerpt(doc.text, own.concat(extra)) : '');
+    : (own.length ? E.matchExcerpt(doc.text, own, undefined, extra) : '') || (extra.length ? E.matchExcerpt(doc.text, own.concat(extra)) : '');
   const bl = unitBlocks[unitKey(doc)] || [];
   if (!ex || !bl.length) return false;
   const { index, off } = excerptLanding(ex, bl.map((b) => b.text), own.concat(extra));

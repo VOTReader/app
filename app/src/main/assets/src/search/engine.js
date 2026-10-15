@@ -441,7 +441,7 @@ function sentenceAt(text, start, words) {
   return best;
 }
 /**
- * @param {Array<{doc:any, placeStart?:number}>} out
+ * @param {Array<{doc:any, placeStart?:number, terms?:string[]}>} out
  * @param {Map<any, string>} idOf
  * @param {Array<{id:string, start:number, passages: () => Array<[number, number]>}>} sem
  * @param {string[]} terms
@@ -452,7 +452,7 @@ function meaningLanding(out, idOf, sem, terms) {
     if (e.doc.kind === 'verse' || typeof e.placeStart === 'number' || !e.doc.text) continue;
     const s = byId.get(idOf.get(e) || '');
     if (!s || s.start < 0) continue;
-    const ex = terms.length ? matchExcerpt(e.doc.text, terms) : '';
+    const ex = terms.length ? matchExcerpt(e.doc.text, terms, undefined, e.terms) : '';
     const at = ex ? e.doc.text.indexOf(ex) : -1;
     if (at < 0) continue;
     const ps = s.passages();
@@ -1000,6 +1000,8 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
     const e = out[i];
     const tier = ORIGINAL_TIER[e.doc.kind];
     if (!tier || !e.doc.text || named(e.doc)) continue;
+    // The typed words alone here, not their engine-matched forms the landing reads too: a form tipped one
+    // reprint's tie onto a sentence of another letter and the original lost first place (sr11, t158).
     let ex = matchExcerpt(e.doc.text, terms);
     let at = ex ? e.doc.text.indexOf(ex) : -1;
     const lower = (/** @type {string[]|undefined} */ ids) => (ids || []).filter((x) => D.has(x) && ORIGINAL_TIER[D.get(x).kind] < tier);
@@ -1103,7 +1105,7 @@ const REPRINT_REACH = 200;
 /** Words in a row a reprint shares with the passage (fewer when the sentence is shorter, five at least). */
 const REPRINT_RUN = 8;
 /**
- * @param {Array<{doc:any, placeStart?:number}>} out  ranked, best first
+ * @param {Array<{doc:any, placeStart?:number, terms?:string[]}>} out  ranked, best first
  * @param {string[]} terms  the words a landing marks
  */
 function reprintSecond(out, terms) {
@@ -1113,7 +1115,7 @@ function reprintSecond(out, terms) {
   if (!d.text || !(d.kind === 'letter' || d.kind === 'wtlb' || d.kind === 'blessed')) return;
   // the passage it was found by: the sentence it opens on, else the one where the typed words sit thickest
   let st = typeof first.placeStart === 'number' && first.placeStart >= 0 ? first.placeStart : -1;
-  if (st < 0) { const ex = matchExcerpt(d.text, terms); st = ex ? d.text.indexOf(ex) : -1; }
+  if (st < 0) { const ex = matchExcerpt(d.text, terms, undefined, first.terms); st = ex ? d.text.indexOf(ex) : -1; }
   if (st < 0) return;
   const sp = sentenceSpans(d.text).find((x) => x.end > st);
   const toks = sp ? kjvEncode(sp.text) : [];

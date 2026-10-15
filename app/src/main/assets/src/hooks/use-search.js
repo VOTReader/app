@@ -388,8 +388,9 @@ export function useSearch({
     // a stretch dense in "them / they / there" outscored the phrase the reader
     // typed and the landing missed its block (study find, 2026-09-22). They
     // stay as the fallback for a hit the typed words cannot find at all — a
-    // typo the engine corrected.
-    const text = (own.length ? sm.matchExcerpt(doc.text, own) : '') || (hit.length ? sm.matchExcerpt(doc.text, own.concat(hit)) : '');
+    // typo the engine corrected — and count with them where one is another form
+    // of a typed word ("keep" for a typed "keeping", matchExcerpt).
+    const text = (own.length ? sm.matchExcerpt(doc.text, own, undefined, hit) : '') || (hit.length ? sm.matchExcerpt(doc.text, own.concat(hit)) : '');
     return text ? { type: 'excerpt', text, letterId: letterId || null, find } : null;
   };
 
