@@ -253,6 +253,11 @@ export var JournalStore = extendStore(
      */
     update(id, patch, opts) {
       if (!id || !patch) return null;
+      // Block ids are minted BEFORE _shouldDefer (v103), as add() does: the
+      // overlay pass and the replay then re-invoke update() with blocks that
+      // already carry them, so a mark made on the overlay's id still finds its
+      // block once the queue replays.
+      if (Array.isArray(patch.blocks)) patch = Object.assign({}, patch, { blocks: withBlockIds(patch.blocks) });
       if (this._shouldDefer('update', id, patch, opts)) return null;
       var data = this._load();
       var list = data.list || [];
@@ -260,7 +265,6 @@ export var JournalStore = extendStore(
       if (idx < 0) return null;
       var cur = list[idx];
       var stamp = (opts && opts.keepDate) ? (cur.updated || cur.created || 0) + 1 : Date.now();
-      if (Array.isArray(patch.blocks)) patch = Object.assign({}, patch, { blocks: withBlockIds(patch.blocks) });
       list[idx] = Object.assign({}, cur, patch, { updated: stamp });
       this._save();
       this._bump();
