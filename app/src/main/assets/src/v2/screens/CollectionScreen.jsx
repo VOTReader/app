@@ -15,7 +15,7 @@ import { collectionOf, useLetters } from './LetterScreen.jsx';
 import { useNowPlaying } from '../now-playing.js';
 import { LayerToast } from '../Sheet.jsx';
 import {
-  collectionHead, collectionEntries, collectionLede, rowWords, isPlayingRow, savedProgress, downloadList,
+  collectionHead, collectionEntries, collectionLede, rowWords, isPlayingRow, savedProgress, downloadList, coverageMark,
 } from '../collection-facts.js';
 import {
   rowItems, rowDownload, downloadQueue, queueWords, downloadWords, useOnline, OFFLINE_DOWNLOADS,
@@ -62,8 +62,8 @@ function useDownloads(gate) {
 
 /**
  * @param {{ e: import('../collection-facts.js').Entry, playing: boolean, paused: boolean, words: string,
- *   dl: any, onOpen: () => void, onPlay: () => void, onRetry: () => void }} props
- *   dl the download part of the line (dlWords)
+ *   dl: any, onOpen: () => void, onPlay: (() => void) | null, onRetry: () => void }} props
+ *   dl the download part of the line (dlWords); onPlay null: no recording, no Play
  */
 function LetterRow({ e, playing, paused, words, dl, onOpen, onPlay, onRetry }) {
   const live = playing && !paused;
@@ -87,9 +87,11 @@ function LetterRow({ e, playing, paused, words, dl, onOpen, onPlay, onRetry }) {
           {line}
         </button>
       )}
-      <button type="button" className={'rp' + (playing ? ' on' : '')} aria-label={(live ? 'Pause ' : 'Play ') + e.title} onClick={onPlay}>
-        <Icon name={live ? 'pause' : 'play'} size={16} />
-      </button>
+      {onPlay && (
+        <button type="button" className={'rp' + (playing ? ' on' : '')} aria-label={(live ? 'Pause ' : 'Play ') + e.title} onClick={onPlay}>
+          <Icon name={live ? 'pause' : 'play'} size={16} />
+        </button>
+      )}
     </div>
   );
 }
@@ -125,6 +127,10 @@ export function CollectionScreen({ route, gate, go, onReady }) {
   const player = gate ? null : g.AudioPlayer;
   const hasAudio = gate ? true : !!(player && typeof player.collectionHasAudio === 'function' && player.collectionHasAudio(col.volKey));
   const letterItems = entries.map((e) => e.item);
+  // a letter with no recording in a collection that has some says so and has no Play (dz16); a gate's are all recorded
+  const unrecorded = (e) => !gate && hasAudio && !(items[e.key] || []).length;
+  const letterRows = entries.filter((e) => !e.preface);
+  const mark = hasAudio ? coverageMark(letterRows.filter((e) => !unrecorded(e)).length, letterRows.length) : null;
   const play = (startId) => {
     if (!player) return;
     player.playCollection(startId ? { volKey: col.volKey, items: letterItems, collectionLabel: col.label, startId }
@@ -159,7 +165,12 @@ export function CollectionScreen({ route, gate, go, onReady }) {
       <div className="page-head g">
         {head.eyebrow && <span className="overline eyebrow">{head.eyebrow}</span>}
         <h1 className="display">{head.title}</h1>
-        {entries.length > 0 && <p className="lede">{collectionLede(col, entries)}</p>}
+        {entries.length > 0 && (
+          <p className="lede">
+            {collectionLede(col, entries)}
+            {mark && <>{' · '}<span className="st cov"><Icon name="readalong" />{mark}</span></>}
+          </p>
+        )}
         {entries.length > 0 && (hasAudio || gate || off) && (
           <div className="actions">
             {hasAudio && <button type="button" className="pill sm2" onClick={() => play(null)}><Icon name="play" size={20} />Play all</button>}
@@ -185,10 +196,11 @@ export function CollectionScreen({ route, gate, go, onReady }) {
             {entries.map((e) => {
               const current = isPlayingRow(e, np, col.volKey);
               const paused = current && !!(np && np.paused);
+              const none = !current && unrecorded(e);
               return (
                 <LetterRow key={e.key} e={e} playing={current} paused={paused}
-                  words={rowWords(e, { playing: current, paused, progress: progress[e.key] || null })}
-                  dl={dlWords(dls[e.key])} onOpen={open(e)} onPlay={playRow(e, current)} onRetry={retry(e)} />
+                  words={rowWords(e, { playing: current, paused, progress: progress[e.key] || null, unrecorded: none })}
+                  dl={dlWords(dls[e.key])} onOpen={open(e)} onPlay={none ? null : playRow(e, current)} onRetry={retry(e)} />
               );
             })}
           </div>

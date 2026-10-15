@@ -72,21 +72,35 @@ export function collectionLede(col, entries) {
   return letters.length + ' ' + noun + ' · ' + (lo === hi ? String(lo) : lo + '–' + hi);
 }
 
+/**
+ * The collection's one Read-along mark in its lede (dz16, v2-gaps 25; main's CoverageBadge words): "Read-along" when
+ * every letter is recorded, "Read-along · n of m" when some are (as 2d), null when none is (no mark, no recording).
+ * Every recording main ships for a letter is timed (audio-coverage.js: only a Bible edition declares timed: false), so
+ * "Listening only" never shows on a letter collection. A mark per row would repeat one word down the page.
+ * @param {number} recorded @param {number} total @returns {string | null}
+ */
+export function coverageMark(recorded, total) {
+  if (!total || recorded <= 0) return null;
+  return recorded >= total ? 'Read-along' : 'Read-along · ' + recorded + ' of ' + total;
+}
+
 /** "6 min left" from seconds, the nearest whole minute and never 0 (main's resume pill). @param {number} sec */
 export const minutesLeft = (sec) => Math.max(1, Math.round(sec / 60));
 
 /**
  * The words under a row's title (the playing row's bars are drawn in front of them):
- *   "Preface" · "Playing · 8/31/04" · "Paused · 8/31/04" · "10/6/04 · Finished" · "10/7/04 · 6 min left" · "10/16/04".
+ *   "Preface" · "Playing · 8/31/04" · "Paused · 8/31/04" · "10/6/04 · Finished" · "10/7/04 · 6 min left" · "10/16/04",
+ *   and "10/16/04 · No recording" for a letter with none in a collection that has some (dz16: it has no Play).
  * Minutes left outrank Finished: a letter heard before and part-heard again shows where the reader is.
- * @param {Entry} e @param {{ playing?: boolean, paused?: boolean, progress?: RowProgress | null }} state
+ * @param {Entry} e @param {{ playing?: boolean, paused?: boolean, progress?: RowProgress | null, unrecorded?: boolean }} state
  */
-export function rowWords(e, { playing = false, paused = false, progress = null } = {}) {
+export function rowWords(e, { playing = false, paused = false, progress = null, unrecorded = false } = {}) {
   const parts = [];
   if (playing) parts.push(paused ? 'Paused' : 'Playing');
   if (e.preface) parts.push('Preface');
   else if (e.date) parts.push(e.date);
-  if (!playing && progress) {
+  if (unrecorded && !playing) parts.push('No recording');
+  else if (!playing && progress) {
     if ((progress.leftMin || 0) > 0) parts.push(progress.leftMin + ' min left');
     else if (progress.finished) parts.push('Finished');
   }

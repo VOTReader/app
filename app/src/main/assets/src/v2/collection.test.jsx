@@ -6,7 +6,7 @@ import { render, cleanup, waitFor, act } from '@testing-library/react';
 import { V2App } from './App.jsx';
 import { CollectionScreen } from './screens/CollectionScreen.jsx';
 import {
-  collectionEntries, collectionLede, collectionHead, yearOf, rowWords, savedProgress, nowPlayingFromEngine, downloadList,
+  collectionEntries, collectionLede, collectionHead, yearOf, rowWords, savedProgress, nowPlayingFromEngine, downloadList, coverageMark,
 } from './collection-facts.js';
 
 const g = /** @type {any} */ (globalThis);
@@ -88,6 +88,20 @@ describe('what the page says', () => {
     expect(yearOf('')).toBe(null);
   });
 
+  it("the lede's Read-along mark: every letter recorded, some (n of m), none (no mark)", () => {
+    expect(coverageMark(29, 29)).toBe('Read-along');
+    expect(coverageMark(27, 29)).toBe('Read-along · 27 of 29');
+    expect(coverageMark(0, 29)).toBe(null);
+    expect(coverageMark(0, 0)).toBe(null);
+  });
+
+  it("a letter with no recording says so after its date, where its progress would be; playing, it says Playing", () => {
+    const e = collectionEntries(ONE)[3];
+    expect(e.title).toBe('Christmas');
+    expect(rowWords(e,{ unrecorded: true, progress: { leftMin: 6 } })).toBe('10/7/04 · No recording');
+    expect(rowWords(e, { unrecorded: true, playing: true })).toBe('Playing · 10/7/04');
+  });
+
   it("a row's words: Preface, Playing/Paused, Finished, minutes left (which outrank Finished), else the date", () => {
     const [pre, l1] = collectionEntries(ONE);
     expect(rowWords(pre)).toBe('Preface');
@@ -163,7 +177,9 @@ describe('2a-collection, the gate picture', () => {
     expect(container.querySelector('.tab[aria-current="page"]').textContent).toBe('Home');
     expect(container.querySelector('.overline').textContent).toBe('The Volumes of Truth');
     expect(container.querySelector('h1.display').textContent).toBe('Volume One');
-    expect(container.querySelector('.lede').textContent).toBe('29 letters · 2004–2005');
+    expect(container.querySelector('.lede').textContent).toBe('29 letters · 2004–2005 · Read-along');
+    expect(container.querySelector('.lede .st.cov svg')).not.toBe(null);
+    expect(container.querySelectorAll('.rows .rp').length).toBe(30);
     expect([...container.querySelectorAll('.actions button')].map((b) => b.textContent)).toEqual(['Play all', 'Download']);
     const rows = [...container.querySelectorAll('.rows .num-row')];
     expect(rows.length).toBe(30);
@@ -274,6 +290,31 @@ describe('a real boot', () => {
     const again = render(<CollectionScreen route={route} {...props} />);
     expect(again.container.querySelector('.actions')).toBe(null);
     expect(again.container.querySelectorAll('.rows .num-row').length).toBe(30);
+  });
+
+  it("one Read-along mark in the lede (n of m when some letters have none); a letter with none says so and has no Play", () => {
+    const player = fakePlayer('idle');
+    const none = new Set(['christmas', 'chosen-by-god']);
+    player.playbackTracks = vi.fn((_vol, letter) => (none.has(letter.id) ? [] : [{ url: 'u-' + letter.id, key: 'one:' + letter.id }]));
+    g.AudioPlayer = player;
+    const props = { facts: {}, gate: null, desktop: false, device: /** @type {'phone'} */ ('phone'), go: vi.fn(), pop: vi.fn(),
+      replace: vi.fn(), openTab: vi.fn(), onReady: vi.fn() };
+    const { container, unmount } = render(<CollectionScreen route={route} {...props} />);
+    const row = (i) => container.querySelectorAll('.rows .num-row')[i];
+    expect(container.querySelector('.lede').textContent).toBe('29 letters · 2004–2005 · Read-along · 27 of 29');
+    expect(row(1).querySelector('.s').textContent).toBe('8/31/04 · No recording');
+    expect(row(1).querySelector('.rp')).toBe(null);
+    expect(row(3).querySelector('.s').textContent).toBe('10/7/04 · No recording');
+    expect(row(3).querySelector('.rp')).toBe(null);
+    expect(row(2).querySelector('.rp').getAttribute('aria-label')).toBe('Play Honor Not the Day of the Dead... Honor God');
+    expect(container.querySelectorAll('.rows .rp').length).toBe(28);
+    unmount();
+    // no letter recorded, or the player cannot say yet: no mark, and the rows stay as they were
+    player.collectionHasAudio = vi.fn(() => false);
+    const again = render(<CollectionScreen route={route} {...props} />);
+    expect(again.container.querySelector('.lede').textContent).toBe('29 letters · 2004–2005');
+    expect(again.container.querySelectorAll('.rows .rp').length).toBe(30);
+    expect(again.container.querySelector('.rows .num-row:nth-child(2) .s').textContent).toBe('8/31/04');
   });
 
   it('says ready once the letters are in; an unknown collection says so and is ready too', () => {
