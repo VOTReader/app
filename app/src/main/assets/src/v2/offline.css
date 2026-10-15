@@ -1,0 +1,11 @@
+/* offline.css - v2's download and offline states (zv1, group 9; pictures 4c-downloads, 9c-offline): the queue bar sticks
+   above a collection's rows while its recordings come in (under the phone's bar, under the laptop's sticky one), a row's
+   ring fills to its percent, a failed row keeps its title as the open button and Retry as its own. */
+.content > .dl-head { position: sticky; top: 0; z-index: 2; background: var(--bg); }
+.dk .content > .dl-head { top: var(--bar); }
+.row .st svg.ring { fill: none; stroke-width: 2; }
+.row .st svg.ring .trk { stroke: var(--edge); }
+.row .st svg.ring .arc { stroke: var(--accent); }
+.row div.tx > .tx-open { display: block; width: 100%; text-align: left; }
+.row .st .retry { color: inherit; font-size: inherit; }
+.row div.tx > .s { display: block; }   /* a block under the title button, as the picture draws .s (its 3 px margin applies) */

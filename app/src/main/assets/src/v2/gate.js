@@ -9,6 +9,7 @@
 import { gateMarks } from './notes-facts.js';
 import { GATE_CHOSEN } from './search-facts.js';
 import { gateListening, gateData } from './settings-pages.js';
+import { gateDownloads } from './offline-facts.js';
 
 /** The website readers use: the hook never acts there. */
 export const LIVE_HOSTS = ['votreader.github.io'];
@@ -28,7 +29,8 @@ const DAY = 24 * 3600 * 1000;
  *   verse?: number, match?: string[] }} Route
  * @typedef {{ item: Record<string, any>, reader: string, at: number, length: number, paused: boolean } & Record<string, any>} GatePlaying
  * `open` names a sheet the screen opens on the gate boot ({ sheet: 'mark-paragraph', para, colour } on a letter; the
- * shell's { sheet: 'text-and-theme' }); `look` the text and page shown (look.js: { scale, page, lines }; Slate otherwise).
+ * shell's { sheet: 'text-and-theme' }; 9c's { toast: 'offline-listen' }, the Listen pill's); `look` the text and page
+ * shown (look.js: { scale, page, lines }; Slate otherwise).
  * @typedef {{ stack: Route[], facts?: Record<string, any>, scroll?: number | string | { to: string, gap?: number },
  *   playing?: GatePlaying | null, player?: Record<string, any>, open?: Record<string, any>,
  *   look?: { scale?: number, page?: string, lines?: string } }} GateState
@@ -147,6 +149,21 @@ export const GATE_STATES = {
   '7b-your-data': { stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/your-data' }], facts: { data: gateData(GATE_NOW) } },
   // states.json 7c-help: Help and about; the version line is this build's own.
   '7c-help': { stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/help' }], facts: {} },
+  // states.json 4c-downloads (zv1): Volume One from Home while it downloads with no connection: the queue bar (12 of 29)
+  // stuck under the top bar with Letter 4 right below it (gap = the bar's 59 px), 4 on this phone, 5 at 64 %, 6 failed,
+  // 7 waiting for Wi-Fi; the no-connection toast.
+  '4c-downloads': {
+    stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }],
+    facts: { downloads: gateDownloads(), offline: true },
+    scroll: { to: '.rows .row[data-key="one/4"]', gap: 59 },
+  },
+  // states.json 9c-offline: Letter 2 with no connection and nothing on this phone, Listen just tapped: its toast. The
+  // toast is the Listen pill's (readalong's ListenPill, rv1 1b part 2), from offline-facts.js offlineListenWords.
+  '9c-offline': {
+    stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 2 }],
+    facts: { offline: true },
+    open: { toast: 'offline-listen' },
+  },
 };
 
 /**
