@@ -6,7 +6,9 @@
    The queries themselves are written by agents that never see the engine
    (writer-brief.md); this file only decides WHAT is remembered.
 
-     node tools/search-bench/make-targets.mjs [--seed 20261005]
+     node tools/search-bench/make-targets.mjs [--seed 20261005] [--out <file>]
+
+   --out writes another file than targets.json (the fresh set, make-fresh.mjs, draws from another seed's 500).
 
    Re-running with the same seed and corpus gives the same targets.
    ─────────────────────────────────────────────────────────────────── */
@@ -253,6 +255,7 @@ if (repArg > 0) {
   console.log('replaced', replaced.length, replaced.join(' '));
   process.exit(0);
 }
-fs.writeFileSync(path.join(HERE, 'targets.json'), JSON.stringify({ seed: seedArg > 0 ? Number(process.argv[seedArg + 1]) : 20261005, targets }, null, 1));
+const outArg = process.argv.indexOf('--out');
+fs.writeFileSync(outArg > 0 ? process.argv[outArg + 1] : path.join(HERE, 'targets.json'), JSON.stringify({ seed: seedArg > 0 ? Number(process.argv[seedArg + 1]) : 20261005, targets }, null, 1));
 const tally = (k) => targets.reduce((o, t) => ((o[t[k]] = (o[t[k]] || 0) + 1), o), {});
 console.log(targets.length, 'targets'); console.log(tally('group')); console.log(tally('style')); console.log(tally('col'));

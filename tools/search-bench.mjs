@@ -20,6 +20,9 @@
         holding the sentence, and the excerpt overlaps the sentence. A verse lands on itself.
    STRICT: a pass whose first hit is the target's own unit. Also reported: the class's best rank,
    top 5, found. 100 cases are HELD OUT: counted, never printed (tuning must not read them).
+   FRESH: 100 more (search-bench/fresh-cases.json, make-fresh.mjs), written by another model family that
+   never saw the engine or this bench, sealed the same way and scored on their own line (path to ~475,
+   2026-10-15): a change ships only when the unseen sets, held + fresh, rise with it.
 
      node tools/search-bench.mjs              run, print the score, failures of the open cases
      node tools/search-bench.mjs --json out   also write every case's outcome
@@ -40,6 +43,8 @@ const t0 = Date.now();
 
 // SEARCH_BENCH_CASES: another cases file (the fairness audit tries candidate queries on a copy)
 const { cases } = JSON.parse(fs.readFileSync(process.env.SEARCH_BENCH_CASES || path.join(HERE, 'search-bench/cases.json'), 'utf8'));
+const FRESH = path.join(HERE, 'search-bench/fresh-cases.json');
+if (!process.env.SEARCH_BENCH_CASES && fs.existsSync(FRESH)) for (const c of JSON.parse(fs.readFileSync(FRESH, 'utf8')).cases) cases.push({ ...c, held: true, set: 'fresh' });
 const { E, initMs, meaning } = await engine();
 const { kjvEncode } = await import(pathToFileURL(path.join(ASSETS, 'src/search/tokenize.js')).href);
 const { excerptLanding } = await import(pathToFileURL(path.join(ASSETS, 'src/utils/excerpt-landing.js')).href);
@@ -237,37 +242,41 @@ for (const c of cases) {
     else if (c.level === 'sentence' && !lands(f.hit, cardTerms(r), c)) why = 'lands off the sentence';
     else { pass = true; strict = matthewTwin(c.uk).includes(k) || k === c.uk; }
   }
-  out.push({ id: c.id, held: !!c.held, group: c.group, col: c.col, style: c.style, q: c.q, pass, strict, rank, top5: !!rank && rank <= 5, found: !!rank, why, ms: times[times.length - 1] });
+  out.push({ id: c.id, held: !!c.held, set: c.set || 'bench', group: c.group, col: c.col, style: c.style, q: c.set === 'fresh' ? undefined : c.q, pass, strict, rank, top5: !!rank && rank <= 5, found: !!rank, why, ms: times[times.length - 1] });
 }
 
 // ── report ──
 const sum = (rows) => ({ n: rows.length, pass: rows.filter((o) => o.pass).length, strict: rows.filter((o) => o.strict).length, top5: rows.filter((o) => o.top5).length, found: rows.filter((o) => o.found).length });
 const by = (rows, k) => Object.fromEntries([...new Set(rows.map((o) => o[k]))].sort().map((v) => [v, sum(rows.filter((o) => o[k] === v))]));
-const all = sum(out);
+const bench = out.filter((o) => o.set !== 'fresh');
+const fresh = out.filter((o) => o.set === 'fresh');
+const all = sum(bench);
 const sorted = times.slice().sort((a, b) => a - b);
 const pct = (p) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
 const fmt = (s) => `${s.pass}/${s.n} pass  (strict ${s.strict}, top5 ${s.top5}, found ${s.found})`;
 console.log(`search-bench: ${fmt(all)}`);
-console.log(`  open ${fmt(sum(out.filter((o) => !o.held)))}`);
-console.log(`  held ${fmt(sum(out.filter((o) => o.held)))}`);
+console.log(`  open ${fmt(sum(bench.filter((o) => !o.held)))}`);
+console.log(`  held ${fmt(sum(bench.filter((o) => o.held)))}`);
+if (fresh.length) console.log(`  fresh ${fmt(sum(fresh))}  (sealed, another writer)`);
 console.log(`  meaning model: ${meaning.status}${meaning.failure ? ' (' + meaning.failure + ')' : ''}`);
 console.log(`  init ${initMs} ms, query median ${pct(0.5)} ms, p95 ${pct(0.95)} ms, max ${sorted[sorted.length - 1]} ms, total ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 const table = (title, o) => { console.log(title); for (const [k, s] of Object.entries(o)) console.log('  ' + k.padEnd(16) + String(s.pass).padStart(4) + ' /' + String(s.n).padStart(4) + '   top5 ' + String(s.top5).padStart(3) + '  found ' + String(s.found).padStart(3)); };
-table('by style', by(out, 'style'));
-table('by collection', by(out, 'group'));
+table('by style', by(bench, 'style'));
+table('by collection', by(bench, 'group'));
 if (!flag('--quiet')) {
   console.log('failures (open cases only):');
   for (const o of out.filter((x) => !x.pass && !x.held)) console.log(`  ${o.id} [${o.style}/${o.col}] ${JSON.stringify(o.q)} -> ${o.why}${o.rank ? ' (target at #' + o.rank + ')' : ' (not found)'}`);
 }
 if (val('--json')) fs.writeFileSync(val('--json'), JSON.stringify(out, null, 1));
 
-const score = { pass: all.pass, strict: all.strict, top5: all.top5, found: all.found, style: Object.fromEntries(Object.entries(by(out, 'style')).map(([k, s]) => [k, s.pass])), group: Object.fromEntries(Object.entries(by(out, 'group')).map(([k, s]) => [k, s.pass])) };
+const score = { pass: all.pass, strict: all.strict, top5: all.top5, found: all.found, style: Object.fromEntries(Object.entries(by(bench, 'style')).map(([k, s]) => [k, s.pass])), group: Object.fromEntries(Object.entries(by(bench, 'group')).map(([k, s]) => [k, s.pass])), ...(fresh.length ? { fresh: sum(fresh).pass } : {}) };
 if (flag('--record')) { fs.writeFileSync(BASELINE, JSON.stringify(score, null, 1) + '\n'); console.log('recorded the floor:', BASELINE); process.exit(0); }
 if (!out.length) { console.error('NOTHING-CHECKED'); process.exit(1); }
 if (fs.existsSync(BASELINE)) {
   const floor = JSON.parse(fs.readFileSync(BASELINE, 'utf8'));
   const drops = [];
   if (score.pass < floor.pass) drops.push(`pass ${score.pass} < floor ${floor.pass}`);
+  if (floor.fresh != null && fresh.length && score.fresh < floor.fresh) drops.push(`fresh ${score.fresh} < floor ${floor.fresh}`);
   for (const sec of ['style', 'group']) for (const [k, n] of Object.entries(floor[sec] || {})) if ((score[sec][k] || 0) < n) drops.push(`${sec} ${k} ${score[sec][k] || 0} < ${n}`);
   if (drops.length) { console.error('search-bench FAILED: ' + drops.join('; ')); process.exit(1); }
   console.log(`floor held (pass ${floor.pass})${score.pass > floor.pass ? `; raised by ${score.pass - floor.pass}: run with --record to keep it` : ''}`);

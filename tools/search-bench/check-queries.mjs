@@ -10,6 +10,9 @@
      typos                         at least one word the corpus does not hold, or a dropped apostrophe
      node tools/search-bench/check-queries.mjs <writers dir> [--freeze]
    Prints every rejection; --freeze writes cases.json only when there are none.
+     node tools/search-bench/check-queries.mjs <writers dir> --targets fresh-targets.json [--freeze]
+   The fresh set (make-fresh.mjs) is sealed: a rejection names the id, style and why, never the query;
+   --freeze writes fresh-cases.json.
    ─────────────────────────────────────────────────────────────────── */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,7 +21,10 @@ import { docs as buildDocs, norm } from './corpus.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const dir = process.argv[2];
-const { targets } = JSON.parse(fs.readFileSync(path.join(HERE, 'targets.json'), 'utf8'));
+const tArg = process.argv.indexOf('--targets');
+const TARGETS = tArg > 0 ? path.resolve(HERE, process.argv[tArg + 1]) : path.join(HERE, 'targets.json');
+const FRESH = path.basename(TARGETS) === 'fresh-targets.json';
+const { targets } = JSON.parse(fs.readFileSync(TARGETS, 'utf8'));
 const qs = {};
 for (const f of fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort()) for (const o of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) qs[o.id] = o.q;
 
@@ -35,7 +41,7 @@ const longestRun = (q, text) => {
 };
 
 const bad = [];
-const reject = (t, why) => bad.push({ id: t.id, style: t.style + (t.variant ? '/' + t.variant : ''), q: qs[t.id], why });
+const reject = (t, why) => bad.push({ id: t.id, style: t.style + (t.variant ? '/' + t.variant : ''), ...(FRESH ? {} : { q: qs[t.id] }), why });
 for (const t of targets) {
   const q = qs[t.id];
   if (!q || !String(q).trim()) { reject(t, 'missing'); continue; }
@@ -72,8 +78,10 @@ console.log(Object.keys(qs).length, 'queries,', bad.length, 'rejected');
 for (const b of bad) console.log(JSON.stringify(b));
 if (process.argv.includes('--freeze')) {
   if (bad.length && !process.argv.includes('--force')) { console.error('not frozen: rejections remain'); process.exit(1); }
-  const keep = ['id', 'held', 'group', 'col', 'style', 'variant', 'level', 'uk', 'unit', 'title', 'ref', 'bookId', 'chapter', 'verse', 'blockIdx', 'sentence'];
+  const keep = ['id', 'held', 'set', 'group', 'col', 'style', 'variant', 'level', 'uk', 'unit', 'title', 'ref', 'bookId', 'chapter', 'verse', 'blockIdx', 'sentence'];
   const cases = targets.map((t) => { const o = {}; for (const k of keep) if (t[k] !== undefined && t[k] !== null) o[k] = t[k]; o.q = qs[t.id]; return o; });
-  fs.writeFileSync(path.join(HERE, 'cases.json'), JSON.stringify({ written: 'blind writers, Opus 5.5 medium, 2026-10-05 (writer-brief.md); targets: make-targets.mjs seed 20261005', cases }, null, 1) + '\n');
+  const written = FRESH ? 'one blind writer, Codex GPT-6 Sol, 2026-10-15 (fresh-brief.md); targets: make-fresh.mjs from seed 20261015'
+    : 'blind writers, Opus 5.5 medium, 2026-10-05 (writer-brief.md); targets: make-targets.mjs seed 20261005';
+  fs.writeFileSync(path.join(HERE, FRESH ? 'fresh-cases.json' : 'cases.json'), JSON.stringify({ written, cases }, null, 1) + '\n');
   console.log('froze', cases.length, 'cases');
 }
