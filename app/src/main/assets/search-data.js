@@ -186,6 +186,31 @@ var BOOK_ABBREVS = {
   'rev':'revelation','re':'revelation','rv':'revelation','revelation':'revelation','revelations':'revelation','apoc':'revelation','apocalypse':'revelation'
 };
 
+// ─── Spanish book names (Reina-Valera 1960, es1) ───
+// So "Juan 3:16" finds John 3:16. Kept apart from BOOK_ABBREVS on purpose: these
+// resolve only as typed (ref-parser resolveBookToken, accents folded first, so
+// "Génesis" / "Isaías" match), never as a near miss of an English slip ("judgs" is
+// one edit from "judas") and never in the book suggestions. Keys are despaced;
+// Génesis, Job, Joel, Daniel, Amós and Nahúm are already English keys. Judas, Jonas
+// and Lucas are also names in the English text (Matthew 12:39, Philemon 24), so
+// ref-parser reads them as a book only before a chapter (WORD_BOOK_NAMES).
+var BOOK_NAMES_ES = {
+  'exodo':'exodus','levitico':'leviticus','numeros':'numbers','deuteronomio':'deuteronomy',
+  'josue':'joshua','jueces':'judges','rut':'ruth','1reyes':'1kings','2reyes':'2kings',
+  '1cronicas':'1chronicles','2cronicas':'2chronicles','esdras':'ezra','nehemias':'nehemiah','ester':'esther',
+  'salmos':'psalms','salmo':'psalms','proverbios':'proverbs','eclesiastes':'ecclesiastes',
+  'cantares':'songofsolomon','cantardeloscantares':'songofsolomon',
+  'isaias':'isaiah','jeremias':'jeremiah','lamentaciones':'lamentations','ezequiel':'ezekiel',
+  'oseas':'hosea','abdias':'obadiah','jonas':'jonah','miqueas':'micah','habacuc':'habakkuk','sofonias':'zephaniah',
+  'hageo':'haggai','zacarias':'zechariah','malaquias':'malachi',
+  'mateo':'matthew','marcos':'mark','lucas':'luke','juan':'john','hechos':'acts','romanos':'romans',
+  '1corintios':'1corinthians','2corintios':'2corinthians','galatas':'galatians','efesios':'ephesians',
+  'filipenses':'philippians','colosenses':'colossians','1tesalonicenses':'1thessalonians','2tesalonicenses':'2thessalonians',
+  '1timoteo':'1timothy','2timoteo':'2timothy','tito':'titus','filemon':'philemon','hebreos':'hebrews','santiago':'james',
+  '1pedro':'1peter','2pedro':'2peter','1juan':'1john','2juan':'2john','3juan':'3john','judas':'jude',
+  'apocalipsis':'revelation'
+};
+
 // ─── Canonical display titles ───
 var BOOK_DISPLAY = {
   genesis:'Genesis',exodus:'Exodus',leviticus:'Leviticus',numbers:'Numbers',
@@ -597,6 +622,7 @@ window.VotSearchData = {
   STOP_WORDS_TRIMMED: STOP_WORDS_TRIMMED,
   SYNONYM_MAP: _bare(SYNONYM_MAP),   // SR4: scripture-aware synonym expansion (opt-in via settings.searchSynonyms)
   BOOK_ABBREVS: _bare(BOOK_ABBREVS),
+  BOOK_NAMES_ES: _bare(BOOK_NAMES_ES),
   BOOK_DISPLAY: _bare(BOOK_DISPLAY),
   NAMED_PASSAGES: NAMED_PASSAGES,
   NAMED_PASSAGE_INDEX: _bare(NAMED_PASSAGE_INDEX),

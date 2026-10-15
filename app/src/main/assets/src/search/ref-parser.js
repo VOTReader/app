@@ -74,6 +74,13 @@ function namedPassageFor(q) {
 /** The books of one chapter: a lone number after one of them names a verse (v07-01). */
 const ONE_CHAPTER_BOOKS = new Set(['obadiah', 'philemon', '2john', '3john', 'jude']);
 
+/** Spanish book names that are also names in the English text (Jonas, Matthew 12:39;
+ *  Lucas, Philemon 24; Judas): a book only before a chapter, else a word search (es1). */
+const WORD_BOOK_NAMES = new Set(['judas', 'jonas', 'lucas']);
+
+/** "Génesis" -> "genesis": the book tables are plain ASCII (BOOK_NAMES_ES, es1). */
+const foldAccents = (/** @type {string} */ s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+
 /**
  * Resolve a word/roman/arabic numeral token to a number.
  * @param {string} s
@@ -98,12 +105,15 @@ export function parseWordNum(s) {
 export function resolveBookToken(raw) {
   if (!raw) return null;
   const D = searchData();
-  const t = raw.toLowerCase().replace(/\s+/g, ' ').trim();
+  const t = foldAccents(raw.toLowerCase()).replace(/\s+/g, ' ').trim();
   if (D.BOOK_ABBREVS[t]) return D.BOOK_ABBREVS[t];
   const collapsed = t.replace(/\s+/g, '');
   if (D.BOOK_ABBREVS[collapsed]) return D.BOOK_ABBREVS[collapsed];
   const spaced = t.replace(/^([123])([a-z])/, '$1 $2');
   if (D.BOOK_ABBREVS[spaced]) return D.BOOK_ABBREVS[spaced];
+  // Spanish names, exact only (search-data.js BOOK_NAMES_ES, es1).
+  const es = D.BOOK_NAMES_ES;
+  if (es && Object.prototype.hasOwnProperty.call(es, collapsed)) return es[collapsed];
   return null;
 }
 
@@ -419,7 +429,7 @@ export function parseReference(query, parseOpts) {
   }
 
   // Bible ref — "Rom 8:28", "Romans 8", "John 14:1-16:33", "Gen 1-3", "Rom8:28", …
-  const qNorm = refShape(lower).replace(/[.,\s]+/g, ' ').replace(/\s*:\s*/g, ':').replace(/\s*-\s*/g, '-').trim();
+  const qNorm = refShape(foldAccents(lower)).replace(/[.,\s]+/g, ' ').replace(/\s*:\s*/g, ':').replace(/\s*-\s*/g, '-').trim();
   const qExp = qNorm.replace(/^([0-3]?[a-z]+)(\d)/i, '$1 $2');
   const toks = qExp.split(/\s+/);
   // The book as typed first; then, before a chapter only, a book name a slip off.
@@ -429,6 +439,7 @@ export function parseReference(query, parseOpts) {
     const bookId = pass === 0 ? resolveBookToken(attempt) : (/^\d/.test(rest) ? nearBookToken(attempt, rest.indexOf(':') > 0) : null);
     if (!bookId) continue;
     const bookTitle = D.BOOK_DISPLAY[bookId] || bookId;
+    if (!rest && WORD_BOOK_NAMES.has(attempt)) continue;
     if (!rest) return { kind: 'ref-book', bookId, bookTitle };
     const rangeM = rest.match(/^(\d+)(?::(\d+))?(?:-(\d+)(?::(\d+))?)?$/);
     if (rangeM) {

@@ -280,6 +280,22 @@ const BOOK_ALIASES = {
   '1pet': '1peter', '2pet': '2peter', '1pe': '1peter', '2pe': '2peter',
   '1jn': '1john', '2jn': '2john', '3jn': '3john', '1jo': '1john', '2jo': '2john', '3jo': '3john',
   rev: 'revelation', re: 'revelation', rv: 'revelation',
+  // Spanish names (Reina-Valera 1960, es1); findBook folds accents first, so
+  // "Génesis" / "Isaías" match. Génesis, Job, Joel, Daniel, Amós, Nahúm match exactly.
+  exodo: 'exodus', levitico: 'leviticus', numeros: 'numbers', deuteronomio: 'deuteronomy',
+  josue: 'joshua', jueces: 'judges', '1reyes': '1kings', '2reyes': '2kings',
+  '1cronicas': '1chronicles', '2cronicas': '2chronicles', esdras: 'ezra', nehemias: 'nehemiah',
+  ester: 'esther', salmos: 'psalms', salmo: 'psalms', proverbios: 'proverbs', eclesiastes: 'ecclesiastes',
+  cantares: 'songofsolomon', cantardeloscantares: 'songofsolomon', isaias: 'isaiah', jeremias: 'jeremiah',
+  lamentaciones: 'lamentations', ezequiel: 'ezekiel', oseas: 'hosea', abdias: 'obadiah', jonas: 'jonah',
+  miqueas: 'micah', habacuc: 'habakkuk', sofonias: 'zephaniah', hageo: 'haggai', zacarias: 'zechariah',
+  malaquias: 'malachi', mateo: 'matthew', marcos: 'mark', lucas: 'luke', juan: 'john', hechos: 'acts',
+  romanos: 'romans', '1corintios': '1corinthians', '2corintios': '2corinthians', galatas: 'galatians',
+  efesios: 'ephesians', filipenses: 'philippians', colosenses: 'colossians',
+  '1tesalonicenses': '1thessalonians', '2tesalonicenses': '2thessalonians', '1timoteo': '1timothy',
+  '2timoteo': '2timothy', tito: 'titus', filemon: 'philemon', hebreos: 'hebrews', santiago: 'james',
+  '1pedro': '1peter', '2pedro': '2peter', '1juan': '1john', '2juan': '2john', '3juan': '3john',
+  judas: 'jude', apocalipsis: 'revelation',
 };
 
 /**
@@ -295,7 +311,7 @@ export function findBook(rawName) {
   // distinguishes the ordinal token from a book that merely begins with I
   // (Isaiah). Try III/II/I longest-first so "III" isn't read as I + II.
   const roman = String(rawName).replace(/^\s*(III|II|I)\s+/i, (_, r) => r.length + ' ');
-  const q = roman.toLowerCase().replace(/\s+/g, '');
+  const q = roman.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '');
   if (!q) return null;
   // U12: two passes so an EXACT match always beats a prefix hit. A single-pass
   // startsWith returned the first key that happened to share a prefix — so

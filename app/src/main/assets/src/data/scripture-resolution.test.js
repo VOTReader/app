@@ -353,6 +353,14 @@ describe('findBook', () => {
     expect(findBook('Jude')).toBe('jude');     // exact beats 'judges'.startsWith('jude')
     expect(findBook('Judges')).toBe('judges');
   });
+  it('resolves the Spanish (RVR1960) names, accents or not — es1', () => {
+    expect(findBook('Juan')).toBe('john');
+    expect(findBook('Salmos')).toBe('psalms');
+    expect(findBook('Génesis')).toBe('genesis');
+    expect(findBook('1 Corintios')).toBe('1corinthians');
+    expect(findBook('Jueces')).toBe('judges');
+    expect(findBook('Judas')).toBe('jude');    // the letter, not Judges by prefix
+  });
   // SC2 — Roman-numeral ordinals.
   it('normalizes Roman-numeral ordinals — SC2', () => {
     expect(findBook('I Corinthians')).toBe('1corinthians'); // "I " → "1 "
