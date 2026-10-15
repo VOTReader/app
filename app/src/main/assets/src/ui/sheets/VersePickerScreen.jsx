@@ -62,11 +62,10 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     const startN = range.startContainer;
     const endN = range.endContainer;
     const startVerseEl = /** @type {Element} */ (startN.nodeType === 3 ? startN.parentElement : startN).closest('[data-verse]');
-    const endVerseEl = /** @type {Element} */ (endN.nodeType === 3 ? endN.parentElement : endN).closest('[data-verse]');
+    let endVerseEl = /** @type {Element} */ (endN.nodeType === 3 ? endN.parentElement : endN).closest('[data-verse]');
     if (!startVerseEl || !endVerseEl) return null;
     if (!bodyRef.current || !bodyRef.current.contains(startVerseEl) || !bodyRef.current.contains(endVerseEl)) return null;
     const startVerse = parseInt(startVerseEl.getAttribute('data-verse'), 10);
-    const endVerse = parseInt(endVerseEl.getAttribute('data-verse'), 10);
     // Offset within the verse's TEXT node (the `.picker-verse-text` span).
     function offsetWithinVerseText(verseEl, container, offset) {
       const textEl = verseEl.querySelector('.picker-verse-text');
@@ -85,14 +84,34 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     }
     let charStart = offsetWithinVerseText(startVerseEl, range.startContainer, range.startOffset);
     let charEnd = offsetWithinVerseText(endVerseEl, range.endContainer, range.endOffset);
+    // sweep v6: Chrome's triple-click, and a drag released just past a line
+    // end, end the Range at offset 0 of the NEXT <p data-verse>. An end that
+    // resolves to character 0 of a later verse takes nothing from it, so the
+    // selection really ends at the close of the verse before it. Without this
+    // a triple-clicked verse 4 linked as "4-5", partial, keyed ':S-0'. Step
+    // back to the previous verse ON SCREEN (the filter can hide verse n-1),
+    // whole. Same zero-offset test as SelectionToolbar (annotation-selection-8).
+    let endAtVerseClose = false;
+    if (charEnd === 0 && endVerseEl !== startVerseEl) {
+      let prev = endVerseEl.previousElementSibling;
+      while (prev && !prev.hasAttribute('data-verse')) prev = prev.previousElementSibling;
+      if (prev) { endVerseEl = prev; endAtVerseClose = true; }
+    }
+    const endVerse = parseInt(endVerseEl.getAttribute('data-verse'), 10);
     // Snap to word boundaries within each verse's text so trailing spaces
     // and partial words don't sneak into the excerpt.
     const startVText = (verses.find(v => v.n === startVerse) || {}).text || '';
     const endVText = (verses.find(v => v.n === endVerse) || {}).text || '';
     const snappedStart = snapRangeToWords(startVText, charStart, startVText.length).start;
-    const snappedEndPos = snapRangeToWords(endVText, 0, charEnd).end;
+    // A stepped-back end IS the verse's close: no overshoot to trim, so it
+    // keeps the full length (snapping would drop the closing '.' and turn a
+    // whole verse into a partial link).
+    const snappedEndPos = endAtVerseClose ? endVText.length : snapRangeToWords(endVText, 0, charEnd).end;
     charStart = Math.max(0, Math.min(snappedStart, startVText.length));
     charEnd = Math.max(0, Math.min(snappedEndPos, endVText.length));
+    // A selection that began at the very close of a verse and was stepped
+    // back into it holds no word at all: no selection, not an empty link.
+    if (endAtVerseClose && startVerse === endVerse && charStart >= charEnd) return null;
     return {
       verseStart: startVerse,
       verseEnd: endVerse,

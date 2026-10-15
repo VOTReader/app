@@ -9,6 +9,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { VersePickerScreen } from './VersePickerScreen.jsx';
+import { snapRangeToWords } from '../../renderer/annotation-engine.jsx';
 
 function stubGlobals() {
   window._allBooks = () => ({ genesis: { chapters: [{ num: 1, verses: [{ n: 1, text: 'In the beginning God created the heavens and the earth.' }, { n: 2, text: 'And the earth was without form.' }] }] } });
@@ -178,5 +179,128 @@ describe('VersePickerScreen marks a whole verse taken by its number', () => {
       window.getSelection = getSelectionOrig;
       vi.useRealTimers();
     }
+  });
+});
+
+/* sweep v6: Chrome's triple-click (and a drag released just past a line end)
+   ends the Range at offset 0 of the NEXT <p data-verse>. That boundary names a
+   verse the reader took no character of, yet the picker linked it: triple-
+   click verse 1, "Link this selection", and the link read "Genesis 1:1-2",
+   partial, keyed '…:1-2:0-0'. SelectionToolbar fixed the same shape
+   (annotation-selection-8); the picker did not. These run the REAL word
+   snapper: it trims a verse's closing '.', which must not make a whole verse
+   taken this way read as partial. */
+describe('VersePickerScreen: a selection ending at offset 0 of the next verse', () => {
+  const V1 = 'In the beginning God created the heavens and the earth.';
+  const V2 = 'And the earth was without form.';
+  const V3 = 'And God said, Let there be light: and there was light.';
+
+  function stubGlobalsRealSnap() {
+    stubGlobals();
+    window.snapRangeToWords = snapRangeToWords;
+  }
+
+  function selectRange(range) {
+    window.getSelection = /** @type {any} */ (() => ({
+      isCollapsed: range.collapsed, rangeCount: 1,
+      getRangeAt: () => range,
+      removeAllRanges: () => {},
+      toString: () => range.toString(),
+    }));
+    act(() => { document.dispatchEvent(new Event('selectionchange')); });
+    act(() => { vi.advanceTimersByTime(200); });
+  }
+
+  /** @param {HTMLElement} container */
+  function confirm(container) {
+    const btn = /** @type {HTMLButtonElement} */ (container.querySelector('.picker-footer-btn'));
+    expect(btn.disabled).toBe(false);
+    fireEvent.click(btn);
+    expect(window.persistLink).toHaveBeenCalledTimes(1);
+    return window.persistLink.mock.calls[0][1];
+  }
+
+  const getSelectionOrig = window.getSelection;
+  afterEach(() => { window.getSelection = getSelectionOrig; vi.useRealTimers(); });
+
+  it('a triple-clicked verse links that verse alone, whole', () => {
+    vi.useFakeTimers();
+    stubGlobalsRealSnap();
+    const { container } = render(<VersePickerScreen {...baseProps} />);
+    const rows = container.querySelectorAll('.picker-verse-selectable');
+    const range = document.createRange();
+    range.setStart(rows[0].querySelector('.picker-verse-num').firstChild, 0);  // the paragraph's first text node
+    range.setEnd(rows[1], 0);                                                  // the NEXT <p data-verse>, offset 0
+    selectRange(range);
+    const target = confirm(container);
+    expect(target.verse).toBe(1);
+    expect(target.verseEnd).toBeUndefined();
+    expect(target.partial).toBeUndefined();
+    expect(target.key).toBe('bible:genesis:1:1');
+    expect(target.label).toBe('Genesis 1:1');
+  });
+
+  it('a drag from mid-verse released past the line end keeps the end on that verse, at its full length', () => {
+    vi.useFakeTimers();
+    stubGlobalsRealSnap();
+    const { container } = render(<VersePickerScreen {...baseProps} />);
+    const rows = container.querySelectorAll('.picker-verse-selectable');
+    const range = document.createRange();
+    range.setStart(rows[0].querySelector('.picker-verse-text').firstChild, 17);  // "God created …"
+    range.setEnd(rows[1], 0);
+    selectRange(range);
+    const target = confirm(container);
+    expect(target.verse).toBe(1);
+    expect(target.verseEnd).toBeUndefined();
+    expect(target.partial).toBe(true);
+    expect([target.charStart, target.charEnd]).toEqual([17, V1.length]);
+    expect(target.key).toBe('bible:genesis:1:1:17-' + V1.length);
+  });
+
+  it('with the list filtered, the end steps back to the previous verse SHOWN, not verse n-1', () => {
+    vi.useFakeTimers();
+    stubGlobalsRealSnap();
+    window._allBooks = () => ({ genesis: { chapters: [{ num: 1, verses: [{ n: 1, text: V1 }, { n: 2, text: V2 }, { n: 3, text: V3 }] }] } });
+    const { container } = render(<VersePickerScreen {...baseProps} />);
+    fireEvent.change(container.querySelector('.picker-find-input'), { target: { value: 'god' } });
+    const rows = container.querySelectorAll('.picker-verse-selectable');
+    expect([...rows].map((r) => r.getAttribute('data-verse'))).toEqual(['1', '3']);
+    const range = document.createRange();
+    range.setStart(rows[0].querySelector('.picker-verse-num').firstChild, 0);
+    range.setEnd(rows[1], 0);   // verse 3's <p>: verse 2 is not on screen
+    selectRange(range);
+    const target = confirm(container);
+    expect(target.verse).toBe(1);
+    expect(target.verseEnd).toBeUndefined();
+    expect(target.partial).toBeUndefined();
+    expect(target.key).toBe('bible:genesis:1:1');
+  });
+
+  it('a selection from the very close of a verse to offset 0 of the next takes no word: nothing to link', () => {
+    vi.useFakeTimers();
+    stubGlobalsRealSnap();
+    const { container } = render(<VersePickerScreen {...baseProps} />);
+    const rows = container.querySelectorAll('.picker-verse-selectable');
+    const range = document.createRange();
+    range.setStart(rows[0].querySelector('.picker-verse-text').firstChild, V1.length);
+    range.setEnd(rows[1], 0);
+    selectRange(range);
+    const btn = /** @type {HTMLButtonElement} */ (container.querySelector('.picker-footer-btn'));
+    expect(btn.disabled).toBe(true);
+  });
+
+  it('a selection that really reaches into the next verse still spans both', () => {
+    vi.useFakeTimers();
+    stubGlobalsRealSnap();
+    const { container } = render(<VersePickerScreen {...baseProps} />);
+    const rows = container.querySelectorAll('.picker-verse-selectable');
+    const range = document.createRange();
+    range.setStart(rows[0].querySelector('.picker-verse-num').firstChild, 0);
+    range.setEnd(rows[1].querySelector('.picker-verse-text').firstChild, 9);   // "And the e…" → snaps to "earth"
+    selectRange(range);
+    const target = confirm(container);
+    expect(target.verse).toBe(1);
+    expect(target.verseEnd).toBe(2);
+    expect(target.partial).toBe(true);
   });
 });
