@@ -1,5 +1,5 @@
 {
- "pass": 466,
+ "pass": 467,
  "strict": 361,
  "top5": 487,
  "found": 499,
@@ -7,7 +7,7 @@
   "crossover": 39,
   "exact": 75,
   "firstwords": 25,
-  "gist": 26,
+  "gist": 27,
   "middle": 49,
   "misremembered": 74,
   "paraphrase": 55,
@@ -22,7 +22,7 @@
   "cross": 16,
   "letters": 180,
   "studies": 36,
-  "words": 75
+  "words": 76
  },
  "fresh": 72
 }

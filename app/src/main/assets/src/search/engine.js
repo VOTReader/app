@@ -993,6 +993,30 @@ function sentenceOriginal(text, ex, at, O, lower, keyWords, need, cite) {
   return null;
 }
 /**
+ * The sentence of the passage the model matched (MEANING_SPAN from `start`) holding the most of the query's words,
+ * when it holds more of them than the sentences the excerpt falls in; else null. Its edge characters are left off,
+ * so it touches no neighbouring sentence (sentenceOriginal reads every sentence an excerpt touches).
+ * @param {string} text
+ * @param {number} start  where the model's passage starts
+ * @param {string} ex  the excerpt
+ * @param {number} at  where it starts
+ * @param {string[]} words  the query's words, encoded
+ * @returns {{text: string, start: number}|null}
+ */
+function meantSentence(text, start, ex, at, words) {
+  const spans = sentenceSpans(text);
+  const held = (/** @type {string} */ s) => { const t = new Set(kjvEncode(s)); return words.filter((w) => t.has(w)).length; };
+  let most = held(spans.filter((sp) => sp.end >= at && sp.start <= at + ex.length).map((sp) => sp.text).join(' '));
+  let best = null;
+  for (const sp of spans) {
+    if (sp.end <= start) continue;
+    if (sp.start >= start + MEANING_SPAN) break;
+    const h = held(sp.text);
+    if (h > most) { most = h; best = sp; }
+  }
+  return best && best.text.length > 2 ? { text: best.text.slice(1, -1), start: best.start + 1 } : null;
+}
+/**
  * Move each original ahead of a reprint of it near the top (in place).
  * @param {Array<{score:number, doc:any, terms?:string[], meaningStart?:number}>} out  ranked, best first (meaningStart: meaningFirst's matched passage)
  * @param {Map<any, string>} idOf  each entry's doc id
@@ -1024,6 +1048,14 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
     // ("passover study about the lamb when god struck the egyptians" asks for the study, not Exodus 12:27).
     const quoted = near(idOf.get(e) || '', e.doc) >= NEAR_PHRASE_MIN;
     let found = sentenceOriginal(e.doc.text, ex, at, O, lower, keyWords, need, quoted);
+    // A reprint the model found is read where it matched, when that sentence holds more of the query than the
+    // excerpt's does and names an original of its own (sr11 t324): the excerpt is the stretch thickest with typed
+    // words, and in an Answers topic that was a line of another letter it quotes, which then led the search.
+    if (typeof e.meaningStart === 'number' && e.meaningStart >= 0 && at >= 0) {
+      const m = meantSentence(e.doc.text, e.meaningStart, ex, at, words);
+      const f = m && sentenceOriginal(e.doc.text, m.text, m.start, O, lower, keyWords, need, quoted);
+      if (m && f) { found = f; ex = m.text; at = m.start; }
+    }
     // A quote held nearly word for word sits where its small words are too ("blessed be the name of our lord":
     // the content words sit thickest in "Blessed are those who Bless the name of The Lord", a line above it).
     if (!found && typed.length > terms.length && quoted) {
