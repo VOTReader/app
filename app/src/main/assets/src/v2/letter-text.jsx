@@ -137,10 +137,11 @@ function FormatB({ para, hlKey = null, bookTitle, refs = null }) {
 
 export const FormatBBlock = React.memo(FormatB, (a, b) => a.para === b.para && a.hlKey === b.hlKey && a.refs === b.refs);
 
-/** The kit's title step: 52 px, long titles 44 (".display.long"), very long 36 (".longer"). */
+/** The kit's title step: 52 px, long titles 44 (".display.long"), very long 36 (".longer"). Design's pictures draw up to 18
+    characters at 52 ("Elect and Precious", 1h/1i, on two lines) and 20 at 44 ("Building the Gallows", 1d). */
 export function titleClass(title) {
   const t = String(title || '');
   if (t.length > 56) return 'display longer';
-  if (t.length > 13) return 'display long';
+  if (t.length > 18) return 'display long';
   return 'display';
 }

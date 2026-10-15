@@ -51,6 +51,8 @@ const HOME_FACTS = {
 const OVER_VOLUME_ONE = [{ place: 'home' }, { place: 'collection', collection: 'one' }];
 /** Words To Live By, Part One, Entry 46 from its collection page (1d, 1e). */
 const WTLB_46 = [{ place: 'home' }, { place: 'collection', collection: 'wtlb1' }, { place: 'letter', collection: 'wtlb1', n: 46 }];
+// states.json 1h/1i (dz15): Words To Live By entry 76, "Elect and Precious", from Home
+const WTLB_76 = [{ place: 'home' }, { place: 'collection', collection: 'wtlb1' }, { place: 'letter', collection: 'wtlb1', n: 76 }];
 /** Volume One, Letter 9 (1f, 1g). */
 const LETTER_9 = [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 9 }];
 const LETTER_ONE_PLAYING = { item: { collection: 'one', n: 1 }, reader: 'B', at: 231, length: 608, paused: false, saved: true };
@@ -240,6 +242,9 @@ export const GATE_STATES = {
       open: [1],
     } },
   },
+  // states.json 1i-find (dz15, mw7): entry 76 at its top, Find open with "more" typed: 1 of 3, the first place current
+  // (the hook draws the word and a caret; the field is not focused, so no keyboard opens).
+  '1i-find': { stack: WTLB_76, open: { sheet: 'find', q: 'more' } },
 };
 
 /**

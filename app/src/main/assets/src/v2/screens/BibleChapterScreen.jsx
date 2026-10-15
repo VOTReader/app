@@ -202,4 +202,5 @@ definePlace('bible-chapter', {
   title: (r) => bookTitle({ book: r.book }) + ' ' + r.chapter,
   actions: chapterActions,
   contentClass: 'content reader',
+  find: () => 'chapter',
 });

@@ -574,6 +574,16 @@ function letterActions({ route, gate, open }) {
   );
 }
 
+/** Find in this <noun> (main's FindInUnit hosts): an Answers topic, a compilation's entry, else a letter. @param {any} r */
+function findNoun(r) {
+  const col = collectionOf(r.collection);
+  const list = col && Array.isArray(g[col.globalName]) ? g[col.globalName] : null;
+  const letter = list ? (r.preface ? prefaceOf(col) : letterAt(list, r.n)) : null;
+  if (!col) return 'letter';
+  if (col.volKey === 'answers') return 'topic';
+  return letter && isFormatB(letter) ? 'entry' : 'letter';
+}
+
 /** The letter place: the next-letter card replaces this letter, so Back still names the collection. */
 function LetterPlace({ route, replace, go, onReady, gate, desktop, facts }) {
   const openLetter = (n) => replace({ place: 'letter', collection: route.collection, n });
@@ -595,4 +605,5 @@ definePlace('letter', {
   },
   actions: letterActions,
   contentClass: 'content reader',
+  find: findNoun,
 });

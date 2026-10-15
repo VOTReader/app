@@ -15,15 +15,17 @@
  * @typedef {{ route: import('./gate.js').Route & Record<string, any>, facts: Record<string, any>,
  *   gate: import('./gate.js').GateState | null, desktop: boolean, device: 'phone' | 'computer',
  *   go: (...routes: any[]) => void, pop: () => void, replace: (route: any) => void, openTab: (id: string) => void,
- *   onReady: () => void }} PlaceProps
+ *   onReady: () => void, open?: (name: string, opts?: Record<string, any>) => void }} PlaceProps
+ * `open` opens the shell's Text and theme sheet ('text-and-theme') or a page tool on this page ('find', 1i).
  */
 
 /**
  * @typedef {{ Screen: (props: PlaceProps) => any,
  *   title?: (route: any) => string,
  *   actions?: (ctx: { route: any, go: (...routes: any[]) => void, desktop: boolean, device: 'phone' | 'computer',
- *     open?: (sheet: string) => void, gate?: any }) => any,
- *   contentClass?: string, bare?: boolean }} PlaceDef
+ *     open?: (sheet: string, opts?: Record<string, any>) => void, gate?: any }) => any,
+ *   contentClass?: string, bare?: boolean, find?: (route: any) => string }} PlaceDef
+ * `find` names the page for Find in this <page> (1i: 'letter', 'entry', 'topic', 'chapter'); a place without it has no Find.
  * `bare` draws the place alone in the window: no top bar, player, tab bar or rail (8a-welcome). It still calls onReady.
  */
 

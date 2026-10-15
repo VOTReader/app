@@ -74,7 +74,8 @@ describe('Format B (Words To Live By, The Blessed, some Holy Days pages: `paragr
 describe('titleClass', () => {
   it("steps the kit's title down for long titles", () => {
     expect(titleClass('Chosen by God')).toBe('display');
-    expect(titleClass('Honor Not the Day')).toBe('display long');
+    expect(titleClass('Elect and Precious')).toBe('display');
+    expect(titleClass('Building the Gallows')).toBe('display long');
     expect(titleClass('x'.repeat(56))).toBe('display long');
     expect(titleClass('x'.repeat(57))).toBe('display longer');
   });

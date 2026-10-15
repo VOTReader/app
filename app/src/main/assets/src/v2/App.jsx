@@ -14,6 +14,7 @@ import { usePlayer, MiniPlayer, NowPlaying, PlayerSheet, PlayerBar } from './pla
 import { useFullScreen, FullScreenToast } from './player/full-screen.jsx';
 import { SheetLayer, closeTopSheet } from './Sheet.jsx';
 import { AaSheet } from './screens/AaSheet.jsx';
+import { FindStrip } from './FindStrip.jsx';
 import { applyLook, savedLook, saveLook, gateLook, sizeWord } from './look.js';
 import { useReadingRecord } from './reading-record.js';
 import { useReadingBars, READING_PLACES } from './reading-bars.js';
@@ -120,6 +121,17 @@ function NotYet({ title, onReady }) {
   );
 }
 
+/**
+ * The page tool a gate state opens with (1i: Find with its word typed), on the gate's own page.
+ * @param {import('./gate.js').GateState | null} gate
+ * @returns {({ kind: string, route: any } & Record<string, any>) | null}
+ */
+function gateTool(gate) {
+  const o = gate && gate.open;
+  if (!o || o.sheet !== 'find') return null;
+  return { kind: 'find', q: o.q || '', route: gate.stack[gate.stack.length - 1] };
+}
+
 /** @param {{ gateId?: string | null }} props */
 export function V2App({ gateId = readGateId() }) {
   const gate = gateId ? gateState(gateId) : null;
@@ -129,6 +141,8 @@ export function V2App({ gateId = readGateId() }) {
   // The reader's text and page (look.js): shown on <html> at once, kept in main's vot-state (never on a gate boot).
   const [look, setLook] = React.useState(() => (gate ? gateLook(gate) : savedLook()));
   const [shellSheet, setShellSheet] = React.useState(() => (gate && gate.open && gate.open.sheet === 'text-and-theme' ? 'text-and-theme' : null));
+  // A page tool the ... opens over the page it was opened on (1i Find): it goes with that page.
+  const [tool, setTool] = React.useState(() => gateTool(gate));
   React.useLayoutEffect(() => { applyLook(look, gate ? { bridge: null } : undefined); }, [look, gate]);
   const changeLook = React.useCallback((next) => { setLook(next); if (!gate) saveLook(next); }, [gate]);
   const facts = React.useMemo(() => (gate ? savedFactsAtBoot
@@ -140,6 +154,12 @@ export function V2App({ gateId = readGateId() }) {
   const scrollRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const route = stack[stack.length - 1];
   const tab = stack[0].place;
+  const pageTool = tool && tool.route === route ? tool : null;
+  /** The shell's own sheet (Aa's Text and theme) or a page tool on this page ('find', with { q, near } from a landing). */
+  const openShell = React.useCallback((/** @type {string} */ name, /** @type {Record<string, any>} */ opts = {}) => {
+    if (name === 'find') setTool({ ...opts, kind: 'find', route });
+    else setShellSheet(name);
+  }, [route]);
   const back = stack.length > 1 ? routeTitle(stack[stack.length - 2]) : null;
   // The player is shell chrome (rv1): the mini player / player bar, Now playing, its sheets, and full screen.
   const player = usePlayer(gate);
@@ -180,11 +200,12 @@ export function V2App({ gateId = readGateId() }) {
   // leave at a root.
   const stackRef = React.useRef(stack);
   stackRef.current = stack;
-  const chromeRef = React.useRef({ player, fs });
-  chromeRef.current = { player, fs };
+  const chromeRef = React.useRef({ player, fs, pageTool });
+  chromeRef.current = { player, fs, pageTool };
   React.useEffect(() => {
     g.handleAndroidBack = () => {
       if (closeTopSheet()) return 'true';
+      if (chromeRef.current.pageTool) { setTool(null); return 'true'; }
       if (chromeRef.current.player.back() || chromeRef.current.fs.exit()) return 'true';
       if (stackRef.current.length > 1) { pop(); return 'true'; }
       return 'false';
@@ -220,9 +241,9 @@ export function V2App({ gateId = readGateId() }) {
   if (def) {
     const Screen = def.Screen;
     contentClass = def.contentClass || 'content';
-    actions = def.actions ? def.actions({ route, go, desktop, device, open: setShellSheet, gate }) : null;
+    actions = def.actions ? def.actions({ route, go, desktop, device, open: openShell, gate }) : null;
     screen = <Screen route={route} facts={facts} gate={gate} desktop={desktop} device={device}
-      go={go} pop={pop} replace={replace} openTab={openTab} onReady={onReady} />;
+      go={go} pop={pop} replace={replace} openTab={openTab} onReady={onReady} open={openShell} />;
   } else {
     screen = <NotYet title={routeTitle(route)} onReady={onReady} />;
   }
@@ -234,6 +255,11 @@ export function V2App({ gateId = readGateId() }) {
     </button>
   ));
   const bar = <TopBar back={back} onBack={pop} actions={actions} scrolled={scrolled} />;
+  const noun = def && def.find ? def.find(route) : '';
+  const findStrip = pageTool && pageTool.kind === 'find' && noun
+    ? <FindStrip key={stack.length + ':' + (pageTool.near ? 'l' : 'm')} rootRef={scrollRef} noun={noun} start={{ q: pageTool.q, near: pageTool.near }}
+        gate={gate} onClose={() => setTool(null)} />
+    : null;
 
   // the layer sheets and dialogs portal into (Sheet.jsx): over the whole window, outside the scrolling page; the shell's
   // own sheet (Text and theme, from a reading page's Aa) goes there too
@@ -257,6 +283,7 @@ export function V2App({ gateId = readGateId() }) {
             <div className="main" ref={scrollRef} onScroll={onScroll} data-scroller="">
               <div className="col" data-zone="col">
                 {!bare && bar}
+                {!bare && findStrip}
                 <div className={contentClass}>{screen}</div>
               </div>
             </div>
@@ -273,6 +300,7 @@ export function V2App({ gateId = readGateId() }) {
     <SheetLayer.Provider value={layer}>
       <div className={'v2 v2-phone' + (fs.full ? ' full' : '') + (bare ? ' bare' : '') + (bars.hidden ? ' bars-off' : '')}>
         {!fs.full && !bare && !bars.hidden && bar}
+        {!fs.full && !bare && findStrip}
         <div className={contentClass + (fs.full ? ' full' : '')} ref={scrollRef} onScroll={onScroll} data-scroller="">{screen}<FullScreenToast text={fs.full ? fs.toast : null} /></div>
         {!fs.full && !bare && <MiniPlayer player={player} />}
         {!fs.full && !bare && !bars.hidden && <nav className="tabbar" aria-label="Places">{tabs}</nav>}

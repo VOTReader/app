@@ -93,3 +93,11 @@ html, body { background: var(--bg); height: 100%; overflow: hidden; overscroll-b
   overflow-x: auto; scrollbar-width: none; }
 .v2 .recent::-webkit-scrollbar { display: none; }
 .v2 .recent .label { margin-right: 4px; flex: none; }
+/* Find in this page (mw7, 1i; screens.css .fnd draws it focused): the field is a real input, its gold edge only while it
+   has focus (a gate boot draws it focused: .on); on the laptop the strip stays under the column's top bar as it scrolls */
+.v2 .fnd .fld:not(:focus-within):not(.on) { border-color: var(--edge); }
+.v2 .fnd .fld input.q { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: 0; background: none; font: inherit;
+  font-size: var(--fs-ui); color: var(--t1); -webkit-appearance: none; appearance: none; }
+.v2 .fnd .fld input.q::-webkit-search-cancel-button { display: none; }
+.v2 .fnd .fld .ic:disabled { color: var(--t3); }
+.v2.dk .col > .fnd { position: sticky; top: var(--bar); z-index: 2; background: var(--bg); }
