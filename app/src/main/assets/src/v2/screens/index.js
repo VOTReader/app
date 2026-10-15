@@ -9,3 +9,4 @@ import './JournalEditor.jsx';
 import './SearchScreen.jsx';
 import './BibleChapterScreen.jsx';
 import './NoteEditor.jsx';
+import './SettingsPages.jsx';

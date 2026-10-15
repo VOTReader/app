@@ -8,6 +8,7 @@
 
 import { gateMarks } from './notes-facts.js';
 import { GATE_CHOSEN } from './search-facts.js';
+import { gateListening, gateData } from './settings-pages.js';
 
 /** The website readers use: the hook never acts there. */
 export const LIVE_HOSTS = ['votreader.github.io'];
@@ -120,6 +121,12 @@ export const GATE_STATES = {
     stack: [{ place: 'search' }, { place: 'bible-chapter', book: 'john', chapter: 3, verse: 3, match: ['born again'] }],
     facts: { translation: 'nkjv' },
   },
+  // states.json 7a-listening (zv1): Settings > Listening from Home; Benjamin, KJV Bible audio, 1x, every switch on.
+  '7a-listening': { stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/listening' }], facts: { listening: gateListening() } },
+  // states.json 7b-your-data: exported 2 days ago, the newest snapshot today, 7 kept on this phone, the weekly copy off.
+  '7b-your-data': { stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/your-data' }], facts: { data: gateData(GATE_NOW) } },
+  // states.json 7c-help: Help and about; the version line is this build's own.
+  '7c-help': { stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/help' }], facts: {} },
 };
 
 /**

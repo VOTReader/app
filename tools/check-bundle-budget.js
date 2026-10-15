@@ -109,7 +109,10 @@ const BUDGETS = [
   // that build-out (~150 KB projected) instead of tripping on every screen; it still catches what this gate is for: a
   // corpus or a v1 bundle pulled in (each is MBs). Re-baseline to +15 % once v2's screens are all in.
   { file: 'bundle-v2.js', measured: 49926, max: 200000 },
-  { file: 'v2.min.css', measured: 30927, max: 35600 },
+  // v2.min.css the same way (zv1 group 8, Settings pages, 2026-10-14): 36458 B with Search, Notes, the player and Settings in
+  // (+5.5 KB over the first kit build, nothing pulled in: each screen's own sheet is 1-3 KB); the ceiling covers the
+  // rest of the build-out and still catches app.min.css (370 KB) or a font pulled in. Re-baseline with bundle-v2.js.
+  { file: 'v2.min.css', measured: 36458, max: 60000 },
   // ── lazy, but still fetched + parsed on the reader's device ──
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.

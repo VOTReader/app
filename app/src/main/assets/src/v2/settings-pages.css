@@ -1,0 +1,39 @@
+/* settings-pages.css - v2's Settings pages (zv1; 7a-listening, 7b-your-data, 7c-help, Credits): the destructive confirm, the
+   typed DELETE field, a checked file's answer, the credits text, and main's own toasts (backup-flow.js shows them through
+   utils/toast.js as #vot-toast-*.vot-toast on <body>; v2 does not load app.css, so the kit's toast look is drawn here). */
+
+/* a destructive confirm: the pill in --danger, its words centred */
+.pill.danger { background: var(--danger); border-color: var(--danger); }
+.pill.block.danger { justify-content: center; }
+.pill:disabled, .btn2:disabled, .textbtn:disabled { opacity: .38; cursor: default; }
+
+/* Clear all personal data: the field DELETE is typed into (the journal editor's field) */
+input.wipe { display: block; width: 100%; box-sizing: border-box; margin: 14px 0 0; padding: 12px 14px; font: inherit;
+  font-size: var(--fs-m); letter-spacing: .04em; color: var(--t1); background: var(--input); border: 1px solid var(--edge);
+  border-radius: var(--r); -webkit-appearance: none; appearance: none; }
+input.wipe:focus { border-color: var(--accent); outline: 0; }
+
+/* Check a backup file: main's answer under the rows, dismissable */
+.report { display: flex; gap: 12px; align-items: center; margin-top: 10px; }
+.report .fine { flex: 1; margin: 0; color: var(--t1); }
+.report.warn .fine { color: var(--danger); }
+.report .textbtn { flex: none; }
+
+/* Credits */
+.credits { margin-top: 18px; }
+.credits p { font-size: var(--fs-s); line-height: 1.5; color: var(--t1); margin: 0 0 14px; }
+.credits a { color: var(--accent); }
+
+/* main's toasts ("Backup saved to Downloads", "Preparing export…"): the kit's .toast, above the tab bar on the phone,
+   centred under the column on the laptop; shown while main's lifecycle holds .show */
+.vot-toast { position: fixed; z-index: 10; left: 12px; right: 12px; bottom: calc(64px + 12px + var(--v2-bottom, 0px));
+  min-height: 48px; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  border-radius: var(--r-s); background: #2B3537; color: var(--t1); font-family: var(--font); font-size: var(--fs-s);
+  line-height: 1.35; box-shadow: 0 8px 24px rgba(0, 0, 0, .35); pointer-events: none; opacity: 0; transition: opacity 220ms ease-out; }
+.vot-toast.show { opacity: 1; }
+.vot-toast-action.show { pointer-events: auto; }
+.vot-toast button { margin-left: auto; flex: none; color: var(--accent); font: inherit; font-weight: 500; background: none;
+  border: 0; padding: 0 0 0 12px; min-height: 40px; }
+@media (min-width: 1024px) {
+  .vot-toast { left: calc(var(--rail) + (100% - var(--rail)) / 2); right: auto; width: var(--dlg); bottom: 24px; transform: translateX(-50%); }
+}
