@@ -130,6 +130,16 @@ export function offlineListenWords(volKey, id, gl = g) {
   try { return p.playableNow(volKey, id) ? null : OFFLINE_LISTEN; } catch (_e) { return null; }
 }
 
+/**
+ * The same for one Bible chapter (2c): main's playableNow asks after that chapter's own recording.
+ * @param {string} volKey the edition @param {string} bookId @param {number} chapter
+ */
+export function offlineChapterWords(volKey, bookId, chapter, gl = g) {
+  const p = gl.AudioPlayer;
+  if (!p || typeof p.playableNow !== 'function') return null;
+  try { return p.playableNow(volKey, bookId, chapter) ? null : OFFLINE_LISTEN; } catch (_e) { return null; }
+}
+
 /** The 4c picture's facts (states.json): Letter 4 on this phone, 5 at 64 %, 6 failed, 7 waiting for Wi-Fi; 12 of 29
  *  done; no connection. */
 export function gateDownloads() {

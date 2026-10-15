@@ -53,6 +53,17 @@ export function realSource(g = /** @type {any} */ (globalThis)) {
 }
 
 /**
+ * The edition a gate row plays a Bible chapter in: the row's `edition` (a BIBLE_AUDIO_EDITIONS id), else the Word of
+ * Promise NKJV the pictures name. Its volKey: the queue's key and the timings the still wash reads.
+ * @returns {string}
+ */
+export function gateBibleVolKey(playing, g = /** @type {any} */ (globalThis)) {
+  const eds = g.BIBLE_AUDIO_EDITIONS || {};
+  const ed = eds[(playing && playing.edition) || 'wop-nkjv'];
+  return (ed && ed.volKey) || 'bible-wop-nkjv';
+}
+
+/**
  * The gate's queue for a playing item: the collection's numbered letters in order, or the book's chapters.
  * Null until the item's corpus is on the page.
  */
@@ -63,9 +74,7 @@ export function gateQueue(playing, g = /** @type {any} */ (globalThis)) {
     const books = Array.isArray(g.BIBLE_AUDIO_BOOKS) ? g.BIBLE_AUDIO_BOOKS : null;
     const book = books ? books.find((b) => b && b[0] === item.book) : null;
     if (!book) return null;
-    const eds = g.BIBLE_AUDIO_EDITIONS || {};
-    const ed = eds[(playing && playing.edition) || 'wop-nkjv'];
-    const volKey = (ed && ed.volKey) || 'bible-wop-nkjv';
+    const volKey = gateBibleVolKey(playing, g);
     const parts = g.BIBLE_AUDIO_MANIFEST && g.BIBLE_AUDIO_MANIFEST[volKey + ':' + item.book];
     const count = Array.isArray(parts) && parts.length ? parts.length : item.chapter;
     const queue = [];

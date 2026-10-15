@@ -627,18 +627,26 @@ function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScr
  * the paint itself is _paintAt, the same path the live wash takes, so the picture and the app cannot disagree.
  * 'waiting' = the timings file is not in memory yet (asked for here; audioSyncStore bumps when it lands);
  * 'none' = no timed clause at that time, no rows for the letter, or the block is not on the page.
+ * A Bible chapter (v2 2c: `chapter` set, `letterId` the book, `volKey` the edition) lights the whole verse from that
+ * edition's table, as the live wash does (_bibleRowsFor); its file's arrival bumps bibleSyncStore instead.
  *
  * @param {{ mainEl: Element | null, volKey: string, letterId: string, hlKeyFn: (id: string, i: number) => string,
- *   time: number, part?: number }} o
+ *   time: number, part?: number, chapter?: number }} o
  * @returns {'painted' | 'waiting' | 'none'}
  */
-export function paintReadAlongAt({ mainEl, volKey, letterId, hlKeyFn, time, part = 0 }) {
+export function paintReadAlongAt({ mainEl, volKey, letterId, hlKeyFn, time, part = 0, chapter = 0 }) {
   const supported = typeof CSS !== 'undefined' && /** @type {any} */ (CSS).highlights;
   if (!supported || !mainEl) return 'none';
   const g = /** @type {any} */ (globalThis);
-  if (!g.AUDIO_SYNC) { loadAudioSync(); return 'waiting'; }
-  const rows = g.AUDIO_SYNC[volKey + ':' + letterId];
-  const frags = Array.isArray(rows) ? rows.filter((f) => (f[4] || 0) === part) : [];
+  let frags;
+  if (chapter) {
+    if (!g[bibleSyncGlobalFor(volKey) || '']) { loadBibleSync(volKey); return 'waiting'; }
+    frags = _bibleRowsFor(letterId, chapter, volKey) || [];
+  } else {
+    if (!g.AUDIO_SYNC) { loadAudioSync(); return 'waiting'; }
+    const rows = g.AUDIO_SYNC[volKey + ':' + letterId];
+    frags = Array.isArray(rows) ? rows.filter((f) => (f[4] || 0) === part) : [];
+  }
   const i = frags.length ? fragmentAt(frags, time + LEAD_S) : -1;
   const last = { current: -1 };
   _paintAt(frags, i, { current: mainEl }, letterId, hlKeyFn, false, { current: 0 }, { current: null }, last, null);

@@ -3,10 +3,12 @@
    (a tap pauses); Resume · N min left when a tap would pick it up part-way (main's listenResume, ra4, so the label never
    promises a resume the player would not make); Listen otherwise. With no connection and the recording not on the
    phone (picture 9c) the pill still says Listen, and a tap shows main's offline line as a toast instead of playing.
-   A gate boot reads gate.playing and gate.open.toast and never touches the engine. */
+   A gate boot reads gate.playing and gate.open.toast and never touches the engine. A Bible chapter's pill (2c) makes
+   the same decisions over main's chapter path (BibleChapterView's HeroListen): the chapter plays on through its book. */
 import { Icon } from '../Icon.jsx';
-import { AUDIO_RESUME_MIN_SEC, AUDIO_RESUME_END_FRACTION } from '../../utils/audio-track.js';
-import { OFFLINE_LISTEN, offlineListenWords } from '../offline-facts.js';
+import { AUDIO_RESUME_MIN_SEC, AUDIO_RESUME_END_FRACTION, resolveBibleAudio } from '../../utils/audio-track.js';
+import { OFFLINE_LISTEN, offlineListenWords, offlineChapterWords } from '../offline-facts.js';
+import { savedSettings, listeningFacts } from '../settings-pages.js';
 
 const g = /** @type {any} */ (globalThis);
 const NONE = () => () => {};
@@ -31,6 +33,28 @@ export function startListening(engine, { volKey, letter, collectionLabel = null 
   const words = offlineListenWords(volKey, letter.id);
   if (words) { if (onToast) onToast(offlineToast(words)); return; }
   engine.playLetter({ volKey, letter, collectionLabel });
+}
+
+/**
+ * Start this Bible chapter (on through its book, main's playBibleBook), or say why it cannot make sound now.
+ * @param {any} engine @param {{ volKey: string, book: string, chapter: number, label?: string | null }} what
+ * @param {((t: Toast) => void) | null | undefined} onToast
+ */
+export function startChapter(engine, { volKey, book, chapter, label = null }, onToast) {
+  const words = offlineChapterWords(volKey, book, chapter);
+  if (words) { if (onToast) onToast(offlineToast(words)); return; }
+  engine.playBibleBook({ volKey, bookId: book, label, chapterNum: chapter });
+}
+
+/**
+ * The edition a chapter's Listen plays and its read-along paints: main's resolveBibleAudio over the reader's saved
+ * settings (the chosen edition when it carries the book, else the default), null when none does (no pill, no wash).
+ * @param {string} bookId @returns {{ volKey: string, label: string } | null}
+ */
+export function chapterAudio(bookId, gl = g) {
+  // listeningFacts fills main's default (brm-kjv) for a store that never saved the setting
+  const ed = resolveBibleAudio({ settings: { bibleAudio: listeningFacts(savedSettings(gl)).bibleAudio }, bookId }).offer;
+  return ed ? { volKey: ed.volKey, label: ed.label } : null;
 }
 
 /**
@@ -95,11 +119,48 @@ export function ListenPill({ gate, collection, n, volKey, letter, collectionLabe
   } else {
     return null;
   }
-  if (!f.show) return null;
+  return f.show ? <PillButton f={f} onClick={tap} /> : null;
+}
+
+/**
+ * A Bible chapter's pill (2c): Pause while this chapter plays, Resume · N min left, Listen; offline and not on the
+ * phone, a tap says so. `volKey`/`label` are chapterAudio's (null: no pill).
+ * @param {{ gate: any, book: string, chapter: number, volKey: string | null, label?: string | null,
+ *   onToast?: ((t: Toast) => void) | null }} props
+ */
+export function ChapterListenPill({ gate, book, chapter, volKey, label = null, onToast = null }) {
+  const engine = gate ? null : g.AudioPlayer;
+  React.useSyncExternalStore(engine ? engine.subscribe : NONE, engine ? engine.getVersion : ZERO);
+  let f;
+  let tap = () => {};
+  if (gate) {
+    const p = gate.playing;
+    const here = !!(p && p.item && p.item.book === book && p.item.chapter === chapter);
+    f = listenPill({ recorded: true, here, playing: here && !p.paused, offline: false, resume: null });
+  } else if (engine && volKey) {
+    const st = engine.getState();
+    const cur = Array.isArray(st.queue) ? st.queue[st.qi] : null;
+    // a book queues on through its chapters: here = this book's track AND this chapter of it
+    const here = !!(cur && cur.key === volKey + ':' + book && engine.bibleChapterOfTrack(cur) === chapter);
+    const recorded = !!engine.hasAudio(volKey, book);
+    const offline = recorded && !here && !!offlineChapterWords(volKey, book, chapter);
+    const playing = st.status === 'playing' || st.status === 'loading';
+    const resume = !recorded || offline || (here && playing) ? null
+      : here ? pausedAt(st) : engine.listenResume({ volKey, bookId: book, chapterNum: chapter });
+    f = listenPill({ recorded, here, playing, offline, resume });
+    tap = () => { if (here) engine.toggle(); else startChapter(engine, { volKey, book, chapter, label }, onToast); };
+  } else {
+    return null;
+  }
+  return f.show ? <PillButton f={f} onClick={tap} /> : null;
+}
+
+/** @param {{ f: { text: string, playing: boolean, label: string }, onClick: () => void }} props */
+function PillButton({ f, onClick }) {
   const wide = f.text.length > 6;
   return (
     <button type="button" className={'pill play' + (wide ? ' wide' : '')} aria-label={f.label} aria-pressed={f.playing}
-      onClick={tap}>
+      onClick={onClick}>
       {f.playing ? <Icon name="pause" size={26} /> : <Icon name="playBig" />}{f.text}
     </button>
   );

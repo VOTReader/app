@@ -2,7 +2,10 @@
    (bundle-d, on window) does the work over the one engine: the same timings file, wash, follow, tap-to-seek and
    double-tap rule as the v1 letter. Importing it here would bundle a second AudioPlayer into bundle-v2, so it is read
    from window at render time. A gate boot never touches the engine: it paints a still wash at the row's playing.at
-   through main's paintReadAlongAt (the live wash's own paint path) and holds the gate until the wash is on the page. */
+   through main's paintReadAlongAt (the live wash's own paint path) and holds the gate until the wash is on the page.
+   A Bible chapter (2c) is the same over main's chapter path: the whole verse lit, keys bible:<book>:<ch>:<v>. */
+import { bibleHlKey } from '../../utils/hl-keys.js';
+import { gateBibleVolKey } from './source.js';
 
 const g = /** @type {any} */ (globalThis);
 
@@ -26,6 +29,16 @@ export function gateAt(gate, collection, n) {
   return it && it.collection === collection && it.n === n ? Number(p.at) || 0 : null;
 }
 
+/**
+ * The gate's clock on this Bible chapter: the row's playing.at when the gate is playing THIS chapter, else null.
+ * @param {any} gate @param {string} book @param {number} chapter @returns {number | null}
+ */
+export function gateChapterAt(gate, book, chapter) {
+  const p = gate && gate.playing;
+  const it = p && p.item;
+  return it && it.book === book && it.chapter === chapter ? Number(p.at) || 0 : null;
+}
+
 const noSubscribe = () => () => {};
 const noVersion = () => 0;
 
@@ -43,11 +56,34 @@ export function LetterReadAlong({ gate, collection, n, volKey, letterId, bodyRef
     readAlongOn={on} readAlongFollow={follow} onListen={onListen} />;
 }
 
-/** @param {{ at: number | null, volKey: string, letterId: string, bodyRef: { current: HTMLElement | null } }} props */
-function StillWash({ at, volKey, letterId, bodyRef }) {
-  const store = g.__audioSyncStore;
+/**
+ * Lights the verse being read on a Bible chapter (2c), as main's BibleChapterView mounts the wash. `bodyRef` holds the
+ * element whose verse spans carry data-hl-key bible:<book>:<chapter>:<verse>; `volKey` is the edition the reader hears
+ * (a gate boot uses the row's own); `textKey` changes when the words on the page change (a new translation).
+ * @param {{ gate: any, book: string, chapter: number, volKey: string, bodyRef: { current: HTMLElement | null },
+ *   on?: boolean, follow?: boolean, onListen?: (() => void) | null, textKey?: string }} props
+ */
+export function ChapterReadAlong({ gate, book, chapter, volKey, bodyRef, on = true, follow = true, onListen = null, textKey = '' }) {
+  const hlKeyFn = React.useCallback((/** @type {string} */ id, /** @type {number} */ v) => bibleHlKey(id, chapter, v), [chapter]);
+  if (gate) {
+    return <StillWash at={on ? gateChapterAt(gate, book, chapter) : null} volKey={gateBibleVolKey(gate.playing)} letterId={book}
+      chapter={chapter} hlKeyFn={hlKeyFn} bodyRef={bodyRef} />;
+  }
+  const RA = g.ReadAlongHighlight;
+  if (typeof RA !== 'function' || !volKey || !book) return null;
+  return <RA volKey={volKey} letterId={book} chapter={chapter} mainRef={bodyRef} hlKeyFn={hlKeyFn}
+    readAlongOn={on} readAlongFollow={follow} onListen={onListen} textKey={textKey} />;
+}
+
+/**
+ * @param {{ at: number | null, volKey: string, letterId: string, bodyRef: { current: HTMLElement | null },
+ *   chapter?: number, hlKeyFn?: ((id: string, i: number) => string) | null }} props
+ */
+function StillWash({ at, volKey, letterId, bodyRef, chapter = 0, hlKeyFn = null }) {
+  // a chapter's timings are the edition's table (bibleSyncStore bumps when it lands); a letter's, the letters' file
+  const store = chapter ? g.__bibleSyncStore : g.__audioSyncStore;
   const version = React.useSyncExternalStore(store ? store.subscribe : noSubscribe, store ? store.getVersion : noVersion);
-  const want = at == null ? null : volKey + ':' + letterId + '@' + at;
+  const want = at == null ? null : volKey + ':' + letterId + (chapter ? ':' + chapter : '') + '@' + at;
   // Held from the first commit (layout, so App's gate effect in the same commit already sees it) until painted.
   const held = React.useRef(/** @type {object | null} */ (null));
   const settle = () => { if (held.current && pending.delete(held.current)) bump(); held.current = null; };
@@ -66,9 +102,10 @@ function StillWash({ at, volKey, letterId, bodyRef }) {
   // Every render until it is painted: the body arrives with the lazy volume and the timings file with its store.
   React.useLayoutEffect(() => {
     if (want == null || !held.current) return;
-    if (typeof g.paintReadAlongAt !== 'function' || typeof g.letterHlKey !== 'function') { settle(); return; }
+    const keyFn = chapter ? hlKeyFn : g.letterHlKey;
+    if (typeof g.paintReadAlongAt !== 'function' || typeof keyFn !== 'function') { settle(); return; }
     if (!bodyRef.current || !bodyRef.current.querySelector('[data-hl-key]')) return;
-    const r = g.paintReadAlongAt({ mainEl: bodyRef.current, volKey, letterId, hlKeyFn: g.letterHlKey, time: at });
+    const r = g.paintReadAlongAt({ mainEl: bodyRef.current, volKey, letterId, hlKeyFn: keyFn, time: at, chapter });
     if (r !== 'waiting') settle();
   });
   void version;

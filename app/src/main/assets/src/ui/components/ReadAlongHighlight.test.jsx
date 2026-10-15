@@ -30,7 +30,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 
 import { AudioPlayer, trackUrl } from '../../utils/audio-player.js';
-import { letterHlKey } from '../../utils/hl-keys.js';
+import { letterHlKey, bibleHlKey } from '../../utils/hl-keys.js';
 import { ReadAlongHighlight, fragmentAt, rangeIn, offsetIn, fragmentAtPoint, paintReadAlongAt, clearReadAlong } from './ReadAlongHighlight.jsx';
 import { formatBOffsetMap, formatBDomText } from '../../utils/format-b-dom-text.js';
 import { resetSyncLoadersForTests } from '../../utils/sync-loaders.js';
@@ -1402,6 +1402,50 @@ describe('paintReadAlongAt - the still wash a v2 gate draws (no engine, no clock
     expect(painted()).toBe('Sentence one. ');
     expect(paint(el, 6, 1)).toBe('painted');
     expect(painted()).toBe('Second block sentence.');
+    el.remove();
+  });
+});
+
+describe('paintReadAlongAt - a Bible chapter (v2 2c): the whole verse under the time, from the edition table', () => {
+  const V = ['There was a man of the Pharisees.', 'This man came to Jesus by night.', 'Jesus answered and said.'];
+  const keyFn = (bookId, verse) => bibleHlKey(bookId, 3, verse);
+  /** A body like v2's BibleChapterScreen renders: one [data-hl-key] span per verse, its number inside. */
+  const body = () => {
+    const el = document.createElement('div');
+    el.innerHTML = '<p>' + V.map((t, i) => '<span data-hl-key="' + keyFn('john', i + 1) + '"><span class="vn">' + (i + 1)
+      + '</span>' + t + '</span> ').join('') + '</p>';
+    document.body.appendChild(el);
+    return el;
+  };
+  const paint = (el, time, chapter = 3) => paintReadAlongAt({ mainEl: el, volKey: 'bible-wop-nkjv', letterId: 'john',
+    hlKeyFn: keyFn, time, chapter });
+  beforeEach(() => { globalThis.BIBLE_SYNC_WOP_NKJV = { john: { 3: [560, 1502, 2401] } }; });
+  afterEach(() => { delete globalThis.BIBLE_SYNC_WOP_NKJV; clearReadAlong(); });
+
+  it('lights the verse being read at that moment, and never touches the player', () => {
+    const el = body();
+    expect(paint(el, 19)).toBe('painted');
+    expect(painted()).toBe('2' + V[1]);
+    expect(paint(el, 30)).toBe('painted');
+    expect(painted()).toBe('3' + V[2]);
+    expect(AudioPlayer.getState().status).toBe('idle');
+    el.remove();
+  });
+
+  it('paints nothing before the first verse, or for a chapter the table does not time', () => {
+    const el = body();
+    expect(paint(el, 2)).toBe('none');
+    expect(painted()).toBe(null);
+    expect(paint(el, 19, 4)).toBe('none');
+    expect(painted()).toBe(null);
+    el.remove();
+  });
+
+  it('says waiting while the edition table is not in memory yet', () => {
+    delete globalThis.BIBLE_SYNC_WOP_NKJV;
+    const el = body();
+    expect(paint(el, 19)).toBe('waiting');
+    expect(painted()).toBe(null);
     el.remove();
   });
 });

@@ -7,6 +7,7 @@ import { render, cleanup, act, waitFor } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import {
   resumeText, pausedAt, listenPill, ListenPill, offlineToast, gateListenToast, startListening,
+  ChapterListenPill, startChapter, chapterAudio,
 } from './listen.jsx';
 import { OFFLINE_LISTEN } from '../offline-facts.js';
 import { GATE_STATES } from '../gate.js';
@@ -22,13 +23,14 @@ const PLAYING = { item: { collection: 'one', n: 1 }, reader: 'B', at: 231, lengt
 
 /**
  * main's AudioPlayer, as much of it as the pill reads: one queue, a status, and what Listen would do.
- * @param {{ cur?: string | null, status?: string, time?: number, duration?: number, recorded?: boolean,
+ * @param {{ cur?: string | null, chapter?: number, status?: string, time?: number, duration?: number, recorded?: boolean,
  *   playable?: boolean, resume?: { at: number, left: number } | null }} [o]
  */
 function engine(o = {}) {
   const ls = new Set();
   let v = 0;
-  const st = { queue: o.cur ? [{ key: o.cur }] : [], qi: 0, status: o.status || 'idle', time: o.time || 0, duration: o.duration || 0 };
+  const st = { queue: o.cur ? [{ key: o.cur, chapter: o.chapter }] : [], qi: 0, status: o.status || 'idle', time: o.time || 0,
+    duration: o.duration || 0 };
   const A = {
     st,
     subscribe: (cb) => { ls.add(cb); return () => ls.delete(cb); },
@@ -39,6 +41,9 @@ function engine(o = {}) {
     listenResume: vi.fn(() => o.resume || null),
     toggle: vi.fn(),
     playLetter: vi.fn(),
+    playBibleBook: vi.fn(),
+    /** main's: which chapter a Bible track is (here the test's own field) */
+    bibleChapterOfTrack: vi.fn((t) => (t && t.chapter) || 0),
     /** The engine moved on: set fields and notify, as main's store does. */
     change: (next) => act(() => { Object.assign(st, next); v += 1; ls.forEach((cb) => cb()); }),
   };
@@ -52,7 +57,7 @@ const pill = (props = {}) => render(
 beforeEach(() => { g.ReactDOM = ReactDOM; });
 afterEach(() => {
   cleanup();
-  for (const k of ['AudioPlayer', 'ReactDOM', 'COL_BY_KEY', 'LETTERS_V1']) delete g[k];
+  for (const k of ['AudioPlayer', 'ReactDOM', 'COL_BY_KEY', 'LETTERS_V1', 'StateStore', 'BIBLE_AUDIO_MANIFEST']) delete g[k];
   delete html.dataset.gate;
   vi.useRealTimers();
 });
@@ -215,5 +220,104 @@ describe('9c on the letter screen', () => {
     expect(A.playLetter).not.toHaveBeenCalled();
     act(() => { vi.advanceTimersByTime(TOAST_MS); });
     expect(container.querySelector('.toast')).toBe(null);
+  });
+});
+
+/* 2c: a Bible chapter's pill (John 3), the same decisions over main's chapter path (BibleChapterView's HeroListen). */
+const JOHN3 = { item: { book: 'john', chapter: 3 }, reader: 'B', at: 19, length: 312, paused: false };
+const WOP = 'bible-wop-nkjv';
+const chapterPill = (props = {}) => render(
+  <ChapterListenPill gate={null} book="john" chapter={3} volKey={WOP} label="NKJV" {...props} />);
+
+describe('ChapterListenPill on a gate boot', () => {
+  it('says Pause on the chapter the gate plays, Listen on another or paused, and touches no engine', () => {
+    const A = engine();
+    chapterPill({ gate: { playing: JOHN3 } });
+    expect(document.querySelector('.pill.play').textContent).toBe('Pause');
+    cleanup();
+    chapterPill({ gate: { playing: JOHN3 }, chapter: 4 });
+    expect(document.querySelector('.pill.play').textContent).toBe('Listen');
+    cleanup();
+    chapterPill({ gate: { playing: { ...JOHN3, paused: true } } });
+    expect(document.querySelector('.pill.play').textContent).toBe('Listen');
+    expect(A.hasAudio).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChapterListenPill over the engine', () => {
+  it('Listen plays this chapter on through its book (playBibleBook); Pause once the engine plays it; a tap toggles', () => {
+    const A = engine();
+    chapterPill();
+    const b = document.querySelector('.pill.play');
+    expect(b.textContent).toBe('Listen');
+    click(b);
+    expect(A.playBibleBook).toHaveBeenCalledWith({ volKey: WOP, bookId: 'john', label: 'NKJV', chapterNum: 3 });
+    A.change({ queue: [{ key: WOP + ':john', chapter: 3 }], qi: 0, status: 'playing' });
+    expect(b.textContent).toBe('Pause');
+    click(b);
+    expect(A.toggle).toHaveBeenCalledTimes(1);
+    expect(A.playBibleBook).toHaveBeenCalledTimes(1);
+  });
+
+  it('another chapter of the same book playing: Listen, and a tap plays this chapter', () => {
+    const A = engine({ cur: WOP + ':john', chapter: 2, status: 'playing' });
+    chapterPill();
+    const b = document.querySelector('.pill.play');
+    expect(b.textContent).toBe('Listen');
+    click(b);
+    expect(A.toggle).not.toHaveBeenCalled();
+    expect(A.playBibleBook).toHaveBeenCalledTimes(1);
+  });
+
+  it("Resume · N min left is the player's own listenResume for this chapter", () => {
+    const A = engine({ resume: { at: 120, left: 190 } });
+    chapterPill();
+    expect(A.listenResume).toHaveBeenCalledWith({ volKey: WOP, bookId: 'john', chapterNum: 3 });
+    expect(document.querySelector('.pill.play').textContent).toBe('Resume · 3 min left');
+  });
+
+  it('offline and this chapter not on the phone: still Listen; a tap shows the toast and never plays', () => {
+    const A = engine({ playable: false });
+    const onToast = vi.fn();
+    chapterPill({ onToast });
+    const b = document.querySelector('.pill.play');
+    expect(b.textContent).toBe('Listen');
+    click(b);
+    expect(A.playableNow).toHaveBeenCalledWith(WOP, 'john', 3);
+    expect(onToast).toHaveBeenCalledWith(offlineToast(OFFLINE_LISTEN));
+    expect(A.playBibleBook).not.toHaveBeenCalled();
+  });
+
+  it('no recording of the book, or no edition: no pill', () => {
+    engine({ recorded: false });
+    chapterPill();
+    expect(document.querySelector('.pill.play')).toBe(null);
+    cleanup();
+    engine();
+    chapterPill({ volKey: null });
+    expect(document.querySelector('.pill.play')).toBe(null);
+  });
+
+  it('startChapter plays when the chapter can make sound, else only says why', () => {
+    const A = engine();
+    const onToast = vi.fn();
+    startChapter(A, { volKey: WOP, book: 'john', chapter: 3, label: 'NKJV' }, onToast);
+    expect(A.playBibleBook).toHaveBeenCalledTimes(1);
+    const B = engine({ playable: false });
+    startChapter(B, { volKey: WOP, book: 'john', chapter: 3, label: 'NKJV' }, onToast);
+    expect(B.playBibleBook).not.toHaveBeenCalled();
+    expect(onToast).toHaveBeenCalledWith(offlineToast(OFFLINE_LISTEN));
+  });
+});
+
+describe('chapterAudio', () => {
+  it("is the edition the reader's settings name when it carries the book, else main's default, else none", () => {
+    g.BIBLE_AUDIO_MANIFEST = { 'bible-brm-kjv:john': [['a', '', 'Chapter 1']], [WOP + ':john']: [['b', '', 'Chapter 1']] };
+    g.StateStore = { isReady: () => true, get: () => ({ settings: { bibleAudio: 'wop-nkjv' } }) };
+    expect(chapterAudio('john')).toMatchObject({ volKey: WOP });
+    expect(chapterAudio('john').label).toContain('NKJV');
+    g.StateStore = { isReady: () => true, get: () => ({ settings: {} }) };
+    expect(chapterAudio('john')).toMatchObject({ volKey: 'bible-brm-kjv' });
+    expect(chapterAudio('luke')).toBe(null);
   });
 });
