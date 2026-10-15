@@ -11,6 +11,7 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.EOFException
 import java.io.InputStream
+import java.io.OutputStream
 import java.util.zip.CRC32
 import timber.log.Timber
 
@@ -229,12 +230,15 @@ class StorageManager(private val context: Context) {
      */
     fun beginV3Export(uri: Uri, manifestBytes: ByteArray): Result<Unit> = synchronized(v3Lock) {
         closeExportQuietly()
+        // Held outside the try so the catch can release it: until exportOut is
+        // assigned below, closeExportQuietly() has nothing to close.
+        var raw: OutputStream? = null
         return try {
             // "wt", never the default "w": a SAF provider need not truncate on "w"
             // (Android 10+), so saving over a larger same-day .votbak kept the old
             // file's tail after the new trailer and Verify / Import then called a good
             // backup corrupt (W12, sweep 2026-10-13). writeTextToUri uses "wt" too.
-            val raw = context.contentResolver.openOutputStream(uri, "wt")
+            raw = context.contentResolver.openOutputStream(uri, "wt")
                 ?: return Result.Failure("no_output_stream")
             val out = DataOutputStream(BufferedOutputStream(raw))
             out.write(CONTAINER_MAGIC)
@@ -247,6 +251,18 @@ class StorageManager(private val context: Context) {
         } catch (e: Exception) {
             Timber.w(e, "beginV3Export failed")
             closeExportQuietly()
+            // Sweep v090: once the "wt" open has returned a stream the document is
+            // already truncated, so a header write that throws leaves a headless
+            // .votbak at the chosen path, and the driver's abort can't reach it
+            // (finishV3Export returns no_session first). Close the provider stream
+            // (the buffered header bytes are being discarded, so no flush) and delete
+            // the partial, the fail-clean contract finishV3Export and writeTextToUri
+            // keep. An open that threw never truncated anything (raw is null), and a
+            // pre-existing backup behind the URI must stay intact, so no delete then.
+            raw?.let { stream ->
+                try { stream.close() } catch (_: Exception) { /* already failing */ }
+                deleteDocumentQuietly(uri)
+            }
             Result.Failure(e.message ?: "begin_failed")
         }
     }
