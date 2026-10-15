@@ -14,16 +14,22 @@ describe('LetterBlock', () => {
     expect(p.textContent).toBe(segmentsDomText(segments));
     expect(p.textContent).toBe('Thus says The Lord to His servant: Many things you must overcome.');
   });
-  it('a footnote mark is a superscript; a closing block keeps its type as its class', () => {
-    const { container } = render(<LetterBlock block={{ type: 'closing', segments: [{ t: 'italic', v: 'says The Lord.' }, { t: 'fn', v: '1' }] }} />);
-    expect(container.querySelector('p.closing i').textContent).toBe('says The Lord.');
-    expect(container.querySelector('sup.fn').textContent).toBe('1');
+  it("a footnote mark is a superscript (main's .fn-ref chrome); a closing-fn block keeps its type as its class", () => {
+    const { container } = render(<LetterBlock block={{ type: 'closing-fn', segments: [{ t: 'italic', v: 'says The Lord.' }, { t: 'fn', v: '1' }] }} />);
+    expect(container.querySelector('p.closing-fn i').textContent).toBe('says The Lord.');
+    expect(container.querySelector('sup.fn.fn-ref').textContent).toBe('1');
   });
-  it('poetry: one paragraph, a span per line, stanza breaks between', () => {
+  it('a closing block shows its words: the corpus keeps them as text ("Says The Lord."), not segments', () => {
+    const { container } = render(<LetterBlock block={{ type: 'closing', text: 'Says The Lord.' }} hlKey="letter:x:4" />);
+    const p = container.querySelector('p.closing');
+    expect(p.textContent).toBe('Says The Lord.');
+    expect(p.getAttribute('data-hl-key')).toBe('letter:x:4');
+  });
+  it("poetry: a block of lines, stanza breaks between (block elements: a copy or a mark breaks the line, as main's)", () => {
     const lines = [[{ t: 'italic', v: 'For in My love' }], [{ t: 'stanza-break' }], [{ t: 'italic', v: 'Were you created' }]];
     const { container } = render(<LetterBlock block={{ type: 'poetry', lines }} />);
-    const p = container.querySelector('p.poetry');
-    expect([...p.children].map((c) => c.className)).toEqual(['poem', 'stanza-break', 'poem']);
+    const p = container.querySelector('div.poetry');
+    expect([...p.children].map((c) => c.tagName + '.' + c.className)).toEqual(['DIV.poem', 'DIV.stanza-break', 'DIV.poem']);
     expect(p.textContent).toBe('For in My loveWere you created');
   });
 });

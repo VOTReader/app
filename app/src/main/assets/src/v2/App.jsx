@@ -12,6 +12,7 @@ import { bookTitle } from './home-facts.js';
 import { placeFor } from './places.js';
 import { usePlayer, MiniPlayer, NowPlaying, PlayerSheet, PlayerBar } from './player/Player.jsx';
 import { useFullScreen, FullScreenToast } from './player/full-screen.jsx';
+import { SheetLayer, closeTopSheet } from './Sheet.jsx';
 import './screens/index.js';
 
 const g = /** @type {any} */ (globalThis);
@@ -55,16 +56,19 @@ export function routeTitle(r) {
 
 /**
  * Scrolls `el` so the gate's `scroll` holds: a number is px from the top; a selector puts that element's top right under
- * the top bar (the phone's bar sits above the scroller; the laptop's is sticky inside it).
- * @param {HTMLElement} el @param {number | string} scroll
+ * the top bar (the phone's bar sits above the scroller; the laptop's is sticky inside it); { to, gap } leaves `gap` px
+ * between the bar and the element.
+ * @param {HTMLElement} el @param {number | string | { to: string, gap?: number }} scroll
  */
 export function applyGateScroll(el, scroll) {
   if (typeof scroll === 'number') { el.scrollTop = scroll; return; }
-  const target = /** @type {HTMLElement | null} */ (el.querySelector(scroll));
+  const sel = typeof scroll === 'string' ? scroll : scroll.to;
+  const gap = typeof scroll === 'string' ? 0 : scroll.gap || 0;
+  const target = /** @type {HTMLElement | null} */ (el.querySelector(sel));
   if (!target) return;
   const bar = el.querySelector(':scope > .col > .tb');
   const top = bar ? bar.getBoundingClientRect().bottom : el.getBoundingClientRect().top;
-  el.scrollTop += target.getBoundingClientRect().top - top;
+  el.scrollTop += target.getBoundingClientRect().top - top - gap;
 }
 
 function TopBar({ back, onBack, actions, scrolled }) {
@@ -98,6 +102,7 @@ export function V2App({ gateId = readGateId() }) {
   const [facts] = React.useState(() => (gate && gate.facts ? gate.facts : savedFacts()));
   const [ready, setReady] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
+  const [layer, setLayer] = React.useState(/** @type {HTMLElement | null} */ (null));
   const desktop = useDesktop();
   const scrollRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const route = stack[stack.length - 1];
@@ -107,10 +112,17 @@ export function V2App({ gateId = readGateId() }) {
   const player = usePlayer(gate);
   const fs = useFullScreen({ enabled: !desktop && route.place === 'letter' && facts.doubleTapFullscreen !== false, gate });
 
+  // Back returns to where a page was left (a letter after its note, a list after a letter): each page's scroll is kept
+  // while a page above it is open.
+  const kept = React.useRef(/** @type {number[]} */ ([]));
+  const popped = React.useRef(false);
   const onReady = React.useCallback(() => setReady(true), []);
-  const go = React.useCallback((...routes) => { setReady(false); setStack((s) => s.concat(routes)); }, []);
-  const pop = React.useCallback(() => { setReady(false); setStack((s) => (s.length > 1 ? s.slice(0, -1) : s)); }, []);
-  const openTab = React.useCallback((id) => { setReady(false); setStack([{ place: id }]); }, []);
+  const go = React.useCallback((...routes) => {
+    setReady(false);
+    setStack((s) => { kept.current[s.length - 1] = scrollRef.current ? scrollRef.current.scrollTop : 0; return s.concat(routes); });
+  }, []);
+  const pop = React.useCallback(() => { setReady(false); popped.current = true; setStack((s) => (s.length > 1 ? s.slice(0, -1) : s)); }, []);
+  const openTab = React.useCallback((id) => { setReady(false); kept.current = []; setStack([{ place: id }]); }, []);
   const replace = React.useCallback((r) => { setReady(false); setStack((s) => s.slice(0, -1).concat(r)); }, []);
 
   // The gate: an unknown id says so at once; a known one is ready once its screen has said so and that is painted.
@@ -125,13 +137,15 @@ export function V2App({ gateId = readGateId() }) {
     return () => { live = false; };
   }, [gateId, gate, ready, player.ready]);
 
-  // Android's back (MainActivity calls window.handleAndroidBack): pop the stack, or let Android leave at a root.
+  // Android's back (MainActivity calls window.handleAndroidBack): close an open sheet, else pop the stack, or let Android
+  // leave at a root.
   const stackRef = React.useRef(stack);
   stackRef.current = stack;
   const chromeRef = React.useRef({ player, fs });
   chromeRef.current = { player, fs };
   React.useEffect(() => {
     g.handleAndroidBack = () => {
+      if (closeTopSheet()) return 'true';
       if (chromeRef.current.player.back() || chromeRef.current.fs.exit()) return 'true';
       if (stackRef.current.length > 1) { pop(); return 'true'; }
       return 'false';
@@ -139,8 +153,16 @@ export function V2App({ gateId = readGateId() }) {
     return () => { delete g.handleAndroidBack; };
   }, [pop]);
 
-  // A new page starts at its top; the top bar draws its hairline once the page has scrolled under it.
-  React.useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; setScrolled(false); }, [route]);
+  // A new page starts at its top, a page Back returns to where it was left; the top bar draws its hairline once the page
+  // has scrolled under it.
+  React.useEffect(() => {
+    const depth = stackRef.current.length - 1;
+    const at = popped.current ? kept.current[depth] || 0 : 0;
+    popped.current = false;
+    kept.current.length = Math.min(kept.current.length, depth);
+    if (scrollRef.current) scrollRef.current.scrollTop = at;
+    setScrolled(!!scrollRef.current && scrollRef.current.scrollTop > 0);
+  }, [route]);
   const onScroll = React.useCallback((e) => {
     const s = e.currentTarget.scrollTop > 0;
     setScrolled((was) => (was === s ? was : s));
@@ -169,33 +191,42 @@ export function V2App({ gateId = readGateId() }) {
   ));
   const bar = <TopBar back={back} onBack={pop} actions={actions} scrolled={scrolled} />;
 
+  // the layer sheets and dialogs portal into (Sheet.jsx): over the whole window, outside the scrolling page
+  const layerHost = <div className="v2-layer" ref={setLayer} />;
+
   if (desktop) {
     return (
-      <div className="v2 dk">
-        <nav className="rail" data-zone="rail" aria-label="Places">{tabs}</nav>
-        <div className="pane">
-          <div className="main" ref={scrollRef} onScroll={onScroll}>
-            <div className="col" data-zone="col">
-              {bar}
-              <div className={contentClass}>{screen}</div>
+      <SheetLayer.Provider value={layer}>
+        <div className="v2 dk">
+          <nav className="rail" data-zone="rail" aria-label="Places">{tabs}</nav>
+          <div className="pane">
+            <div className="main" ref={scrollRef} onScroll={onScroll}>
+              <div className="col" data-zone="col">
+                {bar}
+                <div className={contentClass}>{screen}</div>
+              </div>
             </div>
+            <PlayerBar player={player} />
+            <NowPlaying player={player} desktop go={go} />
           </div>
-          <PlayerBar player={player} />
-          <NowPlaying player={player} desktop go={go} />
+          <PlayerSheet player={player} desktop />
+          {layerHost}
         </div>
-        <PlayerSheet player={player} desktop />
-      </div>
+      </SheetLayer.Provider>
     );
   }
   return (
-    <div className={'v2 v2-phone' + (fs.full ? ' full' : '')}>
-      {!fs.full && bar}
-      <div className={contentClass + (fs.full ? ' full' : '')} ref={scrollRef} onScroll={onScroll}>{screen}<FullScreenToast text={fs.full ? fs.toast : null} /></div>
-      {!fs.full && <MiniPlayer player={player} />}
-      {!fs.full && <nav className="tabbar" aria-label="Places">{tabs}</nav>}
-      <NowPlaying player={player} desktop={false} go={go} />
-      <PlayerSheet player={player} desktop={false} />
-    </div>
+    <SheetLayer.Provider value={layer}>
+      <div className={'v2 v2-phone' + (fs.full ? ' full' : '')}>
+        {!fs.full && bar}
+        <div className={contentClass + (fs.full ? ' full' : '')} ref={scrollRef} onScroll={onScroll}>{screen}<FullScreenToast text={fs.full ? fs.toast : null} /></div>
+        {!fs.full && <MiniPlayer player={player} />}
+        {!fs.full && <nav className="tabbar" aria-label="Places">{tabs}</nav>}
+        <NowPlaying player={player} desktop={false} go={go} />
+        <PlayerSheet player={player} desktop={false} />
+        {layerHost}
+      </div>
+    </SheetLayer.Provider>
   );
 }
 

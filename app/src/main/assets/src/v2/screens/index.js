@@ -8,3 +8,4 @@ import './NotesScreen.jsx';
 import './JournalEditor.jsx';
 import './SearchScreen.jsx';
 import './BibleChapterScreen.jsx';
+import './NoteEditor.jsx';

@@ -26,8 +26,9 @@ const DAY = 24 * 3600 * 1000;
  * @typedef {{ place: string, collection?: string, n?: number, kind?: string, id?: string, book?: string, chapter?: number | string,
  *   verse?: number, match?: string[] }} Route
  * @typedef {{ item: Record<string, any>, reader: string, at: number, length: number, paused: boolean } & Record<string, any>} GatePlaying
- * @typedef {{ stack: Route[], facts?: Record<string, any>, scroll?: number | string, playing?: GatePlaying | null,
- *   player?: Record<string, any> }} GateState
+ * `open` names a sheet the screen opens on the gate boot ({ sheet: 'mark-paragraph', para, colour } on a letter).
+ * @typedef {{ stack: Route[], facts?: Record<string, any>, scroll?: number | string | { to: string, gap?: number },
+ *   playing?: GatePlaying | null, player?: Record<string, any>, open?: Record<string, any> }} GateState
  */
 
 /** Letter 1 of Volume One loaded at 3:51 of 10:08, read by Benjamin (states.json 0a, 0b, 2a, 1b). */
@@ -82,6 +83,13 @@ export const GATE_STATES = {
   // states.json 1a-letter: Volume One, Letter 1 (Chosen by God), top of the page, not playing; Back says Volume One.
   '1a-letter': {
     stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],
+  },
+  // states.json 4b-mark-paragraph: Letter 1's first paragraph tapped (its gold bar just under the top bar, the head
+  // scrolled away), "Mark this paragraph" open with gold ringed; nothing playing.
+  '4b-mark-paragraph': {
+    stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],
+    scroll: { to: '.body [data-hl-key$=":0"]', gap: 20 },
+    open: { sheet: 'mark-paragraph', para: 0, colour: 'gold' },
   },
   // states.json 3c-notes (zv1): the Notes tab, All; a journal entry, a highlight and a note today/yesterday, a bookmark
   // Sunday, a link Oct 9.

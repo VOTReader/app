@@ -205,6 +205,20 @@ describe('2a-collection, the gate picture', () => {
     expect(container.querySelector('h1').textContent).toBe('Chosen by God');
     expect(container.querySelector('.tb .title').textContent).toBe('Volume One');
   });
+
+  it('Back returns to where the list was left; the letter opened at its top', () => {
+    const { container } = render(<V2App gateId="2a-collection" />);
+    const scroller = container.querySelector('.v2-phone > .content');
+    let top = 0;
+    Object.defineProperty(scroller, 'scrollTop', { configurable: true, get: () => top, set: (v) => { top = v; } });
+    top = 420;
+    click(container.querySelectorAll('.rows .num-row button.tx')[3]);
+    expect(container.querySelector('h1').textContent).toBe('Christmas');
+    expect(top).toBe(0);
+    click(container.querySelector('.tb button[aria-label="Back to Volume One"]'));
+    expect(container.querySelector('h1').textContent).toBe('Volume One');
+    expect(top).toBe(420);
+  });
 });
 
 describe('a real boot', () => {
