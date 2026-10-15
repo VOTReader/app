@@ -132,6 +132,18 @@ describe('MyProgressScreen — summary + empty states (brand-new user)', () => {
     expect(fact(container, 'Entries')).toBe('4');
   });
 
+  /* Sweep v054: the article was hard-coded 'a ', so a streak read aloud as "eight", "eleven",
+     "eighteen" or "eighty-..." printed "a 8-day reading streak". The article follows the spoken number. */
+  it.each([
+    [8, 'an'], [11, 'an'], [18, 'an'], [80, 'an'], [84, 'an'], [89, 'an'], [800, 'an'], [8000, 'an'], [11000, 'an'],
+    [2, 'a'], [7, 'a'], [12, 'a'], [19, 'a'], [28, 'a'], [100, 'a'], [111, 'a'], [180, 'a'], [1100, 'a'], [1800, 'a'],
+  ])('says "%s-day" with the article its spoken number takes (%s)', (n, article) => {
+    setupGlobals({ readStreak: n });
+    const { container } = renderScreen();
+    const lead = article.charAt(0).toUpperCase() + article.slice(1);
+    expect(summaryOf(container)).toBe(lead + ' ' + n + '-day reading streak.');
+  });
+
   it('says only what is true: one reading, no one-day "streak", no entries', () => {
     setupGlobals({ readStreak: 1 });
     const { container } = renderScreen({ readItems: { 'v1:mark:1': 1 } });
