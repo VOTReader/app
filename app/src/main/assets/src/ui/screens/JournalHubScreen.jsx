@@ -125,6 +125,14 @@ export function JournalHubScreen(props) {
 
   var allEntries = JournalStore.all();
 
+  // The journal→journal back stack (JournalViewerScreen's onJournalCard) is a
+  // chain of linked-entry card taps. Reaching the hub means the reader left
+  // that chain, so drop it: a stale frame made an entry opened from here show
+  // "Back to <the entry it was once linked from>" and sent back there (v046).
+  React.useEffect(function() {
+    if (typeof window !== 'undefined' && window.__journalBackStack) window.__journalBackStack.length = 0;
+  }, []);
+
   // ─── Unclaimed recordings (journal-3 clause (b)) ───────────
   // Skipping the prune is only half of "never deleted, and always visible".
   // A record nothing references and nothing shows is preserved and invisible,

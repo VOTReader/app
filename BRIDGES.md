@@ -191,9 +191,9 @@ old per-slot line numbers had drifted). The backing store is a window-held Map
 share it. (`__pendingLinkExcerpt` was removed in D2 — write-only dead code.)
 
 ### `__journalBackStack`
-- **Setter:** `src/ui/screens/JournalViewerScreen.js:495,556` — lazy-init (`if (!window.__journalBackStack) window.__journalBackStack = []`)
-- **Cleanup:** none (lazy-init pattern; entries pushed/popped by code)
-- **Consumers:** JournalViewerScreen back-button handler
+- **Setter:** `src/ui/screens/JournalViewerScreen.jsx` (render and `onJournalCard`) — lazy-init (`if (!window.__journalBackStack) window.__journalBackStack = []`)
+- **Cleanup:** emptied in place (`length = 0`) when the Journal hub mounts (`src/ui/screens/JournalHubScreen.jsx`) and when `navigateToLink` opens a journal entry (`src/hooks/use-navigate-to-link.js`): the stack holds only an unbroken chain of linked-entry card taps (sweep v046)
+- **Consumers:** JournalViewerScreen back pill / nav arrow, and use-android-back.js's journal-viewer branch
 
 ---
 
