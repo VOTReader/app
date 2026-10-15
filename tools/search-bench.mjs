@@ -136,6 +136,8 @@ const isLetterKey = (k) => /^(v[1-7]|timothy|flock|rebuke)\//.test(k);
 /** The target's equivalence class, the tier its original sits in, and whether it has one original at all. */
 function classOf(c) {
   const members = new Set();
+  /** members a heading target names by their own title: opening one is arriving under the heading */
+  const titled = new Set();
   if (c.level === 'verse') {
     for (const k of matthewTwin(c.uk)) members.add(k);
     return { members, best: 0, recurring: false };
@@ -154,10 +156,10 @@ function classOf(c) {
     // So does a heading that is a text's own title, with or without a note after it ("Stop Lying to Your Children
     // (Regarding Santa, the Easter Bunny...)" heads the Words To Live By entry the topic reprints under it).
     const head = norm(c.sentence.trim().replace(/\s*\([^()]*\)$/, ''));
-    if (head.trim().split(' ').length >= 3) for (const k of titleNorm[head] || []) if (k !== c.uk) members.add(k);
+    if (head.trim().split(' ').length >= 3) for (const k of titleNorm[head] || []) if (k !== c.uk) { members.add(k); titled.add(k); }
     members.add(c.uk);
   }
-  return { members, best: Math.min(...[...members].map(TIER)), recurring: recurring(members, isVerseKey, isLetterKey) };
+  return { members, titled, best: Math.min(...[...members].map(TIER)), recurring: recurring(members, isVerseKey, isLetterKey) };
 }
 
 /* FAIR TO ASK? (path to 500, step 3, 2026-10-05). `--audit <out.json>`: for every case, the texts outside its
@@ -274,7 +276,8 @@ for (const c of cases) {
     const twin = (a, b) => matthewTwin(a).includes(b);
     if (!cls.members.has(k)) why = 'first hit is not the target (' + (f.hit.doc.ref || k) + ')';
     else if (!cls.recurring && TIER(k) > cls.best) why = 'a reprint leads the original (' + (f.hit.doc.ref || k) + ')';
-    else if (c.level === 'sentence' && !lands(f.hit, cardTerms(r), c)) why = 'lands off the sentence';
+    // A heading's own text has no heading line: the heading is its title, on the card and atop the page (sr11, t405).
+    else if (c.level === 'sentence' && !cls.titled.has(k) && !lands(f.hit, cardTerms(r), c)) why = 'lands off the sentence';
     else if (!cls.recurring && !reprintShown(res.map((h) => ({ key: unitKey(h.doc), card: card(h.doc) })), cls.members, k, twin)) why = 'its reprint is not in the Best Matches';
     else { pass = true; strict = matthewTwin(c.uk).includes(k) || k === c.uk; }
   }
