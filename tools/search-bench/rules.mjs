@@ -7,6 +7,10 @@
    REPRINT      when the original leads, its reprint shows too (Corbin 10-14: "both should surface, with WTLB being
                 second"): another member of the class is among the Best Matches five (SearchScreen topResults: one card
                 per text, so a copy with the same title and opening is the same card and counts as shown).
+   NEAR COPY    a recurring line with a word or two changed ("the pride of man shall be bowed down" / "is bowed down"),
+                which breaks a third of its 3-grams: 80% of its words AND of its content words in order, within a
+                stretch at most 4 words longer (sr11 t276, 2026-10-15). Such a text answers the sentence too but is no
+                original of it (Corbin 10-14: a phrase that recurs has no single original).
    ─────────────────────────────────────────────────────────────────── */
 
 const gram = (w, i) => w[i] + ' ' + w[i + 1] + ' ' + w[i + 2];
@@ -49,6 +53,43 @@ export function reprintShown(hits, members, first, same = (a, b) => a === b) {
     if (firstCard === null) { firstCard = h.card; continue; }
     if (others.includes(h.key)) return true;
     if (cards.size === 5) break;
+  }
+  return false;
+}
+
+/** Words a near copy must hold (fewer is a formula: "I am The Lord your God"), and content words among them. */
+const NEAR_MIN_WORDS = 8;
+const NEAR_MIN_CONTENT = 4;
+
+/** How many of `a`'s words `b` holds in order (longest common subsequence). */
+function inOrder(/** @type {string[]} */ a, /** @type {string[]} */ b) {
+  let prev = new Array(b.length + 1).fill(0);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [0];
+    for (let j = 1; j <= b.length; j++) cur[j] = a[i - 1] === b[j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]);
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+/**
+ * Does `text` hold `sentence` with a word or two changed? Looked for where `anchor` (one of the sentence's words,
+ * best a rare one) sits in both: 80% of the sentence's words, and 80% of its words not in `stop`, in order within
+ * a stretch at most 4 words longer than it.
+ * @param {string[]} sentence  normalized words
+ * @param {string[]} text  normalized words
+ * @param {Set<string>} stop
+ * @param {string} anchor
+ */
+export function nearCopy(sentence, text, stop, anchor) {
+  const L = sentence.length;
+  const content = sentence.filter((x) => !stop.has(x));
+  if (L < NEAR_MIN_WORDS || content.length < NEAR_MIN_CONTENT) return false;
+  for (let p = text.indexOf(anchor); p >= 0; p = text.indexOf(anchor, p + 1)) {
+    for (let r = sentence.indexOf(anchor); r >= 0; r = sentence.indexOf(anchor, r + 1)) {
+      const win = text.slice(Math.max(0, p - r - 2), p - r + L + 2);
+      if (inOrder(sentence, win) >= 0.8 * L && inOrder(content, win) >= 0.8 * content.length) return true;
+    }
   }
   return false;
 }

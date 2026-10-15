@@ -1,26 +1,26 @@
 {
- "pass": 467,
+ "pass": 470,
  "strict": 361,
  "top5": 487,
  "found": 499,
  "style": {
   "crossover": 39,
-  "exact": 75,
+  "exact": 76,
   "firstwords": 25,
   "gist": 27,
-  "middle": 49,
+  "middle": 50,
   "misremembered": 74,
-  "paraphrase": 55,
+  "paraphrase": 56,
   "rare": 48,
   "title": 33,
   "typos": 25,
   "unitgist": 17
  },
  "group": {
-  "answers": 54,
+  "answers": 56,
   "bible": 105,
   "cross": 16,
-  "letters": 180,
+  "letters": 181,
   "studies": 36,
   "words": 76
  },
