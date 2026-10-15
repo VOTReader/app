@@ -10,6 +10,8 @@ import { readGateId, gateState, markGate, whenPainted } from './gate.js';
 import { savedFacts } from './settings-facts.js';
 import { SettingsScreen } from './screens/SettingsScreen.jsx';
 import { LetterScreen, collectionOf, letterAt } from './screens/LetterScreen.jsx';
+import { placeFor } from './places.js';
+import './screens/index.js';
 
 const g = /** @type {any} */ (globalThis);
 export const DESKTOP_QUERY = '(min-width: 1024px)';
@@ -33,6 +35,8 @@ export function useDesktop() {
 /** What a route is called: its own title, and what Back says on the page above it. @param {import('./gate.js').Route} r */
 export function routeTitle(r) {
   if (!r) return '';
+  const def = placeFor(r.place);
+  if (def && def.title) return def.title(r);
   if (r.place === 'home') return 'Home';
   if (r.place === 'settings') return 'Settings';
   if (r.place === 'search') return 'Search';
@@ -114,6 +118,7 @@ export function V2App({ gateId = readGateId() }) {
   const go = React.useCallback((...routes) => { setReady(false); setStack((s) => s.concat(routes)); }, []);
   const pop = React.useCallback(() => { setReady(false); setStack((s) => (s.length > 1 ? s.slice(0, -1) : s)); }, []);
   const openTab = React.useCallback((id) => { setReady(false); setStack([{ place: id }]); }, []);
+  const replace = React.useCallback((r) => { setReady(false); setStack((s) => s.slice(0, -1).concat(r)); }, []);
 
   // The gate: an unknown id says so at once; a known one is ready once its screen has said so and that is painted.
   React.useEffect(() => {
@@ -142,7 +147,15 @@ export function V2App({ gateId = readGateId() }) {
   let screen;
   let contentClass = 'content';
   let actions = null;
-  if (route.place === 'settings') {
+  const device = desktop ? 'computer' : 'phone';
+  const def = placeFor(route.place);
+  if (def) {
+    const Screen = def.Screen;
+    contentClass = def.contentClass || 'content';
+    actions = def.actions ? def.actions({ route, go, desktop, device }) : null;
+    screen = <Screen route={route} facts={facts} gate={gate} desktop={desktop} device={device}
+      go={go} pop={pop} replace={replace} openTab={openTab} onReady={onReady} />;
+  } else if (route.place === 'settings') {
     screen = <SettingsScreen facts={facts} device={desktop ? 'computer' : 'phone'} onReady={onReady} />;
   } else if (route.place === 'letter') {
     contentClass = 'content reader';
