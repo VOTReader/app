@@ -91,6 +91,54 @@ function _isPaceSample(s) {
 }
 
 /**
+ * v062: a lifetime total or one day's word count as the finite, non-negative
+ * number the writers keep. A backup's numbers arrived unchecked, so a string
+ * total ("100") made the next completion's `total + words` concatenate into
+ * "100300", which My Progress then showed and saved. A numeric string keeps
+ * its value; anything else (junk, negative, NaN, Infinity) counts as 0.
+ * @param {any} x
+ * @returns {number}
+ */
+function _count(x) {
+  var n = (typeof x === 'number' || typeof x === 'string') ? Number(x) : NaN;
+  return isFinite(n) && n > 0 ? n : 0;
+}
+
+// A wordsByDay key exactly as _jrnDateStr writes it: a local YYYY-MM-DD date.
+var DAY_KEY = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+/**
+ * Keep the most recent MAX_DAY_KEYS day buckets (in place).
+ * @param {Record<string, number>} byDay
+ * @returns {void}
+ */
+function _pruneDays(byDay) {
+  var dayKeys = Object.keys(byDay);
+  if (dayKeys.length <= MAX_DAY_KEYS) return;
+  dayKeys.sort();  // YYYY-MM-DD sorts chronologically
+  for (var i = 0; i < dayKeys.length - MAX_DAY_KEYS; i++) delete byDay[dayKeys[i]];
+}
+
+/**
+ * v062: an imported `wordsByDay` as recordCompletion writes it: day keys
+ * only, each a positive word count, bounded to MAX_DAY_KEYS.
+ * @param {any} raw
+ * @returns {Record<string, number>}
+ */
+function _normalizeWordsByDay(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  /** @type {Record<string, number>} */
+  var out = {};
+  var keys = Object.keys(raw);
+  for (var i = 0; i < keys.length; i++) {
+    var words = _count(raw[keys[i]]);
+    if (words && DAY_KEY.test(keys[i])) out[keys[i]] = words;
+  }
+  _pruneDays(out);
+  return out;
+}
+
+/**
  * Coerce an imported `progress` map into exactly the shape recordProgress
  * writes, dropping anything that can't be made sense of, and keep only the
  * most-recently-touched MAX_PROGRESS_ITEMS. Import validation checks the
@@ -166,19 +214,16 @@ export var ReadingStatsStore = extendStore(
       var ms = Math.max(0, Math.round((args && args.activeMs) || 0));
       if (!words) return;
       var data = this._load();
-      data.totalWordsRead = (data.totalWordsRead || 0) + words;
-      data.totalActiveMs = (data.totalActiveMs || 0) + ms;
-      data.totalCompletions = (data.totalCompletions || 0) + 1;
-      if (args && args.wasReadBefore) data.rereads = (data.rereads || 0) + 1;
+      // _count, not `|| 0`: a string an earlier import stored would concatenate.
+      data.totalWordsRead = _count(data.totalWordsRead) + words;
+      data.totalActiveMs = _count(data.totalActiveMs) + ms;
+      data.totalCompletions = _count(data.totalCompletions) + 1;
+      if (args && args.wasReadBefore) data.rereads = _count(data.rereads) + 1;
 
       var day = _jrnDateStr(args && args.ts);
       var byDay = data.wordsByDay || (data.wordsByDay = {});
-      byDay[day] = (byDay[day] || 0) + words;
-      var dayKeys = Object.keys(byDay);
-      if (dayKeys.length > MAX_DAY_KEYS) {
-        dayKeys.sort();  // YYYY-MM-DD sorts chronologically
-        for (var i = 0; i < dayKeys.length - MAX_DAY_KEYS; i++) delete byDay[dayKeys[i]];
-      }
+      byDay[day] = _count(byDay[day]) + words;
+      _pruneDays(byDay);
 
       // NOTE: no pace sampling here. Completion fires the instant activeMs
       // crosses the required floor, so a completion-time sample is biased
@@ -364,11 +409,14 @@ export var ReadingStatsStore = extendStore(
       if (this._shouldDefer('replaceAll', data)) return;
       var d = (data && typeof data === 'object' && !Array.isArray(data)) ? data : /** @type {any} */ ({});
       this._cache = /** @type {any} */ ({
-        totalWordsRead: d.totalWordsRead || 0,
-        totalActiveMs: d.totalActiveMs || 0,
-        totalCompletions: d.totalCompletions || 0,
-        rereads: d.rereads || 0,
-        wordsByDay: (d.wordsByDay && typeof d.wordsByDay === 'object') ? d.wordsByDay : {},
+        // v062: the totals and day buckets cross the same trust boundary as
+        // progress below: finite, non-negative numbers, real day keys, and
+        // the MAX_DAY_KEYS bound recordCompletion keeps.
+        totalWordsRead: _count(d.totalWordsRead),
+        totalActiveMs: _count(d.totalActiveMs),
+        totalCompletions: _count(d.totalCompletions),
+        rereads: _count(d.rereads),
+        wordsByDay: _normalizeWordsByDay(d.wordsByDay),
         wpmSamples: Array.isArray(d.wpmSamples) ? d.wpmSamples.filter(_isPaceSample).slice(-MAX_WPM_SAMPLES) : [],
         // Import is a TRUST BOUNDARY: the envelope validator checks the
         // top-level shape only, so nested per-item progress arrived
