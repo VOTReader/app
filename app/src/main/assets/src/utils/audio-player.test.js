@@ -908,6 +908,81 @@ describe('audio-player — a dropped letter must not throw the rebuilt queue awa
   });
 });
 
+describe('audio-player — the restored bar closed while its first Play still loads the corpus (sweep v82)', () => {
+  /* The first tap on a restored bar clears the pending restore and then awaits the lazy VOT corpus (2-5 MB, seconds
+     on a budget phone). A ✕ in that window ran stop(), and the rebuild then carried on regardless: it set the source,
+     the queue and qi and started playing, so the bar the reader had just closed came back, playing. */
+  const SNAPSHOT = {
+    v: 2, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 0,
+    key: 'vol1:preface', time: 90,
+    track: { key: 'vol1:preface', title: 'Preface', sub: 'Volume One', url: URL_OF('idPreface'), readerCode: 'B', partLabel: null },
+  };
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  /** A cold boot onto a restored bar before the VOT corpus has landed; returns the call that lands it. */
+  async function restoredBeforeCorpus() {
+    localStorage.setItem('vot-audio-pos', JSON.stringify(SNAPSHOT));
+    await load();
+    delete globalThis.AUDIO_MANIFEST;
+    let land = () => {};
+    globalThis.__loadVotCorpus = vi.fn(() => new Promise((res) => {
+      land = () => {
+        globalThis.AUDIO_MANIFEST = MANIFEST;
+        globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+        globalThis.colPreface = () => ITEMS[0];
+        globalThis.colLetterArr = () => ITEMS.slice(1);
+        res();
+      };
+    }));
+    return () => land();
+  }
+
+  afterEach(() => {
+    delete globalThis.__loadVotCorpus;
+    delete globalThis.COL_BY_KEY;
+    delete globalThis.colPreface;
+    delete globalThis.colLetterArr;
+  });
+
+  it('CONTROL: with nothing in between, the rebuild waits for the corpus and then plays from the saved place', async () => {
+    const landCorpus = await restoredBeforeCorpus();
+    AudioPlayer.toggle();
+    await flush();
+    expect(globalThis.__loadVotCorpus).toHaveBeenCalledTimes(1);
+    landCorpus();
+    await flush();
+    const st = AudioPlayer.getState();
+    expect(st.status).not.toBe('idle');
+    expect(st.queue.map((t) => t.url)).toEqual([URL_OF('idPreface'), URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
+    expect(el().src).toBe(URL_OF('idPreface'));
+  });
+
+  it('THE READER-FACING CONSEQUENCE: ✕ during the corpus load stays closed once the corpus lands', async () => {
+    const landCorpus = await restoredBeforeCorpus();
+    AudioPlayer.toggle();
+    await flush();
+    AudioPlayer.stop();
+    landCorpus();
+    await flush();
+    const st = AudioPlayer.getState();
+    expect(st.status).toBe('idle');
+    expect(st.queue).toHaveLength(0);
+    expect(el() ? el().played : false).toBe(false);
+    expect(localStorage.getItem('vot-audio-pos')).toBe(null);   // nothing for the next boot to resurrect
+  });
+
+  it('Next on the one-track placeholder during the load ends the bar, and it stays ended', async () => {
+    const landCorpus = await restoredBeforeCorpus();
+    AudioPlayer.toggle();
+    await flush();
+    AudioPlayer.next();   // no pending restore any more, a queue of one: next() stops
+    landCorpus();
+    await flush();
+    expect(AudioPlayer.getState().status).toBe('idle');
+    expect(el() ? el().played : false).toBe(false);
+  });
+});
+
 describe('audio-player — the boot snapshot after a finished recording (audio-player-3)', () => {
   /** Play the collection and put a real clock on it, so there is something to write back. */
   const playedTo = (seconds) => {

@@ -138,6 +138,10 @@ export async function _rebuildRestoredQueue() {
   const saved = { key: typeof r.key === 'string' ? r.key : '', url: r.url };
   if (_unreachable(/** @type {any} */ (saved))) { _offlineNotice(saved); return false; }
   _setPendingRestore(null);
+  // The bar this rebuild stands in for. Every queue change makes a new array (stop()'s ✕, next() ending the
+  // one-track placeholder, any new play), so a different one after the awaits below means the reader has moved
+  // on while the corpus loaded: the rebuild is void, never a resurrection of a bar they closed (sweep v82).
+  const placeholder = _state.queue;
   const g = _g();
   if (r.mode === 'songs') {
     try { await loadSongCatalog(); } catch (_e) { /* no catalog — fall through to the placeholder track */ }
@@ -148,6 +152,7 @@ export async function _rebuildRestoredQueue() {
     } else if (!_manifest() && typeof g.__loadVotCorpus === 'function') await g.__loadVotCorpus();
   } catch (_e) { /* corpus load failed — fall through to the placeholder track */ }
   }
+  if (_state.queue !== placeholder) return false;
   /** @type {Track[]} */
   let queue = [];
   if (r.mode === 'custom') {
