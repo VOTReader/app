@@ -16,6 +16,7 @@ import { SheetLayer, closeTopSheet } from './Sheet.jsx';
 import { AaSheet } from './screens/AaSheet.jsx';
 import { applyLook, savedLook, saveLook, gateLook, sizeWord } from './look.js';
 import { useReadingRecord } from './reading-record.js';
+import { useReadingBars, READING_PLACES } from './reading-bars.js';
 import './screens/index.js';
 
 const g = /** @type {any} */ (globalThis);
@@ -60,11 +61,13 @@ export function routeTitle(r) {
 /**
  * Scrolls `el` so the gate's `scroll` holds: a number is px from the top; a selector puts that element's top right under
  * the top bar (the phone's bar sits above the scroller; the laptop's is sticky inside it); { to, gap } leaves `gap` px
- * between the bar and the element.
- * @param {HTMLElement} el @param {number | string | { to: string, gap?: number }} scroll
+ * between the bar and the element; `phone: true` scrolls the phone only (the laptop's picture sits at the top).
+ * @param {HTMLElement} el @param {number | string | { to: string, gap?: number, phone?: boolean }} scroll
+ * @param {boolean} [desktop]
  */
-export function applyGateScroll(el, scroll) {
+export function applyGateScroll(el, scroll, desktop = false) {
   if (typeof scroll === 'number') { el.scrollTop = scroll; return; }
+  if (typeof scroll === 'object' && scroll.phone && desktop) return;
   const sel = typeof scroll === 'string' ? scroll : scroll.to;
   const gap = typeof scroll === 'string' ? 0 : scroll.gap || 0;
   const target = /** @type {HTMLElement | null} */ (el.querySelector(sel));
@@ -122,6 +125,10 @@ export function V2App({ gateId = readGateId() }) {
   // The player is shell chrome (rv1): the mini player / player bar, Now playing, its sheets, and full screen.
   const player = usePlayer(gate);
   const fs = useFullScreen({ enabled: !desktop && route.place === 'letter' && facts.doubleTapFullscreen !== false, gate });
+  // The phone's bars step aside while a recording plays on a reading page scrolled into its text (reading-bars.js).
+  const bars = useReadingBars({ scrollRef, on: !desktop && !fs.full && READING_PLACES.includes(route.place) && !!player.playing, page: route });
+  const barsRef = React.useRef(bars);
+  barsRef.current = bars;
 
   // Back returns to where a page was left (a letter after its note, a list after a letter): each page's scroll is kept
   // while a page above it is open.
@@ -142,11 +149,11 @@ export function V2App({ gateId = readGateId() }) {
     if (!gate) { markGate('unknown'); return undefined; }
     if (!ready || !player.ready) { markGate('waiting'); return undefined; }
     const el = scrollRef.current;
-    if (el && gate.scroll != null) { applyGateScroll(el, gate.scroll); setScrolled(el.scrollTop > 0); }
+    if (el && gate.scroll != null) { applyGateScroll(el, gate.scroll, desktop); setScrolled(el.scrollTop > 0); barsRef.current.check(); }
     let live = true;
     whenPainted().then(() => { if (live) markGate('ready'); });
     return () => { live = false; };
-  }, [gateId, gate, ready, player.ready]);
+  }, [gateId, gate, ready, player.ready, desktop]);
 
   // Android's back (MainActivity calls window.handleAndroidBack): close an open sheet, else pop the stack, or let Android
   // leave at a root.
@@ -177,6 +184,7 @@ export function V2App({ gateId = readGateId() }) {
   const onScroll = React.useCallback((e) => {
     const s = e.currentTarget.scrollTop > 0;
     setScrolled((was) => (was === s ? was : s));
+    barsRef.current.check();
   }, []);
 
   // What the reader reads is kept as main keeps it (reading-record.js): history, place, read marks. Never on a gate boot.
@@ -242,11 +250,11 @@ export function V2App({ gateId = readGateId() }) {
   }
   return (
     <SheetLayer.Provider value={layer}>
-      <div className={'v2 v2-phone' + (fs.full ? ' full' : '') + (bare ? ' bare' : '')}>
-        {!fs.full && !bare && bar}
+      <div className={'v2 v2-phone' + (fs.full ? ' full' : '') + (bare ? ' bare' : '') + (bars.hidden ? ' bars-off' : '')}>
+        {!fs.full && !bare && !bars.hidden && bar}
         <div className={contentClass + (fs.full ? ' full' : '')} ref={scrollRef} onScroll={onScroll} data-scroller="">{screen}<FullScreenToast text={fs.full ? fs.toast : null} /></div>
         {!fs.full && !bare && <MiniPlayer player={player} />}
-        {!fs.full && !bare && <nav className="tabbar" aria-label="Places">{tabs}</nav>}
+        {!fs.full && !bare && !bars.hidden && <nav className="tabbar" aria-label="Places">{tabs}</nav>}
         <NowPlaying player={player} desktop={false} go={go} />
         <PlayerSheet player={player} desktop={false} />
         {layerHost}

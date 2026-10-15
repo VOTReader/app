@@ -31,7 +31,7 @@ const DAY = 24 * 3600 * 1000;
  * `open` names a sheet the screen opens on the gate boot ({ sheet: 'mark-paragraph', para, colour } on a letter; the
  * shell's { sheet: 'text-and-theme' }; 9c's { toast: 'offline-listen' }, the Listen pill's); `look` the text and page
  * shown (look.js: { scale, page, lines }; Slate otherwise).
- * @typedef {{ stack: Route[], facts?: Record<string, any>, scroll?: number | string | { to: string, gap?: number },
+ * @typedef {{ stack: Route[], facts?: Record<string, any>, scroll?: number | string | { to: string, gap?: number, phone?: boolean },
  *   playing?: GatePlaying | null, player?: Record<string, any>, open?: Record<string, any>,
  *   look?: { scale?: number, page?: string, lines?: string } }} GateState
  */
@@ -100,6 +100,17 @@ export const GATE_STATES = {
     stack: [{ place: 'home' }, { place: 'bible' }, { place: 'bible-book', book: 'genesis' }],
     facts: { bible: { read: { genesis: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] }, place: { genesis: 12 } } },
     playing: { item: { book: 'john', chapter: 3 }, reader: 'B', at: 46, length: 384, paused: true },
+  },
+  // states.json 1b-letter-playing: Letter 1 playing, scrolled into the text with the bars stepped aside (reading-bars.js),
+  // one clause lit, the mini player. The picture's 3:51 of 10:08 was drawn, not measured: Letter 1's recording runs 75 s
+  // and 0:47 lights "For the years draw short, Timothy," (readalong 10-15; the app lights a clause, never the whole
+  // sentence). Phone only: paragraph 1 starts 93 px above where the top bar ends before it steps aside (the shift keeps
+  // lines still), so line 2 sits right under the status bar as drawn (measured against the picture with measure.py);
+  // the laptop stays at the top, bars shown.
+  '1b-letter-playing': {
+    stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],
+    playing: { ...LETTER_ONE_PLAYING, at: 47, length: 75 },
+    scroll: { to: '.body [data-hl-key$=":0"]', gap: -93, phone: true },
   },
   // states.json 1c-aa-sheet: Letter 1 at its top, Text and theme open: standard size (step 3 of 6), Slate, Comfortable.
   '1c-aa-sheet': {
