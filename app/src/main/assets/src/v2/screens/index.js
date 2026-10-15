@@ -15,3 +15,4 @@ import './PlansScreen.jsx';
 import './WelcomeScreen.jsx';
 import './InstallOffer.jsx';
 import './SafariNotice.jsx';
+import './StudiesScreen.jsx';

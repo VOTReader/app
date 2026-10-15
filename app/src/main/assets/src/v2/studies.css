@@ -1,0 +1,13 @@
+/* studies.css - v2's Studies places (zones v2p5, design dz14: 2d, 2e, 5d, 5f). The look is the kit's (screens.css's
+   .row.stu / .row.part / .pch / .row.stc recipes); these rules only make the app's tappable pieces draw as the kit's divs. */
+
+/* a row that is itself the button keeps the kit's two-line clamp on its title */
+.v2 button.num-row .t { display: -webkit-box; }
+/* the website row is a link drawn as a row */
+.v2 a.row { color: inherit; text-decoration: none; }
+.v2 a.row .tx, .v2 a.row .t, .v2 a.row .s { display: block; }
+/* the chapter you are on reaches back over the part's step-in (the kit's div does by its margin; a full-width button needs
+   the width too) */
+.v2 button.row.stc.cur { width: calc(100% + 14px); }
+/* main's "Some studies couldn't load." and its Try again */
+.empty.stu-err { display: flex; flex-direction: column; align-items: center; gap: 14px; }

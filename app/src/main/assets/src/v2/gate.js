@@ -28,7 +28,7 @@ const DAY = 24 * 3600 * 1000;
  * open ('now-playing', or a sheet: 'speed' | 'sleep' | 'up-next' | 'more'), full (full screen) and toast (the hint drawn).
  * playing.savedRecording: the recording is in the Listening Library's Saved (2f's Save; default not).
  * @typedef {{ place: string, collection?: string, n?: number, kind?: string, id?: string, book?: string, chapter?: number | string,
- *   verse?: number, match?: string[] }} Route
+ *   verse?: number, match?: string[], study?: string }} Route
  * @typedef {{ item: Record<string, any>, reader: string, at: number, length: number, paused: boolean } & Record<string, any>} GatePlaying
  * `open` names a sheet the screen opens on the gate boot ({ sheet: 'mark-paragraph', para, colour } on a letter; the
  * shell's { sheet: 'text-and-theme' }; 9c's { toast: 'offline-listen' }, the Listen pill's); `look` the text and page
@@ -220,6 +220,25 @@ export const GATE_STATES = {
     stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],
     scroll: { to: '.body [data-hl-key$=":0"]', gap: 20 },
     open: { sheet: 'safari-7day', para: 0 },
+  },
+  // states.json 2d-studies: Studies from Home, at the top; coverage pinned, not live: the Matthew Study Bible and Purity
+  // read along, Lamb of God reads along in 14 of its 16 chapters, the rest have no recording.
+  '2d-studies': {
+    stack: [{ place: 'home' }, { place: 'studies' }],
+    facts: { studies: { coverage: {
+      'matthew-study': { state: 'read-along' },
+      purity: { state: 'read-along', recorded: 6, total: 6 },
+      'lamb-of-god': { state: 'read-along', recorded: 14, total: 16 },
+    } } },
+  },
+  // states.json 2e-study-index: YAHUSHUA More Than a Man from Studies, at the top: the Preface and Part 1's first chapter
+  // read, Part 1 open, its chapter 2 the one you are on.
+  '2e-study-index': {
+    stack: [{ place: 'home' }, { place: 'studies' }, { place: 'study', study: 'more-than-a-man' }],
+    facts: { studies: {
+      place: { current: 'more-than-a-man-ch2', read: ['more-than-a-man-ch0', 'more-than-a-man-ch1'] },
+      open: [1],
+    } },
   },
 };
 
