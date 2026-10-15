@@ -306,9 +306,6 @@ export function useNavigateToLink({
       setBookId(null); setChapterNum(null);
       setStudyId(null); setStudyChapterId(null);
       setLetterId(null);
-      // A jump from outside starts no journal→journal chain: drop any frame an
-      // earlier card tap left, or it outranks this jump's own back pill (v046).
-      if (window.__journalBackStack) window.__journalBackStack.length = 0;
       setJournalEntryId(endpoint.entryId);
       setScreen('journal-viewer');
     } else if (endpoint.screen) {

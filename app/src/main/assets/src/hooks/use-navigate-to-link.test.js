@@ -369,22 +369,6 @@ describe('useNavigateToLink — every endpoint kind and the prologue', () => {
     });
   });
 
-  // sweep v046: a journal→journal frame left over from an earlier card tap
-  // (A → B) made B show "Back to A" over this jump's own back pill, and sent
-  // the back arrow to A. Opening an entry from outside drops that chain.
-  it('a journal endpoint drops a stale journal→journal back frame', () => {
-    window.__journalBackStack = [{ destId: 'e42', fromId: 'e1', fromTitle: 'Morning' }];
-    try {
-      const p = makeParams();
-      const { result } = renderHook(() => useNavigateToLink(p));
-      act(() => { result.current.navigateToLink({ type: 'journal', entryId: 'e42' }); });
-      expect(p.setScreen).toHaveBeenCalledWith('journal-viewer');
-      expect(window.__journalBackStack).toEqual([]);
-    } finally {
-      delete window.__journalBackStack;
-    }
-  });
-
   it('a screen-driven endpoint opens that screen with its letterId', () => {
     const p = makeParams();
     const { result } = renderHook(() => useNavigateToLink(p));
