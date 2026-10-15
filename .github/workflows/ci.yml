@@ -456,9 +456,14 @@ jobs:
     name: browser (smoke render walk + end-to-end)
     runs-on: ubuntu-latest
     timeout-minutes: 30   # n7-05: a hung browser step must not hold a runner (and the deploy) for 6 h
+    # Branch v2 (the redesign, built from scratch and never shipped without Corbin; mw4 2026-10-14) mounts the v2 shell
+    # instead of the v1 App, so every suite below (the smoke render walk and the e2e walks) drives screens v2 does not
+    # have. v2's screens are proved against their pictures by the design lane's screenshot gates (measure.py --gate on
+    # the S22, desk.py on the laptop) and by vitest; this job comes back for v2 suite by suite as v2 grows into them.
     if: >-
+      github.ref != 'refs/heads/v2' && (
       github.event_name != 'pull_request' ||
-      github.event.pull_request.head.repo.full_name != github.repository
+      github.event.pull_request.head.repo.full_name != github.repository)
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -632,7 +637,8 @@ jobs:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
           echo "gates/vitest/browser/search-bench: $RESULTS"
-          for r in $RESULTS; do [ "$r" = success ] || exit 1; done
+          # On branch v2 the browser job is skipped on purpose (see its if:); there `skipped` counts, nothing else does.
+          for r in $RESULTS; do [ "$r" = success ] || { [ "$r" = skipped ] && [ "$GITHUB_REF" = refs/heads/v2 ]; } || exit 1; done
 
 
   kotlin-tests:

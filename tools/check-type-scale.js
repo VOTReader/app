@@ -24,6 +24,11 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ASSETS = path.join(__dirname, '..', 'app', 'src', 'main', 'assets');
 const SKIP_DIRS = new Set(['dist', 'node_modules', 'data', 'fonts', 'icons']);
+// Branch v2 (mw4, 2026-10-14): the design lane's kit, copied byte for byte by tools/sync-v2-kit.py (its --check says when a
+// copy drifts). Its type is the kit's own by-role scale (--fs-body, --fs-title ... in kit.css), sized in px from Corbin's
+// picked picture and proved by the screenshot gates (design's measure.py --gate / desk.py), not by this ladder. Only
+// these two copies are exempt: v2's own files (shell.css, the screens' JSX) are still held to tokens.
+const SKIP_FILES = new Set([path.join('src', 'v2', 'kit.css'), path.join('src', 'v2', 'screens.css')]);
 
 /** Files to scan: the static CSS + every source module that can carry style text. */
 function collect(dir, out) {
@@ -31,7 +36,7 @@ function collect(dir, out) {
     const p = path.join(dir, name);
     const st = fs.statSync(p);
     if (st.isDirectory()) { if (!SKIP_DIRS.has(name)) collect(p, out); }
-    else if (/\.(css|js|jsx)$/.test(name) && !/\.test\./.test(name)) out.push(p);
+    else if (/\.(css|js|jsx)$/.test(name) && !/\.test\./.test(name) && !SKIP_FILES.has(path.relative(ASSETS, p))) out.push(p);
   }
   return out;
 }

@@ -102,6 +102,10 @@ const BUDGETS = [
   // 2026-10-13, lz1: tools/split-lazy-css.mjs is retired and its four screens-X.min.css sheets come back here:
   // 370,199 B. Ceiling = the sum of the five old ceilings (328,800 + 9,400 + 17,700 + 17,600 + 13,200), no new room.
   { file: 'app.min.css', measured: 370199, max: 386700 },   // render-blocking <link> in index.html
+  // Branch v2 (mw4, 2026-10-14): the v2 shell and the design kit's stylesheet (kit + screens + shell), which replaces
+  // app.min.css as the render-blocking <link> on v2. Ceilings ~+15 % over the first build; they grow as screens land.
+  { file: 'bundle-v2.js', measured: 27859, max: 32000 },
+  { file: 'v2.min.css', measured: 30927, max: 35600 },
   // ── lazy, but still fetched + parsed on the reader's device ──
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.

@@ -1,0 +1,311 @@
+/* v2 layout recipes (mw4): copied from the design lane's v2-step2/screens/screens.css byte for byte (tools/sync-v2-kit.py).
+   They move into kit.css once Corbin approves the screens (design's note below). */
+/* screens.css - page layouts for the step-2 screens, measured from the pick's spacing (replica offsets, rounded to the 4 px grid
+   where the pick allows). These are the layout recipes builders copy; they move into kit.css once Corbin approves the screens. */
+.scr.android { --tabbar: 64px; }                 /* Android: the 3-button nav sits below, so no extra home-indicator air */
+.sb { height: var(--status); padding: 0 16px 0 20px; font-size: 13px; }   /* S22: 27 dp status bar, 48 dp nav bar (measured) */
+.sb .sys { gap: 5px; }
+.sb .sys svg { height: 12px; width: auto; }
+/* the APK draws edge to edge (MainActivity: transparent bars, the page gets --inset-top/--inset-bottom): a scrim and a sheet's
+   colour run under the system bars, but the clock, icons and 3 buttons are the system's, on top and never dimmed */
+.sb, .nav3 { position: relative; z-index: 4; }
+.scr.android .sheet { padding-bottom: 60px; }   /* 12 + the 48 dp nav bar */
+
+/* page heads */
+.page-head { padding-top: 12px; }                /* hero sits right under the top bar (Home 9, Answers 14 in the pick) */
+.page-head.reader-head { padding-top: 26px; }   /* with an overline above the title (the letter: 31 incl. the line box) */
+.page-head.tabroot { padding-top: 6px; }
+.eyebrow { margin-bottom: 15px; }
+.page-head .display + .lede { margin-top: 9px; }
+.page-head .display + .pill { margin-top: 24px; }
+.page-head .pill + .meta { margin-top: 24px; }
+.page-head .meta { margin-bottom: 24px; }
+.page-head + .rows { margin-top: 18px; }
+.actions { margin-top: 22px; }
+.reader .hair + .body { margin-top: 24px; }
+.reader .body.scrolled { padding-top: 22px; }
+.reader .body.scrolled.up { padding-top: 0; margin-top: -62px; }   /* scrolled: the first lines have gone under the status bar */
+.nextcard .chev { color: var(--t2); } .nextcard .chev svg { width: 18px; height: 18px; }
+
+/* collection rows: number, title (wraps to 2 lines), date or state, Play */
+.num-row { align-items: flex-start; gap: 10px; padding: 13px 0 14px; min-height: 0; }
+.num-row .no { padding-top: 2px; }
+.num-row .t { font-size: var(--fs-row1); line-height: 1.18; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }  /* lists clamp at 2 lines; the letter page and player show the whole title */
+.num-row .s { margin-top: 3px; }
+.num-row .rp { width: 40px; height: 40px; align-self: center; }
+.rows .num-row:first-child { border-top: 1px solid var(--line); }
+
+/* the Aa sheet */
+.sheet.aa .aa-row { margin-top: 12px; }
+.aa-k { font-size: var(--fs-s); color: var(--t2); }
+.size { display: flex; align-items: center; gap: 10px; height: 48px; margin-top: 2px; }
+.sz-a { width: 44px; height: 48px; display: grid; place-items: center; color: var(--t1); }
+.sz-a.s { font-size: 17px; } .sz-a.l { font-size: 27px; }
+.steps { flex: 1; display: flex; justify-content: space-between; align-items: center; position: relative; height: 24px; }
+.steps::before { content: ''; position: absolute; left: 4px; right: 4px; top: 11px; height: 2px; background: var(--edge); }
+.steps i { width: 10px; height: 10px; border-radius: 50%; background: var(--raised); border: 2px solid var(--edge); position: relative; }
+.steps i.lit { background: var(--accent); border-color: var(--accent); }
+.steps i.on { width: 20px; height: 20px; background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 4px rgba(196, 164, 105, .18); }
+.looks { display: flex; gap: 12px; margin-top: 8px; }
+.look { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: var(--fs-s); color: var(--t2); }
+.look .sw { width: 100%; height: 54px; border-radius: var(--r-s); display: grid; place-items: center; font-size: 22px; border: 1px solid var(--edge); }
+.sw.slate { background: #172022; color: #E0E6E7; } .sw.paper { background: #F2EDE2; color: #2B2721; } .sw.black { background: #000; color: #D9DDDD; }
+.look.on { color: var(--accent); } .look.on .sw { border: 2px solid var(--accent); }
+.sheet.aa .seg { margin-top: 8px; }
+.sheet .done { margin-top: 20px; justify-content: center; }
+
+/* now playing */
+.np-tb { position: relative; padding-left: 4px; }
+.np-tb .np-title { position: absolute; left: 0; right: 0; text-align: center; padding: 0; pointer-events: none; }
+.np-tb .np-title + .ic { margin-left: auto; }
+.np { padding-top: 6px; }
+.np .np-art { width: 208px; margin: 0 auto; }
+.np .np-art .cn { font-size: 92px; }
+.np-s .dot { margin: 0 7px; color: var(--t3); }
+.np-s .st { display: inline-flex; align-items: center; gap: 5px; }
+.np-s .st svg { width: 15px; height: 15px; }
+.np-meta { margin-top: 20px; }
+.np-meta .overline { display: block; }
+.np-t { font-size: var(--fs-l); line-height: 1.2; margin-top: 9px; }
+.np-s { font-size: var(--fs-s); color: var(--t2); margin-top: 3px; }
+.np .scrub { margin-top: 16px; }
+.np .ctrls { margin: 8px -8px 0; }
+.np-chips { margin-top: 14px; justify-content: center; }
+.np-ra { margin-top: 14px; border-top: 1px solid var(--line); }
+.srow .lead { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--edge); display: grid; place-items: center; color: var(--tgold-hi); flex: none; }
+.srow .lead svg { width: 20px; height: 20px; }
+
+/* Bible chapter */
+.body.bible { margin-top: 24px; }
+.body.bible p { margin: 0; }
+
+/* search */
+.tabroot .field { margin-top: 18px; }
+.label.try { display: block; margin: 28px 0 12px; }
+.hint { font-size: var(--fs-s); color: var(--t2); line-height: 1.45; margin: 24px 0 0; }
+.results { padding-top: 10px; }
+.chips.scroll.scopes { margin-top: 14px; }
+.hit .ex.bx { margin-top: 3px; }
+.hit .tt, .hit .ex { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+
+/* notes */
+.chips.kinds { margin-top: 20px; }               /* dz10: the six kinds wrap to two rows; none sits off the edge */
+.marks { margin-top: 12px; }
+.mark { padding: 16px 0 15px; border-top: 1px solid var(--line); }
+.mark:first-child { border-top: 0; padding-top: 10px; }
+.mq { font-size: var(--fs-m); line-height: 1.45; color: var(--t-body); }
+.mq .hl { color: var(--t-hero); }
+.mn { font-size: var(--fs-s); color: var(--t1); margin-top: 8px; padding-left: 12px; border-left: 2px solid var(--tgold); line-height: 1.4; }
+.mt { font-size: var(--fs-row1); display: flex; align-items: center; gap: 10px; line-height: 1.25; }
+.mt svg { width: 20px; height: 20px; color: var(--tgold-hi); flex: none; }
+.mm { font-size: var(--fs-xs); color: var(--t2); margin-top: 7px; }
+
+/* settings */
+.settings .label { display: block; margin: 26px 0 6px; }
+.settings .label:first-child { margin-top: 30px; }
+.settings .label + .srow { border-top: 0; }
+
+/* mark-this-paragraph */
+.scrim.light { background: rgba(4, 7, 8, .38); }
+.marked .tapped { box-shadow: inset 3px 0 0 var(--accent); background: rgba(196, 164, 105, .08); margin: 0 calc(var(--gut) * -1); padding: 6px var(--gut) 8px; }
+.swatches { display: flex; gap: 16px; margin: 6px 0 12px; }
+.swatch.gold { background: #C9A96A; } .swatch.sage { background: #8FB39A; } .swatch.rose { background: #C98B8B; }
+.swatch.blue { background: #8AA9C9; } .swatch.plum { background: #A68ABE; }
+.swatch.on { box-shadow: 0 0 0 3px var(--raised), 0 0 0 5px var(--t1); }
+.srow.act { min-height: 56px; }
+.srow.act .t { font-size: var(--fs-m); }
+.cancel { width: 100%; justify-content: center; color: var(--t2); margin-top: 4px; }
+
+/* download states */
+.dl-head { padding-top: 6px; padding-bottom: 8px; }
+.dl-bar { display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-s); color: var(--t1); }
+.textbtn.sm { font-size: var(--fs-s); height: 40px; }
+.dl-prog { height: 3px; border-radius: 2px; background: var(--edge); margin-top: 2px; }
+.dl-prog i { display: block; height: 3px; border-radius: 2px; background: var(--accent); }
+.st.bad { color: var(--danger); }
+.toast-wrap { position: absolute; left: 12px; right: 12px; bottom: 12px; }
+
+/* ---------- dz7: the rest of the map ---------- */
+/* Bible: book list (one-line rows: name, chapter count, chevron) and a book's chapter grid */
+.seg.tst { margin-top: 26px; }
+.bks { margin-top: 14px; }
+.row.bk { min-height: 56px; padding: 0; gap: 10px; }
+.row.bk .t { font-size: var(--fs-row1); }
+.row.bk .here { font-size: var(--fs-xs); color: var(--accent); letter-spacing: .02em; }
+.row.bk.cur .t { color: var(--accent); }
+.rows.bks .row.bk:first-child { border-top: 0; }
+.chgrid { display: grid; grid-template-columns: repeat(5, 1fr); column-gap: 8px; margin-top: 20px; }
+.chgrid .ch { height: 52px; display: grid; place-items: center; font-size: var(--fs-m); color: var(--t1); border-bottom: 1px solid var(--line); position: relative; }
+.chgrid .ch.read { color: var(--t2); }
+.chgrid .ch.read::after { content: ''; position: absolute; left: 50%; bottom: 8px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--tgold); }
+.chgrid .ch.cur { color: var(--accent); }
+.chgrid .ch.cur::before { content: ''; position: absolute; width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--accent); left: 50%; top: 50%; margin: -20px 0 0 -20px; }
+.cover.s40.sm .cn { font-size: 14px; letter-spacing: .06em; }
+/* a search match inside the reader: the results' gold underline, on a soft wash so it is found at a glance */
+.reader .body mark.qm { background: var(--wash); color: var(--t-hero); box-shadow: inset 0 -2px 0 rgba(196, 164, 105, .85); border-radius: 2px; padding: 0 1px; }
+
+/* the player's sheets */
+.spd-now { display: flex; align-items: center; justify-content: center; gap: 22px; margin-top: 2px; }
+.stepb { width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--edge); display: grid; place-items: center; color: var(--t1); }
+.stepb svg { width: 22px; height: 22px; }
+.spd-now .v { font-size: 44px; line-height: 1; color: var(--t-hero); min-width: 110px; text-align: center; }
+.spd-s { text-align: center; font-size: var(--fs-s); color: var(--t2); margin: 6px 0 4px; }
+.spd-sl { margin-top: 6px; }
+.spd-chips { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 16px; }
+.spd-chips .chip { padding: 0; justify-content: center; height: 40px; }
+.sheet .opts { margin: 0 calc(var(--gut) * -1); }
+.srow.opt { min-height: 56px; padding: 6px var(--gut); }
+.srow.opt:first-child { border-top: 0; }
+.srow.opt .t { font-size: var(--fs-m); }
+.srow.opt.on .t { color: var(--accent); }
+.srow.opt .ck { color: var(--accent); }
+.srow.opt .ck svg { width: 22px; height: 22px; }
+.fine { font-size: var(--fs-xs); line-height: 1.45; color: var(--t2); margin: 14px 0 0; letter-spacing: .01em; }
+.sheet.tall { top: 64px; }
+.upn-h { display: flex; align-items: baseline; gap: 10px; }
+.upn-h .sh { margin: 0; }
+.upn-h .cnt { font-size: var(--fs-xs); color: var(--t2); }
+.upn-h .textbtn { margin-left: auto; }
+.rows.q { margin: 6px 0 0; }
+.rows.q .num-row .tx { padding-right: 4px; }
+.ic.grip { width: 44px; height: 44px; display: grid; place-items: center; color: var(--t2); align-self: center; margin-right: -8px; }
+.ic.grip svg { width: 22px; height: 22px; }
+
+/* settings pages */
+.settings.cats { margin-top: 18px; }
+.settings.cats .srow { min-height: 72px; }
+.settings.cats .srow:first-child { border-top: 0; }
+.safe { display: flex; gap: 14px; align-items: center; padding: 16px; border: 1px solid var(--edge); border-radius: var(--r); margin-top: 22px; }
+.safe .si { width: 44px; height: 44px; border-radius: 50%; background: rgba(196, 164, 105, .12); color: var(--accent); display: grid; place-items: center; flex: none; }
+.safe .si svg { width: 24px; height: 24px; }
+.safe .t { font-size: var(--fs-row1); line-height: 1.2; }
+.safe .s { font-size: var(--fs-s); color: var(--t2); margin-top: 3px; line-height: 1.3; }
+.stack { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.btn2.block { display: flex; width: 100%; justify-content: center; }
+.stack .pill.block { padding: 0 20px; }
+.settings .srow + .srow, .g > .settings { }
+.g > .settings { margin-top: 10px; }
+.page-head + .g.settings { margin-top: 18px; }   /* a list right under a lede: the 4a gap, no hairline on top */
+.page-head + .g.settings > .srow:first-child { border-top: 0; }
+.danger-t { color: var(--danger); font-size: var(--fs-s); height: 44px; margin-top: 4px; }
+.ver { margin-top: 22px; font-size: var(--fs-s); color: var(--t1); line-height: 1.5; }
+.ver .label { display: block; margin-bottom: 8px; }
+.ver .s { color: var(--t2); }
+
+/* welcome and install */
+.welcome { display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 26px; }
+.appicon { width: 72px; height: 72px; display: block; margin-bottom: 26px; }
+.appicon.sm { width: 44px; height: 44px; margin: 0; }
+.welcome .overline { margin-bottom: 14px; }
+.welcome .lede { margin-top: 14px; }
+.stack.wel { margin-top: 30px; }
+.welcome .fine { margin-top: 18px; }
+.sheet.inst { padding-bottom: 14px; }
+.inst-h { display: flex; align-items: center; gap: 14px; }
+.inst-h .sh { margin: 0; font-size: var(--fs-l); line-height: 1.15; }
+.inst-p { font-size: var(--fs-s); color: var(--t2); line-height: 1.45; margin: 12px 0 18px; }
+.inst-a { display: flex; justify-content: space-between; margin-top: 6px; }
+.textbtn.quiet { color: var(--t2); font-weight: 400; font-size: var(--fs-s); }
+
+/* reading plans */
+.plans { margin-top: 22px; display: flex; flex-direction: column; gap: 14px; }
+.plan { border: 1px solid var(--line); border-radius: var(--r); padding: 16px; }
+.plan.on { border-color: var(--edge); background: var(--raised); }
+.plan .overline { display: block; margin-bottom: 10px; }
+.plan .pt { font-size: var(--fs-l); line-height: 1.15; color: var(--t-hero); }
+.plan .ps { font-size: var(--fs-s); color: var(--t2); margin-top: 4px; }
+.plan .dl-prog { margin-top: 14px; }
+.plan .actions { margin-top: 16px; gap: 10px; }
+.plan .actions .textbtn { margin-left: auto; }
+.chips.pace { margin-top: 14px; }
+.plan .start { margin-top: 14px; }
+
+/* full screen and the offline note */
+.reader.full .body { padding-top: 44px; }
+.toast-wrap.hi { bottom: 40px; }
+.toast svg { width: 20px; height: 20px; color: var(--t2); flex: none; }
+.content.reader .toast-wrap { bottom: 14px; }
+.at-match { margin-top: -383px; }   /* John 3 opened at 'born again': the match line a third down (line 6 of 16), a whole line
+                                       right under the top bar (measured with Range.getClientRects: line tops 0, 36, 71 ... match 177) */
+
+/* ---------- dz8: desktop (a window 1024 css px or wider) ----------
+   Drawn at Corbin's laptop, where VOTReader is an installed app kept maximized: 1463 x 844 css px at 1.75x (measured 10-14 in a
+   maximized chrome --app window on the laptop with no automation bar, which takes 56: 2560 x 1600 at 175 %, taskbar 48; a normal
+   tab with his bookmarks bar gets 1463 x 746). The window's title bar takes the page's theme-color: #172022, the slate. Five rules:
+   D1 the tab bar becomes a left rail: same three items, same icons and labels, gold when on.
+   D2 every page sits in ONE centred column, 688 wide (640 of text: about 70 characters a line at 23 px), its top bar included; the page
+      scrolls in .main with the scrollbar at the window's right edge (scrollbar-gutter: stable both-edges keeps the column centred).
+   D3 the mini player becomes a player bar along the bottom (cover + title, transport in the middle, time / speed / sleep / up next
+      / open on the right); tapping it opens Now playing as a panel docked on the right, and the bar goes while the panel is open.
+   D4 a pull-up sheet opens as a centred dialog over the same scrim: 440 wide, all four corners rounded, no handle, same rows.
+   D5 nothing stretches: type, rows, pills, chips and icons keep their phone sizes; the extra width is the same slate plane (never
+      black, never a box around the column). Lists of short items flow into columns inside the column (books 3, chapters 10). */
+:root { --rail: 88px; --col: 688px; --pbar: 72px; --panel: 400px; --dlg: 440px; }
+.dk { position: relative; width: var(--w, 100vw); height: var(--h, 100vh); background: var(--bg); overflow: hidden;
+  display: grid; grid-template-columns: var(--rail) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.rail { border-right: 1px solid var(--line); display: flex; flex-direction: column; padding-top: 8px; }
+.rail .tab { height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5.5px;
+  color: var(--t2); font-size: var(--fs-xs); line-height: 1; }
+.rail .tab svg { width: var(--ic-tab); height: var(--ic-tab); color: #BCC3C5; }
+.rail .tab.on, .rail .tab.on svg { color: var(--accent); }
+.pane { position: relative; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr) auto; }
+.main { grid-column: 1; grid-row: 1; position: relative; overflow: hidden; scrollbar-gutter: stable both-edges; }
+.col { max-width: var(--col); margin: 0 auto; }
+.col > .tb { position: sticky; top: 0; z-index: 2; background: var(--bg); }
+.col .reader .body, .col .body { max-width: none; }
+
+/* D3: the player bar (the mini player, grown) and the Now playing panel (the phone's player screen, docked) */
+.pbar { grid-column: 1 / 3; grid-row: 2; height: var(--pbar); position: relative; background: var(--raised); border-top: 1px solid var(--line);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; padding: 0 12px 0 16px; gap: 24px; }
+.pbar .prog { position: absolute; left: 0; top: -1px; height: 2px; background: var(--accent); }
+.pbar .now { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.pbar .now .tx { min-width: 0; }
+.pbar .now .t { font-size: var(--fs-s); color: var(--t1); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pbar .now .s { font-size: var(--fs-xs); color: var(--t2); line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cover.s48 { width: 48px; height: 48px; }
+.cover.s48::before { inset: 4px; }
+.cover.s48 .cn { font-size: 22px; }
+.cover.s48.sm .cn { font-size: 15px; letter-spacing: .06em; }
+.pbar .tp { display: flex; align-items: center; gap: 6px; }
+.pbar .tp .ic, .pbar .xt .ic { width: 44px; height: 44px; display: grid; place-items: center; color: var(--t1); }
+.pbar .tp .ic svg { width: 24px; height: 24px; }
+.pbar .tp .pp { width: 48px; height: 48px; margin: 0 6px; border-radius: 50%; background: var(--pill); color: var(--on-pill); display: grid; place-items: center; }
+.pbar .tp .pp svg { width: 22px; height: 22px; }
+.pbar .xt { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
+.pbar .xt .tm { font-size: var(--fs-xs); color: var(--t2); margin-right: 14px; white-space: nowrap; }
+.pbar .xt .chip { height: 32px; margin-right: 6px; }
+.pbar .xt .ic svg { width: 22px; height: 22px; }
+.ic .flip, svg.flip { transform: rotate(180deg); }
+.panel { grid-column: 2; grid-row: 1 / 3; width: var(--panel); background: var(--raised); border-left: 1px solid var(--line); overflow: hidden; }
+.panel .np-tb { padding-left: 4px; }
+
+/* D4: dialogs (the phone's sheets) */
+.dk > .scrim { z-index: 5; }
+.dlg { position: absolute; z-index: 6; top: 50%; left: calc(var(--rail) + (100% - var(--rail)) / 2); width: var(--dlg); transform: translate(-50%, -50%);
+  background: var(--raised); border-radius: var(--r); padding: 22px var(--gut) var(--gut); box-shadow: 0 24px 64px rgba(0, 0, 0, .5); }
+.dlg .sh { font-size: var(--fs-m); color: var(--t1); margin-bottom: 10px; }
+.dlg.aa .aa-row { margin-top: 12px; }
+.dlg.aa .seg { margin-top: 8px; }
+
+/* D5: short lists flow into columns inside the column */
+.col .rows.bks { display: grid; grid-auto-flow: column; grid-template-rows: repeat(var(--n, 9), auto); grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 24px; }
+.col .rows.bks .row.bk.top { border-top: 0; }
+.col .chgrid { grid-template-columns: repeat(10, 1fr); }
+
+/* ---------- dz10: Notes shows every kind at a glance; Home in the three-tab map (Corbin 17:4x "three, drop duplicates") ---------- */
+.tb .btn2.tbj { height: 40px; padding: 0 14px 0 10px; gap: 6px; margin-right: 2px; font-size: var(--fs-s); }   /* "+ Journal entry": words, one tap */
+.tb .btn2.tbj svg { width: 18px; height: 18px; }
+.mx { font-size: var(--fs-s); color: var(--t2); line-height: 1.4; margin-top: 6px; padding-left: 30px; }   /* a journal entry's first line, under its title */
+.tb.scrolled { box-shadow: inset 0 -1px 0 var(--line); }
+/* Home: the pick's hero (replica a-home offsets), Continue's place under the pill, Recent, then the volumes in the pick's numbered grid */
+.page-head.home { padding-top: 9px; }
+.home .subtitle { margin-top: 7px; }
+.home .pill.block { margin-top: 22px; }
+.cont-where { font-size: var(--fs-s); color: var(--t2); margin-top: 10px; line-height: 1.3; }
+.recent { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+.recent .label { margin-right: 4px; }
+.grid2.vols { margin-top: 4px; }
+.grid2.vols .col { align-content: start; max-width: none; margin: 0; }   /* align-content: the right column's three rows keep the left's lines; max-width/margin: not the desktop page .col (D2) */
+.grid2.vols .c { justify-content: space-between; gap: 8px; }
+.grid2.vols .cnt { font-size: var(--fs-xs); color: var(--t2); font-weight: 400; font-variant-numeric: lining-nums; }
+.home-rows { margin-top: 22px; }

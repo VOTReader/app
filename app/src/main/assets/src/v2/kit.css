@@ -1,0 +1,311 @@
+/* v2 kit (mw4, 2026-10-14): copied from the design lane's D:/Swarm/lanes/design/out/v2-step2/kit/kit.css (dz5..dz10),
+   byte for byte except the two font urls (the app's own fonts/, the same files: md5 checked). The ONE source of truth for
+   v2 colour, type and spacing: change a token here, never a literal in a screen. Re-sync with tools/sync-v2-kit.py. */
+/* VOTReader kit v2 - the 10-05 pick (corbin-style-ref.png) measured at a 360 px screen (the S22).
+   Every size here was solved from the pick (tools/fit.js) and checked by tools/measure.py against it.
+   Units are css px = Android dp. Sizes do not grow with screen width; wider phones get more air. */
+@font-face { font-family: 'EB Garamond'; src: url('../fonts/eb-garamond-latin-wght-normal.woff2') format('woff2'); font-weight: 400 800; font-style: normal; font-display: block; }
+@font-face { font-family: 'EB Garamond'; src: url('../fonts/eb-garamond-latin-wght-italic.woff2') format('woff2'); font-weight: 400 800; font-style: italic; font-display: block; }
+
+:root {
+  /* plane */
+  --bg: #172022;          /* page, top bar and tab bar: one flat plane */
+  --raised: #1C2527;      /* sheets, menus, mini player */
+  --input: #242D2F;       /* search field, chips at rest */
+  --line: #2C3537;        /* 1 px hairlines: rows, sections, tab bar top */
+  --edge: #3A4547;        /* input border, as drawn: the field reads by its fill, icon and placeholder */
+  /* text: faintly cool whites, as drawn */
+  --t-hero: #F5F5F3;      /* display titles: a touch brighter and warmer than t1, as drawn */
+  --t1: #E9EEEF;          /* row and section titles, top bar, icons */
+  --t-body: #E0E6E7;      /* reading text */
+  --t-sub: #C6CDCE;       /* hero subtitles: brighter than t2, as drawn */
+  --t2: #B7BFC1;          /* subtitles, row subs, meta, chevrons, idle tab labels */
+  --t3: #959DA0;          /* placeholder, disabled, fine print */
+  /* gold: one for action, one for text */
+  --pill: #BB9B64;        /* primary button fill */
+  --on-pill: #1A1206;     /* label and icon on the pill */
+  --accent: #C4A469;      /* active tab, focus ring, progress, the playing row */
+  --tgold: #A9A188;       /* caps labels, overlines, verse numbers: the pick's muted champagne gold (glyph cores #A59E87..#AAA28A) */
+  --tgold-hi: #C0AA8C;    /* roman numerals in lists: brighter and bolder than the label gold, as drawn */
+  --tgold-ghost: rgba(196, 164, 105, .38);  /* secondary button border */
+
+  --font: 'EB Garamond', Georgia, 'Times New Roman', serif;
+  /* type: one size per role, each solved from the pick's ink at 360 px (ref/fit.json, tools/inkfit.js) */
+  --fs-hero: 57px;        /* Home's hero only */
+  --fs-title: 52px;       /* every other page title: collection pages, letters, entries, chapters (long ones step to 44, then 36) */
+  --fs-l: 24px;           /* two-line row titles, section titles */
+  --fs-row1: 22px;        /* single-line rows (a list of subjects) */
+  --fs-body: 23px;        /* reading text default (the reader scales it), app name */
+  --fs-m: 19.5px;         /* subtitles, button labels */
+  --fs-ui: 18.5px;        /* top-bar titles, search field, a long subtitle's step down */
+  --fs-s: 16.5px;         /* row subs, meta lines, list cells */
+  --fs-cell: 15px;        /* compact two-column lists (the Ten Commandments), weight 500 */
+  --fs-xs: 14px;          /* tab labels, times and counts, caps labels (weight 400, tracked) */
+  --lh-body: 1.535;       /* reading: 23 on 35.3 px lines, as drawn */
+  --track-caps: .115em;   /* section labels */
+  --track-over: .15em;    /* the overline above a reader title: wider, as drawn */
+
+  /* space: 4 px grid */
+  --gut: 24px;            /* one side margin */
+  --status: 27px;         /* Android status bar on the S22: 81 px at 3x (dumpsys window insets, 10-14); the pick's iPhone used 56 */
+  --bar: 56px;            /* top bar */
+  --row: 78px;            /* two-line row pitch, hairline to hairline */
+  --tabbar: 72px;         /* hairline to the system nav bar */
+  --r: 14px;              /* pill, field, card, sheet top: the pick's corners fit 14.5-19.6 on the same estimator that reads 9.5 for 10 */
+  --r-s: 6px;             /* chips, small tags */
+  --ic: 26px;             /* top-bar icons (44 px touch target) */
+  --ic-tab: 28px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: #000; font-family: var(--font); color: var(--t1); -webkit-font-smoothing: antialiased; font-kerning: normal; }
+svg { display: block; flex: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; }
+
+/* the screen */
+.scr { position: relative; width: 360px; height: var(--h, 780px); background: var(--bg); overflow: hidden; display: flex; flex-direction: column; }
+.scr .content { flex: 1; overflow: hidden; position: relative; }
+
+/* status bars (stand-ins drawn by the system, never by the app) */
+.sb { height: var(--status); flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px 0 22px;
+  font: 600 14px/1 system-ui, 'Segoe UI', Roboto, sans-serif; color: #F2F4F4; letter-spacing: .01em; }
+.sb .sys { display: flex; gap: 6px; align-items: center; }
+.sb-ios { height: 56px; padding: 0 30px 0 40px; font-size: 15.5px; }
+.sb-ios .island { position: absolute; left: 50%; top: 11px; width: 112px; height: 32px; margin-left: -56px; border-radius: 16px; background: #000; }
+
+/* top bar */
+.tb { height: var(--bar); flex: none; display: flex; align-items: center; padding: 0 0 0 var(--gut); }
+.tb.has-back { padding-left: 4px; }
+.tb .appname { font-size: var(--fs-body); font-weight: 400; letter-spacing: -.005em; flex: 1; }
+.tb .title { font-size: var(--fs-ui); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 12px; }
+.tb .ic { width: 48px; height: 48px; display: grid; place-items: center; color: var(--t1); }
+.tb .ic svg { width: var(--ic); height: var(--ic); }
+
+/* hero */
+.hero { padding: 0 var(--gut); }
+.display { font-size: var(--fs-title); line-height: 1.0; font-weight: 400; letter-spacing: 0; margin: 0 0 0 -2px; color: var(--t-hero); }  /* -2 px: big type sits optically on the gutter */
+.display.xl { font-size: var(--fs-hero); }
+.display.title { font-size: var(--fs-title); }
+.display.long { font-size: 44px; line-height: 1.05; }
+.display.longer { font-size: 36px; line-height: 1.08; }
+.subtitle { font-size: var(--fs-m); line-height: 1.3; color: var(--t-sub); margin: 0; }
+.subtitle.fit { font-size: var(--fs-ui); }  /* Home's long subtitle keeps one line at 360 */
+.overline, .label { font-size: var(--fs-xs); font-weight: 400; letter-spacing: var(--track-caps); text-transform: uppercase; color: var(--tgold); line-height: 1; white-space: nowrap; }
+.overline { letter-spacing: var(--track-over); }
+
+/* buttons */
+.pill { height: 48px; border-radius: var(--r); background: var(--pill); color: var(--on-pill); display: inline-flex; align-items: center; gap: 14px;
+  padding: 0 22px; font-size: var(--fs-m); font-weight: 500; letter-spacing: .005em; }
+.pill.block { display: flex; width: 100%; justify-content: space-between; }
+.pill svg { width: 20px; height: 20px; }
+.pill.play { height: 52px; width: 166px; padding: 0 0 0 22px; gap: 16px; }  /* the hero Listen: taller, fixed width, label left */
+.pill.play svg { width: 29px; height: 29px; }
+.btn2 { height: 48px; white-space: nowrap; border-radius: var(--r); border: 1px solid var(--tgold-ghost); color: var(--accent); display: inline-flex; align-items: center; gap: 12px;
+  padding: 0 20px; font-size: var(--fs-m); font-weight: 500; }
+.btn2 svg { width: 20px; height: 20px; }
+
+/* rows: title + sub + chevron, hairlines, no boxes */
+.rows { margin: 0 var(--gut); }
+.row { min-height: var(--row); display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line); padding: 12px 0 14.5px; }  /* text sits a little above centre, as drawn */
+.rows.end .row:last-child { border-bottom: 1px solid var(--line); }
+.row .tx { flex: 1; min-width: 0; }
+.row .t { font-size: var(--fs-l); line-height: 1.16; }
+.row.single .t { font-size: var(--fs-row1); }
+.row .s { font-size: var(--fs-s); line-height: 1.3; color: var(--t2); margin-top: 1px; }
+.row .chev { color: var(--t2); margin-right: -2px; }
+.row .chev svg { width: 18px; height: 18px; }
+
+/* section label above rows */
+.sec { padding: 25px 0 0; }
+.sec .label { display: block; margin-bottom: 0; }
+.sec + .rows .row:first-child, .sec .rows .row:first-child { border-top: 0; }
+
+/* search field */
+.field { height: 52px; border-radius: var(--r); background: var(--input); border: 1px solid var(--edge); display: flex; align-items: center; padding: 0 5px 0 14px; gap: 10px; }
+.field .ph { flex: 1; font-size: var(--fs-ui); color: #A7AEB0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.field .q { flex: 1; font-size: var(--fs-ui); color: var(--t1); white-space: nowrap; overflow: hidden; }
+.field svg { width: 24px; height: 24px; color: var(--t1); }
+
+/* section title */
+.h2 { font-size: var(--fs-l); font-weight: 400; margin: 0; line-height: 1.2; }
+
+/* two-column numbered list (the Ten Commandments): each column sizes its numeral track to its widest numeral */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
+.grid2 .col { display: grid; grid-template-columns: max-content 1fr; column-gap: 17px; }
+.grid2 .n, .grid2 .c { height: 47.2px; display: flex; align-items: center; border-bottom: 1px solid var(--line); }
+.grid2 .n { color: var(--tgold-hi); font-size: 17.5px; font-weight: 600; }
+.grid2 .c { font-size: var(--fs-cell); font-weight: 500; color: #CBD0D1; }
+.grid2 .last { border-bottom: 0; }
+
+/* letter header meta + reading text */
+.meta { font-size: var(--fs-s); line-height: 1.54; color: var(--t2); }
+.body { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--t-body); }
+.body p { margin: 0 0 .75em; }
+
+/* tab bar */
+.tabbar { height: var(--tabbar); flex: none; border-top: 1px solid var(--line); display: flex; background: var(--bg); }
+.tabbar .tab { flex: 1; display: flex; flex-direction: column; align-items: center; padding-top: 12px; gap: 5.5px; color: var(--t2); font-size: var(--fs-xs); line-height: 1; }
+.tabbar .tab svg { width: var(--ic-tab); height: var(--ic-tab); color: #BCC3C5; }
+.tabbar .tab.on, .tabbar .tab.on svg { color: var(--accent); }
+.homeind { position: absolute; left: 50%; bottom: 13px; width: 132px; margin-left: -66px; height: 5px; border-radius: 3px; background: #F4F6F6; }
+.navbar { height: 48px; flex: none; background: #000; display: flex; justify-content: space-around; align-items: center; color: #DADDDD; }
+
+/* utilities */
+.hair { height: 1px; background: var(--line); margin: 0 var(--gut); }
+.g { padding-left: var(--gut); padding-right: var(--gut); }
+
+/* ---------- components added for the shared screens (step 2) ---------- */
+:root {
+  --danger: #D88A73;      /* failures only: a download that failed, a destructive confirm (6.2:1 on --bg) */
+  --press: rgba(255, 255, 255, .045);   /* pressed rows and icon buttons */
+  --wash: rgba(196, 164, 105, .16);     /* read-along: the line being read */
+  --hl-gold: rgba(201, 152, 54, .32); --hl-sage: rgba(143, 179, 154, .28); --hl-rose: rgba(201, 139, 139, .28);
+  --hl-blue: rgba(138, 169, 201, .28); --hl-plum: rgba(166, 138, 190, .28);
+  --mini: 56px;           /* mini player: under the 64 px ceiling */
+}
+.num { font-variant-numeric: lining-nums tabular-nums; }
+
+/* Android system bars (drawn by the system over the app's own plane: edge to edge) */
+.sb .clock { font-weight: 500; }
+.nav3 { height: 48px; flex: none; display: flex; align-items: center; justify-content: space-around; padding: 0 28px; color: #C9CED0; }
+.nav3 svg { width: 22px; height: 22px; }
+
+/* states shared by every control */
+.pill.pressed { background: #A88A57; }
+.pill.disabled, .btn2.disabled { opacity: .38; }
+.focus { outline: 2px solid var(--accent); outline-offset: 3px; }
+.row.pressed { background: var(--press); margin: 0 calc(var(--gut) * -1); padding-left: var(--gut); padding-right: var(--gut); }
+.btn2.pressed { background: rgba(196, 164, 105, .10); }
+.btn2.sm, .pill.sm { height: 40px; padding: 0 16px; font-size: var(--fs-s); gap: 8px; }
+.pill.sm svg, .btn2.sm svg { width: 18px; height: 18px; }
+.textbtn { height: 48px; display: inline-flex; align-items: center; color: var(--accent); font-size: var(--fs-m); font-weight: 500; }
+
+/* overline above a page title (collection pages, reader) */
+.eyebrow { display: block; margin-bottom: 14px; }
+.lede { font-size: var(--fs-m); color: var(--t-sub); margin: 8px 0 0; line-height: 1.3; }
+.actions { display: flex; gap: 12px; margin-top: 22px; align-items: center; }
+
+/* rows: number column, trailing play, status */
+.row .no { width: 34px; flex: none; color: var(--tgold-hi); font-size: 17.5px; font-weight: 600; font-variant-numeric: lining-nums; align-self: flex-start; padding-top: 3px; }
+.row .rp { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--edge); display: grid; place-items: center; color: var(--t1); flex: none; }
+.row .rp svg { width: 16px; height: 16px; }
+.row .rp.on { border-color: var(--accent); color: var(--accent); background: rgba(196, 164, 105, .10); }
+.row.playing .t { color: var(--accent); }
+.row .s .bad { color: var(--danger); }
+.row .st { display: inline-flex; align-items: center; gap: 4px; vertical-align: -2px; }
+.row .st svg { width: 14px; height: 14px; }
+.eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; margin-right: 6px; }
+.eq i { width: 2.5px; background: var(--accent); border-radius: 1px; }
+
+/* chips: filters and quick searches (36 visual, 48 touch with the row's padding) */
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chips.scroll { flex-wrap: nowrap; overflow: hidden; margin: 0 calc(var(--gut) * -1); padding: 0 var(--gut); }
+.chip { height: 36px; border-radius: var(--r-s); border: 1px solid var(--edge); color: var(--t1); display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 13px; font-size: var(--fs-s); white-space: nowrap; flex: none; }
+.chip svg { width: 16px; height: 16px; color: var(--t2); }
+.chip.on { border-color: var(--accent); color: var(--accent); background: rgba(196, 164, 105, .12); }
+.chip.on svg { color: var(--accent); }
+
+/* search field states */
+.field.focus { border-color: var(--accent); outline: 0; }
+.field .caret { width: 1.5px; height: 22px; background: var(--accent); margin-left: -8px; }
+.field .clear { width: 40px; height: 40px; display: grid; place-items: center; color: var(--t2); }
+
+/* result groups */
+.grp { padding-top: 22px; }
+.grp > .label { display: block; margin-bottom: 4px; }
+.hit { padding: 12px 0 13px; border-top: 1px solid var(--line); }
+.grp > .label + .hit { border-top: 0; }
+.hit .where { font-size: var(--fs-xs); color: var(--tgold); letter-spacing: .02em; }
+.hit .tt { font-size: var(--fs-row1); line-height: 1.2; margin-top: 3px; }
+.hit .ex { font-size: var(--fs-s); line-height: 1.4; color: var(--t2); margin-top: 4px; }
+.hit mark { background: none; color: var(--t1); box-shadow: inset 0 -2px 0 rgba(196, 164, 105, .75); }
+
+/* switch and segmented control */
+.switch { width: 52px; height: 32px; border-radius: 16px; background: var(--input); border: 1px solid var(--edge); position: relative; flex: none; }
+.switch::after { content: ''; position: absolute; top: 7px; left: 7px; width: 16px; height: 16px; border-radius: 50%; background: var(--t3); }
+.switch.on { background: var(--pill); border-color: var(--pill); }
+.switch.on::after { left: 24px; top: 4px; width: 22px; height: 22px; background: var(--on-pill); }
+.seg { display: flex; height: 44px; border: 1px solid var(--edge); border-radius: var(--r); padding: 3px; gap: 3px; }
+.seg span { flex: 1; border-radius: calc(var(--r) - 4px); color: var(--t2); font-size: var(--fs-s); display: grid; place-items: center; }
+.seg span.on { background: var(--input); color: var(--t1); box-shadow: inset 0 0 0 1px var(--edge); }
+
+/* settings rows: title + value, trailing control */
+.srow { min-height: 64px; display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line); padding: 10px 0; }
+.srow .tx { flex: 1; min-width: 0; }
+.srow .t { font-size: var(--fs-row1); line-height: 1.2; }
+.srow .s { font-size: var(--fs-s); color: var(--t2); margin-top: 2px; }
+.srow .chev { color: var(--t2); }
+.srow .chev svg { width: 18px; height: 18px; }
+
+/* mini player */
+.mini { height: var(--mini); flex: none; display: flex; align-items: center; gap: 12px; padding: 0 4px 0 12px; background: var(--raised); border-top: 1px solid var(--line); position: relative; }
+.mini .prog { position: absolute; left: 0; top: -1px; height: 2px; background: var(--accent); }
+.mini .tx { flex: 1; min-width: 0; }
+.mini .t { font-size: var(--fs-s); color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.25; }
+.mini .s { font-size: var(--fs-xs); color: var(--t2); line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini .ic { width: 48px; height: 48px; display: grid; place-items: center; color: var(--t1); flex: none; }
+.mini .ic svg { width: 24px; height: 24px; }
+
+/* cover: typographic, one per collection (no stock photos) */
+.cover { position: relative; background: linear-gradient(160deg, #233033 0%, #1A2426 55%, #151D1F 100%); border-radius: var(--r-s); flex: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--tgold-hi); overflow: hidden; }
+.cover::before { content: ''; position: absolute; inset: 7%; border: 1px solid rgba(192, 170, 140, .35); border-radius: 3px; }
+.cover .cn { line-height: 1; font-weight: 500; }
+.cover .cl { letter-spacing: .16em; text-transform: uppercase; color: var(--tgold); }
+.cover.s40 { width: 40px; height: 40px; }
+.cover.s40::before { inset: 3px; }
+.cover.s40 .cn { font-size: 19px; }
+
+/* full player */
+.np-art { width: 100%; aspect-ratio: 1; border-radius: var(--r); }
+.np-art .cn { font-size: 112px; }
+.np-art .cl { font-size: 14px; margin-top: 20px; }
+.scrub { position: relative; height: 24px; }
+.scrub .tr { position: absolute; left: 0; right: 0; top: 11px; height: 3px; border-radius: 2px; background: var(--edge); }
+.scrub .fi { position: absolute; left: 0; top: 11px; height: 3px; border-radius: 2px; background: var(--accent); }
+.scrub .th { position: absolute; top: 5px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--accent); }
+.times { display: flex; justify-content: space-between; font-size: var(--fs-xs); color: var(--t2); margin-top: 2px; }
+.ctrls { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
+.ctrls .ic { width: 52px; height: 52px; display: grid; place-items: center; color: var(--t1); }
+.ctrls .ic svg { width: 30px; height: 30px; }
+.bigplay { width: 76px; height: 76px; border-radius: 50%; background: var(--pill); color: var(--on-pill); display: grid; place-items: center; }
+.bigplay svg { width: 32px; height: 32px; }
+
+/* sheets, scrim, toast */
+.scrim { position: absolute; inset: 0; background: rgba(4, 7, 8, .58); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--raised); border-radius: var(--r) var(--r) 0 0; padding: 8px var(--gut) 12px; box-shadow: 0 -10px 30px rgba(0, 0, 0, .35); }
+.sheet .handle { width: 36px; height: 4px; border-radius: 2px; background: var(--edge); margin: 0 auto 18px; }
+.sheet .sh { font-size: var(--fs-m); color: var(--t1); margin-bottom: 10px; }
+.toast { min-height: 48px; border-radius: var(--r-s); background: #2B3537; color: var(--t1); display: flex; align-items: center; gap: 10px; padding: 0 4px 0 16px; font-size: var(--fs-s);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .4); text-wrap: balance; }   /* two lines split evenly, never one word alone */
+.toast .act { margin-left: auto; color: var(--accent); font-weight: 500; padding: 0 12px; height: 48px; display: grid; place-items: center; }
+
+/* empty, loading, error */
+.empty { text-align: center; padding: 44px 8px 24px; }
+.empty .ei { width: 56px; height: 56px; border-radius: 50%; border: 1px solid var(--edge); display: grid; place-items: center; margin: 0 auto 18px; color: var(--tgold-hi); }
+.empty .ei svg { width: 26px; height: 26px; }
+.empty .t { font-size: var(--fs-m); color: var(--t1); }
+.empty .s { font-size: var(--fs-s); color: var(--t2); margin: 8px auto 0; line-height: 1.45; max-width: 280px; }
+.empty .pill, .empty .btn2 { margin-top: 22px; }
+.skel { background: #222B2D; border-radius: var(--r-s); height: 12px; }
+
+/* reading */
+.reader .body { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--t-body); }
+.reader .body p { margin: 0 0 .62em; }
+.reader .body .q { font-style: italic; color: var(--t-sub); }
+.vn { font-size: var(--fs-xs); font-weight: 500; color: var(--tgold); vertical-align: .42em; line-height: 0; margin-right: 3px; font-variant-numeric: lining-nums; }
+.fn { font-size: var(--fs-xs); font-weight: 500; color: var(--tgold); vertical-align: .42em; line-height: 0; margin: 0 1px 0 2px; font-variant-numeric: lining-nums; }
+.reader .body .lead-in { font-style: italic; font-weight: 500; }   /* the corpus marks 'Thus says The Lord...' bold-italic; kept as its emphasis, quietly */
+.reader .body .poem { display: block; font-style: italic; padding-left: 1em; }
+.sec-h { font-size: var(--fs-s); color: var(--tgold); letter-spacing: .02em; margin: 6px 0 8px; }
+.ra { background: var(--wash); color: var(--t-hero); border-radius: 3px; box-decoration-break: clone; -webkit-box-decoration-break: clone; padding: 1px 2px; margin: 0 -2px; }
+.hl { border-radius: 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; padding: 1px 0; }
+.hl.gold { background: var(--hl-gold); } .hl.sage { background: var(--hl-sage); } .hl.rose { background: var(--hl-rose); }
+.hl.blue { background: var(--hl-blue); } .hl.plum { background: var(--hl-plum); }
+.nextcard { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 14px 0 15px; display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.nextcard .tx { flex: 1; }
+.nextcard .k { font-size: var(--fs-xs); color: var(--tgold); letter-spacing: .02em; }
+.nextcard .t { font-size: var(--fs-row1); margin-top: 3px; line-height: 1.2; }
+.swatch { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .18); }

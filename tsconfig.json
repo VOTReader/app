@@ -24,12 +24,13 @@
     "app/src/main/assets/src/data/journal-helpers.js",
     "app/src/main/assets/src/data/letter-linking.js",
     "app/src/main/assets/src/search/**/*",
+    "app/src/main/assets/src/v2/**/*",
     "app/src/main/assets/src/app.jsx"
   ],
   "exclude": [
     "app/src/main/assets/src/stores/_entry-b.js",
     "app/src/main/assets/src/renderer/_entry.js",
-    "app/src/main/assets/src/ui/_entry-d.js",
+    "app/src/main/assets/src/ui/_entry-d.js", "app/src/main/assets/src/v2/_entry-v2.js",
     "app/src/main/assets/src/search/vendor/**"
   ]
 }

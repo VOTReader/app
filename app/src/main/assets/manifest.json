@@ -6,8 +6,8 @@
   "scope": "./",
   "id": "./",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#b8860b",
+  "background_color": "#172022",
+  "theme_color": "#172022",
   "categories": ["books", "education"],
   "icons": [
     {

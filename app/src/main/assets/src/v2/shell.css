@@ -1,0 +1,31 @@
+/* shell.css - v2's app frame around the kit (mw4). The kit draws screens inside a picture's phone (.scr) or laptop (.dk);
+   the app is the real window: these rules make the same pieces fill it. Colour, type and spacing stay the kit's tokens. */
+:root {
+  /* the system bars: the APK's MainActivity sets --inset-top / --inset-bottom in dp (edge to edge); iOS gives env() */
+  --v2-top: max(env(safe-area-inset-top, 0px), var(--inset-top, 0px));
+  --v2-bottom: max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px));
+}
+html, body { background: var(--bg); height: 100%; overflow: hidden; overscroll-behavior: none; }
+#root { height: 100%; }
+.v2i { display: contents; }
+
+/* phone: the column fills the window inside the system bars (Android draws the clock and the 3 buttons over the plane) */
+.v2-phone { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--bg); color: var(--t1);
+  font-family: var(--font); padding: var(--v2-top) 0 var(--v2-bottom); --tabbar: 64px; }
+.v2-phone > .content { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+
+/* desktop: the picture's .dk at the window's size, the page scrolling in .main (D2) */
+.v2.dk { position: fixed; inset: 0; width: auto; height: auto; color: var(--t1); font-family: var(--font); }
+.v2.dk .main { overflow-y: auto; }
+
+/* rows the app makes tappable are buttons: full width, text left, their lines blocks as the kit's divs are */
+.v2 button.srow, .v2 button.row, .v2 button.nextcard { width: 100%; text-align: left; }
+.v2 button .tx, .v2 button .t, .v2 button .s, .v2 button .k { display: block; }
+.v2 .tabbar .tab, .v2 .rail .tab { width: 100%; }
+.v2 .stanza-break { display: block; height: .75em; }
+.v2 .caps { font-weight: 600; letter-spacing: .03em; }
+
+/* the boot splash (index.html's first pixel; HydrationGate renders the same markup while the stores load): the app's
+   name on the page colour, so a real boot opens on the slate instead of a blank black window */
+.hydration-loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); }
+.hydration-loading-text { font-family: var(--font); font-size: var(--fs-title); color: var(--t2); }
