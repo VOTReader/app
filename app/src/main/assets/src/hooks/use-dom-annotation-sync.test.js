@@ -194,7 +194,7 @@ describe('useDomAnnotationSync — apply pass', () => {
     expect(window.applyDOMLinks).toHaveBeenCalledTimes(2);
   });
 
-  it('takes pendingScrollHlKey and scrolls the matching mark into view', () => {
+  it('consumes pendingScrollHlKey once it scrolls the matching mark into view', () => {
     const el = document.createElement('div');
     el.setAttribute('data-hl-key', 'k1');
     el.scrollIntoView = vi.fn();
@@ -202,10 +202,93 @@ describe('useDomAnnotationSync — apply pass', () => {
     navHandoff.set('pendingScrollHlKey', 'k1');
     renderHook(() => useDomAnnotationSync(baseProps()));
     act(() => { vi.advanceTimersByTime(0); });
-    expect(navHandoff.peek('pendingScrollHlKey')).toBe(null);
+    expect(navHandoff.peek('pendingScrollHlKey')).toBe('k1'); // peeked, not taken, until the mark is found
     act(() => { vi.advanceTimersByTime(70); });
     expect(el.scrollIntoView).toHaveBeenCalled();
+    expect(navHandoff.peek('pendingScrollHlKey')).toBe(null); // consumed once it scrolled
     document.body.removeChild(el);
+  });
+
+  describe('pendingScrollHlKey on a cold corpus (sweep v010)', () => {
+    /** The mark's block, as the verse DOM renders it once the corpus lands. */
+    const mountMark = (key) => {
+      const el = document.createElement('div');
+      el.setAttribute('data-hl-key', key);
+      el.scrollIntoView = vi.fn();
+      document.body.appendChild(el);
+      return el;
+    };
+    afterEach(() => { document.querySelectorAll('[data-hl-key]').forEach((n) => n.remove()); });
+
+    it('keeps the key while the route shows its Loading placeholder and scrolls once the corpus lands', () => {
+      // Library -> a bookmark deep in Matthew 5, before bundle-a-matthew has
+      // loaded: navigateToLink stashes the key and navigates at once, so the
+      // first pass runs over the "Loading Matthew…" placeholder. Pre-fix that
+      // pass took the slot, the 70 ms query found nothing, and the re-run the
+      // corpus load triggers found the slot empty: the chapter opened unscrolled.
+      navHandoff.set('pendingScrollHlKey', 'matthew:5:12');
+      renderHook(() => useDomAnnotationSync(baseProps({ screen: 'matthew-ch', placeKey: 'matthew-ch|matthew|5||||' })));
+      act(() => { vi.advanceTimersByTime(0); });
+      act(() => { vi.advanceTimersByTime(70); });               // placeholder only: nothing to scroll to
+      expect(navHandoff.peek('pendingScrollHlKey')).toBe('matthew:5:12'); // still waiting
+
+      const el = mountMark('matthew:5:12');                       // corpus resolves -> verses mount
+      act(() => { window.__matthewCorpus.bump(); });
+      act(() => { vi.advanceTimersByTime(0); });
+      act(() => { vi.advanceTimersByTime(70); });
+      expect(el.scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(el.scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+      expect(navHandoff.peek('pendingScrollHlKey')).toBe(null);  // consumed after the scroll
+    });
+
+    it('drops the key when the reader leaves before the mark appears, instead of jumping a later page', () => {
+      navHandoff.set('pendingScrollHlKey', 'matthew:5:12');
+      const props = baseProps({ screen: 'matthew-ch', placeKey: 'matthew-ch|matthew|5||||' });
+      const { rerender } = renderHook((p) => useDomAnnotationSync(p), { initialProps: props });
+      act(() => { vi.advanceTimersByTime(0); });
+      act(() => { vi.advanceTimersByTime(70); });               // missed on the placeholder: waits
+      expect(navHandoff.peek('pendingScrollHlKey')).toBe('matthew:5:12');
+
+      // The reader gives up and opens another page; that page happens to
+      // render the same block. The abandoned jump must not yank it.
+      const el = mountMark('matthew:5:12');
+      rerender({ ...props, screen: 'bible-ch', placeKey: 'bible-ch|genesis|1||||' });
+      act(() => { vi.advanceTimersByTime(0); });
+      act(() => { vi.advanceTimersByTime(70); });
+      expect(el.scrollIntoView).not.toHaveBeenCalled();
+      expect(navHandoff.peek('pendingScrollHlKey')).toBe(null);  // dropped, not left to linger
+    });
+
+    it('keeps waiting across passes on the same page (a store bump before the corpus lands)', () => {
+      navHandoff.set('pendingScrollHlKey', 'matthew:5:12');
+      renderHook(() => useDomAnnotationSync(baseProps({ screen: 'matthew-ch', placeKey: 'matthew-ch|matthew|5||||' })));
+      act(() => { vi.advanceTimersByTime(70); });
+      act(() => { window.__votCorpus.bump(); });                  // an unrelated re-run, same page
+      act(() => { vi.advanceTimersByTime(70); });
+      expect(navHandoff.peek('pendingScrollHlKey')).toBe('matthew:5:12');
+      const el = mountMark('matthew:5:12');
+      act(() => { window.__matthewCorpus.bump(); });
+      act(() => { vi.advanceTimersByTime(70); });
+      expect(el.scrollIntoView).toHaveBeenCalledTimes(1);
+    });
+
+    it('a pending timer acts only on the key still in the slot (a newer jump, goHome)', () => {
+      const mark = mountMark('k1');
+      navHandoff.set('pendingScrollHlKey', 'k1');
+      renderHook(() => useDomAnnotationSync(baseProps()));
+      act(() => { vi.advanceTimersByTime(0); });                  // pass schedules the 70 ms query for k1
+      navHandoff.set('pendingScrollHlKey', 'k2');                 // a newer jump lands before it fires
+      act(() => { vi.advanceTimersByTime(70); });
+      expect(mark.scrollIntoView).not.toHaveBeenCalled();
+      expect(navHandoff.peek('pendingScrollHlKey')).toBe('k2');   // the stale k1 timer left it alone
+
+      navHandoff.set('pendingScrollHlKey', 'k1');
+      act(() => { window.__votCorpus.bump(); });
+      act(() => { vi.advanceTimersByTime(0); });                  // pass schedules a query for k1
+      navHandoff.clear('pendingScrollHlKey');                     // goHome inside the 70 ms window
+      act(() => { vi.advanceTimersByTime(70); });
+      expect(mark.scrollIntoView).not.toHaveBeenCalled();
+    });
   });
 });
 

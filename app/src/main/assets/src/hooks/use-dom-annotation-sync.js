@@ -23,9 +23,10 @@
      1. The post-render re-apply effect (deps: the four store versions +
         screen + letterId). Runs the five apply* passes inside a 0ms timeout
         (so it fires after React's commit), each guarded so one layer's
-        failure can't trip the ErrorBoundary. Also takes two navHandoff slots:
+        failure can't trip the ErrorBoundary. Also reads two navHandoff slots:
           - 'pendingOpenNote'   → open the NoteSheet for a tapped Notes-index row
-          - 'pendingScrollHlKey' → scroll a Library-opened mark into view
+          - 'pendingScrollHlKey' → scroll a Library-opened mark into view (kept
+            until the mark is found, so it survives a corpus still loading)
      2. The active-note toggle effect (deps: noteSheetTarget). Sets
         window.__activeNoteGroup + re-runs applyActiveNoteState so the open
         note's anchored text lights up (and reverts on close). Store-driven
@@ -46,9 +47,12 @@
 
    RETURNS: nothing — pure effects.
 
-   NAV HAND-OFF (navHandoff, see utils/nav-handoff.js) — taken (read+cleared):
-     - 'pendingOpenNote'     groupId stashed by the Notes index on tap-through.
-     - 'pendingScrollHlKey'  hl-key stashed by Library to scroll-to on open.
+   NAV HAND-OFF (navHandoff, see utils/nav-handoff.js):
+     - 'pendingOpenNote'     groupId stashed by the Notes index on tap-through;
+                             taken (read+cleared) on the next pass.
+     - 'pendingScrollHlKey'  hl-key stashed by Library to scroll-to on open;
+                             peeked, and cleared once its mark is scrolled to
+                             or the reader leaves the page it was awaited on.
    WINDOW:
      - __activeNoteGroup     written so the renderer knows which group is lit.
    ═══════════════════════════════════════════════════════════════════════ */
@@ -59,6 +63,50 @@ import { BookmarkStore } from '../stores/bookmark-store.js';
 import { LinkStore } from '../stores/link-store.js';
 import { NoteStore } from '../stores/note-store.js';
 import { NotebookStore } from '../stores/notebook-store.js';
+
+/**
+ * Scroll a Library jump's mark into view and consume its hand-off slot
+ * (navHandoff 'pendingScrollHlKey'), or keep the slot waiting for the mark
+ * (sweep v010). navigateToLink stashes the key and navigates at once for every
+ * non-Bible target, so when the destination's corpus is still loading (Matthew
+ * or a study on a cold start) the first apply pass runs over the route's
+ * "Loading…" placeholder. The old code took the slot on
+ * that pass, the query found nothing, and the re-run the corpus load triggers
+ * found the slot empty: the page opened unscrolled. Now the slot is cleared
+ * only once the mark is found and scrolled to.
+ *
+ * Bound: a miss records the place it happened on; once the reader is on
+ * another place (they left before the mark ever appeared) the key is dropped
+ * instead of jumping a later page. goHome still clears the slot outright.
+ *
+ * @param {string} sk  the key the scheduling pass peeked
+ * @param {{ current: string }} placeRef  the committed placeKey
+ * @param {{ current: { key: string, place: string } | null }} missRef  the place this key first missed on
+ * @returns {void}
+ */
+function scrollToPendingMark(sk, placeRef, missRef) {
+  // Already scrolled by an earlier pass, cleared by goHome, or replaced by a
+  // newer jump: this timer's key is no longer the pending one.
+  if (window.navHandoff.peek('pendingScrollHlKey') !== sk) return;
+  const here = placeRef.current;
+  const miss = missRef.current;
+  if (miss && miss.key === sk && miss.place !== here) {
+    window.navHandoff.clear('pendingScrollHlKey');
+    missRef.current = null;
+    return;
+  }
+  let el = null;
+  try {
+    el = document.querySelector('[data-hl-key="' + sk.replace(/"/g, '\\"') + '"]');
+    if (el) el.scrollIntoView({ block: 'center' });
+  } catch (_e) { /* DOM access — selector or scrollIntoView unsupported */ }
+  if (el) {
+    window.navHandoff.clear('pendingScrollHlKey');
+    missRef.current = null;
+  } else if (!miss || miss.key !== sk) {
+    missRef.current = { key: sk, place: here };
+  }
+}
 
 /**
  * @param {{
@@ -133,7 +181,12 @@ export function useDomAnnotationSync({ screen, letterId, placeKey, noteSheetTarg
     () => (typeof window.__answersCorpus !== 'undefined') ? window.__answersCorpus.getVersion() : 0
   );
 
+  // The Library jump's scroll key waits for its mark (scrollToPendingMark).
+  const placeRef = React.useRef(placeKey);
+  const scrollMissRef = React.useRef(/** @type {{ key: string, place: string } | null} */ (null));
+
   React.useEffect(() => {
+    placeRef.current = placeKey;
     const t = setTimeout(() => {
       // Each annotation layer is isolated: this pipeline mutates the DOM
       // imperatively AFTER React renders, so rapid prev/next on a heavily
@@ -162,15 +215,12 @@ export function useDomAnnotationSync({ screen, letterId, placeKey, noteSheetTarg
       // Opened from Library (bookmark/note/highlight/underline) → jump
       // straight to that mark's block. Instant (no smooth behavior) so the
       // page opens already at the position rather than animating there.
-      const sk = window.navHandoff.take('pendingScrollHlKey');
-      if (sk) {
-        setTimeout(() => {
-          try {
-            const el = document.querySelector('[data-hl-key="' + sk.replace(/"/g, '\\"') + '"]');
-            if (el) el.scrollIntoView({ block: 'center' });
-          } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
-        }, 70);
-      }
+      // PEEKED, not taken: the slot is cleared only once the mark is found
+      // (see scrollToPendingMark), so a pass over a "Loading…" placeholder
+      // leaves it for the re-run the corpus load triggers (sweep v010).
+      const sk = window.navHandoff.peek('pendingScrollHlKey');
+      if (sk) setTimeout(() => scrollToPendingMark(sk, placeRef, scrollMissRef), 70);
+      else scrollMissRef.current = null; // slot empty (scrolled, goHome, or a jump with no mark): forget any wait
     }, 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setNoteSheetTarget is a useState setter passed in as a param (identity-stable per React invariant; eslint can't trace it through the destructured hook-return at the call site).

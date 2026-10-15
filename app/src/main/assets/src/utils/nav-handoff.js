@@ -30,7 +30,9 @@
         cleared by: goHome / use-nav / use-from-letter-stack / use-android-back
      pendingScrollHlKey string | null
         writer: use-navigate-to-link (navigate to a linked annotation)
-        reader: use-dom-annotation-sync (take → scrollIntoView the mark)
+        reader: use-dom-annotation-sync (peek → scrollIntoView the mark; it
+                clears the slot once the mark is found, so a corpus still
+                loading keeps it, or when the reader leaves that page first)
         cleared by: use-nav (goHome)
      pendingSearchQuery string | null
         writer: SelectionToolbar (Search action on a selection)
