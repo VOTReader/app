@@ -108,7 +108,11 @@ const BUDGETS = [
   // 14.4 KB, Home + its data 8.3 KB). While three builders land ~25 more screens at ~3-8 KB each, the ceiling covers
   // that build-out (~150 KB projected) instead of tripping on every screen; it still catches what this gate is for: a
   // corpus or a v1 bundle pulled in (each is MBs). Re-baseline to +15 % once v2's screens are all in.
-  { file: 'bundle-v2.js', measured: 49926, max: 200000 },
+  // mw5 2026-10-15 (reading record + read-along 1b part 2): 200,502 B, nothing pulled in (esbuild metafile: no store
+  // module, no corpus; the largest inputs are main's backup-flow.js 17.9 KB for Your data, icons 14.4 KB, the player
+  // 14.0 KB). About two thirds of the screens are in, so ~250 KB is projected at the end: ceiling 280 KB, still far under
+  // a corpus or a v1 bundle.
+  { file: 'bundle-v2.js', measured: 200502, max: 280000 },
   // v2.min.css the same way (zv1 group 8, Settings pages, 2026-10-14): 36458 B with Search, Notes, the player and Settings in
   // (+5.5 KB over the first kit build, nothing pulled in: each screen's own sheet is 1-3 KB); the ceiling covers the
   // rest of the build-out and still catches app.min.css (370 KB) or a font pulled in. Re-baseline with bundle-v2.js.
