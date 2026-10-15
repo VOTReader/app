@@ -11,7 +11,8 @@
         else the engine's first hit (the Best Matches row and the lone-group list both open on it).
      2. It belongs to the target's EQUIVALENCE CLASS: every unit whose text holds the remembered
         sentence, or a near copy of it with 80% of its word 3-grams (75-100% of letter sentences are
-        reprinted elsewhere), the verse a sentence quotes, Matthew Study and plain Matthew c:v as
+        reprinted elsewhere), the verse a sentence quotes (word for word or such a near copy),
+        Matthew Study and plain Matthew c:v as
         one, a unit-level target's own unit and its same-titled reprints.
      3. It is the class's ORIGINAL: no member of a better tier exists (letters > Words To Live By and
         The Blessed > Holy Days > studies > Answers; the verse itself for a verse).
@@ -95,7 +96,20 @@ for (const [book, chs] of Object.entries(KJV)) for (const [ch, vs] of Object.ent
 for (let i = verseNorm.length - 1; i >= 0; i--) if (verseNorm[i][1].split(' ').length < 8) verseNorm.splice(i, 1);
 // ...with His name restored too: a study quotes Luke 7:9 as "When YahuShua heard these things".
 const named = (t) => t.replace(/ (?:yahushua|yeshua|yahshua|yahusha|yeshu) /g, ' jesus ').replace(/ (?:yahushua|yeshua|yahshua|yahusha|yeshu) /g, ' jesus ');
-const versesQuoted = (sentence) => { const n = named(norm(sentence)); return verseNorm.filter(([, t]) => t.includes(n) || n.includes(t)).map(([k]) => k); };
+// ...or as a near copy, the same 80%-of-3-grams rule as a prose holder, either way round (a study quotes Acts 20:16 as
+// "for he hurried" where the KJV has "for he hasted"; a sentence holds a verse with a word changed). sr11, 2026-10-15.
+const verseWords = verseNorm.map(([, t]) => t.trim().split(' '));
+const verseGrams = new Map();
+verseWords.forEach((w, i) => { for (let j = 0; j + 3 <= w.length; j++) { const g = w[j] + ' ' + w[j + 1] + ' ' + w[j + 2]; const a = verseGrams.get(g); if (!a) verseGrams.set(g, [i]); else if (a[a.length - 1] !== i) a.push(i); } });
+const versesQuoted = (sentence) => {
+  const n = named(norm(sentence));
+  const out = new Set(verseNorm.filter(([, t]) => t.includes(n) || n.includes(t)).map(([k]) => k));
+  const w = n.trim().split(' ');
+  const shared = new Map();
+  for (const g of new Set(w.slice(0, -2).map((x, j) => x + ' ' + w[j + 1] + ' ' + w[j + 2]))) for (const i of verseGrams.get(g) || []) shared.set(i, (shared.get(i) || 0) + 1);
+  for (const [i, k] of shared) if (k >= 4 && (heldShare(w, verseWords[i]) >= 0.8 || heldShare(verseWords[i], w) >= 0.8)) out.add(verseNorm[i][0]);
+  return [...out];
+};
 const titleNorm = {};
 for (const k of proseKeys) { const t = norm(unitBlocks[k][0].title); (titleNorm[t] || (titleNorm[t] = [])).push(k); }
 const matthewTwin = (uk) => {

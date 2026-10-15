@@ -33,7 +33,7 @@ import { kjvEncode } from './tokenize.js';
 import { snippet, snippetAt, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
 import {
   KIND_BOOST, coverageMultiplier, popcount, PHRASE_BOOST, SYNONYM_DEMOTION,
-  BM25_PARAMS, KEYWORD_BM25, KEYWORD_CONTENT_WORDS, KEYWORD_WORDS, joinApostropheS, SYNONYM_WEIGHT, FORM_WEIGHT, NEAR_PHRASE_MIN, ORIGINAL_BOOST, REPRINT_KINDS, nearPhrase, titleMatch,
+  BM25_PARAMS, KEYWORD_BM25, KEYWORD_CONTENT_WORDS, KEYWORD_WORDS, joinApostropheS, SYNONYM_WEIGHT, FORM_WEIGHT, NEAR_PHRASE_MIN, ORIGINAL_BOOST, REPRINT_KINDS, nearPhrase, titleMatch, TITLE_EXACT_BOOST,
 } from './ranking.js';
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
 import { onIdle } from '../utils/on-idle.js';
@@ -654,9 +654,14 @@ function sentenceSpans(text) {
   while ((m = re.exec(text))) out.push({ start: m.index, end: m.index + m[0].length, text: m[0] });
   return out;
 }
-/** A sentence's key: its words as the index reads them; null under five words (too common to mean one text). */
+/* HIS NAME AS THE EDITIONS PRINT IT (sr11, 2026-10-15). The studies and the Matthew Study Bible restore His name
+   in the verses they quote ("When YahuShua heard these things, He marveled at him"), and the edition the index
+   holds prints "Jesus" (Luke 7:9): the study's sentence never met its verse's key, and the study led the verse. */
+const RESTORED_NAME = /^(?:yahushua|yeshua|yahshua|yahusha|yeshu)$/;
+const nameAsPrinted = (/** @type {string} */ t) => (RESTORED_NAME.test(t) ? 'jesus' : t);
+/** A sentence's key: its words as the index reads them, His name as printed; null under five words (too common to mean one text). */
 function sentenceKey(s) {
-  const toks = kjvEncode(s);
+  const toks = kjvEncode(s).map(nameAsPrinted);
   return toks.length >= 5 ? toks.join(' ') : null;
 }
 /* Words To Live By cuts its excerpts mid-sentence and the Answers reprints re-punctuate, so a
@@ -911,37 +916,106 @@ function condensedFrom(/** @type {string} */ id, /** @type {string} */ text, /**
   SOURCE_CACHE.set(id, src);
   return src;
 }
+/* A QUOTE THAT NAMES ITS VERSE (sr11, 2026-10-15). A study quotes Scripture as the KJV words it (“All have sinned,
+   and come short of the glory of God.” – Romans 3:23) and the edition the index holds words it otherwise ("fall
+   short"), so no key of the verse meets the study's sentence: the reference the study writes after it does. */
+const CITED_AFTER = /^[\s"'“”‘’)]*[–—-]\s*((?:[1-3]\s?)?[A-Z][A-Za-z]+(?: of [A-Z][a-z]+| [A-Z][a-z]+)?\.? \d{1,3}:\d{1,3}(?:\s?[-–]\s?\d{1,3})?)/;
+/** How many verses of a cited range are read for the one the sentence quotes. */
+const CITED_RANGE = 12;
+/**
+ * The verse a sentence's citation names, when it holds `need` of the query's words; else null.
+ * @param {string} after  the text just after the sentence
+ * @param {string[]} words  the query's words, encoded
+ * @param {number} need
+ */
+function citedVerse(after, words, need) {
+  const m = CITED_AFTER.exec(after);
+  if (!m) return null;
+  let p;
+  try { p = parseReference(m[1]); } catch { return null; }
+  if (!p || p.kind !== 'ref-bible' || !p.bookId || !p.chapter || !p.verseStart) return null;
+  const D = /** @type {Map<string, any>} */ (ORIGINAL_DOCS);
+  const books = p.bookId === 'matthew' || p.bookId === 'matthew-plain' ? ['matthew-study/matthew', 'bible/matthew-plain'] : ['bible/' + p.bookId];
+  let best = null;
+  let most = need - 1;
+  const last = Math.min(p.verseEnd || p.verseStart, p.verseStart + CITED_RANGE - 1);
+  for (let v = p.verseStart; v <= last; v++) {
+    for (const b of books) {
+      const id = unitId(b + ':' + p.chapter + ':' + v);
+      const f = id && D.get(id);
+      if (!f || f.kind !== 'verse') continue;
+      const toks = new Set(kjvEncode(f.text).map(nameAsPrinted));
+      const held = words.filter((w) => toks.has(w)).length;
+      if (held > most) { most = held; best = id; }
+    }
+  }
+  return best;
+}
+/**
+ * The originals of the sentence(s) an excerpt falls in: the sentence's key, or the verse it cites.
+ * @param {string} text
+ * @param {string} ex  the excerpt
+ * @param {number} at  where it starts
+ * @param {Map<string, string[]>} O
+ * @param {(ids: string[]|undefined) => string[]} lower  the ids of a lower tier than the reprint's
+ * @param {string[]} keyWords  the query's words as a key reads them
+ * @param {number} need
+ * @param {boolean} cite  the reader typed the quote's words in a row: the verse it cites is its original
+ * @returns {string[]|null}
+ */
+function sentenceOriginal(text, ex, at, O, lower, keyWords, need, cite) {
+  if (at < 0) return null;
+  for (const sp of sentenceSpans(text)) {
+    if (sp.end < at || sp.start > at + ex.length) continue;
+    const k = sentenceKey(sp.text);
+    if (!k || keyWords.filter((w) => (' ' + k + ' ').indexOf(' ' + w + ' ') >= 0).length < need) continue;
+    const l = lower(O.get(k));
+    if (l.length) return l;
+    if (!cite) continue;
+    const v = citedVerse(text.slice(sp.end, sp.end + 48), keyWords, need);
+    if (v && lower([v]).length) return [v];
+  }
+  return null;
+}
 /**
  * Move each original ahead of a reprint of it near the top (in place).
  * @param {Array<{score:number, doc:any, terms?:string[], meaningStart?:number}>} out  ranked, best first (meaningStart: meaningFirst's matched passage)
  * @param {Map<any, string>} idOf  each entry's doc id
  * @param {string[]} terms  the words a landing marks (the query's own)
  * @param {(doc:any) => boolean} allowed  the search's corpus and scope filters
- * @param {(doc:any) => boolean} named  the query names this text's title: it keeps its place
+ * @param {(doc:any) => boolean} named  the query names this text's title so: it keeps its place
  * @param {(id:string, doc:any) => number} near  how nearly a text holds the typed words in a row (0..1)
+ * @param {string[]} [typed]  every typed word, the small ones too: a quote's excerpt is cut by them
  */
-function originalsFirst(out, idOf, terms, allowed, named, near) {
+function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
   if (!terms.length) return;
   let O;
   try { O = originals(); } catch { return; }
   const D = /** @type {Map<string, any>} */ (ORIGINAL_DOCS);
   // The matched sentence must hold a fair share of the query's words, not one word of a title.
   const words = [...new Set(terms.flatMap((t) => kjvEncode(t)))];
+  const keyWords = words.map(nameAsPrinted);
   const need = Math.min(3, Math.ceil(words.length / 2));
   for (let i = 0; i < Math.min(out.length, ORIGINAL_REACH); i++) {
     const e = out[i];
     const tier = ORIGINAL_TIER[e.doc.kind];
     if (!tier || !e.doc.text || named(e.doc)) continue;
-    const ex = matchExcerpt(e.doc.text, terms);
-    const at = ex ? e.doc.text.indexOf(ex) : -1;
+    let ex = matchExcerpt(e.doc.text, terms);
+    let at = ex ? e.doc.text.indexOf(ex) : -1;
     const lower = (/** @type {string[]|undefined} */ ids) => (ids || []).filter((x) => D.has(x) && ORIGINAL_TIER[D.get(x).kind] < tier);
-    let found = null;
-    if (at >= 0) for (const sp of sentenceSpans(e.doc.text)) {
-      if (sp.end < at || sp.start > at + ex.length) continue;
-      const k = sentenceKey(sp.text);
-      if (!k || words.filter((w) => (' ' + k + ' ').indexOf(' ' + w + ' ') >= 0).length < need) continue;
-      const l = lower(O.get(k));
-      if (l.length) { found = l; break; }
+    // A study's citation names the original of a quote of it, not of a passage described in other words
+    // ("passover study about the lamb when god struck the egyptians" asks for the study, not Exodus 12:27).
+    const quoted = near(idOf.get(e) || '', e.doc) >= NEAR_PHRASE_MIN;
+    let found = sentenceOriginal(e.doc.text, ex, at, O, lower, keyWords, need, quoted);
+    // A quote held nearly word for word sits where its small words are too ("blessed be the name of our lord":
+    // the content words sit thickest in "Blessed are those who Bless the name of The Lord", a line above it).
+    if (!found && typed.length > terms.length && quoted) {
+      const ex2 = matchExcerpt(e.doc.text, typed);
+      const at2 = ex2 ? e.doc.text.indexOf(ex2) : -1;
+      if (at2 >= 0 && at2 !== at) {
+        found = sentenceOriginal(e.doc.text, ex2, at2, O, lower, keyWords, need, true);
+        if (found) { ex = ex2; at = at2; }
+      }
     }
     if (!found && at >= 0) {
       // The matched place, a little either side (its edge words may be cut), by its shingles.
@@ -974,7 +1048,10 @@ function originalsFirst(out, idOf, terms, allowed, named, near) {
       const pq = passageQuery(words);
       const share = src ? bestWindow(pq.query, docLemmas(id, e.doc.text), pq.span) : 0;
       const own = src ? near(id, e.doc) : 0;
-        if (src && share >= 0.5 && holdsAsWell(src, pq, share) && (own < NEAR_PHRASE_MIN || near(src, D.get(src)) >= own - 0.1)) found = [src];
+      // The entry is cut from its letter: whatever of the query it holds, a letter holding as much comes first
+      // (sr11, 2026-10-15: a bar of half the query kept "history has an end and christ is coming" on the entry at
+      // 0.46 with its letter holding the same 0.46; Corbin, DECISIONS 10-14: the original first, the reprint second).
+      if (src && share > 0 && holdsAsWell(src, pq, share) && (own < NEAR_PHRASE_MIN || near(src, D.get(src)) >= own - 0.1)) found = [src];
     }
     if (!found && e.doc.kind === 'answers') {
       // A study or Holy Days text just below that holds the query as well, in one passage and in a row: it is what Answers reprints.
@@ -1014,6 +1091,40 @@ function originalsFirst(out, idOf, terms, allowed, named, near) {
     }
     out.splice(i, 0, entry);
     i++;   // the reprint now sits under it
+  }
+}
+/* THE REPRINT RIGHT AFTER ITS ORIGINAL (sr11, 2026-10-15). Corbin (DECISIONS 10-14) on a letter that Words To Live
+   By later excerpts: "what surfaces first? The original, yes. But both should surface, with WTLB being second."
+   With the original first, a reprint of the passage it was found by sat anywhere below it (#7, #15, #100 on the
+   benchmark). The first text below that holds the passage's words in a row comes up second. A verse first keeps
+   its order: the letters quoting it are no reprints of it. */
+/** How far below the first result a reprint of its passage is looked for. */
+const REPRINT_REACH = 200;
+/** Words in a row a reprint shares with the passage (fewer when the sentence is shorter, five at least). */
+const REPRINT_RUN = 8;
+/**
+ * @param {Array<{doc:any, placeStart?:number}>} out  ranked, best first
+ * @param {string[]} terms  the words a landing marks
+ */
+function reprintSecond(out, terms) {
+  if (out.length < 3 || !terms.length) return;
+  const first = out[0];
+  const d = first.doc;
+  if (!d.text || !(d.kind === 'letter' || d.kind === 'wtlb' || d.kind === 'blessed')) return;
+  // the passage it was found by: the sentence it opens on, else the one where the typed words sit thickest
+  let st = typeof first.placeStart === 'number' && first.placeStart >= 0 ? first.placeStart : -1;
+  if (st < 0) { const ex = matchExcerpt(d.text, terms); st = ex ? d.text.indexOf(ex) : -1; }
+  if (st < 0) return;
+  const sp = sentenceSpans(d.text).find((x) => x.end > st);
+  const toks = sp ? kjvEncode(sp.text) : [];
+  if (toks.length < 5) return;
+  const runs = toks.length <= REPRINT_RUN ? [toks] : [0, (toks.length - REPRINT_RUN) >> 1, toks.length - REPRINT_RUN].map((i) => toks.slice(i, i + REPRINT_RUN));
+  const esc = (/** @type {string} */ t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const res = runs.map((run) => new RegExp('(?:^|[^a-z0-9])' + run.map(esc).join('[^a-z0-9]+') + '(?![a-z0-9])', 'i'));
+  for (let r = 1; r < Math.min(out.length, REPRINT_REACH); r++) {
+    const t = out[r].doc.text;
+    if (!t || out[r].doc.kind === 'verse') continue;
+    if (res.some((re) => re.test(t))) { if (r > 1) out.splice(1, 0, out.splice(r, 1)[0]); return; }
   }
 }
 /** @type {Promise<boolean>|null} */ let building = null;
@@ -1695,8 +1806,28 @@ async function search(query, options) {
     if (sem) sem = sem.filter((s) => { const f = msIndex.getStoredFields(s.id); return !!f && allowed(f); });
     if (sem && sem.length) meaningFirst(out, idOf, sem, named, held, fresh);
   }
+  const nearTyped = (/** @type {string} */ id, /** @type {any} */ d) => nearOf[id] ?? (typedTokens.length > 1 ? nearPhrase(docTokens(id, d), typedTokens, STOP) : 0);
+  /* A TITLE NAMED IN PASSING (sr11, 2026-10-15). A title the query names keeps its text's place, but a Words To
+     Live By entry's title is often a line of the letter it condenses: a reader quoting the letter ("attained by
+     human means": the entry "Not By Human Means") or describing it ("letter explaining that history has an end and
+     christ is coming": "History Has an End") named the entry and got it above its letter. Corbin (DECISIONS
+     10-14): the original first, the reprint second. A title typed whole, or one the query is mostly made of, still
+     keeps its text's place; one the query holds beside more of its own words, or that a quote of the text's own
+     words runs through (the text holds more of the query in a row than the title does), does not. */
+  const namedSo = (/** @type {any} */ d) => {
+    if (!named(d)) return false;
+    const tt = kjvEncode(d.title);
+    if (titleMatch(tt, typedTokens, STOP) >= TITLE_EXACT_BOOST) return true;
+    const tl = new Set(tt.map(lemma));
+    const inTitle = typedContent.filter((w) => tl.has(lemma(w))).length;
+    const beside = typedContent.length - inTitle;
+    if (beside > inTitle) return false;
+    if (!beside) return true;
+    const body = nearPhrase(kjvEncode(d.text || ''), typedTokens, STOP);
+    return !(body >= NEAR_PHRASE_MIN && body > nearPhrase(tt, typedTokens, STOP));
+  };
   if (msIndex === inUse) originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) => allowed(d) && fresh(d),
-    named, (id, d) => nearOf[id] ?? (typedTokens.length > 1 ? nearPhrase(docTokens(id, d), typedTokens, STOP) : 0));
+    namedSo, nearTyped, typedTokens);
   // What those two added counts in its collection. A full one does not refuse it (the words' 400th
   // verse is no reason to drop the model's best text or an original): its last text gives way.
   if (perVolume) {
@@ -1730,6 +1861,8 @@ async function search(query, options) {
   const over = out.length > limit;
   if (over) out.length = limit;
   if (sem && sem.length) meaningLanding(out, idOf, sem, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))));
+  // ...by the passage the screen lands on: the card marks the phrase or the typed run with the words (textQuery.run).
+  reprintSecond(out, (p.phrase ? [p.phrase] : run ? [run] : []).concat(filtered.filter((t) => !isStopTerm(t))));
 
   /* CLOSE MATCHES (sr13, 2026-10-15). Book order lists the results in reading order, and most of a passage
      search's results hold a word or two of it: "I am The Lord and I do not change" found 1,344 texts, and Book
