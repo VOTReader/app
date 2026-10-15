@@ -222,6 +222,23 @@ describe('storage-growth series', () => {
     await expect(recordUserDataSample(123)).resolves.toBeDefined();
   });
 
+  it('a failed read never overwrites the stored series (sweep v089)', async () => {
+    const idb = fakeMeta();
+    const stored = [{ d: '2000-01-01', b: 1 }, { d: '2000-01-02', b: 2 }, { d: '2000-01-03', b: 3 }];
+    idb.mem.set('meta/user-data-samples', stored);
+    const put = vi.fn(idb.put);
+    /** @type {any} */ (globalThis).IDBAdapter = {
+      ...idb,
+      get: async () => { throw new Error('version-change blocked'); },
+      put,
+    };
+    const series = await recordUserDataSample(4096);
+    expect(put).not.toHaveBeenCalled();
+    expect(idb.mem.get('meta/user-data-samples')).toEqual(stored);   // history intact
+    expect(series).toHaveLength(1);                                   // today's point still shows
+    expect(series[0].b).toBe(4096);
+  });
+
   it('a new day appends a point after yesterday\'s', async () => {
     const idb = fakeMeta();
     /** @type {any} */ (globalThis).IDBAdapter = idb;
