@@ -33,6 +33,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { docs as buildDocs, blocks as buildBlocks, engine, kjvVerses, unitKey, norm, ASSETS } from './search-bench/corpus.mjs';
+import { heldShare, recurring, reprintShown } from './search-bench/rules.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -102,16 +103,34 @@ const matthewTwin = (uk) => {
   return m ? ['bible/matthew-plain:' + m[1] + ':' + m[2], 'matthew-study/matthew:' + m[1] + ':' + m[2]] : [uk];
 };
 
-/** The target's equivalence class and the tier its original sits in. */
+// CONTAINMENT (rules.mjs): the texts holding 80% of a whole-text target asked for by its subject. Candidates first: texts holding 80% of its
+// distinct words found in under a tenth of the texts, then the 3-gram window rule on those.
+const proseWords = proseNorm.map((t) => t.trim().split(' '));
+const wordUnits = new Map();
+proseWords.forEach((ws, i) => { for (const x of new Set(ws)) { const a = wordUnits.get(x); if (a) a.push(i); else wordUnits.set(x, [i]); } });
+const containers = (uk) => {
+  const at = proseKeys.indexOf(uk);
+  if (at < 0) return [];
+  const rare = [...new Set(proseWords[at])].filter((x) => wordUnits.get(x).length < proseKeys.length / 10);
+  const n = new Map();
+  for (const x of rare) for (const i of wordUnits.get(x)) if (i !== at) n.set(i, (n.get(i) || 0) + 1);
+  return [...n].filter(([i, k]) => k >= 0.8 * rare.length && heldShare(proseWords[at], proseWords[i]) >= 0.8).map(([i]) => proseKeys[i]);
+};
+const isVerseKey = (k) => /^(bible|matthew-study)\//.test(k);
+const isLetterKey = (k) => /^(v[1-7]|timothy|flock|rebuke)\//.test(k);
+
+/** The target's equivalence class, the tier its original sits in, and whether it has one original at all. */
 function classOf(c) {
   const members = new Set();
   if (c.level === 'verse') {
     for (const k of matthewTwin(c.uk)) members.add(k);
-    return { members, best: 0 };
+    return { members, best: 0, recurring: false };
   }
   if (c.level === 'unit') {
     members.add(c.uk);
     for (const k of titleNorm[norm(c.title)] || []) members.add(k);
+    // ...by its subject, any copy of it answers; a title names its own text (same-titled reprints above)
+    if (c.style === 'unitgist') for (const k of containers(c.uk)) members.add(k);
   } else {
     for (const k of holders(c.sentence)) members.add(k);
     if (c.level === 'sentence') for (const k of versesQuoted(c.sentence)) for (const t of matthewTwin(k)) members.add(t);
@@ -124,7 +143,7 @@ function classOf(c) {
     if (head.trim().split(' ').length >= 3) for (const k of titleNorm[head] || []) if (k !== c.uk) members.add(k);
     members.add(c.uk);
   }
-  return { members, best: Math.min(...[...members].map(TIER)) };
+  return { members, best: Math.min(...[...members].map(TIER)), recurring: recurring(members, isVerseKey, isLetterKey) };
 }
 
 /* FAIR TO ASK? (path to 500, step 3, 2026-10-05). `--audit <out.json>`: for every case, the texts outside its
@@ -237,12 +256,17 @@ for (const c of cases) {
   else if (f.card) { pass = cardPasses(f, c); strict = pass; if (!pass) why = 'a ' + f.card + ' card leads'; }
   else {
     const k = unitKey(f.hit.doc);
+    const card = (d) => (d.title || d.ref || '') + '|' + String(d.text || '').slice(0, 80);
+    const twin = (a, b) => matthewTwin(a).includes(b);
     if (!cls.members.has(k)) why = 'first hit is not the target (' + (f.hit.doc.ref || k) + ')';
-    else if (TIER(k) > cls.best) why = 'a reprint leads the original (' + (f.hit.doc.ref || k) + ')';
+    else if (!cls.recurring && TIER(k) > cls.best) why = 'a reprint leads the original (' + (f.hit.doc.ref || k) + ')';
     else if (c.level === 'sentence' && !lands(f.hit, cardTerms(r), c)) why = 'lands off the sentence';
+    else if (!cls.recurring && !reprintShown(res.map((h) => ({ key: unitKey(h.doc), card: card(h.doc) })), cls.members, k, twin)) why = 'its reprint is not in the Best Matches';
     else { pass = true; strict = matthewTwin(c.uk).includes(k) || k === c.uk; }
   }
-  out.push({ id: c.id, held: !!c.held, set: c.set || 'bench', group: c.group, col: c.col, style: c.style, q: c.set === 'fresh' ? undefined : c.q, pass, strict, rank, top5: !!rank && rank <= 5, found: !!rank, why, ms: times[times.length - 1] });
+  // the rank of the class's next text after the first hit (its reprint, when the original leads)
+  const next = f && f.hit ? (res.findIndex((h, i) => i > 0 && cls.members.has(unitKey(h.doc)) && !matthewTwin(unitKey(h.doc)).includes(unitKey(f.hit.doc))) + 1) || null : null;
+  out.push({ id: c.id, held: !!c.held, set: c.set || 'bench', next, members: cls.members.size, recurring: cls.recurring, group: c.group, col: c.col, style: c.style, q: c.set === 'fresh' ? undefined : c.q, pass, strict, rank, top5: !!rank && rank <= 5, found: !!rank, why, ms: times[times.length - 1] });
 }
 
 // ── report ──

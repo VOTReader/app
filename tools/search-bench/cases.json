@@ -667,7 +667,11 @@
    "chapter": 19,
    "verse": 15,
    "sentence": "And He laid His hands on them and departed from there.",
-   "q": "jesus put his hands on the children and then left"
+   "q": "jesus laid hands on them and then went away from there",
+   "retired": {
+    "q": "jesus put his hands on the children and then left",
+    "why": "arguable: Matthew 19:13 fits the old query as well (it has the children; 19:15 does not) (miss audit 2026-10-14; rewritten blind, sr11 2026-10-15)"
+   }
   },
   {
    "id": "t042",
@@ -4046,7 +4050,11 @@
    "title": "Mouthpieces of The Most High God",
    "blockIdx": 2,
    "sentence": "And the pride of man shall be bowed down, And the arrogance of man utterly humiliated!...",
-   "q": "human pride will be brought low and arrogant people humbled"
+   "q": "mans pride bent low and his arrogance totally humiliated",
+   "retired": {
+    "q": "human pride will be brought low and arrogant people humbled",
+    "why": "arguable: the line is a refrain in 6+ letters and Isaiah 2:11/17; Proverbs 29:23 fits the old query too (miss audit 2026-10-14; rewritten blind, sr11 2026-10-15)"
+   }
   },
   {
    "id": "t277",
@@ -4566,7 +4574,11 @@
    "title": "Blurred Vision",
    "blockIdx": 0,
    "sentence": "Thus the one who steps in front of Me shall surely stumble, and the one who seats himself upon My throne shall be cast down.",
-   "q": "whoever sits on gods throne will be cast down"
+   "q": "whoever steps in front of god will stumble and sit on the ground",
+   "retired": {
+    "q": "whoever sits on gods throne will be cast down",
+    "why": "arguable: Volume Seven Letter 43 says the same thing (miss audit 2026-10-14; rewritten blind, sr11 2026-10-15)"
+   }
   },
   {
    "id": "t314",
@@ -5976,7 +5988,11 @@
    "title": "Regarding What is an Abomination to The Lord",
    "blockIdx": 219,
    "sentence": "The Religions of Men Are an Abomination to The Lord",
-   "q": "god hates man made religions"
+   "q": "the lord sees all religions made by men as an abomination",
+   "retired": {
+    "q": "god hates man made religions",
+    "why": "too vague: many texts state this topic (Volume Three Letter 10, Volume One Make Way) (miss audit 2026-10-14; rewritten blind, sr11 2026-10-15)"
+   }
   },
   {
    "id": "t414",
@@ -6374,7 +6390,11 @@
    "title": "YahuShua The Messiah, The Lamb of God — Three Days and Three Nights in the Tomb",
    "blockIdx": 5,
    "sentence": "Let My faithful ones, all who have made a covenant with Me by sacrifice, be gathered to Me, and let them be judged according to the New Covenant; let The Holy Sacrifice stand in their place and speak on their behalf.",
-   "q": "where god gathers those who made a covenant with him by sacrifice"
+   "q": "the holy sacrifice stands in their place and speaks for them",
+   "retired": {
+    "q": "where god gathers those who made a covenant with him by sacrifice",
+    "why": "arguable: Psalm 50:5, the verse the target paraphrases, fits it as well (miss audit 2026-10-14; rewritten blind, sr11 2026-10-15)"
+   }
   },
   {
    "id": "t443",
@@ -6988,7 +7008,11 @@
    "uk": "v4/be-instant-in-and-out-of-season",
    "unit": "be-instant-in-and-out-of-season",
    "title": "Be Instant In and Out of Season",
-   "q": "letter about not denying the lord in front of family to keep the peace"
+   "q": "denying god around others is hating them, speaking is loving",
+   "retired": {
+    "q": "letter about not denying the lord in front of family to keep the peace",
+    "why": "arguable: Flock Letter 20 and Volume Four Letter 5 fit it as well (miss audit 2026-10-14; rewritten blind, sr11 2026-10-15)"
+   }
   },
   {
    "id": "t488",
@@ -7036,7 +7060,11 @@
    "uk": "v3/death-and-deliverance",
    "unit": "death-and-deliverance",
    "title": "Death and Deliverance",
-   "q": "calling on the messiah by his real name to be saved"
+   "q": "god overlooked ignorance of calling the messiah by another name",
+   "retired": {
+    "q": "calling on the messiah by his real name to be saved",
+    "why": "arguable: Volume Seven Letter 17 and Words To Live By Part Two 98 fit it as well (miss audit 2026-10-14; rewritten blind, sr11 2026-10-15)"
+   }
   },
   {
    "id": "t492",
@@ -7060,7 +7088,11 @@
    "uk": "wtlb2/the-joy-of-the-lord",
    "unit": "the-joy-of-the-lord",
    "title": "The Joy of The Lord",
-   "q": "letter about overflowing joy and pure love that restores us"
+   "q": "joy flooding a hidden place made by gods fingertips",
+   "retired": {
+    "q": "letter about overflowing joy and pure love that restores us",
+    "why": "too vague: the old query blends three texts (Joy of the Lord, WTLB1 Pure Love, Flock Letter 7) (miss audit 2026-10-14; rewritten blind, sr11 2026-10-15)"
+   }
   },
   {
    "id": "t494",
