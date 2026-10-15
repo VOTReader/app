@@ -113,7 +113,7 @@ function Hit({ where, title, excerpt, bx, terms, onOpen }) {
 function EngineHit({ hit, terms, go }) {
   const d = hit.doc;
   const words = hit.terms && hit.terms.length ? terms.concat(hit.terms.filter((t) => terms.indexOf(t) < 0)) : terms;
-  const route = hitRoute(d, words);
+  const route = hitRoute(d, terms, undefined, hit.terms);
   const bible = d.kind === 'verse' || d.kind === 'heading' || d.kind === 'chapter-title';
   const excerpt = hit.excerpt || (bible ? (d.kind === 'heading' ? d.heading || d.text : d.text) : snippet(d.text || '', words, 180));
   return <Hit where={d.ref || ''} title={bible ? '' : d.title} excerpt={excerpt} bx={bible} terms={words}

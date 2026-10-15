@@ -5,6 +5,7 @@ import {
   groupOf, colBySearchId, fold, markTerms, hitRoute, collectionNamed, gotoRows, groupHits, notesMatching, searchSettings,
   GATE_CHOSEN, TRY, SCOPES,
 } from './search-facts.js';
+import { matchExcerpt } from '../search/snippet.js';
 
 const ONE = { volKey: 'one', label: 'Volume One', searchVolId: 'v1', globalName: 'LETTERS_V1' };
 const THREE = { volKey: 'three', label: 'Volume Three', searchVolId: 'v3', globalName: 'LETTERS_V3' };
@@ -45,6 +46,21 @@ describe('groups and places', () => {
       .toEqual({ place: 'letter', collection: 'answers', n: 12, match: [] });
     expect(hitRoute({ kind: 'letter', volumeId: 'v9', letterNum: 1 }, [], gl)).toBe(null);
     expect(hitRoute({ kind: 'study-note' }, [], gl)).toBe(null);
+  });
+
+  it("hitRoute: a letter hit carries the words it was found by, cut as main's excerptAnchor cuts them (v2-gaps 9)", () => {
+    const text = 'They shall keep My commandments. And keeping them, they shall be kept. Keep watch, says The Lord.';
+    const doc = { kind: 'letter', volumeId: 'v1', letterNum: 4, text };
+    // the typed words cut it; the engine's other forms only count with them (main sr11), and both are marked
+    const r = hitRoute(doc, ['keeping'], gl, ['keep', 'keeping']);
+    expect(r).toEqual({ place: 'letter', collection: 'one', n: 4, match: ['keeping', 'keep'],
+      excerpt: matchExcerpt(text, ['keeping'], undefined, ['keep', 'keeping']) });
+    expect(r.excerpt).toContain('keeping them');
+    // a typo the engine corrected: the typed word finds nothing, its words cut the excerpt
+    expect(hitRoute(doc, ['kepeing'], gl, ['keeping']).excerpt).toContain('keeping them');
+    // the Bible's route is unchanged; its match takes the engine's words too
+    expect(hitRoute({ kind: 'verse', bookId: 'john', chapterNum: 3, verseNum: 3 }, ['born'], gl, ['again']))
+      .toEqual({ place: 'bible-chapter', book: 'john', chapter: 3, verse: 3, match: ['born', 'again'] });
   });
 
   it('groupHits keeps the engine order inside each group and drops what has no group', () => {

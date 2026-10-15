@@ -30,8 +30,12 @@ import { kitColour } from '../notes-facts.js';
 import { DOUBLE_TAP_MS, FULLSCREEN_GESTURE_EVENT } from '../../utils/fullscreen-gesture-event.js';
 import { ListenPill, gateListenToast, startListening } from '../player/listen.jsx';
 import { LetterReadAlong } from '../player/read-along.jsx';
+import { landingOf, markWords, unmarkWords, placeAtThird } from '../search-landing.js';
+import { whenPainted } from '../gate.js';
 
 const g = /** @type {any} */ (globalThis);
+/** The search routes already landed: Back to one keeps where the reader left it (its words are marked again). */
+const LANDED = new WeakSet();
 /** A value safe inside a "..." attribute selector. @param {string} v */
 const cssValue = (v) => String(v).replace(/["\\]/g, '\\$&');
 /** How long a toast stays (main's confirmCopied). */
@@ -204,10 +208,10 @@ const SectionIntro = React.memo(/** @param {{ blocks: any[] }} props */ function
  * @param {{ collection: string, n?: number, preface?: boolean, onReady?: () => void, onOpenLetter?: (n: number) => void,
  *   gate?: import('../gate.js').GateState | null, desktop?: boolean, waitDoubleTap?: boolean,
  *   onNote?: (target: Record<string, any>) => void, facts?: import('../settings-facts.js').SettingsFacts,
- *   onGo?: (route: any) => void }} props
+ *   onGo?: (route: any) => void, landAt?: { excerpt: string, match?: string[] } | null }} props
  */
 export function LetterScreen({ collection, n = 0, preface = false, onReady, onOpenLetter, gate = null, desktop = false,
-  waitDoubleTap = false, onNote, facts = {}, onGo }) {
+  waitDoubleTap = false, onNote, facts = {}, onGo, landAt = null }) {
   const col = collectionOf(collection);
   const letters = useLetters(col);
   const letter = letters ? (preface ? prefaceOf(col) : letterAt(letters, n)) : null;
@@ -232,6 +236,32 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
   const items = React.useMemo(() => footnoteItems(letter, volKey, scan), [letter, volKey, scan]);
 
   React.useEffect(() => { if (letters && onReady) onReady(); }, [letters, onReady]);
+
+  // A search hit (v2-gaps 9): the words it was found by marked in their block, and that place a third of the way down
+  // once painted (after the shell has put a new page at its top); the first time only, so Back keeps the reader's place.
+  React.useEffect(() => {
+    if (!letter || !landAt) return undefined;
+    const match = [].concat(landAt.match || []).filter(Boolean);
+    const { index, off } = landingOf(letter, landAt.excerpt, match);
+    if (index < 0) return undefined;
+    let live = true;
+    /** @type {HTMLElement | null} */
+    let marked = null;
+    whenPainted().then(() => {
+      const root = bodyRef.current;
+      if (!live || !root) return;
+      const key = isFormatB(letter) ? wtlbHlKey(letter.id, index) : paraKey(letter.id, index);
+      const el = /** @type {HTMLElement | null} */ (root.querySelector('[data-hl-key="' + cssValue(key) + '"]'));
+      if (!el) return;
+      const mark = markWords(el, match, off);
+      marked = el;
+      if (LANDED.has(landAt)) return;
+      LANDED.add(landAt);
+      placeAtThird(mark || el);
+    });
+    // another hit in the same letter marks its own words, not these too
+    return () => { live = false; unmarkWords(marked); };
+  }, [letter, landAt]);
 
   // The gate's open sheet, from the page alone: 4b paragraph 1 tapped, gold ringed (8d: the same paragraph under Safari's
   // notice); 1e a reference's sheet; 1g a footnote's.
@@ -478,7 +508,8 @@ function LetterPlace({ route, replace, go, onReady, gate, desktop, facts }) {
   const openNote = (target) => go({ place: 'note', ...target });
   return <LetterScreen key={route.collection + '/' + (route.preface ? 'P' : route.n)} collection={route.collection} n={route.n}
     preface={!!route.preface} onReady={onReady} onOpenLetter={openLetter} gate={gate} desktop={desktop}
-    waitDoubleTap={!desktop && !(facts && facts.doubleTapFullscreen === false)} onNote={openNote} facts={facts || {}} onGo={go} />;
+    waitDoubleTap={!desktop && !(facts && facts.doubleTapFullscreen === false)} onNote={openNote} facts={facts || {}} onGo={go}
+    landAt={route.excerpt ? route : null} />;
 }
 
 definePlace('letter', {

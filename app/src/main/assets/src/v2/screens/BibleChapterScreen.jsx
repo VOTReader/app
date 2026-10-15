@@ -11,6 +11,7 @@ import { definePlace } from '../places.js';
 import { whenPainted } from '../gate.js';
 import { bookTitle } from '../home-facts.js';
 import { highlightSpans } from '../../search/snippet.js';
+import { placeAtThird } from '../search-landing.js';
 import { bibleHlKey } from '../../utils/hl-keys.js';
 import { LayerToast } from '../Sheet.jsx';
 import { TOAST_MS, useMainMarks } from './LetterScreen.jsx';
@@ -80,36 +81,6 @@ function Words({ hlKey, text, terms, matchRef }) {
   return <span className="vt" data-hl-key={hlKey} data-hl-dom="true">{words}</span>;
 }
 const VerseWords = React.memo(Words, (a, b) => a.hlKey === b.hlKey && a.text === b.text && a.terms.join('\u0001') === b.terms.join('\u0001'));
-
-/** The element that scrolls this page: the laptop's .main, or the phone's .content. */
-function scrollerOf(el) {
-  return el ? /** @type {HTMLElement | null} */ (el.closest('.main') || el.closest('.content')) : null;
-}
-
-/**
- * Scrolls the page so `el`'s line sits a third of the way down what shows between the top bar and the tab bar
- * (states.json 5c: "verse 3 a third of the way down"), on a whole-line row as the picture draws it (5c: line 6 of 16).
- * @param {HTMLElement | null} el
- */
-export function placeAtThird(el) {
-  const sc = scrollerOf(el);
-  if (!el || !sc) return;
-  const doc = el.ownerDocument;
-  const s = sc.getBoundingClientRect();
-  const bar = doc.querySelector('.tb');
-  const tabs = doc.querySelector('.tabbar');
-  const top = Math.max(s.top, bar ? bar.getBoundingClientRect().bottom : s.top);
-  const bottom = Math.min(s.bottom, tabs ? tabs.getBoundingClientRect().top : s.bottom);
-  const r = el.getBoundingClientRect();
-  const mid = (r.top + r.bottom) / 2;
-  const p = el.closest('p');
-  const L = p ? parseFloat(getComputedStyle(p).lineHeight) : NaN;
-  if (!p || !Number.isFinite(L) || L <= 0) { sc.scrollTop += mid - (top + (bottom - top) / 3); return; }
-  // the match's line box (the mark's own box sits off its line's centre), moved to the whole-line row a third of the way down
-  const pTop = p.getBoundingClientRect().top;
-  const line = pTop + Math.floor((mid - pTop) / L) * L;
-  sc.scrollTop += line - (top + Math.floor((bottom - top) / 3 / L) * L);
-}
 
 /** The chapter after this one: the next in the book, else the next book's first (main's BIBLE_BOOK_LIST order). */
 function nextOf(book, n) {

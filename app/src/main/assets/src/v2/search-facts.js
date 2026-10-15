@@ -5,6 +5,7 @@
    words), then In the letters, In the Bible, In Answers and In your notes (the reader's own marks, matched here in memory).
    Results open in the Search tab, so Back comes back to them: the query, scope and place are kept in this module's memory
    (never in storage). A gate boot never calls the engine: states.json's hits are seeded. */
+import { matchExcerpt } from '../search/snippet.js';
 
 const g = /** @type {any} */ (globalThis);
 
@@ -74,19 +75,31 @@ export function markTerms(parsed, parsedTerms, stop) {
 /**
  * Where a hit opens, in this tab: a verse on its chapter (marked there), a letter, WTLB / Blessed / Holy Days entry or
  * Answers topic as its collection's item. null when v2 has no place for it.
- * @param {any} doc @param {string[]} [terms]
+ * `terms` are the words the reader typed, `hitTerms` the engine's for this hit (its other forms, a typo it corrected): both
+ * are marked where it opens. A letter's route also carries `excerpt`, the words it was found by, cut as main's
+ * excerptAnchor cuts them (use-search.js): the typed words first, the engine's forms only breaking ties, its words alone
+ * when the typed ones find nothing. The letter lands there (search-landing.js).
+ * @param {any} doc @param {string[]} [terms] @param {any} [gl] @param {string[]} [hitTerms]
  */
-export function hitRoute(doc, terms, gl = g) {
+export function hitRoute(doc, terms, gl = g, hitTerms) {
+  const own = terms || [];
+  const extra = (hitTerms || []).filter((t) => own.indexOf(t) < 0);
+  const match = own.concat(extra);
   const grp = groupOf(doc);
   if (grp === 'bible') {
     const r = { place: 'bible-chapter', book: doc.bookId, chapter: doc.chapterNum };
-    if (doc.kind === 'verse' && doc.verseNum) Object.assign(r, { verse: doc.verseNum, match: terms || [] });
+    if (doc.kind === 'verse' && doc.verseNum) Object.assign(r, { verse: doc.verseNum, match });
     return r;
   }
   if (grp === 'letters' || grp === 'answers') {
     const col = colBySearchId(doc.volumeId, gl);
     const n = doc.letterNum || doc.num;
-    return col && n ? { place: 'letter', collection: col.volKey, n, match: terms || [] } : null;
+    if (!col || !n) return null;
+    const r = { place: 'letter', collection: col.volKey, n, match };
+    const text = doc.text ? String(doc.text) : '';
+    const excerpt = text && ((own.length ? matchExcerpt(text, own, undefined, extra) : '')
+      || (extra.length ? matchExcerpt(text, match) : ''));
+    return excerpt ? Object.assign(r, { excerpt }) : r;
   }
   return null;
 }

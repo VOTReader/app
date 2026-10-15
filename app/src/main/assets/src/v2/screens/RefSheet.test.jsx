@@ -378,3 +378,45 @@ describe('the gate rows for dz13', () => {
     expect(onGo).not.toHaveBeenCalled();
   });
 });
+
+describe('a search hit opens its letter on the words (v2-gaps 9; the Bible page\'s 5c)', () => {
+  const painted = () => act(async () => { await new Promise((r) => setTimeout(r, 80)); });
+  const marks = (root) => Array.from(root.querySelectorAll('mark.qm'), (m) => [m.closest('[data-hl-key]').getAttribute('data-hl-key'), m.textContent]);
+
+  it('marks the words in the paragraph the excerpt was cut from, and only there', async () => {
+    seed();
+    const route = { excerpt: 'only one name under Heaven by which you must be saved.', match: ['name'] };
+    const { container } = render(<LetterScreen collection="one" n={9} landAt={route} />);
+    await painted();
+    expect(marks(container)).toEqual([['letter:whats-in-a-name:0', 'name']]);
+  });
+
+  it('a Words To Live By entry: the paragraph by its wtlb key, the text read without its {{...}} tokens', async () => {
+    seed();
+    const route = { excerpt: 'beware of the thoughts of your heart, Lest you follow in Haman’s error', match: ['Haman'] };
+    const { container } = render(<LetterScreen collection="wtlb1" n={46} landAt={route} />);
+    await painted();
+    expect(marks(container)).toEqual([['wtlb:building-the-gallows:1', 'Haman']]);
+  });
+
+  it('Back to the letter marks again; another hit in the same letter takes the first marks away', async () => {
+    seed();
+    const route = { excerpt: 'only one name under Heaven by which you must be saved.', match: ['name'] };
+    const first = render(<LetterScreen collection="one" n={9} landAt={route} />);
+    await painted();
+    first.unmount();
+    const again = render(<LetterScreen collection="one" n={9} landAt={route} />);
+    await painted();
+    expect(marks(again.container)).toEqual([['letter:whats-in-a-name:0', 'name']]);
+    again.rerender(<LetterScreen collection="one" n={9} landAt={{ excerpt: 'And oh how blessed are those who put their trust in Him.', match: ['blessed'] }} />);
+    await painted();
+    expect(marks(again.container)).toEqual([['letter:whats-in-a-name:0', 'blessed']]);
+  });
+
+  it('no landing (opened from its collection, or an excerpt the letter does not hold): nothing marked', async () => {
+    seed();
+    const { container } = render(<LetterScreen collection="one" n={9} landAt={{ excerpt: 'no paragraph of this letter says these words at all', match: ['words'] }} />);
+    await painted();
+    expect(container.querySelector('mark.qm')).toBeNull();
+  });
+});
