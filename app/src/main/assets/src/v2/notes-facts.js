@@ -1,8 +1,9 @@
 /* notes-facts.js - what v2's Notes tab lists (zv1; pictures 3c-notes, 3d-notes-journal, 8c-notes-empty).
 
    Saved data is re-shown, never migrated (v2 build plan rule 5): readMarks() reads main's own stores read-only
-   (JournalStore, AnnotationStore through bundle-d's _collectMarks, NoteStore, BookmarkStore, LinkStore) and turns every
-   item into one Mark; the gate hook seeds Marks directly. Everything else here is pure: the six kinds, the line under
+   (JournalStore, AnnotationStore through bundle-d's _collectMarks, NoteStore, BookmarkStore, LinkStore, and the
+   recordings saved in AudioLibraryStore, shown with the bookmarks: v2 has no library page) and turns every item into one
+   Mark; the gate hook seeds Marks directly. Everything else here is pure: the six kinds, the line under
    each kind's title, the day words ("Today", "Sunday", "Oct 9") and each row's meta line. No storage writes, no DOM. */
 
 const DAY = 24 * 3600 * 1000;
@@ -11,7 +12,8 @@ const DAY = 24 * 3600 * 1000;
  * One row in Notes.
  * @typedef {{ kind: 'journal' | 'highlight' | 'note' | 'bookmark' | 'link', id: string, at: number,
  *   title?: string, text?: string, quote?: string, note?: string, colour?: string, where?: string,
- *   open?: Record<string, any> | null }} Mark
+ *   label?: string, open?: Record<string, any> | null }} Mark
+ *   label: the meta line's first words when not the kind's name ("Saved recording")
  */
 
 /** The chips, in the picture's order (Journal second: Corbin asked how to reach his journal, 10-14 17:4x). */
@@ -77,7 +79,7 @@ export function dayLabel(ts, now) {
 
 /** "Highlight · Volume One · Letter 1 · Today". @param {Mark} m @param {number} now */
 export function metaLine(m, now) {
-  return [KIND_NAME[m.kind], m.where, dayLabel(m.at, now)].filter(Boolean).join(' · ');
+  return [m.label || KIND_NAME[m.kind], m.where, dayLabel(m.at, now)].filter(Boolean).join(' · ');
 }
 
 /** The rows a chip shows, newest first. @param {Mark[]} marks @param {string} kind */
@@ -124,18 +126,8 @@ export function placeOfKey(key, env) {
   if (kind === 'letter' || kind === 'wtlb' || kind === 'blessed' || kind === 'holy-days') {
     const id = parts[1];
     for (const col of collections(env)) {
-      const arr = col && env[col.globalName];
-      const pref = col && col.prefaceGlobal ? env[col.prefaceGlobal] : null;
-      if (pref && pref.id === id) return { where: col.label, title: pref.title || col.label, open: null };
-      if (!Array.isArray(arr)) continue;
-      const e = arr.find((x) => x && x.id === id);
-      if (!e) continue;
-      const numbered = typeof e.num === 'number' && /^vot-/.test(col.letterScreen || '');
-      return {
-        where: numbered ? col.label + ' · Letter ' + e.num : col.label,
-        title: e.title || id,
-        open: numbered ? { place: 'letter', collection: col.volKey, n: e.num } : null,
-      };
+      const p = col ? letterPlace(col, id, env) : null;
+      if (p) return p;
     }
     const label = typeof env._bookmarkSourceLabel === 'function' ? env._bookmarkSourceLabel(key) : id;
     const corpus = env.__votCorpus;
@@ -147,6 +139,55 @@ export function placeOfKey(key, env) {
     return { where: 'Journal · ' + t, title: t, open: entry ? { place: 'journal-entry', id: entry.id } : null };
   }
   return { where: '', title: String(key || ''), open: null };
+}
+
+/**
+ * A letter (or the preface) of one collection by its id, or null when the collection does not hold it (or has not
+ * loaded). Every collection's letters open by number in v2's letter place; "· Letter N" is said only for the
+ * numbered volumes (main's vot- letter screens).
+ */
+function letterPlace(col, id, env) {
+  const pref = col.prefaceGlobal ? env[col.prefaceGlobal] : null;
+  if (pref && pref.id === id) return { where: col.label, title: pref.title || col.label, open: { place: 'letter', collection: col.volKey, preface: true } };
+  const arr = env[col.globalName];
+  const e = Array.isArray(arr) ? arr.find((x) => x && x.id === id) : null;
+  if (!e) return null;
+  const n = typeof e.num === 'number' ? e.num : null;
+  return {
+    where: n != null && /^vot-/.test(col.letterScreen || '') ? col.label + ' · Letter ' + n : col.label,
+    title: e.title || id,
+    open: n != null ? { place: 'letter', collection: col.volKey, n } : null,
+  };
+}
+
+/**
+ * Where a saved recording's text is, read as main opens it from the library (screen-routes.jsx _openAudioText): a
+ * 'bible-<edition>:<book>' track at its "Chapter N", a 'study:<id>-chN' track at that study chapter, else the letter
+ * '<volKey>:<letter id>' of that collection (`pending` while that collection's letters have not loaded).
+ * @param {{ key?: string | null, title?: string, partLabel?: string | null }} t @param {any} env
+ * @returns {{ where: string, title: string, open: Record<string, any> | null, pending?: boolean }}
+ */
+export function recordingPlace(t, env) {
+  const key = String((t && t.key) || '');
+  const i = key.indexOf(':');
+  const none = { where: '', title: (t && t.title) || '', open: null };
+  if (i < 1 || i >= key.length - 1) return none;
+  const volKey = key.slice(0, i);
+  const id = key.slice(i + 1);
+  if (volKey.startsWith('bible-')) {
+    const m = typeof t.partLabel === 'string' ? t.partLabel.match(/^Chapter (\d+)$/) : null;
+    return placeOfKey('bible:' + id + ':' + (m ? m[1] : 1), env);
+  }
+  if (volKey === 'study') {
+    const stem = id.match(/^(.+)-ch\d+$/);
+    return stem ? { where: 'Studies', title: none.title, open: { place: 'study-chapter', study: stem[1], chapter: id } } : none;
+  }
+  const col = collections(env).find((c) => c && c.volKey === volKey);
+  if (!col) return none;
+  const p = letterPlace(col, id, env);
+  if (p) return p;
+  const corpus = env.__votCorpus;
+  return { ...none, where: col.label, pending: !Array.isArray(env[col.globalName]) && !!(corpus && !corpus.loaded) };
 }
 
 function bookTitle(bookId, env) {
@@ -218,6 +259,17 @@ export function readMarks(env = globalThis) {
       const p = at(b.hlKey);
       const title = (b.label && String(b.label).trim()) || p.title;
       marks.push({ kind: 'bookmark', id: 'bkm:' + b.id, at: b.created || b.updated || 0, title,
+        where: p.where === title ? '' : p.where, open: p.open });
+    }
+  }
+  const A = env.AudioLibraryStore;
+  if (A && typeof A.saved === 'function') {
+    for (const t of A.saved() || []) {
+      if (!t || !t.url) continue;
+      const p = recordingPlace(t, env);
+      if (p.pending) pending = true;
+      const title = (t.title && String(t.title).trim()) || p.title || 'Recording';
+      marks.push({ kind: 'bookmark', label: 'Saved recording', id: 'rec:' + t.url, at: t.savedAt || 0, title,
         where: p.where === title ? '' : p.where, open: p.open });
     }
   }

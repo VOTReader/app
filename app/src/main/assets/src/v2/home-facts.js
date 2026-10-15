@@ -2,7 +2,9 @@
 
    Saved data is re-shown, never migrated (v2-build-plan rule 5): Continue is main's "you are here" (StateStore's
    activeReadKey with lastReadLetterMap / lastReadChapters, as goToLastRead resumes it) and Recent is main's reading
-   history (HistoryStore, newest first). A gate boot seeds the same shapes in memory. Everything here is read only.
+   history (HistoryStore, newest first) with main's open pages (vot-state tabs: v2 has no tabs, so the pages a reader
+   kept open come back here; Corbin's v2-map call let Open pages go only if they show up in the new places). A gate boot
+   seeds the same shapes in memory. Everything here is read only.
 
    An item is one place a reader was:
      { kind: 'letter', collection, n } or { kind: 'letter', collection, letterId } (main stores letter ids)
@@ -90,23 +92,54 @@ export function itemKey(it) {
   return 'lt:' + it.collection + ':' + (it.n != null ? 'n' + it.n : 'id' + it.letterId);
 }
 
+/** Recent's history places (the row scrolls sideways; main's open pages come on top of these). */
+export const RECENT_MAX = 8;
+
 /**
- * Recent: the newest distinct places in the history, not the one Continue already offers.
- * @param {any[]} entries newest first @param {HomeItem | null} cont @param {number} [max]
+ * One of main's open pages (a vot-state tab; utils/tabs.js describeTab reads the same fields) as an item: a Bible or
+ * Matthew chapter, a letter by its collection's letter screen, a study chapter; null for every other page (Home, an
+ * index, Search, Settings) and for Hidden Manna. @returns {HomeItem | null}
  */
-export function recentItems(entries, cont, max = 2, gl = g) {
+export function itemFromTab(t, gl = g) {
+  if (!t || typeof t !== 'object') return null;
+  const s = t.screen;
+  if ((s === 'bible-ch' || s === 'matthew-ch') && t.bookId && Number(t.chapterNum) > 0) {
+    return { kind: 'chapter', book: t.bookId === 'matthew-plain' ? 'matthew' : String(t.bookId), chapter: Number(t.chapterNum) };
+  }
+  if (s === 'bible-study-chapter' && t.studyId && t.studyChapterId) {
+    return { kind: 'study', studyId: String(t.studyId), chapterId: String(t.studyChapterId) };
+  }
+  const byScreen = gl.COL_BY_LETTER_SC;
+  const col = s && t.letterId && byScreen && typeof byScreen.get === 'function' ? byScreen.get(s) : null;
+  if (!col || col.volKey === 'hm') return null;
+  return { kind: 'letter', collection: col.volKey, letterId: String(t.letterId) };
+}
+
+/**
+ * Recent: the newest distinct places in the history, not the one Continue already offers, `max` of them plus any
+ * further back that is an open page; then the open pages never in the history, in main's tab order.
+ * @param {any[]} entries newest first @param {HomeItem | null} cont @param {number} [max] @param {any} [gl]
+ * @param {any[]} [tabs] main's open pages (vot-state tabs)
+ */
+export function recentItems(entries, cont, max = RECENT_MAX, gl = g, tabs = []) {
   const out = [];
   const seen = new Set();
   const contKeys = cont ? sameKeys(cont, gl) : [];
+  const open = (Array.isArray(tabs) ? tabs : []).map((t) => itemFromTab(t, gl)).filter(Boolean);
+  const openKeys = new Set(open.flatMap((it) => sameKeys(it, gl)));
+  const add = (it, keys) => {
+    if (keys.some((k) => seen.has(k) || contKeys.includes(k))) return;
+    keys.forEach((k) => seen.add(k));
+    out.push(it);
+  };
   for (const e of Array.isArray(entries) ? entries : []) {
     const it = itemFromHistory(e, gl);
     if (!it) continue;
     const keys = sameKeys(it, gl);
-    if (keys.some((k) => seen.has(k) || contKeys.includes(k))) continue;
-    keys.forEach((k) => seen.add(k));
-    out.push(it);
-    if (out.length >= max) break;
+    if (out.length >= max && !keys.some((k) => openKeys.has(k))) continue;
+    add(it, keys);
   }
+  for (const it of open) add(it, sameKeys(it, gl));
   return out;
 }
 
@@ -121,7 +154,7 @@ function sameKeys(it, gl) {
   return keys.length ? keys : [itemKey(it)];
 }
 
-/** The reader's saved Continue + Recent, read only (a real boot, under HydrationGate). @returns {HomeFacts} */
+/** The reader's saved Continue + Recent (history and open pages), read only (a real boot, under HydrationGate). @returns {HomeFacts} */
 export function savedHome(gl = g) {
   let state = null;
   let entries = [];
@@ -134,7 +167,8 @@ export function savedHome(gl = g) {
     if (hist && typeof hist.isReady === 'function' && hist.isReady()) entries = hist.list() || [];
   } catch (_e) { /* no history: no Recent row */ }
   const cont = continueFromState(state);
-  return { continue: cont, recent: recentItems(entries, cont, 2, gl) };
+  const tabs = state && Array.isArray(state.tabs) ? state.tabs : [];
+  return { continue: cont, recent: recentItems(entries, cont, RECENT_MAX, gl, tabs) };
 }
 
 /** The letter an item points at, once its corpus is loaded: { col, letter } (letter null when not found). */

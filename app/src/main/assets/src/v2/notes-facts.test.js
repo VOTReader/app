@@ -1,7 +1,7 @@
 /* notes-facts (zv1): the day words, meta lines and chips of v2 Notes, and readMarks() re-showing main's saved data
    (journal, highlights, notes, bookmarks, links) read only. */
 import { describe, it, expect, vi } from 'vitest';
-import { dayLabel, metaLine, marksOfKind, kindOf, kitColour, placeOfKey, readMarks, journalText, gateMarks, KINDS } from './notes-facts.js';
+import { dayLabel, metaLine, marksOfKind, kindOf, kitColour, placeOfKey, recordingPlace, readMarks, journalText, gateMarks, KINDS } from './notes-facts.js';
 import { GATE_NOW } from './gate.js';
 
 const DAY = 24 * 3600 * 1000;
@@ -94,10 +94,31 @@ describe('readMarks: main saved data, re-shown read only', () => {
     expect(by['note:n1']).toMatchObject({ kind: 'note', quote: '“Timothy, write as I speak.”', note: 'Read this again on Sunday.', where: 'Volume One · Letter 1' });
     expect(by['bkm:k1']).toMatchObject({ kind: 'bookmark', title: 'Honor Not the Day of the Dead... Honor God', where: 'Volume One · Letter 2' });
     expect(by['bkm:k2']).toMatchObject({ title: 'Beatitudes', where: 'Matthew 5:3', open: { place: 'bible-chapter', book: 'matthew', chapter: 5, verse: 3 } });
-    expect(by['bkm:k3']).toMatchObject({ title: 'On Prayer', where: 'Words to Live By One', open: null });
+    expect(by['bkm:k3']).toMatchObject({ title: 'On Prayer', where: 'Words to Live By One', open: { place: 'letter', collection: 'wtlb1', n: 12 } });
     expect(by['lnk:l1']).toMatchObject({ kind: 'link', title: 'Chosen by God, joined to John 15:16', where: 'Volume One · Letter 1' });
     expect(marks.length).toBe(9);
     expect(e.writes).not.toHaveBeenCalled();
+  });
+
+  it("saved recordings join the bookmarks, each opening its text as main's library does", () => {
+    const saved = [
+      { key: 'one:honor-not', title: 'Honor Not the Day of the Dead... Honor God', url: 'u/v1-02.mp3', partLabel: null, savedAt: 800 },
+      { key: 'bible-kjv:john', title: 'John', url: 'u/john-3.mp3', partLabel: 'Chapter 3', savedAt: 700 },
+      { key: 'study:hosea-ch2', title: 'Hosea, Chapter 2', url: 'u/hosea-2.mp3', partLabel: null, savedAt: 600 },
+      { key: 'one:v1-preface', title: '', url: 'u/v1-00.mp3', partLabel: null, savedAt: 500 },
+      { key: null, title: 'A song', url: 'u/song.mp3', partLabel: null, savedAt: 400 },
+    ];
+    const e = { ...env(), AudioLibraryStore: { saved: () => saved, toggleSaved: vi.fn() } };
+    const by = Object.fromEntries(readMarks(e).marks.filter((m) => m.label).map((m) => [m.id, m]));
+    expect(by['rec:u/v1-02.mp3']).toMatchObject({ kind: 'bookmark', label: 'Saved recording', at: 800, title: 'Honor Not the Day of the Dead... Honor God',
+      where: 'Volume One · Letter 2', open: { place: 'letter', collection: 'one', n: 2 } });
+    expect(metaLine(by['rec:u/v1-02.mp3'], 800)).toBe('Saved recording · Volume One · Letter 2 · Today');
+    expect(by['rec:u/john-3.mp3']).toMatchObject({ where: 'John 3', open: { place: 'bible-chapter', book: 'john', chapter: 3 } });
+    expect(by['rec:u/hosea-2.mp3']).toMatchObject({ where: 'Studies', open: { place: 'study-chapter', study: 'hosea', chapter: 'hosea-ch2' } });
+    expect(by['rec:u/v1-00.mp3']).toMatchObject({ title: 'Preface', where: 'Volume One', open: { place: 'letter', collection: 'one', preface: true } });
+    expect(by['rec:u/song.mp3']).toMatchObject({ title: 'A song', where: '', open: null });
+    expect(e.AudioLibraryStore.toggleSaved).not.toHaveBeenCalled();
+    expect(recordingPlace({ key: 'one:honor-not' }, { ...e, LETTERS_V1: undefined, __votCorpus: { loaded: false } })).toMatchObject({ where: 'Volume One', pending: true });
   });
 
   it('a letter whose volume has not loaded yet is pending (its title comes after the load)', () => {

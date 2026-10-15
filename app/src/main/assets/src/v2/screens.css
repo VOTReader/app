@@ -302,8 +302,11 @@
 .home .subtitle { margin-top: 7px; }
 .home .pill.block { margin-top: 22px; }
 .cont-where { font-size: var(--fs-s); color: var(--t2); margin-top: 10px; line-height: 1.3; }
-.recent { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
-.recent .label { margin-right: 4px; }
+/* Recent scrolls sideways edge to edge (history and main's open pages; kit .chips.scroll's bleed), its bar hidden */
+.recent { display: flex; align-items: center; gap: 8px; margin: 16px calc(var(--gut) * -1) 0; padding: 0 var(--gut);
+  overflow-x: auto; scrollbar-width: none; }
+.recent::-webkit-scrollbar { display: none; }
+.recent .label { margin-right: 4px; flex: none; }
 .grid2.vols { margin-top: 4px; }
 .grid2.vols .col { align-content: start; max-width: none; margin: 0; }   /* align-content: the right column's three rows keep the left's lines; max-width/margin: not the desktop page .col (D2) */
 .grid2.vols .c { justify-content: space-between; gap: 8px; }

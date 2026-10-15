@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, waitFor, act } from '@testing-library/react';
 import { V2App, applyGateScroll } from './App.jsx';
-import { continueFromState, itemFromHistory, recentItems, describeItem, itemRoutes, savedHome } from './home-facts.js';
+import { continueFromState, itemFromHistory, itemFromTab, recentItems, describeItem, itemRoutes, savedHome } from './home-facts.js';
 
 const g = /** @type {any} */ (globalThis);
 const html = document.documentElement;
@@ -73,7 +73,7 @@ describe('saved data, re-shown (read only)', () => {
     expect(itemFromHistory({ type: 'chapter', bookId: 'john', bookTitle: 'John', chapterNum: 3 })).toEqual({ kind: 'chapter', book: 'john', bookTitle: 'John', chapter: 3 });
   });
 
-  it('Recent is the newest distinct places, never the one Continue offers (by id or by number), two at most', () => {
+  it('Recent is the newest distinct places, never the one Continue offers (by id or by number)', () => {
     const cont = /** @type {import('./home-facts.js').HomeItem} */ ({ kind: 'letter', collection: 'one', letterId: 'one-1' });
     const hist = [
       { type: 'letter', letterId: 'one-1', letterNum: 1, volumeScreen: 'vot-one-index' },
@@ -84,7 +84,30 @@ describe('saved data, re-shown (read only)', () => {
       { type: 'letter', letterId: 'one-5', letterNum: 5, volumeScreen: 'vot-one-index' },
     ];
     const recent = recentItems(hist, cont);
-    expect(recent.map((it) => describeItem(it).chip)).toEqual(['John 3', 'Vol. One, Letter 2']);
+    expect(recent.map((it) => describeItem(it).chip)).toEqual(['John 3', 'Vol. One, Letter 2', 'Vol. One, Letter 5']);
+  });
+
+  it("main's open pages come into Recent: eight from the history plus any open page further back, then the rest in tab order", () => {
+    g.COL_BY_LETTER_SC = new Map(COLS.map((c) => [c.volKey === 'one' ? 'vot-one-letter' : c.volKey === 'wtlb1' ? 'wtlb-one-entry' : 'x-' + c.volKey, c]));
+    const hist = Array.from({ length: 10 }, (_x, i) => ({ type: 'letter', letterId: 'one-' + (i + 2), letterNum: i + 2, volumeScreen: 'vot-one-index' }));
+    const tabs = [{ screen: 'home' }, { screen: 'vot-one-letter', letterId: 'one-11' }, { screen: 'bible-ch', bookId: 'john', chapterNum: 3 },
+      { screen: 'wtlb-one-entry', letterId: 'wtlb1-4' }, { screen: 'vot-one-letter', letterId: 'one-1' }, { screen: 'settings' }];
+    const recent = recentItems(hist, { kind: 'letter', collection: 'one', letterId: 'one-1' }, 8, g, tabs);
+    expect(recent.map((it) => describeItem(it).chip)).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 11].map((n) => 'Vol. One, Letter ' + n)
+      .concat(['John 3', 'wtlb1 letter 4']));
+    delete g.COL_BY_LETTER_SC;
+  });
+
+  it("an open page as a place: a chapter (Matthew's plain text too), a letter by its letter screen, a study chapter; never Hidden Manna", () => {
+    g.COL_BY_LETTER_SC = new Map([['vot-one-letter', g.COL_BY_KEY.get('one')], ['hm-letter', g.COL_BY_KEY.get('hm')]]);
+    expect(itemFromTab({ screen: 'bible-ch', bookId: 'john', chapterNum: 3 })).toEqual({ kind: 'chapter', book: 'john', chapter: 3 });
+    expect(itemFromTab({ screen: 'matthew-ch', bookId: 'matthew-plain', chapterNum: 5 })).toEqual({ kind: 'chapter', book: 'matthew', chapter: 5 });
+    expect(itemFromTab({ screen: 'vot-one-letter', letterId: 'one-3' })).toEqual({ kind: 'letter', collection: 'one', letterId: 'one-3' });
+    expect(itemFromTab({ screen: 'bible-study-chapter', studyId: 'hosea', studyChapterId: 'hosea-ch2' })).toEqual({ kind: 'study', studyId: 'hosea', chapterId: 'hosea-ch2' });
+    for (const t of [{ screen: 'hm-letter', letterId: 'hm-1' }, { screen: 'home' }, { screen: 'bible-ch', bookId: 'john' }, { screen: 'vot-one-index' }, null]) {
+      expect(itemFromTab(t)).toBe(null);
+    }
+    delete g.COL_BY_LETTER_SC;
   });
 
   it('savedHome reads StateStore and HistoryStore once loaded and writes nothing', () => {
