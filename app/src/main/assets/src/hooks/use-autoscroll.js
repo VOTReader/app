@@ -645,7 +645,11 @@ export function createAutoScroll(io) {
       chain = 0;
       if (resumeToken != null) { try { io.cancelScheduled(resumeToken); } catch (_e) { /* ignore */ } resumeToken = null; }
       if (state === 'running') pause('touch');
-      else if (state === 'enddwell') { clearTimers(); setState('paused', 'touch'); }
+      // Not moving yet, but about to: a dwell countdown, or the post-advance
+      // settle loop that ends in beginRunning(). clearTimers() cancels both
+      // (settleToken included), so motion never starts under the finger and
+      // pointerUp's soft resume takes the run back up.
+      else if (state === 'enddwell' || state === 'advancing') { clearTimers(); setState('paused', 'touch'); }
     },
     /** Finger lifted — resume after stillness, unless something blocks it. */
     pointerUp() {
