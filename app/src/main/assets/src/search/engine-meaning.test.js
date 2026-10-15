@@ -146,6 +146,14 @@ describe('meaning first', () => {
     expect(r.doc.title).toBe('Regarding the Night Watch');
   });
 
+  /* An Answers topic gives its place to a study or letter just below that holds the query as well; one holding none
+     of it is no measure: any text below "held as much" (sr11, 2026-10-15). */
+  it('an Answers topic the model found holding no typed word keeps its place over the text below it', async () => {
+    said.near = 'watch';
+    const r = await first('a sentry who never dozes off before dawn');
+    expect(r.doc.title).toBe('Regarding the Night Watch');
+  });
+
   it('a text the words found opens on the passage the query describes, when the model clearly prefers it', async () => {
     said.near = 'peace';
     const r = await first('everyone come here so weary souls find rest after long labor');

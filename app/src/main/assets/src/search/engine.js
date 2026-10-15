@@ -1065,6 +1065,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
     }
     if (!found && e.doc.kind === 'answers') {
       // A study or Holy Days text just below that holds the query as well, in one passage and in a row: it is what Answers reprints.
+      // A topic holding none of it (the model found it) is no measure: any text below held "as much" (sr11, 2026-10-15).
       const id = idOf.get(e) || '';
       const pq = passageQuery(words);
       const share = bestWindow(pq.query, docLemmas(id, e.doc.text || ''), pq.span);
@@ -1074,7 +1075,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
         const t = ORIGINAL_TIER[f.doc.kind];
         if (t === undefined || t >= tier || !f.doc.text) continue;
         const fid = idOf.get(f) || '';
-        if (bestWindow(pq.query, docLemmas(fid, f.doc.text), pq.span) >= share - REPRINT_COST && near(fid, f.doc) >= own - 0.1) {
+        if (share > 0 && bestWindow(pq.query, docLemmas(fid, f.doc.text), pq.span) >= share - REPRINT_COST && near(fid, f.doc) >= own - 0.1) {
           out.splice(r, 1);
           out.splice(i, 0, f);
           i++;
