@@ -100,6 +100,13 @@ describe('labels', () => {
     expect(sizeLabel(640 * 1024)).toBe('640 KB');
     expect(sizeLabel(1.2 * 1024 * 1024 * 1024)).toBe('1.2 GB');
   });
+  it('under 100 MB a size keeps its tenth, so a list of recordings adds up (7f: 9.6 + 8.4 + 7.9 + 14.5 = 40.4 MB)', () => {
+    expect(sizeLabel(14.5 * 1024 * 1024)).toBe('14.5 MB');
+    expect(sizeLabel(40.4 * 1024 * 1024)).toBe('40.4 MB');
+    expect(sizeLabel(99.94 * 1024 * 1024)).toBe('99.9 MB');
+    expect(sizeLabel(120.4 * 1024 * 1024)).toBe('120 MB');
+    expect(sizeLabel(640.4 * 1024)).toBe('640 KB');
+  });
   it('ago', () => {
     expect(agoLabel(GATE_NOW - 3600 * 1000, GATE_NOW)).toBe('today');
     expect(agoLabel(GATE_NOW - DAY, GATE_NOW)).toBe('yesterday');

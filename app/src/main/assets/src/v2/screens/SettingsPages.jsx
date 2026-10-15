@@ -24,7 +24,7 @@ const PRIVACY_URL = 'https://votreader.github.io/app/privacy.html';
  * @param {{ title: string, options: Array<{ id: string, label: string, s?: string }>, value: string, desktop: boolean,
  *   onPick: (id: string) => void, onClose: () => void }} props
  */
-function ChoiceSheet({ title, options, value, desktop, onPick, onClose }) {
+export function ChoiceSheet({ title, options, value, desktop, onPick, onClose }) {
   return (
     <Sheet kind="pick" label={title} onClose={onClose} desktop={desktop}>
       <div className="sh">{title}</div>
@@ -44,7 +44,7 @@ function ChoiceSheet({ title, options, value, desktop, onPick, onClose }) {
 }
 
 /** A row that opens something: title, what it holds, a chevron. */
-function OpenRow({ t, s, onOpen }) {
+export function OpenRow({ t, s, onOpen }) {
   return (
     <button type="button" className="srow" onClick={onOpen}>
       <span className="tx"><span className="t">{t}</span><span className="s">{s}</span></span>
@@ -54,7 +54,7 @@ function OpenRow({ t, s, onOpen }) {
 }
 
 /** A row with a switch: the whole row flips it. */
-function SwitchRow({ t, s, on, onFlip }) {
+export function SwitchRow({ t, s, on, onFlip }) {
   return (
     <button type="button" className="srow" role="switch" aria-checked={on} onClick={onFlip}>
       <span className="tx"><span className="t">{t}</span><span className="s">{s}</span></span>

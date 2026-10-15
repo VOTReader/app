@@ -88,13 +88,14 @@ export function bibleAudioLabel(key, editions = /** @type {any} */ (globalThis).
   return String(tr).toUpperCase() + ' Bible audio';
 }
 
-/** "48 MB", "1.2 GB", "640 KB": the unit picked from the rounded figure (doctrine mw9). */
+/** "48 MB", "14.5 MB", "1.2 GB", "640 KB": the unit picked from the rounded figure (doctrine mw9); under 100 MB or GB a size
+ *  keeps its tenth, so the Downloads page's rows add up to its total (7f: 9.6 + 8.4 + 7.9 + 14.5 = 40.4 MB). */
 export function sizeLabel(bytes) {
   const units = ['KB', 'MB', 'GB'];
   let v = Math.max(0, Number(bytes) || 0) / 1024;
   let u = 0;
   while (u < units.length - 1 && Math.round(v) >= 1024) { v /= 1024; u += 1; }
-  const shown = v >= 10 || u === 0 ? Math.round(v) : Math.round(v * 10) / 10;
+  const shown = v >= 100 || u === 0 ? Math.round(v) : Math.round(v * 10) / 10;
   return shown + ' ' + units[u];
 }
 
