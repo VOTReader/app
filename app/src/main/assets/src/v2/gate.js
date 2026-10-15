@@ -87,6 +87,18 @@ export const GATE_STATES = {
   '1a-letter': {
     stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],
   },
+  // states.json 5a-bible: The Bible from Home on the New Testament (the reader is reading John), at the top.
+  '5a-bible': {
+    stack: [{ place: 'home' }, { place: 'bible' }],
+    facts: { bible: { reading: 'john' } },
+  },
+  // states.json 5b-book: Genesis from The Bible, chapters 1-11 read, 12 next (ringed); John 3 loaded, paused at 0:46 of
+  // 6:24 (the mini player; the laptop's player bar).
+  '5b-book': {
+    stack: [{ place: 'home' }, { place: 'bible' }, { place: 'bible-book', book: 'genesis' }],
+    facts: { bible: { read: { genesis: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] }, place: { genesis: 12 } } },
+    playing: { item: { book: 'john', chapter: 3 }, reader: 'B', at: 46, length: 384, paused: true },
+  },
   // states.json 1c-aa-sheet: Letter 1 at its top, Text and theme open: standard size (step 3 of 6), Slate, Comfortable.
   '1c-aa-sheet': {
     stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],
