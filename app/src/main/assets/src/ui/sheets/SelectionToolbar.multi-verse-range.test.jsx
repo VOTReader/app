@@ -77,6 +77,9 @@ const button = (text) => [...document.querySelectorAll('.sel-toolbar button')].f
 /** The [key, start, end] of every segment of `gid`, in store order. */
 const spansOf = (gid) => AnnotationStore.getByGroup(gid).map((s) => [s.key, s.ann.start, s.ann.end]);
 
+/** [key, start, end] rows in verse order. */
+const byVerse = (rows) => [...rows].sort((x, y) => [K15, K16, K17].indexOf(x[0]) - [K15, K16, K17].indexOf(y[0]));
+
 /** The one group on `key` that is not in `known`. */
 const freshGroupOn = (key, known = []) => {
   const ids = [...new Set(AnnotationStore.get(key).map((h) => h.groupId))].filter((id) => !known.includes(id));
@@ -141,5 +144,63 @@ describe('SelectionToolbar — multi-verse actions use the selection the toolbar
     expect(spansOf('g_far')).toEqual([[K15, 0, 4]]);
     expect(NoteStore.get('g_far')).not.toBeNull();
     expect(NoteStore.get('g_far').body).toBe('keep me');
+  });
+});
+
+/** Tap a toolbar control with the selection left in place (a desktop click). @param {Element | null | undefined} el */
+function tap(el) {
+  expect(el).toBeTruthy();
+  act(() => { el.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true })); });
+  act(() => { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); });
+}
+
+/* sweep v31: the multi-verse Note attached itself to the first note-less group that merely OVERLAPPED
+   any touched verse, and then made no marks for the rest of the selection. The single-verse path only
+   attaches to a group that COVERS the selection. So "highlight one word in 3:16, select 3:15-17, Note"
+   filed the note on that one word: its quote and keys were the word's, and only the word carried it. */
+describe('SelectionToolbar — a multi-verse note lands on the whole selection (sweep v31)', () => {
+  const LOVED = V16.indexOf('loved');
+
+  it('a one-word highlight in 3:16 does not take a 3:15-17 note: a new group spans the selection', () => {
+    AnnotationStore.add(K16, { id: 'g_word', groupId: 'g_word', kind: 'highlight', color: 'yellow', start: LOVED, end: LOVED + 5, text: 'loved', created: 900 });
+    selectAndRaise(K15, 5, K17, 7);
+    tap(button('Note'));
+    expect(onNoteRequest).toHaveBeenCalledTimes(1);
+    const [gid, , fresh] = onNoteRequest.mock.calls[0];
+    expect(gid).not.toBe('g_word');
+    expect(fresh).toBe(true);
+    // (Store order lists 3:16 first, its first mark being older: the quote's order is pinned below.)
+    expect(byVerse(spansOf(gid))).toEqual([[K15, 5, V15.length], [K16, 0, V16.length], [K17, 0, 7]]);
+    expect([...NoteStore.get(gid).keys].sort()).toEqual([K15, K16, K17]);
+    // The word's highlight is left as it was, with no note of its own.
+    expect(spansOf('g_word')).toEqual([[K16, LOVED, LOVED + 5]]);
+    expect(NoteStore.get('g_word')).toBeNull();
+  });
+
+  it('a highlight over 3:15-16 only does not take a 3:15-17 note either', () => {
+    AnnotationStore.add(K15, { id: 'g_two_a', groupId: 'g_two', kind: 'highlight', color: 'green', start: 0, end: V15.length, text: V15, created: 900 });
+    AnnotationStore.add(K16, { id: 'g_two_b', groupId: 'g_two', kind: 'highlight', color: 'green', start: 0, end: V16.length, text: V16, created: 900 });
+    selectAndRaise(K15, 5, K17, 7);
+    tap(button('Note'));
+    const [gid, , fresh] = onNoteRequest.mock.calls[0];
+    expect(gid).not.toBe('g_two');
+    expect(fresh).toBe(true);
+    expect(spansOf(gid)).toEqual([[K15, 5, V15.length], [K16, 0, V16.length], [K17, 0, 7]]);
+    expect(NoteStore.get('g_two')).toBeNull();
+  });
+
+  it('a note-less highlight that covers every selected word still takes the note, keeping its colour', () => {
+    [[K15, V15], [K16, V16], [K17, V17]].forEach(([k, t], i) => AnnotationStore.add(k, {
+      id: 'g_wide_' + i, groupId: 'g_wide', kind: 'underline', color: 'blue', start: 0, end: t.length, text: t, created: 900,
+    }));
+    selectAndRaise(K15, 5, K17, 7);
+    tap(button('Note'));
+    const [gid, , fresh] = onNoteRequest.mock.calls[0];
+    expect(gid).toBe('g_wide');
+    expect(fresh).toBe(false);
+    expect(spansOf('g_wide')).toEqual([[K15, 0, V15.length], [K16, 0, V16.length], [K17, 0, V17.length]]);
+    expect(NoteStore.get('g_wide')).toEqual(expect.objectContaining({ color: 'blue', keys: [K15, K16, K17] }));
+    // No second group was made.
+    expect([...new Set(AnnotationStore.get(K15).map((h) => h.groupId))]).toEqual(['g_wide']);
   });
 });

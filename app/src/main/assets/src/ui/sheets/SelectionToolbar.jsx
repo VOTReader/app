@@ -1131,33 +1131,37 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       // Each block's offsets as measured when the toolbar rose (sweep v32).
       /** @type {{ container: HTMLElement, key: string, start: number, end: number }[]} */
       const spans = selInfo.multiSpans || [];
-      // Attach to an OVERLAPPING group that doesn't already have a note (keeps
-      // its existing style/color); otherwise create a new group at the default.
-      let attachTarget = null;
+      // Each block's part snapped to whole words, as the new group's marks.
+      /** @type {{ container: HTMLElement, key: string, text: string, start: number, end: number }[]} */
+      const planned = [];
       spans.forEach(function(span) {
-        if (attachTarget) return;
-        AnnotationStore.get(span.key).forEach(function(h) {
-          if (attachTarget) return;
-          if (h.start < span.end && h.end > span.start && h.groupId && !_hasNote(h.groupId)) {
-            attachTarget = h.groupId;
-          }
-        });
+        var containerText = span.container.textContent;
+        var snap = snapSelectionRange(span.container, containerText, span.start, span.end);
+        if (snap.start >= snap.end) return;
+        planned.push({ container: span.container, key: span.key, text: containerText, start: snap.start, end: snap.end });
       });
+      // Attach to a group that doesn't already have a note (keeping its style
+      // and colour) only when it COVERS the selection: one group with a mark
+      // over every block's snapped part, the single-block rule below. sweep
+      // v31: merely overlapping, a one-word highlight in the middle verse took
+      // the whole passage's note, and the note's quote and keys were that word.
+      // Otherwise create a new group over the selection at the default.
+      /** @param {string} gid @param {{ key: string, start: number, end: number }} p */
+      const covers = (gid, p) => AnnotationStore.get(p.key).some((h) =>
+        h.groupId === gid && h.start <= p.start && h.end >= p.end);
+      const attachTarget = planned.length === 0 ? null : (AnnotationStore.get(planned[0].key)
+        .map((h) => h.groupId)
+        .find((gid) => !!gid && !_hasNote(gid) && planned.every((p) => covers(gid, p))) || null);
       if (attachTarget) {
         groupId = attachTarget;
       } else {
         groupId = hlId();
         createdGroup = true;
-        spans.forEach(function(span) {
-          var container = span.container;
-          var hlKey = span.key;
-          var containerText = container.textContent;
-          var snap = snapSelectionRange(container, containerText, span.start, span.end);
-          if (snap.start >= snap.end) return;
-          AnnotationStore.add(hlKey, {
+        planned.forEach(function(p) {
+          AnnotationStore.add(p.key, {
             id: hlId(), groupId: groupId, kind: def.style,
-            start: snap.start, end: snap.end, color: def.color,
-            text: hlDisplayText(container, containerText, snap.start, snap.end),
+            start: p.start, end: p.end, color: def.color,
+            text: hlDisplayText(p.container, p.text, p.start, p.end),
             created: Date.now()
           });
         });
