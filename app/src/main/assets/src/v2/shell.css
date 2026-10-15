@@ -43,6 +43,13 @@ html, body { background: var(--bg); height: 100%; overflow: hidden; overscroll-b
 
 /* a letter's poem is a block of lines (letter-text.jsx), spaced as a paragraph */
 .v2 .reader .body .poetry { margin: 0 0 .62em; }
+/* the header lines main shows that no picture draws (mw6): the note line and "Addendum to ..." as quiet meta lines; the
+   preamble (the question put to The Lord) under them; the section intro quote above the text, set off as main's */
+.v2 .page-head .meta .note, .v2 .page-head .meta .addendum { font-style: italic; }
+.v2 .page-head .meta .addendum a { color: var(--tgold); text-decoration: underline 1px; text-underline-offset: 3px; }
+.v2 .page-head .meta + .preamble { margin: -8px 0 24px; font-size: var(--fs-s); line-height: 1.54; font-style: italic; color: var(--t-sub); }
+.v2 .reader .body .intro-quote { margin: 0 0 1.2em; text-align: center; }
+.v2 .reader .body .intro-quote p { font-style: italic; color: var(--t-sub); }
 /* main's marks on the text (4b): main's painter wraps them as <mark class="hl-mark hl-dom hl-<main colour>">; drawn as the
    kit's .hl in its five colours (main's ten onto five as notes-facts.js kitColour), underlines in the accent */
 .v2 mark.hl-mark { background: none; color: inherit; border-radius: 2px; padding: 1px 0;

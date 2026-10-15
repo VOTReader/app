@@ -7,7 +7,8 @@
    whenever its stores change. On the phone the sheet waits out a double tap (DOUBLE_TAP_MS): two taps are full screen
    (readalong's useFullScreen; Corbin 10-14: the double tap wins). A gate boot paints nothing and writes nothing. */
 import { Icon } from '../Icon.jsx';
-import { LetterBlock, FormatBBlock, titleClass, isMarkable } from '../letter-text.jsx';
+import { LetterBlock, FormatBBlock, titleClass, isMarkable, renderSegments } from '../letter-text.jsx';
+import { letterRoute, findLetterRoute } from '../letter-links.js';
 import { wtlbHlKey } from '../../utils/hl-keys.js';
 import { definePlace } from '../places.js';
 import { LayerToast } from '../Sheet.jsx';
@@ -88,14 +89,65 @@ const LetterBody = React.memo(/** @param {{ letter: any }} props */ function Let
   return (letter.blocks || []).map((b, i) => <LetterBlock key={i} block={b} hlKey={isMarkable(b) ? paraKey(letter.id, i) : null} />);
 });
 
+/** True when a header field has words (a few letters keep From or the note line as rich text: an array of segments). */
+const filled = (v) => (Array.isArray(v) ? v.length > 0 : !!(v && String(v).trim()));
+
+/** A header field's words, with its footnote marks when it is rich text. */
+const lineOf = (v) => (Array.isArray(v) ? renderSegments(v) : v);
+
+/**
+ * "Addendum to <letter>" (main's letter-meta): the letter opens in v2 as a new page (metaAddendumLink names it by its
+ * collection and title, metaAddendumInternal by its id), else its web address opens outside the app.
+ * @param {{ letter: any, onGo?: (route: any) => void }} props
+ */
+function Addendum({ letter, onGo }) {
+  const target = letter.metaAddendumLink || (letter.metaAddendumInternal ? { id: letter.metaAddendumInternal } : null);
+  const url = letter.metaAddendumUrl || null;
+  let link = letter.metaAddendum;
+  if (target) {
+    const open = (e) => {
+      e.preventDefault();
+      const now = letterRoute(target);
+      if (now) { if (onGo) onGo(now); return; }
+      findLetterRoute(target).then((r) => {
+        if (r && onGo) onGo(r);
+        else if (url) window.open(url, '_blank', 'noopener');
+      });
+    };
+    link = <a href={url || '#'} onClick={open}>{letter.metaAddendum}</a>;
+  } else if (url) {
+    link = <a href={url} target="_blank" rel="noopener noreferrer">{letter.metaAddendum}</a>;
+  }
+  return <span className="addendum">Addendum to {link}</span>;
+}
+
+/**
+ * The section intro quote above a letter's text (main's section-intro-quote). Its lines carry main's read-tracker marks
+ * (data-read-seg: the read detector counts these words), never a mark anchor (main keeps it out of highlights).
+ * @param {{ blocks: any[] }} props
+ */
+const SectionIntro = React.memo(/** @param {{ blocks: any[] }} props */ function SectionIntro({ blocks }) {
+  return (
+    <div className="intro-quote">
+      {blocks.map((b, i) => {
+        if (b && b.type === 'heading') return <h3 key={i} className="sec-h" data-read-seg={'intro-h:' + i}>{b.text}</h3>;
+        if (!b || !Array.isArray(b.segments)) return null;
+        return <p key={i} data-read-seg={'intro-p:' + i}>{renderSegments(b.segments)}</p>;
+      })}
+    </div>
+  );
+});
+
 /**
  * One letter, or with `preface` the collection's preface (its next card is Letter 1).
+ * `onGo` opens another letter as a new page (an addendum's).
  * @param {{ collection: string, n?: number, preface?: boolean, onReady?: () => void, onOpenLetter?: (n: number) => void,
  *   gate?: import('../gate.js').GateState | null, desktop?: boolean, waitDoubleTap?: boolean,
- *   onNote?: (target: Record<string, any>) => void, facts?: import('../settings-facts.js').SettingsFacts }} props
+ *   onNote?: (target: Record<string, any>) => void, facts?: import('../settings-facts.js').SettingsFacts,
+ *   onGo?: (route: any) => void }} props
  */
 export function LetterScreen({ collection, n = 0, preface = false, onReady, onOpenLetter, gate = null, desktop = false,
-  waitDoubleTap = false, onNote, facts = {} }) {
+  waitDoubleTap = false, onNote, facts = {}, onGo }) {
   const col = collectionOf(collection);
   const letters = useLetters(col);
   const letter = letters ? (preface ? prefaceOf(col) : letterAt(letters, n)) : null;
@@ -203,7 +255,11 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
   }
   const nextN = preface ? 1 : n + 1;
   const next = letterAt(letters, nextN);
-  const meta = [letter.date, letter.from, letter.spoken, letter.forLine].filter(Boolean);
+  // the header lines (main's letter-meta): date, from, spoken, for; then the note line and "Addendum to ..."
+  const meta = [letter.date, letter.from, letter.spoken, letter.forLine].filter(filled).map(lineOf);
+  if (filled(letter.noteLine)) meta.push(<span className="note">{lineOf(letter.noteLine)}</span>);
+  if (filled(letter.metaAddendum)) meta.push(<Addendum letter={letter} onGo={onGo} />);
+  const intro = Array.isArray(letter.sectionIntro) ? letter.sectionIntro : [];
   return (
     <>
       <div className="page-head g reader-head">
@@ -212,9 +268,12 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
         <ListenPill gate={gate} collection={collection} n={n} volKey={col.volKey} letter={letter} collectionLabel={col.label}
           onToast={setToast} />
         {meta.length > 0 && <div className="meta">{meta.map((m, i) => <React.Fragment key={i}>{i > 0 && <br />}{m}</React.Fragment>)}</div>}
+        {/* the question put to The Lord that the letter answers */}
+        {filled(letter.preamble) && <p className="preamble">{lineOf(letter.preamble)}</p>}
       </div>
       <div className="hair" />
       <div className={'body g first' + (sheet ? ' marked' : '')} ref={bodyRef} onClick={onBodyClick}>
+        {intro.length > 0 && <SectionIntro blocks={intro} />}
         <LetterBody letter={letter} />
         {next && (
           <button type="button" className="nextcard" onClick={() => onOpenLetter && onOpenLetter(nextN)}>
@@ -263,7 +322,7 @@ function LetterPlace({ route, replace, go, onReady, gate, desktop, facts }) {
   const openNote = (target) => go({ place: 'note', ...target });
   return <LetterScreen key={route.collection + '/' + (route.preface ? 'P' : route.n)} collection={route.collection} n={route.n}
     preface={!!route.preface} onReady={onReady} onOpenLetter={openLetter} gate={gate} desktop={desktop}
-    waitDoubleTap={!desktop && !(facts && facts.doubleTapFullscreen === false)} onNote={openNote} facts={facts || {}} />;
+    waitDoubleTap={!desktop && !(facts && facts.doubleTapFullscreen === false)} onNote={openNote} facts={facts || {}} onGo={go} />;
 }
 
 definePlace('letter', {
