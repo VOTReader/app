@@ -212,6 +212,7 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
   const letters = useLetters(col);
   const letter = letters ? (preface ? prefaceOf(col) : letterAt(letters, n)) : null;
   const bodyRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
+  const headRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const [sheet, setSheet] = React.useState(
     /** @type {null | { el: Element, para: import('../marks.js').Para, colour: string, marked: boolean }} */ (null));
   // One toast at a time: Copy's and Share's words, or Listen's offline line (on a gate boot, 9c's from the page alone).
@@ -255,9 +256,10 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
   React.useEffect(() => {
     const root = bodyRef.current;
     if (!refOpen || !root) return undefined;
+    const fn = refOpen.kind === 'fn' ? '.fn-ref[data-fn-num="' + cssValue(refOpen.num) + '"]' : '';
     const el = refOpen.kind === 'ref'
       ? refOpen.el || root.querySelector('.cite[data-ref="' + cssValue(refOpen.ref) + '"]')
-      : root.querySelector('.fn-ref[data-fn-num="' + cssValue(refOpen.num) + '"]');
+      : root.querySelector(fn) || (headRef.current && headRef.current.querySelector(fn));
     if (!el) return undefined;
     el.classList.add('on');
     return () => el.classList.remove('on');
@@ -319,12 +321,22 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
       if (pending.current) clearTimeout(pending.current);
     };
   }, []);
+  /** The reference, chapter link or footnote number a tap inside `root` means (a footnote within its 44 px square). */
+  const markAt = (target, root, e) => target.closest('.cite, .fn-ref')
+    || (target.closest('a, button, input, textarea') ? null : footnoteNear(root, e.clientX, e.clientY));
+  // The header lines carry footnote numbers too (Timothy's From line); a tap there opens only a mark, never a sheet.
+  const onHeadClick = (e) => {
+    const target = /** @type {Element} */ (e.target);
+    const mark = target && target.closest ? markAt(target, headRef.current, e) : null;
+    if (!mark) return;
+    e.preventDefault();
+    if (!gate) openMark(mark);
+  };
   const onBodyClick = (e) => {
     const target = /** @type {Element} */ (e.target);
     if (!target || !target.closest) return;
     // a reference, a chapter link or a footnote number first (a gate boot draws them, never acts)
-    const mark = target.closest('.cite, .fn-ref')
-      || (target.closest('a, button, input, textarea') ? null : footnoteNear(bodyRef.current, e.clientX, e.clientY));
+    const mark = markAt(target, bodyRef.current, e);
     if (mark) {
       e.preventDefault();
       if (!gate) openMark(mark);
@@ -398,7 +410,7 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
   const intro = Array.isArray(letter.sectionIntro) ? letter.sectionIntro : [];
   return (
     <>
-      <div className={'page-head g reader-head' + (fb ? ' fb-head' : '')}>
+      <div className={'page-head g reader-head' + (fb ? ' fb-head' : '')} ref={headRef} onClick={onHeadClick} onKeyDown={onBodyKey}>
         <span className="overline eyebrow">{fb ? entryEyebrow(col, n) : col.label + ' · ' + (preface ? 'Preface' : 'Letter ' + n)}</span>
         <h1 className={titleClass(letter.title)}>{letter.title}</h1>
         <ListenPill gate={gate} collection={collection} n={n} volKey={col.volKey} letter={letter} collectionLabel={col.label}

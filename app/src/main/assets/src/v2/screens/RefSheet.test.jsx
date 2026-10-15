@@ -211,6 +211,27 @@ describe("a letter's footnotes (Volume One, Letter 9: pictures 1f, 1g)", () => {
     expect(document.querySelector('[role="dialog"].ref')).toBeNull();
   });
 
+  it("a footnote number in the header lines opens too (Timothy's From line), wears the ring, and the title opens nothing", () => {
+    seed();
+    // letters-timothy.js 'The Shadow of The Almighty' keeps its From line as segments with a footnote
+    g.LETTERS_V1 = [{ id: 'shadow', num: 1, title: 'The Shadow of The Almighty', date: '6/18/06',
+      from: [{ t: 'text', v: 'The Interpretation of the Vision Given to Timothy' }, { t: 'fn', v: '1' }],
+      blocks: [{ type: 'para', segments: [{ t: 'text', v: 'Behold, the shadow.' }] }],
+      footnotes: { 1: { type: 'scripture', ref: 'Revelation 3:5' } }, nkjv: NAME.nkjv }];
+    const { container } = render(<LetterScreen collection="one" n={1} onGo={() => {}} />);
+    const mark = container.querySelector('.page-head .meta sup.fn-ref[data-fn-num="1"]');
+    expect(mark).toBeTruthy();
+    click(container.querySelector('.page-head h1'));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    click(mark);
+    expect(document.querySelector('[role="dialog"].ref .ref-top .overline').textContent).toBe('Footnote 1');
+    expect(mark.classList.contains('on')).toBe(true);
+    key(document, 'Escape');
+    expect(document.querySelector('[role="dialog"].ref')).toBeNull();
+    key(mark, 'Enter');
+    expect(document.querySelector('[role="dialog"].ref .ref-h').textContent).toBe('Revelation 3:5');
+  });
+
   it('a footnote number answers a tap anywhere in its 44 px square, the nearest when two are close', () => {
     const root = document.createElement('div');
     const box = (left, top, w, h) => () => /** @type {DOMRect} */ (/** @type {any} */ ({ left, top, right: left + w, bottom: top + h, width: w, height: h }));
