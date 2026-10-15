@@ -7,6 +7,7 @@
    name). Each entry below is the states.json row for that id, in the app's terms; add one per screen as it is built. */
 
 import { gateMarks } from './notes-facts.js';
+import { GATE_CHOSEN } from './search-facts.js';
 
 /** The website readers use: the hook never acts there. */
 export const LIVE_HOSTS = ['votreader.github.io'];
@@ -22,7 +23,8 @@ const DAY = 24 * 3600 * 1000;
  * at/length in seconds, paused; the player reads it, agreed with readalong 10-14). rv1 adds optional playing.rate,
  * playing.sleep ({ minutes, left } in min / s, or 'end') and playing.saved (true = saved on this device), and `player`:
  * open ('now-playing', or a sheet: 'speed' | 'sleep' | 'up-next'), full (full screen) and toast (the hint drawn).
- * @typedef {{ place: string, collection?: string, n?: number, kind?: string, id?: string }} Route
+ * @typedef {{ place: string, collection?: string, n?: number, kind?: string, id?: string, book?: string, chapter?: number | string,
+ *   verse?: number, match?: string[] }} Route
  * @typedef {{ item: Record<string, any>, reader: string, at: number, length: number, paused: boolean } & Record<string, any>} GatePlaying
  * @typedef {{ stack: Route[], facts?: Record<string, any>, scroll?: number | string, playing?: GatePlaying | null,
  *   player?: Record<string, any> }} GateState
@@ -99,6 +101,16 @@ export const GATE_STATES = {
     stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 2 }],
     player: { full: true, toast: 'Full screen. Double-tap to come back.' },
     scroll: '.body',
+  },
+  // states.json 3a-search: the Search tab before typing.
+  '3a-search': { stack: [{ place: 'search' }], facts: { search: { query: '', scope: 'all', hits: [], marks: [] } } },
+  // states.json 3b-search-results: 'chosen' typed, All, the field focused; Volume One's Letters 1 and 4, then John 13:18.
+  '3b-search-results': { stack: [{ place: 'search' }], facts: { search: GATE_CHOSEN } },
+  // states.json 5c-search-match: John 3 (NKJV) opened from a search for 'born again', verse 3 a third of the way down with
+  // the words underlined; Back says Search and Search stays lit.
+  '5c-search-match': {
+    stack: [{ place: 'search' }, { place: 'bible-chapter', book: 'john', chapter: 3, verse: 3, match: ['born again'] }],
+    facts: { translation: 'nkjv' },
   },
 };
 

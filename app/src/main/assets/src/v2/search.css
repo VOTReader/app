@@ -1,0 +1,10 @@
+/* search.css - v2 Search (zv1): the real input inside the kit's .field (it draws as the picture's .ph / .q span),
+   the field lit while typing, rows that open, and the "More in ..." row under a group. */
+.field input.q { flex: 1; min-width: 0; height: 100%; margin: 0; padding: 0; border: 0; outline: 0; background: none;
+  font: inherit; font-size: var(--fs-ui); color: var(--t1); caret-color: var(--accent); -webkit-appearance: none; appearance: none; }
+.field input.q::placeholder { color: #A7AEB0; opacity: 1; }
+.field:focus-within { border-color: var(--accent); }
+.hit[role="button"] { cursor: pointer; }
+.hit[role="button"]:active { background: var(--press); }
+.grp > .more { display: block; width: 100%; text-align: left; padding: 12px 0 4px; font-size: var(--fs-s); color: var(--tgold); }
+.results > .hint { margin-top: 22px; }
