@@ -1,5 +1,5 @@
 {
- "pass": 464,
+ "pass": 465,
  "strict": 360,
  "top5": 487,
  "found": 499,
@@ -10,14 +10,14 @@
   "gist": 26,
   "middle": 49,
   "misremembered": 73,
-  "paraphrase": 54,
+  "paraphrase": 55,
   "rare": 48,
   "title": 33,
   "typos": 25,
   "unitgist": 17
  },
  "group": {
-  "answers": 53,
+  "answers": 54,
   "bible": 104,
   "cross": 16,
   "letters": 180,
