@@ -19,7 +19,9 @@ const DAY = 24 * 3600 * 1000;
  * One gate state: `stack` is the history the hook fakes (its last entry is the place shown; the one before names Back),
  * `facts` what the screen would otherwise read from storage, `scroll` where the page sits (px, or a selector whose
  * element's top goes right under the top bar), `playing` the recording loaded (states.json's playing: item, reader code,
- * at/length in seconds, paused; the player reads it, agreed with readalong 10-14).
+ * at/length in seconds, paused; the player reads it, agreed with readalong 10-14). rv1 adds optional playing.rate,
+ * playing.sleep ({ minutes, left } in min / s, or 'end') and playing.saved (true = saved on this device), and `player`:
+ * open ('now-playing', or a sheet: 'speed' | 'sleep' | 'up-next'), full (full screen) and toast (the hint drawn).
  * @typedef {{ place: string, collection?: string, n?: number, kind?: string, id?: string }} Route
  * @typedef {{ item: Record<string, any>, reader: string, at: number, length: number, paused: boolean } & Record<string, any>} GatePlaying
  * @typedef {{ stack: Route[], facts?: Record<string, any>, scroll?: number | string, playing?: GatePlaying | null,
@@ -36,6 +38,8 @@ const HOME_FACTS = {
     recent: [{ kind: 'chapter', book: 'john', bookTitle: 'John', chapter: 3 }, { kind: 'letter', collection: 'one', n: 2 }],
   },
 };
+const OVER_VOLUME_ONE = [{ place: 'home' }, { place: 'collection', collection: 'one' }];
+const LETTER_ONE_PLAYING = { item: { collection: 'one', n: 1 }, reader: 'B', at: 231, length: 608, paused: false, saved: true };
 
 /** @type {Record<string, GateState>} */
 export const GATE_STATES = {
@@ -84,6 +88,18 @@ export const GATE_STATES = {
   '3d-notes-journal': { stack: [{ place: 'notes', kind: 'journal' }], facts: { marks: gateMarks(GATE_NOW), now: GATE_NOW } },
   // states.json 8c-notes-empty: nothing marked yet.
   '8c-notes-empty': { stack: [{ place: 'notes', kind: 'all' }], facts: { marks: [], now: GATE_NOW } },
+  // rv1 Listening (states.json 2b, 6a, 6b, 6c): Now playing opened over Volume One's page (Home > Volume One), Letter 1
+  // read by Benjamin at 3:51 of 10:08, saved on this device; 6a-6c open a sheet over it.
+  '2b-now-playing': { stack: OVER_VOLUME_ONE, playing: LETTER_ONE_PLAYING, player: { open: 'now-playing' } },
+  '6a-speed': { stack: OVER_VOLUME_ONE, playing: { ...LETTER_ONE_PLAYING, rate: 1.25 }, player: { open: 'speed' } },
+  '6b-sleep': { stack: OVER_VOLUME_ONE, playing: { ...LETTER_ONE_PLAYING, sleep: { minutes: 30, left: 24 * 60 } }, player: { open: 'sleep' } },
+  '6c-up-next': { stack: OVER_VOLUME_ONE, playing: LETTER_ONE_PLAYING, player: { open: 'up-next' } },
+  // states.json 9b-full-screen: Letter 2 full screen (every bar hidden), paragraph 1 at the top, the hint showing.
+  '9b-full-screen': {
+    stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 2 }],
+    player: { full: true, toast: 'Full screen. Double-tap to come back.' },
+    scroll: '.body',
+  },
 };
 
 /**

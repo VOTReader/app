@@ -1,0 +1,31 @@
+/* player/player.css - the v2 player in the real window (rv1). The kit (kit.css + screens.css) draws the pieces inside a
+   picture's phone or laptop; these rules place them in the app's frame. Colour, type and spacing stay the kit's. */
+
+/* phone: Now playing covers the column, inside the system bars */
+.np-screen { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; background: var(--bg);
+  padding: var(--v2-top) 0 var(--v2-bottom); }
+.np-screen > .content { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 16px; }
+
+/* phone: sheets over everything, their last row clear of the 3-button nav (the kit's 60 px is .scr.android's) */
+.v2-phone > .scrim { z-index: 4; }
+.v2-phone > .sheet { z-index: 5; padding-bottom: calc(12px + var(--v2-bottom)); }
+.sheet.tall, .dlg.upn { display: flex; flex-direction: column; }
+.sheet.tall .rows.q, .dlg.upn .rows.q { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.dlg.upn { max-height: calc(100% - 96px); }
+.rows.q .num-row { touch-action: pan-y; background: var(--raised); }
+.ic.grip { touch-action: none; cursor: grab; }
+.upn-h .textbtn:disabled { opacity: .38; cursor: default; }
+
+/* laptop: the bar's open button points up; the docked panel scrolls inside itself */
+.pbar button.now { text-align: left; }
+.pbar .open-np svg { transform: rotate(180deg); }
+.panel { display: flex; flex-direction: column; }
+.panel > .np { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 16px; }
+
+/* the mini player opens Now playing */
+.mini { cursor: pointer; }
+
+/* full screen (9b): every bar hides, the text runs edge to edge; the S22 keeps its cutout inset while immersive */
+.v2-phone.full { padding-top: 0; padding-bottom: 0; }
+.v2-phone > .content.reader.full .body { padding-top: max(44px, var(--v2-top)); }
+.v2-phone .toast-wrap { z-index: 2; }

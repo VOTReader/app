@@ -10,6 +10,8 @@ import { readGateId, gateState, markGate, whenPainted } from './gate.js';
 import { savedFacts } from './settings-facts.js';
 import { bookTitle } from './home-facts.js';
 import { placeFor } from './places.js';
+import { usePlayer, MiniPlayer, NowPlaying, PlayerSheet, PlayerBar } from './player/Player.jsx';
+import { useFullScreen, FullScreenToast } from './player/full-screen.jsx';
 import './screens/index.js';
 
 const g = /** @type {any} */ (globalThis);
@@ -101,6 +103,9 @@ export function V2App({ gateId = readGateId() }) {
   const route = stack[stack.length - 1];
   const tab = stack[0].place;
   const back = stack.length > 1 ? routeTitle(stack[stack.length - 2]) : null;
+  // The player is shell chrome (rv1): the mini player / player bar, Now playing, its sheets, and full screen.
+  const player = usePlayer(gate);
+  const fs = useFullScreen({ enabled: !desktop && route.place === 'letter' && facts.doubleTapFullscreen !== false, gate });
 
   const onReady = React.useCallback(() => setReady(true), []);
   const go = React.useCallback((...routes) => { setReady(false); setStack((s) => s.concat(routes)); }, []);
@@ -112,19 +117,22 @@ export function V2App({ gateId = readGateId() }) {
   React.useEffect(() => {
     if (!gateId) return undefined;
     if (!gate) { markGate('unknown'); return undefined; }
-    if (!ready) { markGate('waiting'); return undefined; }
+    if (!ready || !player.ready) { markGate('waiting'); return undefined; }
     const el = scrollRef.current;
     if (el && gate.scroll != null) { applyGateScroll(el, gate.scroll); setScrolled(el.scrollTop > 0); }
     let live = true;
     whenPainted().then(() => { if (live) markGate('ready'); });
     return () => { live = false; };
-  }, [gateId, gate, ready]);
+  }, [gateId, gate, ready, player.ready]);
 
   // Android's back (MainActivity calls window.handleAndroidBack): pop the stack, or let Android leave at a root.
   const stackRef = React.useRef(stack);
   stackRef.current = stack;
+  const chromeRef = React.useRef({ player, fs });
+  chromeRef.current = { player, fs };
   React.useEffect(() => {
     g.handleAndroidBack = () => {
+      if (chromeRef.current.player.back() || chromeRef.current.fs.exit()) return 'true';
       if (stackRef.current.length > 1) { pop(); return 'true'; }
       return 'false';
     };
@@ -172,15 +180,21 @@ export function V2App({ gateId = readGateId() }) {
               <div className={contentClass}>{screen}</div>
             </div>
           </div>
+          <PlayerBar player={player} />
+          <NowPlaying player={player} desktop go={go} />
         </div>
+        <PlayerSheet player={player} desktop />
       </div>
     );
   }
   return (
-    <div className="v2 v2-phone">
-      {bar}
-      <div className={contentClass} ref={scrollRef} onScroll={onScroll}>{screen}</div>
-      <nav className="tabbar" aria-label="Places">{tabs}</nav>
+    <div className={'v2 v2-phone' + (fs.full ? ' full' : '')}>
+      {!fs.full && bar}
+      <div className={contentClass + (fs.full ? ' full' : '')} ref={scrollRef} onScroll={onScroll}>{screen}<FullScreenToast text={fs.full ? fs.toast : null} /></div>
+      {!fs.full && <MiniPlayer player={player} />}
+      {!fs.full && <nav className="tabbar" aria-label="Places">{tabs}</nav>}
+      <NowPlaying player={player} desktop={false} go={go} />
+      <PlayerSheet player={player} desktop={false} />
     </div>
   );
 }

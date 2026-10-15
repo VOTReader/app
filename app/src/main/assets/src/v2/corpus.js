@@ -22,15 +22,26 @@ const version = () => {
   return c && typeof c.getVersion === 'function' ? c.getVersion() : 0;
 };
 
+/** One ask in flight per corpus: a screen and the player (rv1) asking in the same commit share it. */
+const inFlight = new WeakMap();
+
+/** Asks for the VOT corpus unless it is here or already asked for; settles when it lands, rejects when it fails (a later
+ *  ask retries). @returns {Promise<void>} */
+export function askVotCorpus(gl = g) {
+  const c = gl.__votCorpus;
+  if (!c || c.loaded || typeof gl.__loadVotCorpus !== 'function') return Promise.resolve();
+  if (inFlight.has(c)) return inFlight.get(c);
+  const p = Promise.resolve(gl.__loadVotCorpus()).finally(() => { inFlight.delete(c); });
+  inFlight.set(c, p);
+  return p;
+}
+
 /** Asks for the VOT corpus once per mount (the loader retries after a failure) and re-renders when it lands or fails.
  *  @returns {'loading' | 'ready' | 'failed'} */
 export function useVotCorpus() {
   React.useSyncExternalStore(subscribe, version);
   React.useEffect(() => {
-    const c = g.__votCorpus;
-    if (c && !c.loaded && typeof g.__loadVotCorpus === 'function') {
-      Promise.resolve(g.__loadVotCorpus()).catch(() => { /* the loader flags the error and bumps its version */ });
-    }
+    askVotCorpus().catch(() => { /* the loader flags the error and bumps its version */ });
   }, []);
   return votCorpusStatus();
 }
