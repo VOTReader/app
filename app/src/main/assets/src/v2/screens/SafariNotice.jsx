@@ -23,10 +23,12 @@ const ADD = (
   </svg>
 );
 
-/** True on a Mac's Safari (main's test: navigator.platform names Mac). */
+/** True on a Mac's Safari: navigator.platform names Mac and there is no touch screen (iPadOS Safari reports 'MacIntel'
+ *  too; a Mac reports 0 touch points, main c5e5ec2c1). */
 function onMac() {
   const nav = g.navigator;
-  return !!nav && /Mac/.test(nav.platform || '') && !/iPhone|iPad/.test(nav.userAgent || '');
+  return !!nav && /Mac/.test(nav.platform || '') && !/iPhone|iPad/.test(nav.userAgent || '')
+    && !((nav.maxTouchPoints || 0) > 1);
 }
 
 /**

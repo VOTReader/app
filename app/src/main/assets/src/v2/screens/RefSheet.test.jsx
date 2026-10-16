@@ -6,6 +6,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import { LetterScreen, footnoteNear, entryEyebrow } from './LetterScreen.jsx';
 import { SafariSheet } from './SafariNotice.jsx';
+import { RefSheet, FootnoteList, NO_VERSE } from './RefSheet.jsx';
 import { formatBDomText, formatBRefScan } from '../../utils/format-b-dom-text.js';
 import { footnoteItems, passages, translationOf, findChapterRoute } from '../footnotes.js';
 import { OVERLAYS, placeFor } from '../places.js';
@@ -17,7 +18,7 @@ const g = /** @type {any} */ (globalThis);
 const click = (el) => act(() => { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); });
 const key = (el, k) => act(() => { el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); });
 const SEEDED = ['COL_BY_KEY', 'WTLB_ONE', 'LETTERS_V1', 'LETTERS_V3', 'HOLY_DAYS', 'WTLB_SCRIPTURES', 'splitCompoundRef', 'findBook',
-  'lookupVersesFromBooks', 'StorageHealth', 'AnnotationStore', '__loadVotCorpus', '__loadBibleCorpus', 'BOOKS'];
+  'lookupVersesFromBooks', 'StorageHealth', 'AnnotationStore', '__loadVotCorpus', '__loadBibleCorpus', '__bibleCorpus', 'BOOKS'];
 
 afterEach(() => {
   cleanup();
@@ -274,6 +275,53 @@ describe('footnotes.js', () => {
   });
 });
 
+// main bc24368b9 (sweep v73): a verse in neither dictionary comes from the lazy Bible; v2 read it once and never again.
+describe('a reference whose verse needs the Bible (v2-gaps 38)', () => {
+  const ABEL = 'Now Cain talked with Abel his brother; and it came to pass, when they were in the field, that Cain rose up against Abel his brother and killed him.';
+  /** index.html's lazy Bible: not here until its loader runs and the test lands it. */
+  function lazyBible() {
+    bible();
+    const subs = new Set();
+    let version = 0;
+    g.lookupVersesFromBooks = () => null;
+    g.__bibleCorpus = { loaded: false, subscribe: (cb) => { subs.add(cb); return () => subs.delete(cb); }, getVersion: () => version };
+    g.__loadBibleCorpus = vi.fn(() => new Promise(() => {}));
+    return () => act(() => {
+      g.lookupVersesFromBooks = (ref) => (ref === 'Genesis 4:8' ? ABEL : null);
+      g.__bibleCorpus.loaded = true;
+      version++;
+      subs.forEach((cb) => cb());
+    });
+  }
+
+  it('the open sheet asks for the Bible and fills in when it lands', () => {
+    const land = lazyBible();
+    render(<RefSheet open={{ kind: 'ref', ref: 'Genesis 4:8' }} letter={null} items={[]} onClose={() => {}} onGo={() => {}} onRead={() => {}} onStep={() => {}} />);
+    expect(document.querySelector('.ref-v').textContent).toBe(NO_VERSE);
+    expect(g.__loadBibleCorpus).toHaveBeenCalled();
+    land();
+    expect(document.querySelector('.ref-v').textContent).toBe(ABEL);
+  });
+
+  it("the Footnotes list fills in the same verse when the Bible lands", () => {
+    const land = lazyBible();
+    const items = [{ num: '1', fn: { type: 'scripture', ref: 'Genesis 4:8' } }];
+    const { container } = render(<FootnoteList items={/** @type {any} */ (items)} letter={null} onGo={() => {}} onRead={() => {}} />);
+    expect(container.querySelector('.fni .v')).toBeNull();
+    expect(g.__loadBibleCorpus).toHaveBeenCalled();
+    land();
+    expect(container.querySelector('.fni .v').textContent).toBe(ABEL);
+  });
+
+  it('a verse the dictionary holds shows at once and asks for nothing', () => {
+    lazyBible();
+    g.WTLB_SCRIPTURES = { 'Genesis 4:8': ABEL };
+    render(<RefSheet open={{ kind: 'ref', ref: 'Genesis 4:8' }} letter={null} items={[]} onClose={() => {}} onGo={() => {}} onRead={() => {}} onStep={() => {}} />);
+    expect(document.querySelector('.ref-v').textContent).toBe(ABEL);
+    expect(g.__loadBibleCorpus).not.toHaveBeenCalled();
+  });
+});
+
 describe("Safari's 7-day notice (picture 8d)", () => {
   /** main's StorageHealth gate, in memory: the first save of the session in a Safari tab trips it. */
   function health() {
@@ -320,6 +368,36 @@ describe("Safari's 7-day notice (picture 8d)", () => {
   it("on a Mac the step is Safari's File > Add to Dock", () => {
     render(<SafariSheet mac desktop={false} onDone={() => {}} />);
     expect(document.querySelector('.howto').textContent).toBe('1In Safari, choose File > Add to Dock');
+  });
+
+  // iPadOS Safari reports navigator.platform 'MacIntel' too; a touch screen tells it apart (main c5e5ec2c1, sweep v065).
+  describe('the steps per device, on the live notice', () => {
+    /** @param {string} platform @param {number} maxTouchPoints @param {string} [userAgent] */
+    function steps(platform, maxTouchPoints, userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15') {
+      Object.defineProperty(navigator, 'platform', { value: platform, configurable: true });
+      Object.defineProperty(navigator, 'maxTouchPoints', { value: maxTouchPoints, configurable: true });
+      Object.defineProperty(navigator, 'userAgent', { value: userAgent, configurable: true });
+      g.StorageHealth = health();
+      g.StorageHealth.checkFirstDataCreation();
+      const Notice = OVERLAYS['safari-7day'];
+      render(<Notice route={{}} gate={null} desktop={false} go={() => {}} openTab={() => {}} />);
+      return document.querySelector('.sheet.safari .howto').textContent;
+    }
+    afterEach(() => {
+      for (const k of ['platform', 'maxTouchPoints', 'userAgent']) delete /** @type {any} */ (navigator)[k];
+    });
+
+    it('an iPad (MacIntel with a touch screen) gets Share > Add to Home Screen, not the Mac menu', () => {
+      const text = steps('MacIntel', 5);
+      expect(text).toContain('Add to Home Screen');
+      expect(text).not.toContain('Add to Dock');
+    });
+    it('a Mac (MacIntel, no touch) gets File > Add to Dock', () => {
+      expect(steps('MacIntel', 0)).toBe('1In Safari, choose File > Add to Dock');
+    });
+    it('an iPhone gets Share > Add to Home Screen', () => {
+      expect(steps('iPhone', 5, 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1')).toContain('Add to Home Screen');
+    });
   });
 });
 

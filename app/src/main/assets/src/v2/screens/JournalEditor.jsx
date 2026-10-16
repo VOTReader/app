@@ -73,7 +73,7 @@ export function useJournalDraft(route, gated, seed = null) {
   const touch = () => { latest.current.dirty = true; };
   const editTitle = (v) => { touch(); setTitle(v); };
   /** @param {number} i @param {string} v */
-  const editBlock = (i, v) => { touch(); setBlocks((bs) => bs.map((b, j) => (j === i ? { ...b, text: v } : b))); };
+  const editBlock = (i, v, field = 'text') => { touch(); setBlocks((bs) => bs.map((b, j) => (j === i ? { ...b, [field]: v } : b))); };
   /** The whole list replaced (Insert); `now` saves without the half second (a picture: its blob is already kept). */
   const putBlocks = (next, now = false) => { touch(); if (now) latest.current.now = true; setBlocks(next); };
 
@@ -265,7 +265,7 @@ export function JournalEditor({ route, gate, facts, desktop, go, onReady }) {
     : null));
   /** The block a long press is acting on (its sheet: Move up, Move down, Remove), by id. */
   const [held, setHeld] = React.useState(/** @type {string | null} */ (null));
-  const [toast, setToast] = React.useState(/** @type {{ text: string, act?: string, onAct?: () => void, ms?: number } | null} */ (null));
+  const [toast, setToast] = React.useState(/** @type {{ text: string, act?: string, onAct?: () => void, ms?: number, urgent?: boolean } | null} */ (null));
   const gesture = React.useRef({ timer: null, start: null, held: false });
   const blocksRef = React.useRef(blocks);
   blocksRef.current = blocks;
@@ -315,6 +315,8 @@ export function JournalEditor({ route, gate, facts, desktop, go, onReady }) {
   }, [blocks]);
 
   const note = (/** @type {string} */ text) => setToast({ text });
+  /** A memo that cannot play: said out loud, as main's assertive toast. @param {string} text */
+  const alarm = (text) => setToast({ text, urgent: true });
   React.useEffect(() => {
     if (!toast) return undefined;
     const t = setTimeout(() => setToast(null), toast.ms || 2600);
@@ -438,11 +440,33 @@ export function JournalEditor({ route, gate, facts, desktop, go, onReady }) {
                 onFocus={keep(b)} onSelect={keep(b)} onKeyUp={keep(b)} onClick={keep(b)} />
             );
           }
+          // a heading and a quote (written in main) are text as main's editor has them; the quote keeps its citation
+          if (view.kind === 'heading') {
+            return (
+              <GrowField key={key} className="jp jh2" data-b={b.id || undefined} epoch={epoch} value={view.text}
+                placeholder="Heading" aria-label="Heading"
+                onChange={(e) => { keep(b)(e); editBlock(i, e.target.value); }}
+                onFocus={keep(b)} onSelect={keep(b)} onKeyUp={keep(b)} onClick={keep(b)} />
+            );
+          }
+          if (view.kind === 'quote') {
+            return (
+              <div key={key} className="jq">
+                <GrowField className="jp" data-b={b.id || undefined} epoch={epoch} value={view.text}
+                  placeholder="Quoted text…" aria-label="Quote"
+                  onChange={(e) => { keep(b)(e); editBlock(i, e.target.value); }}
+                  onFocus={keep(b)} onSelect={keep(b)} onKeyUp={keep(b)} onClick={keep(b)} />
+                <input type="text" className="jqc" value={view.cite} placeholder="Citation (optional)" aria-label="Citation"
+                  onFocus={() => { cursor.current = b.id ? { id: b.id, caret: 0 } : null; }}
+                  onChange={(e) => editBlock(i, e.target.value, 'cite')} />
+              </div>
+            );
+          }
           const hold = holdProps(gate || !b || !b.id ? null : () => setHeld(b.id), gesture.current);
           if (view.kind === 'card') return <JournalCard key={key} view={view} go={go} hold={hold} />;
           if (view.kind === 'divider') return <div key={key} className="jdiv" aria-hidden="true" {...hold}>❖ ❖ ❖</div>;
           if (view.kind === 'image') return <JournalImage key={key} view={view} gateMedia={gateMedia} onLoaded={() => setLoaded((n) => n + 1)} hold={hold} />;
-          if (view.kind === 'memo') return <JournalMemo key={key} view={view} gateMedia={gateMedia} gateMemo={gateMemo} hold={hold} />;
+          if (view.kind === 'memo') return <JournalMemo key={key} view={view} gateMedia={gateMedia} gateMemo={gateMemo} hold={hold} onFail={alarm} />;
           return <p key={key} className="mm jother" {...hold}>{view.line}</p>;
         })}
         {!gate && <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />}
@@ -458,13 +482,13 @@ export function JournalEditor({ route, gate, facts, desktop, go, onReady }) {
       )}
       {sheet === 'memo' && (
         <JournalRecord desktop={desktop} gate={gateOpen && gateOpen.sheet === 'record' ? gateOpen.rec || null : null}
-          onSave={onMemo} onClose={() => setSheet(null)} />
+          onSave={onMemo} onClose={() => setSheet(null)} onFail={alarm} />
       )}
       {heldAt >= 0 && (
         <BlockSheet name={blockName(blocks[heldAt])} first={heldAt === 0} last={heldAt === blocks.length - 1} desktop={desktop}
           onMove={(by) => move(held, by)} onRemove={() => remove(held)} onClose={() => setHeld(null)} />
       )}
-      <LayerToast text={toast && toast.text} act={toast && toast.act} onAct={toast && toast.onAct} />
+      <LayerToast text={toast && toast.text} act={toast && toast.act} onAct={toast && toast.onAct} urgent={!!(toast && toast.urgent)} />
     </>
   );
 }

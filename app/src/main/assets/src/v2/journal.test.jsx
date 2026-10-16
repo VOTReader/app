@@ -162,6 +162,13 @@ describe('journal-blocks: what each block shows (3n)', () => {
     expect(blockView({ type: 'sketch' })).toEqual({ kind: 'other', line: '[Sketch]' });
   });
 
+  it("a heading and a quote are text, as main's editor writes them (v2-gaps 40): their words, the quote's citation", () => {
+    g.JournalHelpers = { describeBlock: () => '[Heading]' };
+    expect(blockView({ type: 'h2', text: 'Morning' })).toEqual({ kind: 'heading', text: 'Morning' });
+    expect(blockView({ type: 'quote', text: 'Be still, and know.', cite: 'Psalm 46:10' })).toEqual({ kind: 'quote', text: 'Be still, and know.', cite: 'Psalm 46:10' });
+    expect(blockView({ type: 'quote' })).toEqual({ kind: 'quote', text: '', cite: '' });
+  });
+
   it('the memo\'s clock and its bars: 5-28 px from main\'s samples, lit up to the playhead', () => {
     expect(clock(72)).toBe('1:12');
     expect(clock(18.9)).toBe('0:18');
@@ -525,6 +532,26 @@ describe('writing an entry (a real boot)', () => {
     expect(g.__onNativeRecordingComplete).toBeUndefined();   // the sheet let go of main's callbacks
   });
 
+  it("a heading and a quote written in main show their words and are written in place; the quote's citation too (v2-gaps 40)", async () => {
+    journal([{ id: 'b1', type: 'h2', text: 'Morning' }, { id: 'b2', type: 'p', text: 'One' },
+      { id: 'b3', type: 'quote', text: 'Be still, and know that I am God.', cite: 'Psalm 46:10' }, { id: 'b4', type: 'p', text: '' }]);
+    const c = openEntry();
+    expect(c.querySelector('.jed .jother')).toBe(null);
+    const h = /** @type {HTMLTextAreaElement} */ (c.querySelector('.jed textarea.jh2'));
+    expect(h.value).toBe('Morning');
+    const q = /** @type {HTMLTextAreaElement} */ (c.querySelector('.jed .jq textarea'));
+    expect(q.value).toBe('Be still, and know that I am God.');
+    const cite = /** @type {HTMLInputElement} */ (c.querySelector('.jed .jq input.jqc'));
+    expect(cite.value).toBe('Psalm 46:10');
+    expect(cite.getAttribute('placeholder')).toBe('Citation (optional)');
+    fireEvent.change(h, { target: { value: 'Evening' } });
+    fireEvent.change(q, { target: { value: 'Be still.' } });
+    fireEvent.change(cite, { target: { value: 'Psalm 46:10 (KJV)' } });
+    await settle(600);
+    expect(lastPatch().blocks.slice(0, 3)).toEqual([{ id: 'b1', type: 'h2', text: 'Evening' }, { id: 'b2', type: 'p', text: 'One' },
+      { id: 'b3', type: 'quote', text: 'Be still.', cite: 'Psalm 46:10 (KJV)' }]);
+  });
+
   it('the title is one line: Enter goes to the words; a pasted newline becomes a space', async () => {
     journal([{ id: 'b1', type: 'p', text: 'One' }]);
     const c = openEntry();
@@ -562,6 +589,58 @@ describe('writing an entry (a real boot)', () => {
     expect(gone.querySelector('.jmiss').textContent).toBe('Recording missing');
     expect(gone.querySelector('.jplay')).toBe(null);
     expect(g.JournalStore.update).not.toHaveBeenCalled();
+  });
+
+  // main 8d3ef6a2c (sweep v070): play() rejects on a memo this device cannot decode (a backup from another device, a broken
+  // file); the 'play' event has already fired, so the button sat on Pause over silence and the reader was told nothing.
+  const CANT = 'This voice memo can’t be played on this device.';
+  /** A media element whose play() starts (the 'play' event) and then rejects with `name`. @param {string} name */
+  const failingPlay = (name) => vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(function () {
+    this.dispatchEvent(new Event('play'));
+    return Promise.reject(Object.assign(new Error(name), { name }));
+  });
+
+  it('a memo that cannot play goes back to Play and says so, out loud; a start cut short (AbortError) only resets', async () => {
+    journal([{ id: 'b1', type: 'p', text: 'One' }, { id: 'b2', type: 'audio', mediaId: 'a1', duration: 72, caption: '' },
+      { id: 'b3', type: 'p', text: '' }]);
+    g.JournalMediaStore = { acquireUrl: vi.fn(async () => 'blob:a1'), releaseUrl: vi.fn(), get: vi.fn(async () => null), subscribeUrls: () => () => {} };
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    failingPlay('AbortError');
+    const c = openEntry();
+    await settle();
+    const memo = c.querySelector('.jed .jmemo');
+    await click(memo.querySelector('.jplay'));
+    await settle();
+    expect(memo.querySelector('.jplay').getAttribute('aria-label')).toBe('Play');
+    expect(document.querySelector('.toast')).toBe(null);
+    failingPlay('NotSupportedError');
+    await click(memo.querySelector('.jplay'));
+    await settle();
+    expect(memo.querySelector('.jplay').getAttribute('aria-label')).toBe('Play');
+    expect(document.querySelector('.toast').textContent).toBe(CANT);
+    expect(document.querySelector('.toast-wrap').getAttribute('role')).toBe('alert');
+  });
+
+  it("the recorder's review Play: a take that cannot play goes back to Play and says so", async () => {
+    journal([{ id: 'b1', type: 'p', text: 'One' }]);
+    g.PlatformBridge = { isAndroid: false, requestMicPermission: vi.fn(), startAudioSession() {}, endAudioSession() {},
+      nativeRecordStart: vi.fn(() => 'ok'), nativeRecordAmplitude: () => 0, nativeRecordStop: vi.fn(), nativeRecordCancel() {} };
+    g.JournalMediaStore = { put: vi.fn(async () => 'm9'), markLinked: vi.fn(), delete: vi.fn(),
+      acquireUrl: vi.fn(async () => null), releaseUrl() {}, get: vi.fn(async () => null), subscribeUrls: () => () => {} };
+    g.URL.createObjectURL = g.URL.createObjectURL || (() => 'blob:take');
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    failingPlay('NotSupportedError');
+    const c = openEntry();
+    fireEvent.focus(c.querySelector('.jed textarea.jp'));
+    await insertKind('Voice memo');
+    const rec = document.querySelector('[role="dialog"][aria-label="Voice memo"]');
+    act(() => { g.__onMicPermissionResult(true); });
+    await click(byText(rec, 'button', 'Finish'));
+    await act(async () => { g.__onNativeRecordingComplete(null, 1000, 'audio/webm', new Blob(['x'], { type: 'audio/webm' })); });
+    await click(byText(rec, 'button', 'Play'));
+    await settle();
+    expect(byText(rec, 'button', 'Play')).toBeTruthy();
+    expect(document.querySelector('.toast').textContent).toBe(CANT);
   });
 });
 

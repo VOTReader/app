@@ -6,11 +6,13 @@
    cite: each passage under its own heading with an outline Go to). A footnote: "Footnote n of N" with < > (dimmed at the
    ends), then a note (its words, the collection its letter is in, "Read <letter>") or a Scripture footnote (as a
    reference). On the laptop the sheet is the centred dialog with its close x. Every action goes through the screen
-   (onGo / onRead / onStep), which closes the sheet first. */
+   (onGo / onRead / onStep), which closes the sheet first. A verse only main's lazy Bible holds asks for it and fills in
+   when it lands (v2-gaps 38; main bc24368b9). */
 import { Icon } from '../Icon.jsx';
 import { Sheet } from '../Sheet.jsx';
 import { passages, translationOf, noteWords, versePieces } from '../footnotes.js';
 import { splitIntoVerses } from '../../utils/scripture-parse.js';
+import { useBibleCorpus } from '../corpus.js';
 
 /** A verse's words, numbered when it is several verses (the kit's .vn). @param {{ text: string, cite: string }} props */
 function VerseText({ text, cite }) {
@@ -24,6 +26,12 @@ function VerseText({ text, cite }) {
   ));
 }
 
+/** A passage with no words that main's Bible could give (a verse in neither dictionary, read before the lazy Bible
+ *  landed): the sheet and the list ask for the Bible and redraw when it lands. @param {Array<{ text: any, parsed: any }>} list */
+function needsBible(list) {
+  return list.some((p) => !p.text && !!p.parsed);
+}
+
 /** The words main shows when a reference has none in the app. */
 export const NO_VERSE = 'Verse text not available in app data';
 
@@ -34,6 +42,7 @@ export const NO_VERSE = 'Verse text not available in app data';
  */
 function Passages({ cite, letter, onGo }) {
   const list = passages(cite, letter);
+  useBibleCorpus(needsBible(list));
   const edition = translationOf(cite);
   if (list.length === 1) {
     const p = list[0];
@@ -164,6 +173,7 @@ export function FootnoteList({ items, letter, onGo, onRead }) {
 /** @param {{ fn: import('../footnotes.js').Footnote, letter: any, onGo: (parsed: any) => void }} props */
 function ListScripture({ fn, letter, onGo }) {
   const list = passages(/** @type {string} */ (fn.ref), letter);
+  useBibleCorpus(needsBible(list));
   return (
     <>
       <div className="t">{fn.ref}</div>

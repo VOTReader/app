@@ -25,6 +25,7 @@ import { keySiteLink } from '../../utils/passage-copy.js';
 import { definePlace } from '../places.js';
 import { paraKey } from '../marks.js';
 import { useStudies } from './StudiesScreen.jsx';
+import { CouldNotOpen } from './CouldNotOpen.jsx';
 import { MatthewChapter } from './MatthewScreens.jsx';
 import { bookmarkOf } from '../matthew-facts.js';
 import {
@@ -156,7 +157,7 @@ const StudyBody = React.memo(/** @param {{ chapter: any, states: Record<string, 
  */
 export function StudyChapterScreen({ route, gate, go, replace, onReady, desktop, facts }) {
   const matthew = route.study === MATTHEW_ID;
-  const { status } = useStudies(matthew);
+  const { status, retry } = useStudies(matthew);
   const live = !gate;
   const found = status === 'ready' ? chapterFor(route) : null;
   const study = found ? found.study : null;
@@ -191,7 +192,7 @@ export function StudyChapterScreen({ route, gate, go, replace, onReady, desktop,
   React.useEffect(() => { if (status !== 'loading' && !chapter) onReady(); }, [status, chapter, onReady]);
 
   if (status === 'loading') return null;
-  if (!study || !chapter) return <div className="empty"><div className="t">This chapter could not be opened.</div></div>;
+  if (!study || !chapter) return <CouldNotOpen what="chapter" retry={status === 'failed' ? retry : null} />;
   if (matthew) {
     return <MatthewChapter key={chapter.num} study={study} ch={chapter} gate={gate} go={go} replace={replace} onReady={onReady}
       desktop={desktop} facts={facts || {}} />;

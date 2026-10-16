@@ -10,6 +10,7 @@
    ("Discard this recording?") once something was recorded. A gate boot draws one state and never touches the mic. */
 import { Icon } from '../Icon.jsx';
 import { Sheet } from '../Sheet.jsx';
+import { playMemo } from '../journal-blocks.js';
 
 const g = /** @type {any} */ (globalThis);
 
@@ -73,10 +74,11 @@ export function clock(s) {
 
 /**
  * @param {{ desktop?: boolean, gate?: { state: 'recording' | 'paused', at: number, level: number[] } | null,
- *   onSave: (memo: { mediaId: string, duration: number, samples: number[] | null }) => void, onClose: () => void }} props
- *   gate: the state a gate boot draws (3p), nothing started
+ *   onSave: (memo: { mediaId: string, duration: number, samples: number[] | null }) => void, onClose: () => void,
+ *   onFail?: (text: string) => void }} props
+ *   gate: the state a gate boot draws (3p), nothing started; onFail: a take that cannot play says so (as a memo does)
  */
-export function JournalRecord({ desktop = false, gate = null, onSave, onClose }) {
+export function JournalRecord({ desktop = false, gate = null, onSave, onClose, onFail }) {
   // 'requesting' | 'recording' | 'paused' | 'preview' | 'retrieving' | 'error' (main's stages)
   const [stage, setStage] = React.useState(gate ? gate.state : 'requesting');
   const stageRef = React.useRef(stage);
@@ -409,7 +411,7 @@ export function JournalRecord({ desktop = false, gate = null, onSave, onClose })
   const togglePlay = () => {
     const a = audioRef.current;
     if (!a) return;
-    if (a.paused) a.play(); else a.pause();
+    if (a.paused) playMemo(a, setPlaying, onFail); else a.pause();
   };
   const seekTo = (ratio) => {
     const a = audioRef.current;

@@ -301,3 +301,31 @@ describe("main's Bible chrome settings (Settings > Reading, v2-gaps 14; design d
     expect(en.container.querySelector('#v-1').hasAttribute('lang')).toBe(false);
   });
 });
+
+describe('a chapter whose Bible did not load (v2-gaps 39)', () => {
+  it('says it could not be opened, with Try again; Try again asks again and the chapter opens', async () => {
+    let fail = true;
+    g.__loadBibleCorpus = vi.fn(() => {
+      if (fail) return Promise.reject(new Error('offline'));
+      g.BOOKS = { john: JOHN };
+      return Promise.resolve();
+    });
+    const props = { facts: {}, replace: () => {}, onReady: vi.fn() };
+    const { container } = render(<BibleChapterScreen route={{ place: 'bible-chapter', book: 'john', chapter: 3 }} {...props} />);
+    await act(async () => {});
+    expect(container.querySelector('.empty .t').textContent).toBe('This chapter could not be opened.');
+    fail = false;
+    await click([...container.querySelectorAll('button')].find((b) => b.textContent === 'Try again'));
+    await act(async () => {});
+    expect(g.__loadBibleCorpus).toHaveBeenCalledTimes(2);
+    expect(container.querySelector('.empty')).toBe(null);
+    expect(texts(container, '.bible .v .vn')).toEqual(['1', '2', '3', '7']);
+  });
+
+  it('a chapter the loaded Bible does not have offers no Try again', () => {
+    g.BOOKS = { john: JOHN };
+    const { container } = render(<BibleChapterScreen route={{ place: 'bible-chapter', book: 'john', chapter: 99 }} facts={{}} replace={() => {}} onReady={() => {}} />);
+    expect(container.querySelector('.empty .t').textContent).toBe('This chapter could not be opened.');
+    expect([...container.querySelectorAll('button')].some((b) => b.textContent === 'Try again')).toBe(false);
+  });
+});

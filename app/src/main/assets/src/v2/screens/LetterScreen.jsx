@@ -13,6 +13,7 @@
    dz23). Safari (8d): the first mark or note of
    a session in a Safari tab waits on the 7-day notice (SafariNotice.jsx), its paragraph still lit. */
 import { Icon, iconSvg } from '../Icon.jsx';
+import { CouldNotOpen } from './CouldNotOpen.jsx';
 import { LetterBlock, FormatBBlock, titleClass, isMarkable, renderSegments } from '../letter-text.jsx';
 import { letterRoute, findLetterRoute } from '../letter-links.js';
 import { isFormatB, formatBRefs, footnoteItems, findChapterRoute } from '../footnotes.js';
@@ -62,9 +63,12 @@ function lettersOf(col) {
   return col && Array.isArray(g[col.globalName]) ? g[col.globalName] : null;
 }
 
-/** The collection's letters, loading the lazy corpus first when needed; [] when it failed to load or there is no such
-    collection (the page then says it could not be opened, and is ready: it never waits on nothing). */
-export function useLetters(col) {
+/** The collection's letters, loading the lazy corpus first when needed (null while it loads); [] when it failed to load
+    or there is no such collection (the page then says it could not be opened, and is ready: it never waits on nothing).
+    `failed` says the corpus did not load (the collection is known, its letters are not here); `retry` asks again
+    (main's loader retries after a failure; v2-gaps 39).
+    @returns {{ letters: any[] | null, failed: boolean, retry: () => void }} */
+export function useLettersLoad(col) {
   const [letters, setLetters] = React.useState(() => (col ? lettersOf(col) : []));
   const missing = !letters;
   React.useEffect(() => {
@@ -75,7 +79,14 @@ export function useLetters(col) {
       .then(() => { if (live) setLetters(lettersOf(col) || []); }, () => { if (live) setLetters([]); });
     return () => { live = false; };
   }, [col, missing]);
-  return letters;
+  const failed = !!col && !!letters && !letters.length && !lettersOf(col);
+  const retry = React.useCallback(() => setLetters(null), []);
+  return { letters, failed, retry };
+}
+
+/** The collection's letters (useLettersLoad without its outcome). */
+export function useLetters(col) {
+  return useLettersLoad(col).letters;
 }
 
 /** @param {any[]} letters @param {number} n */
@@ -260,7 +271,7 @@ const SectionIntro = React.memo(/** @param {{ blocks: any[], study?: boolean }} 
 export function LetterScreen({ collection, n = 0, preface = false, onReady, onOpenLetter, gate = null, desktop = false,
   waitDoubleTap = false, onNote, facts = {}, onGo, landAt = null, doc = null, onFind }) {
   const col = doc ? null : collectionOf(collection);
-  const letters = useLetters(col);
+  const { letters, failed, retry } = useLettersLoad(col);
   const letter = doc ? doc.letter : letters ? (preface ? prefaceOf(col) : letterAt(letters, n)) : null;
   const bodyRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const headRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
@@ -543,9 +554,7 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
   };
 
   if (!letters) return null;
-  if ((!doc && !col) || !letter) {
-    return <div className="empty"><div className="t">This letter could not be opened.</div></div>;
-  }
+  if ((!doc && !col) || !letter) return <CouldNotOpen what="letter" retry={failed ? retry : null} />;
   const nextN = preface ? 1 : n + 1;
   const next = doc ? null : letterAt(letters, nextN);
   // a Format B entry (Words To Live By, The Blessed): its part and number above the title, no header lines (1d)

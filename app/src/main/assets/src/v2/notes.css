@@ -20,6 +20,16 @@
 .jimg .jimg-none { display: grid; place-items: center; width: 100%; aspect-ratio: 4 / 3; border-radius: var(--r);
   background: var(--raised); color: var(--t2); font-style: italic; font-size: var(--fs-s); }
 .jed .jother { margin: 12px 0 0; padding-left: 12px; border-left: 2px solid var(--line); }
+/* a heading and a quote written in main (v2-gaps 40; main's .jrn-grow-h2 / .jrn-block-quote in the kit's voice): the
+   heading in gold caps, the quote italic behind a gold rule with its citation as a caps label under it */
+.jed textarea.jp.jh2 { margin-top: 20px; font-size: var(--fs-ui); font-weight: 500; line-height: 1.4; text-transform: uppercase;
+  letter-spacing: var(--track-caps); color: var(--tgold-hi); }
+.jed .jq { margin: 14px 0 0; padding: 2px 0 2px 16px; border-left: 2px solid var(--accent); }
+.jed .jq textarea.jp { margin-top: 0; font-style: italic; }
+.jed .jq input.jqc { display: block; width: 100%; box-sizing: border-box; margin-top: 8px; padding: 0; border: 0; border-radius: 0;
+  background: transparent; outline: 0; font-family: inherit; font-size: var(--fs-xs); letter-spacing: var(--track-caps);
+  text-transform: uppercase; color: var(--tgold); line-height: 1.4; }
+.jed .jq input.jqc::placeholder, .jed textarea.jp.jh2::placeholder { color: var(--t-ph); }
 /* mw9b: a block held (long press, right click) opens Move up / Move down / Remove; the press selects nothing */
 .jed .jcard, .jed .jimg, .jed .jmemo, .jed .jdiv { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .jbs .srow:disabled { opacity: .4; }

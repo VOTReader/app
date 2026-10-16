@@ -128,6 +128,9 @@ export function blockView(b, env = g) {
   const H = env.JournalHelpers;
   switch (b.type) {
     case 'p': return { kind: 'text', text: typeof b.text === 'string' ? b.text : '' };
+    // main's editor writes these two as text too: a heading, and a quote with its citation (v2-gaps 40)
+    case 'h2': return { kind: 'heading', text: typeof b.text === 'string' ? b.text : '' };
+    case 'quote': return { kind: 'quote', text: typeof b.text === 'string' ? b.text : '', cite: typeof b.cite === 'string' ? b.cite : '' };
     case 'divider': return { kind: 'divider' };
     case 'image': return { kind: 'image', mediaId: b.mediaId || null, caption: b.caption || '' };
     case 'audio': return { kind: 'memo', mediaId: b.mediaId || null, duration: b.duration || 0, caption: b.caption || '',
@@ -314,6 +317,25 @@ export function entryParts(entry, env = g) {
 /** The card that opens another entry (main's "Link the Whole Entry"). */
 export function wholeEntry(entry, env = g) {
   return newBlock('journal-card', { entryId: entry.id }, env);
+}
+
+/** What a memo that cannot play says (main 8d3ef6a2c). */
+export const MEMO_CANT_PLAY = 'This voice memo can’t be played on this device.';
+
+/**
+ * Plays a memo's audio element as main's JournalAudioBlock does: play() rejects when the memo cannot play (a codec this
+ * device cannot decode, a backup made on another device, a broken file), and by then its 'play' event has already put
+ * the button on Pause, so the button goes back to Play and the reader is told (`onFail`). An AbortError only means a pause
+ * or a new load cut the start short: the button resets without a word.
+ * @param {HTMLAudioElement} audio @param {(on: boolean) => void} setPlaying @param {((text: string) => void) | undefined} onFail
+ */
+export function playMemo(audio, setPlaying, onFail) {
+  Promise.resolve(audio.play()).catch((err) => {
+    setPlaying(false);
+    if (err && err.name === 'AbortError') return;
+    console.warn('journal memo: play failed', err);
+    if (onFail) onFail(MEMO_CANT_PLAY);
+  });
 }
 
 /** "1:12" (main's formatDuration). @param {number} s */

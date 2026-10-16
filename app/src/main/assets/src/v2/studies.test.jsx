@@ -5,6 +5,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, waitFor, act } from '@testing-library/react';
 import { V2App } from './App.jsx';
 import { StudyChapterScreen } from './screens/StudyChapterScreen.jsx';
+import { StudyScreen } from './screens/StudiesScreen.jsx';
 import { defineStart } from './places.js';
 import { visitOf } from './reading-record.js';
 import {
@@ -581,5 +582,40 @@ describe("a study chapter's foot (main's LetterView in studyMode: the letter's g
     const none = footAt('purity', 'purity-ch5');
     await settle();
     expect(none.container.querySelector('.lft')).toBe(null);
+  });
+});
+
+// v2-gaps 39: main's _deadStudy offers Try again when the studies did not load; v2's study pages only said so.
+describe('a study page whose studies did not load', () => {
+  const tryAgain = (root) => [...root.querySelectorAll('button')].find((b) => b.textContent === 'Try again');
+  const props = { gate: null, go: vi.fn(), replace: vi.fn(), pop: vi.fn(), openTab: vi.fn(), onReady: () => {}, desktop: false,
+    device: /** @type {'phone'} */ ('phone'), facts: { doubleTapFullscreen: false } };
+
+  it("a study's page says it could not be opened, with Try again; Try again asks again and the study opens", async () => {
+    installLoaders({ fail: true });
+    const { container } = render(<StudyScreen route={{ place: 'study', study: 'more-than-a-man' }} {...props} />);
+    await waitFor(() => expect(container.querySelector('.empty .t').textContent).toBe('This study could not be opened.'));
+    g.loadBibleStudies.mockImplementation(() => { g.BIBLE_STUDIES = studies(); return Promise.resolve(true); });
+    await click(tryAgain(container));
+    await waitFor(() => expect(container.textContent).not.toContain('could not be opened'));
+    expect(g.loadBibleStudies).toHaveBeenCalledTimes(2);
+  });
+
+  it("a study's chapter says it could not be opened, with Try again; Try again asks again and the chapter opens", async () => {
+    installLoaders({ fail: true });
+    g.ProphecyCardsStore = cardStore();
+    const { container } = render(<StudyChapterScreen route={{ place: 'study-chapter', study: 'more-than-a-man', chapter: CH2 }} {...props} />);
+    await waitFor(() => expect(container.querySelector('.empty .t').textContent).toBe('This chapter could not be opened.'));
+    g.loadBibleStudies.mockImplementation(() => { g.BIBLE_STUDIES = withChapter2(); return Promise.resolve(true); });
+    await click(tryAgain(container));
+    await waitFor(() => expect(container.textContent).not.toContain('could not be opened'));
+    expect(g.loadBibleStudies).toHaveBeenCalledTimes(2);
+  });
+
+  it('a study the loaded studies do not have offers no Try again', async () => {
+    installLoaders();
+    const { container } = render(<StudyScreen route={{ place: 'study', study: 'nope' }} {...props} />);
+    await waitFor(() => expect(container.querySelector('.empty .t').textContent).toBe('This study could not be opened.'));
+    expect(tryAgain(container)).toBe(undefined);
   });
 });

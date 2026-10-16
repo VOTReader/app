@@ -9,6 +9,7 @@
    opens the part holding the chapter you are on); the chapter you are on is gold with a bar, a read one has a check.
    Neither page has a ... (dz15: a page whose ... would hold nothing has none). A gate boot reads its marks from the gate. */
 import { Icon } from '../Icon.jsx';
+import { CouldNotOpen } from './CouldNotOpen.jsx';
 import { definePlace } from '../places.js';
 import { useVotCorpus } from '../corpus.js';
 import { MatthewIndex } from './MatthewScreens.jsx';
@@ -104,7 +105,7 @@ function ChapterRow({ c, current, read, onOpen, rowRef }) {
 
 /** @param {import('../places.js').PlaceProps} props */
 export function StudyScreen({ route, gate, go, onReady }) {
-  const { status } = useStudies(route.study === MATTHEW_ID);
+  const { status, retry } = useStudies(route.study === MATTHEW_ID);
   const study = status === 'loading' ? null : studyById(route.study);
   const place = React.useMemo(() => {
     if (!study) return { current: null, read: [] };
@@ -128,7 +129,7 @@ export function StudyScreen({ route, gate, go, onReady }) {
     if (r.bottom > (g.innerHeight || 0) - 80) el.scrollIntoView({ block: 'center' });
   }, [gate, study]);
   if (status === 'loading') return null;
-  if (!study) return <div className="empty"><div className="t">This study could not be opened.</div></div>;
+  if (!study) return <CouldNotOpen what="study" retry={status === 'failed' ? retry : null} />;
   // the Matthew Study Bible is a book with notes: main's chapter index (5h)
   if (study.isMatthewStudy) return <MatthewIndex study={study} place={place} gate={gate} go={go} />;
 

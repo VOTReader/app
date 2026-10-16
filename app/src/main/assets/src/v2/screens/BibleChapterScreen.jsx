@@ -15,6 +15,7 @@ import { highlightSpans } from '../../search/snippet.js';
 import { placeAtThird } from '../search-landing.js';
 import { bibleHlKey } from '../../utils/hl-keys.js';
 import { LayerToast } from '../Sheet.jsx';
+import { CouldNotOpen } from './CouldNotOpen.jsx';
 import { TOAST_MS, useMainMarks } from './LetterScreen.jsx';
 import { ChapterListenPill, chapterAudio, startChapter } from '../player/listen.jsx';
 import { ChapterReadAlong } from '../player/read-along.jsx';
@@ -31,8 +32,9 @@ function booksNow() {
 }
 
 /** The book (undefined while the Bible loads; null when there is no such book, none is asked for or it failed to load).
- *  @param {string | null} id */
-export function useBook(id) {
+ *  `failed` says the Bible did not load (a book was asked for, main's BOOKS is not here); `retry` asks again (v2-gaps 39).
+ *  @param {string | null} id @returns {{ book: any, failed: boolean, retry: () => void }} */
+export function useBookLoad(id) {
   const [book, setBook] = React.useState(() => { if (!id) return null; const B = booksNow(); return B ? B[id] || null : undefined; });
   const loading = book === undefined;
   React.useEffect(() => {
@@ -43,7 +45,14 @@ export function useBook(id) {
     Promise.resolve(typeof load === 'function' ? load() : null).then(settle, settle);
     return () => { live = false; };
   }, [id, loading]);
-  return book;
+  const failed = !!id && book === null && !booksNow();
+  const retry = React.useCallback(() => setBook(undefined), []);
+  return { book, failed, retry };
+}
+
+/** The book (useBookLoad without its outcome). @param {string | null} id */
+export function useBook(id) {
+  return useBookLoad(id).book;
 }
 
 /** The reader's translation for verse text: held while shown, and the page redrawn once it has loaded (main's pattern). */
@@ -107,7 +116,7 @@ export function restoredChapter(bookId, num, on) {
 
 /** @param {import('../places.js').PlaceProps} props */
 export function BibleChapterScreen({ route, facts, gate = null, replace, onReady }) {
-  const book = useBook(route.book);
+  const { book, failed: bibleFailed, retry: bibleRetry } = useBookLoad(route.book);
   const tr = useTranslation((facts && facts.translation) || 'nkjv');
   const ch = book ? book.chapters.find((c) => c.num === route.chapter) || null : null;
   // main's Bible chrome settings (Settings > Reading; each on unless the reader turned it off)
@@ -153,7 +162,7 @@ export function BibleChapterScreen({ route, facts, gate = null, replace, onReady
   );
   // the heading at once; the verses when main's Bible has loaded
   if (book === undefined) return head;
-  if (!book || !ch) return <>{head}<div className="g"><div className="empty"><div className="t">This chapter could not be opened.</div></div></div></>;
+  if (!book || !ch) return <>{head}<div className="g"><CouldNotOpen what="chapter" retry={bibleFailed ? bibleRetry : null} /></div></>;
   const next = nextOf(book, ch.num);
   const verse = (v) => {
     const hit = v.n === route.verse;

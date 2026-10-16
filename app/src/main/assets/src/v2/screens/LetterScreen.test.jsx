@@ -117,3 +117,33 @@ describe('letterRoute: a letter named elsewhere in the corpus, as a v2 route', (
     expect(letterRoute({ id: 'nope' })).toBe(null);
   });
 });
+
+// v2-gaps 39: main's routes offer Try again when a corpus did not load (offline before it was ever kept); v2 only said so.
+describe('a letter whose corpus did not load', () => {
+  const tryAgain = (root) => [...root.querySelectorAll('button')].find((b) => b.textContent === 'Try again');
+  it('says it could not be opened, with Try again; Try again asks again and the letter opens', async () => {
+    g.COL_BY_KEY = new Map(COLS);
+    let fail = true;
+    g.__loadVotCorpus = vi.fn(() => {
+      if (fail) return Promise.reject(new Error('offline'));
+      g.T_LETTERS = [letter()];
+      return Promise.resolve();
+    });
+    const { container } = render(<LetterScreen collection="timothy" n={1} />);
+    await act(async () => {});
+    expect(container.querySelector('.empty .t').textContent).toBe('This letter could not be opened.');
+    fail = false;
+    await click(tryAgain(container));
+    await act(async () => {});
+    expect(g.__loadVotCorpus).toHaveBeenCalledTimes(2);
+    expect(container.querySelector('.empty')).toBe(null);
+    expect(container.querySelector('h1').textContent).toBe('The Shadow of The Almighty');
+  });
+
+  it('a letter its loaded collection does not have says so, with no Try again (asking again cannot help)', () => {
+    seed([letter()]);
+    const { container } = render(<LetterScreen collection="timothy" n={99} />);
+    expect(container.querySelector('.empty .t').textContent).toBe('This letter could not be opened.');
+    expect(tryAgain(container)).toBe(undefined);
+  });
+});

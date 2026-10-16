@@ -330,3 +330,28 @@ describe('a real boot', () => {
     expect(ready2).toHaveBeenCalled();
   });
 });
+
+describe('a collection whose letters did not load (v2-gaps 39)', () => {
+  it('says it could not be opened, with Try again; Try again asks again and the letters come', async () => {
+    delete g.LETTERS_V1;
+    let fail = true;
+    g.__loadVotCorpus = vi.fn(() => {
+      if (fail) return Promise.reject(new Error('offline'));
+      installCorpus();
+      return Promise.resolve();
+    });
+    const props = { facts: {}, gate: null, desktop: false, device: /** @type {'phone'} */ ('phone'), go: vi.fn(), pop: vi.fn(),
+      replace: vi.fn(), openTab: vi.fn(), onReady: vi.fn() };
+    const { container } = render(<CollectionScreen route={{ place: 'collection', collection: 'one' }} {...props} />);
+    await act(async () => {});
+    expect(container.querySelector('.empty .t').textContent).toBe('This collection could not be opened.');
+    expect(props.onReady).toHaveBeenCalled();
+    fail = false;
+    await click([...container.querySelectorAll('button')].find((b) => b.textContent === 'Try again'));
+    await act(async () => {});
+    expect(g.__loadVotCorpus).toHaveBeenCalledTimes(2);
+    expect(container.querySelector('.empty')).toBe(null);
+    expect(container.querySelectorAll('.rows .num-row').length).toBe(30);
+    delete g.__loadVotCorpus;
+  });
+});

@@ -3,7 +3,7 @@
    place. What each block says comes from journal-blocks.js (blockView); this file only draws it. Pictures and memos are
    main's JournalMediaStore blobs, held while shown (main's useMediaUrl); a gate boot reads facts.journalMedia instead. */
 import { Icon } from '../Icon.jsx';
-import { clock, waveBars } from '../journal-blocks.js';
+import { clock, waveBars, playMemo } from '../journal-blocks.js';
 
 const g = /** @type {any} */ (globalThis);
 
@@ -108,11 +108,12 @@ function useBarCount(ref) {
 /**
  * A voice memo that plays in place (main's JournalAudioBlock): Play / Pause, the waveform lit up to the playhead (a
  * slider: a tap or the arrow keys seek), its caption and "0:18 / 1:12". "Recording missing" when its blob is gone. A
- * gate boot draws `gateMemo` ({ at }: playing, that many seconds in) and plays nothing.
+ * gate boot draws `gateMemo` ({ at }: playing, that many seconds in) and plays nothing. A memo that cannot play goes
+ * back to Play and says so through `onFail` (main 8d3ef6a2c).
  * @param {{ view: Record<string, any>, gateMedia: Record<string, string> | null, gateMemo: { at?: number } | null,
- *   hold?: Record<string, any> }} props
+ *   hold?: Record<string, any>, onFail?: (text: string) => void }} props
  */
-export function JournalMemo({ view, gateMedia, gateMemo, hold = {} }) {
+export function JournalMemo({ view, gateMedia, gateMemo, hold = {}, onFail }) {
   const media = useMediaUrl(view.mediaId, gateMedia);
   const audioRef = React.useRef(/** @type {HTMLAudioElement | null} */ (null));
   const wavRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
@@ -138,7 +139,7 @@ export function JournalMemo({ view, gateMedia, gateMemo, hold = {} }) {
     const a = audioRef.current;
     if (gateMemo || !a) return;
     if (playing) a.pause();
-    else Promise.resolve(a.play()).catch(() => setPlaying(false));
+    else playMemo(a, setPlaying, onFail);
   };
   const seekTo = (sec) => {
     const a = audioRef.current;

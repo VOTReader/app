@@ -84,14 +84,15 @@ function inLayer(layer, content) {
 
 /**
  * The kit's toast over the page, above the tab bar ("Copied"); nothing when `text` is empty. `icon` draws a kit icon
- * before the words (9c's cloudOff); `act` + `onAct` the toast's own button at its end (4c's "OK").
- * @param {{ text: string | null, icon?: string, act?: string, onAct?: () => void }} props
+ * before the words (9c's cloudOff); `act` + `onAct` the toast's own button at its end (4c's "OK"). `urgent` says it out
+ * loud at once (role alert: main's assertive toasts, such as a voice memo that cannot play).
+ * @param {{ text: string | null, icon?: string, act?: string, onAct?: () => void, urgent?: boolean }} props
  */
-export function LayerToast({ text, icon, act, onAct }) {
+export function LayerToast({ text, icon, act, onAct, urgent = false }) {
   const layer = React.useContext(SheetLayer);
   if (!text) return null;
   return inLayer(layer, (
-    <div className="toast-wrap" role="status">
+    <div className="toast-wrap" role={urgent ? 'alert' : 'status'}>
       <div className="toast">
         {icon ? <Icon name={icon} /> : null}
         {text}

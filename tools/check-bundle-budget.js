@@ -152,7 +152,10 @@ const BUDGETS = [
   // zones v2p8 2026-10-15: 101,748 B. The Scripture Web hosts main's screen whole, and v2 does not load app.css, so main's
   // .sw-* rules (app.css 7612-7781, 7844-8160) come in as scripture-web.css: +15.9 KB minified, nothing else pulled in
   // (85,851 B before it, with mw7 banners, mw8 links and the Garden). Ceiling ~+15%: still far under app.min.css or a font.
-  { file: 'v2.min.css', measured: 101748, max: 117000 },
+  // myweb mw12 2026-10-16: 117,584 B. The build-out since (zones' search/notes sheets, mw10 answers.css, mw11's reading
+  // fonts' @font-face list, mw12's journal heading + quote ~0.9 KB) is each screen's own small sheet, nothing pulled in
+  // (no app.min.css rule, no font inlined: woff2 stay external). Ceiling ~+15%: 135 KB, still far under app.min.css.
+  { file: 'v2.min.css', measured: 117584, max: 135000 },
   // ── lazy, but still fetched + parsed on the reader's device ──
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.

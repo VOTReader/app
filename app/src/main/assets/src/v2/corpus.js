@@ -70,6 +70,29 @@ export function askAnswersCorpus(gl = g) {
   return Promise.resolve(gl.__loadAnswersCorpus());
 }
 
+/* main's Bible loads on its own too (index.html's window.__bibleCorpus / __loadBibleCorpus): a verse in neither dictionary
+   comes from it (lookupVersesFromBooks), so whatever shows such a verse redraws when it lands (main bc24368b9). */
+const subscribeBible = (cb) => {
+  const c = g.__bibleCorpus;
+  return c && typeof c.subscribe === 'function' ? c.subscribe(cb) : () => {};
+};
+const bibleVersion = () => {
+  const c = g.__bibleCorpus;
+  return c && typeof c.getVersion === 'function' ? c.getVersion() : 0;
+};
+
+/** Re-renders when main's Bible lands or fails; with `ask` it also asks for it (main's loader shares one fetch and
+ *  retries after a failure; main's Answers topics start it the same way). @returns {number} */
+export function useBibleCorpus(ask = false) {
+  const v = React.useSyncExternalStore(subscribeBible, bibleVersion);
+  React.useEffect(() => {
+    const c = g.__bibleCorpus;
+    if (!ask || (c && c.loaded) || typeof g.__loadBibleCorpus !== 'function') return;
+    Promise.resolve(g.__loadBibleCorpus()).catch(() => { /* the loader flags the error and bumps its version */ });
+  }, [ask]);
+  return v;
+}
+
 /* The Words To Live By compilations' timings (src/data/audio-sync-sections.js) name each compilation's first entry, and
    load on their own as well: main's AudioPlayer.sectionOpeningKey asks for them, and bundle-d's utils/sync-loaders.js
    publishes their store and loader as window.__audioSyncSectionsStore / __loadAudioSyncSections (v2g11b). */

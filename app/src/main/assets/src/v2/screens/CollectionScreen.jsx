@@ -11,7 +11,8 @@
    same page and never touches the player or the downloads. */
 import { Icon } from '../Icon.jsx';
 import { definePlace } from '../places.js';
-import { collectionOf, useLetters } from './LetterScreen.jsx';
+import { collectionOf, useLettersLoad } from './LetterScreen.jsx';
+import { CouldNotOpen } from './CouldNotOpen.jsx';
 import { useNowPlaying } from '../now-playing.js';
 import { LayerToast } from '../Sheet.jsx';
 import {
@@ -111,7 +112,7 @@ export function CollectionScreen(props) {
 /** @param {import('../places.js').PlaceProps} props */
 function VolumeScreen({ route, gate, go, onReady }) {
   const col = collectionOf(route.collection);
-  const letters = useLetters(col);
+  const { letters, failed: lettersFailed, retry: lettersRetry } = useLettersLoad(col);
   const np = useNowPlaying(gate);
   const off = useDownloads(gate);
   const online = useOnline(gate);
@@ -133,7 +134,7 @@ function VolumeScreen({ route, gate, go, onReady }) {
   const loaded = !!letters || !col;
   React.useEffect(() => { if (loaded) onReady(); }, [loaded, onReady]);
   if (!loaded) return null;
-  if (!col) return <div className="empty"><div className="t">This collection could not be opened.</div></div>;
+  if (!col || lettersFailed) return <CouldNotOpen what="collection" retry={lettersFailed ? lettersRetry : null} />;
 
   const head = collectionHead(col);
   const player = gate ? null : g.AudioPlayer;
