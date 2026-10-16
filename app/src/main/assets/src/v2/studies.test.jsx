@@ -504,3 +504,82 @@ describe('auto-scroll on a study chapter (main reads it as a letter)', () => {
     expect(v.pill().querySelector('.pp').getAttribute('aria-label')).toBe('Start auto-scroll');
   });
 });
+
+describe("a study chapter's foot (main's LetterView in studyMode: the letter's groups, no songs)", () => {
+  const AQ = 'https://answersonlygodcangive.com/';
+  const ANSWERS = { volKey: 'answers', label: 'Answers Only God Can Give', globalName: 'ANSWERS_TOPICS' };
+  /** main's bible-studies.js rows for the last chapter of The State of the Dead and of Purity (cut down, verbatim). */
+  const withFeet = () => {
+    const s = studies();
+    const sotd = s.find((x) => x.id === 'state-of-the-dead');
+    Object.assign(sotd.chapters[4], {
+      blocks: [{ type: 'p', text: 'The wicked shall be no more.' }],
+      relatedTopics: [{ label: 'Regarding Hell and Eternal Torment', url: AQ + 'Regarding_Hell_and_Eternal_Torment' },
+        { label: 'Theological Myth - Unending conscious torture', url: 'https://graceheadentries.wordpress.com/2013/07/18/theological-myth-unending-conscious-torture/' }],
+      videos: [{ url: 'https://www.youtube.com/watch?v=YA3YSAK_WGM', label: 'Proclaim NOT the Hell of the Churches of Men' }],
+    });
+    Object.assign(s.find((x) => x.id === 'purity').chapters[5], {
+      audioUrl: 'https://www.dropbox.com/scl/fo/jsm4srx3rt46f97xjf2ci/h?rlkey=nh44jcxbqa8g402lwr9xaajls&dl=0',
+      soundcloudUrl: 'https://soundcloud.com/the-volumes-of-truth/sets/bibleletter-studies',
+      videoVoiceUrl: 'https://www.youtube.com/playlist?list=PLSVchFJ22QYLMlW-oUVi_HPOm9R33Z2Ve', videoVoiceLabel: 'Purity - Video Playlist',
+    });
+    return s;
+  };
+  /** Globals this block sets that the file's afterEach does not clear. */
+  const own = (k, v) => { g[k] = v; undo.push(() => { delete g[k]; }); };
+  function footAt(study, chapter) {
+    g.BIBLE_STUDIES = withFeet();
+    // a catalog that would sing anything it is asked: main shows no songs on a study (LetterView's !studyMode)
+    own('SongCatalog', { loaded: true, error: null, load: vi.fn(), subscribe: () => () => {}, getVersion: () => 0,
+      songsForLetter: vi.fn(() => [{ id: 'song-1', t: 'A Song', f: 'song-1', v: 'Hymn', d: 200, b: 3e6 }]) });
+    own('__answersIdForUrl', (url) => (url === AQ + 'Regarding_Hell_and_Eternal_Torment' ? 'regarding-hell-and-eternal-torment' : null));
+    const go = vi.fn();
+    const r = render(<StudyChapterScreen route={{ place: 'study-chapter', study, chapter }} gate={null}
+      go={go} replace={vi.fn()} pop={vi.fn()} openTab={vi.fn()} onReady={() => {}} desktop={false} device="phone"
+      facts={{ doubleTapFullscreen: false }} />);
+    return { ...r, go };
+  }
+  const texts = (root, sel) => [...root.querySelectorAll(sel)].map((n) => n.textContent);
+  const settle = () => act(() => new Promise((r) => { setTimeout(r, 30); }));
+
+  it("The State of the Dead's last part ends with Related topics and Videos before the Next card; no song is asked for", async () => {
+    const { container } = footAt('state-of-the-dead', 'sotd-ch5');
+    await settle();
+    const kids = [...container.querySelector('.body').children].map((n) => n.className);
+    expect(kids.slice(-2)).toEqual(['lft', 'nextcard']);
+    expect(texts(container, '.lfg > .label')).toEqual(['Related topics', 'Videos']);
+    expect(texts(container, 'button.lfr')).toEqual(['Regarding Hell and Eternal Torment']);
+    expect([...container.querySelectorAll('a.lfr.out')].map((a) => a.getAttribute('aria-label'))).toEqual([
+      'Theological Myth - Unending conscious torture, opens outside the app',
+      'Proclaim NOT the Hell of the Churches of Men, opens outside the app', 'Official YouTube channel, opens outside the app']);
+    expect(container.querySelector('[data-foot="songs"]')).toBe(null);
+    expect(g.SongCatalog.songsForLetter).not.toHaveBeenCalled();
+    expect(g.SongCatalog.load).not.toHaveBeenCalled();
+  });
+
+  it('its Answers row opens the topic in the app once that corpus is in', async () => {
+    const { container, go } = footAt('state-of-the-dead', 'sotd-ch5');
+    g.COL_BY_KEY = new Map([['answers', ANSWERS]]);
+    own('__answersCorpus', { loaded: false, subscribe: () => () => {}, getVersion: () => 0 });
+    own('__loadAnswersCorpus', vi.fn(() => Promise.resolve().then(() => {
+      g.ANSWERS_TOPICS = [{ id: 'regarding-hell-and-eternal-torment', num: 33, title: 'Regarding Hell and Eternal Torment' }];
+      g.__answersCorpus.loaded = true;
+    })));
+    undo.push(() => { delete g.ANSWERS_TOPICS; });
+    await settle();
+    await click(container.querySelector('button.lfr'));
+    await waitFor(() => expect(go).toHaveBeenCalledWith({ place: 'letter', collection: 'answers', n: 33 }));
+  });
+
+  it("Purity's last part: Audio (Dropbox, SoundCloud) and its playlist under Videos; a chapter with none ends as before", async () => {
+    const { container } = footAt('purity', 'purity-ch6');
+    await settle();
+    expect(texts(container, '.lfg > .label')).toEqual(['Audio', 'Videos']);
+    expect(texts(container, 'a.lfr .tx')).toEqual(['Audio recording', 'Listen on SoundCloud', 'Purity - Video Playlist', 'Official YouTube channel']);
+    expect(texts(container, 'a.lfr .host')).toEqual(['Dropbox', 'YouTube']);
+    cleanup();
+    const none = footAt('purity', 'purity-ch5');
+    await settle();
+    expect(none.container.querySelector('.lft')).toBe(null);
+  });
+});

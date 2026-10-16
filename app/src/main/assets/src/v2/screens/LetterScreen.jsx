@@ -241,8 +241,9 @@ const SectionIntro = React.memo(/** @param {{ blocks: any[], study?: boolean }} 
 /**
  * Another page's text read through this one (a study chapter, StudyChapterScreen): the item itself and what the page
  * says about it, in place of a collection's letter. `recorded: false`: a gate's page with no recording (no Listen).
+ * `foot`: the item's own links end the page as a letter's do, without songs (a study chapter: main's studyMode, zs27).
  * @typedef {{ letter: any, volKey: string, label: string, eyebrow: string, titleCls?: string, study?: boolean,
- *   body?: any, next?: { k: string, t: string, open: () => void } | null, recorded?: boolean }} PageDoc
+ *   body?: any, next?: { k: string, t: string, open: () => void } | null, recorded?: boolean, foot?: boolean }} PageDoc
  */
 
 /**
@@ -580,8 +581,9 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
         {/* the end of the text (main's sentinel): auto-scroll comes to rest here, before the footnotes */}
         <span className="reading-end" aria-hidden="true" />
         <FootnoteList items={items} letter={letter} onGo={live ? goToRef : () => {}} onRead={live ? readLink : () => {}} />
-        {/* Also read, Related topics, Bible study, Songs from this letter, Audio, Videos (dz23 1k/1l); a study page has its own */}
-        {!doc && <LetterFoot letter={letter} volKey={volKey} gate={gate} onGo={onGo} />}
+        {/* Also read, Related topics, Bible study, Songs from this letter, Audio, Videos (dz23 1k/1l); a study chapter's
+            without songs (main's studyMode) */}
+        {(!doc || doc.foot) && <LetterFoot letter={letter} volKey={volKey} gate={gate} onGo={onGo} songs={!doc} />}
         {card && (
           <button type="button" className="nextcard" onClick={card.open}>
             <span className="tx"><span className="k">{card.k}</span><span className="t">{card.t}</span></span>

@@ -311,15 +311,16 @@ function SongsKeep({ ids, noteKey, label, gate }) {
 }
 
 /**
- * @param {{ letter: any, volKey: string, gate: any, onGo?: (route: any) => void }} props
+ * @param {{ letter: any, volKey: string, gate: any, onGo?: (route: any) => void, songs?: boolean }} props
+ *   songs false: no Songs card and no catalog asked (a study chapter: main's LetterView in studyMode, zs27)
  */
-export function LetterFoot({ letter, volKey, gate, onGo }) {
+export function LetterFoot({ letter, volKey, gate, onGo, songs: sung = true }) {
   const live = !gate;
   const { before, after } = React.useMemo(() => footGroups(letter), [letter]);
   const letterKey = letter && volKey ? volKey + ':' + letter.id : '';
-  const found = useVerbatimSongs(live ? letterKey : '', null);
+  const found = useVerbatimSongs(live && sung ? letterKey : '', null);
   /** @type {FootSong[]} */
-  const songs = gate ? gateSongs(gate) : found;
+  const songs = !sung ? [] : gate ? gateSongs(gate) : found;
   if (!before.length && !after.length && !songs.length) return null;
   return (
     <div className="lft">

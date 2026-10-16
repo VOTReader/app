@@ -4,6 +4,8 @@
    (LetterScreen's `doc`): the same marks, references, footnotes, Listen and read-along, under the chapter's eyebrow
    ("<study> · Chapter n", which may wrap) and title (36 px). The section intro is 5d's: italic, a gold rule at its left,
    its "(An excerpt from ...)" set apart. The text is main's, character for character (marks address main's DOM text).
+   It ends as a letter does (LetterFoot: Related topics, Bible study, Audio, Videos) but without songs, main's studyMode
+   (zs27); four chapters carry a foot, each the last of its study (State of the Dead, Grace and the Law, Trinity, Purity).
 
    Prophecy groups (5f): the group's label, then main's cards in main's order, tinted by kind (Introduction, Old Testament
    amber, New Testament gold, Volumes of Truth blue). An open card shows the prophecy as its heading and its passages; a
@@ -205,6 +207,8 @@ export function StudyChapterScreen({ route, gate, go, replace, onReady, desktop,
     study: true,
     body: <StudyBody chapter={chapter} states={states} onToggle={onToggle} live={live} />,
     next: nx ? { k: nx.k, t: nx.t, open: () => (nx.replace ? replace(nx.route) : go(nx.route)) } : null,
+    // the chapter's Related topics, Bible study, Audio and Videos, as main's LetterView ends it (no songs: studyMode)
+    foot: true,
     // a gate's chapter says whether it was recorded (5d: none, so no Listen); a real boot asks the player
     recorded: gate && gate.facts && gate.facts.studies && gate.facts.studies.recorded === false ? false : undefined,
   };
