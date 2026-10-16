@@ -66,6 +66,23 @@ export function removeRecentSearch(query) {
   return next;
 }
 
+/**
+ * Put a removed query back where it was (v2's Undo after the chip's ✕): at
+ * `at` in the list as it is now, deduped the addRecentSearch way, capped.
+ * @param {string} query
+ * @param {number} at its index before it was removed
+ * @returns {string[]} the updated list
+ */
+export function restoreRecentSearch(query, at) {
+  const q = (query || '').trim();
+  if (q.length < 2) return read();
+  const next = read().filter((x) => x.toLowerCase() !== q.toLowerCase());
+  next.splice(Math.max(0, Math.min(at, next.length)), 0, q);
+  const capped = next.slice(0, MAX);
+  write(capped);
+  return capped;
+}
+
 /** @returns {string[]} the (now empty) list */
 export function clearRecentSearches() {
   write([]);

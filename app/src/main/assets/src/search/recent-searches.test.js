@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getRecentSearches, addRecentSearch, removeRecentSearch, clearRecentSearches } from './recent-searches.js';
+import { getRecentSearches, addRecentSearch, removeRecentSearch, restoreRecentSearch, clearRecentSearches } from './recent-searches.js';
 
 describe('recent-searches', () => {
   beforeEach(() => { localStorage.clear(); });
@@ -65,5 +65,20 @@ describe('recent-searches', () => {
   it('removeRecentSearch tolerates blanks and an empty store', () => {
     expect(removeRecentSearch('')).toEqual([]);
     expect(removeRecentSearch('  ')).toEqual([]);
+  });
+  /* v2's Undo after a chip's x (zs26): the query goes back where it was, in the list as it is by then. */
+  it('restoreRecentSearch puts a removed query back at its old place, deduped and capped', () => {
+    addRecentSearch('mercy');
+    addRecentSearch('grace');
+    addRecentSearch('chosen');
+    expect(removeRecentSearch('grace')).toEqual(['chosen', 'mercy']);
+    expect(restoreRecentSearch('grace', 1)).toEqual(['chosen', 'grace', 'mercy']);
+    expect(getRecentSearches()).toEqual(['chosen', 'grace', 'mercy']);
+    // already back (or typed again since): moved, never twice; an index past the end goes last
+    expect(restoreRecentSearch('GRACE', 9)).toEqual(['chosen', 'mercy', 'GRACE']);
+    expect(restoreRecentSearch('x', 0)).toEqual(['chosen', 'mercy', 'GRACE']);
+    for (let i = 0; i < 25; i++) addRecentSearch('q' + i);
+    expect(restoreRecentSearch('mercy', 0)).toHaveLength(20);
+    expect(getRecentSearches()[0]).toBe('mercy');
   });
 });

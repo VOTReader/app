@@ -7,7 +7,6 @@
    name). Each entry below is the states.json row for that id, in the app's terms; add one per screen as it is built. */
 
 import { gateMarks, gateNotebookMarks, GATE_NOTEBOOKS } from './notes-facts.js';
-import { GATE_CHOSEN } from './search-facts.js';
 import { gateListening, gateData } from './settings-pages.js';
 import { gateSpace } from './storage-facts.js';
 import { gateReading } from './reading-settings.js';
@@ -33,7 +32,7 @@ const DAY = 24 * 3600 * 1000;
  * playing.savedRecording: the recording is in the Listening Library's Saved (2f's Save; default not).
  * @typedef {{ place: string, collection?: string, n?: number, kind?: string, id?: string, book?: string, chapter?: number | string,
  *   verse?: number, match?: string[], study?: string, list?: string, family?: string, q?: string, st?: string, page?: number,
- *   key?: string, start?: number, end?: number, text?: string, groupId?: string | null }} Route
+ *   key?: string, start?: number, end?: number, text?: string, groupId?: string | null, from?: Record<string, any> }} Route
  * @typedef {{ item: Record<string, any>, reader: string, at: number, length: number, paused: boolean } & Record<string, any>} GatePlaying
  * `open` names a sheet the screen opens on the gate boot ({ sheet: 'mark-paragraph', para, colour } on a letter; the
  * shell's { sheet: 'text-and-theme' }; 9c's { toast: 'offline-listen' }, the Listen pill's); `look` the text and page
@@ -289,8 +288,22 @@ export const GATE_STATES = {
   },
   // states.json 3a-search: the Search tab before typing.
   '3a-search': { stack: [{ place: 'search' }], facts: { search: { query: '', scope: 'all', hits: [], marks: [] } } },
-  // states.json 3b-search-results: 'chosen' typed, All, the field focused; Volume One's Letters 1 and 4, then John 13:18.
-  '3b-search-results': { stack: [{ place: 'search' }], facts: { search: GATE_CHOSEN } },
+  // Search (zs26, design dz19): `rows` names the picture's engine rows in gate-data/search-rows.json (main's engine run on
+  // the query by lanes/zones/out/zs26/gen-gate.mjs: parse, hits with their text, the engine's count), fetched at boot; v2's
+  // code draws the five, the words, the places and the order from them. `songs`: main's songs row count for the query.
+  // states.json 3b-search-results: 'chosen' typed, All, Relevance, the field focused: Go to (1 song), the count, Best matches.
+  '3b-search-results': { stack: [{ place: 'search' }], facts: { search: { rows: '3b', query: 'chosen', focus: true, songs: 1 } } },
+  // states.json 3e-search-book-order: a passage typed, Book order: the two closest matches, the rest behind one button.
+  '3e-search-book-order': { stack: [{ place: 'search' }],
+    facts: { search: { rows: '3e', query: 'from grace to grace from light to the light', focus: true, order: 'book' } } },
+  // states.json 3f-search-corrected: a word misspelled, the results for the word main's engine corrected it to.
+  '3f-search-corrected': { stack: [{ place: 'search' }], facts: { search: { rows: '3f', query: 'rightousness', focus: true } } },
+  // states.json 3g-search-recent: the empty box, five recent searches above Try.
+  '3g-search-recent': { stack: [{ place: 'search' }],
+    facts: { search: { query: '', recent: ['from grace to grace', 'chosen', 'churches of men', 'Malachi 3:6', 'righteousness'] } } },
+  // states.json 3h-search-scoped: Search opened from Volume Three's Letter 15, its chip on: 30 matches in Volume Three.
+  '3h-search-scoped': { stack: [{ place: 'search', from: { place: 'letter', collection: 'three', n: 15 } }],
+    facts: { search: { rows: '3h', query: 'churches of men', focus: true, scoped: true } } },
   // states.json 5c-search-match: John 3 (NKJV) opened from a search for 'born again', verse 3 a third of the way down with
   // the words underlined; Back says Search and Search stays lit.
   '5c-search-match': {

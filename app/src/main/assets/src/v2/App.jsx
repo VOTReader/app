@@ -206,7 +206,16 @@ export function V2App({ gateId = readGateId() }) {
     setStack((s) => { kept.current[s.length - 1] = scrollRef.current ? scrollRef.current.scrollTop : 0; return s.concat(routes); });
   }, []);
   const pop = React.useCallback(() => { setReady(false); popped.current = true; setStack((s) => (s.length > 1 ? s.slice(0, -1) : s)); }, []);
-  const openTab = React.useCallback((id) => { setReady(false); kept.current = []; setStack([{ place: id }]); }, []);
+  // Search names the page it was opened from (3h: main's "In Volume Three" chip); opened again from Search, it keeps it.
+  const openTab = React.useCallback((id) => {
+    setReady(false);
+    kept.current = [];
+    setStack((s) => {
+      if (id !== 'search') return [{ place: id }];
+      const top = s[s.length - 1];
+      return [{ place: 'search', from: top && top.place === 'search' ? top.from : top }];
+    });
+  }, []);
   const replace = React.useCallback((r) => {
     setReady(false);
     const was = stackRef.current[stackRef.current.length - 1];

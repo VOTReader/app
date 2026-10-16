@@ -1,5 +1,6 @@
-/* search.css - v2 Search (zv1): the real input inside the kit's .field (it draws as the picture's .ph / .q span),
-   the field lit while typing, rows that open, and the "More in ..." row under a group. */
+/* search.css - v2 Search (zv1; zs26 = design dz19): the real input inside the kit's .field (it draws as the picture's .ph /
+   .q span), the field lit while typing, rows that open, the "More in ..." row under a group, and what the kit draws as
+   spans that are buttons here: the order switch's halves, a recent search, the more-places line, the scope chip. */
 .field input.q { flex: 1; min-width: 0; height: 100%; margin: 0; padding: 0; border: 0; outline: 0; background: none;
   font: inherit; font-size: var(--fs-ui); color: var(--t1); caret-color: var(--accent); -webkit-appearance: none; appearance: none; }
 .field input.q::placeholder { color: var(--t-ph); opacity: 1; }
@@ -8,3 +9,30 @@
 .hit[role="button"]:active { background: var(--press); }
 .grp > .more { display: block; width: 100%; text-align: left; padding: 12px 0 4px; font-size: var(--fs-s); color: var(--tgold); }
 .results > .hint { margin-top: 22px; }
+
+/* Relevance | Book order: the kit's .seg halves, pressable */
+.seg.sr-seg span[role="button"] { cursor: pointer; }
+.seg.sr-seg span[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* "1 more place in this letter": a button under its row (a button cannot sit in a row that is one). The row gives up its
+   bottom padding and the line takes it, with a taller tap area that lays out as the kit's 8 px gap above the words. */
+.hit.hp { padding-bottom: 0; }
+.hit-x { padding-bottom: 5px; }
+.hit-x .sr-more { margin: 0; padding: 8px 0; border: 0; background: none; font: inherit; font-size: var(--fs-xs); line-height: inherit;
+  color: var(--tgold); letter-spacing: .02em; cursor: pointer; }
+.hit-x .sr-more svg { transition: transform .15s; }
+.hit-x .sr-more[aria-expanded="true"] svg { transform: rotate(90deg); }
+.sr-pl { margin: 0 0 6px; }
+.sr-pl .sr-p { display: block; width: 100%; text-align: left; margin: 0; padding: 10px 0; border: 0; border-top: 1px solid var(--line);
+  background: none; font: inherit; font-size: var(--fs-s); line-height: 1.4; color: var(--t2); cursor: pointer; }
+.sr-pl .sr-p:active { background: var(--press); }
+.sr-pl mark { background: none; color: var(--t1); box-shadow: inset 0 -2px 0 rgba(var(--gold-rgb), .75); }
+
+/* a recent search: the words run it (over the chip's own left padding), the x removes it */
+.chip.rc .rq { align-self: stretch; margin: 0 0 0 -13px; padding: 0 0 0 13px; border: 0; background: none; font: inherit; color: inherit;
+  cursor: pointer; }
+
+/* the notes line's progress (Building search index) and the status said while the last rows still show */
+.sr-bar { height: 2px; margin-top: 8px; background: var(--line); border-radius: 1px; overflow: hidden; }
+.sr-bar > i { display: block; height: 100%; background: var(--accent); }
+.sr-live { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
