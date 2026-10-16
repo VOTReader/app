@@ -6,7 +6,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, cleanup, waitFor, act, fireEvent } from '@testing-library/react';
 import { V2App } from './App.jsx';
 import { GATE_STATES } from './gate.js';
-import { targetToBlock, insertBelow, blockView, newBlock, clock, waveBars } from './journal-blocks.js';
+import { targetToBlock, insertBelow, blockView, newBlock, clock, waveBars, pickRows, entryParts, withTail, moveBlock, removedWords, blockName } from './journal-blocks.js';
 import { LinkPicker } from './screens/LinkPicker.jsx';
 import { INSERT_GROUPS, longDate } from './screens/JournalEditor.jsx';
 import * as NAV from '../utils/nav-index.js';
@@ -483,10 +483,10 @@ describe('writing an entry (a real boot)', () => {
     expect(lastPatch().blocks.map((b) => b.type)).toEqual(['p', 'image', 'p']);
   });
 
-  it('the kinds still to come say so and change nothing', async () => {
+  it('the kind still to come says so and changes nothing', async () => {
     journal([{ id: 'b1', type: 'p', text: 'One' }]);
     openEntry();
-    for (const name of ['Bookmark', 'Note', 'Journal entry', 'Notebook', 'Voice memo']) {
+    for (const name of ['Voice memo']) {
       await insertKind(name);
       expect(document.querySelector('.toast').textContent).toBe('Not built yet in v2.');
     }
@@ -530,5 +530,219 @@ describe('writing an entry (a real boot)', () => {
     expect(gone.querySelector('.jmiss').textContent).toBe('Recording missing');
     expect(gone.querySelector('.jplay')).toBe(null);
     expect(g.JournalStore.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('Insert from your notes (mw9b: main\'s JournalInsertSheet pickers)', () => {
+  const H = { newBlock: (t, x) => ({ id: 'nb_' + t, type: t, ...x }),
+    embedBlockFromJournal: (src, b) => (b.type === 'p' ? { id: 'emb', type: 'journal-excerpt', sourceJournalId: src.id, sourceBlockId: b.id,
+      sourceJournalTitle: src.title, text: b.text, originType: 'p' } : { id: 'emb', type: b.type, sourceJournalId: src.id, mediaId: b.mediaId }) };
+
+  it('bookmarks: newest first, named by their label or their place; the search reads the label, the thought and the place', () => {
+    g.BookmarkStore = { all: () => [
+      { id: 'k1', hlKey: 'letter:' + L16_ID + ':0', label: '', thought: 'for Sunday', created: 1 },
+      { id: 'k2', hlKey: 'letter:chosen-by-god:0', label: 'My start', created: 5 }] };
+    const { total, rows } = pickRows('bookmark', '');
+    expect(total).toBe(2);
+    expect(rows.map((r) => [r.title, r.sub])).toEqual([['My start', 'Volume One · Letter 1'], [LETTER_16.title, 'Volume One · Letter 16']]);
+    expect(rows[1].make()).toMatchObject({ type: 'bookmark-card', bookmarkId: 'k1' });
+    expect(pickRows('bookmark', 'SUNDAY').rows.map((r) => r.key)).toEqual(['k1']);
+    expect(pickRows('bookmark', 'letter 1').rows.map((r) => r.key)).toEqual(['k2', 'k1']);
+    expect(pickRows('bookmark', 'zzz')).toEqual({ total: 2, rows: [] });
+    delete g.BookmarkStore;
+    expect(pickRows('bookmark', '')).toEqual({ total: 0, rows: [] });
+  });
+
+  it('notes: their words as the title (else the passage), where they are from main; a note-card by its group', () => {
+    g.NoteStore = { list: () => [{ groupId: 'n1', body: 'Read again', fullText: 'Thus  says', updated: 2 }, { groupId: 'n2', body: '', fullText: 'Run from', updated: 9 }] };
+    g.noteSourceLabel = (n) => (n.groupId === 'n1' ? 'Chosen by God' : 'Letter 16');
+    const { rows } = pickRows('note', '');
+    expect(rows.map((r) => [r.title, r.sub])).toEqual([['Run from', 'Letter 16'], ['Read again', 'Chosen by God']]);
+    expect(rows[1].make()).toMatchObject({ type: 'note-card', noteGroupId: 'n1' });
+    expect(pickRows('note', 'thus says').rows.map((r) => r.key)).toEqual(['n1']);
+  });
+
+  it('entries: never the one being written, newest first, date and words; one opens to the whole entry or one of its parts', () => {
+    const a = { id: 'a', title: 'Sunday', created: Date.UTC(2026, 9, 11, 15), blocks: [{ id: 'p1', type: 'p', text: 'With the family.' },
+      { id: 'p2', type: 'p', text: '  ' }, { id: 'i1', type: 'image', mediaId: 'm', caption: 'Table' }, { id: 'a1', type: 'audio', mediaId: 'r', duration: 72, caption: '' }] };
+    g.JournalStore = { all: () => [a, { id: 'self', title: 'This one', created: Date.UTC(2026, 9, 15, 15), blocks: [] }], get: () => null };
+    const { total, rows } = pickRows('journal', '', 'self');
+    expect(total).toBe(1);
+    expect(rows.map((r) => [r.title, r.sub])).toEqual([['Sunday', 'Oct 11, 2026 · With the family.']]);
+    expect(rows[0].entry).toBe(a);
+    expect(entryParts(a)).toEqual([]);   // no main helper, no parts (the whole entry still goes in)
+    g.JournalHelpers = H;
+    expect(entryParts(a).map((r) => [r.title, r.sub])).toEqual([['Words', 'With the family.'], ['Picture', 'Table'], ['Voice memo', '1:12']]);
+    expect(entryParts(a)[0].block).toMatchObject({ type: 'journal-excerpt', sourceJournalId: 'a', text: 'With the family.' });
+  });
+
+  it('notebooks: Uncategorized first, each with its notes counted once; a notebook-card', () => {
+    g.NotebookStore = { list: () => [{ id: 'nb1', name: 'Prayer' }, { id: 'nb2', name: 'Study' }] };
+    g.NoteStore = { list: () => [{ groupId: 'x', notebookIds: [] }, { groupId: 'y', notebookIds: ['nb1', 'nb1'] }, { groupId: 'z', notebookIds: ['nb1', 'nb2'] }] };
+    const { total, rows } = pickRows('notebook', '');
+    expect(total).toBe(2);
+    expect(rows.map((r) => [r.title, r.sub])).toEqual([['Uncategorized', '1 note'], ['Prayer', '2 notes'], ['Study', '1 note']]);
+    expect(rows[0].make()).toMatchObject({ type: 'notebook-card', notebookId: 'uncategorized' });
+    expect(pickRows('notebook', 'pray').rows.map((r) => r.key)).toEqual(['nb1']);
+  });
+
+  it('words from another entry show as an excerpt card that opens it', () => {
+    expect(blockView({ type: 'journal-excerpt', sourceJournalId: 'a', sourceJournalTitle: 'Sunday', text: 'With  the family.' })).toEqual({
+      kind: 'card', eyebrow: 'Excerpt', title: 'Sunday', words: 'With the family.', meta: 'Journal', open: { place: 'journal-entry', id: 'a' } });
+  });
+
+  it('a move, a removal and the paragraph after the last card (main\'s moveBlock and its Undo words)', () => {
+    const bl = [{ id: 'a', type: 'p', text: 'x' }, { id: 'b', type: 'divider' }, { id: 'c', type: 'p', text: '' }];
+    expect(moveBlock(bl, 1, -1).map((b) => b.id)).toEqual(['b', 'a', 'c']);
+    expect(moveBlock(bl, 0, -1)).toBe(bl);
+    expect(moveBlock(bl, 2, 1)).toBe(bl);
+    expect(withTail(bl)).toBe(bl);
+    expect(withTail([bl[0], bl[1]]).map((b) => b.type)).toEqual(['p', 'divider', 'p']);
+    expect([{ type: 'audio' }, { type: 'image' }, { type: 'divider' }, { type: 'p' }].map(removedWords))
+      .toEqual(['Voice memo removed.', 'Image removed.', 'Block deleted.', 'Block deleted.']);
+    expect([{ type: 'letter-card', volKey: 'one', letterId: L16_ID }, { type: 'image' }, { type: 'audio' }, { type: 'divider' }].map((b) => blockName(b)))
+      .toEqual(['Letter', 'Picture', 'Voice memo', 'Divider']);
+  });
+});
+
+describe('Insert from your notes, and a block held (a real boot)', () => {
+  function journal(blocks, more = []) {
+    const entry = { id: 'j1', title: 'Old', created: Date.UTC(2026, 9, 1, 15), blocks };
+    const all = [entry, ...more];
+    g.JournalStore = { all: () => all, get: (id) => all.find((e) => e.id === id) || null,
+      add: vi.fn(), update: vi.fn(), purgeBlockMarks: vi.fn(() => 0) };
+    g.StateStore = { isReady: () => true, get: () => ({}), set: vi.fn() };
+    g.HistoryStore = { isReady: () => true, list: () => [], add: vi.fn() };
+    return entry;
+  }
+  function openEntry(title = 'Old') {
+    const r = render(<V2App gateId={null} />);
+    act(() => { [...r.container.querySelectorAll('.tabbar .tab')][2].dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+    const mark = [...r.container.querySelectorAll('.marks .mark[role="button"]')].find((m) => m.querySelector('.mt').textContent === title);
+    act(() => { mark.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+    return r.container;
+  }
+  const lastPatch = () => g.JournalStore.update.mock.calls[g.JournalStore.update.mock.calls.length - 1][1];
+  const insertKind = async (name) => {
+    await click(document.querySelector('.tb .jins'));
+    const it = [...document.querySelectorAll('[aria-label="Insert"] .it')].find((x) => x.querySelector('.itt').textContent === name);
+    await click(it);
+  };
+  const closeTop = async () => { const s = [...document.querySelectorAll('.scrim')].pop(); await click(s); };
+
+  it('Bookmark: "Pick a bookmark" with its search; a bookmark picked goes in as its card and is saved', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    journal([{ id: 'b1', type: 'p', text: 'One' }]);
+    g.BookmarkStore = { all: () => [{ id: 'k1', hlKey: 'letter:' + L16_ID + ':0', label: 'Sunday reading', created: 1 }],
+      get: (id) => (id === 'k1' ? { id: 'k1', hlKey: 'letter:' + L16_ID + ':0', label: 'Sunday reading' } : null) };
+    const c = openEntry();
+    await insertKind('Bookmark');
+    const sheet = document.querySelector('[role="dialog"][aria-label="Pick a bookmark"]');
+    expect(sheet.querySelector('.sh').textContent).toBe('Pick a bookmark');
+    expect(sheet.querySelector('input.q').getAttribute('placeholder')).toBe('Search bookmarks');
+    await act(() => { fireEvent.change(sheet.querySelector('input.q'), { target: { value: 'nothing like it' } }); });
+    expect(sheet.querySelector('.empty .t').textContent).toBe('No matches.');
+    await act(() => { fireEvent.change(sheet.querySelector('input.q'), { target: { value: 'sunday' } }); });
+    await click(sheet.querySelector('.srow'));
+    expect(document.querySelector('[aria-label="Pick a bookmark"]')).toBe(null);
+    act(() => { vi.advanceTimersByTime(600); });
+    expect(lastPatch().blocks.map((b) => b.type)).toEqual(['p', 'bookmark-card', 'p']);
+    expect(texts(c, '.jed .jcard .je')).toEqual(['Bookmark']);
+    expect(texts(c, '.jed .jcard .jh > span:first-child')).toEqual(['Sunday reading']);
+  });
+
+  it('Notebook lists Uncategorized first; Note says when there are none', async () => {
+    journal([{ id: 'b1', type: 'p', text: 'One' }]);
+    g.NotebookStore = { list: () => [{ id: 'nb1', name: 'Prayer' }], get: (id) => (id === 'nb1' ? { id: 'nb1', name: 'Prayer' } : null) };
+    g.NoteStore = { list: () => [] };
+    openEntry();
+    await insertKind('Notebook');
+    expect(texts(document.querySelector('[aria-label="Pick a notebook"]'), '.srow .t')).toEqual(['Uncategorized', 'Prayer']);
+    await closeTop();
+    await insertKind('Note');
+    expect(document.querySelector('[aria-label="Pick a note"] .empty .t').textContent).toBe('No notes yet.');
+  });
+
+  it('Journal entry: never this one; another opens to the whole entry or one of its parts; Back one level', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const other = { id: 'j2', title: 'Sunday', created: Date.UTC(2026, 9, 11, 15), blocks: [{ id: 'q1', type: 'p', text: 'With the family.' }] };
+    journal([{ id: 'b1', type: 'p', text: 'One' }], [other]);
+    g.JournalHelpers = { newBlock: (t, x) => ({ id: 'n' + Math.random().toString(36).slice(2, 7), type: t, ...x }),
+      embedBlockFromJournal: (src, b) => ({ id: 'emb', type: 'journal-excerpt', sourceJournalId: src.id, sourceBlockId: b.id, sourceJournalTitle: src.title, text: b.text }) };
+    const c = openEntry();
+    await insertKind('Journal entry');
+    let sheet = document.querySelector('[aria-label="Pick a journal entry"]');
+    expect(texts(sheet, '.srow .t')).toEqual(['Sunday']);
+    await click(sheet.querySelector('.srow'));
+    expect(sheet.querySelector('.lkbk .sh').textContent).toBe('Sunday');
+    expect(texts(sheet, '.srow .t')).toEqual(['The whole entry', 'Words']);
+    await click(sheet.querySelector('.lkbk .ic'));
+    expect(texts(sheet, '.srow .t')).toEqual(['Sunday']);
+    await click(sheet.querySelector('.srow'));
+    await click(byText(sheet, '.srow', 'WordsWith the family.'));
+    await insertKind('Journal entry');
+    sheet = document.querySelector('[aria-label="Pick a journal entry"]');
+    await click(sheet.querySelector('.srow'));
+    await click(byText(sheet, '.srow', 'The whole entryA card that opens it'));
+    act(() => { vi.advanceTimersByTime(600); });
+    // the excerpt went in at the end (no cursor yet), the cursor into the paragraph after it; the card under that one
+    expect(lastPatch().blocks.map((b) => b.type)).toEqual(['p', 'journal-excerpt', 'p', 'journal-card', 'p']);
+    expect(lastPatch().blocks[1]).toMatchObject({ sourceJournalId: 'j2', sourceBlockId: 'q1', text: 'With the family.' });
+    expect(lastPatch().blocks[3]).toMatchObject({ entryId: 'j2' });
+    expect(texts(c, '.jed .jcard .je')).toEqual(['Excerpt', 'Journal entry']);
+  });
+
+  it('a block held (the context menu): Move up / Move down / Remove; Remove says main\'s words and Undo puts it back', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    journal([{ id: 'b1', type: 'p', text: 'One' }, { id: 'c1', type: 'letter-card', volKey: 'one', letterId: L16_ID },
+      { id: 'd1', type: 'divider' }, { id: 'b2', type: 'p', text: 'Two' }]);
+    const c = openEntry();
+    const order = () => [...c.querySelectorAll('.jed > :not(input)')].map((n) => n.className.split(' ')[0]);
+    fireEvent.contextMenu(c.querySelector('.jed .jcard'));
+    let sheet = document.querySelector('[role="dialog"][aria-label="Letter"]');
+    expect(texts(sheet, '.srow .t')).toEqual(['Move up', 'Move down', 'Remove']);
+    await click(byText(sheet, '.srow', 'Move down'));
+    expect(order()).toEqual(['mm', 'jt', 'jp', 'jdiv', 'jcard', 'jp']);
+    act(() => { vi.advanceTimersByTime(600); });
+    expect(lastPatch().blocks.map((b) => b.id)).toEqual(['b1', 'd1', 'c1', 'b2']);
+    fireEvent.contextMenu(c.querySelector('.jed .jdiv'));
+    sheet = document.querySelector('[role="dialog"][aria-label="Divider"]');
+    await click(byText(sheet, '.srow', 'Remove'));
+    expect(order()).toEqual(['mm', 'jt', 'jp', 'jcard', 'jp']);
+    expect(document.querySelector('.toast').textContent).toBe('Block deleted.Undo');
+    await click(document.querySelector('.toast .act'));
+    expect(order()).toEqual(['mm', 'jt', 'jp', 'jdiv', 'jcard', 'jp']);
+    act(() => { vi.advanceTimersByTime(7000); });
+    expect(g.JournalStore.purgeBlockMarks).not.toHaveBeenCalled();
+    expect(lastPatch().blocks.map((b) => b.id)).toEqual(['b1', 'd1', 'c1', 'b2']);
+    // removed for good: main's purgeBlockMarks once the window has closed, with the editor's blocks
+    fireEvent.contextMenu(c.querySelector('.jed .jcard'));
+    await click(byText(document.querySelector('[aria-label="Letter"]'), '.srow', 'Remove'));
+    act(() => { vi.advanceTimersByTime(6600); });
+    expect(g.JournalStore.purgeBlockMarks).toHaveBeenCalledWith('j1', 'c1', expect.any(Array));
+    expect(lastPatch().blocks.map((b) => b.id)).toEqual(['b1', 'd1', 'b2']);
+  });
+
+  it('a long press opens the same sheet, and the tap\'s own click (on the scrim now under the finger) neither closes it nor opens the card', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    journal([{ id: 'c1', type: 'letter-card', volKey: 'one', letterId: L16_ID }, { id: 'b2', type: 'p', text: 'Two' }]);
+    const c = openEntry();
+    const card = c.querySelector('.jed .jcard');
+    fireEvent.pointerDown(card, { clientX: 10, clientY: 10, pointerType: 'touch' });
+    act(() => { vi.advanceTimersByTime(520); });
+    fireEvent.pointerUp(card);
+    await click([...document.querySelectorAll('.scrim')].pop());   // headless Chrome: the click after a held touch
+    expect(c.querySelector('.reader h1')).toBe(null);
+    const sheet = document.querySelector('[role="dialog"][aria-label="Letter"]');
+    expect(sheet).not.toBe(null);
+    expect(byText(sheet, '.srow', 'Move up').disabled).toBe(true);
+    expect(byText(sheet, '.srow', 'Move down').disabled).toBe(false);
+    await closeTop();
+    expect(document.querySelector('[aria-label="Letter"]')).toBe(null);
+    // a press that moves is a scroll, not a hold
+    fireEvent.pointerDown(card, { clientX: 10, clientY: 10, pointerType: 'touch' });
+    fireEvent.pointerMove(card, { clientX: 10, clientY: 40, pointerType: 'touch' });
+    act(() => { vi.advanceTimersByTime(600); });
+    expect(document.querySelector('[aria-label="Letter"]')).toBe(null);
   });
 });

@@ -5,7 +5,9 @@
    - insertBelow: where a new block goes (main's insertBlockBelow: under the block the cursor is in, never splitting it;
      with no cursor, before the entry's trailing empty paragraph; always one empty paragraph after the last card);
    - blockView: what each block shows on the page (3n: overline, title, words cut at three lines, where it is, and the
-     v2 route a tap opens), read from main's own stores through their globals. */
+     v2 route a tap opens), read from main's own stores through their globals;
+   - pickRows / entryParts: Insert's Bookmark, Note, Journal entry and Notebook pickers (main's JournalInsertSheet);
+   - withTail, moveBlock, removedWords: a block moved or removed (main's moveBlock and its Undo words). */
 import { letterPlaceOf, placeOfKey, journalTitle, journalText } from './notes-facts.js';
 import { testamentOf } from './links.js';
 import { translationName } from './bible-facts.js';
@@ -172,11 +174,146 @@ export function blockView(b, env = g) {
       const nb = b.notebookId === 'uncategorized' ? { name: 'Uncategorized' } : get(env.NotebookStore, b.notebookId);
       return { kind: 'card', eyebrow: 'Notebook', title: nb ? nb.name || 'Notebook' : 'Deleted notebook', words: '', meta: '', open: null };
     }
+    case 'journal-excerpt': {
+      // words from another entry (main's embedBlockFromJournal): its title kept on the block, else looked up
+      let title = b.sourceJournalTitle || '';
+      const src = b.sourceJournalId ? get(env.JournalStore, b.sourceJournalId) : null;
+      if (!title && src) title = journalTitle(src) || 'Untitled';
+      return { kind: 'card', eyebrow: 'Excerpt', title: title || 'Journal entry', words: oneLine(b.text), meta: 'Journal',
+        open: b.sourceJournalId ? { place: 'journal-entry', id: b.sourceJournalId } : null };
+    }
     default: {
       const s = H && typeof H.describeBlock === 'function' ? H.describeBlock(b) : '';
       return { kind: 'other', line: s || 'Kept as it is' };
     }
   }
+}
+
+/** The blocks with a paragraph to write in after the last card (main's rule after an insert, a move or a remove). */
+export function withTail(blocks, env = g) {
+  const last = blocks[blocks.length - 1];
+  return last && isText(last) ? blocks : blocks.concat(newBlock('p', { text: '' }, env));
+}
+
+/**
+ * The block at `i` moved one place up (-1) or down (+1) (main's moveBlock); the same list when it cannot go.
+ * @param {any[]} blocks @param {number} i @param {number} by
+ */
+export function moveBlock(blocks, i, by) {
+  const to = i + by;
+  if (i < 0 || to < 0 || i >= blocks.length || to >= blocks.length) return blocks;
+  const next = blocks.slice();
+  const [b] = next.splice(i, 1);
+  next.splice(to, 0, b);
+  return next;
+}
+
+/** main's Undo words for a removed block. @param {any} b */
+export function removedWords(b) {
+  return b && b.type === 'audio' ? 'Voice memo removed.' : b && b.type === 'image' ? 'Image removed.' : 'Block deleted.';
+}
+
+/** What a block is called on its sheet (Move up / Move down / Remove). @param {any} b */
+export function blockName(b, env = g) {
+  const v = blockView(b, env);
+  if (v.kind === 'card') return v.eyebrow;
+  return { divider: 'Divider', image: 'Picture', memo: 'Voice memo', text: 'Paragraph' }[v.kind] || 'Block';
+}
+
+/* ---- Insert's pickers from your notes (main's JournalInsertSheet: bookmarks, notes, entries, notebooks) ------------- */
+
+/** What each picker says (main's placeholders and empty lines, as v2 words them). */
+export const PICKERS = {
+  bookmark: { title: 'Pick a bookmark', search: 'Search bookmarks', none: 'No bookmarks yet.' },
+  note: { title: 'Pick a note', search: 'Search notes', none: 'No notes yet.' },
+  journal: { title: 'Pick a journal entry', search: 'Search journal entries', none: 'No other journal entries yet.' },
+  notebook: { title: 'Pick a notebook', search: 'Search notebooks', none: 'No notebooks yet. Uncategorized is always available.' },
+};
+
+const newest = (a, b) => (b.updated || b.created || 0) - (a.updated || a.created || 0);
+const tryCall = (f, fallback) => { try { return f(); } catch (_e) { return fallback; } };
+const clip = (s, n) => (s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s);
+
+/**
+ * One picker's rows, newest first, the query matched as main matches it (any part of the row's words, any case); each
+ * row's `make()` is the block that goes in (made only when it is picked), or `entry` for a journal entry (it opens to its
+ * parts first). `total` is how many the store holds (the empty line says "none yet" or "no matches").
+ * @param {'bookmark' | 'note' | 'journal' | 'notebook'} kind @param {string} query @param {string | null} exclude this entry
+ * @returns {{ total: number, rows: Array<{ key: string, title: string, sub: string, make?: () => any, entry?: any }> }}
+ */
+export function pickRows(kind, query, exclude = null, env = g) {
+  const q = String(query || '').trim().toLowerCase();
+  const hit = (s) => !q || s.toLowerCase().indexOf(q) >= 0;
+  const H = env.JournalHelpers;
+  if (kind === 'bookmark') {
+    const all = tryCall(() => env.BookmarkStore.all().slice(), []).sort(newest);
+    const rows = all.map((b) => {
+      const p = b.hlKey ? placeOfKey(b.hlKey, env) : null;
+      const title = b.label || (p && p.title) || 'Bookmark';
+      const sub = p && p.where && p.where !== title ? p.where : '';
+      return { key: b.id, title, sub, hay: title + ' ' + (b.thought || '') + ' ' + sub, make: () => newBlock('bookmark-card', { bookmarkId: b.id }, env) };
+    });
+    return { total: all.length, rows: rows.filter((r) => hit(r.hay)).map(({ hay: _hay, ...r }) => r) };
+  }
+  if (kind === 'note') {
+    const S = env.NoteStore;
+    let all = tryCall(() => (typeof S.list === 'function' ? S.list() : Object.values(S.all() || {})), []);
+    if (!Array.isArray(all)) all = [];
+    all = all.filter((n) => n && n.groupId).sort(newest);
+    const rows = all.map((n) => {
+      const anchor = oneLine(n.fullText).slice(0, 80);
+      const title = clip(oneLine(n.body), 60) || anchor || 'Note';
+      const sub = typeof env.noteSourceLabel === 'function' ? tryCall(() => env.noteSourceLabel(n) || '', '') : '';
+      return { key: n.groupId, title, sub, hay: (n.body || '') + ' ' + oneLine(n.fullText) + ' ' + sub, make: () => newBlock('note-card', { noteGroupId: n.groupId }, env) };
+    });
+    return { total: all.length, rows: rows.filter((r) => hit(r.hay)).slice(0, 200).map(({ hay: _hay, ...r }) => r) };
+  }
+  if (kind === 'journal') {
+    const all = tryCall(() => env.JournalStore.all().slice(), []).filter((e) => e && e.id && e.id !== exclude).sort((a, b) => (b.created || 0) - (a.created || 0));
+    const rows = all.map((e) => {
+      const title = journalTitle(e) || (H && typeof H.entryDisplayTitle === 'function' ? tryCall(() => H.entryDisplayTitle(e), '') : '') || 'Untitled';
+      const preview = clip(journalText(e), 80);
+      const date = e.created ? new Date(e.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+      return { key: e.id, title, sub: date + (preview ? ' · ' + preview : ''), hay: title + ' ' + journalText(e) + ' ' + (e.tags || []).join(' '), entry: e };
+    });
+    return { total: all.length, rows: rows.filter((r) => hit(r.hay)).map(({ hay: _hay, ...r }) => r) };
+  }
+  // notebook: Uncategorized first, then every notebook, each with its notes counted once
+  const nbs = tryCall(() => env.NotebookStore.list().slice(), []);
+  const counts = new Map();
+  let loose = 0;
+  tryCall(() => env.NoteStore.list(), []).forEach((n) => {
+    const ids = (n && n.notebookIds) || [];
+    if (!ids.length) loose++;
+    else new Set(ids).forEach((id) => counts.set(id, (counts.get(id) || 0) + 1));
+  });
+  const rows = [{ id: 'uncategorized', name: 'Uncategorized' }].concat(nbs).filter((nb) => nb && hit(nb.name || '')).map((nb) => {
+    const n = nb.id === 'uncategorized' ? loose : counts.get(nb.id) || 0;
+    return { key: nb.id, title: nb.name || 'Notebook', sub: n + (n === 1 ? ' note' : ' notes'), make: () => newBlock('notebook-card', { notebookId: nb.id }, env) };
+  });
+  return { total: nbs.length, rows };
+}
+
+/**
+ * Another entry's parts Insert can bring in (main's embeddable blocks: words, a picture, a voice memo), each with the
+ * block main makes of it (embedBlockFromJournal: a copy that remembers where it came from); the whole entry is a
+ * journal-card (wholeEntry).
+ * @returns {Array<{ key: string, title: string, sub: string, block: any }>}
+ */
+export function entryParts(entry, env = g) {
+  const H = env.JournalHelpers;
+  if (!entry || !H || typeof H.embedBlockFromJournal !== 'function') return [];
+  return (entry.blocks || []).filter((b) => b && ['p', 'h2', 'quote', 'image', 'audio'].includes(b.type) && (b.type === 'image' || b.type === 'audio' || String(b.text || '').trim()))
+    .map((b) => {
+      const block = tryCall(() => H.embedBlockFromJournal(entry, b), null);
+      const sub = b.type === 'image' ? b.caption || '' : b.type === 'audio' ? (b.caption || '') + (b.duration ? (b.caption ? ' · ' : '') + clock(b.duration) : '') : clip(oneLine(b.text), 90);
+      return { key: b.id, title: b.type === 'image' ? 'Picture' : b.type === 'audio' ? 'Voice memo' : 'Words', sub, block };
+    }).filter((r) => r.block);
+}
+
+/** The card that opens another entry (main's "Link the Whole Entry"). */
+export function wholeEntry(entry, env = g) {
+  return newBlock('journal-card', { entryId: entry.id }, env);
 }
 
 /** "1:12" (main's formatDuration). @param {number} s */

@@ -13,8 +13,9 @@
 import { definePlace } from '../places.js';
 import { Icon } from '../Icon.jsx';
 import { Sheet, LayerToast } from '../Sheet.jsx';
-import { isText, newBlock, blockView, insertBelow, targetToBlock } from '../journal-blocks.js';
+import { isText, newBlock, blockView, insertBelow, targetToBlock, withTail, moveBlock, removedWords, blockName, PICKERS } from '../journal-blocks.js';
 import { JournalCard, JournalImage, JournalMemo } from './JournalBlocks.jsx';
+import { JournalPick } from './JournalPickers.jsx';
 import { LinkPicker } from './LinkPicker.jsx';
 import { useVotCorpus } from '../corpus.js';
 
@@ -148,6 +149,72 @@ function InsertSheet({ desktop, onPick, onClose }) {
   );
 }
 
+const HOLD_MS = 500;
+
+/**
+ * A long press (half a second, the finger still) or the context menu (a right click, the menu key) on a block: `onHold`.
+ * The click that ends a long press is swallowed wherever it lands: on the card it would open the page, and on the sheet's
+ * scrim, drawn under the finger by then, it would close the sheet it just opened. Spread the result on the block's root;
+ * `st` is the editor's one gesture (a ref's object), so a render mid-press keeps its timer.
+ * @param {(() => void) | null} onHold
+ * @param {{ timer: any, start: { x: number, y: number } | null, held: boolean }} st
+ */
+function holdProps(onHold, st) {
+  if (!onHold) return {};
+  const stop = () => { if (st.timer) { clearTimeout(st.timer); st.timer = null; } };
+  // one click, at most: it lets go after the click it caught, a moment after the finger is up, or after 1.5 s (a mouse up
+  // can land on the scrim, never reaching this block's handlers)
+  const unswallow = () => document.removeEventListener('click', swallow, true);
+  const swallow = (e) => { e.preventDefault(); e.stopPropagation(); unswallow(); };
+  const release = () => {
+    stop();
+    if (!st.held) return;
+    st.held = false;
+    setTimeout(unswallow, 350);   // the tap's click comes right after the up
+  };
+  return {
+    onPointerDown: (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      st.held = false;
+      st.start = { x: e.clientX, y: e.clientY };
+      stop();
+      st.timer = setTimeout(() => {
+        st.timer = null;
+        st.held = true;
+        document.addEventListener('click', swallow, true);
+        setTimeout(unswallow, 1500);
+        onHold();
+      }, HOLD_MS);
+    },
+    onPointerMove: (e) => { if (st.start && Math.hypot(e.clientX - st.start.x, e.clientY - st.start.y) > 8) stop(); },
+    onPointerUp: release,
+    onPointerCancel: release,
+    onContextMenu: (e) => { e.preventDefault(); stop(); onHold(); },
+  };
+}
+
+/**
+ * What a held block can do (design dz20: main's Move up, Move down, Remove): a sheet on the phone, a dialog on the laptop.
+ * @param {{ name: string, first: boolean, last: boolean, desktop: boolean, onMove: (by: number) => void,
+ *   onRemove: () => void, onClose: () => void }} props
+ */
+function BlockSheet({ name, first, last, desktop, onMove, onRemove, onClose }) {
+  const row = (label, icon, act, off = false, flip = false) => (
+    <button type="button" className="srow act" disabled={off} onClick={act}>
+      <span className="lead"><Icon name={icon} flip={flip} /></span>
+      <span className="tx"><span className="t">{label}</span></span>
+    </button>
+  );
+  return (
+    <Sheet kind="jbs" label={name} desktop={desktop} closeX onClose={onClose}>
+      <div className="sh">{name}</div>
+      {row('Move up', 'arrowUp', () => onMove(-1), first)}
+      {row('Move down', 'arrowUp', () => onMove(1), last, true)}
+      {row('Remove', 'trash', onRemove)}
+    </Sheet>
+  );
+}
+
 /** The open editors' Insert openers, the newest last: the top bar's button opens the top one's (v2 keeps lower pages mounted). */
 const inserters = /** @type {Array<() => void>} */ ([]);
 
@@ -163,14 +230,21 @@ function InsertButton() {
 /** @param {import('../places.js').PlaceProps} props */
 export function JournalEditor({ route, gate, facts, desktop, go, onReady }) {
   const seed = gate ? (desktop && facts.journalEntryDesktop) || facts.journalEntry || null : null;
-  const { entry, title, blocks, editTitle, editBlock, putBlocks } = useJournalDraft(route, !!gate, seed);
+  const { entry, title, blocks, editTitle, editBlock, putBlocks, id: entryId } = useJournalDraft(route, !!gate, seed);
   const gateOpen = gate && gate.open ? gate.open : null;
   const gateMedia = gate ? facts.journalMedia || {} : null;
   const gateMemo = gate && facts.journalMemo ? facts.journalMemo : null;
-  const [sheet, setSheet] = React.useState(/** @type {null | 'insert' | 'card' | 'excerpt'} */ (gateOpen
+  const [sheet, setSheet] = React.useState(/** @type {null | string} */ (gateOpen
     ? gateOpen.sheet === 'insert' ? 'insert' : gateOpen.sheet === 'link-picker' ? (gateOpen.picker && gateOpen.picker.mode) || 'excerpt' : null
     : null));
-  const [toast, setToast] = React.useState(/** @type {string | null} */ (null));
+  /** The block a long press is acting on (its sheet: Move up, Move down, Remove), by id. */
+  const [held, setHeld] = React.useState(/** @type {string | null} */ (null));
+  const [toast, setToast] = React.useState(/** @type {{ text: string, act?: string, onAct?: () => void, ms?: number } | null} */ (null));
+  const gesture = React.useRef({ timer: null, start: null, held: false });
+  const blocksRef = React.useRef(blocks);
+  blocksRef.current = blocks;
+  const mounted = React.useRef(true);
+  React.useEffect(() => () => { mounted.current = false; }, []);
   const [epoch, setEpoch] = React.useState(0);
   const rootRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const titleRef = React.useRef(/** @type {HTMLTextAreaElement | null} */ (null));
@@ -229,12 +303,48 @@ export function JournalEditor({ route, gate, facts, desktop, go, onReady }) {
     cursor.current = f;
   }, [blocks]);
 
-  const note = (/** @type {string} */ text) => setToast(text);
+  const note = (/** @type {string} */ text) => setToast({ text });
   React.useEffect(() => {
     if (!toast) return undefined;
-    const t = setTimeout(() => setToast(null), 2600);
+    const t = setTimeout(() => setToast(null), toast.ms || 2600);
     return () => clearTimeout(t);
   }, [toast]);
+
+  /** A held block one place up or down; the entry always ends with a paragraph to write in. */
+  const move = (bid, by) => {
+    const i = blocks.findIndex((b) => b && b.id === bid);
+    const next = moveBlock(blocks, i, by);
+    setHeld(null);
+    if (next !== blocks) putBlocks(withTail(next));
+  };
+  /**
+   * A held block taken out, with main's Undo (its words, six seconds): Undo puts it back where it was. Once the window has
+   * closed, main's purgeBlockMarks takes the block's marks (it keeps them if the block is back by then); a picture's or a
+   * memo's blob is left to main's start-up sweep of unreferenced media.
+   */
+  const remove = (bid) => {
+    const i = blocks.findIndex((b) => b && b.id === bid);
+    setHeld(null);
+    if (i < 0) return;
+    const removed = blocks[i];
+    putBlocks(withTail(blocks.filter((_b, j) => j !== i)));
+    let undone = false;
+    setToast({ text: removedWords(removed), act: 'Undo', ms: 6000, onAct: () => {
+      undone = true;
+      setToast(null);
+      const cur = blocksRef.current;
+      if (cur.some((b) => b && b.id === removed.id)) return;
+      const back = cur.slice();
+      back.splice(Math.min(i, back.length), 0, removed);
+      putBlocks(withTail(back));
+    } });
+    setTimeout(() => {
+      const eid = entryId();
+      const S = g.JournalStore;
+      if (undone || !eid || !S || typeof S.purgeBlockMarks !== 'function' || !removed.id) return;
+      try { S.purgeBlockMarks(eid, removed.id, mounted.current ? blocksRef.current : undefined); } catch (_e) { /* best effort, as main */ }
+    }, 6500);
+  };
 
   /** A block put in under the cursor's paragraph. */
   const insert = (block, now = false) => {
@@ -271,7 +381,7 @@ export function JournalEditor({ route, gate, facts, desktop, go, onReady }) {
       .catch(() => note('Could not save that image.'));
   };
   const onInsert = (id) => {
-    if (id === 'card' || id === 'excerpt') { setSheet(id); return; }
+    if (id === 'card' || id === 'excerpt' || PICKERS[id]) { setSheet(id); return; }
     setSheet(null);
     if (id === 'divider') insert(newBlock('divider'));
     else if (id === 'text') insertText();
@@ -286,6 +396,7 @@ export function JournalEditor({ route, gate, facts, desktop, go, onReady }) {
   };
 
   const firstText = blocks.findIndex(isText);
+  const heldAt = held ? blocks.findIndex((b) => b && b.id === held) : -1;
   const keep = (b) => (e) => { if (b.id) cursor.current = { id: b.id, caret: e.currentTarget.selectionStart || 0 }; };
   return (
     <>
@@ -312,11 +423,12 @@ export function JournalEditor({ route, gate, facts, desktop, go, onReady }) {
                 onFocus={keep(b)} onSelect={keep(b)} onKeyUp={keep(b)} onClick={keep(b)} />
             );
           }
-          if (view.kind === 'card') return <JournalCard key={key} view={view} go={go} />;
-          if (view.kind === 'divider') return <div key={key} className="jdiv" aria-hidden="true">❖ ❖ ❖</div>;
-          if (view.kind === 'image') return <JournalImage key={key} view={view} gateMedia={gateMedia} onLoaded={() => setLoaded((n) => n + 1)} />;
-          if (view.kind === 'memo') return <JournalMemo key={key} view={view} gateMedia={gateMedia} gateMemo={gateMemo} />;
-          return <p key={key} className="mm jother">{view.line}</p>;
+          const hold = holdProps(gate || !b || !b.id ? null : () => setHeld(b.id), gesture.current);
+          if (view.kind === 'card') return <JournalCard key={key} view={view} go={go} hold={hold} />;
+          if (view.kind === 'divider') return <div key={key} className="jdiv" aria-hidden="true" {...hold}>❖ ❖ ❖</div>;
+          if (view.kind === 'image') return <JournalImage key={key} view={view} gateMedia={gateMedia} onLoaded={() => setLoaded((n) => n + 1)} hold={hold} />;
+          if (view.kind === 'memo') return <JournalMemo key={key} view={view} gateMedia={gateMedia} gateMemo={gateMemo} hold={hold} />;
+          return <p key={key} className="mm jother" {...hold}>{view.line}</p>;
         })}
         {!gate && <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />}
       </div>
@@ -325,7 +437,15 @@ export function JournalEditor({ route, gate, facts, desktop, go, onReady }) {
         <LinkPicker mode={sheet} desktop={desktop} gate={waitPicker ? gateOpen.picker || {} : null}
           onPick={onPicked} onClose={() => setSheet(null)} onShown={() => setPickerShown(true)} />
       )}
-      <LayerToast text={toast} />
+      {sheet && PICKERS[sheet] && (
+        <JournalPick kind={/** @type {any} */ (sheet)} exclude={entryId() || (entry && entry.id) || null} desktop={desktop}
+          onPick={(block) => { setSheet(null); insert(block); }} onClose={() => setSheet(null)} />
+      )}
+      {heldAt >= 0 && (
+        <BlockSheet name={blockName(blocks[heldAt])} first={heldAt === 0} last={heldAt === blocks.length - 1} desktop={desktop}
+          onMove={(by) => move(held, by)} onRemove={() => remove(held)} onClose={() => setHeld(null)} />
+      )}
+      <LayerToast text={toast && toast.text} act={toast && toast.act} onAct={toast && toast.onAct} />
     </>
   );
 }

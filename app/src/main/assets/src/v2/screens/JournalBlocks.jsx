@@ -48,9 +48,10 @@ export function useMediaUrl(mediaId, gateMedia = null) {
 /**
  * A card (3n): its overline, its title (with a chevron when it opens a page), its words cut at three lines, and where
  * it is. A tap (or Enter) opens the page.
- * @param {{ view: Record<string, any>, go: (...routes: any[]) => void }} props
+ * @param {{ view: Record<string, any>, go: (...routes: any[]) => void, hold?: Record<string, any> }} props
+ *   hold: the editor's long press (Move up, Move down, Remove), spread on the card
  */
-export function JournalCard({ view, go }) {
+export function JournalCard({ view, go, hold = {} }) {
   const open = view.open;
   const act = open ? {
     role: 'button', tabIndex: 0, 'aria-label': view.eyebrow + ': ' + view.title,
@@ -58,7 +59,7 @@ export function JournalCard({ view, go }) {
     onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(open); } },
   } : {};
   return (
-    <div className="jcard" {...act}>
+    <div className="jcard" {...act} {...hold}>
       <div className="je">{view.eyebrow}</div>
       <div className="jh"><span>{view.title}</span>{open && <Icon name="chev" />}</div>
       {view.missing ? <div className="jv jmiss">Verse text not available offline.</div>
@@ -70,12 +71,13 @@ export function JournalCard({ view, go }) {
 
 /**
  * A picture with its caption (main's image block); "Image missing" when its blob is gone.
- * @param {{ view: Record<string, any>, gateMedia: Record<string, string> | null, onLoaded?: () => void }} props
+ * @param {{ view: Record<string, any>, gateMedia: Record<string, string> | null, onLoaded?: () => void,
+ *   hold?: Record<string, any> }} props
  */
-export function JournalImage({ view, gateMedia, onLoaded }) {
+export function JournalImage({ view, gateMedia, onLoaded, hold = {} }) {
   const media = useMediaUrl(view.mediaId, gateMedia);
   return (
-    <figure className="jimg">
+    <figure className="jimg" {...hold}>
       {media.url
         ? <img src={media.url} alt={view.caption || ''} onLoad={onLoaded} onError={onLoaded} />
         : <div className="jimg-none">{media.missing ? 'Image missing' : ''}</div>}
@@ -107,9 +109,10 @@ function useBarCount(ref) {
  * A voice memo that plays in place (main's JournalAudioBlock): Play / Pause, the waveform lit up to the playhead (a
  * slider: a tap or the arrow keys seek), its caption and "0:18 / 1:12". "Recording missing" when its blob is gone. A
  * gate boot draws `gateMemo` ({ at }: playing, that many seconds in) and plays nothing.
- * @param {{ view: Record<string, any>, gateMedia: Record<string, string> | null, gateMemo: { at?: number } | null }} props
+ * @param {{ view: Record<string, any>, gateMedia: Record<string, string> | null, gateMemo: { at?: number } | null,
+ *   hold?: Record<string, any> }} props
  */
-export function JournalMemo({ view, gateMedia, gateMemo }) {
+export function JournalMemo({ view, gateMedia, gateMemo, hold = {} }) {
   const media = useMediaUrl(view.mediaId, gateMedia);
   const audioRef = React.useRef(/** @type {HTMLAudioElement | null} */ (null));
   const wavRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
@@ -122,7 +125,7 @@ export function JournalMemo({ view, gateMedia, gateMemo }) {
 
   if (media.missing && !gateMemo) {
     return (
-      <div className="jmemo">
+      <div className="jmemo" {...hold}>
         <div className="jmb">
           <div className="jmt"><span>{caption}</span>{total > 0 && <span className="num">{clock(total)}</span>}</div>
           <div className="jmiss">Recording missing</div>
@@ -154,7 +157,7 @@ export function JournalMemo({ view, gateMedia, gateMemo }) {
   };
   const bars = waveBars(view.samples, count, total > 0 ? Math.min(1, cur / total) : 0);
   return (
-    <div className="jmemo">
+    <div className="jmemo" {...hold}>
       <button type="button" className="jplay" aria-label={playing ? 'Pause' : 'Play'} disabled={!media.url && !gateMemo} onClick={toggle}>
         <Icon name={playing ? 'pause' : 'play'} size={20} />
       </button>

@@ -325,7 +325,7 @@ function chapterItem(book, n) {
 }
 
 /** A level's back arrow and name (4f). */
-function LevelHead({ title, onBack }) {
+export function LevelHead({ title, onBack }) {
   return (
     <div className="lkbk">
       <button type="button" className="ic" aria-label="Back one level" onClick={onBack}><Icon name="arrowL" /></button>
