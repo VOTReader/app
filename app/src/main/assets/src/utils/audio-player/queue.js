@@ -507,6 +507,25 @@ export function removeUpcoming(index) {
 }
 
 /**
+ * Put a removed future item back at `index` (v2's Up next Undo, rv5): the
+ * track as removeUpcoming took it out. Like removal it never touches the
+ * playing item's place or anything before it; the end of the queue is a place.
+ *
+ * @param {number} index
+ * @param {Track} track
+ * @returns {boolean}
+ */
+export function insertUpcoming(index, track) {
+  if (_pendingRestore || !track || typeof track !== 'object' || !track.url) return false;
+  const at = Math.floor(Number(index));
+  if (!Number.isFinite(at) || at <= _state.qi || at > _state.queue.length) return false;
+  const queue = _state.queue.slice();
+  queue.splice(at, 0, track);
+  _commitQueueEdit(queue);
+  return true;
+}
+
+/**
  * Reorder only future items. Keeping the current track fixed makes the
  * operation stable while a recording is streaming.
  *

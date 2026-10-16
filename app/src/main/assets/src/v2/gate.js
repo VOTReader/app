@@ -6,7 +6,7 @@
    it is inert on the live website; an id this build does not know yet sets data-gate="unknown" (the shooter then fails by
    name). Each entry below is the states.json row for that id, in the app's terms; add one per screen as it is built. */
 
-import { gateMarks, gateNotebookMarks, GATE_NOTEBOOKS } from './notes-facts.js';
+import { gateMarks, gateNotebookMarks, gateSavedMarks, GATE_NOTEBOOKS } from './notes-facts.js';
 import { gateListening, gateData } from './settings-pages.js';
 import { gateSpace } from './storage-facts.js';
 import { gateReading } from './reading-settings.js';
@@ -30,6 +30,9 @@ const DAY = 24 * 3600 * 1000;
  * playing.sleep ({ minutes, left } in min / s, or 'end') and playing.saved (true = saved on this device), and `player`:
  * open ('now-playing', or a sheet: 'speed' | 'sleep' | 'up-next' | 'more'), full (full screen) and toast (the hint drawn).
  * playing.savedRecording: the recording is in the Listening Library's Saved (2f's Save; default not).
+ * rv5 (dz30) adds playing.edition (a Bible chapter's edition id), playing.edited (Up next changed by hand) and player.typed
+ * (6f: the speed box open with these words), player.swipe ({ index, dx }: 6g's row held mid-swipe), player.removed (6h:
+ * that queue index removed, its Undo toast showing) and player.asking (2m: the ... asking before that edition).
  * @typedef {{ place: string, collection?: string, n?: number, kind?: string, id?: string, book?: string, chapter?: number | string,
  *   verse?: number, match?: string[], study?: string, list?: string, family?: string, q?: string, st?: string, page?: number,
  *   key?: string, start?: number, end?: number, text?: string, groupId?: string | null, from?: Record<string, any>,
@@ -130,6 +133,15 @@ const CH2_FACTS = { studies: { recorded: false, cards: CH2_CARDS } };
 const MATTHEW_INDEX = [{ place: 'home' }, { place: 'studies' }, { place: 'study', study: 'matthew-study' }];
 const MATTHEW_5 = [...MATTHEW_INDEX, { place: 'study-chapter', study: 'matthew-study', chapter: '5' }];
 const LETTER_ONE_PLAYING = { item: { collection: 'one', n: 1 }, reader: 'B', at: 231, length: 608, paused: false, saved: true };
+/** 0c's whole Recent list (dz30): Letter 1 heard (Continue's place too), John 3 read today, Letter 2 read yesterday,
+ * Words To Live By 76 heard to the end, Letter 3 heard with 12 min left. */
+const RECENT_ALL = [
+  { it: { kind: 'letter', collection: 'one', n: 1 }, heard: true, left: 377 },
+  { it: HOME_FACTS.home.recent[0], heard: false, at: GATE_NOW - 30 * 60 * 1000 },
+  { it: HOME_FACTS.home.recent[1], heard: false, at: GATE_NOW - DAY },
+  { it: { kind: 'letter', collection: 'wtlb1', n: 76 }, heard: true, done: true },
+  { it: { kind: 'letter', collection: 'one', n: 3 }, heard: true, left: 740 },
+];
 
 /** @type {Record<string, GateState>} */
 export const GATE_STATES = {
@@ -283,6 +295,28 @@ export const GATE_STATES = {
   '6b-sleep': { stack: OVER_VOLUME_ONE, playing: { ...LETTER_ONE_PLAYING, sleep: { minutes: 30, left: 24 * 60 } }, player: { open: 'sleep' } },
   '6c-up-next': { stack: OVER_VOLUME_ONE, playing: LETTER_ONE_PLAYING, player: { open: 'up-next' } },
   '2f-player-more': { stack: OVER_VOLUME_ONE, playing: LETTER_ONE_PLAYING, player: { open: 'more' } },
+  // rv5 Listening extras (dz30; states.json 6f, 6g, 6h, 2m, 3r, 0c). 6f: 6a's readout tapped, 1.15 typed (no keyboard);
+  // 6g: Christmas (queue index 2) held 104 px left over its Remove strip; 6h: Christmas removed, its Undo toast showing.
+  '6f-speed-typed': { stack: OVER_VOLUME_ONE, playing: { ...LETTER_ONE_PLAYING, rate: 1.25 }, player: { open: 'speed', typed: '1.15' } },
+  '6g-up-next-swipe': { stack: OVER_VOLUME_ONE, playing: LETTER_ONE_PLAYING, player: { open: 'up-next', swipe: { index: 2, dx: -104 } } },
+  '6h-up-next-removed': { stack: OVER_VOLUME_ONE, playing: LETTER_ONE_PLAYING, player: { open: 'up-next', removed: 2 } },
+  // 2m: John 3 in the Word of Promise NKJV, 0:46 of 6:24, saved, Up next changed by hand; the ... asking before KJV. Under
+  // Now playing sits Volume One's page (no Bible to load for the picture).
+  '2m-player-edition': {
+    stack: OVER_VOLUME_ONE,
+    playing: { item: { book: 'john', chapter: 3 }, edition: 'wop-nkjv', reader: null, at: 46, length: 384, paused: false,
+      savedRecording: true, edited: true },
+    player: { open: 'more', asking: 'brm-kjv' },
+  },
+  // 3r: Notes > Bookmarks: two saved recordings (Letter 1 by Benjamin today, John 3 in the NKJV yesterday), then two pages.
+  '3r-notes-saved': { stack: [{ place: 'notes', kind: 'bookmark' }], facts: { marks: gateSavedMarks(GATE_NOW), now: GATE_NOW } },
+  // 0c: Home with Recent's whole list open over it (heard and read, newest first); Letter 1 paused as on 0a.
+  '0c-home-recent': {
+    stack: [{ place: 'home' }],
+    facts: { home: { ...HOME_FACTS.home, all: RECENT_ALL }, now: GATE_NOW },
+    playing: { ...LETTER1_AT_351, paused: true },
+    open: { sheet: 'recent' },
+  },
   // dz17 (mw10; states.json 2g-2l): Answers Only God Can Give from Home, main's own data (the boot asks for the Answers
   // corpus as a reader's first visit does). 2h: Browse by subject 92 px below the screen top; 2i: commandment VI's sheet;
   // 2j: "christmas" typed (Back says Answers), the field keeping focus with the keyboard closed.

@@ -9,6 +9,8 @@ import { askVotCorpus } from '../corpus.js';
 import { pushListening } from '../settings-pages.js';
 import { realSource, fakeSource, silentSource } from './source.js';
 import { stillWashes } from './read-along.jsx';
+import { LayerToast } from '../Sheet.jsx';
+import { UNDO_MS } from '../screens/LetterScreen.jsx';
 import {
   trackInfo, miniLine, clock, timeLeft, progressPct, rateLabel, speedWords, ratePct, clampRate, sleepChip, sleepChoice,
   upNextRows, RATE_MIN, RATE_MAX, RATE_PICKS, SLEEP_OPTIONS,
@@ -16,13 +18,28 @@ import {
 
 /** A row dragged this far sideways is removed from up next. */
 export const SWIPE_REMOVE_PX = 96;
+/** Previous more than this far in starts the recording again (main's transport.js PREV_RESTART_SEC). */
+const PREV_RESTART_SEC = 3;
+
+/**
+ * What Previous will do, as its name (dz30's rule): Restart more than 3 s in, with one recording queued, or at the head
+ * of the queue once it has started (main restarts there too); Previous otherwise.
+ * @param {import('./source.js').PlayerState} st
+ */
+export function prevLabel(st) {
+  const time = Number(st && st.time) || 0;
+  const queue = (st && st.queue) || [];
+  return time > PREV_RESTART_SEC || queue.length < 2 || ((st && st.qi) === 0 && time > 0) ? 'Restart' : 'Previous';
+}
 
 /**
  * @typedef {{ np: boolean, sheet: null | 'speed' | 'sleep' | 'up-next' | 'more' }} PlayerUi
+ * @typedef {{ text: string, act?: string, onAct?: () => void, timed: boolean }} PlayerToast
  * @typedef {{ source: import('./source.js').PlayerSource, st: import('./source.js').PlayerState, track: any,
- *   ui: PlayerUi, ready: boolean, playing: boolean,
+ *   ui: PlayerUi, ready: boolean, playing: boolean, seed: Record<string, any>, toast: PlayerToast | null,
  *   openNp: () => void, closeNp: () => void, openSheet: (s: PlayerUi['sheet']) => void, closeSheet: () => void,
- *   back: () => boolean }} PlayerModel
+ *   remove: (i: number) => void, back: () => boolean }} PlayerModel
+ *   seed: the gate row's `player` ({} on a real boot); remove takes a row out of Up next with an Undo toast (dz30 6h)
  */
 
 /** @param {any} open the gate row's player.open @returns {PlayerUi} */
@@ -64,8 +81,32 @@ export function usePlayer(gate) {
   React.useEffect(() => { if (!track && sourceReady) setUi((u) => (u.np || u.sheet ? { np: false, sheet: null } : u)); }, [track, sourceReady]);
   const uiRef = React.useRef(ui);
   uiRef.current = ui;
+  const [seed] = React.useState(() => (gate && gate.player) || {});
+  // The player's one toast: a row taken out of Up next says so and offers Undo (dz30 6h), for UNDO_MS
+  const [toast, setToast] = React.useState(/** @type {PlayerToast | null} */ (null));
+  React.useEffect(() => {
+    if (!toast || !toast.timed) return undefined;
+    const t = setTimeout(() => setToast((x) => (x === toast ? null : x)), UNDO_MS);
+    return () => clearTimeout(t);
+  }, [toast]);
+  const remove = (i, timed = true) => {
+    const now = source.state();
+    const removed = now.queue[i];
+    if (!removed || i <= now.qi) return;
+    source.remove(i);
+    setToast({ text: trackInfo(removed).title + ' removed from Up next', act: 'Undo', timed,
+      onAct: () => { setToast(null); source.insert(i, removed); } });
+  };
+  // 6h: the gate's row comes out once its queue is built, its toast held for the picture (no timer)
+  const seedRemoved = React.useRef(typeof seed.removed === 'number' ? seed.removed : null);
+  React.useEffect(() => {
+    if (!sourceReady || seedRemoved.current == null) return;
+    const i = seedRemoved.current;
+    seedRemoved.current = null;
+    remove(i, false);
+  });
   return {
-    source, st, track, ui, ready,
+    source, st, track, ui, ready, seed, toast, remove,
     playing: st.status === 'playing' || st.status === 'loading',
     openNp: () => setUi({ np: true, sheet: null }),
     closeNp: () => setUi({ np: false, sheet: null }),
@@ -154,7 +195,7 @@ export function PlayerBar({ player }) {
       </button>
       <div className="tp" data-zone="bar-tp">
         <button type="button" className="ic" aria-label="Back 15 seconds" onClick={() => source.skip(-15)}><Icon name="back15" /></button>
-        <button type="button" className="ic" aria-label="Previous" onClick={() => source.prev()}><Icon name="prev" /></button>
+        <button type="button" className="ic" aria-label={prevLabel(st)} onClick={() => source.prev()}><Icon name="prev" /></button>
         <button type="button" className="pp" aria-label={playing ? 'Pause' : 'Play'} onClick={() => source.toggle()}>
           <Icon name={playing ? 'pause' : 'play'} size={22} />
         </button>
@@ -222,7 +263,7 @@ export function NowPlaying({ player, desktop, go }) {
       <div className="times num"><span>{clock(st.time)}</span><span>{timeLeft(st.time, st.duration)}</span></div>
       <div className="ctrls">
         <button type="button" className="ic sk" aria-label="Back 15 seconds" onClick={() => source.skip(-15)}><Icon name="back15" /></button>
-        <button type="button" className="ic" aria-label="Previous" onClick={() => source.prev()}><Icon name="prev" /></button>
+        <button type="button" className="ic" aria-label={prevLabel(st)} onClick={() => source.prev()}><Icon name="prev" /></button>
         <button type="button" className="bigplay" aria-label={playing ? 'Pause' : 'Play'} onClick={() => source.toggle()}>
           <Icon name={playing ? 'pause' : 'play'} size={32} />
         </button>
@@ -273,14 +314,16 @@ export function typedRate(typed) {
 /**
  * 6a's big number: tap it to type a speed (main's speed readout does the same). The box opens empty with the speed as
  * its placeholder, as main's does (Chrome gives a number box no selection, so a pre-filled "1.5" read "1.535" typed over).
- * @param {{ rate: number, onRate: (r: number) => void }} props
+ * The sheet holds what is typed (null = the box is shut) so the line under it can say what the box takes (6f).
+ * `quiet`: a gate boot's box (6f) keeps the keyboard closed.
+ * @param {{ rate: number, onRate: (r: number) => void, typed: string | null, setTyped: (t: string | null) => void,
+ *   quiet: boolean, onOpen: () => void }} props
  */
-function SpeedValue({ rate, onRate }) {
-  const [typed, setTyped] = React.useState(/** @type {string | null} */ (null));
+function SpeedValue({ rate, onRate, typed, setTyped, quiet, onOpen }) {
   // The box's text as last typed, and null once it is done: a blur that follows Enter or Escape (a removed box can
   // still blur) then finds nothing to set.
-  const live = React.useRef(/** @type {string | null} */ (null));
-  const open = () => { live.current = ''; setTyped(''); };
+  const live = React.useRef(/** @type {string | null} */ (typed));
+  const open = () => { live.current = ''; setTyped(''); onOpen(); };
   const close = () => { live.current = null; setTyped(null); };
   const commit = () => {
     const r = live.current == null ? null : typedRate(live.current);
@@ -291,7 +334,7 @@ function SpeedValue({ rate, onRate }) {
     return <button type="button" className="v num" aria-label={'Speed ' + rateLabel(rate) + ', tap to type a value'} onClick={open}>{rateLabel(rate)}</button>;
   }
   return (
-    <input type="number" inputMode="decimal" className="v num" aria-label="Speed" min={RATE_MIN} max={RATE_MAX} step={0.01}
+    <input type="number" inputMode={quiet ? 'none' : 'decimal'} className="v num spd-in" aria-label="Speed" min={RATE_MIN} max={RATE_MAX} step={0.01}
       value={typed} placeholder={String(rate)} autoFocus
       onChange={(e) => { live.current = e.target.value; setTyped(e.target.value); }} onBlur={commit}
       onKeyDown={(e) => {
@@ -303,17 +346,20 @@ function SpeedValue({ rate, onRate }) {
 
 /** @param {{ player: PlayerModel }} props */
 function SpeedSheet({ player }) {
-  const { st, source } = player;
+  const { st, source, seed } = player;
   const rate = clampRate(st.rate);
+  // 6f: a gate row may open the box with words typed
+  const [typed, setTyped] = React.useState(/** @type {string | null} */ (typeof seed.typed === 'string' ? seed.typed : null));
+  const [quiet, setQuiet] = React.useState(typeof seed.typed === 'string');
   return (
     <>
       <div className="sh">Speed</div>
       <div className="spd-now">
         <button type="button" className="stepb" aria-label="Slower by 1 %" onClick={() => source.setRate(clampRate(rate - 0.01))}><Icon name="minus" /></button>
-        <SpeedValue rate={rate} onRate={(r) => source.setRate(r)} />
+        <SpeedValue rate={rate} onRate={(r) => source.setRate(r)} typed={typed} setTyped={setTyped} quiet={quiet} onOpen={() => setQuiet(false)} />
         <button type="button" className="stepb" aria-label="Faster by 1 %" onClick={() => source.setRate(clampRate(rate + 0.01))}><Icon name="plus" /></button>
       </div>
-      <p className="spd-s">{speedWords(rate)}</p>
+      <p className="spd-s">{typed != null ? 'Type a speed from ' + RATE_MIN + ' to ' + RATE_MAX : speedWords(rate)}</p>
       <Scrub className="scrub spd-sl" pct={ratePct(rate)} label="Speed" valueText={rateLabel(rate)}
         onPick={(f) => source.setRate(clampRate(RATE_MIN + f * (RATE_MAX - RATE_MIN)))}
         onStep={(d) => source.setRate(clampRate(rate + d * 0.01))} />
@@ -363,14 +409,15 @@ function SleepSheet({ player }) {
 }
 
 /**
- * One up-next row: tap plays it; its grip drags it up or down; a sideways swipe removes it.
- * @param {{ row: any, player: PlayerModel }} props
+ * One up-next row: tap plays it; its grip drags it up or down; a sideways swipe removes it. While it slides sideways a
+ * strip under it says what letting go does (dz30 6g); `held` is a gate row's swipe (px), drawn mid-gesture.
+ * @param {{ row: any, player: PlayerModel, held?: number }} props
  */
-function QueueRow({ row, player }) {
+function QueueRow({ row, player, held = 0 }) {
   const { source, st } = player;
   const ref = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const drag = React.useRef(/** @type {null | { x: number, y: number, mode: 'grip' | 'swipe' }} */ (null));
-  const [shift, setShift] = React.useState({ x: 0, y: 0 });
+  const [shift, setShift] = React.useState({ x: held, y: 0 });
   const rowHeight = () => (ref.current && ref.current.getBoundingClientRect().height) || 64;
   const start = (mode) => (e) => {
     if (row.current) return;
@@ -394,13 +441,13 @@ function QueueRow({ row, player }) {
       const to = Math.max(st.qi + 1, Math.min(st.queue.length - 1, row.index + by));
       if (to !== row.index) source.move(row.index, to);
     } else if (Math.abs(e.clientX - d.x) >= SWIPE_REMOVE_PX) {
-      source.remove(row.index);
+      player.remove(row.index);
     } else if (Math.abs(e.clientX - d.x) < 8 && Math.abs(e.clientY - d.y) < 8) {
       source.playAt(row.index);
     }
   };
   const style = shift.x || shift.y ? { transform: 'translate(' + shift.x + 'px,' + shift.y + 'px)', position: /** @type {'relative'} */ ('relative'), zIndex: 1 } : undefined;
-  return (
+  const el = (
     <div ref={ref} className={'row num-row' + (row.current ? ' playing qcur' : '')} style={style}
       onPointerDown={row.current ? undefined : start('swipe')} onPointerMove={move} onPointerUp={end}
       onPointerCancel={() => { drag.current = null; setShift({ x: 0, y: 0 }); }}>
@@ -419,7 +466,7 @@ function QueueRow({ row, player }) {
         <button type="button" className="ic grip" aria-label={'Move ' + row.title} aria-keyshortcuts="ArrowUp ArrowDown Delete"
           onPointerDown={start('grip')} onPointerMove={move} onPointerUp={end}
           onKeyDown={(e) => {
-            if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); source.remove(row.index); return; }
+            if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); player.remove(row.index); return; }
             const by = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
             const to = row.index + by;
             if (by && to > st.qi && to < st.queue.length) { e.preventDefault(); source.move(row.index, to); }
@@ -430,8 +477,16 @@ function QueueRow({ row, player }) {
       {!row.current && (
         <button type="button" className="rm" aria-label={'Remove ' + row.title + ' from up next'}
           onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}
-          onClick={() => source.remove(row.index)}>Remove</button>
+          onClick={() => player.remove(row.index)}>Remove</button>
       )}
+    </div>
+  );
+  if (row.current) return el;
+  // every other row sits in a wrapper, so the strip comes and goes under it without the row (mid-drag) remounting
+  return (
+    <div className={shift.x ? 'qsw' : undefined}>
+      {shift.x ? <div className={'qbk' + (shift.x > 0 ? ' r' : '')} aria-hidden="true"><Icon name="trash" />Remove</div> : null}
+      {el}
     </div>
   );
 }
@@ -439,6 +494,7 @@ function QueueRow({ row, player }) {
 /** @param {{ player: PlayerModel }} props */
 function UpNextSheet({ player }) {
   const { rows, count } = upNextRows(player.st);
+  const swipe = player.seed.swipe;
   return (
     <>
       <div className="upn-h">
@@ -446,27 +502,43 @@ function UpNextSheet({ player }) {
         <span className="cnt num">{count}</span>
         <button type="button" className="textbtn sm" disabled={rows.length < 2} onClick={() => player.source.clearUpcoming()}>Clear upcoming</button>
       </div>
-      <div className="rows q">{rows.map((r) => <QueueRow key={r.index + ':' + r.title} row={r} player={player} />)}</div>
+      <div className="rows q">
+        {rows.map((r) => (
+          <QueueRow key={r.index + ':' + r.title} row={r} player={player} held={swipe && swipe.index === r.index ? Number(swipe.dx) || 0 : 0} />
+        ))}
+      </div>
     </>
   );
 }
 
-/** Main's confirm strip words: a voice rebuilds the queue, so a queue changed by hand (or one lone recording) asks first. */
-const VOICE_ASK = 'Switching voice rebuilds this queue and drops your changes to it. Continue?';
-const VOICE_ASK_ONE = 'Switching voice rebuilds this into a full queue. Continue?';
+/**
+ * Main's confirm strip words, naming the pick (dz30 2m): a voice rebuilds the queue, so a queue changed by hand (or one
+ * lone recording) asks first. A reader is named without "Read by " ("Switching to Benjamin ...").
+ * @param {import('./source.js').VoiceChoice} choice @param {boolean} one
+ */
+export function voiceAsk(choice, one) {
+  const name = choice.label.replace(/^Read by /, '');
+  return 'Switching to ' + name + (one ? ' rebuilds this into a full queue. Continue?' : ' rebuilds this queue and drops your changes to it. Continue?');
+}
 
 /**
  * The ...'s items (2f; main's AudioManagerSheet): Save recording, then the voices when there are two or more. A voice
  * starts the recording again in it, the queue following; with up next changed by hand it asks first. `menu`: the
- * laptop's D6 menu (menu item roles), else the phone sheet's toggle button and radio group (main's semantics).
+ * laptop's D6 menu (menu item roles), else the phone sheet's toggle button and radio group (main's semantics). An Audio
+ * Bible edition reads on two lines (dz30 2m). A gate row's `asking` draws the strip already asking (focus left alone).
  * @param {{ player: PlayerModel, menu?: boolean, close: () => void }} props
  */
 function MoreItems({ player, menu = false, close }) {
-  const { source, st } = player;
-  const [pending, setPending] = React.useState(/** @type {string | null} */ (null));
+  const { source, st, seed } = player;
+  const [pending, setPending] = React.useState(/** @type {string | null} */ (typeof seed.asking === 'string' ? seed.asking : null));
   const yesRef = React.useRef(/** @type {HTMLButtonElement | null} */ (null));
   const rows = React.useRef(/** @type {Record<string, HTMLButtonElement | null>} */ ({}));
-  React.useEffect(() => { if (pending && yesRef.current) yesRef.current.focus(); }, [pending]);
+  const seeded = React.useRef(pending);
+  React.useEffect(() => {
+    if (pending && pending === seeded.current) return;
+    seeded.current = null;
+    if (pending && yesRef.current) yesRef.current.focus();
+  }, [pending]);
   const saved = source.recordingSaved();
   const voices = source.voices();
   const edition = !!voices && voices.kind === 'edition';
@@ -491,20 +563,21 @@ function MoreItems({ player, menu = false, close }) {
           <span className="label mlab">{edition ? 'Audio Bible' : 'Voice'}</span>
           <div className="opts mv" role={menu ? 'group' : 'radiogroup'} aria-label={edition ? 'Recorded edition for this chapter' : 'Reader for this recording'}>
             {voices.choices.map((c) => (
-              <button key={c.id} ref={(el) => { rows.current[c.id] = el; }} type="button" className={'srow opt' + (c.active ? ' on' : '')}
+              <button key={c.id} ref={(el) => { rows.current[c.id] = el; }} type="button"
+                className={'srow opt' + (edition ? ' edr' : '') + (c.active ? ' on' : '')}
                 role={menu ? 'menuitemradio' : 'radio'} aria-checked={c.active} tabIndex={menu ? -1 : undefined} onClick={() => pick(c)}>
-                <span className="tx"><span className="t">{c.label}</span></span>
+                <span className="tx"><span className="t">{c.label}</span>{c.sub ? <span className="s">{c.sub}</span> : null}</span>
                 {c.active && <span className="ck"><Icon name="check" /></span>}
               </button>
             ))}
           </div>
           {asking ? (
             <>
-              <p className="fine mvn" id="v2-mvq">{st.queue.length < 2 ? VOICE_ASK_ONE : VOICE_ASK}</p>
+              <p className="fine mvn" id="v2-mvq">{voiceAsk(asking, st.queue.length < 2)}</p>
               <div className="mvc">
                 <button ref={yesRef} type="button" className="pill sm" {...item} aria-describedby="v2-mvq"
                   onClick={() => { setPending(null); source.pickVoice(asking.id); close(); }}>Yes, switch</button>
-                <button type="button" className="btn2 sm" {...item} onClick={keep}>Cancel</button>
+                <button type="button" className="btn2 sm" {...item} onClick={keep}>Not now</button>
               </div>
             </>
           ) : (
@@ -541,8 +614,11 @@ const SHEETS = {
  */
 export function PlayerSheet({ player, desktop }) {
   const sheet = player.ui.sheet ? SHEETS[player.ui.sheet] : null;
+  const { toast, ui } = player;
+  // the player's toast, over its sheet or Now playing when one is up (6h)
+  const toastEl = toast ? <LayerToast text={toast.text} act={toast.act} onAct={toast.onAct} cls={ui.np || ui.sheet ? 'ovs' : ''} /> : null;
   // The laptop's ... is D6's menu in Now playing's panel, not a dialog.
-  if (!sheet || !player.track || (desktop && player.ui.sheet === 'more')) return null;
+  if (!sheet || !player.track || (desktop && player.ui.sheet === 'more')) return toastEl;
   const { Body } = sheet;
   return (
     <>
@@ -551,6 +627,7 @@ export function PlayerSheet({ player, desktop }) {
         {!desktop && <div className="handle" />}
         <Body player={player} />
       </div>
+      {toastEl}
     </>
   );
 }

@@ -7,11 +7,23 @@ import { metaLine, readMarks } from '../notes-facts.js';
 
 const g = /** @type {any} */ (globalThis);
 
-/** @param {{ mark: import('../notes-facts.js').Mark, now: number, onOpen: (m: any) => void }} props */
-export function MarkRow({ mark: m, now, onOpen }) {
+/**
+ * A saved recording (dz30 3r) reads as one: the headphones, its title and line (a tap opens its text), and Play, which
+ * hands the track to `onPlay` (main's playTrack; a gate boot passes none).
+ * @param {{ mark: import('../notes-facts.js').Mark, now: number, onOpen: (m: any) => void, onPlay?: (track: any) => void }} props
+ */
+export function MarkRow({ mark: m, now, onOpen, onPlay }) {
   const open = m.open ? () => onOpen(m.open) : undefined;
   const keys = open ? { role: 'button', tabIndex: 0, onClick: open,
     onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } } } : {};
+  if (m.rec) {
+    return (
+      <div className="mark srec">
+        <div className="rtx" {...keys}><div className="mt"><Icon name="tab.listen" />{m.title}</div><div className="mm">{metaLine(m, now)}</div></div>
+        <button type="button" className="rp" aria-label={'Play ' + m.title} onClick={() => { if (onPlay) onPlay(m.rec); }}><Icon name="play" size={16} /></button>
+      </div>
+    );
+  }
   let body;
   if (m.kind === 'highlight') {
     body = <div className="mq"><span className={'hl ' + (m.colour || 'gold')}>{m.text}</span></div>;

@@ -585,6 +585,24 @@ describe('audio-player — listening controls + arbitration', () => {
     ]);
   });
 
+  it('puts a removed future entry back where it was (Up next\'s Undo, rv5); never at or before the playing one', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    AudioPlayer.next();
+    const urls = () => AudioPlayer.getState().queue.map((track) => track.url);
+    const before = urls();
+    const gone = AudioPlayer.getState().queue[2];
+    expect(AudioPlayer.removeUpcoming(2)).toBe(true);
+    expect(AudioPlayer.insertUpcoming(1, gone)).toBe(false); // the playing item's place
+    expect(AudioPlayer.insertUpcoming(9, gone)).toBe(false); // past the end
+    expect(AudioPlayer.insertUpcoming(2, null)).toBe(false);
+    expect(AudioPlayer.insertUpcoming(2, gone)).toBe(true);
+    expect(urls()).toEqual(before);
+    expect(AudioPlayer.getState().qi).toBe(1);
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).customQueue.map((track) => track.url)).toEqual(before);
+    expect(AudioPlayer.insertUpcoming(urls().length, gone)).toBe(true); // at the very end is a place too
+    expect(urls()).toHaveLength(before.length + 1);
+  });
+
   it('pauses the VOT stream when a journal or other DOM audio element starts', () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
     el().dispatchEvent(new Event('playing'));

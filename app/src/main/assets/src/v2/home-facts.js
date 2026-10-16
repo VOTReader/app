@@ -8,10 +8,15 @@
    Home is that place. A gate boot seeds the same shapes in memory. Everything here is read only. A place is a letter, a
    collection's preface, an Answers topic (its corpus is asked for when one is there), a Bible chapter or a study chapter.
 
+   Recent's whole list (dz30 0c: Home's Recent label opens it) is recentRows(): every place, no cap, Continue's too, each
+   one heard (a recording played) or read, with recentLine()'s words; editing it is screens/RecentSheet.jsx's.
+
    An item is one place a reader was:
      { kind: 'letter', collection, n } or { kind: 'letter', collection, letterId } (main stores letter ids)
      { kind: 'chapter', book, bookTitle?, chapter }      (a Bible chapter; book is main's bookId, 'john')
      { kind: 'study', studyId, chapterId, title }         (a Bible letter study's chapter) */
+
+import { dayLabel } from './notes-facts.js';
 
 const g = /** @type {any} */ (globalThis);
 
@@ -32,6 +37,9 @@ const SHORT = { timothy: 'Timothy', flock: 'Little Flock', rebuke: "The Lord's R
  *   | { kind: 'chapter', book: string, bookTitle?: string, chapter: number }
  *   | { kind: 'study', studyId: string, chapterId: string, title?: string }} HomeItem
  * @typedef {{ continue: HomeItem | null, recent: HomeItem[] }} HomeFacts
+ * @typedef {{ it: HomeItem, heard: boolean, at: number, track?: any, left?: number, done?: boolean }} RecentRow
+ *   One row of Recent's whole list: heard (a recording played: `track`) or read, `at` its time (0 unknown); a gate row
+ *   may say `left` (seconds) or `done` in place of the saved position.
  */
 
 /** The collection record (scripture-resolution COLLECTIONS) for a key, or null. @param {string} key */
@@ -165,7 +173,7 @@ export function recentItems(entries, cont, max = RECENT_MAX, gl = g, tabs = [], 
     keys.forEach((k) => seen.add(k));
     out.push(it);
   };
-  for (const it of byTime(entries, played, gl)) {
+  for (const { it } of byTime(entries, played, gl)) {
     const keys = sameKeys(it, gl);
     if (out.length >= max && !keys.some((k) => openKeys.has(k))) continue;
     add(it, keys);
@@ -174,19 +182,86 @@ export function recentItems(entries, cont, max = RECENT_MAX, gl = g, tabs = [], 
   return out;
 }
 
-/** History and recordings played, each newest first, as one list by time (history entry ts, track playedAt). */
+/**
+ * History and recordings played, each newest first, as one list by time (history entry ts, track playedAt; a tie
+ * read first). @returns {RecentRow[]}
+ */
 function byTime(entries, played, gl) {
-  const a = (Array.isArray(entries) ? entries : []).map((e) => ({ at: Number(e && e.ts) || 0, it: itemFromHistory(e, gl) })).filter((x) => x.it);
-  const b = (Array.isArray(played) ? played : []).map((t) => ({ at: Number(t && t.playedAt) || 0, it: itemFromTrack(t, gl) })).filter((x) => x.it);
+  const a = (Array.isArray(entries) ? entries : []).map((e) => ({ at: Number(e && e.ts) || 0, it: itemFromHistory(e, gl), heard: false }))
+    .filter((x) => x.it);
+  const b = (Array.isArray(played) ? played : []).map((t) => ({ at: Number(t && t.playedAt) || 0, it: itemFromTrack(t, gl), heard: true, track: t }))
+    .filter((x) => x.it);
   const out = [];
   let i = 0;
   let j = 0;
-  while (i < a.length || j < b.length) out.push(j >= b.length || (i < a.length && a[i].at >= b[j].at) ? a[i++].it : b[j++].it);
+  while (i < a.length || j < b.length) out.push(/** @type {RecentRow} */ (j >= b.length || (i < a.length && a[i].at >= b[j].at) ? a[i++] : b[j++]));
   return out;
 }
 
+/**
+ * Recent, all of it (dz30 0c): the history and the recordings played merged newest first, each place once (its newest
+ * visit says heard or read), Continue's place too and no cap; then main's open pages never among them.
+ * @param {any[]} entries newest first @param {any} [gl] @param {any[]} [tabs] @param {any[]} [played] newest first
+ * @returns {RecentRow[]}
+ */
+export function recentRows(entries, gl = g, tabs = [], played = []) {
+  const out = [];
+  const seen = new Set();
+  const add = (row) => {
+    const keys = sameKeys(row.it, gl);
+    if (keys.some((k) => seen.has(k))) return;
+    keys.forEach((k) => seen.add(k));
+    out.push(row);
+  };
+  byTime(entries, played, gl).forEach(add);
+  (Array.isArray(tabs) ? tabs : []).map((t) => itemFromTab(t, gl)).filter(Boolean).forEach((it) => add({ it, heard: false, at: 0 }));
+  return out;
+}
+
+/** Where a Recent row's place is, as its line starts: "Volume One · Letter 1", "The Scriptures of Truth". */
+function recentPlace(it, gl) {
+  if (it.kind === 'chapter') return 'The Scriptures of Truth';
+  if (it.kind === 'study') return 'Studies';
+  const r = resolveLetter(it, gl);
+  if (!r) return '';
+  if (r.preface) return r.col.label + ' · Preface';
+  return r.letter && r.col.kind === 'letter' ? r.col.label + ' · Letter ' + r.letter.num : r.col.label;
+}
+
+/** A recording heard: "Finished" (97 % or more of it), "6 min left" from where it stopped, else "Heard today". */
+function heardWords(row, now, gl) {
+  if (row.done) return 'Finished';
+  let left = typeof row.left === 'number' ? row.left : null;
+  if (left == null && row.track) {
+    const P = gl.AudioPositionsStore;
+    let pos = null;
+    try { pos = P && typeof P.getPosition === 'function' ? P.getPosition(row.track) : null; } catch (_e) { pos = null; }
+    if (pos && pos.d > 0) {
+      if (pos.t / pos.d >= 0.97) return 'Finished';
+      left = pos.d - pos.t;
+    }
+  }
+  if (left != null) return Math.max(1, Math.floor(left / 60)) + ' min left';
+  return row.at ? 'Heard ' + dayWord(row.at, now) : '';
+}
+
+/** notes-facts' day words inside a line: "today", "yesterday", "Sunday", "Oct 9". */
+function dayWord(ts, now) {
+  const d = dayLabel(ts, now);
+  return d === 'Today' || d === 'Yesterday' ? d.toLowerCase() : d;
+}
+
+/**
+ * A Recent row's line: its place, then heard ("6 min left", "Finished") or read ("Read today").
+ * @param {RecentRow} row @param {number} now @param {any} [gl]
+ */
+export function recentLine(row, now, gl = g) {
+  const status = row.heard ? heardWords(row, now, gl) : row.at ? 'Read ' + dayWord(row.at, now) : '';
+  return [recentPlace(row.it, gl), status].filter(Boolean).join(' · ');
+}
+
 /** Both of a letter's keys (by number and by id, whichever are known) so an id-only and a numbered entry match. */
-function sameKeys(it, gl) {
+export function sameKeys(it, gl = g) {
   if (it.kind !== 'letter') return [itemKey(it)];
   const r = resolveLetter(it, gl);
   const keys = [];
@@ -196,8 +271,8 @@ function sameKeys(it, gl) {
   return keys.length ? keys : [itemKey(it)];
 }
 
-/** The reader's saved Continue + Recent (history, recordings played, open pages), read only (a real boot, under HydrationGate). @returns {HomeFacts} */
-export function savedHome(gl = g) {
+/** What Home reads from main's stores (a real boot, under HydrationGate): vot-state, the history, recordings played. */
+function savedLists(gl) {
   let state = null;
   let entries = [];
   let played = [];
@@ -213,9 +288,21 @@ export function savedHome(gl = g) {
     const lib = gl.AudioLibraryStore;
     if (lib && typeof lib.isReady === 'function' && lib.isReady() && typeof lib.recent === 'function') played = lib.recent() || [];
   } catch (_e) { played = []; /* no library: the history alone */ }
-  const cont = continueFromState(state);
   const tabs = state && Array.isArray(state.tabs) ? state.tabs : [];
+  return { state, entries, played, tabs };
+}
+
+/** The reader's saved Continue + Recent (history, recordings played, open pages), read only. @returns {HomeFacts} */
+export function savedHome(gl = g) {
+  const { state, entries, played, tabs } = savedLists(gl);
+  const cont = continueFromState(state);
   return { continue: cont, recent: recentItems(entries, cont, RECENT_MAX, gl, tabs, played) };
+}
+
+/** Recent's whole list from main's stores, read only (0c). @returns {RecentRow[]} */
+export function savedRecent(gl = g) {
+  const { entries, played, tabs } = savedLists(gl);
+  return recentRows(entries, gl, tabs, played);
 }
 
 /**

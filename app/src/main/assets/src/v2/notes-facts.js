@@ -7,6 +7,8 @@
    each kind's title, the day words ("Today", "Sunday", "Oct 9") and each row's meta line. No storage writes, no DOM. */
 
 import { bookName } from './home-facts.js';
+import { readerLine } from './player/view.js';
+import { BIBLE_AUDIO_EDITIONS } from '../utils/audio-track.js';
 
 const DAY = 24 * 3600 * 1000;
 
@@ -14,9 +16,9 @@ const DAY = 24 * 3600 * 1000;
  * One row in Notes.
  * @typedef {{ kind: 'journal' | 'highlight' | 'note' | 'bookmark' | 'link', id: string, at: number,
  *   title?: string, text?: string, quote?: string, note?: string, colour?: string, where?: string,
- *   label?: string, open?: Record<string, any> | null, gid?: string, nb?: string[] }} Mark
- *   label: the meta line's first words when not the kind's name ("Saved recording"); a note's gid is main's groupId and
- *   nb its notebookIds (notebook-facts.js)
+ *   label?: string, open?: Record<string, any> | null, gid?: string, nb?: string[], rec?: Record<string, any> }} Mark
+ *   label: the meta line's first words when not the kind's name ("Recording"); a note's gid is main's groupId and
+ *   nb its notebookIds (notebook-facts.js); rec: a saved recording's track (Play hands it to main's playTrack: dz30 3r)
  */
 
 /** The chips, in the picture's order (Journal second: Corbin asked how to reach his journal, 10-14 17:4x). */
@@ -298,8 +300,9 @@ export function readMarks(env = globalThis) {
       if (p.pending) pending = true;
       if (p.unnamed) unnamed = true;
       const title = (t.title && String(t.title).trim()) || p.title || 'Recording';
-      marks.push({ kind: 'bookmark', label: 'Saved recording', id: 'rec:' + t.url, at: t.savedAt || 0, title,
-        where: p.where === title ? '' : p.where, open: p.open });
+      const who = recordingWho(t);
+      marks.push({ kind: 'bookmark', label: 'Recording', id: 'rec:' + t.url, at: t.savedAt || 0, title,
+        where: who || (p.where === title ? '' : p.where), open: p.open, rec: t });
     }
   }
   const L = env.LinkStore;
@@ -314,6 +317,40 @@ export function readMarks(env = globalThis) {
     }
   }
   return { marks, pending, unnamed };
+}
+
+/**
+ * Who a saved recording is by, as 3r's line says it: an Audio Bible chapter's edition without its bracket ("NKJV, The
+ * Word of Promise"), else its reader ("Read by Benjamin"); '' when neither is known.
+ * @param {{ key?: string | null, readerCode?: string | null }} t
+ */
+export function recordingWho(t) {
+  const key = String((t && t.key) || '');
+  const volKey = key.slice(0, Math.max(0, key.indexOf(':')));
+  const ed = volKey.startsWith('bible-') ? Object.values(BIBLE_AUDIO_EDITIONS).find((e) => e && e.volKey === volKey) : null;
+  if (ed) return ed.label.replace(/\s*\([^)]*\)\s*$/, '').split(' · ').join(', ');
+  return readerLine(t && t.readerCode) || '';
+}
+
+/**
+ * 3r's seeds: two saved recordings (Letter 1 read by Benjamin, saved today; John 3 in the Word of Promise NKJV, saved
+ * yesterday) and two bookmarked pages (Letter 2 on Sunday, Letter 16 on Oct 6), as dz30 draws them.
+ * @param {number} now
+ */
+export function gateSavedMarks(now) {
+  const d = (n) => now - n * DAY;
+  const letter1 = { key: 'one:chosen-by-god', title: 'Chosen by God', sub: 'Volume One', url: 'gate:one/1', readerCode: 'B', partLabel: null };
+  const john3 = { key: 'bible-wop-nkjv:john', title: 'John 3', sub: 'The Scriptures of Truth', url: 'gate:john/3', readerCode: null, partLabel: 'Chapter 3' };
+  return /** @type {Mark[]} */ ([
+    { kind: 'bookmark', label: 'Recording', id: 'rec:gate:one/1', at: d(0), title: letter1.title, where: recordingWho(letter1),
+      open: { place: 'letter', collection: 'one', n: 1 }, rec: letter1 },
+    { kind: 'bookmark', label: 'Recording', id: 'rec:gate:john/3', at: d(1), title: john3.title, where: recordingWho(john3),
+      open: { place: 'bible-chapter', book: 'john', chapter: 3, verse: null }, rec: john3 },
+    { kind: 'bookmark', id: 'bkm:g2', at: d(3), title: 'Honor Not the Day of the Dead... Honor God', where: 'Volume One · Letter 2',
+      open: { place: 'letter', collection: 'one', n: 2 } },
+    { kind: 'bookmark', id: 'bkm:g16', at: d(8), title: 'Run from the Forest and Loose All That Binds You', where: 'Volume One · Letter 16',
+      open: { place: 'letter', collection: 'one', n: 16 } },
+  ]);
 }
 
 /** Seeds for the gate pictures: 'now' minus whole days (so the day words match on any clock). */

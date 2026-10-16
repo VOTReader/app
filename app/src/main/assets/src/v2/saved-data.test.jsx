@@ -156,7 +156,7 @@ describe("main's saved data, found in v2", () => {
     expect(row('Many things you')).toBe('Many things youHighlight · Volume One · Letter 1 · Today');
     expect(row('Read this again on Sunday.')).toBe('“Thus says”Read this again on Sunday.Note · Volume One · Letter 1 · Today');
     expect(row('On Prayer')).toBe('On PrayerBookmark · Words To Live By: Part One · Today');
-    expect(row('Saved recording')).toBe('Honor Not the Day of the Dead... Honor GodSaved recording · Volume One · Letter 2 · Today');
+    expect(row('Recording ·')).toBe('Honor Not the Day of the Dead... Honor GodRecording · Volume One · Letter 2 · Today');
     expect(row('joined to')).toBe('Honor Not the Day of the Dead... Honor God, joined to John 15:16Link · Volume One · Letter 2 · Today');
     // the Bookmarks chip holds the places saved, the recording among them
     await click([...container.querySelectorAll('.chips.kinds .chip')].find((c) => c.textContent === 'Bookmarks'));
@@ -172,7 +172,8 @@ describe("main's saved data, found in v2", () => {
     const { container } = render(<V2App gateId={null} />);
     await click([...container.querySelectorAll('.tab')].find((t) => t.textContent === 'Notes'));
     await waitFor(() => expect(container.querySelectorAll('.marks .mark').length).toBe(6));
-    await click([...container.querySelectorAll('.marks .mark')].find((m) => m.textContent.includes('Saved recording')));
+    // the recording's words open its text; its Play button plays it (dz30 3r)
+    await click([...container.querySelectorAll('.marks .mark.srec .rtx')].find((m) => m.textContent.includes('Recording ·')));
     await waitFor(() => expect(container.querySelector('h1').textContent).toBe('Honor Not the Day of the Dead... Honor God'));
     expect(container.querySelector('.overline').textContent).toBe('Volume One · Letter 2');
   });
@@ -266,8 +267,8 @@ describe("main's Words To Live By compilations and Bible books, found in v2 (v2g
     await AudioLibraryStore.whenSaved();
     const { container } = render(<V2App gateId={null} />);
     await click([...container.querySelectorAll('.tab')].find((t) => t.textContent === 'Notes'));
-    const row = () => [...container.querySelectorAll('.marks .mark')].find((m) => m.textContent.startsWith('Part 1 · Intro–19'));
-    await waitFor(() => expect(row() && row().textContent).toBe('Part 1 · Intro–19Saved recording · Words To Live By: Part One · Today'));
+    const row = () => [...container.querySelectorAll('.marks .mark.srec .rtx')].find((m) => m.textContent.startsWith('Part 1 · Intro–19'));
+    await waitFor(() => expect(row() && row().textContent).toBe('Part 1 · Intro–19Recording · Text-to-speech · Today'));
     await click(row());
     await waitFor(() => expect(container.querySelector('h1').textContent).toBe('Seek First the Kingdom'));
   });
@@ -282,6 +283,6 @@ describe("main's Words To Live By compilations and Bible books, found in v2 (v2g
     const { container } = render(<V2App gateId={null} />);
     expect(texts(container, '.recent .chip')).toEqual(['1 John 4', 'Vol. One, Letter 2', 'John 3', 'On Prayer', 'Vol. One, Letter 3', 'Vol. One, Preface', '2 Corinthians 5']);
     await click([...container.querySelectorAll('.tab')].find((t) => t.textContent === 'Notes'));
-    await waitFor(() => expect(texts(container, '.marks .mark')).toContain('Song of Solomon 2Saved recording · Today'));
+    await waitFor(() => expect(texts(container, '.marks .mark')).toContain('Song of Solomon 2Recording · KJV, Biblical Restoration Ministries · Today'));
   });
 });

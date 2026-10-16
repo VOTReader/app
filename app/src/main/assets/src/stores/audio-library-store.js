@@ -399,6 +399,25 @@ export const AudioLibraryStore = extendStore(
       this._bump();
     },
 
+    /**
+     * Put rows removeRecent or clearRecent took out back in, each at its own
+     * play time (v2's Recent Undo, rv5). A recording played again since keeps
+     * its newer row; the list stays bounded and newest first.
+     *
+     * @param {unknown} rows
+     * @returns {void}
+     */
+    restoreRecent(rows) {
+      const back = (Array.isArray(rows) ? rows : []).filter((item) => item && typeof item === 'object' && _identity(item));
+      if (!back.length) return;
+      if (this._shouldDefer('restoreRecent', back)) return;
+      const data = _writeableData(this);
+      data.recent = /** @type {RecentAudioTrack[]} */ (_sortedUniqueTracks(data.recent.concat(back), 'playedAt', MAX_RECENT_AUDIO_TRACKS));
+      this._cache = data;
+      this._save();
+      this._bump();
+    },
+
     /** Saved song ids, newest first. @returns {string[]} */
     songSaved() { return _readView(this).songSaved.slice(); },
 

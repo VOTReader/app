@@ -14,12 +14,20 @@ import { MarkRow, useMarks } from './MarkList.jsx';
 import { NotebookCards, takeParting } from './Notebooks.jsx';
 import { readNotebooks } from '../notebook-facts.js';
 
+const g = /** @type {any} */ (globalThis);
+
 /** @param {import('../places.js').PlaceProps} props */
 export function NotesScreen({ route, gate, desktop, go, replace, onReady }) {
   const kind = kindOf(route.kind);
   const { marks, pending } = useMarks(gate);
   const now = gate ? ((gate.facts && gate.facts.now) || GATE_NOW) : Date.now();
   const rows = marksOfKind(marks, kind);
+  // Play on a saved recording: main's playTrack (it picks up where the reader stopped, as main's saved list did)
+  const play = gate ? undefined : (track) => { const A = g.AudioPlayer; if (A && typeof A.playTrack === 'function') A.playTrack(track); };
+  const row = (m) => <MarkRow key={m.id} mark={m} now={now} onOpen={(r) => go(r)} onPlay={play} />;
+  // Bookmarks: the saved recordings first, then the pages (dz30 3r), each group named when both are there
+  const recs = kind === 'bookmark' ? rows.filter((m) => m.rec) : [];
+  const pages = recs.length ? rows.filter((m) => !m.rec) : rows;
   React.useEffect(() => { if (!pending) onReady(); }, [onReady, pending, kind]);
   const newEntry = () => newJournalEntry(go, !gate);
   // Delete notebook's Undo (its page has gone: only the top page is mounted)
@@ -69,7 +77,10 @@ export function NotesScreen({ route, gate, desktop, go, replace, onReady }) {
       {books && <NotebookCards gate={gate} marks={marks} desktop={desktop} go={go} listed={rows.length > 0} />}
       {rows.length ? (
         <div className={'g marks' + (books ? ' nbm' : '')}>
-          {rows.map((m) => <MarkRow key={m.id} mark={m} now={now} onOpen={(r) => go(r)} />)}
+          {recs.length > 0 && <span className="label mg">Saved recordings</span>}
+          {recs.map(row)}
+          {recs.length > 0 && pages.length > 0 && <span className="label mg">Pages</span>}
+          {pages.map(row)}
         </div>
       ) : (
         <div className="g">

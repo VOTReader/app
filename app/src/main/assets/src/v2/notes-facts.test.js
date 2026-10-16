@@ -110,9 +110,9 @@ describe('readMarks: main saved data, re-shown read only', () => {
     ];
     const e = { ...env(), AudioLibraryStore: { saved: () => saved, toggleSaved: vi.fn() } };
     const by = Object.fromEntries(readMarks(e).marks.filter((m) => m.label).map((m) => [m.id, m]));
-    expect(by['rec:u/v1-02.mp3']).toMatchObject({ kind: 'bookmark', label: 'Saved recording', at: 800, title: 'Honor Not the Day of the Dead... Honor God',
+    expect(by['rec:u/v1-02.mp3']).toMatchObject({ kind: 'bookmark', label: 'Recording', at: 800, title: 'Honor Not the Day of the Dead... Honor God',
       where: 'Volume One · Letter 2', open: { place: 'letter', collection: 'one', n: 2 } });
-    expect(metaLine(by['rec:u/v1-02.mp3'], 800)).toBe('Saved recording · Volume One · Letter 2 · Today');
+    expect(metaLine(by['rec:u/v1-02.mp3'], 800)).toBe('Recording · Volume One · Letter 2 · Today');
     expect(by['rec:u/john-3.mp3']).toMatchObject({ where: 'John 3', open: { place: 'bible-chapter', book: 'john', chapter: 3 } });
     expect(by['rec:u/hosea-2.mp3']).toMatchObject({ where: 'Studies', open: { place: 'study-chapter', study: 'hosea', chapter: 'hosea-ch2' } });
     expect(by['rec:u/v1-00.mp3']).toMatchObject({ title: 'Preface', where: 'Volume One', open: { place: 'letter', collection: 'one', preface: true } });

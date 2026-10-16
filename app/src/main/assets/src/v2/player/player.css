@@ -54,8 +54,25 @@
    Bookmark does; main's confirm strip under the voices is the kit's gold pill then its outline button. */
 .srow.act.on .lead { color: var(--accent); }
 .srow.act.on .lead svg { fill: currentColor; }
-.mvc { display: flex; gap: 10px; margin: 2px 0 10px; }
 .menu .mvc { padding: 0 16px 6px; }
 /* 4b's Listen row (dz16, v2-gaps 23): the kit draws .srow.act.lis as one row; its Listen half is a button of its own here,
    so the outline Repeat can sit beside it (a button cannot hold a button) */
 .srow.act.lis .lis-go { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 12px; text-align: left; }
+
+/* rv5 Listening extras (dz30; design's recipes are in screens.css): what the app's own markup needs on top.
+   6f: the typed box is an input (.spd-in draws its box); the caret in the accent, as drawn */
+.spd-now input.v.spd-in { caret-color: var(--accent); }
+/* 6g: the list scrolls edge to edge (its rows keep the gutter), so a row swiped left runs off the screen as drawn, not
+   clipped at the gutter; a row swiped right shows its strip's words at the left */
+.sheet.tall .rows.q { margin-left: calc(var(--gut) * -1); margin-right: calc(var(--gut) * -1); padding: 0 var(--gut); }
+.qsw .qbk.r { justify-content: flex-start; padding: 0 0 0 14px; }
+/* 6h: a toast over a sheet or Now playing: above them, just over the phone's nav bar */
+.v2-phone .v2-layer > .toast-wrap.ovs { z-index: 6; bottom: calc(12px + var(--v2-bottom)); }
+/* 0c: Home's Recent label as a button (shell.css spaces a plain label); the whole list scrolls inside its sheet */
+.v2 .recent .rlab { flex: none; }
+.v2 .recent .rlab .label { margin-right: 0; }
+.sheet.rct, .dlg.rct { display: flex; flex-direction: column; }
+.sheet.rct { max-height: calc(100% - 64px); }
+.dlg.rct { max-height: 80%; }
+.sheet.rct .rows, .dlg.rct .rows { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 2px 0 0; }
+.rct .empty-t { margin: 14px 0 10px; color: var(--t2); font-size: var(--fs-s); }

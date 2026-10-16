@@ -327,9 +327,9 @@ describe('gate 2f-player-more (the ⋮ in Now playing)', () => {
     click(voiceRows(c)[1]);
     const sheet = c.querySelector('.sheet.mor');
     expect(sheet).not.toBeNull();
-    expect(text(sheet, '.fine.mvn')).toBe('Switching voice rebuilds this queue and drops your changes to it. Continue?');
+    expect(text(sheet, '.fine.mvn')).toBe('Switching to Text-to-speech rebuilds this queue and drops your changes to it. Continue?');
     const [yes, no] = [...sheet.querySelectorAll('.mvc button')];
-    expect([yes.textContent, no.textContent]).toEqual(['Yes, switch', 'Cancel']);
+    expect([yes.textContent, no.textContent]).toEqual(['Yes, switch', 'Not now']);
     expect(document.activeElement).toBe(yes);
     expect(text(c, '.np-s')).toBe('Read by Benjamin·On this phone');
     click(no);
@@ -622,7 +622,7 @@ describe('the real engine (bundle-d globals)', () => {
     openMore(c);
     click(voiceRows(c)[1]);
     expect(e.api.playLetter).not.toHaveBeenCalled();
-    expect(text(c, '.sheet.mor .fine.mvn')).toBe('Switching voice rebuilds this queue and drops your changes to it. Continue?');
+    expect(text(c, '.sheet.mor .fine.mvn')).toBe('Switching to Text-to-speech rebuilds this queue and drops your changes to it. Continue?');
     click(c.querySelector('.sheet.mor .mvc button'));
     expect(e.api.playLetter).toHaveBeenCalledWith({ volKey: 'one', letter: { id: 'chosen-by-god', title: 'Chosen by God' },
       collectionLabel: 'Volume One', reader: 'V', noResume: true });
@@ -634,7 +634,7 @@ describe('the real engine (bundle-d globals)', () => {
     const { container: c } = render(<V2App gateId={null} />);
     openMore(c);
     click(voiceRows(c)[1]);
-    expect(text(c, '.sheet.mor .fine.mvn')).toBe('Switching voice rebuilds this into a full queue. Continue?');
+    expect(text(c, '.sheet.mor .fine.mvn')).toBe('Switching to Text-to-speech rebuilds this into a full queue. Continue?');
     delete g.AudioLibraryStore;
   });
 
@@ -655,7 +655,9 @@ describe('the real engine (bundle-d globals)', () => {
     const { container: c } = render(<V2App gateId={null} />);
     openMore(c);
     expect(text(c, '.sheet.mor .mlab')).toBe('Audio Bible');
-    expect(voiceRows(c).map((r) => [r.textContent, r.getAttribute('aria-checked')])).toEqual([['KJV · BRM', 'false'], ['NKJV · Dramatized', 'true']]);
+    // each edition on two lines (dz30 2m): main's label split at its first " · "
+    expect(voiceRows(c).map((r) => [text(r, '.t'), text(r, '.s'), r.getAttribute('aria-checked')])).toEqual([
+      ['KJV', 'Biblical Restoration Ministries', 'false'], ['NKJV', 'The Word of Promise (Dramatized)', 'true']]);
     expect(text(c, '.sheet.mor .fine.mvn')).toBe('Switches this chapter — starts it again, and the queue follows.');
     click(voiceRows(c)[0]);
     expect(e.api.playBibleBook).toHaveBeenCalledWith({ volKey: 'bible-brm-kjv', bookId: 'john', chapterNum: 3,

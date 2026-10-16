@@ -890,3 +890,43 @@
 .ver .ver-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
 .ver .ver-h .label { margin-bottom: 0; }
 .ver .ver-h .textbtn { margin-right: -2px; }
+
+/* ---------- dz30 (2026-10-16): Listening extras (v2-gaps 31) ---------- */
+/* Home: the Recent label is a button (a chevron after it) that opens the whole list (0c) */
+.recent .rlab { display: inline-flex; align-items: center; gap: 1px; height: 36px; margin-right: 2px; color: var(--tgold); }
+.recent .rlab .label { margin-right: 0; }
+.recent .rlab svg { width: 14px; height: 14px; }
+/* 6f: the speed readout, tapped, is a box holding what is typed and the caret */
+.spd-now .v.spd-in { display: flex; align-items: center; justify-content: center; height: 60px; min-width: 132px; padding: 0 12px;
+  border: 1px solid var(--accent); border-radius: var(--r-s); background: var(--input); }
+.spd-in .caret { width: 1.5px; height: 34px; background: var(--accent); margin-left: 3px; }
+/* 6g: a queue row mid-swipe slides left over a strip that says what letting go does */
+.qsw { position: relative; }
+.qsw .qbk { position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-right: 14px;
+  background: color-mix(in srgb, var(--danger) 22%, var(--raised)); color: var(--t-hero); font-size: var(--fs-s); border-top: 1px solid var(--line); }
+.qsw .qbk svg { width: 20px; height: 20px; color: var(--danger); }
+.qsw .row { position: relative; background: var(--raised); transform: translateX(-104px); }
+/* 6h: a toast over a sheet sits above the nav bar */
+.toast-wrap.ovs { bottom: 60px; z-index: 6; }
+/* 2m: a saved recording's row wears the filled bookmark; the editions are two lines (translation, who recorded it); the
+   confirm strip's two buttons (v2 player.css .mvc) */
+.srow.act.on .lead { color: var(--accent); border-color: var(--accent); }
+.srow.act.on .lead svg { fill: currentColor; }
+.srow.opt.edr { min-height: 60px; }
+.srow.opt.edr .s { font-size: var(--fs-s); color: var(--t2); margin-top: 1px; }
+.mvc { display: flex; gap: 10px; margin: 2px 0 6px; }
+/* 3r: Notes > Bookmarks in two groups; a saved recording's line ends with Play */
+.marks .label.mg { display: block; margin: 8px 0 10px; }
+.marks .mark + .label.mg { margin-top: 20px; }
+.mark.srec { display: flex; align-items: center; gap: 12px; }
+.mark.srec .rtx { flex: 1; min-width: 0; }
+.mark.srec .rp { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--edge); display: grid; place-items: center; color: var(--t1); flex: none; }
+.mark.srec .rp svg { width: 16px; height: 16px; }
+/* 0c: the Recent sheet: heard (headphones) or read (book), x to remove */
+.sheet.rct .rows { margin: 2px 0 0; }
+.row.rcr { gap: 10px; padding: 10px 0 12px; }
+.row.rcr .lead { width: 24px; flex: none; color: var(--tgold-hi); display: grid; place-items: center; align-self: flex-start; margin-top: 4px; }
+.row.rcr .lead svg { width: 22px; height: 22px; }
+.row.rcr .t { font-size: var(--fs-row1); }
+.ic.rx { width: 40px; height: 40px; display: grid; place-items: center; color: var(--t2); flex: none; margin-right: -8px; }
+.ic.rx svg { width: 20px; height: 20px; }

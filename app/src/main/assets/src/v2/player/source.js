@@ -12,14 +12,15 @@ import { readerLine } from './view.js';
 /**
  * @typedef {{ status: string, queue: any[], qi: number, time: number, duration: number, rate: number,
  *   sleepEndsAt: number, sleepMinutes: number, sleepAtTrackEnd: boolean, sourceMode?: string }} PlayerState
- * @typedef {{ id: string, label: string, active: boolean, reader?: string | null }} VoiceChoice
+ * @typedef {{ id: string, label: string, sub?: string, active: boolean, reader?: string | null }} VoiceChoice
+ *   An edition reads on two lines (dz30 2m): main's label split at its first " · " (KJV / Biblical Restoration Ministries).
  * @typedef {{ kind: 'reader' | 'edition', choices: VoiceChoice[] }} Voices
  * @typedef {{ subscribe: (cb: () => void) => () => void, version: () => string, state: () => PlayerState,
  *   ready: () => boolean, isSaved: (url: string) => boolean, sleepLeft: () => number,
  *   toggle: () => void, prev: () => void, next: () => void, skip: (s: number) => void, seek: (s: number) => void,
  *   setRate: (r: number) => void, setSleep: (min: number) => void, sleepAtEnd: () => void, clearSleep: () => void,
  *   playAt: (i: number) => void, move: (from: number, to: number) => void, remove: (i: number) => void,
- *   clearUpcoming: () => void, voices: () => Voices | null, pickVoice: (id: string) => void,
+ *   insert: (i: number, track: any) => void, clearUpcoming: () => void, voices: () => Voices | null, pickVoice: (id: string) => void,
  *   voiceNeedsConfirm: () => boolean, recordingSaved: () => boolean, toggleRecordingSaved: () => void }} PlayerSource
  */
 
@@ -52,7 +53,11 @@ export function voiceChoices(track, g = /** @type {any} */ (globalThis)) {
     if (typeof A.hasAudio !== 'function') return null;
     const eds = Object.entries(BIBLE_AUDIO_EDITIONS).filter(([, ed]) => bibleAudioOffered(ed) && A.hasAudio(ed.volKey, split.id));
     if (eds.length < 2) return null;
-    return { kind: 'edition', choices: eds.map(([id, ed]) => ({ id, label: ed.short || ed.label, active: ed.volKey === split.volKey })) };
+    return { kind: 'edition', choices: eds.map(([id, ed]) => {
+      const cut = ed.label.indexOf(' · ');
+      return { id, label: cut > 0 ? ed.label.slice(0, cut) : ed.label, sub: cut > 0 ? ed.label.slice(cut + 3) : undefined,
+        active: ed.volKey === split.volKey };
+    }) };
   }
   if (typeof A.renditionsFor !== 'function') return null;
   const rs = A.renditionsFor(split.volKey, { id: split.id, title: track.title }, track.sub) || [];
@@ -131,6 +136,7 @@ export function realSource(g = /** @type {any} */ (globalThis)) {
     playAt: (i) => A.playAt(i),
     move: (from, to) => A.moveUpcoming(from, to),
     remove: (i) => A.removeUpcoming(i),
+    insert: (i, t) => { if (typeof A.insertUpcoming === 'function') A.insertUpcoming(i, t); },
     clearUpcoming: () => A.clearUpcoming(),
     voices: () => voiceChoices(current(), g),
     pickVoice(id) {
@@ -162,7 +168,8 @@ export function gateBibleVolKey(playing, g = /** @type {any} */ (globalThis)) {
  */
 export function gateQueue(playing, g = /** @type {any} */ (globalThis)) {
   const item = (playing && playing.item) || {};
-  const reader = (playing && playing.reader) || 'B';
+  // a row may say reader: null (an Audio Bible edition names no reader: 2m)
+  const reader = playing && 'reader' in playing ? playing.reader : 'B';
   if (item.book) {
     const books = Array.isArray(g.BIBLE_AUDIO_BOOKS) ? g.BIBLE_AUDIO_BOOKS : null;
     const book = books ? books.find((b) => b && b[0] === item.book) : null;
@@ -202,6 +209,8 @@ export function fakeSource(playing, g = /** @type {any} */ (globalThis)) {
     time: Number(p.at) || 0, duration: Number(p.length) || 0, rate: Number(p.rate) || 1,
     sleepEndsAt: sleepLeft > 0 ? 1 : 0, sleepMinutes: sleep && typeof sleep === 'object' ? Number(sleep.minutes) || 0 : 0,
     sleepAtTrackEnd: sleep === 'end',
+    // playing.edited: Up next was changed by hand (2m asks before a switch)
+    sourceMode: p.edited ? 'custom' : '',
   };
   let saved = /** @type {Set<string>} */ (new Set());
   // playing.saved is "downloaded" (On this phone); playing.savedRecording is the Listening Library's Save.
@@ -245,6 +254,10 @@ export function fakeSource(playing, g = /** @type {any} */ (globalThis)) {
       if (i <= st.qi || i >= st.queue.length) return;
       st.queue = st.queue.slice(0, i).concat(st.queue.slice(i + 1)); st.sourceMode = 'custom'; bump();
     },
+    insert(i, t) {
+      if (!t || i <= st.qi || i > st.queue.length) return;
+      st.queue = st.queue.slice(0, i).concat([t], st.queue.slice(i)); st.sourceMode = 'custom'; bump();
+    },
     clearUpcoming() { if (st.queue.length > st.qi + 1) st.sourceMode = 'custom'; st.queue = st.queue.slice(0, st.qi + 1); bump(); },
     voices: () => (build() ? voiceChoices(st.queue[st.qi], g) : null),
     // A voice rebuilds the queue in that voice around the playing item and starts it again (main's engine); that
@@ -273,7 +286,7 @@ export function silentSource() {
   return {
     subscribe: () => () => {}, version: () => '0', state: () => IDLE, ready: () => true, isSaved: () => false,
     sleepLeft: () => 0, toggle() {}, prev() {}, next() {}, skip() {}, seek() {}, setRate() {}, setSleep() {},
-    sleepAtEnd() {}, clearSleep() {}, playAt() {}, move() {}, remove() {}, clearUpcoming() {},
+    sleepAtEnd() {}, clearSleep() {}, playAt() {}, move() {}, remove() {}, insert() {}, clearUpcoming() {},
     voices: () => null, pickVoice() {}, voiceNeedsConfirm: () => false, recordingSaved: () => false, toggleRecordingSaved() {},
   };
 }

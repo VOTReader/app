@@ -126,6 +126,30 @@ describe('AudioLibraryStore — normalized metadata', () => {
     expect(AudioLibraryStore.recent()).toHaveLength(1);
   });
 
+  it('restoreRecent puts removed rows back by their play time (v2 Recent\'s Undo, rv5); a row played again since wins', () => {
+    AudioLibraryStore.recordPlayed(track(1));
+    vi.advanceTimersByTime(60000);
+    AudioLibraryStore.recordPlayed(track(2));
+    vi.advanceTimersByTime(60000);
+    AudioLibraryStore.recordPlayed(track(3));
+    const rows = AudioLibraryStore.recent().filter((item) => item.url !== track(3).url);
+    rows.forEach((item) => AudioLibraryStore.removeRecent(item.url));
+    expect(AudioLibraryStore.recent().map((item) => item.title)).toEqual(['Letter 3']);
+
+    AudioLibraryStore.restoreRecent(rows);
+    expect(AudioLibraryStore.recent().map((item) => item.title)).toEqual(['Letter 3', 'Letter 2', 'Letter 1']);
+    expect(AudioLibraryStore.recent()[2].playedAt).toBe(rows[1].playedAt);
+
+    AudioLibraryStore.clearRecent();
+    vi.advanceTimersByTime(60000);
+    AudioLibraryStore.recordPlayed(track(2));   // played again after the clear
+    const newer = AudioLibraryStore.recent()[0].playedAt;
+    AudioLibraryStore.restoreRecent(rows.concat(/** @type {any[]} */ ([null, { url: '' }])));
+    expect(AudioLibraryStore.recent().map((item) => [item.title, item.playedAt === newer])).toEqual([
+      ['Letter 2', true], ['Letter 1', false],
+    ]);
+  });
+
   it('clearRecent leaves saved recordings and speed intact', () => {
     AudioLibraryStore.toggleSaved(track(1));
     AudioLibraryStore.recordPlayed(track(2));
