@@ -286,7 +286,7 @@ describe("the sheet's Listen row (4b, dz16): main's Listen from here on the page
   it('no recording on the page (no pane): no row, as before', () => {
     const { container, getByRole } = page();
     click(block(container, 0).querySelector('i'));
-    expect(rows(getByRole('dialog', { name: 'Mark this paragraph' }))).toEqual(['Add a note', 'Copy', 'Share a link']);
+    expect(rows(getByRole('dialog', { name: 'Mark this paragraph' }))).toEqual(['Add a note', 'Link to another passage', 'Copy', 'Share a link']);
   });
 
   it("a recorded paragraph: the row after the swatches; Listen closes the sheet and plays from the paragraph's start", () => {
@@ -294,7 +294,7 @@ describe("the sheet's Listen row (4b, dz16): main's Listen from here on the page
     const { container, getByRole } = page();
     click(block(container, 0).querySelector('i'));
     const dlg = getByRole('dialog', { name: 'Mark this paragraph' });
-    expect(rows(dlg)).toEqual(['Listen from hereRepeat', 'Add a note', 'Copy', 'Share a link']);
+    expect(rows(dlg)).toEqual(['Listen from hereRepeat', 'Add a note', 'Link to another passage', 'Copy', 'Share a link']);
     expect(dlg.querySelector('.swatches').nextElementSibling.className).toBe('srow act lis');
     expect(g.__votListenFrom.has).toHaveBeenCalledWith(KEY0);
     click(dlg.querySelector('.lis-go'));
@@ -320,12 +320,12 @@ describe("the sheet's Listen row (4b, dz16): main's Listen from here on the page
     g.__votListenFrom = pane({ repeat: undefined });
     const first = page();
     click(block(first.container, 0).querySelector('i'));
-    expect(rows(first.getByRole('dialog', { name: 'Mark this paragraph' }))).toEqual(['Listen from here', 'Add a note', 'Copy', 'Share a link']);
+    expect(rows(first.getByRole('dialog', { name: 'Mark this paragraph' }))).toEqual(['Listen from here', 'Add a note', 'Link to another passage', 'Copy', 'Share a link']);
     cleanup();
     g.__votListenFrom = pane({ has: vi.fn(() => false) });
     const second = page();
     click(block(second.container, 0).querySelector('i'));
-    expect(rows(second.getByRole('dialog', { name: 'Mark this paragraph' }))).toEqual(['Add a note', 'Copy', 'Share a link']);
+    expect(rows(second.getByRole('dialog', { name: 'Mark this paragraph' }))).toEqual(['Add a note', 'Link to another passage', 'Copy', 'Share a link']);
   });
 });
 
@@ -339,7 +339,7 @@ describe('the 4b gate and closing the sheet', () => {
     expect(sheet.parentElement.className).toBe('v2-layer');
     expect(sheet.querySelector('.swatch.on').className).toBe('swatch gold on');
     expect([...sheet.querySelectorAll('.srow')].map((r) => r.textContent))
-      .toEqual(['Listen from hereRead by BenjaminRepeat', 'Add a note', 'Copy', 'Share a link']);
+      .toEqual(['Listen from hereRead by BenjaminRepeat', 'Add a note', 'Link to another passage', 'Copy', 'Share a link']);
     expect(sheet.querySelector('.srow.act.lis .btn2.sm.rpt').getAttribute('aria-label')).toBe('Repeat this passage 3 times');
     expect(block(container, 0).classList.contains('tapped')).toBe(true);
     expect(g.AnnotationStore.get).not.toHaveBeenCalled();

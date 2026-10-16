@@ -131,3 +131,24 @@ html, body { background: var(--bg); height: 100%; overflow: hidden; overscroll-b
 .v2 .lfk-line .textbtn { margin-left: auto; height: 40px; }
 /* the storage strip (StorageBanner.jsx, 9f/9g): the kit's .shb > svg through Icon's wrapper */
 .v2 .shb > .v2i > svg { width: 22px; height: 22px; color: var(--sh); margin-top: 1px; }
+/* making a link (LinkPicker.jsx, LinksSheet.jsx; dz22 4d-4i): the kit's .lkr > svg through Icon's wrapper (a row that
+   opens its words first ends in a chevron, quieter); the picker's lists scroll inside the sheet with no bar; chosen
+   words wear the gold wash between the system's handles; main's link icon at a passage's end is the kit's .lki, a 44 px
+   target, the second colour where the passage is only a link's target; Recent's From / To pairs */
+.v2 .lkr > .v2i > svg { width: 20px; height: 20px; color: var(--accent); flex: none; margin-top: 10px; }
+.v2 .lkr > .v2i.go > svg { color: var(--t2); }
+.v2 .lkb { overflow-y: auto; scrollbar-width: none; overscroll-behavior: contain; }
+.v2 .lkb::-webkit-scrollbar { display: none; }
+.v2 .lkv ::selection, .v2 .lkw ::selection { background: rgba(var(--gold-rgb), .26); color: var(--t1); }
+.v2 .lkv .vn { cursor: pointer; }
+.v2 .lki { position: relative; cursor: pointer; }
+.v2 .lki::after { content: ''; position: absolute; inset: -9px; }
+.v2 .lki.to { color: var(--t2); }
+.v2 .chips.lkc2 { margin-top: 8px; }
+.v2 .lkn.lkn0 { margin-top: 0; }
+.v2 .empty.lke { padding-top: 28px; }
+.v2 .lkl2 .chgrid { margin-top: 8px; }
+.v2 .lkpair { display: flex; gap: 8px; margin-top: 10px; }
+.v2 .lkend { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 10px 12px; border-radius: var(--r); background: var(--input); border: 1px solid var(--line); }
+.v2 .lkend .je { display: block; font-size: var(--fs-xs); letter-spacing: var(--track-caps); text-transform: uppercase; color: var(--tgold); }
+.v2 .lkend .t { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: var(--fs-s); color: var(--t1); margin-top: 4px; line-height: 1.25; }

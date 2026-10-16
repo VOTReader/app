@@ -30,9 +30,10 @@ function booksNow() {
   return g.BOOKS && typeof g.BOOKS === 'object' ? g.BOOKS : null;
 }
 
-/** The book (undefined while the Bible loads; null when there is no such book or it failed to load). @param {string} id */
+/** The book (undefined while the Bible loads; null when there is no such book, none is asked for or it failed to load).
+ *  @param {string | null} id */
 export function useBook(id) {
-  const [book, setBook] = React.useState(() => { const B = booksNow(); return B ? B[id] || null : undefined; });
+  const [book, setBook] = React.useState(() => { if (!id) return null; const B = booksNow(); return B ? B[id] || null : undefined; });
   const loading = book === undefined;
   React.useEffect(() => {
     if (!loading) return undefined;

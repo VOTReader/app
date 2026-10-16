@@ -1,5 +1,6 @@
 /* MarkSheet - "Mark this paragraph" (picture 4b-mark-paragraph): five highlight colours, Listen from here (a recorded
-   paragraph only, with an outline Repeat where it can loop: dz16, v2-gaps 23), Add a note, Copy, Share a link, Cancel.
+   paragraph only, with an outline Repeat where it can loop: dz16, v2-gaps 23), Add a note, Link to another passage
+   (dz22, v2-gaps 24: it makes a link; Share a link shares the page), Copy, Share a link, Cancel.
    The ringed colour is the paragraph's own highlight, else the colour the reader used last; tapping the ringed colour of a
    highlighted paragraph takes the highlight off. The letter screen does the work (marks.js, main's Listen from here). */
 import { Icon } from '../Icon.jsx';
@@ -11,12 +12,13 @@ export const SWATCHES = ['gold', 'sage', 'rose', 'blue', 'plum'];
 
 /**
  * @param {{ colour: string, marked: boolean, desktop?: boolean, onColour: (c: string) => void, onNote: () => void,
- *   onCopy: () => void, onShare: (() => void) | null, onClose: () => void,
+ *   onLink?: (() => void) | null, onCopy: () => void, onShare: (() => void) | null, onClose: () => void,
  *   listen?: { reader: string | null, repeat: boolean } | null, onListen?: () => void, onRepeat?: () => void }} props
- *   colour the ringed swatch; marked whether the paragraph already carries that highlight; onShare null hides the row;
+ *   colour the ringed swatch; marked whether the paragraph already carries that highlight; onLink and onShare null hide
+ *   their rows;
  *   listen null hides the Listen row (no recording), its repeat false the Repeat button
  */
-export function MarkSheet({ colour, marked, desktop = false, onColour, onNote, onCopy, onShare, onClose, listen = null,
+export function MarkSheet({ colour, marked, desktop = false, onColour, onNote, onLink = null, onCopy, onShare, onClose, listen = null,
   onListen, onRepeat }) {
   const act = (icon, label, fn) => (
     <button type="button" className="srow act" onClick={fn}>
@@ -49,6 +51,7 @@ export function MarkSheet({ colour, marked, desktop = false, onColour, onNote, o
         </div>
       )}
       {act('pen', 'Add a note', onNote)}
+      {onLink && act('link', 'Link to another passage', onLink)}
       {act('copy', 'Copy', onCopy)}
       {onShare && act('share', 'Share a link', onShare)}
       <button type="button" className="textbtn cancel" onClick={onClose}>Cancel</button>

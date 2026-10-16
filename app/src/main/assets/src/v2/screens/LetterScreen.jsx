@@ -12,7 +12,7 @@
    says this letter. The letter's footnotes are listed at its foot (FootnoteList), then its links and songs (LetterFoot,
    dz23). Safari (8d): the first mark or note of
    a session in a Safari tab waits on the 7-day notice (SafariNotice.jsx), its paragraph still lit. */
-import { Icon } from '../Icon.jsx';
+import { Icon, iconSvg } from '../Icon.jsx';
 import { LetterBlock, FormatBBlock, titleClass, isMarkable, renderSegments } from '../letter-text.jsx';
 import { letterRoute, findLetterRoute } from '../letter-links.js';
 import { isFormatB, formatBRefs, footnoteItems, findChapterRoute } from '../footnotes.js';
@@ -38,6 +38,8 @@ import { whenPainted } from '../gate.js';
 import { MoreButton, findItem, autoScrollItem, sungItem, copyLinkItem, useVerbatimSongs } from '../more-menu.jsx';
 import { keySiteLink } from '../../utils/passage-copy.js';
 import { LetterFoot } from './LetterFoot.jsx';
+import { LinkPicker } from './LinkPicker.jsx';
+import { sourceOf, removeLink, dressLinkIcons, gateLinkIcons, linkToast } from '../links.js';
 
 const g = /** @type {any} */ (globalThis);
 /** The search routes already landed: Back to one keeps where the reader left it (its words are marked again). */
@@ -94,24 +96,29 @@ function useStoreVersion(store) {
 }
 
 /**
- * main's painter over this page's blocks, again whenever a highlight or a note changes or `letterId` (any key for what
- * the page shows) does. Off for a gate boot. The Bible chapter page uses it too.
+ * main's painter over this page's blocks, again whenever a highlight, a note or a link changes or `letterId` (any key for
+ * what the page shows) does: its highlights, then its link icons (main's order), drawn as the kit's (4h). Off for a gate
+ * boot. The Bible chapter page uses it too.
  */
 export function useMainMarks(on, letterId) {
   const A = on ? g.AnnotationStore : null;
   const annV = useStoreVersion(A);
   const noteV = useStoreVersion(on ? g.NoteStore : null);
+  const linkV = useStoreVersion(on ? g.LinkStore : null);
   React.useEffect(() => {
     if (!on || !letterId || typeof g.applyDOMHighlights !== 'function') return;
     try { g.applyDOMHighlights(); } catch (_e) { /* a mid-paint throw re-runs on the next change, as on main */ }
-  }, [on, letterId, annV, noteV]);
+    if (typeof g.applyDOMLinks !== 'function') return;
+    try { g.applyDOMLinks(); } catch (_e) { /* as above */ }
+    dressLinkIcons(document, iconSvg('link'));
+  }, [on, letterId, annV, noteV, linkV]);
 }
 
 /**
  * The body's blocks: memoised, so React never re-renders text main's painter has split. `scan`: a Format B entry's
  * reference scan (footnotes.js formatBRefs), which numbers its references in a footnotes-mode collection.
  */
-const LetterBody = React.memo(/** @param {{ letter: any, scan: any }} props */ function LetterBody({ letter, scan }) {
+export const LetterBody = React.memo(/** @param {{ letter: any, scan: any }} props */ function LetterBody({ letter, scan }) {
   // Words To Live By, The Blessed and some Holy Days pages keep Format B `paragraphs`, anchored as main's wtlb:<id>:<i>
   if (isFormatB(letter)) {
     return letter.paragraphs.map((p, i) => (
@@ -125,15 +132,16 @@ export const FOOTNOTE_REACH = 22;
 
 /**
  * The footnote number a tap at (x, y) means: the nearest one whose 44 px square (or its own box, when bigger) holds the
- * point; null when none does. Numbers that are not laid out (no box) never answer.
+ * point; null when none does. Numbers that are not laid out (no box) never answer. `sel` names other small numbers
+ * picked the same way (the link picker's verse numbers).
  * @param {Element | null} root @param {number} x @param {number} y
  */
-export function footnoteNear(root, x, y, reach = FOOTNOTE_REACH) {
+export function footnoteNear(root, x, y, reach = FOOTNOTE_REACH, sel = '.fn-ref') {
   if (!root || typeof x !== 'number' || typeof y !== 'number') return null;
   /** @type {Element | null} */
   let best = null;
   let bestD = Infinity;
-  root.querySelectorAll('.fn-ref').forEach((el) => {
+  root.querySelectorAll(sel).forEach((el) => {
     const r = el.getBoundingClientRect();
     if (!r.width && !r.height) return;
     const dx = Math.abs(x - (r.left + r.right) / 2);
@@ -257,8 +265,11 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
   const headRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const [sheet, setSheet] = React.useState(
     /** @type {null | { el: Element, para: import('../marks.js').Para, colour: string, marked: boolean }} */ (null));
+  // Link to another passage (4d-4f): the picker over the tapped paragraph, which stays lit under it.
+  const [linking, setLinking] = React.useState(/** @type {null | { endpoint: any, title: string, text: string }} */ (null));
   // One toast at a time: Copy's and Share's words, or Listen's offline line (on a gate boot, 9c's from the page alone).
-  const [toast, setToast] = React.useState(/** @type {import('../player/listen.jsx').Toast | null} */ (gateListenToast(gate)));
+  // "Linked to ..." is links' own toast (the shell's Links overlay shows it, 4h).
+  const [toast, setToast] = React.useState(/** @type {null | { text: string, icon?: string, act?: string, onAct?: () => void }} */ (gateListenToast(gate)));
   const live = !gate;
   useMainMarks(live, letter ? letter.id : null);
   // A reference's or a footnote's sheet: { kind: 'ref', ref, el } (the cite tapped) or { kind: 'fn', num }.
@@ -273,7 +284,11 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
   const scan = React.useMemo(() => (letter && isFormatB(letter) ? formatBRefs(letter, volKey) : null), [letter, volKey]);
   const items = React.useMemo(() => footnoteItems(letter, volKey, scan), [letter, volKey, scan]);
 
-  React.useEffect(() => { if (letters && onReady) onReady(); }, [letters, onReady]);
+  // ready once the letters are there, and on a gate's picker once its picture is drawn (4f's chapter rides the Bible)
+  const pickerGate = !!(gate && gate.open && gate.open.sheet === 'link-picker');
+  const [pickerShown, setPickerShown] = React.useState(false);
+  const onPickerShown = React.useCallback(() => setPickerShown(true), []);
+  React.useEffect(() => { if (letters && onReady && (!pickerGate || pickerShown)) onReady(); }, [letters, onReady, pickerGate, pickerShown]);
 
   // A search hit (v2-gaps 9, 13): once painted (after the shell has put a new page at its top), main's find over it: the
   // Find strip with the query as typed, the search's own places marked, the one at the words it was found by current and
@@ -312,16 +327,28 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
   }, [letter, landAt]);
 
   // The gate's open sheet, from the page alone: 4b paragraph 1 tapped, gold ringed (8d: the same paragraph under Safari's
-  // notice); 1e a reference's sheet; 1g a footnote's.
+  // notice; 4d-4f the link picker over it); 1e a reference's sheet; 1g a footnote's.
   const gateOpen = gate && gate.open ? gate.open : null;
-  const open = gateOpen && (gateOpen.sheet === 'mark-paragraph' || gateOpen.sheet === 'safari-7day') ? gateOpen : null;
+  const open = gateOpen && (gateOpen.sheet === 'mark-paragraph' || gateOpen.sheet === 'safari-7day' || gateOpen.sheet === 'link-picker') ? gateOpen : null;
+  const fromLine = letter ? linkingFrom(letter, col, doc, n, preface) : '';
+  /** What the picker links from: main's source endpoint for the paragraph, the line naming it, its words. */
+  const linkSource = (para) => ({ endpoint: sourceOf(para, letter.title), title: fromLine, text: para.text });
   const openPara = open ? open.para || 0 : -1;
   const openColour = open ? open.colour || 'gold' : '';
   React.useLayoutEffect(() => {
     if (openPara < 0 || !letter || !bodyRef.current) return;
     const el = bodyRef.current.querySelector('[data-hl-key="' + paraKey(letter.id, openPara) + '"]');
-    if (el) setSheet({ el, para: paragraphOf(el), colour: openColour, marked: false });
+    if (!el) return;
+    const para = paragraphOf(el);
+    setSheet({ el, para, colour: openColour, marked: false });
+    if (open && open.sheet === 'link-picker') setLinking(linkSource(para));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the gate's sheet, once its letter is there
   }, [openPara, openColour, letter]);
+  // A gate's links (4h, 4i): their icons from the row (main's painter reads the stores, never read on a gate boot).
+  const gateLinks = gate && gate.facts && gate.facts.links ? gate.facts.links : null;
+  React.useLayoutEffect(() => {
+    if (gateLinks && letter && bodyRef.current) gateLinkIcons(bodyRef.current, gateLinks, iconSvg('link'));
+  }, [gateLinks, letter]);
   const openRef = gateOpen && gateOpen.sheet === 'ref' ? String(gateOpen.ref || '') : '';
   const openFn = gateOpen && gateOpen.sheet === 'footnote' ? String(gateOpen.num || '') : '';
   React.useLayoutEffect(() => {
@@ -376,10 +403,10 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
     return () => sheet.el.classList.remove('tapped');
   }, [sheet]);
 
-  // The toast goes by itself (a gate's stays: it is the picture).
+  // The toast goes by itself, later when it can Undo (a gate's stays: it is the picture).
   React.useEffect(() => {
     if (!toast || gate) return undefined;
-    const t = setTimeout(() => setToast(null), TOAST_MS);
+    const t = setTimeout(() => setToast(null), toast.act ? UNDO_MS : TOAST_MS);
     return () => clearTimeout(t);
   }, [toast, gate]);
 
@@ -499,6 +526,21 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
     if (live && onNote) onNote(target);
   };
 
+  // Link to another passage (4b): the picker opens over the paragraph; the first save of a Safari session waits on the
+  // 7-day notice first, as a highlight's does. A link made closes it with "Linked to ..." and an Undo (4h).
+  const onLink = () => {
+    if (!sheet || !live) return;
+    if (firstSaveWaits()) { setHeld(true); return; }
+    setLinking(linkSource(sheet.para));
+  };
+  const closeLinking = () => { setLinking(null); setSheet(null); };
+  const onLinked = (made, target) => {
+    closeLinking();
+    setToast(null);
+    linkToast.set({ text: 'Linked to ' + target.label, act: made.fresh ? 'Undo' : undefined,
+      onAct: made.fresh ? () => { removeLink(made.link.id); linkToast.set(null); } : undefined });
+  };
+
   if (!letters) return null;
   if ((!doc && !col) || !letter) {
     return <div className="empty"><div className="t">This letter could not be opened.</div></div>;
@@ -551,18 +593,31 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
       <LetterReadAlong gate={gate} collection={collection} n={n} volKey={volKey} letterId={letter.id} bodyRef={bodyRef}
         on={facts.readAlong !== false} follow={facts.readAlongFollow !== false} onListen={listenHere(live, { volKey, label }, letter, setToast)}
         paragraphs={scan ? letter.paragraphs : null} scan={scan} />
-      {sheet && !held && (
+      {sheet && !held && !linking && (
         <MarkSheet colour={sheet.colour} marked={sheet.marked} desktop={desktop} onColour={onColour} onNote={onAddNote}
-          onCopy={onCopy} onShare={onShare} onClose={close} listen={listenRow} onListen={onListen} onRepeat={onRepeat} />
+          onLink={onLink} onCopy={onCopy} onShare={onShare} onClose={close} listen={listenRow} onListen={onListen} onRepeat={onRepeat} />
+      )}
+      {linking && (
+        <LinkPicker source={linking} desktop={desktop} gate={open && open.sheet === 'link-picker' ? open.picker || {} : null}
+          onLinked={onLinked} onClose={closeLinking} onShown={onPickerShown} />
       )}
       {refOpen && (
         <RefSheet open={refOpen} letter={letter} items={items} desktop={desktop} onClose={closeRef}
           onGo={live ? goToRef : closeRef} onRead={live ? readLink : closeRef}
           onStep={(num) => setRefOpen({ kind: 'fn', num })} />
       )}
-      <LayerToast text={toast && toast.text} icon={toast && toast.icon} />
+      <LayerToast text={toast && toast.text} icon={toast && toast.icon} act={toast && toast.act} onAct={toast && toast.onAct} />
     </>
   );
+}
+
+/**
+ * The picker's "Linking from" line (4d): the letter's title, then where it sits ("Volume One, Letter 1"); an entry's or
+ * another page's says its collection or its page's name.
+ */
+function linkingFrom(letter, col, doc, n, preface) {
+  const where = doc ? doc.label : !col ? '' : isFormatB(letter) ? col.label : col.label + ', ' + (preface ? 'Preface' : 'Letter ' + n);
+  return letter.title + (where ? ' · ' + where : '');
 }
 
 /**

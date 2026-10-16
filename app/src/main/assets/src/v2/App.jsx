@@ -65,15 +65,17 @@ export function routeTitle(r) {
 /**
  * Scrolls `el` so the gate's `scroll` holds: a number is px from the top; a selector puts that element's top right under
  * the top bar (the phone's bar sits above the scroller; the laptop's is sticky inside it); { to, gap } leaves `gap` px
- * between the bar and the element (`deskGap` on the laptop, when its picture puts it elsewhere); `phone: true` scrolls the
- * phone only (the laptop's picture sits at the top).
- * @param {HTMLElement} el @param {number | string | { to: string, gap?: number, deskGap?: number, phone?: boolean }} scroll
+ * between the bar and the element (`deskGap` on the laptop, when its picture puts it elsewhere); { top } is px from the
+ * top; `phone: true` scrolls the phone only (the laptop's picture sits at the top).
+ * @param {HTMLElement} el
+ * @param {number | string | { to?: string, top?: number, gap?: number, deskGap?: number, phone?: boolean }} scroll
  * @param {boolean} [desktop]
  */
 export function applyGateScroll(el, scroll, desktop = false) {
   if (typeof scroll === 'number') { el.scrollTop = scroll; return; }
   if (scroll === 'end') { el.scrollTop = el.scrollHeight; return; }
   if (typeof scroll === 'object' && scroll.phone && desktop) return;
+  if (typeof scroll === 'object' && typeof scroll.top === 'number') { el.scrollTop = scroll.top; return; }
   const sel = typeof scroll === 'string' ? scroll : scroll.to;
   const gap = typeof scroll === 'string' ? 0 : desktop && scroll.deskGap != null ? scroll.deskGap : scroll.gap || 0;
   const target = /** @type {HTMLElement | null} */ (el.querySelector(sel));

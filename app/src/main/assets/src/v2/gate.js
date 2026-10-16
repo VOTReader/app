@@ -36,10 +36,30 @@ const DAY = 24 * 3600 * 1000;
  * `open` names a sheet the screen opens on the gate boot ({ sheet: 'mark-paragraph', para, colour } on a letter; the
  * shell's { sheet: 'text-and-theme' }; 9c's { toast: 'offline-listen' }, the Listen pill's); `look` the text and page
  * shown (look.js: { scale, page, lines }; Slate otherwise).
- * @typedef {{ stack: Route[], facts?: Record<string, any>, scroll?: number | string | { to: string, gap?: number, deskGap?: number, phone?: boolean },
+ * @typedef {{ stack: Route[], facts?: Record<string, any>, scroll?: number | string | { to?: string, top?: number, gap?: number, deskGap?: number, phone?: boolean },
  *   playing?: GatePlaying | null, player?: Record<string, any>, open?: Record<string, any>,
  *   look?: { scale?: number, page?: string, lines?: string } }} GateState
  */
+
+/** Letter 1 of Volume One open at its first paragraph (4b, 4d-4f). */
+const LETTER_1 = [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }];
+const PARA_1_UNDER_BAR = { to: '.body [data-hl-key$=":0"]', gap: 20 };
+const LINKS_SCROLL = { top: 600, phone: true };
+/** John 15:16 (NKJV), the verse 4d finds and 4f takes whole. */
+const JOHN_15_16 = 'You did not choose Me, but I chose you and appointed you that you should go and bear fruit, and that your fruit '
+  + 'should remain, that whatever you ask the Father in My name He may give you.';
+/** Letter 1's links in main's records (states.json 4h, 4i): today to John 15:16; on Oct 9 from Letter 16's words. */
+const LETTER_1_LINKS = [
+  { id: 'gate-lnk-1', created: GATE_NOW - 60 * 1000,
+    source: { type: 'letter', key: 'letter:chosen-by-god:0', letterId: 'chosen-by-god', collection: 'Volume One', label: 'Chosen by God' },
+    target: { type: 'bible', key: 'bible:john:15:16', bookId: 'john', chapter: 15, verse: 16, label: 'John 15:16', preview: JOHN_15_16 } },
+  { id: 'gate-lnk-2', created: new Date(2026, 9, 9, 12).getTime(),
+    source: { type: 'letter', key: 'letter:run-from-the-forest-and-loose-all-that-binds-you:0:80-158',
+      letterId: 'run-from-the-forest-and-loose-all-that-binds-you', collection: 'Volume One',
+      label: 'Run from the Forest and Loose All That Binds You', start: 80, end: 158,
+      text: 'the children of God must be cleansed and set apart for My glory, says The Lord.' },
+    target: { type: 'letter', key: 'letter:chosen-by-god:0', letterId: 'chosen-by-god', collection: 'Volume One', label: 'Chosen by God' } },
+];
 
 /** Letter 1 of Volume One loaded at 3:51 of 10:08, read by Benjamin (states.json 0a, 0b, 2a, 1b). */
 const LETTER1_AT_351 = { item: { collection: 'one', n: 1 }, reader: 'B', at: 231, length: 608 };
@@ -155,6 +175,30 @@ export const GATE_STATES = {
     scroll: { to: '.body [data-hl-key$=":0"]', gap: 20 },
     open: { sheet: 'mark-paragraph', para: 0, colour: 'gold', listen: 'B' },
   },
+  // states.json 4d-link-picker (dz22, mw8, v2-gaps 24): 4b's paragraph, Link to another passage open: Linking from Letter
+  // 1, Search on Titles and references, "John 15:16" typed, one place (main's reference hit, its verse in 2 lines).
+  '4d-link-picker': {
+    stack: LETTER_1, scroll: PARA_1_UNDER_BAR,
+    open: { sheet: 'link-picker', para: 0, picker: { tab: 'search', q: 'John 15:16', scope: 'titles',
+      places: [{ t: 'John 15:16', s: 'New Testament', v: JOHN_15_16 }] } },
+  },
+  // states.json 4e-link-browse: 4d on Browse, the library from the top.
+  '4e-link-browse': { stack: LETTER_1, scroll: PARA_1_UNDER_BAR, open: { sheet: 'link-picker', para: 0, picker: { tab: 'browse' } } },
+  // states.json 4f-link-verses: 4d a level deeper, John 15's words: verse 16 taken whole, the list from verse 14; the
+  // footer says Link John 15:16.
+  '4f-link-verses': {
+    stack: LETTER_1, scroll: PARA_1_UNDER_BAR,
+    open: { sheet: 'link-picker', para: 0, picker: {
+      level: { kind: 'verses', item: { kind: 'bible-chapter', bookId: 'john', chapter: 15, label: 'John 15', title: 'John' },
+        target: { type: 'bible', key: 'bible:john:15', bookId: 'john', chapter: 15, verse: null, label: 'John 15' } },
+      pick: { v1: 16, whole: true }, scrollTo: 14 } },
+  },
+  // states.json 4h-link-made: Letter 1 600 px down (the laptop's whole letter fits: its top), its paragraph's end with
+  // main's link icon (gold: it made a link; two links touch it); the toast "Linked to John 15:16" with Undo.
+  '4h-link-made': { stack: LETTER_1, scroll: LINKS_SCROLL, facts: { links: LETTER_1_LINKS, now: GATE_NOW }, open: { toast: 'linked', linked: 'John 15:16' } },
+  // states.json 4i-links: 4h with the icon tapped: Links, 2 links on Chosen by God, To John 15:16 (today) and From Letter
+  // 16 (Oct 9), each with Remove.
+  '4i-links': { stack: LETTER_1, scroll: LINKS_SCROLL, facts: { links: LETTER_1_LINKS, now: GATE_NOW }, open: { sheet: 'links', block: 'letter:chosen-by-god:0' } },
   // states.json 3c-notes (zv1): the Notes tab, All; a journal entry, a highlight and a note today/yesterday, a bookmark
   // Sunday, a link Oct 9.
   '3c-notes': { stack: [{ place: 'notes', kind: 'all' }], facts: { marks: gateMarks(GATE_NOW).slice(0, 5), now: GATE_NOW } },
