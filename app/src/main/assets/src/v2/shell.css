@@ -122,3 +122,10 @@ html, body { background: var(--bg); height: 100%; overflow: hidden; overscroll-b
 .v2 .asp .asp-x { height: 44px; padding: 0 10px 0 0; font-size: var(--fs-s); color: var(--tgold); }
 .v2-phone:has(> .asp) > .v2-layer > .toast-wrap { bottom: calc(var(--tabbar) + 80px + var(--v2-bottom)); }
 .v2-phone:has(> .asp) > .content.reader .toast-wrap { bottom: 80px; }
+/* a letter's foot (LetterFoot.jsx, dz23): the kit's .lfr > svg rules through Icon's display: contents wrapper */
+.v2 .lfr > .v2i > svg { flex: none; width: 18px; height: 18px; color: var(--t2); }
+.v2 .lfr > .v2i.lead > svg { width: 20px; height: 20px; color: var(--accent); }
+.v2 .lfg .row.song { cursor: pointer; }
+.v2 .lfk-line { display: flex; align-items: center; gap: 8px; min-height: 40px; margin: 6px 0 4px; font-size: var(--fs-s); color: var(--t2); }
+.v2 .lfk-line svg { width: 18px; height: 18px; flex: none; color: var(--accent); }
+.v2 .lfk-line .textbtn { margin-left: auto; height: 40px; }

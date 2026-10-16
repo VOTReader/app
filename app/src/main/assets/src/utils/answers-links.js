@@ -14,6 +14,9 @@ export const ANSWERS_COLLECTION_LABEL = 'Answers Only God Can Give';
 // findEntryContext (bundle-b) names a topic from this index while the corpus
 // is still unloaded — a saved note or bookmark on a topic, in a new session.
 if (typeof window !== 'undefined') window.__answersTitles = ANSWERS_TITLES;
+// v2's letter foot (src/v2/screens/LetterFoot.jsx) places a Related Topics row
+// with this, so bundle-v2 needs no second copy of the index.
+if (typeof window !== 'undefined') window.__answersIdForUrl = answersIdForUrl;
 
 const HOST_RE = /(^|\.)answersonlygodcangive\.com$/i;
 

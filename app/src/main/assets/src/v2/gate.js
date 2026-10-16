@@ -233,6 +233,21 @@ export const GATE_STATES = {
   // states.json 1f-footnotes: Volume One, Letter 9 (What's In a Name) at its end: the Footnotes list (two notes, then
   // Revelation 3:5) above the Next card.
   '1f-footnotes': { stack: LETTER_9, scroll: 'end' },
+  // states.json 1k-letter-foot (dz23, mw7): Volume One, Letter 1 at its end: footnote 1, Related topics (2, opening Answers
+  // in the app), Audio (Bandcamp, SoundCloud), Videos (the voice-over video, the channel; the channel-as-video row dropped),
+  // then Next · Letter 2. No songs sing its words.
+  '1k-letter-foot': {
+    stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],
+    scroll: 'end',
+  },
+  // states.json 1l-letter-songs (dz23, mw7): Letter 2 at its end, Hear it sung on: Related topics (6), Songs from this letter
+  // (Honor Me!, one version, not kept: "Keep this song · 3 MB"), Audio, Videos, Next · Letter 3. The hook stands in for the
+  // catalog with the picture's song (no catalog fetch on a gate).
+  '1l-letter-songs': {
+    stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 2 }],
+    scroll: 'end',
+    open: { songs: [{ id: '38d21b876868', t: 'Honor Me!', f: '38d21b876868', v: 'Dance · Cinematic', d: 201.2, b: 3021597, versions: 1 }] },
+  },
   // states.json 1g-footnote-sheet (phone): Letter 9 with footnote 1 tapped, its number 190 px below the screen's top (the
   // scroller starts under the 27 px status bar and the 56 px top bar: 190 - 83), Footnote 1 of 3 open, the number ringed.
   '1g-footnote-sheet': {

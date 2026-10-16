@@ -16,8 +16,13 @@ export function iconSvg(name, { on = false, size } = {}) {
   return v;
 }
 
-/** @param {{ name: string, on?: boolean, size?: number, flip?: boolean }} props  flip: turned round (the kit's svg.flip: a back chevron) */
-export function Icon({ name, on, size, flip = false }) {
+/**
+ * @param {{ name: string, on?: boolean, size?: number, flip?: boolean, className?: string }} props  flip: turned round (the
+ *   kit's svg.flip: a back chevron); className: on the wrapper, for a kit rule that names the svg's class (.lfr > svg.lead
+ *   is .lfr > .v2i.lead > svg in shell.css)
+ */
+export function Icon({ name, on, size, flip = false, className = '' }) {
   const svg = iconSvg(name, { on, size });
-  return <span className="v2i" aria-hidden="true" dangerouslySetInnerHTML={{ __html: flip ? svg.replace('<svg', '<svg class="flip"') : svg }} />;
+  return <span className={className ? 'v2i ' + className : 'v2i'} aria-hidden="true"
+    dangerouslySetInnerHTML={{ __html: flip ? svg.replace('<svg', '<svg class="flip"') : svg }} />;
 }

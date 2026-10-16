@@ -9,7 +9,8 @@
 
    References and footnotes (mw6, pictures 1d-1g): a reference "(1 John 3:12)" or a footnote number opens RefSheet at once
    (a footnote number answers anywhere in a 44 px square round it); a chapter link "[Esther 7]" opens the chapter, Back
-   says this letter. The letter's footnotes are listed at its foot (FootnoteList). Safari (8d): the first mark or note of
+   says this letter. The letter's footnotes are listed at its foot (FootnoteList), then its links and songs (LetterFoot,
+   dz23). Safari (8d): the first mark or note of
    a session in a Safari tab waits on the 7-day notice (SafariNotice.jsx), its paragraph still lit. */
 import { Icon } from '../Icon.jsx';
 import { LetterBlock, FormatBBlock, titleClass, isMarkable, renderSegments } from '../letter-text.jsx';
@@ -36,6 +37,7 @@ import { landingOf, markWords, unmarkWords, placeAtThird } from '../search-landi
 import { whenPainted } from '../gate.js';
 import { MoreButton, findItem, autoScrollItem, sungItem, copyLinkItem, useVerbatimSongs } from '../more-menu.jsx';
 import { keySiteLink } from '../../utils/passage-copy.js';
+import { LetterFoot } from './LetterFoot.jsx';
 
 const g = /** @type {any} */ (globalThis);
 /** The search routes already landed: Back to one keeps where the reader left it (its words are marked again). */
@@ -536,6 +538,8 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
         {/* the end of the text (main's sentinel): auto-scroll comes to rest here, before the footnotes */}
         <span className="reading-end" aria-hidden="true" />
         <FootnoteList items={items} letter={letter} onGo={live ? goToRef : () => {}} onRead={live ? readLink : () => {}} />
+        {/* Also read, Related topics, Bible study, Songs from this letter, Audio, Videos (dz23 1k/1l); a study page has its own */}
+        {!doc && <LetterFoot letter={letter} volKey={volKey} gate={gate} onGo={onGo} />}
         {card && (
           <button type="button" className="nextcard" onClick={card.open}>
             <span className="tx"><span className="k">{card.k}</span><span className="t">{card.t}</span></span>
