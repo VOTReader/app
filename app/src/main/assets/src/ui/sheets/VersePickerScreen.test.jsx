@@ -304,3 +304,93 @@ describe('VersePickerScreen: a selection ending at offset 0 of the next verse', 
     expect(target.partial).toBe(true);
   });
 });
+
+/* Sweep v079: the verse filter drops non-matching verses from the DOM, so two
+   shown verses can sit side by side with hidden ones between them (3, then 10).
+   A drag across that seam stored 3-10, linking verses 4-9 the reader never saw,
+   while the preview showed only 3 and 10. The selection now ends at the last
+   verse of the unbroken run of shown verses it started in. */
+describe('VersePickerScreen drag across a filtered seam (sweep v079)', () => {
+  const TEN = [
+    'Thy word is a lamp unto my feet.', 'two', 'A lamp shines here.', 'Also a lamp in four.',
+    'five', 'six', 'seven', 'eight', 'nine', 'The last lamp of all.',
+  ].map((text, i) => ({ n: i + 1, text }));
+
+  function dragAndConfirm(container, fromVerse, toVerse) {
+    const textOf = (n) => /** @type {Element} */ (container.querySelector('[data-verse="' + n + '"] .picker-verse-text'));
+    const startNode = textOf(fromVerse).firstChild;
+    const endNode = textOf(toVerse).firstChild;
+    const getSelectionOrig = window.getSelection;
+    window.getSelection = /** @type {any} */ (() => ({
+      isCollapsed: false, rangeCount: 1,
+      getRangeAt: () => ({
+        startContainer: startNode, startOffset: 2,
+        endContainer: endNode, endOffset: 8,
+        toString: () => 'DOM-ADJACENT SELECTION',
+      }),
+      toString: () => 'DOM-ADJACENT SELECTION',
+    }));
+    try {
+      act(() => { document.dispatchEvent(new Event('selectionchange')); });
+      act(() => { vi.advanceTimersByTime(200); });
+      const hint = container.querySelector('.picker-selection-hint').textContent;
+      fireEvent.click(container.querySelector('.picker-footer-btn'));
+      return { hint, target: window.persistLink.mock.calls[0][1] };
+    } finally {
+      window.getSelection = getSelectionOrig;
+    }
+  }
+
+  function renderFiltered(q) {
+    stubGlobals();
+    window._allBooks = () => ({ genesis: { chapters: [{ num: 1, verses: TEN }] } });
+    const r = render(<VersePickerScreen {...baseProps} />);
+    if (q) fireEvent.change(r.container.querySelector('.picker-find-input'), { target: { value: q } });
+    return r;
+  }
+
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('a drag from shown verse 4 into shown verse 10 links verse 4 alone, not 4-10', () => {
+    vi.useFakeTimers();
+    // 'lamp' shows 1, 3, 4 and 10: verses 4 and 10 render side by side with 5-9 hidden.
+    const { container } = renderFiltered('lamp');
+    const { target, hint } = dragAndConfirm(container, 4, 10);
+    expect(target.verse).toBe(4);
+    expect(target.verseEnd).toBeUndefined();
+    expect(target.label).toBe('Genesis 1:4');
+    expect(target.key).toBe('bible:genesis:1:4:2-20');
+    expect(target.text).toBe('so a lamp in four.');
+    expect(hint).toBe('so a lamp in four.');
+  });
+
+  it('keeps the shown run the drag started in: 3 -> 10 across 3, 4 | hidden 5-9 | 10 links 3-4', () => {
+    vi.useFakeTimers();
+    const { container } = renderFiltered('lamp');
+    const { target } = dragAndConfirm(container, 3, 10);
+    expect(target.verse).toBe(3);
+    expect(target.verseEnd).toBe(4);
+    expect(target.label).toBe('Genesis 1:3-4');
+    expect(target.key).toBe('bible:genesis:1:3-4:2-20');
+    expect(target.text).toBe('lamp shines here.\n4 Also a lamp in four.');
+  });
+
+  it('with no filter every verse is shown, so the same drag spans 3-10 as before', () => {
+    vi.useFakeTimers();
+    const { container } = renderFiltered('');
+    const { target } = dragAndConfirm(container, 3, 10);
+    expect(target.verse).toBe(3);
+    expect(target.verseEnd).toBe(10);
+    expect(target.label).toBe('Genesis 1:3-10');
+    expect(target.text).toBe('DOM-ADJACENT SELECTION');
+  });
+
+  it("with the real word snapper the seam end is the run's last verse whole, as v6's step-back ends", () => {
+    vi.useFakeTimers();
+    const { container } = renderFiltered('lamp');
+    window.snapRangeToWords = snapRangeToWords;   // the real one trims a closing '.', which would make verse 4 partial
+    const { target } = dragAndConfirm(container, 3, 10);
+    expect(target.verseEnd).toBe(4);
+    expect(target.key).toBe('bible:genesis:1:3-4:2-20');
+  });
+});
