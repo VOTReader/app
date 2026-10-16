@@ -55,6 +55,10 @@ describe('offerNow', () => {
     for (const place of ['letter', 'bible-chapter', 'note', 'journal-entry', 'welcome']) expect(offerNow({ ...yes, place })).toBe(false);
   });
 
+  it('never over the Garden: a full-screen photograph (a real boot put it over page 2)', () => {
+    expect(offerNow({ ...yes, place: 'garden' })).toBe(false);
+  });
+
   it('main rules: a browser that installs, once a session, snoozed, never, three dismissals', () => {
     expect(offerNow({ ...yes, flow: null })).toBe(false);
     expect(offerNow({ ...yes, shown: true })).toBe(false);

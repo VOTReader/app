@@ -90,8 +90,8 @@ export function liveFlow(gl = g) {
   });
 }
 
-/** Places the offer never covers: reading pages, a note being written, a bare place. */
-const NOT_OVER = new Set(['letter', 'bible-chapter', 'study-chapter', 'note', 'journal-entry', 'welcome']);
+/** Places the offer never covers: reading pages, a note being written, a bare place (the welcome, the Garden's photograph). */
+const NOT_OVER = new Set(['letter', 'bible-chapter', 'study-chapter', 'note', 'journal-entry', 'welcome', 'garden']);
 
 /**
  * Whether the offer opens now: a browser that installs, the second visit or later, main's rules (snooze, never, three
