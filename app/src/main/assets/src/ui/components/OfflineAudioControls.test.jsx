@@ -185,6 +185,47 @@ describe('downloads a keyboard or screen reader can follow (n2-06)', () => {
     expect(document.activeElement).toBe(container.querySelector('.offline-row.is-saved'));
   });
 
+  it('a reader who taps plain page text has let go: the finished download does not pull focus back (sweep v105)', async () => {
+    const s = fakeStore();
+    s.st.sizes.set(U('a'), 1000);
+    const { getByRole, container } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
+    const btn = getByRole('button', { name: /download letter a/i });
+    btn.focus();
+    fireEvent.click(btn);
+    s.st.status.set(U('a'), 'downloading');
+    act(() => s.bump());
+    const cancel = getByRole('button', { name: /cancel the download of letter a/i });
+    expect(document.activeElement).toBe(cancel);
+    // A tap on text that cannot take focus: the button blurs with nowhere to go and stays in the page.
+    cancel.blur();
+    expect(document.activeElement).toBe(document.body);
+    await act(async () => {});
+    save(s, 'a', 1000);
+    act(() => s.bump());
+    const line = container.querySelector('.offline-row.is-saved');
+    expect(line).not.toBeNull();
+    expect(document.activeElement).toBe(document.body);
+    expect(line.hasAttribute('tabindex')).toBe(false);
+  });
+
+  it('a reader who only left the window still holds the row: focus follows the finished download', async () => {
+    const s = fakeStore();
+    s.st.sizes.set(U('a'), 1000);
+    const { getByRole, container } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
+    getByRole('button', { name: /download letter a/i }).focus();
+    s.st.status.set(U('a'), 'downloading');
+    act(() => s.bump());
+    const cancel = getByRole('button', { name: /cancel the download of letter a/i });
+    expect(document.activeElement).toBe(cancel);
+    // The window loses focus (another app): a blur with nowhere to go, but the page's focus stays on Cancel.
+    fireEvent.focusOut(cancel, { relatedTarget: null });
+    await act(async () => {});
+    expect(document.activeElement).toBe(cancel);
+    save(s, 'a', 1000);
+    act(() => s.bump());
+    expect(document.activeElement).toBe(container.querySelector('.offline-row.is-saved'));
+  });
+
   it('a row that never had focus never takes it', () => {
     const s = fakeStore();
     const other = document.createElement('button');

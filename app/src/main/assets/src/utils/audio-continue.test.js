@@ -154,6 +154,81 @@ describe('w-audio-continue — the queue is the site order, one unit ahead', () 
     } finally { delete globalThis.AUDIO_SECTIONS; }
   });
 
+  it('a range-compilation run that crossed into the next collection walks on from THAT collection, never re-appending it (sweep v7)', () => {
+    globalThis.AUDIO_SECTIONS = { vol1: [['Part 1 · Intro–19', 'idPart1', 'V'], ['Part 2 · 20–39', 'idPart2', 'V']] };
+    try {
+      AudioPlayer.playSection('vol1', 1, 'Volume One');
+      ended();                                                  // → Volume Two's only (so last) track starts
+      expect(el().src).toBe(URL_OF('idSolo'));
+      // Its last track starting appended what comes AFTER Volume Two (silent skipped), not Volume Two again.
+      expect(urls()).toEqual([URL_OF('idPart2'), URL_OF('idSolo'), URL_OF('idLast')]);
+      // The run crossed into Volume Two: the descriptor follows it, as a collection run's does.
+      expect(AudioPlayer.getState().sourceMode).toBe('collection');
+      const snap = JSON.parse(localStorage.getItem('vot-audio-pos'));
+      expect(snap.volKey).toBe('vol2');
+      expect(snap.key).toBe('vol2:solo');
+      ended();
+      expect(el().src).toBe(URL_OF('idLast'));
+      ended();                                                  // the order ends at vol3: stop(), no loop
+      expect(AudioPlayer.getState().status).toBe('idle');
+      expect(el().srcHistory.filter((u) => u === URL_OF('idSolo'))).toHaveLength(1);
+    } finally { delete globalThis.AUDIO_SECTIONS; }
+  });
+
+  /** Restart the app on the saved snapshot (a fresh module graph reads it), tap Play, and let the rebuild run. */
+  async function restartAndPlay() {
+    FakeAudio.all = [];
+    vi.resetModules();
+    AudioPlayer = (await import('./audio-player.js')).AudioPlayer;
+    AudioPlayer.toggle();
+    await new Promise((r) => setTimeout(r, 20));
+  }
+
+  for (const [how, back] of [
+    ['Prev', () => AudioPlayer.prev()],
+    ['a queue tap', () => AudioPlayer.playAt(1)],
+  ]) {
+    it(`a compilation run that crossed into the next collection and came back by ${how} resumes THAT part after a restart (sweep v7 follow-up)`, async () => {
+      globalThis.AUDIO_SECTIONS = { vol1: [['Part 1 · Intro–19', 'idPart1', 'V'], ['Part 2 · 20–39', 'idPart2', 'V']] };
+      try {
+        AudioPlayer.playSection('vol1', 0, 'Volume One');
+        ended();                                                // → Part 2, the last part: Volume Two is appended
+        ended();                                                // → Volume Two's Solo: the run crossed
+        expect(el().src).toBe(URL_OF('idSolo'));
+        expect(AudioPlayer.getState().sourceMode).toBe('collection');
+        back();                                                 // back across the seam to Part 2
+        expect(el().src).toBe(URL_OF('idPart2'));
+        const modeBack = AudioPlayer.getState().sourceMode;
+        tickBuffered();                                         // 0:06 into Part 2, snapshot written
+        const snap = JSON.parse(localStorage.getItem('vot-audio-pos'));
+        await restartAndPlay();
+        expect(el().src, 'Play resumes the part the bar shows').toBe(URL_OF('idPart2'));
+        expect(AudioPlayer.getState().time).toBe(6);
+        // Part 2 belongs to the compilation run again, so the descriptor named the section, not Volume Two.
+        expect(modeBack).toBe('section');
+        expect(snap).toMatchObject({ mode: 'section', volKey: 'vol1', qi: 1, track: { url: URL_OF('idPart2') } });
+      } finally { delete globalThis.AUDIO_SECTIONS; }
+    });
+  }
+
+  it('a run that came back to its compilation crosses forward again without re-appending Volume Two (sweep v7 follow-up)', () => {
+    globalThis.AUDIO_SECTIONS = { vol1: [['Part 1 · Intro–19', 'idPart1', 'V'], ['Part 2 · 20–39', 'idPart2', 'V']] };
+    try {
+      AudioPlayer.playSection('vol1', 0, 'Volume One');
+      ended(); ended();                                         // Part 2, then Volume Two's Solo (Volume Three appended)
+      AudioPlayer.prev();                                       // back to Part 2: the section again
+      ended();                                                  // forward over the seam a second time
+      expect(el().src).toBe(URL_OF('idSolo'));
+      expect(AudioPlayer.getState().sourceMode).toBe('collection');
+      expect(JSON.parse(localStorage.getItem('vot-audio-pos')).volKey).toBe('vol2');
+      expect(urls()).toEqual([URL_OF('idPart1'), URL_OF('idPart2'), URL_OF('idSolo'), URL_OF('idLast')]);
+      ended();
+      expect(el().src).toBe(URL_OF('idLast'));
+      ended();
+      expect(AudioPlayer.getState().status).toBe('idle');
+    } finally { delete globalThis.AUDIO_SECTIONS; }
+  });
+
   it('the next collection joins in the listener\'s Letter Voice where that reader recorded it (ra5)', () => {
     globalThis.AUDIO_ALTERNATES = { 'vol2:solo': [['V', [['idSoloV']]]] };
     try {

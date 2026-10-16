@@ -77,6 +77,27 @@ export function _hlColorIndex(c) {
   return i < 0 ? 99 : i;
 }
 
+/* Reading order of two hlKeys from one view (sweep v067). Every key format ends in its block,
+   verse or paragraph index (utils/hl-keys.js), so the parts compare one by one, numbers as
+   numbers ('9' before '10', '12' before '12-s0' before '13'). A prophecy group's cards render
+   intro, ot, nt, vot (ProphecyGroup.jsx), which is not alphabetical, so they compare by that. */
+var _CARD_ORDER = ['intro', 'ot', 'nt', 'vot'];
+/**
+ * @param {string} a
+ * @param {string} b
+ * @returns {number}
+ */
+function _hlKeyOrder(a, b) {
+  var pa = a.split(':'), pb = b.split(':');
+  for (var i = 0; i < pa.length && i < pb.length; i++) {
+    if (pa[i] === pb[i]) continue;
+    var ca = _CARD_ORDER.indexOf(pa[i]), cb = _CARD_ORDER.indexOf(pb[i]);
+    if (ca >= 0 && cb >= 0) return ca - cb;
+    return pa[i].localeCompare(pb[i], 'en', { numeric: true });
+  }
+  return pa.length - pb.length;
+}
+
 /* Flatten AnnotationStore into one row per groupId. */
 export function _collectMarks() {
   if (typeof AnnotationStore === 'undefined') return [];
@@ -103,7 +124,12 @@ export function _collectMarks() {
   });
   return Object.keys(groups).map(function(gid) {
     var g = groups[gid];
-    g.segs.sort(function(x, y) { return (x.created - y.created) || (x.start - y.start); });
+    /* One selection's segments share `created` (SelectionToolbar adds them in one loop), and
+       `start` is an offset inside each segment's own container, so it orders only segments
+       that share a key; across keys the order is the keys' reading order (sweep v067). */
+    g.segs.sort(function(x, y) {
+      return (x.created - y.created) || (x.key === y.key ? x.start - y.start : _hlKeyOrder(x.key, y.key));
+    });
     g.text = normalizeExcerptDisplay(g.segs.map(function(s) { return s.text; }).join(' ').replace(/\s+/g, ' ').trim());
     return g;
   });

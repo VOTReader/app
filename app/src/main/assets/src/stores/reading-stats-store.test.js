@@ -325,3 +325,70 @@ describe('pace samples from a damaged import (W10)', () => {
     expect(ReadingStatsStore.measuredWpm()).toBe(200);
   });
 });
+
+// v062 (sweep 2026-10-14): replaceAll normalized progress and wpmSamples but
+// copied the totals and the wordsByDay values straight through, and never
+// pruned wordsByDay. A backup carrying `totalWordsRead: "100"` (hand-edited or
+// corrupt) made the next completion compute "100" + 300 = "100300", and My
+// Progress showed and saved that number.
+describe('imported totals and day buckets from a damaged backup (v062)', () => {
+  it('a string total from the backup adds as a number on the next completion', () => {
+    const today = ReadingStatsStore.wordsForDays(1)[0].date;
+    ReadingStatsStore.replaceAll(/** @type {any} */ ({
+      totalWordsRead: '100', totalActiveMs: '6000', totalCompletions: '2', rereads: '1',
+      wordsByDay: { [today]: '50' },
+    }));
+    ReadingStatsStore.recordCompletion({ key: 'k', words: 300, activeMs: 60000, wasReadBefore: true });
+    const s = ReadingStatsStore.get();
+    expect(s.totalWordsRead).toBe(400);
+    expect(s.totalActiveMs).toBe(66000);
+    expect(s.totalCompletions).toBe(3);
+    expect(s.rereads).toBe(2);
+    expect(s.wordsByDay[today]).toBe(350);
+    expect(ReadingStatsStore.wordsForDays(1)[0].words).toBe(350);
+  });
+
+  it('replaceAll keeps only finite, non-negative totals', () => {
+    ReadingStatsStore.replaceAll(/** @type {any} */ ({
+      totalWordsRead: 'lots', totalActiveMs: -5000, totalCompletions: Infinity, rereads: { n: 1 },
+    }));
+    const s = ReadingStatsStore.get();
+    expect(s.totalWordsRead).toBe(0);
+    expect(s.totalActiveMs).toBe(0);
+    expect(s.totalCompletions).toBe(0);
+    expect(s.rereads).toBe(0);
+  });
+
+  it('replaceAll keeps only real day keys with finite word counts', () => {
+    ReadingStatsStore.replaceAll(/** @type {any} */ ({
+      wordsByDay: {
+        '2026-10-01': 120, '2026-10-02': '80', '2026-10-03': 'many', '2026-10-04': -3,
+        '2026-10-05': NaN, '2026-10-06': null, 'yesterday': 40, '2026-13-01': 40, '2026-1-5': 40,
+      },
+    }));
+    expect(ReadingStatsStore.get().wordsByDay).toEqual({ '2026-10-01': 120, '2026-10-02': 80 });
+  });
+
+  it('replaceAll prunes wordsByDay to the newest 400 days, as a completion does', () => {
+    const byDay = {};
+    for (let i = 0; i < 450; i++) {
+      const d = new Date(2020, 0, 1 + i);
+      byDay[`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`] = 10;
+    }
+    ReadingStatsStore.replaceAll({ wordsByDay: byDay });
+    const keys = Object.keys(ReadingStatsStore.get().wordsByDay).sort();
+    expect(keys).toHaveLength(400);
+    expect(keys[0]).toBe('2020-02-20');              // the 50 oldest went
+    expect(keys[399]).toBe('2021-03-25');            // the newest stayed
+  });
+
+  it('a total an earlier import already stored as a string still adds as a number', () => {
+    const today = ReadingStatsStore.wordsForDays(1)[0].date;
+    const data = /** @type {any} */ (ReadingStatsStore.get());
+    data.totalWordsRead = '100';
+    data.wordsByDay[today] = '50';
+    ReadingStatsStore.recordCompletion({ key: 'k', words: 300, activeMs: 60000 });
+    expect(ReadingStatsStore.get().totalWordsRead).toBe(400);
+    expect(ReadingStatsStore.get().wordsByDay[today]).toBe(350);
+  });
+});

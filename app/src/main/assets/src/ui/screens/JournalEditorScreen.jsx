@@ -859,34 +859,45 @@ export function JournalEditorScreen(props) {
   // whole and the caret goes back to exactly where it was, so typing keeps
   // flowing. If the insert becomes the last block, one trailing empty
   // paragraph is appended so there is always somewhere to write below it.
+  //
+  // sweep v4/v24: the insert is a setBlocks UPDATER over the live list, never
+  // a copy of this render's `blocks`. onFileChosen inserts only after the
+  // async compressImage + put chain, from the render the photo was picked in;
+  // a copy of that render's list replaced everything typed, moved or deleted
+  // while the photo saved, and the immediate save then stored the snapshot.
+  // The updater stays pure: the caret and the tail paragraph's id are read
+  // and minted out here, so a re-run computes the same list and focus.
   function insertBlockBelow(block) {
     var info = activeTextareaRef.current;
     var idx = info && info.idx != null ? info.idx : -1;
-    var next = blocks.slice();
-    var focusTarget; // { id, caret } for the post-render focus effect
-    if (idx >= 0 && idx < next.length) {
-      var caret = info.caret != null ? info.caret : (info.el ? info.el.selectionStart : 0);
-      focusTarget = { id: next[idx].id, caret: caret };
-      next.splice(idx + 1, 0, block);
-      if (idx + 1 === next.length - 1) next.push({ id: JournalHelpers.blockId(), type: 'p', text: '' });
-    } else {
-      // No caret context (e.g. picker insert with no focused textarea).
-      // Append, then ensure EXACTLY ONE trailing empty paragraph to keep
-      // writing in — never one-per-insert, which previously littered the
-      // entry with blank gaps after several embeds.
-      var last = next[next.length - 1];
-      if (last && last.type === 'p' && !(last.text || '').trim()) {
-        next.splice(next.length - 1, 0, block); // insert before the blank p
-        focusTarget = { id: last.id, caret: 0 };
+    var caret = info ? (info.caret != null ? info.caret : (info.el ? info.el.selectionStart : 0)) : 0;
+    var tailId = JournalHelpers.blockId();
+    setBlocks(function(arr) {
+      var next = arr.slice();
+      var focusTarget; // { id, caret } for the post-render focus effect
+      if (idx >= 0 && idx < next.length) {
+        focusTarget = { id: next[idx].id, caret: caret };
+        next.splice(idx + 1, 0, block);
+        if (idx + 1 === next.length - 1) next.push({ id: tailId, type: 'p', text: '' });
       } else {
-        var tailId = JournalHelpers.blockId();
-        next.push(block);
-        next.push({ id: tailId, type: 'p', text: '' });
-        focusTarget = { id: tailId, caret: 0 };
+        // No caret context (e.g. picker insert with no focused textarea).
+        // Append, then ensure EXACTLY ONE trailing empty paragraph to keep
+        // writing in — never one-per-insert, which previously littered the
+        // entry with blank gaps after several embeds.
+        var last = next[next.length - 1];
+        if (last && last.type === 'p' && !(last.text || '').trim()) {
+          next.splice(next.length - 1, 0, block); // insert before the blank p
+          focusTarget = { id: last.id, caret: 0 };
+        } else {
+          next.push(block);
+          next.push({ id: tailId, type: 'p', text: '' });
+          focusTarget = { id: tailId, caret: 0 };
+        }
       }
-    }
-    setBlocks(next);
-    pendingFocusRef.current = focusTarget;
+      // Read by the post-render focus effect, which runs after this updater.
+      pendingFocusRef.current = focusTarget;
+      return next;
+    });
     scheduleSave();
   }
 

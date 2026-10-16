@@ -40,6 +40,11 @@
                                   one. Hardware back keys off THIS, not
                                   backHint, so a History-entered chapter
                                   still unwinds to History with no pill.
+     - retargetTop(dest)        moves a LIVE top entry's destSnapshot to
+                                  `dest`, for a navigation that carries the
+                                  reader's way back along (the audio
+                                  follower's in-place move, sweep v041)
+                                  instead of leaving it for the prune.
 
    DOES NOT OWN:
      - _navToLinkRef / navigateToLink / the deferred `_navToLinkRef.current
@@ -71,7 +76,8 @@
        source position.
 
    RETURNS: { fromLetterStack, setFromLetterStack, pushFromLetter,
-              tapThroughBack, fromLetterRef, backHint, backActive }
+              tapThroughBack, fromLetterRef, backHint, backActive,
+              retargetTop }
 
    STORAGE: none directly. fromLetterStack is a tabField, so it rides along
             in the vot-state tab persistence (usePersistedState, P6k+1).
@@ -114,7 +120,8 @@ import { useRefMirror } from './use-ref-mirror.js';
  *   tapThroughBack: () => void,
  *   fromLetterRef: { current: any[] },
  *   backHint: any,
- *   backActive: boolean
+ *   backActive: boolean,
+ *   retargetTop: (dest: any) => void
  * }}
  */
 export function useFromLetterStack({
@@ -187,6 +194,22 @@ export function useFromLetterStack({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- _destMatches is a local helper that closes over screen/bookId/chapterNum/letterId/studyId/studyChapterId/journalEntryId — all seven already in deps — so each re-fire gets a fresh helper. setFromLetterStack is a useState setter from useTabs (identity-stable). Adding either would either re-fire the effect on every render or no-op.
   }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId, fromLetterStack]);
 
+  // Carry the live top entry to a new destination (sweep v041). The audio
+  // follower ("Turn the Page with the Audio", use-audio-follow.js) moves the
+  // pane IN PLACE to the next reading; the prune effect above would read that
+  // as "the user navigated away" and evict the entry, so the "Back to …" pill
+  // vanished and hardware Back skipped the place the reader came from. When
+  // the top is live (its destSnapshot matches where the pane is NOW, i.e. the
+  // reading being left) its destSnapshot becomes `dest`; an empty stack, a
+  // top with no destSnapshot (prune-exempt already) or a stale top is left
+  // alone. The caller moves the pane in the same tick, so the carried entry
+  // and the new position commit in one render before the prune effect looks.
+  const retargetTop = (dest) => setFromLetterStack((prev) => {
+    const top = Array.isArray(prev) && prev.length > 0 ? prev[prev.length - 1] : null;
+    if (!top || !top.destSnapshot || !_destMatches(top.destSnapshot)) return prev;
+    return [...prev.slice(0, -1), { ...top, destSnapshot: dest }];
+  });
+
   // Top-of-stack back-hint — shows above the hero on tap-through destinations
   // so the user knows where Android back will return.
   // If the entry has a destSnapshot (recorded at push time), the pill is
@@ -213,6 +236,6 @@ export function useFromLetterStack({
 
   return {
     fromLetterStack, setFromLetterStack, pushFromLetter,
-    tapThroughBack, fromLetterRef, backHint, backActive,
+    tapThroughBack, fromLetterRef, backHint, backActive, retargetTop,
   };
 }

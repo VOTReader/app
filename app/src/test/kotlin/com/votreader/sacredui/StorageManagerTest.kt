@@ -540,6 +540,63 @@ class StorageManagerTest {
     }
 
     @Test
+    fun `v3 export closes the stream and deletes the truncated document when the header write throws`() {
+        // Sweep v090: the "wt" open truncates the chosen document (maybe the reader's
+        // previous backup) before the header is written. When the magic / length /
+        // manifest write then threw, the catch only closed exportOut — still null at
+        // that point — so the opened stream leaked and a truncated .votbak stayed at
+        // the chosen path. The JS driver's abort (finishV3Export(false)) cannot clean
+        // it up either: with no session it returns no_session before its delete.
+        //
+        // A manifest larger than BufferedOutputStream's 8 KB buffer is written straight
+        // through to the provider stream, so a disk-full surfaces inside beginV3Export.
+        val uri = Uri.parse("content://test/v3-begin-fail")
+        var closed = false
+        every { cr.openOutputStream(uri, "wt") } returns object : OutputStream() {
+            override fun write(b: Int) = throw IOException("disk full")
+            override fun write(b: ByteArray, off: Int, len: Int) =
+                throw IOException("disk full")
+            override fun close() { closed = true }
+        }
+        every { cr.call(any<String>(), any(), any(), any()) } returns Bundle()
+
+        val r = storage.beginV3Export(uri, ByteArray(9000) { 'a'.code.toByte() })
+        assertIs<StorageManager.Result.Failure>(r)
+        assertEquals("disk full", r.reason)
+        assertTrue(closed, "the provider stream opened by beginV3Export must be closed on failure")
+        verify(exactly = 1) {
+            cr.call(eq("test"), eq("android:deleteDocument"), isNull(), any())
+        }
+        // The driver's follow-up abort still finds no session and deletes nothing more.
+        assertEquals(
+            "no_session",
+            (storage.finishV3Export(commit = false, uri = uri) as StorageManager.Result.Failure).reason
+        )
+        verify(exactly = 1) {
+            cr.call(eq("test"), eq("android:deleteDocument"), isNull(), any())
+        }
+    }
+
+    @Test
+    fun `v3 export does NOT delete when the open itself throws or yields no stream`() {
+        // Sweep v090 guard: an open that throws or returns null never truncated the
+        // document, so a pre-existing backup behind the URI is intact and must stay.
+        // Same contract as writeTextToUri.
+        val throwsUri = Uri.parse("content://test/v3-open-throws")
+        val nullUri = Uri.parse("content://test/v3-open-null")
+        every { cr.openOutputStream(throwsUri, "wt") } throws SecurityException("permission revoked")
+        every { cr.openOutputStream(nullUri, "wt") } returns null
+
+        val thrown = storage.beginV3Export(throwsUri, "{}".toByteArray(Charsets.UTF_8))
+        assertIs<StorageManager.Result.Failure>(thrown)
+        assertEquals("permission revoked", thrown.reason)
+        val none = storage.beginV3Export(nullUri, "{}".toByteArray(Charsets.UTF_8))
+        assertIs<StorageManager.Result.Failure>(none)
+        assertEquals("no_output_stream", none.reason)
+        verify(exactly = 0) { cr.call(any<String>(), any(), any(), any()) }
+    }
+
+    @Test
     fun `v3 round-trips manifest + media bytes exactly (write then read back)`() {
         // WRITE a container to a buffer.
         val exportUri = Uri.parse("content://test/v3-exp")
@@ -783,6 +840,65 @@ class StorageManagerTest {
         assertEquals("bad_manifest_len", r.reason)
     }
 
+    // sweep v058: a throw inside beginV3Import before the session is handed to
+    // importIn used to leave the picked SAF stream open. The catch only closed
+    // importIn, which was still null, so every Import or Verify of a cut backup
+    // leaked one file descriptor held by the provider.
+
+    @Test
+    fun `beginV3Import closes the picked stream when the file ends inside the manifest length`() {
+        val cut = ByteArrayOutputStream().apply {
+            write("VOTBACK1".toByteArray(Charsets.US_ASCII))
+            write(byteArrayOf(0, 0, 0, 0))         // 4 of the 8 length bytes, then EOF
+        }.toByteArray()
+        val uri = Uri.parse("content://test/cut-in-length")
+        val picked = CloseTrackingStream(cut)
+        every { cr.openInputStream(uri) } returns picked
+
+        assertIs<StorageManager.Result.Failure>(storage.beginV3Import(uri))
+        assertTrue(picked.closed, "a 12-byte cut backup must not leave the provider's stream open")
+    }
+
+    @Test
+    fun `beginV3Import closes the picked stream when the file ends inside the manifest`() {
+        val cut = ByteArrayOutputStream().apply {
+            write("VOTBACK1".toByteArray(Charsets.US_ASCII))
+            write(beLong(100L))                    // declares a 100-byte manifest
+            write("{\"media\":".toByteArray(Charsets.UTF_8))   // only 9 arrive
+        }.toByteArray()
+        val uri = Uri.parse("content://test/cut-in-manifest")
+        val picked = CloseTrackingStream(cut)
+        every { cr.openInputStream(uri) } returns picked
+
+        assertIs<StorageManager.Result.Failure>(storage.beginV3Import(uri))
+        assertTrue(picked.closed, "a backup cut inside its manifest must not leave the provider's stream open")
+    }
+
+    @Test
+    fun `beginV3Import closes the picked stream when a legacy backup read fails`() {
+        val uri = Uri.parse("content://test/legacy-io-fault")
+        val picked = CloseTrackingStream(
+            "{\"app\":\"VOTReader\",\"stores\":".toByteArray(Charsets.UTF_8),
+            failAtEnd = IOException("provider went away")
+        )
+        every { cr.openInputStream(uri) } returns picked
+
+        val r = storage.beginV3Import(uri)
+        assertIs<StorageManager.Result.Failure>(r)
+        assertEquals("provider went away", r.reason)
+        assertTrue(picked.closed, "a legacy read fault must not leave the provider's stream open")
+    }
+
+    @Test
+    fun `beginV3Import closes the picked stream when the format sniff read fails`() {
+        val uri = Uri.parse("content://test/sniff-io-fault")
+        val picked = CloseTrackingStream(ByteArray(0), failAtEnd = IOException("provider went away"))
+        every { cr.openInputStream(uri) } returns picked
+
+        assertIs<StorageManager.Result.Failure>(storage.beginV3Import(uri))
+        assertTrue(picked.closed, "a fault on the first read must not leave the provider's stream open")
+    }
+
     @Test
     fun `v3 export rejects a short final frame on commit`() {
         val uri = Uri.parse("content://test/short")
@@ -895,6 +1011,33 @@ class StorageManagerTest {
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────
+
+    /**
+     * A stand-in for the provider's stream that records close(). Serves [bytes],
+     * then either reports EOF or, with [failAtEnd], throws it on the next read.
+     */
+    private class CloseTrackingStream(
+        bytes: ByteArray,
+        private val failAtEnd: IOException? = null,
+    ) : InputStream() {
+        private val backing = ByteArrayInputStream(bytes)
+        var closed = false
+            private set
+
+        override fun read(): Int {
+            if (backing.available() == 0) failAtEnd?.let { throw it }
+            return backing.read()
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (backing.available() == 0) failAtEnd?.let { throw it }
+            return backing.read(b, off, len)
+        }
+
+        override fun close() {
+            closed = true
+        }
+    }
 
     /** Drain the current import frame via small reads (exercises multi-read). */
     private fun readWholeFrame(): ByteArray {

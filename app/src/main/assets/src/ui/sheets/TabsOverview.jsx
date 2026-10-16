@@ -262,6 +262,14 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
     });
     return dupes;
   }, [tabs]);
+  // Pinned tabs survive Clear All (closeAllTabs in use-tab-actions), so the
+  // confirm counts the UNPINNED tabs it will close and says the pinned stay,
+  // as TabActionSheet's bulk closes do (sweep v081). With every tab pinned it
+  // would close nothing, and a lone unpinned tab would only be swapped for a
+  // new one, so the button is off for both.
+  const unpinnedCount = tabs.filter((t) => !(t && t.pinned)).length;
+  const hasPinned = unpinnedCount < total;
+  const canClearAll = unpinnedCount > 0 && total > 1;
 
   // Drop stale refs from a shrunk array (after a close/dedupe) so a future
   // naturalRects capture never reads a dead node. Ref callbacks repopulate 0..n-1.
@@ -279,10 +287,12 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
         </div>
         <div className="tabs-overview-meta">{total} / {MAX_TABS} {total === 1 ? 'tab' : 'tabs'} open</div>
         <div className="tabs-overview-actions">
-          {confirmingClearAll ? (
+          {confirmingClearAll && canClearAll ? (
             <ConfirmStrip
-              question={`Close all ${total} tabs?`}
-              yesLabel="Yes, close all"
+              question={hasPinned
+                ? `Close ${unpinnedCount} ${unpinnedCount === 1 ? 'tab' : 'tabs'}? Pinned tabs stay open.`
+                : `Close all ${total} tabs?`}
+              yesLabel={hasPinned ? 'Yes, close them' : 'Yes, close all'}
               onCancel={() => setConfirmingClearAll(false)}
               onConfirm={() => { onClearAll(); setConfirmingClearAll(false); }}
             />
@@ -290,7 +300,8 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
             <button
               className="settings-clear-btn"
               onClick={(e) => { e.stopPropagation(); setConfirmingClearAll(true); }}
-              disabled={total <= 1}
+              disabled={!canClearAll}
+              title={unpinnedCount === 0 ? 'Every tab is pinned; pinned tabs stay open' : undefined}
             >Clear All</button>
           )}
           <button

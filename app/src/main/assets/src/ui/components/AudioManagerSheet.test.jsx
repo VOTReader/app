@@ -20,6 +20,7 @@ import * as ReactDOM from 'react-dom';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AUDIO_PLAYBACK_RATES } from '../../utils/audio-track.js';
 import { AudioManagerSheet } from './AudioManagerSheet.jsx';
+import { SongTransport } from './SongDeskParts.jsx';
 
 /** Mimics the bits of HTMLAudioElement the player touches (see audio-player.test.js). */
 class FakeAudio extends EventTarget {
@@ -753,6 +754,35 @@ describe('AudioManagerSheet — Voice: letter readers', () => {
     expect(voiceChips().map((chip) => chip.getAttribute('aria-checked'))).toEqual(['false', 'true']);
   });
 
+  /* sweep v003: the checked radio is the voice already playing. Tapping it (a
+     reader confirming what they hear) ran the switch anyway, and the switch
+     starts the letter again from its first part: two minutes into Part 2, the
+     tap put the listener back at Part 1, 0:00. */
+  it('tapping the voice already playing keeps the place: Part 2 stays at Part 2, mid-way (sweep v003)', () => {
+    globalThis.AUDIO_MANIFEST = { ...MANIFEST, 'vol1:letter-a': [['idA1', 'B', 'Part 1'], ['idA2', 'B', 'Part 2']] };
+    globalThis.AUDIO_ALTERNATES = { 'vol1:letter-a': [['V', [['idAv1', 'Part 1'], ['idAv2', 'Part 2']]]] };
+    startCollection();
+    openSheet();
+    fireEvent.click(screen.getByRole('button', { name: 'Next track' }));   // The Wide Path, Part 1
+    fireEvent.click(screen.getByRole('button', { name: 'Next track' }));   // The Wide Path, Part 2
+    emit('playing');
+    act(() => { el().duration = 300; el().dispatchEvent(new Event('durationchange')); });
+    drive(() => AudioPlayer.seek(120));
+    expect(el().src).toBe(URL_OF('idA2'));
+    expect(voiceChips().map((chip) => chip.getAttribute('aria-checked'))).toEqual(['true', 'false']);
+    const before = AudioPlayer.getState();
+    const queueBefore = before.queue.map((t) => t.url);
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Read by Benjamin' }));
+
+    const after = AudioPlayer.getState();
+    expect(el().src).toBe(URL_OF('idA2'));                    // not sent back to Part 1
+    expect(el().currentTime).toBe(120);                       // still two minutes in
+    expect(after.queue.map((t) => t.url)).toEqual(queueBefore);   // the heard rows stay listed
+    expect(after.qi).toBe(before.qi);
+    expect(after.status).toBe('playing');
+  });
+
   it('falls back to the lone letter when the collection registry has not landed', () => {
     delete globalThis.COL_BY_KEY;
     delete globalThis.colLetterArr;
@@ -805,6 +835,42 @@ describe('AudioManagerSheet — Voice: Bible editions', () => {
     // Every Listen pill elsewhere reads settings.bibleAudio, so the choice moves it.
     expect(setEdition).toHaveBeenCalledWith('wop-nkjv');
     expect(voiceValue()).toBe('NKJV · Dramatized');
+  });
+
+  /* sweep v003, the edition half. The same chapter rebuilds to the same url, so
+     the element keeps sounding; everything around it was reset: the chapters
+     already heard vanished from the queue, the clock read 0:00, the transport
+     sat in 'loading' (play() on a playing element fires no 'playing' to clear
+     it), and the tap was filed as a fresh play. */
+  it('tapping the edition already playing changes nothing (sweep v003)', () => {
+    const setEdition = vi.fn();
+    window.__setBibleAudioEdition = setEdition;
+    drive(() => AudioPlayer.playBibleBook({
+      volKey: 'bible-brm-kjv', bookId: 'genesis', chapterNum: 1, label: 'KJV · Biblical Restoration Ministries',
+    }));
+    openSheet();
+    fireEvent.click(screen.getByRole('button', { name: 'Next track' }));   // Genesis 2, Genesis 1 heard
+    emit('playing');
+    act(() => { el().duration = 900; el().dispatchEvent(new Event('durationchange')); });
+    drive(() => AudioPlayer.seek(720));
+    act(() => { el().dispatchEvent(new Event('timeupdate')); });
+    const before = AudioPlayer.getState();
+    expect(before.queue[before.qi].url).toBe(BURL('brm1_genesis_002', 'audio-brm-v1'));
+    expect(before.time).toBe(720);
+    const queueBefore = before.queue.map((t) => t.url);
+    const plays = library.recordPlayed.mock.calls.length;
+
+    fireEvent.click(screen.getByRole('radio', { name: 'KJV · BRM' }));
+
+    const after = AudioPlayer.getState();
+    expect(after.queue.map((t) => t.url)).toEqual(queueBefore);   // Genesis 1 still listed as heard
+    expect(after.qi).toBe(before.qi);
+    expect(after.time).toBe(720);                             // the clock still reads minute 12
+    expect(after.status).toBe('playing');                     // no spinner over a playing chapter
+    expect(el().currentTime).toBe(720);
+    expect(library.recordPlayed.mock.calls.length).toBe(plays);   // not a new play
+    expect(setEdition).not.toHaveBeenCalled();                // nothing changed, so nothing is written
+    expect(screen.getByRole('button', { name: 'Pause' }).getAttribute('aria-busy')).toBe('false');
   });
 
   it('shows no Voice row for a book only one edition has recorded', () => {
@@ -997,6 +1063,27 @@ describe('AudioManagerSheet — a restored bar describes nothing it does not kno
     expect(headSub()).toBe('Volume One · Read by Benjamin');
   });
 
+  /* sweep v021: Next keyed on the placeholder's length, so it was greyed out over a
+     queue that may run on for a whole book. The tap has to reach the player, which
+     rebuilds the queue and then steps past the saved recording. */
+  it('leaves Next live, since the queue it would step through is not built yet (sweep v021)', () => {
+    const { unmount } = render(<AudioManagerSheet open state={restoredState()} onClose={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Next track' }).disabled).toBe(false);
+    unmount();
+    // CONTROL: a genuine queue of one still has nowhere to go.
+    render(<AudioManagerSheet open state={restoredState({ restoring: false, sourceMode: 'custom' })} onClose={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Next track' }).disabled).toBe(true);
+  });
+
+  it('the song desk leaves Next song live over a restored songs session too (sweep v021)', () => {
+    const song = { key: 'song:aaaaaaaaaaa1', title: 'Come, Love Awaits You', sub: 'Songs of the Letters', url: URL_OF('idSong'), readerCode: '', partLabel: null };
+    const { unmount } = render(<SongTransport state={restoredState({ queue: [song], sourceMode: 'songs', repeat: 'off' })} />);
+    expect(screen.getByRole('button', { name: 'Next song' }).disabled).toBe(false);
+    unmount();
+    render(<SongTransport state={restoredState({ queue: [song], sourceMode: 'songs', repeat: 'off', restoring: false })} />);
+    expect(screen.getByRole('button', { name: 'Next song' }).disabled).toBe(true);
+  });
+
   it('calls a genuine queue of one what it is', () => {
     render(<AudioManagerSheet open state={restoredState({ restoring: false, sourceMode: 'custom' })} onClose={() => {}} />);
     expect(queueSummary()).toBe('1 recording');
@@ -1108,6 +1195,37 @@ describe('AudioManagerSheet — switching voice warns before discarding a queue'
     expect(confirmStrip()).toBeNull();
     expect(AudioPlayer.getState().queue.map((track) => track.url)).toEqual(before);
     expect(voiceChips().map((chip) => chip.getAttribute('aria-checked'))).toEqual(['true', 'false']);
+  });
+
+  it('does not ask about the voice already playing on an edited queue — there is nothing to switch (sweep v003)', () => {
+    openOnLetterA();
+    drive(() => AudioPlayer.removeUpcoming(3));
+    expect(AudioPlayer.getState().sourceMode).toBe('custom');
+    const before = AudioPlayer.getState().queue.map((track) => track.url);
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Read by Benjamin' }));
+
+    expect(confirmStrip()).toBeNull();
+    expect(document.querySelector('.audio-manager-voice-note')).toBeTruthy();
+    expect(AudioPlayer.getState().sourceMode).toBe('custom');  // the edited queue survives
+    expect(AudioPlayer.getState().queue.map((track) => track.url)).toEqual(before);
+  });
+
+  it('drops an open confirm once its voice is the one playing (sweep v003)', () => {
+    openOnLetterA();
+    drive(() => AudioPlayer.removeUpcoming(3));
+    fireEvent.click(screen.getByRole('radio', { name: 'Text-to-speech' }));
+    expect(confirmStrip()).toBeTruthy();
+    // The listener starts that reading some other way while the confirm is up.
+    drive(() => AudioPlayer.playTrack({
+      key: 'vol1:letter-a', title: 'The Wide Path', sub: 'Volume One',
+      url: URL_OF('idAv'), readerCode: 'V', partLabel: 'Part 1',
+    }));
+    const q = AudioPlayer.getState().queue;
+    drive(() => AudioPlayer.removeUpcoming(q.length - 1));    // and edits that queue too
+    expect(AudioPlayer.getState().sourceMode).toBe('custom');
+    expect(voiceChips().map((chip) => chip.getAttribute('aria-checked'))).toEqual(['false', 'true']);
+    expect(confirmStrip()).toBeNull();
   });
 
   it('switches on confirm', () => {

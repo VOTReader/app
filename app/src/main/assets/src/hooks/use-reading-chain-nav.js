@@ -20,7 +20,9 @@
                                        they run; an empty one (the lazy
                                        VOT corpus not loaded yet) asks
                                        for it and jumps when it lands,
-                                       within 8 s (_whenLettersLoad, as1b).
+                                       within 8 s (_whenLettersLoad, as1b),
+                                       unless the reader moved or a tab
+                                       action ran meanwhile (sweep v013).
      - _goFirst / _goLast              Maps<volKey, () => void> built
                                        once per render by iterating
                                        COLLECTIONS. _goFirst.one is
@@ -94,6 +96,12 @@
      chapter               Current chapter object (or null). Same.
      bookId                Current book id. Used by bookIdx +
                            bcvOnNextBook's Revelation special-case.
+     screen, chapterNum, letterId, studyId, studyChapterId,
+     journalEntryId, activeTabIdx, tabCount
+                           The reader's place (with bookId). A jump
+                           that waits for its letters runs only if
+                           none of them changed, and no tab action ran
+                           (tabActionCount), since the tap (sweep v013).
      setBookId, setChapterNum, setScreen, setLetterId
                            Nav setters.
      setActiveReadKey      From useReadingDwell. Used by
@@ -131,14 +139,26 @@
 // as1b: at most one boundary jump waits for its letters at a time; a newer
 // jump (or any landed one) cancels it. After JUMP_WAIT_MS the wait is dropped,
 // so a slow load never pulls the reader off a page they went on to meanwhile.
+// sweep v013: inside that window too. When the letters land, the jump runs only
+// if `stillHere()` says the reader has not moved and no tab action ran since the
+// tap (the W39 rule useNavigateToLink applies to a Bible jump that waits for its
+// corpus): _open's setters write to whichever tab is active when the letters
+// land, so Home, Back, a Library tap or a tab switch meanwhile was yanked to
+// Volume One, or another tab's place was overwritten with it.
 import { COLLECTIONS, COL_BY_KEY, READING_CHAIN, _boundaryShort, colLetterArr, colPreface } from '../data/scripture-resolution.js';
+import { tabActionCount } from './use-navigate-to-link.js';
 
 const JUMP_WAIT_MS = 8000;
 let _pendingJumpCancel = null;
 function _cancelPendingJump() {
   if (_pendingJumpCancel) _pendingJumpCancel();
 }
-function _whenLettersLoad(col, jump) {
+/**
+ * @param {any} col
+ * @param {() => void} jump
+ * @param {() => boolean} stillHere
+ */
+function _whenLettersLoad(col, jump, stillHere) {
   _cancelPendingJump();
   if (typeof window.__loadVotCorpus === 'function') {
     try { Promise.resolve(window.__loadVotCorpus()).catch(() => {}); } catch (_e) { /* the route shows the load error */ }
@@ -156,7 +176,8 @@ function _whenLettersLoad(col, jump) {
   unsub = corpus.subscribe(() => {
     if (colLetterArr(col).length === 0 && !colPreface(col)) return;
     cancel();
-    jump();
+    if (stillHere()) jump();
+    else console.info('useReadingChainNav: the reader moved on while the letters loaded; jump dropped', col.volKey);
   });
 }
 
@@ -169,6 +190,14 @@ function _whenLettersLoad(col, jump) {
  *   book: any,
  *   chapter: any,
  *   bookId: string | null,
+ *   screen?: string,
+ *   chapterNum?: number | null,
+ *   letterId?: string | null,
+ *   studyId?: string | null,
+ *   studyChapterId?: string | null,
+ *   journalEntryId?: string | null,
+ *   activeTabIdx?: number,
+ *   tabCount?: number,
  *   setBookId: (v: any) => void,
  *   setChapterNum: (v: any) => void,
  *   setScreen: (v: any) => void,
@@ -197,9 +226,25 @@ function _whenLettersLoad(col, jump) {
  */
 export function useReadingChainNav({
   book, chapter, bookId,
+  screen, chapterNum, letterId, studyId, studyChapterId, journalEntryId, activeTabIdx, tabCount,
   setBookId, setChapterNum, setScreen, setLetterId,
   setActiveReadKey, setLastReadForVol, goToGardenFirst,
 }) {
+  // sweep v013: "has the reader moved since the tap?" for a jump that waits for
+  // its letters. Counts moves, not end states, as useNavigateToLink's W39 check
+  // does: every render where the active tab index, the tab count or a nav-position
+  // field differs from the last one bumps the count (Home and back ends where it
+  // started). Synced during render, like useRefMirror.
+  const _place = [activeTabIdx, tabCount, screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId];
+  const _movesRef = React.useRef({ last: _place, count: 0 });
+  const _mv = _movesRef.current;
+  if (_place.some((v, i) => v !== _mv.last[i])) { _mv.last = _place; _mv.count++; }
+  // Taken at the tap: true while the reader is where they tapped from.
+  const _stillHereFromNow = () => {
+    const movesAtTap = _movesRef.current.count, tabActionsAtTap = tabActionCount();
+    return () => _movesRef.current.count === movesAtTap && tabActionCount() === tabActionsAtTap;
+  };
+
   // ── Cross-volume reading chain (Revelation → V1 → ... → Timothy → Garden) ──
   const goToRevelationLast = () => {
     // BOOKS is in the lazy bundle-a-bible bundle (Q8 lazy-loading). If
@@ -230,11 +275,11 @@ export function useReadingChainNav({
   const _first = (col) => function jump() {
     const pref = colPreface(col), arr = colLetterArr(col);
     const id = pref ? pref.id : arr.length > 0 ? arr[0].id : null;
-    if (id) _open(col, id); else _whenLettersLoad(col, jump);
+    if (id) _open(col, id); else _whenLettersLoad(col, jump, _stillHereFromNow());
   };
   const _last = (col) => function jump() {
     const arr = colLetterArr(col);
-    if (arr.length > 0) _open(col, arr[arr.length - 1].id); else _whenLettersLoad(col, jump);
+    if (arr.length > 0) _open(col, arr[arr.length - 1].id); else _whenLettersLoad(col, jump, _stillHereFromNow());
   };
 
   // _goFirst / _goLast maps — built once per render by iterating

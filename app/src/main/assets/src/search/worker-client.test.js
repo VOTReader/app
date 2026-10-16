@@ -7,9 +7,11 @@ import { startSemantic, semanticDocs, semanticStatus, configureSemantic, resetSe
 
 /** What the fake worker answers, by op: (message, post) => void. An op with no entry is never answered. */
 /** @type {Record<string, (m: any, post: (r: any) => void) => void>} */ let script = {};
+/** The worker the page made last. @type {any} */ let made = null;
 
 class FakeWorker {
   constructor() {
+    made = this;
     /** @type {any} */ this.onmessage = null;
     /** @type {any} */ this.onerror = null;
     /** @type {any} */ this.onmessageerror = null;
@@ -102,5 +104,28 @@ describe('the meaning model on the worker', () => {
     await vi.advanceTimersByTimeAsync(61000);
     expect(s.state).toEqual({ value: true });
     expect(semanticStatus().where).toBe('worker');
+  });
+
+  /* A worker that ANSWERS a query with an error (its runtime threw in session.run) is alive and still holds its copy of
+     the model. This thread took the model over beside it, so a 2-3 GB phone held two (~70 MB each; sweep 2026-10-14
+     v017, its second case). The worker is given up first. */
+  it('a query the worker answers with an error gives the worker up before this thread loads the model', async () => {
+    script['meaning-start'] = (_m, post) => post({ done: true, ok: true, status: 'ready', units: 3 });
+    script.meaning = (_m, post) => post({ done: true, error: 'no session' });
+    const loadedBeside = [];
+    configureSemantic({
+      load: (/** @type {string} */ p) => {
+        if (made && !made.terminated) loadedBeside.push(p);
+        return Promise.reject(new Error('no files here'));
+      },
+    });
+    expect(await startSemantic()).toBe(true);
+    expect(semanticStatus().where).toBe('worker');
+    const q = watch(semanticDocs('love', (k) => k));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(q.state).toEqual({ value: null });
+    expect(semanticStatus().where).toBe('page');
+    expect(made.terminated, 'the worker that holds the model is let go').toBe(true);
+    expect(loadedBeside, 'files this thread loaded while the worker still held the model').toEqual([]);
   });
 });

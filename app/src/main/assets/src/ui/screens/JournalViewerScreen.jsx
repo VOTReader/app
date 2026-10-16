@@ -138,10 +138,16 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
   if (b.type === 'quote') {
     var qText = b.text || '';
     var qLong = qText.length > 240;
+    // A long quote folds away behind Show more, but it is drawn by the same
+    // inline renderer inside the same annotation container as a short one:
+    // without both it printed raw **bold** / {{ref:}} markers and its marks
+    // never painted (v047). ExpandableText's whole-text mode keeps the full
+    // quote in that container and clamps it visually.
     return (
       <div className="jrn-block-quote">
         {qLong
-          ? <JrnExpandable text={qText} threshold={240} className="jrn-block-quote-body" />
+          ? <JrnExpandable text={qText} threshold={240} className="jrn-block-quote-body"
+              bodyProps={hlProps} renderText={function(t) { return jrnRenderInline(t, callbacks); }} />
           : <div className="jrn-block-quote-body" {...hlProps}>{jrnRenderInline(qText, callbacks)}</div>}
         {b.cite && <div className="jrn-block-quote-cite">{b.cite}</div>}
       </div>
@@ -446,8 +452,24 @@ export function JournalAudioBlock(props) {
   function toggle(e) {
     if (e) { e.stopPropagation(); }
     if (!audioRef.current) return;
-    if (playing) audioRef.current.pause();
-    else audioRef.current.play();
+    if (playing) { audioRef.current.pause(); return; }
+    // play() returns a promise that rejects when the memo cannot play: a codec
+    // this WebView cannot decode (a backup made on another device), a broken
+    // file. Dropped, the rejection went unhandled, the 'play' event already
+    // fired left the button on Pause over silence, and the reader was told
+    // nothing (v070). An AbortError only means a pause or a new load cut the
+    // start short, so it resets the button without a message.
+    var p = audioRef.current.play();
+    if (p && typeof p.catch === 'function') {
+      p.catch(function(err) {
+        setPlaying(false);
+        if (err && err.name === 'AbortError') return;
+        console.warn('journal memo: play failed', mediaId, err);
+        if (typeof showToast === 'function') {
+          showToast({ id: 'vot-toast-memo-play', className: 'vot-toast', text: 'This voice memo can’t be played on this device.', ariaLive: 'assertive' });
+        }
+      });
+    }
   }
 
   function onTimeUpdate() {

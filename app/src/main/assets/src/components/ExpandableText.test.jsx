@@ -36,6 +36,20 @@ const nestedInteractive = (root) => root.querySelectorAll(
   'button button, button [role="button"], [role="button"] button, [role="button"] [role="button"], '
   + 'button [tabindex="0"], [role="button"] [tabindex="0"]').length;
 
+// Sweep v047: whole-text mode (renderText / bodyProps) keeps the whole text in the body and clamps it, so the
+// toggle is offered only when the clamp hides something. jsdom lays nothing out (both heights are 0).
+describe('ExpandableText — whole-text mode', () => {
+  it('draws through renderText into the bodyProps element, and offers no toggle when nothing is clipped', () => {
+    const text = 'word '.repeat(80);
+    const { container } = render(
+      <ExpandableText text={text} threshold={40} bodyProps={{ 'data-hl-key': 'k' }} renderText={(t) => <b>{t}</b>} />
+    );
+    const body = container.querySelector('[data-hl-key="k"]');
+    expect(body.querySelector('b').textContent).toBe(text);
+    expect(container.querySelector('button')).toBeNull();
+  });
+});
+
 // Sweep low (mw10): with tapToToggle the wrapper was role=button around the real Show more button.
 describe('ExpandableText — tapToToggle', () => {
   it('has one control, the Show more button, which says whether the text is expanded; a tap anywhere still toggles', () => {

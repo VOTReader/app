@@ -338,6 +338,57 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 
+  /* THE MEANING ARRIVES AFTER THE FIRST SEARCH (sr11 S22 look, 2026-10-15). A search typed before the on-device model
+     was ready ran on the words alone, and the screen kept that list until the query changed: on the S22 'stay alert
+     because nobody knows when the lord will come back' led with an unrelated letter, while the engine asked again led
+     with "Keep Watch". The screen now searches again, quietly, once the model is ready, and on a search it resumes. */
+  it('a search run before the meaning model was ready runs again when it is, and its order replaces the first', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchGroup = ({ gkey }) => <div className="stub-group" data-key={gkey} />;
+    /** @type {any} */ (globalThis).SrchCard = ({ entry }) => <div className="stub-card">{entry.doc.title}</div>;
+    const lead = () => { const c = document.querySelector('.srch-top-results .stub-card'); return c && c.textContent; };
+    const E = /** @type {any} */ (window).VotSearchMini;
+    /** @type {any} */ let ready;
+    E.whenMeaningReady = vi.fn(() => new Promise((res) => { ready = res; }));
+    const card = (/** @type {string} */ title) => [title, 'Other'].map((t, i) => ({ score: 2 - i, doc: { kind: 'letter', title: t, text: 't', g: i ? 'v7' : 'v1' } }));
+    E.search = vi.fn()
+      .mockResolvedValueOnce({ parsed: null, results: card('Words Only'), parsedTerms: [], meaningLater: true })
+      .mockResolvedValue({ parsed: null, results: card('Keep Watch'), parsedTerms: [], meaningLater: false });
+    const props = baseProps();
+    const q = 'nobody knows when the lord will come back';
+    const { rerender, unmount } = render(<SearchScreen {...props} />);
+    rerender(<SearchScreen {...props} query={q} />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    expect(lead()).toBe('Words Only');
+    expect(E.search).toHaveBeenCalledTimes(1);
+    expect(E.whenMeaningReady).toHaveBeenCalledTimes(1);
+    await act(async () => { ready(true); for (let i = 0; i < 5; i++) await Promise.resolve(); });
+    expect(E.search).toHaveBeenCalledTimes(2);
+    expect(lead()).toBe('Keep Watch');
+    expect(screen.queryByRole('status'), 'no "Searching" while it ranks again').toBeNull();
+    unmount();
+
+    // Opened a result before the model was ready, then Back: the kept list ranks again too.
+    E.search = vi.fn()
+      .mockResolvedValueOnce({ parsed: null, results: card('Words Only'), parsedTerms: [], meaningLater: true })
+      .mockResolvedValue({ parsed: null, results: card('Keep Watch'), parsedTerms: [], meaningLater: false });
+    E.whenMeaningReady = vi.fn(() => new Promise((res) => { ready = res; }));
+    const q2 = 'stay alert because nobody knows';
+    const first = render(<SearchScreen {...props} />);
+    first.rerender(<SearchScreen {...props} query={q2} />);
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+    first.unmount();
+    render(<SearchScreen {...props} query={q2} />);
+    expect(lead()).toBe('Words Only');
+    await act(async () => { ready(true); for (let i = 0; i < 5; i++) await Promise.resolve(); });
+    expect(lead()).toBe('Keep Watch');
+    vi.useRealTimers();
+  });
+
   it('(a) the summary reads "400+" when results hit the engine cap, not the raw cap as a total', async () => {
     vi.useFakeTimers();
     const results = Array.from({ length: SEARCH_LIMIT }, (_, i) => ({

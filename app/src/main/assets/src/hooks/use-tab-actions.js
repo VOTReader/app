@@ -42,6 +42,8 @@
      cancelDwell — useReadingDwell (P6f); switchToTab cancels an in-flight
        dwell timer BEFORE flipping tabs so the previous tab's reading-streak
        day-record timer can't credit time spent on the newly-active tab.
+       Every close that takes the tab on screen away cancels it too (sweep
+       v098); nothing else cancels the dwell on an active-tab change.
        (Mark-as-read itself is per-visit in use-read-tracker.js, keyed on
        placeKey — a tab flip remounts its state and needs no cancel here.)
      setTabThumbnails — useThumbnails (P6d); closeAllTabs clears them.
@@ -152,6 +154,14 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
   // useState-setter identity stability is a React invariant; ref-only functions
   // are stale-safe by inspection. Including them in deps would either no-op
   // (setters) or destroy useCallback's referential stability (cancelDwell).
+  //
+  // Sweep v098: a close that changes the tab on screen cancels its dwell, as
+  // switchToTab does, or the closed page's streak timer runs on and records a
+  // reading day for a page no longer open. A close that leaves the tab on screen
+  // alone must NOT cancel (that tab's dwell is still honest, and only a new
+  // setActiveReadKey re-arms it). The callbacks keep first-render closures, so the
+  // check runs inside the active-index updater, where `cur` is current;
+  // cancelDwell is idempotent, so an updater React re-runs is harmless.
   const openNewTab = React.useCallback(() => {
     setTabs((prev) => {
       if (prev.length >= MAX_TABS) { _tabCapToast(); return prev; }
@@ -186,6 +196,7 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
         // a real close (a tab always remains), so no undo snapshot.
         closedTabRef.current = null;
         const reset = { ...DEFAULT_TAB };
+        cancelDwell(); // the only tab is the one on screen; it goes back to Home
         setActiveTabIdx(0);
         return [reset];
       }
@@ -196,7 +207,10 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
       // Keep activeTabIdx pointing at a valid tab
       setActiveTabIdx((prevIdx) => {
         if (idx < prevIdx) return prevIdx - 1; // shifted left
-        if (idx === prevIdx) return Math.max(0, Math.min(prevIdx, next.length - 1));
+        if (idx === prevIdx) {
+          cancelDwell(); // closed the tab on screen (sweep v098)
+          return Math.max(0, Math.min(prevIdx, next.length - 1));
+        }
         return prevIdx; // closed tab was to the right; idx unchanged
       });
       return next;
@@ -218,7 +232,7 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
       const btn = el && el.querySelector('.vot-undo-btn');
       if (btn) btn.addEventListener('click', restoreClosedTab, { once: true });
     }, 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin) + restoreClosedTab is a stable useCallback; see header above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin) + restoreClosedTab is a stable useCallback; cancelDwell is a ref-only function (stale-safe); see header above.
   }, [restoreClosedTab]);
   // [7] PINNED TABS survive every BULK close (Close-others / Close-to-the-
   //-right / Clear-all). The single per-tab × still closes a pinned tab —
@@ -230,10 +244,15 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
       if (!kept) return prev;
       const next = prev.filter((t, i) => i === keepIdx || t.pinned);
       if (next.length === prev.length) return prev;
-      setActiveTabIdx(Math.max(0, next.indexOf(kept)));
+      setActiveTabIdx((cur) => {
+        // The kept tab comes on screen; any other tab there loses it, even a
+        // pinned one that survives the close (sweep v098).
+        if (prev[cur] !== kept) cancelDwell();
+        return Math.max(0, next.indexOf(kept));
+      });
       return next;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); see header above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); cancelDwell is a ref-only function (stale-safe); see header above.
   }, []);
   const closeTabsToTheRight = React.useCallback((keepIdx) => {
     setTabs((prev) => {
@@ -242,11 +261,13 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
       if (next.length === prev.length) return prev;
       setActiveTabIdx((cur) => {
         const ni = next.indexOf(prev[cur]);
-        return ni >= 0 ? ni : Math.min(cur, keepIdx);
+        if (ni >= 0) return ni;
+        cancelDwell(); // closed the tab on screen (sweep v098)
+        return Math.min(cur, keepIdx);
       });
       return next;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); see header above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); cancelDwell is a ref-only function (stale-safe); see header above.
   }, []);
   // [7] Rename: a persisted custom title that OVERRIDES the remembered
   // describeTab label everywhere it renders. Empty/whitespace clears it.
@@ -315,14 +336,17 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
       // [7] pinned tabs survive Clear All; the thumbnail wipe only happens
       // on the true full reset (the GC effect prunes the rest).
       const pinned = prev.filter((t) => t.pinned);
-      setActiveTabIdx(0);
-      if (pinned.length === 0) {
-        setTabThumbnails({});
-        return [{ ...DEFAULT_TAB }];
-      }
-      return pinned;
+      const next = pinned.length ? pinned : [{ ...DEFAULT_TAB }];
+      setActiveTabIdx((cur) => {
+        // Index 0 comes on screen; only the first pinned tab already there
+        // stays (sweep v098).
+        if (prev[cur] !== next[0]) cancelDwell();
+        return 0;
+      });
+      if (pinned.length === 0) setTabThumbnails({});
+      return next;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState + setTabThumbnails param (all useState origin); see header above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState + setTabThumbnails param (all useState origin); cancelDwell is a ref-only function (stale-safe); see header above.
   }, []);
   // Merge duplicates: if two tabs have the same content signature, drop later
   // duplicates. A dropped copy's pin and rename carry over to the kept one

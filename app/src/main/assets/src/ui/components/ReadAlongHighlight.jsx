@@ -798,8 +798,9 @@ export function repeatSpanOf(frags, keys, letterId, hlKeyFn) {
  *   chapter's translation). A change repaints the current fragment on the new
  *   text and follows it.
  * @param {(() => void) | null} [props.onListen] - the host's own Listen action
- *   (its hero pill's). Given, this unit offers LISTEN FROM HERE through
- *   window.__votListenFrom; absent (no recording), it offers nothing.
+ *   (its hero pill's). Given, and with readAlongOn, this unit offers LISTEN FROM
+ *   HERE through window.__votListenFrom; absent (no recording), or with the
+ *   read-along off (no timings to find the place in), it offers nothing.
  */
 export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlongOn = true, readAlongFollow = true, chapter = 0, offsetMapFn = null, seekTo = null, seekOffset = null, onListen = null, textKey = '' }) {
   // Named, not discarded: the two lazy-timing effects below depend on it so a
@@ -1058,8 +1059,12 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       // event — dispatched from React's root container, long after the native
       // click has bubbled past this listener. So the seek fires first and
       // cannot be stopped: tapping a note icon jumped the audio.
+      // An annotation's MARK is the same case (sweep v44): a tap on a highlight
+      // opens its action chip and one on a note mark opens the note, through
+      // SelectionToolbar's routeAnnotationTap on the document, after this
+      // listener. `mark.hl-mark` is the selector that router matches.
       if (e.target && e.target.closest
-          && e.target.closest('a, button, [role="button"], [role="link"], .fn-ref, .letter-link-ref, .inline-scrip-ref, .verse-link-icon, .inline-bookmark-icon, .hl-note-icon')) return;
+          && e.target.closest('a, button, [role="button"], [role="link"], .fn-ref, .letter-link-ref, .inline-scrip-ref, .verse-link-icon, .inline-bookmark-icon, .hl-note-icon, mark.hl-mark')) return;
       const i = fragmentAtPoint(frags, el, letterId, hlKeyFn, e.clientX, e.clientY, offsetMapFn);
       if (i < 0) return;                                          // untimed text — stay silent
       if (jump && now - jump.last <= DOUBLE_TAP_MS) jump.last = now;
@@ -1133,7 +1138,12 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   // The follow-scroll stands down meanwhile: the reader is looking at the place.
   // One live pane at a time (the !inert contract), and the cleanup only clears
   // the slot if it is still this pane's.
-  const listenOffered = typeof onListen === 'function';
+  // ONLY WITH THE READ-ALONG ON (sweep v23). The place is found in the timings,
+  // and with the wash off they are never fetched: start() could only fall back
+  // to the host's plain Listen, which played from the top or the resume point
+  // (and restarted a unit already playing), while the landing waited for rows
+  // that never came and lapsed with no word. Repeat stood behind the same gate.
+  const listenOffered = typeof onListen === 'function' && readAlongOn;
   const onListenRef = React.useRef(onListen);
   onListenRef.current = onListen;
   const listenCtx = React.useRef(/** @type {{ frags: any, loaded: boolean, status: string, rows: any[] | null, part: number, perAsset: boolean, queue: any[] }} */ ({ frags: null, loaded: false, status: 'idle', rows: null, part: 0, perAsset: false, queue: [] }));
@@ -1212,8 +1222,8 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       },
       // REPEAT THIS PASSAGE (rp1 part 3): loop these blocks `times` times under `label`. Offered wherever the
       // player can loop: the web's, and the APK's native one since ra2 (an older APK's cannot). And only with the
-      // read-along on: the span comes from the timings, which are not fetched with it off.
-      repeat: (!AudioPlayer.canLoop() || !readAlongOn) ? undefined : (/** @type {string[]} */ keys, /** @type {string} */ label, /** @type {number} */ times) => {
+      // read-along on, as the whole entry is (listenOffered): the span comes from the timings.
+      repeat: !AudioPlayer.canLoop() ? undefined : (/** @type {string[]} */ keys, /** @type {string} */ label, /** @type {number} */ times) => {
         const mine = (Array.isArray(keys) ? keys : []).filter(has);
         if (!mine.length) return false;
         userScrollAt.current = Date.now();
@@ -1239,7 +1249,7 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     };
     w.__votListenFrom = entry;
     return () => { if (w.__votListenFrom === entry) w.__votListenFrom = null; };
-  }, [listenOffered, mainRef, letterId, hlKeyFn, offsetMapFn, readAlongOn]);
+  }, [listenOffered, mainRef, letterId, hlKeyFn, offsetMapFn]);
   // The landing a start() through the host's Listen is waiting for: applied
   // once, the moment this unit is the loaded track with its timings in memory.
   React.useEffect(() => {

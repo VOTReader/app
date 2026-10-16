@@ -87,10 +87,18 @@ describe('noteSourceLabel', () => {
   });
 
   it('verse 0 is dropped from the range (filter(Boolean)) — a whole-chapter key labels bare', () => {
-    // Pins current behavior: a key with no verse parses to 0 and is filtered
-    // out, so the label ends at the colon rather than printing ":0".
+    // A key with no verse parses to 0 and is filtered out; the label is the
+    // bare chapter, with no ":0" and no dangling colon (sweep v087).
     g.BIBLE_BOOK_LIST = [{ id: 'psalms', title: 'Psalms' }];
-    expect(noteSourceLabel({ keys: ['bible:psalms:23:'] })).toBe('Psalms 23:');
+    expect(noteSourceLabel({ keys: ['bible:psalms:23:'] })).toBe('Psalms 23');
+  });
+
+  it('a study chapter-panel key ("panel-s0") labels the bare chapter, no dangling colon (sweep v087)', () => {
+    // parseInt('panel-s0') is NaN, which filter(Boolean) drops — the row read
+    // "Matthew 22:" before.
+    expect(noteSourceLabel({ keys: ['study:matthew-22:panel-s0'] })).toBe('Matthew 22');
+    // A panel key alongside a verse key still labels the verse.
+    expect(noteSourceLabel({ keys: ['study:matthew-22:panel-s0', 'study:matthew-22:37'] })).toBe('Matthew 22:37');
   });
 
   it('a letter note resolves its title through findEntryContext', () => {
@@ -229,9 +237,20 @@ describe('noteSourceSegments', () => {
   it('a whole-chapter key navigates to the chapter with no verse anchor', () => {
     g.BIBLE_BOOK_LIST = [{ id: 'psalms', title: 'Psalms' }];
     const segs = noteSourceSegments({ keys: ['bible:psalms:23:'] });
-    expect(segs[0].label).toBe('Psalms 23:');
+    expect(segs[0].label).toBe('Psalms 23');
     // No NaN verse — verseAnchorFor gets nothing and simply opens the chapter.
     expect(segs[0].nav).toEqual({ type: 'bible', key: 'bible:psalms:23:', bookId: 'psalms', chapter: 23 });
+  });
+
+  it('a study chapter-panel key yields a bare-chapter tap target with no dangling colon (sweep v087)', () => {
+    const note = { keys: ['study:matthew-22:panel-s0'] };
+    const segs = noteSourceSegments(note);
+    expect(segs).toEqual([{
+      label: 'Matthew 22',
+      nav: { type: 'study', key: 'study:matthew-22:panel-s0', bookId: 'matthew', chapter: 22 },
+    }]);
+    // The tap target's label and the row label stay the same string.
+    expect(segs.map(s => s.label).join(' · ')).toBe(noteSourceLabel(note));
   });
 
   it('letter / wtlb / journal notes yield ONE segment reusing label + nav verbatim', () => {

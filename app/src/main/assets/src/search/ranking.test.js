@@ -91,6 +91,27 @@ describe('nearPhrase: how much of the typed phrase a text holds together', () =>
     const far = 'the earth will grow ' + 'word '.repeat(50) + 'old like a garment';
     expect(near(far, 'the earth will grow old like a garment')).toBeLessThan(0.6);
   });
+
+  /* sr11 t042: the pairs counted in any order, so Matthew 23:26 (the inside of the cup
+   * and dish ... the outside of them) held as much of the phrase as 23:25's straight run. */
+  it('scores pairs met out of order below the same pairs met in order', () => {
+    const q = 'you clean the outside of the cup and plate';
+    const inOrder = near('For you cleanse the outside of the cup and dish, but inside they are full', q);
+    const outOfOrder = near('first cleanse the inside of the cup and dish, that the outside of them may be clean also', q);
+    expect(outOfOrder).toBeLessThan(inOrder);
+    expect(outOfOrder).toBeLessThan(0.5);
+  });
+
+  it('keeps the credit of a phrase typed with a middle stretch dropped', () => {
+    const text = 'show wonders in the heavens above and in the earth beneath, blood and fire and pillars of smoke';
+    expect(near(text, 'show wonders in the heavens above blood and fire and pillars of smoke')).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it('gives a typed word met as another form of it half its pairs, another word none', () => {
+    const q = 'you clean the outside';
+    expect(near('you cleanse the outside', q)).toBeCloseTo(2 / 3);
+    expect(near('you wash the outside', q)).toBeCloseTo(1 / 3);
+  });
 });
 
 describe('titleMatch: a title typed whole ranks its unit first', () => {

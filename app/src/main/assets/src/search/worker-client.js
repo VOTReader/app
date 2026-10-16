@@ -56,7 +56,10 @@ function request(op, data, onPart, quietMs) {
   });
 }
 
-const client = { request };
+/** Give the worker up: what it held is done on the page from now on, and its open requests are refused. */
+const close = (/** @type {string} */ why) => fail(why);
+
+const client = { request, close };
 
 /** The search worker, started on first use; null where this page cannot have one. */
 export function searchWorker() {

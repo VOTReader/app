@@ -28,12 +28,22 @@ import { countStoreRecords } from './backup.js';
  * before they need them. `counts` stands in only when there is no `stores`
  * block.
  *
+ * Annotations are the one store whose record count is not the reader's unit.
+ * vot-annotations persists hlKey → [marks], so the store rule counts annotated
+ * passages, and five highlights in two verses are 2 records. With `stores` in
+ * hand the summary counts the marks (`highlights`, the sum data-safety's
+ * summarize and the storage banner print). A `counts`-only file cannot say how
+ * many marks it holds, so its figure stays in its own unit
+ * (`annotatedPassages`) and the report names it that way. Exactly one of the
+ * two is ever non-zero.
+ *
  * @param {any} manifest
  * @returns {{
  *   date: string | null,
  *   records: number, storeCount: number,
  *   mediaCount: number, mediaBytes: number,
- *   notes: number, annotations: number, journal: number, bookmarks: number
+ *   notes: number, highlights: number, annotatedPassages: number,
+ *   journal: number, bookmarks: number
  * }}
  */
 export function summarizeBackupManifest(manifest) {
@@ -70,6 +80,13 @@ export function summarizeBackupManifest(manifest) {
     mediaCount = counts._media;
   }
   const pick = (k) => byStore.get(k) || 0;
+  let highlights = 0;
+  if (stores) {
+    const ann = stores['vot-annotations'];
+    if (ann && typeof ann === 'object' && !Array.isArray(ann)) {
+      for (const list of Object.values(ann)) if (Array.isArray(list)) highlights += list.length;
+    }
+  }
   return {
     date: (manifest && typeof manifest.exportDate === 'string') ? manifest.exportDate : null,
     records,
@@ -77,7 +94,8 @@ export function summarizeBackupManifest(manifest) {
     mediaCount,
     mediaBytes,
     notes: pick('vot-notes'),
-    annotations: pick('vot-annotations'),
+    highlights,
+    annotatedPassages: stores ? 0 : pick('vot-annotations'),
     journal: pick('vot-journal'),
     bookmarks: pick('vot-bookmarks'),
   };
@@ -121,7 +139,10 @@ export function formatVerifyReport(s, integrity, kind, salvaged) {
   }
   const parts = [];
   if (s.notes) parts.push(s.notes + (s.notes === 1 ? ' note' : ' notes'));
-  if (s.annotations) parts.push(s.annotations + (s.annotations === 1 ? ' highlight' : ' highlights'));
+  if (s.highlights) parts.push(s.highlights + (s.highlights === 1 ? ' highlight' : ' highlights'));
+  if (s.annotatedPassages) {
+    parts.push(s.annotatedPassages + (s.annotatedPassages === 1 ? ' annotated passage' : ' annotated passages'));
+  }
   if (s.journal) parts.push(s.journal + (s.journal === 1 ? ' journal entry' : ' journal entries'));
   if (s.bookmarks) parts.push(s.bookmarks + (s.bookmarks === 1 ? ' bookmark' : ' bookmarks'));
   const detail = parts.length ? parts.join(', ') + ' — ' : '';

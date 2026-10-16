@@ -140,7 +140,7 @@ function _syncNativeUpcoming() {
  * is a few dozen bytes here, where a `custom` queue would re-serialize 900
  * tracks into IDB every second. song-catalog.js's songQueue() turns it back
  * into the same queue.
- * @type {{ mode: 'letter'|'collection'|'section'|'custom'|'songs', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null, startPartIndex?: number|null, filter?: any, one?: boolean, seed?: number, shuffle?: boolean, ids?: string[] | null, wrap?: boolean, swaps?: Record<string, string> | null } | null} */
+ * @type {{ mode: 'letter'|'collection'|'section'|'custom'|'songs', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null, startPartIndex?: number|null, filter?: any, one?: boolean, seed?: number, shuffle?: boolean, ids?: string[] | null, wrap?: boolean, swaps?: Record<string, string> | null, fromSection?: any } | null} */
 export let _source = null;
 /** Descriptor waiting for its queue rebuild (set only by _restoreFromSaved). */
 export let _pendingRestore = /** @type {any} */ (null);

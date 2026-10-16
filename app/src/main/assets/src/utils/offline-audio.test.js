@@ -130,6 +130,24 @@ describe('offline-audio — in the phone app', () => {
     expect(b.offlineAudioCancel).not.toHaveBeenCalled();                       // nothing of the recordings' on its way
   });
 
+  it('names the songs on their way (queued or downloading), never a recording or a song already kept (sweep v037)', () => {
+    const S1 = 'https://votreader.github.io/songs-2/a1b2c3d4e5f6.mp3';
+    const S2 = 'https://votreader.github.io/songs-1/b1b2c3d4e5f6.mp3';
+    const S3 = 'https://votreader.github.io/songs-1/c1b2c3d4e5f6.mp3';
+    fakeBridge([{ url: S3, key: 'song:c1b2c3d4e5f6', title: 'Kept', bytes: 3000, savedAt: 2 }]);
+    OfflineAudio.refresh();
+    expect(OfflineAudio.songsOnTheirWay()).toEqual([]);
+    OfflineAudio.download([
+      { url: U1, key: 'one:christmas', title: 'Christmas' },
+      { url: S1, key: 'song:a1b2c3d4e5f6', title: 'A song' },
+      { url: S2, key: 'song:b1b2c3d4e5f6', title: 'Another' },
+    ]);
+    send({ type: 'progress', url: S1, bytes: 10, total: 3000 });
+    expect(OfflineAudio.songsOnTheirWay().sort()).toEqual([S1, S2].sort());
+    send({ type: 'cancelled', url: S2 });
+    expect(OfflineAudio.songsOnTheirWay()).toEqual([S1]);
+  });
+
   it('asks the phone for sizes before a download and answers them per recording', async () => {
     const b = fakeBridge([{ url: U2, key: 'k2', title: 't2', bytes: 20, savedAt: 1 }]);
     OfflineAudio.refresh();

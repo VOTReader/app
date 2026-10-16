@@ -908,6 +908,101 @@ describe('audio-player — a dropped letter must not throw the rebuilt queue awa
   });
 });
 
+describe('audio-player — the restored bar closed while its first Play still loads the corpus (sweep v82)', () => {
+  /* The first tap on a restored bar clears the pending restore and then awaits the lazy VOT corpus (2-5 MB, seconds
+     on a budget phone). A ✕ in that window ran stop(), and the rebuild then carried on regardless: it set the source,
+     the queue and qi and started playing, so the bar the reader had just closed came back, playing. */
+  const SNAPSHOT = {
+    v: 2, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 0,
+    key: 'vol1:preface', time: 90,
+    track: { key: 'vol1:preface', title: 'Preface', sub: 'Volume One', url: URL_OF('idPreface'), readerCode: 'B', partLabel: null },
+  };
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  /** A cold boot onto a restored bar before the VOT corpus has landed; returns the call that lands it. */
+  async function restoredBeforeCorpus() {
+    localStorage.setItem('vot-audio-pos', JSON.stringify(SNAPSHOT));
+    await load();
+    delete globalThis.AUDIO_MANIFEST;
+    let land = () => {};
+    globalThis.__loadVotCorpus = vi.fn(() => new Promise((res) => {
+      land = () => {
+        globalThis.AUDIO_MANIFEST = MANIFEST;
+        globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+        globalThis.colPreface = () => ITEMS[0];
+        globalThis.colLetterArr = () => ITEMS.slice(1);
+        res();
+      };
+    }));
+    return () => land();
+  }
+
+  afterEach(() => {
+    delete globalThis.__loadVotCorpus;
+    delete globalThis.COL_BY_KEY;
+    delete globalThis.colPreface;
+    delete globalThis.colLetterArr;
+  });
+
+  it('CONTROL: with nothing in between, the rebuild waits for the corpus and then plays from the saved place', async () => {
+    const landCorpus = await restoredBeforeCorpus();
+    AudioPlayer.toggle();
+    await flush();
+    expect(globalThis.__loadVotCorpus).toHaveBeenCalledTimes(1);
+    landCorpus();
+    await flush();
+    const st = AudioPlayer.getState();
+    expect(st.status).not.toBe('idle');
+    expect(st.queue.map((t) => t.url)).toEqual([URL_OF('idPreface'), URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
+    expect(el().src).toBe(URL_OF('idPreface'));
+  });
+
+  it('THE READER-FACING CONSEQUENCE: ✕ during the corpus load stays closed once the corpus lands', async () => {
+    const landCorpus = await restoredBeforeCorpus();
+    AudioPlayer.toggle();
+    await flush();
+    AudioPlayer.stop();
+    landCorpus();
+    await flush();
+    const st = AudioPlayer.getState();
+    expect(st.status).toBe('idle');
+    expect(st.queue).toHaveLength(0);
+    expect(el() ? el().played : false).toBe(false);
+    expect(localStorage.getItem('vot-audio-pos')).toBe(null);   // nothing for the next boot to resurrect
+  });
+
+  it('Next during the load joins the rebuild: a step past the saved recording once the corpus lands, never a stop (sweep v021)', async () => {
+    // It used to read the one-track placeholder as the end of a queue of one and stop; the bar now offers Next
+    // while restoring, so Next has to mean Next.
+    const landCorpus = await restoredBeforeCorpus();
+    AudioPlayer.toggle();
+    await flush();
+    AudioPlayer.next();
+    expect(AudioPlayer.getState().status).not.toBe('idle');
+    landCorpus();
+    await flush();
+    const st = AudioPlayer.getState();
+    expect(st.status).not.toBe('idle');
+    expect(st.queue).toHaveLength(4);
+    expect(st.qi).toBe(1);
+    expect(el().src).toBe(URL_OF('idA1'));
+  });
+
+  it('✕ after a Next during the load still stays closed', async () => {
+    const landCorpus = await restoredBeforeCorpus();
+    AudioPlayer.toggle();
+    await flush();
+    AudioPlayer.next();
+    AudioPlayer.stop();
+    landCorpus();
+    await flush();
+    expect(AudioPlayer.getState().status).toBe('idle');
+    expect(AudioPlayer.getState().queue).toHaveLength(0);
+    expect(el() ? el().played : false).toBe(false);
+    expect(localStorage.getItem('vot-audio-pos')).toBe(null);
+  });
+});
+
 describe('audio-player — the boot snapshot after a finished recording (audio-player-3)', () => {
   /** Play the collection and put a real clock on it, so there is something to write back. */
   const playedTo = (seconds) => {
@@ -2349,6 +2444,78 @@ describe('audio-player — a seek on the boot-restored bar (read-along-4)', () =
   });
 });
 
+describe('audio-player — a seek on a restored bar whose element holds a prewarm (sweep v83)', () => {
+  /* The restored bar USUALLY has no element, and seek() chose its branch by that alone. But the durable (IDB) copy
+     is adopted whenever the player is merely idle, and a letter screen's prewarm leaves it idle with an element
+     pointed at ANOTHER recording. Boot with no LS copy (the kill case the durable copy exists for), a prewarm before
+     the IDB read lands, and a verse tap or a desk +15 then seeks the prewarmed element: the descriptor the rebuild
+     resumes from keeps the old clock, so Play starts at the old place, and read-along reads the wrong clock. */
+  const SNAP = {
+    v: 2, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 0, key: 'vol1:preface', time: 90,
+    track: { key: 'vol1:preface', title: 'Preface', sub: 'Volume One', url: URL_OF('idPreface'), readerCode: 'B', partLabel: null },
+  };
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  /** Cold boot, no LS copy; a letter screen prewarms Letter A; then the IDB read lands the snapshot. */
+  async function prewarmedThenAdopted() {
+    let land = () => {};
+    globalThis.IDBAdapter = {
+      put: vi.fn(async () => {}), delete: vi.fn(async () => {}),
+      get: vi.fn(() => new Promise((res) => { land = () => res({ ...SNAP, at: Date.now() }); })),
+    };
+    await load();
+    AudioPlayer.prewarm('vol1', 'letter-a');
+    el().duration = 300;     // preload='metadata' has loaded the prewarmed recording's header
+    el().readyState = 1;
+    land();
+    await flush();
+  }
+
+  afterEach(() => {
+    delete globalThis.IDBAdapter;
+    delete globalThis.COL_BY_KEY;
+    delete globalThis.colPreface;
+    delete globalThis.colLetterArr;
+  });
+
+  it('PRECONDITION: the durable copy restores the bar while the element still holds the other letter\'s prewarm', async () => {
+    await prewarmedThenAdopted();
+    const st = AudioPlayer.getState();
+    expect(st.restoring).toBe(true);
+    expect(st.time).toBe(90);
+    expect(el()).not.toBe(null);
+    expect(el().src).toBe(URL_OF('idA1'));
+  });
+
+  it('THE READER-FACING CONSEQUENCE: Play after the seek starts at the place sought, not the snapshot\'s', async () => {
+    await prewarmedThenAdopted();
+    AudioPlayer.seek(150);
+    expect(AudioPlayer.getState().time).toBe(150);
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    AudioPlayer.toggle();
+    await flush();
+    expect(el().src).toBe(URL_OF('idPreface'));
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(150);
+  });
+
+  it('the prewarmed element is left alone: the seek is a place in the restored recording, not in the warmed one', async () => {
+    await prewarmedThenAdopted();
+    AudioPlayer.seek(150);
+    expect(el().src).toBe(URL_OF('idA1'));
+    expect(el().currentTime).toBe(0);
+  });
+
+  it('read-along reads the restored clock, not the prewarmed element\'s', async () => {
+    await prewarmedThenAdopted();
+    expect(AudioPlayer.getPreciseTime()).toBe(90);
+    AudioPlayer.seek(150);
+    expect(AudioPlayer.getPreciseTime()).toBe(150);
+  });
+});
+
 describe('audio-player — Android keep-alive bridge', () => {
   it('activates on the first Listen, HOLDS through pause, deactivates on stop', () => {
     // Media-card rework 2026-08-09: pause no longer releases the anchor —
@@ -2707,6 +2874,163 @@ describe('audio-player — durable resume (position survives restart)', () => {
       delete globalThis.colPreface;
       delete globalThis.colLetterArr;
     }
+  });
+
+  /* sweep v021: the restored bar now offers Next (it used to hide it as a "queue of one"), so Next has to
+     mean Next. It used to rebuild the queue and resume the SAVED recording, which is what Play does. */
+  describe('Next on a boot-restored bar (sweep v021)', () => {
+    const SNAPSHOT = {
+      v: 1, mode: 'collection', volKey: 'vol1', label: 'Volume One', qi: 2, key: 'vol1:letter-a', time: 123,
+      track: { title: 'Letter A', sub: 'Volume One', readerCode: 'B', partLabel: 'Part 2', url: URL_OF('idA2'), key: 'vol1:letter-a' },
+    };
+    beforeEach(() => {
+      globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1', label: 'Volume One' }]]);
+      globalThis.colPreface = () => ITEMS[0];
+      globalThis.colLetterArr = () => ITEMS.slice(1);
+    });
+    afterEach(() => {
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
+      delete globalThis.__loadVotCorpus;
+    });
+
+    it('rebuilds the real queue and plays the recording AFTER the saved one', async () => {
+      const positions = { getPosition: vi.fn(() => null), setPosition: vi.fn(), clearPosition: vi.fn() };
+      globalThis.AudioPositionsStore = positions;
+      localStorage.setItem('vot-audio-pos', JSON.stringify(SNAPSHOT));
+      await load();
+      expect(AudioPlayer.getState().restoring).toBe(true);
+      AudioPlayer.next();
+      await new Promise((r) => setTimeout(r, 0));
+      const st = AudioPlayer.getState();
+      expect(st.restoring).toBe(false);
+      expect(st.queue.map((t) => t.url)).toEqual([URL_OF('idPreface'), URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
+      expect(st.qi).toBe(3);                           // one past the saved part, not the saved part again
+      expect(el().src).toBe(URL_OF('idC'));
+      expect(st.status).toBe('loading');
+      // The recording stepped over keeps the place the listener left it at.
+      expect(positions.setPosition).toHaveBeenCalledWith(expect.objectContaining({ url: URL_OF('idA2') }), 123, expect.any(Number));
+    });
+
+    it('a second Next while the corpus is still loading is a second step, not a stop on the placeholder', async () => {
+      // The lazy corpus is not in memory on a cold boot: the rebuild waits for it, and until it lands the bar
+      // still holds its ONE placeholder track. A Next read that as the end of a queue of one and stopped.
+      delete globalThis.AUDIO_MANIFEST;
+      globalThis.__loadVotCorpus = () => new Promise((res) => setTimeout(() => { globalThis.AUDIO_MANIFEST = MANIFEST; res(); }, 5));
+      localStorage.setItem('vot-audio-pos', JSON.stringify({ ...SNAPSHOT, qi: 0, key: 'vol1:preface', time: 40,
+        track: { title: 'Preface', sub: 'Volume One', readerCode: 'B', partLabel: null, url: URL_OF('idPreface'), key: 'vol1:preface' } }));
+      await load();
+      AudioPlayer.next();
+      AudioPlayer.next();
+      expect(AudioPlayer.getState().status).not.toBe('idle');
+      await new Promise((r) => setTimeout(r, 20));
+      const st = AudioPlayer.getState();
+      expect(st.status).toBe('loading');
+      expect(st.queue).toHaveLength(4);
+      expect(st.qi).toBe(2);                           // preface → A1 → A2
+      expect(el().src).toBe(URL_OF('idA2'));
+    });
+
+    it('a prev while the corpus is still loading waits for the rebuild instead of playing the placeholder from 0:00', async () => {
+      delete globalThis.AUDIO_MANIFEST;
+      globalThis.__loadVotCorpus = () => new Promise((res) => setTimeout(() => { globalThis.AUDIO_MANIFEST = MANIFEST; res(); }, 5));
+      localStorage.setItem('vot-audio-pos', JSON.stringify({ ...SNAPSHOT, qi: 0, key: 'vol1:preface', time: 40,
+        track: { title: 'Preface', sub: 'Volume One', readerCode: 'B', partLabel: null, url: URL_OF('idPreface'), key: 'vol1:preface' } }));
+      await load();
+      AudioPlayer.toggle();                            // Play: the rebuild starts and waits for the corpus
+      AudioPlayer.prev();
+      expect(FakeAudio.last).toBe(null);               // nothing started on the placeholder
+      expect(AudioPlayer.getState().time).toBe(40);
+      await new Promise((r) => setTimeout(r, 20));
+      const st = AudioPlayer.getState();
+      expect(st.queue).toHaveLength(4);
+      expect(st.qi).toBe(0);
+      expect(el().srcHistory).toEqual([URL_OF('idPreface')]);
+      expect(st.time).toBe(40);                        // resumed where it was left
+    });
+
+    it('offline, with the saved recording not on the phone, Next neither rebuilds nor moves', async () => {
+      localStorage.setItem('vot-audio-pos', JSON.stringify(SNAPSHOT));
+      await load();
+      setOnline(false);
+      AudioPlayer.next();
+      await new Promise((r) => setTimeout(r, 0));
+      const st = AudioPlayer.getState();
+      expect(st.restoring).toBe(true);
+      expect(st.queue).toHaveLength(1);
+      expect(FakeAudio.last).toBe(null);
+    });
+
+    it('with no corpus to rebuild from, Next resumes the saved recording instead of ending the session', async () => {
+      // The rebuild falls back to the bar's own placeholder track (a designed path: the corpus failed to load). That
+      // is not a real queue to step through: stepping past its one track stopped the session and erased the resume
+      // snapshot, so one tap on the bar's Next with no corpus lost the listener's place.
+      delete globalThis.AUDIO_MANIFEST;
+      globalThis.__loadVotCorpus = () => Promise.reject(new Error('offline'));
+      localStorage.setItem('vot-audio-pos', JSON.stringify(SNAPSHOT));
+      await load();
+      AudioPlayer.next();
+      await new Promise((r) => setTimeout(r, 20));
+      const st = AudioPlayer.getState();
+      expect(st.status).toBe('loading');
+      expect(st.queue).toHaveLength(1);
+      expect(el().src).toBe(URL_OF('idA2'));
+      expect(localStorage.getItem('vot-audio-pos')).not.toBe(null);
+    });
+
+    it('on the LAST track of a rebuilt letter queue, Next resumes it instead of ending the session', async () => {
+      // A letter queue never extends (_extendQueue refuses it), so a step past its last track stopped the session
+      // and erased the snapshot. Nowhere to step to: the resume stands, as Play would have.
+      localStorage.setItem('vot-audio-pos', JSON.stringify({
+        v: 2, mode: 'letter', volKey: 'vol1', label: 'Volume One', qi: 0, key: 'vol1:letter-c', startKey: 'vol1:letter-c', time: 300,
+        track: { title: 'Letter C', sub: 'Volume One', readerCode: 'T', partLabel: null, url: URL_OF('idC'), key: 'vol1:letter-c' },
+      }));
+      await load();
+      expect(AudioPlayer.getState().restoring).toBe(true);
+      AudioPlayer.next();
+      await new Promise((r) => setTimeout(r, 20));
+      const st = AudioPlayer.getState();
+      expect(st.status).toBe('loading');
+      expect(st.queue).toHaveLength(1);
+      expect(el().src).toBe(URL_OF('idC'));
+      expect(localStorage.getItem('vot-audio-pos')).not.toBe(null);
+    });
+
+    it('on the LAST track of a restored custom queue, Next resumes it instead of ending the session', async () => {
+      const first = { key: 'vol1:preface', title: 'Preface', sub: 'Volume One', readerCode: 'B', partLabel: null, url: URL_OF('idPreface') };
+      const second = { key: 'vol1:letter-c', title: 'Letter C', sub: 'Volume One', readerCode: 'T', partLabel: null, url: URL_OF('idC') };
+      localStorage.setItem('vot-audio-pos', JSON.stringify({
+        v: 2, mode: 'custom', volKey: '', label: 'Volume One', qi: 1, key: second.key, time: 31,
+        track: second, customQueue: [first, second],
+      }));
+      await load();
+      AudioPlayer.next();
+      await new Promise((r) => setTimeout(r, 20));
+      const st = AudioPlayer.getState();
+      expect(st.status).toBe('loading');
+      expect(st.queue.map((t) => t.url)).toEqual([URL_OF('idPreface'), URL_OF('idC')]);
+      expect(st.qi).toBe(1);
+      expect(el().src).toBe(URL_OF('idC'));
+      expect(localStorage.getItem('vot-audio-pos')).not.toBe(null);
+    });
+
+    it('while the corpus loads the bar is still the restored one, so Next stays offered', async () => {
+      // The descriptor is consumed before the wait; the flag the bar and the desk read went with it, and the
+      // one-track placeholder hid Next again (and greyed it on the desk) for as long as the corpus took.
+      delete globalThis.AUDIO_MANIFEST;
+      let land = () => {};
+      globalThis.__loadVotCorpus = () => new Promise((res) => { land = () => { globalThis.AUDIO_MANIFEST = MANIFEST; res(); }; });
+      localStorage.setItem('vot-audio-pos', JSON.stringify(SNAPSHOT));
+      await load();
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(AudioPlayer.getState().restoring).toBe(true);
+      land();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(AudioPlayer.getState().restoring).toBe(false);
+      expect(AudioPlayer.getState().queue).toHaveLength(4);
+    });
   });
 
   it('restores a v2 custom queue without needing the lazy corpus', async () => {

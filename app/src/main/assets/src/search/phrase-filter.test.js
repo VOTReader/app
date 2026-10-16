@@ -125,4 +125,16 @@ describe('search: phrases and +/- words match words, not letters inside words (v
     const bare = await VotSearchMini.search('is my', { synonyms: false });
     expect(bare.stopWordsOnly).toBe(true);
   });
+
+  /* One small word in quotes is not a phrase: '"the"' listed a page of texts holding "the", cut off, where the bare
+     word says it is in nearly every verse. Only a run of two or more words is a phrase the guard lets through (v016). */
+  it('one small word in quotes stays "stop words only"; two are a phrase', async () => {
+    for (const q of ['"the"', '"my"', '“is”']) {
+      const r = await VotSearchMini.search(q, { synonyms: false });
+      expect(r.stopWordsOnly, q).toBe(true);
+      expect(r.results).toEqual([]);
+    }
+    const run = await VotSearchMini.search('"my shepherd"', { synonyms: false });
+    expect(refs(run)).toEqual(['Psalms 23:1']);
+  });
 });

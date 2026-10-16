@@ -42,7 +42,7 @@ import {
   _setLastPersistSec,
 } from './persist.js';
 import { _stopWarming } from './prefetch.js';
-import { _rebuildRestoredQueue } from './restore.js';
+import { _rebuildInFlight, _rebuildRestored, _rebuildRestoredQueue } from './restore.js';
 import { _seamStop } from './seam.js';
 import { _resetSectionFollow, _setSecLastT } from './sections.js';
 import { _clearSleepTimer } from './sleep.js';
@@ -110,7 +110,19 @@ export function toggle() {
  */
 export function next() {
   if (!_state.queue.length) return;
-  if (_pendingRestore) { void _rebuildRestoredQueue(); return; }
+  // A restored bar's queue is a placeholder. The rebuild alone resumes the SAVED recording, which is Play, not Next:
+  // once the real queue is in, step past it (sweep v021). A tap while the rebuild still waits for its corpus joins
+  // that rebuild, as a step of its own, rather than reading the placeholder as the end of a queue of one. A step
+  // is taken only where there is somewhere to go. With no corpus the rebuild resumes the placeholder itself; and a
+  // real queue resumed on its LAST track (a letter, a custom queue, a songs queue with repeat off, a book's last
+  // chapter: the rebuild's _start already appended whatever _extendQueue would) has nothing after it. A step past
+  // either ends the session and erases the snapshot, the listener's place with it; the resume stands instead.
+  if (_pendingRestore || _rebuildInFlight()) {
+    void _rebuildRestored().then((built) => {
+      if (built === 'queue' && (_state.qi + 1 < _state.queue.length || _repeatMode() === 'all')) next();
+    });
+    return;
+  }
   _rememberOutgoingPosition();   // R8 — attribute the clock before qi moves
   // The end of the queue is the end of the ORDER, not merely of a unit: the site order was
   // already appended when this unit's last track STARTED (_start → _extendQueue, so the boundary
@@ -144,7 +156,8 @@ export function next() {
  */
 export function prev() {
   if (!_state.queue.length) return;
-  if (_pendingRestore) { void _rebuildRestoredQueue(); return; }
+  // In flight too: stepping "back" on the placeholder started it from 0:00 under the rebuild about to resume it.
+  if (_pendingRestore || _rebuildInFlight()) { void _rebuildRestoredQueue(); return; }
   if (_el && (_el.currentTime || 0) > PREV_RESTART_SEC) { seek(0); return; }
   const target = Math.max(0, _state.qi - 1);
   // Landing on the track already playing: a seek, not a reload — the stream
@@ -168,7 +181,7 @@ export function seek(seconds) {
   _clearLoopTimer();   // the timed wrap was for the old clock; the next timeupdate re-arms it
   const lp = _state.loop;
   if (lp && !(seconds >= lp.start - LOOP_SLACK_S && seconds <= lp.end + LOOP_SLACK_S)) _clearLoop(false);   // left the passage
-  if (!_el) {
+  if (!_el || _pendingRestore) {
     /* THE BOOT-RESTORED BAR HAS NO ELEMENT YET, and returning silently here
        was read-along-4: a reader who opens a timed chapter after a cold boot
        and taps a verse got NOTHING. The bar is real, the timings are real,
@@ -190,7 +203,14 @@ export function seek(seconds) {
        of the recording: a wrong answer in place of no answer, which is the
        worse trade. The real ceiling is applied by the element itself when
        metadata arrives (_seekOnMetadata), and the only live caller reads its
-       target out of that recording's own timings file. */
+       target out of that recording's own timings file.
+
+       A RESTORED BAR CAN HAVE AN ELEMENT, just never its own: the durable (IDB)
+       copy is adopted while the player is merely idle, and a prewarm leaves it
+       idle with an element pointed at another recording. Taking the element
+       branch then seeked that recording and left the descriptor's clock where
+       it was, so Play resumed at the old place (sweep v83). Every play path
+       clears _pendingRestore first, so while it is set this branch is the bar. */
     if (!_pendingRestore) return;          // idle: no element and nothing to restore
     const at = Math.max(0, Math.floor(seconds || 0));
     _pendingRestore.time = at;

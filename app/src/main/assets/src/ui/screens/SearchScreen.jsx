@@ -319,9 +319,6 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     // prefix hits ("a" → every "A Warning"/"ABASEMENT"…). Require ≥2 alphanumerics
     // before the full search; the suggest box (above) still reacts at 1 char.
     if (q.replace(/[^\p{L}\p{N}]/gu, '').length < 2) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0, capped: [], truncated: false, corrections: [] });return;}
-    if (resumedFrom.current === memo && lastSearch && lastSearch.allWordsFor === allWordsFor) return;
-    resumedFrom.current = null;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
     // Stale-query guard: the engine yields the main thread mid-search, so a
     // slow older query can resolve AFTER a newer one and silently overwrite
     // its results (and after unmount, setState into a dead screen). The
@@ -330,41 +327,57 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     let stale = false;
     // ...and the engine stops ranking for it at its next turn (sr7): typing a burst no longer ranks every prefix in full.
     const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    /* THE MEANING CAN COME AFTER THE SEARCH (sr11 S22 look, 2026-10-15). The on-device model starts when the page is
+       idle, so a search typed in a session's first seconds ran on the words alone, and the screen kept that list until
+       the query changed. Such a search (meaningLater) runs again once the model is ready: quietly, with no "Searching"
+       and no error over the list it replaces; a list resumed on Back is ranked again the same way. */
+    const run = (/** @type {boolean} */ quiet) => pickEngine().search(q, {
+      translation: settings.translation || 'nkjv',
+      useStopWords: settings.searchUseStopWords !== false,
+      synonyms: settings.searchSynonyms !== false,
+      scope: searchScope || null,
+      corpus: settings.searchCorpus || 'all',
+      limit: SEARCH_TOTAL_LIMIT,
+      perVolume: SEARCH_LIMIT,
+      allWords: allWordsFor === q,
+      signal: ctl ? ctl.signal : undefined
+    }).then((r) => {
+      if (stale || (quiet && r.error)) return;
+      // SRCH4: include the matched synonyms (when synonym search is on) so the
+      // snippet highlights the word that actually surfaced the verse.
+      const terms = expandSnippetTerms(
+        // search-2: under a nav card `parsed` is the CARD's kind, so the
+        // snippet terms have to come from the text reading of the same query
+        // or the hits arrive with nothing highlighted.
+        r.textQuery || r.parsed, r.parsedTerms || [],
+        /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.SYNONYM_MAP,
+        settings.searchSynonyms !== false,
+        /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.STOP_WORDS_TRIMMED,
+      );
+      const done = { phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [], stopWordsOnly: !!r.stopWordsOnly, unquoted: r.unquoted || null, meaningLater: !!r.meaningLater };
+      if (!r.error) lastSearch = { memo, allWordsFor, state: done };
+      setState(done);
+      if (r.meaningLater) rankWithMeaning();
+    }).catch((err) => {
+      if (stale || quiet) return;
+      setState({ phase: 'done', parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0, capped: [], truncated: false, corrections: [] });
+    });
+    const rankWithMeaning = () => {
+      const E = pickEngine();
+      if (E && typeof E.whenMeaningReady === 'function') E.whenMeaningReady().then((ok) => { if (ok && !stale) run(true); });
+    };
+    if (resumedFrom.current === memo && lastSearch && lastSearch.allWordsFor === allWordsFor) {
+      if (lastSearch.state.meaningLater) rankWithMeaning();
+      return () => { stale = true; if (ctl) ctl.abort(); };
+    }
+    resumedFrom.current = null;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       // W0 (micro-gap c): mark the search in-flight so the UI shows a
       // live-region indicator until the engine resolves. Prior results stay
       // on screen underneath (state.results is untouched here).
       setState((s) => ({ ...s, phase: 'searching' }));
-      pickEngine().search(q, {
-        translation: settings.translation || 'nkjv',
-        useStopWords: settings.searchUseStopWords !== false,
-        synonyms: settings.searchSynonyms !== false,
-        scope: searchScope || null,
-        corpus: settings.searchCorpus || 'all',
-        limit: SEARCH_TOTAL_LIMIT,
-        perVolume: SEARCH_LIMIT,
-        allWords: allWordsFor === q,
-        signal: ctl ? ctl.signal : undefined
-      }).then((r) => {
-        if (stale) return;
-        // SRCH4: include the matched synonyms (when synonym search is on) so the
-        // snippet highlights the word that actually surfaced the verse.
-        const terms = expandSnippetTerms(
-          // search-2: under a nav card `parsed` is the CARD's kind, so the
-          // snippet terms have to come from the text reading of the same query
-          // or the hits arrive with nothing highlighted.
-          r.textQuery || r.parsed, r.parsedTerms || [],
-          /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.SYNONYM_MAP,
-          settings.searchSynonyms !== false,
-          /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.STOP_WORDS_TRIMMED,
-        );
-        const done = { phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [], stopWordsOnly: !!r.stopWordsOnly, unquoted: r.unquoted || null };
-        if (!r.error) lastSearch = { memo, allWordsFor, state: done };
-        setState(done);
-      }).catch((err) => {
-        if (stale) return;
-        setState({ phase: 'done', parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0, capped: [], truncated: false, corrections: [] });
-      });
+      run(false);
     }, 140);
     return () => {
       stale = true;

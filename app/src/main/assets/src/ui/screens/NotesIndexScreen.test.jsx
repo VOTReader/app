@@ -121,6 +121,47 @@ describe('NotesIndexScreen — link-out back pill', () => {
     const { container } = render(<NotesIndexScreen {...props} />);
     expect(container.querySelector('.back-hint-pill')).toBeNull();
   });
+
+  /* Sweep v027: a note tap-through re-stashes notesReturnCtx so the reading screen's "Back to Faith" pill
+     lands in the same notebook. That stash used to carry only {tab, drilledNbId}, so the remounted list
+     came back without the journal pill and the one-tap way back to the entry was gone. */
+  describe('across a note tap-through and back', () => {
+    const ORIGIN = { screen: 'journal-viewer', returnOrigin: null };
+    /** @type {Record<string, any>} */ let store;
+    beforeEach(() => {
+      store = { notesReturnCtx: { tab: 'notebooks', drilledNbId: 'nb1', backPill: { title: 'My Journal · Morning' } } };
+      window.navHandoff = { peek: (k) => store[k] || null, set: (k, v) => { store[k] = v; }, clear: (k) => { delete store[k]; } };
+      window.noteSourceNav = () => ({ type: 'bible', bookId: 'genesis', chapter: 1, verse: 1 });
+    });
+    afterEach(() => { delete window.noteSourceNav; });
+
+    /** Open the notebook from the journal card, tap its first note, leave for the passage. */
+    const tapThrough = () => {
+      const onNavigateToSource = vi.fn();
+      const first = render(<NotesIndexScreen {...props} navOrigin={ORIGIN} onNavigateToSource={onNavigateToSource} />);
+      expect(first.getByText('My Journal · Morning')).toBeTruthy();
+      fireEvent.click(first.container.querySelector('.note-row'));
+      expect(onNavigateToSource).toHaveBeenCalledTimes(1);
+      first.unmount();
+    };
+
+    it('comes back to the same notebook with the "Back to My Journal" pill still there', () => {
+      tapThrough();
+      const onBack = vi.fn();
+      const { container, getByText } = render(<NotesIndexScreen {...props} navOrigin={ORIGIN} onBack={onBack} />);
+      expect(container.querySelector('.nb-drilled-title').textContent).toBe('Faith');
+      expect(getByText('My Journal · Morning')).toBeTruthy();
+      fireEvent.click(container.querySelector('.back-hint-pill'));
+      expect(onBack).toHaveBeenCalledTimes(1);
+    });
+
+    it('drops the pill when Notes is reopened some other way (Back no longer leads to the journal)', () => {
+      tapThrough();
+      // Top-nav Notes from the passage captures a new origin; the pill would name a place Back skips.
+      const { container } = render(<NotesIndexScreen {...props} navOrigin={{ screen: 'bible-ch', bookId: 'genesis', chapterNum: 1 }} />);
+      expect(container.querySelector('.back-hint-pill')).toBeNull();
+    });
+  });
 });
 
 describe('NotesIndexScreen drilled header', () => {

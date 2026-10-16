@@ -82,8 +82,11 @@ boot. The other three, the corpora, load the first time something needs them.
 - Code is not split; data is. The screen bundles e-h were folded into bundle-d on 2026-10-13 (lz1; the measurements
   and the reasons are in ARCHITECTURE.md, "Lazy corpora"). An old page that asks the service worker for a retired
   `bundle-[e-h].js` gets a one-time reload onto the new build.
-- `index.html` makes each corpus loader with `window.__makeLazyLoader(name, path, finishFn)`, which injects the
-  script once and wakes the views waiting on it. A route that needs a corpus (`src/ui/screen-routes.jsx`) renders
+- `index.html` makes each corpus loader with `window.__makeLazyLoader(name, path, finishFn, requiredGlobals)`, which
+  injects the script once and wakes the views waiting on it. `requiredGlobals` names one global per file of the
+  bundle: a script that loaded without defining them did not run, so the load fails and the route offers a retry
+  (another build's copy the service worker marked as run to its end still counts; BRIDGES.md `__votOtherCorpus`).
+  A route that needs a corpus (`src/ui/screen-routes.jsx`) renders
   `_corpusView(window.__bibleCorpus, window.__loadBibleCorpus, 'Loading Bible…')` until it has landed.
 - `dist/app.min.css` is a plain stylesheet link in `<head>`, so it blocks first paint too.
 - The screens that came from the old lazy bundles still read some shared helpers as free globals at call time.

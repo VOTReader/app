@@ -368,10 +368,11 @@ describe('song-keep on the web — the offline-songs store', () => {
 describe('song-keep in the phone app — the native store', () => {
   let native;
   function bridge() {
-    native = { items: [], freeBytes: 5e9 };
+    native = { items: [], freeBytes: 5e9, queued: [], active: null };
     const b = {
       offlineAudioState: vi.fn(() => JSON.stringify({
-        items: native.items, totalBytes: native.items.reduce((n, i) => n + i.bytes, 0), freeBytes: native.freeBytes, active: null, queued: [],
+        items: native.items, totalBytes: native.items.reduce((n, i) => n + i.bytes, 0), freeBytes: native.freeBytes,
+        active: native.active, queued: native.queued,
       })),
       offlineAudioSave: vi.fn(),
       offlineAudioRemove: vi.fn(),
@@ -411,6 +412,51 @@ describe('song-keep in the phone app — the native store', () => {
     send({ type: 'removed', urls: [SONG_URL(1, A1)] });
     expect(JSON.parse(b.offlineAudioSave.mock.calls[0][0])[0].url).toBe(SONG_URL(1, A1));
     expect(lib.kept).toEqual([]);   // never listed at the wrong size
+  });
+
+  /* sweep v037: Remove all read only the songs already on the phone, so the ones still queued or downloading in the
+     phone's store went on, landed, and were listed as kept again (on the backup's list too). */
+  it('Remove all stops the songs still on their way, so none of them lands back as kept', async () => {
+    const b = bridge();
+    const row = (id, sh) => ({ url: SONG_URL(sh, id), key: 'song:' + id, title: 't', bytes: 1000, savedAt: 5 });
+    // The phone's store as it really behaves: a cancel takes a song out of its queue, a remove off its disk.
+    b.offlineAudioCancel.mockImplementation((json) => {
+      const urls = JSON.parse(json);
+      native.queued = native.queued.filter((u) => urls.indexOf(u) < 0);
+      if (native.active && urls.indexOf(native.active.url) >= 0) native.active = null;
+    });
+    b.offlineAudioRemove.mockImplementation((json) => {
+      const urls = JSON.parse(json);
+      native.items = native.items.filter((it) => urls.indexOf(it.url) < 0);
+    });
+    await load();
+    Songs.adoptSongCatalog(smallCatalog());
+    SongKeep.subscribe(() => {});
+    await SongKeep.keep([A1, A2, B1], 'k');
+    // A1 has landed, A2 is downloading, B1 waits in the phone's queue.
+    native.items = [row(A1, 1)];
+    native.active = { url: SONG_URL(1, A2), bytes: 10, total: 1000 };
+    native.queued = [SONG_URL(2, B1)];
+    send({ type: 'done', url: SONG_URL(1, A1), bytes: 1000 });
+    expect(lib.kept).toEqual([A1]);
+    expect([SongKeep.statusOf(A2), SongKeep.statusOf(B1)]).toEqual(['keeping', 'queued']);
+
+    await SongKeep.removeAll();
+    // Both songs on their way are stopped, once each, in the phone's store.
+    const cancelled = b.offlineAudioCancel.mock.calls.flatMap((c) => JSON.parse(c[0]));
+    expect(cancelled.sort()).toEqual([SONG_URL(1, A2), SONG_URL(2, B1)].sort());
+    // Whatever the phone still had on its way runs to the end and lands.
+    const going = (native.active ? [native.active.url] : []).concat(native.queued);
+    native.active = null;
+    native.queued = [];
+    for (const url of going) {
+      native.items = native.items.concat([{ url, key: 'song', title: 't', bytes: 1000, savedAt: 6 }]);
+      send({ type: 'done', url, bytes: 1000 });
+    }
+    send({ type: 'removed', urls: [SONG_URL(1, A1)] });
+    expect(SongKeep.keptIds()).toEqual([]);
+    expect(lib.kept).toEqual([]);   // nothing back on the backup's list
+    expect([A1, A2, B1].map((id) => SongKeep.statusOf(id))).toEqual(['none', 'none', 'none']);
   });
 
   it('refuses early when the phone lacks the room (its 200 MB margin kept)', async () => {

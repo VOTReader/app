@@ -313,6 +313,15 @@ export const OfflineAudio = {
   items: () => { if (!_loaded) refresh(); return [..._saved.values()].filter((it) => !isSongUrl(it.url)).sort((a, b) => b.savedAt - a.savedAt); },
   /** The songs of the letters kept on the phone (K1). @returns {SavedItem[]} newest first */
   songItems: () => { if (!_loaded) refresh(); return [..._saved.values()].filter((it) => isSongUrl(it.url)).sort((a, b) => b.savedAt - a.savedAt); },
+  /**
+   * The songs on their way to the phone (queued or downloading, not on it yet; statusOf's order), so song-keep.js can
+   * stop them (sweep v037). @returns {string[]} their URLs
+   */
+  songsOnTheirWay: () => {
+    if (!_loaded) refresh();
+    const urls = [..._queued].concat(_active ? [_active.url] : []).filter((u) => isSongUrl(u) && !_saved.has(u));
+    return [...new Set(urls)];
+  },
   /** Bytes of the recordings on the phone (songs left out). */
   totalBytes: () => {
     if (!_loaded) refresh();

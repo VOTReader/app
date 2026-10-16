@@ -79,3 +79,46 @@ describe('a new bookmark records its words (W48)', () => {
     }));
   });
 });
+
+/* Sweep v080: the default label and the sheet's excerpt sliced the container's
+   raw textContent, which carries the gold footnote bubble's digit, so they read
+   "Lord1 is my" while the stored `text` beside them (hlDisplayText) was clean. */
+describe('a new bookmark labels and previews the words the reader sees (sweep v080)', () => {
+  it('leaves the footnote digit out of the default label and the excerpt', () => {
+    window.__bookmarkCreate = vi.fn();
+    bookmarkLordIsMy();
+    expect(window.__bookmarkCreate).toHaveBeenCalledWith(expect.objectContaining({
+      defaultLabel: 'Lord is my',
+      excerpt: 'Lord is my',
+    }));
+  });
+
+  it('leaves it out of the label the direct-save fallback stores', () => {
+    delete window.__bookmarkCreate;
+    bookmarkLordIsMy();
+    expect(globalThis.BookmarkStore.add).toHaveBeenCalledWith(expect.objectContaining({ label: 'Lord is my' }));
+  });
+
+  it('a selection across two poem lines labels with a space where the line breaks, not run together', () => {
+    window.__bookmarkCreate = vi.fn();
+    const container = document.createElement('div');
+    container.dataset.hlKey = 'bible:psalms:23:1';
+    container.innerHTML = '<div>The Lord is my shepherd;</div><div>I shall not want.</div>';
+    document.body.appendChild(container);
+    const range = document.createRange();
+    range.setStart(container.firstChild.firstChild, 9);
+    range.setEnd(container.lastChild.firstChild, 7);
+    range.getBoundingClientRect = () => ({ left: 10, top: 100, right: 200, bottom: 120, width: 190, height: 20 });
+    window.getSelection = () => ({
+      isCollapsed: false, rangeCount: 1, getRangeAt: () => range,
+      removeAllRanges: vi.fn(), toString: () => range.toString(),
+    });
+    render(<SelectionToolbar />);
+    fireEvent.contextMenu(container, { clientX: 20, clientY: 100 });
+    fireEvent.click([...document.querySelectorAll('button')].find((b) => b.textContent === 'Bookmark'));
+    const arg = window.__bookmarkCreate.mock.calls[0][0];
+    expect(arg.hlKey).toBe('bible:psalms:23:1:9-31');
+    expect(arg.defaultLabel).toBe('is my shepherd; I shall');
+    expect(arg.excerpt).toBe('is my shepherd;\nI shall');
+  });
+});

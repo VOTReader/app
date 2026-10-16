@@ -78,7 +78,9 @@
      setLastReadChapters       Written by select*Ch helpers + goToLastRead's
                                commit-fns.
      getStudyById              From useBibleStudies. goToLastRead uses
-                               it for the 'bible-study-' branch lookup.
+                               it for the 'bible-study-' branch lookup;
+                               the arm effect's study key is resolved
+                               with it during render (lazy studies).
      selectStudy               From useBibleStudies. goToLastRead's
                                fallback when chId is missing.
      selectStudyChapter        From useBibleStudies. goToLastRead's
@@ -179,24 +181,33 @@ export function useReadingPositionNav({
   // idempotent (same key, same cursor value, timer re-arm). Non-reading
   // screens (home, journal, settings, …) match no branch and leave the
   // cursor untouched — a detour can never move the dot.
+  //
+  // The study's read key is resolved HERE, during render, not inside the
+  // effect (sweep v14). BIBLE_STUDIES is lazy: a cold-boot restore or tab
+  // switch onto a study chapter renders before it lands, so getStudyById
+  // finds nothing. App() re-renders when the studies load (studiesTick), and
+  // that render resolves the key; carrying it as a dep makes the effect run
+  // again then (ARCHITECTURE "Lazy corpora": an effect with deps that reads a
+  // corpus must carry a corpus signal). Only a study chapter resolves a key,
+  // so the studies landing never re-arms the dwell on any other screen.
+  const armStudy = (screen === 'bible-study-chapter' && studyId && studyChapterId) ? getStudyById(studyId) : null;
+  const studyArmKey = armStudy ? 'bible-study-' + armStudy.slug : null;   // studyReadKey format (goToLastRead slices this prefix)
   React.useEffect(() => {
     if (screen === 'bible-ch' || screen === 'matthew-ch') {
       const bid = screen === 'matthew-ch' ? 'matthew' : bookId;
       if (!bid || chapterNum == null) return;
       setActiveReadKey(bid, () => setLastReadChapters((prev) => ({ ...prev, [bid]: chapterNum })));
     } else if (screen === 'bible-study-chapter') {
-      if (!studyId || !studyChapterId) return;
-      const study = getStudyById(studyId);
-      if (!study) return;
-      const key = 'bible-study-' + study.slug;   // studyReadKey format (goToLastRead slices this prefix)
+      if (!studyArmKey) return;   // half-populated place, or the studies have not landed yet
+      const key = studyArmKey;
       setActiveReadKey(key, () => setLastReadChapters((prev) => ({ ...prev, [key]: studyChapterId })));
     } else {
       const col = (typeof COL_BY_LETTER_SC !== 'undefined') ? COL_BY_LETTER_SC.get(screen) : null;
       if (!col || !letterId) return;
       setActiveReadKey('vol:' + col.volKey, () => setLastReadForVol(col.volKey, letterId));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- deps are the PLACE identity only. The setters/lookups (setActiveReadKey, setLastReadChapters, setLastReadForVol, getStudyById) are recreated per render but read call-time state via closures/refs — including them would re-arm the dwell timer EVERY render (breaking the streak dwell) for zero behavioral gain.
-  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deps are the PLACE identity plus studyArmKey (the study's resolved read key, which turns non-null when the lazy studies land). The setters (setActiveReadKey, setLastReadChapters, setLastReadForVol) are recreated per render but read call-time state via closures/refs — including them would re-arm the dwell timer EVERY render (breaking the streak dwell) for zero behavioral gain.
+  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, studyArmKey]);
   // ── Prophecy card expand/collapse state (IDB-backed via ProphecyCardsStore) ─
   // Key format: "chapterId:blockIndex:cardType" → boolean.
   // The ref-cached pattern is preserved so consumers can batch mutations

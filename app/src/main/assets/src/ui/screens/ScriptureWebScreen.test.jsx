@@ -685,6 +685,123 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(attr(container, 'data-cam-y')).toBe('0.0');
     });
   });
+
+  /* ── sweep 2026-10-14 (batch 3): what the Scripture / My web switch, the Volumes rail and the
+     controls inside .sw-root each own. My Web is built from LinkStore and the Volumes from
+     COLLECTIONS / READING_CHAIN / colLetterArr, all free globals the setup file does not carry;
+     the top-level afterEach unstubs them. */
+  describe('sweep v5/v55/v72: the web switch lets go, the Volumes rail names its own place, the controls keep their keys', () => {
+    /* one canon thread (index 0) and one chapter that is the whole canon */
+    const threaded = () => Object.assign(graph(), {
+      count: 1,
+      from: new Uint16Array([100]), to: new Uint16Array([20100]), votes: new Int16Array([30]),
+      buckets: [{ off: 0, len: 1, off20: 1, off10: 1, segments: 8, chunks: [[100, 20100]] }],
+      chunkSize: 256,
+    });
+    const LETTERS = ['The First', 'The Second', 'The Third', 'The Fourth', 'The Fifth'];
+    const stubMyWeb = (links = []) => {
+      vi.stubGlobal('LinkStore', { all: () => links, subscribe: () => () => {}, getVersion: () => 1 });
+      vi.stubGlobal('COLLECTIONS', [{ volKey: 'rebuke', label: 'Rebuke',
+        letters: LETTERS.map((title, i) => ({ id: 'r' + i, title })) }]);
+      vi.stubGlobal('READING_CHAIN', ['rebuke']);
+      vi.stubGlobal('colLetterArr', (col) => col.letters);
+    };
+    const settle = async (ms = 40) => { await act(async () => { await new Promise((r) => setTimeout(r, ms)); }); };
+    const seen = { swGuideSeen: true, swEmptyDismissed: true };
+
+    /* v5: the mode buttons closed the sheet but kept focusRef, and a link's index from My Web
+       went to the canon renderer as focusArc: canon thread 0 spotlit, the rest at focus-dim
+       ink, nothing open for Escape or Back to close. */
+    it('v5: a link chosen in My Web is let go by the switch to Scripture: no canon thread is spotlit', async () => {
+      stubMyWeb([{ id: 'l1',
+        source: { type: 'bible', bookId: 'genesis-plain', chapter: 1, verse: 5, label: 'Genesis 1:5' },
+        target: { type: 'bible', bookId: 'genesis-plain', chapter: 1, verse: 900, label: 'Genesis 1:900' } }]);
+      const { container } = await mount({ settings: seen }, threaded);
+      fireEvent.click(screen.getByRole('button', { name: 'My web' }));
+      await settle(60);
+      fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
+      await settle(20);
+      const row = container.querySelector('.sw-list .sw-choice-row');
+      expect(row, 'PRECONDITION: My Web lists the reader\'s link').toBeTruthy();
+      fireEvent.click(row);
+      await settle();
+      expect(container.querySelector('.sw-sheet'), 'PRECONDITION: the link\'s sheet opened').toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Scripture' }));
+      await settle(60);
+      expect(container.querySelector('.sw-sheet')).toBeNull();
+      const last = DRAWN[DRAWN.length - 1];
+      expect(last.focusArc, 'the canon frame after the switch spotlights nothing').toBe(-1);
+      expect(last.focusRange).toBeNull();
+    });
+
+    /* v55: the keys drive the rail last touched, but the live region always read the camera's x
+       as a Bible verse id. On the Volumes rail x is a rail position (0..5 here), so ArrowRight
+       announced "Genesis 1:4" while the reader moved through Rebuke. */
+    it('v55: an arrow key on the Volumes rail announces the Volumes node there, never a Bible verse', async () => {
+      stubMyWeb();
+      const { container } = await mount({ settings: seen });
+      fireEvent.click(screen.getByRole('button', { name: 'My web' }));
+      await settle(60);
+      const root = container.querySelector('.sw-root');
+      const live = () => container.querySelector('.sw-live').textContent;
+      // CONTROL: the Bible rail (the default) still announces its verse
+      fireEvent.keyDown(root, { key: 'ArrowRight' });
+      await settle(20);
+      expect(live(), 'CONTROL: the Bible rail names a verse').toMatch(/^Genesis 1:\d+$/);
+      // touch the top half: the Volumes rail is the one the keys drive now
+      const ev = (type) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 31, pointerType: 'touch', clientX: 400, clientY: 10 });
+      await act(async () => { root.dispatchEvent(ev('pointerdown')); root.dispatchEvent(ev('pointerup')); await new Promise((r) => setTimeout(r, 40)); });
+      fireEvent.keyDown(root, { key: 'ArrowRight' });
+      await settle(20);
+      expect(live(), 'the top rail is not a Bible verse').not.toMatch(/Genesis/);
+      // the camera sits at the fitted centre of the five-letter rail: position 2.5 rounds to 3
+      expect(live()).toBe('The Fourth, Rebuke');
+    });
+
+    /* v72: onKeyDown sits on .sw-root and read every keydown that bubbled up to it. A keyboard
+       reader on the density <select> pressed ArrowRight / ArrowDown: the web panned and
+       preventDefault cancelled the select's own option change. The rows of the Nearby list
+       panned the web behind them the same way. */
+    it('v72: keys pressed on the density select or a list row stay theirs; Escape still reaches the web', async () => {
+      const onBack = vi.fn();
+      const { container } = await mount({ onBack }, threaded);
+      const root = container.querySelector('.sw-root');
+      for (let i = 0; i < 6; i++) { fireEvent.keyDown(root, { key: '+' }); await settle(20); }
+      const lastDraw = () => DRAWN[DRAWN.length - 1];
+      // CONTROL: on the web itself the arrow is the web's: cancelled, and the camera pans
+      let before = lastDraw();
+      expect(fireEvent.keyDown(root, { key: 'ArrowRight' }), 'CONTROL: the web takes its own key').toBe(false);
+      await settle(20);
+      expect(lastDraw().camX, 'CONTROL: the web panned').not.toBeCloseTo(before.camX, 3);
+
+      const select = screen.getByLabelText('Connection density');
+      select.focus();
+      before = lastDraw();
+      for (const key of ['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', '+', '-', '0']) {
+        expect(fireEvent.keyDown(select, { key }), key + ' on the select is not cancelled').toBe(true);
+        await settle(20);
+      }
+      expect(lastDraw().camX, 'the web did not pan under the select').toBeCloseTo(before.camX, 6);
+      expect(lastDraw().ppv, 'nor zoom').toBeCloseTo(before.ppv, 6);
+      expect(lastDraw().camY, 'nor climb').toBe(before.camY);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
+      await settle(20);
+      const row = container.querySelector('.sw-list .sw-choice-row');
+      expect(row, 'PRECONDITION: the list has a row').toBeTruthy();
+      expect(fireEvent.keyDown(row, { key: 'ArrowLeft' }), 'ArrowLeft on a row is not cancelled').toBe(true);
+      await settle(20);
+      expect(lastDraw().camX, 'the web did not pan behind the list').toBeCloseTo(before.camX, 6);
+
+      // Escape is the web's from anywhere: from the row it closes the list, from the select it leaves
+      fireEvent.keyDown(row, { key: 'Escape' });
+      await settle(20);
+      expect(container.querySelector('.sw-list')).toBeNull();
+      expect(onBack).not.toHaveBeenCalled();
+      fireEvent.keyDown(select, { key: 'Escape' });
+      expect(onBack).toHaveBeenCalledTimes(1);
+    });
+  });
 });
 
 describe('how to read this web (landing 13): one card, plain words, once', () => {

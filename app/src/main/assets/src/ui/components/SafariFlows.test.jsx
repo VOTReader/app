@@ -117,6 +117,46 @@ describe('Safari7DayModal', () => {
     expect(container.querySelector('.sh-modal-instructions')).not.toBeNull();
   });
 
+  // Sweep v065: iPadOS Safari reports navigator.platform 'MacIntel', so a platform-only test
+  // handed iPad readers the Mac menu path ("File > Add to Dock"), which does not exist on iPad.
+  // A touch screen is what tells the two apart (a Mac reports maxTouchPoints 0).
+  describe('instructions per device', () => {
+    /** @param {string} platform @param {number} maxTouchPoints */
+    function _openInstructions(platform, maxTouchPoints) {
+      Object.defineProperty(navigator, 'platform', { value: platform, configurable: true });
+      Object.defineProperty(navigator, 'maxTouchPoints', { value: maxTouchPoints, configurable: true });
+      _report = _makeReport({ safariGateBlocked: true, platform: 'safari-tab' });
+      var { container } = render(<Safari7DayModal />);
+      var howBtn = Array.from(container.querySelectorAll('.sh-modal-btn')).find(
+        (b) => b.textContent.includes('How to add')
+      );
+      act(() => { /** @type {HTMLElement} */ (howBtn).click(); });
+      return /** @type {HTMLElement} */ (container.querySelector('.sh-modal-instructions')).textContent;
+    }
+
+    afterEach(() => {
+      delete /** @type {any} */ (navigator).platform;
+      delete /** @type {any} */ (navigator).maxTouchPoints;
+    });
+
+    it('an iPad (MacIntel with a touch screen) gets the Share > Add to Home Screen steps', () => {
+      var text = _openInstructions('MacIntel', 5);
+      expect(text).toContain('Add to Home Screen');
+      expect(text).not.toContain('Add to Dock');
+    });
+
+    it('a Mac (MacIntel, no touch) gets File > Add to Dock', () => {
+      var text = _openInstructions('MacIntel', 0);
+      expect(text).toContain('Add to Dock');
+      expect(text).not.toContain('Add to Home Screen');
+    });
+
+    it('an iPhone gets the Share > Add to Home Screen steps', () => {
+      var text = _openInstructions('iPhone', 5);
+      expect(text).toContain('Add to Home Screen');
+    });
+  });
+
   it('registers with useModalRegistry', () => {
     _report = _makeReport({ safariGateBlocked: true });
     render(<Safari7DayModal />);

@@ -16,7 +16,11 @@
 
    so arrow keys / Home / End still seek the instant they are pressed (the a11y
    contract), and a pointer drag commits on pointerup. A cancelled gesture just
-   drops the preview; the store's own position re-asserts itself.
+   drops the preview; the store's own position re-asserts itself. So does a
+   TAP on the thumb: it fires no change, and the input's value is the FLOORED
+   clock, so committing it would seek back by up to a second and write the
+   position for a touch that was never a seek (sweep v063). A release commits
+   only a gesture that actually previewed something.
 
    The played portion is painted by the track's own gradient, driven by the
    `--seek-pct` custom property this component sets inline. Custom properties
@@ -51,6 +55,9 @@ export function AudioSeekSlider({ className, ariaLabel, time, duration }) {
   /** Preview position while a finger is on the thumb; null = not scrubbing. */
   const [scrub, setScrub] = React.useState(/** @type {number | null} */ (null));
   const dragging = React.useRef(false);
+  /** True once this pointer gesture has previewed a value. A ref, not `scrub`,
+   *  so a release that lands before React re-renders still sees it. */
+  const previewed = React.useRef(false);
 
   // A slider must never advertise max=0 while its value grows (the a11y defect
   // class already fixed once in JournalAudioBlock), so an unknown length is
@@ -70,8 +77,16 @@ export function AudioSeekSlider({ className, ariaLabel, time, duration }) {
   /** @param {number} value */
   const commit = (value) => {
     dragging.current = false;
+    previewed.current = false;
     setScrub(null);
     AudioPlayer.seek(value);
+  };
+
+  /** End of a pointer gesture: seek only if it moved the thumb.
+   *  @param {{ currentTarget: HTMLInputElement }} event */
+  const release = (event) => {
+    if (previewed.current) commit(Number(event.currentTarget.value));
+    else dragging.current = false;
   };
 
   return (
@@ -87,19 +102,19 @@ export function AudioSeekSlider({ className, ariaLabel, time, duration }) {
         aria-label={ariaLabel}
         aria-valuetext={formatClock(spoken) + ' of ' + (dur ? formatClock(dur) : 'unknown length')}
         style={/** @type {any} */ ({ '--seek-pct': pct.toFixed(2) + '%' })}
-        onPointerDown={() => { dragging.current = true; }}
+        onPointerDown={() => { dragging.current = true; previewed.current = false; }}
         onChange={(event) => {
           const value = Number(event.target.value);
-          if (dragging.current) setScrub(value);
+          if (dragging.current) { previewed.current = true; setScrub(value); }
           else commit(value);
         }}
-        onPointerUp={(event) => commit(Number(event.currentTarget.value))}
+        onPointerUp={release}
         /* Backstop for a release the element never sees: a range drag takes
            implicit pointer capture, so if the finger lifts off the control the
            capture is lost rather than a pointerup arriving here. Committing
            twice with the same value is harmless; a stuck preview is not. */
-        onLostPointerCapture={(event) => { if (dragging.current) commit(Number(event.currentTarget.value)); }}
-        onPointerCancel={() => { dragging.current = false; setScrub(null); }}
+        onLostPointerCapture={(event) => { if (dragging.current) release(event); }}
+        onPointerCancel={() => { dragging.current = false; previewed.current = false; setScrub(null); }}
       />
       {scrub == null ? null : (
         <span

@@ -131,6 +131,20 @@ function _nativeSongs() {
 }
 
 /**
+ * The phone app's songs on their way (queued or downloading in its store), found by URL, so one the catalog no longer
+ * names still stops. @returns {Map<string, string>} id → URL
+ */
+function _nativeOnTheirWay() {
+  /** @type {Map<string, string>} */
+  const map = new Map();
+  for (const url of OfflineAudio.songsOnTheirWay()) {
+    const id = _idOfUrl(url);
+    if (id) map.set(id, url);
+  }
+  return map;
+}
+
+/**
  * The phone app's downloads changed: list the songs that landed in songKept (the backup's list). A song whose size
  * is not the catalog's is removed and, once it is gone, fetched once more (a second mismatch is a failure).
  */
@@ -497,13 +511,9 @@ function cancel(ids) {
   const set = new Set(Array.isArray(ids) ? ids : []);
   for (const id of set) _stoppedAt.set(id, ++_stopSeq);
   if (_native()) {
+    const busy = _nativeOnTheirWay();
     const urls = [];
-    for (const id of set) {
-      const s = songById(id);
-      const url = s ? songAssetUrl(s) : '';
-      const st = url ? OfflineAudio.statusOf(url) : 'none';
-      if (st === 'queued' || st === 'downloading') urls.push(url);
-    }
+    for (const id of set) { const url = busy.get(id); if (url) urls.push(url); }
     if (urls.length) OfflineAudio.cancel(urls);
     return;
   }
@@ -546,9 +556,10 @@ async function remove(ids) {
 async function removeAll() {
   _allStoppedAt = ++_stopSeq;
   await _ensureLoaded();   // what a cold start's stored list holds is kept too (W64 refuter round 3)
-  const busy = _native() ? [] : _queue.concat(_active ? [_active] : []);
-  cancel(busy);
-  // The song on its way is not kept yet (keptIds), but "remove all" takes it too: off the backup's list (W64).
+  // The songs on their way are not kept yet (keptIds), but "remove all" takes them too: remove() stops them and takes
+  // them off the backup's list (W64). In the phone app they wait in its store, not in this page's queue: left out,
+  // they went on downloading and came back as kept when they landed (sweep v037).
+  const busy = _native() ? [..._nativeOnTheirWay().keys()] : _queue.concat(_active ? [_active] : []);
   return remove(keptIds().concat(busy));
 }
 

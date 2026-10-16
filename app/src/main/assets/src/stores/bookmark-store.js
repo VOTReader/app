@@ -101,15 +101,22 @@ export const BookmarkStore = extendStore(
     count() { return this._load().length; },
 
     /**
-     * Get all bookmarks whose hlKey exactly matches `key`, OR whose
-     * key's prefix (everything before the last colon) matches — this
-     * second branch lets a verse-level key match a bookmark stored on
-     * the whole verse plus selection range.
+     * Get all bookmarks whose hlKey exactly matches `key`, OR is `key`
+     * plus a `:start-end` selection range — that second branch lets a
+     * verse-level key match a bookmark stored on part of the verse. Only
+     * a range is stripped: a bare verse or paragraph key ("bible:genesis:1:3",
+     * stored when a selection spans two blocks) is NOT a match for its
+     * chapter key ("bible:genesis:1"), or the chapter header button
+     * (ChapterBookmarkBtn) lit up for it and opened its popover (sweep v101).
      * @param {string} key
      * @returns {Bookmark[]}
      */
     getForKey(key) {
-      return this._load().filter(function(b) { return _isBookmark(b) && (b.hlKey === key || b.hlKey.split(':').slice(0, -1).join(':') === key); });
+      return this._load().filter(function(b) {
+        if (!_isBookmark(b)) return false;
+        var k = b.hlKey;
+        return k === key || (k.indexOf(key + ':') === 0 && /^\d+-\d+$/.test(k.slice(key.length + 1)));
+      });
     },
 
     /**

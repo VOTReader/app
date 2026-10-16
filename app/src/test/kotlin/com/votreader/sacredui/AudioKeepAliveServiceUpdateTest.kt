@@ -1,6 +1,7 @@
 package com.votreader.sacredui
 
 import android.app.Application
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
@@ -10,6 +11,7 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNotSame
@@ -30,7 +32,9 @@ import kotlin.test.assertTrue
  * restriction, so this pins the CALL PATTERN: the last startForeground
  * notification must be the SAME object after a paused update (no new
  * startForeground), while a PLAYING update and a plain start intent (the
- * startForegroundService contract) must still enter the foreground.
+ * startForegroundService contract) must still enter the foreground. A start
+ * intent is the resume (sweep v040): it must stay there, not detach again on
+ * the paused snapshot it lands on.
  *
  * @Config pins SDK 35: the cached android-all jar at a level where the
  * restriction is live.
@@ -98,7 +102,7 @@ class AudioKeepAliveServiceUpdateTest {
     }
 
     @Test
-    fun plainStartIntentAlwaysEntersTheForegroundEvenWithAPausedSnapshot() {
+    fun startIntentAfterAPauseEntersTheForegroundAndStaysThereAsPlaying() {
         // startForegroundService demands a matching startForeground within 5 s;
         // the snapshot's play state must never be allowed to skip it.
         val svc = Robolectric.buildService(AudioKeepAliveService::class.java).create().get()
@@ -107,8 +111,17 @@ class AudioKeepAliveServiceUpdateTest {
         svc.onStartCommand(update(playing = false), 0, 2)
         val attachedAtPause = shadow.lastForegroundNotification
 
-        svc.onStartCommand(startIntent(), 0, 3)                       // setActive(true) again, before JS syncs 'playing'
+        svc.onStartCommand(startIntent(), 0, 3)                       // resume: setActive(true), before JS syncs 'playing'
 
         assertNotSame(attachedAtPause, shadow.lastForegroundNotification, "a start intent must call startForeground")
+        // Sweep v040: JS raises setActive(true) only on the 'playing' edge, so a start intent IS the resume. Read
+        // with the snapshot still paused, the same pass detached the card again: swipeable, showing Play over
+        // playing audio, and the process unprotected until the playing update re-entered the foreground from a
+        // plain startService (a background FGS start on API 31+, refused -> CMD_REFUSED -> stopEverything).
+        assertFalse(shadow.isForegroundStopped, "the resume start must stay in the foreground, not detach again")
+        assertTrue(shadow.isLastForegroundNotificationAttached, "the resumed card must stay attached")
+        val card = shadow.lastForegroundNotification
+        assertEquals("Pause", card.actions[1].title.toString(), "the resumed card must offer Pause, not Play")
+        assertTrue(card.flags and Notification.FLAG_ONGOING_EVENT != 0, "the resumed card must be ongoing")
     }
 }

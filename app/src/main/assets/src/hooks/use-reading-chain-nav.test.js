@@ -41,6 +41,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useReadingChainNav } from './use-reading-chain-nav.js';
+import { noteTabAction } from './use-navigate-to-link.js';
 
 // The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
 vi.mock('../data/scripture-resolution.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get COLLECTIONS() { return /** @type {any} */ (globalThis).COLLECTIONS; }, get COL_BY_KEY() { return /** @type {any} */ (globalThis).COL_BY_KEY; }, get READING_CHAIN() { return /** @type {any} */ (globalThis).READING_CHAIN; }, get _boundaryShort() { return /** @type {any} */ (globalThis)._boundaryShort; }, get colLetterArr() { return /** @type {any} */ (globalThis).colLetterArr; }, get colPreface() { return /** @type {any} */ (globalThis).colPreface; } }; });
@@ -510,5 +511,66 @@ describe('useReadingChainNav — boundary jump before the letters load (as1b)', 
     expect(props.setScreen).toHaveBeenCalledWith('vot-one-letter');
     expect(window.__loadVotCorpus).not.toHaveBeenCalled();
     expect(listeners.size).toBe(0);
+  });
+
+  // sweep v013: _open's setters write to whichever tab is active when the
+  // letters land. Home, Back, a Library tap or a tab action while the corpus
+  // loads must drop the jump, not yank the reader (or another tab) to Volume One.
+  describe('the reader moves on before the letters land (sweep v013)', () => {
+    let infoSpy;
+    beforeEach(() => { infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {}); });
+    afterEach(() => { infoSpy.mockRestore(); });
+    const rev22Place = { screen: 'bible-ch', bookId: 'revelation', chapterNum: 22, letterId: null, activeTabIdx: 0, tabCount: 2 };
+    const mount = () => {
+      const props = { ...baseProps(), book: stubBibleBookList[2], chapter: { num: 22 }, ...rev22Place };
+      const view = renderHook((p) => useReadingChainNav(p), { initialProps: props });
+      return { ...view, props };
+    };
+
+    it('the reader stays on Revelation 22 (re-renders, no move): the jump still lands', () => {
+      const { result, rerender, props } = mount();
+      result.current.bcvOnNextBook();
+      rerender({ ...props });
+      land();
+      expect(props.setScreen).toHaveBeenCalledWith('vot-one-letter');
+      expect(props.setLetterId).toHaveBeenCalledWith('v1-a');
+    });
+
+    it('Home (or Back, or a Library tap) before the letters land drops the jump', () => {
+      const { result, rerender, props } = mount();
+      result.current.bcvOnNextBook();
+      rerender({ ...props, screen: 'home' });
+      land();
+      expect(props.setScreen).not.toHaveBeenCalled();
+      expect(props.setLetterId).not.toHaveBeenCalled();
+      expect(props.setActiveReadKey).not.toHaveBeenCalled();
+      expect(listeners.size).toBe(0);
+    });
+
+    it('Home and straight back to Revelation 22 still drops it (moves are counted, not end states)', () => {
+      const { result, rerender, props } = mount();
+      result.current.bcvOnNextBook();
+      rerender({ ...props, screen: 'home' });
+      rerender({ ...props });
+      land();
+      expect(props.setScreen).not.toHaveBeenCalled();
+    });
+
+    it('a tab switch before the letters land drops the jump (no write into the other tab)', () => {
+      const { result, rerender, props } = mount();
+      result.current.bcvOnNextBook();
+      rerender({ ...props, activeTabIdx: 1 });
+      land();
+      expect(props.setScreen).not.toHaveBeenCalled();
+      expect(props.setLetterId).not.toHaveBeenCalled();
+    });
+
+    it('any tab action since the tap drops the jump, even one that leaves the place as it was', () => {
+      const { result, props } = mount();
+      result.current.bcvOnNextBook();
+      noteTabAction();
+      land();
+      expect(props.setScreen).not.toHaveBeenCalled();
+    });
   });
 });

@@ -10,8 +10,10 @@
 
    Data shape: `Record<string, boolean>` where the key is
    "chapterId:blockIndex:cardType" and the value is true (expanded) or
-   absent (collapsed default). Typical size: <10 KB across a heavy
-   reader's usage.
+   false (collapsed by hand). Absent = expanded: ProphecyCard opens a
+   card with nothing saved, so a collapse must be kept as `false`
+   (W2.3b.1 dropped it, and every closed card reopened after a reload).
+   Typical size: <10 KB across a heavy reader's usage.
 
    API:
      ProphecyCardsStore.getAll()    → Record<string, boolean>
@@ -20,7 +22,8 @@
      ProphecyCardsStore.setAll(m)   → void  (whole-map replacement —
                                               the consumer batches
                                               changes via a ref then
-                                              flushes once per gesture)
+                                              flushes once per gesture;
+                                              keeps true and false)
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
@@ -41,7 +44,8 @@ export const ProphecyCardsStore = extendStore(
     },
 
     /**
-     * Boolean for one key. Defaults to false (collapsed).
+     * True when the card is saved expanded; false when saved collapsed or
+     * not saved (a card with nothing saved opens: read getAll for that).
      * @param {string} key
      * @returns {boolean}
      */
@@ -51,7 +55,8 @@ export const ProphecyCardsStore = extendStore(
     },
 
     /**
-     * Set the boolean for one key. Idempotent.
+     * Set the boolean for one key (false keeps the card collapsed); any
+     * other falsy value forgets it (back to expanded). Idempotent.
      * @param {string} key
      * @param {boolean} value
      * @returns {void}
@@ -60,7 +65,8 @@ export const ProphecyCardsStore = extendStore(
       if (!key) return;
       if (this._shouldDefer('setOne', key, value)) return;
       const data = this._load();
-      if (value) data[key] = true;
+      if (value === false) data[key] = false;
+      else if (value) data[key] = true;
       else delete data[key];
       this._save();
       this._bump();
@@ -69,8 +75,8 @@ export const ProphecyCardsStore = extendStore(
     /**
      * Replace the full map. Used by the consumer that batches changes
      * into a ref, then flushes via this method on commit (e.g. tap
-     * commit). Filters falsy values so the persisted map stays
-     * minimal.
+     * commit), and by backup restore. Keeps false (collapsed) and
+     * true (any truthy value); drops the other falsy values.
      * @param {ProphecyCardsData | null | undefined} map
      * @returns {void}
      */
@@ -80,7 +86,8 @@ export const ProphecyCardsStore = extendStore(
       const next = {};
       if (map && typeof map === 'object') {
         for (const k of Object.keys(map)) {
-          if (map[k]) next[k] = true;
+          if (map[k] === false) next[k] = false;
+          else if (map[k]) next[k] = true;
         }
       }
       this._cache = next;

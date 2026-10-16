@@ -143,7 +143,8 @@ export function SongTransport({ state }) {
   const repeat = state.repeat === 'one' || state.repeat === 'all' ? state.repeat : 'off';
   const nextRepeat = repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off';
   const repeatWord = repeat === 'one' ? 'Repeat one' : repeat === 'all' ? 'Repeat all' : 'Repeat';
-  const lastSong = state.qi + 1 >= queue.length && repeat !== 'all';
+  // A restored songs session's one track is a placeholder for the queue its first tap rebuilds (sweep v021).
+  const lastSong = !state.restoring && state.qi + 1 >= queue.length && repeat !== 'all';
   return (
     <div className="audio-manager-transport song-desk-transport" aria-label="Playback controls">
       <button type="button" className={'song-desk-tool' + (state.shuffle ? ' is-on' : '')} aria-pressed={!!state.shuffle} onClick={() => AudioPlayer.setShuffle(!state.shuffle)}>

@@ -32,6 +32,11 @@
         but back must still return to History. Collapsing the two would
         either resurrect a filed bug or show the pill the owner asked us to
         remove.
+
+     F) retargetTop (sweep v041). The audio follower moves the pane in
+        place; without the carry the prune evicted the entry and the pill
+        and hardware Back's target went with it. It must carry only a LIVE
+        top, never revive a stale one.
 */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -305,5 +310,50 @@ describe('useFromLetterStack — journal destSnapshot round-trip', () => {
     rerender({ screen: 'journal-viewer', journalEntryId: 'other-entry' });
     expect(result.current.fromLetterStack).toHaveLength(0);
     expect(result.current.backHint).toBeNull();
+  });
+});
+
+// ── F) retargetTop: a move that carries the way back (sweep v041) ───────
+
+describe('useFromLetterStack — retargetTop', () => {
+  // The audio follower ("Turn the Page with the Audio") moves the pane in
+  // place and hands the new reading to retargetTop in the same batch. Only a
+  // LIVE top (its destSnapshot names where the pane is now) is carried; a
+  // stale or legacy top is never rewritten, so a carry can't resurrect a
+  // pill the reader already walked away from.
+  const letter5 = { screen: 'vot-two-letter', bookId: null, chapterNum: null, letterId: 'letter-5', studyId: null, studyChapterId: null };
+
+  it('a live top moves with the pane: the prune keeps it and the pill stays', () => {
+    const { result, rerender } = setup({ screen: 'vot-two-letter', letterId: 'letter-5' });
+    act(() => { result.current.pushFromLetter(entry({ destSnapshot: letter5 })); });
+    expect(result.current.backHint).toEqual({ title: 'My Notes', volumeLabel: null });
+    act(() => {
+      result.current.retargetTop({ screen: 'vot-two-letter', letterId: 'letter-6' });
+      rerender({ screen: 'vot-two-letter', letterId: 'letter-6' });
+    });
+    expect(result.current.fromLetterStack).toHaveLength(1);
+    expect(result.current.fromLetterStack[0].destSnapshot).toEqual({ screen: 'vot-two-letter', letterId: 'letter-6' });
+    expect(result.current.fromLetterStack[0].sourceScreen).toBe('notes-index');
+    expect(result.current.backHint).toEqual({ title: 'My Notes', volumeLabel: null });
+  });
+
+  it('a top that does not name the current pane is not rewritten (the prune still evicts it)', () => {
+    const { result } = setup({ screen: 'bible-ch', bookId: 'jonah', chapterNum: 4 });
+    act(() => {
+      result.current.pushFromLetter(entry({ destSnapshot: letter5 }));
+      result.current.retargetTop({ screen: 'bible-ch', bookId: 'jonah', chapterNum: 4 });
+    });
+    expect(result.current.fromLetterStack).toHaveLength(0);
+    expect(result.current.backHint).toBeNull();
+  });
+
+  it('an empty stack and a legacy top (no destSnapshot) are left exactly as they were', () => {
+    const { result } = setup({ screen: 'vot-one-letter', letterId: 'a' });
+    act(() => { result.current.retargetTop({ screen: 'vot-one-letter', letterId: 'b' }); });
+    expect(result.current.fromLetterStack).toEqual([]);
+    const legacy = entry({ sourceScreen: 'vot-one-letter', sourceLetterId: 'z', sourceLetterTitle: 'Z' });
+    act(() => { result.current.pushFromLetter(legacy); });
+    act(() => { result.current.retargetTop({ screen: 'vot-one-letter', letterId: 'b' }); });
+    expect(result.current.fromLetterStack).toEqual([legacy]);
   });
 });

@@ -191,9 +191,9 @@ old per-slot line numbers had drifted). The backing store is a window-held Map
 share it. (`__pendingLinkExcerpt` was removed in D2 — write-only dead code.)
 
 ### `__journalBackStack`
-- **Setter:** `src/ui/screens/JournalViewerScreen.js:495,556` — lazy-init (`if (!window.__journalBackStack) window.__journalBackStack = []`)
-- **Cleanup:** none (lazy-init pattern; entries pushed/popped by code)
-- **Consumers:** JournalViewerScreen back-button handler
+- **Setter:** `src/ui/screens/JournalViewerScreen.jsx` (render and `onJournalCard`) — lazy-init (`if (!window.__journalBackStack) window.__journalBackStack = []`)
+- **Cleanup:** when the Journal hub opens or edits an entry (`src/ui/screens/JournalHubScreen.jsx` `dropBackFramesInto`) and when `navigateToLink` opens a journal entry from outside (`src/hooks/use-navigate-to-link.js`), the frames whose `destId` is that entry are dropped in place. Frames into other entries survive a detour through a chapter or note, and the hub never clears on mount, because a tab switch to a tab on journal-home mounts it (sweep v046)
+- **Consumers:** JournalViewerScreen back pill / nav arrow, and use-android-back.js's journal-viewer branch
 
 ---
 
@@ -299,6 +299,11 @@ lifetime rule as §8.
   Consumers: `screen-routes.jsx`, `use-lazy-bundles.js`,
   `use-dom-annotation-sync.js`, `ScripturesHome.jsx`, `SettingsScreen.jsx`,
   `MyProgressScreen.jsx`, `search/engine.js`.
+- `__votOtherCorpus` — an array of `./`-relative paths. Written only by the line the service worker appends to
+  another build's corpus file (`service-worker.js` `otherBuildCopy`), so it runs as that file's last line. Readers:
+  `search/cache.js` (an index built from such a file is never kept) and `index.html`'s `__makeLazyLoader` (a new mark
+  during a load means another build's copy ran to its end, so it counts as run although a global this build names
+  may be missing; sweep v009).
 - The four screen loaders `__screensE`..`__screensH` / `__loadScreensE`..`H` were retired on 2026-10-13 (lz1):
   their screens ship in bundle-d. The service worker answers an old page's request for a retired
   `bundle-[e-h].js` with a one-time reload onto the new build.

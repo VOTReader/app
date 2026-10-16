@@ -30,7 +30,9 @@
         cleared by: goHome / use-nav / use-from-letter-stack / use-android-back
      pendingScrollHlKey string | null
         writer: use-navigate-to-link (navigate to a linked annotation)
-        reader: use-dom-annotation-sync (take → scrollIntoView the mark)
+        reader: use-dom-annotation-sync (peek → scrollIntoView the mark; it
+                clears the slot once the mark is found, so a corpus still
+                loading keeps it, or when the reader leaves that page first)
         cleared by: use-nav (goHome)
      pendingSearchQuery string | null
         writer: SelectionToolbar (Search action on a selection)
@@ -38,7 +40,7 @@
      pendingOpenNote    string (groupId) | null
         writer: NotesIndexScreen (tap-through to a note's source)
         reader: use-dom-annotation-sync (take → open the NoteSheet)
-     notesReturnCtx     {tab, drilledNbId} | null
+     notesReturnCtx     {tab, drilledNbId, backPill?: {title, origin?} | null} | null
         writer: NotesIndexScreen / screen-routes (drill into a notebook)
         reader: NotesIndexScreen (peek on render; clear on mount)
 

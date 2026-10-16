@@ -152,4 +152,41 @@ describe('ChapterView — the read-along mount (§5.2)', () => {
     show({ inert: true });
     expect(mounts.length).toBe(0);
   });
+
+  it('keeps one key fn identity across re-renders of the same chapter (sweep v025)', () => {
+    // hlKeyFn sits in the dependency arrays of ReadAlongHighlight's rAF loop,
+    // its safety-net repaint, tap-to-seek and seek effects. A fresh arrow on
+    // every ChapterView render re-ran all four on every parent render while a
+    // Matthew recording played (BibleChapterView memoizes its key fn for the
+    // same reason).
+    const base = (extra) => (
+      <ChapterView
+        book={MATTHEW} chapter={CHAPTER} mode="pdf" showStudy={false} showEchoes={false}
+        showChapterTitle bibleAudio={BRM} readAlongOn readAlongFollow
+        {...extra}
+      />
+    );
+    const { rerender } = render(base({ theme: 'light' }));
+    rerender(base({ theme: 'dark' }));
+    expect(mounts.length, 'the mount did not re-render with the screen').toBeGreaterThanOrEqual(2);
+    expect(mounts[mounts.length - 1].hlKeyFn, 'a new key fn on a render that changed no chapter')
+      .toBe(mounts[0].hlKeyFn);
+  });
+
+  it('hands a key fn for the NEW chapter when the chapter changes', () => {
+    // The memo must not freeze the first chapter's keys onto the next one
+    // (the instance is reused across chapters without a key).
+    const CH2 = { num: 2, verses: VERSES, scriptures: [], votNotes: [] };
+    const base = (chapter) => (
+      <ChapterView
+        book={MATTHEW} chapter={chapter} mode="pdf" showStudy={false} showEchoes={false}
+        showChapterTitle bibleAudio={BRM} readAlongOn readAlongFollow
+      />
+    );
+    const { rerender } = render(base(CHAPTER));
+    rerender(base(CH2));
+    const last = mounts[mounts.length - 1];
+    expect(last.chapter).toBe(2);
+    expect(last.hlKeyFn(MATTHEW.id, 1)).toBe('study:matthew-2:1');
+  });
 });

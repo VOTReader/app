@@ -193,6 +193,11 @@
   R('.jrn-expand-toggle:active { color: var(--gold-dim); }');
   // When expanded, give the body a little breathing room from the toggle
   R('.is-expanded .jrn-expand-toggle { margin-top: 4px; }');
+  // ExpandableText's whole-text mode (long journal quotes, v047): the body keeps
+  // the whole text, so the collapse is a line clamp; five lines is about the old
+  // 240-character preview on a phone. The toggle sits under the body.
+  R('.jrn-expand-body.is-clamped { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }');
+  R('.jrn-expand-body + .jrn-expand-toggle { padding: 4px 0 0; }');
 
   // Image embed
   R('.jrn-embed-image { border-radius: 10px; overflow: hidden; border: 1px solid var(--gold-border); position: relative; }');

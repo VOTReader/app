@@ -528,6 +528,55 @@ describe('end of page', () => {
     expect(state.el.scrollTop).toBeGreaterThanOrEqual(250);
     ctrl.destroy();
   });
+
+  // Sweep v011: a finger landing while the new page's restore settles must win the lease. pointerDown ignored
+  // 'advancing', so the settle loop went on to beginRunning and wrote scrollTop every frame under the finger.
+  it('a finger down during the post-advance settle yields, and the soft resume takes over', () => {
+    const { io, state } = makeIo();
+    state.autoNext = true;
+    state.el = makeEl({ scrollHeight: 5000, clientHeight: 800, endTop: 900 });
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 900, 50);
+    state.restoring = true;
+    runTimers(state, 6000);
+    expect(ctrl.getState().state).toBe('advancing');
+    runFrames(state, 3);
+    ctrl.pointerDown();
+    expect(ctrl.getState().state).toBe('paused');
+    expect(ctrl.getState().pauseReason).toBe('touch');
+    expect(state.keepScreenOn[state.keepScreenOn.length - 1]).toBe(false);
+    // The restore finishes with the finger still down: nothing may start moving.
+    state.el = makeEl({ scrollHeight: 9000, clientHeight: 800, endTop: 6000 });
+    state.el.scrollTop = 250;
+    state.restoring = false;
+    runFrames(state, 30);
+    expect(ctrl.getState().state).toBe('paused');
+    expect(state.el.scrollTop).toBe(250);
+    // Lift: the ordinary touch resume picks the run back up from where the page sits.
+    ctrl.pointerUp();
+    runTimers(state, 1300);
+    expect(ctrl.getState().state).toBe('running');
+    runFrames(state, 30);
+    expect(state.el.scrollTop).toBeGreaterThan(250);
+    ctrl.destroy();
+  });
+
+  it('a finger down while a handed-over run waits for its restore yields too', () => {
+    const { io, state } = makeIo();
+    state.el = makeEl({ scrollHeight: 5000, clientHeight: 800, endTop: 900 });
+    state.restoring = true;
+    const ctrl = createAutoScroll(io);
+    ctrl.resumeAdvance(3);
+    runFrames(state, 2);
+    ctrl.pointerDown();
+    state.restoring = false;
+    runFrames(state, 10);
+    expect(ctrl.getState().state).toBe('paused');
+    expect(ctrl.getState().pauseReason).toBe('touch');
+    expect(state.el.scrollTop).toBe(0);
+    ctrl.destroy();
+  });
 });
 
 // ── Side effects ───────────────────────────────────────────────────────

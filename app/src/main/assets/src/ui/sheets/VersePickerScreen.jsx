@@ -47,6 +47,18 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
   // through AppShellSheets).
   const trapRef = useFocusTrap(true);
 
+  // Verse filter — long chapters (Psalm 119 is 176 verses) had no way to
+  // find a verse by its words; typing narrows the list live, and the tap-a-
+  // verse-number path selects from the narrowed list as usual. Clearing
+  // restores the full chapter (drag-selection across verses wants context,
+  // so the filter is opt-in, never sticky).
+  const [verseFilter, setVerseFilter] = React.useState('');
+  const filterQ = verseFilter.trim().toLowerCase();
+  const shownVerses = React.useMemo(() => {
+    if (!filterQ) return verses;
+    return verses.filter(v => (v.text || '').toLowerCase().includes(filterQ) || String(v.n) === filterQ);
+  }, [verses, filterQ]);
+
   // captureSelectionSync — find the verse element(s) the user selected, build
   // a span descriptor with the actual selected text plus verse-level + char-
   // level offsets so downstream consumers (Journal excerpt, link overlay
@@ -62,11 +74,10 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     const startN = range.startContainer;
     const endN = range.endContainer;
     const startVerseEl = /** @type {Element} */ (startN.nodeType === 3 ? startN.parentElement : startN).closest('[data-verse]');
-    const endVerseEl = /** @type {Element} */ (endN.nodeType === 3 ? endN.parentElement : endN).closest('[data-verse]');
+    let endVerseEl = /** @type {Element} */ (endN.nodeType === 3 ? endN.parentElement : endN).closest('[data-verse]');
     if (!startVerseEl || !endVerseEl) return null;
     if (!bodyRef.current || !bodyRef.current.contains(startVerseEl) || !bodyRef.current.contains(endVerseEl)) return null;
     const startVerse = parseInt(startVerseEl.getAttribute('data-verse'), 10);
-    const endVerse = parseInt(endVerseEl.getAttribute('data-verse'), 10);
     // Offset within the verse's TEXT node (the `.picker-verse-text` span).
     function offsetWithinVerseText(verseEl, container, offset) {
       const textEl = verseEl.querySelector('.picker-verse-text');
@@ -85,22 +96,74 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     }
     let charStart = offsetWithinVerseText(startVerseEl, range.startContainer, range.startOffset);
     let charEnd = offsetWithinVerseText(endVerseEl, range.endContainer, range.endOffset);
+    // sweep v6: Chrome's triple-click, and a drag released just past a line
+    // end, end the Range at offset 0 of the NEXT <p data-verse>. An end that
+    // resolves to character 0 of a later verse takes nothing from it, so the
+    // selection really ends at the close of the verse before it. Without this
+    // a triple-clicked verse 4 linked as "4-5", partial, keyed ':S-0'. Step
+    // back to the previous verse ON SCREEN (the filter can hide verse n-1),
+    // whole. Same zero-offset test as SelectionToolbar (annotation-selection-8).
+    let endAtVerseClose = false;
+    if (charEnd === 0 && endVerseEl !== startVerseEl) {
+      let prev = endVerseEl.previousElementSibling;
+      while (prev && !prev.hasAttribute('data-verse')) prev = prev.previousElementSibling;
+      if (prev) { endVerseEl = prev; endAtVerseClose = true; }
+    }
+    let endVerse = parseInt(endVerseEl.getAttribute('data-verse'), 10);
+    let text = sel.toString();
+    // The filter drops non-matching verses from the DOM, so shown verses 3
+    // and 10 can sit side by side with 4-9 hidden between them. A drag across
+    // that seam is not 3-10: the reader never saw 4-9 (sweep v079). End the
+    // selection at the last verse of the unbroken shown run it started in,
+    // at that verse's close: the drag took all of it, so like v6's step-back
+    // it ends whole, unsnapped.
+    if (endVerse > startVerse) {
+      const shown = new Set(shownVerses.map(v => v.n));
+      let runEnd = startVerse;
+      for (const v of verses) {
+        if (v.n <= startVerse) continue;
+        if (v.n > endVerse || !shown.has(v.n)) break;
+        runEnd = v.n;
+      }
+      const runEndEl = runEnd === endVerse ? null : bodyRef.current.querySelector('[data-verse="' + runEnd + '"]');
+      if (runEndEl) {
+        // Rebuild the text verse by verse, start verse from the selection's
+        // own start, the rest whole, a line apart as a selection reads them.
+        const pieces = [];
+        for (let el = startVerseEl; el; el = el.nextElementSibling) {
+          const r = document.createRange();
+          r.selectNodeContents(el);
+          if (el === startVerseEl) r.setStart(range.startContainer, range.startOffset);
+          pieces.push(r.toString());
+          if (el === runEndEl) break;
+        }
+        text = pieces.join('\n');
+        endVerse = runEnd;
+        endAtVerseClose = true;
+      }
+    }
     // Snap to word boundaries within each verse's text so trailing spaces
     // and partial words don't sneak into the excerpt.
     const startVText = (verses.find(v => v.n === startVerse) || {}).text || '';
     const endVText = (verses.find(v => v.n === endVerse) || {}).text || '';
     const snappedStart = snapRangeToWords(startVText, charStart, startVText.length).start;
-    const snappedEndPos = snapRangeToWords(endVText, 0, charEnd).end;
+    // A stepped-back end IS the verse's close: no overshoot to trim, so it
+    // keeps the full length (snapping would drop the closing '.' and turn a
+    // whole verse into a partial link).
+    const snappedEndPos = endAtVerseClose ? endVText.length : snapRangeToWords(endVText, 0, charEnd).end;
     charStart = Math.max(0, Math.min(snappedStart, startVText.length));
     charEnd = Math.max(0, Math.min(snappedEndPos, endVText.length));
+    // A selection that began at the very close of a verse and was stepped
+    // back into it holds no word at all: no selection, not an empty link.
+    if (endAtVerseClose && startVerse === endVerse && charStart >= charEnd) return null;
     return {
       verseStart: startVerse,
       verseEnd: endVerse,
       charStart: charStart,
       charEnd: charEnd,
-      text: sel.toString()
+      text: text
     };
-  }, [verses]);
+  }, [verses, shownVerses]);
 
   // Deferred-capture timer is cleared on unmount — closing the picker within
   // 150ms of a lift must not commit selection state into a dead component
@@ -138,18 +201,6 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
       if (t) clearTimeout(t);
     };
   }, [captureSelectionSync]);
-
-  // Verse filter — long chapters (Psalm 119 is 176 verses) had no way to
-  // find a verse by its words; typing narrows the list live, and the tap-a-
-  // verse-number path selects from the narrowed list as usual. Clearing
-  // restores the full chapter (drag-selection across verses wants context,
-  // so the filter is opt-in, never sticky).
-  const [verseFilter, setVerseFilter] = React.useState('');
-  const filterQ = verseFilter.trim().toLowerCase();
-  const shownVerses = React.useMemo(() => {
-    if (!filterQ) return verses;
-    return verses.filter(v => (v.text || '').toLowerCase().includes(filterQ) || String(v.n) === filterQ);
-  }, [verses, filterQ]);
 
   const handleVerseTap = React.useCallback((vn) => {
     // Tap a verse number to quick-select the whole verse. Sets a synthetic

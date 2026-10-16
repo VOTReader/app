@@ -299,8 +299,10 @@ export function AudioManagerSheet({ open, state, onClose }) {
   // collection. Plain, unedited queues rebuild to themselves and switch
   // immediately; only these two ask first (owner directive 2026-08-10).
   const needsVoiceConfirm = state.sourceMode === 'custom';
+  // A pending choice that has since become the voice playing (the queue moved
+  // under the open confirm) has nothing left to confirm.
   const pendingChip = needsVoiceConfirm && voices
-    ? voices.chips.find((chip) => chip.id === pendingVoice) || null
+    ? voices.chips.find((chip) => chip.id === pendingVoice && !chip.active) || null
     : null;
 
   // The window. Only a genuinely long queue is paged; everything else renders
@@ -397,7 +399,14 @@ export function AudioManagerSheet({ open, state, onClose }) {
                   role="radio"
                   className={chip.active ? 'is-active' : ''}
                   aria-checked={chip.active}
-                  onClick={() => { if (needsVoiceConfirm) setPendingVoice(chip.id); else chip.select(); }}
+                  onClick={() => {
+                    // The checked chip is the voice already playing: a tap on it
+                    // switches nothing. select() is a REBUILD from the top of the
+                    // letter (sweep v003: Part 2 at minute 2 went back to Part 1,
+                    // 0:00), and on an edited queue it would ask to drop the edits.
+                    if (chip.active) return;
+                    if (needsVoiceConfirm) setPendingVoice(chip.id); else chip.select();
+                  }}
                 >{chip.label}</button>
               ))}
             </div>
@@ -437,7 +446,8 @@ export function AudioManagerSheet({ open, state, onClose }) {
           >
             {active ? <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M6.5 4h4v16h-4zM13.5 4h4v16h-4z" /></svg> : <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M7 4v16l13-8z" /></svg>}
           </button>
-          <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.next()} disabled={state.qi + 1 >= queue.length} aria-label="Next track">
+          {/* Live while restoring: the placeholder's length says nothing about the queue the tap rebuilds (sweep v021). */}
+          <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.next()} disabled={!restoring && state.qi + 1 >= queue.length} aria-label="Next track">
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7" /><path d="M5 5v14" /></svg>
           </button>
           <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.skip(15)} aria-label="Forward 15 seconds">+15</button>

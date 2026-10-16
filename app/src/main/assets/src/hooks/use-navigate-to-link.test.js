@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useNavigateToLink, verseAnchorFor, noteTabAction } from './use-navigate-to-link.js';
 import { navHandoff } from '../utils/nav-handoff.js';
+import { _resetToasts } from '../utils/toast.js';
 
 function makeParams(over) {
   return {
@@ -369,6 +370,40 @@ describe('useNavigateToLink — every endpoint kind and the prologue', () => {
     });
   });
 
+  // sweep v046: a journal→journal frame left over from an earlier card tap
+  // (A → B) made B show "Back to A" over this jump's own back pill, and sent
+  // the back arrow to A. Opening B from outside drops that frame.
+  it('a journal endpoint drops a stale journal→journal back frame', () => {
+    window.__journalBackStack = [{ destId: 'e42', fromId: 'e1', fromTitle: 'Morning' }];
+    try {
+      const p = makeParams();
+      const { result } = renderHook(() => useNavigateToLink(p));
+      act(() => { result.current.navigateToLink({ type: 'journal', entryId: 'e42' }); });
+      expect(p.setScreen).toHaveBeenCalledWith('journal-viewer');
+      expect(window.__journalBackStack).toEqual([]);
+    } finally {
+      delete window.__journalBackStack;
+    }
+  });
+
+  // ...but only the frames INTO that entry. A -> B by card, then B -> a Bible
+  // chapter -> entry C from the chapter's journal chip: B's frame must outlive
+  // the jump to C, so the reader who comes back through the chapter to B still
+  // sees "Back to A" (the first v046 fix emptied the whole stack here).
+  it('a journal endpoint keeps the back frames of other entries', () => {
+    const frameB = { destId: 'eB', fromId: 'eA', fromTitle: 'Entry A' };
+    window.__journalBackStack = [frameB];
+    try {
+      const p = makeParams({ screen: 'bible-ch' });
+      const { result } = renderHook(() => useNavigateToLink(p));
+      act(() => { result.current.navigateToLink({ type: 'journal', entryId: 'eC' }); });
+      expect(p.setScreen).toHaveBeenCalledWith('journal-viewer');
+      expect(window.__journalBackStack).toEqual([frameB]);
+    } finally {
+      delete window.__journalBackStack;
+    }
+  });
+
   it('a screen-driven endpoint opens that screen with its letterId', () => {
     const p = makeParams();
     const { result } = renderHook(() => useNavigateToLink(p));
@@ -442,5 +477,29 @@ describe('useNavigateToLink — every endpoint kind and the prologue', () => {
     });
     expect(p.setScreen).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledWith('navigateToLink: bible corpus load failed', expect.any(Error));
+  });
+
+  // sweep v059: the sidebar shuts at the tap, and a load that fails (offline,
+  // Bible never cached) never reaches goBible, so the bible-ch route's retry
+  // view never mounts. Before the fix the only trace was a console warning:
+  // the reader saw the sidebar close and nothing open.
+  it('v059: a Bible link whose corpus fails to load tells the reader why nothing opened', async () => {
+    _resetToasts();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    window.__loadBibleCorpus = vi.fn(() => Promise.reject(new Error('Failed to load dist/bundle-a-bible.js')));
+    const p = makeParams({ screen: 'vot-one-letter', letterId: 'L12', activeTabIdx: 0 });
+    const { result } = renderHook(() => useNavigateToLink(p));
+    await act(async () => {
+      result.current.navigateToLink({ type: 'bible', bookId: 'genesis', chapter: 1 });
+      await Promise.resolve(); await Promise.resolve();
+    });
+    expect(p.closeLinkSidebar).toHaveBeenCalledTimes(1);
+    expect(p.setScreen).not.toHaveBeenCalled();
+    const toast = document.getElementById('vot-toast-bible-load');
+    expect(toast).not.toBeNull();
+    expect(toast.classList.contains('show')).toBe(true);
+    expect(toast.textContent).toMatch(/Couldn.t load the Bible/);
+    expect(toast.getAttribute('aria-live')).toBe('assertive');
+    _resetToasts();
   });
 });

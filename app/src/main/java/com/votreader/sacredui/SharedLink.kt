@@ -19,10 +19,11 @@ object SharedLink {
     const val HOST = "votreader.github.io"
     const val PAGE = "https://appassets.androidplatform.net/assets/index.html"
 
-    // Mirror of passage-link.js PUBLIC_KEY; keep the two in step.
+    // Mirror of passage-link.js PUBLIC_KEY; keep the two in step. passage-link.corpus.test.js runs every corpus id
+    // through this copy too (the longest is 149 characters, sweep v008).
     private val PUBLIC_KEY = Regex(
         "^(?:bible:[a-z0-9-]{2,40}:\\d{1,3}:\\d{1,3}|study:[a-z0-9-]{2,60}:[a-z0-9-]{1,16}" +
-            "|(?:letter|wtlb|blessed|holy-days):[A-Za-z0-9._-]{1,120}:\\d{1,4})$",
+            "|(?:letter|wtlb|blessed|holy-days):[A-Za-z0-9._-]{1,200}:\\d{1,4})$",
     )
     private val RANGE = Regex(":\\d+-\\d+$")
 

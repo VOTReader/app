@@ -9,13 +9,14 @@
        be mutated by stamping (created/updated). Regression for the
        polish commit (`bdc479e` per CLAUDE.md) that introduced
        `Object.assign({}, bookmark)` before stamping.
-     - getForKey() prefix fallback: the `slice(0, -1).join(':')` branch
-       lets a verse-level key (no range) match a bookmark stored at the
-       SAME key with a `:start-end` range suffix. Audit flagged a
+     - getForKey() prefix fallback: the range branch lets a verse-level
+       key (no range) match a bookmark stored at the SAME key with a
+       `:start-end` range suffix, and nothing coarser (sweep v101: a
+       bare verse key must not match its chapter key). Audit flagged a
        potential false-positive between `bible:genesis:1:1` (no range)
-       and `bible:genesis:1:10` (no range). The slice strips the last
-       segment, so 1:10's prefix is `bible:genesis:1` — DOES NOT match
-       the query `bible:genesis:1:1`. This test pins that.
+       and `bible:genesis:1:10` (no range). 1:10 neither equals the
+       query `bible:genesis:1:1` nor is it that key plus `:start-end`,
+       so it DOES NOT match. This test pins that.
      - getForKeyPrefix() false-positive guard: the `indexOf(prefix + ':')`
        check requires a colon AFTER the prefix, so `wtlb-one` does NOT
        false-match `wtlb-one-extra:1` (which starts with `wtlb-one-`).
@@ -138,9 +139,8 @@ describe('BookmarkStore — getForKey()', () => {
   it('does NOT false-match between :1 and :10 (verse-suffix discipline)', () => {
     // Audit-flagged false-positive class. Query for `bible:genesis:1:1`:
     //   - bookmark `bible:genesis:1:1` — exact match (expected).
-    //   - bookmark `bible:genesis:1:10` — prefix `bible:genesis:1` (last
-    //     segment stripped). NOT equal to `bible:genesis:1:1`. So NOT
-    //     a false positive.
+    //   - bookmark `bible:genesis:1:10` — neither the same key nor the
+    //     same key plus `:start-end`. So NOT a false positive.
     BookmarkStore.add({ id: 'b_one', hlKey: 'bible:genesis:1:1', label: 'verse 1' });
     BookmarkStore.add({ id: 'b_ten', hlKey: 'bible:genesis:1:10', label: 'verse 10' });
 
@@ -161,6 +161,31 @@ describe('BookmarkStore — getForKey()', () => {
   it('returns empty array when nothing matches', () => {
     BookmarkStore.add({ id: 'b1', hlKey: 'bible:genesis:1:1', label: 'A' });
     expect(BookmarkStore.getForKey('bible:exodus:1:1')).toEqual([]);
+  });
+
+  // Sweep v101 (2026-10-14): the chapter header button (ChapterBookmarkBtn)
+  // asks getForKey with a chapter key. A selection across two verses or
+  // paragraphs stores the bare block key (SelectionToolbar: no :start-end
+  // when snap.end <= snap.start), and stripping its last segment gave the
+  // chapter key, so the chapter button lit up for a verse bookmark and a tap
+  // opened that verse's popover. Only a :start-end range is stripped.
+  it('a bare verse or paragraph bookmark does not match its chapter, letter or entry key', () => {
+    BookmarkStore.add({ id: 'b_verse', hlKey: 'bible:genesis:1:3', label: 'verse 3' });
+    BookmarkStore.add({ id: 'b_para', hlKey: 'letter:the-wide-path:2', label: 'para 2' });
+    BookmarkStore.add({ id: 'b_wtlb', hlKey: 'wtlb:matters-of-the-heart:0', label: 'wtlb para 0' });
+    BookmarkStore.add({ id: 'b_study', hlKey: 'study:romans-3:4', label: 'study para 4' });
+
+    expect(BookmarkStore.getForKey('bible:genesis:1')).toEqual([]);
+    expect(BookmarkStore.getForKey('letter:the-wide-path')).toEqual([]);
+    expect(BookmarkStore.getForKey('wtlb:matters-of-the-heart')).toEqual([]);
+    expect(BookmarkStore.getForKey('study:romans-3')).toEqual([]);
+  });
+
+  it('a chapter bookmark still shows on its chapter key beside a verse bookmark', () => {
+    BookmarkStore.add({ id: 'b_verse', hlKey: 'bible:genesis:1:3', label: 'verse 3' });
+    BookmarkStore.add({ id: 'b_chapter', hlKey: 'bible:genesis:1', label: 'Genesis 1' });
+
+    expect(BookmarkStore.getForKey('bible:genesis:1').map((b) => b.id)).toEqual(['b_chapter']);
   });
 });
 

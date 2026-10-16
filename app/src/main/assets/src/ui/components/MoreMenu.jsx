@@ -21,9 +21,11 @@
    - registers with the modal registry while open, so Escape and Android
      Back close it and never navigate (the W1.5 single-dispatcher contract:
      this component does NOT listen for Escape itself);
-   - closes on an outside press, a resize, a scroll of the page, or an
-     action that leaves the screen (History, Settings); the theme and text
-     size controls keep it open so the reader sees each change land;
+   - closes on an outside press, the reader scrolling the page (a wheel or
+     a touch drag; never the app's own scrollTop writes, such as read-along's
+     follow glide or a text-size reflow), or an action that leaves the screen
+     (History, Settings); a resize re-anchors it; the theme and text size
+     controls keep it open so the reader sees each change land;
    - ArrowUp / ArrowDown / Home / End move between items; focus goes to the
      first item on open and back to ⋯ when the menu is dismissed.
 
@@ -139,17 +141,26 @@ export function MoreMenuBtn() {
       const r = btnRef.current.getBoundingClientRect();
       setPos({ top: Math.round(r.bottom + 6), right: Math.max(8, Math.round(window.innerWidth - r.right)) });
     };
-    const onScroll = (/** @type {Event} */ e) => {
+    // The READER's scroll closes it, not a 'scroll' event: the app writes .screen-scroll's
+    // scrollTop on its own (read-along's follow glide every frame, a text-size step's
+    // reflow re-seat, the autoscroll), and a 'scroll' listener shut the menu on each of
+    // those (sweep v022). A wheel or a touch drag is the reader; a press already closes
+    // it above. A ctrl+wheel zooms, and the resize re-anchors the menu instead.
+    const onUserScroll = (/** @type {Event} */ e) => {
       if (menuRef.current && e.target instanceof Node && menuRef.current.contains(e.target)) return;
+      if (e.type === 'wheel' && /** @type {WheelEvent} */ (e).ctrlKey) return;
       close(false);
     };
+    const passive = { capture: true, passive: true };
     document.addEventListener('pointerdown', onDown, true);
     window.addEventListener('resize', onResize);
-    document.addEventListener('scroll', onScroll, true);
+    document.addEventListener('wheel', onUserScroll, passive);
+    document.addEventListener('touchmove', onUserScroll, passive);
     return () => {
       document.removeEventListener('pointerdown', onDown, true);
       window.removeEventListener('resize', onResize);
-      document.removeEventListener('scroll', onScroll, true);
+      document.removeEventListener('wheel', onUserScroll, true);
+      document.removeEventListener('touchmove', onUserScroll, true);
     };
   }, [open, close]);
 

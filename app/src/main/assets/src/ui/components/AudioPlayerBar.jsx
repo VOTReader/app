@@ -86,10 +86,16 @@ export function AudioPlayerBar() {
   // A queue of one has nowhere to skip to, but it still deserves a way back to
   // the beginning — a saved recording played on its own used to have no restart
   // control at all. Same glyph, honest promise; next stays hidden.
-  const single = queue.length < 2;
+  // A boot-restored bar is NOT a queue of one: its single track is a placeholder
+  // for a queue rebuilt on the first tap, maybe a whole book. Read as one, it hid
+  // Next and called prev Restart, so chapter 5 could not skip to chapter 6 (sweep
+  // v021). The desk's rule since 2026-08-10, which the bar now shares.
+  const restoring = !!st.restoring;
+  const single = !restoring && queue.length < 2;
   // Place in the QUEUE, not in the book: "3 of 12" beside the source line.
-  // Derived, never stored — and silent at 1 of 1, which is noise, not news.
-  const place = single ? null : '· ' + (st.qi + 1) + ' of ' + queue.length;
+  // Derived, never stored — and silent at 1 of 1, which is noise, not news, and
+  // while restoring, when the queue's length is not known yet.
+  const place = single || restoring ? null : '· ' + (st.qi + 1) + ' of ' + queue.length;
 
   // Songs of the Letters (L3, picture final-08): the SAME bar, 70 px, pull-tab kept, in its song skin — cover,
   // title, version, a filled play/pause, next and close; progress is a 3 px line along the top edge (seeking

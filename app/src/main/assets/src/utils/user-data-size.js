@@ -189,26 +189,42 @@ function _sampleDayKey(ts) {
 }
 
 /**
+ * Read the stored series, keeping "the read FAILED" apart from "nothing is
+ * stored yet": null on a rejected read, an array (possibly empty) otherwise.
+ * recordUserDataSample needs the difference — writing back after a failed
+ * read would replace up to MAX_SAMPLES days of history with one point
+ * (sweep v089).
+ *
+ * @returns {Promise<Array<{ d: string, b: number }> | null>}
+ */
+async function _readSamples() {
+  var raw;
+  try {
+    raw = await IDBAdapter.get('meta', SAMPLES_KEY);
+  } catch (_e) {
+    return null;
+  }
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(function (s) {
+    return s && typeof s.d === 'string' && typeof s.b === 'number' && isFinite(s.b);
+  });
+}
+
+/**
  * The recorded series, oldest first. Always an array — IDBAdapter REJECTS
  * on failure (unlike CachedStore, which absorbs it), so this swallows.
  *
  * @returns {Promise<Array<{ d: string, b: number }>>}
  */
 export async function getUserDataSamples() {
-  try {
-    var raw = await IDBAdapter.get('meta', SAMPLES_KEY);
-    if (!Array.isArray(raw)) return [];
-    return raw.filter(function (s) {
-      return s && typeof s.d === 'string' && typeof s.b === 'number' && isFinite(s.b);
-    });
-  } catch (_e) {
-    return [];
-  }
+  return (await _readSamples()) || [];
 }
 
 /**
  * Record today's total. Overwrites today's point if one exists, so opening
  * Settings twice in a day keeps one (current) sample rather than two.
+ * If the stored series can't be read, nothing is written (the history is
+ * unknown, not empty) and today's point alone comes back for display.
  *
  * @param {number} totalBytes
  * @returns {Promise<Array<{ d: string, b: number }>>} the updated series
@@ -216,8 +232,9 @@ export async function getUserDataSamples() {
 export async function recordUserDataSample(totalBytes) {
   var bytes = Math.max(0, Math.round(Number(totalBytes) || 0));
   if (!isFinite(bytes)) return [];
-  var series = await getUserDataSamples();
   var today = _sampleDayKey(Date.now());
+  var series = await _readSamples();
+  if (series === null) return [{ d: today, b: bytes }];
   var last = series.length ? series[series.length - 1] : null;
   if (last && last.d === today) last.b = bytes;
   else series.push({ d: today, b: bytes });

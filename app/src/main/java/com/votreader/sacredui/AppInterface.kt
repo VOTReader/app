@@ -52,6 +52,14 @@ class AppInterface(
     private val audioLifecycleLock = Any()
     private var audioCaptureAllowed = true
 
+    // True from the start that switched the device to MODE_IN_COMMUNICATION
+    // until the end that restores it (under audioLifecycleLock). The audio mode
+    // is device-global, so only a live session of ours may write it back: JS
+    // ends the session more than once per memo (stop, then cleanup() on every
+    // exit, recording or not), and the mode alone is no sign of our session,
+    // since another app's VoIP call holds MODE_IN_COMMUNICATION too (sweep v120).
+    private var audioSessionLive = false
+
     // (U19) Cache the Vibrator lookup — haptic() can fire on many taps and
     // getSystemService on every call is wasteful. The service is process-stable
     // + thread-safe, so a lazy singleton is safe from the binder thread where
@@ -244,6 +252,7 @@ class AppInterface(
         }
         try {
             am.mode = AudioManager.MODE_IN_COMMUNICATION
+            audioSessionLive = true
         } catch (e: Exception) {
             Timber.w(e, "startAudioSession setMode failed")
         }
@@ -278,7 +287,8 @@ class AppInterface(
 
     // Called by the JS recorder when recording stops (entering preview) and
     // again from cleanup(). Restores the prior audio mode so preview/saved
-    // playback routes to the speaker normally, not the earpiece. Idempotent.
+    // playback routes to the speaker normally, not the earpiece. Idempotent:
+    // only the first end after a start writes the mode (audioSessionLive).
     @JavascriptInterface
     fun endAudioSession() {
         synchronized(audioLifecycleLock) { endAudioSessionNow() }
@@ -291,6 +301,8 @@ class AppInterface(
             try { am.abandonAudioFocusRequest(it) } catch (e: Exception) { Timber.w(e, "abandonAudioFocus failed") }
         }
         vm.audioFocusRequest = null
+        if (!audioSessionLive) return
+        audioSessionLive = false
         try {
             am.mode = vm.previousAudioMode
         } catch (e: Exception) {
@@ -339,9 +351,9 @@ class AppInterface(
             vm.audioRecorder.cancel()
             // Restore routing only when a session is actually live. A plain app
             // exit with no recording must not write the device-global audio
-            // mode (another app — a call — may own it right now).
-            val am = host.audioSystemService
-            if (vm.audioFocusRequest != null || am?.mode == AudioManager.MODE_IN_COMMUNICATION) {
+            // mode (another app — a call — may own it right now), so the guard
+            // is our own session flag, never the mode itself (sweep v120).
+            if (vm.audioFocusRequest != null || audioSessionLive) {
                 endAudioSessionNow()
             }
         }

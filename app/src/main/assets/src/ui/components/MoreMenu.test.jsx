@@ -142,6 +142,41 @@ describe('MoreMenuBtn — the compact bar', () => {
     expect(s.menu()).toBeNull();
   });
 
+  /* Sweep v022 (2026-10-14): the menu closed on ANY scroll event outside it, the app's own included.
+     Read-along's follow glides .screen-scroll by writing scrollTop each frame, and a text-size step's
+     reflow re-seats it, so with a letter playing the open menu shut on the next sentence and A+ / A-
+     closed it after one step. A scroll the reader makes still closes it: a wheel or a touch drag. */
+  it('a scroll the app makes (read-along follow, a reflow re-seat) leaves it open', () => {
+    const s = setup({ fontScale: '1' });
+    const scroller = document.createElement('div');
+    scroller.className = 'screen-scroll';
+    document.body.appendChild(scroller);
+    try {
+      s.open();
+      act(() => { scroller.scrollTop = 240; fireEvent.scroll(scroller); });    // one frame of the follow glide
+      expect(s.menu(), 'the follow glide does not shut the menu').not.toBeNull();
+      act(() => { fireEvent.click(s.item('Larger text')); });
+      act(() => { fireEvent.scroll(scroller); fireEvent.scroll(document); });  // the reflow's re-seat
+      expect(s.menu(), 'a text-size step keeps it open, as the header promises').not.toBeNull();
+      expect(s.value.onFontScale).toHaveBeenLastCalledWith('1.1');
+    } finally { scroller.remove(); }
+  });
+
+  it('a scroll the reader makes outside it closes it: a wheel or a touch drag; one over the menu does not', () => {
+    const s = setup();
+    s.open();
+    act(() => { fireEvent.wheel(s.menu(), { deltaY: 40 }); });
+    act(() => { fireEvent.touchMove(s.menu()); });
+    expect(s.menu(), 'over the menu itself').not.toBeNull();
+    act(() => { fireEvent.wheel(document.getElementById('outside'), { deltaY: 40, ctrlKey: true }); });
+    expect(s.menu(), 'a ctrl+wheel zooms (the resize re-anchors it); it is no scroll').not.toBeNull();
+    act(() => { fireEvent.wheel(document.getElementById('outside'), { deltaY: 40 }); });
+    expect(s.menu(), 'a wheel on the page').toBeNull();
+    s.open();
+    act(() => { fireEvent.touchMove(document.getElementById('outside')); });
+    expect(s.menu(), 'a touch drag on the page').toBeNull();
+  });
+
   it('Escape and Android Back reach it through the modal registry, and focus returns to ⋯', () => {
     const s = setup();
     expect(globalThis.modalRegistry.isAnyOpen()).toBe(false);

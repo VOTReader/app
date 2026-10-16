@@ -85,8 +85,19 @@ function useKeepFocus(state) {
   return {
     ref,
     onFocus: () => { owned.current = true; },
-    // A blur with nowhere to go is the focused element leaving with its state: still ours to put back.
-    onBlur: (/** @type {any} */ e) => { if (e.relatedTarget) owned.current = false; },
+    // A blur with nowhere to go is either the focused element leaving with its state (still ours to put back) or
+    // the reader tapping page text that cannot take focus (theirs again: sweep v105). Tell them apart after the
+    // commit: the layout effect above runs inside it, so an element that left is put back first, and one still in
+    // the page lets go unless focus is still on this control (the window only lost focus: switching apps).
+    onBlur: (/** @type {any} */ e) => {
+      if (e.relatedTarget) { owned.current = false; return; }
+      const el = e.target;
+      queueMicrotask(() => {
+        if (!el || !el.isConnected) return;
+        const a = document.activeElement;
+        if (!(a && ref.current && ref.current.contains(a))) owned.current = false;
+      });
+    },
   };
 }
 

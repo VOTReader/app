@@ -609,15 +609,15 @@ describe('ProphecyCardsStore.setAll', () => {
   const payload = {
     'matthew-1:0:prophecy': true,
     'matthew-2:3:fulfillment': true,
-    'matthew-5:1:fulfillment': false,  // falsy entries are filtered on setAll
+    'matthew-5:1:fulfillment': false,  // collapsed by hand: kept (absent would reopen it)
   };
 
-  it('replaces the full map with a valid payload (filtering falsy)', () => {
+  it('replaces the full map with a valid payload (a collapsed card kept as false)', () => {
     ProphecyCardsStore.setAll(payload);
     expect(ProphecyCardsStore.getOne('matthew-1:0:prophecy')).toBe(true);
     expect(ProphecyCardsStore.getOne('matthew-2:3:fulfillment')).toBe(true);
-    // Falsy entry filtered out — getOne returns false (the default).
     expect(ProphecyCardsStore.getOne('matthew-5:1:fulfillment')).toBe(false);
+    expect(ProphecyCardsStore.getAll()).toEqual(payload);
   });
 
   it('resets to empty map on null', () => {

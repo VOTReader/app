@@ -60,6 +60,18 @@ describe('search: short words and apostrophes', () => {
     expect(refs(await VotSearchMini.search('don’t look back'))[0]).toBe('Volume One · Letter 2');
   });
 
+  /* sr11 t216: typed without the apostrophe, the typo corrector read "cant" as "chant", "wasnt" as
+     "want" and "shouldnt" as "should", and the meaning model was asked the same. The word a text's
+     own contraction leaves ("don't" -> don) is still its reading. */
+  it('a negative contraction typed without its apostrophe is no typo: never read as another word', async () => {
+    const bare = ['cant', 'wasnt', 'shouldnt', 'arent', 'aint', 'dont'];
+    const seen = [];
+    for (const q of ['they cant see', 'it wasnt him', 'they shouldnt go', 'they arent here', 'i aint afraid', 'dont look back']) {
+      for (const c of (await VotSearchMini.search(q)).corrections) if (bare.includes(c.from)) seen.push(`${c.from}->${c.to}`);
+    }
+    expect(seen.filter((s) => { const [from, to] = s.split('->'); return to !== from.slice(0, -1); })).toEqual([]);
+  });
+
   it('a number is never "corrected" to another number', async () => {
     const r = await VotSearchMini.search('316');
     expect(r.corrections).toEqual([]);

@@ -45,6 +45,21 @@ export function _fmtWords(n) {
   return v.toLocaleString('en-US');
 }
 
+/**
+ * The indefinite article a whole number takes when read aloud: "an" for the
+ * ones spoken from "eight", "eleven" or "eighteen" (8, 11, 18, 80-89, 800-899,
+ * 8,000, 11,000, 18,000 ...), else "a". The spoken number starts with its
+ * leading thousands group, so that group alone decides (sweep v054: the summary
+ * read "a 8-day reading streak").
+ * @param {number} n
+ * @returns {'a' | 'an'}
+ */
+export function _articleFor(n) {
+  const digits = String(Math.max(0, Math.floor(n || 0)));
+  const lead = digits.slice(0, digits.length % 3 || 3);
+  return lead.charAt(0) === '8' || lead === '11' || lead === '18' ? 'an' : 'a';
+}
+
 /** "3h 24m" / "48 min" — lifetime reading-time display. @param {number} ms */
 function _fmtDuration(ms) {
   const min = Math.round(Math.max(0, ms || 0) / 60000);
@@ -265,7 +280,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
   const summary = (() => {
     const bits = [];
     if (totalRead > 0) bits.push(plural(totalRead, 'chapter or letter read', 'chapters and letters read'));
-    if (readStreak >= 2) bits.push('a ' + readStreak + '-day reading streak');
+    if (readStreak >= 2) bits.push(_articleFor(readStreak) + ' ' + readStreak + '-day reading streak');
     if (journalCount > 0) bits.push(plural(journalCount, 'journal entry', 'journal entries'));
     if (bits.length === 0) return 'Nothing read yet. The chapters and letters you read are counted here.';
     const s = bits.length === 1 ? bits[0] : bits.slice(0, -1).join(', ') + ' and ' + bits[bits.length - 1];

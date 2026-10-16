@@ -639,7 +639,7 @@ describe('Clear All Personal Data', () => {
   it('a user-data database that will not delete fails visibly and lifts the fence', async () => {
     globalThis.indexedDB.deleteDatabase.mockImplementation((name) => {
       const req = {};
-      queueMicrotask(() => (name === 'votreader' ? req.onblocked() : req.onsuccess()));
+      queueMicrotask(() => (name === 'votreader' ? req.onerror() : req.onsuccess()));
       return req;
     });
     await createBackupFlow(ctx).clearAllPersonalData();
@@ -660,6 +660,144 @@ describe('Clear All Personal Data', () => {
     await createBackupFlow(ctx).clearAllPersonalData();
     expect(warn).toHaveBeenCalledWith('settings', 'Clear All: failed to delete vot-thumbs');
     expect(lastToast()).toBe('All personal data cleared. Reloading…');
+  });
+});
+
+/* sweep v033: 'blocked', or no answer within 3 s, does not cancel an IndexedDB delete. The
+   request stays queued and deletes the database once the other connection closes, or once a
+   slow delete of a large library on a budget phone finishes. Treating it as failed lifted the
+   fence while the database was still going, and left the reader's vot-* keys behind it. */
+describe('sweep v033: a user-data delete that is blocked or slow is still running, not failed', () => {
+  /** deleteDatabase whose request for each name in `plan` is driven by plan[name](req); the rest succeed at once. */
+  const planDeletes = (plan) => globalThis.indexedDB.deleteDatabase.mockImplementation((name) => {
+    const req = {};
+    queueMicrotask(() => (plan[name] ? plan[name](req) : req.onsuccess && req.onsuccess()));
+    return req;
+  });
+
+  it('a slow delete (past 3 s on a budget phone) is waited for, and the wipe finishes', async () => {
+    localStorage.setItem('vot-state', '{}');
+    planDeletes({ 'vot-journal-media': (req) => setTimeout(() => req.onsuccess(), 5000) });
+    const done = createBackupFlow(ctx).clearAllPersonalData();
+    await vi.advanceTimersByTimeAsync(5000);
+    await done;
+    expect(lastToast()).toBe('All personal data cleared. Reloading…');
+    expect(localStorage.getItem('vot-state')).toBeNull();
+    expect(globalThis.setStoreWriteFence).not.toHaveBeenCalledWith(false);
+  });
+
+  it('a blocked delete goes through once the other tab lets go, and the reader is told what it waits on', async () => {
+    planDeletes({ votreader: (req) => { req.onblocked(); setTimeout(() => req.onsuccess(), 2000); } });
+    const done = createBackupFlow(ctx).clearAllPersonalData();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(lastToast()).toMatch(/other tab/i);
+    await vi.advanceTimersByTimeAsync(2000);
+    await done;
+    expect(lastToast()).toBe('All personal data cleared. Reloading…');
+    expect(globalThis.setStoreWriteFence).not.toHaveBeenCalledWith(false);
+  });
+
+  it('a library delete still running at the deadline keeps every writer frozen and reloads; it never says "unchanged"', async () => {
+    const said = [];
+    put('announceLibraryChange', (kind) => said.push(kind));
+    localStorage.setItem('vot-state', '{}');
+    planDeletes({ votreader: (req) => req.onblocked() });   // the other connection never lets go
+    const done = createBackupFlow(ctx).clearAllPersonalData();
+    await vi.advanceTimersByTimeAsync(30000);
+    await done;
+    expect(lastToast()).toBe('Clear did not finish. Reloading… then please try again.');
+    expect(globalThis.setStoreWriteFence).not.toHaveBeenCalledWith(false);
+    expect(globalThis.__freezePersistState).not.toHaveBeenCalledWith(false);
+    expect(ctx.reloadPendingRef.current).toBe(true);
+    expect(said).toEqual(['changing', 'changed']);
+    // Not a finished wipe: the next boot judges what it finds, so no Clear All token, keys kept.
+    expect(localStorage.getItem('vot-health-skip')).toBeNull();
+    expect(localStorage.getItem('vot-state')).toBe('{}');
+    vi.advanceTimersByTime(2500);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('the same when only the journal media delete is still running', async () => {
+    const said = [];
+    put('announceLibraryChange', (kind) => said.push(kind));
+    planDeletes({ 'vot-journal-media': () => {} });          // a very large media database, still going
+    const done = createBackupFlow(ctx).clearAllPersonalData();
+    await vi.advanceTimersByTimeAsync(30000);
+    await done;
+    expect(globalThis.setStoreWriteFence).not.toHaveBeenCalledWith(false);
+    expect(ctx.reloadPendingRef.current).toBe(true);
+    expect(said).toEqual(['changing', 'changed']);
+  });
+
+  it('a cache that is blocked never holds the wipe up', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    planDeletes({ 'vot-thumbs': (req) => req.onblocked() });
+    await createBackupFlow(ctx).clearAllPersonalData();
+    expect(lastToast()).toBe('All personal data cleared. Reloading…');
+  });
+});
+
+/* sweep v034: Clear All deleted the automatic snapshots and the weekly copies in Downloads
+   BEFORE the database deletes, which can still fail, and both calls marked DataSafety cleared
+   for the rest of the session. So a failed Clear All left the library on the device with every
+   safety copy of it gone, and no new one taken until a reload. */
+describe('sweep v034: the safety copies go only once the library has', () => {
+  let order;
+  let ds;
+  beforeEach(() => {
+    order = [];
+    ds = {
+      beginClear: vi.fn(() => { order.push('beginClear'); }),
+      abortClear: vi.fn(() => { order.push('abortClear'); }),
+      clearSnapshots: vi.fn(async () => { order.push('clearSnapshots'); return true; }),
+      clearWeeklyCopies: vi.fn(() => { order.push('clearWeeklyCopies'); return true; }),
+    };
+    put('DataSafety', ds);
+  });
+  /** deleteDatabase answering answer(name) ('onsuccess' | 'onerror', or null for no answer at all). */
+  const deletes = (answer) => globalThis.indexedDB.deleteDatabase.mockImplementation((name) => {
+    order.push('delete ' + name);
+    const req = {};
+    queueMicrotask(() => { const a = answer(name); if (a) req[a](); });
+    return req;
+  });
+
+  it('Clear All is marked before the first delete; the copies go after both user-data databases did', async () => {
+    deletes(() => 'onsuccess');
+    await createBackupFlow(ctx).clearAllPersonalData();
+    expect(order).toEqual(['beginClear',
+      'delete votreader', 'delete vot-journal-media', 'delete vot-thumbs', 'delete vot-search-cache', 'delete vot-minisearch-cache',
+      'clearSnapshots', 'clearWeeklyCopies']);
+    expect(lastToast()).toBe('All personal data cleared. Reloading…');
+  });
+
+  it('a library that will not delete keeps its snapshots and weekly copies, and DataSafety saves again', async () => {
+    deletes((name) => (name === 'votreader' ? 'onerror' : 'onsuccess'));
+    await createBackupFlow(ctx).clearAllPersonalData();
+    expect(lastToast()).toBe('Clear did not finish. Please try again.');
+    expect(ds.clearSnapshots).not.toHaveBeenCalled();
+    expect(ds.clearWeeklyCopies).not.toHaveBeenCalled();
+    expect(ds.abortClear).toHaveBeenCalledTimes(1);
+  });
+
+  it('media that will not delete keeps the copies too; the library went, so DataSafety stays marked', async () => {
+    deletes((name) => (name === 'vot-journal-media' ? 'onerror' : 'onsuccess'));
+    await createBackupFlow(ctx).clearAllPersonalData();
+    expect(lastToast()).toBe('Clear did not finish. Please try again.');
+    expect(ds.clearSnapshots).not.toHaveBeenCalled();
+    expect(ds.clearWeeklyCopies).not.toHaveBeenCalled();
+    expect(ds.abortClear).not.toHaveBeenCalled();
+  });
+
+  it('a delete still running at the deadline keeps the copies, and DataSafety marked until the reload', async () => {
+    deletes((name) => (name === 'votreader' ? null : 'onsuccess'));
+    const done = createBackupFlow(ctx).clearAllPersonalData();
+    await vi.advanceTimersByTimeAsync(30000);
+    await done;
+    expect(ctx.reloadPendingRef.current).toBe(true);
+    expect(ds.clearSnapshots).not.toHaveBeenCalled();
+    expect(ds.clearWeeklyCopies).not.toHaveBeenCalled();
+    expect(ds.abortClear).not.toHaveBeenCalled();
   });
 });
 
@@ -688,7 +826,7 @@ describe('W8: the other open tabs hear about Clear All and Import', () => {
   it('a Clear All whose library delete did not go through: "unchanged" (the other tabs save again)', async () => {
     globalThis.indexedDB.deleteDatabase.mockImplementation((name) => {
       const req = {};
-      queueMicrotask(() => (name === 'votreader' ? req.onblocked() : req.onsuccess()));
+      queueMicrotask(() => (name === 'votreader' ? req.onerror() : req.onsuccess()));
       return req;
     });
     await createBackupFlow(ctx).clearAllPersonalData();
@@ -698,7 +836,7 @@ describe('W8: the other open tabs hear about Clear All and Import', () => {
   it('a Clear All whose library went but whose media did not: "changed"', async () => {
     globalThis.indexedDB.deleteDatabase.mockImplementation((name) => {
       const req = {};
-      queueMicrotask(() => (name === 'vot-journal-media' ? req.onblocked() : req.onsuccess()));
+      queueMicrotask(() => (name === 'vot-journal-media' ? req.onerror() : req.onsuccess()));
       return req;
     });
     await createBackupFlow(ctx).clearAllPersonalData();

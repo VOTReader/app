@@ -134,7 +134,9 @@ function _load() {
       await _estimate();
     } catch (_e) { /* no cache here (a private window): nothing is saved */ }
     _loaded = true;
-    _emit({ type: 'done' });
+    // 'checked', not 'done': the mirror re-reads either way, but a 'done' with nothing downloading told a screen
+    // reader "Download finished" at every boot whose first screen had a download control.
+    _emit({ type: 'checked' });
   })();
   return _loading;
 }

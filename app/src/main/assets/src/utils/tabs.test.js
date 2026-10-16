@@ -8,6 +8,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { describeTab, tabContentKey, tabHasProgressBar, scrollKeyForTab } from './tabs.js';
+import { encodeSongsRoute } from './songs-route.js';
 
 beforeEach(() => {
   /** @type {any} */ (globalThis).READING_SCREENS = new Set(['bible-ch', 'matthew-ch', 'vot-letter', 'bible-study-chapter']);
@@ -40,6 +41,57 @@ describe('tabContentKey', () => {
     expect(a).toBe(b);
     expect(a).not.toBe(c);
   });
+
+  // sweep v38: the key left out what a few screens keep outside the fixed fields
+  // (the search words, the Songs/collection place, the journal entry), so the
+  // Dedupe button folded a "mercy" search tab into a "grace" one and the overview
+  // counted them as duplicates. Only the screen that shows a field keys on it.
+  describe('screens whose content lives outside the fixed fields (sweep v38)', () => {
+    it('search tabs for different words or a different scope stay apart', () => {
+      const grace = tabContentKey({ screen: 'search', searchQuery: 'grace' });
+      expect(grace).not.toBe(tabContentKey({ screen: 'search', searchQuery: 'mercy' }));
+      expect(grace).not.toBe(tabContentKey({ screen: 'search' }));
+      const inMatthew = { kind: 'book', bookId: 'matthew', label: 'Matthew' };
+      expect(tabContentKey({ screen: 'search', searchQuery: 'grace', searchScope: inMatthew })).not.toBe(grace);
+    });
+    it('the same search still folds, surrounding spaces and all', () => {
+      expect(tabContentKey({ screen: 'search', searchQuery: '  grace ' })).toBe(tabContentKey({ screen: 'search', searchQuery: 'grace' }));
+    });
+    it('an empty search keeps the key it always had (its thumbnail stays put)', () => {
+      expect(tabContentKey({ screen: 'search', searchQuery: '' })).toBe('search|||||||');
+      expect(tabContentKey({ screen: 'search', searchQuery: '   ' })).toBe('search|||||||');
+    });
+    it('a field left over from another screen does not split a real duplicate', () => {
+      const plain = tabContentKey({ screen: 'bible-ch', bookId: 'john', chapterNum: 1 });
+      expect(tabContentKey({ screen: 'bible-ch', bookId: 'john', chapterNum: 1, searchQuery: 'grace', audioColKey: 'v2', journalEntryId: 'j1' })).toBe(plain);
+      expect(plain).toBe('bible-ch|john|1|||||');
+    });
+    it('collection tabs on different collections stay apart', () => {
+      expect(tabContentKey({ screen: 'audio-library-collection', audioColKey: 'v2' }))
+        .not.toBe(tabContentKey({ screen: 'audio-library-collection', audioColKey: 'study:matthew' }));
+    });
+    it('Songs tabs on different pages stay apart; the same page folds whatever the path to it', () => {
+      const hub = { k: 'hub' };
+      const songA = tabContentKey({ screen: 'audio-library-songs', audioColKey: encodeSongsRoute([hub, { k: 'song', v: 'fam-a' }]) });
+      const songB = tabContentKey({ screen: 'audio-library-songs', audioColKey: encodeSongsRoute([hub, { k: 'song', v: 'fam-b' }]) });
+      const songAViaList = tabContentKey({ screen: 'audio-library-songs', audioColKey: encodeSongsRoute([hub, { k: 'list', v: 'col:v2' }, { k: 'song', v: 'fam-a' }]) });
+      expect(songA).not.toBe(songB);
+      expect(songA).toBe(songAViaList);
+      const found = tabContentKey({ screen: 'audio-library-songs', audioColKey: encodeSongsRoute([{ k: 'hub', q: 'sabbath' }]) });
+      expect(found).not.toBe(tabContentKey({ screen: 'audio-library-songs', audioColKey: encodeSongsRoute([hub]) }));
+    });
+    it('the bare Songs hub keys as before, however its route is spelled', () => {
+      expect(tabContentKey({ screen: 'audio-library-songs', audioColKey: encodeSongsRoute([{ k: 'hub' }]) })).toBe('audio-library-songs|||||||');
+      expect(tabContentKey({ screen: 'audio-library-songs', audioColKey: null })).toBe('audio-library-songs|||||||');
+    });
+    it('journal tabs on different entries stay apart', () => {
+      expect(tabContentKey({ screen: 'journal-viewer', journalEntryId: 'j1' }))
+        .not.toBe(tabContentKey({ screen: 'journal-viewer', journalEntryId: 'j2' }));
+    });
+    it('never holds a newline (use-thumbnails joins the live keys with one)', () => {
+      expect(tabContentKey({ screen: 'search', searchQuery: 'grace\nmercy' })).not.toMatch(/[\r\n]/);
+    });
+  });
 });
 
 describe('scrollKeyForTab', () => {
@@ -54,6 +106,11 @@ describe('scrollKeyForTab', () => {
     expect(scrollKeyForTab({ screen: 'vot-letter', letterId: 'the-wide-path' })).toBe('letter-the-wide-path');
     expect(scrollKeyForTab({ screen: 'holyday-entry', letterId: 'passover' })).toBe('holyday-passover');
     expect(scrollKeyForTab({ screen: 'blessed-entry', letterId: 'intro' })).toBe('blessed-intro');
+  });
+  it('index screens key per book / study / genre, as useScrollMemory saves them (sweep v119)', () => {
+    expect(scrollKeyForTab({ screen: 'bible-idx', bookId: 'psalms' })).toBe('bible-idx-psalms');
+    expect(scrollKeyForTab({ screen: 'bible-study-index', studyId: 'purity' })).toBe('bible-study-index-purity');
+    expect(scrollKeyForTab({ screen: 'scripture-genre', genreId: 'law' })).toBe('scripture-genre-law');
   });
   it('hm-letter keys by entry; unknown screens fall back to the screen name (or home)', () => {
     expect(scrollKeyForTab({ screen: 'hm-letter', letterId: 'woe' })).toBe('entry-woe');

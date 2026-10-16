@@ -143,6 +143,12 @@ class AudioKeepAliveService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
+            // The start intent ([setActive]`(true)`) is the PLAYING edge: JS raises it only when playback starts or
+            // runs. After a pause the snapshot still says paused (the playing update rides the next intent), and
+            // reading it here detached the card again in the same pass: swipeable, showing Play over playing audio,
+            // and the foreground left to that update's plain startService, a background FGS start on API 31+
+            // (sweep v040). A fresh instance already defaults to true.
+            null -> npPlaying = true
             ACTION_STOP -> { stopEverything(); return START_NOT_STICKY }
             // Notification action buttons land here (a PendingIntent can't call
             // the session callback directly); route into the same sink.
@@ -245,6 +251,12 @@ class AudioKeepAliveService : Service() {
             noisyRegistered = false
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
+        // A PAUSED card was detached (see onStartCommand): it belongs to the notification manager now, and the REMOVE
+        // above leaves it up, a stale Play for a session with no player behind it (sweep v039). Every stop path
+        // (stopService, stopEverything's stopSelf, onTaskRemoved) ends here, so the card goes with the service.
+        try {
+            getSystemService(NotificationManager::class.java)?.cancel(NOTIFICATION_ID)
+        } catch (_: Exception) { /* teardown best-effort */ }
         try { session?.release() } catch (_: Exception) { /* teardown best-effort */ }
         session = null
         super.onDestroy()

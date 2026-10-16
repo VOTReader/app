@@ -318,18 +318,22 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
    * Characters before `node` in the container's text, walking the same
    * SHOW_TEXT order that applyDOMHighlights indexes by.
    *
-   * An ELEMENT is located by its first text node, so `contains` is the test —
-   * a text walker can never equal an element.
+   * The walk stops at the first text node that is `node` itself or comes
+   * after its start in document order (a descendant counts: the DOM reports
+   * it as FOLLOWING too). sweep v49: an element was found by "contains the
+   * walker's node", which a child with no text (a WTLB <br>, an SVG-only link
+   * or note icon) never does, so the boundary before it fell through to the
+   * container's whole length and a highlight ran to the paragraph's end.
    */
   const textPosBefore = React.useCallback((container, node) => {
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
     let charPos = 0;
     while (walker.nextNode()) {
       const cur = walker.currentNode;
-      if (cur === node || (node.nodeType === 1 && node.contains(cur))) return charPos;
+      if (cur === node || (node.compareDocumentPosition(cur) & Node.DOCUMENT_POSITION_FOLLOWING)) return charPos;
       charPos += cur.textContent.length;
     }
-    return charPos;   // no text under `node`: it sits at the end
+    return charPos;   // no text at or after `node`: it sits at the end
   }, []);
 
   /**
@@ -680,7 +684,19 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         if (allHlContainers.length === 0) { setVisible(false); return; }
         // REPEAT THIS PASSAGE (rp1 part 3): the blocks the pane can loop, taken with Listen's target.
         const repeat = listen ? repeatTarget(allHlContainers.map((c) => c.getAttribute('data-hl-key') || '')) : null;
-        setSelInfo({ hlKey: null, start: 0, end: 0, text, copyText: selCopyText, shareText: selShareText, share: selShare, existingHl: null, multiVerse: true, multiContainers: allHlContainers, listen, repeat });
+        // sweep v32: each block's part of the selection, measured NOW, as the
+        // single-block path keeps start/end. A tap on the toolbar can collapse
+        // the live selection before its click runs (onSelectionChange's 150 ms
+        // wait expects that, and Remove takes a second tap on its confirm), and
+        // read again then, every block fell back to 0..its length: Highlight and
+        // Note took the whole first and last verse, Remove every group in them.
+        const multiSpans = allHlContainers.map((c) => ({
+          container: c,
+          key: c.getAttribute('data-hl-key') || '',
+          start: c.contains(range.startContainer) ? computeOffset(c, range.startContainer, range.startOffset) : 0,
+          end: c.contains(range.endContainer) ? computeOffset(c, range.endContainer, range.endOffset) : c.textContent.length,
+        }));
+        setSelInfo({ hlKey: null, start: 0, end: 0, text, copyText: selCopyText, shareText: selShareText, share: selShare, existingHl: null, multiVerse: true, multiContainers: allHlContainers, multiSpans, listen, repeat });
       } else {
         const hlKey = container.dataset.hlKey;
         const start = computeOffset(container, range.startContainer, range.startOffset);
@@ -955,11 +971,9 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     const kind = activeStyle === 'underline' ? 'underline'
       : activeStyle === 'squiggle' ? 'squiggle' : 'highlight';
     if (selInfo.multiVerse) {
-      // Multi-container: all spans share ONE groupId so they act as one annotation
-      const sel = window.getSelection();
-      const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-      const containers = selInfo.multiContainers ||
-        (range ? readingBlocksIn(range) : []);
+      // Multi-container: all spans share ONE groupId so they act as one
+      // annotation. Each block's offsets are the ones measured when the
+      // toolbar rose (selInfo.multiSpans, sweep v32), never the live selection.
       const groupId = hlId();
       // Recolor semantics: only groups whose range EXACTLY matches the new
       // selection in this container are recoloured — partial overlap is
@@ -968,14 +982,12 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       const groupsToRemove = new Set();
       /** @type {{ key: string, start: number, end: number, text: string }[]} */
       const planned = [];
-      containers.forEach(function(container) {
-        var hlKey = container.dataset.hlKey;
+      (selInfo.multiSpans || []).forEach(function(span) {
+        var container = span.container;
+        var hlKey = span.key;
         var containerText = container.textContent;
-        var containerLen = containerText.length;
-        var rawStart = range && container.contains(range.startContainer)
-          ? computeOffset(container, range.startContainer, range.startOffset) : 0;
-        var rawEnd = range && container.contains(range.endContainer)
-          ? computeOffset(container, range.endContainer, range.endOffset) : containerLen;
+        var rawStart = span.start;
+        var rawEnd = span.end;
         AnnotationStore.get(hlKey).forEach(function(h) {
           if (h.start === rawStart && h.end === rawEnd && h.groupId) groupsToRemove.add(h.groupId);
         });
@@ -1031,37 +1043,30 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     window.getSelection().removeAllRanges();
     setVisible(false);
     setTimeout(() => { suppressRef.current = false; }, 300);
-  }, [selInfo, activeStyle, computeOffset]);
+  }, [selInfo, activeStyle]);
 
   // The groupIds whose annotation overlaps the current selection, across every
   // touched container. Shared by removeHighlight (what to delete) and the remove
-  // confirm's note-count (ANN2 disclosure) so the two can't drift.
+  // confirm's note-count (ANN2 disclosure) so the two can't drift. Both read the
+  // offsets measured when the toolbar rose (sweep v32): the confirm is a second
+  // tap, and the live selection may be gone by then.
   const selectionGroups = React.useCallback(() => {
     /** @type {Set<string>} */
     const groups = new Set();
     if (!selInfo) return groups;
-    const sel = window.getSelection();
-    const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-    const containers = selInfo.multiVerse
-      ? (selInfo.multiContainers ||
-          (range ? readingBlocksIn(range) : []))
-      : [document.querySelector('[data-hl-key="' + (selInfo.hlKey || '').replace(/"/g, '\\"') + '"]')].filter(Boolean);
-    containers.forEach(function(container) {
-      if (!container) return;
-      var hlKey = container.dataset.hlKey;
-      var containerLen = container.textContent.length;
-      var start = selInfo.multiVerse
-        ? (range && container.contains(range.startContainer) ? computeOffset(container, range.startContainer, range.startOffset) : 0)
-        : selInfo.start;
-      var end = selInfo.multiVerse
-        ? (range && container.contains(range.endContainer) ? computeOffset(container, range.endContainer, range.endOffset) : containerLen)
-        : selInfo.end;
-      AnnotationStore.get(hlKey).forEach(function(h) {
-        if (h.start < end && h.end > start && h.groupId) groups.add(h.groupId);
+    /** @type {{ key: string, start: number, end: number }[]} */
+    const spans = selInfo.multiVerse
+      ? (selInfo.multiSpans || [])
+      : [document.querySelector('[data-hl-key="' + (selInfo.hlKey || '').replace(/"/g, '\\"') + '"]')]
+          .filter(Boolean)
+          .map((container) => ({ key: container.getAttribute('data-hl-key') || '', start: selInfo.start, end: selInfo.end }));
+    spans.forEach(function(span) {
+      AnnotationStore.get(span.key).forEach(function(h) {
+        if (h.start < span.end && h.end > span.start && h.groupId) groups.add(h.groupId);
       });
     });
     return groups;
-  }, [selInfo, computeOffset]);
+  }, [selInfo]);
 
   const removeHighlight = React.useCallback(() => {
     if (!selInfo) return;
@@ -1117,53 +1122,46 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     const def = (typeof NoteDefaultStore !== 'undefined')
       ? NoteDefaultStore.get() : { style: 'highlight', color: 'blank' };
     const _hasNote = (gid) => typeof NoteStore !== 'undefined' && !!NoteStore.get(gid);
-    const sel = window.getSelection();
-    const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
     let groupId;
     // True when THIS flow creates the annotation group (vs attaching note-ness
     // to an existing mark). The NoteSheet needs it so discarding a never-saved
     // note removes exactly what this flow created — never a pre-existing mark.
     let createdGroup = false;
     if (selInfo.multiVerse) {
-      const containers = selInfo.multiContainers ||
-        (range ? readingBlocksIn(range) : []);
-      // Attach to an OVERLAPPING group that doesn't already have a note (keeps
-      // its existing style/color); otherwise create a new group at the default.
-      let attachTarget = null;
-      containers.forEach(function(container) {
-        if (attachTarget) return;
-        var hlKey = container.dataset.hlKey;
-        var containerLen = container.textContent.length;
-        var start = range && container.contains(range.startContainer)
-          ? computeOffset(container, range.startContainer, range.startOffset) : 0;
-        var end = range && container.contains(range.endContainer)
-          ? computeOffset(container, range.endContainer, range.endOffset) : containerLen;
-        AnnotationStore.get(hlKey).forEach(function(h) {
-          if (attachTarget) return;
-          if (h.start < end && h.end > start && h.groupId && !_hasNote(h.groupId)) {
-            attachTarget = h.groupId;
-          }
-        });
+      // Each block's offsets as measured when the toolbar rose (sweep v32).
+      /** @type {{ container: HTMLElement, key: string, start: number, end: number }[]} */
+      const spans = selInfo.multiSpans || [];
+      // Each block's part snapped to whole words, as the new group's marks.
+      /** @type {{ container: HTMLElement, key: string, text: string, start: number, end: number }[]} */
+      const planned = [];
+      spans.forEach(function(span) {
+        var containerText = span.container.textContent;
+        var snap = snapSelectionRange(span.container, containerText, span.start, span.end);
+        if (snap.start >= snap.end) return;
+        planned.push({ container: span.container, key: span.key, text: containerText, start: snap.start, end: snap.end });
       });
+      // Attach to a group that doesn't already have a note (keeping its style
+      // and colour) only when it COVERS the selection: one group with a mark
+      // over every block's snapped part, the single-block rule below. sweep
+      // v31: merely overlapping, a one-word highlight in the middle verse took
+      // the whole passage's note, and the note's quote and keys were that word.
+      // Otherwise create a new group over the selection at the default.
+      /** @param {string} gid @param {{ key: string, start: number, end: number }} p */
+      const covers = (gid, p) => AnnotationStore.get(p.key).some((h) =>
+        h.groupId === gid && h.start <= p.start && h.end >= p.end);
+      const attachTarget = planned.length === 0 ? null : (AnnotationStore.get(planned[0].key)
+        .map((h) => h.groupId)
+        .find((gid) => !!gid && !_hasNote(gid) && planned.every((p) => covers(gid, p))) || null);
       if (attachTarget) {
         groupId = attachTarget;
       } else {
         groupId = hlId();
         createdGroup = true;
-        containers.forEach(function(container) {
-          var hlKey = container.dataset.hlKey;
-          var containerText = container.textContent;
-          var containerLen = containerText.length;
-          var rawStart = range && container.contains(range.startContainer)
-            ? computeOffset(container, range.startContainer, range.startOffset) : 0;
-          var rawEnd = range && container.contains(range.endContainer)
-            ? computeOffset(container, range.endContainer, range.endOffset) : containerLen;
-          var snap = snapSelectionRange(container, containerText, rawStart, rawEnd);
-          if (snap.start >= snap.end) return;
-          AnnotationStore.add(hlKey, {
+        planned.forEach(function(p) {
+          AnnotationStore.add(p.key, {
             id: hlId(), groupId: groupId, kind: def.style,
-            start: snap.start, end: snap.end, color: def.color,
-            text: hlDisplayText(container, containerText, snap.start, snap.end),
+            start: p.start, end: p.end, color: def.color,
+            text: hlDisplayText(p.container, p.text, p.start, p.end),
             created: Date.now()
           });
         });
@@ -1221,7 +1219,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     window.getSelection().removeAllRanges();
     setVisible(false);
     onNoteRequest && onNoteRequest(groupId, /*startInEditMode=*/true, /*freshGroup=*/createdGroup);
-  }, [selInfo, onNoteRequest, computeOffset]);
+  }, [selInfo, onNoteRequest]);
 
   const handleShare = React.useCallback((/** @type {'app' | 'site'} */ which) => {
     if (!selInfo) return;
@@ -1335,22 +1333,28 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     var snap = (typeof snapSelectionRange === 'function')
       ? snapSelectionRange(container, containerText, selInfo.start || 0, selInfo.end || 0)
       : { start: selInfo.start || 0, end: selInfo.end || 0 };
+    // The snapped words as the reader sees them. containerText is the raw
+    // textContent, which carries footnote bubble digits and icon glyphs
+    // ("Lord1 is my"); hlDisplayText leaves that chrome out and breaks the
+    // line between blocks. The label, the excerpt and the stored `text` all
+    // read from it (sweep v080; W48 for `text`).
+    var shownText = (container && snap.end > snap.start)
+      ? hlDisplayText(container, containerText, snap.start, snap.end)
+      : '';
 
     // Derive label from the highlighted text. Two-strategy approach so the
     // label is reliably the user's actual selection across every selection
     // shape:
     //   1. Container slice with word-boundary snap — preferred when we have
     //      the source container and a valid offset range. Keeps the label
-    //      tidy when the user's drag ends mid-word.
+    //      tidy when the user's drag ends mid-word. A label is one line, so
+    //      a block break reads as a space.
     //   2. Raw selInfo.text fallback — needed for multi-container
     //      selections (start/end are 0 in that branch) and for the rare case
     //      where the container DOM has unmounted between selection and tap.
     //   3. Source-style fallback ("Bookmark in <Title>") only if both
     //      above produced nothing — defensive last resort.
-    var labelText = '';
-    if (container && snap.end > snap.start) {
-      labelText = containerText.slice(snap.start, snap.end).trim();
-    }
+    var labelText = shownText.split('\n').map(function(line) { return line.trim(); }).join(' ').trim();
     if (!labelText && selInfo.text) {
       labelText = selInfo.text.trim();
     }
@@ -1378,19 +1382,14 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
 
     // Excerpt: same two-strategy pattern as labelText so the preview block
     // in the BookmarkCreateSheet always shows the actual highlight.
-    var excerpt = '';
-    if (container && snap.end > snap.start) {
-      excerpt = containerText.slice(snap.start, snap.end);
-    }
+    var excerpt = shownText;
     if (!excerpt && selInfo.text) {
       excerpt = selInfo.text;
     }
     if (excerpt.length > 220) excerpt = excerpt.slice(0, 217) + '...';
     // W48: the words themselves, in the form applyDOMBookmarks re-finds them
     // (as a highlight's `text`), so the icon follows them after an edit.
-    var anchorText = (container && snap.end > snap.start)
-      ? hlDisplayText(container, containerText, snap.start, snap.end)
-      : '';
+    var anchorText = shownText;
 
     // Source label: re-use the same derivation that BookmarksScreen rows do.
     var sourceLabel = (typeof _bookmarkSourceLabel === 'function')

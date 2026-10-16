@@ -25,7 +25,10 @@ export function Safari7DayModal() {
 
   if (!visible) return null;
 
-  var isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform || '');
+  // iPadOS Safari reports navigator.platform 'MacIntel' too (sweep v065); a touch screen is what
+  // tells it apart (a Mac reports 0 touch points), as InstallCard's touchMac does.
+  var isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform || '')
+    && !((navigator.maxTouchPoints || 0) > 1);
 
   return (
     <div className="sh-modal-backdrop">

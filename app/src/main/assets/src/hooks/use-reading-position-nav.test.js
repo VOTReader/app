@@ -111,8 +111,7 @@ describe('useReadingPositionNav — prophecy card state', () => {
 
   it('hydrates from ProphecyCardsStore on init', () => {
     // Pre-populate the store directly (in IDB-mode 'loaded' state,
-    // setOne is a normal write-through; ProphecyCardsStore.setAll
-    // filters falsy so we set only the truthy keys).
+    // setOne is a normal write-through).
     ProphecyCardsStore.setAll({ 'chap-1:0:prophecy': true });
     const { result } = setup();
     expect(result.current.prophecyCardStatesRef.current).toEqual({ 'chap-1:0:prophecy': true });
@@ -124,6 +123,16 @@ describe('useReadingPositionNav — prophecy card state', () => {
     ProphecyCardsStore._cache = /** @type {any} */ ({});
     const { result } = setup();
     expect(result.current.prophecyCardStatesRef.current).toEqual({});
+  });
+
+  it('a card closed by hand is still closed when the reader comes back (setAll used to drop false; ProphecyCard opens a card with nothing saved)', () => {
+    const first = setup();
+    first.result.current.prophecyCardStatesRef.current['chap-1:0:ot'] = false;
+    first.result.current.prophecyCardStatesRef.current['chap-1:0:nt'] = true;
+    act(() => { first.result.current.saveProphecyCardStates(); });
+    expect(ProphecyCardsStore.getAll()).toEqual({ 'chap-1:0:ot': false, 'chap-1:0:nt': true });
+    const again = setup();
+    expect(again.result.current.prophecyCardStatesRef.current).toEqual({ 'chap-1:0:ot': false, 'chap-1:0:nt': true });
   });
 
   it('saveProphecyCardStates writes the ref to ProphecyCardsStore', () => {
@@ -476,6 +485,45 @@ describe('useReadingPositionNav — catch-all position arm', () => {
     commitFn();
     const updater = props.setLastReadChapters.mock.calls[0][0];
     expect(updater({})).toEqual({ 'bible-study-more-than-a-man': 'ch-2' });
+  });
+
+  // sweep v14: BIBLE_STUDIES is lazy. App() rebuilds getStudyById over _studies() each render, and
+  // a cold-boot restore (or a tab switch) onto a study chapter renders before the studies land, so the
+  // first arm finds no study. App re-renders when they load (studiesTick); that render must arm, or the
+  // dot keeps pointing at an older place and the chapter cursor is never written for this visit.
+  describe('a study chapter restored before BIBLE_STUDIES loads (sweep v14)', () => {
+    const lazyGetStudyById = (id) => {
+      const all = /** @type {any} */ (globalThis).BIBLE_STUDIES || [];
+      return all.find((s) => s.id === id) || null;
+    };
+    afterEach(() => { delete (/** @type {any} */ (globalThis)).BIBLE_STUDIES; });
+
+    it('arms the study chapter once the studies land', () => {
+      const props = {
+        ...baseProps(),
+        screen: 'bible-study-chapter', studyId: 'more-than-a-man', studyChapterId: 'ch-2',
+        getStudyById: lazyGetStudyById,
+      };
+      const { rerender } = renderHook((p) => useReadingPositionNav(p), { initialProps: props });
+      expect(props.setActiveReadKey).not.toHaveBeenCalled(); // nothing to arm yet
+      /** @type {any} */ (globalThis).BIBLE_STUDIES = [{ id: 'more-than-a-man', slug: 'more-than-a-man' }];
+      rerender({ ...props }); // App's studiesTick re-render; the place itself is unchanged
+      expect(props.setActiveReadKey).toHaveBeenCalledTimes(1);
+      const [key, commitFn] = props.setActiveReadKey.mock.calls[0];
+      expect(key).toBe('bible-study-more-than-a-man');
+      commitFn();
+      expect(props.setLastReadChapters.mock.calls[0][0]({})).toEqual({ 'bible-study-more-than-a-man': 'ch-2' });
+      rerender({ ...props }); // later renders do not re-arm the dwell
+      expect(props.setActiveReadKey).toHaveBeenCalledTimes(1);
+    });
+
+    it('studies landing while on a Bible chapter do not re-arm it (the dwell timer is left alone)', () => {
+      const props = { ...baseProps(), screen: 'bible-ch', bookId: 'proverbs', chapterNum: 2, getStudyById: lazyGetStudyById };
+      const { rerender } = renderHook((p) => useReadingPositionNav(p), { initialProps: props });
+      /** @type {any} */ (globalThis).BIBLE_STUDIES = [{ id: 'more-than-a-man', slug: 'more-than-a-man' }];
+      rerender({ ...props });
+      expect(props.setActiveReadKey).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('NEVER arms from non-reading screens — a home/journal/settings detour cannot move the dot', () => {

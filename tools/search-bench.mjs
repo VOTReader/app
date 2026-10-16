@@ -34,7 +34,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { docs as buildDocs, blocks as buildBlocks, engine, kjvVerses, unitKey, norm, ASSETS } from './search-bench/corpus.mjs';
-import { heldShare, recurring, reprintShown } from './search-bench/rules.mjs';
+import { heldShare, recurring, reprintShown, nearCopy } from './search-bench/rules.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -130,15 +130,57 @@ const containers = (uk) => {
   for (const x of rare) for (const i of wordUnits.get(x)) if (i !== at) n.set(i, (n.get(i) || 0) + 1);
   return [...n].filter(([i, k]) => k >= 0.8 * rare.length && heldShare(proseWords[at], proseWords[i]) >= 0.8).map(([i]) => proseKeys[i]);
 };
+/** Texts holding the sentence with a word or two changed (rules.mjs NEAR COPY), looked for at its two rarest words. */
+const nearCopies = (sentence) => {
+  const w = norm(sentence).trim().split(' ');
+  const stop = g.VotSearchData.STOP_WORDS_TRIMMED;
+  const rare = [...new Set(w)].filter((x) => wordUnits.has(x)).sort((a, b) => wordUnits.get(a).length - wordUnits.get(b).length).slice(0, 2);
+  const out = new Set();
+  for (const x of rare) for (const i of wordUnits.get(x)) if (!out.has(proseKeys[i]) && nearCopy(w, proseWords[i], stop, x)) out.add(proseKeys[i]);
+  return out;
+};
+/* AN ANSWERS HEADING OVER ONE CITED EXCERPT (sr11, 2026-10-15). A topic labels a passage it reprints with a heading of
+   its own words ("The Religions of Men Are an Abomination to The Lord" heads three passages of "The Truth Absolute" ~
+   Volume 3), and the citation closing the section names the text it comes from. That text is the heading's original
+   (Corbin, DECISIONS 10-14: the original first, the reprint second). The section runs to the next ✦; one text cited. */
+const CITE_LINE = /^~\s*\[From\s*[“"](.+)[”"]\s*~\s*(.+?)\]\s*$/;
+const CITE_COL = { "the lord's rebuke": 'rebuke', 'words to live by: part one': 'wtlb1', 'words to live by: part two': 'wtlb2',
+  "letters to the lord's little flock": 'flock', 'letters from timothy': 'timothy', 'the blessed': 'blessed' };
+/** The text a heading's section reprints and that section's passages (normalized), or null. */
+function sectionOf(c) {
+  const bl = unitBlocks[c.uk] || [];
+  const at = bl.findIndex((b) => b.idx === c.blockIdx);
+  // a heading: a short block of its own
+  if (at < 0 || c.sentence.length > 160 || bl[at].text.trim() !== c.sentence.trim()) return null;
+  const cites = new Set();
+  const parts = [];
+  for (let i = at + 1; i < bl.length && bl[i].text.trim() !== '✦'; i++) {
+    const m = CITE_LINE.exec(bl[i].text.trim());
+    if (m) cites.add(norm(m[1]) + '|' + m[2].trim().toLowerCase().replace(/[’‘]/g, "'"));
+    else parts.push(bl[i].text);
+  }
+  if (cites.size !== 1) return null;
+  const [t, vol] = [...cites][0].split('|');
+  const v = /^volume (\d)$/.exec(vol);
+  const col = v ? 'v' + v[1] : CITE_COL[vol];
+  const keys = (titleNorm[t] || []).filter((k) => k.startsWith(col + '/'));
+  return keys.length === 1 ? { key: keys[0], text: norm(parts.join(' ')) } : null;
+}
 const isVerseKey = (k) => /^(bible|matthew-study)\//.test(k);
 const isLetterKey = (k) => /^(v[1-7]|timothy|flock|rebuke)\//.test(k);
 
 /** The target's equivalence class, the tier its original sits in, and whether it has one original at all. */
 function classOf(c) {
   const members = new Set();
+  /** members a heading target names by their own title: opening one is arriving under the heading */
+  const titled = new Set();
+  /** @type {Map<string, string>} the text a heading's section reprints -> the section's passages (sectionOf) */
+  const sectioned = new Map();
+  /** members holding the sentence with a word or two changed: they answer it, and are no original of it */
+  const near = new Set();
   if (c.level === 'verse') {
     for (const k of matthewTwin(c.uk)) members.add(k);
-    return { members, best: 0, recurring: false };
+    return { members, titled, sectioned, near, best: 0, recurring: false };
   }
   if (c.level === 'unit') {
     members.add(c.uk);
@@ -147,6 +189,7 @@ function classOf(c) {
     if (c.style === 'unitgist') for (const k of containers(c.uk)) members.add(k);
   } else {
     for (const k of holders(c.sentence)) members.add(k);
+    for (const k of nearCopies(c.sentence)) if (!members.has(k)) { members.add(k); near.add(k); }
     if (c.level === 'sentence') for (const k of versesQuoted(c.sentence)) for (const t of matthewTwin(k)) members.add(t);
     // An Answers heading that cites a letter ("Excerpt from: Let All in the Earth Be Brought into...") has that letter as its original.
     const cited = /^excerpt from:\s*(.+)$/i.exec(c.sentence.trim());
@@ -154,10 +197,14 @@ function classOf(c) {
     // So does a heading that is a text's own title, with or without a note after it ("Stop Lying to Your Children
     // (Regarding Santa, the Easter Bunny...)" heads the Words To Live By entry the topic reprints under it).
     const head = norm(c.sentence.trim().replace(/\s*\([^()]*\)$/, ''));
-    if (head.trim().split(' ').length >= 3) for (const k of titleNorm[head] || []) if (k !== c.uk) members.add(k);
+    if (head.trim().split(' ').length >= 3) for (const k of titleNorm[head] || []) if (k !== c.uk) { members.add(k); titled.add(k); }
+    // And a heading over one cited excerpt has the text it cites.
+    const sec = c.col === 'answers' ? sectionOf(c) : null;
+    if (sec && sec.key !== c.uk) { members.add(sec.key); sectioned.set(sec.key, sec.text); }
     members.add(c.uk);
   }
-  return { members, best: Math.min(...[...members].map(TIER)), recurring: recurring(members, isVerseKey, isLetterKey) };
+  // The text a heading's section cites answers it as well, but does not outrank the heading: its words are the topic's own.
+  return { members, titled, sectioned, near, best: Math.min(...[...members].filter((k) => !sectioned.has(k) && !near.has(k)).map(TIER)), recurring: recurring(members, isVerseKey, isLetterKey) };
 }
 
 /* FAIR TO ASK? (path to 500, step 3, 2026-10-05). `--audit <out.json>`: for every case, the texts outside its
@@ -230,7 +277,7 @@ function cardTerms(r) {
 }
 
 /** use-search.js excerptAnchor + excerptLanding: does the reader land on the remembered sentence? */
-function lands(hit, terms, c) {
+function lands(hit, terms, c, section = '') {
   const doc = hit.doc;
   if (doc.kind === 'verse') return true;
   const own = terms;
@@ -249,6 +296,8 @@ function lands(hit, terms, c) {
   // A reprint or near copy worded a little differently: the excerpt shares 4 running words with the sentence.
   const w = norm(ex).trim().split(' ');
   for (let i = 0; i + 4 <= w.length; i++) if (norm(c.sentence).includes(' ' + w.slice(i, i + 4).join(' ') + ' ')) return true;
+  // The text a heading's section reprints: the reader lands on a passage the section holds.
+  if (section) for (let i = 0; i + 4 <= w.length; i++) if (section.includes(' ' + w.slice(i, i + 4).join(' ') + ' ')) return true;
   return false;
 }
 
@@ -274,8 +323,9 @@ for (const c of cases) {
     const twin = (a, b) => matthewTwin(a).includes(b);
     if (!cls.members.has(k)) why = 'first hit is not the target (' + (f.hit.doc.ref || k) + ')';
     else if (!cls.recurring && TIER(k) > cls.best) why = 'a reprint leads the original (' + (f.hit.doc.ref || k) + ')';
-    else if (c.level === 'sentence' && !lands(f.hit, cardTerms(r), c)) why = 'lands off the sentence';
-    else if (!cls.recurring && !reprintShown(res.map((h) => ({ key: unitKey(h.doc), card: card(h.doc) })), cls.members, k, twin)) why = 'its reprint is not in the Best Matches';
+    // A heading's own text has no heading line: the heading is its title, on the card and atop the page (sr11, t405).
+    else if (c.level === 'sentence' && !cls.titled.has(k) && !lands(f.hit, cardTerms(r), c, cls.sectioned.get(k))) why = 'lands off the sentence';
+    else if (!cls.recurring && !reprintShown(res.map((h) => ({ key: unitKey(h.doc), card: card(h.doc) })), cls.sectioned.has(k) || cls.near.has(k) ? cls.members : new Set([...cls.members].filter((x) => !cls.sectioned.has(x) && !cls.near.has(x))), k, twin)) why = 'its reprint is not in the Best Matches';
     else { pass = true; strict = matthewTwin(c.uk).includes(k) || k === c.uk; }
   }
   // the rank of the class's next text after the first hit (its reprint, when the original leads)

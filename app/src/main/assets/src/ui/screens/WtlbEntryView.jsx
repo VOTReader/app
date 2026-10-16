@@ -28,13 +28,11 @@ function _prettyBookId(id) {
 
 export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, surpriseAnchor = null }) {
   const [scriptureRef, setScriptureRef] = React.useState(null);
-  const [scriptureText, setScriptureText] = React.useState(null);
   // "Go to Scripture" on the inline ref sheet — close the sheet, then route
   // the resolved {type:'bible'} endpoint through navigateToLink (verse flash
   // highlight + "Back to …" pill + Android back via the from-letter stack).
   const goToScriptureRef = onNavigateToLink ? (endpoint) => {
     setScriptureRef(null);
-    setScriptureText(null);
     onNavigateToLink(endpoint, { sourceLetterTitle: entry.title, sourceVolumeLabel: partLabel || null });
   } : null;
   const [highlightedFn, setHighlightedFn] = React.useState(null);
@@ -136,6 +134,11 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     // index; lookupVersesFromBooks returns null if it isn't loaded yet).
     return perEntry[ref] || dict[ref] || lookupVersesFromBooks(ref) || null;
   };
+  // The open sheet's verse, looked up on every render like the footnote list's
+  // (sweep v73). Stored at tap time it froze a pre-corpus null: a cite tapped
+  // before the lazy Bible corpus landed kept "Verse text not available" after
+  // it loaded and App re-rendered the entry.
+  const scriptureText = scriptureRef ? lookupVerse(scriptureRef) : null;
 
   React.useEffect(() => {
     if (scriptureRef === null) return;
@@ -165,7 +168,6 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
 
   const openSheetForRef = (ref) => {
     setScriptureRef(ref);
-    setScriptureText(lookupVerse(ref));
   };
 
   const handleBubbleClick = (ref, _n) => {
@@ -183,7 +185,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   const railMode = useRailMode();   // companion rail — inline scripture sheet docks too
   const scripTrapRef = useFocusTrap(!!scriptureRef, { modal: !railMode });  // dialog semantics — see LetterView
 
-  React.useEffect(() => { setScriptureRef(null); setScriptureText(null); setHighlightedFn(null); }, [entry.id]);
+  React.useEffect(() => { setScriptureRef(null); setHighlightedFn(null); }, [entry.id]);
 
   React.useEffect(() => {
     const root = wtlbMainRef.current;

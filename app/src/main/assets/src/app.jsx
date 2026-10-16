@@ -202,7 +202,7 @@ function App() {
   const [journalEntryId, setJournalEntryId] = tabField('journalEntryId');
   const {
     setFromLetterStack, pushFromLetter,
-    tapThroughBack, fromLetterRef, backHint, backActive,
+    tapThroughBack, fromLetterRef, backHint, backActive, retargetTop,
   } = useFromLetterStack({
     tabField,
     screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId,
@@ -313,10 +313,10 @@ function App() {
   /* useScrollMemory — per-tab/per-screen scroll position capture +
      restore (P6e). The journal viewer/editor scroll keys are PER-ENTRY —
      one shared key made every entry restore the previous entry's offset —
-     so journalEntryId (declared up at useFromLetterStack) is threaded in. */
+     so journalEntryId (declared up at useFromLetterStack) is threaded in; genreId keys the genre page (v119). */
   const { flushScrollToActiveTab } = useScrollMemory({
     screen, bookId, chapterNum, letterId, studyId, studyChapterId,
-    journalEntryId,
+    journalEntryId, genreId,
     activeTab, activeTabIdx,
     updateActiveTab,
     surpriseAnchor,
@@ -446,12 +446,12 @@ function App() {
     screen, bookId, chapterNum, letterId, studyId, studyChapterId,
     setScreen, setBookId, setChapterNum, setGenreId,
     setNavOrigin, setFromSearch, setFromWtlb, setFromLetterStack, setFromSurprise,
-    setJournalEntryId, setGardenPage,
+    setFromStudies, setFromMatthewCh, setJournalEntryId, setGardenPage,
   });
   // "Show me around" (review-tutorial): the tour's five navigation verbs, kept current every render.
   useTour({ goHome, goJournalHub, goSettings, setScreen, setLetterId, setBookId, setChapterNum });
-  // The reading pane moves with the audio at each unit boundary (w-audio-continue; live-pane rule in the hook).
-  useAudioFollow({ enabled: settings.audioTurnPage !== false, screen, letterId, bookId, chapterNum, studyId, studyChapterId, setLetterId, setBookId, setChapterNum, setScreen, setStudyId, setStudyChapterId });
+  // The reading pane moves with the audio at each unit boundary (w-audio-continue; live-pane rule in the hook), carrying the tap-through back entry along (retargetTop, sweep v041).
+  useAudioFollow({ enabled: settings.audioTurnPage !== false, screen, letterId, bookId, chapterNum, studyId, studyChapterId, setLetterId, setBookId, setChapterNum, setScreen, setStudyId, setStudyChapterId, retargetTop });
 
   /* W1.5(b) — History API sync. Watches the per-active-tab nav-key tuple
      and pushes an empty-state history entry on every change. Required
@@ -490,16 +490,16 @@ function App() {
      (Revelation → V1 → ... → Garden) + within-Bible book prev/next.
      The Revelation → Volume One bridge is the load-bearing intersection
      (Bible side's `next from Rev last` → chain side's `Volume One first`).
-     All deps in scope by here: book/chapter (above), setActiveReadKey
-     (useReadingDwell), setLastReadForVol (useReadingPositionNav),
-     goToGardenFirst (useNav). */
+     The place + tab fields let a jump that waits for the VOT letters drop
+     if the reader moved meanwhile (sweep v013). setActiveReadKey (useReadingDwell),
+     setLastReadForVol (useReadingPositionNav), goToGardenFirst (useNav). */
   const {
     boundaryConfig,
     bcvPrevBook, bcvOnPrevBook, bcvPrevBoundaryTitle,
     bcvNextBook, bcvOnNextBook, bcvNextBoundaryTitle,
   } = useReadingChainNav({
-    book, chapter, bookId,
-    setBookId, setChapterNum, setScreen, setLetterId,
+    book, chapter, bookId, screen, chapterNum, letterId, studyId, studyChapterId, journalEntryId,
+    activeTabIdx, tabCount: tabs.length, setBookId, setChapterNum, setScreen, setLetterId,
     setActiveReadKey, setLastReadForVol, goToGardenFirst,
   });
 
@@ -602,7 +602,7 @@ function App() {
     handleSearchSelect, handleSearchCommand,
   } = useSearch({
     tabField,
-    screen, bookId, chapterNum, letterId,
+    screen, bookId, chapterNum, letterId, studyId, studyChapterId,
     setScreen, setBookId, setChapterNum, setLetterId,
     setStudyId, setStudyChapterId, setSurpriseAnchor, setFromSearch, setFromSurprise,
     setGenreId, // Wave 0 (sticky genreId): useSearch clears it on every result dispatch
@@ -765,7 +765,7 @@ function App() {
       <ErrorBoundary fallback={null} resetKey={screen}><AudioPlayerBar /></ErrorBoundary>
       <AnnotationDomSync
         screen={screen}
-        letterId={letterId}
+        letterId={letterId} studiesLoading={studiesLoading}
         placeKey={[screen, bookId, chapterNum, letterId, studyId, studyChapterId].join('|')}
         noteSheetTarget={noteSheetTarget}
         setNoteSheetTarget={setNoteSheetTarget}

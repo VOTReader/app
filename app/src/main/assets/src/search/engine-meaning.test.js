@@ -28,6 +28,15 @@ const REST = REST_OPEN + 'The walls are high and the towers are many in that cit
 // a letter the typed words find at its opening, whose described passage opens on a sentence that holds none of them
 const HARVEST_OPEN = 'Bring the wheat, bring the sheaves, bring the barn doors near, says the steward. ';
 const HARVEST = HARVEST_OPEN + 'The towers are many in that city. '.repeat(6) + 'The season turns at last. Gather My sheaves before the rain. The year is old.';
+// a letter's heading: every Answers excerpt opens with one, and a letter with a second word in it holds one in its text
+const HEADING = 'From The Lord, Our God and Savior The Word of The Lord Spoken to Timothy For The Lord’s Little Flock, and For All Those Who Have Ears to Hear';
+const OBEY = 'Hear Me, O children: honor your father and your mother in all things that are right. Says The Lord. 3/2/06 ' +
+  HEADING.replace('The Lord, Our God', 'YahuShua HaMashiach, Our Lord') + ' Thus says The Lord: My sons and daughters, walk in My ways and live.';
+// an Answers topic reprinting two letters: the typed words sit thickest in the first's short line, the model matched the second
+const KEEPERS = 'Thus says The Lord: Blessed are those who keep My Sabbath and My Commandments, for they are Mine.';
+const WISDOM = 'For those who love Me obey My Commandments, and those who remember My Sabbaths honor Me and shall know Wisdom.';
+const SABBATH = 'Many have asked about the day of rest. ' + KEEPERS + ' ✦ ' + WISDOM + ' ✦';
+const WATCH = 'Stay awake through the night and guard the door, for the master returns at an hour no one expects. ✦ 1/29/05 ' + HEADING + ' The towers of the proud shall fall.';
 const GLOBALS = {
   BOOKS: {},
   LETTERS_V1: [
@@ -37,17 +46,22 @@ const GLOBALS = {
     { id: 'vineyard', num: 4, title: 'The Vineyard', blocks: [{ segments: [{ v: VINEYARD }] }] },
     { id: 'rest', num: 5, title: 'The Gate', blocks: [{ segments: [{ v: REST }] }] },
     { id: 'harvest', num: 6, title: 'The Steward', blocks: [{ segments: [{ v: HARVEST }] }] },
+    { id: 'obey', num: 7, title: 'Obey God', blocks: [{ segments: [{ v: OBEY }] }] },
+    { id: 'keepers', num: 8, title: 'The Keepers', blocks: [{ segments: [{ v: KEEPERS }] }] },
+    { id: 'wisdom', num: 9, title: 'The Word of Wisdom', blocks: [{ segments: [{ v: 'The fields lie still under the evening sky. '.repeat(12) + WISDOM }] }] },
   ],
   ANSWERS: [
     { id: 'fields', num: 1, title: 'Regarding Fields', paragraphs: [{ text: TOPIC_OPEN + VINEYARD }] },
     { id: 'lamps', num: 2, title: 'Regarding Lamps', paragraphs: [{ text: 'Many have asked about lamps and oil and the hour of the night watch.' }] },
+    { id: 'watch', num: 3, title: 'Regarding the Night Watch', paragraphs: [{ text: WATCH }] },
+    { id: 'sabbath', num: 4, title: 'Regarding the Day of Rest', paragraphs: [{ text: SABBATH }] },
   ],
 };
 const STARTS = { garment: 0, creator: CREATOR.indexOf('Remember'), silver: 0, fields: TOPIC_OPEN.length, gate: 0, peace: REST.indexOf('Lay down'),
-  steward: 0, season: HARVEST.indexOf('The season'), lamps: 0 };
-const KEYS = ['v1/garment', 'v1/creator', 'v1/silver', 'answers/fields', 'v1/rest', 'v1/harvest', 'answers/lamps'];
+  steward: 0, season: HARVEST.indexOf('The season'), lamps: 0, obey: 0, watch: 0, keepers: 0, wisdom: 0, sabbath: SABBATH.indexOf(WISDOM) };
+const KEYS = ['v1/garment', 'v1/creator', 'v1/silver', 'answers/fields', 'v1/rest', 'v1/harvest', 'answers/lamps', 'v1/obey', 'answers/watch', 'v1/keepers', 'v1/wisdom', 'answers/sabbath'];
 /** Each passage: its document (index in KEYS), where it starts, and the name a test calls it by. */
-const UNITS = [[0, 'garment'], [1, 'creator'], [2, 'silver'], [3, 'fields'], [4, 'gate'], [4, 'peace'], [5, 'steward'], [5, 'season'], [6, 'lamps']];
+const UNITS = [[0, 'garment'], [1, 'creator'], [2, 'silver'], [3, 'fields'], [4, 'gate'], [4, 'peace'], [5, 'steward'], [5, 'season'], [6, 'lamps'], [7, 'obey'], [8, 'watch'], [9, 'keepers'], [10, 'wisdom'], [11, 'sabbath']];
 /** What the stand-in model says the query means: the unit (by name) it is nearest, or how near it is to several ({name: weight}). */
 /** @type {{near: string|Record<string, number>}} */
 const said = { near: 'creator' };
@@ -124,10 +138,66 @@ describe('meaning first', () => {
     expect(r.placeStart).toBe(STARTS.creator);
   });
 
+  /* THE MODEL CAN ARRIVE AFTER THE FIRST SEARCH (sr11 S22 look, 2026-10-15). The model starts once the page is idle,
+     so a search typed in a session's first seconds runs on the words alone; the screen kept that list until the query
+     changed ('stay alert because nobody knows when the lord will come back' led with an unrelated letter on the S22,
+     the engine asked again led with "Keep Watch"). Such a search says the meaning comes later, and the screen can
+     wait for the model without starting it. */
+  it('a text search run before the model is ready says the meaning comes later; the wait for it starts nothing', async () => {
+    resetSemantic();
+    standInModel();
+    said.near = 'creator';
+    const q = 'honour the one who made you while still a child';
+    const before = await VotSearchMini.search(q);
+    expect(before.meaningLater).toBe(true);
+    expect(before.results[0].doc.letterId).not.toBe('creator');
+    let ready = false;
+    const wait = VotSearchMini.whenMeaningReady().then((ok) => { ready = ok; });
+    await new Promise((res) => setTimeout(res, 0));
+    expect(ready).toBe(false);
+    expect(VotSearchMini.meaningStatus().status).toBe('off');
+    expect(await startSemantic()).toBe(true);
+    await wait;
+    expect(ready).toBe(true);
+    const after = await VotSearchMini.search(q);
+    expect(after.meaningLater).toBe(false);
+    expect(after.results[0].doc.letterId).toBe('creator');
+    // a quote the words find by themselves never waits on the model
+    resetSemantic();
+    expect((await VotSearchMini.search('"made you"')).meaningLater).toBe(false);
+  });
+
   it('a reprint the meaning found gives its place to the original its matched passage copies', async () => {
     said.near = 'fields';
     const r = await first('a farmer whose crop went sour and so he gave up on his land');
     expect(r.doc.letterId).toBe('vineyard');
+  });
+
+  /* A LETTER'S HEADING IS NO ONE'S WORDS (sr11, 2026-10-15). The passage the model matched in an Answers topic ran on
+     into the next excerpt's heading, and a letter holding a heading in its text (Volume Four's "Obey God") took the
+     topic's place as its "original": it led searches about other things (benchmark t320, t401). */
+  it("a reprint's passage that runs into the next excerpt's heading names no letter by that heading", async () => {
+    said.near = 'watch';
+    const r = await first('stay awake on guard before dawn');
+    expect(r.doc.title).toBe('Regarding the Night Watch');
+  });
+
+  /* THE ORIGINAL OF THE SENTENCE THE MODEL MATCHED (sr11 t324, 2026-10-15). An Answers topic the model found was
+     read for its original at the words' excerpt: the shortest stretch thickest with typed words. That was a line of
+     another letter the topic also quotes ("who keep My Commandments and remember My Sabbath"), and that letter led,
+     while the sentence the model matched holds more of the query and names the letter the reader meant. */
+  it("a reprint the model found is read for its original where it matched, when that sentence holds more of the query", async () => {
+    said.near = 'sabbath';
+    const r = await first('those who keep the sabbath and obey the commandments will know wisdom');
+    expect(r.doc.letterId).toBe('wisdom');
+  });
+
+  /* An Answers topic gives its place to a study or letter just below that holds the query as well; one holding none
+     of it is no measure: any text below "held as much" (sr11, 2026-10-15). */
+  it('an Answers topic the model found holding no typed word keeps its place over the text below it', async () => {
+    said.near = 'watch';
+    const r = await first('a sentry who never dozes off before dawn');
+    expect(r.doc.title).toBe('Regarding the Night Watch');
   });
 
   it('a text the words found opens on the passage the query describes, when the model clearly prefers it', async () => {

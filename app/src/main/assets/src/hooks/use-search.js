@@ -99,6 +99,11 @@
        chapterNum, letterId   context-snapshot logic AND by
                               goSearchOrigin's snapshot-restore
                               comparison.
+     studyId, studyChapterId  The open Bible Study + chapter. Captured
+                              into searchOrigin with the rest of the
+                              position: a bible-study hit overwrites
+                              them, so Back from Search must put them
+                              back (sweep v060).
      setScreen, setBookId,    Nav setters. Used by goSearch (sets to
        setChapterNum,         'search'), goSearchOrigin (restores
        setLetterId,           captured position), handleSearchSelect
@@ -150,7 +155,10 @@
 
    READS FROM GLOBAL SCOPE (cross-bundle):
      BOOKS                      For goSearch's context computation
-                                (book title lookup).
+                                (book title lookup). Lazy (bundle-a-bible):
+                                read only through scopeBookTitle's guard.
+     SCRIPTURE_GENRES           index.html boot constant: the book title
+                                while BOOKS has not loaded.
      COL_BY_LETTER_SC           For goSearch's volume-context lookup
                                 from the current screen.
      COL_BY_INDEX_SC            [9] same lookup for volume INDEX screens
@@ -166,6 +174,27 @@
 
 import { useRefMirror } from './use-ref-mirror.js';
 import { COL_BY_INDEX_SC, COL_BY_LETTER_SC, COL_BY_SEARCH_ID, colLetterArr, colPreface } from '../data/scripture-resolution.js';
+
+/**
+ * The "In {Book}" scope chip's label for a Bible book. BOOKS ships in the lazy
+ * bundle-a-bible, and bible-idx is opened on purpose before it lands (the
+ * "Loading Bible" view, which stays up if the load fails), so a bare BOOKS read
+ * there threw and the '/' or Ctrl+F shortcut never opened Search (sweep v012).
+ * Until the corpus lands, the title comes from index.html's SCRIPTURE_GENRES.
+ * @param {string} bookId
+ * @returns {string}
+ */
+function scopeBookTitle(bookId) {
+  const bk = typeof BOOKS !== 'undefined' && BOOKS ? BOOKS[bookId] : null;
+  if (bk) return bk.title;
+  if (typeof SCRIPTURE_GENRES !== 'undefined' && SCRIPTURE_GENRES) {
+    for (const g of [...SCRIPTURE_GENRES.ot, ...SCRIPTURE_GENRES.nt]) {
+      const b = g.books.find((x) => x.id === bookId);
+      if (b) return b.title;
+    }
+  }
+  return bookId;
+}
 
 /**
  * Search domain hook. Owns search state (4 tabFields), the
@@ -186,6 +215,8 @@ import { COL_BY_INDEX_SC, COL_BY_LETTER_SC, COL_BY_SEARCH_ID, colLetterArr, colP
  *   bookId: string | null,
  *   chapterNum: number | null,
  *   letterId: string | null,
+ *   studyId: string | null,
+ *   studyChapterId: string | null,
  *   setScreen: (v: any) => void,
  *   setBookId: (v: any) => void,
  *   setChapterNum: (v: any) => void,
@@ -232,7 +263,7 @@ export function studyChapterIdByNum(studyId, num) {
 
 export function useSearch({
   tabField,
-  screen, bookId, chapterNum, letterId,
+  screen, bookId, chapterNum, letterId, studyId, studyChapterId,
   setScreen, setBookId, setChapterNum, setLetterId,
   setStudyId, setStudyChapterId, setSurpriseAnchor, setFromSearch, setFromSurprise, setGenreId,
   setActiveReadKey, setLastReadForVol,
@@ -253,7 +284,10 @@ export function useSearch({
   // Opens the search screen with a computed context snapshot. Takes the
   // navHandoff 'pendingSearchQuery' one-shot to pre-fill from SelectionToolbar.
   const goSearch = () => {
-    setSearchOrigin({ screen, bookId, chapterNum, letterId });
+    // The study fields ride along: a bible-study hit overwrites them, and Back
+    // to a 'bible-study-chapter' origin would otherwise open the hit's study
+    // (sweep v060).
+    setSearchOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });
     // Compute the reading-position context so SearchScreen can offer an
     // optional "In {Book/Volume}" scope chip. null = opened outside a
     // reading screen (home/indexes/settings) → no chip shown.
@@ -265,8 +299,7 @@ export function useSearch({
       // list) is just as clear a "search HERE" context as reading it.
       ctx = { kind: 'book', bookId: 'matthew', label: 'Matthew' };
     } else if ((screen === 'bible-ch' || screen === 'bible-idx') && bookId) {
-      const bk = BOOKS[bookId];
-      ctx = { kind: 'book', bookId, label: bk ? bk.title : bookId };
+      ctx = { kind: 'book', bookId, label: scopeBookTitle(bookId) };
     } else {
       const _scCol = COL_BY_LETTER_SC.get(screen) || COL_BY_INDEX_SC.get(screen);
       // A collection search never indexes offers no scope: kept to it, every search found nothing (sweep W34).
@@ -306,6 +339,9 @@ export function useSearch({
       if (o.bookId !== undefined) setBookId(o.bookId);
       if (o.chapterNum !== undefined) setChapterNum(o.chapterNum);
       if (o.letterId !== undefined) setLetterId(o.letterId);
+      // An origin persisted before v060 has no study keys: leave the study alone.
+      if (o.studyId !== undefined) setStudyId(o.studyId);
+      if (o.studyChapterId !== undefined) setStudyChapterId(o.studyChapterId);
     } else {
       goHome();
     }

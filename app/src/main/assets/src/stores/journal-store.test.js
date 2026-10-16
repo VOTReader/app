@@ -644,6 +644,35 @@ describe('JournalStore: every block has an id (n4-07)', () => {
   });
 });
 
+/* sweep v103: update() minted ids for id-less blocks AFTER _shouldDefer, so under
+   pending/degraded hydration the overlay pass and the replay pass each minted their
+   own. The reader saw (and marked, journal:<entry>:<blockId>) the overlay's id; the
+   replay wrote a different one to disk and the mark pointed at no block. add()
+   already builds its ids before deferring (its IDENTITY CONTRACT); update() must too. */
+describe('JournalStore.update(): a new block keeps one id across the pending overlay and the replay (v103)', () => {
+  it('the block id the reader sees while loading is the id that is stored', () => {
+    JournalStore._resetForTests();            // idb-backed, no forceLoaded → 'pending'
+    expect(JournalStore.getState()).toBe('pending');
+    // Every mint differs: the overlay pass and the replay pass can never collide by chance.
+    let n = 0;
+    const rnd = vi.spyOn(Math, 'random').mockImplementation(() => ((++n * 7919) % 100000) / 100000);
+    try {
+      const e = JournalStore.add({ title: 't', blocks: [] });
+      // The hub's recovered voice memo: a block that arrives with no id.
+      JournalStore.update(e.id, { blocks: [{ type: 'audio', mediaId: 'm_1', duration: 3, samples: null }] });
+      const seen = JournalStore.get(e.id).blocks[0].id;   // what the viewer renders and marks
+      expect(seen).toMatch(/^b_/);
+
+      JournalStore._rebaseAndPromote({ list: [] });      // hydration completes; the queue replays
+      expect(JournalStore.getState()).toBe('loaded');
+      expect(JournalStore.get(e.id).blocks[0].id).toBe(seen);
+      expect(JournalStore.get(e.id).blocks[0].mediaId).toBe('m_1');
+    } finally {
+      rnd.mockRestore();
+    }
+  });
+});
+
 /* ──────────────────────────────────────────────────────────────
    n4-06 (sweep 2): deleting ONE block takes its marks with it once the editor's
    Undo window has passed, and nothing else: not the entry's other blocks, not a

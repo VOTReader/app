@@ -514,4 +514,11 @@ describe('screen-routes — link-outs never overwrite the captured navOrigin (na
       /** @type {any} */ (window).navHandoff = prev;
     }
   });
+
+  it('notes-index is handed the live navOrigin, so a note tap-through can carry its back pill (sweep v027)', () => {
+    // NotesIndexScreen stamps the pill it stashes with this origin and restores the pill only while
+    // it is still the origin: the pill's tap IS onBack (goNavOrigin).
+    const { routes } = makeRoutes({ navOrigin: READING_ORIGIN });
+    expect(routes['notes-index']().props.navOrigin).toBe(READING_ORIGIN);
+  });
 });

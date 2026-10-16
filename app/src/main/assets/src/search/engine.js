@@ -38,7 +38,7 @@ import {
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
 import { onIdle } from '../utils/on-idle.js';
 import { lemma, bestWindow } from './passage.js';
-import { startSemantic, semanticDocs, semanticStatus, docUnitKey } from './semantic.js';
+import { startSemantic, semanticDocs, semanticStatus, semanticReady, docUnitKey } from './semantic.js';
 import { KJV_ALIAS, KJV_ALIAS_BOOKS } from './kjv-alias.js';
 import { searchWorker } from './worker-client.js';
 import { indexAssembler } from './index-transfer.js';
@@ -123,6 +123,13 @@ export function expandContractions(q) {
     return (NT_BASE[b] || base) + ' not';
   });
 }
+/* A negative contraction typed without its apostrophe ("dont") is no typo (sr11 t216): it
+   may be read as the word a text's own contraction leaves ("don't" -> don + t), never as
+   another word. The corrector read "cant" as "chant", "wasnt" as "want", "shouldnt" as
+   "should", "arent" as "parent", said so ("Showing results for chant"), and the meaning
+   model was asked the same. Read as two words instead it lost a sealed query whose text
+   contracts. "wont" is no such word here: the KJV's ("the ox was wont to gore"). */
+const NT_BARE = /^(ca|do|does|did|is|are|was|were|has|have|had|could|would|should|must|need|sha|ai)nt$/;
 
 /**
  * One unit's BM25 search, the body and the title scored apart and summed per text:
@@ -689,15 +696,23 @@ const addTo = (/** @type {Map<any, string[]>} */ m, /** @type {any} */ k, /** @t
   if (!list) m.set(k, [id]);
   else if (list[list.length - 1] !== id) list.push(id);
 };
+/* A LETTER'S HEADING IS NO ONE'S WORDS (sr11, 2026-10-15). Every Answers excerpt opens with the heading of the letter
+   it comes from ("1/29/05 From The Lord, Our God and Savior The Word of The Lord Spoken to Timothy For The Lord's
+   Little Flock, and For All Those Who Have Ears to Hear"), and a letter with an addendum or a second word holds one in
+   its text (Volume One's "Christmas", Volume Four's "Obey God"). Keyed, that heading's runs named "Obey God" the
+   original of any Answers passage the model matched next to a heading, and it led searches about other things
+   (benchmark t320 "keep watch", t401 "come out of the churches"). A heading is never keyed. */
+const HEADING = /(?:\d{1,2}\/\d{1,2}\/\d{2,4}\s+)?(?:From [^.!?\n]{0,80}?Savior\s+)?[^.!?\n]{0,40}?(?:to|from) Timothy\s+For [^.!?\n]{0,120}?Ears to Hear/gi;
 /** Key one stored doc if it is an original: its sentences and, past a verse, its runs of words. */
 function addOriginal(/** @type {Map<string, string[]>} */ O, /** @type {Map<number, string[]>} */ S, /** @type {Map<string, any>} */ D, /** @type {string} */ id, /** @type {any} */ f) {
   if (!f || !ORIGINAL_KINDS.has(f.kind) || !f.text) return;
   D.set(id, f);
-  for (const sp of sentenceSpans(f.text)) {
+  const text = f.kind !== 'verse' && /ears to hear/i.test(f.text) ? f.text.replace(HEADING, '\n') : f.text;
+  for (const sp of sentenceSpans(text)) {
     const k = sentenceKey(sp.text);
     if (k) addTo(O, k, id);
   }
-  if (f.kind !== 'verse') eachShingle(kjvEncode(f.text), (h) => addTo(S, h, id));
+  if (f.kind !== 'verse') eachShingle(kjvEncode(text), (h) => addTo(S, h, id));
 }
 /** The originals, read in one pass if they are not read yet (node; a search that raced a swap). */
 function originals() {
@@ -978,6 +993,30 @@ function sentenceOriginal(text, ex, at, O, lower, keyWords, need, cite) {
   return null;
 }
 /**
+ * The sentence of the passage the model matched (MEANING_SPAN from `start`) holding the most of the query's words,
+ * when it holds more of them than the sentences the excerpt falls in; else null. Its edge characters are left off,
+ * so it touches no neighbouring sentence (sentenceOriginal reads every sentence an excerpt touches).
+ * @param {string} text
+ * @param {number} start  where the model's passage starts
+ * @param {string} ex  the excerpt
+ * @param {number} at  where it starts
+ * @param {string[]} words  the query's words, encoded
+ * @returns {{text: string, start: number}|null}
+ */
+function meantSentence(text, start, ex, at, words) {
+  const spans = sentenceSpans(text);
+  const held = (/** @type {string} */ s) => { const t = new Set(kjvEncode(s)); return words.filter((w) => t.has(w)).length; };
+  let most = held(spans.filter((sp) => sp.end >= at && sp.start <= at + ex.length).map((sp) => sp.text).join(' '));
+  let best = null;
+  for (const sp of spans) {
+    if (sp.end <= start) continue;
+    if (sp.start >= start + MEANING_SPAN) break;
+    const h = held(sp.text);
+    if (h > most) { most = h; best = sp; }
+  }
+  return best && best.text.length > 2 ? { text: best.text.slice(1, -1), start: best.start + 1 } : null;
+}
+/**
  * Move each original ahead of a reprint of it near the top (in place).
  * @param {Array<{score:number, doc:any, terms?:string[], meaningStart?:number}>} out  ranked, best first (meaningStart: meaningFirst's matched passage)
  * @param {Map<any, string>} idOf  each entry's doc id
@@ -1009,6 +1048,14 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
     // ("passover study about the lamb when god struck the egyptians" asks for the study, not Exodus 12:27).
     const quoted = near(idOf.get(e) || '', e.doc) >= NEAR_PHRASE_MIN;
     let found = sentenceOriginal(e.doc.text, ex, at, O, lower, keyWords, need, quoted);
+    // A reprint the model found is read where it matched, when that sentence holds more of the query than the
+    // excerpt's does and names an original of its own (sr11 t324): the excerpt is the stretch thickest with typed
+    // words, and in an Answers topic that was a line of another letter it quotes, which then led the search.
+    if (typeof e.meaningStart === 'number' && e.meaningStart >= 0 && at >= 0) {
+      const m = meantSentence(e.doc.text, e.meaningStart, ex, at, words);
+      const f = m && sentenceOriginal(e.doc.text, m.text, m.start, O, lower, keyWords, need, quoted);
+      if (m && f) { found = f; ex = m.text; at = m.start; }
+    }
     // A quote held nearly word for word sits where its small words are too ("blessed be the name of our lord":
     // the content words sit thickest in "Blessed are those who Bless the name of The Lord", a line above it).
     if (!found && typed.length > terms.length && quoted) {
@@ -1057,6 +1104,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
     }
     if (!found && e.doc.kind === 'answers') {
       // A study or Holy Days text just below that holds the query as well, in one passage and in a row: it is what Answers reprints.
+      // A topic holding none of it (the model found it) is no measure: any text below held "as much" (sr11, 2026-10-15).
       const id = idOf.get(e) || '';
       const pq = passageQuery(words);
       const share = bestWindow(pq.query, docLemmas(id, e.doc.text || ''), pq.span);
@@ -1066,7 +1114,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
         const t = ORIGINAL_TIER[f.doc.kind];
         if (t === undefined || t >= tier || !f.doc.text) continue;
         const fid = idOf.get(f) || '';
-        if (bestWindow(pq.query, docLemmas(fid, f.doc.text), pq.span) >= share - REPRINT_COST && near(fid, f.doc) >= own - 0.1) {
+        if (share > 0 && bestWindow(pq.query, docLemmas(fid, f.doc.text), pq.span) >= share - REPRINT_COST && near(fid, f.doc) >= own - 0.1) {
           out.splice(r, 1);
           out.splice(i, 0, f);
           i++;
@@ -1349,7 +1397,8 @@ async function ensureReady(options) {
  * `signal`: when it is aborted the search stops at its next turn and returns `aborted: true`, no results (sr7).
  * `corrections` lists each typed word that found nothing of its own and was
  * searched as the nearest indexed word instead ({ from: 'shephard', to: 'shepherd' }).
- * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[], close?:boolean}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>, stopWordsOnly?:boolean, unquoted?:string, aborted?:boolean}>}
+ * `meaningLater`: a text search the meaning model was not ready for ran on the words alone; whenMeaningReady() says when to ask again.
+ * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[], close?:boolean}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>, stopWordsOnly?:boolean, unquoted?:string, aborted?:boolean, meaningLater?:boolean}>}
  */
 async function search(query, options) {
   options = options || {};
@@ -1433,8 +1482,10 @@ async function search(query, options) {
   const terms = (p.phrase ? p.phrase.split(/\s+/) : p.terms.map(withoutPossessive)).concat(p.must);
 
   // All-stop-word query → no searchable content. Not a quoted phrase: "and it was so" (Genesis 1), quoted,
-  // means those words in that order, which the phrase filter checks (sweep 2026-10-14 v016).
-  if (useStop && !p.phrase && terms.length && terms.every(isStopTerm)) {
+  // means those words in that order, which the phrase filter checks (sweep 2026-10-14 v016). One small word
+  // in quotes ("the") is no run of words: it is in nearly every verse, quoted or not.
+  const quotedRun = !!p.phrase && kjvEncode(p.phrase).length >= 2;
+  if (useStop && !quotedRun && terms.length && terms.every(isStopTerm)) {
     return { parsed, results: [], parsedTerms: [], textQuery: null, stopWordsOnly: true };
   }
   let filtered;
@@ -1501,6 +1552,11 @@ async function search(query, options) {
   // A stop word the reader typed among real words ranks, but is not a word to mark:
   // its matches do not ride on the result for the snippet and the find bar.
   const contentTyped = units.some((u) => u.literal && !isStopTerm(u.term));
+  /* What the reader wants found: a -word is ruled out, not typed, and a +word is its word (sweep 2026-10-14 v002).
+     Read as typed, "Q -x" asked the texts to hold the run "Q x", so the passage quoted lost its phrase and
+     original boosts to a word the reader excluded; and the -word counted toward the words that make a keyword
+     search, so "to the false prophets -x" was searched as a passage. */
+  const wanted = (p.must && p.must.length) || (p.mustNot && p.mustNot.length) ? wantedQuery(query) : query;
   /* A word or two is a keyword search, and a word in a title is the strongest sign of
      the text meant ("144000", "false prophets"). More is a passage or a title typed out,
      and the original of a passage comes before the texts that reprint it. */
@@ -1508,7 +1564,7 @@ async function search(query, options) {
   const contentWords = p.phrase
     ? kjvEncode(p.phrase).filter((t) => !(STOP_TRIMMED && STOP_TRIMMED.has(t))).length
     : units.filter((u) => u.literal && !isStopTerm(u.term)).length;
-  const keyword = contentWords <= KEYWORD_CONTENT_WORDS && kjvEncode(p.phrase || query).length <= KEYWORD_WORDS;
+  const keyword = contentWords <= KEYWORD_CONTENT_WORDS && kjvEncode(p.phrase || wanted).length <= KEYWORD_WORDS;
   /** @param {any} unit @param {any[]} res */
   const accumulate = (unit, res) => {
     const weight = unit.literal || unit.joined ? 1 : unit.form ? FORM_WEIGHT : SYNONYM_WEIGHT;
@@ -1591,8 +1647,9 @@ async function search(query, options) {
     let fixed;
     try { fixed = searchCorrected(unit.term, unitOpts(unit), keyword); } catch { continue; }
     if (!fixed.res.length) continue;
-    accumulate(unit, fixed.res);
     const typed = kjvEncode(unit.term);
+    if (typed.length === 1 && NT_BARE.test(typed[0]) && fixed.to !== typed[0].slice(0, -1)) continue;
+    accumulate(unit, fixed.res);
     if (fixed.to && typed.length === 1 && typed[0] !== fixed.to) corrections.push({ from: typed[0], to: fixed.to });
   }
   /* A CORRECTED QUERY IS SEARCHED AS THAT QUERY (2026-09-27). "Showing results for
@@ -1643,10 +1700,6 @@ async function search(query, options) {
   const nearOf = Object.create(null);
   for (let c = 0; c < corrections.length; c++) fixedTo[corrections[c].from] = corrections[c].to;
   for (const k in modernOf) fixedTo[k] = modernOf[k];
-  /* What the reader wants found: a -word is ruled out, not typed, and a +word is its word (sweep 2026-10-14 v002).
-     Read as typed, "Q -x" asked the texts to hold the run "Q x", so the passage quoted lost its phrase and
-     original boosts to a word the reader excluded. */
-  const wanted = (p.must && p.must.length) || (p.mustNot && p.mustNot.length) ? wantedQuery(query) : query;
   const typedTokens = joinApostropheS(kjvEncode(wanted).map((t) => fixedTo[t] || t));
   const STOP = D.STOP_WORDS_TRIMMED;
   if (!p.phrase && required > 1 && typedTokens.length > 1) {
@@ -1796,6 +1849,8 @@ async function search(query, options) {
   const quoted = out.length && (nearOf[idOf.get(out[0]) || ''] || 0) >= NEAR_PHRASE_MIN;
   const held = !keyword && !p.phrase && !quoted ? bestPassageFirst(out, idOf, units, isStopTerm, named, kjvHeld) : 1;
   /** @type {Awaited<ReturnType<typeof semanticDocs>>} */ let sem = null;
+  // A search the model was not ready for: its words' order stands, and says the meaning comes later (semanticReady).
+  let meaningLater = false;
   // The index the words were read from. While the model runs, a build for another edition (the reader
   // changed translation) can swap its own in: from then on this search reads nothing more by id, since
   // that index would hand back the other edition's text. The words' results stand alone.
@@ -1804,6 +1859,7 @@ async function search(query, options) {
     const meant = String(wanted);
     // Kept to a collection or scope, the model's best of everything may hold few of its texts: it reads further.
     sem = await semanticDocs(meant, unitId, corpusFilter || scopeBookId || scopeVolumeId ? MEANING_FILTERED : undefined);
+    meaningLater = !sem && semanticStatus().status !== 'ready';
     if (msIndex !== inUse) sem = null;
     if (sem) sem = sem.filter((s) => { const f = msIndex.getStoredFields(s.id); return !!f && allowed(f); });
     if (sem && sem.length) meaningFirst(out, idOf, sem, named, held, fresh);
@@ -1897,7 +1953,7 @@ async function search(query, options) {
     const again = await search(String(query).replace(/["\u201C\u201D\u201E\u201F]/g, ' '), { ...options, _unquoted: true });
     if (again.results && again.results.length) return { ...again, unquoted: p.phrase };
   }
-  return { parsed, results: out, parsedTerms: filtered, textQuery: run ? { ...p, run } : p, capped: Object.keys(capped), truncated: over || (out.length >= limit && h < rankedIds.length), corrections };
+  return { parsed, results: out, parsedTerms: filtered, textQuery: run ? { ...p, run } : p, capped: Object.keys(capped), truncated: over || (out.length >= limit && h < rankedIds.length), corrections, meaningLater };
 }
 
 /**
@@ -1987,6 +2043,7 @@ export const VotSearchMini = {
   // the on-device meaning search: its state ({status, failure, units}), and a start for callers that need it now
   meaningStatus: semanticStatus,
   startMeaning: startSemantic,
+  whenMeaningReady: semanticReady,
   rebuild,
   parse: parseReference,
   search,

@@ -70,8 +70,9 @@ loads. Four facts that surprise newcomers:
   and later bundles read them as bare globals at call time, so each module has exactly one copy of its state.
   `tools/gen-eslint-globals.py` generates the lint globals that make this legal. The contract is in `BRIDGES.md`.
 - **Lazy loading is for data only.** `index.html` builds each corpus loader with `window.__makeLazyLoader(name,
-  path, finishFn)`. A route that needs a corpus renders `_corpusView(...)` (a loading placeholder) until it has
-  landed. Code is not split (lz1, 2026-10-13; ARCHITECTURE.md "Lazy corpora" has the numbers). Read-along timings and the Answers corpus load through `src/utils/sync-loaders.js`.
+  path, finishFn, requiredGlobals)`; a bundle that loaded without defining those globals did not run, so the load
+  fails and the route offers a retry. A route that needs a corpus renders `_corpusView(...)` (a loading placeholder)
+  until it has landed. Code is not split (lz1, 2026-10-13; ARCHITECTURE.md "Lazy corpora" has the numbers). Read-along timings and the Answers corpus load through `src/utils/sync-loaders.js`.
 - **`--target=chrome108` is a hard contract** (CLAUDE.md, Permanent Rule 6). esbuild lowers syntax, but a runtime
   API newer than Chromium 108 needs feature detection.
 - **Membership and size are gated.** `tools/bundle-membership.test.js` and its siblings pin which module lives in

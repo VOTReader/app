@@ -174,6 +174,51 @@ describe('shareNotesExport', () => {
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ text: 'Export failed. Please try again.' }));
   });
 
+  // sweep v086: navigator.share(...).catch(() => {}) discarded every rejection,
+  // so a share the host refused (NotAllowedError: activation lapsed or blocked
+  // by policy; DataError/TypeError: text too large for the target) left the
+  // reader with no file and no message. Only a user cancel is silent now.
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+
+  it('stays silent when the user cancels the share sheet (AbortError)', async () => {
+    const share = vi.fn(() => Promise.reject(new DOMException('Share canceled', 'AbortError')));
+    vi.stubGlobal('navigator', { share });
+    const saveToFile = vi.fn();
+    vi.stubGlobal('PlatformBridge', { saveToFile });
+    const toast = vi.fn();
+    vi.stubGlobal('showToast', toast);
+    expect(shareNotesExport({ title: 'T', filename: 'f.md', text: 'doc' })).toBe('share');
+    await settle();
+    expect(saveToFile).not.toHaveBeenCalled();
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it('falls back to PlatformBridge.saveToFile when the share is refused (NotAllowedError)', async () => {
+    const share = vi.fn(() => Promise.reject(new DOMException('Must be handling a user gesture', 'NotAllowedError')));
+    vi.stubGlobal('navigator', { share });
+    const saveToFile = vi.fn();
+    vi.stubGlobal('PlatformBridge', { saveToFile });
+    const toast = vi.fn();
+    vi.stubGlobal('showToast', toast);
+    shareNotesExport({ title: 'Devotional', filename: 'Devotional notes 2026-07-03.md', text: 'doc' });
+    await settle();
+    expect(saveToFile).toHaveBeenCalledWith('Devotional notes 2026-07-03.md', 'doc');
+    // The fallback save reports through the same one-shot toast contract.
+    expect(typeof window.__onExportComplete).toBe('function');
+    window.__onExportComplete('ok');
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ text: 'Notes exported.' }));
+  });
+
+  it('toasts "Export failed" when the share fails and no save path exists', async () => {
+    const share = vi.fn(() => Promise.reject(new TypeError('Share data too large')));
+    vi.stubGlobal('navigator', { share });
+    const toast = vi.fn();
+    vi.stubGlobal('showToast', toast);
+    shareNotesExport({ title: 'T', filename: 'f.md', text: 'doc' });
+    await settle();
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ text: 'Export failed. Please try again.' }));
+  });
+
   it('returns "none" when neither share nor the bridge exists (bare host)', () => {
     vi.stubGlobal('navigator', {});
     const out = shareNotesExport({ title: 'T', filename: 'f.md', text: 'doc' });

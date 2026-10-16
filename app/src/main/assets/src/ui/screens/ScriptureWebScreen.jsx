@@ -982,6 +982,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     schedule();
   }, [focusRef, schedule]);
 
+  /** Scripture / My web. The chosen line goes with the cards: a link's index and a canon thread's
+   * index number two different graphs, so a focus kept across the switch spotlit an unrelated
+   * line in the other web, with nothing open for Escape or Back to close (sweep v5, 2026-10-14). */
+  const switchMode = React.useCallback((next) => {
+    closeCards();
+    setMode(next);
+  }, [closeCards]);
+
   /** Close whatever is on top of the web, one layer a call: the guide, then
    * the empty-web notice, then the panels and the hover chip together.
    * Escape and Android Back both come here (v08-03), so they agree.
@@ -999,6 +1007,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
   // ── keyboard (PWA desktop) ──────────────────────────────────────────────
   const onKeyDown = React.useCallback((e) => {
+    // The web's keys are the web's while the web itself has focus. Keydown bubbles here from
+    // every control inside .sw-root: ArrowRight on the density <select> panned the camera and
+    // preventDefault cancelled the select's own change, and a Nearby row's arrows panned the web
+    // behind the list (sweep v72). Escape is the one key taken from anywhere: it closes the top
+    // layer, or leaves.
+    if (e.key !== 'Escape' && e.target !== e.currentTarget) return;
     const v = viewRef.current;
     // r2: the keys drive the rail the pointer last touched (the Bible rail
     // until a gesture says otherwise); Reset (0) resets both
@@ -1043,6 +1057,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     clampCamera(cam, v.W, ceiling, yf);
     const centre = Math.round(cam.x);
     if (atCeiling) setAnnounce(ZOOM_MAX_MESSAGE);
+    // the Volumes rail's x is a rail position, not a verse id: name its own node (sweep v55)
+    else if (onTop) {
+      const name = votNodeName(personalRef.current && personalRef.current.votRail, centre);
+      if (name) setAnnounce(name);
+    }
     else if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
     schedule();
   }, [viewRef, lastRailRef, camVRef, camRef, zoomCapFor, yFrameFor, graph, schedule, resetView, closeTopOverlay, onBack, dropHover]);
@@ -1162,9 +1181,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       <div className="sw-controls">
         <div className="sw-seg" role="group" aria-label="Which web">
           <button type="button" className={'sw-seg-btn' + (mode === 'canonical' ? ' is-on' : '')}
-            aria-pressed={mode === 'canonical'} onClick={() => { setMode('canonical'); setDetail(null); setChoices(null); setListOpen(false); }}>Scripture</button>
+            aria-pressed={mode === 'canonical'} onClick={() => switchMode('canonical')}>Scripture</button>
           <button type="button" ref={myWebBtnRef} className={'sw-seg-btn' + (mode === 'personal' ? ' is-on' : '')}
-            aria-pressed={mode === 'personal'} onClick={() => { setMode('personal'); setDetail(null); setChoices(null); setListOpen(false); }}>My web</button>
+            aria-pressed={mode === 'personal'} onClick={() => switchMode('personal')}>My web</button>
         </div>
         <button type="button" className={'sw-btn' + (listOpen ? ' is-on' : '')}
           onClick={() => { setListOpen(!listOpen); setChoices(null); }}
@@ -2107,6 +2126,14 @@ function graphStats(graph, density) {
     shown += density === 'essential' ? b.off20 : b.off10;
   }
   return { shown, total: graph.count };
+}
+
+/** The Volumes rail's node at a rail position, with its Volume ("The Bride, Volume Two"); '' off the rail. */
+function votNodeName(votRail, pos) {
+  const node = votRail && pos >= 0 && pos < votRail.total ? votRail.nodes[pos] : null;
+  if (!node) return '';
+  const seg = votRail.segments.find((s) => s.volKey === node.volKey);
+  return node.title + (seg ? ', ' + seg.label : '');
 }
 
 /** A LinkEndpoint's own label, falling back to its key. */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { heldShare, recurring, reprintShown } from './rules.mjs';
+import { heldShare, recurring, reprintShown, nearCopy } from './rules.mjs';
 
 const w = (s) => s.split(' ');
 const entry = w('do not fear the days ahead for i am with you and i will keep you through the fire and the flood says the lord');
@@ -63,5 +63,26 @@ describe('reprintShown (the original first, its reprint after)', () => {
     expect(reprintShown([hit('v6/a')], ['v6/a'], 'v6/a')).toBe(true);
     const twin = (a, b) => a.replace('matthew-study/matthew', 'bible/matthew') === b.replace('matthew-study/matthew', 'bible/matthew');
     expect(reprintShown([hit('bible/matthew:5:3')], ['bible/matthew:5:3', 'matthew-study/matthew:5:3'], 'bible/matthew:5:3', twin)).toBe(true);
+  });
+});
+
+describe('nearCopy (a recurring line with a word or two changed)', () => {
+  const stop = new Set(['the', 'and', 'of', 'is', 'be', 'for', 'i', 'you', 'in', 'to', 'them', 'me', 'from']);
+  const pride = w('and the pride of man shall be bowed down and the arrogance of man utterly humiliated');
+  it('the line with its tense changed is the same line', () => {
+    const t = w('let the glory of man be turned backward until the pride of man is bowed down and the arrogance of man is utterly humiliated for the lord alone');
+    expect(nearCopy(pride, t, stop, 'arrogance')).toBe(true);
+  });
+  it('the same opening ending in another sentence is not', () => {
+    const s = w('for i tell you the truth all have entered in');
+    expect(nearCopy(s, w('cast down for i tell you the truth all flesh shall be humbled in the day'), stop, 'truth')).toBe(false);
+    expect(nearCopy(s, w('behold for i tell you the truth it has come all have entered in'), stop, 'truth')).toBe(true);
+  });
+  it('the words spread over a longer stretch are no copy', () => {
+    const t = w('the pride of man the people saw shall be bowed down in that day and the arrogance of the nations and of man shall be utterly humiliated');
+    expect(nearCopy(pride, t, stop, 'arrogance')).toBe(false);
+  });
+  it('a line too short to tell from a formula judges nothing', () => {
+    expect(nearCopy(w('i am the lord your god'), w('i am the lord your god'), stop, 'lord')).toBe(false);
   });
 });

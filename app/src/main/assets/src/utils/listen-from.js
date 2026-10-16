@@ -3,11 +3,13 @@
    listen-from — a text selection becomes LISTEN FROM HERE (2026-09-22)
    ═══════════════════════════════════════════════════════════════════════
    The live reading pane's ReadAlongHighlight registers window.__votListenFrom
-   ({ has, start }) while its unit has a recording. This is the selection
-   toolbar's side of it: the block the selection STARTS in (its data-hl-key)
-   and the offset of that start inside the block's textContent — the domain
-   the timing rows and the paint both use — so the voice begins at the clause
-   the reader chose. Nothing here knows about audio; the pane decides.
+   ({ has, start }) while its unit has a recording and the read-along is on
+   (the place is found in the timings, which are not fetched with it off).
+   This is the selection toolbar's side of it: the block the selection STARTS
+   in (its data-hl-key) and the offset of that start inside the block's
+   textContent — the domain the timing rows and the paint both use — so the
+   voice begins at the clause the reader chose. Nothing here knows about
+   audio; the pane decides.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /** @returns {{ has: (hlKey: string) => boolean, start: (hlKey: string, offset: number | null) => boolean, repeat?: (keys: string[], label: string, times: number) => boolean } | null} */

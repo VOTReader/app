@@ -74,7 +74,15 @@
      slot, which use-dom-annotation-sync takes post-render to scroll the mark
      into view. (D2 removed the write-only-dead 'pendingLinkExcerpt' slot.)
      A Bible jump that waits for its corpus sets it with the jump (W39).
+
+   TOAST: 'vot-toast-bible-load' when a Bible jump's corpus fails to load
+     (offline, never cached; sweep v059).
    ═══════════════════════════════════════════════════════════════════════ */
+
+import { showToast } from '../utils/toast.js';
+
+/* sweep v059: what a Bible jump says when its corpus cannot load. */
+const BIBLE_LOAD_FAILED_MSG = 'Couldn’t load the Bible. Check your connection.';
 
 /**
  * Build the surpriseAnchor for a bible/matthew endpoint's verse target.
@@ -277,7 +285,13 @@ export function useNavigateToLink({
           } else {
             goBible();
           }
-        }).catch(function (e) { console.warn('navigateToLink: bible corpus load failed', e); });
+        }).catch(function (e) {
+          // sweep v059: the sidebar shut at the tap and goBible never runs, so
+          // the bible-ch route's retry view never mounts. Say so, or the tap
+          // reads as dead: the sidebar closes and nothing opens.
+          console.warn('navigateToLink: bible corpus load failed', e);
+          showToast({ id: 'vot-toast-bible-load', className: 'vot-toast', text: BIBLE_LOAD_FAILED_MSG, durationMs: 5000, ariaLive: 'assertive' });
+        });
       }
       return;
     }
@@ -306,6 +320,17 @@ export function useNavigateToLink({
       setBookId(null); setChapterNum(null);
       setStudyId(null); setStudyChapterId(null);
       setLetterId(null);
+      // A jump from outside is not a card tap: drop the frames an earlier card
+      // tap left INTO this entry, or "Back to <that entry's old parent>"
+      // outranks this jump's own back pill (v046). Frames into other entries
+      // stay: A → B by card, B → a chapter → this entry, then back through the
+      // chapter to B must still show "Back to A". In place: the viewer holds
+      // the same array.
+      const jst = window.__journalBackStack;
+      if (jst && jst.length) {
+        const kept = jst.filter(function (f) { return !f || f.destId !== endpoint.entryId; });
+        if (kept.length !== jst.length) { jst.length = 0; Array.prototype.push.apply(jst, kept); }
+      }
       setJournalEntryId(endpoint.entryId);
       setScreen('journal-viewer');
     } else if (endpoint.screen) {
