@@ -69,9 +69,11 @@ html, body { background: var(--bg); height: 100%; overflow: hidden; overscroll-b
 .v2 mark.hl-purple { background: var(--hl-plum); }
 .v2 mark.hl-underline, .v2 mark.hl-squiggle { background: none; text-decoration: underline 2px var(--accent); text-underline-offset: 3px; }
 .v2 mark.hl-squiggle { text-decoration-style: wavy; }
-/* the note editor's quoted paragraph (NoteEditor.jsx) */
-.jed .nq { margin: 0 0 4px; padding-left: 12px; border-left: 2px solid var(--line); color: var(--t2); font-style: italic;
-  font-size: var(--fs-s); line-height: 1.45; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+/* the note page's quoted paragraph (NoteEditor.jsx; the kit's .jed .nq, 3m): a long paragraph stops at four lines */
+.jed .nq { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+/* its notebooks row (3m .nbin): the kit's svg:last-child rule meets every icon inside Icon's span, so name them */
+.v2 .nbin > .v2i > svg { width: 18px; height: 18px; color: var(--tgold-hi); }
+.v2 .nbin > .v2i.go > svg { width: 16px; height: 16px; color: var(--t2); }
 
 /* the boot splash (index.html's first pixel; HydrationGate renders the same markup while the stores load): the app's
    name on the page colour, so a real boot opens on the slate instead of a blank black window */

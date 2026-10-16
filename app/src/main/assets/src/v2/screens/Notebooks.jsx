@@ -151,6 +151,81 @@ export function NotebookCards({ gate, marks, desktop = false, go, listed }) {
   );
 }
 
+const NO_MARKS = /** @type {import('../notes-facts.js').Mark[]} */ ([]);
+
+/**
+ * A note's notebooks on its own page (3m): the row under its words ("Add to a notebook", or "In Sabbath study,
+ * Prophecy" in main's order) and the sheet it opens: the notebooks with a checkbox each, a tap saving at once through
+ * main's NoteStore.toggleNotebook (a note can sit in more than one; in none it is Uncategorized, which is no choice
+ * here), "+ New notebook" (3l's sheet, then back here with it ticked) and Done. Main's toggle needs the note, so the row
+ * waits for words and opening the sheet saves them first (`ensure`). A gate boot shows its seeds and writes nothing.
+ * @param {{ gate: any, groupId: string | null, hasWords: boolean, ensure: () => string | null, desktop?: boolean }} props
+ *   groupId the note's, null until it is saved; ensure saves the note now and returns its groupId (null with no words)
+ */
+export function NoteNotebooks({ gate, groupId, hasWords, ensure, desktop = false }) {
+  const marks = gate ? (gate.facts && gate.facts.marks) || NO_MARKS : NO_MARKS;
+  const { notebooks, memberships } = useNotebooks(gate, marks);
+  const [open, setOpen] = React.useState(!!(gate && gate.open && gate.open.sheet === 'notebook-pick'));
+  const [making, setMaking] = React.useState(false);
+  const idsOf = (gid) => {
+    if (!gid) return [];
+    if (gate) {
+      const m = marks.find((x) => x.kind === 'note' && x.gid === gid);
+      return (m && m.nb) || [];
+    }
+    const n = g.NoteStore && g.NoteStore.get(gid);
+    return n && Array.isArray(n.notebookIds) ? n.notebookIds : [];
+  };
+  const ids = idsOf(groupId);
+  if (!groupId && !hasWords) return null;
+  const names = notebooks.filter((nb) => ids.includes(nb.id)).map((nb) => nb.name);
+  const count = (id) => memberships.filter((m) => m.includes(id)).length;
+  const toggle = (id) => {
+    if (gate || !g.NoteStore) return;
+    const gid = ensure();
+    if (gid) g.NoteStore.toggleNotebook(gid, id);
+  };
+  const show = () => {
+    if (gate || ensure()) setOpen(true);
+  };
+  const made = (nb) => {
+    setMaking(false);
+    const gid = nb && ensure();
+    if (gid && !idsOf(gid).includes(nb.id)) g.NoteStore.toggleNotebook(gid, nb.id);
+  };
+  return (
+    <>
+      <button type="button" className="nbin" onClick={show}>
+        <Icon name="notebook" /><span>{names.length ? 'In ' + names.join(', ') : 'Add to a notebook'}</span>
+        <Icon name="chev" className="go" />
+      </button>
+      {open && !making && (
+        <Sheet kind="nbp" label="Add to a notebook" scrim="light" desktop={desktop} closeX onClose={() => setOpen(false)}>
+          <div className="sh">Add to a notebook</div>
+          <p className="nbpn">A note can sit in more than one.</p>
+          <div className="opts">
+            {notebooks.map((nb) => {
+              const on = ids.includes(nb.id);
+              return (
+                <button key={nb.id} type="button" className="srow opt nbr" role="checkbox" aria-checked={on} onClick={() => toggle(nb.id)}>
+                  <Dot color={nb.color} />
+                  <span className="tx"><span className="t">{nb.name}</span><span className="s">{noteCount(count(nb.id))}</span></span>
+                  <span className={on ? 'cbx on' : 'cbx'}>{on ? <Icon name="check" /> : null}</span>
+                </button>
+              );
+            })}
+            <button type="button" className="srow opt nbr nbadd" onClick={() => { if (!gate) setMaking(true); }}>
+              <span className="lead"><Icon name="plus" /></span><span className="tx"><span className="t">New notebook</span></span>
+            </button>
+          </div>
+          <button type="button" className="pill block done" onClick={() => setOpen(false)}><span>Done</span><Icon name="check" /></button>
+        </Sheet>
+      )}
+      {making && <NotebookSheet desktop={desktop} onDone={made} onClose={() => setMaking(false)} />}
+    </>
+  );
+}
+
 /** A notebook by id: main's (or the gate's), or Uncategorized. @param {string} id @param {any[]} notebooks */
 function findNotebook(id, notebooks) {
   return id === UNCATEGORIZED ? { id, name: 'Uncategorized', color: null } : notebooks.find((n) => n.id === id) || null;

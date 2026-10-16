@@ -1,9 +1,10 @@
-/* v2 notebooks (mw9d, design dz20 3i-3l): the gate pictures (the Notes chip's cards, a notebook's page, its ..., New
+/* v2 notebooks (mw9d-e, design dz20 3i-3m): the gate pictures (the Notes chip's cards, a notebook's page, its ..., New
    notebook), and a real boot over stand-ins for main's NotebookStore and NoteStore: create with a colour, open, rename,
    share as main's text, delete at once and Undo with the notes' tags and dates put back. */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, waitFor, act, fireEvent } from '@testing-library/react';
 import { V2App } from '../App.jsx';
+import { NoteEditor } from './NoteEditor.jsx';
 import {
   swatchOf, swatchesFor, noteCount, canName, notebookCards, notesIn, emptyWords, deleteNotebook, UNCATEGORIZED,
 } from '../notebook-facts.js';
@@ -13,7 +14,8 @@ const html = document.documentElement;
 const click = (el) => act(() => { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); });
 const texts = (root, sel) => [...root.querySelectorAll(sel)].map((n) => n.textContent);
 const byText = (root, sel, t) => [...root.querySelectorAll(sel)].find((n) => n.textContent === t);
-const STORES = ['NotebookStore', 'NoteStore', 'composeNotesExport', 'noteSourceLabel', 'matchMedia'];
+const STORES = ['NotebookStore', 'NoteStore', 'composeNotesExport', 'noteSourceLabel', 'matchMedia', 'AnnotationStore', 'hlId',
+  'COL_BY_KEY', 'LETTERS_V1'];
 
 afterEach(() => {
   cleanup();
@@ -43,6 +45,18 @@ function stores(notebooks, notes) {
       bump();
     },
     replaceAll: vi.fn(function (m) { this.map = m; bump(); }),
+    // main's set (a new note's defaults under its own fields) and toggleNotebook (stamps now)
+    set: vi.fn(function (id, fields) {
+      this.map = { ...this.map, [id]: { groupId: id, notebookIds: [], created: Date.now(), ...(this.map[id] || {}), ...fields, updated: Date.now() } };
+      bump();
+    }),
+    toggleNotebook: vi.fn(function (id, nb) {
+      const n = this.map[id];
+      if (!n) return;
+      const ids = (n.notebookIds || []).includes(nb) ? n.notebookIds.filter((x) => x !== nb) : [...(n.notebookIds || []), nb];
+      this.map = { ...this.map, [id]: { ...n, notebookIds: ids, updated: Date.now() } };
+      bump();
+    }),
   };
   const B = {
     ...reactive,
@@ -50,6 +64,8 @@ function stores(notebooks, notes) {
     list() { return this.rows.slice().sort((a, b) => a.sortIndex - b.sortIndex); },
     get(id) { return this.rows.find((r) => r.id === id) || null; },
     add: vi.fn(function (name) {
+      const had = this.rows.find((r) => r.name.toLowerCase() === name.trim().toLowerCase());   // main dedupes by name
+      if (had) return had;
       const nb = { id: 'nb' + (this.rows.length + 1), name: name.trim(), sortIndex: this.rows.length, created: 9, updated: 9 };
       this.rows.push(nb);
       bump();
@@ -160,6 +176,112 @@ describe('gate pictures', () => {
     expect(s.querySelector('.pill.block').textContent).toBe('Create notebook');
     expect(s.querySelector('.pill.block').hasAttribute('disabled')).toBe(false);
     await waitFor(() => expect(html.dataset.gate).toBe('ready'));
+  });
+
+  it('3m: Letter 5\'s note, its place over the words, "In Sabbath study, Prophecy", Add to a notebook open; it writes nothing', async () => {
+    g.COL_BY_KEY = new Map([['one', { volKey: 'one', label: 'Volume One', globalName: 'LETTERS_V1', letterScreen: 'vot-volume-one' }]]);
+    g.LETTERS_V1 = [{ id: 'humility-and-the-word-of-god', num: 5, title: 'Humility and The Word of God', blocks: [] }];
+    const { container: c } = render(<V2App gateId="3m-note-notebooks" />);
+    expect(c.querySelector('.tb .title').textContent).toBe('Note');
+    expect(c.querySelector('.jed .jdate').textContent).toBe('Volume One · Letter 5 · Humility and The Word of God');
+    expect(c.querySelector('.jed blockquote.nq').textContent).toBe('For I AM, and My Word the same.');
+    expect(/** @type {HTMLTextAreaElement} */ (c.querySelector('.jed textarea.jp')).value).toBe('Malachi 3:6 says the same.');
+    expect(c.querySelector('.jed .nbin').textContent).toBe('In Sabbath study, Prophecy');
+    const s = document.querySelector('[role="dialog"][aria-label="Add to a notebook"]');
+    expect(s.className).toBe('sheet nbp');
+    expect(s.querySelector('.sh').textContent).toBe('Add to a notebook');
+    expect(s.querySelector('.nbpn').textContent).toBe('A note can sit in more than one.');
+    const rows = [...s.querySelectorAll('.srow.nbr:not(.nbadd)')];
+    expect(rows.map((r) => r.querySelector('.t').textContent + ' · ' + r.querySelector('.s').textContent + ' · ' + r.getAttribute('aria-checked')))
+      .toEqual(['Sabbath study · 4 notes · true', 'Prophecy · 3 notes · true', 'For the family · 1 note · false']);
+    expect(rows.map((r) => r.getAttribute('role'))).toEqual(['checkbox', 'checkbox', 'checkbox']);
+    expect(rows.map((r) => r.querySelector('.nbdot').className)).toEqual(['nbdot sage', 'nbdot blue', 'nbdot rose']);
+    expect(rows.map((r) => r.querySelector('.cbx').className)).toEqual(['cbx on', 'cbx on', 'cbx']);
+    expect(s.querySelector('.nbadd').textContent).toBe('New notebook');
+    expect(s.querySelector('.pill.block.done').textContent).toBe('Done');
+    await waitFor(() => expect(html.dataset.gate).toBe('ready'));
+    await click(rows[2]);
+    await click(s.querySelector('.nbadd'));
+    expect(rows[2].getAttribute('aria-checked')).toBe('false');
+    expect(document.querySelector('[aria-label="New notebook"]')).toBe(null);
+  });
+});
+
+describe('a note\'s notebooks, from the note (3m) over main\'s stores', () => {
+  const ROUTE = { place: 'note', key: 'letter:x:0', start: 0, end: 4, text: 'Thus', groupId: 'n1' };
+  const rowsOf = () => [...document.querySelectorAll('.sheet.nbp .srow.nbr:not(.nbadd)')];
+  const ticks = () => rowsOf().map((r) => r.querySelector('.t').textContent + ':' + r.getAttribute('aria-checked'));
+
+  it('a tick saves at once through main\'s toggle, in more than one; the row names them in main\'s order; no Uncategorized', async () => {
+    const { N } = stores([{ id: 'a', name: 'Sabbath study', color: 'green' }, { id: 'b', name: 'Prophecy', color: 'blue' }],
+      [{ groupId: 'n1', notebookIds: [], updated: 1, body: 'Words' }, { groupId: 'n2', notebookIds: ['a'], updated: 2 }]);
+    const { container: c } = render(<NoteEditor route={ROUTE} gate={null} onReady={vi.fn()} />);
+    expect(c.querySelector('.nbin').textContent).toBe('Add to a notebook');
+    await click(c.querySelector('.nbin'));
+    expect(ticks()).toEqual(['Sabbath study:false', 'Prophecy:false']);
+    expect(texts(document, '.sheet.nbp .srow.nbr .s')).toEqual(['1 note', '0 notes']);
+    await click(rowsOf()[1]);
+    expect(N.toggleNotebook).toHaveBeenLastCalledWith('n1', 'b');
+    expect(N.map.n1.notebookIds).toEqual(['b']);
+    expect(ticks()).toEqual(['Sabbath study:false', 'Prophecy:true']);
+    expect(texts(document, '.sheet.nbp .srow.nbr .s')).toEqual(['1 note', '1 note']);
+    expect(c.querySelector('.nbin').textContent).toBe('In Prophecy');
+    await click(rowsOf()[0]);
+    expect(c.querySelector('.nbin').textContent).toBe('In Sabbath study, Prophecy');
+    await click(rowsOf()[0]);
+    expect(N.map.n1.notebookIds).toEqual(['b']);
+    expect(c.querySelector('.nbin').textContent).toBe('In Prophecy');
+    await click(document.querySelector('.sheet.nbp .done'));
+    expect(document.querySelector('.sheet.nbp')).toBe(null);
+    expect(N.set).not.toHaveBeenCalled();
+  });
+
+  it('+ New notebook: 3l\'s sheet, then back here with it ticked; closing it comes back unticked', async () => {
+    const { B, N } = stores([{ id: 'a', name: 'Sabbath study' }], [{ groupId: 'n1', notebookIds: ['a'], updated: 1, body: 'Words' }]);
+    const { container: c } = render(<NoteEditor route={ROUTE} gate={null} onReady={vi.fn()} />);
+    await click(c.querySelector('.nbin'));
+    await click(document.querySelector('.sheet.nbp .nbadd'));
+    expect(document.querySelector('.sheet.nbp')).toBe(null);
+    const s = document.querySelector('[aria-label="New notebook"]');
+    fireEvent.change(s.querySelector('input.q'), { target: { value: 'Questions' } });
+    await click(s.querySelector('.pill.block'));
+    expect(B.add).toHaveBeenCalledWith('Questions');
+    expect(N.toggleNotebook).toHaveBeenLastCalledWith('n1', 'nb2');
+    expect(ticks()).toEqual(['Sabbath study:true', 'Questions:true']);
+    expect(c.querySelector('.nbin').textContent).toBe('In Sabbath study, Questions');
+    // main's add returns the notebook a name already has: ticked already, it stays ticked
+    await click(document.querySelector('.sheet.nbp .nbadd'));
+    fireEvent.change(document.querySelector('[aria-label="New notebook"] input.q'), { target: { value: 'Questions' } });
+    await click(document.querySelector('[aria-label="New notebook"] .pill.block'));
+    expect(ticks()).toEqual(['Sabbath study:true', 'Questions:true']);
+    await click(document.querySelector('.sheet.nbp .nbadd'));
+    await click(document.querySelector('.scrim'));
+    expect(ticks()).toEqual(['Sabbath study:true', 'Questions:true']);
+    expect(N.toggleNotebook).toHaveBeenCalledTimes(1);
+  });
+
+  it('a new note: no row until it has words; opening the sheet saves them first, and the last save keeps its notebooks', async () => {
+    vi.useFakeTimers();
+    const { N } = stores([{ id: 'a', name: 'Sabbath study' }], []);
+    const rows = [];
+    g.AnnotationStore = { add: vi.fn((key, ann) => rows.push({ key, ann })), getByGroup: (id) => rows.filter((r) => r.ann.groupId === id) };
+    g.hlId = () => 'hl1';
+    const { container: c, unmount } = render(<NoteEditor route={{ ...ROUTE, groupId: null }} gate={null} onReady={vi.fn()} />);
+    expect(c.querySelector('.nbin')).toBe(null);
+    fireEvent.change(c.querySelector('textarea.jp'), { target: { value: '  ' } });
+    expect(c.querySelector('.nbin')).toBe(null);
+    fireEvent.change(c.querySelector('textarea.jp'), { target: { value: 'Be steadfast' } });
+    expect(c.querySelector('.nbin').textContent).toBe('Add to a notebook');
+    expect(N.set).not.toHaveBeenCalled();
+    await click(c.querySelector('.nbin'));
+    expect(N.set).toHaveBeenCalledTimes(1);
+    expect(N.map.hl1.body).toBe('Be steadfast');
+    await click(rowsOf()[0]);
+    expect(N.map.hl1.notebookIds).toEqual(['a']);
+    fireEvent.change(c.querySelector('textarea.jp'), { target: { value: 'Be steadfast, My son' } });
+    unmount();
+    expect(N.map.hl1).toMatchObject({ body: 'Be steadfast, My son', notebookIds: ['a'] });
+    expect(g.AnnotationStore.add).toHaveBeenCalledTimes(1);
   });
 });
 

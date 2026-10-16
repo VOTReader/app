@@ -31,7 +31,8 @@ const DAY = 24 * 3600 * 1000;
  * open ('now-playing', or a sheet: 'speed' | 'sleep' | 'up-next' | 'more'), full (full screen) and toast (the hint drawn).
  * playing.savedRecording: the recording is in the Listening Library's Saved (2f's Save; default not).
  * @typedef {{ place: string, collection?: string, n?: number, kind?: string, id?: string, book?: string, chapter?: number | string,
- *   verse?: number, match?: string[], study?: string, list?: string, family?: string, q?: string, st?: string, page?: number }} Route
+ *   verse?: number, match?: string[], study?: string, list?: string, family?: string, q?: string, st?: string, page?: number,
+ *   key?: string, start?: number, end?: number, text?: string, groupId?: string | null }} Route
  * @typedef {{ item: Record<string, any>, reader: string, at: number, length: number, paused: boolean } & Record<string, any>} GatePlaying
  * `open` names a sheet the screen opens on the gate boot ({ sheet: 'mark-paragraph', para, colour } on a letter; the
  * shell's { sheet: 'text-and-theme' }; 9c's { toast: 'offline-listen' }, the Listen pill's); `look` the text and page
@@ -264,6 +265,12 @@ export const GATE_STATES = {
   // states.json 3l-notebook-new: 3i with + New notebook tapped: "Questions" typed, Plum (main's purple) chosen.
   '3l-notebook-new': { stack: NOTEBOOK_STACK, facts: NOTEBOOK_FACTS,
     open: { sheet: 'notebook-new', form: { name: 'Questions', color: 'purple' } } },
+  // states.json 3m-note-notebooks (mw9e): Letter 5's "For I AM, and My Word the same." noted (gnb1: "Malachi 3:6 says the
+  // same.", in Sabbath study and Prophecy), opened from the letter; Add to a notebook open over it.
+  '3m-note-notebooks': {
+    stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 5 },
+      { place: 'note', key: 'letter:humility-and-the-word-of-god:4', start: 0, end: 31, text: 'For I AM, and My Word the same.', groupId: 'gnb1' }],
+    facts: NOTEBOOK_FACTS, open: { sheet: 'notebook-pick' } },
   // rv1 Listening (states.json 2b, 6a, 6b, 6c): Now playing opened over Volume One's page (Home > Volume One), Letter 1
   // read by Benjamin at 3:51 of 10:08, saved on this device; 6a-6c open a sheet over it.
   '2b-now-playing': { stack: OVER_VOLUME_ONE, playing: LETTER_ONE_PLAYING, player: { open: 'now-playing' } },

@@ -100,8 +100,31 @@ function grow(el) {
   if (box) box.style.minHeight = hold;
 }
 
+/**
+ * A count that moves when the page under `rootRef` changes width and once the faces have loaded: GrowField's `epoch`.
+ * @param {{ current: HTMLElement | null }} rootRef
+ */
+export function useGrowEpoch(rootRef) {
+  const [epoch, setEpoch] = React.useState(0);
+  React.useEffect(() => {
+    const el = rootRef.current;
+    let live = true;
+    const bump = () => { if (live) setEpoch((n) => n + 1); };
+    const fonts = /** @type {any} */ (document).fonts;
+    if (fonts && fonts.ready) fonts.ready.then(bump, () => {});
+    let ro = null;
+    let w = el ? el.clientWidth : 0;
+    if (el && typeof ResizeObserver === 'function') {
+      ro = new ResizeObserver(() => { if (el.clientWidth !== w) { w = el.clientWidth; bump(); } });
+      ro.observe(el);
+    }
+    return () => { live = false; if (ro) ro.disconnect(); };
+  }, [rootRef]);
+  return epoch;
+}
+
 /** A borderless field that grows with its words (the title, a paragraph); `epoch` re-measures after a resize or fonts. */
-function GrowField({ value, epoch, fieldRef = null, ...rest }) {
+export function GrowField({ value, epoch, fieldRef = null, ...rest }) {
   const ref = React.useRef(/** @type {HTMLTextAreaElement | null} */ (null));
   React.useLayoutEffect(() => { grow(ref.current); }, [value, epoch]);
   const setRef = (el) => {
@@ -248,8 +271,9 @@ export function JournalEditor({ route, gate, facts, desktop, go, onReady }) {
   blocksRef.current = blocks;
   const mounted = React.useRef(true);
   React.useEffect(() => () => { mounted.current = false; }, []);
-  const [epoch, setEpoch] = React.useState(0);
   const rootRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
+  // The fields re-measure when the page's width changes and once the faces have loaded.
+  const epoch = useGrowEpoch(rootRef);
   const titleRef = React.useRef(/** @type {HTMLTextAreaElement | null} */ (null));
   const fileRef = React.useRef(/** @type {HTMLInputElement | null} */ (null));
   /** The paragraph the cursor was last in, and where in it (Insert puts a block under it). */
@@ -276,22 +300,6 @@ export function JournalEditor({ route, gate, facts, desktop, go, onReady }) {
     inserters.push(openInsert);
     return () => { const i = inserters.indexOf(openInsert); if (i >= 0) inserters.splice(i, 1); };
   }, [gate]);
-
-  // The fields re-measure when the page's width changes and once the faces have loaded.
-  React.useEffect(() => {
-    const el = rootRef.current;
-    let live = true;
-    const bump = () => { if (live) setEpoch((n) => n + 1); };
-    const fonts = /** @type {any} */ (document).fonts;
-    if (fonts && fonts.ready) fonts.ready.then(bump, () => {});
-    let ro = null;
-    let w = el ? el.clientWidth : 0;
-    if (el && typeof ResizeObserver === 'function') {
-      ro = new ResizeObserver(() => { if (el.clientWidth !== w) { w = el.clientWidth; bump(); } });
-      ro.observe(el);
-    }
-    return () => { live = false; if (ro) ro.disconnect(); };
-  }, []);
 
   // After an insert, the cursor goes back where it was (or into the new paragraph).
   React.useLayoutEffect(() => {
