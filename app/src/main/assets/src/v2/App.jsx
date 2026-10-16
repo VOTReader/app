@@ -204,6 +204,14 @@ export function V2App({ gateId = readGateId() }) {
     else setShellSheet(name);
   }, [route]);
   const back = stack.length > 1 ? routeTitle(stack[stack.length - 2]) : null;
+  // A page's own first step back (Answers with words typed: Back says Answers and clears them, main's __screenBack): what
+  // the top bar says and does, and what Android's Back does once no sheet is open. The page sets it and takes it back.
+  // It belongs to the page that set it: a page that has left (its route gone) never lends its step to the next one.
+  const [backSet, setBackSet] = React.useState(/** @type {{ label: string, run: () => void, route: any } | null} */ (null));
+  const setBackStep = React.useCallback((/** @type {{ label: string, run: () => void } | null} */ step) => {
+    setBackSet(step ? { ...step, route: stackRef.current[stackRef.current.length - 1] } : null);
+  }, []);
+  const backStep = backSet && backSet.route === route ? backSet : null;
   // The player is shell chrome (rv1): the mini player / player bar, Now playing, its sheets, and full screen.
   const player = usePlayer(gate);
   const fs = useFullScreen({ enabled: !desktop && route.place === 'letter' && facts.doubleTapFullscreen !== false, gate });
@@ -225,13 +233,14 @@ export function V2App({ gateId = readGateId() }) {
   }, []);
   const pop = React.useCallback(() => { setReady(false); popped.current = true; setStack((s) => (s.length > 1 ? s.slice(0, -1) : s)); }, []);
   // Search names the page it was opened from (3h: main's "In Volume Three" chip); opened again from Search, it keeps it.
-  const openTab = React.useCallback((id) => {
+  // `extra` joins the tab's root (Answers' "Search the whole library": { q }, which Search opens on, zones' zs28).
+  const openTab = React.useCallback((/** @type {string} */ id, /** @type {Record<string, any>} */ extra = {}) => {
     setReady(false);
     kept.current = [];
     setStack((s) => {
-      if (id !== 'search') return [{ place: id }];
+      if (id !== 'search') return [{ place: id, ...extra }];
       const top = s[s.length - 1];
-      return [{ place: 'search', from: top && top.place === 'search' ? top.from : top }];
+      return [{ place: 'search', from: top && top.place === 'search' ? top.from : top, ...extra }];
     });
   }, []);
   const replace = React.useCallback((r) => {
@@ -257,13 +266,14 @@ export function V2App({ gateId = readGateId() }) {
 
   // Android's back (MainActivity calls window.handleAndroidBack): close an open sheet, else pop the stack, or let Android
   // leave at a root.
-  const chromeRef = React.useRef({ player, fs, pageTool });
-  chromeRef.current = { player, fs, pageTool };
+  const chromeRef = React.useRef({ player, fs, pageTool, backStep });
+  chromeRef.current = { player, fs, pageTool, backStep };
   React.useEffect(() => {
     g.handleAndroidBack = () => {
       if (closeTopSheet()) return 'true';
       if (chromeRef.current.pageTool) { setTool(null); return 'true'; }
       if (chromeRef.current.player.back() || chromeRef.current.fs.exit()) return 'true';
+      if (chromeRef.current.backStep) { chromeRef.current.backStep.run(); return 'true'; }
       if (stackRef.current.length > 1) { pop(); return 'true'; }
       return 'false';
     };
@@ -303,7 +313,7 @@ export function V2App({ gateId = readGateId() }) {
     contentClass = def.contentClass || 'content';
     actions = def.actions ? def.actions({ route, go, pop, desktop, device, open: openShell, gate, facts }) : null;
     screen = <Screen route={route} facts={facts} gate={gate} desktop={desktop} device={device}
-      go={go} pop={pop} replace={replace} openTab={openTab} onReady={onReady} open={openShell} />;
+      go={go} pop={pop} replace={replace} openTab={openTab} onReady={onReady} open={openShell} setBack={setBackStep} />;
   } else {
     screen = <NotYet title={routeTitle(route)} onReady={onReady} />;
   }
@@ -314,7 +324,9 @@ export function V2App({ gateId = readGateId() }) {
       <Icon name={t.icon} on={t.id === tab} />{t.label}
     </button>
   ));
-  const bar = <TopBar back={back} title={def && def.barTitle ? def.barTitle(route) : null} onBack={pop} actions={actions} scrolled={scrolled} />;
+  const bar = backStep
+    ? <TopBar back={backStep.label} title={null} onBack={backStep.run} actions={actions} scrolled={scrolled} />
+    : <TopBar back={back} title={def && def.barTitle ? def.barTitle(route) : null} onBack={pop} actions={actions} scrolled={scrolled} />;
   // main's storage health strip (9f, 9g): under the top bar, in the flow, on every screen; nothing while all is well
   const banner = <StorageBanner gate={gate} go={go} />;
   const noun = def && def.find ? def.find(route) : '';

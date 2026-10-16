@@ -32,7 +32,8 @@ const DAY = 24 * 3600 * 1000;
  * playing.savedRecording: the recording is in the Listening Library's Saved (2f's Save; default not).
  * @typedef {{ place: string, collection?: string, n?: number, kind?: string, id?: string, book?: string, chapter?: number | string,
  *   verse?: number, match?: string[], study?: string, list?: string, family?: string, q?: string, st?: string, page?: number,
- *   key?: string, start?: number, end?: number, text?: string, groupId?: string | null, from?: Record<string, any> }} Route
+ *   key?: string, start?: number, end?: number, text?: string, groupId?: string | null, from?: Record<string, any>,
+ *   cmd?: number, subject?: string }} Route
  * @typedef {{ item: Record<string, any>, reader: string, at: number, length: number, paused: boolean } & Record<string, any>} GatePlaying
  * `open` names a sheet the screen opens on the gate boot ({ sheet: 'mark-paragraph', para, colour } on a letter; the
  * shell's { sheet: 'text-and-theme' }; 9c's { toast: 'offline-listen' }, the Listen pill's); `look` the text and page
@@ -42,6 +43,8 @@ const DAY = 24 * 3600 * 1000;
  *   look?: { scale?: number, page?: string, lines?: string } }} GateState
  */
 
+/** Answers Only God Can Give opened from Home (2g-2l). */
+const ANSWERS = [{ place: 'home' }, { place: 'answers' }];
 /** Letter 1 of Volume One open at its first paragraph (4b, 4d-4f). */
 const LETTER_1 = [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }];
 const PARA_1_UNDER_BAR = { to: '.body [data-hl-key$=":0"]', gap: 20 };
@@ -280,6 +283,15 @@ export const GATE_STATES = {
   '6b-sleep': { stack: OVER_VOLUME_ONE, playing: { ...LETTER_ONE_PLAYING, sleep: { minutes: 30, left: 24 * 60 } }, player: { open: 'sleep' } },
   '6c-up-next': { stack: OVER_VOLUME_ONE, playing: LETTER_ONE_PLAYING, player: { open: 'up-next' } },
   '2f-player-more': { stack: OVER_VOLUME_ONE, playing: LETTER_ONE_PLAYING, player: { open: 'more' } },
+  // dz17 (mw10; states.json 2g-2l): Answers Only God Can Give from Home, main's own data (the boot asks for the Answers
+  // corpus as a reader's first visit does). 2h: Browse by subject 92 px below the screen top; 2i: commandment VI's sheet;
+  // 2j: "christmas" typed (Back says Answers), the field keeping focus with the keyboard closed.
+  '2g-answers': { stack: ANSWERS },
+  '2h-answers-subjects': { stack: ANSWERS, scroll: { to: '.sec.ans-subj', gap: 9 } },
+  '2i-commandment': { stack: [{ place: 'home' }, { place: 'answers', cmd: 6 }] },
+  '2j-answers-search': { stack: [{ place: 'home' }, { place: 'answers', q: 'christmas' }] },
+  '2k-answers-subject': { stack: [...ANSWERS, { place: 'answers/subject', subject: 'the-end-of-this-age' }] },
+  '2l-answers-az': { stack: [...ANSWERS, { place: 'answers/a-z' }] },
   // states.json 9b-full-screen: Letter 2 full screen (every bar hidden), paragraph 1 at the top, the hint showing.
   '9b-full-screen': {
     stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 2 }],

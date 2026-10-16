@@ -1,0 +1,9 @@
+/* answers.css - Answers Only God Can Give (mw10, design dz17: 2g-2l; screens.css draws them): the field is a real input
+   (search.css styles it) with the picture's paler placeholder; a commandment's numeral and label are buttons in the kit's
+   grid, pressed together; a hit opens; past eight mentions main's "n more topics"; a long commandment sheet scrolls. */
+.content.ans .field input.q::placeholder { color: var(--t3); }
+.v2 .grid2.cmds button { text-align: left; }
+.v2 .grid2.cmds button:active { background: var(--press); }
+.ans-res > .more { display: block; width: 100%; text-align: left; padding: 12px 0 4px; font-size: var(--fs-s); color: var(--tgold); }
+.ans-res .empty .textbtn { margin-top: 12px; }
+.v2 .sheet.cmd, .v2 .dlg.cmd { overflow-y: auto; overscroll-behavior: contain; }

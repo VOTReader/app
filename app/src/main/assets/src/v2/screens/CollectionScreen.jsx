@@ -97,7 +97,19 @@ function LetterRow({ e, playing, paused, words, dl, onOpen, onPlay, onRetry }) {
 }
 
 /** @param {import('../places.js').PlaceProps} props */
-export function CollectionScreen({ route, gate, go, onReady }) {
+/**
+ * A collection's page; the collection 'answers' (a route Home Recent or Search's Go to builds) has its own home
+ * (AnswersScreens.jsx, 2g) and is turned into it. @param {import('../places.js').PlaceProps} props
+ */
+export function CollectionScreen(props) {
+  const answers = props.route.collection === 'answers';
+  const { replace } = props;
+  React.useEffect(() => { if (answers && replace) replace({ place: 'answers' }); }, [answers, replace]);
+  return answers ? null : <VolumeScreen {...props} />;
+}
+
+/** @param {import('../places.js').PlaceProps} props */
+function VolumeScreen({ route, gate, go, onReady }) {
   const col = collectionOf(route.collection);
   const letters = useLetters(col);
   const np = useNowPlaying(gate);
