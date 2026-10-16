@@ -13,6 +13,7 @@ import './BibleChapterScreen.jsx';
 import './NoteEditor.jsx';
 import './BibleScreen.jsx';
 import './SettingsPages.jsx';
+import './TextPages.jsx';
 import './DownloadsPage.jsx';
 import './ReadingPages.jsx';
 import './PlansScreen.jsx';

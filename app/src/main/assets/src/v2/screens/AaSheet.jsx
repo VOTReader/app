@@ -1,6 +1,7 @@
 /* AaSheet - "Text and theme" (picture 1c-aa-sheet; desktop: the D4 dialog): text size on six steps, the page (Slate,
    Paper, Black) and line spacing. Every change shows at once and is kept (look.js); Done, the scrim, Escape and Back
-   close it. The shell opens it from a reading page's Aa button. */
+   close it. The shell opens it from a reading page's Aa button. Settings > Text and theme (7g, TextPages.jsx) is the
+   same controls as a page (AaControls), with main's preview sentence under Text size. */
 import { Sheet } from '../Sheet.jsx';
 import { TEXT_STEPS, PAGES, LINES, stepOf } from '../look.js';
 
@@ -9,6 +10,20 @@ import { TEXT_STEPS, PAGES, LINES, stepOf } from '../look.js';
  *   onClose: () => void }} props
  */
 export function AaSheet({ look, desktop = false, onChange, onClose }) {
+  return (
+    <Sheet kind="aa" label="Text and theme" desktop={desktop} onClose={onClose}>
+      <div className="sh">Text and theme</div>
+      <AaControls look={look} onChange={onChange} />
+      <button type="button" className="pill block done" onClick={onClose}>Done</button>
+    </Sheet>
+  );
+}
+
+/**
+ * Text size, Page and Line spacing; `preview` goes under the size (the page's sentence).
+ * @param {{ look: import('../look.js').Look, onChange: (look: import('../look.js').Look) => void, preview?: any }} props
+ */
+export function AaControls({ look, onChange, preview = null }) {
   const at = stepOf(look.scale);
   const toStep = (i) => {
     const n = Math.max(0, Math.min(TEXT_STEPS.length - 1, i));
@@ -29,8 +44,7 @@ export function AaSheet({ look, desktop = false, onChange, onClose }) {
     onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } },
   });
   return (
-    <Sheet kind="aa" label="Text and theme" desktop={desktop} onClose={onClose}>
-      <div className="sh">Text and theme</div>
+    <>
       <div className="aa-row"><span className="aa-k">Text size</span></div>
       <div className="size">
         <button type="button" className="sz-a s" aria-label="Smaller text" disabled={at === 0} onClick={() => toStep(at - 1)}>A</button>
@@ -40,6 +54,7 @@ export function AaSheet({ look, desktop = false, onChange, onClose }) {
         </div>
         <button type="button" className="sz-a l" aria-label="Larger text" disabled={at === TEXT_STEPS.length - 1} onClick={() => toStep(at + 1)}>A</button>
       </div>
+      {preview}
       <div className="aa-row"><span className="aa-k">Page</span></div>
       <div className="looks" role="radiogroup" aria-label="Page">
         {PAGES.map((p) => (
@@ -58,7 +73,6 @@ export function AaSheet({ look, desktop = false, onChange, onClose }) {
           </span>
         ))}
       </div>
-      <button type="button" className="pill block done" onClick={onClose}>Done</button>
-    </Sheet>
+    </>
   );
 }

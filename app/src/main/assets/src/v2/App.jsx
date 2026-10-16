@@ -19,6 +19,7 @@ import { FindStrip } from './FindStrip.jsx';
 import { AutoScrollPill } from './AutoScrollPill.jsx';
 import { StorageBanner } from './StorageBanner.jsx';
 import { applyLook, savedLook, saveLook, gateLook, sizeWord } from './look.js';
+import { applyReadingFont, DEFAULT_FONT } from './reading-font.js';
 import { useReadingRecord } from './reading-record.js';
 import { useReadingBars, READING_PLACES } from './reading-bars.js';
 import './screens/index.js';
@@ -182,6 +183,9 @@ export function V2App({ gateId = readGateId() }) {
   const facts = React.useMemo(() => (gate ? savedFactsAtBoot
     : { ...(settingsVer ? savedFacts() : savedFactsAtBoot), textSize: sizeWord(look.scale), page: look.page, lines: look.lines }),
   [gate, savedFactsAtBoot, look, settingsVer]);
+  // the reading font (reading-font.js): main's chosen one, else the kit's EB Garamond; a gate boot shows its picture's
+  const font = (facts && facts.readingFont) || DEFAULT_FONT;
+  React.useLayoutEffect(() => { applyReadingFont(font); }, [font]);
   // main's Keep the screen on (Settings > Reading; main's use-settings effect): the app holds the screen awake while open
   React.useEffect(() => {
     const pb = gate ? null : g.PlatformBridge;
@@ -313,7 +317,8 @@ export function V2App({ gateId = readGateId() }) {
     contentClass = def.contentClass || 'content';
     actions = def.actions ? def.actions({ route, go, pop, desktop, device, open: openShell, gate, facts }) : null;
     screen = <Screen route={route} facts={facts} gate={gate} desktop={desktop} device={device}
-      go={go} pop={pop} replace={replace} openTab={openTab} onReady={onReady} open={openShell} setBack={setBackStep} />;
+      go={go} pop={pop} replace={replace} openTab={openTab} onReady={onReady} open={openShell} setBack={setBackStep}
+      look={look} setLook={changeLook} />;
   } else {
     screen = <NotYet title={routeTitle(route)} onReady={onReady} />;
   }

@@ -5,6 +5,7 @@
    (v2-step2/screens/ref-4a-settings.html): "Standard size · Slate · comfortable lines", "Benjamin first · KJV Bible audio · 1×". */
 
 import { lookOf, sizeWord } from './look.js';
+import { readingFontOf } from './reading-font.js';
 
 const DAY = 24 * 3600 * 1000;
 
@@ -15,7 +16,7 @@ const PAGE_LABEL = { slate: 'Slate', paper: 'Paper', black: 'Black' };
 const SIZE_LABEL = { smaller: 'Smaller size', standard: 'Standard size', larger: 'Larger size' };
 
 /**
- * @typedef {{ textSize?: string, page?: string, lines?: string, translation?: string, doubleTapFullscreen?: boolean,
+ * @typedef {{ textSize?: string, page?: string, lines?: string, translation?: string, readingFont?: string, doubleTapFullscreen?: boolean,
  *   showChapterTitle?: boolean, showSectionHeadings?: boolean, restoredNames?: boolean, showInlineEchoes?: boolean,
  *   keepScreenOn?: boolean,
  *   reader?: string, bibleAudio?: string, speed?: number, downloads?: { count: number, bytes: number } | null,
@@ -31,6 +32,8 @@ export function readFacts(saved, { theme, speed } = /** @type {{ theme?: string,
   return {
     textSize: sizeWord(look.scale), page: look.page, lines: look.lines,
     translation: typeof s.translation === 'string' ? s.translation : 'nkjv',
+    // main's Reading font (fontStyle), as v2 reads it: chosen, else the kit's EB Garamond (reading-font.js)
+    readingFont: readingFontOf(s),
     doubleTapFullscreen: s.doubleTapFullscreen !== false,
     // main's Bible chrome (Settings > Reading, The Bible; each on by default, hooks/use-settings.js): a chapter's title
     // under its number, its section headings, the Restored-Name chrome, the Matthew Study Bible's reference echoes

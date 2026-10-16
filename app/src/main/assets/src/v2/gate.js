@@ -352,6 +352,9 @@ export const GATE_STATES = {
   },
   // states.json 7f-downloads (v2lis B1, dz16): Settings > Downloads from Home: Letters 1-3 of Volume One (Letter 3 with an
   // update) and John 1-3 as one row, 6 recordings · 40.4 MB, 2 more on their way; Wi-Fi only off; 2 songs kept; Standard.
+  // dz16 (mw11; states.json 7g-text-theme): Settings > Text and theme as a page: standard size, Slate, comfortable lines, EB
+  // Garamond (v2's own face) as the reading font.
+  '7g-text-theme': { stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/text' }], facts: { readingFont: 'modern' } },
   '7f-downloads': { stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/downloads' }], facts: { shelf: gateShelf(GATE_NOW) } },
   // states.json 4c-downloads (zv1): Volume One from Home while it downloads with no connection: the queue bar (12 of 29)
   // stuck under the top bar with Letter 4 right below it (gap = the bar's 59 px), 4 on this phone, 5 at 64 %, 6 failed,

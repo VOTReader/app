@@ -17,11 +17,13 @@
  *   go: (...routes: any[]) => void, pop: () => void, replace: (route: any) => void,
  *   openTab: (id: string, extra?: Record<string, any>) => void,
  *   onReady: () => void, open?: (name: string, opts?: Record<string, any>) => void,
- *   setBack?: (step: { label: string, run: () => void } | null) => void }} PlaceProps
+ *   setBack?: (step: { label: string, run: () => void } | null) => void,
+ *   look?: import('./look.js').Look, setLook?: (look: import('./look.js').Look) => void }} PlaceProps
  * `open` opens the shell's Text and theme sheet ('text-and-theme') or a page tool on this page ('find', 1i).
  * `openTab` opens a tab at its root; `extra` joins that root route (Answers hands Search its words: { q }).
  * `setBack` gives the page's own first step back (the top bar's words and tap, Android's Back once no sheet is open:
  * Answers with words typed says Answers and clears them); null takes it back. The page clears it when it goes.
+ * `look` / `setLook` are the reader's text and page (look.js), shown at once and kept: Settings > Text and theme (7g).
  */
 
 /**
