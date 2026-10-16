@@ -218,6 +218,21 @@ describe('the Answers pages', () => {
     expect(container.querySelector('.ans-hit .tt').textContent).toBe('The Holidays of Men');
   });
 
+  it('a hit tapped while the results trail the field by a keystroke opens with the words as typed (live walk: "christma")', async () => {
+    const { container } = boot(ANSWERS_HOME);
+    await waitFor(() => expect(container.querySelector('input.q')).not.toBe(null));
+    fireEvent.change(container.querySelector('input.q'), { target: { value: 'christma' } });
+    await waitFor(() => expect(container.querySelector('.ans-hit')).not.toBe(null));
+    // React keeps drawing the last results while the next keystroke's search is still under way
+    const real = g.React;
+    g.React = { ...real, useDeferredValue: (v) => { const d = real.useDeferredValue(v); return v === 'christmas' ? 'christma' : d; } };
+    undo.push(() => { g.React = real; });
+    fireEvent.change(container.querySelector('input.q'), { target: { value: 'christmas' } });
+    await click(container.querySelector('.ans-hit'));
+    await waitFor(() => expect(container.querySelector('.fnd input.q')).not.toBe(null));
+    expect(container.querySelector('.fnd input.q').value).toBe('christmas');
+  });
+
   it('past eight mentions, main\'s "n more topics" shows the rest', async () => {
     const { container } = boot(ANSWERS_HOME);
     await waitFor(() => expect(container.querySelector('input.q')).not.toBe(null));

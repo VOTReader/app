@@ -181,11 +181,14 @@ export function AnswersHome({ route, gate, desktop, go, replace, openTab, onRead
     replace(here);
     go(next);
   };
-  // a topic the words found opens at the passage that matched, marked, the Find strip holding the words as typed
+  // a topic the words found opens at the passage that matched, marked, the Find strip holding the words as typed (the
+  // results drawn can trail the field by a keystroke while the reader types: the words are the field's, not theirs)
   const openHit = (row) => {
     const r = topicRoute(entries, row.id);
-    if (!r || !res) return;
-    leave({ ...r, match: res.words, label: res.q, ...(row.at ? { excerpt: row.at } : {}) }, null);
+    const typedNow = query.trim();
+    const now = res && res.q === typedNow ? res : answersResults(entries, typedNow);
+    if (!r || !now) return;
+    leave({ ...r, match: now.words, label: typedNow, ...(row.at ? { excerpt: row.at } : {}) }, null);
   };
   const openListed = (row, cmd) => {
     const r = topicRoute(entries, row.id);
