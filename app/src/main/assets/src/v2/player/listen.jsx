@@ -63,13 +63,13 @@ export function listenRowFor(lf, engine, hlKey, { volKey, letter, collectionLabe
 
 /**
  * Start this Bible chapter (on through its book, main's playBibleBook), or say why it cannot make sound now.
- * @param {any} engine @param {{ volKey: string, book: string, chapter: number, label?: string | null }} what
+ * @param {any} engine @param {{ volKey: string, book: string, chapter: number | null, label?: string | null }} what
  * @param {((t: Toast) => void) | null | undefined} onToast
  */
 export function startChapter(engine, { volKey, book, chapter, label = null }, onToast) {
-  const words = offlineChapterWords(volKey, book, chapter);
+  const words = offlineChapterWords(volKey, book, chapter == null ? undefined : chapter);
   if (words) { if (onToast) onToast(offlineToast(words)); return; }
-  engine.playBibleBook({ volKey, bookId: book, label, chapterNum: chapter });
+  engine.playBibleBook(chapter == null ? { volKey, bookId: book, label } : { volKey, bookId: book, label, chapterNum: chapter });
 }
 
 /**
@@ -152,8 +152,9 @@ export function ListenPill({ gate, collection, n, volKey, letter, collectionLabe
 
 /**
  * A Bible chapter's pill (2c): Pause while this chapter plays, Resume · N min left, Listen; offline and not on the
- * phone, a tap says so. `volKey`/`label` are chapterAudio's (null: no pill).
- * @param {{ gate: any, book: string, chapter: number, volKey: string | null, label?: string | null,
+ * phone, a tap says so. `volKey`/`label` are chapterAudio's (null: no pill). `chapter` null: the whole book from its
+ * start, as main's chapter index (ChapterIndex's HeroListen; the Matthew index, 5h).
+ * @param {{ gate: any, book: string, chapter: number | null, volKey: string | null, label?: string | null,
  *   onToast?: ((t: Toast) => void) | null }} props
  */
 export function ChapterListenPill({ gate, book, chapter, volKey, label = null, onToast = null }) {
@@ -163,18 +164,18 @@ export function ChapterListenPill({ gate, book, chapter, volKey, label = null, o
   let tap = () => {};
   if (gate) {
     const p = gate.playing;
-    const here = !!(p && p.item && p.item.book === book && p.item.chapter === chapter);
+    const here = !!(p && p.item && p.item.book === book && (chapter == null || p.item.chapter === chapter));
     f = listenPill({ recorded: true, here, playing: here && !p.paused, offline: false, resume: null });
   } else if (engine && volKey) {
     const st = engine.getState();
     const cur = Array.isArray(st.queue) ? st.queue[st.qi] : null;
     // a book queues on through its chapters: here = this book's track AND this chapter of it
-    const here = !!(cur && cur.key === volKey + ':' + book && engine.bibleChapterOfTrack(cur) === chapter);
+    const here = !!(cur && cur.key === volKey + ':' + book && (chapter == null || engine.bibleChapterOfTrack(cur) === chapter));
     const recorded = !!engine.hasAudio(volKey, book);
     const offline = recorded && !here && !!offlineChapterWords(volKey, book, chapter);
     const playing = st.status === 'playing' || st.status === 'loading';
     const resume = !recorded || offline || (here && playing) ? null
-      : here ? pausedAt(st) : engine.listenResume({ volKey, bookId: book, chapterNum: chapter });
+      : here ? pausedAt(st) : engine.listenResume(chapter == null ? { volKey, bookId: book } : { volKey, bookId: book, chapterNum: chapter });
     f = listenPill({ recorded, here, playing, offline, resume });
     tap = () => { if (here) engine.toggle(); else startChapter(engine, { volKey, book, chapter, label }, onToast); };
   } else {

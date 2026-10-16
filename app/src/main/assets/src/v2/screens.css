@@ -775,3 +775,60 @@
 /* dz21 (2026-10-15): a chapter's title as the lede under its number, then the pill (Matthew's spacing, .mtx) */
 .page-head .lede + .pill.play { margin-top: 22px; }
 .at-match { margin-top: -440.7px; }   /* 5c: the head grew by the title's two lines and a 9 px gap, less 2 (57.7 px); the match stays where it was */
+/* dz22 (2026-10-15): making a link (v2-gaps 24): the paragraph sheet's Link row, the picker (Search | Browse | Recent), choosing
+   the words (a chapter's verses, a letter's words), the link icon at the paragraph's end, the Links sheet. */
+.lkp { display: flex; flex-direction: column; overflow: hidden; }
+.dlg.lkp { height: min(640px, 84%); padding-top: 22px; }
+.dlg.lkp > .sh, .dlg.lkp .lkbk { margin-right: 40px; }
+.lkp > .sh { margin-bottom: 12px; }
+.lkf { padding: 10px 12px 11px; border-radius: var(--r); background: var(--input); border: 1px solid var(--line); }
+.lkf .overline { display: block; }
+.lkft { font-size: var(--fs-s); color: var(--t1); margin-top: 6px; line-height: 1.25; }
+.lkfq { font-size: var(--fs-s); color: var(--t2); font-style: italic; line-height: 1.4; margin-top: 4px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.seg.lkt { margin: 14px 0 0; flex: none; }
+.lkb { flex: 1; min-height: 0; overflow: hidden; margin-top: 14px; }
+.chips.lks { margin-top: 12px; }
+.label.lkl { display: block; margin: 20px 0 6px; }
+.lkr { display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.lkr .lead { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--edge); display: grid; place-items: center; color: var(--tgold-hi); flex: none; }
+.lkr .lead svg { width: 20px; height: 20px; }
+.lkr .tx { flex: 1; min-width: 0; display: block; }
+.lkr .t { display: block; font-size: var(--fs-row1); color: var(--t1); line-height: 1.2; }
+.lkr .s { display: block; font-size: var(--fs-xs); color: var(--t2); margin-top: 3px; letter-spacing: .02em; }
+.lkr .v { font-size: var(--fs-s); color: var(--t-body); line-height: 1.45; margin-top: 6px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.lkr > svg { width: 20px; height: 20px; color: var(--accent); flex: none; margin-top: 10px; }
+.lkn { font-size: var(--fs-xs); color: var(--t2); line-height: 1.45; margin: 14px 0 0; }
+.lkrows .srow:last-child { border-bottom: 1px solid var(--line); }
+/* choosing the words: back one level, the hint, the text, the footer */
+.lkbk { display: flex; align-items: center; gap: 4px; margin: -6px 0 0 -10px; }
+.lkbk .sh { margin: 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lkh { font-size: var(--fs-xs); color: var(--t2); line-height: 1.45; margin: 6px 0 0; }
+.lkv p, .lkw p { font-size: var(--fs-m); line-height: 1.55; color: var(--t-body); margin: 0 0 10px; }
+.lkv .vn { display: inline-grid; place-items: center; min-width: 26px; height: 22px; margin-right: 4px; padding: 0 5px; border-radius: 11px; font-size: var(--fs-xs); color: var(--tgold); vertical-align: 2px; }
+.lkv .vn.on { background: var(--accent); color: var(--on-pill); }
+.lkv h3.lkvh { font-size: var(--fs-xs); letter-spacing: var(--track-caps); text-transform: uppercase; color: var(--tgold); font-weight: 400; margin: 18px 0 8px; }
+.selw { background: rgba(var(--gold-rgb), .26); color: var(--t1); box-decoration-break: clone; -webkit-box-decoration-break: clone; border-radius: 2px; }
+.hd { display: inline-block; position: relative; width: 2px; height: 1.15em; background: var(--accent); vertical-align: -0.2em; }
+.hd::after { content: ''; position: absolute; left: -5px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); }
+.hd.s::after { top: -10px; }
+.hd.e::after { bottom: -10px; }
+.lkfoot { flex: none; padding-top: 12px; border-top: 1px solid var(--line); margin: 0 calc(var(--gut) * -1); padding-left: var(--gut); padding-right: var(--gut); }
+.dlg .lkfoot { margin: 0 -24px; padding-left: 24px; padding-right: 24px; }
+.lkfoot .lkall { display: flex; justify-content: center; width: 100%; font-size: var(--fs-s); height: 44px; margin-top: 4px; }
+/* the link icon at the end of the linked paragraph (main's inline-link-icon; gold: this paragraph is a source) */
+.lki { display: inline-grid; place-items: center; width: 26px; height: 26px; margin-left: 4px; vertical-align: -4px; border-radius: 50%; color: var(--accent); }
+.lki svg { width: 18px; height: 18px; }
+.lki.on { background: rgba(var(--gold-rgb), .2); }
+.lkpg { padding-bottom: 24px; }
+.toast-wrap.dkt { left: calc(var(--rail) + (100% - var(--rail)) / 2); right: auto; width: 440px; transform: translateX(-50%); bottom: 28px; z-index: 6; }
+/* the Links sheet (main's LinkSidebar) */
+.lkct { font-size: var(--fs-xs); color: var(--t2); margin: -4px 0 4px; letter-spacing: .02em; }
+.lkc { margin: 10px 0 0; border-radius: var(--r); background: var(--input); border: 1px solid var(--line); padding: 11px 14px 0; }
+.lkco { display: block; width: 100%; text-align: left; }
+.lkc .je { display: block; font-size: var(--fs-xs); letter-spacing: var(--track-caps); text-transform: uppercase; color: var(--tgold); line-height: 1.2; }
+.lkc .jh { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--fs-m); color: var(--t1); margin-top: 7px; line-height: 1.2; }
+.lkc .jh > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lkc .jh svg { width: 18px; height: 18px; color: var(--t2); flex: none; }
+.lkc .jv { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: var(--fs-s); line-height: 1.45; color: var(--t-body); margin-top: 6px; }
+.lkcm { display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-xs); color: var(--t2); margin-top: 2px; }
+.lkcm .textbtn { font-size: var(--fs-s); height: 44px; margin-right: -4px; }

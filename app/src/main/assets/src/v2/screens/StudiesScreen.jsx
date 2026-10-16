@@ -11,6 +11,7 @@
 import { Icon } from '../Icon.jsx';
 import { definePlace } from '../places.js';
 import { useVotCorpus } from '../corpus.js';
+import { MatthewIndex } from './MatthewScreens.jsx';
 import {
   studyChain, studyById, studyRow, liveCoverage, studyRoute, studyHead, studyEntries, savedStudyPlace, partHolding,
   splitStudyTitle, askStudies, askMatthew, ANSWERS_SITE, MATTHEW_ID,
@@ -128,6 +129,8 @@ export function StudyScreen({ route, gate, go, onReady }) {
   }, [gate, study]);
   if (status === 'loading') return null;
   if (!study) return <div className="empty"><div className="t">This study could not be opened.</div></div>;
+  // the Matthew Study Bible is a book with notes: main's chapter index (5h)
+  if (study.isMatthewStudy) return <MatthewIndex study={study} place={place} gate={gate} go={go} />;
 
   const head = studyHead(study);
   const entries = studyEntries(study);
@@ -179,7 +182,9 @@ definePlace('study', {
   Screen: StudyScreen,
   // Back on a chapter names the study as lists do ("YAHUSHUA More Than a Man", 5d)
   title: (r) => {
-    const s = Array.isArray(g.BIBLE_STUDIES) || r.study === MATTHEW_ID ? studyById(r.study) : null;
+    // Back on a Matthew chapter says the book (5i)
+    if (r.study === MATTHEW_ID) return 'Matthew';
+    const s = Array.isArray(g.BIBLE_STUDIES) ? studyById(r.study) : null;
     return s ? splitStudyTitle(s.title).title : 'Study';
   },
 });

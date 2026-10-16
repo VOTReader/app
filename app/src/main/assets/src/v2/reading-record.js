@@ -64,6 +64,18 @@ export function visitOf(route, gl = g) {
       entry: { type: 'chapter', bookId, bookTitle: book.title || bookId, chapterNum: n, chapterTitle: ch.title || null },
     };
   }
+  // a Matthew Study Bible chapter (main's selectMatthewCh + use-nav-history-tracking's matthew-ch): the place 'matthew' at
+  // the chapter's number, read marks 'v1:matthew:<n>', and the history entry main writes, a chapter of the book 'matthew'
+  if (route.place === 'study-chapter' && route.study === 'matthew-study') {
+    const book = gl.MATTHEW && Array.isArray(gl.MATTHEW.chapters) ? gl.MATTHEW : null;
+    const n = Number(route.chapter);
+    const ch = book ? book.chapters.find((c) => c && c.num === n) : null;
+    if (!ch) return null;
+    return {
+      key: 'mt:' + n, active: 'matthew', slot: 'lastReadChapters', at: 'matthew', value: n, read: readKey('matthew', n),
+      entry: { type: 'chapter', bookId: 'matthew', bookTitle: 'Matthew', chapterNum: n, chapterTitle: ch.title || null },
+    };
+  }
   // a Bible study's chapter (main's selectStudyChapter + use-nav-history-tracking): the study's read key
   // 'bible-study-<slug>' is the place, lastReadChapters under it the chapter's id, read marks 'v1:bible-study-<slug>:<id>'
   if (route.place === 'study-chapter') {

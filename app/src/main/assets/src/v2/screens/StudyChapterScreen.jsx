@@ -13,8 +13,8 @@
    "Collapse all cards" / "Open all cards" (dz15).
 
    The ... holds Find in this chapter and the cards item for now; myweb's shared ... (MoreButton) takes it over with
-   Auto-scroll and Copy website link when it lands. A Matthew Study Bible chapter waits on design's 5i. A gate boot reads
-   its cards from the gate and writes nothing. */
+   Auto-scroll and Copy website link when it lands. A Matthew Study Bible chapter is main's ChapterView, not a letter:
+   MatthewScreens.jsx draws it (5i-5k). A gate boot reads its cards from the gate and writes nothing. */
 import { Icon } from '../Icon.jsx';
 import { LetterBlock } from '../letter-text.jsx';
 import { LetterScreen, LetterBookmark } from './LetterScreen.jsx';
@@ -22,6 +22,8 @@ import { Sheet } from '../Sheet.jsx';
 import { definePlace } from '../places.js';
 import { paraKey } from '../marks.js';
 import { useStudies } from './StudiesScreen.jsx';
+import { MatthewChapter } from './MatthewScreens.jsx';
+import { bookmarkOf } from '../matthew-facts.js';
 import {
   studyById, chapterOf, chapterEyebrow, chapterNext, groupCards, cardKey, chapterCardKeys, passagesWords, cardOpen, curly,
   MATTHEW_ID,
@@ -46,7 +48,7 @@ const subscribeShown = (/** @type {() => void} */ f) => { cardsShown.subs.add(f)
 
 /** The chapter a route names, once main's studies have loaded; null otherwise. @param {any} route */
 function chapterFor(route) {
-  const s = Array.isArray(g.BIBLE_STUDIES) ? studyById(route.study) : null;
+  const s = Array.isArray(g.BIBLE_STUDIES) || (route.study === MATTHEW_ID && g.MATTHEW) ? studyById(route.study) : null;
   return s ? { study: s, chapter: chapterOf(s, route.chapter) } : null;
 }
 
@@ -153,7 +155,7 @@ export function StudyChapterScreen({ route, gate, go, replace, onReady, desktop,
   const matthew = route.study === MATTHEW_ID;
   const { status } = useStudies(matthew);
   const live = !gate;
-  const found = status === 'ready' && !matthew ? chapterFor(route) : null;
+  const found = status === 'ready' ? chapterFor(route) : null;
   const study = found ? found.study : null;
   const chapter = found ? found.chapter : null;
   const saved = useSavedCards(live);
@@ -182,14 +184,15 @@ export function StudyChapterScreen({ route, gate, go, replace, onReady, desktop,
   React.useEffect(() => {
     if (chapter) publishAllOpen(chapter.id, chapterCardKeys(chapter).every((k) => cardOpen(states, k)));
   }, [chapter, states]);
-  // the letter page says when its text is on the page; a page with no chapter to show is ready at once
-  React.useEffect(() => { if (status !== 'loading' && (matthew || !chapter)) onReady(); }, [status, chapter, matthew, onReady]);
+  // the page says when its text is on the page; a page with no chapter to show is ready at once
+  React.useEffect(() => { if (status !== 'loading' && !chapter) onReady(); }, [status, chapter, onReady]);
 
   if (status === 'loading') return null;
-  if (matthew) {
-    return <div className="page-head g"><h1 className="display">{'Chapter ' + route.chapter}</h1><p className="lede">Not built yet in v2.</p></div>;
-  }
   if (!study || !chapter) return <div className="empty"><div className="t">This chapter could not be opened.</div></div>;
+  if (matthew) {
+    return <MatthewChapter key={chapter.num} study={study} ch={chapter} gate={gate} go={go} replace={replace} onReady={onReady}
+      desktop={desktop} facts={facts || {}} />;
+  }
   const nx = chapterNext(study, chapter);
   /** @type {import('./LetterScreen.jsx').PageDoc} */
   const doc = {
@@ -237,7 +240,7 @@ function StudyMore({ route, desktop, open }) {
         onClick={() => setShown((v) => !v)}><Icon name="more" /></button>
       {shown && (
         <Sheet kind="mor" label="More" onClose={close} desktop={desktop} scrim="light">
-          {chapter && <div className="sh">{curly(chapter.title)}</div>}
+          {chapter && <div className="sh">{route.study === MATTHEW_ID ? 'Matthew ' + chapter.num : curly(chapter.title)}</div>}
           {row('search', 'Find in this chapter', () => open && open('find'))}
           {keys.length > 0 && (allOpen ? row('minus', 'Collapse all cards', allTo(false)) : row('plus', 'Open all cards', allTo(true)))}
           <button type="button" className="textbtn cancel" onClick={close}>Cancel</button>
@@ -254,9 +257,11 @@ function StudyMore({ route, desktop, open }) {
 function studyChapterActions({ route, gate, open, desktop }) {
   const found = chapterFor(route);
   const chapter = found ? found.chapter : null;
+  // a Matthew chapter keeps main's own bookmark ('study:matthew-5', "Matthew 5 (Study)")
+  const mark = route.study === MATTHEW_ID && chapter ? bookmarkOf(chapter.num) : null;
   return (
     <>
-      <LetterBookmark route={route} gate={gate} item={chapter} noun="chapter" />
+      <LetterBookmark route={route} gate={gate} item={chapter} noun="chapter" mark={mark} />
       <button type="button" className="ic" aria-label="Text and theme" onClick={() => open && open('text-and-theme')}><Icon name="aa" /></button>
       <StudyMore route={route} desktop={desktop} open={open} />
     </>
@@ -267,6 +272,7 @@ definePlace('study-chapter', {
   Screen: StudyChapterScreen,
   // Back on a page above the chapter says its title
   title: (r) => {
+    if (r.study === MATTHEW_ID) return 'Matthew ' + r.chapter;
     const found = chapterFor(r);
     return found && found.chapter ? curly(found.chapter.title || '') : 'Study';
   },

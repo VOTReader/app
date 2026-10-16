@@ -586,10 +586,11 @@ function bookmarksVersion() {
  * Undo (main asked "delete?" first; the kit's toast undoes instead). Only the whole-letter bookmark counts: a bookmark on
  * one of its paragraphs is its own. The first save of a Safari tab waits on the 7-day notice (main drops that tap too).
  * A gate boot draws the empty icon and touches nothing. `item`: another page's text read as a letter (a study chapter,
- * main's same 'letter:<id>' bookmark), `noun` what it is called.
- * @param {{ route: any, gate: any, item?: any, noun?: string }} props
+ * main's same 'letter:<id>' bookmark), `noun` what it is called; `mark` a page main bookmarks under its own key and label
+ * (a Matthew chapter: 'study:matthew-5', "Matthew 5 (Study)").
+ * @param {{ route: any, gate: any, item?: any, noun?: string, mark?: { key: string, label: string } | null }} props
  */
-export function LetterBookmark({ route, gate, item = null, noun = 'letter' }) {
+export function LetterBookmark({ route, gate, item = null, noun = 'letter', mark = null }) {
   const live = !gate;
   const col = item ? null : collectionOf(route.collection);
   const letters = useLetters(col);
@@ -602,7 +603,7 @@ export function LetterBookmark({ route, gate, item = null, noun = 'letter' }) {
     return () => clearTimeout(t);
   }, [toast]);
   const B = live ? g.BookmarkStore : null;
-  const key = letter ? letterBookmarkKey(letter) : null;
+  const key = mark ? mark.key : letter ? letterBookmarkKey(letter) : null;
   const saved = B && key && typeof B.all === 'function' ? (B.all() || []).filter((b) => b && b.hlKey === key) : [];
   const on = saved.length > 0;
   const onClick = () => {
@@ -619,7 +620,7 @@ export function LetterBookmark({ route, gate, item = null, noun = 'letter' }) {
     if (firstSaveWaits()) return;
     const now = Date.now();
     const id = typeof g.bkmId === 'function' ? g.bkmId() : 'bkm_' + now + '_' + Math.random().toString(36).slice(2, 6);
-    B.add({ id, hlKey: key, label: letter.title || 'Letter bookmark', thought: '', created: now, updated: now });
+    B.add({ id, hlKey: key, label: (mark && mark.label) || letter.title || 'Letter bookmark', thought: '', created: now, updated: now });
     setToast({ text: 'Bookmarked. It is in Notes.', icon: 'bookmark' });
   };
   return (

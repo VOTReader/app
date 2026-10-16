@@ -87,12 +87,14 @@ export function LetterReadAlong({ gate, collection, n, volKey, letterId, bodyRef
 /**
  * Lights the verse being read on a Bible chapter (2c), as main's BibleChapterView mounts the wash. `bodyRef` holds the
  * element whose verse spans carry data-hl-key bible:<book>:<chapter>:<verse>; `volKey` is the edition the reader hears
- * (a gate boot uses the row's own); `textKey` changes when the words on the page change (a new translation).
+ * (a gate boot uses the row's own); `textKey` changes when the words on the page change (a new translation). `keyOf`
+ * (chapter, verse) names a verse's key when the page keys them otherwise (the Matthew Study Bible's study:matthew-<n>:<v>).
  * @param {{ gate: any, book: string, chapter: number, volKey: string, bodyRef: { current: HTMLElement | null },
- *   on?: boolean, follow?: boolean, onListen?: (() => void) | null, textKey?: string }} props
+ *   on?: boolean, follow?: boolean, onListen?: (() => void) | null, textKey?: string,
+ *   keyOf?: ((chapter: number, verse: number) => string) | null }} props
  */
-export function ChapterReadAlong({ gate, book, chapter, volKey, bodyRef, on = true, follow = true, onListen = null, textKey = '' }) {
-  const hlKeyFn = React.useCallback((/** @type {string} */ id, /** @type {number} */ v) => bibleHlKey(id, chapter, v), [chapter]);
+export function ChapterReadAlong({ gate, book, chapter, volKey, bodyRef, on = true, follow = true, onListen = null, textKey = '', keyOf = null }) {
+  const hlKeyFn = React.useCallback((/** @type {string} */ id, /** @type {number} */ v) => (keyOf ? keyOf(chapter, v) : bibleHlKey(id, chapter, v)), [chapter, keyOf]);
   if (gate) {
     return <StillWash at={on ? gateChapterAt(gate, book, chapter) : null} volKey={gateBibleVolKey(gate.playing)} letterId={book}
       chapter={chapter} hlKeyFn={hlKeyFn} bodyRef={bodyRef} />;

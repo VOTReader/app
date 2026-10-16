@@ -64,6 +64,9 @@ const STUDY_CH2 = [{ place: 'home' }, { place: 'studies' }, { place: 'study', st
 const CH2_CARDS = { 'more-than-a-man-ch2:0:nt': false, 'more-than-a-man-ch2:0:vot': false };
 /** What the chapter's page reads on 5d / 5f: no recording (no Listen), its cards as drawn. */
 const CH2_FACTS = { studies: { recorded: false, cards: CH2_CARDS } };
+/** The Matthew Study Bible from Home > Studies (5h), and its chapter 5 from there (5i-5k). */
+const MATTHEW_INDEX = [{ place: 'home' }, { place: 'studies' }, { place: 'study', study: 'matthew-study' }];
+const MATTHEW_5 = [...MATTHEW_INDEX, { place: 'study-chapter', study: 'matthew-study', chapter: '5' }];
 const LETTER_ONE_PLAYING = { item: { collection: 'one', n: 1 }, reader: 'B', at: 231, length: 608, paused: false, saved: true };
 
 /** @type {Record<string, GateState>} */
@@ -288,6 +291,16 @@ export const GATE_STATES = {
   // (the scroller starts under the 27 px status bar and the 56 px top bar: 92 - 83), the Old Testament card open, the
   // New Testament and Volumes of Truth cards closed (main opens every card; the gate closes these two).
   '5f-prophecy-cards': { stack: STUDY_CH2, facts: CH2_FACTS, scroll: { to: '.body .pgrp', gap: 9 } },
+  // states.json 5h-matthew (dz18): the Matthew Study Bible from Studies, at the top: chapters 1 and 2 read, 3 the one you
+  // are on (lit, so the S22 frame shows it); Matthew is recorded, so Listen shows.
+  '5h-matthew': { stack: MATTHEW_INDEX, facts: { studies: { place: { current: '3', read: ['1', '2'] } } } },
+  // states.json 5i-matthew-chapter: Matthew 5 from the index, at the top; Study notes on PDF (main's default for a new tab)
+  '5i-matthew-chapter': { stack: MATTHEW_5, facts: { matthew: { notes: 'pdf' } } },
+  // states.json 5j-matthew-notes: the same in PDF, scrolled so the Volumes of Truth notes section sits 330 px below the
+  // screen top (the scroller starts 83 px down: the 27 px status bar and the 56 px top bar)
+  '5j-matthew-notes': { stack: MATTHEW_5, facts: { matthew: { notes: 'pdf' } }, scroll: { to: '.spn .sp-vot', gap: 247, phone: true } },
+  // states.json 5k-matthew-inline: the same in Inline, verse 3 100 px below the screen top
+  '5k-matthew-inline': { stack: MATTHEW_5, facts: { matthew: { notes: 'inline' } }, scroll: { to: '#v-3', gap: 17, phone: true } },
 };
 
 /**
