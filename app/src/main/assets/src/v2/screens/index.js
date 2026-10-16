@@ -5,6 +5,7 @@ import './SettingsScreen.jsx';
 import './LetterScreen.jsx';
 import './CollectionScreen.jsx';
 import './NotesScreen.jsx';
+import './Notebooks.jsx';
 import './JournalEditor.jsx';
 import './SearchScreen.jsx';
 import './BibleChapterScreen.jsx';

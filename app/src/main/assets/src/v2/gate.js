@@ -6,7 +6,7 @@
    it is inert on the live website; an id this build does not know yet sets data-gate="unknown" (the shooter then fails by
    name). Each entry below is the states.json row for that id, in the app's terms; add one per screen as it is built. */
 
-import { gateMarks } from './notes-facts.js';
+import { gateMarks, gateNotebookMarks, GATE_NOTEBOOKS } from './notes-facts.js';
 import { GATE_CHOSEN } from './search-facts.js';
 import { gateListening, gateData } from './settings-pages.js';
 import { gateReading } from './reading-settings.js';
@@ -88,6 +88,9 @@ const JOURNAL_FACTS = {
   journalMedia: { 'gate-photo': 'src/v2/_gate/journal-photo.jpg' },
   journalMemo: { at: 18 },
 };
+/** dz20's notebooks (3i-3l): main's three notebooks and the notes in them. */
+const NOTEBOOK_FACTS = { notebooks: GATE_NOTEBOOKS, marks: gateNotebookMarks(GATE_NOW), now: GATE_NOW };
+const NOTEBOOK_STACK = [{ place: 'notes', kind: 'note' }];
 const JOURNAL_ENTRY_STACK = [{ place: 'notes', kind: 'all' }, { place: 'journal-entry', id: 'gate-je' }];
 /** 3p's live level as the picture draws it (its 40 bars' px over the recorder's 44 px top). */
 const REC_LEVEL = [4, 5, 24, 24, 13, 33, 19, 6, 15, 40, 37, 9, 10, 16, 25, 6, 33, 28, 6, 9, 34, 41, 15, 13, 6, 23, 8, 30, 35, 13, 5, 27,
@@ -251,6 +254,16 @@ export const GATE_STATES = {
   '3d-notes-journal': { stack: [{ place: 'notes', kind: 'journal' }], facts: { marks: gateMarks(GATE_NOW), now: GATE_NOW } },
   // states.json 8c-notes-empty: nothing marked yet.
   '8c-notes-empty': { stack: [{ place: 'notes', kind: 'all' }], facts: { marks: [], now: GATE_NOW } },
+  // states.json 3i-notes-notebooks (dz20, mw9d): the Notes chip: Notebooks (Uncategorized 2, Sabbath study 4, Prophecy 3,
+  // For the family 1, + New notebook), then All notes, Sabbath study's four first.
+  '3i-notes-notebooks': { stack: NOTEBOOK_STACK, facts: NOTEBOOK_FACTS },
+  // states.json 3j-notebook: Sabbath study's page, newest first; 3k-notebook-more: its ... open.
+  '3j-notebook': { stack: [...NOTEBOOK_STACK, { place: 'notebook', id: GATE_NOTEBOOKS[0].id }], facts: NOTEBOOK_FACTS },
+  '3k-notebook-more': { stack: [...NOTEBOOK_STACK, { place: 'notebook', id: GATE_NOTEBOOKS[0].id }], facts: NOTEBOOK_FACTS,
+    open: { sheet: 'more' } },
+  // states.json 3l-notebook-new: 3i with + New notebook tapped: "Questions" typed, Plum (main's purple) chosen.
+  '3l-notebook-new': { stack: NOTEBOOK_STACK, facts: NOTEBOOK_FACTS,
+    open: { sheet: 'notebook-new', form: { name: 'Questions', color: 'purple' } } },
   // rv1 Listening (states.json 2b, 6a, 6b, 6c): Now playing opened over Volume One's page (Home > Volume One), Letter 1
   // read by Benjamin at 3:51 of 10:08, saved on this device; 6a-6c open a sheet over it.
   '2b-now-playing': { stack: OVER_VOLUME_ONE, playing: LETTER_ONE_PLAYING, player: { open: 'now-playing' } },

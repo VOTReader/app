@@ -274,7 +274,7 @@ export function V2App({ gateId = readGateId() }) {
   if (def) {
     const Screen = def.Screen;
     contentClass = def.contentClass || 'content';
-    actions = def.actions ? def.actions({ route, go, desktop, device, open: openShell, gate, facts }) : null;
+    actions = def.actions ? def.actions({ route, go, pop, desktop, device, open: openShell, gate, facts }) : null;
     screen = <Screen route={route} facts={facts} gate={gate} desktop={desktop} device={device}
       go={go} pop={pop} replace={replace} openTab={openTab} onReady={onReady} open={openShell} />;
   } else {

@@ -22,7 +22,7 @@
 /**
  * @typedef {{ Screen: (props: PlaceProps) => any,
  *   title?: (route: any) => string,
- *   actions?: (ctx: { route: any, go: (...routes: any[]) => void, desktop: boolean, device: 'phone' | 'computer',
+ *   actions?: (ctx: { route: any, go: (...routes: any[]) => void, pop?: () => void, desktop: boolean, device: 'phone' | 'computer',
  *     open?: (sheet: string, opts?: Record<string, any>) => void, gate?: any, facts?: Record<string, any> }) => any,
  *   contentClass?: string, bare?: boolean, rail?: boolean, rootClass?: string, find?: (route: any) => string, barTitle?: (route: any) => string }} PlaceDef
  * `barTitle` is what the top bar says on this page when it is not Back's place (3n: "Journal entry" over Back to Notes).

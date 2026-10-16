@@ -36,3 +36,6 @@
 .rec .recq { margin: 20px 0 0; color: var(--t1); line-height: 1.5; }
 .rec .stack { text-align: left; }
 .rec .recc { margin: 20px 0 4px; text-align: left; }
+/* mw9d: a notebook card is a button (3i): its name a block line, so the kit's ellipsis applies */
+.nbc .nbn { display: block; }
+.swatch.own { border-color: var(--swatch-edge); }

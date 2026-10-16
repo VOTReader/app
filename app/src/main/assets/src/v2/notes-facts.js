@@ -14,8 +14,9 @@ const DAY = 24 * 3600 * 1000;
  * One row in Notes.
  * @typedef {{ kind: 'journal' | 'highlight' | 'note' | 'bookmark' | 'link', id: string, at: number,
  *   title?: string, text?: string, quote?: string, note?: string, colour?: string, where?: string,
- *   label?: string, open?: Record<string, any> | null }} Mark
- *   label: the meta line's first words when not the kind's name ("Saved recording")
+ *   label?: string, open?: Record<string, any> | null, gid?: string, nb?: string[] }} Mark
+ *   label: the meta line's first words when not the kind's name ("Saved recording"); a note's gid is main's groupId and
+ *   nb its notebookIds (notebook-facts.js)
  */
 
 /** The chips, in the picture's order (Journal second: Corbin asked how to reach his journal, 10-14 17:4x). */
@@ -33,7 +34,7 @@ export const LEDES = {
   all: 'Everything you marked, newest first',
   journal: 'Your own entries, newest first',
   highlight: 'Words you highlighted, newest first',
-  note: 'Your notes on the text, newest first',
+  note: 'Your notes and their notebooks',
   bookmark: 'Places you saved, newest first',
   link: 'Passages you joined, newest first',
 };
@@ -275,7 +276,8 @@ export function readMarks(env = globalThis) {
       const p = at((n.keys || [])[0]);
       const quote = String(n.fullText || '').replace(/\s+/g, ' ').trim();
       marks.push({ kind: 'note', id: 'note:' + n.groupId, at: n.updated || n.created || 0,
-        quote: quote ? curly(clip(quote, 160)) : '', note: String(n.body || '').trim(), where: p.where, open: p.open });
+        quote: quote ? curly(clip(quote, 160)) : '', note: String(n.body || '').trim(), where: p.where, open: p.open,
+        gid: n.groupId, nb: Array.isArray(n.notebookIds) ? n.notebookIds : [] });
     }
   }
   const B = env.BookmarkStore;
@@ -328,4 +330,34 @@ export function gateMarks(now) {
     { kind: 'journal', id: 'journal:g3', at: d(12), title: 'Questions for this month', text: 'Read the Answers on the Sabbath, then John 3 again.' },
   ];
   return /** @type {Mark[]} */ (all);
+}
+
+/** The gate's notebooks (dz20 3i-3m), as main keeps them: Sabbath study (green), Prophecy (blue), For the family (pink). */
+export const GATE_NOTEBOOKS = [
+  { id: 'gate-nb-sabbath', name: 'Sabbath study', color: 'green' },
+  { id: 'gate-nb-prophecy', name: 'Prophecy', color: 'blue' },
+  { id: 'gate-nb-family', name: 'For the family', color: 'pink' },
+];
+
+/**
+ * The notes behind GATE_NOTEBOOKS: Sabbath study's four are the newest (3j's), and the counts are 3i's: 2 in no notebook,
+ * Sabbath study 4, Prophecy 3, For the family 1 (a note can sit in more than one).
+ */
+export function gateNotebookMarks(now) {
+  const d = (n) => now - n * DAY;
+  const [S, P, F] = GATE_NOTEBOOKS.map((nb) => nb.id);
+  const note = (gid, days, quote, text, n, nb) => ({ kind: 'note', id: 'note:' + gid, gid, at: d(days), quote: curly(quote), note: text,
+    where: 'Volume One · Letter ' + n, nb });
+  return /** @type {Mark[]} */ ([
+    note('gnb1', 0, 'For I AM, and My Word the same.', 'Malachi 3:6 says the same.', 5, [S, P]),
+    note('gnb2', 1, 'Let your hearts guide you, for on them have I written many things, and will continue to do so.',
+      'Ask the children what this means to them.', 3, [S]),
+    note('gnb3', 3, 'So then shine forth, O child of Zion, stand firm.', 'Read aloud on Sunday.', 6, [S]),
+    note('gnb4', 5, 'And though you feel weak and helpless, as a young child struggling to gain his feet, I will strengthen you, for I am with you.',
+      'Where we started.', 1, [S]),
+    note('gnb5', 8, 'the children of God must be cleansed and set apart for My glory, says The Lord.', 'Cleansed, then set apart.', 16, [P]),
+    note('gnb6', 10, 'Many things you must overcome in the years ahead.', 'For the years ahead.', 1, [P, F]),
+    note('gnb7', 12, 'Timothy, write as I speak.', 'Read this again on Sunday.', 1, []),
+    note('gnb8', 14, 'Thus says The Lord.', 'Where it begins.', 2, []),
+  ]);
 }
