@@ -8,7 +8,7 @@
    inert. */
 import { Icon } from '../Icon.jsx';
 import { Sheet } from '../Sheet.jsx';
-import { defineOverlay } from '../places.js';
+import { defineOverlay, placeFor } from '../places.js';
 import { hasInstallPrompt, wasInstalled, subscribeInstall, promptInstall } from '../../utils/install-offer.js';
 import { liveFlow, visitNumber, readOffer, offerNow, offerWords, endOffer, STEPS } from '../first-run-facts.js';
 
@@ -109,7 +109,7 @@ function LiveOffer({ route, desktop }) {
   // a page the reader stays on for a moment, where the rules say yes, opens the offer
   React.useEffect(() => {
     if (open || shownThisSession || !flow || installed) return undefined;
-    const ok = offerNow({ flow, visit: visitNumber(), state: readOffer(), place: route.place, moved, shown: shownThisSession, now: Date.now() });
+    const ok = offerNow({ flow, visit: visitNumber(), state: readOffer(), place: route.place, bare: !!(placeFor(route.place) || {}).bare, moved, shown: shownThisSession, now: Date.now() });
     if (!ok) return undefined;
     const t = setTimeout(() => { shownThisSession = true; setOpen(true); }, SETTLE_MS);
     return () => clearTimeout(t);

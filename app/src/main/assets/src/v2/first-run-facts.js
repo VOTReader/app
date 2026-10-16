@@ -95,11 +95,12 @@ const NOT_OVER = new Set(['letter', 'bible-chapter', 'study-chapter', 'note', 'j
 
 /**
  * Whether the offer opens now: a browser that installs, the second visit or later, main's rules (snooze, never, three
- * dismissals), once a session, after the reader has moved off the first page, and not over reading.
- * @param {{ flow: string | null, visit: number, state: OfferState, place: string, moved: boolean, shown: boolean, now: number }} c
+ * dismissals), once a session, after the reader has moved off the first page, and not over reading or a bare place
+ * (`bare`: the place's def draws it alone in the window).
+ * @param {{ flow: string | null, visit: number, state: OfferState, place: string, bare?: boolean, moved: boolean, shown: boolean, now: number }} c
  */
 export function offerNow(c) {
-  if (c.visit < 2 || !c.moved || NOT_OVER.has(c.place)) return false;
+  if (c.visit < 2 || !c.moved || c.bare || NOT_OVER.has(c.place)) return false;
   return shouldOffer(c.state, { flow: c.flow, engaged: true, shownThisSession: c.shown, now: c.now });
 }
 

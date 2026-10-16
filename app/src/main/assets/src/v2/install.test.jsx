@@ -59,6 +59,11 @@ describe('offerNow', () => {
     expect(offerNow({ ...yes, place: 'garden' })).toBe(false);
   });
 
+  it('never over any bare place (drawn alone in the window), listed or not', () => {
+    expect(offerNow({ ...yes, place: 'some-new-full-screen', bare: true })).toBe(false);
+    expect(offerNow({ ...yes, place: 'some-new-full-screen', bare: false })).toBe(true);
+  });
+
   it('main rules: a browser that installs, once a session, snoozed, never, three dismissals', () => {
     expect(offerNow({ ...yes, flow: null })).toBe(false);
     expect(offerNow({ ...yes, shown: true })).toBe(false);
