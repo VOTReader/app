@@ -771,7 +771,11 @@
    "chapter": 11,
    "verse": 13,
    "sentence": "For all the prophets and the Law prophesied until John.",
-   "q": "every prophet and the law spoke of what was coming up to john"
+   "q": "all prophets and the law were prophesying up to john",
+   "retired": {
+    "q": "every prophet and the law spoke of what was coming up to john",
+    "why": "arguable: Luke 16:16, the parallel (\"The law and the prophets were until John\"), fits the old query as well (miss audit 2026-10-15; rewritten blind, sr11 2026-10-15)"
+   }
   },
   {
    "id": "t048",
@@ -3702,7 +3706,11 @@
    "title": "The Day of Astonishment",
    "blockIdx": 1,
    "sentence": "For I shall stretch out My hand against the nations, And My strength shall be made fully known...",
-   "q": "god reaching his hand out against the nations so everyone sees his power"
+   "q": "god says his strength will be completely made known to the nations",
+   "retired": {
+    "q": "god reaching his hand out against the nations so everyone sees his power",
+    "why": "arguable: Volume Seven \"I Shall Bring My Hand Against ALL Nations Who Have Forsaken Me\" fits the old query as well (miss audit 2026-10-15; rewritten blind, sr11 2026-10-15)"
+   }
   },
   {
    "id": "t252",
@@ -4758,7 +4766,11 @@
    "title": "ONE",
    "blockIdx": 0,
    "sentence": "For the time has come and is coming and is already here, when all signs and wonders shall be made manifest, when all prophecy shall be fulfilled.",
-   "q": "where the lord says every prophecy will now be fulfilled"
+   "q": "signs and wonders made plain and all prophecy done redemption drawing near",
+   "retired": {
+    "q": "where the lord says every prophecy will now be fulfilled",
+    "why": "arguable: Volume Six \"Fulfilled\" and Matthew 1:22 fit \"every prophecy will be fulfilled\" as well (miss audit 2026-10-15; rewritten blind, sr11 2026-10-15)"
+   }
   },
   {
    "id": "t327",
@@ -5239,7 +5251,11 @@
    "title": "Blessed Are Those Who Walk in My Ways",
    "blockIdx": 0,
    "sentence": "† It is written: “Who can know the mind of God?”",
-   "q": "scripture asks who is able to understand what god is thinking"
+   "q": "blessed are those who walk his ways since no one knows the mind of god",
+   "retired": {
+    "q": "scripture asks who is able to understand what god is thinking",
+    "why": "arguable: the sentence quotes scripture; Romans 11:34 and Volume Six \"What Is Man\" fit the old query as well (miss audit 2026-10-15; rewritten blind, sr11 2026-10-15)"
+   }
   },
   {
    "id": "t361",
@@ -6754,7 +6770,11 @@
    "title": "The False Doctrine of \"The Trinity\" Exposed - The Holy Spirit is Not a Person — Conclusion: Thus Says The Lord",
    "blockIdx": 10,
    "sentence": "Thus says The Lord to His servant: Timothy, think not in earthly terms, nor consider by human means.",
-   "q": "where god tells timothy the holy spirit isnt a person but a gift"
+   "q": "lord tells timothy not to think in earthly terms about the spirit",
+   "retired": {
+    "q": "where god tells timothy the holy spirit isnt a person but a gift",
+    "why": "arguable: Volume Two \"The Holy Spirit\" (not a person, a gift) fits the old query as well; every letter is spoken to Timothy (miss audit 2026-10-15; rewritten blind, sr11 2026-10-15)"
+   }
   },
   {
    "id": "t469",
