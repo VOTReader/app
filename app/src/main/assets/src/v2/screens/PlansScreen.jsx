@@ -8,9 +8,31 @@ import { Sheet } from '../Sheet.jsx';
 import { useVotCorpus } from '../corpus.js';
 import { savedSettings } from '../settings-pages.js';
 import {
-  PACES, plansView, gatePlans, savedPlans, writePlans, liveIsRead, liveSequence, itemRoute, listenItem,
+  PACES, WEEKDAYS, plansView, gatePlans, savedPlans, writePlans, liveIsRead, liveSequence, itemRoute, listenItem,
   startPlan, stopPlan,
 } from '../plans-facts.js';
+
+/** A plan's month under its actions (9a, main's month): read days carry a gold tick, a missed day a ring, today a gold
+ *  box; the days ahead and those outside the plan are dim. This month only, as main. @param {{ month: import('../plans-facts.js').MonthView }} props */
+export function Month({ month }) {
+  return (
+    <div className="pmo" role="group" aria-label={month.name}>
+      <div className="pmo-n">{month.name}</div>
+      <div className="pmo-g">
+        {WEEKDAYS.map((w, i) => <span key={'w' + i} className="pmo-w" aria-hidden="true">{w}</span>)}
+        {Array.from({ length: month.lead }, (_x, i) => <span key={'b' + i} className="pmo-d none" />)}
+        {month.days.map((d) => (
+          <span key={d.date} className={'pmo-d ' + d.state} aria-label={d.label}>
+            <span className="num">{d.date}</span>
+            <span className="mk" aria-hidden="true">
+              {d.done && d.state !== 'none' ? <Icon name="check" /> : d.state === 'missed' ? <span className="ring" /> : null}
+            </span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /**
  * @param {{ view: import('../plans-facts.js').PlansView, pace: number, markOff?: boolean, desktop?: boolean,
@@ -41,6 +63,7 @@ export function PlansScreen({ view, pace, markOff = false, desktop = false, onPa
                 {r.catchUp ? <button type="button" className="textbtn sm" onClick={call(onRead, r.catchUp)}>Catch up</button> : null}
               </div>
             ) : null}
+            {r.month ? <Month month={r.month} /> : null}
           </section>
         ))}
         {view.offers.map((o) => (

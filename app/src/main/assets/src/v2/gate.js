@@ -11,7 +11,7 @@ import { GATE_CHOSEN } from './search-facts.js';
 import { gateListening, gateData } from './settings-pages.js';
 import { gateReading } from './reading-settings.js';
 import { gateDownloads } from './offline-facts.js';
-import { gatePlans } from './plans-facts.js';
+import { gatePlans, gateToday } from './plans-facts.js';
 import { gateShelf } from './downloads-facts.js';
 import { gateSongsHub, gateSongPage } from './songs-gate.js';
 
@@ -306,9 +306,18 @@ export const GATE_STATES = {
     facts: { offline: true },
     open: { toast: 'offline-listen' },
   },
-  // states.json 9a-plans (zv1): Reading plans from Home; Bible in a Year on day 40 of 365 (Numbers 11-13, a day to catch
-  // up, 11 % done), the Volumes in Order not started with 2 a day chosen.
+  // states.json 9a-plans (zv1; redrawn dz24): Reading plans from Home; Bible in a Year on day 40 of 365 (Numbers 11-13, a
+  // day to catch up, 10 % done) with October under its actions, the Volumes in Order not started with 2 a day chosen.
   '9a-plans': { stack: [{ place: 'home' }, { place: 'reading-plans' }], facts: { plans: gatePlans() } },
+  // states.json 9h-home-today, 9i-home-today-two (dz24): Home with today's reading under Recent (one plan; then Bible in
+  // a Year and the Volumes), scrolled so the card's top sits 129 px under the top bar. 9h keeps 0a's paused Letter 1.
+  '9h-home-today': {
+    stack: [{ place: 'home' }],
+    facts: { ...HOME_FACTS, today: gateToday(1) },
+    scroll: { to: '.tdy', gap: 129 },
+    playing: { ...LETTER1_AT_351, paused: true },
+  },
+  '9i-home-today-two': { stack: [{ place: 'home' }], facts: { ...HOME_FACTS, today: gateToday(2) }, scroll: { to: '.tdy', gap: 129 } },
   // states.json 8a-welcome (zv1): the welcome a first visit opens on; no tab, no Back, no bars.
   '8a-welcome': { stack: [{ place: 'welcome' }] },
   // states.json 8b-install (zv1): Volume One from Home in a browser on the second visit, the offer open; this browser

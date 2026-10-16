@@ -1,6 +1,7 @@
 /* HomeScreen - v2 Home, the Home tab's root (pictures 0a-home, 0b-home-more; Corbin 10-14 "three, drop duplicates").
 
-   The display title, Continue reading (main's "you are here"), Recent (main's reading history), the seven volumes with
+   The display title, Continue reading (main's "you are here"), Recent (main's reading history), today's reading while a
+   plan runs (TodayCard.jsx, pictures 9h and 9i), the seven volumes with
    their letter counts, then the Bible, Answers, Studies, plans, More letters and Listen and see. Settings is the gear in
    the top bar. Numbers and titles come from the corpus itself (corpus.js); the screen is ready once it has loaded. */
 import { Icon } from '../Icon.jsx';
@@ -9,6 +10,10 @@ import { useVotCorpus, useAnswersCorpusVersion, askAnswersCorpus, useAudioSyncSe
 import { VOLUMES, MORE_LETTERS, savedHome, describeItem, itemRoutes, letterCount, colOf, wantsAnswers } from '../home-facts.js';
 import { noticeSeen } from '../garden-facts.js';
 import { GardenNotice, noticeTier } from './GardenScreens.jsx';
+import { TodayCard } from './TodayCard.jsx';
+import { todayView, savedPlans, liveIsRead, liveSequence, gateIsRead, itemRoute, listenItem } from '../plans-facts.js';
+import { savedSettings } from '../settings-pages.js';
+import { useNow } from '../../ui/components/TodayCard.jsx';
 
 /** Where a reader with nothing read yet starts. @type {import('../home-facts.js').HomeItem} */
 const FIRST = { kind: 'letter', collection: 'one', n: 1 };
@@ -70,6 +75,16 @@ export function HomeScreen({ gate, facts, go, onReady, desktop, device }) {
     if (!gate && wantsAnswers(home)) askAnswersCorpus().catch(() => { /* the loader flags the error; the topic stays out */ });
   }, [gate, home]);
   React.useEffect(() => { if (corpus !== 'loading') onReady(); }, [corpus, onReady]);
+  // Today's reading (9h, 9i): the plans in settings and main's read record, read again each time Home draws (it comes
+  // back to the top of the stack after a reading); the date turns over at midnight and on coming back to the front
+  const seeded = gate ? (gate.facts && gate.facts.today) || null : null;
+  const plans = gate ? (seeded ? seeded.plans : []) : savedPlans();
+  const wantsVolumes = plans.some((p) => p.id === 'volumes');
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- corpus is the trigger: liveSequence() reads the globals its load fills
+  const seq = React.useMemo(() => (wantsVolumes ? liveSequence() : []), [wantsVolumes, corpus]);
+  const now = useNow();
+  const today = todayView({ plans, now: seeded ? new Date(seeded.now) : now, isRead: gate ? gateIsRead(plans, seq) : liveIsRead(), seq });
+  const openPlanItem = (it) => { const r = itemRoute(it); if (r) go(r); };
 
   const contDesc = home.continue ? describeItem(home.continue) : null;
   const target = contDesc ? home.continue : FIRST;
@@ -101,6 +116,9 @@ export function HomeScreen({ gate, facts, go, onReady, desktop, device }) {
             {recent.map(({ it, d }, i) => <button key={i} type="button" className="chip" onClick={open(it)}>{d.chip}</button>)}
           </div>
         )}
+        <TodayCard view={today} markOff={!gate && savedSettings().markAsRead === false}
+          onPlans={() => go({ place: 'reading-plans' })} onRead={openPlanItem}
+          onListen={(it) => { if (!listenItem(it)) openPlanItem(it); }} />
       </div>
       <div className="sec g"><span className="label">The Volumes of Truth</span></div>
       <div className="g">

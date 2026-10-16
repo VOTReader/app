@@ -845,3 +845,45 @@
 .lfg .row.song { border-top: 0; padding-top: 6px; }
 .lfg .lfk { margin: 6px 0 4px; }
 .lft + .nextcard { margin-top: 0; }
+
+/* dz24: today's reading on Home (main's TodayCard; only while a plan runs), and the plan's month on Reading plans */
+.tdy { margin-top: 18px; border: 1px solid var(--edge); background: var(--raised); border-radius: var(--r); padding: 4px 16px 16px; }
+.tdy-h { display: flex; align-items: center; justify-content: space-between; height: 40px; }
+.tdy-h .textbtn { margin-right: -2px; }
+.tdy-t { font-size: var(--fs-l); line-height: 1.15; color: var(--t-hero); margin-top: 2px; }
+.tdy-s { font-size: var(--fs-s); color: var(--t2); margin-top: 4px; line-height: 1.3; }
+.tdy-p { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.tdy-p .dl-prog { flex: 1; margin-top: 0; }
+.tdy-p .num { font-size: var(--fs-xs); color: var(--t2); }
+.tdy .actions { margin-top: 14px; gap: 10px; }
+.tdy-r { display: flex; align-items: center; gap: 14px; min-height: 58px; border-top: 1px solid var(--line); }
+.tdy-h + .tdy-r { border-top: 0; }
+.tdy-c { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--t3); display: grid; place-items: center; flex: none; }
+.tdy-c.on { background: var(--accent); border-color: var(--accent); color: var(--on-pill); }
+.tdy-c svg { width: 16px; height: 16px; }
+.tdy-r .tx { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tdy-r .t { font-size: var(--fs-ui); color: var(--t1); line-height: 1.2; }
+.tdy-r .s { font-size: var(--fs-s); color: var(--t2); margin-top: 2px; line-height: 1.25; }
+.tdy-r .chev { color: var(--t2); }
+.tdy .tdy-l { display: flex; width: 100%; justify-content: center; margin-top: 10px; }
+.tdy .tdy-b { display: flex; height: 36px; margin-top: 6px; }
+.pmo { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 12px; }
+.pmo-n { font-size: var(--fs-m); color: var(--t1); line-height: 1.2; }
+.pmo-g { display: grid; grid-template-columns: repeat(7, 1fr); margin-top: 6px; text-align: center; }
+.pmo-w { font-size: var(--fs-xs); color: var(--t3); height: 24px; line-height: 24px; }
+.pmo-d { height: 38px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: var(--fs-cell); color: var(--t3); }
+.pmo-d .num { line-height: 18px; }
+.pmo-d .mk { height: 12px; display: grid; place-items: center; }
+.pmo-d .mk svg { width: 12px; height: 12px; color: var(--accent); }
+.pmo-d .ring { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--t2); }
+.pmo-d.done { color: var(--t1); }
+.pmo-d.missed { color: var(--t2); }
+.pmo-d.today { color: var(--t-hero); border: 1.5px solid var(--accent); border-radius: 8px; width: 34px; justify-self: center; }
+
+/* dz25: upkeep. The offline library strip is information (gold), not a warning; Storage rows carry no chevron (they open nothing) */
+.shb.gold { --sh: var(--accent); }
+.settings.stor .srow .s { line-height: 1.35; }
+.settings.stor .btn2.sm { flex: none; }
+.ver .ver-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.ver .ver-h .label { margin-bottom: 0; }
+.ver .ver-h .textbtn { margin-right: -2px; }

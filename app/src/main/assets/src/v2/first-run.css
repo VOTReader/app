@@ -1,8 +1,13 @@
-/* first-run.css - Reading plans, the welcome and the install offer (zv1 group 10; pictures 9a-plans, 8a-welcome,
-   8b-install). The pictures' own rules are screens.css's; these are what the app adds around them. */
+/* first-run.css - Reading plans (and Home's Today card), the welcome and the install offer (zv1 group 10; pictures
+   9a-plans, 9h, 9i, 8a-welcome, 8b-install). The pictures' own rules are screens.css's; these are what the app adds around them. */
 
 /* 9a: Stop sits under the cards as a quiet line, its tap area only as wide as its words */
 .plans > .stop { align-self: flex-start; }
+
+/* 9i (dz24): a plan's row on Home's Today card is itself the button (the kit draws a span): full width, words left */
+.v2 button.tdy-r { width: 100%; text-align: left; }
+.v2 button.tdy-r:disabled { cursor: default; }
+.tdy > .fine { margin-top: 10px; }
 
 /* 8a: on a computer the welcome stands in the middle of the window, as wide as a dialog (the picture is the phone's) */
 .v2.dk.bare .col { min-height: 100%; display: flex; flex-direction: column; justify-content: center; max-width: calc(var(--dlg) + 2 * var(--gut)); }

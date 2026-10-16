@@ -26,11 +26,12 @@ describe('plansView', () => {
     for (const [b, n] of BOOKS) for (let c = 1; c <= n; c++) read.add(b + ':' + c);
     const isRead = (bid, cid) => read.has(bid + ':' + cid);
     const v = plansView({ plans: [{ id: 'bible-year', start: startedAgo(now, 39) }], now, isRead, seq: [], pace: 1 });
-    expect(v.running).toEqual([{
+    expect(v.running).toHaveLength(1);
+    expect(v.running[0]).toMatchObject({
       id: 'bible-year', name: 'Bible in a Year', overline: 'Today · Day 40 of 365', title: 'Numbers 11–13',
       sub: 'Bible in a Year · 1 day to catch up', percent: 10,
-      next: { bid: 'numbers', cid: 11 }, catchUp: { bid: 'numbers', cid: 8 },
-    }]);
+      next: { bid: 'numbers', cid: 11 }, catchUp: { bid: 'numbers', cid: 8 }, loading: false, done: false, behind: 1,
+    });
     expect(v.offers.map((o) => o.id)).toEqual(['volumes']);
   });
 
@@ -71,7 +72,7 @@ describe('the 9a gate', () => {
     expect(on.querySelector('.overline').textContent).toBe('Today · Day 40 of 365');
     expect(on.querySelector('.pt').textContent).toBe('Numbers 11–13');
     expect(on.querySelector('.ps').textContent).toBe('Bible in a Year · 1 day to catch up');
-    expect(/** @type {HTMLElement} */ (on.querySelector('.dl-prog i')).style.width).toBe('11%');
+    expect(/** @type {HTMLElement} */ (on.querySelector('.dl-prog i')).style.width).toBe('10%');
     expect([...on.querySelectorAll('.actions button')].map((b) => b.textContent)).toEqual(['Listen', 'Read', 'Catch up']);
     expect(off.querySelector('.pt').textContent).toBe('The Volumes in Order');
     expect(off.querySelector('.chip.on').textContent).toBe('2 a day');
