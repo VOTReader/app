@@ -8,14 +8,19 @@
    - Recent: main's newest links as From / To pairs; either end links that place again as it was.
    A chapter's or a letter's words: a verse number (a 44 px target, picked in the click handler) takes the verse whole;
    pressing and dragging chooses words (the system's own selection, washed gold). The footer says what it links.
-   Linking is the letter screen's (onLinked); a gate boot draws its row's state and does nothing. */
+   Linking is the letter screen's (onLinked); a gate boot draws its row's state and does nothing.
+   The journal's Insert opens the same picker (4g, mw9): mode 'card' ("Add a card": a place goes in whole, no words level)
+   or 'excerpt' ("Add an excerpt": every place opens its words, a verse too); no "Linking from", the buttons say Insert,
+   and the place goes back through onPick (main's onPickTarget): nothing is saved as a link. */
 import { Icon } from '../Icon.jsx';
 import { Sheet } from '../Sheet.jsx';
 import { findPlaces, placeRow, targetOf, sourceQuote, makeLink, snapWords, verseTarget, wordsTarget, testamentOf, nav } from '../links.js';
+import { placeOfKey } from '../notes-facts.js';
 import { BOOK_LIST } from '../bible-facts.js';
 import { VOLUMES, MORE_LETTERS, colOf } from '../home-facts.js';
 import { displayText } from '../marks.js';
 import { useBook } from './BibleChapterScreen.jsx';
+import { votCorpusStatus } from '../corpus.js';
 import { LetterBody, footnoteNear } from './LetterScreen.jsx';
 
 const g = /** @type {any} */ (globalThis);
@@ -26,6 +31,12 @@ export const TABS = [{ id: 'search', label: 'Search' }, { id: 'browse', label: '
 export const CORPORA = [{ id: 'all', label: 'All' }, { id: 'scriptures', label: 'Scriptures' }, { id: 'volumes', label: 'Volumes' }];
 /** Target kinds whose words open first (main's excerpt picker). */
 const WORDS_KINDS = ['letter', 'wtlb', 'blessed', 'holy-days', 'study-letter'];
+/** What each mode calls itself (4d; 4g: main's "Embed a Card" / "Embed an Excerpt" as v2 says them). */
+const MODES = {
+  link: { title: 'Link to a passage', empty: 'Search to link', note: 'A verse links at once. A chapter or a letter opens first, so you can choose its words.', verb: 'Link' },
+  card: { title: 'Add a card', empty: 'Search for a place', note: 'Tap a place to add it to your entry as a card.', verb: 'Insert' },
+  excerpt: { title: 'Add an excerpt', empty: 'Search for a place', note: 'A place opens first, so you can choose its words.', verb: 'Insert' },
+};
 
 /**
  * @typedef {{ kind: 'books' | 'matthew' | 'chapters' | 'letters' | 'verses' | 'words' } & Record<string, any>} Level
@@ -172,12 +183,15 @@ export function selectionPick(root, kind, sel = typeof window.getSelection === '
 }
 
 /**
- * @param {{ source: Source, desktop?: boolean, gate?: any, onLinked: (made: { link: any, fresh: boolean }, target: any) => void,
+ * @param {{ source?: Source | null, mode?: 'link' | 'card' | 'excerpt', desktop?: boolean, gate?: any,
+ *   onLinked?: (made: { link: any, fresh: boolean }, target: any) => void, onPick?: (target: any, item: any) => void,
  *   onClose: () => void, onShown?: () => void }} props
  *   gate: the row's picker state ({ tab, q, scope, places, level, pick, scrollTo }), drawn as it is and inert; onShown
- *   says (on a gate boot) that its picture is drawn
+ *   says (on a gate boot) that its picture is drawn. mode 'link' (the default) links from `source` (onLinked); 'card' and
+ *   'excerpt' hand the place back (onPick) and need no source.
  */
-export function LinkPicker({ source, desktop = false, gate = null, onLinked, onClose, onShown }) {
+export function LinkPicker({ source = null, mode = 'link', desktop = false, gate = null, onLinked, onPick, onClose, onShown }) {
+  const words = MODES[mode] || MODES.link;
   const [tab, setTab] = React.useState(gate ? gate.tab || 'search' : 'search');
   const [q, setQ] = React.useState(gate ? gate.q || '' : '');
   const [scope, setScope] = React.useState(gate ? gate.scope || 'titles' : 'titles');
@@ -187,9 +201,9 @@ export function LinkPicker({ source, desktop = false, gate = null, onLinked, onC
   const inputRef = React.useRef(/** @type {HTMLInputElement | null} */ (null));
   const level = levels.length ? levels[levels.length - 1] : null;
 
-  // The places come from main's corpora: ask for them, and look again as each lands (main's index re-derives).
+  // The places come from main's corpora: ask for them, and look again as each lands (main's index re-derives). A gate
+  // boot asks too: a letter's words (4g) are its corpus's.
   React.useEffect(() => {
-    if (gate) return undefined;
     let live = true;
     const loads = ['__loadBibleCorpus', '__loadVotCorpus', '__loadMatthewCorpus', '__loadAnswersCorpus', 'loadBibleStudies'].map((f) =>
       (typeof g[f] === 'function' ? Promise.resolve().then(() => g[f]()).catch(() => {}) : Promise.resolve()));
@@ -209,27 +223,39 @@ export function LinkPicker({ source, desktop = false, gate = null, onLinked, onC
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as the picker opens
   }, []);
 
-  const link = (target) => {
+  /** The place chosen: linked from the source, or (Insert's modes) handed back as it is. */
+  const link = (target, item = null) => {
     if (gate || !target) return;
-    const made = makeLink(source.endpoint, target);
-    if (made) onLinked(made, target);
+    if (mode !== 'link') {
+      if (onPick) onPick(target, item);
+      return;
+    }
+    const made = source ? makeLink(source.endpoint, target) : null;
+    if (made && onLinked) onLinked(made, target);
   };
-  /** A place chosen: a verse links at once, a chapter or a letter opens its words first (main's createLinkTo). */
+  /**
+   * A place chosen (main's createLinkTo): a card takes it whole at once; else a verse links at once and a chapter or a
+   * letter opens its words first, and an excerpt opens every place's words (a verse's chapter with that verse taken).
+   */
   const choose = (item) => {
     if (gate || !item) return;
     const target = targetOf(item);
     if (!target) return;
     try { if (g.RecentNavStore && typeof g.RecentNavStore.add === 'function') g.RecentNavStore.add(item); } catch (_e) { /* best effort */ }
-    if ((target.type === 'bible' || target.type === 'study') && target.verse == null) setLevels((l) => l.concat([{ kind: 'verses', item, target }]));
-    else if (WORDS_KINDS.includes(target.type)) setLevels((l) => l.concat([{ kind: 'words', item, target }]));
-    else link(target);
+    if (mode === 'card') link(target, item);
+    else if ((target.type === 'bible' || target.type === 'study') && (target.verse == null || mode === 'excerpt')) {
+      const v = target.verse != null ? target.verse : null;
+      setLevels((l) => l.concat([{ kind: 'verses', item, target, pick: v != null ? { v1: v, whole: true } : null, scrollTo: v }]));
+    } else if (WORDS_KINDS.includes(target.type)) setLevels((l) => l.concat([{ kind: 'words', item, target }]));
+    else link(target, item);
   };
   const push = (lv) => { if (!gate) setLevels((l) => l.concat([lv])); };
   const back = () => { if (!gate) setLevels((l) => l.slice(0, -1)); };
 
   let body;
   if (level && (level.kind === 'verses' || level.kind === 'words')) {
-    body = <Words level={level} source={source} desktop={desktop} gate={gate} onBack={back} onLink={link} onShown={onShown} />;
+    body = <Words level={level} source={source} mode={mode} desktop={desktop} gate={gate} onBack={back}
+      onLink={(t) => link(t, level.item || null)} onShown={onShown} />;
   } else if (level) {
     body = (
       <>
@@ -263,12 +289,14 @@ export function LinkPicker({ source, desktop = false, gate = null, onLinked, onC
   } else {
     body = (
       <>
-        <div className="sh">Link to a passage</div>
-        <div className="lkf">
-          <span className="overline">Linking from</span>
-          <div className="lkft">{source.title}</div>
-          <div className="lkfq">{sourceQuote(source.text)}</div>
-        </div>
+        <div className="sh">{words.title}</div>
+        {mode === 'link' && source && (
+          <div className="lkf">
+            <span className="overline">Linking from</span>
+            <div className="lkft">{source.title}</div>
+            <div className="lkfq">{sourceQuote(source.text)}</div>
+          </div>
+        )}
         <div className="seg lkt" role="tablist" aria-label="How to find it">
           {TABS.map((t) => (
             <span key={t.id} role="tab" aria-selected={t.id === tab} className={t.id === tab ? 'on' : undefined}
@@ -277,15 +305,15 @@ export function LinkPicker({ source, desktop = false, gate = null, onLinked, onC
         </div>
         <div className="lkb">
           {tab === 'search' ? <SearchTab q={q} setQ={setQ} scope={scope} setScope={setScope} corpus={corpus} setCorpus={setCorpus}
-            gate={gate} inputRef={inputRef} ver={ver} onChoose={choose} />
+            gate={gate} inputRef={inputRef} ver={ver} onChoose={choose} mode={mode} />
             : tab === 'browse' ? <BrowseRows gate={gate} ver={ver} onOpen={push} />
-            : <RecentTab gate={gate} onReuse={(ep) => link({ ...ep })} />}
+            : <RecentTab gate={gate} onReuse={(ep) => link({ ...ep }, { label: ep.label || '', collection: ep.collection || '' })} />}
         </div>
       </>
     );
   }
   return (
-    <Sheet kind={'lkp' + (desktop ? '' : ' tall')} label="Link to a passage" desktop={desktop} closeX onClose={onClose}>
+    <Sheet kind={'lkp' + (desktop ? '' : ' tall')} label={words.title} desktop={desktop} closeX onClose={onClose}>
       {body}
     </Sheet>
   );
@@ -306,8 +334,12 @@ function LevelHead({ title, onBack }) {
   );
 }
 
-/** One Places row (4d): the place, its kind, a verse's words; the link icon when one tap links it. */
-function PlaceButton({ row, onChoose }) {
+/**
+ * One Places row (4d): the place, its kind, a verse's words; the link icon when one tap links it, a plus when one tap
+ * adds it as a card, else a chevron (its words open first).
+ */
+function PlaceButton({ row, onChoose, mode = 'link' }) {
+  const icon = mode === 'card' ? 'plus' : mode === 'link' && row.direct ? 'link' : 'chev';
   return (
     <button type="button" className="lkr" onClick={() => onChoose(row.item)}>
       <span className="lead"><Icon name={row.icon} /></span>
@@ -316,12 +348,13 @@ function PlaceButton({ row, onChoose }) {
         {row.s && <span className="s">{row.s}</span>}
         {row.v && <span className="v">{row.v}</span>}
       </span>
-      <Icon name={row.direct ? 'link' : 'chev'} className={row.direct ? '' : 'go'} />
+      <Icon name={icon} className={icon === 'chev' ? 'go' : ''} />
     </button>
   );
 }
 
-function SearchTab({ q, setQ, scope, setScope, corpus, setCorpus, gate, inputRef, ver, onChoose }) {
+function SearchTab({ q, setQ, scope, setScope, corpus, setCorpus, gate, inputRef, ver, onChoose, mode = 'link' }) {
+  const words = MODES[mode] || MODES.link;
   const query = q.trim();
   const titles = React.useMemo(() => (gate ? (gate.places || []).map((p) => ({ item: null, icon: 'book', direct: true, ...p }))
     : scope === 'titles' ? findPlaces(query) : []),
@@ -335,11 +368,11 @@ function SearchTab({ q, setQ, scope, setScope, corpus, setCorpus, gate, inputRef
     body = recent.length ? (
       <>
         <span className="label lkl">Recent</span>
-        {recent.map((r, i) => <PlaceButton key={i} row={r} onChoose={onChoose} />)}
+        {recent.map((r, i) => <PlaceButton key={i} row={r} onChoose={onChoose} mode={mode} />)}
       </>
     ) : (
       <div className="empty lke">
-        <div className="t">Search to link</div>
+        <div className="t">{words.empty}</div>
         <div className="s">Try a title or a reference like “Eph 6:5”, or search the words in the text.</div>
       </div>
     );
@@ -347,8 +380,8 @@ function SearchTab({ q, setQ, scope, setScope, corpus, setCorpus, gate, inputRef
     body = titles.length ? (
       <>
         <span className="label lkl">Places</span>
-        {titles.map((r, i) => <PlaceButton key={i} row={r} onChoose={onChoose} />)}
-        <p className="lkn">A verse links at once. A chapter or a letter opens first, so you can choose its words.</p>
+        {titles.map((r, i) => <PlaceButton key={i} row={r} onChoose={onChoose} mode={mode} />)}
+        <p className="lkn">{words.note}</p>
       </>
     ) : (
       <div className="empty lke">
@@ -364,7 +397,7 @@ function SearchTab({ q, setQ, scope, setScope, corpus, setCorpus, gate, inputRef
     body = hits.length ? (
       <>
         <span className="label lkl">In the text</span>
-        {hits.map((r, i) => <PlaceButton key={i} row={r} onChoose={onChoose} />)}
+        {hits.map((r, i) => <PlaceButton key={i} row={r} onChoose={onChoose} mode={mode} />)}
       </>
     ) : <div className="empty lke"><div className="t">Nothing in the text matches</div></div>;
   }
@@ -491,15 +524,16 @@ function RecentTab({ gate, onReuse }) {
 
 /**
  * A chapter's or a letter's words (4f, 4g): the back arrow and its name, the hint, the text, the footer.
- * @param {{ level: any, source: Source, desktop: boolean, gate: any, onBack: () => void, onLink: (t: any) => void,
- *   onShown?: () => void }} props
+ * @param {{ level: any, source: Source | null, mode: string, desktop: boolean, gate: any, onBack: () => void,
+ *   onLink: (t: any) => void, onShown?: () => void }} props
  */
-function Words({ level, source, desktop, gate, onBack, onLink, onShown }) {
+function Words({ level, source, mode, desktop, gate, onBack, onLink, onShown }) {
+  const verb = (MODES[mode] || MODES.link).verb;
   const verses = level.kind === 'verses';
   const target = level.target;
   const book = useBook(verses && target.type === 'bible' ? target.bookId : null);
   const boxRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
-  const [chosenPick, setPick] = React.useState(/** @type {any} */ (gate && gate.pick ? gate.pick : null));
+  const [chosenPick, setPick] = React.useState(/** @type {any} */ (gate && gate.pick ? gate.pick : level.pick || null));
   const sections = verses ? chapterVerses(book, target) : null;
   const entry = verses ? null : entryOf(target);
   const flat = sections ? sections.flatMap((s) => s.verses) : [];
@@ -526,15 +560,23 @@ function Words({ level, source, desktop, gate, onBack, onLink, onShown }) {
     document.addEventListener('selectionchange', read);
     return () => { document.removeEventListener('selectionchange', read); if (t) clearTimeout(t); };
   }, [gate, verses]);
-  // the gate's picture: the list scrolled to its verse
+  // the list scrolled to its verse (the gate's picture; an excerpt of a verse opens at that verse), once it is drawn
+  const scrollTo = gate ? gate.scrollTo : level.scrollTo;
+  const scrolled = React.useRef(false);
   React.useLayoutEffect(() => {
     const box = boxRef.current;
-    if (!gate || !gate.scrollTo || !box) return;
-    const p = /** @type {HTMLElement | null} */ (box.querySelector('[data-verse="' + gate.scrollTo + '"]'));
-    if (p) box.scrollTop = p.offsetTop - box.offsetTop;
-  }, [gate, shown]);
-  // a gate's picture is drawn once its text is (or once it is known there is none)
-  const drawn = verses ? book !== undefined || target.type === 'study' : true;
+    if (!scrollTo || !box || (scrolled.current && !gate)) return;
+    const p = /** @type {HTMLElement | null} */ (box.querySelector('[data-verse="' + scrollTo + '"]'));
+    if (p) { box.scrollTop = p.offsetTop - box.offsetTop; scrolled.current = true; }
+  }, [gate, scrollTo, shown]);
+  // a gate's chosen words wear the gold wash between the handles (4g), as the system's selection draws them live
+  React.useLayoutEffect(() => {
+    const box = boxRef.current;
+    if (!gate || verses || !entry || !pick || !pick.block || !box) return undefined;
+    return washWords(box, pick.block, pick.start, pick.end);
+  }, [gate, verses, pick, entry]);
+  // a gate's picture is drawn once its text is (or once it is known there is none: a letter's corpus landed or failed)
+  const drawn = verses ? book !== undefined || target.type === 'study' : !!entry || votCorpusStatus() !== 'loading';
   React.useEffect(() => { if (gate && onShown && drawn) onShown(); }, [gate, onShown, drawn, shown]);
   // a letter's text is the page's (LetterBody): main's painter must not mark it here
   React.useLayoutEffect(() => {
@@ -558,7 +600,9 @@ function Words({ level, source, desktop, gate, onBack, onLink, onShown }) {
   const hint = verses
     ? (desktop ? 'Click a verse number for the whole verse, or drag over words.' : 'Tap a verse number for the whole verse, or press and drag over words.')
     : (desktop ? 'Drag over the words you want.' : 'Press and drag over the words you want.');
-  const from = source.endpoint && source.endpoint.label ? 'From ' + source.endpoint.label + '. ' : '';
+  const place = mode === 'link' || verses ? '' : placeOfKey(target.key || 'letter:' + (target.letterId || ''), g).where;
+  const from = mode === 'link' ? (source && source.endpoint && source.endpoint.label ? 'From ' + source.endpoint.label + '. ' : '')
+    : place ? place + '. ' : '';
   return (
     <>
       <LevelHead title={title} onBack={onBack} />
@@ -581,11 +625,49 @@ function Words({ level, source, desktop, gate, onBack, onLink, onShown }) {
       </div>
       <div className="lkfoot">
         <button type="button" className={'pill block' + (chosen ? '' : ' disabled')} disabled={!chosen} onClick={() => { if (chosen) onLink(chosen); }}>
-          <span>{chosen ? (verses ? 'Link ' + chosen.label : 'Link these words') : (verses ? 'Choose a verse or some words' : 'Choose some words')}</span>
-          <Icon name="link" />
+          <span>{chosen ? (verses ? verb + ' ' + chosen.label : verb + ' these words') : (verses ? 'Choose a verse or some words' : 'Choose some words')}</span>
+          <Icon name={mode === 'link' ? 'link' : 'check'} />
         </button>
-        {!verses && <button type="button" className="textbtn lkall" onClick={() => onLink({ ...target })}>{'Link the whole ' + noun}</button>}
+        {!verses && <button type="button" className="textbtn lkall" onClick={() => onLink({ ...target })}>{verb + ' the whole ' + noun}</button>}
       </div>
     </>
   );
+}
+
+/**
+ * Wraps characters [start, end) of the block `key` inside `box` in the kit's wash (span.selw) with its two handles
+ * (span.hd.s / .hd.e), counting as selectionPick counts (the block's textContent); returns the undo.
+ * @param {HTMLElement} box @param {string} key @param {number} start @param {number} end
+ */
+export function washWords(box, key, start, end) {
+  const block = [...box.querySelectorAll('[data-hl-key]')].find((el) => el.getAttribute('data-hl-key') === key);
+  if (!block || !(end > start)) return undefined;
+  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  let at = 0;
+  let began = false;
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const len = (n.nodeValue || '').length;
+    if (!began && start <= at + len) { range.setStart(n, start - at); began = true; }
+    if (began && end <= at + len) { range.setEnd(n, end - at); break; }
+    at += len;
+  }
+  if (!began) return undefined;
+  const wash = document.createElement('span');
+  wash.className = 'selw';
+  try { wash.appendChild(range.extractContents()); } catch (_e) { return undefined; }
+  range.insertNode(wash);
+  const hs = document.createElement('span');
+  hs.className = 'hd s';
+  const he = document.createElement('span');
+  he.className = 'hd e';
+  wash.before(hs);
+  wash.after(he);
+  return () => {
+    hs.remove();
+    he.remove();
+    while (wash.firstChild) wash.before(wash.firstChild);
+    wash.remove();
+    block.normalize();
+  };
 }

@@ -144,6 +144,15 @@ export function placeOfKey(key, env) {
 }
 
 /**
+ * A letter of the collection `volKey` by its id (a journal card's volKey + letterId), as placeOfKey says it; any
+ * collection's when that one does not hold it. @param {string} volKey @param {string} id @param {any} env
+ */
+export function letterPlaceOf(volKey, id, env) {
+  const col = collections(env).find((c) => c && c.volKey === volKey);
+  return (col && letterPlace(col, id, env)) || placeOfKey('letter:' + id, env);
+}
+
+/**
  * A letter (or the preface) of one collection by its id, or null when the collection does not hold it (or has not
  * loaded). Every collection's letters open by number in v2's letter place; "· Letter N" is said only for the
  * numbered volumes (main's vot- letter screens).
@@ -214,7 +223,7 @@ function bookTitle(bookId, env) {
 }
 
 /** A journal entry's own title (blank when it has none). */
-function journalTitle(entry) {
+export function journalTitle(entry) {
   if (entry.title && String(entry.title).trim()) return String(entry.title).trim();
   return '';
 }

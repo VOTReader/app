@@ -80,10 +80,11 @@ describe('using Notes', () => {
     g.JournalStore = { add: vi.fn(), update: vi.fn(), get: vi.fn() };
     const { container } = render(<V2App gateId="3c-notes" />);
     click(container.querySelector('.tb .btn2.tbj'));
-    expect(container.querySelector('.tb .title').textContent).toBe('Notes');
-    const ta = container.querySelector('.jed textarea.jb');
+    expect(container.querySelector('.tb .title').textContent).toBe('Journal entry');
+    expect(container.querySelector('.tb .ic').getAttribute('aria-label')).toBe('Back to Notes');
+    const ta = container.querySelector('.jed textarea.jp');
     expect(ta).not.toBe(null);
-    fireEvent.change(container.querySelector('.jed input.jt'), { target: { value: 'A title' } });
+    fireEvent.change(container.querySelector('.jed textarea.jt'), { target: { value: 'A title' } });
     fireEvent.change(ta, { target: { value: 'Words' } });
     click(container.querySelector('.tb button'));
     expect(g.JournalStore.add).not.toHaveBeenCalled();
@@ -119,12 +120,12 @@ describe('the journal editor (real boot)', () => {
     let n = 0;
     g.JournalStore = { all: () => [], get: () => null, add: vi.fn((seed) => ({ ...seed, id: 'new' + (++n) })), update: vi.fn() };
     const c = openEditor();
-    expect(c.querySelector('.tb .title').textContent).toBe('Notes');
-    fireEvent.change(c.querySelector('.jed textarea.jb'), { target: { value: 'First words' } });
+    expect(c.querySelector('.tb .title').textContent).toBe('Journal entry');
+    fireEvent.change(c.querySelector('.jed textarea.jp'), { target: { value: 'First words' } });
     act(() => { vi.advanceTimersByTime(600); });
     expect(g.JournalStore.add).toHaveBeenCalledTimes(1);
     expect(g.JournalStore.add.mock.calls[0][0].blocks.map((b) => b.text)).toEqual(['First words']);
-    fireEvent.change(c.querySelector('.jed input.jt'), { target: { value: 'My title' } });
+    fireEvent.change(c.querySelector('.jed textarea.jt'), { target: { value: 'My title' } });
     click(c.querySelector('.tb button'));   // Back before the half second
     expect(g.JournalStore.add).toHaveBeenCalledTimes(1);
     expect(g.JournalStore.update).toHaveBeenCalledWith('new1', expect.objectContaining({ title: 'My title' }));
@@ -134,13 +135,13 @@ describe('the journal editor (real boot)', () => {
     vi.useFakeTimers();
     g.JournalStore = { all: () => [], get: () => null, add: vi.fn(), update: vi.fn() };
     const c = openEditor();
-    fireEvent.change(c.querySelector('.jed input.jt'), { target: { value: '  ' } });
+    fireEvent.change(c.querySelector('.jed textarea.jt'), { target: { value: '  ' } });
     act(() => { vi.advanceTimersByTime(600); });
     click(c.querySelector('.tb button'));
     expect(g.JournalStore.add).not.toHaveBeenCalled();
   });
 
-  it('editing an entry keeps its picture and verse blocks where they are', () => {
+  it('editing an entry keeps its picture where it is', () => {
     vi.useFakeTimers();
     const entry = { id: 'j1', title: 'Old', created: Date.now(), blocks: [
       { id: 'b1', type: 'p', text: 'One' }, { id: 'b2', type: 'image', mediaId: 'm1' }, { id: 'b3', type: 'p', text: 'Two' }] };
@@ -149,9 +150,9 @@ describe('the journal editor (real boot)', () => {
     const { container: c } = render(<V2App gateId={null} />);
     click([...c.querySelectorAll('.tabbar .tab')][2]);
     click(c.querySelector('.marks .mark[role="button"]'));
-    expect(/** @type {HTMLInputElement} */ (c.querySelector('.jed input.jt')).value).toBe('Old');
-    expect(texts(c, '.jed .jother')).toEqual(['[Image]']);
-    fireEvent.change(c.querySelectorAll('.jed textarea.jb')[1], { target: { value: 'Two, edited' } });
+    expect(/** @type {HTMLTextAreaElement} */ (c.querySelector('.jed textarea.jt')).value).toBe('Old');
+    expect(c.querySelectorAll('.jed figure.jimg').length).toBe(1);
+    fireEvent.change(c.querySelectorAll('.jed textarea.jp')[1], { target: { value: 'Two, edited' } });
     act(() => { vi.advanceTimersByTime(600); });
     expect(g.JournalStore.add).not.toHaveBeenCalled();
     const [id, patch] = g.JournalStore.update.mock.calls[0];
@@ -197,7 +198,7 @@ describe("Safari's 7-day notice before a first journal entry (myweb's ask; main'
       await click(notice.querySelector('button.done'));
       expect(document.querySelector('.sheet.safari')).toBe(null);
       await click(find(container));
-      expect(container.querySelector('.jed textarea.jb')).not.toBe(null);
+      expect(container.querySelector('.jed textarea.jp')).not.toBe(null);
       expect(g.JournalStore.add).not.toHaveBeenCalled();   // nothing is written before words
     });
   }

@@ -62,6 +62,34 @@ const LETTER_1_LINKS = [
 ];
 
 /** Letter 1 of Volume One loaded at 3:51 of 10:08, read by Benjamin (states.json 0a, 0b, 2a, 1b). */
+/** mw9 (dz20 3n): the journal entry "On being set apart" opened from Notes: its words, a letter card, John 15:16 as an
+ * excerpt, and a voice memo (72 s; its waveform is design's laptop bars as main's 0..1 samples); the laptop's column
+ * also holds a second paragraph, the divider and a picture (a gate-only file: src/ never ships, _gate never packs). */
+const JE_WAVE = [5, 5, 8, 25, 17, 21, 12, 7, 18, 14, 28, 8, 11, 6, 22, 13, 25, 13, 7, 13, 16, 27, 11, 16, 5, 19, 10, 27, 13, 11,
+  9, 16, 24, 15, 20, 6, 14, 6, 28, 12, 16, 5, 14, 21, 18, 22, 8, 8, 6, 28, 9, 21, 7, 11, 17, 21, 23, 12, 7, 7, 25, 6, 25, 8, 7, 12,
+  22, 22, 16, 12, 7, 21, 8, 28, 7, 9, 8, 22, 20, 20, 15, 5, 16, 11, 29, 5, 14, 6, 19, 16, 24, 17, 9, 11, 12, 28, 9, 19, 5, 16, 12,
+  26, 17, 13, 6, 13, 25, 12, 23, 5, 11, 8, 27, 15, 18, 7, 11, 21, 16, 25, 8, 5, 6, 26, 12, 22, 10, 8, 17, 18, 26, 11, 10, 6, 23, 9,
+  26, 11, 6, 12, 19, 24, 15, 15, 6, 19, 5, 28, 10, 12].map((h) => (h - 5) / 23);
+const L16 = 'run-from-the-forest-and-loose-all-that-binds-you';
+const JE_BLOCKS = [
+  { id: 'gb1', type: 'p', text: 'What “set apart for My glory” asks of me this week.' },
+  { id: 'gb2', type: 'letter-card', volKey: 'one', letterId: L16 },
+  { id: 'gb3', type: 'verse-block', ref: 'John 15:16', text: JOHN_15_16, partial: false, bookId: 'john', chapter: 15, verse: 16,
+    verseEnd: null, isStudy: false, translation: 'nkjv' },
+  { id: 'gb4', type: 'audio', mediaId: 'gate-memo', duration: 72, caption: 'A prayer for the week', samples: JE_WAVE },
+];
+const JOURNAL_ENTRY = { id: 'gate-je', title: 'On being set apart', created: Date.UTC(2026, 9, 15, 15), blocks: JE_BLOCKS };
+const JOURNAL_FACTS = {
+  journalEntry: JOURNAL_ENTRY,
+  journalEntryDesktop: { ...JOURNAL_ENTRY, blocks: [...JE_BLOCKS,
+    { id: 'gb5', type: 'p', text: 'Read it again with the family after dinner. Leave the phone in the other room.' },
+    { id: 'gb6', type: 'divider' },
+    { id: 'gb7', type: 'image', mediaId: 'gate-photo', caption: 'The kitchen table this morning' }] },
+  journalMedia: { 'gate-photo': 'src/v2/_gate/journal-photo.jpg' },
+  journalMemo: { at: 18 },
+};
+const JOURNAL_ENTRY_STACK = [{ place: 'notes', kind: 'all' }, { place: 'journal-entry', id: 'gate-je' }];
+
 const LETTER1_AT_351 = { item: { collection: 'one', n: 1 }, reader: 'B', at: 231, length: 608 };
 
 /** Home's seeded saved data (states.json 0a/0b data): Continue is Letter 1; Recent is John 3, then Letter 2. */
@@ -199,6 +227,17 @@ export const GATE_STATES = {
   // states.json 4i-links: 4h with the icon tapped: Links, 2 links on Chosen by God, To John 15:16 (today) and From Letter
   // 16 (Oct 9), each with Remove.
   '4i-links': { stack: LETTER_1, scroll: LINKS_SCROLL, facts: { links: LETTER_1_LINKS, now: GATE_NOW }, open: { sheet: 'links', block: 'letter:chosen-by-god:0' } },
+  // states.json 3n-journal-entry (dz20, mw9): the entry at its top, its memo playing at 0:18 of 1:12.
+  '3n-journal-entry': { stack: JOURNAL_ENTRY_STACK, facts: JOURNAL_FACTS },
+  // states.json 3o-journal-insert: 3n with "+ Insert" tapped: main's ten in four groups (the laptop's a dialog).
+  '3o-journal-insert': { stack: JOURNAL_ENTRY_STACK, facts: JOURNAL_FACTS, open: { sheet: 'insert' } },
+  // states.json 4g-excerpt-words (dz22): Insert > Excerpt > Volume One's Letter 16: its words open, "the children of God
+  // ... says The Lord." chosen (the wash and its handles), the footer says Insert these words (phone only).
+  '4g-excerpt-words': { stack: JOURNAL_ENTRY_STACK, facts: JOURNAL_FACTS, open: { sheet: 'link-picker', picker: {
+    mode: 'excerpt',
+    level: { kind: 'words', item: { kind: 'letter', volKey: 'one', letterId: L16, collection: 'Volume One', label: 'Run from the Forest and Loose All That Binds You' },
+      target: { type: 'letter', key: 'letter:' + L16, letterId: L16, collection: 'Volume One', label: 'Run from the Forest and Loose All That Binds You' } },
+    pick: { block: 'letter:' + L16 + ':0', start: 80, end: 159, text: 'the children of God must be cleansed and set apart for My glory, says The Lord.' } } } },
   // states.json 3c-notes (zv1): the Notes tab, All; a journal entry, a highlight and a note today/yesterday, a bookmark
   // Sunday, a link Oct 9.
   '3c-notes': { stack: [{ place: 'notes', kind: 'all' }], facts: { marks: gateMarks(GATE_NOW).slice(0, 5), now: GATE_NOW } },

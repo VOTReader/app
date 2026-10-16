@@ -24,7 +24,8 @@
  *   title?: (route: any) => string,
  *   actions?: (ctx: { route: any, go: (...routes: any[]) => void, desktop: boolean, device: 'phone' | 'computer',
  *     open?: (sheet: string, opts?: Record<string, any>) => void, gate?: any, facts?: Record<string, any> }) => any,
- *   contentClass?: string, bare?: boolean, rootClass?: string, find?: (route: any) => string }} PlaceDef
+ *   contentClass?: string, bare?: boolean, rootClass?: string, find?: (route: any) => string, barTitle?: (route: any) => string }} PlaceDef
+ * `barTitle` is what the top bar says on this page when it is not Back's place (3n: "Journal entry" over Back to Notes).
  * `find` names the page for Find in this <page> (1i: 'letter', 'entry', 'topic', 'chapter'); a place without it has no Find.
  * `bare` draws the place alone in the window: no top bar, player, tab bar or rail (8a-welcome). It still calls onReady.
  * `rootClass` joins the shell root's classes while the place is open (the Garden's 'gvd': the kit's .dk.gvd on the laptop).

@@ -1,15 +1,22 @@
 /* notes.css - v2 Notes screens beyond the kit (zv1). The marks list and chips are the kit's own (screens.css .marks, .mark,
-   .chips.kinds); this adds only what has no picture: a mark is tappable, and the journal editor's fields (the kit's
-   field colours: --input fill, --edge border, --accent on focus). */
+   .chips.kinds); this adds only what has no picture: a mark is tappable, and the journal entry's fields written in place. */
 .v2 .mark[role="button"] { cursor: pointer; }
 .v2 .mark[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.jed { padding-top: 6px; padding-bottom: 32px; }
-.jed .jdate { margin: 0 0 10px; }
-.jed .jt, .jed .jb { display: block; width: 100%; box-sizing: border-box; font-family: var(--font); color: var(--t1);
-  background: var(--input); border: 1px solid var(--edge); border-radius: var(--r); padding: 12px 14px; }
-.jed .jt { font-size: var(--fs-l); line-height: 1.25; }
-.jed .jb { margin-top: 12px; min-height: 42vh; font-size: var(--fs-body); line-height: var(--lh-body); color: var(--t-body); resize: vertical; }
-.jed .jt:focus, .jed .jb:focus { border-color: var(--accent); outline: 0; }
-.jed .jt::placeholder, .jed .jb::placeholder { color: var(--t-ph); }
+/* the journal entry (mw9, 3n): the kit's .jed .jt / .jp, written in place - borderless fields that grow with their
+   words (JournalEditor sizes them), the title's hairline under it; the caret is the only focus sign */
+.jed textarea.jt, .jed textarea.jp { display: block; width: 100%; box-sizing: border-box; padding-left: 0; padding-right: 0;
+  padding-top: 0; border: 0; border-radius: 0; background: transparent; font-family: inherit; resize: none; overflow: hidden;
+  outline: 0; }
+.jed textarea.jt { padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.jed textarea.jp { padding-bottom: 0; }
+.jed textarea.jt::placeholder, .jed textarea.jp::placeholder { color: var(--t-ph); }
+.jed .jcard[role="button"] { cursor: pointer; }
+.jed .jcard[role="button"]:focus-visible, .jed .jwav:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.jed .jwav { cursor: pointer; }
+.jed .jplay:disabled { opacity: .5; }
+.jed .jmiss { color: var(--t2); font-style: italic; }
+.jed .jmemo .jmiss { font-size: var(--fs-s); margin-top: 4px; }
+.jimg .jimg-none { display: grid; place-items: center; width: 100%; aspect-ratio: 4 / 3; border-radius: var(--r);
+  background: var(--raised); color: var(--t2); font-style: italic; font-size: var(--fs-s); }
 .jed .jother { margin: 12px 0 0; padding-left: 12px; border-left: 2px solid var(--line); }

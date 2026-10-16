@@ -103,14 +103,14 @@ export function holdGateScroll(el, scroll, desktop, after) {
   return () => ro.disconnect();
 }
 
-function TopBar({ back, onBack, actions, scrolled }) {
+function TopBar({ back, title, onBack, actions, scrolled }) {
   if (!back) {
     return <div className={'tb' + (scrolled ? ' scrolled' : '')}><span className="appname">VOTReader</span>{actions}</div>;
   }
   return (
     <div className={'tb has-back' + (scrolled ? ' scrolled' : '')}>
       <button type="button" className="ic" aria-label={'Back to ' + back} onClick={onBack}><Icon name="arrowL" /></button>
-      <span className="title">{back}</span>
+      <span className="title">{title || back}</span>
       {actions}
     </div>
   );
@@ -285,7 +285,7 @@ export function V2App({ gateId = readGateId() }) {
       <Icon name={t.icon} on={t.id === tab} />{t.label}
     </button>
   ));
-  const bar = <TopBar back={back} onBack={pop} actions={actions} scrolled={scrolled} />;
+  const bar = <TopBar back={back} title={def && def.barTitle ? def.barTitle(route) : null} onBack={pop} actions={actions} scrolled={scrolled} />;
   // main's storage health strip (9f, 9g): under the top bar, in the flow, on every screen; nothing while all is well
   const banner = <StorageBanner gate={gate} go={go} />;
   const noun = def && def.find ? def.find(route) : '';

@@ -36,13 +36,14 @@ export function askVotCorpus(gl = g) {
   return p;
 }
 
-/** Asks for the VOT corpus once per mount (the loader retries after a failure) and re-renders when it lands or fails.
+/** Asks for the VOT corpus once per mount (the loader retries after a failure) and re-renders when it lands or fails;
+ *  with `ask` false it only listens (a journal entry asks once it holds a letter's card).
  *  @returns {'loading' | 'ready' | 'failed'} */
-export function useVotCorpus() {
+export function useVotCorpus(ask = true) {
   React.useSyncExternalStore(subscribe, version);
   React.useEffect(() => {
-    askVotCorpus().catch(() => { /* the loader flags the error and bumps its version */ });
-  }, []);
+    if (ask) askVotCorpus().catch(() => { /* the loader flags the error and bumps its version */ });
+  }, [ask]);
   return votCorpusStatus();
 }
 

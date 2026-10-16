@@ -535,7 +535,9 @@ describe('the gate rows (4b, 4d-4f, 4h, 4i)', () => {
     let land;
     const B = g.BOOKS;
     delete g.BOOKS;
-    g.__loadBibleCorpus = vi.fn(() => new Promise((res) => { land = res; }));
+    // main's loader (index.html) hands every ask the one load in flight
+    const loading = new Promise((res) => { land = res; });
+    g.__loadBibleCorpus = vi.fn(() => loading);
     linkStore();
     render(<V2App gateId="4f-link-verses" />);
     await settle(50);
