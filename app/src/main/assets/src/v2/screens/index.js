@@ -19,3 +19,4 @@ import './InstallOffer.jsx';
 import './SafariNotice.jsx';
 import './StudiesScreen.jsx';
 import './StudyChapterScreen.jsx';
+import './SongsScreens.jsx';

@@ -233,7 +233,7 @@ function LetterSongs({ songs, letterKey, title, gate, go }) {
           const versions = count > 1 && (
             <div className="s">
               {songsPlace && live
-                ? <button type="button" className="vers" onClick={(e) => { e.stopPropagation(); if (go) go({ place: 'songs', family: lead.f }); }}
+                ? <button type="button" className="vers" onClick={(e) => { e.stopPropagation(); if (go) go({ place: 'song', family: lead.f }); }}
                   aria-label={'All ' + count + ' versions of ' + name}>{count} versions<Icon name="chev" /></button>
                 : <span className="vers">{count} versions</span>}
             </div>

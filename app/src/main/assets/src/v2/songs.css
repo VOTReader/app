@@ -1,0 +1,23 @@
+/* songs.css - v2 Songs of the Letters (zones v2p6; 6d the hub, 6e a song): the kit's songs rules (screens.css) as buttons,
+   main's states the pictures do not draw (loading, the one playing, offline, keeping), and the keep row's icon (the kit
+   draws it as the row's child svg; v2's Icon wraps it). */
+.v2 button.stile { display: block; width: 100%; text-align: left; }
+.v2 .row.song { cursor: pointer; }
+.v2 .row.song .vers { font-size: inherit; }
+.v2 .row.song.on .t { color: var(--accent); }
+.v2 .row.song.off, .v2 .row.ver.off { opacity: .45; }
+.v2 .row.ver { cursor: pointer; }
+.v2 .keep > .v2i > svg { width: 24px; height: 24px; color: var(--accent); flex: none; }
+.v2 .keep .kbar { display: block; height: 3px; margin-top: 6px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.v2 .keep .kbar > span { display: block; height: 100%; background: var(--accent); }
+.v2 .keep .kn { color: var(--t2); }
+.v2 .sec.sec-a .cnt { font-size: var(--fs-s); color: var(--t2); }
+.v2 .sg-shelves { margin-top: 28px; }
+.v2 .sg-empty, .v2 .sg-off { margin-top: 18px; }
+.v2 .sg-state { padding-top: 12px; }
+.v2 .sg-state .btn2 { margin-top: 14px; }
+.v2 .sg-sk .row.song { cursor: default; }
+.v2 .sg-sk .row.song .tx i { display: block; height: 12px; width: 62%; margin: 6px 0; border-radius: 4px; background: var(--input); }
+.v2 .sg-sk .row.song .tx i + i { width: 40%; }
+.v2 .row.song.rd .btn2.sm { flex: none; }
+.v2 .field input.q[type="search"]::-webkit-search-cancel-button { display: none; }

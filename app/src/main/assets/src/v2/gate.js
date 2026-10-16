@@ -13,6 +13,7 @@ import { gateReading } from './reading-settings.js';
 import { gateDownloads } from './offline-facts.js';
 import { gatePlans } from './plans-facts.js';
 import { gateShelf } from './downloads-facts.js';
+import { gateSongsHub, gateSongPage } from './songs-gate.js';
 
 /** The website readers use: the hook never acts there. */
 export const LIVE_HOSTS = ['votreader.github.io'];
@@ -30,7 +31,7 @@ const DAY = 24 * 3600 * 1000;
  * open ('now-playing', or a sheet: 'speed' | 'sleep' | 'up-next' | 'more'), full (full screen) and toast (the hint drawn).
  * playing.savedRecording: the recording is in the Listening Library's Saved (2f's Save; default not).
  * @typedef {{ place: string, collection?: string, n?: number, kind?: string, id?: string, book?: string, chapter?: number | string,
- *   verse?: number, match?: string[], study?: string }} Route
+ *   verse?: number, match?: string[], study?: string, list?: string, family?: string, q?: string, st?: string }} Route
  * @typedef {{ item: Record<string, any>, reader: string, at: number, length: number, paused: boolean } & Record<string, any>} GatePlaying
  * `open` names a sheet the screen opens on the gate boot ({ sheet: 'mark-paragraph', para, colour } on a letter; the
  * shell's { sheet: 'text-and-theme' }; 9c's { toast: 'offline-listen' }, the Listen pill's); `look` the text and page
@@ -333,6 +334,11 @@ export const GATE_STATES = {
   '5j-matthew-notes': { stack: MATTHEW_5, facts: { matthew: { notes: 'pdf' } }, scroll: { to: '.spn .sp-vot', gap: 247, phone: true } },
   // states.json 5k-matthew-inline: the same in Inline, verse 3 100 px below the screen top
   '5k-matthew-inline': { stack: MATTHEW_5, facts: { matthew: { notes: 'inline' } }, scroll: { to: '#v-3', gap: 17, phone: true } },
+  // states.json 6d-songs (dz14): Songs of the Letters from Home, at the top, nothing typed, All: the catalog design drew
+  // (2026-10-06.1097, pinned in songs-gate.js), 3 saved, 12 recent, 2 kept (7.6 MB); the laptop too.
+  '6d-songs': { stack: [{ place: 'home' }, { place: 'songs' }], facts: { songs: gateSongsHub() } },
+  // states.json 6e-song-page: Elect and Precious (Words To Live By, Part One) from the hub, at the top; not saved, not kept.
+  '6e-song-page': { stack: [{ place: 'home' }, { place: 'songs' }, { place: 'song', family: 'elect-and-precious' }], facts: { songs: gateSongPage() } },
 };
 
 /**

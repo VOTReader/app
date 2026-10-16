@@ -121,7 +121,12 @@ const BUDGETS = [
   // largest; Reading 4.3 KB + its facts 3.9 KB). Still to come: the ... menus, Matthew, Songs, the Garden, the Scripture
   // Web host, notebooks (dz20), links (dz22), storage banners (~8 KB each): ceiling 400 KB, far under a corpus or a v1
   // bundle (MBs).
-  { file: 'bundle-v2.js', measured: 340478, max: 400000 },
+  // zones v2p6 2026-10-15 (Songs of the Letters 6d/6e: the hub, its lists, a song's page, Letters read with music, over
+  // myweb's ... menus, search landing and letter foot): 407,721 B, nothing pulled in (esbuild metafile: SongsScreens.jsx
+  // 23.8 KB, songs-facts.js 10.6 KB, the gate's pinned catalog views 4.4 KB; main's song-catalog / song-keep / SongParts
+  // stay bundle-d globals, none bundled). Still to come: the Garden, the Scripture Web host, notebooks (dz20), links
+  // (dz22), storage banners: ceiling 470 KB, far under a corpus or a v1 bundle (MBs).
+  { file: 'bundle-v2.js', measured: 407721, max: 470000 },
   // v2.min.css the same way (zv1 group 8, Settings pages, 2026-10-14): 36458 B with Search, Notes, the player and Settings in
   // (+5.5 KB over the first kit build, nothing pulled in: each screen's own sheet is 1-3 KB); the ceiling covers the
   // rest of the build-out and still catches app.min.css (370 KB) or a font pulled in. Re-baseline with bundle-v2.js.
