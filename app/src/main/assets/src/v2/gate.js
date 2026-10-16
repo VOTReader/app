@@ -35,7 +35,7 @@ const DAY = 24 * 3600 * 1000;
  * `open` names a sheet the screen opens on the gate boot ({ sheet: 'mark-paragraph', para, colour } on a letter; the
  * shell's { sheet: 'text-and-theme' }; 9c's { toast: 'offline-listen' }, the Listen pill's); `look` the text and page
  * shown (look.js: { scale, page, lines }; Slate otherwise).
- * @typedef {{ stack: Route[], facts?: Record<string, any>, scroll?: number | string | { to: string, gap?: number, phone?: boolean },
+ * @typedef {{ stack: Route[], facts?: Record<string, any>, scroll?: number | string | { to: string, gap?: number, deskGap?: number, phone?: boolean },
  *   playing?: GatePlaying | null, player?: Record<string, any>, open?: Record<string, any>,
  *   look?: { scale?: number, page?: string, lines?: string } }} GateState
  */
@@ -230,9 +230,26 @@ export const GATE_STATES = {
   '1d-wtlb-entry': { stack: WTLB_46, scroll: 'end' },
   // states.json 1e-ref-sheet: 1d with (1 John 3:12) tapped: its sheet (the laptop's dialog), the cite washed.
   '1e-ref-sheet': { stack: WTLB_46, scroll: 'end', open: { sheet: 'ref', ref: '1 John 3:12' } },
-  // states.json 1f-footnotes: Volume One, Letter 9 (What's In a Name) at its end: the Footnotes list (two notes, then
-  // Revelation 3:5) above the Next card.
-  '1f-footnotes': { stack: LETTER_9, scroll: 'end' },
+  // states.json 1f-footnotes (dz23b): Volume One, Letter 9 (What's In a Name), its Footnotes list (two notes, then
+  // Revelation 3:5) with its top hairline 88 px below the phone's screen top (the scroller starts under the 27 px status
+  // bar and the 56 px top bar: 88 - 83) and 120 px below the laptop window's top (63 under its 57 px bar); under it
+  // Letter 9's foot (Related topics).
+  '1f-footnotes': { stack: LETTER_9, scroll: { to: '.body .fnl', gap: 5, deskGap: 63 } },
+  // states.json 9f-data-missing (dz15, mw7, v2-gaps 33): Home as 0a (Letter 1 paused in the player), under the top bar
+  // main's danger strip "Some of your data looks missing": the 2026-10-13 snapshot had 55 highlights, 6 notes and 627 read
+  // marks, now 2 highlights and 41 read marks; Restore, Keep as is and the x (the hook fakes StorageHealth's report).
+  '9f-data-missing': {
+    stack: [{ place: 'home' }],
+    facts: { ...HOME_FACTS, storage: { dataMissing: { name: 'auto', at: new Date(2026, 9, 13, 12).getTime(),
+      then: { highlights: 55, notes: 6, readMarks: 627 }, now: { highlights: 2, readMarks: 41 } } } },
+    playing: { ...LETTER1_AT_351, paused: true },
+  },
+  // states.json 9g-storage-low (dz15, mw7): Volume One, Letter 1 at its top under main's warn strip "Storage is running low"
+  // (38 MB remaining) with Export data.
+  '9g-storage-low': {
+    stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],
+    facts: { storage: { tier: 'warning', remaining: 38 * 1024 * 1024 } },
+  },
   // states.json 1k-letter-foot (dz23, mw7): Volume One, Letter 1 at its end: footnote 1, Related topics (2, opening Answers
   // in the app), Audio (Bandcamp, SoundCloud), Videos (the voice-over video, the channel; the channel-as-video row dropped),
   // then Next · Letter 2. No songs sing its words.

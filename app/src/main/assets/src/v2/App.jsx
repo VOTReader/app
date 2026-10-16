@@ -17,6 +17,7 @@ import { SheetLayer, closeTopSheet } from './Sheet.jsx';
 import { AaSheet } from './screens/AaSheet.jsx';
 import { FindStrip } from './FindStrip.jsx';
 import { AutoScrollPill } from './AutoScrollPill.jsx';
+import { StorageBanner } from './StorageBanner.jsx';
 import { applyLook, savedLook, saveLook, gateLook, sizeWord } from './look.js';
 import { useReadingRecord } from './reading-record.js';
 import { useReadingBars, READING_PLACES } from './reading-bars.js';
@@ -64,8 +65,9 @@ export function routeTitle(r) {
 /**
  * Scrolls `el` so the gate's `scroll` holds: a number is px from the top; a selector puts that element's top right under
  * the top bar (the phone's bar sits above the scroller; the laptop's is sticky inside it); { to, gap } leaves `gap` px
- * between the bar and the element; `phone: true` scrolls the phone only (the laptop's picture sits at the top).
- * @param {HTMLElement} el @param {number | string | { to: string, gap?: number, phone?: boolean }} scroll
+ * between the bar and the element (`deskGap` on the laptop, when its picture puts it elsewhere); `phone: true` scrolls the
+ * phone only (the laptop's picture sits at the top).
+ * @param {HTMLElement} el @param {number | string | { to: string, gap?: number, deskGap?: number, phone?: boolean }} scroll
  * @param {boolean} [desktop]
  */
 export function applyGateScroll(el, scroll, desktop = false) {
@@ -73,7 +75,7 @@ export function applyGateScroll(el, scroll, desktop = false) {
   if (scroll === 'end') { el.scrollTop = el.scrollHeight; return; }
   if (typeof scroll === 'object' && scroll.phone && desktop) return;
   const sel = typeof scroll === 'string' ? scroll : scroll.to;
-  const gap = typeof scroll === 'string' ? 0 : scroll.gap || 0;
+  const gap = typeof scroll === 'string' ? 0 : desktop && scroll.deskGap != null ? scroll.deskGap : scroll.gap || 0;
   const target = /** @type {HTMLElement | null} */ (el.querySelector(sel));
   if (!target) return;
   const bar = el.querySelector(':scope > .col > .tb');
@@ -281,6 +283,8 @@ export function V2App({ gateId = readGateId() }) {
     </button>
   ));
   const bar = <TopBar back={back} onBack={pop} actions={actions} scrolled={scrolled} />;
+  // main's storage health strip (9f, 9g): under the top bar, in the flow, on every screen; nothing while all is well
+  const banner = <StorageBanner gate={gate} go={go} />;
   const noun = def && def.find ? def.find(route) : '';
   const findStrip = pageTool && pageTool.kind === 'find' && noun
     ? <FindStrip key={stack.length + ':' + (pageTool.near ? 'l' : 'm')} rootRef={scrollRef} noun={noun} start={{ q: pageTool.q, near: pageTool.near, nearOff: pageTool.nearOff, terms: pageTool.terms }}
@@ -316,6 +320,7 @@ export function V2App({ gateId = readGateId() }) {
             <div className="main" ref={scrollRef} onScroll={onScroll} data-scroller="">
               <div className="col anc" data-zone="col">
                 {!bare && bar}
+                {!bare && banner}
                 {!bare && findStrip}
                 <div className={contentClass}>{screen}</div>
               </div>
@@ -334,6 +339,7 @@ export function V2App({ gateId = readGateId() }) {
     <SheetLayer.Provider value={layer}>
       <div className={'v2 v2-phone' + (fs.full ? ' full' : '') + (bare ? ' bare' : '') + (bars.hidden ? ' bars-off' : '')}>
         {!fs.full && !bare && !bars.hidden && bar}
+        {!fs.full && !bare && banner}
         {!fs.full && !bare && findStrip}
         <div className={contentClass + (fs.full ? ' full' : '')} ref={scrollRef} onScroll={onScroll} data-scroller="">{screen}<FullScreenToast text={fs.full ? fs.toast : null} /></div>
         {!fs.full && !bare && <MiniPlayer player={player} />}

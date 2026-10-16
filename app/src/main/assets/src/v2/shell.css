@@ -129,3 +129,5 @@ html, body { background: var(--bg); height: 100%; overflow: hidden; overscroll-b
 .v2 .lfk-line { display: flex; align-items: center; gap: 8px; min-height: 40px; margin: 6px 0 4px; font-size: var(--fs-s); color: var(--t2); }
 .v2 .lfk-line svg { width: 18px; height: 18px; flex: none; color: var(--accent); }
 .v2 .lfk-line .textbtn { margin-left: auto; height: 40px; }
+/* the storage strip (StorageBanner.jsx, 9f/9g): the kit's .shb > svg through Icon's wrapper */
+.v2 .shb > .v2i > svg { width: 22px; height: 22px; color: var(--sh); margin-top: 1px; }
