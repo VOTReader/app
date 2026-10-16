@@ -109,11 +109,16 @@ function Hit({ where, title, excerpt, bx, terms, onOpen }) {
   );
 }
 
-/** An engine hit as a row: verses quote the whole verse; letters and Answers show the words around the match. */
-function EngineHit({ hit, terms, go }) {
+/**
+ * An engine hit as a row: verses quote the whole verse; letters and Answers show the words around the match. A letter's
+ * route carries the query as typed: its Find strip opens with it (main's find.label).
+ */
+function EngineHit({ hit, terms, query, go }) {
   const d = hit.doc;
   const words = hit.terms && hit.terms.length ? terms.concat(hit.terms.filter((t) => terms.indexOf(t) < 0)) : terms;
-  const route = hitRoute(d, terms, undefined, hit.terms);
+  const found = hitRoute(d, terms, undefined, hit.terms);
+  const label = String(query || '').trim();
+  const route = found && found.place === 'letter' && label ? { ...found, label } : found;
   const bible = d.kind === 'verse' || d.kind === 'heading' || d.kind === 'chapter-title';
   const excerpt = hit.excerpt || (bible ? (d.kind === 'heading' ? d.heading || d.text : d.text) : snippet(d.text || '', words, 180));
   return <Hit where={d.ref || ''} title={bible ? '' : d.title} excerpt={excerpt} bx={bible} terms={words}
@@ -203,7 +208,7 @@ export function SearchScreen({ gate, go, onReady }) {
     const any = gotos.length || GROUPS.some((gr) => (scope === 'all' || scope === gr.id) && lists[gr.id].length);
     const row = (gr) => (gr.id === 'notes'
       ? (m) => <NoteHit key={m.id} mark={m} now={now} terms={q.split(/\s+/)} go={go} />
-      : (h, i) => <EngineHit key={(h.doc && h.doc.id) || i} hit={h} terms={terms} go={go} />);
+      : (h, i) => <EngineHit key={(h.doc && h.doc.id) || i} hit={h} terms={terms} query={q} go={go} />);
     let status = null;
     if (found.error) status = <p className="hint">{found.error}</p>;
     else if (!any && searchable(q) && (found.building || found.phase !== 'done')) {

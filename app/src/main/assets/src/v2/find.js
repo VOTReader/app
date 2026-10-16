@@ -70,22 +70,48 @@ export function placesIn(text, q) {
   return out;
 }
 
+/** main's FindInUnit: a place's words lie within this many characters. */
+const PLACE_LEN = 120;
+const LETTER = /\p{L}/u;
+
+/**
+ * A search landing's places (main's FindInUnit over its `find.terms`): the search's own places, VotSearchMini.findPlaces,
+ * the same runs a result card lists (the typed words, their other forms, the rarer word leading where the words never
+ * meet), each hit run on to its word's end. null without main's search, so the field's words are found instead.
+ * @param {string} text @param {string[]} terms @returns {[number, number][][] | null}
+ */
+export function termPlaces(text, terms, gl = /** @type {any} */ (globalThis)) {
+  const sm = gl.VotSearchMini;
+  if (!terms.length || !sm || typeof sm.findPlaces !== 'function') return null;
+  const end = (/** @type {number} */ i) => { while (i < text.length && LETTER.test(text[i])) i++; return i; };
+  return sm.findPlaces(text, terms, PLACE_LEN)
+    .map((/** @type {{ hits: { idx: number, len: number }[] }} */ p) => p.hits.map((h) => /** @type {[number, number]} */ ([h.idx, end(h.idx + h.len)]))
+      .sort((a, b) => a[0] - b[0]))
+    .filter((/** @type {[number, number][]} */ runs) => runs.length);
+}
+
 /**
  * Marks each place of `q` in `root` (mark.fm.qm2) and returns them, one list of marks per place, in reading order. A
- * place that crosses an element (italics, a verse's end) is several marks.
- * @param {Element | null} root @param {string} q @returns {{ count: number, marks: HTMLElement[][] }}
+ * place that crosses an element (italics, a verse's end) is several marks; a search landing's place (`terms`, while the
+ * field still holds the words it opened with) is each of its words.
+ * @param {Element | null} root @param {string} q @param {string[] | null} [terms]
+ * @returns {{ count: number, marks: HTMLElement[][] }}
  */
-export function markFind(root, q) {
+export function markFind(root, q, terms = null) {
   if (!root) return { count: 0, marks: [] };
   const { text, nodes } = readText(root);
-  const places = placesIn(text, q);
+  const places = (terms && terms.length ? termPlaces(text, terms) : null) || placesIn(text, q).map((r) => [r]);
   const shown = places.slice(0, MARK_MAX);
   const doc = root.ownerDocument;
   /** @type {HTMLElement[][]} */
   const marks = shown.map(() => []);
-  // the last first, so a split never moves a place still to be marked (a split keeps the text before it in its node)
-  for (let h = shown.length - 1; h >= 0; h--) {
-    const [s, e] = shown[h];
+  // every run, the last first, so a split never moves a run still to be marked (a split keeps the text before it in its
+  // node); a run that overlaps one already marked is left (two places never share a word)
+  const runs = shown.flatMap((p, h) => p.map(([s, e]) => ({ h, s, e }))).sort((a, b) => b.s - a.s);
+  let floor = Infinity;
+  for (const { h, s, e } of runs) {
+    if (e > floor) continue;
+    floor = s;
     for (let k = nodes.length - 1; k >= 0; k--) {
       const { node, start } = nodes[k];
       const a = Math.max(s, start) - start;
@@ -121,12 +147,35 @@ export function unmarkFind(root) {
   for (const p of parents) /** @type {Node} */ (p).normalize();
 }
 
-/** The place nearest `el` in reading order (a search landing's block): the first place at or after it, else the last. */
-export function placeFrom(/** @type {HTMLElement[][]} */ marks, /** @type {Element | null} */ el) {
+/** How many characters of `el`'s text come before `m` (footnote numbers left out, as search-landing.js counts). */
+function textBefore(/** @type {Element} */ el, /** @type {Element} */ m) {
+  const walker = el.ownerDocument.createTreeWalker(el, 4 /* SHOW_TEXT */, {
+    acceptNode: (n) => (n.parentElement && n.parentElement.closest('.fn-ref') ? 2 : 1),
+  });
+  let at = 0;
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (m.contains(n)) return at;
+    at += (n.nodeValue || '').length;
+  }
+  return at;
+}
+
+/**
+ * The place nearest a search landing in reading order: the first place at or after `off` characters into its block `el`
+ * (the landed words: a place still running there counts), else after the block, else the last.
+ * @param {HTMLElement[][]} marks @param {Element | null} el @param {number} [off]
+ */
+export function placeFrom(marks, el, off = 0) {
   if (!el || !marks.length) return 0;
   for (let i = 0; i < marks.length; i++) {
     const m = marks[i][0];
-    if (m && (el === m || el.contains(m) || (el.compareDocumentPosition(m) & 4 /* FOLLOWING */))) return i;
+    if (!m) continue;
+    if (el !== m && el.contains(m)) {
+      const last = marks[i][marks[i].length - 1];
+      if (!off || textBefore(el, last) + (last.textContent || '').length > off) return i;
+      continue;
+    }
+    if (el === m || (el.compareDocumentPosition(m) & 4 /* FOLLOWING */)) return i;
   }
   return marks.length - 1;
 }

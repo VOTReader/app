@@ -283,7 +283,7 @@ export function V2App({ gateId = readGateId() }) {
   const bar = <TopBar back={back} onBack={pop} actions={actions} scrolled={scrolled} />;
   const noun = def && def.find ? def.find(route) : '';
   const findStrip = pageTool && pageTool.kind === 'find' && noun
-    ? <FindStrip key={stack.length + ':' + (pageTool.near ? 'l' : 'm')} rootRef={scrollRef} noun={noun} start={{ q: pageTool.q, near: pageTool.near }}
+    ? <FindStrip key={stack.length + ':' + (pageTool.near ? 'l' : 'm')} rootRef={scrollRef} noun={noun} start={{ q: pageTool.q, near: pageTool.near, nearOff: pageTool.nearOff, terms: pageTool.terms }}
         gate={gate} onClose={() => setTool(null)} />
     : null;
   // auto-scroll (1j): opened by the ...; with main's Auto-scroll setting on it waits on every reading page; Stop closes it

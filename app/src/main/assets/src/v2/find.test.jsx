@@ -4,7 +4,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, waitFor, act, fireEvent } from '@testing-library/react';
 import { V2App } from './App.jsx';
 import { FindStrip } from './FindStrip.jsx';
-import { findPattern, markFind, showCurrent, unmarkFind, placesIn, readText, placeFrom } from './find.js';
+import { findPattern, markFind, showCurrent, unmarkFind, placesIn, readText, placeFrom, termPlaces } from './find.js';
+import { findPlaces } from '../search/snippet.js';
 import { GATE_STATES } from './gate.js';
 
 const g = /** @type {any} */ (globalThis);
@@ -30,7 +31,7 @@ function installCorpus() {
 
 afterEach(() => {
   cleanup();
-  for (const k of ['COLLECTIONS', 'COL_BY_KEY', 'WTLB_ONE']) delete g[k];
+  for (const k of ['COLLECTIONS', 'COL_BY_KEY', 'WTLB_ONE', 'VotSearchMini']) delete g[k];
   delete html.dataset.gate;
   vi.restoreAllMocks();
 });
@@ -136,6 +137,57 @@ describe('the find strip (1i)', () => {
     expect(container.querySelector('.cnt').textContent).toBe('1 of 2');
     expect(root.querySelectorAll('mark.fm').length).toBe(2);
     root.remove();
+  });
+});
+
+describe("a search landing's strip (v2-gaps 9, 13; main's FindInUnit find: { terms, label })", () => {
+  const FILLER = ' And the Lord spoke again and again of many other things to those who would listen to Him in that day.';
+  /** Two blocks far apart: "Keep the faith" (the engine's other form) and "keeping faith" (the words as typed). */
+  function landingPage() {
+    const root = document.createElement('div');
+    root.innerHTML = '<div class="body"><p data-hl-key="p:0">Keep the faith, little flock.' + FILLER + FILLER + '</p>'
+      + '<p data-hl-key="p:1">' + FILLER.trim() + ' Keeping faith is My command.</p></div>';
+    document.body.appendChild(root);
+    return root;
+  }
+
+  it("termPlaces reads main's places (each hit run to its word's end); none without main's search", () => {
+    g.VotSearchMini = { findPlaces };
+    const { text } = readText(landingPage());
+    const places = termPlaces(text, ['keeping', 'faith', 'keep']);
+    expect(places.map((p) => p.map(([a, b]) => text.slice(a, b)))).toEqual([['Keep', 'faith'], ['Keeping', 'faith']]);
+    delete g.VotSearchMini;
+    expect(termPlaces(text, ['faith'])).toBe(null);
+  });
+
+  it('opens with the query as typed, the search\'s places marked (a word each), the landed one current; typing finds the field\'s words', async () => {
+    g.VotSearchMini = { findPlaces };
+    const root = landingPage();
+    const near = root.querySelector('[data-hl-key="p:1"]');
+    const nearOff = near.textContent.indexOf('Keeping');
+    const { container } = render(<FindStrip rootRef={{ current: root }} noun="letter" onClose={() => {}}
+      start={{ q: 'keeping faith', terms: ['keeping', 'faith', 'keep'], near, nearOff }} />);
+    await settle(30);
+    const strip = container.querySelector('.fnd');
+    expect(/** @type {HTMLInputElement} */ (strip.querySelector('input.q')).value).toBe('keeping faith');
+    expect(document.activeElement).not.toBe(strip.querySelector('input.q'));   // no keyboard over the landing
+    expect(strip.querySelector('.cnt').textContent).toBe('2 of 2');
+    expect(Array.from(root.querySelectorAll('mark.qm'), (m) => m.textContent)).toEqual(['Keeping', 'faith']);
+    expect(Array.from(root.querySelectorAll('mark.qm2'), (m) => m.textContent)).toEqual(['Keep', 'faith']);
+    fireEvent.change(strip.querySelector('input.q'), { target: { value: 'keeping faith ' } });
+    await settle();
+    expect(strip.querySelector('.cnt').textContent).toBe('1 of 1');   // the field's words now: the phrase as typed
+    expect(Array.from(root.querySelectorAll('mark.fm'), (m) => m.textContent)).toEqual(['Keeping faith']);
+    root.remove();
+  });
+
+  it('a landing in its block\'s second place makes that place current, not the block\'s first', () => {
+    const root = document.createElement('div');
+    root.innerHTML = '<p data-hl-key="p:0">more here, then <sup class="fn-ref">1</sup>more there</p>';
+    const el = root.querySelector('p');
+    const { marks } = markFind(root, 'more');
+    expect(placeFrom(marks, el, el.textContent.replace('1', '').indexOf('more there'))).toBe(1);
+    expect(placeFrom(marks, el, 0)).toBe(0);
   });
 });
 

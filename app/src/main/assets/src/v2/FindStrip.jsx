@@ -31,10 +31,13 @@ export function bringIntoView(el) {
 }
 
 /**
- * @param {{ rootRef: { current: HTMLElement | null }, noun: string, start?: { q?: string, near?: Element | null },
- *   gate?: any, onClose: () => void }} props
+ * @param {{ rootRef: { current: HTMLElement | null }, noun: string,
+ *   start?: { q?: string, near?: Element | null, nearOff?: number, terms?: string[] | null }, gate?: any,
+ *   onClose: () => void }} props
  *   rootRef the page's scroller (its reading blocks are searched); noun main's word for the page ('entry', 'letter',
- *   'topic', 'chapter'); start what the strip opens with (a search landing's words and its block)
+ *   'topic', 'chapter'); start what the strip opens with: a search landing's query as typed (main's find.label), its
+ *   block (nearOff characters in, where the landed words stand) and its search terms (main's find.terms: while the
+ *   field still says q, the places are the search's own)
  */
 export function FindStrip({ rootRef, noun, start = {}, gate = null, onClose }) {
   const [q, setQ] = React.useState(start.q || '');
@@ -43,10 +46,13 @@ export function FindStrip({ rootRef, noun, start = {}, gate = null, onClose }) {
   const cur = React.useRef(0);
   const input = React.useRef(/** @type {HTMLInputElement | null} */ (null));
   const near = React.useRef(start.near || null);
+  const nearOff = React.useRef(start.nearOff || 0);
   const opened = React.useRef(start.q || '');   // what the strip opened with: marked at once, typing settles first
+  const terms = React.useRef(start.terms || null);
 
+  // the ... opens it to type in (focus); a search landing opens it filled, over the words it landed on: no keyboard
   React.useEffect(() => {
-    if (!gate && input.current) input.current.focus();
+    if (!gate && !opened.current && input.current) input.current.focus();
   }, [gate]);
 
   // mark the page for `q`, and again whenever its text changes under the marks (never for find's own marking)
@@ -60,10 +66,10 @@ export function FindStrip({ rootRef, noun, start = {}, gate = null, onClose }) {
     const build = () => {
       if (obs) obs.disconnect();
       unmarkFind(root);
-      const out = markFind(root, q);
+      const out = markFind(root, q, q === opened.current ? terms.current : null);
       marks.current = out.marks;
       let at = Math.min(cur.current, Math.max(0, out.marks.length - 1));
-      if (first) at = near.current ? placeFrom(out.marks, near.current) : 0;
+      if (first) at = near.current ? placeFrom(out.marks, near.current, nearOff.current) : 0;
       cur.current = at;
       showCurrent(out.marks, at);
       setFound({ count: out.count, cur: at });

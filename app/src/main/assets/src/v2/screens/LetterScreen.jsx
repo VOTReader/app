@@ -242,10 +242,12 @@ const SectionIntro = React.memo(/** @param {{ blocks: any[], study?: boolean }} 
  * @param {{ collection: string, n?: number, preface?: boolean, onReady?: () => void, onOpenLetter?: (n: number) => void,
  *   gate?: import('../gate.js').GateState | null, desktop?: boolean, waitDoubleTap?: boolean,
  *   onNote?: (target: Record<string, any>) => void, facts?: import('../settings-facts.js').SettingsFacts,
- *   onGo?: (route: any) => void, landAt?: { excerpt: string, match?: string[] } | null, doc?: PageDoc | null }} props
+ *   onGo?: (route: any) => void, landAt?: { excerpt?: string, match?: string[], label?: string } | null, doc?: PageDoc | null,
+ *   onFind?: (start: { q: string, terms: string[], near: Element | null, nearOff: number }) => void }} props
+ *   onFind opens the shell's Find strip on this page (a search landing's words)
  */
 export function LetterScreen({ collection, n = 0, preface = false, onReady, onOpenLetter, gate = null, desktop = false,
-  waitDoubleTap = false, onNote, facts = {}, onGo, landAt = null, doc = null }) {
+  waitDoubleTap = false, onNote, facts = {}, onGo, landAt = null, doc = null, onFind }) {
   const col = doc ? null : collectionOf(collection);
   const letters = useLetters(col);
   const letter = doc ? doc.letter : letters ? (preface ? prefaceOf(col) : letterAt(letters, n)) : null;
@@ -271,21 +273,30 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
 
   React.useEffect(() => { if (letters && onReady) onReady(); }, [letters, onReady]);
 
-  // A search hit (v2-gaps 9): the words it was found by marked in their block, and that place a third of the way down
-  // once painted (after the shell has put a new page at its top); the first time only, so Back keeps the reader's place.
+  // A search hit (v2-gaps 9, 13): once painted (after the shell has put a new page at its top), main's find over it: the
+  // Find strip with the query as typed, the search's own places marked, the one at the words it was found by current and
+  // brought a third of the way down (design 1i: "a search landing still opens main's pill strings in the same strip, the
+  // field filled"). The first time only, so Back keeps the reader's place and a closed strip stays closed. A page drawn
+  // without the shell's Find marks those words in their block instead, that place a third of the way down.
   React.useEffect(() => {
     if (!letter || !landAt) return undefined;
     const match = [].concat(landAt.match || []).filter(Boolean);
     const { index, off } = landingOf(letter, landAt.excerpt, match);
-    if (index < 0) return undefined;
+    if (index < 0 && !(onFind && match.length)) return undefined;
     let live = true;
     /** @type {HTMLElement | null} */
     let marked = null;
     whenPainted().then(() => {
       const root = bodyRef.current;
       if (!live || !root) return;
-      const key = isFormatB(letter) ? wtlbHlKey(letter.id, index) : paraKey(letter.id, index);
-      const el = /** @type {HTMLElement | null} */ (root.querySelector('[data-hl-key="' + cssValue(key) + '"]'));
+      const key = index < 0 ? '' : isFormatB(letter) ? wtlbHlKey(letter.id, index) : paraKey(letter.id, index);
+      const el = key ? /** @type {HTMLElement | null} */ (root.querySelector('[data-hl-key="' + cssValue(key) + '"]')) : null;
+      if (onFind) {
+        if (LANDED.has(landAt)) return;
+        LANDED.add(landAt);
+        onFind({ q: landAt.label || match[0], terms: match, near: el, nearOff: el ? off : 0 });
+        return;
+      }
       if (!el) return;
       const mark = markWords(el, match, off);
       marked = el;
@@ -295,6 +306,7 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
     });
     // another hit in the same letter marks its own words, not these too
     return () => { live = false; unmarkWords(marked); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onFind is the shell's open, read when the hit lands
   }, [letter, landAt]);
 
   // The gate's open sheet, from the page alone: 4b paragraph 1 tapped, gold ringed (8d: the same paragraph under Safari's
@@ -674,14 +686,15 @@ function findNoun(r) {
   return letter && isFormatB(letter) ? 'entry' : 'letter';
 }
 
-/** The letter place: the next-letter card replaces this letter, so Back still names the collection. */
-function LetterPlace({ route, replace, go, onReady, gate, desktop, facts }) {
+/** The letter place: the next-letter card replaces this letter, so Back still names the collection. @param {import('../places.js').PlaceProps} props */
+function LetterPlace({ route, replace, go, onReady, gate, desktop, facts, open }) {
   const openLetter = (n) => replace({ place: 'letter', collection: route.collection, n });
   const openNote = (target) => go({ place: 'note', ...target });
   return <LetterScreen key={route.collection + '/' + (route.preface ? 'P' : route.n)} collection={route.collection} n={route.n}
     preface={!!route.preface} onReady={onReady} onOpenLetter={openLetter} gate={gate} desktop={desktop}
     waitDoubleTap={!desktop && !(facts && facts.doubleTapFullscreen === false)} onNote={openNote} facts={facts || {}} onGo={go}
-    landAt={route.excerpt ? route : null} />;
+    landAt={route.excerpt || (route.match && route.match.length) ? route : null}
+    onFind={open && !gate ? (start) => open('find', start) : undefined} />;
 }
 
 definePlace('letter', {

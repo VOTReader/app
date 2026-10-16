@@ -413,6 +413,33 @@ describe('a search hit opens its letter on the words (v2-gaps 9; the Bible page\
     expect(marks(again.container)).toEqual([['letter:whats-in-a-name:0', 'blessed']]);
   });
 
+  it("in the shell: the landing opens Find with the query as typed and the search's terms, at the words it was found by; once", async () => {
+    seed();
+    const onFind = vi.fn();
+    const route = { excerpt: 'only one name under Heaven by which you must be saved.', match: ['name', 'names'], label: 'Name' };
+    const first = render(<LetterScreen collection="one" n={9} landAt={route} onFind={onFind} />);
+    await painted();
+    expect(onFind).toHaveBeenCalledTimes(1);
+    const start = onFind.mock.calls[0][0];
+    expect(start.q).toBe('Name');
+    expect(start.terms).toEqual(['name', 'names']);
+    expect(start.near.getAttribute('data-hl-key')).toBe('letter:whats-in-a-name:0');
+    expect(start.nearOff).toBe(start.near.textContent.indexOf('only one name under Heaven'));
+    expect(first.container.querySelector('mark.qm')).toBeNull();   // the strip marks the places, not the landing
+    first.unmount();
+    render(<LetterScreen collection="one" n={9} landAt={route} onFind={onFind} />);   // Back to the letter
+    await painted();
+    expect(onFind).toHaveBeenCalledTimes(1);
+  });
+
+  it('in the shell, a hit the letter holds no excerpt for still opens Find (main: the first place), and no label reads the first term', async () => {
+    seed();
+    const onFind = vi.fn();
+    render(<LetterScreen collection="one" n={9} landAt={{ match: ['blessed'] }} onFind={onFind} />);
+    await painted();
+    expect(onFind).toHaveBeenCalledWith({ q: 'blessed', terms: ['blessed'], near: null, nearOff: 0 });
+  });
+
   it('no landing (opened from its collection, or an excerpt the letter does not hold): nothing marked', async () => {
     seed();
     const { container } = render(<LetterScreen collection="one" n={9} landAt={{ excerpt: 'no paragraph of this letter says these words at all', match: ['words'] }} />);
