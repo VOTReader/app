@@ -89,6 +89,9 @@ const JOURNAL_FACTS = {
   journalMemo: { at: 18 },
 };
 const JOURNAL_ENTRY_STACK = [{ place: 'notes', kind: 'all' }, { place: 'journal-entry', id: 'gate-je' }];
+/** 3p's live level as the picture draws it (its 40 bars' px over the recorder's 44 px top). */
+const REC_LEVEL = [4, 5, 24, 24, 13, 33, 19, 6, 15, 40, 37, 9, 10, 16, 25, 6, 33, 28, 6, 9, 34, 41, 15, 13, 6, 23, 8, 30, 35, 13, 5, 27,
+  42, 22, 13, 10, 17, 13, 25, 39].map((h) => h / 44);
 
 const LETTER1_AT_351 = { item: { collection: 'one', n: 1 }, reader: 'B', at: 231, length: 608 };
 
@@ -231,6 +234,9 @@ export const GATE_STATES = {
   '3n-journal-entry': { stack: JOURNAL_ENTRY_STACK, facts: JOURNAL_FACTS },
   // states.json 3o-journal-insert: 3n with "+ Insert" tapped: main's ten in four groups (the laptop's a dialog).
   '3o-journal-insert': { stack: JOURNAL_ENTRY_STACK, facts: JOURNAL_FACTS, open: { sheet: 'insert' } },
+  // states.json 3p-journal-record: 3n with Insert > Voice memo recording, 0:42 in (4:18 left of main's 5 minutes).
+  '3p-journal-record': { stack: JOURNAL_ENTRY_STACK, facts: JOURNAL_FACTS,
+    open: { sheet: 'record', rec: { state: 'recording', at: 42, level: REC_LEVEL } } },
   // states.json 4g-excerpt-words (dz22): Insert > Excerpt > Volume One's Letter 16: its words open, "the children of God
   // ... says The Lord." chosen (the wash and its handles), the footer says Insert these words (phone only).
   '4g-excerpt-words': { stack: JOURNAL_ENTRY_STACK, facts: JOURNAL_FACTS, open: { sheet: 'link-picker', picker: {

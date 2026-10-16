@@ -1,11 +1,12 @@
-/* JournalEditor - one journal entry as a writing surface (zv1; mw9, design dz20 3n, 3o, 4g).
+/* JournalEditor - one journal entry as a writing surface (zv1; mw9, design dz20 3n, 3o, 3p, 4g).
 
    The page IS the entry: its date, its title and its paragraphs are written in place (fields with no boxes, growing with
    their words), and what Insert added sits between them as main's own blocks: cards (a letter, a chapter, an excerpt),
    the divider, a picture, a voice memo that plays in place (JournalBlocks.jsx draws them; journal-blocks.js says what
    they are). Insert (the top bar's "+ Insert") is main's ten kinds in its four groups; Card and Excerpt open the link
    picker in its card and excerpt modes, and a block goes in under the paragraph the cursor was in (main's
-   insertBlockBelow). Bookmark, Note, Journal entry, Notebook and Voice memo come next (mw9b, mw9c).
+   insertBlockBelow). Bookmark, Note, Journal entry and Notebook open their pickers (JournalPickers.jsx), and Voice memo
+   main's recorder (JournalRecord.jsx), its memo saved at once as main does.
 
    It writes through main's own JournalStore (add / update), the entry shape main keeps, so nothing is migrated. It saves
    half a second after the last change, at once after a picture (its blob is already stored), and once more on leaving,
@@ -16,6 +17,7 @@ import { Sheet, LayerToast } from '../Sheet.jsx';
 import { isText, newBlock, blockView, insertBelow, targetToBlock, withTail, moveBlock, removedWords, blockName, PICKERS } from '../journal-blocks.js';
 import { JournalCard, JournalImage, JournalMemo } from './JournalBlocks.jsx';
 import { JournalPick } from './JournalPickers.jsx';
+import { JournalRecord } from './JournalRecord.jsx';
 import { LinkPicker } from './LinkPicker.jsx';
 import { useVotCorpus } from '../corpus.js';
 
@@ -235,7 +237,8 @@ export function JournalEditor({ route, gate, facts, desktop, go, onReady }) {
   const gateMedia = gate ? facts.journalMedia || {} : null;
   const gateMemo = gate && facts.journalMemo ? facts.journalMemo : null;
   const [sheet, setSheet] = React.useState(/** @type {null | string} */ (gateOpen
-    ? gateOpen.sheet === 'insert' ? 'insert' : gateOpen.sheet === 'link-picker' ? (gateOpen.picker && gateOpen.picker.mode) || 'excerpt' : null
+    ? gateOpen.sheet === 'insert' ? 'insert' : gateOpen.sheet === 'record' ? 'memo'
+      : gateOpen.sheet === 'link-picker' ? (gateOpen.picker && gateOpen.picker.mode) || 'excerpt' : null
     : null));
   /** The block a long press is acting on (its sheet: Move up, Move down, Remove), by id. */
   const [held, setHeld] = React.useState(/** @type {string | null} */ (null));
@@ -381,12 +384,16 @@ export function JournalEditor({ route, gate, facts, desktop, go, onReady }) {
       .catch(() => note('Could not save that image.'));
   };
   const onInsert = (id) => {
-    if (id === 'card' || id === 'excerpt' || PICKERS[id]) { setSheet(id); return; }
+    if (id === 'card' || id === 'excerpt' || id === 'memo' || PICKERS[id]) { setSheet(id); return; }
     setSheet(null);
     if (id === 'divider') insert(newBlock('divider'));
     else if (id === 'text') insertText();
     else if (id === 'picture') { if (fileRef.current) fileRef.current.click(); }
-    else note('Not built yet in v2.');
+  };
+  /** A memo the recorder saved: main's audio block, kept at once (its bytes are already stored). */
+  const onMemo = (m) => {
+    setSheet(null);
+    if (m && m.mediaId) insert(newBlock('audio', { mediaId: m.mediaId, duration: m.duration, caption: '', samples: m.samples || null }), true);
   };
   const onPicked = (target, item) => {
     const block = targetToBlock(target, item, sheet === 'excerpt');
@@ -440,6 +447,10 @@ export function JournalEditor({ route, gate, facts, desktop, go, onReady }) {
       {sheet && PICKERS[sheet] && (
         <JournalPick kind={/** @type {any} */ (sheet)} exclude={entryId() || (entry && entry.id) || null} desktop={desktop}
           onPick={(block) => { setSheet(null); insert(block); }} onClose={() => setSheet(null)} />
+      )}
+      {sheet === 'memo' && (
+        <JournalRecord desktop={desktop} gate={gateOpen && gateOpen.sheet === 'record' ? gateOpen.rec || null : null}
+          onSave={onMemo} onClose={() => setSheet(null)} />
       )}
       {heldAt >= 0 && (
         <BlockSheet name={blockName(blocks[heldAt])} first={heldAt === 0} last={heldAt === blocks.length - 1} desktop={desktop}

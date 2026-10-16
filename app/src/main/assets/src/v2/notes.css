@@ -25,3 +25,14 @@
 .jbs .srow:disabled { opacity: .4; }
 .dlg.jbs .sh, .dlg.jpk > .sh, .dlg.jpk .lkbk { margin-right: 40px; }
 .jpk .field { flex: none; }
+/* mw9c: the Voice memo (3p, the kit's .sheet.rec): Paused dims the dot; the review's level is its scrubber (played bars
+   gold, the rest grey, as the 3n memo); main's asking and failing words, and its discard question, sit in the sheet */
+.recst.is-paused .recdot { background: var(--t3); box-shadow: none; }
+.rec .rectot { font-size: var(--fs-l); color: var(--t2); }
+.recw.scrub { cursor: pointer; }
+.recw.scrub span { background: var(--t3); }
+.recw.scrub span.p { background: var(--accent); }
+.recw.scrub:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+.rec .recq { margin: 20px 0 0; color: var(--t1); line-height: 1.5; }
+.rec .stack { text-align: left; }
+.rec .recc { margin: 20px 0 4px; text-align: left; }

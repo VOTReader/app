@@ -35,7 +35,7 @@ const NAV_FNS = ['buildNavIndex', 'searchNavIndex', 'navItemPreview', 'navItemTo
 const GLOBALS = [...NAV_FNS, 'COLLECTIONS', 'COL_BY_KEY', 'LETTERS_V1', 'BOOKS', '_allBooks', '_matthew', 'colLetterArr', 'colPreface',
   'bookCategory', 'findBook', 'parseRefStr', 'findEntryContext', '__NAV_INDEX', '__NAV_INDEX_SIG', 'RecentNavStore', 'JournalStore',
   'JournalHelpers', 'JournalMediaStore', 'BookmarkStore', 'NoteStore', 'NotebookStore', 'noteSourceLabel', 'resolveVerseText',
-  'StateStore', 'HistoryStore', 'matchMedia', '_collectMarks', 'LinkStore', '__votCorpus', '__loadVotCorpus'];
+  'StateStore', 'HistoryStore', 'matchMedia', '_collectMarks', 'LinkStore', '__votCorpus', '__loadVotCorpus', 'PlatformBridge'];
 
 function installCorpus() {
   for (const k of NAV_FNS) g[k] = NAV[k];
@@ -280,6 +280,20 @@ describe('gate pictures', () => {
     expect(byText(sheet, '.its', 'A picture on this computer')).toBeTruthy();
   });
 
+  it('3p: Voice memo over 3n: Recording at 0:42, the picture\'s level, 4:18 left, Cancel · Pause · Finish; the mic left alone', async () => {
+    g.PlatformBridge = { requestMicPermission: vi.fn() };
+    render(<V2App gateId="3p-journal-record" />);
+    const rec = document.querySelector('[role="dialog"][aria-label="Voice memo"]');
+    expect(rec.className).toBe('sheet rec');
+    expect(texts(rec, '.sh, .recst, .rect, .recn')).toEqual(['Voice memo', 'Recording', '0:42', 'Up to 5 minutes · 4:18 left']);
+    expect([...rec.querySelectorAll('.recw span.p')].map((s) => parseInt(/** @type {HTMLElement} */ (s).style.height, 10))).toEqual([4, 5, 24, 24, 13, 33, 19, 6,
+      15, 40, 37, 9, 10, 16, 25, 6, 33, 28, 6, 9, 34, 41, 15, 13, 6, 23, 8, 30, 35, 13, 5, 27, 42, 22, 13, 10, 17, 13, 25, 39]);
+    expect(texts(rec, '.recb .rb')).toEqual(['Cancel', 'Pause', 'Finish']);
+    expect(texts(document.querySelector('.jed .jmemo'), '.jmt > span')).toEqual(['A prayer for the week', '0:18 / 1:12']);
+    await waitFor(() => expect(html.dataset.gate).toBe('ready'));
+    expect(g.PlatformBridge.requestMicPermission).not.toHaveBeenCalled();
+  });
+
   it('4g: Excerpt over Letter 16: its words open, the picked words washed between the handles; ready once they are drawn', async () => {
     render(<V2App gateId="4g-excerpt-words" />);
     const picker = document.querySelector('[role="dialog"][aria-label="Add an excerpt"]');
@@ -483,14 +497,32 @@ describe('writing an entry (a real boot)', () => {
     expect(lastPatch().blocks.map((b) => b.type)).toEqual(['p', 'image', 'p']);
   });
 
-  it('the kind still to come says so and changes nothing', async () => {
-    journal([{ id: 'b1', type: 'p', text: 'One' }]);
-    openEntry();
-    for (const name of ['Voice memo']) {
-      await insertKind(name);
-      expect(document.querySelector('.toast').textContent).toBe('Not built yet in v2.');
-    }
-    expect(g.JournalStore.update).not.toHaveBeenCalled();
+  it('Voice memo: main\'s recorder; Save puts main\'s audio block under the cursor\'s paragraph, saved at once', async () => {
+    journal([{ id: 'b1', type: 'p', text: 'One' }, { id: 'b2', type: 'p', text: 'Two' }]);
+    g.PlatformBridge = { isAndroid: false, requestMicPermission: vi.fn(), startAudioSession() {}, endAudioSession() {},
+      nativeRecordStart: vi.fn(() => 'ok'), nativeRecordAmplitude: () => 0, nativeRecordStop: vi.fn(), nativeRecordCancel() {} };
+    g.JournalMediaStore = { put: vi.fn(async () => 'm9'), markLinked: vi.fn(), delete: vi.fn(),
+      acquireUrl: vi.fn(async () => null), releaseUrl() {}, get: vi.fn(async () => null), subscribeUrls: () => () => {} };
+    const c = openEntry();
+    fireEvent.focus(c.querySelector('.jed textarea.jp'));
+    await insertKind('Voice memo');
+    expect(document.querySelector('.toast')).toBe(null);
+    const rec = document.querySelector('[role="dialog"][aria-label="Voice memo"]');
+    expect(rec.querySelector('.recq').textContent).toBe('Requesting microphone access…');
+    expect(g.PlatformBridge.requestMicPermission).toHaveBeenCalled();
+    act(() => { g.__onMicPermissionResult(true); });
+    await click(byText(rec, 'button', 'Finish'));
+    expect(g.PlatformBridge.nativeRecordStop).toHaveBeenCalled();
+    await act(async () => { g.__onNativeRecordingComplete(null, 1000, 'audio/webm', new Blob(['x'], { type: 'audio/webm' })); });
+    expect(g.JournalStore.update).not.toHaveBeenCalled();   // nothing goes in before Save
+    await click(byText(rec, 'button', 'Save'));
+    expect(document.querySelector('[aria-label="Voice memo"]')).toBe(null);
+    expect(g.JournalStore.update).toHaveBeenCalledTimes(1);   // at once, as main's immediateSave
+    expect(lastPatch().blocks.map((b) => b.type)).toEqual(['p', 'audio', 'p']);
+    expect(lastPatch().blocks[1]).toMatchObject({ type: 'audio', mediaId: 'm9', duration: 1, caption: '', samples: [] });
+    expect(g.JournalMediaStore.markLinked).toHaveBeenCalledWith('m9');
+    expect(c.querySelectorAll('.jed .jmemo')).toHaveLength(1);
+    expect(g.__onNativeRecordingComplete).toBeUndefined();   // the sheet let go of main's callbacks
   });
 
   it('the title is one line: Enter goes to the words; a pasted newline becomes a space', async () => {
