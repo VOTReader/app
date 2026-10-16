@@ -12,13 +12,14 @@
    main's mark keys (letter:<chapter>:<block>:<kind>:<i>). main's floating Expand / Collapse moves into the ... as
    "Collapse all cards" / "Open all cards" (dz15).
 
-   The ... holds Find in this chapter and the cards item for now; myweb's shared ... (MoreButton) takes it over with
-   Auto-scroll and Copy website link when it lands. A Matthew Study Bible chapter is main's ChapterView, not a letter:
-   MatthewScreens.jsx draws it (5i-5k). A gate boot reads its cards from the gate and writes nothing. */
+   The ... is v2's shared one (more-menu.jsx MoreButton, dz15): Find in this chapter, Auto-scroll, Copy website link, then
+   the cards rows. A Matthew Study Bible chapter is main's ChapterView, not a letter: MatthewScreens.jsx draws it (5i-5k).
+   A gate boot reads its cards from the gate and writes nothing. */
 import { Icon } from '../Icon.jsx';
 import { LetterBlock } from '../letter-text.jsx';
 import { LetterScreen, LetterBookmark } from './LetterScreen.jsx';
-import { Sheet } from '../Sheet.jsx';
+import { MoreButton, findItem, autoScrollItem, copyLinkItem } from '../more-menu.jsx';
+import { keySiteLink } from '../../utils/passage-copy.js';
 import { definePlace } from '../places.js';
 import { paraKey } from '../marks.js';
 import { useStudies } from './StudiesScreen.jsx';
@@ -214,40 +215,28 @@ export function StudyChapterScreen({ route, gate, go, replace, onReady, desktop,
 }
 
 /**
- * The chapter's ... (for now: Find in this chapter, and the cards). Phone: a sheet titled by the chapter; laptop: the
- * same as a small dialog until the shared ... lands.
- * @param {{ route: any, desktop: boolean, open?: (name: string, opts?: Record<string, any>) => void }} props
+ * The chapter's ... (more-menu.jsx; dz15): Find in this chapter, Auto-scroll, Copy website link (the study's page on the
+ * site: main's pageSiteLink of LetterView's 'letter:<id>'), then 5f's "Collapse all cards" / "Open all cards". No Hear it
+ * sung: main hides a study's songs (LetterView studyMode). A Matthew chapter's is main's More there (dz18 5i): Copy website
+ * link first ('study:matthew-<n>'), then Find and Auto-scroll; it has no cards.
+ * @param {{ route: any, gate?: any, desktop: boolean, open?: (name: string, opts?: Record<string, any>) => void }} props
  */
-function StudyMore({ route, desktop, open }) {
-  const [shown, setShown] = React.useState(false);
+function StudyMore({ route, gate, desktop, open }) {
   const found = chapterFor(route);
   const chapter = found ? found.chapter : null;
   const keys = chapter ? chapterCardKeys(chapter) : [];
   const allOpen = React.useSyncExternalStore(subscribeShown, () => !chapter || cardsShown.all.get(chapter.id) !== false);
-  const close = () => setShown(false);
-  const row = (icon, t, run) => (
-    <button type="button" className="srow act" role="menuitem" onClick={() => { close(); run(); }}>
-      <span className="lead"><Icon name={icon} /></span>
-      <span className="tx"><span className="t">{t}</span></span>
-    </button>
-  );
+  const matthew = route.study === MATTHEW_ID;
   const allTo = (/** @type {boolean} */ o) => () => {
     if (chapter) allCards.dispatchEvent(new CustomEvent(ALL_CARDS, { detail: { chapter: chapter.id, open: o } }));
   };
-  return (
-    <>
-      <button type="button" className="ic" aria-label="More" aria-haspopup="menu" aria-expanded={shown}
-        onClick={() => setShown((v) => !v)}><Icon name="more" /></button>
-      {shown && (
-        <Sheet kind="mor" label="More" onClose={close} desktop={desktop} scrim="light">
-          {chapter && <div className="sh">{route.study === MATTHEW_ID ? 'Matthew ' + chapter.num : curly(chapter.title)}</div>}
-          {row('search', 'Find in this chapter', () => open && open('find'))}
-          {keys.length > 0 && (allOpen ? row('minus', 'Collapse all cards', allTo(false)) : row('plus', 'Open all cards', allTo(true)))}
-          <button type="button" className="textbtn cancel" onClick={close}>Cancel</button>
-        </Sheet>
-      )}
-    </>
-  );
+  const cards = !keys.length ? null : allOpen ? { id: 'cards', icon: 'minus', t: 'Collapse all cards', run: allTo(false) }
+    : { id: 'cards', icon: 'plus', t: 'Open all cards', run: allTo(true) };
+  const link = chapter ? copyLinkItem(keySiteLink(matthew ? bookmarkOf(chapter.num).key : 'letter:' + chapter.id)) : null;
+  const find = findItem('chapter', open);
+  const auto = autoScrollItem(open, gate);
+  const title = !chapter ? '' : matthew ? 'Matthew ' + chapter.num : curly(chapter.title);
+  return <MoreButton title={title} desktop={desktop} gate={gate} items={matthew ? [link, find, auto] : [find, auto, link, cards]} />;
 }
 
 /**
@@ -263,7 +252,7 @@ function studyChapterActions({ route, gate, open, desktop }) {
     <>
       <LetterBookmark route={route} gate={gate} item={chapter} noun="chapter" mark={mark} />
       <button type="button" className="ic" aria-label="Text and theme" onClick={() => open && open('text-and-theme')}><Icon name="aa" /></button>
-      <StudyMore route={route} desktop={desktop} open={open} />
+      <StudyMore route={route} gate={gate} desktop={desktop} open={open} />
     </>
   );
 }

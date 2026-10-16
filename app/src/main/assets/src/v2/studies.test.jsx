@@ -64,7 +64,7 @@ const undo = [];
 afterEach(() => {
   cleanup();
   for (const k of ['BIBLE_STUDIES', 'MATTHEW', 'loadBibleStudies', '__loadMatthewCorpus', 'StateStore', 'AUDIO_MANIFEST', 'matchMedia',
-    'ProphecyCardsStore', 'COL_BY_KEY', 'V2_LETTERS']) delete g[k];
+    'ProphecyCardsStore', 'COL_BY_KEY', 'V2_LETTERS', 'findEntryContext']) delete g[k];
   while (undo.length) undo.pop()();
   delete html.dataset.gate;
   localStorage.clear();
@@ -279,8 +279,9 @@ function openChapter(chapter = CH2, store = cardStore()) {
 const cardsOf = (root) => [...root.querySelectorAll('.pgrp .pcard')].map((c) => ({
   kind: c.className.replace(/^pcard /, '').replace(/ open$/, ''), open: c.classList.contains('open'),
   n: c.querySelector('.pc-n') ? c.querySelector('.pc-n').textContent : null }));
-const menuRows = () => [...document.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent);
-const menuRow = (t) => [...document.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent === t);
+/** The ... 's rows (more-menu.jsx MoreButton: the phone's sheet). */
+const menuRows = () => [...document.querySelectorAll('.srow.act .t')].map((t) => t.textContent);
+const menuRow = (t) => [...document.querySelectorAll('.srow.act')].find((b) => b.querySelector('.t').textContent === t);
 
 describe("a study's chapter (5d) and its prophecy cards (5f)", () => {
   it("the chapter's facts: by id, its eyebrow, main's cards in main's order, what Collapse all changes", () => {
@@ -344,19 +345,41 @@ describe("a study's chapter (5d) and its prophecy cards (5f)", () => {
     expect(localStorage.length).toBe(0);
   });
 
-  it("a gate's ... opens every card without saving; then it offers Collapse all cards", async () => {
+  it("a gate's ... holds Find, Auto-scroll and the cards row; a tap there closes it and changes nothing", async () => {
     installLoaders({ make: withChapter2 });
     const store = cardStore();
     g.ProphecyCardsStore = store;
     const { container } = render(<V2App gateId="5f-prophecy-cards" />);
     await waitFor(() => expect(html.dataset.gate).toBe('ready'));
+    const before = cardsOf(container);
     await click(container.querySelector('.tb [aria-label="More"]'));
-    expect(menuRows()).toEqual(['Find in this chapter', 'Open all cards']);
+    expect(document.querySelector('.sheet.mor .sh').textContent).toBe(curly(chapterOf(withChapter2()[0], CH2).title));
+    expect(menuRows()).toEqual(['Find in this chapter', 'Auto-scroll', 'Open all cards']);
     await click(menuRow('Open all cards'));
-    expect(cardsOf(container).every((c) => c.open)).toBe(true);
-    await click(container.querySelector('.tb [aria-label="More"]'));
-    expect(menuRows()).toEqual(['Find in this chapter', 'Collapse all cards']);
+    expect(document.querySelector('.sheet.mor')).toBe(null);
+    expect(cardsOf(container)).toEqual(before);
     expect(store.setAll).not.toHaveBeenCalled();
+  });
+
+  it("main's page for the study: Copy website link after Auto-scroll, before the cards", async () => {
+    installLoaders({ make: withChapter2 });
+    g.ProphecyCardsStore = cardStore();
+    // main's lookup behind its pageSiteLink (data/scripture-resolution.js): a study's chapter is a 'study-letter'
+    g.findEntryContext = vi.fn((id, kind) => (id === CH2 && kind === 'letter'
+      ? { kind: 'study-letter', screen: 'bible-study-chapter', collection: 'YAHUSHUA More Than a Man', title: 'Section Two' } : null));
+    const writeText = vi.fn((/** @type {string} */ _text) => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    undo.push(defineStart(() => [{ place: 'home' }, { place: 'study', study: 'more-than-a-man' },
+      { place: 'study-chapter', study: 'more-than-a-man', chapter: CH2 }]));
+    const { container } = render(<V2App gateId={null} />);
+    await waitFor(() => expect(container.querySelector('.pgrp')).not.toBe(null));
+    await click(container.querySelector('.tb [aria-label="More"]'));
+    expect(menuRows()).toEqual(['Find in this chapter', 'Auto-scroll', 'Copy website link', 'Collapse all cards']);
+    expect(menuRow('Copy website link').querySelector('.s').textContent).toBe('thevolumesoftruth.com');
+    await click(menuRow('Copy website link'));
+    await act(() => new Promise((r) => { setTimeout(r, 30); }));
+    expect(writeText.mock.calls[0][0]).toContain('YAHUSHUA_More_Than_a_Man');
+    expect(document.querySelector('.toast').textContent).toBe('Link copied: Section Two (YAHUSHUA More Than a Man)');
   });
 
   it("a real boot: every card open with none saved, a saved false closed; a tap saves it as main does", () => {
@@ -389,7 +412,7 @@ describe("a study's chapter (5d) and its prophecy cards (5f)", () => {
     expect(store.getAll()).toEqual({});
     expect(cardsOf(container).map((c) => c.open)).toEqual([false, true, true]);
     await click(container.querySelector('.tb [aria-label="More"]'));
-    expect(menuRows()).toEqual(['Find in this chapter', 'Open all cards']);
+    expect(menuRows()).toEqual(['Find in this chapter', 'Auto-scroll', 'Open all cards']);
     await click(menuRow('Open all cards'));
     expect(cardsOf(container).map((c) => c.open)).toEqual([true, true, true]);
     expect(store.setAll).toHaveBeenLastCalledWith({ [CH2 + ':0:ot']: true, [CH2 + ':0:nt']: true, [CH2 + ':0:vot']: true });

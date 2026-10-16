@@ -286,4 +286,20 @@ describe('a chapter (5i-5k)', () => {
     expect(g.BookmarkStore.add).toHaveBeenCalledTimes(1);
     expect(g.BookmarkStore.add.mock.calls[0][0]).toMatchObject({ hlKey: 'study:matthew-5', label: 'Matthew 5 (Study)' });
   });
+
+  it("the ... is main's More there: Copy website link first (the Study Bible's page), then Find and Auto-scroll; no cards", async () => {
+    const writeText = vi.fn((_text) => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const { container } = liveChapter();
+    await waitFor(() => expect(container.querySelector('.reader-head h1')).not.toBe(null));
+    await click(container.querySelector('.tb [aria-label="More"]'));
+    const sheet = document.querySelector('.sheet.mor');
+    expect(sheet.querySelector('.sh').textContent).toBe('Matthew 5');
+    expect([...sheet.querySelectorAll('.srow .t')].map((t) => t.textContent)).toEqual(['Copy website link', 'Find in this chapter', 'Auto-scroll']);
+    expect(sheet.querySelector('.srow .s').textContent).toBe('thevolumesoftruth.com');
+    await click(sheet.querySelector('.srow'));
+    await act(() => new Promise((r) => { setTimeout(r, 30); }));
+    expect(writeText.mock.calls[0][0]).toContain('The_Volumes_of_Truth_New_Testament_Study_Bible');
+    expect(document.querySelector('.toast').textContent).toBe('Link copied: Matthew 5 (Study Bible)');
+  });
 });
