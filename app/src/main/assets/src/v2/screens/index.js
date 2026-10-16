@@ -4,6 +4,7 @@ import './HomeScreen.jsx';
 import './SettingsScreen.jsx';
 import './LetterScreen.jsx';
 import './CollectionScreen.jsx';
+import './AnswersScreens.jsx';
 import './NotesScreen.jsx';
 import './Notebooks.jsx';
 import './JournalEditor.jsx';

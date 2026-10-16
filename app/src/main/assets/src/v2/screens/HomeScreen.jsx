@@ -20,7 +20,7 @@ const FIRST = { kind: 'letter', collection: 'one', n: 1 };
 
 const ROWS = [
   { place: 'bible', t: 'The Scriptures of Truth', s: 'Genesis to Revelation · NKJV' },
-  { place: 'collection', collection: 'answers', t: 'Answers Only God Can Give', s: 'The Lord sets the record straight' },
+  { place: 'answers', t: 'Answers Only God Can Give', s: 'The Lord sets the record straight' },
   { place: 'studies', t: 'Studies', s: 'Letter Studies · Matthew Study Bible' },
   { place: 'reading-plans', t: 'Reading plans', s: 'The Bible in a year, or the Volumes in order' },
 ];
