@@ -163,6 +163,42 @@ export function saveNote(target, body, { A = g.AnnotationStore, N = g.NoteStore,
   return groupId;
 }
 
+/**
+ * What a note's Share sends (3q, main's NoteSheet): its passage, a blank line, the note, then the reference and the
+ * passage's link (passage-link.js). Before the note is saved, `target` (the note page's paragraph) gives the passage.
+ * @param {string | null} groupId @param {{ key?: string, text?: string }} target
+ */
+export function noteShareText(groupId, target, { A = g.AnnotationStore, N = g.NoteStore, excerpt = g.normalizeExcerptDisplay,
+  label = g._bookmarkSourceLabel } = {}) {
+  const note = groupId && N ? N.get(groupId) : null;
+  const segs = groupId && A ? A.getByGroup(groupId) || [] : [];
+  const raw = (note && note.fullText) || segs.map((s) => s.ann.text || '').join(' … ') || target.text || '';
+  const anchor = typeof excerpt === 'function' ? excerpt(raw) : raw;
+  const key = (segs[0] && segs[0].key) || target.key;
+  const body = note && note.body ? note.body : '';
+  return withPassageLink(anchor + (body ? '\n\n' + body : ''), key, key && typeof label === 'function' ? label(key) : null);
+}
+
+/**
+ * Delete note (3q): at once, as main's NoteSheet does it (the note and its highlight); returns the Undo, which puts the
+ * highlight's pieces and the note back as they were (its notebooks and dates too), or null when there is no note.
+ * @param {string | null} groupId @returns {(() => void) | null}
+ */
+export function deleteNote(groupId, { A = g.AnnotationStore, N = g.NoteStore } = {}) {
+  const note = groupId && N ? N.get(groupId) : null;
+  if (!groupId || !note) return null;
+  const record = { ...note };
+  const segs = A ? (A.getByGroup(groupId) || []).map((s) => ({ key: s.key, ann: { ...s.ann } })) : [];
+  if (A) A.removeGroup(groupId);
+  N.remove(groupId);
+  return () => {
+    if (A && !(A.getByGroup(groupId) || []).length) segs.forEach((s) => A.add(s.key, s.ann));
+    if (N.get(groupId)) return;
+    if (typeof N.replaceAll === 'function') N.replaceAll({ ...(N.all() || {}), [groupId]: record });
+    else N.set(groupId, record);
+  };
+}
+
 /** A Range over the whole block. @param {Element} el */
 function rangeOf(el) {
   const r = document.createRange();

@@ -92,6 +92,9 @@ const JOURNAL_FACTS = {
 /** dz20's notebooks (3i-3l): main's three notebooks and the notes in them. */
 const NOTEBOOK_FACTS = { notebooks: GATE_NOTEBOOKS, marks: gateNotebookMarks(GATE_NOW), now: GATE_NOW };
 const NOTEBOOK_STACK = [{ place: 'notes', kind: 'note' }];
+/** 3m/3q: Letter 5's note page (gnb1), opened from the letter. */
+const NOTE_5_STACK = [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 5 },
+  { place: 'note', key: 'letter:humility-and-the-word-of-god:4', start: 0, end: 31, text: 'For I AM, and My Word the same.', groupId: 'gnb1' }];
 const JOURNAL_ENTRY_STACK = [{ place: 'notes', kind: 'all' }, { place: 'journal-entry', id: 'gate-je' }];
 /** 3p's live level as the picture draws it (its 40 bars' px over the recorder's 44 px top). */
 const REC_LEVEL = [4, 5, 24, 24, 13, 33, 19, 6, 15, 40, 37, 9, 10, 16, 25, 6, 33, 28, 6, 9, 34, 41, 15, 13, 6, 23, 8, 30, 35, 13, 5, 27,
@@ -267,10 +270,9 @@ export const GATE_STATES = {
     open: { sheet: 'notebook-new', form: { name: 'Questions', color: 'purple' } } },
   // states.json 3m-note-notebooks (mw9e): Letter 5's "For I AM, and My Word the same." noted (gnb1: "Malachi 3:6 says the
   // same.", in Sabbath study and Prophecy), opened from the letter; Add to a notebook open over it.
-  '3m-note-notebooks': {
-    stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 5 },
-      { place: 'note', key: 'letter:humility-and-the-word-of-god:4', start: 0, end: 31, text: 'For I AM, and My Word the same.', groupId: 'gnb1' }],
-    facts: NOTEBOOK_FACTS, open: { sheet: 'notebook-pick' } },
+  '3m-note-notebooks': { stack: NOTE_5_STACK, facts: NOTEBOOK_FACTS, open: { sheet: 'notebook-pick' } },
+  // states.json 3q-note-more (dz26): the same note's ... open: Share, Delete note (the laptop: the menu under it).
+  '3q-note-more': { stack: NOTE_5_STACK, facts: NOTEBOOK_FACTS, open: { sheet: 'more' } },
   // rv1 Listening (states.json 2b, 6a, 6b, 6c): Now playing opened over Volume One's page (Home > Volume One), Letter 1
   // read by Benjamin at 3:51 of 10:08, saved on this device; 6a-6c open a sheet over it.
   '2b-now-playing': { stack: OVER_VOLUME_ONE, playing: LETTER_ONE_PLAYING, player: { open: 'now-playing' } },
