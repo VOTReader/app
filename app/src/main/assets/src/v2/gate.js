@@ -266,6 +266,15 @@ export const GATE_STATES = {
   // states.json 1i-find (dz15, mw7): entry 76 at its top, Find open with "more" typed: 1 of 3, the first place current
   // (the hook draws the word and a caret; the field is not focused, so no keyboard opens).
   '1i-find': { stack: WTLB_76, open: { sheet: 'find', q: 'more' } },
+  // states.json 1h-entry-more (dz15, mw7): entry 76 at its top, its ... open (the laptop: D6's menu under the ...). The
+  // song catalog has 15 verbatim songs for it, so Hear it sung shows (the hook stands in: no catalog fetch on a gate).
+  '1h-entry-more': { stack: WTLB_76, open: { sheet: 'more', songs: true } },
+  // states.json 5g-chapter-more (dz15, dz21, mw7): John 3 (NKJV) at its top, its title under the h1, the ... open.
+  '5g-chapter-more': {
+    stack: [{ place: 'home' }, { place: 'bible' }, { place: 'bible-book', book: 'john' }, { place: 'bible-chapter', book: 'john', chapter: 3 }],
+    facts: { translation: 'nkjv' },
+    open: { sheet: 'more' },
+  },
   // states.json 1j-auto-scroll (dz15, mw7): Letter 1 at its top, auto-scroll running at main's 16 lines/min with
   // Auto-continue (2.5 s): the hook freezes the run (nothing moves) and stops the fade, so the pill shows the time left.
   '1j-auto-scroll': {

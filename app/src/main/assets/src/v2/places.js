@@ -23,7 +23,7 @@
  * @typedef {{ Screen: (props: PlaceProps) => any,
  *   title?: (route: any) => string,
  *   actions?: (ctx: { route: any, go: (...routes: any[]) => void, desktop: boolean, device: 'phone' | 'computer',
- *     open?: (sheet: string, opts?: Record<string, any>) => void, gate?: any }) => any,
+ *     open?: (sheet: string, opts?: Record<string, any>) => void, gate?: any, facts?: Record<string, any> }) => any,
  *   contentClass?: string, bare?: boolean, find?: (route: any) => string }} PlaceDef
  * `find` names the page for Find in this <page> (1i: 'letter', 'entry', 'topic', 'chapter'); a place without it has no Find.
  * `bare` draws the place alone in the window: no top bar, player, tab bar or rail (8a-welcome). It still calls onReady.

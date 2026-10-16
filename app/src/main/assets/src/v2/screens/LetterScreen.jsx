@@ -34,6 +34,8 @@ import { REPEAT_TIMES } from '../../utils/listen-from.js';
 import { LetterReadAlong } from '../player/read-along.jsx';
 import { landingOf, markWords, unmarkWords, placeAtThird } from '../search-landing.js';
 import { whenPainted } from '../gate.js';
+import { MoreButton, findItem, autoScrollItem, sungItem, copyLinkItem, useVerbatimSongs } from '../more-menu.jsx';
+import { keySiteLink } from '../../utils/passage-copy.js';
 
 const g = /** @type {any} */ (globalThis);
 /** The search routes already landed: Back to one keeps where the reader left it (its words are marked again). */
@@ -629,13 +631,34 @@ export function LetterBookmark({ route, gate, item = null, noun = 'letter' }) {
   );
 }
 
-/** The letter's top bar: Bookmark, Aa (the shell's Text and theme sheet), More. @param {{ route: any, gate?: any, open?: (sheet: string) => void }} ctx */
-function letterActions({ route, gate, open }) {
+/**
+ * The letter's ... (1h; more-menu.jsx): Find in this letter / entry / topic, Auto-scroll, Hear it sung (only with a song
+ * that sings its words), Copy website link (only where the site has the page: keySiteLink of main's page key).
+ * @param {{ route: any, gate?: any, open?: (sheet: string) => void, desktop: boolean }} props
+ */
+function LetterMore({ route, gate, open, desktop }) {
+  const col = collectionOf(route.collection);
+  const letters = useLetters(col);
+  const letter = letters && col ? (route.preface ? prefaceOf(col) : letterAt(letters, route.n)) : null;
+  const songs = useVerbatimSongs(letter && col ? col.volKey + ':' + letter.id : '', gate);
+  const title = letter ? letter.title || '' : '';
+  return (
+    <MoreButton title={title} desktop={desktop} gate={gate} items={[
+      findItem(findNoun(route), open),
+      autoScrollItem(open, gate),
+      sungItem(songs, title),
+      letter ? copyLinkItem(keySiteLink(letterBookmarkKey(letter))) : null,
+    ]} />
+  );
+}
+
+/** The letter's top bar: Bookmark, Aa (the shell's Text and theme sheet), More. @param {{ route: any, gate?: any, open?: (sheet: string) => void, desktop: boolean }} ctx */
+function letterActions({ route, gate, open, desktop }) {
   return (
     <>
       <LetterBookmark route={route} gate={gate} />
       <button type="button" className="ic" aria-label="Text and theme" onClick={() => open && open('text-and-theme')}><Icon name="aa" /></button>
-      <button type="button" className="ic" aria-label="More"><Icon name="more" /></button>
+      <LetterMore route={route} gate={gate} open={open} desktop={desktop} />
     </>
   );
 }

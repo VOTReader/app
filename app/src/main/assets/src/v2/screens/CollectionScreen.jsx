@@ -216,8 +216,6 @@ function dlWords(d) {
   return w && d && d.kind === 'downloading' ? { ...w, percent: d.percent } : w;
 }
 
-const COLLECTION_ACTIONS = <button type="button" className="ic" aria-label="More"><Icon name="more" /></button>;
-
 definePlace('collection', {
   Screen: CollectionScreen,
   // Back on a letter says the collection's name as its page heads it ("Words To Live By" for either part, picture 1d)
@@ -225,5 +223,4 @@ definePlace('collection', {
     const col = collectionOf(r.collection);
     return col ? collectionHead(col).title : '';
   },
-  actions: () => COLLECTION_ACTIONS,
 });

@@ -267,7 +267,7 @@ export function V2App({ gateId = readGateId() }) {
   if (def) {
     const Screen = def.Screen;
     contentClass = def.contentClass || 'content';
-    actions = def.actions ? def.actions({ route, go, desktop, device, open: openShell, gate }) : null;
+    actions = def.actions ? def.actions({ route, go, desktop, device, open: openShell, gate, facts }) : null;
     screen = <Screen route={route} facts={facts} gate={gate} desktop={desktop} device={device}
       go={go} pop={pop} replace={replace} openTab={openTab} onReady={onReady} open={openShell} />;
   } else {
@@ -314,7 +314,7 @@ export function V2App({ gateId = readGateId() }) {
           {!bare && <nav className="rail" data-zone="rail" aria-label="Places">{tabs}</nav>}
           <div className="pane">
             <div className="main" ref={scrollRef} onScroll={onScroll} data-scroller="">
-              <div className="col" data-zone="col">
+              <div className="col anc" data-zone="col">
                 {!bare && bar}
                 {!bare && findStrip}
                 <div className={contentClass}>{screen}</div>

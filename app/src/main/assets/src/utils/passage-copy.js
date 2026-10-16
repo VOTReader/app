@@ -280,7 +280,14 @@ function declaredOrigin(range) {
     @returns {{ link: string, reference: string } | null} */
 export function pageSiteLink(root = document) {
   const host = Array.from(root.querySelectorAll('[data-copy-key]')).find((el) => !el.closest(OFF_PAGE));
-  const key = host ? host.getAttribute('data-copy-key') || '' : '';
+  return keySiteLink(host ? host.getAttribute('data-copy-key') || '' : '');
+}
+
+/** pageSiteLink for a page's own key ('letter:<id>', 'wtlb:<id>', 'bible:<book>:<n>'), with no page on screen: v2's
+    ⋯ menu decides its rows before the page has drawn. null where the site has no page (the Bible).
+    @param {string} key
+    @returns {{ link: string, reference: string } | null} */
+export function keySiteLink(key) {
   const origin = key ? passageOrigin([key]) : null;
   const link = origin && origin.target ? siteUrl(origin.target) : '';
   return origin && link ? { link, reference: origin.reference } : null;

@@ -18,7 +18,8 @@ import { LayerToast } from '../Sheet.jsx';
 import { TOAST_MS, useMainMarks } from './LetterScreen.jsx';
 import { ChapterListenPill, chapterAudio, startChapter } from '../player/listen.jsx';
 import { ChapterReadAlong } from '../player/read-along.jsx';
-import { translationOptions } from '../reading-settings.js';
+import { translationOptions, translationRow } from '../reading-settings.js';
+import { MoreButton, findItem, autoScrollItem } from '../more-menu.jsx';
 
 const g = /** @type {any} */ (globalThis);
 /** @type {string[]} */
@@ -200,12 +201,29 @@ export function BibleChapterScreen({ route, facts, gate = null, replace, onReady
   );
 }
 
-/** Aa opens the shell's Text and theme sheet (myweb 1c). @param {{ open?: (sheet: string) => void }} ctx */
-function chapterActions({ open }) {
+/** Bible translation (5g): the reader's edition, "NKJV · New King James Version"; it opens 7e. @param {string} id @param {any} go */
+export function translationItem(id, go) {
+  const o = translationOptions().find((t) => t.id === id) || translationOptions()[0];
+  const row = translationRow(o);
+  return { id: 'translation', icon: 'book', t: 'Bible translation', s: row.code + ' · ' + row.name, chev: true,
+    run: () => go({ place: 'settings/translation' }) };
+}
+
+/**
+ * Aa opens the shell's Text and theme sheet (myweb 1c); the ... (5g; more-menu.jsx) holds Find in this chapter,
+ * Auto-scroll and Bible translation (the site has no Bible pages: no Copy website link).
+ * @param {{ route: any, go: (...routes: any[]) => void, desktop: boolean, gate?: any, facts?: Record<string, any>,
+ *   open?: (sheet: string) => void }} ctx
+ */
+function chapterActions({ route, go, desktop, gate, facts, open }) {
   return (
     <>
       <button type="button" className="ic" aria-label="Text and theme" onClick={() => open && open('text-and-theme')}><Icon name="aa" /></button>
-      <button type="button" className="ic" aria-label="More"><Icon name="more" /></button>
+      <MoreButton title={bookTitle({ book: route.book }) + ' ' + route.chapter} desktop={desktop} gate={gate} items={[
+        findItem('chapter', open),
+        autoScrollItem(open, gate),
+        translationItem((facts && facts.translation) || 'nkjv', go),
+      ]} />
     </>
   );
 }
