@@ -33,7 +33,8 @@ const EDITIONS = { 'brm-kjv': { label: 'KJV · Biblical Restoration Ministries' 
 
 afterEach(() => {
   cleanup();
-  for (const k of ['StateStore', 'AudioPlayer', 'AudioLibraryStore', 'BIBLE_AUDIO_EDITIONS', 'DataSafety', 'getBuildVersion', 'PlatformBridge']) delete g[k];
+  for (const k of ['StateStore', 'AudioPlayer', 'AudioLibraryStore', 'BIBLE_AUDIO_EDITIONS', 'DataSafety', 'getBuildVersion', 'PlatformBridge',
+    'fetchServerBuildVersion', 'StorageHealth', 'measureUserData', 'recordUserDataSample']) delete g[k];
   delete html.dataset.gate;
   flow.ctx = null;
   flow.api = null;
@@ -95,6 +96,61 @@ describe('gate pictures', () => {
     expect(texts(container, '.settings .srow .s')).toEqual(['A short tour that points at the real buttons', 'Nothing you write leaves this phone', 'OpenBible.info, and the songs of the flock']);
     await waitFor(() => expect(html.dataset.gate).toBe('ready'));
     expect(texts(container, '.ver > div')).toEqual(['1.0.2-27de477ee6 · corpus c69', 'Installed app build: updates come as a new app']);
+    expect(container.querySelector('.ver button')).toBe(null);
+  });
+
+  it('7c-help in a browser (the gate\'s phone boot): still the installed app\'s block, no Check', async () => {
+    g.getBuildVersion = () => Promise.resolve(null);
+    g.fetchServerBuildVersion = () => Promise.resolve({ cacheVersion: 'v1.0.2-27de477ee6', corpusVersion: 'c69' });
+    const { container } = render(<V2App gateId="7c-help" />);
+    await waitFor(() => expect(html.dataset.gate).toBe('ready'));
+    expect(texts(container, '.ver > div')).toEqual(['1.0.2-27de477ee6 · corpus c69', 'Installed app build: updates come as a new app']);
+    expect(container.querySelector('.ver button')).toBe(null);
+  });
+
+  it('7i-help-web: Version with Check at its right, this build, and the published one ready (the gate cannot see Check)', async () => {
+    let asked = 0;
+    g.getBuildVersion = () => { asked += 1; return Promise.resolve(null); };
+    const { container } = render(<V2App gateId="7i-help-web" />);
+    await waitFor(() => expect(html.dataset.gate).toBe('ready'));
+    const head = container.querySelector('.ver > .ver-h');
+    expect(texts(head, '.label')).toEqual(['Version']);
+    const check = head.querySelector('button.textbtn.sm');
+    expect(check.textContent).toBe('Check');
+    expect(check.hasAttribute('disabled')).toBe(false);
+    expect(head.lastElementChild).toBe(check);
+    expect(texts(container, '.ver > div:not(.ver-h)')).toEqual(['1.0.2-27de477ee6 · corpus c69', 'An update is ready: 1.0.3-5b1c09e2a4.Reopen the app to use it.']);
+    expect(container.querySelector('.ver .s').innerHTML).toBe('An update is ready: 1.0.3-5b1c09e2a4.<br>Reopen the app to use it.');
+    await click(check);
+    expect(asked).toBe(0);
+    expect(container.querySelector('.ver .s').textContent).toBe('An update is ready: 1.0.3-5b1c09e2a4.Reopen the app to use it.');
+  });
+
+  it('7h-your-data-storage: Storage after Check a backup file and before Clear all; Protect now inert from a gate boot', async () => {
+    g.StorageHealth = { getReport: vi.fn(), requestPersistence: vi.fn(), subscribe: () => () => {}, getVersion: () => 0 };
+    g.measureUserData = vi.fn(() => Promise.resolve({ total: 1 }));
+    const { container } = render(<V2App gateId="7h-your-data-storage" />);
+    await waitFor(() => expect(html.dataset.gate).toBe('ready'));
+    const sec = container.querySelector('.sec.stor');
+    expect(sec.textContent).toBe('Storage');
+    expect(sec.previousElementSibling.querySelector('.srow:last-child .t').textContent).toBe('Check a backup file');
+    const list = container.querySelector('.settings.stor');
+    expect(list.previousElementSibling).toBe(sec);
+    expect(list.nextElementSibling.textContent).toBe('Clear all personal data…');
+    expect([...list.querySelectorAll('.srow')].map((r) => [r.querySelector('.t').textContent, r.querySelector('.s').textContent])).toEqual([
+      ['Protection', 'Not active: the browser may clear it to free space'],
+      ['Space used', 'About 212.4 MB of 2.0 GB, the offline library, kept songs and Garden pages included'],
+      ['What Export saves', 'About 1.4 MB: highlights, notes, journal, bookmarks, links, progress and history'],
+      ['Growth', 'Grown by 312.0 KB since ' + new Date(2026, 8, 20).toLocaleDateString(undefined, { month: 'long', day: 'numeric' }) + ' · now 1.4 MB'],
+      ['Browser', 'Firefox'],
+    ]);
+    expect(list.querySelectorAll('.chev')).toHaveLength(0);
+    const protect = list.querySelector('.srow .btn2.sm');
+    expect(protect.textContent).toBe('Protect now');
+    await click(protect);
+    expect(g.StorageHealth.requestPersistence).not.toHaveBeenCalled();
+    expect(g.StorageHealth.getReport).not.toHaveBeenCalled();
+    expect(g.measureUserData).not.toHaveBeenCalled();
   });
 
   it('4a\'s Listening, Your data and Help rows open these pages; Back returns to Settings', async () => {
@@ -218,6 +274,112 @@ describe('Help and about, real boot', () => {
     expect(openTab).toHaveBeenCalledWith('home');
     await click(rowByTitle(container, 'Credits'));
     expect(go).toHaveBeenCalledWith({ place: 'settings/credits' });
-    await waitFor(() => expect(container.querySelector('.ver > div').textContent).toBe('Not known on this phone'));
+    await waitFor(() => expect(container.querySelector('.ver .s').textContent).toBe('Website build: not kept for offline on this device yet'));
+    expect(texts(container, '.ver > div:not(.ver-h)')).toEqual(['Website build: not kept for offline on this device yet']);
+  });
+
+  it('the website compares on open; Check asks again, saying Checking\u2026 until it answers', async () => {
+    const running = { cacheVersion: 'v1.0.2-27de477ee6', corpusVersion: 'c69' };
+    let server = /** @type {any} */ (null);
+    let answer = /** @type {any} */ (null);
+    g.getBuildVersion = () => Promise.resolve(running);
+    g.fetchServerBuildVersion = vi.fn(() => new Promise((r) => { answer = r; }));
+    const { container } = bare(Help);
+    const sub = () => container.querySelector('.ver .s').textContent;
+    const check = () => container.querySelector('.ver-h button');
+    expect(sub()).toBe('Checking…');
+    await waitFor(() => expect(g.fetchServerBuildVersion).toHaveBeenCalledTimes(1));
+    await act(async () => { answer(server); });
+    await waitFor(() => expect(sub()).toBe("Website build: couldn't reach the server to compare"));
+    expect(container.querySelector('.ver > div:not(.ver-h)').textContent).toBe('1.0.2-27de477ee6 · corpus c69');
+    server = { ...running };
+    await click(check());
+    expect(sub()).toBe('Checking…');
+    expect(check().hasAttribute('disabled')).toBe(true);
+    await waitFor(() => expect(g.fetchServerBuildVersion).toHaveBeenCalledTimes(2));
+    await act(async () => { answer(server); });
+    await waitFor(() => expect(sub()).toBe('Website build: up to date'));
+    expect(check().hasAttribute('disabled')).toBe(false);
+    await click(check());
+    await waitFor(() => expect(g.fetchServerBuildVersion).toHaveBeenCalledTimes(3));
+    await act(async () => { answer({ cacheVersion: 'v1.0.3-5b1c09e2a4', corpusVersion: 'c70' }); });
+    await waitFor(() => expect(sub()).toBe('An update is ready: 1.0.3-5b1c09e2a4.Reopen the app to use it.'));
+  });
+
+  it('the installed app reads its own build and never asks the server; no Check', async () => {
+    g.PlatformBridge = { isAndroid: true };
+    g.getBuildVersion = () => Promise.resolve(null);
+    g.fetchServerBuildVersion = vi.fn(() => Promise.resolve({ cacheVersion: 'v1.0.2-27de477ee6', corpusVersion: 'c69' }));
+    const { container } = bare(Help);
+    await waitFor(() => expect(texts(container, '.ver > div')).toEqual(['1.0.2-27de477ee6 · corpus c69', 'Installed app build: updates come as a new app']));
+    expect(g.fetchServerBuildVersion).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('.ver button')).toBe(null);
+  });
+});
+
+describe('Your data > Storage, real boot', () => {
+  /** bundle-b's StorageHealth as the group reads it */
+  function fakeHealth(report, platform = 'firefox') {
+    const listeners = new Set();
+    const H = {
+      v: 0, report,
+      subscribe: (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
+      getVersion: () => H.v,
+      getReport: () => H.report,
+      getPlatform: () => platform,
+      requestPersistence: vi.fn(() => Promise.resolve(false)),
+      changed: () => act(() => { H.v += 1; listeners.forEach((cb) => cb()); }),
+    };
+    g.StorageHealth = H;
+    return H;
+  }
+  const rows = (root) => [...root.querySelectorAll('.settings.stor .srow')].map((r) => [r.querySelector('.t').textContent, r.querySelector('.s').textContent]);
+
+  it('reads main\'s report as it changes, measures what Export saves and records main\'s growth sample once', async () => {
+    const H = fakeHealth({ lastAssessedAt: 0 }, 'chrome');
+    g.measureUserData = vi.fn(() => Promise.resolve({ total: 2048, structured: 2048, media: 0, mediaCount: 0 }));
+    g.recordUserDataSample = vi.fn(() => Promise.resolve([{ d: '2026-10-15', b: 2048 }]));
+    const { container } = bare(YourData);
+    expect(rows(container).slice(0, 2)).toEqual([['Protection', 'Checking…'], ['Space used', 'Checking…']]);
+    await waitFor(() => expect(rows(container)).toContainEqual(['Growth', 'First measured today · 2.0 KB']));
+    expect(g.recordUserDataSample).toHaveBeenCalledWith(2048);
+    expect(g.measureUserData).toHaveBeenCalledTimes(1);
+    H.report = { lastAssessedAt: 1, quota: 4 * 1024 * 1024 * 1024, usage: 5 * 1024 * 1024, persisted: false, risks: [] };
+    H.changed();
+    expect(rows(container)).toEqual([
+      ['Protection', 'Saved on this phone. Export a backup now and then.'],
+      ['Space used', 'About 5.0 MB of 4.0 GB, the offline library, kept songs and Garden pages included'],
+      ['What Export saves', 'About 2.0 KB: highlights, notes, journal, bookmarks, links, progress and history'],
+      ['Growth', 'First measured today · 2.0 KB'],
+      ['Browser', 'Chrome'],
+    ]);
+    expect(container.querySelector('.settings.stor button')).toBe(null);
+  });
+
+  it('Protect now asks the browser (main\'s requestPersistence); refused, it says so and the button goes', async () => {
+    const H = fakeHealth({ lastAssessedAt: 1, quota: 1024, usage: 512, persisted: false, risks: ['not-persisted'] });
+    const { container } = bare(YourData);
+    await click(container.querySelector('.settings.stor .btn2.sm'));
+    expect(H.requestPersistence).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(rows(container)[0]).toEqual(['Protection', 'The browser said no. Export a backup now and then.']));
+    expect(container.querySelector('.settings.stor button')).toBe(null);
+  });
+
+  it('granted: main re-reads and the report says protected', async () => {
+    const H = fakeHealth({ lastAssessedAt: 1, quota: 1024, usage: 512, persisted: false, risks: ['not-persisted'] });
+    H.requestPersistence = vi.fn(() => { H.report = { ...H.report, persisted: true, risks: [] }; H.v += 1; return Promise.resolve(true); });
+    const { container } = bare(YourData);
+    await click(container.querySelector('.settings.stor .btn2.sm'));
+    H.changed();
+    await waitFor(() => expect(rows(container)[0]).toEqual(['Protection', "Active: the browser won't clear it on its own"]));
+  });
+
+  it('the APK: Installed app, and the diagnostic log last when it holds entries', async () => {
+    fakeHealth({ lastAssessedAt: 1, quota: 1024, usage: 512, persisted: true, risks: [] }, 'android-webview');
+    g.PlatformBridge = { isAndroid: true, getCrashLog: () => JSON.stringify([{ t: 1 }, { t: 2 }, { t: 3 }]) };
+    const { container } = bare(YourData);
+    await waitFor(() => expect(rows(container).map((r) => r[0])).toEqual(['Protection', 'Space used', 'What Export saves', 'Browser', 'Diagnostic log']));
+    expect(rows(container)[3][1]).toBe('Installed app');
+    expect(rows(container)[4][1]).toBe('3 entries: warnings, errors and timings, file paths left out. It goes into your next export.');
   });
 });

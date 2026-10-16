@@ -6,7 +6,11 @@
    warn, act soon (private window, running low, slow). Buttons: the kit's gold pill first, an outline second. Only "data
    looks missing" has the x; Restore and Keep as is are main's (DataSafety.restoreMissing / acceptCurrent). Export goes to
    Settings > Your data (main's goes to Settings). Reads bundle-b's StorageHealth report; a gate boot reads its row's
-   facts.storage (a partial report), and its buttons do nothing. */
+   facts.storage (a partial report), and its buttons do nothing.
+   With no storage message the slot holds main's offline library strip (OfflineLibraryBanner, its fallback there too;
+   dz25 9j): gold, information, on the website only (the APK ships its library, and main's check never runs there).
+   Main's words and phases (utils/offline-library.js, bundle-d's OfflineLibrary): a check once per visit, 9 s after an
+   active worker; Retry fetches only the missing files; Dismiss hides it for the visit. A gate reads facts.offline. */
 import { Icon } from './Icon.jsx';
 import { formatBytes } from '../utils/format-bytes.js';
 
@@ -124,6 +128,65 @@ function useReport(gate) {
   try { return H && typeof H.getReport === 'function' ? H.getReport() : null; } catch (_e) { return null; }
 }
 
+/** @param {number} n @param {string} one @param {string} many */
+const count = (n, one, many) => (n === 1 ? '1 ' + one : n + ' ' + many);
+
+/**
+ * Main's OfflineLibraryBanner for one OfflineLibrary state: its words, Retry, and the x; null when nothing shows
+ * (unknown, complete, dismissed).
+ * @param {null | { phase: string, missing: number }} st
+ * @returns {null | { lead: string, detail: string, retry: boolean, close: boolean }}
+ */
+export function offlineView(st) {
+  const n = st ? st.missing : 0;
+  switch (st && st.phase) {
+    case 'incomplete':
+      return { lead: 'Offline library incomplete.', detail: count(n, 'file did not download.', 'files did not download.'), retry: true, close: true };
+    case 'retrying':
+      return { lead: 'Downloading ' + count(n, 'missing file', 'missing files') + '…', detail: '', retry: false, close: true };
+    case 'fixed':
+      return { lead: 'Offline library complete.', detail: '', retry: false, close: false };
+    case 'still':
+      return { lead: 'Offline library incomplete.', detail: count(n, 'file is still missing.', 'files are still missing.')
+        + ' Connect to the internet, then retry.', retry: true, close: true };
+    default:
+      return null;
+  }
+}
+
+/** bundle-d's OfflineLibrary state, its once-per-visit check started (main's banner does it on mount); a gate's facts. */
+function useOffline(gate) {
+  const L = gate ? null : g.OfflineLibrary;
+  const live = !!(L && typeof L.subscribe === 'function' && typeof L.getVersion === 'function');
+  React.useSyncExternalStore(live ? L.subscribe : NO_SUB, live ? L.getVersion : ZERO);
+  React.useEffect(() => { if (live && typeof L.start === 'function') L.start(); }, [live, L]);
+  if (gate) return gate.facts && gate.facts.offline ? gate.facts.offline : null;
+  try { return live && typeof L.getState === 'function' ? L.getState() : null; } catch (_e) { return null; }
+}
+
+/** The offline library strip (9j), in the storage strip's slot when that has nothing to say. @param {{ gate: any }} props */
+function OfflineStrip({ gate }) {
+  const v = offlineView(useOffline(gate));
+  if (!v) return null;
+  const L = gate ? null : g.OfflineLibrary;
+  return (
+    <div className={'shb gold' + (v.close ? ' dis' : '')} role="status" data-banner="offline">
+      <Icon name="downCircle" />
+      <div className="shb-t"><span className="shb-h">{v.lead}</span>{v.detail ? ' ' + v.detail : null}</div>
+      {v.retry && (
+        <div className="shb-a">
+          <button type="button" className="pill" onClick={() => { if (L && typeof L.retry === 'function') L.retry(); }}>Retry</button>
+        </div>
+      )}
+      {v.close && (
+        <button type="button" className="ic x" aria-label="Dismiss" onClick={() => { if (L && typeof L.dismiss === 'function') L.dismiss(); }}>
+          <Icon name="close" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** @param {{ gate: any, go: (route: any) => void }} props */
 export function StorageBanner({ gate, go }) {
   const report = useReport(gate);
@@ -132,7 +195,7 @@ export function StorageBanner({ gate, go }) {
     android: !gate && !!(g.PlatformBridge && g.PlatformBridge.isAndroid),
     dismissed: (id) => !!(H && typeof H.isDismissed === 'function' && H.isDismissed(id)),
   });
-  if (!b) return null;
+  if (!b) return <OfflineStrip gate={gate} />;
   const run = (/** @type {BannerAct} */ act) => {
     if (gate) return;
     const DS = g.DataSafety;

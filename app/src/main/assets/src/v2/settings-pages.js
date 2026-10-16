@@ -207,20 +207,48 @@ export function versionLine(v) {
  * The build this page runs: the service worker's answer, else (Android, where the APK's own service-worker.js is the
  * installed build) the file read directly, as main's Settings does. Resolves null when neither answers.
  */
-export async function readVersion(gl = g) {
+export async function readVersion(gl = g, android = !!(gl.PlatformBridge && gl.PlatformBridge.isAndroid)) {
   try {
     const sw = typeof gl.getBuildVersion === 'function' ? await gl.getBuildVersion() : null;
     if (sw && sw.cacheVersion) return sw;
-    const android = !!(gl.PlatformBridge && gl.PlatformBridge.isAndroid);
     if (android && typeof gl.fetchServerBuildVersion === 'function') return await gl.fetchServerBuildVersion();
   } catch (_e) { /* no version line */ }
   return null;
 }
 
-/** What updates mean on this platform (the line under the version). */
-export function updateLine(gl = g) {
-  return gl.PlatformBridge && gl.PlatformBridge.isAndroid ? 'Installed app build: updates come as a new app'
-    : 'Website build: a new version arrives when the app reopens';
+/**
+ * @typedef {{ cacheVersion: string, corpusVersion?: string }} Build
+ * @typedef {{ android: boolean, running: Build | null, server: Build | null }} BuildFacts
+ */
+
+/**
+ * Main's refreshBuildInfo (dz25 7i): this page's build and, on the website, the published one beside it (main's
+ * fetchServerBuildVersion reads the deployed service-worker.js, no cache). The APK has nothing to compare against, and
+ * a website page no worker keeps has no build of its own to compare.
+ * @param {boolean} android @returns {Promise<BuildFacts>}
+ */
+export async function readBuild(android, gl = g) {
+  const running = await readVersion(gl, android);
+  if (android || !running) return { android, running, server: null };
+  let server = null;
+  try { server = typeof gl.fetchServerBuildVersion === 'function' ? await gl.fetchServerBuildVersion() : null; } catch (_e) { server = null; }
+  return { android, running, server: server && server.cacheVersion ? server : null };
+}
+
+/**
+ * The version block (7c, 7i): the build's line, the lines under it, and whether Check shows (the website only; main
+ * compares on open and Check asks again). `b` is null until the first read answers.
+ * @param {BuildFacts | null} b @param {boolean} android @param {boolean} checking @param {string} where
+ * @returns {{ line: string | null, sub: string[], check: boolean }}
+ */
+export function buildView(b, android, checking, where) {
+  const line = b ? versionLine(b.running) : null;
+  if (android) return { line: b ? line || 'Not known on ' + where : '…', sub: ['Installed app build: updates come as a new app'], check: false };
+  if (checking || !b) return { line, sub: ['Checking…'], check: true };
+  if (!b.running) return { line: null, sub: ['Website build: not kept for offline on this device yet'], check: true };
+  if (!b.server) return { line, sub: ["Website build: couldn't reach the server to compare"], check: true };
+  if (b.server.cacheVersion === b.running.cacheVersion) return { line, sub: ['Website build: up to date'], check: true };
+  return { line, sub: ['An update is ready: ' + String(b.server.cacheVersion).replace(/^v/, '') + '.', 'Reopen the app to use it.'], check: true };
 }
 
 /** The 7a-7c pictures' facts (states.json): Benjamin, KJV BRM, 1x, every switch on; exported 2 days ago, newest snapshot

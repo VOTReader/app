@@ -9,6 +9,7 @@
 import { gateMarks, gateNotebookMarks, GATE_NOTEBOOKS } from './notes-facts.js';
 import { GATE_CHOSEN } from './search-facts.js';
 import { gateListening, gateData } from './settings-pages.js';
+import { gateSpace } from './storage-facts.js';
 import { gateReading } from './reading-settings.js';
 import { gateDownloads } from './offline-facts.js';
 import { gatePlans, gateToday } from './plans-facts.js';
@@ -300,8 +301,22 @@ export const GATE_STATES = {
   '7a-listening': { stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/listening' }], facts: { listening: gateListening() } },
   // states.json 7b-your-data: exported 2 days ago, the newest snapshot today, 7 kept on this phone, the weekly copy off.
   '7b-your-data': { stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/your-data' }], facts: { data: gateData(GATE_NOW) } },
-  // states.json 7c-help: Help and about; the version line is this build's own.
-  '7c-help': { stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/help' }], facts: {} },
+  // states.json 7c-help: Help and about on the installed app (no Check); the version line is this build's own.
+  '7c-help': { stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/help' }], facts: { build: { android: true } } },
+  // states.json 7h-your-data-storage (dz25, v2-gaps 34): Your data further down, the Storage label 54 px under the top bar:
+  // Firefox, not installed, not yet protected (Protect now); 212.4 MB of 2.0 GB; Export about 1.4 MB; grown by 312.0 KB
+  // since September 20 (the hook fakes main's StorageHealth report, measureUserData and the samples).
+  '7h-your-data-storage': {
+    stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/your-data' }],
+    facts: { data: gateData(GATE_NOW), space: gateSpace(GATE_NOW) }, scroll: { to: '.sec.stor', gap: 54 },
+  },
+  // states.json 7i-help-web (dz25): Help and about on the website: Check, and this build one behind the published one
+  // (the hook fakes main's fetchServerBuildVersion).
+  '7i-help-web': {
+    stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/help' }],
+    facts: { build: { android: false, running: { cacheVersion: 'v1.0.2-27de477ee6', corpusVersion: 'c69' },
+      server: { cacheVersion: 'v1.0.3-5b1c09e2a4', corpusVersion: 'c69' } } },
+  },
   // states.json 7d-reading (mw7, v2-gaps 14): Settings > Reading from Home: NKJV, main's defaults (Auto-scroll and Highlight
   // the passage off, the rest on), 42 places in the reading history, the app link.
   '7d-reading': { stack: [{ place: 'home' }, { place: 'settings' }, { place: 'settings/reading' }], facts: { reading: gateReading() } },
@@ -370,6 +385,13 @@ export const GATE_STATES = {
   '9g-storage-low': {
     stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 1 }],
     facts: { storage: { tier: 'warning', remaining: 38 * 1024 * 1024 } },
+  },
+  // states.json 9j-offline-incomplete (dz25, v2-gaps 34): Home as 9f, no storage strip, so main's offline library strip
+  // takes the slot: 3 files did not download, Retry and the x (the hook fakes main's offline-library state).
+  '9j-offline-incomplete': {
+    stack: [{ place: 'home' }],
+    facts: { ...HOME_FACTS, offline: { phase: 'incomplete', missing: 3 } },
+    playing: { ...LETTER1_AT_351, paused: true },
   },
   // states.json 1k-letter-foot (dz23, mw7): Volume One, Letter 1 at its end: footnote 1, Related topics (2, opening Answers
   // in the app), Audio (Bandcamp, SoundCloud), Videos (the voice-over video, the channel; the channel-as-video row dropped),

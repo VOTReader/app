@@ -3,8 +3,9 @@
 
    Each page re-shows main's own settings and changes them the way main's Settings does (settings-pages.js): a choice
    opens a sheet of main's options, a switch flips main's key, Your data runs main's own backup flow (utils/backup-flow.js:
-   export, import with its overwrite question, check a file, clear everything behind a typed DELETE). A gate boot shows
-   states.json's facts and every control is inert. */
+   export, import with its overwrite question, check a file, clear everything behind a typed DELETE) and shows main's
+   storage facts under Storage (dz25 7h, storage-facts.js); Help and about's version compares with the published build
+   on the website, with Check (dz25 7i). A gate boot shows states.json's facts and every control is inert. */
 import { Icon } from '../Icon.jsx';
 import { definePlace } from '../places.js';
 import { GATE_NOW } from '../gate.js';
@@ -13,10 +14,13 @@ import { createBackupFlow } from '../../utils/backup-flow.js';
 import { startTour } from './WelcomeScreen.jsx';
 import {
   READERS, PLAY_SWITCHES, SONG_SWITCH, liveListening, readerLine, editionOptions, editionLine, rateLabel, rateOptions,
-  writeSetting, writeRate, liveData, here, safeCard, weeklyLine, versionLine, readVersion, updateLine, gateListening, gateData,
+  writeSetting, writeRate, liveData, here, safeCard, weeklyLine, readBuild, buildView, gateListening, gateData,
 } from '../settings-pages.js';
+import { spaceRows, gateSpace } from '../storage-facts.js';
 
 const g = /** @type {any} */ (globalThis);
+const NO_SUB = () => () => {};
+const ZERO = () => 0;
 const PRIVACY_URL = 'https://votreader.github.io/app/privacy.html';
 
 /**
@@ -129,6 +133,67 @@ function useBackup() {
   return { flow, busy, report, setReport, ask, settle };
 }
 
+/** @param {any} H bundle-b's StorageHealth */
+const readReport = (H) => { try { return H && typeof H.getReport === 'function' ? H.getReport() : null; } catch (_e) { return null; } };
+/** @param {any} H */
+const readPlatform = (H) => { try { return H && typeof H.getPlatform === 'function' ? String(H.getPlatform()) : ''; } catch (_e) { return ''; } };
+
+/**
+ * Your data's Storage group (dz25 7h): bundle-b's StorageHealth report, re-read when it changes; what Export saves,
+ * measured on each visit with main's growth sample recorded from it (main's Settings does both on mount); on the APK the
+ * diagnostic log's length. Protect now asks the browser (main's requestPersistence); a refusal says so and the button
+ * goes. A gate boot reads facts.space and writes nothing.
+ * @param {{ gate: any, device: string }} props
+ */
+function StorageGroup({ gate, device }) {
+  const H = gate ? null : g.StorageHealth;
+  const live = !!(H && typeof H.subscribe === 'function' && typeof H.getVersion === 'function');
+  React.useSyncExternalStore(live ? H.subscribe : NO_SUB, live ? H.getVersion : ZERO);
+  const [denied, setDenied] = React.useState(false);
+  const [userData, setUserData] = React.useState(/** @type {null | { total: number, mediaCount?: number }} */ (null));
+  const [samples, setSamples] = React.useState(/** @type {Array<{ d: string, b: number }>} */ ([]));
+  const [log, setLog] = React.useState(0);
+  const android = !gate && !!(g.PlatformBridge && g.PlatformBridge.isAndroid);
+  React.useEffect(() => {
+    if (gate) return undefined;
+    let alive = true;
+    if (typeof g.measureUserData === 'function') {
+      Promise.resolve(g.measureUserData()).then((r) => {
+        if (!alive || !r) return undefined;
+        setUserData(r);
+        if (typeof g.recordUserDataSample !== 'function') return undefined;
+        return Promise.resolve(g.recordUserDataSample(r.total)).then((s) => { if (alive && Array.isArray(s)) setSamples(s); });
+      }).catch(() => {});
+    }
+    if (android && typeof g.PlatformBridge.getCrashLog === 'function') {
+      try {
+        const entries = JSON.parse(g.PlatformBridge.getCrashLog());
+        if (Array.isArray(entries)) setLog(entries.length);
+      } catch (_e) { /* no log row */ }
+    }
+    return () => { alive = false; };
+  }, [gate, android]);
+  const f = gate ? (gate.facts && gate.facts.space) || gateSpace(GATE_NOW)
+    : { report: readReport(H), platform: readPlatform(H), userData, samples, denied, log, android };
+  const protect = () => {
+    if (gate || !H || typeof H.requestPersistence !== 'function') return;
+    Promise.resolve(H.requestPersistence()).then((ok) => { if (!ok) setDenied(true); }, () => setDenied(true));
+  };
+  return (
+    <>
+      <div className="sec stor"><span className="label">Storage</span></div>
+      <div className="settings stor">
+        {spaceRows(f, here(device)).map((r) => (
+          <div key={r.id} className="srow">
+            <div className="tx"><div className="t">{r.t}</div><div className="s">{r.s}</div></div>
+            {r.protect && <button type="button" className="btn2 sm" onClick={protect}>Protect now</button>}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 /** @param {import('../places.js').PlaceProps} props */
 export function YourDataPage({ gate, device, desktop, onReady }) {
   const [f, setF] = React.useState(() => (gate ? (gate.facts && gate.facts.data) || gateData(GATE_NOW) : liveData()));
@@ -177,6 +242,7 @@ export function YourDataPage({ gate, device, desktop, onReady }) {
             <button type="button" className="textbtn sm" onClick={() => b.setReport(null)}>Dismiss</button>
           </div>
         )}
+        <StorageGroup gate={gate} device={device} />
         <button type="button" className="textbtn danger-t" disabled={b.busy} onClick={() => { if (!gate) setWipe(''); }}>Clear all personal data…</button>
       </div>
       {b.ask && (
@@ -210,14 +276,26 @@ export function YourDataPage({ gate, device, desktop, onReady }) {
 
 /** @param {import('../places.js').PlaceProps} props */
 export function HelpPage({ gate, device, go, openTab, onReady }) {
-  const [ver, setVer] = React.useState(/** @type {string | null | undefined} */ (undefined));
+  // A gate row may name the platform (7c: the installed app) and the builds themselves (7i: the website, one behind).
+  const fb = gate && gate.facts ? gate.facts.build : null;
+  const android = fb ? !!fb.android : !!(g.PlatformBridge && g.PlatformBridge.isAndroid);
+  const [build, setBuild] = React.useState(/** @type {import('../settings-pages.js').BuildFacts | null} */ (fb && fb.running ? fb : null));
+  const [checking, setChecking] = React.useState(false);
+  const alive = React.useRef(true);
+  // main's refreshBuildInfo: on open, and again on Check ("Checking…" until it answers)
+  const read = React.useCallback(() => {
+    setChecking(true);
+    const done = (/** @type {any} */ b) => { if (alive.current) { setBuild(b); setChecking(false); } };
+    readBuild(android).then(done, () => done({ android, running: null, server: null }));
+  }, [android]);
   React.useEffect(() => {
-    let live = true;
-    Promise.resolve(readVersion()).then((v) => { if (live) setVer(versionLine(v)); }, () => { if (live) setVer(null); });
-    return () => { live = false; };
-  }, []);
-  // ready once the version line has its words (or has none to show)
-  React.useEffect(() => { if (ver !== undefined) onReady(); }, [ver, onReady]);
+    alive.current = true;
+    if (!build) read();
+    return () => { alive.current = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- once per visit, as main
+  // ready once the version block has its words
+  React.useEffect(() => { if (build && !checking) onReady(); }, [build, checking, onReady]);
+  const v = buildView(build, android, checking, here(device));
   const open = (url) => { if (!gate && typeof g.open === 'function') g.open(url, '_blank', 'noopener,noreferrer'); };
   return (
     <>
@@ -232,9 +310,14 @@ export function HelpPage({ gate, device, go, openTab, onReady }) {
       </div>
       <p className="fine g">This reader was made by a disciple for personal study; it is not the canonical source.</p>
       <div className="ver g num">
-        <span className="label">Version</span>
-        <div>{ver || (ver === null ? 'Not known on ' + here(device) : '…')}</div>
-        <div className="s">{updateLine()}</div>
+        {v.check ? (
+          <div className="ver-h">
+            <span className="label">Version</span>
+            <button type="button" className="textbtn sm" disabled={checking} onClick={() => { if (!gate) read(); }}>Check</button>
+          </div>
+        ) : <span className="label">Version</span>}
+        {v.line ? <div>{v.line}</div> : null}
+        <div className="s">{v.sub.map((t, i) => <React.Fragment key={t}>{i ? <br /> : null}{t}</React.Fragment>)}</div>
       </div>
     </>
   );

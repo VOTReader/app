@@ -198,6 +198,8 @@ import { AudioPlayerBar } from './components/AudioPlayerBar.jsx';
 import { AudioManagerSheet } from './components/AudioManagerSheet.jsx';
 import { AudioPlayButton, AudioSectionChips } from './components/AudioPlayButton.jsx';
 import { StorageHealthBanner, useStorageHealth } from './components/StorageHealthBanner.jsx';
+// v2 (dz25 9j) reads the one offline-library store on window: its strip replaces OfflineLibraryBanner there.
+import { OfflineLibrary } from '../utils/offline-library.js';
 import { Safari7DayModal, IosPwaWelcomeCard } from './components/SafariFlows.jsx';
 import { AppShellOverlays } from './components/AppShellOverlays.jsx';
 import { TourPrompt } from './components/TourPrompt.jsx';
@@ -374,7 +376,7 @@ Object.assign(window, {
   NoteRow, LinkCard, LinkIcon, BookmarkIcon, HolyDaysPlaylistHeader,
   AudioPlayerBar, AudioManagerSheet, AudioPlayButton, AudioSectionChips,
   ReadAlongHighlight, paintReadAlongAt, clearReadAlong,
-  StorageHealthBanner, useStorageHealth, Safari7DayModal, IosPwaWelcomeCard,
+  StorageHealthBanner, useStorageHealth, OfflineLibrary, Safari7DayModal, IosPwaWelcomeCard,
   AppShellOverlays, AppShellSheets, AnnotationDomSync, TourPrompt,
   buildScreenRoutes,
   // Screens

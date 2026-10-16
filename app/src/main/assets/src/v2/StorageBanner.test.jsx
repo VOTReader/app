@@ -5,7 +5,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, waitFor, act } from '@testing-library/react';
 import { V2App, applyGateScroll } from './App.jsx';
 import { GATE_STATES } from './gate.js';
-import { pickBanner, splitHead, StorageBanner, TIER } from './StorageBanner.jsx';
+import { pickBanner, splitHead, StorageBanner, TIER, offlineView } from './StorageBanner.jsx';
 import './screens/LetterScreen.jsx';
 import './screens/CollectionScreen.jsx';
 
@@ -41,7 +41,7 @@ function fakeHealth(report) {
 
 afterEach(() => {
   cleanup();
-  for (const k of ['StorageHealth', 'DataSafety', 'PlatformBridge', 'COLLECTIONS', 'COL_BY_KEY', 'LETTERS_V1', 'StateStore', 'HistoryStore', 'matchMedia']) delete g[k];
+  for (const k of ['StorageHealth', 'OfflineLibrary', 'DataSafety', 'PlatformBridge', 'COLLECTIONS', 'COL_BY_KEY', 'LETTERS_V1', 'StateStore', 'HistoryStore', 'matchMedia']) delete g[k];
   delete html.dataset.gate;
   vi.restoreAllMocks();
 });
@@ -249,5 +249,92 @@ describe('applyGateScroll: deskGap', () => {
     const plain = page();
     applyGateScroll(plain, { to: '.fnl', gap: 5 }, true);
     expect(plain.scrollTop).toBe(1000 - 5);
+  });
+});
+
+/** bundle-d's OfflineLibrary as v2 reads it: main's state, its change signal, and the three calls the strip makes */
+function fakeOffline(state) {
+  const listeners = new Set();
+  const L = {
+    v: 0, state,
+    subscribe: (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
+    getVersion: () => L.v,
+    getState: () => L.state,
+    start: vi.fn(),
+    retry: vi.fn(() => Promise.resolve('fixed')),
+    dismiss: vi.fn(),
+    set: (next) => act(() => { L.state = next; L.v += 1; listeners.forEach((cb) => cb()); }),
+  };
+  g.OfflineLibrary = L;
+  return L;
+}
+
+describe('the offline library strip (dz25 9j; main\'s OfflineLibraryBanner in the storage strip\'s slot)', () => {
+  it('main\'s words for each phase; nothing while unknown, complete or dismissed', () => {
+    expect(offlineView({ phase: 'incomplete', missing: 3 })).toEqual({ lead: 'Offline library incomplete.', detail: '3 files did not download.', retry: true, close: true });
+    expect(offlineView({ phase: 'incomplete', missing: 1 }).detail).toBe('1 file did not download.');
+    expect(offlineView({ phase: 'retrying', missing: 3 })).toEqual({ lead: 'Downloading 3 missing files…', detail: '', retry: false, close: true });
+    expect(offlineView({ phase: 'retrying', missing: 1 }).lead).toBe('Downloading 1 missing file…');
+    expect(offlineView({ phase: 'fixed', missing: 0 })).toEqual({ lead: 'Offline library complete.', detail: '', retry: false, close: false });
+    expect(offlineView({ phase: 'still', missing: 2 })).toEqual({ lead: 'Offline library incomplete.',
+      detail: '2 files are still missing. Connect to the internet, then retry.', retry: true, close: true });
+    expect(offlineView({ phase: 'still', missing: 1 }).detail).toBe('1 file is still missing. Connect to the internet, then retry.');
+    for (const phase of ['unknown', 'complete', 'dismissed']) expect(offlineView({ phase, missing: 3 })).toBe(null);
+    expect(offlineView(null)).toBe(null);
+  });
+
+  it('a real boot: gold information with Retry and the x, main\'s check started once; Retry and Dismiss are main\'s', async () => {
+    fakeHealth({});
+    const L = fakeOffline({ phase: 'incomplete', missing: 3 });
+    const { container } = render(<StorageBanner gate={null} go={() => {}} />);
+    const strip = container.querySelector('.shb');
+    expect(strip.className).toBe('shb gold dis');
+    expect(strip.getAttribute('role')).toBe('status');
+    expect(strip.querySelector('.shb-h').textContent).toBe('Offline library incomplete.');
+    expect(strip.querySelector('.shb-t').textContent).toBe('Offline library incomplete. 3 files did not download.');
+    expect(L.start).toHaveBeenCalledTimes(1);
+    await click(button(container, 'Retry'));
+    expect(L.retry).toHaveBeenCalledTimes(1);
+    L.set({ phase: 'retrying', missing: 3 });
+    expect(container.querySelector('.shb-t').textContent).toBe('Downloading 3 missing files…');
+    expect(button(container, 'Retry')).toBe(undefined);
+    L.set({ phase: 'fixed', missing: 0 });
+    expect(container.querySelector('.shb').className).toBe('shb gold');
+    expect(container.querySelectorAll('.shb button')).toHaveLength(0);
+    L.set({ phase: 'still', missing: 2 });
+    await click(button(container, 'Dismiss'));
+    expect(L.dismiss).toHaveBeenCalledTimes(1);
+    L.set({ phase: 'dismissed', missing: 2 });
+    expect(container.querySelector('.shb')).toBe(null);
+  });
+
+  it('data danger comes first: a storage strip takes the slot, and the offline one waits under it', async () => {
+    const H = fakeHealth({ privateModeLikely: true });
+    fakeOffline({ phase: 'incomplete', missing: 3 });
+    const { container } = render(<StorageBanner gate={null} go={() => {}} />);
+    expect(container.querySelectorAll('.shb')).toHaveLength(1);
+    expect(container.querySelector('.shb').className).toBe('shb warn');
+    H.report = {};
+    H.changed();
+    expect(container.querySelector('.shb').className).toBe('shb gold dis');
+  });
+
+  it('9j: Home under the gold strip, from the row; Retry and the x do nothing; the live library is not read', async () => {
+    const ONE = { volKey: 'one', label: 'Volume One', globalName: 'LETTERS_V1' };
+    g.COLLECTIONS = [ONE];
+    g.COL_BY_KEY = new Map([['one', ONE]]);
+    g.LETTERS_V1 = [{ id: 'chosen-by-god', num: 1, title: 'Chosen by God', blocks: [{ type: 'p', text: 'Thus says The Lord.' }] }];
+    const L = fakeOffline({ phase: 'still', missing: 9 });
+    expect(GATE_STATES['9j-offline-incomplete'].facts.offline).toEqual({ phase: 'incomplete', missing: 3 });
+    const { container } = render(<V2App gateId="9j-offline-incomplete" />);
+    await waitFor(() => expect(html.dataset.gate).toBe('ready'));
+    const strip = container.querySelector('.shb');
+    expect(strip.className).toBe('shb gold dis');
+    expect(strip.previousElementSibling.classList.contains('tb')).toBe(true);
+    expect(strip.querySelector('.shb-t').textContent).toBe('Offline library incomplete. 3 files did not download.');
+    for (const label of ['Retry', 'Dismiss']) await click(button(container, label));
+    expect(L.start).not.toHaveBeenCalled();
+    expect(L.retry).not.toHaveBeenCalled();
+    expect(L.dismiss).not.toHaveBeenCalled();
   });
 });

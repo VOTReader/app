@@ -3,7 +3,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   READERS, readerLine, listeningFacts, liveListening, editionOptions, editionLine, rateLabel, rateOptions, writeSetting,
-  writeRate, daysAgo, liveData, safeCard, weeklyLine, versionLine, readVersion, updateLine, gateListening, gateData, pushListening,
+  writeRate, daysAgo, liveData, safeCard, weeklyLine, versionLine, readVersion, readBuild, buildView, gateListening, gateData, pushListening,
 } from './settings-pages.js';
 
 const DAY = 24 * 3600 * 1000;
@@ -169,9 +169,46 @@ describe('Help and about', () => {
     expect(await readVersion({ getBuildVersion: () => Promise.reject(new Error('no sw')) })).toBe(null);
   });
 
-  it('what updates mean here', () => {
-    expect(updateLine({ PlatformBridge: { isAndroid: true } })).toBe('Installed app build: updates come as a new app');
-    expect(updateLine({})).toBe('Website build: a new version arrives when the app reopens');
+  it('readVersion: a gate row may say it is the installed app (7c) whatever the browser says', async () => {
+    const file = { cacheVersion: 'v2', corpusVersion: 'c2' };
+    const web = { getBuildVersion: () => Promise.resolve(null), fetchServerBuildVersion: () => Promise.resolve(file) };
+    expect(await readVersion(web, true)).toBe(file);
+    expect(await readVersion(web, false)).toBe(null);
+  });
+
+  it('readBuild: the website compares its build with the published one; the APK and an unkept page do not ask', async () => {
+    const running = { cacheVersion: 'v1.0.2-27de477ee6', corpusVersion: 'c69' };
+    const server = { cacheVersion: 'v1.0.3-5b1c09e2a4', corpusVersion: 'c69' };
+    let asked = 0;
+    const web = { getBuildVersion: () => Promise.resolve(running), fetchServerBuildVersion: () => { asked += 1; return Promise.resolve(server); } };
+    expect(await readBuild(false, web)).toEqual({ android: false, running, server });
+    expect(asked).toBe(1);
+    expect(await readBuild(false, { ...web, fetchServerBuildVersion: () => Promise.resolve(null) })).toEqual({ android: false, running, server: null });
+    expect(await readBuild(false, { ...web, fetchServerBuildVersion: () => Promise.reject(new Error('offline')) })).toEqual({ android: false, running, server: null });
+    expect(await readBuild(false, { ...web, getBuildVersion: () => Promise.resolve(null) })).toEqual({ android: false, running: null, server: null });
+    expect(asked).toBe(1);
+    const apk = { getBuildVersion: () => Promise.resolve(null), fetchServerBuildVersion: () => Promise.resolve(running) };
+    expect(await readBuild(true, apk)).toEqual({ android: true, running, server: null });
+  });
+
+  it('buildView: every line under the version (dz25 7i), Check on the website only', () => {
+    const running = { cacheVersion: 'v1.0.2-27de477ee6', corpusVersion: 'c69' };
+    const line = '1.0.2-27de477ee6 · corpus c69';
+    const web = (server) => ({ android: false, running, server });
+    expect(buildView(web({ cacheVersion: 'v1.0.3-5b1c09e2a4' }), false, false, 'this phone'))
+      .toEqual({ line, sub: ['An update is ready: 1.0.3-5b1c09e2a4.', 'Reopen the app to use it.'], check: true });
+    expect(buildView(web({ cacheVersion: 'v1.0.2-27de477ee6' }), false, false, 'this phone'))
+      .toEqual({ line, sub: ['Website build: up to date'], check: true });
+    expect(buildView(web(null), false, false, 'this phone'))
+      .toEqual({ line, sub: ["Website build: couldn't reach the server to compare"], check: true });
+    expect(buildView({ android: false, running: null, server: null }, false, false, 'this phone'))
+      .toEqual({ line: null, sub: ['Website build: not kept for offline on this device yet'], check: true });
+    expect(buildView(null, false, false, 'this phone')).toEqual({ line: null, sub: ['Checking…'], check: true });
+    expect(buildView(web(null), false, true, 'this phone')).toEqual({ line, sub: ['Checking…'], check: true });
+    expect(buildView({ android: true, running, server: null }, true, false, 'this phone'))
+      .toEqual({ line, sub: ['Installed app build: updates come as a new app'], check: false });
+    expect(buildView({ android: true, running: null, server: null }, true, false, 'this phone').line).toBe('Not known on this phone');
+    expect(buildView(null, true, true, 'this phone')).toEqual({ line: '…', sub: ['Installed app build: updates come as a new app'], check: false });
   });
 });
 
