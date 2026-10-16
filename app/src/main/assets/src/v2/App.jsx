@@ -268,6 +268,7 @@ export function V2App({ gateId = readGateId() }) {
   const device = desktop ? 'computer' : 'phone';
   const def = placeFor(route.place);
   const bare = !!(def && def.bare);
+  const rootClass = def && def.rootClass ? ' ' + def.rootClass : '';
   if (def) {
     const Screen = def.Screen;
     contentClass = def.contentClass || 'content';
@@ -316,7 +317,7 @@ export function V2App({ gateId = readGateId() }) {
   if (desktop) {
     return (
       <SheetLayer.Provider value={layer}>
-        <div className={'v2 dk' + (bare ? ' bare' : '')}>
+        <div className={'v2 dk' + (bare ? ' bare' : '') + rootClass}>
           {!bare && <nav className="rail" data-zone="rail" aria-label="Places">{tabs}</nav>}
           <div className="pane">
             <div className="main" ref={scrollRef} onScroll={onScroll} data-scroller="">
@@ -339,7 +340,7 @@ export function V2App({ gateId = readGateId() }) {
   }
   return (
     <SheetLayer.Provider value={layer}>
-      <div className={'v2 v2-phone' + (fs.full ? ' full' : '') + (bare ? ' bare' : '') + (bars.hidden ? ' bars-off' : '')}>
+      <div className={'v2 v2-phone' + (fs.full ? ' full' : '') + (bare ? ' bare' : '') + (bars.hidden ? ' bars-off' : '') + rootClass}>
         {!fs.full && !bare && !bars.hidden && bar}
         {!fs.full && !bare && banner}
         {!fs.full && !bare && findStrip}

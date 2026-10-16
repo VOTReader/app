@@ -7,6 +7,8 @@ import { Icon } from '../Icon.jsx';
 import { definePlace } from '../places.js';
 import { useVotCorpus, useAnswersCorpusVersion, askAnswersCorpus, useAudioSyncSectionsVersion } from '../corpus.js';
 import { VOLUMES, MORE_LETTERS, savedHome, describeItem, itemRoutes, letterCount, colOf, wantsAnswers } from '../home-facts.js';
+import { noticeSeen } from '../garden-facts.js';
+import { GardenNotice, noticeTier } from './GardenScreens.jsx';
 
 /** Where a reader with nothing read yet starts. @type {import('../home-facts.js').HomeItem} */
 const FIRST = { kind: 'letter', collection: 'one', n: 1 };
@@ -52,7 +54,7 @@ function VolumeCells({ vol, last, count, onOpen }) {
 }
 
 /** @param {import('../places.js').PlaceProps} props */
-export function HomeScreen({ gate, facts, go, onReady }) {
+export function HomeScreen({ gate, facts, go, onReady, desktop, device }) {
   const corpus = useVotCorpus();
   const answers = useAnswersCorpusVersion();
   const sections = useAudioSyncSectionsVersion();
@@ -75,6 +77,12 @@ export function HomeScreen({ gate, facts, go, onReady }) {
   const recent = (home.recent || []).map((it) => ({ it, d: describeItem(it) })).filter((x) => x.d);
   const open = (it) => () => go(...itemRoutes(it));
   const openCol = (key) => () => go({ place: 'collection', collection: key });
+  // Return to the Garden: main's notice first, until the reader has opened the Garden past it (vot-garden-warning-acked)
+  const [notice, setNotice] = React.useState(() => !!(gate && gate.open && gate.open.sheet === 'garden-notice'));
+  const openPlace = (place) => () => {
+    if (place === 'garden' && !(gate ? gate.facts && gate.facts.gardenSeen : noticeSeen())) setNotice(true);
+    else go({ place });
+  };
   const left = VOLUMES.slice(0, 4);
   const right = VOLUMES.slice(4);
 
@@ -120,8 +128,12 @@ export function HomeScreen({ gate, facts, go, onReady }) {
       </div>
       <div className="sec g"><span className="label">Listen and see</span></div>
       <div className="rows end">
-        {LISTEN_SEE.map((r) => <Row key={r.place} t={r.t} s={r.s} onClick={() => go({ place: r.place })} />)}
+        {LISTEN_SEE.map((r) => <Row key={r.place} t={r.t} s={r.s} onClick={openPlace(r.place)} />)}
       </div>
+      {notice && (
+        <GardenNotice tier={noticeTier(gate)} gate={gate} device={device || 'phone'} desktop={!!desktop}
+          onClose={() => setNotice(false)} onOpen={() => { setNotice(false); go({ place: 'garden' }); }} />
+      )}
     </>
   );
 }

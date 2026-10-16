@@ -31,7 +31,7 @@ const DAY = 24 * 3600 * 1000;
  * open ('now-playing', or a sheet: 'speed' | 'sleep' | 'up-next' | 'more'), full (full screen) and toast (the hint drawn).
  * playing.savedRecording: the recording is in the Listening Library's Saved (2f's Save; default not).
  * @typedef {{ place: string, collection?: string, n?: number, kind?: string, id?: string, book?: string, chapter?: number | string,
- *   verse?: number, match?: string[], study?: string, list?: string, family?: string, q?: string, st?: string }} Route
+ *   verse?: number, match?: string[], study?: string, list?: string, family?: string, q?: string, st?: string, page?: number }} Route
  * @typedef {{ item: Record<string, any>, reader: string, at: number, length: number, paused: boolean } & Record<string, any>} GatePlaying
  * `open` names a sheet the screen opens on the gate boot ({ sheet: 'mark-paragraph', para, colour } on a letter; the
  * shell's { sheet: 'text-and-theme' }; 9c's { toast: 'offline-listen' }, the Listen pill's); `look` the text and page
@@ -383,6 +383,17 @@ export const GATE_STATES = {
   '6d-songs': { stack: [{ place: 'home' }, { place: 'songs' }], facts: { songs: gateSongsHub() } },
   // states.json 6e-song-page: Elect and Precious (Words To Live By, Part One) from the hub, at the top; not saved, not kept.
   '6e-song-page': { stack: [{ place: 'home' }, { place: 'songs' }, { place: 'song', family: 'elect-and-precious' }], facts: { songs: gateSongPage() } },
+  // states.json 9d-garden-notice: Home as 0b (500 px down, Letter 1 paused) with Return to the Garden tapped on a first
+  // visit: main's notice, Standard picked.
+  '9d-garden-notice': {
+    stack: [{ place: 'home' }],
+    facts: { ...HOME_FACTS, gardenTier: 'standard', gardenSeen: false },
+    scroll: 500,
+    playing: { ...LETTER1_AT_351, paused: true },
+    open: { sheet: 'garden-notice' },
+  },
+  // states.json 9e-garden-page: the Garden at page 40 of 209, Standard, full screen (the laptop's too).
+  '9e-garden-page': { stack: [{ place: 'home' }, { place: 'garden', page: 40 }], facts: { gardenTier: 'standard', gardenSeen: true } },
 };
 
 /**
