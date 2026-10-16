@@ -22,3 +22,4 @@ import './StudyChapterScreen.jsx';
 import './SongsScreens.jsx';
 import './LinksSheet.jsx';
 import './GardenScreens.jsx';
+import './WebScreen.jsx';

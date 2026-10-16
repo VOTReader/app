@@ -268,6 +268,8 @@ export function V2App({ gateId = readGateId() }) {
   const device = desktop ? 'computer' : 'phone';
   const def = placeFor(route.place);
   const bare = !!(def && def.bare);
+  // a bare place with `rail` keeps the laptop's rail (the Scripture Web fills the pane beside it)
+  const railOn = !bare || !!(def && def.rail);
   const rootClass = def && def.rootClass ? ' ' + def.rootClass : '';
   if (def) {
     const Screen = def.Screen;
@@ -317,8 +319,8 @@ export function V2App({ gateId = readGateId() }) {
   if (desktop) {
     return (
       <SheetLayer.Provider value={layer}>
-        <div className={'v2 dk' + (bare ? ' bare' : '') + rootClass}>
-          {!bare && <nav className="rail" data-zone="rail" aria-label="Places">{tabs}</nav>}
+        <div className={'v2 dk' + (railOn ? '' : ' bare') + rootClass}>
+          {railOn && <nav className="rail" data-zone="rail" aria-label="Places">{tabs}</nav>}
           <div className="pane">
             <div className="main" ref={scrollRef} onScroll={onScroll} data-scroller="">
               <div className="col anc" data-zone="col">

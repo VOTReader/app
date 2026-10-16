@@ -18,11 +18,25 @@ export function anySheetOpen() {
   return open.length > 0;
 }
 
-/** Closes the top open sheet; false when none is open. */
+/** Pages' own Back steps, the newest last (the Scripture Web's: main's panels close before the page leaves). */
+const steps = [];
+
+/** Registers `step` as Back's move once no sheet is open; returns its remover. @param {() => void} step */
+export function pushBackStep(step) {
+  steps.push(step);
+  return () => {
+    const i = steps.indexOf(step);
+    if (i >= 0) steps.splice(i, 1);
+  };
+}
+
+/** Closes the top open sheet, else runs the top page's Back step; false when there is neither. */
 export function closeTopSheet() {
   const close = open[open.length - 1];
-  if (!close) return false;
-  close();
+  if (close) { close(); return true; }
+  const step = steps[steps.length - 1];
+  if (!step) return false;
+  step();
   return true;
 }
 

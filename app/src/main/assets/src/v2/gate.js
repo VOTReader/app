@@ -433,6 +433,9 @@ export const GATE_STATES = {
   },
   // states.json 9e-garden-page: the Garden at page 40 of 209, Standard, full screen (the laptop's too).
   '9e-garden-page': { stack: [{ place: 'home' }, { place: 'garden', page: 40 }], facts: { gardenTier: 'standard', gardenSeen: true } },
+  // states.json 5e-scripture-web: main's web whole at its opening camera, Scripture, Famous, the guide seen (WebScreen
+  // hands main's screen web-facts' GATE_WEB_SETTINGS); an upright phone gets it turned, as main; the laptop's fills the pane.
+  '5e-scripture-web': { stack: [{ place: 'home' }, { place: 'scripture-web' }] },
 };
 
 /**

@@ -143,7 +143,10 @@ const BUDGETS = [
   // myweb mw7 2026-10-15: 75,818 B after syncing design's dz17-dz21 recipes (+185 lines: the Answers home, notebooks, the
   // chapter title lede), nothing pulled in. Notebooks (dz20) and links (dz22) recipes still to sync: ceiling 92 KB, still
   // far under app.min.css (370 KB) or a font.
-  { file: 'v2.min.css', measured: 75818, max: 92000 },
+  // zones v2p8 2026-10-15: 101,748 B. The Scripture Web hosts main's screen whole, and v2 does not load app.css, so main's
+  // .sw-* rules (app.css 7612-7781, 7844-8160) come in as scripture-web.css: +15.9 KB minified, nothing else pulled in
+  // (85,851 B before it, with mw7 banners, mw8 links and the Garden). Ceiling ~+15%: still far under app.min.css or a font.
+  { file: 'v2.min.css', measured: 101748, max: 117000 },
   // ── lazy, but still fetched + parsed on the reader's device ──
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.

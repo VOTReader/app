@@ -165,10 +165,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     return undefined;
   }, [rotated]);
 
-  /** Viewport coords -> the rotated screen's own CSS space. */
-  const loc = React.useCallback((e) => (rotatedRef.current
-    ? rotatePointer(e.clientX, e.clientY, window.innerWidth)
-    : { x: e.clientX, y: e.clientY }), []);
+  /** Viewport coords -> the screen's own CSS space, measured from the root's box: it covers the window from 0,0 here, so
+   *  this is rotatePointer(clientX, clientY, innerWidth) or the raw coords; v2 starts it further in (its laptop draws the
+   *  web in the pane beside the rail; its turned phone web keeps the live insets, under the status bar). */
+  const loc = React.useCallback((e) => {
+    const r = wrapRef.current ? wrapRef.current.getBoundingClientRect() : null;
+    if (rotatedRef.current) return rotatePointer(e.clientX, e.clientY - (r ? r.top : 0), r ? r.right : window.innerWidth);
+    return { x: e.clientX - (r ? r.left : 0), y: e.clientY - (r ? r.top : 0) };
+  }, []);
   const [mode, setMode] = React.useState(() => (resumeRef.current && resumeRef.current.mode) || 'canonical');   // 'canonical' | 'personal'
   // The empty-web notice hands focus back here when it closes, so a keyboard
   // reader stays in the control they were using instead of at the document top.
