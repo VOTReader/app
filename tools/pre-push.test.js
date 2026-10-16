@@ -121,11 +121,14 @@ describe('pre-push: the heavy gates run once per push (ln1 item 6)', () => {
     r = push(`(delete) ${ZERO} refs/heads/x ${head}\n`, { env });   // a branch delete pushes nothing: no line
     expect(r.status, r.out).toBe(0);
     expect(readFileSync(log, 'utf8')).toMatch(new RegExp(`^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d readalong ${sha} overhaul pre-push\\n$`));
-    const real = 'D:/Swarm/tools/logs/pushes.log';                     // a dry run that names no log leaves the real one alone
-    const size = () => (existsSync(real) ? readFileSync(real, 'utf8').length : -1);
-    const before = size();
-    push(line(sha), { env: { SWARM_LANE: 'readalong', VOT_PUSH_LOG: undefined } });
-    expect(size()).toBe(before);
+    // a dry run that names no log leaves the real one alone. Other pushes append to the real log while this runs (flake
+    // 10-15: 18545 -> 18624 bytes mid-test), so look for this push's own lane and commit, not for a change in size
+    const real = 'D:/Swarm/tools/logs/pushes.log';
+    const lane = `pre-push-test-${sha.slice(0, 12)}`;
+    push(line(sha), { env: { SWARM_LANE: lane, VOT_PUSH_LOG: undefined } });
+    const after = existsSync(real) ? readFileSync(real, 'utf8') : '';
+    expect(after).not.toContain(lane);
+    expect(after).not.toContain(sha);
   }, 60_000);
 
   it('vitest and gradle run through heavy_run (the machine-wide gates.lock), and the old-branch fallback stays', () => {
