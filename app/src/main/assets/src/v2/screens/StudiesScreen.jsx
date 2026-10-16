@@ -22,22 +22,27 @@ const g = /** @type {any} */ (globalThis);
 
 /**
  * main's studies (and, when `matthew`, the Matthew corpus) asked for once per mount: 'loading', then 'ready' or 'failed'
- * (bible-studies.js did not load; Try again asks again).
- * @param {boolean} matthew @returns {{ status: 'loading' | 'ready' | 'failed', retry: () => void }}
+ * (bible-studies.js did not load; Try again asks again). `matthewFailed`: Matthew was asked for and is still not there
+ * (offline before it was kept, a bundle that never ran), whatever the studies did; only the Matthew pages read it, so the
+ * Studies list keeps its rows (zs30).
+ * @param {boolean} matthew @returns {{ status: 'loading' | 'ready' | 'failed', matthewFailed: boolean, retry: () => void }}
  */
 export function useStudies(matthew) {
   const [status, setStatus] = React.useState(/** @type {() => 'loading' | 'ready' | 'failed'} */ (
     () => (Array.isArray(g.BIBLE_STUDIES) && (!matthew || g.MATTHEW) ? 'ready' : 'loading')));
+  const [matthewGone, setMatthewGone] = React.useState(false);
   const [asks, setAsks] = React.useState(0);
   React.useEffect(() => {
     let live = true;
     Promise.all([askStudies(), matthew ? askMatthew() : Promise.resolve()]).then(([ok]) => {
-      if (live) setStatus(ok ? 'ready' : 'failed');
+      if (!live) return;
+      setStatus(ok ? 'ready' : 'failed');
+      setMatthewGone(!!matthew && !g.MATTHEW);
     });
     return () => { live = false; };
   }, [matthew, asks]);
   const retry = React.useCallback(() => { setStatus('loading'); setAsks((n) => n + 1); }, []);
-  return { status, retry };
+  return { status, matthewFailed: status !== 'loading' && matthewGone, retry };
 }
 
 /** One study's row on Studies. @param {{ row: ReturnType<typeof studyRow>, onOpen: () => void }} props */
@@ -105,7 +110,7 @@ function ChapterRow({ c, current, read, onOpen, rowRef }) {
 
 /** @param {import('../places.js').PlaceProps} props */
 export function StudyScreen({ route, gate, go, onReady }) {
-  const { status, retry } = useStudies(route.study === MATTHEW_ID);
+  const { status, matthewFailed, retry } = useStudies(route.study === MATTHEW_ID);
   const study = status === 'loading' ? null : studyById(route.study);
   const place = React.useMemo(() => {
     if (!study) return { current: null, read: [] };
@@ -130,8 +135,10 @@ export function StudyScreen({ route, gate, go, onReady }) {
   }, [gate, study]);
   if (status === 'loading') return null;
   if (!study) return <CouldNotOpen what="study" retry={status === 'failed' ? retry : null} />;
-  // the Matthew Study Bible is a book with notes: main's chapter index (5h)
-  if (study.isMatthewStudy) return <MatthewIndex study={study} place={place} gate={gate} go={go} />;
+  // the Matthew Study Bible is a book with notes: main's chapter index (5h), once its corpus is here
+  if (study.isMatthewStudy) {
+    return matthewFailed ? <CouldNotOpen what="study" retry={retry} /> : <MatthewIndex study={study} place={place} gate={gate} go={go} />;
+  }
 
   const head = studyHead(study);
   const entries = studyEntries(study);

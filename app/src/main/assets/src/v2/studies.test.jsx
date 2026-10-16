@@ -5,7 +5,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, waitFor, act } from '@testing-library/react';
 import { V2App } from './App.jsx';
 import { StudyChapterScreen } from './screens/StudyChapterScreen.jsx';
-import { StudyScreen } from './screens/StudiesScreen.jsx';
+import { StudyScreen, StudiesScreen } from './screens/StudiesScreen.jsx';
 import { defineStart } from './places.js';
 import { visitOf } from './reading-record.js';
 import {
@@ -617,5 +617,40 @@ describe('a study page whose studies did not load', () => {
     const { container } = render(<StudyScreen route={{ place: 'study', study: 'nope' }} {...props} />);
     await waitFor(() => expect(container.querySelector('.empty .t').textContent).toBe('This study could not be opened.'));
     expect(tryAgain(container)).toBe(undefined);
+  });
+
+  // zs30: the studies loaded but main's MATTHEW corpus did not (offline before it was kept): useStudies said 'ready'
+  /** main's Matthew loader failing once (index.html rejects a bundle that did not load or run), then landing */
+  const matthewFailsOnce = () => {
+    installLoaders();
+    g.__loadMatthewCorpus = vi.fn(() => Promise.reject(new Error('offline')));
+    return () => g.__loadMatthewCorpus.mockImplementation(() => { g.MATTHEW = MATTHEW; return Promise.resolve(); });
+  };
+
+  it('a Matthew chapter whose Matthew corpus did not load says so, with Try again; Try again opens it', async () => {
+    const land = matthewFailsOnce();
+    const { container } = render(<StudyChapterScreen route={{ place: 'study-chapter', study: 'matthew-study', chapter: '5' }} {...props} />);
+    await waitFor(() => expect(container.querySelector('.empty .t').textContent).toBe('This chapter could not be opened.'));
+    land();
+    await click(tryAgain(container));
+    await waitFor(() => expect(container.textContent).not.toContain('could not be opened'));
+    expect(g.__loadMatthewCorpus).toHaveBeenCalledTimes(2);
+  });
+
+  it('the Matthew index whose Matthew corpus did not load says so, with Try again; Try again opens it', async () => {
+    const land = matthewFailsOnce();
+    const { container } = render(<StudyScreen route={{ place: 'study', study: 'matthew-study' }} {...props} />);
+    await waitFor(() => expect(container.querySelector('.empty .t').textContent).toBe('This study could not be opened.'));
+    land();
+    await click(tryAgain(container));
+    await waitFor(() => expect(container.textContent).not.toContain('could not be opened'));
+    expect(g.__loadMatthewCorpus).toHaveBeenCalledTimes(2);
+  });
+
+  it('a Matthew failure leaves the Studies list as it was (its rows, no "couldn\'t load")', async () => {
+    matthewFailsOnce();
+    const { container } = render(<StudiesScreen {...props} route={{ place: 'studies' }} />);
+    await waitFor(() => expect(container.querySelectorAll('.rows .stu').length).toBeGreaterThan(1));
+    expect(container.textContent).not.toContain('load');
   });
 });

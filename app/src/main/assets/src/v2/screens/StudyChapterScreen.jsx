@@ -157,7 +157,7 @@ const StudyBody = React.memo(/** @param {{ chapter: any, states: Record<string, 
  */
 export function StudyChapterScreen({ route, gate, go, replace, onReady, desktop, facts }) {
   const matthew = route.study === MATTHEW_ID;
-  const { status, retry } = useStudies(matthew);
+  const { status, matthewFailed, retry } = useStudies(matthew);
   const live = !gate;
   const found = status === 'ready' ? chapterFor(route) : null;
   const study = found ? found.study : null;
@@ -192,7 +192,7 @@ export function StudyChapterScreen({ route, gate, go, replace, onReady, desktop,
   React.useEffect(() => { if (status !== 'loading' && !chapter) onReady(); }, [status, chapter, onReady]);
 
   if (status === 'loading') return null;
-  if (!study || !chapter) return <CouldNotOpen what="chapter" retry={status === 'failed' ? retry : null} />;
+  if (!study || !chapter) return <CouldNotOpen what="chapter" retry={status === 'failed' || matthewFailed ? retry : null} />;
   if (matthew) {
     return <MatthewChapter key={chapter.num} study={study} ch={chapter} gate={gate} go={go} replace={replace} onReady={onReady}
       desktop={desktop} facts={facts || {}} />;
