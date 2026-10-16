@@ -400,6 +400,48 @@ describe('searching (real boot, fake engine)', () => {
       expect(c.querySelector('.chip.ctx')).not.toBe(null);
     });
 
+    it("a route's q (Answers' \"Search the whole library for\", mw10 2j): those words everywhere, Relevance, each new route once", async () => {
+      vi.useFakeTimers();
+      g.COL_BY_KEY = new Map([['one', ONE]]);
+      g.VotSearchMini = fakeEngine((q, o) => ({ results: o.scope ? FIVE().filter((h) => h.doc.volumeId === 'v1') : FIVE() }));
+      const props = /** @type {any} */ ({ gate: null, go: vi.fn(), onReady: () => {}, facts: {}, desktop: false, device: 'phone', pop: () => {},
+        replace: () => {}, openTab: () => {} });
+      const box = (root) => /** @type {HTMLInputElement} */ (root.querySelector('.field input.q')).value;
+      const settle = async () => { await act(async () => { vi.advanceTimersByTime(140); }); await act(async () => { await Promise.resolve(); }); };
+      const last = () => g.VotSearchMini.search.mock.calls.at(-1);
+      // scoped to Volume One and in Book order, then asked from elsewhere
+      const r = render(<SearchScreen route={FROM} {...props} />);
+      const c = r.container;
+      await typeAndWait(c, 'chosen');
+      click(c.querySelector('.chip.ctx'));
+      fireEvent.keyDown(c.querySelectorAll('.seg.sr-seg span')[1], { key: 'Enter' });
+      await settle();
+      expect(last()[1].scope).toEqual({ volumeId: 'v1' });
+      const asked = { ...FROM, q: 'chosen sons' };
+      r.rerender(<SearchScreen route={asked} {...props} />);
+      await settle();
+      expect(box(c)).toBe('chosen sons');
+      expect(last()[0]).toBe('chosen sons');
+      expect(last()[1].scope).toBe(null);
+      expect(pressed(c)).toEqual(['true', 'false']);
+      expect(c.querySelector('.sr-sum').textContent).toBe('Found 5 matches across 2 sections');
+      // typed over, then the same route again (Back to Search): what was typed stays
+      await typeAndWait(c, 'faith');
+      r.rerender(<SearchScreen route={asked} {...props} />);
+      await settle();
+      expect(box(c)).toBe('faith');
+      // a new route with the same words asks again; a fresh mount opens on its words
+      await typeAndWait(c, 'other');
+      r.rerender(<SearchScreen route={{ place: 'search', q: 'chosen sons' }} {...props} />);
+      await settle();
+      expect(box(c)).toBe('chosen sons');
+      cleanup();
+      const fresh = render(<SearchScreen route={{ place: 'search', q: 'mercy' }} {...props} />).container;
+      await settle();
+      expect(box(fresh)).toBe('mercy');
+      expect(last()[0]).toBe('mercy');
+    });
+
     it('corrected, unquoted, stop words only, did you mean: main\'s words, the fix a button', async () => {
       vi.useFakeTimers();
       g.VotSearchData = { BOOK_DISPLAY: { genesis: 'Genesis' }, STOP_WORDS_TRIMMED: new Set(['the', 'of']) };

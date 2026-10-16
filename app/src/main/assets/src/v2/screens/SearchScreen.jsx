@@ -5,7 +5,8 @@
    the same element from 3a to 3b (only the heading above it goes), so typing the first letter never drops the keyboard.
    Under the chips, as main's Search lays them out: one notes line, Go to, the count, Relevance | Book order, Best matches
    and the groups, or the collections in reading order. Results open in this tab, and Back returns to them as they were
-   left (the query, the chip, the order, the places opened, the scroll). A gate boot draws its picture from main's engine
+   left (the query, the chip, the order, the places opened, the scroll). A route's `q` (zs28: Answers' "Search the whole
+   library for", openTab('search', { q })) opens those words as a new query, everywhere. A gate boot draws its picture from main's engine
    rows (gate-data/search-rows.json) and never starts the engine (its index build writes the Cache API). */
 import { Icon } from '../Icon.jsx';
 import { definePlace } from '../places.js';
@@ -226,15 +227,29 @@ export function SearchScreen({ route, gate, go, onReady }) {
   const seeded = React.useMemo(() => (gate ? (gate.facts && gate.facts.search) || { query: '' } : null), [gate]);
   const settings = React.useMemo(() => (seeded ? null : searchSettings()), [seeded]);
   const ctx = React.useMemo(() => searchContext(route && route.from), [route]);
-  const [query, setQuery] = React.useState(() => (seeded ? seeded.query || '' : kept.query));
-  const [scope, setScope] = React.useState(() => (seeded ? seeded.scope || 'all' : kept.scope));
-  const [scoped, setScoped] = React.useState(() => !!ctx && (seeded ? !!seeded.scoped : kept.scoped === ctx.key));
+  // Search asked for words (Answers' "Search the whole library for", mw10 2j): a route's q opens them as a new query,
+  // everywhere, in Relevance; once per route, so Back to Search keeps what was typed since
+  const asked = !seeded && route && typeof route.q === 'string' ? route : null;
+  const [query, setQuery] = React.useState(() => (seeded ? seeded.query || '' : asked ? asked.q : kept.query));
+  const [scope, setScope] = React.useState(() => (seeded ? seeded.scope || 'all' : asked ? 'all' : kept.scope));
+  const [scoped, setScoped] = React.useState(() => !!ctx && !asked && (seeded ? !!seeded.scoped : kept.scoped === ctx.key));
   const scopeCtx = scoped ? ctx : null;
   const found = useFound(query, seeded, scopeCtx, settings);
   const q = query.trim();
   // The query's view: Relevance, partial matches hidden, places closed with every new query (main :395, :437).
   const [viewState, setView] = React.useState(() => (seeded
-    ? { ...freshView((seeded.query || '').trim()), book: seeded.order === 'book', loose: !!seeded.loose } : kept.view));
+    ? { ...freshView((seeded.query || '').trim()), book: seeded.order === 'book', loose: !!seeded.loose }
+    : asked ? freshView(asked.q.trim()) : kept.view));
+  const took = React.useRef(asked);
+  React.useEffect(() => {
+    if (!asked || took.current === asked) return;
+    took.current = asked;
+    setQuery(asked.q);
+    setScope('all');
+    setScoped(false);
+    setView(freshView(asked.q.trim()));
+    kept.top = 0;
+  }, [asked]);
   const view = viewState.q === q ? viewState : freshView(q);
   const patch = (p) => setView({ ...view, ...p });
   const history = seeded ? true : settings.history;
@@ -265,7 +280,7 @@ export function SearchScreen({ route, gate, go, onReady }) {
   }, [toast, seeded]);
   // Back from a result: the list where it was left (after the shell has put the new page at its top).
   React.useEffect(() => {
-    const top = seeded ? 0 : kept.top;
+    const top = seeded || took.current ? 0 : kept.top; // words asked for start at the top
     if (!top) return undefined;
     const raf = g.requestAnimationFrame || ((cb) => setTimeout(cb, 16));
     const cancel = g.cancelAnimationFrame || clearTimeout;
