@@ -76,28 +76,46 @@ export function applyGateScroll(el, scroll, desktop = false) {
   if (scroll === 'end') { el.scrollTop = el.scrollHeight; return; }
   if (typeof scroll === 'object' && scroll.phone && desktop) return;
   if (typeof scroll === 'object' && typeof scroll.top === 'number') { el.scrollTop = scroll.top; return; }
+  el.scrollTop += gateScrollOff(el, scroll, desktop);
+}
+
+/**
+ * A selector scroll's miss: how far its element sits below the place the gate puts it (px; 0 when it is not there).
+ * @param {HTMLElement} el @param {string | { to?: string, gap?: number, deskGap?: number }} scroll @param {boolean} desktop
+ */
+function gateScrollOff(el, scroll, desktop) {
   const sel = typeof scroll === 'string' ? scroll : scroll.to;
   const gap = typeof scroll === 'string' ? 0 : desktop && scroll.deskGap != null ? scroll.deskGap : scroll.gap || 0;
-  const target = /** @type {HTMLElement | null} */ (el.querySelector(sel));
-  if (!target) return;
+  const target = /** @type {HTMLElement | null} */ (sel ? el.querySelector(sel) : null);
+  if (!target) return 0;
   const bar = el.querySelector(':scope > .col > .tb');
   const top = bar ? bar.getBoundingClientRect().bottom : el.getBoundingClientRect().top;
-  el.scrollTop += target.getBoundingClientRect().top - top - gap;
+  return target.getBoundingClientRect().top - top - gap;
 }
 
 /**
  * applyGateScroll, kept true while the gate's page lives: 'end' stays the end when the scroller or its page changes size
  * after it (the APK sets --inset-top / --inset-bottom when the page has loaded, on the S22 after the gate's scroll; the
- * shell's padding then shrinks the scroller and a page left at the old scrollTop stops ~80 px short). `after` runs after
- * each placing. Returns the stop.
+ * shell's padding then shrinks the scroller and a page left at the old scrollTop stops ~80 px short). A selector the
+ * first scroll could not reach (clamped at the page's end, short of a place near it: S22 7h, 61 px) is placed again as
+ * sizes change until it is there, then let go: a page the edge moved whole never moves, and the page's own scrolls after
+ * the gate's (the letter following the voice, 1b) stand. `after` runs after each placing. Returns the stop.
  * @param {HTMLElement} el @param {Parameters<typeof applyGateScroll>[1]} scroll @param {boolean} desktop
  * @param {() => void} after
  */
 export function holdGateScroll(el, scroll, desktop, after) {
   const place = () => { applyGateScroll(el, scroll, desktop); after(); };
   place();
-  if (scroll !== 'end' || typeof ResizeObserver === 'undefined') return () => {};
-  const ro = new ResizeObserver(() => { if (el.scrollTop + el.clientHeight < el.scrollHeight - 1) place(); });
+  const end = scroll === 'end';
+  const sel = typeof scroll === 'string' ? !end
+    : !!(scroll && typeof scroll === 'object' && scroll.to && typeof scroll.top !== 'number' && !(scroll.phone && desktop));
+  if ((!end && !sel) || typeof ResizeObserver === 'undefined') return () => {};
+  const short = () => Math.abs(gateScrollOff(el, /** @type {any} */ (scroll), desktop)) > 1;
+  if (sel && !short()) return () => {};
+  const ro = new ResizeObserver(() => {
+    if (end ? el.scrollTop + el.clientHeight < el.scrollHeight - 1 : short()) place();
+    if (sel && !short()) ro.disconnect();
+  });
   ro.observe(el);
   for (const child of Array.from(el.children)) ro.observe(child);
   return () => ro.disconnect();

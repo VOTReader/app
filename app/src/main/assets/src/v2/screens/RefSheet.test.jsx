@@ -358,8 +358,48 @@ describe('the gate rows for dz13', () => {
       expect(after).toHaveBeenCalledTimes(2);
       stop();
       expect(fire).toHaveLength(0);
-      // a number or a selector is not held: the system moved every line with the edge
+      // a number is not held: the system moved every line with the edge
       holdGateScroll(el, 300, false, after);
+      expect(fire).toHaveLength(0);
+    } finally {
+      globalThis.ResizeObserver = realRO;
+    }
+  });
+
+  it('a selector the first scroll could not reach is placed again as sizes change, then let go (S22 7h: clamped 61 px short)', () => {
+    const realRO = globalThis.ResizeObserver;
+    /** @type {(() => void)[]} */
+    const fire = [];
+    globalThis.ResizeObserver = /** @type {any} */ (class {
+      constructor(cb) { fire.push(cb); }
+      observe() {}
+      disconnect() { fire.length = 0; }
+    });
+    try {
+      // the bar's bottom 83 px from the screen top; the Storage label 1900 px down the page; a browser clamps scrollTop
+      const el = /** @type {any} */ ({ children: [], scrollHeight: 2400, clientHeight: 700, top: 0, barBottom: 83,
+        get scrollTop() { return this.top; }, set scrollTop(v) { this.top = Math.max(0, Math.min(v, this.scrollHeight - this.clientHeight)); },
+        getBoundingClientRect() { return { top: this.barBottom }; },
+        querySelector(sel) {
+          if (sel === '.sec.stor') return { getBoundingClientRect: () => ({ top: el.barBottom + 1900 - el.top }) };
+          if (sel === ':scope > .col > .tb') return { getBoundingClientRect: () => ({ bottom: el.barBottom }) };
+          return null;
+        } });
+      const after = vi.fn();
+      holdGateScroll(el, { to: '.sec.stor', gap: 54 }, false, after);
+      expect(el.scrollTop).toBe(1700);        // wanted 1846: clamped at the end
+      el.clientHeight = 625;                  // the insets arrive: 75 px shorter
+      fire.forEach((cb) => cb());
+      expect(el.scrollTop).toBe(1775);        // still clamped, 14 px nearer
+      el.scrollHeight = 2500;                 // the page grows under it
+      fire.forEach((cb) => cb());
+      expect(el.scrollTop).toBe(1846);
+      expect(after).toHaveBeenCalledTimes(3);
+      expect(fire).toHaveLength(0);           // there: let go, so the page's own scrolls after it stand
+      // reached by the first scroll: not held at all (1b: the letter then follows the voice)
+      el.top = 0;
+      holdGateScroll(el, { to: '.sec.stor', gap: 54 }, false, after);
+      expect(el.scrollTop).toBe(1846);
       expect(fire).toHaveLength(0);
     } finally {
       globalThis.ResizeObserver = realRO;
