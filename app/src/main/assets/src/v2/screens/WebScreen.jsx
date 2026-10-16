@@ -46,10 +46,11 @@ export function WebScreen({ gate, go, pop, onReady }) {
     else pop();
   }), [pop]);
 
-  // ready once the web has drawn: main's "Weaving the web…" gone (or its no-WebGL list up), then two frames
+  // ready once the web has drawn: main's "Weaving the web…" gone (or its no-WebGL list up), then two frames; with no main
+  // screen (bundle-d absent) there is nothing to wait for
   React.useEffect(() => {
     const host = hostRef.current;
-    if (!gate || !host) { onReady(); return undefined; }
+    if (!gate || !host || typeof Main !== 'function') { onReady(); return undefined; }
     let live = true;
     let raf = 0;
     const drawn = () => !host.querySelector('.sw-loading') && !!host.querySelector('.sw-root, .sw-fallback-list, .sw-fallback');
@@ -58,7 +59,7 @@ export function WebScreen({ gate, go, pop, onReady }) {
     const mo = new MutationObserver(() => { if (drawn()) { mo.disconnect(); settle(); } });
     mo.observe(host, { childList: true, subtree: true });
     return () => { live = false; mo.disconnect(); cancelAnimationFrame(raf); };
-  }, [gate, onReady]);
+  }, [gate, onReady, Main]);
 
   if (typeof Main !== 'function') return <div className="sw-host" ref={hostRef} />;
   return (
