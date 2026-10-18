@@ -182,17 +182,26 @@ describe('the Scripture Web chrome, trimmed', () => {
   it('has ONE hide-all control, and it hides the chrome and shows it again', async () => {
     const { container } = await mount();
     const btn = screen.getByLabelText(HIDE_ALL);
-    expect(btn.getAttribute('aria-pressed')).toBe('false');
+    /* w3 panel step 2 (the a11y pass): the toggle carries a visible label that flips with its
+       name, "Hide controls" / "Show controls", in place of a constant name plus aria-pressed
+       (both at once would read "Show controls, pressed"). The law is the same: ONE control, the
+       same element both ways, outside what it hides, saying which way it goes. */
+    expect(btn.getAttribute('aria-label')).toBe('Hide controls');
+    expect(btn.textContent).toBe('Hide controls');
+    expect(btn.hasAttribute('aria-pressed')).toBe(false);
 
     fireEvent.click(btn);
     expect(container.querySelector('.sw-root.sw-chrome-hidden')).toBeTruthy();
-    expect(btn.getAttribute('aria-pressed')).toBe('true');
+    expect(container.querySelectorAll('.sw-hide-all')).toHaveLength(1);
+    expect(container.querySelector('.sw-hide-all')).toBe(btn);
+    expect(btn.getAttribute('aria-label')).toBe('Show controls');
+    expect(btn.textContent).toBe('Show controls');
     /* The button is the way back, so it must not be inside what it hides. */
     expect(btn.closest('.sw-topbar, .sw-controls, .sw-legend, .sw-credit')).toBeNull();
 
     fireEvent.click(btn);
     expect(container.querySelector('.sw-root.sw-chrome-hidden')).toBeNull();
-    expect(btn.getAttribute('aria-pressed')).toBe('false');
+    expect(btn.getAttribute('aria-label')).toBe('Hide controls');
   });
 
   it('remembers hidden for the SESSION, not the profile', async () => {

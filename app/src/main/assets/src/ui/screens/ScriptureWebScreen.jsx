@@ -148,17 +148,25 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   };
   const [density, setDensity] = React.useState(storedDensity);
   const [chromeHidden, setChromeHidden] = React.useState(readChromeHidden);
-  const [announce, setAnnounce] = React.useState('');
-  // A transient explanation under the title — set on control cycles so the
-  // reader is TOLD what Essential/Famous and the colour modes mean
-  // instead of having to guess (the on-device report).
+  /* THE ONE LIVE REGION (.sw-live, polite): everything the web says to a screen reader goes
+     through here, and nothing else on the screen is a status region (the density hint was a
+     second one). The same words twice are said twice: a region whose text did not change is
+     not read again, so a repeat toggles a trailing no-break space (trim() reads the words). */
+  const [announce, setAnnounceText] = React.useState('');
+  const setAnnounce = React.useCallback((/** @type {string} */ msg) => {
+    setAnnounceText((prev) => (msg && prev === msg ? msg + ' ' : msg));
+  }, []);
+  // A transient line under the title on a density switch, so the reader is TOLD what Essential
+  // and Famous mean (the on-device report); out of the header's flow (item 21) and said once,
+  // through the live region.
   const [hint, setHint] = React.useState('');
   const hintTimer = React.useRef(0);
-  const flashHint = React.useCallback((text) => {
+  const flashHint = React.useCallback((/** @type {string} */ text) => {
     setHint(text);
+    setAnnounce(text);
     if (hintTimer.current) clearTimeout(hintTimer.current);
     hintTimer.current = setTimeout(() => setHint(''), 3600);
-  }, []);
+  }, [setAnnounce]);
   const [showUnderlay, setShowUnderlay] = React.useState(true);
 
   // ── everything below here is per-frame state; deliberately NOT React ──
@@ -379,6 +387,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // no-WebGL face.)
 
   const stats = graph ? graphStats(graph, density) : null;
+  const famousCount = graph ? graphStats(graph, 'famous').shown : 0;
+  const essentialCount = graph ? graphStats(graph, 'essential').shown : 0;
 
   return (
     <div className={'sw-root' + (rotated ? ' sw-rotated' : '') + (chromeHidden ? ' sw-chrome-hidden' : '')
@@ -398,7 +408,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
       <div className="sw-topbar" ref={topbarRef}>
         <button type="button" className="sw-btn sw-btn-icon" onClick={onBack} aria-label="Back">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M15 18l-6-6 6-6" /></svg>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
         <div className="sw-title">
           <h1>{mode === 'personal' ? 'My Web' : 'The Scripture Web'}</h1>
@@ -415,7 +425,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
                "just keep x connections"); the density hint that flashes on a
                switch is where the two densities are explained. */
             : (stats && <p>{stats.shown.toLocaleString()} connections</p>)}
-          {hint && <p className="sw-hint" role="status">{hint}</p>}
+          {/* the density's line after a switch: seen here, said by .sw-live (one live region) */}
+          {hint ? <div className="sw-hint" aria-hidden="true">{hint}</div> : null}
         </div>
       </div>
 
@@ -453,9 +464,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
                   if (typeof updateSetting === 'function') updateSetting('webDensity', next);
                   setMenuOpen(false);
                 }}>
-                <option value="essential">Essential</option>
-                <option value="famous">Famous</option>
+                {/* each density with its count and one line (Q6); closed, the face reads its name */}
+                <option value="famous">{densityLine('famous', famousCount)}</option>
+                <option value="essential">{densityLine('essential', essentialCount)}</option>
               </select>
+              <span className="sw-select-face" aria-hidden="true">
+                {density === 'essential' ? 'Essential' : 'Famous'}
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 9l6 6 6-6" /></svg>
+              </span>
             </label>
         ) : (
           <button type="button" className={'sw-btn sw-toggle' + (showUnderlay ? ' is-on' : '')} aria-pressed={showUnderlay}
@@ -486,13 +502,16 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           counter); the book rail on the UI canvas and the colour key stay, because
           they are how the web is read, not how it is driven (Corbin, 2026-09-11:
           "keep the web legend (the books at the bottom, etc) but just hide the
-          interactable UI"). The label stays constant and aria-pressed carries
-          the state, the same convention as the Scripture / My Web seg. */}
+          interactable UI"). Its label flips with its name (the a11y pass, w3): "Hide
+          controls" (a round icon, the words for a screen reader and a tooltip) and, hidden,
+          "Show controls" in words, because then it is the only way back. */}
       <button type="button" className="sw-btn sw-btn-icon sw-hide-all"
-        aria-label="Hide controls" aria-pressed={chromeHidden} onClick={toggleChrome}>
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+        aria-label={chromeHidden ? 'Show controls' : 'Hide controls'}
+        title={chromeHidden ? undefined : 'Hide controls'} onClick={toggleChrome}>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+          <path d={chromeHidden ? 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5' : 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'} />
         </svg>
+        <span className="sw-hide-label">{chromeHidden ? 'Show controls' : 'Hide controls'}</span>
       </button>
 
       {/* the how-to-read card's button: the corner above the hide-all

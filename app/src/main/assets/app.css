@@ -7709,7 +7709,7 @@
        font-size names a scale step (check-type-scale.js). The arcs
        themselves are drawn in WebGL and carry their own data palette. */
     .sw-root {
-      position: fixed; inset: 0; background: var(--bg);
+      position: fixed; inset: 0; background: var(--sw-canvas);
       touch-action: none; overflow: hidden; outline: none;
       -webkit-user-select: none; user-select: none;
     }
@@ -7718,8 +7718,10 @@
        utils/scripture-web/sw-ink.js's TABLE, which this file cannot import, so
        ui/scripture-web/panel-css.test.js holds each token to its row. Pinned in both themes
        like the canvas: the panel is never cream (#18). A colour the spec does not name goes
-       into sw-ink.js first. */
-    .sw-root {
+       into sw-ink.js first. The load-error panel (.sw-fallback) is the screen's root when the
+       graph fails, so it reads the same tokens (spec 4.1, item 24). */
+    .sw-fallback, .sw-root {
+      --sw-canvas: #000000;
       --sw-gold: #C4A469; --sw-title: #F5F5F3; --sw-text: #E9EEEF; --sw-text-body: #E0E6E7;
       --sw-text-meta: #B7BFC1; --sw-text-muted: #959DA0; --sw-overline: #A9A188;
       --sw-control-fill: rgba(28, 37, 39, 0.88); --sw-control-border: #3A4547;
@@ -7785,103 +7787,144 @@
       --sw-topbar-floor: calc(44px + 2 * var(--sw-topbar-pad) + 2px);
     }
 
-    /* NO PANEL. The top chrome floats over the canvas: the back button and the
-       controls carry their own pill borders, so the rectangles behind them were
-       drawing a box around a box (owner call, 2026-09-10). Layout is untouched
-       -- the padding stays, so nothing moves. */
+    /* THE HEADER (spec 4.1): Back, then the title in the book's serif, sentence case, with the
+       count under it (after it on a phone). NO PANEL behind it: the back button and the
+       controls carry their own fills (owner call, 2026-09-10), and the top scrim is the
+       canvas's own (overlay-renderer.js drawScrim, sw-ink row `scrim`), so a CSS twin here
+       would darken it twice. The row aligns to its TOP, so a line under the title (the
+       density hint) can never move Back (item 21); it sits above the loader (z 5), so Back is
+       there while the web is woven (item 24). */
     .sw-topbar {
-      position: absolute; z-index: 4; display: flex; align-items: center; gap: 10px;
-      left: 14px; top: var(--sw-chrome-top);
+      position: absolute; z-index: 6; display: flex; align-items: flex-start; gap: 16px;
+      left: 16px; top: var(--sw-chrome-top);
       padding: var(--sw-topbar-pad) 10px var(--sw-topbar-pad) var(--sw-topbar-pad);
     }
+    .sw-title { position: relative; padding-top: 3px; }
     .sw-title h1 {
-      margin: 0; font-family: var(--font-cinzel);
-      font-size: var(--fsc-15); font-weight: 600;
-      letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold);
+      margin: 0; font-family: var(--sw-font); font-size: var(--fsc-24); font-weight: 400;
+      line-height: 1.15; color: var(--sw-title);
     }
-    .sw-title p {
-      margin: 3px 0 0; font-size: var(--fsc-11);
-      color: var(--cream-muted); letter-spacing: 0.04em;
+    .sw-title p { margin: 2px 0 0; font-family: var(--sw-font); font-size: var(--fsc-15); color: var(--sw-text-muted); }
+    .sw-root.sw-compact .sw-title { display: flex; align-items: baseline; gap: 10px; padding-top: 7px; }
+    .sw-root.sw-compact .sw-title h1 { font-size: var(--fsc-20); }
+    .sw-root.sw-compact .sw-title p { margin: 0; font-size: var(--fsc-14); }
+    /* The density's line after a switch: out of the row's flow and on one line, so it never
+       wraps the header or moves Back (item 21). What it says is announced by the one live
+       region (.sw-live), not by this. */
+    .sw-hint {
+      position: absolute; left: 0; top: 100%; margin-top: 4px; max-width: min(60vw, 520px);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+      font-family: var(--sw-font); font-size: var(--fsc-14); color: var(--sw-text-meta);
     }
 
-    /* .sw-topbar's twin, and it loses its panel for the same reason. */
+    /* THE CONTROLS (spec 4.1): the go-to's search slot, Scripture | My Web, Nearby, the
+       density, Reset; .sw-topbar's twin, with no panel for the same reason. Its 7 px padding
+       sits inside the 24 px gutter; the 3 px drop centres the 40 px controls on Back. */
     .sw-controls {
-      position: absolute; z-index: 4; display: flex; flex-wrap: wrap; gap: 8px;
-      right: 14px; top: var(--sw-chrome-top);
+      position: absolute; z-index: 4; display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+      right: 17px; top: calc(var(--sw-chrome-top) + 3px);
       max-width: 62vw; justify-content: flex-end; padding: 7px;
     }
-    /* ONE PILL GRAMMAR (Corbin, 2026-09-10: "some buttons are full black and
-       some are see through, unify"): every resting pill is the same
-       half-black scrim behind a gold hairline, so the web shows through and
-       cream text still reads over the brightest arc (a 50 % scrim under
-       --cream-dim on the green corridor's ~0.35 luminance gives ~4.1:1, where
-       bare glass gave ~2.3:1); the active pill alone takes the gold tint. No
-       solid box anywhere: the box is what the nobox landing killed. */
+    .sw-root.sw-compact .sw-controls { gap: 8px; right: 9px; }
+    /* ONE CONTROL GRAMMAR (Corbin, 2026-09-10: "some buttons are full black and some are see
+       through, unify"; spec 4.1): every resting control is the web's control fill behind a
+       1 px edge, its words in the book's serif, 40 px tall with a 44 px hit (36 with a 44 hit
+       on a phone, item 48); the active segment alone takes the gold. */
     .sw-btn {
-      display: inline-flex; align-items: center; justify-content: center;
-      min-height: 44px; min-width: 44px; padding: 0 14px;
-      background: rgba(0, 0, 0, 0.5); color: var(--cream-dim);
-      border: 1px solid var(--gold-border); border-radius: 999px;
-      font-family: var(--font-cinzel); font-size: var(--fsc-11);
-      letter-spacing: 0.09em; text-transform: uppercase; cursor: pointer;
+      position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      box-sizing: border-box; min-height: 40px; min-width: 44px; padding: 0 14px;
+      background: var(--sw-control-fill); color: var(--sw-text);
+      border: 1px solid var(--sw-control-border); border-radius: 6px;
+      font-family: var(--sw-font); font-size: var(--fsc-16); line-height: 1; cursor: pointer;
       transition: var(--transition);
     }
-    .sw-btn:hover { border-color: var(--gold); color: var(--gold-bright); }
-    .sw-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-    .sw-btn.is-on, .sw-toggle.is-on { border-color: var(--gold); background: var(--gold-faint); color: var(--gold-bright); }
-    .sw-btn-icon { padding: 0; }
-    /* HIDE ALL. One button OUTSIDE everything it hides (it is the way back), in
-       the bottom-right corner — the one corner nothing else uses on any frame.
-       It was top-right first, with the strip shifted 52 px left to make room;
-       the walk measured the strip back over the title on the rotated 320x640
-       root (2a: 60x23 px), because the strip's rotated max-width was tuned to
-       clear the title with the strip at right:14px and the smallest frame has
-       no 44 px to spare between them. In the hidden state it is a small quiet
-       glyph — the border goes, the glyph shrinks, the 44 px tap target does not. */
+    /* the 44 px hit, whatever the face */
+    .sw-btn::after { content: ''; position: absolute; left: 0; right: 0; top: -3px; bottom: -3px; }
+    .sw-btn:hover { border-color: var(--sw-control-border-hover); }
+    .sw-btn:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
+    .sw-btn.is-on, .sw-toggle.is-on { border-color: var(--sw-active-border); background: var(--sw-active-fill); color: var(--sw-gold); }
+    .sw-btn-icon { padding: 0; width: 44px; }
+    .sw-btn svg { flex: none; display: block; }
+    .sw-root.sw-compact .sw-btn { min-height: 36px; font-size: var(--fsc-15); }
+    .sw-root.sw-compact .sw-btn::after { top: -5px; bottom: -5px; }
+    /* Back, ? and hide-UI are round: 44 px on PC, 40 with a 44 hit on a phone. */
+    :is(.sw-topbar, .sw-fallback) .sw-btn-icon, .sw-hide-all, .sw-guide-btn { width: 44px; height: 44px; border-radius: 50%; }
+    .sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, .sw-hide-all, .sw-guide-btn) { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
+    .sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, .sw-hide-all, .sw-guide-btn)::after { left: -2px; right: -2px; top: -2px; bottom: -2px; }
+    /* HIDE ALL. One button OUTSIDE everything it hides (it is the way back), in the
+       bottom-right corner with ? beside it (spec 4.1: bottom 16 / right 24, a 12 px gap; 8 / 16
+       on a phone). Hidden, it says so in words, "Show controls": the label flips with its name,
+       and it is still the 44 px target. */
     .sw-hide-all {
-      position: absolute; z-index: 5; right: 14px;
-      bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
+      position: absolute; z-index: 5; right: 24px;
+      bottom: calc(16px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
     }
+    .sw-root.sw-compact .sw-hide-all { right: 16px; bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
+    .sw-hide-label {
+      position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+    }
+    .sw-root.sw-chrome-hidden .sw-hide-all { width: auto; padding: 0 16px 0 12px; border-radius: 22px; }
+    .sw-root.sw-chrome-hidden .sw-hide-label { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
     /* A narrow root parks the strip bottom-left at full width; it yields the corner. */
     .sw-root.sw-narrow .sw-controls { max-width: calc(100% - 76px); }
     /* Hidden = the controls, not the legend: the colour key stays with the book
        rail on the canvas (Corbin, 2026-09-11: "keep the web legend … just hide
        the interactable UI"). */
     .sw-root.sw-chrome-hidden :is(.sw-topbar, .sw-controls, .sw-tip) { display: none; }
-    .sw-root.sw-chrome-hidden .sw-hide-all { border-color: transparent; opacity: 0.55; }
-    .sw-root.sw-chrome-hidden .sw-hide-all svg { width: 14px; height: 14px; }
     /* r2: one pill per zoomed rail, sitting just inside its rail (the rail's
        y is published by the personal draw as --sw-rail-top / --sw-rail-bottom) */
-    .sw-rail-reset { position: absolute; left: 16px; z-index: 4; min-height: 36px; padding: 0 12px; }
+    .sw-rail-reset { position: absolute; left: 16px; z-index: 4; min-height: 44px; padding: 0 12px; }
     .sw-rail-reset-top { top: calc(var(--sw-rail-top, 96px) + 8px); }
-    .sw-rail-reset-bottom { top: calc(var(--sw-rail-bottom, 60vh) - 44px); }
+    .sw-rail-reset-bottom { top: calc(var(--sw-rail-bottom, 60vh) - 52px); }
     .sw-root.sw-chrome-hidden .sw-rail-reset { display: none; }
-    .sw-seg { display: inline-flex; background: rgba(0, 0, 0, 0.5); border: 1px solid var(--gold-border); border-radius: 999px; overflow: hidden; }
+    .sw-seg { display: inline-flex; background: var(--sw-control-fill); border: 1px solid var(--sw-control-border); border-radius: 6px; }
     .sw-seg-btn {
-      min-height: 44px; padding: 0 14px; background: transparent; border: 0;
-      color: var(--cream-dim); font-family: var(--font-cinzel);
-      font-size: var(--fsc-11); letter-spacing: 0.09em; text-transform: uppercase;
+      position: relative; box-sizing: border-box; min-height: 38px; padding: 0 14px;
+      background: transparent; border: 1px solid transparent; border-radius: 5px;
+      color: var(--sw-text); font-family: var(--sw-font); font-size: var(--fsc-16); line-height: 1;
       cursor: pointer; transition: var(--transition);
     }
-    .sw-seg-btn.is-on { background: var(--gold-faint); color: var(--gold-bright); }
-    .sw-seg-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
-    .sw-select-wrap { display: inline-flex; align-items: center; }
+    .sw-seg-btn::after { content: ''; position: absolute; left: 0; right: 0; top: -4px; bottom: -4px; }
+    .sw-seg-btn.is-on { background: var(--sw-active-fill); color: var(--sw-gold); border-color: var(--sw-active-border); }
+    .sw-seg-btn:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -2px; }
+    .sw-root.sw-compact .sw-seg-btn { min-height: 34px; font-size: var(--fsc-15); }
+    .sw-root.sw-compact .sw-seg-btn::after { top: -6px; bottom: -6px; }
+    /* THE DENSITY (Q6). The closed control reads the density's name and a chevron (the face);
+       the native select lies over it, transparent, so the list it opens names each density
+       with its count and one line ("Famous · 63,418, the full classic chart"), and the keyboard
+       and a screen reader get the real control. */
+    .sw-select-wrap { position: relative; display: inline-flex; align-items: center; }
     .sw-select {
-      min-height: 44px; padding: 0 28px 0 13px; appearance: auto;
-      background: rgba(0, 0, 0, 0.5); color: var(--cream-dim); border: 1px solid var(--gold-border);
-      border-radius: 999px; font-family: var(--font-cinzel); font-size: var(--fsc-11);
-      letter-spacing: 0.07em; text-transform: uppercase; cursor: pointer;
+      position: absolute; z-index: 1; left: 0; top: -2px; width: 100%; height: calc(100% + 4px);
+      margin: 0; padding: 0; opacity: 0; appearance: none; border: 0; border-radius: 6px;
+      background: var(--sw-control-fill); color: var(--sw-text);
+      font-family: var(--sw-font); font-size: var(--fsc-16); cursor: pointer;
     }
-    .sw-select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+    .sw-select option { background: var(--sw-panel); color: var(--sw-text); }
+    .sw-select-face {
+      display: inline-flex; align-items: center; gap: 8px; box-sizing: border-box;
+      min-height: 40px; padding: 0 10px 0 14px; pointer-events: none;
+      background: var(--sw-control-fill); color: var(--sw-text);
+      border: 1px solid var(--sw-control-border); border-radius: 6px;
+      font-family: var(--sw-font); font-size: var(--fsc-16); line-height: 1;
+    }
+    .sw-select-face svg { flex: none; display: block; color: var(--sw-text-meta); }
+    .sw-select-wrap:hover .sw-select-face { border-color: var(--sw-control-border-hover); }
+    .sw-select:focus-visible + .sw-select-face { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
+    .sw-root.sw-compact .sw-select-face { min-height: 36px; font-size: var(--fsc-15); }
 
+    /* The loader and the load error paint on the canvas's black in both themes (Q4); the
+       topbar (z 6) stays above the loader, so Back is there while the web is woven (item 24). */
     .sw-loading, .sw-fallback {
       position: absolute; inset: 0; z-index: 5;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 14px; padding: 0 28px; text-align: center;
-      color: var(--cream-muted); font-size: var(--fs-15); background: var(--bg);
+      font-family: var(--sw-font); color: var(--sw-text-meta); font-size: var(--fs-16); background: var(--sw-canvas);
     }
-    .sw-fallback-title { color: var(--cream-dim); font-size: var(--fs-20); font-family: var(--font-cinzel); }
-    .sw-fallback-body { max-width: 34em; line-height: 1.6; }
+    .sw-fallback-title { color: var(--sw-title); font-size: var(--fs-24); font-family: var(--sw-font); }
+    .sw-fallback-body { max-width: 34em; line-height: 1.6; color: var(--sw-text-body); }
+    .sw-fallback-detail { max-width: 34em; font-size: var(--fs-14); color: var(--sw-text-muted); }
+    .sw-fallback-back { position: absolute; left: 24px; top: calc(var(--sw-chrome-top) + var(--sw-topbar-pad)); }
 
     /* ── Scripture Web: the go-to (the navigation stream, w3; spec 4.5, r3-04) ──
        The box floats over the canvas area, over every other layer of the web
@@ -8000,7 +8043,7 @@
 .swf-step-label[aria-expanded="true"]::after { content: '\25B4'; }
 .swf-step-label:focus-visible, .swf-picker-book:focus-visible, .swf-picker-ch:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .swf-picker { margin-top: 10px; padding: 12px 14px 14px; border: 1px solid var(--gold-border); border-radius: 14px; background: var(--bg3); }
-.swf-picker-cap { display: block; margin: 2px 0 6px; font-family: var(--font-cinzel); font-size: var(--fs-11); letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-dim); }
+.swf-picker-cap { display: block; margin: 2px 0 6px; font-family: var(--font-cinzel); font-size: var(--fs-12); letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-dim); }
 .swf-picker-grid + .swf-picker-cap, .swf-picker-book + .swf-picker-cap { margin-top: 14px; }
 .swf-picker-book { width: 100%; min-height: 48px; padding: 0 14px; border: 1px solid var(--gold-border); border-radius: 12px; background: var(--bg); color: var(--cream); font-family: var(--font-body); font-size: var(--fs-18); }
 .swf-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 7px; max-height: 262px; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--gold-border) transparent; }
@@ -8030,7 +8073,7 @@
     }
     .swf-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
     .swf-ref { font-size: var(--fs-20); font-weight: 600; color: var(--gold); }
-    .swf-tier { flex: 0 0 auto; font-family: var(--font-cinzel); font-size: var(--fs-11); letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-dim); }
+    .swf-tier { flex: 0 0 auto; font-family: var(--font-cinzel); font-size: var(--fs-12); letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-dim); }
     .swf-snip { display: block; margin-top: 4px; font-size: var(--fs-16); color: var(--cream-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .swf-empty { padding: 18px 0; color: var(--cream-muted); font-size: var(--fs-16); }
     .swf-back {
@@ -8039,22 +8082,24 @@
     }
     .swf-back:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
+    /* The hover chip, in the panel's ink and pinned dark like it (Q4: never cream over the
+       black canvas); its overline is the panel's tracked caps, never under 12 px (item 47). */
     .sw-tip {
       position: absolute; z-index: 6; pointer-events: none; max-width: 300px;
-      background: var(--bg3); border: 1px solid var(--gold-border);
-      border-radius: var(--radius); padding: 11px 13px;
-      font-family: var(--font-body); color: var(--cream-dim);
+      background: var(--sw-panel); border: 1px solid var(--sw-panel-edge);
+      border-radius: 6px; padding: 11px 13px;
+      font-family: var(--sw-font); color: var(--sw-text-body);
     }
     .sw-tip-eyebrow {
-      font-family: var(--font-cinzel); font-size: var(--fsc-10); color: var(--gold-dim);
-      letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 6px;
+      font-size: var(--fsc-12); color: var(--sw-overline);
+      letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 6px;
     }
-    .sw-tip-ref { font-size: var(--fs-16); color: var(--gold-bright); }
-    .sw-tip-ref-alt { color: var(--link-blue); }
-    .sw-tip-arrow { color: var(--gold-dim); font-size: var(--fs-13); margin: 2px 0; }
+    .sw-tip-ref { font-size: var(--fs-16); color: var(--sw-gold); }
+    .sw-tip-ref-alt { color: var(--sw-title); }
+    .sw-tip-arrow { color: var(--sw-text-muted); font-size: var(--fs-13); margin: 2px 0; }
     .sw-tip-meta {
-      margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--border);
-      color: var(--cream-muted); font-size: var(--fs-13);
+      margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--sw-hairline);
+      color: var(--sw-text-meta); font-size: var(--fs-14);
     }
 
     /* ═══ THE DOCKED PANEL (w3; spec section 3 "Horizontal: the panel open", spec 4.6) ═══
@@ -8294,20 +8339,12 @@
     .sw-root.sw-collapse.sw-menu-open .sw-menu .sw-seg { align-self: stretch; }
     .sw-root.sw-collapse.sw-menu-open .sw-menu .sw-seg-btn { flex: 1 1 0; }
     .sw-more-btn svg { display: block; }
-    /* Follow to <the far foot> — the line stays chosen, the camera goes to its other end */
-    .sw-sheet-follow {
-      display: inline-flex; align-items: center; min-height: 36px; margin-top: 8px; padding: 0 12px;
-      background: transparent; border: 1px solid var(--gold-border); border-radius: 999px;
-      font-family: var(--font-cinzel); font-size: var(--fsc-10); letter-spacing: 0.1em;
-      text-transform: uppercase; color: var(--gold); cursor: pointer;
-    }
-    .sw-sheet-follow:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
     .sw-legend {
       position: absolute; z-index: 4; left: 14px;
       bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
       display: flex; flex-wrap: wrap; gap: 4px 12px; max-width: 70vw;
-      font-size: var(--fsc-10); color: var(--cream-muted); letter-spacing: 0.04em;
+      font-size: var(--fsc-14); color: var(--cream-muted); letter-spacing: 0.04em;
       pointer-events: none;
     }
     .sw-key { display: inline-flex; align-items: center; gap: 5px; }
@@ -8373,12 +8410,14 @@
        phoneLand-1-fit-l14lightcard-*). */
     .sw-guide-close { display: flex; margin: 0 0 0 auto; }
     .sw-guide-btn {
-      /* beside the hide-all button, on its left: above it the button sat on
-         the ruler's last chapter numeral (the l14 sky picture) */
-      position: absolute; z-index: 5; right: 76px;
-      bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
-      font-family: var(--font-body); font-weight: 600;
+      /* beside the hide-all button, on its left (44 + a 12 px gap; 40 + 12 on a phone): above
+         it the button sat on the ruler's last chapter numeral (the l14 sky picture). Its ink is
+         the web's own, so it reads in the light theme too (item 18, crop-pc-light-qbtn). */
+      position: absolute; z-index: 5; right: 80px;
+      bottom: calc(16px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
+      font-size: var(--fsc-20); font-weight: 500;
     }
+    .sw-root.sw-compact .sw-guide-btn { right: 68px; bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); font-size: var(--fsc-18); }
     .sw-root.sw-chrome-hidden .sw-guide-btn { display: none; }
     /* a narrow root parks the controls bottom-left and keeps the right 76 px
        column free: the ? stacks above hide-all there instead */
@@ -8460,7 +8499,7 @@
     }
     .sw-root.sw-rotated .sw-btn { padding-left: 10px; padding-right: 10px; }
     .sw-root.sw-rotated .sw-seg-btn { padding-left: 10px; padding-right: 10px; }
-    .sw-root.sw-rotated .sw-select { padding-left: 10px; padding-right: 20px; }
+    .sw-root.sw-rotated .sw-select-face { padding-left: 10px; padding-right: 8px; }
     /* The rotated root is `width: 100vh; height: 100vw` (the CSS rotation
        swaps the axes). The docked panel needs no rotated cap: it is top: 0 /
        bottom: 0 of that root, its own height whatever the physical viewport
@@ -8505,11 +8544,6 @@
       overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
     }
 
-    /* Transient control explanation under the title. */
-    .sw-hint {
-      margin: 4px 0 0; font-size: var(--fsc-11); color: var(--gold-dim);
-      letter-spacing: 0.03em; font-style: italic; max-width: 46%;
-    }
     .sw-fallback-row { display: flex; gap: 10px; }
 
       /* ══════════════════════════════════════════════════════════════════

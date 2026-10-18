@@ -228,7 +228,9 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
   it('A1 — says so through .sw-live instead of doing nothing silently', async () => {
     const { container } = await mount();
     for (let i = 0; i < 40; i++) await press('+');
-    expect(container.querySelector('.sw-live').textContent).toBe('Zoomed all the way in');
+    // the words, trimmed: a repeat of the same words toggles a trailing no-break space so the
+    // region is read again (w3 panel step 2, sw-chrome-header.test.jsx)
+    expect(container.querySelector('.sw-live').textContent.trim()).toBe('Zoomed all the way in');
   });
 
   /* ── the density is the reader's choice at every zoom (w-sw-zoom-pan, item 2) ──

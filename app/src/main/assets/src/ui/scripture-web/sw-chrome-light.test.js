@@ -44,6 +44,7 @@ function mountChrome() {
       <button class="sw-btn">Reset</button>
     </div>
     <button class="sw-btn sw-btn-icon sw-hide-all">Hide</button>
+    <button class="sw-btn sw-btn-icon sw-guide-btn">?</button>
     <div class="sw-legend"><span class="sw-key">your links</span></div>`;
   document.body.appendChild(root);
   return root;
@@ -58,6 +59,8 @@ const SITES = {
   'segment on': '.sw-seg-btn.is-on',
   'select': '.sw-select',
   'hide-all': '.sw-hide-all',
+  // the ? read nearly invisible in the light theme (digest item 18, crop-pc-light-qbtn)
+  'guide ?': '.sw-guide-btn',
   'legend': '.sw-legend',
 };
 
@@ -99,12 +102,14 @@ describe('the Scripture Web chrome reads on its black canvas in the light theme 
     expect(USE_SETTINGS).toMatch(/document\.body\.classList\.toggle\("light",\s*theme === "light"\)/);
   });
 
-  // The calmer dark (2026-09-25) moved --ink-cream-dim from #f2ede5 (18.02:1) to #e0d9cc; the pill follows.
-  it('calibration: in the dark theme a pill resolves to the shared cream ink (14.97:1)', () => {
+  // The calmer dark (2026-09-25) moved --ink-cream-dim from #f2ede5 (18.02:1) to #e0d9cc; spec 4.1
+  // (w3 panel step 2) moved the controls onto the web's own control ink, sw-ink.js `text` #E9EEEF,
+  // the --sw-text token panel-css.test.js holds to its row. The calibration follows the value.
+  it('calibration: in the dark theme a pill resolves to the web’s control ink (17.94:1)', () => {
     const root = mountChrome();
     const ink = inkOf(root.querySelector(SITES['pill .sw-btn']));
-    expect(ink).toEqual([0xe0, 0xd9, 0xcc]);
-    expect(onBlack(ink)).toBeCloseTo(14.97, 1);
+    expect(ink).toEqual([0xe9, 0xee, 0xef]);
+    expect(onBlack(ink)).toBeCloseTo(17.94, 1);
   });
 
   /* The chrome rule and :root's dark set spelled the same seven literals twice (chrome-light,

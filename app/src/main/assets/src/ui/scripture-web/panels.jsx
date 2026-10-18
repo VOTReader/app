@@ -100,7 +100,7 @@ export function HowToReadGuide({ onClose }) {
         <li>Drag the web down to look higher, where the long threads cross. The ruler on the left names the height; the bar on the right jumps.</li>
         <li><strong>Reset</strong> brings you home.</li>
       </ul>
-      <button type="button" className="sw-sheet-follow sw-guide-close" onClick={onClose}>Got it</button>
+      <button type="button" className="sw-btn sw-guide-close" onClick={onClose}>Got it</button>
     </div>
   );
 }
