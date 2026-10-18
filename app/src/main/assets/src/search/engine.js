@@ -29,7 +29,7 @@ import { parseReference, fuzzyBookSuggest, levenshtein } from './ref-parser.js';
 import { parseTextQuery, applyCorrections } from './query-parse.js';
 import { expandQueryTerms } from './synonyms.js';
 import { wordForms } from './word-forms.js';
-import { kjvEncode } from './tokenize.js';
+import { kjvEncode, negationOf } from './tokenize.js';
 import { snippet, snippetAt, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
 import {
   KIND_BOOST, coverageMultiplier, popcount, PHRASE_BOOST, SYNONYM_DEMOTION,
@@ -92,11 +92,12 @@ function hasTokenRun(toks, run) {
    won: "a virgin shall conceive" ranked Isaiah 7:14 45th ("virgin shall conceive":
    1st), "The Lord's Table" #8, "lord's supper" put four topics highlighting
    "skillful" and "smoke" above 1 Cor 11:20. Only a word of three letters or more
-   that is not a stop word reaches forward now; the rest match whole words. */
+   that is not a stop word reaches forward now; the rest match whole words. A number
+   is whole too (search200 B2): "100" is not "1000", "144" not "144000". */
 /** @param {string} term */
 function prefixable(term) {
   const stop = searchData().STOP_WORDS_TRIMMED;
-  return term.length >= 3 && !(stop && stop.has(term));
+  return term.length >= 3 && !(stop && stop.has(term)) && !/\d/.test(term);
 }
 /** A typed term whose words are all stop words ("the", "me." with its period). */
 function isStopTerm(term) {
@@ -114,23 +115,22 @@ function wantedQuery(q) {
   return String(q).split(/\s+/).filter((t) => !(t.length > 1 && t[0] === '-')).map((t) => (t.length > 1 && t[0] === '+' ? t.slice(1) : t)).join(' ');
 }
 /* A negative contraction is its two words, as the text mostly spells them: "don't
-   look back" found its letter at #119, "do not look back" at #1. */
-const NT_BASE = { wo: 'will', sha: 'shall', ai: 'am' };   // the base the pattern leaves: wo|n't, sha|n't
+   look back" found its letter at #119, "do not look back" at #1. Typed without its
+   apostrophe ("dont") it is no typo: the corrector read "cant" as "chant", "wasnt" as
+   "want", "shouldnt" as "should", "arent" as "parent" (sr11 t216). kjvEncode reads it as
+   the same two words (search200 B2, tokenize.js), and a text's own "don't" as "do not",
+   so it is heard and never corrected; the query keeps it as typed (spelled out here, a
+   sealed paraphrase lost its verse, as in sr11). */
+/** The words of a contraction's base, its case kept where the base is the word ("Don't" is "Do not"). @param {string} base */
+const notWords = (base) => {
+  const b = base.toLowerCase();
+  return negationOf(b) === b + ' not' ? base + ' not' : negationOf(b);
+};
 /** @param {string} q */
 export function expandContractions(q) {
-  return String(q).replace(/\b([a-z]+)n['\u2019]t\b/gi, (m, base) => {
-    const b = base.toLowerCase();
-    if (b === 'ca') return 'cannot';
-    return (NT_BASE[b] || base) + ' not';
-  });
+  return String(q)
+    .replace(/\b([a-z]+)n['\u2019]t\b/gi, (m, base) => notWords(base));
 }
-/* A negative contraction typed without its apostrophe ("dont") is no typo (sr11 t216): it
-   may be read as the word a text's own contraction leaves ("don't" -> don + t), never as
-   another word. The corrector read "cant" as "chant", "wasnt" as "want", "shouldnt" as
-   "should", "arent" as "parent", said so ("Showing results for chant"), and the meaning
-   model was asked the same. Read as two words instead it lost a sealed query whose text
-   contracts. "wont" is no such word here: the KJV's ("the ox was wont to gore"). */
-const NT_BARE = /^(ca|do|does|did|is|are|was|were|has|have|had|could|would|should|must|need|sha|ai)nt$/;
 
 /**
  * One unit's BM25 search, the body and the title scored apart and summed per text:
@@ -1674,7 +1674,6 @@ async function search(query, options) {
     try { fixed = searchCorrected(unit.term, unitOpts(unit), keyword); } catch { continue; }
     if (!fixed.res.length) continue;
     const typed = kjvEncode(unit.term);
-    if (typed.length === 1 && NT_BARE.test(typed[0]) && fixed.to !== typed[0].slice(0, -1)) continue;
     accumulate(unit, fixed.res);
     if (fixed.to && typed.length === 1 && typed[0] !== fixed.to) corrections.push({ from: typed[0], to: fixed.to });
   }
