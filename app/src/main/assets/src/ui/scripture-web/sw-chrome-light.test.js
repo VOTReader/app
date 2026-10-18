@@ -40,7 +40,7 @@ function mountChrome() {
     <div class="sw-controls">
       <div class="sw-seg"><button class="sw-seg-btn is-on">Scripture</button><button class="sw-seg-btn">My web</button></div>
       <select class="sw-select"><option>Famous</option></select>
-      <button class="sw-btn sw-toggle is-on">Corpus context</button>
+      <button class="sw-btn sw-toggle is-on">Timothy’s notes</button>
       <button class="sw-btn">Reset</button>
     </div>
     <button class="sw-btn sw-btn-icon sw-hide-all">Hide</button>
@@ -53,7 +53,7 @@ const SITES = {
   'title h1': '.sw-title h1',
   'subtitle': '.sw-title p',
   'pill .sw-btn': '.sw-btn:not(.is-on):not(.sw-hide-all)',
-  'pill .sw-btn.is-on (Corpus context rests ON)': '.sw-btn.is-on',
+  'pill .sw-btn.is-on (Timothy’s notes rests ON)': '.sw-btn.is-on',
   'segment off': '.sw-seg-btn:not(.is-on)',
   'segment on': '.sw-seg-btn.is-on',
   'select': '.sw-select',
