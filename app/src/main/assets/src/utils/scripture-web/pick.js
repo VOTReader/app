@@ -23,6 +23,12 @@
    read the frame's visible set (frame-set.frameSet, E1), the set the
    renderer draws, so a thread whose body never reaches the frame is
    neither drawn nor tapped, labelled or counted.
+
+   One exception, and it is the reader's own choice (A1, w2 digest item 7):
+   while a thread or a range is chosen, the rest recede to the tap context
+   and step back as targets too (focusedPickFilter). A tap beside the chosen
+   line then lands on what reads as empty sky, and empty sky clears the
+   choice; once it clears, every thread is a target again.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
@@ -50,15 +56,53 @@ export function pickArc(g, cam, view, px, py, tol) {
   return pickArcs(g, cam, view, px, py, tol, 1)[0] || null;
 }
 
+/** The lit sets already turned into lookups, by the (never mutated) array focus-state hands over. */
+const LIT_SETS = new WeakMap();
+function litSetOf(lit) {
+  if (!lit || !lit.length) return null;
+  let set = LIT_SETS.get(lit);
+  if (!set) { set = new Set(lit); LIT_SETS.set(lit, set); }
+  return set;
+}
+
+/**
+ * Which threads are targets while something is chosen (A1): the ones the shader keeps lit
+ * (web-renderer.js, its focus rule) - the chosen thread; a thread with a foot in the chosen range,
+ * or with a chosen group inside it, a foot in each; and a thread in the lit set (go-to's fan, verse
+ * mode). Null when nothing is chosen (no focusArc, no focusRange): then every thread is a target.
+ * A chosen prophecy pair does not focus the shader (focusArc is -1 for it), so it filters nothing.
+ * @param {{ focusArc?: number, focusRange?: (number[]|null), focusRange2?: (number[]|null),
+ *   lit?: (ArrayLike<number>|null) }} view
+ * @returns {((index: number, from: number, to: number) => boolean) | null}
+ */
+export function focusedPickFilter(view) {
+  const arc = view.focusArc != null ? view.focusArc : -1;
+  const r = view.focusRange && view.focusRange[0] <= view.focusRange[1] ? view.focusRange : null;
+  if (arc < 0 && !r) return null;
+  const r2 = r && view.focusRange2 && view.focusRange2[0] <= view.focusRange2[1] ? view.focusRange2 : null;
+  const lit = litSetOf(view.lit);
+  return (i, from, to) => {
+    if (i === arc) return true;
+    if (lit && lit.has(i)) return true;
+    if (!r) return false;
+    const a1 = from >= r[0] && from <= r[1], b1 = to >= r[0] && to <= r[1];
+    if (!r2) return a1 || b1;
+    const a2 = from >= r2[0] && from <= r2[1], b2 = to >= r2[0] && to <= r2[1];
+    return (a1 && b2) || (b1 && a2);
+  };
+}
+
 /**
  * Nearest arcs to a screen point, retaining a small candidate set so dense
  * crossings can be disambiguated instead of silently choosing one line.
+ * While something is chosen only the lit threads are candidates (focusedPickFilter).
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, y?:number, ppv:number, total:number}} cam
  * @param {{width:number, base:number, ceil:number, squash:number,
  *   localize:number, density:import('./decode.js').Density,
- *   focusArc?:number, focusRange?:(number[]|null)}} view
+ *   focusArc?:number, focusRange?:(number[]|null), focusRange2?:(number[]|null),
+ *   lit?:(ArrayLike<number>|null)}} view
  * @param {number} px
  * @param {number} py
  * @param {number} tol
@@ -81,11 +125,13 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
   const lo = verseAtPoint - verseTolerance, hi = verseAtPoint + verseTolerance;
   // the frame's visible set (E1): a thread the renderer did not draw is not there to tap
   const set = frameSet(g, cam, view);
+  const target = focusedPickFilter(view);
 
   for (const bucket of g.buckets) {
     walkDrawnRuns(bucket, bucketDrawCount(bucket, density), chunkSize, lo, hi, (start, end) => {
       for (let i = start; i < end; i++) {
         if (!inFrame(set, i)) continue;
+        if (target && !target(i, g.from[i], g.to[i])) continue;
         // the feet as drawn: in their verses' cells, by rank (geometry.footX)
         const x0 = footX(cam, width, g.from[i], fanA[i]);
         const x1 = footX(cam, width, g.to[i], fanB[i]);
