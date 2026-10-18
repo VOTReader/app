@@ -190,6 +190,15 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     if (!surpriseAnchor || surpriseAnchor.type !== "excerpt") return;
     // Made for another unit (the follower or the arrows moved on; the anchor did not): not ours.
     if (surpriseAnchor.letterId && surpriseAnchor.letterId !== letter.id) return;
+    // A title named (search200 B5, the S22 look): the landing is the letter's top, where its title is. No
+    // block is landed on, pulsed or sought, though the excerpt (the text's first words) would find one.
+    if (surpriseAnchor.top) {
+      const topTimer = setTimeout(() => {
+        const sc = mainRef.current && mainRef.current.closest(".screen-scroll");
+        if (sc && typeof sc.scrollTo === "function") sc.scrollTo({ top: 0, behavior: scrollBehavior() });
+      }, 150);
+      return () => clearTimeout(topTimer);
+    }
     // The excerpt comes from the search index's flattened text (a search hit's
     // matched words, matchExcerpt). Its HEAD is what must sit inside one block:
     // it starts at the matched word and may run past the block's end, so

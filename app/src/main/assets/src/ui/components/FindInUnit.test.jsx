@@ -125,6 +125,33 @@ describe('FindInUnit', () => {
     expect(marked('vot-find-current')).toEqual(['flood', 'flood']);
   });
 
+  /* A title named opens at the title (search200 B5, the S22 look): the landing is the unit's top, so no place is the
+     one landed on and none is scrolled to once the page settles; the first › goes to the first place. */
+  it('a landing at the top marks every place, none current, scrolls to none; › starts at the first', () => {
+    vi.useFakeTimers();
+    try {
+      render(<Host anchor={anchor('I shall bring upon them a flooding rain, a great', { top: true })} />);
+      act(() => { vi.advanceTimersByTime(1500); });
+      expect(pill().textContent).toBe('flood0 of 3‹›×');
+      expect(marked('vot-find-current')).toEqual([]);
+      expect(marked('vot-find')).toEqual(['flooding', 'flood', 'flood', 'flood']);
+      expect(Element.prototype.scrollTo).not.toHaveBeenCalled();
+      fireEvent.click(pill().querySelector('[aria-label="Next place"]'));
+      expect(pill().textContent).toContain('1 of 3');
+      expect(marked('vot-find-current')).toEqual(['flooding']);
+      fireEvent.click(pill().querySelector('[aria-label="Previous place"]'));
+      expect(pill().textContent).toContain('3 of 3');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('...and from the top, ‹ goes to the last place', () => {
+    render(<Host anchor={anchor('I shall bring upon them a flooding rain, a great', { top: true })} />);
+    fireEvent.click(pill().querySelector('[aria-label="Previous place"]'));
+    expect(pill().textContent).toContain('3 of 3');
+  });
+
   it('› and ‹ step through the places, wrapping, each step one scroll write', () => {
     render(<Host anchor={anchor('flooding rain, a great deluge.')} />);
     const next = pill().querySelector('[aria-label="Next place"]');

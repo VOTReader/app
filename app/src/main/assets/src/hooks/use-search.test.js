@@ -841,6 +841,30 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
     expect(props.setLetterId).toHaveBeenCalledWith('vengeance');
   });
 
+  /* A title named opens at the title (search200 B5, the S22 look): the engine opens a text found by its title at its
+     start (placeStart 0), and the landing says so, so the reader opens at the top, not at a find place below it. */
+  it('a landing at the text\'s start (a title named) opens the unit at its top', () => {
+    const text = 'Beloved, hear Me. Much later: God speaks about the Sabbath.';
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect(
+      { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'vengeance', text }, terms: ['sabbath'], placeStart: 0 },
+      ['god', 'speaks', 'sabbath'],
+    ); });
+    expect(calls, 'the snippet window is not consulted').toEqual([]);
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(expect.objectContaining({ type: 'excerpt', text: text.slice(0, 48), top: true, letterId: 'vengeance' }));
+  });
+
+  it('a landing anywhere else is no top landing', () => {
+    const text = 'Beloved, hear Me. Much later: God speaks about the Sabbath.';
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect(
+      { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'vengeance', text }, terms: ['sabbath'], placeStart: text.indexOf('God') },
+      ['sabbath'],
+    ); });
+    const seen = props.setSurpriseAnchor.mock.calls;
+    expect(seen[seen.length - 1][0].top).toBeUndefined();
+  });
+
   it('a place start outside the text falls back to the query\'s own excerpt', () => {
     const { result, props } = setup();
     act(() => { result.current.handleSearchSelect(

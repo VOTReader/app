@@ -74,6 +74,15 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   React.useEffect(() => {
     if (!surpriseAnchor || surpriseAnchor.type !== 'excerpt') return;
     if (surpriseAnchor.letterId && surpriseAnchor.letterId !== entry.id) return;   // made for another entry: not ours
+    // A title named (search200 B5, the S22 look): the landing is the entry's top, where its title is. No
+    // paragraph is landed on, pulsed or sought, though the excerpt (the text's first words) would find one.
+    if (surpriseAnchor.top) {
+      const topTimer = setTimeout(() => {
+        const sc = wtlbMainRef.current && wtlbMainRef.current.closest('.screen-scroll');
+        if (sc && typeof sc.scrollTo === 'function') sc.scrollTo({ top: 0, behavior: scrollBehavior() });
+      }, 150);
+      return () => clearTimeout(topTimer);
+    }
     const squash = (s) => String(s || '').replace(/\{\{[^}]+\}\}/g, ' ').replace(/\s+/g, ' ').trim();
     // (excerptLanding: head then TAIL at every length — the engine's cut can
     // open with the previous paragraph's last words, read-along find 2026-09-22.)

@@ -299,7 +299,8 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
         if (ranges.length) places.push({ start: p.start, span: p.span, ranges });
       }
       placesRef.current = places;
-      if (first) { first = false; curRef.current = placeAt(places, locate(flat, anchor.text)); }
+      // A landing at the unit's top (a title named, search200 B5) is on no place: none is current until a step.
+      if (first) { first = false; curRef.current = anchor.top ? -1 : placeAt(places, locate(flat, anchor.text)); }
       else if (curRef.current >= places.length) curRef.current = Math.max(0, places.length - 1);
       setCount(places.length);
       setCur(curRef.current);
@@ -319,8 +320,9 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
     const scroller = root.closest('.screen-scroll');
     const handsOn = () => clearInterval(settle);
     const HANDS = ['pointerdown', 'touchstart', 'wheel', 'keydown'];
-    for (const ev of HANDS) document.addEventListener(ev, handsOn, { capture: true, passive: true });
-    settle = setInterval(() => {
+    // A landing at the top has no place to bring into view: the page stays at the title.
+    if (!anchor.top) for (const ev of HANDS) document.addEventListener(ev, handsOn, { capture: true, passive: true });
+    if (!anchor.top) settle = setInterval(() => {
       tries++;
       const busy = document.body.classList.contains('scroll-restoring') || document.body.classList.contains('autoscroll-running');
       const top = scroller ? scroller.scrollTop : 0;
@@ -355,7 +357,9 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
   const go = (/** @type {number} */ delta) => {
     const places = placesRef.current;
     if (!places.length || !mainRef.current) return;
-    curRef.current = (curRef.current + delta + places.length) % places.length;
+    // from the top (no place current), › goes to the first place and ‹ to the last
+    const from = curRef.current < 0 ? (delta > 0 ? -1 : 0) : curRef.current;
+    curRef.current = (from + delta + places.length) % places.length;
     setCur(curRef.current);
     mark(places, curRef.current);
     reveal(mainRef.current, places[curRef.current]);
@@ -366,8 +370,8 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
     <div className="find-pill" role="toolbar" aria-label={'Search words in this ' + noun}>
       <span className="find-pill-word">{find.label || find.terms[0]}</span>
       <span className="find-pill-count" role="status" aria-live="polite">{(cur + 1) + ' of ' + count}</span>
-      <button type="button" className="find-pill-btn" aria-label="Previous place" disabled={count < 2} onClick={() => go(-1)}>‹</button>
-      <button type="button" className="find-pill-btn" aria-label="Next place" disabled={count < 2} onClick={() => go(1)}>›</button>
+      <button type="button" className="find-pill-btn" aria-label="Previous place" disabled={count < 2 && cur >= 0} onClick={() => go(-1)}>‹</button>
+      <button type="button" className="find-pill-btn" aria-label="Next place" disabled={count < 2 && cur >= 0} onClick={() => go(1)}>›</button>
       <button type="button" className="find-pill-btn find-pill-close" aria-label="Close" onClick={() => setClosed(true)}>×</button>
     </div>,
     document.body

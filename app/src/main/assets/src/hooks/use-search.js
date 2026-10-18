@@ -413,8 +413,12 @@ export function useSearch({
     const find = own.length || hit.length ? { terms: own.concat(hit), label: String(query || '').trim() || own.concat(hit)[0] } : null;
     // A tapped PLACE (SrchCard's "more places" list) names where in the text it
     // starts, a word start: the landing reads the same 48 chars matchExcerpt cuts.
+    // A landing at the text's very start is the engine saying a TITLE was named
+    // (search200 B5, the S22 look): `top` opens the unit at its top, where the
+    // title is, and the find pill counts the places without landing on one.
     if (entry && typeof entry.placeStart === 'number' && doc && doc.text && entry.placeStart >= 0 && entry.placeStart < doc.text.length) {
-      return { type: 'excerpt', text: doc.text.slice(entry.placeStart, entry.placeStart + 48), letterId: letterId || null, find };
+      const a = { type: 'excerpt', text: doc.text.slice(entry.placeStart, entry.placeStart + 48), letterId: letterId || null, find };
+      return entry.placeStart === 0 ? { ...a, top: true } : a;
     }
     const sm = /** @type {any} */ (window).VotSearchMini;
     if (!sm || typeof sm.matchExcerpt !== 'function' || !doc || !doc.text) return null;
