@@ -51,6 +51,27 @@ function pickEngine() {
    "volume 7 letter 99" the same. The numbered collections, in the site's order. */
 const NUMBERED_LETTERS = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'timothy', 'flock', 'rebuke'];
 
+/* The parses that answer with a card of their own (directEntries). */
+const NAV_KINDS = ['ref-bible', 'named-passage', 'ref-book', 'ref-letter'];
+
+/* What a held tab is called in a sentence: "No results for “x” in the Scriptures." */
+const TAB_NAME = /** @type {Record<string, string>} */ ({ scriptures: 'the Scriptures', volumes: 'the Volumes' });
+
+/**
+ * A scope the tab cannot reach (search200 B2): a book of the Bible under the Volumes tab, a collection of the
+ * Volumes under the Scriptures tab. Luke under Volumes said "No results in Luke". The Matthew study is a book and
+ * a collection at once, so it is never one. Pure.
+ * @param {any} scope  the search scope ({kind:'book', bookId} | {kind:'volume', volumeId})
+ * @param {string} corpus  the tab
+ * @returns {{ home: string, tab: string } | null}
+ */
+export function scopeConflict(scope, corpus) {
+  if (!scope) return null;
+  if (corpus === 'volumes' && scope.bookId && scope.bookId !== 'matthew') return { home: 'the Scriptures', tab: 'Volumes' };
+  if (corpus === 'scriptures' && scope.volumeId && String(scope.volumeId).indexOf('matthew') !== 0) return { home: 'the Volumes', tab: 'Scriptures' };
+  return null;
+}
+
 /**
  * The cards a letter reference offers, each naming the letter's title: the letter
  * named when its collection holds it; for "letter N" alone, each numbered collection
@@ -354,13 +375,24 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         settings.searchSynonyms !== false,
         /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.STOP_WORDS_TRIMMED,
       );
-      const done = { phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [], stopWordsOnly: !!r.stopWordsOnly, unquoted: r.unquoted || null, meaningLater: !!r.meaningLater };
+      /* `memo`: the search this list came from (search200 B2). The groups are keyed by it, not by the live memo,
+         which a tab or scope change moves at once: keyed live, the groups remounted over the OLD list (long, so
+         closed), and the new list, a lone group, arrived under the same key and stayed closed over a blank screen.
+         `refParsed`: the parse is held to the tab ("john 3:16" under Volumes is words), but a reference answers
+         under any tab, so the card reads the query across all of it (the parse needs no index). */
+      const corpus = settings.searchCorpus || 'all';
+      const E = pickEngine();
+      let refParsed = null;
+      if (corpus !== 'all' && (!r.parsed || r.parsed.kind === 'text') && E && typeof E.parse === 'function') {
+        try { const p = E.parse(q, { corpus: 'all' }); if (p && NAV_KINDS.indexOf(p.kind) >= 0) refParsed = p; } catch { /* words, then */ }
+      }
+      const done = { phase: 'done', memo, parsed: r.parsed, refParsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [], stopWordsOnly: !!r.stopWordsOnly, unquoted: r.unquoted || null, meaningLater: !!r.meaningLater };
       if (!r.error) lastSearch = { memo, allWordsFor, state: done };
       setState(done);
       if (r.meaningLater) rankWithMeaning();
     }).catch((err) => {
       if (stale || quiet) return;
-      setState({ phase: 'done', parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0, capped: [], truncated: false, corrections: [] });
+      setState({ phase: 'done', memo, parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0, capped: [], truncated: false, corrections: [] });
     });
     const rankWithMeaning = () => {
       const E = pickEngine();
@@ -385,6 +417,26 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [query, buildInfo.ready, settings.translation, settings.searchUseStopWords, settings.searchSynonyms, settings.searchCorpus, searchScope, allWordsFor, memo]);
+
+  // The search the list on screen came from (see `done` above): its groups' keys and their memory.
+  const listMemo = state.memo || memo;
+
+  /* A NEW SEARCH LANDS AT THE TOP (search200 B2). Refining a query while scrolled down
+     showed the new list from mid-list ("forgive one another" scrolled to 500, refined to
+     "seventy times": the new list opened at 680). A list from a new search is a screen
+     landing, the one-shot write LetterView makes on its own landing; it yields to
+     scroll-restore, the lease's writer for a list resumed on Back (use-autoscroll.js), and
+     a quiet re-rank or "Show every match" keeps the search, so it keeps the place. */
+  const screenRef = React.useRef(/** @type {HTMLDivElement|null} */ (null));
+  const landedFor = React.useRef(resumed ? memo : '');
+  React.useEffect(() => {
+    const m = state.memo || '';
+    if (!m || m === landedFor.current) return;
+    landedFor.current = m;
+    if (document.body.classList.contains('scroll-restoring')) return;
+    const sc = screenRef.current && screenRef.current.closest('.screen-scroll');
+    if (sc && typeof sc.scrollTo === 'function') sc.scrollTo({ top: 0 });
+  }, [state.memo]);
 
   // Handle command-kind parsed results
   React.useEffect(() => {
@@ -459,22 +511,24 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
 
   /** One list of collections. `view` names the order and the list (each remembers its own open groups);
       `capped`: the list can say a collection holds more than it shows ("400+"), which a close list never does. */
-  const renderGroups = (/** @type {Array<{key: string, items: any[]}>} */ groups, /** @type {string} */ view, /** @type {boolean} */ capped) => (
+  const renderGroups = (/** @type {Array<{key: string, items: any[], more?: boolean}>} */ groups, /** @type {string} */ view, /** @type {boolean} */ capped) => (
     <div className="srch-groups">
       {groups.map((g) => (
         <SrchGroup
-          /* Keyed by the search: narrowed to Scriptures, the one group left
-             opens as a lone group does, not closed as the All list had it.
-             And by the order: each order opens with its own state, and the
-             group remembers each (a group opened under Relevance is open
-             again after a trip to Book order). */
-          key={g.key + '|' + memo + '|' + view}
+          /* Keyed by the search the list came from (state.memo, search200 B2):
+             narrowed to Scriptures, the one group left opens as a lone group
+             does, not closed as the All list had it. And by the order: each
+             order opens with its own state, and the group remembers each (a
+             group opened under Relevance is open again after a trip to Book
+             order). */
+          key={g.key + '|' + listMemo + '|' + view}
           gkey={g.key}
           items={g.items}
+          more={!!g.more}
           capped={capped && cappedGroups.has(g.key)}
           terms={state.terms}
           onSelect={handleSelect}
-          memo={memo}
+          memo={listMemo}
           view={view}
           /* Book order opens every collection with its first ten, so a phone
              draws a few cards per collection, not fifty each. */
@@ -491,38 +545,38 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   );
 
   // Build "direct" fake entries from parsed ref/passage/book (shown at top before results).
-  // Engine-gated: Scriptures corpus shows only bible/book/named-passage refs;
-  // Volumes corpus shows only letter refs. No crossover.
+  // A reference answers under any tab (search200 B2): "john 3:16" typed under Volumes lost
+  // its card, because the engine's parse is held to the tab; `refParsed` is the query read
+  // across all of it, when the engine's own parse found words.
+  const navParsed = state.parsed && NAV_KINDS.indexOf(state.parsed.kind) >= 0 ? state.parsed : (state.refParsed || null);
   const directEntries = React.useMemo(() => {
-    const p = state.parsed;
+    const p = navParsed;
     if (!p) return [];
     const curCorpus = settings.searchCorpus || 'all';
-    const allowBible = curCorpus === 'all' || curCorpus === 'scriptures';
-    const allowLetter = curCorpus === 'all' || curCorpus === 'volumes';
     const out = [];
-    if ((p.kind === 'ref-bible' || p.kind === 'named-passage') && allowBible) {
+    if (p.kind === 'ref-bible' || p.kind === 'named-passage') {
       // A range across chapters names both ends, "John 14:1-16:33" (sweep W32); a chapter range is "Matthew 5-7".
       const lbl = p.bookTitle + ' ' + (p.chapterEnd && p.verseStart
         ? p.chapter + ':' + p.verseStart + '-' + p.chapterEnd + (p.verseEnd ? ':' + p.verseEnd : '')
         : p.chapter + (p.chapterEnd ? '-' + p.chapterEnd : '') + (p.verseStart ? ':' + p.verseStart + (p.verseEnd ? '-' + p.verseEnd : '') : ''));
       out.push({ __direct: true, __corpus: curCorpus, __label: lbl, __sub: p.kind === 'named-passage' ? 'Named passage — open' : 'Open chapter', ref: p });
-    } else if (p.kind === 'ref-letter' && allowLetter) {
+    } else if (p.kind === 'ref-letter') {
       const lr = letterRefCards(p, /** @type {any} */ (window).VotSearchData, window);
       for (const c of lr.cards) out.push({ __direct: true, __corpus: curCorpus, ...c });
-    } else if (p.kind === 'ref-book' && allowBible) {
+    } else if (p.kind === 'ref-book') {
       out.push({ __direct: true, __corpus: curCorpus, __label: p.bookTitle, __sub: 'Open book index', ref: p });
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- buildInfo.ready: the collections' letters load with the index, and the cards read them off window.
-  }, [state.parsed, settings.searchCorpus, buildInfo.ready]);
+  }, [navParsed, settings.searchCorpus, buildInfo.ready]);
 
   // A letter reference to a letter that is not there says so, instead of a card that does nothing.
   const letterRefMissing = React.useMemo(() => {
-    const p = state.parsed;
-    if (!p || p.kind !== 'ref-letter' || (settings.searchCorpus || 'all') === 'scriptures') return null;
+    const p = navParsed;
+    if (!p || p.kind !== 'ref-letter') return null;
     return letterRefCards(p, /** @type {any} */ (window).VotSearchData, window).missing;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- buildInfo.ready: as above, the letters load with the index.
-  }, [state.parsed, settings.searchCorpus, buildInfo.ready]);
+  }, [navParsed, buildInfo.ready]);
 
   // Top results: the best 5 hits shown before the groups whenever there is more
   // than one group, in every corpus. The groups follow the site's order, not
@@ -546,9 +600,22 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     }
     return top;
   }, [state.results, grouped.length, directEntries.length]);
+  /* A SHORT LIST SHOWS EACH RESULT ONCE (search200 B2). Thirty or fewer results open
+     every group (renderGroups' defaultOpen) under Best Matches, which showed its five
+     twice. The groups hold the rest, and one that gave some up counts them as "more";
+     when the five are the whole list, the open groups are the list, with no row above. */
+  const restGroups = React.useMemo(() => {
+    if (bookOrder || !topResults.length || state.results.length > 30) return null;
+    const inTop = new Set(topResults);
+    return visibleGroups
+      .map((g) => { const items = g.items.filter((e) => !inTop.has(e)); return { key: g.key, items, more: items.length < g.items.length }; })
+      .filter((g) => g.items.length > 0);
+  }, [bookOrder, topResults, state.results.length, visibleGroups]);
+  const bestRow = restGroups && restGroups.length === 0 ? [] : topResults;
+  const listGroups = restGroups && restGroups.length > 0 ? restGroups : visibleGroups;
   // The switch matters when some group has two or more results to order, or when
   // there is a Best Matches row for Book order to set aside.
-  const sortToggleVisible = topResults.length > 0 || visibleGroups.some((g) => g.items.length > 1);
+  const sortToggleVisible = bestRow.length > 0 || visibleGroups.some((g) => g.items.length > 1);
 
   // Fuzzy book suggestion for did-you-mean — very conservative.
   // Only fires when the query is a SHORT single-token that plausibly looks
@@ -602,6 +669,64 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     setShowSuggest(false);
   };
 
+  // The tab in use, and the one tap out of it (search200 B2).
+  const corpus = settings.searchCorpus || 'all';
+  const tabName = TAB_NAME[corpus] || null;
+  const searchAll = () => onSettingsChange('searchCorpus', 'all');
+  // Everywhere is no scope AND every text: the Volumes tab kept on found nothing in Luke's words again.
+  const searchEverywhere = () => { onToggleScope(); if (corpus !== 'all') searchAll(); };
+  const conflict = scopeConflict(searchScope, corpus);
+  const scopeLabel = (searchContext && searchContext.label) || (searchScope && searchScope.label) || '';
+
+  /* The recent searches and the quick picks: the empty screen's way in, and the no-results
+     screen's way on (search200 B2: it was one grey line). */
+  const pickRows = (
+    <>
+      {settings.historyEnabled !== false && recents.length > 0 && (
+        <>
+          <div className="srch-section-label">Recent</div>
+          {confirmRecent != null ? (
+            /* W0 (micro-gap b): per-recent removal. Follows the
+               ConfirmStrip convention — per-instance useId registration
+               (back dismisses the confirm, not the screen), "remove"
+               vocabulary (the stored query list is recoverable by
+               searching again, so this is not a "delete"). The strip
+               replaces the chips row, the LinkCard actions-row swap
+               pattern. */
+            <ConfirmStrip
+              question={'Remove “' + confirmRecent + '” from recent searches?'}
+              yesLabel="Yes, remove"
+              onCancel={() => setConfirmRecent(null)}
+              onConfirm={() => {
+                if (typeof window.removeRecentSearch === 'function') setRecents(window.removeRecentSearch(confirmRecent));
+                setConfirmRecent(null);
+              }}
+            />
+          ) : (
+            <div className="srch-quick-row">
+              {recents.slice(0, 12).map((r) => (
+                <span key={r} className="srch-quick-chip-wrap">
+                  <button className="srch-quick-chip" onClick={() => onQueryChange(r)}>{r}</button>
+                  <button
+                    className="srch-chip-remove"
+                    aria-label={'Remove recent search ' + r}
+                    onClick={() => setConfirmRecent(r)}
+                  >{"✕"}</button>
+                </span>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+      <div className="srch-section-label">Quick picks</div>
+      <div className="srch-quick-row">
+        {SRCH_QUICK_PICKS.map((q) => (
+          <button key={q} className="srch-quick-chip" onClick={() => onQueryChange(q.toLowerCase())}>{q}</button>
+        ))}
+      </div>
+    </>
+  );
+
   const handleKey = (e) => {
     if (e.key === 'Enter') { recordSearch(); return; }
     if (e.key === 'Escape') {
@@ -645,7 +770,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         </div>
       </>
     }>
-      <div className="search-screen">
+      <div className="search-screen" ref={screenRef}>
 
         <div className="srch-corpus-row" role="tablist" aria-label="Search corpus">
           {[
@@ -719,52 +844,27 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
 
         {!query && buildInfo.ready && (
           <>
+            {/* The hero names the tab in use (search200 B2): a saved Scriptures tab sat lit
+                under "Search everything". */}
             <div className="srch-empty-hero">
-              <h3>Search everything</h3>
-              <p>Verses, letters, Words To Live By and Bible studies — across all 66 books and every Volume.</p>
+              {corpus === 'scriptures' ? (
+                <>
+                  <h3>Search the Scriptures</h3>
+                  <p>Verses across all 66 books.{' '}<button type="button" className="srch-more-link" onClick={searchAll}>Search all</button></p>
+                </>
+              ) : corpus === 'volumes' ? (
+                <>
+                  <h3>Search the Volumes</h3>
+                  <p>Letters, Words To Live By, Answers and Bible studies.{' '}<button type="button" className="srch-more-link" onClick={searchAll}>Search all</button></p>
+                </>
+              ) : (
+                <>
+                  <h3>Search everything</h3>
+                  <p>Verses, letters, Words To Live By and Bible studies — across all 66 books and every Volume.</p>
+                </>
+              )}
             </div>
-            {settings.historyEnabled !== false && recents.length > 0 && (
-              <>
-                <div className="srch-section-label">Recent</div>
-                {confirmRecent != null ? (
-                  /* W0 (micro-gap b): per-recent removal. Follows the
-                     ConfirmStrip convention — per-instance useId registration
-                     (back dismisses the confirm, not the screen), "remove"
-                     vocabulary (the stored query list is recoverable by
-                     searching again, so this is not a "delete"). The strip
-                     replaces the chips row, the LinkCard actions-row swap
-                     pattern. */
-                  <ConfirmStrip
-                    question={'Remove “' + confirmRecent + '” from recent searches?'}
-                    yesLabel="Yes, remove"
-                    onCancel={() => setConfirmRecent(null)}
-                    onConfirm={() => {
-                      if (typeof window.removeRecentSearch === 'function') setRecents(window.removeRecentSearch(confirmRecent));
-                      setConfirmRecent(null);
-                    }}
-                  />
-                ) : (
-                  <div className="srch-quick-row">
-                    {recents.slice(0, 12).map((r) => (
-                      <span key={r} className="srch-quick-chip-wrap">
-                        <button className="srch-quick-chip" onClick={() => onQueryChange(r)}>{r}</button>
-                        <button
-                          className="srch-chip-remove"
-                          aria-label={'Remove recent search ' + r}
-                          onClick={() => setConfirmRecent(r)}
-                        >{"✕"}</button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-            <div className="srch-section-label">Quick picks</div>
-            <div className="srch-quick-row">
-              {SRCH_QUICK_PICKS.map((q) => (
-                <button key={q} className="srch-quick-chip" onClick={() => onQueryChange(q.toLowerCase())}>{q}</button>
-              ))}
-            </div>
+            {pickRows}
           </>
         )}
 
@@ -852,11 +952,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </div>
         )}
 
-        {!bookOrder && topResults.length > 0 && (
+        {!bookOrder && bestRow.length > 0 && (
           <div className="srch-top-results">
             <div className="srch-section-label">Best Matches</div>
-            {topResults.map((entry, i) => (
-              <SrchCard key={'top' + i} entry={entry} terms={state.terms} onSelect={handleSelect} memo={memo} where="best" />
+            {bestRow.map((entry, i) => (
+              <SrchCard key={'top' + i} entry={entry} terms={state.terms} onSelect={handleSelect} memo={listMemo} where="best" />
             ))}
           </div>
         )}
@@ -876,19 +976,39 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
               </button>
             )}
           </>
-        ) : visibleGroups.length > 0 && renderGroups(visibleGroups, bookOrder ? 'book' : 'relevance', true)}
+        ) : listGroups.length > 0 && renderGroups(listGroups, bookOrder ? 'book' : 'relevance', true)}
 
         {query && state.phase === 'done' && letterRefMissing && (
           <div className="srch-corrected">{letterRefMissing}</div>
         )}
 
         {query && buildInfo.ready && state.phase === 'done' && state.results.length === 0 && directEntries.length === 0 && !didYouMean && !letterRefMissing && (
-          <div className="search-no-results">
-            {state.stopWordsOnly ?
-            <>“{query.trim()}” is in nearly every verse and letter. Add another word to search.</> :
-            <>No results for “{query.trim()}”{searchScope && searchContext ? ' in ' + searchContext.label : ''}.</>}
-            {searchScope && !state.stopWordsOnly ? <>{' '}<button type="button" className="srch-more-link" onClick={onToggleScope}>Search everywhere</button></> : null}
-          </div>
+          /* No results says where it looked and offers a way on (search200 B2): the tab or the
+             scope it was held to, a scope the tab cannot reach, a tip, and the picks. */
+          <>
+            <div className={'search-no-results' + (state.stopWordsOnly ? '' : ' has-picks')}>
+              {state.stopWordsOnly ? (
+                <>“{query.trim()}” is in nearly every verse and letter. Add another word to search.</>
+              ) : searchScope && conflict ? (
+                <>
+                  {scopeLabel} is in {conflict.home}, and the {conflict.tab} tab is on.{' '}
+                  <button type="button" className="srch-more-link" onClick={searchAll}>Search {scopeLabel}</button>
+                  {' · '}
+                  <button type="button" className="srch-more-link" onClick={searchEverywhere}>Search everywhere</button>
+                </>
+              ) : (
+                <>
+                  No results for “{query.trim()}”{searchScope && searchContext ? ' in ' + searchContext.label : tabName ? ' in ' + tabName : ''}.
+                  {searchScope ? <>{' '}<button type="button" className="srch-more-link" onClick={searchEverywhere}>Search everywhere</button></> :
+                    tabName ? <>{' '}<button type="button" className="srch-more-link" onClick={searchAll}>Search all</button></> : null}
+                </>
+              )}
+              {state.stopWordsOnly || (searchScope && conflict) ? null : (
+                <span className="srch-no-results-tip">Check the spelling, try fewer words, or type a reference such as John 3:16.</span>
+              )}
+            </div>
+            {state.stopWordsOnly ? null : pickRows}
+          </>
         )}
 
         {/* Nothing to search for: an emoji or punctuation alone left a blank screen. */}

@@ -352,7 +352,8 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     const E = /** @type {any} */ (window).VotSearchMini;
     /** @type {any} */ let ready;
     E.whenMeaningReady = vi.fn(() => new Promise((res) => { ready = res; }));
-    const card = (/** @type {string} */ title) => [title, 'Other'].map((t, i) => ({ score: 2 - i, doc: { kind: 'letter', title: t, text: 't', g: i ? 'v7' : 'v1' } }));
+    // six results: five or fewer would have no Best Matches row to lead (search200 B2)
+    const card = (/** @type {string} */ title) => [title, 'O1', 'O2', 'O3', 'O4', 'O5'].map((t, i) => ({ score: 10 - i, doc: { kind: 'letter', title: t, text: 't', g: i ? 'v7' : 'v1' } }));
     E.search = vi.fn()
       .mockResolvedValueOnce({ parsed: null, results: card('Words Only'), parsedTerms: [], meaningLater: true })
       .mockResolvedValue({ parsed: null, results: card('Keep Watch'), parsedTerms: [], meaningLater: false });
@@ -499,7 +500,8 @@ describe('SearchScreen (W0 micro-gaps)', () => {
       { score: 2, doc: { kind: 'letter', title: 'a', text: 't', g: 'v7' } },
       { score: 1, doc: { kind: 'letter', title: 'b', text: 't', g: 'v1' } },
     ]);
-    expect(few).toEqual({ open: ['true', 'true'], best: true });
+    // Five or fewer: Best Matches would be the whole list again (search200 B2), so the open groups are the list.
+    expect(few).toEqual({ open: ['true', 'true'], best: false });
     const many = [];
     for (let i = 0; i < 40; i++) many.push({ score: 40 - i, doc: { kind: 'letter', title: 'x' + i, text: 't', g: 'v3' } });
     expect(await run(many)).toEqual({ open: ['true'], best: false });
@@ -1303,5 +1305,240 @@ describe('letterRefCards', () => {
     const r = letterRefCards({ kind: 'ref-letter', anyVolume: true, volumeId: 'v2', letterNum: 55, label: 'Letter 55' }, D, {});
     expect(r.cards.map((c) => c.__label)).toEqual(['Letter 55']);
     expect(r.missing).toBeNull();
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   search200 UX, track B: the search screen as a reader meets it (the UX walk
+   of 2026-10-17, D:/Swarm/lanes/search200/out/ux/PLAN.md).
+   ─────────────────────────────────────────────────────────────────────── */
+describe('SearchScreen (search200 UX, track B)', () => {
+  const noop = () => {};
+  const baseProps = () => ({
+    query: '', onQueryChange: noop, settings: {}, onSettingsChange: noop,
+    onSelect: noop, onBack: noop, searchScope: null, searchContext: null,
+    onToggleScope: noop, onCommand: noop,
+  });
+  /** A collection's letters, best first: titles g-0, g-1 ... */
+  const letters = (/** @type {string} */ g, /** @type {number} */ n, from = 0) => Array.from({ length: n }, (_, i) => (
+    { score: 1000 - from - i, doc: { kind: 'letter', title: g + '-' + (from + i), text: 'text of ' + g + '-' + (from + i), g } }));
+  const searchReturns = (/** @type {any} */ r) => {
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: null, parsedTerms: [], results: [], ...r }));
+  };
+  // past the 140ms debounce, then the engine's promise
+  const commit = async () => {
+    act(() => { vi.advanceTimersByTime(200); });
+    await act(async () => { await Promise.resolve(); });
+  };
+  const typeIn = async (/** @type {any} */ props, /** @type {string} */ q) => {
+    const r = render(<SearchScreen {...props} />);
+    r.rerender(<SearchScreen {...props} query={q} />);
+    await commit();
+    return r;
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).ScreenLayout = ({ navChildren, children }) => (
+      <div className="screen-scroll">{navChildren}{children}</div>
+    );
+    setScreenGlobals();
+    /** @type {any} */ (globalThis).ConfirmStrip = ConfirmStrip;
+    /** @type {any} */ (globalThis).SRCH_QUICK_PICKS = ['Beatitudes', 'Armor of God'];
+    /** @type {any} */ (window).VotSearchMini = {
+      getState: () => ({ ready: true }),
+      init: () => Promise.resolve(),
+      suggest: () => [],
+      fuzzyBookSuggest: () => null,
+      search: () => Promise.resolve({ parsed: null, results: [], parsedTerms: [] }),
+    };
+    /** @type {any} */ (window).VotSearchData = { BOOK_DISPLAY: {}, SYNONYM_MAP: {} };
+    /** @type {any} */ (window).getRecentSearches = () => [];
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    document.body.classList.remove('scroll-restoring');
+    delete /** @type {any} */ (window).VotSearchMini;
+    delete /** @type {any} */ (window).VotSearchData;
+    delete /** @type {any} */ (window).getRecentSearches;
+  });
+
+  /* B2 (major): the Scriptures tab and the scope chip showed the one group left closed over a blank screen. The
+     groups were keyed by the live search, so a tab switch remounted them over the OLD list (long, so closed),
+     and the new list arrived under the same key. They are keyed by the search the list on screen came from. */
+  it('B2: a tab that leaves one group opens it, though the list before it was long', async () => {
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    // like the real group, it reads defaultOpen once, when it mounts
+    const StubGroup = ({ gkey, defaultOpen }) => {
+      const [open] = React.useState(defaultOpen);
+      return <div className="stub-group" data-key={gkey} data-open={String(open)} />;
+    };
+    /** @type {any} */ (globalThis).SrchGroup = StubGroup;
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn((q, o) => Promise.resolve({ parsed: null, parsedTerms: [],
+      results: o.corpus === 'scriptures' ? letters('bible', 40) : letters('bible', 30).concat(letters('v3', 20)) }));
+    const props = baseProps();
+    const r = await typeIn(props, 'a lone group');
+    const groups = () => [...document.querySelectorAll('.stub-group')].map((g) => g.getAttribute('data-key') + ':' + g.getAttribute('data-open'));
+    expect(groups()).toEqual(['bible:false', 'v3:false']);
+    r.rerender(<SearchScreen {...props} settings={{ searchCorpus: 'scriptures' }} query="a lone group" />);
+    await commit();
+    expect(groups()).toEqual(['bible:true']);
+  });
+
+  /* B2: 30 or fewer results across two or more groups open every group under Best Matches, which showed its
+     five twice. The groups hold the rest, and a group that gave some up says "more". */
+  it('B2: a short list leaves Best Matches out of the open groups', async () => {
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchGroup = ({ gkey, items, more }) => (
+      <div className="stub-group" data-key={gkey} data-more={String(!!more)}>{items.map((e) => e.doc.title).join(',')}</div>
+    );
+    /** @type {any} */ (globalThis).SrchCard = ({ entry }) => <div className="stub-card">{entry.doc.title}</div>;
+    searchReturns({ results: letters('v7', 6).concat(letters('v1', 3, 6)) });
+    await typeIn(baseProps(), 'a short list');
+    const best = [...document.querySelectorAll('.srch-top-results .stub-card')].map((c) => c.textContent);
+    expect(best).toEqual(['v7-0', 'v7-1', 'v7-2', 'v7-3', 'v7-4']);
+    const groups = [...document.querySelectorAll('.stub-group')].map((g) => [g.getAttribute('data-key'), g.textContent, g.getAttribute('data-more')]);
+    expect(groups).toEqual([['v1', 'v1-6,v1-7,v1-8', 'false'], ['v7', 'v7-5', 'true']]);
+    // the summary still counts every match, in every section that holds one
+    expect(document.querySelector('.srch-results-summary').textContent).toContain('9 matches across 2 sections');
+  });
+
+  /* B2: refining a query while scrolled down showed the new list from mid-list. A new search lands at the top
+     (the one-shot landing LetterView makes); a list resumed on Back is scroll-restore's, and so is a restore
+     under way. */
+  it('B2: a new search lands at the top of the list; a resumed one, or one under a restore, does not', async () => {
+    const proto = /** @type {any} */ (Element.prototype);
+    const had = Object.getOwnPropertyDescriptor(proto, 'scrollTo');
+    const scrollTo = vi.fn();
+    proto.scrollTo = scrollTo;
+    try {
+      searchReturns({ results: letters('g', 3) });
+      const props = baseProps();
+      const r = await typeIn(props, 'forgive one another');
+      expect(scrollTo).toHaveBeenCalledWith({ top: 0 });
+      scrollTo.mockClear();
+      r.rerender(<SearchScreen {...props} query="forgive one seventy" />);
+      await commit();
+      expect(scrollTo, 'a refined query').toHaveBeenCalledWith({ top: 0 });
+      scrollTo.mockClear();
+      document.body.classList.add('scroll-restoring');
+      r.rerender(<SearchScreen {...props} query="forgive one seventy times" />);
+      await commit();
+      expect(scrollTo, 'under a restore').not.toHaveBeenCalled();
+      document.body.classList.remove('scroll-restoring');
+      r.unmount();
+      // Back to the same search: it opens on its list, where the reader left it
+      render(<SearchScreen {...props} query="forgive one seventy times" />);
+      await commit();
+      expect(scrollTo, 'a resumed list').not.toHaveBeenCalled();
+    } finally {
+      if (had) Object.defineProperty(proto, 'scrollTo', had); else delete proto.scrollTo;
+    }
+  });
+
+  /* B2: a saved corpus tab stayed on while the empty screen said "Search everything". */
+  it('B2: the empty screen names the tab in use and offers all of it in one tap', () => {
+    const onSettingsChange = vi.fn();
+    const hero = (/** @type {string} */ corpus) => {
+      const r = render(<SearchScreen {...baseProps()} settings={{ searchCorpus: corpus }} onSettingsChange={onSettingsChange} />);
+      const h = document.querySelector('.srch-empty-hero');
+      const out = { text: h.textContent, all: !!screen.queryByRole('button', { name: 'Search all' }) };
+      if (out.all) fireEvent.click(screen.getByRole('button', { name: 'Search all' }));
+      r.unmount();
+      return out;
+    };
+    const scrip = hero('scriptures');
+    expect(scrip.text).toMatch(/^Search the Scriptures/);
+    expect(scrip.all).toBe(true);
+    expect(onSettingsChange).toHaveBeenLastCalledWith('searchCorpus', 'all');
+    onSettingsChange.mockClear();
+    const vol = hero('volumes');
+    expect(vol.text).toMatch(/^Search the Volumes/);
+    expect(vol.all).toBe(true);
+    expect(onSettingsChange).toHaveBeenLastCalledWith('searchCorpus', 'all');
+    onSettingsChange.mockClear();
+    const all = hero('all');
+    expect(all.text).toMatch(/^Search everything/);
+    expect(all.all).toBe(false);
+    expect(onSettingsChange).not.toHaveBeenCalled();
+  });
+
+  /* B2: "No results" never named the tab the search was held to. */
+  it('B2: no results under a tab names the tab, and "Search all" widens it', async () => {
+    const onSettingsChange = vi.fn();
+    searchReturns({ results: [] });
+    await typeIn({ ...baseProps(), settings: { searchCorpus: 'scriptures' }, onSettingsChange }, 'qqzzxvb');
+    expect(document.querySelector('.search-no-results').textContent).toContain('No results for \u201cqqzzxvb\u201d in the Scriptures.');
+    fireEvent.click(screen.getByRole('button', { name: 'Search all' }));
+    expect(onSettingsChange).toHaveBeenCalledWith('searchCorpus', 'all');
+  });
+
+  /* B2: a reference typed under the Volumes tab lost its passage card (the parse is held to the tab). The card
+     answers the reference under any tab: the screen reads the query as a reference across all of it. */
+  it('B2: a Bible reference under Volumes, and a letter reference under Scriptures, keep their card', async () => {
+    /** @type {any} */ (globalThis).SrchCard = ({ entry, isDirect }) => (isDirect ? <div className="stub-direct">{entry.__label}</div> : null);
+    const parse = vi.fn((q) => (/john/.test(q)
+      ? { kind: 'ref-bible', bookId: 'john', bookTitle: 'John', chapter: 3, verseStart: 16 }
+      : { kind: 'ref-letter', volumeId: 'zz', letterNum: 5, label: 'Volume Two · Letter 5' }));
+    /** @type {any} */ (window).VotSearchMini.parse = parse;
+    searchReturns({ parsed: { kind: 'text' }, results: letters('v2', 2) });
+    const r = await typeIn({ ...baseProps(), settings: { searchCorpus: 'volumes' } }, 'john 3:16');
+    expect([...document.querySelectorAll('.stub-direct')].map((d) => d.textContent)).toEqual(['John 3:16']);
+    expect(parse).toHaveBeenCalledWith('john 3:16', { corpus: 'all' });
+    r.unmount();
+    await typeIn({ ...baseProps(), settings: { searchCorpus: 'scriptures' } }, 'volume 2 letter 5');
+    expect([...document.querySelectorAll('.stub-direct')].map((d) => d.textContent)).toEqual(['Volume Two · Letter 5']);
+  });
+
+  /* B2: a book scope with the Volumes tab on said "No results in Luke", and "Search everywhere" kept the
+     Volumes tab on. The conflict is named, with a way out of each side. */
+  it('B2: a book scope under the Volumes tab names the conflict; each way out widens the tab', async () => {
+    const onSettingsChange = vi.fn();
+    const onToggleScope = vi.fn();
+    const luke = { kind: 'book', bookId: 'luke', label: 'Luke' };
+    searchReturns({ results: [] });
+    await typeIn({ ...baseProps(), settings: { searchCorpus: 'volumes' }, searchScope: luke, searchContext: luke, onSettingsChange, onToggleScope }, 'turn the other cheek');
+    const none = document.querySelector('.search-no-results');
+    expect(none.textContent).toContain('Luke is in the Scriptures, and the Volumes tab is on.');
+    expect(none.textContent).not.toContain('No results');
+    expect(document.querySelector('.srch-no-results-tip'), 'no spelling tip: the words were never searched').toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Search Luke' }));
+    expect(onSettingsChange).toHaveBeenLastCalledWith('searchCorpus', 'all');
+    expect(onToggleScope).not.toHaveBeenCalled();
+    onSettingsChange.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Search everywhere' }));
+    expect(onToggleScope).toHaveBeenCalledTimes(1);
+    expect(onSettingsChange).toHaveBeenLastCalledWith('searchCorpus', 'all');
+  });
+
+  it('B2: a volume scope under the Scriptures tab names the conflict too', async () => {
+    const v7 = { kind: 'volume', volumeId: 'v7', label: 'Volume Seven' };
+    searchReturns({ results: [] });
+    await typeIn({ ...baseProps(), settings: { searchCorpus: 'scriptures' }, searchScope: v7, searchContext: v7 }, 'vengeance repay');
+    expect(document.querySelector('.search-no-results').textContent).toContain('Volume Seven is in the Volumes, and the Scriptures tab is on.');
+    expect(screen.getByRole('button', { name: 'Search Volume Seven' })).toBeTruthy();
+  });
+
+  /* B2 (polish): the no-results screen was one grey line. It offers a way on: a tip, and the same Recent and
+     Quick picks rows the empty screen has. */
+  it('B2: no results offers a tip and the Recent and Quick picks rows', async () => {
+    const onQueryChange = vi.fn();
+    /** @type {any} */ (window).getRecentSearches = () => ['mercy seat'];
+    searchReturns({ results: [] });
+    await typeIn({ ...baseProps(), onQueryChange }, 'zzqqxx nothing');
+    expect(document.querySelector('.srch-no-results-tip').textContent).toMatch(/spelling/);
+    expect(screen.getByRole('button', { name: 'mercy seat' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Beatitudes' }));
+    expect(onQueryChange).toHaveBeenCalledWith('beatitudes');
+  });
+
+  it('B2: a stop word alone keeps its own line, with no tip under it', async () => {
+    searchReturns({ parsed: { kind: 'text' }, results: [], stopWordsOnly: true });
+    await typeIn(baseProps(), 'unto');
+    expect(document.querySelector('.search-no-results').textContent).toContain('is in nearly every verse and letter');
+    expect(document.querySelector('.srch-no-results-tip')).toBeNull();
   });
 });

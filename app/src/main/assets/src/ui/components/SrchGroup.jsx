@@ -35,8 +35,10 @@ function cardKey(entry, i) {
    `view` is the order the screen shows ('relevance' | 'book'): Book order opens every
    group with a short first `page`, and each order remembers its own open and paged
    state, so a group opened under Relevance is open again after a trip to Book order (sr12);
-   'book-more' is Book order's second list, the loose matches of a passage search (sr13). */
-export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = false, memo = '', view = 'relevance', page = SRCH_GROUP_PAGE }) {
+   'book-more' is Book order's second list, the loose matches of a passage search (sr13).
+   `more`: some of the group's results sit in Best Matches above it (a short list shows each
+   result once, search200 B2), so its count is of the rest: "1 more letter". */
+export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = false, more = false, memo = '', view = 'relevance', page = SRCH_GROUP_PAGE }) {
   const slot = 'group|' + gkey + (view === 'relevance' ? '' : '|' + view);
   const was = recall(memo, slot);
   const [open, setOpen] = React.useState(was ? was.open : defaultOpen !== false);
@@ -50,7 +52,7 @@ export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = 
       <button className="srch-group-header" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <span>
           {meta.label}
-          <span className="srch-group-count-inline"> · {items.length.toLocaleString('en-US')}{capped ? '+' : ''} {unit}</span>
+          <span className="srch-group-count-inline"> · {items.length.toLocaleString('en-US')}{capped ? '+' : ''} {more ? 'more ' : ''}{unit}</span>
         </span>
         {/* Session-5 (5): the old 0.55rem ▾/▸ glyph was a near-invisible
             affordance — a real 24px chevron that ROTATES makes the

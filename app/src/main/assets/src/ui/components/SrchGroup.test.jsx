@@ -41,6 +41,13 @@ describe('SrchGroup', () => {
     expect(count('zz', items)).toBe(' · 2 matches');
   });
 
+  /* search200 B2: a short list's Best Matches come out of their groups; a group that gave some up says the
+     rest are "more", so "1 letter" does not read as all its collection holds. */
+  it('a group that gave its best to Best Matches counts the rest as "more"', () => {
+    const { container } = render(<SrchGroup gkey="v7" items={items.slice(0, 1)} terms={[]} onSelect={() => {}} defaultOpen={false} more={true} />);
+    expect(container.querySelector('.srch-group-count-inline').textContent).toBe(' · 1 more letter');
+  });
+
   it('a capped group says "400+" (it may hold more), in grouped thousands', () => {
     const many = Array.from({ length: 400 }, (_, i) => ({ doc: { title: 'v' + i } }));
     const { container } = render(<SrchGroup gkey="bible" items={many} terms={[]} onSelect={() => {}} defaultOpen={false} capped={true} />);

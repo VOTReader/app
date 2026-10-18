@@ -3777,6 +3777,9 @@
     body.light .search-input { background:rgba(0,0,0,0.04); }
     /* .search-screen — no styles needed */
     .search-no-results { padding:3rem 1.5rem; text-align:center; font-family:var(--font-body); font-size:var(--fs-16); color:var(--cream-muted); }
+    /* search200 B2: no results offers a tip, then the Recent and Quick picks rows under it. */
+    .search-no-results.has-picks { padding-bottom:1rem; }
+    .srch-no-results-tip { display:block; margin-top:0.75rem; font-size:var(--fs-14); line-height:1.5; }
     .search-highlight { background:rgba(200,164,86,0.25); color:var(--cream); border-radius:2px; }
     body.light .search-highlight { background:rgba(122,92,16,0.2); }
 
