@@ -948,7 +948,7 @@ function setAlign(on) { ALIGN_ON = !!on; }
 let ALIGN_LEXICON = null;
 /** @type {string|null} where the lexicon file is fetched from; null, nowhere */
 let LEXICON_SOURCE = null;
-/** @type {{url: string, done: Promise<void>, settled: boolean, failed: boolean}|null} the file's load */
+/** @type {{url: string, done: Promise<void>, settled: boolean, failed: boolean, wait?: Promise<void>, waited?: boolean}|null} the file's load */
 let LEXICON_LOAD = null;
 /** The longest a text search waits for the lexicon file (the first search after a cold start; it loads with the index). */
 const LEXICON_WAIT_MS = 2000;
@@ -973,13 +973,13 @@ function setAlignLexiconSource(url) {
 /**
  * Start (or join) the lexicon file's load. `again`: a load that failed is tried once more (a build).
  * @param {boolean} again
- * @returns {{done: Promise<void>, settled: boolean}|null}  null when there is no file to load
+ * @returns {{done: Promise<void>, settled: boolean, wait?: Promise<void>, waited?: boolean}|null}  null when there is no file to load
  */
 function loadAlignLexicon(again) {
   const url = LEXICON_SOURCE;
   if (!url || typeof fetch !== 'function') return null;
   if (LEXICON_LOAD && LEXICON_LOAD.url === url && !(again && LEXICON_LOAD.failed)) return LEXICON_LOAD;
-  /** @type {{url: string, done: Promise<void>, settled: boolean, failed: boolean}} */
+  /** @type {{url: string, done: Promise<void>, settled: boolean, failed: boolean, wait?: Promise<void>, waited?: boolean}} */
   const load = { url, done: Promise.resolve(), settled: false, failed: false };
   LEXICON_LOAD = load;
   load.done = fetch(url)
@@ -997,13 +997,20 @@ function loadAlignLexicon(again) {
     .finally(() => { load.settled = true; });
   return load;
 }
-/** Resolves when the lexicon file has loaded or failed, or LEXICON_WAIT_MS has passed; at once when it is settled. */
+/**
+ * Resolves when the lexicon file has loaded or failed, or LEXICON_WAIT_MS has passed; at once when it is settled.
+ * The wait is one per load, shared by the searches that join it: once it has run out, a search no longer waits for
+ * a file still on its way (S22 B7 look: a held file cost every search 2 s, not the first alone).
+ */
 function alignLexiconReady() {
   const load = loadAlignLexicon(false);
-  if (!load || load.settled) return Promise.resolve();
-  /** @type {any} */ let timer = 0;
-  const wait = new Promise((resolve) => { timer = setTimeout(resolve, LEXICON_WAIT_MS); });
-  return Promise.race([load.done, wait]).finally(() => clearTimeout(timer));
+  if (!load || load.settled || load.waited) return Promise.resolve();
+  if (!load.wait) {
+    /** @type {any} */ let timer = 0;
+    const timeout = new Promise((resolve) => { timer = setTimeout(resolve, LEXICON_WAIT_MS); });
+    load.wait = Promise.race([load.done, timeout]).finally(() => { clearTimeout(timer); load.waited = true; });
+  }
+  return load.wait;
 }
 /** Typed tokens, at least, for the typed words to be aligned as a quote. */
 const ALIGN_MIN = 5;

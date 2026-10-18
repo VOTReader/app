@@ -114,6 +114,21 @@ describe('the substitution lexicon in the engine (B7)', () => {
     }
   });
 
+  it('a file still on its way holds the first search at most 2 s, and the searches after it not at all', async () => {
+    E.setAlignLexicon(null);
+    const base = ids(await E.search(Q));
+    const hung = vi.fn(() => new Promise(() => {}));
+    vi.stubGlobal('fetch', hung);
+    E.setAlignLexiconSource('search-lexicon.json');
+    let t = performance.now();
+    expect(ids(await E.search(Q))).toEqual(base);
+    expect(performance.now() - t).toBeGreaterThanOrEqual(1900);
+    t = performance.now();
+    expect(ids(await E.search(Q))).toEqual(base);
+    expect(performance.now() - t).toBeLessThan(1500);
+    expect(hung).toHaveBeenCalledTimes(1);
+  }, 20000);
+
   it('a lexicon set directly wins over a file: the file is not read', async () => {
     const fetch = answer({}, { lexicon: 'unrelated pair7' });
     vi.stubGlobal('fetch', fetch);
