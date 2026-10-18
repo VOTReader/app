@@ -205,6 +205,78 @@ export function visibleArcs(g, cam, view, limit) {
 }
 
 /**
+ * @typedef {{ i:number, x0:number, x1:number, A:number, fromOn:boolean, toOn:boolean, anchored:boolean }} FeedThread
+ *   i: the instance; x0, x1: its feet as drawn (footX), device px; A: its apex
+ *   height (arcShape); fromOn / toOn: that foot stands on the frame (0..width);
+ *   anchored: the shader's word (arcAnchored, a foot within the margin)
+ */
+
+/**
+ * The label pass's feed for one frame (digest C2: "a label engine fed from
+ * the visible list"): every drawn thread a reader can see on this frame, in
+ * draw order, each with its feet and apex so the labeller ranks and places
+ * without walking the curve again. Seen means some point of its drawn body
+ * is in the sky - x in [0, width], y between the sky's top (view.inset) and
+ * the baseline - which the half-ellipse answers in closed form: over the
+ * frame's x range the height runs from its lower end to the apex (or the
+ * higher end, when the apex is off the frame), and that range must meet
+ * [camY, base + camY - inset]. A foot on the frame at camY 0 is always seen.
+ *
+ * This replaces walking visibleArcs for labels: that list is the CROSSING
+ * set in bucket order, cut at a limit, so at the ceiling the label pass
+ * stopped among fly-overs whose bodies were in the sky far above the frame
+ * and labelled 22 of the 86 threads on screen (digest item 3). Here nothing
+ * is cut by order: fly-overs (both feet off the frame) come only when asked
+ * for, and only those whose bodies are in the frame.
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, y?:number, ppv:number, total:number}} cam
+ * @param {{width:number, base:number, squash:number, density:import('./decode.js').Density, inset?:number}} view
+ * @param {{ flyovers?: boolean, limit?: number }} [opts]  flyovers: include threads with
+ *   neither foot on the frame; limit: a safety cap (default 50,000)
+ * @returns {FeedThread[]}
+ */
+export function labelFeed(g, cam, view, opts) {
+  const { width, squash, density } = view;
+  /** @type {FeedThread[]} */
+  const out = [];
+  if (!g || !g.count || !(width > 0)) return out;
+  const inset = view.inset > 0 ? view.inset : 0;
+  const camY = cam.y > 0 ? cam.y : 0;
+  // the sky, as heights above the DRAWN baseline (base + camY)
+  const hLow = camY, hHigh = view.base + camY - inset;
+  if (!(hHigh > hLow)) return out;
+  const flyovers = !!(opts && opts.flyovers);
+  const limit = opts && opts.limit > 0 ? opts.limit : 50000;
+  const { fanA, fanB } = fansOf(g);
+  const lo = xToVerse(cam, width, 0) - 1, hi = xToVerse(cam, width, width) + 1;
+  const chunkSize = g.chunkSize || 256;
+  for (const bucket of g.buckets) {
+    const full = walkDrawnRuns(bucket, bucketDrawCount(bucket, density), chunkSize, lo, hi, (start, end) => {
+      for (let i = start; i < end; i++) {
+        const x0 = footX(cam, width, g.from[i], fanA[i]);
+        const x1 = footX(cam, width, g.to[i], fanB[i]);
+        if (x1 < 0 || x0 > width) continue;
+        const fromOn = x0 >= 0 && x0 <= width, toOn = x1 >= 0 && x1 <= width;
+        if (!fromOn && !toOn && !flyovers) continue;
+        const { A } = arcShape((x1 - x0) * 0.5, squash);
+        const xa = x0 > 0 ? x0 : 0, xb = x1 < width ? x1 : width;
+        const ha = arcHeightAt(xa, x0, x1, A), hb = arcHeightAt(xb, x0, x1, A);
+        const cx = (x0 + x1) * 0.5;
+        const hMax = cx >= xa && cx <= xb ? A : (ha > hb ? ha : hb);
+        const hMin = ha < hb ? ha : hb;
+        if (hMax < hLow || hMin > hHigh) continue;
+        out.push({ i, x0, x1, A, fromOn, toOn, anchored: arcAnchored(x0, x1, width) === 1 });
+        if (out.length >= limit) return true;
+      }
+      return false;
+    });
+    if (full) break;
+  }
+  return out;
+}
+
+/**
  * @typedef {{ verse:number, x:number, onScreen:boolean,
  *   at:({x:number, y:number, angle:number}|null) }} ThreadEnd
  *   x: the foot's screen x, device px. at: for a foot the frame does not
