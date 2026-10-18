@@ -159,6 +159,10 @@ export function pickProphecy(g, cam, view, px, py, tol, limit) {
  * @returns {Array<{ index:number, prophecy:number, distance:number, from:number, to:number, votes:number }>}
  */
 export function pickThreads(g, cam, view, px, py, tol, limit) {
+  // the ruler band is the ruler's: the renderer scissors every thread pass at
+  // the ruler's top (view.base, whatever cam.y), so a line sunk through it by
+  // a camera looking up is not drawn there and is not picked there either
+  if (py > view.base + tol) return [];
   const cap = Math.max(1, Math.min(limit || 4, 8));
   const ps = prophecySet(g);
   const hits = pickArcs(g, cam, view, px, py, tol, cap).map((h) => {

@@ -296,6 +296,49 @@ describe("My Web's ground is one clear (refactor.md #10)", () => {
   });
 });
 
+/* GL item 6 (digest item 9): the ruler band is the overlay's. The ruler stands at view.base
+   whatever the camera's height (overlay drawRuler, pick.pickChapter), its gold line from
+   base + 1 device px down; the threads stand on base + camY, so a camera looking up would sink
+   them through the ruler. Every thread pass is scissored to the rows above the gold line. */
+describe('the ruler band is never painted by the web (scissor at the ruler\'s top)', () => {
+  const view = (over) => Object.assign({
+    width: 800, height: 720, base: 260.4, ceil: 240, squash: squashFactor(240, 800), localize: 1, density: 'famous',
+    camX: 125, camY: 0, ppv: 4, strokeWidth: 2, alpha: 0.5, dpr: 2, bg: '#000', focusRange: null, focusArc: 0,
+  }, over);
+
+  it('the main and the top pass draw inside a scissor that ends where the ruler\'s gold line begins; the clear is whole', () => {
+    const { calls, canvas } = recordingGL();
+    const r = /** @type {any} */ (createRenderer(canvas, tinyGraph()));
+    for (const camY of [0, 180]) {
+      calls.length = 0;
+      r.draw(view({ camY }));
+      const names = calls.map((c) => c[0]);
+      const clear = names.indexOf('clear');
+      const on = calls.findIndex((c) => c[0] === 'enable' && c[1][0] === 'SCISSOR_TEST');
+      const off = calls.findIndex((c, i) => i > on && c[0] === 'disable' && c[1][0] === 'SCISSOR_TEST');
+      expect(on, 'the scissor is on after the clear').toBeGreaterThan(clear);
+      const rows = Math.ceil(260.4 + 2);
+      expect(calls.find((c) => c[0] === 'scissor')[1]).toEqual([0, 720 - rows, 800, rows]);
+      const drawsAt = calls.map((c, i) => (c[0] === 'drawArraysInstanced' ? i : -1)).filter((i) => i >= 0);
+      expect(drawsAt.length, 'the main pass and the chosen line').toBe(2);
+      for (const i of drawsAt) expect(i > on && i < off, `draw at ${i} inside the scissor`).toBe(true);
+      expect(off, 'and off again at the frame\'s end').toBeGreaterThan(drawsAt[drawsAt.length - 1]);
+    }
+    // My Web's ground: one clear over the whole canvas, no scissor
+    calls.length = 0;
+    r.clear('#000000');
+    expect(calls.some((c) => c[0] === 'enable' && c[1][0] === 'SCISSOR_TEST')).toBe(false);
+  });
+
+  it('a base past the canvas clips nothing away (the scissor is never taller than the frame)', () => {
+    const { calls, canvas } = recordingGL();
+    const r = /** @type {any} */ (createRenderer(canvas, tinyGraph()));
+    calls.length = 0;
+    r.draw(view({ base: 900 }));
+    expect(calls.find((c) => c[0] === 'scissor')[1]).toEqual([0, 0, 800, 720]);
+  });
+});
+
 /* GL items 3 and 5 (digest C1, C3, item 10). The chosen, hovered and lit
    lines are redrawn over the web by a top pass in the ink table's gold, a
    core under a soft halo; while a line is chosen the rest recedes to

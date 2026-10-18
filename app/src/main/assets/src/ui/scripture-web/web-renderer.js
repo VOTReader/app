@@ -569,6 +569,14 @@ export function createRenderer(canvas, graph, opts = {}) {
       // old additive dark pass made the 300k tail bloom into neon and exposed
       // the phone GPU to a needless sustained fill-rate spike.
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      // GL item 6: the ruler band is the overlay's. The ruler stands at
+      // view.base whatever the camera's height (overlay drawRuler, pickChapter),
+      // its gold line from base + 1 device px down, while the threads stand on
+      // base + camY: every thread pass is held to the rows above that line.
+      // Turned on after the clear (which is whole) and off at the frame's end.
+      const rows = Math.min(v.height, Math.max(0, Math.ceil(v.base + (v.dpr || 1))));
+      gl.enable(gl.SCISSOR_TEST);
+      gl.scissor(0, v.height - rows, v.width, rows);
 
       gl.useProgram(program);
       gl.bindVertexArray(vao);
@@ -635,6 +643,7 @@ export function createRenderer(canvas, graph, opts = {}) {
       }
       lastStats = { instances, draws };
       drawTop(v, camXHi, tapFade);
+      gl.disable(gl.SCISSOR_TEST);
       return lastStats;
     },
 

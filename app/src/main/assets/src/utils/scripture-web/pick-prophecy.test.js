@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { pickProphecy, pickThreads, pickArcs } from './pick.js';
 import { prophecySet } from './frame-set.js';
+import { fansOf } from './decode.js';
 import * as geo from './geometry.js';
 import { describeFound, connectionMeta, sheetMeta, prophecyMeta } from './describe.js';
 
@@ -90,6 +91,22 @@ describe('pickThreads: the arcs, flagged when they are a pair, and the pairs tha
     const hits = pickThreads(g, cam, view, px, py, 400, 2);
     expect(hits.length).toBeLessThanOrEqual(2);
     for (let i = 1; i < hits.length; i++) expect(hits[i].distance).toBeGreaterThanOrEqual(hits[i - 1].distance);
+  });
+
+  it('the ruler band is the ruler\'s: a camera looking up sinks a line through it, and the sunk part (scissored away) is not picked', () => {
+    const g = graph();
+    const up = Object.assign({}, cam, { y: 100 });
+    const fans = fansOf(g);
+    const x0 = geo.footX(up, W, g.from[0], fans.fanA[0]), x1 = geo.footX(up, W, g.to[0], fans.fanB[0]);
+    const { A } = geo.arcShape((x1 - x0) / 2, view.squash);
+    const p = geo.arcPointAt(Math.asin(50 / A), x0, x1, A);   // 50 px over the sunk baseline: 50 px under the ruler's top
+    const py = base + up.y - p.h;
+    expect(py).toBeGreaterThan(base + 14);
+    expect(pickArcs(g, up, view, p.x, py, 14, 4).map((h) => h.index), 'CONTROL: the curve is there').toContain(0);
+    expect(pickThreads(g, up, view, p.x, py, 14, 4)).toEqual([]);
+    // above the ruler the same line is picked as ever
+    const q = geo.arcPointAt(Math.PI / 2, x0, x1, A);
+    expect(pickThreads(g, up, view, q.x, base + up.y - q.h, 14, 4).map((h) => h.index)).toContain(0);
   });
 
   it('a graph with no prophecy is pickArcs, each hit flagged -1', () => {
