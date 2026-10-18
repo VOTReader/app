@@ -36,7 +36,6 @@ import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { WebFallbackList } from '../scripture-web/WebFallbackList.jsx';
 import { startChapter } from '../../utils/scripture-web/chapter-connections.js';
-import { bucketDrawCount as bucketDrawCountFor } from '../../utils/scripture-web/decode.js';
 import { readChromeTokens, LINK_KIND_NAMES, MY_WEB_SOURCES, MY_WEB_LINK_KINDS, distanceRampRGB } from '../../utils/scripture-web/palette.js';
 import { placeRailLabels } from '../../utils/scripture-web/rail-labels.js';
 import { entryHlBase } from '../../utils/hl-keys.js';
@@ -505,9 +504,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // are how the reader knows where in scripture the web is (Corbin,
     // 2026-09-11: "keep the web legend (the books at the bottom, etc)"). It
     // used to be cleared here as "chrome too".
-    const numerals = drawRuler(uiRef.current, g, cam,
-      Object.assign({}, base, { densityDraw: (bucket) => bucketDrawCountFor(bucket, density) }),
-      v, chrome);
+    const numerals = drawRuler(uiRef.current, g, cam, base, v, chrome);
     // the sky the labels may use starts under the top chrome (layout metrics,
     // so the rotated portrait root measures the same; 0 when the chrome is hidden)
     const tb = topbarRef.current;
@@ -686,15 +683,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const px = cx * v.DPR, py = cy * v.DPR;
     const view = viewFor();
     if (mode !== 'personal') {
-      // a badge is a real target: the bundle it counts, or the representative it rides
+      // a badge is a real target: the bundle it counts
       for (const box of badgeBoxesRef.current) {
         if (px < box.x0 || px > box.x1 || py < box.y0 || py > box.y1) continue;
         if (box.cell) return [{ kind: 'bundle', cell: box.cell, distance: 0 }];
-        if (box.rep >= 0) {
-          return [{ kind: 'arc', distance: 0, hit: {
-            index: box.rep, distance: 0, from: g.from[box.rep], to: g.to[box.rep], votes: g.votes[box.rep],
-          } }];
-        }
       }
     }
     if (mode === 'personal') {
@@ -1120,28 +1112,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         onBack={onBack} verseText={verseTextFor} />
     );
   }
-  if (noWebGL) {
-    return (
-      <div className="sw-fallback">
-        <div className="sw-fallback-title">The web can’t be drawn right now.</div>
-        <div className="sw-fallback-body">
-          This needs WebGL2. If the device just recovered from a graphics
-          reset, trying again usually works; otherwise every cross-reference
-          is still reachable from the reader’s footnotes and links.
-        </div>
-        <div className="sw-fallback-row">
-          <button type="button" className="sw-btn"
-            onClick={() => { setNoWebGL(false); setGlRetry((n) => n + 1); }}>Try again</button>
-          <button type="button" className="sw-btn" onClick={onBack}>Go back</button>
-        </div>
-      </div>
-    );
-  }
+  // (noWebGL is only ever set by the renderer effect, which needs the graph,
+  // and the graph is never cleared once loaded: the list above is the one
+  // no-WebGL face.)
 
   const stats = graph ? graphStats(graph, density) : null;
 
   return (
-    <React.Fragment>
     <div className={'sw-root' + (rotated ? ' sw-rotated' : '') + (chromeHidden ? ' sw-chrome-hidden' : '')} ref={wrapRef}
       tabIndex={0} onKeyDown={onKeyDown}
       role="application"
@@ -1250,9 +1227,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         </div>
       )}
       {tip && <TipChip info={tip} viewport={viewRef.current} />}
-      {choices && <ConnectionChooser choices={Array.isArray(choices) ? choices : choices.items}
-        title={Array.isArray(choices) ? undefined : choices.title} meta={Array.isArray(choices) ? undefined : choices.meta}
-        onChoose={commitFound} onClose={closeCards} />}
+      {choices && <ConnectionChooser choices={choices} onChoose={commitFound} onClose={closeCards} />}
       {listOpen && <ConnectionList items={listItems} mode={mode}
         lensOn={mode !== 'personal' && !!(camRef.current && viewRef.current.W && lensRange(graph, camRef.current, viewRef.current.W))}
         onChoose={commitFound} onClose={closeCards} />}
@@ -1276,7 +1251,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         Select a line to see its references; Nearby opens a keyboard-friendly list.
       </div>
     </div>
-    </React.Fragment>
   );
 }
 
@@ -1562,7 +1536,7 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
     const text = fmtCount(n);
     if (ctx.measureText(text).width + fs * 0.9 > wCell + 2 * DPR) continue;   // a pill wider than its cell lies
     const box = pill(text, cx, cy, false, lensDimFor(cell.lo, cell.hi, view.lens || null, view.lensDim));
-    if (box) boxes.push(Object.assign(box, { cell, rep: -1 }));
+    if (box) boxes.push(Object.assign(box, { cell }));
   }
   ctx.restore();
   return boxes;
@@ -1872,14 +1846,14 @@ function HowToReadGuide({ onClose }) {
   );
 }
 
-function ConnectionChooser({ choices, onChoose, onClose, title, meta }) {
+function ConnectionChooser({ choices, onChoose, onClose }) {
   // v03-03: Tab stays in the panel; closing it hands focus back to the web
   const trapRef = useFocusTrap(true);
   return (
-    <div className="sw-choice" ref={trapRef} data-focus-self="" role="dialog" aria-modal="false" aria-label={title || 'Connections here'}>
+    <div className="sw-choice" ref={trapRef} data-focus-self="" role="dialog" aria-modal="false" aria-label="Connections here">
       <button type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close connection choices">×</button>
-      <div className="sw-sheet-eyebrow">{title || 'Connections here'}</div>
-      <div className="sw-sheet-meta">{meta || 'Several threads are close together. Choose the one you meant.'}</div>
+      <div className="sw-sheet-eyebrow">Connections here</div>
+      <div className="sw-sheet-meta">Several threads are close together. Choose the one you meant.</div>
       <div className="sw-choice-list">
         {choices.map((choice, i) => (
           <button type="button" className="sw-choice-row" key={i} onClick={() => onChoose(choice)}>
@@ -2121,7 +2095,7 @@ function graphStats(graph, density) {
   for (const b of graph.buckets) {
     shown += density === 'essential' ? b.off20 : b.off10;
   }
-  return { shown, total: graph.count };
+  return { shown };
 }
 
 /** The Volumes rail's node at a rail position, with its Volume ("The Bride, Volume Two"); '' off the rail. */

@@ -5,7 +5,7 @@
    surface. Extracted verbatim out of ScriptureWebScreen's gesture effect
    (same closures, same order, same comments) so a real dispatched DOM
    event — not a screenshot — can prove it: jsdom builds a `.sw-root` with
-   a `.sw-list`/`.sw-goto` inside it, fires pointerdown/wheel, and reads
+   a `.sw-list` and a bare `input` inside it, fires pointerdown/wheel, and reads
    back whether the camera moved.
 
    Gesture doctrine copied from GardenView: nothing that runs per frame
@@ -28,12 +28,11 @@
 /**
  * Chrome the gesture surface must leave alone: controls, the topbar, every
  * dialog/sheet/list the screen opens, and any native form control wherever
- * it appears (the Go-to field lives inside `.sw-goto`, but a bare `input`
- * entry keeps this correct even if a future control lands outside a
- * `.sw-*` wrapper).
+ * it appears (a bare `input` entry keeps this correct even if a future
+ * control lands outside a `.sw-*` wrapper).
  */
 export const SW_CHROME_SELECTOR =
-  '.sw-controls, .sw-topbar, .sw-sheet, .sw-tip, .sw-goto, .sw-choice, .sw-list, button, input, select, textarea';
+  '.sw-controls, .sw-topbar, .sw-sheet, .sw-tip, .sw-choice, .sw-list, button, input, select, textarea';
 
 /** True when `target` is the chrome itself, or nested inside it. */
 export function isChromeTarget(target) {

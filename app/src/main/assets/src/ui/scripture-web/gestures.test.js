@@ -21,15 +21,14 @@ function makeDom() {
   list.className = 'sw-list';
   const listBtn = document.createElement('button');
   list.appendChild(listBtn);
-  const goto = document.createElement('div');
-  goto.className = 'sw-goto';
+  // a bare input outside any `.sw-*` wrapper: the selector's `input` entry
+  // must catch it alone (the `.sw-goto` field it once sat in is gone)
   const input = document.createElement('input');
-  goto.appendChild(input);
   const choice = document.createElement('div');
   choice.className = 'sw-choice';
-  root.append(list, goto, choice);
+  root.append(list, input, choice);
   document.body.appendChild(root);
-  return { root, list, listBtn, goto, input, choice };
+  return { root, list, listBtn, input, choice };
 }
 
 function pointerEvent(type, opts) {
@@ -112,10 +111,9 @@ describe('the elevator (landing 14): a pointer down on the track drives the lift
 
 describe('SW_CHROME_SELECTOR / isChromeTarget', () => {
   it('matches every declared chrome surface, including nested controls', () => {
-    const { list, listBtn, goto, input, choice } = makeDom();
+    const { list, listBtn, input, choice } = makeDom();
     expect(isChromeTarget(list)).toBe(true);
     expect(isChromeTarget(listBtn)).toBe(true);
-    expect(isChromeTarget(goto)).toBe(true);
     expect(isChromeTarget(input)).toBe(true);
     expect(isChromeTarget(choice)).toBe(true);
   });
