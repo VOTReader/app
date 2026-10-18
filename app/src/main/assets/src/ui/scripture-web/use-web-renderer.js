@@ -321,7 +321,7 @@ export function useWebRenderer({
         paintMyWebOverlay(ctx, { personal: p, g, cam, view: base, v, chrome, rail: ro });
         if (wrap) put(wrap, attrs, 'data-cap-fraction', String(ro.capFraction));
         // the rails' JSON is for the walks; the CSS the rails' chrome sits by is always set
-        if (walkOn()) publishRails(ro, p, g, cam, camV, v);
+        if (walkOn()) publishRails(ro, p, g, cam, camV, v, wrap);
         else if (wrap && ro && ro.width) {
           const rails = railFrame(v, ro.base);
           put(wrap, attrs, '--sw-rail-top', (rails.topY / v.DPR).toFixed(0) + 'px');

@@ -497,10 +497,12 @@ function drawThreadRefs(ctx, g, cam, view, v, chrome, density, focusArc) {
  * root): every visible Volumes band and every visible Bible book with its
  * on-screen span in CSS px, and where the two rails sit. A walk that zooms
  * the top rail to Rebuke and the bottom to Isaiah reads this to know the
- * zoom took before it reads a pixel.
+ * zoom took before it reads a pixel. Written to the screen's own root (bug
+ * #5: a document query found the first .sw-root mounted, not this one).
+ * @param {HTMLElement|null} [root]  the screen's .sw-root (useWebRenderer's wrapRef)
  */
-export function publishRails(ro, p, g, cam, camV, v) {
-  const el = /** @type {HTMLElement|null} */ (ro && ro.width ? document.querySelector('.sw-root') : null);
+export function publishRails(ro, p, g, cam, camV, v, root) {
+  const el = ro && ro.width && root && typeof root.setAttribute === 'function' ? root : null;
   if (!el || !g) return;
   const rails = railFrame({ H: v.H, DPR: v.DPR }, ro.base);
   const top = [];
