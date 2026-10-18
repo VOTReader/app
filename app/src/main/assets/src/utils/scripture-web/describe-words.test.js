@@ -54,9 +54,11 @@ describe('"Nearby" is the Nearby list and nothing else', () => {
 });
 
 describe('plurals are right at one', () => {
-  it('a group of one thread', () => {
-    expect(ds.groupAnnouncement({ count: 1, label: 'Genesis 1' }, false)).toBe('1 thread to Genesis 1 shown.');
-    expect(ds.groupAnnouncement({ count: 2104, label: 'Genesis 1' }, false)).toBe('2,104 threads to Genesis 1 shown.');
+  // was pinned on groupAnnouncement, which went with the bundle sheet's group buttons (w3 review);
+  // the same law on the bundle's own words
+  it('a bundle of one thread, and thousands grouped', () => {
+    expect(ds.summaryOf({ kind: 'bundle', label: 'Genesis 1', connections: 1 })).toBe('Genesis 1, 1 connection converges here.');
+    expect(ds.summaryOf({ kind: 'bundle', label: 'Genesis 1', connections: 2104 })).toBe('Genesis 1, 2,104 connections converge here.');
   });
 });
 
@@ -71,7 +73,8 @@ describe('Timothy’s links have one name', () => {
 describe('the density law’s leftovers are gone', () => {
   it('a bundle with threads the old law hid says only how many converge', () => {
     const bundle = { kind: 'bundle', label: 'Genesis 1', hidden: 12, drawn: 8, connections: 20 };
-    expect(ds.sheetMeta(bundle)).toBe('20 connections converge here. Choose where they go to follow them.');
+    // and names no control the sheet no longer has (its group buttons went: w3 review)
+    expect(ds.sheetMeta(bundle)).toBe('20 connections converge here.');
     expect(ds.summaryOf(bundle)).toBe('Genesis 1, 20 connections converge here.');
   });
 });

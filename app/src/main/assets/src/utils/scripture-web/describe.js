@@ -95,11 +95,6 @@ export function followAnnouncement(label) {
   return 'Following the line to ' + label;
 }
 
-/** The live region when a bundle's group is chosen, or let go of (`letGo`). */
-export function groupAnnouncement(grp, letGo) {
-  return letGo ? 'Showing the strongest again.' : plural(grp.count, 'thread', 'threads') + ' to ' + grp.label + ' shown.';
-}
-
 /** How many threads the canon web draws at this density (the topbar's count). */
 export function graphStats(graph, density) {
   let shown = 0;
@@ -201,19 +196,13 @@ export function describeFound(found, { g, personal, cam, v, viewFor, density }) 
   }
   if (found.kind === 'bundle') {
     const cell = found.cell;
-    const view = viewFor();
     const first = refOfVerse(g, cell.lo), last = refOfVerse(g, cell.hi);
     const label = cell.verse ? first.label
       : cell.chapterLo === cell.chapterHi ? first.bookTitle + ' ' + first.chapter
       : first.bookTitle + ' ' + first.chapter + ' – ' + (last.bookTitle === first.bookTitle ? '' : last.bookTitle + ' ') + last.chapter;
-    const groups = cam && v.W ? bundleGroups(g, cam, view, cell.lo, cell.hi, 40) : [];
     const chapter = g.chapters[cell.chapterLo];
     return { kind: 'bundle', cell, label, lo: cell.lo, hi: cell.hi,
       connections: countTouching(g, cell.lo, cell.hi, density),
-      groups: groups.map((grp) => {
-        const r = refOfVerse(g, grp.lo);
-        return Object.assign({ label: r.bookTitle + ' ' + r.chapter }, grp);
-      }),
       cards: cell.verse ? [verseCard('Verse', first)]
         : [chapterCard(g.books[chapter[0]], chapter[1], chapter[3], first)] };
   }
@@ -291,7 +280,7 @@ export function sheetMeta(info) {
     : info.kind === 'link' ? LINK_KIND_NAMES[info.joins]
     : info.kind === 'underlay' ? (info.sourceName ? info.sourceName + ' · ' + info.joins : info.joins)
     : info.kind === 'bundle'
-      ? plural(info.connections, 'connection converges', 'connections converge') + ' here. Choose where they go to follow them.'
+      ? plural(info.connections, 'connection converges', 'connections converge') + ' here.'
     : info.kind === 'chapter'
       ? plural(info.verses, 'verse', 'verses') + ' · ' + plural(info.connections, 'connection', 'connections')
       : plural(info.connections, 'connection', 'connections');

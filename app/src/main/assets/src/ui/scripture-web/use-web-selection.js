@@ -41,7 +41,7 @@ import {
 import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 import { focusState, withLit } from '../../utils/scripture-web/focus-state.js';
 import {
-  describeFound, summaryOf, chooserAnnouncement, followAnnouncement, groupAnnouncement,
+  describeFound, summaryOf, chooserAnnouncement, followAnnouncement,
 } from '../../utils/scripture-web/describe.js';
 import { pickPersonalLinks, pickUnderlayLinks, nearestLinks, nearestUnderlay } from './rail-renderer.js';
 import { hitOverlay } from './overlay-renderer.js';
@@ -634,26 +634,12 @@ export function useWebSelection({
     schedule();
   }, [graph, focusRef, flyTo, schedule]);
 
-  // A bundle's group, chosen in its sheet: the pair of ranges the shader and
-  // the picker draw and spotlight (uFocusRange2). Choosing the
-  // same group again lets go of it. The pointer's hover stays as it was.
-  const chooseGroup = React.useCallback((info, grp) => {
-    const same = focusRef.current.range2 && grp && focusRef.current.range2[0] === grp.lo && focusRef.current.range2[1] === grp.hi;
-    focusRef.current = focusState({
-      range: [info.lo, info.hi], range2: same || !grp ? null : [grp.lo, grp.hi], hover: focusRef.current.hover,
-      hoverProphecy: focusRef.current.hoverProphecy,
-    });
-    setDetail(Object.assign({}, info, { chosenGroup: same || !grp ? null : grp.chapterIndex }));
-    setAnnounce(groupAnnouncement(grp, same || !grp));
-    schedule();
-  }, [focusRef, schedule, setAnnounce]);
-
   // what is open, in the panel's terms (panelOf); closePanel is the one close
   const panel = React.useMemo(() => panelOf(detail, choices, choiceChapter), [detail, choices, choiceChapter]);
 
   return {
     tip, choices, choiceChapter, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
-    handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread, chooseGroup,
+    handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread,
     followRow, zoomTo, describe,
     panel, openPanel, closePanel: closeCards, lightThreads, journey,
   };
