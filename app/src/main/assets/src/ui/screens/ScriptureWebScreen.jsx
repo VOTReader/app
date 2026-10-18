@@ -183,7 +183,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
   // My Web (use-personal-web.js): the reader's links built into the dual
   // rail, rebuilt live; railOpts() is what the rail renderer places them by
-  const { personalRef, personalCount, contextCount, skippedCount, railOpts } = usePersonalWeb({
+  const { personalRef, personalCount, contextCount, skippedCount, railOpts, relink } = usePersonalWeb({
     graph, mode, showUnderlay, camRef, camVRef, viewRef, frame, chromeRef, schedule, resumeRef, focusRef, topbarRef,
   });
 
@@ -236,7 +236,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     openPanel, lightThreads,
   } = useWebSelection({
     graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, yFrameFor,
-    personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce,
+    personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce, relink,
   });
 
   // the go-to (goto.jsx): its header slot (goTo.button, first in the control

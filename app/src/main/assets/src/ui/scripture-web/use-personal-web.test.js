@@ -17,6 +17,8 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { usePersonalWeb } from './use-personal-web.js';
+import { useWebSelection } from './use-web-selection.js';
+import { useJourney } from './use-journey.js';
 
 const g = /** @type {any} */ (globalThis);
 const STUBS = ['LinkStore', 'COLLECTIONS', 'READING_CHAIN', 'colLetterArr', 'colPreface', 'BIBLE_STUDIES', 'loadBibleStudies'];
@@ -68,6 +70,36 @@ function mount(extra) {
 }
 
 const tick = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+/** usePersonalWeb and the selection wired as the screen wires them: the open card is the selection's. */
+function mountWithSelection(extra) {
+  const refs = {
+    camRef: { current: { x: 30, y: 0, ppv: 10, total: 60 } },
+    camVRef: { current: null },
+    viewRef: { current: { W: 100, H: 80, DPR: 1 } },
+    chromeRef: { current: {} },
+    focusRef: { current: { arc: -1, hover: -1 } },
+    resumeRef: { current: null },
+    elevatorRef: { current: null }, badgeBoxesRef: { current: [] }, overlayFrameRef: { current: null },
+  };
+  Object.assign(refs, extra || {});
+  const schedule = vi.fn();
+  const frame = () => ({ base: 60 });
+  const hook = renderHook((p) => {
+    const web = usePersonalWeb(p);
+    const journey = useJourney();
+    const sel = useWebSelection({
+      graph: p.graph, mode: p.mode, density: 'famous', showUnderlay: true, resumeRef: p.resumeRef,
+      camRef: p.camRef, viewRef: p.viewRef, focusRef: p.focusRef, viewFor: () => ({}), yFrameFor: () => null,
+      personalRef: web.personalRef, railOpts: web.railOpts, elevatorRef: p.elevatorRef, badgeBoxesRef: p.badgeBoxesRef,
+      overlayFrameRef: p.overlayFrameRef, flyTo: () => Promise.resolve(false), journey, schedule: p.schedule,
+      setAnnounce: () => {}, relink: web.relink,
+    });
+    return { web, sel };
+  }, { initialProps: { graph: GRAPH, mode: 'personal', showUnderlay: true, frame, schedule, ...refs } });
+  return { hook, refs, get: () => hook.result.current };
+}
+const recordAt = (get, i) => get().web.personalRef.current.graph.records[i];
 
 describe('usePersonalWeb railOpts', () => {
   it('carries the top chrome’s bottom edge in device px, so the Volumes rail clears the header (w3 picture)', () => {
@@ -160,9 +192,52 @@ describe('usePersonalWeb across rebuilds', () => {
     g.LinkStore = store([link('b', 2, 'l2'), link('c', 3, 'l3')]);    // 'a' was deleted in the reader
     const detail = { kind: 'link', index: 2, record: { id: 'c' } };
     const resumeRef = { current: { mode: 'personal', cam: { x: 30, y: 0, ppv: 10, total: 60 }, focus: { arc: 2, hover: -1 }, detail } };
-    mount({ resumeRef });
+    const { get } = mountWithSelection({ resumeRef });
     expect(resumeRef.current.focus.arc).toBe(1);
-    expect(detail.index).toBe(1);
+    // the open card is the selection's, found again by id (fix-review #8:
+    // it was the resume's object, patched in place under the selection)
+    expect(get().sel.panel.spec).toEqual({ mode: 'connection', arc: 1, myWeb: 'link' });
+    expect(recordAt(get, get().sel.panel.spec.arc).id).toBe('c');
+    expect(detail.index).toBe(2);
+  });
+
+  it('fix-review #8: deleting an earlier link keeps the open card on the same record, and the focus is replaced, not written', () => {
+    corpus();
+    const s = store([link('a', 1, 'l1'), link('b', 2, 'l2'), link('c', 3, 'l3')]);
+    g.LinkStore = s;
+    const { get, refs } = mountWithSelection();
+    act(() => { get().sel.commitFound({ kind: 'link', index: 2, record: recordAt(get, 2), source: { label: 'Genesis 1:3' }, target: { label: 'Letter 3' } }); });
+    const before = refs.focusRef.current;
+    expect(get().sel.panel.spec.arc).toBe(2);
+    act(() => { s.set([link('b', 2, 'l2'), link('c', 3, 'l3')]); });
+    expect(get().sel.panel.spec).toEqual({ mode: 'connection', arc: 1, myWeb: 'link' });
+    expect(recordAt(get, get().sel.panel.spec.arc).id).toBe('c');
+    expect(refs.focusRef.current.arc).toBe(1);
+    expect(refs.focusRef.current).not.toBe(before);
+    expect(before.arc).toBe(2);
+  });
+
+  it('fix-review #8: deleting the chosen link closes its card and lets go of the focus', () => {
+    corpus();
+    const s = store([link('a', 1, 'l1'), link('b', 2, 'l2')]);
+    g.LinkStore = s;
+    const { get, refs } = mountWithSelection();
+    act(() => { get().sel.commitFound({ kind: 'link', index: 1, record: recordAt(get, 1), source: { label: 'Genesis 1:2' }, target: { label: 'Letter 2' } }); });
+    act(() => { s.set([link('a', 1, 'l1')]); });
+    expect(get().sel.panel).toBeNull();
+    expect(refs.focusRef.current).toMatchObject({ arc: -1, underlay: false, range: null, lit: null });
+  });
+
+  it('fix-review #8: a chosen Timothy thread is not a link: a rebuild leaves its focus and card as they are', () => {
+    corpus();
+    const s = store([link('a', 1, 'l1'), link('b', 2, 'l2')]);
+    g.LinkStore = s;
+    const { get, refs } = mountWithSelection();
+    act(() => { get().sel.commitFound({ kind: 'underlay', index: 0, source: { label: 'Genesis 1:4' }, target: { label: 'Letter 1' } }); });
+    const before = refs.focusRef.current;
+    act(() => { s.set([link('b', 2, 'l2')]); });
+    expect(refs.focusRef.current).toBe(before);
+    expect(get().sel.panel.spec).toEqual({ mode: 'connection', arc: 0, myWeb: 'underlay' });
   });
 
   it('the header counts are state of the build: links placed, Timothy’s threads placed, links skipped', () => {

@@ -80,13 +80,22 @@ export function panelOf(detail, choices) {
  *   (the sheet that was open); the cameras' refs and callbacks and flyTo
  *   (use-web-camera.js); My Web's personalRef and railOpts; the boxes the
  *   draw wrote (elevatorRef, badgeBoxesRef, overlayFrameRef); the journey
- *   (use-journey.js); the frame loop; the live region
+ *   (use-journey.js); the frame loop; the live region; and My Web's relink
+ *   (use-personal-web.js, optional): the chosen link found again after a rebuild
  */
 export function useWebSelection({
   graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, yFrameFor,
-  personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce,
+  personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce, relink = null,
 }) {
   const [detail, setDetail] = React.useState(() => (resumeRef.current && resumeRef.current.detail) || null);      // the open sheet
+  // My Web's rebuild found the chosen link again (use-personal-web's relink):
+  // its open card moves to the link's new index, or closes with it deleted
+  // (fix-review #8)
+  React.useEffect(() => {
+    if (!relink) return;
+    setDetail((d) => (!d || d.kind !== 'link' || !d.record || d.record.id !== relink.id ? d
+      : relink.at >= 0 ? Object.assign({}, d, { index: relink.at }) : null));
+  }, [relink]);
   const [choices, setChoices] = React.useState(null);    // overlapped line chooser
   const [listOpen, setListOpen] = React.useState(false); // accessible nearby list
   const [tip, setTip] = React.useState(null);            // hover chip

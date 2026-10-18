@@ -16,11 +16,18 @@
    the focus and in the resume from the reader (item 30, bug #7: kept by
    index, a deletion before it moved the spotlight onto a neighbour); a
    studies load that fails is caught (bug #8); and the header's counts are
-   state of the build, so a render never reads a half-landed ref. */
+   state of the build, so a render never reads a half-landed ref.
+
+   Fix-review #8: the found-again choice is written through focusState (the
+   focus is replaced, never patched in place), and the open card follows it
+   through `relink` ({id, at}: the chosen link's record id and its index in
+   the rebuilt list, -1 when it was deleted), which the selection reads to
+   move its card's index or close the card. */
 
 import { createCamera, verseToX, fitPPV, clampCamera } from '../../utils/scripture-web/geometry.js';
 import { buildPersonal } from '../../utils/scripture-web/personal-build.js';
 import { linkIndexById } from '../../utils/scripture-web/personal-graph.js';
+import { focusState } from '../../utils/scripture-web/focus-state.js';
 
 /** Subscribe to LinkStore so the personal web follows new links live. */
 function useLinkVersion() {
@@ -85,6 +92,7 @@ function chosenLink(prev, focusRef, resumeRef) {
 export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, viewRef, frame, chromeRef, schedule, resumeRef, focusRef, topbarRef }) {
   const personalRef = React.useRef(null);
   const [counts, setCounts] = React.useState({ links: 0, timothy: 0, skipped: 0 });
+  const [relink, setRelink] = React.useState(/** @type {{id:string, at:number}|null} */ (null));
 
   /** Everything the rail renderer needs to place a personal endpoint. */
   const railOpts = React.useCallback(() => {
@@ -123,19 +131,20 @@ export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, vie
     camVRef.current = keepRailCamera(camVRef.current, total, viewRef.current ? viewRef.current.W : 0);
     if (chosen) {
       const at = linkIndexById(built && built.graph, chosen.id);
+      // the choice found again, or (deleted) let go whole
+      const follow = (f) => (at >= 0 ? focusState(Object.assign({}, f, { arc: at })) : focusState());
       const focus = focusRef && focusRef.current;
-      if (prev) {
-        if (focus && focus.arc === chosen.arc) focus.arc = at;
-      } else {
+      if (!prev) {
         // the mount's first build: the renderer restores focusRef from the
-        // resume (after this effect, or before it on a later graph); patch
-        // both so the order does not matter, and the open card the
-        // selection took from the same resume
+        // resume (after this effect, or before it on a later graph); follow
+        // in both so the order does not matter
         const back = resumeRef.current;
-        back.focus = Object.assign({}, back.focus, { arc: at });
-        if (back.detail) back.detail.index = at;
-        if (focus && focus.arc === chosen.arc) focus.arc = at;
+        back.focus = follow(back.focus);
+        if (back.detail) back.detail = at >= 0 ? Object.assign({}, back.detail, { index: at }) : null;
       }
+      if (focus && !focus.underlay && focus.arc === chosen.arc) focusRef.current = follow(focus);
+      // the open card follows by id (the selection's own state)
+      if (!prev || at !== chosen.arc) setRelink({ id: chosen.id, at });
     }
     const pg = built && built.graph;
     setCounts({
@@ -158,6 +167,6 @@ export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, vie
   }, [graph, mode, linkVersion, studiesTick, schedule, camVRef, viewRef, focusRef, resumeRef]);
 
   return {
-    personalRef, personalCount: counts.links, contextCount: counts.timothy, skippedCount: counts.skipped, railOpts,
+    personalRef, personalCount: counts.links, contextCount: counts.timothy, skippedCount: counts.skipped, railOpts, relink,
   };
 }
