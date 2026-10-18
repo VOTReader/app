@@ -171,6 +171,9 @@ async function toMyWeb(page) {
   await page.waitForFunction(() => !document.querySelector('.sw-loading'), { timeout: NAV_MS });
   await clickLabel(page, 'My web');
   await sleep(600);
+  // the first-run guide ("How to read this web") opens on a fresh context and covers the band; its
+  // button is "Got it" ('Dismiss' is the empty notice's x)
+  await clickIfPresent(page, 'Got it'); await sleep(300);
   await clickIfPresent(page, 'Reset the view');
   await sleep(900);
   return true;
