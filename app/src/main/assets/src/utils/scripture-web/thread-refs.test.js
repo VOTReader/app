@@ -167,8 +167,9 @@ describe('threadEnds: where a thread\'s references are written', () => {
 
 describe('visibleArcs: the drawn threads a label pass walks', () => {
   /* Restated for E1 (GL step 2): the draw order is the frame's visible set's,
-     shortest drawn span first so the widest lies on top, the same at every
-     zoom (it was the asset's bucket order). */
+     shortest drawn span first (by span step, frame-set.spanStep) so the
+     widest lies on top, the same at every zoom (it was the asset's bucket
+     order). */
   it('returns the threads whose body is in the frame, in draw order (shortest first), and not the ones wholly off it', () => {
     const g = makeGraph([[5, 35], [60, 70], [0, 99], [30, 31]]);
     const view = viewOf(520);

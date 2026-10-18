@@ -16,19 +16,29 @@
    cameras).
 
    Order. A density's threads are ranked once by their span on screen (the
-   feet as drawn, fans included), so the draw is shortest first and the
-   widest on top, in the same order at every zoom: the web is blended over
-   (premultiplied), so the order IS the picture, and a thread never changes
-   layer as the reader zooms (C20). The set goes to the renderer as RUNS of
-   consecutive ranks, one draw each, every thread of a run with the run's
-   most segments (more than a thread asked for only refines it): a run splits
-   where the vertex invocations that saves pass RUN_DRAW_VERTICES, the worth
-   of one more draw. At the overview a thread's segments follow its span
-   alone, so a run is one segment count; deeper in, the long threads' legs
-   need fewer segments than the arches beside them, and the runs follow
-   that. Candidates come from a scan of every rank, or, once the
-   frame is deep, from the feet in the frame widened by the farthest a foot
-   can stand from it and still lift its body into the frame (see feetWindow).
+   feet as drawn, fans included) in steps of an eighth of an octave
+   (ORDER_STEPS), so the draw is shortest first and the widest on top, in
+   the same order at every zoom: the web is blended over (premultiplied), so
+   the order IS the picture, and a thread never changes layer as the reader
+   zooms (C20). Within a step the threads go by x (their from-verse, then
+   the asset's order), so consecutive draws stand side by side on the
+   screen: ranked by exact span they scattered across the frame, and the
+   GPU paid for it (6x on the 890M, perf.md: 12.9 ms by exact span, 6.4 by
+   step and x, 7.3 in the asset's bucket order).
+
+   Runs. The set goes to the renderer as RUNS of consecutive ranks, one draw
+   each, every thread of a run with the run's most segments (more than a
+   thread asked for only refines it): a run splits where the vertex
+   invocations that saves pass RUN_DRAW_VERTICES, the worth of one more
+   draw. At the overview a thread's segments follow its span alone, so a
+   step's threads ask for nearly one count and the overview is drawn within
+   a couple of percent of every thread's own; deeper in, the long threads'
+   legs need fewer segments than the arches beside them, and the runs follow
+   that.
+
+   Candidates come from a scan of every rank, or, once the frame is deep,
+   from the feet in the frame widened by the farthest a foot can stand from
+   it and still lift its body into the frame (see feetWindow).
 
    THE TOP PASS. The GL renderer (web-renderer.js) draws the web in two
    passes. The main pass is the visible set above, in the distance ramp. The
@@ -248,9 +258,23 @@ export function topSet(g, v, prev) {
 
 const ORDERS = new WeakMap();
 
+/** Steps of the drawing order per octave of span: a step's threads differ by under 9% in span. */
+export const ORDER_STEPS = 8;
+
 /**
- * A density's threads in drawing order, cached per graph: ranked by their span as drawn
- * ((to + fanB) - (from + fanA), shortest first; ties in asset order), with each verse's feet.
+ * A thread's step in the drawing order: floor(ORDER_STEPS log2 span), spans under 1/1024 of a
+ * verse taken as 1/1024.
+ * @param {number} span  (to + fanB) - (from + fanA), in verses
+ * @returns {number}
+ */
+export function spanStep(span) {
+  return Math.floor(ORDER_STEPS * Math.log2(Math.max(span, 1 / 1024)));
+}
+
+/**
+ * A density's threads in drawing order, cached per graph: ranked by the step of their span as
+ * drawn (spanStep of (to + fanB) - (from + fanA), shortest first), then by their from-verse, then
+ * in asset order, with each verse's feet.
  * @param {any} g  the decoded graph
  * @param {import('./decode.js').Density} density
  * @returns {DrawOrder}
@@ -265,16 +289,17 @@ export function drawOrder(g, density) {
   let n = 0;
   for (const b of (g && g.buckets) || []) n += Math.max(0, bucketDrawCount(b, which));
   const members = new Uint32Array(n);
-  const span = new Float64Array(count);
+  const step = new Int32Array(count);
   let at = 0;
   for (const b of (g && g.buckets) || []) {
     const end = b.off + Math.max(0, bucketDrawCount(b, which));
     for (let i = b.off; i < end; i++) {
       members[at++] = i;
-      span[i] = (g.to[i] + fans.fanB[i]) - (g.from[i] + fans.fanA[i]);
+      step[i] = spanStep((g.to[i] + fans.fanB[i]) - (g.from[i] + fans.fanA[i]));
     }
   }
-  members.sort((p, q) => span[p] - span[q] || p - q);
+  const from = g.from;
+  members.sort((p, q) => step[p] - step[q] || from[p] - from[q] || p - q);
   const ids = count <= 0xffff ? new Uint16Array(n) : new Uint32Array(n);
   const rankOf = new Int32Array(count).fill(-1);
   const fx0 = new Float64Array(n), fx1 = new Float64Array(n);

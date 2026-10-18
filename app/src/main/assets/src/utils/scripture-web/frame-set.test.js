@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import {
   prophecySet, topSet, topSetKey, isCompact, COMPACT_HEIGHT_CSS, TOP_ORDER,
-  drawOrder, frameSetAt, frameSet, inFrame, RUN_DRAW_VERTICES,
+  drawOrder, frameSetAt, frameSet, inFrame, RUN_DRAW_VERTICES, ORDER_STEPS, spanStep,
 } from './frame-set.js';
 import * as dec from './decode.js';
 import { fansOf } from './decode.js';
@@ -280,7 +280,7 @@ describe('the visible set: drawn, counted, labelled and picked are one set (E1)'
           if (!listed.has(i)) bad.push(`inFrame ${i} not listed`);
         }
         if (members !== set.count) bad.push(`inFrame holds ${members}, count ${set.count}`);
-        // the list in rank order: the shortest drawn span first, the order the web is blended in
+        // the list in rank order: the shortest drawn span step first, the order the web is blended in
         for (let k = 1; k < set.count; k++) {
           if (order.rankOf[set.list[k]] <= order.rankOf[set.list[k - 1]]) bad.push(`list out of rank at ${k}`);
         }
@@ -313,17 +313,52 @@ describe('the visible set: drawn, counted, labelled and picked are one set (E1)'
     }
   });
 
-  it('a run splits only where it saves more than a draw: the overview, where segments follow span, is one run per count', () => {
+  /* Restated (GL step 2, the stepped order): the overview's runs were held to
+     one per segment count, true while the order was by exact span, so the
+     counts rose once each. Ranked by span step and by x inside a step, the
+     counts rise and fall within a step; what the runs owe is the same
+     intent, the overview drawn at about each thread's own count. */
+  it('the drawing order: by span step, shortest first, then by from-verse, then the asset\'s order', () => {
+    const bad = [];
+    let steps = 1;
+    for (let r = 1; r < order.count; r++) {
+      const p = order.ids[r - 1], q = order.ids[r];
+      const sp = spanStep((g.to[p] + fans.fanB[p]) - (g.from[p] + fans.fanA[p]));
+      const sq = spanStep((g.to[q] + fans.fanB[q]) - (g.from[q] + fans.fanA[q]));
+      if (sq < sp) bad.push(`rank ${r}: step ${sq} after ${sp}`);
+      else if (sq === sp && g.from[q] < g.from[p]) bad.push(`rank ${r}: from ${g.from[q]} after ${g.from[p]} in step ${sq}`);
+      else if (sq === sp && g.from[q] === g.from[p] && q < p) bad.push(`rank ${r}: id ${q} after ${p}`);
+      if (sq !== sp) steps++;
+    }
+    expect(bad.slice(0, 5)).toEqual([]);
+    // a step is an eighth of an octave: the asset's 1 .. 31,093-verse spans fill some 120 of them
+    expect(ORDER_STEPS).toBe(8);
+    expect(steps).toBeGreaterThan(60);
+    expect(steps).toBeLessThan(200);
+  });
+
+  it('consecutive draws stand side by side: at 6.5x the next thread\'s foot is a few percent of the frame away, not across it', () => {
+    // ranked by exact span the 6.5x frame's threads scattered (a mean step of 61% of its width) and
+    // the 890M paid 12.9 ms for a frame it draws in 6.4 by step and x (perf.md)
+    for (const dev of devices) {
+      const fr = frameOf(dev);
+      const c = cameras(fr)[1];
+      const set = setOf(fr, c);
+      let dx = 0;
+      for (let k = 1; k < set.count; k++) dx += Math.abs(g.from[set.list[k]] - g.from[set.list[k - 1]]);
+      const mean = dx / (set.count - 1), width = fr.W / c.ppv;
+      expect(mean / width, dev.name).toBeLessThan(0.05);
+    }
+  });
+
+  it('a run splits only where it saves more than a draw, and the overview is drawn at about each thread\'s own count', () => {
     const fr = frameOf(devices[0]);
     const set = setOf(fr, cameras(fr)[0]);
-    let counts = 0;
-    for (let k = 0; k < set.count; k++) {
-      const n = set.segments[order.rankOf[set.list[k]]];
-      if (k === 0 || n !== set.segments[order.rankOf[set.list[k - 1]]]) counts++;
-    }
-    // segments rise with span at the overview: each change of count is a run boundary, or a merge
-    expect(set.runs).toBeLessThanOrEqual(counts);
-    expect(set.runs).toBeGreaterThan(counts / 2);
+    let own = 0;
+    for (let k = 0; k < set.count; k++) own += 2 * (set.segments[order.rankOf[set.list[k]]] + 1);
+    // a step's threads differ by under 9% in span and their counts by about half that
+    expect(set.vertices).toBeLessThanOrEqual(1.05 * own);
+    expect(set.runs).toBeLessThanOrEqual(64);
     // every boundary the runs keep saves more than RUN_DRAW_VERTICES against merging the pair
     for (let k = 0; k + 1 < set.runs; k++) {
       const a = set.runCount[k], b = set.runCount[k + 1], na = set.runN[k], nb = set.runN[k + 1];
