@@ -2,7 +2,9 @@
    original first, its reprint second, both shown". Round 2 of the tri bench's open misses of that kind, each on a
    fixture shaped like its texts:
    - an Answers topic prints a letter's line with one word in another form ("messengers" where the letter says
-     "messenger"), and the reader types the topic's words: the letter, holding the line up to that word's form, leads.
+     "messenger"), and the reader types the topic's words: the letter, holding the line up to that word's form, leads;
+   - a letter's line quotes a verse word for word, and the reader types the letter's own words around it: the verse
+     it quotes comes up second, not a text that quotes the verse too.
    Fixture texts only (no benchmark query). */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VotSearchMini as E } from './engine.js';
@@ -28,11 +30,17 @@ const GLOBALS = {
   BOOKS: {
     proverbs: { id: 'proverbs', title: 'Proverbs', chapters: [
       { num: 30, sections: [{ heading: '', verses: Array.from({ length: 200 }, (_, i) => ({ n: i + 1, text: 'The ant and the rock badger turn in the house of kings ' + i + '.' })) }] },
+      { num: 31, sections: [{ heading: '', verses: [
+        { n: 1, text: 'He who keeps watch at the gate of the city shall not be ashamed in the day of trouble, for his lamp is trimmed.' },
+      ] }] },
     ] },
   },
   LETTERS_V4: [
     { id: 'heed-letter', num: 3, title: 'Heed My Words', blocks: [para(filler(12) + HEED + ' Pride has bound them, and the world holds them fast. ' + filler(12))] },
     { id: 'grain-letter', num: 4, title: 'The Grain', blocks: [para(filler(12) + 'Gather the grain before the rain, for the season turns. ' + filler(12))] },
+    // a letter's line quoting the verse after a colon, and a letter quoting it too
+    { id: 'watch-letter', num: 5, title: 'Keep Watch', blocks: [para(filler(12) + 'Children, have you not remembered this word: He who keeps watch at the gate of the city shall not be ashamed in the day of trouble, for his lamp is trimmed. ' + filler(12))] },
+    { id: 'gate-letter', num: 6, title: 'At the Gate', blocks: [para(filler(2) + 'It is written, He who keeps watch at the gate of the city shall not be ashamed in the day of trouble, for his lamp is trimmed. Remembered by few. ' + filler(2))] },
   ],
   ANSWERS: [
     // three topics print the line with the plural, each denser in the typed words than the long letter
@@ -63,6 +71,12 @@ describe('the original first, its reprint second, both shown (R1)', () => {
     const top = ids(await E.search('or my messengers has turned from me toward his own desire'));
     expect(top[0]).toBe('heed-letter');
     expect(['scoffers-topic', 'pride-topic', 'obedience-topic']).toContain(top[1]);
+  });
+
+  it('a letter\'s line quoting a verse, found by the letter\'s own words: the verse it quotes comes up second', async () => {
+    const top = ids(await E.search('children have you not remembered this word'));
+    expect(top[0]).toBe('watch-letter');
+    expect(top[1]).toBe('Proverbs 31:1');
   });
 
   it('a line a topic prints with another word in a word\'s place: the topic holding the typed run leads', async () => {

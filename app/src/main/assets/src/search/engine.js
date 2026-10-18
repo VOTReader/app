@@ -1584,30 +1584,85 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
 const REPRINT_REACH = 200;
 /** Words in a row a reprint shares with the passage (fewer when the sentence is shorter, five at least). */
 const REPRINT_RUN = 8;
+/** The results the screen shows first (its Best Matches): a verse quoted among them is shown. */
+const BEST_SHOWN = 5;
+/* THE VERSE A PASSAGE QUOTES, SHOWN WITH IT (search200 R1, 2026-10-18). A letter's line that quotes Scripture ("Or have
+   you forgotten this Scripture: For everyone to whom much is given...") was found by the letter's own words, and the
+   verse it quotes never came up: the reader saw the letter and not the Scripture it names. A clause of the passage
+   that is a verse's sentence word for word (QUOTED_KEY_MIN words or more, His name as printed, and one verse's, not a
+   formula many verses say) is that verse quoted: it comes up second, after a reprint of the passage's own words when
+   one is shown. A text holding only the quoted words is no reprint of the passage: it quotes the verse too. */
+/** Words, at least, of a clause that names the verse it quotes by its sentence. */
+const QUOTED_KEY_MIN = 8;
+/** The verses (one, or Matthew's two printings of it) whose sentence a passage clause is: [] when none or a formula. */
+function quotedVerses(/** @type {string} */ clause) {
+  const k = sentenceKey(clause);
+  const O = ORIGINALS;
+  const D = ORIGINAL_DOCS;
+  if (!k || !O || !D || k.split(' ').length < QUOTED_KEY_MIN) return [];
+  const ids = (O.get(k) || []).filter((id) => D.has(id) && D.get(id).kind === 'verse');
+  const where = new Set(ids.map((id) => { const f = D.get(id); return (f.bookId === 'matthew-plain' ? 'matthew' : f.bookId) + ':' + f.chapterNum + ':' + f.verseNum; }));
+  return where.size === 1 ? ids : [];
+}
 /**
- * @param {Array<{doc:any, placeStart?:number, terms?:string[]}>} out  ranked, best first
+ * @param {Array<{score:number, doc:any, placeStart?:number, terms?:string[]}>} out  ranked, best first
  * @param {string[]} terms  the words a landing marks
+ * @param {Map<any, string>} [idOf]  each entry's doc id (with `allowed`: the verse a passage quotes may come up)
+ * @param {(doc:any) => boolean} [allowed]  the search's corpus and scope filters, and its dedup
+ * @returns {boolean} whether an entry was added
  */
-function reprintSecond(out, terms) {
-  if (out.length < 3 || !terms.length) return;
+function reprintSecond(out, terms, idOf, allowed) {
+  if (out.length < 3 || !terms.length) return false;
   const first = out[0];
   const d = first.doc;
-  if (!d.text || !(d.kind === 'letter' || d.kind === 'wtlb' || d.kind === 'blessed')) return;
+  if (!d.text || !(d.kind === 'letter' || d.kind === 'wtlb' || d.kind === 'blessed')) return false;
   // the passage it was found by: the sentence it opens on, else the one where the typed words sit thickest
   let st = typeof first.placeStart === 'number' && first.placeStart >= 0 ? first.placeStart : -1;
   if (st < 0) { const ex = matchExcerpt(d.text, terms, undefined, first.terms); st = ex ? d.text.indexOf(ex) : -1; }
-  if (st < 0) return;
-  const sp = sentenceSpans(d.text).find((x) => x.end > st);
-  const toks = sp ? kjvEncode(sp.text) : [];
-  if (toks.length < 5) return;
-  const runs = toks.length <= REPRINT_RUN ? [toks] : [0, (toks.length - REPRINT_RUN) >> 1, toks.length - REPRINT_RUN].map((i) => toks.slice(i, i + REPRINT_RUN));
-  const esc = (/** @type {string} */ t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const res = runs.map((run) => new RegExp('(?:^|[^a-z0-9])' + run.map(esc).join('[^a-z0-9]+') + '(?![a-z0-9])', 'i'));
-  for (let r = 1; r < Math.min(out.length, REPRINT_REACH); r++) {
-    const t = out[r].doc.text;
-    if (!t || out[r].doc.kind === 'verse') continue;
-    if (res.some((re) => re.test(t))) { if (r > 1) out.splice(1, 0, out.splice(r, 1)[0]); return; }
+  if (st < 0) return false;
+  const spans = sentenceSpans(d.text);
+  const at = spans.findIndex((x) => x.end > st);
+  const sp = at >= 0 ? spans[at] : null;
+  let toks = sp ? kjvEncode(sp.text) : [];
+  // the verse it quotes: a clause of the reader's sentence (to its . ! or ?), whole or after a colon or opening quote
+  /** @type {string[]} */ let verses = [];
+  if (sp && idOf && allowed) {
+    for (let j = at; j < Math.min(spans.length, at + 3) && !verses.length; j++) {
+      const s = spans[j].text;
+      const cut = s.search(/[:“"]/);
+      verses = quotedVerses(s);
+      if (!verses.length && cut > 0) {
+        verses = quotedVerses(s.slice(cut + 1));
+        // the passage's own words are those before the quote
+        if (verses.length && j === at) toks = kjvEncode(s.slice(0, cut));
+      } else if (verses.length && j === at) toks = [];
+      if (/[.!?]\s*$/.test(s)) break;
+    }
   }
+  // a reprint of the passage's own words: the first text below holding a run of them
+  let slot = 1;
+  if (toks.length >= 5) {
+    const runs = toks.length <= REPRINT_RUN ? [toks] : [0, (toks.length - REPRINT_RUN) >> 1, toks.length - REPRINT_RUN].map((i) => toks.slice(i, i + REPRINT_RUN));
+    const esc = (/** @type {string} */ t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const res = runs.map((run) => new RegExp('(?:^|[^a-z0-9])' + run.map(esc).join('[^a-z0-9]+') + '(?![a-z0-9])', 'i'));
+    for (let r = 1; r < Math.min(out.length, REPRINT_REACH); r++) {
+      const t = out[r].doc.text;
+      if (!t || out[r].doc.kind === 'verse') continue;
+      if (res.some((re) => re.test(t))) { if (r > 1) out.splice(1, 0, out.splice(r, 1)[0]); slot = 2; break; }
+    }
+  }
+  if (!verses.length || !idOf || !allowed) return false;
+  // ...and after it the verse quoted, unless it is shown already
+  const r = out.findIndex((e) => verses.indexOf(idOf.get(e) || '') >= 0);
+  if (r >= 0 && r < BEST_SHOWN) return false;
+  if (r > slot) { out.splice(slot, 0, out.splice(r, 1)[0]); return false; }
+  const D = /** @type {Map<string, any>} */ (ORIGINAL_DOCS);
+  const id = verses.find((x) => allowed({ ...D.get(x), id: x }));
+  if (!id) return false;
+  const entry = { score: out[slot - 1].score, doc: reshapeDoc(D.get(id)), terms: first.terms || [] };
+  idOf.set(entry, id);
+  out.splice(slot, 0, entry);
+  return true;
 }
 /** @type {Promise<boolean>|null} */ let building = null;
 /** The edition the build under way is for. */
@@ -2774,7 +2829,7 @@ async function search(query, options) {
   }
   // And in all: an original originalsFirst brought in from outside the results (or the model's best text) was one
   // text past the limit (sweep low, REPORT.md:645). The last gives way, and the result says texts were left.
-  const over = out.length > limit;
+  let over = out.length > limit;
   if (over) out.length = limit;
   /* THE READER LANDS ON THE RUN TYPED (search200 B3, 2026-10-18). A text opened where the typed words sit thickest
      (use-search matchExcerpt), and a long letter holding the run deep down opened where its common words crowd. The
@@ -2806,7 +2861,8 @@ async function search(query, options) {
   if (sem && sem.length) meaningLanding(out, idOf, sem, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))));
   // ...by the passage the screen lands on: the card marks the phrase or the typed run with the words (textQuery.run).
   // A title named first was found by no passage: its same-titled reprints were admitted beside it.
-  if (!out.length || !titleTop.has(out[0])) reprintSecond(out, (p.phrase ? [p.phrase] : run ? [run] : []).concat(filtered.filter((t) => !isStopTerm(t))));
+  if ((!out.length || !titleTop.has(out[0])) && reprintSecond(out, (p.phrase ? [p.phrase] : run ? [run] : []).concat(filtered.filter((t) => !isStopTerm(t))),
+    idOf, (d) => allowed(d) && fresh(d)) && out.length > limit) { out.length = limit; over = true; }
 
   /* CLOSE MATCHES (sr13, 2026-10-15). Book order lists the results in reading order, and most of a passage
      search's results hold a word or two of it: "I am The Lord and I do not change" found 1,344 texts, and Book
