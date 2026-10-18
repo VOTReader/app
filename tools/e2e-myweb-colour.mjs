@@ -124,7 +124,7 @@ const note = (s) => { notes.push(s); console.log('[e2e-myweb-colour] ' + s); };
 // link was on any picture (its pin - one of the three pin shapes Corbin approves, amber then, a gold dot since w3 - never
 // appeared) and the seven across links stacked out of the top-left corner with their pins clipped.
 const LETTER_SETS = (() => {
-  const files = { one: 'volume-one', four: 'volume-four', rebuke: 'lords-rebuke', flock: 'letters-flock' };
+  const files = { one: 'volume-one', four: 'volume-four', six: 'volume-six', rebuke: 'lords-rebuke', flock: 'letters-flock' };
   const out = {};
   for (const [volKey, file] of Object.entries(files)) {
     const src = readFileSync(resolve(OWN, `app/src/main/assets/src/data/${file}.js`), 'utf8');
@@ -137,9 +137,10 @@ const LETTER_SETS = (() => {
 const VOL_KEYS = Object.keys(LETTER_SETS);
 // The pins are told by shape since w3 (one gold), and a collection's first letters sit within a few px of each other
 // at 800 px wide: a letter holding both kinds read as one ring-and-dot (0 dot pins at phoneLand and pixelLand on
-// 762e11490, 2 on the PC). So the within-the-Volumes links join Vol IV and the Letters to the Flock (still two
-// different collections, D1) and the across links leave from Vol I and the Lord's Rebuke (still spread, D2).
-const WITHIN_KEYS = ['four', 'flock'], ACROSS_KEYS = ['one', 'rebuke'];
+// 762e11490, 2 on the PC). So the within-the-Volumes links join Vol IV, Vol VI and the Letters to the Flock (each
+// pair two different collections, D1; three arcs, not six links piled on one) and the across links leave from
+// Vol I and the Lord's Rebuke (still spread, D2).
+const WITHIN_KEYS = ['four', 'six', 'flock'], ACROSS_KEYS = ['one', 'rebuke'];
 const BIBLE = [['genesis', 1, 1], ['exodus', 20, 3], ['psalms', 23, 1], ['isaiah', 53, 5], ['john', 3, 16], ['romans', 8, 28],
   ['revelation', 21, 4], ['proverbs', 3, 5], ['deuteronomy', 6, 4], ['jeremiah', 29, 11], ['matthew', 5, 3], ['hebrews', 11, 1], ['micah', 6, 8], ['daniel', 3, 17]];
 const bibleEp = ([b, c, v]) => ({ type: 'bible', key: `bible:${b}:${c}:${v}`, bookId: b, chapter: c, verse: v, label: `${b} ${c}:${v}` });
@@ -148,9 +149,9 @@ function seedPairs(n) {
   const pairs = [];
   const nWithin = Math.round(n * 0.35), nVol = Math.round(n * 0.3), nAcross = n - nWithin - nVol;
   for (let i = 0; i < nWithin; i++) pairs.push([bibleEp(BIBLE[i]), bibleEp(BIBLE[(i + 7) % BIBLE.length])]);
-  // each within-the-Volumes pair joins the two DIFFERENT collections of WITHIN_KEYS, alternating which end is first;
+  // each within-the-Volumes pair joins two DIFFERENT collections of WITHIN_KEYS, rotating through its three pairs;
   // the across links' letter ends alternate between the two of ACROSS_KEYS
-  for (let i = 0; i < nVol; i++) pairs.push([letterEp(WITHIN_KEYS[i % 2], i), letterEp(WITHIN_KEYS[(i + 1) % 2], i + 2)]);
+  for (let i = 0; i < nVol; i++) pairs.push([letterEp(WITHIN_KEYS[i % 3], i), letterEp(WITHIN_KEYS[(i + 1) % 3], i + 2)]);
   for (let i = 0; i < nAcross; i++) pairs.push([bibleEp(BIBLE[(i + 3) % BIBLE.length]), letterEp(ACROSS_KEYS[i % 2], i + 4)]);
   return pairs;
 }
