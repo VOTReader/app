@@ -7877,6 +7877,12 @@
     .sw-goto.is-compact {
       top: 8px; left: 64px; right: calc(64px + var(--sw-goto-inset, 0px)); width: auto; transform: none;
     }
+    /* the compact box lies over the title and the control row by the spec's geometry, and its 0.96
+       fill let their gold ghost through behind the query: hidden while it is open (no reflow),
+       with a hover tip under it; Back, left of the box, stays (review 2026-10-18) */
+    .sw-root:has(> .sw-goto.is-compact) .sw-title,
+    .sw-root:has(> .sw-goto.is-compact) .sw-controls,
+    .sw-root:has(> .sw-goto.is-compact) .sw-tip { visibility: hidden; }
     .sw-goto-field { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 18px; }
     .sw-goto.is-compact .sw-goto-field { height: 48px; padding: 0 14px; gap: 10px; }
     .sw-goto-icon { flex: none; width: 20px; height: 20px; color: #B7BFC1; }

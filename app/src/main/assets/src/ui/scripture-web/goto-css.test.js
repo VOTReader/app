@@ -54,3 +54,18 @@ describe("the go-to's chips in compact mode", () => {
     expect(CSS).not.toMatch(/\.sw-narrow \.sw-goto-(chip|edge)/);
   });
 });
+
+/* The compact box runs 64 px in from each side at top 8, over the title and the control row by the
+   spec's own geometry, and its 0.96 fill let their gold text ghost through behind the query (the
+   review of 2026-10-18). While it is open they are hidden (visibility, so nothing reflows); the
+   Back button, left of the box, stays. */
+describe('the chrome under the compact box', () => {
+  it('the title and the control row are hidden while a compact box is open; the topbar (Back) is not', () => {
+    const under = '.sw-root:has(> .sw-goto.is-compact)';
+    expect(declsFor(under + ' .sw-title')).toMatch(/visibility:\s*hidden/);
+    expect(declsFor(under + ' .sw-controls')).toMatch(/visibility:\s*hidden/);
+    // a hover tip left under it ghosted the same way (the phone walk, tools/e2e-sw-goto.mjs)
+    expect(declsFor(under + ' .sw-tip')).toMatch(/visibility:\s*hidden/);
+    expect(declsFor(under + ' .sw-topbar')).toBe('');
+  });
+});
