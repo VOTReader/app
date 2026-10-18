@@ -38,6 +38,7 @@ afterEach(() => {
   HTMLCanvasElement.prototype.getContext = realGetContext;
   _resetFallbackPlace();   // a followed row sets where the next list opens (n6-05)
   delete window.SCRIPTURE_WEB_DATA;
+  delete /** @type {any} */ (globalThis).__swWalk;
   delete /** @type {any} */ (globalThis).HistoryStore;
   delete /** @type {any} */ (HTMLCanvasElement.prototype).clientWidth;
   delete /** @type {any} */ (HTMLCanvasElement.prototype).clientHeight;
@@ -117,6 +118,8 @@ describe('Scripture Web without WebGL2: the web read as a list (A7)', () => {
       set: (t, k, val) => { t[k] = val; return true; },
     });
     HTMLCanvasElement.prototype.getContext = /** @type {any} */ (function (kind) { return kind === '2d' ? fake2d() : null; });
+    // the rails' JSON is published only while a walk reads the frame (use-web-renderer walkOn, E3)
+    /** @type {any} */ (globalThis).__swWalk = {};
     const { container } = await mountWithoutWebGL();
     const open = [...container.querySelectorAll('.sw-fallback-list button')].find((b) => b.textContent === 'My web');
     expect(open, 'the list offers My web').toBeTruthy();
