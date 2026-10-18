@@ -31,8 +31,14 @@
  *      book. At every notch the thread's endpoints and stroke class come from
  *      the tree's own exported geometry (verseToX, threadPath) fed the
  *      published cameras. Registered: the largest per-notch endpoint
- *      displacement in CSS px, and that the thread is never null and never
- *      changes stroke class (rise-only vs rise+run) between adjacent notches.
+ *      displacement in CSS px, that the thread is never null, and THE SMEAR
+ *      (fix-review #6, the w3 path shape): at no notch does an on-screen run
+ *      of it flatter than 4 deg (2 deg for a fly-over, no foot on screen) span
+ *      more than a third of the width, the unit tests' G2 law read on the
+ *      published cameras. Its class (anchored / leg / fly) is printed as
+ *      information: a foot leaving the screen changes it, legitimately. (The
+ *      r2 rise / level-run classification read pts.rise, which the w3 path
+ *      no longer has, so every leg read 'rise'; it is retired.)
  *      Each notch's capture is taken while the gesture is still LIVE (inside
  *      the 150 ms hold, data-cap-fraction 0): what a moving finger sees.
  *   R  release: from the overview one wheel notch over the Bible rail at the
@@ -62,8 +68,8 @@
  *      width while data-ppv-css (the Bible camera) does not move; then wheel
  *      over the bottom rail until Isaiah fills >= 60 % while data-ppv-vot does
  *      not move. Endpoints THROUGH THE REAL UI: the pointer scans the Isaiah
- *      band 6 px above the bottom rail until the hover card reads "Corpus
- *      connection" with an Isaiah verse; then the Rebuke band 6 px below the
+ *      band 6 px above the bottom rail until the hover card reads "Timothy's
+ *      thread" (r2: "Corpus connection") with an Isaiah verse; then the Rebuke band 6 px below the
  *      top rail until the card's third line (the Volume the passage sits in)
  *      reads Rebuke. Then the pills:
  *      "Reset the Volumes rail" returns only the top camera to fit; "Reset the
@@ -73,7 +79,7 @@
  *      at its first assertion, which is the RED.
  *
  * USAGE
- *   node tools/e2e-myweb-r2.mjs [--frames phoneLand,desktop] [--arms O,S,T,C] [--out DIR] [--before TREE]
+ *   node tools/e2e-myweb-r2.mjs [--frames phoneLand,pixelLand,desktop] [--arms O,S,T,C] [--out DIR] [--before TREE]
  *   --before TREE serves THAT tree (its own tools/e2e-read-serve.mjs, its own
  *   git status) and measures it with this file's instruments: the BEFORE
  *   number comes from the same exported code as the AFTER. Both trees must be
@@ -92,15 +98,32 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const OWN = resolve(HERE, '..');
 const TREE = resolve(arg('before', OWN));
 const OUT = arg('out', '');
-const FRAME_LIST = arg('frames', 'phoneLand,desktop').split(',');
+const FRAME_LIST = arg('frames', 'phoneLand,pixelLand,desktop').split(',');
 const NAV_MS = 60000;
 /* v3 gate. Measured 2026-09-11 on the RTX 5080 with this instrument: main
    ce710380 reads 0.874 (800x360) / 0.900 (1920x1080); the tip ae30374e reads
    0.365 / 0.219. The gate sits at the midpoint so a regression halfway back to
    the streak field fails. The phone frame's 0.365 is its geometry, not a
    defect: a 144 px gap under 800 px puts a thread crossing 500 px at 16 deg. */
-const STREAK_HORIZ = { phoneLand: 0.45, desktop: 0.35 };   // per frame: measured tip + margin; main fails both
+const STREAK_HORIZ = { phoneLand: 0.45, pixelLand: 0.45, desktop: 0.35 };   // per frame: measured tip + margin; main fails both
+/* pixelLand (fix-review #6) starts at phoneLand's gate: the same phone geometry (a 411 px frame's gap under
+   891 px), registered from its first measured run. */
 const NOTCHES = 22;
+/* arm C's smear law (fix-review #6): the flattest on-screen run allowed, as a share of the width */
+const FLAT_DEG = { leg: 4, fly: 2 };
+const FLAT_SHARE = 1 / 3;
+/** The widest on-screen run of a polyline flatter than deg degrees, device px (rail-renderer-r2.test's flatRun). */
+function flatRun(pts, width, deg) {
+  const tan = Math.tan((deg * Math.PI) / 180);
+  let best = 0, from = null;
+  for (let i = 1; i < pts.length; i++) {
+    const [x1, y1] = pts[i - 1], [x2, y2] = pts[i];
+    const inside = Math.min(x1, x2) >= 0 && Math.max(x1, x2) <= width;
+    const flat = Math.abs(x2 - x1) > 1e-9 && Math.abs(y2 - y1) / Math.abs(x2 - x1) < tan;
+    if (inside && flat) { if (from == null) from = Math.min(x1, x2); best = Math.max(best, Math.max(x1, x2) - from); } else from = null;
+  }
+  return best;
+}
 const ARMS = arg('arms', 'R,O,S,T,C').split(',');
 const BAND_FILL = 0.6;
 // arm R launch classifier: an accelerated release frame draws in 5-8 ms here;
@@ -127,6 +150,7 @@ if (OUT) mkdirSync(OUT, { recursive: true });
 
 const FRAMES = {
   phoneLand: { w: 800, h: 360, dpr: 2, mobile: true },
+  pixelLand: { w: 891, h: 411, dpr: 2.6, mobile: true },     // the owner's Pixel 9 Pro, landscape
   desktop: { w: 1920, h: 1080, dpr: 2, mobile: false },
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -163,6 +187,10 @@ const attr = (page, k) => page.evaluate((k) => (document.querySelector('.sw-root
 const rails = (page) => page.evaluate(() => JSON.parse((document.querySelector('.sw-root') || { getAttribute: () => null }).getAttribute('data-rails') || 'null'));
 const ppv = async (page) => ({ b: Number(await attr(page, 'data-ppv-css')), v: Number(await attr(page, 'data-ppv-vot')) });
 const canvasRect = (page) => page.evaluate(() => { const b = document.querySelector('.sw-canvas-ui').getBoundingClientRect(); return { l: b.left, t: b.top, w: b.width, h: b.height }; });
+// a Timothy thread's hover card (w3: "Timothy's thread"; r2 said "Corpus connection")
+const THREAD_CARD = /Timothy.s thread|Corpus connection/i;
+// its third line: "<source> · <Volume>" from w3, the Volume alone before
+const volumeOf = (meta) => String(meta || '').replace(/^.*·\s*/, '');
 const tipText = (page) => page.evaluate(() => {
   const t = document.querySelector('.sw-tip'); if (!t) return null;
   const q = (c) => { const e = t.querySelector(c); return e ? e.textContent.trim() : ''; };
@@ -237,8 +265,8 @@ async function hoverEndpoint(page, c, r, which, band, want) {
     await page.mouse.move(x, y); await sleep(120);
     const t = await tipText(page);
     last = t;
-    if (t && /Corpus connection/i.test(t.eyebrow)) {
-      const text = which === 'top' ? t.meta : t.ref;
+    if (t && THREAD_CARD.test(t.eyebrow)) {
+      const text = which === 'top' ? volumeOf(t.meta) : t.ref;
       if (want.test(text)) return { ok: true, x: Math.round(x - c.l), card: t, tries: i + 1 };
     }
   }
@@ -304,7 +332,7 @@ async function armC(page, tag, fname, c, r0, f) {
     const x = c.l + mid + half * (((i * 0.618) % 1) * 2 - 1);
     await page.mouse.move(x, c.t + r1.bottomY - 6); await sleep(120);
     const tip = await tipText(page);
-    if (tip && /Corpus connection/i.test(tip.eyebrow) && Number.isFinite(tip.verse) && Number.isFinite(tip.vot)) found = tip;
+    if (tip && THREAD_CARD.test(tip.eyebrow) && Number.isFinite(tip.verse) && Number.isFinite(tip.vot)) found = tip;
   }
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(200);
   if (!found) { fails.push(`${tag} C: no corpus thread within 14 px of the bottom rail near the centre of Isaiah`); return; }
@@ -317,12 +345,14 @@ async function armC(page, tag, fname, c, r0, f) {
     const topY = r.topY * f.dpr, bottomY = r.bottomY * f.dpr;
     const a = /** @type {[number, number]} */ ([law.verseToX(r.cam, W, found.verse), bottomY]);
     const bb = /** @type {[number, number]} */ ([law.verseToX(r.camV, W, found.vot), topY]);
-    const pts = law.threadPath(a, bb, true, { width: W, gap: bottomY - topY, n: 12 });
-    return { ax: +(a[0] / f.dpr).toFixed(1), bx: +(bb[0] / f.dpr).toFixed(1), drawn: !!pts, cls: pts ? (pts.rise >= 0 ? 'rise+run' : 'rise') : 'none', r };
+    const pts = law.threadPath(a, bb, true, { width: W, gap: bottomY - topY, n: 48 });
+    const cls = pts ? (pts.cls || 'curve') : 'none';
+    const flat = pts ? flatRun(pts, W, cls === 'fly' ? FLAT_DEG.fly : FLAT_DEG.leg) / W : 0;
+    return { ax: +(a[0] / f.dpr).toFixed(1), bx: +(bb[0] / f.dpr).toFixed(1), drawn: !!pts, cls, flat: +flat.toFixed(3), r };
   };
   const strip = async (which, label) => {
     let prev = await read();
-    let maxDisp = 0, nulls = 0, classChanges = 0, at = -1;
+    let maxDisp = 0, nulls = 0, classChanges = 0, at = -1, flattest = prev.flat, flatAt = 0;
     const rows = [{ notch: 0, ...prev }];
     for (let i = 1; i <= NOTCHES; i++) {
       const r = prev.r;
@@ -342,17 +372,18 @@ async function armC(page, tag, fname, c, r0, f) {
       if (disp > maxDisp) { maxDisp = disp; at = i; }
       if (!cur.drawn) nulls++;
       if (cur.cls !== prev.cls) classChanges++;
+      if (cur.flat > flattest) { flattest = cur.flat; flatAt = i; }
       rows.push({ notch: i, ...cur, disp: +disp.toFixed(1) });
       prev = cur;
     }
     const p = await ppv(page);
-    note(`${tag} C ${which} rail, ${NOTCHES} notches at ${label}: largest per-notch endpoint displacement ${maxDisp.toFixed(1)} CSS px (notch ${at}); drawn at every notch: ${nulls === 0 ? 'yes' : 'NO (' + nulls + ' null)'}; stroke class changes: ${classChanges}; endpoints notch 0 -> ${NOTCHES}: bottom x ${rows[0].ax} -> ${prev.ax}, top x ${rows[0].bx} -> ${prev.bx}; cameras now Bible ${(p.b / rows[0].r.cam.ppv * f.dpr).toFixed(1)}x Volumes ${(p.v / rows[0].r.camV.ppv * f.dpr).toFixed(1)}x`);
+    note(`${tag} C ${which} rail, ${NOTCHES} notches at ${label}: largest per-notch endpoint displacement ${maxDisp.toFixed(1)} CSS px (notch ${at}); drawn at every notch: ${nulls === 0 ? 'yes' : 'NO (' + nulls + ' null)'}; flattest on-screen run ${(flattest * 100).toFixed(1)} % of the width (notch ${flatAt}, gate <= ${(FLAT_SHARE * 100).toFixed(1)} %); class changes ${classChanges} (information: ${[...new Set(rows.map((x) => x.cls))].join(' / ')}); endpoints notch 0 -> ${NOTCHES}: bottom x ${rows[0].ax} -> ${prev.ax}, top x ${rows[0].bx} -> ${prev.bx}; cameras now Bible ${(p.b / rows[0].r.cam.ppv * f.dpr).toFixed(1)}x Volumes ${(p.v / rows[0].r.camV.ppv * f.dpr).toFixed(1)}x`);
     if (nulls) fails.push(`${tag} C ${which}: the thread vanished at ${nulls} notches`);
-    if (classChanges) fails.push(`${tag} C ${which}: the thread changed stroke class ${classChanges} times between adjacent notches`);
+    if (flattest > FLAT_SHARE) fails.push(`${tag} C ${which}: at notch ${flatAt} an on-screen run of the thread flatter than ${FLAT_DEG.leg} deg (${FLAT_DEG.fly} for a fly-over) spans ${(flattest * 100).toFixed(1)} % of the width: the smear`);
     if (OUT) writeFileSync(resolve(OUT, `${fname}-C-${which}.json`), JSON.stringify(rows.map(({ r, ...rest }) => rest), null, 1));
     return maxDisp;
   };
-  await strip('top', found.meta);
+  await strip('top', volumeOf(found.meta));
   await strip('bottom', book);
   await clickIfPresent(page, 'Reset the view'); await sleep(400);
 }

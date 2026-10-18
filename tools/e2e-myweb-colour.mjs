@@ -2,12 +2,23 @@
  * tools/e2e-myweb-colour.mjs — My Web colour logic (1b): the pictures for
  * Corbin's call folder and the corridor gate (design-myweb-colour.md, 2026-09-11).
  *
- * ARM K, per frame (phoneLand 800x360 @2 touch, desktop 1920x1080 @2), on a
- * fresh browser context each:
+ * ARM K, per frame (phoneLand 800x360 @2 touch, pixelLand 891x411 @2.6 touch,
+ * desktop 1920x1080 @2), on a fresh browser context each:
  *   1. boot, SEED 20 reader links through the app's own persistLink (7 within
  *      scripture, 6 within the Volumes, 7 across; the subtitle's count is
  *      read back and printed; < 15 placed is a FAIL: the picture would be a lie)
- *   2. open My Web (corpus context on, view reset): `<frame>-O-dark.png`
+ *   2. open My Web (Timothy's notes on, view reset): `<frame>-O-dark.png`, and
+ *      THE TWO FAMILIES (the w3 law, fix-review #6; the 2026-09-11 four-hue
+ *      cool family and the gold / amber / coral warm one are retired): every
+ *      saturated lit pixel between the rails is Timothy's teal family (hue
+ *      165-215 deg: his four sources) or the reader's one gold (hue 33-46;
+ *      the retired amber sits at 29, coral at 11). Gate: both families drawn,
+ *      and the rest (a third family, or a blend where a gold halo crosses a
+ *      teal corridor) under OTHER_MAX of them. The reader's links are one
+ *      gold, so their shape is the pin's: on the top rail's row the pins are
+ *      classed by their profile above the rail (a solid dot, 4 CSS px, for a
+ *      link within the Volumes; a dot inside a ring, 5.5, for one across);
+ *      gate: >= 2 dot pins, a within-the-Volumes link with both pins on screen
  *   3. body.light applied exactly as use-settings.js does: `<frame>-O-light.png`
  *      (the canvas is black in both themes by construction; the chrome is what
  *      changes), then removed
@@ -33,7 +44,7 @@
  * the overview draws), never gated: contrast and colour do not depend on it;
  * a software-raster launch is stated in the README the call folder carries.
  *
- *   node tools/e2e-myweb-colour.mjs [--frames phoneLand,desktop] [--out DIR] [--ceilings 0.45,0.70] [--links 20]
+ *   node tools/e2e-myweb-colour.mjs [--frames phoneLand,pixelLand,desktop] [--out DIR] [--ceilings 0.45,0.70] [--links 20]
  *
  * Refuses a dirty tree (the tree under test IS the commit). Serves its own tree
  * in this process and exits when done; run it as ONE foreground node process.
@@ -49,12 +60,15 @@ const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ?
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OWN = resolve(HERE, '..');
 const OUT = arg('out', '');
-const FRAME_LIST = arg('frames', 'phoneLand,desktop').split(',');
+const FRAME_LIST = arg('frames', 'phoneLand,pixelLand,desktop').split(',');
 const CEILINGS = arg('ceilings', '').split(',').filter(Boolean).map(Number);   // opt-in: the knob comparison (call 07's first pictures)
 const LADDER = arg('ladder', '1,6,16,ceil').split(',');                          // the zoom ladder under the ONE law (call 07's adjust)
 const N_LINKS = Number(arg('links', '20'));
 const NAV_MS = 60000;
 const MIN_PLACED = 15;
+// the two families (fix-review #6): hue bands in degrees, and the share of saturated lit pixels allowed outside both
+const TEAL_HUE = [165, 215], GOLD_HUE = [33, 46];
+const OTHER_MAX = 0.05;
 
 const dirty = execSync('git status --porcelain', { cwd: OWN }).toString().trim();
 if (dirty) { console.error(`[e2e-myweb-colour] REFUSING: dirty tree ${OWN}\n` + dirty); process.exit(3); }
@@ -67,6 +81,7 @@ if (OUT) mkdirSync(OUT, { recursive: true });
 
 const FRAMES = {
   phoneLand: { w: 800, h: 360, dpr: 2, mobile: true },
+  pixelLand: { w: 891, h: 411, dpr: 2.6, mobile: true },     // the owner's Pixel 9 Pro, landscape
   desktop: { w: 1920, h: 1080, dpr: 2, mobile: false },
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -87,7 +102,7 @@ const note = (s) => { notes.push(s); console.log('[e2e-myweb-colour] ' + s); };
 // Letter ends from FOUR collections spread along the top rail (Vol I at the left edge, Vol IV, the
 // Lord's Rebuke near the middle, Letters to the Flock past it), each endpoint scoped by its volKey.
 // myweb-colour's review (D1/D2): with every letter drawn from volume-one, no 'within the Volumes'
-// link was on any picture (the amber dot - one of the three pin shapes Corbin approves - never
+// link was on any picture (its pin - one of the three pin shapes Corbin approves, amber then, a gold dot since w3 - never
 // appeared) and the seven across links stacked out of the top-left corner with their pins clipped.
 const LETTER_SETS = (() => {
   const files = { one: 'volume-one', four: 'volume-four', rebuke: 'lords-rebuke', flock: 'letters-flock' };
@@ -221,22 +236,63 @@ const simulate = (page, b64, kind) => page.evaluate(async (b64, kind) => {
   return c.toDataURL('image/png');
 }, b64, kind);
 
-/** Blobs of one colour (within tol per channel) along a horizontal band: columns holding the colour, merged
- *  into runs, ignoring runs narrower than 2 px. Used for the pin count on a rail's row. */
-const countPins = (page, b64, y0, y1, W, rgb, tol) => page.evaluate(async (b64, y0, y1, W, rgb, tol) => {
+/** The two families over a band of the screenshot (scratch canvas): saturated lit pixels by hue band. */
+const families = (page, b64, y0, y1, teal, gold) => page.evaluate(async (b64, y0, y1, teal, gold) => {
   const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
   const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
   const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
-  const H = y1 - y0; const d = g.getImageData(0, y0, W, H).data;
-  const col = new Uint8Array(W);
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const p = (y * W + x) * 4;
-    if (Math.abs(d[p] - rgb[0]) <= tol && Math.abs(d[p + 1] - rgb[1]) <= tol && Math.abs(d[p + 2] - rgb[2]) <= tol) col[x] = 1;
+  const W = c.width, H = y1 - y0; const d = g.getImageData(0, y0, W, H).data;
+  let nTeal = 0, nGold = 0, nOther = 0;
+  const others = new Map();
+  for (let p = 0; p < d.length; p += 4) {
+    const r = d[p], gg = d[p + 1], b = d[p + 2];
+    const mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
+    if (r + gg + b <= 90 || mx === 0 || (mx - mn) / mx < 0.25) continue;     // dark, or neutral (rails, names, ticks)
+    let h = mx === r ? ((gg - b) / (mx - mn)) % 6 : mx === gg ? (b - r) / (mx - mn) + 2 : (r - gg) / (mx - mn) + 4;
+    h = (h * 60 + 360) % 360;
+    if (h >= teal[0] && h <= teal[1]) nTeal++;
+    else if (h >= gold[0] && h <= gold[1]) nGold++;
+    else { nOther++; const k = Math.round(h / 10) * 10; others.set(k, (others.get(k) || 0) + 1); }
   }
-  let blobs = 0, run = 0, widest = 0;
-  for (let x = 0; x <= W; x++) { if (x < W && col[x]) run++; else { if (run >= 2) { blobs++; widest = Math.max(widest, run); } run = 0; } }
-  return { blobs, widest };
-}, b64, y0, y1, W, rgb, tol);
+  const all = nTeal + nGold + nOther;
+  const top = [...others.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, n]) => `${k}deg:${n}`).join(' ');
+  return { teal: nTeal, gold: nGold, other: nOther, otherShare: all ? +(nOther / all).toFixed(4) : 0, otherHues: top };
+}, b64, y0, y1, teal, gold);
+
+/** The reader's pins on one rail's row, by shape: gold blobs along the row, each classed by its profile ABOVE the
+ *  rail (the link leaves its pin downward): a solid dot (radius 4 CSS) has no gold 5-6.3 CSS px up, a dot inside a
+ *  ring (radius 5.5) does. */
+const pinShapes = (page, b64, yRail, dpr, W, gold) => page.evaluate(async (b64, yRail, dpr, W, gold) => {
+  const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
+  const y0 = Math.max(0, Math.round(yRail - 9 * dpr)), H = Math.round(18 * dpr);
+  const d = g.getImageData(0, y0, W, H).data;
+  const isGold = (x, y) => {
+    if (x < 0 || x >= W || y < y0 || y >= y0 + H) return false;
+    const p = ((y - y0) * W + x) * 4, r = d[p], gg = d[p + 1], b = d[p + 2];
+    const mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
+    if (r + gg + b <= 150 || (mx - mn) / mx < 0.25 || mx !== r) return false;
+    const h = (((gg - b) / (mx - mn)) % 6) * 60;
+    return h >= gold[0] && h <= gold[1];
+  };
+  const col = new Uint8Array(W);
+  for (let y = y0; y < y0 + H; y++) for (let x = 0; x < W; x++) if (isGold(x, y)) col[x] = 1;
+  let dots = 0, ringDots = 0, other = 0, run = 0;
+  const yc = Math.round(yRail);
+  const anyUp = (x, r0, r1) => { for (let r = Math.round(r0 * dpr); r <= Math.round(r1 * dpr); r++) if (isGold(x, yc - r)) return true; return false; };
+  for (let x = 0; x <= W; x++) {
+    if (x < W && col[x]) { run++; continue; }
+    if (run >= 2) {
+      const cx = x - Math.ceil(run / 2);
+      if (!anyUp(cx, 0, 1.5)) other++;
+      else if (anyUp(cx, 5, 6.3)) ringDots++;
+      else dots++;
+    }
+    run = 0;
+  }
+  return { dots, ringDots, other };
+}, b64, yRail, dpr, W, gold);
 
 /** Distinct lit runs per row and the lit share over a band of the screenshot (scratch canvas). */
 const scanBand = (page, b64, x0, x1, y0, y1) => page.evaluate(async (b64, x0, x1, y0, y1) => {
@@ -303,12 +359,17 @@ async function walk(page, url, fname) {
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(300);
   const dark = await page.screenshot({ encoding: 'base64' });
   if (OUT) writeFileSync(resolve(OUT, `${fname}-O-dark.png`), Buffer.from(dark, 'base64'));
-  // D1: at least one 'within the Volumes' link with BOTH pins on screen = >= 2 amber pin blobs on the top
-  // rail's row (amber 236,150,70 is the pin AND the ribbon of that kind; coral 236,120,96 differs by 30 in G)
+  // THE TWO FAMILIES (w3, fix-review #6): between the rails, Timothy's teal and the reader's one gold, nothing else
   if (r0) {
-    const pins = await countPins(page, dark, Math.round((c.t + r0.topY - 9) * f.dpr), Math.round((c.t + r0.topY + 9) * f.dpr), f.w * f.dpr, [236, 150, 70], 14);
-    note(`${tag} amber pins on the top rail's row: ${pins.blobs} (>= 2 means a within-the-Volumes link has both pins on screen), widest ${pins.widest} px`);
-    if (pins.blobs < 2) fails.push(`${tag} no within-the-Volumes link with both pins on screen (amber pin blobs on the top rail: ${pins.blobs}) - the amber dot would be missing from the picture`);
+    const fam = await families(page, dark, Math.round((c.t + r0.topY + 4) * f.dpr), Math.round((c.t + r0.bottomY - 4) * f.dpr), TEAL_HUE, GOLD_HUE);
+    note(`${tag} two families between the rails: teal ${fam.teal} px, gold ${fam.gold} px, other ${fam.other} px (${(fam.otherShare * 100).toFixed(2)} %, gate < ${OTHER_MAX * 100} %${fam.other ? '; commonest other hues ' + fam.otherHues : ''})`);
+    if (!fam.teal) fails.push(`${tag} two families: no teal drawn (Timothy's notes are on)`);
+    if (!fam.gold) fails.push(`${tag} two families: no gold drawn (${placed} links placed)`);
+    if (!(fam.otherShare < OTHER_MAX)) fails.push(`${tag} two families: ${(fam.otherShare * 100).toFixed(2)} % of the saturated ink is neither teal nor the reader's gold (hues ${fam.otherHues})`);
+    // D1, by shape: a within-the-Volumes link with BOTH pins on screen = >= 2 solid-dot pins on the top rail's row
+    const pins = await pinShapes(page, dark, (c.t + r0.topY) * f.dpr, f.dpr, Math.round(f.w * f.dpr), GOLD_HUE);
+    note(`${tag} pins on the top rail's row: ${pins.dots} dot (within the Volumes), ${pins.ringDots} ring-and-dot (across), ${pins.other} unclassed`);
+    if (pins.dots < 2) fails.push(`${tag} no within-the-Volumes link with both pins on screen (dot pins on the top rail: ${pins.dots}) - the dot pin would be missing from the picture`);
   }
   // light: the theme applied as use-settings.js does; the screen's observer re-reads its tokens
   await page.evaluate(() => document.body.classList.toggle('light', true)); await sleep(600);
