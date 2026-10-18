@@ -170,8 +170,14 @@ const VERSE_NUM_ALL = 22;
 /** ... and from the verse-numeral zoom the far end of each thread is written beside its leg. */
 export const LEG_PPV_CSS = 22;
 /** How many heights a far end may try beside its leg: a short column of names over each crowded
-    verse, and the sky above it left to the threads (C2: "fully zoomed in must look good and clean"). */
+    verse, and the sky above it left to the threads (C2: "fully zoomed in must look good and clean");
+    on a phone's short sky three, or the column is a wall of text (w3 review). */
 const LEG_SLOTS = 5;
+const LEG_SLOTS_COMPACT = 3;
+/** The clear space a far end keeps from its neighbours on its row, CSS px, so two never read as
+    one: on a phone about a word's width ("Gen" at 12 px), where the names run closer. */
+const LEG_CLEAR = 8;
+const LEG_CLEAR_COMPACT = 24;
 /** While a line is chosen the other labels step back with the threads, two thirds of the
     threads' way (to TAP_CONTEXT): the chosen line reads first, the rest stay readable (C3). */
 export const LABEL_RECEDE = 1 - (1 - TAP_CONTEXT) * 0.65;
@@ -1080,7 +1086,8 @@ function legBoxes(x0, x1, A, side, w, half, step, h0, L) {
   const R = (x1 - x0) / 2, cx = (x0 + x1) / 2, yb = base + camY;
   /** @type {Array<Box|null>} */
   const out = [];
-  for (let k = 0; k < LEG_SLOTS; k++) {
+  const slots = L.compact ? LEG_SLOTS_COMPACT : LEG_SLOTS;
+  for (let k = 0; k < slots; k++) {
     const h = h0 + k * step;
     if (!(h < A * 0.97)) break;
     const y = yb - h;
@@ -1469,9 +1476,10 @@ function drawLegs(ctx, g, L, fs, feed, grid, memo, labelled, quiet) {
       cands.push(c);
     }
   }
+  const clear = (L.compact ? LEG_CLEAR_COMPACT : LEG_CLEAR) * s;
   const res = placeRanked(cands, memo,
-    // a name keeps a word's width from its neighbours on the row, so two never read as one
-    (b, c) => !labelled.has(c.i) && !grid.hits({ x0: b.x0 - 8 * s, x1: b.x1 + 8 * s, y0: b.y0, y1: b.y1 }, 2 * s)
+    // a name keeps clear of its neighbours on the row, so two never read as one
+    (b, c) => !labelled.has(c.i) && !grid.hits({ x0: b.x0 - clear, x1: b.x1 + clear, y0: b.y0, y1: b.y1 }, 2 * s)
       && (c.tier < 3 || placedFly++ < FLY_LABELS),
     (b, c) => { grid.add(b); labelled.add(c.i); });
   ctx.save();

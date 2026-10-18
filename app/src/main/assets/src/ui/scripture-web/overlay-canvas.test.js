@@ -449,6 +449,23 @@ describe('the pills and the labels', () => {
     }
   });
 
+  it('on the phone the far ends stand in at most 3 rows, and a word apart on a row (w3 review: a 5-row wall of text at the ceiling)', () => {
+    const { rec, fs } = paint('phone', zMax('phone'), ISA53_6);
+    const s = fs.v.DPR, clear = 24 * s;
+    const legs = rec.texts().filter((c) => /→$|^←/.test(c.t) && c.fill !== css('chosenLabel'));
+    expect(legs.length, 'far ends named').toBeGreaterThan(5);
+    const rows = [...new Set(legs.map((c) => Math.round(c.y)))];
+    expect(rows.length, 'rows: ' + rows.join(', ')).toBeLessThanOrEqual(3);
+    for (let i = 0; i < legs.length; i++) {
+      for (let j = i + 1; j < legs.length; j++) {
+        if (Math.abs(legs[i].y - legs[j].y) > 1) continue;
+        const a = textBox(legs[i]), b = textBox(legs[j]);
+        const gap = Math.max(a.x0 - b.x1, b.x0 - a.x1);
+        expect(gap, legs[i].t + ' / ' + legs[j].t).toBeGreaterThanOrEqual(clear - 1e-6);
+      }
+    }
+  });
+
   it('the chips stand about one per 160 px (PC) and 120 px (phone), never closer', () => {
     for (const [name, every] of [['pc', 160], ['phone', 120]]) {
       const { rec, fs } = paint(name, 200, ISA53_6);
