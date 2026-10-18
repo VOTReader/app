@@ -63,6 +63,8 @@ const GLOBALS = {
     // a letter whose first words call its reader by a collection's name
     { id: 'lamp-letter', num: 14, title: 'The Evening Watch', blocks: [para('Little flock, concerning the lamp, the evening oil of the house is the oil you shall keep burning. ' + filler(3))] },
     { id: 'lamps-trimmed', num: 8, title: 'Lamps Trimmed for the Bridegroom', blocks: [para(filler(15) + 'Keep your lamps trimmed for the bridegroom, for He comes.')] },
+    // a letter whose line holds a title's every word in a row, in another order and running on past it
+    { id: 'morning-cry', num: 15, title: 'A Cry in the Morning', blocks: [para(filler(5) + 'And the watchers asked one another, Is the Shepherd King risen, the Lamb of the morning? ' + filler(5))] },
   ],
   LETTERS_FLOCK: [
     // bodies thick with the query's words, titled otherwise
@@ -72,6 +74,8 @@ const GLOBALS = {
     // a title in that collection the letter's first words hold loosely
     { id: 'lamp-oil', num: 6, title: 'The Lamp and the Oil', blocks: [para(filler(2) + 'Trim it.')] },
     { id: 'flock-cedars', num: 4, title: 'Under the Trees', blocks: [para('Springs and cedars, cedars and springs: the springs ran beneath the tall cedars. '.repeat(3))] },
+    // ...and the letter so titled, its body never saying it
+    { id: 'shepherd-king', num: 7, title: 'The Shepherd King Is Risen', blocks: [para(filler(6) + 'Rejoice, for He lives.')] },
   ],
   WTLB_TWO: [
     { id: 'still-waters-wtlb', num: 9, title: 'Beside the Still Waters', paragraphs: [{ text: 'He leads me beside the still waters.' }] },
@@ -131,6 +135,13 @@ describe('a title remembered loosely is admitted (B5)', () => {
   afterAll(() => {
     window.VotSearchData = prev;
     for (const k of Object.keys(GLOBALS)) delete globalThis[k];
+  });
+
+  it('a title\'s every word typed in another order leads a line holding them in that order: the title was typed whole (R3)', async () => {
+    const r = await E.search('is the shepherd king risen');
+    expect(ids(r)[0]).toBe('shepherd-king');
+    expect(r.results[0].placeStart).toBe(0);
+    expect(ids(r).slice(0, 5)).toContain('morning-cry');
   });
 
   it('a title typed with its words in other forms leads the texts whose bodies say them more', async () => {

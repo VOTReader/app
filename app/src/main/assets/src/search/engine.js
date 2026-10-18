@@ -934,6 +934,8 @@ const TITLE_ORDER_REACH = 30;
 const VERSE_RUN_HELD = 4;
 /** Typed words, at least, for a stretch holding all of them but one to be read as a quote over a title remembered loosely. */
 const QUOTE_NEAR_MIN = 5;
+/** Typed words, at least, for a title's every word typed in another order to be the title typed whole (search200 R3). */
+const TITLE_REORDER_MIN = 3;
 /* A QUOTE REMEMBERED WITH ITS SLIPS (search200 B4, 2026-10-18): align.js's knobs, read in search() below. */
 /** On by default (2026-10-18: tri open 577 -> 586 of 600, the 500's floor held); setAlign(false) is the off switch (header). */
 let ALIGN_ON = true;
@@ -2719,7 +2721,15 @@ async function search(query, options) {
        by name ("~ From “Sabbath Peace” ~ Words To Live By"), not a quote found. A title remembered loosely (levels 2
        and 1) is weaker than any quote found: a text holding the typed run (RUN_MIN words or more, B3's runAt) keeps above
        it, as a verse quoted keeps above any title ("held them fast" is a verse's words before it names "Hold Fast"). */
-    const whole = admitted.some((h) => h.level >= TITLE_LEVEL_LEAD);
+    /* A TITLE'S WORDS TYPED IN ANOTHER ORDER ARE THE TITLE TYPED WHOLE (search200 R3, 2026-10-18). Every word of a title
+       and no other typed (TITLE_REORDER_MIN or more, a collection's name beside them aside), only their order changed, is
+       the title named, as levels 4 and 3 name it: a text holding those words in the typed order holds a line, the title
+       being the reader's whole query. A title missing a typed word, or typed with one of its own left out, stays loose. */
+    const typedTitle = (() => { const w = titleWords(wanted); const st = stripCollections(w); return st ? st.w : w; })();
+    const sortedWords = (/** @type {string[]} */ w) => [...w].sort().join(' ');
+    const typedSorted = typedTitle.length >= TITLE_REORDER_MIN ? sortedWords(typedTitle) : '';
+    const reordered = (/** @type {any} */ h) => !!typedSorted && h.kind !== 'heading' && sortedWords(titleWords(h.title || '')) === typedSorted;
+    const whole = admitted.some((h) => h.level >= TITLE_LEVEL_LEAD || reordered(h));
     admittedWhole = whole;
     /** A text holding the typed words in a row, in its own words (a title holding them is the admission's call). */
     const holdsTyped = (/** @type {any} */ e) => {
