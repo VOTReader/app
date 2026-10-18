@@ -40,6 +40,9 @@ import { railFrame } from './rail-renderer.js';
 /** How long after the camera's last move a frame still counts as in a gesture (E2), ms. */
 export const GESTURE_HOLD_MS = 150;
 
+/** How far a device-pixel box may sit from the CSS box times the dpr (pixel snapping), device px. */
+export const BOX_SNAP_PX = 2;
+
 /**
  * Whether a browser walk is reading the frame (the walks set __swWalk; a driven
  * browser reports navigator.webdriver): the rails' JSON and the badge boxes are
@@ -100,8 +103,9 @@ export function gestureStep(motion, cam, now) {
 
 /**
  * E2: the GL backing for a resize, device px: the ResizeObserver entry's device-pixel box when the
- * browser gives one (exact, no rounding of a fractional CSS size) and the dpr is not clamped, else
- * the CSS box times the dpr, rounded.
+ * browser gives one (exact, no rounding of a fractional CSS size), the dpr is not clamped and the box
+ * IS the CSS box at the dpr, within BOX_SNAP_PX (headless Chrome's device emulation reports CSS px
+ * there, which put a 343 CSS px world on a 891 px phone); else the CSS box times the dpr, rounded.
  * @param {ResizeObserverEntry | null} entry
  * @param {number} raw - window.devicePixelRatio
  * @param {number} dpr - the frame's dpr (raw, at most 3)
@@ -110,10 +114,10 @@ export function gestureStep(motion, cam, now) {
  */
 export function backingOf(entry, raw, dpr, cssW, cssH) {
   const box = entry && raw <= 3 && entry.devicePixelContentBoxSize && entry.devicePixelContentBoxSize[0];
-  return {
-    W: box && box.inlineSize > 0 ? box.inlineSize : Math.round(cssW * dpr),
-    H: box && box.blockSize > 0 ? box.blockSize : Math.round(cssH * dpr),
-  };
+  const w = cssW * dpr, h = cssH * dpr;
+  const exact = !!box && box.inlineSize > 0 && box.blockSize > 0
+    && Math.abs(box.inlineSize - w) <= BOX_SNAP_PX && Math.abs(box.blockSize - h) <= BOX_SNAP_PX;
+  return { W: exact ? box.inlineSize : Math.round(w), H: exact ? box.blockSize : Math.round(h) };
 }
 
 /**

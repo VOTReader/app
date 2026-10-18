@@ -51,6 +51,16 @@ describe('E2: the backing a resize takes, and the zoom it keeps', () => {
     expect(backingOf({ devicePixelContentBoxSize: [{ inlineSize: 1600, blockSize: 1200 }] }, 4, 3, 400, 300)).toEqual({ W: 1200, H: 900 });
   });
 
+  it('refuses a device box that is not the CSS box at the dpr (headless Chrome\'s emulation reports CSS px there)', () => {
+    // the GL step 2 phone run: 891 x 411 CSS px at dpr 2.6 came back as a 891 x 411 device box, and the
+    // frame took a 343 CSS px wide world with the ruler over it (131 threads drawn at the overview)
+    expect(backingOf({ devicePixelContentBoxSize: [{ inlineSize: 891, blockSize: 411 }] }, 2.6, 2.6, 891, 411))
+      .toEqual({ W: 2317, H: 1069 });
+    // a device box a snapped pixel off the CSS box is the exact one, and taken
+    expect(backingOf({ devicePixelContentBoxSize: [{ inlineSize: 2318, blockSize: 1068 }] }, 2.6, 2.6, 891.2, 411.1))
+      .toEqual({ W: 2318, H: 1068 });
+  });
+
   it('keeps the zoom relative to fit, and the camera\'s height relative to the frame, across a resize or a dpr change', () => {
     const total = 31102;
     const cam = { x: 14000, y: 120, ppv: fitPPV({ total }, 1600) * 42.9, total };
