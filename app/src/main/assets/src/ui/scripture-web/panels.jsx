@@ -87,19 +87,23 @@ export function TipChip({ info, viewport, inset }) {
  * focus in on open, Tab kept inside, focus handed back to where the reader
  * was (the ? button) on close. Escape and Back close it through
  * closeTopOverlay, the same as the docked panel. */
-export function HowToReadGuide({ onClose }) {
+/** "How to read this web": four short lines, five with the go-to, each pointing at something the
+ * screen has (digest items 22, 23). The "+" button, the ruler on the left and the bar that
+ * jumped are gone, so the card no longer names them; the legend says what the colours are.
+ * The footer carries the OpenBible.info credit (Q5). `canSearch`: the go-to's button is there. */
+export function HowToReadGuide({ onClose, canSearch, credit }) {
   const trapRef = useFocusTrap(true);
   return (
     <div className="sw-guide" ref={trapRef} role="dialog" aria-labelledby="sw-guide-title">
       <div className="sw-guide-title" id="sw-guide-title">How to read this web</div>
       <ul className="sw-guide-body">
-        <li>Every thread joins two passages of Scripture. Its feet stand on the verses it joins; the taller the arch, the farther apart they are.</li>
-        <li>Colour is distance: violet threads join near neighbours, green ones cross the whole Bible. The books run along the bottom.</li>
-        <li>Pinch or press <strong>+</strong> to zoom in. Past the overview, the chapter under the middle is lit and the rest stands back.</li>
-        <li>Tap a thread to see both ends and follow it. Tap a number under the baseline to list every thread landing on that verse.</li>
-        <li>Drag the web down to look higher, where the long threads cross. The ruler on the left names the height; the bar on the right jumps.</li>
-        <li><strong>Reset</strong> brings you home.</li>
+        <li><strong>Pinch</strong> or scroll to zoom. Drag down to look higher, where the long threads cross.</li>
+        <li>Tap a thread to read both ends. Its votes are readers&rsquo; votes for how strong the link is.</li>
+        <li>A gold tick under the baseline marks a verse the Volumes cite.</li>
+        {canSearch ? <li><strong>Search</strong> at the top goes straight to a verse.</li> : null}
+        <li><strong>Reset</strong> brings the whole web back.</li>
       </ul>
+      <p className="sw-guide-foot">{credit || WEB_CREDIT}</p>
       <button type="button" className="sw-btn sw-guide-close" onClick={onClose}>Got it</button>
     </div>
   );

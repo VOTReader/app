@@ -8417,22 +8417,23 @@
       transform: translate(-50%, -50%);
       width: min(520px, calc(100% - 32px)); max-height: calc(100% - 20px);
       overflow: auto; box-sizing: border-box;
-      padding: 12px 18px 12px; border-radius: 14px;
-      background: var(--bg3); border: 1px solid var(--gold-border);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.45);
-      font-family: var(--font-body); color: var(--cream);
+      padding: 16px 20px 14px; border-radius: 10px;
+      /* the web's own panel in both themes (Q4: panels pinned dark), as the docked panel is */
+      background: var(--sw-panel); border: 1px solid var(--sw-panel-edge);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+      font-family: var(--sw-font); color: var(--sw-text-body);
     }
-    .sw-guide-title {
-      font-family: var(--font-cinzel); font-size: var(--fs-16);
-      color: var(--gold); letter-spacing: 0.04em; margin-bottom: 6px;
+    .sw-guide-title { font-size: var(--fs-20); color: var(--sw-title); margin-bottom: 8px; }
+    .sw-guide-body { margin: 0 0 10px; padding-left: 18px; font-size: var(--fs-15); line-height: 1.45; }
+    .sw-guide-body li + li { margin-top: 4px; }
+    .sw-guide-body strong { color: var(--sw-gold); font-weight: 600; }
+    /* the footer: the OpenBible.info credit (Q5), under a hairline */
+    .sw-guide-foot {
+      margin: 0 0 12px; padding-top: 8px; border-top: 1px solid var(--sw-hairline);
+      font-size: var(--fs-13); color: var(--sw-text-muted);
     }
-    .sw-guide-body { margin: 0 0 8px; padding-left: 16px; font-size: var(--fs-13); line-height: 1.4; }
-    .sw-guide-body li + li { margin-top: 3px; }
-    .sw-guide-body strong { color: var(--gold-bright); font-weight: 600; }
-    /* Got it follows the theme like the sheet's Follow (transparent, gold
-       border, gold ink): the pinned .sw-btn read as a grey blob on the
-       parchment card in the light theme (lanes/myweb/out/look-structure/
-       phoneLand-1-fit-l14lightcard-*). */
+    /* Got it is the web's own control (the panel is dark in both themes, so the light theme's
+       grey-blob problem it once had cannot arise), right-aligned. */
     .sw-guide-close { display: flex; margin: 0 0 0 auto; }
     .sw-guide-btn {
       /* beside the hide-all button, on its left (44 + a 12 px gap; 40 + 12 on a phone): above

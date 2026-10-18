@@ -515,7 +515,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       <button type="button" className={'sw-btn sw-btn-icon sw-guide-btn' + (guideOpen ? ' is-on' : '')}
         onClick={() => (guideOpen ? closeGuide() : setGuideOpen(true))}
         aria-label="How to read this web" aria-expanded={guideOpen} aria-haspopup="dialog">?</button>
-      {guideOpen && <HowToReadGuide onClose={closeGuide} />}
+      {guideOpen && <HowToReadGuide onClose={closeGuide} canSearch={!!goTo.button} credit={graph && graph.attribution} />}
       {goTo.box}
       {emptyShown && <EmptyWebNotice onDismiss={dismissEmpty} />}
       {tip && <TipChip info={tip} viewport={viewRef.current} inset={panelInsetRef.current} />}

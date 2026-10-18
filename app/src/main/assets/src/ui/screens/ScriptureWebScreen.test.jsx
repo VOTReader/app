@@ -982,7 +982,8 @@ describe('how to read this web (landing 13): one card, plain words, once', () =>
     expect(card, 'the card is up for a reader who has not seen it').toBeTruthy();
     expect(card.getAttribute('role')).toBe('dialog');
     expect(card.textContent).toMatch(/How to read this web/);
-    expect(card.querySelectorAll('li').length).toBeGreaterThanOrEqual(5);
+    // four short lines, five with the go-to (w3 panel step 2, item 22; guide-words.test.jsx pins them)
+    expect(card.querySelectorAll('li').length).toBeGreaterThanOrEqual(4);
     fireEvent.click(screen.getByRole('button', { name: /got it/i }));
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     expect(container.querySelector('.sw-guide')).toBeNull();
