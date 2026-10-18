@@ -14,7 +14,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, endpointLabel,
+  connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, endpointLabel, prophecyMeta,
 } from '../../utils/scripture-web/describe.js';
 import { LINK_KIND_NAMES, MY_WEB_SOURCES, MY_WEB_LINK_KINDS } from '../../utils/scripture-web/palette.js';
 
@@ -35,7 +35,7 @@ export function TipChip({ info, viewport }) {
           <div className="sw-tip-ref">{s.a.label}</div>
           <div className="sw-tip-arrow">↕</div>
           <div className="sw-tip-ref sw-tip-ref-alt">{s.b.label}</div>
-          <div className="sw-tip-meta">{s.span.toLocaleString()} verses apart · weight {s.votes}</div>
+          <div className="sw-tip-meta">{s.prophecy ? prophecyMeta(s) : s.span.toLocaleString() + ' verses apart · weight ' + s.votes}</div>
         </React.Fragment>
       )}
       {s.kind === 'link' && (

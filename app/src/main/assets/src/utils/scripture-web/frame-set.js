@@ -51,7 +51,8 @@
      prophecy every prophecy pair (g.prophecy), always, at every density
               (GL item 4; Q1 a): the Bible Studies' prophecy and its fulfilment
      lit      focus.lit: go-to, verse mode, a chooser row under hover or focus
-     hover    the thread under a resting pointer (dims nothing)
+     hover    the thread under a resting pointer (dims nothing): an arc, or a
+              prophecy pair that is none (hoverProphecy)
      chosen   the chosen thread: an OpenBible arc or a prophecy pair
 
    in that order, so the chosen line is drawn last, on top. This file builds
@@ -156,17 +157,18 @@ export function prophecySet(g) {
  * @typedef {{ kind: string, first: number, count: number }} TopRange
  * @typedef {{ key: string, count: number, from: Uint16Array, to: Uint16Array,
  *   fanA: Float32Array, fanB: Float32Array, ranges: TopRange[], litKey: string,
- *   hoverArc: number, focusArc: number, focusProphecy: number }} TopSet
+ *   hoverArc: number, hoverProphecy: number, focusArc: number, focusProphecy: number }} TopSet
  *   litKey .. focusProphecy: the ask it was built for, as topSetKey reads it (-1 for none)
  */
 
 /**
  * The key of the frame's top set: what is lit, hovered and chosen (the
  * prophecy class is the graph's own, the same every frame).
- * @param {{ litKey?: string, hoverArc?: number, focusArc?: number, focusProphecy?: number }} v
+ * @param {{ litKey?: string, hoverArc?: number, hoverProphecy?: number, focusArc?: number, focusProphecy?: number }} v
  */
 export function topSetKey(v) {
-  return (v.litKey || '') + '|' + askOf(v.hoverArc) + '|' + askOf(v.focusArc) + '|' + askOf(v.focusProphecy);
+  return (v.litKey || '') + '|' + askOf(v.hoverArc) + '|' + askOf(v.focusArc) + '|' + askOf(v.focusProphecy)
+    + '|' + askOf(v.hoverProphecy);
 }
 
 /** One asked-about index as the key reads it: -1 for none. @param {number | null | undefined} x */
@@ -176,11 +178,11 @@ function askOf(x) {
 
 /**
  * The top pass's threads for one frame, as instance data in TOP_ORDER: every
- * prophecy pair, the lit arcs, the hovered arc (unless it is the chosen
- * one), the chosen thread. `prev` comes back as it is when nothing changed
+ * prophecy pair, the lit arcs, the hovered thread (an arc, or a prophecy
+ * pair that is none; never the chosen one), the chosen thread. `prev` comes back as it is when nothing changed
  * (its key) and it was built over the same graph.
  * @param {any} g  the decoded graph
- * @param {{ lit?: ArrayLike<number> | null, litKey?: string, hoverArc?: number,
+ * @param {{ lit?: ArrayLike<number> | null, litKey?: string, hoverArc?: number, hoverProphecy?: number,
  *   focusArc?: number, focusProphecy?: number }} v  the frame's view args (webViewArgs)
  * @param {TopSet | null} [prev]
  * @returns {TopSet}
@@ -190,7 +192,7 @@ export function topSet(g, v, prev) {
   // the same ask, field by field: a frame that changes nothing builds no key (E3)
   if (prev && prev.ranges.length && prev.ranges[0].count === ps.unique && prev.litKey === (v.litKey || '')
     && prev.hoverArc === askOf(v.hoverArc) && prev.focusArc === askOf(v.focusArc)
-    && prev.focusProphecy === askOf(v.focusProphecy)) return prev;
+    && prev.focusProphecy === askOf(v.focusProphecy) && prev.hoverProphecy === askOf(v.hoverProphecy)) return prev;
   const key = topSetKey(v);
   const count = g && g.count > 0 ? g.count : 0;
   const isArc = (i) => i != null && i >= 0 && i < count && Number.isInteger(i);
@@ -198,9 +200,15 @@ export function topSet(g, v, prev) {
   if (v.lit) for (let k = 0; k < v.lit.length; k++) if (isArc(v.lit[k])) arcs.lit.push(v.lit[k]);
   if (isArc(v.hoverArc) && v.hoverArc !== v.focusArc) arcs.hover.push(/** @type {number} */ (v.hoverArc));
   if (isArc(v.focusArc)) arcs.chosen.push(/** @type {number} */ (v.focusArc));
-  const chosenPair = !isArc(v.focusArc) && v.focusProphecy != null && v.focusProphecy >= 0
-    && v.focusProphecy < ps.count ? v.focusProphecy : -1;
-  const total = ps.unique + arcs.lit.length + arcs.hover.length + arcs.chosen.length + (chosenPair >= 0 ? 1 : 0);
+  const isPair = (k) => k != null && k >= 0 && k < ps.count && Number.isInteger(k);
+  const chosenPair = !isArc(v.focusArc) && isPair(v.focusProphecy) ? /** @type {number} */ (v.focusProphecy) : -1;
+  // the pair under the pointer when no arc is (107 of the asset's pairs are none): drawn once,
+  // so not when it is the chosen thread (by its twin, or by the arc it is)
+  const hp = !isArc(v.hoverArc) && isPair(v.hoverProphecy) ? ps.twin[/** @type {number} */ (v.hoverProphecy)] : -1;
+  const hoverPair = hp >= 0 && !(chosenPair >= 0 && ps.twin[chosenPair] === hp)
+    && !(isArc(v.focusArc) && ps.arcOf[hp] === v.focusArc) ? hp : -1;
+  const total = ps.unique + arcs.lit.length + arcs.hover.length + arcs.chosen.length
+    + (hoverPair >= 0 ? 1 : 0) + (chosenPair >= 0 ? 1 : 0);
   const from = new Uint16Array(total), to = new Uint16Array(total);
   const fanA = new Float32Array(total), fanB = new Float32Array(total);
   const fans = count ? fansOf(g) : null;
@@ -216,6 +224,10 @@ export function topSet(g, v, prev) {
     fanB[at] = swap ? fans.fanA[i] : fans.fanB[i];
     at++;
   };
+  const putPair = (k) => {
+    from[at] = ps.from[k]; to[at] = ps.to[k]; fanA[at] = ps.fanA[k]; fanB[at] = ps.fanB[k];
+    at++;
+  };
   for (const kind of TOP_ORDER) {
     const first = at;
     if (kind === 'prophecy' && ps.unique === ps.count) {
@@ -224,23 +236,19 @@ export function topSet(g, v, prev) {
     } else if (kind === 'prophecy') {
       // a pair given twice is drawn once: twice, its line would carry double ink
       for (let k = 0; k < ps.count; k++) {
-        if (ps.twin[k] !== k) continue;
-        from[at] = ps.from[k]; to[at] = ps.to[k]; fanA[at] = ps.fanA[k]; fanB[at] = ps.fanB[k];
-        at++;
+        if (ps.twin[k] === k) putPair(k);
       }
     } else {
       for (const i of arcs[kind]) putArc(i);
     }
-    if (kind === 'chosen' && chosenPair >= 0) {
-      from[at] = ps.from[chosenPair]; to[at] = ps.to[chosenPair];
-      fanA[at] = ps.fanA[chosenPair]; fanB[at] = ps.fanB[chosenPair];
-      at++;
-    }
+    if (kind === 'hover' && hoverPair >= 0) putPair(hoverPair);
+    if (kind === 'chosen' && chosenPair >= 0) putPair(chosenPair);
     ranges.push({ kind, first, count: at - first });
   }
   return {
     key, count: total, from, to, fanA, fanB, ranges, litKey: v.litKey || '',
-    hoverArc: askOf(v.hoverArc), focusArc: askOf(v.focusArc), focusProphecy: askOf(v.focusProphecy),
+    hoverArc: askOf(v.hoverArc), hoverProphecy: askOf(v.hoverProphecy),
+    focusArc: askOf(v.focusArc), focusProphecy: askOf(v.focusProphecy),
   };
 }
 

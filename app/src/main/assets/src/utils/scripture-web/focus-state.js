@@ -19,20 +19,25 @@
                (a chapter, a bundle, a verse: today's focusRange).
      range2    the group chosen inside a range (chooseGroup), or null.
      hover     the thread under a resting pointer, -1 for none. Hover dims
-               nothing (C3). The one field written IN PLACE (the hover rAF,
-               dropHover): it changes per pointer move.
+               nothing (C3). Written IN PLACE (the hover rAF, dropHover): it
+               changes per pointer move.
+     hoverProphecy  the prophecy pair under a resting pointer when no
+               OpenBible arc is (hover -1): its index in g.prophecy, or -1.
+               107 of the asset's pairs are no arc, so `hover` cannot name
+               them (GL review 2026-10-18). Written in place with `hover`.
      lit       Int32Array of OpenBible arc ids drawn in the lit ink in the
                top pass (go-to, verse mode, a chooser row under hover or
                focus), or null. Never mutate it: replace it with withLit().
      litKey    a content key of `lit` ('' for none), so the renderer uploads
                a new id set only when the key changes.
 
-   Every other write replaces focusRef.current with focusState(...) or
+   Every other field's write replaces focusRef.current with focusState(...) or
    withLit(...). */
 
 /**
  * @typedef {{ arc: number, prophecy: boolean, range: [number, number] | null,
- *   range2: [number, number] | null, hover: number, lit: Int32Array | null, litKey: string }} Focus
+ *   range2: [number, number] | null, hover: number, hoverProphecy: number, lit: Int32Array | null,
+ *   litKey: string }} Focus
  */
 
 /**
@@ -43,10 +48,11 @@
  */
 export function focusState(patch) {
   /** @type {Focus} */
-  const f = { arc: -1, prophecy: false, range: null, range2: null, hover: -1, lit: null, litKey: '' };
+  const f = { arc: -1, prophecy: false, range: null, range2: null, hover: -1, hoverProphecy: -1, lit: null, litKey: '' };
   if (patch) Object.assign(f, patch);
   if (f.arc == null) f.arc = -1;
   if (f.hover == null) f.hover = -1;
+  if (f.hoverProphecy == null) f.hoverProphecy = -1;
   if (!f.range2) f.range2 = null;
   if (!f.range) f.range = null;
   f.prophecy = !!f.prophecy;

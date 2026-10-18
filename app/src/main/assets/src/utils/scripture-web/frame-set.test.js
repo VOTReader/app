@@ -117,6 +117,36 @@ describe('topSet: the prophecy class, then the lit, the hovered and the chosen, 
     expect(s.ranges.map((r) => r.count)).toEqual([3, 1, 0, 1]);
   });
 
+  /* GL review 2026-10-18 (finding 2): 107 of the asset's pairs are no OpenBible arc, so hoverArc
+     cannot name them and a hover on one drew nothing. hoverProphecy names the pair. */
+  it('a hovered prophecy pair that is no arc is the hover thread, on prophecySet\'s feet; never twice, and an arc under the pointer wins', () => {
+    const g = graph();
+    const s = topSet(g, { lit: null, litKey: '', hoverArc: -1, hoverProphecy: 2, focusArc: -1, focusProphecy: -1 });
+    expect(s.ranges.find((r) => r.kind === 'hover')).toEqual({ kind: 'hover', first: 3, count: 1 });
+    expect([s.from[3], s.to[3], s.fanA[3], s.fanB[3]]).toEqual([5, 180, 0, 0]);
+    // the chosen pair under the pointer is drawn once, as the chosen
+    const chosen = topSet(g, { lit: null, litKey: '', hoverArc: -1, hoverProphecy: 2, focusArc: -1, focusProphecy: 2 });
+    expect(chosen.ranges.map((r) => r.count)).toEqual([3, 0, 0, 1]);
+    // an arc under the pointer is the hover; the pair beside it is not a second one
+    const both = topSet(g, { lit: null, litKey: '', hoverArc: 2, hoverProphecy: 2, focusArc: -1, focusProphecy: -1 });
+    expect(both.ranges.find((r) => r.kind === 'hover').count).toBe(1);
+    expect([both.from[3], both.to[3]]).toEqual([40, 90]);
+    // a pair outside the list is nothing
+    expect(topSet(g, { lit: null, litKey: '', hoverArc: -1, hoverProphecy: 9, focusArc: -1, focusProphecy: -1 })
+      .ranges.find((r) => r.kind === 'hover').count).toBe(0);
+  });
+
+  it('a new hovered pair is a new set (the pointer moved from one lone pair to the next)', () => {
+    const g = graph();
+    const v = { lit: null, litKey: '', hoverArc: -1, hoverProphecy: 2, focusArc: -1, focusProphecy: -1 };
+    const a = topSet(g, v);
+    expect(topSet(g, Object.assign({}, v), a)).toBe(a);
+    const b = topSet(g, Object.assign({}, v, { hoverProphecy: -1 }), a);
+    expect(b).not.toBe(a);
+    expect(b.ranges.find((r) => r.kind === 'hover').count).toBe(0);
+    expect(topSetKey(v)).not.toBe(topSetKey(Object.assign({}, v, { hoverProphecy: 0 })));
+  });
+
   it('a chosen prophecy pair is the chosen thread, on prophecySet\'s feet', () => {
     const g = graph();
     const s = topSet(g, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: 2 });
@@ -134,7 +164,7 @@ describe('topSet: the prophecy class, then the lit, the hovered and the chosen, 
     expect(a).not.toBe(none);
     expect(topSet(g, Object.assign({}, v), a)).toBe(a);
     expect(topSet(g, Object.assign({}, v, { hoverArc: 1 }), a)).not.toBe(a);
-    expect(topSetKey(v)).toBe('|2|-1|-1');
+    expect(topSetKey(v)).toBe('|2|-1|-1|-1');
     // a graph with no prophecy and nothing asked about: no top pass at all
     const bare = Object.assign(graph(), { prophecy: [] });
     expect(topSet(bare, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 }).count).toBe(0);

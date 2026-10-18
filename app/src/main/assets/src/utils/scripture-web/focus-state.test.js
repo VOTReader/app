@@ -6,8 +6,14 @@ import { focusState, withLit, litKeyOf, prophecyIndexOf, chosenEnds } from './fo
 describe('focusState', () => {
   it('nothing chosen, hovered or lit is the default, with every field present', () => {
     expect(focusState()).toEqual({
-      arc: -1, prophecy: false, range: null, range2: null, hover: -1, lit: null, litKey: '',
+      arc: -1, prophecy: false, range: null, range2: null, hover: -1, hoverProphecy: -1, lit: null, litKey: '',
     });
+  });
+
+  it('hoverProphecy: the prophecy pair under the pointer when no arc is (GL review finding 2), -1 for none', () => {
+    expect(focusState({ hoverProphecy: 4 }).hoverProphecy).toBe(4);
+    expect(focusState({ hoverProphecy: undefined }).hoverProphecy).toBe(-1);
+    expect(withLit(focusState({ hoverProphecy: 4 }), [1]).hoverProphecy).toBe(4);
   });
 
   it('a patch lands over the defaults and the missing fields stay whole (the old { arc, range } writes dropped range2)', () => {

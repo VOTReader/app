@@ -689,7 +689,7 @@ export function createRenderer(canvas, graph, opts = {}) {
      *   density:import('../../utils/scripture-web/decode.js').Density,
      *   bg:string,
      *   focusRange:(number[]|null), focusRange2?:(number[]|null), focusArc:number, hoverArc?:number,
-     *   focusProphecy?:number, lit?:(ArrayLike<number>|null), litKey?:string, tapFade?:number,
+     *   hoverProphecy?:number, focusProphecy?:number, lit?:(ArrayLike<number>|null), litKey?:string, tapFade?:number,
      *   scale?:number,
      *   centre?:(import('../../utils/scripture-web/web-frame.js').CentreChapter|null)}} v
      *   the view (web-frame.webViewArgs) and the frame's own values, in one object the screen

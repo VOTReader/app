@@ -78,6 +78,7 @@ export function webFrame(v, personal) {
  *   focusProphecy  the chosen prophecy pair's index in g.prophecy, or -1
  *   focusRange, focusRange2  the lit verse range and its chosen group
  *   hoverArc       the thread under a resting pointer, -1 (it dims nothing)
+ *   hoverProphecy  the prophecy pair under it when no arc is, -1
  *   lit, litKey    the lit arc ids (Int32Array or null) and their key; a
  *                  renderer uploads the set when litKey differs from the
  *                  key it last uploaded
@@ -107,6 +108,7 @@ export function webViewArgs(v, cam, f, density, focus) {
     focusRange2: focus.range2 || null,
     focusProphecy: prophecy ? focus.arc : -1,
     hoverArc: focus.hover == null ? -1 : focus.hover,
+    hoverProphecy: focus.hoverProphecy == null ? -1 : focus.hoverProphecy,
     lit: focus.lit || null, litKey: focus.lit ? focus.litKey || '' : '',
   };
 }

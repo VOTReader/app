@@ -57,7 +57,8 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
       draw: (opts) => {
         DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density, camY: opts && opts.camY, camX: opts && opts.camX, lens: opts && opts.lens,
           focusArc: opts && opts.focusArc, focusRange: opts && opts.focusRange, lensDim: opts && opts.lensDim,
-          centre: opts && opts.centre, tapFade: opts && opts.tapFade, focusProphecy: opts && opts.focusProphecy });
+          centre: opts && opts.centre, tapFade: opts && opts.tapFade, focusProphecy: opts && opts.focusProphecy,
+          hoverProphecy: opts && opts.hoverProphecy });
         return { instances: 0, draws: 0 };
       },
       // My Web's ground (refactor.md #10): one clear, recorded so a case can
@@ -325,6 +326,48 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       await act(async () => { root.dispatchEvent(down2); root.dispatchEvent(up2); await new Promise((r) => setTimeout(r, 40)); });
       expect(container.querySelector('.sw-sheet')).toBeNull();
       expect(DRAWN.filter((d) => !d.clear).pop().focusProphecy).toBe(-1);
+    });
+
+    /* GL review 2026-10-18 (finding 2): a hover on a lone prophecy pair (no OpenBible arc, 107 of
+       the asset's) drew no highlight, since hoverArc can only name an arc; its chip read "weight 0";
+       and from one lone pair to the next within 4 px the chip kept the first, as both read index -1.
+       Two pairs about the same centre, the second 3 px higher at its apex. */
+    it('a hover on a prophecy pair that is no arc lights it (hoverProphecy), its chip reads "Prophecy fulfilled", and the next pair 3 px on takes the chip', async () => {
+      const f = webFrame({ W: FRAME_CSS, H: 360, DPR: 1 });
+      const cam = { x: CANON / 2, ppv: FRAME_CSS / CANON, total: CANON };
+      const squash = squashFactor(f.ceil, FRAME_CSS);
+      const d = Math.ceil(3 / (cam.ppv * squash));
+      const pairs = [{ a: 1000, b: 30000, studyId: 's', chapterId: 'c' }, { a: 1000 - d, b: 30000 + d, studyId: 's', chapterId: 'c' }];
+      const apex = (p) => {
+        const x0 = footX(cam, FRAME_CSS, p.a, 0), x1 = footX(cam, FRAME_CSS, p.b, 0);
+        return { cx: (x0 + x1) / 2, cy: f.base - arcShape((x1 - x0) / 2, squash).A };
+      };
+      const [pa, pb] = pairs.map(apex);
+      expect(pa.cy - pb.cy, 'PRECONDITION: the second apex is 3 px over the first').toBeGreaterThanOrEqual(3);
+      expect(pa.cy - pb.cy).toBeLessThan(4);
+      expect(Math.abs(pa.cx - pb.cx)).toBeLessThan(0.5);
+      const { container } = await mount({}, () => Object.assign(graph(), { prophecy: pairs }));
+      const root = container.querySelector('.sw-root');
+      const move = async (x, y) => {
+        await act(async () => {
+          root.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerId: 22, pointerType: 'mouse', clientX: x, clientY: y }));
+          // two frames: the hover's (the pick, the chip) and the draw it schedules
+          await new Promise((r) => setTimeout(r, 80));
+        });
+      };
+      await move(pa.cx, pa.cy);
+      const tip = container.querySelector('.sw-tip');
+      expect(tip, 'a resting mouse on the pair shows its chip').toBeTruthy();
+      expect(tip.textContent).toMatch(/Prophecy fulfilled · 29,000 verses apart/);
+      expect(tip.textContent).not.toMatch(/weight/);
+      expect(DRAWN.filter((d2) => !d2.clear).pop().hoverProphecy, 'the hovered pair is drawn in the hover ink').toBe(0);
+      await move(pb.cx, pb.cy);
+      expect(container.querySelector('.sw-tip').textContent).toMatch(new RegExp('Prophecy fulfilled · ' + (29000 + 2 * d).toLocaleString() + ' verses apart'));
+      expect(DRAWN.filter((d2) => !d2.clear).pop().hoverProphecy).toBe(1);
+      // CONTROL: off every line the hover lets go
+      await move(pa.cx, pa.cy + 40);
+      expect(container.querySelector('.sw-tip')).toBeNull();
+      expect(DRAWN.filter((d2) => !d2.clear).pop().hoverProphecy).toBe(-1);
     });
 
     /* sw1 B4 (audit-web 10-05): the hover chip was set only by a resting mouse and cleared by nothing

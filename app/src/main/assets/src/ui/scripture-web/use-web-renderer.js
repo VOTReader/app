@@ -481,7 +481,7 @@ export function useWebRenderer({
       if (back && back.cam && back.cam.total === graph.total) {
         camRef.current = Object.assign({}, back.cam);
         // the place comes back, the pointer's hover does not
-        focusRef.current = focusState(Object.assign({}, back.focus, { hover: -1 }));
+        focusRef.current = focusState(Object.assign({}, back.focus, { hover: -1, hoverProphecy: -1 }));
       } else {
         camRef.current = createCamera(graph.total);
       }

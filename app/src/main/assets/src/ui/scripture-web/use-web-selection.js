@@ -104,6 +104,7 @@ export function useWebSelection({
     if (hoverRafRef.current) { cancelAnimationFrame(hoverRafRef.current); hoverRafRef.current = 0; }
     hoverPointRef.current = null;
     focusRef.current.hover = -1;
+    focusRef.current.hoverProphecy = -1;
     if (tipOnRef.current) { tipOnRef.current = false; setTip(null); }
   }, [focusRef]);
 
@@ -234,11 +235,14 @@ export function useWebSelection({
       if (!point) return;
       const found = describe(hitAt(point.cx, point.cy));
       const nextHover = found && found.kind === 'arc' ? found.index : -1;
-      if (nextHover !== focusRef.current.hover) { focusRef.current.hover = nextHover; schedule(); }
+      // a prophecy pair that is no OpenBible arc has no arc index: the focus names the pair
+      const nextPair = found && found.kind === 'arc' && found.index < 0 && found.prophecyIndex >= 0 ? found.prophecyIndex : -1;
+      const f = focusRef.current;
+      if (nextHover !== f.hover || nextPair !== f.hoverProphecy) { f.hover = nextHover; f.hoverProphecy = nextPair; schedule(); }
       setTip((previous) => {
         if (!found) return previous ? null : previous;
         if (previous && previous.info.kind === found.kind &&
-            (found.kind !== 'arc' || previous.info.index === found.index) &&
+            (found.kind !== 'arc' || (previous.info.index === found.index && previous.info.prophecyIndex === found.prophecyIndex)) &&
             Math.abs(previous.x - point.cx) < 4 && Math.abs(previous.y - point.cy) < 4) {
           return previous;
         }
@@ -387,6 +391,7 @@ export function useWebSelection({
     const same = focusRef.current.range2 && grp && focusRef.current.range2[0] === grp.lo && focusRef.current.range2[1] === grp.hi;
     focusRef.current = focusState({
       range: [info.lo, info.hi], range2: same || !grp ? null : [grp.lo, grp.hi], hover: focusRef.current.hover,
+      hoverProphecy: focusRef.current.hoverProphecy,
     });
     setDetail(Object.assign({}, info, { chosenGroup: same || !grp ? null : grp.chapterIndex }));
     setAnnounce(groupAnnouncement(grp, same || !grp));
