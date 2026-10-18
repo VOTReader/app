@@ -1,7 +1,7 @@
 /* A QUOTE REMEMBERED WITH ITS SLIPS LEADS (search200 B4, 2026-10-18). The phrase pass reads the typed words in a row
    as typed, so a quote remembered with a word in another form, a word left out or two verses run together lost its
    run, and BM25 ranked a text thick with its words, in no order, over the text it quotes. With the alignment on
-   (setAlign, SEARCH_ALIGN), a text holding ALIGN_HELD of the quote or more, slips allowed for, leads every text
+   (the default; setAlign(false) is its off switch), a text holding ALIGN_HELD of the quote or more, slips allowed for, leads every text
    holding less (the original first among those holding it alike) and opens on the words, where the first typed words
    are. Texts within a small word of each other hold it alike, and one within a small word of a text just under
    ALIGN_HELD is not told from it: the words rank them. A verse is lifted by its neighbour only when neither holds the
@@ -9,7 +9,7 @@
    when the original holds the quote as well: not to a verse it cites in other words, nor to the letter another of
    its lines comes from. A quote held whole, or typed in fewer than ALIGN_MIN words, is ranked as before. Fixture
    texts only (no benchmark query). */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { VotSearchMini as E } from './engine.js';
 
 const STOP = new Set(['the', 'a', 'an', 'of', 'and', 'is', 'my', 'to', 'in', 'he', 'that', 'his', 'for', 'i', 'you', 'it', 'not', 'are', 'be', 'with', 'all', 'on', 'who', 'by', 'was', 'at', 'so', 'your', 'has', 'through', 'upon', 'our']);
@@ -94,10 +94,10 @@ const GLOBALS = {
   ],
 };
 const ids = (r) => r.results.map((x) => x.doc.letterId || x.doc.ref);
-/** One search with the alignment on or off, the setting put back after. */
+/** One search with the alignment on or off, the default (on) put back after. */
 async function searchWith(on, q) {
   E.setAlign(on);
-  try { return await E.search(q); } finally { E.setAlign(false); }
+  try { return await E.search(q); } finally { E.setAlign(true); }
 }
 
 describe('a quote remembered with its slips leads (B4)', () => {
@@ -109,13 +109,24 @@ describe('a quote remembered with its slips leads (B4)', () => {
     await E.init();
   }, 60000);
   afterAll(() => {
-    E.setAlign(false);
+    E.setAlign(true);
     window.VotSearchData = prev;
     for (const k of Object.keys(GLOBALS)) delete globalThis[k];
   });
 
   // a word in another form (words), one changed (lighted), two small ones traded (the, in)
   const SLIPPED = 'my children the lamp of the soul is lighted by oil of my words so keep it burning in the long night';
+
+  it('the alignment is on by default, and setAlign(false) turns it off', async () => {
+    // a fresh engine module reads the default (another test's searchWith puts the default back too)
+    vi.resetModules();
+    const { VotSearchMini: F } = await import('./engine.js');
+    await F.init();
+    const q = 'go down to the river in the evening and washed your garment in running waters and you will be clean';
+    expect(ids(await F.search(q))[0]).toBe('river-letter');
+    F.setAlign(false);
+    try { expect(ids(await F.search(q))[0]).toBe('river-scattered'); } finally { F.setAlign(true); }
+  }, 60000);
 
   it('a line remembered with its slips leads a text thick with its words in no order, and opens on the line', async () => {
     // words in other forms (washed, garment, waters), the modern word (will), a small word traded (in the)

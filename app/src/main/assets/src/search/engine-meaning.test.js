@@ -32,10 +32,12 @@ const HARVEST = HARVEST_OPEN + 'The towers are many in that city. '.repeat(6) + 
 const HEADING = 'From The Lord, Our God and Savior The Word of The Lord Spoken to Timothy For The Lord’s Little Flock, and For All Those Who Have Ears to Hear';
 const OBEY = 'Hear Me, O children: honor your father and your mother in all things that are right. Says The Lord. 3/2/06 ' +
   HEADING.replace('The Lord, Our God', 'YahuShua HaMashiach, Our Lord') + ' Thus says The Lord: My sons and daughters, walk in My ways and live.';
-// an Answers topic reprinting two letters: the typed words sit thickest in the first's short line, the model matched the second
+// an Answers topic reprinting two letters: the typed words sit thickest in the first's short line, the model matched the second.
+// The excerpts sit apart, as in the topics (search200 B4's alignment, on by default, read two lines run together as one
+// passage holding the typed words)
 const KEEPERS = 'Thus says The Lord: Blessed are those who keep My Sabbath and My Commandments, for they are Mine.';
 const WISDOM = 'For those who love Me obey My Commandments, and those who remember My Sabbaths honor Me and shall know Wisdom.';
-const SABBATH = 'Many have asked about the day of rest. ' + KEEPERS + ' ✦ ' + WISDOM + ' ✦';
+const SABBATH = 'Many have asked about the day of rest. ' + KEEPERS + ' ✦ ' + 'The fields lie still under the evening sky. '.repeat(3) + WISDOM + ' ✦';
 const WATCH = 'Stay awake through the night and guard the door, for the master returns at an hour no one expects. ✦ 1/29/05 ' + HEADING + ' The towers of the proud shall fall.';
 const GLOBALS = {
   BOOKS: {},

@@ -19,6 +19,13 @@
      6. emit { score, doc, terms } — doc carries the routing/display contract
         fields; terms carries the doc-side matched words (fuzzy/prefix-
         corrected) for snippet highlighting. Classic results have no terms.
+
+   Switches:
+     - The alignment of a quote remembered with its slips (search200 B4, align.js)
+       is ON by default. Its emergency off switch is setAlign(false), for the
+       session: window.VotSearchMini.setAlign(false) in the app (setAlign(true)
+       puts it back), and SEARCH_ALIGN=off for the benchmarks
+       (tools/search-bench/corpus.mjs). Off, the ranking is B5's exactly.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import MiniSearch from './vendor/minisearch.js';
@@ -922,8 +929,8 @@ const VERSE_RUN_HELD = 4;
 /** Typed words, at least, for a stretch holding all of them but one to be read as a quote over a title remembered loosely. */
 const QUOTE_NEAR_MIN = 5;
 /* A QUOTE REMEMBERED WITH ITS SLIPS (search200 B4, 2026-10-18): align.js's knobs, read in search() below. */
-/** Off until the benches say otherwise (SEARCH_ALIGN; setAlign). */
-let ALIGN_ON = false;
+/** On by default (2026-10-18: tri open 577 -> 586 of 600, the 500's floor held); setAlign(false) is the off switch (header). */
+let ALIGN_ON = true;
 /** @param {boolean} on */
 function setAlign(on) { ALIGN_ON = !!on; }
 /** Typed tokens, at least, for the typed words to be aligned as a quote. */
@@ -2827,6 +2834,6 @@ export const VotSearchMini = {
   fuzzyBookSuggest,
   getState,
   getStats,
-  // B4's alignment of a quote remembered with its slips, off by default (SEARCH_ALIGN)
+  // B4's alignment of a quote remembered with its slips: on by default, setAlign(false) its emergency off switch
   setAlign,
 };

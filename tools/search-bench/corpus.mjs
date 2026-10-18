@@ -99,8 +99,8 @@ export async function engine() {
   const t0 = Date.now();
   const { VotSearchMini: E } = await import(pathToFileURL(path.join(ASSETS, 'src/search/engine.js')).href);
   await E.init();
-  // SEARCH_ALIGN=on: B4's alignment of a quote remembered with its slips (engine.js setAlign; off by default)
-  if (process.env.SEARCH_ALIGN === 'on' && E.setAlign) E.setAlign(true);
+  // SEARCH_ALIGN=off: B4's alignment of a quote remembered with its slips, off (engine.js setAlign; on by default)
+  if (process.env.SEARCH_ALIGN === 'off' && E.setAlign) E.setAlign(false);
   const meaning = await startMeaning();
   return { E, initMs: Date.now() - t0, meaning };
 }
