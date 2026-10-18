@@ -15,17 +15,16 @@
    shader draws with. There are THREE of them, and geometry.js owns all.
    Height (geometry.arcShape, the half-ellipse of a thread's own span, its
    feet at geometry.footX) — or arcs become untappable exactly where they
-   look tappable. Visibility (geometry.arcAnchored + flyOverDim) — or
-   the reverse: at full localize an arc with neither foot near the viewport
-   paints alpha 0, and picking it silently focuses a line nobody can see.
-   Nothing is hidden (the structure law, 2026-09-21): every thread crossing
+   look tappable. Visibility (geometry.arcAnchored + flyOverDim) only
+   dims: a fly-over settles at FLYOVER_FLOOR and never reaches zero, so
+   no thread the shader draws is refused a tap for it. Nothing is hidden (the structure law, 2026-09-21): every thread crossing
    the frame is drawn and pickable, so there is no third law. Visible equals
    pickable, in both directions.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcAnchored, arcDistance, arcShape, arcHeightAt, flyOverDim, verseToX, xToVerse, footX,
-  FLYOVER_MARGIN, LOCALIZE_START, skyLocalize,
+  arcAnchored, arcDistance, arcShape, arcHeightAt, verseToX, xToVerse, footX,
+  FLYOVER_MARGIN, LOCALIZE_START,
 } from './geometry.js';
 import { bucketDrawCount, fansOf } from './decode.js';
 import { walkDrawnRuns } from './chunk-walk.js';
@@ -63,7 +62,7 @@ export function pickArc(g, cam, view, px, py, tol) {
  * @returns {Array<{ index:number, distance:number, from:number, to:number, votes:number }>}
  */
 export function pickArcs(g, cam, view, px, py, tol, limit) {
-  const { width, squash, localize, density } = view;
+  const { width, squash, density } = view;
   // The baseline as DRAWN: the camera's y shifts the whole picture down the
   // frame, so the curve the finger meets stands cam.y below the frame's base.
   const base = view.base + (cam.y > 0 ? cam.y : 0);
@@ -85,12 +84,8 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
         const x1 = footX(cam, width, g.to[i], fanB[i]);
         // Cheap x-range reject before any ellipse maths.
         if (x1 < px - tol || x0 > px + tol) continue;
-        // Pickable iff painted. `width` is device px — the shader's uRes.x
-        // frame — so this is the fly-over fade the GPU applies, evaluated
-        // exactly. Only a full zero is skipped: an arc still showing the
-        // partial fly-over floor is dim, but it is there to be tapped.
-        const anchored = arcAnchored(x0, x1, width);
-        if (flyOverDim(anchored, skyLocalize(localize, cam.y, view.ceil)) === 0) continue;
+        // Pickable iff painted: the fly-over fade dims a thread to
+        // FLYOVER_FLOOR and never to nothing, so it is there to be tapped.
         // the curve as the shader draws it: the half-ellipse of its own span
         const { A } = arcShape((x1 - x0) * 0.5, squash);
         const d = arcDistance(px, py, x0, x1, base, A, tol);
@@ -111,9 +106,9 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
  * The drawn threads whose span crosses the frame, in draw order: the set a
  * label pass walks (Corbin's brief, 2026-09-11: "when zoomed close, each
  * line shows its source and target beside it"). The same loop as pickArcs
- * without the distance test — the density prefix, the chunk extents and the
- * fly-over law — so a label is written for a line the reader can see and
- * never for one the shader skipped.
+ * without the distance test — the density prefix and the chunk extents —
+ * so a label is written for a line the reader can see and never for one
+ * the shader skipped.
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, y?:number, ppv:number, total:number}} cam
@@ -122,7 +117,7 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
  * @returns {number[]} instance indices
  */
 export function visibleArcs(g, cam, view, limit) {
-  const { width, localize, density } = view;
+  const { width, density } = view;
   const { fanA, fanB } = fansOf(g);
   // a verse of slack each side: a foot stands anywhere in its verse's cell (footX)
   const lo = xToVerse(cam, width, 0) - 1, hi = xToVerse(cam, width, width) + 1;
@@ -135,8 +130,6 @@ export function visibleArcs(g, cam, view, limit) {
         const x0 = footX(cam, width, g.from[i], fanA[i]);
         const x1 = footX(cam, width, g.to[i], fanB[i]);
         if (x1 < 0 || x0 > width) continue;
-        const anchored = arcAnchored(x0, x1, width);
-        if (flyOverDim(anchored, skyLocalize(localize, cam.y, view.ceil)) === 0) continue;
         out.push(i);
         if (out.length >= limit) return true;
       }

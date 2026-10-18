@@ -39,27 +39,6 @@ export const COLOR_MODES = ['distance', 'testament', 'genre'];
 /** Density steps, in the order the control cycles them. */
 export const DENSITY_STEPS = ['essential', 'famous'];
 
-// The zero-alpha cull in VERT's main(), on the line marked `zero-alpha cull`.
-//
-// A zero dim is not drawn. flyOverDim can no longer produce one (FLYOVER_FLOOR
-// is never 0, by owner rule), so this cull is kept for any OTHER zero the law
-// is ever handed, and is not the fly-over law's exit any more.
-// (Original rationale follows.) Once flyOverDim has faded an arc to zero, STOP DRAWING IT. Alpha 0 still costs a full
-// rasterise and blend of every pixel of the ribbon. Measured with
-// EXT_disjoint_timer_query_webgl2 on the real asset (Design & Performance,
-// scripture-web-3-fill-measure.md): phone 375@3 at zoom 400x, 3.05 -> 1.09 ms on a
-// Radeon 890M (-64 %) and 319.7 -> 134.5 ms on SwiftShader (-58 %). The chunk cull already
-// dropped 63,418 instances to 18,944 there; only a few dozen of those are visible, and the
-// rest were being blended for nothing.
-//
-// The threshold is EXACTLY the zero pick.js refuses taps on (pick.js:87), not an epsilon
-// near it. Culling any wider would blank arcs inside the partial fade band that are still
-// tappable, and the reader would be tapping a line that is not on the screen.
-//
-// This lives out here, not beside the line, because a template literal ships its comments
-// verbatim: inside the shader these twelve lines were 821 B of the 917 B that put bundle-f
-// (lazy until lz1) over its byte ceiling. esbuild strips them here and the shipped shader is unchanged.
-
 const VERT = `#version 300 es
 precision highp float;
 uniform vec2  uRes;
@@ -117,8 +96,8 @@ void main(){
 
   // At depth every anchored ribbon needs the full alpha to clear 3:1 alone, so
   // votes can no longer ride on alpha; they drive WIDTH instead. uVoteMix is
-  // the same fly-over crossover the cull uses, so there is never a zoom where
-  // an arc is culled under one law and styled under another.
+  // the same fly-over crossover the fade uses, so there is never a zoom where
+  // an arc is faded under one law and styled under another.
   float strength = clamp(aVotes/70., .30, 1.);
   float wScale = mix(1., mix(${STROKE_MIN_CSS / STROKE_DEEP_CSS}, 1., (strength - .30)/.70), uVoteMix);
   float halfW = uWidth*.5*wScale;
@@ -160,11 +139,9 @@ void main(){
   // is legible instead of fogged; under the structure law a fly-over's body
   // is up in the sky at its own span's height, never a level run over the
   // passage.
-  // The law lives in geometry.js, inlined above, because pick.js applies the
-  // same test — an arc faded to nothing here must not win a tap there.
+  // The law lives in geometry.js, inlined above. It dims and never reaches
+  // zero (FLYOVER_FLOOR), so every thread drawn here can be tapped there.
   dim *= flyOverDim(arcAnchored(x0, x1, uRes.x), uFlyLocalize);
-  // zero-alpha cull: why, and why exactly zero, above this shader
-  if (dim <= 0.) { vCol = vec4(0.); vEdge = side; gl_Position = vec4(2., 2., 0., 1.); return; }
 
   vec3 col;
   if (uColorMode < .5) {
