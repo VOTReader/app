@@ -21,7 +21,10 @@
                tapped Timothy thread had no spotlight).
      range     a verse range kept lit, [lo, hi] inclusive verse ids, or null
                (a chapter, a bundle, a verse: today's focusRange).
-     range2    the group chosen inside a range (chooseGroup), or null.
+     range2    RESERVED, always null: nothing writes it since the bundle sheet's
+               group choosing went (panel stream, 2e4164c40). The shader's
+               uFocusRange2 still reads it; retiring both is a spine and GL
+               change.
      hover     the thread under a resting pointer, -1 for none. Hover dims
                nothing (C3). Written IN PLACE (the hover rAF, dropHover): it
                changes per pointer move.
