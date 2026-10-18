@@ -512,7 +512,7 @@ export function useGoTo(web) {
   ) : null;
 
   const theChip = chip ? (
-    <div className="sw-goto-chip" ref={chipElRef} aria-hidden="true">
+    <div className={'sw-goto-chip' + (compact ? ' is-compact' : '')} ref={chipElRef} aria-hidden="true">
       {chip.label + ' · ' + connectionsText(chip.count)}
     </div>
   ) : null;
@@ -520,7 +520,7 @@ export function useGoTo(web) {
     const e = edges[side];
     if (!e) return null;
     return (
-      <button type="button" className={'sw-goto-edge sw-goto-edge-' + side} onClick={() => follow(side)}
+      <button type="button" className={'sw-goto-edge sw-goto-edge-' + side + (compact ? ' is-compact' : '')} onClick={() => follow(side)}
         style={side === 'right' ? { right: 'calc(' + inset + 'px + var(--sw-goto-gutter, 24px))' } : undefined}
         aria-label={'Follow the line to ' + e.label}>
         {side === 'left' ? '‹ ' + e.label : e.label + ' ›'}

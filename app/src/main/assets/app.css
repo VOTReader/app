@@ -7925,8 +7925,10 @@
     .sw-goto-edge:hover { border-color: #C4A469; }
     .sw-goto-edge:focus-visible { outline: 2px solid #C4A469; outline-offset: 2px; }
     .sw-goto-edge-left { left: var(--sw-goto-gutter, 24px); }
-    .sw-root.sw-narrow .sw-goto-chip { font-size: var(--fsc-14); padding: 5px 10px; }
-    .sw-root.sw-narrow .sw-goto-edge { font-size: var(--fsc-13); --sw-goto-gutter: 16px; }
+    /* compact is goto.jsx's rule (a root 500 px tall or less), not .sw-narrow: the phone in
+       landscape is 891 px wide, so the narrow keying left it the PC sizes (review 2026-10-18) */
+    .sw-goto-chip.is-compact { font-size: var(--fsc-14); padding: 5px 10px; }
+    .sw-goto-edge.is-compact { font-size: var(--fsc-13); --sw-goto-gutter: 16px; }
 
     /* ── The Scripture Web read as a list (A7, 2026-09-22) ──────────────────
        WebFallbackList.jsx: what a device that cannot draw the web gets instead

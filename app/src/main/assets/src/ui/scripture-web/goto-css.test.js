@@ -43,3 +43,14 @@ describe("the go-to box's place", () => {
     expect(d).toMatch(/width:\s*var\(--sw-goto-w,\s*min\(640px,/);
   });
 });
+
+/* Compact is a root 500 px tall or less (spec 4.5), not a narrow one: the phone in landscape is
+   891 px wide, so chips keyed to .sw-narrow kept the PC sizes there (the review of 2026-10-18). */
+describe("the go-to's chips in compact mode", () => {
+  it('the compact chips are keyed to .is-compact: 13 px edge chips at a 16 px gutter, a 14 px verse chip', () => {
+    expect(declsFor('.sw-goto-edge.is-compact')).toMatch(/font-size:\s*var\(--fsc-13\)/);
+    expect(declsFor('.sw-goto-edge.is-compact')).toMatch(/--sw-goto-gutter:\s*16px/);
+    expect(declsFor('.sw-goto-chip.is-compact')).toMatch(/font-size:\s*var\(--fsc-14\)/);
+    expect(CSS).not.toMatch(/\.sw-narrow \.sw-goto-(chip|edge)/);
+  });
+});

@@ -50,10 +50,11 @@ const graph = () => ({
 
 /**
  * The web, as the screen wires it; `api.current` is every hook's latest answer.
- * @param {{ start?: any, cam?: { x: number, ppv: number }, keys?: boolean }} [opts]  keys: the root's
- *   onKeyDown is the web's own (use-web-keys.js), not a spy
+ * @param {{ start?: any, cam?: { x: number, ppv: number }, keys?: boolean, frame?: { W: number, H: number, DPR: number } }} [opts]
+ *   keys: the root's onKeyDown is the web's own (use-web-keys.js), not a spy; frame: the canvas in
+ *   device px (default an 800x600 PC frame)
  */
-function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false } = {}) {
+function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W: 800, H: 600, DPR: 1 } } = {}) {
   const g = graph();
   const api = { current: /** @type {any} */ (null) };
   const setAnnounce = vi.fn();
@@ -63,7 +64,7 @@ function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false } = {}) {
     const modeRef = React.useRef('canonical');
     const camera = useWebCamera({ graph: g, density: 'famous', modeRef, schedule: frames.schedule, animate: frames.animate });
     if (!camera.camRef.current) {
-      camera.viewRef.current = { W: 800, H: 600, DPR: 1 };
+      camera.viewRef.current = { ...frame };
       camera.camRef.current = { x: cam.x, ppv: cam.ppv, total: TOTAL, y: 0 };
     }
     const journey = useJourney({ flyTo: camera.flyTo });
@@ -389,6 +390,24 @@ describe('the edge chips (spec 4.5): where lit threads leave the frame, and Foll
     expect(get().cam.camRef.current.ppv, 'the same zoom').toBeCloseTo(8, 9);
     expect(get().sel.detail, 'the line opens where it landed').toMatchObject({ kind: 'arc', index: 0, far: 'from' });
     expect(get().journey.stack.map((e) => e.verse)).toEqual([120, 20100]);
+  });
+
+  it('compact (a root 500 px tall or less, not a narrow one) takes the compact chips: 13 px edge chips at a 16 px gutter, a 14 px verse chip', async () => {
+    // the phone in landscape: 891x411 CSS px at 2.625, wider than any narrow root, but compact
+    const phone = { W: Math.round(891 * 2.625), H: Math.round(411 * 2.625), DPR: 2.625 };
+    const { container, get } = mountWeb({ cam: { x: 120, ppv: 8 }, frame: phone });
+    act(() => { get().sel.lightThreads([0]); });
+    settle();
+    expect(container.querySelector('.sw-goto-edge-right').classList.contains('is-compact')).toBe(true);
+    act(() => { get().goTo.open('Genesis 1:101'); });
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    settle(); await flush();
+    expect(container.querySelector('.sw-goto-chip').classList.contains('is-compact')).toBe(true);
+    cleanup();
+    const pc = mountWeb({ cam: { x: 120, ppv: 8 } });
+    act(() => { pc.get().sel.lightThreads([0]); });
+    settle();
+    expect(pc.container.querySelector('.sw-goto-edge-right').classList.contains('is-compact')).toBe(false);
   });
 
   it('at most one a side, the strongest; none when both ends are in view or both are out', () => {
