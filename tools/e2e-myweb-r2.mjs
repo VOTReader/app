@@ -19,6 +19,13 @@
  *                     A stack of streaks reads high whatever its density; a fan
  *                     of diagonals reads low; a saturated blob has no edges and
  *                     drops out. (v3, the gate)
+ *        ribbon       of band pixels, the share at full ink (a channel >= 140:
+ *                     several context threads stacked on one pixel at depth
+ *                     ink). Information (fix-review #6/#12): horiz cannot tell
+ *                     a corridor of fly-overs piled into a saturated ribbon
+ *                     from the same corridor drawn line by line (both read
+ *                     about 0.73 at 800x360 on the w3 path); ribbon can
+ *                     (0.139 against 0.060).
  *      PASS: horiz <= STREAK_HORIZ[frame] (registered per frame at measured
  *      plus margin, the way R5 ceilings are keyed; main reads the BEFORE).
  *   O  overview shot at rest, for the byte-wise comparison between tips.
@@ -213,7 +220,7 @@ const streak = (page, b64) => page.evaluate(async (b64, y0f, y1f) => {
   const lum = new Float32Array(W * H);
   for (let i = 0, p = 0; i < lum.length; i++, p += 4) lum[i] = d[p] + d[p + 1] + d[p + 2];
   const R = 8;
-  let streakRows = 0, nLit = 0, nAniso = 0, nEdge = 0, nHoriz = 0;
+  let streakRows = 0, nLit = 0, nAniso = 0, nEdge = 0, nHoriz = 0, nRibbon = 0;
   for (let y = y0; y < y1; y++) {
     let row = 0;
     for (let x = 0; x < W; x++) {
@@ -227,6 +234,7 @@ const streak = (page, b64) => page.evaluate(async (b64, y0f, y1f) => {
       }
       if (!lit[y * W + x]) continue;
       row++; nLit++;
+      { const p = (y * W + x) * 4; if (Math.max(d[p], d[p + 1], d[p + 2]) >= 140) nRibbon++; }
       if (x < R || x >= W - R || y < R || y >= H - R) continue;
       const hx = lit[y * W + x - R] && lit[y * W + x + R];
       const vy = lit[(y - R) * W + x] || lit[(y + R) * W + x];
@@ -234,14 +242,14 @@ const streak = (page, b64) => page.evaluate(async (b64, y0f, y1f) => {
     }
     if (row / W >= 0.6) streakRows++;
   }
-  return { rows: y1 - y0, rowFraction: +(streakRows / (y1 - y0)).toFixed(3), litPixels: nLit, aniso: +(nAniso / Math.max(1, nLit)).toFixed(3), edgePixels: nEdge, horiz: +(nHoriz / Math.max(1, nEdge)).toFixed(3) };
+  return { rows: y1 - y0, rowFraction: +(streakRows / (y1 - y0)).toFixed(3), litPixels: nLit, aniso: +(nAniso / Math.max(1, nLit)).toFixed(3), edgePixels: nEdge, horiz: +(nHoriz / Math.max(1, nEdge)).toFixed(3), ribbon: +(nRibbon / Math.max(1, (y1 - y0) * W)).toFixed(4) };
 }, b64, 0.22, 0.80);
 
 async function shot(page, name) { if (OUT) await page.screenshot({ path: resolve(OUT, name + '.png') }); }
 
 /** Wheel over one rail at a band's centre until the band spans >= frac of the width. */
 async function zoomBandTo(page, c, r0, which, label, frac) {
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 60; i++) {     // 40 ran out before Revelation spanned 60 % at 891x411
     const r = await rails(page);
     if (!r) return { ok: false, why: 'data-rails not published' };
     const bands = which === 'top' ? r.top : r.bottom;
@@ -286,7 +294,7 @@ async function armS(page, tag, fname, c, r0) {
   await shot(page, `${fname}-S-psalms-10x`);
   const s = await streak(page, await page.screenshot({ encoding: 'base64' }));
   const gate = STREAK_HORIZ[fname];
-  note(`${tag} S: Bible ${(p1.b / p0.b).toFixed(1)}x (Volumes ${(p1.v / p0.v || 1).toFixed(1)}x): horiz ${s.horiz} (edges ${s.edgePixels}, gate <= ${gate}); rowFraction ${s.rowFraction}, aniso ${s.aniso} (lit ${s.litPixels} px)`);
+  note(`${tag} S: Bible ${(p1.b / p0.b).toFixed(1)}x (Volumes ${(p1.v / p0.v || 1).toFixed(1)}x): horiz ${s.horiz} (edges ${s.edgePixels}, gate <= ${gate}); rowFraction ${s.rowFraction}, aniso ${s.aniso} (lit ${s.litPixels} px), ribbon ${s.ribbon}`);
   if (!(s.horiz <= gate)) fails.push(`${tag} S: horiz ${s.horiz} > ${gate}: the zoomed context reads as a horizontal streak field`);
   await clickIfPresent(page, 'Reset the view'); await sleep(600);
   return s;
@@ -316,7 +324,7 @@ async function pairing(page, tag, fname, c, r0, topLabel, bottomLabel, topWant, 
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(250);
   await shot(page, `${fname}-T${suffix}-${topLabel}-${bottomLabel}`.replace(/\s+/g, '_'));
   const s = await streak(page, await page.screenshot({ encoding: 'base64' }));
-  note(`${tag} T${suffix}: streak horiz ${s.horiz} (edges ${s.edgePixels}), rowFraction ${s.rowFraction}, aniso ${s.aniso}`);
+  note(`${tag} T${suffix}: streak horiz ${s.horiz} (edges ${s.edgePixels}), rowFraction ${s.rowFraction}, aniso ${s.aniso}, ribbon ${s.ribbon}`);
   if (!(s.horiz <= STREAK_HORIZ[fname])) fails.push(`${tag} T${suffix}: horiz ${s.horiz} > ${STREAK_HORIZ[fname]} with both rails zoomed`);
   return { t, b, after, before };
 }
