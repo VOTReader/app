@@ -158,6 +158,33 @@ describe('useFocusTrap', () => {
     expect(document.activeElement).toBe(opener);
   });
 
+  it('returnFocus names where focus goes on close in place of the pre-open element; null keeps the pre-open element', () => {
+    // the Scripture Web's go-to: a place chosen sends the keyboard home to the web, not back to
+    // the search button that opened the box (review 2026-10-18)
+    const opener = document.createElement('button');
+    const home = document.createElement('div');
+    home.tabIndex = -1;
+    document.body.append(opener, home);
+    cleanupEls.push(opener, home);
+    const { root, buttons } = buildDialog('r');
+    /** @type {HTMLElement | null} */
+    let to = null;
+    const hook = renderHook((p) => useFocusTrap(p.active, { returnFocus: () => to }), { initialProps: { active: false } });
+    hook.result.current.current = root;
+    opener.focus();
+    hook.rerender({ active: true });
+    expect(document.activeElement).toBe(buttons[0]);
+    to = home;
+    hook.rerender({ active: false });
+    expect(document.activeElement, 'where returnFocus said').toBe(home);
+    opener.focus();
+    hook.rerender({ active: true });
+    to = null;
+    hook.rerender({ active: false });
+    expect(document.activeElement, 'null: back to the pre-open element').toBe(opener);
+    hook.unmount();
+  });
+
   it('an empty dialog focuses its container (tabindex -1 applied) and eats Tab', () => {
     const root = document.createElement('div');
     document.body.appendChild(root);

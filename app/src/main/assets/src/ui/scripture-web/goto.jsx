@@ -166,8 +166,14 @@ export function useGoTo(web) {
   const [edges, setEdges] = React.useState(/** @type {{ left: any, right: any }} */ ({ left: null, right: null }));
   const inputRef = React.useRef(null);
   // the box is a dialog: Tab stays in it, and focus goes home when it closes (useFocusTrap,
-  // the app's free-global hook; dialog-focus-contract.test.js)
-  const boxRef = useFocusTrap(isOpen);
+  // the app's free-global hook; dialog-focus-contract.test.js). Home is where homeRef says: the
+  // web once a place is chosen (choose), the opener on Escape (close); else the trap's own, the
+  // element that had focus when the box opened. Left to the trap alone, a place chosen from the
+  // search button sent the keyboard back to the button after choose had sent it to the web, and
+  // a panel opening in the same commit took the button as where its own close goes (review
+  // 2026-10-18): the arrows, Enter and Backspace then went to the button
+  const homeRef = React.useRef(/** @type {HTMLElement | null} */ (null));
+  const boxRef = useFocusTrap(isOpen, { returnFocus: () => homeRef.current });
   const buttonRef = React.useRef(null);
   const openerRef = React.useRef(null);
   const chipRef = React.useRef(chip);
@@ -221,6 +227,7 @@ export function useGoTo(web) {
     openerRef.current = null;
     const root = rootRef && rootRef.current;
     const to = back && back.isConnected && back !== document.body ? back : root;
+    homeRef.current = to || null;
     if (to && typeof to.focus === 'function') to.focus();
   }, [rootRef]);
 
@@ -232,6 +239,7 @@ export function useGoTo(web) {
       const a = document.activeElement;
       if ((!a || a === document.body) && root && typeof root.focus === 'function') root.focus({ preventScroll: true });
       openerRef.current = document.activeElement;
+      homeRef.current = null;
     }
     setQuery(typeof q === 'string' ? q : '');
     setSel(0);
@@ -338,6 +346,8 @@ export function useGoTo(web) {
     setOpen(false);
     openerRef.current = null;
     const root = rootRef && rootRef.current;
+    // the web has the keyboard after a go-to, and keeps it when the box's trap lets go (homeRef)
+    homeRef.current = root || null;
     if (root && typeof root.focus === 'function') root.focus();
     go(row.place);
   }, [go, rootRef]);

@@ -27,7 +27,10 @@
        first wraps to the last. Focus that escaped the container (e.g.
        a programmatic .focus() elsewhere) is pulled back on the next Tab.
      - On deactivate/unmount: restores focus to the remembered element
-       when it is still in the document.
+       when it is still in the document, or to where opts.returnFocus
+       names, when the dialog knows better (the Scripture Web's go-to: a
+       place chosen sends the keyboard home to the web, not back to the
+       search button that opened the box).
 
    STACKED MODALS: a module-level stack tracks every active trap; only
    the TOPMOST trap's keydown handler acts. Without this, a dialog opened
@@ -67,15 +70,20 @@ function _focusables(root) {
  *
  * @param {boolean} active - trap engaged while true (same flag that renders
  *   the dialog; the ref must be attached to the dialog's root element).
- * @param {{ modal?: boolean }} [opts] - `modal: false` (the companion rail's docked
- *   panels) neither takes focus nor contains Tab; it only returns focus on close
- *   (see _returnFocusOnClose).
+ * @param {{ modal?: boolean, returnFocus?: () => (HTMLElement | null | undefined) }} [opts] -
+ *   `modal: false` (the companion rail's docked panels) neither takes focus nor contains
+ *   Tab; it only returns focus on close (see _returnFocusOnClose). `returnFocus` (a modal
+ *   trap's) is asked on close where focus goes in place of the element focused when the
+ *   dialog opened; null or undefined keeps that element. Read at close, so it may change
+ *   from render to render.
  * @returns {{ current: HTMLDivElement | null }} ref to attach to the dialog root
  *   (every dialog root in the app is a <div>)
  */
 export function useFocusTrap(active, opts) {
   const ref = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const modal = !(opts && opts.modal === false);
+  const returnRef = React.useRef(opts && opts.returnFocus);
+  returnRef.current = opts && opts.returnFocus;
 
   React.useEffect(() => {
     if (!active) return undefined;
@@ -131,9 +139,11 @@ export function useFocusTrap(active, opts) {
       document.removeEventListener('keydown', onKeyDown, true);
       const i = _trapStack.lastIndexOf(root);
       if (i !== -1) _trapStack.splice(i, 1);
-      // Restore focus to where the user was before the dialog opened.
-      if (prev && prev.isConnected && document.contains(prev)) {
-        try { prev.focus(); } catch (_e) { /* best-effort */ }
+      // Restore focus to where the user was before the dialog opened, or where the dialog says.
+      const ask = returnRef.current;
+      const to = (typeof ask === 'function' && ask()) || prev;
+      if (to && to.isConnected && document.contains(to)) {
+        try { to.focus(); } catch (_e) { /* best-effort */ }
       }
     };
   }, [active, modal]);

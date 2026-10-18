@@ -10,6 +10,7 @@ import { useJourney } from './use-journey.js';
 import { useFrameScheduler } from './use-frame-scheduler.js';
 import { useGoTo, routeOverlayHit, reopenOf, gotoBoxPlace, GOTO_BOX_W, GOTO_BOX_TOP, GOTO_BOX_MIN, GOTO_HINT } from './goto.jsx';
 import { useWebKeys } from './use-web-keys.js';
+import { DetailSheet } from './panels.jsx';
 import { verseToX, fitPPV, maxZoomFor, PPV_MAX_CSS } from '../../utils/scripture-web/geometry.js';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
 
@@ -50,11 +51,12 @@ const graph = () => ({
 
 /**
  * The web, as the screen wires it; `api.current` is every hook's latest answer.
- * @param {{ start?: any, cam?: { x: number, ppv: number }, keys?: boolean, frame?: { W: number, H: number, DPR: number }, web?: any }} [opts]
+ * @param {{ start?: any, cam?: { x: number, ppv: number }, keys?: boolean, frame?: { W: number, H: number, DPR: number }, web?: any, sheet?: boolean }} [opts]
  *   keys: the root's onKeyDown is the web's own (use-web-keys.js), not a spy; frame: the canvas in
- *   device px (default an 800x600 PC frame); web: the graph (default graph())
+ *   device px (default an 800x600 PC frame); web: the graph (default graph()); sheet: the panel's
+ *   own DetailSheet renders for what is open, as the screen renders it (its focus trap with it)
  */
-function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W: 800, H: 600, DPR: 1 }, web } = {}) {
+function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W: 800, H: 600, DPR: 1 }, web, sheet = false } = {}) {
   const g = web || graph();
   const api = { current: /** @type {any} */ (null) };
   const setAnnounce = vi.fn();
@@ -96,6 +98,7 @@ function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W
       <div className="sw-root" ref={rootRef} tabIndex={0} onKeyDown={keys ? web.onKeyDown : rootKeys}>
         <div className="sw-controls">{goTo.button}</div>
         {goTo.box}
+        {sheet && sel.detail ? <DetailSheet info={sel.detail} onClose={sel.closeCards} onOpen={() => {}} onFollow={null} onGroup={null} /> : null}
       </div>
     );
   }
@@ -542,6 +545,49 @@ describe("through the web's own keys (use-web-keys.js)", () => {
     fireEvent.keyDown(root, { key: 'Escape' });
     expect(get().sel.detail).toBeNull();
   });
+  // review 2026-10-18: opened from the search button, the box's trap gave focus back to the button
+  // after choose had sent it home, so the arrows, Enter and Backspace went to the button; and the
+  // panel opening in the same commit took the button as where its own close goes
+  it('opened from the search button, Enter on a book: the keyboard is on the web, not the button, and the arrows pan it', async () => {
+    const g = graph();
+    g.books = [{ id: 'genesis', title: 'Genesis', abbr: 'Gen' }, { id: 'exodus', title: 'Exodus', abbr: 'Exod' }];
+    g.chapters = [[0, 1, 0, 15550], [1, 1, 15550, TOTAL - 15550]];
+    g.chapterOfVerse = new Uint16Array(TOTAL).map((_, v) => (v < 15550 ? 0 : 1));
+    const { container, get } = mountWeb({ keys: true, web: g, cam: { x: 20000, ppv: 1 } });
+    const root = /** @type {HTMLElement} */ (container.querySelector('.sw-root'));
+    const button = /** @type {HTMLElement} */ (container.querySelector('.sw-goto-btn'));
+    button.focus();
+    fireEvent.click(button);
+    expect(document.activeElement).toBe(input(container));
+    fireEvent.change(input(container), { target: { value: 'Genesis' } });
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    expect(box(container)).toBeNull();
+    expect(get().journey.stack.map((e) => e.label).pop()).toBe('Genesis');
+    expect(document.activeElement, 'the web has the keyboard, not the button that opened the box').toBe(root);
+    settle(); await flush();
+    const x = get().cam.camRef.current.x;
+    fireEvent.keyDown(/** @type {HTMLElement} */ (document.activeElement), { key: 'ArrowRight' });
+    settle();
+    expect(get().cam.camRef.current.x, 'the arrows pan the web').toBeGreaterThan(x);
+  });
+
+  it('opened from the search button, Enter on a verse, then its panel closed: the keyboard goes home to the web', async () => {
+    const { container, get } = mountWeb({ keys: true, sheet: true });
+    const root = /** @type {HTMLElement} */ (container.querySelector('.sw-root'));
+    const button = /** @type {HTMLElement} */ (container.querySelector('.sw-goto-btn'));
+    button.focus();
+    fireEvent.click(button);
+    fireEvent.change(input(container), { target: { value: 'Gen 1:101' } });
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    const sheet = /** @type {HTMLElement} */ (container.querySelector('.sw-sheet'));
+    expect(get().sel.detail).toMatchObject({ kind: 'verse', verse: 100 });
+    expect(document.activeElement, 'the panel takes the keyboard as it opens').toBe(sheet);
+    settle(); await flush();
+    fireEvent.click(/** @type {HTMLElement} */ (sheet.querySelector('.sw-sheet-close')));
+    expect(container.querySelector('.sw-sheet')).toBeNull();
+    expect(document.activeElement, 'its close goes home to the web, not to the search button').toBe(root);
+  });
+
   it('Backspace goes back along the trail: to where the go-to set out, named; nothing further back, said so', async () => {
     const { container, get, setAnnounce } = mountWeb({ keys: true });
     const root = /** @type {HTMLElement} */ (container.querySelector('.sw-root'));
