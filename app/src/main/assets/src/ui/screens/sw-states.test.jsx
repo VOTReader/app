@@ -81,6 +81,18 @@ describe('the load error (item 24)', () => {
     expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
   });
 
+  /* w4: on a first visit the how-to-read card opened over the loader and hid "Weaving the web…"
+     (the s11 shot): a card about a web that is not there yet, over the one line saying it is
+     coming. The card waits for the web; the loader and Back show alone until then. */
+  it('on a first visit the guide waits for the web: the loader and Back show, the card does not', async () => {
+    const { container } = render(<ScriptureWebScreen {...baseProps()} settings={{ webDensity: 'famous' }} />);
+    await act(async () => { await Promise.resolve(); });
+    expect(container.querySelector('.sw-loading'), 'the loader').toBeTruthy();
+    expect(container.querySelector('.sw-guide'), 'no card over the loader').toBeNull();
+    expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /how to read this web/i }).getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('while the web is woven, the density names no count it does not have yet ("Famous", not "Famous · 0")', async () => {
     render(<ScriptureWebScreen {...baseProps()} />);
     await act(async () => { await Promise.resolve(); });

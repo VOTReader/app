@@ -130,6 +130,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
      first visit to the canon web until the reader closes it; the ? button
      brings it back. The seen flag rides `settings` like swEmptyDismissed. */
   const [guideOpen, setGuideOpen] = React.useState(() => !(settings && settings.swGuideSeen));
+  // The card waits for the web (w4): on a first visit it opened over the loader and hid
+  // "Weaving the web…" behind a card about a web that was not there yet.
+  const guideShown = guideOpen && !!graph;
   const closeGuide = React.useCallback(() => {
     setGuideOpen(false);
     if (typeof updateSetting === 'function') updateSetting('swGuideSeen', true);
@@ -359,7 +362,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // Escape, Android Back and the web's own keys (use-web-keys.js): one layer
   // closes a press, then the keys pan, climb, zoom and reset
   const { onKeyDown } = useWebKeys({
-    graph, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
+    graph, guideOpen: guideShown, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
     camRef, camVRef, lastRailRef, viewRef, modeRef, personalRef, zoomCapFor, yFrameFor,
     resetView, onBack, dropHover, setAnnounce, schedule, cancelFly, goTo, slackFor,
   });
@@ -520,10 +523,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
       {/* the how-to-read card's button: the corner above the hide-all
           button, off the controls strip (which it overflowed on a phone) */}
-      <button type="button" className={'sw-btn sw-btn-icon sw-guide-btn' + (guideOpen ? ' is-on' : '')}
-        onClick={() => (guideOpen ? closeGuide() : setGuideOpen(true))}
-        aria-label="How to read this web" aria-expanded={guideOpen} aria-haspopup="dialog">?</button>
-      {guideOpen && <HowToReadGuide onClose={closeGuide} canSearch={!!goTo.button} credit={graph && graph.attribution} />}
+      <button type="button" className={'sw-btn sw-btn-icon sw-guide-btn' + (guideShown ? ' is-on' : '')}
+        onClick={() => (guideShown ? closeGuide() : setGuideOpen(true))}
+        aria-label="How to read this web" aria-expanded={guideShown} aria-haspopup="dialog">?</button>
+      {guideShown && <HowToReadGuide onClose={closeGuide} canSearch={!!goTo.button} credit={graph && graph.attribution} />}
       {goTo.box}
       {emptyShown && <EmptyWebNotice onDismiss={dismissEmpty} />}
       {tip && <TipChip info={tip} viewport={viewRef.current} inset={panelInsetRef.current} />}
