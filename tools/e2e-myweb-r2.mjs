@@ -76,7 +76,7 @@
  *      over the bottom rail until Isaiah fills >= 60 % while data-ppv-vot does
  *      not move. Endpoints THROUGH THE REAL UI: the pointer scans the Isaiah
  *      band 6 px above the bottom rail until the hover card reads "Timothy's
- *      thread" (r2: "Corpus connection") with an Isaiah verse; then the Rebuke band 6 px below the
+ *      note" (w3 "Timothy's thread", r2 "Corpus connection") with an Isaiah verse; then the Rebuke band 6 px below the
  *      top rail until the card's third line (the Volume the passage sits in)
  *      reads Rebuke. Then the pills:
  *      "Reset the Volumes rail" returns only the top camera to fit; "Reset the
@@ -173,6 +173,30 @@ async function clickLabel(page, label) {
   await page.evaluate((l, s) => (new Function('return ' + s)())(l).click(), label, finder.toString());
 }
 const clickIfPresent = (page, label) => page.evaluate((l, s) => { const b = (new Function('return ' + s)())(l); if (!b) return false; b.click(); return true; }, label, finder.toString());
+/** A top control as a reader reaches it (w4): on a frame whose controls collapse to the
+ *  "More controls" menu (spec section 3's collapse rule: a canvas under 1000 px, so every
+ *  phone frame), through that menu; the walk's own labels are unchanged. need: wait for it
+ *  (or the menu) and throw when neither carries it, as clickLabel did. */
+async function control(page, label, need) {
+  if (need) {
+    await page.waitForFunction((l, s) => { const f = new Function('return ' + s)(); return !!f(l) || !!f('More controls'); },
+      { timeout: NAV_MS }, label, finder.toString());
+  }
+  if (await clickIfPresent(page, label)) { await sleep(150); await closeMenu(page); return true; }
+  if (await clickIfPresent(page, 'More controls')) {
+    await sleep(250);
+    const ok = await clickIfPresent(page, label);
+    await sleep(150);
+    await closeMenu(page);
+    if (ok) return true;
+  }
+  if (need) throw new Error('no control "' + label + '", on screen or in the More controls menu');
+  return false;
+}
+async function closeMenu(page) {
+  const open = await page.evaluate(() => { const b = document.querySelector('[aria-label="More controls"]'); return !!b && b.getAttribute('aria-expanded') === 'true'; });
+  if (open) { await clickIfPresent(page, 'More controls'); await sleep(200); }
+}
 async function boot(page, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_MS });
   await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0; }, { timeout: NAV_MS });
@@ -185,20 +209,21 @@ async function toMyWeb(page) {
   await page.waitForFunction(() => !!document.querySelector('.sw-root') || !!document.querySelector('.sw-fallback'), { timeout: NAV_MS });
   if (await page.$('.sw-fallback')) return false;
   await page.waitForFunction(() => !document.querySelector('.sw-loading'), { timeout: NAV_MS });
-  await clickLabel(page, 'My Web'); await sleep(800);
   // the first-run guide ("How to read this web") opens on a fresh context and covers the band; its
   // button is "Got it" ('Dismiss' is the empty notice's x)
   await clickIfPresent(page, 'Got it'); await sleep(300);
+  await control(page, 'My Web', true); await sleep(800);
+  await clickIfPresent(page, 'Got it'); await sleep(300);
   await clickIfPresent(page, 'Dismiss'); await sleep(300);
-  await clickIfPresent(page, 'Reset the view'); await sleep(700);
+  await control(page, 'Reset the view'); await sleep(700);
   return true;
 }
 const attr = (page, k) => page.evaluate((k) => (document.querySelector('.sw-root') || { getAttribute: () => null }).getAttribute(k), k);
 const rails = (page) => page.evaluate(() => JSON.parse((document.querySelector('.sw-root') || { getAttribute: () => null }).getAttribute('data-rails') || 'null'));
 const ppv = async (page) => ({ b: Number(await attr(page, 'data-ppv-css')), v: Number(await attr(page, 'data-ppv-vot')) });
 const canvasRect = (page) => page.evaluate(() => { const b = document.querySelector('.sw-canvas-ui').getBoundingClientRect(); return { l: b.left, t: b.top, w: b.width, h: b.height }; });
-// a Timothy thread's hover card (w3: "Timothy's thread"; r2 said "Corpus connection")
-const THREAD_CARD = /Timothy.s thread|Corpus connection/i;
+// a Timothy thread's hover card (today "Timothy's note"; w3 said "Timothy's thread", r2 "Corpus connection")
+const THREAD_CARD = /Timothy.s (note|thread)|Corpus connection/i;
 // its third line: "<source> · <Volume>" from w3, the Volume alone before
 const volumeOf = (meta) => String(meta || '').replace(/^.*·\s*/, '');
 const tipText = (page) => page.evaluate(() => {
@@ -296,7 +321,7 @@ async function armS(page, tag, fname, c, r0) {
   const gate = STREAK_HORIZ[fname];
   note(`${tag} S: Bible ${(p1.b / p0.b).toFixed(1)}x (Volumes ${(p1.v / p0.v || 1).toFixed(1)}x): horiz ${s.horiz} (edges ${s.edgePixels}, gate <= ${gate}); rowFraction ${s.rowFraction}, aniso ${s.aniso} (lit ${s.litPixels} px), ribbon ${s.ribbon}`);
   if (!(s.horiz <= gate)) fails.push(`${tag} S: horiz ${s.horiz} > ${gate}: the zoomed context reads as a horizontal streak field`);
-  await clickIfPresent(page, 'Reset the view'); await sleep(600);
+  await control(page, 'Reset the view'); await sleep(600);
   return s;
 }
 
@@ -349,7 +374,7 @@ async function armC(page, tag, fname, c, r0, f) {
   if (!found) { fails.push(`${tag} C: no corpus thread within 14 px of the bottom rail near the centre of Isaiah`); return; }
   const book = found.ref.replace(/\s+\d+:\d+.*$/, '');
   note(`${tag} C: following "${found.ref}" ↕ "${found.alt}" (${found.meta}); verse ${found.verse}, vot ${found.vot}`);
-  await clickLabel(page, 'Reset the view'); await sleep(600);
+  await control(page, 'Reset the view', true); await sleep(600);
   const W = c.w * f.dpr;
   const read = async () => {
     const r = await rails(page);
@@ -396,7 +421,7 @@ async function armC(page, tag, fname, c, r0, f) {
   };
   await strip('top', volumeOf(found.meta));
   await strip('bottom', book);
-  await clickIfPresent(page, 'Reset the view'); await sleep(400);
+  await control(page, 'Reset the view'); await sleep(400);
 }
 
 /** Arm R: the release fade, measured in the Matthew corridor. */
@@ -405,7 +430,7 @@ async function armR(page, tag, fname, c, r0, attempt) {
   // bottom rail (the Study Bible notes), the densest ink on the overview
   const band = r0.bottom.find((b) => b.label === 'Matthew');
   if (!band) { fails.push(`${tag} R: no Matthew band published`); return; }
-  await clickIfPresent(page, 'Reset the view'); await sleep(500);
+  await control(page, 'Reset the view'); await sleep(500);
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(300);
   // THE INSTRUMENT is data-cap-fraction read every animation frame: the
   // fraction the screen drew that frame (0 live, 1 full, between = fading).
@@ -478,7 +503,7 @@ async function armR(page, tag, fname, c, r0, attempt) {
     : `${tag} R: UNRESOLVED: ${fading.length} fading frames and a ${jumpGap} ms tick gap into full (cadence ${cadence} ms): the sampler could not have seen a 250 ms fade; not a pass`);
   else if (!(fadeSpan >= 100)) fails.push(`${tag} R: the fade spanned ${fadeSpan} ms of frames, under 100: not a visible span`);
   if (falls) fails.push(`${tag} R: the cap fraction fell ${falls} times during the release: not monotone`);
-  await clickIfPresent(page, 'Reset the view'); await sleep(300);
+  await control(page, 'Reset the view'); await sleep(300);
   return 'ok';
 }
 
@@ -507,13 +532,13 @@ async function walk(page, url, fname, attempt) {
     note(`${tag} T1 pill "Reset the Volumes rail": Volumes ${(q.v / p1.before.v).toFixed(2)}x of fit, Bible ${(q.b / p1.before.b).toFixed(1)}x held`);
     if (!topBack) fails.push(`${tag} T1: the Volumes pill did not return the top camera to fit`);
     if (!bibleHeld) fails.push(`${tag} T1: the Volumes pill moved the Bible camera`);
-    await clickLabel(page, 'Reset the view'); await sleep(500);
+    await control(page, 'Reset the view', true); await sleep(500);
     const z = await ppv(page);
     if (!(Math.abs(z.b - p1.before.b) <= p1.before.b * 0.01 && Math.abs(z.v - p1.before.v) <= p1.before.v * 0.01)) fails.push(`${tag} T1: "Reset the view" did not return both cameras to fit (${JSON.stringify(z)} vs ${JSON.stringify(p1.before)})`);
   }
-  await clickIfPresent(page, 'Reset the view'); await sleep(500);
+  await control(page, 'Reset the view'); await sleep(500);
   await pairing(page, tag, fname, c, r0, 'Vol I', 'Revelation', /^Vol I$/, /^Revelation\b/, '2');
-  await clickIfPresent(page, 'Reset the view'); await sleep(300);
+  await control(page, 'Reset the view'); await sleep(300);
 }
 
 let browser, own;

@@ -147,6 +147,34 @@ const clickIfPresent = (page, label) => page.evaluate((l) => {
   if (!b) return false; b.click(); return true;
 }, label);
 
+/** A top control as a reader reaches it (w4): on a frame whose controls collapse to the
+ *  "More controls" menu (spec section 3's collapse rule: a canvas under 1000 px, so the phone
+ *  frames), through that menu; the walk's own labels are unchanged. need: as clickLabel, wait
+ *  for it (or the menu) and throw when neither carries it. label: a prefix, or a RegExp. */
+async function control(page, label, need) {
+  const re = label instanceof RegExp ? label.source : null;
+  const src = finder.toString();
+  const click = (l) => page.evaluate((x, r, f) => { const b = (new Function('return ' + f)())(x, r); if (!b) return false; b.click(); return true; }, String(l), l === label ? re : null, src);
+  if (need) {
+    await page.waitForFunction((x, r, f) => { const g = new Function('return ' + f)(); return !!g(x, r) || !!g('More controls', null); },
+      { timeout: NAV_MS }, String(label), re, src);
+  }
+  if (await click(label)) { await sleep(150); await closeMenu(page); return true; }
+  if (await click('More controls')) {
+    await sleep(250);
+    const ok = await click(label);
+    await sleep(150);
+    await closeMenu(page);
+    if (ok) return true;
+  }
+  if (need) throw new Error('no control "' + label + '", on screen or in the More controls menu');
+  return false;
+}
+async function closeMenu(page) {
+  const open = await page.evaluate(() => { const b = document.querySelector('[aria-label="More controls"]'); return !!b && b.getAttribute('aria-expanded') === 'true'; });
+  if (open) { await clickIfPresent(page, 'More controls'); await sleep(200); }
+}
+
 async function boot(page, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_MS });
   await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0; }, { timeout: NAV_MS });
@@ -169,12 +197,13 @@ async function toMyWeb(page) {
   await page.waitForFunction(() => !!document.querySelector('.sw-root') || !!document.querySelector('.sw-fallback'), { timeout: NAV_MS });
   if (await page.$('.sw-fallback')) return false;
   await page.waitForFunction(() => !document.querySelector('.sw-loading'), { timeout: NAV_MS });
-  await clickLabel(page, 'My Web');
-  await sleep(600);
   // the first-run guide ("How to read this web") opens on a fresh context and covers the band; its
   // button is "Got it" ('Dismiss' is the empty notice's x)
   await clickIfPresent(page, 'Got it'); await sleep(300);
-  await clickIfPresent(page, 'Reset the view');
+  await control(page, 'My Web', true);
+  await sleep(600);
+  await clickIfPresent(page, 'Got it'); await sleep(300);
+  await control(page, 'Reset the view');
   await sleep(900);
   return true;
 }
@@ -253,9 +282,9 @@ function diffStats(on, off) {
 }
 async function readBoth(page) {
   const on = await page.evaluate(MEASURE);
-  await clickLabel(page, /^Timothy’s notes/); await sleep(500);
+  await control(page, /^Timothy’s notes/, true); await sleep(500);
   const off = await page.evaluate(MEASURE);
-  await clickLabel(page, /^Timothy’s notes/); await sleep(500);
+  await control(page, /^Timothy’s notes/, true); await sleep(500);
   return { on, off, ctx: diffStats(on, off) };
 }
 const COUNTERS = () => {
@@ -384,10 +413,10 @@ async function walk(page, url, fname) {
   if (PERF) {
     // TIMING FIRST, PIXELS AFTER: getImageData demotes the canvas (note 3b).
     await perfArm(page, tag, 'overview', R5 ? R5.overview : null);
-    await clickIfPresent(page, 'Reset the view'); await sleep(500);
+    await control(page, 'Reset the view'); await sleep(500);
     await zoom3(page, tag);
     await perfArm(page, tag, 'three zoom steps', R5 && R5[fname] != null ? R5[fname] : null);
-    await clickIfPresent(page, 'Reset the view'); await sleep(700);
+    await control(page, 'Reset the view'); await sleep(700);
   }
   await shot(page, `${fname}-0links-overview`);
   const zero = await readBoth(page);
