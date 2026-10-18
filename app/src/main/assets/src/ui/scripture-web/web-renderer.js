@@ -6,16 +6,23 @@
    Every cross-reference is one instance of a triangle-strip ribbon. The
    vertex shader turns (from, to) into a half-ellipse in screen space and
    offsets each vertex along the curve normal to give the stroke width, so a
-   whole canon of arcs is a handful of draw calls and zero per-frame CPU
+   whole canon of arcs is a handful of draw calls and no per-frame CPU
    geometry. The fragment shader does nothing but antialias the edge.
 
-   Three things make it fast enough for a mid-range phone:
-     · The asset is pre-sorted into span buckets, so short arcs are drawn with
-       8 segments and only the longest get 48 — the average is ~12, not 48.
-     · Each density is a PREFIX of its bucket, so switching Essential / Famous
-       just shortens the instance count. Nothing re-uploads.
-     · Buckets carry per-chunk [minFrom, maxTo] extents, so a zoomed-in view
-       skips whole runs of instances that cannot touch the viewport.
+   What makes it fast enough for a mid-range phone (E1):
+     · The frame's VISIBLE SET (utils/scripture-web/frame-set.js): one pass
+       per camera finds every thread whose body touches the frame, x window
+       and heights both, and the segments its own piece on screen needs
+       (chord error under geometry.TESS_TOL_CSS at every zoom). The picker,
+       the labels and the pills read the same set, so what is drawn is what
+       is counted, labelled and pickable.
+     · The threads live in two textures, once (their feet and fans, their
+       votes); a frame sends only the set's ids, uploaded when the set
+       changes, and draws them one draw per segment count, each thread with
+       exactly the segments it asked for. Nothing off the frame runs.
+     · During a gesture on a dense screen the backing shrinks to
+       GESTURE_DPR device px per CSS px (E2) and the frame after the gesture
+       redraws it whole; the geometry stays in full-resolution px (uPx).
 
    Over it a TOP PASS draws the prophecy class (every g.prophecy pair, always
    on) and redraws the few threads the reader has asked about (the lit, the
@@ -27,55 +34,91 @@
    recedes to TAP_CONTEXT, eased (uTapFade); a hover dims nothing.
 
    Neither the height law (the structure law: every thread the half-ellipse
-   of its own span, every thread drawn at every zoom) nor the fly-over leg
-   is written here. Both are imported from utils/scripture-web/geometry.js
-   as GLSL and inlined, because the CPU hit test applies the same laws — if
-   either drifts,
+   of its own span, every thread drawn at every zoom), the frame's piece of
+   it nor the fly-over leg is written here. All three are imported from
+   utils/scripture-web/geometry.js as GLSL and inlined, because the CPU
+   (the visible set, the hit test) applies the same laws — if either drifts,
    arcs stop being tappable where they look tappable, or start being tappable
    where nothing is drawn. Tests assert this shader contains them.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcShapeGLSL, flyOverGLSL, segmentsFor, CLIP_MARGIN, glslFloat,
-  STROKE_MIN_CSS, STROKE_DEEP_CSS, skyLocalize, topSegmentsFor, footX,
+  arcShapeGLSL, arcFrameGLSL, flyOverGLSL, CLIP_MARGIN, glslFloat, frameHeights,
+  STROKE_MIN_CSS, STROKE_DEEP_CSS, skyLocalize, topSegmentsFor,
 } from '../../utils/scripture-web/geometry.js';
 import {
   CENTRE_BRIGHT, CENTRE_WIDTH, FLYOVER_LEG_WIDTH, TAP_CONTEXT, rgba01, inkWidth,
 } from '../../utils/scripture-web/sw-ink.js';
-import { topSet, isCompact } from '../../utils/scripture-web/frame-set.js';
+import { topSet, isCompact, frameSetAt } from '../../utils/scripture-web/frame-set.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
-import { bucketDrawCount, fansOf } from '../../utils/scripture-web/decode.js';
-import { walkDrawnRuns } from '../../utils/scripture-web/chunk-walk.js';
+import { fansOf } from '../../utils/scripture-web/decode.js';
 
 /** Density steps, in the order the control cycles them. */
 export const DENSITY_STEPS = ['essential', 'famous'];
 
+/** Texels per row of the thread textures; the vertex stage's `i & 1023, i >> 10` is this. */
+export const ARC_TEX_W = 1024;
+
+/** E2: the most device px per CSS px the GL backing keeps while the camera moves. */
+export const GESTURE_DPR = 2;
+
+/**
+ * The backing's share of the full-resolution frame (E2): 1 at rest, and during a
+ * gesture on a screen denser than GESTURE_DPR, that density's share of it.
+ * @param {number} dpr  device px per CSS px
+ * @param {boolean} moving  the camera is in a gesture
+ */
+export function backingScale(dpr, moving) {
+  return moving && dpr > GESTURE_DPR ? GESTURE_DPR / dpr : 1;
+}
+
+/**
+ * One side of the GL backing, backing px, for a full-resolution side and backingScale:
+ * the size the screen gives the canvas and the viewport the renderer draws into.
+ * @param {number} n  full-resolution device px
+ * @param {number} [scale]
+ */
+export function backingSize(n, scale) {
+  const s = scale > 0 && scale < 1 ? scale : 1;
+  const b = Math.round(n * s);
+  return b > 1 ? b : 1;
+}
+
 const VERT = `#version 300 es
 precision highp float;
-uniform vec2  uRes;
+precision highp int;
+uniform highp sampler2D uArcs;   // per thread: (from, to, fanA, fanB), ARC_TEX_W texels a row
+uniform highp sampler2D uVotes;  // per thread: its votes
+uniform vec2  uRes;          // the frame, full-resolution device px (the backing may be smaller: uPx)
 uniform float uCamXHi, uCamXLo;  // the camera's x, split: hi = floor(x), lo = x - hi (float32 at the ceiling)
-uniform float uPPV, uBase, uSquash, uLocalize;
+uniform float uPPV, uBase, uSquash;
 uniform float uFlyLocalize;  // the fly-over leg's localize: the zoom's, let go as the camera rises (geometry.skyLocalize)
 uniform float uCamY;         // the picture's shift down the frame, device px
+uniform vec2  uFrameH;       // the heights a body must reach to be in the frame (geometry.frameHeights)
+uniform float uPx;           // full-resolution px per backing px: 1 at rest, more in a gesture (E2)
 uniform float uWidth, uAlpha, uTotal;
-uniform float uSegments;
+uniform float uSegments;     // this draw's segment count: every thread in it asked for exactly this many
 uniform float uVoteMix;      // 0 = votes drive alpha (overview), 1 = width (depth)
 uniform vec2  uFocusRange;   // verse range kept lit (lo > hi = no focus)
 uniform vec2  uFocusRange2;  // with uFocusRange: a GROUP, one foot in each, lit AND drawn
-uniform float uFocusArc;     // the chosen instance: kept at full ink while the rest recedes
+uniform float uFocusArc;     // the chosen thread: kept at full ink while the rest recedes
 uniform float uTapFade;      // 0..1: how far the rest has receded to TAP_CONTEXT (a tap only, eased)
 uniform vec2  uCentre;       // the centre chapter, canon x [x0, x1) (x0 >= x1 = none): its own arcs are emphasised
 uniform float uCentreT;      // the centre's emphasis ease, 0..1 (web-frame CentreChapter.t)
-uniform float uInstanceBase; // gl_InstanceID offset of this draw range
-in uint aFrom; in uint aTo; in float aVotes;
-in float aFanA; in float aFanB; // each foot's departure rank, -0.5..0.5
+in uint aId;                 // the thread: one id of the frame's visible set (frame-set.js) per instance
 // colour and half width are one per instance: flat, so nothing is interpolated
 flat out vec4 vCol; out float vEdge; flat out float vHalfW;
 ${arcShapeGLSL}
+${arcFrameGLSL}
 ${flyOverGLSL}
 ${rampGLSL()}
 void main(){
-  float a = float(aFrom), b = float(aTo);
+  // the thread's own data, by id (an integer texel fetch: no filtering, exact)
+  int i = int(aId);
+  ivec2 at = ivec2(i & 1023, i >> 10);
+  vec4 arc = texelFetch(uArcs, at, 0);
+  float aVotes = texelFetch(uVotes, at, 0).r;
+  float a = arc.x, b = arc.y, aFanA = arc.z, aFanB = arc.w;
   // each foot stands in its verse's own cell, in the order of its far end
   // (geometry.footX; the picker computes the same). The camera's x comes
   // split, because a verse id near 31,102 carries ~0.002 of float32 error
@@ -89,26 +132,28 @@ void main(){
   // the structure law: the half-ellipse of its own span, at every zoom
   float A = arcShape(rx, uSquash).y;
 
-  // The piece worth tessellating. At overview this is the whole arc, so the 1x
-  // frame cannot move; as the reader localizes it closes onto the viewport,
-  // because a 440,000 px arc spending 47 of its 48 segments off screen is what
-  // draws the visible piece as one straight chord. Clipping moves only WHERE
-  // the samples land — never the curve they land on. geometry.visibleWindow.
-  float m = ${glslFloat(CLIP_MARGIN)};
-  float lo = mix(left,  max(left,  -m),         uLocalize);
-  float hi = mix(right, min(right, uRes.x + m), uLocalize);
-  hi = max(hi, lo);
+  // E1: the piece of it in the frame (geometry.arcFrameTau, the same law the
+  // visible set chose this draw's segments by), sampled evenly in its
+  // parameter. Clipping moves only WHERE the samples land, never the curve
+  // they land on. A piece float32 finds empty is a point: nothing is drawn.
+  vec2 win = arcFrameTau(left, right, uRes.x, A, uFrameH.x, uFrameH.y);
+  win.y = max(win.y, win.x);
+  float dTau = (win.y - win.x)/uSegments;
 
   // Ribbon: two vertices per segment step, offset along the curve normal.
   int vid = gl_VertexID;
-  float t = float(vid >> 1) / uSegments;
   float side = float(vid & 1)*2. - 1.;
-  float tau = mix(arcTau(lo, left, right), arcTau(hi, left, right), t);
+  float tau = win.x + float(vid >> 1)*dTau;
   float px, hgt; vec2 tgv;
   arcAt(tau, left, right, A, px, hgt, tgv);
-  // the baseline draws uCamY below the frame's base; pick.js adds the same
-  vec2 p = vec2(px, uBase + uCamY - hgt);
   vec2 tg = normalize(tgv + vec2(1e-6, 0.));
+  // the baseline draws uCamY below the frame's base; pick.js adds the same.
+  // Each sample is pushed out from the ellipse's centre by arcPush of its
+  // own offset from it (geometry.frameSegments), so the chords straddle the
+  // curve. The offset is built from tau, never as p minus the centre, which
+  // float32 would round at the ceiling's million-px radii.
+  float rr = max(rx, 0.);
+  vec2 p = vec2(px, uBase + uCamY - hgt) + vec2(-rr*cos(tau), -A*sin(tau))*arcPush(dTau);
 
   // At depth every anchored ribbon needs the full alpha to clear 3:1 alone, so
   // votes can no longer ride on alpha; they drive WIDTH instead. uVoteMix is
@@ -131,14 +176,15 @@ void main(){
 
   // The chosen and hovered lines are not styled here: the top pass redraws
   // them over this one in their own ink and width, at every zoom (sw1 B2).
-  float id = float(gl_InstanceID) + uInstanceBase;
+  // The instance's id IS the thread's (the stream carries it), so no range base.
+  float id = float(aId);
   float spot = (uFocusArc >= 0. && abs(id - uFocusArc) < .5) ? 1. : 0.;
-  // Thin-line hygiene: a ribbon under one device px wide aliases into dashes as it crosses
-  // the pixel grid. Hold the half width at 0.5 device px and pay for the
+  // Thin-line hygiene: a ribbon under one backing px wide aliases into dashes as it crosses
+  // the pixel grid. Hold the half width at half a backing px and pay for the
   // extra width in alpha (thin), so a thin line puts the same ink on screen.
-  float thin = clamp(halfW/.5, 0., 1.);
-  halfW = max(halfW, .5);
-  float hw = halfW + .5;                         // +0.5 px feather skirt: the antialias ramp's own half
+  float thin = clamp(halfW/(.5*uPx), 0., 1.);
+  halfW = max(halfW, .5*uPx);
+  float hw = halfW + .5*uPx;                     // + half a backing px of feather skirt: the antialias ramp's own half
   p += vec2(-tg.y, tg.x)*side*hw;
   float a1 = step(uFocusRange.x, a)*step(a, uFocusRange.y);
   float b1 = step(uFocusRange.x, b)*step(b, uFocusRange.y);
@@ -173,11 +219,12 @@ void main(){
 
 const FRAG = `#version 300 es
 precision mediump float;
+uniform float uFeather;      // the vertex stage's uPx: one backing px of feather, in full-resolution px
 flat in vec4 vCol; in float vEdge; flat in float vHalfW; out vec4 o;
 void main(){
-  float hw = vHalfW + .5;                         // the vertex stage's skirt
+  float hw = vHalfW + .5*uFeather;                // the vertex stage's skirt
   float d = abs(vEdge)*hw;
-  float aa = 1.0 - smoothstep(vHalfW - .5, vHalfW + .5, d);
+  float aa = 1.0 - smoothstep(vHalfW - .5*uFeather, vHalfW + .5*uFeather, d);
   float a = clamp(vCol.a, 0., 1.)*aa;
   o = vec4(vCol.rgb*a, a);                        // premultiplied
 }`;
@@ -232,14 +279,15 @@ void main(){
 const TOP_FRAG = `#version 300 es
 precision mediump float;
 uniform float uRibbon;       // the vertex stage's uRibbonHalf
-uniform float uCoreHalf;     // the core's half width, device px (at least 0.5)
+uniform float uCoreHalf;     // the core's half width, device px (at least half a backing px)
 uniform float uHaloHalf;     // the halo's half width, device px (0: none)
+uniform float uFeather;      // one backing px, in full-resolution px (the main pass's uPx)
 uniform vec4  uCore;         // straight rgba
 uniform vec4  uHalo;         // straight rgba, its alpha at the core's edge
 in float vEdge; out vec4 o;
 void main(){
   float d = abs(vEdge)*uRibbon;
-  float core = (1. - smoothstep(uCoreHalf - .5, uCoreHalf + .5, d))*uCore.a;
+  float core = (1. - smoothstep(uCoreHalf - .5*uFeather, uCoreHalf + .5*uFeather, d))*uCore.a;
   // the halo: full under the core, falling softly to nothing at its own edge
   float h = uHaloHalf > uCoreHalf ? clamp(1. - (d - uCoreHalf)/(uHaloHalf - uCoreHalf), 0., 1.) : 0.;
   float halo = h*h*uHalo.a;
@@ -261,7 +309,7 @@ const TOP_LOOK = {
 
 /**
  * The uniforms one top-pass kind draws with, from the ink table: device px
- * widths (the compact width on a phone), the core held at 0.5 device px
+ * widths (the compact width on a phone), the core held at half a backing px
  * with the lost width paid in alpha (the main pass's thin-line law).
  * The prophecy class recedes with the rest of the web while a line is
  * chosen (to TAP_CONTEXT at tapFade 1); what the reader asked for does not.
@@ -269,20 +317,22 @@ const TOP_LOOK = {
  * @param {number} dpr
  * @param {boolean} compact
  * @param {number} [tapFade]  0..1, the frame's (uTapFade)
+ * @param {number} [px]  full-resolution px per backing px (E2; 1 at rest)
  * @returns {{ coreHalf: number, haloHalf: number, core: number[], halo: number[], ribbon: number, cap: number }}
  */
-export function topLook(kind, dpr, compact, tapFade) {
+export function topLook(kind, dpr, compact, tapFade, px) {
   const look = TOP_LOOK[kind];
   const d = dpr > 0 ? dpr : 1;
+  const p = px > 0 ? px : 1;
   const wide = inkWidth(look.core, compact) * d;
   const half = (look.minDevicePx && wide < look.minDevicePx ? look.minDevicePx : wide) / 2;
-  const thin = half >= 0.5 ? 1 : half / 0.5;
-  const coreHalf = half > 0.5 ? half : 0.5;
+  const thin = half >= 0.5 * p ? 1 : half / (0.5 * p);
+  const coreHalf = half > 0.5 * p ? half : 0.5 * p;
   const haloHalf = look.halo ? (inkWidth(look.halo, compact) * d) / 2 : 0;
   const fade = look.recedes && tapFade > 0 ? 1 + (TAP_CONTEXT - 1) * (tapFade < 1 ? tapFade : 1) : 1;
   const core = rgba01(look.core, thin * fade);
   const halo = look.halo ? rgba01(look.halo, fade) : [0, 0, 0, 0];
-  return { coreHalf, haloHalf, core, halo, ribbon: Math.max(coreHalf, haloHalf) + 0.5, cap: look.cap };
+  return { coreHalf, haloHalf, core, halo, ribbon: Math.max(coreHalf, haloHalf) + 0.5 * p, cap: look.cap };
 }
 
 function compile(gl, type, src) {
@@ -323,6 +373,54 @@ function link(gl, vertex, fragment) {
 }
 
 /**
+ * One program's uniforms, each sent only when its value changes (E3): a
+ * frame that moves the camera sends the camera and nothing else.
+ * @param {WebGL2RenderingContext} gl
+ * @param {WebGLProgram} program
+ * @param {string[]} names
+ */
+function uniformsOf(gl, program, names) {
+  /** @type {Record<string, WebGLUniformLocation | null>} */
+  const loc = Object.create(null);
+  /** @type {Record<string, Float64Array>} */
+  const held = Object.create(null);
+  for (const name of names) {
+    loc[name] = gl.getUniformLocation(program, name);
+    held[name] = new Float64Array(4).fill(NaN);
+  }
+  return {
+    /** @param {string} n @param {number} a */
+    f1(n, a) {
+      const h = held[n];
+      if (h[0] === a) return;
+      h[0] = a;
+      gl.uniform1f(loc[n], a);
+    },
+    /** @param {string} n @param {number} a @param {number} b */
+    f2(n, a, b) {
+      const h = held[n];
+      if (h[0] === a && h[1] === b) return;
+      h[0] = a; h[1] = b;
+      gl.uniform2f(loc[n], a, b);
+    },
+    /** @param {string} n @param {ArrayLike<number>} v */
+    f4(n, v) {
+      const h = held[n];
+      if (h[0] === v[0] && h[1] === v[1] && h[2] === v[2] && h[3] === v[3]) return;
+      h[0] = v[0]; h[1] = v[1]; h[2] = v[2]; h[3] = v[3];
+      gl.uniform4f(loc[n], v[0], v[1], v[2], v[3]);
+    },
+    /** @param {string} n @param {number} a */
+    i1(n, a) {
+      const h = held[n];
+      if (h[0] === a) return;
+      h[0] = a;
+      gl.uniform1i(loc[n], a);
+    },
+  };
+}
+
+/**
  * Create the renderer over a canvas. Returns null when WebGL2 is
  * unavailable — the screen shows its fallback panel rather than a blank void.
  *
@@ -351,75 +449,60 @@ export function createRenderer(canvas, graph, opts = {}) {
   }
   gl.useProgram(program);
 
-  const U = {};
-  for (const name of ['uRes', 'uCamXHi', 'uCamXLo', 'uCamY', 'uPPV', 'uBase', 'uSquash',
-    'uLocalize', 'uFlyLocalize', 'uWidth', 'uAlpha', 'uTotal',
-    'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc', 'uTapFade',
-    'uInstanceBase', 'uFocusRange2', 'uCentre', 'uCentreT']) {
-    U[name] = gl.getUniformLocation(program, name);
-  }
-  const TU = {};
-  for (const name of ['uRes', 'uCamXHi', 'uCamXLo', 'uPPV', 'uBase', 'uSquash', 'uCamY', 'uSegments',
-    'uRibbonHalf', 'uRibbon', 'uCoreHalf', 'uHaloHalf', 'uCore', 'uHalo']) {
-    TU[name] = gl.getUniformLocation(topProgram, name);
-  }
+  const U = uniformsOf(gl, program, ['uArcs', 'uVotes', 'uRes', 'uCamXHi', 'uCamXLo', 'uCamY', 'uPPV',
+    'uBase', 'uSquash', 'uFlyLocalize', 'uFrameH', 'uPx', 'uFeather', 'uWidth', 'uAlpha', 'uTotal',
+    'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc', 'uTapFade', 'uFocusRange2', 'uCentre', 'uCentreT']);
+  const TU = uniformsOf(gl, topProgram, ['uRes', 'uCamXHi', 'uCamXLo', 'uPPV', 'uBase', 'uSquash', 'uCamY',
+    'uSegments', 'uRibbonHalf', 'uRibbon', 'uCoreHalf', 'uHaloHalf', 'uFeather', 'uCore', 'uHalo']);
 
-  // Widest arc in each bucket, once. Tessellation is chosen per draw from the
-  // camera, and a bucket of 3-verse arcs must not be given 96 segments because
-  // a bucket of 10,000-verse ones needs them.
-  const bucketMaxSpan = graph.buckets.map((b) => {
-    let m = 0;
-    const end = b.off + b.len;
-    for (let i = b.off; i < end; i++) {
-      const s = Math.abs(graph.to[i] - graph.from[i]);
-      if (s > m) m = s;
-    }
-    return m;
-  });
+  // The threads, once: their feet and fans in one RGBA32F texture, their
+  // votes in an R32F one, ARC_TEX_W a row, fetched by id in the vertex stage
+  // (verse ids and votes are exact in float32).
+  const count = graph.count > 0 ? graph.count : 0;
+  const rows = Math.max(1, Math.ceil(count / ARC_TEX_W));
+  const fans = fansOf(graph);
+  const arcData = new Float32Array(ARC_TEX_W * rows * 4);
+  const voteData = new Float32Array(ARC_TEX_W * rows);
+  for (let i = 0; i < count; i++) {
+    arcData[4 * i] = graph.from[i];
+    arcData[4 * i + 1] = graph.to[i];
+    arcData[4 * i + 2] = fans.fanA[i];
+    arcData[4 * i + 3] = fans.fanB[i];
+    voteData[i] = graph.votes[i];
+  }
+  const texture = (unit, internal, format, data) => {
+    const t = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, internal, ARC_TEX_W, rows, 0, format, gl.FLOAT, data);
+    return t;
+  };
+  const arcTex = texture(0, gl.RGBA32F, gl.RGBA, arcData);
+  const voteTex = texture(1, gl.R32F, gl.RED, voteData);
+  gl.activeTexture(gl.TEXTURE0);
+  U.i1('uArcs', 0);
+  U.i1('uVotes', 1);
 
+  // The id stream: the frame's visible set, by segment count (frame-set.js),
+  // uploaded only when the set changes (a new camera), into one buffer as
+  // long as the graph.
+  const wide = count > 0xffff;
+  const idType = wide ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
+  const idBytes = wide ? 4 : 2;
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
-  /** @type {Array<{buf:WebGLBuffer, loc:number, type:number, isInt:boolean, bytes:number}>} */
-  const attribs = [];
-  const attrib = (data, name, type, isInt, bytes) => {
-    const loc = gl.getAttribLocation(program, name);
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribDivisor(loc, 1);
-    attribs.push({ buf, loc, type, isInt, bytes });
-  };
-  // Uint16 verse ids widen to uint in the shader; votes stay signed.
-  attrib(graph.from, 'aFrom', gl.UNSIGNED_SHORT, true, 2);
-  attrib(graph.to, 'aTo', gl.UNSIGNED_SHORT, true, 2);
-  attrib(new Float32Array(graph.votes), 'aVotes', gl.FLOAT, false, 4);
-  // Each foot's departure rank, the table the hit test reads too.
-  const fans = fansOf(graph);
-  attrib(fans.fanA, 'aFanA', gl.FLOAT, false, 4);
-  attrib(fans.fanB, 'aFanB', gl.FLOAT, false, 4);
-
-  /**
-   * Point every instance attribute at `first`.
-   *
-   * WebGL2's drawArraysInstanced has NO base-instance parameter — instance
-   * data is always read from the start of the bound range. Drawing a bucket's
-   * sub-range therefore means re-pointing the attributes at a byte offset,
-   * not just passing a different first index. Getting this wrong silently
-   * draws the WRONG arcs (every bucket rendering instance 0..n), which is
-   * exactly what it did before this existed.
-   */
-  let pointedAt = -1;
-  const pointInstances = (first) => {
-    if (first === pointedAt) return;
-    pointedAt = first;
-    for (const a of attribs) {
-      gl.bindBuffer(gl.ARRAY_BUFFER, a.buf);
-      if (a.isInt) gl.vertexAttribIPointer(a.loc, 1, a.type, 0, first * a.bytes);
-      else gl.vertexAttribPointer(a.loc, 1, a.type, false, 0, first * a.bytes);
-    }
-  };
-  pointInstances(0);
+  const idLoc = gl.getAttribLocation(program, 'aId');
+  const idBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, idBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, Math.max(1, count) * idBytes, gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(idLoc);
+  gl.vertexAttribDivisor(idLoc, 1);
+  gl.vertexAttribIPointer(idLoc, 1, idType, 0, 0);
+  let streamSerial = -1;
 
   // The top pass's instances: a handful of threads, re-uploaded only when
   // what is lit, hovered or chosen changes (frame-set.js topSet's key).
@@ -450,12 +533,52 @@ export function createRenderer(canvas, graph, opts = {}) {
   };
   gl.bindVertexArray(vao);
 
+  // Each kind's look, rebuilt only when what it reads changes (E3).
+  /** @type {Record<string, {dpr:number, compact:boolean, fade:number, px:number, look:any}>} */
+  const looks = Object.create(null);
+  const lookOf = (kind, dpr, compact, fade, px) => {
+    const held = looks[kind];
+    if (held && held.dpr === dpr && held.compact === compact && held.fade === fade && held.px === px) return held.look;
+    const look = topLook(kind, dpr, compact, fade, px);
+    looks[kind] = { dpr, compact, fade, px, look };
+    return look;
+  };
+  // Each range's segments, recomputed only when the camera or the set moves.
+  const topSegs = new Int32Array(8);
+  const topSegKey = new Float64Array(5).fill(NaN);
+  let topSegSet = null;
+  const topSegmentsOf = (set, width, camX, ppv, squash, dpr) => {
+    const k = topSegKey;
+    if (topSegSet === set && k[0] === width && k[1] === camX && k[2] === ppv && k[3] === squash && k[4] === dpr) return;
+    topSegSet = set;
+    k[0] = width; k[1] = camX; k[2] = ppv; k[3] = squash; k[4] = dpr;
+    const half = width / 2;
+    for (let ri = 0; ri < set.ranges.length; ri++) {
+      const range = set.ranges[ri];
+      const cap = TOP_LOOK[range.kind].cap;
+      let segments = 0;
+      for (let j = range.first; j < range.first + range.count; j++) {
+        // geometry.footX, without a camera object
+        const n = topSegmentsFor((set.from[j] + 0.5 + set.fanA[j] - camX) * ppv + half,
+          (set.to[j] + 0.5 + set.fanB[j] - camX) * ppv + half, width, squash, dpr, cap);
+        if (n > segments) segments = n;
+      }
+      topSegs[ri] = segments;
+    }
+  };
+
+  const heights = new Float64Array(2);
+  /** The main pass's last frame: instances and vertex invocations it sent, in how many draws. */
+  const stats = { instances: 0, vertices: 0, draws: 0 };
+  /** The top pass's: the prophecy class and what is asked about. */
+  const topStats = { instances: 0, vertices: 0, draws: 0 };
+
   /**
    * The top pass over the frame the main pass just drew: the lit, hovered and
    * chosen threads in their ink, the chosen last. Not counted in stats (the
    * main pass's instances are the web; these are a handful drawn again).
    */
-  const drawTop = (v, camXHi, tapFade) => {
+  const drawTop = (v, camX, ppv, camXHi, camY, dpr, tapFade, px) => {
     const set = topSet(graph, v, topHeld);
     if (set !== topHeld) {
       topHeld = set;
@@ -465,43 +588,51 @@ export function createRenderer(canvas, graph, opts = {}) {
         gl.bufferData(gl.ARRAY_BUFFER, set[a.field], gl.DYNAMIC_DRAW);
       }
     }
+    topStats.instances = 0; topStats.vertices = 0; topStats.draws = 0;
     if (!set.count) return;
-    const dpr = v.dpr || 1;
     const compact = isCompact(v.height / dpr);
-    const cam = { x: v.camX, ppv: v.ppv };
+    topSegmentsOf(set, v.width, camX, ppv, v.squash, dpr);
     gl.useProgram(topProgram);
     gl.bindVertexArray(topVao);
-    gl.uniform2f(TU.uRes, v.width, v.height);
-    gl.uniform1f(TU.uCamXHi, camXHi);
-    gl.uniform1f(TU.uCamXLo, v.camX - camXHi);
-    gl.uniform1f(TU.uPPV, v.ppv);
-    gl.uniform1f(TU.uBase, v.base);
-    gl.uniform1f(TU.uSquash, v.squash);
-    gl.uniform1f(TU.uCamY, v.camY > 0 ? v.camY : 0);
-    for (const range of set.ranges) {
+    TU.f2('uRes', v.width, v.height);
+    TU.f1('uCamXHi', camXHi);
+    TU.f1('uCamXLo', camX - camXHi);
+    TU.f1('uPPV', ppv);
+    TU.f1('uBase', v.base);
+    TU.f1('uSquash', v.squash);
+    TU.f1('uCamY', camY);
+    TU.f1('uFeather', px);
+    for (let ri = 0; ri < set.ranges.length; ri++) {
+      const range = set.ranges[ri];
       if (!range.count) continue;
-      const look = topLook(range.kind, dpr, compact, tapFade);
-      let segments = 0;
-      for (let k = range.first; k < range.first + range.count; k++) {
-        const n = topSegmentsFor(footX(cam, v.width, set.from[k], set.fanA[k]),
-          footX(cam, v.width, set.to[k], set.fanB[k]), v.width, v.squash, dpr, look.cap);
-        if (n > segments) segments = n;
-      }
-      gl.uniform1f(TU.uSegments, segments);
-      gl.uniform1f(TU.uRibbonHalf, look.ribbon);
-      gl.uniform1f(TU.uRibbon, look.ribbon);
-      gl.uniform1f(TU.uCoreHalf, look.coreHalf);
-      gl.uniform1f(TU.uHaloHalf, look.haloHalf);
-      gl.uniform4f(TU.uCore, look.core[0], look.core[1], look.core[2], look.core[3]);
-      gl.uniform4f(TU.uHalo, look.halo[0], look.halo[1], look.halo[2], look.halo[3]);
+      const look = lookOf(range.kind, dpr, compact, TOP_LOOK[range.kind].recedes ? tapFade : 0, px);
+      const segments = topSegs[ri];
+      TU.f1('uSegments', segments);
+      TU.f1('uRibbonHalf', look.ribbon);
+      TU.f1('uRibbon', look.ribbon);
+      TU.f1('uCoreHalf', look.coreHalf);
+      TU.f1('uHaloHalf', look.haloHalf);
+      TU.f4('uCore', look.core);
+      TU.f4('uHalo', look.halo);
       pointTop(range.first);
       gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 2 * (segments + 1), range.count);
+      topStats.instances += range.count;
+      topStats.vertices += 2 * (segments + 1) * range.count;
+      topStats.draws++;
     }
     gl.bindVertexArray(vao);
   };
 
   gl.disable(gl.DEPTH_TEST);
   gl.enable(gl.BLEND);
+
+  // the ground colour, parsed once per colour (E3)
+  let bgKey = '';
+  let bg = [0, 0, 0];
+  const ground = (css) => {
+    if (css !== bgKey) { bgKey = css; bg = cssColorToRGB(css); }
+    return bg;
+  };
 
   // Context loss (GPU reset, WebView renderer restart — the on-device
   // "everything washes out" report). preventDefault() tells the browser we
@@ -523,12 +654,13 @@ export function createRenderer(canvas, graph, opts = {}) {
   canvas.addEventListener('webglcontextlost', onLost, false);
   canvas.addEventListener('webglcontextrestored', onRestored, false);
 
-  let lastStats = { instances: 0, draws: 0 };
-
   return {
     gl,
     get contextLost() { return lost; },
-    get stats() { return lastStats; },
+    /** The main pass's last frame (the debug stat, E1): {instances, vertices, draws}. */
+    get stats() { return stats; },
+    /** The top pass's last frame: {instances, vertices, draws}. */
+    get topStats() { return topStats; },
 
     /**
      * Paint the ground and nothing else: My Web draws its links in Canvas2D
@@ -538,11 +670,12 @@ export function createRenderer(canvas, graph, opts = {}) {
      */
     clear(bgColor) {
       if (lost) return;
-      const bg = cssColorToRGB(bgColor);
+      const c = ground(bgColor);
       gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.clearColor(bg[0], bg[1], bg[2], 1);
+      gl.clearColor(c[0], c[1], c[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      lastStats = { instances: 0, draws: 0 };
+      stats.instances = 0; stats.vertices = 0; stats.draws = 0;
+      topStats.instances = 0; topStats.vertices = 0; topStats.draws = 0;
     },
 
     /**
@@ -554,16 +687,25 @@ export function createRenderer(canvas, graph, opts = {}) {
      *   bg:string,
      *   focusRange:(number[]|null), focusRange2?:(number[]|null), focusArc:number, hoverArc?:number,
      *   focusProphecy?:number, lit?:(ArrayLike<number>|null), litKey?:string, tapFade?:number,
+     *   scale?:number,
      *   centre?:(import('../../utils/scripture-web/web-frame.js').CentreChapter|null)}} v
-     *   centre: the centre chapter (web-frame.centreOf over centreRange), its own arcs emphasised
+     *   the view (web-frame.webViewArgs) and the frame's own values, in one object the screen
+     *   fills in place (E3);
+     *   centre: the centre chapter (web-frame.centreOf over centreRange), its own arcs emphasised;
      *   tapFade: 0..1, how far the rest of the web has receded (web-frame.tapFadeStep); when it is
-     *     not given, the focus decides at once (1 while something is chosen)
+     *     not given, the focus decides at once (1 while something is chosen);
+     *   scale: the backing's share of the full-resolution frame (backingScale; 1 when not given):
+     *     the geometry stays in full-resolution device px and the viewport is the backing
      */
     draw(v) {
-      if (lost) return lastStats;
-      const bg = cssColorToRGB(v.bg);
-      gl.viewport(0, 0, v.width, v.height);
-      gl.clearColor(bg[0], bg[1], bg[2], 1);
+      if (lost) return stats;
+      const dpr = v.dpr > 0 ? v.dpr : 1;
+      const k = v.scale > 0 && v.scale < 1 ? v.scale : 1;
+      const px = 1 / k;
+      const bw = backingSize(v.width, k), bh = backingSize(v.height, k);
+      const c = ground(v.bg);
+      gl.viewport(0, 0, bw, bh);
+      gl.clearColor(c[0], c[1], c[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
       // Premultiplied-over on both themes keeps dense crossings legible. The
       // old additive dark pass made the 300k tail bloom into neon and exposed
@@ -574,84 +716,84 @@ export function createRenderer(canvas, graph, opts = {}) {
       // its gold line from base + 1 device px down, while the threads stand on
       // base + camY: every thread pass is held to the rows above that line.
       // Turned on after the clear (which is whole) and off at the frame's end.
-      const rows = Math.min(v.height, Math.max(0, Math.ceil(v.base + (v.dpr || 1))));
+      const rows = Math.min(bh, Math.max(0, Math.ceil((v.base + dpr) * k)));
       gl.enable(gl.SCISSOR_TEST);
-      gl.scissor(0, v.height - rows, v.width, rows);
+      gl.scissor(0, bh - rows, bw, rows);
+
+      const camX = v.camX, ppv = v.ppv;
+      const camY = v.camY > 0 ? v.camY : 0;
+      // THE visible set (frame-set.js): the picker and the overlay ask for the same one
+      const set = frameSetAt(graph, v.density, v.width, v.base, v.squash, camX, camY, ppv, dpr);
 
       gl.useProgram(program);
       gl.bindVertexArray(vao);
-      gl.uniform2f(U.uRes, v.width, v.height);
+      U.f2('uRes', v.width, v.height);
       // split for float32 (the vertex stage's feet): hi whole, lo the rest
-      const camXHi = Math.floor(v.camX);
-      gl.uniform1f(U.uCamXHi, camXHi);
-      gl.uniform1f(U.uCamXLo, v.camX - camXHi);
-      gl.uniform1f(U.uCamY, v.camY > 0 ? v.camY : 0);
-      gl.uniform1f(U.uPPV, v.ppv);
-      gl.uniform1f(U.uBase, v.base);
-      gl.uniform1f(U.uSquash, v.squash);
-      gl.uniform1f(U.uLocalize, v.localize);
-      gl.uniform1f(U.uFlyLocalize, skyLocalize(v.localize, v.camY > 0 ? v.camY : 0, v.ceil));
-      gl.uniform1f(U.uWidth, v.strokeWidth);
-      gl.uniform1f(U.uAlpha, v.alpha);
-      gl.uniform1f(U.uTotal, graph.total);
-      gl.uniform1f(U.uVoteMix, v.voteMix || 0);
-      gl.uniform1f(U.uFocusArc, v.focusArc == null ? -1 : v.focusArc);
+      const camXHi = Math.floor(camX);
+      U.f1('uCamXHi', camXHi);
+      U.f1('uCamXLo', camX - camXHi);
+      U.f1('uCamY', camY);
+      U.f1('uPPV', ppv);
+      U.f1('uBase', v.base);
+      U.f1('uSquash', v.squash);
+      // the heights the set was cut by (geometry.frameHeights)
+      frameHeights(v.base, camY, dpr, heights);
+      U.f2('uFrameH', heights[0], heights[1]);
+      U.f1('uFlyLocalize', skyLocalize(v.localize, camY, v.ceil));
+      U.f1('uPx', px);
+      U.f1('uFeather', px);
+      U.f1('uWidth', v.strokeWidth);
+      U.f1('uAlpha', v.alpha);
+      U.f1('uTotal', graph.total);
+      U.f1('uVoteMix', v.voteMix || 0);
+      U.f1('uFocusArc', v.focusArc == null ? -1 : v.focusArc);
       const chosen = (v.focusArc != null && v.focusArc >= 0) || (v.focusProphecy != null && v.focusProphecy >= 0)
         || !!v.focusRange;
-      const tapFade = typeof v.tapFade === 'number' ? v.tapFade : (chosen ? 1 : 0);
-      gl.uniform1f(U.uTapFade, tapFade > 0 ? (tapFade < 1 ? tapFade : 1) : 0);
-      if (v.centre && v.centre.x0 < v.centre.x1) {
-        gl.uniform2f(U.uCentre, v.centre.x0, v.centre.x1);
-        gl.uniform1f(U.uCentreT, v.centre.t > 0 ? Math.min(1, v.centre.t) : 0);
+      const t = typeof v.tapFade === 'number' ? v.tapFade : (chosen ? 1 : 0);
+      const tapFade = t > 0 ? (t < 1 ? t : 1) : 0;
+      U.f1('uTapFade', tapFade);
+      const centre = v.centre;
+      if (centre && centre.x0 < centre.x1) {
+        U.f2('uCentre', centre.x0, centre.x1);
+        U.f1('uCentreT', centre.t > 0 ? Math.min(1, centre.t) : 0);
       } else {
-        gl.uniform2f(U.uCentre, 1, 0);
-        gl.uniform1f(U.uCentreT, 0);
+        U.f2('uCentre', 1, 0);
+        U.f1('uCentreT', 0);
       }
-      if (v.focusRange) gl.uniform2f(U.uFocusRange, v.focusRange[0], v.focusRange[1]);
-      else gl.uniform2f(U.uFocusRange, 1, 0);
-      if (v.focusRange && v.focusRange2) gl.uniform2f(U.uFocusRange2, v.focusRange2[0], v.focusRange2[1]);
-      else gl.uniform2f(U.uFocusRange2, 1, 0);
+      if (v.focusRange) U.f2('uFocusRange', v.focusRange[0], v.focusRange[1]);
+      else U.f2('uFocusRange', 1, 0);
+      if (v.focusRange && v.focusRange2) U.f2('uFocusRange2', v.focusRange2[0], v.focusRange2[1]);
+      else U.f2('uFocusRange2', 1, 0);
 
-      // Viewport verse range, for chunk culling - with a verse of slack each
-      // side: a foot stands anywhere in its verse's cell (geometry.footX), so
-      // a chunk whose last verse is just left of the frame can still put a
-      // foot inside it (the refuter, 2026-09-22).
-      const viewLo = v.camX - (v.width / 2) / v.ppv - 1;
-      const viewHi = v.camX + (v.width / 2) / v.ppv + 1;
-      const chunkSize = graph.chunkSize || 256;
-
-      let instances = 0, draws = 0;
-      for (let bi = 0; bi < graph.buckets.length; bi++) {
-        const bucket = graph.buckets[bi];
-        const count = bucketDrawCount(bucket, v.density);
-        if (count <= 0) continue;
-        // Segments from what this bucket can put ON SCREEN, not from its span.
-        const segments = segmentsFor(bucket.segments, v.localize,
-          bucketMaxSpan[bi] * v.ppv * 0.5, v.ceil, v.width, v.dpr || 1, v.squash);
-        gl.uniform1f(U.uSegments, segments);
-        const verts = 2 * (segments + 1);
-        // One draw per run of adjacent visible chunks (chunk-walk.js; a
-        // bucket without chunks is one run of its whole count).
-        walkDrawnRuns(bucket, count, chunkSize, viewLo, viewHi, (start, end) => {
-          const n = end - start;
-          pointInstances(start);
-          gl.uniform1f(U.uInstanceBase, start);
-          gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, verts, n);
-          instances += n;
-          draws++;
-        });
+      gl.bindBuffer(gl.ARRAY_BUFFER, idBuf);
+      if (set.serial !== streamSerial && set.count) {
+        streamSerial = set.serial;
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, set.stream, 0, set.count);
       }
-      lastStats = { instances, draws };
-      drawTop(v, camXHi, tapFade);
+      // one draw per segment count, each thread with exactly the segments it asked for
+      let vertices = 0;
+      for (let ci = 0; ci < set.classes; ci++) {
+        const n = set.classN[ci];
+        U.f1('uSegments', n);
+        gl.vertexAttribIPointer(idLoc, 1, idType, 0, set.classFirst[ci] * idBytes);
+        gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 2 * (n + 1), set.classCount[ci]);
+        vertices += 2 * (n + 1) * set.classCount[ci];
+      }
+      stats.instances = set.count;
+      stats.vertices = vertices;
+      stats.draws = set.classes;
+      drawTop(v, camX, ppv, camXHi, camY, dpr, tapFade, px);
       gl.disable(gl.SCISSOR_TEST);
-      return lastStats;
+      return stats;
     },
 
     dispose() {
       canvas.removeEventListener('webglcontextlost', onLost);
       canvas.removeEventListener('webglcontextrestored', onRestored);
-      for (const a of attribs) gl.deleteBuffer(a.buf);
+      gl.deleteBuffer(idBuf);
       for (const a of topAttribs) gl.deleteBuffer(a.buf);
+      gl.deleteTexture(arcTex);
+      gl.deleteTexture(voteTex);
       gl.deleteVertexArray(vao);
       gl.deleteVertexArray(topVao);
       gl.deleteProgram(program);

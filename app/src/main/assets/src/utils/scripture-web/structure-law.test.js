@@ -63,7 +63,7 @@ function camAt(zoom, x = CENTRE) {
   return cam;
 }
 const viewAt = (cam, over) => Object.assign({
-  width: W, height: 2 * BASE, base: BASE, ceil: CEIL, squash: SQUASH,
+  width: W, height: 2 * BASE, base: BASE, ceil: CEIL, squash: SQUASH, dpr: DPR,
   localize: geo.localizeFactor(cam.ppv / geo.fitPPV(cam, W)), density: 'famous', rulerDepth: 40,
 }, over);
 
@@ -281,16 +281,27 @@ describe('the picker agrees with the drawn curve, on the asset, at rest and in t
     }
   });
 
-  it('the picker\'s crossing set is the shader\'s: anchoring and the frame test read the same spread feet (footX) at the ceiling and at 12x', () => {
+  /* Restated for E1 (GL step 2): the drawn set is every thread whose BODY
+     touches the frame (the height-aware cull), not every thread whose span
+     crosses it; a span crossing the frame with its body far above it has
+     nothing there to see, tap or label. The oracle below is independent of
+     geometry.arcFrameTau: the ellipse is concave, so over the frame's x window
+     its lowest point is at a window end and its highest is the crown (when
+     the crown is over the window) or the other end, and the body touches the
+     frame iff that range of heights meets the frame's (frameHeights). */
+  it('the picker\'s drawn set is the shader\'s: every thread whose body touches the frame, on the same spread feet (footX), at the ceiling, at 12x and in the sky', () => {
     // a foot stands anywhere in its verse's cell, so at the frame's edges the
     // old verse-edge feet and the drawn feet disagree by up to a verse; the
     // shader's arcAnchored reads the drawn ones and so must every walk here
-    for (const zoom of [12, zMax]) {
+    for (const [zoom, up] of [[12, 0], [zMax, 0], [12, 3 * CEIL]]) {
       const cam = camAt(zoom, CENTRE + 0.37);
+      cam.y = up;
       const view = viewAt(cam);
       const got = new Set(pick.visibleArcs(graph, cam, view, 1e9));
+      const [hLo, hHi] = geo.frameHeights(BASE, up, DPR);
+      const m = geo.CLIP_MARGIN;
       const want = new Set();
-      let anchoredWant = 0;
+      let anchoredWant = 0, crossing = 0;
       for (const b of graph.buckets) {
         const end = b.off + dec.bucketDrawCount(b, 'famous');
         for (let i = b.off; i < end; i++) {
@@ -298,12 +309,23 @@ describe('the picker agrees with the drawn curve, on the asset, at rest and in t
           // anchored: a foot within the margin, crossing or not (a foot just
           // outside the frame with its other foot further out still anchors)
           if (geo.arcAnchored(x0, x1, W)) anchoredWant++;
-          if (x1 < 0 || x0 > W) continue;
+          if (x1 < -m || x0 > W + m) continue;
+          crossing++;
+          const { A } = geo.arcShape((x1 - x0) / 2, SQUASH);
+          const xa = Math.max(x0, -m), xb = Math.min(x1, W + m), cx = (x0 + x1) / 2;
+          const ha = geo.arcHeightAt(xa, x0, x1, A), hb = geo.arcHeightAt(xb, x0, x1, A);
+          const lo = Math.min(ha, hb), hi = cx >= xa && cx <= xb ? A : Math.max(ha, hb);
+          if (hi < hLo || lo > hHi) continue;
           want.add(i);
         }
       }
-      expect(got, `zoom ${zoom}`).toEqual(want);
-      expect(pick.countAnchored(graph, cam, W, 'famous'), `zoom ${zoom}: countAnchored`).toBe(anchoredWant);
+      expect(got, `zoom ${zoom} y ${up}`).toEqual(want);
+      // the cull has teeth at depth: spans that cross the frame with their bodies out of it
+      if (zoom === 12) expect(crossing - want.size, `zoom ${zoom} y ${up}: culled`).toBeGreaterThan(1000);
+      // anchored regardless of the camera's height (C14): the crowding law's count
+      expect(pick.countAnchored(graph, cam, W, 'famous'), `zoom ${zoom} y ${up}: countAnchored`).toBe(anchoredWant);
+      // the pills stand on the ruler: in the sky the culled feet are not drawn there
+      if (up > 0) continue;
       const cells = pick.footBundles(graph, cam, Object.assign({}, view, { level: undefined }), DPR);
       let cellSum = 0;
       for (const c of cells) cellSum += c.drawn + c.hidden;
@@ -320,7 +342,12 @@ describe('the picker agrees with the drawn curve, on the asset, at rest and in t
     expect(cam.y, 'the sky at 12x is at least three ceilings tall').toBe(3 * CEIL);
     const view = viewAt(cam);
     const list = pick.visibleArcs(graph, cam, view, 100000);
-    let seen = 0, curved = 0;
+    // Restated for E1: the list is the draw order now, shortest first, whose
+    // first threads are the ones whose crowns just reach the frame (level
+    // there by geometry), so the first 400 points of it are no sample of the
+    // sky. The share is taken over every on-screen point of every such
+    // thread, and the picker asked at a spread of them.
+    let seen = 0, curved = 0, picked = 0;
     for (const i of list) {
       const span = Math.abs(graph.to[i] - graph.from[i]);
       if (span < 3000) continue;
@@ -332,15 +359,17 @@ describe('the picker agrees with the drawn curve, on the asset, at rest and in t
         const y = view.base + cam.y - geo.arcHeightAt(x, x0, x1, A);
         if (y < 0 || y > view.base) continue;
         seen++;
-        const got = pick.pickArcs(graph, cam, view, x, y, 3, 8);
-        expect(got.length, `thread ${i} at x ${x}`).toBeGreaterThan(0);
+        if (seen % 250 === 1) {
+          const got = pick.pickArcs(graph, cam, view, x, y, 3, 8);
+          expect(got.length, `thread ${i} at x ${x}`).toBeGreaterThan(0);
+          picked++;
+        }
         const slope = (geo.arcHeightAt(x + 4, x0, x1, A) - geo.arcHeightAt(x - 4, x0, x1, A)) / 8;
         if (Math.abs(slope) > 0.05) curved++;
-        if (seen > 400) break;
       }
-      if (seen > 400) break;
     }
     expect(seen).toBeGreaterThan(50);
+    expect(picked).toBeGreaterThan(100);
     expect(curved / seen, 'the sky is curves with a direction, not a stack of level runs').toBeGreaterThan(0.8);
   });
 });
@@ -592,5 +621,89 @@ describe('the GLSL arcShape / arcTau / arcAt ARE the JS: the twin transliterated
 
   it('BITES: a GLSL built-in the transliteration does not know is refused, not miscompared', () => {
     expect(() => twinOf(geo.arcShapeGLSL.replace('acos(', 'smoothstep(0., 1., '))).toThrow(/smoothstep/);
+  });
+});
+
+/* ── the frame twin (GL step 2, E1): the shader's cull and push ARE the JS's ── */
+describe('the GLSL arcFrameTau / arcPush ARE the JS: the frame twin transliterated and run', () => {
+  function frameTwinOf(glsl) {
+    let js = glsl
+      .replace(/vec2 arcFrameTau\(([^)]*)\)/, (_, a) => `function arcFrameTau(${a.replace(/float /g, '')})`)
+      .replace(/float arcPush\(([^)]*)\)/, (_, a) => `function arcPush(${a.replace(/float /g, '')})`)
+      .replace(/\b(float|vec2|bool) (\w+) =/g, 'let $2 =')
+      .replace(/\b(asin|sqrt|tan|max|min)\(/g, 'Math.$1(');
+    const allowed = new Set(['function', 'arcFrameTau', 'arcPush', 'x0', 'x1', 'width', 'A', 'hLo', 'hHi', 'r', 'm',
+      'ua', 'ub', 'ta', 'tb', 'tc', 'td', 'l0', 'l1', 'r0', 'r1', 'left', 'right', 'dTau', 't', 'let', 'return', 'if',
+      'vec2', 'clamp', 'Math', 'max', 'min', 'asin', 'sqrt', 'tan']);
+    const idents = js.replace(/\b\d+(\.\d*)?(e[-+]?\d+)?/g, ' ').match(/[A-Za-z_]\w*/g) || [];
+    for (const id of idents) {
+      if (!allowed.has(id)) {
+        const at = js.indexOf(id);
+        throw new Error(`the frame twin uses \`${id}\` (…${js.slice(Math.max(0, at - 40), at + 40)}…): extend the transliteration before trusting this pin`);
+      }
+    }
+    const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+    const vec2 = (a, b) => [a, b];
+    return new Function('clamp', 'vec2', js + '; return {arcFrameTau, arcPush};')(clamp, vec2);
+  }
+  /** random frames and threads over every branch: off the window, under or over the frame, the whole arch, a leg, both */
+  function cases(n, seed) {
+    let s = seed;
+    const r = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const width = [800, 1600, 2317][i % 3], dpr = [1, 2, 2.6][i % 3];
+      const base = width * (0.4 + 0.3 * r());
+      const span = Math.exp(Math.log(0.01) + r() * (Math.log(4e6) - Math.log(0.01)));
+      const x0 = -2 * width + r() * 4 * width - (r() < 0.3 ? span * r() : 0);
+      const squash = 0.3 + 1.9 * r();
+      const camY = r() < 0.4 ? 0 : Math.exp(r() * Math.log(span * squash + 2));
+      const [hLo, hHi] = geo.frameHeights(base, camY, dpr);
+      out.push({ x0, x1: x0 + span, width, A: (span / 2) * squash, hLo, hHi });
+    }
+    return out;
+  }
+
+  it('agrees with the JS over 20,000 threads: the same hit, the same piece (1e-12), the same push', () => {
+    const twin = frameTwinOf(geo.arcFrameGLSL);
+    const tau = [0, 0];
+    let hits = 0, whole = 0, piece = 0;
+    const bad = [];
+    for (const c of cases(20000, 17)) {
+      const hit = geo.arcFrameTau(c.x0, c.x1, c.width, c.A, c.hLo, c.hHi, tau);
+      const got = twin.arcFrameTau(c.x0, c.x1, c.width, c.A, c.hLo, c.hHi);
+      // the shader's "no piece" is an empty interval, vec2(1, 0)
+      if ((got[0] <= got[1]) !== hit) { bad.push({ c, hit, got }); continue; }
+      if (!hit) continue;
+      hits++;
+      if (tau[0] === 0 && tau[1] === Math.PI) whole++; else piece++;
+      if (Math.abs(got[0] - tau[0]) > 1e-12 || Math.abs(got[1] - tau[1]) > 1e-12) bad.push({ c, want: [...tau], got });
+    }
+    expect(bad.slice(0, 3)).toEqual([]);
+    expect(hits).toBeGreaterThan(4000);
+    expect(whole).toBeGreaterThan(500);
+    expect(piece).toBeGreaterThan(2000);
+    for (let k = 0; k <= 64; k++) {
+      const dTau = (Math.PI * k) / 64;
+      expect(Math.abs(twin.arcPush(dTau) - geo.arcPush(dTau))).toBeLessThanOrEqual(1e-15);
+    }
+  });
+
+  it('BITES: dropping the quick path\'s "baseline in the frame" clause makes the twin draw the whole arch of a sky thread', () => {
+    const needle = '&& hLo <= 0.) return vec2(0.';
+    expect(geo.arcFrameGLSL).toContain(needle);
+    const bitten = frameTwinOf(geo.arcFrameGLSL.replace(needle, ') return vec2(0.'));
+    const tau = [0, 0];
+    let differs = 0;
+    for (const c of cases(4000, 23)) {
+      if (!geo.arcFrameTau(c.x0, c.x1, c.width, c.A, c.hLo, c.hHi, tau)) continue;
+      const got = bitten.arcFrameTau(c.x0, c.x1, c.width, c.A, c.hLo, c.hHi);
+      if (Math.abs(got[0] - tau[0]) > 1e-9 || Math.abs(got[1] - tau[1]) > 1e-9) differs++;
+    }
+    expect(differs).toBeGreaterThan(50);
+  });
+
+  it('BITES: a GLSL built-in the frame twin does not know is refused, not miscompared', () => {
+    expect(() => frameTwinOf(geo.arcFrameGLSL.replace('tan(dTau', 'atan(dTau'))).toThrow(/atan/);
   });
 });

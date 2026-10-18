@@ -33,6 +33,8 @@ const ASSET = resolve(here, '../../data/scripture-web-data.js');
 const graph = dec.decodeGraph(runInNewContext(readFileSync(ASSET, 'utf8') + ';SCRIPTURE_WEB_DATA', {}));
 
 const DPR = 2, W = 800 * DPR;
+// the frame the pills and the labels read (E1: they walk its visible set): phone landscape
+const CEIL = 256 * DPR, BASE = CEIL / 0.985, SQUASH = geo.squashFactor(CEIL, W);
 const psalm107 = (() => {
   for (let ci = 0; ci < graph.chapters.length; ci++) {
     const ch = graph.chapters[ci];
@@ -75,7 +77,7 @@ describe('the lens is retired: nothing dims as the reader zooms (Q2)', () => {
 
   it('the pills count every thread at a cell and hide none: at 12x the cells carry thousands of feet, hidden 0', () => {
     const cam = camAt(12);
-    const view = { width: W, density: 'famous' };
+    const view = { width: W, base: BASE, squash: SQUASH, density: 'famous' };
     const cells = pick.footBundles(graph, cam, view, DPR);
     expect(cells.length).toBeGreaterThan(3);
     for (const c of cells) expect(c.hidden).toBe(0);
@@ -223,7 +225,7 @@ describe('the lens is the chapter under the frame\'s centre, past the overview o
 
   it('hides nothing: the picker\'s drawn set at 12x is the same with the lens as without', () => {
     const cam = camAt(12);
-    const view = { width: W, localize: geo.localizeFactor(12), density: 'famous' };
+    const view = { width: W, base: BASE, squash: SQUASH, dpr: DPR, localize: geo.localizeFactor(12), density: 'famous' };
     const without = pick.visibleArcs(graph, cam, view, 1e9);
     const lens = pick.lensRange(graph, cam, W);
     const withLens = pick.visibleArcs(graph, cam, Object.assign({}, view, { lens }), 1e9);

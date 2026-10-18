@@ -81,6 +81,8 @@ export function webFrame(v, personal) {
  *   lit, litKey    the lit arc ids (Int32Array or null) and their key; a
  *                  renderer uploads the set when litKey differs from the
  *                  key it last uploaded
+ *   dpr            v.DPR, so the picker and the overlay find the renderer's
+ *                  visible set (frame-set.frameSet)
  * The canon overlay reads the same object (paintCanonOverlay's fs.view).
  * @param {View} v
  * @param {{ ppv: number, y: number, total: number, x: number }} cam
@@ -97,6 +99,9 @@ export function webViewArgs(v, cam, f, density, focus) {
     // the camera's height, device px: the shader draws the baseline camY
     // below base and the picker reads the same off the camera
     camY: cam.y > 0 ? cam.y : 0,
+    // device px per CSS px: the renderer, the picker and the overlay ask the
+    // frame's visible set (frame-set.frameSet) with the same numbers (E1)
+    dpr: v.DPR,
     density, rulerDepth: f.ruler,
     focusArc: prophecy ? -1 : focus.arc, focusRange: focus.range,
     focusRange2: focus.range2 || null,

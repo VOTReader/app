@@ -8,10 +8,14 @@
  * tappable where they look tappable — and nothing on screen looks wrong.
  */
 import { describe, it, expect } from 'vitest';
-import { SHADER_SOURCE, TOP_SHADER_SOURCE, DENSITY_STEPS, createRenderer, topLook } from './web-renderer.js';
 import {
-  arcShapeGLSL, flyOverWidth, flyOverGLSL, glslFloat, squashFactor, TOP_SEGMENT_MIN,
+  SHADER_SOURCE, TOP_SHADER_SOURCE, DENSITY_STEPS, createRenderer, topLook,
+  ARC_TEX_W, GESTURE_DPR, backingScale, backingSize,
+} from './web-renderer.js';
+import {
+  arcShapeGLSL, arcFrameGLSL, flyOverWidth, flyOverGLSL, glslFloat, squashFactor, TOP_SEGMENT_MIN,
 } from '../../utils/scripture-web/geometry.js';
+import { frameSetAt } from '../../utils/scripture-web/frame-set.js';
 import { FLYOVER_LEG_WIDTH, TAP_CONTEXT, rgba01, inkWidth } from '../../utils/scripture-web/sw-ink.js';
 import {
   DISTANCE_RAMP, rampGLSL, readChromeTokens, cssColorToRGB,
@@ -36,8 +40,15 @@ describe('shader / CPU agreement', () => {
     expect(SHADER_SOURCE.vertex).toMatch(/arcAt\(tau,\s*left,\s*right,\s*A,/);
     // and the camera's y shifts the baseline the ribbon stands on
     expect(SHADER_SOURCE.vertex).toMatch(/uBase \+ uCamY - hgt/);
-    expect(SHADER_SOURCE.vertex).toMatch(/arcTau\(lo,/);
-    expect(SHADER_SOURCE.vertex).toMatch(/arcTau\(hi,/);
+    // E1 (GL step 2): the piece in the frame comes from the SHARED frame law,
+    // heights and x window both, and each sample is pushed by it. Restated:
+    // this pinned arcTau(lo/hi), the x-only window retired with
+    // geometry.visibleWindow.
+    expect(SHADER_SOURCE.vertex).toContain(arcFrameGLSL);
+    expect(SHADER_SOURCE.vertex).toMatch(/vec2 win = arcFrameTau\(left, right, uRes\.x, A, uFrameH\.x, uFrameH\.y\);/);
+    expect(SHADER_SOURCE.vertex).toMatch(/float dTau = \(win\.y - win\.x\)\/uSegments;/);
+    expect(SHADER_SOURCE.vertex).toMatch(/\*arcPush\(dTau\);/);
+    expect(SHADER_SOURCE.vertex).not.toMatch(/arcTau\((lo|hi),/);
   });
 
   it('gives the fragment stage the PER-INSTANCE half width, not the uniform', () => {
@@ -65,17 +76,28 @@ describe('shader shape', () => {
     expect(SHADER_SOURCE.fragment.startsWith('#version 300 es')).toBe(true);
   });
 
-  it('reads instance data as integers, not floats', () => {
-    // Verse ids arrive as Uint16; float attributes would quietly lose the
-    // top of the range once the canon exceeds 2^24 — and read wrong now.
-    expect(SHADER_SOURCE.vertex).toMatch(/in uint aFrom;/);
-    expect(SHADER_SOURCE.vertex).toMatch(/in uint aTo;/);
+  /* Restated for E1 (GL step 2): the per-thread attributes (in uint aFrom,
+     aTo) became one integer id per instance from the frame's visible set,
+     the threads' data two float textures read by integer texel fetch. The
+     intent kept: a thread's identity is an integer end to end (verse ids and
+     votes are exact in float32; a float id would round past 2^24). */
+  it('reads each thread by an integer id from the visible set, its data by integer texel fetch', () => {
+    const V = SHADER_SOURCE.vertex;
+    expect(V).toMatch(/in uint aId;/);
+    expect(V).toContain('uniform highp sampler2D uArcs;');
+    expect(V).toContain('uniform highp sampler2D uVotes;');
+    expect(V).toContain('ivec2 at = ivec2(i & ' + (ARC_TEX_W - 1) + ', i >> ' + Math.log2(ARC_TEX_W) + ');');
+    expect(V).toMatch(/texelFetch\(uArcs, at, 0\)/);
+    expect(V).toMatch(/texelFetch\(uVotes, at, 0\)\.r/);
+    expect(V).not.toMatch(/in (uint|float) a(From|To|FanA|FanB|Votes);/);
   });
 
-  it('offsets the spotlight test by uInstanceBase', () => {
-    // gl_InstanceID restarts at 0 for every sub-range draw, so the shader can
-    // only identify a specific arc by adding the range's base back on.
-    expect(SHADER_SOURCE.vertex).toContain('float id = float(gl_InstanceID) + uInstanceBase;');
+  /* Restated for E1: gl_InstanceID restarts at 0 for every draw, which
+     uInstanceBase used to add back for the one draw per bucket run. A
+     class's draw carries the ids themselves, so there is nothing to add. */
+  it('the spotlight test reads the thread\'s own id from the stream, not gl_InstanceID', () => {
+    expect(SHADER_SOURCE.vertex).toContain('float id = float(aId);');
+    expect(SHADER_SOURCE.vertex).not.toMatch(/gl_InstanceID|uInstanceBase/);
   });
 
   it('emits premultiplied alpha, matching both blend modes the renderer sets', () => {
@@ -146,27 +168,34 @@ describe('thin lines hold a device px, and the feet do not shimmer at the ceilin
     expect(SHADER_SOURCE.vertex.split('\n')[1]).toBe('precision highp float;');
   });
 
-  it('the half width holds at 0.5 device px, the lost width paid in alpha, with a 0.5 px skirt in both stages', () => {
-    expect(SHADER_SOURCE.vertex).toContain('float thin = clamp(halfW/.5, 0., 1.);');
-    expect(SHADER_SOURCE.vertex).toContain('halfW = max(halfW, .5);');
-    expect(SHADER_SOURCE.vertex).toContain('float hw = halfW + .5;');
+  /* E2: the hold and the skirt are half a BACKING px. uPx (vertex) and
+     uFeather (fragment) are one backing px in full-resolution px: 1 at rest,
+     1 / scale while a gesture draws a smaller backing. */
+  it('the half width holds at half a backing px, the lost width paid in alpha, with half a backing px of skirt in both stages', () => {
+    expect(SHADER_SOURCE.vertex).toContain('float thin = clamp(halfW/(.5*uPx), 0., 1.);');
+    expect(SHADER_SOURCE.vertex).toContain('halfW = max(halfW, .5*uPx);');
+    expect(SHADER_SOURCE.vertex).toContain('float hw = halfW + .5*uPx;');
     expect(SHADER_SOURCE.vertex).toMatch(/float aOut = [^;]*\*thin;/);
-    expect(SHADER_SOURCE.fragment).toContain('float hw = vHalfW + .5;');
+    expect(SHADER_SOURCE.fragment).toContain('float hw = vHalfW + .5*uFeather;');
+    expect(SHADER_SOURCE.fragment).toContain('smoothstep(vHalfW - .5*uFeather, vHalfW + .5*uFeather, d)');
+    expect(TOP_SHADER_SOURCE.fragment).toContain('smoothstep(uCoreHalf - .5*uFeather, uCoreHalf + .5*uFeather, d)');
     expect(SHADER_SOURCE.vertex).not.toContain('halfW + 1.0');
     expect(SHADER_SOURCE.fragment).not.toContain('vHalfW + 1.0');
   });
 
-  it('TWIN: a thin line keeps its ink (width x alpha) and never draws under one device px', () => {
+  it('TWIN: a thin line keeps its ink (width x alpha) and never draws under one backing px, at rest or in a gesture', () => {
     // the three shader lines, in JS
-    const shade = (halfW, alpha) => {
-      const thin = Math.min(Math.max(halfW / 0.5, 0), 1);
-      const hw = Math.max(halfW, 0.5);
+    const shade = (halfW, alpha, px) => {
+      const thin = Math.min(Math.max(halfW / (0.5 * px), 0), 1);
+      const hw = Math.max(halfW, 0.5 * px);
       return { width: 2 * hw, alpha: alpha * thin };
     };
-    for (const halfW of [0.05, 0.2, 0.37, 0.5, 0.8, 1.6, 4]) {
-      const o = shade(halfW, 0.6);
-      expect(o.width).toBeGreaterThanOrEqual(1);
-      expect(o.width * o.alpha).toBeCloseTo(2 * halfW * 0.6, 12);
+    for (const px of [1, 1.3, 2.6 / GESTURE_DPR]) {
+      for (const halfW of [0.05, 0.2, 0.37, 0.5, 0.8, 1.6, 4]) {
+        const o = shade(halfW, 0.6, px);
+        expect(o.width).toBeGreaterThanOrEqual(px - 1e-12);
+        expect(o.width * o.alpha).toBeCloseTo(2 * halfW * 0.6, 12);
+      }
     }
   });
 });
@@ -274,11 +303,43 @@ function recordingGL() {
   return { gl, calls, canvas };
 }
 
+/**
+ * One frame of a recordingGL renderer, replayed from the first call: each
+ * draw with the uniforms its program held at that moment. The renderer sends
+ * a uniform only when it changes (E3), so a frame's own calls no longer carry
+ * them all. main and top are the two passes' draws in order; the main
+ * program is the one the renderer first uses.
+ */
+function frameOf(r, calls, view) {
+  const start = calls.length;
+  const stats = { ...r.draw(view) };
+  const held = new Map();
+  let mainProgram = null, current = null;
+  const main = [], top = [];
+  calls.forEach((c, i) => {
+    if (c[0] === 'useProgram') {
+      current = c[1][0];
+      if (mainProgram === null) mainProgram = current;
+      if (!held.has(current)) held.set(current, {});
+    } else if (/^uniform/.test(c[0]) && current) {
+      held.get(current)[c[1][0]] = c[1].slice(1);
+    } else if (c[0] === 'drawArraysInstanced' && i >= start) {
+      (current === mainProgram ? main : top).push({ args: c[1], u: { ...held.get(current) } });
+    }
+  });
+  const u = (pass, name) => pass.map((d) => d.u[name]);
+  return { stats, main, top, u, calls: calls.slice(start) };
+}
+
 const tinyGraph = () => /** @type {any} */ ({
   total: 200, count: 1, from: new Uint16Array([100]), to: new Uint16Array([150]), votes: new Int16Array([30]),
   buckets: [{ off: 0, len: 1, off20: 1, off10: 1, segments: 8, chunks: [] }],
   chunkSize: 256, books: [{ id: 'alpha', title: 'Alpha', abbr: 'Alp', start: 0 }],
   chapters: [[0, 1, 0, 200]], chapterOfVerse: new Uint16Array(200), prophecy: [], votEdges: [], votLinks: [],
+});
+const threeArcs = () => Object.assign(tinyGraph(), {
+  count: 3, from: new Uint16Array([100, 20, 120]), to: new Uint16Array([150, 60, 190]), votes: new Int16Array([30, 10, 5]),
+  buckets: [{ off: 0, len: 3, off20: 3, off10: 3, segments: 8, chunks: [] }],
 });
 
 describe("My Web's ground is one clear (refactor.md #10)", () => {
@@ -292,7 +353,7 @@ describe("My Web's ground is one clear (refactor.md #10)", () => {
     expect(calls.find((c) => c[0] === 'clearColor')[1]).toEqual([0, 0, 0, 1]);
     expect(calls.find((c) => c[0] === 'viewport')[1]).toEqual([0, 0, 800, 360]);
     expect(names).not.toContain('drawArraysInstanced');
-    expect(r.stats).toEqual({ instances: 0, draws: 0 });
+    expect(r.stats).toEqual({ instances: 0, vertices: 0, draws: 0 });
   });
 });
 
@@ -309,7 +370,9 @@ describe('the ruler band is never painted by the web (scissor at the ruler\'s to
   it('the main and the top pass draw inside a scissor that ends where the ruler\'s gold line begins; the clear is whole', () => {
     const { calls, canvas } = recordingGL();
     const r = /** @type {any} */ (createRenderer(canvas, tinyGraph()));
-    for (const camY of [0, 180]) {
+    // camY 180 lifts the camera past the one thread's apex (60 px): the height
+    // cull (E1) leaves only the chosen line's top pass, still scissored
+    for (const [camY, want] of [[0, 2], [40, 2], [180, 1]]) {
       calls.length = 0;
       r.draw(view({ camY }));
       const names = calls.map((c) => c[0]);
@@ -320,7 +383,7 @@ describe('the ruler band is never painted by the web (scissor at the ruler\'s to
       const rows = Math.ceil(260.4 + 2);
       expect(calls.find((c) => c[0] === 'scissor')[1]).toEqual([0, 720 - rows, 800, rows]);
       const drawsAt = calls.map((c, i) => (c[0] === 'drawArraysInstanced' ? i : -1)).filter((i) => i >= 0);
-      expect(drawsAt.length, 'the main pass and the chosen line').toBe(2);
+      expect(drawsAt.length, `camY ${camY}: the main pass (if in the frame) and the chosen line`).toBe(want);
       for (const i of drawsAt) expect(i > on && i < off, `draw at ${i} inside the scissor`).toBe(true);
       expect(off, 'and off again at the frame\'s end').toBeGreaterThan(drawsAt[drawsAt.length - 1]);
     }
@@ -348,20 +411,8 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     width: 800, height: 720, base: 260, ceil: 240, squash: squashFactor(240, 800), localize: 1, density: 'famous',
     camX: 125, camY: 0, ppv: 4, strokeWidth: 2, alpha: 0.5, dpr: 1, bg: '#000', focusRange: null, focusArc: -1,
   }, over);
-  const threeArcs = () => Object.assign(tinyGraph(), {
-    count: 3, from: new Uint16Array([100, 20, 120]), to: new Uint16Array([150, 60, 190]), votes: new Int16Array([30, 10, 5]),
-    buckets: [{ off: 0, len: 3, off20: 3, off10: 3, segments: 8, chunks: [] }],
-  });
-  /** one frame's calls, split at the second useProgram: the main pass, then the top pass */
-  const frame = (r, calls, over) => {
-    calls.length = 0;
-    const stats = r.draw(args(over));
-    const at = calls.map((c, i) => (c[0] === 'useProgram' ? i : -1)).filter((i) => i >= 0);
-    const main = at.length > 1 ? calls.slice(0, at[1]) : calls.slice();
-    const top = at.length > 1 ? calls.slice(at[1]) : [];
-    const u = (list, name) => list.filter((c) => /^uniform/.test(c[0]) && c[1][0] === name).map((c) => c[1].slice(1));
-    return { stats, main, top, u };
-  };
+  /** one frame, replayed: the main pass's draws and the top pass's, each with its uniforms */
+  const frame = (r, calls, over) => frameOf(r, calls, args(over));
   const build = (g) => {
     const { calls, canvas } = recordingGL();
     return { calls, r: /** @type {any} */ (createRenderer(canvas, g || tinyGraph())) };
@@ -370,16 +421,18 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
   it('the chosen line is drawn last, its core and halo the ink table\'s chosen rows, and stats count the web alone', () => {
     const { calls, r } = build();
     const f = frame(r, calls, { focusArc: 0 });
-    expect(f.stats).toEqual({ instances: 1, draws: 1 });
+    expect(f.stats).toEqual({ instances: 1, vertices: f.main[0].args[2] * f.main[0].args[3], draws: 1 });
     expect(f.u(f.top, 'uCore')).toEqual([rgba01('chosen')]);
     expect(f.u(f.top, 'uHalo')).toEqual([rgba01('chosenHalo')]);
     expect(f.u(f.top, 'uCoreHalf')).toEqual([[inkWidth('chosen') / 2]]);
     expect(f.u(f.top, 'uHaloHalf')).toEqual([[inkWidth('chosenHalo') / 2]]);
-    const draws = calls.filter((c) => c[0] === 'drawArraysInstanced');
+    const draws = f.calls.filter((c) => c[0] === 'drawArraysInstanced');
     const last = draws[draws.length - 1];
+    expect(f.top[f.top.length - 1].args, 'the chosen line is the last draw of the frame').toBe(last[1]);
     const segments = f.u(f.top, 'uSegments')[0][0];
     expect(last[1].slice(2)).toEqual([2 * (segments + 1), 1]);
     expect(segments).toBeGreaterThanOrEqual(TOP_SEGMENT_MIN);
+    expect(r.topStats).toEqual({ instances: 1, vertices: 2 * (segments + 1), draws: 1 });
   });
 
   it('a frame 500 CSS px tall or less is compact: the chosen core takes the ink table\'s compact width', () => {
@@ -416,15 +469,16 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(f.u(f.top, 'uCore')).toEqual([rgba01('lit'), rgba01('hover'), rgba01('chosen')]);
     // the lit line has no halo row: its halo is nothing
     expect(f.u(f.top, 'uHaloHalf')[0]).toEqual([0]);
-    expect(f.stats).toEqual({ instances: 3, draws: 1 });
+    expect(f.stats.instances).toBe(3);
   });
 
   it('uploads the set only when what is asked about changes', () => {
     const { calls, r } = build();
     const first = frame(r, calls, { focusArc: 0 });
-    expect(first.top.filter((c) => c[0] === 'bufferData').length + first.main.filter((c) => c[0] === 'bufferData').length).toBe(4);
+    // the top pass's four attributes (from, to and the two fans)
+    expect(first.calls.filter((c) => c[0] === 'bufferData').length).toBe(4);
     const again = frame(r, calls, { focusArc: 0, camX: 126 });
-    expect(calls.filter((c) => c[0] === 'bufferData')).toEqual([]);
+    expect(again.calls.filter((c) => c[0] === 'bufferData')).toEqual([]);
     expect(again.u(again.top, 'uCore')).toEqual([rgba01('chosen')]);
   });
 
@@ -432,7 +486,8 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     const { calls, r } = build();
     const f = frame(r, calls, {});
     expect(f.top).toEqual([]);
-    expect(calls.filter((c) => c[0] === 'drawArraysInstanced').length).toBe(1);
+    expect(f.calls.filter((c) => c[0] === 'drawArraysInstanced').length).toBe(1);
+    expect(r.topStats).toEqual({ instances: 0, vertices: 0, draws: 0 });
   });
 
   it('topLook: the lit ink has no halo; a core under 1 device px holds 0.5 px of half width and pays in alpha', () => {
@@ -459,10 +514,10 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(idle.u(idle.top, 'uHalo')).toEqual([rgba01('prophecyGlow')]);
     expect(idle.u(idle.top, 'uCoreHalf')).toEqual([[inkWidth('prophecy') / 2]]);
     expect(idle.u(idle.top, 'uHaloHalf')).toEqual([[inkWidth('prophecyGlow') / 2]]);
-    const draws = idle.top.filter((c) => c[0] === 'drawArraysInstanced');
-    expect(draws.length).toBe(1);
-    expect(draws[0][1][3]).toBe(2);
-    expect(idle.stats).toEqual({ instances: 3, draws: 1 });   // stats count the web alone
+    expect(idle.top.length).toBe(1);
+    expect(idle.top[0].args[3]).toBe(2);
+    expect(idle.stats.instances).toBe(3);   // stats count the web alone
+    expect(idle.stats.draws).toBe(idle.main.length);
     const chosen = frame(r, calls, { focusArc: 0 });
     const [pc, cc] = chosen.u(chosen.top, 'uCore');
     expect(cc).toEqual(rgba01('chosen'));
@@ -474,7 +529,7 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     const { calls, r } = build(prophetic());
     for (const density of ['essential', 'famous', 'all']) {
       const f = frame(r, calls, { density });
-      expect(f.top.filter((c) => c[0] === 'drawArraysInstanced')[0][1][3], density).toBe(2);
+      expect(f.top[0].args[3], density).toBe(2);
     }
   });
 
@@ -500,9 +555,8 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     const [pc, cc] = f.u(f.top, 'uCore');
     expect(cc).toEqual(rgba01('chosen'));
     expect(pc[3]).toBeCloseTo(rgba01('prophecy')[3] * TAP_CONTEXT, 12);
-    const draws = f.top.filter((c) => c[0] === 'drawArraysInstanced');
-    expect(draws[draws.length - 1][1][3]).toBe(1);
-    expect(f.u(f.main, 'uTapFade')).toEqual([[1]]);
+    expect(f.top[f.top.length - 1].args[3]).toBe(1);
+    expect(f.u(f.main, 'uTapFade').every((v) => v[0] === 1)).toBe(true);
   });
 
   it('the shaders: the main pass recedes by TAP_CONTEXT at most and has no hover input or gold of its own; the top pass shares the curve law and the split feet', () => {
@@ -520,6 +574,119 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(TOP_SHADER_SOURCE.vertex).toMatch(/uBase \+ uCamY - hgt/);
     expect(TOP_SHADER_SOURCE.fragment.split('\n')[1]).toBe('precision mediump float;');
     expect(TOP_SHADER_SOURCE.fragment).toContain('o = vec4(uCore.rgb*core + uHalo.rgb*halo*(1. - core), a);');
+  });
+});
+
+/* GL step 2 (performance): E1 the frame draws its visible set, one draw per
+   segment count, and counts what it sent; E2 a gesture draws a smaller
+   backing under the same geometry; E3 an unchanged frame sends nothing. */
+describe('E1-E3: the visible set, the gesture backing, and a frame that sends only what changed', () => {
+  const view = (over) => Object.assign({
+    width: 800, height: 720, base: 260.4, ceil: 240, squash: squashFactor(240, 800), localize: 1, density: 'famous',
+    camX: 125, camY: 0, ppv: 4, strokeWidth: 2, alpha: 0.5, dpr: 2, bg: '#000', focusRange: null, focusArc: 0,
+  }, over);
+  const build = (g) => {
+    const { calls, canvas } = recordingGL();
+    return { calls, r: /** @type {any} */ (createRenderer(canvas, g || threeArcs())) };
+  };
+
+  it('E1: one draw per segment count, each over its class of the id stream; stats are the instances and vertex invocations sent', () => {
+    const g = threeArcs();
+    const { calls, r } = build(g);
+    const v = view({});
+    const f = frameOf(r, calls, v);
+    // the set the renderer drew is THE visible set (frame-set.js), the one the picker and labels read
+    const set = frameSetAt(g, v.density, v.width, v.base, v.squash, v.camX, v.camY, v.ppv, v.dpr);
+    expect(set.count).toBe(3);
+    expect(f.main.length).toBe(set.classes);
+    const ptrs = f.calls.filter((c) => c[0] === 'vertexAttribIPointer');
+    let vertices = 0, instances = 0;
+    f.main.forEach((d, k) => {
+      const n = d.u.uSegments[0];
+      expect(n).toBe(set.classN[k]);
+      expect(d.args).toEqual(['TRIANGLE_STRIP', 0, 2 * (n + 1), set.classCount[k]]);
+      // Uint16 ids: the class's first id, two bytes each
+      expect(ptrs[k][1]).toEqual(['aId', 1, 'UNSIGNED_SHORT', 0, set.classFirst[k] * 2]);
+      vertices += d.args[2] * d.args[3];
+      instances += d.args[3];
+    });
+    expect(f.stats).toEqual({ instances, vertices, draws: f.main.length });
+    expect(r.stats).toEqual(f.stats);
+    // three threads of three sizes: three classes, the widest the most segments
+    expect(new Set(f.main.map((d) => d.u.uSegments[0])).size).toBe(3);
+  });
+
+  it('E1: a thread whose body is out of the frame is not drawn (the height cull), and is again when the camera comes back', () => {
+    const { calls, r } = build(tinyGraph());
+    expect(frameOf(r, calls, view({ camY: 180 })).stats).toEqual({ instances: 0, vertices: 0, draws: 0 });
+    const back = frameOf(r, calls, view({ camY: 0 }));
+    expect(back.stats.instances).toBe(1);
+    expect(back.main.length).toBe(1);
+  });
+
+  it('E2: the backing is GESTURE_DPR at most in a gesture on a denser screen, and whole at rest', () => {
+    expect(GESTURE_DPR).toBe(2);
+    expect(backingScale(2.6, true)).toBeCloseTo(2 / 2.6, 12);
+    expect(backingScale(2.6, false)).toBe(1);
+    expect(backingScale(2, true)).toBe(1);
+    expect(backingScale(1, true)).toBe(1);
+    expect(backingSize(2317, backingScale(2.6, true))).toBe(Math.round(2317 * (2 / 2.6)));
+    expect(backingSize(2317, 1)).toBe(2317);
+    expect(backingSize(0.2, 1)).toBe(1);
+  });
+
+  it('E2: in a gesture the viewport and scissor are the backing\'s; the geometry stays full resolution, and one backing px feathers', () => {
+    const { calls, r } = build();
+    const f = frameOf(r, calls, view({ scale: 0.5 }));
+    expect(f.calls.find((c) => c[0] === 'viewport')[1]).toEqual([0, 0, 400, 360]);
+    const rows = Math.ceil((260.4 + 2) * 0.5);
+    expect(f.calls.find((c) => c[0] === 'scissor')[1]).toEqual([0, 360 - rows, 400, rows]);
+    for (const d of f.main) {
+      expect(d.u.uRes).toEqual([800, 720]);
+      expect(d.u.uPx).toEqual([2]);
+      expect(d.u.uFeather).toEqual([2]);
+    }
+    expect(f.u(f.top, 'uFeather')).toEqual([[2]]);
+    // the chosen line's hold and skirt follow the backing px too
+    expect(f.u(f.top, 'uRibbonHalf')).toEqual([[topLook('chosen', 2, false, 0, 2).ribbon]]);
+    // the settle frame: the whole backing again, at the same geometry
+    const g = frameOf(r, calls, view({}));
+    expect(g.calls.find((c) => c[0] === 'viewport')[1]).toEqual([0, 0, 800, 720]);
+    expect(g.u(g.main, 'uPx').every((p) => p[0] === 1)).toBe(true);
+    expect(g.stats).toEqual(f.stats);
+  });
+
+  it('E3: an unchanged frame sends no uniform but the segment count of each class, and uploads nothing; the threads go up once, at creation', () => {
+    const { calls, r } = build();
+    expect(calls.filter((c) => c[0] === 'texImage2D').length).toBe(2);
+    const first = frameOf(r, calls, view({}));
+    expect(first.calls.filter((c) => c[0] === 'bufferSubData').length).toBe(1);
+    const again = frameOf(r, calls, view({}));
+    // a draw's segment count is that draw's own: with three classes it changes three times a frame
+    expect(again.calls.filter((c) => /^uniform/.test(c[0]))).toEqual(
+      again.main.map((d) => ['uniform1f', ['uSegments', d.u.uSegments[0]]]));
+    expect(again.main.length).toBe(3);
+    expect(again.calls.filter((c) => /^(bufferData|bufferSubData|texImage2D|texSubImage2D)$/.test(c[0]))).toEqual([]);
+    expect(again.main.map((d) => d.args)).toEqual(first.main.map((d) => d.args));
+    expect(again.top.map((d) => d.args)).toEqual(first.top.map((d) => d.args));
+    // a pan sends what moved, and the stream once; the stroke and the ink stay put
+    const moved = frameOf(r, calls, view({ camX: 125.5 }));
+    const sent = moved.calls.filter((c) => /^uniform/.test(c[0])).map((c) => c[1][0]);
+    expect(sent).toContain('uCamXLo');
+    expect(sent).not.toContain('uWidth');
+    expect(sent).not.toContain('uCore');
+    expect(moved.calls.filter((c) => c[0] === 'bufferSubData').length).toBe(1);
+    expect(moved.calls.filter((c) => c[0] === 'texImage2D')).toEqual([]);
+  });
+
+  it('topLook in a gesture: the hold and the skirt are a backing px, the lost width paid in alpha', () => {
+    const lit = topLook('lit', 1, false, 0, 2);   // 0.75 device px of half width under a 1 px hold
+    expect(lit.coreHalf).toBe(1);
+    expect(lit.core[3]).toBeCloseTo(rgba01('lit')[3] * 0.75, 12);
+    expect(lit.ribbon).toBe(1 + 1);
+    const rest = topLook('lit', 1, false, 0, 1);
+    expect(rest.coreHalf).toBe(inkWidth('lit') / 2);
+    expect(topLook('lit', 1, false, 0)).toEqual(rest);
   });
 });
 

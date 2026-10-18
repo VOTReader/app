@@ -37,9 +37,12 @@ describe('the fly-over law lets go as the reader rises', () => {
   it('the vertex shader thins fly-overs by uFlyLocalize, not the tessellation\'s uLocalize', () => {
     expect(SHADER_SOURCE.vertex).toMatch(/uniform float uFlyLocalize;/);
     expect(SHADER_SOURCE.vertex).toMatch(/flyOverWidth\(arcAnchored\(x0, x1, uRes\.x\), uFlyLocalize,/);
-    // the clip of the samples onto the viewport still reads uLocalize: the
-    // sky must not draw a visible piece as one chord
-    expect(SHADER_SOURCE.vertex).toMatch(/mix\(left,\s+max\(left,\s+-m\),\s+uLocalize\)/);
+    // the sky must not draw a visible piece as one chord. Restated for E1 (GL
+    // step 2): the samples are clipped onto the frame by the frame law, its x
+    // window and its heights (uFrameH), at every zoom, so no tessellation
+    // localize is left to read (uLocalize is gone with geometry.visibleWindow)
+    expect(SHADER_SOURCE.vertex).toMatch(/vec2 win = arcFrameTau\(left, right, uRes\.x, A, uFrameH\.x, uFrameH\.y\);/);
+    expect(SHADER_SOURCE.vertex).not.toMatch(/\buLocalize\b/);
   });
 });
 

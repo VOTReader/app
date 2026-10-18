@@ -19,7 +19,10 @@
    thins, its alpha unchanged, so no thread the shader draws is refused a
    tap for it. Nothing is hidden (the structure law, 2026-09-21): every thread crossing
    the frame is drawn and pickable, so there is no third law. Visible equals
-   pickable, in both directions.
+   pickable, in both directions: the picker, the label pass and the pills
+   read the frame's visible set (frame-set.frameSet, E1), the set the
+   renderer draws, so a thread whose body never reaches the frame is
+   neither drawn nor tapped, labelled or counted.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
@@ -28,7 +31,7 @@ import {
 } from './geometry.js';
 import { bucketDrawCount, fansOf } from './decode.js';
 import { walkDrawnRuns } from './chunk-walk.js';
-import { prophecySet } from './frame-set.js';
+import { prophecySet, frameSet, inFrame } from './frame-set.js';
 
 /**
  * Nearest arc to a screen point.
@@ -76,10 +79,13 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
   const verseTolerance = tol / ppv + 1;
   const chunkSize = g.chunkSize || 256;
   const lo = verseAtPoint - verseTolerance, hi = verseAtPoint + verseTolerance;
+  // the frame's visible set (E1): a thread the renderer did not draw is not there to tap
+  const set = frameSet(g, cam, view);
 
   for (const bucket of g.buckets) {
     walkDrawnRuns(bucket, bucketDrawCount(bucket, density), chunkSize, lo, hi, (start, end) => {
       for (let i = start; i < end; i++) {
+        if (!inFrame(set, i)) continue;
         // the feet as drawn: in their verses' cells, by rank (geometry.footX)
         const x0 = footX(cam, width, g.from[i], fanA[i]);
         const x1 = footX(cam, width, g.to[i], fanB[i]);
@@ -178,40 +184,23 @@ export function pickThreads(g, cam, view, px, py, tol, limit) {
 }
 
 /**
- * The drawn threads whose span crosses the frame, in draw order: the set a
- * label pass walks (Corbin's brief, 2026-09-11: "when zoomed close, each
- * line shows its source and target beside it"). The same loop as pickArcs
- * without the distance test — the density prefix and the chunk extents —
- * so a label is written for a line the reader can see and never for one
- * the shader skipped.
+ * The drawn threads, in draw order: the set a label pass walks (Corbin's
+ * brief, 2026-09-11: "when zoomed close, each line shows its source and
+ * target beside it"). It IS the frame's visible set (frame-set.frameSet,
+ * the renderer's), shortest first, so a label is written for a line the
+ * reader can see and never for one the shader skipped.
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, y?:number, ppv:number, total:number}} cam
- * @param {{width:number, localize:number, density:import('./decode.js').Density, ceil?:number}} view
+ * @param {{width:number, base:number, squash:number, density:import('./decode.js').Density, dpr?:number}} view
  * @param {number} limit — at most this many, so a dense screen bounds its own pass
  * @returns {number[]} instance indices
  */
 export function visibleArcs(g, cam, view, limit) {
-  const { width, density } = view;
-  const { fanA, fanB } = fansOf(g);
-  // a verse of slack each side: a foot stands anywhere in its verse's cell (footX)
-  const lo = xToVerse(cam, width, 0) - 1, hi = xToVerse(cam, width, width) + 1;
-  const out = [];
-  const chunkSize = g.chunkSize || 256;
-  for (const bucket of g.buckets) {
-    const full = walkDrawnRuns(bucket, bucketDrawCount(bucket, density), chunkSize, lo, hi, (start, end) => {
-      for (let i = start; i < end; i++) {
-        // the feet as drawn (geometry.footX): the shader's own anchoring test
-        const x0 = footX(cam, width, g.from[i], fanA[i]);
-        const x1 = footX(cam, width, g.to[i], fanB[i]);
-        if (x1 < 0 || x0 > width) continue;
-        out.push(i);
-        if (out.length >= limit) return true;
-      }
-      return false;
-    });
-    if (full) return out;
-  }
+  const set = frameSet(g, cam, view);
+  const n = set.count < limit ? set.count : Math.max(0, Math.floor(limit));
+  const out = new Array(n);
+  for (let k = 0; k < n; k++) out[k] = set.list[k];
   return out;
 }
 
@@ -535,7 +524,7 @@ export function chapterRange(g, chapterIndex) {
  * Every thread is drawn; what converges is counted: at each in-view FOOT
  * CELL the anchored threads with a foot there are a bundle with a count
  * pill. These passes produce those numbers for the badge layer, over the
- * same visible chunks and the same feet (geometry.footX) the shader uses,
+ * frame's visible set and the same feet (geometry.footX) the shader uses,
  * so a pill counts exactly what is drawn there.
  */
 
@@ -563,12 +552,12 @@ export const BUNDLE_VERSE_PPV_CSS = 26;
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, ppv:number, total:number}} cam
- * @param {{width:number, density:import('./decode.js').Density}} view
+ * @param {{width:number, base:number, squash:number, density:import('./decode.js').Density, dpr?:number}} view
  * @param {number} dpr
  * @returns {FootBundle[]}
  */
 export function footBundles(g, cam, view, dpr) {
-  const { width, density } = view;
+  const { width } = view;
   const ppvCss = cam.ppv / (dpr || 1);
   const minVerses = (BUNDLE_MIN_CSS * (dpr || 1)) / cam.ppv;
   const lo = Math.max(0, Math.floor(xToVerse(cam, width, -FLYOVER_MARGIN)));
@@ -600,22 +589,24 @@ export function footBundles(g, cam, view, dpr) {
   for (let c = 0; c < cells.length; c++) {
     for (let v = cells[c].lo; v <= cells[c].hi; v++) if (v - first >= 0 && v - first < span) cellOf[v - first] = c;
   }
-  const { fanA, fanB } = fansOf(g);
   const half = width / 2, camX = cam.x, ppv = cam.ppv;
-  const chunkSize = g.chunkSize || 256;
-  for (const bucket of g.buckets) {
-    walkDrawnRuns(bucket, bucketDrawCount(bucket, density), chunkSize, first, first + span - 1, (start, end) => {
-      for (let i = start; i < end; i++) {
-        const a = g.from[i], b = g.to[i];
-        const ca = a - first >= 0 && a - first < span ? cellOf[a - first] : -1;
-        const cb = b - first >= 0 && b - first < span ? cellOf[b - first] : -1;
-        if (ca < 0 && cb < 0) continue;
-        // the feet as drawn (geometry.footX): anchored is the shader's word
-        if (!arcAnchored(footX(cam, width, a, fanA[i]), footX(cam, width, b, fanB[i]), width)) continue;
-        if (ca >= 0) cells[ca].drawn++;
-        if (cb >= 0 && cb !== ca) cells[cb].drawn++;
-      }
-    });
+  // the frame's visible set (E1), walked by the feet that stand in the cells
+  const set = frameSet(g, cam, view, dpr);
+  const { ids, fx0, fx1, footStart, foot } = set.order;
+  const cellAt = (v) => (v - first >= 0 && v - first < span ? cellOf[v - first] : -1);
+  const end = footStart[first + span];
+  for (let j = footStart[first]; j < end; j++) {
+    const rank = foot[j] >> 1;
+    if (!set.all && !set.segments[rank]) continue;
+    const i = ids[rank];
+    const ca = cellAt(g.from[i]), cb = cellAt(g.to[i]);
+    // a thread with both feet in one cell counts once, at its from-foot
+    const isTo = (foot[j] & 1) === 1;
+    if (isTo && cb === ca) continue;
+    // the feet as drawn (geometry.footX): anchored is the shader's word
+    if (!arcAnchored((fx0[rank] - camX) * ppv + half, (fx1[rank] - camX) * ppv + half, width)) continue;
+    const c = isTo ? cb : ca;
+    if (c >= 0) cells[c].drawn++;
   }
   for (const cell of cells) cell.x = ((cell.lo + cell.hi + 1) / 2 - camX) * ppv + half;
   return cells;

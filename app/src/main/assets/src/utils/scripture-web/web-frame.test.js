@@ -53,14 +53,14 @@ describe('webViewArgs', () => {
   const cam = { ppv: 3, y: 12, total: 360, x: 0 };
   const f = webFrame(desktop, false);
 
-  it('tells the shader the frame, the squash, the localize, the camera height and the focus', () => {
+  it('tells the shader the frame, the squash, the localize, the camera height, the dpr and the focus', () => {
     const focus = focusState({ arc: 7, range: [1, 5], range2: [2, 3], hover: 4 });
     const a = webViewArgs(desktop, cam, f, 'famous', focus);
     expect(a).toEqual({
       width: 1920, height: 1080, base: f.base, ceil: f.ceil,
       squash: squashFactor(f.ceil, 1920),
       localize: localizeFactor(3 / (1920 / 360)),
-      camY: 12, density: 'famous', rulerDepth: f.ruler,
+      camY: 12, dpr: desktop.DPR, density: 'famous', rulerDepth: f.ruler,
       focusArc: 7, focusRange: [1, 5], focusRange2: [2, 3],
       focusProphecy: -1, hoverArc: 4, lit: null, litKey: '',
     });

@@ -1,10 +1,31 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   scripture-web/frame-set — the threads the top pass draws. Cluster F (bundle-d)
+   scripture-web/frame-set — what one frame draws. Cluster F (bundle-d)
    ═══════════════════════════════════════════════════════════════════════
 
-   The GL renderer (web-renderer.js) draws the web in two passes. The main
-   pass is every thread of the density, from the asset's static buffers, in
-   the distance ramp. The top pass redraws, over it, the few threads the
+   THE VISIBLE SET (E1). One pass per camera finds every thread of the
+   density whose body touches the frame (geometry.arcFrameTau: the x window
+   AND the heights, so a span crossing the frame with its body far above it
+   is not in it), how many segments its piece needs (geometry.frameSegments,
+   by its own size on screen), and how many threads are anchored (a foot near
+   the frame, the crowding law's count). The renderer draws exactly this set,
+   one draw per segment count; the picker (pick.pickArcs) hits only threads
+   in it, the label pass walks it (pick.visibleArcs) and the convergence
+   pills count it (pick.footBundles). So what is drawn, counted, labelled and
+   pickable are one set by construction, and a frame that redraws for a
+   hover or a fade finds the set it already has (frameSet keeps the last two
+   cameras).
+
+   Order. A density's threads are ranked once by their span on screen (the
+   feet as drawn, fans included), so the draw is shortest first and the
+   widest on top, in the same order at every zoom, and at the overview, where
+   a thread's segments follow its span alone, each count's threads are one
+   run of ranks. Candidates come from a scan of every rank, or, once the
+   frame is deep, from the feet in the frame widened by the farthest a foot
+   can stand from it and still lift its body into the frame (see feetWindow).
+
+   THE TOP PASS. The GL renderer (web-renderer.js) draws the web in two
+   passes. The main pass is the visible set above, in the distance ramp. The
+   top pass redraws, over it, the few threads the
    reader has asked about, in the ink table's colours (sw-ink.js) and with
    their own tessellation (geometry.topSegmentsFor), so the chosen line is a
    smooth gold core under a soft halo at every zoom (GL item 3; digest C1,
@@ -27,7 +48,10 @@
    arc stands on that arc's fans; any other pair stands mid-cell (fan 0),
    and the picker reads the same table (prophecySet). */
 
-import { fansOf } from './decode.js';
+import { fansOf, bucketDrawCount } from './decode.js';
+import {
+  arcFrameTau, frameSegments, frameHeights, CLIP_MARGIN, FLYOVER_MARGIN, TESS_CAP,
+} from './geometry.js';
 
 /** The top pass's kinds, in drawing order: the chosen line last, on top. */
 export const TOP_ORDER = Object.freeze(['prophecy', 'lit', 'hover', 'chosen']);
@@ -114,7 +138,9 @@ export function prophecySet(g) {
 /**
  * @typedef {{ kind: string, first: number, count: number }} TopRange
  * @typedef {{ key: string, count: number, from: Uint16Array, to: Uint16Array,
- *   fanA: Float32Array, fanB: Float32Array, ranges: TopRange[] }} TopSet
+ *   fanA: Float32Array, fanB: Float32Array, ranges: TopRange[], litKey: string,
+ *   hoverArc: number, focusArc: number, focusProphecy: number }} TopSet
+ *   litKey .. focusProphecy: the ask it was built for, as topSetKey reads it (-1 for none)
  */
 
 /**
@@ -123,8 +149,12 @@ export function prophecySet(g) {
  * @param {{ litKey?: string, hoverArc?: number, focusArc?: number, focusProphecy?: number }} v
  */
 export function topSetKey(v) {
-  const n = (x) => (x == null || !(x >= 0) ? -1 : x);
-  return (v.litKey || '') + '|' + n(v.hoverArc) + '|' + n(v.focusArc) + '|' + n(v.focusProphecy);
+  return (v.litKey || '') + '|' + askOf(v.hoverArc) + '|' + askOf(v.focusArc) + '|' + askOf(v.focusProphecy);
+}
+
+/** One asked-about index as the key reads it: -1 for none. @param {number | null | undefined} x */
+function askOf(x) {
+  return x == null || !(x >= 0) ? -1 : x;
 }
 
 /**
@@ -139,9 +169,12 @@ export function topSetKey(v) {
  * @returns {TopSet}
  */
 export function topSet(g, v, prev) {
-  const key = topSetKey(v);
   const ps = prophecySet(g);
-  if (prev && prev.key === key && prev.ranges.length && prev.ranges[0].count === ps.unique) return prev;
+  // the same ask, field by field: a frame that changes nothing builds no key (E3)
+  if (prev && prev.ranges.length && prev.ranges[0].count === ps.unique && prev.litKey === (v.litKey || '')
+    && prev.hoverArc === askOf(v.hoverArc) && prev.focusArc === askOf(v.focusArc)
+    && prev.focusProphecy === askOf(v.focusProphecy)) return prev;
+  const key = topSetKey(v);
   const count = g && g.count > 0 ? g.count : 0;
   const isArc = (i) => i != null && i >= 0 && i < count && Number.isInteger(i);
   const arcs = { lit: /** @type {number[]} */ ([]), hover: /** @type {number[]} */ ([]), chosen: /** @type {number[]} */ ([]) };
@@ -188,5 +221,259 @@ export function topSet(g, v, prev) {
     }
     ranges.push({ kind, first, count: at - first });
   }
-  return { key, count: total, from, to, fanA, fanB, ranges };
+  return {
+    key, count: total, from, to, fanA, fanB, ranges, litKey: v.litKey || '',
+    hoverArc: askOf(v.hoverArc), focusArc: askOf(v.focusArc), focusProphecy: askOf(v.focusProphecy),
+  };
+}
+
+/* ── the visible set (E1) ─────────────────────────────────────────────── */
+
+/**
+ * @typedef {{ density: string, count: number, ids: Uint16Array | Uint32Array,
+ *   fx0: Float64Array, fx1: Float64Array, rankOf: Int32Array,
+ *   footStart: Int32Array, foot: Int32Array, stamp: Uint32Array }} DrawOrder
+ *   ids[rank]: the thread at that rank (an index into g.from); rankOf[id]: its rank, -1 outside the
+ *   density; fx0, fx1: its feet as canon x (verse + 0.5 + fan: geometry.footX before the camera);
+ *   foot[footStart[v] .. footStart[v + 1]): rank * 2 + (1 at its to-foot) for every foot standing in
+ *   verse v; stamp: scratch for one pass's dedupe
+ */
+
+const ORDERS = new WeakMap();
+
+/**
+ * A density's threads in drawing order, cached per graph: ranked by their span as drawn
+ * ((to + fanB) - (from + fanA), shortest first; ties in asset order), with each verse's feet.
+ * @param {any} g  the decoded graph
+ * @param {import('./decode.js').Density} density
+ * @returns {DrawOrder}
+ */
+export function drawOrder(g, density) {
+  const which = density === 'essential' ? 'essential' : 'famous';
+  let per = ORDERS.get(g);
+  if (!per) { per = {}; ORDERS.set(g, per); }
+  if (per[which]) return per[which];
+  const count = g && g.count > 0 ? g.count : 0;
+  const fans = count ? fansOf(g) : null;
+  let n = 0;
+  for (const b of (g && g.buckets) || []) n += Math.max(0, bucketDrawCount(b, which));
+  const members = new Uint32Array(n);
+  const span = new Float64Array(count);
+  let at = 0;
+  for (const b of (g && g.buckets) || []) {
+    const end = b.off + Math.max(0, bucketDrawCount(b, which));
+    for (let i = b.off; i < end; i++) {
+      members[at++] = i;
+      span[i] = (g.to[i] + fans.fanB[i]) - (g.from[i] + fans.fanA[i]);
+    }
+  }
+  members.sort((p, q) => span[p] - span[q] || p - q);
+  const ids = count <= 0xffff ? new Uint16Array(n) : new Uint32Array(n);
+  const rankOf = new Int32Array(count).fill(-1);
+  const fx0 = new Float64Array(n), fx1 = new Float64Array(n);
+  const total = g && g.total > 0 ? g.total : 0;
+  const footStart = new Int32Array(total + 1);
+  for (let r = 0; r < n; r++) {
+    const i = members[r];
+    ids[r] = i; rankOf[i] = r;
+    fx0[r] = g.from[i] + 0.5 + fans.fanA[i];
+    fx1[r] = g.to[i] + 0.5 + fans.fanB[i];
+    footStart[g.from[i] + 1]++; footStart[g.to[i] + 1]++;
+  }
+  for (let v = 0; v < total; v++) footStart[v + 1] += footStart[v];
+  const fill = footStart.slice(0, total);
+  const foot = new Int32Array(2 * n);
+  for (let r = 0; r < n; r++) {
+    const i = members[r];
+    foot[fill[g.from[i]]++] = r * 2;
+    foot[fill[g.to[i]]++] = r * 2 + 1;
+  }
+  const order = { density: which, count: n, ids, fx0, fx1, rankOf, footStart, foot, stamp: new Uint32Array(n) };
+  per[which] = order;
+  return order;
+}
+
+/**
+ * @typedef {{ serial: number, order: DrawOrder,
+ *   width: number, base: number, squash: number, camX: number, camY: number, ppv: number, dpr: number,
+ *   segments: Uint8Array, count: number, list: Uint16Array | Uint32Array,
+ *   stream: Uint16Array | Uint32Array, classes: number, classN: Int32Array, classFirst: Int32Array,
+ *   classCount: Int32Array, vertices: number, anchored: number, all: boolean, scan: string,
+ *   perN: Int32Array, cursor: Int32Array }} FrameSet
+ *   segments[rank]: the thread's segments, 0 when nothing of it is in the frame; count: how many are;
+ *   list[0 .. count): their ids in rank order; stream[0 .. count): the same ids by segment count, then
+ *   rank (the renderer's id stream); classes: how many segment counts, the k-th classN[k] segments over
+ *   stream[classFirst[k] .. classFirst[k] + classCount[k]); vertices: the main pass's vertex
+ *   invocations, the sum of 2 (n + 1); anchored: threads with a foot within FLYOVER_MARGIN of the
+ *   frame (geometry.arcAnchored), in the frame or not; all: every thread of the density is in the
+ *   frame; scan: 'all' (every rank was a candidate) or 'feet' (the feet window's); perN, cursor: scratch
+ */
+
+/** Two cameras per graph: the frame's, and one other (a test, a walk) without evicting it. */
+const SLOTS = new WeakMap();
+let SERIAL = 0;
+const TAU = new Float64Array(2);
+const HEIGHTS = new Float64Array(2);
+const FEET = new Int32Array(2);
+
+/**
+ * The frame's own window of verses for its candidates (see the file's header): the feet that can
+ * hold a thread's body in the frame. A thread spanning the whole window with both feet a distance
+ * d and d' (device px) past its edges stands at least squash sqrt(d (W + 2m)) high over the window
+ * (the ellipse, from the nearer foot), so once d exceeds hHi^2 / (squash^2 (W + 2m)) nothing of it
+ * can reach down into the frame. Returns [lo, hi], inclusive verses, a verse of slack for the fans.
+ * @param {number} total @param {number} width @param {number} squash @param {number} hHi
+ * @param {number} camX @param {number} ppv
+ * @param {number[] | Int32Array} [out] - receives [lo, hi] (a fresh array when not given)
+ * @returns {number[] | Int32Array}
+ */
+export function feetWindow(total, width, squash, hHi, camX, ppv, out) {
+  const s = squash > 0 ? squash : 1;
+  const reach = (hHi * hHi) / (s * s * (width + 2 * CLIP_MARGIN)) + 1;
+  const lo = Math.floor((-CLIP_MARGIN - reach - width / 2) / ppv + camX) - 1;
+  const hi = Math.ceil((width + CLIP_MARGIN + reach - width / 2) / ppv + camX) + 1;
+  const o = out || [0, 0];
+  o[0] = lo < 0 ? 0 : lo;
+  o[1] = hi > total - 1 ? total - 1 : hi;
+  return o;
+}
+
+/**
+ * THE frame's visible set (see the file's header), for a camera and a frame given as numbers;
+ * the same camera and frame return the same set without a second pass. A set stays valid until two
+ * other cameras have been asked for on the same graph.
+ * @param {any} g  the decoded graph
+ * @param {import('./decode.js').Density} density
+ * @param {number} width - the frame, device px
+ * @param {number} base - its baseline row, device px
+ * @param {number} squash - geometry.squashFactor
+ * @param {number} camX @param {number} camY @param {number} ppv - the camera (camY: its height, device px)
+ * @param {number} dpr
+ * @returns {FrameSet}
+ */
+export function frameSetAt(g, density, width, base, squash, camX, camY, ppv, dpr) {
+  const order = drawOrder(g, density);
+  const y = camY > 0 ? camY : 0;
+  const d = dpr > 0 ? dpr : 1;
+  let slots = SLOTS.get(g);
+  if (!slots) { slots = []; SLOTS.set(g, slots); }
+  for (let k = 0; k < slots.length; k++) {
+    const s = slots[k];
+    if (s.order === order && s.width === width && s.base === base && s.squash === squash && s.camX === camX
+      && s.camY === y && s.ppv === ppv && s.dpr === d) {
+      if (k) { slots.splice(k, 1); slots.unshift(s); }
+      return s;
+    }
+  }
+  const N = order.count;
+  let set = slots.length >= 2 ? slots.pop() : null;
+  if (!set || set.order !== order) {
+    const Ids = /** @type {any} */ (order.ids.constructor);
+    set = /** @type {FrameSet} */ ({
+      serial: 0, order, width: 0, base: 0, squash: 0, camX: 0, camY: 0, ppv: 0, dpr: 0,
+      segments: new Uint8Array(N), count: 0, list: new Ids(N), stream: new Ids(N), classes: 0,
+      classN: new Int32Array(TESS_CAP + 1), classFirst: new Int32Array(TESS_CAP + 1),
+      classCount: new Int32Array(TESS_CAP + 1), vertices: 0, anchored: 0, all: false, scan: 'all',
+      perN: new Int32Array(TESS_CAP + 1), cursor: new Int32Array(TESS_CAP + 1),
+    });
+  }
+  slots.unshift(set);
+  set.serial = ++SERIAL;
+  set.width = width; set.base = base; set.squash = squash; set.camX = camX; set.camY = y; set.ppv = ppv; set.dpr = d;
+  const seg = set.segments, perN = set.perN, cursor = set.cursor;
+  seg.fill(0);
+  perN.fill(0);
+  const s = squash > 0 ? squash : 1;
+  frameHeights(base, y, d, HEIGHTS);
+  const hLo = HEIGHTS[0], hHi = HEIGHTS[1];
+  const half = width / 2, m = CLIP_MARGIN, fm = FLYOVER_MARGIN, right = width + m;
+  const { fx0, fx1, footStart, foot, stamp } = order;
+  // the candidates: every rank, or the feet in the frame's own window once that is the smaller
+  let cand = null, candCount = N;
+  set.scan = 'all';
+  if (N && ppv > 0 && g.total > 0) {
+    feetWindow(g.total, width, s, hHi, camX, ppv, FEET);
+    const vLo = FEET[0], vHi = FEET[1];
+    const feet = vHi >= vLo ? footStart[vHi + 1] - footStart[vLo] : 0;
+    if (feet < N / 2) {
+      set.scan = 'feet';
+      cand = set.list;   // scratch: the list is written after the pass, from the segments
+      candCount = 0;
+      const mark = set.serial >>> 0;
+      const end = vHi >= vLo ? footStart[vHi + 1] : 0;
+      for (let j = vHi >= vLo ? footStart[vLo] : 0; j < end; j++) {
+        const rank = foot[j] >> 1;
+        if (stamp[rank] === mark) continue;
+        stamp[rank] = mark;
+        cand[candCount++] = rank;
+      }
+    }
+  }
+  let count = 0, vertices = 0, anchored = 0;
+  for (let k = 0; k < candCount; k++) {
+    const rank = cand ? cand[k] : k;
+    const x0 = (fx0[rank] - camX) * ppv + half;
+    const x1 = (fx1[rank] - camX) * ppv + half;
+    // geometry.arcAnchored on the drawn feet: the crowding law counts these, in the frame or not
+    if ((x0 >= -fm && x0 <= width + fm) || (x1 >= -fm && x1 <= width + fm)) anchored++;
+    if (x1 < -m || x0 > right) continue;
+    const r = (x1 - x0) * 0.5;
+    const A = (r > 0 ? r : 0) * s;   // geometry.arcShape
+    if (!arcFrameTau(x0, x1, width, A, hLo, hHi, TAU)) continue;
+    const n = frameSegments(TAU[0], TAU[1], r, A, d);
+    seg[rank] = n;
+    perN[n]++;
+    count++;
+    vertices += 2 * (n + 1);
+  }
+  // the classes, fewest segments first, then every id in rank order into the list and the stream
+  const { classN, classFirst, classCount, list, stream } = set;
+  let classes = 0, at = 0;
+  for (let n = 1; n <= TESS_CAP; n++) {
+    if (!perN[n]) continue;
+    classN[classes] = n;
+    classFirst[classes] = at;
+    classCount[classes] = perN[n];
+    classes++;
+    cursor[n] = at;
+    at += perN[n];
+  }
+  const ids = order.ids;
+  let li = 0;
+  for (let rank = 0; rank < N && li < count; rank++) {
+    const n = seg[rank];
+    if (!n) continue;
+    const id = ids[rank];
+    list[li++] = id;
+    stream[cursor[n]++] = id;
+  }
+  set.classes = classes;
+  set.count = count;
+  set.vertices = vertices;
+  set.anchored = anchored;
+  set.all = count === N;
+  return set;
+}
+
+/**
+ * The visible set for a camera and a view (pick.js, the overlay): frameSetAt over the view's frame.
+ * @param {any} g
+ * @param {{x:number, y?:number, ppv:number}} cam
+ * @param {{width:number, base:number, squash:number, density:import('./decode.js').Density, dpr?:number}} view
+ * @param {number} [dpr]  the device pixel ratio when the view does not carry one
+ * @returns {FrameSet}
+ */
+export function frameSet(g, cam, view, dpr) {
+  return frameSetAt(g, view.density, view.width, view.base, view.squash, cam.x, cam.y > 0 ? cam.y : 0, cam.ppv,
+    view.dpr > 0 ? view.dpr : (dpr > 0 ? dpr : 1));
+}
+
+/**
+ * Whether thread i is in the set: drawn, and so countable, labellable and pickable.
+ * @param {FrameSet} set @param {number} i
+ */
+export function inFrame(set, i) {
+  if (set.all) return set.order.rankOf[i] >= 0;
+  const rank = set.order.rankOf[i];
+  return rank >= 0 && set.segments[rank] > 0;
 }

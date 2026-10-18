@@ -177,84 +177,163 @@ export function ribbonStyle(zoom, localize, anchoredPerCssPx) {
   };
 }
 
-/**
- * The piece of an arc worth tessellating, in device px.
- *
- * At overview this is the whole arc, so the 1x frame cannot move. As the
- * reader localizes it closes onto the viewport, because a 440,000 px arc
- * spending 47 of its 48 segments off screen is what draws the visible piece
- * as one straight chord. Clipping changes only WHERE the samples land, never
- * the curve they land on.
- *
- * @param {number} x0 @param {number} x1 - feet, device px
- * @param {number} width - viewport width, device px
- * @param {number} localize - localizeFactor()
- * @returns {[number, number]} the parameter window, device px
- */
-export function visibleWindow(x0, x1, width, localize) {
-  const lo = Math.min(x0, x1);
-  const hi = Math.max(x0, x1);
-  const a = lo + (Math.max(lo, -CLIP_MARGIN) - lo) * localize;
-  const b = hi + (Math.min(hi, width + CLIP_MARGIN) - hi) * localize;
-  return [a, b < a ? a : b];
-}
-
-/** How far outside the viewport the tessellation window still reaches. */
+/** How far outside the viewport a thread's body still counts as in the frame,
+ *  device px: the tessellation reaches this far past each side and the top. */
 export const CLIP_MARGIN = 32;
-/**
- * Most segments one draw may use. It binds only on wide frames: phoneLand at
- * its ceiling asks for 68. At 96 the desktop ceiling still drew a 24.4 CSS px
- * segment against S3's 24, so the cap was what missed the target, not the law.
- */
-export const SEGMENT_CAP = 128;
-
-/** Farthest a drawn chord may stray from the true curve, CSS px. */
-export const CHORD_TOL_CSS = 0.5;
-
-/** Longest on-screen straight segment we aim for, CSS px. */
-export const SEGMENT_TARGET_CSS = 16;
 
 /**
- * Segments to tessellate one draw range with: enough that no on-screen
- * piece of any arc in the range shows a chord. At overview it is the
- * asset's own count, so the 1x frame cannot move. Localized, the parameter
- * runs over the piece the window holds (visibleWindow) and two rules bound
- * the count. (1) LENGTH: no on-screen segment longer than
- * SEGMENT_TARGET_CSS over what the frame can hold of an arc - the window's
- * width plus a leg's height at each end. (2) CURVATURE: sampling uniformly
- * in the parameter, a step of dTau strays at most max(R, A) dTau^2 / 8
- * from its chord; over a window narrower than the arc the parameter range
- * shrinks as the arc widens (acos(1 - w/r) past r = w/2), so the bound is
- * the arc the window just holds, pi sqrt(max(1, squash) w / (16 tol)),
- * whatever the range's widest span. A leg steeper than the frame is
- * straight to within a pixel and needs nothing more.
- *
- * @param {number} bucketSegments - the asset's own per-bucket count
- * @param {number} localize - localizeFactor()
- * @param {number} maxRx - largest half-span in the range, device px
- * @param {number} ceil - usable height above the baseline, device px
- * @param {number} width - viewport width, device px
- * @param {number} dpr - device pixel ratio, so the targets are in CSS px
- * @param {number} squash - squashFactor()
- * @returns {number}
+ * Farthest the drawn ribbon's centre may stray from the true curve, CSS px,
+ * at every zoom (E1). The samples are pushed out from the ellipse's centre
+ * (arcPush) so the chords straddle the curve, and the segment count is the
+ * fewest that keep both the pushed samples and the chords' middles inside
+ * this bound (frameSegments).
  */
-export function segmentsFor(bucketSegments, localize, maxRx, ceil, width, dpr, squash) {
-  const base = bucketSegments > 0 ? bucketSegments : 8;
-  if (!(localize > 0)) return base;
-  const d = dpr > 0 ? dpr : 1;
-  const r = maxRx > 0 ? maxRx : 0;
-  const s = squash > 0 ? squash : 1;
-  const win = width + 2 * CLIP_MARGIN;
-  const leg = Math.min(ceil, r * s);
-  const byLength = Math.ceil((Math.min(2 * r, win) + 2 * leg) / d / SEGMENT_TARGET_CSS);
-  const tol = CHORD_TOL_CSS * d;
-  const rEff = Math.min(r, win / 2);
-  const byCurve = Math.ceil(Math.PI * Math.sqrt((Math.max(1, s) * rEff) / (8 * tol)));
-  const want = byLength > byCurve ? byLength : byCurve;
-  const capped = want < 8 ? 8 : (want > SEGMENT_CAP ? SEGMENT_CAP : want);
-  const n = Math.round(base + (capped - base) * localize);
-  return n < 8 ? 8 : n;
+export const TESS_TOL_CSS = 0.25;
+/** Most segments one thread may take (a safety rail: the frame bounds the
+ *  count well under it, ~45 for a 1600 px frame at the overview). */
+export const TESS_CAP = 255;
+/** How far below the ruler's top a body still counts as in the frame, CSS px:
+ *  the scissor's own device px plus the widest ribbon's half and skirt. */
+export const FRAME_PAD_LOW_CSS = 3;
+
+/**
+ * The heights a thread's body must reach to touch the frame, device px above
+ * its baseline as drawn (base + camY): from the ruler's top (the scissor at
+ * base, less FRAME_PAD_LOW_CSS) up to the frame's top (plus CLIP_MARGIN).
+ * @param {number} base - the frame's baseline row, device px
+ * @param {number} camY - the camera's height, device px (0 at the baseline)
+ * @param {number} dpr
+ * @param {number[] | Float64Array} [out] - receives [hLo, hHi] (a fresh array when not given)
+ * @returns {number[] | Float64Array} [hLo, hHi]
+ */
+export function frameHeights(base, camY, dpr, out) {
+  const y = camY > 0 ? camY : 0;
+  const o = out || [0, 0];
+  o[0] = y - FRAME_PAD_LOW_CSS * (dpr > 0 ? dpr : 1);
+  o[1] = base + y + CLIP_MARGIN;
+  return o;
 }
+
+const HALF_PI = Math.PI / 2;
+
+/**
+ * THE PIECE OF A THREAD THE FRAME SHOWS (E1): its parameter interval
+ * [out[0], out[1]] (0..pi, the ellipse's angle from the left foot, as
+ * arcPointAt reads it), or false when no part of its body touches the frame.
+ *
+ * The frame is x in [-CLIP_MARGIN, width + CLIP_MARGIN] and a height in
+ * [hLo, hHi] (frameHeights). The x window cuts the parameter at the window's
+ * edges; the heights cut each leg: the left leg runs [td, tc] and the right
+ * [pi - tc, pi - td], where sin(tc) = hHi / A and sin(td) = hLo / A (the
+ * whole arch when it is lower than the frame's top; from the foot when the
+ * baseline is in the frame). The interval is the hull of the two legs' cut
+ * pieces: a thread whose crown climbs past the frame's top with both legs in
+ * it is sampled across its crown too, which costs segments and never draws
+ * anything wrong. This is the height-aware cull: a thread whose span crosses
+ * the frame while its body passes far above or below it is not drawn,
+ * counted, labelled or picked, because nothing of it is there to see.
+ *
+ * Every parameter comes from 2 asin(sqrt(u / 2)), the stable form of
+ * acos(1 - u) (arcTauOf), which loses the small angles a foot needs to
+ * float32 at the ceiling. MUST stay identical to arcFrameTau in
+ * arcFrameGLSL below.
+ *
+ * @param {number} x0 @param {number} x1 - the feet, device px (footX), x0 left
+ * @param {number} width - viewport width, device px
+ * @param {number} A - apex height (arcShape)
+ * @param {number} hLo @param {number} hHi - frameHeights()
+ * @param {number[] | Float64Array} out - receives the interval
+ * @returns {boolean}
+ */
+export function arcFrameTau(x0, x1, width, A, hLo, hHi, out) {
+  const r = (x1 - x0) * 0.5;
+  const m = CLIP_MARGIN;
+  if (!(r > 0) || x1 < -m || x0 > width + m || !(A > 0) || hLo > A || hHi < 0) return false;
+  // the whole arch in the frame (every overview thread): what the cuts below give, without them
+  if (x0 >= -m && x1 <= width + m && A <= hHi && hLo <= 0) { out[0] = 0; out[1] = Math.PI; return true; }
+  const ua = ((x0 > -m ? x0 : -m) - x0) / (2 * r);
+  const ub = ((x1 < width + m ? x1 : width + m) - x0) / (2 * r);
+  const ta = 2 * Math.asin(Math.sqrt(ua < 0 ? 0 : (ua > 1 ? 1 : ua)));
+  const tb = 2 * Math.asin(Math.sqrt(ub < 0 ? 0 : (ub > 1 ? 1 : ub)));
+  const tc = hHi >= A ? HALF_PI : Math.asin(hHi / A);
+  const td = hLo > 0 ? Math.asin(hLo / A) : 0;
+  const l0 = ta > td ? ta : td, l1 = tb < tc ? tb : tc;
+  const r0 = ta > Math.PI - tc ? ta : Math.PI - tc, r1 = tb < Math.PI - td ? tb : Math.PI - td;
+  const left = l1 >= l0, right = r1 >= r0;
+  if (!left && !right) return false;
+  out[0] = left ? l0 : r0;
+  out[1] = right ? r1 : l1;
+  return true;
+}
+
+/**
+ * Segments for one thread's piece in the frame (E1): chosen by its own
+ * on-screen size at every zoom, so no drawn point strays more than
+ * TESS_TOL_CSS from the true curve. Exact, not a small-angle estimate: the
+ * half-ellipse is the affine image of a half-circle, which keeps chords,
+ * midpoints and parallel tangents, so a step dTau in its parameter strays
+ * from its chord by (1 - cos(dTau / 2)) times the centre's distance to the
+ * tangent there, r A / |r'| <= max(r, A). Pushing every sample out from the
+ * centre by arcPush(dTau) = tan^2(dTau / 4) of its own distance puts the
+ * samples outside and the chords' middles inside by the same amount, at
+ * most tan^2(dTau / 4) max(r, A); so dTau = 4 atan(sqrt(tol / max(r, A))).
+ * The S3 sweep in depth.test.js measures it against an independent
+ * point-to-ellipse oracle. A thread smaller than the tolerance takes one
+ * segment.
+ * @param {number} t0 @param {number} t1 - arcFrameTau's interval
+ * @param {number} r - half the span on screen, device px
+ * @param {number} A - apex height, device px
+ * @param {number} dpr
+ * @returns {number} 1..TESS_CAP
+ */
+export function frameSegments(t0, t1, r, A, dpr) {
+  const m = r > A ? r : A;
+  if (!(m > 0)) return 1;
+  const tol = TESS_TOL_CSS * (dpr > 0 ? dpr : 1);
+  const n = Math.ceil((t1 - t0) / (4 * Math.atan(Math.sqrt(tol / m))));
+  return n < 1 ? 1 : (n > TESS_CAP ? TESS_CAP : n);
+}
+
+/**
+ * How far a sample is pushed out from the ellipse's centre, as a share of
+ * its own distance from it: tan^2(dTau / 4) for a parameter step dTau, so
+ * each chord straddles the curve instead of cutting inside it
+ * (frameSegments has the derivation). MUST stay identical to arcPush in
+ * arcFrameGLSL below.
+ * @param {number} dTau
+ */
+export function arcPush(dTau) {
+  const t = Math.tan(dTau * 0.25);
+  return t * t;
+}
+
+/**
+ * The same two laws as GLSL ES 3.00, for the main pass's vertex stage
+ * (web-renderer.js) to inline; web-renderer.test.js asserts it does, and
+ * structure-law.test.js transliterates this text and runs it against the JS.
+ */
+export const arcFrameGLSL = `
+vec2 arcFrameTau(float x0, float x1, float width, float A, float hLo, float hHi){
+  float r = (x1 - x0)*.5;
+  float m = ${glslFloat(CLIP_MARGIN)};
+  if (r <= 0. || x1 < -m || x0 > width + m || A <= 0. || hLo > A || hHi < 0.) return vec2(1., 0.);
+  if (x0 >= -m && x1 <= width + m && A <= hHi && hLo <= 0.) return vec2(0., ${glslFloat(Math.PI)});
+  float ua = (max(x0, -m) - x0)/(2.*r);
+  float ub = (min(x1, width + m) - x0)/(2.*r);
+  float ta = 2.*asin(sqrt(clamp(ua, 0., 1.)));
+  float tb = 2.*asin(sqrt(clamp(ub, 0., 1.)));
+  float tc = hHi >= A ? ${glslFloat(HALF_PI)} : asin(hHi/A);
+  float td = hLo > 0. ? asin(hLo/A) : 0.;
+  float l0 = max(ta, td), l1 = min(tb, tc);
+  float r0 = max(ta, ${glslFloat(Math.PI)} - tc), r1 = min(tb, ${glslFloat(Math.PI)} - td);
+  bool left = l1 >= l0, right = r1 >= r0;
+  if (!left && !right) return vec2(1., 0.);
+  return vec2(left ? l0 : r0, right ? r1 : l1);
+}
+float arcPush(float dTau){
+  float t = tan(dTau*.25);
+  return t*t;
+}`;
 /** The top pass's chord tolerance, CSS px: the chosen line is 3 px of gold
  *  under a soft halo, and a 0.5 px chord reads on it as a facet. */
 export const TOP_CHORD_TOL_CSS = 0.1;
@@ -266,9 +345,8 @@ export const TOP_SEGMENT_MIN = 16;
 /**
  * Segments for ONE thread in the top pass (web-renderer.js: the chosen,
  * hovered and lit lines, the prophecy class), so its visible piece shows no
- * facet. The top pass always clips the parameter to the window (the
- * main pass's visibleWindow at localize 1) and samples it uniformly, as the
- * main pass does; two bounds, the larger wins, then the cap:
+ * facet. The top pass always clips the parameter to the window's x range
+ * and samples it uniformly; two bounds, the larger wins, then the cap:
  *   BEND: a parameter step dTau strays at most max(R, A) dTau^2 / 8 from its
  *     chord, so the window's parameter span over sqrt(8 tol / max(R, A));
  *   LENGTH: the curve's speed is at most max(R, A) per unit of parameter, so
@@ -292,7 +370,8 @@ export function topSegmentsFor(x0, x1, width, squash, dpr, cap) {
   if (!(rx > 0)) return TOP_SEGMENT_MIN;
   const lo = Math.max(left, -CLIP_MARGIN), hi = Math.min(right, width + CLIP_MARGIN);
   if (!(hi > lo)) return TOP_SEGMENT_MIN;
-  const { R, A } = arcShape(rx, squash);
+  // arcShape(rx, squash) inline, so a frame's top pass allocates nothing
+  const R = rx, A = rx * (squash > 0 ? squash : 1);
   const span = arcTauOf(hi, left, right) - arcTauOf(lo, left, right);
   const bound = Math.max(R, A, 1);
   const byBend = span * Math.sqrt(bound / (8 * TOP_CHORD_TOL_CSS * d));

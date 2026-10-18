@@ -5,10 +5,23 @@
    that its threads stand on the main pass's own feet, and that its curve is
    sampled finely enough that the gold shows no facet: an independent oracle
    walks the drawn chords against the true curve. */
-import { describe, it, expect } from 'vitest';
-import { prophecySet, topSet, topSetKey, isCompact, COMPACT_HEIGHT_CSS, TOP_ORDER } from './frame-set.js';
+import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
+import { fileURLToPath } from 'node:url';
+import { resolve, dirname } from 'node:path';
+import {
+  prophecySet, topSet, topSetKey, isCompact, COMPACT_HEIGHT_CSS, TOP_ORDER,
+  drawOrder, frameSetAt, frameSet, inFrame,
+} from './frame-set.js';
+import * as dec from './decode.js';
 import { fansOf } from './decode.js';
 import * as geo from './geometry.js';
+import * as pick from './pick.js';
+import { webFrame } from './web-frame.js';
+
+// the visible-set cases scan the whole asset at ten frames: give them the time they take under coverage
+vi.setConfig({ testTimeout: 60000 });
 
 /** A small graph: six arcs over 200 verses, two of them joining the same verses as a prophecy pair. */
 function graph() {
@@ -194,9 +207,13 @@ describe('topSegmentsFor: the gold shows no facet at any zoom', () => {
     });
   }
 
-  it('CONTROL: the main pass\'s sampling of the same line (what drew the chosen line before) strays over three times as far at the overview', () => {
-    const fitSegments = 48;   // the asset's widest bucket, drawn whole at the overview (localize 0)
-    const n = geo.segmentsFor(fitSegments, 0, W / 2, base * 0.985, W, dpr, squash);
+  /* Restated for E1 (GL step 2): the main pass's count is geometry.frameSegments
+     now (the bucket's own count and segmentsFor are retired). Its chords are
+     pushed out to straddle the curve; the top pass samples unpushed, so the
+     main pass's count would facet the gold. */
+  it('CONTROL: the main pass\'s segment count for the same line (frameSegments, its chords pushed) strays over three times as far unpushed, as the top pass samples', () => {
+    const { A } = geo.arcShape(W / 2, squash);
+    const n = geo.frameSegments(0, Math.PI, W / 2, A, dpr);
     const { stray } = worstStray(0, W, W, H, base, squash, n);
     expect(stray).toBeGreaterThan(3 * geo.TOP_CHORD_TOL_CSS * dpr);
     expect(geo.topSegmentsFor(0, W, W, squash, dpr, 512)).toBeGreaterThan(n);
@@ -208,5 +225,194 @@ describe('topSegmentsFor: the gold shows no facet at any zoom', () => {
     expect(geo.topSegmentsFor(1200, 441200, W, squash, dpr, 192)).toBeLessThanOrEqual(192);
     // the feet in either order are the same thread
     expect(geo.topSegmentsFor(2100, 300, W, squash, dpr, 512)).toBe(geo.topSegmentsFor(300, 2100, W, squash, dpr, 512));
+  });
+});
+
+/* ── the visible set (E1, GL step 2) ─────────────────────────────────────
+   One pass per camera: every thread of the density whose body touches the
+   frame, its segments by its own size, and the anchored count. The renderer
+   draws it, the picker hits it, the labels walk it and the pills count it,
+   so the four are one set by construction. These cases hold the set's own
+   shape on the asset, its cull against a full brute-force scan, its
+   consumers, and the vertex targets the brief set (the overview under half
+   of the old ~4.4M invocations; the ceiling down from ~4M to the low
+   thousands), measured deterministically, without a GPU. */
+describe('the visible set: drawn, counted, labelled and picked are one set (E1)', () => {
+  const ASSET = resolve(dirname(fileURLToPath(import.meta.url)), '../../data/scripture-web-data.js');
+  const g = dec.decodeGraph(runInNewContext(readFileSync(ASSET, 'utf8') + ';SCRIPTURE_WEB_DATA', {}));
+  const fans = fansOf(g);
+  /** the old renderer's main-pass vertex invocations at the PC overview (perf.md, before) */
+  const OLD_OVERVIEW = 4395988;
+  const devices = [
+    { name: 'pc', W: 1600, H: 900, DPR: 1 },
+    { name: 'phone', W: Math.round(891 * 2.6), H: Math.round(411 * 2.6), DPR: 2.6 },
+  ];
+  const frameOf = (dev) => {
+    const f = webFrame(dev, false);
+    return { W: dev.W, DPR: dev.DPR, base: f.base, ceil: f.ceil, squash: geo.squashFactor(f.ceil, dev.W) };
+  };
+  const cameras = (fr) => {
+    const fit = fr.W / g.total, zMax = geo.maxZoomFor(g.total, fr.W / fr.DPR);
+    return [
+      { name: 'overview', x: g.total / 2, y: 0, ppv: fit },
+      { name: '6.5x', x: 14000.3, y: 0, ppv: fit * 6.55 },
+      { name: '42.9x', x: 14000.3, y: 0, ppv: fit * 42.9 },
+      { name: 'ceiling', x: 14000.3, y: 0, ppv: fit * zMax },
+      { name: 'sky 42.9x', x: 14000.3, y: 3 * fr.ceil, ppv: fit * 42.9 },
+    ];
+  };
+  const setOf = (fr, c) => frameSetAt(g, 'famous', fr.W, fr.base, fr.squash, c.x, c.y, c.ppv, fr.DPR);
+  const order = drawOrder(g, 'famous');
+
+  it('its shape: inFrame is the list, the stream is the list by segment class (fewest first, rank within), and the vertices add up', () => {
+    for (const dev of devices) {
+      const fr = frameOf(dev);
+      for (const c of cameras(fr)) {
+        const set = setOf(fr, c);
+        const where = `${dev.name} ${c.name}`;
+        const bad = [];
+        const listed = new Set(set.list.subarray(0, set.count));
+        if (listed.size !== set.count) bad.push('duplicate ids in the list');
+        let members = 0;
+        for (let i = 0; i < g.count; i++) {
+          if (!inFrame(set, i)) continue;
+          members++;
+          if (!listed.has(i)) bad.push(`inFrame ${i} not listed`);
+        }
+        if (members !== set.count) bad.push(`inFrame holds ${members}, count ${set.count}`);
+        // the list in rank order: the shortest drawn span first, as the renderer draws
+        for (let k = 1; k < set.count; k++) {
+          if (order.rankOf[set.list[k]] <= order.rankOf[set.list[k - 1]]) bad.push(`list out of rank at ${k}`);
+        }
+        let vertices = 0, at = 0;
+        for (let k = 0; k < set.classes; k++) {
+          if (k && set.classN[k] <= set.classN[k - 1]) bad.push(`class ${k} not after ${k - 1}`);
+          if (set.classFirst[k] !== at) bad.push(`class ${k} starts at ${set.classFirst[k]}, not ${at}`);
+          for (let j = at; j < at + set.classCount[k]; j++) {
+            const rank = order.rankOf[set.stream[j]];
+            if (set.segments[rank] !== set.classN[k]) bad.push(`stream ${j} in class ${k} has ${set.segments[rank]} segments`);
+            if (j > at && rank <= order.rankOf[set.stream[j - 1]]) bad.push(`stream out of rank at ${j}`);
+          }
+          at += set.classCount[k];
+          vertices += 2 * (set.classN[k] + 1) * set.classCount[k];
+        }
+        if (at !== set.count) bad.push(`classes hold ${at}, count ${set.count}`);
+        expect(bad.slice(0, 5), where).toEqual([]);
+        expect(set.vertices, where).toBe(vertices);
+        expect(set.count, where).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('its cull is a full scan\'s: every thread whose body touches the frame (arcFrameTau on its drawn feet) and no other, whichever scan found the candidates', () => {
+    const tau = [0, 0];
+    for (const dev of devices) {
+      const fr = frameOf(dev);
+      for (const c of cameras(fr)) {
+        const set = setOf(fr, c);
+        const cam = { x: c.x, y: c.y, ppv: c.ppv, total: g.total };
+        const [hLo, hHi] = geo.frameHeights(fr.base, c.y, fr.DPR);
+        const bad = [];
+        let want = 0;
+        for (const b of g.buckets) {
+          const end = b.off + dec.bucketDrawCount(b, 'famous');
+          for (let i = b.off; i < end; i++) {
+            const x0 = geo.footX(cam, fr.W, g.from[i], fans.fanA[i]), x1 = geo.footX(cam, fr.W, g.to[i], fans.fanB[i]);
+            const { A } = geo.arcShape((x1 - x0) / 2, fr.squash);
+            const hit = geo.arcFrameTau(x0, x1, fr.W, A, hLo, hHi, tau);
+            if (hit) want++;
+            if (inFrame(set, i) !== hit) bad.push(`thread ${i}: drawn ${inFrame(set, i)}, in the frame ${hit}`);
+          }
+        }
+        expect(bad.slice(0, 5), `${dev.name} ${c.name}`).toEqual([]);
+        expect(set.count).toBe(want);
+      }
+    }
+    // the deep frames found their candidates by the feet, the overview over every rank
+    const fr = frameOf(devices[0]);
+    const scans = cameras(fr).map((c) => setOf(fr, c).scan);
+    expect(scans[0]).toBe('all');
+    expect(scans.slice(2)).toEqual(['feet', 'feet', 'feet']);
+  });
+
+  it('anchored is the crowding law\'s own count, pick.countAnchored, at rest and in the sky (C14: anchored whatever the camera\'s height)', () => {
+    for (const dev of devices) {
+      const fr = frameOf(dev);
+      for (const c of cameras(fr)) {
+        const cam = { x: c.x, y: c.y, ppv: c.ppv, total: g.total };
+        expect(setOf(fr, c).anchored, `${dev.name} ${c.name}`).toBe(pick.countAnchored(g, cam, fr.W, 'famous'));
+      }
+    }
+  });
+
+  it('its consumers: the labels walk it, the picker hits nothing outside it, the pills count only it', () => {
+    const fr = frameOf(devices[1]);
+    for (const c of cameras(fr).slice(1)) {
+      const cam = { x: c.x, y: c.y, ppv: c.ppv, total: g.total };
+      const view = { width: fr.W, base: fr.base, squash: fr.squash, density: 'famous', dpr: fr.DPR, localize: 1 };
+      const set = frameSet(g, cam, view);
+      expect(set, c.name).toBe(setOf(fr, c));
+      expect(pick.visibleArcs(g, cam, view, 1e9)).toEqual(Array.from(set.list.subarray(0, set.count)));
+      expect(pick.visibleArcs(g, cam, view, 5)).toEqual(Array.from(set.list.subarray(0, Math.min(5, set.count))));
+      const outside = [];
+      let hits = 0;
+      for (let k = 0; k < 240; k++) {
+        const px = (fr.W * (k + 0.5)) / 240, py = fr.base * (0.25 + (0.74 * ((k * 37) % 240)) / 240);
+        for (const r of pick.pickArcs(g, cam, view, px, py, 12, 8)) {
+          hits++;
+          if (!inFrame(set, r.index)) outside.push(r.index);
+        }
+      }
+      expect(outside, c.name).toEqual([]);
+      expect(hits, c.name).toBeGreaterThan(0);
+      // the pills: a thread counts at each foot cell it stands in (once when both feet share one),
+      // and only a thread of the set, anchored to the frame
+      const cells = pick.footBundles(g, cam, view, fr.DPR);
+      const cellOf = new Map();
+      cells.forEach((cell, k) => { for (let v = cell.lo; v <= cell.hi; v++) cellOf.set(v, k); });
+      const want = new Array(cells.length).fill(0);
+      for (const i of set.list.subarray(0, set.count)) {
+        const x0 = geo.footX(cam, fr.W, g.from[i], fans.fanA[i]), x1 = geo.footX(cam, fr.W, g.to[i], fans.fanB[i]);
+        if (!geo.arcAnchored(x0, x1, fr.W)) continue;
+        const ca = cellOf.has(g.from[i]) ? cellOf.get(g.from[i]) : -1;
+        const cb = cellOf.has(g.to[i]) ? cellOf.get(g.to[i]) : -1;
+        if (ca >= 0) want[ca]++;
+        if (cb >= 0 && cb !== ca) want[cb]++;
+      }
+      expect(cells.map((cell) => cell.drawn), c.name).toEqual(want);
+      expect(want.some((n) => n > 0), c.name).toBe(true);
+    }
+  });
+
+  it('a camera asked for again is the same set; two other cameras evict it, and it comes back the same', () => {
+    const fr = frameOf(devices[0]);
+    const [a, b, c] = cameras(fr).slice(1, 4);
+    const first = setOf(fr, a);
+    const serial = first.serial, count = first.count, vertices = first.vertices;
+    expect(setOf(fr, a)).toBe(first);
+    expect(setOf(fr, a).serial).toBe(serial);
+    setOf(fr, b);
+    expect(setOf(fr, a).serial, 'one other camera keeps it').toBe(serial);
+    setOf(fr, b);
+    setOf(fr, c);
+    const again = setOf(fr, a);
+    expect(again.serial).not.toBe(serial);
+    expect([again.count, again.vertices]).toEqual([count, vertices]);
+  });
+
+  it('E1 targets, deterministic on the asset: the overview under half the old 4.4M vertex invocations, the ceiling in the low thousands, every zoom between falling', () => {
+    for (const dev of devices) {
+      const fr = frameOf(dev);
+      const [overview, z6, z43, ceiling] = cameras(fr).map((c) => {
+        const s = setOf(fr, c);
+        return { count: s.count, vertices: s.vertices };
+      });
+      expect(overview.count, `${dev.name}: every thread is drawn at the overview`).toBe(order.count);
+      expect(overview.vertices, dev.name).toBeLessThan(OLD_OVERVIEW / 2);
+      expect(z6.vertices, dev.name).toBeLessThan(overview.vertices / 3);
+      expect(z43.vertices, dev.name).toBeLessThan(z6.vertices / 3);
+      expect(ceiling.vertices, dev.name).toBeLessThan(10000);
+      expect(ceiling.count, dev.name).toBeGreaterThan(0);
+    }
   });
 });
