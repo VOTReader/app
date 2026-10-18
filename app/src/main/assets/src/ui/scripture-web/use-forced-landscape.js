@@ -1,34 +1,55 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   useForcedLandscape — the Scripture Web is landscape, always.
+   useForcedLandscape — the Scripture Web is landscape on a phone.
    Cluster F (bundle-d), used by ui/screens/ScriptureWebScreen.jsx.
    ═══════════════════════════════════════════════════════════════════════
 
    Split out of ScriptureWebScreen unchanged (F0, 2026-10-18): whether the
-   root is CSS-rotated (any portrait viewport), the orientation lock where
+   root is CSS-rotated (a portrait phone: Q11, below), the orientation lock where
    the platform offers one, immersive mode while the web is open (and the
    unlock on the way out), and loc(), which maps a pointer's viewport
    coordinates into the rotated screen's own CSS space. */
 
 import { rotatePointer } from '../../utils/scripture-web/geometry.js';
 
+/** The longest short side, CSS px, that is a phone's (Q11): past it a portrait viewport is a
+ * tablet or a window, and keeps its own orientation. */
+export const PHONE_SHORT_SIDE = 600;
+
+/**
+ * Whether the web turns itself on its side (Q11, the navigation stream's G3): a portrait
+ * viewport, a coarse primary pointer, and a phone's short side. A desktop window or a tablet
+ * held upright keeps its own orientation.
+ * @returns {boolean}
+ */
+export function wantsRotation() {
+  if (typeof window === 'undefined') return false;
+  const w = window.innerWidth, h = window.innerHeight;
+  if (!(h > w) || w > PHONE_SHORT_SIDE) return false;
+  try {
+    return typeof window.matchMedia === 'function' && !!window.matchMedia('(pointer: coarse)').matches;
+  } catch (_e) { return false; }
+}
+
 /**
  * @param {() => void} schedule  the frame loop's (use-frame-scheduler.js)
  * @returns {{ rotated: boolean, loc: (e: { clientX: number, clientY: number }) => { x: number, y: number } }}
  */
 export function useForcedLandscape(schedule) {
-  // A canon needs its width. The Scripture Web presents in LANDSCAPE, always
-  // (owner call, 2026-09-10: "landscape by default, no rotate option"). Where
-  // the platform will flip the display, screen.orientation.lock('landscape')
-  // does it; where that is refused, absent, or resolves without flipping, the
-  // root is CSS-rotated 90° in ANY portrait viewport — chrome included — so
-  // the reader turns the phone and sees landscape either way. No hint, no
-  // control, no preference, no pointer-type gate. Pointer coords are mapped
-  // back through loc(). A real flip arrives as a resize, and the resize
-  // handler un-rotates by itself; there is nothing to settle.
-  const [rotated, setRotated] = React.useState(
-    typeof window !== 'undefined' && window.innerHeight > window.innerWidth);
+  // A canon needs its width. On a phone the Scripture Web presents in
+  // LANDSCAPE, always (owner call, 2026-09-10: "landscape by default, no
+  // rotate option"). Where the platform will flip the display,
+  // screen.orientation.lock('landscape') does it; where that is refused,
+  // absent, or resolves without flipping, the root is CSS-rotated 90° in a
+  // portrait phone — chrome included — so the reader turns the phone and sees
+  // landscape either way. No hint, no control, no preference. Q11 (decided,
+  // 2026-10) gates it to phones: his words were said of the phone, and a
+  // desktop window or a tablet turned on its side went further than them
+  // (wantsRotation, above). Pointer coords are mapped back through loc(). A
+  // real flip arrives as a resize, and the resize handler un-rotates by
+  // itself; there is nothing to settle.
+  const [rotated, setRotated] = React.useState(wantsRotation);
   React.useEffect(() => {
-    const onResize = () => setRotated(window.innerHeight > window.innerWidth);
+    const onResize = () => setRotated(wantsRotation());
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);

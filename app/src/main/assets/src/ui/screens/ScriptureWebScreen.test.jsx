@@ -1210,7 +1210,7 @@ describe('scripture-web-5 — Try again re-decodes the graph', () => {
   });
 });
 
-describe('landscape, always — a portrait viewport is rotated, and nothing asks the reader to turn', () => {
+describe('landscape on a phone — a portrait phone is rotated, and nothing asks the reader to turn', () => {
   /* This block used to be scripture-web-6, which asserted that a rejected
      lock produced a "Best in landscape" note and an UN-rotated root. That is
      the behaviour the owner asked to be removed (2026-09-10: "landscape by
@@ -1232,18 +1232,31 @@ describe('landscape, always — a portrait viewport is rotated, and nothing asks
     expect(document.querySelector('.sw-orientation-note')).toBeNull();
   });
 
-  it('rotates a portrait viewport on a FINE pointer too — the touch-only gate is gone', async () => {
-    /* The old code rotated only when `(pointer: coarse)` matched, so a
-       portrait viewport on a mouse-driven device showed the note instead. The
-       owner's rule has no pointer clause: any portrait viewport rotates. */
+  /* Was 'rotates a portrait viewport on a FINE pointer too — the touch-only gate is gone'.
+     Corbin's "landscape by default, no rotate option" (09-10) was said of the phone; turning a
+     desktop or tablet window on its side went further than his words, and Q11 (decided, the w1
+     digest's G3) puts the gate back: the forced rotation is for coarse-pointer phones only. The
+     case keeps its intent (which viewports rotate is pinned) with the decided answer. */
+  it('does NOT rotate a portrait window on a FINE pointer (Q11: phones only)', async () => {
     setViewport(400, 800);
     vi.stubGlobal('matchMedia', vi.fn((q) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} })));
-    window.screen.orientation = { lock: () => Promise.reject(new Error('not supported')) };
+    window.screen.orientation = { lock: vi.fn(() => Promise.reject(new Error('not supported'))) };
 
     const { container } = render(<ScriptureWebScreen {...baseProps()} />);
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 
-    expect(container.querySelector('.sw-root.sw-rotated')).toBeTruthy();
+    expect(container.querySelector('.sw-root')).toBeTruthy();
+    expect(container.querySelector('.sw-root.sw-rotated')).toBeNull();
+    expect(window.screen.orientation.lock, 'no lock asked for either').not.toHaveBeenCalled();
+  });
+
+  it('does NOT rotate a portrait tablet: a coarse pointer, but a short side past a phone’s', async () => {
+    setViewport(820, 1180);
+    vi.stubGlobal('matchMedia', vi.fn((q) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} })));
+    window.screen.orientation = { lock: () => Promise.reject(new Error('not supported')) };
+    const { container } = render(<ScriptureWebScreen {...baseProps()} />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(container.querySelector('.sw-root.sw-rotated')).toBeNull();
   });
 
   it('does NOT rotate a landscape viewport — the control for the two above', async () => {
