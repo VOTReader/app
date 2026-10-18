@@ -81,6 +81,20 @@ for (const g of REGISTER_GROUPS) {
   }
 }
 
+/* A SMALL WORD IS A CLOSED CLASS (search200 R4, 2026-10-18). The light lemma strips endings: it finds a content word's
+   forms, and it guesses a small word's ("note" and "notes" key as "not", "here" as "her"). A stop word or a negation
+   meets a content word by a form only where the small word's paradigm below lists it (said: saying); otherwise neither
+   meets the other by a form, and two content words do not meet through a small word's key (here, hers). A negation
+   takes no lexicon partner either (none keys as "non", the hour). */
+const NEGATIONS = new Set(['not', 'no', 'nor', 'never', 'neither', 'none', 'nothing', 'nay', 'naught', 'nought']);
+const PARADIGMS = [
+  'be am is are was were been being art wast wert', 'have has had having hadst', 'do does did doing done doeth doest',
+  'say says said saying saith sayest saidst', 'her hers', 'their theirs',
+];
+/** @type {Map<string, number>} a small word's paradigm, and its forms', by number */
+const PARADIGM = new Map();
+PARADIGMS.forEach((g, n) => { for (const w of g.split(' ')) PARADIGM.set(w, n); });
+
 const VOWEL = /[aeiou]/;
 const LETTERS = /^[a-z]+$/;
 
@@ -215,10 +229,18 @@ export function alignClasses(words, opts) {
   const toWord = o.word || ((/** @type {any} */ t) => (typeof t === 'string' ? t : String(t)));
   /** @type {Array<import('./lexicon.js').Lexicon>} */
   const lexicons = !o.lexicon ? [] : Array.isArray(o.lexicon) ? o.lexicon.filter(Boolean) : [o.lexicon];
+  /** A stop word or a negation (NEGATIONS) */
+  const small = (/** @type {string} */ w) => isStop(w) || NEGATIONS.has(w);
+  /** Two words of one class, small or content, or of one small word's paradigm (said, saying) */
+  const kin = (/** @type {string} */ a, /** @type {string} */ b) => small(a) === small(b) || (PARADIGM.has(a) && PARADIGM.get(a) === PARADIGM.get(b));
+  /** A word's form key: its light lemma, set apart from a small word's when the word is no form of that word (note, here) */
+  const keyOf = (/** @type {string} */ w) => { const l = lemma(w); return small(l) && !kin(w, l) ? l + '+' : l; };
   const m = words.length;
   const ws = words.map(String);
   const stop = new Uint8Array(m);
   const lem = [];
+  /** @type {string[]} each typed word's form key (keyOf) */
+  const key = [];
   const fam = [];
   const syn = [];
   const synLem = [];
@@ -230,7 +252,9 @@ export function alignClasses(words, opts) {
     const q = ws[i];
     stop[i] = isStop(q) ? 1 : 0;
     lem.push(lemma(q));
-    const f = familyOf(q, isStop);
+    key.push(keyOf(q));
+    // a small word's family holds no content word but its paradigm's, a content word's no small word
+    const f = new Set([...familyOf(q, isStop)].filter((x) => kin(q, x)));
     fam.push(f);
     /** @type {Set<string>} */
     const s = new Set();
@@ -242,8 +266,8 @@ export function alignClasses(words, opts) {
       }
     }
     syn.push(s);
-    synLem.push(new Set([...s].map(lemma)));
-    const lp = !stop[i] && lexicons.length ? partnersOf(lexicons, lem[i]) : null;
+    synLem.push(new Set([...s].map(keyOf)));
+    const lp = !stop[i] && !NEGATIONS.has(q) && lexicons.length ? partnersOf(lexicons, lem[i]) : null;
     lex.push(lp);
     const a = new Set();
     const add = (/** @type {string} */ w) => { const t = toId(w); if (t !== undefined && t !== null) a.add(t); };
@@ -253,7 +277,7 @@ export function alignClasses(words, opts) {
     for (const w of s) add(w);
     anchor.push(a);
     const la = new Set();
-    if (lp) for (const l of lp.keys()) for (const w of surfacesOf(l)) { const t = toId(w); if (t !== undefined && t !== null && !a.has(t) && !isStop(w)) la.add(t); }
+    if (lp) for (const l of lp.keys()) for (const w of surfacesOf(l)) { const t = toId(w); if (t !== undefined && t !== null && !a.has(t) && !small(w)) la.add(t); }
     lexAnchor.push(la);
   }
   /** @type {Map<string, number>} typed words i-1 and i run together -> i (1-based) */
@@ -276,7 +300,9 @@ export function alignClasses(words, opts) {
     const d = toWord(tok);
     if (typeof d !== 'string' || !d) return NO_ENTRY;
     const dl = lemma(d);
+    const dk = keyOf(d);
     const dStop = isStop(d) ? 1 : 0;
+    const dNeg = NEGATIONS.has(d);
     const reg = REGISTER.get(d);
     /** @type {number[]} */
     const c = [];
@@ -285,11 +311,11 @@ export function alignClasses(words, opts) {
       let cr = 0;
       if (d === q) cr = 1;
       else if (reg && reg.has(q)) cr = K.REGISTER;
-      else if (dl === lem[i] || fam[i].has(d)) cr = K.FORM;
+      else if ((dk === key[i] && kin(q, d)) || fam[i].has(d)) cr = K.FORM;
       else if (!stop[i] && !dStop) {
         const lp = lex[i];
-        const x = lp ? lp.get(dl) || 0 : 0;
-        if (syn[i].has(d) || synLem[i].has(dl)) cr = K.SYNONYM > x ? K.SYNONYM : x;
+        const x = lp && !dNeg ? lp.get(dl) || 0 : 0;
+        if (syn[i].has(d) || synLem[i].has(dk)) cr = K.SYNONYM > x ? K.SYNONYM : x;
         else if (x >= K.EDIT) cr = x;
         else if (oneEdit(q, d)) cr = K.EDIT;
         else cr = x;

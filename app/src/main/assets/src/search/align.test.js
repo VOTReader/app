@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { alignScore, alignClasses, alignWeights, ALIGN } from './align.js';
 import { kjvEncode } from './tokenize.js';
+import { parseLexicon } from './lexicon.js';
 
 const STOP = new Set(('the a an and or but in on at to for of with by from that this these those is was are were be been being '
   + 'have has had do does did as if than then so yet him his her he she they their them we our ours you your yours it its '
@@ -307,5 +308,62 @@ describe('alignClasses: what a typed word may meet', () => {
   it('anchors carry the forms, so a window opens on a changed tense', () => {
     expect(cls.anchor[1].has('walked')).toBe(true);
     expect(cls.anchor[8].has('gladness')).toBe(true);
+  });
+});
+
+describe('alignClasses: a small word shares no form with a content word (search200 R4)', () => {
+  // the light lemma keys "note" as "not" and "here" as "her": the same key, not the same word
+  const cls = alignClasses(toks('take note of what is not here but hers'), { stop: STOP, synonyms: SYN });
+  const credit = (/** @type {string} */ tok, /** @type {number} */ pos) => {
+    const e = cls.entry(tok);
+    for (let k = 0; k < e.c.length; k += 2) if (e.c[k] === pos + 1) return e.c[k + 1];
+    return 0;
+  };
+  it('a negation and a content word: not/note, noted, notes meet nothing across', () => {
+    expect(credit('not', 1)).toBe(0);
+    expect(credit('note', 5)).toBe(0);
+    expect(credit('noted', 5)).toBe(0);
+    expect(credit('notes', 5)).toBe(0);
+  });
+  it('a stop word and a content word: her/here, and two content words keyed by a stop word, here/hers', () => {
+    expect(credit('her', 6)).toBe(0);
+    expect(credit('here', 8)).toBe(0);
+    expect(credit('hers', 6)).toBe(0);
+  });
+  it('the content word\'s own forms still meet it, and a small word\'s own forms it', () => {
+    expect(credit('noted', 1)).toBe(ALIGN.FORM);
+    expect(credit('notes', 1)).toBe(ALIGN.FORM);
+    expect(credit('her', 8)).toBe(ALIGN.FORM);
+  });
+  it('no window opens across: a negation\'s anchors hold no content word, a content word\'s no negation', () => {
+    expect(cls.anchor[5].has('noted')).toBe(false);
+    expect(cls.anchor[5].has('notes')).toBe(false);
+    expect(cls.anchor[1].has('not')).toBe(false);
+    expect(cls.anchor[1].has('noted')).toBe(true);
+  });
+  it('a negation takes no lexicon partner: "none" keys as "non", a lexicon\'s partner of the hour', () => {
+    const lexicon = parseLexicon('hour non6');
+    const v = alignClasses(toks('none at that hour'), { stop: STOP, synonyms: SYN, lexicon });
+    const at = (/** @type {string} */ tok, /** @type {number} */ pos) => {
+      const e = v.entry(tok);
+      for (let k = 0; k < e.c.length; k += 2) if (e.c[k] === pos + 1) return e.c[k + 1];
+      return 0;
+    };
+    expect(at('hour', 0)).toBe(0);
+    expect(at('none', 3)).toBe(0);
+    expect(v.lexAnchor[3].has('none')).toBe(false);
+  });
+  it('the forms a small verb really has stay, either way typed: said/saying, have/having', () => {
+    const at = (/** @type {any} */ v, /** @type {string} */ tok, /** @type {number} */ pos) => {
+      const e = v.entry(tok);
+      for (let k = 0; k < e.c.length; k += 2) if (e.c[k] === pos + 1) return e.c[k + 1];
+      return 0;
+    };
+    const small = alignClasses(toks('he said they have it'), { stop: STOP, synonyms: SYN });
+    expect(at(small, 'saying', 1)).toBe(ALIGN.FORM);
+    expect(at(small, 'having', 3)).toBe(ALIGN.FORM);
+    const content = alignClasses(toks('saying and having'), { stop: STOP, synonyms: SYN });
+    expect(at(content, 'said', 0)).toBe(ALIGN.FORM);
+    expect(at(content, 'have', 2)).toBe(ALIGN.FORM);
   });
 });
