@@ -7729,7 +7729,7 @@
       --sw-active-border: rgba(196, 164, 105, 0.7);
       --sw-panel: #1C2527; --sw-panel-edge: #3A4547; --sw-hairline: #2C3537;
       --sw-cite-rule: rgba(196, 164, 105, 0.6);
-      --sw-cited: rgba(196, 164, 105, 0.7); --sw-prophecy: rgba(234, 223, 196, 0.8);
+      --sw-cited: rgba(196, 164, 105, 0.7); --sw-prophecy: rgba(234, 223, 196, 0.4);
       --sw-font: 'EB Garamond', Georgia, serif;
     }
     /* ONE PALETTE, ONE CANVAS. The canvas is black in both themes (SW_PALETTE,
