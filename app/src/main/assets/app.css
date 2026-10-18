@@ -7926,8 +7926,7 @@
       font-family: var(--sw-font); color: var(--sw-text-meta); font-size: var(--fs-16); background: var(--sw-canvas);
     }
     .sw-fallback-title { color: var(--sw-title); font-size: var(--fs-24); font-family: var(--sw-font); }
-    .sw-fallback-body { max-width: 34em; line-height: 1.6; color: var(--sw-text-body); }
-    .sw-fallback-detail { max-width: 34em; font-size: var(--fs-14); color: var(--sw-text-muted); }
+    .sw-fallback-body { max-width: 34em; line-height: 1.6; color: var(--sw-text-body); text-wrap: balance; }
     .sw-fallback-back { position: absolute; left: 24px; top: calc(var(--sw-chrome-top) + var(--sw-topbar-pad)); }
 
     /* ── Scripture Web: the go-to (the navigation stream, w3; spec 4.5, r3-04) ──

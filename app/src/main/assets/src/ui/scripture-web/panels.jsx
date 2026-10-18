@@ -183,15 +183,15 @@ export function EmptyWebNotice({ onDismiss }) {
  */
 export function loadErrorPanel(message, onRetry, onBack) {
   // It replaces the whole screen, topbar and all, so it carries its own Back (item 24) where the
-  // topbar's sits; the words are plain, the raw message small beneath them.
+  // topbar's sits. It says it once, in plain words (w4): the raw message beneath them only said
+  // them again, or said them in a programmer's words, so it rides on data-detail for a bug report.
   return (
-    <div className="sw-fallback">
+    <div className="sw-fallback" data-detail={message || undefined}>
       <button type="button" className="sw-btn sw-btn-icon sw-fallback-back" onClick={onBack} aria-label="Back">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
       </button>
       <div className="sw-fallback-title">The Scripture Web couldn’t load.</div>
       <div className="sw-fallback-body">{loadErrorWords(message)}</div>
-      {message ? <div className="sw-fallback-detail">{message}</div> : null}
       <button type="button" className="sw-btn" onClick={onRetry}>Try again</button>
     </div>
   );

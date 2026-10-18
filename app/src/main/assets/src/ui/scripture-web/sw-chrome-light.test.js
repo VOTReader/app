@@ -163,12 +163,13 @@ describe('the Scripture Web chrome reads on its black canvas in the light theme 
 
   /* The load error replaces the whole screen (no .sw-root above it), so it reads the web's
      tokens from its own rule (.sw-fallback, .sw-root) and paints the canvas's black (Q4). */
-  it.each([['title', '.sw-fallback-title'], ['body', '.sw-fallback-body'], ['detail', '.sw-fallback-detail']])(
+  /* (w4: the raw-detail line is gone from the page, so its case went with it.) */
+  it.each([['title', '.sw-fallback-title'], ['body', '.sw-fallback-body']])(
     'the load error\'s %s reads on black in both themes, the same ink in both', (_name, sel) => {
       const panel = document.createElement('div');
       panel.className = 'sw-fallback';
       panel.innerHTML = '<div class="sw-fallback-title">The Scripture Web couldn\u2019t load.</div>'
-        + '<div class="sw-fallback-body">Check your connection.</div><div class="sw-fallback-detail">detail</div>';
+        + '<div class="sw-fallback-body">Check your connection.</div>';
       document.body.appendChild(panel);
       const el = panel.querySelector(sel);
       const dark = inkOf(el);
