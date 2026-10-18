@@ -131,7 +131,7 @@ export function buildNavIndex() {
       if (vn) pAliases.push(col.label.toLowerCase() + ' preface', 'v' + vn + ' preface');
       if (bases) bases.forEach(b => pAliases.push(b + ' preface'));
       items.push({
-        kind: navKind, collection: col.label, screen: col.letterScreen,
+        kind: navKind, collection: col.label, volKey: col.volKey, screen: col.letterScreen,
         letterId: pref.id, letterNum: 0,
         label: pref.title, category: category, title: pref.title, aliases: pAliases
       });
@@ -156,7 +156,7 @@ export function buildNavIndex() {
         });
       }
       const item = {
-        kind: navKind, collection: col.label, screen: col.letterScreen,
+        kind: navKind, collection: col.label, volKey: col.volKey, screen: col.letterScreen,
         label: entry.title, category: category, title: entry.title, aliases
       };
       if (isLetter) { item.letterId = entry.id; item.letterNum = entry.num; }
@@ -462,6 +462,21 @@ function verseEndOf(/** @type {any} */ it) {
   return (it.verse != null && typeof it.verseEnd === 'number' && it.verseEnd > it.verse) ? { verseEnd: it.verseEnd } : {};
 }
 
+/* The collection's volKey on a Volumes endpoint (w3, item 25). 23 letter ids
+   are shared between collections (Holy Days repeats letters from the Volumes;
+   WTLB and The Blessed share entry ids) and the label is display text, so the
+   saved link names its collection by key; My Web's top rail places it by that
+   scope before a bare id. Spread in only when known: an endpoint never
+   carries `volKey: undefined`. */
+function volKeyOf(volKey) { return volKey ? { volKey } : {}; }
+
+/** A collection label -> its volKey through the registry; null when the registry does not know it. */
+function volKeyOfLabel(label) {
+  if (!label || typeof COLLECTIONS === 'undefined' || !Array.isArray(COLLECTIONS)) return null;
+  const col = COLLECTIONS.find((c) => c && c.label === label);
+  return col && col.volKey ? col.volKey : null;
+}
+
 /**
  * Convert a NavItem into a link-endpoint object — shape varies by kind
  * (bible / letter / wtlb / blessed / holy-days / study / study-letter).
@@ -486,6 +501,7 @@ export function navItemToEndpoint(it) {
     return {
       type: 'letter', key: 'letter:' + it.letterId + ':0',
       letterId: it.letterId, screen: it.screen, collection: it.collection,
+      ...volKeyOf(it.volKey),
       label: it.label, preview: ''
     };
   }
@@ -494,6 +510,7 @@ export function navItemToEndpoint(it) {
     return {
       type: _type, key: entryHlBase(_type, it.entryId) + ':0',
       entryId: it.entryId, screen: it.screen, collection: it.collection,
+      ...volKeyOf(it.volKey),
       label: it.label, preview: ''
     };
   }
@@ -578,7 +595,8 @@ export function buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceE
       /** @type {any} */
       const base = {
         type: ctx.kind, key: sourceKey, screen: ctx.screen,
-        collection: ctx.collection, label: sourceLabel || ctx.title, ...excerpt
+        collection: ctx.collection, ...volKeyOf(volKeyOfLabel(ctx.collection)),
+        label: sourceLabel || ctx.title, ...excerpt
       };
       if (ctx.kind === 'letter') base.letterId = id;
       else base.entryId = id;

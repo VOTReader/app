@@ -9,13 +9,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   VOT_TYPES, baseKey, buildVotRail, placeEndpoint, buildPersonalGraph,
-  buildCuratedUnderlay,
+  buildCuratedUnderlay, linkIndexById,
 } from './personal-graph.js';
 
 // Bottom rail: 2 books x 2 chapters x 10 verses, matching the geometry tests.
 const CHAPTER_START = {
   'alpha:1': 0, 'alpha:2': 10, 'beta:1': 20, 'beta:2': 30,
-  'matthew-plain:1': 40, 'matthew-plain:4': 50,
+  'matthew-plain:1': 40, 'matthew-plain:4': 50, 'matthew-plain:22': 60,
 };
 const verseIdOf = (bookId, chapter, verse) => {
   const start = CHAPTER_START[bookId + ':' + chapter];
@@ -225,5 +225,87 @@ describe('curated underlay', () => {
 
   it('is empty when there is no rail yet', () => {
     expect(buildCuratedUnderlay([{ v: 1, volKey: 'one', letterId: 'duty' }], {}).count).toBe(0);
+  });
+});
+
+/* ── w3 My Web stream: the correctness pack (REDs first, 2026-10-18) ────────
+   Item 25: 23 letter ids are shared between collections (Holy Days carries
+   letters from the Volumes; WTLB and The Blessed share entry ids), and the
+   bare-id lookup is first-writer-wins, so a link into the later collection
+   landed on the earlier one's letter. The endpoint names its collection
+   (nav-index writes `collection`, and now `volKey`); the rail resolves that
+   scope before the bare id. Item 26: the Study Bible's key fuses
+   "<book>-<chapter>" and puts the verse THIRD ("study:matthew-22:11"), and
+   the key-only path read the verse slot as the chapter. */
+describe('w3 placement: every endpoint lands on its own letter and verse', () => {
+  const shared = buildVotRail([
+    { volKey: 'one', label: 'Volume One', items: [{ id: 'intro', title: 'Intro' }, { id: 'duty', title: 'Duty' }] },
+    { volKey: 'two', label: 'Volume Two', items: [{ id: 'intro', title: 'Intro (II)' }] },
+    { volKey: 'wtlb1', label: 'Words To Live By: Part One', items: [{ id: 'introduction', title: 'Introduction' }] },
+    { volKey: 'blessed', label: 'The Blessed', items: [{ id: 'introduction', title: 'Introduction (Blessed)' }] },
+    { volKey: 'holydays', label: 'Holy Days', items: [{ id: 'duty', title: 'Duty (Holy Days)' }] },
+    { volKey: 'study-lamb-of-god', label: 'The Lamb of God', items: [{ id: 'intro', title: 'Lamb ch1' }] },
+  ]);
+  const sctx = { verseIdOf, votRail: shared };
+  const at = (ep) => { const p = placeEndpoint(ep, sctx); return p && p.pos; };
+
+  it('item 25: a shared id resolves through the collection the endpoint names, not the first writer', () => {
+    // nav-index endpoints carry the collection LABEL (and, from w3, its volKey)
+    expect(at({ type: 'letter', key: 'letter:intro:0', letterId: 'intro', collection: 'Volume Two' })).toBe(2);
+    expect(at({ type: 'letter', key: 'letter:intro:0', letterId: 'intro', volKey: 'two' })).toBe(2);
+    expect(at({ type: 'blessed', key: 'wtlb:introduction:0', entryId: 'introduction', collection: 'The Blessed' })).toBe(4);
+    // the endpoint's own type names the collection when nothing else does
+    expect(at({ type: 'holy-days', key: 'wtlb:duty:0', entryId: 'duty' })).toBe(5);
+    expect(at({ type: 'blessed', key: 'wtlb:introduction:0', entryId: 'introduction' })).toBe(4);
+    // a study chapter rides its study's segment
+    expect(at({ type: 'study-letter', key: 'letter:intro:0', letterId: 'intro', studyId: 'lamb-of-god' })).toBe(6);
+    // the first writer still answers an endpoint that names nothing
+    expect(at({ type: 'letter', key: 'letter:intro:0', letterId: 'intro' })).toBe(0);
+    // a named collection the rail does not hold falls back to the bare id rather than losing the link
+    expect(at({ type: 'letter', key: 'letter:duty:0', letterId: 'duty', collection: 'Gone Volume' })).toBe(1);
+  });
+
+  it('item 26: a key-only study endpoint reads "<book>-<chapter>" then the verse', () => {
+    expect(placeEndpoint({ type: 'study', key: 'study:matthew-22:11' }, ctx)).toMatchObject({ rail: 'bible', pos: 70 });
+    // the chapter-level key (verse slot 0) is the chapter's first verse
+    expect(placeEndpoint({ type: 'study', key: 'study:matthew-4:0' }, ctx)).toMatchObject({ rail: 'bible', pos: 50 });
+    // a fused bookId with no verse field takes the verse from the key
+    expect(placeEndpoint({ type: 'study', key: 'study:matthew-22:11', bookId: 'matthew-22' }, ctx)).toMatchObject({ rail: 'bible', pos: 70 });
+    // a bible key is unchanged: book, chapter, verse
+    expect(placeEndpoint({ type: 'bible', key: 'bible:beta:2:3' }, ctx)).toMatchObject({ rail: 'bible', pos: 32 });
+  });
+});
+
+describe('w3 counts: a record is drawn and counted once', () => {
+  it('a link record the store holds twice (same id) is one link, and not a skipped one', () => {
+    const one = { id: 'L1', source: { type: 'bible', bookId: 'alpha', chapter: 1, verse: 1 }, target: { type: 'letter', letterId: 'duty' } };
+    const g = buildPersonalGraph([one, Object.assign({}, one), { id: 'L2', source: one.source, target: { type: 'letter', letterId: 'gone' } }], ctx);
+    expect(g.count).toBe(1);
+    expect(g.skipped).toBe(1);
+  });
+
+  it('two links between the same two places are both the reader’s, so both stay', () => {
+    const a = { type: 'bible', bookId: 'alpha', chapter: 1, verse: 1 }, b = { type: 'letter', letterId: 'duty' };
+    expect(buildPersonalGraph([{ id: 'x', source: a, target: b }, { id: 'y', source: b, target: a }], ctx).count).toBe(2);
+  });
+
+  it('a curated edge listed twice is one thread: the count is the threads drawn', () => {
+    const u = buildCuratedUnderlay([
+      { v: 5, kind: 'footnote', volKey: 'one', letterId: 'duty' },
+      { v: 5, kind: 'votNote', volKey: 'one', letterId: 'duty' },
+      { v: 6, kind: 'footnote', volKey: 'one', letterId: 'duty' },
+    ], ctx);
+    expect(u.count).toBe(2);
+    expect(Array.from(u.versePos)).toEqual([5, 6]);
+  });
+
+  it('item 30: a link is found again by its id, whatever its index became', () => {
+    const mk = (id, verse) => ({ id, source: { type: 'bible', bookId: 'alpha', chapter: 1, verse }, target: { type: 'letter', letterId: 'duty' } });
+    const before = buildPersonalGraph([mk('a', 1), mk('b', 2), mk('c', 3)], ctx);
+    const after = buildPersonalGraph([mk('b', 2), mk('c', 3)], ctx);
+    expect(linkIndexById(before, 'c')).toBe(2);
+    expect(linkIndexById(after, 'c')).toBe(1);
+    expect(linkIndexById(after, 'a')).toBe(-1);
+    expect(linkIndexById(null, 'a')).toBe(-1);
   });
 });

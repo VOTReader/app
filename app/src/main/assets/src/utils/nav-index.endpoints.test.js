@@ -265,3 +265,28 @@ describe('buildSourceEndpoint — where the link was made FROM', () => {
     expect(ep.label).toBe('Chapter 1');
   });
 });
+
+/* ── w3 (My Web stream, 2026-10-18): every Volumes endpoint names its volKey ──
+   23 letter ids live in more than one collection (Holy Days repeats letters
+   from the Volumes; WTLB and The Blessed share entry ids), and the label alone
+   is display text. An endpoint that carries the collection's volKey lands on
+   the right letter of the right Volume on My Web's top rail (item 25). RED
+   first: neither the nav items nor the endpoints carried it. */
+describe('w3: the endpoint carries its collection\'s volKey', () => {
+  it('a picked letter keeps the volKey of the collection it was listed under', () => {
+    const hit = searchNavIndex('wide path').find((h) => h.item.kind === 'letter');
+    expect(hit.item.volKey).toBe('one');
+    expect(navItemToEndpoint(hit.item)).toMatchObject({ type: 'letter', letterId: 'the-wide-path', collection: 'Volume One', volKey: 'one' });
+    const entry = navItemToEndpoint({ kind: 'holy-days-entry', entryId: 'e1', screen: 's', collection: 'Holy Days', volKey: 'holydays', label: 'L' });
+    expect(entry.volKey).toBe('holydays');
+  });
+
+  it('a source endpoint maps its collection back to the volKey', () => {
+    g.findEntryContext = (id, hint) => (hint === 'letter'
+      ? { kind: 'letter', screen: 'vot-one-letter', collection: 'Volume One', title: 'The Wide Path' } : null);
+    expect(buildSourceEndpoint('letter:the-wide-path:3', null)).toMatchObject({ type: 'letter', letterId: 'the-wide-path', volKey: 'one' });
+    // a collection the registry does not know carries no volKey rather than a wrong one
+    g.findEntryContext = () => ({ kind: 'letter', screen: 's', collection: 'Nowhere', title: 'T' });
+    expect(buildSourceEndpoint('letter:x:0', null).volKey).toBeUndefined();
+  });
+});

@@ -2,7 +2,8 @@
    scripture-web/personal-build — Cluster F (bundle-d)
 
    My Web's inputs, read from the live app: the reader's links (LinkStore),
-   the Volumes in READING_CHAIN order (COLLECTIONS, colLetterArr) and the
+   the Volumes in READING_CHAIN order (COLLECTIONS, colPreface then
+   colLetterArr: a preface opens its segment, w3) and the
    Bible studies (BIBLE_STUDIES), turned into the dual-rail web by the pure
    builders in personal-graph.js. Moved out of ScriptureWebScreen unchanged
    (F0, 2026-10-18). The globals are free (the bundle-d pattern), resolved at
@@ -48,7 +49,12 @@ export function buildPersonal(graph) {
       const col = COLLECTIONS.find((c) => c.volKey === volKey);
       if (!col) continue;
       const arr = (typeof colLetterArr === 'function') ? colLetterArr(col) : [];
-      collections.push({ volKey, label: col.label, short: SHORT_VOL[volKey] || col.label, items: arr });
+      // The preface is a page the reader can link to (nav-index lists it as
+      // letter 0) and the Volumes cite scripture from: it opens its
+      // collection's segment, where the reading chain puts it.
+      const pref = (typeof colPreface === 'function') ? colPreface(col) : null;
+      const items = pref && pref.id ? [{ id: pref.id, title: pref.title || pref.id }].concat(arr) : arr;
+      collections.push({ volKey, label: col.label, short: SHORT_VOL[volKey] || col.label, items });
     }
   }
   // The Bible studies are corpora too — their 781 curated threads need rail

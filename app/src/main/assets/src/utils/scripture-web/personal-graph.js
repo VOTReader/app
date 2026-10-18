@@ -22,7 +22,10 @@ import { myWebSourceIndex } from './palette.js';
  * @typedef {{ total:number, index:Map<string, number>,
  *   segments:Array<{volKey:string, label:string, short?:string,
  *     start:number, count:number}>,
- *   nodes:Array<{volKey:string, id:string, title:string}> }} VotRail
+ *   nodes:Array<{volKey:string, id:string, title:string}>,
+ *   labels?:Map<string, string> }} VotRail
+ *   labels: a collection's display label -> its volKey (an endpoint names
+ *   its collection by label; the rail resolves that scope before a bare id)
  */
 
 /**
@@ -57,11 +60,13 @@ export function baseKey(key) {
  */
 export function buildVotRail(collections) {
   const index = new Map();
+  const labels = new Map();
   const segments = [];
   const nodes = [];
   let cursor = 0;
   for (const col of collections || []) {
     const items = col.items || [];
+    if (col.label && !labels.has(col.label)) labels.set(col.label, col.volKey);
     segments.push({
       volKey: col.volKey, label: col.label, short: col.short || col.label,
       start: cursor, count: items.length,
@@ -78,7 +83,27 @@ export function buildVotRail(collections) {
     }
     segments[segments.length - 1].count = cursor - segments[segments.length - 1].start;
   }
-  return { total: cursor, index, segments, nodes };
+  return { total: cursor, index, segments, nodes, labels };
+}
+
+/** The collection an endpoint's TYPE names when nothing else does. */
+const TYPE_SCOPE = { 'holy-days': 'holydays', blessed: 'blessed' };
+
+/**
+ * The volKey an endpoint lives under, or null when it names none. 23 letter
+ * ids are shared between collections (Holy Days repeats letters from the
+ * Volumes; WTLB and The Blessed share entry ids), so a bare id is a guess:
+ * the endpoint's own volKey first (nav-index writes it from w3), then its
+ * study, then the collection label it carries, then its type.
+ * @param {any} ep
+ * @param {VotRail} rail
+ * @returns {string|null}
+ */
+function scopeOf(ep, rail) {
+  if (ep.volKey) return ep.volKey;
+  if (ep.studyId) return 'study-' + ep.studyId;
+  if (ep.collection && rail.labels && rail.labels.has(ep.collection)) return rail.labels.get(ep.collection) || null;
+  return TYPE_SCOPE[ep.type] || null;
 }
 
 /**
@@ -101,13 +126,19 @@ export function placeEndpoint(ep, ctx) {
   // belongs on the scripture rail at its verse, not on the VOT rail.
   if (ep.type === 'bible' || ep.type === 'study') {
     let bookId = ep.bookId, chapter = ep.chapter, verse = ep.verse;
-    if (!bookId && key) {
-      const parts = key.split(':');
-      if (parts[0] === 'bible' || parts[0] === 'study') {
-        bookId = parts[1];
-        chapter = parts[2] != null ? parseInt(parts[2], 10) : undefined;
-        verse = parts[3] != null ? parseInt(parts[3], 10) : undefined;
-      }
+    const parts = key ? key.split(':') : [];
+    // The two key spaces differ: "bible:<book>:<chapter>:<verse>", but the
+    // Study Bible fuses "study:<book>-<chapter>:<verse>", so its verse is the
+    // THIRD part (item 26: "study:matthew-22:11" was read as chapter 11).
+    const fused = parts[0] === 'study';
+    const keyed = fused || parts[0] === 'bible';
+    if (!bookId && keyed) {
+      bookId = parts[1];
+      if (!fused) chapter = parts[2] != null ? parseInt(parts[2], 10) : undefined;
+    }
+    if (verse == null && keyed) {
+      const vp = fused ? parts[2] : parts[3];
+      verse = vp != null ? parseInt(vp, 10) : undefined;
     }
     if (!bookId) return null;
     // The alias trap: `matthew` is the Study Bible; plain Matthew's verses
@@ -131,7 +162,11 @@ export function placeEndpoint(ep, ctx) {
   if (!rail) return null;
   const id = ep.letterId || ep.entryId || (key ? key.split(':')[1] : '');
   if (!id) return null;
-  const scoped = ep.volKey ? ep.volKey + ':' + id : null;
+  const scope = scopeOf(ep, rail);
+  const scoped = scope ? scope + ':' + id : null;
+  // a scope the rail does not hold (a renamed collection, a study not loaded
+  // yet) falls back to the bare id: a link placed on its likeliest letter is
+  // better than a link lost
   const pos = (scoped != null && rail.index.has(scoped))
     ? rail.index.get(scoped)
     : rail.index.get(id);
@@ -157,9 +192,13 @@ export function placeEndpoint(ep, ctx) {
 export function buildPersonalGraph(links, ctx) {
   const rows = [];
   const degree = new Map();
+  const seen = new Set();
   let skipped = 0;
   for (const link of links || []) {
     if (!link || !link.source || !link.target) { skipped++; continue; }
+    // a record the store holds twice (one id) is one link: drawn and counted
+    // once, and never reported as one that is not on the web
+    if (link.id) { if (seen.has(link.id)) continue; seen.add(link.id); }
     const a = placeEndpoint(link.source, ctx);
     const b = placeEndpoint(link.target, ctx);
     if (!a || !b) { skipped++; continue; }
@@ -180,6 +219,8 @@ export function buildPersonalGraph(links, ctx) {
     records: rows.map((r) => r.link),
     skipped,
     degree,
+    /** link id -> index, so a chosen link is found again by WHAT it is (item 30) */
+    byId: new Map(),
   };
   for (let i = 0; i < n; i++) {
     const { a, b } = rows[i];
@@ -189,8 +230,24 @@ export function buildPersonalGraph(links, ctx) {
     out.bPos[i] = b.pos;
     // 0 = within scripture, 1 = within the Volumes, 2 = a bridge between them
     out.kind[i] = (out.aRail[i] === out.bRail[i]) ? out.aRail[i] : 2;
+    const id = rows[i].link.id;
+    if (id) out.byId.set(id, i);
   }
   return out;
+}
+
+/**
+ * Where a link sits in a built personal graph, by its LinkStore id; -1 when
+ * it is not on the web (deleted, or skipped). An index names a row of ONE
+ * build: a link deleted or added before it shifts every index after it, so a
+ * choice kept across a rebuild (the resume, a live store bump) is kept by id.
+ * @param {{byId?:Map<string, number>, records?:Array<any>}|null|undefined} pg
+ * @param {string|null|undefined} id
+ */
+export function linkIndexById(pg, id) {
+  if (!pg || !id) return -1;
+  if (pg.byId) { const i = pg.byId.get(id); return i === undefined ? -1 : i; }
+  return (pg.records || []).findIndex((r) => r && r.id === id);
 }
 
 /**
@@ -204,6 +261,10 @@ export function buildPersonalGraph(links, ctx) {
  */
 export function buildCuratedUnderlay(votEdges, ctx) {
   const rows = [];
+  // one thread per (verse, passage): the asset is one edge per (verse,
+  // letter) already (v2), and this holds the count to the threads drawn
+  // even when a source lists one twice
+  const seen = new Set();
   for (const e of votEdges || []) {
     if (!(e && e.v >= 0) || !ctx.votRail) continue;
     // Letters and entries address the rail by their own id; STUDY edges carry
@@ -219,6 +280,9 @@ export function buildCuratedUnderlay(votEdges, ctx) {
       ? ctx.votRail.index.get(scoped)
       : ctx.votRail.index.get(id);
     if (pos === undefined) continue;
+    const pair = e.v + ':' + pos;
+    if (seen.has(pair)) continue;
+    seen.add(pair);
     rows.push([e.v, pos, e]);
   }
   const n = rows.length;
