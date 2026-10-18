@@ -10,6 +10,8 @@
    smooth gold core under a soft halo at every zoom (GL item 3; digest C1,
    C3, item 10):
 
+     prophecy every prophecy pair (g.prophecy), always, at every density
+              (GL item 4; Q1 a): the Bible Studies' prophecy and its fulfilment
      lit      focus.lit: go-to, verse mode, a chooser row under hover or focus
      hover    the thread under a resting pointer (dims nothing)
      chosen   the chosen thread: an OpenBible arc or a prophecy pair
@@ -28,7 +30,7 @@
 import { fansOf } from './decode.js';
 
 /** The top pass's kinds, in drawing order: the chosen line last, on top. */
-export const TOP_ORDER = Object.freeze(['lit', 'hover', 'chosen']);
+export const TOP_ORDER = Object.freeze(['prophecy', 'lit', 'hover', 'chosen']);
 
 /** Compact mode (the build spec, mockups README.md "Compact mode"): the root at most this tall, CSS px. */
 export const COMPACT_HEIGHT_CSS = 500;
@@ -42,9 +44,10 @@ export function isCompact(heightCss) {
 
 /**
  * @typedef {{ count: number, from: Uint16Array, to: Uint16Array, fanA: Float32Array,
- *   fanB: Float32Array, arcOf: Int32Array }} ProphecySet
+ *   fanB: Float32Array, arcOf: Int32Array, pairOf: Map<number, number> }} ProphecySet
  *   from < to: each pair's verse ids in canon order; fanA at from, fanB at to;
- *   arcOf: the OpenBible arc joining the same two verses (the strongest, by votes), or -1
+ *   arcOf: the OpenBible arc joining the same two verses (the strongest, by votes), or -1;
+ *   pairOf: the other way, an arc id to its pair (the first, when two pairs join the same verses)
  */
 
 const PROPHECY_SETS = new WeakMap();
@@ -63,6 +66,8 @@ export function prophecySet(g) {
   const from = new Uint16Array(n), to = new Uint16Array(n);
   const fanA = new Float32Array(n), fanB = new Float32Array(n);
   const arcOf = new Int32Array(n).fill(-1);
+  /** @type {Map<number, number>} */
+  const pairOf = new Map();
   /** @type {Map<string, number[]>} */
   const want = new Map();
   for (let k = 0; k < n; k++) {
@@ -87,6 +92,7 @@ export function prophecySet(g) {
     }
     for (const [key, i] of best) {
       const swap = g.from[i] > g.to[i];
+      pairOf.set(i, want.get(key)[0]);
       for (const k of want.get(key)) {
         arcOf[k] = i;
         fanA[k] = swap ? fans.fanB[i] : fans.fanA[i];
@@ -94,7 +100,7 @@ export function prophecySet(g) {
       }
     }
   }
-  const set = { count: n, from, to, fanA, fanB, arcOf };
+  const set = { count: n, from, to, fanA, fanB, arcOf, pairOf };
   if (g && typeof g === 'object') PROPHECY_SETS.set(g, set);
   return set;
 }
@@ -106,7 +112,8 @@ export function prophecySet(g) {
  */
 
 /**
- * The key of the frame's top set: what is lit, hovered and chosen.
+ * The key of the frame's top set: what is lit, hovered and chosen (the
+ * prophecy class is the graph's own, the same every frame).
  * @param {{ litKey?: string, hoverArc?: number, focusArc?: number, focusProphecy?: number }} v
  */
 export function topSetKey(v) {
@@ -115,9 +122,10 @@ export function topSetKey(v) {
 }
 
 /**
- * The top pass's threads for one frame, as instance data in TOP_ORDER: the
- * lit arcs, the hovered arc (unless it is the chosen one), the chosen
- * thread. `prev` comes back as it is when nothing changed (its key).
+ * The top pass's threads for one frame, as instance data in TOP_ORDER: every
+ * prophecy pair, the lit arcs, the hovered arc (unless it is the chosen
+ * one), the chosen thread. `prev` comes back as it is when nothing changed
+ * (its key) and it was built over the same graph.
  * @param {any} g  the decoded graph
  * @param {{ lit?: ArrayLike<number> | null, litKey?: string, hoverArc?: number,
  *   focusArc?: number, focusProphecy?: number }} v  the frame's view args (webViewArgs)
@@ -126,17 +134,17 @@ export function topSetKey(v) {
  */
 export function topSet(g, v, prev) {
   const key = topSetKey(v);
-  if (prev && prev.key === key) return prev;
+  const ps = prophecySet(g);
+  if (prev && prev.key === key && prev.ranges.length && prev.ranges[0].count === ps.count) return prev;
   const count = g && g.count > 0 ? g.count : 0;
   const isArc = (i) => i != null && i >= 0 && i < count && Number.isInteger(i);
   const arcs = { lit: /** @type {number[]} */ ([]), hover: /** @type {number[]} */ ([]), chosen: /** @type {number[]} */ ([]) };
   if (v.lit) for (let k = 0; k < v.lit.length; k++) if (isArc(v.lit[k])) arcs.lit.push(v.lit[k]);
   if (isArc(v.hoverArc) && v.hoverArc !== v.focusArc) arcs.hover.push(/** @type {number} */ (v.hoverArc));
   if (isArc(v.focusArc)) arcs.chosen.push(/** @type {number} */ (v.focusArc));
-  const ps = prophecySet(g);
   const chosenPair = !isArc(v.focusArc) && v.focusProphecy != null && v.focusProphecy >= 0
     && v.focusProphecy < ps.count ? v.focusProphecy : -1;
-  const total = arcs.lit.length + arcs.hover.length + arcs.chosen.length + (chosenPair >= 0 ? 1 : 0);
+  const total = ps.count + arcs.lit.length + arcs.hover.length + arcs.chosen.length + (chosenPair >= 0 ? 1 : 0);
   const from = new Uint16Array(total), to = new Uint16Array(total);
   const fanA = new Float32Array(total), fanB = new Float32Array(total);
   const fans = count ? fansOf(g) : null;
@@ -154,7 +162,12 @@ export function topSet(g, v, prev) {
   };
   for (const kind of TOP_ORDER) {
     const first = at;
-    for (const i of arcs[kind]) putArc(i);
+    if (kind === 'prophecy') {
+      from.set(ps.from, at); to.set(ps.to, at); fanA.set(ps.fanA, at); fanB.set(ps.fanB, at);
+      at += ps.count;
+    } else {
+      for (const i of arcs[kind]) putArc(i);
+    }
     if (kind === 'chosen' && chosenPair >= 0) {
       from[at] = ps.from[chosenPair]; to[at] = ps.to[chosenPair];
       fanA[at] = ps.fanA[chosenPair]; fanB[at] = ps.fanB[chosenPair];

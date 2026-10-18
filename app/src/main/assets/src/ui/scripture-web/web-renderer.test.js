@@ -403,6 +403,65 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(topLook('chosen', 1, false).ribbon).toBe(inkWidth('chosenHalo') / 2 + 0.5);
   });
 
+  /* GL item 4: the prophecy class. Every g.prophecy pair, always, at every
+     density, drawn first in the top pass (under the lit, hovered and chosen). */
+  const prophetic = () => Object.assign(threeArcs(), {
+    prophecy: [{ a: 100, b: 150, studyId: 's', chapterId: 'c' }, { a: 5, b: 180, studyId: 's', chapterId: 'c' }],
+  });
+
+  it('the prophecy class is drawn with nothing asked about, every pair in one draw, in the prophecy ink, before the chosen', () => {
+    const { calls, r } = build(prophetic());
+    const idle = frame(r, calls, {});
+    expect(idle.u(idle.top, 'uCore')).toEqual([rgba01('prophecy')]);
+    expect(idle.u(idle.top, 'uHalo')).toEqual([rgba01('prophecyGlow')]);
+    expect(idle.u(idle.top, 'uCoreHalf')).toEqual([[inkWidth('prophecy') / 2]]);
+    expect(idle.u(idle.top, 'uHaloHalf')).toEqual([[inkWidth('prophecyGlow') / 2]]);
+    const draws = idle.top.filter((c) => c[0] === 'drawArraysInstanced');
+    expect(draws.length).toBe(1);
+    expect(draws[0][1][3]).toBe(2);
+    expect(idle.stats).toEqual({ instances: 3, draws: 1 });   // stats count the web alone
+    const chosen = frame(r, calls, { focusArc: 0 });
+    const [pc, cc] = chosen.u(chosen.top, 'uCore');
+    expect(cc).toEqual(rgba01('chosen'));
+    expect(pc.slice(0, 3)).toEqual(rgba01('prophecy').slice(0, 3));
+    expect(pc[3]).toBeCloseTo(rgba01('prophecy')[3] * TAP_CONTEXT, 12);
+  });
+
+  it('every density draws the whole class (essential too)', () => {
+    const { calls, r } = build(prophetic());
+    for (const density of ['essential', 'famous', 'all']) {
+      const f = frame(r, calls, { density });
+      expect(f.top.filter((c) => c[0] === 'drawArraysInstanced')[0][1][3], density).toBe(2);
+    }
+  });
+
+  it('the core never draws under 1 device px; the glow and the core recede with a tap, as far as TAP_CONTEXT and no further', () => {
+    const half = topLook('prophecy', 0.5, false);   // 1.25 CSS px at half a device px: 0.625 device px, held at 1
+    expect(half.coreHalf).toBe(0.5);
+    expect(half.core).toEqual(rgba01('prophecy'));
+    const at = topLook('prophecy', 2, false, 0.5);
+    expect(at.coreHalf).toBe(inkWidth('prophecy'));
+    expect(at.core[3]).toBeCloseTo(rgba01('prophecy')[3] * (1 + (TAP_CONTEXT - 1) * 0.5), 12);
+    const full = topLook('prophecy', 1, false, 1);
+    expect(full.core[3]).toBeCloseTo(rgba01('prophecy')[3] * TAP_CONTEXT, 12);
+    expect(full.halo[3]).toBeCloseTo(rgba01('prophecyGlow')[3] * TAP_CONTEXT, 12);
+    expect(topLook('prophecy', 1, false, 9).core[3]).toBeCloseTo(rgba01('prophecy')[3] * TAP_CONTEXT, 12);
+    // the chosen, lit and hovered never recede
+    expect(topLook('chosen', 1, false, 1).core).toEqual(rgba01('chosen'));
+    expect(topLook('hover', 1, false, 1).core).toEqual(rgba01('hover'));
+  });
+
+  it('a chosen prophecy pair that is no arc takes the chosen ink on its own feet', () => {
+    const { calls, r } = build(prophetic());
+    const f = frame(r, calls, { focusProphecy: 1 });
+    const [pc, cc] = f.u(f.top, 'uCore');
+    expect(cc).toEqual(rgba01('chosen'));
+    expect(pc[3]).toBeCloseTo(rgba01('prophecy')[3] * TAP_CONTEXT, 12);
+    const draws = f.top.filter((c) => c[0] === 'drawArraysInstanced');
+    expect(draws[draws.length - 1][1][3]).toBe(1);
+    expect(f.u(f.main, 'uTapFade')).toEqual([[1]]);
+  });
+
   it('the shaders: the main pass recedes by TAP_CONTEXT at most and has no hover input or gold of its own; the top pass shares the curve law and the split feet', () => {
     expect(SHADER_SOURCE.vertex).toContain('float dim = mix(1., ' + glslFloat(TAP_CONTEXT) + ', uTapFade*(1. - lit));');
     expect(SHADER_SOURCE.vertex).not.toMatch(/uHoverArc|float hovered|\.784|mix\(\.05/);

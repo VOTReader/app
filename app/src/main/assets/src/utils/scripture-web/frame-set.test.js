@@ -53,43 +53,69 @@ describe('prophecySet: the prophecy pairs as threads, on their arc\'s feet when 
   });
 });
 
-describe('topSet: the lit, the hovered and the chosen, chosen last', () => {
+/* The prophecy class (GL item 4) joined the top set in the commit that draws it: every pair, always,
+   first. The cases below were written for the set without it; rewritten to the same intent with the
+   class leading (three pairs in the fixture). */
+describe('topSet: the prophecy class, then the lit, the hovered and the chosen, chosen last', () => {
   it('lays the kinds out in TOP_ORDER, each thread on the main pass\'s feet', () => {
     const g = graph();
     const fans = fansOf(g);
-    expect(TOP_ORDER).toEqual(['lit', 'hover', 'chosen']);
+    expect(TOP_ORDER).toEqual(['prophecy', 'lit', 'hover', 'chosen']);
     const s = topSet(g, { lit: Int32Array.from([1, 2]), litKey: 'k', hoverArc: 3, focusArc: 0, focusProphecy: -1 });
     expect(s.ranges).toEqual([
-      { kind: 'lit', first: 0, count: 2 }, { kind: 'hover', first: 2, count: 1 }, { kind: 'chosen', first: 3, count: 1 },
+      { kind: 'prophecy', first: 0, count: 3 }, { kind: 'lit', first: 3, count: 2 },
+      { kind: 'hover', first: 5, count: 1 }, { kind: 'chosen', first: 6, count: 1 },
     ]);
-    expect([...s.from]).toEqual([10, 40, 60, 10]);
-    expect([...s.to]).toEqual([30, 90, 70, 150]);
-    expect(s.fanA[3]).toBe(fans.fanA[0]);
-    expect(s.fanB[3]).toBe(fans.fanB[0]);
+    expect([...s.from]).toEqual([60, 120, 5, 10, 40, 60, 10]);
+    expect([...s.to]).toEqual([70, 190, 180, 30, 90, 70, 150]);
+    expect(s.fanA[6]).toBe(fans.fanA[0]);
+    expect(s.fanB[6]).toBe(fans.fanB[0]);
+  });
+
+  it('the prophecy class is every pair on prophecySet\'s feet, whatever is asked about', () => {
+    const g = graph();
+    const ps = prophecySet(g);
+    const s = topSet(g, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 });
+    expect(s.ranges[0]).toEqual({ kind: 'prophecy', first: 0, count: ps.count });
+    expect([...s.from.slice(0, 3)]).toEqual([...ps.from]);
+    expect([...s.fanA.slice(0, 3)]).toEqual([...ps.fanA]);
+    expect([...s.fanB.slice(0, 3)]).toEqual([...ps.fanB]);
   });
 
   it('a hover on the chosen line is not drawn twice; ids outside the graph are dropped', () => {
     const s = topSet(graph(), { lit: Int32Array.from([-1, 2, 99]), litKey: 'x', hoverArc: 0, focusArc: 0, focusProphecy: -1 });
-    expect(s.ranges.map((r) => r.count)).toEqual([1, 0, 1]);
+    expect(s.ranges.map((r) => r.count)).toEqual([3, 1, 0, 1]);
   });
 
   it('a chosen prophecy pair is the chosen thread, on prophecySet\'s feet', () => {
     const g = graph();
     const s = topSet(g, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: 2 });
-    expect(s.ranges.find((r) => r.kind === 'chosen')).toEqual({ kind: 'chosen', first: 0, count: 1 });
-    expect([s.from[0], s.to[0], s.fanA[0], s.fanB[0]]).toEqual([5, 180, 0, 0]);
+    expect(s.ranges.find((r) => r.kind === 'chosen')).toEqual({ kind: 'chosen', first: 3, count: 1 });
+    expect([s.from[3], s.to[3], s.fanA[3], s.fanB[3]]).toEqual([5, 180, 0, 0]);
   });
 
-  it('nothing asked about is an empty set; the same ask is the same set (no re-upload), a new one is new', () => {
+  it('nothing asked about is the prophecy class alone; the same ask is the same set (no re-upload), a new one is new', () => {
     const g = graph();
     const none = topSet(g, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 });
-    expect(none.count).toBe(0);
+    expect(none.count).toBe(3);
+    expect(none.ranges.slice(1).every((r) => r.count === 0)).toBe(true);
     const v = { lit: null, litKey: '', hoverArc: 2, focusArc: -1, focusProphecy: -1 };
     const a = topSet(g, v, none);
     expect(a).not.toBe(none);
     expect(topSet(g, Object.assign({}, v), a)).toBe(a);
     expect(topSet(g, Object.assign({}, v, { hoverArc: 1 }), a)).not.toBe(a);
     expect(topSetKey(v)).toBe('|2|-1|-1');
+    // a graph with no prophecy and nothing asked about: no top pass at all
+    const bare = Object.assign(graph(), { prophecy: [] });
+    expect(topSet(bare, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 }).count).toBe(0);
+  });
+
+  it('pairOf: an arc that joins a pair\'s verses names it; any other arc is not there', () => {
+    const ps = prophecySet(graph());
+    expect(ps.pairOf.get(4)).toBe(0);
+    expect(ps.pairOf.get(5)).toBe(1);
+    expect(ps.pairOf.has(3)).toBe(false);   // the weaker arc over the same verses: the pair's arc is 4
+    expect(ps.pairOf.has(0)).toBe(false);
   });
 });
 

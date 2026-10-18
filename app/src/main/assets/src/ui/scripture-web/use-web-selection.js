@@ -23,7 +23,7 @@
    pushes onto it and moves the camera with flyTo (use-web-camera.js). */
 
 import { zoomAbout } from '../../utils/scripture-web/geometry.js';
-import { pickArcs, pickChapter, pickVerse, chapterRange, nearbyChapter, nearbyThreads } from '../../utils/scripture-web/pick.js';
+import { pickThreads, pickChapter, pickVerse, chapterRange, nearbyChapter, nearbyThreads } from '../../utils/scripture-web/pick.js';
 import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 import { focusState, withLit } from '../../utils/scripture-web/focus-state.js';
 import {
@@ -58,7 +58,7 @@ import { routeOverlayHit } from './goto.jsx';
 export function panelOf(detail, choices) {
   if (detail) {
     const k = detail.kind;
-    if (k === 'arc') return { spec: { mode: 'connection', arc: detail.index }, info: detail };
+    if (k === 'arc') return { spec: detail.index < 0 && detail.prophecy >= 0 ? { mode: 'connection', arc: detail.prophecy, prophecy: true } : { mode: 'connection', arc: detail.index }, info: detail };
     if (k === 'verse') return { spec: { mode: 'verse', verse: detail.verse }, info: detail };
     if (k === 'chapter') {
       return { spec: { mode: 'group', ids: [], label: detail.book ? detail.book.title + ' ' + detail.chapter : '', chapter: detail.chapterIndex }, info: detail };
@@ -164,7 +164,7 @@ export function useWebSelection({
       }
       return [{ kind: 'chapter', chapterIndex: ci }];
     }
-    return pickArcs(g, cam, view, px, py, 14 * v.DPR, 4)
+    return pickThreads(g, cam, view, px, py, 14 * v.DPR, 4)
       .map((hit) => ({ kind: 'arc', hit, distance: hit.distance }));
   }, [graph, camRef, viewRef, viewFor, mode, railOpts, showUnderlay, badgeBoxesRef, personalRef]);
 
@@ -214,7 +214,7 @@ export function useWebSelection({
     }
     // a new choice: nothing hovered, nothing lit but what the choice lights
     focusRef.current = focusState(found.kind === 'arc' || found.kind === 'link'
-      ? { arc: found.index }
+      ? (found.kind === 'arc' && found.index < 0 && found.prophecy >= 0 ? { arc: found.prophecy, prophecy: true } : { arc: found.index })
       : { range: found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi]
         : found.kind === 'verse' ? [found.verse, found.verse] : null });
     setTip(null);

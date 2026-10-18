@@ -57,7 +57,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
       draw: (opts) => {
         DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density, camY: opts && opts.camY, camX: opts && opts.camX, lens: opts && opts.lens,
           focusArc: opts && opts.focusArc, focusRange: opts && opts.focusRange, lensDim: opts && opts.lensDim,
-          centre: opts && opts.centre, tapFade: opts && opts.tapFade });
+          centre: opts && opts.centre, tapFade: opts && opts.tapFade, focusProphecy: opts && opts.focusProphecy });
         return { instances: 0, draws: 0 };
       },
       // My Web's ground (refactor.md #10): one clear, recorded so a case can
@@ -72,6 +72,8 @@ import { createRenderer } from '../scripture-web/web-renderer.js';
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import { ScriptureWebScreen, _resetWebPlace } from './ScriptureWebScreen.jsx';
 import { modalRegistry } from '../../hooks/use-modal-registry.js';
+import { webFrame } from '../../utils/scripture-web/web-frame.js';
+import { footX, arcShape, squashFactor } from '../../utils/scripture-web/geometry.js';
 
 const baseProps = () => ({
   // swGuideSeen: the how-to-read card (landing 13) opens on a first visit and
@@ -290,6 +292,39 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       const sheet = container.querySelector('.sw-sheet');
       expect(sheet, 'the connection card opened for the 7-vote thread').toBeTruthy();
       expect(sheet.textContent).toMatch(/Isaiah/);
+    });
+
+    /* GL item 4: a prophecy pair is drawn always, so it is tappable. This one joins verses no
+       OpenBible arc joins (107 of the asset's 132 pairs are such), so the graph has no arcs at all:
+       the tap can only find it through the prophecy class. The apex is computed from the frame the
+       screen draws (webFrame) and the law (arcShape over the pair's own feet). */
+    it('a tap on a prophecy pair that is no arc chooses it: the draw names it, the card reads "Prophecy fulfilled"', async () => {
+      const foretold = () => Object.assign(graph(), { prophecy: [{ a: 1000, b: 30000, studyId: 's', chapterId: 'c' }] });
+      const { container } = await mount({}, foretold);
+      const f = webFrame({ W: FRAME_CSS, H: 360, DPR: 1 });
+      const cam = { x: CANON / 2, ppv: FRAME_CSS / CANON, total: CANON };
+      const x0 = footX(cam, FRAME_CSS, 1000, 0), x1 = footX(cam, FRAME_CSS, 30000, 0);
+      const { A } = arcShape((x1 - x0) / 2, squashFactor(f.ceil, FRAME_CSS));
+      const cx = (x0 + x1) / 2, cy = f.base - A;
+      expect(DRAWN[DRAWN.length - 1].camX, 'PRECONDITION: the overview camera').toBeCloseTo(CANON / 2, 6);
+      const root = container.querySelector('.sw-root');
+      const down = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 8, pointerType: 'touch', clientX: cx, clientY: cy });
+      const up = new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 8, pointerType: 'touch', clientX: cx, clientY: cy });
+      await act(async () => { root.dispatchEvent(down); root.dispatchEvent(up); await new Promise((r) => setTimeout(r, 40)); });
+      const last = DRAWN.filter((d) => !d.clear).pop();
+      expect(last.focusProphecy).toBe(0);
+      expect(last.focusArc).toBe(-1);
+      const sheet = container.querySelector('.sw-sheet');
+      expect(sheet, 'the connection card opened for the pair').toBeTruthy();
+      expect(sheet.textContent).toMatch(/Prophecy fulfilled · 29,000 verses apart/);
+      // CONTROL: 30 px under the line there is nothing to choose
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+      const down2 = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 8, pointerType: 'touch', clientX: cx, clientY: cy + 30 });
+      const up2 = new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 8, pointerType: 'touch', clientX: cx, clientY: cy + 30 });
+      await act(async () => { root.dispatchEvent(down2); root.dispatchEvent(up2); await new Promise((r) => setTimeout(r, 40)); });
+      expect(container.querySelector('.sw-sheet')).toBeNull();
+      expect(DRAWN.filter((d) => !d.clear).pop().focusProphecy).toBe(-1);
     });
 
     /* sw1 B4 (audit-web 10-05): the hover chip was set only by a resting mouse and cleared by nothing

@@ -17,8 +17,9 @@
      · Buckets carry per-chunk [minFrom, maxTo] extents, so a zoomed-in view
        skips whole runs of instances that cannot touch the viewport.
 
-   Over it a TOP PASS redraws the few threads the reader has asked about
-   (the lit, the hovered, the chosen: utils/scripture-web/frame-set.js) in
+   Over it a TOP PASS draws the prophecy class (every g.prophecy pair, always
+   on) and redraws the few threads the reader has asked about (the lit, the
+   hovered, the chosen: utils/scripture-web/frame-set.js) in
    the ink table's gold (sw-ink.js), a core under a soft halo, each
    tessellated for its own visible piece (geometry.topSegmentsFor), so the
    chosen line shows no facet at any zoom and is never drawn under another
@@ -251,6 +252,8 @@ export const TOP_SHADER_SOURCE = { vertex: TOP_VERT, fragment: TOP_FRAG };
 
 /** Each top-pass kind's ink (sw-ink.js rows) and its tessellation cap. */
 const TOP_LOOK = {
+  // the core never under 1 device px (the ink table's prophecy row); it recedes with a tap
+  prophecy: { core: 'prophecy', halo: 'prophecyGlow', cap: 192, minDevicePx: 1, recedes: true },
   lit: { core: 'lit', halo: '', cap: 192 },
   hover: { core: 'hover', halo: 'hoverHalo', cap: 512 },
   chosen: { core: 'chosen', halo: 'chosenHalo', cap: 512 },
@@ -260,20 +263,25 @@ const TOP_LOOK = {
  * The uniforms one top-pass kind draws with, from the ink table: device px
  * widths (the compact width on a phone), the core held at 0.5 device px
  * with the lost width paid in alpha (the main pass's thin-line law).
+ * The prophecy class recedes with the rest of the web while a line is
+ * chosen (to TAP_CONTEXT at tapFade 1); what the reader asked for does not.
  * @param {string} kind  a frame-set TOP_ORDER kind
  * @param {number} dpr
  * @param {boolean} compact
+ * @param {number} [tapFade]  0..1, the frame's (uTapFade)
  * @returns {{ coreHalf: number, haloHalf: number, core: number[], halo: number[], ribbon: number, cap: number }}
  */
-export function topLook(kind, dpr, compact) {
+export function topLook(kind, dpr, compact, tapFade) {
   const look = TOP_LOOK[kind];
   const d = dpr > 0 ? dpr : 1;
-  const half = (inkWidth(look.core, compact) * d) / 2;
+  const wide = inkWidth(look.core, compact) * d;
+  const half = (look.minDevicePx && wide < look.minDevicePx ? look.minDevicePx : wide) / 2;
   const thin = half >= 0.5 ? 1 : half / 0.5;
   const coreHalf = half > 0.5 ? half : 0.5;
   const haloHalf = look.halo ? (inkWidth(look.halo, compact) * d) / 2 : 0;
-  const core = rgba01(look.core, thin);
-  const halo = look.halo ? rgba01(look.halo) : [0, 0, 0, 0];
+  const fade = look.recedes && tapFade > 0 ? 1 + (TAP_CONTEXT - 1) * (tapFade < 1 ? tapFade : 1) : 1;
+  const core = rgba01(look.core, thin * fade);
+  const halo = look.halo ? rgba01(look.halo, fade) : [0, 0, 0, 0];
   return { coreHalf, haloHalf, core, halo, ribbon: Math.max(coreHalf, haloHalf) + 0.5, cap: look.cap };
 }
 
@@ -447,7 +455,7 @@ export function createRenderer(canvas, graph, opts = {}) {
    * chosen threads in their ink, the chosen last. Not counted in stats (the
    * main pass's instances are the web; these are a handful drawn again).
    */
-  const drawTop = (v, camXHi) => {
+  const drawTop = (v, camXHi, tapFade) => {
     const set = topSet(graph, v, topHeld);
     if (set !== topHeld) {
       topHeld = set;
@@ -472,7 +480,7 @@ export function createRenderer(canvas, graph, opts = {}) {
     gl.uniform1f(TU.uCamY, v.camY > 0 ? v.camY : 0);
     for (const range of set.ranges) {
       if (!range.count) continue;
-      const look = topLook(range.kind, dpr, compact);
+      const look = topLook(range.kind, dpr, compact, tapFade);
       let segments = 0;
       for (let k = range.first; k < range.first + range.count; k++) {
         const n = topSegmentsFor(footX(cam, v.width, set.from[k], set.fanA[k]),
@@ -626,7 +634,7 @@ export function createRenderer(canvas, graph, opts = {}) {
         });
       }
       lastStats = { instances, draws };
-      drawTop(v, camXHi);
+      drawTop(v, camXHi, tapFade);
       return lastStats;
     },
 

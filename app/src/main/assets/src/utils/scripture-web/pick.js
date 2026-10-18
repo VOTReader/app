@@ -28,6 +28,7 @@ import {
 } from './geometry.js';
 import { bucketDrawCount, fansOf } from './decode.js';
 import { walkDrawnRuns } from './chunk-walk.js';
+import { prophecySet } from './frame-set.js';
 
 /**
  * Nearest arc to a screen point.
@@ -100,6 +101,75 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
     });
   }
   return best;
+}
+
+/**
+ * The prophecy class under a point (GL item 4): every g.prophecy pair is
+ * drawn, always, at every density, by the top pass (web-renderer.js) on the
+ * feet frame-set.prophecySet gives it, so it is pickable on the same curve.
+ * A hit names the pair (`prophecy`, an index into g.prophecy) and the
+ * OpenBible arc that joins the same verses (`index`, or -1 when none: 107 of
+ * the asset's 132 pairs). Nearest first.
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, y?:number, ppv:number, total:number}} cam
+ * @param {{width:number, base:number, squash:number}} view
+ * @param {number} px @param {number} py
+ * @param {number} tol  device px
+ * @param {number} [limit]
+ * @returns {Array<{ prophecy:number, index:number, distance:number, from:number, to:number, votes:number }>}
+ */
+export function pickProphecy(g, cam, view, px, py, tol, limit) {
+  const ps = prophecySet(g);
+  if (!ps.count) return [];
+  const { width, squash } = view;
+  const base = view.base + (cam.y > 0 ? cam.y : 0);
+  const cap = Math.max(1, Math.min(limit || 4, 8));
+  const best = [];
+  for (let k = 0; k < ps.count; k++) {
+    const x0 = footX(cam, width, ps.from[k], ps.fanA[k]);
+    const x1 = footX(cam, width, ps.to[k], ps.fanB[k]);
+    if (x1 < px - tol || x0 > px + tol) continue;
+    const { A } = arcShape((x1 - x0) * 0.5, squash);
+    const d = arcDistance(px, py, x0, x1, base, A, tol);
+    if (d >= tol || (best.length === cap && d >= best[best.length - 1].distance)) continue;
+    let at = best.length;
+    while (at > 0 && best[at - 1].distance > d) at--;
+    const i = ps.arcOf[k];
+    best.splice(at, 0, { prophecy: k, index: i, distance: d, from: ps.from[k], to: ps.to[k], votes: i >= 0 ? g.votes[i] : 0 });
+    if (best.length > cap) best.pop();
+  }
+  return best;
+}
+
+/**
+ * The threads under a point, the tap's and the hover's candidate set: the
+ * drawn arcs (pickArcs), an arc that is a prophecy pair flagged with it
+ * (`prophecy`, its index in g.prophecy; -1 otherwise), and the prophecy pairs
+ * the arcs did not bring (no arc, or one outside the density) as threads of
+ * their own. Nearest first, at most `limit`.
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, y?:number, ppv:number, total:number}} cam
+ * @param {{width:number, base:number, ceil:number, squash:number,
+ *   localize:number, density:import('./decode.js').Density}} view
+ * @param {number} px @param {number} py
+ * @param {number} tol  device px
+ * @param {number} [limit]
+ * @returns {Array<{ index:number, prophecy:number, distance:number, from:number, to:number, votes:number }>}
+ */
+export function pickThreads(g, cam, view, px, py, tol, limit) {
+  const cap = Math.max(1, Math.min(limit || 4, 8));
+  const ps = prophecySet(g);
+  const hits = pickArcs(g, cam, view, px, py, tol, cap).map((h) => {
+    const k = ps.pairOf.get(h.index);
+    return Object.assign(h, { prophecy: k === undefined ? -1 : k });
+  });
+  for (const p of pickProphecy(g, cam, view, px, py, tol, cap)) {
+    if (!hits.some((h) => h.prophecy === p.prophecy || (p.index >= 0 && h.index === p.index))) hits.push(p);
+  }
+  hits.sort((a, b) => a.distance - b.distance);
+  return hits.slice(0, cap);
 }
 
 /**
