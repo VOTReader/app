@@ -179,6 +179,9 @@ export const LABEL_RECEDE = 1 - (1 - TAP_CONTEXT) * 0.65;
 const FLY_LABELS = 12;
 /** The corner buttons keep this much clear around them (spec §3: their rectangles + 8). */
 const ZONE_PAD = 8;
+/** The black fade a stuck book name stands on: this wide (CSS px), solid to this share of it. */
+const FADE_SPAN = 160;
+const FADE_SOLID = 0.55;
 /** The deep band's left and right gutter, where the sticky book names stand. */
 const GUTTER = 16;
 /** Chapter-numeral strides at depth: the smallest whose numerals do not collide. */
@@ -533,11 +536,13 @@ export function paintCanonOverlay(ctx, fs) {
     ensureWebFont();   // the screen repaints when it loads (onWebFontReady)
     for (const z of L.zones) grid.add(z);
     drawScrim(ctx, L);
-    drawCentreWash(ctx, cam, L, fs.centre);
     drawBaseline(ctx, L);
     drawCited(ctx, g, cam, L);
     drawOverview(ctx, g, cam, L, 1 - L.deepT, hits);
     drawDeep(ctx, g, cam, L, L.deepT, fs.centre, grid, hits);
+    // the centre chapter's wash over the band it marks: over the sticky names' fades (no dark box
+    // in the gold) and with its gold top edge over the baseline
+    drawCentreWash(ctx, cam, L, fs.centre);
   }
   // the sky's chrome (landing 9): the altitude ruler on the left, only above
   // the baseline, and the elevator on the right once there is a sky to climb;
@@ -883,6 +888,9 @@ function drawDeep(ctx, g, cam, L, t, centre, grid, hits) {
     else if (tall) ctx.fillRect(xr, dp.nums.top - 2 * s, tw, ticksBottom - dp.nums.top + 2 * s);
     else if (c[1] === 1 || X(c[2] + c[3]) - x0 >= 3 * s) ctx.fillRect(xr, dp.ticks.top, tw, dp.ticks.h);
   }
+  // the stuck names' fades, under every numeral
+  ctx.globalAlpha = tt;
+  paintDeepFades(ctx, L, names);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   setFont(ctx, numFont, 0);
@@ -909,11 +917,12 @@ function drawDeep(ctx, g, cam, L, t, centre, grid, hits) {
       const cx = X(x + 0.5), w = measure.width(ctx, vf, text);
       const box = { x0: cx - w / 2, x1: cx + w / 2, y0, y1 };
       if (box.x1 < 0 || box.x0 > Wc || L.zones.some((z) => boxesMeet(box, z))) continue;
+      if (names && (box.x0 < names.fade.left || box.x1 > names.fade.right)) continue;   // under a fade's solid part
       ctx.fillText(text, cx, y1);
     }
   }
 
-  // the names over their gradients, so the ticks pass under them cleanly
+  // the names over their fades
   ctx.globalAlpha = tt;
   if (names) paintDeepNames(ctx, L, names);
   ctx.restore();
@@ -932,7 +941,9 @@ function drawDeep(ctx, g, cam, L, t, centre, grid, hits) {
  * gutter as "‹ ISAIAH" and pushed out by the next book's name; and, when the
  * next book starts within one frame width past the right edge, "MATTHEW ›"
  * at the right gutter, stepped left off a corner button. Each reserves its
- * box in the grid before the numerals are placed.
+ * box in the grid before the numerals are placed, and a stuck name (either
+ * side) the solid part of the black fade it stands on (FADE_SOLID of
+ * FADE_SPAN), so no numeral is placed where the fade would ghost it.
  */
 function deepNames(ctx, g, cam, L, v0, v1, grid) {
   const { s, W, Wc, dp, sz, gutter } = L;
@@ -1005,22 +1016,40 @@ function deepNames(ctx, g, cam, L, v0, v1, grid) {
       }
     }
   }
-  return { list, font, sp, stuck, after, y1, wArrow, gap };
+  // the fades the stuck names stand on (paintDeepFades): their rows, and the solid part of each
+  // reserved, so no numeral is placed under it
+  const top = dp.nums.top - 10 * s, bottom = Math.max(top + 1, Math.min(L.bandBottom, dp.end));
+  const solid = FADE_SOLID * FADE_SPAN * s;
+  const fade = { top, bottom, left: stuck ? solid : 0, right: after ? Wc - solid : Wc };
+  if (stuck) grid.add({ x0: 0, x1: fade.left, y0: top, y1: bottom });
+  if (after) grid.add({ x0: fade.right, x1: Wc, y0: top, y1: bottom });
+  return { list, font, sp, stuck, after, y1, wArrow, gap, fade };
+}
+
+/**
+ * The black fades the stuck names stand on, so the ticks and rules pass
+ * under them: solid to FADE_SOLID of FADE_SPAN, then clear. Painted before
+ * the numerals (one beside the solid part is drawn over the fade, never
+ * ghosted by it) and before the centre chapter's wash (which veils it).
+ */
+function paintDeepFades(ctx, L, names) {
+  if (!names || !names.list.length) return;
+  const { s, Wc } = L;
+  const { top, bottom } = names.fade;
+  const span = FADE_SPAN * s;
+  const stops = [[0, 'rgba(0,0,0,1)'], [FADE_SOLID, 'rgba(0,0,0,0.75)'], [1, 'rgba(0,0,0,0)']];
+  if (names.stuck) {
+    const gr = gradient(ctx, 0, 0, span, 0, stops);
+    if (gr) { ctx.fillStyle = gr; ctx.beginPath(); ctx.rect(0, top, span, bottom - top); ctx.fill(); }
+  }
+  if (names.after) {
+    const gr = gradient(ctx, Wc, 0, Wc - span, 0, stops);
+    if (gr) { ctx.fillStyle = gr; ctx.beginPath(); ctx.rect(Wc - span, top, span, bottom - top); ctx.fill(); }
+  }
 }
 
 function paintDeepNames(ctx, L, names) {
   if (!names.list.length) return;
-  const { s, Wc, dp } = L;
-  const top = dp.nums.top - 10 * s, bottom = Math.max(top + 1, Math.min(L.bandBottom, dp.end));
-  const span = 160 * s;
-  if (names.stuck) {
-    const gr = gradient(ctx, 0, 0, span, 0, [[0, 'rgba(0,0,0,1)'], [0.55, 'rgba(0,0,0,0.75)'], [1, 'rgba(0,0,0,0)']]);
-    if (gr) { ctx.fillStyle = gr; ctx.beginPath(); ctx.rect(0, top, span, bottom - top); ctx.fill(); }
-  }
-  if (names.after) {
-    const gr = gradient(ctx, Wc, 0, Wc - span, 0, [[0, 'rgba(0,0,0,1)'], [0.55, 'rgba(0,0,0,0.75)'], [1, 'rgba(0,0,0,0)']]);
-    if (gr) { ctx.fillStyle = gr; ctx.beginPath(); ctx.rect(Wc - span, top, span, bottom - top); ctx.fill(); }
-  }
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = css('stickyBook');

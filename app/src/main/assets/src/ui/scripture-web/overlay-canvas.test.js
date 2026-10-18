@@ -313,6 +313,45 @@ describe('the deep band (r3-03): chapter numerals, verse ticks and numerals, the
     expect(t.some((c) => c.t === 'MATTHEW')).toBe(true);
   });
 
+  it('the sticky names black fade: no numeral under its solid part, the numerals beside it drawn over it, and the gold wash over it (w3 review: ghosted numerals, a dark box in the wash)', () => {
+    const malachiEnd = verseOf('matthew', 1, 1) - 1;
+    const ppvPc = geo.fitPPV({ total: g.total }, FRAMES.pc.W) * 40;
+    for (const [name, zoom, verse, sides] of [
+      ['pc', 40, ISA53_6, ['left']], ['phone', 300, ISA53_6, ['left']], ['phone', zMax('phone'), ISA53_6, ['left']],
+      ['pc', 40, malachiEnd - (FRAMES.pc.W * 0.55) / ppvPc, ['right']],
+    ]) {
+      const { rec, fs } = paint(name, zoom, verse);
+      const s = fs.v.DPR, Wc = fs.v.W, span = 160 * s, solid = 0.55 * span;
+      const calls = rec.calls;
+      const what = name + ' ' + Math.round(zoom) + 'x';
+      for (const side of sides) {
+        const gx = side === 'left' ? 0 : Wc - span;
+        const gi = calls.findIndex((c) => c.op === 'rect' && Math.abs(c.a[0] - gx) < 1e-6 && Math.abs(c.a[2] - span) < 1e-6);
+        expect(gi, what + ': the ' + side + ' fade').toBeGreaterThanOrEqual(0);
+        const z0 = side === 'left' ? 0 : Wc - solid, z1 = side === 'left' ? solid : Wc;
+        const f0 = side === 'left' ? 0 : Wc - span, f1 = side === 'left' ? span : Wc;
+        let beside = 0;
+        calls.forEach((c, k) => {
+          if (c.op !== 'fillText' || !/^\d+$/.test(c.t)) return;
+          const b = textBox(c);
+          expect(b.x1 <= z0 || b.x0 >= z1, what + ': numeral ' + c.t + ' at ' + Math.round(b.x0) + ' under the solid fade').toBe(true);
+          if (b.x1 > f0 && b.x0 < f1) { beside++; expect(k, what + ': numeral ' + c.t + ' drawn before the fade over it').toBeGreaterThan(gi); }
+        });
+        // the wash's gold top edge comes after the fade and over the baseline
+        const edge = calls.findIndex((c) => c.op === 'rect' && Math.abs(c.a[1] - fs.view.base) < 1e-6 && Math.abs(c.a[3] - 1 * s) < 1e-6);
+        const baseline = calls.findIndex((c) => c.op === 'fillRect' && Math.abs(c.y - fs.view.base) < 1e-6 && c.w === fs.v.W);
+        if (edge >= 0) {
+          expect(edge, what + ': the wash after the fade').toBeGreaterThan(gi);
+          expect(edge, what + ': the wash edge over the baseline').toBeGreaterThan(baseline);
+        }
+        if (side === 'left' && name === 'pc') {
+          expect(edge, what + ': the centre chapter is washed').toBeGreaterThanOrEqual(0);
+          expect(beside, what + ': a numeral beside the fade').toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
   it('no chapter rule cuts through a numeral or a name, and under a stride no bare "1" stands for a book', () => {
     const tick = css('chapterTick');
     for (const [name, zoom] of [['pc', 6], ['pc', 40], ['phone', 6], ['phone', 40]]) {
