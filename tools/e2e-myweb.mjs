@@ -190,7 +190,22 @@ async function zoom3(page, tag) {
   let ratio = 1;
   if (hasBtn) { for (let i = 0; i < 3; i++) { await clickLabel(page, 'Zoom in'); await sleep(450); } ratio = (await readPpv(page)) / p0; }
   else {
-    const c = await page.evaluate(() => { const b = document.querySelector('.sw-canvas-ui').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
+    // the Bible rail's half of the band: camFor splits the two cameras at the drawn rails' midline (fix-review #7),
+    // which sits 15 CSS px BELOW the canvas's centre at 1920x1080 (rails at 150 and 961), so a wheel at the centre
+    // drove the Volumes camera and data-ppv-css (the Bible's) never moved (the w3 tree, before #7, failed the
+    // same way; the base did not). The point is the first in that half,
+    // from the middle of the screen out, with a canvas under it (the empty notice is chrome: the wheel ignores it)
+    const c = await page.evaluate(() => {
+      const b = document.querySelector('.sw-canvas-ui').getBoundingClientRect(), root = document.querySelector('.sw-root');
+      const r = JSON.parse((root && root.getAttribute('data-rails')) || 'null'), top = root ? root.getBoundingClientRect().top : b.top;
+      if (!r) return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+      const mid = top + (r.topY + r.bottomY) / 2, low = top + r.bottomY;
+      for (const fy of [0.5, 0.3, 0.7, 0.15, 0.85]) for (const fx of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+        const x = b.left + b.width * fx, y = mid + (low - mid) * fy, el = document.elementFromPoint(x, y);
+        if (el && el.tagName === 'CANVAS') return { x, y };
+      }
+      return { x: b.left + b.width / 2, y: mid + (low - mid) / 2 };
+    });
     await page.mouse.move(c.x, c.y);
     for (let i = 0; i < 24 && ratio < ZOOM_TARGET * 0.97; i++) { await page.mouse.wheel({ deltaY: -280 }); await sleep(250); ratio = (await readPpv(page)) / p0; }
   }
