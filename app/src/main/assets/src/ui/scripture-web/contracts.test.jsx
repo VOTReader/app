@@ -372,6 +372,22 @@ describe('the panel frames what it opens (spec section 3)', () => {
     expect(x).toBeGreaterThan(0);
     expect(x).toBeLessThan(500);
   });
+
+  it('a verse in the area\'s outer tenth is brought in too: its threads fan out on both sides', () => {
+    // the w3 PC shot: John 3:16 opened 24 px left of the panel and every thread it lit ran under it
+    const right = mount({ insetFor: () => ({ right: 300, bottom: 0 }) });
+    act(() => { right.get().sel.openPanel({ mode: 'verse', verse: 15558 }); }); // 460 of 500: the right tenth
+    let c = right.get().cam.camRef.current;
+    let x = verseToX(c, 800, 15558.5);
+    expect(x).toBeGreaterThan(0.1 * 500);
+    expect(x).toBeLessThan(0.9 * 500);
+    const left = mount({ insetFor: () => ({ right: 300, bottom: 0 }) });
+    act(() => { left.get().sel.openPanel({ mode: 'verse', verse: 15506 }); }); // 44 of 500: the left tenth
+    c = left.get().cam.camRef.current;
+    x = verseToX(c, 800, 15506.5);
+    expect(x).toBeGreaterThan(0.1 * 500);
+    expect(x).toBeLessThan(0.9 * 500);
+  });
 });
 
 describe('a resting mouse over the open panel hovers nothing under it (spec section 3)', () => {

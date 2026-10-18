@@ -278,8 +278,9 @@ export function useWebSelection({
   /**
    * Keep what was opened in the canvas area (spec section 3). A connection is framed: both feet
    * inside the area the panel leaves, 10 % margins (connectionFrame), eased over FRAME_MS. A verse,
-   * a chapter or a bundle moves only when its middle would sit under the panel (or off the left
-   * edge), centred in the area at the same zoom. My Web's cards stay where the reader put them.
+   * a chapter or a bundle moves only when its middle would sit under the panel, off the left edge
+   * or in the area's outer tenth either side (its threads fan out both ways), centred in the area
+   * at the same zoom. My Web's cards stay where the reader put them.
    */
   const frameFound = React.useCallback((found) => {
     const cam = camRef.current, v = viewRef.current;
@@ -295,7 +296,7 @@ export function useWebSelection({
     const mid = (range[0] + range[1] + 1) / 2;
     const x = verseToX(cam, v.W, mid) / (v.DPR || 1);
     const areaW = v.W / (v.DPR || 1) - (inset ? inset.right : 0);
-    if (x < 0 || x > areaW - 24) flyTo({ x: mid }, opts);
+    if (x < 0.1 * areaW || x > 0.9 * areaW) flyTo({ x: mid }, opts);
   }, [camRef, viewRef, flyTo, insetFor, mode]);
 
   /**
