@@ -71,6 +71,9 @@ import { drawPersonalWeb, railFrame, segmentSpan } from './rail-renderer.js';
  * @property {{right:number, bottom:number}} [panelInset]  CSS px the open panel covers at the
  *                               right edge (docked) or the bottom (the sheet under 560 px); labels,
  *                               chips and pills keep out of it
+ * @property {Box[]|null} [keepOut]  CSS px boxes the page's own chips stand in over the canvas (the
+ *                               go-to's verse chip, goto.jsx): the labels keep out of them as they
+ *                               keep out of the panel
  * @property {OverlayBox[]} [hits]  what the last paint made tappable; the draw copies
  *                               paintCanonOverlay's result here so hitOverlay can read it
  */
@@ -560,6 +563,9 @@ export function paintCanonOverlay(ctx, fs) {
   const elevator = drawElevator(ctx, cam, Object.assign({}, view, { inset, reserved, total: g ? g.total : 0 }), v, chrome, fs.yFrame);
   if (!L) return { marks, altitudeSpan: altitude.span, elevator, labels: 0, badges, hits };
   for (const b of reserved) grid.add(b);
+  // the page's chips over the canvas (CSS px): no label is drawn under one
+  const dpr = v.DPR || 1;
+  for (const b of fs.keepOut || []) grid.add({ x0: b.x0 * dpr, x1: b.x1 * dpr, y0: b.y0 * dpr, y1: b.y1 * dpr });
   /** threads labelled this frame: OpenBible ids, and 'p<n>' for a prophecy pair */
   const labelled = new Set();
   const chosen = drawChosen(ctx, g, cam, L, fs, grid, labelled);

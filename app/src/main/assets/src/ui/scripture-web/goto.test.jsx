@@ -78,6 +78,7 @@ function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W
     const overlayFrameRef = React.useRef(null);
     const rootRef = React.useRef(null);
     const railOpts = React.useCallback(() => ({}), []);
+    const keepOutRef = React.useRef(null);
     const sel = useWebSelection({
       graph: g, mode: 'canonical', density: 'famous', showUnderlay: false, resumeRef,
       camRef: camera.camRef, viewRef: camera.viewRef, focusRef: camera.focusRef, viewFor: camera.viewFor, yFrameFor: camera.yFrameFor,
@@ -85,7 +86,8 @@ function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W
     });
     const goTo = useGoTo({ graph: g, flyTo: camera.flyTo, openPanel: sel.openPanel, journey, lightThreads: sel.lightThreads, setAnnounce, start,
       closePanel: sel.closeCards, panel: sel.panel, density: 'famous', mode: 'canonical', camRef: camera.camRef, viewRef: camera.viewRef,
-      focusRef: camera.focusRef, panelInsetRef: camera.panelInsetRef, viewFor: camera.viewFor, onFrame: frames.onFrame, rootRef });
+      focusRef: camera.focusRef, panelInsetRef: camera.panelInsetRef, viewFor: camera.viewFor, onFrame: frames.onFrame, rootRef,
+      keepOutRef, schedule: frames.schedule });
     const none = React.useRef(null);
     const web = useWebKeys({
       graph: g, guideOpen: false, emptyShown: false, listOpen: sel.listOpen, choices: sel.choices, detail: sel.detail, tip: null,
@@ -94,7 +96,7 @@ function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W
       resetView: () => {}, onBack: rootKeys, dropHover: () => {}, setAnnounce, schedule: frames.schedule,
       cancelFly: camera.cancelFly, goTo: keys ? goTo : null,
     });
-    api.current = { cam: camera, sel, journey, goTo, frames, overlayFrameRef };
+    api.current = { cam: camera, sel, journey, goTo, frames, overlayFrameRef, keepOutRef };
     return (
       <div className="sw-root" ref={rootRef} tabIndex={0} onKeyDown={keys ? web.onKeyDown : rootKeys}>
         <div className="sw-controls">{goTo.button}</div>
@@ -203,6 +205,28 @@ describe('the go-to box (spec 4.5)', () => {
     act(() => { get().frames.schedule(); });
     settle();
     expect(chipY(), 'the sheet gone: back at the foot').toBe(footY);
+  });
+
+  it('the chip tells the overlay where it stands (keepOutRef, CSS px), so the canvas labels keep off it; it lets go when the chip goes', async () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(180);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(30);
+    const { container, get } = mountWeb();
+    act(() => { get().goTo.open('Genesis 1:101'); });
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    settle(); await flush();
+    const el = /** @type {HTMLElement} */ (container.querySelector('.sw-goto-chip'));
+    const [, tx, ty] = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(el.style.transform).map(Number);
+    expect(el.style.visibility).toBe('visible');
+    expect(get().keepOutRef.current).toEqual([{ x0: tx, x1: tx + 180, y0: ty - 30, y1: ty }]);
+    // a still camera publishes the same box and asks for no further frame: the loop goes quiet
+    act(() => { get().frames.schedule(); });
+    settle(40);
+    expect(rafQueue.length).toBe(0);
+    act(() => { get().sel.openPanel({ mode: 'connection', arc: 1 }); });
+    act(() => { get().frames.schedule(); });
+    settle();
+    expect(container.querySelector('.sw-goto-chip')).toBeNull();
+    expect(get().keepOutRef.current).toBeNull();
   });
 
   it('the chip goes when the verse is no longer what is lit', async () => {

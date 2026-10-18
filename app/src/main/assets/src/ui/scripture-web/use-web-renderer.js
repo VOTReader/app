@@ -205,13 +205,15 @@ export function useChromeTokens(theme, schedule) {
  * the centre chapter (web-frame.centreOf) and the panel's inset
  * (panelInsetRef) on it (CONTRACTS.md §2, §5). slackFor (optional,
  * use-web-camera.js) is the camera clamp's room for the docked panel, which
- * the resize's clamp keeps as every other clamp does.
+ * the resize's clamp keeps as every other clamp does. keepOutRef (optional,
+ * goto.jsx) holds the CSS px boxes of the page's own chips over the canvas,
+ * which the overlay's labels keep out of.
  * @param {any} p
  */
 export function useWebRenderer({
   graph, mode, density, setLoadError, resumeRef, glRef, uiRef, wrapRef, topbarRef,
   camRef, camVRef, viewRef, focusRef, panelInsetRef, viewFor, zoomCapFor, yFrameFor,
-  chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow, slackFor,
+  chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow, slackFor, keepOutRef,
 }) {
   // read by the resize, which lives in the GL effect and must not re-run for it
   const slackRef = React.useRef(slackFor);
@@ -416,6 +418,7 @@ export function useWebRenderer({
     // the centre chapter (GL computes it; the overlay paints its band) and
     // what the open panel covers (the panel writes it; labels keep out)
     fs.centre = centre; fs.panelInset = panelInsetRef.current;
+    fs.keepOut = (keepOutRef && keepOutRef.current) || null;
     const painted = paintCanonOverlay(uic ? uic.getContext('2d') : null, fs);
     fs.hits = painted.hits;
     overlayFrameRef.current = fs;
@@ -431,7 +434,7 @@ export function useWebRenderer({
     // the walk's window on the badges (device px boxes), like __swContextCeiling: unset in the app
     if (walkOn()) globalThis.__swBadgeBoxes = badgeBoxesRef.current;
   }, [graph, camRef, viewRef, mode, zoomCapFor, camVRef, viewFor, density, focusRef, yFrameFor, railOpts, capFractionNow,
-    chromeRef, personalRef, topbarRef, uiRef, wrapRef, glRef, panelInsetRef, schedule, settleLater]);
+    chromeRef, personalRef, topbarRef, uiRef, wrapRef, glRef, panelInsetRef, keepOutRef, schedule, settleLater]);
 
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule, drawRef]);
   // the settle timer goes with the screen

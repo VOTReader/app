@@ -225,10 +225,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // the WebGL renderer, its lifecycle and the frame's draw (use-web-renderer.js):
   // it writes the elevator's track, the pills' boxes and the overlay's frame
   // (with the targets it drew) that the tap test reads
+  // the go-to's verse chip over the canvas (CSS px boxes, goto.jsx writes them): the overlay's labels keep off it
+  const keepOutRef = React.useRef(/** @type {any} */ (null));
   const { noWebGL, glRetry, retryGL, railZoom, elevatorRef, badgeBoxesRef, overlayFrameRef } = useWebRenderer({
     graph, mode, density, setLoadError, resumeRef, glRef, uiRef, wrapRef, topbarRef,
     camRef, camVRef, viewRef, focusRef, panelInsetRef, viewFor, zoomCapFor, yFrameFor,
-    chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow, slackFor,
+    chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow, slackFor, keepOutRef,
   });
   // without WebGL2 the canon web is read as a list; My Web draws in Canvas2D
   // and stays up (w3 item 31)
@@ -283,7 +285,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // the go-to (goto.jsx): its header slot (goTo.button, first in the control
   // row) and what it puts over the canvas (goTo.box: the box, its verse chip, its edge chips)
   const goTo = useGoTo({ graph, flyTo, openPanel, journey, lightThreads, setAnnounce, start,
-    closePanel: closeCards, panel, density, mode, camRef, viewRef, focusRef, panelInsetRef, viewFor, onFrame, rootRef: wrapRef });
+    closePanel: closeCards, panel, density, mode, camRef, viewRef, focusRef, panelInsetRef, viewFor, onFrame, rootRef: wrapRef,
+    keepOutRef, schedule });
 
   // ── gestures — imperative, never React state per frame ──────────────────
   // Wiring itself lives in gestures.js (attachWebGestures) — a pure move, so

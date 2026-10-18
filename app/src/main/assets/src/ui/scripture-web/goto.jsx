@@ -168,17 +168,19 @@ export function hereLabel(g, span, verse, atFit) {
  * openPanel, the journey, lightThreads, the live region's setAnnounce and the start prop; and
  * (the navigation stream's additions on its own call line) closePanel and panel (what is open,
  * so a journey crumb records it), the density and mode, the camera's refs and viewFor, the frame
- * loop's onFrame and the root.
+ * loop's onFrame and the root. keepOutRef and schedule (the integration's): the verse chip's box,
+ * CSS px, is written to keepOutRef ([box], or null while no chip shows) so the overlay's labels keep
+ * off it, and a frame is asked for whenever the box changes, so a still camera repaints once.
  * @param {{ graph?: any, flyTo?: Function, openPanel?: Function, journey?: any,
  *   lightThreads?: Function, setAnnounce?: Function, start?: any, closePanel?: Function, panel?: any,
  *   density?: any, mode?: string, camRef?: any, viewRef?: any, focusRef?: any, panelInsetRef?: any,
- *   viewFor?: Function, onFrame?: Function, rootRef?: any }} web
+ *   viewFor?: Function, onFrame?: Function, rootRef?: any, keepOutRef?: any, schedule?: Function }} web
  * @returns {GoTo}
  */
 export function useGoTo(web) {
   const {
     graph, flyTo, openPanel, journey, lightThreads, setAnnounce, start, closePanel, panel,
-    density, mode, camRef, viewRef, focusRef, panelInsetRef, viewFor, onFrame, rootRef,
+    density, mode, camRef, viewRef, focusRef, panelInsetRef, viewFor, onFrame, rootRef, keepOutRef, schedule,
   } = web || {};
   // what is open, read when a crumb is recorded (here), not when this render ran
   const panelRef = React.useRef(panel);
@@ -456,6 +458,18 @@ export function useGoTo(web) {
     return !!to;
   }, [journey, live, mode, say]);
 
+  /** The verse chip's box (CSS px) for the overlay, or null; a frame when it changed. */
+  const keepOut = React.useCallback((b) => {
+    if (!keepOutRef) return;
+    const was = keepOutRef.current && keepOutRef.current[0];
+    if (!was && !b) return;
+    if (was && b && was.x0 === b.x0 && was.x1 === b.x1 && was.y0 === b.y0 && was.y1 === b.y1) return;
+    keepOutRef.current = b ? [b] : null;
+    if (typeof schedule === 'function') schedule();
+  }, [keepOutRef, schedule]);
+  // the chip goes with the screen
+  React.useEffect(() => () => { if (keepOutRef) keepOutRef.current = null; }, [keepOutRef]);
+
   /** One frame's placing: the verse chip at its verse's foot, the edge chips' names. */
   const placeChips = React.useCallback(() => {
     const cam = camRef && camRef.current, v = viewRef && viewRef.current;
@@ -464,6 +478,7 @@ export function useGoTo(web) {
     const f = focusRef.current;
     const right = area();
     const c = chipRef.current;
+    let kept = null;
     if (c && f.litKey !== c.litKey) { chipRef.current = null; setChip(null); }
     else if (c && chipElRef.current && viewFor) {
       const va = viewFor();
@@ -473,9 +488,14 @@ export function useGoTo(web) {
       const sheetTop = v.H / dpr - ((panelInsetRef && panelInsetRef.current && panelInsetRef.current.bottom) || 0);
       const y = Math.min((va.base + (va.camY || 0)) / dpr, sheetTop);
       const el = chipElRef.current;
-      el.style.transform = 'translate(' + Math.round(x + 10) + 'px,' + Math.round(y - 12) + 'px) translateY(-100%)';
-      el.style.visibility = x >= 0 && x <= right / dpr - 40 && y <= v.H / dpr ? 'visible' : 'hidden';
+      const tx = Math.round(x + 10), ty = Math.round(y - 12);
+      el.style.transform = 'translate(' + tx + 'px,' + ty + 'px) translateY(-100%)';
+      const shown = x >= 0 && x <= right / dpr - 40 && y <= v.H / dpr;
+      el.style.visibility = shown ? 'visible' : 'hidden';
+      // the overlay's labels keep off it (its foot chip would print under it: "John 3:16 · J…")
+      if (shown) kept = { x0: tx, x1: tx + el.offsetWidth, y0: ty - el.offsetHeight, y1: ty };
     }
+    keepOut(kept);
     let left = null, rightEnd = null;
     const lit = f.lit;
     if (lit && lit.length) {
@@ -498,7 +518,7 @@ export function useGoTo(web) {
       const named = (e) => (e ? { arc: e.arc, verse: e.verse, label: refOfVerse(graph, e.verse).label } : null);
       setEdges({ left: named(left), right: named(rightEnd) });
     }
-  }, [graph, camRef, viewRef, focusRef, area, viewFor, panelInsetRef]);
+  }, [graph, camRef, viewRef, focusRef, area, viewFor, panelInsetRef, keepOut]);
 
   /** The start prop, once: as soon as the camera exists. */
   const tryStart = React.useCallback(() => {

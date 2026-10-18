@@ -79,7 +79,7 @@ function frameAt(name, zoom, verse, extra = {}) {
     g, cam, view, v, chrome: { bg: '#000000', fsRuler: 13, fsLabel: 13 }, canvasH: v.H, inset: extra.inset == null ? 56 * v.DPR : extra.inset,
     yFrame: { base: f.base, ceil: f.ceil, squash: view.squash, maxSpan: dec.maxSpanOf(g) },
     density: 'famous', focusArc: view.focusArc, bundles: { cells: footBundles(g, cam, view, v.DPR) }, lens, lensDim: 1,
-    centre: centreOf(g, lens, zoom), panelInset: extra.panelInset || null, hits: [],
+    centre: centreOf(g, lens, zoom), panelInset: extra.panelInset || null, keepOut: extra.keepOut || null, hits: [],
   };
   return fs;
 }
@@ -485,6 +485,26 @@ describe('the pills and the labels', () => {
       const b = textBox(c);
       expect(b.x1, c.t).toBeLessThanOrEqual(edge);
       expect(c.y, c.t).toBeGreaterThan(fs.inset);
+    }
+  });
+
+  it("a DOM chip over the canvas (the go-to's verse chip, goto.jsx) is kept out of as the panel is: no label prints under it", () => {
+    for (const name of ['pc', 'phone']) {
+      const s = FRAMES[name].DPR;
+      const labels = (rec) => rec.texts().filter((c) => /·|→|←/.test(c.t) && c.fill !== css('chosenLabel'));
+      const free = labels(paint(name, 200, ISA53_6).rec).filter((c) => c.align === 'center');
+      expect(free.length, name + ' chips').toBeGreaterThan(2);
+      // the verse chip as goto.jsx publishes it (CSS px): standing over the first chip's foot
+      const c = free[0], b = textBox(c);
+      const keep = { x0: b.x0 / s - 6, x1: b.x1 / s + 120, y0: c.y / s - 16, y1: c.y / s + 12 };
+      const meets = (t) => {
+        const tb = textBox(t), h = fontPxOf(t.font) / 2;
+        return tb.x0 < keep.x1 * s && tb.x1 > keep.x0 * s && t.y - h < keep.y1 * s && t.y + h > keep.y0 * s;
+      };
+      expect(free.filter(meets).length, name + ': with no keep-out the chip is there').toBeGreaterThan(0);
+      const kept = labels(paint(name, 200, ISA53_6, { keepOut: [keep] }).rec);
+      expect(kept.filter(meets).map((t) => t.t), name).toEqual([]);
+      expect(kept.length, name + ': the rest of the frame keeps its labels').toBeGreaterThan(1);
     }
   });
 
