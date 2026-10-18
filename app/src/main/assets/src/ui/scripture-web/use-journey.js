@@ -131,7 +131,8 @@ export function useJourney(deps) {
       if (to.open.lit && p.lightThreads) p.lightThreads(to.open.lit);
     };
     if (typeof fly === 'function') {
-      const target = to.span ? { x0: to.span[0], x1: to.span[1] } : { x: to.verse };
+      // a crumb is a verse; the camera centres its middle, where a foot stands (v + 0.5), as Follow does
+      const target = to.span ? { x0: to.span[0], x1: to.span[1] } : { x: to.verse + 0.5 };
       Promise.resolve(fly(target)).then((ok) => { if (ok) arrive(); }, () => {});
     } else arrive();
     return to;

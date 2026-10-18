@@ -103,7 +103,7 @@ function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W
           <WebPanel graph={g} mode="canonical" density="famous" listOpen={sel.listOpen} listItems={sel.listItems}
             choices={sel.choices} detail={sel.detail} journey={journey} lensOn={false} onClose={sel.closeCards}
             onChoose={sel.commitFound} openPanel={sel.openPanel} followThread={sel.followThread} followRow={sel.followRow}
-            zoomTo={sel.zoomTo} onOpen={() => {}} lightThreads={sel.lightThreads} flyTo={camera.flyTo} />
+            zoomTo={sel.zoomTo} onOpen={() => {}} lightThreads={sel.lightThreads} />
         ) : null}
       </div>
     );

@@ -502,6 +502,34 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(container.querySelector('.sw-sheet')).toBeTruthy();
     });
 
+    /* Integration (w3): the panel's trail Back called journey.back(), which flies home and reopens
+       the line on landing (use-journey.js), and then flew on its own to the crumb's verse: the second
+       fly took over the first, so the line was never reopened from home and the camera stopped at
+       the verse's edge, not its foot. Back is the journey's alone. */
+    it("the trail's Back flies home to the foot and opens the line again from there", async () => {
+      const { container } = await mount({}, threaded);
+      for (let i = 0; i < 40; i++) await pressFrame('+');
+      await pickNearby();
+      const landsAt = async (x) => {
+        for (let i = 0; i < 80 && Math.abs(lastCamX() - x) > 0.05; i++) {
+          await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+        }
+        expect(lastCamX()).toBeCloseTo(x, 1);
+      };
+      fireEvent.click(screen.getByRole('button', { name: /^follow to the other end · genesis 2:5101$/i }));
+      await landsAt(20100.5);
+      expect(container.querySelectorAll('.sw-crumbs li'), 'home, then here').toHaveLength(2);
+      fireEvent.click(screen.getByRole('button', { name: 'Back along the trail' }));
+      await landsAt(15551.5);
+      // reopened from home on landing (the fly's last frame): its Follow names the far foot again
+      const again = /^follow to the other end · genesis 2:5101$/i;
+      for (let i = 0; i < 50 && !screen.queryByRole('button', { name: again }); i++) {
+        await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+      }
+      expect(screen.getByRole('button', { name: again })).toBeTruthy();
+      expect(container.querySelector('.sw-crumbs'), 'home: the trail is done').toBeNull();
+    });
+
     /* sw1 B1 (audit-web 10-05): the card's x closed the card but left the line focused, so the shader kept
        every other thread at 5 % ink for good; Escape and Back cleared it, the visible x did not. */
     it('closing the card with its x lets go of the line: the next frame draws with no focus', async () => {

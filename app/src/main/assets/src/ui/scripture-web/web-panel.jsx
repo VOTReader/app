@@ -317,14 +317,13 @@ function ThreadGroups({ groups, tagOf, translation, rowProps, light }) {
  *   openPanel: (spec: any, opts?: any) => boolean, followThread: (info: any) => void,
  *   followRow: (row: any) => void, zoomTo: (chapterIndex: number) => void,
  *   onOpen: (endpoint: any) => void, lightThreads: (ids: ArrayLike<number> | null) => void,
- *   flyTo?: (target: any, opts?: any) => any,
  * }} props
  */
 export function WebPanel(props) {
   const {
     graph: g, mode: webMode, density, translation, compact = false, listOpen, listItems, lensOn, choices, choiceChapter = -1,
     choiceCut = false, detail,
-    journey, onClose, onChoose, openPanel, followThread, followRow, zoomTo, onOpen, lightThreads, flyTo,
+    journey, onClose, onChoose, openPanel, followThread, followRow, zoomTo, onOpen, lightThreads,
   } = props;
   const mode = listOpen ? 'list' : choices && choices.length ? 'chooser' : modeOfDetail(detail);
   const key = subjectKey(mode, detail, choices);
@@ -576,10 +575,9 @@ export function WebPanel(props) {
   // the Follow trail (use-journey.js: the navigation stream keeps it): "Gen 3:15 › Isa 7:14 › Matt 1:23"
   const stack = journey && Array.isArray(journey.stack) ? journey.stack : [];
   const crumbs = mode === 'connection' && stack.length >= 2 ? stack : null;
-  const back = () => {
-    const prev = journey && typeof journey.back === 'function' ? journey.back() : null;
-    if (prev && prev.verse >= 0 && typeof flyTo === 'function') flyTo({ x: prev.verse }, { ms: 450 });
-  };
+  // Back is the journey's alone: back() flies home and reopens what was open there on landing
+  // (use-journey.js); a fly of the panel's own after it took that fly over, so nothing reopened
+  const back = () => { if (journey && typeof journey.back === 'function') journey.back(); };
   const credit = webMode !== 'personal' && mode !== 'myweb' && g.attribution
     ? <div className="sw-panel-credit">{g.attribution}</div> : null;
 

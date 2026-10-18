@@ -64,7 +64,7 @@ function mount(over = {}) {
     listOpen: false, listItems: [], lensOn: false, choices: null, detail: null,
     journey: { stack: [], push() {}, clear() {}, back: () => null },
     onClose: vi.fn(), onChoose: vi.fn(), openPanel: vi.fn(() => true), followThread: vi.fn(),
-    followRow: vi.fn(), zoomTo: vi.fn(), onOpen: vi.fn(), lightThreads: vi.fn(), flyTo: vi.fn(),
+    followRow: vi.fn(), zoomTo: vi.fn(), onOpen: vi.fn(), lightThreads: vi.fn(), flyTo: vi.fn(), // flyTo: not WebPanel's (a guard: Back must not fly)
     ...over,
   };
   const r = render(<WebPanel {...props} />);
@@ -211,8 +211,10 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     expect(crumbs[1].classList.contains('is-here')).toBe(true);
     expect(crumbs[1].getAttribute('aria-current')).toBe('location');
     fireEvent.click(byLabel(/^Back along the trail$/)[0]);
-    expect(back).toHaveBeenCalled();
-    expect(props.flyTo).toHaveBeenCalledWith({ x: ISA_7_14 }, { ms: 450 });
+    expect(back).toHaveBeenCalledTimes(1);
+    // the journey flies home and reopens the line itself (use-journey.js): a fly of the panel's own
+    // would take that one over (integration, w3)
+    expect(props.flyTo).not.toHaveBeenCalled();
   });
 });
 

@@ -529,7 +529,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           detail={detail} journey={journey}
           lensOn={listOpen && mode !== 'personal' && !!(camRef.current && viewRef.current.W && lensRange(graph, camRef.current, viewRef.current.W))}
           onClose={closeCards} onChoose={commitFound} openPanel={openPanel} followThread={followThread}
-          followRow={followRow} zoomTo={zoomTo} onOpen={openEndpoint} lightThreads={lightThreads} flyTo={flyTo} />
+          followRow={followRow} zoomTo={zoomTo} onOpen={openEndpoint} lightThreads={lightThreads} />
       ) : null}
 
       {/* the key, and the OpenBible.info credit as its tail (Q5): read, not hidden; its glyphs are */}

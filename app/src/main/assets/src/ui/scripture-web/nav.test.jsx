@@ -267,7 +267,8 @@ describe('the journey (A3): a breadcrumb trail whose top is where the reader is'
     expect(get().sel.detail.far).toBe('from');
     act(() => { get().sel.followThread(get().sel.detail); });
     settle();
-    expect(get().cam.camRef.current.x).toBeCloseTo(100, 6);
+    // centred on the foot, at its verse's middle (the panel stream's Follow)
+    expect(get().cam.camRef.current.x).toBeCloseTo(100.5, 6);
     expect(verses(get().journey.stack), 'the near foot, then the far').toEqual([20100, 100]);
     expect(get().sel.detail.far).toBe('to');
     let to = null;
@@ -275,9 +276,10 @@ describe('the journey (A3): a breadcrumb trail whose top is where the reader is'
     expect(to).toMatchObject({ verse: 20100 });
     expect(get().journey.stack, 'home: nothing further back').toEqual([]);
     tick();
-    expect(get().cam.camRef.current.x, 'on its way, not jumped').not.toBeCloseTo(20100, 0);
+    expect(get().cam.camRef.current.x, 'on its way, not jumped').not.toBeCloseTo(20100.5, 0);
     await act(async () => { settle(); await Promise.resolve(); await Promise.resolve(); });
-    expect(get().cam.camRef.current.x).toBeCloseTo(20100, 6);
+    // home to the foot, at its verse's middle, as Follow lands
+    expect(get().cam.camRef.current.x).toBeCloseTo(20100.5, 6);
     expect(get().sel.detail, 'the line is open again').toMatchObject({ kind: 'arc', index: 0 });
     expect(get().sel.detail.far, 'and its Follow names the end it now faces away from').toBe('from');
     expect(get().journey.back()).toBeNull();
@@ -286,9 +288,12 @@ describe('the journey (A3): a breadcrumb trail whose top is where the reader is'
   it('Follow back along the same line is a step back, not a longer trail', () => {
     const { get } = mount();
     act(() => { get().sel.openPanel({ mode: 'connection', arc: 0 }); });
+    // opening the line framed all 20,000 verses of it (the panel stream's frameFound), a zoom at
+    // which the camera's clamp holds it off both feet; the reader zooms back in to walk it
+    get().cam.camRef.current = { x: 15551, ppv: 8, total: TOTAL, y: 0 };
     act(() => { get().sel.followThread(get().sel.detail); });
     act(() => { get().sel.followThread(get().sel.detail); });
-    expect(get().cam.camRef.current.x).toBeCloseTo(20100, 6);
+    expect(get().cam.camRef.current.x).toBeCloseTo(20100.5, 6);
     expect(get().journey.stack).toEqual([]);
   });
 
@@ -303,11 +308,12 @@ describe('the journey (A3): a breadcrumb trail whose top is where the reader is'
     expect(verses(get().journey.stack)).toEqual([15551, 9000, 300]);
     act(() => { get().journey.back(); });
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    expect(get().cam.camRef.current.x).toBe(9000);
+    // each crumb's verse at its middle, where a foot stands
+    expect(get().cam.camRef.current.x).toBe(9000.5);
     expect(closed).toHaveBeenCalledTimes(1);
     act(() => { get().journey.back(); });
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    expect(get().cam.camRef.current.x).toBe(15551);
+    expect(get().cam.camRef.current.x).toBe(15551.5);
     expect(get().journey.stack).toEqual([]);
   });
 });
