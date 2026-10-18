@@ -9,6 +9,8 @@ import { useWebSelection, panelOf } from './use-web-selection.js';
 import { useJourney } from './use-journey.js';
 import { useGoTo, routeOverlayHit } from './goto.jsx';
 import { hitOverlay } from './overlay-renderer.js';
+import { railFrame } from './rail-renderer.js';
+import { buildVotRail } from '../../utils/scripture-web/personal-graph.js';
 import { verseToX, fitPPV } from '../../utils/scripture-web/geometry.js';
 
 const TOTAL = 31102;
@@ -22,22 +24,22 @@ const graph = () => ({
 });
 
 /** The camera, the journey and the selection wired as the screen wires them. */
-function mount({ withCamera = true } = {}) {
+function mount({ withCamera = true, mode = 'canonical', personal = null, rails = null } = {}) {
   const g = graph();
   const schedule = vi.fn();
   const setAnnounce = vi.fn();
   const hook = renderHook(() => {
-    const modeRef = React.useRef('canonical');
+    const modeRef = React.useRef(mode);
     const cam = useWebCamera({ graph: g, density: 'famous', modeRef, schedule });
     const journey = useJourney();
     const resumeRef = React.useRef(null);
-    const personalRef = React.useRef(null);
+    const personalRef = React.useRef(personal);
     const elevatorRef = React.useRef(null);
     const badgeBoxesRef = React.useRef([]);
     const overlayFrameRef = React.useRef(null);
-    const railOpts = React.useCallback(() => ({}), []);
+    const railOpts = React.useCallback(() => rails || {}, []);
     const sel = useWebSelection({
-      graph: g, mode: 'canonical', density: 'famous', showUnderlay: false, resumeRef,
+      graph: g, mode, density: 'famous', showUnderlay: false, resumeRef,
       camRef: cam.camRef, viewRef: cam.viewRef, focusRef: cam.focusRef, viewFor: cam.viewFor, yFrameFor: cam.yFrameFor,
       personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo: cam.flyTo, journey, schedule, setAnnounce,
     });
@@ -198,6 +200,43 @@ describe('the lit set (CONTRACTS.md section 2): lightThreads is its one writer',
     act(() => { get().sel.lightThreads([1]); });
     act(() => { get().sel.lightThreads(null); });
     expect(get().cam.focusRef.current).toMatchObject({ lit: null, litKey: '', range: [200, 200] });
+  });
+});
+
+describe("My Web's focus names its list (fix-review #4, #11)", () => {
+  it("a chosen Timothy thread is chosen in its own list, a reader's link in theirs", () => {
+    const { get } = mount();
+    act(() => { get().sel.commitFound({ kind: 'underlay', index: 3, source: { label: 'Genesis 1:1' }, target: { label: 'A letter' } }); });
+    expect(get().cam.focusRef.current).toMatchObject({ arc: 3, underlay: true, hover: -1, hoverUnderlay: false });
+    act(() => { get().sel.commitFound({ kind: 'link', index: 1, source: { label: 'Genesis 1:1' }, target: { label: 'A letter' } }); });
+    expect(get().cam.focusRef.current).toMatchObject({ arc: 1, underlay: false });
+  });
+  it("a reader's link under the pointer is the hover, and dropping the hover lets go of either list", () => {
+    vi.stubGlobal('requestAnimationFrame', (f) => { f(0); return 1; });
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+    try {
+      // one plumb link from mid-canon on the Bible rail to mid-rail on the Volumes
+      const votRail = buildVotRail([{ volKey: 'one', label: 'Volume One', items: Array.from({ length: 10 }, (_, i) => ({ id: 'l' + i, title: 'L' + i })) }]);
+      const W = 800, H = 360, base = 300;
+      const links = {
+        count: 1, aRail: new Uint8Array([0]), bRail: new Uint8Array([1]),
+        aPos: new Float32Array([TOTAL / 2]), bPos: new Float32Array([votRail.total / 2 - 0.5]), kind: new Uint8Array([2]),
+        records: [{ id: 'r1', source: { type: 'letter', label: 'A letter' }, target: { type: 'letter', label: 'Another' } }],
+      };
+      const rails = { width: W, height: H, DPR: 1, base, votRail, verseTotal: TOTAL,
+        verseX: (v) => (v / TOTAL) * W, votX: (q) => (q / votRail.total) * W };
+      const { get, schedule } = mount({ mode: 'personal', personal: { graph: links, underlay: null, votRail }, rails });
+      const frame = railFrame({ H, DPR: 1 }, base);
+      schedule.mockClear();
+      act(() => { get().sel.handlersRef.current.hover(W / 2, (frame.topY + frame.bottomY) / 2); });
+      expect(get().cam.focusRef.current).toMatchObject({ hover: 0, hoverUnderlay: false });
+      expect(schedule).toHaveBeenCalled();
+      get().cam.focusRef.current.hoverUnderlay = true;
+      act(() => { get().sel.dropHover(); });
+      expect(get().cam.focusRef.current).toMatchObject({ hover: -1, hoverUnderlay: false });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

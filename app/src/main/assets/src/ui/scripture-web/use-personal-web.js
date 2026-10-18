@@ -65,7 +65,8 @@ export function keepRailCamera(cam, total, W) {
  */
 function chosenLink(prev, focusRef, resumeRef) {
   if (prev) {
-    const arc = focusRef && focusRef.current ? focusRef.current.arc : -1;
+    const f = focusRef && focusRef.current;
+    const arc = f && !f.underlay ? f.arc : -1;   // a chosen Timothy thread is not a link
     const rec = arc >= 0 && prev.graph && prev.graph.records[arc];
     return rec && rec.id ? { id: rec.id, arc } : null;
   }

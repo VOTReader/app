@@ -323,6 +323,9 @@ export function useWebRenderer({
         const ro = railOpts();
         ro.hoverIndex = focusRef.current.hover;
         ro.focusIndex = focusRef.current.arc;
+        // which list each indexes: the reader's links, or Timothy's notes (fix-review #4, #11)
+        ro.hoverUnderlay = focusRef.current.hoverUnderlay;
+        ro.focusUnderlay = focusRef.current.underlay;
         ro.capFraction = capFractionNow();
         // the walk's knob for the corridor pair (e2e-myweb-colour arm K): a
         // number here overrides the context's depth alpha ceiling; unset in the app
@@ -498,7 +501,7 @@ export function useWebRenderer({
       if (back && back.cam && back.cam.total === graph.total) {
         camRef.current = Object.assign({}, back.cam);
         // the place comes back, the pointer's hover does not
-        focusRef.current = focusState(Object.assign({}, back.focus, { hover: -1, hoverProphecy: -1 }));
+        focusRef.current = focusState(Object.assign({}, back.focus, { hover: -1, hoverProphecy: -1, hoverUnderlay: false }));
       } else {
         camRef.current = createCamera(graph.total);
       }

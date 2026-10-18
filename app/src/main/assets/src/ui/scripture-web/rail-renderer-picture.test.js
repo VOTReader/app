@@ -16,7 +16,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildVotRail } from '../../utils/scripture-web/personal-graph.js';
 import { drawPersonalWeb, personalInk, railFrame } from './rail-renderer.js';
-import { css, FONT, TAP_CONTEXT, FLYOVER_LEG_WIDTH } from '../../utils/scripture-web/sw-ink.js';
+import { css, FONT, TAP_CONTEXT, FLYOVER_LEG_WIDTH, INK } from '../../utils/scripture-web/sw-ink.js';
 
 const rail = buildVotRail([
   { volKey: 'one', label: 'Volume One', short: 'Vol I', items: Array.from({ length: 10 }, (_, i) => ({ id: 'l' + i, title: 'Letter ' + i })) },
@@ -151,6 +151,52 @@ describe('P3 a chosen link recedes the rest to TAP_CONTEXT', () => {
     expect(alphas[0]).toBeCloseTo(L.alpha * TAP_CONTEXT, 6);
     expect(alphas[alphas.length - 1]).toBeCloseTo(L.alpha, 6);
     expect(alphaOf(contextStrokes(ctx)[0].style)).toBeCloseTo(personalInk(1).context.alpha * TAP_CONTEXT, 6);
+  });
+  const personal2 = {
+    count: 2, aRail: new Uint8Array([0, 0]), bRail: new Uint8Array([1, 1]),
+    aPos: new Float32Array([20, 80]), bPos: new Float32Array([3, 15]), kind: new Uint8Array([2, 2]),
+  };
+  // two threads: source 0 (footnotes) and source 2 (Words To Live By)
+  const two = { count: 2, versePos: new Float32Array([50, 30]), votPos: new Float32Array([9, 4]), source: new Uint8Array([0, 2]) };
+  const WTLB = 'rgba(163,196,193,';
+  it('a chosen Timothy thread: the rest recedes to TAP_CONTEXT and it is stroked last, in its own colour, at the chosen width with a halo (fix-review #4)', () => {
+    const ctx = recordingCtx();
+    drawPersonalWeb(ctx, personal2, two, Object.assign({}, base, { focusIndex: 1, focusUnderlay: true }));
+    const L = personalInk(1).link;
+    // the reader's links all recede, none is taken for the chosen one
+    const cores = ctx.strokes.filter((s) => s.style.startsWith('rgba(224,178,90,') && Math.abs(s.width - L.width) < 1e-6);
+    expect(cores.length).toBe(2);
+    for (const s of cores) expect(alphaOf(s.style)).toBeCloseTo(L.alpha * TAP_CONTEXT, 6);
+    // the other thread recedes; the chosen one is not in the faint pass at all
+    const below = { strokes: ctx.strokes.slice(0, -2) };
+    const faint = contextStrokes(below).filter((s) => alphaOf(s.style) < 0.5);
+    expect(faint.length).toBe(1);
+    expect(faint[0].style.startsWith('rgba(127,179,176,')).toBe(true);
+    expect(alphaOf(faint[0].style)).toBeCloseTo(personalInk(1).context.alpha * TAP_CONTEXT, 6);
+    // last: its halo, then its core, in its own source's colour (never the reader's gold)
+    const [halo, core] = ctx.strokes.slice(-2);
+    expect(halo.style.startsWith(WTLB)).toBe(true);
+    expect(alphaOf(halo.style)).toBeCloseTo(INK.chosenHalo.alpha, 6);
+    expect(halo.width).toBeCloseTo(INK.chosenHalo.width, 6);
+    expect(core.style.startsWith(WTLB)).toBe(true);
+    expect(alphaOf(core.style)).toBeCloseTo(INK.chosen.alpha, 6);
+    expect(core.width).toBeCloseTo(INK.chosen.width, 6);
+  });
+  it('a Timothy thread under the pointer is drawn on top at the hover width, and nothing dims (C3, fix-review #11)', () => {
+    const ctx = recordingCtx();
+    drawPersonalWeb(ctx, personal2, two, Object.assign({}, base, { hoverIndex: 1, hoverUnderlay: true }));
+    const L = personalInk(1).link;
+    // the reader's link 1 is NOT the hovered one: the hover indexes Timothy's list
+    const gold = ctx.strokes.filter((s) => s.style.startsWith('rgba(224,178,90,'));
+    expect(gold.some((s) => Math.abs(s.width - L.hoverWidth) < 1e-6)).toBe(false);
+    for (const s of gold.filter((x) => Math.abs(x.width - L.width) < 1e-6)) expect(alphaOf(s.style)).toBeCloseTo(L.alpha, 6);
+    const last = ctx.strokes[ctx.strokes.length - 1];
+    expect(last.style.startsWith(WTLB)).toBe(true);
+    expect(last.width).toBeCloseTo(INK.hover.width, 6);
+    expect(alphaOf(last.style)).toBeCloseTo(INK.hover.alpha, 6);
+    const below = contextStrokes({ strokes: ctx.strokes.slice(0, -2) });
+    expect(below.length).toBe(2);
+    for (const s of below) expect(alphaOf(s.style)).toBeCloseTo(personalInk(1).context.alpha, 6);
   });
 });
 

@@ -107,6 +107,7 @@ export function useWebSelection({
     hoverPointRef.current = null;
     focusRef.current.hover = -1;
     focusRef.current.hoverProphecy = -1;
+    focusRef.current.hoverUnderlay = false;
     if (tipOnRef.current) { tipOnRef.current = false; setTip(null); }
   }, [focusRef]);
 
@@ -224,8 +225,10 @@ export function useWebSelection({
       found = Object.assign({}, found, { far: Math.abs(found.to - x) >= Math.abs(found.from - x) ? 'to' : 'from' });
     }
     // a new choice: nothing hovered, nothing lit but what the choice lights
-    focusRef.current = focusState(found.kind === 'arc' || found.kind === 'link'
-      ? (found.kind === 'arc' && found.index < 0 && found.prophecyIndex >= 0 ? { arc: found.prophecyIndex, prophecy: true } : { arc: found.index })
+    // (a Timothy thread is chosen in its own list: focus.underlay, fix-review #4)
+    focusRef.current = focusState(found.kind === 'arc' || found.kind === 'link' || found.kind === 'underlay'
+      ? (found.kind === 'arc' && found.index < 0 && found.prophecyIndex >= 0 ? { arc: found.prophecyIndex, prophecy: true }
+        : { arc: found.index, underlay: found.kind === 'underlay' })
       : { range: found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi]
         : found.kind === 'verse' ? [found.verse, found.verse] : null });
     setTip(null);
@@ -244,15 +247,20 @@ export function useWebSelection({
       const point = hoverPointRef.current;
       if (!point) return;
       const found = describe(hitAt(point.cx, point.cy));
-      const nextHover = found && found.kind === 'arc' ? found.index : -1;
+      // a thread under the pointer lights: an OpenBible arc, or on My Web a
+      // reader's link or a Timothy thread (fix-review #11), in its own list
+      const line = !!found && (found.kind === 'arc' || found.kind === 'link' || found.kind === 'underlay');
+      const nextHover = line ? found.index : -1, nextUnderlay = line && found.kind === 'underlay';
       // a prophecy pair that is no OpenBible arc has no arc index: the focus names the pair
       const nextPair = found && found.kind === 'arc' && found.index < 0 && found.prophecyIndex >= 0 ? found.prophecyIndex : -1;
       const f = focusRef.current;
-      if (nextHover !== f.hover || nextPair !== f.hoverProphecy) { f.hover = nextHover; f.hoverProphecy = nextPair; schedule(); }
+      if (nextHover !== f.hover || nextPair !== f.hoverProphecy || nextUnderlay !== !!f.hoverUnderlay) {
+        f.hover = nextHover; f.hoverProphecy = nextPair; f.hoverUnderlay = nextUnderlay; schedule();
+      }
       setTip((previous) => {
         if (!found) return previous ? null : previous;
         if (previous && previous.info.kind === found.kind &&
-            (found.kind !== 'arc' || (previous.info.index === found.index && previous.info.prophecyIndex === found.prophecyIndex)) &&
+            (!line || (previous.info.index === found.index && previous.info.prophecyIndex === found.prophecyIndex)) &&
             Math.abs(previous.x - point.cx) < 4 && Math.abs(previous.y - point.cy) < 4) {
           return previous;
         }

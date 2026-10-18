@@ -15,6 +15,10 @@
                the asset's 132 prophecy pairs are not OpenBible arcs, so the
                class is its own list, not a flag on an arc.
      prophecy  which list `arc` indexes (above).
+     underlay  My Web's other list: with it true `arc` indexes Timothy's
+               notes (the rail renderer's underlay), false the reader's
+               links. Always false on the canon web (fix-review #4: a
+               tapped Timothy thread had no spotlight).
      range     a verse range kept lit, [lo, hi] inclusive verse ids, or null
                (a chapter, a bundle, a verse: today's focusRange).
      range2    the group chosen inside a range (chooseGroup), or null.
@@ -25,6 +29,8 @@
                OpenBible arc is (hover -1): its index in g.prophecy, or -1.
                107 of the asset's pairs are no arc, so `hover` cannot name
                them (GL review 2026-10-18). Written in place with `hover`.
+     hoverUnderlay  which My Web list `hover` indexes, as `underlay` for
+               `arc`; written in place with hover.
      lit       Int32Array of OpenBible arc ids drawn in the lit ink in the
                top pass (go-to, verse mode, a chooser row under hover or
                focus), or null. Never mutate it: replace it with withLit().
@@ -35,8 +41,9 @@
    withLit(...). */
 
 /**
- * @typedef {{ arc: number, prophecy: boolean, range: [number, number] | null,
- *   range2: [number, number] | null, hover: number, hoverProphecy: number, lit: Int32Array | null,
+ * @typedef {{ arc: number, prophecy: boolean, underlay: boolean, range: [number, number] | null,
+ *   range2: [number, number] | null, hover: number, hoverProphecy: number, hoverUnderlay: boolean,
+ *   lit: Int32Array | null,
  *   litKey: string }} Focus
  */
 
@@ -48,7 +55,8 @@
  */
 export function focusState(patch) {
   /** @type {Focus} */
-  const f = { arc: -1, prophecy: false, range: null, range2: null, hover: -1, hoverProphecy: -1, lit: null, litKey: '' };
+  const f = { arc: -1, prophecy: false, range: null, range2: null, hover: -1, hoverProphecy: -1,
+    underlay: false, hoverUnderlay: false, lit: null, litKey: '' };
   if (patch) Object.assign(f, patch);
   if (f.arc == null) f.arc = -1;
   if (f.hover == null) f.hover = -1;
@@ -56,6 +64,8 @@ export function focusState(patch) {
   if (!f.range2) f.range2 = null;
   if (!f.range) f.range = null;
   f.prophecy = !!f.prophecy;
+  f.underlay = !!f.underlay;
+  f.hoverUnderlay = !!f.hoverUnderlay;
   // the key always follows the set, so no writer can hand the renderer a stale one
   const ids = f.lit;
   f.lit = ids && ids.length ? (ids instanceof Int32Array ? ids : Int32Array.from(ids)) : null;

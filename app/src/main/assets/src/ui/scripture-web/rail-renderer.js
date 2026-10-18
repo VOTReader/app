@@ -29,7 +29,7 @@
 
 import { MY_WEB_SOURCES, CONTEXT_BINS, myWebLinkColor, MY_WEB_LINK_KINDS } from '../../utils/scripture-web/palette.js';
 import { placeRailLabels } from '../../utils/scripture-web/rail-labels.js';
-import { css as inkCss, TAP_CONTEXT, FLYOVER_LEG_WIDTH, FONT } from '../../utils/scripture-web/sw-ink.js';
+import { css as inkCss, TAP_CONTEXT, FLYOVER_LEG_WIDTH, FONT, INK } from '../../utils/scripture-web/sw-ink.js';
 
 /** The Volumes rail's height from the top, CSS px (spec §3, My Web: 150 PC, 62 phone). */
 const TOP_RAIL_PC = 150;
@@ -835,7 +835,10 @@ function setTracking(ctx, px) {
  * @param {{count:number, versePos:Float32Array, votPos:Float32Array, source?:Uint8Array}|null} underlay
  * @param {{verseX:(v:number)=>number, votX?:(p:number)=>number, votRail:any, verseTotal:number, width:number, height:number,
  *   DPR:number, base:number, chrome:any, showUnderlay?:boolean, capFraction?:number,
- *   hoverIndex?:number, focusIndex?:number, contextCeiling?:number, inset?:number}} opts
+ *   hoverIndex?:number, focusIndex?:number, hoverUnderlay?:boolean, focusUnderlay?:boolean,
+ *   contextCeiling?:number, inset?:number}} opts
+ *   hoverIndex / focusIndex index the reader's links, or Timothy's notes when
+ *   hoverUnderlay / focusUnderlay is set (the Focus's underlay fields).
  */
 export function drawPersonalWeb(ctx, personal, underlay, opts) {
   const { width, DPR, votRail, verseX } = opts;
@@ -844,8 +847,15 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
   const zB = opts.verseTotal ? (verseX(opts.verseTotal) - verseX(0)) / width : 1;
   const zV = (votRail && votRail.total && opts.votX) ? (opts.votX(votRail.total) - opts.votX(0)) / width : zB;
   const z = Math.max(zB, zV);
-  // a chosen link: the rest of the web recedes to TAP_CONTEXT, never to black
-  const chosen = opts.focusIndex >= 0 && personal && opts.focusIndex < personal.count;
+  // a chosen line, the reader's link or Timothy's thread: the rest of the web
+  // recedes to TAP_CONTEXT, never to black (fix-review #4)
+  const focus = opts.focusIndex == null ? -1 : opts.focusIndex, hover = opts.hoverIndex == null ? -1 : opts.hoverIndex;
+  const threads = underlay && opts.showUnderlay ? underlay.count : 0;
+  const linkFocus = !opts.focusUnderlay && personal && focus < personal.count ? focus : -1;
+  const linkHover = opts.hoverUnderlay ? -1 : hover;
+  const threadFocus = opts.focusUnderlay && focus < threads ? focus : -1;
+  const threadHover = opts.hoverUnderlay && hover < threads && hover !== threadFocus ? hover : -1;
+  const chosen = linkFocus >= 0 || threadFocus >= 0;
   const rest = chosen ? TAP_CONTEXT : 1;
 
   // ── Timothy's notes, beneath everything ──
@@ -860,6 +870,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     /** @type {Map<number, ContextBatches>} */
     const steps = new Map();
     for (let i = 0; i < underlay.count; i++) {
+      if (i === threadFocus) continue;   // stroked last, on top of everything
       const { a, b, pts } = underlayGeometry(underlay, i, opts, rails);
       if (!pts) continue;
       const fly = /** @type {any} */ (pts).cls === 'fly';
@@ -878,11 +889,40 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
   }
 
   drawRails(ctx, opts, rails);
+  if (personal && personal.count) drawLinks(ctx, personal, opts, rails, personalInk(z).link, linkHover, linkFocus, chosen);
 
-  if (!personal || !personal.count) return rails;
+  // ── Timothy's thread under the pointer, then the chosen one: on top, in its
+  // own source's colour (never the reader's gold); hover dims nothing (C3) ──
+  const compact = isCompact({ H: opts.height, DPR });
+  if (threadHover >= 0) strokeThread(ctx, underlay, threadHover, opts, rails, INK.hoverHalo, INK.hover.alpha, INK.hover.width * DPR);
+  if (threadFocus >= 0) {
+    strokeThread(ctx, underlay, threadFocus, opts, rails, INK.chosenHalo, INK.chosen.alpha,
+      (compact ? INK.chosen.widthCompact : INK.chosen.width) * DPR);
+  }
+  return rails;
+}
 
-  // ── the reader's links: halo pass first so no halo covers a neighbour's core ──
-  const L = personalInk(z).link;
+/** One of Timothy's threads, drawn alone: a halo, then its core. */
+function strokeThread(ctx, underlay, i, opts, rails, halo, alpha, width) {
+  const { pts } = underlayGeometry(underlay, i, opts, rails);
+  if (!pts) return;
+  const bin = underlay.source ? Math.min(CONTEXT_BINS - 1, Math.max(0, underlay.source[i] | 0)) : CONTEXT_BINS - 1;
+  const rgb = MY_WEB_SOURCES[bin].rgb;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const [a, w] of [[halo.alpha, halo.width * opts.DPR], [alpha, width]]) {
+    ctx.strokeStyle = 'rgba(' + rgb + ',' + a + ')';
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+    ctx.stroke();
+  }
+}
+
+/** The reader's links: halo pass first so no halo covers a neighbour's core. */
+function drawLinks(ctx, personal, opts, rails, L, linkHover, linkFocus, chosen) {
+  const { width, DPR } = opts;
+
   const paths = [];
   for (let i = 0; i < personal.count; i++) {
     const { a, b, pts } = linkGeometry(personal, i, opts, rails);
@@ -896,8 +936,8 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
   for (let i = 0; i < personal.count; i++) {
     const { pts, rgb, thin } = paths[i];
     if (!pts) continue;
-    const hot = i === opts.hoverIndex || i === opts.focusIndex;
-    const dim = (chosen && i !== opts.focusIndex) ? TAP_CONTEXT : 1;
+    const hot = i === linkHover || i === linkFocus;
+    const dim = (chosen && i !== linkFocus) ? TAP_CONTEXT : 1;
     ctx.strokeStyle = 'rgba(' + rgb + ',' + ((hot ? L.hoverHaloAlpha : L.haloAlpha) * dim) + ')';
     ctx.lineWidth = (hot ? L.hoverHalo : L.halo) * DPR * thin;
     ctx.beginPath();
@@ -908,8 +948,8 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
   for (let i = 0; i < personal.count; i++) {
     const { a, b, pts, rgb, pin, thin } = paths[i];
     if (!pts) continue;
-    const isHover = i === opts.hoverIndex;
-    const isFocus = i === opts.focusIndex;
+    const isHover = i === linkHover;
+    const isFocus = i === linkFocus;
     const dim = (chosen && !isFocus) ? TAP_CONTEXT : 1;
     ctx.strokeStyle = 'rgba(' + rgb + ',' + (L.alpha * dim) + ')';
     ctx.lineWidth = (isHover || isFocus ? L.hoverWidth : L.width) * DPR * thin;
@@ -929,7 +969,6 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
       if (pin !== 'ring') { ctx.beginPath(); ctx.arc(p[0], p[1], (pin === 'dot' ? L.dotSolo : L.dot) * DPR, 0, Math.PI * 2); ctx.fill(); }
     }
   }
-  return rails;
 }
 
 function insertNearest(out, candidate, limit) {

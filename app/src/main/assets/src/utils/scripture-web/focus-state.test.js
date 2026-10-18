@@ -6,7 +6,8 @@ import { focusState, withLit, litKeyOf, prophecyIndexOf, chosenEnds } from './fo
 describe('focusState', () => {
   it('nothing chosen, hovered or lit is the default, with every field present', () => {
     expect(focusState()).toEqual({
-      arc: -1, prophecy: false, range: null, range2: null, hover: -1, hoverProphecy: -1, lit: null, litKey: '',
+      arc: -1, prophecy: false, underlay: false, range: null, range2: null, hover: -1, hoverProphecy: -1,
+      hoverUnderlay: false, lit: null, litKey: '',
     });
   });
 
@@ -14,6 +15,15 @@ describe('focusState', () => {
     expect(focusState({ hoverProphecy: 4 }).hoverProphecy).toBe(4);
     expect(focusState({ hoverProphecy: undefined }).hoverProphecy).toBe(-1);
     expect(withLit(focusState({ hoverProphecy: 4 }), [1]).hoverProphecy).toBe(4);
+  });
+
+  it("My Web names which list arc and hover index: the reader's links, or Timothy's notes (fix-review #4)", () => {
+    expect(focusState({ arc: 4, underlay: true })).toMatchObject({ arc: 4, underlay: true, hoverUnderlay: false });
+    expect(focusState({ arc: 4, underlay: /** @type {any} */ (1) }).underlay).toBe(true);
+    expect(focusState({ hover: 2, hoverUnderlay: /** @type {any} */ (undefined) }).hoverUnderlay).toBe(false);
+    // a copy keeps them; a new choice drops them
+    expect(withLit(focusState({ arc: 4, underlay: true, hover: 1, hoverUnderlay: true }), [1])).toMatchObject({ underlay: true, hoverUnderlay: true });
+    expect(focusState({ arc: 2 }).underlay).toBe(false);
   });
 
   it('a patch lands over the defaults and the missing fields stay whole (the old { arc, range } writes dropped range2)', () => {
