@@ -7853,16 +7853,19 @@
     .sw-fallback-body { max-width: 34em; line-height: 1.6; }
 
     /* ── Scripture Web: the go-to (the navigation stream, w3; spec 4.5, r3-04) ──
-       The box floats over the canvas area (centred beside an open panel:
-       --sw-goto-inset is the panel's width, set inline from panelInsetRef);
+       The box floats over the canvas area, over every other layer of the web
+       (z 10: it is the dialog the reader just called up), centred beside an
+       open panel (--sw-goto-inset is the panel's width, set inline from
+       panelInsetRef);
        compact (a root 500 px tall or less) runs it 64 px from each side. The
        web is always night (Q4), so its ink is the spec's own, not the theme's.
        The verse chip rides the verse's foot (placed per frame from JS; it
-       takes no pointer); the edge chips sit at the frame's edges and Follow. */
+       takes no pointer; over a bottom sheet it stands on the sheet's top
+       edge); the edge chips sit at the frame's edges and Follow. */
     .sw-goto-btn { width: 44px; height: 44px; min-width: 44px; padding: 0; }
     .sw-goto-btn svg { width: 20px; height: 20px; }
     .sw-goto {
-      position: absolute; z-index: 6; top: 24px;
+      position: absolute; z-index: 10; top: 24px;
       left: calc((100% - var(--sw-goto-inset, 0px)) / 2); transform: translateX(-50%);
       width: min(640px, calc(100% - var(--sw-goto-inset, 0px) - 48px));
       background: rgba(36, 45, 47, 0.96); border: 1px solid #3A4547; border-radius: 14px;
@@ -7880,6 +7883,10 @@
       color: #F5F5F3; font-family: var(--font-body); font-size: var(--fsc-20); caret-color: #C4A469;
     }
     .sw-goto-input::placeholder { color: #959DA0; }
+    /* the box is the field (r3-04): the global [role="combobox"] ring would draw a box inside the
+       box, so the box itself shows where the keyboard is */
+    .sw-goto-input:focus-visible { outline: none; }
+    .sw-goto:focus-within { border-color: rgba(196, 164, 105, 0.55); }
     .sw-goto.is-compact .sw-goto-input { font-size: var(--fsc-18); }
     .sw-goto-list { list-style: none; margin: 0; padding: 4px 10px 0; }
     .sw-goto-row {
@@ -7889,6 +7896,8 @@
     .sw-goto.is-compact .sw-goto-row { height: 44px; line-height: 44px; font-size: var(--fsc-16); }
     .sw-goto-row.is-sel { background: #2C3537; }
     .sw-goto-ref, .sw-goto-sub { flex: none; }
+    /* each part is a flex item, whose leading space would collapse ("John 3· whole chapter") */
+    .sw-goto-sub, .sw-goto-text { white-space: pre; }
     .sw-goto-text {
       flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
       font-size: var(--fsc-16); color: #B7BFC1;

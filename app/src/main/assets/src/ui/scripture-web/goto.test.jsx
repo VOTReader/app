@@ -155,6 +155,27 @@ describe('the go-to box (spec 4.5)', () => {
     expect(get().journey.stack.map((e) => e.label)).toEqual(['Genesis 1:15552', 'Genesis 1:101']);
   });
 
+  it('the chip keeps out of the panel (CONTRACTS.md section 5): over a bottom sheet it stands on the sheet, not under it', async () => {
+    const { container, get } = mountWeb();
+    act(() => { get().goTo.open('Genesis 1:101'); });
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    settle(); await flush();
+    const chipEl = () => /** @type {HTMLElement} */ (container.querySelector('.sw-goto-chip'));
+    const chipY = () => Number(/translate\([^,]+,\s*(-?[\d.]+)px\)/.exec(chipEl().style.transform)[1]);
+    const footY = chipY();
+    expect(footY, 'with no panel: at the verse\'s foot, low in the frame').toBeGreaterThan(600 - 215);
+    // the panel stream's sheet below 560 px writes its height as the bottom inset, then schedules a frame
+    get().cam.panelInsetRef.current = { right: 0, bottom: 215 };
+    act(() => { get().frames.schedule(); });
+    settle();
+    expect(chipY(), 'its foot clear of the sheet\'s top edge').toBeLessThanOrEqual(600 - 215);
+    expect(chipEl().style.visibility).toBe('visible');
+    get().cam.panelInsetRef.current = { right: 0, bottom: 0 };
+    act(() => { get().frames.schedule(); });
+    settle();
+    expect(chipY(), 'the sheet gone: back at the foot').toBe(footY);
+  });
+
   it('the chip goes when the verse is no longer what is lit', async () => {
     const { container, get } = mountWeb();
     act(() => { get().goTo.open('Genesis 1:101'); });

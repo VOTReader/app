@@ -316,7 +316,10 @@ export function useGoTo(web) {
     else if (c && chipElRef.current && viewFor) {
       const va = viewFor();
       const x = verseToX(cam, v.W, (c.lo + c.hi + 1) / 2) / dpr;
-      const y = (va.base + (va.camY || 0)) / dpr;
+      // at the verse's foot, but never under the panel (CONTRACTS.md section 5: chips keep out of
+      // panelInsetRef): over a bottom sheet the chip stands on the sheet's top edge
+      const sheetTop = v.H / dpr - ((panelInsetRef && panelInsetRef.current && panelInsetRef.current.bottom) || 0);
+      const y = Math.min((va.base + (va.camY || 0)) / dpr, sheetTop);
       const el = chipElRef.current;
       el.style.transform = 'translate(' + Math.round(x + 10) + 'px,' + Math.round(y - 12) + 'px) translateY(-100%)';
       el.style.visibility = x >= 0 && x <= right / dpr - 40 && y <= v.H / dpr ? 'visible' : 'hidden';
@@ -343,7 +346,7 @@ export function useGoTo(web) {
       const named = (e) => (e ? { arc: e.arc, verse: e.verse, label: refOfVerse(graph, e.verse).label } : null);
       setEdges({ left: named(left), right: named(rightEnd) });
     }
-  }, [graph, camRef, viewRef, focusRef, area, viewFor]);
+  }, [graph, camRef, viewRef, focusRef, area, viewFor, panelInsetRef]);
 
   /** The start prop, once: as soon as the camera exists. */
   const tryStart = React.useCallback(() => {
