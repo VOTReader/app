@@ -139,6 +139,16 @@ describe('the panel API (CONTRACTS.md section 6): each mode opens today\'s card'
     expect(setAnnounce).toHaveBeenLastCalledWith(expect.stringMatching(/2/));
   });
 
+  it("group with ids carries the chapter it was opened at, for the chooser's zoom row (w3 review)", () => {
+    const { get } = mount();
+    act(() => { get().sel.openPanel({ mode: 'group', ids: [1, 0], label: '', chapter: 0 }); });
+    expect(get().sel.panel.spec).toMatchObject({ mode: 'group', ids: [1, 0], chapter: 0 });
+    expect(get().sel.choiceChapter).toBe(0);
+    act(() => { get().sel.openPanel({ mode: 'group', ids: [1, 0], label: '' }); });
+    expect(get().sel.panel.spec).not.toHaveProperty('chapter');
+    expect(get().sel.choiceChapter).toBe(-1);
+  });
+
   it('group with only a chapter opens the chapter sheet', () => {
     const { get } = mount();
     act(() => { get().sel.openPanel({ mode: 'group', ids: [], label: 'Genesis 1', chapter: 0 }); });

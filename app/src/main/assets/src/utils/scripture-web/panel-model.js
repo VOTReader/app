@@ -19,7 +19,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { refOfVerse, arcsTouching, countTouching, chapterRange } from './pick.js';
-import { clampCamera, fitPPV, verseToX } from './geometry.js';
+import { clampCamera, fitPPV, verseToX, xToVerse } from './geometry.js';
 import { citationsForVerse, letterCiteSites, endpointFor } from './vot-citations.js';
 import { verseEndpoint } from './describe.js';
 
@@ -170,6 +170,25 @@ export function zoomChapterOf(g, ids) {
     }
   }
   return best;
+}
+
+/**
+ * The chapter under a tap: the one whose verses stand at device x on the baseline, or -1 off the
+ * canon (or with no graph). The chooser's "Zoom to <chapter>" flies there, where the reader
+ * tapped; zoomChapterOf (where most feet stand, the lowest on a tie) is only the fallback when no
+ * tap is known (w3 review: a mid-overview tap offered Numbers 5).
+ * @param {any} g
+ * @param {{ x: number, ppv: number }} cam  ppv in device px a verse
+ * @param {number} W  the view's width, device px
+ * @param {number} x  the tap, device px
+ * @returns {number}
+ */
+export function chapterAtX(g, cam, W, x) {
+  if (!g || !g.chapterOfVerse || !g.chapters || !(g.total > 0) || !cam || !(cam.ppv > 0)) return -1;
+  const v = Math.floor(xToVerse(cam, W, x));
+  if (!(v >= 0 && v < g.total)) return -1;
+  const ci = g.chapterOfVerse[v];
+  return ci >= 0 && ci < g.chapters.length ? ci : -1;
 }
 
 /** A chapter's name for the zoom row: "Isaiah 7". @param {any} g @param {number} ci */

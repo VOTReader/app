@@ -36,7 +36,7 @@ import {
   pickThreads, pickChapter, pickVerse, chapterRange, nearbyChapter, nearbyThreads, arcsTouching,
 } from '../../utils/scripture-web/pick.js';
 import {
-  connectionFrame, chapterFrame, centreTarget, frameHolds,
+  connectionFrame, chapterFrame, centreTarget, frameHolds, chapterAtX,
 } from '../../utils/scripture-web/panel-model.js';
 import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 import { focusState, withLit } from '../../utils/scripture-web/focus-state.js';
@@ -78,9 +78,11 @@ export const PANEL_MODES = Object.freeze({ connection: true, verse: true, group:
  * The open card in the panel's terms. Pure, so the mapping is pinned without a mount.
  * @param {any} detail  the open sheet's described payload, or null
  * @param {any[] | null} choices  the chooser's described rows, or null
+ * @param {number} [choiceChapter]  the chapter the chooser was opened at (the tap's, a pill's), -1 or
+ *   absent when none is known
  * @returns {PanelState | null}
  */
-export function panelOf(detail, choices) {
+export function panelOf(detail, choices, choiceChapter = -1) {
   if (detail) {
     const k = detail.kind;
     if (k === 'arc') {
@@ -101,7 +103,10 @@ export function panelOf(detail, choices) {
   if (choices && choices.length) {
     // the group's ids are OpenBible arc ids: a row for a prophecy pair that is no arc (index -1)
     // stays in the rows (info), never in the ids
-    return { spec: { mode: 'group', ids: choices.map((c) => c.index).filter((i) => i >= 0), label: '' }, info: choices };
+    const ids = choices.map((c) => c.index).filter((i) => i >= 0);
+    return choiceChapter >= 0
+      ? { spec: { mode: 'group', ids, label: '', chapter: choiceChapter }, info: choices }
+      : { spec: { mode: 'group', ids, label: '' }, info: choices };
   }
   return null;
 }
@@ -142,6 +147,8 @@ export function useWebSelection({
   const detailRef = React.useRef(detail);
   detailRef.current = detail;
   const [choices, setChoices] = React.useState(null);    // overlapped line chooser
+  // the chapter the chooser was opened at (under the tap, or a pill's): its "Zoom to" row's, -1 none
+  const [choiceChapter, setChoiceChapter] = React.useState(-1);
   const [listOpen, setListOpen] = React.useState(false); // accessible nearby list
   const [tip, setTip] = React.useState(null);            // hover chip
   // whether the docked panel is open (read by the hover: the panel covers the web under it)
@@ -475,6 +482,7 @@ export function useWebSelection({
         focusRef.current = focusState();
         dropHover();
         setDetail(null); setListOpen(false); setChoices(rows);
+        setChoiceChapter(spec.chapter >= 0 && spec.chapter < g.chapters.length ? spec.chapter : -1);
         setAnnounce(chooserAnnouncement(rows.length));
         schedule();
         return true;
@@ -519,6 +527,7 @@ export function useWebSelection({
     if (closeEnough && described.length > 1 && described.every((item) => item.kind === 'arc' ||
         item.kind === 'link' || item.kind === 'underlay')) {
       setChoices(described);
+      setChoiceChapter(chapterAtX(graph, camRef.current, viewRef.current.W, cx * (viewRef.current.DPR || 1)));
       setDetail(null);
       setListOpen(false);
       // nothing is chosen while the chooser asks, and its rows replace the hover chip
@@ -530,7 +539,7 @@ export function useWebSelection({
     }
     commitFound(described[0]);
   }, [liftAt, hitCandidatesAt, describe, viewRef, commitFound, schedule, focusRef, dropHover, setAnnounce,
-    overlayFrameRef, graph, flyTo, openPanel, journey]);
+    overlayFrameRef, graph, flyTo, openPanel, journey, camRef]);
 
   /** Zoom in 2.5x about the tap (A4, the navigation stream): to where zoomAbout puts the camera,
    * eased through flyTo about the same point (instant under reduced motion). */
@@ -640,10 +649,10 @@ export function useWebSelection({
   }, [focusRef, schedule, setAnnounce]);
 
   // what is open, in the panel's terms (panelOf); closePanel is the one close
-  const panel = React.useMemo(() => panelOf(detail, choices), [detail, choices]);
+  const panel = React.useMemo(() => panelOf(detail, choices, choiceChapter), [detail, choices, choiceChapter]);
 
   return {
-    tip, choices, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
+    tip, choices, choiceChapter, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
     handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread, chooseGroup,
     followRow, zoomTo, describe,
     panel, openPanel, closePanel: closeCards, lightThreads, journey,

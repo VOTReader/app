@@ -292,7 +292,7 @@ function ThreadGroups({ groups, tagOf, translation, rowProps, light }) {
  * chooser over card, the precedence the state already has).
  * @param {{
  *   graph: any, mode: string, density: any, translation?: string, compact?: boolean,
- *   listOpen: boolean, listItems: any[], lensOn: boolean, choices: any[] | null, detail: any,
+ *   listOpen: boolean, listItems: any[], lensOn: boolean, choices: any[] | null, choiceChapter?: number, detail: any,
  *   journey?: any, onClose: () => void, onChoose: (found: any, opts?: any) => void,
  *   openPanel: (spec: any, opts?: any) => boolean, followThread: (info: any) => void,
  *   followRow: (row: any) => void, zoomTo: (chapterIndex: number) => void,
@@ -302,7 +302,7 @@ function ThreadGroups({ groups, tagOf, translation, rowProps, light }) {
  */
 export function WebPanel(props) {
   const {
-    graph: g, mode: webMode, density, translation, compact = false, listOpen, listItems, lensOn, choices, detail,
+    graph: g, mode: webMode, density, translation, compact = false, listOpen, listItems, lensOn, choices, choiceChapter = -1, detail,
     journey, onClose, onChoose, openPanel, followThread, followRow, zoomTo, onOpen, lightThreads, flyTo,
   } = props;
   const mode = listOpen ? 'list' : choices && choices.length ? 'chooser' : modeOfDetail(detail);
@@ -417,7 +417,7 @@ export function WebPanel(props) {
               onLight={c.kind === 'arc' ? (on) => light(on ? [c.index] : null) : undefined} />
           ))}
         </ul>
-        {webMode !== 'personal' && arcs.length ? <ZoomRow g={g} chapterIndex={zoomChapterOf(g, arcs)} zoomTo={zoomTo} /> : null}
+        {webMode !== 'personal' && arcs.length ? <ZoomRow g={g} chapterIndex={choiceChapter >= 0 ? choiceChapter : zoomChapterOf(g, arcs)} zoomTo={zoomTo} /> : null}
       </React.Fragment>
     );
   } else if (mode === 'connection' && model) {

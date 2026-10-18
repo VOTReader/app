@@ -189,6 +189,22 @@ describe('group mode', () => {
     expect(pm.zoomChapterOf(g, ids)).toBe(g.chapterOfVerse[ISA_7_14]);
     expect(pm.zoomChapterOf(g, [])).toBe(-1);
   });
+
+  it('the chapter under a tap, which the chooser zooms to (w3 review: not the lowest of a tie)', () => {
+    const W = 1280;
+    const cam = { x: g.total / 2, ppv: W / g.total, total: g.total, y: 0 };
+    // a tap at the middle of the overview: the chapter of the canon's middle verse
+    expect(pm.chapterAtX(g, cam, W, W / 2)).toBe(g.chapterOfVerse[Math.floor(g.total / 2)]);
+    expect(pm.chapterAtX(g, cam, W, 0)).toBe(0);
+    expect(pm.chapterAtX(g, cam, W, W - 0.01)).toBe(g.chapters.length - 1);
+    // zoomed on Isaiah 7:14: the tap's own verse
+    const near = { x: ISA_7_14 + 0.5, ppv: 8, total: g.total, y: 0 };
+    expect(pm.chapterAtX(g, near, W, W / 2)).toBe(g.chapterOfVerse[ISA_7_14]);
+    // off the canon, and no graph: no chapter
+    expect(pm.chapterAtX(g, cam, W, -5)).toBe(-1);
+    expect(pm.chapterAtX(g, cam, W, W + 5)).toBe(-1);
+    expect(pm.chapterAtX(null, cam, W, 10)).toBe(-1);
+  });
 });
 
 describe('letter mode', () => {

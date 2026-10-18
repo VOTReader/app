@@ -293,6 +293,16 @@ describe('the chooser at overview', () => {
     expect(byText(/^Zoom to Isaiah 7$/)).toHaveLength(1);
   });
 
+  it('"Zoom to" names the chapter the reader tapped when the tap is known (w3 review)', () => {
+    const ids = [ARC, ...pm.threadsFrom(g, ISA_7_14, ISA_7_14, 'famous').ids.slice(0, 4)];
+    const { byText, props } = mount({ choices: ids.map(arcOf), choiceChapter: g.chapterOfVerse[JOHN_3_16] });
+    expect(byText(/^Zoom to Isaiah 7$/)).toHaveLength(0);
+    const zoom = byText(/^Zoom to John 3$/);
+    expect(zoom).toHaveLength(1);
+    fireEvent.click(zoom[0]);
+    expect(props.zoomTo).toHaveBeenCalledWith(g.chapterOfVerse[JOHN_3_16]);
+  });
+
   it('lights nothing on My Web (the reader\'s own links have no lit set)', () => {
     const choices = [arcOf(ARC), arcOf(ARC + 1)];
     const { panel, props } = mount({ choices, mode: 'personal' });
