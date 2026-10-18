@@ -19,6 +19,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { refOfVerse, arcsTouching, countTouching, chapterRange } from './pick.js';
+import { clampCamera, fitPPV, verseToX } from './geometry.js';
 import { citationsForVerse, letterCiteSites, endpointFor } from './vot-citations.js';
 import { verseEndpoint } from './describe.js';
 
@@ -283,3 +284,80 @@ export function connectionFrame(from, to) {
 
 /** The narrowest connection frame, in verses (connectionFrame). */
 export const MIN_FRAME = 24;
+
+/**
+ * Where flyTo leaves the camera for a target (CONTRACTS.md section 3, its pinned maths): the zoom
+ * clamped to [fit, fit x cap], the target at the CANVAS AREA's centre, then the camera's own clamp
+ * (geometry.js clampCamera), which never lets the view run past either end of the canon. A copy;
+ * the camera is not touched.
+ * @param {{ x: number, ppv: number, total: number }} cam  ppv in device px a verse
+ * @param {number} W  the view's width, device px
+ * @param {number} right  what the panel covers on the right, device px
+ * @param {{ x0: number, x1: number } | { x: number, zoom?: number }} target  a FlyTarget
+ * @param {number} cap  the zoom ceiling, a multiple of fit (web-frame.js maxZoomOf)
+ * @returns {{ x: number, ppv: number, total: number, y?: number }}
+ */
+export function landingOf(cam, W, right, target, cap) {
+  const fit = fitPPV(cam, W);
+  const areaW = Math.max(1, W - right);
+  const t = /** @type {any} */ (target);
+  let ppv = cam.ppv, cx = t.x;
+  if ('x0' in t && t.x1 > t.x0) { ppv = areaW / (t.x1 - t.x0); cx = (t.x0 + t.x1) / 2; }
+  else if (t.zoom > 0) ppv = fit * t.zoom;
+  ppv = Math.min(Math.max(ppv, fit), fit * cap);
+  return clampCamera({ x: cx + right / (2 * ppv), ppv, total: cam.total, y: 0 }, W, cap);
+}
+
+/**
+ * A flyTo target that brings canon x into the canvas area (spec section 3) whatever the camera's
+ * clamp allows (w3 review, the major finding): centred at the reader's zoom where it can be, as
+ * before. Near the canon's end the clamp stops the camera before x reaches the area's centre, so a
+ * verse there stayed under the docked panel (John 3:16 at 888 of a 960 px area; Revelation's
+ * threads hidden). The zoom then rises to the least at which x sits at the area's centre, or failing
+ * that inside its inner 90 %, never past the ceiling; where even the ceiling cannot bring it out
+ * (the canon's last few verses), the zoom is left alone, because a dive that ends under the panel
+ * gains nothing. The canon's start needs nothing: the clamp holds Genesis at the left edge, in the
+ * area. The zoom never falls below the reader's.
+ * @param {{ x: number, ppv: number, total: number }} cam
+ * @param {number} W @param {number} right  device px, as landingOf
+ * @param {number} x  the canon x to bring in (verse v's middle is v + 0.5)
+ * @param {number} cap  the zoom ceiling, a multiple of fit
+ * @returns {{ x: number, zoom?: number }}
+ */
+export function centreTarget(cam, W, right, x, cap) {
+  const fit = fitPPV(cam, W);
+  const top = fit * cap;
+  const ppv0 = Math.min(Math.max(cam.ppv, fit), top);
+  const areaW = Math.max(1, W - right);
+  // where x lands, view px, centred at ppv; it falls as the zoom rises while the clamp holds the
+  // camera at the canon's end
+  const land = (/** @type {number} */ ppv) => verseToX(landingOf(cam, W, right, { x, zoom: ppv / fit }, cap), W, x);
+  if (!(right > 0) || land(ppv0) <= areaW / 2 + 1) return { x };
+  for (const goal of [areaW / 2 + 0.25, 0.9 * areaW]) {
+    if (land(top) > goal) continue;
+    let lo = Math.log(ppv0), hi = Math.log(top);
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2;
+      if (land(Math.exp(mid)) <= goal) hi = mid; else lo = mid;
+    }
+    return { x, zoom: Math.exp(hi) / fit };
+  }
+  return { x };
+}
+
+/**
+ * Whether a connection's frame holds both its feet inside the canvas area once flyTo and the clamp
+ * have had their say: a thread wider than the area at fit cannot be framed whole (the zoom stops at
+ * fit), nor can one the clamp keeps from being centred.
+ * @param {{ x: number, ppv: number, total: number }} cam
+ * @param {number} W @param {number} right  device px
+ * @param {{ x0: number, x1: number }} frame  connectionFrame's
+ * @param {number} from @param {number} to  the thread's verses
+ * @param {number} cap
+ */
+export function frameHolds(cam, W, right, frame, from, to, cap) {
+  const c = landingOf(cam, W, right, frame, cap);
+  const areaW = Math.max(1, W - right);
+  const a = verseToX(c, W, Math.min(from, to) + 0.5), b = verseToX(c, W, Math.max(from, to) + 0.5);
+  return a >= 0 && b <= areaW;
+}

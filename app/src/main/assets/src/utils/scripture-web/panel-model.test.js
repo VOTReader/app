@@ -20,6 +20,7 @@ import { decodeGraph } from './decode.js';
 import { windowCorpus, endpointFor } from './vot-citations.js';
 import * as pm from './panel-model.js';
 import * as ds from './describe.js';
+import { verseToX } from './geometry.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DATA = resolve(here, '../../data');
@@ -234,5 +235,64 @@ describe('shared pieces', () => {
     expect(pm.verseText(ref, 'kjv')).toBe('KJV TEXT john 3:16');
     expect(pm.verseText(ref, 'web')).toBe('TEXT john 3:16');
     expect(pm.verseText(ref, 'nkjv')).toBe('TEXT john 3:16');
+  });
+});
+
+/* The camera's clamp keeps the VIEW inside the canon, so near its end a verse centred at the
+   reader's zoom stayed under the docked panel (w3 review). PC 1600x900 at DPR 1, panel 640. */
+describe('framing under the camera clamp: landingOf, centreTarget, frameHolds', () => {
+  const W = 1600, RIGHT = 640, AREA = W - RIGHT;
+  const T = g.total;
+  const fit = W / T;
+  const cap = 44 * T / W; // web-frame maxZoomOf at DPR 1
+  const at = (cam, target, x) => verseToX(pm.landingOf(cam, W, RIGHT, target, cap), W, x);
+
+  it('landingOf is flyTo\'s maths: the canvas area\'s centre, the zoom held to [fit, cap], then the clamp', () => {
+    const cam = { x: 15000, ppv: 1, total: T };
+    expect(at(cam, { x: 15000 }, 15000)).toBeCloseTo(AREA / 2, 6);
+    expect(pm.landingOf(cam, W, RIGHT, { x: 15000, zoom: 0.5 }, cap).ppv).toBeCloseTo(fit, 9);
+    expect(pm.landingOf(cam, W, RIGHT, { x: 15000, zoom: cap * 2 }, cap).ppv).toBeCloseTo(fit * cap, 6);
+    // at the canon's end the view stops at its last verse: x is left right of the area's centre
+    expect(at(cam, { x: T - 100 }, T - 100)).toBeGreaterThan(AREA);
+    expect(cam).toEqual({ x: 15000, ppv: 1, total: T }); // a copy: the camera is not moved
+  });
+
+  it('centreTarget keeps the reader\'s zoom wherever the clamp lets x be centred', () => {
+    expect(pm.centreTarget({ x: 15000, ppv: 1, total: T }, W, RIGHT, 16000, cap)).toEqual({ x: 16000 });
+    // the canon's start is in the area already: the clamp holds Genesis at the left edge
+    expect(pm.centreTarget({ x: T / 2, ppv: fit, total: T }, W, RIGHT, 70.5, cap)).toEqual({ x: 70.5 });
+    // no panel, nothing to keep out of
+    expect(pm.centreTarget({ x: T / 2, ppv: fit, total: T }, W, 0, T - 40, cap)).toEqual({ x: T - 40 });
+  });
+
+  it('near the end it zooms in only as far as centring x needs, never out', () => {
+    const cam = { x: T / 2, ppv: fit, total: T };
+    const t = pm.centreTarget(cam, W, RIGHT, JOHN_3_16 + 0.5, cap);
+    expect(t.zoom).toBeGreaterThan(1);
+    expect(Math.abs(at(cam, t, JOHN_3_16 + 0.5) - AREA / 2)).toBeLessThanOrEqual(0.25);
+    // a hair less zoom and the clamp would leave it right of centre
+    expect(at(cam, { x: t.x, zoom: t.zoom * 0.98 }, JOHN_3_16 + 0.5)).toBeGreaterThan(AREA / 2 + 1);
+    const deep = { x: T - 200, ppv: 30, total: T };
+    expect(pm.centreTarget(deep, W, RIGHT, T - 300, cap)).toEqual({ x: T - 300 });
+  });
+
+  it('a verse the ceiling cannot bring out stays at the reader\'s zoom (a dive under the panel gains nothing)', () => {
+    const cam = { x: T / 2, ppv: fit, total: T };
+    expect(pm.centreTarget(cam, W, RIGHT, T - 0.5, cap)).toEqual({ x: T - 0.5 });
+    // a few verses further in: the inner 90 % is reachable though the centre is not
+    const near = pm.centreTarget(cam, W, RIGHT, T - 18.5, cap);
+    expect(near.zoom).toBeGreaterThan(1);
+    const x = at(cam, near, T - 18.5);
+    expect(x).toBeGreaterThan(AREA / 2);
+    expect(x).toBeLessThanOrEqual(0.9 * AREA + 0.01);
+  });
+
+  it('frameHolds: Isaiah 7:14 to Matthew 1:23 frames whole; Isaiah to Revelation and Genesis to Revelation cannot', () => {
+    const cam = { x: T / 2, ppv: fit, total: T };
+    const holds = (a, b) => pm.frameHolds(cam, W, RIGHT, pm.connectionFrame(a, b), a, b, cap);
+    expect(holds(ISA_7_14, MATT_1_23)).toBe(true);
+    expect(holds(ISA_7_14, T - 30)).toBe(false); // the clamp keeps its frame from the area's centre
+    expect(holds(60, T - 200)).toBe(false); // wider than the area at fit
+    expect(pm.frameHolds(cam, W, 0, pm.connectionFrame(60, T - 200), 60, T - 200, cap)).toBe(true); // no panel
   });
 });

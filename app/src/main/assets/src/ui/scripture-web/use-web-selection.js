@@ -35,7 +35,9 @@ import { zoomAbout, fitPPV, verseToX } from '../../utils/scripture-web/geometry.
 import {
   pickThreads, pickChapter, pickVerse, chapterRange, nearbyChapter, nearbyThreads, arcsTouching,
 } from '../../utils/scripture-web/pick.js';
-import { connectionFrame, chapterFrame } from '../../utils/scripture-web/panel-model.js';
+import {
+  connectionFrame, chapterFrame, centreTarget, frameHolds,
+} from '../../utils/scripture-web/panel-model.js';
 import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 import { focusState, withLit } from '../../utils/scripture-web/focus-state.js';
 import {
@@ -276,28 +278,63 @@ export function useWebSelection({
   }, [graph, listOpen, mode, describe, showUnderlay, camRef, viewRef, density, personalRef, railOpts, settledAt]);
 
   /**
-   * Keep what was opened in the canvas area (spec section 3). A connection is framed: both feet
-   * inside the area the panel leaves, 10 % margins (connectionFrame), eased over FRAME_MS. A verse,
-   * a chapter or a bundle moves only when its middle would sit under the panel, off the left edge
-   * or in the area's outer tenth either side (its threads fan out both ways), centred in the area
-   * at the same zoom. My Web's cards stay where the reader put them.
+   * What the open panel covers and how flyTo is told it: `right` in device px (0 with no layout
+   * known), and the opts that name the inset and the spec's ease.
    */
-  const frameFound = React.useCallback((found) => {
-    const cam = camRef.current, v = viewRef.current;
-    if (!found || !cam || !v || !v.W || typeof flyTo !== 'function') return;
+  const coverNow = React.useCallback(() => {
+    const v = viewRef.current;
     const inset = typeof insetFor === 'function' ? insetFor() : null;
     /** @type {any} */
     const opts = { ms: FRAME_MS };
     if (inset) { opts.insetRight = inset.right; opts.insetBottom = inset.bottom; }
-    if (found.kind === 'arc') { flyTo(connectionFrame(found.from, found.to), opts); return; }
+    return { right: inset && v ? inset.right * (v.DPR || 1) : 0, opts };
+  }, [viewRef, insetFor]);
+
+  /**
+   * Bring canon x into the canvas area the panel leaves (spec section 3), at the reader's zoom where
+   * the camera's clamp lets it be centred there, else at the least zoom that does (panel-model
+   * centreTarget: near the canon's end the clamp stops the camera first, and what was opened stayed
+   * under the panel, the w3 review's major finding). `always` centres it; otherwise it moves only
+   * when x sits under the panel, off the left edge or in the area's outer tenth either side (its
+   * threads fan out both ways).
+   * @param {number} x  canon x
+   * @param {{ always?: boolean }} [how]
+   */
+  const bringIn = React.useCallback((x, how = {}) => {
+    const cam = camRef.current, v = viewRef.current;
+    if (!cam || !v || !v.W || typeof flyTo !== 'function') return;
+    const { right, opts } = coverNow();
+    if (!how.always) {
+      const at = verseToX(cam, v.W, x), areaW = v.W - right;
+      if (at >= 0.1 * areaW && at <= 0.9 * areaW) return;
+    }
+    flyTo(centreTarget(cam, v.W, right, x, maxZoomOf(graph, v)), opts);
+  }, [camRef, viewRef, flyTo, coverNow, graph]);
+
+  /**
+   * Keep what was opened in the canvas area (spec section 3). A connection is framed: both feet
+   * inside the area the panel leaves, 10 % margins (connectionFrame), eased over FRAME_MS. A thread
+   * the area cannot hold whole (wider than it at fit, or kept from its centre by the camera's clamp
+   * at the canon's end) keeps its NEAR foot in instead, the one the reader is looking at; Follow
+   * takes them to the other. A verse, a chapter or a bundle moves only when its middle would sit
+   * under the panel or in the area's outer tenth (bringIn). My Web's cards stay where the reader
+   * put them.
+   */
+  const frameFound = React.useCallback((found) => {
+    const cam = camRef.current, v = viewRef.current;
+    if (!found || !cam || !v || !v.W || typeof flyTo !== 'function') return;
+    if (found.kind === 'arc') {
+      const { right, opts } = coverNow();
+      const frame = connectionFrame(found.from, found.to);
+      if (frameHolds(cam, v.W, right, frame, found.from, found.to, maxZoomOf(graph, v))) { flyTo(frame, opts); return; }
+      bringIn((found.far === 'to' ? found.from : found.to) + 0.5);
+      return;
+    }
     const range = found.kind === 'verse' ? [found.verse, found.verse]
       : found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi] : null;
     if (!range || mode === 'personal') return;
-    const mid = (range[0] + range[1] + 1) / 2;
-    const x = verseToX(cam, v.W, mid) / (v.DPR || 1);
-    const areaW = v.W / (v.DPR || 1) - (inset ? inset.right : 0);
-    if (x < 0.1 * areaW || x > 0.9 * areaW) flyTo({ x: mid }, opts);
-  }, [camRef, viewRef, flyTo, insetFor, mode]);
+    bringIn((range[0] + range[1] + 1) / 2);
+  }, [camRef, viewRef, flyTo, coverNow, bringIn, graph, mode]);
 
   /**
    * Choose a described hit: it opens in the panel, the focus is its own, and the camera keeps it in
@@ -309,10 +346,12 @@ export function useWebSelection({
   const commitFound = React.useCallback((found, opts = {}) => {
     if (!found) return;
     const o = /** @type {{ frame?: boolean, parent?: any }} */ (opts && typeof opts === 'object' && !('nativeEvent' in opts) ? opts : {});
-    // the far foot is the one further from the camera: what Follow pans to, read BEFORE the
-    // framing moves the camera to the middle
+    // the far foot is the one further from the middle of what the reader sees (the canvas area's
+    // centre, the panel left out): what Follow goes to, read BEFORE the framing moves the camera.
+    // The near one is what a thread too wide to frame keeps in view (frameFound)
     if (found.kind === 'arc' && camRef.current && !found.far) {
-      const x = camRef.current.x;
+      const cam = camRef.current;
+      const x = cam.x - (cam.ppv > 0 ? coverNow().right / (2 * cam.ppv) : 0);
       found = Object.assign({}, found, { far: Math.abs(found.to - x) >= Math.abs(found.from - x) ? 'to' : 'from' });
     }
     if (o.parent !== undefined) found = Object.assign({}, found, { parent: o.parent });
@@ -334,7 +373,7 @@ export function useWebSelection({
     setAnnounce(summaryOf(found));
     if (o.frame !== false) frameFound(found);
     schedule();
-  }, [camRef, focusRef, schedule, setAnnounce, graph, density, frameFound]);
+  }, [camRef, focusRef, schedule, setAnnounce, graph, density, frameFound, coverNow]);
 
   const hover = React.useCallback((cx, cy) => {
     // the docked panel covers the web under it: the gesture surface is the root, so a mouse resting
@@ -528,10 +567,10 @@ export function useWebSelection({
     schedule();
   }, [focusRef, schedule]);
 
-  /** Follow the chosen line to its far foot: the camera centres on that
-   * verse at the same zoom, the line stays spotlit, and the control turns
-   * to the other end so the reader can walk it back (Corbin's brief,
-   * 2026-09-11: "every line followable end to end"). */
+  /** Follow the chosen line to its far foot: the camera centres that verse in the canvas area at
+   * the same zoom (closer only where the clamp at the canon's end needs it: bringIn), the line
+   * stays spotlit, and the control turns to the other end so the reader can walk it back (Corbin's
+   * brief, 2026-09-11: "every line followable end to end"). */
   const followThread = React.useCallback((info) => {
     if (!camRef.current || !info || info.kind !== 'arc') return;
     const toFar = info.far === 'to';
@@ -543,12 +582,12 @@ export function useWebSelection({
     const open = info.index >= 0 ? { mode: 'connection', arc: info.index }
       : { mode: 'connection', arc: info.prophecyIndex, prophecy: true };
     if (journey) journey.push({ verse, label: end.label, open }, { verse: toFar ? info.from : info.to, label: (toFar ? info.a : info.b).label, open });
-    // the camera goes there through flyTo: same zoom, clamped (instant today; the ease is nav's)
-    flyTo({ x: verse }, { ms: FRAME_MS });
+    // the camera goes there through flyTo (bringIn: out from under the panel, clamped)
+    bringIn(verse, { always: true });
     setDetail(Object.assign({}, info, { far: toFar ? 'from' : 'to' }));
     setAnnounce(followAnnouncement(end.label));
     schedule();
-  }, [camRef, flyTo, journey, schedule, setAnnounce]);
+  }, [camRef, bringIn, journey, schedule, setAnnounce]);
 
   /**
    * Follow a listed thread (a MORE FROM or a verse-mode row) to its far end: the panel swaps to that
@@ -570,10 +609,10 @@ export function useWebSelection({
     focusRef.current = focusState({ arc: row.index });
     setTip(null); setChoices(null); setListOpen(false);
     setDetail(Object.assign({}, info, { far }));
-    if (camRef.current) flyTo({ x: row.otherVerse }, { ms: FRAME_MS });
+    bringIn(row.otherVerse, { always: true });
     setAnnounce(followAnnouncement(there.label));
     schedule();
-  }, [graph, describe, journey, focusRef, camRef, flyTo, schedule, setAnnounce]);
+  }, [graph, describe, journey, focusRef, bringIn, schedule, setAnnounce]);
 
   /** "Zoom to <chapter>" (the chooser's last row, Q7): the panel closes and the chapter fills about
    * 70 % of the canvas (panel-model chapterFrame). @param {number} chapterIndex */

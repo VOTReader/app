@@ -23,9 +23,21 @@ const graph = () => ({
   votEdges: [], prophecy: [{ a: 5, b: 9000 }], votLinks: [], chunkSize: 256,
 });
 
-/** The camera, the journey and the selection wired as the screen wires them. */
-function mount({ withCamera = true, mode = 'canonical', personal = null, rails = null, topbar = null, insetFor = undefined } = {}) {
+/** The fixture with more threads after its two, each [from, to, votes]. */
+const graphWith = (more) => {
   const g = graph();
+  const all = [[100, 20100, 7], [200, 300, 30], ...more];
+  g.count = all.length;
+  g.buckets = [{ off: 0, len: all.length, off20: all.length, off10: all.length, segments: 8, chunks: [[100, 20100]] }];
+  g.from = new Uint16Array(all.map((a) => a[0]));
+  g.to = new Uint16Array(all.map((a) => a[1]));
+  g.votes = new Int16Array(all.map((a) => a[2]));
+  return g;
+};
+
+/** The camera, the journey and the selection wired as the screen wires them. */
+function mount({ withCamera = true, mode = 'canonical', personal = null, rails = null, topbar = null, insetFor = undefined, make = graph } = {}) {
+  const g = make();
   const schedule = vi.fn();
   const setAnnounce = vi.fn();
   const hook = renderHook(() => {
@@ -387,6 +399,75 @@ describe('the panel frames what it opens (spec section 3)', () => {
     x = verseToX(c, 800, 15506.5);
     expect(x).toBeGreaterThan(0.1 * 500);
     expect(x).toBeLessThan(0.9 * 500);
+  });
+});
+
+/* w3 review (major): the camera's clamp keeps the VIEW inside the canon, so near the canon's end
+   flyTo stopped before what the panel opened reached the canvas area's centre. John 3:16 opened
+   with its foot at 888 of a 960 px area, and anything in Revelation sat under the panel. The PC
+   frame here is the review's, 1600x900 (DPR 2): the docked panel covers 640 CSS px, 40 %. */
+describe("the panel brings what it opens out from under itself, even at the canon's end", () => {
+  const W = 3200, AREA = 960, FIT = W / TOTAL;
+  const pc = (cam, more = []) => {
+    const m = mount({ insetFor: () => ({ right: 640, bottom: 0 }), make: () => graphWith(more) });
+    m.get().cam.viewRef.current = { W, H: 1800, DPR: 2 };
+    m.get().cam.camRef.current = Object.assign({ total: TOTAL, y: 0 }, cam);
+    return m;
+  };
+  // where verse v's foot stands across the canvas area: 0 its left edge, 1 the panel's
+  const across = (m, v) => verseToX(m.get().cam.camRef.current, W, v + 0.5) / 2 / AREA;
+
+  it('a verse in Revelation 21 opened at the overview sits inside the canvas area', () => {
+    const REV_21_4 = TOTAL - 45;
+    const m = pc({ x: TOTAL / 2, ppv: FIT });
+    act(() => { m.get().sel.openPanel({ mode: 'verse', verse: REV_21_4 }); });
+    const f = across(m, REV_21_4);
+    expect(f).toBeGreaterThan(0.1);
+    expect(f).toBeLessThan(0.9);
+  });
+
+  it('John 3:16 at the zoom the review measured is centred in the area, not left at 888 of 960', () => {
+    const JOHN_3_16 = 26137;
+    const m = pc({ x: 24000, ppv: 0.286 });
+    act(() => { m.get().sel.openPanel({ mode: 'verse', verse: JOHN_3_16 }); });
+    expect(across(m, JOHN_3_16)).toBeCloseTo(0.5, 1);
+    expect(m.get().cam.camRef.current.ppv).toBeGreaterThan(0.286); // it zoomed in to get there
+  });
+
+  it('a thread the area cannot hold whole keeps its near foot in; Follow brings the far foot in Revelation out too', () => {
+    // Isaiah to Revelation 22: the clamp keeps the frame from being centred in the area
+    const m = pc({ x: 18000, ppv: 2 }, [[18000, TOTAL - 30, 50]]);
+    act(() => { m.get().sel.openPanel({ mode: 'connection', arc: 2 }); });
+    const info = m.get().sel.detail;
+    expect(info.far).toBe('to');
+    const near = across(m, 18000);
+    expect(near).toBeGreaterThan(0.1);
+    expect(near).toBeLessThan(0.9);
+    act(() => { m.get().sel.followThread(info); });
+    const far = across(m, TOTAL - 30);
+    expect(far).toBeGreaterThan(0.1);
+    expect(far).toBeLessThan(0.9);
+  });
+
+  it('a thread wider than the area at fit, tapped deep in Revelation, keeps the tapped foot in view', () => {
+    // Genesis 3 to Revelation 13 with the reader at Revelation 12: the whole frame needs less than
+    // fit, and fit put the foot the reader was looking at under the panel
+    const m = pc({ x: 30800, ppv: 4 }, [[60, 30900, 90]]);
+    act(() => { m.get().sel.openPanel({ mode: 'connection', arc: 2 }); });
+    expect(m.get().sel.detail.far).toBe('from');
+    const f = across(m, 30900);
+    expect(f).toBeGreaterThan(0.1);
+    expect(f).toBeLessThan(0.9);
+    expect(m.get().cam.camRef.current.ppv).toBeGreaterThanOrEqual(4); // never zoomed out from the reader
+  });
+
+  it("a row's Follow to Revelation lands in the area as well", () => {
+    const m = pc({ x: 18000, ppv: 2 }, [[18000, TOTAL - 30, 50]]);
+    act(() => { m.get().sel.openPanel({ mode: 'verse', verse: 18000 }); });
+    act(() => { m.get().sel.followRow({ index: 2, hereVerse: 18000, otherVerse: TOTAL - 30 }); });
+    const f = across(m, TOTAL - 30);
+    expect(f).toBeGreaterThan(0.1);
+    expect(f).toBeLessThan(0.9);
   });
 });
 
