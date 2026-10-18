@@ -42,6 +42,7 @@ export const GESTURE_HOLD_MS = 150;
 
 /** How far a device-pixel box may sit from the CSS box times the dpr (pixel snapping), device px. */
 export const BOX_SNAP_PX = 2;
+import { onWebFontReady } from '../../utils/scripture-web/label-engine.js';
 
 /**
  * Whether a browser walk is reading the frame (the walks set __swWalk; a driven
@@ -421,6 +422,8 @@ export function useWebRenderer({
     const m = motionRef.current;
     if (m.timer) { clearTimeout(m.timer); m.timer = 0; }
   }, []);
+  // the canvas's face arriving changes every width: one more frame (nothing else holds this one)
+  React.useEffect(() => onWebFontReady(schedule), [schedule]);
 
   // ── size + renderer lifecycle ───────────────────────────────────────────
   // noWebGL is a dep (#3): the list unmounts the canvases, so the renderer

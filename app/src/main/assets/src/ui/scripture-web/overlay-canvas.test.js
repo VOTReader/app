@@ -511,6 +511,36 @@ describe('labelFeed: every drawn thread a reader can see on the frame', () => {
    (about 17,000 threads at 6x) and sorted every 40 px bucket of them, to keep three a bucket:
    panning at 6x cost 8.3 ms a frame against the spine's 0.6. The keepers are now chosen in one
    pass with no sort, and nothing is made for a foot that cannot win. */
+describe('the face arriving (w3 review: the overlay kept the last frame, its ctx and graph, in a module global)', () => {
+  it('the overlay paints nothing on its own when the face loads; whoever subscribed (the screen schedule) is told once', async () => {
+    vi.resetModules();
+    globalThis.FontFace = class {
+      constructor(family) { this.family = family; this.status = 'unloaded'; }
+      load() { this.status = 'loaded'; return Promise.resolve(this); }
+    };
+    Object.defineProperty(document, 'fonts', { configurable: true, value: { add() {}, ready: Promise.resolve() } });
+    try {
+      const le = await import('../../utils/scripture-web/label-engine.js');
+      const ov = await import('./overlay-renderer.js');
+      const schedule = vi.fn();
+      const off = le.onWebFontReady(schedule);
+      const rec = recorder();
+      ov.paintCanonOverlay(rec.ctx, frameAt('pc', 40, ISA53_6));
+      const n = rec.calls.length;
+      expect(n).toBeGreaterThan(100);
+      await new Promise((r) => setTimeout(r, 0));
+      expect(le.webFontReady()).toBe(true);
+      expect(schedule).toHaveBeenCalledTimes(1);
+      expect(rec.calls.length, 'no repaint of the old frame from inside the overlay').toBe(n);
+      off();
+    } finally {
+      delete globalThis.FontFace;
+      delete document.fonts;
+      vi.resetModules();
+    }
+  });
+});
+
 describe('the chip pass chooses its keepers in one pass', () => {
   /** The sort per bucket the pass replaced (the old cull), as the reference. */
   function sortedKeepers(fs, memo, left, right, bucketW, keep) {

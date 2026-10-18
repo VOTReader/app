@@ -24,7 +24,8 @@
      flicker between two neighbours as the camera moves a pixel.
 
    Pure apart from ensureWebFont, which registers the face once (a no-op
-   where there is no FontFace, as in jsdom). */
+   where there is no FontFace, as in jsdom), and onWebFontReady, which tells
+   the screens when it has loaded. */
 
 import { FONT } from './sw-ink.js';
 
@@ -225,32 +226,45 @@ export function placeRanked(cands, memory, fits, commit) {
 /** @type {any} */
 let face = null;
 let faceReady = false;
-/** @type {(() => void)|null} */
-let onFaceReady = null;
+/** @type {Set<() => void>} who repaints when the face arrives (the screens' frame schedulers) */
+const faceListeners = new Set();
 
 /** True once the web's face has loaded (until then the canvas draws in the fallbacks). */
 export function webFontReady() { return faceReady; }
 
 /**
- * Register the web's face once and call `onReady` when it (or any font the
- * document waits on) has loaded: the overlay clears the measure cache and
- * repaints. The last `onReady` given wins (the overlay passes one repaint).
- * Same-origin and precached: no network fetch, no CDN.
- * @param {() => void} [onReady]
+ * Be told once when the web's face has loaded: every width changes then (the
+ * measure cache is cleared first), so the screen schedules a frame. The
+ * screen subscribes on mount and unsubscribes on unmount; nothing here holds
+ * a frame, a context or a graph.
+ * @param {() => void} fn
+ * @returns {() => void} unsubscribe
+ */
+export function onWebFontReady(fn) {
+  if (typeof fn !== 'function') return () => {};
+  faceListeners.add(fn);
+  return () => { faceListeners.delete(fn); };
+}
+
+/**
+ * Register the web's face once; onWebFontReady's subscribers hear when it has
+ * loaded (once, though both the face's load and document.fonts.ready
+ * resolve). Same-origin and precached: no network fetch, no CDN.
  * @returns {boolean} the face is ready
  */
-export function ensureWebFont(onReady) {
-  if (onReady) onFaceReady = onReady;
+export function ensureWebFont() {
   if (face) return faceReady;
   if (typeof FontFace === 'undefined' || typeof document === 'undefined' || !document.fonts) { face = {}; return false; }
   try {
     face = new FontFace(WEB_FACE, "url('" + WEB_FONT_URL + "') format('woff2')", { weight: '400 800', style: 'normal' });
     document.fonts.add(face);
     const done = () => {
-      if (face.status !== 'loaded') return;
+      if (faceReady || face.status !== 'loaded') return;
       faceReady = true;
       measure.clear();
-      if (onFaceReady) onFaceReady();
+      for (const fn of Array.from(faceListeners)) {
+        try { fn(); } catch (_e) { /* one screen's repaint never stops another's */ }
+      }
     };
     face.load().then(done, () => {});
     if (document.fonts.ready) document.fonts.ready.then(done, () => {});

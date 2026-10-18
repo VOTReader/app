@@ -462,22 +462,6 @@ function layoutOf(ctx, fs) {
   };
 }
 
-/* ── the last paint, for the face's arrival ─────────────────────────────── */
-
-/** @type {{kind: string, ctx: any, fs: any}|null} */
-let LAST = null;
-/** The web's face has loaded: every width changed, so the last frame is painted again. */
-function repaintLast() {
-  const l = LAST;
-  if (!l || !l.ctx) return;
-  if (l.kind === 'canon') {
-    const r = paintCanonOverlay(l.ctx, l.fs);
-    l.fs.hits = r.hits;
-  } else {
-    paintMyWebOverlay(l.ctx, l.fs);
-  }
-}
-
 /**
  * The canon web's overlay for one frame. One clear; the top scrim; the
  * ruler (the overview's, or the deep band's, eased across 5x-6.5x); the
@@ -502,8 +486,7 @@ export function paintCanonOverlay(ctx, fs) {
   const L = usable ? layoutOf(ctx, fs) : null;
   const grid = createGrid();
   if (L) {
-    LAST = { kind: 'canon', ctx, fs };
-    ensureWebFont(repaintLast);
+    ensureWebFont();   // the screen repaints when it loads (onWebFontReady)
     for (const z of L.zones) grid.add(z);
     drawScrim(ctx, L);
     drawCentreWash(ctx, cam, L, fs.centre);
@@ -547,8 +530,7 @@ export function paintMyWebOverlay(ctx, fs) {
   if (!ctx) return;
   const { personal: p, v } = fs;
   ctx.clearRect(0, 0, v.W, v.H);
-  LAST = { kind: 'myweb', ctx, fs };
-  ensureWebFont(repaintLast);
+  ensureWebFont();
   drawPersonalWeb(ctx, p && p.graph, p && p.underlay, fs.rail);
   drawRulerOnly(ctx, fs.g, fs.cam, fs.view, v);
 }

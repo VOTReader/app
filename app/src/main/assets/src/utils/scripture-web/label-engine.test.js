@@ -1,7 +1,7 @@
 // @ts-nocheck
 /* The label engine (w3 canvas stream, digest C2): the face, the measure
    cache, the collision grid and the ranked placement with hysteresis. */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   TEXT_MIN_CSS, WEB_FACE, WEB_FONT_URL, canvasFont, fontPx, setFont, createMeasure, boxesMeet, createGrid, placeRanked, ensureWebFont,
 } from './label-engine.js';
@@ -22,7 +22,7 @@ describe('the face', () => {
     expect(WEB_FONT_URL).not.toMatch(/^https?:|^\/\//);
   });
   it('registering it is a no-op where there is no FontFace (jsdom, node)', () => {
-    expect(ensureWebFont(() => {})).toBe(false);
+    expect(ensureWebFont()).toBe(false);
   });
   it('tracking is set only where the context has it', () => {
     const plain = { font: '' };
@@ -31,6 +31,52 @@ describe('the face', () => {
     const tracked = { font: '', letterSpacing: '0px' };
     setFont(tracked, '12px x', 1.234);
     expect(tracked.letterSpacing).toBe('1.23px');
+  });
+});
+
+/** A FontFace that loads at once and a document.fonts whose ready resolves when told, on a fresh module. */
+async function withFace(run) {
+  vi.resetModules();
+  const added = [];
+  let resolveReady = () => {};
+  const ready = new Promise((r) => { resolveReady = r; });
+  globalThis.FontFace = class {
+    constructor(family) { this.family = family; this.status = 'unloaded'; }
+    load() { this.status = 'loaded'; return Promise.resolve(this); }
+  };
+  Object.defineProperty(document, 'fonts', { configurable: true, value: { add: (f) => added.push(f), ready } });
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+  try {
+    await run({ added, resolveReady, settle });
+  } finally {
+    delete globalThis.FontFace;
+    delete document.fonts;
+    vi.resetModules();
+  }
+}
+
+describe('the face arriving', () => {
+  it('tells each subscriber once, though both the face and document.fonts.ready resolve; one that unsubscribed hears nothing (w3 review: done ran twice, the callback held in a module global)', async () => {
+    await withFace(async ({ added, resolveReady, settle }) => {
+      const le = await import('./label-engine.js');
+      const a = vi.fn(), b = vi.fn(), gone = vi.fn();
+      const offA = le.onWebFontReady(a);
+      le.onWebFontReady(b);
+      const offGone = le.onWebFontReady(gone);
+      offGone();
+      expect(le.ensureWebFont()).toBe(false);
+      expect(le.ensureWebFont()).toBe(false);
+      expect(added.length, 'the face is registered once').toBe(1);
+      await settle();
+      resolveReady();
+      await settle();
+      expect(a).toHaveBeenCalledTimes(1);
+      expect(b).toHaveBeenCalledTimes(1);
+      expect(gone).not.toHaveBeenCalled();
+      expect(le.webFontReady()).toBe(true);
+      expect(le.ensureWebFont()).toBe(true);
+      offA();
+    });
   });
 });
 
