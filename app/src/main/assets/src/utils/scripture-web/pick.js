@@ -31,7 +31,7 @@ import {
 } from './geometry.js';
 import { bucketDrawCount, fansOf } from './decode.js';
 import { walkDrawnRuns } from './chunk-walk.js';
-import { prophecySet, frameSet, inFrame } from './frame-set.js';
+import { prophecySet, frameSet, inFrame, drawOrder } from './frame-set.js';
 
 /**
  * Nearest arc to a screen point.
@@ -548,7 +548,12 @@ export const BUNDLE_VERSE_PPV_CSS = 26;
  * Cells are verses once a verse is BUNDLE_VERSE_PPV_CSS wide, else chapters,
  * adjacent chapters merged left to right until a cell is BUNDLE_MIN_CSS wide
  * (a badge must be readable and tappable). A thread counts once per cell
- * that holds a foot of it.
+ * that holds a foot of it: every thread of the density anchored to the frame
+ * (arcAnchored on its drawn feet), whatever its body - the count its sheet
+ * (bundleGroups) and the crowding law (countAnchored) read, so in the sky
+ * too (C14). Until GL review 2026-10-18 (finding 7) it counted only the
+ * frame's visible set, which in the sky drops a thread whose body passes
+ * under the frame: the pill read 274 where its sheet listed 1,044.
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, ppv:number, total:number}} cam
@@ -590,14 +595,12 @@ export function footBundles(g, cam, view, dpr) {
     for (let v = cells[c].lo; v <= cells[c].hi; v++) if (v - first >= 0 && v - first < span) cellOf[v - first] = c;
   }
   const half = width / 2, camX = cam.x, ppv = cam.ppv;
-  // the frame's visible set (E1), walked by the feet that stand in the cells
-  const set = frameSet(g, cam, view, dpr);
-  const { ids, fx0, fx1, footStart, foot } = set.order;
+  // the density's threads (the visible set's own order, E1), walked by the feet that stand in the cells
+  const { ids, fx0, fx1, footStart, foot } = drawOrder(g, view.density);
   const cellAt = (v) => (v - first >= 0 && v - first < span ? cellOf[v - first] : -1);
   const end = footStart[first + span];
   for (let j = footStart[first]; j < end; j++) {
     const rank = foot[j] >> 1;
-    if (!set.all && !set.segments[rank]) continue;
     const i = ids[rank];
     const ca = cellAt(g.from[i]), cb = cellAt(g.to[i]);
     // a thread with both feet in one cell counts once, at its from-foot

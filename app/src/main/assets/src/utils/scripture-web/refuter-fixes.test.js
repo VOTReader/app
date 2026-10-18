@@ -45,5 +45,22 @@ describe('refuter bullet 3a: a badge and the sheet it opens agree, at the frame 
       }
     }
   });
+
+  /* GL review 2026-10-18 (finding 7): in the sky the pills counted only the frame's visible set,
+     which drops a thread whose body passes under the frame, while the sheet (bundleGroups) and the
+     crowding law (countAnchored) count it: anchored whatever the camera's height (C14). One law. */
+  it('in the sky too: a pill counts the threads anchored at its feet whatever their body, as its sheet does', () => {
+    const cam = camAt(12);
+    const view = viewAt(cam);
+    cam.y = 3 * view.ceil;
+    const cells = pick.footBundles(graph, cam, view, DPR);
+    let total = 0;
+    for (const cell of cells) {
+      const count = pick.bundleGroups(graph, cam, view, cell.lo, cell.hi).reduce((n, grp) => n + grp.count, 0);
+      expect(cell.drawn, `cell ${cell.lo}-${cell.hi} in the sky`).toBe(count);
+      total += count;
+    }
+    expect(total, 'PRECONDITION: the sky\'s cells hold threads').toBeGreaterThan(0);
+  });
 });
 

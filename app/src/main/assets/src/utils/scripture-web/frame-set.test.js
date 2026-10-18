@@ -467,7 +467,7 @@ describe('the visible set: drawn, counted, labelled and picked are one set (E1)'
     }
   });
 
-  it('its consumers: the labels walk it, the picker hits nothing outside it, the pills count only it', () => {
+  it('its consumers: the labels walk it, the picker hits nothing outside it; the pills count every anchored thread at its feet (C14)', () => {
     const fr = frameOf(devices[1]);
     for (const c of cameras(fr).slice(1)) {
       const cam = { x: c.x, y: c.y, ppv: c.ppv, total: g.total };
@@ -488,12 +488,15 @@ describe('the visible set: drawn, counted, labelled and picked are one set (E1)'
       expect(outside, c.name).toEqual([]);
       expect(hits, c.name).toBeGreaterThan(0);
       // the pills: a thread counts at each foot cell it stands in (once when both feet share one),
-      // and only a thread of the set, anchored to the frame
+      // every thread of the density anchored to the frame, whatever its body: the sheet's count
+      // (bundleGroups) and the crowding law's (countAnchored). Until GL review 2026-10-18
+      // (finding 7) this read "only a thread of the set", which in the sky dropped the threads
+      // whose bodies pass under the frame from the pill and not from its sheet.
       const cells = pick.footBundles(g, cam, view, fr.DPR);
       const cellOf = new Map();
       cells.forEach((cell, k) => { for (let v = cell.lo; v <= cell.hi; v++) cellOf.set(v, k); });
       const want = new Array(cells.length).fill(0);
-      for (const i of set.list.subarray(0, set.count)) {
+      for (const i of order.ids.subarray(0, order.count)) {
         const x0 = geo.footX(cam, fr.W, g.from[i], fans.fanA[i]), x1 = geo.footX(cam, fr.W, g.to[i], fans.fanB[i]);
         if (!geo.arcAnchored(x0, x1, fr.W)) continue;
         const ca = cellOf.has(g.from[i]) ? cellOf.get(g.from[i]) : -1;
