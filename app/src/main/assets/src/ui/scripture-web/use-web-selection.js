@@ -583,7 +583,13 @@ export function useWebSelection({
   }, [detail, choices, listOpen, focusRef, schedule]);
 
   // Publish the latest handlers for the (stable) gesture listeners to call.
-  React.useEffect(() => { handlersRef.current = { hover, tap, doubleTap, snapshot }; }, [hover, tap, doubleTap, snapshot]);
+  /** The mouse left the web, or is over the chrome: what it hovered goes (gestures.js). */
+  const leave = React.useCallback(() => {
+    const had = focusRef.current.hover !== -1 || focusRef.current.hoverProphecy !== -1 || !!focusRef.current.hoverUnderlay;
+    dropHover();
+    if (had) schedule();
+  }, [focusRef, dropHover, schedule]);
+  React.useEffect(() => { handlersRef.current = { hover, tap, doubleTap, leave, snapshot }; }, [hover, tap, doubleTap, leave, snapshot]);
 
   /** Close the cards (the chooser, the Nearby list, the connection sheet) and let go of the chosen
    * line. Every close goes through here: the sheet's x once cleared the card but kept focusRef, so

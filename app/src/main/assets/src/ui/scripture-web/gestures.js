@@ -79,7 +79,7 @@ const FLING_TAU_MS = 325;
  *   camFor?: (yDevice:number) => {x:number, y?:number, ppv:number, total:number},
  *   live?: () => void,
  *   view: () => {W:number, H:number, DPR:number},
- *   handlers: () => {hover:Function, tap:Function, doubleTap:Function, snapshot?:() => (() => void)},
+ *   handlers: () => {hover:Function, tap:Function, doubleTap:Function, leave?:Function, snapshot?:() => (() => void)},
  *   schedule: () => void,
  *   maxZoom: (cam?:object) => number,
  *   clampCamera: (cam:object, width:number, maxZoom:number, yf?:object) => void,
@@ -192,13 +192,20 @@ export function attachWebGestures(el, deps) {
   // W52: a pointer that went down on the chrome (or anywhere this code did
   // not register it) is the chrome's for its whole life: its move must not
   // pan, its up must not tap, and its cancel must not end another finger's
-  // drag. A mouse moving with no button down still hovers the web.
+  // drag. A mouse moving with no button down still hovers the web, but not
+  // through the chrome: over a control or the topbar it lets go of what it
+  // hovered (a reach for Reset lit the threads under the button and put a
+  // chip beside it), as it does when it leaves the web.
+  const leave = () => { const h = handlers(); if (h && typeof h.leave === 'function') h.leave(); };
   const move = (e) => {
-    const pt = loc(e);
     if (!pointers.has(e.pointerId)) {
-      if (!drag && !pinch && e.pointerType === 'mouse') handlers().hover(pt.x, pt.y);
+      if (drag || pinch || e.pointerType !== 'mouse') return;
+      if (isChromeTarget(e.target)) { leave(); return; }
+      const pt = loc(e);
+      handlers().hover(pt.x, pt.y);
       return;
     }
+    const pt = loc(e);
     pointers.set(e.pointerId, pt);
     const W = view().W;
     if (pinch) {
@@ -344,6 +351,8 @@ export function attachWebGestures(el, deps) {
   el.addEventListener('pointerup', up);
   el.addEventListener('pointercancel', cancel);
   el.addEventListener('wheel', wheel, { passive: false });
+  const out = (e) => { if (e.pointerType === 'mouse') leave(); };
+  el.addEventListener('pointerleave', out);
   return () => {
     endFling();
     el.removeEventListener('pointerdown', down);
@@ -351,5 +360,6 @@ export function attachWebGestures(el, deps) {
     el.removeEventListener('pointerup', up);
     el.removeEventListener('pointercancel', cancel);
     el.removeEventListener('wheel', wheel);
+    el.removeEventListener('pointerleave', out);
   };
 }

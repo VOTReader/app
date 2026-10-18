@@ -623,6 +623,28 @@ describe('a resting mouse over the open panel hovers nothing under it (spec sect
   });
 });
 
+describe('the mouse leaving the web, or resting on the chrome, hovers nothing (gestures.js leave)', () => {
+  it('leave drops the chip and the hovered thread, and a second leave is a no-op', () => {
+    const queue = [];
+    vi.stubGlobal('requestAnimationFrame', (cb) => { queue.push(cb); return queue.length; });
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+    const flush = () => act(() => { while (queue.length) queue.shift()(0); });
+    try {
+      const { get } = mount();
+      const y = get().cam.viewFor().base + 6;
+      get().sel.handlersRef.current.hover(100, y); flush();
+      expect(get().sel.tip).toMatchObject({ info: { kind: 'chapter' } });
+      act(() => { get().sel.handlersRef.current.leave(); }); flush();
+      expect(get().sel.tip).toBeNull();
+      expect(get().cam.focusRef.current.hover).toBe(-1);
+      act(() => { get().sel.handlersRef.current.leave(); }); flush();
+      expect(get().sel.tip).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe('a row\'s Follow and the zoom row (the panel stream)', () => {
   it('followRow swaps to that connection and goes to the end the row names', () => {
     const { get } = mount();

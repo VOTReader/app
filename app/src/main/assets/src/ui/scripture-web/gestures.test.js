@@ -261,6 +261,22 @@ describe('pointers that went down on a control never steer the canvas (W52)', ()
     root.dispatchEvent(pointerEvent('pointermove', { pointerId: 7, pointerType: 'mouse', clientX: 420, clientY: 200 }));
     expect(handlers.hover).toHaveBeenCalledWith(420, 200);
   });
+
+  it('a mouse over the chrome (a control, the topbar) hovers nothing under it and lets go of what it hovered; leaving the web lets go too', () => {
+    const { root, listBtn } = makeDom();
+    const { handlers } = attach(root);
+    handlers.leave = vi.fn();
+    root.dispatchEvent(pointerEvent('pointermove', { pointerId: 7, pointerType: 'mouse', clientX: 420, clientY: 200 }));
+    expect(handlers.hover).toHaveBeenCalledTimes(1);
+    listBtn.dispatchEvent(pointerEvent('pointermove', { pointerId: 7, pointerType: 'mouse', clientX: 100, clientY: 50 }));
+    expect(handlers.hover, 'the web under a button is not hovered').toHaveBeenCalledTimes(1);
+    expect(handlers.leave).toHaveBeenCalledTimes(1);
+    root.dispatchEvent(pointerEvent('pointerleave', { pointerId: 7, pointerType: 'mouse', bubbles: false }));
+    expect(handlers.leave).toHaveBeenCalledTimes(2);
+    // a finger's leave (it lifted) is not a mouse leaving
+    root.dispatchEvent(pointerEvent('pointerleave', { pointerId: 8, pointerType: 'touch', bubbles: false }));
+    expect(handlers.leave).toHaveBeenCalledTimes(2);
+  });
 });
 
 /* sweep v074: after a pinch, the finger still down could no longer pan. The
