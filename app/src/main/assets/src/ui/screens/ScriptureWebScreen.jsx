@@ -184,7 +184,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // My Web (use-personal-web.js): the reader's links built into the dual
   // rail, rebuilt live; railOpts() is what the rail renderer places them by
   const { personalRef, personalCount, contextCount, skippedCount, railOpts } = usePersonalWeb({
-    graph, mode, showUnderlay, camRef, camVRef, viewRef, frame, chromeRef, schedule, resumeRef, focusRef,
+    graph, mode, showUnderlay, camRef, camVRef, viewRef, frame, chromeRef, schedule, resumeRef, focusRef, topbarRef,
   });
 
   /**

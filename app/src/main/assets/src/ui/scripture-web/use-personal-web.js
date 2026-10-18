@@ -79,8 +79,9 @@ function chosenLink(prev, focusRef, resumeRef) {
  * @param {any} p  the graph and mode, showUnderlay, the cameras' refs and
  *   frame() (use-web-camera.js), the chrome tokens' ref, the frame loop;
  *   the resume (resumeRef) and the focus (focusRef), so a choice is kept by id
+ *   and the top chrome (topbarRef), whose bottom edge the Volumes rail clears
  */
-export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, viewRef, frame, chromeRef, schedule, resumeRef, focusRef }) {
+export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, viewRef, frame, chromeRef, schedule, resumeRef, focusRef, topbarRef }) {
   const personalRef = React.useRef(null);
   const [counts, setCounts] = React.useState({ links: 0, timothy: 0, skipped: 0 });
 
@@ -88,8 +89,12 @@ export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, vie
   const railOpts = React.useCallback(() => {
     const v = viewRef.current, cam = camRef.current;
     const f = frame();
+    // the top chrome's bottom edge, device px (the canon overlay measures it
+    // the same way): the Volumes rail keeps its names clear of it
+    const tb = topbarRef && topbarRef.current;
+    const inset = tb && tb.offsetHeight ? (tb.offsetTop + tb.offsetHeight) * (v.DPR || 1) : 0;
     return {
-      width: v.W, height: v.H, DPR: v.DPR, base: f.base,
+      width: v.W, height: v.H, DPR: v.DPR, base: f.base, inset,
       chrome: chromeRef.current,
       votRail: personalRef.current && personalRef.current.votRail,
       // Both rails ride this one camera. The top rail's own axis is even
@@ -102,7 +107,7 @@ export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, vie
       votX: camVRef.current ? (pos) => verseToX(/** @type {any} */ (camVRef.current), v.W, pos) : undefined,
       showUnderlay,
     };
-  }, [camRef, camVRef, frame, showUnderlay, viewRef, chromeRef]);
+  }, [camRef, camVRef, frame, showUnderlay, viewRef, chromeRef, topbarRef]);
 
   // ── the personal web ────────────────────────────────────────────────────
   const linkVersion = useLinkVersion();

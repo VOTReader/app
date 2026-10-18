@@ -8,11 +8,13 @@
  *     And zoom rewards: the law's context alpha at 5.8x is at least twice its
  *     alpha at 1x (main has no law; the underlay is 0.045 at every zoom).
  * R2  a user link is unmistakable from context at every zoom: the link's core
- *     alpha·width over the context thread's >= 8 up to 5.8x (three zoom taps),
- *     and core+halo over the thread >= 6 at every z to 40x (at depth the
- *     context thread is deliberately strong enough to read alone, 0.45 · 1.3,
- *     so the link thickens with depth like a canon ribbon and carries its
- *     halo), AND the two are different hues (main: both --gold).
+ *     alpha·width over the context thread's >= 5 up to 5.8x (three zoom taps),
+ *     and core+halo over the thread >= 6 at every z to 40x (the link
+ *     thickens with depth like a canon ribbon and carries its halo), AND the
+ *     two are different families (main: both --gold). w3 rewrote the ratios
+ *     to this intent (digest §5): the spec's reader link is 1.5 px at the
+ *     overview (sw-ink myWebReader), not r2's 2.0, so the core-alone floor
+ *     moved from 8x to 5x; the halo floor of 6x now holds to 40x, not 25x.
  *
  * The probe (tools/e2e-myweb.mjs) reads the same export; nothing re-types it.
  */
@@ -90,16 +92,17 @@ describe('My Web ink law', () => {
     expect(personalInk(40).context.width).toBeCloseTo(1.6, 3);
   });
 
-  it('R2 a reader link outweighs a context thread (8x core to 5.8x, 6x with halo to 25x, 3.5x past it), in a different family', () => {
+  it('R2 a reader link outweighs a context thread (5x core to 5.8x, 6x with halo to 40x), in the other family', () => {
     for (const z of [1, 1.8, 3.24, 5.83, 10.5, 18.9, 40]) {
       const { context, link } = personalInk(z);
       const thread = context.alpha * context.width;
       const core = link.alpha * link.width;
-      if (z <= 5.83) expect(core / thread).toBeGreaterThanOrEqual(8);
-      // past 25x the context sits on its 0.30 plateau at 1.6 px and the link's
-      // lead rests on hue (warm on cool, dE >= 32 under every deficiency) and
-      // its pins as well as ink; the ink ratio alone stays >= 3.5 (it is ~7.5)
-      expect((core + link.halo * link.haloAlpha) / thread).toBeGreaterThanOrEqual(z <= 25 ? 6 : 3.5);
+      if (z <= 5.83) expect(core / thread).toBeGreaterThanOrEqual(5);
+      // on the 0.30 plateau the context widens to 1.6 px at 40x; the link
+      // thickens to 2.1 px and its halo keeps the lead at 6x, with the family
+      // split (gold on teal-silver) and the pins on top of the ink
+      expect((core + link.halo * link.haloAlpha) / thread).toBeGreaterThanOrEqual(6);
+      expect(link.width).toBeCloseTo(1.5 + 0.6 * Math.min(1, Math.log(z) / Math.log(40)), 6);
       // no reader hue is a Timothy hue
       for (let k = 0; k < 3; k++) for (const src of MY_WEB_SOURCES) expect(myWebLinkColor(k)).not.toBe(src.rgb);
     }
@@ -111,8 +114,8 @@ describe('My Web ink law', () => {
     const o2 = Object.assign({}, opts, { showUnderlay: false, votRail: rail2 });
     const ctx0 = fakeCtx();
     drawPersonalWeb(ctx0, null, null, o2);
-    // 1b: the pin is the reader family's second channel (gold and amber meet
-    // under deuteranopia); kind 0 within scripture = ring, 1 within the
+    // the pin says the link's shape (w3: the reader's links are one gold, so
+    // the pin is the only channel for it); kind 0 within scripture = ring, 1 within the
     // Volumes = dot, 2 across = ring and dot. Rails are 0/1 so kind 2 is a
     // cross-rail link and kinds 0/1 sit on one rail each.
     const cases = [

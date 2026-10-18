@@ -1366,22 +1366,24 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     expect(sub.textContent).toMatch(/\bLink\b/);
   });
 
-  it('R4 in My Web the legend names the two families, yours first, a pin per shape and a bar per source; never the canon axis or the distance ramp', async () => {
-    // 1b (design-myweb-colour.md, 5): the reader's links are the point of My
-    // Web, so "yours" leads with the three shapes and their pins; Timothy's
-    // four sources follow with a bar each. Canon hue is retired here.
+  it('R4 in My Web the legend names the two families, Timothy’s notes then your links, one line each; never the canon axis, the distance ramp or chapter length', async () => {
+    // w3 rewrote R4 to its intent (digest §5, r2-05): the legend still names
+    // the two families and never the canon's colour law, but the picture's
+    // order and words are "Timothy's notes · your links", one line of each
+    // family's ink. The reader's links are one gold now (their shape is the
+    // pin on the canvas, not a legend entry) and Timothy's sources one
+    // teal-silver family, so the 1b pins and per-source bars are retired; My
+    // Web draws no chapter bars, so the histogram key goes too.
     await openMyWeb();
     const legend = document.querySelector('.sw-legend');
     expect(legend).toBeTruthy();
-    const text = legend.textContent;
-    expect(text.indexOf('yours')).toBeGreaterThanOrEqual(0);
-    expect(text.indexOf('yours')).toBeLessThan(text.indexOf('Timothy'));
-    for (const w of ['within scripture', 'within the Volumes', 'across', 'footnotes', 'study notes', 'studies', 'Words To Live By']) expect(text).toContain(w);
-    expect(legend.querySelectorAll('.sw-key-pin').length).toBe(3);
-    expect(legend.querySelectorAll('.sw-key-pin.is-ring, .sw-key-pin.is-dot, .sw-key-pin.is-ring-dot').length).toBe(3);
-    expect(legend.querySelectorAll('.sw-key-line').length).toBe(4);
+    const keys = [...legend.querySelectorAll('.sw-key')].map((k) => k.textContent);
+    expect(keys).toEqual(['Timothy’s notes', 'your links']);
+    expect(legend.querySelectorAll('.sw-key-line').length).toBe(2);
+    expect(legend.querySelector('.sw-key-pin')).toBeNull();
     expect(legend.querySelector('.sw-key-gradient')).toBeNull();
-    expect(text).not.toMatch(/Genesis|Revelation|across the canon|nearby/);
+    expect(legend.querySelector('.sw-key-hist')).toBeNull();
+    expect(legend.textContent).not.toMatch(/Genesis|Revelation|across the canon|nearby|chapter length/);
   });
 
   it('offers a Dismiss control on the notice', async () => {

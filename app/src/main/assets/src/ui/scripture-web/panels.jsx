@@ -15,8 +15,10 @@
 
 import {
   connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, endpointLabel, prophecyMeta,
+  myWebLegendWords,
 } from '../../utils/scripture-web/describe.js';
-import { LINK_KIND_NAMES, MY_WEB_SOURCES, MY_WEB_LINK_KINDS } from '../../utils/scripture-web/palette.js';
+import { LINK_KIND_NAMES } from '../../utils/scripture-web/palette.js';
+import { ink } from '../../utils/scripture-web/sw-ink.js';
 
 export function TipChip({ info, viewport }) {
   const s = info.info;
@@ -226,34 +228,20 @@ export function legendFor(mode) {
       bars below — chapter length
     </span>
   );
-  // My Web (1b, design-myweb-colour.md, 5): two families, yours first because
-  // the reader's own links are the point of My Web. A pin per shape for yours
-  // (the channel a deuteranope keeps once gold and amber meet), a bar per
-  // source for Timothy's. Canon hue retired here by Corbin (2026-09-11).
+  // My Web (w3, r2-05): two families, named as the picture names them,
+  // Timothy's notes then the reader's links; one line of each family's ink.
+  // No histogram key: My Web's ruler draws book names only, no chapter bars.
   if (mode === 'personal') {
-    const shapeWords = ['within scripture', 'within the Volumes', 'across'];
+    const words = myWebLegendWords();
     return [
-      <span className="sw-key" key="yours">
-        yours
-        {MY_WEB_LINK_KINDS.map((k, i) => (
-          <React.Fragment key={k.name}>
-            {i > 0 ? ' \u00b7 ' : ' '}
-            <i className={'sw-key-pin is-' + k.pin} style={{ color: 'rgb(' + k.rgb + ')' }} aria-hidden="true" />
-            {shapeWords[i]}
-          </React.Fragment>
-        ))}
-      </span>,
       <span className="sw-key" key="timothy">
-        Timothy&rsquo;s
-        {MY_WEB_SOURCES.map((src, i) => (
-          <React.Fragment key={src.key}>
-            {i > 0 ? ' \u00b7 ' : ' '}
-            <i className="sw-key-line" style={{ background: 'rgb(' + src.rgb + ')' }} aria-hidden="true" />
-            {src.name}
-          </React.Fragment>
-        ))}
+        <i className="sw-key-line" style={{ background: ink('myWebFootnote').hex }} aria-hidden="true" />
+        {words.timothy}
       </span>,
-      histKey,
+      <span className="sw-key" key="yours">
+        <i className="sw-key-line" style={{ background: ink('myWebReader').hex }} aria-hidden="true" />
+        {words.yours}
+      </span>,
     ];
   }
   // Distance is the only colour law the screen offers (Corbin, 2026-09-10:

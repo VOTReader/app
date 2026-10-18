@@ -13,6 +13,8 @@
    both themes. Only the data channel is allowed its own spectrum.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { ink } from './sw-ink.js';
+
 /**
  * The distance ramp, matched to the source visualization: magenta and violet
  * at the feet, through blue and steel, into red, tan, olive and finally green
@@ -43,24 +45,29 @@ export function distanceRampRGB(t) {
   return [0, 1, 2].map((k) => Math.round((DISTANCE_RAMP[i][k] + (DISTANCE_RAMP[j][k] - DISTANCE_RAMP[i][k]) * f) * 255));
 }
 
-/* ── My Web's colour law (design-myweb-colour.md, 2026-09-11) ──────────────
+/* ── My Web's colour law (w3, the r2-05 picture; spec §4.2) ─────────────────
    Two families a reader tells apart at a glance, and a colour-blind reader by
-   lightness, width and pin. Timothy's threads (the Volumes' own citations of
-   scripture) are a COOL family, hue by SOURCE, four steps 0.07 apart in WCAG
-   luminance so the source survives a deuteranope's collapse of the hues; the
-   reader's links are a WARM family, hue by SHAPE, pin by shape. The families
-   sit on opposite sides of Lab b* under every deficiency (warm-versus-cool is
-   the axis red-green blindness keeps). Salience (alpha, width) never touches
-   hue. Canon hue on My Web was retired by Corbin ("My web color yes replaces
-   canon"). Every number is measured in sessions/2026-09-11-orchestrator/
-   myweb-colour/contrast-v2.md and pinned by palette-myweb-colour.test.js. */
+   the warm-versus-cool axis every deficiency keeps. Timothy's threads (the
+   Volumes' own citations of scripture) are ONE teal-silver family, a step of
+   lightness per SOURCE (sw-ink's myWeb* rows); the reader's links are ONE warm
+   gold (myWebReader, #E0B25A, at least 4.5:1 on the canvas), their shape told
+   by the pin. Salience (alpha, width) never touches hue. The rgb is sw-ink's,
+   read here, so the table and the canvas cannot drift apart; the numbers are
+   pinned by palette-myweb-colour.test.js. (The 2026-09-11 four-hue cool family
+   and the gold / amber / coral warm one are retired by the w3 picture.) */
 
-/** Timothy's sources, brightest first; the index is the batch bin the renderer strokes. */
+/** '#rrggbb' -> 'r,g,b' for an rgba() string. */
+const rgbOf = (name) => {
+  const hex = ink(name).hex;
+  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(',');
+};
+
+/** Timothy's sources in storage-key order; the index is the batch bin the renderer strokes. */
 export const MY_WEB_SOURCES = [
-  { key: 'footnote', name: 'footnotes', rgb: '74,195,210' },        // teal,   L .45 (cyan-leaning: keeps b* -13 under protanopia)
-  { key: 'votNote', name: 'study notes', rgb: '106,166,255' },      // sky,    L .38
-  { key: 'wtlb', name: 'Words To Live By', rgb: '139,149,173' },    // slate,  L .30
-  { key: 'study', name: 'studies', rgb: '148,108,222' },            // violet, L .22
+  { key: 'footnote', name: 'footnotes', rgb: rgbOf('myWebFootnote') },        // L .40
+  { key: 'votNote', name: 'study notes', rgb: rgbOf('myWebStudyNote') },      // L .29
+  { key: 'wtlb', name: 'Words To Live By', rgb: rgbOf('myWebWtlb') },         // L .51
+  { key: 'study', name: 'studies', rgb: rgbOf('myWebStudy') },                // L .26, the bluest
 ];
 const SOURCE_INDEX = new Map(MY_WEB_SOURCES.map((s, i) => [s.key, i]));
 /** Bin for a curated edge's storage kind; a kind the table does not know draws as a study, the commonest. */
@@ -71,11 +78,12 @@ export function myWebSourceIndex(kind) {
 /** The context is stroked in one colour bin per source (one path per bin and corridor layer, see rail-renderer). */
 export const CONTEXT_BINS = MY_WEB_SOURCES.length;
 
-/** The reader's links by shape (personal-graph `kind` 0 / 1 / 2): colour and pin. */
+/** The reader's links by shape (personal-graph `kind` 0 / 1 / 2): one gold, the pin says the shape. */
+const READER = rgbOf('myWebReader');
 export const MY_WEB_LINK_KINDS = [
-  { name: 'Within scripture', rgb: '232,192,80', pin: 'ring' },        // gold (--gold), L .55
-  { name: 'Within the Volumes', rgb: '236,150,70', pin: 'dot' },       // amber, L .40
-  { name: 'Scripture ↔ Volumes', rgb: '236,120,96', pin: 'ring-dot' }, // coral, L .32
+  { name: 'Within scripture', rgb: READER, pin: 'ring' },
+  { name: 'Within the Volumes', rgb: READER, pin: 'dot' },
+  { name: 'Scripture ↔ Volumes', rgb: READER, pin: 'ring-dot' },
 ];
 export function myWebLinkColor(kind) { return (MY_WEB_LINK_KINDS[kind] || MY_WEB_LINK_KINDS[2]).rgb; }
 export const LINK_KIND_NAMES = MY_WEB_LINK_KINDS.map((k) => k.name);

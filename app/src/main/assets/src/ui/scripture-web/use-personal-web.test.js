@@ -69,6 +69,18 @@ function mount(extra) {
 
 const tick = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 
+describe('usePersonalWeb railOpts', () => {
+  it('carries the top chrome’s bottom edge in device px, so the Volumes rail clears the header (w3 picture)', () => {
+    corpus();
+    g.LinkStore = store([]);
+    g.loadBibleStudies = vi.fn(() => Promise.resolve([]));
+    const { hook } = mount({ viewRef: { current: { W: 100, H: 80, DPR: 2 } }, topbarRef: { current: { offsetTop: 10, offsetHeight: 50 } } });
+    expect(hook.result.current.railOpts().inset).toBe(120);
+    const bare = mount({ topbarRef: { current: null } });
+    expect(bare.hook.result.current.railOpts().inset).toBe(0);
+  });
+});
+
 describe('usePersonalWeb across rebuilds', () => {
   it('bug #8: a Bible-studies load that fails is caught, and the web stays up without the studies', async () => {
     corpus();

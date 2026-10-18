@@ -1,6 +1,14 @@
 // @ts-nocheck
-/* My Web's colour law, pinned to its numbers (design-myweb-colour.md, 2026-09-11).
+/* My Web's colour law, pinned to its numbers (w3, the r2-05 picture; spec §4.2).
  * ═══════════════════════════════════════════════════════════════════════
+ * w3 rewrote this file to the law's intent (digest §5, "My Web colour"): the
+ * 2026-09-11 cool family of four hues 0.07 apart, brightest first, and the
+ * gold / amber / coral warm one are retired by the w3 picture, which draws
+ * Timothy's notes in ONE teal-silver family (sw-ink's myWeb* rows, a step of
+ * lightness per source) and the reader's links in ONE gold (#E0B25A). What
+ * the old pins protected is kept: the two families split on the axis every
+ * colour deficiency keeps, the sources stay apart in lightness, the reader's
+ * link reads at 4.5:1, a corridor at 3:1, the plateau and the 0.70 bound.
  * The oracle is the exported tables, never a retyped copy: WCAG luminance,
  * Lab b*, and the Machado 2009 severity-1.0 matrices are computed here from
  * MY_WEB_SOURCES / MY_WEB_LINK_KINDS, so a retune that breaks a step, a
@@ -13,8 +21,10 @@ import {
 } from './palette.js';
 import { buildCuratedUnderlay, buildVotRail } from './personal-graph.js';
 import { personalInk } from '../../ui/scripture-web/rail-renderer.js';
+import { ink } from './sw-ink.js';
 
 const rgb = (s) => s.split(',').map(Number);
+const rgb255 = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 const s2l = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
 const l2s = (v) => Math.round(255 * (Math.max(0, Math.min(1, v)) <= 0.0031308 ? 12.92 * v : 1.055 * Math.max(0, Math.min(1, v)) ** (1 / 2.4) - 0.055));
 const lum = (c) => 0.2126 * s2l(c[0]) + 0.7152 * s2l(c[1]) + 0.0722 * s2l(c[2]);
@@ -36,19 +46,23 @@ const sim = (c, m) => { const l = c.map(s2l); return CVD[m].map((row) => l2s(row
 const T = MY_WEB_SOURCES.map((s) => rgb(s.rgb));
 const R = MY_WEB_LINK_KINDS.map((k) => rgb(k.rgb));
 
-describe("Timothy's family: cool, hue by source, a lightness ladder", () => {
-  it('four sources, one bin each, the table order is brightest first', () => {
+describe("Timothy's family: one teal-silver family, a lightness step per source", () => {
+  it('four sources, one bin each, in storage-key order, each its own sw-ink row', () => {
     expect(MY_WEB_SOURCES.map((s) => s.key)).toEqual(['footnote', 'votNote', 'wtlb', 'study']);
     expect(CONTEXT_BINS).toBe(4);
-    for (let i = 1; i < T.length; i++) expect(lum(T[i - 1])).toBeGreaterThan(lum(T[i]));
+    expect(MY_WEB_SOURCES.map((s) => s.rgb)).toEqual(
+      ['myWebFootnote', 'myWebStudyNote', 'myWebWtlb', 'myWebStudy'].map((n) => rgb255(ink(n).hex).join(',')));
   });
-  it('adjacent steps are at least 0.07 in WCAG luminance (the channel a deuteranope keeps)', () => {
-    for (let i = 1; i < T.length; i++) expect(lum(T[i - 1]) - lum(T[i])).toBeGreaterThanOrEqual(0.07 - 1e-3);
+  it('no two sources share a lightness: sorted, the steps are at least 0.025 in WCAG luminance', () => {
+    const L = T.map(lum).sort((a, b) => b - a);
+    for (let i = 1; i < L.length; i++) expect(L[i - 1] - L[i]).toBeGreaterThanOrEqual(0.025);
   });
-  it('every source is on the cool side of Lab b* and every reader hue on the warm side, under normal vision and all three deficiencies', () => {
+  it('the families split on Lab b* under normal vision and all three deficiencies: every source cool, the reader warm, 14 apart', () => {
     for (const m of [null, 'deutan', 'protan', 'tritan']) {
-      for (const c of T) expect(labB(m ? sim(c, m) : c), `source ${c} ${m}`).toBeLessThan(-3);
-      for (const c of R) expect(labB(m ? sim(c, m) : c), `link ${c} ${m}`).toBeGreaterThan(10);
+      const tb = T.map((c) => labB(m ? sim(c, m) : c)), rb = R.map((c) => labB(m ? sim(c, m) : c));
+      for (const b of tb) expect(b, `source ${m}`).toBeLessThan(0);
+      for (const b of rb) expect(b, `link ${m}`).toBeGreaterThan(10);
+      expect(Math.min(...rb) - Math.max(...tb), `gap ${m}`).toBeGreaterThanOrEqual(14);
     }
   });
   it('myWebSourceIndex maps the four kinds and sends an unknown kind to the studies bin', () => {
@@ -58,12 +72,13 @@ describe("Timothy's family: cool, hue by source, a lightness ladder", () => {
   });
 });
 
-describe("the reader's family: warm, hue by shape, pin by shape", () => {
+describe("the reader's family: one gold, pin by shape", () => {
   it('three kinds, three names, three distinct pins, in the personal-graph order (within scripture, within the Volumes, across)', () => {
     expect(LINK_KIND_NAMES).toEqual(['Within scripture', 'Within the Volumes', 'Scripture ↔ Volumes']);
     expect(new Set(MY_WEB_LINK_KINDS.map((k) => k.pin)).size).toBe(3);
     expect(MY_WEB_LINK_KINDS.map((k) => k.pin)).toEqual(['ring', 'dot', 'ring-dot']);
-    expect(myWebLinkColor(0)).toBe('232,192,80');   // --gold, the app's one saturated ink
+    for (const k of [0, 1, 2]) expect(myWebLinkColor(k)).toBe('224,178,90');   // sw-ink myWebReader, #E0B25A
+    expect(ink('myWebReader').hex).toBe('#E0B25A');
     expect(myWebLinkColor(7)).toBe(myWebLinkColor(2));
   });
   it('no reader hue is a Timothy hue', () => {
@@ -78,32 +93,35 @@ describe('contrast on the black canvas (WCAG 1.4.11, 3:1 where a thread is meant
       expect(onBlack(c)).toBeGreaterThan(onBlack(over(c, 0.95)));
     }
   });
-  it('a corridor at the overview (40 layers at 0.04 = 0.80 coverage) clears 3:1 for every source', () => {
+  it('a corridor at the overview (40 layers at the overview alpha) clears 3:1 for every source', () => {
     const a0 = personalInk(1).context.alpha;
     const coverage = 1 - Math.pow(1 - a0, 40);
     expect(coverage).toBeGreaterThan(0.79);
     for (const c of T) expect(onBlack(over(c, coverage))).toBeGreaterThanOrEqual(3);
   });
-  it('a lone thread at depth sits on the 0.30 plateau (call 07, Corbin 2026-09-12): 1.39-1.73:1 per source, in the ladder order, and width carries the rest', () => {
+  it('a lone thread at depth sits on the 0.30 plateau (call 07, Corbin 2026-09-12): 1.4-1.9:1 per source, in the lightness order, and width carries the rest', () => {
     // The 3:1 that justified 0.70 is given up on Corbin's word ("brighter and brighter ... odd";
     // "a little clearer lines as you zoom in is fine"): at depth the ink stays at the plateau and the
     // stroke widens to 1.6 px. Recorded so the next reader knows the number was chosen, not missed.
     const top = personalInk(1e6).context.alpha;
     expect(top).toBeCloseTo(0.30, 3);
     const ratios = T.map((c) => onBlack(over(c, top)));
-    expect(ratios[0]).toBeGreaterThan(1.7); expect(ratios[3]).toBeGreaterThan(1.35);
-    for (let i = 1; i < ratios.length; i++) expect(ratios[i]).toBeLessThan(ratios[i - 1]);   // brightest first
+    for (const r of ratios) { expect(r).toBeGreaterThan(1.4); expect(r).toBeLessThan(1.9); }
+    // the plateau keeps the lightness ladder: a brighter source reads brighter there too
+    const byLum = T.map((c, i) => i).sort((a, b) => lum(T[b]) - lum(T[a]));
+    for (let i = 1; i < byLum.length; i++) expect(ratios[byLum[i]]).toBeLessThan(ratios[byLum[i - 1]]);
     expect(personalInk(1e6).context.width).toBeCloseTo(1.6, 3);
   });
   it('the 0.70 bound keeps its property for the walk\'s knob: every source clears 3:1 there and the darkest did not at 0.45', () => {
     const bound = personalInk(1e6, 0.70).context.alpha;
     expect(bound).toBeCloseTo(0.70, 2);
     for (const c of T) expect(onBlack(over(c, bound)), `source ${c}`).toBeGreaterThanOrEqual(3);
-    expect(onBlack(over(T[3], 0.45))).toBeLessThan(3);
+    expect(onBlack(over(T[3], 0.45))).toBeLessThan(3);   // the studies, the darkest source
   });
-  it('the brightest source at the bound stays under the darkest reader hue at full ink', () => {
+  it('the brightest source at the bound stays under the reader’s gold at full ink', () => {
     const bound = personalInk(1e6, 0.70).context.alpha;
-    expect(lum(over(T[0], bound))).toBeLessThan(lum(over(R[2], 0.95)));
+    const brightest = T.reduce((a, c) => (lum(c) > lum(a) ? c : a));
+    expect(lum(over(brightest, bound))).toBeLessThan(lum(over(R[0], 0.95)));
   });
 });
 
