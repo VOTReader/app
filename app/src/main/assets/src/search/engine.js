@@ -1335,8 +1335,11 @@ function meantSentence(text, start, ex, at, words) {
  * @param {(doc:any) => boolean} named  the query names this text's title so: it keeps its place
  * @param {(id:string, doc:any) => number} near  how nearly a text holds the typed words in a row (0..1)
  * @param {string[]} [typed]  every typed word, the small ones too: a quote's excerpt is cut by them
+ * @param {{has: (id:string) => boolean, cov: (id:string) => number}|null} [aligned]  B4's texts holding the quote with
+ *   its slips (has), and how much of it a text holds (cov, align.js): a reprint held so gives way only to an original
+ *   holding ALIGN_HELD of the quote as well
  */
-function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
+function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], aligned = null) {
   if (!terms.length) return;
   let O;
   try { O = originals(); } catch { return; }
@@ -1365,7 +1368,17 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
     // stays its original: a study quotes Scripture word for word, in the KJV or with His name restored, where the
     // index prints the NKJV (a study quoting Acts 20:16 as the KJV words it).
     const whole = typed.length >= RUN_MIN ? near(idOf.get(e) || '', e.doc) : 0;
+    /* A reprint holding the quote with its slips (search200 B4) gives way only to an original holding it as well: the
+       letter or verse a sentence's key, its shingles, a cite or the model's passage names may hold another of its lines
+       (a study's sentence beside the quote, or the verse a study quotes in another translation's words). */
+    const holds = aligned && aligned.has(idOf.get(e) || '') ? aligned : null;
+    const fit = (/** @type {string[]|null} */ f) => {
+      if (!f || !holds) return f;
+      const k = f.filter((x) => holds.cov(x) >= ALIGN_HELD);
+      return k.length ? k : null;
+    };
     const keep = (/** @type {string[]|null} */ f) => {
+      f = fit(f);
       if (!f || whole < 1) return f;
       const k = f.filter((x) => (e.doc.kind === 'bible-study' && D.get(x).kind === 'verse') || near(x, D.get(x)) >= whole - 0.1);
       return k.length ? k : null;
@@ -1412,7 +1425,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
       const src = citedOriginal(id, e.doc.text, words);
       // A quote of the Answers' own wording stays with it, when the letter words it otherwise.
       const own = src ? near(id, e.doc) : 0;
-      if (src && (own < NEAR_PHRASE_MIN || near(src, D.get(src)) >= own - 0.1)) found = lower([src]);
+      if (src && (own < NEAR_PHRASE_MIN || near(src, D.get(src)) >= own - 0.1)) found = fit(lower([src]));
     }
     if (!found && (e.doc.kind === 'wtlb' || e.doc.kind === 'blessed')) {
       const id = idOf.get(e) || '';
@@ -1423,7 +1436,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
       // The entry is cut from its letter: whatever of the query it holds, a letter holding as much comes first
       // (sr11, 2026-10-15: a bar of half the query kept "history has an end and christ is coming" on the entry at
       // 0.46 with its letter holding the same 0.46; Corbin, DECISIONS 10-14: the original first, the reprint second).
-      if (src && share > 0 && holdsAsWell(src, pq, share) && (own < NEAR_PHRASE_MIN || near(src, D.get(src)) >= own - 0.1)) found = [src];
+      if (src && share > 0 && holdsAsWell(src, pq, share) && (own < NEAR_PHRASE_MIN || near(src, D.get(src)) >= own - 0.1)) found = fit([src]);
     }
     if (!found && e.doc.kind === 'answers') {
       // A study or Holy Days text just below that holds the query as well, in one passage and in a row: it is what Answers reprints.
@@ -1437,7 +1450,8 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
         const t = ORIGINAL_TIER[f.doc.kind];
         if (t === undefined || t >= tier || !f.doc.text) continue;
         const fid = idOf.get(f) || '';
-        if (share > 0 && bestWindow(pq.query, docLemmas(fid, f.doc.text), pq.span) >= share - REPRINT_COST && near(fid, f.doc) >= own - 0.1) {
+        if (share > 0 && bestWindow(pq.query, docLemmas(fid, f.doc.text), pq.span) >= share - REPRINT_COST && near(fid, f.doc) >= own - 0.1 &&
+          (!holds || holds.cov(fid) >= ALIGN_HELD)) {
           out.splice(r, 1);
           out.splice(i, 0, f);
           i++;
@@ -2153,10 +2167,13 @@ async function search(query, options) {
      aligned, a verse with its neighbour too (a quote of two verses run together); those holding ALIGN_HELD of the
      quote or more (tier B) lead every text holding less, the one holding more first, and open on the words. A cov
      within a small word of another's is no better (the words rank the two), nor is one within a small word of the
-     best text left under ALIGN_HELD (it is not lifted); a study quoting a verse gives way to the verse. On the
-     open benches (2026-10-18): tri 577 -> 583 of 600, the 500's open unchanged (381), dropped-word probe 1720 -> 1743. */
+     best text left under ALIGN_HELD (it is not lifted); a study quoting a verse gives way to the verse, and a text
+     held so gives way in originalsFirst only to an original holding the quote as well. On the open benches
+     (2026-10-18): tri 577 -> 586 of 600, the 500's open unchanged (381), dropped-word probe 1720 -> 1751. */
   /** @type {Map<string, {cov: number, start: number, rank: number}>} tier B: the texts holding the quote, slips and all */
   const alignHeld = new Map();
+  /** @type {((id: string) => number)|null} how much of the quote a text holds (align.js cov), for originalsFirst */
+  let alignCovOf = null;
   const AS = ALIGN_ON && !p.phrase && !keyword && typedTokens.length >= ALIGN_MIN && !heldWhole.length ? storeNow() : null;
   if (AS) {
     const n = msIndex.documentCount || 1;
@@ -2192,6 +2209,7 @@ async function search(query, options) {
       if (c === undefined) { c = alignScore(t, typedTokens, w, cls).cov; single.set(id, c); }
       return c;
     };
+    alignCovOf = (id) => { const t = single.has(id) ? null : toksOf(id); return single.has(id) || t ? alone(id, t) : 0; };
     /** The verse beside a verse (`by` -1 or 1) in its chapter: its id, or ''. */
     const besideVerse = (/** @type {string} */ id, /** @type {any} */ d, /** @type {number} */ by) => {
       const k = /^d(\d+)$/.exec(id);
@@ -2606,7 +2624,8 @@ async function search(query, options) {
     return typedHeld(joinApostropheS(kjvEncode(d.text || '')), typedTokens, typedTokens.length + 2) <= typedHeld(t, typedTokens, t.length);
   };
   if (msIndex === inUse) originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) => allowed(d) && fresh(d),
-    admittedDocs.size ? (/** @type {any} */ d) => admittedSo(d) || namedSo(d) : namedSo, nearTyped, typedTokens);
+    admittedDocs.size ? (/** @type {any} */ d) => admittedSo(d) || namedSo(d) : namedSo, nearTyped, typedTokens,
+    alignHeld.size && alignCovOf ? { has: (id) => alignHeld.has(id), cov: alignCovOf } : null);
   // What those two added counts in its collection. A full one does not refuse it (the words' 400th
   // verse is no reason to drop the model's best text or an original): its last text gives way.
   if (perVolume) {

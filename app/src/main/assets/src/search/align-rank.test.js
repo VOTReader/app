@@ -5,8 +5,10 @@
    holding less (the original first among those holding it alike) and opens on the words, where the first typed words
    are. Texts within a small word of each other hold it alike, and one within a small word of a text just under
    ALIGN_HELD is not told from it: the words rank them. A verse is lifted by its neighbour only when neither holds the
-   quote alone, and a study quoting a verse gives way to it. A quote held whole, or typed in fewer than ALIGN_MIN
-   words, is ranked as before. Fixture texts only (no benchmark query). */
+   quote alone, and a study quoting a verse gives way to it. A text holding the quote gives way to its original only
+   when the original holds the quote as well: not to a verse it cites in other words, nor to the letter another of
+   its lines comes from. A quote held whole, or typed in fewer than ALIGN_MIN words, is ranked as before. Fixture
+   texts only (no benchmark query). */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VotSearchMini as E } from './engine.js';
 
@@ -46,6 +48,8 @@ const GLOBALS = {
         { n: 8, text: 'And the keeper of the orchard carried the baskets.' },
         // ...and its words spread over twice its length, "our" among them
         { n: 9, text: 'Praised is the city of our fathers, the city that comes in the name of the King.' },
+        // a verse a study quotes in another translation's words
+        { n: 10, text: 'But My kindness shall be for ever, and My help from age to age; it will not fail.' },
       ] }] },
     ] },
   },
@@ -58,6 +62,9 @@ const GLOBALS = {
     { id: 'honey-letter', num: 8, title: 'The Vessels of Honey', blocks: [para(filler(12))] },
     // a line no other text reprints, deep in a long letter
     { id: 'river-letter', num: 5, title: 'At the Water', blocks: [para(filler(16) + 'Go down to the river at evening and wash your garments in the running water, and you shall be clean. ' + filler(4))] },
+    // a line remembered, and a letter whose one line an Answers topic beside it also prints, thick with its words
+    { id: 'apart-letter', num: 12, title: 'Remain Apart', blocks: [para(filler(9) + 'Yet have no part with them, nor give them a place among you; for they do rebel against their Maker. ' + filler(9))] },
+    { id: 'rebel-letter', num: 13, title: 'The Proud', blocks: [para(filler(9) + 'The rebel takes no part; they rebel, they rebel against their Maker and take their part with them. ' + filler(9))] },
   ],
   LETTERS_FLOCK: [
     // a letter thick with the line's words, none of them in its order
@@ -77,8 +84,14 @@ const GLOBALS = {
     { id: 'restored', slug: 'restored', title: 'Of the Cross', chapters: [
       { id: 'restored-ch1', num: 1, title: 'His Last Words', blocks: [para(filler(8) + 'And YahuShua lifted up His voice and said, Father, I commit My spirit into Your hand. ' + filler(8))] },
     ] },
+    { id: 'kindness', slug: 'kindness', title: 'Of Mercy', chapters: [
+      { id: 'kindness-ch1', num: 1, title: 'It Endures', blocks: [para(filler(8) + 'As the prophet wrote: “But my kindness will last forever, my help through all the ages.” – Proverbs 31:10 ' + filler(8))] },
+    ] },
   ],
-  ANSWERS: [],
+  ANSWERS: [
+    // a topic printing the proud letter's line and the line remembered, under it
+    { id: 'apart-topic', num: 3, title: 'Regarding the Proud', paragraphs: [{ text: filler(2) + 'The rebel takes no part; they rebel, they rebel against their Maker and take their part with them. Yet have no part with them, nor give them a place among you; for they do rebel against their Maker. ' + filler(2) }] },
+  ],
 };
 const ids = (r) => r.results.map((x) => x.doc.letterId || x.doc.ref);
 /** One search with the alignment on or off, the setting put back after. */
@@ -149,6 +162,17 @@ describe('a quote remembered with its slips leads (B4)', () => {
     const top = ids(r);
     expect(top[0]).toBe('Proverbs 31:6');
     expect(top).toContain('restored');
+  });
+
+  it('a study quoting a verse in other words than the verse prints, typed as the study words it: the study leads', async () => {
+    const r = await searchWith(true, 'but my kindness will endure forever my help through all the ages');
+    expect(ids(r)[0]).toBe('kindness');
+  });
+
+  it('a reprint holding the quote gives way to the original that holds it, not to one naming another of its lines', async () => {
+    const top = ids(await searchWith(true, 'yet have no part with them for they do rebel against their god'));
+    expect(top[0]).toBe('apart-letter');
+    expect(top).toContain('apart-topic');
   });
 
   it('a text holding the quote no better than one just under the bar is not lifted over it: the words rank them', async () => {
