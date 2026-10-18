@@ -38,7 +38,7 @@
 
 import { ConnectionRow } from './connection-row.jsx';
 import {
-  connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, arcLine, plural, timesWord,
+  connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, arcLine, plural, timesWord, followLabel,
   verseEndpoint, verseTextFor,
 } from '../../utils/scripture-web/describe.js';
 import {
@@ -425,7 +425,7 @@ export function WebPanel(props) {
     const farEnd = detail.far === 'to' ? detail.b : detail.a;
     const follow = (
       <button type="button" className="sw-link sw-follow" onClick={() => followThread(detail)}
-        aria-label={'Follow the line to ' + farEnd.label}>Follow to {farEnd.label} <span aria-hidden="true">›</span></button>
+        aria-label={followLabel(farEnd.label)}>{followLabel(farEnd.label)} <span aria-hidden="true">›</span></button>
     );
     body = (
       <React.Fragment>

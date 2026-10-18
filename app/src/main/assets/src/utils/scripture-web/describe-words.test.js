@@ -53,6 +53,12 @@ describe('"Nearby" is the Nearby list and nothing else', () => {
   });
 });
 
+describe('Follow names where it goes as the spec words it (spec 4.6, G1; w3 review)', () => {
+  it('"Follow to the other end · <the far end>"', () => {
+    expect(ds.followLabel('Luke 1:31')).toBe('Follow to the other end · Luke 1:31');
+  });
+});
+
 describe('plurals are right at one', () => {
   // was pinned on groupAnnouncement, which went with the bundle sheet's group buttons (w3 review);
   // the same law on the bundle's own words

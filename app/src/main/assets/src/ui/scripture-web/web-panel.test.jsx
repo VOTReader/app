@@ -130,9 +130,10 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     expect(open).toHaveLength(1);
     fireEvent.click(open[0]);
     expect(props.onOpen).toHaveBeenCalledWith(expect.objectContaining({ type: 'bible', bookId: 'isaiah', chapter: 7, verse: 14 }));
-    const follow = byLabel(/^Follow the line to Matthew 1:23$/);
+    // spec 4.6 and G1's words, its name the words it shows (w3 review)
+    const follow = byLabel(/^Follow to the other end · Matthew 1:23$/);
     expect(follow).toHaveLength(1);
-    expect(follow[0].textContent).toMatch(/Follow to Matthew 1:23/);
+    expect(follow[0].textContent).toBe('Follow to the other end · Matthew 1:23 ›');
     fireEvent.click(follow[0]);
     expect(props.followThread).toHaveBeenCalledWith(expect.objectContaining({ index: ARC, far: 'to' }));
   });

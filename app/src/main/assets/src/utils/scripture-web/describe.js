@@ -90,6 +90,11 @@ export function chooserAnnouncement(count) {
   return plural(count, 'connection', 'connections') + ' here. Choose one.';
 }
 
+/** The connection's Follow, as spec 4.6 and G1 word it: "Follow to the other end · Luke 1:31". */
+export function followLabel(label) {
+  return 'Follow to the other end · ' + label;
+}
+
 /** The live region as Follow pans to a thread's far foot. */
 export function followAnnouncement(label) {
   return 'Following the line to ' + label;
