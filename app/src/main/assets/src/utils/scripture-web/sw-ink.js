@@ -40,8 +40,12 @@ const TABLE = {
 
   // ── the Volumes in the flagship view (Q1 a: always on) ──────────────────
   cited: { hex: '#C4A469', alpha: 0.70 },                        // cited-in-the-Volumes ticks: 1 DEVICE px wide (min), 5 / 4 px tall, baseline +4..+9
-  prophecy: { hex: '#EADFC4', alpha: 0.80, width: 1.25 },        // prophecy thread core, never under 1 device px; top pass, every density
-  prophecyGlow: { hex: '#EADFC4', alpha: 0.12, width: 4 },
+  // the prophecy class: a pale constellation over the web (r2-01a). The spec's .80 / 1.25 px / .12 glow
+  // were set for 51 pairs; the asset carries 131 distinct, clustered on a few feet (Matthew 1:1 x5,
+  // Isaiah 7:14 x4), and at those numbers Psalms/Isaiah to the Gospels became a solid cream tangle
+  // (GL review 2026-10-18). Retuned to the picture's intent, not its count; the hub holds the call.
+  prophecy: { hex: '#EADFC4', alpha: 0.40 },                     // core: 1 DEVICE px (no CSS width, as cited); top pass, every density
+  prophecyGlow: { hex: '#EADFC4', alpha: 0.06, width: 4 },
 
   // ── the chosen, hovered and lit lines: the top pass (C1, C3) ────────────
   chosen: { hex: '#E6D3A3', alpha: 1, width: 3, widthCompact: 2.5 },   // adaptive tessellation, no facets

@@ -42,8 +42,10 @@ describe('the ink table', () => {
   it('holds the spec §4.2 inks by name', () => {
     expect(INK.canvas).toEqual({ hex: '#000000', alpha: 1 });
     expect(INK.cited).toEqual({ hex: '#C4A469', alpha: 0.70 });
-    expect(INK.prophecy).toEqual({ hex: '#EADFC4', alpha: 0.80, width: 1.25 });
-    expect(INK.prophecyGlow).toEqual({ hex: '#EADFC4', alpha: 0.12, width: 4 });
+    // the prophecy class, retuned from the spec's .80 / 1.25 px / .12 (set for 51 pairs) to its
+    // pale-constellation intent over the asset's 131 (GL review 2026-10-18): a 1 device px core
+    expect(INK.prophecy).toEqual({ hex: '#EADFC4', alpha: 0.40 });
+    expect(INK.prophecyGlow).toEqual({ hex: '#EADFC4', alpha: 0.06, width: 4 });
     expect(INK.chosen).toEqual({ hex: '#E6D3A3', alpha: 1, width: 3, widthCompact: 2.5 });
     expect(INK.chosenHalo).toEqual({ hex: '#E6D3A3', alpha: 0.22, width: 10 });
     expect(INK.hover).toEqual({ hex: '#E6D3A3', alpha: 1, width: 2 });
@@ -116,8 +118,9 @@ describe('the helpers', () => {
   it('inkWidth picks the compact width on a phone, the PC one otherwise, 0 for an ink with none', () => {
     expect(inkWidth('chosen')).toBe(3);
     expect(inkWidth('chosen', true)).toBe(2.5);
-    expect(inkWidth('prophecy', true)).toBe(1.25);
+    expect(inkWidth('lit', true)).toBe(1.5);   // no compact width: the PC one
     expect(inkWidth('cited')).toBe(0);
+    expect(inkWidth('prophecy', true)).toBe(0);   // 1 device px, the renderer's floor
   });
 
   it('inkGLSL is a vec4 whose every component carries a fraction (the shader-hygiene law)', () => {
@@ -125,6 +128,6 @@ describe('the helpers', () => {
     expect(src).toBe('vec4(0.0, 0.0, 0.0, 1.0)');
     const prophecy = inkGLSL('prophecy');
     expect(prophecy).toMatch(/^vec4\(([0-9]+\.[0-9]+, ){3}[0-9]+\.[0-9]+\)$/);
-    expect(prophecy.endsWith('0.8)')).toBe(true);
+    expect(prophecy.endsWith('0.4)')).toBe(true);
   });
 });

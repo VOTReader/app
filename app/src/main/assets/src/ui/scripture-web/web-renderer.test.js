@@ -512,7 +512,7 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     const idle = frame(r, calls, {});
     expect(idle.u(idle.top, 'uCore')).toEqual([rgba01('prophecy')]);
     expect(idle.u(idle.top, 'uHalo')).toEqual([rgba01('prophecyGlow')]);
-    expect(idle.u(idle.top, 'uCoreHalf')).toEqual([[inkWidth('prophecy') / 2]]);
+    expect(idle.u(idle.top, 'uCoreHalf')).toEqual([[0.5]]);   // 1 device px at dpr 1
     expect(idle.u(idle.top, 'uHaloHalf')).toEqual([[inkWidth('prophecyGlow') / 2]]);
     expect(idle.top.length).toBe(1);
     expect(idle.top[0].args[3]).toBe(2);
@@ -534,11 +534,11 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
   });
 
   it('the core never draws under 1 device px; the glow and the core recede with a tap, as far as TAP_CONTEXT and no further', () => {
-    const half = topLook('prophecy', 0.5, false);   // 1.25 CSS px at half a device px: 0.625 device px, held at 1
+    const half = topLook('prophecy', 0.5, false);   // the row has no CSS width: 1 device px at any dpr
     expect(half.coreHalf).toBe(0.5);
     expect(half.core).toEqual(rgba01('prophecy'));
     const at = topLook('prophecy', 2, false, 0.5);
-    expect(at.coreHalf).toBe(inkWidth('prophecy'));
+    expect(at.coreHalf).toBe(0.5);
     expect(at.core[3]).toBeCloseTo(rgba01('prophecy')[3] * (1 + (TAP_CONTEXT - 1) * 0.5), 12);
     const full = topLook('prophecy', 1, false, 1);
     expect(full.core[3]).toBeCloseTo(rgba01('prophecy')[3] * TAP_CONTEXT, 12);
@@ -547,6 +547,23 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     // the chosen, lit and hovered never recede
     expect(topLook('chosen', 1, false, 1).core).toEqual(rgba01('chosen'));
     expect(topLook('hover', 1, false, 1).core).toEqual(rgba01('hover'));
+  });
+
+  /* GL review 2026-10-18: at the spec's .80 / 1.25 px / .12 glow (set for 51 pairs) the asset's 131
+     distinct pairs, clustered on a few feet, drew Psalms/Isaiah to the Gospels as a solid cream tangle
+     over the whole dome, against r2-01a's pale constellation. The class sits under what the reader
+     asks about: one device px on every screen, at most half the lit ink, its glow under the halos'. */
+  it('the prophecy class is a pale constellation: 1 device px on every screen, under half the lit ink', () => {
+    for (const dpr of [0.5, 1, 2, 2.625, 3]) {
+      for (const compact of [false, true]) {
+        const look = topLook('prophecy', dpr, compact);
+        expect(look.coreHalf, `dpr ${dpr} compact ${compact}`).toBe(0.5);
+        expect(look.core[3], `dpr ${dpr} compact ${compact}`).toBe(rgba01('prophecy')[3]);
+      }
+    }
+    expect(rgba01('prophecy')[3]).toBeLessThanOrEqual(rgba01('lit')[3] / 2);
+    expect(rgba01('prophecyGlow')[3]).toBeLessThan(rgba01('hoverHalo')[3] / 2);
+    expect(rgba01('prophecyGlow')[3]).toBeLessThan(rgba01('chosenHalo')[3] / 2);
   });
 
   it('a chosen prophecy pair that is no arc takes the chosen ink on its own feet', () => {

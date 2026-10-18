@@ -302,7 +302,8 @@ export const TOP_SHADER_SOURCE = { vertex: TOP_VERT, fragment: TOP_FRAG };
 
 /** Each top-pass kind's ink (sw-ink.js rows) and its tessellation cap. */
 const TOP_LOOK = {
-  // the core never under 1 device px (the ink table's prophecy row); it recedes with a tap
+  // the core is 1 device px on every screen (the ink table's prophecy row has no CSS width, and
+  // nothing draws it thinner); it recedes with a tap
   prophecy: { core: 'prophecy', halo: 'prophecyGlow', cap: 192, minDevicePx: 1, recedes: true },
   lit: { core: 'lit', halo: '', cap: 192 },
   hover: { core: 'hover', halo: 'hoverHalo', cap: 512 },
