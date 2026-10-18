@@ -237,20 +237,42 @@ export function visibleArcs(g, cam, view, limit) {
  * @returns {FeedThread[]}
  */
 export function labelFeed(g, cam, view, opts) {
-  const { width, squash, density } = view;
   /** @type {FeedThread[]} */
   const out = [];
-  if (!g || !g.count || !(width > 0)) return out;
+  const width = view.width;
+  eachLabelThread(g, cam, view, opts, (i, x0, x1, A, fromOn, toOn) => {
+    out.push({ i, x0, x1, A, fromOn, toOn, anchored: arcAnchored(x0, x1, width) === 1 });
+  });
+  return out;
+}
+
+/**
+ * labelFeed's walk without the list: `visit(i, x0, x1, A, fromOn, toOn)` for
+ * every thread labelFeed would hold, in the same order, with nothing made
+ * per thread. The overlay's chip pass ranks every foot on the frame this way
+ * (some 17,000 threads at 6x) and keeps the few dozen that can win, so the
+ * thousands that cannot cost no object. Returns how many it visited.
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, y?:number, ppv:number, total:number}} cam
+ * @param {{width:number, base:number, squash:number, density:import('./decode.js').Density, inset?:number}} view
+ * @param {{ flyovers?: boolean, limit?: number }|null|undefined} opts  as labelFeed's
+ * @param {(i:number, x0:number, x1:number, A:number, fromOn:boolean, toOn:boolean) => void} visit
+ * @returns {number}
+ */
+export function eachLabelThread(g, cam, view, opts, visit) {
+  const { width, squash, density } = view;
+  if (!g || !g.count || !(width > 0)) return 0;
   const inset = view.inset > 0 ? view.inset : 0;
   const camY = cam.y > 0 ? cam.y : 0;
   // the sky, as heights above the DRAWN baseline (base + camY)
   const hLow = camY, hHigh = view.base + camY - inset;
-  if (!(hHigh > hLow)) return out;
+  if (!(hHigh > hLow)) return 0;
   const flyovers = !!(opts && opts.flyovers);
   const limit = opts && opts.limit > 0 ? opts.limit : 50000;
   const { fanA, fanB } = fansOf(g);
   const lo = xToVerse(cam, width, 0) - 1, hi = xToVerse(cam, width, width) + 1;
   const chunkSize = g.chunkSize || 256;
+  let n = 0;
   for (const bucket of g.buckets) {
     const full = walkDrawnRuns(bucket, bucketDrawCount(bucket, density), chunkSize, lo, hi, (start, end) => {
       for (let i = start; i < end; i++) {
@@ -260,20 +282,24 @@ export function labelFeed(g, cam, view, opts) {
         const fromOn = x0 >= 0 && x0 <= width, toOn = x1 >= 0 && x1 <= width;
         if (!fromOn && !toOn && !flyovers) continue;
         const { A } = arcShape((x1 - x0) * 0.5, squash);
-        const xa = x0 > 0 ? x0 : 0, xb = x1 < width ? x1 : width;
-        const ha = arcHeightAt(xa, x0, x1, A), hb = arcHeightAt(xb, x0, x1, A);
-        const cx = (x0 + x1) * 0.5;
-        const hMax = cx >= xa && cx <= xb ? A : (ha > hb ? ha : hb);
-        const hMin = ha < hb ? ha : hb;
-        if (hMax < hLow || hMin > hHigh) continue;
-        out.push({ i, x0, x1, A, fromOn, toOn, anchored: arcAnchored(x0, x1, width) === 1 });
-        if (out.length >= limit) return true;
+        // a foot on the frame with the camera on the baseline is always seen (height 0 there,
+        // the sky's floor); every other thread asks the curve
+        if (!((fromOn || toOn) && hLow <= 0)) {
+          const xa = x0 > 0 ? x0 : 0, xb = x1 < width ? x1 : width;
+          const ha = arcHeightAt(xa, x0, x1, A), hb = arcHeightAt(xb, x0, x1, A);
+          const cx = (x0 + x1) * 0.5;
+          const hMax = cx >= xa && cx <= xb ? A : (ha > hb ? ha : hb);
+          const hMin = ha < hb ? ha : hb;
+          if (hMax < hLow || hMin > hHigh) continue;
+        }
+        visit(i, x0, x1, A, fromOn, toOn);
+        if (++n >= limit) return true;
       }
       return false;
     });
     if (full) break;
   }
-  return out;
+  return n;
 }
 
 /**
