@@ -29,7 +29,7 @@ import { focusState, withLit } from '../../utils/scripture-web/focus-state.js';
 import {
   describeFound, summaryOf, chooserAnnouncement, followAnnouncement, groupAnnouncement,
 } from '../../utils/scripture-web/describe.js';
-import { pickPersonalLinks, pickUnderlayLinks } from './rail-renderer.js';
+import { pickPersonalLinks, pickUnderlayLinks, nearestLinks, nearestUnderlay } from './rail-renderer.js';
 import { hitOverlay } from './overlay-renderer.js';
 import { routeOverlayHit } from './goto.jsx';
 
@@ -183,11 +183,19 @@ export function useWebSelection({
     if (!graph || !listOpen) return [];
     const found = [];
     if (mode === 'personal') {
+      // every link, the one passing nearest the middle of the view first
+      // (item 29, w3: it was the first 36 in store order wherever the camera
+      // stood); before the first frame has a size, store order
       const p = personalRef.current;
+      const cam = camRef.current, v = viewRef.current;
+      const opts = cam && v && v.W && p && p.votRail ? railOpts() : null;
       const count = p && p.graph ? p.graph.count : 0;
-      for (let i = 0; i < Math.min(count, 36); i++) found.push({ kind: 'link', index: i });
+      const links = opts ? nearestLinks(p.graph, opts) : Array.from({ length: count }, (_, index) => ({ index }));
+      for (const hit of links) found.push({ kind: 'link', index: hit.index });
       if (!found.length && showUnderlay && p && p.underlay) {
-        for (let i = 0; i < Math.min(p.underlay.count, 36); i++) found.push({ kind: 'underlay', index: i });
+        const near = opts ? nearestUnderlay(p.underlay, opts, 36)
+          : Array.from({ length: Math.min(p.underlay.count, 36) }, (_, index) => ({ index }));
+        for (const hit of near) found.push({ kind: 'underlay', index: hit.index });
       }
     } else {
       // the list reads the lens (landing 15): the lit chapter leads - its
@@ -206,7 +214,7 @@ export function useWebSelection({
       }
     }
     return found.map(describe).filter(Boolean);
-  }, [graph, listOpen, mode, describe, showUnderlay, camRef, viewRef, density, personalRef]);
+  }, [graph, listOpen, mode, describe, showUnderlay, camRef, viewRef, density, personalRef, railOpts]);
 
   const commitFound = React.useCallback((found) => {
     if (!found) return;

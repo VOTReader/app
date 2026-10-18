@@ -130,8 +130,9 @@ export function ConnectionList({ items, mode, lensOn, onChoose, onClose }) {
   const trapRef = useFocusTrap(true);
   // the canon list leads with the chapter it reads (landing 15)
   const chapter = mode !== 'personal' && items[0] && items[0].kind === 'chapter' ? items[0] : null;
-  // My Web lists the reader's own links (up to 36, store order) wherever the camera is: no 'nearby'
-  // promise there (sweep mw12). The canon list does read the view (the lit chapter, its threads).
+  // My Web lists every one of the reader's links, the one passing nearest the middle of the view
+  // first (w3 item 29; it was the first 36 in store order, sweep mw12); its header still says
+  // 'Your links'. The canon list reads the view too (the lit chapter, its threads).
   const eyebrow = listEyebrow(mode, chapter, lensOn);
   const meta = listMeta(chapter, items.length);
   return (

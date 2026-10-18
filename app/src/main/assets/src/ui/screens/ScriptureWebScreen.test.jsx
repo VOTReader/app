@@ -861,6 +861,25 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(last.focusRange).toBeNull();
     });
 
+    /* item 29 (w3, the My Web stream): the list was the first 36 links in store order wherever
+       the camera stood, so "Nearby" was not near and link 37 on could be reached only by finding
+       it on the canvas. Now every link is listed, the one passing nearest the middle first. */
+    it('item 29: My Web lists every link, nearest the middle of the view first', async () => {
+      const at = (v) => ({ type: 'bible', bookId: 'genesis-plain', chapter: 1, verse: v, label: 'Genesis 1:' + v });
+      stubMyWeb(Array.from({ length: 40 }, (_, i) => ({ id: 'n' + i, source: at(1 + i * 770), target: at(31 + i * 770) })));
+      const { container } = await mount({ settings: seen });
+      fireEvent.click(screen.getByRole('button', { name: 'My web' }));
+      await settle(60);
+      fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
+      await settle(20);
+      const rows = [...container.querySelectorAll('.sw-list .sw-choice-row')];
+      expect(rows.length, 'every link, not the first 36').toBe(40);
+      // the overview's centre is verse 15,551: link 20 (15,401) is nearest, then 21, then 19
+      expect(rows[0].textContent).toMatch(/Genesis 1:15401\b/);
+      expect(rows[1].textContent).toMatch(/Genesis 1:16171\b/);
+      expect(rows[2].textContent).toMatch(/Genesis 1:14631\b/);
+    });
+
     /* v55: the keys drive the rail last touched, but the live region always read the camera's x
        as a Bible verse id. On the Volumes rail x is a rail position (0..5 here), so ArrowRight
        announced "Genesis 1:4" while the reader moved through Rebuke. */
@@ -1040,8 +1059,8 @@ describe('the Nearby list reads the lens (landing 15)', () => {
     if (prevDecode) vi.mocked(decodeGraph).mockImplementation(prevDecode);
   });
 
-  // Sweep mw12: My Web's list is the reader's links in store order (up to 36), wherever the camera is;
-  // its header said 'Your nearby links' and its empty line 'No nearby connections at this location.'
+  // Sweep mw12: My Web's list is the reader's links (every one, nearest the middle first since w3
+  // item 29); its header said 'Your nearby links' and its empty line 'No nearby connections at this location.'
   it('on My Web the list says what it is: your links, with no "nearby" and no "at this location"', async () => {
     const { container } = await mountList();
     fireEvent.click(screen.getByRole('button', { name: /my web/i }));

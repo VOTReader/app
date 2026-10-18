@@ -406,6 +406,90 @@ function distanceToPath(pts, px, py) {
 }
 
 /**
+ * One reader's link in this frame: its two feet and the path it is drawn
+ * along. The draw, the pick and the Nearby order all read this, so what the
+ * list calls near is what the eye sees near (item 29).
+ * @param {any} personal
+ * @param {number} i
+ * @param {any} opts
+ * @param {{bottomY:number, topY:number}} rails
+ * @returns {{a:[number, number], b:[number, number], pts:Array<[number, number]>|null}}
+ */
+function linkGeometry(personal, i, opts, rails) {
+  const a = endpointPoint({ rail: personal.aRail[i], pos: personal.aPos[i] }, opts, rails);
+  const b = endpointPoint({ rail: personal.bRail[i], pos: personal.bPos[i] }, opts, rails);
+  const gap = Math.abs(rails.bottomY - rails.topY);
+  const cross = personal.aRail[i] !== personal.bRail[i];
+  const pts = threadPath(a, b, cross, { width: opts.width, gap, n: 28, up: personal.aRail[i] === 0, maxRy: gap * 0.78 });
+  return { a, b, pts };
+}
+
+/**
+ * One of Timothy's threads in this frame (Bible foot a, Volumes foot b).
+ * @param {any} underlay
+ * @param {number} i
+ * @param {any} opts
+ * @param {{bottomY:number, topY:number}} rails
+ * @returns {{a:[number, number], b:[number, number], pts:Array<[number, number]>|null}}
+ */
+function underlayGeometry(underlay, i, opts, rails) {
+  const a = /** @type {[number, number]} */ ([opts.verseX(underlay.versePos[i]), rails.bottomY]);
+  const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, opts, rails);
+  const pts = threadPath(a, b, true, { width: opts.width, gap: Math.abs(rails.bottomY - rails.topY), n: 12 });
+  return { a, b, pts };
+}
+
+/**
+ * How far a line passes from the middle of the view (mid-width, mid-gap):
+ * along its drawn path when it has one on screen, else from its nearer foot.
+ * @param {{a:[number, number], b:[number, number], pts:Array<[number, number]>|null}} geo
+ * @param {number} cx
+ * @param {number} cy
+ */
+function distanceFromMiddle(geo, cx, cy) {
+  if (geo.pts && geo.pts.length > 1) return distanceToPath(geo.pts, cx, cy);
+  return Math.min(Math.hypot(geo.a[0] - cx, geo.a[1] - cy), Math.hypot(geo.b[0] - cx, geo.b[1] - cy));
+}
+
+/**
+ * Every reader's link, the one passing nearest the middle of the view first
+ * (the Nearby list on My Web, item 29: it was the first 36 in store order).
+ * Ties keep store order.
+ * @param {any} personal
+ * @param {any} opts railOpts()
+ * @returns {Array<{index:number, distance:number}>}
+ */
+export function nearestLinks(personal, opts) {
+  if (!personal || !personal.count) return [];
+  const rails = railFrame({ H: opts.height, DPR: opts.DPR }, opts.base);
+  const cx = opts.width / 2, cy = (rails.topY + rails.bottomY) / 2;
+  const out = [];
+  for (let i = 0; i < personal.count; i++) {
+    out.push({ index: i, distance: distanceFromMiddle(linkGeometry(personal, i, opts, rails), cx, cy) });
+  }
+  return out.sort((p, q) => p.distance - q.distance || p.index - q.index);
+}
+
+/**
+ * Timothy's threads nearest the middle of the view, up to `limit` (the
+ * Nearby list's fallback while the reader has no link).
+ * @param {any} underlay
+ * @param {any} opts railOpts()
+ * @param {number} limit
+ * @returns {Array<{index:number, distance:number}>}
+ */
+export function nearestUnderlay(underlay, opts, limit) {
+  if (!underlay || !underlay.count) return [];
+  const rails = railFrame({ H: opts.height, DPR: opts.DPR }, opts.base);
+  const cx = opts.width / 2, cy = (rails.topY + rails.bottomY) / 2;
+  const best = [];
+  for (let i = 0; i < underlay.count; i++) {
+    insertNearest(best, { index: i, distance: distanceFromMiddle(underlayGeometry(underlay, i, opts, rails), cx, cy) }, limit);
+  }
+  return best;
+}
+
+/**
  * Draw the personal web.
  *
  * @param {CanvasRenderingContext2D} ctx
@@ -515,8 +599,6 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
   const zB = opts.verseTotal ? (verseX(opts.verseTotal) - verseX(0)) / width : 1;
   const zV = (votRail && votRail.total && opts.votX) ? (opts.votX(votRail.total) - opts.votX(0)) / width : zB;
   const z = Math.max(zB, zV);
-  const gap = Math.abs(rails.bottomY - rails.topY);
-  const geo = { width, gap };
   if (underlay && opts.showUnderlay && underlay.count) {
     const cx = personalInk(z, opts.contextCeiling).context;
     // FULL RESOLUTION, on the canvas the reader sees (Corbin, 2026-09-11:
@@ -527,9 +609,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     ctx.lineCap = 'round';
     const batches = new ContextBatches();
     for (let i = 0; i < underlay.count; i++) {
-      const a = /** @type {[number, number]} */ ([verseX(underlay.versePos[i]), rails.bottomY]);
-      const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, opts, rails);
-      const pts = threadPath(a, b, true, Object.assign({ n: 12 }, geo));
+      const { a, b, pts } = underlayGeometry(underlay, i, opts, rails);
       if (!pts) continue;
       batches.add(underlay.source ? underlay.source[i] : CONTEXT_BINS - 1, a[0], b[0], pts);
     }
@@ -542,10 +622,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
   const L = personalInk(z).link;
   const paths = [];
   for (let i = 0; i < personal.count; i++) {
-    const a = endpointPoint({ rail: personal.aRail[i], pos: personal.aPos[i] }, opts, rails);
-    const b = endpointPoint({ rail: personal.bRail[i], pos: personal.bPos[i] }, opts, rails);
-    const cross = personal.aRail[i] !== personal.bRail[i];
-    const pts = threadPath(a, b, cross, Object.assign({ n: 28, up: personal.aRail[i] === 0, maxRy: gap * 0.78 }, geo));
+    const { a, b, pts } = linkGeometry(personal, i, opts, rails);
     const kind = personal.kind ? personal.kind[i] : 2;
     const rgb = myWebLinkColor(kind);
     const pin = (MY_WEB_LINK_KINDS[kind] || MY_WEB_LINK_KINDS[2]).pin;
@@ -618,13 +695,9 @@ export function pickPersonalLinks(personal, opts, px, py, tol, limit) {
   const cap = Math.max(1, Math.min(limit || 4, 8));
   const best = [];
   for (let i = 0; i < personal.count; i++) {
-    const a = endpointPoint({ rail: personal.aRail[i], pos: personal.aPos[i] }, opts, rails);
-    const b = endpointPoint({ rail: personal.bRail[i], pos: personal.bPos[i] }, opts, rails);
+    const { a, b, pts } = linkGeometry(personal, i, opts, rails);
     const minX = Math.min(a[0], b[0]) - tol, maxX = Math.max(a[0], b[0]) + tol;
     if (px < minX || px > maxX) continue;
-    const cross = personal.aRail[i] !== personal.bRail[i];
-    const gap = Math.abs(rails.bottomY - rails.topY);
-    const pts = threadPath(a, b, cross, { width: opts.width, gap, n: 28, up: personal.aRail[i] === 0, maxRy: gap * 0.78 });
     if (!pts) continue;
     const d = distanceToPath(pts, px, py);
     if (d < tol) insertNearest(best, { index: i, distance: d }, cap);
@@ -648,16 +721,14 @@ export function pickPersonalLinks(personal, opts, px, py, tol, limit) {
  */
 export function pickUnderlayLinks(underlay, opts, px, py, tol, limit) {
   if (!underlay || !underlay.count) return [];
-  const { base, DPR, verseX } = opts;
+  const { base, DPR } = opts;
   const rails = railFrame({ H: opts.height, DPR }, base);
   const cap = Math.max(1, Math.min(limit || 4, 8));
   const best = [];
   for (let i = 0; i < underlay.count; i++) {
-    const a = [verseX(underlay.versePos[i]), rails.bottomY];
-    const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, opts, rails);
+    const { a, b, pts } = underlayGeometry(underlay, i, opts, rails);
     const minX = Math.min(a[0], b[0]) - tol, maxX = Math.max(a[0], b[0]) + tol;
     if (px < minX || px > maxX) continue;
-    const pts = threadPath(/** @type {[number, number]} */ (a), b, true, { width: opts.width, gap: Math.abs(rails.bottomY - rails.topY), n: 12 });
     if (!pts) continue;
     const d = distanceToPath(pts, px, py);
     if (d < tol) insertNearest(best, {
