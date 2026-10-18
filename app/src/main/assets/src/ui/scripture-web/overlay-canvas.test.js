@@ -52,6 +52,7 @@ function recorder(canvas = null) {
     createLinearGradient() { return { addColorStop() {} }; },
   });
   for (const k of ['clearRect', 'strokeText', 'beginPath', 'closePath', 'moveTo', 'lineTo', 'arc', 'arcTo', 'rect', 'fill', 'stroke']) ctx[k] = (...a) => calls.push({ op: k, a });
+  ctx.fill = (...a) => calls.push({ op: 'fill', a, fill: ctx.fillStyle, alpha: ctx.globalAlpha });
   return { ctx, calls, texts: () => calls.filter((c) => c.op === 'fillText') };
 }
 function fontPxOf(font) { return parseFloat(/([\d.]+)px/.exec(font)[1]); }
@@ -121,6 +122,56 @@ describe('the cited strip marks exactly the verses the panel lists citations for
     for (let x = c53[2]; x < c53[2] + c53[3]; x++) sample.push(x);
     for (const x of sample) expect(pre[x + 1] - pre[x] > 0, 'verse ' + x).toBe(citationsForVerse(g, x, null).length > 0);
   });
+  /* w3 review (major): one solid tick on every pixel column holding any cited verse saturated -
+     3,367 of 31,102 verses are cited, and at the PC overview 85 % of the New Testament's columns
+     were lit at the full ink, a continuous gold rule from Matthew to Revelation where r2-01a (and
+     the states checklist, #1) asks for a sparse strip. Every cited verse still leaves a mark, but a
+     column's ink follows how much of it is cited: one verse in nineteen is faint, the clusters
+     stand out. */
+  it("at the overview a column's ink follows how much of it is cited: one verse in nineteen is faint, the New Testament is not a solid rule", () => {
+    const { pre } = citedVerses(g);
+    const full = css('cited').match(/rgba\(196,164,105,([\d.]+)\)/);
+    const inkA = Number(full[1]);
+    for (const name of ['pc', 'phone']) {
+      const { rec, fs } = paint(name, 1, g.total / 2);
+      const W = fs.v.W, s = fs.v.DPR;
+      const top = fs.view.base + (name === 'pc' ? 4 : 3) * s;
+      // each strip column's alpha (the rects of one path take the fill that closes it)
+      const colA = new Float64Array(W);
+      let pending = [];
+      for (const c of rec.calls) {
+        if (c.op === 'beginPath') pending = [];
+        else if (c.op === 'rect' && Math.abs(c.a[1] - top) < 1e-6) pending.push(c.a);
+        else if (c.op === 'fill' && pending.length) {
+          const m = String(c.fill).match(/^rgba\(196,164,105,([\d.]+)\)$/);
+          if (m) for (const [x, , w] of pending) for (let k = Math.round(x); k < Math.round(x + w); k++) colA[k] = Number(m[1]) / inkA;
+          pending = [];
+        }
+      }
+      const mt = verseOf('matthew', 1, 1);
+      let ntCols = 0, ntStrong = 0, lit = 0, drawn = 0;
+      const rows = [];
+      for (let c = 0; c < W; c++) {
+        const lo = Math.max(0, Math.floor(geo.xToVerse(fs.cam, W, c))), hi = Math.min(g.total, Math.ceil(geo.xToVerse(fs.cam, W, c + 1)));
+        const n = pre[hi] - pre[lo];
+        if (n > 0) lit++;
+        if (colA[c] > 0) drawn++;
+        expect(colA[c] > 0, name + ': column ' + c + ' holds ' + n + ' cited verses').toBe(n > 0);
+        if (n > 0) rows.push({ d: n / (hi - lo), a: colA[c], n, m: hi - lo });
+        if (lo >= mt) { ntCols++; if (colA[c] >= 0.5) ntStrong++; }
+      }
+      expect(drawn, name + ': every column with a cited verse is marked').toBe(lit);
+      // the ink rises with the share of the column that is cited
+      rows.sort((p, q) => p.d - q.d);
+      for (let k = 1; k < rows.length; k++) expect(rows[k].a, name + ' at density ' + rows[k].d.toFixed(3)).toBeGreaterThanOrEqual(rows[k - 1].a - 1e-9);
+      // one cited verse in a column of many is faint; the densest columns take the full ink
+      for (const r of rows) if (r.n === 1 && r.m >= 10) expect(r.a, name + ': 1 of ' + r.m).toBeLessThanOrEqual(0.35);
+      expect(rows[rows.length - 1].a, name + ': the densest column').toBeCloseTo(1, 6);
+      // the New Testament reads as clusters, not a rule
+      expect(ntStrong / ntCols, name + ': ' + ntStrong + ' of ' + ntCols + ' NT columns at half the ink or more').toBeLessThan(0.45);
+    }
+  });
+
   it('the overview paints the strip in the cited gold, one run per lit pixel column', () => {
     const { rec } = paint('pc', 1, g.total / 2);
     const fills = rec.calls.filter((c) => c.op === 'fill');

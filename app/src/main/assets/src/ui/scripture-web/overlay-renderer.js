@@ -255,14 +255,25 @@ function bookSpans(g) {
   return s;
 }
 
-/** @type {WeakMap<object, {pre: Int32Array, count: number}>} */
+/** The cited strip's density reference is read over runs of this many verses (about a PC column at fit). */
+const CITED_REF_RUN = 20;
+/** A column holding a cited verse keeps at least this share of the cited ink ... */
+const CITED_FLOOR = 0.25;
+/** ... and reaches the full ink at the reference density, along this power (> 1: the clusters stand out). */
+const CITED_GAMMA = 2;
+/** The strip's inks are quantized to this many steps, one path each. */
+const CITED_LEVELS = 12;
+
+/** @type {WeakMap<object, {pre: Int32Array, count: number, ref: number}>} */
 const CITED = new WeakMap();
 /**
  * Which verses the Volumes cite (Q1 a), as prefix sums so a pixel column of
  * the overview asks one subtraction. A verse is cited exactly when the
  * panel's CITED IN THE VOLUMES list for it is not empty: the list's own
  * function (vot-citations.citationsForVerse) answers for every verse any
- * citation reaches, so the strip and the panel cannot disagree.
+ * citation reaches, so the strip and the panel cannot disagree. `ref` is
+ * the strip's reference density: the 90th percentile of the cited share
+ * over the canon's runs of CITED_REF_RUN verses that hold any.
  * @param {any} g
  */
 export function citedVerses(g) {
@@ -281,9 +292,28 @@ export function citedVerses(g) {
     }
     for (let x = 0; x < total; x++) pre[x + 1] = pre[x] + (reach[x] && citationsForVerse(g, x, null).length ? 1 : 0);
   }
-  c = { pre, count: pre[total] };
+  const shares = [];
+  for (let x = 0; x < total; x += CITED_REF_RUN) {
+    const hi = Math.min(total, x + CITED_REF_RUN);
+    if (pre[hi] > pre[x]) shares.push((pre[hi] - pre[x]) / (hi - x));
+  }
+  shares.sort((a, b) => a - b);
+  c = { pre, count: pre[total], ref: shares.length ? shares[Math.floor(0.9 * (shares.length - 1))] : 1 };
   CITED.set(g, c);
   return c;
+}
+
+/**
+ * The share of the cited ink a strip column takes when `share` of the verses
+ * it holds are cited: CITED_FLOOR for a lone cited verse among many, rising
+ * along CITED_GAMMA to the full ink at the reference density `ref`, quantized
+ * to CITED_LEVELS steps. 0 for none.
+ * @param {number} share @param {number} ref
+ */
+export function citedInk(share, ref) {
+  if (!(share > 0)) return 0;
+  const t = Math.pow(Math.min(1, share / (ref > 0 ? ref : 1)), CITED_GAMMA);
+  return Math.max(1, Math.round((CITED_FLOOR + (1 - CITED_FLOOR) * t) * CITED_LEVELS)) / CITED_LEVELS;
 }
 
 /**
@@ -559,9 +589,13 @@ function drawBaseline(ctx, L) {
 
 /**
  * The cited strip (Q1 a): a gold tick at every verse the Volumes cite, just
- * under the baseline. Below 2 device px a verse, one tick per device pixel
- * column that holds a cited verse (so the overview is honest at any width);
- * past it, one per verse at the verse's centre.
+ * under the baseline. Below 2 device px a verse, a tick on every device pixel
+ * column that holds a cited verse (so the overview is honest at any width),
+ * its ink by how much of the column is cited (citedInk): one cited verse
+ * among nineteen is faint and the clusters stand out, where one full tick per
+ * lit column made the New Testament a solid gold rule (w3 review; r2-01a's
+ * strip is sparse). Past 2 px a verse, one tick per cited verse at its centre,
+ * in the full ink.
  */
 function drawCited(ctx, g, cam, L) {
   const cited = citedVerses(g);
@@ -569,25 +603,37 @@ function drawCited(ctx, g, cam, L) {
   const { s, W } = L;
   const row = L.deepT < 0.5 ? L.ov.cited : L.dp.cited;
   const pre = cited.pre, total = g.total;
-  ctx.fillStyle = css('cited');
-  ctx.beginPath();
   if (cam.ppv < 2 * s) {
-    let run = -1;
+    /** @type {number[][]} runs [x, w, ...] by ink level */
+    const runs = [];
+    let level = 0, from = 0;
     for (let c = 0; c <= W; c++) {
-      let lit = false;
+      let l = 0;
       if (c < W) {
         const lo = Math.max(0, Math.floor(xToVerse(cam, W, c)));
         const hi = Math.min(total, Math.ceil(xToVerse(cam, W, c + 1)));
-        lit = hi > lo && pre[hi] - pre[lo] > 0;
+        if (hi > lo && pre[hi] > pre[lo]) l = Math.round(citedInk((pre[hi] - pre[lo]) / (hi - lo), cited.ref) * CITED_LEVELS);
       }
-      if (lit && run < 0) run = c;
-      else if (!lit && run >= 0) { ctx.rect(run, row.top, c - run, row.h); run = -1; }
+      if (l === level) continue;
+      if (level > 0) (runs[level] || (runs[level] = [])).push(from, c - from);
+      level = l;
+      from = c;
     }
-  } else {
-    const v0 = Math.max(0, Math.floor(xToVerse(cam, W, 0))), v1 = Math.min(total - 1, Math.ceil(xToVerse(cam, W, W)));
-    const w = Math.max(1, Math.min(cam.ppv * 0.5, 2 * s));
-    for (let x = v0; x <= v1; x++) if (pre[x + 1] > pre[x]) ctx.rect(verseToX(cam, W, x + 0.5) - w / 2, row.top, w, row.h);
+    for (let l = 1; l < runs.length; l++) {
+      const r = runs[l];
+      if (!r) continue;
+      ctx.fillStyle = css('cited', l / CITED_LEVELS);
+      ctx.beginPath();
+      for (let k = 0; k < r.length; k += 2) ctx.rect(r[k], row.top, r[k + 1], row.h);
+      ctx.fill();
+    }
+    return;
   }
+  ctx.fillStyle = css('cited');
+  ctx.beginPath();
+  const v0 = Math.max(0, Math.floor(xToVerse(cam, W, 0))), v1 = Math.min(total - 1, Math.ceil(xToVerse(cam, W, W)));
+  const w = Math.max(1, Math.min(cam.ppv * 0.5, 2 * s));
+  for (let x = v0; x <= v1; x++) if (pre[x + 1] > pre[x]) ctx.rect(verseToX(cam, W, x + 0.5) - w / 2, row.top, w, row.h);
   ctx.fill();
 }
 
