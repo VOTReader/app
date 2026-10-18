@@ -50,6 +50,7 @@ import { AnswersHome, AnswersSubject, AnswersAZ } from './screens/AnswersHome.js
 import { answersSubjectById } from '../utils/answers-shelves.js';
 import { GARDEN_DEFAULT_TIER } from '../utils/garden.js';
 import { searchBackActive, isSearchLook, RESULTS_LABEL } from '../utils/search-visit.js';
+import { PANEL_MODES } from './scripture-web/use-web-selection.js';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
@@ -618,6 +619,9 @@ export function buildScreenRoutes({
         : activeVolKey && activeVolKey !== 'hm' && activeLetter && activeLetter.id ? { letterKey: activeVolKey + '/' + activeLetter.id } : null;
     }
     if (!to || typeof to !== 'object') return false;
+    // a letter is a door only once the web's panel has letter mode (PANEL_MODES): before that the
+    // web would open at its old place and name nothing of the letter, so the toolbar hides it
+    if (to.letterKey && !PANEL_MODES.letter) return false;
     if (opts && opts.check) return true;
     window.navHandoff.set('webStart', to);
     setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId, returnOrigin: navOrigin || null });

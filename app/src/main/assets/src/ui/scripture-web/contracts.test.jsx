@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useWebCamera } from './use-web-camera.js';
-import { useWebSelection, panelOf } from './use-web-selection.js';
+import { useWebSelection, panelOf, PANEL_MODES } from './use-web-selection.js';
 import { useJourney } from './use-journey.js';
 import { useGoTo, routeOverlayHit } from './goto.jsx';
 import { hitOverlay } from './overlay-renderer.js';
@@ -142,6 +142,22 @@ describe('the panel API (CONTRACTS.md section 6): each mode opens today\'s card'
       expect(opened, JSON.stringify(spec)).toBe(false);
     }
     expect(get().sel.panel).toBeNull();
+  });
+
+  it("PANEL_MODES says which modes openPanel opens: the reader's doors offer only what opens (screen-routes.jsx)", () => {
+    // the panel stream sets letter true in the commit that lands letter mode; this case then holds
+    // the flag to the behaviour, and the reader's "See this letter's scriptures" door appears
+    const valid = {
+      connection: { mode: 'connection', arc: 1 }, verse: { mode: 'verse', verse: 100 },
+      group: { mode: 'group', ids: [1], label: '' }, letter: { mode: 'letter', letterKey: 'two/the-wide-path' },
+    };
+    expect(Object.keys(PANEL_MODES).sort()).toEqual(Object.keys(valid).sort());
+    for (const [mode, spec] of Object.entries(valid)) {
+      const { get } = mount();
+      let opened;
+      act(() => { opened = get().sel.openPanel(/** @type {any} */ (spec)); });
+      expect(opened, mode).toBe(PANEL_MODES[mode]);
+    }
   });
 
   it('closePanel is the one close: the card goes and the focus is let go whole', () => {

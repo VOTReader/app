@@ -50,6 +50,17 @@ import { routeOverlayHit } from './goto.jsx';
  */
 
 /**
+ * Which modes openPanel opens (true) and which it has no panel for yet (false), so a door into
+ * the web offers only what opens: the reader's "See this letter's scriptures" (screen-routes.jsx
+ * __openScriptureWeb) stays hidden while letter is false, because the web would otherwise open at
+ * its old place and name nothing of the letter (the navigation stream's review, 2026-10-18). THE
+ * PANEL STREAM SETS letter TRUE in the commit that lands letter mode; contracts.test.jsx holds each
+ * flag to what openPanel does.
+ * @type {Readonly<Record<PanelSpec['mode'], boolean>>}
+ */
+export const PANEL_MODES = Object.freeze({ connection: true, verse: true, group: true, letter: false });
+
+/**
  * The open card in the panel's terms. Pure, so the mapping is pinned without a mount.
  * @param {any} detail  the open sheet's described payload, or null
  * @param {any[] | null} choices  the chooser's described rows, or null

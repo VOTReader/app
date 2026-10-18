@@ -8,6 +8,15 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { buildScreenRoutes } from './screen-routes.jsx';
+
+/* Which modes the panel opens (use-web-selection.js PANEL_MODES), held here so a case can say
+   "once letter mode exists"; each case starts from the panel's own answer. */
+const modes = vi.hoisted(() => ({ real: /** @type {any} */ (null), now: /** @type {any} */ ({}) }));
+vi.mock('./scripture-web/use-web-selection.js', async (importOriginal) => {
+  const real = /** @type {any} */ (await importOriginal());
+  modes.real = real.PANEL_MODES;
+  return { ...real, PANEL_MODES: modes.now };
+});
 import { COL_BY_KEY } from '../data/scripture-resolution.js';
 import { navHandoff } from '../utils/nav-handoff.js';
 
@@ -55,6 +64,8 @@ function makeRoutes(over = {}) {
 const JOHN_3_16 = { verse: { bookId: 'john', chapter: 3, verse: 16 } };
 
 beforeEach(() => {
+  for (const k of Object.keys(modes.now)) delete modes.now[k];
+  Object.assign(modes.now, modes.real);
   globalThis.COL_BY_KEY = COL_BY_KEY;
   globalThis.ScriptureWebScreen = function ScriptureWebScreen() { return null; };
   window.navHandoff = navHandoff;
@@ -85,7 +96,8 @@ describe('window.__openScriptureWeb: a door from the reader', () => {
     expect(props.setNavOrigin.mock.calls[0][0].returnOrigin).toBe(was);
   });
 
-  it('"this letter": the page\'s own letter, entry or study chapter, as the web keys them', () => {
+  it('"this letter": the page\'s own letter, entry or study chapter, as the web keys them (once the panel has letter mode)', () => {
+    modes.now.letter = true;
     makeRoutes({ screen: 'vot-letter', activeVolKey: 'two', activeLetter: { id: 'the-wide-path' }, letterId: 'the-wide-path' });
     expect(window.__openScriptureWeb('this-letter')).toBe(true);
     expect(navHandoff.peek('webStart')).toEqual({ letterKey: 'two/the-wide-path' });
@@ -95,6 +107,17 @@ describe('window.__openScriptureWeb: a door from the reader', () => {
     makeRoutes({ screen: 'bible-study-chapter', studyId: 'more-than-a-man', studyChapterId: 'mtm-ch5' });
     window.__openScriptureWeb('this-letter');
     expect(navHandoff.peek('webStart')).toEqual({ letterKey: 'study:more-than-a-man/mtm-ch5' });
+  });
+
+  it('no letter door until the panel has letter mode: the web would open at its old place, naming nothing of the letter', () => {
+    modes.now.letter = false;
+    const { props } = makeRoutes({ screen: 'vot-letter', activeVolKey: 'two', activeLetter: { id: 'the-wide-path' }, letterId: 'the-wide-path' });
+    expect(window.__openScriptureWeb('this-letter', { check: true }), 'the toolbar asks, and hides the door').toBe(false);
+    expect(window.__openScriptureWeb('this-letter')).toBe(false);
+    expect(window.__openScriptureWeb({ letterKey: 'two/the-wide-path' })).toBe(false);
+    expect(props.setScreen).not.toHaveBeenCalled();
+    expect(navHandoff.has('webStart')).toBe(false);
+    expect(window.__openScriptureWeb(JOHN_3_16, { check: true }), 'a verse still has its door').toBe(true);
   });
 
   it('nothing to open is no door: no letter on a Bible chapter, no start at all', () => {
