@@ -57,14 +57,23 @@ export const FAR_FOOT = 0.12;
 export const LOCAL_FAR_FOOT = 0.03;
 /** A foot's hold on its line's ink fades out over this share of the width past the screen edge. */
 const PRESENCE_FADE = 0.5;
-/** The context's ink is stroked in steps of zoom, log-spaced up to 40x (one batch per step in view). */
-const INK_STEPS = 16;
-const INK_STEP_LOG = Math.log(40) / INK_STEPS;
+/** The context's ink is stroked in at most this many rungs of zoom a frame, log-spaced between
+ * the two rails' zooms with both ends exact (one batch set per rung, twice with fly-overs).
+ * w3's sixteen global steps made 137 strokes at 20x / 3x (fix-review #5). */
+export const INK_RUNGS = 8;
 /** How much the samples of a line with both feet in view crowd toward its feet (0 even, 1 at most). */
 const FOOT_EASE = 0.5;
-/** Device px per sample, CSS px: Timothy's threads and the reader's links (a short piece takes fewer). */
-const SEG_CONTEXT = 12;
-const SEG_LINK = 6;
+/** How far a drawn line may stray from its curve, CSS px: Timothy's threads (faint, thousands)
+ * and the reader's links. A line takes the samples that tolerance needs (chordCount), so a
+ * short or nearly straight piece takes few and the overview's context about a dozen. */
+const EPS_CONTEXT = 2.5;
+const EPS_LINK = 0.5;
+/** n = CHORD sqrt(turning * length / eps): the uniform-curvature chord law (1 / sqrt 8 = 0.354)
+ * calibrated up so the overview's S, a leg and a fly-over all stay within eps (fix-review #5);
+ * a rail-local arc's samples crowd to its feet, away from a round arc's even turn, so it
+ * takes CHORD_ARC. */
+const CHORD = 0.45;
+const CHORD_ARC = 0.5;
 /** Letter ticks show once letters are this far apart, CSS px. */
 const LETTER_TICK_MIN = 1.8;
 /** Layers per colour bin while a gesture is live (opts.capFraction 0): about
@@ -269,15 +278,15 @@ const unsmooth = (s) => 0.5 - Math.sin(Math.asin(1 - 2 * s) / 3);
  * @param {[number, number]} a
  * @param {[number, number]} b
  * @param {boolean} crossRail
- * @param {{width:number, gap:number, up?:boolean, maxRy?:number, n?:number, seg?:number}} o
+ * @param {{width:number, gap:number, up?:boolean, maxRy?:number, n?:number, eps?:number}} o
  * @returns {Array<[number, number]>|null}
  */
 export function threadPath(a, b, crossRail, o) {
   const W = o.width, nMax = o.n || 24;
   const gap = o.gap || W;
-  // o.seg (device px a segment): a short visible piece needs few samples, a
-  // long one up to nMax; without it every path takes nMax
-  const count = (len) => (o.seg > 0 ? Math.max(4, Math.min(nMax, Math.ceil(len / o.seg))) : nMax);
+  // o.eps (device px): as many samples as keep the drawn line within eps of
+  // its curve, from 4 to nMax; without it every path takes nMax
+  const count = (turn, len, k) => (o.eps > 0 ? Math.max(4, Math.min(nMax, Math.ceil(k * Math.sqrt((turn * len) / o.eps)))) : nMax);
   const lo = -EDGE_MARGIN, hi = W + EDGE_MARGIN;
   const onA = a[0] >= lo && a[0] <= hi, onB = b[0] >= lo && b[0] <= hi;
   // the drawn feet: exact on screen, projected off it (monotone, so a line
@@ -298,7 +307,12 @@ export function threadPath(a, b, crossRail, o) {
     const t0 = s0 <= 0 ? 0 : unsmooth(s0), t1 = s1 >= 1 ? 1 : unsmooth(s1);
     const c1y = a[1] + dy * RIBBON_BOW, c2y = b[1] - dy * RIBBON_BOW;
     const yAt = (t) => { const u = 1 - t; return u * u * u * a[1] + 3 * u * u * t * c1y + 3 * u * t * t * c2y + t * t * t * b[1]; };
-    const n = count(Math.abs(dx) * (s1 - s0) + Math.abs(yAt(t1) - yAt(t0)));
+    // the heading turns monotonically to the middle (t = 0.5) and back, so
+    // the turning over [t0, t1] is exact from three headings
+    const head = (t) => { const u = 1 - t; return Math.atan2(Math.abs(3 * ((c1y - a[1]) * u * u + 2 * (c2y - c1y) * u * t + (b[1] - c2y) * t * t)), Math.abs(6 * dx * t * u)); };
+    const tm = Math.min(t1, Math.max(t0, 0.5));
+    const turn = Math.abs(head(t0) - head(tm)) + Math.abs(head(tm) - head(t1));
+    const n = count(turn, Math.abs(dx) * (s1 - s0) + Math.abs(yAt(t1) - yAt(t0)), CHORD);
     pts = [];
     for (let i = 0; i <= n; i++) {
       const t = t0 + (t1 - t0) * spacing(i / n, onA, onB);
@@ -318,7 +332,11 @@ export function threadPath(a, b, crossRail, o) {
     } else if (!onA) return null;
     // a lone visible foot is the left one when the path runs left to right
     const left = a[0] <= b[0] ? onA : onB, right = a[0] <= b[0] ? onB : onA;
-    const n = count(rx * Math.abs(Math.cos(th1) - Math.cos(th0)) + 2 * ry);
+    // the heading runs from straight up (or down) at the left foot through
+    // level at the top to straight down at the right: monotone in the angle
+    const head = (th) => Math.atan2(ry * Math.cos(th), rx * Math.sin(th));
+    const rise = th0 > Math.PI / 2 && th1 < Math.PI / 2 ? 2 - Math.sin(th0) - Math.sin(th1) : Math.abs(Math.sin(th0) - Math.sin(th1));
+    const n = count(Math.abs(head(th1) - head(th0)), rx * Math.abs(Math.cos(th1) - Math.cos(th0)) + ry * rise, CHORD_ARC);
     pts = [];
     for (let i = 0; i <= n; i++) {
       const th = th0 + (th1 - th0) * spacing(i / n, left, right);
@@ -392,9 +410,25 @@ function lineZoom(zA, pA, zB, pB) {
   return Math.max(Math.min(zA, zB), Math.pow(Math.max(1, zA), pA), Math.pow(Math.max(1, zB), pB));
 }
 
-/** The ink step of a zoom (log-spaced; step 0 is the overview exactly), and the zoom a step stands for. */
-function inkStepOf(z) { return Math.min(INK_STEPS, Math.max(0, Math.round(Math.log(Math.max(1, z)) / INK_STEP_LOG))); }
-function zoomOfStep(step) { return Math.exp(step * INK_STEP_LOG); }
+/**
+ * This frame's ink rungs: INK_RUNGS zooms log-spaced from the shallower rail's
+ * zoom to the deeper's, both ends exact (lineZoom never leaves that range), so
+ * a thread on a zoomed rail is that rail's ink exactly and one hanging from the
+ * other rail is the other's; only threads whose feet sit in the fade past an
+ * edge take a rung between. One rung when the rails share a zoom.
+ * @param {number} zB
+ * @param {number} zV
+ */
+function inkRungs(zB, zV) {
+  const lo = Math.max(1, Math.min(zB, zV)), span = Math.log(Math.max(1, zB, zV) / lo);
+  const top = span > 1e-9 ? INK_RUNGS - 1 : 0;
+  return {
+    /** @param {number} z */
+    of: (z) => (top ? Math.min(top, Math.max(0, Math.round((top * Math.log(Math.max(lo, z) / lo)) / span))) : 0),
+    /** @param {number} r */
+    zoom: (r) => (top ? lo * Math.exp((span * r) / top) : lo),
+  };
+}
 
 /**
  * Layers a corridor keeps at this alpha: the full count is the one past which
@@ -432,8 +466,8 @@ export function layerCap(alpha, f) {
  * lose accumulation only at the crossing. The 5080
  * read 8.3 ms a frame with a stroke per thread (2,100 strokeStyle changes
  * and stroke() calls) and 4.2 with one path: the batches bring the count to
- * the number of (bin, layer) pairs in view. One set of batches per ink step
- * (the drawer keeps them apart): a step is one alpha and one width.
+ * the number of (bin, layer) pairs in view. One set of batches per ink rung
+ * (the drawer keeps them apart): a rung is one alpha and one width.
  */
 class ContextBatches {
   constructor() {
@@ -538,10 +572,14 @@ function distanceToPath(pts, px, py) {
 function linkGeometry(personal, i, opts, rails) {
   const a = endpointPoint({ rail: personal.aRail[i], pos: personal.aPos[i] }, opts, rails);
   const b = endpointPoint({ rail: personal.bRail[i], pos: personal.bPos[i] }, opts, rails);
+  return { a, b, pts: linkPathOf(personal, i, a, b, opts, rails) };
+}
+
+/** A reader's link's drawn path between its feet a and b (linkGeometry's, and the pick's once its prefilter passes). */
+function linkPathOf(personal, i, a, b, opts, rails) {
   const gap = Math.abs(rails.bottomY - rails.topY);
   const cross = personal.aRail[i] !== personal.bRail[i];
-  const pts = threadPath(a, b, cross, { width: opts.width, gap, n: 48, seg: SEG_LINK * (opts.DPR || 1), up: personal.aRail[i] === 0 });
-  return { a, b, pts };
+  return threadPath(a, b, cross, { width: opts.width, gap, n: 48, eps: EPS_LINK * (opts.DPR || 1), up: personal.aRail[i] === 0 });
 }
 
 /**
@@ -555,8 +593,29 @@ function linkGeometry(personal, i, opts, rails) {
 function underlayGeometry(underlay, i, opts, rails) {
   const a = /** @type {[number, number]} */ ([opts.verseX(underlay.versePos[i]), rails.bottomY]);
   const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, opts, rails);
-  const pts = threadPath(a, b, true, { width: opts.width, gap: Math.abs(rails.bottomY - rails.topY), n: 24, seg: SEG_CONTEXT * (opts.DPR || 1) });
-  return { a, b, pts };
+  return { a, b, pts: underlayPathOf(a, b, opts, rails) };
+}
+
+/** One of Timothy's threads' drawn path between its feet. */
+function underlayPathOf(a, b, opts, rails) {
+  return threadPath(a, b, true, { width: opts.width, gap: Math.abs(rails.bottomY - rails.topY), n: 24, eps: EPS_CONTEXT * (opts.DPR || 1) });
+}
+
+/**
+ * A pick at px misses a line whose DRAWN feet do not span px (within tol):
+ * the drawn path never leaves that span, so the picks skip such a line
+ * before building its path (fix-review #5: w3 built every path first).
+ * @param {[number, number]} a
+ * @param {[number, number]} b
+ * @param {boolean} cross
+ * @param {number} width
+ * @param {number} px
+ * @param {number} tol
+ */
+function missesX(a, b, cross, width, px, tol) {
+  const far = cross ? FAR_FOOT : LOCAL_FAR_FOOT;
+  const xa = drawnFootX(a[0], width, far), xb = drawnFootX(b[0], width, far);
+  return px < Math.min(xa, xb) - tol || px > Math.max(xa, xb) + tol;
 }
 
 /**
@@ -778,16 +837,17 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     // FULL RESOLUTION, on the canvas the reader sees (Corbin, 2026-09-11:
     // the half-resolution layer read as "low resolution"). Each thread's ink
     // follows the zoom of the rails its feet hold on screen (lineZoom), in
-    // log steps; a fly-over (no foot on screen) takes the depth both rails
-    // share at FLYOVER_LEG_WIDTH of its width (Q3 ii), so anchored lines read
+    // the frame's rungs; a fly-over (no foot on screen) takes the depth both
+    // rails share at FLYOVER_LEG_WIDTH of its width (Q3 ii), so anchored lines read
     // first while every line stays drawn and tappable.
+    const rungs = inkRungs(zB, zV);
     /** @type {Map<number, ContextBatches>} */
     const steps = new Map();
     for (let i = 0; i < underlay.count; i++) {
       const { a, b, pts } = underlayGeometry(underlay, i, opts, rails);
       if (!pts) continue;
       const fly = /** @type {any} */ (pts).cls === 'fly';
-      const step = inkStepOf(lineZoom(zB, presence(a[0], width), zV, presence(b[0], width)));
+      const step = rungs.of(lineZoom(zB, presence(a[0], width), zV, presence(b[0], width)));
       const key = step * 2 + (fly ? 1 : 0);
       let batch = steps.get(key);
       if (!batch) { batch = new ContextBatches(); steps.set(key, batch); }
@@ -795,7 +855,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     }
     ctx.lineCap = 'round';
     for (const key of [...steps.keys()].sort((p, q) => p - q)) {
-      const cx = personalInk(zoomOfStep(key >> 1), opts.contextCeiling).context;
+      const cx = personalInk(rungs.zoom(key >> 1), opts.contextCeiling).context;
       ctx.lineWidth = cx.width * DPR * (key & 1 ? FLYOVER_LEG_WIDTH : 1);
       /** @type {ContextBatches} */ (steps.get(key)).stroke(ctx, cx.alpha * rest, ctx.lineWidth * 4, opts.capFraction);
     }
@@ -882,10 +942,13 @@ export function pickPersonalLinks(personal, opts, px, py, tol, limit) {
   const rails = railFrame({ H: opts.height, DPR, inset: opts.inset }, base);
   const cap = Math.max(1, Math.min(limit || 4, 8));
   const best = [];
+  // every drawn line lies between the rails (an S between them, an arc into the gap)
+  if (py < Math.min(rails.topY, rails.bottomY) - tol || py > Math.max(rails.topY, rails.bottomY) + tol) return best;
   for (let i = 0; i < personal.count; i++) {
-    const { a, b, pts } = linkGeometry(personal, i, opts, rails);
-    const minX = Math.min(a[0], b[0]) - tol, maxX = Math.max(a[0], b[0]) + tol;
-    if (px < minX || px > maxX) continue;
+    const a = endpointPoint({ rail: personal.aRail[i], pos: personal.aPos[i] }, opts, rails);
+    const b = endpointPoint({ rail: personal.bRail[i], pos: personal.bPos[i] }, opts, rails);
+    if (missesX(a, b, personal.aRail[i] !== personal.bRail[i], opts.width, px, tol)) continue;
+    const pts = linkPathOf(personal, i, a, b, opts, rails);
     if (!pts) continue;
     const d = distanceToPath(pts, px, py);
     if (d < tol) insertNearest(best, { index: i, distance: d }, cap);
@@ -913,10 +976,12 @@ export function pickUnderlayLinks(underlay, opts, px, py, tol, limit) {
   const rails = railFrame({ H: opts.height, DPR, inset: opts.inset }, base);
   const cap = Math.max(1, Math.min(limit || 4, 8));
   const best = [];
+  if (py < Math.min(rails.topY, rails.bottomY) - tol || py > Math.max(rails.topY, rails.bottomY) + tol) return best;
   for (let i = 0; i < underlay.count; i++) {
-    const { a, b, pts } = underlayGeometry(underlay, i, opts, rails);
-    const minX = Math.min(a[0], b[0]) - tol, maxX = Math.max(a[0], b[0]) + tol;
-    if (px < minX || px > maxX) continue;
+    const a = /** @type {[number, number]} */ ([opts.verseX(underlay.versePos[i]), rails.bottomY]);
+    const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, opts, rails);
+    if (missesX(a, b, true, opts.width, px, tol)) continue;
+    const pts = underlayPathOf(a, b, opts, rails);
     if (!pts) continue;
     const d = distanceToPath(pts, px, py);
     if (d < tol) insertNearest(best, {
