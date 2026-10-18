@@ -21,7 +21,8 @@ import { attachWebGestures } from './gestures.js';
 import { createCamera, clampCamera, zoomAbout, xToVerse, squashFactor } from '../../utils/scripture-web/geometry.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const SCREEN = fs.readFileSync(path.join(HERE, '../screens/ScriptureWebScreen.jsx'), 'utf8');
+// the guide's markup lives in panels.jsx (moved out of ScriptureWebScreen, F0)
+const SCREEN = fs.readFileSync(path.join(HERE, 'panels.jsx'), 'utf8');
 
 /** The guide as the reader reads it: its list items, tags stripped. */
 function guideItems() {
