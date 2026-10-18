@@ -5098,6 +5098,21 @@
     .sel-repeat-btn:active { background: var(--gold-faint); }
     .sel-repeat-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
     .sel-listen-btn:not(:last-child) { border-radius: 8px 0 0 8px; }
+    /* THE SCRIPTURE WEB'S DOOR (the navigation stream; review of 2026-10-18): its own row under the
+       six actions, the Listen row's outlined shape, since as a seventh action it laid the grid of
+       three out 3/3/1 with an orphan; full width, so it says what it does ("Show in Scripture Web") */
+    .sel-toolbar-web { padding-top: 4px; }
+    .sel-web-btn {
+      flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 44px; padding: 6px 12px; border-radius: 8px; cursor: pointer;
+      background: transparent; border: 1px solid var(--gold);
+      color: var(--gold); font-family: 'Cinzel', serif;
+      font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s;
+    }
+    .sel-web-btn:active { background: var(--gold-faint); }
+    .sel-web-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
 
     /* ── LINK ICON (next to verse) ───────────────────────────────── */
     .verse-link-icon {
@@ -7618,6 +7633,7 @@
     .sel-action-btn { font-size: var(--fsc-13); }
     .sel-listen-btn { font-size: var(--fsc-12); }
     .sel-repeat-btn { font-size: var(--fsc-12); }
+    .sel-web-btn { font-size: var(--fsc-12); }
     .ann-chip-btn { font-size: var(--fsc-10); }
     .mode-toggle-label { font-size: var(--fsc-10); }
     .ascroll-step { font-size: var(--fsc-20); }

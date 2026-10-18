@@ -1679,17 +1679,20 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           </svg>
           <span>Bookmark</span>
         </button>
-        {webDoor && (
-          <button type="button" className="sel-action-btn" data-door="web" onClick={handleWeb}
-            title={webDoor.label} aria-label={webDoor.label}>
-            <svg viewBox="0 0 24 24">
-              <path d="M2 19c2-7 6-11 10-11s8 4 10 11" />
-              <path d="M7 19c1.4-3.6 3-5.5 5-5.5s3.6 1.9 5 5.5" />
-            </svg>
-            <span>Scripture Web</span>
-          </button>
-        )}
       </div>
+      {/* The Scripture Web's door: its own full-width row under the six actions, outlined like
+          Listen from here (as a seventh action the grid of three laid out 3/3/1, review of
+          2026-10-18). The icon is the web itself: two threads crossing over the canon's line. */}
+      {webDoor && (
+        <div className="sel-toolbar-row sel-toolbar-web">
+          <button type="button" className="sel-web-btn" data-door="web" onClick={handleWeb}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+              <path d="M2 17.5h20M3 17.5a6 11 0 0 1 12 0M9 17.5a6 9 0 0 1 12 0" />
+            </svg>
+            <span>{webDoor.label}</span>
+          </button>
+        </div>
+      )}
       </>
       )}
     </div>
