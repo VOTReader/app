@@ -132,6 +132,11 @@ setup effect.
 - **Cleanup:** none — the next build overwrites it
 - **Consumers:** `ui/components/LetterSongs.jsx` (a letter page's SONGS FROM THIS LETTER card opens a song or the letter's verbatim songs, the `sung:<key>` list; Back returns to that letter, the back pill naming it); `ui/screens/SettingsScreen.jsx` (K1: Listening → "Songs kept on this phone · Manage ›" opens the Kept list; Back returns to Settings); `ui/components/SongDeskParts.jsx` (K2: the desk's song title and "Song page ›" open the playing song's page); `utils/audio-player.js` (K3: the offline "This song isn't on this phone" toast's "Kept songs ›" opens the Kept list)
 
+### `__openScriptureWeb`
+- **Setter:** `ui/screen-routes.jsx` (`buildScreenRoutes`, reassigned every build like `__openSongs`: `(start, opts) => boolean`). `start` is the Scripture Web's start prop (CONTRACTS.md section 8 of the w3 rebuild: `{ verse: { bookId, chapter, verse } }`, `{ book, chapter? }`, `{ letterKey }`), or `'this-letter'` for the page's own letter, entry or study chapter (`activeVolKey/activeLetter.id`, or `study:<studyId>/<studyChapterId>`; none on Hidden Manna). It writes the navHandoff slot `webStart`, makes the page the navOrigin (chaining the one there), and opens `scripture-web`; the web's route hands `webStart` to the screen as `start` while the web is up, and every build on another screen clears it, so the web opened later from the Library opens where it was. `opts.check` answers whether there is a door here without going. Returns false when there is nothing to open
+- **Cleanup:** none — the next build overwrites it
+- **Consumers:** `ui/sheets/SelectionToolbar.jsx` (the "Scripture Web" action: "Show in Scripture Web" on a Bible verse selection, "See this letter's scriptures" on a letter, entry or study chapter); `ui/components/FootnoteSheet.jsx` (a scripture footnote's "Show in Scripture Web", its reference read by `utils/scripture-web/ref-parse.js` `webStartOfRef`)
+
 ---
 
 ## 4. Reading-state bridges

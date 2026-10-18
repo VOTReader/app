@@ -5,6 +5,18 @@
 import { inertAttr } from '../../utils/inert-attr.js';
 import { sheetReference } from '../../utils/passage-copy.js';
 import { _fnTextRedundantWithLink } from './VerseWithNumbers.jsx';
+import { webStartOfRef } from '../../utils/scripture-web/ref-parse.js';
+
+/** The Scripture Web's door for a scripture footnote (the navigation stream, w3): the start the
+ * web opens on (its verse, or its chapter), or null when the routes have no door
+ * (window.__openScriptureWeb, screen-routes.jsx) or the reference names no Bible place.
+ * @param {any} fn */
+function webDoorOf(fn) {
+  const open = typeof window !== 'undefined' ? /** @type {any} */ (window).__openScriptureWeb : null;
+  if (!fn || fn.type !== 'scripture' || typeof open !== 'function') return null;
+  const start = webStartOfRef(fn.ref);
+  return start && open(start, { check: true }) ? start : null;
+}
 
 export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, onNavigate, onGoToRef }) {
   const isOpen = num != null;
@@ -30,6 +42,7 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
   const nextKey = curIdx >= 0 && curIdx < orderedKeys.length - 1 ? orderedKeys[curIdx + 1] : null;
   const total = orderedKeys.length;
   const showNav = total > 1 && onNavigate && curIdx !== -1;
+  const webStart = webDoorOf(fn);
   // position:fixed sheet — portal to <body> so it anchors to the viewport, not to
   // the reading screen's `.pager-track` (whose transient page-swipe transform
   // would otherwise become its containing block and drop it off-screen — see
@@ -83,6 +96,16 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
                 )}
                 {typeof GoToRefButton !== 'undefined' && onGoToRef && (
                   <GoToRefButton refStr={fn.ref} onGo={onGoToRef} />
+                )}
+                {webStart && (
+                  <button type="button" className="fn-sheet-link-btn" data-door="web"
+                    onClick={() => { if (onClose) onClose(); /** @type {any} */ (window).__openScriptureWeb(webStart); }}>
+                    <span className="fn-sheet-link-body">
+                      <span className="fn-sheet-link-eyebrow">Show in Scripture Web</span>
+                      <span className="fn-sheet-link-title">{fn.ref}</span>
+                    </span>
+                    <span className="fn-sheet-link-chevron">{"\u203a"}</span>
+                  </button>
                 )}
                 {fn.seeAlso && (
                   <div className="fn-sheet-see-also">

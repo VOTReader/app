@@ -7,7 +7,7 @@
    portals it to <body>. FootnoteSheet already had a graceful missing-verse
    message; this guards the portal relocation. */
 
-import { it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { FootnoteSheet } from './FootnoteSheet.jsx';
@@ -157,4 +157,57 @@ it('rail: focus the reader moved elsewhere is left where it is when the panel cl
     rerender(<Sheet num={null} fn={null} nkjv={{}} footnotes={{}} onClose={() => {}} />);
     expect(document.activeElement).toBe(other);
   } finally { opener.remove(); other.remove(); vi.unstubAllGlobals(); }
+});
+
+/* The Scripture Web's door (the navigation stream, w3): a scripture footnote offers "Show in
+   Scripture Web" beside Go to Scripture when the routes have a door (window.__openScriptureWeb,
+   screen-routes.jsx); the sheet closes and the web opens on the footnote's verse, or its chapter.
+   The reference is read by the app's own parser (search/ref-parser.js). */
+describe('the Scripture Web door', () => {
+  let prevData;
+  beforeAll(async () => {
+    prevData = window.VotSearchData;
+    // @ts-ignore -- a classic script: it sets window.VotSearchData
+    await import('../../../search-data.js');
+  });
+  afterAll(() => { window.VotSearchData = prevData; });
+  afterEach(() => { delete /** @type {any} */ (window).__openScriptureWeb; });
+  const webBtn = () => /** @type {HTMLButtonElement | null} */ (document.querySelector('.fn-sheet [data-door="web"]'));
+
+  it('opens the web on the footnote\'s verse and closes the sheet', () => {
+    const open = vi.fn(() => true);
+    /** @type {any} */ (window).__openScriptureWeb = open;
+    const onClose = vi.fn();
+    render(<Sheet num={1} fn={fn} nkjv={{}} footnotes={{ '1': fn }} onClose={onClose} />);
+    const btn = webBtn();
+    expect(btn).not.toBeNull();
+    expect(btn.textContent).toContain('Show in Scripture Web');
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(onClose).toHaveBeenCalled();
+    expect(open).toHaveBeenLastCalledWith({ verse: { bookId: 'isaiah', chapter: 13, verse: 11 } });
+  });
+
+  it('a chapter footnote opens its chapter; a translation tag and a compound tail are read past', () => {
+    const open = vi.fn(() => true);
+    /** @type {any} */ (window).__openScriptureWeb = open;
+    const ch = { type: 'scripture', ref: '1 Kings 22' };
+    render(<Sheet num={1} fn={ch} nkjv={{}} footnotes={{ '1': ch }} onClose={() => {}} />);
+    webBtn().dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(open).toHaveBeenLastCalledWith({ book: '1kings', chapter: 22 });
+    cleanup();
+    const tagged = { type: 'scripture', ref: 'John 14:6 (CJB); Acts 4:12' };
+    render(<Sheet num={1} fn={tagged} nkjv={{}} footnotes={{ '1': tagged }} onClose={() => {}} />);
+    webBtn().dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(open).toHaveBeenLastCalledWith({ verse: { bookId: 'john', chapter: 14, verse: 6 } });
+  });
+
+  it('no door without the routes, and none on a note that is not scripture', () => {
+    render(<Sheet num={1} fn={fn} nkjv={{}} footnotes={{ '1': fn }} onClose={() => {}} />);
+    expect(webBtn()).toBeNull();
+    cleanup();
+    /** @type {any} */ (window).__openScriptureWeb = vi.fn(() => true);
+    const note = { type: 'note', text: 'A note' };
+    render(<Sheet num={1} fn={note} nkjv={{}} footnotes={{ '1': note }} onClose={() => {}} />);
+    expect(webBtn()).toBeNull();
+  });
 });

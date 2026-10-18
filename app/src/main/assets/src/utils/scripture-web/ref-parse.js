@@ -309,3 +309,24 @@ export function startPlace(g, start) {
   }
   return null;
 }
+
+/**
+ * A reader's reference as the web's start (the doors in: a footnote's "Isaiah 13:11", a sheet's
+ * cite), read by the app's own parser: its first passage (a compound's tail and a translation tag
+ * read past), as a verse, or a chapter, or a book. Null when it names no Bible place.
+ * @param {string | null | undefined} refStr
+ * @returns {{ verse: { bookId: string, chapter: number, verse: number } } | { book: string, chapter?: number } | null}
+ */
+export function webStartOfRef(refStr) {
+  // Permanent Rule 1: a range's dash is a hyphen before anything parses it
+  const first = String(refStr || '').replace(/[\u2013\u2014]/g, '-').split(/[;,]/)[0]
+    .replace(/\([^)]*\)/g, ' ').trim();
+  if (!first) return null;
+  const r = parseReference(first, { corpus: 'scriptures' });
+  if (!r || !r.bookId) return null;
+  if (r.kind === 'ref-book') return { book: r.bookId };
+  if (r.kind !== 'ref-bible' || !r.chapter) return null;
+  return r.verseStart
+    ? { verse: { bookId: r.bookId, chapter: r.chapter, verse: r.verseStart } }
+    : { book: r.bookId, chapter: r.chapter };
+}

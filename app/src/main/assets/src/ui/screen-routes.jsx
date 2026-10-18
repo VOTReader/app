@@ -602,6 +602,30 @@ export function buildScreenRoutes({
     _openSongs(frames, { screen, letterId, label: label || (screen === 'home' ? '' : _audioTextFrom(screen)) });
   };
 
+  // The doors into the Scripture Web (the navigation stream, w3): the reader's menus open the web at
+  // a place (CONTRACTS.md section 8's start: { verse }, { book, chapter? }, { letterKey }, or
+  // 'this-letter' for the page's own letter, entry or study chapter; opts.check asks whether
+  // there is a door here without going: Hidden Manna has none, being reached only through the
+  // Matthew study chain). The page becomes the way
+  // back (the web's Back is goNavOrigin), and the start rides navHandoff 'webStart' into the route
+  // below, which hands it to the screen while the web is up; anywhere else it is spent, so the web
+  // opened later from the Library opens where it was. Reassigned every build, like __openSongs.
+  window.__openScriptureWeb = (start, opts) => {
+    let to = start;
+    if (start === 'this-letter') {
+      to = screen === 'bible-study-chapter' && studyId && studyChapterId
+        ? { letterKey: 'study:' + studyId + '/' + studyChapterId }
+        : activeVolKey && activeVolKey !== 'hm' && activeLetter && activeLetter.id ? { letterKey: activeVolKey + '/' + activeLetter.id } : null;
+    }
+    if (!to || typeof to !== 'object') return false;
+    if (opts && opts.check) return true;
+    window.navHandoff.set('webStart', to);
+    setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId, returnOrigin: navOrigin || null });
+    setScreen('scripture-web');
+    return true;
+  };
+  if (screen !== 'scripture-web' && window.navHandoff) window.navHandoff.clear('webStart');
+
   // Q8.3: VOT corpus is lazy-loaded as bundle-a-vot.js. Until it arrives,
   // every VOT route (indexes + letter views + WTLB entries + Holy Days +
   // Hidden Manna) gets routed through this wrapper which triggers the
@@ -1719,6 +1743,7 @@ export function buildScreenRoutes({
           onBack={() => navOrigin ? goNavOrigin() : setScreen('library')}
           settings={settings}
           updateSetting={updateSetting}
+          start={(window.navHandoff && window.navHandoff.peek('webStart')) || undefined}
         />
       );
     },

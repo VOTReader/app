@@ -1835,3 +1835,63 @@ describe('dockTop: the toolbar measures its room below the selection against the
     expect(computeToolbarPlacement({ ...base, viewportH: 745 }).y).toBe(123);
   });
 });
+
+/* The Scripture Web's door (the navigation stream, w3; the digest's A2 "doors in from reading").
+   The app's routes register window.__openScriptureWeb(start, { check }) (screen-routes.jsx): a
+   selection in a Bible chapter offers "Show in Scripture Web" (the web opens on its first verse),
+   one in a letter, entry or study chapter "See this letter's scriptures" (letter mode), as one
+   more action. The routes say whether the page has a door (check); no bridge, no action. */
+describe('SelectionToolbar — the Scripture Web door', () => {
+  afterEach(() => { delete /** @type {any} */ (window).__openScriptureWeb; });
+
+  async function raise(c, start, end) {
+    stubSelection(rangeOver(c, start, end));
+    act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
+    await act(async () => {
+      fire(c, 'pointerup', { clientX: 80, clientY: 5 });
+      await new Promise((r) => setTimeout(r, 250));
+    });
+    return /** @type {HTMLElement} */ (document.querySelector('.sel-toolbar'));
+  }
+  const door = (tb) => /** @type {HTMLButtonElement | null} */ (tb.querySelector('.sel-action-btn[data-door="web"]'));
+
+  it('a Bible verse: "Show in Scripture Web", opening the web on that verse', async () => {
+    const open = vi.fn(() => true);
+    /** @type {any} */ (window).__openScriptureWeb = open;
+    const c = readingContainer('bible:john:3:16', 'For God so loved the world');
+    mount();
+    const tb = await raise(c, 0, 10);
+    const btn = door(tb);
+    expect(btn).not.toBeNull();
+    expect(btn.getAttribute('aria-label')).toBe('Show in Scripture Web');
+    expect(btn.textContent.trim()).toBe('Scripture Web');
+    expect(open).toHaveBeenCalledWith({ verse: { bookId: 'john', chapter: 3, verse: 16 } }, { check: true });
+    act(() => { btn.click(); });
+    expect(open, 'went: the start alone, no check').toHaveBeenCalledWith({ verse: { bookId: 'john', chapter: 3, verse: 16 } });
+    expect(document.querySelector('.sel-toolbar')).toBeNull();
+  });
+
+  it('a letter: "See this letter\u2019s scriptures", for the page\'s own letter', async () => {
+    const open = vi.fn(() => true);
+    /** @type {any} */ (window).__openScriptureWeb = open;
+    const c = readingContainer('letter:the-wide-path:4', 'Enter by the narrow gate');
+    mount();
+    const btn = door(await raise(c, 0, 9));
+    expect(btn.getAttribute('aria-label')).toBe('See this letter\u2019s scriptures');
+    act(() => { btn.click(); });
+    expect(open).toHaveBeenCalledWith('this-letter');
+  });
+
+  it('no door where the routes have none, or no routes: the six actions as they were', async () => {
+    /** @type {any} */ (window).__openScriptureWeb = vi.fn(() => false);
+    const c = readingContainer('letter:hidden:1', 'A hidden page');
+    mount();
+    const tb = await raise(c, 0, 8);
+    expect(door(tb)).toBeNull();
+    cleanup();
+    delete /** @type {any} */ (window).__openScriptureWeb;
+    const b = readingContainer('bible:john:3:17', 'For God did not send');
+    mount();
+    expect(door(await raise(b, 0, 8))).toBeNull();
+  });
+});

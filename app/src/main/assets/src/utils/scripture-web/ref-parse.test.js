@@ -9,7 +9,7 @@ import { runInNewContext } from 'node:vm';
 import { decodeGraph } from './decode.js';
 import { refOfVerse, chapterRange } from './pick.js';
 import {
-  bookIndexOf, chapterIndexOf, placeOfRef, goToRows, booksStarting, frameOf, startPlace, bookSpan,
+  bookIndexOf, chapterIndexOf, placeOfRef, goToRows, booksStarting, frameOf, startPlace, bookSpan, webStartOfRef,
 } from './ref-parse.js';
 import { parseReference } from '../../search/ref-parser.js';
 
@@ -125,5 +125,18 @@ describe('the start prop (CONTRACTS.md section 8)', () => {
     expect(startPlace(g, { verse: { bookId: 'nope', chapter: 1, verse: 1 } })).toBeNull();
     expect(startPlace(g, { verse: { bookId: 'john', chapter: 3, verse: 99 } })).toMatchObject({ kind: 'chapter', label: 'John 3' });
     expect(startPlace(g, null)).toBeNull();
+  });
+});
+
+describe("a reader's reference as the web's start (the doors in)", () => {
+  it('a verse, a chapter; a translation tag and a compound tail read past; words are nothing', () => {
+    expect(webStartOfRef('Isaiah 13:11')).toEqual({ verse: { bookId: 'isaiah', chapter: 13, verse: 11 } });
+    expect(webStartOfRef('1 Kings 22')).toEqual({ book: '1kings', chapter: 22 });
+    expect(webStartOfRef('John 14:6 (CJB); Acts 4:12')).toEqual({ verse: { bookId: 'john', chapter: 14, verse: 6 } });
+    expect(webStartOfRef('Exodus 12:18\u201320')).toEqual({ verse: { bookId: 'exodus', chapter: 12, verse: 18 } });
+    expect(webStartOfRef('Romans')).toEqual({ book: 'romans' });
+    expect(webStartOfRef('love one another')).toBeNull();
+    expect(webStartOfRef('')).toBeNull();
+    expect(startPlace(g, webStartOfRef('Isaiah 13:11'))).toMatchObject({ kind: 'verse', label: 'Isaiah 13:11' });
   });
 });
