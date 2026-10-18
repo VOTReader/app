@@ -36,13 +36,13 @@ import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
 import { createRenderer, backingScale, backingSize } from './web-renderer.js';
 import { paintCanonOverlay, paintMyWebOverlay, publishRails } from './overlay-renderer.js';
 import { railFrame } from './rail-renderer.js';
+import { onWebFontReady } from '../../utils/scripture-web/label-engine.js';
 
 /** How long after the camera's last move a frame still counts as in a gesture (E2), ms. */
 export const GESTURE_HOLD_MS = 150;
 
 /** How far a device-pixel box may sit from the CSS box times the dpr (pixel snapping), device px. */
 export const BOX_SNAP_PX = 2;
-import { onWebFontReady } from '../../utils/scripture-web/label-engine.js';
 
 /**
  * Whether a browser walk is reading the frame (the walks set __swWalk; a driven
