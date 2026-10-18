@@ -59,6 +59,9 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
           focusArc: opts && opts.focusArc, focusRange: opts && opts.focusRange, lensDim: opts && opts.lensDim });
         return { instances: 0, draws: 0 };
       },
+      // My Web's ground (refactor.md #10): one clear, recorded so a case can
+      // tell the last GL call was the ground and not a thread pass
+      clear: (bg) => { DRAWN.push({ clear: true, bg }); },
       dispose: vi.fn(),
     })),
   };
@@ -546,7 +549,9 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(lastCamY(), 'precondition: raised on the canon web').toBeGreaterThan(0);
       fireEvent.click(screen.getByRole('button', { name: /my web/i }));
       await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
-      expect(lastCamY()).toBe(0);
+      // My Web's GL surface is the ground alone (refactor.md #10): no thread
+      // pass runs, so nothing can be drawn up in a sky
+      expect(DRAWN[DRAWN.length - 1].clear).toBe(true);
       expect(shownCamY(container)).toBe(0);
     });
   });
@@ -594,7 +599,8 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       fireEvent.click(screen.getByRole('button', { name: /my web/i }));
       await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
       expect(shownLens(container)).toBe('');
-      expect(DRAWN[DRAWN.length - 1].lens).toBeNull();
+      // the GL surface is the ground alone (#10): no thread pass, no lens
+      expect(DRAWN[DRAWN.length - 1].clear).toBe(true);
     });
   });
 

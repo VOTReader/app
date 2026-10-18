@@ -39,6 +39,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
     createRenderer: vi.fn(() => ({
       gl: {}, contextLost: false, stats: { instances: 0, draws: 0 },
       draw: (opts) => { DRAWN.push({ hasColorMode: !!opts && 'colorMode' in opts, density: opts && opts.density }); return { instances: 0, draws: 0 }; },
+      clear: vi.fn(),
       dispose: vi.fn(),
     })),
   };

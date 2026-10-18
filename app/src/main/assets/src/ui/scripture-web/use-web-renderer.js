@@ -190,13 +190,8 @@ export function useWebRenderer({
       if (wrapRef.current) { wrapRef.current.setAttribute('data-elevator', ''); wrapRef.current.setAttribute('data-altitude', ''); wrapRef.current.setAttribute('data-altitude-span', ''); }
       // The personal web is Canvas2D over a cleared GL surface: hundreds of
       // links, not hundreds of thousands, so crisp 2D curves beat a second
-      // shader. The GL pass still runs to paint the ground colour.
-      r.draw(Object.assign({}, base, {
-        camX: cam.x, ppv: cam.ppv, strokeWidth: 1, alpha: 0,
-        density: 'essential', bg: chrome.bg,
-        focusRange: null, focusArc: -1, hoverArc: -1, lens: null,
-        focusProphecy: -1, lit: null, litKey: '',
-      }));
+      // shader. The GL surface is one clear to the ground colour (#10).
+      r.clear(chrome.bg);
       const uic = uiRef.current;
       const ctx = uic && uic.getContext('2d');
       if (ctx) {
@@ -279,8 +274,11 @@ export function useWebRenderer({
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule, drawRef]);
 
   // ── size + renderer lifecycle ───────────────────────────────────────────
+  // noWebGL is a dep (#3): the list unmounts the canvases, so the renderer
+  // that drew on them is disposed with them rather than outliving them, and
+  // the effect waits, idle, for Try again (glRetry) to bring a canvas back.
   React.useEffect(() => {
-    if (!graph) return;
+    if (!graph || noWebGL) return;
     const glc = glRef.current, uic = uiRef.current;
     if (!glc || !uic) return;
     let renderer = null;
@@ -290,19 +288,28 @@ export function useWebRenderer({
       // After a GPU reset every GL object is dead. Rebuild the whole
       // renderer on the same (restored) context and repaint — this is what
       // turns the on-device "wash-out until app restart" into a blink.
+      // A rebuild that throws (a shader that will not link on the restored
+      // context) or gets no context lands the reader on the list
+      // (WebFallbackList), never on a dead canvas with nothing to say (#1).
       onContextRestored: () => {
         if (lossTimer) { window.clearTimeout(lossTimer); lossTimer = 0; }
         if (disposed) return;
-        try { renderer && renderer.dispose(); } catch (_e) { /* already dead */ }
-        renderer = build();
-        rendererRef.current = renderer;
+        const dead = renderer;
+        renderer = null;
+        rendererRef.current = null;
+        try { if (dead) dead.dispose(); } catch (_e) { /* already dead */ }
+        let next = null;
+        try { next = build(); } catch (_e) { next = null; }
+        if (!next) { setNoWebGL(true); return; }
+        renderer = next;
+        rendererRef.current = next;
         schedule();
       },
       // A loss Chrome never restores (it gives up after repeated resets)
       // otherwise leaves the instrument permanently dead with no report —
       // draw() just returns silently forever. Give a restore ~3s, then
-      // fall back to the same noWebGL panel the "unavailable" path uses,
-      // whose Try again already rebuilds via glRetry.
+      // fall back to the list (WebFallbackList), the face the "unavailable"
+      // path shows too, whose Try again rebuilds via glRetry.
       onContextLost: () => {
         if (disposed) return;
         if (lossTimer) window.clearTimeout(lossTimer);
@@ -362,10 +369,12 @@ export function useWebRenderer({
       if (lossTimer) window.clearTimeout(lossTimer);
       if (ro) ro.disconnect(); else window.removeEventListener('resize', resize);
       glc.removeEventListener('webglcontextrestored', onRestored);
-      renderer.dispose();
+      // null after a restore that could not rebuild (#1)
+      if (renderer) renderer.dispose();
+      renderer = null;
       rendererRef.current = null;
     };
-  }, [graph, schedule, glRetry, yFrameFor, camRef, viewRef, focusRef, glRef, resumeRef, setLoadError, uiRef, wrapRef]);
+  }, [graph, noWebGL, schedule, glRetry, yFrameFor, camRef, viewRef, focusRef, glRef, resumeRef, setLoadError, uiRef, wrapRef]);
 
   // the no-WebGL list's Try again: a fresh renderer on a fresh root
   const retryGL = React.useCallback(() => { setNoWebGL(false); setGlRetry((n) => n + 1); }, []);

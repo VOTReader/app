@@ -317,6 +317,21 @@ export function createRenderer(canvas, graph, opts = {}) {
     get stats() { return lastStats; },
 
     /**
+     * Paint the ground and nothing else: My Web draws its links in Canvas2D
+     * over this, so a whole instanced pass at alpha 0 was a frame of vertex
+     * work for one colour (refactor.md #10).
+     * @param {string} bgColor  a CSS colour (the chrome's ground)
+     */
+    clear(bgColor) {
+      if (lost) return;
+      const bg = cssColorToRGB(bgColor);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(bg[0], bg[1], bg[2], 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      lastStats = { instances: 0, draws: 0 };
+    },
+
+    /**
      * Draw one frame.
      * @param {{width:number, height:number, base:number, ceil:number,
      *   squash:number, localize:number, camX:number, camY?:number, ppv:number,

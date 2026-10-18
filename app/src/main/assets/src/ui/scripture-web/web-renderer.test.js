@@ -177,6 +177,43 @@ describe('chrome tokens are one palette, but the text size is still the reader\'
   });
 });
 
+/** A WebGL2 stand-in that answers every call and records each one by name. */
+function recordingGL() {
+  const calls = [];
+  const gl = new Proxy({}, { get(_, key) {
+    if (key === 'getShaderParameter' || key === 'getProgramParameter') return () => true;
+    if (key === 'getUniformLocation' || key === 'getAttribLocation') return (_p, name) => name;
+    if (key === 'getExtension') return () => null;
+    if (typeof key === 'string' && key.startsWith('create')) return () => ({});
+    if (typeof key === 'string' && /^[A-Z_0-9]+$/.test(key)) return key;
+    return (...args) => { calls.push([key, args]); };
+  } });
+  const canvas = /** @type {any} */ ({ width: 800, height: 360, getContext: () => gl, addEventListener() {}, removeEventListener() {} });
+  return { gl, calls, canvas };
+}
+
+const tinyGraph = () => /** @type {any} */ ({
+  total: 200, count: 1, from: new Uint16Array([100]), to: new Uint16Array([150]), votes: new Int16Array([30]),
+  buckets: [{ off: 0, len: 1, off20: 1, off10: 1, segments: 8, chunks: [] }],
+  chunkSize: 256, books: [{ id: 'alpha', title: 'Alpha', abbr: 'Alp', start: 0 }],
+  chapters: [[0, 1, 0, 200]], chapterOfVerse: new Uint16Array(200), prophecy: [], votEdges: [], votLinks: [],
+});
+
+describe("My Web's ground is one clear (refactor.md #10)", () => {
+  it('clear() paints the ground colour over the whole canvas and draws no instances', () => {
+    const { calls, canvas } = recordingGL();
+    const r = /** @type {any} */ (createRenderer(canvas, tinyGraph()));
+    calls.length = 0;
+    r.clear('#000000');
+    const names = calls.map((c) => c[0]);
+    expect(names).toContain('clear');
+    expect(calls.find((c) => c[0] === 'clearColor')[1]).toEqual([0, 0, 0, 1]);
+    expect(calls.find((c) => c[0] === 'viewport')[1]).toEqual([0, 0, 800, 360]);
+    expect(names).not.toContain('drawArraysInstanced');
+    expect(r.stats).toEqual({ instances: 0, draws: 0 });
+  });
+});
+
 describe('graceful degradation', () => {
   it('returns null when WebGL2 is unavailable instead of throwing', () => {
     // jsdom canvases have no WebGL2 — this is the real code path on an old
