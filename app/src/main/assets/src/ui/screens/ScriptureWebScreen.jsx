@@ -449,7 +449,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       // shader. The GL pass still runs to paint the ground colour.
       r.draw(Object.assign({}, base, {
         camX: cam.x, ppv: cam.ppv, strokeWidth: 1, alpha: 0,
-        colorMode: 'distance', density: 'essential', light: chrome.isLight, bg: chrome.bg,
+        density: 'essential', light: chrome.isLight, bg: chrome.bg,
         focusRange: null, focusArc: -1, hoverArc: -1, lens: null,
       }));
       const uic = uiRef.current;
@@ -496,7 +496,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       alpha: style.alpha,
       voteMix: style.voteMix,
       dpr: v.DPR,
-      colorMode: 'distance', density, light: chrome.isLight, bg: chrome.bg,
+      density, light: chrome.isLight, bg: chrome.bg,
       focusRange: focusRef.current.range, focusArc: focusRef.current.arc,
       hoverArc: hoverRef.current,
     }));
@@ -2104,8 +2104,8 @@ function legendFor(mode) {
     ];
   }
   // Distance is the only colour law the screen offers (Corbin, 2026-09-10:
-  // "leave distance as only option, it looks best anyway"). The renderer
-  // still knows testament and genre by uColorMode; nothing here selects them.
+  // "leave distance as only option, it looks best anyway"); the renderer has
+  // no other.
   return [
     <span className="sw-key sw-key-ramp" key="ramp">
       <span>nearby</span><i className="sw-key-gradient" /><span>across the canon</span>

@@ -34,8 +34,6 @@ import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
 import { bucketDrawCount, fansOf } from '../../utils/scripture-web/decode.js';
 import { walkDrawnRuns } from '../../utils/scripture-web/chunk-walk.js';
 
-/** Colour modes, in the order the control cycles them. */
-export const COLOR_MODES = ['distance', 'testament', 'genre'];
 /** Density steps, in the order the control cycles them. */
 export const DENSITY_STEPS = ['essential', 'famous'];
 
@@ -45,7 +43,7 @@ uniform vec2  uRes;
 uniform float uCamX, uPPV, uBase, uSquash, uLocalize;
 uniform float uFlyLocalize;  // the fly-over law's localize: the zoom's, let go as the camera rises (geometry.skyLocalize)
 uniform float uCamY;         // the picture's shift down the frame, device px
-uniform float uWidth, uAlpha, uTotal, uNT, uColorMode, uLightness;
+uniform float uWidth, uAlpha, uTotal, uLightness;
 uniform float uSegments;
 uniform float uVoteMix;      // 0 = votes drive alpha (overview), 1 = width (depth)
 uniform vec2  uFocusRange;   // verse range kept lit (lo > hi = no focus)
@@ -56,7 +54,7 @@ uniform float uLensDim;      // what the rest of the web keeps of its alpha unde
 uniform float uHoverArc;     // HOVERED instance: brightened only, dims nothing
 uniform float uInstanceBase; // gl_InstanceID offset of this draw range
 uniform float uDpr;          // device px per CSS px: the chosen line's floor width is set in CSS px
-in uint aFrom; in uint aTo; in float aVotes; in float aGenre;
+in uint aFrom; in uint aTo; in float aVotes;
 in float aFanA; in float aFanB; // each foot's departure rank, -0.5..0.5
 out vec4 vCol; out float vEdge; out float vHalfW;
 ${arcShapeGLSL}
@@ -143,14 +141,8 @@ void main(){
   // zero (FLYOVER_FLOOR), so every thread drawn here can be tapped there.
   dim *= flyOverDim(arcAnchored(x0, x1, uRes.x), uFlyLocalize);
 
-  vec3 col;
-  if (uColorMode < .5) {
-    col = distanceRamp(pow(abs(b - a)/uTotal, .40));
-  } else if (uColorMode < 1.5) {
-    col = testamentColor(step(uNT, a) + step(uNT, b));
-  } else {
-    col = genreColor(aGenre);
-  }
+  // colour is distance, the one law (Corbin, 2026-09-10: genre and testament retired)
+  vec3 col = distanceRamp(pow(abs(b - a)/uTotal, .40));
   col = mix(col, vec3(1.), hovered*(1. - spot)*.55);
   col = mix(col, vec3(.784, .643, .337), spot);  // the chosen line is the app's gold (#c8a456)
   col *= uLightness;                              // parchment needs darker ink
@@ -232,7 +224,7 @@ export function createRenderer(canvas, graph, opts = {}) {
 
   const U = {};
   for (const name of ['uRes', 'uCamX', 'uCamY', 'uPPV', 'uBase', 'uSquash',
-    'uLocalize', 'uFlyLocalize', 'uWidth', 'uAlpha', 'uTotal', 'uNT', 'uColorMode',
+    'uLocalize', 'uFlyLocalize', 'uWidth', 'uAlpha', 'uTotal',
     'uLightness', 'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
     'uHoverArc', 'uInstanceBase', 'uFocusRange2', 'uLens', 'uLensDim', 'uDpr']) {
     U[name] = gl.getUniformLocation(program, name);
@@ -251,18 +243,6 @@ export function createRenderer(canvas, graph, opts = {}) {
     return m;
   });
 
-  // Per-instance genre of the earlier endpoint — precomputed once so the
-  // shader never walks the chapter table.
-  const genre = new Float32Array(graph.count);
-  {
-    const bookOfChapter = graph.chapters;
-    for (let i = 0; i < graph.count; i++) {
-      const v = graph.from[i] < graph.to[i] ? graph.from[i] : graph.to[i];
-      const bookIndex = bookOfChapter[graph.chapterOfVerse[v]][0];
-      genre[i] = genreBucket(bookIndex);
-    }
-  }
-
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
   /** @type {Array<{buf:WebGLBuffer, loc:number, type:number, isInt:boolean, bytes:number}>} */
@@ -280,7 +260,6 @@ export function createRenderer(canvas, graph, opts = {}) {
   attrib(graph.from, 'aFrom', gl.UNSIGNED_SHORT, true, 2);
   attrib(graph.to, 'aTo', gl.UNSIGNED_SHORT, true, 2);
   attrib(new Float32Array(graph.votes), 'aVotes', gl.FLOAT, false, 4);
-  attrib(genre, 'aGenre', gl.FLOAT, false, 4);
   // Each foot's departure rank, the table the hit test reads too.
   const fans = fansOf(graph);
   attrib(fans.fanA, 'aFanA', gl.FLOAT, false, 4);
@@ -310,12 +289,6 @@ export function createRenderer(canvas, graph, opts = {}) {
 
   gl.disable(gl.DEPTH_TEST);
   gl.enable(gl.BLEND);
-
-  // First verse of Matthew — the testament boundary.
-  let ntStart = graph.total;
-  for (const ch of graph.chapters) {
-    if (graph.books[ch[0]].id === 'matthew-plain') { ntStart = ch[2]; break; }
-  }
 
   // Context loss (GPU reset, WebView renderer restart — the on-device
   // "everything washes out" report). preventDefault() tells the browser we
@@ -349,7 +322,6 @@ export function createRenderer(canvas, graph, opts = {}) {
      * @param {{width:number, height:number, base:number, ceil:number,
      *   squash:number, localize:number, camX:number, camY?:number, ppv:number,
      *   strokeWidth:number, alpha:number, voteMix?:number, dpr?:number,
-     *   colorMode:string,
      *   density:import('../../utils/scripture-web/decode.js').Density,
      *   light:boolean, bg:string,
      *   focusRange:(number[]|null), focusRange2?:(number[]|null), focusArc:number, hoverArc?:number,
@@ -382,8 +354,6 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.uniform1f(U.uDpr, v.dpr || 1);
       gl.uniform1f(U.uAlpha, v.alpha);
       gl.uniform1f(U.uTotal, graph.total);
-      gl.uniform1f(U.uNT, ntStart);
-      gl.uniform1f(U.uColorMode, COLOR_MODES.indexOf(v.colorMode));
       gl.uniform1f(U.uLightness, v.light ? 0.72 : 1);
       gl.uniform1f(U.uVoteMix, v.voteMix || 0);
       gl.uniform1f(U.uFocusArc, v.focusArc == null ? -1 : v.focusArc);
@@ -440,11 +410,4 @@ export function createRenderer(canvas, graph, opts = {}) {
       // context would kill the replacement renderer as it is being born.
     },
   };
-}
-
-/** Local copy of the genre bucket bounds, to avoid a cross-module call per arc. */
-const GENRE_ENDS = [5, 17, 22, 27, 39, 43, 44, 57, 65, 66];
-function genreBucket(bookIndex) {
-  for (let g = 0; g < GENRE_ENDS.length; g++) if (bookIndex < GENRE_ENDS[g]) return g;
-  return GENRE_ENDS.length - 1;
 }

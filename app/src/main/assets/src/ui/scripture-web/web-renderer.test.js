@@ -8,12 +8,12 @@
  * tappable where they look tappable — and nothing on screen looks wrong.
  */
 import { describe, it, expect } from 'vitest';
-import { SHADER_SOURCE, COLOR_MODES, DENSITY_STEPS, createRenderer } from './web-renderer.js';
+import { SHADER_SOURCE, DENSITY_STEPS, createRenderer } from './web-renderer.js';
 import {
   arcShapeGLSL, flyOverDim, FLYOVER_FLOOR, flyOverGLSL, glslFloat,
 } from '../../utils/scripture-web/geometry.js';
 import {
-  DISTANCE_RAMP, GENRE_COLORS, rampGLSL, readChromeTokens, cssColorToRGB,
+  DISTANCE_RAMP, rampGLSL, readChromeTokens, cssColorToRGB,
 } from '../../utils/scripture-web/palette.js';
 
 describe('shader / CPU agreement', () => {
@@ -51,10 +51,9 @@ describe('shader / CPU agreement', () => {
     expect(SHADER_SOURCE.vertex).not.toMatch(/tanh\(|strataLift\(|float bow|float lift/);
   });
 
-  it('inlines the generated colour ramps rather than hardcoding hexes', () => {
+  it('inlines the generated colour ramp rather than hardcoding hexes', () => {
     expect(SHADER_SOURCE.vertex).toContain(rampGLSL());
     expect(SHADER_SOURCE.vertex).toMatch(/RAMP\[8\]/);
-    expect(SHADER_SOURCE.vertex).toMatch(/GENRE\[10\]/);
   });
 });
 
@@ -124,16 +123,12 @@ describe('deep-zoom declutter', () => {
 });
 
 describe('modes', () => {
-  it('maps its three colour laws to uColorMode 0/1/2 — the screen offers only distance (sw-chrome-trim.test.jsx)', () => {
-    expect(COLOR_MODES).toEqual(['distance', 'testament', 'genre']);
-  });
   it('exposes the three densities from sparsest to fullest', () => {
     expect(DENSITY_STEPS).toEqual(['essential', 'famous']);
   });
-  it('keeps a colour for every genre bucket', () => {
-    expect(GENRE_COLORS).toHaveLength(10);
+  it('keeps a valid colour at every stop of the distance ramp', () => {
     expect(DISTANCE_RAMP.length).toBeGreaterThan(1);
-    for (const c of GENRE_COLORS.concat(DISTANCE_RAMP)) {
+    for (const c of DISTANCE_RAMP) {
       expect(c).toHaveLength(3);
       for (const ch of c) expect(ch).toBeGreaterThanOrEqual(0), expect(ch).toBeLessThanOrEqual(1);
     }

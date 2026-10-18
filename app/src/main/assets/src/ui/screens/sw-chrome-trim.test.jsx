@@ -19,9 +19,9 @@
  * jsdom) and draw() returns before touching the renderer on a 0 px frame —
  * with an unsized canvas the "hard-wires distance" case below would pass
  * vacuously on a renderer that was never asked to draw. The mocked renderer
- * records every draw's opts, because colorMode travels per draw() call, not
- * through createRenderer(). The precondition case comes first and doubles as
- * the anti-vacuity guard for everything after it.
+ * records every draw's opts, because a colour choice would travel per draw()
+ * call, not through createRenderer(). The precondition case comes first and
+ * doubles as the anti-vacuity guard for everything after it.
  */
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -38,13 +38,14 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
     ...real,
     createRenderer: vi.fn(() => ({
       gl: {}, contextLost: false, stats: { instances: 0, draws: 0 },
-      draw: (opts) => { DRAWN.push({ colorMode: opts && opts.colorMode, density: opts && opts.density }); return { instances: 0, draws: 0 }; },
+      draw: (opts) => { DRAWN.push({ hasColorMode: !!opts && 'colorMode' in opts, density: opts && opts.density }); return { instances: 0, draws: 0 }; },
       dispose: vi.fn(),
     })),
   };
 });
 
 import { ScriptureWebScreen } from './ScriptureWebScreen.jsx';
+import { SHADER_SOURCE } from '../scripture-web/web-renderer.js';
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 
 const CANON = 31102;
@@ -149,8 +150,12 @@ describe('the Scripture Web chrome, trimmed', () => {
     await mount();
     expect(DRAWN.length).toBeGreaterThan(0);
     /* A select that is hidden but still wired would let a stale stored value
-       paint testament; every frame this screen asks for says distance. */
-    expect(DRAWN.map((d) => d.colorMode)).toEqual(DRAWN.map(() => 'distance'));
+       paint testament. The testament and genre laws are gone from the shader
+       (distance is its one colour), and no frame this screen asks for carries
+       a colour mode for a stale value to ride in on. */
+    expect(SHADER_SOURCE.vertex).toContain('vec3 col = distanceRamp(');
+    expect(SHADER_SOURCE.vertex).not.toMatch(/uColorMode|testamentColor|genreColor/);
+    expect(DRAWN.map((d) => d.hasColorMode)).toEqual(DRAWN.map(() => false));
   });
 
   it('has ONE hide-all control, and it hides the chrome and shows it again', async () => {

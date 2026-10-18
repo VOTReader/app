@@ -1,19 +1,12 @@
 /* ═══════════════════════════════════════════════════════════════════════
    scripture-web/palette — Cluster F (bundle-d since lz1; lazy bundle-f before)
 
-   Colour in this view always ENCODES something. Three modes, each answering
-   a different question about the same ~64,000 shipped connections:
-
-     distance   — how far apart in the canon the two ends sit. This is the
-                  original Harrison/Römhild reading and the reason the whole
-                  picture reads as a dome: short local references pool in
-                  violet at the feet, the long reaches arch overhead in green.
-     testament  — whether a reference stays inside the Old, inside the New, or
-                  bridges the two. The bridge is the theologically loaded set,
-                  so it gets the one warm hue and everything else recedes.
-     genre      — the law/history/poetry/prophets/gospels/epistles grouping the
-                  app already uses in search (GENRE_GROUPS), so a reader can
-                  see which kind of book a thread leaves from.
+   Colour in this view always ENCODES something. The canon web has one law,
+   distance: how far apart in the canon the two ends sit. This is the
+   original Harrison/Römhild reading and the reason the whole picture reads
+   as a dome: short local references pool in violet at the feet, the long
+   reaches arch overhead in green. (The testament and genre modes were
+   retired by Corbin, 2026-09-10: "leave distance as only option".)
 
    Chrome (labels, ruler, hairlines) is NOT free to invent colour: it reads
    the app's own tokens off :root so the view matches every other screen in
@@ -49,27 +42,6 @@ export function distanceRampRGB(t) {
   const i = Math.floor(s), j = Math.min(i + 1, n), f = s - i;
   return [0, 1, 2].map((k) => Math.round((DISTANCE_RAMP[i][k] + (DISTANCE_RAMP[j][k] - DISTANCE_RAMP[i][k]) * f) * 255));
 }
-
-/** Old↔Old, the prophecy bridge, New↔New. */
-const TESTAMENT_COLORS = {
-  ot: [0.816, 0.659, 0.220],      // gold — the app's own accent family
-  bridge: [0.957, 0.561, 0.694],  // rose — what the reader is here to see
-  nt: [0.424, 0.706, 0.863],      // blue
-};
-
-/** The ten GENRE_GROUPS, in canonical order. */
-export const GENRE_COLORS = [
-  [0.816, 0.659, 0.220],  // law
-  [0.855, 0.514, 0.235],  // history
-  [0.906, 0.769, 0.361],  // poetry
-  [0.937, 0.427, 0.404],  // major prophets
-  [0.957, 0.561, 0.694],  // minor prophets
-  [0.482, 0.796, 0.639],  // gospels
-  [0.400, 0.749, 0.847],  // acts
-  [0.424, 0.596, 0.878],  // pauline epistles
-  [0.643, 0.502, 0.886],  // general epistles
-  [0.804, 0.404, 0.812],  // revelation
-];
 
 /* ── My Web's colour law (design-myweb-colour.md, 2026-09-11) ──────────────
    Two families a reader tells apart at a glance, and a colour-blind reader by
@@ -108,28 +80,19 @@ export const MY_WEB_LINK_KINDS = [
 export function myWebLinkColor(kind) { return (MY_WEB_LINK_KINDS[kind] || MY_WEB_LINK_KINDS[2]).rgb; }
 export const LINK_KIND_NAMES = MY_WEB_LINK_KINDS.map((k) => k.name);
 
-/** GLSL for the ramps, generated from the tables above so they cannot drift. */
+/** GLSL for the distance ramp, generated from the table above so the two cannot drift. */
 export function rampGLSL() {
   const vec3 = (c) => `vec3(${c.map((v) => v.toFixed(4)).join(',')})`;
   const stops = DISTANCE_RAMP.map(vec3).join(',\n    ');
-  const genres = GENRE_COLORS.map(vec3).join(',\n    ');
   return `
 const vec3 RAMP[${DISTANCE_RAMP.length}] = vec3[${DISTANCE_RAMP.length}](
     ${stops});
-const vec3 GENRE[${GENRE_COLORS.length}] = vec3[${GENRE_COLORS.length}](
-    ${genres});
 vec3 distanceRamp(float t){
   float s = clamp(t, 0., 1.) * ${(DISTANCE_RAMP.length - 1).toFixed(1)};
   int i = int(floor(s));
   int j = min(i + 1, ${DISTANCE_RAMP.length - 1});
   return mix(RAMP[i], RAMP[j], s - float(i));
-}
-vec3 testamentColor(float crossings){
-  if (crossings < .5) return ${vec3(TESTAMENT_COLORS.ot)};
-  if (crossings < 1.5) return ${vec3(TESTAMENT_COLORS.bridge)};
-  return ${vec3(TESTAMENT_COLORS.nt)};
-}
-vec3 genreColor(float g){ return GENRE[int(g + .5)]; }`;
+}`;
 }
 
 /**
