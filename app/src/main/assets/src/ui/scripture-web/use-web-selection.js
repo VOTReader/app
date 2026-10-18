@@ -385,8 +385,20 @@ export function useWebSelection({
     schedule();
   }, [camRef, graph, schedule, viewRef, yFrameFor]);
 
+  /** What is open now, as a way back to it (A1, the navigation stream): the gestures keep one
+   * before a tap, and when that tap turns out to be a double-tap's first, the double takes back
+   * the card it opened, so a double-tap only zooms. */
+  const snapshot = React.useCallback(() => {
+    const was = { detail, choices, listOpen, focus: focusRef.current };
+    return () => {
+      setDetail(was.detail); setChoices(was.choices); setListOpen(was.listOpen); setTip(null);
+      focusRef.current = was.focus;
+      schedule();
+    };
+  }, [detail, choices, listOpen, focusRef, schedule]);
+
   // Publish the latest handlers for the (stable) gesture listeners to call.
-  React.useEffect(() => { handlersRef.current = { hover, tap, doubleTap }; }, [hover, tap, doubleTap]);
+  React.useEffect(() => { handlersRef.current = { hover, tap, doubleTap, snapshot }; }, [hover, tap, doubleTap, snapshot]);
 
   /** Close the cards (the chooser, the Nearby list, the connection sheet) and let go of the chosen
    * line. Every close goes through here: the sheet's x once cleared the card but kept focusRef, so

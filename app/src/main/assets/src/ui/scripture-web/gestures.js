@@ -39,6 +39,25 @@ export function isChromeTarget(target) {
   return !!(target && target.closest && target.closest(SW_CHROME_SELECTOR));
 }
 
+/* A1 (w2 digest): how far a pointer may wander, CSS px, and still be a tap. A fingertip is wide
+   and trembles; a stylus less; a mouse barely at all. One 3 px rule for every pointer made a
+   finger's ordinary tap read as a drag on the phone, so the tap was lost. Until the pointer
+   leaves its slop the camera holds still (a tap never nudges the web); once it does, the pan
+   catches up to the finger in one step, from where the press began. */
+const SLOP = { mouse: 3, pen: 6, touch: 10 };
+/** The slop for a pointer type; an unknown one is treated as a finger. */
+export function slopFor(pointerType) {
+  return SLOP[pointerType] || SLOP.touch;
+}
+/** A second tap is a double only this soon after the first, and this close to it, CSS px: two
+ * quick taps on two different lines are two choices, not a zoom. */
+export const DOUBLE_TAP_MS = 300;
+export const DOUBLE_TAP_PX = 24;
+/** One wheel line in CSS px (deltaMode 1, Firefox's mouse wheel); a page is the view's height.
+ * A single event zooms by at most this much pixel delta, so a page-mode notch is not a leap. */
+const WHEEL_LINE_PX = 16;
+const WHEEL_MAX_PX = 300;
+
 /**
  * Wires pan/pinch/tap/double-tap/wheel-zoom onto `el`.
  *
@@ -50,7 +69,7 @@ export function isChromeTarget(target) {
  *   camFor?: (yDevice:number) => {x:number, y?:number, ppv:number, total:number},
  *   live?: () => void,
  *   view: () => {W:number, H:number, DPR:number},
- *   handlers: () => {hover:Function, tap:Function, doubleTap:Function},
+ *   handlers: () => {hover:Function, tap:Function, doubleTap:Function, snapshot?:() => (() => void)},
  *   schedule: () => void,
  *   maxZoom: (cam?:object) => number,
  *   clampCamera: (cam:object, width:number, maxZoom:number, yf?:object) => void,
@@ -79,7 +98,24 @@ export function attachWebGestures(el, deps) {
   // function called once. Absent, or null, the pointer is the web's.
   const liftAt = (x, y) => (deps.lift ? deps.lift(x, y) : null);
   const pointers = new Map();
-  let drag = null, pinch = null, moved = false, lastTap = 0;
+  // drag: the one pointer that pans (its id, where it went down, its slop); pinch: the two
+  // pointers that zoom (their ids). lastTap: the first tap of a possible double, with the undo
+  // of what it opened.
+  let drag = null, pinch = null, moved = false, lastTap = null;
+
+  /** Two fingers pinch: the first two still down. A third finger rides along without steering;
+   * if one of the two lifts while it is down, it and the one left pinch on from where they are. */
+  const seedPinch = () => {
+    const ids = Array.from(pointers.keys()).slice(0, 2);
+    const p = pointers.get(ids[0]), q = pointers.get(ids[1]);
+    const mid = (p.x + q.x) / 2;
+    const pc = camAt((p.y + q.y) / 2);
+    pinch = { ids, d: Math.hypot(p.x - q.x, p.y - q.y), ppv: pc.ppv, y: pc.y > 0 ? pc.y : 0, cam: pc,
+              mid, midY: (p.y + q.y) / 2, verse: xToVerse(pc, view().W, mid * dpr()) };
+    drag = null;
+    // a second finger down means this press is no tap
+    moved = true;
+  };
 
   const down = (e) => {
     // A tap on the chrome is the chrome's alone. Without this, pressing
@@ -92,20 +128,17 @@ export function attachWebGestures(el, deps) {
     // listeners still see the move — but letting it throw here would abort
     // the handler and leave the gesture dead.
     try { if (el.setPointerCapture) el.setPointerCapture(e.pointerId); } catch (_e) { /* capture is optional */ }
+    // the first pointer of a new gesture: anything still recorded is a ghost whose up never came
+    if (e.isPrimary && pointers.size) { pointers.clear(); drag = null; pinch = null; }
     const pt = loc(e);
     pointers.set(e.pointerId, pt);
+    // a third finger while two pinch is registered (its up must not tap) but steers nothing
+    if (pinch) return;
+    if (pointers.size >= 2) { seedPinch(); return; }
     moved = false;
-    if (pointers.size === 2) {
-      const [p, q] = Array.from(pointers.values());
-      const mid = (p.x + q.x) / 2;
-      const pc = camAt((p.y + q.y) / 2);
-      pinch = { d: Math.hypot(p.x - q.x, p.y - q.y), ppv: pc.ppv, y: pc.y > 0 ? pc.y : 0, cam: pc,
-                mid, midY: (p.y + q.y) / 2, verse: xToVerse(pc, view().W, mid * dpr()) };
-      drag = null;
-    } else {
-      const dc = camAt(pt.y);
-      drag = { x: pt.x, y: pt.y, camx: dc.x, camy: dc.y || 0, cam: dc, lift: liftAt(pt.x, pt.y) };
-    }
+    const dc = camAt(pt.y);
+    drag = { id: e.pointerId, x: pt.x, y: pt.y, camx: dc.x, camy: dc.y || 0, cam: dc,
+             lift: liftAt(pt.x, pt.y), slop: slopFor(e.pointerType) };
   };
   // W52: a pointer that went down on the chrome (or anywhere this code did
   // not register it) is the chrome's for its whole life: its move must not
@@ -119,9 +152,12 @@ export function attachWebGestures(el, deps) {
     }
     pointers.set(e.pointerId, pt);
     const W = view().W;
-    if (pinch && pointers.size === 2) {
+    if (pinch) {
+      // the pinch reads its own two fingers: a third one moving steers nothing (it once panned
+      // the web from the third finger's press while the other two zoomed it)
+      if (!pinch.ids.includes(e.pointerId)) return;
       const c = pinch.cam;
-      const [p, q] = Array.from(pointers.values());
+      const p = pointers.get(pinch.ids[0]), q = pointers.get(pinch.ids[1]);
       const yf = yFrameOf(c);
       c.ppv = pinch.ppv * (Math.hypot(p.x - q.x, p.y - q.y) / Math.max(pinch.d, 1));
       clampCamera(c, W, zoomCap(c), yf);
@@ -137,31 +173,31 @@ export function attachWebGestures(el, deps) {
       clampCamera(c, W, zoomCap(c), yf);
       moved = true; if (deps.live) deps.live(); schedule(); return;
     }
-    if (drag && drag.lift) {
-      if (Math.hypot(pt.x - drag.x, pt.y - drag.y) > 3) moved = true;
+    if (!drag || e.pointerId !== drag.id) return;
+    if (drag.lift) {
+      if (Math.hypot(pt.x - drag.x, pt.y - drag.y) > drag.slop) moved = true;
       drag.lift(pt.y);
       if (deps.live) deps.live(); schedule(); return;
     }
-    if (drag) {
-      const c = drag.cam;
-      // Motion on EITHER axis is a gesture, not a tap. The web pans along x
-      // (and along y once its camera has a y frame, below), but before that
-      // a finger that travelled 100 px across the canon did not
-      // tap: read from x alone, that swipe ended in handlers().tap, opened
-      // the thread chooser over the canvas, and every drag after it began on
-      // the sheet and moved nothing (Corbin, 2026-09-11: "you can't grab the
-      // screen … and move around"; measured on the rotated phone frame).
-      // The camera is the one under the finger when it went down (drag.cam,
-      // the two-rail My Web's per-rail camera); a swipe across the gap
-      // between the rails is likewise a gesture and not a tap.
-      if (Math.hypot(pt.x - drag.x, pt.y - drag.y) > 3) moved = true;
-      c.x = drag.camx - (pt.x - drag.x) * dpr() / c.ppv;
-      const yf = yFrameOf(c);
-      if (yf) c.y = drag.camy + (pt.y - drag.y) * dpr();
-      clampCamera(c, W, zoomCap(c), yf);
-      if (deps.live) deps.live(); schedule(); return;
-    }
-    if (e.pointerType === 'mouse') handlers().hover(pt.x, pt.y);
+    const c = drag.cam;
+    // Motion on EITHER axis is a gesture, not a tap. The web pans along x
+    // (and along y once its camera has a y frame, below), but before that
+    // a finger that travelled 100 px across the canon did not
+    // tap: read from x alone, that swipe ended in handlers().tap, opened
+    // the thread chooser over the canvas, and every drag after it began on
+    // the sheet and moved nothing (Corbin, 2026-09-11: "you can't grab the
+    // screen … and move around"; measured on the rotated phone frame).
+    // The camera is the one under the finger when it went down (drag.cam,
+    // the two-rail My Web's per-rail camera); a swipe across the gap
+    // between the rails is likewise a gesture and not a tap.
+    // Inside the slop it is still a tap and the camera holds (slopFor, above).
+    if (!moved && Math.hypot(pt.x - drag.x, pt.y - drag.y) <= drag.slop) return;
+    moved = true;
+    c.x = drag.camx - (pt.x - drag.x) * dpr() / c.ppv;
+    const yf = yFrameOf(c);
+    if (yf) c.y = drag.camy + (pt.y - drag.y) * dpr();
+    clampCamera(c, W, zoomCap(c), yf);
+    if (deps.live) deps.live(); schedule();
   };
   // sweep v074: a pinch that ends with one finger still down hands the pan
   // to that finger. down() nulled `drag` when the pinch began, so the finger
@@ -170,36 +206,51 @@ export function attachWebGestures(el, deps) {
   // again. It picks up from where it rests now (no jump), on the camera
   // under it, the shape down() seeds; never on the elevator (a pinch is not
   // a press on the track), and with `moved` set so its lift is not a tap.
-  const handOff = (wasPinch) => {
-    if (!wasPinch || pointers.size !== 1) return;
-    const [pt] = Array.from(pointers.values());
+  const handOff = () => {
+    if (pointers.size !== 1) return;
+    const [[id, pt]] = Array.from(pointers.entries());
     const dc = camAt(pt.y);
-    drag = { x: pt.x, y: pt.y, camx: dc.x, camy: dc.y || 0, cam: dc, lift: null };
+    drag = { id, x: pt.x, y: pt.y, camx: dc.x, camy: dc.y || 0, cam: dc, lift: null, slop: 0 };
     moved = true;
+  };
+  /** A pinch finger left (up or cancel): with two still down they pinch on, with one it pans. */
+  const pinchFingerGone = () => {
+    pinch = null;
+    if (pointers.size >= 2) seedPinch();
+    else handOff();
   };
   const up = (e) => {
     if (!pointers.has(e.pointerId)) return;
     pointers.delete(e.pointerId);
-    const wasPinch = !!pinch;
-    if (pointers.size < 2) pinch = null;
-    if (drag && drag.lift) {
+    if (pinch) { if (pinch.ids.includes(e.pointerId)) pinchFingerGone(); return; }
+    if (!drag || drag.id !== e.pointerId) return;
+    if (drag.lift) {
       // a tap on the track jumps there; never a web tap, never a double-tap zoom
       if (!moved) { drag.lift(loc(e).y); schedule(); }
-      lastTap = 0;
-    } else if (drag && !moved) {
+      lastTap = null;
+    } else if (!moved) {
       const pt = loc(e);
       const now = Date.now();
-      if (now - lastTap < 300) { handlers().doubleTap(pt.x); lastTap = 0; }
-      else { lastTap = now; handlers().tap(pt.x, pt.y); }
+      const first = lastTap;
+      if (first && now - first.t < DOUBLE_TAP_MS && Math.hypot(pt.x - first.x, pt.y - first.y) <= DOUBLE_TAP_PX) {
+        // A1: the double takes back what its first tap opened (the card, the chosen line), so a
+        // double-tap only zooms
+        lastTap = null;
+        if (first.undo) first.undo();
+        handlers().doubleTap(pt.x, pt.y);
+      } else {
+        const h = handlers();
+        lastTap = { t: now, x: pt.x, y: pt.y, undo: h.snapshot ? h.snapshot() : null };
+        h.tap(pt.x, pt.y);
+      }
     }
     drag = null;
-    handOff(wasPinch);
   };
   const cancel = (e) => {
     if (!pointers.has(e.pointerId)) return;
-    const wasPinch = !!pinch;
-    pointers.delete(e.pointerId); drag = null; pinch = null;
-    handOff(wasPinch);
+    pointers.delete(e.pointerId);
+    if (pinch) { if (pinch.ids.includes(e.pointerId)) pinchFingerGone(); return; }
+    if (drag && drag.id === e.pointerId) drag = null;
   };
   const wheel = (e) => {
     // A panel with its own scroll must scroll (or its text must select)
@@ -214,9 +265,22 @@ export function attachWebGestures(el, deps) {
     // (data-wheel-through) and the rail beneath zooms. Its taps stay its own.
     if (isChromeTarget(e.target) && !(e.target.closest && e.target.closest('[data-wheel-through]'))) return;
     e.preventDefault();
-    const pt = loc(e), W = view().W;
+    const pt = loc(e), v = view(), W = v.W;
     const c = camAt(pt.y);
-    zoomAbout(c, W, pt.x * dpr(), Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)), zoomCap(c), yFrameOf(c) || undefined, pt.y * dpr());
+    // A1: every wheel in CSS px: a line wheel (deltaMode 1) and a page wheel (2) read as their
+    // pixel travel, so one notch zooms alike in every browser. A sideways wheel (a trackpad's
+    // two-finger swipe, a tilt wheel, shift+wheel) pans along the canon; up and down zoom; a
+    // trackpad pinch (ctrlKey) always zooms.
+    const unit = e.deltaMode === 1 ? WHEEL_LINE_PX : e.deltaMode === 2 ? (v.H / (v.DPR || 1) || 600) : 1;
+    let dx = (e.deltaX || 0) * unit, dy = (e.deltaY || 0) * unit;
+    if (e.shiftKey && !e.ctrlKey && !dx) { dx = dy; dy = 0; }
+    if (!e.ctrlKey && Math.abs(dx) > Math.abs(dy)) {
+      c.x += (dx * dpr()) / c.ppv;
+      clampCamera(c, W, zoomCap(c), yFrameOf(c));
+    } else {
+      dy = Math.max(-WHEEL_MAX_PX, Math.min(WHEEL_MAX_PX, dy));
+      zoomAbout(c, W, pt.x * dpr(), Math.exp(-dy * (e.ctrlKey ? 0.011 : 0.0021)), zoomCap(c), yFrameOf(c) || undefined, pt.y * dpr());
+    }
     if (deps.live) deps.live();
     schedule();
   };
