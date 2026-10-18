@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import {
   prophecySet, topSet, topSetKey, isCompact, COMPACT_HEIGHT_CSS, TOP_ORDER,
-  drawOrder, frameSetAt, frameSet, inFrame,
+  drawOrder, frameSetAt, frameSet, inFrame, RUN_DRAW_VERTICES,
 } from './frame-set.js';
 import * as dec from './decode.js';
 import { fansOf } from './decode.js';
@@ -264,7 +264,7 @@ describe('the visible set: drawn, counted, labelled and picked are one set (E1)'
   const setOf = (fr, c) => frameSetAt(g, 'famous', fr.W, fr.base, fr.squash, c.x, c.y, c.ppv, fr.DPR);
   const order = drawOrder(g, 'famous');
 
-  it('its shape: inFrame is the list, the stream is the list by segment class (fewest first, rank within), and the vertices add up', () => {
+  it('its shape: inFrame is the list, in rank order; the runs cut it in order, each at the most segments its threads ask for, and the vertices add up', () => {
     for (const dev of devices) {
       const fr = frameOf(dev);
       for (const c of cameras(fr)) {
@@ -280,27 +280,55 @@ describe('the visible set: drawn, counted, labelled and picked are one set (E1)'
           if (!listed.has(i)) bad.push(`inFrame ${i} not listed`);
         }
         if (members !== set.count) bad.push(`inFrame holds ${members}, count ${set.count}`);
-        // the list in rank order: the shortest drawn span first, as the renderer draws
+        // the list in rank order: the shortest drawn span first, the order the web is blended in
         for (let k = 1; k < set.count; k++) {
           if (order.rankOf[set.list[k]] <= order.rankOf[set.list[k - 1]]) bad.push(`list out of rank at ${k}`);
         }
-        let vertices = 0, at = 0;
-        for (let k = 0; k < set.classes; k++) {
-          if (k && set.classN[k] <= set.classN[k - 1]) bad.push(`class ${k} not after ${k - 1}`);
-          if (set.classFirst[k] !== at) bad.push(`class ${k} starts at ${set.classFirst[k]}, not ${at}`);
-          for (let j = at; j < at + set.classCount[k]; j++) {
-            const rank = order.rankOf[set.stream[j]];
-            if (set.segments[rank] !== set.classN[k]) bad.push(`stream ${j} in class ${k} has ${set.segments[rank]} segments`);
-            if (j > at && rank <= order.rankOf[set.stream[j - 1]]) bad.push(`stream out of rank at ${j}`);
+        let vertices = 0, own = 0, at = 0;
+        for (let k = 0; k < set.runs; k++) {
+          if (set.runFirst[k] !== at) bad.push(`run ${k} starts at ${set.runFirst[k]}, not ${at}`);
+          if (!(set.runCount[k] > 0)) bad.push(`run ${k} is empty`);
+          let most = 0;
+          for (let j = at; j < at + set.runCount[k]; j++) {
+            const n = set.segments[order.rankOf[set.list[j]]];
+            if (!(n > 0)) bad.push(`list ${j} has no segments`);
+            if (n > most) most = n;
+            own += 2 * (n + 1);
           }
-          at += set.classCount[k];
-          vertices += 2 * (set.classN[k] + 1) * set.classCount[k];
+          // a run draws every thread at its threads' most: never fewer segments than one asked for
+          if (set.runN[k] !== most) bad.push(`run ${k} draws ${set.runN[k]} segments, its most is ${most}`);
+          at += set.runCount[k];
+          vertices += 2 * (set.runN[k] + 1) * set.runCount[k];
         }
-        if (at !== set.count) bad.push(`classes hold ${at}, count ${set.count}`);
+        if (at !== set.count) bad.push(`runs hold ${at}, count ${set.count}`);
         expect(bad.slice(0, 5), where).toEqual([]);
         expect(set.vertices, where).toBe(vertices);
         expect(set.count, where).toBeGreaterThan(0);
+        // the runs' price: a few dozen draws, and at most 2.5 times what each thread's own count would
+        // cost (or a couple of draws' worth, for a frame of a hundred threads)
+        expect(set.runs, where).toBeLessThanOrEqual(96);
+        expect(set.vertices, where).toBeGreaterThanOrEqual(own);
+        expect(set.vertices, where).toBeLessThanOrEqual(Math.max(2.5 * own, own + 2 * RUN_DRAW_VERTICES));
       }
+    }
+  });
+
+  it('a run splits only where it saves more than a draw: the overview, where segments follow span, is one run per count', () => {
+    const fr = frameOf(devices[0]);
+    const set = setOf(fr, cameras(fr)[0]);
+    let counts = 0;
+    for (let k = 0; k < set.count; k++) {
+      const n = set.segments[order.rankOf[set.list[k]]];
+      if (k === 0 || n !== set.segments[order.rankOf[set.list[k - 1]]]) counts++;
+    }
+    // segments rise with span at the overview: each change of count is a run boundary, or a merge
+    expect(set.runs).toBeLessThanOrEqual(counts);
+    expect(set.runs).toBeGreaterThan(counts / 2);
+    // every boundary the runs keep saves more than RUN_DRAW_VERTICES against merging the pair
+    for (let k = 0; k + 1 < set.runs; k++) {
+      const a = set.runCount[k], b = set.runCount[k + 1], na = set.runN[k], nb = set.runN[k + 1];
+      const merged = 2 * (a + b) * (Math.max(na, nb) + 1), apart = 2 * a * (na + 1) + 2 * b * (nb + 1);
+      expect(merged - apart, `boundary ${k}`).toBeGreaterThan(RUN_DRAW_VERTICES);
     }
   });
 

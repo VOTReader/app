@@ -15,7 +15,7 @@ import {
 import {
   arcShapeGLSL, arcFrameGLSL, flyOverWidth, flyOverGLSL, glslFloat, squashFactor, TOP_SEGMENT_MIN,
 } from '../../utils/scripture-web/geometry.js';
-import { frameSetAt } from '../../utils/scripture-web/frame-set.js';
+import { frameSetAt, drawOrder } from '../../utils/scripture-web/frame-set.js';
 import { FLYOVER_LEG_WIDTH, TAP_CONTEXT, rgba01, inkWidth } from '../../utils/scripture-web/sw-ink.js';
 import {
   DISTANCE_RAMP, rampGLSL, readChromeTokens, cssColorToRGB,
@@ -94,7 +94,7 @@ describe('shader shape', () => {
 
   /* Restated for E1: gl_InstanceID restarts at 0 for every draw, which
      uInstanceBase used to add back for the one draw per bucket run. A
-     class's draw carries the ids themselves, so there is nothing to add. */
+     run's draw carries the ids themselves, so there is nothing to add. */
   it('the spotlight test reads the thread\'s own id from the stream, not gl_InstanceID', () => {
     expect(SHADER_SOURCE.vertex).toContain('float id = float(aId);');
     expect(SHADER_SOURCE.vertex).not.toMatch(/gl_InstanceID|uInstanceBase/);
@@ -590,30 +590,52 @@ describe('E1-E3: the visible set, the gesture backing, and a frame that sends on
     return { calls, r: /** @type {any} */ (createRenderer(canvas, g || threeArcs())) };
   };
 
-  it('E1: one draw per segment count, each over its class of the id stream; stats are the instances and vertex invocations sent', () => {
-    const g = threeArcs();
+  /** 600 one-verse threads (one segment each) under six that span the frame (twenty-odd each):
+   *  drawing the short ones at the wide ones' count would cost far more than a draw, so two runs */
+  const manyArcs = () => {
+    const n = 606, from = new Uint16Array(n), to = new Uint16Array(n), votes = new Int16Array(n);
+    for (let i = 0; i < 600; i++) { from[i] = 30 + ((i * 7) % 160); to[i] = from[i] + 1; votes[i] = 5; }
+    for (let i = 600; i < n; i++) { from[i] = 40 + (i - 600) * 3; to[i] = 190 - (i - 600) * 3; votes[i] = 20; }
+    return Object.assign(tinyGraph(), {
+      count: n, from, to, votes, buckets: [{ off: 0, len: n, off20: n, off10: n, segments: 8, chunks: [] }],
+    });
+  };
+
+  it('E1: the set is drawn in rank order, one draw per run of the id stream; stats are the instances and vertex invocations sent', () => {
+    const g = manyArcs();
     const { calls, r } = build(g);
     const v = view({});
     const f = frameOf(r, calls, v);
     // the set the renderer drew is THE visible set (frame-set.js), the one the picker and labels read
     const set = frameSetAt(g, v.density, v.width, v.base, v.squash, v.camX, v.camY, v.ppv, v.dpr);
-    expect(set.count).toBe(3);
-    expect(f.main.length).toBe(set.classes);
+    expect(set.count).toBe(606);
+    expect(set.runs).toBeGreaterThanOrEqual(2);
+    expect(f.main.length).toBe(set.runs);
+    // the stream uploaded is the list, in rank order: the web blends shortest first, widest on top
+    const up = f.calls.find((c) => c[0] === 'bufferSubData')[1];
+    const sent = Array.from(up[2].subarray(up[3], up[3] + up[4]));
+    expect(sent).toEqual(Array.from(set.list.subarray(0, set.count)));
+    const { rankOf } = drawOrder(g, v.density);
+    expect(sent.every((id, k) => k === 0 || rankOf[id] > rankOf[sent[k - 1]])).toBe(true);
     const ptrs = f.calls.filter((c) => c[0] === 'vertexAttribIPointer');
-    let vertices = 0, instances = 0;
+    let vertices = 0, instances = 0, at = 0;
     f.main.forEach((d, k) => {
       const n = d.u.uSegments[0];
-      expect(n).toBe(set.classN[k]);
-      expect(d.args).toEqual(['TRIANGLE_STRIP', 0, 2 * (n + 1), set.classCount[k]]);
-      // Uint16 ids: the class's first id, two bytes each
-      expect(ptrs[k][1]).toEqual(['aId', 1, 'UNSIGNED_SHORT', 0, set.classFirst[k] * 2]);
+      expect(n).toBe(set.runN[k]);
+      expect(d.args).toEqual(['TRIANGLE_STRIP', 0, 2 * (n + 1), set.runCount[k]]);
+      // Uint16 ids: the run's first id, two bytes each; the runs follow one another down the stream
+      expect(ptrs[k][1]).toEqual(['aId', 1, 'UNSIGNED_SHORT', 0, at * 2]);
+      at += set.runCount[k];
       vertices += d.args[2] * d.args[3];
       instances += d.args[3];
     });
+    expect(at).toBe(set.count);
     expect(f.stats).toEqual({ instances, vertices, draws: f.main.length });
     expect(r.stats).toEqual(f.stats);
-    // three threads of three sizes: three classes, the widest the most segments
-    expect(new Set(f.main.map((d) => d.u.uSegments[0])).size).toBe(3);
+    // the short threads drew first, at their own few segments; the wide ones over them, at theirs
+    const last = f.main[f.main.length - 1].u.uSegments[0];
+    expect(last).toBeGreaterThan(10);
+    expect(f.main[0].u.uSegments[0]).toBeLessThan(last / 4);
   });
 
   it('E1: a thread whose body is out of the frame is not drawn (the height cull), and is again when the camera comes back', () => {
@@ -656,16 +678,22 @@ describe('E1-E3: the visible set, the gesture backing, and a frame that sends on
     expect(g.stats).toEqual(f.stats);
   });
 
-  it('E3: an unchanged frame sends no uniform but the segment count of each class, and uploads nothing; the threads go up once, at creation', () => {
+  it('E3: an unchanged frame sends no uniform but each run\'s segment count, and uploads nothing; the threads go up once, at creation', () => {
     const { calls, r } = build();
     expect(calls.filter((c) => c[0] === 'texImage2D').length).toBe(2);
     const first = frameOf(r, calls, view({}));
     expect(first.calls.filter((c) => c[0] === 'bufferSubData').length).toBe(1);
     const again = frameOf(r, calls, view({}));
-    // a draw's segment count is that draw's own: with three classes it changes three times a frame
-    expect(again.calls.filter((c) => /^uniform/.test(c[0]))).toEqual(
-      again.main.map((d) => ['uniform1f', ['uSegments', d.u.uSegments[0]]]));
-    expect(again.main.length).toBe(3);
+    // three threads are one run: an unchanged frame sends no uniform at all
+    expect(again.main.length).toBe(1);
+    expect(again.calls.filter((c) => /^uniform/.test(c[0]))).toEqual([]);
+    // with several runs a draw's segment count is that draw's own, sent once per run
+    const many = build(manyArcs());
+    frameOf(many.r, many.calls, view({}));
+    const steady = frameOf(many.r, many.calls, view({}));
+    expect(steady.main.length).toBeGreaterThanOrEqual(2);
+    expect(steady.calls.filter((c) => /^uniform/.test(c[0]))).toEqual(
+      steady.main.map((d) => ['uniform1f', ['uSegments', d.u.uSegments[0]]]));
     expect(again.calls.filter((c) => /^(bufferData|bufferSubData|texImage2D|texSubImage2D)$/.test(c[0]))).toEqual([]);
     expect(again.main.map((d) => d.args)).toEqual(first.main.map((d) => d.args));
     expect(again.top.map((d) => d.args)).toEqual(first.top.map((d) => d.args));

@@ -18,8 +18,10 @@
        is counted, labelled and pickable.
      · The threads live in two textures, once (their feet and fans, their
        votes); a frame sends only the set's ids, uploaded when the set
-       changes, and draws them one draw per segment count, each thread with
-       exactly the segments it asked for. Nothing off the frame runs.
+       changes, and draws them in rank order (the blend is premultiplied
+       over, so the order is the picture) as a few runs, one draw each, each
+       thread with at least the segments it asked for. Nothing off the frame
+       runs.
      · During a gesture on a dense screen the backing shrinks to
        GESTURE_DPR device px per CSS px (E2) and the frame after the gesture
        redraws it whole; the geometry stays in full-resolution px (uPx).
@@ -487,7 +489,7 @@ export function createRenderer(canvas, graph, opts = {}) {
   U.i1('uArcs', 0);
   U.i1('uVotes', 1);
 
-  // The id stream: the frame's visible set, by segment count (frame-set.js),
+  // The id stream: the frame's visible set in rank order (frame-set.js),
   // uploaded only when the set changes (a new camera), into one buffer as
   // long as the graph.
   const wide = count > 0xffff;
@@ -768,20 +770,20 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.bindBuffer(gl.ARRAY_BUFFER, idBuf);
       if (set.serial !== streamSerial && set.count) {
         streamSerial = set.serial;
-        gl.bufferSubData(gl.ARRAY_BUFFER, 0, set.stream, 0, set.count);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, set.list, 0, set.count);
       }
-      // one draw per segment count, each thread with exactly the segments it asked for
+      // one draw per run, in rank order: every thread of a run at the run's segments
       let vertices = 0;
-      for (let ci = 0; ci < set.classes; ci++) {
-        const n = set.classN[ci];
+      for (let k = 0; k < set.runs; k++) {
+        const n = set.runN[k];
         U.f1('uSegments', n);
-        gl.vertexAttribIPointer(idLoc, 1, idType, 0, set.classFirst[ci] * idBytes);
-        gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 2 * (n + 1), set.classCount[ci]);
-        vertices += 2 * (n + 1) * set.classCount[ci];
+        gl.vertexAttribIPointer(idLoc, 1, idType, 0, set.runFirst[k] * idBytes);
+        gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 2 * (n + 1), set.runCount[k]);
+        vertices += 2 * (n + 1) * set.runCount[k];
       }
       stats.instances = set.count;
       stats.vertices = vertices;
-      stats.draws = set.classes;
+      stats.draws = set.runs;
       drawTop(v, camX, ppv, camXHi, camY, dpr, tapFade, px);
       gl.disable(gl.SCISSOR_TEST);
       return stats;

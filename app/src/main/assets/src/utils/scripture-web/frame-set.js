@@ -8,7 +8,7 @@
    is not in it), how many segments its piece needs (geometry.frameSegments,
    by its own size on screen), and how many threads are anchored (a foot near
    the frame, the crowding law's count). The renderer draws exactly this set,
-   one draw per segment count; the picker (pick.pickArcs) hits only threads
+   in rank order, a few runs of it per frame; the picker (pick.pickArcs) hits only threads
    in it, the label pass walks it (pick.visibleArcs) and the convergence
    pills count it (pick.footBundles). So what is drawn, counted, labelled and
    pickable are one set by construction, and a frame that redraws for a
@@ -17,9 +17,16 @@
 
    Order. A density's threads are ranked once by their span on screen (the
    feet as drawn, fans included), so the draw is shortest first and the
-   widest on top, in the same order at every zoom, and at the overview, where
-   a thread's segments follow its span alone, each count's threads are one
-   run of ranks. Candidates come from a scan of every rank, or, once the
+   widest on top, in the same order at every zoom: the web is blended over
+   (premultiplied), so the order IS the picture, and a thread never changes
+   layer as the reader zooms (C20). The set goes to the renderer as RUNS of
+   consecutive ranks, one draw each, every thread of a run with the run's
+   most segments (more than a thread asked for only refines it): a run splits
+   where the vertex invocations that saves pass RUN_DRAW_VERTICES, the worth
+   of one more draw. At the overview a thread's segments follow its span
+   alone, so a run is one segment count; deeper in, the long threads' legs
+   need fewer segments than the arches beside them, and the runs follow
+   that. Candidates come from a scan of every rank, or, once the
    frame is deep, from the feet in the frame widened by the farthest a foot
    can stand from it and still lift its body into the frame (see feetWindow).
 
@@ -50,7 +57,7 @@
 
 import { fansOf, bucketDrawCount } from './decode.js';
 import {
-  arcFrameTau, frameSegments, frameHeights, CLIP_MARGIN, FLYOVER_MARGIN, TESS_CAP,
+  arcFrameTau, frameSegments, frameHeights, CLIP_MARGIN, FLYOVER_MARGIN,
 } from './geometry.js';
 
 /** The top pass's kinds, in drawing order: the chosen line last, on top. */
@@ -297,17 +304,26 @@ export function drawOrder(g, density) {
  * @typedef {{ serial: number, order: DrawOrder,
  *   width: number, base: number, squash: number, camX: number, camY: number, ppv: number, dpr: number,
  *   segments: Uint8Array, count: number, list: Uint16Array | Uint32Array,
- *   stream: Uint16Array | Uint32Array, classes: number, classN: Int32Array, classFirst: Int32Array,
- *   classCount: Int32Array, vertices: number, anchored: number, all: boolean, scan: string,
- *   perN: Int32Array, cursor: Int32Array }} FrameSet
+ *   runs: number, runN: Int32Array, runFirst: Int32Array, runCount: Int32Array,
+ *   vertices: number, anchored: number, all: boolean, scan: string }} FrameSet
  *   segments[rank]: the thread's segments, 0 when nothing of it is in the frame; count: how many are;
- *   list[0 .. count): their ids in rank order; stream[0 .. count): the same ids by segment count, then
- *   rank (the renderer's id stream); classes: how many segment counts, the k-th classN[k] segments over
- *   stream[classFirst[k] .. classFirst[k] + classCount[k]); vertices: the main pass's vertex
- *   invocations, the sum of 2 (n + 1); anchored: threads with a foot within FLYOVER_MARGIN of the
- *   frame (geometry.arcAnchored), in the frame or not; all: every thread of the density is in the
- *   frame; scan: 'all' (every rank was a candidate) or 'feet' (the feet window's); perN, cursor: scratch
+ *   list[0 .. count): their ids in rank order (the renderer's id stream, the labels' walk); runs: how
+ *   many draws, the k-th over list[runFirst[k] .. runFirst[k] + runCount[k]) at runN[k] segments,
+ *   its threads' most; vertices: the main pass's vertex invocations, the sum over the runs of
+ *   2 (runN + 1) runCount; anchored: threads with a foot within FLYOVER_MARGIN of the frame
+ *   (geometry.arcAnchored), in the frame or not; all: every thread of the density is in the frame;
+ *   scan: 'all' (every rank was a candidate) or 'feet' (the feet window's)
  */
+
+/**
+ * What one more draw is worth, in vertex invocations: a run of the set splits where drawing its
+ * threads at their own segment counts saves more than this. A draw call's fixed cost is some
+ * microseconds of CPU and GPU, about what a phone GPU spends on a thousand vertices; on the asset
+ * it keeps every frame to a few dozen draws (frame-set.test.js holds the bounds).
+ */
+export const RUN_DRAW_VERTICES = 1024;
+/** The most runs a set holds: past it the last run takes the rest (never reached on the asset). */
+export const RUN_CAP = 1024;
 
 /** Two cameras per graph: the frame's, and one other (a test, a walk) without evicting it. */
 const SLOTS = new WeakMap();
@@ -371,18 +387,16 @@ export function frameSetAt(g, density, width, base, squash, camX, camY, ppv, dpr
     const Ids = /** @type {any} */ (order.ids.constructor);
     set = /** @type {FrameSet} */ ({
       serial: 0, order, width: 0, base: 0, squash: 0, camX: 0, camY: 0, ppv: 0, dpr: 0,
-      segments: new Uint8Array(N), count: 0, list: new Ids(N), stream: new Ids(N), classes: 0,
-      classN: new Int32Array(TESS_CAP + 1), classFirst: new Int32Array(TESS_CAP + 1),
-      classCount: new Int32Array(TESS_CAP + 1), vertices: 0, anchored: 0, all: false, scan: 'all',
-      perN: new Int32Array(TESS_CAP + 1), cursor: new Int32Array(TESS_CAP + 1),
+      segments: new Uint8Array(N), count: 0, list: new Ids(N), runs: 0,
+      runN: new Int32Array(RUN_CAP), runFirst: new Int32Array(RUN_CAP), runCount: new Int32Array(RUN_CAP),
+      vertices: 0, anchored: 0, all: false, scan: 'all',
     });
   }
   slots.unshift(set);
   set.serial = ++SERIAL;
   set.width = width; set.base = base; set.squash = squash; set.camX = camX; set.camY = y; set.ppv = ppv; set.dpr = d;
-  const seg = set.segments, perN = set.perN, cursor = set.cursor;
+  const seg = set.segments;
   seg.fill(0);
-  perN.fill(0);
   const s = squash > 0 ? squash : 1;
   frameHeights(base, y, d, HEIGHTS);
   const hLo = HEIGHTS[0], hHi = HEIGHTS[1];
@@ -409,7 +423,7 @@ export function frameSetAt(g, density, width, base, squash, camX, camY, ppv, dpr
       }
     }
   }
-  let count = 0, vertices = 0, anchored = 0;
+  let count = 0, anchored = 0;
   for (let k = 0; k < candCount; k++) {
     const rank = cand ? cand[k] : k;
     const x0 = (fx0[rank] - camX) * ppv + half;
@@ -422,32 +436,43 @@ export function frameSetAt(g, density, width, base, squash, camX, camY, ppv, dpr
     if (!arcFrameTau(x0, x1, width, A, hLo, hHi, TAU)) continue;
     const n = frameSegments(TAU[0], TAU[1], r, A, d);
     seg[rank] = n;
-    perN[n]++;
     count++;
-    vertices += 2 * (n + 1);
   }
-  // the classes, fewest segments first, then every id in rank order into the list and the stream
-  const { classN, classFirst, classCount, list, stream } = set;
-  let classes = 0, at = 0;
-  for (let n = 1; n <= TESS_CAP; n++) {
-    if (!perN[n]) continue;
-    classN[classes] = n;
-    classFirst[classes] = at;
-    classCount[classes] = perN[n];
-    classes++;
-    cursor[n] = at;
-    at += perN[n];
-  }
+  // every id in rank order into the list, cut into runs as it goes (see the file's header): the
+  // current run [start, start + len) at max segments, and its tail since its last peak
+  const { list, runN, runFirst, runCount } = set;
   const ids = order.ids;
-  let li = 0;
+  const lam = RUN_DRAW_VERTICES;
+  let li = 0, runs = 0, start = 0, len = 0, max = 0, tailLen = 0, tailMax = 0;
   for (let rank = 0; rank < N && li < count; rank++) {
     const n = seg[rank];
     if (!n) continue;
-    const id = ids[rank];
-    list[li++] = id;
-    stream[cursor[n]++] = id;
+    list[li++] = ids[rank];
+    if (!len) { len = 1; max = n; continue; }
+    const room = runs < RUN_CAP - 1;
+    if (n > max) {
+      // raising the run to n costs its threads more than a draw: n starts a run of its own
+      if (room && 2 * len * (n - max) > lam) {
+        runFirst[runs] = start; runCount[runs] = len; runN[runs] = max; runs++;
+        start += len; len = 1; max = n;
+      } else { len++; max = n; }
+      tailLen = 0; tailMax = 0;
+      continue;
+    }
+    len++;
+    if (n === max) { tailLen = 0; tailMax = 0; continue; }
+    tailLen++;
+    if (n > tailMax) tailMax = n;
+    // the threads since the run's last peak are cheaper by more than a draw at their own most
+    if (room && 2 * tailLen * (max - tailMax) > lam) {
+      runFirst[runs] = start; runCount[runs] = len - tailLen; runN[runs] = max; runs++;
+      start += len - tailLen; len = tailLen; max = tailMax; tailLen = 0; tailMax = 0;
+    }
   }
-  set.classes = classes;
+  if (len) { runFirst[runs] = start; runCount[runs] = len; runN[runs] = max; runs++; }
+  let vertices = 0;
+  for (let k = 0; k < runs; k++) vertices += 2 * (runN[k] + 1) * runCount[k];
+  set.runs = runs;
   set.count = count;
   set.vertices = vertices;
   set.anchored = anchored;
