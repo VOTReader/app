@@ -169,7 +169,7 @@ async function toMyWeb(page) {
   await page.waitForFunction(() => !!document.querySelector('.sw-root') || !!document.querySelector('.sw-fallback'), { timeout: NAV_MS });
   if (await page.$('.sw-fallback')) return false;
   await page.waitForFunction(() => !document.querySelector('.sw-loading'), { timeout: NAV_MS });
-  await clickLabel(page, 'My web');
+  await clickLabel(page, 'My Web');
   await sleep(600);
   // the first-run guide ("How to read this web") opens on a fresh context and covers the band; its
   // button is "Got it" ('Dismiss' is the empty notice's x)
@@ -253,9 +253,9 @@ function diffStats(on, off) {
 }
 async function readBoth(page) {
   const on = await page.evaluate(MEASURE);
-  await clickLabel(page, /^Corpus context/); await sleep(500);
+  await clickLabel(page, /^Timothy’s notes/); await sleep(500);
   const off = await page.evaluate(MEASURE);
-  await clickLabel(page, /^Corpus context/); await sleep(500);
+  await clickLabel(page, /^Timothy’s notes/); await sleep(500);
   return { on, off, ctx: diffStats(on, off) };
 }
 const COUNTERS = () => {

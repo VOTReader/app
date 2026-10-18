@@ -185,7 +185,7 @@ async function toMyWeb(page) {
   await page.waitForFunction(() => !!document.querySelector('.sw-root') || !!document.querySelector('.sw-fallback'), { timeout: NAV_MS });
   if (await page.$('.sw-fallback')) return false;
   await page.waitForFunction(() => !document.querySelector('.sw-loading'), { timeout: NAV_MS });
-  await clickLabel(page, 'My web'); await sleep(800);
+  await clickLabel(page, 'My Web'); await sleep(800);
   // the first-run guide ("How to read this web") opens on a fresh context and covers the band; its
   // button is "Got it" ('Dismiss' is the empty notice's x)
   await clickIfPresent(page, 'Got it'); await sleep(300);

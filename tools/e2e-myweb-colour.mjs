@@ -194,7 +194,7 @@ async function toMyWeb(page) {
   if (!(await waitFor(page, () => !!document.querySelector('.sw-root') || !!document.querySelector('.sw-fallback'), NAV_MS))) throw new Error('wait timed out (main-world poll)');
   if (await page.$('.sw-fallback')) return false;
   if (!(await waitFor(page, () => !document.querySelector('.sw-loading'), NAV_MS))) throw new Error('wait timed out (main-world poll)');
-  await clickLabel(page, 'My web'); await sleep(800);
+  await clickLabel(page, 'My Web'); await sleep(800);
   // the first-run guide ("How to read this web") opens on a fresh context and covers the band; its
   // button is "Got it" ('Dismiss' is the empty notice's x)
   await clickIfPresent(page, 'Got it'); await sleep(300);
