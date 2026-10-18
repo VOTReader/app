@@ -43,7 +43,7 @@ export const MS_INDEX_VERSION = 'm17';  // m17: kjvEncode reads a number however
 
 /** MUST equal service-worker.js CORPUS_VERSION — gate-enforced (SRCH1, see
  *  header). Busts the cached index on content-only corpus edits. */
-export const CORPUS_CONTENT_VERSION = 'c71';
+export const CORPUS_CONTENT_VERSION = 'c72';
 
 function ln(v) { return (v && typeof v.length === 'number') ? v.length : 0; }
 function kc(v) { return (v && typeof v === 'object') ? Object.keys(v).length : 0; }
