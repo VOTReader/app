@@ -169,8 +169,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // names it, but never dims the rest of the web. Only a tap focuses.
   const {
     camRef, camVRef, lastRailRef, viewRef, focusRef, panelInsetRef,
-    frame, viewFor, zoomCapFor, yFrameFor, camFor, flyTo, cancelFly,
-  } = useWebCamera({ graph, density, modeRef, schedule, topbarRef, animate });
+    frame, viewFor, zoomCapFor, yFrameFor, camFor, flyTo, cancelFly, settledAt,
+  } = useWebCamera({ graph, density, modeRef, schedule, topbarRef, animate, onFrame });
   const theme = settings && settings.theme;
 
   // the canvas's colours, re-read when the theme flips (use-web-renderer.js)
@@ -235,7 +235,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     openPanel, lightThreads,
   } = useWebSelection({
     graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, yFrameFor,
-    personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce, relink,
+    personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce, relink, settledAt,
   });
 
   // the go-to (goto.jsx): its header slot (goTo.button, first in the control

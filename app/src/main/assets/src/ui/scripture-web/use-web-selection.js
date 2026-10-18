@@ -80,12 +80,14 @@ export function panelOf(detail, choices) {
  *   (the sheet that was open); the cameras' refs and callbacks and flyTo
  *   (use-web-camera.js); My Web's personalRef and railOpts; the boxes the
  *   draw wrote (elevatorRef, badgeBoxesRef, overlayFrameRef); the journey
- *   (use-journey.js); the frame loop; the live region; and My Web's relink
- *   (use-personal-web.js, optional): the chosen link found again after a rebuild
+ *   (use-journey.js); the frame loop; the live region; My Web's relink
+ *   (use-personal-web.js, optional): the chosen link found again after a rebuild; settledAt (the navigation stream, A6:
+ *   use-web-camera.js's chapter at rest), which Nearby's list re-derives on
  */
 export function useWebSelection({
   graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, yFrameFor,
   personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce, relink = null,
+  settledAt,
 }) {
   const [detail, setDetail] = React.useState(() => (resumeRef.current && resumeRef.current.detail) || null);      // the open sheet
   // My Web's rebuild found the chosen line again (use-personal-web's relink):
@@ -228,7 +230,10 @@ export function useWebSelection({
       }
     }
     return found.map(describe).filter(Boolean);
-  }, [graph, listOpen, mode, describe, showUnderlay, camRef, viewRef, density, personalRef, railOpts]);
+    // settledAt is the trigger, not an input: the list reads the live camera, and is re-derived
+    // each time the camera comes to rest somewhere new (A6)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graph, listOpen, mode, describe, showUnderlay, camRef, viewRef, density, personalRef, railOpts, settledAt]);
 
   const commitFound = React.useCallback((found) => {
     if (!found) return;

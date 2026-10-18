@@ -18,7 +18,12 @@
                     stream writes it, flyTo frames around it, the overlay keeps
                     its labels out of it
      flyTo          the one way code moves the camera to a place (go-to, Follow,
-                    a book name, the panel's framing); cancelFly stops one */
+                    a book name, the panel's framing); cancelFly stops one
+     settledAt      (the navigation stream, A6) the chapter in the lens where the
+                    camera last came to rest: state, set once no frame has moved
+                    the camera for SETTLE_MS, and only when the chapter changes,
+                    so what reads "near here" (Nearby) re-derives on arrival,
+                    never per frame. -1 until the first rest. Needs onFrame. */
 
 import { maxSpanOf } from '../../utils/scripture-web/decode.js';
 import { maxZoomFor, fitPPV, clampCamera } from '../../utils/scripture-web/geometry.js';
@@ -27,6 +32,11 @@ import { focusState } from '../../utils/scripture-web/focus-state.js';
 import { flyPath, flyMs, easeInOutCubic } from '../../utils/scripture-web/fly-path.js';
 import { prefersReducedMotion } from '../../utils/reduced-motion.js';
 import { railFrame, chromeInset } from './rail-renderer.js';
+import { nearbyChapter } from '../../utils/scripture-web/pick.js';
+
+/** How long the camera must go unmoved to count as at rest (A6): past a fling's last frames and a
+ * key's repeat, short enough that Nearby has caught up by the time the eye has. */
+export const SETTLE_MS = 180;
 
 /**
  * Where flyTo takes the camera: a canon x range to frame across the canvas area (edge to edge;
@@ -55,8 +65,10 @@ import { railFrame, chromeInset } from './rail-renderer.js';
  *   (camFor splits the rails where the draw places them)
  * @param {(step: (ms: number) => (boolean | void), onEnd?: (arrived: boolean) => void) => () => void} [args.animate]
  *   the frame loop's one motion (use-frame-scheduler.js): flyTo eases through it; without it a fly is instant
+ * @param {(fn: () => void) => () => void} [args.onFrame]  the frame loop's after-draw listeners
+ *   (use-frame-scheduler.js): settledAt watches the camera through it; without it settledAt stays -1
  */
-export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, animate }) {
+export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, animate, onFrame }) {
   const camRef = React.useRef(null);
   /* r2: the Volumes rail has a camera of its own, so the top and bottom halves
      zoom and pan independently (Corbin: "zoom into Rebuke [top] and on the
@@ -235,8 +247,33 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
     if (flyStopRef.current) flyStopRef.current();
   }, []);
 
+  // A6: where the camera came to rest. Each drawn frame compares the camera with the last one;
+  // a move restarts the wait, and SETTLE_MS without one reads the chapter in the lens.
+  const [settledAt, setSettledAt] = React.useState(-1);
+  React.useEffect(() => {
+    if (typeof onFrame !== 'function' || !graph) return undefined;
+    let timer = 0, seen = '';
+    const rest = () => {
+      timer = 0;
+      const c = camRef.current, v = viewRef.current;
+      if (!c || !v.W) return;
+      const ci = nearbyChapter(graph, c, v.W);
+      setSettledAt((was) => (was === ci ? was : ci));
+    };
+    const off = onFrame(() => {
+      const c = camRef.current;
+      if (!c) return;
+      const now = c.x + ',' + c.ppv + ',' + viewRef.current.W;
+      if (now === seen) return;
+      seen = now;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(rest, SETTLE_MS);
+    });
+    return () => { off(); if (timer) clearTimeout(timer); };
+  }, [onFrame, graph]);
+
   return {
     camRef, camVRef, lastRailRef, viewRef, focusRef, panelInsetRef,
-    frame, viewFor, zoomCapFor, yFrameFor, camFor, flyTo, cancelFly,
+    frame, viewFor, zoomCapFor, yFrameFor, camFor, flyTo, cancelFly, settledAt,
   };
 }
