@@ -490,10 +490,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
             </svg>
           </button>
         ) : null}
-        {/* NO CREDIT LINE HERE. The CC-BY attribution for the OpenBible.info
-            dataset lives on About ("Cross-reference data from OpenBible.info,
-            used under CC-BY."); the copy this strip carried printed over the
-            book labels in landscape (Corbin, 2026-09-11). */}
       </div>
 
       {/* HIDE THE CONTROLS — outside everything it hides, because it is the way
@@ -534,7 +530,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           followRow={followRow} zoomTo={zoomTo} onOpen={openEndpoint} lightThreads={lightThreads} flyTo={flyTo} />
       ) : null}
 
-      <div className="sw-legend" aria-hidden="true">{legendFor(mode)}</div>
+      {/* the key, and the OpenBible.info credit as its tail (Q5): read, not hidden; its glyphs are */}
+      <div className="sw-legend">{legendFor(mode, graph && graph.attribution)}</div>
       {mode === 'personal' && railZoom.top ? (
         <button type="button" className="sw-btn sw-rail-reset sw-rail-reset-top" aria-label="Reset the Volumes rail"
           data-wheel-through="1" onClick={() => resetRail('top')}>Reset Volumes</button>

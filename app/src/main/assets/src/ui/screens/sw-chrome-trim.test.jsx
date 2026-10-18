@@ -1,3 +1,4 @@
+// @ts-nocheck — reads app.css through node:fs (the typecheck has no node types), as sw-chrome-header.test.jsx does
 /* RED for Corbin's trim: four things must NOT render, one thing MUST.
  * ═══════════════════════════════════════════════════════════════════════
  * Corbin, from a screenshot of live My Web at desktop width: "Make sure for
@@ -26,6 +27,9 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, act, fireEvent, cleanup } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const DRAWN = [];
 vi.mock('../../utils/scripture-web/decode.js', async (importOriginal) => {
@@ -248,14 +252,20 @@ describe('the Scripture Web chrome, trimmed', () => {
  * painted at all before the hidden case asks whether it survives. */
 describe('the Scripture Web chrome, round 3 — the credit goes, the hide button keeps the legend and the rail', () => {
   const CALLS = [];
-  const fake2d = () => new Proxy({}, {
-    get(_t, prop) {
-      if (prop === 'measureText') return (s) => { CALLS.push(['measureText', s]); return { width: 20 }; };
-      if (prop === 'canvas') return null;
-      return (...a) => { CALLS.push([String(prop), ...a]); };
-    },
-    set() { return true; },
-  });
+  // the context's font rides on each fillText (call[4]), so a label's foot can be read back
+  const fake2d = () => {
+    const state = { font: '' };
+    return new Proxy({}, {
+      get(_t, prop) {
+        if (prop === 'measureText') return (s) => { CALLS.push(['measureText', s]); return { width: 20 }; };
+        if (prop === 'canvas') return null;
+        if (prop === 'font') return state.font;
+        if (prop === 'fillText') return (...a) => { CALLS.push(['fillText', a[0], a[1], a[2], state.font]); };
+        return (...a) => { CALLS.push([String(prop), ...a]); };
+      },
+      set(_t, prop, value) { if (prop === 'font') state.font = String(value); return true; },
+    });
+  };
   const labelsPainted = () => CALLS.filter((c) => c[0] === 'fillText').map((c) => String(c[1]));
   const waitForLabel = async () => {
     for (let i = 0; i < 60 && !labelsPainted().some((s) => /^gen/i.test(s)); i++) {
@@ -291,10 +301,44 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     expect(labels.some((s) => /^gen/i.test(s)), 'a Genesis label: ' + JSON.stringify(labels.slice(0, 6))).toBe(true);
   });
 
-  it('renders NO credit line on the canvas — the attribution lives on About', async () => {
+  /* Q5 (w3 panel step 2) brings the credit back, as the legend's tail and never as a line of
+     its own: round 3's law ("nothing prints over the book labels") with the credit present. It
+     is the legend's last item, read (not aria-hidden), and every book label the canvas paints
+     ends above the legend's line. The legend's top is the stylesheet's own numbers (its bottom
+     offset plus one line), read from app.css; that it is one line on a phone and a PC is the
+     screenshots' (D:/Swarm/lanes/sweb/out/w3/chrome). */
+  it('the credit is the legend\'s tail, read, and every book label ends above the legend', async () => {
     const { container } = await mount();
-    expect(container.querySelector('.sw-credit')).toBeNull();
-    expect(screen.queryByText(/OpenBible/i)).toBeNull();
+    const labels = await waitForLabel();
+    expect(labels.some((s) => /^gen/i.test(s)), 'PRECONDITION: the rail painted').toBe(true);
+    const legend = container.querySelector('.sw-legend');
+    const credit = legend && legend.querySelector('.sw-credit');
+    expect(credit, 'the credit, in the legend').toBeTruthy();
+    expect(legend.lastElementChild).toBe(credit);
+    expect(credit.textContent).toBe('Cross-reference data \u00a9 OpenBible.info (CC-BY)');
+    expect(credit.closest('[aria-hidden="true"]'), 'the credit is read, not hidden').toBeNull();
+
+    const here = dirname(fileURLToPath(import.meta.url));
+    const css = readFileSync(resolve(here, '../../../app.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const ruleOf = (sel) => {
+      const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const m = new RegExp('(?:^|[{}\\n])\\s*' + esc + '\\s*\\{([^}]*)\\}').exec(css);
+      if (!m) throw new Error('no `' + sel + ' {` rule in app.css');
+      return m[1];
+    };
+    const H = SIZES.find((s) => s[0] === 'clientHeight')[1];
+    // a root 500 px tall or less is .sw-compact (use-panel-layout.js); jsdom gives the root no box,
+    // so the canvas's height stands in for it
+    const own = ruleOf(H <= 500 ? '.sw-root.sw-compact .sw-legend' : '.sw-legend');
+    const bottom = Number(/bottom:\s*calc\((\d+)px/.exec(own)[1]);
+    const size = Number(/font-size:\s*var\(--fsc-(\d+)\)/.exec(own)[1]);
+    const lineHeight = Number(/line-height:\s*([\d.]+)/.exec(ruleOf('.sw-legend'))[1]);
+    const legendTop = H - bottom - size * lineHeight;
+    const books = CALLS.filter((c) => c[0] === 'fillText' && /Cinzel/.test(String(c[4])));
+    expect(books.length, 'book labels recorded, with their font').toBeGreaterThan(0);
+    const foot = (c) => Number(c[3]) + Number((/(\d+(?:\.\d+)?)px/.exec(String(c[4])) || [0, 0])[1]);
+    const lowest = Math.max(...books.map(foot));
+    expect(lowest, 'the lowest book label\'s foot against the legend\'s top, ' + legendTop).toBeLessThanOrEqual(legendTop);
   });
 
   /* The hide itself repaints nothing (the canvas is not cleared by a CSS class), so the

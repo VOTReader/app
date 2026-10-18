@@ -13,7 +13,7 @@
    guide keeps Tab inside and hands focus back on close.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { connectionTitle, arcLine, endpointLabel, plural, myWebLegendWords } from '../../utils/scripture-web/describe.js';
+import { connectionTitle, arcLine, endpointLabel, plural, myWebLegendWords, WEB_CREDIT } from '../../utils/scripture-web/describe.js';
 import { LINK_KIND_NAMES } from '../../utils/scripture-web/palette.js';
 import { ink } from '../../utils/scripture-web/sw-ink.js';
 
@@ -105,7 +105,7 @@ export function HowToReadGuide({ onClose }) {
   );
 }
 
-export function legendFor(mode) {
+export function legendFor(mode, credit) {
   // The key names only what the web draws (digest item 22): the chapter-length bars' key left
   // with the spec's legend, which has none, and My Web never drew bars.
   // My Web (w3, r2-05): two families, named as the picture names them,
@@ -125,11 +125,19 @@ export function legendFor(mode) {
   }
   // Distance is the only colour law the screen offers (Corbin, 2026-09-10:
   // "leave distance as only option, it looks best anyway"); the renderer has
-  // no other.
+  // no other. Then the two marks it paints over the threads (Q1 a: the Volumes
+  // are always on): a verse the Volumes cite carries a gold tick under the
+  // baseline, a prophecy's fulfilment is the pale thread on top. Last, the
+  // credit the OpenBible.info data is owed (Q5), on the same line: it is never
+  // a line of its own on the canvas (round 3), so it can never print over the
+  // book labels. My Web draws none of that data, so it carries no credit.
   return [
     <span className="sw-key sw-key-ramp" key="ramp">
-      <span>nearby</span><i className="sw-key-gradient" /><span>across the canon</span>
+      <span>nearby</span><i className="sw-key-gradient" aria-hidden="true" /><span>across the canon</span>
     </span>,
+    <span className="sw-key" key="cited"><i className="sw-key-tick" aria-hidden="true" />cited in the Volumes</span>,
+    <span className="sw-key" key="prophecy"><i className="sw-key-arc" aria-hidden="true" />prophecy fulfilled</span>,
+    <span className="sw-credit" key="credit">{credit || WEB_CREDIT}</span>,
   ];
 }
 

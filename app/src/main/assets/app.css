@@ -7729,6 +7729,7 @@
       --sw-active-border: rgba(196, 164, 105, 0.7);
       --sw-panel: #1C2527; --sw-panel-edge: #3A4547; --sw-hairline: #2C3537;
       --sw-cite-rule: rgba(196, 164, 105, 0.6);
+      --sw-cited: rgba(196, 164, 105, 0.7); --sw-prophecy: rgba(234, 223, 196, 0.8);
       --sw-font: 'EB Garamond', Georgia, serif;
     }
     /* ONE PALETTE, ONE CANVAS. The canvas is black in both themes (SW_PALETTE,
@@ -8340,14 +8341,37 @@
     .sw-root.sw-collapse.sw-menu-open .sw-menu .sw-seg-btn { flex: 1 1 0; }
     .sw-more-btn svg { display: block; }
 
+    /* THE LEGEND (spec 4.1, Q5): one line in the bottom-left corner, what the web draws and
+       whose data it is: the distance ramp "nearby → across the canon", the gold tick under a
+       verse the Volumes cite, the pale thread of a prophecy fulfilled, and last the
+       OpenBible.info credit. It WRAPS rather than run under ? and hide-UI (the max-width keeps
+       their corner: 24 + 44 + 12 + 44 + 16 on PC, 16 + 40 + 12 + 40 + 16 compact), and the canvas
+       stacks its label rows above its top. It hides while the panel is open (item 19) and stays
+       when the controls are hidden. */
     .sw-legend {
-      position: absolute; z-index: 4; left: 14px;
-      bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
-      display: flex; flex-wrap: wrap; gap: 4px 12px; max-width: 70vw;
-      font-size: var(--fsc-14); color: var(--cream-muted); letter-spacing: 0.04em;
+      position: absolute; z-index: 4; left: 24px;
+      bottom: calc(16px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
+      display: flex; flex-wrap: wrap; align-items: center; row-gap: 2px; max-width: calc(100% - 164px);
+      font-family: var(--sw-font); font-size: var(--fsc-14); line-height: 1.35; color: var(--sw-text-muted);
       pointer-events: none;
     }
+    .sw-root.sw-compact .sw-legend {
+      left: 16px; bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
+      font-size: var(--fsc-13); max-width: calc(100% - 140px);
+    }
+    /* hidden, the hide-UI pill says "Show controls" and is wider than the two round buttons */
+    .sw-root.sw-chrome-hidden .sw-legend { max-width: calc(100% - 210px); }
+    .sw-legend > * + *::before { content: '\00b7'; margin: 0 10px; }
     .sw-key { display: inline-flex; align-items: center; gap: 5px; }
+    /* the cited tick (sw-ink `cited`) and the prophecy thread (sw-ink `prophecy`), as the
+       canvas paints them, a little larger so they read at legend size */
+    .sw-key-tick { width: 2px; height: 10px; border-radius: 1px; display: inline-block; background: var(--sw-cited); }
+    .sw-key-arc {
+      width: 16px; height: 7px; display: inline-block; box-sizing: border-box; margin-top: 3px;
+      border: 1.5px solid var(--sw-prophecy); border-bottom: 0; border-radius: 8px 8px 0 0;
+    }
+    /* the credit is the legend's tail and flows with it: no place of its own (round 3) */
+    .sw-legend .sw-credit { white-space: nowrap; }
     .sw-key-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
     /* My Web's two families in the key (design-myweb-colour.md, 5): a bar in the
        source colour for Timothy's threads; for yours the pin the canvas draws at a
@@ -8361,12 +8385,13 @@
     .sw-key-pin.is-ring-dot { background: radial-gradient(circle, currentColor 0 1.5px, transparent 2px); }
     /* My Web's context ink: cream at the law's depth alpha, so the key matches the thread. */
     .sw-key-gradient {
-      width: 84px; height: 6px; border-radius: 3px; display: inline-block; margin: 0 6px;
+      width: 120px; height: 4px; border-radius: 2px; display: inline-block; margin: 0 4px;
       background: linear-gradient(to right, #c252b8, #8f5cd9, #4f70d4, #5c9ec9, #b54750, #c9a06b, #99a84f, #54c25e);
     }
 
-    /* The canvas carried a CC-BY credit line here until 2026-09-11; it printed
-       over the book labels in landscape and About carries the attribution. */
+    .sw-root.sw-compact .sw-key-gradient { width: 64px; }
+    /* The canvas carried a CC-BY credit line of its own until 2026-09-11; it printed over the
+       book labels in landscape. Since Q5 it is the legend's tail (.sw-legend .sw-credit). */
     .sw-live {
       position: absolute; width: 1px; height: 1px; overflow: hidden;
       clip-path: inset(50%); white-space: nowrap;

@@ -31,6 +31,11 @@ const DENSITY_LABEL = { essential: 'Essential', famous: 'Famous' };
 /* What each density is, in one line (Q6): the name, the count it draws, and what that is. */
 const DENSITY_MEANS = { essential: 'the strongest', famous: 'the full classic chart' };
 
+/** The CC-BY credit the OpenBible.info cross-references are owed (Q5): the legend's tail, the
+ * panel's footer and the guide's footer say it in these words. The data file carries the same
+ * line as `attribution`; this is what shows when a graph arrives without one. */
+export const WEB_CREDIT = 'Cross-reference data © OpenBible.info (CC-BY)';
+
 /**
  * A density in words, with its count: "Famous · 63,418, the full classic chart",
  * "Essential · 15,402, the strongest". The density control's options read it, and the hint

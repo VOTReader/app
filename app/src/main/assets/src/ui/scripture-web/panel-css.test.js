@@ -53,6 +53,8 @@ const ROWS = {
   '--sw-hairline': 'hairline', '--sw-cite-rule': 'citeRule',
   // the canvas's black, which the root, the loader and the load error paint (Q4, w3 panel step 2)
   '--sw-canvas': 'canvas',
+  // the legend's cited tick and prophecy thread, the marks the canvas paints (w3 panel step 2)
+  '--sw-cited': 'cited', '--sw-prophecy': 'prophecy',
 };
 
 describe('the panel\'s ink: app.css --sw-* tokens are sw-ink.js TABLE rows', () => {
