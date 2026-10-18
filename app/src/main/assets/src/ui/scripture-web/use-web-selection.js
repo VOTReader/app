@@ -142,6 +142,9 @@ export function useWebSelection({
   const [choices, setChoices] = React.useState(null);    // overlapped line chooser
   const [listOpen, setListOpen] = React.useState(false); // accessible nearby list
   const [tip, setTip] = React.useState(null);            // hover chip
+  // whether the docked panel is open (read by the hover: the panel covers the web under it)
+  const panelOpenRef = React.useRef(false);
+  panelOpenRef.current = !!(detail || (choices && choices.length) || listOpen);
 
   // The pointer handlers are reached through a ref for the reason draw is
   // (use-frame-scheduler.js): the gesture listeners bind once and call the
@@ -333,6 +336,21 @@ export function useWebSelection({
   }, [camRef, focusRef, schedule, setAnnounce, graph, density, frameFound]);
 
   const hover = React.useCallback((cx, cy) => {
+    // the docked panel covers the web under it: the gesture surface is the root, so a mouse resting
+    // on the panel arrives here, and it hovers nothing there (and leaving the canvas area for the
+    // panel lets go of what was hovered)
+    if (panelOpenRef.current && typeof insetFor === 'function') {
+      const v = viewRef.current;
+      const inset = insetFor();
+      const dpr = (v && v.DPR) || 1;
+      if (v && v.W && inset && ((inset.right > 0 && cx >= v.W / dpr - inset.right) ||
+          (inset.bottom > 0 && cy >= v.H / dpr - inset.bottom))) {
+        const had = focusRef.current.hover !== -1;
+        dropHover();
+        if (had) schedule();
+        return;
+      }
+    }
     hoverPointRef.current = { cx, cy };
     if (hoverRafRef.current) return;
     hoverRafRef.current = requestAnimationFrame(() => {
@@ -360,7 +378,7 @@ export function useWebSelection({
         return { info: found, x: point.cx, y: point.cy };
       });
     });
-  }, [describe, hitAt, schedule, focusRef]);
+  }, [describe, hitAt, schedule, focusRef, insetFor, viewRef, dropHover]);
 
   React.useEffect(() => () => {
     if (hoverRafRef.current) cancelAnimationFrame(hoverRafRef.current);

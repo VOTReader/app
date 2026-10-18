@@ -374,6 +374,38 @@ describe('the panel frames what it opens (spec section 3)', () => {
   });
 });
 
+describe('a resting mouse over the open panel hovers nothing under it (spec section 3)', () => {
+  // The gesture surface is the root, so a mouse resting on the docked panel (its text, its padding)
+  // reached the web's hover: the chip named the chapter under the panel and the thread under it lit
+  // (the w3 PC shot, the chip "Romans 9" over Matthew while the pointer read the credit).
+  it('no chip and no hovered thread under the panel; the canvas area still hovers, and leaving it drops the chip', () => {
+    const queue = [];
+    vi.stubGlobal('requestAnimationFrame', (cb) => { queue.push(cb); return queue.length; });
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+    const flush = () => act(() => { while (queue.length) queue.shift()(0); });
+    try {
+      const { get } = mount({ insetFor: () => ({ right: 300, bottom: 0 }) });
+      const y = get().cam.viewFor().base + 6; // the ruler: a chapter under any x of the canon
+      // closed, the point the panel will cover hovers the web
+      get().sel.handlersRef.current.hover(700, y); flush();
+      expect(get().sel.tip).toMatchObject({ info: { kind: 'chapter' } });
+      act(() => { get().sel.openPanel({ mode: 'connection', arc: 1 }); });
+      // open: over the panel, nothing
+      get().sel.handlersRef.current.hover(700, y); flush();
+      expect(get().sel.tip).toBeNull();
+      expect(get().cam.focusRef.current.hover).toBe(-1);
+      // the canvas area it leaves still hovers
+      get().sel.handlersRef.current.hover(100, y); flush();
+      expect(get().sel.tip).toMatchObject({ info: { kind: 'chapter' } });
+      // and moving from there onto the panel drops the chip
+      act(() => { get().sel.handlersRef.current.hover(520, y); }); flush();
+      expect(get().sel.tip).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe('a row\'s Follow and the zoom row (the panel stream)', () => {
   it('followRow swaps to that connection and goes to the end the row names', () => {
     const { get } = mount();
