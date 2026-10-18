@@ -82,7 +82,7 @@ export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack
       <div className="swf-note">
         <span>The map can’t be drawn on this device right now.</span>
         <button type="button" className="swf-retry" onClick={() => { resumeChapter = ci; onRetry(); }}>Try again</button>
-        {onMyWeb && <button type="button" className="swf-retry" onClick={() => { resumeChapter = ci; onMyWeb(); }}>My web</button>}
+        {onMyWeb && <button type="button" className="swf-retry" onClick={() => { resumeChapter = ci; onMyWeb(); }}>My Web</button>}
       </div>
       <div className="swf-count-row">
         <h2 className="swf-h2">Connected passages</h2>

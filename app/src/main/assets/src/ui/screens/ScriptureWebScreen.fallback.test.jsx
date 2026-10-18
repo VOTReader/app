@@ -121,8 +121,8 @@ describe('Scripture Web without WebGL2: the web read as a list (A7)', () => {
     // the rails' JSON is published only while a walk reads the frame (use-web-renderer walkOn, E3)
     /** @type {any} */ (globalThis).__swWalk = {};
     const { container } = await mountWithoutWebGL();
-    const open = [...container.querySelectorAll('.sw-fallback-list button')].find((b) => b.textContent === 'My web');
-    expect(open, 'the list offers My web').toBeTruthy();
+    const open = [...container.querySelectorAll('.sw-fallback-list button')].find((b) => b.textContent === 'My Web');
+    expect(open, 'the list offers My Web').toBeTruthy();
     act(() => { fireEvent.click(open); });
     for (let i = 0; i < 30 && !container.querySelector('.sw-root[data-rails]'); i++) {
       await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
