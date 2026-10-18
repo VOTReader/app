@@ -592,8 +592,9 @@ export function useWebSelection({
     const open = info.index >= 0 ? { mode: 'connection', arc: info.index }
       : { mode: 'connection', arc: info.prophecyIndex, prophecy: true };
     if (journey) journey.push({ verse, label: end.label, open }, { verse: toFar ? info.from : info.to, label: (toFar ? info.a : info.b).label, open });
-    // the camera goes there through flyTo (bringIn: out from under the panel, clamped)
-    bringIn(verse, { always: true });
+    // the camera goes there through flyTo (bringIn: out from under the panel, clamped): to the
+    // foot, which stands at the verse's middle
+    bringIn(verse + 0.5, { always: true });
     setDetail(Object.assign({}, info, { far: toFar ? 'from' : 'to' }));
     setAnnounce(followAnnouncement(end.label));
     schedule();
@@ -619,7 +620,7 @@ export function useWebSelection({
     focusRef.current = focusState({ arc: row.index });
     setTip(null); setChoices(null); setListOpen(false);
     setDetail(Object.assign({}, info, { far }));
-    bringIn(row.otherVerse, { always: true });
+    bringIn(row.otherVerse + 0.5, { always: true });
     setAnnounce(followAnnouncement(there.label));
     schedule();
   }, [graph, describe, journey, focusRef, bringIn, schedule, setAnnounce]);

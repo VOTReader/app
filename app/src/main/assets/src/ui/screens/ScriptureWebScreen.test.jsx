@@ -487,16 +487,17 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       /* A3 (w3 navigation): Follow FLIES there, eased over 600-900 ms through the frame loop, so
          the camera is read once the fly has landed (it once jumped, and one frame was enough). */
       const landsAt = async (x) => {
-        for (let i = 0; i < 80 && Math.abs(lastCamX() - x) > 0.5; i++) {
+        for (let i = 0; i < 80 && Math.abs(lastCamX() - x) > 0.05; i++) {
           await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
         }
-        expect(lastCamX()).toBeCloseTo(x, 0);
+        expect(lastCamX()).toBeCloseTo(x, 1);
       };
       fireEvent.click(follow);
-      await landsAt(20100);
+      // centred on the foot, at the verse's middle
+      await landsAt(20100.5);
       // and back: the control now names the from foot
       fireEvent.click(screen.getByRole('button', { name: /^follow to the other end · genesis 2:552$/i }));
-      await landsAt(15551);
+      await landsAt(15551.5);
       // the line stays chosen throughout: the sheet is still up
       expect(container.querySelector('.sw-sheet')).toBeTruthy();
     });

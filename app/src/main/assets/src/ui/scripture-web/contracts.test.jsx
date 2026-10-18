@@ -365,7 +365,8 @@ describe('the journey (CONTRACTS.md section 7): a real trail since the navigatio
     expect(info.far).toBe('from'); // the camera sat nearer verse 300 when it opened
     const ppv = get().cam.camRef.current.ppv; // the zoom the opening framed
     act(() => { get().sel.followThread(info); });
-    expect(get().cam.camRef.current.x).toBeCloseTo(200, 6);
+    // the camera centres the far foot, which stands at the verse's middle (w3 review, round 2)
+    expect(get().cam.camRef.current.x).toBeCloseTo(200.5, 6);
     expect(get().cam.camRef.current.ppv).toBe(ppv);
     expect(get().sel.detail.far).toBe('to');
   });
@@ -495,6 +496,23 @@ describe("the panel brings what it opens out from under itself, even at the cano
     expect(f).toBeLessThan(0.9);
   });
 
+  /* w3 review, round 2: Follow handed bringIn the bare verse index, the left edge of the verse's
+     cell, while the foot stands at its middle (v + 0.5, as frameFound has it). At deep zoom the
+     followed foot landed half a verse right of the area's centre: 15 CSS px at 30 a verse. */
+  it("Follow and a row's Follow centre the far foot itself at deep zoom", () => {
+    const m = pc({ x: 5000, ppv: 60 }, [[5000, 9000, 40]]);
+    act(() => { m.get().sel.openPanel({ mode: 'verse', verse: 5000 }); });
+    act(() => { m.get().sel.followRow({ index: 2, hereVerse: 5000, otherVerse: 9000 }); });
+    expect(m.get().cam.camRef.current.ppv).toBe(60);
+    expect(across(m, 9000)).toBeCloseTo(0.5, 2);
+    // the connection's own Follow walks it back, as deep
+    const info = m.get().sel.detail;
+    expect(info.far).toBe('from');
+    act(() => { m.get().sel.followThread(info); });
+    expect(m.get().cam.camRef.current.ppv).toBe(60);
+    expect(across(m, 5000)).toBeCloseTo(0.5, 2);
+  });
+
   /* KNOWN GAP, a cross-stream item for the hub (w3 review, round 2): the camera's clamp
      (geometry.js clampCamera, called by flyTo and the gestures) holds the VIEW's right edge at the
      canon's end, so with the panel docked the canon's last verses can never stand in the canvas
@@ -571,7 +589,7 @@ describe('a row\'s Follow and the zoom row (the panel stream)', () => {
     act(() => { get().sel.openPanel({ mode: 'verse', verse: 200 }); });
     act(() => { get().sel.followRow({ index: 1, hereVerse: 200, otherVerse: 300 }); });
     expect(get().sel.detail).toMatchObject({ kind: 'arc', index: 1, far: 'from' });
-    expect(get().cam.camRef.current.x).toBeCloseTo(300, 6);
+    expect(get().cam.camRef.current.x).toBeCloseTo(300.5, 6); // the foot, at the verse's middle
     expect(get().cam.focusRef.current).toMatchObject({ arc: 1, lit: null });
     // a row that names no thread does nothing
     act(() => { get().sel.followRow({ index: 99, hereVerse: 0, otherVerse: 1 }); });
