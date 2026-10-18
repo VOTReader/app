@@ -13,7 +13,14 @@
 
    Chromium-108 floor: atob + a charCode loop. NOT Uint8Array.fromBase64
    (Chrome ~140) — see Permanent Rule 6.
+
+   The Volumes' citations (votCites, studyLinks) are expanded by
+   vot-citations.js, which owns their shipped shape; a pre-2026-10 asset (or
+   a test fixture) that carries votEdges / prophecy / votLinks directly is
+   passed through unchanged.
    ═══════════════════════════════════════════════════════════════════════ */
+
+import { expandCites, expandStudyLinks } from './vot-citations.js';
 
 /**
  * One span bucket of the baked layout.
@@ -31,9 +38,17 @@
  *   chapters:Array<number[]>,
  *   chapterOfVerse:Uint16Array,
  *   densityTiers:number[], attribution:string,
- *   votEdges:Array<any>, prophecy:Array<any>, votLinks:Array<any>,
+ *   votEdges:Array<import('./vot-citations.js').CuratedEdge>,
+ *   prophecy:Array<{a:number, b:number, studyId:string, chapterId:string, p?:number}>,
+ *   votLinks:Array<{kind:'studyLetter', studyId:string, chapterId:string, volKey:string,
+ *     letterId:string, p?:number, sub?:[string, number]}>,
+ *   mirrors?:Record<string, string>,
  *   chunkSize?:number
  * }} ScriptureGraph
+ * votEdges: one per (verse, letter), each with its citation sites (`at`);
+ * prophecy: a Bible Study's Old Testament prophecy (a) and New Testament
+ * fulfilment (b), block p of the chapter; votLinks: a study block that links
+ * a letter; mirrors: "holydays/<id>" -> the "<volKey>/<letterId>" it re-presents.
  */
 
 /** @typedef {'essential'|'famous'} Density */
@@ -96,6 +111,8 @@ export function decodeGraph(data) {
     }
   }
 
+  const links = expandStudyLinks(data.studyLinks);
+
   // Verse → chapter index, built once. 1,189 chapters fits Uint16 with room.
   const chapterOfVerse = new Uint16Array(data.total);
   for (let ci = 0; ci < data.chapters.length; ci++) {
@@ -115,9 +132,10 @@ export function decodeGraph(data) {
     chapterOfVerse,
     densityTiers: data.densityTiers || [20, 7],
     attribution: data.attribution || '',
-    votEdges: data.votEdges || [],
-    prophecy: data.prophecy || [],
-    votLinks: data.votLinks || [],
+    votEdges: data.votCites ? expandCites(data.votCites) : (data.votEdges || []),
+    prophecy: data.studyLinks ? links.prophecy : (data.prophecy || []),
+    votLinks: data.studyLinks ? links.votLinks : (data.votLinks || []),
+    mirrors: (data.mirrors && typeof data.mirrors === 'object') ? data.mirrors : {},
   };
 }
 
