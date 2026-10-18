@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useWebCamera } from './use-web-camera.js';
-import { useWebSelection, panelOf, PANEL_MODES } from './use-web-selection.js';
+import { useWebSelection, panelOf, PANEL_MODES, CHOOSER_MOST } from './use-web-selection.js';
 import { useJourney } from './use-journey.js';
 import { useGoTo, routeOverlayHit } from './goto.jsx';
 import { hitOverlay } from './overlay-renderer.js';
@@ -640,6 +640,20 @@ describe("the chooser's Zoom to, from a tap", () => {
     expect(m.get().sel.choices.map((c) => c.index).sort()).toEqual([2, 3]);
     // under the tap is chapter 25; chapters 10 and 39 hold two feet each, and 39 is the nearer
     expect(m.get().sel.choiceChapter).toBe(39);
+  });
+
+  /* w3 review, round 2: the tap asked the pick for 4 threads, so a dense crossing always read "4
+     threads close together" and "Strongest first" sorted only the 4 nearest. */
+  it('a tap lists up to CHOOSER_MOST threads under it, and says when the list is the nearest of more', () => {
+    const fan = (n) => Array.from({ length: n }, (_, k) => [1050 + k, 3990 - k, 10 + k]);
+    const ys = Array.from({ length: 300 }, (_, i) => 2 + i);
+    const six = tapAt(fan(6), 400, ys).m.get().sel;
+    expect(six.choices).toHaveLength(6);
+    expect(six.choiceCut).toBe(false);
+    const ten = tapAt(fan(10), 400, ys).m.get().sel;
+    expect(CHOOSER_MOST).toBe(8);
+    expect(ten.choices).toHaveLength(CHOOSER_MOST);
+    expect(ten.choiceCut).toBe(true);
   });
 
   it('a tap down among the feet zooms to the chapter under it', () => {

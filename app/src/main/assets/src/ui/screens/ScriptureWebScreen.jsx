@@ -246,7 +246,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // gestures call; the cards' close, Follow, a row's Follow and the zoom row; the
   // panel API (openPanel, closePanel, panel) and the lit set (lightThreads)
   const {
-    tip, choices, choiceChapter, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
+    tip, choices, choiceChapter, choiceCut, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
     handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread, followRow, zoomTo,
     openPanel, lightThreads, panel,
   } = useWebSelection({
@@ -525,7 +525,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       {panelOpen && graph ? (
         <WebPanel graph={graph} mode={mode} density={density} translation={translation}
           compact={!!(layout && layout.compact)}
-          listOpen={listOpen} listItems={listItems} choices={choices} choiceChapter={choiceChapter} detail={detail} journey={journey}
+          listOpen={listOpen} listItems={listItems} choices={choices} choiceChapter={choiceChapter} choiceCut={choiceCut}
+          detail={detail} journey={journey}
           lensOn={listOpen && mode !== 'personal' && !!(camRef.current && viewRef.current.W && lensRange(graph, camRef.current, viewRef.current.W))}
           onClose={closeCards} onChoose={commitFound} openPanel={openPanel} followThread={followThread}
           followRow={followRow} zoomTo={zoomTo} onOpen={openEndpoint} lightThreads={lightThreads} flyTo={flyTo} />

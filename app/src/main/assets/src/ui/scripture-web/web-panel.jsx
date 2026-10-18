@@ -292,7 +292,8 @@ function ThreadGroups({ groups, tagOf, translation, rowProps, light }) {
  * chooser over card, the precedence the state already has).
  * @param {{
  *   graph: any, mode: string, density: any, translation?: string, compact?: boolean,
- *   listOpen: boolean, listItems: any[], lensOn: boolean, choices: any[] | null, choiceChapter?: number, detail: any,
+ *   listOpen: boolean, listItems: any[], lensOn: boolean, choices: any[] | null, choiceChapter?: number,
+ *   choiceCut?: boolean, detail: any,
  *   journey?: any, onClose: () => void, onChoose: (found: any, opts?: any) => void,
  *   openPanel: (spec: any, opts?: any) => boolean, followThread: (info: any) => void,
  *   followRow: (row: any) => void, zoomTo: (chapterIndex: number) => void,
@@ -302,7 +303,8 @@ function ThreadGroups({ groups, tagOf, translation, rowProps, light }) {
  */
 export function WebPanel(props) {
   const {
-    graph: g, mode: webMode, density, translation, compact = false, listOpen, listItems, lensOn, choices, choiceChapter = -1, detail,
+    graph: g, mode: webMode, density, translation, compact = false, listOpen, listItems, lensOn, choices, choiceChapter = -1,
+    choiceCut = false, detail,
     journey, onClose, onChoose, openPanel, followThread, followRow, zoomTo, onOpen, lightThreads, flyTo,
   } = props;
   const mode = listOpen ? 'list' : choices && choices.length ? 'chooser' : modeOfDetail(detail);
@@ -408,7 +410,8 @@ export function WebPanel(props) {
     const arcs = rows.filter((r) => r.kind === 'arc').map((r) => r.index);
     body = (
       <React.Fragment>
-        <PanelHead over="Connections here" title={plural(rows.length, 'thread', 'threads') + ' close together'}
+        <PanelHead over="Connections here"
+          title={choiceCut ? 'The ' + rows.length + ' nearest threads' : plural(rows.length, 'thread', 'threads') + ' close together'}
           meta="Choose the one you meant. Strongest first." />
         <ul className="sw-rows sw-choice-list">
           {rows.map((c) => (

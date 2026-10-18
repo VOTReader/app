@@ -114,6 +114,11 @@ export function panelOf(detail, choices, choiceChapter = -1) {
 /** The camera's ease when the panel frames what it opened (spec section 3: 450 ms). */
 export const FRAME_MS = 450;
 
+/** The most threads a tap's chooser lists, the nearest first from the pick (pick.js pickArcs holds
+ * a list of at most 8); the panel says when it listed the nearest of more (w3 review, round 2:
+ * at 4, a dense crossing always read "4 threads close together"). */
+export const CHOOSER_MOST = 8;
+
 /**
  * @param {any} p  the graph, mode, density and showUnderlay; the resume point
  *   (the sheet that was open); the cameras' refs and callbacks and flyTo
@@ -149,6 +154,8 @@ export function useWebSelection({
   const [choices, setChoices] = React.useState(null);    // overlapped line chooser
   // the chapter the chooser was opened at (under the tap, or a pill's): its "Zoom to" row's, -1 none
   const [choiceChapter, setChoiceChapter] = React.useState(-1);
+  // whether a tap's chooser listed the nearest CHOOSER_MOST of more threads than that
+  const [choiceCut, setChoiceCut] = React.useState(false);
   const [listOpen, setListOpen] = React.useState(false); // accessible nearby list
   const [tip, setTip] = React.useState(null);            // hover chip
   // whether the docked panel is open (read by the hover: the panel covers the web under it)
@@ -232,7 +239,7 @@ export function useWebSelection({
       }
       return [{ kind: 'chapter', chapterIndex: ci }];
     }
-    return pickThreads(g, cam, view, px, py, 14 * v.DPR, 4)
+    return pickThreads(g, cam, view, px, py, 14 * v.DPR, CHOOSER_MOST)
       .map((hit) => ({ kind: 'arc', hit, distance: hit.distance }));
   }, [graph, camRef, viewRef, viewFor, mode, railOpts, showUnderlay, badgeBoxesRef, personalRef]);
 
@@ -484,6 +491,7 @@ export function useWebSelection({
         dropHover();
         setDetail(null); setListOpen(false); setChoices(rows);
         setChoiceChapter(spec.chapter >= 0 && spec.chapter < g.chapters.length ? spec.chapter : -1);
+        setChoiceCut(false);
         setAnnounce(chooserAnnouncement(rows.length));
         schedule();
         return true;
@@ -528,6 +536,7 @@ export function useWebSelection({
     if (closeEnough && described.length > 1 && described.every((item) => item.kind === 'arc' ||
         item.kind === 'link' || item.kind === 'underlay')) {
       setChoices(described);
+      setChoiceCut(candidates.length >= CHOOSER_MOST);
       // its "Zoom to": the chapter under the tap only where the listed threads stand (chooserChapter)
       const v = viewRef.current, dpr = v.DPR || 1, cam = camRef.current;
       const base = viewFor().base + (cam.y > 0 ? cam.y : 0); // the baseline as drawn (pickArcs)
@@ -645,7 +654,7 @@ export function useWebSelection({
   const panel = React.useMemo(() => panelOf(detail, choices, choiceChapter), [detail, choices, choiceChapter]);
 
   return {
-    tip, choices, choiceChapter, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
+    tip, choices, choiceChapter, choiceCut, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
     handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread,
     followRow, zoomTo, describe,
     panel, openPanel, closePanel: closeCards, lightThreads, journey,

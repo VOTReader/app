@@ -304,6 +304,15 @@ describe('the chooser at overview', () => {
     expect(props.zoomTo).toHaveBeenCalledWith(g.chapterOfVerse[JOHN_3_16]);
   });
 
+  // w3 review, round 2: a dense crossing listed 4 and read "4 threads close together"
+  it('a tap that found more threads than it lists says these are the nearest', () => {
+    const ids = [ARC, ...pm.threadsFrom(g, ISA_7_14, ISA_7_14, 'famous').ids.slice(0, 7)];
+    const { panel } = mount({ choices: ids.map(arcOf), choiceCut: true });
+    expect(panel.querySelectorAll('.sw-choice-row')).toHaveLength(8);
+    expect(panel.querySelector('.sw-panel-title').textContent).toBe('The 8 nearest threads');
+    expect(panel.querySelector('.sw-panel-meta').textContent).toBe('Choose the one you meant. Strongest first.');
+  });
+
   it('lights nothing on My Web (the reader\'s own links have no lit set)', () => {
     const choices = [arcOf(ARC), arcOf(ARC + 1)];
     const { panel, props } = mount({ choices, mode: 'personal' });
