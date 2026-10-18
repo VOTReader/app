@@ -1,7 +1,7 @@
 /* rail-labels — where a rail's names may be printed without printing over each other.
    ─────────────────────────────────────────────────────────────────────────────────
    Global-scope module (bundle-d since lz1). ONE rule for both rails. The scripture rail
-   (drawRuler, ScriptureWebScreen.jsx) always had it inline: two rows, prefer the
+   (drawRuler, now in ui/scripture-web/overlay-renderer.js) always had it inline: two rows, prefer the
    top, fall to the second, and a book that fits on neither goes unlabelled
    rather than overprinting. The Volumes rail (drawPersonalWeb, rail-renderer.js)
    had an ALTERNATION instead — a name up to twice its band flipped rows — which

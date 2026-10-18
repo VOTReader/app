@@ -94,7 +94,8 @@ describe('the law exists in one form for both sides', () => {
     for (const dead of ['drawnTest', 'flyBundles', 'standInsFor', 'groupMembers']) expect(pick[dead], 'pick.' + dead).toBeUndefined();
     expect(SHADER_SOURCE.vertex).not.toMatch(/uLevel|uEssential|aLod|uStandIn|lodShown/);
     // the screen and the modules F0 split out of it (2026-10-18)
-    const screen = ['../../ui/screens/ScriptureWebScreen.jsx', '../../ui/scripture-web/panels.jsx']
+    const screen = ['../../ui/screens/ScriptureWebScreen.jsx', '../../ui/scripture-web/panels.jsx',
+      '../../ui/scripture-web/overlay-renderer.js']
       .map((p) => readFileSync(resolve(here, p), 'utf8')).join('\n');
     expect(screen).not.toMatch(/likeIt|LikeIt|flyBundles|standInsFor|groupMembers|LOD_OFF|level:/);
     // and every thread anchored in the frame is counted as drawn: the pills
