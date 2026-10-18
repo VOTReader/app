@@ -12,35 +12,42 @@
                       overlay (overlay-renderer.js), with the data-* attributes
                       the walks read
    The draw reads per-frame refs, never React state per frame; drawRef (the
-   frame loop's, use-frame-scheduler.js) always holds the latest draw. */
+   frame loop's, use-frame-scheduler.js) always holds the latest draw.
+
+   Per frame (GL step 2, E1-E3): the frame's visible set (frame-set.frameSet)
+   is asked for once and gives the crowding law its anchored count; the
+   renderer, the picker and the overlay's labels and pills find the same set.
+   While the camera moves on a screen denser than GESTURE_DPR the GL backing
+   shrinks to it, and the frame after the motion stops (GESTURE_HOLD_MS)
+   redraws it whole; the overlay keeps full resolution. Nothing is copied per
+   frame: the renderer's arguments and the overlay's frame are kept objects,
+   the data-* attributes are written only when they change, and the rails'
+   JSON for the walks (publishRails) is built only while a walk is running
+   (walkOn). A resize keeps the zoom relative to fit and draws at once. */
 
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import { createCamera, clampCamera, fitPPV, ribbonStyle } from '../../utils/scripture-web/geometry.js';
-import { countAnchored, footBundles } from '../../utils/scripture-web/pick.js';
+import { footBundles } from '../../utils/scripture-web/pick.js';
+import { frameSet } from '../../utils/scripture-web/frame-set.js';
 import { maxZoomOf, centreOf, centreRange, tapFadeStep, TAP_FADE_MS } from '../../utils/scripture-web/web-frame.js';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
 import { readChromeTokens } from '../../utils/scripture-web/palette.js';
 import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
-import { createRenderer } from './web-renderer.js';
+import { createRenderer, backingScale, backingSize } from './web-renderer.js';
 import { paintCanonOverlay, paintMyWebOverlay, publishRails } from './overlay-renderer.js';
+import { railFrame } from './rail-renderer.js';
+
+/** How long after the camera's last move a frame still counts as in a gesture (E2), ms. */
+export const GESTURE_HOLD_MS = 150;
 
 /**
- * Anchored arcs per CSS px of viewport width, which is what decides whether
- * the deep alpha reads as one clear ribbon or as fog. Counted over the drawn
- * set with the shader's own arcAnchored law, cached until the camera moves
- * more than 5 % - 64k pairs is under a millisecond but not per frame.
+ * Whether a browser walk is reading the frame (the walks set __swWalk; a driven
+ * browser reports navigator.webdriver): the rails' JSON and the badge boxes are
+ * published only then (E3).
  */
-function anchoredDensity(cache, g, cam, v, density) {
-  const moved = cache.W !== v.W || cache.density !== density
-    || Math.abs(cam.ppv - cache.ppv) > cache.ppv * 0.05
-    || Math.abs(cam.x - cache.x) * cam.ppv > v.W * 0.05;
-  if (moved) {
-    cache.ppv = cam.ppv; cache.x = cam.x; cache.W = v.W; cache.density = density;
-    // every anchored thread is drawn (the structure law), so the crowding
-    // law counts them all
-    cache.value = countAnchored(g, cam, v.W, density);
-  }
-  return cache.value / ((v.W || 1) / (v.DPR || 1));
+export function walkOn() {
+  return typeof globalThis.__swWalk !== 'undefined'
+    || (typeof navigator !== 'undefined' && navigator.webdriver === true);
 }
 
 /**
@@ -49,15 +56,79 @@ function anchoredDensity(cache, g, cam, v, density) {
  * less than 2 %; overlay-renderer.js draws them.
  */
 function bundlesFor(cache, g, cam, view, v, density) {
-  const key = [v.W, density].join('|');
-  const moved = cache.key !== key
+  const moved = cache.W !== v.W || cache.density !== density
     || Math.abs(cam.ppv - cache.ppv) > cache.ppv * 0.02
     || Math.abs(cam.x - cache.x) * cam.ppv > v.W * 0.02;
   if (moved) {
-    cache.key = key; cache.ppv = cam.ppv; cache.x = cam.x;
+    cache.W = v.W; cache.density = density; cache.ppv = cam.ppv; cache.x = cam.x;
     cache.cells = footBundles(g, cam, view, v.DPR);
   }
   return cache;
+}
+
+/**
+ * Write an attribute (or, for a name starting --, a style property) only when its
+ * value changed since the last write through the same cache (E3).
+ * @param {HTMLElement} el
+ * @param {{ el: HTMLElement | null, vals: Record<string, string> }} cache
+ * @param {string} name @param {string} value
+ */
+export function putAttr(el, cache, name, value) {
+  if (cache.el !== el) { cache.el = el; cache.vals = Object.create(null); }
+  if (cache.vals[name] === value) return;
+  cache.vals[name] = value;
+  if (name.charCodeAt(0) === 45 && name.charCodeAt(1) === 45) el.style.setProperty(name, value);
+  else el.setAttribute(name, value);
+}
+const put = putAttr;
+
+/**
+ * E2: one frame's step of the camera's motion. Records the camera and returns whether this frame is
+ * in a gesture: the camera moved within GESTURE_HOLD_MS. The first frame is at rest.
+ * @param {{ seen: boolean, x: number, y: number, ppv: number, movedAt: number }} motion
+ * @param {{ x: number, y?: number, ppv: number }} cam
+ * @param {number} now  ms
+ * @returns {boolean}
+ */
+export function gestureStep(motion, cam, now) {
+  if (!motion.seen || cam.x !== motion.x || cam.y !== motion.y || cam.ppv !== motion.ppv) {
+    if (motion.seen) motion.movedAt = now;
+    motion.seen = true; motion.x = cam.x; motion.y = cam.y; motion.ppv = cam.ppv;
+  }
+  return now - motion.movedAt < GESTURE_HOLD_MS;
+}
+
+/**
+ * E2: the GL backing for a resize, device px: the ResizeObserver entry's device-pixel box when the
+ * browser gives one (exact, no rounding of a fractional CSS size) and the dpr is not clamped, else
+ * the CSS box times the dpr, rounded.
+ * @param {ResizeObserverEntry | null} entry
+ * @param {number} raw - window.devicePixelRatio
+ * @param {number} dpr - the frame's dpr (raw, at most 3)
+ * @param {number} cssW @param {number} cssH - the canvas's CSS box
+ * @returns {{ W: number, H: number }}
+ */
+export function backingOf(entry, raw, dpr, cssW, cssH) {
+  const box = entry && raw <= 3 && entry.devicePixelContentBoxSize && entry.devicePixelContentBoxSize[0];
+  return {
+    W: box && box.inlineSize > 0 ? box.inlineSize : Math.round(cssW * dpr),
+    H: box && box.blockSize > 0 ? box.blockSize : Math.round(cssH * dpr),
+  };
+}
+
+/**
+ * E2: the zoom stays relative to fit across a resize or a dpr change. ppv and the camera's height are
+ * device px and fit is the frame's width, so both scale by the width's ratio (the second camera too).
+ * @param {{ ppv: number, y?: number }} cam
+ * @param {{ ppv: number } | null} camV
+ * @param {number} wasW @param {number} W - the backing's width before and after, device px
+ */
+export function keepZoom(cam, camV, wasW, W) {
+  const k = wasW > 0 && W !== wasW ? W / wasW : 1;
+  if (!(cam.ppv > 0) || k === 1) return;
+  cam.ppv *= k;
+  if (cam.y > 0) cam.y *= k;
+  if (camV && camV.ppv > 0) camV.ppv *= k;
 }
 
 /**
@@ -140,11 +211,17 @@ export function useWebRenderer({
   const [railZoom, setRailZoom] = React.useState({ top: false, bottom: false });
   const railZoomRef = React.useRef(railZoom);
   const rendererRef = React.useRef(null);
-  const anchoredRef = React.useRef({ ppv: 0, x: 0, W: 0, density: '', value: 0 });
   // the convergence pills: the counted cells, cached across frames while
   // the camera barely moves, and the boxes drawn last frame,
   // which the tap test reads before it reaches the lines
-  const bundleRef = React.useRef({ key: '', cells: [] });
+  const bundleRef = React.useRef({ W: 0, density: '', ppv: 0, x: 0, cells: [] });
+  // E3: the renderer's arguments and the overlay's frame, filled in place every
+  // frame; the data-* attributes' last values
+  const argsRef = React.useRef(/** @type {any} */ ({}));
+  const overlayFsRef = React.useRef(/** @type {any} */ ({ hits: [] }));
+  const attrRef = React.useRef({ el: /** @type {HTMLElement | null} */ (null), vals: Object.create(null) });
+  // E2: the camera as last drawn, when it last moved, and the settle frame's timer
+  const motionRef = React.useRef({ seen: false, x: 0, y: 0, ppv: 0, movedAt: -1e9, timer: 0 });
   const badgeBoxesRef = React.useRef([]);
   // the elevator's track (device px box + the height its top stands for),
   // null when there is no sky to climb; the tap test reads it first
@@ -160,11 +237,28 @@ export function useWebRenderer({
   const tapFadeRef = React.useRef(/** @type {import('../../utils/scripture-web/web-frame.js').TapFade | null} */ (null));
   const reduceMotionRef = React.useRef(/** @type {MediaQueryList | null | undefined} */ (undefined));
 
+  // E2: one frame at the full backing once the camera has been still for
+  // GESTURE_HOLD_MS (one timer a gesture, re-armed while it lasts)
+  const settleLater = React.useCallback(() => {
+    const m = motionRef.current;
+    if (m.timer) return;
+    const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const wait = () => {
+      const left = m.movedAt + GESTURE_HOLD_MS - now();
+      if (left > 0) { m.timer = window.setTimeout(wait, left + 1); return; }
+      m.timer = 0;
+      schedule();
+    };
+    m.timer = window.setTimeout(wait, GESTURE_HOLD_MS + 1);
+  }, [schedule]);
+
   // ── the frame ───────────────────────────────────────────────────────────
   const draw = React.useCallback(() => {
     const g = graph, cam = camRef.current, r = rendererRef.current;
     const v = viewRef.current;
     if (!g || !cam || !r || !v.W) return;
+    const wrap = wrapRef.current;
+    const attrs = attrRef.current;
     const zoom = cam.ppv / fitPPV(cam, v.W);
     /* The zoom's own input, published for the browser walks (the same line the
        scripture-web walk branch carries, so the two merge as one): a walk that
@@ -182,46 +276,53 @@ export function useWebRenderer({
     const lens = mode === 'personal' ? null
       : centreRange(g, cam, v.W, (panel && panel.right > 0 ? panel.right : 0) * v.DPR, centreRangeRef.current);
     centreRangeRef.current = lens;
-    if (wrapRef.current) {
-      wrapRef.current.setAttribute('data-ppv-css', (cam.ppv / v.DPR).toPrecision(4));
+    if (wrap) {
+      put(wrap, attrs, 'data-ppv-css', (cam.ppv / v.DPR).toPrecision(4));
       // the camera's height, device px, for the walks (0 at the baseline)
-      wrapRef.current.setAttribute('data-cam-y', (cam.y > 0 ? cam.y : 0).toFixed(1));
+      put(wrap, attrs, 'data-cam-y', (cam.y > 0 ? cam.y : 0).toFixed(1));
       // the centre chapter's verse range, for the walks (the old lens's attribute)
-      wrapRef.current.setAttribute('data-lens', lens ? lens[0] + '-' + lens[1] : '');
+      put(wrap, attrs, 'data-lens', lens ? lens[0] + '-' + lens[1] : '');
     }
     const camV = mode === 'personal' ? camVRef.current : null;
     if (camV) clampCamera(camV, v.W, zoomCapFor(camV));
-    if (wrapRef.current && camV) wrapRef.current.setAttribute('data-ppv-vot', (camV.ppv / v.DPR).toPrecision(4));
+    if (wrap && camV) put(wrap, attrs, 'data-ppv-vot', (camV.ppv / v.DPR).toPrecision(4));
     const chrome = chromeRef.current;
     const base = viewFor();
+    const glc = glRef.current;
     if (mode === 'personal') {
       // My Web has no sky and no elevator: the canon track's box must not
       // survive the switch, or liftAt eats every tap and drag in the right
       // 24 CSS px of the rails (the l9-14 refuter's one FAIL, 02:4x).
       elevatorRef.current = null;
       overlayFrameRef.current = null;
-      if (wrapRef.current) { wrapRef.current.setAttribute('data-elevator', ''); wrapRef.current.setAttribute('data-altitude', ''); wrapRef.current.setAttribute('data-altitude-span', ''); }
+      if (wrap) { put(wrap, attrs, 'data-elevator', ''); put(wrap, attrs, 'data-altitude', ''); put(wrap, attrs, 'data-altitude-span', ''); }
       // The personal web is Canvas2D over a cleared GL surface: hundreds of
       // links, not hundreds of thousands, so crisp 2D curves beat a second
-      // shader. The GL surface is one clear to the ground colour (#10).
+      // shader. The GL surface is one clear to the ground colour (#10), at
+      // the full backing.
+      if (glc && (glc.width !== v.W || glc.height !== v.H)) { glc.width = v.W; glc.height = v.H; }
       r.clear(chrome.bg);
       const uic = uiRef.current;
       const ctx = uic && uic.getContext('2d');
       if (ctx) {
         const p = personalRef.current;
         const ro = railOpts();
+        ro.hoverIndex = focusRef.current.hover;
+        ro.focusIndex = focusRef.current.arc;
+        ro.capFraction = capFractionNow();
+        // the walk's knob for the corridor pair (e2e-myweb-colour arm K): a
+        // number here overrides the context's depth alpha ceiling; unset in the app
+        ro.contextCeiling = typeof globalThis.__swContextCeiling === 'number' ? globalThis.__swContextCeiling : undefined;
         // the overlay (overlay-renderer.js): one clear, the links, the book names
-        paintMyWebOverlay(ctx, {
-          personal: p, g, cam, view: base, v, chrome,
-          rail: Object.assign(ro, {
-            hoverIndex: focusRef.current.hover, focusIndex: focusRef.current.arc, capFraction: capFractionNow(),
-            // the walk's knob for the corridor pair (e2e-myweb-colour arm K): a
-            // number here overrides the context's depth alpha ceiling; unset in the app
-            contextCeiling: typeof globalThis.__swContextCeiling === 'number' ? globalThis.__swContextCeiling : undefined,
-          }),
-        });
-        if (wrapRef.current) wrapRef.current.setAttribute('data-cap-fraction', String(ro.capFraction));
-        publishRails(ro, p, g, cam, camV, v);
+        paintMyWebOverlay(ctx, { personal: p, g, cam, view: base, v, chrome, rail: ro });
+        if (wrap) put(wrap, attrs, 'data-cap-fraction', String(ro.capFraction));
+        // the rails' JSON is for the walks; the CSS the rails' chrome sits by is always set
+        if (walkOn()) publishRails(ro, p, g, cam, camV, v);
+        else if (wrap && ro && ro.width) {
+          const rails = railFrame(v, ro.base);
+          put(wrap, attrs, '--sw-rail-top', (rails.topY / v.DPR).toFixed(0) + 'px');
+          put(wrap, attrs, '--sw-rail-bottom', (rails.bottomY / v.DPR).toFixed(0) + 'px');
+        }
         // the per-rail reset pills show only while that rail is zoomed;
         // setState from the frame loop runs only when the answer changes
         const rz = { top: !!camV && camV.ppv > fitPPV(camV, v.W) * 1.02, bottom: cam.ppv > fitPPV(cam, v.W) * 1.02 };
@@ -235,8 +336,12 @@ export function useWebRenderer({
     // the alpha law: thin at the overview, the deep value past 12x divided
     // by the crowd - every line is drawn, and the law was tuned for that
     // (Corbin, 2026-09-21 21:21)
-    const perCssPx = base.localize > 0
-      ? anchoredDensity(anchoredRef.current, g, cam, v, density) : 0;
+    // THE frame's visible set (frame-set.js; E1), asked once: the renderer
+    // draws it and the picker, the labels and the pills find the same one.
+    // Its anchored count (the shader's arcAnchored over the drawn feet) is the
+    // crowding law's: every anchored thread is drawn, so it counts them all.
+    const set = frameSet(g, cam, base);
+    const perCssPx = base.localize > 0 ? set.anchored / ((v.W || 1) / (v.DPR || 1)) : 0;
     const style = ribbonStyle(zoom, base.localize, perCssPx);
     // the convergence pills: how many threads meet at each foot cell
     const bundles = bundlesFor(bundleRef.current, g, cam, base, v, density);
@@ -247,20 +352,30 @@ export function useWebRenderer({
       reduceMotionRef.current = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
     }
     const still = !!(reduceMotionRef.current && reduceMotionRef.current.matches);
-    const tap = tapFadeStep(tapFadeRef.current, tapTarget,
-      typeof performance !== 'undefined' ? performance.now() : Date.now(), still ? 0 : TAP_FADE_MS);
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const tap = tapFadeStep(tapFadeRef.current, tapTarget, now, still ? 0 : TAP_FADE_MS);
     tapFadeRef.current = tap;
     if (tap.running) schedule();
-    r.draw(Object.assign({}, base, {
-      centre, tapFade: tap.value,
-      camX: cam.x, ppv: cam.ppv,
-      strokeWidth: style.strokeWidthCss * v.DPR,
-      alpha: style.alpha,
-      voteMix: style.voteMix,
-      dpr: v.DPR,
-      density, bg: chrome.bg,
-      // the focus, hover and lit set ride `base` (viewFor: webViewArgs)
-    }));
+    // E2: while the camera moves, a dense screen's GL backing keeps
+    // GESTURE_DPR device px per CSS px; the frame after it settles is whole
+    const moving = gestureStep(motionRef.current, cam, now);
+    const scale = backingScale(v.DPR, moving);
+    if (scale < 1) settleLater();
+    const bw = backingSize(v.W, scale), bh = backingSize(v.H, scale);
+    if (glc && (glc.width !== bw || glc.height !== bh)) { glc.width = bw; glc.height = bh; }
+    // the renderer's arguments, filled in place (E3): the view (viewFor:
+    // webViewArgs, the focus, hover and lit set with it), then the frame's own
+    const args = argsRef.current;
+    for (const k in base) args[k] = base[k];
+    args.centre = centre; args.tapFade = tap.value;
+    args.camX = cam.x; args.ppv = cam.ppv;
+    args.strokeWidth = style.strokeWidthCss * v.DPR;
+    args.alpha = style.alpha;
+    args.voteMix = style.voteMix;
+    args.dpr = v.DPR;
+    args.density = density; args.bg = chrome.bg;
+    args.scale = scale;
+    r.draw(args);
     // the sky the labels may use starts under the top chrome (layout metrics,
     // so the rotated portrait root measures the same; 0 when the chrome is hidden)
     const tb = topbarRef.current;
@@ -268,35 +383,40 @@ export function useWebRenderer({
     // the overlay (overlay-renderer.js): one clear, the ruler, the sky's
     // altitude ruler and elevator, the references beside the lines, the pills
     const uic = uiRef.current;
-    const fs = {
-      g, cam, view: base, v, chrome, canvasH: uic ? uic.height : 0, inset, yFrame: yFrameFor(cam),
-      // lens and lensDim stay on the frame until the overlay stops reading
-      // them (CONTRACTS.md section 5): the centre's range, and 1, so its pills
-      // dim nothing
-      density, focusArc: base.focusArc, bundles, lens, lensDim: 1,
-      // the centre chapter (GL computes it; the overlay paints its band) and
-      // what the open panel covers (the panel writes it; labels keep out)
-      centre, panelInset: panelInsetRef.current,
-      hits: /** @type {any[]} */ ([]),
-    };
+    // the overlay's frame, filled in place (E3); hitOverlay reads the last one
+    const fs = overlayFsRef.current;
+    fs.g = g; fs.cam = cam; fs.view = base; fs.v = v; fs.chrome = chrome;
+    fs.canvasH = uic ? uic.height : 0; fs.inset = inset; fs.yFrame = yFrameFor(cam);
+    // lens and lensDim stay on the frame until the overlay stops reading
+    // them (CONTRACTS.md section 5): the centre's range, and 1, so its pills
+    // dim nothing
+    fs.density = density; fs.focusArc = base.focusArc; fs.bundles = bundles; fs.lens = lens; fs.lensDim = 1;
+    // the centre chapter (GL computes it; the overlay paints its band) and
+    // what the open panel covers (the panel writes it; labels keep out)
+    fs.centre = centre; fs.panelInset = panelInsetRef.current;
     const painted = paintCanonOverlay(uic ? uic.getContext('2d') : null, fs);
     fs.hits = painted.hits;
     overlayFrameRef.current = fs;
     elevatorRef.current = painted.elevator;
     badgeBoxesRef.current = painted.badges;
-    if (wrapRef.current) {
-      wrapRef.current.setAttribute('data-altitude', painted.marks.join(','));
-      wrapRef.current.setAttribute('data-altitude-span', painted.altitudeSpan > 0 ? String(painted.altitudeSpan) : '');
-      wrapRef.current.setAttribute('data-elevator', painted.elevator ? painted.elevator.at.toFixed(4) : '');
-      wrapRef.current.setAttribute('data-thread-labels', String(painted.labels));
-      wrapRef.current.setAttribute('data-bundle-badges', String(painted.badges.length));
+    if (wrap) {
+      put(wrap, attrs, 'data-altitude', painted.marks.join(','));
+      put(wrap, attrs, 'data-altitude-span', painted.altitudeSpan > 0 ? String(painted.altitudeSpan) : '');
+      put(wrap, attrs, 'data-elevator', painted.elevator ? painted.elevator.at.toFixed(4) : '');
+      put(wrap, attrs, 'data-thread-labels', String(painted.labels));
+      put(wrap, attrs, 'data-bundle-badges', String(painted.badges.length));
     }
     // the walk's window on the badges (device px boxes), like __swContextCeiling: unset in the app
-    if (typeof globalThis.__swWalk !== 'undefined') globalThis.__swBadgeBoxes = badgeBoxesRef.current;
+    if (walkOn()) globalThis.__swBadgeBoxes = badgeBoxesRef.current;
   }, [graph, camRef, viewRef, mode, zoomCapFor, camVRef, viewFor, density, focusRef, yFrameFor, railOpts, capFractionNow,
-    chromeRef, personalRef, topbarRef, uiRef, wrapRef, panelInsetRef, schedule]);
+    chromeRef, personalRef, topbarRef, uiRef, wrapRef, glRef, panelInsetRef, schedule, settleLater]);
 
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule, drawRef]);
+  // the settle timer goes with the screen
+  React.useEffect(() => () => {
+    const m = motionRef.current;
+    if (m.timer) { clearTimeout(m.timer); m.timer = 0; }
+  }, []);
 
   // ── size + renderer lifecycle ───────────────────────────────────────────
   // noWebGL is a dep (#3): the list unmounts the canvases, so the renderer
@@ -363,11 +483,16 @@ export function useWebRenderer({
       }
     }
 
-    const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 3);
-      const W = Math.round(glc.clientWidth * dpr);
-      const H = Math.round(glc.clientHeight * dpr);
+    /** @param {ResizeObserverEntry[]} [entries] */
+    const resize = (entries) => {
+      const raw = window.devicePixelRatio || 1;
+      const dpr = Math.min(raw, 3);
+      // E2: the backing from the device-pixel box when the browser gives it
+      // (exact device px, no rounding of a fractional CSS size), else rounded
+      const entry = entries && entries.length ? entries[entries.length - 1] : null;
+      const { W, H } = backingOf(entry, raw, dpr, glc.clientWidth, glc.clientHeight);
       if (!W || !H) return;
+      const was = viewRef.current;
       viewRef.current = { W, H, DPR: dpr };
       // Layout class from the root's OWN width: a rotated portrait phone is a
       // WIDE screen even though the physical viewport (and every media query)
@@ -378,28 +503,43 @@ export function useWebRenderer({
       glc.width = uic.width = W;
       glc.height = uic.height = H;
       const cam = camRef.current;
+      // E2: the zoom stays relative to fit across a resize or a dpr change
+      // (ppv and the camera's height are device px; fit is the frame's width)
+      keepZoom(cam, camVRef.current, was ? was.W : 0, W);
       if (!(cam.ppv > 0)) cam.ppv = fitPPV(cam, W);
       // with the y frame: a frame that grew cannot leave y above the new ceiling
       clampCamera(cam, W, maxZoomOf(graph, viewRef.current), yFrameFor(cam));
-      schedule();
+      // a resize is not a gesture: the camera it leaves is the one last drawn
+      const m = motionRef.current;
+      m.x = cam.x; m.y = cam.y; m.ppv = cam.ppv;
+      // the canvas was just cleared by its new size: draw now, in this
+      // callback, so the frame never shows blank between layout and paint
+      if (entries) drawRef.current(); else schedule();
     };
     resize();
     const ro = (typeof ResizeObserver !== 'undefined') ? new ResizeObserver(resize) : null;
-    if (ro) ro.observe(glc); else window.addEventListener('resize', resize);
+    if (ro) {
+      // the device-pixel box where the browser has it (a dpr change resizes the backing too)
+      try { ro.observe(glc, { box: 'device-pixel-content-box' }); } catch (_e) { ro.observe(glc); }
+    }
+    // without an observer the window's resize event stands in (an Event, not entries: schedule the frame)
+    const onWindowResize = () => resize();
+    if (!ro) window.addEventListener('resize', onWindowResize);
     const onRestored = () => schedule();
     glc.addEventListener('webglcontextrestored', onRestored);
 
     return () => {
       disposed = true;
       if (lossTimer) window.clearTimeout(lossTimer);
-      if (ro) ro.disconnect(); else window.removeEventListener('resize', resize);
+      if (ro) ro.disconnect(); else window.removeEventListener('resize', onWindowResize);
       glc.removeEventListener('webglcontextrestored', onRestored);
       // null after a restore that could not rebuild (#1)
       if (renderer) renderer.dispose();
       renderer = null;
       rendererRef.current = null;
     };
-  }, [graph, noWebGL, schedule, glRetry, yFrameFor, camRef, viewRef, focusRef, glRef, resumeRef, setLoadError, uiRef, wrapRef]);
+  }, [graph, noWebGL, schedule, glRetry, yFrameFor, camRef, camVRef, viewRef, focusRef, glRef, resumeRef, setLoadError, uiRef,
+    wrapRef, drawRef]);
 
   // the no-WebGL list's Try again: a fresh renderer on a fresh root
   const retryGL = React.useCallback(() => { setNoWebGL(false); setGlRetry((n) => n + 1); }, []);
