@@ -45,29 +45,10 @@ import {
   describeFound, summaryOf, votNodeName, verseTextFor, graphStats, densityHint,
   chooserAnnouncement, followAnnouncement, groupAnnouncement, ZOOM_MAX_MESSAGE,
 } from '../../utils/scripture-web/describe.js';
-import {
-  buildVotRail, buildPersonalGraph, buildCuratedUnderlay,
-} from '../../utils/scripture-web/personal-graph.js';
+import { buildPersonal } from '../../utils/scripture-web/personal-build.js';
+import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
 import { pickPersonalLinks, pickUnderlayLinks } from '../scripture-web/rail-renderer.js';
 import { paintCanonOverlay, paintMyWebOverlay, publishRails } from '../scripture-web/overlay-renderer.js';
-
-/**
- * Short names for the VOT rail. Full collection titles ("Words To Live By:
- * Part One") do not fit above a rail segment sized by letter count.
- */
-const SHORT_VOL = {
-  one: 'Vol I', two: 'Vol II', three: 'Vol III', four: 'Vol IV', five: 'Vol V',
-  six: 'Vol VI', seven: 'Vol VII', rebuke: 'Rebuke', wtlb1: 'WTLB I',
-  wtlb2: 'WTLB II', blessed: 'Blessed', flock: 'Flock', timothy: 'Timothy',
-  holydays: 'Holy Days', hm: 'Manna',
-};
-
-/** Short rail names for the Bible studies (full titles are sentence-long). */
-const SHORT_STUDY = {
-  'more-than-a-man': 'MTaM', 'odds-chart': 'Odds', 'lamb-of-god': 'Lamb',
-  'state-of-the-dead': 'SotD', 'grace-and-the-law': 'Grace',
-  'trinity-exposed': 'Trinity', 'purity': 'Purity',
-};
 
 /* The zoom ceiling (maxZoomOf), the frame, the render arguments and the y
    frame live in utils/scripture-web/web-frame.js, pure and tested; the
@@ -1164,76 +1145,6 @@ function useLinkVersion() {
   return React.useSyncExternalStore(subscribe, snapshot, snapshot);
 }
 
-/** Build the dual-rail personal web from live stores + the loaded corpora. */
-function buildPersonal(graph) {
-  if (typeof LinkStore === 'undefined') return null;
-  const chapterStart = new Map();
-  for (let i = 0; i < graph.chapters.length; i++) {
-    const c = graph.chapters[i];
-    chapterStart.set(graph.books[c[0]].id + ':' + c[1], { start: c[2], verses: c[3] });
-  }
-  const verseIdOf = (bookId, chapter, verse) => {
-    const ch = chapterStart.get(bookId + ':' + chapter);
-    if (!ch) return -1;
-    return ch.start + (Math.min(Math.max(verse, 1), ch.verses) - 1);
-  };
-  const collections = [];
-  if (typeof COLLECTIONS !== 'undefined' && typeof READING_CHAIN !== 'undefined') {
-    for (const volKey of READING_CHAIN) {
-      const col = COLLECTIONS.find((c) => c.volKey === volKey);
-      if (!col) continue;
-      const arr = (typeof colLetterArr === 'function') ? colLetterArr(col) : [];
-      collections.push({ volKey, label: col.label, short: SHORT_VOL[volKey] || col.label, items: arr });
-    }
-  }
-  // The Bible studies are corpora too — their 781 curated threads need rail
-  // segments to land on, keyed 'study-<id>' with chapters as the nodes.
-  // (Hidden Manna stays OFF the rail on purpose: not publicly indexed.)
-  if (typeof BIBLE_STUDIES !== 'undefined' && Array.isArray(BIBLE_STUDIES)) {
-    for (const st of BIBLE_STUDIES) {
-      if (!st || !st.chapters) continue;
-      const key = st.slug || st.id;
-      collections.push({
-        volKey: 'study-' + key, label: st.title,
-        short: SHORT_STUDY[st.id] || SHORT_STUDY[key] || 'Study',
-        items: st.chapters.map((c) => ({ id: c.id, title: c.title || st.title })),
-      });
-    }
-  }
-  const votRail = buildVotRail(collections);
-  const ctx = { verseIdOf, votRail };
-  return {
-    votRail,
-    graph: buildPersonalGraph(LinkStore.all(), ctx),
-    // The corpus's OWN curated Bible->Volumes edges, drawn dim beneath the
-    // reader's links: on day one the personal web is nearly empty, and this
-    // shows what the app already knows so the screen is never a blank page.
-    underlay: buildCuratedUnderlay(graph.votEdges, ctx),
-  };
-}
-
-/**
- * Inject the graph asset once, the same way bible-studies.js is loaded.
- * It is precached into the STABLE corpus cache, so this is a cache hit
- * offline and after an app-version bump.
- */
-let _swDataPromise = null;
-export function ensureScriptureWebData(force) {
-  if (typeof window !== 'undefined' && window.SCRIPTURE_WEB_DATA) {
-    return Promise.resolve(window.SCRIPTURE_WEB_DATA);
-  }
-  if (force) _swDataPromise = null;
-  if (_swDataPromise) return _swDataPromise;
-  _swDataPromise = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'src/data/scripture-web-data.js';
-    script.async = true;
-    script.onload = () => {
-      if (window.SCRIPTURE_WEB_DATA) resolve(window.SCRIPTURE_WEB_DATA);
-      else reject(new Error('scripture-web-data.js loaded but defined nothing'));
-    };
-    script.onerror = () => { _swDataPromise = null; reject(new Error('Couldn’t fetch the cross-reference data.')); };
-    document.head.appendChild(script);
-  });
-  return _swDataPromise;
-}
+/* The graph asset's loader lives in utils/scripture-web/web-data.js; it is
+   still exported from here, where _entry-d.js imports it. */
+export { ensureScriptureWebData };
