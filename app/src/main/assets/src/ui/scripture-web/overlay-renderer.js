@@ -384,13 +384,17 @@ const now = () => (typeof performance !== 'undefined' && performance.now ? perfo
  * The round buttons' boxes (+ ZONE_PAD) and the legend's top, device px in the
  * canvas's frame, from the screen's own root (the canvas's ancestor, never a
  * document query: two roots can be mounted). Layout metrics, so the rotated
- * portrait root measures the same; read at most every half second.
+ * portrait root measures the same; read at most every half second, and at
+ * once when the frame's size, the root's class or the docked panel changes
+ * (the buttons move with the panel, Q12).
+ * @param {any} ctx @param {{W:number, H:number, DPR:number}} v
+ * @param {{right:number, bottom:number}|null} [pi]  the open panel's inset, CSS px
  */
-function chromeBoxes(ctx, v) {
+function chromeBoxes(ctx, v, pi) {
   const canvas = ctx && ctx.canvas;
   const root = canvas && typeof canvas.closest === 'function' ? canvas.closest('.sw-root') : null;
   if (!root) return NO_CHROME;
-  const key = v.W + '|' + v.H + '|' + v.DPR + '|' + root.className;
+  const key = v.W + '|' + v.H + '|' + v.DPR + '|' + root.className + '|' + ((pi && pi.right) || 0) + '|' + ((pi && pi.bottom) || 0);
   const cached = CHROME.get(root);
   const t = now();
   if (cached && cached.key === key && t - cached.at < 500) return cached.val;
@@ -434,7 +438,7 @@ function layoutOf(ctx, fs) {
   const compact = H / s <= 500;
   const zoom = cam.ppv / fitPPV(cam, W);
   const deepT = zoom > 0 ? smooth(Math.log(DEEP_FROM), Math.log(DEEP_FULL), Math.log(zoom)) : 0;
-  const chrome = chromeBoxes(ctx, v);
+  const chrome = chromeBoxes(ctx, v, pi);
   const zones = chrome.zones.slice();
   if (right > 0) zones.push({ x0: Wc, x1: W, y0: 0, y1: H });
   if (bottom > 0) zones.push({ x0: 0, x1: W, y0: H - bottom, y1: H });

@@ -232,6 +232,31 @@ describe('the overview ruler (r2-01a)', () => {
     expect(drawn.some((c) => textBox(c).x1 > fs.v.W * 0.95), 'a name at the right end').toBe(true);
   });
 
+  it('the panel docking moves the corner buttons, and the very next frame keeps the text off them (w3 review: the 500 ms cache keyed on size and class)', () => {
+    const v = FRAMES.phone, s = v.DPR, panel = 300;
+    for (const zoom of [1, 40]) {
+      const root = { className: 'sw-root', offsetParent: null };
+      const el = (left, top, w, h) => ({ offsetLeft: left, offsetTop: top, offsetWidth: w, offsetHeight: h, offsetParent: root });
+      const at = (dx) => ({ '.sw-hide-all': el(891 - dx - 14 - 44, 411 - 8 - 44, 44, 44), '.sw-guide-btn': el(891 - dx - 76 - 44, 411 - 8 - 44, 44, 44) });
+      let els = at(0);
+      root.querySelector = (sel) => els[sel] || null;
+      const canvas = { closest: () => root, offsetLeft: 0, offsetTop: 0, offsetParent: root };
+      paint('phone', zoom, ISA53_6, { canvas });
+      // the panel docks on the right and the buttons move left with it; the frame right after
+      els = at(panel);
+      const { rec } = paint('phone', zoom, ISA53_6, { canvas, panelInset: { right: panel, bottom: 0 } });
+      const zone = { x0: (891 - panel - 76 - 44 - 8) * s, x1: (891 - panel - 14 + 8) * s, y0: (411 - 8 - 44 - 8) * s, y1: v.H };
+      const drawn = rec.texts().filter((c) => /^[0-9A-Z]+$/.test(c.t));
+      expect(drawn.length, zoom + 'x').toBeGreaterThan(5);
+      for (const c of drawn) {
+        const b = textBox(c);
+        const top = c.y - fontPxOf(c.font) * 0.7;
+        const meets = b.x0 < zone.x1 && b.x1 > zone.x0 && top < zone.y1 && c.y > zone.y0;
+        expect(meets, zoom + 'x: ' + c.t + ' under the moved corner buttons').toBe(false);
+      }
+    }
+  });
+
   it('the top scrim is painted behind the header while the chrome shows, and not when it is hidden', () => {
     const shown = paint('pc', 1, g.total / 2);
     const hidden = paint('pc', 1, g.total / 2, { inset: 0 });
