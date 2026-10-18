@@ -18,11 +18,25 @@
    Free globals (PlatformBridge, ScreenLayout, LinkStore, …) are resolved at
    call time, the free-global pattern the other bundle-d screens use (from
    when this rode lazy bundle-f), so this file imports only the feature's own code.
+
+   This file composes the screen; the pieces live beside it (F0, 2026-10-18):
+     ui/scripture-web/use-frame-scheduler.js   the one rAF loop, the gesture ease, the revive
+     ui/scripture-web/use-forced-landscape.js  landscape always, immersive, loc()
+     ui/scripture-web/use-web-camera.js        the cameras, the view, the focused thread
+     ui/scripture-web/use-web-renderer.js      the graph's load, the colours, the GL renderer
+                                               and the frame's draw
+     ui/scripture-web/overlay-renderer.js      the Canvas2D overlay's painters
+     ui/scripture-web/use-personal-web.js      My Web's build and railOpts()
+     ui/scripture-web/use-web-selection.js     the hit test, the hover chip, the open cards
+     ui/scripture-web/use-web-keys.js          Escape, Back and the keys
+     ui/scripture-web/gestures.js              pointer, wheel and pinch wiring
+     ui/scripture-web/panels.jsx               the DOM panels
+     utils/scripture-web/describe.js           every word the web says
+     utils/scripture-web/personal-build.js     My Web's inputs from the live stores
+     utils/scripture-web/web-data.js           the graph asset's loader
    ═══════════════════════════════════════════════════════════════════════ */
 
-import {
-  clampCamera, fitPPV, xToVerse, zoomAbout,
-} from '../../utils/scripture-web/geometry.js';
+import { clampCamera, fitPPV, xToVerse, zoomAbout } from '../../utils/scripture-web/geometry.js';
 import { lensRange } from '../../utils/scripture-web/pick.js';
 import { DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { useWebCamera } from '../scripture-web/use-web-camera.js';
