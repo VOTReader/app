@@ -34,21 +34,23 @@ const base = {
 
 /** A 2D context recording each stroke's style and width, and each text. @returns {any} */
 function recordingCtx() {
-  const strokes = [], texts = [];
+  const strokes = [], texts = [], log = [];
   const st = { strokeStyle: '', lineWidth: 0, font: '', fillStyle: '', letterSpacing: '0px' };
   const noop = () => {};
   return {
-    strokes, texts,
+    strokes, texts, log,
     get strokeStyle() { return st.strokeStyle; }, set strokeStyle(v) { st.strokeStyle = v; },
     get lineWidth() { return st.lineWidth; }, set lineWidth(v) { st.lineWidth = v; },
     get font() { return st.font; }, set font(v) { st.font = v; },
     get fillStyle() { return st.fillStyle; }, set fillStyle(v) { st.fillStyle = v; },
     get letterSpacing() { return st.letterSpacing; }, set letterSpacing(v) { st.letterSpacing = v; },
     textAlign: '', textBaseline: '', lineCap: '', lineJoin: '', globalAlpha: 1,
-    beginPath: noop, moveTo: noop, lineTo: noop, arc: noop, fill: noop, clearRect: noop, save: noop, restore: noop,
+    beginPath: noop, moveTo: noop, lineTo: noop, fill: noop, clearRect: noop, save: noop, restore: noop,
+    arc(x, y) { log.push(['arc', x, y]); },
     stroke() { strokes.push({ style: st.strokeStyle, width: st.lineWidth }); },
     measureText: (t) => ({ width: String(t).length * 7 }),
-    fillText(t, x, y) { texts.push({ text: String(t), x, y, font: st.font, fill: st.fillStyle, spacing: st.letterSpacing }); },
+    fillText(t, x, y) { log.push(['fill', String(t)]); texts.push({ text: String(t), x, y, font: st.font, fill: st.fillStyle, spacing: st.letterSpacing }); },
+    strokeText(t) { log.push(['knock', String(t), st.strokeStyle, st.lineWidth]); },
   };
 }
 const alphaOf = (style) => Number(/,\s*([\d.]+)\)$/.exec(style)[1]);
@@ -286,6 +288,37 @@ describe('P4 the Volumes rail in the spec\'s type and ink', () => {
     // fix-review #13: every placed name is one ink, the second row's too
     for (const t of pc) expect(t.fill).toBe(css('volumesLabel'));
   });
+  it('a reader\'s pin under a name never prints over it: the names are painted last, each over a knockout in the canvas ink (fix-review 2 #3)', () => {
+    // on the phone the names sit 4 px over the rail and a pin's ring is 5.5 px:
+    // painted before the links, the gold covered "VOL I" and "REBUKE"
+    const dpr = 2.6, w = 891 * dpr;
+    const phone = Object.assign({}, base, {
+      width: w, height: 411 * dpr, DPR: dpr, base: 319 * dpr, votX: (p) => (p / 20) * w,
+    });
+    // a link from Genesis to the middle of Vol I, right under its name
+    const personal = {
+      count: 1, aRail: new Uint8Array([0]), bRail: new Uint8Array([1]),
+      aPos: new Float32Array([20]), bPos: new Float32Array([4.5]), kind: new Uint8Array([2]),
+    };
+    for (const [name, o] of /** @type {Array<[string, any]>} */ ([['phone', phone], ['PC', base]])) {
+      const ctx = recordingCtx();
+      drawPersonalWeb(ctx, personal, null, o);
+      const at = (pred) => ctx.log.findIndex(pred);
+      const lastPin = ctx.log.reduce((k, e, i) => (e[0] === 'arc' ? i : k), -1);
+      const vol1 = at((e) => e[0] === 'fill' && e[1] === 'VOL I');
+      const cut = at((e) => e[0] === 'knock' && e[1] === 'VOL I');
+      expect(lastPin, name).toBeGreaterThan(-1);
+      expect(vol1, name).toBeGreaterThan(lastPin);
+      expect(cut, name).toBeGreaterThan(lastPin);
+      expect(cut, name).toBeLessThan(vol1);
+      const knock = ctx.log[cut];
+      expect(knock[2], name).toBe(css('canvas'));
+      expect(knock[3], name).toBeGreaterThanOrEqual(2 * o.DPR);
+      // the name keeps its place and its ink
+      const t = ctx.texts.find((x) => x.text === 'VOL I');
+      expect(t.fill, name).toBe(css('volumesLabel'));
+    }
+  });
   it('no tick crosses a printed name, and every name sits inside the screen (fix-review #3)', () => {
     // the phone's band ticks ran 7 px over the rail, through its names (the
     // names' baseline sits 4 px over it); and a band cut by the left edge
@@ -380,7 +413,7 @@ function segmentCtx() {
     get letterSpacing() { return st.letterSpacing; }, set letterSpacing(v) { st.letterSpacing = v; },
     lineWidth: 0, fillStyle: '', textAlign: '', textBaseline: '', lineCap: '', lineJoin: '', globalAlpha: 1,
     beginPath() { path = []; }, moveTo(x, y) { path.push([[x, y]]); }, lineTo(x, y) { path[path.length - 1].push([x, y]); },
-    arc: noop, fill: noop, clearRect: noop, save: noop, restore: noop,
+    arc: noop, fill: noop, clearRect: noop, save: noop, restore: noop, strokeText: noop,
     stroke() {
       if (st.strokeStyle !== css('volumesTick')) return;
       for (const sub of path) for (let i = 1; i < sub.length; i++) ticks.push([sub[i - 1][0], sub[i - 1][1], sub[i][0], sub[i][1]]);

@@ -74,6 +74,8 @@ const EPS_LINK = 0.5;
  * takes CHORD_ARC. */
 const CHORD = 0.45;
 const CHORD_ARC = 0.5;
+/** The cut each Volumes name makes in what lies under it, CSS px either side of its strokes (drawRailNames). */
+const KNOCKOUT = 1.5;
 /** Letter ticks show once letters are this far apart, CSS px. */
 const LETTER_TICK_MIN = 1.8;
 /** Layers per colour bin while a gesture is live (opts.capFraction 0): about
@@ -737,10 +739,13 @@ export function personalInk(z, ceiling) {
 }
 
 /**
- * The two rails, the Volumes rail's ticks and names, and its overline.
+ * The two rails and the Volumes rail's ticks; the names are placed here (the
+ * ticks and the names share one walk of the bands) and painted last, by
+ * drawRailNames, over everything else.
  * @param {CanvasRenderingContext2D} ctx
  * @param {any} opts
  * @param {{bottomY:number, topY:number}} rails
+ * @returns {{names:Array<{label:string, x:number, y:number}>, size:number, compact:boolean}|null}
  */
 function drawRails(ctx, opts, rails) {
   const { width, DPR, votRail } = opts;
@@ -755,7 +760,7 @@ function drawRails(ctx, opts, rails) {
   ctx.beginPath();
   ctx.moveTo(0, rails.topY); ctx.lineTo(width, rails.topY);
   ctx.stroke();
-  if (!votRail || !votRail.segments || !(votRail.total > 0)) return;
+  if (!votRail || !votRail.segments || !(votRail.total > 0)) return null;
 
   // The ticks stay under the names' baseline (fix-review #3): on a PC the
   // names sit 14 px over the rail, clear of 7 px ticks; on the phone the
@@ -817,15 +822,43 @@ function drawRails(ctx, opts, rails) {
   // the top chrome to 50); a name the row cannot take keeps its tick and
   // shows on a zoom. The PC's rows sit on 136 and 120 (names 116-136).
   const rowY = [14, 30];
+  const placed = [];
+  names.forEach((nm, i) => {
+    if (rows[i] >= 0) placed.push({ label: nm.label, x: nm.x, y: rails.topY - (compact ? 4 : rowY[rows[i] ? 1 : 0]) * DPR });
+  });
+  setTracking(ctx, 0);
+  return { names: placed, size, compact };
+}
+
+/**
+ * The Volumes rail's names and its overline, painted after every line and
+ * pin. On the phone the names sit 4 px over the rail and a reader's pin
+ * (5.5 px) reaches up into them; painted before the links, the gold printed
+ * over "VOL I" and "REBUKE" (fix-review 2 #3). Each name is cut out of what
+ * lies under it first, a KNOCKOUT px stroke in the canvas ink (the canon's
+ * chosen foot rings the same way), then filled, so the type always reads
+ * whole and a pin under it shows round it.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {any} opts
+ * @param {{bottomY:number, topY:number}} rails
+ * @param {{names:Array<{label:string, x:number, y:number}>, size:number, compact:boolean}|null} placed
+ */
+function drawRailNames(ctx, opts, rails, placed) {
+  if (!placed) return;
+  const { DPR } = opts;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.font = '500 ' + placed.size + 'px ' + FONT;
+  setTracking(ctx, 0.10 * placed.size);
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 2 * KNOCKOUT * DPR;
+  ctx.strokeStyle = inkCss('canvas');
+  for (const nm of placed.names) ctx.strokeText(nm.label, nm.x, nm.y);
   // every placed name in the one ink, the second row's too (fix-review #13)
   ctx.fillStyle = inkCss('volumesLabel');
-  names.forEach((nm, i) => {
-    if (rows[i] < 0) return;
-    ctx.fillText(nm.label, nm.x, rails.topY - (compact ? 4 : rowY[rows[i] ? 1 : 0]) * DPR);
-  });
+  for (const nm of placed.names) ctx.fillText(nm.label, nm.x, nm.y);
   // the overline names the rail, in the left gutter over its names (PC: the
   // phone's header sits where it would go)
-  if (!compact) {
+  if (!placed.compact) {
     const osize = 14 * DPR;
     ctx.font = '500 ' + osize + 'px ' + FONT;
     setTracking(ctx, 0.15 * osize);
@@ -911,7 +944,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     }
   }
 
-  drawRails(ctx, opts, rails);
+  const names = drawRails(ctx, opts, rails);
   if (personal && personal.count) drawLinks(ctx, personal, opts, rails, personalInk(z).link, linkHover, linkFocus, chosen);
 
   // ── Timothy's thread under the pointer, then the chosen one: on top, in its
@@ -922,6 +955,8 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     strokeThread(ctx, underlay, threadFocus, opts, rails, INK.chosenHalo, INK.chosen.alpha,
       (compact ? INK.chosen.widthCompact : INK.chosen.width) * DPR);
   }
+  // the Volumes names last: no pin or line prints over them
+  drawRailNames(ctx, opts, rails, names);
   return rails;
 }
 

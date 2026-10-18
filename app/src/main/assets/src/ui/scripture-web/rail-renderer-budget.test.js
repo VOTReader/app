@@ -44,7 +44,7 @@ function countingCtx() {
     c, canvas: {}, fillStyle: '', font: '', textAlign: '', textBaseline: '', lineCap: '', lineJoin: '', letterSpacing: '0px',
     get strokeStyle() { return st.strokeStyle; }, set strokeStyle(v) { st.strokeStyle = v; },
     get lineWidth() { return st.lineWidth; }, set lineWidth(v) { st.lineWidth = v; },
-    beginPath: noop, moveTo: noop, lineTo() { c.lineTo++; }, arc: noop, fill: noop, fillText: noop,
+    beginPath: noop, moveTo: noop, lineTo() { c.lineTo++; }, arc: noop, fill: noop, fillText: noop, strokeText: noop,
     stroke() { c.strokes.push({ style: st.strokeStyle, width: st.lineWidth }); },
     measureText: (t) => ({ width: String(t).length * 8 }), clearRect: noop, save: noop, restore: noop,
   };

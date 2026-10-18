@@ -51,7 +51,7 @@ function fakeCtx() {
     lineCap: '', lineJoin: '', globalAlpha: 1,
     beginPath() { calls.beginPath++; }, moveTo: noop, lineTo: noop, arc: noop, bezierCurveTo: noop,
     stroke() { calls.stroke++; }, fill() { calls.fill++; },
-    fillText: noop, measureText: () => ({ width: 40 }), clearRect: noop, save: noop, restore: noop,
+    fillText: noop, strokeText: noop, measureText: () => ({ width: 40 }), clearRect: noop, save: noop, restore: noop,
     setTransform: noop,
   };
 }

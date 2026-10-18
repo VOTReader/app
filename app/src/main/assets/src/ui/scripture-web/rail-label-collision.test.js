@@ -71,6 +71,7 @@ function recordingCtx() {
     moveTo(x, y) { ticks.push({ x, y }); },
     measureText: (text) => ({ width: width(String(text)) }),
     fillText(text, x, y) { const w = width(String(text)); labels.push({ text: String(text), x, y, w, left: x - w / 2, right: x + w / 2 }); },
+    strokeText() {},   // the names' knockout (drawRailNames): not a label
   };
 }
 
