@@ -568,6 +568,8 @@ function runHolders(run) {
   }
   return out;
 }
+/** Typed tokens from which a text holding them all in a row leads every text that does not. */
+const RUN_LEAD_MIN = 3;
 /** The first texts that open on the typed run they hold (their placeStart). */
 const RUN_LAND_REACH = 10;
 /**
@@ -1286,13 +1288,26 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
     // A study's citation names the original of a quote of it, not of a passage described in other words
     // ("passover study about the lamb when god struck the egyptians" asks for the study, not Exodus 12:27).
     const quoted = near(idOf.get(e) || '', e.doc) >= NEAR_PHRASE_MIN;
-    let found = sentenceOriginal(e.doc.text, ex, at, O, lower, keyWords, need, quoted);
+    // A reprint holding the typed run whole (RUN_MIN words or more) gives way only to an original holding it as
+    // well (search200 B3, the tri bench: exact quotes led by a text holding part of them). The letter a sentence's
+    // key, its shingles or a cited verse names often words the typed stretch otherwise: the run crosses into a
+    // sentence the letter has not, or the reprint changed a word. A run both hold keeps the original first, and
+    // with none kept the topic is read as a topic (a letter just below holding the run comes up). A study's verse
+    // stays its original: a study quotes Scripture word for word, in the KJV or with His name restored, where the
+    // index prints the NKJV (a study quoting Acts 20:16 as the KJV words it).
+    const whole = typed.length >= RUN_MIN ? near(idOf.get(e) || '', e.doc) : 0;
+    const keep = (/** @type {string[]|null} */ f) => {
+      if (!f || whole < 1) return f;
+      const k = f.filter((x) => (e.doc.kind === 'bible-study' && D.get(x).kind === 'verse') || near(x, D.get(x)) >= whole - 0.1);
+      return k.length ? k : null;
+    };
+    let found = keep(sentenceOriginal(e.doc.text, ex, at, O, lower, keyWords, need, quoted));
     // A reprint the model found is read where it matched, when that sentence holds more of the query than the
     // excerpt's does and names an original of its own (sr11 t324): the excerpt is the stretch thickest with typed
     // words, and in an Answers topic that was a line of another letter it quotes, which then led the search.
     if (typeof e.meaningStart === 'number' && e.meaningStart >= 0 && at >= 0) {
       const m = meantSentence(e.doc.text, e.meaningStart, ex, at, words);
-      const f = m && sentenceOriginal(e.doc.text, m.text, m.start, O, lower, keyWords, need, quoted);
+      const f = m && keep(sentenceOriginal(e.doc.text, m.text, m.start, O, lower, keyWords, need, quoted));
       if (m && f) { found = f; ex = m.text; at = m.start; }
     }
     // A quote held nearly word for word sits where its small words are too ("blessed be the name of our lord":
@@ -1301,7 +1316,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
       const ex2 = matchExcerpt(e.doc.text, typed);
       const at2 = ex2 ? e.doc.text.indexOf(ex2) : -1;
       if (at2 >= 0 && at2 !== at) {
-        found = sentenceOriginal(e.doc.text, ex2, at2, O, lower, keyWords, need, true);
+        found = keep(sentenceOriginal(e.doc.text, ex2, at2, O, lower, keyWords, need, true));
         if (found) { ex = ex2; at = at2; }
       }
     }
@@ -1312,7 +1327,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
         /** @type {Map<string, number>} */ const votes = new Map();
         eachShingle(win, (h) => { for (const x of lower(/** @type {Map<number, string[]>} */ (SHINGLES).get(h))) votes.set(x, (votes.get(x) || 0) + 1); });
         for (const [x, n] of votes) if (n < 2) votes.delete(x);   // two runs shared, not one stray run at the window's edge
-        if (votes.size) found = [...votes.keys()].sort((a, b) => /** @type {number} */ (votes.get(b)) - /** @type {number} */ (votes.get(a)));
+        if (votes.size) found = keep([...votes.keys()].sort((a, b) => /** @type {number} */ (votes.get(b)) - /** @type {number} */ (votes.get(a))));
       }
     }
     // A reprint the meaning brought up (meaningFirst noted the passage it matched): that passage's
@@ -1321,7 +1336,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = []) {
       /** @type {Map<string, number>} */ const votes = new Map();
       eachShingle(kjvEncode(e.doc.text.slice(e.meaningStart, e.meaningStart + MEANING_SPAN)), (h) => { for (const x of lower(/** @type {Map<number, string[]>} */ (SHINGLES).get(h))) votes.set(x, (votes.get(x) || 0) + 1); });
       for (const [x, n] of votes) if (n < MEANING_VOTES) votes.delete(x);
-      if (votes.size) found = [...votes.keys()].sort((a, b) => /** @type {number} */ (votes.get(b)) - /** @type {number} */ (votes.get(a)));
+      if (votes.size) found = keep([...votes.keys()].sort((a, b) => /** @type {number} */ (votes.get(b)) - /** @type {number} */ (votes.get(a))));
     }
     if (!found && e.doc.kind === 'answers') {
       const id = idOf.get(e) || '';
@@ -2006,6 +2021,29 @@ async function search(query, options) {
     }
     restOfRun();
     if (Object.keys(runAt).length) run = wanted.trim().replace(/\s+/g, ' ').toLowerCase();
+  }
+  /* THE RUN HELD WHOLE LEADS (search200 B3, 2026-10-18). A short verse thick with a quote's words, or a holy day
+     dense in them, outscored the text holding the typed run word for word even after its PHRASE_BOOST: a letter's
+     sentence that turns Titus 1:11 to "you" opened on the verse ("they"), the letter second (the tri bench: three
+     exact quotes). When RUN_LEAD_MIN typed tokens or more sit in a row in some text and a text holding
+     less leads them all, every holder is lifted by one factor, just past it (their own order kept). Not for a
+     corrected typo (the run is the engine's guess), nor over a verse a study holds the run of: a study quotes
+     Scripture in the KJV or with His name restored, and the verse is its original (DECISIONS 10-14). */
+  const heldWhole = Object.keys(runAt);
+  if (!p.phrase && !corrections.length && typedTokens.length >= RUN_LEAD_MIN && heldWhole.length) {
+    let topHeld = 0;
+    let topOther = 0;
+    let heldBy = '';
+    let otherBy = '';
+    for (const id in scoreMap) {
+      const s = scoreMap[id];
+      if (id in runAt) { if (s > topHeld) { topHeld = s; heldBy = id; } } else if (s > topOther) { topOther = s; otherBy = id; }
+    }
+    const studyOfVerse = docLookup[heldBy] && docLookup[otherBy] && docLookup[heldBy].kind === 'bible-study' && docLookup[otherBy].kind === 'verse';
+    if (topHeld > 0 && topHeld <= topOther && !studyOfVerse) {
+      const f = (topOther / topHeld) * 1.05;
+      for (const id of heldWhole) if (scoreMap[id] !== undefined) scoreMap[id] *= f;
+    }
   }
   // A quoted phrase: every text shown holds it (the filter below), so the original first.
   if (p.phrase) {
