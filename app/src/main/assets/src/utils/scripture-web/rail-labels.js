@@ -39,3 +39,36 @@ export function placeRailLabels(boxes, pad, rows = 2) {
   }
   return out;
 }
+
+/**
+ * The same law with a rank (w3, the canvas stream): the major books (GEN,
+ * PSALMS, ISAIAH, MATT, JOHN, REV) are placed before their neighbours, so a
+ * crowd at the right end gives way to REV and not the other way round. A
+ * label takes the first row where it keeps `pad` from every label already on
+ * that row; -1 when no row has room. With one rank for every box this is
+ * placeRailLabels exactly: boxes in x order meet only the last on a row.
+ *
+ * @param {ReadonlyArray<{left:number, right:number}>} boxes  left to right
+ * @param {number} pad
+ * @param {number} [rows=2]
+ * @param {ReadonlyArray<number>} [rank]  per box, lower first (default all 0)
+ * @param {(index: number, row: number) => boolean} [blocked]  a row the box may not take
+ *   there (the corner buttons sit over the right end of the lower row on a phone)
+ * @returns {number[]}  row per box, or -1
+ */
+export function placeRailLabelsRanked(boxes, pad, rows = 2, rank, blocked) {
+  const R = Math.max(1, rows | 0);
+  /** @type {Array<Array<[number, number]>>} */
+  const taken = Array.from({ length: R }, () => []);
+  const out = new Array(boxes.length).fill(-1);
+  const order = boxes.map((_, i) => i).sort((a, b) => ((rank ? rank[a] || 0 : 0) - (rank ? rank[b] || 0 : 0)) || (a - b));
+  for (const i of order) {
+    const b = boxes[i];
+    if (!b || !(b.right > b.left)) continue;
+    for (let r = 0; r < R; r++) {
+      if (blocked && blocked(i, r)) continue;
+      if (taken[r].every(([l, rt]) => b.left >= rt + pad || b.right + pad <= l)) { taken[r].push([b.left, b.right]); out[i] = r; break; }
+    }
+  }
+  return out;
+}
