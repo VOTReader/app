@@ -8166,6 +8166,8 @@
     }
     .sw-panel-title { margin: 6px 0 0; font-size: var(--fs-30); font-weight: 500; line-height: 1.2; color: var(--sw-title); }
     .sw-sheet-meta, .sw-panel-meta { margin-top: 6px; font-size: var(--fs-16); color: var(--sw-text-meta); }
+    /* each short item whole, so the line breaks only at a separator (web-panel.jsx metaItems) */
+    .sw-panel-meta > span { white-space: nowrap; }
     /* sections: a 1 px hairline with 20 px either side (16 compact) */
     .sw-sec { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--sw-hairline); }
     .sw-sec.sw-verses, .sw-links.sw-sec { border-top: 0; padding-top: 0; }

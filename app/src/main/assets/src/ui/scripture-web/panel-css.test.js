@@ -158,6 +158,11 @@ describe('what the w3 screenshots caught (PC 1600x900, phone 891x411)', () => {
     expect(rule('.sw-sheet-close')).toMatch(/background:\s*var\(--sw-panel\)/);
   });
 
+  it('a meta line breaks only between its items: each short item is kept whole', () => {
+    // the phone verse shot (w3 review, round 2): "48 connections · cited in the Volumes 5 / times"
+    expect(rule('.sw-panel-meta > span')).toMatch(/white-space:\s*nowrap/);
+  });
+
   it('"‹ Back to …" keeps a space between the chevron and its words', () => {
     // the PC shot: "‹Back to Isaiah 7:14", the span's trailing space trimmed by the inline-flex
     expect(rule('.sw-back-link')).toMatch(/gap:\s*\d+px/);

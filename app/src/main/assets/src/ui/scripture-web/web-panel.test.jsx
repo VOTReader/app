@@ -224,6 +224,9 @@ describe('verse mode: John 3:16', () => {
     expect(panel.getAttribute('data-mode')).toBe('verse');
     expect(panel.querySelector('.sw-panel-title').textContent).toBe('John 3:16');
     expect(panel.querySelector('.sw-panel-meta').textContent).toBe('48 connections · cited in the Volumes 5 times');
+    // each item whole, so the line breaks only at a separator (the phone shot left "times" alone)
+    expect([...panel.querySelectorAll('.sw-panel-meta > span')].map((s) => s.textContent))
+      .toEqual(['48 connections', 'cited in the Volumes 5 times']);
     expect(panel.querySelector('.sw-verse-text').textContent).toBe('TEXT john 3:16');
     expect(panel.querySelector('.sw-sec-more .sw-sec-title').textContent).toBe('Connections · 48');
     const row = panel.querySelector('.sw-group .sw-row');

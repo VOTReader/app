@@ -156,9 +156,28 @@ function PanelHead({ over, title, meta }) {
     <div className="sw-panel-head">
       <div className="sw-sheet-eyebrow sw-panel-over">{over}</div>
       {title ? <h2 className="sw-panel-title">{title}</h2> : null}
-      {meta ? <div className="sw-sheet-meta sw-panel-meta">{meta}</div> : null}
+      {meta ? <div className="sw-sheet-meta sw-panel-meta">{metaItems(meta)}</div> : null}
     </div>
   );
+}
+
+/** A meta item up to this long is kept whole (metaItems); a longer one is a sentence and wraps. */
+const META_WHOLE = 32;
+
+/**
+ * A meta line whose items are kept whole, so it breaks only at a " · " (w3 review, round 2: the
+ * phone verse panel read "48 connections · cited in the Volumes 5 / times"). Each short item is a
+ * span (white-space: nowrap in app.css); a long one (Nearby's sentence) is left to wrap.
+ * @param {any} meta  a string, or anything else to render as it is
+ */
+function metaItems(meta) {
+  if (typeof meta !== 'string' || meta.indexOf(' · ') < 0) return meta;
+  const out = [];
+  meta.split(' · ').forEach((item, i) => {
+    if (i) out.push(' · ');
+    out.push(item.length <= META_WHOLE ? <span key={i}>{item}</span> : item);
+  });
+  return out;
 }
 
 /** One verse in full, with "Open in reader ›" (and, for the far end of a connection, its Follow). */
