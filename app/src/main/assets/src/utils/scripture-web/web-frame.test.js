@@ -3,7 +3,7 @@
    numbers below are the formulas' own, worked by hand, so a change to where
    the dome sits or what the shader is told shows up here first. */
 import { describe, it, expect } from 'vitest';
-import { webFrame, webViewArgs, webYFrame, maxZoomOf, centreOf, RULER_H, tapFadeStep, TAP_FADE_MS } from './web-frame.js';
+import { webFrame, webViewArgs, webYFrame, maxZoomOf, centreOf, RULER_H, RULER_PC, tapFadeStep, TAP_FADE_MS } from './web-frame.js';
 import { MAX_STRETCH, squashFactor, localizeFactor, maxZoomFor } from './geometry.js';
 import { focusState, withLit } from './focus-state.js';
 
@@ -16,8 +16,15 @@ describe('webFrame', () => {
     expect(f.ruler).toBe((RULER_H + 104) * 3);
   });
 
-  it('a wide screen reserves only the legend line', () => {
-    expect(webFrame(desktop, false).ruler).toBe(RULER_H + 26);
+  it('a wide short screen (a phone on its side) reserves only the legend line', () => {
+    expect(webFrame({ W: 2317, H: 1069, DPR: 2.6 }, false).ruler).toBeCloseTo((RULER_H + 26) * 2.6, 6);
+  });
+
+  it('a PC holds the deep-zoom band: the canon baseline at H - 212 (build spec §3); My Web keeps the short ruler', () => {
+    expect(RULER_PC).toBe(212);
+    expect(webFrame(desktop, false).ruler).toBe(212);
+    expect(webFrame(desktop, false).base).toBe(1080 - 212);
+    expect(webFrame(desktop, true).ruler).toBe(RULER_H + 26);
   });
 
   it('on a tall phone the dome keeps its stretch and the slack goes mostly above it', () => {

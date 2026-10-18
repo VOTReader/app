@@ -19,6 +19,10 @@ import { CENTRE_BRIGHT, CENTRE_WIDTH } from './sw-ink.js';
 
 /** Height reserved below the baseline for the ruler + book names, CSS px. */
 export const RULER_H = 74;
+/** The canon web's ruler on a tall wide frame (a PC), CSS px: the build spec's baseline at
+    H - 212 (§3), which holds the deep-zoom band (+175: chapter numerals, verse ticks and
+    numerals, the cited dots) above the legend line. Phones and My Web keep RULER_H. */
+export const RULER_PC = 212;
 
 /**
  * The zoom ceiling, from the frame rather than from a constant. 44 CSS px
@@ -51,7 +55,8 @@ export function webFrame(v, personal) {
   const narrow = (v.W / (v.DPR || 1)) <= 560;
   // Wide screens reserve the legend/credit line too, or the staggered book
   // labels print straight through it (the "legends colliding" report).
-  const ruler = (narrow ? RULER_H + 104 : RULER_H + 26) * v.DPR;
+  const tall = (v.H / (v.DPR || 1)) > 500;
+  const ruler = (narrow ? RULER_H + 104 : !personal && tall ? RULER_PC : RULER_H + 26) * v.DPR;
   const avail = v.H - ruler;
   if (personal) {
     // No dome to centre — the rails want the whole frame, less the strip the
