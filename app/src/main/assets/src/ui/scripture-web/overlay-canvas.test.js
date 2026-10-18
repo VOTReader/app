@@ -1,0 +1,379 @@
+// @ts-nocheck
+/* The canvas stream (w3): the overlay's wayfinding on the real asset, read
+   off a recording 2D context. The deep-zoom ruler (r3-03), the overview's
+   names (r2-01a), the cited strip (Q1 a), the centre chapter (§4.4), the
+   hit boxes the tap path reads (hitOverlay), and the label engine fed from
+   the frame (digest C2, item 3). */
+import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
+import { fileURLToPath } from 'node:url';
+import { resolve, dirname } from 'node:path';
+import * as geo from '../../utils/scripture-web/geometry.js';
+import * as dec from '../../utils/scripture-web/decode.js';
+import { footBundles, lensRange, labelFeed } from '../../utils/scripture-web/pick.js';
+import { webFrame, webViewArgs, centreOf } from '../../utils/scripture-web/web-frame.js';
+import { citationsForVerse } from '../../utils/scripture-web/vot-citations.js';
+import { css } from '../../utils/scripture-web/sw-ink.js';
+import { paintCanonOverlay, hitOverlay, stackRows, citedVerses, DEEP_FULL } from './overlay-renderer.js';
+
+vi.setConfig({ testTimeout: 60000 });
+
+const here = dirname(fileURLToPath(import.meta.url));
+const ASSET = resolve(here, '../../data/scripture-web-data.js');
+const g = dec.decodeGraph(runInNewContext(readFileSync(ASSET, 'utf8') + ';SCRIPTURE_WEB_DATA', {}));
+
+const bookIndex = (prefix) => g.books.findIndex((b) => b.id === prefix || b.id.startsWith(prefix + '-'));
+const verseOf = (prefix, chapter, verse) => {
+  const bi = bookIndex(prefix);
+  const c = g.chapters.find((ch) => ch[0] === bi && ch[1] === chapter);
+  return c[2] + verse - 1;
+};
+const ISA = bookIndex('isaiah');
+const ISA53_6 = verseOf('isaiah', 53, 6);
+
+const FRAMES = {
+  pc: { W: 1600, H: 900, DPR: 1 },
+  phone: { W: Math.round(891 * 2.6), H: Math.round(411 * 2.6), DPR: 2.6 },
+};
+
+/** A 2D context that records what is drawn; text is 0.5 em a glyph plus the tracking. */
+function recorder(canvas = null) {
+  const calls = [];
+  const state = { font: '10px serif', letterSpacing: '0px', globalAlpha: 1, fillStyle: '#000', strokeStyle: '#000', lineWidth: 1, textAlign: 'start', textBaseline: 'alphabetic', lineJoin: 'miter' };
+  const stack = [];
+  const ctx = Object.assign(Object.create(null), state, {
+    canvas,
+    save() { stack.push(Object.fromEntries(Object.keys(state).map((k) => [k, ctx[k]]))); },
+    restore() { const s = stack.pop(); if (s) Object.assign(ctx, s); },
+    measureText(t) { return { width: textWidth(ctx, t) }; },
+    fillText(t, x, y) { calls.push({ op: 'fillText', t: String(t), x, y, font: ctx.font, align: ctx.textAlign, base: ctx.textBaseline, alpha: ctx.globalAlpha, fill: ctx.fillStyle, w: textWidth(ctx, t) }); },
+    fillRect(x, y, w, h) { calls.push({ op: 'fillRect', x, y, w, h, fill: ctx.fillStyle }); },
+    createLinearGradient() { return { addColorStop() {} }; },
+  });
+  for (const k of ['clearRect', 'strokeText', 'beginPath', 'closePath', 'moveTo', 'lineTo', 'arc', 'arcTo', 'rect', 'fill', 'stroke']) ctx[k] = (...a) => calls.push({ op: k, a });
+  return { ctx, calls, texts: () => calls.filter((c) => c.op === 'fillText') };
+}
+function fontPxOf(font) { return parseFloat(/([\d.]+)px/.exec(font)[1]); }
+function textWidth(ctx, t) {
+  const n = String(t).length;
+  return (0.5 * fontPxOf(ctx.font) + (parseFloat(ctx.letterSpacing) || 0)) * n;
+}
+/** A drawn text's box (device px), from its alignment. */
+function textBox(c) {
+  const x0 = c.align === 'center' ? c.x - c.w / 2 : c.align === 'right' ? c.x - c.w : c.x;
+  return { x0, x1: x0 + c.w };
+}
+
+function frameAt(name, zoom, verse, extra = {}) {
+  const v = FRAMES[name];
+  const cam = geo.createCamera(g.total);
+  cam.ppv = geo.fitPPV(cam, v.W) * zoom;
+  cam.x = verse;
+  cam.y = 0;
+  const f = webFrame(v, false);
+  const view = webViewArgs(v, cam, f, 'famous', Object.assign({ arc: -1, range: null, hover: null, lit: null }, extra.focus || {}));
+  const lens = lensRange(g, cam, v.W);
+  const fs = {
+    g, cam, view, v, chrome: { bg: '#000000', fsRuler: 13, fsLabel: 13 }, canvasH: v.H, inset: extra.inset == null ? 56 * v.DPR : extra.inset,
+    yFrame: { base: f.base, ceil: f.ceil, squash: view.squash, maxSpan: dec.maxSpanOf(g) },
+    density: 'famous', focusArc: view.focusArc, bundles: { cells: footBundles(g, cam, view, v.DPR) }, lens, lensDim: 1,
+    centre: centreOf(g, lens, zoom), panelInset: extra.panelInset || null, hits: [],
+  };
+  return fs;
+}
+function paint(name, zoom, verse, extra) {
+  const fs = frameAt(name, zoom, verse, extra);
+  const rec = recorder(extra && extra.canvas);
+  const out = paintCanonOverlay(rec.ctx, fs);
+  fs.hits = out.hits;
+  return { fs, rec, out };
+}
+const zMax = (name) => geo.maxZoomFor(g.total, FRAMES[name].W / FRAMES[name].DPR);
+
+describe('stackRows: the ruler stacks keep every row and close the gaps first', () => {
+  const rows = [{ k: 'a', top: 4, h: 5 }, { k: 'b', top: 12, h: 30, min: 10 }, { k: 'c', top: 52, h: 9 }];
+  it('lays the natural stack where it fits', () => {
+    const st = stackRows(rows, 62, 100);
+    expect(st.a).toEqual({ top: 4, h: 5 });
+    expect(st.b).toEqual({ top: 12, h: 30 });
+    expect(st.c).toEqual({ top: 52, h: 9 });
+    expect(st.end).toBe(62);
+  });
+  it('a short band closes the gaps, then the flexible row gives height; rows stay in order and apart', () => {
+    for (const avail of [55, 45, 30]) {
+      const st = stackRows(rows, 62, avail);
+      expect(st.a.top + st.a.h).toBeLessThanOrEqual(st.b.top);
+      expect(st.b.top + st.b.h).toBeLessThanOrEqual(st.c.top);
+      expect(st.b.h).toBeGreaterThanOrEqual(10);
+      if (avail >= 30) expect(st.end).toBeLessThanOrEqual(avail + 1e-9);
+    }
+  });
+});
+
+describe('the cited strip marks exactly the verses the panel lists citations for (Q1 a)', () => {
+  it('a verse is cited iff citationsForVerse lists something for it', () => {
+    const { pre, count } = citedVerses(g);
+    expect(count, 'the asset carries cited verses').toBeGreaterThan(100);
+    const sample = [];
+    for (let x = 0; x < g.total; x += 13) sample.push(x);
+    const c53 = g.chapters.find((ch) => ch[0] === ISA && ch[1] === 53);
+    for (let x = c53[2]; x < c53[2] + c53[3]; x++) sample.push(x);
+    for (const x of sample) expect(pre[x + 1] - pre[x] > 0, 'verse ' + x).toBe(citationsForVerse(g, x, null).length > 0);
+  });
+  it('the overview paints the strip in the cited gold, one run per lit pixel column', () => {
+    const { rec } = paint('pc', 1, g.total / 2);
+    const fills = rec.calls.filter((c) => c.op === 'fill');
+    expect(fills.length).toBeGreaterThan(0);
+    // the strip is a path of rects under the baseline; at least a few dozen columns are lit
+    const rects = rec.calls.filter((c) => c.op === 'rect');
+    expect(rects.length).toBeGreaterThan(30);
+  });
+});
+
+describe('the overview ruler (r2-01a)', () => {
+  for (const name of ['pc', 'phone']) {
+    it(name + ': every book name is wholly on the frame, none overlaps another, the majors are named', () => {
+      const { rec, fs, out } = paint(name, 1, g.total / 2);
+      const names = new Set(g.books.flatMap((b) => [String(b.title).toUpperCase(), String(b.abbr).toUpperCase()]));
+      const drawn = rec.texts().filter((c) => names.has(c.t));
+      expect(drawn.length).toBeGreaterThan(20);
+      for (const c of drawn) {
+        const b = textBox(c);
+        expect(b.x0, c.t + ' starts on the frame').toBeGreaterThanOrEqual(0);
+        expect(b.x1, c.t + ' ends on the frame').toBeLessThanOrEqual(fs.v.W);
+      }
+      for (let i = 0; i < drawn.length; i++) {
+        for (let j = i + 1; j < drawn.length; j++) {
+          if (drawn[i].y !== drawn[j].y) continue;
+          const a = textBox(drawn[i]), b = textBox(drawn[j]);
+          expect(a.x1 <= b.x0 || b.x1 <= a.x0, drawn[i].t + ' / ' + drawn[j].t).toBe(true);
+        }
+      }
+      const texts = drawn.map((c) => c.t);
+      for (const major of ['GENESIS', 'ISAIAH', 'REVELATION']) {
+        expect(texts.some((t) => t === major || g.books.some((b) => String(b.abbr).toUpperCase() === t && String(b.title).toUpperCase() === major)), major).toBe(true);
+      }
+      // each named book is a tap target
+      expect(out.hits.filter((h) => h.hit.kind === 'book').length).toBe(drawn.length);
+    });
+  }
+
+  it('no name is printed under a corner button (#20): the zones come from the screen root', () => {
+    const v = FRAMES.phone, s = v.DPR;
+    const root = { className: 'sw-root', offsetParent: null };
+    const el = (left, top, w, h) => ({ offsetLeft: left, offsetTop: top, offsetWidth: w, offsetHeight: h, offsetParent: root });
+    const els = { '.sw-hide-all': el(891 - 14 - 44, 411 - 8 - 44, 44, 44), '.sw-guide-btn': el(891 - 76 - 44, 411 - 8 - 44, 44, 44) };
+    root.querySelector = (sel) => els[sel] || null;
+    const canvas = { closest: () => root, offsetLeft: 0, offsetTop: 0, offsetParent: root };
+    const { rec, fs } = paint('phone', 1, g.total / 2, { canvas });
+    const zone = { x0: (891 - 76 - 44 - 8) * s, x1: v.W, y0: (411 - 8 - 44 - 8) * s, y1: v.H };
+    const names = new Set(g.books.flatMap((b) => [String(b.title).toUpperCase(), String(b.abbr).toUpperCase()]));
+    const drawn = rec.texts().filter((c) => names.has(c.t));
+    expect(drawn.length).toBeGreaterThan(20);
+    for (const c of drawn) {
+      const b = textBox(c);
+      const top = c.y - fontPxOf(c.font) * 0.7;
+      const meets = b.x0 < zone.x1 && b.x1 > zone.x0 && top < zone.y1 && c.y > zone.y0;
+      expect(meets, c.t + ' under the corner buttons').toBe(false);
+    }
+    // the right end is still named, on the row the buttons leave free
+    expect(drawn.some((c) => textBox(c).x1 > fs.v.W * 0.95), 'a name at the right end').toBe(true);
+  });
+
+  it('the top scrim is painted behind the header while the chrome shows, and not when it is hidden', () => {
+    const shown = paint('pc', 1, g.total / 2);
+    const hidden = paint('pc', 1, g.total / 2, { inset: 0 });
+    const firstRect = (rec) => rec.calls.find((c) => c.op === 'rect');
+    expect(firstRect(shown.rec).a.slice(0, 2)).toEqual([0, 0]);
+    expect(firstRect(shown.rec).a[3]).toBeGreaterThanOrEqual(104);
+    expect(firstRect(hidden.rec).a[1]).toBeGreaterThan(0);
+  });
+});
+
+describe('the deep band (r3-03): chapter numerals, verse ticks and numerals, the sticky book', () => {
+  it('pc 40x on Isaiah 53: the chapter numerals are the primary mark, 53 in gold, the frame inside Isaiah says so at the left edge', () => {
+    const { rec, out, fs } = paint('pc', 40, ISA53_6);
+    const t = rec.texts();
+    const n53 = t.filter((c) => c.t === '53');
+    expect(n53.length, 'chapter 53 is numbered').toBe(1);
+    expect(fontPxOf(n53[0].font), 'at the spec size').toBe(28);
+    expect(n53[0].fill, 'the centre chapter in gold').toBe('rgb(196,164,105)');
+    const others = t.filter((c) => /^\d+$/.test(c.t) && c.t !== '53' && fontPxOf(c.font) === 28);
+    expect(others.length, 'other chapters numbered').toBeGreaterThan(2);
+    for (const c of others) expect(c.fill, c.t + ' plain').toBe(css('chapterNumeral'));
+    expect(t.some((c) => c.t === '‹'), 'the sticky arrow').toBe(true);
+    expect(t.some((c) => c.t === 'ISAIAH'), 'the sticky name').toBe(true);
+    expect(t.some((c) => c.t === 'JEREMIAH' || c.t === 'JER'), 'the next book named at its start').toBe(true);
+    // the numeral is a tap target that names its chapter
+    const box = out.hits.find((h) => h.hit.kind === 'chapter' && h.hit.chapter === 53);
+    expect(box && box.hit.book).toBe(ISA);
+    const hit = hitOverlay(fs, (box.x0 + box.x1) / 2 / fs.v.DPR, (box.y0 + box.y1) / 2 / fs.v.DPR);
+    expect(hit).toEqual({ kind: 'chapter', book: ISA, chapter: 53 });
+  });
+
+  it('phone 300x on Isaiah 53: verse numerals every 5th, later every verse; no text under 12 CSS px anywhere', () => {
+    for (const [zoom, every] of [[300, 5], [zMax('phone'), 1]]) {
+      const { rec, fs } = paint('phone', zoom, ISA53_6);
+      const s = fs.v.DPR;
+      const t = rec.texts();
+      for (const c of t) expect(fontPxOf(c.font) / s, c.t + ' at ' + zoom + 'x').toBeGreaterThanOrEqual(12 - 1e-9);
+      const vnums = t.filter((c) => c.align === 'center' && /^\d+$/.test(c.t) && Math.abs(fontPxOf(c.font) - 12 * s) < 1e-6);
+      expect(vnums.length, 'verse numerals at ' + zoom + 'x').toBeGreaterThan(0);
+      if (every === 5) for (const c of vnums) expect(Number(c.t) % 5, c.t).toBe(0);
+      else expect(vnums.some((c) => Number(c.t) % 5 !== 0)).toBe(true);
+    }
+  });
+
+  it('the next book is announced at the right when it starts within a frame width', () => {
+    // the last verses of Malachi: Matthew is just past the right edge
+    const end = verseOf('matthew', 1, 1) - 1;
+    const v = FRAMES.pc;
+    const zoom = 40;
+    const ppv = geo.fitPPV({ total: g.total }, v.W) * zoom;
+    const { rec } = paint('pc', zoom, end - (v.W * 0.55) / ppv);
+    const t = rec.texts();
+    expect(t.some((c) => c.t === '›'), 'the right arrow').toBe(true);
+    expect(t.some((c) => c.t === 'MATTHEW')).toBe(true);
+  });
+
+  it('no chapter rule cuts through a numeral or a name, and under a stride no bare "1" stands for a book', () => {
+    const tick = css('chapterTick');
+    for (const [name, zoom] of [['pc', 6], ['pc', 40], ['phone', 6], ['phone', 40]]) {
+      const { rec, fs } = paint(name, zoom, ISA53_6);
+      const s = fs.v.DPR;
+      const rules = rec.calls.filter((c) => c.op === 'fillRect' && c.fill === tick);
+      expect(rules.length, name + ' ' + zoom + 'x rules').toBeGreaterThan(10);
+      const texts = rec.texts();
+      for (const c of texts) {
+        const b = textBox(c), top = c.y - fontPxOf(c.font) * 0.7;
+        expect(b.x0 >= 0 && b.x1 <= fs.v.W, name + ' ' + zoom + 'x: "' + c.t + '" wholly on the frame').toBe(true);
+        for (const r of rules) {
+          const cuts = r.x > b.x0 + 1 && r.x < b.x1 - 1 && r.y < c.y && r.y + r.h > top;
+          expect(cuts, name + ' ' + zoom + 'x: a rule at ' + Math.round(r.x / s) + ' cuts "' + c.t + '"').toBe(false);
+        }
+      }
+      // 6x and 40x number under a stride (Song of Songs, Lamentations, Jeremiah start on these frames)
+      const bare = texts.filter((c) => c.t === '1' && Math.abs(fontPxOf(c.font) - fs.v.DPR * (name === 'pc' ? 28 : 20)) < 1e-6);
+      expect(bare.length, name + ' ' + zoom + 'x bare "1"').toBe(0);
+    }
+  });
+
+  it('the sticky name is pushed along by the next book, gives way to its abbreviation, and never slides off the frame', () => {
+    const v = FRAMES.phone, s = v.DPR;
+    const ppv = geo.fitPPV({ total: g.total }, v.W) * 6;
+    const prov = verseOf('proverbs', 1, 1);
+    const seen = new Set();
+    for (let xs = 20; xs <= 420; xs += 10) {
+      const { rec } = paint('phone', 6, prov - (xs * s - v.W / 2) / ppv);
+      const t = rec.texts();
+      for (const c of t) expect(textBox(c).x0, '"' + c.t + '" with Proverbs at ' + xs).toBeGreaterThanOrEqual(0);
+      const arrow = t.find((c) => c.t === '‹');
+      if (arrow) {
+        const name = t.find((c) => Math.abs(c.y - arrow.y) < 1e-6 && c.t !== '‹' && c.x > arrow.x && c.x < arrow.x + 60 * s);
+        expect(name, 'the arrow has its name at ' + xs).toBeTruthy();
+        seen.add(name.t);
+      }
+    }
+    expect(seen.has('PSALMS'), 'the title while it fits').toBe(true);
+  });
+
+  it('the overview hands over to the deep band: no chapter-length bars past it, no numerals before it', () => {
+    const before = paint('pc', 3, ISA53_6).rec.texts().filter((c) => /^\d+$/.test(c.t));
+    expect(before.length, 'no numerals at 3x').toBe(0);
+    const after = paint('pc', DEEP_FULL + 0.5, ISA53_6).rec.calls.filter((c) => c.op === 'fillRect' && c.h > 4 && c.w > 1.5);
+    expect(after.length, 'no bars at depth').toBe(0);
+  });
+});
+
+describe('the pills and the labels', () => {
+  it('a pill is a tap target whose ids are the threads it counts', () => {
+    const { out } = paint('pc', 40, ISA53_6);
+    const pills = out.hits.filter((h) => h.hit.kind === 'pill');
+    expect(pills.length, 'pills at 40x on Isaiah 53').toBeGreaterThan(0);
+    expect(out.badges.length).toBe(pills.length);
+    pills.forEach((p, k) => {
+      const cell = out.badges[k].cell;
+      expect(p.hit.ids.length, p.hit.label).toBe(cell.drawn + (cell.hidden || 0));
+      expect(p.hit.label).toMatch(/^Isaiah|^Jeremiah|^Lamentations|^Ezekiel|^[1-3A-Z]/);
+    });
+  });
+
+  /* digest item 3: the old pass walked visibleArcs (the crossing set in bucket order, cut at a
+     limit) and stopped among fly-overs far above the frame: 22 of the 86 threads on the frame were
+     named. Fed from the frame, every thread with a foot on it is a candidate, ranked by votes, and
+     the names reach across the frame. What is shown is what stays clean (C2, "fully zoomed in must
+     look good and clean"): the chips at the feet, and over them a short column of far ends; the
+     upper half of the sky is the threads'. */
+  it('at the ceiling over Isaiah 53 the labels reach across the frame and leave the upper sky to the threads (digest item 3: 22 of 86)', () => {
+    for (const [name, least] of [['pc', 40], ['phone', 25]]) {
+      const { out, fs, rec } = paint(name, zMax(name), ISA53_6);
+      const feed = labelFeed(g, fs.cam, { width: fs.v.W, base: fs.view.base, squash: fs.view.squash, density: 'famous', inset: fs.inset });
+      const footed = feed.filter((f) => f.fromOn || f.toOn).length;
+      expect(footed, name + ': threads with a foot on the frame').toBeGreaterThan(100);
+      expect(out.labels, name + ': ' + out.labels + ' of ' + footed + ' named').toBeGreaterThanOrEqual(least);
+      const named = rec.texts().filter((c) => /·|→|←/.test(c.t));
+      expect(named.length).toBe(out.labels);
+      for (let third = 0; third < 3; third++) {
+        const inThird = named.filter((c) => { const b = textBox(c); const cx = (b.x0 + b.x1) / 2; return cx >= (third * fs.v.W) / 3 && cx < ((third + 1) * fs.v.W) / 3; });
+        expect(inThird.length, name + ': labels in third ' + third).toBeGreaterThan(3);
+      }
+      const skyMid = (fs.inset + fs.view.base) / 2;
+      for (const c of named) expect(c.y, name + ': ' + c.t + ' in the upper sky').toBeGreaterThan(skyMid);
+    }
+  });
+
+  it('the chips stand about one per 160 px (PC) and 120 px (phone), never closer', () => {
+    for (const [name, every] of [['pc', 160], ['phone', 120]]) {
+      const { rec, fs } = paint(name, 200, ISA53_6);
+      const xs = rec.texts().filter((c) => / · /.test(c.t) && c.align === 'center').map((c) => c.x).sort((a, b) => a - b);
+      expect(xs.length, name + ' chips').toBeGreaterThan(2);
+      for (let k = 1; k < xs.length; k++) expect(xs[k] - xs[k - 1], name).toBeGreaterThanOrEqual(every * fs.v.DPR - 1e-6);
+    }
+  });
+
+  it('labels never print in the open panel or under the scrim', () => {
+    const v = FRAMES.pc;
+    const { rec, fs } = paint('pc', zMax('pc'), ISA53_6, { panelInset: { right: 400, bottom: 0 } });
+    const edge = v.W - 400 * v.DPR;
+    const chips = rec.texts().filter((c) => /·|→|←/.test(c.t));
+    expect(chips.length).toBeGreaterThan(0);
+    for (const c of chips) {
+      const b = textBox(c);
+      expect(b.x1, c.t).toBeLessThanOrEqual(edge);
+      expect(c.y, c.t).toBeGreaterThan(fs.inset);
+    }
+  });
+
+  it('hysteresis: a label placed on one frame keeps its thread on the next, a pixel later', () => {
+    const a = paint('pc', zMax('pc'), ISA53_6);
+    const b = paint('pc', zMax('pc'), ISA53_6 + 1 / a.fs.cam.ppv);
+    const chips = (r) => new Set(r.rec.texts().filter((c) => /·/.test(c.t)).map((c) => c.t));
+    const ca = chips(a), cb = chips(b);
+    let kept = 0;
+    for (const t of ca) if (cb.has(t)) kept++;
+    expect(kept / Math.max(1, ca.size)).toBeGreaterThan(0.9);
+  });
+});
+
+describe('labelFeed: every drawn thread a reader can see on the frame', () => {
+  it('at the ceiling it holds every thread with a foot on the frame, and fly-overs only when asked', () => {
+    const fs = frameAt('pc', zMax('pc'), ISA53_6);
+    const view = { width: fs.v.W, base: fs.view.base, squash: fs.view.squash, density: 'famous', inset: fs.inset };
+    const feed = labelFeed(g, fs.cam, view);
+    const ids = new Set(feed.map((f) => f.i));
+    const { fanA, fanB } = dec.fansOf(g);
+    let footed = 0;
+    for (const bucket of g.buckets) {
+      const end = bucket.off + dec.bucketDrawCount(bucket, 'famous');
+      for (let i = bucket.off; i < end; i++) {
+        const x0 = geo.footX(fs.cam, fs.v.W, g.from[i], fanA[i]), x1 = geo.footX(fs.cam, fs.v.W, g.to[i], fanB[i]);
+        if ((x0 >= 0 && x0 <= fs.v.W) || (x1 >= 0 && x1 <= fs.v.W)) { footed++; expect(ids.has(i), 'thread ' + i).toBe(true); }
+      }
+    }
+    expect(feed.length).toBe(footed);
+    const withFly = labelFeed(g, fs.cam, view, { flyovers: true });
+    expect(withFly.length).toBeGreaterThanOrEqual(feed.length);
+    for (const f of withFly) if (!f.fromOn && !f.toOn) expect(f.x0 < 0 && f.x1 > fs.v.W).toBe(true);
+  });
+});

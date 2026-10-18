@@ -72,6 +72,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
 import { createRenderer } from '../scripture-web/web-renderer.js';
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import { ScriptureWebScreen, _resetWebPlace } from './ScriptureWebScreen.jsx';
+import { LEG_PPV_CSS } from '../scripture-web/overlay-renderer.js';
 import { modalRegistry } from '../../hooks/use-modal-registry.js';
 import { webFrame } from '../../utils/scripture-web/web-frame.js';
 import { footX, arcShape, squashFactor } from '../../utils/scripture-web/geometry.js';
@@ -562,12 +563,21 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     /* sw1 (audit-web 10-05): under the baseline each chapter's bar is as TALL as the chapter is long, and was
        drawn 0.8 of the chapter WIDE, so zoomed in a long chapter (Psalm 119) became a large grey block. */
     it('the chapter-length bars stay thin at every zoom below the verse ticks (their height is the length)', async () => {
+      // w3: the overview ruler hands over to the deep band at 5x-6.5x, so the bars are read
+      // at 3 presses (4.1x, the overview's own) and at 6 (16.8x, where only the deep band's
+      // chapter ticks are left): nothing tall is ever wide
       await mount({}, threaded);
-      for (let i = 0; i < 6; i++) await pressFrame('+');
-      const dpr = DRAWN[DRAWN.length - 1].dpr;
-      const bars = RECTS.filter((r) => r.h > 4 * dpr);
-      expect(bars.length, 'PRECONDITION: the bars were drawn').toBeGreaterThan(0);
-      expect(Math.max(...bars.map((r) => r.w))).toBeLessThanOrEqual(3 * dpr);
+      let pressed = 0;
+      for (const presses of [3, 6]) {
+        for (; pressed < presses - 1; pressed++) await pressFrame('+');
+        RECTS.length = 0;          // read the one frame at this zoom
+        await pressFrame('+');
+        pressed++;
+        const dpr = DRAWN[DRAWN.length - 1].dpr;
+        const bars = RECTS.filter((r) => r.h > 4 * dpr);
+        expect(bars.length, 'PRECONDITION: the bars were drawn at ' + presses + ' presses').toBeGreaterThan(0);
+        expect(Math.max(...bars.map((r) => r.w)), presses + ' presses').toBeLessThanOrEqual(3 * dpr);
+      }
     });
 
     it('at the ceiling the off-screen foot of the line is written on its body, and the on-screen foot reads off the ruler (book, chapter, verse)', async () => {
@@ -588,19 +598,25 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(container.querySelector('.sw-root').getAttribute('data-thread-labels'), 'the count of body labels drawn is published for the walks').toBe('1');
     });
 
-    it('CONTROL: in the middle band the far foot is off-screen and NO body label is written; the labels belong to the verse-numeral zoom', async () => {
+    /* w3 (the canvas stream; build spec §4.3): from about 6x a chip at each foot names both ends
+       ("Gen 2:552 · Gen 2:5101"), so in the middle band the far foot is already named, at the foot.
+       What still belongs to the verse-numeral zoom (LEG_PPV_CSS) is the far end written alone
+       beside the leg. This CONTROL pinned "no label at all under 30 px a verse"; its intent, that
+       the leg labels wait for the verse numerals, is what it pins now. */
+    it('CONTROL: in the middle band the far foot is off-screen and is named in the chip at its near foot, never beside the leg; the leg labels belong to the verse-numeral zoom', async () => {
       const { container } = await mount({}, threaded);
       for (let i = 0; i < 12; i++) await pressFrame('+');
       const last = DRAWN[DRAWN.length - 1];
       const ppvCss = last.ppv / last.dpr;
-      // the far foot (4,549 verses off) leaves the 800 px frame past 0.088 px/verse; verse numerals begin at 30
+      // the far foot (4,549 verses off) leaves the 800 px frame past 0.088 px/verse
       expect(ppvCss, 'precondition: the far foot is off-screen at this zoom (' + zoomText(container) + ')').toBeGreaterThan(0.2);
-      expect(ppvCss, 'precondition: not yet the verse-numeral band').toBeLessThan(30);
+      expect(ppvCss, 'precondition: not yet the verse-numeral band').toBeLessThan(LEG_PPV_CSS);
       TEXTS.length = 0;
       await pressFrame('ArrowLeft');
       expect(TEXTS.length, 'precondition: a frame was painted').toBeGreaterThan(0);
-      expect(TEXTS.some((t) => /Gen 2:5101|Gen 2:552/.test(t)), 'no body label in the middle band; texts: ' + TEXTS.slice(-8).join(' | ')).toBe(false);
-      expect(container.querySelector('.sw-root').getAttribute('data-thread-labels')).toBe('0');
+      expect(TEXTS, 'the chip at the near foot names both ends; texts: ' + TEXTS.slice(-8).join(' | ')).toContain('Gen 2:552 · Gen 2:5101');
+      expect(TEXTS.some((t) => /→|←/.test(t)), 'no far end written beside the leg in the middle band; texts: ' + TEXTS.slice(-8).join(' | ')).toBe(false);
+      expect(container.querySelector('.sw-root').getAttribute('data-thread-labels'), 'one thread labelled, once').toBe('1');
     });
   });
 

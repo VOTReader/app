@@ -347,7 +347,9 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     };
     const yGen = yOf('GEN'), yExo = yOf('EXO'), yLev = yOf('LEV');
     const DPR = Math.min(window.devicePixelRatio || 1, 3);
-    expect(yExo - yGen, 'EXO one row below GEN').toBe(14 * DPR);
+    // one row below at the build spec's row pitch (§3: +32 / +47 on a compact frame, +52 / +70 on a
+    // PC one; the w3 canvas stream retired the old 14 px pitch for it)
+    expect([15 * DPR, 18 * DPR], 'EXO one row below GEN').toContain(yExo - yGen);
     expect(yLev, 'LEV back on the top row').toBe(yGen);
   });
 });
