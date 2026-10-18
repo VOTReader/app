@@ -232,6 +232,23 @@ describe('verse mode: John 3:16', () => {
     expect(base.length).toBe(48);
   });
 
+  it('a change of density lights the threads it now lists, never the stale set (w3 review)', () => {
+    const { panel, props, rerender } = mount({ detail: detail() });
+    rerender(<WebPanel {...props} density="essential" />);
+    const n = Number(/· (\d+)$/.exec(panel.querySelector('.sw-sec-more .sw-sec-title').textContent)[1]);
+    expect(n).toBeGreaterThan(0);
+    expect(n).toBeLessThan(48);
+    const lit = props.lightThreads.mock.calls.at(-1)[0];
+    expect([...lit].sort((a, b) => a - b)).toEqual([...pm.threadsFrom(g, JOHN_3_16, JOHN_3_16, 'essential').ids].sort((a, b) => a - b));
+    expect(lit.length).toBe(n);
+  });
+
+  it('on My Web a change of density lights nothing (no lit set there)', () => {
+    const { props, rerender } = mount({ detail: detail(), mode: 'personal' });
+    rerender(<WebPanel {...props} density="essential" />);
+    expect(props.lightThreads).not.toHaveBeenCalled();
+  });
+
   it('a row shows that connection; its tag is its votes', () => {
     const { panel, props } = mount({ detail: detail() });
     expect(panel.querySelector('.sw-group .sw-row-tag').textContent).toMatch(/^\d+ votes?$/);

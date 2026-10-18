@@ -45,6 +45,7 @@ import {
   GROUP_ROWS, verseText, shortRef, connectionModel, verseModel, rangeModel, letterRows, zoomChapterOf, chapterName,
 } from '../../utils/scripture-web/panel-model.js';
 import { windowCorpus, letterKeyOf } from '../../utils/scripture-web/vot-citations.js';
+import { litKeyOf } from '../../utils/scripture-web/focus-state.js';
 
 /** Citations shown before "Show n more". */
 export const CITED_SHOWN = 4;
@@ -355,6 +356,15 @@ export function WebPanel(props) {
     if (webMode === 'personal' || typeof lightThreads !== 'function') return;
     lightThreads(ids && ids.length ? ids : base);
   }, [lightThreads, base, webMode]);
+  // verse mode keeps its own lit set current: a density change re-lists its threads and the lit set
+  // follows (w3 review: it stayed the set the verse was opened at). Keyed on the ids, not the array,
+  // so a corpus landing (the same threads) does not take a row's light back
+  const baseKey = litKeyOf(base);
+  React.useEffect(() => {
+    if (mode !== 'verse' || webMode === 'personal' || typeof lightThreads !== 'function') return;
+    lightThreads(base);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- baseKey is base's content: the trigger
+  }, [mode, baseKey, webMode, lightThreads]);
 
   if (!g || !mode) return null;
   const containerClass = 'sw-panel ' + (mode === 'list' ? 'sw-list' : mode === 'chooser' ? 'sw-choice' : 'sw-sheet');
