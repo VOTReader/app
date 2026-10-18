@@ -112,7 +112,9 @@ export function describeFound(found, { g, personal, cam, v, viewFor, density }) 
     return {
       kind: 'arc', a, b, votes: found.hit.votes,
       span: Math.abs(found.hit.to - found.hit.from), index: found.hit.index,
-      prophecy: found.hit.prophecy >= 0 ? found.hit.prophecy : -1,   // its pair in g.prophecy (GL, pick.pickThreads)
+      // whether it is a prophecy pair, and which (g.prophecy; GL, pick.pickThreads): the panel
+      // stream's describe carries the same two fields
+      prophecy: found.hit.prophecy >= 0, prophecyIndex: found.hit.prophecy >= 0 ? found.hit.prophecy : -1,
       from: found.hit.from, to: found.hit.to,
       cards: [verseCard('From', a), verseCard('To', b)],
     };
@@ -168,7 +170,7 @@ export function connectionTitle(info) {
 
 /** A described hit's row meta line in the chooser and the Nearby list. */
 export function connectionMeta(info) {
-  if (info.kind === 'arc') return info.prophecy >= 0 ? prophecyMeta(info) : info.votes + ' votes · ' + info.span.toLocaleString() + ' verses apart';
+  if (info.kind === 'arc') return info.prophecy ? prophecyMeta(info) : info.votes + ' votes · ' + info.span.toLocaleString() + ' verses apart';
   if (info.kind === 'chapter') {
     return info.verses + ' verses · ' + info.connections.toLocaleString() + ' connections'
       + (info.groups && info.groups.length ? ' · to ' + info.groups.length + (info.groups.length === 1 ? ' chapter' : ' chapters') : '');
@@ -180,7 +182,7 @@ export function connectionMeta(info) {
 /**
  * The meta line of a thread that is a prophecy pair (GL item 4; the mockup's chosen panel, r2-02):
  * "Prophecy fulfilled", then its votes when it is also an OpenBible arc, then how far apart.
- * @param {{ index: number, votes: number, span: number }} info  a described arc with prophecy >= 0
+ * @param {{ index: number, votes: number, span: number }} info  a described arc that is a prophecy pair
  */
 export function prophecyMeta(info) {
   return 'Prophecy fulfilled · ' + (info.index >= 0 ? info.votes + ' votes · ' : '') + info.span.toLocaleString() + ' verses apart';
@@ -198,7 +200,7 @@ export function sheetEyebrow(info) {
 /** The detail sheet's meta line. */
 export function sheetMeta(info) {
   return info.kind === 'arc'
-    ? (info.prophecy >= 0 ? prophecyMeta(info) : info.span.toLocaleString() + ' verses apart · weight ' + info.votes)
+    ? (info.prophecy ? prophecyMeta(info) : info.span.toLocaleString() + ' verses apart · weight ' + info.votes)
     : info.kind === 'link' ? LINK_KIND_NAMES[info.joins]
     : info.kind === 'underlay' ? (info.sourceName ? info.sourceName + ' · ' + info.joins : info.joins)
     : info.kind === 'bundle'

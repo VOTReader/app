@@ -58,7 +58,7 @@ import { routeOverlayHit } from './goto.jsx';
 export function panelOf(detail, choices) {
   if (detail) {
     const k = detail.kind;
-    if (k === 'arc') return { spec: detail.index < 0 && detail.prophecy >= 0 ? { mode: 'connection', arc: detail.prophecy, prophecy: true } : { mode: 'connection', arc: detail.index }, info: detail };
+    if (k === 'arc') return { spec: detail.index < 0 && detail.prophecyIndex >= 0 ? { mode: 'connection', arc: detail.prophecyIndex, prophecy: true } : { mode: 'connection', arc: detail.index }, info: detail };
     if (k === 'verse') return { spec: { mode: 'verse', verse: detail.verse }, info: detail };
     if (k === 'chapter') {
       return { spec: { mode: 'group', ids: [], label: detail.book ? detail.book.title + ' ' + detail.chapter : '', chapter: detail.chapterIndex }, info: detail };
@@ -214,7 +214,7 @@ export function useWebSelection({
     }
     // a new choice: nothing hovered, nothing lit but what the choice lights
     focusRef.current = focusState(found.kind === 'arc' || found.kind === 'link'
-      ? (found.kind === 'arc' && found.index < 0 && found.prophecy >= 0 ? { arc: found.prophecy, prophecy: true } : { arc: found.index })
+      ? (found.kind === 'arc' && found.index < 0 && found.prophecyIndex >= 0 ? { arc: found.prophecyIndex, prophecy: true } : { arc: found.index })
       : { range: found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi]
         : found.kind === 'verse' ? [found.verse, found.verse] : null });
     setTip(null);

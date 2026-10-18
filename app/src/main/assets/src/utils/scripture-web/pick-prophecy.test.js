@@ -134,7 +134,7 @@ describe('the words: a prophecy pair reads "Prophecy fulfilled" (the mockup\'s c
     const [px, py] = onPair(g, 0, 0.5);
     const hit = pickThreads(g, cam, view, px, py, 14, 4).find((h) => h.index === 1);
     const info = describeFound({ kind: 'arc', hit }, ctx(g));
-    expect(info.prophecy).toBe(0);
+    expect(info).toMatchObject({ prophecy: true, prophecyIndex: 0 });
     expect(connectionMeta(info)).toBe('Prophecy fulfilled · 141 votes · 10 verses apart');
     expect(sheetMeta(info)).toBe('Prophecy fulfilled · 141 votes · 10 verses apart');
   });
@@ -143,7 +143,7 @@ describe('the words: a prophecy pair reads "Prophecy fulfilled" (the mockup\'s c
     const g = graph();
     const [px, py] = onPair(g, 1, 0.5);
     const info = describeFound({ kind: 'arc', hit: pickThreads(g, cam, view, px, py, 14, 4)[0] }, ctx(g));
-    expect(info).toMatchObject({ kind: 'arc', index: -1, prophecy: 1 });
+    expect(info).toMatchObject({ kind: 'arc', index: -1, prophecy: true, prophecyIndex: 1 });
     expect(sheetMeta(info)).toBe('Prophecy fulfilled · 160 verses apart');
     expect(prophecyMeta({ index: -1, votes: 0, span: 15632 })).toBe('Prophecy fulfilled · 15,632 verses apart');
   });
@@ -151,7 +151,7 @@ describe('the words: a prophecy pair reads "Prophecy fulfilled" (the mockup\'s c
   it('CONTROL: an ordinary arc keeps its words', () => {
     const g = graph();
     const info = describeFound({ kind: 'arc', hit: { index: 0, from: 10, to: 150, votes: 30 } }, ctx(g));
-    expect(info.prophecy).toBe(-1);
+    expect(info).toMatchObject({ prophecy: false, prophecyIndex: -1 });
     expect(connectionMeta(info)).toBe('30 votes · 140 verses apart');
     expect(sheetMeta(info)).toBe('140 verses apart · weight 30');
   });
