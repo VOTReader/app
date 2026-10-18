@@ -61,8 +61,12 @@
 
    in that order, so the chosen line is drawn last, on top. This file builds
    that small set as instance data (feet and fans), once per change of what
-   is chosen, hovered or lit: the set carries a key, and a renderer uploads
-   it only when the key differs from the one it holds.
+   is chosen, hovered or lit (topSet: the same ask is the same set). Each
+   frame topDraws keeps of it what touches the frame, by the main pass's own
+   cull, and draws each kind in a few runs by segment class, every thread
+   near its own count (GL review 2026-10-18: the uncut pass sent the whole
+   class at its most segments wherever the camera stood); a renderer uploads
+   the packing only when it changes.
 
    A thread here stands on the same feet as in the main pass (decode.fansOf),
    so the redraw lies exactly over the line it covers and the picker
@@ -72,7 +76,7 @@
 
 import { fansOf, bucketDrawCount } from './decode.js';
 import {
-  arcFrameTau, frameSegments, frameHeights, CLIP_MARGIN, FLYOVER_MARGIN,
+  arcFrameTau, frameSegments, frameHeights, topSegmentsFor, CLIP_MARGIN, FLYOVER_MARGIN, TOP_SEGMENT_MIN,
 } from './geometry.js';
 
 /** The top pass's kinds, in drawing order: the chosen line last, on top. */
@@ -295,6 +299,108 @@ export function topSet(g, v, prev) {
     focusArc: askOf(v.focusArc), focusProphecy: askOf(v.focusProphecy),
     range, range2,
   };
+}
+
+/**
+ * The top pass's segment classes: from TOP_SEGMENT_MIN up by sqrt 2, rounded up. A thread is
+ * drawn at the first class at or over its own count (geometry.topSegmentsFor, under its kind's
+ * cap), so it is drawn at most about sqrt 2 over what it asks for, and a kind in a few runs.
+ */
+export const TOP_CLASSES = Object.freeze(Array.from({ length: 12 }, (_, c) => Math.ceil(TOP_SEGMENT_MIN * 2 ** (c / 2))));
+
+/**
+ * @typedef {{ kind: string, first: number, count: number, segments: number }} TopRun
+ * @typedef {{ width: number, base: number, camX: number, camY: number, ppv: number,
+ *   squash: number, dpr: number }} TopFrame
+ * @typedef {{ set: TopSet, frame: TopFrame, caps: number[], pads: number[], fresh: boolean,
+ *   count: number, ids: Int32Array, from: Uint16Array, to: Uint16Array, fanA: Float32Array,
+ *   fanB: Float32Array, runs: TopRun[], vertices: number }} TopDraws
+ *   ids[k]: the set's thread drawn k-th (an index into set.from); from .. fanB: its instance data,
+ *   packed in draw order; runs: one draw each, in TOP_ORDER, a kind's threads by class;
+ *   fresh: whether the packing differs from prev's (the renderer uploads only then)
+ */
+
+const TOP_TAU = new Float64Array(2);
+const TOP_HEIGHTS = new Float64Array(2);
+/**
+ * What the top pass draws this frame (GL review 2026-10-18): of the set's threads, those whose
+ * ribbon touches the frame, by the main pass's own test (arcFrameTau on the drawn feet, the
+ * heights frameHeights gives widened by the kind's ribbon half width), each kind in runs by
+ * segment class (TOP_CLASSES), the threads of a class in the set's order. A kind is one ink, so
+ * the order inside it does not change the picture; the kinds keep TOP_ORDER, the chosen last.
+ * `prev` comes back as it is when nothing it reads changed.
+ * @param {TopSet} set
+ * @param {TopFrame} f  the frame and camera, device px (camY: the camera's height)
+ * @param {ArrayLike<number>} caps  per TOP_ORDER kind: its most segments
+ * @param {ArrayLike<number>} pads  per TOP_ORDER kind: its ribbon's half width, device px
+ * @param {TopDraws | null} [prev]
+ * @returns {TopDraws}
+ */
+export function topDraws(set, f, caps, pads, prev) {
+  if (prev && prev.set === set && sameFrame(prev.frame, f) && sameList(prev.caps, caps) && sameList(prev.pads, pads)) return prev;
+  const n = set.count;
+  const W = f.width, half = W / 2, ppv = f.ppv;
+  const s = f.squash > 0 ? f.squash : 1, d = f.dpr > 0 ? f.dpr : 1;
+  frameHeights(f.base, f.camY, d, TOP_HEIGHTS);
+  const cls = new Int8Array(n).fill(-1);
+  const ids = new Int32Array(n);
+  /** @type {TopRun[]} */
+  const runs = [];
+  const tally = new Int32Array(TOP_CLASSES.length);
+  let at = 0, vertices = 0;
+  for (const range of set.ranges) {
+    if (!range.count) continue;
+    const ki = TOP_ORDER.indexOf(range.kind);
+    const cap = caps[ki] > TOP_SEGMENT_MIN ? caps[ki] : TOP_SEGMENT_MIN;
+    const pad = pads[ki] > 0 ? pads[ki] : 0;
+    const hLo = TOP_HEIGHTS[0] - pad, hHi = TOP_HEIGHTS[1] + pad;
+    tally.fill(0);
+    for (let j = range.first; j < range.first + range.count; j++) {
+      // geometry.footX, without a camera object; the feet are in canon order
+      const x0 = (set.from[j] + 0.5 + set.fanA[j] - f.camX) * ppv + half;
+      const x1 = (set.to[j] + 0.5 + set.fanB[j] - f.camX) * ppv + half;
+      const r = (x1 - x0) * 0.5;
+      if (!arcFrameTau(x0, x1, W, (r > 0 ? r : 0) * s, hLo, hHi, TOP_TAU)) continue;
+      const own = topSegmentsFor(x0, x1, W, s, d, cap);
+      let c = 0;
+      while (c < TOP_CLASSES.length - 1 && TOP_CLASSES[c] < own && TOP_CLASSES[c] < cap) c++;
+      cls[j] = c;
+      tally[c]++;
+    }
+    for (let c = 0; c < TOP_CLASSES.length; c++) {
+      if (!tally[c]) continue;
+      const segments = TOP_CLASSES[c] < cap ? TOP_CLASSES[c] : cap;
+      runs.push({ kind: range.kind, first: at, count: tally[c], segments });
+      for (let j = range.first; j < range.first + range.count; j++) if (cls[j] === c) ids[at++] = j;
+      vertices += 2 * (segments + 1) * tally[c];
+    }
+  }
+  const from = new Uint16Array(at), to = new Uint16Array(at);
+  const fanA = new Float32Array(at), fanB = new Float32Array(at);
+  for (let k = 0; k < at; k++) {
+    const j = ids[k];
+    from[k] = set.from[j]; to[k] = set.to[j]; fanA[k] = set.fanA[j]; fanB[k] = set.fanB[j];
+  }
+  let fresh = !prev || prev.set !== set || prev.count !== at;
+  for (let k = 0; !fresh && k < at; k++) fresh = prev.ids[k] !== ids[k];
+  return {
+    set, frame: { width: W, base: f.base, camX: f.camX, camY: f.camY, ppv, squash: f.squash, dpr: f.dpr },
+    caps: Array.from(caps), pads: Array.from(pads), fresh,
+    count: at, ids, from, to, fanA, fanB, runs, vertices,
+  };
+}
+
+/** @param {TopFrame} a @param {TopFrame} b */
+function sameFrame(a, b) {
+  return a.width === b.width && a.base === b.base && a.camX === b.camX && a.camY === b.camY
+    && a.ppv === b.ppv && a.squash === b.squash && a.dpr === b.dpr;
+}
+
+/** @param {ArrayLike<number>} a @param {ArrayLike<number>} b */
+function sameList(a, b) {
+  if (a.length !== b.length) return false;
+  for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) return false;
+  return true;
 }
 
 /* ── the visible set (E1) ─────────────────────────────────────────────── */

@@ -371,8 +371,9 @@ describe('the ruler band is never painted by the web (scissor at the ruler\'s to
     const { calls, canvas } = recordingGL();
     const r = /** @type {any} */ (createRenderer(canvas, tinyGraph()));
     // camY 180 lifts the camera past the one thread's apex (60 px): the height
-    // cull (E1) leaves only the chosen line's top pass, still scissored
-    for (const [camY, want] of [[0, 2], [40, 2], [180, 1]]) {
+    // cull (E1) leaves nothing of it in the frame, and since GL review finding 4
+    // the top pass is culled by the same test, so the chosen line is not drawn either
+    for (const [camY, want] of [[0, 2], [40, 2], [180, 0]]) {
       calls.length = 0;
       r.draw(view({ camY }));
       const names = calls.map((c) => c[0]);
@@ -383,9 +384,9 @@ describe('the ruler band is never painted by the web (scissor at the ruler\'s to
       const rows = Math.ceil(260.4 + 2);
       expect(calls.find((c) => c[0] === 'scissor')[1]).toEqual([0, 720 - rows, 800, rows]);
       const drawsAt = calls.map((c, i) => (c[0] === 'drawArraysInstanced' ? i : -1)).filter((i) => i >= 0);
-      expect(drawsAt.length, `camY ${camY}: the main pass (if in the frame) and the chosen line`).toBe(want);
+      expect(drawsAt.length, `camY ${camY}: the main pass and the chosen line, when in the frame`).toBe(want);
       for (const i of drawsAt) expect(i > on && i < off, `draw at ${i} inside the scissor`).toBe(true);
-      expect(off, 'and off again at the frame\'s end').toBeGreaterThan(drawsAt[drawsAt.length - 1]);
+      expect(off, 'and off again at the frame\'s end').toBeGreaterThan(want ? drawsAt[drawsAt.length - 1] : on);
     }
     // My Web's ground: one clear over the whole canvas, no scissor
     calls.length = 0;
@@ -507,19 +508,25 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     prophecy: [{ a: 100, b: 150, studyId: 's', chapterId: 'c' }, { a: 5, b: 180, studyId: 's', chapterId: 'c' }],
   });
 
-  it('the prophecy class is drawn with nothing asked about, every pair in one draw, in the prophecy ink, before the chosen', () => {
+  // the class's draws: since GL review finding 4 the pass draws a kind in runs by segment class,
+  // so "every pair in one draw" is now every pair drawn, each draw in the class's ink
+  const instancesOf = (pass) => pass.reduce((n, d) => n + d.args[3], 0);
+
+  it('the prophecy class is drawn with nothing asked about, every pair of it, in the prophecy ink, before the chosen', () => {
     const { calls, r } = build(prophetic());
     const idle = frame(r, calls, {});
-    expect(idle.u(idle.top, 'uCore')).toEqual([rgba01('prophecy')]);
-    expect(idle.u(idle.top, 'uHalo')).toEqual([rgba01('prophecyGlow')]);
-    expect(idle.u(idle.top, 'uCoreHalf')).toEqual([[0.5]]);   // 1 device px at dpr 1
-    expect(idle.u(idle.top, 'uHaloHalf')).toEqual([[inkWidth('prophecyGlow') / 2]]);
-    expect(idle.top.length).toBe(1);
-    expect(idle.top[0].args[3]).toBe(2);
+    // each of the class's draws (a run per segment class) in its ink and widths
+    const each = (name, want) => expect(idle.u(idle.top, name)).toEqual(idle.top.map(() => want));
+    each('uCore', rgba01('prophecy'));
+    each('uHalo', rgba01('prophecyGlow'));
+    each('uCoreHalf', [0.5]);   // 1 device px at dpr 1
+    each('uHaloHalf', [inkWidth('prophecyGlow') / 2]);
+    expect(instancesOf(idle.top)).toBe(2);
     expect(idle.stats.instances).toBe(3);   // stats count the web alone
     expect(idle.stats.draws).toBe(idle.main.length);
     const chosen = frame(r, calls, { focusArc: 0 });
-    const [pc, cc] = chosen.u(chosen.top, 'uCore');
+    const cores = chosen.u(chosen.top, 'uCore');
+    const pc = cores[0], cc = cores[cores.length - 1];
     expect(cc).toEqual(rgba01('chosen'));
     expect(pc.slice(0, 3)).toEqual(rgba01('prophecy').slice(0, 3));
     expect(pc[3]).toBeCloseTo(rgba01('prophecy')[3] * TAP_CONTEXT, 12);
@@ -529,7 +536,7 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     const { calls, r } = build(prophetic());
     for (const density of ['essential', 'famous', 'all']) {
       const f = frame(r, calls, { density });
-      expect(f.top[0].args[3], density).toBe(2);
+      expect(instancesOf(f.top), density).toBe(2);
     }
   });
 
@@ -566,10 +573,33 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(rgba01('prophecyGlow')[3]).toBeLessThan(rgba01('chosenHalo')[3] / 2);
   });
 
+  /* GL review 2026-10-18 (finding 4): the top pass was never culled, so every pair went to the GPU
+     wherever the camera stood. It draws what touches the frame (frame-set.topDraws), and its
+     stats are what it sent. */
+  it('the top pass draws only what touches the frame: a pan past every pair draws none of them', () => {
+    const { calls, r } = build(prophetic());
+    const here = frame(r, calls, {});
+    expect(instancesOf(here.top)).toBe(2);
+    const segs = here.u(here.top, 'uSegments').map((u) => u[0]);
+    expect(r.topStats).toEqual({
+      instances: 2, draws: here.top.length,
+      vertices: here.top.reduce((n, d, k) => n + 2 * (segs[k] + 1) * d.args[3], 0),
+    });
+    here.top.forEach((d, k) => expect(d.args[2], 'a draw\'s strip is its own run\'s').toBe(2 * (segs[k] + 1)));
+    // verses 950 to 1050 across the frame, past the graph's 200: nothing of the class is there
+    const away = frame(r, calls, { camX: 1000 });
+    expect(away.top).toEqual([]);
+    expect(r.topStats).toEqual({ instances: 0, vertices: 0, draws: 0 });
+    // and back: the pairs are drawn again, the same draws
+    const back = frame(r, calls, {});
+    expect(back.top.map((d) => d.args)).toEqual(here.top.map((d) => d.args));
+  });
+
   it('a chosen prophecy pair that is no arc takes the chosen ink on its own feet', () => {
     const { calls, r } = build(prophetic());
     const f = frame(r, calls, { focusProphecy: 1 });
-    const [pc, cc] = f.u(f.top, 'uCore');
+    const cores = f.u(f.top, 'uCore');
+    const pc = cores[0], cc = cores[cores.length - 1];
     expect(cc).toEqual(rgba01('chosen'));
     expect(pc[3]).toBeCloseTo(rgba01('prophecy')[3] * TAP_CONTEXT, 12);
     expect(f.top[f.top.length - 1].args[3]).toBe(1);

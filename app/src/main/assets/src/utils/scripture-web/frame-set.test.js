@@ -11,7 +11,7 @@ import { runInNewContext } from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import {
-  prophecySet, topSet, topSetKey, isCompact, COMPACT_HEIGHT_CSS, TOP_ORDER,
+  prophecySet, topSet, topSetKey, topDraws, TOP_CLASSES, isCompact, COMPACT_HEIGHT_CSS, TOP_ORDER,
   drawOrder, frameSetAt, frameSet, inFrame, RUN_DRAW_VERTICES, ORDER_STEPS, spanStep,
 } from './frame-set.js';
 import * as dec from './decode.js';
@@ -573,6 +573,195 @@ describe('the top pass on the asset: the class follows the chosen range', () => 
     expect(rest.count + kept.count, 'the class is whole: every distinct pair, once').toBe(prophecySet(g).unique);
     for (let j = rest.first; j < rest.first + rest.count; j++) {
       expect(want.has(s.from[j] + ':' + s.to[j]), 'a receding pair has no foot in Isaiah 7').toBe(false);
+    }
+  });
+});
+
+/* GL review 2026-10-18 (finding 4): the top pass drew every thread of its set, in one draw per
+   kind at the kind's most segments, wherever the camera stood (~50k vertex invocations a frame
+   for the prophecy class alone). topDraws culls it by the main pass's own test (arcFrameTau on
+   the drawn feet, the heights widened by the kind's ribbon) and draws each kind in runs by
+   segment class (TOP_CLASSES), so a thread is drawn at most about sqrt 2 over its own count. */
+
+/** The oracle: whether any point of the drawn curve stands inside the frame's box widened by
+ *  `pad` (the ribbon) and `grow` (the sampling's slack), sampled densely along its parameter. */
+function touchesFrame(x0, x1, f, pad, grow) {
+  const A = ((x1 - x0) / 2) * f.squash;
+  const [hLo, hHi] = geo.frameHeights(f.base, f.camY, f.dpr);
+  const m = geo.CLIP_MARGIN + grow;
+  for (let i = 0; i <= 6000; i++) {
+    const p = geo.arcPointAt((Math.PI * i) / 6000, x0, x1, A);
+    if (p.x >= -m && p.x <= f.width + m && p.h >= hLo - pad - grow && p.h <= hHi + pad + grow) return true;
+  }
+  return false;
+}
+const footsOf = (set, j, f) => [
+  (set.from[j] + 0.5 + set.fanA[j] - f.camX) * f.ppv + f.width / 2,
+  (set.to[j] + 0.5 + set.fanB[j] - f.camX) * f.ppv + f.width / 2,
+];
+const CAPS = TOP_ORDER.map((k) => (k === 'hover' || k === 'chosen' ? 512 : 192));
+const PADS = TOP_ORDER.map((k) => (k === 'hover' || k === 'chosen' ? 5.5 : 2.5));
+
+/** Every law topDraws keeps, checked against the oracle and the set it was handed. */
+function checkDraws(set, f, td, label) {
+  // the runs: in TOP_ORDER, each inside one kind, cutting [0, count) in order
+  let at = 0, vertices = 0, own = 0;
+  const kinds = set.ranges.map((r) => r.kind);
+  let lastKind = -1;
+  for (const run of td.runs) {
+    expect(run.first, label).toBe(at);
+    expect(run.count, label).toBeGreaterThan(0);
+    const ki = kinds.indexOf(run.kind);
+    expect(ki, label + ': kinds in order').toBeGreaterThanOrEqual(lastKind);
+    lastKind = ki;
+    const range = set.ranges[ki];
+    for (let k = run.first; k < run.first + run.count; k++) {
+      const j = td.ids[k];
+      expect(j >= range.first && j < range.first + range.count, label + ': a run holds its own kind').toBe(true);
+      expect([td.from[k], td.to[k], td.fanA[k], td.fanB[k]]).toEqual([set.from[j], set.to[j], set.fanA[j], set.fanB[j]]);
+      const [x0, x1] = footsOf(set, j, f);
+      const n = geo.topSegmentsFor(x0, x1, f.width, f.squash, f.dpr, CAPS[TOP_ORDER.indexOf(run.kind)]);
+      expect(run.segments, label + ': never under its own count (no facet)').toBeGreaterThanOrEqual(n);
+      if (run.segments > geo.TOP_SEGMENT_MIN) {
+        expect(run.segments, label + ': at most about sqrt 2 over it').toBeLessThanOrEqual(Math.ceil(Math.SQRT2 * n));
+      }
+      own += 2 * (n + 1);
+    }
+    vertices += 2 * (run.segments + 1) * run.count;
+    at += run.count;
+  }
+  expect(at, label).toBe(td.count);
+  expect(td.vertices, label).toBe(vertices);
+  expect(td.vertices, label).toBeLessThanOrEqual(Math.SQRT2 * own + 2 * td.count);
+  // the cull: every thread whose ribbon touches the frame, and no other
+  const drawn = new Set(Array.from(td.ids.subarray(0, td.count)));
+  for (const range of set.ranges) {
+    const pad = PADS[TOP_ORDER.indexOf(range.kind)];
+    for (let j = range.first; j < range.first + range.count; j++) {
+      const [x0, x1] = footsOf(set, j, f);
+      if (touchesFrame(x0, x1, f, pad, 0)) expect(drawn.has(j), `${label}: ${range.kind} ${j} shows and is drawn`).toBe(true);
+      else if (!touchesFrame(x0, x1, f, pad, 3)) expect(drawn.has(j), `${label}: ${range.kind} ${j} is nowhere near and is culled`).toBe(false);
+    }
+  }
+  return { vertices, own };
+}
+
+describe('topDraws: the top pass draws what touches the frame, each thread near its own segments', () => {
+  const W = 800, base = 260, squash = geo.squashFactor(240, 800);
+  const at = (camX, ppv, over) => Object.assign({ width: W, base, camX, camY: 0, ppv, squash, dpr: 1 }, over);
+  const ask = { lit: null, litKey: '', hoverArc: -1, focusArc: 0, focusProphecy: -1 };
+
+  it('TOP_CLASSES: from TOP_SEGMENT_MIN up by sqrt 2, rounded up', () => {
+    expect(TOP_CLASSES[0]).toBe(geo.TOP_SEGMENT_MIN);
+    expect(Array.from(TOP_CLASSES.slice(0, 9))).toEqual([16, 23, 32, 46, 64, 91, 128, 182, 256]);
+    for (let c = 1; c < TOP_CLASSES.length; c++) expect(TOP_CLASSES[c] / TOP_CLASSES[c - 1]).toBeLessThan(1.46);
+    expect(TOP_CLASSES[TOP_CLASSES.length - 1]).toBeGreaterThanOrEqual(512);
+  });
+
+  it('the overview draws every thread; a deep camera only those under it, by the oracle', () => {
+    const g = graph();
+    const set = topSet(g, ask);
+    const fit = W / g.total;
+    const wide = topDraws(set, at(100, fit), CAPS, PADS);
+    expect(wide.count, 'the overview: the class and the chosen line').toBe(set.count);
+    checkDraws(set, at(100, fit), wide, 'overview');
+    // verses 55 to 75 across the frame: pair 0 (60 to 70) stands in it; the chosen arc (10 to 150)
+    // and the pairs 120 to 190 and 5 to 180 pass far above it or beside it
+    const deep = topDraws(set, at(65, 40), CAPS, PADS);
+    expect(Array.from(deep.ids.subarray(0, deep.count))).toEqual([0]);
+    expect(deep.runs).toEqual([{ kind: 'prophecy', first: 0, count: 1, segments: deep.runs[0].segments }]);
+    checkDraws(set, at(65, 40), deep, 'deep');
+    // in the sky the same feet are under the frame: nothing of them is there to see
+    const sky = topDraws(set, at(65, 40, { camY: 4000 }), CAPS, PADS);
+    checkDraws(set, at(65, 40, { camY: 4000 }), sky, 'sky');
+    expect(sky.count).toBe(0);
+  });
+
+  it('the same frame is the same draws; a pan that keeps the packing is not fresh, one that changes it is', () => {
+    const g = graph();
+    const set = topSet(g, ask);
+    const a = topDraws(set, at(65, 40), CAPS, PADS);
+    expect(a.fresh, 'the first is always fresh').toBe(true);
+    expect(topDraws(set, at(65, 40), CAPS, PADS, a)).toBe(a);
+    const b = topDraws(set, at(65.01, 40), CAPS, PADS, a);
+    expect(b).not.toBe(a);
+    expect(b.fresh, 'the same threads in the same order: nothing to upload').toBe(false);
+    const c = topDraws(set, at(100, W / g.total), CAPS, PADS, b);
+    expect(c.fresh).toBe(true);
+    // a new set is always fresh, a new ribbon or cap is a new draws
+    expect(topDraws(topSet(g, Object.assign({}, ask, { focusArc: 1 })), at(100, W / g.total), CAPS, PADS, c).fresh).toBe(true);
+    expect(topDraws(set, at(100, W / g.total), CAPS, PADS.map((p) => p + 1), c)).not.toBe(c);
+  });
+
+  it('nothing in the set: nothing drawn', () => {
+    const bare = Object.assign(graph(), { prophecy: [] });
+    const set = topSet(bare, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 });
+    const td = topDraws(set, at(100, 4), CAPS, PADS);
+    expect([td.count, td.runs.length, td.vertices]).toEqual([0, 0, 0]);
+  });
+});
+
+describe('topDraws on the asset: the prophecy class culled and drawn near its own segments', () => {
+  const ASSET = resolve(dirname(fileURLToPath(import.meta.url)), '../../data/scripture-web-data.js');
+  const g = dec.decodeGraph(runInNewContext(readFileSync(ASSET, 'utf8') + ';SCRIPTURE_WEB_DATA', {}));
+  const devices = [
+    { name: 'pc', W: 1600, H: 900, DPR: 1 },
+    { name: 'phone', W: Math.round(891 * 2.6), H: Math.round(411 * 2.6), DPR: 2.6 },
+  ];
+  const set = topSet(g, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 });
+  /** the old top pass: every thread of a kind in one draw at the kind's most segments */
+  const uncut = (f) => {
+    let v = 0;
+    for (const range of set.ranges) {
+      let most = 0;
+      for (let j = range.first; j < range.first + range.count; j++) {
+        const [x0, x1] = footsOf(set, j, f);
+        most = Math.max(most, geo.topSegmentsFor(x0, x1, f.width, f.squash, f.dpr, CAPS[TOP_ORDER.indexOf(range.kind)]));
+      }
+      v += 2 * (most + 1) * range.count;
+    }
+    return v;
+  };
+
+  /* Measured 2026-10-18 (vertex invocations, the class alone; uncut is the old pass): PC overview
+     24,446 of 50,566, 6.5x 17,152, 42.9x 8,026, the ceiling 386; phone overview 15,180 of 35,894,
+     42.9x 7,118, the ceiling 0. Every pin below has headroom over those. */
+  it('at every camera the laws hold, and the class costs a fraction of the uncut pass, less the deeper the camera', () => {
+    const report = [];
+    for (const dev of devices) {
+      const wf = webFrame(dev, false);
+      const squash = geo.squashFactor(wf.ceil, dev.W);
+      const fit = dev.W / g.total, zMax = geo.maxZoomFor(g.total, dev.W / dev.DPR);
+      const cams = [
+        { name: 'overview', x: g.total / 2, y: 0, ppv: fit },
+        { name: '6.5x', x: 14000.3, y: 0, ppv: fit * 6.55 },
+        { name: '42.9x', x: 14000.3, y: 0, ppv: fit * 42.9 },
+        { name: 'ceiling', x: 14000.3, y: 0, ppv: fit * zMax },
+        { name: 'sky 42.9x', x: 14000.3, y: 3 * wf.ceil, ppv: fit * 42.9 },
+        { name: 'Isaiah 7 at 42.9x', x: 17795, y: 0, ppv: fit * 42.9 },
+      ];
+      for (const c of cams) {
+        const f = { width: dev.W, base: wf.base, camX: c.x, camY: c.y, ppv: c.ppv, squash, dpr: dev.DPR };
+        const td = topDraws(set, f, CAPS, PADS);
+        const label = `${dev.name} ${c.name}`;
+        checkDraws(set, f, td, label);
+        report.push({ label, count: td.count, vertices: td.vertices, uncut: uncut(f), runs: td.runs.length });
+      }
+    }
+    const of = (label) => report.find((r) => r.label === label);
+    for (const dev of devices) {
+      const o = of(dev.name + ' overview');
+      expect(o.count, `${dev.name}: the overview draws the whole class`).toBe(set.count);
+      expect(o.runs, `${dev.name}: in a few runs`).toBeLessThanOrEqual(9);
+      expect(o.vertices, `${dev.name}: the overview at about half the uncut pass`).toBeLessThan(o.uncut * 0.55);
+      for (const name of ['42.9x', 'ceiling', 'sky 42.9x']) {
+        const r = of(dev.name + ' ' + name);
+        expect(r.vertices, `${dev.name} ${name}: under a fifth of the uncut pass`).toBeLessThan(r.uncut / 5);
+      }
+      const falling = ['overview', '6.5x', '42.9x', 'ceiling'].map((name) => of(dev.name + ' ' + name).vertices);
+      for (let k = 1; k < falling.length; k++) expect(falling[k], `${dev.name}: deeper sends less`).toBeLessThan(falling[k - 1]);
+      expect(falling[3], `${dev.name}: the ceiling in the hundreds`).toBeLessThan(1000);
+      expect(of(dev.name + ' Isaiah 7 at 42.9x').count, `${dev.name}: Isaiah 7's pairs stand in the frame`).toBeGreaterThan(0);
     }
   });
 });

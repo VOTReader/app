@@ -30,7 +30,9 @@
    on) and redraws the few threads the reader has asked about (the lit, the
    hovered, the chosen: utils/scripture-web/frame-set.js) in
    the ink table's gold (sw-ink.js), a core under a soft halo, each
-   tessellated for its own visible piece (geometry.topSegmentsFor), so the
+   tessellated for its own visible piece (geometry.topSegmentsFor), culled
+   by the main pass's own test and drawn in runs by segment class
+   (frame-set.topDraws), so the
    chosen line shows no facet at any zoom and is never drawn under another
    (digest C1, C3, item 10). While a line is chosen the rest of the web
    recedes to TAP_CONTEXT, eased (uTapFade), the prophecy class with it but
@@ -48,12 +50,12 @@
 
 import {
   arcShapeGLSL, arcFrameGLSL, flyOverGLSL, CLIP_MARGIN, glslFloat, frameHeights,
-  STROKE_MIN_CSS, STROKE_DEEP_CSS, skyLocalize, topSegmentsFor,
+  STROKE_MIN_CSS, STROKE_DEEP_CSS, skyLocalize,
 } from '../../utils/scripture-web/geometry.js';
 import {
   CENTRE_BRIGHT, CENTRE_WIDTH, FLYOVER_LEG_WIDTH, TAP_CONTEXT, rgba01, inkWidth,
 } from '../../utils/scripture-web/sw-ink.js';
-import { topSet, isCompact, frameSetAt } from '../../utils/scripture-web/frame-set.js';
+import { topSet, topDraws, isCompact, frameSetAt, TOP_ORDER } from '../../utils/scripture-web/frame-set.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
 import { fansOf } from '../../utils/scripture-web/decode.js';
 
@@ -512,8 +514,8 @@ export function createRenderer(canvas, graph, opts = {}) {
   gl.vertexAttribIPointer(idLoc, 1, idType, 0, 0);
   let streamSerial = -1;
 
-  // The top pass's instances: a handful of threads, re-uploaded only when
-  // what is lit, hovered or chosen changes (frame-set.js topSet's key).
+  // The top pass's instances: what of the top set touches the frame, packed
+  // by run (frame-set.js topDraws), re-uploaded only when the packing changes.
   const topVao = gl.createVertexArray();
   gl.bindVertexArray(topVao);
   /** @type {Array<{buf:WebGLBuffer, loc:number, type:number, isInt:boolean, bytes:number, field:string}>} */
@@ -532,6 +534,13 @@ export function createRenderer(canvas, graph, opts = {}) {
   topAttrib('fanB', 'aFanB', gl.FLOAT, false, 4);
   /** @type {import('../../utils/scripture-web/frame-set.js').TopSet | null} */
   let topHeld = null;
+  /** @type {import('../../utils/scripture-web/frame-set.js').TopDraws | null} */
+  let topDrawn = null;
+  // what topDraws reads each frame, filled in place (E3): the frame, and each kind's cap and
+  // ribbon half width (its look's), in TOP_ORDER
+  const topFrame = { width: 0, base: 0, camX: 0, camY: 0, ppv: 0, squash: 0, dpr: 1 };
+  const topCaps = TOP_ORDER.map((kind) => TOP_LOOK[kind].cap);
+  const topPads = TOP_ORDER.map(() => 0);
   const pointTop = (first) => {
     for (const a of topAttribs) {
       gl.bindBuffer(gl.ARRAY_BUFFER, a.buf);
@@ -551,30 +560,6 @@ export function createRenderer(canvas, graph, opts = {}) {
     looks[kind] = { dpr, compact, fade, px, look };
     return look;
   };
-  // Each range's segments, recomputed only when the camera or the set moves.
-  const topSegs = new Int32Array(8);
-  const topSegKey = new Float64Array(5).fill(NaN);
-  let topSegSet = null;
-  const topSegmentsOf = (set, width, camX, ppv, squash, dpr) => {
-    const k = topSegKey;
-    if (topSegSet === set && k[0] === width && k[1] === camX && k[2] === ppv && k[3] === squash && k[4] === dpr) return;
-    topSegSet = set;
-    k[0] = width; k[1] = camX; k[2] = ppv; k[3] = squash; k[4] = dpr;
-    const half = width / 2;
-    for (let ri = 0; ri < set.ranges.length; ri++) {
-      const range = set.ranges[ri];
-      const cap = TOP_LOOK[range.kind].cap;
-      let segments = 0;
-      for (let j = range.first; j < range.first + range.count; j++) {
-        // geometry.footX, without a camera object
-        const n = topSegmentsFor((set.from[j] + 0.5 + set.fanA[j] - camX) * ppv + half,
-          (set.to[j] + 0.5 + set.fanB[j] - camX) * ppv + half, width, squash, dpr, cap);
-        if (n > segments) segments = n;
-      }
-      topSegs[ri] = segments;
-    }
-  };
-
   const heights = new Float64Array(2);
   /** The main pass's last frame: instances and vertex invocations it sent, in how many draws. */
   const stats = { instances: 0, vertices: 0, draws: 0 };
@@ -588,18 +573,29 @@ export function createRenderer(canvas, graph, opts = {}) {
    */
   const drawTop = (v, camX, ppv, camXHi, camY, dpr, tapFade, px) => {
     const set = topSet(graph, v, topHeld);
-    if (set !== topHeld) {
-      topHeld = set;
-      gl.bindVertexArray(topVao);
-      for (const a of topAttribs) {
-        gl.bindBuffer(gl.ARRAY_BUFFER, a.buf);
-        gl.bufferData(gl.ARRAY_BUFFER, set[a.field], gl.DYNAMIC_DRAW);
-      }
-    }
+    topHeld = set;
     topStats.instances = 0; topStats.vertices = 0; topStats.draws = 0;
     if (!set.count) return;
     const compact = isCompact(v.height / dpr);
-    topSegmentsOf(set, v.width, camX, ppv, v.squash, dpr);
+    for (let k = 0; k < TOP_ORDER.length; k++) {
+      const kind = TOP_ORDER[k];
+      topPads[k] = lookOf(kind, dpr, compact, TOP_LOOK[kind].recedes ? tapFade : 0, px).ribbon;
+    }
+    const f = topFrame;
+    f.width = v.width; f.base = v.base; f.camX = camX; f.camY = camY; f.ppv = ppv; f.squash = v.squash; f.dpr = dpr;
+    const drawn = topDraws(set, f, topCaps, topPads, topDrawn);
+    if (drawn !== topDrawn) {
+      // an empty packing keeps the buffers: the next fresh one replaces them
+      if (drawn.fresh && drawn.count) {
+        gl.bindVertexArray(topVao);
+        for (const a of topAttribs) {
+          gl.bindBuffer(gl.ARRAY_BUFFER, a.buf);
+          gl.bufferData(gl.ARRAY_BUFFER, drawn[a.field], gl.DYNAMIC_DRAW);
+        }
+      }
+      topDrawn = drawn;
+    }
+    if (!drawn.count) return;
     gl.useProgram(topProgram);
     gl.bindVertexArray(topVao);
     TU.f2('uRes', v.width, v.height);
@@ -610,22 +606,20 @@ export function createRenderer(canvas, graph, opts = {}) {
     TU.f1('uSquash', v.squash);
     TU.f1('uCamY', camY);
     TU.f1('uFeather', px);
-    for (let ri = 0; ri < set.ranges.length; ri++) {
-      const range = set.ranges[ri];
-      if (!range.count) continue;
-      const look = lookOf(range.kind, dpr, compact, TOP_LOOK[range.kind].recedes ? tapFade : 0, px);
-      const segments = topSegs[ri];
-      TU.f1('uSegments', segments);
+    for (let ri = 0; ri < drawn.runs.length; ri++) {
+      const run = drawn.runs[ri];
+      const look = lookOf(run.kind, dpr, compact, TOP_LOOK[run.kind].recedes ? tapFade : 0, px);
+      TU.f1('uSegments', run.segments);
       TU.f1('uRibbonHalf', look.ribbon);
       TU.f1('uRibbon', look.ribbon);
       TU.f1('uCoreHalf', look.coreHalf);
       TU.f1('uHaloHalf', look.haloHalf);
       TU.f4('uCore', look.core);
       TU.f4('uHalo', look.halo);
-      pointTop(range.first);
-      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 2 * (segments + 1), range.count);
-      topStats.instances += range.count;
-      topStats.vertices += 2 * (segments + 1) * range.count;
+      pointTop(run.first);
+      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 2 * (run.segments + 1), run.count);
+      topStats.instances += run.count;
+      topStats.vertices += 2 * (run.segments + 1) * run.count;
       topStats.draws++;
     }
     gl.bindVertexArray(vao);
