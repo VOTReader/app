@@ -72,4 +72,11 @@ describe('the load error (item 24)', () => {
     expect(container.querySelector('.sw-loading'), 'the loader').toBeTruthy();
     expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
   });
+
+  it('while the web is woven, the density names no count it does not have yet ("Famous", not "Famous · 0")', async () => {
+    render(<ScriptureWebScreen {...baseProps()} />);
+    await act(async () => { await Promise.resolve(); });
+    const select = /** @type {HTMLSelectElement} */ (screen.getByLabelText('Connection density'));
+    expect([...select.options].map((o) => o.textContent)).toEqual(['Famous', 'Essential']);
+  });
 });

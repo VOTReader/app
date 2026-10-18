@@ -465,8 +465,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
                   setMenuOpen(false);
                 }}>
                 {/* each density with its count and one line (Q6); closed, the face reads its name */}
-                <option value="famous">{densityLine('famous', famousCount)}</option>
-                <option value="essential">{densityLine('essential', essentialCount)}</option>
+                {/* the count only once the graph is here: no "Famous · 0" while the web is woven */}
+                <option value="famous">{graph ? densityLine('famous', famousCount) : 'Famous'}</option>
+                <option value="essential">{graph ? densityLine('essential', essentialCount) : 'Essential'}</option>
               </select>
               <span className="sw-select-face" aria-hidden="true">
                 {density === 'essential' ? 'Essential' : 'Famous'}
