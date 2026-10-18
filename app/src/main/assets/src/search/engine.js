@@ -1434,6 +1434,15 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
   const words = [...new Set(terms.flatMap((t) => kjvEncode(t)))];
   const keyWords = words.map(nameAsPrinted);
   const need = Math.min(3, Math.ceil(words.length / 2));
+  /* AN ORIGINAL HOLDING THE RUN UP TO A WORD'S FORM (search200 R1, 2026-10-18). A reprint holding the typed run whole
+     gives way only to an original holding it as well (B3, below), and "as well" read the words as typed: an Answers
+     topic printing a letter's line with one word in another form ("My prophets" where the letter says "My prophet")
+     held the run, the letter did not, and the topic led its original. An original holding every typed word in a row,
+     each as typed or in another form of it (passage.js lemma), holds it as well. */
+  const typedLemmas = typed.map(lemma);
+  /** Does text `x` hold the typed words as nearly as a reprint holding `own` of them in a row (near, 0..1)? */
+  const asWell = (/** @type {string} */ x, /** @type {any} */ d, /** @type {number} */ own) => near(x, d) >= own - 0.1 ||
+    (own >= 1 && typedLemmas.length >= RUN_MIN && !!d && !!d.text && tokenRunAt(joinApostropheS(kjvEncode(d.text)).map(lemma), typedLemmas) >= 0);
   for (let i = 0; i < Math.min(out.length, ORIGINAL_REACH); i++) {
     const e = out[i];
     const tier = ORIGINAL_TIER[e.doc.kind];
@@ -1466,7 +1475,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
     const keep = (/** @type {string[]|null} */ f) => {
       f = fit(f);
       if (!f || whole < 1) return f;
-      const k = f.filter((x) => (e.doc.kind === 'bible-study' && D.get(x).kind === 'verse') || near(x, D.get(x)) >= whole - 0.1);
+      const k = f.filter((x) => (e.doc.kind === 'bible-study' && D.get(x).kind === 'verse') || asWell(x, D.get(x), whole));
       return k.length ? k : null;
     };
     let found = keep(sentenceOriginal(e.doc.text, ex, at, O, lower, keyWords, need, quoted));
@@ -1511,7 +1520,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
       const src = citedOriginal(id, e.doc.text, words);
       // A quote of the Answers' own wording stays with it, when the letter words it otherwise.
       const own = src ? near(id, e.doc) : 0;
-      if (src && (own < NEAR_PHRASE_MIN || near(src, D.get(src)) >= own - 0.1)) found = fit(lower([src]));
+      if (src && (own < NEAR_PHRASE_MIN || asWell(src, D.get(src), own))) found = fit(lower([src]));
     }
     if (!found && (e.doc.kind === 'wtlb' || e.doc.kind === 'blessed')) {
       const id = idOf.get(e) || '';
@@ -1522,7 +1531,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
       // The entry is cut from its letter: whatever of the query it holds, a letter holding as much comes first
       // (sr11, 2026-10-15: a bar of half the query kept "history has an end and christ is coming" on the entry at
       // 0.46 with its letter holding the same 0.46; Corbin, DECISIONS 10-14: the original first, the reprint second).
-      if (src && share > 0 && holdsAsWell(src, pq, share) && (own < NEAR_PHRASE_MIN || near(src, D.get(src)) >= own - 0.1)) found = fit([src]);
+      if (src && share > 0 && holdsAsWell(src, pq, share) && (own < NEAR_PHRASE_MIN || asWell(src, D.get(src), own))) found = fit([src]);
     }
     if (!found && e.doc.kind === 'answers') {
       // A study or Holy Days text just below that holds the query as well, in one passage and in a row: it is what Answers reprints.
@@ -1536,7 +1545,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
         const t = ORIGINAL_TIER[f.doc.kind];
         if (t === undefined || t >= tier || !f.doc.text) continue;
         const fid = idOf.get(f) || '';
-        if (share > 0 && bestWindow(pq.query, docLemmas(fid, f.doc.text), pq.span) >= share - REPRINT_COST && near(fid, f.doc) >= own - 0.1 &&
+        if (share > 0 && bestWindow(pq.query, docLemmas(fid, f.doc.text), pq.span) >= share - REPRINT_COST && asWell(fid, f.doc, own) &&
           (!holds || holds.cov(fid) >= ALIGN_HELD)) {
           out.splice(r, 1);
           out.splice(i, 0, f);
