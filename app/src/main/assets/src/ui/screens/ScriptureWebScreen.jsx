@@ -21,7 +21,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
+  clampCamera, fitPPV, xToVerse, zoomAbout,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange,
@@ -32,6 +32,7 @@ import { useWebCamera } from '../scripture-web/use-web-camera.js';
 import { useFrameScheduler } from '../scripture-web/use-frame-scheduler.js';
 import { useForcedLandscape } from '../scripture-web/use-forced-landscape.js';
 import { useWebGraph, useChromeTokens, useWebRenderer } from '../scripture-web/use-web-renderer.js';
+import { usePersonalWeb } from '../scripture-web/use-personal-web.js';
 import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 /** @typedef {import('../../utils/scripture-web/decode.js').Density} Density */
 import { attachWebGestures } from '../scripture-web/gestures.js';
@@ -45,7 +46,6 @@ import {
   describeFound, summaryOf, votNodeName, verseTextFor, graphStats, densityHint,
   chooserAnnouncement, followAnnouncement, groupAnnouncement, ZOOM_MAX_MESSAGE,
 } from '../../utils/scripture-web/describe.js';
-import { buildPersonal } from '../../utils/scripture-web/personal-build.js';
 import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
 import { pickPersonalLinks, pickUnderlayLinks } from '../scripture-web/rail-renderer.js';
 
@@ -136,14 +136,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     hintTimer.current = setTimeout(() => setHint(''), 3600);
   }, []);
   const [showUnderlay, setShowUnderlay] = React.useState(true);
-  const [personalCount, setPersonalCount] = React.useState(0);
 
   // ── everything below here is per-frame state; deliberately NOT React ──
   const topbarRef = React.useRef(null);
   // Hover is a LIGHT touch: it brightens the thread under the pointer and
   // names it, but never dims the rest of the web. Only a tap focuses.
   const hoverRef = React.useRef(-1);
-  const personalRef = React.useRef(null);
   // frame() runs per draw and must stay identity-stable, so it reads the mode
   // from a ref rather than closing over the state value.
   const modeRef = React.useRef(mode);
@@ -179,6 +177,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // renders; keep that ref in step with the state it mirrors.
   React.useEffect(() => { modeRef.current = mode; schedule(); }, [mode, schedule]);
 
+  // My Web (use-personal-web.js): the reader's links built into the dual
+  // rail, rebuilt live; railOpts() is what the rail renderer places them by
+  const { personalRef, personalCount, railOpts } = usePersonalWeb({
+    graph, mode, showUnderlay, camRef, camVRef, viewRef, frame, chromeRef, schedule,
+  });
+
   /**
    * Close the empty-web notice for good.
    *
@@ -202,27 +206,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (myWebBtnRef.current) myWebBtnRef.current.focus();
   }, [updateSetting]);
 
-  /** Everything the rail renderer needs to place a personal endpoint. */
-  const railOpts = React.useCallback(() => {
-    const v = viewRef.current, cam = camRef.current;
-    const f = frame();
-    return {
-      width: v.W, height: v.H, DPR: v.DPR, base: f.base,
-      chrome: chromeRef.current,
-      votRail: personalRef.current && personalRef.current.votRail,
-      // Both rails ride this one camera. The top rail's own axis is even
-      // across the corpus, but it is spread across the SAME verse span the
-      // bottom rail uses, so a pinch moves both halves (rail-renderer's
-      // votRailX). Without verseTotal every top-rail x is NaN, by design.
-      verseTotal: cam.total,
-      verseX: (verse) => verseToX(cam, v.W, verse),
-      // r2: the Volumes rail through ITS camera when one exists
-      votX: camVRef.current ? (pos) => verseToX(/** @type {any} */ (camVRef.current), v.W, pos) : undefined,
-      showUnderlay,
-    };
-  }, [camRef, camVRef, frame, showUnderlay, viewRef, chromeRef]);
-
-
   // the WebGL renderer, its lifecycle and the frame's draw (use-web-renderer.js):
   // it writes the elevator's track and the pills' boxes the tap test reads
   const { noWebGL, glRetry, retryGL, railZoom, elevatorRef, badgeBoxesRef } = useWebRenderer({
@@ -230,23 +213,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     camRef, camVRef, viewRef, focusRef, viewFor, zoomCapFor, yFrameFor,
     chromeRef, personalRef, hoverRef, railOpts, drawRef, schedule, capFractionNow,
   });
-
-  // ── the personal web ────────────────────────────────────────────────────
-  const linkVersion = useLinkVersion();
-  const [studiesTick, setStudiesTick] = React.useState(0);
-  React.useEffect(() => {
-    if (!graph || mode !== 'personal') return;
-    const built = buildPersonal(graph);
-    personalRef.current = built;
-    camVRef.current = built && built.votRail && built.votRail.total > 0 ? createCamera(built.votRail.total) : null;
-    setPersonalCount(built && built.graph ? built.graph.count : 0);
-    schedule();
-    // The studies corpus is lazy; when it lands after the first build, the
-    // study rail segments and their underlay threads appear on the re-run.
-    if (typeof BIBLE_STUDIES === 'undefined' && typeof loadBibleStudies === 'function') {
-      loadBibleStudies().then((ok) => { if (ok) setStudiesTick((n) => n + 1); });
-    }
-  }, [graph, mode, linkVersion, studiesTick, schedule, camVRef]);
 
   /**
    * The elevator's lift (landing 14): for a pointer going down on the track
@@ -326,7 +292,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     }
     return pickArcs(g, cam, view, px, py, 14 * v.DPR, 4)
       .map((hit) => ({ kind: 'arc', hit, distance: hit.distance }));
-  }, [graph, camRef, viewRef, viewFor, mode, railOpts, showUnderlay, badgeBoxesRef]);
+  }, [graph, camRef, viewRef, viewFor, mode, railOpts, showUnderlay, badgeBoxesRef, personalRef]);
 
   const hitAt = React.useCallback((cx, cy) => hitCandidatesAt(cx, cy)[0] || null,
     [hitCandidatesAt]);
@@ -334,7 +300,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // what a hit is, in the panels' terms (describe.js), read in this frame
   const describe = React.useCallback((found) => describeFound(found, {
     g: graph, personal: personalRef.current, cam: camRef.current, v: viewRef.current, viewFor, density,
-  }), [graph, camRef, viewRef, density, viewFor]);
+  }), [graph, camRef, viewRef, density, viewFor, personalRef]);
 
   const listItems = React.useMemo(() => {
     if (!graph || !listOpen) return [];
@@ -363,7 +329,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       }
     }
     return found.map(describe).filter(Boolean);
-  }, [graph, listOpen, mode, describe, showUnderlay, camRef, viewRef, density]);
+  }, [graph, listOpen, mode, describe, showUnderlay, camRef, viewRef, density, personalRef]);
 
   const commitFound = React.useCallback((found) => {
     if (!found) return;
@@ -575,7 +541,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     }
     else if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
     schedule();
-  }, [viewRef, lastRailRef, camVRef, camRef, zoomCapFor, yFrameFor, graph, schedule, resetView, closeTopOverlay, onBack, dropHover]);
+  }, [viewRef, lastRailRef, camVRef, camRef, zoomCapFor, yFrameFor, graph, schedule, resetView, closeTopOverlay, onBack, dropHover,
+    personalRef]);
 
   /** Follow the chosen line to its far foot: the camera centres on that
    * verse at the same zoom, the line stays spotlit, and the control turns
@@ -754,19 +721,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       </div>
     </div>
   );
-}
-
-/* ── helpers ───────────────────────────────────────────────────────────── */
-
-/** Subscribe to LinkStore so the personal web follows new links live. */
-function useLinkVersion() {
-  const subscribe = React.useCallback((cb) => {
-    if (typeof LinkStore === 'undefined') return () => {};
-    return LinkStore.subscribe(cb);
-  }, []);
-  const snapshot = React.useCallback(
-    () => (typeof LinkStore === 'undefined' ? 0 : LinkStore.getVersion()), []);
-  return React.useSyncExternalStore(subscribe, snapshot, snapshot);
 }
 
 /* The graph asset's loader lives in utils/scripture-web/web-data.js; it is
