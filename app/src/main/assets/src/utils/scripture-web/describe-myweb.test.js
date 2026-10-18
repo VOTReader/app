@@ -20,6 +20,17 @@ describe('My Web header, skipped line and legend words', () => {
     expect(myWebSkippedLine(1)).toBe('1 link isn\u2019t on the web yet');
     expect(myWebSkippedLine(4)).toBe('4 links aren\u2019t on the web yet');
   });
+  it('says "yet" only of links waiting for their corpus; a link naming what the web cannot place is said so (fix-review 2 #6)', () => {
+    // every skipped link waiting
+    expect(myWebSkippedLine(4, 4)).toBe('4 links aren\u2019t on the web yet');
+    // none waiting: they will never arrive, so no "yet"
+    expect(myWebSkippedLine(12, 0)).toBe('12 links point to passages this web can\u2019t place');
+    expect(myWebSkippedLine(1, 0)).toBe('1 link points to a passage this web can\u2019t place');
+    // both
+    expect(myWebSkippedLine(3, 1)).toBe('1 link isn\u2019t on the web yet · 2 point to passages this web can\u2019t place');
+    expect(myWebSkippedLine(2, 1)).toBe('1 link isn\u2019t on the web yet · 1 points to a passage this web can\u2019t place');
+    expect(myWebSkippedLine(0, 0)).toBe('');
+  });
   it('names the two families the picture draws', () => {
     expect(myWebLegendWords()).toEqual({ timothy: 'Timothy\u2019s notes', yours: 'your links' });
   });

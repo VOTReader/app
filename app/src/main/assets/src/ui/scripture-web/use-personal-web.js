@@ -117,7 +117,7 @@ function chosenLine(prev, focusRef, resumeRef) {
  */
 export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, viewRef, frame, chromeRef, schedule, resumeRef, focusRef, topbarRef }) {
   const personalRef = React.useRef(null);
-  const [counts, setCounts] = React.useState({ links: 0, timothy: 0, skipped: 0 });
+  const [counts, setCounts] = React.useState({ links: 0, timothy: 0, skipped: 0, pending: 0 });
   const [relink, setRelink] = React.useState(/** @type {{kind:'link'|'underlay', id:string, at:number}|null} */ (null));
 
   /** Everything the rail renderer needs to place a personal endpoint. */
@@ -179,6 +179,7 @@ export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, vie
       links: pg ? pg.count : 0,
       timothy: built && built.underlay ? built.underlay.count : 0,
       skipped: pg ? pg.skipped : 0,
+      pending: pg ? pg.pending : 0,
     });
     schedule();
     // The studies corpus is lazy; when it lands after the first build, the
@@ -195,6 +196,6 @@ export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, vie
   }, [graph, mode, linkVersion, corpusVersion, studiesTick, schedule, camVRef, viewRef, focusRef, resumeRef]);
 
   return {
-    personalRef, personalCount: counts.links, contextCount: counts.timothy, skippedCount: counts.skipped, railOpts, relink,
+    personalRef, personalCount: counts.links, contextCount: counts.timothy, skippedCount: counts.skipped, pendingCount: counts.pending, railOpts, relink,
   };
 }

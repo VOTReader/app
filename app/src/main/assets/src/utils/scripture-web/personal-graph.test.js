@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   VOT_TYPES, baseKey, buildVotRail, placeEndpoint, buildPersonalGraph,
-  buildCuratedUnderlay, linkIndexById,
+  buildCuratedUnderlay, linkIndexById, unplacedReason,
 } from './personal-graph.js';
 
 // Bottom rail: 2 books x 2 chapters x 10 verses, matching the geometry tests.
@@ -289,6 +289,48 @@ describe('w3 placement: every endpoint lands on its own letter and verse', () =>
     expect(placeEndpoint({ type: 'study', key: 'study:matthew-22:11', bookId: 'matthew-22' }, ctx)).toMatchObject({ rail: 'bible', pos: 70 });
     // a bible key is unchanged: book, chapter, verse
     expect(placeEndpoint({ type: 'bible', key: 'bible:beta:2:3' }, ctx)).toMatchObject({ rail: 'bible', pos: 32 });
+  });
+});
+
+describe('fix-review 2 #6: a link not on the web says why: waiting for its corpus, or naming what the web has no place for', () => {
+  const loaded = buildVotRail([
+    { volKey: 'one', label: 'Volume One', items: [{ id: 'duty', title: 'Duty' }] },
+    { volKey: 'two', label: 'Volume Two', items: [] },                       // its letters have not landed
+    { volKey: 'study-lamb-of-god', label: 'The Lamb of God', items: [{ id: 'intro', title: 'Lamb ch1' }] },
+  ]);
+  const noStudies = buildVotRail([{ volKey: 'one', label: 'Volume One', items: [{ id: 'duty', title: 'Duty' }] }]);
+  const why = (ep, rail) => unplacedReason(ep, { verseIdOf, votRail: rail });
+  it('pending: the corpus, its collection or the studies have not landed', () => {
+    expect(why({ type: 'letter', letterId: 'duty', volKey: 'one' }, buildVotRail([]))).toBe('pending');
+    expect(why({ type: 'letter', letterId: 'duty', volKey: 'one' }, null)).toBe('pending');
+    expect(why({ type: 'letter', letterId: 'x', volKey: 'two' }, loaded)).toBe('pending');
+    expect(why({ type: 'study-letter', letterId: 'intro', studyId: 'lamb-of-god' }, noStudies)).toBe('pending');
+    // a bare id while a collection is still empty
+    expect(why({ type: 'letter', letterId: 'gone' }, loaded)).toBe('pending');
+  });
+  it('unknown: the scope is on the web without the id, or names nothing the web holds', () => {
+    expect(why({ type: 'letter', letterId: 'gone', volKey: 'one' }, loaded)).toBe('unknown');
+    // the walk's seeding: a volKey no collection has ("volume-one" for "one"), on a loaded web
+    expect(why({ type: 'letter', letterId: 'duty', volKey: 'volume-one' }, noStudies)).toBe('unknown');
+    // a study the loaded studies do not hold
+    expect(why({ type: 'study-letter', letterId: 'intro', studyId: 'renamed' }, loaded)).toBe('unknown');
+    expect(why({ type: 'letter', letterId: 'gone' }, noStudies)).toBe('unknown');
+    // the Bible rail is whole from the first frame, so a verse it cannot place never arrives
+    expect(why({ type: 'bible', bookId: 'nope', chapter: 1, verse: 1 }, loaded)).toBe('unknown');
+    expect(why(null, loaded)).toBe('unknown');
+    expect(why({ type: 'nonsense' }, loaded)).toBe('unknown');
+  });
+  it('buildPersonalGraph counts the waiting ones apart: a link waits only when every side it could not place waits', () => {
+    const src = { type: 'bible', bookId: 'alpha', chapter: 1, verse: 1 };
+    const g = buildPersonalGraph([
+      { id: 'a', source: src, target: { type: 'letter', letterId: 'x', volKey: 'two' } },          // waits for Vol II
+      { id: 'b', source: src, target: { type: 'letter', letterId: 'duty', volKey: 'volume-one' } },  // never placed
+      { id: 'c', source: { type: 'bible', bookId: 'nope', chapter: 1 }, target: { type: 'letter', letterId: 'x', volKey: 'two' } },
+      { id: 'd', source: src, target: { type: 'letter', letterId: 'duty', volKey: 'one' } },         // placed
+    ], { verseIdOf, votRail: loaded });
+    expect(g.count).toBe(1);
+    expect(g.skipped).toBe(3);
+    expect(g.pending).toBe(1);
   });
 });
 

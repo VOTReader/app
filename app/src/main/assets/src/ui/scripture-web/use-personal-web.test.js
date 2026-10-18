@@ -308,5 +308,7 @@ describe('usePersonalWeb across rebuilds', () => {
     expect(hook.result.current.personalCount).toBe(1);
     expect(hook.result.current.contextCount).toBe(1);   // the study thread waits for its study
     expect(hook.result.current.skippedCount).toBe(1);
+    // the corpus is loaded and has no 'gone': that link is not waiting for anything (fix-review 2 #6)
+    expect(hook.result.current.pendingCount).toBe(0);
   });
 });

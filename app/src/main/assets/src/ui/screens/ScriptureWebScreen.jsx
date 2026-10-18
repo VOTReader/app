@@ -183,7 +183,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
   // My Web (use-personal-web.js): the reader's links built into the dual
   // rail, rebuilt live; railOpts() is what the rail renderer places them by
-  const { personalRef, personalCount, contextCount, skippedCount, railOpts, relink } = usePersonalWeb({
+  const { personalRef, personalCount, contextCount, skippedCount, pendingCount, railOpts, relink } = usePersonalWeb({
     graph, mode, showUnderlay, camRef, camVRef, viewRef, frame, chromeRef, schedule, resumeRef, focusRef, topbarRef,
   });
 
@@ -370,7 +370,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
                27): describe.js, the My Web stream's words */
             ? <>
               <p>{myWebHeadline(personalCount, contextCount)}</p>
-              {skippedCount > 0 && <p>{myWebSkippedLine(skippedCount)}</p>}
+              {skippedCount > 0 && <p>{myWebSkippedLine(skippedCount, pendingCount)}</p>}
             </>
             /* The count shown, alone: "15,402 of 63,418" read as a fraction of
                something the reader had not asked about (Corbin, 2026-09-11:

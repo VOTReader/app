@@ -174,6 +174,37 @@ export function placeEndpoint(ep, ctx) {
 }
 
 /**
+ * Why placeEndpoint could not place an endpoint (fix-review 2 #6): 'pending'
+ * when what it names has not landed yet (the VOT corpus, its collection's
+ * letters, or the Bible studies), so the web will place it when they do; else
+ * 'unknown': the scope it names is on the web without its id, or names nothing
+ * the web holds (a renamed collection, a wrong volKey), and it never will.
+ * The Bible rail is whole from the first frame, so a verse it cannot place is
+ * unknown.
+ * @param {any} ep — a LinkEndpoint placeEndpoint returned null for
+ * @param {PlaceCtx} ctx
+ * @returns {'pending'|'unknown'}
+ */
+export function unplacedReason(ep, ctx) {
+  if (!ep || !ep.type || !VOT_TYPES.has(ep.type)) return 'unknown';
+  const rail = ctx.votRail;
+  if (!rail || !(rail.total > 0)) return 'pending';
+  const key = baseKey(ep.key);
+  if (!(ep.letterId || ep.entryId || (key ? key.split(':')[1] : ''))) return 'unknown';
+  const segs = rail.segments || [];
+  const isStudy = (k) => String(k).startsWith('study-');
+  const scope = scopeOf(ep, rail);
+  if (scope) {
+    const seg = segs.find((s) => s.volKey === scope);
+    if (seg) return seg.count > 0 ? 'unknown' : 'pending';
+    // a study with no segment waits for the studies, until any study is on the rail
+    return isStudy(scope) && !segs.some((s) => isStudy(s.volKey)) ? 'pending' : 'unknown';
+  }
+  // a bare id waits while a collection's letters have yet to land
+  return segs.some((s) => !isStudy(s.volKey) && !(s.count > 0)) ? 'pending' : 'unknown';
+}
+
+/**
  * Build the personal web from raw LinkStore records.
  *
  * Unresolvable endpoints are skipped and counted, never thrown — a link into
@@ -185,14 +216,16 @@ export function placeEndpoint(ep, ctx) {
  * @returns {{
  *   count:number, aRail:Uint8Array, bRail:Uint8Array,
  *   aPos:Float32Array, bPos:Float32Array, kind:Uint8Array,
- *   records:Array<object>, skipped:number, degree:Map<string, number>
+ *   records:Array<object>, skipped:number, pending:number, degree:Map<string, number>
  * }}
+ *   skipped: the links not placed; pending: those of them waiting for a
+ *   corpus to land (unplacedReason), the rest name what the web has no place for
  */
 export function buildPersonalGraph(links, ctx) {
   const rows = [];
   const degree = new Map();
   const seen = new Set();
-  let skipped = 0;
+  let skipped = 0, pending = 0;
   for (const link of links || []) {
     if (!link || !link.source || !link.target) { skipped++; continue; }
     // a record the store holds twice (one id) is one link: drawn and counted
@@ -200,7 +233,12 @@ export function buildPersonalGraph(links, ctx) {
     if (link.id) { if (seen.has(link.id)) continue; seen.add(link.id); }
     const a = placeEndpoint(link.source, ctx);
     const b = placeEndpoint(link.target, ctx);
-    if (!a || !b) { skipped++; continue; }
+    if (!a || !b) {
+      skipped++;
+      // waiting only when every side it could not place is waiting
+      if ((a || unplacedReason(link.source, ctx) === 'pending') && (b || unplacedReason(link.target, ctx) === 'pending')) pending++;
+      continue;
+    }
     rows.push({ link, a, b });
     for (const side of [a, b]) {
       const k = side.rail + ':' + side.pos;
@@ -217,6 +255,7 @@ export function buildPersonalGraph(links, ctx) {
     kind: new Uint8Array(n),
     records: rows.map((r) => r.link),
     skipped,
+    pending,
     degree,
     /** link id -> index, so a chosen link is found again by WHAT it is (item 30) */
     byId: new Map(),

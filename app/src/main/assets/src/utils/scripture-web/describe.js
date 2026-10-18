@@ -390,14 +390,25 @@ export function myWebHeadline(links, timothy) {
 }
 
 /**
- * The line under it when some of the reader's links could not be placed (a
- * deleted letter, a corpus not loaded yet): said, never silently dropped
- * (item 27). '' when every link is on the web.
- * @param {number} skipped
+ * The line under it when some of the reader's links could not be placed:
+ * said, never silently dropped (item 27). "Yet" only of the links waiting for
+ * their corpus to land (the studies, the letters); a link naming what the web
+ * has no place for (a renamed collection) will never arrive, and is said so
+ * (fix-review 2 #6). '' when every link is on the web.
+ * @param {number} skipped the links not placed
+ * @param {number} [pending] of them, those waiting (all of them when omitted)
  */
-export function myWebSkippedLine(skipped) {
+export function myWebSkippedLine(skipped, pending) {
   if (!(skipped > 0)) return '';
-  return skipped === 1 ? '1 link isn’t on the web yet' : skipped.toLocaleString() + ' links aren’t on the web yet';
+  const wait = Math.min(skipped, pending == null ? skipped : Math.max(0, pending));
+  const lost = skipped - wait;
+  const parts = [];
+  if (wait > 0) parts.push(wait === 1 ? '1 link isn’t on the web yet' : wait.toLocaleString() + ' links aren’t on the web yet');
+  if (lost > 0) {
+    const lead = wait > 0 ? lost.toLocaleString() : lost === 1 ? '1 link' : lost.toLocaleString() + ' links';
+    parts.push(lead + (lost === 1 ? ' points to a passage' : ' point to passages') + ' this web can’t place');
+  }
+  return parts.join(' · ');
 }
 
 /** The legend's two families, Timothy's first as the picture reads (r2-05). */
