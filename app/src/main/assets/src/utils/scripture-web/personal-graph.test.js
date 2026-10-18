@@ -108,7 +108,7 @@ describe('placeEndpoint — all endpoint types', () => {
       ['letter', { type: 'letter', key: 'letter:the-wide-path:2', letterId: 'the-wide-path' }, 0],
       ['wtlb', { type: 'wtlb', key: 'wtlb:matters-of-the-heart:0', entryId: 'matters-of-the-heart' }, 2],
       ['blessed', { type: 'blessed', key: 'wtlb:blessed-are-those-who-seek-me:0', entryId: 'blessed-are-those-who-seek-me' }, 3],
-      ['holy-days', { type: 'holy-days', key: 'wtlb:duty:0', entryId: 'duty' }, 1],
+      ['holy-days', { type: 'holy-days', key: 'wtlb:duty:0', entryId: 'duty', volKey: 'one' }, 1],
       ['study-letter', { type: 'study-letter', key: 'letter:duty:0', letterId: 'duty' }, 1],
       ['journal', { type: 'journal', key: 'journal:the-wide-path:0', entryId: 'the-wide-path' }, 0],
     ];
@@ -263,6 +263,22 @@ describe('w3 placement: every endpoint lands on its own letter and verse', () =>
     expect(at({ type: 'letter', key: 'letter:intro:0', letterId: 'intro' })).toBe(0);
     // a named collection the rail does not hold falls back to the bare id rather than losing the link
     expect(at({ type: 'letter', key: 'letter:duty:0', letterId: 'duty', collection: 'Gone Volume' })).toBe(1);
+  });
+
+  it("fix-review #10: an endpoint that names its scope is placed there or nowhere, never on another collection's same id", () => {
+    // a Volume that does not hold the id
+    expect(at({ type: 'letter', key: 'letter:duty:0', letterId: 'duty', volKey: 'two' })).toBeNull();
+    // a study not on the rail yet (the studies load lazily; the web rebuilds when they land)
+    expect(at({ type: 'study-letter', key: 'letter:intro:0', letterId: 'intro', studyId: 'not-loaded' })).toBeNull();
+    // a type that names its collection, on a rail without it
+    expect(placeEndpoint({ type: 'holy-days', key: 'wtlb:duty:0', entryId: 'duty' }, ctx)).toBeNull();
+    // the bare id is the answer only when the endpoint names no scope at all
+    expect(at({ type: 'letter', key: 'letter:duty:0', letterId: 'duty' })).toBe(1);
+    // and such a link is counted as skipped, not drawn to the wrong letter
+    const g = buildPersonalGraph([{ id: 'x', source: { type: 'bible', bookId: 'alpha', chapter: 1, verse: 1 },
+      target: { type: 'letter', key: 'letter:duty:0', letterId: 'duty', volKey: 'two' } }], sctx);
+    expect(g.count).toBe(0);
+    expect(g.skipped).toBe(1);
   });
 
   it('item 26: a key-only study endpoint reads "<book>-<chapter>" then the verse', () => {

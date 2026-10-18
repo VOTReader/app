@@ -163,13 +163,12 @@ export function placeEndpoint(ep, ctx) {
   const id = ep.letterId || ep.entryId || (key ? key.split(':')[1] : '');
   if (!id) return null;
   const scope = scopeOf(ep, rail);
-  const scoped = scope ? scope + ':' + id : null;
-  // a scope the rail does not hold (a renamed collection, a study not loaded
-  // yet) falls back to the bare id: a link placed on its likeliest letter is
-  // better than a link lost
-  const pos = (scoped != null && rail.index.has(scoped))
-    ? rail.index.get(scoped)
-    : rail.index.get(id);
+  // an endpoint that names its scope is placed there or nowhere (fix-review
+  // #10): a study not loaded yet, or a Volume without the id, is skipped and
+  // counted (the web rebuilds when the studies or the corpus land), never
+  // drawn to another collection's letter of the same id; only an endpoint
+  // that names no scope takes the bare id's first writer
+  const pos = scope ? rail.index.get(scope + ':' + id) : rail.index.get(id);
   if (pos === undefined) return null;
   return { rail: 'vot', pos, key };
 }
