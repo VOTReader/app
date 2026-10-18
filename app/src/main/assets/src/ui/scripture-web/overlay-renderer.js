@@ -1080,7 +1080,8 @@ function drawChosen(ctx, g, cam, L, fs, grid, labelled) {
   const { s, W, Wc, base, camY, sz } = L;
   const x0 = footX(cam, W, a, fa), x1 = footX(cam, W, b, fb);
   const yb = base + camY;
-  const on0 = x0 >= 0 && x0 <= W, on1 = x1 >= 0 && x1 <= W;
+  // a foot under the open panel is off the frame the reader sees (Q12)
+  const on0 = x0 >= 0 && x0 <= Wc, on1 = x1 >= 0 && x1 <= Wc;
   for (const [on, x] of [[on0, x0], [on1, x1]]) {
     if (!on) continue;
     ctx.fillStyle = css('chosenFootRing');

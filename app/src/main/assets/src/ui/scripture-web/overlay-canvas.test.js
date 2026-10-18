@@ -407,6 +407,32 @@ describe('the pills and the labels', () => {
     }
   });
 
+  it('the chosen line with a foot under the open panel: no dot there, and that end is written beside the leg on the frame (w3 review: on0/on1 read W)', () => {
+    const v = FRAMES.pc, s = v.DPR, right = 400, Wc = v.W - right * s;
+    const probe = frameAt('pc', 40, ISA53_6);
+    const { fanA, fanB } = dec.fansOf(g);
+    let pick = -1;
+    for (const bucket of g.buckets) {
+      const end = bucket.off + dec.bucketDrawCount(bucket, 'famous');
+      for (let i = bucket.off; i < end && pick < 0; i++) {
+        const x0 = geo.footX(probe.cam, v.W, g.from[i], fanA[i]), x1 = geo.footX(probe.cam, v.W, g.to[i], fanB[i]);
+        if (x0 > 80 * s && x0 < Wc - 300 * s && x1 > Wc + 40 * s && x1 < v.W - 40 * s && geo.arcShape((x1 - x0) / 2, probe.view.squash).A > 120 * s) pick = i;
+      }
+      if (pick >= 0) break;
+    }
+    expect(pick, 'a thread from the frame to under the panel').toBeGreaterThanOrEqual(0);
+    const { rec, fs } = paint('pc', 40, ISA53_6, { focus: { arc: pick }, panelInset: { right, bottom: 0 } });
+    expect(fs.focusArc).toBe(pick);
+    const dots = rec.calls.filter((c) => c.op === 'arc' && c.a[2] === 4 * s);
+    expect(dots.length, 'the foot on the frame is marked').toBe(1);
+    for (const d of dots) expect(d.a[0], 'a dot under the panel').toBeLessThanOrEqual(Wc);
+    const gold = rec.texts().filter((c) => c.fill === css('chosenLabel'));
+    const far = gold.filter((c) => / →$|^← /.test(c.t));
+    expect(far.length, 'the end under the panel written beside the leg: ' + gold.map((c) => c.t).join(', ')).toBe(1);
+    expect(textBox(far[0]).x1).toBeLessThanOrEqual(Wc);
+    expect(gold.length, 'one foot reference and the far end').toBe(2);
+  });
+
   it('hysteresis: a label placed on one frame keeps its thread on the next, a pixel later', () => {
     const a = paint('pc', zMax('pc'), ISA53_6);
     const b = paint('pc', zMax('pc'), ISA53_6 + 1 / a.fs.cam.ppv);
