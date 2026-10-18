@@ -2,14 +2,17 @@
    scripture-web/describe — Cluster F (bundle-d)
 
    Every word the Scripture Web computes about what is under the finger, and
-   the cards behind it: what a tapped thread, chapter, verse, bundle, link or
-   corpus thread is (describeFound), the chooser's and Nearby's rows
-   (connectionTitle / connectionMeta), the sheet's and the list's eyebrow and
-   meta lines, what the live region announces, the density hint, and the
-   endpoint cards that jump into the reader. Moved out of ScriptureWebScreen
-   unchanged (F0, 2026-10-18): the wording is today's, character for
-   character, and the screen and its panels only ask. Copy that is plain
-   markup (the guide's lines, the empty-web notice) stays in the JSX.
+   the cards behind it: what a tapped thread, chapter, verse, bundle, link,
+   corpus thread, prophecy pair or letter is (describeFound), the chooser's
+   and Nearby's rows (connectionTitle / connectionMeta), the panel's eyebrow
+   and meta lines, what the live region announces, the density hint, and the
+   endpoints that jump into the reader. Moved out of ScriptureWebScreen in F0
+   (2026-10-18); the panel stream (w3) fixed the drift the digest named
+   (item 22): one word for the vote count ("votes", never "weight"), plurals
+   everywhere ("1 verse apart"), and "↔" between the two ends, because the
+   data has no direction. Copy that is plain markup (the guide's lines, the
+   empty-web notice) stays in the JSX; the docked panel's own words are in
+   panel-model.js.
 
    Free globals (bookCategory, resolveVerseText) are resolved at call time,
    the free-global pattern the rest of bundle-d uses.
@@ -17,7 +20,8 @@
 
 import { refOfVerse, chapterRange, countTouching, bundleGroups } from './pick.js';
 import { MY_WEB_SOURCES, LINK_KIND_NAMES } from './palette.js';
-import { entryHlBase } from '../hl-keys.js';
+import { prophecyIndexOf } from './focus-state.js';
+import { endpointFor, collectionName, letterKeyOf, COLLECTION_NAMES } from './vot-citations.js';
 
 /** What the live region says when + does nothing because it can do nothing. */
 export const ZOOM_MAX_MESSAGE = 'Zoomed all the way in';
@@ -32,6 +36,33 @@ const DENSITY_HINT = {
 /** The hint that flashes under the title when the reader switches density. */
 export function densityHint(density) {
   return DENSITY_LABEL[density] + ' — ' + DENSITY_HINT[density];
+}
+
+/**
+ * A count and its noun, singular at exactly one: "1 connection", "2,104 connections".
+ * @param {number} n @param {string} one @param {string} many
+ */
+export function plural(n, one, many) {
+  return Number(n).toLocaleString() + ' ' + (n === 1 ? one : many);
+}
+
+/** How often the Volumes cite a verse, in words: once, twice, 3 times. */
+export function timesWord(n) {
+  return n === 1 ? 'once' : n === 2 ? 'twice' : Number(n).toLocaleString() + ' times';
+}
+
+/**
+ * A connection's meta line: "Prophecy fulfilled · 183 votes · 5,371 verses apart". The prophecy
+ * words only for a prophecy pair (spec 4.6), the votes only when the pair has OpenBible votes (a
+ * prophecy pair the dataset does not hold has none), and always the distance.
+ * @param {{ prophecy?: boolean, votes?: number, span: number }} info
+ */
+export function arcLine(info) {
+  const parts = [];
+  if (info.prophecy) parts.push('Prophecy fulfilled');
+  if (info.votes > 0) parts.push(plural(info.votes, 'vote', 'votes'));
+  parts.push(plural(info.span, 'verse apart', 'verses apart'));
+  return parts.join(' · ');
 }
 
 /** The live region while the chooser asks which of several close threads was meant. */
@@ -91,7 +122,11 @@ export function describeFound(found, { g, personal, cam, v, viewFor, density }) 
     const node = p && p.votRail && p.votRail.nodes[underlay && underlay.votPos[found.index]];
     if (!underlay || !edge || !node) return null;
     const source = refOfVerse(g, underlay.versePos[found.index]);
-    const target = curatedEndpoint(edge, node);
+    // the citing paragraph of the edge, opened through vot-citations' endpointFor (the reader's
+    // block key at that paragraph, the collection a reader knows): today's card opened every
+    // letter at its top and named its collection by the raw volKey (digest item 15)
+    const cite = citationOfEdge(edge, node);
+    const target = endpointFor(cite);
     // the card's third line names the Volume the passage sits in (what the
     // reader zoomed the top rail to), never the edge's storage kind
     const seg = p.votRail.segments.find((s) => s.volKey === node.volKey);
@@ -106,20 +141,43 @@ export function describeFound(found, { g, personal, cam, v, viewFor, density }) 
       // the family in words (design-myweb-colour.md, 5): the source the thread's
       // colour encodes, then the Volume
       sourceName: MY_WEB_SOURCES[underlay.source ? underlay.source[found.index] : MY_WEB_SOURCES.length - 1].name,
+      cite,
       cards: [verseCard('Scripture', source), endpointCard('Corpus', target)],
     };
   }
   if (found.kind === 'arc') {
     const a = refOfVerse(g, found.hit.from), b = refOfVerse(g, found.hit.to);
+    // whether it is a prophecy pair, and which (g.prophecy): GL's pickThreads names it on the hit
+    // (a pair that is no OpenBible arc comes with index -1); a hit without the field is looked up
+    const prophecyIndex = found.hit.prophecy != null ? (found.hit.prophecy >= 0 ? found.hit.prophecy : -1)
+      : prophecyIndexOf(g, found.hit.from, found.hit.to);
     return {
       kind: 'arc', a, b, votes: found.hit.votes,
       span: Math.abs(found.hit.to - found.hit.from), index: found.hit.index,
-      // whether it is a prophecy pair, and which (g.prophecy; GL, pick.pickThreads): the panel
-      // stream's describe carries the same two fields
-      prophecy: found.hit.prophecy >= 0, prophecyIndex: found.hit.prophecy >= 0 ? found.hit.prophecy : -1,
       from: found.hit.from, to: found.hit.to,
-      cards: [verseCard('From', a), verseCard('To', b)],
+      prophecy: prophecyIndex >= 0, prophecyIndex,
+      cards: [verseCard('This end', a), verseCard('Other end', b)],
     };
+  }
+  if (found.kind === 'prophecy') {
+    // a prophecy pair (g.prophecy[k]): 107 of the 132 are not OpenBible arcs, so `index` is the
+    // OpenBible arc joining the same two verses when there is one, else -1, and the votes are
+    // that arc's (none without it)
+    const p = g.prophecy && g.prophecy[found.prophecy];
+    if (!p) return null;
+    const arc = arcJoining(g, p.a, p.b);
+    const a = refOfVerse(g, p.a), b = refOfVerse(g, p.b);
+    return {
+      kind: 'arc', a, b, votes: arc >= 0 ? g.votes[arc] : 0,
+      span: Math.abs(p.b - p.a), index: arc, from: p.a, to: p.b,
+      prophecy: true, prophecyIndex: found.prophecy,
+      cards: [verseCard('This end', a), verseCard('Other end', b)],
+    };
+  }
+  if (found.kind === 'letter') {
+    const letter = letterOf(g, found.letterKey);
+    if (!letter) return null;
+    return Object.assign({ kind: 'letter', cards: [] }, letter);
   }
   if (found.kind === 'bundle') {
     const cell = found.cell;
@@ -162,20 +220,25 @@ export function describeFound(found, { g, personal, cam, v, viewFor, density }) 
     cards: [chapterCard(g.books[ch[0]], ch[1], ch[3], first)] };
 }
 
-/** A described hit's row title in the chooser and the Nearby list. */
+/** A described thread's two ends in canon order: the data has no direction (digest item 22). */
+export function endsOf(info) {
+  return info.from <= info.to ? [info.a, info.b] : [info.b, info.a];
+}
+
+/** A described hit's row title in the chooser and the Nearby list (and the panel's title). */
 export function connectionTitle(info) {
-  if (info.kind === 'arc') return info.a.label + ' ↕ ' + info.b.label;
+  if (info.kind === 'arc') { const [x, y] = endsOf(info); return x.label + ' ↔ ' + y.label; }
   if (info.kind === 'chapter') return info.book.title + ' ' + info.chapter + ' — where its threads go';
-  if (info.kind === 'underlay') return info.source.label + ' ↕ ' + endpointLabel(info.target);
-  return endpointLabel(info.source) + ' ↕ ' + endpointLabel(info.target);
+  if (info.kind === 'underlay') return info.source.label + ' ↔ ' + endpointLabel(info.target);
+  return endpointLabel(info.source) + ' ↔ ' + endpointLabel(info.target);
 }
 
 /** A described hit's row meta line in the chooser and the Nearby list. */
 export function connectionMeta(info) {
-  if (info.kind === 'arc') return info.prophecy ? prophecyMeta(info) : info.votes + ' votes · ' + info.span.toLocaleString() + ' verses apart';
+  if (info.kind === 'arc') return arcLine(info);
   if (info.kind === 'chapter') {
-    return info.verses + ' verses · ' + info.connections.toLocaleString() + ' connections'
-      + (info.groups && info.groups.length ? ' · to ' + info.groups.length + (info.groups.length === 1 ? ' chapter' : ' chapters') : '');
+    return plural(info.verses, 'verse', 'verses') + ' · ' + plural(info.connections, 'connection', 'connections')
+      + (info.groups && info.groups.length ? ' · to ' + plural(info.groups.length, 'chapter', 'chapters') : '');
   }
   if (info.kind === 'underlay') return info.joins;
   return LINK_KIND_NAMES[info.joins] || 'Your link';
@@ -187,22 +250,25 @@ export function connectionMeta(info) {
  * @param {{ index: number, votes: number, span: number }} info  a described arc that is a prophecy pair
  */
 export function prophecyMeta(info) {
-  return 'Prophecy fulfilled · ' + (info.index >= 0 ? info.votes + ' votes · ' : '') + info.span.toLocaleString() + ' verses apart';
+  // the panel stream's arcLine is the one wording; a pair that is no arc has no votes to name
+  return arcLine(Object.assign({}, info, { prophecy: true, votes: info.index >= 0 ? info.votes : 0 }));
 }
 
-/** The detail sheet's eyebrow (also its aria-label's head). */
+/** The panel's eyebrow (its overline, and its aria-label's head). */
 export function sheetEyebrow(info) {
   return info.kind === 'link' ? 'Your link'
     : info.kind === 'underlay' ? 'Timothy’s thread'
     : info.kind === 'arc' ? 'Connection'
     : info.kind === 'bundle' ? 'Bundle · ' + info.label
+    : info.kind === 'letter' ? 'In the Volumes'
     : info.kind === 'chapter' ? 'Chapter' : 'Verse';
 }
 
-/** The detail sheet's meta line. */
+/** The panel's meta line. */
 export function sheetMeta(info) {
   return info.kind === 'arc'
-    ? (info.prophecy ? prophecyMeta(info) : info.span.toLocaleString() + ' verses apart · weight ' + info.votes)
+    ? arcLine(info)
+    : info.kind === 'letter' ? info.collectionName
     : info.kind === 'link' ? LINK_KIND_NAMES[info.joins]
     : info.kind === 'underlay' ? (info.sourceName ? info.sourceName + ' · ' + info.joins : info.joins)
     : info.kind === 'bundle'
@@ -211,8 +277,8 @@ export function sheetMeta(info) {
           + ' not drawn at this zoom. Choose where they go to see them.'
         : info.connections.toLocaleString() + ' connections converge here. Choose where they go to follow them.')
     : info.kind === 'chapter'
-      ? info.verses + ' verses · ' + info.connections.toLocaleString() + ' connections'
-      : info.connections.toLocaleString() + ' connections';
+      ? plural(info.verses, 'verse', 'verses') + ' · ' + plural(info.connections, 'connection', 'connections')
+      : plural(info.connections, 'connection', 'connections');
 }
 
 /** The Nearby list's eyebrow: the reader's links on My Web, else the chapter it reads. */
@@ -238,13 +304,17 @@ export function summaryOf(found) {
   if (found.kind === 'underlay') {
     return found.source.label + ' and ' + endpointLabel(found.target) + ', corpus connection.';
   }
-  if (found.kind === 'arc') return found.a.label + ' and ' + found.b.label + ', connected.';
-  if (found.kind === 'verse') return found.ref.label + ', ' + found.connections + ' connections.';
+  if (found.kind === 'arc') {
+    const [x, y] = endsOf(found);
+    return x.label + ' and ' + y.label + (found.prophecy ? ', a prophecy fulfilled.' : ', connected.');
+  }
+  if (found.kind === 'letter') return found.title + ', ' + plural(found.verses.length, 'verse', 'verses') + ' it cites.';
+  if (found.kind === 'verse') return found.ref.label + ', ' + plural(found.connections, 'connection', 'connections') + '.';
   if (found.kind === 'bundle') {
     return found.label + ', ' + (found.hidden > 0
       ? found.hidden + ' connections not drawn here.' : found.connections + ' connections converge here.');
   }
-  return found.book.title + ' ' + found.chapter + ', ' + found.connections + ' connections.';
+  return found.book.title + ' ' + found.chapter + ', ' + plural(found.connections, 'connection', 'connections') + '.';
 }
 
 /** The Volumes rail's node at a rail position, with its Volume ("The Bride, Volume Two"); '' off the rail. */
@@ -271,6 +341,19 @@ export function verseTextFor(ref) {
 }
 
 /**
+ * The reader endpoint of one Bible verse the graph knows (the panel's "Open in reader ›" and a
+ * row's Open): one verse, so the jump flashes that verse (see verseCard on `verseEnd`).
+ * @param {{bookId:string, chapter:number, verse:number, label:string}} ref
+ */
+export function verseEndpoint(ref) {
+  return {
+    type: 'bible',
+    key: 'bible:' + ref.bookId + ':' + ref.chapter + ':' + ref.verse,
+    bookId: ref.bookId, chapter: ref.chapter, verse: ref.verse, label: ref.label,
+  };
+}
+
+/**
  * A tappable card for a Bible verse the graph knows about.
  *
  * `verseEnd` is deliberately absent: the canonical web stores one verse id per
@@ -282,11 +365,7 @@ export function verseTextFor(ref) {
  * @param {{bookId:string, bookTitle:string, chapter:number, verse:number, label:string}} ref
  */
 export function verseCard(eyebrow, ref) {
-  const endpoint = {
-    type: 'bible',
-    key: 'bible:' + ref.bookId + ':' + ref.chapter + ':' + ref.verse,
-    bookId: ref.bookId, chapter: ref.chapter, verse: ref.verse, label: ref.label,
-  };
+  const endpoint = verseEndpoint(ref);
   return {
     eyebrow, label: ref.label, endpoint,
     cat: typeof bookCategory === 'function' ? bookCategory(ref.bookId) : '',
@@ -331,42 +410,65 @@ export function endpointCard(eyebrow, ep) {
   };
 }
 
-/** The reader-side endpoint of one of Timothy's curated threads (study, letter or entry). */
-export function curatedEndpoint(edge, node) {
-  if (edge.studyId) {
-    return {
-      type: 'study-letter', key: 'study:' + edge.studyId + ':' + edge.chapterId,
-      studyId: edge.studyId, studyChapterId: edge.chapterId,
-      screen: 'bible-study-chapter',
-      label: node.title, collection: 'Bible Studies',
-    };
+/**
+ * One curated thread's edge (a graph votEdge, My Web's underlay record) as the citation
+ * vot-citations' endpointFor opens: its letter's address, the collection by the name a reader
+ * knows (never the raw volKey), and the paragraph of its first citing site, with that site's
+ * anchor so the excerpt is the sentence that cites the verse. Replaces curatedEndpoint (B4,
+ * digest item 15), which opened every letter at block 0, named the collection "two", and keyed
+ * a Bible Study as study:, a space the reader does not scroll to.
+ * @param {any} edge  a votEdge ({ v, at, title, key, volKey, letterId | entryId | studyId + chapterId })
+ * @param {any} [node]  the Volumes rail node it lands on (its title, when the edge has none)
+ * @returns {any}
+ */
+export function citationOfEdge(edge, node) {
+  if (!edge) return null;
+  const at = (Array.isArray(edge.at) && edge.at[0]) || {};
+  /** @type {any} */
+  const cite = {};
+  for (const f of ['fn', 'r', 'o', 'n']) if (at[f] != null) cite[f] = at[f];
+  if (at.sub) cite.sub = at.sub;
+  /** @type {any} */
+  const c = {
+    letterKey: edge.key || letterKeyOf(edge),
+    title: String(edge.title || (node && node.title) || ''),
+    collection: edge.studyId ? 'studies' : String(edge.volKey || ''),
+    collectionName: edge.studyId ? String(edge.studyTitle || COLLECTION_NAMES.studies) : collectionName(edge.volKey),
+    paragraph: at.p >= 0 ? at.p : 0,
+    sub: at.sub || null,
+    cite,
+  };
+  for (const f of ['volKey', 'letterId', 'entryId', 'studyId', 'chapterId']) if (edge[f]) c[f] = edge[f];
+  return c;
+}
+
+/**
+ * The OpenBible arc joining verses a and b (either order), or -1. A scan, asked once per open.
+ * @param {any} g @param {number} a @param {number} b
+ */
+export function arcJoining(g, a, b) {
+  if (!g || !g.from) return -1;
+  for (let i = 0; i < g.count; i++) {
+    if ((g.from[i] === a && g.to[i] === b) || (g.from[i] === b && g.to[i] === a)) return i;
   }
-  if (edge.letterId) {
-    const screenByVolume = {
-      one: 'vot-one-letter', two: 'vot-letter', three: 'vot-three-letter',
-      four: 'vot-four-letter', five: 'vot-five-letter', six: 'vot-six-letter',
-      seven: 'vot-seven-letter', timothy: 'vot-timothy-letter', flock: 'vot-flock-letter',
-      rebuke: 'vot-rebuke-letter', hm: 'hm-letter',
-    };
-    return {
-      type: 'letter', key: 'letter:' + edge.letterId + ':0', letterId: edge.letterId,
-      screen: screenByVolume[edge.volKey] || 'vot-letter',
-      volKey: edge.volKey, collection: edge.volKey, label: node.title,
-    };
-  }
-  if (edge.entryId) {
-    const type = edge.volKey === 'blessed' ? 'blessed'
-      : edge.volKey === 'holydays' ? 'holy-days' : 'wtlb';
-    const screen = edge.volKey === 'blessed' ? 'blessed-entry'
-      : edge.volKey === 'holydays' ? 'holy-days-entry'
-      : edge.volKey === 'wtlb2' ? 'wtlb-two-entry' : 'wtlb-one-entry';
-    return {
-      type, key: entryHlBase(type, edge.entryId) + ':0', entryId: edge.entryId,
-      screen,
-      volKey: edge.volKey, collection: edge.volKey, label: node.title,
-    };
-  }
-  return null;
+  return -1;
+}
+
+/**
+ * A letter, entry or study chapter as the panel's letter mode names it: its title, its
+ * collection by name, the verses it cites (ascending) and the endpoint that opens it at the top.
+ * Null for a key no curated edge carries.
+ * @param {any} g @param {string} letterKey  vot-citations' key ("three/i-am-risen")
+ * @returns {{ letterKey: string, title: string, collectionName: string, verses: number[], endpoint: any } | null}
+ */
+export function letterOf(g, letterKey) {
+  const edges = (g && g.votEdges) || [];
+  const key = String(letterKey || '');
+  const mine = edges.filter((/** @type {any} */ e) => e && (e.key || letterKeyOf(e)) === key);
+  if (!mine.length) return null;
+  const cite = Object.assign(citationOfEdge(mine[0], null), { paragraph: 0, sub: null, cite: {} });
+  const verses = [...new Set(mine.map((/** @type {any} */ e) => e.v))].sort((x, y) => x - y);
+  return { letterKey: key, title: cite.title, collectionName: cite.collectionName, verses, endpoint: endpointFor(cite) };
 }
 
 /* ── My Web's words (w3, the My Web stream; spec Q8, r2-05) ────────────────
