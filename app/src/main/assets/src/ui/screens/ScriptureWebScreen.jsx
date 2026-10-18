@@ -56,7 +56,6 @@ import { useWebKeys } from '../scripture-web/use-web-keys.js';
 import { useJourney } from '../scripture-web/use-journey.js';
 import { useGoTo } from '../scripture-web/goto.jsx';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
-import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 /** @typedef {import('../../utils/scripture-web/decode.js').Density} Density */
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { WebFallbackList } from '../scripture-web/WebFallbackList.jsx';
@@ -113,7 +112,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const wrapRef = React.useRef(null);
   // the one frame loop (use-frame-scheduler.js) and landscape, always
   // (use-forced-landscape.js): rotation, orientation lock, immersive, loc()
-  const { drawRef, schedule, live, capFractionNow } = useFrameScheduler();
+  const { drawRef, schedule, live, capFractionNow, animate } = useFrameScheduler();
   const { rotated, loc } = useForcedLandscape(schedule);
 
   // the graph asset, loaded once (use-web-renderer.js); Try again refetches
@@ -171,7 +170,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const {
     camRef, camVRef, lastRailRef, viewRef, focusRef, panelInsetRef,
     frame, viewFor, zoomCapFor, yFrameFor, camFor, flyTo, cancelFly,
-  } = useWebCamera({ graph, density, modeRef, schedule, topbarRef });
+  } = useWebCamera({ graph, density, modeRef, schedule, topbarRef, animate });
   const theme = settings && settings.theme;
 
   // the canvas's colours, re-read when the theme flips (use-web-renderer.js)
@@ -261,10 +260,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       // a gesture takes the camera: the chip drops and a running fly stops
       live: () => { live(); dropHover(); cancelFly(); },
       schedule, maxZoom: (c) => zoomCapFor(c || camRef.current), clampCamera, zoomAbout, xToVerse,
-      yFrame: yFrameFor, lift: liftAt,
+      yFrame: yFrameFor, lift: liftAt, animate,
     });
   }, [graph, listShown, loadError, glRetry, schedule, loc, camFor, zoomCapFor, live, dropHover, cancelFly, yFrameFor, liftAt, viewRef, camRef,
-    handlersRef]);
+    handlersRef, animate]);
 
   /** Reset one rail's camera to fit (r2: each rail has its own). */
   const resetRail = React.useCallback((which) => {
@@ -278,19 +277,17 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   }, [camRef, camVRef, schedule, viewRef, zoomCapFor]);
 
   const resetView = React.useCallback(() => {
-    const cam = camRef.current, v = viewRef.current;
+    const cam = camRef.current;
     if (!cam) return;
-    cam.ppv = fitPPV(cam, v.W);
-    cam.x = cam.total / 2;
-    // explicit, though the frameless clamp below also holds y at 0: Reset
-    // MEANS the baseline, whatever clamp a later edit puts after it
-    cam.y = 0;
-    clampCamera(cam, v.W, maxZoomOf(graph, v));
+    // A4 (the navigation stream): Reset flies home, eased (instant under reduced motion), to the
+    // whole canon at fit across the whole view, on the baseline: y 0 is explicit, Reset MEANS
+    // the baseline whatever clamp a later edit puts after it
+    flyTo({ x0: 0, x1: cam.total, y: 0 }, { insetRight: 0 });
     if (camVRef.current) resetRail('top');
     focusRef.current = focusState();
     journey.clear();
     setDetail(null); setChoices(null); setListOpen(false); setTip(null); schedule();
-  }, [camRef, viewRef, graph, camVRef, resetRail, focusRef, journey, schedule, setChoices, setDetail, setListOpen, setTip]);
+  }, [camRef, flyTo, camVRef, resetRail, focusRef, journey, schedule, setChoices, setDetail, setListOpen, setTip]);
 
   const toggleChrome = React.useCallback(() => {
     const next = !chromeHidden;
@@ -315,7 +312,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const { onKeyDown } = useWebKeys({
     graph, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
     camRef, camVRef, lastRailRef, viewRef, modeRef, personalRef, zoomCapFor, yFrameFor,
-    resetView, onBack, dropHover, setAnnounce, schedule,
+    resetView, onBack, dropHover, setAnnounce, schedule, cancelFly,
   });
 
   const openEndpoint = React.useCallback((endpoint) => {

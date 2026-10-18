@@ -8,15 +8,28 @@
    drawRef), the gesture ease that thins My Web's corridors while a gesture
    is live (live(), capFractionNow()), and the revive that keeps a frame
    requested while the page was hidden from freezing the view for good.
-   Nothing here is React state: gestures run it hundreds of times a second. */
+   Nothing here is React state: gestures run it hundreds of times a second.
+
+   animate(step, onEnd) is the camera's one motion (the navigation stream,
+   w3): a fly (use-web-camera.js flyTo) or a fling (gestures.js) runs its
+   step inside this same frame, just before the draw, so a moving camera
+   never needs a second requestAnimationFrame. One motion at a time: a newer
+   one ends the one running (its onEnd(false)), as stop() does; a step that
+   returns false has arrived (onEnd(true)). */
 
 // r2 (Orchestrator's ruling, 2026-09-11): see live() below.
 const LIVE_HOLD_MS = 150;
 const FADE_MS = 250;
 
 /**
+ * One frame of a motion: ms since its last frame (16 on its first). Return false when it has
+ * arrived; anything else asks for another frame.
+ * @typedef {(ms: number, now: number) => (boolean | void)} MotionStep
+ */
+/**
  * @returns {{ drawRef: { current: () => void }, schedule: () => void,
- *   live: () => void, capFractionNow: () => number }}
+ *   live: () => void, capFractionNow: () => number,
+ *   animate: (step: MotionStep, onEnd?: ((arrived: boolean) => void) | null) => () => void }}
  */
 export function useFrameScheduler() {
   const rafRef = React.useRef(0);
@@ -26,9 +39,46 @@ export function useFrameScheduler() {
   // rather than closing over one. The screen's pointer handlers ride a ref the same way.
   const drawRef = React.useRef(() => {});
 
+  // the camera's one motion: { step, onEnd, last } (animate, below)
+  const motionRef = React.useRef(null);
+
   const schedule = React.useCallback(() => {
     if (rafRef.current) return;
-    rafRef.current = requestAnimationFrame(() => { rafRef.current = 0; drawRef.current(); });
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = 0;
+      const m = motionRef.current;
+      if (m) {
+        const now = performance.now();
+        const ms = m.last ? now - m.last : 16;
+        m.last = now;
+        let more = false;
+        try { more = m.step(ms, now) !== false; } catch (_e) { more = false; }
+        if (motionRef.current === m) {
+          if (more) schedule();
+          else { motionRef.current = null; if (m.onEnd) m.onEnd(true); }
+        }
+      }
+      drawRef.current();
+    });
+  }, []);
+
+  const animate = React.useCallback((step, onEnd) => {
+    const prev = motionRef.current;
+    const m = { step, onEnd: onEnd || null, last: 0 };
+    motionRef.current = m;
+    if (prev && prev.onEnd) prev.onEnd(false);
+    schedule();
+    return () => {
+      if (motionRef.current !== m) return;
+      motionRef.current = null;
+      if (m.onEnd) m.onEnd(false);
+    };
+  }, [schedule]);
+  // a motion running when the screen goes ends there, so a fly's promise never hangs
+  React.useEffect(() => () => {
+    const m = motionRef.current;
+    motionRef.current = null;
+    if (m && m.onEnd) m.onEnd(false);
   }, []);
 
   // r2 (Orchestrator's ruling, 2026-09-11): while a gesture is live the
@@ -78,5 +128,5 @@ export function useFrameScheduler() {
     };
   }, [schedule]);
 
-  return { drawRef, schedule, live, capFractionNow };
+  return { drawRef, schedule, live, capFractionNow, animate };
 }

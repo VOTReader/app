@@ -9,7 +9,7 @@
  * use it directly rather than the MouseEvent-plus-defineProperty fallback
  * older jsdom would have needed.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { attachWebGestures, SW_CHROME_SELECTOR, isChromeTarget } from './gestures.js';
 import { createCamera, clampCamera, zoomAbout, xToVerse } from '../../utils/scripture-web/geometry.js';
 
@@ -481,5 +481,102 @@ describe('the wheel reads in pixels, and a sideways wheel pans (A1)', () => {
     const { cam } = attach(root);
     wheelAt(root, { deltaX: 20, deltaY: -10, ctrlKey: true });
     expect(cam.ppv).toBeCloseTo(10 * Math.exp(0.11), 6);
+  });
+});
+
+/* A4: a drag let go while moving glides on and slows, through the frame loop's one motion
+   (deps.animate); never under reduced motion, never from a finger that stopped before it lifted. */
+describe('fling inertia (A4)', () => {
+  /** A frame loop the test steps: animate keeps the one motion, frame() runs it once. */
+  function loop() {
+    let m = null;
+    const animate = vi.fn((step, onEnd) => {
+      const prev = m; const cur = { step, onEnd }; m = cur;
+      if (prev && prev.onEnd) prev.onEnd(false);
+      return () => { if (m === cur) { m = null; if (cur.onEnd) cur.onEnd(false); } };
+    });
+    const frame = (ms = 16) => {
+      const cur = m;
+      if (!cur) return false;
+      const more = cur.step(ms) !== false;
+      if (m === cur && !more) { m = null; if (cur.onEnd) cur.onEnd(true); }
+      return !!m;
+    };
+    return { animate, frame, running: () => !!m };
+  }
+  /** A flick: down at x 600, moves of 30 px every 10 ms to the left, up at the last. */
+  function flick(root, clock, steps = 6, dx = -30, dt = 10) {
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 600, clientY: 300 }));
+    let x = 600;
+    for (let i = 0; i < steps; i++) {
+      clock.t += dt; x += dx;
+      root.dispatchEvent(pointerEvent('pointermove', { clientX: x, clientY: 300 }));
+    }
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: x, clientY: 300 }));
+    return x;
+  }
+  let clock;
+  beforeEach(() => {
+    clock = { t: 5000 };
+    vi.spyOn(performance, 'now').mockImplementation(() => clock.t);
+  });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('a flick glides on in the same direction, slowing, and stops', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const l = loop();
+    const { cam, handlers } = attach(root, { animate: l.animate, reduceMotion: () => false });
+    const x0 = cam.x;
+    flick(root, clock);
+    const released = cam.x;
+    expect(released - x0, 'the drag itself: 180 px left is 18 verses right').toBeCloseTo(18, 6);
+    expect(l.animate).toHaveBeenCalledTimes(1);
+    const steps = [];
+    let last = cam.x, n = 0;
+    while (l.frame() && n++ < 500) { steps.push(cam.x - last); last = cam.x; }
+    expect(cam.x, 'it glided on').toBeGreaterThan(released + 5);
+    expect(steps.every((d) => d >= 0), 'the same way the finger went').toBe(true);
+    expect(steps[steps.length - 1], 'slowing').toBeLessThan(steps[0]);
+    expect(l.running(), 'and stopped').toBe(false);
+    expect(handlers.tap).not.toHaveBeenCalled();
+  });
+
+  it('none under reduced motion', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const l = loop();
+    attach(root, { animate: l.animate, reduceMotion: () => true });
+    flick(root, clock);
+    expect(l.animate).not.toHaveBeenCalled();
+  });
+
+  it('none from a finger that stopped before it lifted, or that crept', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const l = loop();
+    attach(root, { animate: l.animate, reduceMotion: () => false });
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 600, clientY: 300 }));
+    clock.t += 10;
+    root.dispatchEvent(pointerEvent('pointermove', { clientX: 500, clientY: 300 }));
+    clock.t += 250;    // held still, then lifted
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 500, clientY: 300 }));
+    expect(l.animate).not.toHaveBeenCalled();
+    flick(root, clock, 6, -2, 40);   // a slow creep: 0.05 px a ms
+    expect(l.animate).not.toHaveBeenCalled();
+  });
+
+  it('a press catches the gliding web where it is', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const l = loop();
+    const { cam } = attach(root, { animate: l.animate, reduceMotion: () => false });
+    flick(root, clock);
+    l.frame(); l.frame();
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 2, clientX: 300, clientY: 300 }));
+    expect(l.running(), 'the press ended the glide').toBe(false);
+    const held = cam.x;
+    l.frame();
+    expect(cam.x).toBe(held);
   });
 });

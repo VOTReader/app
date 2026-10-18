@@ -24,7 +24,7 @@ import { votNodeName, ZOOM_MAX_MESSAGE } from '../../utils/scripture-web/describ
 export function useWebKeys({
   graph, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
   camRef, camVRef, lastRailRef, viewRef, modeRef, personalRef, zoomCapFor, yFrameFor,
-  resetView, onBack, dropHover, setAnnounce, schedule,
+  resetView, onBack, dropHover, setAnnounce, schedule, cancelFly,
 }) {
   /** Close whatever is on top of the web, one layer a call: the guide, then
    * the empty-web notice, then the panels and the hover chip together.
@@ -90,6 +90,9 @@ export function useWebKeys({
     } else return;
     e.preventDefault();
     dropHover();
+    // a key that moves the camera takes it: a fly running stops where the key found it (the
+    // fly only moves in a frame, so none runs between the key's move and this)
+    if (cancelFly) cancelFly();
     clampCamera(cam, v.W, ceiling, yf);
     const centre = Math.round(cam.x);
     if (atCeiling) setAnnounce(ZOOM_MAX_MESSAGE);
@@ -101,7 +104,7 @@ export function useWebKeys({
     else if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
     schedule();
   }, [viewRef, lastRailRef, camVRef, camRef, zoomCapFor, yFrameFor, graph, schedule, resetView, closeTopOverlay, onBack, dropHover,
-    personalRef, modeRef, setAnnounce]);
+    personalRef, modeRef, setAnnounce, cancelFly]);
 
   return { onKeyDown };
 }

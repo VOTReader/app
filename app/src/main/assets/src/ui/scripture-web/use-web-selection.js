@@ -22,7 +22,7 @@
    The journey (use-journey.js) rides through here to the panel; Follow
    pushes onto it and moves the camera with flyTo (use-web-camera.js). */
 
-import { zoomAbout } from '../../utils/scripture-web/geometry.js';
+import { zoomAbout, fitPPV } from '../../utils/scripture-web/geometry.js';
 import { pickThreads, pickChapter, pickVerse, chapterRange, nearbyChapter, nearbyThreads } from '../../utils/scripture-web/pick.js';
 import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 import { focusState, withLit } from '../../utils/scripture-web/focus-state.js';
@@ -379,11 +379,16 @@ export function useWebSelection({
   }, [liftAt, hitCandidatesAt, describe, viewRef, commitFound, schedule, focusRef, dropHover, setAnnounce,
     overlayFrameRef, graph, flyTo, openPanel, journey]);
 
-  const doubleTap = React.useCallback((cx) => {
+  /** Zoom in 2.5x about the tap (A4, the navigation stream): to where zoomAbout puts the camera,
+   * eased through flyTo about the same point (instant under reduced motion). */
+  const doubleTap = React.useCallback((cx, cy) => {
     const cam = camRef.current, v = viewRef.current;
-    zoomAbout(cam, v.W, cx * v.DPR, 2.5, maxZoomOf(graph, v), yFrameFor(cam) || undefined);
-    schedule();
-  }, [camRef, graph, schedule, viewRef, yFrameFor]);
+    if (!cam || !v.W) return;
+    const to = { x: cam.x, y: cam.y, ppv: cam.ppv, total: cam.total };
+    zoomAbout(to, v.W, cx * v.DPR, 2.5, maxZoomOf(graph, v), yFrameFor(cam) || undefined,
+      typeof cy === 'number' ? cy * v.DPR : undefined);
+    flyTo({ x: to.x, zoom: to.ppv / fitPPV(cam, v.W), y: to.y }, { insetRight: 0, ms: 280, anchor: cx });
+  }, [camRef, graph, viewRef, yFrameFor, flyTo]);
 
   /** What is open now, as a way back to it (A1, the navigation stream): the gestures keep one
    * before a tap, and when that tap turns out to be a double-tap's first, the double takes back

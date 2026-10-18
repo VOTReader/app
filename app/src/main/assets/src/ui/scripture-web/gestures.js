@@ -25,6 +25,8 @@
    `e.target` in the first place — adding them here would be dead code.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { prefersReducedMotion } from '../../utils/reduced-motion.js';
+
 /**
  * Chrome the gesture surface must leave alone: controls, the topbar, every
  * dialog/sheet/list the screen opens, and any native form control wherever
@@ -57,6 +59,14 @@ export const DOUBLE_TAP_PX = 24;
  * A single event zooms by at most this much pixel delta, so a page-mode notch is not a leap. */
 const WHEEL_LINE_PX = 16;
 const WHEEL_MAX_PX = 300;
+/* A4: a drag let go while moving glides on and slows (fling inertia), as a page does under a
+   flicked finger. The speed is read over the last FLING_WINDOW_MS of the drag up to the lift (a
+   finger that rested before it lifted has none left); it decays with FLING_TAU_MS and stops under
+   FLING_STOP (CSS px per ms) or against the canon's ends. None under reduced motion. */
+const FLING_WINDOW_MS = 100;
+const FLING_MIN = 0.35;
+const FLING_STOP = 0.02;
+const FLING_TAU_MS = 325;
 
 /**
  * Wires pan/pinch/tap/double-tap/wheel-zoom onto `el`.
@@ -77,6 +87,8 @@ const WHEEL_MAX_PX = 300;
  *   xToVerse: (cam:object, width:number, x:number) => number,
  *   yFrame?: (cam:object) => (object|null),
  *   lift?: (xCss:number, yCss:number) => (((yCss:number) => void)|null),
+ *   animate?: (step:(ms:number) => (boolean|void), onEnd?:((arrived:boolean) => void)|null) => (() => void),
+ *   reduceMotion?: () => boolean,
  * }} deps
  * @returns {() => void} detach
  */
@@ -102,6 +114,40 @@ export function attachWebGestures(el, deps) {
   // pointers that zoom (their ids). lastTap: the first tap of a possible double, with the undo
   // of what it opened.
   let drag = null, pinch = null, moved = false, lastTap = null;
+  // the running fling's stop (deps.animate's), or null
+  let stopFling = null;
+  const endFling = () => { if (stopFling) { const stop = stopFling; stopFling = null; stop(); } };
+  const reduced = () => (deps.reduceMotion ? deps.reduceMotion() : prefersReducedMotion());
+  /** Where the dragging pointer was over the last FLING_WINDOW_MS, for the speed it lifts at. */
+  const sample = (d, pt) => {
+    const t = performance.now();
+    d.samples.push({ t, x: pt.x, y: pt.y });
+    while (d.samples.length > 2 && t - d.samples[0].t > FLING_WINDOW_MS) d.samples.shift();
+  };
+  /** A drag let go while moving glides on (A4). */
+  const fling = (d) => {
+    if (!deps.animate || reduced() || d.samples.length < 2) return;
+    const last = d.samples[d.samples.length - 1], first = d.samples[0];
+    const span = last.t - first.t;
+    if (span <= 0) return;
+    let vx = (last.x - first.x) / span, vy = (last.y - first.y) / span;
+    if (Math.hypot(vx, vy) < FLING_MIN) return;
+    const c = d.cam;
+    const stop = deps.animate((ms) => {
+      const yf = yFrameOf(c);
+      const k = Math.exp(-ms / FLING_TAU_MS);
+      // the travel this frame: the decaying speed's integral over it
+      const tx = vx * FLING_TAU_MS * (1 - k), ty = vy * FLING_TAU_MS * (1 - k);
+      const bx = c.x, by = c.y;
+      c.x -= (tx * dpr()) / c.ppv;
+      if (yf) c.y = (c.y > 0 ? c.y : 0) + ty * dpr();
+      clampCamera(c, view().W, zoomCap(c), yf);
+      vx *= k; vy *= k;
+      if (deps.live) deps.live();
+      return Math.hypot(vx, vy) >= FLING_STOP && (c.x !== bx || c.y !== by);
+    }, () => { if (stopFling === stop) stopFling = null; });
+    stopFling = stop;
+  };
 
   /** Two fingers pinch: the first two still down. A third finger rides along without steering;
    * if one of the two lifts while it is down, it and the one left pinch on from where they are. */
@@ -128,6 +174,8 @@ export function attachWebGestures(el, deps) {
     // listeners still see the move — but letting it throw here would abort
     // the handler and leave the gesture dead.
     try { if (el.setPointerCapture) el.setPointerCapture(e.pointerId); } catch (_e) { /* capture is optional */ }
+    // a press catches a gliding web where it is
+    endFling();
     // the first pointer of a new gesture: anything still recorded is a ghost whose up never came
     if (e.isPrimary && pointers.size) { pointers.clear(); drag = null; pinch = null; }
     const pt = loc(e);
@@ -138,7 +186,8 @@ export function attachWebGestures(el, deps) {
     moved = false;
     const dc = camAt(pt.y);
     drag = { id: e.pointerId, x: pt.x, y: pt.y, camx: dc.x, camy: dc.y || 0, cam: dc,
-             lift: liftAt(pt.x, pt.y), slop: slopFor(e.pointerType) };
+             lift: liftAt(pt.x, pt.y), slop: slopFor(e.pointerType), samples: [] };
+    sample(drag, pt);
   };
   // W52: a pointer that went down on the chrome (or anywhere this code did
   // not register it) is the chrome's for its whole life: its move must not
@@ -193,6 +242,7 @@ export function attachWebGestures(el, deps) {
     // Inside the slop it is still a tap and the camera holds (slopFor, above).
     if (!moved && Math.hypot(pt.x - drag.x, pt.y - drag.y) <= drag.slop) return;
     moved = true;
+    sample(drag, pt);
     c.x = drag.camx - (pt.x - drag.x) * dpr() / c.ppv;
     const yf = yFrameOf(c);
     if (yf) c.y = drag.camy + (pt.y - drag.y) * dpr();
@@ -210,7 +260,8 @@ export function attachWebGestures(el, deps) {
     if (pointers.size !== 1) return;
     const [[id, pt]] = Array.from(pointers.entries());
     const dc = camAt(pt.y);
-    drag = { id, x: pt.x, y: pt.y, camx: dc.x, camy: dc.y || 0, cam: dc, lift: null, slop: 0 };
+    drag = { id, x: pt.x, y: pt.y, camx: dc.x, camy: dc.y || 0, cam: dc, lift: null, slop: 0, samples: [] };
+    sample(drag, pt);
     moved = true;
   };
   /** A pinch finger left (up or cancel): with two still down they pinch on, with one it pans. */
@@ -243,6 +294,9 @@ export function attachWebGestures(el, deps) {
         lastTap = { t: now, x: pt.x, y: pt.y, undo: h.snapshot ? h.snapshot() : null };
         h.tap(pt.x, pt.y);
       }
+    } else {
+      sample(drag, loc(e));
+      fling(drag);
     }
     drag = null;
   };
@@ -265,6 +319,7 @@ export function attachWebGestures(el, deps) {
     // (data-wheel-through) and the rail beneath zooms. Its taps stay its own.
     if (isChromeTarget(e.target) && !(e.target.closest && e.target.closest('[data-wheel-through]'))) return;
     e.preventDefault();
+    endFling();
     const pt = loc(e), v = view(), W = v.W;
     const c = camAt(pt.y);
     // A1: every wheel in CSS px: a line wheel (deltaMode 1) and a page wheel (2) read as their
@@ -290,6 +345,7 @@ export function attachWebGestures(el, deps) {
   el.addEventListener('pointercancel', cancel);
   el.addEventListener('wheel', wheel, { passive: false });
   return () => {
+    endFling();
     el.removeEventListener('pointerdown', down);
     el.removeEventListener('pointermove', move);
     el.removeEventListener('pointerup', up);
