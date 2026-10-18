@@ -12,7 +12,7 @@ afterEach(() => { cleanup(); document.body.innerHTML = ''; });
 
 const goToStub = (over = {}) => ({
   button: {}, box: null, isOpen: false,
-  open: vi.fn(), close: vi.fn(), selectCentre: vi.fn(() => true), step: vi.fn(() => true), ...over,
+  open: vi.fn(), close: vi.fn(), selectCentre: vi.fn(() => true), step: vi.fn(() => true), back: vi.fn(() => true), ...over,
 });
 
 function mountKeys(over = {}) {
@@ -111,6 +111,16 @@ describe('Enter, Space, [ and ] on the web', () => {
     expect(p.goTo.step.mock.calls).toEqual([[-1], [1], [1]]);
   });
 
+  it('Backspace goes back along the trail (journey.back, which nothing called: review of 2026-10-18)', () => {
+    const { p, keys } = mountKeys();
+    const e = rootKey('Backspace');
+    keys().onKeyDown(e);
+    expect(p.goTo.back).toHaveBeenCalledTimes(1);
+    expect(e.preventDefault).toHaveBeenCalled();
+    keys().onKeyDown(rootKey('Backspace', { onChild: true }));
+    expect(p.goTo.back, 'a field or a button keeps its own Backspace').toHaveBeenCalledTimes(1);
+  });
+
   it('they are the web\'s only while the web has the keyboard: a button keeps its own Enter', () => {
     const { p, keys } = mountKeys();
     const e = rootKey('Enter', { onChild: true });
@@ -149,7 +159,7 @@ describe('Escape and Back close the go-to first', () => {
 
 describe('the help text (G2)', () => {
   it('names the keys', () => {
-    for (const w of [/arrow keys/i, /plus and minus/i, /\b0\b/, /Enter or Space/, /\[ and \]/, /slash|\//i, /Control\+K/, /Escape/]) {
+    for (const w of [/arrow keys/i, /plus and minus/i, /\b0\b/, /Enter or Space/, /\[ and \]/, /slash|\//i, /Control\+K/, /Backspace/, /Escape/]) {
       expect(WEB_KEYS_HELP).toMatch(w);
     }
   });

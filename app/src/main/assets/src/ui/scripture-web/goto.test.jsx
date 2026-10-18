@@ -542,6 +542,23 @@ describe("through the web's own keys (use-web-keys.js)", () => {
     fireEvent.keyDown(root, { key: 'Escape' });
     expect(get().sel.detail).toBeNull();
   });
+  it('Backspace goes back along the trail: to where the go-to set out, named; nothing further back, said so', async () => {
+    const { container, get, setAnnounce } = mountWeb({ keys: true });
+    const root = /** @type {HTMLElement} */ (container.querySelector('.sw-root'));
+    act(() => { get().goTo.open('Genesis 1:101'); });
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    settle(); await flush();
+    expect(get().journey.stack.map((e) => e.label)).toEqual(['Genesis 1:15552', 'Genesis 1:101']);
+    fireEvent.keyDown(root, { key: 'Backspace' });
+    settle(); await flush(); settle();
+    expect(setAnnounce).toHaveBeenLastCalledWith('Back to Genesis 1:15552');
+    expect(get().journey.stack, 'home: the trail is done').toEqual([]);
+    expect(get().cam.camRef.current.x, 'where it set out').toBeCloseTo(15551, 6);
+    expect(get().sel.panel, 'the overview had nothing open').toBeNull();
+    fireEvent.keyDown(root, { key: 'Backspace' });
+    expect(setAnnounce).toHaveBeenLastCalledWith('Nothing to go back to');
+  });
+
   it('Enter on the web takes the line at the centre; ] steps on from it', () => {
     const { container, get } = mountWeb({ keys: true, cam: { x: 300, ppv: 8 } });
     const root = /** @type {HTMLElement} */ (container.querySelector('.sw-root'));

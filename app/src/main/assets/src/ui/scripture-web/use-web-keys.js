@@ -15,9 +15,10 @@
    in the capture phase, so it goes ahead of the app's own "/ opens Search" in
    use-desktop-keyboard.js; My Web has no go-to and leaves / to the app);
    Enter or Space choose the line at the centre and [ ] step through the lines
-   at the chosen verse while the web itself has the keyboard; Escape and Back
-   close the go-to before anything else. WEB_KEYS_HELP is the screen's help
-   text, naming every key. */
+   at the chosen verse while the web itself has the keyboard, and Backspace
+   goes back along the trail (goTo.back, journey.back); Escape and Back close
+   the go-to before anything else. WEB_KEYS_HELP is the screen's help text,
+   naming every key. */
 
 import { clampCamera, zoomAbout } from '../../utils/scripture-web/geometry.js';
 import { refOfVerse } from '../../utils/scripture-web/pick.js';
@@ -27,7 +28,7 @@ import { votNodeName, ZOOM_MAX_MESSAGE } from '../../utils/scripture-web/describ
 export const WEB_KEYS_HELP = 'Drag to move through scripture; pinch or scroll to zoom. '
   + 'The arrow keys move, the plus and minus keys zoom, and 0 resets the view. '
   + 'Enter or Space selects the line nearest the centre; [ and ] step through the lines at the chosen verse. '
-  + 'Slash or Control+K opens Go to, for a book, chapter or verse. '
+  + 'Slash or Control+K opens Go to, for a book, chapter or verse; Backspace goes back to where you were before. '
   + 'Escape closes what is on top, then leaves the web. Nearby opens a keyboard-friendly list.';
 
 const TEXT_FIELD = { INPUT: 1, TEXTAREA: 1, SELECT: 1 };
@@ -95,6 +96,7 @@ export function useWebKeys({
     if (goTo && !e.ctrlKey && !e.metaKey && !e.altKey) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goTo.selectCentre(); return; }
       if (e.key === '[' || e.key === ']') { e.preventDefault(); goTo.step(e.key === ']' ? 1 : -1); return; }
+      if (e.key === 'Backspace' && goTo.back) { e.preventDefault(); goTo.back(); return; }
     }
     const v = viewRef.current;
     // r2: the keys drive the rail the pointer last touched (the Bible rail
