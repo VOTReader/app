@@ -108,6 +108,10 @@ function offsetBox(el) {
   return { l: el.offsetLeft, t: el.offsetTop, r: el.offsetLeft + el.offsetWidth, b: el.offsetTop + el.offsetHeight };
 }
 
+/** The lazy Bible corpus's signal (window.__bibleCorpus), typeof-guarded: inert where it is absent. */
+const subscribeBible = (cb) => (typeof window.__bibleCorpus !== 'undefined' ? window.__bibleCorpus.subscribe(cb) : () => {});
+const bibleCorpusVersion = () => (typeof window.__bibleCorpus !== 'undefined' ? window.__bibleCorpus.getVersion() : 0);
+
 /** "64 connections", "1 connection". */
 export function connectionsText(n) {
   return n.toLocaleString() + (n === 1 ? ' connection' : ' connections');
@@ -317,12 +321,16 @@ export function useGoTo(web) {
     return true;
   }, [graph, live, openPanel, camRef, viewRef, density, lightThreads, journey, here, focusRef, flyTo, say]);
 
+  // a verse row's text is the Bible corpus's, which loads lazily: a box open before it lands takes
+  // the text when it does (review 2026-10-18; the signal hooks/use-lazy-bundles.js reads). The
+  // version is a dependency the memo's body never names: verseTextFor reads the corpus itself
+  const bibleVersion = React.useSyncExternalStore(subscribeBible, bibleCorpusVersion);
   const rows = React.useMemo(() => {
     if (!isOpen || !graph) return [];
     const v = viewRef && viewRef.current;
     const compact = !!(v && v.H && v.H / (v.DPR || 1) <= 500);
     return goToRows(graph, query, { density, limit: compact ? GOTO_ROWS_COMPACT : GOTO_ROWS });
-  }, [isOpen, graph, query, density, viewRef]);
+  }, [isOpen, graph, query, density, viewRef, bibleVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const selAt = rows.length ? Math.min(sel, rows.length - 1) : -1;
 
   const choose = React.useCallback((row) => {

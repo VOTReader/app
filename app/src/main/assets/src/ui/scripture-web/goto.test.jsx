@@ -136,6 +136,22 @@ describe('the go-to box (spec 4.5)', () => {
     expect(sel(), 'up from the first is the last').toBe(rows.length - 1);
   });
 
+  it('a verse row takes its text when the Bible corpus lands while the box is open (it loads lazily)', () => {
+    let version = 0, loaded = false;
+    const subs = new Set();
+    vi.stubGlobal('__bibleCorpus', {
+      subscribe: (cb) => { subs.add(cb); return () => subs.delete(cb); },
+      getVersion: () => version, get loaded() { return loaded; },
+    });
+    vi.stubGlobal('resolveVerseText', (r) => (loaded && r.bookId === 'genesis' && r.chapter === 1 && r.verse === 1 ? 'In the beginning' : ''));
+    const { container, get } = mountWeb();
+    act(() => { get().goTo.open(); });
+    fireEvent.change(input(container), { target: { value: 'Gen 1:1' } });
+    expect(rowTexts(container)[0], 'no corpus yet: the reference alone').toBe('Genesis 1:1');
+    act(() => { loaded = true; version = 1; for (const cb of subs) cb(); });
+    expect(rowTexts(container)[0]).toBe('Genesis 1:1 — In the beginning');
+  });
+
   it('Enter on a verse: the box closes, the camera frames it, its threads light, verse mode opens, the chip names it', async () => {
     const { container, get, setAnnounce } = mountWeb();
     act(() => { get().goTo.open(); });
