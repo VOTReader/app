@@ -405,28 +405,39 @@ function presence(x, W) {
 
 /**
  * The zoom a line's ink follows: each rail's zoom, held by its foot's
- * presence on screen, and never less than the depth both rails share (the
- * shallower rail's zoom). Both feet in view: the deeper rail's zoom; one
- * foot: its rail's; none (a fly-over): the shallower rail's, so a fly-over
- * at 10x on both rails is an anchored thread's ink at 10x, not the
- * overview's (fix-review #12). Continuous as a foot crosses the edge (a
- * leg whose last foot leaves already sits at that floor), so panning never
- * pops a line's ink.
+ * presence on screen. Both feet in view: the deeper rail's zoom; one foot:
+ * its rail's (at least the shallower rail's, so never under it); none (a
+ * fly-over): what its feet's presence holds, near the view's depth while
+ * they sit just past the edges and the overview's ink once they are far,
+ * never less. Continuous as a foot crosses the edge, so panning never pops
+ * a line's ink.
+ *
+ * A fly-over does NOT take the view's depth (fix-review #12 asked for it
+ * once the geometry stopped fly-overs reading as a sky). Its on-screen part
+ * is the middle of a curve whose feet are both past the edges, so a
+ * corridor of them (Vol I-VII to the Gospels, the studies to the Law) lies
+ * in one shallow ribbon whatever the feet's projection, and at the view's
+ * depth that ribbon saturated: on e2e-myweb-r2's T arm (both rails 16x) the
+ * band's pixels at full ink were 0.139 of it at 800x360 and 0.073 at
+ * 1920x1080 against 0.060 and 0.006 with this law (the base's r2 picture
+ * 0.064 and 0.024): the sky C17 forbids.
  * @param {number} zA the zoom of foot a's rail
  * @param {number} pA foot a's presence
  * @param {number} zB the zoom of foot b's rail
  * @param {number} pB foot b's presence
  */
 function lineZoom(zA, pA, zB, pB) {
-  return Math.max(Math.min(zA, zB), Math.pow(Math.max(1, zA), pA), Math.pow(Math.max(1, zB), pB));
+  return Math.max(Math.pow(Math.max(1, zA), pA), Math.pow(Math.max(1, zB), pB));
 }
 
 /**
  * This frame's ink rungs: INK_RUNGS zooms log-spaced from the shallower rail's
- * zoom to the deeper's, both ends exact (lineZoom never leaves that range), so
- * a thread on a zoomed rail is that rail's ink exactly and one hanging from the
- * other rail is the other's; only threads whose feet sit in the fade past an
- * edge take a rung between. One rung when the rails share a zoom.
+ * zoom to the deeper's, both ends exact (a line with a foot on screen never
+ * leaves that range), so a thread on a zoomed rail is that rail's ink exactly
+ * and one hanging from the other rail is the other's; only threads whose feet
+ * sit in the fade past an edge take a rung between. One rung when the rails
+ * share a zoom. The fly-overs take their own: inkRungs(1, the deeper zoom),
+ * from the overview's ink to the deeper rail's.
  * @param {number} zB
  * @param {number} zV
  */
@@ -874,10 +885,11 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     // FULL RESOLUTION, on the canvas the reader sees (Corbin, 2026-09-11:
     // the half-resolution layer read as "low resolution"). Each thread's ink
     // follows the zoom of the rails its feet hold on screen (lineZoom), in
-    // the frame's rungs; a fly-over (no foot on screen) takes the depth both
-    // rails share at FLYOVER_LEG_WIDTH of its width (Q3 ii), so anchored lines read
-    // first while every line stays drawn and tappable.
-    const rungs = inkRungs(zB, zV);
+    // the frame's rungs; a fly-over (no foot on screen) is held the same way,
+    // on its own rungs from the overview's ink, at FLYOVER_LEG_WIDTH of its
+    // width (Q3 ii), so anchored lines read first while every line stays
+    // drawn and tappable.
+    const rungs = inkRungs(zB, zV), flyRungs = inkRungs(1, Math.max(zB, zV));
     /** @type {Map<number, ContextBatches>} */
     const steps = new Map();
     for (let i = 0; i < underlay.count; i++) {
@@ -885,7 +897,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
       const { a, b, pts } = underlayGeometry(underlay, i, opts, rails);
       if (!pts) continue;
       const fly = /** @type {any} */ (pts).cls === 'fly';
-      const step = rungs.of(lineZoom(zB, presence(a[0], width), zV, presence(b[0], width)));
+      const step = (fly ? flyRungs : rungs).of(lineZoom(zB, presence(a[0], width), zV, presence(b[0], width)));
       const key = step * 2 + (fly ? 1 : 0);
       let batch = steps.get(key);
       if (!batch) { batch = new ContextBatches(); steps.set(key, batch); }
@@ -893,7 +905,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     }
     ctx.lineCap = 'round';
     for (const key of [...steps.keys()].sort((p, q) => p - q)) {
-      const cx = personalInk(rungs.zoom(key >> 1), opts.contextCeiling).context;
+      const cx = personalInk((key & 1 ? flyRungs : rungs).zoom(key >> 1), opts.contextCeiling).context;
       ctx.lineWidth = cx.width * DPR * (key & 1 ? FLYOVER_LEG_WIDTH : 1);
       /** @type {ContextBatches} */ (steps.get(key)).stroke(ctx, cx.alpha * rest, ctx.lineWidth * 4, opts.capFraction);
     }

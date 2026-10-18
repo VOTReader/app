@@ -8,9 +8,11 @@
    B1  a line takes the samples its curve needs: the drawn polyline stays
        within EPS (2.5 CSS px for Timothy's threads, 0.5 for the reader's
        links) of the curve, and the overview's context takes about a dozen.
-   B2  the context is stroked in at most INK_RUNGS inks a frame (twice that
-       with fly-overs), spaced between the two rails' zooms with both ends
-       exact, so the threads on a zoomed rail are that rail's ink exactly.
+   B2  the context is stroked in at most INK_RUNGS inks a frame, spaced
+       between the two rails' zooms with both ends exact, so the threads on a
+       zoomed rail are that rail's ink exactly; the fly-overs take at most
+       INK_RUNGS more, from the overview's ink (theirs once their feet are
+       far) to the deeper rail's.
    B3  the picks prefilter on the drawn feet before building a path, and
        pick exactly what the draw draws. */
 import { describe, it, expect } from 'vitest';
@@ -132,14 +134,18 @@ describe('B2 the context is stroked in a bounded set of inks, both rails\' own e
     expect(Math.max(...alphas)).toBeCloseTo(personalInk(40).context.alpha, 6);
     expect(Math.min(...alphas)).toBeCloseTo(personalInk(1).context.alpha, 6);
   });
-  it('with fly-overs too: at most twice INK_RUNGS stroke inks, the fly-overs at the depth both rails share', () => {
+  it('with fly-overs too: at most twice INK_RUNGS stroke inks, the far fly-overs at the overview\'s ink', () => {
     const u = corpus(2648, 11);
     const ctx = countingCtx();
     drawPersonalWeb(ctx, null, u, frame(20, 26000, 3, rail.total * 0.3));
     const cs = ctx.c.strokes.filter(contextStroke);
     const inks = new Set(cs.map((s) => alphaOf(s.style).toFixed(6) + '/' + s.width.toFixed(6)));
     expect(inks.size).toBeLessThanOrEqual(2 * RR.INK_RUNGS);
-    expect(Math.min(...cs.map((s) => alphaOf(s.style)))).toBeCloseTo(personalInk(3).context.alpha, 6);
+    // the far fly-overs keep the overview's ink, never less
+    expect(Math.min(...cs.map((s) => alphaOf(s.style)))).toBeCloseTo(personalInk(1).context.alpha, 6);
+    // the threads hanging from the Volumes rail at 3x are that rail's ink exactly, at full width
+    const v3 = personalInk(3).context;
+    expect(cs.some((s) => Math.abs(alphaOf(s.style) - v3.alpha) < 1e-6 && Math.abs(s.width - v3.width) < 1e-6)).toBe(true);
   });
 });
 
