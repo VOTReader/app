@@ -18,7 +18,7 @@
        VOLUMES OF TRUTH" on a PC only; the phone's names keep one row. */
 import { describe, it, expect } from 'vitest';
 import { buildVotRail } from '../../utils/scripture-web/personal-graph.js';
-import { drawPersonalWeb, personalInk, railFrame } from './rail-renderer.js';
+import { drawPersonalWeb, personalInk, railFrame, linkPath } from './rail-renderer.js';
 import { css, FONT, TAP_CONTEXT, FLYOVER_LEG_WIDTH, INK } from '../../utils/scripture-web/sw-ink.js';
 
 const rail = buildVotRail([
@@ -187,6 +187,36 @@ describe('P3 a chosen link recedes the rest to TAP_CONTEXT', () => {
     expect(alphaOf(core.style)).toBeCloseTo(INK.chosen.alpha, 6);
     expect(core.width).toBeCloseTo(INK.chosen.width, 6);
   });
+  it('the chosen and the hovered Timothy thread are stroked smooth: within 0.5 px of the curve, no corner (Q8, item 33; fix-review 2 #2)', () => {
+    // the faint pass samples a thread to EPS_CONTEXT (2.5 px: thousands of
+    // threads at 0.06 alpha); stroked alone at the chosen width with a halo,
+    // those chords showed as facets, the one line the reader is looking at
+    const one = { count: 1, versePos: new Float32Array([20]), votPos: new Float32Array([15]), source: new Uint8Array([0]) };
+    const rails = railFrame({ H, DPR: 1 }, base.base);
+    const a = [base.verseX(20), rails.bottomY], b = [base.votX(15.5), rails.topY];
+    const curve = linkPath(a[0], a[1], b[0], b[1], true, 6000);
+    for (const [name, o] of /** @type {Array<[string, any]>} */ ([
+      ['chosen', { focusIndex: 0, focusUnderlay: true }],
+      ['hovered', { hoverIndex: 0, hoverUnderlay: true }],
+    ])) {
+      const ctx = pathCtx();
+      drawPersonalWeb(ctx, null, one, Object.assign({}, base, o));
+      const core = ctx.strokes[ctx.strokes.length - 1].path;
+      expect(core.length, name).toBeGreaterThan(8);
+      expect(core[0], name).toEqual(a);
+      expect(core[core.length - 1], name).toEqual(b);
+      // every chord's quarter points lie on the curve, within half a pixel
+      let worst = 0;
+      for (let i = 1; i < core.length; i++) {
+        for (const f of [0.25, 0.5, 0.75]) {
+          const p = [core[i - 1][0] + (core[i][0] - core[i - 1][0]) * f, core[i - 1][1] + (core[i][1] - core[i - 1][1]) * f];
+          worst = Math.max(worst, distTo(curve, p));
+        }
+      }
+      expect(worst, name).toBeLessThanOrEqual(0.5);
+      expect(turnOf(core), name).toBeLessThan(20);
+    }
+  });
   it('a Timothy thread under the pointer is drawn on top at the hover width, and nothing dims (C3, fix-review #11)', () => {
     const ctx = recordingCtx();
     drawPersonalWeb(ctx, personal2, two, Object.assign({}, base, { hoverIndex: 1, hoverUnderlay: true }));
@@ -299,6 +329,41 @@ describe('P4 the Volumes rail in the spec\'s type and ink', () => {
     }
   });
 });
+
+/** A context recording each stroke's style, width and the points of its path. @returns {any} */
+function pathCtx() {
+  const ctx = recordingCtx();
+  let path = [];
+  ctx.beginPath = () => { path = []; };
+  ctx.moveTo = (x, y) => { path.push([x, y]); };
+  ctx.lineTo = (x, y) => { path.push([x, y]); };
+  ctx.stroke = () => { ctx.strokes.push({ style: ctx.strokeStyle, width: ctx.lineWidth, path: path.slice() }); };
+  return ctx;
+}
+/** Distance from a point to a polyline. */
+function distTo(line, p) {
+  let best = Infinity;
+  for (let i = 1; i < line.length; i++) {
+    const [x1, y1] = line[i - 1], [x2, y2] = line[i];
+    const dx = x2 - x1, dy = y2 - y1, len = dx * dx + dy * dy;
+    let t = len > 0 ? ((p[0] - x1) * dx + (p[1] - y1) * dy) / len : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    best = Math.min(best, Math.hypot(p[0] - (x1 + t * dx), p[1] - (y1 + t * dy)));
+  }
+  return best;
+}
+/** The sharpest turn between consecutive segments of a polyline, degrees. */
+function turnOf(pts) {
+  let worst = 0;
+  for (let i = 2; i < pts.length; i++) {
+    const h1 = Math.atan2(pts[i - 1][1] - pts[i - 2][1], pts[i - 1][0] - pts[i - 2][0]);
+    const h2 = Math.atan2(pts[i][1] - pts[i - 1][1], pts[i][0] - pts[i - 1][0]);
+    let d = Math.abs(h2 - h1);
+    if (d > Math.PI) d = 2 * Math.PI - d;
+    worst = Math.max(worst, (d * 180) / Math.PI);
+  }
+  return worst;
+}
 
 /** A context recording the tick segments (volumesTick strokes) and each name's box. @returns {any} */
 function segmentCtx() {

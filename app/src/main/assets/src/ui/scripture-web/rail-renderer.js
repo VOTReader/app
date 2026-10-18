@@ -925,9 +925,17 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
   return rails;
 }
 
-/** One of Timothy's threads, drawn alone: a halo, then its core. */
+/**
+ * One of Timothy's threads, drawn alone: a halo, then its core. Sampled to
+ * the reader's links' tolerance (EPS_LINK), not the faint pass's: stroked
+ * alone at the chosen width with a halo, the context's 2.5 px chords showed
+ * as facets on the one line the reader is looking at (Q8, item 33). The pick
+ * keeps the context polyline: its 14 px reach dwarfs the difference.
+ */
 function strokeThread(ctx, underlay, i, opts, rails, halo, alpha, width) {
-  const { pts } = underlayGeometry(underlay, i, opts, rails);
+  const a = /** @type {[number, number]} */ ([opts.verseX(underlay.versePos[i]), rails.bottomY]);
+  const b = endpointPoint({ rail: 1, pos: underlay.votPos[i] }, opts, rails);
+  const pts = threadPath(a, b, true, { width: opts.width, gap: Math.abs(rails.bottomY - rails.topY), n: 48, eps: EPS_LINK * (opts.DPR || 1) });
   if (!pts) return;
   const bin = underlay.source ? Math.min(CONTEXT_BINS - 1, Math.max(0, underlay.source[i] | 0)) : CONTEXT_BINS - 1;
   const rgb = MY_WEB_SOURCES[bin].rgb;
