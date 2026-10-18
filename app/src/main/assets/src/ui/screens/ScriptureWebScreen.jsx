@@ -250,9 +250,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // W52: listShown and glRetry are deps because the fallback unmounts .sw-root
   // and Try again mounts a NEW one; without them the listeners stayed on the
   // first, detached root and the web came back dead to every drag and pinch.
+  // loadError likewise (refactor bug #2): the error panel reused the root's node,
+  // and a drag on it reached a camera the failed build never made.
   React.useEffect(() => {
     const el = wrapRef.current;
-    if (!el || !graph || listShown) return;
+    if (!el || !graph || listShown || loadError) return;
     return attachWebGestures(el, {
       loc, dpr: () => viewRef.current.DPR, cam: () => camRef.current, camFor,
       view: () => viewRef.current, handlers: () => handlersRef.current,
@@ -261,7 +263,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       schedule, maxZoom: (c) => zoomCapFor(c || camRef.current), clampCamera, zoomAbout, xToVerse,
       yFrame: yFrameFor, lift: liftAt,
     });
-  }, [graph, listShown, glRetry, schedule, loc, camFor, zoomCapFor, live, dropHover, cancelFly, yFrameFor, liftAt, viewRef, camRef,
+  }, [graph, listShown, loadError, glRetry, schedule, loc, camFor, zoomCapFor, live, dropHover, cancelFly, yFrameFor, liftAt, viewRef, camRef,
     handlersRef]);
 
   /** Reset one rail's camera to fit (r2: each rail has its own). */
