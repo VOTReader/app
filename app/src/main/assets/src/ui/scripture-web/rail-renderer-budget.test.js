@@ -16,7 +16,7 @@
    B3  the picks prefilter on the drawn feet before building a path, and
        pick exactly what the draw draws. */
 import { describe, it, expect } from 'vitest';
-import { buildVotRail } from '../../utils/scripture-web/personal-graph.js';
+import { buildVotRail, railUnit, railSpan } from '../../utils/scripture-web/personal-graph.js';
 import * as RR from './rail-renderer.js';
 
 const { drawPersonalWeb, personalInk, pickUnderlayLinks, pickPersonalLinks, railFrame } = RR;
@@ -66,12 +66,15 @@ function corpus(N, seed0) {
   }
   return { count: N, versePos, votPos, source };
 }
-/** The frame with the Bible camera at zB about verse cB and the Volumes camera at zV about position cV. */
+/** The frame with the Bible camera at zB about verse cB and the Volumes camera at zV about
+ * rail position cV (a letter index; w4: the camera's axis is the rail's own unit, railUnit). */
 function frame(zB, cB, zV, cV) {
-  const ppvB = (zB * W) / TOTAL, ppvV = (zV * W) / rail.total;
+  const ppvB = (zB * W) / TOTAL, ppvV = (zV * W) / railSpan(rail), cU = railUnit(rail, cV);
   return {
     width: W, height: H, DPR: 1, base: BASE, votRail: rail, verseTotal: TOTAL,
-    verseX: (v) => (v - cB) * ppvB + W / 2, votX: (p) => (p - cV) * ppvV + W / 2,
+    verseX: (v) => (v - cB) * ppvB + W / 2, votX: (u) => (u - cU) * ppvV + W / 2,
+    /** a letter position's x, as the draw places it */
+    votAt: (p) => (railUnit(rail, p) - cU) * ppvV + W / 2,
     chrome: {}, showUnderlay: true, hoverIndex: -1, focusIndex: -1, capFraction: 1,
   };
 }
@@ -159,7 +162,7 @@ describe('B3 the picks prefilter on the drawn feet and pick what is drawn', () =
         // brute force: every thread's drawn path, as the draw builds it
         const want = [];
         for (let i = 0; i < u.count; i++) {
-          const a = [f.verseX(u.versePos[i]), rails.bottomY], b = [f.votX(u.votPos[i] + 0.5), rails.topY];
+          const a = [f.verseX(u.versePos[i]), rails.bottomY], b = [f.votAt(u.votPos[i] + 0.5), rails.topY];
           const pts = threadPath(a, b, true, { width: W, gap: rails.bottomY - rails.topY, n: 24, eps: 2.5 });
           if (!pts) continue;
           const d = distToLine(pts, [px, py]);
@@ -178,7 +181,7 @@ describe('B3 the picks prefilter on the drawn feet and pick what is drawn', () =
     const f = frame(6, 15000, 1, rail.total / 2);
     const rails = railFrame({ H, DPR: 1 }, BASE);
     // a point on link 0's drawn path is link 0
-    const a = [f.verseX(16000), rails.bottomY], b = [f.votX(700.5), rails.topY];
+    const a = [f.verseX(16000), rails.bottomY], b = [f.votAt(700.5), rails.topY];
     const pts = threadPath(a, b, true, { width: W, gap: rails.bottomY - rails.topY, n: 48, eps: 0.5 });
     const mid = pts[Math.floor(pts.length / 2)];
     expect(pickPersonalLinks(personal, f, mid[0], mid[1], 6, 4)[0].index).toBe(0);

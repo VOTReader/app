@@ -23,6 +23,7 @@
 import { clampCamera, zoomAbout } from '../../utils/scripture-web/geometry.js';
 import { refOfVerse } from '../../utils/scripture-web/pick.js';
 import { votNodeName, ZOOM_MAX_MESSAGE } from '../../utils/scripture-web/describe.js';
+import { railPosition } from '../../utils/scripture-web/personal-graph.js';
 
 /** The screen's #sw-a11y-help: what each key does, for the screen reader (G2). */
 export const WEB_KEYS_HELP = 'Drag to move through scripture; pinch or scroll to zoom. '
@@ -148,9 +149,11 @@ export function useWebKeys({
     clampCamera(cam, v.W, ceiling, yf, slack);
     const centre = Math.round(cam.x);
     if (atCeiling) setAnnounce(ZOOM_MAX_MESSAGE);
-    // the Volumes rail's x is a rail position, not a verse id: name its own node (sweep v55)
+    // the Volumes rail's x is a rail unit, not a verse id: name its own node
+    // (sweep v55), the letter under the middle (w4: through the slots)
     else if (onTop) {
-      const name = votNodeName(personalRef.current && personalRef.current.votRail, centre);
+      const rail = personalRef.current && personalRef.current.votRail;
+      const name = votNodeName(rail, Math.floor(railPosition(rail, cam.x)));
       if (name) setAnnounce(name);
     }
     else if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);

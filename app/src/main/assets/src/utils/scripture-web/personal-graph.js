@@ -19,14 +19,48 @@
 import { myWebSourceIndex } from './palette.js';
 
 /**
- * @typedef {{ total:number, index:Map<string, number>,
+ * @typedef {{ total:number, span?:number, index:Map<string, number>,
  *   segments:Array<{volKey:string, label:string, short?:string,
- *     start:number, count:number}>,
+ *     start:number, count:number, u0?:number, uw?:number}>,
  *   nodes:Array<{volKey:string, id:string, title:string}>,
  *   labels?:Map<string, string> }} VotRail
+ *   total: the letters on the rail (a position is a letter's index, 0..total);
+ *   span: the rail's length in its own units, the Volumes camera's axis
+ *   (RAIL_SLOTS: each collection's slot is [u0, u0 + uw)); absent, the rail
+ *   is one unit a letter.
  *   labels: a collection's display label -> its volKey (an endpoint names
  *   its collection by label; the rail resolves that scope before a bare id)
  */
+
+/**
+ * How the Volumes rail shares its width among the collections (w4, r2-05).
+ * Through w3 every letter took one unit, so the two Words To Live By took
+ * half the rail and Timothy's threads left it as two wide sheets (the C17
+ * smear: Vol I-VII swept right into Matthew, the studies left into the Law).
+ * r2-05 gives every collection one equal slot, and its threads read as one
+ * fan per Volume. Three whole pictures were shot at 1600x900 and 891x411
+ * (D:/Swarm/lanes/sweb/out/w4/myweb/slots/): by letter count, by its square
+ * root, and equal. 'equal' is the one that reads as a fan per Volume, and
+ * the only one that leaves every collection room for its name on a phone;
+ * the order is the reading chain's in all three, and inside its slot a
+ * collection's letters stay evenly spaced in reading order, so zooming the
+ * rail still reveals every letter (the densest collection's letter is the
+ * rail's unit, so its zoom ceiling of 44 CSS px a unit reaches each one).
+ * @type {'count'|'sqrt'|'equal'}
+ */
+export const RAIL_SLOTS = 'equal';
+
+/**
+ * What the rail's axis needs of a rail (a VotRail, or a caller's own stand-in).
+ * @typedef {{ total:number, span?:number,
+ *   segments?:Array<{start:number, count:number, u0?:number, uw?:number}> }} RailAxis
+ */
+
+/** A collection's share of the rail under a slot law, before the scale. */
+function slotShare(count, law) {
+  if (!(count > 0)) return 0;
+  return law === 'count' ? count : law === 'sqrt' ? Math.sqrt(count) : 1;
+}
 
 /**
  * @typedef {{ verseIdOf?: (bookId:string, chapter:number, verse:number) => number,
@@ -56,9 +90,10 @@ export function baseKey(key) {
  * @param {Array<{volKey:string, label:string, short?:string,
  *   items:Array<{id:string, title:string}>}>} collections
  *   in READING_CHAIN order
+ * @param {'count'|'sqrt'|'equal'} [law] how the collections share the rail (RAIL_SLOTS)
  * @returns {VotRail}
  */
-export function buildVotRail(collections) {
+export function buildVotRail(collections, law = RAIL_SLOTS) {
   const index = new Map();
   const labels = new Map();
   const segments = [];
@@ -83,7 +118,85 @@ export function buildVotRail(collections) {
     }
     segments[segments.length - 1].count = cursor - segments[segments.length - 1].start;
   }
-  return { total: cursor, index, segments, nodes, labels };
+  // the slots: the scale makes the densest collection's letter one unit (the
+  // count law's own scale is 1, so its rail is the w3 rail exactly); a
+  // collection with no letters yet takes no width until they land
+  let scale = 0;
+  for (const s of segments) if (s.count > 0) scale = Math.max(scale, s.count / slotShare(s.count, law));
+  let u = 0;
+  for (const s of segments) {
+    s.u0 = u;
+    s.uw = slotShare(s.count, law) * scale;
+    u += s.uw;
+  }
+  return { total: cursor, span: u, index, segments, nodes, labels };
+}
+
+/**
+ * The rail's length in its own units, the Volumes camera's total (a rail
+ * built without slots is one unit a letter).
+ * @param {RailAxis|null|undefined} rail
+ */
+export function railSpan(rail) {
+  if (!rail) return 0;
+  return /** @type {number} */ (rail.span) > 0 ? /** @type {number} */ (rail.span) : rail.total || 0;
+}
+
+/**
+ * The segment a rail position (a letter index, fractional) falls in: the last
+ * collection with letters that starts at or before it, the first one before
+ * the rail's start. -1 for a rail with none.
+ * @param {RailAxis} rail
+ * @param {number} pos
+ */
+function segmentAt(rail, pos) {
+  const segs = rail.segments || [];
+  let lo = 0, hi = segs.length - 1, at = -1;
+  while (lo <= hi) {
+    const m = (lo + hi) >> 1;
+    if (segs[m].start <= pos) { at = m; lo = m + 1; } else hi = m - 1;
+  }
+  while (at >= 0 && !(segs[at].count > 0)) at--;
+  if (at < 0) at = segs.findIndex((s) => s.count > 0);
+  return at;
+}
+
+/**
+ * A rail position (a letter index, fractional: a letter's middle is i + 0.5)
+ * as the rail's own unit, the Volumes camera's axis (RAIL_SLOTS). Inside a
+ * collection its letters are spread evenly over its slot; past either end
+ * of the rail the end collection's spacing carries on, so the map is
+ * continuous and increasing everywhere. A rail built without slots is one
+ * unit a letter.
+ * @param {RailAxis|null|undefined} rail
+ * @param {number} pos
+ */
+export function railUnit(rail, pos) {
+  if (!rail || !(/** @type {number} */ (rail.span) > 0) || !rail.segments) return pos;
+  const at = segmentAt(rail, pos);
+  if (at < 0) return pos;
+  const s = rail.segments[at];
+  return /** @type {number} */ (s.u0) + ((pos - s.start) * /** @type {number} */ (s.uw)) / s.count;
+}
+
+/**
+ * The inverse of railUnit: the rail position (a letter index, fractional) at
+ * one of the rail's units.
+ * @param {RailAxis|null|undefined} rail
+ * @param {number} u
+ */
+export function railPosition(rail, u) {
+  if (!rail || !(/** @type {number} */ (rail.span) > 0) || !rail.segments) return u;
+  const segs = rail.segments;
+  let at = -1;
+  for (let i = 0; i < segs.length; i++) {
+    if (!(segs[i].count > 0)) continue;
+    if (at < 0 || /** @type {number} */ (segs[i].u0) <= u) at = i;
+    if (/** @type {number} */ (segs[i].u0) > u) break;
+  }
+  if (at < 0) return u;
+  const s = segs[at];
+  return s.start + ((u - /** @type {number} */ (s.u0)) * s.count) / /** @type {number} */ (s.uw);
 }
 
 /** The collection an endpoint's TYPE names when nothing else does. */

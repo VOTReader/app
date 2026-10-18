@@ -28,7 +28,7 @@
 
 import { createCamera, verseToX, fitPPV, clampCamera } from '../../utils/scripture-web/geometry.js';
 import { buildPersonal } from '../../utils/scripture-web/personal-build.js';
-import { linkIndexById, underlayIndexByKey } from '../../utils/scripture-web/personal-graph.js';
+import { linkIndexById, underlayIndexByKey, railSpan, railUnit, railPosition } from '../../utils/scripture-web/personal-graph.js';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
 import { chromeInset } from './rail-renderer.js';
 
@@ -54,25 +54,49 @@ function useCorpusVersion() {
 }
 
 /**
- * The Volumes camera across a rebuild. The rail only ever GROWS at its end
- * (the studies are appended after READING_CHAIN) or keeps its length (a new
- * link), so every position the camera knows keeps its place: the same
- * camera object is kept (a gesture in flight holds it) with the new length.
- * A rail at fit stays at fit, the NEW fit (ppv 0: the frame's clamp fits it).
+ * The Volumes camera across a rebuild. Its axis is the rail's own unit
+ * (personal-graph's slots, w4), so a rebuild that re-shares the rail (the
+ * studies land and every collection's slot narrows) moves every letter: the
+ * same camera object is kept (a gesture in flight holds it), with the
+ * rail's new span, the letter that was at the middle of the view still
+ * there and its letters as far apart as they were. A rebuild that keeps the
+ * slots (a new link) keeps the camera as it is. A rail at fit stays at fit,
+ * the NEW fit (ppv 0: the frame's clamp fits it).
  * @param {any} cam the camera so far, or null
- * @param {number} total the rebuilt rail's length
+ * @param {any} rail the rebuilt rail (personal-graph's VotRail), or null
  * @param {number} W the view width, device px (0 before the first resize)
+ * @param {any} [prev] the rail the camera was on (the last build's), or null
  * @returns {any} the camera to use, or null when there is no rail
  */
-export function keepRailCamera(cam, total, W) {
-  if (!(total > 0)) return null;
-  if (!cam) return createCamera(total);
-  if (cam.total === total) return cam;
+export function keepRailCamera(cam, rail, W, prev) {
+  const span = rail && rail.total > 0 ? railSpan(rail) : 0;
+  if (!(span > 0)) return null;
+  if (!cam) return createCamera(span);
+  const moved = !!prev && prev !== rail && slotsMoved(prev, rail);
+  if (cam.total === span && !moved) return cam;
   const atFit = !(cam.ppv > 0) || !(W > 0) || cam.ppv <= fitPPV(cam, W) * 1.001;
-  cam.total = total;
-  if (atFit) { cam.ppv = 0; cam.x = total / 2; return cam; }
+  if (atFit) { cam.total = span; cam.ppv = 0; cam.x = span / 2; return cam; }
+  if (prev && prev.total > 0) {
+    // the letter at the middle, and the units one letter takes there, then and now
+    const pos = railPosition(prev, cam.x);
+    const i = Math.min(Math.max(Math.floor(pos), 0), prev.total - 1);
+    const was = railUnit(prev, i + 1) - railUnit(prev, i), now = railUnit(rail, i + 1) - railUnit(rail, i);
+    cam.x = railUnit(rail, pos);
+    if (was > 0 && now > 0) cam.ppv *= was / now;
+  }
+  cam.total = span;
   clampCamera(cam, W, undefined);      // the frame re-clamps with the rail's own zoom cap
   return cam;
+}
+
+/** Whether a rebuild moved any collection on the rail (its letters or its slot). */
+function slotsMoved(a, b) {
+  const p = a.segments || [], q = b.segments || [];
+  if (p.length !== q.length || a.total !== b.total) return true;
+  for (let k = 0; k < p.length; k++) {
+    if (p[k].start !== q[k].start || p[k].count !== q[k].count || p[k].u0 !== q[k].u0 || p[k].uw !== q[k].uw) return true;
+  }
+  return false;
 }
 
 /**
@@ -137,8 +161,9 @@ export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, vie
       // votRailX). Without verseTotal every top-rail x is NaN, by design.
       verseTotal: cam.total,
       verseX: (verse) => verseToX(cam, v.W, verse),
-      // r2: the Volumes rail through ITS camera when one exists
-      votX: camVRef.current ? (pos) => verseToX(/** @type {any} */ (camVRef.current), v.W, pos) : undefined,
+      // r2: the Volumes rail through ITS camera when one exists; the camera's
+      // axis is the rail's own unit (w4, the slots: votRailX converts a letter)
+      votX: camVRef.current ? (u) => verseToX(/** @type {any} */ (camVRef.current), v.W, u) : undefined,
       showUnderlay,
     };
   }, [camRef, camVRef, frame, showUnderlay, viewRef, chromeRef, topbarRef]);
@@ -153,8 +178,7 @@ export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, vie
     const chosen = chosenLine(prev, focusRef, resumeRef);
     const built = buildPersonal(graph);
     personalRef.current = built;
-    const total = built && built.votRail ? built.votRail.total : 0;
-    camVRef.current = keepRailCamera(camVRef.current, total, viewRef.current ? viewRef.current.W : 0);
+    camVRef.current = keepRailCamera(camVRef.current, built && built.votRail, viewRef.current ? viewRef.current.W : 0, prev && prev.votRail);
     if (chosen) {
       const thread = chosen.kind === 'underlay';
       const at = thread ? underlayIndexByKey(built && built.underlay, chosen.id) : linkIndexById(built && built.graph, chosen.id);

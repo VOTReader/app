@@ -29,6 +29,7 @@
 
 import { MY_WEB_SOURCES, CONTEXT_BINS, myWebLinkColor, MY_WEB_LINK_KINDS } from '../../utils/scripture-web/palette.js';
 import { placeRailLabels } from '../../utils/scripture-web/rail-labels.js';
+import { railUnit, railSpan } from '../../utils/scripture-web/personal-graph.js';
 import { css as inkCss, MYWEB_TAP_CONTEXT, FLYOVER_LEG_WIDTH, FONT, INK } from '../../utils/scripture-web/sw-ink.js';
 
 /** The Volumes rail's height from the top, CSS px (spec §3, My Web: 150 PC, 62 phone). */
@@ -140,8 +141,14 @@ function isCompact(v) {
  * a fix that moved one and not the others would be worse than no fix: before,
  * every reading was wrong and they at least AGREED.
  *
- * @param {number} pos — rail position, 0..votRail.total
- * @param {{verseX:(v:number)=>number, votX?:(p:number)=>number, votRail:{total:number}, verseTotal:number}} opts
+ * w4 (r2-05): a position is a letter's index, and the rail's own unit
+ * (personal-graph's railUnit, the collections' slots) is what the Volumes
+ * camera (opts.votX) and the shared span see; with the slots equal, every
+ * collection takes the same width and its letters share it evenly.
+ *
+ * @param {number} pos — rail position, 0..votRail.total (a letter's middle is i + 0.5)
+ * @param {{verseX:(v:number)=>number, votX?:(u:number)=>number, votRail:{total:number, span?:number}, verseTotal:number}} opts
+ *   votX: a rail UNIT (0..votRail.span) to device px, the Volumes camera's map
  * @returns {number}
  */
 export function votRailX(pos, opts) {
@@ -155,8 +162,10 @@ export function votRailX(pos, opts) {
   // r2: the Volumes rail carries its OWN camera when the screen gives one
   // (opts.votX), so the two rails zoom and pan independently; a caller with
   // one camera keeps the shared-span mapping.
-  if (opts.votX) return opts.votX(pos);
-  return opts.verseX((pos / Math.max(opts.votRail.total, 1)) * total);
+  const rail = opts.votRail;
+  const u = railUnit(rail, pos);
+  if (opts.votX) return opts.votX(u);
+  return opts.verseX((u / Math.max(railSpan(rail), 1)) * total);
 }
 
 /**
@@ -767,20 +776,26 @@ function drawRails(ctx, opts, rails) {
   // header leaves a 12 px band and the names sit 4 px over the rail, so the
   // ticks there rise only 2 px over it and reach below it instead.
   const letterTick = compact ? [2, 2] : [4, 0], bandTick = compact ? [2, 5] : [7, 4];
-  // letter ticks, 4 px, once the letters stand apart
-  const pitch = Math.abs(votRailX(1, opts) - votRailX(0, opts));
-  if (pitch >= LETTER_TICK_MIN * DPR) {
-    const first = Math.max(0, Math.floor(votRailLeftPos(opts, pitch)));
-    ctx.strokeStyle = inkCss('volumesTick');
-    ctx.beginPath();
-    for (let i = first; i < votRail.total; i++) {
-      const x = votRailX(i + 0.5, opts);
-      if (x > width) break;
-      if (x < 0) continue;
+  // letter ticks, 4 px, once a collection's letters stand apart: each
+  // collection has its own pitch (w4, the slots), so each decides for its own
+  // letters, and only the letters on screen are visited
+  ctx.strokeStyle = inkCss('volumesTick');
+  ctx.beginPath();
+  for (const seg of votRail.segments) {
+    if (!(seg.count > 0)) continue;
+    const x0 = votRailX(seg.start, opts), x1 = votRailX(seg.start + seg.count, opts);
+    if (x1 < 0 || x0 > width) continue;
+    const pitch = (x1 - x0) / seg.count;
+    if (!(pitch >= LETTER_TICK_MIN * DPR)) continue;
+    const first = Math.max(0, Math.floor(-x0 / pitch - 0.5));
+    const last = Math.min(seg.count - 1, Math.ceil((width - x0) / pitch - 0.5));
+    for (let i = first; i <= last; i++) {
+      const x = x0 + (i + 0.5) * pitch;
+      if (x < 0 || x > width) continue;
       ctx.moveTo(x, rails.topY - letterTick[0] * DPR); ctx.lineTo(x, rails.topY + letterTick[1] * DPR);
     }
-    ctx.stroke();
   }
+  ctx.stroke();
 
   // the collections: a tick at each band's start, its name above the rail
   const size = (compact ? 11 : 13) * DPR;
@@ -870,12 +885,6 @@ function drawRailNames(ctx, opts, rails, placed) {
   ctx.textAlign = 'center';
 }
 
-/** The rail position at the screen's left edge, from the pitch (a cheap lower bound for the tick loop). */
-function votRailLeftPos(opts, pitch) {
-  const x0 = votRailX(0, opts);
-  return x0 >= 0 ? 0 : -x0 / pitch - 1;
-}
-
 /** Tracked caps where the canvas has letterSpacing (Chrome 99+); a no-op where it does not. */
 function setTracking(ctx, px) {
   if ('letterSpacing' in ctx) /** @type {any} */ (ctx).letterSpacing = px > 0 ? px.toFixed(2) + 'px' : '0px';
@@ -900,7 +909,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
   const rails = railFrame({ H: opts.height, DPR, inset: opts.inset }, opts.base);
   // the rails' zooms: z = the corpus's on-screen width / the screen width
   const zB = opts.verseTotal ? (verseX(opts.verseTotal) - verseX(0)) / width : 1;
-  const zV = (votRail && votRail.total && opts.votX) ? (opts.votX(votRail.total) - opts.votX(0)) / width : zB;
+  const zV = (votRail && votRail.total && opts.votX) ? (opts.votX(railSpan(votRail)) - opts.votX(0)) / width : zB;
   const z = Math.max(zB, zV);
   // a chosen line, the reader's link or Timothy's thread: the rest of the web
   // recedes to MYWEB_TAP_CONTEXT, never to black (fix-review #4)

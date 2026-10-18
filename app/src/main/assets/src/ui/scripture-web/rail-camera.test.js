@@ -18,18 +18,27 @@
    camera as a verse at (p + 0.5) / n · total … top-rail item pitch is
    zoom · W / n". The 44 px zoom ceiling (Z1) and the ribbon shape/dim work
    (D1, S1-S4) are a separate branch; this file is M1 only.
+
+   w4 (r2-05, the rail slots): a letter is no longer one n-th of the rail.
+   Every collection takes an equal slot and its letters share it evenly
+   (personal-graph's railUnit), so "pitch is zoom · W / n" was the count
+   law's own arithmetic, not M1's intent; restated here to what M1 asks of
+   the camera: a pitch at zoom is zoom times the pitch at fit, collection by
+   collection, and at fit the camera's map is the rail's own (u / span · W).
 */
 import { describe, it, expect } from 'vitest';
-import { buildVotRail } from '../../utils/scripture-web/personal-graph.js';
+import { buildVotRail, railUnit } from '../../utils/scripture-web/personal-graph.js';
 import { createCamera, fitPPV, verseToX } from '../../utils/scripture-web/geometry.js';
 import { endpointPoint, railFrame, segmentSpan, votRailX } from './rail-renderer.js';
 
-/** Two collections, five letters — enough for a band with a neighbour. */
+/** Three collections, six letters — enough for a band with neighbours (and,
+ * the slots equal, a middle band the centred camera sits inside). */
 const rail = buildVotRail([
   { volKey: 'one', label: 'Volume One', short: 'Vol I', items: [
     { id: 'a1', title: 'A1' }, { id: 'a2', title: 'A2' }, { id: 'a3', title: 'A3' }] },
   { volKey: 'two', label: 'Volume Two', short: 'Vol II', items: [
     { id: 'b1', title: 'B1' }, { id: 'b2', title: 'B2' }] },
+  { volKey: 'three', label: 'Volume Three', short: 'Vol III', items: [{ id: 'c1', title: 'C1' }] },
 ]);
 
 const W = 1000;
@@ -48,13 +57,20 @@ function optsAt(zoom) {
 }
 
 describe('M1 — both halves zoom', () => {
-  it('spreads the Volumes rail with the camera: item pitch is zoom · W / n', () => {
-    // BEFORE: pitch is W / n at every zoom — the top rail is pinned to the
-    // screen, which is the whole of the defect Corbin reported.
-    for (const zoom of [1, 40, 400]) {
-      const o = optsAt(zoom);
-      const pitch = votRailX(1.5, o) - votRailX(0.5, o);
-      expect(pitch, 'pitch at ' + zoom + 'x').toBeCloseTo(zoom * W / rail.total, 6);
+  it('spreads the Volumes rail with the camera: a letter pitch at zoom is zoom times its pitch at fit', () => {
+    // BEFORE: pitch is the same at every zoom — the top rail is pinned to the
+    // screen, which is the whole of the defect Corbin reported. w4: each
+    // collection has its own pitch at fit (its slot over its letters).
+    const fit = optsAt(1);
+    for (const seg of rail.segments) {
+      const at = seg.start;
+      const pitch1 = votRailX(at + 1.5, fit) - votRailX(at + 0.5, fit);
+      if (seg.count > 1) expect(pitch1, seg.volKey + ' at fit').toBeCloseTo(((seg.uw / seg.count) / rail.span) * W, 9);
+      for (const zoom of [40, 400]) {
+        const o = optsAt(zoom);
+        const pitch = votRailX(at + 1.5, o) - votRailX(at + 0.5, o);
+        expect(pitch, seg.volKey + ' pitch at ' + zoom + 'x').toBeCloseTo(zoom * pitch1, 6);
+      }
     }
   });
 
@@ -104,14 +120,15 @@ describe('M1 — both halves zoom', () => {
     // returns (p + 0.5) / n · W exactly. So ANY difference at 1x is a scale
     // error I did not intend, which is what makes this a real bite-catcher
     // rather than a restatement of the fix.
+    // w4: the viewport mapping is the rail's own unit over its span.
     const o = optsAt(1);
     for (let p = 0; p < rail.total; p++) {
-      expect(votRailX(p + 0.5, o), 'endpoint ' + p).toBeCloseTo(((p + 0.5) / rail.total) * W, 9);
+      expect(votRailX(p + 0.5, o), 'endpoint ' + p).toBeCloseTo((railUnit(rail, p + 0.5) / rail.span) * W, 9);
     }
     for (const seg of rail.segments) {
       const span = segmentSpan(seg, o);
-      expect(span.x0).toBeCloseTo((seg.start / rail.total) * W, 9);
-      expect(span.x1).toBeCloseTo(((seg.start + seg.count) / rail.total) * W, 9);
+      expect(span.x0).toBeCloseTo((seg.u0 / rail.span) * W, 9);
+      expect(span.x1).toBeCloseTo(((seg.u0 + seg.uw) / rail.span) * W, 9);
       // A fully visible band claims its whole width for its label, exactly as
       // before — the clip below only ever narrows a band that runs off screen.
       expect(span.room).toBeCloseTo(span.x1 - span.x0, 9);

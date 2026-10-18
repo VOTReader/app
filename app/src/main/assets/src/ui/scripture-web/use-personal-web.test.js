@@ -153,8 +153,32 @@ describe('usePersonalWeb across rebuilds', () => {
     g.BIBLE_STUDIES = [{ id: 'lamb', slug: 'lamb', title: 'The Lamb of God', chapters: [{ id: 'lamb-ch1' }, { id: 'lamb-ch2' }] }];
     await act(async () => { resolveStudies(true); await Promise.resolve(); });
     await tick();
+    // w4 (the slots): the camera's axis is the rail's own unit; the study
+    // takes an equal slot (10 units for its 2 chapters), so the span is 20
+    // and Volume One's letters keep their units: letter 7 stays put
     expect(refs.camVRef.current).toBe(cam);
-    expect(cam).toMatchObject({ x: 7, ppv: 40, total: 12 });
+    expect(cam).toMatchObject({ x: 7, ppv: 40, total: 20 });
+  });
+
+  it('w4: a rebuild that re-shares the rail keeps the letter at the middle and its pitch on screen', async () => {
+    corpus();
+    g.LinkStore = store([]);
+    let resolveStudies;
+    g.loadBibleStudies = vi.fn(() => new Promise((r) => { resolveStudies = r; }));
+    const { refs } = mount();
+    const cam = refs.camVRef.current;
+    // the reader zooms the top rail in on letter 7 (its middle, 7.5)
+    cam.ppv = 40; cam.x = 7.5;
+    await tick();
+    // a study with 12 chapters lands: the densest collection's letter is the
+    // rail's unit, so Volume One's slot widens to 12 units, 1.2 a letter
+    g.BIBLE_STUDIES = [{ id: 'lamb', slug: 'lamb', title: 'The Lamb of God', chapters: Array.from({ length: 12 }, (_, i) => ({ id: 'lamb-ch' + i })) }];
+    await act(async () => { resolveStudies(true); await Promise.resolve(); });
+    await tick();
+    expect(refs.camVRef.current).toBe(cam);
+    expect(cam.total).toBe(24);
+    expect(cam.x).toBeCloseTo(7.5 * 1.2, 9);
+    expect(cam.ppv * 1.2).toBeCloseTo(40, 9);
   });
 
   it('bug #9: a Volumes rail at fit stays at fit as it grows (the new fit, not the old ppv)', async () => {
@@ -169,10 +193,11 @@ describe('usePersonalWeb across rebuilds', () => {
     g.BIBLE_STUDIES = [{ id: 'lamb', slug: 'lamb', title: 'The Lamb of God', chapters: [{ id: 'lamb-ch1' }, { id: 'lamb-ch2' }] }];
     await act(async () => { resolveStudies(true); await Promise.resolve(); });
     await tick();
+    // w4: the new fit is the new span's (the study's equal slot: 20 units)
     expect(refs.camVRef.current).toBe(cam);
-    expect(cam.total).toBe(12);
-    expect(cam.x).toBe(6);
-    expect(cam.ppv > 0 ? cam.ppv : 100 / 12).toBeCloseTo(100 / 12, 6);
+    expect(cam.total).toBe(20);
+    expect(cam.x).toBe(10);
+    expect(cam.ppv > 0 ? cam.ppv : 100 / 20).toBeCloseTo(100 / 20, 6);
   });
 
   it('item 30: a rebuild keeps the chosen link by its id when one before it is deleted', () => {

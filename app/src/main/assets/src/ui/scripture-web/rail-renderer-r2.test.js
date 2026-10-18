@@ -19,7 +19,7 @@
  *     and a cross-rail thread takes one endpoint from each.
  */
 import { describe, it, expect } from 'vitest';
-import { buildVotRail } from '../../utils/scripture-web/personal-graph.js';
+import { buildVotRail, railUnit, railSpan } from '../../utils/scripture-web/personal-graph.js';
 import { createCamera, fitPPV, verseToX, zoomAbout } from '../../utils/scripture-web/geometry.js';
 import * as RR from './rail-renderer.js';
 
@@ -362,29 +362,32 @@ describe('My Web fix-review — rail-local arcs rise with their span', () => {
 });
 
 describe('My Web r2 — G3 two transforms, one for each rail', () => {
+  // w4: the Volumes camera's axis is the rail's own unit (the slots,
+  // personal-graph's railUnit), no longer the letter index; restated so.
   it('a VOT endpoint follows the Volumes camera and a verse follows the Bible camera', () => {
     const camB = createCamera(100); camB.ppv = fitPPV(camB, W); camB.x = 50;
-    const camV = createCamera(rail.total); camV.ppv = fitPPV(camV, W); camV.x = rail.total / 2;
+    const span = railSpan(rail);
+    const camV = createCamera(span); camV.ppv = fitPPV(camV, W); camV.x = span / 2;
     // zoom the Volumes rail 10x about the Rebuke band's centre; leave the Bible at fit
     const rebuke = rail.segments.find((s) => s.volKey === 'rebuke');
-    const anchor = verseToX(camV, W, rebuke.start + rebuke.count / 2);
+    const anchor = verseToX(camV, W, railUnit(rail, rebuke.start + rebuke.count / 2));
     zoomAbout(camV, W, anchor, 10, 1000);
     const two = Object.assign({}, opts, {
       verseX: (verse) => verseToX(camB, W, verse),
-      votX: (pos) => verseToX(camV, W, pos),
+      votX: (u) => verseToX(camV, W, u),
     });
     const top = endpointPoint({ rail: 1, pos: rebuke.start }, two, rails);
     const bottom = endpointPoint({ rail: 0, pos: 50 }, two, rails);
     // the Bible end sits where fit puts verse 50; the Volumes end where the
-    // 10x camera puts the first Rebuke letter: NOT (start/total)*100 verses
+    // 10x camera puts the first Rebuke letter: NOT its share of 100 verses
     expect(bottom[0]).toBeCloseTo(W / 2, 6);
-    expect(top[0]).toBeCloseTo(verseToX(camV, W, rebuke.start + 0.5), 6);
-    expect(Math.abs(top[0] - verseToX(camB, W, ((rebuke.start + 0.5) / rail.total) * 100))).toBeGreaterThan(50);
+    expect(top[0]).toBeCloseTo(verseToX(camV, W, railUnit(rail, rebuke.start + 0.5)), 6);
+    expect(Math.abs(top[0] - verseToX(camB, W, (railUnit(rail, rebuke.start + 0.5) / span) * 100))).toBeGreaterThan(50);
     expect(top[1]).toBe(rails.topY);
     expect(bottom[1]).toBe(rails.bottomY);
   });
   it('without votX the top rail still rides the Bible camera (the pre-r2 contract holds for callers that give one camera)', () => {
     const p = endpointPoint({ rail: 1, pos: 10 }, opts, rails);
-    expect(p[0]).toBeCloseTo(opts.verseX(((10 + 0.5) / rail.total) * 100), 6);
+    expect(p[0]).toBeCloseTo(opts.verseX((railUnit(rail, 10 + 0.5) / railSpan(rail)) * 100), 6);
   });
 });

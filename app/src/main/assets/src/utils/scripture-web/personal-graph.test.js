@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import {
   VOT_TYPES, baseKey, buildVotRail, placeEndpoint, buildPersonalGraph,
   buildCuratedUnderlay, linkIndexById, unplacedReason,
+  RAIL_SLOTS, railUnit, railPosition, railSpan,
 } from './personal-graph.js';
 
 // Bottom rail: 2 books x 2 chapters x 10 verses, matching the geometry tests.
@@ -30,13 +31,16 @@ const votRail = buildVotRail([
 const ctx = { verseIdOf, votRail };
 
 describe('buildVotRail', () => {
-  it('lays collections out in reading order with contiguous segments', () => {
+  // w4: each segment also carries its slot on the rail (u0, uw: the rail's
+  // own unit, RAIL_SLOTS 'equal', every collection the densest one's width)
+  it('lays collections out in reading order with contiguous segments, each in an equal slot', () => {
     expect(votRail.total).toBe(4);
     expect(votRail.segments).toEqual([
-      { volKey: 'one', label: 'Volume One', short: 'Volume One', start: 0, count: 2 },
-      { volKey: 'wtlb1', label: 'Words To Live By', short: 'Words To Live By', start: 2, count: 1 },
-      { volKey: 'blessed', label: 'The Blessed', short: 'The Blessed', start: 3, count: 1 },
+      { volKey: 'one', label: 'Volume One', short: 'Volume One', start: 0, count: 2, u0: 0, uw: 2 },
+      { volKey: 'wtlb1', label: 'Words To Live By', short: 'Words To Live By', start: 2, count: 1, u0: 2, uw: 2 },
+      { volKey: 'blessed', label: 'The Blessed', short: 'The Blessed', start: 3, count: 1, u0: 4, uw: 2 },
     ]);
+    expect(votRail.span).toBe(6);
   });
 
   it('indexes by scoped key AND bare id (endpoints often omit the volume)', () => {
@@ -48,6 +52,80 @@ describe('buildVotRail', () => {
     const empty = buildVotRail([]);
     expect(empty.total).toBe(0);
     expect(empty.segments).toEqual([]);
+    expect(railSpan(empty)).toBe(0);
+  });
+});
+
+describe('the rail slots (w4, r2-05: one fan per Volume)', () => {
+  const items = (n, tag) => Array.from({ length: n }, (_, i) => ({ id: tag + i, title: tag + i }));
+  const cols = [
+    { volKey: 'one', label: 'Volume One', items: items(16, 'a') },
+    { volKey: 'two', label: 'Volume Two', items: items(4, 'b') },
+    { volKey: 'empty', label: 'Not Yet', items: [] },
+    { volKey: 'three', label: 'Volume Three', items: items(1, 'c') },
+  ];
+  const slots = (rail) => rail.segments.map((s) => [s.u0, s.uw]);
+
+  it('ships the equal slots', () => {
+    expect(RAIL_SLOTS).toBe('equal');
+  });
+
+  it('by count is the w3 rail exactly: one unit a letter', () => {
+    const r = buildVotRail(cols, 'count');
+    expect(slots(r)).toEqual([[0, 16], [16, 4], [20, 0], [20, 1]]);
+    expect(r.span).toBe(r.total);
+    for (const p of [0, 3.5, 16, 20.5, 21]) expect(railUnit(r, p)).toBeCloseTo(p, 12);
+  });
+
+  it('by square root and equal, the densest collection keeps one unit a letter and the rest widen', () => {
+    // the scale puts the densest collection's letter at one unit, so the
+    // zoom ceiling (44 CSS px a unit) still reveals every letter
+    expect(slots(buildVotRail(cols, 'sqrt'))).toEqual([[0, 16], [16, 8], [24, 0], [24, 4]]);
+    const eq = buildVotRail(cols, 'equal');
+    expect(slots(eq)).toEqual([[0, 16], [16, 16], [32, 0], [32, 16]]);
+    for (const s of eq.segments) if (s.count) expect(s.uw / s.count).toBeGreaterThanOrEqual(1);
+  });
+
+  it('keeps the reading order: the map is increasing and every letter sits inside its own slot', () => {
+    for (const law of /** @type {const} */ (['count', 'sqrt', 'equal'])) {
+      const r = buildVotRail(cols, law);
+      let last = -Infinity;
+      for (let p = -2; p <= r.total + 2; p += 0.25) {
+        const u = railUnit(r, p);
+        expect(u).toBeGreaterThan(last);
+        last = u;
+      }
+      for (const s of r.segments) {
+        for (let i = 0; i < s.count; i++) {
+          const u = railUnit(r, s.start + i + 0.5);
+          expect(u).toBeGreaterThan(s.u0);
+          expect(u).toBeLessThan(s.u0 + s.uw);
+        }
+      }
+    }
+  });
+
+  it("spreads a collection's letters evenly over its slot", () => {
+    const r = buildVotRail(cols, 'equal');
+    // Volume Two: 4 letters in 16 units, 4 apart, the first's middle at 18
+    expect([0, 1, 2, 3].map((i) => railUnit(r, 16 + i + 0.5))).toEqual([18, 22, 26, 30]);
+    // Volume Three's one letter fills its slot after the empty collection
+    expect(railUnit(r, 20.5)).toBe(40);
+  });
+
+  it("railPosition is railUnit's inverse, past the ends too", () => {
+    for (const law of /** @type {const} */ (['count', 'sqrt', 'equal'])) {
+      const r = buildVotRail(cols, law);
+      for (let p = -1.5; p <= r.total + 1.5; p += 0.5) expect(railPosition(r, railUnit(r, p))).toBeCloseTo(p, 9);
+    }
+  });
+
+  it('a rail without slots (or none at all) is one unit a letter', () => {
+    const bare = { total: 5, segments: [{ start: 0, count: 5 }] };
+    expect(railUnit(/** @type {any} */ (bare), 2.5)).toBe(2.5);
+    expect(railPosition(/** @type {any} */ (bare), 2.5)).toBe(2.5);
+    expect(railSpan(/** @type {any} */ (bare))).toBe(5);
+    expect(railUnit(null, 3)).toBe(3);
   });
 });
 

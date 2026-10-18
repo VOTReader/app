@@ -21,6 +21,7 @@
 import { refOfVerse, chapterRange, countTouching, bundleGroups } from './pick.js';
 import { MY_WEB_SOURCES, LINK_KIND_NAMES } from './palette.js';
 import { prophecyIndexOf } from './focus-state.js';
+import { railUnit } from './personal-graph.js';
 import { endpointFor, collectionName, letterKeyOf, letterCiteSites, COLLECTION_NAMES } from './vot-citations.js';
 
 /** What the live region says when + does nothing because it can do nothing. */
@@ -154,9 +155,12 @@ export function describeFound(found, { g, personal, cam, v, viewFor, density }) 
       kind: 'underlay', index: found.index, source, target,
       // what the thread is, so a rebuild finds it again (personal-graph's underlayKey)
       key: underlay.keys ? underlay.keys[found.index] : undefined,
-      // rail positions, published on the card (data-verse / data-vot) so a
-      // walk can follow this one thread through the exported geometry
-      verse: underlay.versePos[found.index], vot: underlay.votPos[found.index],
+      // the feet on their cameras' axes, published on the card (data-verse /
+      // data-vot) so a walk can follow this one thread through the exported
+      // geometry: the verse, and the Volumes foot (its letter's middle) in the
+      // rail's own unit, the Volumes camera's x (w4, the slots; through w3 a
+      // letter was one unit and this was the letter's index)
+      verse: underlay.versePos[found.index], vot: railUnit(p.votRail, underlay.votPos[found.index] + 0.5),
       joins: (seg && (seg.short || seg.label)) || edge.kind || 'curated connection',
       // the family in words (design-myweb-colour.md, 5): the source the thread's
       // colour encodes, then the Volume
