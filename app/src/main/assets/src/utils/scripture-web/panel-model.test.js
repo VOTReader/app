@@ -268,6 +268,39 @@ describe('shared pieces', () => {
   });
 });
 
+/* w3 review, round 2: "Zoom to" took the chapter on the baseline under the tap's x. A tap high on
+   long arcs (the usual chooser at the overview) is over a chapter none of its threads touches, and
+   zooming there sent every one of them off screen: the PC shot's four long threads offered
+   "Zoom to Psalms 103". */
+describe("the chooser's Zoom to: the tap's chapter only where its threads stand", () => {
+  const chapterIndex = (bookId, ch) => g.chapterOfVerse[vid(bookId, ch, 1)];
+  // the review's PC chooser: Gen 49:18 - Isa 25:9, 1 Sam 15:3 and 15:9 - Jer 48:10, 1 Chr 5:2 - Mic 5:2
+  const IDS = [47313, 51165, 51166, 52185];
+  const PS_103 = chapterIndex('psalms', 103), SAM_15 = chapterIndex('1samuel', 15);
+  const JER_48 = chapterIndex('jeremiah', 48), GEN_49 = chapterIndex('genesis', 49);
+
+  it("the fixture is the review's four threads", () => {
+    expect(pm.chooserRows(g, IDS).map((r) => r.a.label + ' - ' + r.b.label)).toEqual(expect.arrayContaining([
+      'Genesis 49:18 - Isaiah 25:9', '1 Samuel 15:3 - Jeremiah 48:10', '1 Samuel 15:9 - Jeremiah 48:10',
+      '1 Chronicles 5:2 - Micah 5:2',
+    ]));
+  });
+
+  it('a high tap over a chapter none of them touches goes where most feet stand, the nearer of a tie', () => {
+    // 1 Samuel 15 and Jeremiah 48 hold two feet each; Jeremiah 48 is the nearer to Psalms 103
+    expect(pm.chooserChapter(g, IDS, PS_103, false)).toBe(JER_48);
+    // with no tap known, the lower of the tie, as before
+    expect(pm.chooserChapter(g, IDS, -1, false)).toBe(SAM_15);
+    expect(pm.zoomChapterOf(g, IDS)).toBe(SAM_15);
+  });
+
+  it("the tap's own chapter when a listed thread stands in it, or the tap is down among the feet", () => {
+    expect(pm.chooserChapter(g, IDS, GEN_49, false)).toBe(GEN_49);
+    expect(pm.chooserChapter(g, IDS, PS_103, true)).toBe(PS_103);
+    expect(pm.chooserChapter(g, [], -1, false)).toBe(-1);
+  });
+});
+
 /* The camera's clamp keeps the VIEW inside the canon, so near its end a verse centred at the
    reader's zoom stayed under the docked panel (w3 review). PC 1600x900 at DPR 1, panel 640. */
 describe('framing under the camera clamp: landingOf, centreTarget, frameHolds', () => {

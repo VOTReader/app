@@ -36,7 +36,7 @@ import {
   pickThreads, pickChapter, pickVerse, chapterRange, nearbyChapter, nearbyThreads, arcsTouching,
 } from '../../utils/scripture-web/pick.js';
 import {
-  connectionFrame, chapterFrame, centreTarget, diveLimit, frameHolds, chapterAtX,
+  connectionFrame, chapterFrame, centreTarget, diveLimit, frameHolds, chapterAtX, chooserChapter, FEET_BAND,
 } from '../../utils/scripture-web/panel-model.js';
 import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 import { focusState, withLit } from '../../utils/scripture-web/focus-state.js';
@@ -528,7 +528,12 @@ export function useWebSelection({
     if (closeEnough && described.length > 1 && described.every((item) => item.kind === 'arc' ||
         item.kind === 'link' || item.kind === 'underlay')) {
       setChoices(described);
-      setChoiceChapter(chapterAtX(graph, camRef.current, viewRef.current.W, cx * (viewRef.current.DPR || 1)));
+      // its "Zoom to": the chapter under the tap only where the listed threads stand (chooserChapter)
+      const v = viewRef.current, dpr = v.DPR || 1, cam = camRef.current;
+      const base = viewFor().base + (cam.y > 0 ? cam.y : 0); // the baseline as drawn (pickArcs)
+      const ids = described.filter((item) => item.kind === 'arc').map((item) => item.index);
+      setChoiceChapter(chooserChapter(graph, ids, chapterAtX(graph, cam, v.W, cx * dpr),
+        cy * dpr >= base - FEET_BAND * dpr));
       setDetail(null);
       setListOpen(false);
       // nothing is chosen while the chooser asks, and its rows replace the hover chip
@@ -540,7 +545,7 @@ export function useWebSelection({
     }
     commitFound(described[0]);
   }, [liftAt, hitCandidatesAt, describe, viewRef, commitFound, schedule, focusRef, dropHover, setAnnounce,
-    overlayFrameRef, graph, flyTo, openPanel, journey, camRef]);
+    overlayFrameRef, graph, flyTo, openPanel, journey, camRef, viewFor]);
 
   /** Zoom in 2.5x about the tap (A4, the navigation stream): to where zoomAbout puts the camera,
    * eased through flyTo about the same point (instant under reduced motion). */

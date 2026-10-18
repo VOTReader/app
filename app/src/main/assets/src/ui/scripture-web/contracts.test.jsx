@@ -608,6 +608,50 @@ describe('a row\'s Follow and the zoom row (the panel stream)', () => {
   });
 });
 
+/** The fixture cut into chapters of 100 verses (chapter c holds verses 100c to 100c + 99). */
+const graphChapters = (more) => () => {
+  const g = graphWith(more);
+  const n = Math.ceil(TOTAL / 100);
+  g.chapters = Array.from({ length: n }, (_, c) => [0, c + 1, c * 100, Math.min(100, TOTAL - c * 100)]);
+  g.chapterOfVerse = Uint16Array.from({ length: TOTAL }, (_, v) => Math.floor(v / 100));
+  return g;
+};
+
+/* w3 review, round 2: the chooser's "Zoom to" took the chapter under the tap's x, and a tap high
+   on long threads is over a chapter none of them touches: zooming there sent them all off screen. */
+describe("the chooser's Zoom to, from a tap", () => {
+  const cam = { x: 2520, ppv: 0.2 };
+  /** Tap down the column at x until the chooser opens; y -1 when it never did. */
+  const tapAt = (more, x, ys) => {
+    const m = mount({ make: graphChapters(more) });
+    m.get().cam.camRef.current = Object.assign({ total: TOTAL, y: 0 }, cam);
+    for (const y of ys) {
+      act(() => { m.get().sel.handlersRef.current.tap(x, y); });
+      if (m.get().sel.choices) return { m, y };
+    }
+    return { m, y: -1 };
+  };
+
+  it('a tap high over a chapter the threads do not touch zooms where their feet stand, the nearer first', () => {
+    // two threads a few verses apart, from chapter 10 to chapter 39, crossing high over chapter 25
+    const { m, y } = tapAt([[1050, 3990, 10], [1060, 3980, 9]], 400, Array.from({ length: 300 }, (_, i) => 2 + i));
+    expect(y, 'the tap found the crossing').toBeGreaterThan(0);
+    expect(m.get().cam.viewFor().base - y, 'high over the baseline').toBeGreaterThan(100);
+    expect(m.get().sel.choices.map((c) => c.index).sort()).toEqual([2, 3]);
+    // under the tap is chapter 25; chapters 10 and 39 hold two feet each, and 39 is the nearer
+    expect(m.get().sel.choiceChapter).toBe(39);
+  });
+
+  it('a tap down among the feet zooms to the chapter under it', () => {
+    // the feet stand at the end of chapter 39; the tap is a fraction of a verse into chapter 40
+    const x = (4000.3 - cam.x) * cam.ppv + 400;
+    const base = mount().get().cam.viewFor().base;
+    const { m, y } = tapAt([[1050, 3999, 10], [1060, 3998, 9]], x, [base - 12, base - 8, base - 5]);
+    expect(y, 'the tap opened the chooser').toBeGreaterThan(0);
+    expect(m.get().sel.choiceChapter).toBe(40);
+  });
+});
+
 describe('the overlay\'s tap targets (CONTRACTS.md section 4)', () => {
   const book = { kind: 'book', book: 0 };
   const pill = { kind: 'pill', ids: [1], label: 'Genesis 1' };

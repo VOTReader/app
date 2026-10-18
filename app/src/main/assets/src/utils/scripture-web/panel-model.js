@@ -153,30 +153,64 @@ export function chooserRows(g, ids) {
 
 /**
  * The chapter a group's "Zoom to <chapter>" row flies to: the chapter most of its threads' feet
- * stand in (the lower verse's chapter on a tie), or -1 with no threads.
+ * stand in, or -1 with no threads. A tie goes to the chapter nearer `near` (a chapter index: the
+ * tap's; middles compared in verses), then to the lower chapter.
  * @param {any} g @param {ArrayLike<number>} ids
+ * @param {number} [near]  a chapter to break ties toward, -1 or absent for none
  */
-export function zoomChapterOf(g, ids) {
+export function zoomChapterOf(g, ids, near = -1) {
   /** @type {Map<number, number>} */
   const count = new Map();
-  let best = -1, bestN = 0;
   for (const i of Array.from(ids || [])) {
     if (!(i >= 0 && i < g.count)) continue;
     for (const v of [g.from[i], g.to[i]]) {
       const ci = g.chapterOfVerse[v];
-      const n = (count.get(ci) || 0) + 1;
-      count.set(ci, n);
-      if (n > bestN || (n === bestN && ci < best)) { best = ci; bestN = n; }
+      count.set(ci, (count.get(ci) || 0) + 1);
     }
+  }
+  const mid = (/** @type {number} */ ci) => { const [lo, hi] = chapterRange(g, ci); return (lo + hi + 1) / 2; };
+  const at = near >= 0 && g.chapters[near] ? mid(near) : null;
+  let best = -1, bestN = 0, bestD = Infinity;
+  for (const [ci, n] of count) {
+    const d = at === null ? 0 : Math.abs(mid(ci) - at);
+    if (n > bestN || (n === bestN && (d < bestD || (d === bestD && ci < best)))) { best = ci; bestN = n; bestD = d; }
   }
   return best;
 }
 
+/** How far above the baseline a tap still stands among the feet, CSS px (chooserChapter). */
+export const FEET_BAND = 40;
+
+/**
+ * The chapter the chooser's "Zoom to" offers for a tap (w3 review, round 2): the chapter under the
+ * tap where that is where its threads stand (a listed thread has a foot in it, or the tap was down
+ * among the feet, within FEET_BAND of the baseline); otherwise where most of their feet stand,
+ * the nearer to the tap on a tie (zoomChapterOf). A tap high on long arcs is over a chapter none
+ * of them touches, and zooming there sent every listed thread off screen ("Zoom to Psalms 103"
+ * for four threads from Genesis, 1 Samuel and 1 Chronicles to Isaiah, Jeremiah and Micah).
+ * @param {any} g
+ * @param {ArrayLike<number>} ids  the listed threads (OpenBible arc ids)
+ * @param {number} tapChapter  the chapter under the tap on the baseline (chapterAtX), or -1
+ * @param {boolean} nearFeet  whether the tap was within FEET_BAND of the drawn baseline
+ * @returns {number}
+ */
+export function chooserChapter(g, ids, tapChapter, nearFeet) {
+  if (!g || !g.chapters) return -1;
+  const tap = tapChapter >= 0 && tapChapter < g.chapters.length ? tapChapter : -1;
+  if (tap >= 0) {
+    if (nearFeet) return tap;
+    for (const i of Array.from(ids || [])) {
+      if (i >= 0 && i < g.count && (g.chapterOfVerse[g.from[i]] === tap || g.chapterOfVerse[g.to[i]] === tap)) return tap;
+    }
+  }
+  return zoomChapterOf(g, ids, tap);
+}
+
 /**
  * The chapter under a tap: the one whose verses stand at device x on the baseline, or -1 off the
- * canon (or with no graph). The chooser's "Zoom to <chapter>" flies there, where the reader
- * tapped; zoomChapterOf (where most feet stand, the lowest on a tie) is only the fallback when no
- * tap is known (w3 review: a mid-overview tap offered Numbers 5).
+ * canon (or with no graph). The chooser's "Zoom to <chapter>" flies there when the tap was where
+ * its threads stand (chooserChapter; w3 review: a mid-overview tap offered Numbers 5, and a high
+ * one Psalms 103, which none of its threads touched).
  * @param {any} g
  * @param {{ x: number, ppv: number }} cam  ppv in device px a verse
  * @param {number} W  the view's width, device px
