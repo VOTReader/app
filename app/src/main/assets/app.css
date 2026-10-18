@@ -7864,10 +7864,12 @@
        edge); the edge chips sit at the frame's edges and Follow. */
     .sw-goto-btn { width: 44px; height: 44px; min-width: 44px; padding: 0; }
     .sw-goto-btn svg { width: 20px; height: 20px; }
+    /* goto.jsx gotoBoxPlace measures where the PC box sits clear of the title and the control row
+       (--sw-goto-x its centre, --sw-goto-w, --sw-goto-top); the fallbacks are the spec's place */
     .sw-goto {
-      position: absolute; z-index: 10; top: 24px;
-      left: calc((100% - var(--sw-goto-inset, 0px)) / 2); transform: translateX(-50%);
-      width: min(640px, calc(100% - var(--sw-goto-inset, 0px) - 48px));
+      position: absolute; z-index: 10; top: var(--sw-goto-top, 24px);
+      left: var(--sw-goto-x, calc((100% - var(--sw-goto-inset, 0px)) / 2)); transform: translateX(-50%);
+      width: var(--sw-goto-w, min(640px, calc(100% - var(--sw-goto-inset, 0px) - 48px)));
       background: rgba(36, 45, 47, 0.96); border: 1px solid #3A4547; border-radius: 14px;
       box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55); color: #E9EEEF; font-family: var(--font-body);
       overflow: hidden;

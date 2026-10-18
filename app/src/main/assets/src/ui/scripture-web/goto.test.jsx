@@ -8,7 +8,7 @@ import { useWebCamera } from './use-web-camera.js';
 import { useWebSelection } from './use-web-selection.js';
 import { useJourney } from './use-journey.js';
 import { useFrameScheduler } from './use-frame-scheduler.js';
-import { useGoTo, routeOverlayHit, reopenOf, GOTO_HINT } from './goto.jsx';
+import { useGoTo, routeOverlayHit, reopenOf, gotoBoxPlace, GOTO_BOX_W, GOTO_BOX_TOP, GOTO_BOX_MIN, GOTO_HINT } from './goto.jsx';
 import { useWebKeys } from './use-web-keys.js';
 import { verseToX, fitPPV } from '../../utils/scripture-web/geometry.js';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
@@ -240,6 +240,57 @@ describe('the go-to box (spec 4.5)', () => {
     fireEvent.keyDown(input(container), { key: 'Enter' });
     expect(setAnnounce).toHaveBeenLastCalledWith('No book, chapter or verse called love one another');
     expect(box(container)).toBeTruthy();
+  });
+});
+
+/* Where the PC box sits (the review of 2026-10-18): centred over the canvas area at every width, it
+   covered the search button that opens it and half of "Scripture" below about 1900 px. The rects
+   are the real ones, read by tools/e2e-sw-goto.mjs in headless Chrome: the topbar (Back and the
+   title) from x 14 to 287, the control row from x 1041 at 1600, 807 at 1366, 1361 at 1920, both
+   from y 10 to 70. */
+describe('the PC box keeps clear of the title and the control row', () => {
+  const TOPBAR = { l: 14, t: 10, r: 287, b: 70 };
+  const controls = (W, l) => ({ l, t: 10, r: W - 14, b: 70 });
+  const meets = (p, q) => p.l < q.r && q.l < p.r && p.t < q.b && q.t < p.b;
+  const boxOf = (p) => ({ l: p.x - p.w / 2, r: p.x + p.w / 2, t: p.top, b: p.top + 56 });
+
+  it("1600x900: in the gap, the spec's 640 px at top 24, moved left of the control row", () => {
+    const p = gotoBoxPlace({ W: 1600, chrome: [TOPBAR, controls(1600, 1041)] });
+    expect(p).toEqual({ x: 697, w: GOTO_BOX_W, top: GOTO_BOX_TOP });
+    expect(meets(boxOf(p), controls(1600, 1041))).toBe(false);
+    expect(meets(boxOf(p), TOPBAR)).toBe(false);
+  });
+
+  it('1366x768: the gap is under 480 px, so it drops under the chrome, centred, 8 px below it', () => {
+    expect(1041 - 287 - 48).toBeGreaterThanOrEqual(GOTO_BOX_MIN);
+    expect(807 - 287 - 48).toBeLessThan(GOTO_BOX_MIN);
+    const p = gotoBoxPlace({ W: 1366, chrome: [TOPBAR, controls(1366, 807)] });
+    expect(p).toEqual({ x: 683, w: GOTO_BOX_W, top: 78 });
+    expect(meets(boxOf(p), controls(1366, 807))).toBe(false);
+    expect(meets(boxOf(p), TOPBAR)).toBe(false);
+  });
+
+  it("1920x1080: wide enough that the canvas area's centre is clear, so the spec's place stands", () => {
+    expect(gotoBoxPlace({ W: 1920, chrome: [TOPBAR, controls(1920, 1361)] })).toEqual({ x: 960, w: 640, top: 24 });
+  });
+
+  it('a side panel narrows the canvas area: the centre moves left, the box keeps right of the title', () => {
+    const p = gotoBoxPlace({ W: 1600, inset: 420, chrome: [TOPBAR, controls(1600, 1041)] });
+    expect(p).toEqual({ x: 631, w: 640, top: 24 });
+    expect(boxOf(p).l).toBe(TOPBAR.r + 24);
+  });
+
+  it('a gap between 480 and 640 px takes a narrower box rather than dropping', () => {
+    const p = gotoBoxPlace({ W: 1440, chrome: [TOPBAR, controls(1440, 880)] });
+    expect(p.top).toBe(GOTO_BOX_TOP);
+    expect(p.w).toBe(880 - 287 - 48);
+    expect(meets(boxOf(p), controls(1440, 880))).toBe(false);
+  });
+
+  it("chrome not laid out (null) or out of the top band (a narrow root's row at the bottom) is not in the way", () => {
+    expect(gotoBoxPlace({ W: 1366, chrome: [null, null] })).toEqual({ x: 683, w: 640, top: 24 });
+    expect(gotoBoxPlace({ W: 1366, chrome: [TOPBAR, { l: 14, t: 700, r: 900, b: 758 }] })).toEqual({ x: 683, w: 640, top: 24 });
+    expect(gotoBoxPlace({ W: 600, chrome: [] })).toEqual({ x: 300, w: 552, top: 24 });
   });
 });
 

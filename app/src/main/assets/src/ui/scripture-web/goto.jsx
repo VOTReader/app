@@ -60,6 +60,54 @@ export const GOTO_HINT = 'Try “Isaiah 53”, “Romans”, “Gen 1:1”';
 export const GOTO_ROWS = 5;
 export const GOTO_ROWS_COMPACT = 3;
 
+/** The PC box (spec 4.5): its width, its top, its field's height, and the gutter it keeps. */
+export const GOTO_BOX_W = 640;
+export const GOTO_BOX_TOP = 24;
+const GOTO_FIELD_H = 56;
+const GOTO_GUTTER = 24;
+/** Narrower than this between the title and the control row, the box drops under them. */
+export const GOTO_BOX_MIN = 480;
+
+/**
+ * Where the PC box sits (spec 4.5, r3-04): 640 px at top 24, centred over the canvas area, and
+ * clear of the chrome in its band. It sits in the gap between the title block and the control row,
+ * moved along when the canvas area's centre would put it over either; where that gap is under
+ * 480 px (1366 and the other laptop widths), it drops under the chrome at the canvas area's
+ * width. The review of 2026-10-18 found it centred over the canvas area at every width, over the
+ * search button that opens it and half of "Scripture" below about 1900 px. Pure, so the rule is
+ * pinned without a layout; CSS px in the root's own frame (transform-free, so a rotated root too).
+ * @param {{ W: number, inset?: number,
+ *   chrome: Array<{ l: number, t: number, r: number, b: number } | null> }} m
+ *   W the root's width; inset the panel's (right); chrome the title block and the control row
+ *   (null or empty: not shown)
+ * @returns {{ x: number, w: number, top: number }}  x the box's centre
+ */
+export function gotoBoxPlace({ W, inset, chrome }) {
+  const right = Math.max(0, W - (inset || 0));
+  const mid = right / 2;
+  let lo = 0, hi = right, under = 0;
+  for (const c of chrome || []) {
+    if (!c || !(c.r > c.l) || !(c.b > c.t)) continue;
+    // only what shares the box's band at the top; the rows below it fall clear of the chrome
+    if (c.b <= GOTO_BOX_TOP || c.t >= GOTO_BOX_TOP + GOTO_FIELD_H) continue;
+    under = Math.max(under, c.b);
+    if ((c.l + c.r) / 2 <= mid) lo = Math.max(lo, c.r);
+    else hi = Math.min(hi, c.l);
+  }
+  const gap = hi - lo - 2 * GOTO_GUTTER;
+  if (gap >= GOTO_BOX_MIN) {
+    const w = Math.min(GOTO_BOX_W, gap);
+    return { x: Math.min(Math.max(mid, lo + GOTO_GUTTER + w / 2), hi - GOTO_GUTTER - w / 2), w, top: GOTO_BOX_TOP };
+  }
+  return { x: mid, w: Math.max(0, Math.min(GOTO_BOX_W, right - 2 * GOTO_GUTTER)), top: under ? under + 8 : GOTO_BOX_TOP };
+}
+
+/** An element's box in its offset parent (the root), or null when it is not laid out. */
+function offsetBox(el) {
+  if (!el || !el.offsetParent) return null;
+  return { l: el.offsetLeft, t: el.offsetTop, r: el.offsetLeft + el.offsetWidth, b: el.offsetTop + el.offsetHeight };
+}
+
 /** "64 connections", "1 connection". */
 export function connectionsText(n) {
   return n.toLocaleString() + (n === 1 ? ' connection' : ' connections');
@@ -190,6 +238,29 @@ export function useGoTo(web) {
   React.useEffect(() => {
     if (isOpen && inputRef.current) inputRef.current.focus();
   }, [isOpen]);
+
+  // where the PC box sits (gotoBoxPlace), measured before it paints and again when the window
+  // resizes, so it keeps clear of the title and the control row; compact mode's place is the CSS
+  // rule's (spec 4.5: 64 px in from each side at top 8). Unmeasured (no layout): the CSS default.
+  const [place, setPlace] = React.useState(/** @type {null | { x: number, w: number, top: number }} */ (null));
+  const insetNow = (panelInsetRef && panelInsetRef.current && panelInsetRef.current.right) || 0;
+  const measure = React.useCallback(() => {
+    const root = rootRef && rootRef.current;
+    const W = root ? root.clientWidth : 0;
+    const v = viewRef && viewRef.current;
+    const compact = !!(v && v.H && v.H / (v.DPR || 1) <= 500);
+    const next = W > 0 && !compact ? gotoBoxPlace({
+      W, inset: (panelInsetRef && panelInsetRef.current && panelInsetRef.current.right) || 0,
+      chrome: [offsetBox(root.querySelector('.sw-topbar')), offsetBox(root.querySelector('.sw-controls'))],
+    }) : null;
+    setPlace((was) => (was && next && was.x === next.x && was.w === next.w && was.top === next.top ? was : next));
+  }, [rootRef, viewRef, panelInsetRef]);
+  React.useLayoutEffect(() => {
+    if (!isOpen) return undefined;
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [isOpen, insetNow, measure]);
 
   // a press anywhere outside the box (and its button) closes it
   React.useEffect(() => {
@@ -403,9 +474,15 @@ export function useGoTo(web) {
   const compact = !!(v && v.H && v.H / (v.DPR || 1) <= 500);
   const inset = (panelInsetRef && panelInsetRef.current && panelInsetRef.current.right) || 0;
   const optId = (k) => 'sw-goto-opt-' + k;
+  const boxStyle = /** @type {any} */ ({ '--sw-goto-inset': inset + 'px' });
+  if (place && !compact) {
+    boxStyle['--sw-goto-x'] = place.x + 'px';
+    boxStyle['--sw-goto-w'] = place.w + 'px';
+    boxStyle['--sw-goto-top'] = place.top + 'px';
+  }
   const theBox = isOpen ? (
     <div className={'sw-goto' + (compact ? ' is-compact' : '')} ref={boxRef} role="dialog" aria-label="Go to"
-      style={/** @type {any} */ ({ '--sw-goto-inset': inset + 'px' })}>
+      style={boxStyle}>
       <div className="sw-goto-field">
         <svg className="sw-goto-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
           <circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5L20.5 20.5" />

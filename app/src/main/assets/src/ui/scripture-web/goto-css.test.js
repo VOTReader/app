@@ -31,3 +31,15 @@ describe("the go-to's rows keep their spaces", () => {
     }
   });
 });
+
+/* The PC box's place is goto.jsx gotoBoxPlace's, measured clear of the title and the control row
+   (the review of 2026-10-18); the rule reads it, and keeps the spec's place (640 px, top 24,
+   centred over the canvas area) as each fallback for a frame not yet measured. */
+describe("the go-to box's place", () => {
+  it('.sw-goto reads --sw-goto-x, --sw-goto-w and --sw-goto-top, each with the spec place as its fallback', () => {
+    const d = declsFor('.sw-goto');
+    expect(d).toMatch(/top:\s*var\(--sw-goto-top,\s*24px\)/);
+    expect(d).toMatch(/left:\s*var\(--sw-goto-x,\s*calc\(\(100% - var\(--sw-goto-inset, 0px\)\) \/ 2\)\)/);
+    expect(d).toMatch(/width:\s*var\(--sw-goto-w,\s*min\(640px,/);
+  });
+});
