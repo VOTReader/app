@@ -156,14 +156,24 @@ export function kjvEncode(str) {
   // "psalm 119 105" is a chapter and a verse.
   if (s.indexOf(',') >= 0) s = s.replace(/(\d),(?=\d{3}(?!\d))/g, '$1');
   if (s.indexOf('&') >= 0) s = s.replace(/&/g, ' and ');
-  const tokens = s.replace(/[^a-z0-9\s]+/g, ' ').split(/\s+/);
   const out = [];
+  foldTokens(s.replace(/[^a-z0-9\s]+/g, ' ').split(/\s+/), out, null, null);
+  return out;
+}
+
+/**
+ * The folds of the split words, into `out`: the loop kjvEncode and kjvEncodeAt share, so the two read the same
+ * tokens. With `starts` (each split word's start in the text), each token's start goes to `outStarts`: a token
+ * two words make (24, 144000, "do" of "don't") starts where the first does.
+ * @param {string[]} tokens @param {string[]} out @param {number[]|null} starts @param {number[]|null} outStarts
+ */
+function foldTokens(tokens, out, starts, outStarts) {
   let tensAt = -1;   // the out index of a tens word just pushed: a units word next joins it
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
     if (!t) continue;
     const f = FOLD[t];
-    if (!f) { out.push(t); continue; }
+    if (!f) { out.push(t); if (outStarts) outStarts.push(/** @type {number[]} */ (starts)[i]); continue; }
     if (f.unit && tensAt >= 0 && tensAt === out.length - 1) {
       // "twenty" + "four" is 24; "twenty" + "first" is 21st (the units' suffix is the number's)
       out[tensAt] = out[tensAt][0] + f.unit;
@@ -173,14 +183,76 @@ export function kjvEncode(str) {
     if (f.nt && out.length) {
       // a written contraction: "don't" and "don’t" split as "don" + "t" ("do not"; "can't" is "cannot")
       const w = NT_BEFORE_T[out[out.length - 1]];
-      if (w) { out[out.length - 1] = w[0]; if (w.length > 1) out.push(w[1]); continue; }
+      if (w) {
+        out[out.length - 1] = w[0];
+        if (w.length > 1) { out.push(w[1]); if (outStarts) outStarts.push(outStarts[outStarts.length - 1]); }
+        continue;
+      }
     }
     if (f.thousands && out.length && /^\d+$/.test(out[out.length - 1])) { out[out.length - 1] += '000'; continue; }
-    if (f.split) { for (let j = 0; j < f.split.length; j++) out.push(f.split[j]); continue; }
+    if (f.split) {
+      for (let j = 0; j < f.split.length; j++) { out.push(f.split[j]); if (outStarts) outStarts.push(/** @type {number[]} */ (starts)[i]); }
+      continue;
+    }
     out.push(f.to);
+    if (outStarts) outStarts.push(/** @type {number[]} */ (starts)[i]);
     if (f.tens) tensAt = out.length - 1;
   }
-  return out;
+}
+
+/** A thousands comma kjvEncode drops: a digit before it, three digits and no fourth after (`s[at]` the first). */
+function thousandsComma(/** @type {string} */ s, /** @type {number} */ at) {
+  const d = (/** @type {number} */ i) => { const c = s.charCodeAt(i); return c >= 48 && c <= 57; };
+  return s.charCodeAt(at - 1) === 44 && d(at - 2) && d(at) && d(at + 1) && d(at + 2) && !d(at + 3);
+}
+
+/**
+ * kjvEncode's tokens, each with where it starts in `str` (search200 B3: a run found in a text's tokens lands on
+ * its place in the text). kjvEncode rewrites the string before it splits it; this reads the same rewrites in
+ * place: the lowercase and accent folds through a map back to `str` when they change its length, "&" as "and",
+ * and a thousands comma joining a number's two sides. The folds after the split are kjvEncode's own (foldTokens).
+ * search/exact-runs.test.js holds the two to the same tokens.
+ * @param {string} str
+ * @returns {{tokens: string[], starts: number[]}}
+ */
+export function kjvEncodeAt(str) {
+  /** @type {string[]} */ const tokens = [];
+  /** @type {number[]} */ const starts = [];
+  if (typeof str !== 'string' || !str) return { tokens, starts };
+  let s = str.toLowerCase();
+  /** @type {number[]|null} where each char of `s` came from in `str`; null: the same place */
+  let from = null;
+  // the accent fold, on the chars outside printable ASCII alone (the rest it leaves as they are)
+  let moved = s.length !== str.length;
+  if (!moved && /[^ -~]/.test(s)) {
+    const f = s.replace(/[^ -~]/g, (c) => { const d = c.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); if (d.length !== 1) moved = true; return d; });
+    if (!moved) s = f;
+  }
+  if (moved) {
+    // a fold that changes the length (a mark dropped, a capital lowercased to two): a char at a time, mapped
+    let f = '';
+    from = [];
+    for (let i = 0; i < str.length; i++) {
+      let c = str[i].toLowerCase();
+      if (/[^ -~]/.test(c)) c = c.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      f += c;
+      for (let k = 0; k < c.length; k++) from.push(i);
+    }
+    s = f;
+  }
+  /** @type {string[]} */ const raw = [];
+  /** @type {number[]} */ const rawAt = [];
+  const re = /[a-z0-9]+|&/g;
+  let end = -1;
+  for (let m = re.exec(s); m; m = re.exec(s)) {
+    const at = m.index;
+    const w = m[0];
+    if (w !== '&' && raw.length && end === at - 1 && thousandsComma(s, at)) raw[raw.length - 1] += w;
+    else { raw.push(w === '&' ? 'and' : w); rawAt.push(from ? from[at] : at); }
+    end = at + w.length;
+  }
+  foldTokens(raw, tokens, rawAt, starts);
+  return { tokens, starts };
 }
 
 /**

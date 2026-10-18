@@ -211,7 +211,8 @@ describe('meaning first', () => {
     said.near = 'silver';
     const r = await first('remember now your creator in the days of your youth');
     expect(r.doc.letterId).toBe('creator');
-    expect(r.placeStart).toBeUndefined();
+    // it opens on the words typed (search200 B3: the run's own sentence), never on the passage the model preferred
+    expect(r.placeStart).toBe(STARTS.creator);
   });
 
   /* THE MODEL SURE, UNSURE, AND WHERE IT LANDS (search sr10, 2026-10-14). Its clear first leads even

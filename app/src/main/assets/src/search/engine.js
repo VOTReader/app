@@ -29,7 +29,7 @@ import { parseReference, fuzzyBookSuggest, levenshtein } from './ref-parser.js';
 import { parseTextQuery, applyCorrections } from './query-parse.js';
 import { expandQueryTerms } from './synonyms.js';
 import { wordForms } from './word-forms.js';
-import { kjvEncode, negationOf } from './tokenize.js';
+import { kjvEncode, kjvEncodeAt, negationOf } from './tokenize.js';
 import { snippet, snippetAt, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
 import {
   KIND_BOOST, coverageMultiplier, popcount, PHRASE_BOOST, SYNONYM_DEMOTION,
@@ -74,16 +74,18 @@ const NAV_TEXT_LIMIT = 5;
    one verse each that outrank a common word on BM25. searchCorrected() below. */
 const FUZZY = 0.2;
 
-/** True when `run` occurs in `toks` as consecutive tokens (an empty run always does). */
-function hasTokenRun(toks, run) {
-  if (!run.length) return true;
+/** Where `run` first occurs in `toks` as consecutive tokens, as a token index; -1 when it does not (an empty run is at 0). */
+function tokenRunAt(toks, run) {
+  if (!run.length) return 0;
   for (let i = 0; i + run.length <= toks.length; i++) {
     let j = 0;
     while (j < run.length && toks[i + j] === run[j]) j++;
-    if (j === run.length) return true;
+    if (j === run.length) return i;
   }
-  return false;
+  return -1;
 }
+/** True when `run` occurs in `toks` as consecutive tokens (an empty run always does). */
+const hasTokenRun = (/** @type {string[]} */ toks, /** @type {string[]} */ run) => tokenRunAt(toks, run) >= 0;
 
 /* SHORT WORDS, APOSTROPHES (search audit 2026-09-27). A literal word was also
    searched as a prefix, so every one- and two-letter word ("a", "i", the "s" an
@@ -366,25 +368,220 @@ function skeleton(/** @type {string} */ w) {
 
 /** @type {any} */ let msIndex = null;
 
-/* A text's tokens, kept for the phrase ranking: the same few hundred candidates come
-   back on every keystroke of a query. Bounded by total tokens (a long Answers topic is
-   20,000), oldest out first; emptied when the index is rebuilt. */
-/** @type {Map<string, string[]>} */
-const TOKEN_CACHE = new Map();
-let tokenCacheSize = 0;
+/* EVERY TEXT'S TOKENS, AS NUMBERS (search200 B3, 2026-10-18). The phrase ranking read the typed words in a row
+   in a text's tokens (kjvEncode with a possessive's "s" joined, text and title), kept in a cache of the texts it
+   read: the 500 best-scored, so a run of common words in a long letter that 600 short texts outscored on its one
+   content word was never read. The store holds every text's tokens, each as its word's number, in one Uint32Array
+   with each text's span (by its MiniSearch short id), read with the originals at idle a slice at a time; a run is
+   then looked for in every text holding its rarest word (runHolders). A word with a possessive's "s" joined
+   ("god's") is a number of its own, its word "gods" and its stem kept (STORE.base), so a quoted phrase reads it as
+   the two words it was ("the name of the lord" holds in "the name of the Lord's house"). */
+/**
+ * @typedef {{ms: any, words: string[], ids: Map<string, number>, base: Int32Array, toks: Uint32Array, from: Uint32Array, to: Uint32Array, sId: number}} TokenStore
+ */
+/** @type {TokenStore|null} */ let STORE = null;
+/** A store being filled: `add` one stored doc, `done` the store. */
+function storeBuilder(/** @type {any} */ ms) {
+  /** @type {Map<string, number>} */ const ids = new Map();
+  /** @type {string[]} */ const words = [];
+  /** @type {string[]} */ const keys = [];
+  /** @type {number[]} */ const base = [];
+  /** @type {number[]} */ const from = [];
+  /** @type {number[]} */ const to = [];
+  let toks = new Uint32Array(1 << 20);
+  let n = 0;
+  const idOf = (/** @type {string} */ key, /** @type {string} */ word, /** @type {number} */ b) => {
+    let id = ids.get(key);
+    if (id === undefined) { id = words.length; ids.set(key, id); words.push(word); keys.push(key); base.push(b); }
+    return id;
+  };
+  const sId = idOf('s', 's', -1);
+  return {
+    add(/** @type {number} */ shortId, /** @type {any} */ f) {
+      if (!f) return;
+      const raw = kjvEncode((f.text || '') + ' ' + (f.title || ''));
+      if (n + raw.length > toks.length) {
+        const t = new Uint32Array(Math.max(Math.ceil(toks.length * 1.5), n + raw.length));
+        t.set(toks.subarray(0, n));
+        toks = t;
+      }
+      const a = n;
+      for (let i = 0; i < raw.length; i++) {
+        const w = raw[i];
+        if (w === 's' && n > a) {
+          // joinApostropheS: the "s" joins the word before it
+          const prev = toks[n - 1];
+          toks[n - 1] = idOf(keys[prev] + "'s", words[prev] + 's', prev);
+        } else {
+          toks[n++] = idOf(w, w, -1);
+        }
+      }
+      from[shortId] = a;
+      to[shortId] = n;
+    },
+    /** @returns {TokenStore} */
+    done() {
+      return {
+        ms, words, ids, sId,
+        base: Int32Array.from(base),
+        toks: n < toks.length * 0.9 ? toks.slice(0, n) : toks,
+        from: Uint32Array.from(from, (x) => x || 0),
+        to: Uint32Array.from(to, (x) => x || 0),
+      };
+    },
+  };
+}
+/** The store of the index in use, when it is read; null while it is being read (a search reads the old way then). */
+function storeNow() {
+  return STORE && STORE.ms === msIndex ? STORE : null;
+}
+/** The store of the index in use, read in one pass if it is not read yet (node; a search that raced a swap). */
+function tokenStore() {
+  if (!msIndex) return null;
+  const S = storeNow();
+  if (S) return S;
+  const b = storeBuilder(msIndex);
+  for (const [shortId, f] of msIndex._storedFields) b.add(shortId, f);
+  STORE = b.done();
+  return STORE;
+}
+/** A text's span in the store, by its doc id; null when the store or the text is not there. */
+function storeSpan(/** @type {TokenStore|null} */ S, /** @type {string|undefined} */ id) {
+  if (!S || id === undefined) return null;
+  const sid = S.ms._idToShortId.get(id);
+  return sid === undefined || sid >= S.from.length ? null : sid;
+}
+/* A text's tokens for the phrase ranking: kjvEncode's, a possessive's "s" joined (text and title), read from the
+   store; kjvEncode'd anew only for a text the store does not hold yet. */
 /** @param {string} id @param {{ text?: string, title?: string }} doc */
 function docTokens(id, doc) {
-  let t = TOKEN_CACHE.get(id);
-  if (t) return t;
-  t = joinApostropheS(kjvEncode((doc.text || '') + ' ' + (doc.title || '')));
-  TOKEN_CACHE.set(id, t);
-  tokenCacheSize += t.length;
-  while (tokenCacheSize > 1500000 && TOKEN_CACHE.size > 1) {
-    const oldest = /** @type {string} */ (TOKEN_CACHE.keys().next().value);
-    tokenCacheSize -= /** @type {string[]} */ (TOKEN_CACHE.get(oldest)).length;
-    TOKEN_CACHE.delete(oldest);
+  const S = storeNow();
+  const sid = storeSpan(S, id);
+  if (S && sid !== null) {
+    const a = S.from[sid];
+    const out = new Array(S.to[sid] - a);
+    for (let k = 0; k < out.length; k++) out[k] = S.words[S.toks[a + k]];
+    return out;
   }
-  return t;
+  return joinApostropheS(kjvEncode((doc.text || '') + ' ' + (doc.title || '')));
+}
+/**
+ * The numbers each typed token may be, in a row: the word, and the word joined from a possessive ("lords" from
+ * "lord's"), as the phrase ranking reads them alike. null when a word is in no text (none holds the run).
+ * @param {TokenStore} S @param {string[]} run  joined tokens (joinApostropheS)
+ * @returns {Array<[number, number]>|null}
+ */
+function runIds(S, run) {
+  /** @type {Array<[number, number]>} */ const acc = [];
+  for (const t of run) {
+    const lit = S.ids.get(t);
+    const jn = t.length > 1 && t[t.length - 1] === 's' ? S.ids.get(t.slice(0, -1) + "'s") : undefined;
+    if (lit === undefined && jn === undefined) return null;
+    acc.push([lit === undefined ? -1 : lit, jn === undefined ? -1 : jn]);
+  }
+  return acc;
+}
+/** Where the run (runIds) first starts in a text's tokens, as an index into them; -1 when it does not. */
+function storeRunAt(/** @type {TokenStore} */ S, /** @type {number} */ sid, /** @type {Array<[number, number]>} */ acc) {
+  const T = S.toks;
+  const a = S.from[sid];
+  const n = acc.length;
+  if (!n) return 0;
+  const [f0, f1] = acc[0];
+  for (let i = a; i + n <= S.to[sid]; i++) {
+    const t = T[i];
+    if (t !== f0 && t !== f1) continue;
+    let j = 1;
+    while (j < n && (T[i + j] === acc[j][0] || T[i + j] === acc[j][1])) j++;
+    if (j === n) return i - a;
+  }
+  return -1;
+}
+/**
+ * Where a run of words as kjvEncode reads them (a possessive's "s" a word of its own) first starts in a text's
+ * tokens, the store's joined words read as their two ("god's" as god, s); -1 when it does not. The quoted
+ * phrase's and the +/- words' test, as holdsWords read them on kjvEncode's own tokens.
+ * @param {TokenStore} S @param {number} sid @param {number[]} r  the run's numbers (-1: a word in no text)
+ */
+function storeWordsAt(S, sid, r) {
+  const n = r.length;
+  if (!n) return 0;
+  const T = S.toks;
+  const B = S.base;
+  const b = S.to[sid];
+  for (let i = S.from[sid]; i < b; i++) {
+    // a run may start on a joined word's "s" (o = 1) as well as on its word
+    for (let o = 0; o < (B[T[i]] >= 0 ? 2 : 1); o++) {
+      let k = i;
+      let ko = o;
+      let j = 0;
+      while (j < n && k < b) {
+        const t = T[k];
+        const bt = B[t];
+        if ((bt < 0 ? t : ko === 0 ? bt : S.sId) !== r[j]) break;
+        j++;
+        if (bt >= 0 && ko === 0) ko = 1;
+        else { k++; ko = 0; }
+      }
+      if (j === n) return i - S.from[sid];
+    }
+  }
+  return -1;
+}
+/** How many texts the index finds the run's anchor in at most, for the store to read the run in all of them. */
+const RUN_HOLDERS = 5000;
+/** A run of this many typed tokens or more is looked for in every text holding it (runHolders), and landed on. */
+const RUN_MIN = 3;
+/**
+ * The texts holding the typed run in a row, wherever they rank: id -> the token index where it starts. Read in
+ * every text the index finds the run's rarest word in, when no more than RUN_HOLDERS hold it; null when more do
+ * (the phrase ranking's 500 best are read then), or with no store yet.
+ * @param {string[]} run  joined tokens
+ * @returns {Map<string, number>|null}
+ */
+function runHolders(run) {
+  const S = storeNow();
+  if (!S || run.length < RUN_MIN) return null;
+  const acc = runIds(S, run);
+  /** @type {Map<string, number>} */ const out = new Map();
+  if (!acc) return out;
+  // the anchor: the word fewest texts hold (a joined word's texts: those holding its stem, and those holding it as written)
+  let best = -1;
+  let bestN = Infinity;
+  for (let j = 0; j < run.length; j++) {
+    const t = run[j];
+    const n = (acc[j][0] >= 0 ? docFreq(t) : 0) + (acc[j][1] >= 0 ? docFreq(t.slice(0, -1)) : 0);
+    if (n && n < bestN) { bestN = n; best = j; }
+  }
+  if (best < 0 || bestN > RUN_HOLDERS) return null;
+  /** @type {Set<number>} */ const sids = new Set();
+  const holding = (/** @type {string} */ term) => {
+    const data = msIndex._index.get(term);
+    if (data) for (const docs of data.values()) for (const sid of docs.keys()) sids.add(sid);
+  };
+  if (acc[best][0] >= 0) holding(run[best]);
+  if (acc[best][1] >= 0) holding(run[best].slice(0, -1));
+  for (const sid of sids) {
+    if (sid >= S.from.length) continue;
+    const at = storeRunAt(S, sid, acc);
+    if (at >= 0) out.set(S.ms._documentIds.get(sid), at);
+  }
+  return out;
+}
+/** The first texts that open on the typed run they hold (their placeStart). */
+const RUN_LAND_REACH = 10;
+/**
+ * Where in `text` its joined token `at` starts (kjvEncodeAt, a possessive's "s" joined as the store joins it);
+ * -1 past the text's own tokens (the title's).
+ */
+function tokenPlace(/** @type {string} */ text, /** @type {number} */ at) {
+  const { tokens, starts } = kjvEncodeAt(text);
+  let k = -1;
+  for (let i = 0; i < tokens.length; i++) {
+    if (tokens[i] === 's' && k >= 0) continue;
+    if (++k === at) return starts[i];
+  }
+  return -1;
 }
 /* A TITLE'S WORDS, READ ONCE (search200 B1, 2026-10-18). The title pass read every candidate's title through
    kjvEncode on every query. A study chapter is titled "Study — Chapter" (index-builder.js), and a reader types the
@@ -428,7 +625,7 @@ const PASSAGE_RANK_COST = 0.01;
 const PASSAGE_MARGIN = 0.15;
 /** How much less of the query an original's passage may hold and still come before an Answers topic. */
 const REPRINT_COST = 0.05;
-/** @type {Map<string, string[]>} doc id -> its tokens' lemmas, alongside TOKEN_CACHE */
+/** @type {Map<string, string[]>} doc id -> its tokens' lemmas, a few hundred texts, oldest out first */
 const LEMMA_CACHE = new Map();
 /** How many texts hold `term` (the index's own term data). */
 function docFreq(term) {
@@ -788,6 +985,22 @@ async function readOriginals(/** @type {any} */ ms) {
   SHINGLES = S;
   ORIGINALS = O;
 }
+/** Read the token store of `ms` in slices, after the originals; dropped when another index swaps in or a one-pass read finished first. */
+async function readStore(/** @type {any} */ ms) {
+  if (msIndex !== ms || (STORE && STORE.ms === ms)) return;
+  const b = storeBuilder(ms);
+  const it = ms._storedFields[Symbol.iterator]();
+  let step = it.next();
+  while (!step.done) {
+    const end = now() + SLICE_MS;
+    for (; !step.done && now() < end; step = it.next()) b.add(step.value[0], step.value[1]);
+    if (step.done) break;
+    await yieldToPage();
+    if (msIndex !== ms || (STORE && STORE.ms === ms)) return;
+  }
+  if (msIndex !== ms || (STORE && STORE.ms === ms)) return;
+  STORE = b.done();
+}
 /* THE ANSWERS EXCERPTS ARE READ AT IDLE TOO (sr7, 2026-10-14). A first search split every Answers topic
    it touched into its excerpts (excerptCover reads a topic one excerpt at a time): 64-140 ms of a first
    search's ranking on a desktop, 1-3 ms of a later one's. After the originals they are read the same way,
@@ -809,16 +1022,17 @@ async function warmExcerpts(/** @type {any} */ ms) {
     excerpts(ids.get(shortId), f.text);
   }
 }
-/** Resolves once the index in use has its originals read (or has been replaced); never rejects. */
+/** Resolves once the index in use has its originals and its token store read (or has been replaced); never rejects. */
 function warmOriginals() {
-  if (ORIGINALS || !msIndex) return Promise.resolve();
+  if (!msIndex || (ORIGINALS && storeNow())) return Promise.resolve();
   if (typeof document === 'undefined') {
     try { originals(); } catch { /* read again, and caught, where they are used */ }
+    try { tokenStore(); } catch { /* the phrase ranking reads each text's tokens anew */ }
     return Promise.resolve();
   }
   if (ORIGINALS_BUILD && ORIGINALS_BUILD.ms === msIndex) return ORIGINALS_BUILD.done;
   const ms = msIndex;
-  const done = readOriginals(ms).catch(() => { if (ORIGINALS_BUILD && ORIGINALS_BUILD.done === done) ORIGINALS_BUILD = null; });
+  const done = readOriginals(ms).then(() => readStore(ms)).catch(() => { if (ORIGINALS_BUILD && ORIGINALS_BUILD.done === done) ORIGINALS_BUILD = null; });
   ORIGINALS_BUILD = { ms, done };
   return done;
 }
@@ -1230,8 +1444,7 @@ function reshapeDoc(r) {
     outlive the index it was read from. Cleared here, at the swap, not when the build starts: a search on
     the old index while the new one builds would fill them again with the old texts. */
 function swapIn(/** @type {any} */ ms, /** @type {typeof stats} */ st) {
-  TOKEN_CACHE.clear();
-  tokenCacheSize = 0;
+  STORE = null;
   TITLE_TOKS.clear();
   ORIGINALS = null;
   ORIGINALS_BUILD = null;
@@ -1424,7 +1637,7 @@ async function ensureReady(options) {
  * `corrections` lists each typed word that found nothing of its own and was
  * searched as the nearest indexed word instead ({ from: 'shephard', to: 'shepherd' }).
  * `meaningLater`: a text search the meaning model was not ready for ran on the words alone; whenMeaningReady() says when to ask again.
- * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[], close?:boolean}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>, stopWordsOnly?:boolean, unquoted?:string, aborted?:boolean, meaningLater?:boolean}>}
+ * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[], close?:boolean, placeStart?:number}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>, stopWordsOnly?:boolean, unquoted?:string, aborted?:boolean, meaningLater?:boolean}>}
  */
 async function search(query, options) {
   options = options || {};
@@ -1499,7 +1712,7 @@ async function search(query, options) {
      searched, so '"love one another" brethren' showed every text holding the phrase, ranked and marked as if
      "brethren" was never typed. It narrows the phrase as a +word does (a small word aside); a phrase and word
      no text holds together fall back to the words unquoted, as a quote nothing holds does. */
-  const p = read.phrase && read.terms && read.terms.length
+  let p = read.phrase && read.terms && read.terms.length
     ? { ...read, must: read.must.concat(read.terms.map(withoutPossessive).filter((t) => !(useStop && isStopTerm(t)))), terms: [] }
     : read;
   // `allWords`: the reader asked for every match under the card (SearchScreen).
@@ -1511,9 +1724,15 @@ async function search(query, options) {
   // means those words in that order, which the phrase filter checks (sweep 2026-10-14 v016). One small word
   // in quotes ("the") is no run of words: it is in nearly every verse, quoted or not.
   const quotedRun = !!p.phrase && kjvEncode(p.phrase).length >= 2;
-  if (useStop && !quotedRun && terms.length && terms.every(isStopTerm)) {
-    return { parsed, results: [], parsedTerms: [], textQuery: null, stopWordsOnly: true };
-  }
+  /* ...but SMALL_RUN_MIN small words or more, unquoted, are a run of words (search200 B3): "and it was so" found
+     nothing unless quoted. They are searched as the run, as if quoted (every text shown holds it), and the card marks
+     the run; a run no text holds is the small words alone, as before. */
+  // (the words as typed: the parse eats "and", "or" and "not" as operators)
+  const smallRun = useStop && !quotedRun && !p.phrase && !options._unquoted && !p.must.length && !p.mustNot.length &&
+    terms.length && terms.every(isStopTerm) && kjvEncode(query).length >= SMALL_RUN_MIN ? String(query).trim() : '';
+  const stopOnly = { parsed, results: [], parsedTerms: [], textQuery: null, stopWordsOnly: true };
+  if (smallRun) p = { ...p, phrase: smallRun, terms: [] };
+  else if (useStop && !quotedRun && terms.length && terms.every(isStopTerm)) return stopOnly;
   let filtered;
   if (!useStop || terms.length <= 4) filtered = terms.slice();
   else { filtered = terms.filter((t) => !isStopTerm(t)); if (!filtered.length) filtered = terms; }
@@ -1727,6 +1946,31 @@ async function search(query, options) {
   for (const k in modernOf) fixedTo[k] = modernOf[k];
   const typedTokens = joinApostropheS(kjvEncode(wanted).map((t) => fixedTo[t] || t));
   const STOP = D.STOP_WORDS_TRIMMED;
+  /* THE RUN IN EVERY TEXT HOLDING IT (search200 B3, 2026-10-18). Read in the 500 best-scored texts alone, a run of
+     common words in a long letter went unread when more short texts outscored it on its content word, and it was
+     never boosted. RUN_MIN typed tokens or more are looked for in every text holding the rarest of them (the token
+     store, runHolders): each holding the run in a row is boosted wherever it ranked, the original before a reprint
+     (ORIGINAL_BOOST) in a keyword search too: the Answers topic denser in two of its words led the letter it
+     reprints. In a keyword search that boost passes over the Answers alone: a study or a holy day holding the run
+     keeps its place among the letters (it reads the run as its own, where the Answers reprint a letter's words).
+     The 500 best are still read for a run one word off (nearPhrase). */
+  const holders = !p.phrase ? runHolders(typedTokens) : null;
+  /** @type {Record<string, number>} where a text holds the typed run, as a token index (the landing) */
+  const runAt = Object.create(null);
+  const runBoost = (/** @type {string} */ id, /** @type {any} */ d) => {
+    nearOf[id] = 1;
+    scoreMap[id] *= PHRASE_BOOST;
+    if (!keyword ? !REPRINT_KINDS.has(d.kind) : typedTokens.length >= RUN_MIN && d.kind !== 'answers') scoreMap[id] *= ORIGINAL_BOOST;
+  };
+  /** The holders the passes below did not read: boosted where they rank (a text the words did not find is no result). */
+  const restOfRun = () => {
+    if (!holders) return;
+    for (const [id, at] of holders) {
+      if (id in nearOf || scoreMap[id] === undefined || !docLookup[id]) continue;
+      runAt[id] = at;
+      runBoost(id, docLookup[id]);
+    }
+  };
   if (!p.phrase && required > 1 && typedTokens.length > 1) {
     const needCover = required >= 3 ? required - 1 : required;
     const cands = rankedIds.filter((id) => popcount((termMask[id] || 0) & requiredMask) >= needCover)
@@ -1737,29 +1981,31 @@ async function search(query, options) {
       const d = docLookup[id];
       if (!d) continue;
       const toks = docTokens(id, d);
-      const exact = hasTokenRun(toks, typedTokens);
-      const near = exact ? 1 : nearPhrase(toks, typedTokens, STOP);
+      const at = holders ? (holders.has(id) ? /** @type {number} */ (holders.get(id)) : -1) : tokenRunAt(toks, typedTokens);
+      if (at >= 0) { runAt[id] = at; runBoost(id, d); continue; }
+      const near = nearPhrase(toks, typedTokens, STOP);
       nearOf[id] = near;
-      if (exact) scoreMap[id] *= PHRASE_BOOST;
-      else if (near >= NEAR_PHRASE_MIN) scoreMap[id] *= 1 + (PHRASE_BOOST - 1) * near * near;
+      if (near >= NEAR_PHRASE_MIN) scoreMap[id] *= 1 + (PHRASE_BOOST - 1) * near * near;
       // the original before a reprint when both hold the phrase
       if (near >= 0.9 && !keyword && !REPRINT_KINDS.has(d.kind)) scoreMap[id] *= ORIGINAL_BOOST;
     }
+    restOfRun();
   }
   // One word that means anything among small ones ("for you to embrace me"): the texts holding the typed run exactly.
   // The card marks the run, so its excerpt and the landing go to it, not the word's first place (textQuery.run).
   let run = '';
   if (!p.phrase && required === 1 && typedTokens.length >= SMALL_RUN_MIN) {
-    const cands = rankedIds.slice().sort((a, b) => scoreMap[b] - scoreMap[a]).slice(0, PHRASE_CANDIDATES);
+    const cands = holders ? [] : rankedIds.slice().sort((a, b) => scoreMap[b] - scoreMap[a]).slice(0, PHRASE_CANDIDATES);
     for (const id of cands) {
       if (spent()) { const r = await pause(); if (r) return r; }
       const d = docLookup[id];
-      if (!d || !hasTokenRun(docTokens(id, d), typedTokens)) continue;
-      run = wanted.trim().replace(/\s+/g, ' ').toLowerCase();
-      nearOf[id] = 1;
-      scoreMap[id] *= PHRASE_BOOST;
-      if (!keyword && !REPRINT_KINDS.has(d.kind)) scoreMap[id] *= ORIGINAL_BOOST;
+      const at = d ? tokenRunAt(docTokens(id, d), typedTokens) : -1;
+      if (at < 0) continue;
+      runAt[id] = at;
+      runBoost(id, d);
     }
+    restOfRun();
+    if (Object.keys(runAt).length) run = wanted.trim().replace(/\s+/g, ' ').toLowerCase();
   }
   // A quoted phrase: every text shown holds it (the filter below), so the original first.
   if (p.phrase) {
@@ -1822,12 +2068,29 @@ async function search(query, options) {
      and - words), and shows once; what the meaning and originalsFirst add counts in its collection's cap. */
   const inScope = (/** @type {any} */ d) => (!corpusFilter || d.corpus === corpusFilter) &&
     (!scopeBookId || d.bookId === scopeBookId) && (!scopeVolumeId || d.volumeId === scopeVolumeId);
+  /* ...read in the token store (search200 B3): kjvEncode'ing every text the loop below passes over, a quoted phrase
+     of common words read thousands of texts anew per search. The store holds text and title; a heading and a ref
+     (a collection's name, "John 3:16") are read apart, with the title, where the store has not the run. */
+  const S = storeNow();
+  const asIds = (/** @type {string[]} */ run) => run.map((t) => { const id = S && S.ids.get(t); return id === undefined || id === null ? -1 : id; });
+  const phraseIds = phraseToks && S ? asIds(phraseToks) : null;
+  const mustIds = S ? mustToks.map(asIds) : [];
+  const mustNotIds = S ? mustNotToks.map(asIds) : [];
   const holdsWords = (/** @type {any} */ d) => {
     if (!phraseToks && !hasMust && !hasMustNot) return true;
-    const toks = kjvEncode((d.text || '') + ' ' + (d.title || '') + ' ' + (d.heading || '') + ' ' + (d.ref || ''));
-    if (phraseToks && !hasTokenRun(toks, phraseToks)) return false;
-    if (hasMust && !mustToks.every((run) => hasTokenRun(toks, run))) return false;
-    return !mustNotToks.some((run) => hasTokenRun(toks, run));
+    const sid = S ? storeSpan(S, d.id) : null;
+    if (!S || sid === null) {
+      const toks = kjvEncode((d.text || '') + ' ' + (d.title || '') + ' ' + (d.heading || '') + ' ' + (d.ref || ''));
+      if (phraseToks && !hasTokenRun(toks, phraseToks)) return false;
+      if (hasMust && !mustToks.every((run) => hasTokenRun(toks, run))) return false;
+      return !mustNotToks.some((run) => hasTokenRun(toks, run));
+    }
+    /** @type {string[]|null} */ let side = null;
+    const sideToks = () => side || (side = d.heading || d.ref ? kjvEncode((d.title || '') + ' ' + (d.heading || '') + ' ' + (d.ref || '')) : []);
+    const holds = (/** @type {string[]} */ run, /** @type {number[]} */ ids) => storeWordsAt(S, sid, ids) >= 0 || hasTokenRun(sideToks(), run);
+    if (phraseToks && !holds(phraseToks, /** @type {number[]} */ (phraseIds))) return false;
+    if (hasMust && !mustToks.every((run, i) => holds(run, mustIds[i]))) return false;
+    return !mustNotToks.some((run, i) => holds(run, mustNotIds[i]));
   };
   const allowed = (/** @type {any} */ d) => inScope(d) && holdsWords(d);
   /** A text not shown yet, marked shown (the dedup). */
@@ -1924,7 +2187,7 @@ async function search(query, options) {
     sem = await semanticDocs(meant, unitId, corpusFilter || scopeBookId || scopeVolumeId ? MEANING_FILTERED : undefined);
     meaningLater = !sem && semanticStatus().status !== 'ready';
     if (msIndex !== inUse) sem = null;
-    if (sem) sem = sem.filter((s) => { const f = msIndex.getStoredFields(s.id); return !!f && allowed(f); });
+    if (sem) sem = sem.filter((s) => { const f = msIndex.getStoredFields(s.id); return !!f && allowed({ ...f, id: s.id }); });
     if (sem && sem.length) meaningFirst(out, idOf, sem, named, held, fresh);
   }
   const nearTyped = (/** @type {string} */ id, /** @type {any} */ d) => nearOf[id] ?? (typedTokens.length > 1 ? nearPhrase(docTokens(id, d), typedTokens, STOP) : 0);
@@ -1981,6 +2244,25 @@ async function search(query, options) {
   // text past the limit (sweep low, REPORT.md:645). The last gives way, and the result says texts were left.
   const over = out.length > limit;
   if (over) out.length = limit;
+  /* THE READER LANDS ON THE RUN TYPED (search200 B3, 2026-10-18). A text opened where the typed words sit thickest
+     (use-search matchExcerpt), and a long letter holding the run deep down opened where its common words crowd. The
+     first RUN_LAND_REACH texts holding the typed run (RUN_MIN tokens or more), or the quoted phrase, open on it
+     (placeStart), at the run's first word: a landing snapped back to its sentence's start opened a letter's
+     greeting, or the clause before the one typed, and missed the words. */
+  const landRun = p.phrase ? joinApostropheS(/** @type {string[]} */ (phraseToks)) : typedTokens;
+  const landAcc = S && landRun.length >= RUN_MIN ? runIds(S, landRun) : null;
+  if (S && landAcc) {
+    for (let r = 0; r < Math.min(out.length, RUN_LAND_REACH); r++) {
+      const e = out[r];
+      if (e.doc.kind === 'verse' || !e.doc.text) continue;
+      const id = idOf.get(e);
+      const sid = storeSpan(S, id);
+      if (sid === null) continue;
+      const at = !p.phrase && id !== undefined && id in runAt ? runAt[id] : storeRunAt(S, sid, landAcc);
+      const c = at >= 0 ? tokenPlace(e.doc.text, at) : -1;
+      if (c >= 0) /** @type {any} */ (e).placeStart = c;
+    }
+  }
   if (sem && sem.length) meaningLanding(out, idOf, sem, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))));
   // ...by the passage the screen lands on: the card marks the phrase or the typed run with the words (textQuery.run).
   reprintSecond(out, (p.phrase ? [p.phrase] : run ? [run] : []).concat(filtered.filter((t) => !isStopTerm(t))));
@@ -2012,6 +2294,7 @@ async function search(query, options) {
      the letter says "will") showed "No results" with the letter a word away; the
      reader had to know to take the quote marks off. `unquoted` names the phrase, so
      the screen can say what it did. */
+  if (smallRun) return out.length ? { parsed, results: out, parsedTerms: [], textQuery: { ...p, phrase: null, run: smallRun.trim().replace(/\s+/g, ' ').toLowerCase() }, capped: Object.keys(capped), truncated: over || (out.length >= limit && h < rankedIds.length), corrections, meaningLater } : stopOnly;
   if (p.phrase && !out.length && !options._unquoted) {
     const again = await search(String(query).replace(/["\u201C\u201D\u201E\u201F]/g, ' '), { ...options, _unquoted: true });
     if (again.results && again.results.length) return { ...again, unquoted: p.phrase };
