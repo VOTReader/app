@@ -218,6 +218,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     camRef, camVRef, viewRef, focusRef, panelInsetRef, viewFor, zoomCapFor, yFrameFor,
     chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow,
   });
+  // without WebGL2 the canon web is read as a list; My Web draws in Canvas2D
+  // and stays up (w3 item 31)
+  const listShown = noWebGL && mode !== 'personal';
 
   // where the reader has been (use-journey.js): the navigation stream pushes,
   // the panel shows it and its Back
@@ -244,12 +247,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // Wiring itself lives in gestures.js (attachWebGestures) — a pure move, so
   // it can be exercised with real dispatched DOM events instead of only a
   // screenshot. This effect just owns the mount guard and hands over refs.
-  // W52: noWebGL and glRetry are deps because the fallback unmounts .sw-root
+  // W52: listShown and glRetry are deps because the fallback unmounts .sw-root
   // and Try again mounts a NEW one; without them the listeners stayed on the
   // first, detached root and the web came back dead to every drag and pinch.
   React.useEffect(() => {
     const el = wrapRef.current;
-    if (!el || !graph || noWebGL) return;
+    if (!el || !graph || listShown) return;
     return attachWebGestures(el, {
       loc, dpr: () => viewRef.current.DPR, cam: () => camRef.current, camFor,
       view: () => viewRef.current, handlers: () => handlersRef.current,
@@ -258,7 +261,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       schedule, maxZoom: (c) => zoomCapFor(c || camRef.current), clampCamera, zoomAbout, xToVerse,
       yFrame: yFrameFor, lift: liftAt,
     });
-  }, [graph, noWebGL, glRetry, schedule, loc, camFor, zoomCapFor, live, dropHover, cancelFly, yFrameFor, liftAt, viewRef, camRef,
+  }, [graph, listShown, glRetry, schedule, loc, camFor, zoomCapFor, live, dropHover, cancelFly, yFrameFor, liftAt, viewRef, camRef,
     handlersRef]);
 
   /** Reset one rail's camera to fit (r2: each rail has its own). */
@@ -325,7 +328,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
   // ── render ──────────────────────────────────────────────────────────────
   if (loadError) return loadErrorPanel(loadError, retryLoad);
-  if (noWebGL && graph) {
+  if (listShown && graph) {
     // A7: the web read as a list instead of a dead end (WebFallbackList.jsx).
     // It opens on the reader's last Bible chapter (HistoryStore, newest first).
     const hist = typeof HistoryStore !== 'undefined' ? HistoryStore.list() : [];
@@ -334,7 +337,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       <WebFallbackList graph={graph}
         initialChapter={startChapter(graph, lastCh && lastCh.bookId, lastCh && lastCh.chapterNum)}
         onOpen={(ref) => navigateToLink && navigateToLink({ type: 'bible', bookId: ref.bookId, chapter: ref.chapter, verse: ref.verse })}
-        onRetry={retryGL}
+        onRetry={retryGL} onMyWeb={() => switchMode('personal')}
         onBack={onBack} verseText={verseTextFor} />
     );
   }

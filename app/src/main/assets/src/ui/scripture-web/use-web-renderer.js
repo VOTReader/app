@@ -212,6 +212,8 @@ export function useWebRenderer({
   chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow,
 }) {
   const [noWebGL, setNoWebGL] = React.useState(false);
+  // without WebGL2 the screen shows the canon web as a list; My Web stays drawn (w3 item 31)
+  const listShown = noWebGL && mode !== 'personal';
   const [glRetry, setGlRetry] = React.useState(0);
   const [railZoom, setRailZoom] = React.useState({ top: false, bottom: false });
   const railZoomRef = React.useRef(railZoom);
@@ -261,7 +263,8 @@ export function useWebRenderer({
   const draw = React.useCallback(() => {
     const g = graph, cam = camRef.current, r = rendererRef.current;
     const v = viewRef.current;
-    if (!g || !cam || !r || !v.W) return;
+    // My Web draws in Canvas2D and needs no GL renderer (w3 item 31)
+    if (!g || !cam || !v.W || (!r && mode !== 'personal')) return;
     const wrap = wrapRef.current;
     const attrs = attrRef.current;
     const zoom = cam.ppv / fitPPV(cam, v.W);
@@ -305,8 +308,14 @@ export function useWebRenderer({
       // links, not hundreds of thousands, so crisp 2D curves beat a second
       // shader. The GL surface is one clear to the ground colour (#10), at
       // the full backing.
-      if (glc && (glc.width !== v.W || glc.height !== v.H)) { glc.width = v.W; glc.height = v.H; }
-      r.clear(chrome.bg);
+      if (r) {
+        if (glc && (glc.width !== v.W || glc.height !== v.H)) { glc.width = v.W; glc.height = v.H; }
+        r.clear(chrome.bg);
+      } else if (glRef.current) {
+        // no WebGL2 (w3 item 31): the ground is the GL canvas's own CSS
+        // background, the web's one dark ground in both themes
+        glRef.current.style.background = chrome.bg;
+      }
       const uic = uiRef.current;
       const ctx = uic && uic.getContext('2d');
       if (ctx) {
@@ -426,11 +435,13 @@ export function useWebRenderer({
   React.useEffect(() => onWebFontReady(schedule), [schedule]);
 
   // ── size + renderer lifecycle ───────────────────────────────────────────
-  // noWebGL is a dep (#3): the list unmounts the canvases, so the renderer
+  // listShown is a dep (#3): the list unmounts the canvases, so the renderer
   // that drew on them is disposed with them rather than outliving them, and
   // the effect waits, idle, for Try again (glRetry) to bring a canvas back.
+  // My Web without WebGL2 shows no list (w3 item 31): it keeps its canvases,
+  // and the effect sets up the camera and the size with no renderer.
   React.useEffect(() => {
-    if (!graph || noWebGL) return;
+    if (!graph || listShown) return;
     const glc = glRef.current, uic = uiRef.current;
     if (!glc || !uic) return;
     let renderer = null;
@@ -477,7 +488,10 @@ export function useWebRenderer({
       setLoadError(e && e.message ? e.message : String(e));
       return;
     }
-    if (!renderer) { setNoWebGL(true); return; }
+    // No WebGL2: the canon web is read as a list (the screen's fallback), but
+    // My Web is Canvas2D, so the camera and the canvas size are set up all the
+    // same and its frame draws without a renderer (w3 item 31).
+    if (!renderer) setNoWebGL(true);
     rendererRef.current = renderer;
     if (!camRef.current) {
       const back = resumeRef.current;
@@ -545,7 +559,7 @@ export function useWebRenderer({
       renderer = null;
       rendererRef.current = null;
     };
-  }, [graph, noWebGL, schedule, glRetry, yFrameFor, camRef, camVRef, viewRef, focusRef, glRef, resumeRef, setLoadError, uiRef,
+  }, [graph, listShown, schedule, glRetry, yFrameFor, camRef, camVRef, viewRef, focusRef, glRef, resumeRef, setLoadError, uiRef,
     wrapRef, drawRef]);
 
   // the no-WebGL list's Try again: a fresh renderer on a fresh root

@@ -32,9 +32,11 @@ export function _resetFallbackPlace() { resumeChapter = null; }
 
 /**
  * @param {{ graph: any, initialChapter: number, onOpen: (ref: any) => void,
- *   onRetry: () => void, onBack: () => void, verseText: (ref: any) => string }} props
+ *   onRetry: () => void, onBack: () => void, verseText: (ref: any) => string,
+ *   onMyWeb?: () => void }} props
+ *   onMyWeb: My web draws in Canvas2D, so it opens without WebGL2 (w3 item 31)
  */
-export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack, verseText }) {
+export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack, verseText, onMyWeb }) {
   const [ci, setCi] = React.useState(() => {
     const at = resumeChapter;
     resumeChapter = null;
@@ -77,6 +79,7 @@ export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack
       <div className="swf-note">
         <span>The map can’t be drawn on this device right now.</span>
         <button type="button" className="swf-retry" onClick={() => { resumeChapter = ci; onRetry(); }}>Try again</button>
+        {onMyWeb && <button type="button" className="swf-retry" onClick={() => { resumeChapter = ci; onMyWeb(); }}>My web</button>}
       </div>
       <div className="swf-count-row">
         <h2 className="swf-h2">Connected passages</h2>
