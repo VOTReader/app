@@ -37,8 +37,10 @@ export function flyPath(c0, w0, c1, w1) {
   const d1 = Math.sqrt(d2);
   const b0 = (w1 * w1 - w0 * w0 + RHO4 * d2) / (2 * w0 * RHO2 * d1);
   const b1 = (w1 * w1 - w0 * w0 - RHO4 * d2) / (2 * w1 * RHO2 * d1);
-  const r0 = Math.log(Math.sqrt(b0 * b0 + 1) - b0);
-  const r1 = Math.log(Math.sqrt(b1 * b1 + 1) - b1);
+  // the paper's log(sqrt(b^2 + 1) - b), which is -asinh(b): the log form cancels to log(0) for a
+  // large b (a hair of a pan with a big zoom out), asinh does not
+  const r0 = -Math.asinh(b0);
+  const r1 = -Math.asinh(b1);
   const S = (r1 - r0) / RHO;
   const cosh0 = Math.cosh(r0), sinh0 = Math.sinh(r0);
   return {

@@ -45,6 +45,24 @@ describe('flyPath', () => {
   it('nowhere to go has no length', () => {
     expect(flyPath(500, 40, 500, 40).S).toBe(0);
   });
+  it('a hair of a pan with a big zoom (b large) is the zoom, not a NaN: no cancellation in r0, r1', () => {
+    // dx 1e-5 is past the zoom-alone branch (dx^2 > 1e-12), so b0 and b1 are about 2.5e10 and
+    // 2.5e8; log(sqrt(b^2 + 1) - b) took the log of 0 there (review of 2026-10-18), -asinh(b) does not
+    const RHO = Math.SQRT2;
+    for (const [w0, w1] of [[100, 10000], [10000, 100]]) {
+      const p = flyPath(500, w0, 500 + 1e-5, w1);
+      expect(Number.isFinite(p.S), w0 + ' to ' + w1).toBe(true);
+      expect(p.S / (Math.abs(Math.log(w1 / w0)) / RHO), 'the zoom-alone length').toBeCloseTo(1, 6);
+      expect(p.at(0.5)[1] / Math.sqrt(w0 * w1), 'halfway in the even exponential').toBeCloseTo(1, 4);
+      let last = w0;
+      for (let i = 1; i <= 20; i++) {
+        const [c, w] = p.at(i / 20);
+        expect(Math.abs(c - 500)).toBeLessThan(1e-3);
+        expect(w1 > w0 ? w >= last : w <= last).toBe(true);
+        last = w;
+      }
+    }
+  });
 });
 
 describe('flyMs and the ease', () => {
