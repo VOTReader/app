@@ -71,6 +71,15 @@ describe('How to read this web: four or five short lines about controls that exi
     expect(text).not.toMatch(/\bbar\b/i);
   });
 
+  /* Digest item 46: a dialog that traps focus is modal and must say so. The docked panel is the
+     other kind (aria-modal="false", no trap: web-panel.jsx); the guide traps Tab and takes Escape,
+     so it is aria-modal="true". */
+  it('says it is modal, because it traps focus (item 46)', () => {
+    const card = guide();
+    expect(card.getAttribute('role')).toBe('dialog');
+    expect(card.getAttribute('aria-modal')).toBe('true');
+  });
+
   it('the footer carries the OpenBible.info credit, the data\'s own line when it has one (Q5)', () => {
     let foot = guide().querySelector('.sw-guide-foot');
     expect(foot && foot.textContent).toBe(WEB_CREDIT);

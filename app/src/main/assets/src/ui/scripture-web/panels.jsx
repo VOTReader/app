@@ -94,7 +94,7 @@ export function TipChip({ info, viewport, inset }) {
 export function HowToReadGuide({ onClose, canSearch, credit }) {
   const trapRef = useFocusTrap(true);
   return (
-    <div className="sw-guide" ref={trapRef} role="dialog" aria-labelledby="sw-guide-title">
+    <div className="sw-guide" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="sw-guide-title">
       <div className="sw-guide-title" id="sw-guide-title">How to read this web</div>
       <ul className="sw-guide-body">
         <li><strong>Pinch</strong> or scroll to zoom. Drag down to look higher, where the long threads cross.</li>
