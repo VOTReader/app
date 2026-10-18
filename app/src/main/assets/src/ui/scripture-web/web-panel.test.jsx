@@ -202,6 +202,24 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     expect(phone.panel.querySelector('.sw-panel-credit').parentElement.classList.contains('sw-panel-body')).toBe(true);
   });
 
+  /* w4 (the s04 phone shot read "Ps 103:2 › Isa 7:14"): each crumb named the verse under the
+     centre when the step was taken, so the whole web read as whatever verse sat mid-canon (Psalm
+     103:2) and a book or a chapter read as its first verse. A crumb names the place the trail
+     holds, its book abbreviated as the verse crumbs are. */
+  it('a crumb names the place it holds: the whole web, a book, a chapter, a verse', () => {
+    const journey = { stack: [
+      { verse: vid('psalms', 103, 2), label: 'the whole web' },
+      { verse: vid('romans', 1, 1), label: 'Romans' },
+      { verse: vid('john', 3, 1), label: 'John 3' },
+      { verse: vid('1corinthians', 13, 1), label: '1 Corinthians 13' },
+      { verse: ISA_7_14, label: 'Isaiah 7:14' },
+      { verse: g.to[ARC], label: 'Matthew 1:23' },
+    ], push() {}, clear() {}, back() { return null; } };
+    const { panel } = mount({ detail: detail(), journey });
+    expect([...panel.querySelectorAll('.sw-crumbs li')].map((c) => c.textContent))
+      .toEqual(['Whole web', 'Romans', 'John 3', '1Cor 13', 'Isa 7:14', 'Matt 1:23']);
+  });
+
   it('the trail shows once a Follow has steps, the current crumb marked, and Back walks it', () => {
     const back = vi.fn(() => ({ verse: ISA_7_14, label: 'Isaiah 7:14' }));
     const journey = { stack: [{ verse: ISA_7_14, label: 'Isaiah 7:14' }, { verse: g.to[ARC], label: 'Matthew 1:23' }], push() {}, clear() {}, back };

@@ -44,6 +44,7 @@ import {
 import {
   GROUP_ROWS, verseText, shortRef, connectionModel, verseModel, rangeModel, letterRows, zoomChapterOf, chapterName,
 } from '../../utils/scripture-web/panel-model.js';
+import { refOfVerse } from '../../utils/scripture-web/pick.js';
 import { windowCorpus, letterKeyOf } from '../../utils/scripture-web/vot-citations.js';
 import { litKeyOf } from '../../utils/scripture-web/focus-state.js';
 
@@ -186,6 +187,23 @@ function metaItems(meta) {
       ))}
     </span>
   );
+}
+
+/**
+ * A crumb's words: the place the trail holds, its book abbreviated as a verse crumb's is ("Whole
+ * web", "Romans", "John 3", "Isa 7:14"). w4: each crumb named the verse under the centre when the
+ * step was taken, so the whole web read "Ps 103:2" (the verse mid-canon) and a book its first
+ * verse; the label is what the go-to and the journey say the place is (goto.jsx hereLabel).
+ * @param {any} g @param {{ verse: number, label: string }} c
+ */
+export function crumbText(g, c) {
+  const label = typeof c.label === 'string' ? c.label : '';
+  if (label === 'the whole web') return 'Whole web';
+  if (!(c.verse >= 0 && c.verse < g.total)) return label;
+  const r = refOfVerse(g, c.verse);
+  if (!label) return shortRef(g, c.verse);
+  if (r.abbr && label.indexOf(r.bookTitle + ' ') === 0) return r.abbr + label.slice(r.bookTitle.length);
+  return label;
 }
 
 /** One verse in full, with "Open in reader ›" (and, for the far end of a connection, its Follow). */
@@ -606,7 +624,7 @@ export function WebPanel(props) {
             <ol>
               {crumbs.map((c, i) => (
                 <li key={i} className={i === crumbs.length - 1 ? 'is-here' : undefined} aria-current={i === crumbs.length - 1 ? 'location' : undefined}>
-                  {c.verse >= 0 && c.verse < g.total ? shortRef(g, c.verse) : c.label}
+                  {crumbText(g, c)}
                 </li>
               ))}
             </ol>
