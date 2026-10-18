@@ -350,6 +350,17 @@ describe('the pills and the labels', () => {
     });
   });
 
+  it('a pill counts its threads once: every read of ids hands back the same array (w3 review: a walk of every thread per read)', () => {
+    const { out } = paint('pc', 40, ISA53_6);
+    const pills = out.hits.filter((h) => h.hit.kind === 'pill');
+    expect(pills.length).toBeGreaterThan(0);
+    for (const p of pills) {
+      const first = p.hit.ids;
+      expect(first).toBeInstanceOf(Int32Array);
+      expect(p.hit.ids, p.hit.label).toBe(first);
+    }
+  });
+
   /* digest item 3: the old pass walked visibleArcs (the crossing set in bucket order, cut at a
      limit) and stopped among fly-overs far above the frame: 22 of the 86 threads on the frame were
      named. Fed from the frame, every thread with a foot on it is a candidate, ranked by votes, and

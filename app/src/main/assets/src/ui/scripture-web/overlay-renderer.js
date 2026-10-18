@@ -1199,10 +1199,13 @@ function drawPills(ctx, g, cam, L, fs, grid, hits, badges) {
     ctx.fillText(text, cx, (y0 + y1) / 2 + 0.05 * h);
     badges.push(Object.assign({ x0: box.x0, x1: box.x1, y0: box.y0, y1: box.y1 }, { cell }));
     const lo = cell.lo, hi = cell.hi;
+    // counted on the first read only (a tap), and then kept: the walk visits every thread
+    /** @type {Int32Array|null} */
+    let ids = null;
     /** @type {any} */
     const hit = {
       kind: 'pill', label: cellLabel(g, cell),
-      get ids() { return pillIds(g, snap, W, density, lo, hi); },
+      get ids() { return ids || (ids = pillIds(g, snap, W, density, lo, hi)); },
     };
     hits.push({ x0: box.x0, y0: box.y0, x1: box.x1, y1: box.y1, hit });
   }
