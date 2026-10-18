@@ -141,3 +141,21 @@ describe('the docked panel (spec section 3)', () => {
     expect(rule('.sw-panel-body > .sw-panel-credit')).toMatch(/min-height:\s*0/);
   });
 });
+
+describe('what the w3 screenshots caught (PC 1600x900, phone 891x411)', () => {
+  it('a row\'s reference never breaks inside itself; its tag drops under it when the two do not fit', () => {
+    // the phone shot: "Genesis / 3:15" beside "57 votes", the reference broken at its space by the tag
+    expect(rule('.sw-row-ref')).not.toMatch(/overflow-wrap:\s*anywhere/);
+    expect(rule('.sw-row-ref')).toMatch(/white-space:\s*nowrap/);
+    expect(rule('.sw-row-top')).toMatch(/flex-wrap:\s*wrap/);
+  });
+
+  it('the close X is filled with the panel, so the text that scrolls under it never shows through', () => {
+    expect(rule('.sw-sheet-close')).toMatch(/background:\s*var\(--sw-panel\)/);
+  });
+
+  it('"‹ Back to …" keeps a space between the chevron and its words', () => {
+    // the PC shot: "‹Back to Isaiah 7:14", the span's trailing space trimmed by the inline-flex
+    expect(rule('.sw-back-link')).toMatch(/gap:\s*\d+px/);
+  });
+});

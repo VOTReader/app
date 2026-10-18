@@ -8092,7 +8092,7 @@
     .sw-sheet-close {
       position: absolute; z-index: 1; top: 10px; right: calc(10px + env(safe-area-inset-right, 0px));
       min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center;
-      background: transparent; border: 0; border-radius: 6px; color: var(--sw-text-meta); cursor: pointer;
+      background: var(--sw-panel); border: 0; border-radius: 6px; color: var(--sw-text-meta); cursor: pointer;
     }
     .sw-sheet-close:hover { color: var(--sw-text); }
     .sw-sheet-close:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -2px; }
@@ -8185,8 +8185,13 @@
       font-family: var(--sw-font); color: inherit; cursor: pointer;
     }
     .sw-row-main:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -2px; }
-    .sw-row-top { display: flex; align-items: baseline; gap: 10px; max-width: 100%; }
-    .sw-row-ref { font-size: var(--fs-18); color: var(--sw-text-body); overflow-wrap: anywhere; }
+    /* the reference stays whole; when it and its tag do not fit (a phone's narrow column) the tag
+       drops under it */
+    .sw-row-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; max-width: 100%; }
+    .sw-row-ref {
+      max-width: 100%; font-size: var(--fs-18); color: var(--sw-text-body);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
     .sw-row-tag { flex: none; font-size: var(--fs-14); color: var(--sw-text-muted); white-space: nowrap; }
     .sw-row-text {
       max-width: 100%; font-size: var(--fs-15); color: var(--sw-text-muted);
@@ -8217,7 +8222,7 @@
     .sw-zoom-row:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
     /* the way back to the card this one came from, and the Follow trail */
     .sw-back-link {
-      display: inline-flex; align-items: center; min-height: 44px; margin: -12px 0 4px; padding: 0;
+      display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin: -12px 0 4px; padding: 0;
       background: none; border: 0; font-family: var(--sw-font); font-size: var(--fs-15);
       color: var(--sw-text-meta); cursor: pointer;
     }
