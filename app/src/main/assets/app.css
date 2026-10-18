@@ -8165,8 +8165,15 @@
     }
     .sw-panel-title { margin: 6px 0 0; font-size: var(--fs-30); font-weight: 500; line-height: 1.2; color: var(--sw-title); }
     .sw-sheet-meta, .sw-panel-meta { margin-top: 6px; font-size: var(--fs-16); color: var(--sw-text-meta); }
-    /* each short item whole, so the line breaks only at a separator (web-panel.jsx metaItems) */
-    .sw-panel-meta > span { white-space: nowrap; }
+    /* A LINE OF ITEMS (web-panel.jsx metaItems; w4): it breaks only between items, and no "·" is
+       left at a line's end or start. Each item after the first carries its dot in a 1.1em head the
+       row is pulled left by, and the line clips that strip, so a dot that would start a line is
+       clipped and every dot on screen has words on both sides. A long item wraps inside itself. */
+    .sw-panel-meta, .sw-cite-source, .sw-sec-title, .sw-follow-label { overflow: hidden; }
+    .sw-dots { display: flex; flex-wrap: wrap; margin-left: -1.1em; }
+    .sw-dot-item { position: relative; flex: none; padding-left: 1.1em; white-space: nowrap; }
+    .sw-dot-item.is-long { flex: 0 1 auto; min-width: 0; white-space: normal; }
+    .sw-dot-sep { position: absolute; left: 0; top: 0; width: 1.1em; text-align: center; }
     /* sections: a 1 px hairline with 20 px either side (16 compact) */
     .sw-sec { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--sw-hairline); }
     .sw-sec.sw-verses, .sw-links.sw-sec { border-top: 0; padding-top: 0; }

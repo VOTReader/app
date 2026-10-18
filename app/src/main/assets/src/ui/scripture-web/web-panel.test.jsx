@@ -226,11 +226,21 @@ describe('verse mode: John 3:16', () => {
     expect(panel.getAttribute('data-mode')).toBe('verse');
     expect(panel.querySelector('.sw-panel-title').textContent).toBe('John 3:16');
     expect(panel.querySelector('.sw-panel-meta').textContent).toBe('48 connections · cited in the Volumes 5 times');
-    // each item whole, so the line breaks only at a separator (the phone shot left "times" alone)
-    expect([...panel.querySelectorAll('.sw-panel-meta > span')].map((s) => s.textContent))
-      .toEqual(['48 connections', 'cited in the Volumes 5 times']);
+    // each item whole, so the line breaks only at a separator (the phone shot left "times" alone),
+    // and the separator rides at the head of the item after it, so a wrap carries it to the start
+    // of the next line, where the line's clip hides it (w4: the same shot then read
+    // "48 connections ·" / "cited in the Volumes 5 times")
+    const meta = panel.querySelector('.sw-panel-meta');
+    const items = [...meta.querySelectorAll('.sw-dots > .sw-dot-item')];
+    expect(items.map((s) => s.lastChild.textContent)).toEqual(['48 connections', 'cited in the Volumes 5 times']);
+    expect(items.map((s) => !!s.querySelector(':scope > .sw-dot-sep'))).toEqual([false, true]);
+    expect(meta.querySelector('.sw-dot-sep').textContent).toBe(' · ');
     expect(panel.querySelector('.sw-verse-text').textContent).toBe('TEXT john 3:16');
     expect(panel.querySelector('.sw-sec-more .sw-sec-title').textContent).toBe('Connections · 48');
+    // every line with a " · " in it (the section titles, the cite sources) wraps the same way
+    for (const line of panel.querySelectorAll('.sw-sec-title, .sw-cite-source')) {
+      if (line.textContent.includes(' · ')) expect(line.querySelector('.sw-dots'), line.textContent).toBeTruthy();
+    }
     const row = panel.querySelector('.sw-group .sw-row');
     fireEvent.mouseEnter(row);
     fireEvent.mouseLeave(row);

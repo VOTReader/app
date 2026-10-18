@@ -176,9 +176,31 @@ describe('what the w3 screenshots caught (PC 1600x900, phone 891x411)', () => {
     expect(rule('.sw-sheet-close')).toMatch(/background:\s*var\(--sw-panel\)/);
   });
 
-  it('a meta line breaks only between its items: each short item is kept whole', () => {
-    // the phone verse shot (w3 review, round 2): "48 connections · cited in the Volumes 5 / times"
-    expect(rule('.sw-panel-meta > span')).toMatch(/white-space:\s*nowrap/);
+  /* A META LINE BREAKS ONLY BETWEEN ITS ITEMS AND LEAVES NO "·" HANGING (w3 review round 2, w4).
+     The phone verse shot read "48 connections · cited in the Volumes 5 / times"; keeping each item
+     whole (84da5587c) then left "48 connections ·" / "cited in the Volumes 5 times". Now each item
+     after the first carries its separator in a padding at its head, the row is pulled left by that
+     padding, and the line clips it: whatever item starts a line, its dot is in the clipped strip.
+     (This rewrites the w3 pin on `.sw-panel-meta > span { nowrap }` to its intent; the geometry
+     itself is measured headlessly in the w4 shots, every dot with words on both sides.) */
+  it('a meta line breaks only between its items, and a wrap leaves no dangling dot', () => {
+    const dots = rule('.sw-dots');
+    expect(dots).toMatch(/display:\s*flex/);
+    expect(dots).toMatch(/flex-wrap:\s*wrap/);
+    const pull = /margin-left:\s*-([\d.]+em)/.exec(dots);
+    expect(pull, 'the row is pulled left by the separator’s width').toBeTruthy();
+    const item = rule('.sw-dot-item');
+    expect(item).toMatch(/white-space:\s*nowrap/);
+    expect(item).toMatch(/position:\s*relative/);
+    expect((/padding-left:\s*([\d.]+em)/.exec(item) || [])[1], 'the item’s head is that wide').toBe(pull[1]);
+    const sep = rule('.sw-dot-sep');
+    expect(sep).toMatch(/position:\s*absolute/);
+    expect(sep).toMatch(/left:\s*0/);
+    expect((/(?:^|[;\s])width:\s*([\d.]+em)/.exec(sep) || [])[1], 'the dot sits in that head').toBe(pull[1]);
+    // a long item (a sentence) still wraps inside itself
+    expect(rule('.sw-dot-item.is-long')).toMatch(/white-space:\s*normal/);
+    // every line that holds one clips the strip the dots are pulled into
+    expect(rule('.sw-panel-meta, .sw-cite-source, .sw-sec-title, .sw-follow-label')).toMatch(/overflow:\s*hidden/);
   });
 
   it('"‹ Back to …" keeps a space between the chevron and its words', () => {

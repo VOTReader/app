@@ -142,9 +142,9 @@ function Section({ title, collapsible = false, startOpen = true, children, class
     <section className={'sw-sec ' + className}>
       {collapsible ? (
         <button type="button" className="sw-sec-head sw-sec-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
-          <span className="sw-sec-title">{title}</span><Chevron open={open} />
+          <span className="sw-sec-title">{metaItems(title)}</span><Chevron open={open} />
         </button>
-      ) : <h3 className="sw-sec-head"><span className="sw-sec-title">{title}</span></h3>}
+      ) : <h3 className="sw-sec-head"><span className="sw-sec-title">{metaItems(title)}</span></h3>}
       {shown ? children : null}
     </section>
   );
@@ -165,19 +165,27 @@ function PanelHead({ over, title, meta }) {
 const META_WHOLE = 32;
 
 /**
- * A meta line whose items are kept whole, so it breaks only at a " · " (w3 review, round 2: the
- * phone verse panel read "48 connections · cited in the Volumes 5 / times"). Each short item is a
- * span (white-space: nowrap in app.css); a long one (Nearby's sentence) is left to wrap.
+ * A line of items joined by " · " that breaks only between its items and leaves no "·" hanging
+ * (w3 review round 2; w4). The phone verse panel read "48 connections · cited in the Volumes 5 /
+ * times"; keeping each item whole (84da5587c) then read "48 connections ·" / "cited in the Volumes
+ * 5 times". So each item after the first carries its separator at its own head, in a padding the
+ * row is pulled left by, and the line clips that strip (app.css, .sw-dots): whichever item starts
+ * a line, its dot is in the clipped strip, and every dot left on screen has words on both sides.
+ * The text reads as before (" · " between the items). A long item (Nearby's sentence) wraps
+ * inside itself.
  * @param {any} meta  a string, or anything else to render as it is
  */
 function metaItems(meta) {
   if (typeof meta !== 'string' || meta.indexOf(' · ') < 0) return meta;
-  const out = [];
-  meta.split(' · ').forEach((item, i) => {
-    if (i) out.push(' · ');
-    out.push(item.length <= META_WHOLE ? <span key={i}>{item}</span> : item);
-  });
-  return out;
+  return (
+    <span className="sw-dots">
+      {meta.split(' · ').map((item, i) => (
+        <span key={i} className={'sw-dot-item' + (item.length > META_WHOLE ? ' is-long' : '')}>
+          {i ? <span className="sw-dot-sep"> · </span> : null}{item}
+        </span>
+      ))}
+    </span>
+  );
 }
 
 /** One verse in full, with "Open in reader ›" (and, for the far end of a connection, its Follow). */
@@ -224,7 +232,7 @@ function CitedSection({ g, cited, showCites, startOpen, onOpen, openPanel }) {
         {shown.map((c) => (
           <li className="sw-cite" key={c.key}>
             <div className="sw-cite-title">{c.title}</div>
-            <div className="sw-cite-source">{c.collectionName}{showCites(c) ? ' · ' + c.cites : ''}</div>
+            <div className="sw-cite-source">{metaItems(c.collectionName + (showCites(c) ? ' · ' + c.cites : ''))}</div>
             {c.excerpt ? <Quote text={c.excerpt} /> : null}
             <div className="sw-links">
               {c.endpoint ? (
@@ -446,7 +454,7 @@ export function WebPanel(props) {
     const farEnd = detail.far === 'to' ? detail.b : detail.a;
     const follow = (
       <button type="button" className="sw-link sw-follow" onClick={() => followThread(detail)}
-        aria-label={followLabel(farEnd.label)}>{followLabel(farEnd.label)} <span aria-hidden="true">›</span></button>
+        aria-label={followLabel(farEnd.label)}><span className="sw-follow-label">{metaItems(followLabel(farEnd.label))}</span> <span aria-hidden="true">›</span></button>
     );
     body = (
       <React.Fragment>
