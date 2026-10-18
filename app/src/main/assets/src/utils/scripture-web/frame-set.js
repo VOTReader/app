@@ -43,9 +43,11 @@ export function isCompact(heightCss) {
 }
 
 /**
- * @typedef {{ count: number, from: Uint16Array, to: Uint16Array, fanA: Float32Array,
- *   fanB: Float32Array, arcOf: Int32Array, pairOf: Map<number, number> }} ProphecySet
+ * @typedef {{ count: number, unique: number, from: Uint16Array, to: Uint16Array, fanA: Float32Array,
+ *   fanB: Float32Array, arcOf: Int32Array, twin: Int32Array, pairOf: Map<number, number> }} ProphecySet
  *   from < to: each pair's verse ids in canon order; fanA at from, fanB at to;
+ *   twin: the first pair joining the same two verses (k itself when it is the first): a pair given
+ *   twice is one thread, drawn and picked once; unique: how many pairs are their own twin;
  *   arcOf: the OpenBible arc joining the same two verses (the strongest, by votes), or -1;
  *   pairOf: the other way, an arc id to its pair (the first, when two pairs join the same verses)
  */
@@ -66,6 +68,8 @@ export function prophecySet(g) {
   const from = new Uint16Array(n), to = new Uint16Array(n);
   const fanA = new Float32Array(n), fanB = new Float32Array(n);
   const arcOf = new Int32Array(n).fill(-1);
+  const twin = new Int32Array(n);
+  let unique = 0;
   /** @type {Map<number, number>} */
   const pairOf = new Map();
   /** @type {Map<string, number[]>} */
@@ -77,6 +81,8 @@ export function prophecySet(g) {
     const key = lo + ':' + hi;
     const ks = want.get(key);
     if (ks) ks.push(k); else want.set(key, [k]);
+    twin[k] = ks ? ks[0] : k;
+    if (!ks) unique++;
   }
   // one pass over the arcs, looking up only the pairs' few keys
   const count = g && g.count > 0 ? g.count : 0;
@@ -100,7 +106,7 @@ export function prophecySet(g) {
       }
     }
   }
-  const set = { count: n, from, to, fanA, fanB, arcOf, pairOf };
+  const set = { count: n, unique, from, to, fanA, fanB, arcOf, twin, pairOf };
   if (g && typeof g === 'object') PROPHECY_SETS.set(g, set);
   return set;
 }
@@ -135,7 +141,7 @@ export function topSetKey(v) {
 export function topSet(g, v, prev) {
   const key = topSetKey(v);
   const ps = prophecySet(g);
-  if (prev && prev.key === key && prev.ranges.length && prev.ranges[0].count === ps.count) return prev;
+  if (prev && prev.key === key && prev.ranges.length && prev.ranges[0].count === ps.unique) return prev;
   const count = g && g.count > 0 ? g.count : 0;
   const isArc = (i) => i != null && i >= 0 && i < count && Number.isInteger(i);
   const arcs = { lit: /** @type {number[]} */ ([]), hover: /** @type {number[]} */ ([]), chosen: /** @type {number[]} */ ([]) };
@@ -144,7 +150,7 @@ export function topSet(g, v, prev) {
   if (isArc(v.focusArc)) arcs.chosen.push(/** @type {number} */ (v.focusArc));
   const chosenPair = !isArc(v.focusArc) && v.focusProphecy != null && v.focusProphecy >= 0
     && v.focusProphecy < ps.count ? v.focusProphecy : -1;
-  const total = ps.count + arcs.lit.length + arcs.hover.length + arcs.chosen.length + (chosenPair >= 0 ? 1 : 0);
+  const total = ps.unique + arcs.lit.length + arcs.hover.length + arcs.chosen.length + (chosenPair >= 0 ? 1 : 0);
   const from = new Uint16Array(total), to = new Uint16Array(total);
   const fanA = new Float32Array(total), fanB = new Float32Array(total);
   const fans = count ? fansOf(g) : null;
@@ -162,9 +168,16 @@ export function topSet(g, v, prev) {
   };
   for (const kind of TOP_ORDER) {
     const first = at;
-    if (kind === 'prophecy') {
+    if (kind === 'prophecy' && ps.unique === ps.count) {
       from.set(ps.from, at); to.set(ps.to, at); fanA.set(ps.fanA, at); fanB.set(ps.fanB, at);
       at += ps.count;
+    } else if (kind === 'prophecy') {
+      // a pair given twice is drawn once: twice, its line would carry double ink
+      for (let k = 0; k < ps.count; k++) {
+        if (ps.twin[k] !== k) continue;
+        from[at] = ps.from[k]; to[at] = ps.to[k]; fanA[at] = ps.fanA[k]; fanB[at] = ps.fanB[k];
+        at++;
+      }
     } else {
       for (const i of arcs[kind]) putArc(i);
     }

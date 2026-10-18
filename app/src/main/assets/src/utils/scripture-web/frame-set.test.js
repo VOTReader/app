@@ -45,6 +45,23 @@ describe('prophecySet: the prophecy pairs as threads, on their arc\'s feet when 
     expect([ps.from[2], ps.to[2], ps.fanA[2], ps.fanB[2]]).toEqual([5, 180, 0, 0]);
   });
 
+  /* The asset carries one pair twice (131 distinct of 132): drawn twice, its line doubled its ink
+     (.80 over .80 is .96, the glow .23); picked twice, the chooser offered the same row twice. */
+  it('a pair given twice is one thread: its twin names the first, the class draws it once', () => {
+    const g = Object.assign(graph(), { prophecy: [...graph().prophecy, { a: 180, b: 5, studyId: 's2', chapterId: 'c2' }] });
+    const ps = prophecySet(g);
+    expect(ps.count).toBe(4);
+    expect(ps.unique).toBe(3);
+    expect([...ps.twin]).toEqual([0, 1, 2, 2]);
+    const s = topSet(g, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 });
+    expect(s.ranges[0]).toEqual({ kind: 'prophecy', first: 0, count: 3 });
+    expect([...s.from]).toEqual([60, 120, 5]);
+    expect(topSet(g, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 }, s)).toBe(s);
+    // CONTROL: the fixture without the twin has none
+    expect(prophecySet(graph()).unique).toBe(3);
+    expect([...prophecySet(graph()).twin]).toEqual([0, 1, 2]);
+  });
+
   it('is built once per graph, and an empty list is an empty set', () => {
     const g = graph();
     expect(prophecySet(g)).toBe(prophecySet(g));

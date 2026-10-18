@@ -56,6 +56,14 @@ describe('pickProphecy: a pair is found on the curve the top pass draws', () => 
     expect(pickProphecy(g, cam, view, qx, qy - 20, 14)).toEqual([]);
   });
 
+  it('a pair given twice is found once, as the first of the two (one chooser row, not two)', () => {
+    const g = Object.assign(graph(), { prophecy: [...graph().prophecy, { a: 180, b: 20, studyId: 's2', chapterId: 'c2' }] });
+    const [px, py] = onPair(g, 1, 0.5);
+    const hits = pickProphecy(g, cam, view, px, py, 14);
+    expect(hits.filter((h) => h.from === 20 && h.to === 180).map((h) => h.prophecy)).toEqual([1]);
+    expect(pickThreads(g, cam, view, px, py, 14, 4).filter((h) => h.from === 20 && h.to === 180).length).toBe(1);
+  });
+
   it('reads the camera\'s y: the drawn baseline stands cam.y lower', () => {
     const g = graph();
     const [px, py] = onPair(g, 1, 0.5);

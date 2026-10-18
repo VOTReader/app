@@ -127,6 +127,7 @@ export function pickProphecy(g, cam, view, px, py, tol, limit) {
   const cap = Math.max(1, Math.min(limit || 4, 8));
   const best = [];
   for (let k = 0; k < ps.count; k++) {
+    if (ps.twin[k] !== k) continue;   // a pair given twice is one thread, found as the first
     const x0 = footX(cam, width, ps.from[k], ps.fanA[k]);
     const x1 = footX(cam, width, ps.to[k], ps.fanB[k]);
     if (x1 < px - tol || x0 > px + tol) continue;
