@@ -89,7 +89,13 @@ const BUDGETS = [
   // Garden + the search tables, the Scripture Web, the Personal Study + journal + Studies screens, the
   // Listening Library) fold back into this bundle: 663,792 -> 1,313,034. The ceiling is the SUM of the five
   // old ceilings (718,300 + 357,600 + 101,200 + 193,600 + 88,100), so the merge claims no new room.
-  { file: 'bundle-d.js', measured: 1313034, max: 1458800 },   // every screen/sheet/util (bundles e-h folded in by lz1)
+  // 2026-10-18, the Scripture Web w3 integration (branch sweb): six feature streams on one spine - the GL top pass,
+  // prophecy class and frame set; the canvas label engine, wayfinding and cited strip; My Web's S-curve fans and
+  // rails; the go-to, flyTo's ease, the journey and the doors; the docked panel and its modes. Measured per stream
+  // on its own branch against the spine's 1,367,470: GL +25.9 KB, canvas +31.1 KB, My Web +13.0 KB, navigation
+  // +28.0 KB (the panel's +35 KB lands next, inside this room). All of it is the feature's own code; nothing
+  // pulled in a library. Re-baselined UP by the same rule: 1,460,091 x 1.15 = 1,679,104.7 -> the hundred above.
+  { file: 'bundle-d.js', measured: 1460091, max: 1679200 },   // every screen/sheet/util (bundles e-h folded in by lz1)
   // 2026-10-14, sr9: the search worker (src/search/worker.js): the warm-index read and the meaning model, off the
   // page's thread. 7,967 B measured x 1.15. onnxruntime-web is not in it: the worker imports the vendored copy.
   { file: 'bundle-w.js', measured: 7967, max: 9200 },
