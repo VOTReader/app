@@ -373,8 +373,8 @@ function windows(docIds, order, m, cls, w) {
 
 const NEG = -1e15;
 const FAR = 0x7fffffff;
-/** @type {{ cov: number, start: number, end: number }} */
-const NONE = Object.freeze({ cov: 0, start: -1, end: -1 });
+/** @type {{ cov: number, start: number, end: number, first: number }} */
+const NONE = Object.freeze({ cov: 0, start: -1, end: -1, first: -1 });
 
 /* Scratch shared by every call: alignScore is synchronous and never re-entered. State 0's columns are
    kept whole (the jump in state 1 reads them); everything else rolls over three columns. */
@@ -391,8 +391,9 @@ const COL_SP = [];
  * @param {ArrayLike<any>} qIds  the typed words in the same token space (their length is the query's)
  * @param {ArrayLike<number>} idf  each typed word's weight (alignWeights)
  * @param {AlignClasses} classes  alignClasses(the typed words)
- * @returns {{ cov: number, start: number, end: number }}  cov 0..1; start/end the matched span's token
- *   indices in docIds (end exclusive), -1 when nothing aligns
+ * @returns {{ cov: number, start: number, end: number, first: number }}  cov 0..1; start/end the matched span's token
+ *   indices in docIds (end exclusive), -1 when nothing aligns; first where the first typed words are met (the span's
+ *   start, but for clauses typed in the other order: there the span opens on the clause typed last)
  */
 export function alignScore(docIds, qIds, idf, classes) {
   const m = qIds ? qIds.length : 0;
@@ -433,15 +434,22 @@ export function alignScore(docIds, qIds, idf, classes) {
   const G = new Float64Array(M1).fill(NEG); // state 0's best at each typed position over the whole text
   const GS = new Int32Array(M1).fill(-1);
   const GE = new Int32Array(M1).fill(-1);
+  /** @type {Array<[Float64Array, Int32Array, Int32Array]>} ...and within each window: a jump stays in one passage */
+  const WG = [];
   const R = new Float64Array(M1); // the most credit each typed word meets anywhere in the windows
   let best = NEG;
   let bestS = -1;
   let bestE = -1;
+  let bestF = -1; // a jump back's first piece: where the first typed words are
   let col = 0;
   for (let x = 0; x < win.length; x += 2) {
     const lo = win[x];
     const hi = win[x + 1];
     Cb.fill(0); Fa.fill(0); Fb.fill(0);
+    const wg = new Float64Array(M1).fill(NEG);
+    const wgs = new Int32Array(M1).fill(-1);
+    const wge = new Int32Array(M1).fill(-1);
+    WG.push([wg, wgs, wge]);
     let prevTok = null;
     let prevPre = 0;
     for (let j = lo; j < hi; j++, col++) {
@@ -495,6 +503,7 @@ export function alignScore(docIds, qIds, idf, classes) {
         }
         H0[c0 + i] = h; S0[c0 + i] = s; Fc[i] = f;
         if (h > G[i]) { G[i] = h; GS[i] = s; GE[i] = j; }
+        if (h > wg[i]) { wg[i] = h; wgs[i] = s; wge[i] = j; }
       }
       if (H0[c0 + m] > best && S0[c0 + m] >= 0) { best = H0[c0 + m]; bestS = S0[c0 + m]; bestE = j + 1; }
       let r = Ca; Ca = Cb; Cb = r; // Cb now holds this column's credits
@@ -505,8 +514,10 @@ export function alignScore(docIds, qIds, idf, classes) {
   }
 
   // ── pass 2, state 1: the query in two pieces, one jump between them. A jump forward leaves from state 0's
-  //    best at that typed position in any earlier column; a jump back (clauses typed in the other order) from
-  //    its best over the whole text, so long as the second piece ends before the first piece starts. ──
+  //    best at that typed position in any earlier column of its window; a jump back (clauses typed in the other
+  //    order) from its best in the window, so long as the second piece ends before the first piece starts. Two
+  //    clauses run together sit in one passage: a jump between windows read the quote's last words wherever the
+  //    text said them again, far off, and opened there. ──
   let bound = NEG; // the most a jump can reach: the first piece's best plus the most each later typed word can earn
   let tail = 0;
   for (let i = m; i >= 1; i--) {
@@ -530,6 +541,8 @@ export function alignScore(docIds, qIds, idf, classes) {
       const lo = win[x];
       const hi = win[x + 1];
       A.fill(NEG); B.fill(NEG); CB.fill(0); FA.fill(0); FB.fill(0);
+      M0.fill(NEG); MS0.fill(-1);
+      const [wg, wgs, wge] = WG[x >> 1];
       for (let j = lo; j < hi; j++, col++) {
         const e = COL_E[col];
         const spl = COL_SP[col];
@@ -540,7 +553,7 @@ export function alignScore(docIds, qIds, idf, classes) {
         // the jump into this column, after i typed words
         for (let i = 0; i <= m; i++) {
           Jv[i] = M0[i] - JUMP; Js[i] = MS0[i]; Je[i] = -1; Jl[i] = FAR;
-          if (j < GS[i] && G[i] - JUMP > Jv[i]) { Jv[i] = G[i] - JUMP; Js[i] = -1; Je[i] = GE[i] + 1; Jl[i] = GS[i]; }
+          if (j < wgs[i] && wg[i] - JUMP > Jv[i]) { Jv[i] = wg[i] - JUMP; Js[i] = -1; Je[i] = wge[i] + 1; Jl[i] = wgs[i]; }
         }
         const first = j === lo;
         C[0] = NEG; SC[0] = -1; EC[0] = -1; LC[0] = FAR; FC[0] = 0;
@@ -577,7 +590,7 @@ export function alignScore(docIds, qIds, idf, classes) {
           }
           C[i] = h; SC[i] = s; EC[i] = en; LC[i] = li; FC[i] = f;
         }
-        if (C[m] > best && SC[m] >= 0 && j + 1 <= LC[m]) { best = C[m]; bestS = SC[m]; bestE = EC[m] >= 0 ? EC[m] : j + 1; }
+        if (C[m] > best && SC[m] >= 0 && j + 1 <= LC[m]) { best = C[m]; bestS = SC[m]; bestE = EC[m] >= 0 ? EC[m] : j + 1; bestF = LC[m] < FAR ? LC[m] : -1; }
         const c0 = col * M1;
         for (let i = 1; i <= m; i++) if (H0[c0 + i] > M0[i]) { M0[i] = H0[c0 + i]; MS0[i] = S0[c0 + i]; }
         let r = A; A = B; B = C; C = r;
@@ -591,5 +604,5 @@ export function alignScore(docIds, qIds, idf, classes) {
   }
   COL_E.length = 0;
   if (!(best > 0) || bestS < 0) return { ...NONE };
-  return { cov: Math.min(1, best / total), start: bestS, end: bestE };
+  return { cov: Math.min(1, best / total), start: bestS, end: bestE, first: bestF >= 0 ? bestF : bestS };
 }

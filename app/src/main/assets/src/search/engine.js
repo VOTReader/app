@@ -44,6 +44,7 @@ import { KJV_ALIAS, KJV_ALIAS_BOOKS } from './kjv-alias.js';
 import { searchWorker } from './worker-client.js';
 import { indexAssembler } from './index-transfer.js';
 import { buildTitles, scoreTitles, admitTitles, stripCollections, titleWords } from './titles.js';
+import { alignClasses, alignWeights, alignScore } from './align.js';
 
 /**
  * The parse kinds a direct-nav card answers ALONE.
@@ -920,6 +921,21 @@ const TITLE_ORDER_REACH = 30;
 const VERSE_RUN_HELD = 4;
 /** Typed words, at least, for a stretch holding all of them but one to be read as a quote over a title remembered loosely. */
 const QUOTE_NEAR_MIN = 5;
+/* A QUOTE REMEMBERED WITH ITS SLIPS (search200 B4, 2026-10-18): align.js's knobs, read in search() below. */
+/** Off until the benches say otherwise (SEARCH_ALIGN; setAlign). */
+let ALIGN_ON = false;
+/** @param {boolean} on */
+function setAlign(on) { ALIGN_ON = !!on; }
+/** Typed tokens, at least, for the typed words to be aligned as a quote. */
+const ALIGN_MIN = 5;
+/** The share of the typed words' weight (BM25 idf) a text holds anywhere, as typed or in a form or synonym, to be aligned. */
+const ALIGN_MASS = 0.5;
+/** Texts aligned at most: the best-scored of those holding that share. */
+const ALIGN_CANDIDATES = 300;
+/** How much of the quote (align.js cov) a text holds, slips allowed for, to lead every text holding less (tier B). */
+const ALIGN_HELD = 0.75;
+/** Two covs this near, and a small word's share of the quote (search() below), hold the quote alike: the words' order stands. */
+const ALIGN_TIE = 0.02;
 /** Typed words, one of them a content word, that read as a quote when held in a row. */
 const SMALL_RUN_MIN = 4;
 /** Who reprints whom: a text yields only to an original of a LOWER tier (Words To Live By excerpts the letters). */
@@ -2128,6 +2144,111 @@ async function search(query, options) {
       if (!literalHit[rankedIds[i]]) scoreMap[rankedIds[i]] *= SYNONYM_DEMOTION;
     }
   }
+  /* A QUOTE REMEMBERED WITH ITS SLIPS (search200 B4, 2026-10-18). The phrase pass reads the typed words in a row as
+     typed, so a quote remembered with a tense changed, the modern word for the King James one, a synonym, a word left
+     out or two clauses run together broke its run, and BM25 ranked the texts thick with its words over the one it
+     quotes (the tri bench's misremembered quotes, and the exact ones a verse pair holds between them). align.js lines
+     the typed words up against a text the way a reader would recognise it (cov 0..1). When no text holds the typed run
+     whole (B3's runAt, tier A), the best-scored ALIGN_CANDIDATES holding ALIGN_MASS of the typed words' weight are
+     aligned, a verse with its neighbour too (a quote of two verses run together); those holding ALIGN_HELD of the
+     quote or more (tier B) lead every text holding less, the one holding more first, and open on the words. A cov
+     within a small word of another's is no better (the words rank the two), nor is one within a small word of the
+     best text left under ALIGN_HELD (it is not lifted); a study quoting a verse gives way to the verse. On the
+     open benches (2026-10-18): tri 577 -> 583 of 600, the 500's open unchanged (381), dropped-word probe 1720 -> 1743. */
+  /** @type {Map<string, {cov: number, start: number, rank: number}>} tier B: the texts holding the quote, slips and all */
+  const alignHeld = new Map();
+  const AS = ALIGN_ON && !p.phrase && !keyword && typedTokens.length >= ALIGN_MIN && !heldWhole.length ? storeNow() : null;
+  if (AS) {
+    const n = msIndex.documentCount || 1;
+    // a possessive's "s" joined ("lord's" as lords) is its word's
+    const df = (/** @type {string} */ t) => docFreq(t) || (t.length > 2 && t[t.length - 1] === 's' ? docFreq(t.slice(0, -1)) : 0);
+    const idf = (/** @type {string} */ t) => { const x = df(t); return Math.log(1 + (n - x + 0.5) / (x + 0.5)); };
+    const ow = new Float64Array(31);
+    for (const u of units) if (u.literal && u.origin < 31) ow[u.origin] = Math.max(ow[u.origin], kjvEncode(u.term).reduce((a, t) => a + idf(t), 0));
+    let all = 0;
+    for (let o = 0; o < 31; o++) all += ow[o];
+    const massOf = (/** @type {string} */ id) => {
+      const m = termMask[id] || 0;
+      let s = 0;
+      for (let o = 0; o < 31; o++) if (m & (1 << o)) s += ow[o];
+      return all ? s / all : 0;
+    };
+    const cands = rankedIds.filter((id) => massOf(id) >= ALIGN_MASS).sort((a, b) => scoreMap[b] - scoreMap[a]).slice(0, ALIGN_CANDIDATES);
+    const w = alignWeights(typedTokens, df, n);
+    const cls = alignClasses(typedTokens, { stop: STOP, id: (t) => AS.ids.get(t), word: (x) => AS.words[x] });
+    const toksOf = (/** @type {string} */ id) => { const sid = storeSpan(AS, id); return sid === null ? null : AS.toks.subarray(AS.from[sid], AS.to[sid]); };
+    /* Two covs within a small word of each other (the heaviest typed, "so" for "and"), give or take ALIGN_TIE, hold the
+       quote alike: the words' order stands. */
+    let wAll = 0;
+    let wSmall = 0;
+    for (let i = 0; i < typedTokens.length; i++) { wAll += w[i]; if (STOP.has(typedTokens[i]) && w[i] > wSmall) wSmall = w[i]; }
+    const tie = ALIGN_TIE + (wAll ? wSmall / wAll : 0);
+    /** The most a candidate left under ALIGN_HELD holds: a text holding the quote only that well is not told from it. */
+    let under = 0;
+    /** @type {Map<string, number>} each verse's own cov, its neighbour's pair aside */
+    const single = new Map();
+    const alone = (/** @type {string} */ id, /** @type {any} */ t) => {
+      let c = single.get(id);
+      if (c === undefined) { c = alignScore(t, typedTokens, w, cls).cov; single.set(id, c); }
+      return c;
+    };
+    /** The verse beside a verse (`by` -1 or 1) in its chapter: its id, or ''. */
+    const besideVerse = (/** @type {string} */ id, /** @type {any} */ d, /** @type {number} */ by) => {
+      const k = /^d(\d+)$/.exec(id);
+      if (!k) return '';
+      const nid = 'd' + (+k[1] + by);
+      const f = docLookup[nid] || msIndex.getStoredFields(nid);
+      return f && f.kind === 'verse' && f.bookId === d.bookId && f.chapterNum === d.chapterNum && f.verseNum === d.verseNum + by ? nid : '';
+    };
+    for (const id of cands) {
+      if (spent()) { const r = await pause(); if (r) return r; }
+      const t = toksOf(id);
+      const d = docLookup[id];
+      if (!t || !d) continue;
+      let a = alignScore(t, typedTokens, w, cls);
+      single.set(id, a.cov);
+      // two verses run together: the pair holds what neither holds alone (a neighbour holding it alone is the verse
+      // remembered, and this one, saying the like, is not lifted by it)
+      if (d.kind === 'verse' && a.cov < ALIGN_HELD) {
+        for (const by of [-1, 1]) {
+          const o = besideVerse(id, d, by);
+          const ot = o ? toksOf(o) : null;
+          if (!ot || alone(o, ot) >= ALIGN_HELD) continue;
+          const [x, y] = by < 0 ? [ot, t] : [t, ot];
+          const both = new Uint32Array(x.length + y.length);
+          both.set(x);
+          both.set(y, x.length);
+          const b = alignScore(both, typedTokens, w, cls);
+          if (b.cov > a.cov && b.start < x.length && b.end > x.length) a = { cov: b.cov, start: -1, end: -1, first: -1 };
+        }
+      }
+      // it opens where the first typed words are (clauses typed in the other order: on the first typed)
+      if (a.cov >= ALIGN_HELD) alignHeld.set(id, { cov: a.cov, start: a.first, rank: 0 });
+      else if (a.cov > under) under = a.cov;
+    }
+    /* Held, and told from the rest: a text holding the quote within a small word of one just under ALIGN_HELD holds it
+       no better ("blessed be the name of our lord": three verses and a Blessed hold it in a row with "the" for "our",
+       and a verse spreading its words over twice its length holds "our" too), and the words' order stands. */
+    for (const [id, a] of alignHeld) if (a.cov - under <= tie) alignHeld.delete(id);
+    if (alignHeld.size) {
+      const order = [...alignHeld.keys()].sort((x, y) => {
+        const cx = /** @type {any} */ (alignHeld.get(x)).cov;
+        const cy = /** @type {any} */ (alignHeld.get(y)).cov;
+        return Math.abs(cy - cx) > tie ? cy - cx : scoreMap[y] - scoreMap[x];
+      });
+      // A study quoting a verse (the KJV's words, or with His name restored) gives way to the verse, its original (DECISIONS 10-14).
+      const kindAt = (/** @type {string} */ id) => (docLookup[id] ? docLookup[id].kind : '');
+      const v = order.findIndex((id) => kindAt(id) === 'verse');
+      const st = v > 0 ? order.findIndex((id) => kindAt(id) === 'bible-study') : -1;
+      if (st >= 0 && st < v) order.splice(st, 0, ...order.splice(v, 1));
+      let top = 0;
+      for (const id in scoreMap) if (!alignHeld.has(id) && scoreMap[id] > top) top = scoreMap[id];
+      for (let r = 0; r < order.length; r++) {
+        /** @type {any} */ (alignHeld.get(order[r])).rank = r;
+        scoreMap[order[r]] = (top || 1) * 1.05 * (1 + (order.length - r) * 1e-3);
+      }
+    }
+  }
 
   rankedIds.sort((a, b) => scoreMap[b] - scoreMap[a]);
 
@@ -2275,8 +2396,11 @@ async function search(query, options) {
      original: that text comes first, on those words, and the topic second (Corbin, DECISIONS 10-14). */
   /** @type {Set<any>} the docs the admission placed: they keep their place, as a title named does */
   const admittedDocs = new Set();
-  /** @type {Set<any>} ...and the quotes held word for word it left above them */
+  /** @type {Set<any>} ...and the quotes held word for word it left above them, and the texts holding the quote with its slips (B4) */
   const keptDocs = new Set();
+  /** A text holding the quote, its slips allowed for (B4's tier B). */
+  const alignedSo = (/** @type {any} */ e) => alignHeld.has(/** @type {string} */ (idOf.get(e)));
+  for (const e of out) if (alignedSo(e)) keptDocs.add(e.doc);
   /** @type {Set<any>} the entries a title named opens where it says (placeStart): the run typed does not move them */
   const landedByTitle = new Set();
   /** @type {Set<any>} ...of them, those opened at their start: the text was asked for, not a passage of it */
@@ -2441,6 +2565,16 @@ async function search(query, options) {
     if (msIndex !== inUse) sem = null;
     if (sem) sem = sem.filter((s) => { const f = msIndex.getStoredFields(s.id); return !!f && allowed({ ...f, id: s.id }); });
     if (sem && sem.length) meaningFirst(out, idOf, sem, namedOr, held, fresh);
+    // The meaning re-orders the texts holding less of the quote (B4): those holding it keep their own order.
+    if (sem && sem.length && alignHeld.size) {
+      const slots = [];
+      const kept = [];
+      // (what the admission placed keeps its place: a title named, held with its slips too, is no slot)
+      for (let r = 0; r < out.length; r++) if (alignedSo(out[r])) { slots.push(r); kept.push(out[r]); }
+      const rank = (/** @type {any} */ e) => /** @type {any} */ (alignHeld.get(/** @type {string} */ (idOf.get(e)))).rank;
+      kept.sort((x, y) => rank(x) - rank(y));
+      for (let s = 0; s < slots.length; s++) out[slots[s]] = kept[s];
+    }
   }
   const nearTyped = (/** @type {string} */ id, /** @type {any} */ d) => nearOf[id] ?? (typedTokens.length > 1 ? nearPhrase(docTokens(id, d), typedTokens, STOP) : 0);
   /* A TITLE NAMED IN PASSING (sr11, 2026-10-15). A title the query names keeps its text's place, but a Words To
@@ -2524,6 +2658,14 @@ async function search(query, options) {
       if (c >= 0) /** @type {any} */ (e).placeStart = c;
     }
   }
+  // A text holding the quote with its slips (B4) opens on the words it holds, at the first of them.
+  for (let r = 0; r < Math.min(out.length, RUN_LAND_REACH) && alignHeld.size; r++) {
+    const e = out[r];
+    const a = alignHeld.get(/** @type {string} */ (idOf.get(e)));
+    if (!a || a.start < 0 || e.doc.kind === 'verse' || !e.doc.text || typeof (/** @type {any} */ (e).placeStart) === 'number') continue;
+    const c = tokenPlace(e.doc.text, a.start);
+    if (c >= 0) /** @type {any} */ (e).placeStart = c;
+  }
   if (sem && sem.length) meaningLanding(out, idOf, sem, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))));
   // ...by the passage the screen lands on: the card marks the phrase or the typed run with the words (textQuery.run).
   // A title named first was found by no passage: its same-titled reprints were admitted beside it.
@@ -2547,7 +2689,7 @@ async function search(query, options) {
       const id = /** @type {string} */ (idOf.get(e));
       let near = nearOf[id];
       if (near === undefined) near = byWords.has(e) ? 0 : nearPhrase(docTokens(id, e.doc), typedTokens, STOP);
-      /** @type {{close?: boolean}} */ (e).close = near >= NEAR_PHRASE_MIN && bestWindow(pq.query, docTokens(id, e.doc), pq.span) >= CLOSE_SHARE;
+      /** @type {{close?: boolean}} */ (e).close = alignHeld.has(id) || (near >= NEAR_PHRASE_MIN && bestWindow(pq.query, docTokens(id, e.doc), pq.span) >= CLOSE_SHARE);
     }
   }
 
@@ -2666,4 +2808,6 @@ export const VotSearchMini = {
   fuzzyBookSuggest,
   getState,
   getStats,
+  // B4's alignment of a quote remembered with its slips, off by default (SEARCH_ALIGN)
+  setAlign,
 };

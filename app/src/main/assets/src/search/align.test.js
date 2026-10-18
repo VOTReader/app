@@ -183,7 +183,7 @@ describe('alignScore: the span and the edges', () => {
     expect(alignScore([], words, w, cls).cov).toBe(0);
     expect(alignScore(toks('a voice'), [], w, cls).cov).toBe(0);
     const none = alignScore(toks('and the people went up to the house'), words, w, cls);
-    expect(none).toEqual({ cov: 0, start: -1, end: -1 });
+    expect(none).toEqual({ cov: 0, start: -1, end: -1, first: -1 });
   });
 
   it('four-letter words meet by one vowel only: pray/prey yes, lord/word no', () => {
@@ -200,6 +200,16 @@ describe('alignScore: the span and the edges', () => {
     expect(twice.cov).toBeLessThan(0.6);
   });
 
+  it('a quote opens where its first typed words are: clauses typed in the other order open on the first clause typed', () => {
+    const [q, src] = PAIRS['clauses reordered'];
+    const r = align(q, src);
+    const t = toks(src);
+    expect(t.slice(r.first, r.first + 4).join(' ')).toBe('do not grow weary');
+    // in one piece, the quote opens where its span does
+    const one = align('be steadfast and watchful in prayer', src);
+    expect(one.first).toBe(one.start);
+  });
+
   it('a word of their own counts only beside a met word, and never twice in a row', () => {
     const one = align('the lord is my rock and my fortress', 'The LORD is my rock and my fortress and my deliverer.');
     const slot = align('the lord is my stone and my fortress', 'The LORD is my rock and my fortress and my deliverer.');
@@ -211,6 +221,22 @@ describe('alignScore: the span and the edges', () => {
     const off = alignClasses(toks('the lord is my stone and my fortress'), { stop: STOP, synonyms: SYN, credits: { SLOT: 0 } });
     const words = toks('the lord is my stone and my fortress');
     expect(alignScore(toks('The LORD is my rock and my fortress.'), words, alignWeights(words, df, N), off).cov).toBeLessThan(slot.cov);
+  });
+
+  it('a jump between clauses stays in one passage: the last word said far off in the text is not the quote', () => {
+    const src = 'Everything you carry, I carry; every burden you bear, I lift.';
+    const body = [];
+    for (let i = 0; i < 40; i++) body.push(FILLER[i % FILLER.length]);
+    body.splice(30, 0, src);
+    body.splice(10, 0, 'He set the yoke upon his shoulder.');
+    const text = body.join(' ');
+    const at = toks(body.slice(0, 31).join(' ')).length;
+    // the last typed word the rarest: a window opens on it where the text says it, far off
+    const words = toks('everything you carry i carry every burden you bear i shoulder');
+    const w = Float64Array.from(words, (x) => (x === 'shoulder' ? 6 : STOP.has(x) ? 0.5 : 2));
+    const r = alignScore(toks(text), words, w, alignClasses(words, { stop: STOP, synonyms: SYN }));
+    expect(r.start).toBe(at);
+    expect(r.end).toBeLessThanOrEqual(at + toks(src).length);
   });
 
   it('a reordered pair far apart is not a swap: the order a text holds still counts', () => {
