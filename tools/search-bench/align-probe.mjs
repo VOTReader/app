@@ -19,7 +19,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { docs as buildDocs, blocks as buildBlocks, engine, kjvVerses, unitKey, ASSETS } from './corpus.mjs';
+import { docs as buildDocs, blocks as buildBlocks, engine, kjvVerses, unitKey, ASSETS, lexicons } from './corpus.mjs';
 import { makeClasses } from './classes.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -40,6 +40,9 @@ const cases = JSON.parse(fs.readFileSync(path.join(HERE, 'tri/cases.json'), 'utf
 const CREDITS = process.env.ALIGN_CREDITS ? JSON.parse(process.env.ALIGN_CREDITS) : {};
 const CAP = +(process.env.ALIGN_CAP || 0) || undefined;
 const TIER_B = +(process.env.ALIGN_TIER_B || 0) || 0.85; // the reorder's tier B: cov at or above it
+// B7's lexicons in the probe's own classes: PROBE_LEXICON (lexicons() in corpus.mjs), else the engine's (SEARCH_LEXICON,
+// else the shipped one), so the probe reads the covs the engine ranks by
+const LEX = await lexicons(process.env.PROBE_LEXICON ?? process.env.SEARCH_LEXICON ?? 'shipped');
 const t0 = Date.now();
 const { E, meaning } = await engine();
 const D = await buildDocs('nkjv');
@@ -78,7 +81,7 @@ const rows = [];
 for (const c of cases) {
   const words = toks(expandContractions(c.q));
   const w = alignWeights(words, df, N, CAP);
-  const cls = alignClasses(words, { stop: STOP, credits: CREDITS });
+  const cls = alignClasses(words, { stop: STOP, credits: CREDITS, lexicon: LEX });
   const al = (d) => alignScore(docToks(d), words, w, cls);
   const r = await E.search(c.q, { limit: 6000, perVolume: 400 });
   const res = r.results || [];
@@ -95,7 +98,8 @@ for (const c of cases) {
   const firstOk = !!first && inClass(first) && K.TIER(k1) <= klass.best;
   const comp = first && !inClass(first) ? al(first) : null;
   let hazard = 0; let hazardRef = '';
-  for (const h of res.slice(0, 10)) if (!inClass(h.doc)) { const a = al(h.doc); if (a.cov > hazard) { hazard = a.cov; hazardRef = h.doc.ref || unitKey(h.doc); } }
+  let d1 = null; // the engine's first hit outside the target's class, in its top 10: the distractor it ranks highest
+  for (const h of res.slice(0, 10)) if (!inClass(h.doc)) { const a = al(h.doc); if (d1 === null) d1 = a.cov; if (a.cov > hazard) { hazard = a.cov; hazardRef = h.doc.ref || unitKey(h.doc); } }
   // the landing: does the aligned span reach the remembered sentence?
   let lands = null;
   if (c.level === 'sentence' && c.sentence && tA.a.start >= 0) {
@@ -122,7 +126,7 @@ for (const c of cases) {
     id: c.id, style: c.style, tier: c.tier, form: c.form, q: c.q, words: words.length,
     target: c.uk, tRank, tCov: +tA.a.cov.toFixed(3), tMass: +mass(docToks(target), w, cls).toFixed(3), tTokens: docToks(target).length,
     first: first ? first.ref || k1 : null, firstOk, firstInClass: !!first && inClass(first),
-    cCov: comp ? +comp.cov.toFixed(3) : null, hazard: +hazard.toFixed(3), hazardRef, lands,
+    cCov: comp ? +comp.cov.toFixed(3) : null, d1: d1 === null ? null : +d1.toFixed(3), hazard: +hazard.toFixed(3), hazardRef, lands,
     sim: s1.ref || unitKey(s1), simOk,
   });
 }
@@ -139,6 +143,15 @@ for (const st of ['exact', 'misremembered']) for (const t of [...TIERS, 'all']) 
   const hz = R.filter((o) => o.tCov > o.hazard).length;
   const covs = R.map((o) => o.tCov);
   console.log(`${(st + '/' + t).padEnd(18)}${String(R.length).padStart(3)}${String(C.length).padStart(10)}${String(beat).padStart(13)}${String(tie).padStart(5)}${String(hz).padStart(15)}${(R.filter((o) => o.simOk).length + ' (' + R.filter((o) => o.firstOk).length + ')').padStart(20)}${String(pct(covs, 0.5)).padStart(12)}${String(pct(covs, 0.1)).padStart(6)}`);
+}
+// the distractors (B7): what a lexicon lifts besides the target. d1 = the engine's first outside-class hit in its top 10,
+// hazard = the best outside-class cov in its top 10; margin = target cov - hazard
+console.log('distractors       n  target med  p10   d1 med  p90   hazard med  p90   margin med  p10  target<=hazard');
+for (const st of ['exact', 'misremembered']) {
+  const R = rows.filter((o) => !o.missing && o.style === st);
+  const d = R.map((o) => o.d1).filter((x) => x != null);
+  const f = (x) => (x == null ? '-' : x.toFixed(3));
+  console.log(`${st.padEnd(15)}${String(R.length).padStart(4)}  ${f(pct(R.map((o) => o.tCov), 0.5)).padStart(9)} ${f(pct(R.map((o) => o.tCov), 0.1))}  ${f(pct(d, 0.5)).padStart(6)} ${f(pct(d, 0.9))}  ${f(pct(R.map((o) => o.hazard), 0.5)).padStart(10)} ${f(pct(R.map((o) => o.hazard), 0.9))}  ${f(pct(R.map((o) => o.tCov - o.hazard), 0.5)).padStart(10)} ${f(pct(R.map((o) => o.tCov - o.hazard), 0.1))}  ${String(R.filter((o) => o.tCov <= o.hazard).length).padStart(6)}`);
 }
 // tier B's threshold: targets at or above it, against cases whose best outside-class top-10 hit is at or above it
 console.log('threshold  target>=t (exact, misremembered)  hazard>=t (exact, misremembered)');
@@ -171,7 +184,7 @@ for (const c of tq) {
   const w = alignWeights(words, df, N, CAP);
   for (let rep = 0; rep < 2; rep++) {
     const ts = process.hrtime.bigint();
-    const cls = alignClasses(words, { stop: STOP, credits: CREDITS });
+    const cls = alignClasses(words, { stop: STOP, credits: CREDITS, lexicon: LEX });
     for (const t of cand) alignScore(t, words, w, cls);
     if (rep) { ms.push(Number(process.hrtime.bigint() - ts) / 1e6); toksSeen += cand.reduce((a, t) => a + t.length, 0); }
   }
@@ -183,7 +196,7 @@ const lq = tq.slice().sort((a, b) => b.q.length - a.q.length)[0];
 const lw = toks(expandContractions(lq.q));
 const lwt = alignWeights(lw, df, N, CAP);
 const lt = [];
-for (let rep = 0; rep < 3; rep++) { const ts = process.hrtime.bigint(); const cls = alignClasses(lw, { stop: STOP, credits: CREDITS }); for (const t of longest) alignScore(t, lw, lwt, cls); lt.push(Number(process.hrtime.bigint() - ts) / 1e6); }
+for (let rep = 0; rep < 3; rep++) { const ts = process.hrtime.bigint(); const cls = alignClasses(lw, { stop: STOP, credits: CREDITS, lexicon: LEX }); for (const t of longest) alignScore(t, lw, lwt, cls); lt.push(Number(process.hrtime.bigint() - ts) / 1e6); }
 console.log(`timing, worst case: the 300 longest texts (${longest.reduce((a, t) => a + t.length, 0)} tokens), a ${lw.length}-word query: ${Math.min(...lt).toFixed(1)} ms`);
 console.log(`total ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 process.exit(0);

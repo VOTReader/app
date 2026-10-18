@@ -52,6 +52,7 @@ import { searchWorker } from './worker-client.js';
 import { indexAssembler } from './index-transfer.js';
 import { buildTitles, scoreTitles, admitTitles, stripCollections, titleWords } from './titles.js';
 import { alignClasses, alignWeights, alignScore } from './align.js';
+import { parseLexicon } from './lexicon.js';
 
 /**
  * The parse kinds a direct-nav card answers ALONE.
@@ -933,6 +934,77 @@ const QUOTE_NEAR_MIN = 5;
 let ALIGN_ON = true;
 /** @param {boolean} on */
 function setAlign(on) { ALIGN_ON = !!on; }
+/* THE SUBSTITUTION LEXICON (search200 B7, 2026-10-18). Word pairs a reader trades when quoting from memory
+   (creator for maker, tread for walk), each a share of a typed word's weight align.js gives the text that says
+   its partner in its place: a credit inside the alignment, never a query term, so a query some text holds as
+   typed is ranked as it was (the alignment does not run for it). The app's is WordNet's, kept to the corpus
+   (search-lexicon.json at the assets root, tools/build-wordnet-lex.mjs; tri open 591 -> 593 of 600, the 500's
+   floor held). It is fetched beside the index, on the first build: setAlignLexiconSource names the file
+   (ui/_entry-d.js), the service worker keeps it offline and verifies it (CORE_ASSETS, ASSET_INTEGRITY), the APK
+   packages it (tools/check-apk-assets.js). A text search waits for it at most LEXICON_WAIT_MS, once; a file that
+   does not load (offline and never cached, a 404, a redirect, bad JSON) leaves the alignment as it is without
+   one, and the next build tries again. setAlignLexicon (the benchmark, tests) sets one directly. */
+/** @type {Array<import('./lexicon.js').Lexicon>|null} the lexicons align.js credits; null, none */
+let ALIGN_LEXICON = null;
+/** @type {string|null} where the lexicon file is fetched from; null, nowhere */
+let LEXICON_SOURCE = null;
+/** @type {{url: string, done: Promise<void>, settled: boolean, failed: boolean}|null} the file's load */
+let LEXICON_LOAD = null;
+/** The longest a text search waits for the lexicon file (the first search after a cold start; it loads with the index). */
+const LEXICON_WAIT_MS = 2000;
+/**
+ * Set the lexicons directly (null: none). The file named by setAlignLexiconSource is no longer read.
+ * @param {Array<import('./lexicon.js').Lexicon>|import('./lexicon.js').Lexicon|null} lex
+ */
+function setAlignLexicon(lex) {
+  ALIGN_LEXICON = !lex ? null : Array.isArray(lex) ? lex : [lex];
+  LEXICON_SOURCE = null;
+  LEXICON_LOAD = null;
+}
+/**
+ * Name the lexicon file (relative to the page), fetched on the next build or text search; null: none.
+ * @param {string|null} url
+ */
+function setAlignLexiconSource(url) {
+  LEXICON_SOURCE = url || null;
+  LEXICON_LOAD = null;
+  ALIGN_LEXICON = null;
+}
+/**
+ * Start (or join) the lexicon file's load. `again`: a load that failed is tried once more (a build).
+ * @param {boolean} again
+ * @returns {{done: Promise<void>, settled: boolean}|null}  null when there is no file to load
+ */
+function loadAlignLexicon(again) {
+  const url = LEXICON_SOURCE;
+  if (!url || typeof fetch !== 'function') return null;
+  if (LEXICON_LOAD && LEXICON_LOAD.url === url && !(again && LEXICON_LOAD.failed)) return LEXICON_LOAD;
+  /** @type {{url: string, done: Promise<void>, settled: boolean, failed: boolean}} */
+  const load = { url, done: Promise.resolve(), settled: false, failed: false };
+  LEXICON_LOAD = load;
+  load.done = fetch(url)
+    .then((r) => {
+      // a redirected answer is a captive portal or a proxy, not the file
+      if (!r.ok || r.redirected) throw new Error('search lexicon: ' + url + ' ' + (r.redirected ? 'redirected' : r.status));
+      return r.json();
+    })
+    .then((j) => {
+      if (!j || typeof j.lexicon !== 'string' || !j.lexicon) throw new Error('search lexicon: ' + url + ' holds no lexicon');
+      const lex = parseLexicon(j.lexicon);
+      if (LEXICON_LOAD === load) ALIGN_LEXICON = [lex];
+    })
+    .catch(() => { load.failed = true; })
+    .finally(() => { load.settled = true; });
+  return load;
+}
+/** Resolves when the lexicon file has loaded or failed, or LEXICON_WAIT_MS has passed; at once when it is settled. */
+function alignLexiconReady() {
+  const load = loadAlignLexicon(false);
+  if (!load || load.settled) return Promise.resolve();
+  /** @type {any} */ let timer = 0;
+  const wait = new Promise((resolve) => { timer = setTimeout(resolve, LEXICON_WAIT_MS); });
+  return Promise.race([load.done, wait]).finally(() => clearTimeout(timer));
+}
 /** Typed tokens, at least, for the typed words to be aligned as a quote. */
 const ALIGN_MIN = 5;
 /** The share of the typed words' weight (BM25 idf) a text holds anywhere, as typed or in a form or synonym, to be aligned. */
@@ -1704,6 +1776,7 @@ function isCurrent(/** @type {{translation?:string}|undefined} */ options) {
 function init(options) {
   const code = editionOf(options);
   const opts = { ...options, translation: code };
+  loadAlignLexicon(true); // beside the corpora (B7): a text search waits for it, not the build
   // One build at a time (each swaps in its index): this call is looked at again when it ends.
   // A build for this edition that fails fails this call; one for another edition does not.
   if (building) return buildingFor === code ? building.then(() => init(opts)) : building.then(() => init(opts), () => init(opts));
@@ -1774,6 +1847,7 @@ async function search(query, options) {
 
   await ensureReady(options);
   await warmOriginals();
+  await alignLexiconReady();
   // rebuild() dropped the index while this search waited (sweep 2026-10-14 v061): it waits for the new one
   if (!msIndex) return search(query, options);
 
@@ -2199,7 +2273,7 @@ async function search(query, options) {
     };
     const cands = rankedIds.filter((id) => massOf(id) >= ALIGN_MASS).sort((a, b) => scoreMap[b] - scoreMap[a]).slice(0, ALIGN_CANDIDATES);
     const w = alignWeights(typedTokens, df, n);
-    const cls = alignClasses(typedTokens, { stop: STOP, id: (t) => AS.ids.get(t), word: (x) => AS.words[x] });
+    const cls = alignClasses(typedTokens, { stop: STOP, id: (t) => AS.ids.get(t), word: (x) => AS.words[x], lexicon: ALIGN_LEXICON });
     const toksOf = (/** @type {string} */ id) => { const sid = storeSpan(AS, id); return sid === null ? null : AS.toks.subarray(AS.from[sid], AS.to[sid]); };
     /* Two covs within a small word of each other (the heaviest typed, "so" for "and"), give or take ALIGN_TIE, hold the
        quote alike: the words' order stands. */
@@ -2836,4 +2910,8 @@ export const VotSearchMini = {
   getStats,
   // B4's alignment of a quote remembered with its slips: on by default, setAlign(false) its emergency off switch
   setAlign,
+  // B7's substitution lexicon (lexicon.js), credited inside the alignment only: the app names its file
+  // (setAlignLexiconSource, ui/_entry-d.js); the benchmark and tests set one directly (setAlignLexicon)
+  setAlignLexicon,
+  setAlignLexiconSource,
 };

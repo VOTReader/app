@@ -101,8 +101,25 @@ export async function engine() {
   await E.init();
   // SEARCH_ALIGN=off: B4's alignment of a quote remembered with its slips, off (engine.js setAlign; on by default)
   if (process.env.SEARCH_ALIGN === 'off' && E.setAlign) E.setAlign(false);
+  // B7's substitution lexicon, credited inside the alignment: the one the app ships (search-lexicon.json) by default,
+  // as the app runs; SEARCH_LEXICON=off none, or a comma list of lexicon files (a builder's --out) to measure
+  if (E.setAlignLexicon) E.setAlignLexicon(await lexicons(process.env.SEARCH_LEXICON ?? 'shipped'));
   const meaning = await startMeaning();
   return { E, initMs: Date.now() - t0, meaning };
+}
+
+/** B7's substitution lexicons, parsed: 'shipped' (the app's, search-lexicon.json), 'off' or '' none, else a comma
+    list of lexicon files (tools/build-wordnet-lex.mjs --out, tools/build-slips.mjs), 'shipped' among them if wanted. */
+export async function lexicons(/** @type {string} */ spec) {
+  const { parseLexicon } = await import(pathToFileURL(path.join(ASSETS, 'src/search/lexicon.js')).href);
+  const out = [];
+  for (const name of String(spec || '').split(',').map((x) => x.trim()).filter((x) => x && x !== 'off')) {
+    const file = name === 'shipped' ? path.join(ASSETS, 'search-lexicon.json') : path.resolve(name);
+    const j = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (typeof j.lexicon !== 'string') throw new Error(`${file}: no lexicon`);
+    out.push(parseLexicon(j.lexicon));
+  }
+  return out.length ? out : null;
 }
 
 /** The on-device meaning model (semantic.js), from the shipped files, as the app runs it by default.

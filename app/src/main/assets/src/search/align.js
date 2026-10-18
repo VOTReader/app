@@ -30,6 +30,7 @@ import { lemma } from './passage.js';
 import { wordForms } from './word-forms.js';
 import { kjvEncode } from './tokenize.js';
 import { searchData } from './search-data.js';
+import { lemmaSurfaces } from './lexicon.js';
 
 /** Credits (a share of a typed word's weight) and charges (PLAN B4); alignClasses `credits` overrides any. */
 export const ALIGN = Object.freeze({
@@ -148,20 +149,58 @@ const NO_ENTRY_STOP = Object.freeze({ c: [], join: 0, stop: 1, pre: 0 });
  * @property {string[]} words  the typed words
  * @property {Uint8Array} stop  1 where the typed word is a stop word
  * @property {Array<Set<any>>} anchor  per typed word (0-based): the text tokens that open a window on it
+ * @property {Array<Set<any>>} lexAnchor  per typed word (0-based): its lexicon partners' text tokens (none of anchor's),
+ *   which open a window on it only in a text that holds none of its anchor tokens
  * @property {AlignK} k  the credits and charges in force
  * @property {(tok: any) => AlignEntry} entry  what one text token meets (memoized for the query's life)
  * @property {(a: any, b: any) => number} splitAt  the 1-based position of a typed word two text tokens spell, else 0
  */
 
+/** A lexicon partner's text words (lexicon.js lemmaSurfaces), kept for the session: the lexicons are fixed. */
+/** @type {Map<string, string[]>} */
+const SURFACES = new Map();
+function surfacesOf(/** @type {string} */ l) {
+  let s = SURFACES.get(l);
+  if (!s) {
+    if (SURFACES.size > 20000) SURFACES.clear();
+    SURFACES.set(l, (s = lemmaSurfaces(l, lemma)));
+  }
+  return s;
+}
+
+/**
+ * A typed lemma's partners in the substitution lexicons (search200 B7): partner lemma -> credit, every
+ * lexicon's highest; null when it has none.
+ * @param {Array<import('./lexicon.js').Lexicon>} lexicons @param {string} l
+ * @returns {Map<string, number>|null}
+ */
+function partnersOf(lexicons, l) {
+  /** @type {Map<string, number>|null} */
+  let out = null;
+  let own = false;
+  for (const L of lexicons) {
+    const p = L.get(l);
+    if (!p) continue;
+    if (!out) { out = p; continue; }
+    if (!own) { out = new Map(out); own = true; }
+    for (const [k, v] of p) if (!(/** @type {Map<string, number>} */ (out).get(k) >= v)) out.set(k, v);
+  }
+  return out;
+}
+
 /**
  * The substitution classes of a query, built once and shared by every text it is aligned against:
- * word forms and lemmas (word-forms.js, passage.js), the register table, and SYNONYM_MAP.
+ * word forms and lemmas (word-forms.js, passage.js), the register table, SYNONYM_MAP, and the
+ * substitution lexicons when given (lexicon.js).
  * @param {string[]} words  the typed words, kjvEncode'd (the same tokenizer as the texts)
  * @param {{ stop?: Set<string> | ((w: string) => boolean), synonyms?: Object<string, string[]>,
- *   id?: (w: string) => any, word?: (tok: any) => string, credits?: Partial<AlignK> }} [opts]
+ *   id?: (w: string) => any, word?: (tok: any) => string, credits?: Partial<AlignK>,
+ *   lexicon?: import('./lexicon.js').Lexicon | Array<import('./lexicon.js').Lexicon> | null }} [opts]
  *   stop: the stop words (default STOP_WORDS_TRIMMED); synonyms: default SYNONYM_MAP;
  *   id / word: a token store's string -> id and id -> string (default: tokens are the strings);
- *   credits: any of ALIGN's numbers, overridden for this query
+ *   credits: any of ALIGN's numbers, overridden for this query;
+ *   lexicon: word pairs a reader trades (search200 B7): a typed content word meets its partner at the pair's
+ *   credit (the highest a word's lemmas reach, never above a form's), and its partner's words open windows
  * @returns {AlignClasses}
  */
 export function alignClasses(words, opts) {
@@ -174,6 +213,8 @@ export function alignClasses(words, opts) {
   const SYN = o.synonyms || D.SYNONYM_MAP || {};
   const toId = o.id || ((/** @type {string} */ w) => w);
   const toWord = o.word || ((/** @type {any} */ t) => (typeof t === 'string' ? t : String(t)));
+  /** @type {Array<import('./lexicon.js').Lexicon>} */
+  const lexicons = !o.lexicon ? [] : Array.isArray(o.lexicon) ? o.lexicon.filter(Boolean) : [o.lexicon];
   const m = words.length;
   const ws = words.map(String);
   const stop = new Uint8Array(m);
@@ -181,7 +222,10 @@ export function alignClasses(words, opts) {
   const fam = [];
   const syn = [];
   const synLem = [];
+  /** @type {Array<Map<string, number>|null>} each typed content word's lexicon partners (lemma -> credit) */
+  const lex = [];
   const anchor = [];
+  const lexAnchor = [];
   for (let i = 0; i < m; i++) {
     const q = ws[i];
     stop[i] = isStop(q) ? 1 : 0;
@@ -199,6 +243,8 @@ export function alignClasses(words, opts) {
     }
     syn.push(s);
     synLem.push(new Set([...s].map(lemma)));
+    const lp = !stop[i] && lexicons.length ? partnersOf(lexicons, lem[i]) : null;
+    lex.push(lp);
     const a = new Set();
     const add = (/** @type {string} */ w) => { const t = toId(w); if (t !== undefined && t !== null) a.add(t); };
     add(q);
@@ -206,6 +252,9 @@ export function alignClasses(words, opts) {
     for (const w of f) add(w);
     for (const w of s) add(w);
     anchor.push(a);
+    const la = new Set();
+    if (lp) for (const l of lp.keys()) for (const w of surfacesOf(l)) { const t = toId(w); if (t !== undefined && t !== null && !a.has(t) && !isStop(w)) la.add(t); }
+    lexAnchor.push(la);
   }
   /** @type {Map<string, number>} typed words i-1 and i run together -> i (1-based) */
   const joins = new Map();
@@ -238,8 +287,12 @@ export function alignClasses(words, opts) {
       else if (reg && reg.has(q)) cr = K.REGISTER;
       else if (dl === lem[i] || fam[i].has(d)) cr = K.FORM;
       else if (!stop[i] && !dStop) {
-        if (syn[i].has(d) || synLem[i].has(dl)) cr = K.SYNONYM;
+        const lp = lex[i];
+        const x = lp ? lp.get(dl) || 0 : 0;
+        if (syn[i].has(d) || synLem[i].has(dl)) cr = K.SYNONYM > x ? K.SYNONYM : x;
+        else if (x >= K.EDIT) cr = x;
         else if (oneEdit(q, d)) cr = K.EDIT;
+        else cr = x;
       }
       if (cr) c.push(i + 1, cr);
     }
@@ -252,6 +305,7 @@ export function alignClasses(words, opts) {
     words: ws,
     stop,
     anchor,
+    lexAnchor,
     k: K,
     entry(tok) {
       let e = memo.get(tok);
@@ -289,7 +343,8 @@ export function alignWeights(words, docFreq, n, cap) {
 
 /** @type {WeakMap<AlignClasses, Map<any, number[]>>} */
 const LOOKS = new WeakMap();
-/** Text token -> the typed words (1-based) it can anchor: every content word's family, built once per query. */
+/** Text token -> the typed words (1-based) it can anchor: every content word's family, built once per query;
+    a lexicon partner's token as -k (it anchors typed word k only in a text holding none of k's own tokens). */
 function lookOf(/** @type {AlignClasses} */ cls) {
   let look = LOOKS.get(cls);
   if (look) return look;
@@ -302,15 +357,46 @@ function lookOf(/** @type {AlignClasses} */ cls) {
       const l = look.get(t);
       if (l) { if (l.indexOf(k) < 0) l.push(k); } else look.set(t, [k]);
     }
+    const lx = cls.lexAnchor ? cls.lexAnchor[k - 1] : null;
+    if (lx) {
+      for (const t of lx) {
+        const l = look.get(t);
+        if (l) { if (l.indexOf(-k) < 0) l.push(-k); } else look.set(t, [-k]);
+      }
+    }
   }
   LOOKS.set(cls, look);
   return look;
 }
 
 /**
+ * The typed words a text holds none of its own tokens of, held where it says their lexicon partners: their
+ * positions join `at`, and their hits join `ev` in text order.
+ * @param {Array<number[] | undefined>} at @param {number[]} ev @param {Array<number[] | undefined>} atL
+ * @param {number[]} evL @param {number} m
+ * @returns {number[]}  the hits, those partners' among them
+ */
+function lexHeld(at, ev, atL, evL, m) {
+  let fill = null;
+  for (let k = 1; k <= m; k++) if (!at[k] && atL[k]) { at[k] = atL[k]; (fill || (fill = new Uint8Array(m + 1)))[k] = 1; }
+  if (!fill) return ev;
+  /** @type {number[]} */
+  const out = [];
+  let a = 0;
+  let b = 0;
+  while (a < ev.length || b < evL.length) {
+    if (b < evL.length && !fill[evL[b + 1]]) { b += 2; continue; }
+    if (b >= evL.length || (a < ev.length && ev[a] <= evL[b])) { out.push(ev[a], ev[a + 1]); a += 2; } else { out.push(evL[b], evL[b + 1]); b += 2; }
+  }
+  return out;
+}
+
+/**
  * Windows [lo, hi) of the text around its anchors: the two rarest typed words the text holds (or a
  * word of their family), and the rarest of the query's other half when both sit in one half, so two
- * clauses run together each open a window. A window reaches far enough either side to hold the whole
+ * clauses run together each open a window. A typed word the text holds none of its own tokens of is held
+ * where the text says a lexicon partner of it (search200 B7), after every word the text holds itself, so a
+ * text holding every typed word opens the windows it opened with no lexicon. A window reaches far enough either side to hold the whole
  * query; an anchor the text repeats keeps its K.WINDOWS windows that hold the most typed weight (each
  * typed word's family counted once); windows that touch merge. One read of the text.
  * @param {ArrayLike<any>} docIds @param {number[]} order  typed positions (1-based), rarest first
@@ -323,13 +409,27 @@ function windows(docIds, order, m, cls, w) {
   /** @type {Array<number[] | undefined>} where each typed word's family sits in the text */
   const at = [];
   /** @type {number[]} every hit in text order: its position, then the typed word */
-  const ev = [];
+  let ev = [];
+  /** @type {Array<number[] | undefined>} where each typed word's lexicon partners sit */
+  let atL = null;
+  /** @type {number[]} the partners' hits in text order */
+  let evL = null;
   for (let p = 0; p < n; p++) {
     const ks = look.get(docIds[p]);
     if (!ks) continue;
-    for (let h = 0; h < ks.length; h++) { const k = ks[h]; (at[k] || (at[k] = [])).push(p); ev.push(p, k); }
+    for (let h = 0; h < ks.length; h++) {
+      const k = ks[h];
+      if (k > 0) { (at[k] || (at[k] = [])).push(p); ev.push(p, k); continue; }
+      if (!atL) { atL = []; evL = []; }
+      (atL[-k] || (atL[-k] = [])).push(p);
+      /** @type {number[]} */ (evL).push(p, -k);
+    }
   }
-  const held = order.filter((k) => at[k]);
+  if (atL) ev = lexHeld(at, ev, atL, /** @type {number[]} */ (evL), m);
+  // the typed words the text holds, rarest first; those held only by a partner after every word it holds itself
+  const own = (/** @type {number} */ k) => !atL || at[k] !== atL[k];
+  const held = order.filter((k) => at[k] && own(k));
+  if (atL) for (const k of order) if (at[k] && !own(k)) held.push(k);
   if (!held.length) return [];
   const anchors = held.slice(0, 2);
   const half = (/** @type {number} */ i) => (i - 1) * 2 < m;
@@ -431,12 +531,10 @@ export function alignScore(docIds, qIds, idf, classes) {
   // ── pass 1, state 0: the query in one piece. Columns j-2 and j-1 roll; every column is kept in H0/S0. ──
   let Ca = new Float64Array(M1); let Cb = new Float64Array(M1);
   let Fa = new Uint8Array(M1); let Fb = new Uint8Array(M1); let Fc = new Uint8Array(M1); // the cell ended on a met word
-  const G = new Float64Array(M1).fill(NEG); // state 0's best at each typed position over the whole text
-  const GS = new Int32Array(M1).fill(-1);
-  const GE = new Int32Array(M1).fill(-1);
-  /** @type {Array<[Float64Array, Int32Array, Int32Array]>} ...and within each window: a jump stays in one passage */
+  /** @type {Array<[Float64Array, Int32Array, Int32Array]>} state 0's best at each typed position in each window: a jump stays in one passage */
   const WG = [];
-  const R = new Float64Array(M1); // the most credit each typed word meets anywhere in the windows
+  /** @type {Float64Array[]} per window, the most credit each typed word meets in it */
+  const WR = [];
   let best = NEG;
   let bestS = -1;
   let bestE = -1;
@@ -450,6 +548,8 @@ export function alignScore(docIds, qIds, idf, classes) {
     const wgs = new Int32Array(M1).fill(-1);
     const wge = new Int32Array(M1).fill(-1);
     WG.push([wg, wgs, wge]);
+    const R = new Float64Array(M1);
+    WR.push(R);
     let prevTok = null;
     let prevPre = 0;
     for (let j = lo; j < hi; j++, col++) {
@@ -502,7 +602,6 @@ export function alignScore(docIds, qIds, idf, classes) {
           if (t > h) { h = t; s = a0 >= 0 && S0[a0 + i - 1] >= 0 ? S0[a0 + i - 1] : j - 1; f = 1; }
         }
         H0[c0 + i] = h; S0[c0 + i] = s; Fc[i] = f;
-        if (h > G[i]) { G[i] = h; GS[i] = s; GE[i] = j; }
         if (h > wg[i]) { wg[i] = h; wgs[i] = s; wge[i] = j; }
       }
       if (H0[c0 + m] > best && S0[c0 + m] >= 0) { best = H0[c0 + m]; bestS = S0[c0 + m]; bestE = j + 1; }
@@ -518,13 +617,23 @@ export function alignScore(docIds, qIds, idf, classes) {
   //    order) from its best in the window, so long as the second piece ends before the first piece starts. Two
   //    clauses run together sit in one passage: a jump between windows read the quote's last words wherever the
   //    text said them again, far off, and opened there. ──
-  let bound = NEG; // the most a jump can reach: the first piece's best plus the most each later typed word can earn
-  let tail = 0;
-  for (let i = m; i >= 1; i--) {
-    if (G[i] + tail - JUMP > bound) bound = G[i] + tail - JUMP;
-    let u = R[i] > 0 ? R[i] * w[i] : -sp[i]; // met somewhere, else skipped or (after a met word) a slot
-    if (SLOT > 0 && i > 1 && R[i - 1] > 0 && !qStop[i - 1] && SLOT * w[i] > u) u = SLOT * w[i];
-    tail += u;
+  // the most a jump can reach in each window (both pieces sit in it): the first piece's best there plus the most
+  // each later typed word can earn there; a window that cannot beat the best so far is not read again
+  const WB = new Float64Array(win.length >> 1);
+  let bound = NEG;
+  for (let x = 0; x < WB.length; x++) {
+    const wg = WG[x][0];
+    const R = WR[x];
+    let bx = NEG;
+    let tail = 0;
+    for (let i = m; i >= 1; i--) {
+      if (wg[i] + tail - JUMP > bx) bx = wg[i] + tail - JUMP;
+      let u = R[i] > 0 ? R[i] * w[i] : -sp[i]; // met in the window, else skipped or (after a met word) a slot
+      if (SLOT > 0 && i > 1 && R[i - 1] > 0 && !qStop[i - 1] && SLOT * w[i] > u) u = SLOT * w[i];
+      tail += u;
+    }
+    WB[x] = bx;
+    if (bx > bound) bound = bx;
   }
   if (bound > best && bound >= K.JUMP_FLOOR * total) {
     const M0 = new Float64Array(M1).fill(NEG);
@@ -537,9 +646,11 @@ export function alignScore(docIds, qIds, idf, classes) {
     const Jv = new Float64Array(M1); const Js = new Int32Array(M1); const Je = new Int32Array(M1); const Jl = new Int32Array(M1);
     let CB = new Float64Array(M1); let CC = new Float64Array(M1);
     col = 0;
+    const best1 = best;
     for (let x = 0; x < win.length; x += 2) {
       const lo = win[x];
       const hi = win[x + 1];
+      if (!(WB[x >> 1] > best1)) { col += hi - lo; continue; }
       A.fill(NEG); B.fill(NEG); CB.fill(0); FA.fill(0); FB.fill(0);
       M0.fill(NEG); MS0.fill(-1);
       const [wg, wgs, wge] = WG[x >> 1];

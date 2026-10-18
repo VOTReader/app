@@ -19,7 +19,9 @@
  * lazy-loader primitive `__makeLazyLoader(name, 'src/data/…', …)` used by
  * src/utils/sync-loaders.js for the read-along timing files — a shape this
  * gate could not see before, which would have let a "dead weight" exclusion
- * of audio-sync.js break read-along on the APK with every gate green.
+ * of audio-sync.js break read-along on the APK with every gate green. A third,
+ * since search200 B7: `setAlignLexiconSource('search-lexicon.json')`, the
+ * search's substitution lexicon, fetched (not injected) beside the index.
  *
  * Run: node tools/check-apk-assets.js
  * Exits non-zero (and explains) when a needed asset would be excluded.
@@ -64,6 +66,10 @@ function collectInjectedPaths() {
       for (const m of src.matchAll(/__makeLazyLoader\(\s*[^,()]+,\s*['"]([^'"]*\/)([a-z-]*)-['"]\s*\+/gi)) {
         found.add({ dir: m[1], prefix: m[2] + '-' });
       }
+      // VotSearchMini.setAlignLexiconSource('search-lexicon.json') — the search's
+      // substitution lexicon (search200 B7), fetched beside the index; without it
+      // a quote with a traded word is ranked as if the lexicon did not exist.
+      for (const m of src.matchAll(/setAlignLexiconSource\(\s*['"]([^'"]+)['"]\s*\)/g)) found.add(m[1]);
     }
   };
   walk(ASSETS);

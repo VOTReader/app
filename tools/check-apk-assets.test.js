@@ -109,7 +109,7 @@ afterEach(() => { for (const m of mirrors.splice(0)) rmSync(m, { recursive: true
  * module, and the data file the loader names (so the gate's missing-on-disk
  * failure stays out of the cases that are about the ignore list).
  */
-function mirror({ gradle, loader, dataFiles = ['bible-studies.js'] }) {
+function mirror({ gradle, loader, dataFiles = ['bible-studies.js'], rootFiles = [] }) {
   const root = mkdtempSync(join(tmpdir(), 'vot-apk-assets-'));
   mirrors.push(root);
   // The gate is ESM under a .js extension, which node accepts only inside a
@@ -124,6 +124,7 @@ function mirror({ gradle, loader, dataFiles = ['bible-studies.js'] }) {
   mkdirSync(join(src, 'utils'), { recursive: true });
   writeFileSync(join(src, 'utils', 'translations.js'), loader);
   for (const f of dataFiles) writeFileSync(join(src, 'data', f), 'window.STUB = 1;\n');
+  for (const f of rootFiles) writeFileSync(join(src, '..', f), '{}\n');
   return root;
 }
 
@@ -167,5 +168,33 @@ describe('check-apk-assets — refuses to pass vacuously (RED against the old ga
     const r = runGate(mirror({ gradle: GRADLE_WITH_BLOCK, loader: LOADER_INVISIBLE }));
     expect(r.status, 'exit 0 with zero derived paths means the gate checks nothing:\n' + r.all).toBe(1);
     expect(r.stderr).toMatch(/\[apk-assets\]/);
+  });
+});
+
+/* search200 B7: the search's substitution lexicon is FETCHED, not injected, so it is named by a shape of its own:
+   VotSearchMini.setAlignLexiconSource('search-lexicon.json') in the bundle-d entry, a file at the assets root. */
+const LOADER_WITH_LEXICON = LOADER_LITERAL + `
+VotSearchMini.setAlignLexiconSource('search-lexicon.json');
+`;
+
+describe('check-apk-assets — the search lexicon a loader names (search200 B7)', { timeout: SPAWN_TIMEOUT_MS }, () => {
+  it('counts the lexicon among the assets it checks', () => {
+    const r = runGate(mirror({ gradle: GRADLE_WITH_BLOCK, loader: LOADER_WITH_LEXICON, rootFiles: ['search-lexicon.json'] }));
+    expect(r.status, r.all).toBe(0);
+    expect(r.stdout).toMatch(/\[apk-assets\] OK — 2 runtime-injected/);
+  });
+
+  it('FAILS when the ignore list would leave the lexicon out of the APK', () => {
+    const gradle = GRADLE_WITH_BLOCK.replace('"app.jsx"', '"app.jsx", "*.json"');
+    const r = runGate(mirror({ gradle, loader: LOADER_WITH_LEXICON, rootFiles: ['search-lexicon.json'] }));
+    expect(r.status, r.all).toBe(1);
+    expect(r.stderr).toContain('search-lexicon.json');
+    expect(r.stderr).toContain('*.json');
+  });
+
+  it('FAILS when the lexicon it names is not on disk', () => {
+    const r = runGate(mirror({ gradle: GRADLE_WITH_BLOCK, loader: LOADER_WITH_LEXICON }));
+    expect(r.status, r.all).toBe(1);
+    expect(r.stderr).toContain('search-lexicon.json');
   });
 });
