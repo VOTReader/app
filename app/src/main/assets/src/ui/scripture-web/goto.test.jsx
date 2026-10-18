@@ -183,12 +183,15 @@ describe('the go-to box (spec 4.5)', () => {
     const chipEl = () => /** @type {HTMLElement} */ (container.querySelector('.sw-goto-chip'));
     const chipY = () => Number(/translate\([^,]+,\s*(-?[\d.]+)px\)/.exec(chipEl().style.transform)[1]);
     const footY = chipY();
-    expect(footY, 'with no panel: at the verse\'s foot, low in the frame').toBeGreaterThan(600 - 215);
+    // a sheet tall enough to cover the foot: the canvas stream's PC ruler (RULER_PC, 212 px) puts a
+    // 600 px frame's baseline at 388, so the old 215 px sheet no longer reached the chip at all
+    const sheet = 260;
+    expect(footY, 'with no panel: at the verse\'s foot, low in the frame').toBeGreaterThan(600 - sheet);
     // the panel stream's sheet below 560 px writes its height as the bottom inset, then schedules a frame
-    get().cam.panelInsetRef.current = { right: 0, bottom: 215 };
+    get().cam.panelInsetRef.current = { right: 0, bottom: sheet };
     act(() => { get().frames.schedule(); });
     settle();
-    expect(chipY(), 'its foot clear of the sheet\'s top edge').toBeLessThanOrEqual(600 - 215);
+    expect(chipY(), 'its foot clear of the sheet\'s top edge').toBeLessThanOrEqual(600 - sheet);
     expect(chipEl().style.visibility).toBe('visible');
     get().cam.panelInsetRef.current = { right: 0, bottom: 0 };
     act(() => { get().frames.schedule(); });
