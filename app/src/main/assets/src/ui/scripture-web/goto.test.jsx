@@ -381,11 +381,15 @@ describe('the edge chips (spec 4.5): where lit threads leave the frame, and Foll
     const { container, get } = mountWeb({ cam: { x: 120, ppv: 8 } });
     act(() => { get().sel.lightThreads([0]); });
     settle();
-    const right = container.querySelector('.sw-goto-edge-right');
+    const right = /** @type {HTMLButtonElement} */ (container.querySelector('.sw-goto-edge-right'));
     expect(right && right.textContent).toBe('Genesis 1:20101 ›');
     expect(container.querySelector('.sw-goto-edge-left')).toBeNull();
+    right.focus();
     fireEvent.click(right);
     settle(); await flush();
+    // the chip it was on is gone (that end is in view now): the keyboard is on the web, not the body
+    expect(container.querySelector('.sw-goto-edge-right')).toBeNull();
+    expect(document.activeElement, 'focus goes home to the root').toBe(container.querySelector('.sw-root'));
     expect(get().cam.camRef.current.x).toBeCloseTo(20100.5, 6);
     expect(get().cam.camRef.current.ppv, 'the same zoom').toBeCloseTo(8, 9);
     expect(get().sel.detail, 'the line opens where it landed').toMatchObject({ kind: 'arc', index: 0, far: 'from' });

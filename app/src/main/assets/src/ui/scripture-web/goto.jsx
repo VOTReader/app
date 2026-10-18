@@ -393,8 +393,12 @@ export function useGoTo(web) {
     if (!e || !graph || !live) return;
     const open = { mode: 'connection', arc: e.arc };
     if (journey) journey.push({ verse: e.verse, label: e.label, open }, here());
+    // the chip goes once that end is in view, and the keyboard with it to the body (review
+    // 2026-10-18): it goes home to the web first, which does not scroll the page
+    const root = rootRef && rootRef.current;
+    if (root && typeof root.focus === 'function') root.focus({ preventScroll: true });
     Promise.resolve(flyTo({ x: e.verse + 0.5 })).then((ok) => { if (ok) openPanel(open); }, () => {});
-  }, [edges, graph, live, journey, here, flyTo, openPanel]);
+  }, [edges, graph, live, journey, here, flyTo, openPanel, rootRef]);
 
   /** One frame's placing: the verse chip at its verse's foot, the edge chips' names. */
   const placeChips = React.useCallback(() => {
