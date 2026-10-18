@@ -43,6 +43,7 @@ import { startSemantic, semanticDocs, semanticStatus, semanticReady, docUnitKey 
 import { KJV_ALIAS, KJV_ALIAS_BOOKS } from './kjv-alias.js';
 import { searchWorker } from './worker-client.js';
 import { indexAssembler } from './index-transfer.js';
+import { buildTitles, scoreTitles, admitTitles, stripCollections, titleWords } from './titles.js';
 
 /**
  * The parse kinds a direct-nav card answers ALONE.
@@ -74,6 +75,29 @@ const NAV_TEXT_LIMIT = 5;
    one verse each that outrank a common word on BM25. searchCorrected() below. */
 const FUZZY = 0.2;
 
+/**
+ * The most of the typed words (counted as typed, a word typed twice twice) any stretch of `width` tokens holds.
+ * @param {string[]} toks @param {string[]} typed @param {number} width
+ */
+function typedHeld(toks, typed, width) {
+  /** @type {Map<string, number>} */ const want = new Map();
+  for (const t of typed) want.set(t, (want.get(t) || 0) + 1);
+  /** @type {Map<string, number>} */ const have = new Map();
+  let n = 0;
+  let best = 0;
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    const w = want.get(t) || 0;
+    if (w) { const h = have.get(t) || 0; if (h < w) n++; have.set(t, h + 1); }
+    if (i >= width) {
+      const o = toks[i - width];
+      const wo = want.get(o) || 0;
+      if (wo) { const h = /** @type {number} */ (have.get(o)) - 1; have.set(o, h); if (h < wo) n--; }
+    }
+    if (n > best) best = n;
+  }
+  return best;
+}
 /** Where `run` first occurs in `toks` as consecutive tokens, as a token index; -1 when it does not (an empty run is at 0). */
 function tokenRunAt(toks, run) {
   if (!run.length) return 0;
@@ -605,6 +629,30 @@ function titleToks(d) {
   }
   return t;
 }
+/* EVERY TITLE AND ANSWERS HEADING, SCORED ON ITS OWN (search200 B5, 2026-10-18): titles.js, built once per index from
+   its stored fields (and the Answers entries' headings, read in ANSWERS), 25 ms on a desktop; emptied with the index. */
+/** @type {{ms: any, answers: any, ix: any}|null} */ let TITLES = null;
+/** Titles scored per query: a name's reprints and a numbered series are admitted together. */
+const TITLE_HITS = 12;
+/** The title index of the index in use, built if it is not (null where it cannot be). */
+function titlesNow() {
+  if (!msIndex) return null;
+  const A = /** @type {any} */ (globalThis).ANSWERS;
+  const answers = Array.isArray(A) ? A : null;
+  if (TITLES && TITLES.ms === msIndex && TITLES.answers === answers) return TITLES.ix;
+  const ids = msIndex._documentIds;
+  const docs = [];
+  for (const [sid, f] of msIndex._storedFields) {
+    if (!f || f.kind === 'verse' || !f.title) continue;
+    docs.push({ id: ids.get(sid), kind: f.kind, title: f.title, volumeId: f.volumeId, letterId: f.letterId, studyChapterId: f.studyChapterId, text: f.text || '' });
+  }
+  let ix = null;
+  try { ix = buildTitles(docs, { answers: answers || [] }); } catch { ix = null; }
+  TITLES = { ms: msIndex, answers, ix };
+  return ix;
+}
+/** Kinds an Answers heading's original may be: the prose it labels (a verse is no heading's text). */
+const HEADING_ORIGINALS = new Set(['letter', 'wtlb', 'blessed', 'holy-day', 'bible-study']);
 /** The phrase ranking reads at most this many of the best-scored texts. */
 const PHRASE_CANDIDATES = 500;
 /** A close match holds this share of the query's content words in one passage, rare words weighing most (sr13). */
@@ -870,6 +918,8 @@ const TITLE_NEARER = 0.2;
 const TITLE_ORDER_REACH = 30;
 /** A verse first that holds this many typed words in a row keeps its place over a title typed whole. */
 const VERSE_RUN_HELD = 4;
+/** Typed words, at least, for a stretch holding all of them but one to be read as a quote over a title remembered loosely. */
+const QUOTE_NEAR_MIN = 5;
 /** Typed words, one of them a content word, that read as a quote when held in a row. */
 const SMALL_RUN_MIN = 4;
 /** Who reprints whom: a text yields only to an original of a LOWER tier (Words To Live By excerpts the letters). */
@@ -1026,15 +1076,18 @@ async function warmExcerpts(/** @type {any} */ ms) {
 }
 /** Resolves once the index in use has its originals and its token store read (or has been replaced); never rejects. */
 function warmOriginals() {
-  if (!msIndex || (ORIGINALS && storeNow())) return Promise.resolve();
+  if (!msIndex || (ORIGINALS && storeNow() && TITLES && TITLES.ms === msIndex)) return Promise.resolve();
   if (typeof document === 'undefined') {
     try { originals(); } catch { /* read again, and caught, where they are used */ }
     try { tokenStore(); } catch { /* the phrase ranking reads each text's tokens anew */ }
+    titlesNow();
     return Promise.resolve();
   }
   if (ORIGINALS_BUILD && ORIGINALS_BUILD.ms === msIndex) return ORIGINALS_BUILD.done;
   const ms = msIndex;
-  const done = readOriginals(ms).then(() => readStore(ms)).catch(() => { if (ORIGINALS_BUILD && ORIGINALS_BUILD.done === done) ORIGINALS_BUILD = null; });
+  // the titles last, in one task of their own (a search that comes first builds them itself)
+  const done = readOriginals(ms).then(() => readStore(ms)).then(() => yieldToPage()).then(() => { if (msIndex === ms) titlesNow(); })
+    .catch(() => { if (ORIGINALS_BUILD && ORIGINALS_BUILD.done === done) ORIGINALS_BUILD = null; });
   ORIGINALS_BUILD = { ms, done };
   return done;
 }
@@ -1460,6 +1513,7 @@ function reshapeDoc(r) {
     the old index while the new one builds would fill them again with the old texts. */
 function swapIn(/** @type {any} */ ms, /** @type {typeof stats} */ st) {
   STORE = null;
+  TITLES = null;
   TITLE_TOKS.clear();
   ORIGINALS = null;
   ORIGINALS_BUILD = null;
@@ -2209,9 +2263,169 @@ async function search(query, options) {
       if (b) out.unshift(out.splice(b, 1)[0]);
     }
   }
+  /* A TITLE REMEMBERED LOOSELY (search200 B5, 2026-10-18). BM25 reads a title as a field among the body's words: a
+     title typed with a word changed in form, a near-synonym, its words reordered, a typo or the collection's name
+     beside it ranked under the Answers topics and short entries whose bodies say the words again and again (the tri
+     bench's title/hard, 44 of 70), and an Answers section heading, no field at all, was found only by its body. titles.js
+     scores every title and heading on its own; the one the query clearly names (admitTitles: its same-titled reprints
+     and its series with it, the original first) joins the results wherever BM25 ranked it, or did not. It leads, just
+     under a title typed whole (the pass above: titles.js's levels 4 and 3 are B1's) and under the first texts holding
+     the typed words as a quote (below: a quote found is no title). A title opens at its start;
+     a heading opens on itself, and a text that holds the heading's words in a row is the passage it labels, its
+     original: that text comes first, on those words, and the topic second (Corbin, DECISIONS 10-14). */
+  /** @type {Set<any>} the docs the admission placed: they keep their place, as a title named does */
+  const admittedDocs = new Set();
+  /** @type {Set<any>} ...and the quotes held word for word it left above them */
+  const keptDocs = new Set();
+  /** @type {Set<any>} the entries a title named opens where it says (placeStart): the run typed does not move them */
+  const landedByTitle = new Set();
+  /** @type {Set<any>} ...of them, those opened at their start: the text was asked for, not a passage of it */
+  const titleTop = new Set();
+  /** whether what was admitted is a title typed whole (titles.js's levels 4 and 3) */
+  let admittedWhole = false;
+  /** @type {Set<any>} the docs admitted by their own title (a unit, chapter or part), not by a heading inside them */
+  const byOwnTitle = new Set();
+  /** A text whose body (not its title) holds the typed words in a row: they are a line of it as well as its title. */
+  const bodyHolds = (/** @type {any} */ e) => {
+    const id = idOf.get(e);
+    return id !== undefined && id in runAt && e.doc.kind !== 'verse' && tokenPlace(e.doc.text || '', runAt[id]) >= 0;
+  };
+  const titleIx = !p.phrase && typedTokens.length ? titlesNow() : null;
+  /* Two readings the words alone do not settle (e2e-search). A collection's word taken off a title in another collection
+     names no title: "rebuke one" is no Words To Live By "ONE" (Proverbs 19:25 holds both words). And in a word or two, an
+     Answers heading gives way to a text its own title names by them: "144,000" is the topic "Regarding the 144,000
+     Witnesses", not the heading "The 144,000" in the index of false doctrines. */
+  const titledSo = keyword && out.slice(0, TITLE_REACH).some((e) => e.doc.kind !== 'verse' && named(e.doc));
+  const admissible = (/** @type {any} */ h) => !(/collection/.test(h.via) && !h.hinted) && !(titledSo && h.kind === 'heading');
+  const admitted = titleIx ? admitTitles(scoreTitles(wanted, { index: titleIx, limit: TITLE_HITS })).filter(admissible) : [];
+  if (admitted.length) {
+    /** @type {Map<string, any>} */ const entryOf = new Map();
+    for (const e of out) entryOf.set(/** @type {string} */ (idOf.get(e)), e);
+    /** The text's entry: the one shown, else a new one when the search may show it. */
+    const take = (/** @type {string} */ id) => {
+      let e = entryOf.get(id);
+      if (e) return e;
+      const f = docLookup[id] || msIndex.getStoredFields(id);
+      if (!f) return null;
+      const d = docLookup[id] ? f : { ...f, id };
+      if (!allowed(d) || !fresh(d)) return null;
+      e = { score: 0, doc: reshapeDoc(d), terms: matchedTerms[id] || [] };
+      idOf.set(e, id);
+      entryOf.set(id, e);
+      return e;
+    };
+    /** The prose holding a heading's words in a row, the lowest tier first, then the best ranked: {id, place} or null. */
+    const headingOriginal = (/** @type {any} */ h) => {
+      const run = joinApostropheS(kjvEncode(h.title));
+      /** @type {Map<string, number>|null} */ let hold = run.length >= RUN_MIN ? runHolders(run) : null;
+      // A heading too short to look for ("Solidified Eternally") that the typed run holds: the texts holding the typed
+      // run hold the heading's words too, so they are its candidates, opened on the typed words.
+      if (!hold && run.length && tokenRunAt(typedTokens, run) >= 0) {
+        hold = new Map();
+        for (const id in runAt) hold.set(id, runAt[id]);
+      }
+      if (!hold || !hold.size) return null;
+      let best = null;
+      let bestKey = Infinity;
+      for (const [id, at] of hold) {
+        if (id === h.docId) continue;
+        const f = docLookup[id] || msIndex.getStoredFields(id);
+        if (!f || !HEADING_ORIGINALS.has(f.kind)) continue;
+        const shown = entryOf.get(id);
+        const key = ORIGINAL_TIER[f.kind] * 1e7 + (shown ? out.indexOf(shown) : 1e7 - 1);
+        if (key < bestKey) { bestKey = key; best = { id, at, f }; }
+      }
+      if (!best) return null;
+      // held in its title alone: opening the text is arriving under the heading
+      const c = tokenPlace(best.f.text || '', best.at);
+      return { id: best.id, place: c >= 0 ? c : 0 };
+    };
+    /** @type {Array<{e: any, at: number, title?: boolean}>} each text admitted, where it opens (-1: where its words are), and whether by its title */
+    const placed = [];
+    const has = (/** @type {any} */ e) => placed.some((x) => x.e === e);
+    for (const h of admitted) {
+      if (h.kind === 'heading') {
+        const o = headingOriginal(h);
+        const oe = o && take(o.id);
+        if (oe && !has(oe)) placed.push({ e: oe, at: o.place });
+      }
+      const e = take(h.docId);
+      if (!e || has(e)) continue;
+      placed.push({ e, at: h.kind !== 'heading' ? 0 : h.start, title: h.kind !== 'heading' });
+    }
+    /* A title typed whole (titles.js's levels 4 and 3, its collection's name beside it) is named as B1 names one: only a
+       verse quoted word for word keeps above it. Prose holding the typed words in a row is then a text citing the title
+       by name ("~ From “Sabbath Peace” ~ Words To Live By"), not a quote found. A title remembered loosely (levels 2
+       and 1) is weaker than any quote found: a text holding the typed run (RUN_MIN words or more, B3's runAt) keeps above
+       it, as a verse quoted keeps above any title ("held them fast" is a verse's words before it names "Hold Fast"). */
+    const whole = admitted.some((h) => h.level >= TITLE_LEVEL_LEAD);
+    admittedWhole = whole;
+    /** A text holding the typed words in a row, in its own words (a title holding them is the admission's call). */
+    const holdsTyped = (/** @type {any} */ e) => {
+      const id = idOf.get(e);
+      if (id === undefined) return false;
+      if (whole && e.doc.kind !== 'verse') return false;
+      if (id in runAt && typedTokens.length >= (whole ? VERSE_RUN_HELD : RUN_MIN)) return e.doc.kind === 'verse' || tokenPlace(e.doc.text || '', runAt[id]) >= 0;
+      return typedTokens.length >= VERSE_RUN_HELD && e.doc.kind === 'verse' && hasTokenRun(docTokens(id, e.doc), typedTokens);
+    };
+    /* A title remembered loosely is weaker than a quote one word off, too: a text a stretch of which holds every typed
+       word but one (QUOTE_NEAR_MIN typed or more), and more of them than the title does, is the quote with a word
+       dropped or changed, the title a part of it ("love your bless those who curse you" drops a word of Matthew 5:44,
+       its middle the title "Bless Those Who Curse You"). A collection's name typed with the title is the title's: a
+       letter's first words "Timothy, concerning the Sabbath..." name no collection, but its words are held. */
+    const hintWords = (() => { const w = titleWords(wanted); const st = stripCollections(w); return st ? w.length - st.w.length : 0; })();
+    const titleHeld = whole || typedTokens.length < QUOTE_NEAR_MIN ? Infinity
+      : Math.max(...admitted.map((h) => typedHeld(joinApostropheS(kjvEncode(h.title || '')), typedTokens, typedTokens.length + 2) + (h.hinted ? hintWords : 0)));
+    const quotesNear = (/** @type {any} */ e) => {
+      if (titleHeld === Infinity || !e.doc.text) return false;
+      const n = typedHeld(joinApostropheS(kjvEncode(e.doc.text)), typedTokens, typedTokens.length + 2);
+      return n >= typedTokens.length - 1 && n > titleHeld;
+    };
+    const lead = out.length && levelOf(out[0].doc) >= TITLE_LEVEL_LEAD ? 1 : 0;
+    let pos = lead;
+    while (pos < out.length && (holdsTyped(out[pos]) || quotesNear(out[pos]))) { keptDocs.add(out[pos].doc); pos++; }
+    for (const x of placed) {
+      const at = out.indexOf(x.e);
+      // a text the typed words were found in word for word is a quote found, ranked as one (its original first)
+      if (at >= lead && at < pos) continue;
+      if (at < 0 || at >= pos) {
+        if (at >= 0) out.splice(at, 1);
+        out.splice(pos++, 0, x.e);
+      }
+      admittedDocs.add(x.e.doc);
+      keptDocs.add(x.e.doc);
+      if (x.title) byOwnTitle.add(x.e.doc);
+      if (x.at < 0) continue;
+      // A title typed whole that its body says word for word: the typed words are that line too, and the run landing
+      // below opens on it (a remembered sentence that is also its letter's title, the bench's sentence cases).
+      if (x.title && whole && bodyHolds(x.e)) continue;
+      // A title remembered loosely that its own body says (nearly) as typed: the reader remembered that sentence, which
+      // the run landing below opens on ("the mountains will crumble..." is a line of the letter so titled).
+      if (x.title && !whole && (nearOf[/** @type {string} */ (idOf.get(x.e))] || 0) >= NEAR_PHRASE_MIN) continue;
+      x.e.placeStart = x.at;
+      landedByTitle.add(x.e);
+      if (x.at === 0 && x.e.doc.title && admitted.some((h) => h.docId === idOf.get(x.e) && h.kind !== 'heading')) titleTop.add(x.e);
+    }
+  }
+  /* A TITLE NAMED OPENS AT THE TITLE (search200 B5, the S22 look of B1-B3). A text found by its title typed whole opened
+     where its words sat thickest in the body (use-search matchExcerpt), or on the typed run held deep in it: the reader
+     who typed "God Speaks About The Sabbath" landed on the in-text find's fifth place of six, not on the letter's
+     title. A title typed whole (B1's levels) or admitted opens at its start (placeStart 0, use-search's landing at the
+     top), a heading on itself; the run landing below leaves them. */
+  if (typedTokens.length) {
+    for (let r = 0; r < Math.min(out.length, TITLE_ORDER_REACH); r++) {
+      const e = out[r];
+      if (landedByTitle.has(e) || levelOf(e.doc) < TITLE_LEVEL_LEAD || bodyHolds(e)) continue;
+      e.placeStart = 0;
+      landedByTitle.add(e);
+      titleTop.add(e);
+    }
+  }
+  /** A title named keeps its place, and so does what the admission placed (and the quotes it left above it). */
+  const namedOr = keptDocs.size ? (/** @type {any} */ d) => keptDocs.has(d) || named(d) : named;
   // A first result holding the typed words in a row, or one word off, is a quote found: no re-ordering.
   const quoted = out.length && (nearOf[idOf.get(out[0]) || ''] || 0) >= NEAR_PHRASE_MIN;
-  const held = !keyword && !p.phrase && !quoted ? bestPassageFirst(out, idOf, units, isStopTerm, named, kjvHeld) : 1;
+  const held = !keyword && !p.phrase && !quoted ? bestPassageFirst(out, idOf, units, isStopTerm, namedOr, kjvHeld) : 1;
   /** @type {Awaited<ReturnType<typeof semanticDocs>>} */ let sem = null;
   // A search the model was not ready for: its words' order stands, and says the meaning comes later (semanticReady).
   let meaningLater = false;
@@ -2226,7 +2440,7 @@ async function search(query, options) {
     meaningLater = !sem && semanticStatus().status !== 'ready';
     if (msIndex !== inUse) sem = null;
     if (sem) sem = sem.filter((s) => { const f = msIndex.getStoredFields(s.id); return !!f && allowed({ ...f, id: s.id }); });
-    if (sem && sem.length) meaningFirst(out, idOf, sem, named, held, fresh);
+    if (sem && sem.length) meaningFirst(out, idOf, sem, namedOr, held, fresh);
   }
   const nearTyped = (/** @type {string} */ id, /** @type {any} */ d) => nearOf[id] ?? (typedTokens.length > 1 ? nearPhrase(docTokens(id, d), typedTokens, STOP) : 0);
   /* A TITLE NAMED IN PASSING (sr11, 2026-10-15). A title the query names keeps its text's place, but a Words To
@@ -2248,8 +2462,17 @@ async function search(query, options) {
     const body = nearPhrase(kjvEncode(d.text || ''), typedTokens, STOP);
     return !(body >= NEAR_PHRASE_MIN && body > nearPhrase(tt, typedTokens, STOP));
   };
+  /* A title admitted keeps its place as a title named does, but one remembered loosely gives way as namedSo's do when a
+     quote of its own words runs through it: "rather let the be written in your heart" is a line of the letter that
+     the entry titled "Let The Law Be Written in Your Heart" reprints, the letter first (DECISIONS 10-14). */
+  const admittedSo = (/** @type {any} */ d) => {
+    if (!admittedDocs.has(d)) return false;
+    if (admittedWhole || !byOwnTitle.has(d) || !d.title || typedTokens.length < RUN_MIN) return true;
+    const t = joinApostropheS(titleToks(d).all);
+    return typedHeld(joinApostropheS(kjvEncode(d.text || '')), typedTokens, typedTokens.length + 2) <= typedHeld(t, typedTokens, t.length);
+  };
   if (msIndex === inUse) originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) => allowed(d) && fresh(d),
-    namedSo, nearTyped, typedTokens);
+    admittedDocs.size ? (/** @type {any} */ d) => admittedSo(d) || namedSo(d) : namedSo, nearTyped, typedTokens);
   // What those two added counts in its collection. A full one does not refuse it (the words' 400th
   // verse is no reason to drop the model's best text or an original): its last text gives way.
   if (perVolume) {
@@ -2292,7 +2515,7 @@ async function search(query, options) {
   if (S && landAcc) {
     for (let r = 0; r < Math.min(out.length, RUN_LAND_REACH); r++) {
       const e = out[r];
-      if (e.doc.kind === 'verse' || !e.doc.text) continue;
+      if (e.doc.kind === 'verse' || !e.doc.text || landedByTitle.has(e)) continue;
       const id = idOf.get(e);
       const sid = storeSpan(S, id);
       if (sid === null) continue;
@@ -2303,7 +2526,8 @@ async function search(query, options) {
   }
   if (sem && sem.length) meaningLanding(out, idOf, sem, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))));
   // ...by the passage the screen lands on: the card marks the phrase or the typed run with the words (textQuery.run).
-  reprintSecond(out, (p.phrase ? [p.phrase] : run ? [run] : []).concat(filtered.filter((t) => !isStopTerm(t))));
+  // A title named first was found by no passage: its same-titled reprints were admitted beside it.
+  if (!out.length || !titleTop.has(out[0])) reprintSecond(out, (p.phrase ? [p.phrase] : run ? [run] : []).concat(filtered.filter((t) => !isStopTerm(t))));
 
   /* CLOSE MATCHES (sr13, 2026-10-15). Book order lists the results in reading order, and most of a passage
      search's results hold a word or two of it: "I am The Lord and I do not change" found 1,344 texts, and Book

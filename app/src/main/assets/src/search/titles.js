@@ -590,5 +590,12 @@ export function admitTitles(hits) {
   if (lead.level >= 3) return hits.filter((h) => h.score >= TITLE_ADMIT && (h.level >= 3 || sameTitle(h, lead))).sort(nameOrder);
   const next = hits.find((h) => !sameTitle(h, lead));
   if (next && lead.score - next.score < TITLE_MARGIN) return [];
-  return hits.filter((h) => h.score >= TITLE_ADMIT && sameTitle(h, lead)).sort(nameOrder);
+  return hits.filter((h) => h.score >= TITLE_ADMIT && sameTitle(h, lead)).sort(looseOrder);
+}
+
+/** A unit's (or chapter's) own title before a longer title it is the first part of, when the name was remembered
+    loosely too ("Serve Me As I Have Loved You" before "Serve Me as I Have Loved You, Says The Lord"); then nameOrder. */
+const ownTitle = (/** @type {any} */ h) => (h.kind === 'unit' || h.kind === 'chapter' ? 1 : 0);
+function looseOrder(/** @type {any} */ a, /** @type {any} */ b) {
+  return (b.hinted ? 1 : 0) - (a.hinted ? 1 : 0) || ownTitle(b) - ownTitle(a) || nameOrder(a, b);
 }
