@@ -8,7 +8,7 @@ import { useWebCamera } from './use-web-camera.js';
 import { useWebSelection } from './use-web-selection.js';
 import { useJourney } from './use-journey.js';
 import { useFrameScheduler } from './use-frame-scheduler.js';
-import { useGoTo, routeOverlayHit, reopenOf, gotoBoxPlace, GOTO_BOX_W, GOTO_BOX_TOP, GOTO_BOX_MIN, GOTO_HINT } from './goto.jsx';
+import { useGoTo, routeOverlayHit, reopenOf, gotoBoxPlace, hereLabel, GOTO_BOX_W, GOTO_BOX_TOP, GOTO_BOX_MIN, GOTO_HINT } from './goto.jsx';
 import { useWebKeys } from './use-web-keys.js';
 import { DetailSheet } from './panels.jsx';
 import { verseToX, fitPPV, maxZoomFor, PPV_MAX_CSS } from '../../utils/scripture-web/geometry.js';
@@ -415,6 +415,25 @@ describe('Back puts the panel back as it was', () => {
   });
 });
 
+describe('hereLabel: what a crumb calls where the reader set out from', () => {
+  // two books: Genesis of chapters 1 (100 verses) and 2 (50), then Exodus 1, the rest
+  const g = graph();
+  g.books = [{ id: 'genesis', title: 'Genesis', abbr: 'Gen' }, { id: 'exodus', title: 'Exodus', abbr: 'Exod' }];
+  g.chapters = [[0, 1, 0, 100], [0, 2, 100, 50], [1, 1, 150, TOTAL - 150]];
+  g.chapterOfVerse = new Uint16Array(TOTAL).map((_, v) => (v < 100 ? 0 : v < 150 ? 1 : 2));
+  it('the camera at fit, or nearly the whole canon in view, is the whole web', () => {
+    expect(hereLabel(g, [0, TOTAL / 2], 120, true)).toBe('the whole web');
+    expect(hereLabel(g, [-50, TOTAL + 50], 15551, false)).toBe('the whole web');
+    expect(hereLabel(g, [0, 0.9 * TOTAL], 15551, false)).toBe('the whole web');
+  });
+  it('else the smallest of the book, the chapter or the verse at the centre that the view holds whole', () => {
+    expect(hereLabel(g, [0, 200], 120, false), 'all of Genesis in view').toBe('Genesis');
+    expect(hereLabel(g, [95, 155], 120, false), 'Genesis 2 in view, not Genesis').toBe('Genesis 2');
+    expect(hereLabel(g, [110, 130], 120, false), 'inside a chapter').toBe('Genesis 2:21');
+    expect(hereLabel(g, [10000, 12000], 11000, false), 'inside Exodus 1, its one chapter').toBe('Exodus 1:10851');
+  });
+});
+
 describe('the edge chips (spec 4.5): where lit threads leave the frame, and Follow', () => {
   it('a lit thread whose far end is off the frame is named at that side; a tap follows it there', async () => {
     const { container, get } = mountWeb({ cam: { x: 120, ppv: 8 } });
@@ -603,6 +622,20 @@ describe("through the web's own keys (use-web-keys.js)", () => {
     expect(get().sel.panel, 'the overview had nothing open').toBeNull();
     fireEvent.keyDown(root, { key: 'Backspace' });
     expect(setAnnounce).toHaveBeenLastCalledWith('Nothing to go back to');
+  });
+
+  // review 2026-10-18: from the rest view the crumb named the verse at the centre, so Back said
+  // "Back to Psalms 103:2" on its way to the whole canon
+  it('Backspace home to the whole web says so, not the verse at its centre', async () => {
+    const { container, get, setAnnounce } = mountWeb({ keys: true, cam: { x: TOTAL / 2, ppv: 800 / TOTAL } });
+    const root = /** @type {HTMLElement} */ (container.querySelector('.sw-root'));
+    act(() => { get().goTo.open('Genesis 1:101'); });
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    settle(); await flush();
+    expect(get().journey.stack.map((e) => e.label)).toEqual(['the whole web', 'Genesis 1:101']);
+    fireEvent.keyDown(root, { key: 'Backspace' });
+    settle(); await flush(); settle();
+    expect(setAnnounce).toHaveBeenLastCalledWith('Back to the whole web');
   });
 
   it('Enter on the web takes the line at the centre; ] steps on from it', () => {

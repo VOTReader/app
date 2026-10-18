@@ -41,8 +41,9 @@
    camera exists: the web opens on that place, instantly, over the resume
    point. */
 
-import { goToRows, frameOf, startPlace, bookPlace, chapterPlace, chapterIndexOf } from '../../utils/scripture-web/ref-parse.js';
+import { goToRows, frameOf, startPlace, bookPlace, chapterPlace, chapterIndexOf, bookSpan } from '../../utils/scripture-web/ref-parse.js';
 import { arcsTouching, nearbyThreads, refOfVerse, verseToX, xToVerse } from '../../utils/scripture-web/pick.js';
+import { fitPPV } from '../../utils/scripture-web/geometry.js';
 import { litKeyOf } from '../../utils/scripture-web/focus-state.js';
 
 /**
@@ -138,6 +139,30 @@ export function reopenOf(panel, lit) {
   return lit && lit.length ? Object.assign({}, spec, { lit }) : spec;
 }
 
+/** Nearly this share of the canon in view is the whole web, so a crumb from it says so. */
+const WHOLE_WEB_SHARE = 0.9;
+
+/**
+ * What a journey crumb calls where the reader is (here): the whole web at the rest view (the
+ * camera at fit, or nearly all of the canon in view), else the smallest of the book, the chapter
+ * or the verse at the centre that the view holds whole. Back read "Back to Psalms 103:2" on its
+ * way to the whole canon, and the trail showed the same (review 2026-10-18). Pure, for its tests.
+ * @param {any} g  the graph
+ * @param {[number, number]} span  the canon x the view holds, [x0, x1]
+ * @param {number} verse  the verse at the centre
+ * @param {boolean} atFit  the camera is at fit (the rest view)
+ * @returns {string}
+ */
+export function hereLabel(g, span, verse, atFit) {
+  const w = Math.min(g.total, span[1]) - Math.max(0, span[0]);
+  if (atFit || w >= WHOLE_WEB_SHARE * g.total) return 'the whole web';
+  const r = refOfVerse(g, verse);
+  const ch = g.chapters[r.chapterIndex];
+  if (w < ch[3]) return r.label;
+  const b = bookSpan(g, ch[0]);
+  return b && w >= b[1] - b[0] + 1 ? r.bookTitle : r.bookTitle + ' ' + r.chapter;
+}
+
 /**
  * The go-to. `web` is what it needs from the screen (CONTRACTS.md section 9): the graph, flyTo,
  * openPanel, the journey, lightThreads, the live region's setAnnounce and the start prop; and
@@ -209,10 +234,11 @@ export function useGoTo(web) {
     const f = focusRef.current;
     const lit = c && f.litKey === c.litKey;
     const verse = lit ? c.lo : centreVerse();
+    /** @type {[number, number]} */
+    const span = [xToVerse(cam, v.W, 0), xToVerse(cam, v.W, area())];
     return {
-      verse, label: lit ? c.label : refOfVerse(graph, verse).label,
-      span: [xToVerse(cam, v.W, 0), xToVerse(cam, v.W, area())],
-      open: reopenOf(panelRef.current, f.lit),
+      verse, label: lit ? c.label : hereLabel(graph, span, verse, cam.ppv <= fitPPV(cam, v.W) * 1.001),
+      span, open: reopenOf(panelRef.current, f.lit),
     };
   }, [graph, camRef, viewRef, focusRef, centreVerse, area]);
 
