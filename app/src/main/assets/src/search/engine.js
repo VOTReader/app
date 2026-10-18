@@ -1609,6 +1609,39 @@ function quotedVerses(/** @type {string} */ clause) {
   const where = new Set(ids.map((id) => { const f = D.get(id); return (f.bookId === 'matthew-plain' ? 'matthew' : f.bookId) + ':' + f.chapterNum + ':' + f.verseNum; }));
   return where.size === 1 ? ids : [];
 }
+/* AN ANSWERS TOPIC FIRST: ITS PASSAGE'S REPRINT, THEN THE LETTER IT CITES (search200 R1, 2026-10-18). An Answers topic
+   that leads (its title typed, a heading of its own) opens on a passage it prints, a heading over a letter's excerpt
+   closed by its source ("~ [From “...” ~ Volume 2]"), and neither the other topic printing that passage nor the
+   letter came up: the reader saw one reprint, and not its original. As after a letter, the first text below holding
+   the passage's words in a row comes up second (the topic's own heading line, the letter's heading cut, HEADING);
+   then the text the excerpt cites, unless it is shown already. */
+/** HEADING, one match at a time (no lastIndex carried between calls). */
+const HEADING_AT = new RegExp(HEADING.source, 'i');
+/**
+ * @param {Array<{score:number, doc:any, placeStart?:number, terms?:string[]}>} out  ranked, best first, an Answers topic first
+ * @param {number} st  where the topic opens
+ * @param {number} slot  where the cited text comes (after a reprint moved up second)
+ * @param {Map<any, string>} idOf
+ * @param {(doc:any) => boolean} allowed
+ * @returns {boolean} whether an entry was added
+ */
+function citedNext(out, st, slot, idOf, allowed) {
+  const D = ORIGINAL_DOCS;
+  const t = out[0].doc.text;
+  if (!D) return false;
+  const end = t.indexOf('✦', st);
+  const id = citedId(t.slice(t.lastIndexOf('✦', st) + 1, end < 0 ? t.length : end));
+  if (!id) return false;
+  const r = out.findIndex((e) => idOf.get(e) === id);
+  if (r >= 0 && r < BEST_SHOWN) return false;
+  if (r > slot) { out.splice(slot, 0, out.splice(r, 1)[0]); return false; }
+  const f = D.get(id);
+  if (!f || !allowed({ ...f, id })) return false;
+  const entry = { score: out[slot - 1].score, doc: reshapeDoc(f), terms: out[0].terms || [] };
+  idOf.set(entry, id);
+  out.splice(slot, 0, entry);
+  return true;
+}
 /**
  * @param {Array<{score:number, doc:any, placeStart?:number, terms?:string[]}>} out  ranked, best first
  * @param {string[]} terms  the words a landing marks
@@ -1620,18 +1653,25 @@ function reprintSecond(out, terms, idOf, allowed) {
   if (out.length < 3 || !terms.length) return false;
   const first = out[0];
   const d = first.doc;
-  if (!d.text || !(d.kind === 'letter' || d.kind === 'wtlb' || d.kind === 'blessed')) return false;
+  if (!d.text || !(d.kind === 'letter' || d.kind === 'wtlb' || d.kind === 'blessed' || (d.kind === 'answers' && idOf && allowed))) return false;
   // the passage it was found by: the sentence it opens on, else the one where the typed words sit thickest
   let st = typeof first.placeStart === 'number' && first.placeStart >= 0 ? first.placeStart : -1;
   if (st < 0) { const ex = matchExcerpt(d.text, terms, undefined, first.terms); st = ex ? d.text.indexOf(ex) : -1; }
   if (st < 0) return false;
+  const topic = d.kind === 'answers';
   const spans = sentenceSpans(d.text);
   const at = spans.findIndex((x) => x.end > st);
   const sp = at >= 0 ? spans[at] : null;
   let toks = sp ? kjvEncode(sp.text) : [];
+  // an Answers topic's sentence running into the heading of the letter it prints: the topic's own line before it
+  // (its heading), else the letter's words after it; the letter's heading is no one's words (HEADING)
+  if (topic && sp) {
+    const h = HEADING_AT.exec(sp.text);
+    if (h) toks = kjvEncode(h.index > 0 ? sp.text.slice(0, h.index) : sp.text.slice(h[0].length));
+  }
   // the verse it quotes: a clause of the reader's sentence (to its . ! or ?), whole or after a colon or opening quote
   /** @type {string[]} */ let verses = [];
-  if (sp && idOf && allowed) {
+  if (sp && idOf && allowed && !topic) {
     for (let j = at; j < Math.min(spans.length, at + 3) && !verses.length; j++) {
       const s = spans[j].text;
       const cut = s.search(/[:“"]/);
@@ -1656,6 +1696,7 @@ function reprintSecond(out, terms, idOf, allowed) {
       if (res.some((re) => re.test(t))) { if (r > 1) out.splice(1, 0, out.splice(r, 1)[0]); slot = 2; break; }
     }
   }
+  if (topic) return citedNext(out, st, slot, /** @type {Map<any, string>} */ (idOf), /** @type {(doc:any) => boolean} */ (allowed));
   if (!verses.length || !idOf || !allowed) return false;
   // ...and after it the verse quoted, unless it is shown already
   const r = out.findIndex((e) => verses.indexOf(idOf.get(e) || '') >= 0);

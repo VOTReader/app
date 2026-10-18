@@ -4,7 +4,9 @@
    - an Answers topic prints a letter's line with one word in another form ("messengers" where the letter says
      "messenger"), and the reader types the topic's words: the letter, holding the line up to that word's form, leads;
    - a letter's line quotes a verse word for word, and the reader types the letter's own words around it: the verse
-     it quotes comes up second, not a text that quotes the verse too.
+     it quotes comes up second, not a text that quotes the verse too;
+   - an Answers topic found by its title opens on an excerpt it prints under a heading of its own: a topic printing
+     that heading again comes up second, and the letter the excerpt cites after it.
    Fixture texts only (no benchmark query). */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VotSearchMini as E } from './engine.js';
@@ -26,6 +28,7 @@ const HEEDS = HEED.replace('My messenger has', 'My messengers has');
 // ...and a print of it with a word changed to another word
 const HEED_SERVANTS = HEED.replace('My messenger has', 'My servants has');
 const cite = (title) => ' ~ [From “' + title + '” ~ Volume 4]';
+const SMOKE = 'Thus says The Lord: The nations feast upon the high places, and the smoke of their offerings goes up before Me continually!';
 const GLOBALS = {
   BOOKS: {
     proverbs: { id: 'proverbs', title: 'Proverbs', chapters: [
@@ -41,6 +44,13 @@ const GLOBALS = {
     // a letter's line quoting the verse after a colon, and a letter quoting it too
     { id: 'watch-letter', num: 5, title: 'Keep Watch', blocks: [para(filler(12) + 'Children, have you not remembered this word: He who keeps watch at the gate of the city shall not be ashamed in the day of trouble, for his lamp is trimmed. ' + filler(12))] },
     { id: 'gate-letter', num: 6, title: 'At the Gate', blocks: [para(filler(2) + 'It is written, He who keeps watch at the gate of the city shall not be ashamed in the day of trouble, for his lamp is trimmed. Remembered by few. ' + filler(2))] },
+    // a letter an Answers topic prints under a heading of the topic's own words, its own body never saying them
+    { id: 'smoke-letter', num: 7, title: 'Smoke on the High Places', blocks: [para(SMOKE + ' ' + filler(14))] },
+    // ...and letters thick with the topic's title words
+    ...['Lanterns', 'Tents', 'Harvests', 'Seasons', 'Banners', 'Gates'].map((w, i) => ({
+      id: 'feasts-' + i, num: 20 + i, title: 'Of ' + w,
+      blocks: [para('The feasts of the nations are many, and the feasts of the nations are loud. '.repeat(3) + filler(2))],
+    })),
   ],
   ANSWERS: [
     // three topics print the line with the plural, each denser in the typed words than the long letter
@@ -50,6 +60,15 @@ const GLOBALS = {
     })),
     // a topic printing it with another word in the place of one: the letter does not hold that line
     { id: 'servants-topic', num: 4, title: 'Regarding Servants', paragraphs: [{ text: filler(1) + HEED_SERVANTS + ' Pride has bound them.' + cite('Heed My Words') }] },
+    // a topic opening on a heading of its own over an excerpt of the letter, the letter's heading before it
+    { id: 'feasts-topic', num: 5, title: 'Regarding the Feasts of the Nations', paragraphs: [
+      { align: 'center', text: '**The Feasts of the Nations Grieve the Name of The Lord**' },
+      { text: '3/4/09 From The Lord, Our God and Savior The Word of The Lord Spoken to Timothy For All Those Who Have Ears to Hear (Regarding the feasts of the nations) ' + SMOKE + cite('Smoke on the High Places') + ' ✦ Gather the grain before the rain.' + cite('The Grain') },
+    ] },
+    // ...and a topic printing that heading and excerpt again, deep in it
+    { id: 'idols-topic', num: 6, title: 'Regarding Idols', paragraphs: [
+      { text: filler(6) + 'Gather the grain before the rain.' + cite('The Grain') + ' ✦ • The Feasts of the Nations Grieve the Name of The Lord 3/4/09 From The Lord, Our God and Savior The Word of The Lord Spoken to Timothy For All Those Who Have Ears to Hear ' + SMOKE + cite('Smoke on the High Places') },
+    ] },
   ],
 };
 const ids = (r) => r.results.map((x) => x.doc.letterId || x.doc.ref);
@@ -77,6 +96,11 @@ describe('the original first, its reprint second, both shown (R1)', () => {
     const top = ids(await E.search('children have you not remembered this word'));
     expect(top[0]).toBe('watch-letter');
     expect(top[1]).toBe('Proverbs 31:1');
+  });
+
+  it('a topic found by its title, opening on a heading of its own over an excerpt: the topic reprinting it next, then the letter it cites', async () => {
+    const top = ids(await E.search('feasts of the nations'));
+    expect(top.slice(0, 3)).toEqual(['feasts-topic', 'idols-topic', 'smoke-letter']);
   });
 
   it('a line a topic prints with another word in a word\'s place: the topic holding the typed run leads', async () => {
