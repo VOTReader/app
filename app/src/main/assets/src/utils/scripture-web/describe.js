@@ -36,6 +36,17 @@ const DENSITY_MEANS = { essential: 'the strongest', famous: 'the full classic ch
  * line as `attribution`; this is what shows when a graph arrives without one. */
 export const WEB_CREDIT = 'Cross-reference data © OpenBible.info (CC-BY)';
 
+/** What a failed load says to the reader (item 24): the data file that never arrived is the
+ * connection (web-data.js rejects with "Couldn’t fetch the cross-reference data."); anything
+ * else (data that would not decode, a renderer that would not build) is said plainly, and the
+ * raw message goes under it, small, for a bug report. */
+export function loadErrorWords(message) {
+  if (/couldn.t fetch/i.test(String(message || ''))) {
+    return 'The cross-reference data didn’t arrive. Check your connection, then try again.';
+  }
+  return 'Something went wrong while the web was being drawn. Try again, or go back and come in again.';
+}
+
 /**
  * A density in words, with its count: "Famous · 63,418, the full classic chart",
  * "Essential · 15,402, the strongest". The density control's options read it, and the hint

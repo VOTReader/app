@@ -368,7 +368,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   }, [navigateToLink, camRef, focusRef, modeRef, detail]);
 
   // ── render ──────────────────────────────────────────────────────────────
-  if (loadError) return loadErrorPanel(loadError, retryLoad);
+  if (loadError) return loadErrorPanel(loadError, retryLoad, onBack);
   if (listShown && graph) {
     // A7: the web read as a list instead of a dead end (WebFallbackList.jsx).
     // It opens on the reader's last Bible chapter (HistoryStore, newest first).

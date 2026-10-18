@@ -8455,17 +8455,16 @@
       transform: translate(-50%, -50%);
       width: min(460px, calc(100% - 48px)); text-align: center;
       pointer-events: none;
-      font-family: var(--font-body); color: var(--cream-muted);
+      /* the web's own ink in both themes (item 18): it sits on the black canvas, and the theme's
+         --cream-muted and --bg turned it dark-on-black in the light theme */
+      font-family: var(--sw-font); color: var(--sw-text-body);
       /* Text on the canvas, no box: the corpus's silk runs behind it, and a
          2 px ground shadow is what keeps the words legible over it. */
-      text-shadow: 0 0 2px var(--bg), 0 0 8px var(--bg);
+      text-shadow: 0 0 2px var(--sw-canvas), 0 0 8px var(--sw-canvas);
     }
-    .sw-empty-title {
-      font-family: var(--font-cinzel); font-size: var(--fs-20);
-      color: var(--gold); letter-spacing: 0.04em; margin-bottom: 10px;
-    }
+    .sw-empty-title { font-size: var(--fs-20); color: var(--sw-gold); margin-bottom: 10px; }
     .sw-empty-body { font-size: var(--fs-15); line-height: 1.65; }
-    .sw-empty-body strong { color: var(--gold-bright); font-weight: 600; }
+    .sw-empty-body strong { color: var(--sw-gold); font-weight: 600; }
     /* A phone reader is in LANDSCAPE here — ScriptureWebScreen locks it on a
        coarse pointer — so the frame is about 360 CSS px tall and .sw-narrow is
        absent. 42 % of that is 151, which put the panel's top edge at 85 while
@@ -8507,12 +8506,12 @@
       position: absolute; top: -8px; right: -8px;
       width: 44px; height: 44px; min-width: 44px; min-height: 44px;
       display: flex; align-items: center; justify-content: center;
-      background: var(--bg3); border: 1px solid var(--gold-dim);
+      background: var(--sw-panel); border: 1px solid var(--sw-panel-edge);
       border-radius: 50%; cursor: pointer;
-      color: var(--gold); font-size: var(--fs-18); line-height: 1;
+      color: var(--sw-gold); font-size: var(--fs-18); line-height: 1;
       -webkit-tap-highlight-color: transparent;
     }
-    .sw-empty-close:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+    .sw-empty-close:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
     .sw-empty-close:active { background: var(--bg2); }
 
     .sw-root.sw-narrow .sw-controls { bottom: calc(10px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }

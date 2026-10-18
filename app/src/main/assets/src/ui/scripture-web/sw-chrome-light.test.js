@@ -45,7 +45,10 @@ function mountChrome() {
     </div>
     <button class="sw-btn sw-btn-icon sw-hide-all">Hide</button>
     <button class="sw-btn sw-btn-icon sw-guide-btn">?</button>
-    <div class="sw-legend"><span class="sw-key">your links</span></div>`;
+    <div class="sw-legend"><span class="sw-key">your links</span><span class="sw-credit">Cross-reference data</span></div>
+    <div class="sw-empty"><div class="sw-empty-title">Your web is still being woven.</div>
+      <div class="sw-empty-body">Select text anywhere in the app, tap <strong>Link</strong>.</div>
+      <button class="sw-empty-close">x</button></div>`;
   document.body.appendChild(root);
   return root;
 }
@@ -62,6 +65,13 @@ const SITES = {
   // the ? read nearly invisible in the light theme (digest item 18, crop-pc-light-qbtn)
   'guide ?': '.sw-guide-btn',
   'legend': '.sw-legend',
+  'legend credit': '.sw-legend .sw-credit',
+  // My Web's empty notice sits on the canvas with no box: --cream-muted turned it dark-on-black
+  // in the light theme (digest item 18)
+  'empty title': '.sw-empty-title',
+  'empty body': '.sw-empty-body',
+  'empty body strong': '.sw-empty-body strong',
+  'empty close': '.sw-empty-close',
 };
 
 /** Resolve `color` through the cascade: var(--x) -> the property's computed value, following a
@@ -150,4 +160,21 @@ describe('the Scripture Web chrome reads on its black canvas in the light theme 
     expect(onBlack(light), `light ink ${light.join(',')} on #000`).toBeGreaterThanOrEqual(4.5);
     expect(light, 'one palette: the same ink in both themes').toEqual(dark);
   });
+
+  /* The load error replaces the whole screen (no .sw-root above it), so it reads the web's
+     tokens from its own rule (.sw-fallback, .sw-root) and paints the canvas's black (Q4). */
+  it.each([['title', '.sw-fallback-title'], ['body', '.sw-fallback-body'], ['detail', '.sw-fallback-detail']])(
+    'the load error\'s %s reads on black in both themes, the same ink in both', (_name, sel) => {
+      const panel = document.createElement('div');
+      panel.className = 'sw-fallback';
+      panel.innerHTML = '<div class="sw-fallback-title">The Scripture Web couldn\u2019t load.</div>'
+        + '<div class="sw-fallback-body">Check your connection.</div><div class="sw-fallback-detail">detail</div>';
+      document.body.appendChild(panel);
+      const el = panel.querySelector(sel);
+      const dark = inkOf(el);
+      document.body.classList.toggle('light', true);
+      const light = inkOf(el);
+      expect(onBlack(light), `light ink ${light.join(',')} on #000`).toBeGreaterThanOrEqual(4.5);
+      expect(light).toEqual(dark);
+    });
 });

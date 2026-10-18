@@ -13,7 +13,7 @@
    guide keeps Tab inside and hands focus back on close.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { connectionTitle, arcLine, endpointLabel, plural, myWebLegendWords, WEB_CREDIT } from '../../utils/scripture-web/describe.js';
+import { connectionTitle, arcLine, endpointLabel, plural, WEB_CREDIT, loadErrorWords, myWebLegendWords } from '../../utils/scripture-web/describe.js';
 import { LINK_KIND_NAMES } from '../../utils/scripture-web/palette.js';
 import { ink } from '../../utils/scripture-web/sw-ink.js';
 
@@ -172,11 +172,17 @@ export function EmptyWebNotice({ onDismiss }) {
  * @param {string} message
  * @param {() => void} onRetry
  */
-export function loadErrorPanel(message, onRetry) {
+export function loadErrorPanel(message, onRetry, onBack) {
+  // It replaces the whole screen, topbar and all, so it carries its own Back (item 24) where the
+  // topbar's sits; the words are plain, the raw message small beneath them.
   return (
     <div className="sw-fallback">
+      <button type="button" className="sw-btn sw-btn-icon sw-fallback-back" onClick={onBack} aria-label="Back">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+      </button>
       <div className="sw-fallback-title">The Scripture Web couldn’t load.</div>
-      <div className="sw-fallback-body">{message}</div>
+      <div className="sw-fallback-body">{loadErrorWords(message)}</div>
+      {message ? <div className="sw-fallback-detail">{message}</div> : null}
       <button type="button" className="sw-btn" onClick={onRetry}>Try again</button>
     </div>
   );
