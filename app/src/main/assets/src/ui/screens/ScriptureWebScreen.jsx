@@ -232,7 +232,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const {
     tip, choices, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
     handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread, chooseGroup,
-    openPanel, lightThreads,
+    openPanel, lightThreads, panel,
   } = useWebSelection({
     graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, yFrameFor,
     personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce, relink, settledAt,
@@ -241,7 +241,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // the go-to (goto.jsx): its header slot (goTo.button, first in the control
   // row) and what it puts over the canvas (goTo.box: the box, its verse chip, its edge chips)
   const goTo = useGoTo({ graph, flyTo, openPanel, journey, lightThreads, setAnnounce, start,
-    closePanel: closeCards, density, mode, camRef, viewRef, focusRef, panelInsetRef, viewFor, onFrame, rootRef: wrapRef });
+    closePanel: closeCards, panel, density, mode, camRef, viewRef, focusRef, panelInsetRef, viewFor, onFrame, rootRef: wrapRef });
 
   // ── gestures — imperative, never React state per frame ──────────────────
   // Wiring itself lives in gestures.js (attachWebGestures) — a pure move, so

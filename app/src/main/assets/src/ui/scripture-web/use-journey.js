@@ -19,7 +19,10 @@
      push(entry, origin?)   records an arrival. origin (additive) is where the
              reader set out from: it seeds an empty trail, so the first Follow
              already has somewhere to come back to; left out, the trail asks
-             the go-to where the reader is (connect's here). An arrival at the place
+             the go-to where the reader is (connect's here). An entry with no
+             `open` (a book name's: the tap opens nothing) records what is open
+             at the push, the same way, so Back puts the panel back as it was
+             there instead of leaving a later step's panel up. An arrival at the place
              one step back is a walk back (Follow on the same line, end to
              end): it steps back instead of growing the trail. The same place
              twice is one crumb; the trail keeps the last 24.
@@ -101,8 +104,11 @@ export function useJourney(deps) {
   const push = React.useCallback((entry, origin) => {
     const s = stackRef.current;
     const p = panelRef.current;
-    const from = origin !== undefined ? origin : (!s.length && p && p.here ? p.here() : null);
-    set(pushed(s, entry, from));
+    const now = p && p.here ? p.here() : null;
+    const from = origin !== undefined ? origin : (!s.length ? now : null);
+    // an arrival that opens nothing keeps what is open (the panel stays up through a book's fly)
+    const at = entry && entry.open === undefined && now ? Object.assign({}, entry, { open: now.open }) : entry;
+    set(pushed(s, at, from));
   }, [set]);
 
   const clear = React.useCallback(() => { if (stackRef.current.length) set([]); }, [set]);

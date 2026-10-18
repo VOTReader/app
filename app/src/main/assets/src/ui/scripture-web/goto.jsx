@@ -71,21 +71,41 @@ const NO_GOTO = Object.freeze({
 });
 
 /**
+ * What a journey crumb reopens on Back, from what is open now: the panel's spec (with the lit
+ * threads, when there are any), or null when nothing is open, so Back closes whatever a later step
+ * opened. A card no spec reopens (a bundle's sheet, a My Web card) counts as nothing: Back closes
+ * it rather than leave a panel up over a view that no longer shows it. Pure, for its own tests.
+ * @param {any} panel  use-web-selection.js's panel ({ spec, info } | null)
+ * @param {ArrayLike<number> | null} lit  focus.lit
+ * @returns {any}  a PanelSpec (plus `lit`), or null
+ */
+export function reopenOf(panel, lit) {
+  const spec = panel && panel.spec;
+  if (!spec || spec.myWeb) return null;
+  if (spec.mode === 'group' && !(spec.ids && spec.ids.length) && !(spec.chapter >= 0)) return null;
+  return lit && lit.length ? Object.assign({}, spec, { lit }) : spec;
+}
+
+/**
  * The go-to. `web` is what it needs from the screen (CONTRACTS.md section 9): the graph, flyTo,
  * openPanel, the journey, lightThreads, the live region's setAnnounce and the start prop; and
- * (the navigation stream's additions on its own call line) closePanel, the density and mode, the
- * camera's refs and viewFor, the frame loop's onFrame and the root.
+ * (the navigation stream's additions on its own call line) closePanel and panel (what is open,
+ * so a journey crumb records it), the density and mode, the camera's refs and viewFor, the frame
+ * loop's onFrame and the root.
  * @param {{ graph?: any, flyTo?: Function, openPanel?: Function, journey?: any,
- *   lightThreads?: Function, setAnnounce?: Function, start?: any, closePanel?: Function,
+ *   lightThreads?: Function, setAnnounce?: Function, start?: any, closePanel?: Function, panel?: any,
  *   density?: any, mode?: string, camRef?: any, viewRef?: any, focusRef?: any, panelInsetRef?: any,
  *   viewFor?: Function, onFrame?: Function, rootRef?: any }} web
  * @returns {GoTo}
  */
 export function useGoTo(web) {
   const {
-    graph, flyTo, openPanel, journey, lightThreads, setAnnounce, start, closePanel,
+    graph, flyTo, openPanel, journey, lightThreads, setAnnounce, start, closePanel, panel,
     density, mode, camRef, viewRef, focusRef, panelInsetRef, viewFor, onFrame, rootRef,
   } = web || {};
+  // what is open, read when a crumb is recorded (here), not when this render ran
+  const panelRef = React.useRef(panel);
+  panelRef.current = panel;
   const live = !!(camRef && viewRef && focusRef && flyTo && openPanel);
   const [isOpen, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
@@ -121,8 +141,9 @@ export function useGoTo(web) {
     return Math.max(0, Math.min(graph.total - 1, c));
   }, [camRef, viewRef, area, graph]);
 
-  /** Where the reader is, as a journey entry: the centre verse, the span in view, and the
-   * go-to's lit verse open again when that is what is up. */
+  /** Where the reader is, as a journey entry: the go-to's lit verse or else the centre verse, the
+   * span in view, and what is open there (reopenOf): Back opens it again, or closes what a later
+   * step opened when nothing was. */
   const here = React.useCallback(() => {
     const cam = camRef.current, v = viewRef.current;
     if (!graph || !cam || !v.W) return null;
@@ -133,7 +154,7 @@ export function useGoTo(web) {
     return {
       verse, label: lit ? c.label : refOfVerse(graph, verse).label,
       span: [xToVerse(cam, v.W, 0), xToVerse(cam, v.W, area())],
-      open: lit ? { mode: 'verse', verse: c.lo, lit: c.ids } : undefined,
+      open: reopenOf(panelRef.current, f.lit),
     };
   }, [graph, camRef, viewRef, focusRef, centreVerse, area]);
 

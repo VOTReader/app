@@ -8,7 +8,7 @@ import { useWebCamera } from './use-web-camera.js';
 import { useWebSelection } from './use-web-selection.js';
 import { useJourney } from './use-journey.js';
 import { useFrameScheduler } from './use-frame-scheduler.js';
-import { useGoTo, routeOverlayHit, GOTO_HINT } from './goto.jsx';
+import { useGoTo, routeOverlayHit, reopenOf, GOTO_HINT } from './goto.jsx';
 import { useWebKeys } from './use-web-keys.js';
 import { verseToX, fitPPV } from '../../utils/scripture-web/geometry.js';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
@@ -80,7 +80,7 @@ function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false } = {}) {
       personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo: camera.flyTo, journey, schedule: frames.schedule, setAnnounce,
     });
     const goTo = useGoTo({ graph: g, flyTo: camera.flyTo, openPanel: sel.openPanel, journey, lightThreads: sel.lightThreads, setAnnounce, start,
-      closePanel: sel.closeCards, density: 'famous', mode: 'canonical', camRef: camera.camRef, viewRef: camera.viewRef,
+      closePanel: sel.closeCards, panel: sel.panel, density: 'famous', mode: 'canonical', camRef: camera.camRef, viewRef: camera.viewRef,
       focusRef: camera.focusRef, panelInsetRef: camera.panelInsetRef, viewFor: camera.viewFor, onFrame: frames.onFrame, rootRef });
     const none = React.useRef(null);
     const web = useWebKeys({
@@ -240,6 +240,87 @@ describe('the go-to box (spec 4.5)', () => {
     fireEvent.keyDown(input(container), { key: 'Enter' });
     expect(setAnnounce).toHaveBeenLastCalledWith('No book, chapter or verse called love one another');
     expect(box(container)).toBeTruthy();
+  });
+});
+
+/* Back restores the panel as it was where the reader set out (the review of 2026-10-18): a trail's
+   crumb records what is OPEN there, so Back closes a panel the trail opened later, and reopens one
+   that was open, with its lit threads. */
+describe('Back puts the panel back as it was', () => {
+  it('reopenOf: what is open as a spec to reopen, its lit threads with it; nothing, or a card no spec opens, is null', () => {
+    const lit = Int32Array.from([3, 4]);
+    expect(reopenOf(null, null)).toBeNull();
+    expect(reopenOf({ spec: { mode: 'verse', verse: 7 } }, lit)).toEqual({ mode: 'verse', verse: 7, lit });
+    expect(reopenOf({ spec: { mode: 'connection', arc: 2 } }, null)).toEqual({ mode: 'connection', arc: 2 });
+    expect(reopenOf({ spec: { mode: 'group', ids: [1, 2], label: '' } }, new Int32Array(0))).toEqual({ mode: 'group', ids: [1, 2], label: '' });
+    expect(reopenOf({ spec: { mode: 'group', ids: [], label: 'Isaiah 53', chapter: 4 } }, null)).toMatchObject({ chapter: 4 });
+    expect(reopenOf({ spec: { mode: 'group', ids: [], label: 'a bundle' } }, null), "a bundle's sheet").toBeNull();
+    expect(reopenOf({ spec: { mode: 'connection', arc: 0, myWeb: 'link' } }, null), 'a My Web card').toBeNull();
+  });
+
+  const back = async (get) => {
+    act(() => { get().journey.back(); });
+    // the fly, its landing's reopen, then the frame that reopen asked for
+    settle(); await flush(); settle();
+  };
+  const litOf = (get) => Array.from(get().cam.focusRef.current.lit || []);
+
+  it('a go-to from the overview, then Back: the go-to\'s panel closes and its threads let go', async () => {
+    const { container, get } = mountWeb();
+    act(() => { get().goTo.open('Genesis 1:101'); });
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    settle(); await flush();
+    expect(get().sel.panel.spec).toMatchObject({ mode: 'verse', verse: 100 });
+    await back(get);
+    expect(get().cam.camRef.current.x, 'home').toBeCloseTo(15551, 0);
+    expect(get().sel.panel, 'nothing was open at home').toBeNull();
+    expect(litOf(get)).toEqual([]);
+    expect(container.querySelector('.sw-goto-chip')).toBeNull();
+  });
+
+  it('a panel open where the go-to set out opens again on Back (report gap 5)', async () => {
+    const { container, get } = mountWeb();
+    act(() => { get().sel.openPanel({ mode: 'connection', arc: 1 }); });
+    act(() => { get().goTo.open('Genesis 1:101'); });
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    settle(); await flush();
+    await back(get);
+    expect(get().sel.panel.spec).toEqual({ mode: 'connection', arc: 1 });
+    expect(litOf(get)).toEqual([]);
+  });
+
+  it('an edge chip\'s Follow from a go-to: Back reopens the verse with its threads lit', async () => {
+    const { container, get } = mountWeb({ cam: { x: 120, ppv: 8 } });
+    act(() => { get().goTo.open('Genesis 1:101'); });
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    settle(); await flush();
+    expect(litOf(get).sort()).toEqual([0, 2]);
+    // Genesis 1:101 framed at the fixture's fit: zoom in on its foot so its threads leave the frame
+    act(() => { get().cam.camRef.current.ppv = 8; get().cam.camRef.current.x = 120; get().frames.schedule(); });
+    settle();
+    fireEvent.click(container.querySelector('.sw-goto-edge-right'));
+    settle(); await flush();
+    // the view holds verses 70-170: 2 (100-300) and 0 (100-20100) leave on the right; 2 is the stronger
+    expect(get().sel.panel.spec).toEqual({ mode: 'connection', arc: 2 });
+    await back(get);
+    expect(get().sel.panel.spec).toEqual({ mode: 'verse', verse: 100 });
+    expect(litOf(get).sort(), 'its threads lit again').toEqual([0, 2]);
+  });
+
+  it('a book name\'s crumb keeps what was open when it was tapped, not the go-to\'s panel after it', async () => {
+    const { container, get } = mountWeb({ cam: { x: 9000, ppv: 8 } });
+    act(() => { get().sel.openPanel({ mode: 'connection', arc: 1 }); });
+    const nav = () => ({ graph: graph(), flyTo: get().cam.flyTo, openPanel: get().sel.openPanel, journey: get().journey });
+    act(() => { routeOverlayHit({ kind: 'book', book: 0 }, nav()); });
+    settle(); await flush();
+    act(() => { get().goTo.open('Genesis 1:101'); });
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    settle(); await flush();
+    expect(get().journey.stack.map((e) => e.label)).toEqual(['Genesis 1:9001', 'Genesis', 'Genesis 1:101']);
+    await back(get);
+    expect(get().sel.panel.spec, 'the book, with the line that was open there').toEqual({ mode: 'connection', arc: 1 });
+    await back(get);
+    expect(get().sel.panel.spec, 'home, with the same line').toEqual({ mode: 'connection', arc: 1 });
   });
 });
 
