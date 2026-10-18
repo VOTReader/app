@@ -82,7 +82,8 @@ import { drawPersonalWeb, railFrame, segmentSpan } from './rail-renderer.js';
  *   book: an index into g.books; chapter: its number (1-based); ids: the OpenBible
  *   arc ids a "+n" pill counts, label: what the panel's group mode is titled
  */
-/** @typedef {{ x0:number, y0:number, x1:number, y1:number, hit: OverlayHit }} OverlayBox  device px */
+/** @typedef {{ x0:number, y0:number, x1:number, y1:number, hit: OverlayHit, core?: Box }} OverlayBox
+ *   device px: the tap target, at least TAP_MIN CSS px each way; `core` is what is drawn there */
 /** @typedef {{ x0:number, y0:number, x1:number, y1:number }} Box  device px */
 
 /**
@@ -91,7 +92,9 @@ import { drawPersonalWeb, railFrame, segmentSpan } from './rail-renderer.js';
  * name, a chapter numeral or a pill is never read as the line beneath it.
  * The canvas stream records the boxes (paintCanonOverlay's `hits`) as it
  * paints and owns this lookup; the navigation stream routes the result
- * (goto.jsx routeOverlayHit). The box painted last is on top.
+ * (goto.jsx routeOverlayHit). A tap on what is drawn (a box's core) takes
+ * it, the box painted last on top; else, among the tap targets the point is
+ * in (each a finger wide, so neighbours' overlap), the one drawn nearest.
  * @param {CanonFrame|null} fs  the last painted frame (useWebRenderer's overlayFrameRef)
  * @param {number} xCss @param {number} yCss
  * @returns {OverlayHit|null}
@@ -101,11 +104,52 @@ export function hitOverlay(fs, xCss, yCss) {
   if (!hits || !hits.length) return null;
   const dpr = (fs.v && fs.v.DPR) || 1;
   const px = xCss * dpr, py = yCss * dpr;
+  /** @param {Box} b */
+  const inside = (b) => px >= b.x0 && px <= b.x1 && py >= b.y0 && py <= b.y1;
+  for (let i = hits.length - 1; i >= 0; i--) {
+    if (inside(hits[i].core || hits[i])) return hits[i].hit;
+  }
+  /** @type {OverlayHit|null} */
+  let best = null;
+  let bestD = Infinity;
   for (let i = hits.length - 1; i >= 0; i--) {
     const b = hits[i];
-    if (px >= b.x0 && px <= b.x1 && py >= b.y0 && py <= b.y1) return b.hit;
+    if (!inside(b)) continue;
+    const c = b.core || b;
+    const dx = Math.max(c.x0 - px, 0, px - c.x1), dy = Math.max(c.y0 - py, 0, py - c.y1);
+    const d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = b.hit; }
   }
-  return null;
+  return best;
+}
+
+/** A tap target is at least this big each way, CSS px: a finger (WCAG 2.5.5; the platforms' 44 pt / 48 dp). */
+export const TAP_MIN = 44;
+
+/**
+ * The tap target for what is drawn at `core`: `area` (the drawn box with its
+ * own margin, or a chapter's whole span) grown to TAP_MIN each way about its
+ * centre, then slid into the ruler band (under the baseline, on the canvas,
+ * left of the open panel) so it never reaches up into the threads. Device px.
+ * @param {Box} core @param {Box} area @param {OverlayHit} hit @param {any} L  layoutOf's
+ * @returns {OverlayBox}
+ */
+function tapTarget(core, area, hit, L) {
+  const m = TAP_MIN * L.s;
+  /** @param {number} a @param {number} b @param {number} lo @param {number} hi @returns {[number, number]} */
+  const fit = (a, b, lo, hi) => {
+    if (b - a < m) { const c = (a + b) / 2; a = c - m / 2; b = c + m / 2; }
+    if (a < lo) { b += lo - a; a = lo; }
+    if (b > hi) { a = Math.max(lo, a - (b - hi)); b = hi; }
+    return [a, b];
+  };
+  const [x0, x1] = fit(area.x0, area.x1, 0, L.Wc);
+  const [y0, y1] = fit(area.y0, area.y1, L.base, L.H);
+  const c = {
+    x0: Math.min(Math.max(core.x0, x0), x1), x1: Math.min(Math.max(core.x1, x0), x1),
+    y0: Math.min(Math.max(core.y0, y0), y1), y1: Math.min(Math.max(core.y1, y0), y1),
+  };
+  return { x0, y0, x1, y1, core: c, hit };
 }
 
 /* ── the numbers (CSS px unless named otherwise) ────────────────────────── */
@@ -716,7 +760,7 @@ function drawBookLabels(ctx, g, cam, L, rows, size, hits) {
     setFont(ctx, n.font, sp);
     ctx.fillStyle = css(n.major ? 'bookLabelMajor' : 'bookLabel');
     ctx.fillText(n.label, n.left, b.y1);
-    if (hits) hits.push({ x0: b.x0 - 3 * s, y0: b.y0 - 5 * s, x1: b.x1 + 3 * s, y1: b.y1 + 5 * s, hit: { kind: 'book', book: n.bi } });
+    if (hits) hits.push(tapTarget(b, { x0: b.x0 - 3 * s, y0: b.y0 - 5 * s, x1: b.x1 + 3 * s, y1: b.y1 + 5 * s }, { kind: 'book', book: n.bi }, L));
   });
   setFont(ctx, fontN, 0);
 }
@@ -817,9 +861,9 @@ function drawDeep(ctx, g, cam, L, t, centre, grid, hits) {
     placedCi.add(ci);
     if (takeHits) {
       const hit = { kind: /** @type {'chapter'} */ ('chapter'), book: c[0], chapter: c[1] };
-      chapterHits.push(stride === 1
-        ? { x0: Math.max(x0, 0), x1: Math.min(x1, Wc), y0: box.y0 - 6 * s, y1: box.y1 + 6 * s, hit }
-        : { x0: box.x0 - 6 * s, x1: box.x1 + 6 * s, y0: box.y0 - 6 * s, y1: box.y1 + 6 * s, hit });
+      chapterHits.push(tapTarget(box, stride === 1
+        ? { x0: Math.max(x0, 0), x1: Math.min(x1, Wc), y0: box.y0 - 6 * s, y1: box.y1 + 6 * s }
+        : { x0: box.x0 - 6 * s, x1: box.x1 + 6 * s, y0: box.y0 - 6 * s, y1: box.y1 + 6 * s }, hit, L));
     }
   }
   // the rules at the chapters' starts: a book's tallest, a numbered chapter's to its numeral, the
@@ -876,7 +920,7 @@ function drawDeep(ctx, g, cam, L, t, centre, grid, hits) {
   if (takeHits && names) {
     for (const h of chapterHits) hits.push(h);
     for (const n of names.list) {
-      hits.push({ x0: n.box.x0 - 4 * s, y0: n.box.y0 - 8 * s, x1: n.box.x1 + 4 * s, y1: n.box.y1 + 8 * s, hit: { kind: 'book', book: n.bi } });
+      hits.push(tapTarget(n.box, { x0: n.box.x0 - 4 * s, y0: n.box.y0 - 8 * s, x1: n.box.x1 + 4 * s, y1: n.box.y1 + 8 * s }, { kind: 'book', book: n.bi }, L));
     }
   }
 }
@@ -1197,7 +1241,7 @@ function drawPills(ctx, g, cam, L, fs, grid, hits, badges) {
       kind: 'pill', label: cellLabel(g, cell),
       get ids() { return ids || (ids = pillIds(g, snap, W, density, lo, hi)); },
     };
-    hits.push({ x0: box.x0, y0: box.y0, x1: box.x1, y1: box.y1, hit });
+    hits.push(tapTarget(box, box, hit, L));
   }
   ctx.restore();
 }

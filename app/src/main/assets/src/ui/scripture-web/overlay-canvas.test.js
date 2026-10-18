@@ -511,6 +511,64 @@ describe('labelFeed: every drawn thread a reader can see on the frame', () => {
    (about 17,000 threads at 6x) and sorted every 40 px bucket of them, to keep three a bucket:
    panning at 6x cost 8.3 ms a frame against the spine's 0.6. The keepers are now chosen in one
    pass with no sort, and nothing is made for a foot that cannot win. */
+describe('the tap targets are a finger wide (w3 review: the hit boxes ran 14-30 px tall against 44)', () => {
+  const TAP = 44;
+  for (const [name, zoom] of [['phone', 1], ['phone', 40], ['phone', 300], ['pc', 1], ['pc', 40]]) {
+    it(name + ' ' + zoom + 'x: every hit box is at least 44 CSS px each way, in the ruler band, around what it names', () => {
+      const { out, fs } = paint(name, zoom, ISA53_6, { panelInset: name === 'pc' ? { right: 400, bottom: 0 } : null });
+      const s = fs.v.DPR, Wc = fs.v.W - (name === 'pc' ? 400 * s : 0);
+      expect(out.hits.length, 'tap targets').toBeGreaterThan(3);
+      const kinds = new Set(out.hits.map((h) => h.hit.kind));
+      expect(kinds.has(zoom === 1 ? 'book' : 'chapter')).toBe(true);
+      for (const h of out.hits) {
+        const what = h.hit.kind + ' ' + (h.hit.chapter || h.hit.book || h.hit.label);
+        expect(h.y1 - h.y0, what + ' tall').toBeGreaterThanOrEqual(TAP * s - 1e-6);
+        expect(h.x1 - h.x0, what + ' wide').toBeGreaterThanOrEqual(TAP * s - 1e-6);
+        expect(h.y0, what + ' under the baseline').toBeGreaterThanOrEqual(fs.view.base - 1e-6);
+        expect(h.y1, what + ' on the canvas').toBeLessThanOrEqual(fs.v.H + 1e-6);
+        expect(h.x0, what).toBeGreaterThanOrEqual(-1e-6);
+        expect(h.x1, what + ' left of the panel').toBeLessThanOrEqual(Wc + 1e-6);
+        expect(h.core, what + ' keeps its drawn box').toBeTruthy();
+        expect(h.core.x0 >= h.x0 - 1e-6 && h.core.x1 <= h.x1 + 1e-6 && h.core.y0 >= h.y0 - 1e-6 && h.core.y1 <= h.y1 + 1e-6, what + ' inside').toBe(true);
+      }
+    });
+  }
+
+  it('a tap a little off a numeral still finds it, and where two grown targets meet the nearer drawn one wins', () => {
+    const { out, fs } = paint('phone', 40, ISA53_6);
+    const s = fs.v.DPR;
+    const at = (x, y) => hitOverlay(fs, x / s, y / s);
+    const ch = out.hits.filter((h) => h.hit.kind === 'chapter');
+    expect(ch.length).toBeGreaterThan(2);
+    for (const h of ch) {
+      const cx = (h.core.x0 + h.core.x1) / 2;
+      // just under and just over the drawn box, inside the grown one
+      for (const y of [h.core.y1 + 4 * s, h.core.y0 - 4 * s]) {
+        if (y < h.y0 || y > h.y1) continue;
+        const hit = at(cx, y);
+        expect(hit, 'chapter ' + h.hit.chapter).toBeTruthy();
+        if (hit.kind === 'chapter') expect(hit.chapter).toBe(h.hit.chapter);
+      }
+    }
+    // the overview's two name rows: a tap nearer one row's name reads that name
+    const ov = paint('phone', 1, ISA53_6);
+    const books = ov.out.hits.filter((h) => h.hit.kind === 'book');
+    let pairs = 0;
+    for (const a of books) {
+      for (const b of books) {
+        if (a === b || !(a.core.y0 > b.core.y1)) continue;   // a on the lower row, b on the upper
+        const x = Math.max(a.core.x0, b.core.x0), x1 = Math.min(a.core.x1, b.core.x1);
+        if (!(x1 > x)) continue;
+        const mx = (x + x1) / 2;
+        expect(hitOverlay(ov.fs, mx / s, (a.core.y0 - 1 * s) / s), 'just over the lower name').toBe(a.hit);
+        expect(hitOverlay(ov.fs, mx / s, (b.core.y1 + 1 * s) / s), 'just under the upper name').toBe(b.hit);
+        pairs++;
+      }
+    }
+    expect(pairs, 'names on both rows over each other').toBeGreaterThan(3);
+  });
+});
+
 describe('the face arriving (w3 review: the overlay kept the last frame, its ctx and graph, in a module global)', () => {
   it('the overlay paints nothing on its own when the face loads; whoever subscribed (the screen schedule) is told once', async () => {
     vi.resetModules();
