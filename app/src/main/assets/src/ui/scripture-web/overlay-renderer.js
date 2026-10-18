@@ -1639,7 +1639,7 @@ function drawElevator(ctx, cam, view, v, chrome, yf) {
 export function publishRails(ro, p, g, cam, camV, v, root) {
   const el = ro && ro.width && root && typeof root.setAttribute === 'function' ? root : null;
   if (!el || !g) return;
-  const rails = railFrame({ H: v.H, DPR: v.DPR }, ro.base);
+  const rails = railFrame({ H: v.H, DPR: v.DPR, inset: ro.inset }, ro.base);   // as drawn (fix-review #7)
   const top = [];
   if (p && p.votRail && p.votRail.segments) {
     for (const seg of p.votRail.segments) {

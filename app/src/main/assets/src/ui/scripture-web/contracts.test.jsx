@@ -24,13 +24,14 @@ const graph = () => ({
 });
 
 /** The camera, the journey and the selection wired as the screen wires them. */
-function mount({ withCamera = true, mode = 'canonical', personal = null, rails = null } = {}) {
+function mount({ withCamera = true, mode = 'canonical', personal = null, rails = null, topbar = null } = {}) {
   const g = graph();
   const schedule = vi.fn();
   const setAnnounce = vi.fn();
   const hook = renderHook(() => {
     const modeRef = React.useRef(mode);
-    const cam = useWebCamera({ graph: g, density: 'famous', modeRef, schedule });
+    const topbarRef = React.useRef(topbar);
+    const cam = useWebCamera({ graph: g, density: 'famous', modeRef, schedule, topbarRef });
     const journey = useJourney();
     const resumeRef = React.useRef(null);
     const personalRef = React.useRef(personal);
@@ -237,6 +238,25 @@ describe("My Web's focus names its list (fix-review #4, #11)", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe("camFor: My Web splits its two cameras at the gap's midline (fix-review #7)", () => {
+  it("reads the rails as the draw places them, the top chrome's inset included", () => {
+    const topbar = { offsetTop: 0, offsetHeight: 140 };
+    const { get } = mount({ mode: 'personal', topbar });
+    const { cam } = get();
+    cam.viewRef.current = { W: 1600, H: 900, DPR: 1 };
+    const bible = cam.camRef.current, vols = { x: 5, ppv: 10, total: 10, y: 0 };
+    cam.camVRef.current = vols;
+    const base = cam.frame().base;
+    const drawn = railFrame({ H: 900, DPR: 1, inset: 140 }, base), bare = railFrame({ H: 900, DPR: 1 }, base);
+    const mid = (drawn.topY + drawn.bottomY) / 2, midBare = (bare.topY + bare.bottomY) / 2;
+    expect(mid).toBeGreaterThan(midBare + 10);    // the inset moves the split: the test can tell
+    expect(cam.camFor(mid - 1)).toBe(vols);
+    expect(cam.camFor(mid + 1)).toBe(bible);
+    // between the two midlines: the Volumes half as drawn, not the bare frame's Bible half
+    expect(cam.camFor((mid + midBare) / 2)).toBe(vols);
   });
 });
 

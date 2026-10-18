@@ -24,7 +24,7 @@ import { maxSpanOf } from '../../utils/scripture-web/decode.js';
 import { maxZoomFor, fitPPV, clampCamera } from '../../utils/scripture-web/geometry.js';
 import { webFrame, webViewArgs, webYFrame, maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
-import { railFrame } from './rail-renderer.js';
+import { railFrame, chromeInset } from './rail-renderer.js';
 
 /**
  * Where flyTo takes the camera: a canon x range to frame across the canvas area (edge to edge;
@@ -46,8 +46,10 @@ import { railFrame } from './rail-renderer.js';
  * @param {import('../../utils/scripture-web/decode.js').Density} args.density  the density setting the shader draws
  * @param {{ current: string }} args.modeRef  'canonical' | 'personal', read per frame
  * @param {() => void} [args.schedule]  the frame loop's (use-frame-scheduler.js): flyTo draws through it
+ * @param {{ current: any }} [args.topbarRef]  the top chrome, whose bottom edge the Volumes rail clears
+ *   (camFor splits the rails where the draw places them)
  */
-export function useWebCamera({ graph, density, modeRef, schedule }) {
+export function useWebCamera({ graph, density, modeRef, schedule, topbarRef }) {
   const camRef = React.useRef(null);
   /* r2: the Volumes rail has a camera of its own, so the top and bottom halves
      zoom and pan independently (Corbin: "zoom into Rebuke [top] and on the
@@ -100,11 +102,12 @@ export function useWebCamera({ graph, density, modeRef, schedule }) {
     const cv = camVRef.current;
     if (modeRef.current !== 'personal' || !cv) return camRef.current;
     const v = viewRef.current;
-    const rails = railFrame({ H: v.H, DPR: v.DPR }, frame().base);
+    // the rails as the draw places them, the top chrome's inset included (fix-review #7)
+    const rails = railFrame({ H: v.H, DPR: v.DPR, inset: chromeInset(topbarRef && topbarRef.current, v.DPR) }, frame().base);
     const top = yDevice < (rails.topY + rails.bottomY) / 2;
     lastRailRef.current = top ? 'top' : 'bottom';
     return top ? cv : camRef.current;
-  }, [frame, modeRef]);
+  }, [frame, modeRef, topbarRef]);
 
   /**
    * Move the canon camera to a place (CONTRACTS.md §3). Resolves true on arrival, false when

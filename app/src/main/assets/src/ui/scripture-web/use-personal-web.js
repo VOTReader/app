@@ -28,6 +28,7 @@ import { createCamera, verseToX, fitPPV, clampCamera } from '../../utils/scriptu
 import { buildPersonal } from '../../utils/scripture-web/personal-build.js';
 import { linkIndexById } from '../../utils/scripture-web/personal-graph.js';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
+import { chromeInset } from './rail-renderer.js';
 
 /** Subscribe to LinkStore so the personal web follows new links live. */
 function useLinkVersion() {
@@ -110,8 +111,7 @@ export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, vie
     const f = frame();
     // the top chrome's bottom edge, device px (the canon overlay measures it
     // the same way): the Volumes rail keeps its names clear of it
-    const tb = topbarRef && topbarRef.current;
-    const inset = tb && tb.offsetHeight ? (tb.offsetTop + tb.offsetHeight) * (v.DPR || 1) : 0;
+    const inset = chromeInset(topbarRef && topbarRef.current, v.DPR);
     return {
       width: v.W, height: v.H, DPR: v.DPR, base: f.base, inset,
       chrome: chromeRef.current,

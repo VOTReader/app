@@ -171,7 +171,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const {
     camRef, camVRef, lastRailRef, viewRef, focusRef, panelInsetRef,
     frame, viewFor, zoomCapFor, yFrameFor, camFor, flyTo, cancelFly,
-  } = useWebCamera({ graph, density, modeRef, schedule });
+  } = useWebCamera({ graph, density, modeRef, schedule, topbarRef });
   const theme = settings && settings.theme;
 
   // the canvas's colours, re-read when the theme flips (use-web-renderer.js)

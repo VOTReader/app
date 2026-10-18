@@ -104,6 +104,17 @@ export function railFrame(v, base) {
   return { bottomY: base, topY: Math.min(Math.max(spec, clear), base * 0.4) };
 }
 
+/**
+ * The top chrome's bottom edge in device px, the inset railFrame clears (0
+ * without the element or before it has laid out). Every reader of the rails
+ * (the draw's railOpts, camFor's split, the published rails) measures it so.
+ * @param {{offsetTop:number, offsetHeight:number}|null|undefined} el the top bar
+ * @param {number} dpr
+ */
+export function chromeInset(el, dpr) {
+  return el && el.offsetHeight ? (el.offsetTop + el.offsetHeight) * (dpr || 1) : 0;
+}
+
 /** The phone's frame (spec §3's compact column): a frame under COMPACT_H CSS px tall. */
 function isCompact(v) {
   return v.H / (v.DPR || 1) <= COMPACT_H;
