@@ -38,7 +38,7 @@ function mountChrome() {
   root.innerHTML = `
     <div class="sw-topbar"><div class="sw-title"><h1>My Web</h1><p>No links yet</p></div></div>
     <div class="sw-controls">
-      <div class="sw-seg"><button class="sw-seg-btn is-on">Scripture</button><button class="sw-seg-btn">My web</button></div>
+      <div class="sw-seg"><button class="sw-seg-btn is-on">Scripture</button><button class="sw-seg-btn">My Web</button></div>
       <select class="sw-select"><option>Famous</option></select>
       <button class="sw-btn sw-toggle is-on">Corpus context</button>
       <button class="sw-btn">Reset</button>

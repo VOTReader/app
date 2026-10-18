@@ -5,7 +5,7 @@
    the cards behind it: what a tapped thread, chapter, verse, bundle, link,
    corpus thread, prophecy pair or letter is (describeFound), the chooser's
    and Nearby's rows (connectionTitle / connectionMeta), the panel's eyebrow
-   and meta lines, what the live region announces, the density hint, and the
+   and meta lines, what the live region announces, the density's line, and the
    endpoints that jump into the reader. Moved out of ScriptureWebScreen in F0
    (2026-10-18); the panel stream (w3) fixed the drift the digest named
    (item 22): one word for the vote count ("votes", never "weight"), plurals
@@ -28,14 +28,17 @@ export const ZOOM_MAX_MESSAGE = 'Zoomed all the way in';
 
 const DENSITY_LABEL = { essential: 'Essential', famous: 'Famous' };
 
-const DENSITY_HINT = {
-  essential: 'only the strongest connections',
-  famous: 'the famous view — about 64,000 connections',
-};
+/* What each density is, in one line (Q6): the name, the count it draws, and what that is. */
+const DENSITY_MEANS = { essential: 'the strongest', famous: 'the full classic chart' };
 
-/** The hint that flashes under the title when the reader switches density. */
-export function densityHint(density) {
-  return DENSITY_LABEL[density] + ' — ' + DENSITY_HINT[density];
+/**
+ * A density in words, with its count: "Famous · 63,418, the full classic chart",
+ * "Essential · 15,402, the strongest". The density control's options read it, and the hint
+ * under the title and the live region say it when the reader switches.
+ * @param {'essential'|'famous'} density @param {number} count
+ */
+export function densityLine(density, count) {
+  return DENSITY_LABEL[density] + ' · ' + Number(count).toLocaleString() + ', ' + DENSITY_MEANS[density];
 }
 
 /**
@@ -65,9 +68,10 @@ export function arcLine(info) {
   return parts.join(' · ');
 }
 
-/** The live region while the chooser asks which of several close threads was meant. */
+/** The live region while the chooser asks which of several close threads was meant. "Here", not
+ * "nearby": Nearby is the list the Nearby control opens (digest item 22). */
 export function chooserAnnouncement(count) {
-  return count + ' nearby connections. Choose one.';
+  return plural(count, 'connection', 'connections') + ' here. Choose one.';
 }
 
 /** The live region as Follow pans to a thread's far foot. */
@@ -77,7 +81,7 @@ export function followAnnouncement(label) {
 
 /** The live region when a bundle's group is chosen, or let go of (`letGo`). */
 export function groupAnnouncement(grp, letGo) {
-  return letGo ? 'Showing the strongest again.' : grp.count + ' threads to ' + grp.label + ' shown.';
+  return letGo ? 'Showing the strongest again.' : plural(grp.count, 'thread', 'threads') + ' to ' + grp.label + ' shown.';
 }
 
 /** How many threads the canon web draws at this density (the topbar's count). */
@@ -142,7 +146,7 @@ export function describeFound(found, { g, personal, cam, v, viewFor, density }) 
       // colour encodes, then the Volume
       sourceName: MY_WEB_SOURCES[underlay.source ? underlay.source[found.index] : MY_WEB_SOURCES.length - 1].name,
       cite,
-      cards: [verseCard('Scripture', source), endpointCard('Corpus', target)],
+      cards: [verseCard('Scripture', source), endpointCard('In the Volumes', target)],
     };
   }
   if (found.kind === 'arc') {
@@ -189,7 +193,6 @@ export function describeFound(found, { g, personal, cam, v, viewFor, density }) 
     const groups = cam && v.W ? bundleGroups(g, cam, view, cell.lo, cell.hi, 40) : [];
     const chapter = g.chapters[cell.chapterLo];
     return { kind: 'bundle', cell, label, lo: cell.lo, hi: cell.hi,
-      hidden: cell.hidden, drawn: cell.drawn,
       connections: countTouching(g, cell.lo, cell.hi, density),
       groups: groups.map((grp) => {
         const r = refOfVerse(g, grp.lo);
@@ -257,7 +260,7 @@ export function prophecyMeta(info) {
 /** The panel's eyebrow (its overline, and its aria-label's head). */
 export function sheetEyebrow(info) {
   return info.kind === 'link' ? 'Your link'
-    : info.kind === 'underlay' ? 'Timothy’s thread'
+    : info.kind === 'underlay' ? 'Timothy’s note'
     : info.kind === 'arc' ? 'Connection'
     : info.kind === 'bundle' ? 'Bundle · ' + info.label
     : info.kind === 'letter' ? 'In the Volumes'
@@ -272,19 +275,18 @@ export function sheetMeta(info) {
     : info.kind === 'link' ? LINK_KIND_NAMES[info.joins]
     : info.kind === 'underlay' ? (info.sourceName ? info.sourceName + ' · ' + info.joins : info.joins)
     : info.kind === 'bundle'
-      ? (info.hidden > 0
-        ? info.connections.toLocaleString() + ' connections here, ' + info.hidden.toLocaleString()
-          + ' not drawn at this zoom. Choose where they go to see them.'
-        : info.connections.toLocaleString() + ' connections converge here. Choose where they go to follow them.')
+      ? plural(info.connections, 'connection converges', 'connections converge') + ' here. Choose where they go to follow them.'
     : info.kind === 'chapter'
       ? plural(info.verses, 'verse', 'verses') + ' · ' + plural(info.connections, 'connection', 'connections')
       : plural(info.connections, 'connection', 'connections');
 }
 
-/** The Nearby list's eyebrow: the reader's links on My Web, else the chapter it reads. */
-export function listEyebrow(mode, chapter, lensOn) {
+/** The Nearby list's eyebrow: the reader's links on My Web, else the chapter it reads, zoomed in
+ * or not ("Nearby" names this list and nothing else, digest item 22; `_lensOn` is kept for the
+ * panel's call). */
+export function listEyebrow(mode, chapter, _lensOn) {
   return mode === 'personal' ? 'Your links'
-    : chapter ? (lensOn ? 'Under the lens · ' : 'Nearby · ') + chapter.book.title + ' ' + chapter.chapter
+    : chapter ? 'Nearby · ' + chapter.book.title + ' ' + chapter.chapter
     : 'Nearby connections';
 }
 
@@ -302,7 +304,7 @@ export function summaryOf(found) {
     return endpointLabel(found.source) + ' and ' + endpointLabel(found.target) + ', your link.';
   }
   if (found.kind === 'underlay') {
-    return found.source.label + ' and ' + endpointLabel(found.target) + ', corpus connection.';
+    return found.source.label + ' and ' + endpointLabel(found.target) + ', Timothy’s note.';
   }
   if (found.kind === 'arc') {
     const [x, y] = endsOf(found);
@@ -311,8 +313,7 @@ export function summaryOf(found) {
   if (found.kind === 'letter') return found.title + ', ' + plural(found.verses.length, 'verse', 'verses') + ' it cites.';
   if (found.kind === 'verse') return found.ref.label + ', ' + plural(found.connections, 'connection', 'connections') + '.';
   if (found.kind === 'bundle') {
-    return found.label + ', ' + (found.hidden > 0
-      ? found.hidden + ' connections not drawn here.' : found.connections + ' connections converge here.');
+    return found.label + ', ' + plural(found.connections, 'connection converges', 'connections converge') + ' here.';
   }
   return found.book.title + ' ' + found.chapter + ', ' + plural(found.connections, 'connection', 'connections') + '.';
 }

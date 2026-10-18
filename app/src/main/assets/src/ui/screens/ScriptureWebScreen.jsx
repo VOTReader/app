@@ -66,7 +66,7 @@ import { attachWebGestures } from '../scripture-web/gestures.js';
 import { WebFallbackList } from '../scripture-web/WebFallbackList.jsx';
 import { TipChip, HowToReadGuide, EmptyWebNotice, loadErrorPanel, legendFor } from '../scripture-web/panels.jsx';
 import { startChapter } from '../../utils/scripture-web/chapter-connections.js';
-import { graphStats, densityHint, myWebHeadline, myWebSkippedLine } from '../../utils/scripture-web/describe.js';
+import { graphStats, densityLine, myWebHeadline, myWebSkippedLine } from '../../utils/scripture-web/describe.js';
 import { verseText } from '../../utils/scripture-web/panel-model.js';
 import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
 
@@ -332,7 +332,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     setChromeHidden(next);
   }, [chromeHidden]);
 
-  /** Scripture / My web. The chosen line goes with the cards: a link's index and a canon thread's
+  /** Scripture / My Web. The chosen line goes with the cards: a link's index and a canon thread's
    * index number two different graphs, so a focus kept across the switch spotlit an unrelated
    * line in the other web, with nothing open for Escape or Back to close (sweep v5, 2026-10-14). */
   const switchMode = React.useCallback((next) => {
@@ -437,7 +437,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           <button type="button" className={'sw-seg-btn' + (mode === 'canonical' ? ' is-on' : '')}
             aria-pressed={mode === 'canonical'} onClick={fromMenu(() => switchMode('canonical'))}>Scripture</button>
           <button type="button" ref={myWebBtnRef} className={'sw-seg-btn' + (mode === 'personal' ? ' is-on' : '')}
-            aria-pressed={mode === 'personal'} onClick={fromMenu(() => switchMode('personal'))}>My web</button>
+            aria-pressed={mode === 'personal'} onClick={fromMenu(() => switchMode('personal'))}>My Web</button>
         </div>
         <button type="button" className={'sw-btn' + (listOpen ? ' is-on' : '')}
           onClick={fromMenu(() => { setListOpen(!listOpen); setChoices(null); })}
@@ -449,7 +449,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
                 onChange={(e) => {
                   const next = /** @type {Density} */ (e.target.value);
                   setDensity(next);
-                  flashHint(densityHint(next));
+                  flashHint(densityLine(next, graphStats(graph, next).shown));
                   if (typeof updateSetting === 'function') updateSetting('webDensity', next);
                   setMenuOpen(false);
                 }}>
@@ -460,8 +460,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         ) : (
           <button type="button" className={'sw-btn sw-toggle' + (showUnderlay ? ' is-on' : '')} aria-pressed={showUnderlay}
             onClick={fromMenu(() => { setShowUnderlay(!showUnderlay); schedule(); })}
-            aria-label={'Corpus context · ' + (contextCount > 0 ? contextCount.toLocaleString() : '…') + ' curated connections'}>
-            Corpus context · {contextCount > 0 ? contextCount.toLocaleString() : '…'}
+            aria-label={'Timothy’s notes · ' + (contextCount > 0 ? contextCount.toLocaleString() : '…') + ' citations'}>
+            Timothy&rsquo;s notes · {contextCount > 0 ? contextCount.toLocaleString() : '…'}
           </button>
         )}
         <button type="button" className="sw-btn" onClick={fromMenu(resetView)} aria-label="Reset the view">Reset</button>
@@ -487,7 +487,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           they are how the web is read, not how it is driven (Corbin, 2026-09-11:
           "keep the web legend (the books at the bottom, etc) but just hide the
           interactable UI"). The label stays constant and aria-pressed carries
-          the state, the same convention as the Scripture / My web seg. */}
+          the state, the same convention as the Scripture / My Web seg. */}
       <button type="button" className="sw-btn sw-btn-icon sw-hide-all"
         aria-label="Hide controls" aria-pressed={chromeHidden} onClick={toggleChrome}>
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">

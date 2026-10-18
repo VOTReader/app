@@ -820,7 +820,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     });
   });
 
-  /* ── sweep 2026-10-14 (batch 3): what the Scripture / My web switch, the Volumes rail and the
+  /* ── sweep 2026-10-14 (batch 3): what the Scripture / My Web switch, the Volumes rail and the
      controls inside .sw-root each own. My Web is built from LinkStore and the Volumes from
      COLLECTIONS / READING_CHAIN / colLetterArr, all free globals the setup file does not carry;
      the top-level afterEach unstubs them. */
@@ -851,7 +851,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
         source: { type: 'bible', bookId: 'genesis-plain', chapter: 1, verse: 5, label: 'Genesis 1:5' },
         target: { type: 'bible', bookId: 'genesis-plain', chapter: 1, verse: 900, label: 'Genesis 1:900' } }]);
       const { container } = await mount({ settings: seen }, threaded);
-      fireEvent.click(screen.getByRole('button', { name: 'My web' }));
+      fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
       await settle(60);
       fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
       await settle(20);
@@ -893,7 +893,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     it('v55: an arrow key on the Volumes rail announces the Volumes node there, never a Bible verse', async () => {
       stubMyWeb();
       const { container } = await mount({ settings: seen });
-      fireEvent.click(screen.getByRole('button', { name: 'My web' }));
+      fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
       await settle(60);
       const root = container.querySelector('.sw-root');
       const live = () => container.querySelector('.sw-live').textContent;
@@ -1095,7 +1095,9 @@ describe('the Nearby list reads the lens (landing 15)', () => {
     expect(rows[2].textContent).toMatch(/7 votes/);
   });
 
-  it('past the overview the header says Under the lens, and choosing the chapter row opens its sheet', async () => {
+  // "Under the lens" retired (digest item 22: "Nearby" means one thing); the header still names the
+  // chapter the list reads past the overview, which is what this case is about.
+  it('past the overview the header names the chapter it reads, and choosing the chapter row opens its sheet', async () => {
     const { container } = await mountList();
     const root = container.querySelector('.sw-root');
     for (let i = 0; i < 12; i++) {
@@ -1106,7 +1108,7 @@ describe('the Nearby list reads the lens (landing 15)', () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     const list = container.querySelector('.sw-list');
     expect(list.getAttribute('data-lens-on')).toBe('1');
-    expect(list.querySelector('.sw-sheet-eyebrow').textContent).toMatch(/^Under the lens · Genesis 1/);
+    expect(list.querySelector('.sw-sheet-eyebrow').textContent).toMatch(/^Nearby · Genesis 1/);
     fireEvent.click(list.querySelector('.sw-choice-chapter'));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     expect(container.querySelector('.sw-list')).toBeNull();
@@ -1363,16 +1365,17 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     // an explicit settings object still describes a reader who has seen the how-to-read card
     props = Object.assign({}, props, { settings: Object.assign({ swGuideSeen: true }, props && props.settings) });
     const r = render(<ScriptureWebScreen {...baseProps()} {...props} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'My web' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'My Web' }));
     return r;
   };
 
   // Sweep low (mw10, WCAG 2.5.3): the toggle was named "Show the curated corpus connections", leaving out
-  // the words it shows, "Corpus context".
-  it('the Corpus context toggle is named starting with the words it shows', async () => {
+  // the words it shows. Its words are now Timothy's notes' one name (digest item 22, w3 panel step 2);
+  // the law (the name starts with the words on the button) is the same.
+  it('the Timothy’s notes toggle is named starting with the words it shows', async () => {
     await openMyWeb();
-    const btn = await screen.findByRole('button', { name: /^Corpus context/ });
-    expect(btn.textContent.startsWith('Corpus context')).toBe(true);
+    const btn = await screen.findByRole('button', { name: /^Timothy’s notes/ });
+    expect(btn.textContent.startsWith('Timothy’s notes')).toBe(true);
   });
 
   // ── My Web visual (design-perf, 2026-09-10; note: myweb-visual-design.md) ──
@@ -1471,7 +1474,7 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     expect(onBack).not.toHaveBeenCalled();
   });
 
-  it('returns focus to the My web segment button, not to the body', async () => {
+  it('returns focus to the My Web segment button, not to the body', async () => {
     // The notice is the only thing that was focused; without this the next
     // Tab starts from the top of the document and a keyboard reader is
     // dropped out of the control they were using.
@@ -1479,7 +1482,7 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     const close = screen.getByRole('button', { name: 'Dismiss' });
     close.focus();
     fireEvent.click(close);
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'My web' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'My Web' }));
   });
 });
 

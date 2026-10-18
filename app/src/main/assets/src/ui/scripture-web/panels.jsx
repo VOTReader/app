@@ -13,7 +13,7 @@
    guide keeps Tab inside and hands focus back on close.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { connectionTitle, arcLine, endpointLabel, myWebLegendWords } from '../../utils/scripture-web/describe.js';
+import { connectionTitle, arcLine, endpointLabel, plural, myWebLegendWords } from '../../utils/scripture-web/describe.js';
 import { LINK_KIND_NAMES } from '../../utils/scripture-web/palette.js';
 import { ink } from '../../utils/scripture-web/sw-ink.js';
 
@@ -51,10 +51,10 @@ export function TipChip({ info, viewport, inset }) {
       )}
       {s.kind === 'underlay' && (
         <React.Fragment>
-          <div className="sw-tip-eyebrow">Timothy&rsquo;s thread</div>
+          <div className="sw-tip-eyebrow">Timothy&rsquo;s note</div>
           <div className="sw-tip-ref">{s.source.label}</div>
           <div className="sw-tip-arrow">↕</div>
-          <div className="sw-tip-ref sw-tip-ref-alt">{s.target ? endpointLabel(s.target) : 'Corpus passage'}</div>
+          <div className="sw-tip-ref sw-tip-ref-alt">{s.target ? endpointLabel(s.target) : 'A passage in the Volumes'}</div>
           <div className="sw-tip-meta">{s.sourceName ? s.sourceName + ' \u00b7 ' + s.joins : s.joins}</div>
         </React.Fragment>
       )}
@@ -62,23 +62,21 @@ export function TipChip({ info, viewport, inset }) {
         <React.Fragment>
           <div className="sw-tip-eyebrow">Chapter</div>
           <div className="sw-tip-ref">{s.book.title} {s.chapter}</div>
-          <div className="sw-tip-meta">{s.verses} verses · {s.connections.toLocaleString()} connections</div>
+          <div className="sw-tip-meta">{plural(s.verses, 'verse', 'verses')} · {plural(s.connections, 'connection', 'connections')}</div>
         </React.Fragment>
       )}
       {s.kind === 'verse' && (
         <React.Fragment>
           <div className="sw-tip-eyebrow">Verse</div>
           <div className="sw-tip-ref">{s.ref.label}</div>
-          <div className="sw-tip-meta">{s.connections.toLocaleString()} connections</div>
+          <div className="sw-tip-meta">{plural(s.connections, 'connection', 'connections')}</div>
         </React.Fragment>
       )}
       {s.kind === 'bundle' && (
         <React.Fragment>
           <div className="sw-tip-eyebrow">Bundle</div>
           <div className="sw-tip-ref">{s.label}</div>
-          <div className="sw-tip-meta">{s.hidden > 0
-            ? s.hidden.toLocaleString() + ' of ' + s.connections.toLocaleString() + ' connections not drawn here'
-            : s.connections.toLocaleString() + ' connections converge here'} · tap to open</div>
+          <div className="sw-tip-meta">{plural(s.connections, 'connection converges', 'connections converge')} here · tap to open</div>
         </React.Fragment>
       )}
     </div>
@@ -108,18 +106,10 @@ export function HowToReadGuide({ onClose }) {
 }
 
 export function legendFor(mode) {
-  // Every variant ends with the histogram key — the bars hanging under the
-  // baseline (Psalm 119 reaching deepest) are chapter LENGTH, and nothing on
-  // screen said so until a reader asked what the deep column was.
-  const histKey = (
-    <span className="sw-key" key="hist">
-      <i className="sw-key-hist" aria-hidden="true"><i /><i /><i /></i>
-      bars below — chapter length
-    </span>
-  );
+  // The key names only what the web draws (digest item 22): the chapter-length bars' key left
+  // with the spec's legend, which has none, and My Web never drew bars.
   // My Web (w3, r2-05): two families, named as the picture names them,
   // Timothy's notes then the reader's links; one line of each family's ink.
-  // No histogram key: My Web's ruler draws book names only, no chapter bars.
   if (mode === 'personal') {
     const words = myWebLegendWords();
     return [
@@ -140,7 +130,6 @@ export function legendFor(mode) {
     <span className="sw-key sw-key-ramp" key="ramp">
       <span>nearby</span><i className="sw-key-gradient" /><span>across the canon</span>
     </span>,
-    histKey,
   ];
 }
 
@@ -150,12 +139,12 @@ export function EmptyWebNotice({ onDismiss }) {
   return (
     <div className="sw-empty">
       <div className="sw-empty-title">Your web is still being woven.</div>
-      {/* One sentence, so the panel covers under half the band on the
-          800x360 frame (the walk's R3); the silver threads behind it are
-          the corpus's own citations, and the panel must not hide them. */}
+      {/* Two short sentences, so the panel covers under half the band on the
+          800x360 frame (the walk's R3); the faint threads behind it are
+          Timothy's notes, and the panel must not hide them. */}
       <div className="sw-empty-body">
         Select text anywhere in the app, tap <strong>Link</strong>, and pick
-        where it goes. The silver threads are the Volumes&rsquo; own citations.
+        where it goes. The faint threads are Timothy&rsquo;s notes, the Volumes&rsquo; own citations.
       </div>
       <button type="button" className="sw-empty-close" aria-label="Dismiss"
         onClick={onDismiss}>×</button>
