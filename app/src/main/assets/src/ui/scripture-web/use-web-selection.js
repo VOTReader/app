@@ -1,0 +1,278 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   useWebSelection — what the pointer is on, and what is open over the web.
+   Cluster F (bundle-d), used by ui/screens/ScriptureWebScreen.jsx.
+   ═══════════════════════════════════════════════════════════════════════
+
+   Split out of ScriptureWebScreen unchanged (F0, 2026-10-18): the hover chip
+   (tip), the chooser for close threads (choices), the Nearby list and the
+   detail sheet; the tap test (the elevator's track, the pills, then the
+   lines, a chapter or a verse), what a hit is in the panels' terms
+   (describe.js), and the handlers the gestures call through handlersRef
+   (hover, tap, doubleTap); the cards' one close, Follow, and a bundle's
+   group. The hover index and the focused thread are per-frame refs the
+   draw reads; the boxes it drew last frame come back in elevatorRef and
+   badgeBoxesRef (use-web-renderer.js). */
+
+import { clampCamera, zoomAbout } from '../../utils/scripture-web/geometry.js';
+import { pickArcs, pickChapter, pickVerse, chapterRange, nearbyChapter, nearbyThreads } from '../../utils/scripture-web/pick.js';
+import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
+import {
+  describeFound, summaryOf, chooserAnnouncement, followAnnouncement, groupAnnouncement,
+} from '../../utils/scripture-web/describe.js';
+import { pickPersonalLinks, pickUnderlayLinks } from './rail-renderer.js';
+
+/**
+ * @param {any} p  the graph, mode, density and showUnderlay; the resume point
+ *   (the sheet that was open); the cameras' refs and callbacks
+ *   (use-web-camera.js); My Web's personalRef and railOpts; the per-frame
+ *   hoverRef and the boxes the draw wrote; the frame loop; the live region
+ */
+export function useWebSelection({
+  graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, zoomCapFor, yFrameFor,
+  personalRef, railOpts, hoverRef, elevatorRef, badgeBoxesRef, schedule, setAnnounce,
+}) {
+  const [detail, setDetail] = React.useState(() => (resumeRef.current && resumeRef.current.detail) || null);      // the open sheet
+  const [choices, setChoices] = React.useState(null);    // overlapped line chooser
+  const [listOpen, setListOpen] = React.useState(false); // accessible nearby list
+  const [tip, setTip] = React.useState(null);            // hover chip
+
+  // The pointer handlers are reached through a ref for the reason draw is
+  // (use-frame-scheduler.js): the gesture listeners bind once and call the
+  // LATEST handlers, not the ones of the render that attached them.
+  const handlersRef = React.useRef(/** @type {any} */ ({}));
+  const hoverRafRef = React.useRef(0);
+  const hoverPointRef = React.useRef(null);
+
+  /* The hover chip names what is under a resting mouse. A drag, pinch, wheel or key pan moves the
+     web out from under it, so each one drops it (sw1 B4: it stayed put over different lines). */
+  const tipOnRef = React.useRef(false);
+  React.useEffect(() => { tipOnRef.current = !!tip; }, [tip]);
+  const dropHover = React.useCallback(() => {
+    if (hoverRafRef.current) { cancelAnimationFrame(hoverRafRef.current); hoverRafRef.current = 0; }
+    hoverPointRef.current = null;
+    hoverRef.current = -1;
+    if (tipOnRef.current) { tipOnRef.current = false; setTip(null); }
+  }, [hoverRef]);
+
+  /**
+   * The elevator's lift (landing 14): for a pointer going down on the track
+   * (device-px box in elevatorRef, kept by drawElevator), the function of a
+   * CSS y that sets the camera's height - the track's top is the tallest
+   * apex, its foot the baseline. Null off the track, so the web pans.
+   */
+  const liftAt = React.useCallback((cx, cy) => {
+    const lift = elevatorRef.current, v = viewRef.current;
+    if (!lift || !v.W) return null;
+    const px = cx * v.DPR, py = cy * v.DPR;
+    if (px < lift.x0 || px > lift.x1 || py < lift.y0 || py > lift.y1) return null;
+    return (yCss) => {
+      const cam = camRef.current;
+      if (!cam) return;
+      const f = lift.y1 > lift.y0 ? (lift.y1 - yCss * v.DPR) / (lift.y1 - lift.y0) : 0;
+      cam.y = Math.max(0, Math.min(1, f)) * lift.maxY;
+    };
+  }, [camRef, viewRef, elevatorRef]);
+
+  // Verse and chapter candidates carry no distance: they only ever come alone.
+  const hitCandidatesAt = React.useCallback(/** @returns {Array<{ kind: string, distance?: number } & Record<string, any>>} */ (cx, cy) => {
+    const g = graph, cam = camRef.current, v = viewRef.current;
+    if (!g || !cam || !v.W) return [];
+    const px = cx * v.DPR, py = cy * v.DPR;
+    const view = viewFor();
+    if (mode !== 'personal') {
+      // a badge is a real target: the bundle it counts
+      for (const box of badgeBoxesRef.current) {
+        if (px < box.x0 || px > box.x1 || py < box.y0 || py > box.y1) continue;
+        if (box.cell) return [{ kind: 'bundle', cell: box.cell, distance: 0 }];
+      }
+    }
+    if (mode === 'personal') {
+      const p = personalRef.current;
+      const opts = railOpts();
+      const userHits = pickPersonalLinks(p && p.graph, opts, px, py, 14 * v.DPR, 4);
+      if (userHits.length) return userHits.map((hit) => ({
+        kind: 'link', index: hit.index, distance: hit.distance,
+      }));
+      if (showUnderlay) {
+        const contextHits = pickUnderlayLinks(p && p.underlay, opts, px, py, 14 * v.DPR, 4);
+        if (contextHits.length) return contextHits.map((hit) => ({
+          kind: 'underlay', index: hit.index, distance: hit.distance,
+        }));
+      }
+      const ci = pickChapter(g, cam, view, px, py);
+      return ci >= 0 ? [{ kind: 'chapter', chapterIndex: ci }] : [];
+    }
+    const ci = pickChapter(g, cam, view, px, py);
+    if (ci >= 0) {
+      const zoomed = cam.ppv > 26 * v.DPR;
+      if (zoomed) {
+        const verse = pickVerse(g, cam, view, px, py);
+        if (verse >= 0) return [{ kind: 'verse', verse }];
+      }
+      return [{ kind: 'chapter', chapterIndex: ci }];
+    }
+    return pickArcs(g, cam, view, px, py, 14 * v.DPR, 4)
+      .map((hit) => ({ kind: 'arc', hit, distance: hit.distance }));
+  }, [graph, camRef, viewRef, viewFor, mode, railOpts, showUnderlay, badgeBoxesRef, personalRef]);
+
+  const hitAt = React.useCallback((cx, cy) => hitCandidatesAt(cx, cy)[0] || null,
+    [hitCandidatesAt]);
+
+  // what a hit is, in the panels' terms (describe.js), read in this frame
+  const describe = React.useCallback((found) => describeFound(found, {
+    g: graph, personal: personalRef.current, cam: camRef.current, v: viewRef.current, viewFor, density,
+  }), [graph, camRef, viewRef, density, viewFor, personalRef]);
+
+  const listItems = React.useMemo(() => {
+    if (!graph || !listOpen) return [];
+    const found = [];
+    if (mode === 'personal') {
+      const p = personalRef.current;
+      const count = p && p.graph ? p.graph.count : 0;
+      for (let i = 0; i < Math.min(count, 36); i++) found.push({ kind: 'link', index: i });
+      if (!found.length && showUnderlay && p && p.underlay) {
+        for (let i = 0; i < Math.min(p.underlay.count, 36); i++) found.push({ kind: 'underlay', index: i });
+      }
+    } else {
+      // the list reads the lens (landing 15): the lit chapter leads - its
+      // sheet says where its threads go, by chapter - then its threads,
+      // strongest first, so the sky is walked from a list as well as by eye
+      const cam = camRef.current, v = viewRef.current;
+      if (!cam || !v.W) return [];
+      const chapterIndex = nearbyChapter(graph, cam, v.W);
+      if (chapterIndex < 0) return [];
+      const [lo, hi] = chapterRange(graph, chapterIndex);
+      found.push({ kind: 'chapter', chapterIndex });
+      for (const index of nearbyThreads(graph, lo, hi, density, 36)) {
+        found.push({ kind: 'arc', hit: {
+          index, from: graph.from[index], to: graph.to[index], votes: graph.votes[index],
+        } });
+      }
+    }
+    return found.map(describe).filter(Boolean);
+  }, [graph, listOpen, mode, describe, showUnderlay, camRef, viewRef, density, personalRef]);
+
+  const commitFound = React.useCallback((found) => {
+    if (!found) return;
+    // the far foot is the one further from the camera: what Follow pans to
+    if (found.kind === 'arc' && camRef.current) {
+      const x = camRef.current.x;
+      found = Object.assign({}, found, { far: Math.abs(found.to - x) >= Math.abs(found.from - x) ? 'to' : 'from' });
+    }
+    focusRef.current = found.kind === 'arc' || found.kind === 'link'
+      ? { arc: found.index, range: null }
+      : { arc: -1, range: found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi]
+        : found.kind === 'verse' ? [found.verse, found.verse] : null };
+    hoverRef.current = -1;
+    setTip(null);
+    setChoices(null);
+    setListOpen(false);
+    setDetail(found);
+    setAnnounce(summaryOf(found));
+    schedule();
+  }, [camRef, focusRef, schedule, hoverRef, setAnnounce]);
+
+  const hover = React.useCallback((cx, cy) => {
+    hoverPointRef.current = { cx, cy };
+    if (hoverRafRef.current) return;
+    hoverRafRef.current = requestAnimationFrame(() => {
+      hoverRafRef.current = 0;
+      const point = hoverPointRef.current;
+      if (!point) return;
+      const found = describe(hitAt(point.cx, point.cy));
+      const nextHover = found && found.kind === 'arc' ? found.index : -1;
+      if (nextHover !== hoverRef.current) { hoverRef.current = nextHover; schedule(); }
+      setTip((previous) => {
+        if (!found) return previous ? null : previous;
+        if (previous && previous.info.kind === found.kind &&
+            (found.kind !== 'arc' || previous.info.index === found.index) &&
+            Math.abs(previous.x - point.cx) < 4 && Math.abs(previous.y - point.cy) < 4) {
+          return previous;
+        }
+        return { info: found, x: point.cx, y: point.cy };
+      });
+    });
+  }, [describe, hitAt, schedule, hoverRef]);
+
+  React.useEffect(() => () => {
+    if (hoverRafRef.current) cancelAnimationFrame(hoverRafRef.current);
+  }, []);
+
+  const tap = React.useCallback((cx, cy) => {
+    // the elevator (landing 9): a tap on the track sets the camera's height -
+    // the top of the track is the tallest apex, the bottom the baseline
+    const lift = liftAt(cx, cy);
+    if (lift) { lift(cy); schedule(); return; }
+    const candidates = hitCandidatesAt(cx, cy);
+    const described = candidates.map(describe).filter(Boolean);
+    if (!described.length) {
+      focusRef.current = { arc: -1, range: null };
+      hoverRef.current = -1;
+      setTip(null); setChoices(null); setDetail(null); setListOpen(false); schedule(); return;
+    }
+    const closeEnough = candidates.length > 1 && candidates[1].distance <= 8 * viewRef.current.DPR;
+    if (closeEnough && described.length > 1 && described.every((item) => item.kind === 'arc' ||
+        item.kind === 'link' || item.kind === 'underlay')) {
+      setChoices(described);
+      setDetail(null);
+      setListOpen(false);
+      // nothing is chosen while the chooser asks, and its rows replace the hover chip
+      focusRef.current = { arc: -1, range: null };
+      dropHover();
+      setAnnounce(chooserAnnouncement(described.length));
+      schedule();
+      return;
+    }
+    commitFound(described[0]);
+  }, [liftAt, hitCandidatesAt, describe, viewRef, commitFound, schedule, focusRef, dropHover, hoverRef, setAnnounce]);
+
+  const doubleTap = React.useCallback((cx) => {
+    const cam = camRef.current, v = viewRef.current;
+    zoomAbout(cam, v.W, cx * v.DPR, 2.5, maxZoomOf(graph, v), yFrameFor(cam) || undefined);
+    schedule();
+  }, [camRef, graph, schedule, viewRef, yFrameFor]);
+
+  // Publish the latest handlers for the (stable) gesture listeners to call.
+  React.useEffect(() => { handlersRef.current = { hover, tap, doubleTap }; }, [hover, tap, doubleTap]);
+
+  /** Close the cards (the chooser, the Nearby list, the connection sheet) and let go of the chosen
+   * line. Every close goes through here: the sheet's x once cleared the card but kept focusRef, so
+   * the shader held every other thread at 5 % ink until Escape or Back (sw1 B1, 2026-10-05). */
+  const closeCards = React.useCallback(() => {
+    setListOpen(false); setChoices(null); setDetail(null); setTip(null);
+    focusRef.current = { arc: -1, range: null };
+    hoverRef.current = -1;
+    schedule();
+  }, [focusRef, schedule, hoverRef]);
+
+  /** Follow the chosen line to its far foot: the camera centres on that
+   * verse at the same zoom, the line stays spotlit, and the control turns
+   * to the other end so the reader can walk it back (Corbin's brief,
+   * 2026-09-11: "every line followable end to end"). */
+  const followThread = React.useCallback((info) => {
+    const cam = camRef.current, v = viewRef.current;
+    if (!cam || !info || info.kind !== 'arc') return;
+    const toFar = info.far === 'to';
+    cam.x = toFar ? info.to : info.from;
+    clampCamera(cam, v.W, zoomCapFor(cam), yFrameFor(cam) || undefined);
+    setDetail(Object.assign({}, info, { far: toFar ? 'from' : 'to' }));
+    setAnnounce(followAnnouncement((toFar ? info.b : info.a).label));
+    schedule();
+  }, [camRef, viewRef, zoomCapFor, yFrameFor, schedule, setAnnounce]);
+
+  // A bundle's group, chosen in its sheet: the pair of ranges the shader and
+  // the picker draw and spotlight (uFocusRange2). Choosing the
+  // same group again lets go of it.
+  const chooseGroup = React.useCallback((info, grp) => {
+    const same = focusRef.current.range2 && grp && focusRef.current.range2[0] === grp.lo && focusRef.current.range2[1] === grp.hi;
+    focusRef.current = { arc: -1, range: [info.lo, info.hi], range2: same || !grp ? null : [grp.lo, grp.hi] };
+    setDetail(Object.assign({}, info, { chosenGroup: same || !grp ? null : grp.chapterIndex }));
+    setAnnounce(groupAnnouncement(grp, same || !grp));
+    schedule();
+  }, [focusRef, schedule, setAnnounce]);
+
+  return {
+    tip, choices, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
+    handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread, chooseGroup,
+  };
+}

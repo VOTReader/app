@@ -23,16 +23,14 @@
 import {
   clampCamera, fitPPV, xToVerse, zoomAbout,
 } from '../../utils/scripture-web/geometry.js';
-import {
-  pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange,
-  lensRange, nearbyChapter, nearbyThreads,
-} from '../../utils/scripture-web/pick.js';
+import { refOfVerse, lensRange } from '../../utils/scripture-web/pick.js';
 import { DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { useWebCamera } from '../scripture-web/use-web-camera.js';
 import { useFrameScheduler } from '../scripture-web/use-frame-scheduler.js';
 import { useForcedLandscape } from '../scripture-web/use-forced-landscape.js';
 import { useWebGraph, useChromeTokens, useWebRenderer } from '../scripture-web/use-web-renderer.js';
 import { usePersonalWeb } from '../scripture-web/use-personal-web.js';
+import { useWebSelection } from '../scripture-web/use-web-selection.js';
 import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 /** @typedef {import('../../utils/scripture-web/decode.js').Density} Density */
 import { attachWebGestures } from '../scripture-web/gestures.js';
@@ -43,11 +41,9 @@ import {
 } from '../scripture-web/panels.jsx';
 import { startChapter } from '../../utils/scripture-web/chapter-connections.js';
 import {
-  describeFound, summaryOf, votNodeName, verseTextFor, graphStats, densityHint,
-  chooserAnnouncement, followAnnouncement, groupAnnouncement, ZOOM_MAX_MESSAGE,
+  votNodeName, verseTextFor, graphStats, densityHint, ZOOM_MAX_MESSAGE,
 } from '../../utils/scripture-web/describe.js';
 import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
-import { pickPersonalLinks, pickUnderlayLinks } from '../scripture-web/rail-renderer.js';
 
 /* The zoom ceiling (maxZoomOf), the frame, the render arguments and the y
    frame live in utils/scripture-web/web-frame.js, pure and tested; the
@@ -119,11 +115,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     return DENSITY_STEPS.indexOf(saved) >= 0 ? /** @type {Density} */ (saved) : 'famous';
   };
   const [density, setDensity] = React.useState(storedDensity);
-  const [detail, setDetail] = React.useState(() => (resumeRef.current && resumeRef.current.detail) || null);      // the open sheet
-  const [choices, setChoices] = React.useState(null);    // overlapped line chooser
-  const [listOpen, setListOpen] = React.useState(false); // accessible nearby list
   const [chromeHidden, setChromeHidden] = React.useState(readChromeHidden);
-  const [tip, setTip] = React.useState(null);            // hover chip
   const [announce, setAnnounce] = React.useState('');
   // A transient explanation under the title — set on control cycles so the
   // reader is TOLD what Essential/Famous and the colour modes mean
@@ -153,23 +145,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   } = useWebCamera({ graph, density, modeRef });
   const theme = settings && settings.theme;
 
-  // The pointer handlers are reached through a ref for the reason draw is
-  // (use-frame-scheduler.js): the gesture listeners bind once and call the
-  // LATEST handlers, not the ones of the render that attached them.
-  const handlersRef = React.useRef(/** @type {any} */ ({}));
-  const hoverRafRef = React.useRef(0);
-  const hoverPointRef = React.useRef(null);
-
-  /* The hover chip names what is under a resting mouse. A drag, pinch, wheel or key pan moves the
-     web out from under it, so each one drops it (sw1 B4: it stayed put over different lines). */
-  const tipOnRef = React.useRef(false);
-  React.useEffect(() => { tipOnRef.current = !!tip; }, [tip]);
-  const dropHover = React.useCallback(() => {
-    if (hoverRafRef.current) { cancelAnimationFrame(hoverRafRef.current); hoverRafRef.current = 0; }
-    hoverPointRef.current = null;
-    hoverRef.current = -1;
-    if (tipOnRef.current) { tipOnRef.current = false; setTip(null); }
-  }, []);
   // the canvas's colours, re-read when the theme flips (use-web-renderer.js)
   const chromeRef = useChromeTokens(theme, schedule);
 
@@ -214,24 +189,16 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     chromeRef, personalRef, hoverRef, railOpts, drawRef, schedule, capFractionNow,
   });
 
-  /**
-   * The elevator's lift (landing 14): for a pointer going down on the track
-   * (device-px box in elevatorRef, kept by drawElevator), the function of a
-   * CSS y that sets the camera's height - the track's top is the tallest
-   * apex, its foot the baseline. Null off the track, so the web pans.
-   */
-  const liftAt = React.useCallback((cx, cy) => {
-    const lift = elevatorRef.current, v = viewRef.current;
-    if (!lift || !v.W) return null;
-    const px = cx * v.DPR, py = cy * v.DPR;
-    if (px < lift.x0 || px > lift.x1 || py < lift.y0 || py > lift.y1) return null;
-    return (yCss) => {
-      const cam = camRef.current;
-      if (!cam) return;
-      const f = lift.y1 > lift.y0 ? (lift.y1 - yCss * v.DPR) / (lift.y1 - lift.y0) : 0;
-      cam.y = Math.max(0, Math.min(1, f)) * lift.maxY;
-    };
-  }, [camRef, viewRef, elevatorRef]);
+  // what the pointer is on and what is open (use-web-selection.js): the hover
+  // chip, the chooser, Nearby and the sheet; the tap test and the handlers the
+  // gestures call; the cards' close, Follow and a bundle's group
+  const {
+    tip, choices, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
+    handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread, chooseGroup,
+  } = useWebSelection({
+    graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, zoomCapFor, yFrameFor,
+    personalRef, railOpts, hoverRef, elevatorRef, badgeBoxesRef, schedule, setAnnounce,
+  });
 
   // ── gestures — imperative, never React state per frame ──────────────────
   // Wiring itself lives in gestures.js (attachWebGestures) — a pure move, so
@@ -250,169 +217,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       schedule, maxZoom: (c) => zoomCapFor(c || camRef.current), clampCamera, zoomAbout, xToVerse,
       yFrame: yFrameFor, lift: liftAt,
     });
-  }, [graph, noWebGL, glRetry, schedule, loc, camFor, zoomCapFor, live, dropHover, yFrameFor, liftAt, viewRef, camRef]);
-
-  // Verse and chapter candidates carry no distance: they only ever come alone.
-  const hitCandidatesAt = React.useCallback(/** @returns {Array<{ kind: string, distance?: number } & Record<string, any>>} */ (cx, cy) => {
-    const g = graph, cam = camRef.current, v = viewRef.current;
-    if (!g || !cam || !v.W) return [];
-    const px = cx * v.DPR, py = cy * v.DPR;
-    const view = viewFor();
-    if (mode !== 'personal') {
-      // a badge is a real target: the bundle it counts
-      for (const box of badgeBoxesRef.current) {
-        if (px < box.x0 || px > box.x1 || py < box.y0 || py > box.y1) continue;
-        if (box.cell) return [{ kind: 'bundle', cell: box.cell, distance: 0 }];
-      }
-    }
-    if (mode === 'personal') {
-      const p = personalRef.current;
-      const opts = railOpts();
-      const userHits = pickPersonalLinks(p && p.graph, opts, px, py, 14 * v.DPR, 4);
-      if (userHits.length) return userHits.map((hit) => ({
-        kind: 'link', index: hit.index, distance: hit.distance,
-      }));
-      if (showUnderlay) {
-        const contextHits = pickUnderlayLinks(p && p.underlay, opts, px, py, 14 * v.DPR, 4);
-        if (contextHits.length) return contextHits.map((hit) => ({
-          kind: 'underlay', index: hit.index, distance: hit.distance,
-        }));
-      }
-      const ci = pickChapter(g, cam, view, px, py);
-      return ci >= 0 ? [{ kind: 'chapter', chapterIndex: ci }] : [];
-    }
-    const ci = pickChapter(g, cam, view, px, py);
-    if (ci >= 0) {
-      const zoomed = cam.ppv > 26 * v.DPR;
-      if (zoomed) {
-        const verse = pickVerse(g, cam, view, px, py);
-        if (verse >= 0) return [{ kind: 'verse', verse }];
-      }
-      return [{ kind: 'chapter', chapterIndex: ci }];
-    }
-    return pickArcs(g, cam, view, px, py, 14 * v.DPR, 4)
-      .map((hit) => ({ kind: 'arc', hit, distance: hit.distance }));
-  }, [graph, camRef, viewRef, viewFor, mode, railOpts, showUnderlay, badgeBoxesRef, personalRef]);
-
-  const hitAt = React.useCallback((cx, cy) => hitCandidatesAt(cx, cy)[0] || null,
-    [hitCandidatesAt]);
-
-  // what a hit is, in the panels' terms (describe.js), read in this frame
-  const describe = React.useCallback((found) => describeFound(found, {
-    g: graph, personal: personalRef.current, cam: camRef.current, v: viewRef.current, viewFor, density,
-  }), [graph, camRef, viewRef, density, viewFor, personalRef]);
-
-  const listItems = React.useMemo(() => {
-    if (!graph || !listOpen) return [];
-    const found = [];
-    if (mode === 'personal') {
-      const p = personalRef.current;
-      const count = p && p.graph ? p.graph.count : 0;
-      for (let i = 0; i < Math.min(count, 36); i++) found.push({ kind: 'link', index: i });
-      if (!found.length && showUnderlay && p && p.underlay) {
-        for (let i = 0; i < Math.min(p.underlay.count, 36); i++) found.push({ kind: 'underlay', index: i });
-      }
-    } else {
-      // the list reads the lens (landing 15): the lit chapter leads - its
-      // sheet says where its threads go, by chapter - then its threads,
-      // strongest first, so the sky is walked from a list as well as by eye
-      const cam = camRef.current, v = viewRef.current;
-      if (!cam || !v.W) return [];
-      const chapterIndex = nearbyChapter(graph, cam, v.W);
-      if (chapterIndex < 0) return [];
-      const [lo, hi] = chapterRange(graph, chapterIndex);
-      found.push({ kind: 'chapter', chapterIndex });
-      for (const index of nearbyThreads(graph, lo, hi, density, 36)) {
-        found.push({ kind: 'arc', hit: {
-          index, from: graph.from[index], to: graph.to[index], votes: graph.votes[index],
-        } });
-      }
-    }
-    return found.map(describe).filter(Boolean);
-  }, [graph, listOpen, mode, describe, showUnderlay, camRef, viewRef, density, personalRef]);
-
-  const commitFound = React.useCallback((found) => {
-    if (!found) return;
-    // the far foot is the one further from the camera: what Follow pans to
-    if (found.kind === 'arc' && camRef.current) {
-      const x = camRef.current.x;
-      found = Object.assign({}, found, { far: Math.abs(found.to - x) >= Math.abs(found.from - x) ? 'to' : 'from' });
-    }
-    focusRef.current = found.kind === 'arc' || found.kind === 'link'
-      ? { arc: found.index, range: null }
-      : { arc: -1, range: found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi]
-        : found.kind === 'verse' ? [found.verse, found.verse] : null };
-    hoverRef.current = -1;
-    setTip(null);
-    setChoices(null);
-    setListOpen(false);
-    setDetail(found);
-    setAnnounce(summaryOf(found));
-    schedule();
-  }, [camRef, focusRef, schedule]);
-
-  const hover = React.useCallback((cx, cy) => {
-    hoverPointRef.current = { cx, cy };
-    if (hoverRafRef.current) return;
-    hoverRafRef.current = requestAnimationFrame(() => {
-      hoverRafRef.current = 0;
-      const point = hoverPointRef.current;
-      if (!point) return;
-      const found = describe(hitAt(point.cx, point.cy));
-      const nextHover = found && found.kind === 'arc' ? found.index : -1;
-      if (nextHover !== hoverRef.current) { hoverRef.current = nextHover; schedule(); }
-      setTip((previous) => {
-        if (!found) return previous ? null : previous;
-        if (previous && previous.info.kind === found.kind &&
-            (found.kind !== 'arc' || previous.info.index === found.index) &&
-            Math.abs(previous.x - point.cx) < 4 && Math.abs(previous.y - point.cy) < 4) {
-          return previous;
-        }
-        return { info: found, x: point.cx, y: point.cy };
-      });
-    });
-  }, [describe, hitAt, schedule]);
-
-  React.useEffect(() => () => {
-    if (hoverRafRef.current) cancelAnimationFrame(hoverRafRef.current);
-  }, []);
-
-  const tap = React.useCallback((cx, cy) => {
-    // the elevator (landing 9): a tap on the track sets the camera's height -
-    // the top of the track is the tallest apex, the bottom the baseline
-    const lift = liftAt(cx, cy);
-    if (lift) { lift(cy); schedule(); return; }
-    const candidates = hitCandidatesAt(cx, cy);
-    const described = candidates.map(describe).filter(Boolean);
-    if (!described.length) {
-      focusRef.current = { arc: -1, range: null };
-      hoverRef.current = -1;
-      setTip(null); setChoices(null); setDetail(null); setListOpen(false); schedule(); return;
-    }
-    const closeEnough = candidates.length > 1 && candidates[1].distance <= 8 * viewRef.current.DPR;
-    if (closeEnough && described.length > 1 && described.every((item) => item.kind === 'arc' ||
-        item.kind === 'link' || item.kind === 'underlay')) {
-      setChoices(described);
-      setDetail(null);
-      setListOpen(false);
-      // nothing is chosen while the chooser asks, and its rows replace the hover chip
-      focusRef.current = { arc: -1, range: null };
-      dropHover();
-      setAnnounce(chooserAnnouncement(described.length));
-      schedule();
-      return;
-    }
-    commitFound(described[0]);
-  }, [liftAt, hitCandidatesAt, describe, viewRef, commitFound, schedule, focusRef, dropHover]);
-
-  const doubleTap = React.useCallback((cx) => {
-    const cam = camRef.current, v = viewRef.current;
-    zoomAbout(cam, v.W, cx * v.DPR, 2.5, maxZoomOf(graph, v), yFrameFor(cam) || undefined);
-    schedule();
-  }, [camRef, graph, schedule, viewRef, yFrameFor]);
-
-  // Publish the latest handlers for the (stable) gesture listeners to call.
-  React.useEffect(() => { handlersRef.current = { hover, tap, doubleTap }; }, [hover, tap, doubleTap]);
+  }, [graph, noWebGL, glRetry, schedule, loc, camFor, zoomCapFor, live, dropHover, yFrameFor, liftAt, viewRef, camRef, handlersRef]);
 
   /** Reset one rail's camera to fit (r2: each rail has its own). */
   const resetRail = React.useCallback((which) => {
@@ -438,7 +243,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     focusRef.current = { arc: -1, range: null };
     hoverRef.current = -1;
     setDetail(null); setChoices(null); setListOpen(false); setTip(null); schedule();
-  }, [camRef, viewRef, graph, camVRef, resetRail, focusRef, schedule]);
+  }, [camRef, viewRef, graph, camVRef, resetRail, focusRef, schedule, setChoices, setDetail, setListOpen, setTip]);
 
   const toggleChrome = React.useCallback(() => {
     const next = !chromeHidden;
@@ -448,16 +253,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     } catch (_e) { /* private mode: the toggle still works for this mount */ }
     setChromeHidden(next);
   }, [chromeHidden]);
-
-  /** Close the cards (the chooser, the Nearby list, the connection sheet) and let go of the chosen
-   * line. Every close goes through here: the sheet's x once cleared the card but kept focusRef, so
-   * the shader held every other thread at 5 % ink until Escape or Back (sw1 B1, 2026-10-05). */
-  const closeCards = React.useCallback(() => {
-    setListOpen(false); setChoices(null); setDetail(null); setTip(null);
-    focusRef.current = { arc: -1, range: null };
-    hoverRef.current = -1;
-    schedule();
-  }, [focusRef, schedule]);
 
   /** Scripture / My web. The chosen line goes with the cards: a link's index and a canon thread's
    * index number two different graphs, so a focus kept across the switch spotlit an unrelated
@@ -544,21 +339,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   }, [viewRef, lastRailRef, camVRef, camRef, zoomCapFor, yFrameFor, graph, schedule, resetView, closeTopOverlay, onBack, dropHover,
     personalRef]);
 
-  /** Follow the chosen line to its far foot: the camera centres on that
-   * verse at the same zoom, the line stays spotlit, and the control turns
-   * to the other end so the reader can walk it back (Corbin's brief,
-   * 2026-09-11: "every line followable end to end"). */
-  const followThread = React.useCallback((info) => {
-    const cam = camRef.current, v = viewRef.current;
-    if (!cam || !info || info.kind !== 'arc') return;
-    const toFar = info.far === 'to';
-    cam.x = toFar ? info.to : info.from;
-    clampCamera(cam, v.W, zoomCapFor(cam), yFrameFor(cam) || undefined);
-    setDetail(Object.assign({}, info, { far: toFar ? 'from' : 'to' }));
-    setAnnounce(followAnnouncement((toFar ? info.b : info.a).label));
-    schedule();
-  }, [camRef, viewRef, zoomCapFor, yFrameFor, schedule]);
-
   const openEndpoint = React.useCallback((endpoint) => {
     if (!endpoint || typeof navigateToLink !== 'function') return;
     // meta.sourceLetterTitle is what the reader's back pill is labelled with,
@@ -569,16 +349,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     navigateToLink(endpoint, { sourceLetterTitle: 'The Scripture Web' });
   }, [navigateToLink, camRef, focusRef, modeRef, detail]);
 
-  // A bundle's group, chosen in its sheet: the pair of ranges the shader and
-  // the picker draw and spotlight (uFocusRange2). Choosing the
-  // same group again lets go of it.
-  const chooseGroup = React.useCallback((info, grp) => {
-    const same = focusRef.current.range2 && grp && focusRef.current.range2[0] === grp.lo && focusRef.current.range2[1] === grp.hi;
-    focusRef.current = { arc: -1, range: [info.lo, info.hi], range2: same || !grp ? null : [grp.lo, grp.hi] };
-    setDetail(Object.assign({}, info, { chosenGroup: same || !grp ? null : grp.chapterIndex }));
-    setAnnounce(groupAnnouncement(grp, same || !grp));
-    schedule();
-  }, [focusRef, schedule]);
   // ── render ──────────────────────────────────────────────────────────────
   if (loadError) return loadErrorPanel(loadError, retryLoad);
   if (noWebGL && graph) {
