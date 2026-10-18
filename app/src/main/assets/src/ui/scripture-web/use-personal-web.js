@@ -5,8 +5,8 @@
 
    Split out of ScriptureWebScreen unchanged (F0, 2026-10-18): the built web
    (personalRef, from utils/scripture-web/personal-build.js) and its counts,
-   rebuilt whenever the mode, the links (LinkStore's version) or the lazily
-   loaded Bible studies change; and railOpts(), everything the rail renderer
+   rebuilt whenever the mode, the links (LinkStore's version), the VOT corpus
+   (window.__votCorpus's version) or the lazily loaded Bible studies change; and railOpts(), everything the rail renderer
    needs to place a personal endpoint in this frame.
 
    w3 (the My Web stream): a rebuild keeps what the reader has. The Volumes
@@ -37,6 +37,16 @@ function useLinkVersion() {
   }, []);
   const snapshot = React.useCallback(
     () => (typeof LinkStore === 'undefined' ? 0 : LinkStore.getVersion()), []);
+  return React.useSyncExternalStore(subscribe, snapshot, snapshot);
+}
+
+/** The VOT corpus's version (window.__votCorpus, as use-lazy-bundles reads it): the
+ *  Volumes rail is built from the letters, so the web rebuilds when they land
+ *  (fix-review #9: a My Web opened before the corpus left every link skipped). */
+function useCorpusVersion() {
+  const corpus = () => /** @type {any} */ (globalThis).__votCorpus;
+  const subscribe = React.useCallback((cb) => { const c = corpus(); return c ? c.subscribe(cb) : () => {}; }, []);
+  const snapshot = React.useCallback(() => { const c = corpus(); return c ? c.getVersion() : 0; }, []);
   return React.useSyncExternalStore(subscribe, snapshot, snapshot);
 }
 
@@ -120,6 +130,7 @@ export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, vie
 
   // ── the personal web ────────────────────────────────────────────────────
   const linkVersion = useLinkVersion();
+  const corpusVersion = useCorpusVersion();
   const [studiesTick, setStudiesTick] = React.useState(0);
   React.useEffect(() => {
     if (!graph || mode !== 'personal') return;
@@ -164,7 +175,7 @@ export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, vie
         .catch(() => { /* the web stands without the studies; the next build tries again */ });
     }
     return () => { live = false; };
-  }, [graph, mode, linkVersion, studiesTick, schedule, camVRef, viewRef, focusRef, resumeRef]);
+  }, [graph, mode, linkVersion, corpusVersion, studiesTick, schedule, camVRef, viewRef, focusRef, resumeRef]);
 
   return {
     personalRef, personalCount: counts.links, contextCount: counts.timothy, skippedCount: counts.skipped, railOpts, relink,

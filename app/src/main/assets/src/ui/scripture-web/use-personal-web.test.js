@@ -21,7 +21,7 @@ import { useWebSelection } from './use-web-selection.js';
 import { useJourney } from './use-journey.js';
 
 const g = /** @type {any} */ (globalThis);
-const STUBS = ['LinkStore', 'COLLECTIONS', 'READING_CHAIN', 'colLetterArr', 'colPreface', 'BIBLE_STUDIES', 'loadBibleStudies'];
+const STUBS = ['LinkStore', 'COLLECTIONS', 'READING_CHAIN', 'colLetterArr', 'colPreface', 'BIBLE_STUDIES', 'loadBibleStudies', '__votCorpus'];
 afterEach(() => { STUBS.forEach((k) => delete g[k]); vi.restoreAllMocks(); });
 
 const GRAPH = {
@@ -238,6 +238,27 @@ describe('usePersonalWeb across rebuilds', () => {
     act(() => { s.set([link('b', 2, 'l2')]); });
     expect(refs.focusRef.current).toBe(before);
     expect(get().sel.panel.spec).toEqual({ mode: 'connection', arc: 0, myWeb: 'underlay' });
+  });
+
+  it('fix-review #9: the web rebuilds when the VOT corpus lands, so a link into it is placed, not left skipped', () => {
+    corpus();
+    const letters = [];
+    g.colLetterArr = () => letters;
+    const subs = new Set();
+    let version = 1;
+    g.__votCorpus = { subscribe: (cb) => { subs.add(cb); return () => subs.delete(cb); }, getVersion: () => version };
+    g.LinkStore = store([link('a', 1, 'l1')]);
+    g.loadBibleStudies = vi.fn(() => Promise.resolve(false));
+    const { hook } = mount();
+    expect(hook.result.current.personalCount).toBe(0);
+    expect(hook.result.current.skippedCount).toBe(1);
+    act(() => {
+      for (let i = 0; i < 10; i++) letters.push({ id: 'l' + i, title: 'Letter ' + i });
+      version++;
+      subs.forEach((cb) => cb());
+    });
+    expect(hook.result.current.personalCount).toBe(1);
+    expect(hook.result.current.skippedCount).toBe(0);
   });
 
   it('the header counts are state of the build: links placed, Timothy’s threads placed, links skipped', () => {

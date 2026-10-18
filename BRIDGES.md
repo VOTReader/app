@@ -290,7 +290,8 @@ lifetime rule as §8.
 
 - `__votCorpus` / `__loadVotCorpus` — `index.html:268-269`. Consumers:
   `screen-routes.jsx`, `use-navigate-to-link.js`, `use-surprise.js`,
-  `progress-stats.js`, `search/engine.js` (init loads every corpus before it builds the index), and
+  `progress-stats.js`, `search/engine.js` (init loads every corpus before it builds the index),
+  `scripture-web/use-personal-web.js` (My Web rebuilds its Volumes rail on the version), and
   every VOT-rendering `*Home.jsx`/`*Screen.jsx`.
 - `__matthewCorpus` / `__loadMatthewCorpus` — `index.html:265-266`. Consumers:
   `screen-routes.jsx`, `use-navigate-to-link.js`, `use-surprise.js`,
