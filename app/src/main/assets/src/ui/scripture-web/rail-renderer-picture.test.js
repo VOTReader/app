@@ -202,5 +202,77 @@ describe('P4 the Volumes rail in the spec\'s type and ink', () => {
     expect(phone.length).toBeLessThan(40);
     expect(new Set(phone.map((t) => t.y)).size).toBe(1);
     expect(phone[0].y).toBeCloseTo(58 * dpr, 6);           // spec §3: names 46-58, under the chrome's 50
+    // fix-review #13: every placed name is one ink, the second row's too
+    for (const t of pc) expect(t.fill).toBe(css('volumesLabel'));
+  });
+  it('no tick crosses a printed name, and every name sits inside the screen (fix-review #3)', () => {
+    // the phone's band ticks ran 7 px over the rail, through its names (the
+    // names' baseline sits 4 px over it); and a band cut by the left edge
+    // centred its name over the sliver on screen, so "VOL I" printed past x = 0
+    const dpr = 2.6, w = 891 * dpr;
+    const phone = Object.assign({}, base, { width: w, height: 411 * dpr, DPR: dpr, base: 319 * dpr });
+    const pc = base;
+    // a rail of 200 letters: at the overview the letter ticks stand 12 px apart, under every name
+    const dense = buildVotRail([
+      { volKey: 'one', label: 'Volume One', short: 'Vol I', items: Array.from({ length: 100 }, (_, i) => ({ id: 'l' + i, title: 'Letter ' + i })) },
+      { volKey: 'two', label: 'Volume Two', short: 'Vol II', items: Array.from({ length: 100 }, (_, i) => ({ id: 'm' + i, title: 'Letter ' + i })) },
+    ]);
+    const crowded = buildVotRail(Array.from({ length: 40 }, (_, k) => ({
+      volKey: 'c' + k, label: 'VOL C' + String(k).padStart(2, '0'), short: 'VOL C' + String(k).padStart(2, '0'), items: [{ id: 'x' + k, title: 'X' }],
+    })));
+    const frames = /** @type {Array<[string, any]>} */ ([
+      ['phone, overview', Object.assign({}, phone, { votX: (p) => (p / 20) * w })],
+      ['phone, dense ticks', Object.assign({}, phone, { votRail: dense, votX: (p) => (p / 200) * w })],
+      // names a little wider than their bands (the fake measures 7 px a glyph): each overhangs a neighbour's tick
+      ['phone, crowded', Object.assign({}, phone, { votRail: crowded, votX: (p) => (p / 40) * w })],
+      ['phone, Vol I cut by the left edge', Object.assign({}, phone, { votX: (p) => (p - 10) * (w / 8) + 12 * dpr })],
+      ['phone, Vol II cut by the right edge', Object.assign({}, phone, { votX: (p) => (p - 10) * (w / 8) + w - 12 * dpr })],
+      ['PC, overview', pc],
+      ['PC, dense ticks', Object.assign({}, pc, { votRail: dense, votX: (p) => (p / 200) * W })],
+      ['PC, Vol I cut by the left edge', Object.assign({}, pc, { votX: (p) => (p - 10) * (W / 8) + 12 })],
+    ]);
+    for (const [name, o] of frames) {
+      const ctx = segmentCtx();
+      drawPersonalWeb(ctx, null, null, o);
+      const names = ctx.texts.filter((t) => t.text.startsWith('VOL '));
+      expect(names.length, name).toBeGreaterThan(0);
+      for (const t of names) {
+        expect(t.left, `${name}: ${t.text}`).toBeGreaterThanOrEqual(0);
+        expect(t.right, `${name}: ${t.text}`).toBeLessThanOrEqual(o.width);
+        for (const [x1, y1, x2, y2] of ctx.ticks) {
+          const crossesX = Math.max(x1, x2) >= t.left && Math.min(x1, x2) <= t.right;
+          const crossesY = Math.max(y1, y2) > t.y - t.size && Math.min(y1, y2) < t.y;
+          expect(crossesX && crossesY, `${name}: a tick at ${x1.toFixed(0)} crosses ${t.text}`).toBe(false);
+        }
+      }
+    }
   });
 });
+
+/** A context recording the tick segments (volumesTick strokes) and each name's box. @returns {any} */
+function segmentCtx() {
+  const ticks = [], texts = [];
+  let path = [];
+  const st = { strokeStyle: '', font: '', letterSpacing: '0px' };
+  const noop = () => {};
+  const size = () => Number(/(\d+(?:\.\d+)?)px/.exec(st.font)[1]);
+  const spacing = () => parseFloat(st.letterSpacing) || 0;
+  return {
+    ticks, texts,
+    get strokeStyle() { return st.strokeStyle; }, set strokeStyle(v) { st.strokeStyle = v; },
+    get font() { return st.font; }, set font(v) { st.font = v; },
+    get letterSpacing() { return st.letterSpacing; }, set letterSpacing(v) { st.letterSpacing = v; },
+    lineWidth: 0, fillStyle: '', textAlign: '', textBaseline: '', lineCap: '', lineJoin: '', globalAlpha: 1,
+    beginPath() { path = []; }, moveTo(x, y) { path.push([[x, y]]); }, lineTo(x, y) { path[path.length - 1].push([x, y]); },
+    arc: noop, fill: noop, clearRect: noop, save: noop, restore: noop,
+    stroke() {
+      if (st.strokeStyle !== css('volumesTick')) return;
+      for (const sub of path) for (let i = 1; i < sub.length; i++) ticks.push([sub[i - 1][0], sub[i - 1][1], sub[i][0], sub[i][1]]);
+    },
+    measureText: (t) => ({ width: String(t).length * (7 + spacing()) }),
+    fillText(t, x, y) {
+      const wd = String(t).length * (7 + spacing());
+      texts.push({ text: String(t), x, y, size: size(), left: x - wd / 2, right: x + wd / 2 });
+    },
+  };
+}

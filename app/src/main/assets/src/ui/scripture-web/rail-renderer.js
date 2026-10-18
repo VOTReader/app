@@ -735,6 +735,11 @@ function drawRails(ctx, opts, rails) {
   ctx.stroke();
   if (!votRail || !votRail.segments || !(votRail.total > 0)) return;
 
+  // The ticks stay under the names' baseline (fix-review #3): on a PC the
+  // names sit 14 px over the rail, clear of 7 px ticks; on the phone the
+  // header leaves a 12 px band and the names sit 4 px over the rail, so the
+  // ticks there rise only 2 px over it and reach below it instead.
+  const letterTick = compact ? [2, 2] : [4, 0], bandTick = compact ? [2, 5] : [7, 4];
   // letter ticks, 4 px, once the letters stand apart
   const pitch = Math.abs(votRailX(1, opts) - votRailX(0, opts));
   if (pitch >= LETTER_TICK_MIN * DPR) {
@@ -745,7 +750,7 @@ function drawRails(ctx, opts, rails) {
       const x = votRailX(i + 0.5, opts);
       if (x > width) break;
       if (x < 0) continue;
-      ctx.moveTo(x, rails.topY - 4 * DPR); ctx.lineTo(x, rails.topY);
+      ctx.moveTo(x, rails.topY - letterTick[0] * DPR); ctx.lineTo(x, rails.topY + letterTick[1] * DPR);
     }
     ctx.stroke();
   }
@@ -760,29 +765,40 @@ function drawRails(ctx, opts, rails) {
   // The rows are then given by the one placement law both rails share
   // (rail-labels.js): the top row first, the second when the top's last
   // name would be nearer than 5 px, and NO row when neither has room. Every
-  // band keeps its tick either way.
+  // band keeps its tick either way. Before the law, a name is kept inside the
+  // screen (a band cut by the edge printed its name past it: "VOL I" at
+  // x = 0 on the phone, fix-review #3) and may slide right, over its own
+  // band, to clear its neighbour on the top row rather than drop to the
+  // second alone ("LAMB" by MTAM, fix-review #13).
   const names = [];
+  const pad = 5 * DPR, inset = 4 * DPR;
   ctx.strokeStyle = inkCss('volumesTick');
   for (const seg of votRail.segments) {
     if (!seg.count) continue;
     const span = segmentSpan(seg, opts);
     if (!span) continue;
     ctx.beginPath();
-    ctx.moveTo(span.x0, rails.topY - 7 * DPR); ctx.lineTo(span.x0, rails.topY + 4 * DPR);
+    ctx.moveTo(span.x0, rails.topY - bandTick[0] * DPR); ctx.lineTo(span.x0, rails.topY + bandTick[1] * DPR);
     ctx.stroke();
     const label = (seg.short || seg.label).toUpperCase();
     const w = ctx.measureText(label).width;
     if (w > span.room * 2) continue;
-    names.push({ label, x: span.labelX, left: span.labelX - w / 2, right: span.labelX + w / 2, fits: w <= span.room - 6 * DPR });
+    const lo = w / 2 + inset, hi = width - w / 2 - inset;
+    let x = lo > hi ? width / 2 : Math.min(hi, Math.max(lo, span.labelX));
+    const prev = names[names.length - 1];
+    const need = prev ? prev.right + pad - (x - w / 2) : 0;
+    if (need > 0 && x + need <= Math.min(hi, span.labelX + span.room / 2)) x += need;
+    names.push({ label, x, left: x - w / 2, right: x + w / 2 });
   }
-  const rows = placeRailLabels(names, 5 * DPR);
+  const rows = placeRailLabels(names, pad, compact ? 1 : 2);
   // the phone has room for one row (spec §3: names 46-58 on the baseline 58,
   // the top chrome to 50); a name the row cannot take keeps its tick and
   // shows on a zoom. The PC's rows sit on 136 and 120 (names 116-136).
   const rowY = [14, 30];
+  // every placed name in the one ink, the second row's too (fix-review #13)
+  ctx.fillStyle = inkCss('volumesLabel');
   names.forEach((nm, i) => {
-    if (rows[i] < 0 || (compact && rows[i] > 0)) return;
-    ctx.fillStyle = inkCss('volumesLabel', nm.fits && rows[i] === 0 ? 1 : 0.75);
+    if (rows[i] < 0) return;
     ctx.fillText(nm.label, nm.x, rails.topY - (compact ? 4 : rowY[rows[i] ? 1 : 0]) * DPR);
   });
   // the overline names the rail, in the left gutter over its names (PC: the
