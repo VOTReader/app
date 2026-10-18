@@ -21,7 +21,7 @@
 import { refOfVerse, chapterRange, countTouching, bundleGroups } from './pick.js';
 import { MY_WEB_SOURCES, LINK_KIND_NAMES } from './palette.js';
 import { prophecyIndexOf } from './focus-state.js';
-import { endpointFor, collectionName, letterKeyOf, COLLECTION_NAMES } from './vot-citations.js';
+import { endpointFor, collectionName, letterKeyOf, letterCiteSites, COLLECTION_NAMES } from './vot-citations.js';
 
 /** What the live region says when + does nothing because it can do nothing. */
 export const ZOOM_MAX_MESSAGE = 'Zoomed all the way in';
@@ -326,7 +326,10 @@ export function summaryOf(found) {
     const [x, y] = endsOf(found);
     return x.label + ' and ' + y.label + (found.prophecy ? ', a prophecy fulfilled.' : ', connected.');
   }
-  if (found.kind === 'letter') return found.title + ', ' + plural(found.verses.length, 'verse', 'verses') + ' it cites.';
+  if (found.kind === 'letter') {
+    const n = typeof found.passages === 'number' ? found.passages : found.verses.length;
+    return found.title + ', ' + plural(n, 'verse', 'verses') + ' it cites.';
+  }
   if (found.kind === 'verse') return found.ref.label + ', ' + plural(found.connections, 'connection', 'connections') + '.';
   if (found.kind === 'bundle') {
     return found.label + ', ' + plural(found.connections, 'connection converges', 'connections converge') + ' here.';
@@ -473,10 +476,12 @@ export function arcJoining(g, a, b) {
 
 /**
  * A letter, entry or study chapter as the panel's letter mode names it: its title, its
- * collection by name, the verses it cites (ascending) and the endpoint that opens it at the top.
- * Null for a key no curated edge carries.
+ * collection by name, the verses it cites (ascending, each first verse once), how many passages it
+ * cites (each verse-to-verseEnd once, as panel-model letterRows lists them: the count the live
+ * region says, so it matches the list's header; w3 review) and the endpoint that opens it at the
+ * top. Null for a key no curated edge carries.
  * @param {any} g @param {string} letterKey  vot-citations' key ("three/i-am-risen")
- * @returns {{ letterKey: string, title: string, collectionName: string, verses: number[], endpoint: any } | null}
+ * @returns {{ letterKey: string, title: string, collectionName: string, verses: number[], passages: number, endpoint: any } | null}
  */
 export function letterOf(g, letterKey) {
   const edges = (g && g.votEdges) || [];
@@ -485,7 +490,8 @@ export function letterOf(g, letterKey) {
   if (!mine.length) return null;
   const cite = Object.assign(citationOfEdge(mine[0], null), { paragraph: 0, sub: null, cite: {} });
   const verses = [...new Set(mine.map((/** @type {any} */ e) => e.v))].sort((x, y) => x - y);
-  return { letterKey: key, title: cite.title, collectionName: cite.collectionName, verses, endpoint: endpointFor(cite) };
+  const passages = new Set(letterCiteSites(g, key).map((site) => site.verse + '-' + site.verseEnd)).size;
+  return { letterKey: key, title: cite.title, collectionName: cite.collectionName, verses, passages, endpoint: endpointFor(cite) };
 }
 
 /* ── My Web's words (w3, the My Web stream; spec Q8, r2-05) ────────────────

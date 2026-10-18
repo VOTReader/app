@@ -17,7 +17,7 @@ import { runInNewContext } from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import { decodeGraph } from './decode.js';
-import { windowCorpus, endpointFor } from './vot-citations.js';
+import { windowCorpus, endpointFor, letterKeyOf } from './vot-citations.js';
 import * as pm from './panel-model.js';
 import * as ds from './describe.js';
 import { verseToX } from './geometry.js';
@@ -97,6 +97,20 @@ describe('the words (digest item 22)', () => {
     expect(ds.sheetMeta(info)).toBe('Volume Two');
     expect(info.verses.length).toBeGreaterThan(0);
     expect(info.endpoint && info.endpoint.type).toBeTruthy();
+  });
+
+  it('says one count of what a letter cites: the live region and the list header agree (w3 review)', () => {
+    const keys = [...new Set(g.votEdges.map((e) => e.key || letterKeyOf(e)))];
+    let differed = 0;
+    for (const key of keys) {
+      const info = ds.describeFound({ kind: 'letter', letterKey: key }, { g, density: 'famous' });
+      if (!info) continue;
+      const n = pm.letterRows(g, key).length;
+      if (info.verses.length !== n) differed++;
+      expect(ds.summaryOf(info), key).toBe(info.title + ', ' + ds.plural(n, 'verse', 'verses') + ' it cites.');
+    }
+    // the review's case is real: counting distinct first verses undercounts the passages listed
+    expect(differed).toBeGreaterThan(0);
   });
 });
 

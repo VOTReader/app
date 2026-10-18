@@ -247,7 +247,8 @@ export function rangeModel(g, lo, hi, density) {
 
 /**
  * The verses a letter cites, one row per cited passage in the order it cites them (its first
- * citation of each), each with its text now.
+ * citation of each), each with its text now. A passage is a verse-to-verseEnd pair, the same key
+ * describe.js letterOf counts as `passages`, so the list's header and the live region agree.
  * @param {any} g @param {string} letterKey @param {string} [translation]
  */
 export function letterRows(g, letterKey, translation) {
