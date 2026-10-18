@@ -226,6 +226,45 @@ describe('camera', () => {
     cam.ppv = fit * 1e6; clampCamera(cam, 1000, 100);
     expect(cam.ppv).toBeCloseTo(fit * 100, 6);
   });
+
+  /* The docked panel covers the view's right (the w3 review's major finding): with the view's own
+     edges as the bound, the canon's last right / ppv verses could never stand in the canvas area.
+     The slack moves only the canon's END bound, by what the panel covers, so the area's right edge,
+     not the view's, is where Revelation's last verse can stop; Genesis still stops at the left. */
+  it('a right slack lets the canon\'s end stop at the canvas area\'s right edge, and no further', () => {
+    const cam = createCamera(31102);
+    clampCamera(cam, 1000, 5000);
+    zoomAbout(cam, 1000, 500, 50, 5000);
+    cam.x = 99999; clampCamera(cam, 1000, 5000, undefined, 400);
+    expect(verseToX(cam, 1000, cam.total)).toBeCloseTo(600, 6);
+    cam.x = -99999; clampCamera(cam, 1000, 5000, undefined, 400);
+    expect(verseToX(cam, 1000, 0)).toBeCloseTo(0, 6);
+    // no slack is the view's own bound, as before
+    cam.x = 99999; clampCamera(cam, 1000, 5000, undefined, 0);
+    expect(verseToX(cam, 1000, cam.total)).toBeCloseTo(1000, 6);
+  });
+
+  it('at fit the slack lets the overview slide left until the canon\'s end meets the area\'s edge', () => {
+    const cam = createCamera(31102);
+    clampCamera(cam, 1000, 5000);
+    cam.x = 99999; clampCamera(cam, 1000, 5000, undefined, 400);
+    expect(cam.ppv).toBeCloseTo(fitPPV(cam, 1000), 9);
+    expect(verseToX(cam, 1000, cam.total)).toBeCloseTo(600, 6);
+    cam.x = -99999; clampCamera(cam, 1000, 5000, undefined, 400);
+    expect(cam.x).toBeCloseTo(31102 / 2, 6);
+  });
+
+  it('zoomAbout holds its anchor under the same slack', () => {
+    const cam = createCamera(31102);
+    clampCamera(cam, 1000, 5000);
+    zoomAbout(cam, 1000, 500, 50, 5000);
+    cam.x = 99999; clampCamera(cam, 1000, 5000, undefined, 400);
+    const anchor = 590; // just left of the panel, over the canon's last verses
+    const before = xToVerse(cam, 1000, anchor);
+    zoomAbout(cam, 1000, anchor, 1.5, 5000, undefined, undefined, 400);
+    expect(xToVerse(cam, 1000, anchor)).toBeCloseTo(before, 3);
+    expect(verseToX(cam, 1000, cam.total)).toBeGreaterThanOrEqual(600 - 1e-6);
+  });
 });
 
 describe('arcDistance', () => {

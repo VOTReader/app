@@ -92,4 +92,23 @@ describe('the hooks', () => {
     expect(schedule).toHaveBeenCalledTimes(2);
     el.remove();
   });
+
+  /* The camera's clamp leaves the docked panel room past the canon's end (its right slack); once the
+     panel stops covering the right, the camera may stand past the view's own bound. onShrink tells
+     the camera, so it eases back inside instead of jumping at the reader's next drag. */
+  it('usePanelInset calls onShrink after the right inset shrinks, never as it grows', () => {
+    const el = rootOf(1600, 900);
+    const wrapRef = { current: el };
+    const panelInsetRef = { current: { right: 0, bottom: 0 } };
+    const onShrink = vi.fn(() => { expect(panelInsetRef.current.right).toBe(0); });
+    const layout = panelLayout(1600, 900);
+    const { rerender } = renderHook(({ open }) => usePanelInset({ layout, open, panelInsetRef, wrapRef, schedule: vi.fn(), onShrink }),
+      { initialProps: { open: false } });
+    rerender({ open: true });
+    expect(onShrink).not.toHaveBeenCalled();
+    rerender({ open: true });
+    rerender({ open: false });
+    expect(onShrink).toHaveBeenCalledTimes(1);
+    el.remove();
+  });
 });

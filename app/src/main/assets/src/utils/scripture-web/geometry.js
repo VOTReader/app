@@ -678,19 +678,32 @@ export function maxCamY(cam, yf) {
  * viewport, and hold y inside [0, maxCamY] — or at 0 when the caller has no
  * y frame. Mutates in place — this runs per gesture frame.
  *
+ * `right` is what the docked panel covers on the view's right, device px (the
+ * w3 review's major finding: with the view's own edges as the bound, the
+ * canon's last right / ppv verses could never stand in the canvas area the
+ * panel leaves). It is slack on the canon's END bound only: the camera may
+ * move on until the canon's last verse meets the canvas area's right edge,
+ * so the area, not the view, is what holds the canon there; the start keeps
+ * the view's left edge, which the panel never covers. At fit that lets the
+ * overview slide left by the panel's width. 0 (the default) is the view's
+ * own bound, as before.
+ *
  * @param {{x:number, y?:number, ppv:number, total:number}} cam
  * @param {number} width — viewport width, device px
  * @param {number} maxZoom — multiple of fit
  * @param {YFrame} [yf] - absent: a 1-D camera
+ * @param {number} [right] - device px the panel covers on the right (0: none)
  */
-export function clampCamera(cam, width, maxZoom, yf) {
+export function clampCamera(cam, width, maxZoom, yf, right) {
   const min = fitPPV(cam, width);
   const max = min * (maxZoom || 5000);
   if (!(cam.ppv > 0)) cam.ppv = min;
   cam.ppv = Math.min(Math.max(cam.ppv, min), max);
   const half = width / cam.ppv / 2;
-  cam.x = (half * 2 >= cam.total) ? cam.total / 2
-    : Math.min(Math.max(cam.x, half), cam.total - half);
+  const slack = right > 0 ? right / cam.ppv : 0;
+  const lo = Math.min(half, cam.total / 2);
+  const hi = Math.max(cam.total - half, cam.total / 2) + slack;
+  cam.x = Math.min(Math.max(cam.x, lo), hi);
   const top = yf ? maxCamY(cam, yf) : 0;
   cam.y = !(cam.y > 0) ? 0 : (cam.y > top ? top : cam.y);
   return cam;
@@ -747,8 +760,9 @@ export function rotatePointer(clientX, clientY, physicalWidth) {
  * @param {number} factor — multiplicative zoom (>1 zooms in)
  * @param {YFrame} [yf] - the y frame, when the camera has one
  * @param {number} [anchorY] - device px from the frame's top to hold still, in the sky
+ * @param {number} [right] - the panel's slack, device px (clampCamera)
  */
-export function zoomAbout(cam, width, anchorX, factor, maxZoom, yf, anchorY) {
+export function zoomAbout(cam, width, anchorX, factor, maxZoom, yf, anchorY, right) {
   const verse = xToVerse(cam, width, anchorX);
   const min = fitPPV(cam, width);
   const max = min * (maxZoom || 5000);
@@ -759,7 +773,7 @@ export function zoomAbout(cam, width, anchorX, factor, maxZoom, yf, anchorY) {
   if (yf && y0 > 0 && typeof anchorY === 'number') {
     cam.y = (ppv1 / ppv0) * (yf.base + y0 - anchorY) + anchorY - yf.base;
   }
-  clampCamera(cam, width, maxZoom, yf);
+  clampCamera(cam, width, maxZoom, yf, right);
   cam.x = verse - (anchorX - width / 2) / cam.ppv;
-  return clampCamera(cam, width, maxZoom, yf);
+  return clampCamera(cam, width, maxZoom, yf, right);
 }

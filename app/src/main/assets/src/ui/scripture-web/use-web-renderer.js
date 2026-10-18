@@ -203,14 +203,19 @@ export function useChromeTokens(theme, schedule) {
  * Per frame it hands the renderer viewFor() (web-frame.webViewArgs: the
  * focus, hover and lit set included) and the canon overlay a CanonFrame with
  * the centre chapter (web-frame.centreOf) and the panel's inset
- * (panelInsetRef) on it (CONTRACTS.md §2, §5).
+ * (panelInsetRef) on it (CONTRACTS.md §2, §5). slackFor (optional,
+ * use-web-camera.js) is the camera clamp's room for the docked panel, which
+ * the resize's clamp keeps as every other clamp does.
  * @param {any} p
  */
 export function useWebRenderer({
   graph, mode, density, setLoadError, resumeRef, glRef, uiRef, wrapRef, topbarRef,
   camRef, camVRef, viewRef, focusRef, panelInsetRef, viewFor, zoomCapFor, yFrameFor,
-  chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow,
+  chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow, slackFor,
 }) {
+  // read by the resize, which lives in the GL effect and must not re-run for it
+  const slackRef = React.useRef(slackFor);
+  slackRef.current = slackFor;
   const [noWebGL, setNoWebGL] = React.useState(false);
   // without WebGL2 the screen shows the canon web as a list; My Web stays drawn (w3 item 31)
   const listShown = noWebGL && mode !== 'personal';
@@ -532,7 +537,8 @@ export function useWebRenderer({
       keepZoom(cam, camVRef.current, was ? was.W : 0, W);
       if (!(cam.ppv > 0)) cam.ppv = fitPPV(cam, W);
       // with the y frame: a frame that grew cannot leave y above the new ceiling
-      clampCamera(cam, W, maxZoomOf(graph, viewRef.current), yFrameFor(cam));
+      clampCamera(cam, W, maxZoomOf(graph, viewRef.current), yFrameFor(cam),
+        typeof slackRef.current === 'function' ? slackRef.current(cam) : 0);
       // a resize is not a gesture: the camera it leaves is the one last drawn
       const m = motionRef.current;
       m.x = cam.x; m.y = cam.y; m.ppv = cam.ppv;

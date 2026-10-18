@@ -19,6 +19,12 @@
                     its labels out of it
      flyTo          the one way code moves the camera to a place (go-to, Follow,
                     a book name, the panel's framing); cancelFly stops one
+     slackFor       the camera clamp's room for the docked panel (geometry.js
+                    clampCamera's `right`): flyTo, the gestures, the keys and
+                    the resize all clamp with it, so the canon's end stops at
+                    the canvas area's right edge, not under the panel;
+                    settleInset eases the camera back inside the view's own
+                    bound once the panel stops covering the right
      settledAt      (the navigation stream, A6) the chapter in the lens where the
                     camera last came to rest: state, set once no frame has moved
                     the camera for SETTLE_MS, and only when the chapter changes,
@@ -129,6 +135,21 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
     return top ? cv : camRef.current;
   }, [frame, modeRef, topbarRef]);
 
+  /**
+   * The clamp's slack for the docked panel (geometry.clampCamera's `right`), device px: what the
+   * panel covers on the right now, or what a fly is told it will (`flyRight`, device px, before the
+   * panel renders), whichever is more. Only the canon camera in the canon web has one: My Web's
+   * rails keep the view's own edges, as their per-frame clamp does.
+   * @param {any} c  the camera being clamped
+   * @param {number} [flyRight]
+   */
+  const slackFor = React.useCallback((/** @type {any} */ c, flyRight = 0) => {
+    if (!c || c !== camRef.current || modeRef.current === 'personal') return 0;
+    const v = viewRef.current;
+    const now = (panelInsetRef.current && panelInsetRef.current.right > 0 ? panelInsetRef.current.right : 0) * (v.DPR || 1);
+    return Math.max(now, flyRight > 0 ? flyRight : 0);
+  }, [modeRef]);
+
   /** Where a target puts the camera, read against the view and the inset now (CONTRACTS.md §3):
    * the zoom clamped to [fit, fit x cap], the centre of the CANVAS AREA (the view less the panel on
    * the right). Null for a target that names no place. */
@@ -157,8 +178,8 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
     // the canvas area's centre, not the view's: the panel covers the right
     cam.x = d.cx + d.right / (2 * cam.ppv);
     if (typeof target.y === 'number') cam.y = target.y;
-    clampCamera(cam, viewRef.current.W, d.cap, yFrameFor(cam) || undefined);
-  }, [yFrameFor]);
+    clampCamera(cam, viewRef.current.W, d.cap, yFrameFor(cam) || undefined, slackFor(cam, d.right));
+  }, [yFrameFor, slackFor]);
 
   // the running fly's stop (the frame loop's motion), so cancelFly and a newer fly can end it
   const flyStopRef = React.useRef(/** @type {null | (() => void)} */ (null));
@@ -222,17 +243,17 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
         const e = easeInOutCubic(t);
         const vNow = viewRef.current;
         const fit = fitPPV(cam, vNow.W), cap = zoomCapFor(cam);
+        const right = rightCss() * (vNow.DPR || 1);
         if (ax != null) {
           cam.ppv = Math.min(Math.max(ppv0 * Math.pow(d0.ppv / ppv0, e), fit), fit * cap);
           cam.x = aVerse - (ax - vNow.W / 2) / cam.ppv + xDrift * e;
         } else {
           const [c, w] = path.at(e);
-          const right = rightCss() * (vNow.DPR || 1);
           cam.ppv = Math.min(Math.max(Math.max(1, vNow.W - right) / w, fit), fit * cap);
           cam.x = c + right / (2 * cam.ppv);
         }
         if (typeof target.y === 'number') cam.y = y0 + (target.y - y0) * e;
-        clampCamera(cam, vNow.W, cap, yFrameFor(cam) || undefined);
+        clampCamera(cam, vNow.W, cap, yFrameFor(cam) || undefined, slackFor(cam, right));
         return true;
       }, (arrived) => {
         if (flyStopRef.current === stop) flyStopRef.current = null;
@@ -240,13 +261,30 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
       });
       flyStopRef.current = stop;
     });
-  }, [destination, land, animate, schedule, zoomCapFor, yFrameFor]);
+  }, [destination, land, animate, schedule, zoomCapFor, yFrameFor, slackFor]);
 
   /** Stop a running fly where it is (a drag, pinch, wheel or key pan takes the camera); its
    * promise resolves false. Safe with nothing running. */
   const cancelFly = React.useCallback(() => {
     if (flyStopRef.current) flyStopRef.current();
   }, []);
+
+  /**
+   * The panel stopped covering the right (it closed, or became the bottom sheet): a camera its
+   * slack let stand past the view's own bound eases back inside it, at the same zoom, rather than
+   * jumping there at the reader's next drag. usePanelInset calls it once the inset has shrunk. A fly
+   * running already clamps with the new inset every frame, so it is left to land.
+   */
+  const settleInset = React.useCallback(() => {
+    const cam = camRef.current, v = viewRef.current;
+    if (!cam || !v.W || flyStopRef.current) return;
+    const to = clampCamera({ x: cam.x, ppv: cam.ppv, total: cam.total, y: cam.y }, v.W, zoomCapFor(cam),
+      yFrameFor(cam) || undefined, slackFor(cam));
+    if (!(Math.abs(to.x - cam.x) * cam.ppv > 0.5)) return;
+    // flyTo centres x in the canvas area: what the panel still covers is added back on landing
+    const right = (panelInsetRef.current && panelInsetRef.current.right > 0 ? panelInsetRef.current.right : 0) * (v.DPR || 1);
+    flyTo({ x: to.x - right / (2 * to.ppv) });
+  }, [zoomCapFor, yFrameFor, slackFor, flyTo]);
 
   // A6: where the camera came to rest. Each drawn frame compares the camera with the last one;
   // a move restarts the wait, and SETTLE_MS without one reads the chapter in the lens.
@@ -275,6 +313,6 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
 
   return {
     camRef, camVRef, lastRailRef, viewRef, focusRef, panelInsetRef,
-    frame, viewFor, zoomCapFor, yFrameFor, camFor, flyTo, cancelFly, settledAt,
+    frame, viewFor, zoomCapFor, yFrameFor, camFor, flyTo, cancelFly, settledAt, slackFor, settleInset,
   };
 }

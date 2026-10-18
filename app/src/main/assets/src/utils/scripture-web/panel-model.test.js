@@ -301,96 +301,68 @@ describe("the chooser's Zoom to: the tap's chapter only where its threads stand"
   });
 });
 
-/* The camera's clamp keeps the VIEW inside the canon, so near its end a verse centred at the
-   reader's zoom stayed under the docked panel (w3 review). PC 1600x900 at DPR 1, panel 640. */
-describe('framing under the camera clamp: landingOf, centreTarget, frameHolds', () => {
+/* The camera's clamp once kept the VIEW inside the canon, so near its end a verse centred at the
+   reader's zoom stayed under the docked panel (w3 review), and the panel dived (zoomed in, up to
+   the reader's x 4) to bring it out. The clamp now leaves the panel room: its slack lets the canon's
+   end stop at the CANVAS AREA's right edge (geometry.clampCamera's `right`), the area is the view,
+   and nothing dives. These pin the area-as-view law the dive tests (centreTarget, diveLimit) stood
+   in for: what the panel opens stands in the area at the reader's own zoom. PC 1600x900 at DPR 1,
+   panel 640. */
+describe('framing under the camera clamp: landingOf and frameHolds, with the panel\'s slack', () => {
   const W = 1600, RIGHT = 640, AREA = W - RIGHT;
   const T = g.total;
   const fit = W / T;
   const cap = 44 * T / W; // web-frame maxZoomOf at DPR 1
-  const at = (cam, target, x) => verseToX(pm.landingOf(cam, W, RIGHT, target, cap), W, x);
+  const land = (cam, target) => pm.landingOf(cam, W, RIGHT, target, cap);
+  const at = (cam, target, x) => verseToX(land(cam, target), W, x);
 
   it('landingOf is flyTo\'s maths: the canvas area\'s centre, the zoom held to [fit, cap], then the clamp', () => {
     const cam = { x: 15000, ppv: 1, total: T };
     expect(at(cam, { x: 15000 }, 15000)).toBeCloseTo(AREA / 2, 6);
-    expect(pm.landingOf(cam, W, RIGHT, { x: 15000, zoom: 0.5 }, cap).ppv).toBeCloseTo(fit, 9);
-    expect(pm.landingOf(cam, W, RIGHT, { x: 15000, zoom: cap * 2 }, cap).ppv).toBeCloseTo(fit * cap, 6);
-    // at the canon's end the view stops at its last verse: x is left right of the area's centre
-    expect(at(cam, { x: T - 100 }, T - 100)).toBeGreaterThan(AREA);
+    expect(land(cam, { x: 15000, zoom: 0.5 }).ppv).toBeCloseTo(fit, 9);
+    expect(land(cam, { x: 15000, zoom: cap * 2 }).ppv).toBeCloseTo(fit * cap, 6);
     expect(cam).toEqual({ x: 15000, ppv: 1, total: T }); // a copy: the camera is not moved
   });
 
-  it('centreTarget keeps the reader\'s zoom wherever the clamp lets x be centred', () => {
-    expect(pm.centreTarget({ x: 15000, ppv: 1, total: T }, W, RIGHT, 16000, cap)).toEqual({ x: 16000 });
-    // the canon's start is in the area already: the clamp holds Genesis at the left edge
-    expect(pm.centreTarget({ x: T / 2, ppv: fit, total: T }, W, RIGHT, 70.5, cap)).toEqual({ x: 70.5 });
-    // no panel, nothing to keep out of
-    expect(pm.centreTarget({ x: T / 2, ppv: fit, total: T }, W, 0, T - 40, cap)).toEqual({ x: T - 40 });
-  });
-
-  it('near the end it zooms in only as far as centring x needs, never out', () => {
-    const cam = { x: T / 2, ppv: fit, total: T };
-    const t = pm.centreTarget(cam, W, RIGHT, JOHN_3_16 + 0.5, cap);
-    expect(t.zoom).toBeGreaterThan(1);
-    expect(Math.abs(at(cam, t, JOHN_3_16 + 0.5) - AREA / 2)).toBeLessThanOrEqual(0.25);
-    // a hair less zoom and the clamp would leave it right of centre
-    expect(at(cam, { x: t.x, zoom: t.zoom * 0.98 }, JOHN_3_16 + 0.5)).toBeGreaterThan(AREA / 2 + 1);
-    const deep = { x: T - 200, ppv: 30, total: T };
-    expect(pm.centreTarget(deep, W, RIGHT, T - 300, cap)).toEqual({ x: T - 300 });
-  });
-
-  it('a verse the ceiling cannot bring out stays at the reader\'s zoom (a dive under the panel gains nothing)', () => {
-    const cam = { x: T / 2, ppv: fit, total: T };
-    expect(pm.centreTarget(cam, W, RIGHT, T - 0.5, cap)).toEqual({ x: T - 0.5 });
-    // a few verses further in: the inner 90 % is reachable though the centre is not
-    const near = pm.centreTarget(cam, W, RIGHT, T - 18.5, cap);
-    expect(near.zoom).toBeGreaterThan(1);
-    const x = at(cam, near, T - 18.5);
+  it('at the canon\'s end the area\'s right edge stops at its last verse: x stands in the area, not under the panel', () => {
+    const cam = { x: 15000, ppv: 1, total: T };
+    const x = at(cam, { x: T - 100 }, T - 100);
     expect(x).toBeGreaterThan(AREA / 2);
-    expect(x).toBeLessThanOrEqual(0.9 * AREA + 0.01);
+    expect(x).toBeLessThan(AREA);
+    expect(at(cam, { x: T - 100 }, T)).toBeCloseTo(AREA, 6);
+    // Revelation's last verse, at the reader's zoom: the area's last pixel, its threads all inward
+    const last = at(cam, { x: T - 0.5 }, T - 0.5);
+    expect(last).toBeGreaterThan(0.9 * AREA);
+    expect(last).toBeLessThan(AREA);
+    expect(land(cam, { x: T - 0.5 }).ppv).toBe(1);
+    // the canon's start needs no slack: the clamp holds Genesis at the left edge, in the area
+    expect(at({ x: T / 2, ppv: fit, total: T }, { x: 70.5 }, 70.5)).toBeGreaterThan(0);
+    // no panel, no slack: the view's own edges, as before
+    expect(verseToX(pm.landingOf(cam, W, 0, { x: T - 100 }, cap), W, T)).toBeCloseTo(W, 6);
   });
 
-  /* w3 review, round 2 (major): unbounded, the dive took Revelation 21:4 from the overview to 489x
-     and the far end of its Follow with it: a curtain of vertical legs, no thread's way readable.
-     The dive now stops at the reader's zoom x DIVE_ZOOM or the five chapters around the verse (the
-     go-to's verse frame, spec 4.5), whichever is deeper; what that cannot bring out waits on the
-     camera's clamp leaving the panel room (the hub's cross-stream item). */
-  it('diveLimit: the reader\'s zoom x 4, or the five chapters around the verse across the area', () => {
-    const REV_21_4 = vid('revelation', 21, 4);
+  /* w3 review, round 2 (major): the dive that brought Revelation 21:4 out from the overview went to
+     489x, a curtain of vertical legs; bounded at the reader's x 4 it still changed the reader's
+     zoom to open a verse. With the slack nothing needs a dive. */
+  it('what the panel opens from the overview keeps the overview\'s zoom and stands in the area', () => {
     const over = { x: T / 2, ppv: fit, total: T };
-    // Revelation 19 to 22: the canon ends two chapters short of five
-    const span = T - vid('revelation', 19, 1);
-    expect(span).toBe(84);
-    expect(pm.diveLimit(g, over, AREA, REV_21_4 + 0.5)).toBeCloseTo(AREA / span, 9);
-    // deep already: four times the reader's zoom
-    expect(pm.diveLimit(g, { x: T - 400, ppv: 20, total: T }, AREA, REV_21_4 + 0.5)).toBe(80);
-    expect(pm.DIVE_ZOOM).toBe(4);
+    for (const v of [JOHN_3_16, vid('revelation', 17, 1), vid('revelation', 21, 4), T - 1]) {
+      const c = land(over, { x: v + 0.5 });
+      expect(c.ppv).toBeCloseTo(fit, 12);
+      const x = verseToX(c, W, v + 0.5);
+      expect(x).toBeGreaterThan(0);
+      expect(x).toBeLessThan(AREA);
+    }
+    // John 3:16 deep in: centred at the reader's zoom
+    const deep = { x: JOHN_3_16, ppv: 0.286, total: T };
+    expect(at(deep, { x: JOHN_3_16 + 0.5 }, JOHN_3_16 + 0.5)).toBeCloseTo(AREA / 2, 6);
   });
 
-  it('a bounded dive: Revelation 21:4 from the overview stays within it; Revelation 17 is centred inside it', () => {
-    const over = { x: T / 2, ppv: fit, total: T };
-    const REV_21_4 = vid('revelation', 21, 4) + 0.5;
-    const most = pm.diveLimit(g, over, AREA, REV_21_4);
-    const t = pm.centreTarget(over, W, RIGHT, REV_21_4, cap, most);
-    expect(pm.landingOf(over, W, RIGHT, t, cap).ppv).toBeLessThanOrEqual(most * (1 + 1e-9));
-    // neither the centre nor the inner 90 % is in reach of the bound: the reader's zoom is kept
-    expect(t).toEqual({ x: REV_21_4 });
-    const REV_17_1 = vid('revelation', 17, 1) + 0.5;
-    const most17 = pm.diveLimit(g, over, AREA, REV_17_1);
-    const t17 = pm.centreTarget(over, W, RIGHT, REV_17_1, cap, most17);
-    expect(t17.zoom).toBeGreaterThan(1);
-    expect(pm.landingOf(over, W, RIGHT, t17, cap).ppv).toBeLessThanOrEqual(most17 * (1 + 1e-9));
-    expect(Math.abs(at(over, t17, REV_17_1) - AREA / 2)).toBeLessThanOrEqual(0.25);
-    // John 3:16 from the overview needs about 4.4x: well inside its bound, centred as before
-    const j = pm.centreTarget(over, W, RIGHT, JOHN_3_16 + 0.5, cap, pm.diveLimit(g, over, AREA, JOHN_3_16 + 0.5));
-    expect(Math.abs(at(over, j, JOHN_3_16 + 0.5) - AREA / 2)).toBeLessThanOrEqual(0.25);
-  });
-
-  it('frameHolds: Isaiah 7:14 to Matthew 1:23 frames whole; Isaiah to Revelation and Genesis to Revelation cannot', () => {
+  it('frameHolds: Isaiah 7:14 to Matthew 1:23 and Isaiah to Revelation 22 frame whole; Genesis to Revelation cannot', () => {
     const cam = { x: T / 2, ppv: fit, total: T };
     const holds = (a, b) => pm.frameHolds(cam, W, RIGHT, pm.connectionFrame(a, b), a, b, cap);
     expect(holds(ISA_7_14, MATT_1_23)).toBe(true);
-    expect(holds(ISA_7_14, T - 30)).toBe(false); // the clamp keeps its frame from the area's centre
+    expect(holds(ISA_7_14, T - 30)).toBe(true); // the clamp's slack lets its frame reach the canon's end
     expect(holds(60, T - 200)).toBe(false); // wider than the area at fit
     expect(pm.frameHolds(cam, W, 0, pm.connectionFrame(60, T - 200), 60, T - 200, cap)).toBe(true); // no panel
   });

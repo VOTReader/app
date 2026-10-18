@@ -38,13 +38,15 @@ const TEXT_FIELD = { INPUT: 1, TEXTAREA: 1, SELECT: 1 };
  *   and how each closes; the cameras' refs and callbacks; My Web's
  *   personalRef; resetView and onBack; dropHover, the live region and the
  *   frame loop; goTo (additive, the navigation stream): goto.jsx's answer, whose
- *   box Escape closes first and whose open, selectCentre and step the keys call
+ *   box Escape closes first and whose open, selectCentre and step the keys call;
+ *   slackFor (optional, use-web-camera.js): the camera clamp's room for the docked
+ *   panel, device px, so the keys stop where flyTo and the gestures do
  * @returns {{ onKeyDown: (e: any) => void }}
  */
 export function useWebKeys({
   graph, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
   camRef, camVRef, lastRailRef, viewRef, modeRef, personalRef, zoomCapFor, yFrameFor,
-  resetView, onBack, dropHover, setAnnounce, schedule, cancelFly, goTo,
+  resetView, onBack, dropHover, setAnnounce, schedule, cancelFly, goTo, slackFor,
 }) {
   const goToOpen = !!(goTo && goTo.isOpen);
   /** Close whatever is on top of the web, one layer a call: the guide, then
@@ -107,6 +109,7 @@ export function useWebKeys({
     const step = (v.W / cam.ppv) * 0.12;
     const ceiling = zoomCapFor(cam);
     const yf = yFrameFor(cam);
+    const slack = typeof slackFor === 'function' ? slackFor(cam) : 0;
     let atCeiling = false;
     if (e.key === 'ArrowLeft') { cam.x -= step; }
     else if (e.key === 'ArrowRight') { cam.x += step; }
@@ -118,10 +121,10 @@ export function useWebKeys({
     }
     else if (e.key === '+' || e.key === '=') {
       const before = cam.ppv;
-      zoomAbout(cam, v.W, v.W / 2, 1.6, ceiling, yf || undefined);
+      zoomAbout(cam, v.W, v.W / 2, 1.6, ceiling, yf || undefined, undefined, slack);
       atCeiling = cam.ppv === before;
     }
-    else if (e.key === '-' || e.key === '_') { zoomAbout(cam, v.W, v.W / 2, 1 / 1.6, ceiling, yf || undefined); }
+    else if (e.key === '-' || e.key === '_') { zoomAbout(cam, v.W, v.W / 2, 1 / 1.6, ceiling, yf || undefined, undefined, slack); }
     else if (e.key === '0') { resetView(); return; }
     else if (e.key === 'Escape') {
       // The notice is an overlay like the five below and goes first for the
@@ -142,7 +145,7 @@ export function useWebKeys({
     // a key that moves the camera takes it: a fly running stops where the key found it (the
     // fly only moves in a frame, so none runs between the key's move and this)
     if (cancelFly) cancelFly();
-    clampCamera(cam, v.W, ceiling, yf);
+    clampCamera(cam, v.W, ceiling, yf, slack);
     const centre = Math.round(cam.x);
     if (atCeiling) setAnnounce(ZOOM_MAX_MESSAGE);
     // the Volumes rail's x is a rail position, not a verse id: name its own node (sweep v55)
@@ -153,7 +156,7 @@ export function useWebKeys({
     else if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
     schedule();
   }, [viewRef, lastRailRef, camVRef, camRef, zoomCapFor, yFrameFor, graph, schedule, resetView, closeTopOverlay, onBack, dropHover,
-    personalRef, modeRef, setAnnounce, cancelFly, goTo]);
+    personalRef, modeRef, setAnnounce, cancelFly, goTo, slackFor]);
 
   return { onKeyDown };
 }

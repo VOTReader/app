@@ -36,7 +36,7 @@ import {
   pickThreads, pickChapter, pickVerse, chapterRange, nearbyChapter, nearbyThreads, arcsTouching,
 } from '../../utils/scripture-web/pick.js';
 import {
-  connectionFrame, chapterFrame, centreTarget, diveLimit, frameHolds, chapterAtX, chooserChapter, FEET_BAND,
+  connectionFrame, chapterFrame, frameHolds, chapterAtX, chooserChapter, FEET_BAND,
 } from '../../utils/scripture-web/panel-model.js';
 import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 import { focusState, withLit } from '../../utils/scripture-web/focus-state.js';
@@ -129,12 +129,14 @@ export const CHOOSER_MOST = 8;
  *   (use-personal-web.js, optional): the chosen link found again after a rebuild; settledAt (the navigation stream, A6:
  *   use-web-camera.js's chapter at rest), which Nearby's list re-derives on; insetFor (optional,
  *   use-panel-layout.js): what the panel will cover once open, CSS px, so a
- *   choice is framed before the panel has rendered
+ *   choice is framed before the panel has rendered; slackFor (optional,
+ *   use-web-camera.js): the camera clamp's room for the docked panel, which the
+ *   double-tap's zoom keeps
  */
 export function useWebSelection({
   graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, yFrameFor,
   personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce, relink = null,
-  settledAt, insetFor,
+  settledAt, insetFor, slackFor,
 }) {
   const [detail, setDetail] = React.useState(() => (resumeRef.current && resumeRef.current.detail) || null);      // the open sheet
   // My Web's rebuild found the chosen line again (use-personal-web's relink):
@@ -306,13 +308,13 @@ export function useWebSelection({
   }, [viewRef, insetFor]);
 
   /**
-   * Bring canon x into the canvas area the panel leaves (spec section 3), at the reader's zoom where
-   * the camera's clamp lets it be centred there, else at the least zoom that does (panel-model
-   * centreTarget: near the canon's end the clamp stops the camera first, and what was opened stayed
-   * under the panel, the w3 review's major finding), never deeper than diveLimit (the reader's
-   * zoom x 4, or the five chapters around x: the review's second round found a 489x dive). `always`
-   * centres it; otherwise it moves only when x sits under the panel, off the left edge or in the
-   * area's outer tenth either side (its threads fan out both ways).
+   * Bring canon x into the canvas area the panel leaves (spec section 3), centred there at the
+   * reader's zoom. Near the canon's end the camera's clamp stops it with the canon's last verse at
+   * the area's right edge (its slack for the panel, geometry.clampCamera), so x stands in the area,
+   * right of centre, and never under the panel (the w3 review's major finding); the zoom is never
+   * changed to get there (its second round found the dive that once did a curtain of legs).
+   * `always` centres it; otherwise it moves only when x sits under the panel, off the left edge or
+   * in the area's outer tenth either side (its threads fan out both ways).
    * @param {number} x  canon x
    * @param {{ always?: boolean }} [how]
    */
@@ -324,8 +326,8 @@ export function useWebSelection({
       const at = verseToX(cam, v.W, x), areaW = v.W - right;
       if (at >= 0.1 * areaW && at <= 0.9 * areaW) return;
     }
-    flyTo(centreTarget(cam, v.W, right, x, maxZoomOf(graph, v), diveLimit(graph, cam, v.W - right, x)), opts);
-  }, [camRef, viewRef, flyTo, coverNow, graph]);
+    flyTo({ x }, opts);
+  }, [camRef, viewRef, flyTo, coverNow]);
 
   /**
    * Keep what was opened in the canvas area (spec section 3). A connection is framed: both feet
@@ -564,9 +566,9 @@ export function useWebSelection({
     if (!cam || !v.W) return;
     const to = { x: cam.x, y: cam.y, ppv: cam.ppv, total: cam.total };
     zoomAbout(to, v.W, cx * v.DPR, 2.5, maxZoomOf(graph, v), yFrameFor(cam) || undefined,
-      typeof cy === 'number' ? cy * v.DPR : undefined);
+      typeof cy === 'number' ? cy * v.DPR : undefined, typeof slackFor === 'function' ? slackFor(cam) : 0);
     flyTo({ x: to.x, zoom: to.ppv / fitPPV(cam, v.W), y: to.y }, { insetRight: 0, ms: 280, anchor: cx });
-  }, [camRef, graph, viewRef, yFrameFor, flyTo]);
+  }, [camRef, graph, viewRef, yFrameFor, flyTo, slackFor]);
 
   /** What is open now, as a way back to it (A1, the navigation stream): the gestures keep one
    * before a tap, and when that tap turns out to be a double-tap's first, the double takes back
@@ -593,7 +595,7 @@ export function useWebSelection({
   }, [focusRef, schedule]);
 
   /** Follow the chosen line to its far foot: the camera centres that verse in the canvas area at
-   * the same zoom (closer only where the clamp at the canon's end needs it: bringIn), the line
+   * the same zoom (bringIn; at the canon's end it stands right of centre, still in the area), the line
    * stays spotlit, and the control turns to the other end so the reader can walk it back (Corbin's
    * brief, 2026-09-11: "every line followable end to end"). */
   const followThread = React.useCallback((info) => {

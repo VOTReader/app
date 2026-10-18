@@ -176,12 +176,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const modeRef = React.useRef(mode);
   // The cameras (canon + Volumes rail), the view, the focus and the frame
   // maths that reads them (v15-code-health-06); flyTo moves the camera to a
-  // place, and panelInsetRef is what the open panel covers. Hover (the focus's
+  // place, and panelInsetRef is what the open panel covers; slackFor is the
+  // clamp's room for it, which every clamp below takes. Hover (the focus's
   // hover) is a LIGHT touch: it brightens the thread under the pointer and
   // names it, but never dims the rest of the web. Only a tap focuses.
   const {
     camRef, camVRef, lastRailRef, viewRef, focusRef, panelInsetRef,
-    frame, viewFor, zoomCapFor, yFrameFor, camFor, flyTo, cancelFly, settledAt,
+    frame, viewFor, zoomCapFor, yFrameFor, camFor, flyTo, cancelFly, settledAt, slackFor, settleInset,
   } = useWebCamera({ graph, density, modeRef, schedule, topbarRef, animate, onFrame });
   const theme = settings && settings.theme;
 
@@ -227,7 +228,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const { noWebGL, glRetry, retryGL, railZoom, elevatorRef, badgeBoxesRef, overlayFrameRef } = useWebRenderer({
     graph, mode, density, setLoadError, resumeRef, glRef, uiRef, wrapRef, topbarRef,
     camRef, camVRef, viewRef, focusRef, panelInsetRef, viewFor, zoomCapFor, yFrameFor,
-    chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow,
+    chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow, slackFor,
   });
   // without WebGL2 the canon web is read as a list; My Web draws in Canvas2D
   // and stays up (w3 item 31)
@@ -252,14 +253,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   } = useWebSelection({
     graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, yFrameFor,
     personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce, relink, settledAt,
-    insetFor,
+    insetFor, slackFor,
   });
 
   // the docked panel is open while anything is: the inset's one writer (CONTRACTS.md section 5)
   // records what it covers and the controls right-align to its edge; under 1000 px of canvas
   // area they collapse to the go-to and a "more" menu (spec section 3)
   const panelOpen = listOpen || !!choices || !!detail;
-  usePanelInset({ layout, open: panelOpen, panelInsetRef, wrapRef, schedule });
+  usePanelInset({ layout, open: panelOpen, panelInsetRef, wrapRef, schedule, onShrink: settleInset });
   const collapse = collapsedFor(layout, panelOpen);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const controlsRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
@@ -293,6 +294,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // first, detached root and the web came back dead to every drag and pinch.
   // loadError likewise (refactor bug #2): the error panel reused the root's node,
   // and a drag on it reached a camera the failed build never made.
+  // the gestures clamp with the panel's slack (use-web-camera slackFor), as flyTo lands
+  const clampWithSlack = React.useCallback((c, w, z, yf) => clampCamera(c, w, z, yf, slackFor(c)), [slackFor]);
+  const zoomWithSlack = React.useCallback((c, w, x, f, z, yf, ay) => zoomAbout(c, w, x, f, z, yf, ay, slackFor(c)), [slackFor]);
   React.useEffect(() => {
     const el = wrapRef.current;
     if (!el || !graph || listShown || loadError) return;
@@ -301,11 +305,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       view: () => viewRef.current, handlers: () => handlersRef.current,
       // a gesture takes the camera: the chip drops and a running fly stops
       live: () => { live(); dropHover(); cancelFly(); },
-      schedule, maxZoom: (c) => zoomCapFor(c || camRef.current), clampCamera, zoomAbout, xToVerse,
+      schedule, maxZoom: (c) => zoomCapFor(c || camRef.current), clampCamera: clampWithSlack, zoomAbout: zoomWithSlack, xToVerse,
       yFrame: yFrameFor, lift: liftAt, animate,
     });
   }, [graph, listShown, loadError, glRetry, schedule, loc, camFor, zoomCapFor, live, dropHover, cancelFly, yFrameFor, liftAt, viewRef, camRef,
-    handlersRef, animate]);
+    handlersRef, animate, clampWithSlack, zoomWithSlack]);
 
   /** Reset one rail's camera to fit (r2: each rail has its own). */
   const resetRail = React.useCallback((which) => {
@@ -354,7 +358,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const { onKeyDown } = useWebKeys({
     graph, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
     camRef, camVRef, lastRailRef, viewRef, modeRef, personalRef, zoomCapFor, yFrameFor,
-    resetView, onBack, dropHover, setAnnounce, schedule, cancelFly, goTo,
+    resetView, onBack, dropHover, setAnnounce, schedule, cancelFly, goTo, slackFor,
   });
 
   const openEndpoint = React.useCallback((endpoint) => {

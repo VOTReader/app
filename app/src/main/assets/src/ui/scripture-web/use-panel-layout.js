@@ -107,17 +107,20 @@ export function usePanelLayout(wrapRef) {
 /**
  * The inset's one writer (CONTRACTS.md section 5), and the panel's width as --sw-panel-w on the root
  * (the controls right-align to the panel's left edge). Runs after every commit; writes and schedules a
- * frame only when the value changed.
+ * frame only when the value changed. onShrink (optional; the camera's settleInset) runs once the
+ * right inset has shrunk, after the new value is written: the camera clamp's slack for the panel
+ * shrank with it.
  * @param {{ layout: PanelLayout | null, open: boolean, panelInsetRef: { current: { right: number, bottom: number } },
- *   wrapRef: { current: HTMLElement | null }, schedule: () => void }} p
+ *   wrapRef: { current: HTMLElement | null }, schedule: () => void, onShrink?: () => void }} p
  */
-export function usePanelInset({ layout, open, panelInsetRef, wrapRef, schedule }) {
+export function usePanelInset({ layout, open, panelInsetRef, wrapRef, schedule, onShrink }) {
   React.useLayoutEffect(() => {
     const next = insetOf(layout, open);
     const cur = panelInsetRef.current;
     if (!cur || cur.right !== next.right || cur.bottom !== next.bottom) {
       panelInsetRef.current = next;
       schedule();
+      if (cur && next.right < cur.right && typeof onShrink === 'function') onShrink();
     }
     const el = wrapRef.current;
     if (el && layout) {
