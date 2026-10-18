@@ -103,30 +103,28 @@ describe('D1 — a lone ribbon at the ceiling clears 3:1', () => {
   // luminance). BEFORE: 0.19 dark / 0.376 light, times strength 0.3 at worst.
   const AT_CEILING = 141 / 800;   // anchored arcs per CSS px of width, phoneLand
 
-  it('reaches 0.85 in both themes at the ceiling', () => {
-    for (const light of [false, true]) {
-      const s = ribbonStyle(zMax, 1, light, AT_CEILING);
-      expect(s.alpha).toBeGreaterThanOrEqual(0.85);
-    }
+  // The screen has one (dark) palette since 2026-09-10, so the law has no
+  // theme argument: the light arm these checks once also walked is gone.
+  it('reaches 0.85 at the ceiling', () => {
+    const s = ribbonStyle(zMax, 1, AT_CEILING);
+    expect(s.alpha).toBeGreaterThanOrEqual(0.85);
   });
 
   it('stops letting votes scale alpha at depth, or the weakest arc never gets there', () => {
     // strength floors at 0.30. If alpha still scaled by it, 0.9 x 0.3 = 0.27.
-    expect(ribbonStyle(zMax, 1, false, AT_CEILING).voteMix).toBe(1);
-    expect(ribbonStyle(1, 0, false, AT_CEILING).voteMix).toBe(0);
+    expect(ribbonStyle(zMax, 1, AT_CEILING).voteMix).toBe(1);
+    expect(ribbonStyle(1, 0, AT_CEILING).voteMix).toBe(0);
   });
 });
 
 describe('D2 — nothing below the ceiling washes out', () => {
   it('is the old law exactly at overview, whatever the density reads', () => {
-    for (const light of [false, true]) {
-      const a = ribbonStyle(1, 0, light, 0.0001);
-      const b = ribbonStyle(1, 0, light, 900);
-      expect(a.alpha).toBe(0.075);
-      expect(a.strokeWidthCss).toBe(0.9);
-      // Density must not be able to reach the overview frame at all.
-      expect(b).toEqual(a);
-    }
+    const a = ribbonStyle(1, 0, 0.0001);
+    const b = ribbonStyle(1, 0, 900);
+    expect(a.alpha).toBe(0.075);
+    expect(a.strokeWidthCss).toBe(0.9);
+    // Density must not be able to reach the overview frame at all.
+    expect(b).toEqual(a);
   });
 
   /* D2's OWN target is +-25 % on ink contrast and +-10 % on ink share, in
@@ -152,7 +150,7 @@ describe('D2 — nothing below the ceiling washes out', () => {
       { frame: 'desktop1920', per: 4220 / 1920, divisor: 3.92 },
     ];
     for (const c of cases) {
-      const s = ribbonStyle(40, localizeFactor(40), false, c.per);
+      const s = ribbonStyle(40, localizeFactor(40), c.per);
       expect(ALPHA_DEEP / s.alpha, c.frame + ' 40x crowding divisor').toBeCloseTo(c.divisor, 1);
     }
   });
@@ -160,7 +158,7 @@ describe('D2 — nothing below the ceiling washes out', () => {
   it('clamps that divisor to 1 at every ceiling, so D1 keeps the full value', () => {
     // The measured anchored density at each frame's own 44 px ceiling.
     for (const per of [141 / 800, 59 / 375, 336 / 1920]) {
-      expect(ribbonStyle(1711, 1, false, per).alpha).toBeCloseTo(ALPHA_DEEP, 12);
+      expect(ribbonStyle(1711, 1, per).alpha).toBeCloseTo(ALPHA_DEEP, 12);
     }
   });
 
@@ -168,8 +166,7 @@ describe('D2 — nothing below the ceiling washes out', () => {
     // The wash direction is UP. Whatever the crowd reads, the deep alpha is a
     // ceiling, not a floor: an empty frame cannot be brighter than one ribbon.
     for (const per of [0, 1e-9, 0.001, 5, 500]) {
-      expect(ribbonStyle(40, 1, false, per).alpha).toBeLessThanOrEqual(ALPHA_DEEP);
-      expect(ribbonStyle(40, 1, true, per).alpha).toBeLessThanOrEqual(ALPHA_DEEP);
+      expect(ribbonStyle(40, 1, per).alpha).toBeLessThanOrEqual(ALPHA_DEEP);
     }
   });
 });

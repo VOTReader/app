@@ -179,13 +179,12 @@ export const STROKE_MIN_CSS = 1.4;
  *
  * @param {number} zoom - multiple of fit-to-width
  * @param {number} localize - localizeFactor()
- * @param {boolean} light - parchment theme
  * @param {number} anchoredPerCssPx - anchored arcs per CSS px of viewport width
  * @returns {{alpha:number, strokeWidthCss:number, voteMix:number}}
  */
-export function ribbonStyle(zoom, localize, light, anchoredPerCssPx) {
+export function ribbonStyle(zoom, localize, anchoredPerCssPx) {
   const l2 = Math.log2(zoom > 0 ? zoom : 1);
-  const alpha = Math.min(0.075 + l2 * 0.028, light ? 0.42 : 0.19);
+  const alpha = Math.min(0.075 + l2 * 0.028, 0.19);
   const strokeWidthCss = Math.min(0.9 + l2 * 0.16, STROKE_DEEP_CSS);
   const t = smoothstep(0.55, 1, localize);
   if (!(t > 0)) return { alpha, strokeWidthCss, voteMix: 0 };

@@ -43,7 +43,7 @@ uniform vec2  uRes;
 uniform float uCamX, uPPV, uBase, uSquash, uLocalize;
 uniform float uFlyLocalize;  // the fly-over law's localize: the zoom's, let go as the camera rises (geometry.skyLocalize)
 uniform float uCamY;         // the picture's shift down the frame, device px
-uniform float uWidth, uAlpha, uTotal, uLightness;
+uniform float uWidth, uAlpha, uTotal;
 uniform float uSegments;
 uniform float uVoteMix;      // 0 = votes drive alpha (overview), 1 = width (depth)
 uniform vec2  uFocusRange;   // verse range kept lit (lo > hi = no focus)
@@ -145,7 +145,6 @@ void main(){
   vec3 col = distanceRamp(pow(abs(b - a)/uTotal, .40));
   col = mix(col, vec3(1.), hovered*(1. - spot)*.55);
   col = mix(col, vec3(.784, .643, .337), spot);  // the chosen line is the app's gold (#c8a456)
-  col *= uLightness;                              // parchment needs darker ink
 
   float aStrength = mix(strength, 1., uVoteMix);
   // ...and nearly opaque: uAlpha at the overview is 0.075, so x3 left a tapped line at ~0.12.
@@ -225,7 +224,7 @@ export function createRenderer(canvas, graph, opts = {}) {
   const U = {};
   for (const name of ['uRes', 'uCamX', 'uCamY', 'uPPV', 'uBase', 'uSquash',
     'uLocalize', 'uFlyLocalize', 'uWidth', 'uAlpha', 'uTotal',
-    'uLightness', 'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
+    'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
     'uHoverArc', 'uInstanceBase', 'uFocusRange2', 'uLens', 'uLensDim', 'uDpr']) {
     U[name] = gl.getUniformLocation(program, name);
   }
@@ -323,7 +322,7 @@ export function createRenderer(canvas, graph, opts = {}) {
      *   squash:number, localize:number, camX:number, camY?:number, ppv:number,
      *   strokeWidth:number, alpha:number, voteMix?:number, dpr?:number,
      *   density:import('../../utils/scripture-web/decode.js').Density,
-     *   light:boolean, bg:string,
+     *   bg:string,
      *   focusRange:(number[]|null), focusRange2?:(number[]|null), focusArc:number, hoverArc?:number,
      *   lens?:(number[]|null), lensDim?:number}} v
      *   lens: pick.lensRange(); the chapter under the frame's centre, lit while nothing is tapped
@@ -354,7 +353,6 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.uniform1f(U.uDpr, v.dpr || 1);
       gl.uniform1f(U.uAlpha, v.alpha);
       gl.uniform1f(U.uTotal, graph.total);
-      gl.uniform1f(U.uLightness, v.light ? 0.72 : 1);
       gl.uniform1f(U.uVoteMix, v.voteMix || 0);
       gl.uniform1f(U.uFocusArc, v.focusArc == null ? -1 : v.focusArc);
       if (v.lens) gl.uniform2f(U.uLens, v.lens[0], v.lens[1]);

@@ -449,7 +449,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       // shader. The GL pass still runs to paint the ground colour.
       r.draw(Object.assign({}, base, {
         camX: cam.x, ppv: cam.ppv, strokeWidth: 1, alpha: 0,
-        density: 'essential', light: chrome.isLight, bg: chrome.bg,
+        density: 'essential', bg: chrome.bg,
         focusRange: null, focusArc: -1, hoverArc: -1, lens: null,
       }));
       const uic = uiRef.current;
@@ -484,7 +484,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // (Corbin, 2026-09-21 21:21)
     const perCssPx = base.localize > 0
       ? anchoredDensity(anchoredRef.current, g, cam, v, density) : 0;
-    const style = ribbonStyle(zoom, base.localize, chrome.isLight, perCssPx);
+    const style = ribbonStyle(zoom, base.localize, perCssPx);
     // the convergence pills: how many threads meet at each foot cell
     const bundles = bundlesFor(bundleRef.current, g, cam, base, v, density);
     // the lens eases in from 6x to 24x rather than switching on at 6x (sw1)
@@ -496,7 +496,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       alpha: style.alpha,
       voteMix: style.voteMix,
       dpr: v.DPR,
-      density, light: chrome.isLight, bg: chrome.bg,
+      density, bg: chrome.bg,
       focusRange: focusRef.current.range, focusArc: focusRef.current.arc,
       hoverArc: hoverRef.current,
     }));
@@ -1293,8 +1293,8 @@ function drawRuler(canvas, g, cam, view, v, chrome) {
   if (!ctx) return numerals;
   const W = v.W, DPR = v.DPR, base = view.base;
   ctx.clearRect(0, 0, W, canvas.height);
-  const ink = chrome.isLight ? '58,37,16' : '235,231,222';
-  const gold = chrome.isLight ? '122,92,16' : '232,192,80';
+  const ink = '235,231,222';
+  const gold = '232,192,80';
   const X = (verse) => verseToX(cam, W, verse);
 
   if (cam.ppv < 8 * DPR) {
@@ -1478,8 +1478,8 @@ function drawElevator(canvas, cam, view, v, chrome, yf) {
   if (view.reserved) view.reserved.push({ x0: box.x0, x1: box.x1, y0, y1 });
   const ctx = canvas ? canvas.getContext('2d') : null;
   if (!ctx) return box;
-  const ink = chrome.isLight ? '58,37,16' : '235,231,222';
-  const gold = chrome.isLight ? '122,92,16' : '232,192,80';
+  const ink = '235,231,222';
+  const gold = '232,192,80';
   const x = W - 10 * DPR;
   ctx.save();
   ctx.lineWidth = 1.5 * DPR;
@@ -1519,8 +1519,8 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
   const fs = BADGE_FONT_CSS * DPR;
   const camY = cam.y > 0 ? cam.y : 0;
   const baseY = view.base + camY;
-  const ink = chrome.isLight ? '58,37,16' : '235,231,222';
-  const gold = chrome.isLight ? '122,92,16' : '232,192,80';
+  const ink = '235,231,222';
+  const gold = '232,192,80';
   ctx.save();
   ctx.font = '600 ' + fs + 'px Georgia,serif';
   ctx.textBaseline = 'middle';
@@ -1537,7 +1537,7 @@ function drawBundleBadges(canvas, g, cam, view, v, chrome, bundles) {
     ctx.beginPath();
     ctx.moveTo(box.x0 + r, box.y0); ctx.lineTo(box.x1 - r, box.y0); ctx.arc(box.x1 - r, cy, r, -Math.PI / 2, Math.PI / 2);
     ctx.lineTo(box.x0 + r, box.y1); ctx.arc(box.x0 + r, cy, r, Math.PI / 2, Math.PI * 1.5); ctx.closePath();
-    ctx.fillStyle = chrome.isLight ? 'rgba(248,242,228,0.92)' : 'rgba(14,12,10,0.88)';
+    ctx.fillStyle = 'rgba(14,12,10,0.88)';
     ctx.fill();
     ctx.lineWidth = 1 * DPR;
     ctx.strokeStyle = 'rgba(' + gold + ',' + ((strong ? 0.9 : 0.55) * dim).toFixed(3) + ')';
@@ -1592,8 +1592,8 @@ function drawThreadRefs(canvas, g, cam, view, v, chrome, density, focusArc) {
   const DPR = v.DPR;
   const close = cam.ppv >= VERSE_LABELS_PPV * DPR;
   if (!close && focusArc < 0) return 0;
-  const ink = chrome.isLight ? '58,37,16' : '235,231,222';
-  const gold = chrome.isLight ? '122,92,16' : '232,192,80';
+  const ink = '235,231,222';
+  const gold = '232,192,80';
   const fs = chrome.fsRuler * DPR;
   // boxes already taken (the ruler's numerals), so a label is never written over them
   const placed = view.reserved ? view.reserved.slice() : [];
@@ -1760,8 +1760,8 @@ function drawBookNames(ctx, g, X, W, DPR, base, chrome, ink, gold) {
  */
 function drawRulerOnly(ctx, g, cam, view, v, chrome) {
   const W = v.W, DPR = v.DPR, base = view.base;
-  const ink = chrome.isLight ? '58,37,16' : '235,231,222';
-  const gold = chrome.isLight ? '122,92,16' : '232,192,80';
+  const ink = '235,231,222';
+  const gold = '232,192,80';
   const X = (verse) => verseToX(cam, W, verse);
   drawBookNames(ctx, g, X, W, DPR, base, chrome, ink, gold);
 }
