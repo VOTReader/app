@@ -79,7 +79,9 @@ const STEP = { down: 150, up: -150 };
 
 describe('the guide names the drag that reaches the sky (ux1)', () => {
   it('the sky line names a direction for the finger', () => {
-    expect(skyLine()).toMatch(/look higher, where the long threads cross/i);
+    // and why to look there: it said "where the long threads cross" until the w3 review asked the
+    // guide to say what an arch's height means (C22); the taller arches it names are the long threads
+    expect(skyLine()).toMatch(/\btaller\b[^.]*\barch\b[^.]*\blook higher\b/i);
     expect(guideItems().join(' ')).not.toMatch(/\bsky\b/i);
     expect(['up', 'down']).toContain(directionWord(skyLine()));
   });

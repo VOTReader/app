@@ -89,7 +89,8 @@ export function TipChip({ info, viewport, inset }) {
  * closeTopOverlay, the same as the docked panel. */
 /** "How to read this web": four short lines, five with the go-to, each pointing at something the
  * screen has (digest items 22, 23). The "+" button, the ruler on the left and the bar that
- * jumped are gone, so the card no longer names them; the legend says what the colours are.
+ * jumped are gone, so the card no longer names them; the legend says what the colours are, and the
+ * first line what an arch's height is (C22, w3 review).
  * The footer carries the OpenBible.info credit (Q5). `canSearch`: the go-to's button is there. */
 export function HowToReadGuide({ onClose, canSearch, credit }) {
   const trapRef = useFocusTrap(true);
@@ -97,7 +98,7 @@ export function HowToReadGuide({ onClose, canSearch, credit }) {
     <div className="sw-guide" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="sw-guide-title">
       <div className="sw-guide-title" id="sw-guide-title">How to read this web</div>
       <ul className="sw-guide-body">
-        <li><strong>Pinch</strong> or scroll to zoom. Drag down to look higher, where the long threads cross.</li>
+        <li><strong>Pinch</strong> or scroll to zoom. The farther apart two verses, the taller their arch: drag down to look higher.</li>
         <li>Tap a thread to read both ends. Its votes are readers&rsquo; votes for how strong the link is.</li>
         <li>A gold tick under the baseline marks a verse the Volumes cite.</li>
         {canSearch ? <li><strong>Search</strong> at the top goes straight to a verse.</li> : null}

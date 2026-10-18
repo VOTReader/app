@@ -2,7 +2,8 @@
 /* "How to read this web" (digest items 22, 23; Q5; w3 panel step 2).
  * ═══════════════════════════════════════════════════════════════════════
  * The card a first visit opens. It is four or five short lines, and each one points at
- * something the screen has: pinch or scroll to zoom (and the drag that looks higher), tap a
+ * something the screen has: pinch or scroll to zoom (and the drag that looks higher, and what an
+ * arch's height means: the farther apart its verses, the taller; w3 review, C22), tap a
  * thread (its votes, said once in plain words), the gold ticks of the Volumes' citations,
  * the search that goes to a verse (only when the go-to is there), and Reset. It never names a
  * control the screen does not have: the "+" button and the ruler-and-bar it described were
@@ -56,6 +57,12 @@ describe('How to read this web: four or five short lines about controls that exi
     expect(text).toMatch(/tap a thread/i);
     expect(text).toMatch(/gold ticks?\b[^.]*\bVolumes\b/i);
     expect(text).toMatch(/\bReset\b/);
+  });
+
+  it("says what an arch's height means, once: the farther apart its verses, the taller (C22, w3 review)", () => {
+    const text = lines(guide()).join(' ');
+    expect(text).toMatch(/farther apart[^.]*\btaller\b[^.]*\barch\b/i);
+    expect(text.match(/\btaller\b/gi)).toHaveLength(1);
   });
 
   it('says what votes are, once, in plain words', () => {
