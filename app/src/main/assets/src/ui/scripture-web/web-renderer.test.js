@@ -576,6 +576,21 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(f.u(f.main, 'uTapFade').every((v) => v[0] === 1)).toBe(true);
   });
 
+  /* GL review 2026-10-18 (finding 3): the class receded all or nothing. A chosen range keeps the
+     ink of the pairs with a foot in it, as the main pass keeps its own threads'. */
+  it('a chosen range: the pairs with a foot in it keep the prophecy ink, the rest of the class recedes', () => {
+    const { calls, r } = build(prophetic());
+    const f = frame(r, calls, { focusRange: [95, 105], tapFade: 1 });
+    expect(f.u(f.main, 'uTapFade')).toEqual([[1]]);
+    const cores = f.u(f.top, 'uCore'), glows = f.u(f.top, 'uHalo');
+    expect(cores.length).toBe(2);
+    expect(cores[0][3], 'the pair from 5 to 180 recedes').toBeCloseTo(rgba01('prophecy')[3] * TAP_CONTEXT, 12);
+    expect(cores[1], 'the pair from 100 keeps its ink').toEqual(rgba01('prophecy'));
+    expect(glows[1]).toEqual(rgba01('prophecyGlow'));
+    expect(f.top.map((d) => d.args[3])).toEqual([1, 1]);
+    expect(topLook('prophecyInRange', 2, true, 1)).toEqual(topLook('prophecy', 2, true, 0));
+  });
+
   it('the shaders: the main pass recedes by TAP_CONTEXT at most and has no hover input or gold of its own; the top pass shares the curve law and the split feet', () => {
     expect(SHADER_SOURCE.vertex).toContain('float dim = mix(1., ' + glslFloat(TAP_CONTEXT) + ', uTapFade*(1. - lit));');
     expect(SHADER_SOURCE.vertex).not.toMatch(/uHoverArc|float hovered|\.784|mix\(\.05/);

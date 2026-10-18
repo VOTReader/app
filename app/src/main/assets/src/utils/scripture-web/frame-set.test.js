@@ -90,10 +90,10 @@ describe('topSet: the prophecy class, then the lit, the hovered and the chosen, 
   it('lays the kinds out in TOP_ORDER, each thread on the main pass\'s feet', () => {
     const g = graph();
     const fans = fansOf(g);
-    expect(TOP_ORDER).toEqual(['prophecy', 'lit', 'hover', 'chosen']);
+    expect(TOP_ORDER).toEqual(['prophecy', 'prophecyInRange', 'lit', 'hover', 'chosen']);
     const s = topSet(g, { lit: Int32Array.from([1, 2]), litKey: 'k', hoverArc: 3, focusArc: 0, focusProphecy: -1 });
     expect(s.ranges).toEqual([
-      { kind: 'prophecy', first: 0, count: 3 }, { kind: 'lit', first: 3, count: 2 },
+      { kind: 'prophecy', first: 0, count: 3 }, { kind: 'prophecyInRange', first: 3, count: 0 }, { kind: 'lit', first: 3, count: 2 },
       { kind: 'hover', first: 5, count: 1 }, { kind: 'chosen', first: 6, count: 1 },
     ]);
     expect([...s.from]).toEqual([60, 120, 5, 10, 40, 60, 10]);
@@ -114,7 +114,7 @@ describe('topSet: the prophecy class, then the lit, the hovered and the chosen, 
 
   it('a hover on the chosen line is not drawn twice; ids outside the graph are dropped', () => {
     const s = topSet(graph(), { lit: Int32Array.from([-1, 2, 99]), litKey: 'x', hoverArc: 0, focusArc: 0, focusProphecy: -1 });
-    expect(s.ranges.map((r) => r.count)).toEqual([3, 1, 0, 1]);
+    expect(s.ranges.map((r) => r.count)).toEqual([3, 0, 1, 0, 1]);
   });
 
   /* GL review 2026-10-18 (finding 2): 107 of the asset's pairs are no OpenBible arc, so hoverArc
@@ -126,7 +126,7 @@ describe('topSet: the prophecy class, then the lit, the hovered and the chosen, 
     expect([s.from[3], s.to[3], s.fanA[3], s.fanB[3]]).toEqual([5, 180, 0, 0]);
     // the chosen pair under the pointer is drawn once, as the chosen
     const chosen = topSet(g, { lit: null, litKey: '', hoverArc: -1, hoverProphecy: 2, focusArc: -1, focusProphecy: 2 });
-    expect(chosen.ranges.map((r) => r.count)).toEqual([3, 0, 0, 1]);
+    expect(chosen.ranges.map((r) => r.count)).toEqual([3, 0, 0, 0, 1]);
     // an arc under the pointer is the hover; the pair beside it is not a second one
     const both = topSet(g, { lit: null, litKey: '', hoverArc: 2, hoverProphecy: 2, focusArc: -1, focusProphecy: -1 });
     expect(both.ranges.find((r) => r.kind === 'hover').count).toBe(1);
@@ -164,10 +164,39 @@ describe('topSet: the prophecy class, then the lit, the hovered and the chosen, 
     expect(a).not.toBe(none);
     expect(topSet(g, Object.assign({}, v), a)).toBe(a);
     expect(topSet(g, Object.assign({}, v, { hoverArc: 1 }), a)).not.toBe(a);
-    expect(topSetKey(v)).toBe('|2|-1|-1|-1');
+    expect(topSetKey(v)).toBe('|2|-1|-1|-1||');
     // a graph with no prophecy and nothing asked about: no top pass at all
     const bare = Object.assign(graph(), { prophecy: [] });
     expect(topSet(bare, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 }).count).toBe(0);
+  });
+
+  /* GL review 2026-10-18 (finding 3): the class receded all or nothing. The main pass keeps the
+     ink of a thread with a foot in the chosen range (with a group chosen, a foot in each range:
+     the shader's inRange / pair), so the prophecy class keeps it by the same law. */
+  it('a chosen range splits the class: the pairs the shader would keep lit are prophecyInRange, the rest recede', () => {
+    const g = graph();
+    const ask = (range, range2, prev) => topSet(g, {
+      lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1, focusRange: range, focusRange2: range2,
+    }, prev);
+    const counts = (s) => [s.ranges[0].count, s.ranges[1].count];
+    const one = ask([55, 65], null);   // pair 0's foot 60
+    expect(one.ranges[1]).toEqual({ kind: 'prophecyInRange', first: 2, count: 1 });
+    expect([one.from[2], one.to[2]]).toEqual([60, 70]);
+    expect([...one.from.slice(0, 2)]).toEqual([120, 5]);
+    expect(counts(ask([180, 180], null)), 'inclusive, either foot').toEqual([2, 1]);
+    expect(counts(ask([55, 75], null)), 'both feet in it: one thread').toEqual([2, 1]);
+    // a group: a foot in each range, either way round
+    expect(counts(ask([55, 75], [175, 185])), 'pair 0 has no foot in the group').toEqual([3, 0]);
+    expect(counts(ask([0, 10], [175, 185]))).toEqual([2, 1]);
+    expect(counts(ask([175, 185], [0, 10]))).toEqual([2, 1]);
+    // a group without a range is no group (the shader reads range2 only with a range); none is none
+    expect(counts(ask(null, [175, 185]))).toEqual([3, 0]);
+    expect(counts(ask(null, null))).toEqual([3, 0]);
+    // the same range is the same set; a new one is new
+    expect(ask([55, 65], null, one)).toBe(one);
+    expect(ask([55, 66], null, one)).not.toBe(one);
+    expect(ask([55, 65], [1, 2], one)).not.toBe(one);
+    expect(topSetKey({ focusRange: [55, 65] })).not.toBe(topSetKey({ focusRange: [55, 65], focusRange2: [1, 2] }));
   });
 
   it('pairOf: an arc that joins a pair\'s verses names it; any other arc is not there', () => {
@@ -506,6 +535,44 @@ describe('the visible set: drawn, counted, labelled and picked are one set (E1)'
       expect(z43.vertices, dev.name).toBeLessThan(z6.vertices / 3);
       expect(ceiling.vertices, dev.name).toBeLessThan(10000);
       expect(ceiling.count, dev.name).toBeGreaterThan(0);
+    }
+  });
+});
+
+/* The top pass over the asset (GL review 2026-10-18). */
+describe('the top pass on the asset: the class follows the chosen range', () => {
+  const ASSET = resolve(dirname(fileURLToPath(import.meta.url)), '../../data/scripture-web-data.js');
+  const g = dec.decodeGraph(runInNewContext(readFileSync(ASSET, 'utf8') + ';SCRIPTURE_WEB_DATA', {}));
+  const chapter = (bookId, ch) => {
+    const bi = g.books.findIndex((b) => b.id === bookId);
+    const row = g.chapters.find((c) => c[0] === bi && c[1] === ch);
+    return [row[2], row[2] + row[3] - 1];
+  };
+  /** the oracle: the asset's distinct pairs with a foot in [lo, hi], straight off g.prophecy */
+  const pairsIn = ([lo, hi]) => {
+    const keys = new Set();
+    for (const p of g.prophecy) {
+      if ((p.a >= lo && p.a <= hi) || (p.b >= lo && p.b <= hi)) keys.add(Math.min(p.a, p.b) + ':' + Math.max(p.a, p.b));
+    }
+    return keys;
+  };
+
+  it('Isaiah 7 chosen: its pairs (7:14 to Matthew 1:22, to 1:18 given twice, to John 1:14) keep their ink, every other pair recedes', () => {
+    const isa7 = chapter('isaiah', 7);
+    const want = pairsIn(isa7);
+    const i714 = isa7[0] + 13, m122 = chapter('matthew-plain', 1)[0] + 21;
+    expect(want.has(Math.min(i714, m122) + ':' + Math.max(i714, m122)), 'PRECONDITION: Isaiah 7:14 to Matthew 1:22 is a pair').toBe(true);
+    expect(want.size, 'PRECONDITION: three distinct pairs (the asset gives 7:14 to Matthew 1:18 twice)').toBe(3);
+    const s = topSet(g, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1, focusRange: isa7, focusRange2: null });
+    const [rest, kept] = s.ranges;
+    expect(kept.kind).toBe('prophecyInRange');
+    expect(kept.count).toBe(want.size);
+    const got = new Set();
+    for (let j = kept.first; j < kept.first + kept.count; j++) got.add(s.from[j] + ':' + s.to[j]);
+    expect([...got].sort()).toEqual([...want].sort());
+    expect(rest.count + kept.count, 'the class is whole: every distinct pair, once').toBe(prophecySet(g).unique);
+    for (let j = rest.first; j < rest.first + rest.count; j++) {
+      expect(want.has(s.from[j] + ':' + s.to[j]), 'a receding pair has no foot in Isaiah 7').toBe(false);
     }
   });
 });

@@ -33,7 +33,9 @@
    tessellated for its own visible piece (geometry.topSegmentsFor), so the
    chosen line shows no facet at any zoom and is never drawn under another
    (digest C1, C3, item 10). While a line is chosen the rest of the web
-   recedes to TAP_CONTEXT, eased (uTapFade); a hover dims nothing.
+   recedes to TAP_CONTEXT, eased (uTapFade), the prophecy class with it but
+   for the pairs the chosen range keeps lit, by the main pass's own law; a
+   hover dims nothing.
 
    Neither the height law (the structure law: every thread the half-ellipse
    of its own span, every thread drawn at every zoom), the frame's piece of
@@ -305,6 +307,8 @@ const TOP_LOOK = {
   // the core is 1 device px on every screen (the ink table's prophecy row has no CSS width, and
   // nothing draws it thinner); it recedes with a tap
   prophecy: { core: 'prophecy', halo: 'prophecyGlow', cap: 192, minDevicePx: 1, recedes: true },
+  // the pairs the chosen range keeps lit (frame-set.topSet): the same ink, and it does not recede
+  prophecyInRange: { core: 'prophecy', halo: 'prophecyGlow', cap: 192, minDevicePx: 1 },
   lit: { core: 'lit', halo: '', cap: 192 },
   hover: { core: 'hover', halo: 'hoverHalo', cap: 512 },
   chosen: { core: 'chosen', halo: 'chosenHalo', cap: 512 },
@@ -315,7 +319,8 @@ const TOP_LOOK = {
  * widths (the compact width on a phone), the core held at half a backing px
  * with the lost width paid in alpha (the main pass's thin-line law).
  * The prophecy class recedes with the rest of the web while a line is
- * chosen (to TAP_CONTEXT at tapFade 1); what the reader asked for does not.
+ * chosen (to TAP_CONTEXT at tapFade 1); what the reader asked for does not,
+ * nor do the pairs the chosen range keeps lit (prophecyInRange).
  * @param {string} kind  a frame-set TOP_ORDER kind
  * @param {number} dpr
  * @param {boolean} compact
