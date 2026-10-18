@@ -191,15 +191,22 @@ describe('the panel API (CONTRACTS.md section 6): each mode opens today\'s card'
   });
 
   it("PANEL_MODES says which modes openPanel opens: the reader's doors offer only what opens (screen-routes.jsx)", () => {
-    // the panel stream sets letter true in the commit that lands letter mode; this case then holds
-    // the flag to the behaviour, and the reader's "See this letter's scriptures" door appears
+    // letter mode is in (the panel stream), so every mode opens and the reader's "See this letter's
+    // scriptures" door appears; the case holds each flag to the behaviour, on a fixture that has the
+    // letter's citations (a key no curated edge carries opens nothing, in any mode's terms)
     const valid = {
       connection: { mode: 'connection', arc: 1 }, verse: { mode: 'verse', verse: 100 },
       group: { mode: 'group', ids: [1], label: '' }, letter: { mode: 'letter', letterKey: 'two/the-wide-path' },
     };
     expect(Object.keys(PANEL_MODES).sort()).toEqual(Object.keys(valid).sort());
+    expect(PANEL_MODES.letter, 'letter mode landed with the panel stream').toBe(true);
+    const withLetter = () => {
+      const g = graph();
+      g.votEdges.push({ v: 100, key: 'two/the-wide-path', title: 'The Wide Path', volKey: 'two', letterId: 'the-wide-path', at: [{ p: 5 }] });
+      return g;
+    };
     for (const [mode, spec] of Object.entries(valid)) {
-      const { get } = mount();
+      const { get } = mount({ make: withLetter });
       let opened;
       act(() => { opened = get().sel.openPanel(/** @type {any} */ (spec)); });
       expect(opened, mode).toBe(PANEL_MODES[mode]);
