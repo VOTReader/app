@@ -376,16 +376,20 @@ function presence(x, W) {
 
 /**
  * The zoom a line's ink follows: each rail's zoom, held by its foot's
- * presence on screen. Both feet in view: the deeper rail's zoom (today's
- * law); one foot: its rail's; none (a fly-over): the overview's. Continuous
- * as a foot crosses the edge, so panning never pops a line's ink.
+ * presence on screen, and never less than the depth both rails share (the
+ * shallower rail's zoom). Both feet in view: the deeper rail's zoom; one
+ * foot: its rail's; none (a fly-over): the shallower rail's, so a fly-over
+ * at 10x on both rails is an anchored thread's ink at 10x, not the
+ * overview's (fix-review #12). Continuous as a foot crosses the edge (a
+ * leg whose last foot leaves already sits at that floor), so panning never
+ * pops a line's ink.
  * @param {number} zA the zoom of foot a's rail
  * @param {number} pA foot a's presence
  * @param {number} zB the zoom of foot b's rail
  * @param {number} pB foot b's presence
  */
 function lineZoom(zA, pA, zB, pB) {
-  return Math.max(Math.pow(Math.max(1, zA), pA), Math.pow(Math.max(1, zB), pB));
+  return Math.max(Math.min(zA, zB), Math.pow(Math.max(1, zA), pA), Math.pow(Math.max(1, zB), pB));
 }
 
 /** The ink step of a zoom (log-spaced; step 0 is the overview exactly), and the zoom a step stands for. */
@@ -774,9 +778,9 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     // FULL RESOLUTION, on the canvas the reader sees (Corbin, 2026-09-11:
     // the half-resolution layer read as "low resolution"). Each thread's ink
     // follows the zoom of the rails its feet hold on screen (lineZoom), in
-    // log steps; a fly-over (no foot on screen) keeps the overview's ink at
-    // FLYOVER_LEG_WIDTH of its width (Q3 ii), so anchored lines read first
-    // while every line stays drawn and tappable.
+    // log steps; a fly-over (no foot on screen) takes the depth both rails
+    // share at FLYOVER_LEG_WIDTH of its width (Q3 ii), so anchored lines read
+    // first while every line stays drawn and tappable.
     /** @type {Map<number, ContextBatches>} */
     const steps = new Map();
     for (let i = 0; i < underlay.count; i++) {

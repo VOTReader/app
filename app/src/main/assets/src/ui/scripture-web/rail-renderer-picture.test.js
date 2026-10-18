@@ -7,7 +7,8 @@
        zoomed rail takes that rail's depth, a thread whose only foot on screen
        is on the unzoomed rail keeps the overview's ink (so zooming the Bible
        does not brighten the whole field: C13 / C14), and a fly-over (no foot
-       on screen, Q3 ii) draws at FLYOVER_LEG_WIDTH of its width, alpha kept.
+       on screen, Q3 ii) takes the depth both rails share, an anchored
+       thread's alpha at that zoom, at FLYOVER_LEG_WIDTH of its width.
    P3  a chosen link recedes the rest to TAP_CONTEXT, never further.
    P4  the Volumes rail's type: sw-ink's face, 13 / 11 px tracked caps in the
        volumesLabel ink, the rail in volumesRail, and the overline "THE
@@ -106,16 +107,29 @@ describe('P2 a line\'s ink follows the rails it is anchored to on screen', () =>
     expect(Math.abs(cs[1].a - ten.alpha)).toBeLessThan(0.03);
     expect(cs[1].w).toBeGreaterThan(overview.width);
   });
-  it('a fly-over (no foot on screen) keeps its alpha and draws at FLYOVER_LEG_WIDTH of its width', () => {
-    // both rails zoomed 10x: the line from verse 2 to Volumes position 18 crosses the screen with both feet off it
+  it('a fly-over (no foot on screen) takes the view\'s depth, an anchored thread\'s ink at the same zoom, at FLYOVER_LEG_WIDTH of its width', () => {
+    // fix-review #12: w3 gave a fly-over the overview's alpha, so at 10x on both
+    // rails it read fainter than every anchored thread beside it. Both rails
+    // zoomed 10x: verse 2 to Volumes position 18 crosses the screen with both
+    // feet off it; verse 50 to position 10.5 has both feet on it
     const deep = Object.assign({}, base, { verseX: (v) => 500 + (v - 50) * 100, votX: (p) => 500 + (p - 10) * 500 });
-    const u = { count: 1, versePos: new Float32Array([2]), votPos: new Float32Array([18]), source: new Uint8Array([3]) };
+    const u = { count: 2, versePos: new Float32Array([2, 50]), votPos: new Float32Array([18, 10]), source: new Uint8Array([3, 0]) };
     const ctx = recordingCtx();
     drawPersonalWeb(ctx, null, u, deep);
     const cs = contextStrokes(ctx);
-    expect(cs.length).toBe(1);
-    expect(alphaOf(cs[0].style)).toBeCloseTo(overview.alpha, 6);
-    expect(cs[0].width).toBeCloseTo(overview.width * FLYOVER_LEG_WIDTH, 6);
+    expect(cs.length).toBe(2);
+    const fly = cs.find((s) => s.style.startsWith('rgba(108,143,168,')), anchored = cs.find((s) => s.style.startsWith('rgba(127,179,176,'));
+    expect(alphaOf(fly.style)).toBeGreaterThan(overview.alpha * 2);
+    expect(alphaOf(fly.style)).toBeCloseTo(alphaOf(anchored.style), 6);
+    expect(fly.width).toBeCloseTo(anchored.width * FLYOVER_LEG_WIDTH, 6);
+    // one rail deeper than the other: a fly-over keeps the depth both rails
+    // share (the shallower one's), where a leg whose last foot just left had
+    // it, so the ink never pops as that foot leaves
+    const uneven = Object.assign({}, deep, { verseX: (v) => 500 + (v - 50) * 400 });
+    const c2 = recordingCtx();
+    drawPersonalWeb(c2, null, { count: 1, versePos: new Float32Array([2]), votPos: new Float32Array([18]), source: new Uint8Array([3]) }, uneven);
+    const ten = personalInk(10).context;
+    expect(Math.abs(alphaOf(contextStrokes(c2)[0].style) - ten.alpha)).toBeLessThan(0.03);
   });
 });
 
