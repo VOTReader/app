@@ -23,7 +23,7 @@
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import {
   createCamera, clampCamera, fitPPV, verseToX, xToVerse, zoomAbout,
-  rotatePointer, ribbonStyle, lensShareAt,
+  ribbonStyle, lensShareAt,
 } from '../../utils/scripture-web/geometry.js';
 import {
   pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countAnchored,
@@ -31,6 +31,8 @@ import {
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { useWebCamera } from '../scripture-web/use-web-camera.js';
+import { useFrameScheduler } from '../scripture-web/use-frame-scheduler.js';
+import { useForcedLandscape } from '../scripture-web/use-forced-landscape.js';
 import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 /** @typedef {import('../../utils/scripture-web/decode.js').Density} Density */
 import { attachWebGestures } from '../scripture-web/gestures.js';
@@ -97,7 +99,6 @@ function bundlesFor(cache, g, cam, view, v, density) {
    swept by the vot-* localStorage migration and is per-tab, which is the
    scope the flag means. */
 const CHROME_HIDDEN_KEY = 'vot-sw-chrome-hidden';
-const LIVE_HOLD_MS = 150;
 
 /* Where the reader was when they opened a verse from the web (sw1 B3, 2026-10-05). The screen
    unmounts while the reader is up, and its camera, focus and card live in refs, so "Back to The
@@ -106,7 +107,6 @@ const LIVE_HOLD_MS = 150;
 let resumeWeb = null;
 /** Tests only: forget the resume point between cases. */
 export function _resetWebPlace() { resumeWeb = null; }
-const FADE_MS = 250;
 function readChromeHidden() {
   try { return sessionStorage.getItem(CHROME_HIDDEN_KEY) === '1'; } catch (_e) { return false; }
 }
@@ -125,43 +125,16 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const glRef = React.useRef(null);
   const uiRef = React.useRef(null);
   const wrapRef = React.useRef(null);
+  // the one frame loop (use-frame-scheduler.js) and landscape, always
+  // (use-forced-landscape.js): rotation, orientation lock, immersive, loc()
+  const { drawRef, schedule, live, capFractionNow } = useFrameScheduler();
+  const { rotated, loc } = useForcedLandscape(schedule);
 
   const [graph, setGraph] = React.useState(null);
   const [loadError, setLoadError] = React.useState(null);
   const [noWebGL, setNoWebGL] = React.useState(false);
   const [glRetry, setGlRetry] = React.useState(0);
   const [dataRetry, setDataRetry] = React.useState(0);
-  // A canon needs its width. The Scripture Web presents in LANDSCAPE, always
-  // (owner call, 2026-09-10: "landscape by default, no rotate option"). Where
-  // the platform will flip the display, screen.orientation.lock('landscape')
-  // does it; where that is refused, absent, or resolves without flipping, the
-  // root is CSS-rotated 90° in ANY portrait viewport — chrome included — so
-  // the reader turns the phone and sees landscape either way. No hint, no
-  // control, no preference, no pointer-type gate. Pointer coords are mapped
-  // back through loc(). A real flip arrives as a resize, and the resize
-  // handler un-rotates by itself; there is nothing to settle.
-  const [rotated, setRotated] = React.useState(
-    typeof window !== 'undefined' && window.innerHeight > window.innerWidth);
-  React.useEffect(() => {
-    const onResize = () => setRotated(window.innerHeight > window.innerWidth);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-  const rotatedRef = React.useRef(rotated);
-  React.useEffect(() => {
-    if (!rotated) return undefined;
-    const orientation = typeof screen !== 'undefined' && screen.orientation;
-    if (!orientation || typeof orientation.lock !== 'function') return undefined;
-    // A refusal is not an error here: the CSS rotation already covers it.
-    // lock() can reject OR throw synchronously depending on the browser.
-    try { Promise.resolve(orientation.lock('landscape')).catch(() => {}); } catch (_e) { /* covered */ }
-    return undefined;
-  }, [rotated]);
-
-  /** Viewport coords -> the rotated screen's own CSS space. */
-  const loc = React.useCallback((e) => (rotatedRef.current
-    ? rotatePointer(e.clientX, e.clientY, window.innerWidth)
-    : { x: e.clientX, y: e.clientY }), []);
   const [mode, setMode] = React.useState(() => (resumeRef.current && resumeRef.current.mode) || 'canonical');   // 'canonical' | 'personal'
   // The empty-web notice hands focus back here when it closes, so a keyboard
   // reader stays in the control they were using instead of at the document top.
@@ -225,7 +198,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // names it, but never dims the rest of the web. Only a tap focuses.
   const hoverRef = React.useRef(-1);
   const chromeRef = React.useRef(readChromeTokens());
-  const rafRef = React.useRef(0);
   const personalRef = React.useRef(null);
   // frame() runs per draw and must stay identity-stable, so it reads the mode
   // from a ref rather than closing over the state value.
@@ -256,45 +228,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     return () => { alive = false; };
   }, [dataRetry]);
 
-  // Immersive while the web is open — it is a full-bleed instrument.
-  React.useEffect(() => {
-    if (typeof PlatformBridge !== 'undefined') PlatformBridge.setImmersiveMode(true);
-    return () => {
-      if (typeof PlatformBridge !== 'undefined') PlatformBridge.setImmersiveMode(false);
-      // The rotation effect above may have locked landscape;
-      // leaving without unlocking strands every OTHER screen rotated (F27).
-      // No orientation API, and unlock() rejecting/throwing when nothing was
-      // locked, are both normal — swallow either.
-      try { screen.orientation.unlock(); } catch (_e) { /* nothing to unlock */ }
-    };
-  }, []);
-
-  // Per-frame work is reached through refs, not through the dependency graph:
-  // schedule() must keep a stable identity (gesture listeners bind it once and
-  // run it hundreds of times a second), so it calls the LATEST draw via a ref
-  // rather than closing over one. Same for the pointer handlers below.
-  const drawRef = React.useRef(() => {});
+  // The pointer handlers are reached through a ref for the reason draw is
+  // (use-frame-scheduler.js): the gesture listeners bind once and call the
+  // LATEST handlers, not the ones of the render that attached them.
   const handlersRef = React.useRef(/** @type {any} */ ({}));
   const hoverRafRef = React.useRef(0);
   const hoverPointRef = React.useRef(null);
 
-  const schedule = React.useCallback(() => {
-    if (rafRef.current) return;
-    rafRef.current = requestAnimationFrame(() => { rafRef.current = 0; drawRef.current(); });
-  }, []);
-
-  // r2 (Orchestrator's ruling, 2026-09-11): while a gesture is live the
-  // context's corridors keep LIVE_CAP layers a bin (a phone's frame budget);
-  // at rest every layer (the approved picture). A wheel notch holds "live"
-  // for LIVE_HOLD_MS so a run of notches never flickers between the two, and
-  // the way back is a FADE_MS coverage ease, brightness only: nothing is
-  // re-laid-out or re-bucketed, the cap is the one knob.
-  const liveUntilRef = React.useRef(0);
-  const releaseAtRef = React.useRef(0);
-  const live = React.useCallback(() => {
-    liveUntilRef.current = performance.now() + LIVE_HOLD_MS;
-    releaseAtRef.current = 0;
-  }, []);
   /* The hover chip names what is under a resting mouse. A drag, pinch, wheel or key pan moves the
      web out from under it, so each one drops it (sw1 B4: it stayed put over different lines). */
   const tipOnRef = React.useRef(false);
@@ -305,40 +245,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     hoverRef.current = -1;
     if (tipOnRef.current) { tipOnRef.current = false; setTip(null); }
   }, []);
-  /** 0 while live, rising to 1 over FADE_MS after the hold; schedules the next frame while fading. */
-  const capFractionNow = React.useCallback(() => {
-    const now = performance.now();
-    // a frame is kept pending through the hold, so the fade starts the moment
-    // it ends even when the last gesture event drew the last frame
-    if (now < liveUntilRef.current) { schedule(); return 0; }
-    if (!liveUntilRef.current) return 1;
-    if (!releaseAtRef.current) releaseAtRef.current = now;
-    const f = Math.min(1, (now - releaseAtRef.current) / FADE_MS);
-    if (f >= 1) { liveUntilRef.current = 0; releaseAtRef.current = 0; return 1; }
-    schedule();
-    return f;
-  }, [schedule]);
-
-  // A frame requested while the page is hidden never runs, so rafRef stays
-  // set and EVERY later schedule() short-circuits — the view would come back
-  // from the background permanently frozen, redrawing for nothing. Clearing
-  // the stale handle on the way back is what keeps that from happening.
-  React.useEffect(() => {
-    const revive = () => {
-      if (document.visibilityState === 'hidden') return;
-      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
-      schedule();
-    };
-    document.addEventListener('visibilitychange', revive);
-    window.addEventListener('pageshow', revive);
-    window.addEventListener('focus', revive);
-    return () => {
-      document.removeEventListener('visibilitychange', revive);
-      window.removeEventListener('pageshow', revive);
-      window.removeEventListener('focus', revive);
-    };
-  }, [schedule]);
-
   // Re-read chrome tokens whenever the theme flips. The settings prop covers
   // the in-app toggle, but light/dark is ultimately carried by a class on
   // <body> — watch that too, or a theme change from anywhere else leaves the
@@ -356,8 +262,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // frame() reads the mode from a ref so it can stay identity-stable across
   // renders; keep that ref in step with the state it mirrors.
   React.useEffect(() => { modeRef.current = mode; schedule(); }, [mode, schedule]);
-  React.useEffect(() => { rotatedRef.current = rotated; schedule(); }, [rotated, schedule]);
-
 
   /**
    * Close the empty-web notice for good.
@@ -401,7 +305,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       showUnderlay,
     };
   }, [camRef, camVRef, frame, showUnderlay, viewRef]);
-
 
   // ── render ──────────────────────────────────────────────────────────────
   const draw = React.useCallback(() => {
@@ -517,7 +420,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (typeof globalThis.__swWalk !== 'undefined') globalThis.__swBadgeBoxes = badgeBoxesRef.current;
   }, [graph, camRef, viewRef, mode, zoomCapFor, camVRef, viewFor, density, focusRef, yFrameFor, railOpts, capFractionNow]);
 
-  React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule]);
+  React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule, drawRef]);
 
   // ── size + renderer lifecycle ───────────────────────────────────────────
   React.useEffect(() => {
