@@ -10,10 +10,13 @@
    order. A link between the two is an S-curve spanning the gap; a link inside
    one corpus is a small arc that leaves and returns to its own rail.
 
-   w3 (Q8, the r2-05 picture): every line is ONE smooth curve between its TRUE
-   feet at every zoom of either rail, with vertical tangents at both feet and
-   no elbow anywhere; only the part on screen is sampled, so a far foot costs
-   nothing and a line never shears from its foot when one rail zooms. Two ink
+   w3 (Q8, the r2-05 picture): every line is ONE smooth curve at every zoom
+   of either rail, with vertical tangents at both feet and no elbow anywhere;
+   a foot on screen is exact, so a line never shears from its foot when one
+   rail zooms, and a foot off screen is drawn at a projected x (drawnFootX),
+   so what is on screen still crosses the gap instead of running level to a
+   foot forty screens away (fix-review #1). Only the part on screen is
+   sampled, so a far foot costs nothing. Two ink
    families: Timothy's notes in teal-silver by source (sw-ink myWeb* rows),
    the reader's links in one warm gold (myWebReader).
 
@@ -38,10 +41,20 @@ const NAME_BAND_COMPACT = 12;
 const COMPACT_H = 500;
 /** Curve tension for the S-curves: how far the control points push out (a share of the gap). */
 const RIBBON_BOW = 0.42;
-/** A rail-local arc takes at most this share of the gap between the rails (spec §3, My Web). */
+/** A short rail-local arc is this share of the gap tall (spec §3, My Web: rail-local arcs within 12%). */
 const LOCAL_ARC_GAP = 0.12;
+/** A longer one keeps this width / height, up to LOCAL_ARC_MAX of the gap (fix-review #2: a
+ * Genesis-to-Revelation arc held to 12% drew 26:1, a flat line along its rail). */
+const LOCAL_ARC_ASPECT = 5.5;
+const LOCAL_ARC_MAX = 0.72;
 /** An endpoint this far past the screen edge still counts as on screen (device px). */
 const EDGE_MARGIN = 24;
+/** An off-screen foot is drawn at edge + k ln(1 + d / k), k this share of the width:
+ * the S-curves' (FAR_FOOT) keeps a leg climbing over a third of the gap on
+ * screen out to 400 screens; the rail-local arcs' (LOCAL_FAR_FOOT) is tighter,
+ * an arc having no climb of its own to keep. */
+export const FAR_FOOT = 0.12;
+export const LOCAL_FAR_FOOT = 0.03;
 /** A foot's hold on its line's ink fades out over this share of the width past the screen edge. */
 const PRESENCE_FADE = 0.5;
 /** The context's ink is stroked in steps of zoom, log-spaced up to 40x (one batch per step in view). */
@@ -204,31 +217,54 @@ export function linkPath(ax, ay, bx, by, crossRail, steps) {
   return pts;
 }
 
+/**
+ * Where an off-screen foot is drawn (fix-review #1, C16/C17). A foot on screen
+ * (within EDGE_MARGIN) is its true x. Past the margin the distance d is drawn
+ * as k ln(1 + d / k), k = scale * width: the same slope at the margin (C1, so
+ * a foot crossing the edge moves its line smoothly), monotone, ever slower,
+ * never back on screen. A foot one screen off still reads as one screen off;
+ * one forty screens off reads farther, but its line still crosses the gap on
+ * screen instead of running level to a foot nobody can see.
+ * @param {number} x the true x, device px
+ * @param {number} width
+ * @param {number} scale FAR_FOOT or LOCAL_FAR_FOOT
+ */
+export function drawnFootX(x, width, scale) {
+  const lo = -EDGE_MARGIN, hi = width + EDGE_MARGIN, k = Math.max(1, scale * width);
+  if (x > hi) return hi + k * Math.log1p((x - hi) / k);
+  if (x < lo) return lo - k * Math.log1p((lo - x) / k);
+  return x;
+}
+
 /** smoothstep: the S-curve's x runs a -> b along it (its control points sit over the feet). */
 const smooth = (t) => t * t * (3 - 2 * t);
 /** The inverse of smoothstep on [0, 1]: the t at which the S-curve has run share s of its width. */
 const unsmooth = (s) => 0.5 - Math.sin(Math.asin(1 - 2 * s) / 3);
 
 /**
- * The w3 thread: ONE smooth curve between its TRUE feet at every zoom, sampled
- * over the part on screen (Q8: "smooth S-curve fans ... with vertical tangents
- * at both ends and no elbows"; item 33).
+ * The thread: ONE smooth curve at every zoom, sampled over the part on screen
+ * (Q8: "smooth S-curve fans ... with vertical tangents at both ends and no
+ * elbows"; item 33).
  *
  * The r2 thread hid a line with no foot on screen and bent a line to a far
  * foot into a rise and a level run along the far rail: an elbow by the rail,
- * and a line that sheared away from its foot as one rail zoomed. Here:
+ * and a line that sheared away from its foot as one rail zoomed. w3 drew the
+ * curve to the TRUE far foot, which at 20x runs level across the screen (the
+ * smear, fix-review #1). Here a foot on screen is exact, a foot off it is
+ * drawn at drawnFootX, and the curve runs between those drawn feet:
  *   - across the rails, the cubic with its control points straight over each
  *     foot: x runs a -> b as smoothstep(t), so the visible part is a t range
  *     in closed form (the inverse smoothstep) and is sampled densely however
  *     far off the other foot is; vertical at both feet, no elbow anywhere;
- *   - along one rail, a half-ellipse between the feet, bulging into the gap
- *     and never taller than LOCAL_ARC_GAP of it (the spec's rail-local arcs),
- *     its visible part a range of the angle (acos);
+ *   - along one rail, a half-ellipse between the feet, bulging into the gap:
+ *     LOCAL_ARC_GAP of it tall for a short span (the spec's rail-local arcs),
+ *     width / height LOCAL_ARC_ASPECT for a longer one up to LOCAL_ARC_MAX of
+ *     the gap, its visible part a range of the angle (acos);
  *   - a foot on screen is the exact first or last point; a line whose curve
  *     never crosses the screen is null (nothing to draw or pick), and a line
  *     that crosses with no foot on screen is a fly-over, drawn (Q3 ii).
  * The returned points carry `cls`: 'anchored' (both feet on screen), 'leg'
- * (one) or 'fly' (none); `rise` is -1 (the r2 level run is gone).
+ * (one) or 'fly' (none).
  *
  * @param {[number, number]} a
  * @param {[number, number]} b
@@ -244,6 +280,11 @@ export function threadPath(a, b, crossRail, o) {
   const count = (len) => (o.seg > 0 ? Math.max(4, Math.min(nMax, Math.ceil(len / o.seg))) : nMax);
   const lo = -EDGE_MARGIN, hi = W + EDGE_MARGIN;
   const onA = a[0] >= lo && a[0] <= hi, onB = b[0] >= lo && b[0] <= hi;
+  // the drawn feet: exact on screen, projected off it (monotone, so a line
+  // crosses the screen exactly when its true feet's span does)
+  const far = crossRail ? FAR_FOOT : LOCAL_FAR_FOOT;
+  if (!onA) a = [drawnFootX(a[0], W, far), a[1]];
+  if (!onB) b = [drawnFootX(b[0], W, far), b[1]];
   /** @type {any} */
   let pts;
   if (crossRail) {
@@ -266,7 +307,7 @@ export function threadPath(a, b, crossRail, o) {
   } else {
     const rx = Math.abs(b[0] - a[0]) / 2, cx = (a[0] + b[0]) / 2;
     const dir = o.up === false ? 1 : -1;
-    const ry = Math.min(rx, o.maxRy > 0 ? o.maxRy : gap * LOCAL_ARC_GAP);
+    const ry = Math.min(rx, o.maxRy > 0 ? o.maxRy : localArcHeight(2 * rx, gap));
     // the angle runs from pi (the left foot) to 0 (the right foot)
     let th0 = Math.PI, th1 = 0;
     if (rx > 1e-9) {
@@ -288,8 +329,18 @@ export function threadPath(a, b, crossRail, o) {
   if (onA) pts[0] = [a[0], a[1]];
   if (onB) pts[pts.length - 1] = [b[0], b[1]];
   pts.cls = onA && onB ? 'anchored' : (onA || onB) ? 'leg' : 'fly';
-  pts.rise = -1;
   return pts;
+}
+
+/**
+ * A rail-local arc's height for its drawn span: LOCAL_ARC_GAP of the gap for a
+ * short one, width / height LOCAL_ARC_ASPECT for a longer one, never past
+ * LOCAL_ARC_MAX of the gap (it never reaches the far rail).
+ * @param {number} span device px
+ * @param {number} gap device px
+ */
+function localArcHeight(span, gap) {
+  return Math.min(LOCAL_ARC_MAX * gap, Math.max(LOCAL_ARC_GAP * gap, span / LOCAL_ARC_ASPECT));
 }
 
 /**

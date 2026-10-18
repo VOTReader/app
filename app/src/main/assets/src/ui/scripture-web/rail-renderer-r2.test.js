@@ -144,40 +144,99 @@ function sharpestTurn(pts) {
   return worst;
 }
 
-/* w3 rewrote G2 to its intent (digest §5, Q8 and item 33). r2 hid a thread
- * with no foot on screen and bent a thread to a far foot into a rise and a
- * level run along the far rail: an elbow by the rail, and a line that sheared
- * away from its foot as one rail zoomed. Q8 asks for ONE S-curve with vertical
- * tangents at both feet and no elbow, and Q3 (ii) for every line drawn; what
- * the r2 pins protected (a line attached exactly to its feet, continuous as a
- * foot leaves the screen) is kept. The oracle for "the true curve" is
- * linkPath, the whole curve between the true feet, sampled densely. */
-describe('My Web w3 — G2 a thread is one smooth curve between its true feet', () => {
+/** The widest on-screen run of a polyline flatter than `deg` degrees, device px. */
+function flatRun(pts, width, deg) {
+  const tan = Math.tan((deg * Math.PI) / 180);
+  let best = 0, from = null;
+  for (let i = 1; i < pts.length; i++) {
+    const [x1, y1] = pts[i - 1], [x2, y2] = pts[i];
+    const inside = Math.min(x1, x2) >= 0 && Math.max(x1, x2) <= width;
+    const flat = Math.abs(x2 - x1) > 1e-9 && Math.abs(y2 - y1) / Math.abs(x2 - x1) < tan;
+    if (inside && flat) { if (from == null) from = Math.min(x1, x2); best = Math.max(best, Math.max(x1, x2) - from); } else from = null;
+  }
+  return best;
+}
+
+/* G2, rewritten again (fix-review #1, C16/C17). w3 drew every thread to its
+ * TRUE far foot, which is honest and wrong to look at: with one rail zoomed
+ * 20x the far foot sits twenty screens away, the S-curve's middle (all of it
+ * that is on screen) runs nearly level, and the field reads as the horizontal
+ * smear Corbin saw. The pin "every sample on linkPath between the true feet"
+ * protected that smear, so it is retired here to the intent behind it: a
+ * VISIBLE foot is exact (zooming one rail never shears a line from its foot),
+ * the line is continuous as a foot crosses the edge, it leaves and meets each
+ * rail vertically with no elbow, and what is on screen still CROSSES the gap.
+ * An off-screen foot is drawn at a projected x (drawnFootX: the true x out to
+ * EDGE_MARGIN, then edge + k ln(1 + d / k), C1 at the margin), so a foot one
+ * screen off reads one screen off and one forty screens off reads farther,
+ * never level. */
+describe('My Web fix-review — G2 a thread is one smooth curve that crosses the gap at every zoom', () => {
   const gap = rails.bottomY - rails.topY;
   const whole = (a, b) => RR.linkPath(a[0], a[1], b[0], b[1], true, 6000);
-  it('is null only when no part of it crosses the screen; a fly-over is drawn, clipped to the screen', () => {
+  const drawn = (x, w = W) => RR.drawnFootX(x, w, RR.FAR_FOOT);
+  it('projects an off-screen foot: exact on screen, continuous and C1 at the margin, monotone, ever slower, never back on screen', () => {
+    for (const x of [-24, 0, 333, W, W + 24]) expect(drawn(x)).toBe(x);
+    // C1 at the margin: the slope just past it is 1
+    expect((drawn(W + 24.001) - drawn(W + 24)) / 0.001).toBeCloseTo(1, 3);
+    expect((drawn(-24) - drawn(-24.001)) / 0.001).toBeCloseTo(1, 3);
+    let prev = drawn(W + 24), prevSlope = 1;
+    for (let d = 100; d <= 4e6; d *= 2) {
+      const x = drawn(W + 24 + d), slope = drawn(W + 25 + d) - x;
+      expect(x).toBeGreaterThan(prev);
+      expect(slope).toBeLessThan(prevSlope);            // ever slower
+      prevSlope = slope; prev = x;
+      expect(drawn(-24 - d)).toBeCloseTo(-24 - (x - W - 24), 9);   // the left side mirrors the right
+    }
+    // 400 screens away is still under three screens' worth of projection
+    expect(drawn(W + 400 * W) - W).toBeLessThan(3 * W);
+  });
+  it('is null only when no part of it crosses the screen; a fly-over is drawn, clipped to the screen, on the curve between its drawn feet', () => {
     const fly = threadPath([-4000, rails.bottomY], [6000, rails.topY], true, { width: W, gap });
     expect(fly).not.toBeNull();
     expect(fly.cls).toBe('fly');
     for (const p of fly) { expect(p[0]).toBeGreaterThanOrEqual(-24 - 1e-6); expect(p[0]).toBeLessThanOrEqual(W + 24 + 1e-6); }
-    const line = whole([-4000, rails.bottomY], [6000, rails.topY]);
+    const line = whole([drawn(-4000), rails.bottomY], [drawn(6000), rails.topY]);
     for (const p of fly) expect(distToLine(line, p)).toBeLessThan(0.5);
     expect(threadPath([-4000, rails.bottomY], [-3000, rails.topY], true, { width: W, gap })).toBeNull();
     expect(threadPath([-4000, rails.bottomY], [-200, rails.bottomY], false, { width: W, gap })).toBeNull();
   });
-  it('zooming one rail never shears a line from its foot: the visible foot is the exact first point and every sample lies on the true curve', () => {
+  it('zooming one rail never shears a line from its foot: the visible foot is the exact first point, the line leaves at the edge, on ONE S-curve', () => {
     // the Volumes end runs off screen as its rail zooms; the Bible end stays put
     for (const far of [-3000, -20000, 4000, 60000]) {
       const a = [500, rails.bottomY], b = [far, rails.topY];
       const pts = threadPath(a, b, true, { width: W, gap, n: 28 });
       expect(pts).not.toBeNull();
       expect(pts.cls).toBe('leg');
-      expect(pts.rise).toBe(-1);             // no level run along the far rail any more
+      expect(pts.rise).toBeUndefined();         // no rise or level run of r2's
       expect(pts[0]).toEqual(a);
-      // the line leaves the screen where the true curve does, at the edge
       expect(Math.abs(pts[pts.length - 1][0] - (far < 0 ? -24 : W + 24))).toBeLessThan(1e-6);
-      const line = whole(a, b);
+      const line = whole(a, [drawn(far), b[1]]);
       for (const p of pts) expect(distToLine(line, p), 'far ' + far).toBeLessThan(0.5);
+    }
+  });
+  it('what is on screen crosses the gap: no run flatter than 4 degrees wider than a third of the screen for a leg, 2 for a fly-over, out to 400 screens', () => {
+    // the reviewer's streak (C16): at 20x the w3 leg climbed 11% of the gap on
+    // screen, level for 40% of the width; frames: this one, the phone's
+    // 800x360@2 and the PC's 1920x1080@2 (device px)
+    for (const f of [{ w: W, top: rails.topY, bottom: rails.bottomY }, { w: 1600, top: 124, bottom: 536 }, { w: 3840, top: 300, bottom: 1376 }]) {
+      const g = f.bottom - f.top;
+      for (const screens of [1, 3, 20, 60, 400]) {
+        const off = screens * f.w;
+        const legs = [
+          [[f.w / 2, f.bottom], [f.w + off, f.top]], [[f.w / 2, f.top], [-off, f.bottom]],
+          [[0, f.bottom], [f.w + off, f.top]], [[f.w, f.top], [-off, f.bottom]],
+        ];
+        for (const [a, b] of legs) {
+          const pts = threadPath(a, b, true, { width: f.w, gap: g, n: 400 });
+          expect(pts.cls).toBe('leg');
+          expect(flatRun(pts, f.w, 4), `${f.w} leg ${a} -> ${screens} screens`).toBeLessThan(f.w / 3);
+          // and it climbs at least a third of the gap before it leaves the screen
+          expect(Math.abs(pts[pts.length - 1][1] - a[1]) / g, `${f.w} leg climb ${screens}`).toBeGreaterThan(1 / 3);
+        }
+        const fly = threadPath([-off, f.bottom], [f.w + off, f.top], true, { width: f.w, gap: g, n: 400 });
+        expect(fly.cls).toBe('fly');
+        expect(flatRun(fly, f.w, 2), `${f.w} fly ${screens} screens`).toBeLessThan(f.w / 3);
+      }
     }
   });
   it('leaves and meets each rail vertically, with no elbow anywhere along the drawn line', () => {
@@ -202,7 +261,7 @@ describe('My Web w3 — G2 a thread is one smooth curve between its true feet', 
     expect(shallow[0]).toEqual([400, 96]);
   });
   it('keeps both endpoints exactly on their rails when both are visible, on the overview curve itself', () => {
-    const pts = threadPath([200, rails.bottomY], [700, rails.topY], true, { width: W, gap });
+    const pts = threadPath([200, rails.bottomY], [700, rails.topY], true, { width: W, gap, n: 24 });
     expect(pts[0]).toEqual([200, rails.bottomY]);
     expect(pts[pts.length - 1]).toEqual([700, rails.topY]);
     expect(Math.min(...pts.map((p) => p[1]))).toBeGreaterThanOrEqual(rails.topY - 0.01);
@@ -211,17 +270,16 @@ describe('My Web w3 — G2 a thread is one smooth curve between its true feet', 
     pts.forEach((p, i) => { expect(p[0]).toBeCloseTo(ref[i][0], 6); expect(p[1]).toBeCloseTo(ref[i][1], 6); });
     expect(pts.cls).toBe('anchored');
   });
-  it('is continuous as the far endpoint crosses the screen edge', () => {
+  it('is continuous as the far endpoint crosses the screen edge and runs on out', () => {
     // the point where the thread meets x = 900 must move smoothly as the far
-    // end walks from on-screen (980) to just off (1020) and on out: no jump > 3 px
+    // end walks from on-screen (960) to just off and on out: no jump > 3 px
     const yAt = (far) => {
       const pts = threadPath([300, rails.bottomY], [far, rails.topY], true, { width: W, gap });
-      let best = null;
       for (let i = 1; i < pts.length; i++) {
         const [x1, y1] = pts[i - 1], [x2, y2] = pts[i];
-        if ((x1 - 900) * (x2 - 900) <= 0 && x2 !== x1) { best = y1 + (y2 - y1) * (900 - x1) / (x2 - x1); break; }
+        if ((x1 - 900) * (x2 - 900) <= 0 && x2 !== x1) return y1 + (y2 - y1) * (900 - x1) / (x2 - x1);
       }
-      return best;
+      return null;
     };
     let prev = yAt(960);
     for (let far = 962; far <= 1400; far += 2) {
@@ -230,22 +288,76 @@ describe('My Web w3 — G2 a thread is one smooth curve between its true feet', 
       expect(Math.abs(y - prev), 'far ' + far).toBeLessThan(3);
       prev = y;
     }
+    for (let far = 1400; far <= 4e5; far *= 1.05) {
+      const y = yAt(far);
+      expect(Math.abs(y - prev), 'far ' + far).toBeLessThan(3);
+      prev = y;
+    }
   });
-  it('a rail-local arc is a half-ellipse between its true feet, bulging into the gap and never taller than 12% of it', () => {
-    // spec §3, My Web: rail-local arcs within 12% of the gap
-    const near = threadPath([300, rails.bottomY], [700, rails.bottomY], false, { width: W, gap, up: true });
+});
+
+/* Rail-local arcs (fix-review #2). The spec's 12% of the gap is kept for a
+ * short span; a long one capped at 12% read as a flat line along its rail
+ * (Genesis 3:15 to Revelation 12:9 drew 26:1 on the PC), so the height grows
+ * with the span (width / height 5.5) up to LOCAL_ARC_MAX of the gap, never
+ * reaching the far rail. Off-screen feet are projected like the S-curves'
+ * (LOCAL_FAR_FOOT, tighter: an arc has no climb of its own to keep). */
+describe('My Web fix-review — rail-local arcs rise with their span', () => {
+  const gap = rails.bottomY - rails.topY;
+  it('a short arc is a half-ellipse between its true feet, bulging into the gap, 12% of it tall', () => {
+    const near = threadPath([300, rails.bottomY], [480, rails.bottomY], false, { width: W, gap, up: true });
     expect(near[0]).toEqual([300, rails.bottomY]);
-    expect(near[near.length - 1]).toEqual([700, rails.bottomY]);
+    expect(near[near.length - 1]).toEqual([480, rails.bottomY]);
+    expect(near.cls).toBe('anchored');
     expect(Math.max(...near.map((p) => rails.bottomY - p[1]))).toBeCloseTo(0.12 * gap, 6);
-    const hang = threadPath([300, rails.topY], [700, rails.topY], false, { width: W, gap, up: false });
+    const hang = threadPath([300, rails.topY], [480, rails.topY], false, { width: W, gap, up: false });
     expect(Math.max(...hang.map((p) => p[1] - rails.topY))).toBeCloseTo(0.12 * gap, 6);
     expect(Math.min(...hang.map((p) => p[1]))).toBeGreaterThanOrEqual(rails.topY - 1e-6);
-    // one foot far off: attached to the visible foot, on the same ellipse, no elbow
-    const far = threadPath([500, rails.bottomY], [-9000, rails.bottomY], false, { width: W, gap, up: true, n: 28 });
+  });
+  it('no rail-local arc wider than twice the gap is flatter than 6:1, and none reaches the far rail', () => {
+    // frames: this one, the phone's 800x360@2 and the PC's 1920x1080@2
+    for (const f of [{ w: W, g: gap }, { w: 1600, g: 412 }, { w: 3840, g: 1076 }]) {
+      for (let span = 2 * f.g + 1; span <= f.w; span += 37) {
+        for (const up of [true, false]) {
+          const y0 = up ? 2000 : 100;
+          const pts = threadPath([f.w - span, y0], [f.w, y0], false, { width: f.w, gap: f.g, up, n: 200 });
+          const h = Math.max(...pts.map((p) => Math.abs(p[1] - y0)));
+          expect(span / h, `${f.w} span ${span}`).toBeLessThanOrEqual(6);
+          expect(h, `${f.w} span ${span}`).toBeLessThan(0.75 * f.g);
+        }
+      }
+    }
+  });
+  it('with a foot far off, the arc stays on one ellipse from its visible foot and still rises on screen', () => {
+    const far = threadPath([500, rails.bottomY], [-9000, rails.bottomY], false, { width: W, gap, up: true, n: 200 });
     expect(far[0]).toEqual([500, rails.bottomY]);
-    const rx = 4750, cx = -4250, ry = 0.12 * gap;
-    for (const p of far) expect(Math.abs(((p[0] - cx) / rx) ** 2 + ((rails.bottomY - p[1]) / ry) ** 2 - 1)).toBeLessThan(1e-6);
+    expect(far.cls).toBe('leg');
     expect(sharpestTurn(far)).toBeLessThan(20);
+    // the ellipse between the visible foot and the drawn far foot
+    const x1 = RR.drawnFootX(-9000, W, RR.LOCAL_FAR_FOOT);
+    expect(x1).toBeLessThan(-24);
+    const rx = (500 - x1) / 2, cx = (500 + x1) / 2;
+    const ry = Math.max(...far.map((p) => rails.bottomY - p[1]));
+    for (const p of far) expect(Math.abs(((p[0] - cx) / rx) ** 2 + ((rails.bottomY - p[1]) / ry) ** 2 - 1)).toBeLessThan(1e-3);
+    // under zoom, G2's rule: no on-screen run flatter than 4 degrees (a leg) or
+    // 2 (a fly-over, the top of its arc) wider than a third of the screen
+    for (const f of [{ w: W, g: gap }, { w: 1600, g: 412 }, { w: 3840, g: 1076 }]) {
+      for (const screens of [1, 20, 400]) {
+        const off = screens * f.w;
+        const legs = [
+          threadPath([f.w / 2, 2000], [f.w + off, 2000], false, { width: f.w, gap: f.g, up: true, n: 400 }),
+          threadPath([0, 100], [f.w + off, 100], false, { width: f.w, gap: f.g, up: false, n: 400 }),
+          threadPath([f.w, 2000], [-off, 2000], false, { width: f.w, gap: f.g, up: true, n: 400 }),
+        ];
+        for (const pts of legs) {
+          expect(pts.cls).toBe('leg');
+          expect(flatRun(pts, f.w, 4), `${f.w} leg ${screens}`).toBeLessThan(f.w / 3);
+        }
+        const fly = threadPath([-off, 2000], [f.w + off, 2000], false, { width: f.w, gap: f.g, up: true, n: 400 });
+        expect(fly.cls).toBe('fly');
+        expect(flatRun(fly, f.w, 2), `${f.w} fly ${screens}`).toBeLessThan(f.w / 3);
+      }
+    }
   });
 });
 
