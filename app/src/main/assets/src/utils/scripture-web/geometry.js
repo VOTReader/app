@@ -255,6 +255,52 @@ export function segmentsFor(bucketSegments, localize, maxRx, ceil, width, dpr, s
   const n = Math.round(base + (capped - base) * localize);
   return n < 8 ? 8 : n;
 }
+/** The top pass's chord tolerance, CSS px: the chosen line is 3 px of gold
+ *  under a soft halo, and a 0.5 px chord reads on it as a facet. */
+export const TOP_CHORD_TOL_CSS = 0.1;
+/** The top pass's longest segment, CSS px, over the parameter's widest step. */
+export const TOP_SEGMENT_CSS = 10;
+/** The top pass's fewest segments for a thread on screen. */
+export const TOP_SEGMENT_MIN = 16;
+
+/**
+ * Segments for ONE thread in the top pass (web-renderer.js: the chosen,
+ * hovered and lit lines, the prophecy class), so its visible piece shows no
+ * facet. The top pass always clips the parameter to the window (the
+ * main pass's visibleWindow at localize 1) and samples it uniformly, as the
+ * main pass does; two bounds, the larger wins, then the cap:
+ *   BEND: a parameter step dTau strays at most max(R, A) dTau^2 / 8 from its
+ *     chord, so the window's parameter span over sqrt(8 tol / max(R, A));
+ *   LENGTH: the curve's speed is at most max(R, A) per unit of parameter, so
+ *     the span times that over TOP_SEGMENT_CSS.
+ * A caller drawing several threads in one draw takes the largest (the
+ * renderer caps a set: 512 for the one chosen or hovered line, less for a
+ * set). A thread with nothing in the window gets TOP_SEGMENT_MIN.
+ *
+ * @param {number} x0 @param {number} x1 - the feet, device px (footX)
+ * @param {number} width - viewport width, device px
+ * @param {number} squash - squashFactor()
+ * @param {number} dpr - device px per CSS px
+ * @param {number} cap - most segments
+ * @returns {number}
+ */
+export function topSegmentsFor(x0, x1, width, squash, dpr, cap) {
+  const d = dpr > 0 ? dpr : 1;
+  const left = Math.min(x0, x1), right = Math.max(x0, x1);
+  const rx = (right - left) / 2;
+  const top = cap > TOP_SEGMENT_MIN ? cap : TOP_SEGMENT_MIN;
+  if (!(rx > 0)) return TOP_SEGMENT_MIN;
+  const lo = Math.max(left, -CLIP_MARGIN), hi = Math.min(right, width + CLIP_MARGIN);
+  if (!(hi > lo)) return TOP_SEGMENT_MIN;
+  const { R, A } = arcShape(rx, squash);
+  const span = arcTauOf(hi, left, right) - arcTauOf(lo, left, right);
+  const bound = Math.max(R, A, 1);
+  const byBend = span * Math.sqrt(bound / (8 * TOP_CHORD_TOL_CSS * d));
+  const byLength = (span * bound) / (TOP_SEGMENT_CSS * d);
+  const want = Math.ceil(byBend > byLength ? byBend : byLength);
+  return want < TOP_SEGMENT_MIN ? TOP_SEGMENT_MIN : (want > top ? top : want);
+}
+
 /**
  * THE drawn curve of a thread, as two radii: R, the horizontal radius (half
  * its span on screen) and A, its apex height, R x squash. The half-ellipse

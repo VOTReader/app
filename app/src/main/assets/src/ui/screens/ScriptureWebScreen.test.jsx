@@ -57,7 +57,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
       draw: (opts) => {
         DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density, camY: opts && opts.camY, camX: opts && opts.camX, lens: opts && opts.lens,
           focusArc: opts && opts.focusArc, focusRange: opts && opts.focusRange, lensDim: opts && opts.lensDim,
-          centre: opts && opts.centre });
+          centre: opts && opts.centre, tapFade: opts && opts.tapFade });
         return { instances: 0, draws: 0 };
       },
       // My Web's ground (refactor.md #10): one clear, recorded so a case can
@@ -428,6 +428,28 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       const last = DRAWN[DRAWN.length - 1];
       expect(last.focusArc).toBe(-1);
       expect(last.focusRange).toBeNull();
+    });
+
+    /* GL item 5: a chosen line makes the rest of the web recede to TAP_CONTEXT (the shader's uTapFade), eased
+       over about 180 ms rather than snapped, and the close brings it back the same way. */
+    it('choosing a line eases the rest of the web back (tapFade 0 to 1 over frames), and closing eases it in again', async () => {
+      await mount({}, threaded);
+      for (let i = 0; i < 40; i++) await pressFrame('+');
+      expect(DRAWN[DRAWN.length - 1].tapFade, 'PRECONDITION: nothing chosen, nothing receded').toBe(0);
+      let mark = DRAWN.length;
+      await pickNearby();
+      await act(async () => { await new Promise((r) => setTimeout(r, 400)); });
+      expect(DRAWN[DRAWN.length - 1].focusArc, 'PRECONDITION: the line is chosen').toBe(0);
+      let fades = DRAWN.slice(mark).filter((d) => !d.clear).map((d) => d.tapFade);
+      expect(fades[fades.length - 1]).toBe(1);
+      expect(fades.some((f) => f > 0 && f < 1), 'a frame between: eased, not snapped').toBe(true);
+      for (let i = 1; i < fades.length; i++) expect(fades[i]).toBeGreaterThanOrEqual(fades[i - 1]);
+      mark = DRAWN.length;
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+      await act(async () => { await new Promise((r) => setTimeout(r, 400)); });
+      fades = DRAWN.slice(mark).filter((d) => !d.clear).map((d) => d.tapFade);
+      expect(fades[fades.length - 1]).toBe(0);
+      expect(fades.some((f) => f > 0 && f < 1), 'a frame between on the way back').toBe(true);
     });
 
     /* sw1 B3 (audit-web 10-05): opening a verse unmounts the web, and its camera, focus and card lived only in

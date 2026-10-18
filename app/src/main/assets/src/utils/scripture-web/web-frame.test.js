@@ -3,7 +3,7 @@
    numbers below are the formulas' own, worked by hand, so a change to where
    the dome sits or what the shader is told shows up here first. */
 import { describe, it, expect } from 'vitest';
-import { webFrame, webViewArgs, webYFrame, maxZoomOf, centreOf, RULER_H } from './web-frame.js';
+import { webFrame, webViewArgs, webYFrame, maxZoomOf, centreOf, RULER_H, tapFadeStep, TAP_FADE_MS } from './web-frame.js';
 import { MAX_STRETCH, squashFactor, localizeFactor, maxZoomFor } from './geometry.js';
 import { focusState, withLit } from './focus-state.js';
 
@@ -127,5 +127,53 @@ describe('webYFrame and maxZoomOf', () => {
     expect(maxZoomOf(null, phone)).toBe(4000);
     expect(maxZoomOf({ total: 31000 }, phone)).toBe(maxZoomFor(31000, 360));
     expect(maxZoomOf({ total: 31000 }, { W: 0, H: 0, DPR: 0 })).toBe(maxZoomFor(31000, 1));
+  });
+});
+
+/* GL item 5: while a line is chosen the rest of the web recedes to TAP_CONTEXT, over ~180 ms,
+   and comes back the same way. Hover is never a target (it dims nothing). */
+describe('tapFadeStep (the tap\'s fade, eased)', () => {
+  it('the first frame starts where it should be: nothing chosen is 0, a web opened on a choice is 1, neither running', () => {
+    expect(tapFadeStep(null, 0, 1000)).toMatchObject({ value: 0, running: false });
+    expect(tapFadeStep(null, 1, 1000)).toMatchObject({ value: 1, running: false });
+  });
+
+  it('a tap eases 0 -> 1 over TAP_FADE_MS, never stepping backwards, half way at half time', () => {
+    expect(TAP_FADE_MS).toBe(180);
+    let s = tapFadeStep(null, 0, 0);
+    s = tapFadeStep(s, 1, 1000);
+    expect(s).toMatchObject({ value: 0, running: true });
+    const start = s;
+    let prev = 0;
+    for (let t = 1000; t <= 1180; t += 15) {
+      s = tapFadeStep(s, 1, t);
+      expect(s.value).toBeGreaterThanOrEqual(prev);
+      prev = s.value;
+    }
+    expect(tapFadeStep(start, 1, 1090).value).toBeCloseTo(0.5, 6);
+    s = tapFadeStep(s, 1, 1181);
+    expect(s).toMatchObject({ value: 1, running: false });
+    // and it stays put without asking for frames
+    expect(tapFadeStep(s, 1, 5000)).toBe(s);
+  });
+
+  it('letting go mid-fade turns back from where it is: no jump', () => {
+    let s = tapFadeStep(null, 0, 0);
+    s = tapFadeStep(s, 1, 0);
+    s = tapFadeStep(s, 1, 60);
+    const mid = s.value;
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(1);
+    s = tapFadeStep(s, 0, 60);
+    expect(s.value).toBeCloseTo(mid, 12);
+    expect(s.running).toBe(true);
+    s = tapFadeStep(s, 0, 60 + TAP_FADE_MS);
+    expect(s).toMatchObject({ value: 0, running: false });
+  });
+
+  it('under reduced motion (ms 0) it jumps', () => {
+    let s = tapFadeStep(null, 0, 0);
+    s = tapFadeStep(s, 1, 10, 0);
+    expect(s).toMatchObject({ value: 1, running: false });
   });
 });

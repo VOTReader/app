@@ -17,6 +17,14 @@
      · Buckets carry per-chunk [minFrom, maxTo] extents, so a zoomed-in view
        skips whole runs of instances that cannot touch the viewport.
 
+   Over it a TOP PASS redraws the few threads the reader has asked about
+   (the lit, the hovered, the chosen: utils/scripture-web/frame-set.js) in
+   the ink table's gold (sw-ink.js), a core under a soft halo, each
+   tessellated for its own visible piece (geometry.topSegmentsFor), so the
+   chosen line shows no facet at any zoom and is never drawn under another
+   (digest C1, C3, item 10). While a line is chosen the rest of the web
+   recedes to TAP_CONTEXT, eased (uTapFade); a hover dims nothing.
+
    Neither the height law (the structure law: every thread the half-ellipse
    of its own span, every thread drawn at every zoom) nor the fly-over leg
    is written here. Both are imported from utils/scripture-web/geometry.js
@@ -28,9 +36,12 @@
 
 import {
   arcShapeGLSL, flyOverGLSL, segmentsFor, CLIP_MARGIN, glslFloat,
-  STROKE_MIN_CSS, STROKE_DEEP_CSS, skyLocalize,
+  STROKE_MIN_CSS, STROKE_DEEP_CSS, skyLocalize, topSegmentsFor, footX,
 } from '../../utils/scripture-web/geometry.js';
-import { CENTRE_BRIGHT, CENTRE_WIDTH, FLYOVER_LEG_WIDTH } from '../../utils/scripture-web/sw-ink.js';
+import {
+  CENTRE_BRIGHT, CENTRE_WIDTH, FLYOVER_LEG_WIDTH, TAP_CONTEXT, rgba01, inkWidth,
+} from '../../utils/scripture-web/sw-ink.js';
+import { topSet, isCompact } from '../../utils/scripture-web/frame-set.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
 import { bucketDrawCount, fansOf } from '../../utils/scripture-web/decode.js';
 import { walkDrawnRuns } from '../../utils/scripture-web/chunk-walk.js';
@@ -50,12 +61,11 @@ uniform float uSegments;
 uniform float uVoteMix;      // 0 = votes drive alpha (overview), 1 = width (depth)
 uniform vec2  uFocusRange;   // verse range kept lit (lo > hi = no focus)
 uniform vec2  uFocusRange2;  // with uFocusRange: a GROUP, one foot in each, lit AND drawn
-uniform float uFocusArc;     // TAPPED instance: spotlit AND dims everything else
+uniform float uFocusArc;     // the chosen instance: kept at full ink while the rest recedes
+uniform float uTapFade;      // 0..1: how far the rest has receded to TAP_CONTEXT (a tap only, eased)
 uniform vec2  uCentre;       // the centre chapter, canon x [x0, x1) (x0 >= x1 = none): its own arcs are emphasised
 uniform float uCentreT;      // the centre's emphasis ease, 0..1 (web-frame CentreChapter.t)
-uniform float uHoverArc;     // HOVERED instance: brightened only, dims nothing
 uniform float uInstanceBase; // gl_InstanceID offset of this draw range
-uniform float uDpr;          // device px per CSS px: the chosen line's floor width is set in CSS px
 in uint aFrom; in uint aTo; in float aVotes;
 in float aFanA; in float aFanB; // each foot's departure rank, -0.5..0.5
 // colour and half width are one per instance: flat, so nothing is interpolated
@@ -118,13 +128,10 @@ void main(){
   float cT = uCentreT*inCentre;
   halfW *= mix(1., ${glslFloat(CENTRE_WIDTH)}, cT);
 
+  // The chosen and hovered lines are not styled here: the top pass redraws
+  // them over this one in their own ink and width, at every zoom (sw1 B2).
   float id = float(gl_InstanceID) + uInstanceBase;
   float spot = (uFocusArc >= 0. && abs(id - uFocusArc) < .5) ? 1. : 0.;
-  float hovered = (uHoverArc >= 0. && abs(id - uHoverArc) < .5) ? 1. : 0.;
-  // The chosen line reads at every zoom: at least 2.4 CSS px wide (2 for a hovered one). At the
-  // overview the stroke law gives ~0.9 px, and the reader lost the line they had just tapped
-  // (sw1 B2, 2026-10-05). Drawing only; pick.js keeps its own hit width.
-  halfW = max(halfW, max(spot*1.2, hovered*1.)*uDpr);
   // Thin-line hygiene: a ribbon under one device px wide aliases into dashes as it crosses
   // the pixel grid. Hold the half width at 0.5 device px and pay for the
   // extra width in alpha (thin), so a thin line puts the same ink on screen.
@@ -142,23 +149,21 @@ void main(){
   float pair = (uFocusRange2.x <= uFocusRange2.y && max(a1*b2, b1*a2) > .5) ? 1. : 0.;
   float grouped = (uFocusRange2.x <= uFocusRange2.y) ? 1. : 0.;
   float lit = max(spot, mix(inRange, pair, grouped));
-  // Only a TAP darkens the rest of the web. Merely moving the mouse across
-  // the dome must not blank the picture the reader is looking at.
-  float focusing = (uFocusArc >= 0. || uFocusRange.x <= uFocusRange.y) ? 1. : 0.;
-  float dim = mix(1., mix(.05, 1., lit), focusing);
-  float bright = max(spot, hovered);
+  // Only a TAP makes the rest of the web recede, and only to TAP_CONTEXT
+  // (sw-ink.js): never to black, never for a hover (C3). uTapFade eases it
+  // in and out (web-frame.tapFadeStep). What the reader asked for, the
+  // chosen thread and the chosen range's threads, keeps its full ink.
+  float dim = mix(1., ${glslFloat(TAP_CONTEXT)}, uTapFade*(1. - lit));
 
   // colour is distance, the one law (Corbin, 2026-09-10: genre and testament retired)
+  // (the chosen, hovered and lit lines take the ink table's gold in the top pass)
   vec3 col = distanceRamp(pow(abs(b - a)/uTotal, .40));
-  col = mix(col, vec3(1.), hovered*(1. - spot)*.55);
-  col = mix(col, vec3(.784, .643, .337), spot);  // the chosen line is the app's gold (#c8a456)
 
   float aStrength = mix(strength, 1., uVoteMix);
-  // ...and nearly opaque: uAlpha at the overview is 0.075, so x3 left a tapped line at ~0.12.
-  float aOut = uAlpha*dim*aStrength*mix(1., 3.0, bright)*mix(1., ${glslFloat(CENTRE_BRIGHT)}, cT)*thin;
+  float aOut = uAlpha*dim*aStrength*mix(1., ${glslFloat(CENTRE_BRIGHT)}, cT)*thin;
   // past full ink the centre's boost lifts the colour instead, clamped
   col = min(col*max(aOut, 1.), vec3(1.));
-  vCol = vec4(col, max(min(aOut, 1.), max(spot*.95, hovered*.7)));
+  vCol = vec4(col, min(aOut, 1.));
   vEdge = side;
   vHalfW = halfW;
   gl_Position = vec4(p/uRes*2. - 1., 0, 1);
@@ -179,6 +184,99 @@ void main(){
 /** The shader sources, exported so a test can prove they inline the shared law. */
 export const SHADER_SOURCE = { vertex: VERT, fragment: FRAG };
 
+/* The top pass (GL item 3). One instance is one thread the reader asked
+   about, drawn as one ribbon wide enough for its halo: the fragment stage
+   lays the core over the halo, both antialiased, premultiplied. Its feet and
+   curve are the main pass's (the same footX, the same shared arc law, the
+   same camera split), so the gold lies exactly over the line it covers and
+   over the curve the picker hits; only the sampling differs: always clipped
+   to the window, with as many segments as the visible piece needs
+   (geometry.topSegmentsFor). */
+const TOP_VERT = `#version 300 es
+precision highp float;
+uniform vec2  uRes;
+uniform float uCamXHi, uCamXLo;  // the camera's x, split for float32 (the main pass's feet)
+uniform float uPPV, uBase, uSquash, uCamY;
+uniform float uSegments;
+uniform float uRibbonHalf;   // the ribbon's half width, device px: the wider of core and halo, plus the skirt
+in uint aFrom; in uint aTo;
+in float aFanA; in float aFanB;
+out float vEdge;
+${arcShapeGLSL}
+void main(){
+  float a = float(aFrom), b = float(aTo);
+  float x0 = ((a - uCamXHi) + (.5 + aFanA - uCamXLo))*uPPV + uRes.x*.5;
+  float x1 = ((b - uCamXHi) + (.5 + aFanB - uCamXLo))*uPPV + uRes.x*.5;
+  float rx = (x1 - x0)*.5;
+  float left = x0, right = x0 + 2.*max(rx, 0.);
+  float A = arcShape(rx, uSquash).y;
+  // always the piece in the window: the segments go where the reader looks
+  float m = ${glslFloat(CLIP_MARGIN)};
+  float lo = max(left, -m);
+  float hi = max(min(right, uRes.x + m), lo);
+  int vid = gl_VertexID;
+  float t = float(vid >> 1) / uSegments;
+  float side = float(vid & 1)*2. - 1.;
+  float tau = mix(arcTau(lo, left, right), arcTau(hi, left, right), t);
+  float px, hgt; vec2 tgv;
+  arcAt(tau, left, right, A, px, hgt, tgv);
+  vec2 p = vec2(px, uBase + uCamY - hgt);
+  vec2 tg = normalize(tgv + vec2(1e-6, 0.));
+  p += vec2(-tg.y, tg.x)*side*uRibbonHalf;
+  vEdge = side;
+  gl_Position = vec4(p/uRes*2. - 1., 0, 1);
+  gl_Position.y = -gl_Position.y;
+}`;
+
+const TOP_FRAG = `#version 300 es
+precision mediump float;
+uniform float uRibbon;       // the vertex stage's uRibbonHalf
+uniform float uCoreHalf;     // the core's half width, device px (at least 0.5)
+uniform float uHaloHalf;     // the halo's half width, device px (0: none)
+uniform vec4  uCore;         // straight rgba
+uniform vec4  uHalo;         // straight rgba, its alpha at the core's edge
+in float vEdge; out vec4 o;
+void main(){
+  float d = abs(vEdge)*uRibbon;
+  float core = (1. - smoothstep(uCoreHalf - .5, uCoreHalf + .5, d))*uCore.a;
+  // the halo: full under the core, falling softly to nothing at its own edge
+  float h = uHaloHalf > uCoreHalf ? clamp(1. - (d - uCoreHalf)/(uHaloHalf - uCoreHalf), 0., 1.) : 0.;
+  float halo = h*h*uHalo.a;
+  float a = core + halo*(1. - core);
+  o = vec4(uCore.rgb*core + uHalo.rgb*halo*(1. - core), a);   // premultiplied, the core over the halo
+}`;
+
+/** The top pass's shader sources, exported for the same proofs. */
+export const TOP_SHADER_SOURCE = { vertex: TOP_VERT, fragment: TOP_FRAG };
+
+/** Each top-pass kind's ink (sw-ink.js rows) and its tessellation cap. */
+const TOP_LOOK = {
+  lit: { core: 'lit', halo: '', cap: 192 },
+  hover: { core: 'hover', halo: 'hoverHalo', cap: 512 },
+  chosen: { core: 'chosen', halo: 'chosenHalo', cap: 512 },
+};
+
+/**
+ * The uniforms one top-pass kind draws with, from the ink table: device px
+ * widths (the compact width on a phone), the core held at 0.5 device px
+ * with the lost width paid in alpha (the main pass's thin-line law).
+ * @param {string} kind  a frame-set TOP_ORDER kind
+ * @param {number} dpr
+ * @param {boolean} compact
+ * @returns {{ coreHalf: number, haloHalf: number, core: number[], halo: number[], ribbon: number, cap: number }}
+ */
+export function topLook(kind, dpr, compact) {
+  const look = TOP_LOOK[kind];
+  const d = dpr > 0 ? dpr : 1;
+  const half = (inkWidth(look.core, compact) * d) / 2;
+  const thin = half >= 0.5 ? 1 : half / 0.5;
+  const coreHalf = half > 0.5 ? half : 0.5;
+  const haloHalf = look.halo ? (inkWidth(look.halo, compact) * d) / 2 : 0;
+  const core = rgba01(look.core, thin);
+  const halo = look.halo ? rgba01(look.halo) : [0, 0, 0, 0];
+  return { coreHalf, haloHalf, core, halo, ribbon: Math.max(coreHalf, haloHalf) + 0.5, cap: look.cap };
+}
+
 function compile(gl, type, src) {
   const s = gl.createShader(type);
   gl.shaderSource(s, src);
@@ -189,6 +287,31 @@ function compile(gl, type, src) {
     throw new Error('scripture-web shader: ' + log);
   }
   return s;
+}
+
+/** Compile and link one program; throws with the driver's log. */
+function link(gl, vertex, fragment) {
+  const program = gl.createProgram();
+  let vs, fs;
+  try {
+    vs = compile(gl, gl.VERTEX_SHADER, vertex);
+    fs = compile(gl, gl.FRAGMENT_SHADER, fragment);
+  } catch (e) {
+    if (vs) gl.deleteShader(vs);
+    gl.deleteProgram(program);
+    throw e;
+  }
+  gl.attachShader(program, vs);
+  gl.attachShader(program, fs);
+  gl.linkProgram(program);
+  gl.deleteShader(vs);
+  gl.deleteShader(fs);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    const log = gl.getProgramInfoLog(program);
+    gl.deleteProgram(program);
+    throw new Error('scripture-web link: ' + log);
+  }
+  return program;
 }
 
 /**
@@ -210,33 +333,27 @@ export function createRenderer(canvas, graph, opts = {}) {
   });
   if (!gl) return null;
 
-  const program = gl.createProgram();
-  let vs, fs;
+  const program = link(gl, VERT, FRAG);
+  let topProgram;
   try {
-    vs = compile(gl, gl.VERTEX_SHADER, VERT);
-    fs = compile(gl, gl.FRAGMENT_SHADER, FRAG);
+    topProgram = link(gl, TOP_VERT, TOP_FRAG);
   } catch (e) {
     gl.deleteProgram(program);
     throw e;
-  }
-  gl.attachShader(program, vs);
-  gl.attachShader(program, fs);
-  gl.linkProgram(program);
-  gl.deleteShader(vs);
-  gl.deleteShader(fs);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    const log = gl.getProgramInfoLog(program);
-    gl.deleteProgram(program);
-    throw new Error('scripture-web link: ' + log);
   }
   gl.useProgram(program);
 
   const U = {};
   for (const name of ['uRes', 'uCamXHi', 'uCamXLo', 'uCamY', 'uPPV', 'uBase', 'uSquash',
     'uLocalize', 'uFlyLocalize', 'uWidth', 'uAlpha', 'uTotal',
-    'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
-    'uHoverArc', 'uInstanceBase', 'uFocusRange2', 'uCentre', 'uCentreT', 'uDpr']) {
+    'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc', 'uTapFade',
+    'uInstanceBase', 'uFocusRange2', 'uCentre', 'uCentreT']) {
     U[name] = gl.getUniformLocation(program, name);
+  }
+  const TU = {};
+  for (const name of ['uRes', 'uCamXHi', 'uCamXLo', 'uPPV', 'uBase', 'uSquash', 'uCamY', 'uSegments',
+    'uRibbonHalf', 'uRibbon', 'uCoreHalf', 'uHaloHalf', 'uCore', 'uHalo']) {
+    TU[name] = gl.getUniformLocation(topProgram, name);
   }
 
   // Widest arc in each bucket, once. Tessellation is chosen per draw from the
@@ -296,6 +413,85 @@ export function createRenderer(canvas, graph, opts = {}) {
   };
   pointInstances(0);
 
+  // The top pass's instances: a handful of threads, re-uploaded only when
+  // what is lit, hovered or chosen changes (frame-set.js topSet's key).
+  const topVao = gl.createVertexArray();
+  gl.bindVertexArray(topVao);
+  /** @type {Array<{buf:WebGLBuffer, loc:number, type:number, isInt:boolean, bytes:number, field:string}>} */
+  const topAttribs = [];
+  const topAttrib = (field, name, type, isInt, bytes) => {
+    const loc = gl.getAttribLocation(topProgram, name);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribDivisor(loc, 1);
+    topAttribs.push({ buf, loc, type, isInt, bytes, field });
+  };
+  topAttrib('from', 'aFrom', gl.UNSIGNED_SHORT, true, 2);
+  topAttrib('to', 'aTo', gl.UNSIGNED_SHORT, true, 2);
+  topAttrib('fanA', 'aFanA', gl.FLOAT, false, 4);
+  topAttrib('fanB', 'aFanB', gl.FLOAT, false, 4);
+  /** @type {import('../../utils/scripture-web/frame-set.js').TopSet | null} */
+  let topHeld = null;
+  const pointTop = (first) => {
+    for (const a of topAttribs) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, a.buf);
+      if (a.isInt) gl.vertexAttribIPointer(a.loc, 1, a.type, 0, first * a.bytes);
+      else gl.vertexAttribPointer(a.loc, 1, a.type, false, 0, first * a.bytes);
+    }
+  };
+  gl.bindVertexArray(vao);
+
+  /**
+   * The top pass over the frame the main pass just drew: the lit, hovered and
+   * chosen threads in their ink, the chosen last. Not counted in stats (the
+   * main pass's instances are the web; these are a handful drawn again).
+   */
+  const drawTop = (v, camXHi) => {
+    const set = topSet(graph, v, topHeld);
+    if (set !== topHeld) {
+      topHeld = set;
+      gl.bindVertexArray(topVao);
+      for (const a of topAttribs) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, a.buf);
+        gl.bufferData(gl.ARRAY_BUFFER, set[a.field], gl.DYNAMIC_DRAW);
+      }
+    }
+    if (!set.count) return;
+    const dpr = v.dpr || 1;
+    const compact = isCompact(v.height / dpr);
+    const cam = { x: v.camX, ppv: v.ppv };
+    gl.useProgram(topProgram);
+    gl.bindVertexArray(topVao);
+    gl.uniform2f(TU.uRes, v.width, v.height);
+    gl.uniform1f(TU.uCamXHi, camXHi);
+    gl.uniform1f(TU.uCamXLo, v.camX - camXHi);
+    gl.uniform1f(TU.uPPV, v.ppv);
+    gl.uniform1f(TU.uBase, v.base);
+    gl.uniform1f(TU.uSquash, v.squash);
+    gl.uniform1f(TU.uCamY, v.camY > 0 ? v.camY : 0);
+    for (const range of set.ranges) {
+      if (!range.count) continue;
+      const look = topLook(range.kind, dpr, compact);
+      let segments = 0;
+      for (let k = range.first; k < range.first + range.count; k++) {
+        const n = topSegmentsFor(footX(cam, v.width, set.from[k], set.fanA[k]),
+          footX(cam, v.width, set.to[k], set.fanB[k]), v.width, v.squash, dpr, look.cap);
+        if (n > segments) segments = n;
+      }
+      gl.uniform1f(TU.uSegments, segments);
+      gl.uniform1f(TU.uRibbonHalf, look.ribbon);
+      gl.uniform1f(TU.uRibbon, look.ribbon);
+      gl.uniform1f(TU.uCoreHalf, look.coreHalf);
+      gl.uniform1f(TU.uHaloHalf, look.haloHalf);
+      gl.uniform4f(TU.uCore, look.core[0], look.core[1], look.core[2], look.core[3]);
+      gl.uniform4f(TU.uHalo, look.halo[0], look.halo[1], look.halo[2], look.halo[3]);
+      pointTop(range.first);
+      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 2 * (segments + 1), range.count);
+    }
+    gl.bindVertexArray(vao);
+  };
+
   gl.disable(gl.DEPTH_TEST);
   gl.enable(gl.BLEND);
 
@@ -349,8 +545,11 @@ export function createRenderer(canvas, graph, opts = {}) {
      *   density:import('../../utils/scripture-web/decode.js').Density,
      *   bg:string,
      *   focusRange:(number[]|null), focusRange2?:(number[]|null), focusArc:number, hoverArc?:number,
+     *   focusProphecy?:number, lit?:(ArrayLike<number>|null), litKey?:string, tapFade?:number,
      *   centre?:(import('../../utils/scripture-web/web-frame.js').CentreChapter|null)}} v
      *   centre: the centre chapter (web-frame.centreOf over centreRange), its own arcs emphasised
+     *   tapFade: 0..1, how far the rest of the web has receded (web-frame.tapFadeStep); when it is
+     *     not given, the focus decides at once (1 while something is chosen)
      */
     draw(v) {
       if (lost) return lastStats;
@@ -377,11 +576,14 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.uniform1f(U.uLocalize, v.localize);
       gl.uniform1f(U.uFlyLocalize, skyLocalize(v.localize, v.camY > 0 ? v.camY : 0, v.ceil));
       gl.uniform1f(U.uWidth, v.strokeWidth);
-      gl.uniform1f(U.uDpr, v.dpr || 1);
       gl.uniform1f(U.uAlpha, v.alpha);
       gl.uniform1f(U.uTotal, graph.total);
       gl.uniform1f(U.uVoteMix, v.voteMix || 0);
       gl.uniform1f(U.uFocusArc, v.focusArc == null ? -1 : v.focusArc);
+      const chosen = (v.focusArc != null && v.focusArc >= 0) || (v.focusProphecy != null && v.focusProphecy >= 0)
+        || !!v.focusRange;
+      const tapFade = typeof v.tapFade === 'number' ? v.tapFade : (chosen ? 1 : 0);
+      gl.uniform1f(U.uTapFade, tapFade > 0 ? (tapFade < 1 ? tapFade : 1) : 0);
       if (v.centre && v.centre.x0 < v.centre.x1) {
         gl.uniform2f(U.uCentre, v.centre.x0, v.centre.x1);
         gl.uniform1f(U.uCentreT, v.centre.t > 0 ? Math.min(1, v.centre.t) : 0);
@@ -389,7 +591,6 @@ export function createRenderer(canvas, graph, opts = {}) {
         gl.uniform2f(U.uCentre, 1, 0);
         gl.uniform1f(U.uCentreT, 0);
       }
-      gl.uniform1f(U.uHoverArc, v.hoverArc == null ? -1 : v.hoverArc);
       if (v.focusRange) gl.uniform2f(U.uFocusRange, v.focusRange[0], v.focusRange[1]);
       else gl.uniform2f(U.uFocusRange, 1, 0);
       if (v.focusRange && v.focusRange2) gl.uniform2f(U.uFocusRange2, v.focusRange2[0], v.focusRange2[1]);
@@ -425,6 +626,7 @@ export function createRenderer(canvas, graph, opts = {}) {
         });
       }
       lastStats = { instances, draws };
+      drawTop(v, camXHi);
       return lastStats;
     },
 
@@ -432,8 +634,11 @@ export function createRenderer(canvas, graph, opts = {}) {
       canvas.removeEventListener('webglcontextlost', onLost);
       canvas.removeEventListener('webglcontextrestored', onRestored);
       for (const a of attribs) gl.deleteBuffer(a.buf);
+      for (const a of topAttribs) gl.deleteBuffer(a.buf);
       gl.deleteVertexArray(vao);
+      gl.deleteVertexArray(topVao);
       gl.deleteProgram(program);
+      gl.deleteProgram(topProgram);
       // NOTE: no loseContext() here. A rebuild after a real context loss
       // reuses this same canvas, and force-losing the freshly restored
       // context would kill the replacement renderer as it is being born.

@@ -17,7 +17,7 @@
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import { createCamera, clampCamera, fitPPV, ribbonStyle } from '../../utils/scripture-web/geometry.js';
 import { countAnchored, footBundles } from '../../utils/scripture-web/pick.js';
-import { maxZoomOf, centreOf, centreRange } from '../../utils/scripture-web/web-frame.js';
+import { maxZoomOf, centreOf, centreRange, tapFadeStep, TAP_FADE_MS } from '../../utils/scripture-web/web-frame.js';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
 import { readChromeTokens } from '../../utils/scripture-web/palette.js';
 import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
@@ -155,6 +155,10 @@ export function useWebRenderer({
   // the centre chapter's range last frame (web-frame.centreRange holds it
   // while the centre stays near it); null on My Web and at the overview
   const centreRangeRef = React.useRef(null);
+  // the tap's fade (web-frame.tapFadeStep): how far the rest of the web has
+  // receded while a line is chosen; null until the first canon frame
+  const tapFadeRef = React.useRef(/** @type {import('../../utils/scripture-web/web-frame.js').TapFade | null} */ (null));
+  const reduceMotionRef = React.useRef(/** @type {MediaQueryList | null | undefined} */ (undefined));
 
   // ── the frame ───────────────────────────────────────────────────────────
   const draw = React.useCallback(() => {
@@ -237,8 +241,18 @@ export function useWebRenderer({
     // the convergence pills: how many threads meet at each foot cell
     const bundles = bundlesFor(bundleRef.current, g, cam, base, v, density);
     const centre = centreOf(g, lens, zoom);
+    // a tap makes the rest recede to TAP_CONTEXT, eased (GL item 5); never a hover
+    const tapTarget = base.focusArc >= 0 || base.focusProphecy >= 0 || !!base.focusRange ? 1 : 0;
+    if (reduceMotionRef.current === undefined) {
+      reduceMotionRef.current = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+    }
+    const still = !!(reduceMotionRef.current && reduceMotionRef.current.matches);
+    const tap = tapFadeStep(tapFadeRef.current, tapTarget,
+      typeof performance !== 'undefined' ? performance.now() : Date.now(), still ? 0 : TAP_FADE_MS);
+    tapFadeRef.current = tap;
+    if (tap.running) schedule();
     r.draw(Object.assign({}, base, {
-      centre,
+      centre, tapFade: tap.value,
       camX: cam.x, ppv: cam.ppv,
       strokeWidth: style.strokeWidthCss * v.DPR,
       alpha: style.alpha,
@@ -280,7 +294,7 @@ export function useWebRenderer({
     // the walk's window on the badges (device px boxes), like __swContextCeiling: unset in the app
     if (typeof globalThis.__swWalk !== 'undefined') globalThis.__swBadgeBoxes = badgeBoxesRef.current;
   }, [graph, camRef, viewRef, mode, zoomCapFor, camVRef, viewFor, density, focusRef, yFrameFor, railOpts, capFractionNow,
-    chromeRef, personalRef, topbarRef, uiRef, wrapRef, panelInsetRef]);
+    chromeRef, personalRef, topbarRef, uiRef, wrapRef, panelInsetRef, schedule]);
 
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule, drawRef]);
 

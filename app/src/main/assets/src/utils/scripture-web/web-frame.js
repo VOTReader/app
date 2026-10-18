@@ -194,3 +194,37 @@ export function centreOf(g, lens, zoom) {
 export function webYFrame(v, f, maxSpan) {
   return { base: f.base, ceil: f.ceil, squash: squashFactor(f.ceil, v.W), maxSpan };
 }
+
+/** How long the rest of the web takes to recede to TAP_CONTEXT when a line is tapped, and to
+ * come back when it is let go, ms (GL item 5). */
+export const TAP_FADE_MS = 180;
+
+/**
+ * @typedef {{ value: number, from: number, target: number, t0: number, running: boolean }} TapFade
+ *   value   how far the rest of the web has receded, 0 (all of it at full ink) .. 1 (at TAP_CONTEXT)
+ */
+
+/**
+ * One frame of the tap's fade: the rest of the web recedes while a line, a pair or a range is
+ * chosen, and comes back when it is let go, eased over `ms` (0 under reduced motion: a jump). A
+ * change of target mid-fade starts from where the fade is, so a quick tap-and-close never jumps.
+ * Hover is never a target (it dims nothing, C3). Pure: returns the next state.
+ * @param {TapFade | null} prev  last frame's, or null for the first
+ * @param {number} target  1 while something is chosen, else 0
+ * @param {number} now  ms (performance.now)
+ * @param {number} [ms]  the fade's length, TAP_FADE_MS by default
+ * @returns {TapFade}
+ */
+export function tapFadeStep(prev, target, now, ms) {
+  const goal = target > 0 ? 1 : 0;
+  const len = ms == null ? TAP_FADE_MS : ms;
+  // the first frame starts where it should be: a web that opens with a choice is already receded
+  if (!prev) return { value: goal, from: goal, target: goal, t0: now, running: false };
+  let s = prev;
+  if (goal !== prev.target) s = { value: prev.value, from: prev.value, target: goal, t0: now, running: true };
+  if (!s.running) return s;
+  const k = len > 0 ? Math.min(1, Math.max(0, (now - s.t0) / len)) : 1;
+  const e = k * k * (3 - 2 * k);
+  const value = s.from + (s.target - s.from) * e;
+  return { value: k >= 1 ? s.target : value, from: s.from, target: s.target, t0: s.t0, running: k < 1 };
+}
