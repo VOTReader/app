@@ -68,7 +68,9 @@ export function panelOf(detail, choices) {
     return null;
   }
   if (choices && choices.length) {
-    return { spec: { mode: 'group', ids: choices.map((c) => c.index), label: '' }, info: choices };
+    // the group's ids are OpenBible arc ids: a row for a prophecy pair that is no arc (index -1)
+    // stays in the rows (info), never in the ids
+    return { spec: { mode: 'group', ids: choices.map((c) => c.index).filter((i) => i >= 0), label: '' }, info: choices };
   }
   return null;
 }

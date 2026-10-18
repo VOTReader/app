@@ -165,6 +165,20 @@ describe('panelOf: today\'s open card in the panel\'s terms', () => {
     expect(panelOf(null, null)).toBeNull();
     expect(panelOf(null, [])).toBeNull();
   });
+
+  /* GL review 2026-10-18 (finding 6): a chooser row for a prophecy pair that is no OpenBible arc
+     reads index -1, and the group's ids are arc ids: -1 handed on is an id no reader can index. */
+  it('a group names only OpenBible arcs: a chooser row for a lone prophecy pair is in its rows, not its ids', () => {
+    const rows = [{ index: 4 }, { index: -1, prophecy: true, prophecyIndex: 2 }, { index: 9 }];
+    const p = panelOf(null, rows);
+    expect(p.spec).toEqual({ mode: 'group', ids: [4, 9], label: '' });
+    expect(p.info).toBe(rows);
+    // a chooser of lone pairs only: no arc to name, the rows still say what it holds
+    expect(panelOf(null, [{ index: -1, prophecy: true, prophecyIndex: 0 }]).spec).toEqual({ mode: 'group', ids: [], label: '' });
+    // the card of one: the pair by its index, flagged (the panel's connection spec)
+    expect(panelOf({ kind: 'arc', index: -1, prophecy: true, prophecyIndex: 2 }, null).spec)
+      .toEqual({ mode: 'connection', arc: 2, prophecy: true });
+  });
 });
 
 describe('the lit set (CONTRACTS.md section 2): lightThreads is its one writer', () => {
