@@ -42,7 +42,7 @@ import { refOfVerse, labelFeed, eachLabelThread } from '../../utils/scripture-we
 import { fansOf, bucketDrawCount } from '../../utils/scripture-web/decode.js';
 import { distanceRampRGB } from '../../utils/scripture-web/palette.js';
 import { placeRailLabelsRanked } from '../../utils/scripture-web/rail-labels.js';
-import { css, ink, inkWidth } from '../../utils/scripture-web/sw-ink.js';
+import { css, ink, inkWidth, TAP_CONTEXT } from '../../utils/scripture-web/sw-ink.js';
 import { citationsForVerse } from '../../utils/scripture-web/vot-citations.js';
 import {
   canvasFont, fontPx, setFont, measure, boxesMeet, createGrid, placeRanked, ensureWebFont,
@@ -128,6 +128,9 @@ export const LEG_PPV_CSS = 22;
 /** How many heights a far end may try beside its leg: a short column of names over each crowded
     verse, and the sky above it left to the threads (C2: "fully zoomed in must look good and clean"). */
 const LEG_SLOTS = 5;
+/** While a line is chosen the other labels step back with the threads, two thirds of the
+    threads' way (to TAP_CONTEXT): the chosen line reads first, the rest stay readable (C3). */
+export const LABEL_RECEDE = 1 - (1 - TAP_CONTEXT) * 0.65;
 /** Up in the sky, at most this many crossing threads are named at their bodies. */
 const FLY_LABELS = 12;
 /** The corner buttons keep this much clear around them (spec §3: their rectangles + 8). */
@@ -521,7 +524,7 @@ export function paintCanonOverlay(ctx, fs) {
   drawPills(ctx, g, cam, L, fs, grid, hits, badges);
   if (g.count > 0 && L.deepT >= 0.5) {
     const memo = memoOf(g);
-    const quiet = chosen ? 0.55 : 1;   // the chosen line reads first; the rest of the labels step back
+    const quiet = chosen ? LABEL_RECEDE : 1;
     memo.chips = drawChips(ctx, g, cam, L, fs, grid, memo, labelled, quiet);
     if (cam.ppv / L.s >= LEG_PPV_CSS) memo.legs = drawLegs(ctx, g, L, fs, legFeed(g, cam, L, fs, memo), grid, memo.legs, labelled, quiet);
   }

@@ -14,8 +14,8 @@ import * as dec from '../../utils/scripture-web/decode.js';
 import { footBundles, lensRange, labelFeed } from '../../utils/scripture-web/pick.js';
 import { webFrame, webViewArgs, centreOf } from '../../utils/scripture-web/web-frame.js';
 import { citationsForVerse } from '../../utils/scripture-web/vot-citations.js';
-import { css } from '../../utils/scripture-web/sw-ink.js';
-import { paintCanonOverlay, hitOverlay, stackRows, citedVerses, chipKeepers, DEEP_FULL } from './overlay-renderer.js';
+import { css, TAP_CONTEXT } from '../../utils/scripture-web/sw-ink.js';
+import { paintCanonOverlay, hitOverlay, stackRows, citedVerses, chipKeepers, DEEP_FULL, LABEL_RECEDE } from './overlay-renderer.js';
 
 vi.setConfig({ testTimeout: 60000 });
 
@@ -431,6 +431,22 @@ describe('the pills and the labels', () => {
     expect(far.length, 'the end under the panel written beside the leg: ' + gold.map((c) => c.t).join(', ')).toBe(1);
     expect(textBox(far[0]).x1).toBeLessThanOrEqual(Wc);
     expect(gold.length, 'one foot reference and the far end').toBe(2);
+  });
+
+  it('a chosen line makes the other labels step back with the threads, two thirds of their way (TAP_CONTEXT), never to black', () => {
+    expect(LABEL_RECEDE).toBeCloseTo(1 - (1 - TAP_CONTEXT) * 0.65, 12);
+    expect(LABEL_RECEDE).toBeGreaterThan(TAP_CONTEXT);
+    expect(LABEL_RECEDE).toBeLessThan(1);
+    const others = (rec) => rec.texts().filter((c) => /·|→|←/.test(c.t) && c.fill !== css('chosenLabel'));
+    const free = others(paint('pc', zMax('pc'), ISA53_6).rec);
+    expect(free.length).toBeGreaterThan(5);
+    for (const c of free) expect(c.alpha, c.t).toBeCloseTo(1, 6);
+    const probe = frameAt('pc', zMax('pc'), ISA53_6);
+    const pick = labelFeed(g, probe.cam, { width: probe.v.W, base: probe.view.base, squash: probe.view.squash, density: 'famous', inset: probe.inset })
+      .find((f) => f.fromOn && f.toOn).i;
+    const chosen = others(paint('pc', zMax('pc'), ISA53_6, { focus: { arc: pick } }).rec);
+    expect(chosen.length).toBeGreaterThan(5);
+    for (const c of chosen) expect(c.alpha, c.t).toBeCloseTo(LABEL_RECEDE, 6);
   });
 
   it('hysteresis: a label placed on one frame keeps its thread on the next, a pixel later', () => {
