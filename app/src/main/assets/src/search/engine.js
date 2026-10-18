@@ -2307,6 +2307,8 @@ async function search(query, options) {
       return c;
     };
     alignCovOf = (id) => { const t = single.has(id) ? null : toksOf(id); return single.has(id) || t ? alone(id, t) : 0; };
+    /** @type {Map<string, string>} a verse lifted by its neighbour -> that neighbour */
+    const pairOf = new Map();
     /** The verse beside a verse (`by` -1 or 1) in its chapter: its id, or ''. */
     const besideVerse = (/** @type {string} */ id, /** @type {any} */ d, /** @type {number} */ by) => {
       const k = /^d(\d+)$/.exec(id);
@@ -2334,7 +2336,11 @@ async function search(query, options) {
           both.set(x);
           both.set(y, x.length);
           const b = alignScore(both, typedTokens, w, cls);
-          if (b.cov > a.cov && b.start < x.length && b.end > x.length) a = { cov: b.cov, start: -1, end: -1, first: -1 };
+          if (b.cov > a.cov && b.start < x.length && b.end > x.length) {
+            a = { cov: b.cov, start: -1, end: -1, first: -1 };
+            // ...the neighbour holding more of the quote than a small word is the rest of it
+            if (b.cov - /** @type {number} */ (single.get(id)) > tie) pairOf.set(id, o); else pairOf.delete(id);
+          }
         }
       }
       // it opens where the first typed words are (clauses typed in the other order: on the first typed)
@@ -2356,6 +2362,21 @@ async function search(query, options) {
       const v = order.findIndex((id) => kindAt(id) === 'verse');
       const st = v > 0 ? order.findIndex((id) => kindAt(id) === 'bible-study') : -1;
       if (st >= 0 && st < v) order.splice(st, 0, ...order.splice(v, 1));
+      /* TWO VERSES RUN TOGETHER, BOTH SHOWN (search200 R1, 2026-10-18). A quote of two verses lifted the verse holding
+         most of it, and its neighbour, holding the rest in a few common words ("...an abomination to the LORD"), stayed
+         where those words put it, below every text thick with them: the reader saw half of the saying remembered. The
+         neighbour comes right after the verse it lifted. */
+      for (let r = order.length - 1; r >= 0; r--) {
+        const o = pairOf.get(order[r]);
+        if (!o || alignHeld.has(o)) continue;
+        if (!(o in scoreMap)) {
+          if (!docLookup[o]) docLookup[o] = { id: o, ...msIndex.getStoredFields(o) };
+          scoreMap[o] = 0;
+          rankedIds.push(o);
+        }
+        alignHeld.set(o, { cov: /** @type {any} */ (alignHeld.get(order[r])).cov, start: -1, rank: 0 });
+        order.splice(r + 1, 0, o);
+      }
       let top = 0;
       for (const id in scoreMap) if (!alignHeld.has(id) && scoreMap[id] > top) top = scoreMap[id];
       for (let r = 0; r < order.length; r++) {

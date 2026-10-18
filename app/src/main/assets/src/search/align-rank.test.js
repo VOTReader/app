@@ -50,6 +50,9 @@ const GLOBALS = {
         { n: 9, text: 'Praised is the city of our fathers, the city that comes in the name of the King.' },
         // a verse a study quotes in another translation's words
         { n: 10, text: 'But My kindness shall be for ever, and My help from age to age; it will not fail.' },
+        // a saying of two verses remembered as one, nearly all of it the first's words
+        { n: 11, text: 'Who can boast, I have kept my hands clean?' },
+        { n: 12, text: 'Unequal scales, both alike are hateful to the Lord.' },
       ] }] },
     ] },
   },
@@ -71,6 +74,8 @@ const GLOBALS = {
     { id: 'scattered-letter', num: 4, title: 'Of Many Lamps', blocks: [para('Night and the long lamp: oil, soul, children, words, burning, keep. Keep the night burning, the oil of souls, the lamps and the words, children. '.repeat(8))] },
     // ...and one thick with that line's words, in no order
     { id: 'river-scattered', num: 6, title: 'Of Rivers', blocks: [para('Clean water, running rivers; garments and evening, wash and go down. The river of evening washes the garments clean, running down. '.repeat(4))] },
+    // letters thick with the common words closing a saying two verses hold between them
+    ...[7, 8, 9].map((num) => ({ id: 'glory-letter-' + num, num, title: 'Before Him ' + num, blocks: [para('Give glory to the Lord, sing to the Lord, and bring your gifts to the Lord. '.repeat(4) + filler(1))] })),
   ],
   WTLB_TWO: [
     // the line reprinted whole under a title of its own
@@ -151,6 +156,12 @@ describe('a quote remembered with its slips leads (B4)', () => {
   it('two verses remembered as one saying lead a verse thick with their words', async () => {
     const r = await searchWith(true, 'arise and sing on the hills of morning for the watchman sees the banner of the prince');
     expect(['Proverbs 31:1', 'Proverbs 31:2']).toContain(ids(r)[0]);
+  });
+
+  it('two verses remembered as one saying, most of it the first one\'s: both shown, the second right after the first', async () => {
+    const top = ids(await searchWith(true, 'who can boast i have kept my hands clean hateful to the lord'));
+    expect(top[0]).toBe('Proverbs 31:11');
+    expect(top[1]).toBe('Proverbs 31:12');
   });
 
   it('a sentence remembered opens on it, not on its last word said before it', async () => {
