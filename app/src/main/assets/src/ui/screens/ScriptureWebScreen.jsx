@@ -26,8 +26,8 @@ import {
   rotatePointer, ribbonStyle, arcShape, maxCamY, ALTITUDE_MARKS, spanAtHeight, lensDimFor, lensShareAt,
 } from '../../utils/scripture-web/geometry.js';
 import {
-  pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countTouching, countAnchored,
-  visibleArcs, threadEnds, footBundles, bundleGroups, lensRange, nearbyChapter, nearbyThreads,
+  pickArcs, pickChapter, pickVerse, refOfVerse, chapterRange, countAnchored,
+  visibleArcs, threadEnds, footBundles, lensRange, nearbyChapter, nearbyThreads,
 } from '../../utils/scripture-web/pick.js';
 import { createRenderer, DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { useWebCamera } from '../scripture-web/use-web-camera.js';
@@ -38,7 +38,11 @@ import { WebFallbackList } from '../scripture-web/WebFallbackList.jsx';
 import { startChapter } from '../../utils/scripture-web/chapter-connections.js';
 import { readChromeTokens, LINK_KIND_NAMES, MY_WEB_SOURCES, MY_WEB_LINK_KINDS, distanceRampRGB } from '../../utils/scripture-web/palette.js';
 import { placeRailLabels } from '../../utils/scripture-web/rail-labels.js';
-import { entryHlBase } from '../../utils/hl-keys.js';
+import {
+  describeFound, connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta,
+  summaryOf, votNodeName, endpointLabel, verseTextFor, graphStats, densityHint,
+  chooserAnnouncement, followAnnouncement, groupAnnouncement, ZOOM_MAX_MESSAGE,
+} from '../../utils/scripture-web/describe.js';
 import {
   buildVotRail, buildPersonalGraph, buildCuratedUnderlay,
 } from '../../utils/scripture-web/personal-graph.js';
@@ -68,9 +72,6 @@ const SHORT_STUDY = {
    frame live in utils/scripture-web/web-frame.js, pure and tested; the
    cameras and view that feed them in ui/scripture-web/use-web-camera.js. */
 
-/** What the live region says when + does nothing because it can do nothing. */
-const ZOOM_MAX_MESSAGE = 'Zoomed all the way in';
-
 /**
  * Anchored arcs per CSS px of viewport width, which is what decides whether
  * the deep alpha reads as one clear ribbon or as fog. Counted over the drawn
@@ -90,12 +91,6 @@ function anchoredDensity(cache, g, cam, v, density) {
   return cache.value / ((v.W || 1) / (v.DPR || 1));
 }
 
-const DENSITY_LABEL = { essential: 'Essential', famous: 'Famous' };
-
-const DENSITY_HINT = {
-  essential: 'only the strongest connections',
-  famous: 'the famous view — about 64,000 connections',
-};
 /* HIDE ALL. One session-scoped flag, not a profile setting: the reader hides
    the chrome to look at the web, and the next visit should open with the
    controls back. Absence is the signal — the key is removed, never set to
@@ -721,97 +716,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const hitAt = React.useCallback((cx, cy) => hitCandidatesAt(cx, cy)[0] || null,
     [hitCandidatesAt]);
 
-  const describe = React.useCallback((found) => {
-    const g = graph;
-    if (!found) return null;
-    if (found.kind === 'link') {
-      const p = personalRef.current;
-      const rec = p && p.graph && p.graph.records[found.index];
-      if (!rec) return null;
-      return {
-        kind: 'link', index: found.index, record: rec,
-        source: rec.source, target: rec.target,
-        joins: p.graph.kind[found.index],
-        // The reader's OWN endpoints, passed through untouched — they already
-        // carry verse/verseEnd and char spans, so a link the user made over a
-        // range highlights that whole range on arrival.
-        cards: [endpointCard('Source', rec.source), endpointCard('Target', rec.target)],
-      };
-    }
-    if (found.kind === 'underlay') {
-      const p = personalRef.current;
-      const underlay = p && p.underlay;
-      const edge = underlay && underlay.records && underlay.records[found.index];
-      const node = p && p.votRail && p.votRail.nodes[underlay && underlay.votPos[found.index]];
-      if (!underlay || !edge || !node) return null;
-      const source = refOfVerse(g, underlay.versePos[found.index]);
-      const target = curatedEndpoint(edge, node);
-      // the card's third line names the Volume the passage sits in (what the
-      // reader zoomed the top rail to), never the edge's storage kind
-      const seg = p.votRail.segments.find((s) => s.volKey === node.volKey);
-      return {
-        kind: 'underlay', index: found.index, source, target,
-        // rail positions, published on the card (data-verse / data-vot) so a
-        // walk can follow this one thread through the exported geometry
-        verse: underlay.versePos[found.index], vot: underlay.votPos[found.index],
-        joins: (seg && (seg.short || seg.label)) || edge.kind || 'curated connection',
-        // the family in words (design-myweb-colour.md, 5): the source the thread's
-        // colour encodes, then the Volume
-        sourceName: MY_WEB_SOURCES[underlay.source ? underlay.source[found.index] : MY_WEB_SOURCES.length - 1].name,
-        cards: [verseCard('Scripture', source), endpointCard('Corpus', target)],
-      };
-    }
-    if (found.kind === 'arc') {
-      const a = refOfVerse(g, found.hit.from), b = refOfVerse(g, found.hit.to);
-      return {
-        kind: 'arc', a, b, votes: found.hit.votes,
-        span: Math.abs(found.hit.to - found.hit.from), index: found.hit.index,
-        from: found.hit.from, to: found.hit.to,
-        cards: [verseCard('From', a), verseCard('To', b)],
-      };
-    }
-    if (found.kind === 'bundle') {
-      const cell = found.cell;
-      const cam = camRef.current, v = viewRef.current;
-      const view = viewFor();
-      const first = refOfVerse(g, cell.lo), last = refOfVerse(g, cell.hi);
-      const label = cell.verse ? first.label
-        : cell.chapterLo === cell.chapterHi ? first.bookTitle + ' ' + first.chapter
-        : first.bookTitle + ' ' + first.chapter + ' \u2013 ' + (last.bookTitle === first.bookTitle ? '' : last.bookTitle + ' ') + last.chapter;
-      const groups = cam && v.W ? bundleGroups(g, cam, view, cell.lo, cell.hi, 40) : [];
-      const chapter = g.chapters[cell.chapterLo];
-      return { kind: 'bundle', cell, label, lo: cell.lo, hi: cell.hi,
-        hidden: cell.hidden, drawn: cell.drawn,
-        connections: countTouching(g, cell.lo, cell.hi, density),
-        groups: groups.map((grp) => {
-          const r = refOfVerse(g, grp.lo);
-          return Object.assign({ label: r.bookTitle + ' ' + r.chapter }, grp);
-        }),
-        cards: cell.verse ? [verseCard('Verse', first)]
-          : [chapterCard(g.books[chapter[0]], chapter[1], chapter[3], first)] };
-    }
-    if (found.kind === 'verse') {
-      const r = refOfVerse(g, found.verse);
-      return { kind: 'verse', ref: r, verse: found.verse,
-        connections: countTouching(g, found.verse, found.verse, density),
-        cards: [verseCard('Verse', r)] };
-    }
-    const [lo, hi] = chapterRange(g, found.chapterIndex);
-    const ch = g.chapters[found.chapterIndex];
-    const first = refOfVerse(g, lo);
-    const camNow = camRef.current, vNow = viewRef.current;
-    return { kind: 'chapter', chapterIndex: found.chapterIndex,
-      book: g.books[ch[0]], chapter: ch[1], verses: ch[3], lo, hi,
-      connections: countTouching(g, lo, hi, density),
-      // where this chapter's threads go, by the other end's chapter: the
-      // convergence entry point now that nothing is hidden at rest
-      groups: camNow && vNow.W ? bundleGroups(g, camNow, viewFor(), lo, hi, 40).map((grp) => {
-        const r = refOfVerse(g, grp.lo);
-        return Object.assign({ label: r.bookTitle + ' ' + r.chapter }, grp);
-      }) : [],
-      // Opening a chapter highlights the WHOLE chapter on arrival.
-      cards: [chapterCard(g.books[ch[0]], ch[1], ch[3], first)] };
-  }, [graph, camRef, viewRef, density, viewFor]);
+  // what a hit is, in the panels' terms (describe.js), read in this frame
+  const describe = React.useCallback((found) => describeFound(found, {
+    g: graph, personal: personalRef.current, cam: camRef.current, v: viewRef.current, viewFor, density,
+  }), [graph, camRef, viewRef, density, viewFor]);
 
   const listItems = React.useMemo(() => {
     if (!graph || !listOpen) return [];
@@ -909,7 +817,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       // nothing is chosen while the chooser asks, and its rows replace the hover chip
       focusRef.current = { arc: -1, range: null };
       dropHover();
-      setAnnounce(described.length + ' nearby connections. Choose one.');
+      setAnnounce(chooserAnnouncement(described.length));
       schedule();
       return;
     }
@@ -1065,7 +973,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     cam.x = toFar ? info.to : info.from;
     clampCamera(cam, v.W, zoomCapFor(cam), yFrameFor(cam) || undefined);
     setDetail(Object.assign({}, info, { far: toFar ? 'from' : 'to' }));
-    setAnnounce('Following the line to ' + (toFar ? info.b : info.a).label);
+    setAnnounce(followAnnouncement((toFar ? info.b : info.a).label));
     schedule();
   }, [camRef, viewRef, zoomCapFor, yFrameFor, schedule]);
 
@@ -1086,7 +994,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const same = focusRef.current.range2 && grp && focusRef.current.range2[0] === grp.lo && focusRef.current.range2[1] === grp.hi;
     focusRef.current = { arc: -1, range: [info.lo, info.hi], range2: same || !grp ? null : [grp.lo, grp.hi] };
     setDetail(Object.assign({}, info, { chosenGroup: same || !grp ? null : grp.chapterIndex }));
-    setAnnounce(same || !grp ? 'Showing the strongest again.' : grp.count + ' threads to ' + grp.label + ' shown.');
+    setAnnounce(groupAnnouncement(grp, same || !grp));
     schedule();
   }, [focusRef, schedule]);
   // ── render ──────────────────────────────────────────────────────────────
@@ -1168,7 +1076,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
                 onChange={(e) => {
                   const next = /** @type {Density} */ (e.target.value);
                   setDensity(next);
-                  flashHint(DENSITY_LABEL[next] + ' — ' + DENSITY_HINT[next]);
+                  flashHint(densityHint(next));
                   if (typeof updateSetting === 'function') updateSetting('webDensity', next);
                 }}>
                 <option value="essential">Essential</option>
@@ -1807,23 +1715,6 @@ function TipChip({ info, viewport }) {
   );
 }
 
-function connectionTitle(info) {
-  if (info.kind === 'arc') return info.a.label + ' ↕ ' + info.b.label;
-  if (info.kind === 'chapter') return info.book.title + ' ' + info.chapter + ' \u2014 where its threads go';
-  if (info.kind === 'underlay') return info.source.label + ' ↕ ' + endpointLabel(info.target);
-  return endpointLabel(info.source) + ' ↕ ' + endpointLabel(info.target);
-}
-
-function connectionMeta(info) {
-  if (info.kind === 'arc') return info.votes + ' votes · ' + info.span.toLocaleString() + ' verses apart';
-  if (info.kind === 'chapter') {
-    return info.verses + ' verses \u00b7 ' + info.connections.toLocaleString() + ' connections'
-      + (info.groups && info.groups.length ? ' \u00b7 to ' + info.groups.length + (info.groups.length === 1 ? ' chapter' : ' chapters') : '');
-  }
-  if (info.kind === 'underlay') return info.joins;
-  return LINK_KIND_NAMES[info.joins] || 'Your link';
-}
-
 /** The how-to-read card (landing 13). A dialog like the panels below it, so it
  * gets their trap: focus in on open, Tab kept inside, focus handed back to
  * where the reader was (the ? button) on close. Escape and Back close it
@@ -1873,13 +1764,8 @@ function ConnectionList({ items, mode, lensOn, onChoose, onClose }) {
   const chapter = mode !== 'personal' && items[0] && items[0].kind === 'chapter' ? items[0] : null;
   // My Web lists the reader's own links (up to 36, store order) wherever the camera is: no 'nearby'
   // promise there (sweep mw12). The canon list does read the view (the lit chapter, its threads).
-  const eyebrow = mode === 'personal' ? 'Your links'
-    : chapter ? (lensOn ? 'Under the lens \u00b7 ' : 'Nearby \u00b7 ') + chapter.book.title + ' ' + chapter.chapter
-    : 'Nearby connections';
-  const meta = chapter
-    ? chapter.connections.toLocaleString() + (chapter.connections === 1 ? ' connection' : ' connections')
-      + ' \u00b7 the strongest ' + (items.length - 1) + ' below; the chapter row lists where they all go.'
-    : 'Select a connection to focus it and open its passages.';
+  const eyebrow = listEyebrow(mode, chapter, lensOn);
+  const meta = listMeta(chapter, items.length);
   return (
     <div className="sw-list" ref={trapRef} data-focus-self="" role="dialog" aria-modal="false" aria-label="Nearby connections" data-lens-on={lensOn ? '1' : '0'}>
       <button type="button" className="sw-sheet-close" onClick={onClose} aria-label="Close nearby connections">×</button>
@@ -1903,23 +1789,8 @@ function DetailSheet({ info, onClose, onOpen, onFollow, onGroup }) {
   // v03-03: Tab stays in the panel; closing it hands focus back to the web
   const trapRef = useFocusTrap(true);
   const cards = info.cards || [];
-  const eyebrow = info.kind === 'link' ? 'Your link'
-    : info.kind === 'underlay' ? 'Timothy\u2019s thread'
-    : info.kind === 'arc' ? 'Connection'
-    : info.kind === 'bundle' ? 'Bundle · ' + info.label
-    : info.kind === 'chapter' ? 'Chapter' : 'Verse';
-  const meta = info.kind === 'arc'
-    ? info.span.toLocaleString() + ' verses apart · weight ' + info.votes
-    : info.kind === 'link' ? LINK_KIND_NAMES[info.joins]
-    : info.kind === 'underlay' ? (info.sourceName ? info.sourceName + ' \u00b7 ' + info.joins : info.joins)
-    : info.kind === 'bundle'
-      ? (info.hidden > 0
-        ? info.connections.toLocaleString() + ' connections here, ' + info.hidden.toLocaleString()
-          + ' not drawn at this zoom. Choose where they go to see them.'
-        : info.connections.toLocaleString() + ' connections converge here. Choose where they go to follow them.')
-    : info.kind === 'chapter'
-      ? info.verses + ' verses · ' + info.connections.toLocaleString() + ' connections'
-      : info.connections.toLocaleString() + ' connections';
+  const eyebrow = sheetEyebrow(info);
+  const meta = sheetMeta(info);
 
   return (
     <div className="sw-sheet" ref={trapRef} data-focus-self="" role="dialog" aria-modal="false"
@@ -1976,67 +1847,6 @@ function DetailSheet({ info, onClose, onOpen, onFollow, onGroup }) {
   );
 }
 
-/**
- * A tappable card for a Bible verse the graph knows about.
- *
- * `verseEnd` is deliberately absent: the canonical web stores one verse id per
- * arc end (the source dataset's ranges were resolved to their start verse), so
- * a jump from here flashes that verse. The reader's OWN links keep whatever
- * range they were made over — see endpointCard.
- *
- * @param {string} eyebrow
- * @param {{bookId:string, bookTitle:string, chapter:number, verse:number, label:string}} ref
- */
-function verseCard(eyebrow, ref) {
-  const endpoint = {
-    type: 'bible',
-    key: 'bible:' + ref.bookId + ':' + ref.chapter + ':' + ref.verse,
-    bookId: ref.bookId, chapter: ref.chapter, verse: ref.verse, label: ref.label,
-  };
-  return {
-    eyebrow, label: ref.label, endpoint,
-    cat: typeof bookCategory === 'function' ? bookCategory(ref.bookId) : '',
-    preview: verseTextFor(ref),
-  };
-}
-
-/**
- * A tappable card for a whole chapter — the anchor covers every verse in it,
- * so arriving flashes the chapter rather than one line.
- */
-function chapterCard(book, chapterNum, verses, firstRef) {
-  const label = book.title + ' ' + chapterNum;
-  return {
-    eyebrow: 'Chapter', label,
-    cat: typeof bookCategory === 'function' ? bookCategory(book.id) : '',
-    preview: verseTextFor(firstRef),
-    endpoint: {
-      type: 'bible', key: 'bible:' + book.id + ':' + chapterNum + ':1',
-      bookId: book.id, chapter: chapterNum, verse: 1, verseEnd: verses, label,
-    },
-  };
-}
-
-/**
- * A tappable card for one side of a link the reader made. The stored endpoint
- * is passed through UNTOUCHED so its verse range and character span survive —
- * that is what makes a link made over a long passage flash the whole passage.
- */
-function endpointCard(eyebrow, ep) {
-  if (!ep) return { eyebrow, label: '(unknown)', endpoint: null };
-  const cat = ep.type === 'bible' && typeof bookCategory === 'function'
-    ? bookCategory(ep.bookId)
-    : ep.type === 'study' || ep.type === 'study-letter' || ep.type === 'study-chapter' ? 'Matthew Study Bible'
-    : ep.collection || '';
-  return {
-    eyebrow,
-    label: endpointLabel(ep),
-    cat,
-    preview: ep.preview || ep.text || (ep.type === 'bible' ? verseTextFor(ep) : ''),
-    endpoint: ep,
-  };
-}
-
 function legendFor(mode) {
   // Every variant ends with the histogram key — the bars hanging under the
   // baseline (Psalm 119 reaching deepest) are chapter LENGTH, and nothing on
@@ -2089,90 +1899,6 @@ function legendFor(mode) {
 }
 
 /* ── helpers ───────────────────────────────────────────────────────────── */
-
-function graphStats(graph, density) {
-  let shown = 0;
-  for (const b of graph.buckets) {
-    shown += density === 'essential' ? b.off20 : b.off10;
-  }
-  return { shown };
-}
-
-/** The Volumes rail's node at a rail position, with its Volume ("The Bride, Volume Two"); '' off the rail. */
-function votNodeName(votRail, pos) {
-  const node = votRail && pos >= 0 && pos < votRail.total ? votRail.nodes[pos] : null;
-  if (!node) return '';
-  const seg = votRail.segments.find((s) => s.volKey === node.volKey);
-  return node.title + (seg ? ', ' + seg.label : '');
-}
-
-/** A LinkEndpoint's own label, falling back to its key. */
-function endpointLabel(ep) {
-  if (!ep) return '';
-  return ep.label || ep.key || '';
-}
-
-function curatedEndpoint(edge, node) {
-  if (edge.studyId) {
-    return {
-      type: 'study-letter', key: 'study:' + edge.studyId + ':' + edge.chapterId,
-      studyId: edge.studyId, studyChapterId: edge.chapterId,
-      screen: 'bible-study-chapter',
-      label: node.title, collection: 'Bible Studies',
-    };
-  }
-  if (edge.letterId) {
-    const screenByVolume = {
-      one: 'vot-one-letter', two: 'vot-letter', three: 'vot-three-letter',
-      four: 'vot-four-letter', five: 'vot-five-letter', six: 'vot-six-letter',
-      seven: 'vot-seven-letter', timothy: 'vot-timothy-letter', flock: 'vot-flock-letter',
-      rebuke: 'vot-rebuke-letter', hm: 'hm-letter',
-    };
-    return {
-      type: 'letter', key: 'letter:' + edge.letterId + ':0', letterId: edge.letterId,
-      screen: screenByVolume[edge.volKey] || 'vot-letter',
-      volKey: edge.volKey, collection: edge.volKey, label: node.title,
-    };
-  }
-  if (edge.entryId) {
-    const type = edge.volKey === 'blessed' ? 'blessed'
-      : edge.volKey === 'holydays' ? 'holy-days' : 'wtlb';
-    const screen = edge.volKey === 'blessed' ? 'blessed-entry'
-      : edge.volKey === 'holydays' ? 'holy-days-entry'
-      : edge.volKey === 'wtlb2' ? 'wtlb-two-entry' : 'wtlb-one-entry';
-    return {
-      type, key: entryHlBase(type, edge.entryId) + ':0', entryId: edge.entryId,
-      screen,
-      volKey: edge.volKey, collection: edge.volKey, label: node.title,
-    };
-  }
-  return null;
-}
-
-function summaryOf(found) {
-  if (found.kind === 'link') {
-    return endpointLabel(found.source) + ' and ' + endpointLabel(found.target) + ', your link.';
-  }
-  if (found.kind === 'underlay') {
-    return found.source.label + ' and ' + endpointLabel(found.target) + ', corpus connection.';
-  }
-  if (found.kind === 'arc') return found.a.label + ' and ' + found.b.label + ', connected.';
-  if (found.kind === 'verse') return found.ref.label + ', ' + found.connections + ' connections.';
-  if (found.kind === 'bundle') {
-    return found.label + ', ' + (found.hidden > 0
-      ? found.hidden + ' connections not drawn here.' : found.connections + ' connections converge here.');
-  }
-  return found.book.title + ' ' + found.chapter + ', ' + found.connections + ' connections.';
-}
-
-/** Verse text via the app's own resolver, once the Bible corpus has landed. */
-function verseTextFor(ref) {
-  if (typeof resolveVerseText !== 'function') return '';
-  try {
-    const t = resolveVerseText({ type: 'bible', bookId: ref.bookId, chapter: ref.chapter, verse: ref.verse });
-    return t || '';
-  } catch (_e) { return ''; }
-}
 
 /** Subscribe to LinkStore so the personal web follows new links live. */
 function useLinkVersion() {
