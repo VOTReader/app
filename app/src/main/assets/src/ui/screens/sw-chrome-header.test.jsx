@@ -192,6 +192,36 @@ describe('the chrome\'s CSS (spec 4.1; items 21, 24, 47, 48)', () => {
     expect(px(rule('.sw-empty-close'), 'min-height')).toBeGreaterThanOrEqual(44);
   });
 
+  /* The phone's round rule (0,4,0: .sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, ...)) held the
+     hidden pill at 40 px, so "Show controls" ran off the glass (phone-ui-hidden, w3 panel step 2).
+     The phone's hidden rule must name as many classes and come after it. */
+  it('hidden, the hide-UI pill is as wide as its words on a phone too', () => {
+    const round = '.sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, .sw-hide-all, .sw-guide-btn) {';
+    const pill = '.sw-root.sw-compact.sw-chrome-hidden .sw-hide-all {';
+    expect(BARE.indexOf(round), 'the phone\'s round rule').toBeGreaterThan(-1);
+    expect(BARE.indexOf(pill), 'the phone\'s hidden pill comes after it').toBeGreaterThan(BARE.indexOf(round));
+    expect(rule('.sw-root.sw-compact.sw-chrome-hidden .sw-hide-all')).toMatch(/width:\s*auto/);
+  });
+
+  /* The legend wraps rather than run under ? and hide-UI (spec 4.1), and a wrapped line must not
+     start with a separator: each item's dot sits in its own left margin, the line is pulled left
+     by that margin, and the legend clips what is left of its edge, so a line's first dot is
+     outside it. */
+  it('a wrapped legend line never starts with its separator', () => {
+    expect(rule('.sw-legend')).toMatch(/overflow:\s*hidden/);
+    const line = rule('.sw-legend-line');
+    expect(line).toMatch(/display:\s*flex/);
+    expect(line).toMatch(/flex-wrap:\s*wrap/);
+    const pull = -px(line, 'margin-left');
+    const item = rule('.sw-legend-line > *');
+    expect(px(item, 'margin-left'), 'the item\'s margin is the line\'s pull').toBe(pull);
+    const dot = rule('.sw-legend-line > *::before');
+    expect(dot).toMatch(/position:\s*absolute/);
+    const left = -px(dot, 'left');
+    expect(left, 'the dot sits inside the item\'s margin').toBeGreaterThan(0);
+    expect(left).toBeLessThan(pull);
+  });
+
   it('no type in the web\'s chrome is under 12 px (item 47)', () => {
     const small = [];
     for (const m of BARE.matchAll(/([^{}]+)\{([^}]*)\}/g)) {

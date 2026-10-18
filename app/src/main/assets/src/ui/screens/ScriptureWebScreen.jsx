@@ -532,7 +532,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       ) : null}
 
       {/* the key, and the OpenBible.info credit as its tail (Q5): read, not hidden; its glyphs are */}
-      <div className="sw-legend">{legendFor(mode, graph && graph.attribution)}</div>
+      <div className="sw-legend"><div className="sw-legend-line">{legendFor(mode, graph && graph.attribution)}</div></div>
       {mode === 'personal' && railZoom.top ? (
         <button type="button" className="sw-btn sw-rail-reset sw-rail-reset-top" aria-label="Reset the Volumes rail"
           data-wheel-through="1" onClick={() => resetRail('top')}>Reset Volumes</button>

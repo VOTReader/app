@@ -314,7 +314,7 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     const legend = container.querySelector('.sw-legend');
     const credit = legend && legend.querySelector('.sw-credit');
     expect(credit, 'the credit, in the legend').toBeTruthy();
-    expect(legend.lastElementChild).toBe(credit);
+    expect(credit.parentElement.lastElementChild, 'the credit is the legend\'s last item').toBe(credit);
     expect(credit.textContent).toBe('Cross-reference data \u00a9 OpenBible.info (CC-BY)');
     expect(credit.closest('[aria-hidden="true"]'), 'the credit is read, not hidden').toBeNull();
 
@@ -329,11 +329,15 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     const H = SIZES.find((s) => s[0] === 'clientHeight')[1];
     // a root 500 px tall or less is .sw-compact (use-panel-layout.js); jsdom gives the root no box,
     // so the canvas's height stands in for it
-    const own = ruleOf(H <= 500 ? '.sw-root.sw-compact .sw-legend' : '.sw-legend');
+    const compact = H <= 500;
+    const own = ruleOf(compact ? '.sw-root.sw-compact .sw-legend' : '.sw-legend');
     const bottom = Number(/bottom:\s*calc\((\d+)px/.exec(own)[1]);
     const size = Number(/font-size:\s*var\(--fsc-(\d+)\)/.exec(own)[1]);
-    const lineHeight = Number(/line-height:\s*([\d.]+)/.exec(ruleOf('.sw-legend'))[1]);
-    const legendTop = H - bottom - size * lineHeight;
+    const lineHeight = Number(/line-height:\s*([\d.]+)/.exec(/line-height/.test(own) ? own : ruleOf('.sw-legend'))[1]);
+    // a phone's legend is two lines: the key, then the credit (it needs about 890 px at 13 px and a
+    // phone has about 750 beside ? and hide-UI; the phone screenshot shows it)
+    const lines = compact ? 2 : 1;
+    const legendTop = H - bottom - lines * size * lineHeight;
     const books = CALLS.filter((c) => c[0] === 'fillText' && /Cinzel/.test(String(c[4])));
     expect(books.length, 'book labels recorded, with their font').toBeGreaterThan(0);
     const foot = (c) => Number(c[3]) + Number((/(\d+(?:\.\d+)?)px/.exec(String(c[4])) || [0, 0])[1]);

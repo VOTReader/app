@@ -7866,6 +7866,9 @@
     }
     .sw-root.sw-chrome-hidden .sw-hide-all { width: auto; padding: 0 16px 0 12px; border-radius: 22px; }
     .sw-root.sw-chrome-hidden .sw-hide-label { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
+    /* the phone's round rule names four classes (.sw-root.sw-compact :is(.sw-topbar .sw-btn-icon,
+       ...)), so the phone's pill names four too, after it */
+    .sw-root.sw-compact.sw-chrome-hidden .sw-hide-all { width: auto; padding: 0 14px 0 10px; border-radius: 20px; }
     /* A narrow root parks the strip bottom-left at full width; it yields the corner. */
     .sw-root.sw-narrow .sw-controls { max-width: calc(100% - 76px); }
     /* Hidden = the controls, not the legend: the colour key stays with the book
@@ -8351,23 +8354,30 @@
     .sw-legend {
       position: absolute; z-index: 4; left: 24px;
       bottom: calc(16px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
-      display: flex; flex-wrap: wrap; align-items: center; row-gap: 2px; max-width: calc(100% - 164px);
+      max-width: calc(100% - 164px); overflow: hidden;
       font-family: var(--sw-font); font-size: var(--fsc-14); line-height: 1.35; color: var(--sw-text-muted);
       pointer-events: none;
     }
+    /* a phone's legend is two lines, the key and then the credit (about 890 px of words at 13 px
+       against about 750 beside ? and hide-UI); a little tighter, so it sits under the labels */
     .sw-root.sw-compact .sw-legend {
       left: 16px; bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
-      font-size: var(--fsc-13); max-width: calc(100% - 140px);
+      font-size: var(--fsc-13); line-height: 1.25; max-width: calc(100% - 140px);
     }
     /* hidden, the hide-UI pill says "Show controls" and is wider than the two round buttons */
     .sw-root.sw-chrome-hidden .sw-legend { max-width: calc(100% - 210px); }
-    .sw-legend > * + *::before { content: '\00b7'; margin: 0 10px; }
+    /* THE SEPARATORS. Each item carries its dot in its own 21 px left margin and the line is pulled
+       left by that margin, so the first item of every line, wrapped or not, has its dot outside the
+       legend's clipped box: a wrapped line never starts with a dot. */
+    .sw-legend-line { display: flex; flex-wrap: wrap; align-items: center; margin-left: -21px; }
+    .sw-legend-line > * { position: relative; margin-left: 21px; }
+    .sw-legend-line > *::before { content: '\00b7'; position: absolute; left: -13px; }
     .sw-key { display: inline-flex; align-items: center; gap: 5px; }
     /* the cited tick (sw-ink `cited`) and the prophecy thread (sw-ink `prophecy`), as the
        canvas paints them, a little larger so they read at legend size */
     .sw-key-tick { width: 2px; height: 10px; border-radius: 1px; display: inline-block; background: var(--sw-cited); }
     .sw-key-arc {
-      width: 16px; height: 7px; display: inline-block; box-sizing: border-box; margin-top: 3px;
+      width: 28px; height: 8px; display: inline-block; box-sizing: border-box; margin-top: 3px;
       border: 1.5px solid var(--sw-prophecy); border-bottom: 0; border-radius: 8px 8px 0 0;
     }
     /* the credit is the legend's tail and flows with it: no place of its own (round 3) */
@@ -8390,6 +8400,7 @@
     }
 
     .sw-root.sw-compact .sw-key-gradient { width: 64px; }
+    .sw-root.sw-compact .sw-key-arc { width: 20px; height: 7px; }
     /* The canvas carried a CC-BY credit line of its own until 2026-09-11; it printed over the
        book labels in landscape. Since Q5 it is the legend's tail (.sw-legend .sw-credit). */
     .sw-live {
