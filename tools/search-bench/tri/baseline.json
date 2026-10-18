@@ -1,19 +1,19 @@
 {
- "open": 544,
- "strict": 497,
- "top5": 583,
+ "open": 559,
+ "strict": 513,
+ "top5": 584,
  "found": 600,
- "held": 166,
- "fresh": 83,
+ "held": 167,
+ "fresh": 84,
  "styleTier": {
-  "exact/easy": 56,
+  "exact/easy": 59,
   "exact/medium": 70,
-  "exact/hard": 66,
+  "exact/hard": 69,
   "misremembered/easy": 56,
-  "misremembered/medium": 66,
+  "misremembered/medium": 68,
   "misremembered/hard": 63,
-  "title/easy": 58,
-  "title/medium": 65,
-  "title/hard": 44
+  "title/easy": 60,
+  "title/medium": 69,
+  "title/hard": 45
  }
 }

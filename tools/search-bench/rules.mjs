@@ -11,6 +11,14 @@
                 which breaks a third of its 3-grams: 80% of its words AND of its content words in order, within a
                 stretch at most 4 words longer (sr11 t276, 2026-10-15). Such a text answers the sentence too but is no
                 original of it (Corbin 10-14: a phrase that recurs has no single original).
+   NEAR QUOTE   (errata 2026-10-18, a blind 3-judge review of tri m246, 3 of 3) a sentence quoting a verse with a word or
+                two changed ("seek, and you shall find" for the NKJV's "you will find") breaks too many 3-grams for the
+                80% rule but holds the verse by NEAR COPY's measure, or the verse holds it. Such a verse answers the
+                sentence as a near member: any holder of a recurring line counts, and the class's original is unchanged.
+   NAMED COLLECTION  (errata 2026-10-18, tri n344, 3 of 3) a query naming the target's collection ("capital punishment
+                answers only god can give") asks for that collection's own text: the target's own unit may lead though a
+                better-tier text holds the same words (the original-first and reprint-shown checks yield). A name counts
+                only where the query holds it and the target's title and sentence do not.
    ─────────────────────────────────────────────────────────────────── */
 
 const gram = (w, i) => w[i] + ' ' + w[i + 1] + ' ' + w[i + 2];
@@ -115,3 +123,34 @@ export function rangeHolds(p, chapter, verse) {
 
 /** A merged Bible misquote's target is two adjacent verses of one chapter (verse, verse2): a card holding either passes. */
 export const pairHolds = (p, c) => rangeHolds(p, c.chapter, c.verse) || (c.verse2 != null && rangeHolds(p, c.chapter, c.verse2));
+
+/** NEAR QUOTE: does sentence `s` hold verse `v` with a word or two changed, or `v` hold `s` (nearCopy either way, at
+    the two rarest content words the pair shares; `rank` orders words rarest first)? Normalized word arrays. */
+export function nearQuote(/** @type {string[]} */ s, /** @type {string[]} */ v, /** @type {Set<string>} */ stop, /** @type {(w: string) => number} */ rank) {
+  for (const [a, b] of [[v, s], [s, v]]) {
+    const anchors = [...new Set(a)].filter((x) => !stop.has(x) && b.includes(x)).sort((x, y) => rank(x) - rank(y) || (x < y ? -1 : 1)).slice(0, 2);
+    for (const x of anchors) if (nearCopy(a, b, stop, x)) return true;
+  }
+  return false;
+}
+
+/** NAMED COLLECTION: the names a reader types for each collection (normalized, as corpus.mjs norm). */
+const VOL = ['one', 'two', 'three', 'four', 'five', 'six', 'seven'];
+export const COLLECTION_NAMES = {
+  ...Object.fromEntries(VOL.map((w, i) => ['v' + (i + 1), ['volume ' + w, 'volume ' + (i + 1), 'vol ' + w, 'vol ' + (i + 1), 'v' + (i + 1)]])),
+  timothy: ['letters from timothy'],
+  flock: ['little flock', 'lords little flock'],
+  rebuke: ['the lords rebuke', 'lords rebuke', 'rebuke'],
+  wtlb1: ['words to live by', 'wtlb'],
+  wtlb2: ['words to live by', 'wtlb'],
+  blessed: ['the blessed'],
+  holydays: ['holy days'],
+  'bible-studies': ['bible study', 'bible studies', 'study', 'studies'],
+  answers: ['answers only god can give', 'answers'],
+};
+
+/** Does query `q` name collection `col` where `own` (the target's title and sentence) does not? Both normalized
+    with their padding spaces (" a b "). */
+export function namesCollection(/** @type {string} */ q, /** @type {string} */ own, /** @type {string} */ col) {
+  return (COLLECTION_NAMES[col] || []).some((p) => q.includes(' ' + p + ' ') && !own.includes(' ' + p + ' '));
+}

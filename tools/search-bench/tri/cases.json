@@ -1,5 +1,5 @@
 {
- "made": "2026-10-18T11:39:07.227Z",
+ "made": "2026-10-18T19:45:08.595Z",
  "by": "freeze-tri.mjs (search200)",
  "targetsHash": "b7cc67dfc81d4e12",
  "counts": {
@@ -6121,9 +6121,16 @@
    "num": 17,
    "blockIdx": 0,
    "sentence": "From the beginning I had written to you by the pen of My prophets, even to the showing of great signs and wonders.",
-   "q": "i have written to you by the hand of my prophets",
-   "from": "i had written to you by the pen of my prophets",
-   "held": false
+   "q": "from the beginning i had written to you through the hand of my prophets",
+   "from": "from the beginning i had written to you by the pen of my prophets",
+   "held": false,
+   "retired": [
+    {
+     "q": "i have written to you by the hand of my prophets",
+     "from": "i had written to you by the pen of my prophets",
+     "why": "errata 2026-10-18: a separate letter in the same collection has this line with 'I have written', so turning the target's 'had' into 'have' points the query at that letter. Keep the target's own 'I had written' (its 'from the beginning' helps too) and put the two or three slips elsewhere."
+    }
+   ]
   },
   {
    "id": "m257",
@@ -9251,22 +9258,28 @@
    "held": false
   },
   {
-   "id": "n047",
+   "id": "n236",
    "style": "title",
    "tier": "medium",
    "form": "memorable-part",
-   "group": "answers",
-   "col": "answers",
-   "collection": "Answers Only God Can Give",
-   "level": "sentence",
-   "titleCol": "answers-heading",
-   "uk": "answers/god-speaks-regarding-those-who-bear-false-witness-in-his-name",
-   "unit": "god-speaks-regarding-those-who-bear-false-witness-in-his-name",
-   "blockIdx": 0,
-   "title": "Woe to Those Who Bear False Witness in The Lord's Name",
-   "sentence": "Woe to Those Who Bear False Witness in The Lord's Name",
-   "q": "woe to those who bear false witness",
+   "group": "studies",
+   "col": "bible-studies",
+   "collection": "Bible / Letter Studies",
+   "level": "unit",
+   "titleCol": "bible-studies",
+   "uk": "bible-studies/grace-and-the-law-ch6",
+   "unit": "grace-and-the-law-ch6",
+   "title": "VERSES OFTEN STUMBLED OVER:",
+   "fullTitle": "Grace AND The Law (Bible/Letter Study) — VERSES OFTEN STUMBLED OVER:",
+   "num": 6,
+   "q": "verses stumbled",
    "held": false,
+   "retired": [
+    {
+     "q": "verses often stumbled",
+     "why": "3 of the title's 4 words; a memorable part keeps 2 to (title length - 2) words, in order"
+    }
+   ],
    "replaces": "n091"
   },
   {
@@ -10370,8 +10383,14 @@
    "title": "The Rod of Discipline",
    "fullTitle": "The Rod of Discipline",
    "num": 15,
-   "q": "rod of correction",
-   "held": false
+   "q": "staff of discipline",
+   "held": false,
+   "retired": [
+    {
+     "q": "rod of correction",
+     "why": "errata 2026-10-18: 'rod of correction' is a Bible verse's exact wording, so a reader typing it is at least as likely to mean the verse. Keep this title's own distinctive word 'discipline', make the drop and the wrong word elsewhere, and land on no familiar Bible phrase."
+    }
+   ]
   },
   {
    "id": "n005",

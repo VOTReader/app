@@ -6,7 +6,7 @@
    its chapter title alone (rules.mjs titleForms), so a title target links it by its short title.
    ─────────────────────────────────────────────────────────────────── */
 import { unitKey, norm } from './corpus.mjs';
-import { heldShare, recurring, nearCopy, titleForms } from './rules.mjs';
+import { heldShare, recurring, nearCopy, nearQuote, titleForms } from './rules.mjs';
 
 /**
  * @param {{ D: any[], B: any[], KJV: any }} corpus  buildDocs('nkjv'), blocks(), kjvVerses()
@@ -59,12 +59,17 @@ export function makeClasses({ D, B, KJV }) {
   const verseWords = verseNorm.map(([, t]) => t.trim().split(' '));
   const verseGrams = new Map();
   verseWords.forEach((w, i) => { for (let j = 0; j + 3 <= w.length; j++) { const g = w[j] + ' ' + w[j + 1] + ' ' + w[j + 2]; const a = verseGrams.get(g); if (!a) verseGrams.set(g, [i]); else if (a[a.length - 1] !== i) a.push(i); } });
+  /** verse index -> how many of the words' distinct 3-grams it holds */
+  const sharedGrams = (w) => {
+    const shared = new Map();
+    for (const g of new Set(w.slice(0, -2).map((x, j) => x + ' ' + w[j + 1] + ' ' + w[j + 2]))) for (const i of verseGrams.get(g) || []) shared.set(i, (shared.get(i) || 0) + 1);
+    return shared;
+  };
   const versesQuoted = (sentence) => {
     const n = named(norm(sentence));
     const out = new Set(verseNorm.filter(([, t]) => t.includes(n) || n.includes(t)).map(([k]) => k));
     const w = n.trim().split(' ');
-    const shared = new Map();
-    for (const g of new Set(w.slice(0, -2).map((x, j) => x + ' ' + w[j + 1] + ' ' + w[j + 2]))) for (const i of verseGrams.get(g) || []) shared.set(i, (shared.get(i) || 0) + 1);
+    const shared = sharedGrams(w);
     for (const [i, k] of shared) if (k >= 4 && (heldShare(w, verseWords[i]) >= 0.8 || heldShare(verseWords[i], w) >= 0.8)) out.add(verseNorm[i][0]);
     return [...out];
   };
@@ -96,6 +101,16 @@ export function makeClasses({ D, B, KJV }) {
     const rare = [...new Set(w)].filter((x) => wordUnits.has(x)).sort((a, b) => wordUnits.get(a).length - wordUnits.get(b).length).slice(0, 2);
     const out = new Set();
     for (const x of rare) for (const i of wordUnits.get(x)) if (!out.has(proseKeys[i]) && nearCopy(w, proseWords[i], stop, x)) out.add(proseKeys[i]);
+    return out;
+  };
+  /** NEAR QUOTE (rules.mjs, errata 2026-10-18): verses the sentence holds, or that hold it, with a word or two changed
+      ("given you" / "given to you", "shall find" / "will find"), among those sharing 4+ of its 3-grams. */
+  const versesNear = (sentence) => {
+    const w = named(norm(sentence)).trim().split(' ');
+    const stop = g.VotSearchData.STOP_WORDS_TRIMMED;
+    const rank = (x) => (wordUnits.get(x) || []).length;
+    const out = [];
+    for (const [i, k] of sharedGrams(w)) if (k >= 4 && nearQuote(w, verseWords[i], stop, rank)) out.push(verseNorm[i][0]);
     return out;
   };
   /* AN ANSWERS HEADING OVER ONE CITED EXCERPT (sr11, 2026-10-15). A topic labels a passage it reprints with a heading of
@@ -151,7 +166,11 @@ export function makeClasses({ D, B, KJV }) {
     } else {
       for (const k of holders(c.sentence)) members.add(k);
       for (const k of nearCopies(c.sentence)) if (!members.has(k)) { members.add(k); near.add(k); }
-      if (c.level === 'sentence') for (const k of versesQuoted(c.sentence)) for (const t of matthewTwin(k)) members.add(t);
+      if (c.level === 'sentence') {
+        for (const k of versesQuoted(c.sentence)) for (const t of matthewTwin(k)) members.add(t);
+        // ...and one it quotes with a word or two changed answers it too, as a near member (rules.mjs NEAR QUOTE)
+        for (const k of versesNear(c.sentence)) for (const t of matthewTwin(k)) if (!members.has(t)) { members.add(t); near.add(t); }
+      }
       // An Answers heading that cites a letter ("Excerpt from: Let All in the Earth Be Brought into...") has that letter as its original.
       const cited = /^excerpt from:\s*(.+)$/i.exec(c.sentence.trim());
       if (cited) for (const k of titleNorm[norm(cited[1])] || []) members.add(k);
@@ -168,6 +187,6 @@ export function makeClasses({ D, B, KJV }) {
     return { members, titled, sectioned, near, best: Math.min(...[...members].filter((k) => !sectioned.has(k) && !near.has(k)).map(TIER)), recurring: recurring(members, isVerseKey, isLetterKey) };
   }
 
-  return { unitBlocks, unitDoc, TIER, proseKeys, proseNorm, proseWords, wordUnits, holders, verseNorm, versesQuoted, titleNorm,
+  return { unitBlocks, unitDoc, TIER, proseKeys, proseNorm, proseWords, wordUnits, holders, verseNorm, versesQuoted, versesNear, titleNorm,
     matthewTwin, containers, nearCopies, sectionOf, isVerseKey, isLetterKey, classOf, CITE_LINE };
 }

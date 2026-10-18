@@ -15,7 +15,8 @@
         Matthew Study and plain Matthew c:v as
         one, a unit-level target's own unit and its same-titled reprints.
      3. It is the class's ORIGINAL: no member of a better tier exists (letters > Words To Live By and
-        The Blessed > Holy Days > studies > Answers; the verse itself for a verse).
+        The Blessed > Holy Days > studies > Answers; the verse itself for a verse). A query naming the target's
+        collection asks for that text itself: the target's own unit may lead (rules.mjs NAMED COLLECTION).
      4. Sentence targets: the landing the screen makes (use-search.js excerptAnchor: matchExcerpt over
         the card's terms, then excerpt-landing.js excerptLanding over the unit's blocks) is the block
         holding the sentence, and the excerpt overlaps the sentence. A verse lands on itself.
@@ -42,7 +43,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { docs as buildDocs, blocks as buildBlocks, engine, kjvVerses, unitKey, norm, ASSETS } from './search-bench/corpus.mjs';
-import { reprintShown, pairHolds } from './search-bench/rules.mjs';
+import { reprintShown, pairHolds, namesCollection } from './search-bench/rules.mjs';
 import { makeClasses } from './search-bench/classes.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -186,11 +187,14 @@ for (const c of cases) {
     const k = unitKey(f.hit.doc);
     const card = (d) => (d.title || d.ref || '') + '|' + String(d.text || '').slice(0, 80);
     const twin = (a, b) => matthewTwin(a).includes(b);
+    // NAMED COLLECTION (rules.mjs, errata 2026-10-18): the target's own unit leads a query naming its collection
+    const own = matthewTwin(c.uk).includes(k) || k === c.uk;
+    const named = own && namesCollection(norm(c.q), norm([((unitBlocks[c.uk] || [])[0] || {}).title, c.title, c.sentence].filter(Boolean).join(' ')), c.uk.slice(0, c.uk.indexOf('/')));
     if (!cls.members.has(k)) why = 'first hit is not the target (' + (f.hit.doc.ref || k) + ')';
-    else if (!cls.recurring && TIER(k) > cls.best) why = 'a reprint leads the original (' + (f.hit.doc.ref || k) + ')';
+    else if (!cls.recurring && !named && TIER(k) > cls.best) why = 'a reprint leads the original (' + (f.hit.doc.ref || k) + ')';
     // A heading's own text has no heading line: the heading is its title, on the card and atop the page (sr11, t405).
     else if (c.level === 'sentence' && !cls.titled.has(k) && !lands(f.hit, cardTerms(r), c, cls.sectioned.get(k))) why = 'lands off the sentence';
-    else if (!cls.recurring && !reprintShown(res.map((h) => ({ key: unitKey(h.doc), card: card(h.doc) })), cls.sectioned.has(k) || cls.near.has(k) ? cls.members : new Set([...cls.members].filter((x) => !cls.sectioned.has(x) && !cls.near.has(x))), k, twin)) why = 'its reprint is not in the Best Matches';
+    else if (!cls.recurring && !named && !reprintShown(res.map((h) => ({ key: unitKey(h.doc), card: card(h.doc) })), cls.sectioned.has(k) || cls.near.has(k) ? cls.members : new Set([...cls.members].filter((x) => !cls.sectioned.has(x) && !cls.near.has(x))), k, twin)) why = 'its reprint is not in the Best Matches';
     else { pass = true; strict = matthewTwin(c.uk).includes(k) || k === c.uk || (!!c.uk2 && (matthewTwin(c.uk2).includes(k) || k === c.uk2)); }
   }
   // the rank of the class's next text after the first hit (its reprint, when the original leads)

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { heldShare, recurring, reprintShown, nearCopy, titleForms, rangeHolds, pairHolds } from './rules.mjs';
+import { heldShare, recurring, reprintShown, nearCopy, nearQuote, namesCollection, titleForms, rangeHolds, pairHolds } from './rules.mjs';
 
 const w = (s) => s.split(' ');
 const entry = w('do not fear the days ahead for i am with you and i will keep you through the fire and the flood says the lord');
@@ -127,5 +127,41 @@ describe('rangeHolds / pairHolds (a Bible card; a merged Bible misquote passes o
   it('a single verse (no verse2) is just rangeHolds', () => {
     expect(pairHolds(card(3, null, 16), { chapter: 3, verse: 16 })).toBe(true);
     expect(pairHolds(card(3, null, 17), { chapter: 3, verse: 16 })).toBe(false);
+  });
+});
+
+describe('nearQuote (errata 2026-10-18, m246: a verse quoted with a word or two changed answers the sentence)', () => {
+  const stop = new Set(['the', 'and', 'of', 'is', 'be', 'it', 'will', 'shall', 'to', 'you', 'so', 'i', 'say', 'given']);
+  const rank = (x) => ({ knock: 1, seek: 2, opened: 3, ask: 4, find: 5 }[x] || 9);
+  const letter = w('it is written ask and it will be given you seek and you shall find knock and it will be opened to you');
+  it('a letter quoting the verse with two words changed holds it (the 80% 3-gram rule does not)', () => {
+    const matt = w('ask and it will be given to you seek and you will find knock and it will be opened to you');
+    expect(heldShare(matt, letter)).toBeLessThan(0.8);
+    expect(nearQuote(letter, matt, stop, rank)).toBe(true);
+  });
+  it('a longer parallel that holds the quoted sentence answers it too', () => {
+    const luke = w('so i say to you ask and it will be given to you seek and you will find knock and it will be opened to you');
+    expect(nearQuote(letter, luke, stop, rank)).toBe(true);
+  });
+  it('a verse sharing a few of its words is no quote', () => {
+    expect(nearQuote(letter, w('knock and it will be opened to you for everyone who asks receives'), stop, rank)).toBe(false);
+    expect(nearQuote(letter, w('seek the lord while he may be found call upon him while he is near'), stop, rank)).toBe(false);
+  });
+});
+
+describe('namesCollection (errata 2026-10-18, n344: a query naming the target collection asks for that text)', () => {
+  const n = (s) => ' ' + s + ' ';
+  it('the collection named beside the title', () => {
+    expect(namesCollection(n('capital punishment answers only god can give'), n('capital punishment'), 'answers')).toBe(true);
+    expect(namesCollection(n('mature faith words to live by'), n('mature faith'), 'wtlb1')).toBe(true);
+    expect(namesCollection(n('under god nation volume 7'), n('one nation under god'), 'v7')).toBe(true);
+  });
+  it('another collection name, or none, names nothing', () => {
+    expect(namesCollection(n('capital punishment volume two'), n('capital punishment'), 'answers')).toBe(false);
+    expect(namesCollection(n('capital punishment'), n('capital punishment'), 'answers')).toBe(false);
+  });
+  it('a name the title or the quoted sentence holds itself names nothing', () => {
+    expect(namesCollection(n('the blessed hope'), n('the blessed hope'), 'blessed')).toBe(false);
+    expect(namesCollection(n('i am the answers you seek'), n('i am the answers you seek'), 'answers')).toBe(false);
   });
 });
