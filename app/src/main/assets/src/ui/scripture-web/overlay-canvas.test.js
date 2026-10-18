@@ -15,7 +15,7 @@ import { footBundles, lensRange, labelFeed } from '../../utils/scripture-web/pic
 import { webFrame, webViewArgs, centreOf } from '../../utils/scripture-web/web-frame.js';
 import { citationsForVerse } from '../../utils/scripture-web/vot-citations.js';
 import { css } from '../../utils/scripture-web/sw-ink.js';
-import { paintCanonOverlay, hitOverlay, stackRows, citedVerses, DEEP_FULL } from './overlay-renderer.js';
+import { paintCanonOverlay, hitOverlay, stackRows, citedVerses, chipKeepers, DEEP_FULL } from './overlay-renderer.js';
 
 vi.setConfig({ testTimeout: 60000 });
 
@@ -375,5 +375,85 @@ describe('labelFeed: every drawn thread a reader can see on the frame', () => {
     const withFly = labelFeed(g, fs.cam, view, { flyovers: true });
     expect(withFly.length).toBeGreaterThanOrEqual(feed.length);
     for (const f of withFly) if (!f.fromOn && !f.toOn) expect(f.x0 < 0 && f.x1 > fs.v.W).toBe(true);
+  });
+});
+
+/* w3 review (major): from 4x to 40x the chip pass made a candidate for every foot on the frame
+   (about 17,000 threads at 6x) and sorted every 40 px bucket of them, to keep three a bucket:
+   panning at 6x cost 8.3 ms a frame against the spine's 0.6. The keepers are now chosen in one
+   pass with no sort, and nothing is made for a foot that cannot win. */
+describe('the chip pass chooses its keepers in one pass', () => {
+  /** The sort per bucket the pass replaced (the old cull), as the reference. */
+  function sortedKeepers(fs, memo, left, right, bucketW, keep) {
+    const view = { width: fs.v.W, base: fs.view.base, squash: fs.view.squash, density: 'famous', inset: fs.inset };
+    const c = fs.centre;
+    const by = new Map();
+    for (const f of labelFeed(g, fs.cam, view)) {
+      for (let side = 0; side < 2; side++) {
+        if (!(side ? f.toOn : f.fromOn)) continue;
+        const fx = side ? f.x1 : f.x0;
+        if (fx < left || fx > right) continue;
+        const near = side ? g.to[f.i] : g.from[f.i];
+        const cand = { key: f.i * 2 + side, tier: c && near >= c.x0 && near < c.x1 ? 1 : 2, score: g.votes[f.i], fx };
+        const k = Math.floor(fx / bucketW);
+        if (!by.has(k)) by.set(k, []);
+        by.get(k).push(cand);
+      }
+    }
+    const was = (p) => (memo.has(p.key) ? 0 : 1);
+    const out = [];
+    for (const l of by.values()) {
+      l.sort((p, q) => (p.tier - q.tier) || (was(p) - was(q)) || (q.score - p.score) || (p.key - q.key));
+      l.forEach((p, j) => { if (j < keep || !was(p)) out.push(p); });
+    }
+    return { out, view };
+  }
+
+  for (const [name, zoom] of [['pc', 6], ['phone', 6], ['pc', 40], ['phone', 300]]) {
+    it(name + ' ' + zoom + 'x: the same feet as a full sort of every bucket, with and without a memory', () => {
+      const fs = frameAt(name, zoom, ISA53_6);
+      const s = fs.v.DPR, every = (name === 'pc' ? 160 : 120) * s;
+      const left = 16 * s, right = fs.v.W - 16 * s;
+      const probe = sortedKeepers(fs, new Map(), left, right, every / 4, 3);
+      // a memory of every 7th foot the frame holds, whatever its rank
+      const memo = new Map();
+      for (const f of labelFeed(g, fs.cam, probe.view)) if (f.i % 7 === 0) memo.set(f.i * 2 + (f.fromOn ? 0 : 1), 0);
+      for (const m of [new Map(), memo]) {
+        const want = sortedKeepers(fs, m, left, right, every / 4, 3).out;
+        const got = chipKeepers(g, fs.cam, probe.view, { left, right, bucketW: every / 4, keep: 3, centre: fs.centre, memory: m });
+        const key = (p) => p.key + ':' + p.tier + ':' + p.score + ':' + p.fx;
+        expect(got.map(key).sort(), name + ' ' + zoom + 'x, memory of ' + m.size).toEqual(want.map(key).sort());
+        expect(got.length, 'keepers').toBeGreaterThan(10);
+        if (m.size) expect(got.length).toBeGreaterThan(probe.out.length);
+      }
+    });
+  }
+
+  it('panning at 6x: a frame costs about what one labelFeed walk does, not a sort of every foot', () => {
+    // a context that draws nothing, so the overlay's own work is what is timed
+    const nop = () => {};
+    const ctx = Object.assign(Object.create(null), { font: '10px serif', letterSpacing: '0px', globalAlpha: 1, canvas: null,
+      save: nop, restore: nop, clearRect: nop, fillText: nop, strokeText: nop, fillRect: nop, beginPath: nop, closePath: nop,
+      moveTo: nop, lineTo: nop, arc: nop, arcTo: nop, rect: nop, fill: nop, stroke: nop,
+      measureText(t) { return { width: String(t).length * 7 }; }, createLinearGradient() { return { addColorStop: nop }; } });
+    for (const name of ['pc', 'phone']) {
+      const ppv = geo.fitPPV({ total: g.total }, FRAMES[name].W) * 6;
+      const frames = [];
+      for (let k = 0; k < 40; k++) frames.push(frameAt(name, 6, ISA53_6 + (k * 3) / ppv));   // 3 device px a frame
+      const view = (fs) => ({ width: fs.v.W, base: fs.view.base, squash: fs.view.squash, density: 'famous', inset: fs.inset });
+      for (const fs of frames.slice(0, 8)) { paintCanonOverlay(ctx, fs); labelFeed(g, fs.cam, view(fs)); }
+      const tp = [], tf = [];
+      for (const fs of frames) {
+        let t0 = performance.now();
+        paintCanonOverlay(ctx, fs);
+        tp.push(performance.now() - t0);
+        t0 = performance.now();
+        labelFeed(g, fs.cam, view(fs));
+        tf.push(performance.now() - t0);
+      }
+      const med = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1];
+      // measured in node: the sorting pass 5.4 ms a frame against a 0.75 ms walk (7x); one pass about 1 ms (1.3x)
+      expect(med(tp), name + ': ' + med(tp).toFixed(2) + ' ms a frame against a ' + med(tf).toFixed(2) + ' ms walk').toBeLessThan(3.5 * med(tf));
+    }
   });
 });

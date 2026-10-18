@@ -38,7 +38,7 @@
 import {
   verseToX, xToVerse, arcShape, arcHeightAt, arcAnchored, footX, fitPPV, maxCamY, ALTITUDE_MARKS, spanAtHeight,
 } from '../../utils/scripture-web/geometry.js';
-import { refOfVerse, labelFeed } from '../../utils/scripture-web/pick.js';
+import { refOfVerse, labelFeed, eachLabelThread } from '../../utils/scripture-web/pick.js';
 import { fansOf, bucketDrawCount } from '../../utils/scripture-web/decode.js';
 import { distanceRampRGB } from '../../utils/scripture-web/palette.js';
 import { placeRailLabelsRanked } from '../../utils/scripture-web/rail-labels.js';
@@ -286,11 +286,18 @@ export function citedVerses(g) {
   return c;
 }
 
-/** @type {WeakMap<object, {chips: Map<any, number>, legs: Map<any, number>}>} */
+/**
+ * The label pass's memory per graph: the chips and leg labels placed last frame (hysteresis),
+ * and the chip keepers and the leg feed of the last camera, so a frame that did not move (a
+ * hover, a font) reuses them.
+ * @typedef {{ chips: Map<any, number>, legs: Map<any, number>,
+ *   chipCache: {key: string, recs: ChipFoot[]}|null, feedCache: {key: string, feed: any[]}|null }} LabelMemo
+ */
+/** @type {WeakMap<object, LabelMemo>} */
 const MEMO = new WeakMap();
 const memoOf = (g) => {
   let m = MEMO.get(g);
-  if (!m) { m = { chips: new Map(), legs: new Map() }; MEMO.set(g, m); }
+  if (!m) { m = { chips: new Map(), legs: new Map(), chipCache: null, feedCache: null }; MEMO.set(g, m); }
   return m;
 };
 
@@ -483,12 +490,10 @@ export function paintCanonOverlay(ctx, fs) {
   const chosen = drawChosen(ctx, g, cam, L, fs, grid, labelled);
   drawPills(ctx, g, cam, L, fs, grid, hits, badges);
   if (g.count > 0 && L.deepT >= 0.5) {
-    const legs = cam.ppv / L.s >= LEG_PPV_CSS;
-    const feed = labelFeed(g, cam, { width: L.W, base: view.base, squash: view.squash, density: fs.density, inset: L.inset }, { flyovers: legs });
     const memo = memoOf(g);
     const quiet = chosen ? 0.55 : 1;   // the chosen line reads first; the rest of the labels step back
-    memo.chips = drawChips(ctx, g, L, fs, feed, grid, memo.chips, labelled, quiet);
-    if (legs) memo.legs = drawLegs(ctx, g, L, fs, feed, grid, memo.legs, labelled, quiet);
+    memo.chips = drawChips(ctx, g, cam, L, fs, grid, memo, labelled, quiet);
+    if (cam.ppv / L.s >= LEG_PPV_CSS) memo.legs = drawLegs(ctx, g, L, fs, legFeed(g, cam, L, fs, memo), grid, memo.legs, labelled, quiet);
   }
   return { marks, altitudeSpan: altitude.span, elevator, labels: labelled.size, badges, hits };
 }
@@ -1160,59 +1165,115 @@ function drawPills(ctx, g, cam, L, fs, grid, hits, badges) {
 
 /* ── the labels over the baseline ──────────────────────────────────────── */
 
-/** Keep at most `keep` candidates per `bucketW` of foot x (and every one placed last frame). */
-function cull(all, memo, bucketW, keep) {
-  /** @type {Map<number, any[]>} */
-  const by = new Map();
-  for (const c of all) {
-    const k = Math.floor(c.fx / bucketW);
-    let l = by.get(k);
-    if (!l) by.set(k, (l = []));
-    l.push(c);
+/**
+ * A foot that may carry a chip: key = thread * 2 + side (0 the from-foot, 1 the to-foot);
+ * tier 1 in the centre chapter, else 2; score its thread's votes; fx its x, device px.
+ * @typedef {{ key:number, i:number, side:number, tier:number, score:number, fx:number, text?:string }} ChipFoot
+ */
+
+/** @type {WeakMap<object, Uint8Array>} the feet placed last frame, marked by key (set and cleared per pass) */
+const MARKS = new WeakMap();
+
+/**
+ * The chips' candidates for one frame: in each `bucketW` of foot x (from
+ * x 0), the best `keep` feet on [left, right] by tier, then placed last frame,
+ * then votes, then key; and every foot the memory placed last frame, whatever
+ * its rank, so its chip can stay where it was (hysteresis). One pass over
+ * labelFeed's walk (pick.eachLabelThread) with no sort and nothing made for a
+ * foot that cannot win: at 6x the frame holds some 17,000 threads and keeps a
+ * few dozen chips, and sorting every bucket made panning 8 ms a frame (w3
+ * review). Exported for the tests, which hold it to the sort it replaced.
+ * @param {any} g @param {any} cam
+ * @param {{width:number, base:number, squash:number, density:any, inset?:number}} view  labelFeed's
+ * @param {{ left:number, right:number, bucketW:number, keep:number,
+ *   centre?: {x0:number, x1:number}|null, memory?: Map<any, number>|null }} o
+ * @returns {ChipFoot[]}
+ */
+export function chipKeepers(g, cam, view, o) {
+  if (!g || !(g.count > 0) || !(o.bucketW > 0) || !(o.keep > 0)) return [];
+  const { left, right, bucketW, keep } = o;
+  const c0 = o.centre ? o.centre.x0 : 0, c1 = o.centre ? o.centre.x1 : 0;
+  let mark = MARKS.get(g);
+  if (!mark || mark.length !== 2 * g.count) { mark = new Uint8Array(2 * g.count); MARKS.set(g, mark); }
+  const memory = o.memory || null;
+  if (memory) for (const k of memory.keys()) if (k >= 0 && k < mark.length) mark[k] = 1;
+  const nb = Math.max(1, Math.floor(Math.max(0, right) / bucketW) + 1), size = nb * keep;
+  const bKey = new Int32Array(size).fill(-1), bTier = new Uint8Array(size), bWas = new Uint8Array(size);
+  const bScore = new Float64Array(size), bFx = new Float64Array(size);
+  const votes = g.votes, from = g.from, to = g.to;
+  /** @type {ChipFoot[]} */
+  const recs = [];
+  const take = (key, i, fx, near) => {
+    const tier = near >= c0 && near < c1 ? 1 : 2, was = mark[key] ? 0 : 1, score = votes ? votes[i] : 0;
+    if (!was) recs.push({ key, i, side: key & 1, tier, score, fx });
+    const b0 = Math.floor(fx / bucketW) * keep;
+    // > 0: this foot ranks under the one in slot q (an empty slot ranks under everything)
+    const under = (q) => bKey[q] >= 0 && ((tier - bTier[q]) || (was - bWas[q]) || (bScore[q] - score) || (key - bKey[q])) > 0;
+    if (under(b0 + keep - 1)) return;   // most feet: no better than the bucket's last keeper
+    let j = 0;
+    while (j < keep && under(b0 + j)) j++;
+    for (let q = b0 + keep - 1; q > b0 + j; q--) {
+      bKey[q] = bKey[q - 1]; bTier[q] = bTier[q - 1]; bWas[q] = bWas[q - 1]; bScore[q] = bScore[q - 1]; bFx[q] = bFx[q - 1];
+    }
+    const q = b0 + j;
+    bKey[q] = key; bTier[q] = tier; bWas[q] = was; bScore[q] = score; bFx[q] = fx;
+  };
+  eachLabelThread(g, cam, view, null, (i, x0, x1, _A, fromOn, toOn) => {
+    if (fromOn && x0 >= left && x0 <= right) take(i * 2, i, x0, from[i]);
+    if (toOn && x1 >= left && x1 <= right) take(i * 2 + 1, i, x1, to[i]);
+  });
+  if (memory) for (const k of memory.keys()) if (k >= 0 && k < mark.length) mark[k] = 0;
+  for (let q = 0; q < size; q++) {
+    const key = bKey[q];
+    if (key >= 0 && bWas[q]) recs.push({ key, i: key >> 1, side: key & 1, tier: bTier[q], score: bScore[q], fx: bFx[q] });
   }
-  const was = (c) => (memo && memo.has(c.key) ? 0 : 1);
-  const out = [];
-  for (const l of by.values()) {
-    l.sort((p, q) => (p.tier - q.tier) || (was(p) - was(q)) || (q.score - p.score) || (p.key - q.key));
-    for (let j = 0; j < l.length; j++) if (j < keep || !was(l[j])) out.push(l[j]);
-  }
-  return out;
+  return recs;
 }
 
 /**
  * The chips at the feet (spec §4.3): "Isa 53:5 · 1 Pet 2:24", the near foot
- * first, 12 px over the baseline, about one per 160 / 120 px. A candidate per
- * on-frame foot; the threads in the centre chapter rank first, then by votes;
- * a chip takes its foot's centre, else steps right or left of it; one per
- * thread. Returns the memory for the next frame.
+ * first, 12 px over the baseline, about one per 160 / 120 px. The candidates
+ * are chipKeepers' (cached by the camera and the layout); the threads in the
+ * centre chapter rank first, then by votes; a chip takes its foot's centre,
+ * else steps right or left of it; one per thread. Returns the memory for the
+ * next frame.
  */
-function drawChips(ctx, g, L, fs, feed, grid, memo, labelled, quiet) {
-  const { s, Wc, base, camY, sz, gutter } = L;
+function drawChips(ctx, g, cam, L, fs, grid, m, labelled, quiet) {
+  const memo = m.chips;
+  const { s, W, Wc, base, camY, sz, gutter, inset } = L;
   const font = canvasFont(sz.chip, s), fpx = fontPx(sz.chip, s);
   const h = fpx + 8 * s;
   const y1 = base + camY - 12 * s, y0 = y1 - h;
   if (y0 < L.skyTop || y1 > base) return memo;
   const every = sz.every * s;
-  const centre = fs.centre;
-  const all = [];
-  for (const f of feed) {
-    for (let side = 0; side < 2; side++) {
-      if (!(side ? f.toOn : f.fromOn)) continue;
-      const fx = side ? f.x1 : f.x0;
-      if (fx < gutter || fx > Wc - gutter) continue;
-      const near = side ? g.to[f.i] : g.from[f.i], far = side ? g.from[f.i] : g.to[f.i];
-      const inCentre = !!centre && near >= centre.x0 && near < centre.x1;
-      all.push({ key: f.i * 2 + side, i: f.i, tier: inCentre ? 1 : 2, score: g.votes ? g.votes[f.i] : 0, fx, near, far, text: '', slots: null });
-    }
-  }
-  const cands = cull(all, memo, every / 4, 3);
-  for (const c of cands) {
-    c.slots = () => {
-      c.text = shortRef(g, c.near) + ' · ' + shortRef(g, c.far);
-      const w = measure.width(ctx, font, c.text) + 20 * s;
-      return [c.fx - w / 2, c.fx - 12 * s, c.fx + 12 * s - w].map((x0) => ({ x0, x1: x0 + w, y0, y1 }));
+  const centre = fs.centre || null;
+  const view = fs.view;
+  // the same camera and layout as last frame keep last frame's keepers: the memory the pass
+  // would read is last frame's placement, which was chosen from them, so none of it is lost
+  const key = [cam.x, cam.ppv, camY, fs.density, W, Wc, gutter, every, view.base, view.squash, inset,
+    centre ? centre.x0 : -1, centre ? centre.x1 : -1].join('|');
+  if (!m.chipCache || m.chipCache.key !== key) {
+    m.chipCache = {
+      key,
+      recs: chipKeepers(g, cam, { width: W, base: view.base, squash: view.squash, density: fs.density, inset },
+        { left: gutter, right: Wc - gutter, bucketW: every / 4, keep: 3, centre, memory: memo }),
     };
   }
+  /** @type {any[]} */
+  const cands = m.chipCache.recs.map((r) => {
+    /** @type {any} */
+    const c = { key: r.key, i: r.i, tier: r.tier, score: r.score, text: '', slots: null };
+    c.slots = () => {
+      if (!r.text) {
+        const near = r.side ? g.to[r.i] : g.from[r.i], far = r.side ? g.from[r.i] : g.to[r.i];
+        r.text = shortRef(g, near) + ' · ' + shortRef(g, far);
+      }
+      c.text = r.text;
+      const w = measure.width(ctx, font, c.text) + 20 * s;
+      return [r.fx - w / 2, r.fx - 12 * s, r.fx + 12 * s - w].map((x0) => ({ x0, x1: x0 + w, y0, y1 }));
+    };
+    return c;
+  });
   const spacing = createGrid(256 * s);
   const room = (b) => { const cx = (b.x0 + b.x1) / 2; return { x0: cx - every / 2, x1: cx + every / 2, y0, y1 }; };
   const res = placeRanked(cands, memo,
@@ -1235,6 +1296,19 @@ function drawChips(ctx, g, L, fs, feed, grid, memo, labelled, quiet) {
   }
   ctx.restore();
   return res.memory;
+}
+
+/** The leg labels' feed (labelFeed with the fly-overs), kept while the camera and the frame stand still. */
+function legFeed(g, cam, L, fs, m) {
+  const view = fs.view;
+  const key = [cam.x, cam.ppv, L.camY, fs.density, L.W, view.base, view.squash, L.inset].join('|');
+  if (!m.feedCache || m.feedCache.key !== key) {
+    m.feedCache = {
+      key,
+      feed: labelFeed(g, cam, { width: L.W, base: view.base, squash: view.squash, density: fs.density, inset: L.inset }, { flyovers: true }),
+    };
+  }
+  return m.feedCache.feed;
 }
 
 /**
