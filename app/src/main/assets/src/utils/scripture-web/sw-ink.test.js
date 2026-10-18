@@ -1,0 +1,130 @@
+/* sw-ink: the one ink table the shader and Canvas2D both read (digest C6, the build spec §4).
+   The spec's numbers are pinned here by name, so a stream that retunes a colour does it in the
+   table and says so in its commit, and the GLSL and 2D sides cannot drift apart. */
+import { describe, it, expect } from 'vitest';
+import {
+  INK, ink, rgba01, css, inkWidth, inkGLSL,
+  TAP_CONTEXT, CENTRE_BRIGHT, CENTRE_WIDTH, FLYOVER_LEG_WIDTH, FONT,
+} from './sw-ink.js';
+
+/** WCAG 2 relative luminance of '#rrggbb'. */
+function luminance(hex) {
+  const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const [r, g, b] = [1, 3, 5].map((i) => lin(parseInt(hex.slice(i, i + 2), 16) / 255));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+const contrast = (a, b) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+describe('the ink table', () => {
+  it('every row is a #rrggbb hex, a straight alpha in (0, 1], and a positive width where it has one', () => {
+    const names = Object.keys(INK);
+    expect(names.length, 'PRECONDITION: the table is not empty').toBeGreaterThan(40);
+    for (const name of names) {
+      const e = INK[name];
+      expect(e.hex, name).toMatch(/^#[0-9A-F]{6}$/);
+      expect(e.alpha > 0 && e.alpha <= 1, name + ' alpha').toBe(true);
+      if (e.width != null) expect(e.width, name + ' width').toBeGreaterThan(0);
+      if (e.widthCompact != null) {
+        expect(e.width, name + ': a compact width needs the PC one').toBeGreaterThan(0);
+        expect(e.widthCompact, name + ' compact is never wider').toBeLessThanOrEqual(e.width);
+      }
+    }
+  });
+
+  it('is frozen, row by row, so nobody retunes it at runtime', () => {
+    expect(Object.isFrozen(INK)).toBe(true);
+    for (const name of Object.keys(INK)) expect(Object.isFrozen(INK[name]), name).toBe(true);
+  });
+
+  it('holds the spec §4.2 inks by name', () => {
+    expect(INK.canvas).toEqual({ hex: '#000000', alpha: 1 });
+    expect(INK.cited).toEqual({ hex: '#C4A469', alpha: 0.70 });
+    expect(INK.prophecy).toEqual({ hex: '#EADFC4', alpha: 0.80, width: 1.25 });
+    expect(INK.prophecyGlow).toEqual({ hex: '#EADFC4', alpha: 0.12, width: 4 });
+    expect(INK.chosen).toEqual({ hex: '#E6D3A3', alpha: 1, width: 3, widthCompact: 2.5 });
+    expect(INK.chosenHalo).toEqual({ hex: '#E6D3A3', alpha: 0.22, width: 10 });
+    expect(INK.hover).toEqual({ hex: '#E6D3A3', alpha: 1, width: 2 });
+    expect(INK.lit).toEqual({ hex: '#E6D3A3', alpha: 0.85, width: 1.5 });
+    expect(INK.roots).toEqual({ hex: '#C4A469', alpha: 0.25 });
+    expect(INK.myWebReader).toEqual({ hex: '#E0B25A', alpha: 0.95, width: 1.5 });
+    expect(INK.panel).toEqual({ hex: '#1C2527', alpha: 1 });
+    expect(INK.bookLabel.hex).toBe('#B7BFC1');
+    expect(INK.bookLabelMajor.hex).toBe('#E0E6E7');
+    expect(INK.gold.hex).toBe('#C4A469');
+    expect(INK.centreWash).toEqual({ hex: '#C4A469', alpha: 0.10 });
+  });
+
+  it("My Web's two families: Timothy's notes one cool family at the .30 plateau (C13, C14), the reader's links warm and at least 4.5:1 on the canvas", () => {
+    const timothy = ['myWebFootnote', 'myWebStudyNote', 'myWebWtlb', 'myWebStudy'];
+    for (const name of timothy) {
+      expect(INK[name].alpha, name).toBe(0.30);
+      const [r, , b] = rgba01(name);
+      expect(b, name + ' is cool: blue over red').toBeGreaterThan(r);
+    }
+    const [r, , b] = rgba01('myWebReader');
+    expect(r, 'the reader is warm: red over blue').toBeGreaterThan(b);
+    expect(contrast(INK.myWebReader.hex, INK.canvas.hex)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('the panel and every chrome fill are night slate, never cream (#18, Q4)', () => {
+    for (const name of ['panel', 'controlFill', 'activeFill', 'gotoFill', 'chipFill', 'pillFill']) {
+      expect(luminance(INK[name].hex), name).toBeLessThan(0.05);
+    }
+    expect(INK.panel.alpha, 'the panel is opaque').toBe(1);
+  });
+
+  it('a tapped line makes the rest RECEDE, never vanish (C3, dead end 3): TAP_CONTEXT is about .30', () => {
+    expect(TAP_CONTEXT).toBe(0.30);
+    expect(TAP_CONTEXT).toBeGreaterThan(0.05);   // today's near-black isolation is what it replaces
+    expect(TAP_CONTEXT).toBeLessThan(1);
+    expect(CENTRE_BRIGHT).toBe(1.35);
+    expect(CENTRE_WIDTH).toBe(1.25);
+    expect(FLYOVER_LEG_WIDTH).toBe(0.7);
+    expect(FONT).toMatch(/^'EB Garamond'/);
+  });
+});
+
+describe('the helpers', () => {
+  it('ink() returns a row and throws on a name the table does not have, so a typo is loud', () => {
+    expect(ink('gold')).toBe(INK.gold);
+    expect(() => ink('golden')).toThrow(/no ink named golden/);
+    expect(() => ink('toString')).toThrow(/no ink named/);
+  });
+
+  it('rgba01 gives straight-alpha floats for GLSL, scaled and clamped', () => {
+    expect(rgba01('panel')).toEqual([28 / 255, 37 / 255, 39 / 255, 1]);
+    expect(rgba01('cited')).toEqual([196 / 255, 164 / 255, 105 / 255, 0.70]);
+    expect(rgba01('lit', TAP_CONTEXT)[3]).toBeCloseTo(0.85 * 0.30, 10);
+    expect(rgba01('gold', 3)[3]).toBe(1);
+    expect(rgba01('gold', -1)[3]).toBe(0);
+  });
+
+  it('css gives an rgba() string for Canvas2D with the same numbers', () => {
+    expect(css('cited')).toBe('rgba(196,164,105,0.7)');
+    expect(css('panel')).toBe('rgba(28,37,39,1)');
+    expect(css('chipFill')).toBe('rgba(28,37,39,0.92)');
+    expect(css('scrim')).toBe('rgba(0,0,0,0.65)');
+    expect(css('chosenHalo', 0.5)).toBe('rgba(230,211,163,0.11)');
+    // the two sides agree: the 2D string is the GLSL floats, x255
+    const [r, g, b, a] = rgba01('prophecy');
+    expect(css('prophecy')).toBe(`rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${a})`);
+  });
+
+  it('inkWidth picks the compact width on a phone, the PC one otherwise, 0 for an ink with none', () => {
+    expect(inkWidth('chosen')).toBe(3);
+    expect(inkWidth('chosen', true)).toBe(2.5);
+    expect(inkWidth('prophecy', true)).toBe(1.25);
+    expect(inkWidth('cited')).toBe(0);
+  });
+
+  it('inkGLSL is a vec4 whose every component carries a fraction (the shader-hygiene law)', () => {
+    const src = inkGLSL('canvas');
+    expect(src).toBe('vec4(0.0, 0.0, 0.0, 1.0)');
+    const prophecy = inkGLSL('prophecy');
+    expect(prophecy).toMatch(/^vec4\(([0-9]+\.[0-9]+, ){3}[0-9]+\.[0-9]+\)$/);
+    expect(prophecy.endsWith('0.8)')).toBe(true);
+  });
+});

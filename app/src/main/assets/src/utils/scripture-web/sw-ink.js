@@ -1,0 +1,189 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   scripture-web/sw-ink — THE ink table. Cluster F (bundle-d)
+   ═══════════════════════════════════════════════════════════════════════
+
+   Every colour the Scripture Web paints outside the distance ramp, in one
+   table that feeds the shader (rgba01, inkGLSL) and Canvas2D / inline style
+   (css) alike, so a retune moves both at once (digest C6; the build spec,
+   D:/Swarm/lanes/sweb/out/w2/mockups/README.md §4). The spec's numbers win
+   over the mockup pictures; this table is those numbers.
+
+   What is NOT here:
+   - the ordinary threads: palette.js DISTANCE_RAMP, by span only, unchanged
+     (C7; spec §4.2 "Ordinary threads");
+   - geometry (tick heights, pill radii, gutters): the stream that draws a
+     thing owns its geometry; the comment on each row repeats the spec's
+     size so it is not hunted for.
+
+   Units: `alpha` is straight (not premultiplied) 0..1; `width` is CSS px on
+   PC and `widthCompact` the phone / `.sw-compact` value where the spec gives
+   one (inkWidth picks). Multiply by the view's DPR at the draw.
+
+   The CSS side (app.css's `.sw` panel and chrome block, v2's copy) cannot
+   import this file; the panel stream writes the same hexes there and a test
+   holds the two together. A colour the spec does not name is added here
+   first, then used. */
+
+import { glslFloat } from './geometry.js';
+
+/** @typedef {{ hex: string, alpha: number, width?: number, widthCompact?: number }} Ink */
+
+/** @type {Record<string, Ink>} */
+const TABLE = {
+  // ── the canvas and the ruler (§4.2) ─────────────────────────────────────
+  canvas: { hex: '#000000', alpha: 1 },                          // Q4: always night
+  baseline: { hex: '#6B7577', alpha: 1, width: 1 },
+  chapterBar: { hex: '#6B7577', alpha: 0.8 },                    // chapter-length bars, +12..+42 / +9..+25
+  bookLabel: { hex: '#B7BFC1', alpha: 1 },                       // 13 / 11.5 px caps, tracked .10em
+  bookLabelMajor: { hex: '#E0E6E7', alpha: 1 },                  // GEN, PSALMS, ISAIAH, MATT, JOHN, REV, the bigger books
+  labelRule: { hex: '#2C3537', alpha: 1, width: 1 },             // label cell separators, 14 px tall
+
+  // ── the Volumes in the flagship view (Q1 a: always on) ──────────────────
+  cited: { hex: '#C4A469', alpha: 0.70 },                        // cited-in-the-Volumes ticks: 1 DEVICE px wide (min), 5 / 4 px tall, baseline +4..+9
+  prophecy: { hex: '#EADFC4', alpha: 0.80, width: 1.25 },        // prophecy thread core, never under 1 device px; top pass, every density
+  prophecyGlow: { hex: '#EADFC4', alpha: 0.12, width: 4 },
+
+  // ── the chosen, hovered and lit lines: the top pass (C1, C3) ────────────
+  chosen: { hex: '#E6D3A3', alpha: 1, width: 3, widthCompact: 2.5 },   // adaptive tessellation, no facets
+  chosenHalo: { hex: '#E6D3A3', alpha: 0.22, width: 10 },
+  chosenFoot: { hex: '#E6D3A3', alpha: 1, width: 8 },            // the foot dot's diameter
+  chosenFootRing: { hex: '#000000', alpha: 1, width: 2 },
+  chosenLabel: { hex: '#E6D3A3', alpha: 1 },                     // 16 / 14 px, 10 px below the baseline
+  hover: { hex: '#E6D3A3', alpha: 1, width: 2 },                 // dims nothing (C3)
+  hoverHalo: { hex: '#E6D3A3', alpha: 0.22, width: 10 },
+  lit: { hex: '#E6D3A3', alpha: 0.85, width: 1.5 },              // focus.lit rows: go-to, verse mode, a chooser row under hover or focus
+
+  // ── deep zoom wayfinding (§4.3) ─────────────────────────────────────────
+  chapterNumeral: { hex: '#B7BFC1', alpha: 1 },                  // 28 / 20 px
+  chapterTick: { hex: '#5A6567', alpha: 1, width: 1 },           // 40 / 24 px tall
+  verseTick: { hex: '#6B7577', alpha: 1, width: 1 },             // 6 px tall, every 5th 12 px
+  verseNumeral: { hex: '#959DA0', alpha: 1 },                    // 13 / 11 px
+  citedDot: { hex: '#C4A469', alpha: 1, width: 4 },              // the dot's diameter, under a cited verse's tick
+  stickyBook: { hex: '#B7BFC1', alpha: 1 },                      // "‹ ISAIAH", 16 / 13 px caps, tracked .12em
+  chipText: { hex: '#E0E6E7', alpha: 1 },                        // label chips at thread feet, 14 / 12.5 px
+  chipFill: { hex: '#1C2527', alpha: 0.92 },
+  chipBorder: { hex: '#3A4547', alpha: 1, width: 1 },
+  pillText: { hex: '#B7BFC1', alpha: 1 },                        // "+n" pills, 12 / 11 px
+  pillFill: { hex: '#1C2527', alpha: 1 },
+  pillBorder: { hex: '#3A4547', alpha: 1, width: 1 },
+
+  // ── the centre chapter (§4.4, Q2: emphasis, nothing dims) ───────────────
+  centreWash: { hex: '#C4A469', alpha: 0.10 },                   // baseline to ruler bottom, no hard sides
+  centreEdge: { hex: '#C4A469', alpha: 0.60, width: 1 },         // the wash's top edge
+  centreNumeral: { hex: '#C4A469', alpha: 1 },
+
+  // ── roots (Q1 b, opt-in, waits on Corbin's look) and the Volumes rail ───
+  roots: { hex: '#C4A469', alpha: 0.25 },                        // additive S-curves, vertical tangents both ends
+  volumesRail: { hex: '#5A6567', alpha: 1, width: 1 },
+  volumesTick: { hex: '#6B7577', alpha: 1 },                     // letter ticks, 4 px
+  volumesLabel: { hex: '#B7BFC1', alpha: 1 },                    // 13 / 11 px caps
+  volumesOverline: { hex: '#A9A188', alpha: 1 },                 // "THE VOLUMES OF TRUTH", 14 / 12 px tracked .15em
+
+  // ── My Web (Q8; C13 two families, C14 the .30 plateau) ──────────────────
+  myWebFootnote: { hex: '#7FB3B0', alpha: 0.30 },                // Timothy's notes: one teal-silver family
+  myWebStudyNote: { hex: '#5E9C9A', alpha: 0.30 },
+  myWebWtlb: { hex: '#A3C4C1', alpha: 0.30 },
+  myWebStudy: { hex: '#6C8FA8', alpha: 0.30 },
+  myWebReader: { hex: '#E0B25A', alpha: 0.95, width: 1.5 },      // the reader's links: warm gold, >= 4.5:1 on the canvas
+
+  // ── chrome (§4.1), go-to (§4.5), the panel (§4.6) ───────────────────────
+  gold: { hex: '#C4A469', alpha: 1 },                            // the one gold: active text, verse refs, text links, Open
+  title: { hex: '#F5F5F3', alpha: 1 },                           // titles, the go-to input, excerpt letter titles
+  text: { hex: '#E9EEEF', alpha: 1 },                            // control text and icons, group headers, Follow
+  textBody: { hex: '#E0E6E7', alpha: 1 },                        // verse text, row refs, quotes
+  textMeta: { hex: '#B7BFC1', alpha: 1 },                        // meta lines, previews in the go-to rows
+  textMuted: { hex: '#959DA0', alpha: 1 },                       // counts, legend, credit, row previews, sources
+  overline: { hex: '#A9A188', alpha: 1 },                        // tracked caps overlines
+  controlFill: { hex: '#1C2527', alpha: 0.88 },                  // controls, round buttons, Back
+  controlBorder: { hex: '#3A4547', alpha: 1, width: 1 },
+  controlBorderHover: { hex: '#4A5658', alpha: 1, width: 1 },
+  activeFill: { hex: '#242D2F', alpha: 1 },                      // the active segment
+  activeBorder: { hex: '#C4A469', alpha: 0.70, width: 1 },       // the active segment; the go-to result chip
+  scrim: { hex: '#000000', alpha: 0.65 },                        // the top scrim's dark end (#000000A6), to transparent
+  gotoFill: { hex: '#242D2F', alpha: 0.96 },
+  gotoRow: { hex: '#2C3537', alpha: 1 },                         // the keyboard-selected suggestion
+  panel: { hex: '#1C2527', alpha: 1 },                           // opaque, pinned under .sw-root: never cream (#18)
+  panelEdge: { hex: '#3A4547', alpha: 1, width: 1 },
+  hairline: { hex: '#2C3537', alpha: 1, width: 1 },              // section rules in the panel
+  citeRule: { hex: '#C4A469', alpha: 0.60, width: 2 },           // CITED IN THE VOLUMES left rule
+};
+
+for (const k of Object.keys(TABLE)) Object.freeze(TABLE[k]);
+/** The table itself, frozen. Read it through ink() so a misspelt name throws. */
+export const INK = Object.freeze(TABLE);
+
+/** What the rest of the web keeps of its alpha while a line is tapped: it RECEDES, never to
+ * black (Corbin 08-10: other lines may disappear "only if it is tapped"; hover dims nothing).
+ * Replaces today's near-black isolation (.05) and the spec's x0.80; tunable. */
+export const TAP_CONTEXT = 0.30;
+/** The centre chapter's own arcs (a foot inside it), in their own ramp colours (§4.4). */
+export const CENTRE_BRIGHT = 1.35;
+export const CENTRE_WIDTH = 1.25;
+/** Q3 (ii): a thread with neither foot on screen draws at this share of its width, alpha unchanged. */
+export const FLYOVER_LEG_WIDTH = 0.7;
+/** The web's one face, canvas text included (Cinzel is retired from the web). */
+export const FONT = "'EB Garamond', Georgia, serif";
+
+/**
+ * One ink by name.
+ * @param {string} name
+ * @returns {Ink}
+ */
+export function ink(name) {
+  const entry = Object.prototype.hasOwnProperty.call(TABLE, name) ? TABLE[name] : null;
+  if (!entry) throw new Error('sw-ink: no ink named ' + String(name));
+  return entry;
+}
+
+/** '#rrggbb' -> [r, g, b] 0..255. */
+function rgb255(hex) {
+  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+}
+
+const clamp01 = (n) => (n < 0 ? 0 : n > 1 ? 1 : n);
+
+/**
+ * The ink as floats for a uniform or a GLSL constant: [r, g, b, a], each 0..1, straight alpha.
+ * @param {string} name
+ * @param {number} [alphaScale]  multiplies the table's alpha (a fade, TAP_CONTEXT), clamped
+ * @returns {[number, number, number, number]}
+ */
+export function rgba01(name, alphaScale) {
+  const e = ink(name);
+  const [r, g, b] = rgb255(e.hex);
+  return [r / 255, g / 255, b / 255, clamp01(e.alpha * (alphaScale == null ? 1 : alphaScale))];
+}
+
+/**
+ * The ink as a CSS colour for Canvas2D (fillStyle, strokeStyle) or an inline style.
+ * @param {string} name
+ * @param {number} [alphaScale]
+ * @returns {string}  'rgba(r,g,b,a)'
+ */
+export function css(name, alphaScale) {
+  const e = ink(name);
+  const a = clamp01(e.alpha * (alphaScale == null ? 1 : alphaScale));
+  return 'rgba(' + rgb255(e.hex).join(',') + ',' + String(Math.round(a * 1000) / 1000) + ')';
+}
+
+/**
+ * The ink's width, CSS px: the compact value on a phone (`.sw-compact`) where the spec gives one.
+ * 0 for an ink the spec gives no width.
+ * @param {string} name
+ * @param {boolean} [compact]
+ */
+export function inkWidth(name, compact) {
+  const e = ink(name);
+  if (compact && e.widthCompact != null) return e.widthCompact;
+  return e.width != null ? e.width : 0;
+}
+
+/**
+ * The ink as a GLSL ES 3.00 vec4 literal, every component through glslFloat
+ * (the shader-hygiene law: a bare `1` is an int and fails to compile).
+ * @param {string} name
+ * @returns {string}
+ */
+export function inkGLSL(name) {
+  return 'vec4(' + rgba01(name).map((c) => glslFloat(Math.round(c * 10000) / 10000)).join(', ') + ')';
+}

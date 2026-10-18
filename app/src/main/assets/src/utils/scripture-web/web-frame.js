@@ -67,14 +67,28 @@ export function webFrame(v, personal) {
 }
 
 /**
- * What the web renderer is told for one frame.
+ * What the web renderer is told for one frame (CONTRACTS.md §2). The focus
+ * (focus-state.js) goes over as the renderer's own fields, read fresh from
+ * focusRef every frame:
+ *   focusArc       the chosen OpenBible arc, -1 when none, or when the chosen
+ *                  thread is a prophecy pair (then focusProphecy names it) -
+ *                  so no reader of focusArc can index g.from with a
+ *                  prophecy index
+ *   focusProphecy  the chosen prophecy pair's index in g.prophecy, or -1
+ *   focusRange, focusRange2  the lit verse range and its chosen group
+ *   hoverArc       the thread under a resting pointer, -1 (it dims nothing)
+ *   lit, litKey    the lit arc ids (Int32Array or null) and their key; a
+ *                  renderer uploads the set when litKey differs from the
+ *                  key it last uploaded
+ * The canon overlay reads the same object (paintCanonOverlay's fs.view).
  * @param {View} v
  * @param {{ ppv: number, y: number, total: number, x: number }} cam
  * @param {Frame} f  webFrame(v, …)
  * @param {import('./decode.js').Density} density
- * @param {{ arc: number, range: any, range2?: [number, number] | null }} focus
+ * @param {Partial<import('./focus-state.js').Focus>} focus  focusRef.current
  */
 export function webViewArgs(v, cam, f, density, focus) {
+  const prophecy = !!focus.prophecy && focus.arc >= 0;
   return {
     width: v.W, height: v.H, base: f.base, ceil: f.ceil,
     squash: squashFactor(f.ceil, v.W),
@@ -83,9 +97,40 @@ export function webViewArgs(v, cam, f, density, focus) {
     // below base and the picker reads the same off the camera
     camY: cam.y > 0 ? cam.y : 0,
     density, rulerDepth: f.ruler,
-    focusArc: focus.arc, focusRange: focus.range,
+    focusArc: prophecy ? -1 : focus.arc, focusRange: focus.range,
     focusRange2: focus.range2 || null,
+    focusProphecy: prophecy ? focus.arc : -1,
+    hoverArc: focus.hover == null ? -1 : focus.hover,
+    lit: focus.lit || null, litKey: focus.lit ? focus.litKey || '' : '',
   };
+}
+
+/**
+ * @typedef {{ chapterIndex: number, book: number, chapter: number, x0: number, x1: number, t: number }} CentreChapter
+ *   chapterIndex  into g.chapters; book: into g.books; chapter: its number (1-based)
+ *   x0, x1        its canon x range, half-open: verse v spans [v, v + 1), so x0 is
+ *                 its first verse id and x1 one past its last (verseToX maps both)
+ *   t             the emphasis ease, 0..1: the GL draws the chapter's own arcs
+ *                 at mix(1, CENTRE_BRIGHT, t) and the overlay the wash at t
+ */
+
+/**
+ * The centre chapter (the Q2 lens replacement, spec §4.4) for one frame, or
+ * null below the zoom where it applies. GL-owned: today it is the lens's
+ * chapter (pick.lensRange, from 6x) with the lens's own log-zoom ease
+ * (6x -> 24x); the GL stream adds the 15 % hysteresis and the canvas-area
+ * centre. The overlay paints the band from it and dims nothing.
+ * @param {any} g  the decoded graph
+ * @param {[number, number] | null} lens  pick.lensRange(): the chapter's inclusive verse range
+ * @param {number} zoom  as a multiple of fit
+ * @returns {CentreChapter | null}
+ */
+export function centreOf(g, lens, zoom) {
+  if (!g || !g.chapters || !g.chapterOfVerse || !lens || !(lens[0] <= lens[1])) return null;
+  const chapterIndex = g.chapterOfVerse[lens[0]];
+  const ch = g.chapters[chapterIndex];
+  if (!ch) return null;
+  return { chapterIndex, book: ch[0], chapter: ch[1], x0: ch[2], x1: ch[2] + ch[3], t: localizeFactor(zoom) };
 }
 
 /**

@@ -34,11 +34,53 @@ import { drawPersonalWeb, railFrame, segmentSpan } from './rail-renderer.js';
  * @property {number} inset      where the sky starts under the top chrome, device px (0: hidden)
  * @property {any} yFrame        the camera's y frame (yFrameFor), or null
  * @property {string} density
- * @property {number} focusArc   the chosen thread, or -1
+ * @property {number} focusArc   the chosen OpenBible thread, or -1 (view.focusArc: a chosen prophecy
+ *                               pair is view.focusProphecy; the rest of the focus is on view too)
  * @property {any} bundles       the convergence pills' counts (bundlesFor)
  * @property {[number, number]|null} lens  the lit chapter's verse range, or null
  * @property {number} lensDim
+ * @property {import('../../utils/scripture-web/web-frame.js').CentreChapter|null} [centre]
+ *                               the centre chapter (web-frame.centreOf, GL-computed): the overlay
+ *                               paints its wash and gold numeral at centre.t and dims nothing
+ * @property {{right:number, bottom:number}} [panelInset]  CSS px the open panel covers at the
+ *                               right edge (docked) or the bottom (the sheet under 560 px); labels,
+ *                               chips and pills keep out of it
+ * @property {OverlayBox[]} [hits]  what the last paint made tappable; the draw copies
+ *                               paintCanonOverlay's result here so hitOverlay can read it
  */
+
+/**
+ * @typedef {{ kind: 'book', book: number }
+ *   | { kind: 'chapter', book: number, chapter: number }
+ *   | { kind: 'pill', ids: ArrayLike<number>, label: string }} OverlayHit
+ *   book: an index into g.books; chapter: its number (1-based); ids: the OpenBible
+ *   arc ids a "+n" pill counts, label: what the panel's group mode is titled
+ */
+/** @typedef {{ x0:number, y0:number, x1:number, y1:number, hit: OverlayHit }} OverlayBox  device px */
+
+/**
+ * What the overlay drew under a CSS-px point, for the tap path: the tap tries it
+ * after the elevator's track and before the badges and the threads, so a book
+ * name, a chapter numeral or a pill is never read as the line beneath it.
+ * The canvas stream records the boxes (paintCanonOverlay's `hits`) as it
+ * paints and owns this lookup; the navigation stream routes the result
+ * (goto.jsx routeOverlayHit). The box painted last is on top. Until a painter
+ * records one, this is always null: today's taps.
+ * @param {CanonFrame|null} fs  the last painted frame (useWebRenderer's overlayFrameRef)
+ * @param {number} xCss @param {number} yCss
+ * @returns {OverlayHit|null}
+ */
+export function hitOverlay(fs, xCss, yCss) {
+  const hits = fs && fs.hits;
+  if (!hits || !hits.length) return null;
+  const dpr = (fs.v && fs.v.DPR) || 1;
+  const px = xCss * dpr, py = yCss * dpr;
+  for (let i = hits.length - 1; i >= 0; i--) {
+    const b = hits[i];
+    if (px >= b.x0 && px <= b.x1 && py >= b.y0 && py <= b.y1) return b.hit;
+  }
+  return null;
+}
 
 /**
  * The canon web's overlay for one frame. One clear, then the ruler, the
@@ -51,7 +93,7 @@ import { drawPersonalWeb, railFrame, segmentSpan } from './rail-renderer.js';
  * "chrome too".
  * @param {CanvasRenderingContext2D|null} ctx
  * @param {CanonFrame} fs
- * @returns {{marks:number[], altitudeSpan:number, elevator:any, labels:number, badges:any[]}}
+ * @returns {{marks:number[], altitudeSpan:number, elevator:any, labels:number, badges:any[], hits:OverlayBox[]}}
  */
 export function paintCanonOverlay(ctx, fs) {
   const { g, cam, view, v, chrome, inset } = fs;
@@ -68,7 +110,10 @@ export function paintCanonOverlay(ctx, fs) {
   const elevator = drawElevator(ctx, cam, Object.assign({}, view, { inset, reserved, total: g.total }), v, chrome, fs.yFrame);
   const labels = drawThreadRefs(ctx, g, cam, Object.assign({}, view, { inset, reserved }), v, chrome, fs.density, fs.focusArc);
   const badges = drawBundleBadges(ctx, g, cam, Object.assign({}, view, { inset, reserved, lens: fs.lens, lensDim: fs.lensDim }), v, chrome, fs.bundles);
-  return { marks, altitudeSpan: altitude.span, elevator, labels, badges };
+  // the boxes a tap can land on (hitOverlay), device px; no painter records one yet
+  /** @type {OverlayBox[]} */
+  const hits = [];
+  return { marks, altitudeSpan: altitude.span, elevator, labels, badges, hits };
 }
 
 /**

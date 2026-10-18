@@ -17,7 +17,8 @@
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import { createCamera, clampCamera, fitPPV, ribbonStyle, lensShareAt } from '../../utils/scripture-web/geometry.js';
 import { countAnchored, footBundles, lensRange } from '../../utils/scripture-web/pick.js';
-import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
+import { maxZoomOf, centreOf } from '../../utils/scripture-web/web-frame.js';
+import { focusState } from '../../utils/scripture-web/focus-state.js';
 import { readChromeTokens } from '../../utils/scripture-web/palette.js';
 import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
 import { createRenderer } from './web-renderer.js';
@@ -120,13 +121,19 @@ export function useChromeTokens(theme, schedule) {
  * as refs and identity-stable callbacks (the cameras' hook, the frame loop,
  * the screen's own refs); what it returns is the no-WebGL state and its Try
  * again, the rail-zoom pills' state, and the boxes the tap test reads (the
- * elevator's track, the pills drawn last frame).
+ * elevator's track, the pills drawn last frame, the overlay's last frame and
+ * its tappable boxes for hitOverlay).
+ *
+ * Per frame it hands the renderer viewFor() (web-frame.webViewArgs: the
+ * focus, hover and lit set included) and the canon overlay a CanonFrame with
+ * the centre chapter (web-frame.centreOf) and the panel's inset
+ * (panelInsetRef) on it (CONTRACTS.md §2, §5).
  * @param {any} p
  */
 export function useWebRenderer({
   graph, mode, density, setLoadError, resumeRef, glRef, uiRef, wrapRef, topbarRef,
-  camRef, camVRef, viewRef, focusRef, viewFor, zoomCapFor, yFrameFor,
-  chromeRef, personalRef, hoverRef, railOpts, drawRef, schedule, capFractionNow,
+  camRef, camVRef, viewRef, focusRef, panelInsetRef, viewFor, zoomCapFor, yFrameFor,
+  chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow,
 }) {
   const [noWebGL, setNoWebGL] = React.useState(false);
   const [glRetry, setGlRetry] = React.useState(0);
@@ -142,6 +149,9 @@ export function useWebRenderer({
   // the elevator's track (device px box + the height its top stands for),
   // null when there is no sky to climb; the tap test reads it first
   const elevatorRef = React.useRef(null);
+  // the canon overlay's last painted frame, with the boxes it made tappable
+  // (fs.hits): hitOverlay reads it in the tap path; null on My Web
+  const overlayFrameRef = React.useRef(null);
 
   // ── the frame ───────────────────────────────────────────────────────────
   const draw = React.useCallback(() => {
@@ -176,6 +186,7 @@ export function useWebRenderer({
       // survive the switch, or liftAt eats every tap and drag in the right
       // 24 CSS px of the rails (the l9-14 refuter's one FAIL, 02:4x).
       elevatorRef.current = null;
+      overlayFrameRef.current = null;
       if (wrapRef.current) { wrapRef.current.setAttribute('data-elevator', ''); wrapRef.current.setAttribute('data-altitude', ''); wrapRef.current.setAttribute('data-altitude-span', ''); }
       // The personal web is Canvas2D over a cleared GL surface: hundreds of
       // links, not hundreds of thousands, so crisp 2D curves beat a second
@@ -184,6 +195,7 @@ export function useWebRenderer({
         camX: cam.x, ppv: cam.ppv, strokeWidth: 1, alpha: 0,
         density: 'essential', bg: chrome.bg,
         focusRange: null, focusArc: -1, hoverArc: -1, lens: null,
+        focusProphecy: -1, lit: null, litKey: '',
       }));
       const uic = uiRef.current;
       const ctx = uic && uic.getContext('2d');
@@ -194,7 +206,7 @@ export function useWebRenderer({
         paintMyWebOverlay(ctx, {
           personal: p, g, cam, view: base, v, chrome,
           rail: Object.assign(ro, {
-            hoverIndex: hoverRef.current, focusIndex: focusRef.current.arc, capFraction: capFractionNow(),
+            hoverIndex: focusRef.current.hover, focusIndex: focusRef.current.arc, capFraction: capFractionNow(),
             // the walk's knob for the corridor pair (e2e-myweb-colour arm K): a
             // number here overrides the context's depth alpha ceiling; unset in the app
             contextCeiling: typeof globalThis.__swContextCeiling === 'number' ? globalThis.__swContextCeiling : undefined,
@@ -230,8 +242,7 @@ export function useWebRenderer({
       voteMix: style.voteMix,
       dpr: v.DPR,
       density, bg: chrome.bg,
-      focusRange: focusRef.current.range, focusArc: focusRef.current.arc,
-      hoverArc: hoverRef.current,
+      // the focus, hover and lit set ride `base` (viewFor: webViewArgs)
     }));
     // the sky the labels may use starts under the top chrome (layout metrics,
     // so the rotated portrait root measures the same; 0 when the chrome is hidden)
@@ -240,10 +251,17 @@ export function useWebRenderer({
     // the overlay (overlay-renderer.js): one clear, the ruler, the sky's
     // altitude ruler and elevator, the references beside the lines, the pills
     const uic = uiRef.current;
-    const painted = paintCanonOverlay(uic ? uic.getContext('2d') : null, {
+    const fs = {
       g, cam, view: base, v, chrome, canvasH: uic ? uic.height : 0, inset, yFrame: yFrameFor(cam),
-      density, focusArc: focusRef.current.arc, bundles, lens, lensDim,
-    });
+      density, focusArc: base.focusArc, bundles, lens, lensDim,
+      // the centre chapter (GL computes it; the overlay paints its band) and
+      // what the open panel covers (the panel writes it; labels keep out)
+      centre: centreOf(g, lens, zoom), panelInset: panelInsetRef.current,
+      hits: /** @type {any[]} */ ([]),
+    };
+    const painted = paintCanonOverlay(uic ? uic.getContext('2d') : null, fs);
+    fs.hits = painted.hits;
+    overlayFrameRef.current = fs;
     elevatorRef.current = painted.elevator;
     badgeBoxesRef.current = painted.badges;
     if (wrapRef.current) {
@@ -256,7 +274,7 @@ export function useWebRenderer({
     // the walk's window on the badges (device px boxes), like __swContextCeiling: unset in the app
     if (typeof globalThis.__swWalk !== 'undefined') globalThis.__swBadgeBoxes = badgeBoxesRef.current;
   }, [graph, camRef, viewRef, mode, zoomCapFor, camVRef, viewFor, density, focusRef, yFrameFor, railOpts, capFractionNow,
-    chromeRef, hoverRef, personalRef, topbarRef, uiRef, wrapRef]);
+    chromeRef, personalRef, topbarRef, uiRef, wrapRef, panelInsetRef]);
 
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule, drawRef]);
 
@@ -306,7 +324,8 @@ export function useWebRenderer({
       const back = resumeRef.current;
       if (back && back.cam && back.cam.total === graph.total) {
         camRef.current = Object.assign({}, back.cam);
-        focusRef.current = Object.assign({}, back.focus);
+        // the place comes back, the pointer's hover does not
+        focusRef.current = focusState(Object.assign({}, back.focus, { hover: -1 }));
       } else {
         camRef.current = createCamera(graph.total);
       }
@@ -350,5 +369,5 @@ export function useWebRenderer({
 
   // the no-WebGL list's Try again: a fresh renderer on a fresh root
   const retryGL = React.useCallback(() => { setNoWebGL(false); setGlRetry((n) => n + 1); }, []);
-  return { noWebGL, glRetry, retryGL, railZoom, elevatorRef, badgeBoxesRef };
+  return { noWebGL, glRetry, retryGL, railZoom, elevatorRef, badgeBoxesRef, overlayFrameRef };
 }

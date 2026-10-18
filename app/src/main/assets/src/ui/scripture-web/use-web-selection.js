@@ -9,27 +9,80 @@
    lines, a chapter or a verse), what a hit is in the panels' terms
    (describe.js), and the handlers the gestures call through handlersRef
    (hover, tap, doubleTap); the cards' one close, Follow, and a bundle's
-   group. The hover index and the focused thread are per-frame refs the
-   draw reads; the boxes it drew last frame come back in elevatorRef and
-   badgeBoxesRef (use-web-renderer.js). */
+   group. The focus (focus-state.js: the chosen thread, the hover, the lit
+   set) is the per-frame ref the draw reads; the boxes it drew last frame
+   come back in elevatorRef, badgeBoxesRef and overlayFrameRef
+   (use-web-renderer.js).
 
-import { clampCamera, zoomAbout } from '../../utils/scripture-web/geometry.js';
+   The panel API every stream opens the panel through (CONTRACTS.md section 6):
+     openPanel(spec)   spec is a PanelSpec (below); returns whether it opened
+     closePanel()      the one close (closeCards)
+     panel             { spec, info } | null: what is open, in the panel's terms
+     lightThreads(ids) the lit set (focus.lit): the one writer of it
+   The journey (use-journey.js) rides through here to the panel; Follow
+   pushes onto it and moves the camera with flyTo (use-web-camera.js). */
+
+import { zoomAbout } from '../../utils/scripture-web/geometry.js';
 import { pickArcs, pickChapter, pickVerse, chapterRange, nearbyChapter, nearbyThreads } from '../../utils/scripture-web/pick.js';
 import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
+import { focusState, withLit } from '../../utils/scripture-web/focus-state.js';
 import {
   describeFound, summaryOf, chooserAnnouncement, followAnnouncement, groupAnnouncement,
 } from '../../utils/scripture-web/describe.js';
 import { pickPersonalLinks, pickUnderlayLinks } from './rail-renderer.js';
+import { hitOverlay } from './overlay-renderer.js';
+import { routeOverlayHit } from './goto.jsx';
+
+/**
+ * What the panel is asked to show (CONTRACTS.md section 6). `arc` is an OpenBible arc id unless
+ * `prophecy` (then an index into g.prophecy); `verse` is a graph verse id; `chapter` an index into
+ * g.chapters; `letterKey` is vot-citations' key for a letter (its collection and id).
+ * @typedef {{ mode: 'connection', arc: number, prophecy?: boolean }
+ *   | { mode: 'verse', verse: number }
+ *   | { mode: 'group', ids: ArrayLike<number>, label: string, chapter?: number }
+ *   | { mode: 'letter', letterKey: string }} PanelSpec
+ */
+/**
+ * What is open: the spec in the panel's terms and the described payload today's cards render
+ * (describe.js describeFound, or for the chooser its described rows). A My Web card is a
+ * connection spec with `myWeb` naming the rail list ('link' | 'underlay') `arc` indexes.
+ * @typedef {{ spec: PanelSpec & { myWeb?: string }, info: any }} PanelState
+ */
+
+/**
+ * The open card in the panel's terms. Pure, so the mapping is pinned without a mount.
+ * @param {any} detail  the open sheet's described payload, or null
+ * @param {any[] | null} choices  the chooser's described rows, or null
+ * @returns {PanelState | null}
+ */
+export function panelOf(detail, choices) {
+  if (detail) {
+    const k = detail.kind;
+    if (k === 'arc') return { spec: { mode: 'connection', arc: detail.index }, info: detail };
+    if (k === 'verse') return { spec: { mode: 'verse', verse: detail.verse }, info: detail };
+    if (k === 'chapter') {
+      return { spec: { mode: 'group', ids: [], label: detail.book ? detail.book.title + ' ' + detail.chapter : '', chapter: detail.chapterIndex }, info: detail };
+    }
+    if (k === 'bundle') return { spec: { mode: 'group', ids: [], label: detail.label || '' }, info: detail };
+    if (k === 'link' || k === 'underlay') return { spec: { mode: 'connection', arc: detail.index, myWeb: k }, info: detail };
+    return null;
+  }
+  if (choices && choices.length) {
+    return { spec: { mode: 'group', ids: choices.map((c) => c.index), label: '' }, info: choices };
+  }
+  return null;
+}
 
 /**
  * @param {any} p  the graph, mode, density and showUnderlay; the resume point
- *   (the sheet that was open); the cameras' refs and callbacks
- *   (use-web-camera.js); My Web's personalRef and railOpts; the per-frame
- *   hoverRef and the boxes the draw wrote; the frame loop; the live region
+ *   (the sheet that was open); the cameras' refs and callbacks and flyTo
+ *   (use-web-camera.js); My Web's personalRef and railOpts; the boxes the
+ *   draw wrote (elevatorRef, badgeBoxesRef, overlayFrameRef); the journey
+ *   (use-journey.js); the frame loop; the live region
  */
 export function useWebSelection({
-  graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, zoomCapFor, yFrameFor,
-  personalRef, railOpts, hoverRef, elevatorRef, badgeBoxesRef, schedule, setAnnounce,
+  graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, yFrameFor,
+  personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce,
 }) {
   const [detail, setDetail] = React.useState(() => (resumeRef.current && resumeRef.current.detail) || null);      // the open sheet
   const [choices, setChoices] = React.useState(null);    // overlapped line chooser
@@ -50,9 +103,9 @@ export function useWebSelection({
   const dropHover = React.useCallback(() => {
     if (hoverRafRef.current) { cancelAnimationFrame(hoverRafRef.current); hoverRafRef.current = 0; }
     hoverPointRef.current = null;
-    hoverRef.current = -1;
+    focusRef.current.hover = -1;
     if (tipOnRef.current) { tipOnRef.current = false; setTip(null); }
-  }, [hoverRef]);
+  }, [focusRef]);
 
   /**
    * The elevator's lift (landing 14): for a pointer going down on the track
@@ -159,18 +212,18 @@ export function useWebSelection({
       const x = camRef.current.x;
       found = Object.assign({}, found, { far: Math.abs(found.to - x) >= Math.abs(found.from - x) ? 'to' : 'from' });
     }
-    focusRef.current = found.kind === 'arc' || found.kind === 'link'
-      ? { arc: found.index, range: null }
-      : { arc: -1, range: found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi]
-        : found.kind === 'verse' ? [found.verse, found.verse] : null };
-    hoverRef.current = -1;
+    // a new choice: nothing hovered, nothing lit but what the choice lights
+    focusRef.current = focusState(found.kind === 'arc' || found.kind === 'link'
+      ? { arc: found.index }
+      : { range: found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi]
+        : found.kind === 'verse' ? [found.verse, found.verse] : null });
     setTip(null);
     setChoices(null);
     setListOpen(false);
     setDetail(found);
     setAnnounce(summaryOf(found));
     schedule();
-  }, [camRef, focusRef, schedule, hoverRef, setAnnounce]);
+  }, [camRef, focusRef, schedule, setAnnounce]);
 
   const hover = React.useCallback((cx, cy) => {
     hoverPointRef.current = { cx, cy };
@@ -181,7 +234,7 @@ export function useWebSelection({
       if (!point) return;
       const found = describe(hitAt(point.cx, point.cy));
       const nextHover = found && found.kind === 'arc' ? found.index : -1;
-      if (nextHover !== hoverRef.current) { hoverRef.current = nextHover; schedule(); }
+      if (nextHover !== focusRef.current.hover) { focusRef.current.hover = nextHover; schedule(); }
       setTip((previous) => {
         if (!found) return previous ? null : previous;
         if (previous && previous.info.kind === found.kind &&
@@ -192,22 +245,86 @@ export function useWebSelection({
         return { info: found, x: point.cx, y: point.cy };
       });
     });
-  }, [describe, hitAt, schedule, hoverRef]);
+  }, [describe, hitAt, schedule, focusRef]);
 
   React.useEffect(() => () => {
     if (hoverRafRef.current) cancelAnimationFrame(hoverRafRef.current);
   }, []);
+
+  /**
+   * Open the panel (CONTRACTS.md section 6). THE STUB MAPS EACH MODE ONTO TODAY'S CARDS, so it is
+   * behaviour-neutral: connection opens the connection sheet; verse the verse sheet; group the
+   * chooser's rows (its ids), or the chapter sheet when it names only a chapter; a letter and a
+   * prophecy connection have no card yet and open nothing. The panel stream replaces the body with
+   * the docked panel and keeps the signature.
+   * @param {PanelSpec} spec
+   * @returns {boolean} whether a panel opened
+   */
+  const openPanel = React.useCallback((spec) => {
+    const g = graph;
+    if (!g || !spec) return false;
+    const arcHit = (i) => ({ kind: 'arc', hit: { index: i, from: g.from[i], to: g.to[i], votes: g.votes[i] } });
+    if (spec.mode === 'connection') {
+      if (spec.prophecy || !(spec.arc >= 0 && spec.arc < g.count)) return false;
+      const info = describe(arcHit(spec.arc));
+      if (!info) return false;
+      commitFound(info);
+      return true;
+    }
+    if (spec.mode === 'verse') {
+      if (!(spec.verse >= 0 && spec.verse < g.total)) return false;
+      const info = describe({ kind: 'verse', verse: spec.verse });
+      if (!info) return false;
+      commitFound(info);
+      return true;
+    }
+    if (spec.mode === 'group') {
+      const ids = Array.from(spec.ids || []).filter((i) => i >= 0 && i < g.count);
+      if (ids.length) {
+        const rows = ids.map((i) => describe(arcHit(i))).filter(Boolean);
+        if (!rows.length) return false;
+        // the chooser's own open: nothing chosen while it asks, its rows replace the hover chip
+        focusRef.current = focusState();
+        dropHover();
+        setDetail(null); setListOpen(false); setChoices(rows);
+        setAnnounce(chooserAnnouncement(rows.length));
+        schedule();
+        return true;
+      }
+      if (spec.chapter >= 0 && spec.chapter < g.chapters.length) {
+        const info = describe({ kind: 'chapter', chapterIndex: spec.chapter });
+        if (!info) return false;
+        commitFound(info);
+        return true;
+      }
+      return false;
+    }
+    return false;
+  }, [graph, describe, commitFound, focusRef, dropHover, schedule, setAnnounce]);
+
+  /** Light a set of threads (focus.lit: the lit ink, the top pass), or none (null). The one writer
+   * of the lit set: go-to's verse, verse mode, a chooser row under hover or focus. Nothing draws it
+   * until the GL stream does; every new choice (commitFound, closeCards) clears it.
+   * @param {ArrayLike<number> | null} ids  OpenBible arc ids */
+  const lightThreads = React.useCallback((ids) => {
+    focusRef.current = withLit(focusRef.current, ids);
+    schedule();
+  }, [focusRef, schedule]);
 
   const tap = React.useCallback((cx, cy) => {
     // the elevator (landing 9): a tap on the track sets the camera's height -
     // the top of the track is the tallest apex, the bottom the baseline
     const lift = liftAt(cx, cy);
     if (lift) { lift(cy); schedule(); return; }
+    // then what the overlay drew there (a book name, a chapter numeral, a "+n"
+    // pill: overlay-renderer.js hitOverlay), before any line under it; the
+    // navigation stream routes it (goto.jsx). Nothing records boxes yet: null.
+    const overlayHit = hitOverlay(overlayFrameRef ? overlayFrameRef.current : null, cx, cy);
+    if (overlayHit && routeOverlayHit(overlayHit, { graph, flyTo, openPanel, journey })) return;
     const candidates = hitCandidatesAt(cx, cy);
     const described = candidates.map(describe).filter(Boolean);
     if (!described.length) {
-      focusRef.current = { arc: -1, range: null };
-      hoverRef.current = -1;
+      focusRef.current = focusState();
       setTip(null); setChoices(null); setDetail(null); setListOpen(false); schedule(); return;
     }
     const closeEnough = candidates.length > 1 && candidates[1].distance <= 8 * viewRef.current.DPR;
@@ -217,14 +334,15 @@ export function useWebSelection({
       setDetail(null);
       setListOpen(false);
       // nothing is chosen while the chooser asks, and its rows replace the hover chip
-      focusRef.current = { arc: -1, range: null };
+      focusRef.current = focusState();
       dropHover();
       setAnnounce(chooserAnnouncement(described.length));
       schedule();
       return;
     }
     commitFound(described[0]);
-  }, [liftAt, hitCandidatesAt, describe, viewRef, commitFound, schedule, focusRef, dropHover, hoverRef, setAnnounce]);
+  }, [liftAt, hitCandidatesAt, describe, viewRef, commitFound, schedule, focusRef, dropHover, setAnnounce,
+    overlayFrameRef, graph, flyTo, openPanel, journey]);
 
   const doubleTap = React.useCallback((cx) => {
     const cam = camRef.current, v = viewRef.current;
@@ -240,39 +358,47 @@ export function useWebSelection({
    * the shader held every other thread at 5 % ink until Escape or Back (sw1 B1, 2026-10-05). */
   const closeCards = React.useCallback(() => {
     setListOpen(false); setChoices(null); setDetail(null); setTip(null);
-    focusRef.current = { arc: -1, range: null };
-    hoverRef.current = -1;
+    focusRef.current = focusState();
     schedule();
-  }, [focusRef, schedule, hoverRef]);
+  }, [focusRef, schedule]);
 
   /** Follow the chosen line to its far foot: the camera centres on that
    * verse at the same zoom, the line stays spotlit, and the control turns
    * to the other end so the reader can walk it back (Corbin's brief,
    * 2026-09-11: "every line followable end to end"). */
   const followThread = React.useCallback((info) => {
-    const cam = camRef.current, v = viewRef.current;
-    if (!cam || !info || info.kind !== 'arc') return;
+    if (!camRef.current || !info || info.kind !== 'arc') return;
     const toFar = info.far === 'to';
-    cam.x = toFar ? info.to : info.from;
-    clampCamera(cam, v.W, zoomCapFor(cam), yFrameFor(cam) || undefined);
+    const verse = toFar ? info.to : info.from;
+    const end = toFar ? info.b : info.a;
+    // the journey records the arrival (the navigation stream's stack; a no-op today)
+    if (journey) journey.push({ verse, label: end.label });
+    // the camera goes there through flyTo: same zoom, clamped (instant today; the ease is nav's)
+    flyTo({ x: verse });
     setDetail(Object.assign({}, info, { far: toFar ? 'from' : 'to' }));
-    setAnnounce(followAnnouncement((toFar ? info.b : info.a).label));
+    setAnnounce(followAnnouncement(end.label));
     schedule();
-  }, [camRef, viewRef, zoomCapFor, yFrameFor, schedule, setAnnounce]);
+  }, [camRef, flyTo, journey, schedule, setAnnounce]);
 
   // A bundle's group, chosen in its sheet: the pair of ranges the shader and
   // the picker draw and spotlight (uFocusRange2). Choosing the
-  // same group again lets go of it.
+  // same group again lets go of it. The pointer's hover stays as it was.
   const chooseGroup = React.useCallback((info, grp) => {
     const same = focusRef.current.range2 && grp && focusRef.current.range2[0] === grp.lo && focusRef.current.range2[1] === grp.hi;
-    focusRef.current = { arc: -1, range: [info.lo, info.hi], range2: same || !grp ? null : [grp.lo, grp.hi] };
+    focusRef.current = focusState({
+      range: [info.lo, info.hi], range2: same || !grp ? null : [grp.lo, grp.hi], hover: focusRef.current.hover,
+    });
     setDetail(Object.assign({}, info, { chosenGroup: same || !grp ? null : grp.chapterIndex }));
     setAnnounce(groupAnnouncement(grp, same || !grp));
     schedule();
   }, [focusRef, schedule, setAnnounce]);
 
+  // what is open, in the panel's terms (panelOf); closePanel is the one close
+  const panel = React.useMemo(() => panelOf(detail, choices), [detail, choices]);
+
   return {
     tip, choices, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
     handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread, chooseGroup,
+    panel, openPanel, closePanel: closeCards, lightThreads, journey,
   };
 }

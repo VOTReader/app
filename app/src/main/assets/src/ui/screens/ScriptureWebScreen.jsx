@@ -22,18 +22,25 @@
    This file composes the screen; the pieces live beside it (F0, 2026-10-18):
      ui/scripture-web/use-frame-scheduler.js   the one rAF loop, the gesture ease, the revive
      ui/scripture-web/use-forced-landscape.js  landscape always, immersive, loc()
-     ui/scripture-web/use-web-camera.js        the cameras, the view, the focused thread
+     ui/scripture-web/use-web-camera.js        the cameras, the view, the focus, flyTo
      ui/scripture-web/use-web-renderer.js      the graph's load, the colours, the GL renderer
                                                and the frame's draw
      ui/scripture-web/overlay-renderer.js      the Canvas2D overlay's painters
      ui/scripture-web/use-personal-web.js      My Web's build and railOpts()
-     ui/scripture-web/use-web-selection.js     the hit test, the hover chip, the open cards
+     ui/scripture-web/use-web-selection.js     the hit test, the hover chip, the open cards,
+                                               the panel API (openPanel / closePanel)
      ui/scripture-web/use-web-keys.js          Escape, Back and the keys
+     ui/scripture-web/goto.jsx                 the go-to and its header slot; overlay taps
+     ui/scripture-web/use-journey.js           the Back trail through the web
      ui/scripture-web/gestures.js              pointer, wheel and pinch wiring
      ui/scripture-web/panels.jsx               the DOM panels
      utils/scripture-web/describe.js           every word the web says
+     utils/scripture-web/focus-state.js        the focus's one shape (chosen, hovered, lit)
+     utils/scripture-web/sw-ink.js             every ink the canvas draws
      utils/scripture-web/personal-build.js     My Web's inputs from the live stores
      utils/scripture-web/web-data.js           the graph asset's loader
+   The shared contracts the feature streams build on (the CONTRACTS.md the
+   spine wrote, D:/Swarm/lanes/sweb/out/w3) are named where they live.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { clampCamera, fitPPV, xToVerse, zoomAbout } from '../../utils/scripture-web/geometry.js';
@@ -46,6 +53,9 @@ import { useWebGraph, useChromeTokens, useWebRenderer } from '../scripture-web/u
 import { usePersonalWeb } from '../scripture-web/use-personal-web.js';
 import { useWebSelection } from '../scripture-web/use-web-selection.js';
 import { useWebKeys } from '../scripture-web/use-web-keys.js';
+import { useJourney } from '../scripture-web/use-journey.js';
+import { useGoTo } from '../scripture-web/goto.jsx';
+import { focusState } from '../../utils/scripture-web/focus-state.js';
 import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 /** @typedef {import('../../utils/scripture-web/decode.js').Density} Density */
 import { attachWebGestures } from '../scripture-web/gestures.js';
@@ -87,8 +97,14 @@ function readChromeHidden() {
  * @param {() => void} props.onBack
  * @param {{webDensity?:string, theme?:string, swEmptyDismissed?:boolean, swGuideSeen?:boolean}} props.settings
  * @param {(key:string, value:any) => void} props.updateSetting
+ * @param {{ verse: { bookId: string, chapter: number, verse: number } }
+ *   | { book: string, chapter?: number } | { letterKey: string }} [props.start]
+ *   where the web opens (additive; absent opens as it always has): at a verse
+ *   (the camera on it, the panel in verse mode), at a book or one of its
+ *   chapters, or on a letter's citations (vot-citations' key). A start wins
+ *   over the resume point. The go-to (goto.jsx) takes it; the stub ignores it.
  */
-export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSetting }) {
+export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSetting, start }) {
   // Taken once per mount (a ref survives StrictMode's second render; the module slot does not).
   const resumeRef = React.useRef(/** @type {any} */ (undefined));
   if (resumeRef.current === undefined) { resumeRef.current = resumeWeb; resumeWeb = null; }
@@ -144,18 +160,18 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
   // ── everything below here is per-frame state; deliberately NOT React ──
   const topbarRef = React.useRef(null);
-  // Hover is a LIGHT touch: it brightens the thread under the pointer and
-  // names it, but never dims the rest of the web. Only a tap focuses.
-  const hoverRef = React.useRef(-1);
   // frame() runs per draw and must stay identity-stable, so it reads the mode
   // from a ref rather than closing over the state value.
   const modeRef = React.useRef(mode);
-  // The cameras (canon + Volumes rail), the view, the focused thread and the
-  // frame maths that reads them (v15-code-health-06).
+  // The cameras (canon + Volumes rail), the view, the focus and the frame
+  // maths that reads them (v15-code-health-06); flyTo moves the camera to a
+  // place, and panelInsetRef is what the open panel covers. Hover (the focus's
+  // hover) is a LIGHT touch: it brightens the thread under the pointer and
+  // names it, but never dims the rest of the web. Only a tap focuses.
   const {
-    camRef, camVRef, lastRailRef, viewRef, focusRef,
-    frame, viewFor, zoomCapFor, yFrameFor, camFor,
-  } = useWebCamera({ graph, density, modeRef });
+    camRef, camVRef, lastRailRef, viewRef, focusRef, panelInsetRef,
+    frame, viewFor, zoomCapFor, yFrameFor, camFor, flyTo, cancelFly,
+  } = useWebCamera({ graph, density, modeRef, schedule });
   const theme = settings && settings.theme;
 
   // the canvas's colours, re-read when the theme flips (use-web-renderer.js)
@@ -195,23 +211,34 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   }, [updateSetting]);
 
   // the WebGL renderer, its lifecycle and the frame's draw (use-web-renderer.js):
-  // it writes the elevator's track and the pills' boxes the tap test reads
-  const { noWebGL, glRetry, retryGL, railZoom, elevatorRef, badgeBoxesRef } = useWebRenderer({
+  // it writes the elevator's track, the pills' boxes and the overlay's frame
+  // (with the targets it drew) that the tap test reads
+  const { noWebGL, glRetry, retryGL, railZoom, elevatorRef, badgeBoxesRef, overlayFrameRef } = useWebRenderer({
     graph, mode, density, setLoadError, resumeRef, glRef, uiRef, wrapRef, topbarRef,
-    camRef, camVRef, viewRef, focusRef, viewFor, zoomCapFor, yFrameFor,
-    chromeRef, personalRef, hoverRef, railOpts, drawRef, schedule, capFractionNow,
+    camRef, camVRef, viewRef, focusRef, panelInsetRef, viewFor, zoomCapFor, yFrameFor,
+    chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow,
   });
+
+  // where the reader has been (use-journey.js): the navigation stream pushes,
+  // the panel shows it and its Back
+  const journey = useJourney();
 
   // what the pointer is on and what is open (use-web-selection.js): the hover
   // chip, the chooser, Nearby and the sheet; the tap test and the handlers the
-  // gestures call; the cards' close, Follow and a bundle's group
+  // gestures call; the cards' close, Follow and a bundle's group; the panel
+  // API (openPanel, closePanel, panel) and the lit set (lightThreads)
   const {
     tip, choices, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
     handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread, chooseGroup,
+    openPanel, lightThreads,
   } = useWebSelection({
-    graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, zoomCapFor, yFrameFor,
-    personalRef, railOpts, hoverRef, elevatorRef, badgeBoxesRef, schedule, setAnnounce,
+    graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, yFrameFor,
+    personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce,
   });
+
+  // the go-to (goto.jsx): its header slot (goTo.button, first in the control
+  // row) and its box (goTo.box); both null until the navigation stream builds them
+  const goTo = useGoTo({ graph, flyTo, openPanel, journey, lightThreads, setAnnounce, start });
 
   // ── gestures — imperative, never React state per frame ──────────────────
   // Wiring itself lives in gestures.js (attachWebGestures) — a pure move, so
@@ -226,11 +253,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     return attachWebGestures(el, {
       loc, dpr: () => viewRef.current.DPR, cam: () => camRef.current, camFor,
       view: () => viewRef.current, handlers: () => handlersRef.current,
-      live: () => { live(); dropHover(); },
+      // a gesture takes the camera: the chip drops and a running fly stops
+      live: () => { live(); dropHover(); cancelFly(); },
       schedule, maxZoom: (c) => zoomCapFor(c || camRef.current), clampCamera, zoomAbout, xToVerse,
       yFrame: yFrameFor, lift: liftAt,
     });
-  }, [graph, noWebGL, glRetry, schedule, loc, camFor, zoomCapFor, live, dropHover, yFrameFor, liftAt, viewRef, camRef, handlersRef]);
+  }, [graph, noWebGL, glRetry, schedule, loc, camFor, zoomCapFor, live, dropHover, cancelFly, yFrameFor, liftAt, viewRef, camRef,
+    handlersRef]);
 
   /** Reset one rail's camera to fit (r2: each rail has its own). */
   const resetRail = React.useCallback((which) => {
@@ -253,10 +282,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     cam.y = 0;
     clampCamera(cam, v.W, maxZoomOf(graph, v));
     if (camVRef.current) resetRail('top');
-    focusRef.current = { arc: -1, range: null };
-    hoverRef.current = -1;
+    focusRef.current = focusState();
+    journey.clear();
     setDetail(null); setChoices(null); setListOpen(false); setTip(null); schedule();
-  }, [camRef, viewRef, graph, camVRef, resetRail, focusRef, schedule, setChoices, setDetail, setListOpen, setTip]);
+  }, [camRef, viewRef, graph, camVRef, resetRail, focusRef, journey, schedule, setChoices, setDetail, setListOpen, setTip]);
 
   const toggleChrome = React.useCallback(() => {
     const next = !chromeHidden;
@@ -272,8 +301,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
    * line in the other web, with nothing open for Escape or Back to close (sweep v5, 2026-10-14). */
   const switchMode = React.useCallback((next) => {
     closeCards();
+    journey.clear();
     setMode(next);
-  }, [closeCards]);
+  }, [closeCards, journey]);
 
   // Escape, Android Back and the web's own keys (use-web-keys.js): one layer
   // closes a press, then the keys pan, climb, zoom and reset
@@ -348,6 +378,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       </div>
 
       <div className="sw-controls">
+        {/* THE HEADER SLOT: the go-to's search button, first in the row (spec
+            section 4.1). goto.jsx owns it; null today, so nothing renders */}
+        {goTo.button}
         <div className="sw-seg" role="group" aria-label="Which web">
           <button type="button" className={'sw-seg-btn' + (mode === 'canonical' ? ' is-on' : '')}
             aria-pressed={mode === 'canonical'} onClick={() => switchMode('canonical')}>Scripture</button>
@@ -408,6 +441,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         onClick={() => (guideOpen ? closeGuide() : setGuideOpen(true))}
         aria-label="How to read this web" aria-expanded={guideOpen} aria-haspopup="dialog">?</button>
       {guideOpen && <HowToReadGuide onClose={closeGuide} />}
+      {goTo.box}
       {emptyShown && <EmptyWebNotice onDismiss={dismissEmpty} />}
       {tip && <TipChip info={tip} viewport={viewRef.current} />}
       {choices && <ConnectionChooser choices={choices} onChoose={commitFound} onClose={closeCards} />}
