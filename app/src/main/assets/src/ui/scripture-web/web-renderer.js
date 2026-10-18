@@ -41,7 +41,8 @@ export const DENSITY_STEPS = ['essential', 'famous'];
 const VERT = `#version 300 es
 precision highp float;
 uniform vec2  uRes;
-uniform float uCamX, uPPV, uBase, uSquash, uLocalize;
+uniform float uCamXHi, uCamXLo;  // the camera's x, split: hi = floor(x), lo = x - hi (float32 at the ceiling)
+uniform float uPPV, uBase, uSquash, uLocalize;
 uniform float uFlyLocalize;  // the fly-over leg's localize: the zoom's, let go as the camera rises (geometry.skyLocalize)
 uniform float uCamY;         // the picture's shift down the frame, device px
 uniform float uWidth, uAlpha, uTotal;
@@ -57,16 +58,21 @@ uniform float uInstanceBase; // gl_InstanceID offset of this draw range
 uniform float uDpr;          // device px per CSS px: the chosen line's floor width is set in CSS px
 in uint aFrom; in uint aTo; in float aVotes;
 in float aFanA; in float aFanB; // each foot's departure rank, -0.5..0.5
-out vec4 vCol; out float vEdge; out float vHalfW;
+// colour and half width are one per instance: flat, so nothing is interpolated
+flat out vec4 vCol; out float vEdge; flat out float vHalfW;
 ${arcShapeGLSL}
 ${flyOverGLSL}
 ${rampGLSL()}
 void main(){
   float a = float(aFrom), b = float(aTo);
   // each foot stands in its verse's own cell, in the order of its far end
-  // (geometry.footX; the picker computes the same)
-  float x0 = (a + .5 + aFanA - uCamX)*uPPV + uRes.x*.5;
-  float x1 = (b + .5 + aFanB - uCamX)*uPPV + uRes.x*.5;
+  // (geometry.footX; the picker computes the same). The camera's x comes
+  // split, because a verse id near 31,102 carries ~0.002 of float32 error
+  // and the ceiling's ~132 device px per verse turns that into ~0.26 px of
+  // jitter on every foot as the camera pans (digest 39): the whole verses
+  // subtract exactly, then the fractions are added.
+  float x0 = ((a - uCamXHi) + (.5 + aFanA - uCamXLo))*uPPV + uRes.x*.5;
+  float x1 = ((b - uCamXHi) + (.5 + aFanB - uCamXLo))*uPPV + uRes.x*.5;
   float rx = (x1 - x0)*.5;
   float left = x0, right = x0 + 2.*max(rx, 0.);
   // the structure law: the half-ellipse of its own span, at every zoom
@@ -77,7 +83,7 @@ void main(){
   // because a 440,000 px arc spending 47 of its 48 segments off screen is what
   // draws the visible piece as one straight chord. Clipping moves only WHERE
   // the samples land — never the curve they land on. geometry.visibleWindow.
-  float m = ${CLIP_MARGIN}.;
+  float m = ${glslFloat(CLIP_MARGIN)};
   float lo = mix(left,  max(left,  -m),         uLocalize);
   float hi = mix(right, min(right, uRes.x + m), uLocalize);
   hi = max(hi, lo);
@@ -98,7 +104,7 @@ void main(){
   // the same fly-over crossover the fade uses, so there is never a zoom where
   // an arc is faded under one law and styled under another.
   float strength = clamp(aVotes/70., .30, 1.);
-  float wScale = mix(1., mix(${STROKE_MIN_CSS / STROKE_DEEP_CSS}, 1., (strength - .30)/.70), uVoteMix);
+  float wScale = mix(1., mix(${glslFloat(STROKE_MIN_CSS / STROKE_DEEP_CSS)}, 1., (strength - .30)/.70), uVoteMix);
   float halfW = uWidth*.5*wScale;
   // Q3 (ii): once the reader is inside a passage a thread merely passing
   // overhead draws thinner, never fainter (geometry.flyOverWidth, inlined
@@ -119,7 +125,12 @@ void main(){
   // overview the stroke law gives ~0.9 px, and the reader lost the line they had just tapped
   // (sw1 B2, 2026-10-05). Drawing only; pick.js keeps its own hit width.
   halfW = max(halfW, max(spot*1.2, hovered*1.)*uDpr);
-  float hw = halfW + 1.0;                        // +1px feather skirt
+  // Thin-line hygiene: a ribbon under one device px wide aliases into dashes as it crosses
+  // the pixel grid. Hold the half width at 0.5 device px and pay for the
+  // extra width in alpha (thin), so a thin line puts the same ink on screen.
+  float thin = clamp(halfW/.5, 0., 1.);
+  halfW = max(halfW, .5);
+  float hw = halfW + .5;                         // +0.5 px feather skirt: the antialias ramp's own half
   p += vec2(-tg.y, tg.x)*side*hw;
   float a1 = step(uFocusRange.x, a)*step(a, uFocusRange.y);
   float b1 = step(uFocusRange.x, b)*step(b, uFocusRange.y);
@@ -144,7 +155,7 @@ void main(){
 
   float aStrength = mix(strength, 1., uVoteMix);
   // ...and nearly opaque: uAlpha at the overview is 0.075, so x3 left a tapped line at ~0.12.
-  float aOut = uAlpha*dim*aStrength*mix(1., 3.0, bright)*mix(1., ${glslFloat(CENTRE_BRIGHT)}, cT);
+  float aOut = uAlpha*dim*aStrength*mix(1., 3.0, bright)*mix(1., ${glslFloat(CENTRE_BRIGHT)}, cT)*thin;
   // past full ink the centre's boost lifts the colour instead, clamped
   col = min(col*max(aOut, 1.), vec3(1.));
   vCol = vec4(col, max(min(aOut, 1.), max(spot*.95, hovered*.7)));
@@ -155,10 +166,10 @@ void main(){
 }`;
 
 const FRAG = `#version 300 es
-precision highp float;
-in vec4 vCol; in float vEdge; in float vHalfW; out vec4 o;
+precision mediump float;
+flat in vec4 vCol; in float vEdge; flat in float vHalfW; out vec4 o;
 void main(){
-  float hw = vHalfW + 1.0;
+  float hw = vHalfW + .5;                         // the vertex stage's skirt
   float d = abs(vEdge)*hw;
   float aa = 1.0 - smoothstep(vHalfW - .5, vHalfW + .5, d);
   float a = clamp(vCol.a, 0., 1.)*aa;
@@ -221,7 +232,7 @@ export function createRenderer(canvas, graph, opts = {}) {
   gl.useProgram(program);
 
   const U = {};
-  for (const name of ['uRes', 'uCamX', 'uCamY', 'uPPV', 'uBase', 'uSquash',
+  for (const name of ['uRes', 'uCamXHi', 'uCamXLo', 'uCamY', 'uPPV', 'uBase', 'uSquash',
     'uLocalize', 'uFlyLocalize', 'uWidth', 'uAlpha', 'uTotal',
     'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
     'uHoverArc', 'uInstanceBase', 'uFocusRange2', 'uCentre', 'uCentreT', 'uDpr']) {
@@ -355,7 +366,10 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.useProgram(program);
       gl.bindVertexArray(vao);
       gl.uniform2f(U.uRes, v.width, v.height);
-      gl.uniform1f(U.uCamX, v.camX);
+      // split for float32 (the vertex stage's feet): hi whole, lo the rest
+      const camXHi = Math.floor(v.camX);
+      gl.uniform1f(U.uCamXHi, camXHi);
+      gl.uniform1f(U.uCamXLo, v.camX - camXHi);
       gl.uniform1f(U.uCamY, v.camY > 0 ? v.camY : 0);
       gl.uniform1f(U.uPPV, v.ppv);
       gl.uniform1f(U.uBase, v.base);

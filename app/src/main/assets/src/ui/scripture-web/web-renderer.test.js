@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { SHADER_SOURCE, DENSITY_STEPS, createRenderer } from './web-renderer.js';
 import {
-  arcShapeGLSL, flyOverWidth, flyOverGLSL, glslFloat,
+  arcShapeGLSL, flyOverWidth, flyOverGLSL, glslFloat, squashFactor,
 } from '../../utils/scripture-web/geometry.js';
 import { FLYOVER_LEG_WIDTH } from '../../utils/scripture-web/sw-ink.js';
 import {
@@ -27,9 +27,10 @@ describe('shader / CPU agreement', () => {
     // frame's height, the zoom or the span's log
     expect(SHADER_SOURCE.vertex).toMatch(/float A = arcShape\(rx,\s*uSquash\)\.y;/);
     expect(SHADER_SOURCE.vertex).not.toMatch(/uCeil/);
-    // the feet: geometry.footX in GLSL
-    expect(SHADER_SOURCE.vertex).toMatch(/float x0 = \(a \+ \.5 \+ aFanA - uCamX\)\*uPPV/);
-    expect(SHADER_SOURCE.vertex).toMatch(/float x1 = \(b \+ \.5 \+ aFanB - uCamX\)\*uPPV/);
+    // the feet: geometry.footX in GLSL, (verse + .5 + fan - camX)*ppv, with
+    // the camera's x split into whole and fraction for float32 (digest 39)
+    expect(SHADER_SOURCE.vertex).toMatch(/float x0 = \(\(a - uCamXHi\) \+ \(\.5 \+ aFanA - uCamXLo\)\)\*uPPV/);
+    expect(SHADER_SOURCE.vertex).toMatch(/float x1 = \(\(b - uCamXHi\) \+ \(\.5 \+ aFanB - uCamXLo\)\)\*uPPV/);
     // The point and its tangent come from the shared arcAt, not from a
     // hand-written cos/sin pair beside it
     expect(SHADER_SOURCE.vertex).toMatch(/arcAt\(tau,\s*left,\s*right,\s*A,/);
@@ -79,6 +80,94 @@ describe('shader shape', () => {
 
   it('emits premultiplied alpha, matching both blend modes the renderer sets', () => {
     expect(SHADER_SOURCE.fragment).toContain('vec4(vCol.rgb*a, a)');
+  });
+});
+
+/* Thin-line hygiene (GL item 7). A ribbon under one device px aliases into
+   dashes where it crosses the pixel grid; a 1 px feather skirt on a 0.4 px
+   line is mostly skirt; and the vertex stage's float32 turns a verse id near
+   31,102 into ~0.002 verses of error, which the ceiling's ~132 device px per
+   verse makes into a visible shimmer on every foot as the camera pans. */
+describe('thin lines hold a device px, and the feet do not shimmer at the ceiling', () => {
+  const f = Math.fround;
+  /** The shader's foot, emulated in float32 op by op. The old form subtracted
+   *  the whole camera from a five-digit verse id; the new one subtracts the
+   *  whole verses (exact in float32) and adds the fractions. */
+  const footOld = (a, fan, camX, ppv, W) => f(f(f(f(f(f(a) + 0.5) + f(fan)) - f(camX)) * f(ppv)) + f(W * 0.5));
+  const footNew = (a, fan, camX, ppv, W) => {
+    const hi = f(Math.floor(camX)), lo = f(camX - Math.floor(camX));
+    const whole = f(f(a) - hi);
+    const frac = f(f(0.5 + f(fan)) - lo);
+    return f(f(f(whole + frac) * f(ppv)) + f(W * 0.5));
+  };
+  const truth = (a, fan, camX, ppv, W) => (a + 0.5 + f(fan) - camX) * ppv + W * 0.5;
+
+  it('ORACLE: at the ceiling (132 device px per verse, the far end of the canon) the old foot is off by more than 0.1 px; the split foot by under 0.01', () => {
+    const ppv = 132, W = 2400;
+    let worstOld = 0, worstNew = 0;
+    for (let k = 0; k < 400; k++) {
+      const camX = 31090.0 + k * 0.01373;
+      for (const a of [31088, 31090, 31095, 31100]) {
+        for (const fan of [0, 0.1234, -0.37]) {
+          const t = truth(a, fan, camX, ppv, W);
+          worstOld = Math.max(worstOld, Math.abs(footOld(a, fan, camX, ppv, W) - t));
+          worstNew = Math.max(worstNew, Math.abs(footNew(a, fan, camX, ppv, W) - t));
+        }
+      }
+    }
+    expect(worstOld, 'CONTROL: the float32 emulation sees the old shimmer').toBeGreaterThan(0.1);
+    expect(worstNew).toBeLessThan(0.01);
+  });
+
+  it('the renderer hands the shader the camera split: hi the whole verses, lo the fraction, and no unsplit uCamX', () => {
+    const { calls, canvas } = recordingGL();
+    const r = /** @type {any} */ (createRenderer(canvas, tinyGraph()));
+    calls.length = 0;
+    const width = 800, ceil = 240;
+    r.draw({ width, height: 360, base: 260, ceil, squash: squashFactor(ceil, width), localize: 1, density: 'famous',
+      camX: 150.375, camY: 0, ppv: 44, strokeWidth: 2, alpha: 0.5, dpr: 1, bg: '#000', focusRange: null, focusArc: -1 });
+    const set = (name) => calls.filter((c) => c[0] === 'uniform1f' && c[1][0] === name).map((c) => c[1][1]);
+    expect(set('uCamXHi')).toEqual([150]);
+    expect(set('uCamXLo')).toEqual([0.375]);
+    expect(set('uCamX')).toEqual([]);
+  });
+
+  it('colour and half width are flat (one per instance); the edge coordinate interpolates across the ribbon', () => {
+    expect(SHADER_SOURCE.vertex).toContain('flat out vec4 vCol;');
+    expect(SHADER_SOURCE.vertex).toContain('flat out float vHalfW;');
+    expect(SHADER_SOURCE.fragment).toContain('flat in vec4 vCol;');
+    expect(SHADER_SOURCE.fragment).toContain('flat in float vHalfW;');
+    expect(SHADER_SOURCE.vertex).not.toMatch(/flat out float vEdge/);
+    expect(SHADER_SOURCE.fragment).not.toMatch(/flat in float vEdge/);
+  });
+
+  it('the fragment stage runs at mediump (it only feathers an edge); the vertex stage keeps highp for positions', () => {
+    expect(SHADER_SOURCE.fragment.split('\n')[1]).toBe('precision mediump float;');
+    expect(SHADER_SOURCE.vertex.split('\n')[1]).toBe('precision highp float;');
+  });
+
+  it('the half width holds at 0.5 device px, the lost width paid in alpha, with a 0.5 px skirt in both stages', () => {
+    expect(SHADER_SOURCE.vertex).toContain('float thin = clamp(halfW/.5, 0., 1.);');
+    expect(SHADER_SOURCE.vertex).toContain('halfW = max(halfW, .5);');
+    expect(SHADER_SOURCE.vertex).toContain('float hw = halfW + .5;');
+    expect(SHADER_SOURCE.vertex).toMatch(/float aOut = [^;]*\*thin;/);
+    expect(SHADER_SOURCE.fragment).toContain('float hw = vHalfW + .5;');
+    expect(SHADER_SOURCE.vertex).not.toContain('halfW + 1.0');
+    expect(SHADER_SOURCE.fragment).not.toContain('vHalfW + 1.0');
+  });
+
+  it('TWIN: a thin line keeps its ink (width x alpha) and never draws under one device px', () => {
+    // the three shader lines, in JS
+    const shade = (halfW, alpha) => {
+      const thin = Math.min(Math.max(halfW / 0.5, 0), 1);
+      const hw = Math.max(halfW, 0.5);
+      return { width: 2 * hw, alpha: alpha * thin };
+    };
+    for (const halfW of [0.05, 0.2, 0.37, 0.5, 0.8, 1.6, 4]) {
+      const o = shade(halfW, 0.6);
+      expect(o.width).toBeGreaterThanOrEqual(1);
+      expect(o.width * o.alpha).toBeCloseTo(2 * halfW * 0.6, 12);
+    }
   });
 });
 

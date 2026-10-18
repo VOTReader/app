@@ -107,6 +107,35 @@ describe('every constant interpolated into the GLSL templates routes through gls
   });
 });
 
+/* The renderer's own templates (GL item 7). Before this case the vertex
+   stage carried two raw interpolations, `${CLIP_MARGIN}.` (a literal that
+   compiled only while CLIP_MARGIN stayed whole) and the stroke ratio
+   `${STROKE_MIN_CSS / STROKE_DEEP_CSS}` (one that would break the day it
+   came out whole). Every site in a `#version 300 es` template in
+   web-renderer.js routes through glslFloat, or is one of the shared GLSL
+   blocks (themselves checked above or generated). */
+const RENDERER = fs.readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../ui/scripture-web/web-renderer.js'), 'utf8');
+const SHARED_BLOCKS = /^(arcShapeGLSL|flyOverGLSL|rampGLSL\(\)|inkGLSL\([^)]*\))$/;
+function rendererTemplates() {
+  return [...RENDERER.matchAll(/const (\w+) = `(#version 300 es[\s\S]*?)`;/g)].map((m) => ({ name: m[1], body: m[2] }));
+}
+
+describe("every constant interpolated into the renderer's shader templates routes through glslFloat", () => {
+  it('is not reading an empty region: the vertex and fragment templates are found, and the clip margin is seen as a formatted site', () => {
+    const names = rendererTemplates().map((t) => t.name);
+    expect(names).toEqual(expect.arrayContaining(['VERT', 'FRAG']));
+    const vert = rendererTemplates().find((t) => t.name === 'VERT');
+    expect(allSites(vert.body)).toContain('glslFloat(CLIP_MARGIN)');
+  });
+
+  it('has no raw interpolation in any of them', () => {
+    for (const t of rendererTemplates()) {
+      const raw = rawSites(t.body).filter((s) => !SHARED_BLOCKS.test(s));
+      expect({ template: t.name, raw }).toEqual({ template: t.name, raw: [] });
+    }
+  });
+});
+
 describe('the emitted GLSL carries no bare integer literal', () => {
   it('control: the stripper keeps a bare 1 and eats 2., 1e-3, .5 and the digit in x0', () => {
     expect(bareInts('float f = 1; float g = 2.; float h = 1e-3; float i = .5; vec2 x0;')).toEqual(['1']);
