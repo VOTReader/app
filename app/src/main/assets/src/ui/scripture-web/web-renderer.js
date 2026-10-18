@@ -32,6 +32,7 @@ import {
 } from '../../utils/scripture-web/geometry.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
 import { bucketDrawCount, fansOf } from '../../utils/scripture-web/decode.js';
+import { walkDrawnRuns } from '../../utils/scripture-web/chunk-walk.js';
 
 /** Colour modes, in the order the control cycles them. */
 export const COLOR_MODES = ['distance', 'testament', 'genre'];
@@ -436,42 +437,16 @@ export function createRenderer(canvas, graph, opts = {}) {
           bucketMaxSpan[bi] * v.ppv * 0.5, v.ceil, v.width, v.dpr || 1, v.squash);
         gl.uniform1f(U.uSegments, segments);
         const verts = 2 * (segments + 1);
-        // Walk chunks, coalescing adjacent visible ones into single draws.
-        const chunks = bucket.chunks || [];
-        let runStart = -1;
-        const flush = (endExclusive) => {
-          if (runStart < 0) return;
-          const first = runStart;
-          const n = endExclusive - first;
-          if (n > 0) {
-            pointInstances(bucket.off + first);
-            gl.uniform1f(U.uInstanceBase, bucket.off + first);
-            gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, verts, n);
-            instances += n;
-            draws++;
-          }
-          runStart = -1;
-        };
-        if (!chunks.length) {
-          pointInstances(bucket.off);
-          gl.uniform1f(U.uInstanceBase, bucket.off);
-          gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, verts, count);
-          instances += count;
+        // One draw per run of adjacent visible chunks (chunk-walk.js; a
+        // bucket without chunks is one run of its whole count).
+        walkDrawnRuns(bucket, count, chunkSize, viewLo, viewHi, (start, end) => {
+          const n = end - start;
+          pointInstances(start);
+          gl.uniform1f(U.uInstanceBase, start);
+          gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, verts, n);
+          instances += n;
           draws++;
-          continue;
-        }
-        for (let c = 0; c * chunkSize < count; c++) {
-          const ext = chunks[c];
-          const start = c * chunkSize;
-          const end = Math.min(start + chunkSize, count);
-          // An arc is visible if its span overlaps the viewport at all — the
-          // apex of a long arc can cross the view with both feet off-screen.
-          const visible = !ext || (ext[1] >= viewLo && ext[0] <= viewHi);
-          if (visible) { if (runStart < 0) runStart = start; }
-          else flush(start);
-          if (end >= count) flush(end);
-        }
-        flush(count);
+        });
       }
       lastStats = { instances, draws };
       return lastStats;

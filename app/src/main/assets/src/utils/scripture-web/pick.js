@@ -28,6 +28,7 @@ import {
   FLYOVER_MARGIN, LOCALIZE_START, skyLocalize,
 } from './geometry.js';
 import { bucketDrawCount, fansOf } from './decode.js';
+import { walkDrawnRuns } from './chunk-walk.js';
 
 /**
  * Nearest arc to a screen point.
@@ -73,17 +74,11 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
   const verseAtPoint = xToVerse(cam, width, px);
   // a verse of slack for the chunk cull: a foot stands anywhere in its verse's cell (footX)
   const verseTolerance = tol / ppv + 1;
+  const chunkSize = g.chunkSize || 256;
+  const lo = verseAtPoint - verseTolerance, hi = verseAtPoint + verseTolerance;
 
   for (const bucket of g.buckets) {
-    const draw = bucketDrawCount(bucket, density);
-    const chunks = bucket.chunks || [];
-    const chunkSize = g.chunkSize || 256;
-    const chunkCount = Math.ceil(draw / chunkSize);
-    for (let c = 0; c < chunkCount; c++) {
-      const ext = chunks[c];
-      if (ext && (ext[1] < verseAtPoint - verseTolerance || ext[0] > verseAtPoint + verseTolerance)) continue;
-      const start = bucket.off + c * chunkSize;
-      const end = Math.min(start + chunkSize, bucket.off + draw);
+    walkDrawnRuns(bucket, bucketDrawCount(bucket, density), chunkSize, lo, hi, (start, end) => {
       for (let i = start; i < end; i++) {
         // the feet as drawn: in their verses' cells, by rank (geometry.footX)
         const x0 = footX(cam, width, g.from[i], fanA[i]);
@@ -107,7 +102,7 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
         });
         if (best.length > cap) best.pop();
       }
-    }
+    });
   }
   return best;
 }
@@ -132,16 +127,9 @@ export function visibleArcs(g, cam, view, limit) {
   // a verse of slack each side: a foot stands anywhere in its verse's cell (footX)
   const lo = xToVerse(cam, width, 0) - 1, hi = xToVerse(cam, width, width) + 1;
   const out = [];
+  const chunkSize = g.chunkSize || 256;
   for (const bucket of g.buckets) {
-    const draw = bucketDrawCount(bucket, density);
-    const chunks = bucket.chunks || [];
-    const chunkSize = g.chunkSize || 256;
-    const chunkCount = Math.ceil(draw / chunkSize);
-    for (let c = 0; c < chunkCount; c++) {
-      const ext = chunks[c];
-      if (ext && (ext[1] < lo || ext[0] > hi)) continue;
-      const start = bucket.off + c * chunkSize;
-      const end = Math.min(start + chunkSize, bucket.off + draw);
+    const full = walkDrawnRuns(bucket, bucketDrawCount(bucket, density), chunkSize, lo, hi, (start, end) => {
       for (let i = start; i < end; i++) {
         // the feet as drawn (geometry.footX): the shader's own anchoring test
         const x0 = footX(cam, width, g.from[i], fanA[i]);
@@ -150,9 +138,11 @@ export function visibleArcs(g, cam, view, limit) {
         const anchored = arcAnchored(x0, x1, width);
         if (flyOverDim(anchored, skyLocalize(localize, cam.y, view.ceil)) === 0) continue;
         out.push(i);
-        if (out.length >= limit) return out;
+        if (out.length >= limit) return true;
       }
-    }
+      return false;
+    });
+    if (full) return out;
   }
   return out;
 }
@@ -543,14 +533,7 @@ export function footBundles(g, cam, view, dpr) {
   const half = width / 2, camX = cam.x, ppv = cam.ppv;
   const chunkSize = g.chunkSize || 256;
   for (const bucket of g.buckets) {
-    const draw = bucketDrawCount(bucket, density);
-    const chunks = bucket.chunks || [];
-    const chunkCount = Math.ceil(draw / chunkSize);
-    for (let c = 0; c < chunkCount; c++) {
-      const ext = chunks[c];
-      if (ext && (ext[1] < first || ext[0] > first + span - 1)) continue;
-      const start = bucket.off + c * chunkSize;
-      const end = Math.min(start + chunkSize, bucket.off + draw);
+    walkDrawnRuns(bucket, bucketDrawCount(bucket, density), chunkSize, first, first + span - 1, (start, end) => {
       for (let i = start; i < end; i++) {
         const a = g.from[i], b = g.to[i];
         const ca = a - first >= 0 && a - first < span ? cellOf[a - first] : -1;
@@ -561,7 +544,7 @@ export function footBundles(g, cam, view, dpr) {
         if (ca >= 0) cells[ca].drawn++;
         if (cb >= 0 && cb !== ca) cells[cb].drawn++;
       }
-    }
+    });
   }
   for (const cell of cells) cell.x = ((cell.lo + cell.hi + 1) / 2 - camX) * ppv + half;
   return cells;
