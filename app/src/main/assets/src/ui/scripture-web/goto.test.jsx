@@ -191,6 +191,27 @@ describe('the go-to box (spec 4.5)', () => {
     expect(box(container)).toBeNull();
   });
 
+  it('a dialog that keeps the keyboard (dialog-focus-contract): Tab stays in the box, and focus goes home on close', () => {
+    const { container, get, getByRole } = mountWeb();
+    const button = getByRole('button', { name: /go to a book, chapter or verse/i });
+    button.focus();
+    fireEvent.click(button);
+    expect(document.activeElement).toBe(input(container));
+    expect(fireEvent.keyDown(input(container), { key: 'Tab' }), 'Tab does not walk out of the box').toBe(false);
+    expect(fireEvent.keyDown(input(container), { key: 'Tab', shiftKey: true })).toBe(false);
+    // focus that got out (a stray .focus() behind the box) is pulled back on the next Tab
+    button.focus();
+    fireEvent.keyDown(button, { key: 'Tab' });
+    expect(document.activeElement, 'pulled back into the box').toBe(input(container));
+    fireEvent.keyDown(input(container), { key: 'Escape' });
+    expect(document.activeElement, 'back to the button that opened it').toBe(button);
+    // opened from nowhere (the page had no focus): home is the web itself
+    /** @type {HTMLElement} */ (document.activeElement).blur();
+    act(() => { get().goTo.open(); });
+    fireEvent.keyDown(input(container), { key: 'Escape' });
+    expect(document.activeElement).toBe(container.querySelector('.sw-root'));
+  });
+
   it('nothing it can name: no rows, and Enter says so', () => {
     const { container, get, setAnnounce } = mountWeb();
     act(() => { get().goTo.open('love one another'); });

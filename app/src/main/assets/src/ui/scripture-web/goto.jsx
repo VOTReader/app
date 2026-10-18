@@ -93,7 +93,9 @@ export function useGoTo(web) {
   const [chip, setChip] = React.useState(/** @type {null | { lo: number, hi: number, label: string, count: number, litKey: string, ids: Int32Array }} */ (null));
   const [edges, setEdges] = React.useState(/** @type {{ left: any, right: any }} */ ({ left: null, right: null }));
   const inputRef = React.useRef(null);
-  const boxRef = React.useRef(null);
+  // the box is a dialog: Tab stays in it, and focus goes home when it closes (useFocusTrap,
+  // the app's free-global hook; dialog-focus-contract.test.js)
+  const boxRef = useFocusTrap(isOpen);
   const buttonRef = React.useRef(null);
   const openerRef = React.useRef(null);
   const chipRef = React.useRef(chip);
@@ -151,11 +153,17 @@ export function useGoTo(web) {
 
   const open = React.useCallback((q = '') => {
     if (!live || mode === 'personal') return;
-    if (!isOpen) openerRef.current = document.activeElement;
+    if (!isOpen) {
+      // opened from nowhere (no focus on the page): the web itself is where focus goes home to
+      const root = rootRef && rootRef.current;
+      const a = document.activeElement;
+      if ((!a || a === document.body) && root && typeof root.focus === 'function') root.focus({ preventScroll: true });
+      openerRef.current = document.activeElement;
+    }
     setQuery(typeof q === 'string' ? q : '');
     setSel(0);
     setOpen(true);
-  }, [live, mode, isOpen]);
+  }, [live, mode, isOpen, rootRef]);
 
   // the box takes the keyboard when it opens
   React.useEffect(() => {
@@ -174,7 +182,7 @@ export function useGoTo(web) {
     };
     document.addEventListener('pointerdown', onDown, true);
     return () => document.removeEventListener('pointerdown', onDown, true);
-  }, [isOpen]);
+  }, [isOpen, boxRef]);
 
   /**
    * Take the reader to a place: the panel and the lit set first (so the panel slides in while
