@@ -261,7 +261,10 @@ export function goToRows(g, query, opts) {
 /**
  * Where the camera frames a place (flyTo's { x0, x1 }, canon x; a verse v spans [v, v + 1)): a
  * book fills the canvas area, a chapter or a range about 70 % of it, and a verse the five
- * chapters around it, centred on the verse (spec section 4.5).
+ * chapters around it, centred on the verse (spec section 4.5). A deviation the camera makes, not
+ * this frame: flyTo clamps the zoom at the ceiling (44 CSS px a verse, geometry.js maxZoomFor), so
+ * a chapter shorter than about 0.7 x width / 44 verses (22 at 1366 px) lands at the ceiling,
+ * centred, smaller than 70 % (CONTRACTS.md ledger; pinned in goto.test.jsx).
  * @param {any} g
  * @param {Place} place
  * @returns {{ x0: number, x1: number }}

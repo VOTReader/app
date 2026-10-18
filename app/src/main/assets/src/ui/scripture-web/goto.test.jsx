@@ -10,7 +10,7 @@ import { useJourney } from './use-journey.js';
 import { useFrameScheduler } from './use-frame-scheduler.js';
 import { useGoTo, routeOverlayHit, reopenOf, gotoBoxPlace, GOTO_BOX_W, GOTO_BOX_TOP, GOTO_BOX_MIN, GOTO_HINT } from './goto.jsx';
 import { useWebKeys } from './use-web-keys.js';
-import { verseToX, fitPPV } from '../../utils/scripture-web/geometry.js';
+import { verseToX, fitPPV, maxZoomFor, PPV_MAX_CSS } from '../../utils/scripture-web/geometry.js';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
 
 let prevData;
@@ -50,12 +50,12 @@ const graph = () => ({
 
 /**
  * The web, as the screen wires it; `api.current` is every hook's latest answer.
- * @param {{ start?: any, cam?: { x: number, ppv: number }, keys?: boolean, frame?: { W: number, H: number, DPR: number } }} [opts]
+ * @param {{ start?: any, cam?: { x: number, ppv: number }, keys?: boolean, frame?: { W: number, H: number, DPR: number }, web?: any }} [opts]
  *   keys: the root's onKeyDown is the web's own (use-web-keys.js), not a spy; frame: the canvas in
- *   device px (default an 800x600 PC frame)
+ *   device px (default an 800x600 PC frame); web: the graph (default graph())
  */
-function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W: 800, H: 600, DPR: 1 } } = {}) {
-  const g = graph();
+function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W: 800, H: 600, DPR: 1 }, web } = {}) {
+  const g = web || graph();
   const api = { current: /** @type {any} */ (null) };
   const setAnnounce = vi.fn();
   const rootKeys = vi.fn();
@@ -215,6 +215,26 @@ describe('the go-to box (spec 4.5)', () => {
     const cam = get().cam.camRef.current;
     // 70 % of the frame is the chapter: the camera is zoomed OUT past fit, clamped back to fit
     expect(cam.ppv).toBeCloseTo(fitPPV(cam, 800), 9);
+  });
+
+  it('a short chapter is framed at the zoom ceiling, centred, not at 70 % (the ceiling wins; CONTRACTS.md deviation)', async () => {
+    // Genesis 2 is two verses: 70 % of an 800 px frame would be 280 px a verse, past the 44 CSS
+    // px a verse the camera stops at (geometry.js maxZoomFor), so it lands at the ceiling: 88 px,
+    // 11 % of the frame, on the chapter's centre
+    const g = graph();
+    g.chapters = [[0, 1, 0, 15550], [0, 2, 15550, 2], [0, 3, 15552, TOTAL - 15552]];
+    g.chapterOfVerse = new Uint16Array(TOTAL).map((_, v) => (v < 15550 ? 0 : v < 15552 ? 1 : 2));
+    const { container, get } = mountWeb({ web: g, cam: { x: 3000, ppv: 1 } });
+    act(() => { get().goTo.open('Genesis 2'); });
+    expect(rowTexts(container)[0]).toBe('Genesis 2 · whole chapter');
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    settle(); await flush();
+    const cam = get().cam.camRef.current;
+    const ceiling = fitPPV(cam, 800) * maxZoomFor(TOTAL, 800);
+    expect(ceiling).toBeCloseTo(PPV_MAX_CSS, 9);
+    expect(0.7 * 800 / 2, 'what 70 % asks').toBeGreaterThan(ceiling);
+    expect(cam.ppv).toBeCloseTo(ceiling, 9);
+    expect(cam.x, 'centred on the chapter').toBeCloseTo(15551, 6);
   });
 
   it('Escape in the box closes it and goes no further; a press outside closes it too', () => {
