@@ -51,6 +51,8 @@ const GLOBALS = {
     { id: 'obey', num: 7, title: 'Obey God', blocks: [{ segments: [{ v: OBEY }] }] },
     { id: 'keepers', num: 8, title: 'The Keepers', blocks: [{ segments: [{ v: KEEPERS }] }] },
     { id: 'wisdom', num: 9, title: 'The Word of Wisdom', blocks: [{ segments: [{ v: 'The fields lie still under the evening sky. '.repeat(12) + WISDOM }] }] },
+    // a title, and a sentence past the first ones saying a word of its collection's name
+    { id: 'strayed', num: 10, title: 'The Fold', blocks: [{ segments: [{ v: 'Where does a shepherd spend his days? Pray in like manner. For the one who strays from the flock shall not be forsaken.' }] }] },
   ],
   ANSWERS: [
     { id: 'fields', num: 1, title: 'Regarding Fields', paragraphs: [{ text: TOPIC_OPEN + VINEYARD }] },
@@ -240,6 +242,17 @@ describe('meaning first', () => {
     const r = await first('bring sheaves into the barn before rain comes');
     expect(r.doc.letterId).toBe('harvest');
     expect(r.placeStart).toBe(HARVEST.indexOf('Gather My sheaves'));
+  });
+
+  /* A TEXT FOUND BY ITS TITLE OPENS AT THE TITLE, THE MODEL ON (search200 R1, the S22 look, 2026-10-18). A title typed
+     with its collection's name led and opened at its top (B5), and the meaning's landing then moved every opened text to
+     the sentence holding the most typed words: the reader landed a few lines down, on a body sentence that says one of
+     the words typed, and the card quoted that sentence. */
+  it('a text found by its title and collection opens at its top, not on a sentence saying a word typed', async () => {
+    said.near = 'garment';
+    const r = await first('the fold volume one');
+    expect(r.doc.letterId).toBe('strayed');
+    expect(r.placeStart).toBe(0);
   });
 
   /* THE READER'S FILTERS HOLD FOR WHAT THE MEANING ADDS (sweep W1, 2026-10-13). The model's best

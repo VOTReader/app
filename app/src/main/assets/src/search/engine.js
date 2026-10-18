@@ -729,8 +729,9 @@ function sentenceAt(text, start, words) {
  * @param {Map<any, string>} idOf
  * @param {Array<{id:string, start:number, passages: () => Array<[number, number]>}>} sem
  * @param {string[]} terms
+ * @param {Set<any>} [byTitle]  the entries a title named opens where it says: their landing stands
  */
-function meaningLanding(out, idOf, sem, terms) {
+function meaningLanding(out, idOf, sem, terms, byTitle) {
   const byId = new Map(sem.map((s) => [s.id, s]));
   for (const e of out.slice(0, LAND_REACH)) {
     if (e.doc.kind === 'verse' || typeof e.placeStart === 'number' || !e.doc.text) continue;
@@ -746,9 +747,13 @@ function meaningLanding(out, idOf, sem, terms) {
     if (lex && bestScore - lex[1] > LAND_MARGIN && s.start !== lex[0]) e.placeStart = s.start;
   }
   // Every text opened on a matched passage (here, or meaningFirst's own finds): on its sentence the words point at.
+  /* ...but not one a title named (search200 R1, the S22 look, 2026-10-18): a title typed with its collection's name
+     ("...Words To Live By Part Two") opened its entry at the top, and was moved to the first sentence saying "one" or
+     "two", a few lines down; the card quoted that sentence. A text found by its title, or a heading, opens on it. */
   const words = new Set(terms.flatMap((t) => kjvEncode(t)).filter((w) => !isStopTerm(w)).map(lemma));
   if (!words.size) return;
   for (const e of out) {
+    if (byTitle && byTitle.has(e)) continue;
     if (typeof e.placeStart === 'number' && e.placeStart >= 0 && e.doc.text) e.placeStart = sentenceAt(e.doc.text, e.placeStart, words);
   }
 }
@@ -2858,7 +2863,7 @@ async function search(query, options) {
     const c = tokenPlace(e.doc.text, a.start);
     if (c >= 0) /** @type {any} */ (e).placeStart = c;
   }
-  if (sem && sem.length) meaningLanding(out, idOf, sem, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))));
+  if (sem && sem.length) meaningLanding(out, idOf, sem, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), landedByTitle);
   // ...by the passage the screen lands on: the card marks the phrase or the typed run with the words (textQuery.run).
   // A title named first was found by no passage: its same-titled reprints were admitted beside it.
   if ((!out.length || !titleTop.has(out[0])) && reprintSecond(out, (p.phrase ? [p.phrase] : run ? [run] : []).concat(filtered.filter((t) => !isStopTerm(t))),
