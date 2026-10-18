@@ -15,7 +15,12 @@
    step inside this same frame, just before the draw, so a moving camera
    never needs a second requestAnimationFrame. One motion at a time: a newer
    one ends the one running (its onEnd(false)), as stop() does; a step that
-   returns false has arrived (onEnd(true)). */
+   returns false has arrived (onEnd(true)).
+
+   onFrame(fn) (the navigation stream, w3) runs fn after each frame's draw,
+   for the DOM that rides the camera (the go-to's verse chip and its edge
+   chips): it is placed in the same frame the web moved in, and reads the
+   camera the draw just used. It returns its own unsubscribe. */
 
 // r2 (Orchestrator's ruling, 2026-09-11): see live() below.
 const LIVE_HOLD_MS = 150;
@@ -29,7 +34,8 @@ const FADE_MS = 250;
 /**
  * @returns {{ drawRef: { current: () => void }, schedule: () => void,
  *   live: () => void, capFractionNow: () => number,
- *   animate: (step: MotionStep, onEnd?: ((arrived: boolean) => void) | null) => () => void }}
+ *   animate: (step: MotionStep, onEnd?: ((arrived: boolean) => void) | null) => () => void,
+ *   onFrame: (fn: () => void) => () => void }}
  */
 export function useFrameScheduler() {
   const rafRef = React.useRef(0);
@@ -41,6 +47,8 @@ export function useFrameScheduler() {
 
   // the camera's one motion: { step, onEnd, last } (animate, below)
   const motionRef = React.useRef(null);
+  // what runs after each draw (onFrame, below)
+  const afterRef = React.useRef(/** @type {Set<() => void>} */ (new Set()));
 
   const schedule = React.useCallback(() => {
     if (rafRef.current) return;
@@ -59,7 +67,13 @@ export function useFrameScheduler() {
         }
       }
       drawRef.current();
+      for (const fn of afterRef.current) { try { fn(); } catch (_e) { /* one listener never stops the frame */ } }
     });
+  }, []);
+
+  const onFrame = React.useCallback((fn) => {
+    afterRef.current.add(fn);
+    return () => { afterRef.current.delete(fn); };
   }, []);
 
   const animate = React.useCallback((step, onEnd) => {
@@ -128,5 +142,5 @@ export function useFrameScheduler() {
     };
   }, [schedule]);
 
-  return { drawRef, schedule, live, capFractionNow, animate };
+  return { drawRef, schedule, live, capFractionNow, animate, onFrame };
 }

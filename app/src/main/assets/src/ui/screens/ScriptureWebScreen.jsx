@@ -112,7 +112,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const wrapRef = React.useRef(null);
   // the one frame loop (use-frame-scheduler.js) and landscape, always
   // (use-forced-landscape.js): rotation, orientation lock, immersive, loc()
-  const { drawRef, schedule, live, capFractionNow, animate } = useFrameScheduler();
+  const { drawRef, schedule, live, capFractionNow, animate, onFrame } = useFrameScheduler();
   const { rotated, loc } = useForcedLandscape(schedule);
 
   // the graph asset, loaded once (use-web-renderer.js); Try again refetches
@@ -239,8 +239,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   });
 
   // the go-to (goto.jsx): its header slot (goTo.button, first in the control
-  // row) and its box (goTo.box); both null until the navigation stream builds them
-  const goTo = useGoTo({ graph, flyTo, openPanel, journey, lightThreads, setAnnounce, start });
+  // row) and what it puts over the canvas (goTo.box: the box, its verse chip, its edge chips)
+  const goTo = useGoTo({ graph, flyTo, openPanel, journey, lightThreads, setAnnounce, start,
+    closePanel: closeCards, density, mode, camRef, viewRef, focusRef, panelInsetRef, viewFor, onFrame, rootRef: wrapRef });
 
   // ── gestures — imperative, never React state per frame ──────────────────
   // Wiring itself lives in gestures.js (attachWebGestures) — a pure move, so

@@ -9,20 +9,25 @@
    selection hook carries it (use-web-selection.js returns it) so the panel
    reaches it where it reaches everything else.
 
-     stack   [{ verse, label, open? }], oldest first: verse a graph verse id,
-             label what the panel shows ("John 3:16"); the TOP IS WHERE THE
-             READER IS, so a trail is empty or two long at least (where they
-             set out from, then each arrival)
+     stack   [{ verse, label, open?, span? }], oldest first: verse a graph
+             verse id, label what the panel shows ("John 3:16"); the TOP IS
+             WHERE THE READER IS, so a trail is empty or two long at least
+             (where they set out from, then each arrival). open (additive): the
+             panel spec to open again on arriving back (null closes it; with a
+             `lit` list, those threads light again); span (additive): the
+             canon x the view held, [x0, x1], so Back restores the zoom too
      push(entry, origin?)   records an arrival. origin (additive) is where the
              reader set out from: it seeds an empty trail, so the first Follow
-             already has somewhere to come back to. An arrival at the place
+             already has somewhere to come back to; left out, the trail asks
+             the go-to where the reader is (connect's here). An arrival at the place
              one step back is a walk back (Follow on the same line, end to
              end): it steps back instead of growing the trail. The same place
              twice is one crumb; the trail keeps the last 24.
      back()  pops the newest and returns the entry to go back to (the one now
              on top), or null when there is nowhere to go. Navigation decides
              what Back does: the camera flies there (flyTo, centred in the
-             canvas area beside the panel), and on landing the entry's `open`
+             canvas area beside the panel; its span when it has one), and on
+             landing the entry's `open`
              (a panel spec) opens again, so a connection's "Follow to" names
              the far end from where the camera now is. Back home to where the
              trail set out empties it: there is nothing further back.
@@ -33,8 +38,9 @@
    back() and nothing else: it flies and reopens by itself. */
 
 /**
- * @typedef {{ verse: number, label: string, open?: object | null }} JourneyEntry
- * @typedef {{ openPanel?: (spec: object) => boolean, closePanel?: () => void }} JourneyPanel
+ * @typedef {{ verse: number, label: string, open?: any, span?: [number, number] }} JourneyEntry
+ * @typedef {{ openPanel?: (spec: any) => boolean, closePanel?: () => void,
+ *   lightThreads?: (ids: ArrayLike<number> | null) => void, here?: () => JourneyEntry | null }} JourneyPanel
  * @typedef {{ stack: JourneyEntry[], push: (entry: JourneyEntry, origin?: JourneyEntry | null) => void,
  *   back: () => JourneyEntry | null, clear: () => void,
  *   connect: (panel: JourneyPanel | null) => void }} Journey
@@ -92,7 +98,12 @@ export function useJourney(deps) {
     setStack(stackRef.current);
   }, []);
 
-  const push = React.useCallback((entry, origin) => { set(pushed(stackRef.current, entry, origin)); }, [set]);
+  const push = React.useCallback((entry, origin) => {
+    const s = stackRef.current;
+    const p = panelRef.current;
+    const from = origin !== undefined ? origin : (!s.length && p && p.here ? p.here() : null);
+    set(pushed(s, entry, from));
+  }, [set]);
 
   const clear = React.useCallback(() => { if (stackRef.current.length) set([]); }, [set]);
 
@@ -111,9 +122,11 @@ export function useJourney(deps) {
       if (!p || to.open === undefined) return;
       if (to.open === null) { if (p.closePanel) p.closePanel(); return; }
       if (p.openPanel) p.openPanel(to.open);
+      if (to.open.lit && p.lightThreads) p.lightThreads(to.open.lit);
     };
     if (typeof fly === 'function') {
-      Promise.resolve(fly({ x: to.verse })).then((ok) => { if (ok) arrive(); }, () => {});
+      const target = to.span ? { x0: to.span[0], x1: to.span[1] } : { x: to.verse };
+      Promise.resolve(fly(target)).then((ok) => { if (ok) arrive(); }, () => {});
     } else arrive();
     return to;
   }, [set]);

@@ -9,53 +9,447 @@
 
      useGoTo(web)   the go-to's state and its two render nodes. `button` is
                     the header slot: the screen renders it first inside the
-                    chrome's control row, so the search button sits in the
-                    header without the screen knowing what it is; `box` is the
-                    search box, rendered over the canvas. Both are null today,
-                    so the chrome is exactly as it was (no new DOM, no new
-                    sw-* class: every sw-* class needs its v2 CSS rule).
+                    chrome's control row (the 40 px search button, spec 4.1);
+                    `box` is everything the go-to puts over the canvas: the
+                    box itself while it is open (spec 4.5), the chip naming
+                    the verse it went to ("John 3:16 · 64 connections"), and
+                    the edge chips naming where lit threads go off the frame
+                    ("‹ Genesis 22:2", tap = Follow). Null at rest, so the
+                    DOM is as it was until the reader asks.
      routeOverlayHit(hit, nav)
-                    what a tap on something the overlay drew does (a book
-                    name, a chapter numeral, a "+n" pill: overlay-renderer.js
-                    hitOverlay); true when it handled the tap, so the tap
-                    stops before the line picking. Returns false today.
+                    what a tap on something the overlay drew does: a book
+                    name frames the book, a chapter numeral frames the chapter
+                    and opens its group, a "+n" pill opens its group; true
+                    when it handled the tap, so the tap stops before the line
+                    picking. Each camera move is a journey arrival.
 
-   THE STUBS ARE BEHAVIOUR-NEUTRAL: no button, no box, no routing. */
+   The box reads what is typed through the app's own reference parser
+   (utils/scripture-web/ref-parse.js over search/ref-parser.js: no parser of
+   its own). Enter closes it and the camera eases there (flyTo, 600-900 ms,
+   instant under reduced motion): a book fills the canvas area, a chapter
+   about 70 % of it with its group open, a verse the five chapters around it
+   with its threads lit and the panel in verse mode. The keys the web's root
+   takes for it (use-web-keys.js): / and Ctrl+K open it, Escape closes it
+   first, Enter or Space choose the line at the centre (selectCentre), [ and ]
+   step through the lines at the chosen verse (step).
+
+   The chips ride the camera: the frame loop's onFrame places them in the
+   frame the web moved in (DOM style, never React state per frame); React
+   state changes only when what they name changes.
+
+   start (CONTRACTS.md section 8) is consumed once per mount, as soon as the
+   camera exists: the web opens on that place, instantly, over the resume
+   point. */
+
+import { goToRows, frameOf, startPlace, bookPlace, chapterPlace, chapterIndexOf } from '../../utils/scripture-web/ref-parse.js';
+import { arcsTouching, nearbyThreads, refOfVerse, verseToX, xToVerse } from '../../utils/scripture-web/pick.js';
+import { litKeyOf } from '../../utils/scripture-web/focus-state.js';
 
 /**
- * @typedef {{ button: any, box: any, isOpen: boolean, open: (query?: string) => void, close: () => void }} GoTo
+ * @typedef {{ button: any, box: any, isOpen: boolean, open: (query?: string) => void, close: () => void,
+ *   selectCentre: () => boolean, step: (dir: number) => boolean }} GoTo
  *   button  the header slot's node (null: nothing in the header)
- *   box     the go-to box's node, rendered over the canvas (null: none)
+ *   box     what the go-to puts over the canvas (null: nothing)
  *   open    opens the box, optionally with a query typed in; close closes it
+ *   selectCentre, step (additive, for use-web-keys.js): Enter / Space and [ ]
  */
+
+/** The hint under the rows (spec 4.5). */
+export const GOTO_HINT = 'Try “Isaiah 53”, “Romans”, “Gen 1:1”';
+/** At most this many rows: PC, and the phone (its keyboard takes the rest). */
+export const GOTO_ROWS = 5;
+export const GOTO_ROWS_COMPACT = 3;
+
+/** "64 connections", "1 connection". */
+export function connectionsText(n) {
+  return n.toLocaleString() + (n === 1 ? ' connection' : ' connections');
+}
 
 const NO_GOTO = Object.freeze({
   button: null, box: null, isOpen: false,
-  open() {}, close() {},
+  open() {}, close() {}, selectCentre() { return false; }, step() { return false; },
 });
 
 /**
  * The go-to. `web` is what it needs from the screen (CONTRACTS.md section 9): the graph, flyTo,
- * openPanel, the journey, lightThreads, the live region's setAnnounce and the start prop. The
- * stub reads none of it and returns the same frozen nothing every render.
+ * openPanel, the journey, lightThreads, the live region's setAnnounce and the start prop; and
+ * (the navigation stream's additions on its own call line) closePanel, the density and mode, the
+ * camera's refs and viewFor, the frame loop's onFrame and the root.
  * @param {{ graph?: any, flyTo?: Function, openPanel?: Function, journey?: any,
- *   lightThreads?: Function, setAnnounce?: Function, start?: any }} _web
+ *   lightThreads?: Function, setAnnounce?: Function, start?: any, closePanel?: Function,
+ *   density?: any, mode?: string, camRef?: any, viewRef?: any, focusRef?: any, panelInsetRef?: any,
+ *   viewFor?: Function, onFrame?: Function, rootRef?: any }} web
  * @returns {GoTo}
  */
-export function useGoTo(_web) {
-  return NO_GOTO;
+export function useGoTo(web) {
+  const {
+    graph, flyTo, openPanel, journey, lightThreads, setAnnounce, start, closePanel,
+    density, mode, camRef, viewRef, focusRef, panelInsetRef, viewFor, onFrame, rootRef,
+  } = web || {};
+  const live = !!(camRef && viewRef && focusRef && flyTo && openPanel);
+  const [isOpen, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState('');
+  const [sel, setSel] = React.useState(0);
+  const [chip, setChip] = React.useState(/** @type {null | { lo: number, hi: number, label: string, count: number, litKey: string, ids: Int32Array }} */ (null));
+  const [edges, setEdges] = React.useState(/** @type {{ left: any, right: any }} */ ({ left: null, right: null }));
+  const inputRef = React.useRef(null);
+  const boxRef = React.useRef(null);
+  const buttonRef = React.useRef(null);
+  const openerRef = React.useRef(null);
+  const chipRef = React.useRef(chip);
+  chipRef.current = chip;
+  const chipElRef = React.useRef(null);
+  const edgeKeyRef = React.useRef('|');
+  const stepRef = React.useRef({ verse: -1, list: /** @type {number[]} */ ([]) });
+  const startedRef = React.useRef(false);
+
+  const say = React.useCallback((s) => { if (typeof setAnnounce === 'function') setAnnounce(s); }, [setAnnounce]);
+
+  /** The canvas area beside the panel, device px. */
+  const area = React.useCallback(() => {
+    const v = viewRef.current;
+    const inset = (panelInsetRef && panelInsetRef.current && panelInsetRef.current.right) || 0;
+    return Math.max(1, v.W - inset * (v.DPR || 1));
+  }, [viewRef, panelInsetRef]);
+
+  /** The verse at the canvas area's centre. */
+  const centreVerse = React.useCallback(() => {
+    const cam = camRef.current, v = viewRef.current;
+    const c = Math.floor(xToVerse(cam, v.W, area() / 2));
+    return Math.max(0, Math.min(graph.total - 1, c));
+  }, [camRef, viewRef, area, graph]);
+
+  /** Where the reader is, as a journey entry: the centre verse, the span in view, and the
+   * go-to's lit verse open again when that is what is up. */
+  const here = React.useCallback(() => {
+    const cam = camRef.current, v = viewRef.current;
+    if (!graph || !cam || !v.W) return null;
+    const c = chipRef.current;
+    const f = focusRef.current;
+    const lit = c && f.litKey === c.litKey;
+    const verse = lit ? c.lo : centreVerse();
+    return {
+      verse, label: lit ? c.label : refOfVerse(graph, verse).label,
+      span: [xToVerse(cam, v.W, 0), xToVerse(cam, v.W, area())],
+      open: lit ? { mode: 'verse', verse: c.lo, lit: c.ids } : undefined,
+    };
+  }, [graph, camRef, viewRef, focusRef, centreVerse, area]);
+
+  // the journey's Back reopens through the panel API, and asks here where a trail sets out from
+  React.useEffect(() => {
+    if (journey && typeof journey.connect === 'function') journey.connect({ openPanel, closePanel, lightThreads, here });
+  }, [journey, openPanel, closePanel, lightThreads, here]);
+
+  const close = React.useCallback(() => {
+    setOpen(false);
+    const back = openerRef.current;
+    openerRef.current = null;
+    const root = rootRef && rootRef.current;
+    const to = back && back.isConnected && back !== document.body ? back : root;
+    if (to && typeof to.focus === 'function') to.focus();
+  }, [rootRef]);
+
+  const open = React.useCallback((q = '') => {
+    if (!live || mode === 'personal') return;
+    if (!isOpen) openerRef.current = document.activeElement;
+    setQuery(typeof q === 'string' ? q : '');
+    setSel(0);
+    setOpen(true);
+  }, [live, mode, isOpen]);
+
+  // the box takes the keyboard when it opens
+  React.useEffect(() => {
+    if (isOpen && inputRef.current) inputRef.current.focus();
+  }, [isOpen]);
+
+  // a press anywhere outside the box (and its button) closes it
+  React.useEffect(() => {
+    if (!isOpen) return undefined;
+    const onDown = (e) => {
+      const t = e.target;
+      if (boxRef.current && boxRef.current.contains(t)) return;
+      if (buttonRef.current && buttonRef.current.contains(t)) return;
+      setOpen(false);
+      openerRef.current = null;
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    return () => document.removeEventListener('pointerdown', onDown, true);
+  }, [isOpen]);
+
+  /**
+   * Take the reader to a place: the panel and the lit set first (so the panel slides in while
+   * the camera flies and the fly lands beside it), the journey before the camera moves (its
+   * origin is where the camera still is), then the fly; the verse chip once it lands.
+   * @param {any} place  ref-parse's Place, or { kind: 'letter', letterKey }
+   * @param {{ push?: boolean, instant?: boolean }} [how]
+   */
+  const go = React.useCallback((place, how = /** @type {{ push?: boolean, instant?: boolean }} */ ({})) => {
+    const push = how.push !== false;
+    if (!graph || !place || !live) return false;
+    if (place.kind === 'letter') return !!openPanel({ mode: 'letter', letterKey: place.letterKey });
+    if (!camRef.current || !viewRef.current.W) return false;
+    // where the reader set out from, read before the panel or the camera changes
+    const origin = push ? here() : null;
+    const frame = frameOf(graph, place);
+    const lights = place.kind === 'verse' || place.kind === 'range';
+    const ids = lights ? Int32Array.from(arcsTouching(graph, place.lo, place.hi, density, 0)) : null;
+    let entryOpen;
+    if (place.kind === 'chapter') {
+      entryOpen = { mode: 'group', chapter: place.chapterIndex };
+      openPanel(entryOpen);
+    } else if (lights) {
+      entryOpen = { mode: 'verse', verse: place.lo, lit: ids };
+      openPanel({ mode: 'verse', verse: place.lo });
+      if (lightThreads) lightThreads(ids);
+    }
+    setChip(null);
+    if (push && journey) {
+      journey.push({ verse: place.lo, label: place.label, open: entryOpen, span: [frame.x0, frame.x1] }, origin);
+    }
+    const litKey = ids ? litKeyOf(ids) : '';
+    const done = () => {
+      if (ids && focusRef.current.litKey === litKey) {
+        setChip({ lo: place.lo, hi: place.hi, label: place.label, count: ids.length, litKey, ids });
+      }
+    };
+    Promise.resolve(flyTo(frame, how && how.instant ? { reduceMotion: true } : undefined)).then(done, done);
+    say(ids ? place.label + ', ' + connectionsText(ids.length) : place.label);
+    return true;
+  }, [graph, live, openPanel, camRef, viewRef, density, lightThreads, journey, here, focusRef, flyTo, say]);
+
+  const rows = React.useMemo(() => {
+    if (!isOpen || !graph) return [];
+    const v = viewRef && viewRef.current;
+    const compact = !!(v && v.H && v.H / (v.DPR || 1) <= 500);
+    return goToRows(graph, query, { density, limit: compact ? GOTO_ROWS_COMPACT : GOTO_ROWS });
+  }, [isOpen, graph, query, density, viewRef]);
+  const selAt = rows.length ? Math.min(sel, rows.length - 1) : -1;
+
+  const choose = React.useCallback((row) => {
+    if (!row) return;
+    setOpen(false);
+    openerRef.current = null;
+    const root = rootRef && rootRef.current;
+    if (root && typeof root.focus === 'function') root.focus();
+    go(row.place);
+  }, [go, rootRef]);
+
+  const onInputKey = React.useCallback((e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (rows.length) setSel((selAt + (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selAt >= 0) choose(rows[selAt]);
+      else if (query.trim()) say('No book, chapter or verse called ' + query.trim());
+    } else if (e.key === 'Escape') {
+      // the box is the top layer: Escape closes it and goes no further (not the panel, not the web)
+      e.preventDefault(); e.stopPropagation();
+      close();
+    }
+  }, [rows, selAt, choose, query, say, close]);
+
+  /** Enter / Space: the line at the centre - the drawn thread with a foot nearest the canvas
+   * area's centre, the strongest among the nearest. */
+  const selectCentre = React.useCallback(() => {
+    if (!graph || !live || !camRef.current || !viewRef.current.W || mode === 'personal') return false;
+    const cam = camRef.current, v = viewRef.current;
+    const c = centreVerse() + 0.5;
+    const lo = Math.max(0, Math.floor(xToVerse(cam, v.W, 0))), hi = Math.min(graph.total - 1, Math.ceil(xToVerse(cam, v.W, area())));
+    let best = -1, bestD = Infinity, bestW = -Infinity;
+    for (const i of arcsTouching(graph, lo, hi, density, 0)) {
+      const d = Math.min(Math.abs(graph.from[i] + 0.5 - c), Math.abs(graph.to[i] + 0.5 - c));
+      if (d < bestD || (d === bestD && graph.votes[i] > bestW)) { best = i; bestD = d; bestW = graph.votes[i]; }
+    }
+    if (best < 0) { say('No line in view'); return false; }
+    return !!openPanel({ mode: 'connection', arc: best });
+  }, [graph, live, camRef, viewRef, mode, centreVerse, area, density, say, openPanel]);
+
+  /** [ and ]: the next or the previous line at the chosen verse (a verse open, or the end of the
+   * chosen line nearer the centre, or else the centre verse), the strongest first. */
+  const step = React.useCallback((dir) => {
+    if (!graph || !live || !camRef.current || !viewRef.current.W || mode === 'personal') return false;
+    const f = focusRef.current;
+    const s = stepRef.current;
+    let verse;
+    if (f.arc >= 0 && s.verse >= 0 && s.list.indexOf(f.arc) >= 0) verse = s.verse;
+    else if (f.arc >= 0 && f.arc < graph.count) {
+      const c = centreVerse(), a = graph.from[f.arc], b = graph.to[f.arc];
+      verse = Math.abs(a - c) <= Math.abs(b - c) ? a : b;
+    } else if (f.range && f.range[0] === f.range[1]) verse = f.range[0];
+    else verse = centreVerse();
+    const list = s.verse === verse && s.list.length ? s.list : nearbyThreads(graph, verse, verse, density, 0);
+    stepRef.current = { verse, list };
+    if (!list.length) { say('No lines at ' + refOfVerse(graph, verse).label); return false; }
+    const at = list.indexOf(f.arc);
+    const next = at < 0 ? (dir > 0 ? 0 : list.length - 1) : (at + (dir > 0 ? 1 : list.length - 1)) % list.length;
+    return !!openPanel({ mode: 'connection', arc: list[next] });
+  }, [graph, live, camRef, viewRef, mode, focusRef, centreVerse, density, say, openPanel]);
+
+  /** An edge chip's tap: Follow that thread off the frame - the camera goes to its far end at the
+   * same zoom, and the line opens there (on landing, so its own Follow names the way back). */
+  const follow = React.useCallback((side) => {
+    const e = edges[side];
+    if (!e || !graph || !live) return;
+    const open = { mode: 'connection', arc: e.arc };
+    if (journey) journey.push({ verse: e.verse, label: e.label, open }, here());
+    Promise.resolve(flyTo({ x: e.verse + 0.5 })).then((ok) => { if (ok) openPanel(open); }, () => {});
+  }, [edges, graph, live, journey, here, flyTo, openPanel]);
+
+  /** One frame's placing: the verse chip at its verse's foot, the edge chips' names. */
+  const placeChips = React.useCallback(() => {
+    const cam = camRef && camRef.current, v = viewRef && viewRef.current;
+    if (!graph || !cam || !v || !v.W || !focusRef) return;
+    const dpr = v.DPR || 1;
+    const f = focusRef.current;
+    const right = area();
+    const c = chipRef.current;
+    if (c && f.litKey !== c.litKey) { chipRef.current = null; setChip(null); }
+    else if (c && chipElRef.current && viewFor) {
+      const va = viewFor();
+      const x = verseToX(cam, v.W, (c.lo + c.hi + 1) / 2) / dpr;
+      const y = (va.base + (va.camY || 0)) / dpr;
+      const el = chipElRef.current;
+      el.style.transform = 'translate(' + Math.round(x + 10) + 'px,' + Math.round(y - 12) + 'px) translateY(-100%)';
+      el.style.visibility = x >= 0 && x <= right / dpr - 40 && y <= v.H / dpr ? 'visible' : 'hidden';
+    }
+    let left = null, rightEnd = null;
+    const lit = f.lit;
+    if (lit && lit.length) {
+      const vl = xToVerse(cam, v.W, 0), vr = xToVerse(cam, v.W, right);
+      for (let k = 0; k < lit.length; k++) {
+        const i = lit[k];
+        if (!(i >= 0 && i < graph.count)) continue;
+        const a = graph.from[i] + 0.5, b = graph.to[i] + 0.5;
+        const aIn = a >= vl && a <= vr, bIn = b >= vl && b <= vr;
+        if (aIn === bIn) continue;
+        const out = aIn ? graph.to[i] : graph.from[i];
+        const w = graph.votes[i];
+        if (out + 0.5 < vl) { if (!left || w > left.w) left = { arc: i, verse: out, w }; }
+        else if (!rightEnd || w > rightEnd.w) rightEnd = { arc: i, verse: out, w };
+      }
+    }
+    const key = (left ? left.arc + ':' + left.verse : '') + '|' + (rightEnd ? rightEnd.arc + ':' + rightEnd.verse : '');
+    if (key !== edgeKeyRef.current) {
+      edgeKeyRef.current = key;
+      const named = (e) => (e ? { arc: e.arc, verse: e.verse, label: refOfVerse(graph, e.verse).label } : null);
+      setEdges({ left: named(left), right: named(rightEnd) });
+    }
+  }, [graph, camRef, viewRef, focusRef, area, viewFor]);
+
+  /** The start prop, once: as soon as the camera exists. */
+  const tryStart = React.useCallback(() => {
+    if (startedRef.current || !start || !graph || !live || !camRef.current || !viewRef.current.W) return;
+    startedRef.current = true;
+    const p = startPlace(graph, start);
+    if (p) go(p, { push: false, instant: true });
+  }, [start, graph, live, camRef, viewRef, go]);
+  React.useEffect(() => { tryStart(); }, [tryStart]);
+
+  const latest = React.useRef({ placeChips, tryStart });
+  latest.current = { placeChips, tryStart };
+  React.useEffect(() => {
+    if (typeof onFrame !== 'function') return undefined;
+    return onFrame(() => { latest.current.tryStart(); latest.current.placeChips(); });
+  }, [onFrame]);
+  // a chip just mounted is placed before it paints
+  React.useLayoutEffect(() => { if (chip) placeChips(); }, [chip, placeChips]);
+
+  if (!live) return NO_GOTO;
+
+  const button = mode === 'personal' ? null : (
+    <button type="button" ref={buttonRef} className="sw-btn sw-btn-icon sw-goto-btn"
+      aria-label="Go to a book, chapter or verse" title="Go to ( / )" aria-haspopup="dialog" aria-expanded={isOpen}
+      onClick={() => (isOpen ? close() : open())}>
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+        <circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5L20.5 20.5" />
+      </svg>
+    </button>
+  );
+
+  const v = viewRef.current;
+  const compact = !!(v && v.H && v.H / (v.DPR || 1) <= 500);
+  const inset = (panelInsetRef && panelInsetRef.current && panelInsetRef.current.right) || 0;
+  const optId = (k) => 'sw-goto-opt-' + k;
+  const theBox = isOpen ? (
+    <div className={'sw-goto' + (compact ? ' is-compact' : '')} ref={boxRef} role="dialog" aria-label="Go to"
+      style={/** @type {any} */ ({ '--sw-goto-inset': inset + 'px' })}>
+      <div className="sw-goto-field">
+        <svg className="sw-goto-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+          <circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5L20.5 20.5" />
+        </svg>
+        <input ref={inputRef} className="sw-goto-input" type="text" value={query}
+          placeholder="Book, chapter or verse" aria-label="Go to a book, chapter or verse"
+          role="combobox" aria-expanded={rows.length > 0} aria-controls="sw-goto-list" aria-autocomplete="list"
+          aria-activedescendant={selAt >= 0 ? optId(selAt) : undefined}
+          autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="go"
+          onChange={(e) => { setQuery(e.target.value); setSel(0); }} onKeyDown={onInputKey} />
+      </div>
+      {rows.length ? (
+        <ul id="sw-goto-list" className="sw-goto-list" role="listbox" aria-label="Places">
+          {rows.map((row, k) => (
+            <li key={row.key} id={optId(k)} role="option" aria-selected={k === selAt}
+              className={'sw-goto-row' + (k === selAt ? ' is-sel' : '')}
+              onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setSel(k)} onClick={() => choose(row)}>
+              <span className="sw-goto-ref">{row.label}</span>
+              {row.sub ? <span className="sw-goto-sub">{' · ' + row.sub}</span> : null}
+              {row.text ? <span className="sw-goto-text">{' — ' + row.text}</span> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="sw-goto-hint">{GOTO_HINT}</div>
+    </div>
+  ) : null;
+
+  const theChip = chip ? (
+    <div className="sw-goto-chip" ref={chipElRef} aria-hidden="true">
+      {chip.label + ' · ' + connectionsText(chip.count)}
+    </div>
+  ) : null;
+  const edgeChip = (side) => {
+    const e = edges[side];
+    if (!e) return null;
+    return (
+      <button type="button" className={'sw-goto-edge sw-goto-edge-' + side} onClick={() => follow(side)}
+        style={side === 'right' ? { right: 'calc(' + inset + 'px + var(--sw-goto-gutter, 24px))' } : undefined}
+        aria-label={'Follow the line to ' + e.label}>
+        {side === 'left' ? '‹ ' + e.label : e.label + ' ›'}
+      </button>
+    );
+  };
+  const box = theBox || theChip || edges.left || edges.right
+    ? <>{theBox}{theChip}{edgeChip('left')}{edgeChip('right')}</> : null;
+
+  return { button, box, isOpen, open, close, selectCentre, step };
 }
 
 /**
- * Route a tap on an overlay target (CONTRACTS.md section 4). The navigation stream fills it in:
- * a book name frames the book (flyTo { x0, x1 }), a chapter numeral opens the chapter's group
- * (openPanel { mode: 'group', chapter }), a pill opens its group (openPanel { mode: 'group', ids,
- * label }), and each pushes onto the journey. The stub routes nothing.
+ * Route a tap on an overlay target (CONTRACTS.md section 4): a book name frames the book, a
+ * chapter numeral frames the chapter (about 70 % of the canvas area) and opens its group, a pill
+ * opens its group. A camera move is a journey arrival, pushed before the camera moves (the trail
+ * asks the go-to where it set out from).
  * @param {import('./overlay-renderer.js').OverlayHit | null} hit
  * @param {{ graph: any, flyTo: Function, openPanel: Function, journey: any }} nav
  * @returns {boolean} whether the tap was handled
  */
 export function routeOverlayHit(hit, nav) {
-  if (!hit || !nav) return false;
+  if (!hit || !nav || !nav.graph) return false;
+  const g = nav.graph;
+  if (hit.kind === 'book' || hit.kind === 'chapter') {
+    const ci = hit.kind === 'chapter' ? chapterIndexOf(g, hit.book, hit.chapter) : -1;
+    if (hit.kind === 'chapter' && ci < 0) return false;
+    const place = hit.kind === 'book' ? bookPlace(g, hit.book) : chapterPlace(g, ci);
+    if (!place) return false;
+    const frame = frameOf(g, place);
+    const open = hit.kind === 'chapter' ? { mode: 'group', chapter: ci } : undefined;
+    if (nav.journey) nav.journey.push({ verse: place.lo, label: place.label, open, span: [frame.x0, frame.x1] });
+    if (open && typeof nav.openPanel === 'function') nav.openPanel(open);
+    if (typeof nav.flyTo === 'function') nav.flyTo(frame);
+    return true;
+  }
+  if (hit.kind === 'pill') {
+    return typeof nav.openPanel === 'function' && !!nav.openPanel({ mode: 'group', ids: hit.ids, label: hit.label });
+  }
   return false;
 }

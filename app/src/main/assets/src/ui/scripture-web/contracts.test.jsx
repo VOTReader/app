@@ -305,20 +305,30 @@ describe('the overlay\'s tap targets (CONTRACTS.md section 4)', () => {
     expect(hitOverlay(fs, 5, 30)).toBeNull();
   });
 
-  it('routeOverlayHit routes nothing yet, so a tap on a recorded target still picks the line under it', () => {
+  // was "routeOverlayHit routes nothing yet" (the spine's stub); the navigation stream routes it
+  // now, and the law it pinned keeps its intent: the tap reaches routeOverlayHit before the line
+  // picking, and whatever it handles stops there (goto.test.jsx has each route's own cases)
+  it('a tap on a recorded target is routed before the line picking: a book name frames its book', () => {
     expect(routeOverlayHit(/** @type {any} */ (book), /** @type {any} */ ({}))).toBe(false);
     expect(routeOverlayHit(null, null)).toBe(false);
     const { get } = mount();
     get().overlayFrameRef.current = { v: { DPR: 1 }, hits: [{ x0: 0, y0: 0, x1: 800, y1: 360, hit: book }] };
-    // empty sky: the tap clears, as it always has
     act(() => { get().sel.openPanel({ mode: 'connection', arc: 1 }); });
     act(() => { get().sel.handlersRef.current.tap(400, 5); });
-    expect(get().sel.detail).toBeNull();
+    // the fixture's one book is the whole canon: the canon at fit, and the tap went no further
+    const c = get().cam.camRef.current;
+    expect(verseToX(c, 800, 0)).toBeCloseTo(0, 6);
+    expect(verseToX(c, 800, TOTAL)).toBeCloseTo(800, 6);
+    expect(get().sel.detail, "the open line stays: the tap was the name's").toMatchObject({ kind: 'arc', index: 1 });
+    expect(get().journey.stack.map((e) => e.label)).toEqual(['Genesis']);
   });
 });
 
 describe('the go-to (CONTRACTS.md sections 8 and 9)', () => {
-  it('fills the header slot with nothing today, the same object every render', () => {
+  // was "fills the header slot with nothing today" (the spine's stub); the go-to is real now
+  // (goto.test.jsx), and the law this keeps is its edge: a host without the web's camera gets the
+  // same frozen nothing every render, with every call safe
+  it('without the camera there is no go-to: nothing in the slot, the same object every render', () => {
     const { result, rerender } = renderHook(() => useGoTo({ start: { verse: { bookId: 'john', chapter: 3, verse: 16 } } }));
     const first = result.current;
     expect(first).toMatchObject({ button: null, box: null, isOpen: false });

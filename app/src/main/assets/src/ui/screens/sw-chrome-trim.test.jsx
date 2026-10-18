@@ -136,10 +136,30 @@ describe('the Scripture Web chrome, trimmed', () => {
     expect(screen.queryByLabelText('Zoom in')).toBeNull();
   });
 
-  it('renders NO "Go to" — deletion is the fix for a control that did not function', async () => {
+  /* Was 'renders NO "Go to" — deletion is the fix for a control that did not function'.
+     Corbin's words were "get rid of the 'go to' or fix it" (the w1 digest A2: flip this case
+     together with a working-control test). The navigation stream (w3) fixed it, so the law
+     keeps its intent: no Go to that does nothing. The old dead "Go to" pill is still gone, and
+     the search button there is opens a box that answers what is typed and closes again. */
+  it('renders no dead "Go to": the search button that replaced it opens a working box', async () => {
+    // the app's own book table (bundle-d ships it beside the web): the box reads names through it
+    const prev = window.VotSearchData;
+    // @ts-ignore -- a classic script: it sets window.VotSearchData
+    await import('../../../search-data.js');
     const { container } = await mount();
     expect(screen.queryByRole('button', { name: /^go to$/i })).toBeNull();
+    expect(container.querySelector('.sw-goto'), 'no box until asked').toBeNull();
+    const btn = screen.getByRole('button', { name: /go to a book, chapter or verse/i });
+    expect(btn.closest('.sw-controls').firstElementChild, 'first in the control row (spec 4.1)').toBe(btn);
+    fireEvent.click(btn);
+    const box = container.querySelector('.sw-goto');
+    expect(box).toBeTruthy();
+    const input = box.querySelector('input');
+    fireEvent.change(input, { target: { value: 'Genesis' } });
+    expect(box.querySelectorAll('.sw-goto-row').length, 'it answers what is typed').toBeGreaterThan(0);
+    fireEvent.keyDown(input, { key: 'Escape' });
     expect(container.querySelector('.sw-goto')).toBeNull();
+    window.VotSearchData = prev;
   });
 
   it('renders NO colour-mode select — distance is the only law, hard-wired', async () => {
