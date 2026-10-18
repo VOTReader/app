@@ -23,7 +23,7 @@
 import {
   clampCamera, fitPPV, xToVerse, zoomAbout,
 } from '../../utils/scripture-web/geometry.js';
-import { refOfVerse, lensRange } from '../../utils/scripture-web/pick.js';
+import { lensRange } from '../../utils/scripture-web/pick.js';
 import { DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { useWebCamera } from '../scripture-web/use-web-camera.js';
 import { useFrameScheduler } from '../scripture-web/use-frame-scheduler.js';
@@ -31,6 +31,7 @@ import { useForcedLandscape } from '../scripture-web/use-forced-landscape.js';
 import { useWebGraph, useChromeTokens, useWebRenderer } from '../scripture-web/use-web-renderer.js';
 import { usePersonalWeb } from '../scripture-web/use-personal-web.js';
 import { useWebSelection } from '../scripture-web/use-web-selection.js';
+import { useWebKeys } from '../scripture-web/use-web-keys.js';
 import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 /** @typedef {import('../../utils/scripture-web/decode.js').Density} Density */
 import { attachWebGestures } from '../scripture-web/gestures.js';
@@ -40,9 +41,7 @@ import {
   loadErrorPanel, legendFor,
 } from '../scripture-web/panels.jsx';
 import { startChapter } from '../../utils/scripture-web/chapter-connections.js';
-import {
-  votNodeName, verseTextFor, graphStats, densityHint, ZOOM_MAX_MESSAGE,
-} from '../../utils/scripture-web/describe.js';
+import { verseTextFor, graphStats, densityHint } from '../../utils/scripture-web/describe.js';
 import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
 
 /* The zoom ceiling (maxZoomOf), the frame, the render arguments and the y
@@ -262,82 +261,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     setMode(next);
   }, [closeCards]);
 
-  /** Close whatever is on top of the web, one layer a call: the guide, then
-   * the empty-web notice, then the panels and the hover chip together.
-   * Escape and Android Back both come here (v08-03), so they agree.
-   * @returns {boolean} whether there was anything to close */
-  const closeTopOverlay = React.useCallback(() => {
-    if (guideOpen) { closeGuide(); return true; }
-    if (emptyShown) { dismissEmpty(); return true; }
-    if (listOpen || choices || detail || tip) { closeCards(); return true; }
-    return false;
-  }, [guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards]);
-  // Android Back and the app's Escape dispatcher close the top overlay first
-  // instead of leaving the web (the hover chip alone is not worth a Back).
-  useModalRegistry({ id: 'scripture-web-overlay', dismiss: closeTopOverlay,
-    active: !!(guideOpen || emptyShown || listOpen || choices || detail) });
-
-  // ── keyboard (PWA desktop) ──────────────────────────────────────────────
-  const onKeyDown = React.useCallback((e) => {
-    // The web's keys are the web's while the web itself has focus. Keydown bubbles here from
-    // every control inside .sw-root: ArrowRight on the density <select> panned the camera and
-    // preventDefault cancelled the select's own change, and a Nearby row's arrows panned the web
-    // behind the list (sweep v72). Escape is the one key taken from anywhere: it closes the top
-    // layer, or leaves.
-    if (e.key !== 'Escape' && e.target !== e.currentTarget) return;
-    const v = viewRef.current;
-    // r2: the keys drive the rail the pointer last touched (the Bible rail
-    // until a gesture says otherwise); Reset (0) resets both
-    const onTop = modeRef.current === 'personal' && lastRailRef.current === 'top' && camVRef.current;
-    const cam = onTop ? camVRef.current : camRef.current;
-    if (!cam || !v.W) return;
-    const step = (v.W / cam.ppv) * 0.12;
-    const ceiling = zoomCapFor(cam);
-    const yf = yFrameFor(cam);
-    let atCeiling = false;
-    if (e.key === 'ArrowLeft') { cam.x -= step; }
-    else if (e.key === 'ArrowRight') { cam.x += step; }
-    else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      // 0.12 of the frame a press, like the x keys; a rail has no height.
-      // Up looks up: the picture moves down the frame, y grows.
-      if (!yf) return;
-      cam.y = (cam.y > 0 ? cam.y : 0) + (e.key === 'ArrowUp' ? 1 : -1) * 0.12 * yf.base;
-    }
-    else if (e.key === '+' || e.key === '=') {
-      const before = cam.ppv;
-      zoomAbout(cam, v.W, v.W / 2, 1.6, ceiling, yf || undefined);
-      atCeiling = cam.ppv === before;
-    }
-    else if (e.key === '-' || e.key === '_') { zoomAbout(cam, v.W, v.W / 2, 1 / 1.6, ceiling, yf || undefined); }
-    else if (e.key === '0') { resetView(); return; }
-    else if (e.key === 'Escape') {
-      // The notice is an overlay like the five below and goes first for the
-      // same reason they do: Escape dismisses what is on top before it leaves
-      // the screen. It lives HERE rather than in a handler of its own on the
-      // panel \u2014 a second handler closed the notice and let the keystroke
-      // through to onBack(), so one press both dismissed the tip and threw the
-      // reader out to the Library.
-      // v08-03: the app's own Escape dispatcher listens on the document; the
-      // keystroke stops here so it cannot close a panel AND leave the web,
-      // or leave twice when nothing is open.
-      e.preventDefault(); e.stopPropagation();
-      if (!closeTopOverlay() && onBack) onBack();
-      return;
-    } else return;
-    e.preventDefault();
-    dropHover();
-    clampCamera(cam, v.W, ceiling, yf);
-    const centre = Math.round(cam.x);
-    if (atCeiling) setAnnounce(ZOOM_MAX_MESSAGE);
-    // the Volumes rail's x is a rail position, not a verse id: name its own node (sweep v55)
-    else if (onTop) {
-      const name = votNodeName(personalRef.current && personalRef.current.votRail, centre);
-      if (name) setAnnounce(name);
-    }
-    else if (graph && centre >= 0 && centre < graph.total) setAnnounce(refOfVerse(graph, centre).label);
-    schedule();
-  }, [viewRef, lastRailRef, camVRef, camRef, zoomCapFor, yFrameFor, graph, schedule, resetView, closeTopOverlay, onBack, dropHover,
-    personalRef]);
+  // Escape, Android Back and the web's own keys (use-web-keys.js): one layer
+  // closes a press, then the keys pan, climb, zoom and reset
+  const { onKeyDown } = useWebKeys({
+    graph, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
+    camRef, camVRef, lastRailRef, viewRef, modeRef, personalRef, zoomCapFor, yFrameFor,
+    resetView, onBack, dropHover, setAnnounce, schedule,
+  });
 
   const openEndpoint = React.useCallback((endpoint) => {
     if (!endpoint || typeof navigateToLink !== 'function') return;
