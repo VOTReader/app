@@ -65,7 +65,7 @@ import {
   loadErrorPanel, legendFor,
 } from '../scripture-web/panels.jsx';
 import { startChapter } from '../../utils/scripture-web/chapter-connections.js';
-import { verseTextFor, graphStats, densityHint } from '../../utils/scripture-web/describe.js';
+import { verseTextFor, graphStats, densityHint, myWebHeadline, myWebSkippedLine } from '../../utils/scripture-web/describe.js';
 import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
 
 /* The zoom ceiling (maxZoomOf), the frame, the render arguments and the y
@@ -183,8 +183,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
   // My Web (use-personal-web.js): the reader's links built into the dual
   // rail, rebuilt live; railOpts() is what the rail renderer places them by
-  const { personalRef, personalCount, railOpts } = usePersonalWeb({
-    graph, mode, showUnderlay, camRef, camVRef, viewRef, frame, chromeRef, schedule,
+  const { personalRef, personalCount, contextCount, skippedCount, railOpts } = usePersonalWeb({
+    graph, mode, showUnderlay, camRef, camVRef, viewRef, frame, chromeRef, schedule, resumeRef, focusRef,
   });
 
   /**
@@ -362,12 +362,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         <div className="sw-title">
           <h1>{mode === 'personal' ? 'My Web' : 'The Scripture Web'}</h1>
           {mode === 'personal'
-            ? (personalCount === 0
-              /* An invitation, not a count of zero: "0 links you have made" under
-                 a fog was Corbin's screenshot of a dead screen (design-perf,
-                 2026-09-10). The number returns with the first link. */
-              ? <p>No links yet — select any text and tap Link.</p>
-              : <p>{personalCount.toLocaleString()} {personalCount === 1 ? 'link' : 'links'} you have made</p>)
+            /* "N links · M from Timothy's notes" (r2-05), the invitation with no
+               links (R3), and the links not on the web said, never dropped (item
+               27): describe.js, the My Web stream's words */
+            ? <>
+              <p>{myWebHeadline(personalCount, contextCount)}</p>
+              {skippedCount > 0 && <p>{myWebSkippedLine(skippedCount)}</p>}
+            </>
             /* The count shown, alone: "15,402 of 63,418" read as a fraction of
                something the reader had not asked about (Corbin, 2026-09-11:
                "just keep x connections"); the density hint that flashes on a
@@ -407,10 +408,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         ) : (
           <button type="button" className={'sw-btn sw-toggle' + (showUnderlay ? ' is-on' : '')} aria-pressed={showUnderlay}
             onClick={() => { setShowUnderlay(!showUnderlay); schedule(); }}
-            aria-label={'Corpus context · ' + (personalRef.current && personalRef.current.underlay
-              ? personalRef.current.underlay.count.toLocaleString() : '…') + ' curated connections'}>
-            Corpus context · {personalRef.current && personalRef.current.underlay
-              ? personalRef.current.underlay.count.toLocaleString() : '…'}
+            aria-label={'Corpus context · ' + (contextCount > 0 ? contextCount.toLocaleString() : '…') + ' curated connections'}>
+            Corpus context · {contextCount > 0 ? contextCount.toLocaleString() : '…'}
           </button>
         )}
         <button type="button" className="sw-btn" onClick={resetView} aria-label="Reset the view">Reset</button>

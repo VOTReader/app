@@ -366,3 +366,39 @@ export function curatedEndpoint(edge, node) {
   }
   return null;
 }
+
+/* ── My Web's words (w3, the My Web stream; spec Q8, r2-05) ────────────────
+   Sentence case, one line each. The counts are the BUILT web's (the reader's
+   links placed, Timothy's threads placed), so they never move with the
+   camera: the old toggle read a ref at render time and showed whichever
+   build the last zoom's render happened to see (1,314 one frame, 2,095 the
+   next, as the studies landed). */
+
+/**
+ * My Web's subtitle: "25 links · 2,095 from Timothy’s notes". With no links
+ * yet it is the invitation, never a count of zero (R3, design-perf
+ * 2026-09-10: "0 links you have made" under a fog read as a dead screen).
+ * @param {number} links the reader's links on the web
+ * @param {number} timothy Timothy's threads on the web (the curated underlay)
+ */
+export function myWebHeadline(links, timothy) {
+  if (!(links > 0)) return 'No links yet — select any text and tap Link.';
+  const head = links.toLocaleString() + (links === 1 ? ' link' : ' links');
+  return timothy > 0 ? head + ' · ' + timothy.toLocaleString() + ' from Timothy’s notes' : head;
+}
+
+/**
+ * The line under it when some of the reader's links could not be placed (a
+ * deleted letter, a corpus not loaded yet): said, never silently dropped
+ * (item 27). '' when every link is on the web.
+ * @param {number} skipped
+ */
+export function myWebSkippedLine(skipped) {
+  if (!(skipped > 0)) return '';
+  return skipped === 1 ? '1 link isn’t on the web yet' : skipped.toLocaleString() + ' links aren’t on the web yet';
+}
+
+/** The legend's two families, Timothy's first as the picture reads (r2-05). */
+export function myWebLegendWords() {
+  return { timothy: 'Timothy’s notes', yours: 'your links' };
+}
