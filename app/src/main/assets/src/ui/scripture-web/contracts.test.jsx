@@ -24,7 +24,7 @@ const graph = () => ({
 });
 
 /** The camera, the journey and the selection wired as the screen wires them. */
-function mount({ withCamera = true, mode = 'canonical', personal = null, rails = null, topbar = null } = {}) {
+function mount({ withCamera = true, mode = 'canonical', personal = null, rails = null, topbar = null, insetFor = undefined } = {}) {
   const g = graph();
   const schedule = vi.fn();
   const setAnnounce = vi.fn();
@@ -43,6 +43,7 @@ function mount({ withCamera = true, mode = 'canonical', personal = null, rails =
       graph: g, mode, density: 'famous', showUnderlay: false, resumeRef,
       camRef: cam.camRef, viewRef: cam.viewRef, focusRef: cam.focusRef, viewFor: cam.viewFor, yFrameFor: cam.yFrameFor,
       personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo: cam.flyTo, journey, schedule, setAnnounce,
+      insetFor,
     });
     return { cam, sel, journey, overlayFrameRef };
   });
@@ -133,10 +134,33 @@ describe('the panel API (CONTRACTS.md section 6): each mode opens today\'s card'
     expect(get().sel.panel.spec).toMatchObject({ mode: 'group', chapter: 0, label: 'Genesis 1' });
   });
 
-  it('a letter, a prophecy pair and an unknown arc have no card yet: nothing opens', () => {
+  it('a prophecy pair opens as a connection, chosen as the pair (no OpenBible arc joins it here)', () => {
     const { get } = mount();
-    for (const spec of [{ mode: 'letter', letterKey: 'two/the-wide-path' }, { mode: 'connection', arc: 0, prophecy: true },
-      { mode: 'connection', arc: 9 }, { mode: 'verse', verse: TOTAL }, { mode: 'group', ids: [], label: '' }]) {
+    let opened;
+    act(() => { opened = get().sel.openPanel({ mode: 'connection', arc: 0, prophecy: true }); });
+    expect(opened).toBe(true);
+    expect(get().sel.detail).toMatchObject({ kind: 'arc', index: -1, prophecyIndex: 0, prophecy: true, from: 5, to: 9000 });
+    expect(get().sel.panel.spec).toEqual({ mode: 'connection', arc: 0, prophecy: true });
+    expect(get().cam.focusRef.current).toMatchObject({ arc: 0, prophecy: true });
+  });
+
+  it('a letter opens with the verses it cites; one no curated edge carries opens nothing', () => {
+    const { get, g } = mount();
+    g.votEdges.push({ v: 300, key: 'two/the-wide-path', title: 'The Wide Path', volKey: 'two', letterId: 'the-wide-path', at: [{ p: 2 }] },
+      { v: 100, key: 'two/the-wide-path', title: 'The Wide Path', volKey: 'two', letterId: 'the-wide-path', at: [{ p: 5 }] });
+    let opened;
+    act(() => { opened = get().sel.openPanel({ mode: 'letter', letterKey: 'two/the-wide-path' }); });
+    expect(opened).toBe(true);
+    expect(get().sel.detail).toMatchObject({ kind: 'letter', letterKey: 'two/the-wide-path', title: 'The Wide Path', verses: [100, 300] });
+    expect(get().sel.panel.spec).toEqual({ mode: 'letter', letterKey: 'two/the-wide-path' });
+    act(() => { opened = get().sel.openPanel({ mode: 'letter', letterKey: 'two/no-such-letter' }); });
+    expect(opened).toBe(false);
+  });
+
+  it('an unknown arc, an out-of-range verse and an empty group still open nothing', () => {
+    const { get } = mount();
+    for (const spec of [{ mode: 'connection', arc: 9 }, { mode: 'connection', arc: 3, prophecy: true },
+      { mode: 'verse', verse: TOTAL }, { mode: 'group', ids: [], label: '' }]) {
       let opened;
       act(() => { opened = get().sel.openPanel(/** @type {any} */ (spec)); });
       expect(opened, JSON.stringify(spec)).toBe(false);
@@ -158,6 +182,16 @@ describe('the panel API (CONTRACTS.md section 6): each mode opens today\'s card'
       act(() => { opened = get().sel.openPanel(/** @type {any} */ (spec)); });
       expect(opened, mode).toBe(PANEL_MODES[mode]);
     }
+  });
+
+  it('opts.back keeps the open card as the new one\'s parent (the panel\'s way back)', () => {
+    const { get } = mount();
+    act(() => { get().sel.openPanel({ mode: 'connection', arc: 1 }); });
+    const first = get().sel.detail;
+    act(() => { get().sel.openPanel({ mode: 'verse', verse: 100 }, { back: true }); });
+    expect(get().sel.detail.parent).toBe(first);
+    act(() => { get().sel.openPanel({ mode: 'verse', verse: 200 }); });
+    expect(get().sel.detail.parent).toBeUndefined();
   });
 
   it('closePanel is the one close: the card goes and the focus is let go whole', () => {
@@ -198,6 +232,11 @@ describe('panelOf: today\'s open card in the panel\'s terms', () => {
     expect(panelOf({ kind: 'arc', index: -1, prophecy: true, prophecyIndex: 2 }, null).spec)
       .toEqual({ mode: 'connection', arc: 2, prophecy: true });
   });
+
+  it('a prophecy pair with no arc names the pair; a letter names its key', () => {
+    expect(panelOf({ kind: 'arc', index: -1, prophecyIndex: 2 }, null).spec).toEqual({ mode: 'connection', arc: 2, prophecy: true });
+    expect(panelOf({ kind: 'letter', letterKey: 'three/i-am-risen' }, null).spec).toEqual({ mode: 'letter', letterKey: 'three/i-am-risen' });
+  });
 });
 
 describe('the lit set (CONTRACTS.md section 2): lightThreads is its one writer', () => {
@@ -213,7 +252,10 @@ describe('the lit set (CONTRACTS.md section 2): lightThreads is its one writer',
     expect(schedule).toHaveBeenCalled();
     expect(get().cam.viewFor()).toMatchObject({ focusArc: 1, focusProphecy: -1, litKey: f.litKey });
     act(() => { get().sel.openPanel({ mode: 'verse', verse: 200 }); });
-    expect(get().cam.focusRef.current).toMatchObject({ lit: null, litKey: '' });
+    // a new choice replaces the set: verse mode lights the verse's own threads (arc 1, 200-300)
+    const v = get().cam.focusRef.current;
+    expect(Array.from(v.lit)).toEqual([1]);
+    expect(v.litKey).not.toBe(f.litKey);
     act(() => { get().sel.lightThreads([1]); });
     act(() => { get().sel.lightThreads(null); });
     expect(get().cam.focusRef.current).toMatchObject({ lit: null, litKey: '', range: [200, 200] });
@@ -296,12 +338,64 @@ describe('the journey (CONTRACTS.md section 7): a real trail since the navigatio
 
   it('Follow still lands on the far foot at the same zoom, through flyTo, and offers the way back', () => {
     const { get } = mount();
-    act(() => { get().sel.openPanel({ mode: 'connection', arc: 0 }); });
+    act(() => { get().sel.openPanel({ mode: 'connection', arc: 1 }); });
     const info = get().sel.detail;
-    expect(info.far).toBe('from'); // the camera sits nearer verse 20100
+    expect(info.far).toBe('from'); // the camera sat nearer verse 300 when it opened
+    const ppv = get().cam.camRef.current.ppv; // the zoom the opening framed
     act(() => { get().sel.followThread(info); });
-    expect(get().cam.camRef.current).toMatchObject({ x: 100, ppv: 8 });
+    expect(get().cam.camRef.current.x).toBeCloseTo(200, 6);
+    expect(get().cam.camRef.current.ppv).toBe(ppv);
     expect(get().sel.detail.far).toBe('to');
+  });
+});
+
+describe('the panel frames what it opens (spec section 3)', () => {
+  it('a connection is framed inside the canvas area the panel leaves, both feet in, 10 % margins', () => {
+    const { get } = mount({ insetFor: () => ({ right: 300, bottom: 0 }) });
+    act(() => { get().sel.openPanel({ mode: 'connection', arc: 1 }); });
+    const c = get().cam.camRef.current;
+    const a = verseToX(c, 800, 200), b = verseToX(c, 800, 300 + 1);
+    expect(a).toBeGreaterThan(0.09 * 500);
+    expect(b).toBeLessThan(500 - 0.09 * 500);
+    expect(a).toBeCloseTo(500 - b, 0); // centred in the 500 px area, not the 800 px canvas
+  });
+
+  it('a verse already in the area stays put; one under the panel is brought out, same zoom', () => {
+    const { get } = mount({ insetFor: () => ({ right: 300, bottom: 0 }) });
+    const before = { ...get().cam.camRef.current };
+    act(() => { get().sel.openPanel({ mode: 'verse', verse: 15540 }); }); // 84 px left of centre: in the area
+    expect(get().cam.camRef.current).toMatchObject({ x: before.x, ppv: before.ppv });
+    act(() => { get().sel.openPanel({ mode: 'verse', verse: 15580 }); }); // 232 px right of centre: under the panel
+    const c = get().cam.camRef.current;
+    expect(c.ppv).toBe(before.ppv);
+    const x = verseToX(c, 800, 15580.5);
+    expect(x).toBeGreaterThan(0);
+    expect(x).toBeLessThan(500);
+  });
+});
+
+describe('a row\'s Follow and the zoom row (the panel stream)', () => {
+  it('followRow swaps to that connection and goes to the end the row names', () => {
+    const { get } = mount();
+    act(() => { get().sel.openPanel({ mode: 'verse', verse: 200 }); });
+    act(() => { get().sel.followRow({ index: 1, hereVerse: 200, otherVerse: 300 }); });
+    expect(get().sel.detail).toMatchObject({ kind: 'arc', index: 1, far: 'from' });
+    expect(get().cam.camRef.current.x).toBeCloseTo(300, 6);
+    expect(get().cam.focusRef.current).toMatchObject({ arc: 1, lit: null });
+    // a row that names no thread does nothing
+    act(() => { get().sel.followRow({ index: 99, hereVerse: 0, otherVerse: 1 }); });
+    expect(get().sel.detail).toMatchObject({ index: 1 });
+  });
+
+  it('zoomTo closes the panel and fits the chapter across the canvas, ignoring the inset', () => {
+    const { get } = mount({ insetFor: () => ({ right: 300, bottom: 0 }) });
+    act(() => { get().sel.openPanel({ mode: 'group', ids: [1, 0], label: '' }); });
+    expect(get().sel.choices).toHaveLength(2);
+    act(() => { get().sel.zoomTo(0); });
+    expect(get().sel.choices).toBeNull();
+    expect(get().sel.detail).toBeNull();
+    expect(get().cam.focusRef.current).toMatchObject({ arc: -1, range: null, lit: null });
+    act(() => { get().sel.zoomTo(99); }); // no such chapter: nothing moves, nothing throws
   });
 });
 

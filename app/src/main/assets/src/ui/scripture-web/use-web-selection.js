@@ -20,10 +20,22 @@
      panel             { spec, info } | null: what is open, in the panel's terms
      lightThreads(ids) the lit set (focus.lit): the one writer of it
    The journey (use-journey.js) rides through here to the panel; Follow
-   pushes onto it and moves the camera with flyTo (use-web-camera.js). */
+   pushes onto it and moves the camera with flyTo (use-web-camera.js).
 
-import { zoomAbout, fitPPV } from '../../utils/scripture-web/geometry.js';
-import { pickThreads, pickChapter, pickVerse, chapterRange, nearbyChapter, nearbyThreads } from '../../utils/scripture-web/pick.js';
+   THE DOCKED PANEL (panel stream, 2026-10-18; web-panel.jsx draws it): a
+   chosen connection is FRAMED, both feet inside the canvas area the panel
+   leaves with 10 % margins (spec section 3, A3; panel-model connectionFrame),
+   the far foot read before the camera moves; a verse, a chapter or a bundle
+   moves the camera only when it would sit under the panel. A prophecy pair
+   and a letter open (their own describe.js kinds), verse mode lights the
+   verse's threads, and a row's Follow (followRow) swaps the panel to that
+   connection at its far end. */
+
+import { zoomAbout, fitPPV, verseToX } from '../../utils/scripture-web/geometry.js';
+import {
+  pickThreads, pickChapter, pickVerse, chapterRange, nearbyChapter, nearbyThreads, arcsTouching,
+} from '../../utils/scripture-web/pick.js';
+import { connectionFrame, chapterFrame } from '../../utils/scripture-web/panel-model.js';
 import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 import { focusState, withLit } from '../../utils/scripture-web/focus-state.js';
 import {
@@ -69,7 +81,13 @@ export const PANEL_MODES = Object.freeze({ connection: true, verse: true, group:
 export function panelOf(detail, choices) {
   if (detail) {
     const k = detail.kind;
-    if (k === 'arc') return { spec: detail.index < 0 && detail.prophecyIndex >= 0 ? { mode: 'connection', arc: detail.prophecyIndex, prophecy: true } : { mode: 'connection', arc: detail.index }, info: detail };
+    if (k === 'arc') {
+      // a prophecy pair the OpenBible data does not hold has no arc: its spec names the pair
+      return detail.index >= 0
+        ? { spec: { mode: 'connection', arc: detail.index }, info: detail }
+        : { spec: { mode: 'connection', arc: detail.prophecyIndex, prophecy: true }, info: detail };
+    }
+    if (k === 'letter') return { spec: { mode: 'letter', letterKey: detail.letterKey }, info: detail };
     if (k === 'verse') return { spec: { mode: 'verse', verse: detail.verse }, info: detail };
     if (k === 'chapter') {
       return { spec: { mode: 'group', ids: [], label: detail.book ? detail.book.title + ' ' + detail.chapter : '', chapter: detail.chapterIndex }, info: detail };
@@ -86,6 +104,9 @@ export function panelOf(detail, choices) {
   return null;
 }
 
+/** The camera's ease when the panel frames what it opened (spec section 3: 450 ms). */
+export const FRAME_MS = 450;
+
 /**
  * @param {any} p  the graph, mode, density and showUnderlay; the resume point
  *   (the sheet that was open); the cameras' refs and callbacks and flyTo
@@ -93,12 +114,14 @@ export function panelOf(detail, choices) {
  *   draw wrote (elevatorRef, badgeBoxesRef, overlayFrameRef); the journey
  *   (use-journey.js); the frame loop; the live region; My Web's relink
  *   (use-personal-web.js, optional): the chosen link found again after a rebuild; settledAt (the navigation stream, A6:
- *   use-web-camera.js's chapter at rest), which Nearby's list re-derives on
+ *   use-web-camera.js's chapter at rest), which Nearby's list re-derives on; insetFor (optional,
+ *   use-panel-layout.js): what the panel will cover once open, CSS px, so a
+ *   choice is framed before the panel has rendered
  */
 export function useWebSelection({
   graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, yFrameFor,
   personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce, relink = null,
-  settledAt,
+  settledAt, insetFor,
 }) {
   const [detail, setDetail] = React.useState(() => (resumeRef.current && resumeRef.current.detail) || null);      // the open sheet
   // My Web's rebuild found the chosen line again (use-personal-web's relink):
@@ -113,6 +136,9 @@ export function useWebSelection({
       return relink.at >= 0 ? Object.assign({}, d, { index: relink.at }) : null;
     });
   }, [relink]);
+  // the open card, for a panel opened from it (its parent: the way back in the panel)
+  const detailRef = React.useRef(detail);
+  detailRef.current = detail;
   const [choices, setChoices] = React.useState(null);    // overlapped line chooser
   const [listOpen, setListOpen] = React.useState(false); // accessible nearby list
   const [tip, setTip] = React.useState(null);            // hover chip
@@ -246,27 +272,65 @@ export function useWebSelection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graph, listOpen, mode, describe, showUnderlay, camRef, viewRef, density, personalRef, railOpts, settledAt]);
 
-  const commitFound = React.useCallback((found) => {
+  /**
+   * Keep what was opened in the canvas area (spec section 3). A connection is framed: both feet
+   * inside the area the panel leaves, 10 % margins (connectionFrame), eased over FRAME_MS. A verse,
+   * a chapter or a bundle moves only when its middle would sit under the panel (or off the left
+   * edge), centred in the area at the same zoom. My Web's cards stay where the reader put them.
+   */
+  const frameFound = React.useCallback((found) => {
+    const cam = camRef.current, v = viewRef.current;
+    if (!found || !cam || !v || !v.W || typeof flyTo !== 'function') return;
+    const inset = typeof insetFor === 'function' ? insetFor() : null;
+    /** @type {any} */
+    const opts = { ms: FRAME_MS };
+    if (inset) { opts.insetRight = inset.right; opts.insetBottom = inset.bottom; }
+    if (found.kind === 'arc') { flyTo(connectionFrame(found.from, found.to), opts); return; }
+    const range = found.kind === 'verse' ? [found.verse, found.verse]
+      : found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi] : null;
+    if (!range || mode === 'personal') return;
+    const mid = (range[0] + range[1] + 1) / 2;
+    const x = verseToX(cam, v.W, mid) / (v.DPR || 1);
+    const areaW = v.W / (v.DPR || 1) - (inset ? inset.right : 0);
+    if (x < 0 || x > areaW - 24) flyTo({ x: mid }, opts);
+  }, [camRef, viewRef, flyTo, insetFor, mode]);
+
+  /**
+   * Choose a described hit: it opens in the panel, the focus is its own, and the camera keeps it in
+   * the canvas area (frameFound). `opts.frame: false` re-shows a card without moving the camera (the
+   * panel's way back); `opts.parent` is the card it was opened from.
+   * @param {any} found
+   * @param {{ frame?: boolean, parent?: any }} [opts]
+   */
+  const commitFound = React.useCallback((found, opts = {}) => {
     if (!found) return;
-    // the far foot is the one further from the camera: what Follow pans to
-    if (found.kind === 'arc' && camRef.current) {
+    const o = /** @type {{ frame?: boolean, parent?: any }} */ (opts && typeof opts === 'object' && !('nativeEvent' in opts) ? opts : {});
+    // the far foot is the one further from the camera: what Follow pans to, read BEFORE the
+    // framing moves the camera to the middle
+    if (found.kind === 'arc' && camRef.current && !found.far) {
       const x = camRef.current.x;
       found = Object.assign({}, found, { far: Math.abs(found.to - x) >= Math.abs(found.from - x) ? 'to' : 'from' });
     }
-    // a new choice: nothing hovered, nothing lit but what the choice lights
-    // (a Timothy thread is chosen in its own list: focus.underlay, fix-review #4)
-    focusRef.current = focusState(found.kind === 'arc' || found.kind === 'link' || found.kind === 'underlay'
-      ? (found.kind === 'arc' && found.index < 0 && found.prophecyIndex >= 0 ? { arc: found.prophecyIndex, prophecy: true }
-        : { arc: found.index, underlay: found.kind === 'underlay' })
-      : { range: found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi]
-        : found.kind === 'verse' ? [found.verse, found.verse] : null });
+    if (o.parent !== undefined) found = Object.assign({}, found, { parent: o.parent });
+    // a new choice: nothing hovered, nothing lit but what the choice lights. A prophecy pair the
+    // OpenBible data does not hold is chosen as the pair; verse mode lights the verse's threads
+    // (CONTRACTS.md section 6) and keeps the verse lit as a range. On My Web a Timothy thread is
+    // chosen in its own list (focus.underlay, fix-review #4)
+    const g = graph;
+    focusRef.current = focusState(found.kind === 'arc'
+      ? (found.index >= 0 ? { arc: found.index } : { arc: found.prophecyIndex, prophecy: true })
+      : found.kind === 'link' || found.kind === 'underlay' ? { arc: found.index, underlay: found.kind === 'underlay' }
+      : found.kind === 'verse' ? { range: [found.verse, found.verse],
+        lit: g ? arcsTouching(g, found.verse, found.verse, density, 0) : null }
+      : { range: found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi] : null });
     setTip(null);
     setChoices(null);
     setListOpen(false);
     setDetail(found);
     setAnnounce(summaryOf(found));
+    if (o.frame !== false) frameFound(found);
     schedule();
-  }, [camRef, focusRef, schedule, setAnnounce]);
+  }, [camRef, focusRef, schedule, setAnnounce, graph, density, frameFound]);
 
   const hover = React.useCallback((cx, cy) => {
     hoverPointRef.current = { cx, cy };
@@ -303,30 +367,45 @@ export function useWebSelection({
   }, []);
 
   /**
-   * Open the panel (CONTRACTS.md section 6). THE STUB MAPS EACH MODE ONTO TODAY'S CARDS, so it is
-   * behaviour-neutral: connection opens the connection sheet; verse the verse sheet; group the
-   * chooser's rows (its ids), or the chapter sheet when it names only a chapter; a letter and a
-   * prophecy connection have no card yet and open nothing. The panel stream replaces the body with
-   * the docked panel and keeps the signature.
+   * Open the panel (CONTRACTS.md section 6) in one of its modes (web-panel.jsx draws them): a
+   * connection (an OpenBible arc, or a prophecy pair by its index), a verse, a group (the chooser's
+   * rows for ids, or a chapter), a letter (the verses it cites). Each is chosen through commitFound,
+   * so the focus, the lit set and the framing are the tap's own. `opts.back` keeps the open card as
+   * the new one's parent (a letter opened from a citation, a verse from that letter).
    * @param {PanelSpec} spec
+   * @param {{ back?: boolean }} [opts]
    * @returns {boolean} whether a panel opened
    */
-  const openPanel = React.useCallback((spec) => {
+  const openPanel = React.useCallback((spec, opts = {}) => {
     const g = graph;
     if (!g || !spec) return false;
+    const via = opts && opts.back ? { parent: detailRef.current } : undefined;
     const arcHit = (i) => ({ kind: 'arc', hit: { index: i, from: g.from[i], to: g.to[i], votes: g.votes[i] } });
     if (spec.mode === 'connection') {
-      if (spec.prophecy || !(spec.arc >= 0 && spec.arc < g.count)) return false;
+      if (spec.prophecy) {
+        if (!(g.prophecy && spec.arc >= 0 && spec.arc < g.prophecy.length)) return false;
+        const info = describe({ kind: 'prophecy', prophecy: spec.arc });
+        if (!info) return false;
+        commitFound(info, via);
+        return true;
+      }
+      if (!(spec.arc >= 0 && spec.arc < g.count)) return false;
       const info = describe(arcHit(spec.arc));
       if (!info) return false;
-      commitFound(info);
+      commitFound(info, via);
+      return true;
+    }
+    if (spec.mode === 'letter') {
+      const info = describe({ kind: 'letter', letterKey: spec.letterKey });
+      if (!info) return false;
+      commitFound(info, via);
       return true;
     }
     if (spec.mode === 'verse') {
       if (!(spec.verse >= 0 && spec.verse < g.total)) return false;
       const info = describe({ kind: 'verse', verse: spec.verse });
       if (!info) return false;
-      commitFound(info);
+      commitFound(info, via);
       return true;
     }
     if (spec.mode === 'group') {
@@ -345,7 +424,7 @@ export function useWebSelection({
       if (spec.chapter >= 0 && spec.chapter < g.chapters.length) {
         const info = describe({ kind: 'chapter', chapterIndex: spec.chapter });
         if (!info) return false;
-        commitFound(info);
+        commitFound(info, via);
         return true;
       }
       return false;
@@ -441,14 +520,52 @@ export function useWebSelection({
     const end = toFar ? info.b : info.a;
     // the journey records the arrival, and where it set out from (the near foot), so Back comes
     // home with this line open again (use-journey.js)
-    const open = { mode: 'connection', arc: info.index };
+    // (a prophecy pair the OpenBible data does not hold is reopened as the pair)
+    const open = info.index >= 0 ? { mode: 'connection', arc: info.index }
+      : { mode: 'connection', arc: info.prophecyIndex, prophecy: true };
     if (journey) journey.push({ verse, label: end.label, open }, { verse: toFar ? info.from : info.to, label: (toFar ? info.a : info.b).label, open });
     // the camera goes there through flyTo: same zoom, clamped (instant today; the ease is nav's)
-    flyTo({ x: verse });
+    flyTo({ x: verse }, { ms: FRAME_MS });
     setDetail(Object.assign({}, info, { far: toFar ? 'from' : 'to' }));
     setAnnounce(followAnnouncement(end.label));
     schedule();
   }, [camRef, flyTo, journey, schedule, setAnnounce]);
+
+  /**
+   * Follow a listed thread (a MORE FROM or a verse-mode row) to its far end: the panel swaps to that
+   * connection, the camera goes to the end the row names at the zoom it has, and the connection's
+   * own Follow then names the end the reader came from (spec 4.6 "Follow").
+   * @param {{ index: number, hereVerse: number, otherVerse: number }} row
+   */
+  const followRow = React.useCallback((row) => {
+    const g = graph;
+    if (!g || !row || !(row.index >= 0 && row.index < g.count)) return;
+    const info = describe({ kind: 'arc', hit: { index: row.index, from: g.from[row.index], to: g.to[row.index], votes: g.votes[row.index] } });
+    if (!info) return;
+    const far = info.to === row.otherVerse ? 'from' : 'to';
+    const here = far === 'from' ? info.a : info.b, there = far === 'from' ? info.b : info.a;
+    if (journey) {
+      if (!journey.stack.length) journey.push({ verse: row.hereVerse, label: here.label });
+      journey.push({ verse: row.otherVerse, label: there.label });
+    }
+    focusRef.current = focusState({ arc: row.index });
+    setTip(null); setChoices(null); setListOpen(false);
+    setDetail(Object.assign({}, info, { far }));
+    if (camRef.current) flyTo({ x: row.otherVerse }, { ms: FRAME_MS });
+    setAnnounce(followAnnouncement(there.label));
+    schedule();
+  }, [graph, describe, journey, focusRef, camRef, flyTo, schedule, setAnnounce]);
+
+  /** "Zoom to <chapter>" (the chooser's last row, Q7): the panel closes and the chapter fills about
+   * 70 % of the canvas (panel-model chapterFrame). @param {number} chapterIndex */
+  const zoomTo = React.useCallback((chapterIndex) => {
+    const frame = graph ? chapterFrame(graph, chapterIndex) : null;
+    if (!frame) return;
+    setListOpen(false); setChoices(null); setDetail(null); setTip(null);
+    focusRef.current = focusState();
+    flyTo(frame, { insetRight: 0, insetBottom: 0, ms: FRAME_MS });
+    schedule();
+  }, [graph, focusRef, flyTo, schedule]);
 
   // A bundle's group, chosen in its sheet: the pair of ranges the shader and
   // the picker draw and spotlight (uFocusRange2). Choosing the
@@ -470,6 +587,7 @@ export function useWebSelection({
   return {
     tip, choices, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
     handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread, chooseGroup,
+    followRow, zoomTo, describe,
     panel, openPanel, closePanel: closeCards, lightThreads, journey,
   };
 }

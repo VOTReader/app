@@ -96,8 +96,8 @@ export function citedRows(g, verses, corpus) {
 }
 
 /**
- * @typedef {{ index: number, here: ReturnType<typeof refOfVerse>, other: ReturnType<typeof refOfVerse>,
- *   otherVerse: number, votes: number }} ThreadRow
+ * @typedef {{ index: number, here: ReturnType<typeof refOfVerse>, hereVerse: number,
+ *   other: ReturnType<typeof refOfVerse>, otherVerse: number, votes: number }} ThreadRow
  * @typedef {{ book: number, title: string, rows: ThreadRow[] }} ThreadGroup
  */
 
@@ -124,7 +124,7 @@ export function threadsFrom(g, lo, hi, density, skip = -1) {
     const ref = refOfVerse(g, other);
     const book = g.chapters[ref.chapterIndex][0];
     if (!byBook.has(book)) byBook.set(book, []);
-    /** @type {ThreadRow[]} */ (byBook.get(book)).push({ index: i, here: refOfVerse(g, here), other: ref, otherVerse: other, votes: g.votes[i] });
+    /** @type {ThreadRow[]} */ (byBook.get(book)).push({ index: i, here: refOfVerse(g, here), hereVerse: here, other: ref, otherVerse: other, votes: g.votes[i] });
     ids.push(i);
   }
   const groups = [...byBook.keys()].sort((x, y) => x - y).map((book) => {
