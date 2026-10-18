@@ -143,19 +143,22 @@ describe('app.css — Scripture Web panel scrolling (scripture-web-2/8)', () => 
     expect(block).toContain('touch-action: pan-y');
     expect(block).toContain('overscroll-behavior: contain');
   });
-  it('a rotated phone caps panels against the rotated root (100vw tall), not the physical viewport', () => {
-    // The base rules cap these in vh (52vh / 46vh / 62vh) against the
-    // PHYSICAL viewport height, but `.sw-root.sw-rotated` is `height: 100vw`
-    // — so at depth the panel is sized taller than the instrument and
-    // overflows before touch-action ever gets a chance to help.
-    const sheetBlock = ruleBlock(CSS, '.sw-root.sw-rotated .sw-sheet');
-    expect(sheetBlock).not.toBeNull();
-    expect(sheetBlock).toContain('max-height: 46vw');
-    // .sw-choice and .sw-list share one comma-joined rule (not ruleBlock —
-    // the selector list itself, not a declaration, is what's being pinned).
+  it('a rotated phone sizes panels against the rotated root (100vw tall), not the physical viewport', () => {
+    // `.sw-root.sw-rotated` is `height: 100vw`, so a panel capped in vh against
+    // the PHYSICAL viewport is taller than the instrument and overflows before
+    // touch-action ever gets a chance to help. The docked panel (w3, rewritten
+    // to that intent: the old floating panels' 46vw / 62vw caps went with
+    // them) takes no viewport unit at all: it is top 0 / bottom 0 of the root,
+    // the rotated root's own height, and the sheet's height is --sw-sheet-h,
+    // measured from the root's own box (use-panel-layout.js).
+    const dock = ruleBlock(CSS, '.sw-panel, .sw-sheet, .sw-choice, .sw-list');
+    expect(dock).not.toBeNull();
+    expect(dock).toMatch(/\btop:\s*0;/);
+    expect(dock).toMatch(/\bbottom:\s*0;/);
     const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(bare).toMatch(
-      /\.sw-root\.sw-rotated \.sw-choice,\s*\.sw-root\.sw-rotated \.sw-list\s*\{\s*max-height:\s*62vw;\s*\}/);
+    expect(bare, 'no panel is capped in vh').not.toMatch(/\.sw-(?:panel|sheet|choice|list)\b[^{}]*\{[^}]*max-height:\s*[\d.]+vh/);
+    const sheet = ruleBlock(CSS, '.sw-root[data-panel="sheet"] .sw-panel');
+    expect(sheet).toMatch(/height:\s*var\(--sw-sheet-h/);
   });
 });
 
