@@ -99,7 +99,7 @@ uniform float uCamY;         // the picture's shift down the frame, device px
 uniform vec2  uFrameH;       // the heights a body must reach to be in the frame (geometry.frameHeights)
 uniform float uPx;           // full-resolution px per backing px: 1 at rest, more in a gesture (E2)
 uniform float uWidth, uAlpha, uTotal;
-uniform float uSegments;     // this draw's segment count: every thread in it asked for exactly this many
+uniform float uSegments;     // this run's segment count: the most any thread in it asked for
 uniform float uVoteMix;      // 0 = votes drive alpha (overview), 1 = width (depth)
 uniform vec2  uFocusRange;   // verse range kept lit (lo > hi = no focus)
 uniform vec2  uFocusRange2;  // with uFocusRange: a GROUP, one foot in each, lit AND drawn
