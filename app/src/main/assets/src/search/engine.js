@@ -34,6 +34,7 @@ import { snippet, snippetAt, highlightSpans, matchExcerpt, morePlaces, findPlace
 import {
   KIND_BOOST, coverageMultiplier, popcount, PHRASE_BOOST, SYNONYM_DEMOTION,
   BM25_PARAMS, KEYWORD_BM25, KEYWORD_CONTENT_WORDS, KEYWORD_WORDS, joinApostropheS, SYNONYM_WEIGHT, FORM_WEIGHT, NEAR_PHRASE_MIN, ORIGINAL_BOOST, REPRINT_KINDS, nearPhrase, titleMatch, TITLE_EXACT_BOOST,
+  titleLevel, TITLE_LEVEL_LEAD, TITLE_LEAD,
 } from './ranking.js';
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
 import { onIdle } from '../utils/on-idle.js';
@@ -385,6 +386,26 @@ function docTokens(id, doc) {
   }
   return t;
 }
+/* A TITLE'S WORDS, READ ONCE (search200 B1, 2026-10-18). The title pass read every candidate's title through
+   kjvEncode on every query. A study chapter is titled "Study — Chapter" (index-builder.js), and a reader types the
+   chapter's title alone ("The Unleavened Loaves"): that part is a title of its own, typed whole. Keyed by the
+   title (a study's apart), so a text needs no id here; emptied with the index. */
+/** @type {Map<string, {all: string[], own: string[]|null}>} */
+const TITLE_TOKS = new Map();
+/** @param {{title?: string, kind?: string}} d */
+function titleToks(d) {
+  const title = d.title || '';
+  const study = d.kind === 'bible-study';
+  const key = study ? 'study|' + title : title;
+  let t = TITLE_TOKS.get(key);
+  if (!t) {
+    const cut = study ? title.lastIndexOf(' — ') : -1;
+    const own = cut >= 0 ? kjvEncode(title.slice(cut + 3)) : null;
+    t = { all: kjvEncode(title), own: own && own.length ? own : null };
+    TITLE_TOKS.set(key, t);
+  }
+  return t;
+}
 /** The phrase ranking reads at most this many of the best-scored texts. */
 const PHRASE_CANDIDATES = 500;
 /** A close match holds this share of the query's content words in one passage, rare words weighing most (sr13). */
@@ -646,6 +667,10 @@ const STUDY_REACH = 3;
 /** Named titles read for one the query names more nearly than the first's, and by how much more. */
 const TITLE_REACH = 5;
 const TITLE_NEARER = 0.2;
+/** How far down a title typed whole (titleLevel) is looked for, to lead (search200 B1). */
+const TITLE_ORDER_REACH = 30;
+/** A verse first that holds this many typed words in a row keeps its place over a title typed whole. */
+const VERSE_RUN_HELD = 4;
 /** Typed words, one of them a content word, that read as a quote when held in a row. */
 const SMALL_RUN_MIN = 4;
 /** Who reprints whom: a text yields only to an original of a LOWER tier (Words To Live By excerpts the letters). */
@@ -1207,6 +1232,7 @@ function reshapeDoc(r) {
 function swapIn(/** @type {any} */ ms, /** @type {typeof stats} */ st) {
   TOKEN_CACHE.clear();
   tokenCacheSize = 0;
+  TITLE_TOKS.clear();
   ORIGINALS = null;
   ORIGINALS_BUILD = null;
   EXCERPTS_FOR = null;
@@ -1743,13 +1769,19 @@ async function search(query, options) {
       if (d && !REPRINT_KINDS.has(d.kind)) scoreMap[rankedIds[i]] *= ORIGINAL_BOOST;
     }
   }
+  /** How the query names a text's title (ranking.js titleMatch); a study chapter's by its own title too. */
+  const titleScore = (/** @type {any} */ d) => {
+    const t = titleToks(d);
+    const all = titleMatch(t.all, typedTokens, STOP);
+    return t.own ? Math.max(all, titleMatch(t.own, typedTokens, STOP)) : all;
+  };
   // A title typed whole, or a run of it, ranks its unit up (ranking.js titleMatch).
   if (typedTokens.length) {
     for (let i = 0; i < rankedIds.length; i++) {
       if (spent()) { const r = await pause(); if (r) return r; }
       const d = docLookup[rankedIds[i]];
       if (!d || !d.title || d.kind === 'verse') continue;
-      const tm = titleMatch(kjvEncode(d.title), typedTokens, STOP);
+      const tm = titleScore(d);
       if (tm > 1) scoreMap[rankedIds[i]] *= tm;
     }
   }
@@ -1831,12 +1863,44 @@ async function search(query, options) {
   const typedContent = typedTokens.filter((w) => !(STOP && STOP.has(w)));
   const named = (/** @type {any} */ d) => {
     if (!d.title) return false;
-    const tt = kjvEncode(d.title);
-    return titleMatch(tt, typedTokens, STOP) > 1 || (keyword && typedContent.length > 0 && typedContent.every((w) => tt.indexOf(w) >= 0));
+    const tt = titleToks(d).all;
+    return titleScore(d) > 1 || (keyword && typedContent.length > 0 && typedContent.every((w) => tt.indexOf(w) >= 0));
   };
-  // Two titles the query names: the one it names more nearly leads ("the high holy days" names The Holy Days, not Regarding The Holy Days of God).
-  if (out.length > 1 && out[0].doc.title && !keyword) {
-    const tm = (/** @type {any} */ d) => (d.title ? titleMatch(kjvEncode(d.title), typedTokens, STOP) : 1);
+  /* THE TITLE TYPED LEADS (search200 B1, 2026-10-18). titleMatch scores a title typed whole x3 with its leading
+     Regarding/The/A/An left off, so "Fasting" and "Regarding Fasting", "Watchmen" and "The Watchmen" tied, and
+     body BM25 chose: the dense Answers topic, or the short Words To Live By entry, led the letter whose title was
+     typed (weak-spots T1: 21 of the 52 whole-title sweep failures), and a near title over a richer body beat the
+     title typed whole (T3). Among the first TITLE_ORDER_REACH, keyword searches too, the text whose title the query
+     is leads. Which, when several are: a lead word typed is a word of the title, so "the gatekeepers" names "The
+     Gatekeepers" (titleLevel 4) before "Gatekeepers" (3), and then the original (ORIGINAL_TIER: a letter, then Words
+     To Live By, Holy Days, a study, Answers); a lead word left off says nothing (readers drop it: open case t233,
+     "true baptism" for the letter "The True Baptism", whose Words To Live By entry is "True Baptism"), so the original
+     first, then the title as typed; then the score. A verse first that holds a quote of VERSE_RUN_HELD typed words
+     or more as typed keeps its place (T4's default). */
+  const levelOf = (/** @type {any} */ d) => {
+    if (!d.title || d.kind === 'verse') return 0;
+    const t = titleToks(d);
+    return Math.max(titleLevel(t.all, typedTokens), t.own ? titleLevel(t.own, typedTokens) : 0);
+  };
+  let typedTitle = -1;
+  if (out.length > 1 && typedTokens.length) {
+    const leadTyped = TITLE_LEAD.has(typedTokens[0]) && typedTokens.length > 1;
+    let best = 0;
+    for (let r = 0; r < Math.min(out.length, TITLE_ORDER_REACH); r++) {
+      const lv = levelOf(out[r].doc);
+      if (lv < TITLE_LEVEL_LEAD) continue;
+      const t = 9 - (ORIGINAL_TIER[out[r].doc.kind] ?? 5);
+      // out is in score order, so the first of equal keys is the higher score
+      const key = leadTyped ? lv * 10 + t : t * 10 + lv;
+      if (key > best) { typedTitle = r; best = key; }
+    }
+    const f = out[0];
+    const verseHolds = f.doc.kind === 'verse' && typedTokens.length >= VERSE_RUN_HELD && hasTokenRun(docTokens(idOf.get(f) || '', f.doc), typedTokens);
+    if (typedTitle > 0 && !verseHolds) out.unshift(out.splice(typedTitle, 1)[0]);
+  }
+  // Two titles the query names, none typed whole: the one it names more nearly leads ("the high holy days" names The Holy Days, not Regarding The Holy Days of God).
+  if (typedTitle < 0 && out.length > 1 && out[0].doc.title && !keyword) {
+    const tm = (/** @type {any} */ d) => (d.title ? titleScore(d) : 1);
     const t0 = tm(out[0].doc);
     if (t0 > 1) {
       let b = 0;
@@ -1874,8 +1938,8 @@ async function search(query, options) {
      words runs through (the text holds more of the query in a row than the title does), does not. */
   const namedSo = (/** @type {any} */ d) => {
     if (!named(d)) return false;
-    const tt = kjvEncode(d.title);
-    if (titleMatch(tt, typedTokens, STOP) >= TITLE_EXACT_BOOST) return true;
+    const tt = titleToks(d).all;
+    if (titleScore(d) >= TITLE_EXACT_BOOST) return true;
     const tl = new Set(tt.map(lemma));
     const inTitle = typedContent.filter((w) => tl.has(lemma(w))).length;
     const beside = typedContent.length - inTitle;

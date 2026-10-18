@@ -92,7 +92,7 @@ export const FORM_WEIGHT = 0.7;
 export const NEAR_PHRASE_MIN = 0.5;
 /** A title typed whole; the leading words a title opens with that readers leave off. */
 export const TITLE_EXACT_BOOST = 3;
-const TITLE_LEAD = new Set(['regarding', 'the', 'a', 'an']);
+export const TITLE_LEAD = new Set(['regarding', 'the', 'a', 'an']);
 /** The original over a reprint when both hold the typed words together: a letter, a
  *  verse, a Words To Live By or a Blessed entry over the Answers topic, Holy Days
  *  entry or Bible study that quotes it (they are compilations of the letters and
@@ -273,14 +273,37 @@ function titleWords(/** @type {string[]} */ titleToks, /** @type {string[]} */ q
   if (joinApostropheS(qTokens).filter((w) => !TITLE_LEAD.has(w) && !tl.has(lemma(w))).length > 1) return 1;
   return 1 + (TITLE_EXACT_BOOST - 1) * TITLE_BAG_RATE * (0.5 + 0.5 * q.length / t.length);
 }
+/** A title's or a query's words with the lead words a title opens with taken off (the last word stays). */
+const stripLead = (/** @type {string[]} */ x) => { let i = 0; while (i < x.length - 1 && TITLE_LEAD.has(x[i])) i++; return x.slice(i); };
+const sameWords = (/** @type {string[]} */ a, /** @type {string[]} */ b) => a.length === b.length && a.every((w, i) => w === b[i]);
+/** The title typed as written: TITLE_LEVEL_TYPED. */
+export const TITLE_LEVEL_TYPED = 4;
+/** The title typed with its leading Regarding / The / A / An left off, or put on: TITLE_LEVEL_LEAD. */
+export const TITLE_LEVEL_LEAD = 3;
+/**
+ * How exactly the typed words are a title (search200 B1, 2026-10-18): TITLE_LEVEL_TYPED when they are
+ * the title as written (case, punctuation and a possessive's apostrophe aside), TITLE_LEVEL_LEAD when
+ * they are once a leading Regarding / The / A / An is taken off both, else 0. titleMatch scores both
+ * x TITLE_EXACT_BOOST, so "Fasting" and "Regarding Fasting" tied and body BM25 settled it: the dense
+ * Answers topic led the letter whose title the reader typed (weak-spots T1, 21 sweep failures).
+ * @param {string[]} titleToks
+ * @param {string[]} qTokens
+ * @returns {number}
+ */
+export function titleLevel(titleToks, qTokens) {
+  if (!titleToks || !titleToks.length || !qTokens || !qTokens.length) return 0;
+  const t = joinApostropheS(titleToks);
+  const q = joinApostropheS(qTokens);
+  if (sameWords(t, q)) return TITLE_LEVEL_TYPED;
+  return sameWords(stripLead(t), stripLead(q)) ? TITLE_LEVEL_LEAD : 0;
+}
 function titleInOrder(/** @type {string[]} */ titleToks, /** @type {string[]} */ qTokens) {
   if (!titleToks || !titleToks.length || !qTokens || !qTokens.length) return 1;
   const t = joinApostropheS(titleToks);
   const q = joinApostropheS(qTokens);
-  const strip = (/** @type {string[]} */ x) => { let i = 0; while (i < x.length - 1 && TITLE_LEAD.has(x[i])) i++; return x.slice(i); };
-  const tt = strip(t);
-  const qq = strip(q);
-  if (tt.length === qq.length && tt.every((w, i) => w === qq[i])) return TITLE_EXACT_BOOST;
+  const tt = stripLead(t);
+  const qq = stripLead(q);
+  if (sameWords(tt, qq)) return TITLE_EXACT_BOOST;
   if (q.length < 2) return 1;
   const common = commonInOrder(q, t);
   if (common < 2) return 1;
