@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { heldShare, recurring, reprintShown, nearCopy } from './rules.mjs';
+import { heldShare, recurring, reprintShown, nearCopy, titleForms, rangeHolds, pairHolds } from './rules.mjs';
 
 const w = (s) => s.split(' ');
 const entry = w('do not fear the days ahead for i am with you and i will keep you through the fire and the flood says the lord');
@@ -84,5 +84,48 @@ describe('nearCopy (a recurring line with a word or two changed)', () => {
   });
   it('a line too short to tell from a formula judges nothing', () => {
     expect(nearCopy(w('i am the lord your god'), w('i am the lord your god'), stop, 'lord')).toBe(false);
+  });
+});
+
+describe('titleForms (tri bench, PLAN 1.6: a study chapter is linked by its short title too)', () => {
+  const study = 'YAHUSHUA More Than a Man: YahuShua Is The Fulfillment of All Messianic Prophecy (Extensive Bible/Letter Study) — Section One: YahuShua The Messiah, God With Us';
+  it('a study chapter is filed under its whole title and under the chapter title alone', () => {
+    expect(titleForms(study, true)).toEqual([study, 'Section One: YahuShua The Messiah, God With Us']);
+  });
+  it('a chapter title that itself holds " — " keeps the rest whole', () => {
+    expect(titleForms('The Lamb of God — Part 3 — Without Spot or Blemish', true)).toEqual(['The Lamb of God — Part 3 — Without Spot or Blemish', 'Part 3 — Without Spot or Blemish']);
+  });
+  it('any other unit keeps its one title, a dash in it or not', () => {
+    expect(titleForms('Stand — and Wait', false)).toEqual(['Stand — and Wait']);
+    expect(titleForms('Without Spot or Blemish', false)).toEqual(['Without Spot or Blemish']);
+  });
+  it('a study chapter with nothing after the dash, or no dash, has one form', () => {
+    expect(titleForms('Lamb of God — ', true)).toEqual(['Lamb of God — ']);
+    expect(titleForms('Lamb of God', true)).toEqual(['Lamb of God']);
+  });
+});
+
+describe('rangeHolds / pairHolds (a Bible card; a merged Bible misquote passes on either verse)', () => {
+  const card = (chapter, chapterEnd, verseStart, verseEnd) => ({ chapter, chapterEnd, verseStart, verseEnd });
+  it('a whole-chapter card holds every verse of its chapters', () => {
+    expect(rangeHolds(card(5, 7), 6, 12)).toBe(true);
+    expect(rangeHolds(card(5, 7), 8, 1)).toBe(false);
+    expect(rangeHolds(card(5), 5, 40)).toBe(true);
+  });
+  it('a verse-range card holds only its verses', () => {
+    expect(rangeHolds(card(5, null, 3, 12), 5, 3)).toBe(true);
+    expect(rangeHolds(card(5, null, 3, 12), 5, 13)).toBe(false);
+    expect(rangeHolds(card(5, null, 3), 5, 3)).toBe(true);
+    expect(rangeHolds(card(5, null, 3), 5, 4)).toBe(false);
+  });
+  it('a pair: the card holding either verse passes, one holding neither does not', () => {
+    const pair = { chapter: 3, verse: 16, verse2: 17 };
+    expect(pairHolds(card(3, null, 17), pair)).toBe(true);
+    expect(pairHolds(card(3, null, 16), pair)).toBe(true);
+    expect(pairHolds(card(3, null, 18, 20), pair)).toBe(false);
+  });
+  it('a single verse (no verse2) is just rangeHolds', () => {
+    expect(pairHolds(card(3, null, 16), { chapter: 3, verse: 16 })).toBe(true);
+    expect(pairHolds(card(3, null, 17), { chapter: 3, verse: 16 })).toBe(false);
   });
 });

@@ -573,7 +573,7 @@ jobs:
   search-bench:
     name: Search benchmark (500 remembered queries + the fresh 100)
     runs-on: ubuntu-latest
-    timeout-minutes: 5   # ~85 s locally: corpus load, index build, 600 queries
+    timeout-minutes: 8   # ~85 s + ~90 s locally: corpus load, index build, 600 + 870 queries
     # tools/search-bench.mjs (search lane, 2026-10-05): 500 things readers remember, each
     # with the query a blind writer typed for it, run through the shipped engine in plain
     # node, and 100 more written by another model family (fresh-cases.json, 2026-10-15).
@@ -592,6 +592,12 @@ jobs:
           node-version-file: '.nvmrc'
       - name: Search benchmark
         run: npm run bench:search
+      # The tri bench (search200, 2026-10-18): 200 exact quotes, 200 misremembered quotes and
+      # 200 titles in easy/medium/hard tiers (tri/cases.json, gated and frozen before any tuning),
+      # plus held 180 (counted, never printed) and fresh 90 by another model family. Fails when
+      # open, held, fresh or any style x tier falls below tools/search-bench/tri/baseline.json.
+      - name: Tri benchmark (exact, misremembered, titles)
+        run: npm run bench:tri
       # src/search/kjv-alias.js is generated from data/bible-kjv.js and the indexed texts:
       # a corpus change that leaves it stale fails here (rebuild: node tools/build-kjv-alias.mjs).
       - name: KJV alias is current

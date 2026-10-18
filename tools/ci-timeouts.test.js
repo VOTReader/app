@@ -23,7 +23,7 @@ function jobs(text) {
 }
 
 describe('workflow job timeouts', () => {
-  for (const [file, expected] of [['ci.yml', { gates: 20, vitest: 20, browser: 30, 'search-bench': 5, build: 5, 'kotlin-tests': 20 }], ['deploy-web.yml', { gate: 5, build: 15, deploy: 10 }]]) {
+  for (const [file, expected] of [['ci.yml', { gates: 20, vitest: 20, browser: 30, 'search-bench': 8, build: 5, 'kotlin-tests': 20 }], ['deploy-web.yml', { gate: 5, build: 15, deploy: 10 }]]) {
     it(`${file}: every job has one`, () => {
       const js = jobs(wf(file));
       expect(Object.keys(js).sort()).toEqual(Object.keys(expected).sort());

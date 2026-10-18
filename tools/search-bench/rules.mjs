@@ -93,3 +93,25 @@ export function nearCopy(sentence, text, stop, anchor) {
   }
   return false;
 }
+
+/* SHORT TITLE (tri bench, PLAN 1.6, fixed before any tri run): a study chapter is "Study — Chapter" on its card, and
+   a reader types the chapter's own title. classOf files a study chapter under both, so a title target links it by the
+   part after the first " — " ("Without Spot or Blemish" is a v4 letter and a Lamb of God chapter). Other units keep
+   their one title. */
+/** The titles a unit is filed under: its whole title, and for a study chapter the chapter title alone. */
+export function titleForms(/** @type {string} */ title, /** @type {boolean} */ isStudy) {
+  const t = String(title || '');
+  if (!isStudy) return [t];
+  const at = t.indexOf(' — ');
+  const short = at >= 0 ? t.slice(at + 3).trim() : '';
+  return short ? [t, short] : [t];
+}
+
+/** Does a Bible card's range ({chapter, chapterEnd, verseStart, verseEnd}) hold chapter:verse? (cardPasses, same book) */
+export function rangeHolds(p, chapter, verse) {
+  if (chapter < p.chapter || chapter > (p.chapterEnd || p.chapter)) return false;
+  return !p.verseStart || (verse >= p.verseStart && verse <= (p.verseEnd || p.verseStart));
+}
+
+/** A merged Bible misquote's target is two adjacent verses of one chapter (verse, verse2): a card holding either passes. */
+export const pairHolds = (p, c) => rangeHolds(p, c.chapter, c.verse) || (c.verse2 != null && rangeHolds(p, c.chapter, c.verse2));
