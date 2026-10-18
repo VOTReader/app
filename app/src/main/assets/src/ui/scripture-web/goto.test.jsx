@@ -10,7 +10,7 @@ import { useJourney } from './use-journey.js';
 import { useFrameScheduler } from './use-frame-scheduler.js';
 import { useGoTo, routeOverlayHit, reopenOf, gotoBoxPlace, hereLabel, GOTO_BOX_W, GOTO_BOX_TOP, GOTO_BOX_MIN, GOTO_HINT } from './goto.jsx';
 import { useWebKeys } from './use-web-keys.js';
-import { DetailSheet } from './panels.jsx';
+import { WebPanel } from './web-panel.jsx';
 import { verseToX, fitPPV, maxZoomFor, PPV_MAX_CSS } from '../../utils/scripture-web/geometry.js';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
 
@@ -54,7 +54,8 @@ const graph = () => ({
  * @param {{ start?: any, cam?: { x: number, ppv: number }, keys?: boolean, frame?: { W: number, H: number, DPR: number }, web?: any, sheet?: boolean }} [opts]
  *   keys: the root's onKeyDown is the web's own (use-web-keys.js), not a spy; frame: the canvas in
  *   device px (default an 800x600 PC frame); web: the graph (default graph()); sheet: the panel's
- *   own DetailSheet renders for what is open, as the screen renders it (its focus trap with it)
+ *   own docked panel (web-panel.jsx) renders for what is open, as the screen renders it (its focus
+ *   hand-back with it)
  */
 function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W: 800, H: 600, DPR: 1 }, web, sheet = false } = {}) {
   const g = web || graph();
@@ -98,7 +99,12 @@ function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W
       <div className="sw-root" ref={rootRef} tabIndex={0} onKeyDown={keys ? web.onKeyDown : rootKeys}>
         <div className="sw-controls">{goTo.button}</div>
         {goTo.box}
-        {sheet && sel.detail ? <DetailSheet info={sel.detail} onClose={sel.closeCards} onOpen={() => {}} onFollow={null} onGroup={null} /> : null}
+        {sheet && (sel.detail || sel.choices || sel.listOpen) ? (
+          <WebPanel graph={g} mode="canonical" density="famous" listOpen={sel.listOpen} listItems={sel.listItems}
+            choices={sel.choices} detail={sel.detail} journey={journey} lensOn={false} onClose={sel.closeCards}
+            onChoose={sel.commitFound} openPanel={sel.openPanel} followThread={sel.followThread} followRow={sel.followRow}
+            zoomTo={sel.zoomTo} onOpen={() => {}} lightThreads={sel.lightThreads} flyTo={camera.flyTo} />
+        ) : null}
       </div>
     );
   }

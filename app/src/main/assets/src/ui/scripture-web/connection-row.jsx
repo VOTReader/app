@@ -24,15 +24,17 @@
  *   onMain?: () => void, mainLabel?: string,
  *   onOpen?: () => void, openLabel?: string,
  *   onFollow?: () => void, followLabel?: string,
- *   onLight?: (on: boolean) => void, active?: boolean,
+ *   onLight?: (on: boolean) => void, active?: boolean, mainClass?: string,
  * }} props
  */
 export function ConnectionRow({ title, tag, text, skin = 'panel', onMain, mainLabel, onOpen, openLabel,
-  onFollow, followLabel, onLight, active }) {
+  onFollow, followLabel, onLight, active, mainClass }) {
   const fallback = skin === 'fallback';
   const c = fallback
     ? { li: undefined, main: 'swf-row', top: 'swf-row-top', ref: 'swf-ref', tag: 'swf-tier', text: 'swf-snip' }
     : { li: 'sw-row' + (active ? ' is-on' : ''), main: 'sw-row-main', top: 'sw-row-top', ref: 'sw-row-ref', tag: 'sw-row-tag', text: 'sw-row-text' };
+  // the chooser and the Nearby list keep their rows' old hooks (.sw-choice-row, .sw-choice-chapter)
+  if (mainClass) c.main += ' ' + mainClass;
   const light = onLight ? {
     onMouseEnter: () => onLight(true), onMouseLeave: () => onLight(false),
     onFocus: () => onLight(true),

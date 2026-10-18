@@ -33,7 +33,10 @@
      ui/scripture-web/goto.jsx                 the go-to and its header slot; overlay taps
      ui/scripture-web/use-journey.js           the Back trail through the web
      ui/scripture-web/gestures.js              pointer, wheel and pinch wiring
-     ui/scripture-web/panels.jsx               the DOM panels
+     ui/scripture-web/panels.jsx               the hover chip, the guide, the notices, the key
+     ui/scripture-web/web-panel.jsx            the docked panel (every mode) and its rows
+     ui/scripture-web/use-panel-layout.js      where the panel docks, the inset it covers, the
+                                               controls' collapse
      utils/scripture-web/describe.js           every word the web says
      utils/scripture-web/focus-state.js        the focus's one shape (chosen, hovered, lit)
      utils/scripture-web/sw-ink.js             every ink the canvas draws
@@ -52,6 +55,8 @@ import { useForcedLandscape } from '../scripture-web/use-forced-landscape.js';
 import { useWebGraph, useChromeTokens, useWebRenderer } from '../scripture-web/use-web-renderer.js';
 import { usePersonalWeb } from '../scripture-web/use-personal-web.js';
 import { useWebSelection } from '../scripture-web/use-web-selection.js';
+import { usePanelLayout, usePanelInset, collapsedFor } from '../scripture-web/use-panel-layout.js';
+import { WebPanel } from '../scripture-web/web-panel.jsx';
 import { useWebKeys, WEB_KEYS_HELP } from '../scripture-web/use-web-keys.js';
 import { useJourney } from '../scripture-web/use-journey.js';
 import { useGoTo } from '../scripture-web/goto.jsx';
@@ -59,12 +64,10 @@ import { focusState } from '../../utils/scripture-web/focus-state.js';
 /** @typedef {import('../../utils/scripture-web/decode.js').Density} Density */
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { WebFallbackList } from '../scripture-web/WebFallbackList.jsx';
-import {
-  TipChip, HowToReadGuide, ConnectionChooser, ConnectionList, DetailSheet, EmptyWebNotice,
-  loadErrorPanel, legendFor,
-} from '../scripture-web/panels.jsx';
+import { TipChip, HowToReadGuide, EmptyWebNotice, loadErrorPanel, legendFor } from '../scripture-web/panels.jsx';
 import { startChapter } from '../../utils/scripture-web/chapter-connections.js';
-import { verseTextFor, graphStats, densityHint, myWebHeadline, myWebSkippedLine } from '../../utils/scripture-web/describe.js';
+import { graphStats, densityHint, myWebHeadline, myWebSkippedLine } from '../../utils/scripture-web/describe.js';
+import { verseText } from '../../utils/scripture-web/panel-model.js';
 import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
 
 /* The zoom ceiling (maxZoomOf), the frame, the render arguments and the y
@@ -94,7 +97,8 @@ function readChromeHidden() {
  * @param {object} props
  * @param {(endpoint:object, meta?:object) => void} props.navigateToLink
  * @param {() => void} props.onBack
- * @param {{webDensity?:string, theme?:string, swEmptyDismissed?:boolean, swGuideSeen?:boolean}} props.settings
+ * @param {{webDensity?:string, theme?:string, swEmptyDismissed?:boolean, swGuideSeen?:boolean, translation?:string}} props.settings
+ *   (translation is read, never written: the reader's own Bible, for the panel's verse text)
  * @param {(key:string, value:any) => void} props.updateSetting
  * @param {{ verse: { bookId: string, chapter: number, verse: number } }
  *   | { book: string, chapter?: number } | { letterKey: string }} [props.start]
@@ -225,18 +229,47 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // the panel shows it and its Back
   const journey = useJourney({ flyTo });
 
+  // where the docked panel sits (use-panel-layout.js): the root's own size as a layout, and what
+  // the panel will cover once open (insetFor), so a choice is framed before the panel renders
+  const { layout, insetFor } = usePanelLayout(wrapRef);
+
   // what the pointer is on and what is open (use-web-selection.js): the hover
-  // chip, the chooser, Nearby and the sheet; the tap test and the handlers the
-  // gestures call; the cards' close, Follow and a bundle's group; the panel
-  // API (openPanel, closePanel, panel) and the lit set (lightThreads)
+  // chip, the chooser, Nearby and the open card; the tap test and the handlers the
+  // gestures call; the cards' close, Follow, a row's Follow and the zoom row; the
+  // panel API (openPanel, closePanel, panel) and the lit set (lightThreads)
   const {
     tip, choices, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
-    handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread, chooseGroup,
+    handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread, followRow, zoomTo,
     openPanel, lightThreads, panel,
   } = useWebSelection({
     graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, yFrameFor,
     personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce, relink, settledAt,
+    insetFor,
   });
+
+  // the docked panel is open while anything is: the inset's one writer (CONTRACTS.md section 5)
+  // records what it covers and the controls right-align to its edge; under 1000 px of canvas
+  // area they collapse to the go-to and a "more" menu (spec section 3)
+  const panelOpen = listOpen || !!choices || !!detail;
+  usePanelInset({ layout, open: panelOpen, panelInsetRef, wrapRef, schedule });
+  const collapse = collapsedFor(layout, panelOpen);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const controlsRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
+  const moreBtnRef = React.useRef(/** @type {HTMLButtonElement | null} */ (null));
+  React.useEffect(() => { if (!collapse) setMenuOpen(false); }, [collapse]);
+  React.useEffect(() => {
+    if (!menuOpen) return undefined;
+    // a press anywhere outside the controls closes the menu
+    const onDown = (/** @type {Event} */ e) => {
+      const el = controlsRef.current;
+      if (el && e.target instanceof Node && !el.contains(e.target)) setMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    return () => document.removeEventListener('pointerdown', onDown, true);
+  }, [menuOpen]);
+  /** A control in the menu closes the menu as it acts. @param {() => void} act */
+  const fromMenu = (act) => () => { act(); setMenuOpen(false); };
+  const translation = settings && settings.translation;
 
   // the go-to (goto.jsx): its header slot (goTo.button, first in the control
   // row) and what it puts over the canvas (goTo.box: the box, its verse chip, its edge chips)
@@ -338,7 +371,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         initialChapter={startChapter(graph, lastCh && lastCh.bookId, lastCh && lastCh.chapterNum)}
         onOpen={(ref) => navigateToLink && navigateToLink({ type: 'bible', bookId: ref.bookId, chapter: ref.chapter, verse: ref.verse })}
         onRetry={retryGL} onMyWeb={() => switchMode('personal')}
-        onBack={onBack} verseText={verseTextFor} />
+        onBack={onBack} verseText={(ref) => verseText(ref, translation)} />
     );
   }
   // (noWebGL is only ever set by the renderer effect, which needs the graph,
@@ -348,7 +381,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const stats = graph ? graphStats(graph, density) : null;
 
   return (
-    <div className={'sw-root' + (rotated ? ' sw-rotated' : '') + (chromeHidden ? ' sw-chrome-hidden' : '')} ref={wrapRef}
+    <div className={'sw-root' + (rotated ? ' sw-rotated' : '') + (chromeHidden ? ' sw-chrome-hidden' : '')
+      // the layout classes from the root's own box (use-panel-layout.js); sw-narrow agrees with the
+      // renderer's classList toggle, so a re-render cannot drop it
+      + (layout && layout.narrow ? ' sw-narrow' : '') + (layout && layout.compact ? ' sw-compact' : '')
+      + (panelOpen ? ' sw-panel-open' : '') + (collapse ? ' sw-collapse' : '') + (collapse && menuOpen ? ' sw-menu-open' : '')}
+      ref={wrapRef} data-panel={panelOpen ? (layout && layout.sheet ? 'sheet' : 'dock') : undefined}
       tabIndex={0} onKeyDown={onKeyDown}
       role="application"
       aria-label="The Scripture Web — an interactive map of cross-references"
@@ -381,18 +419,28 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         </div>
       </div>
 
-      <div className="sw-controls">
+      <div className="sw-controls" ref={controlsRef}
+        onKeyDown={(e) => {
+          // Escape in the open menu closes the menu, not the panel or the web
+          if (e.key !== 'Escape' || !(collapse && menuOpen)) return;
+          e.stopPropagation();
+          setMenuOpen(false);
+          if (moreBtnRef.current) moreBtnRef.current.focus();
+        }}>
         {/* THE HEADER SLOT: the go-to's search button, first in the row (spec
             section 4.1). goto.jsx owns it; null today, so nothing renders */}
         {goTo.button}
+        {/* THE MENU: the controls in the row or, collapsed (spec section 3), the drop-down the
+            more button opens; the same buttons either way */}
+        <div className="sw-menu" id="sw-menu">
         <div className="sw-seg" role="group" aria-label="Which web">
           <button type="button" className={'sw-seg-btn' + (mode === 'canonical' ? ' is-on' : '')}
-            aria-pressed={mode === 'canonical'} onClick={() => switchMode('canonical')}>Scripture</button>
+            aria-pressed={mode === 'canonical'} onClick={fromMenu(() => switchMode('canonical'))}>Scripture</button>
           <button type="button" ref={myWebBtnRef} className={'sw-seg-btn' + (mode === 'personal' ? ' is-on' : '')}
-            aria-pressed={mode === 'personal'} onClick={() => switchMode('personal')}>My web</button>
+            aria-pressed={mode === 'personal'} onClick={fromMenu(() => switchMode('personal'))}>My web</button>
         </div>
         <button type="button" className={'sw-btn' + (listOpen ? ' is-on' : '')}
-          onClick={() => { setListOpen(!listOpen); setChoices(null); }}
+          onClick={fromMenu(() => { setListOpen(!listOpen); setChoices(null); })}
           aria-expanded={listOpen} aria-haspopup="dialog">Nearby</button>
         {mode === 'canonical' ? (
             <label className="sw-select-wrap">
@@ -403,6 +451,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
                   setDensity(next);
                   flashHint(densityHint(next));
                   if (typeof updateSetting === 'function') updateSetting('webDensity', next);
+                  setMenuOpen(false);
                 }}>
                 <option value="essential">Essential</option>
                 <option value="famous">Famous</option>
@@ -410,12 +459,21 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
             </label>
         ) : (
           <button type="button" className={'sw-btn sw-toggle' + (showUnderlay ? ' is-on' : '')} aria-pressed={showUnderlay}
-            onClick={() => { setShowUnderlay(!showUnderlay); schedule(); }}
+            onClick={fromMenu(() => { setShowUnderlay(!showUnderlay); schedule(); })}
             aria-label={'Corpus context · ' + (contextCount > 0 ? contextCount.toLocaleString() : '…') + ' curated connections'}>
             Corpus context · {contextCount > 0 ? contextCount.toLocaleString() : '…'}
           </button>
         )}
-        <button type="button" className="sw-btn" onClick={resetView} aria-label="Reset the view">Reset</button>
+        <button type="button" className="sw-btn" onClick={fromMenu(resetView)} aria-label="Reset the view">Reset</button>
+        </div>
+        {collapse ? (
+          <button type="button" ref={moreBtnRef} className={'sw-btn sw-btn-icon sw-more-btn' + (menuOpen ? ' is-on' : '')}
+            aria-label="More controls" aria-expanded={menuOpen} aria-controls="sw-menu" onClick={() => setMenuOpen(!menuOpen)}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+              <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
+            </svg>
+          </button>
+        ) : null}
         {/* NO CREDIT LINE HERE. The CC-BY attribution for the OpenBible.info
             dataset lives on About ("Cross-reference data from OpenBible.info,
             used under CC-BY."); the copy this strip carried printed over the
@@ -445,15 +503,17 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       {guideOpen && <HowToReadGuide onClose={closeGuide} />}
       {goTo.box}
       {emptyShown && <EmptyWebNotice onDismiss={dismissEmpty} />}
-      {tip && <TipChip info={tip} viewport={viewRef.current} />}
-      {choices && <ConnectionChooser choices={choices} onChoose={commitFound} onClose={closeCards} />}
-      {listOpen && <ConnectionList items={listItems} mode={mode}
-        lensOn={mode !== 'personal' && !!(camRef.current && viewRef.current.W && lensRange(graph, camRef.current, viewRef.current.W))}
-        onChoose={commitFound} onClose={closeCards} />}
-      {detail && (
-        <DetailSheet info={detail} onClose={closeCards} onOpen={openEndpoint} onFollow={followThread}
-          onGroup={chooseGroup} />
-      )}
+      {tip && <TipChip info={tip} viewport={viewRef.current} inset={panelInsetRef.current} />}
+      {/* THE DOCKED PANEL (web-panel.jsx): one panel at the right edge while anything is open; Nearby
+          over the chooser over the open card, the precedence the state has */}
+      {panelOpen && graph ? (
+        <WebPanel graph={graph} mode={mode} density={density} translation={translation}
+          compact={!!(layout && layout.compact)}
+          listOpen={listOpen} listItems={listItems} choices={choices} detail={detail} journey={journey}
+          lensOn={listOpen && mode !== 'personal' && !!(camRef.current && viewRef.current.W && lensRange(graph, camRef.current, viewRef.current.W))}
+          onClose={closeCards} onChoose={commitFound} openPanel={openPanel} followThread={followThread}
+          followRow={followRow} zoomTo={zoomTo} onOpen={openEndpoint} lightThreads={lightThreads} flyTo={flyTo} />
+      ) : null}
 
       <div className="sw-legend" aria-hidden="true">{legendFor(mode)}</div>
       {mode === 'personal' && railZoom.top ? (

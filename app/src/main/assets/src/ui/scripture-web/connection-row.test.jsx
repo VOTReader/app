@@ -48,4 +48,14 @@ describe('ConnectionRow', () => {
     expect(container.querySelector('.sw-row-actions')).toBeNull();
     expect(container.querySelector('li').className).toBe('');
   });
+
+  it('mainClass adds the hooks a list keeps (the chooser and Nearby rows: .sw-choice-row) to the main button', () => {
+    const { container } = ul(<ConnectionRow title="Genesis 1" text="31 verses" mainClass="sw-choice-row sw-choice-chapter" active />);
+    const main = container.querySelector('button');
+    expect(main.className).toBe('sw-row-main sw-choice-row sw-choice-chapter');
+    expect(container.querySelector('li').className).toBe('sw-row is-on');
+    cleanup();
+    const plain = ul(<ConnectionRow title="Genesis 1" />);
+    expect(plain.container.querySelector('button').className).toBe('sw-row-main');
+  });
 });

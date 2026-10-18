@@ -546,7 +546,8 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       await pickNearby();
       const before = DRAWN[DRAWN.length - 1];
       expect(before.focusArc, 'PRECONDITION: a line is chosen').toBe(0);
-      const go = [...first.container.querySelectorAll('.sw-card')].find((b) => !b.disabled);
+      const go = [...first.container.querySelectorAll('.sw-sheet button')]
+        .find((b) => /^Open .* in the reader$/.test(b.getAttribute('aria-label') || ''));
       expect(go, 'PRECONDITION: the card offers a verse to open').toBeTruthy();
       fireEvent.click(go);
       expect(opened.length).toBe(1);
@@ -1168,23 +1169,25 @@ describe('the Nearby list reads the lens (landing 15)', () => {
     }
   });
 
-  /* v03-03: the panels focused their close button on mount and nothing more:
-     Tab walked out into the page behind, and closing dropped focus on body. */
-  it('(v03-03) Tab stays inside an open panel and closing it hands focus back to the web', async () => {
+  /* v03-03: the panels focused their close button on mount and nothing more, and closing dropped
+     focus on body. w3 (digest #46, spec 4.6): the docked panel is a non-modal dialog beside the web,
+     so it keeps no trap; it still takes focus on open and hands it back on close. */
+  it('(v03-03) an open panel takes focus, does not trap Tab, and closing it hands focus back to the web', async () => {
     const { container } = await mountList();
     const root = container.querySelector('.sw-root');
     root.focus();
     fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     const list = container.querySelector('.sw-list');
+    expect(list.getAttribute('role')).toBe('dialog');
+    expect(list.getAttribute('aria-modal')).toBe('false');
     const buttons = [...list.querySelectorAll('button')];
-    // sw1: the panel itself takes focus (no focus ring on its x after a tap); Tab steps in
+    // sw1: the panel itself takes focus (no focus ring on its x after a tap)
     expect(document.activeElement).toBe(list);
-    fireEvent.keyDown(document.activeElement, { key: 'Tab' });
-    expect(document.activeElement).toBe(buttons[0]);
     buttons[buttons.length - 1].focus();
-    fireEvent.keyDown(document.activeElement, { key: 'Tab' });
-    expect(document.activeElement, 'Tab from the last row wraps to the first').toBe(buttons[0]);
+    // no trap: Tab from the last row is the browser's own (not cancelled, not wrapped)
+    expect(fireEvent.keyDown(document.activeElement, { key: 'Tab' }), 'Tab is not cancelled').toBe(true);
+    expect(document.activeElement).toBe(buttons[buttons.length - 1]);
     fireEvent.click(buttons[0]);
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     expect(container.querySelector('.sw-list')).toBeNull();
@@ -1477,5 +1480,116 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     close.focus();
     fireEvent.click(close);
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'My web' }));
+  });
+});
+
+/* w3, the docked panel in the web (spec section 3): the root's own size decides where the panel
+   docks, what it covers (--sw-panel-w / --sw-sheet-h beside the inset) and whether the controls
+   collapse to the more button. jsdom lays nothing out, so the ROOT is sized here (its clientWidth
+   and clientHeight), as the canvas is in the blocks above. */
+describe('the docked panel in the web (w3, spec section 3)', () => {
+  const two = () => ({
+    total: 31102, count: 2, buckets: [{ off: 0, len: 2, off20: 2, off10: 2, segments: 8, chunks: [[100, 20100]] }],
+    books: [{ id: 'genesis-plain', title: 'Genesis', abbr: 'Gen' }],
+    chapters: [[0, 1, 0, 31102]], chapterOfVerse: new Uint16Array(31102),
+    from: new Uint16Array([100, 200]), to: new Uint16Array([20100, 300]), votes: new Int16Array([7, 30]),
+    votEdges: [], prophecy: [], votLinks: [], chunkSize: 256,
+  });
+  let prevDecode = null;
+  const mountAt = async (w, h) => {
+    for (const [prop, px] of [['clientWidth', w], ['clientHeight', h]]) {
+      Object.defineProperty(HTMLCanvasElement.prototype, prop, { configurable: true, get() { return px; } });
+      Object.defineProperty(HTMLDivElement.prototype, prop, {
+        configurable: true, get() { return this.classList.contains('sw-root') ? px : 0; },
+      });
+    }
+    window.SCRIPTURE_WEB_DATA = { ok: true, count: 2 };
+    if (!prevDecode) prevDecode = vi.mocked(decodeGraph).getMockImplementation();
+    vi.mocked(decodeGraph).mockImplementation(() => two());
+    const view = render(<ScriptureWebScreen {...baseProps()} />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+    return { ...view, root: view.container.querySelector('.sw-root') };
+  };
+  afterEach(() => {
+    for (const prop of ['clientWidth', 'clientHeight']) {
+      delete HTMLCanvasElement.prototype[prop];
+      delete HTMLDivElement.prototype[prop];
+    }
+    if (prevDecode) vi.mocked(decodeGraph).mockImplementation(prevDecode);
+  });
+  const wait = (ms) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
+
+  it('PC 1600x900: the panel docks right at 640 px, and its 960 px canvas area collapses the controls', async () => {
+    const { root } = await mountAt(1600, 900);
+    expect(root.classList.contains('sw-collapse'), 'closed: the whole 1600 px is canvas').toBe(false);
+    expect(screen.queryByRole('button', { name: 'More controls' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+    await wait(30);
+    expect(root.getAttribute('data-panel')).toBe('dock');
+    expect(root.classList.contains('sw-panel-open')).toBe(true);
+    expect(root.style.getPropertyValue('--sw-panel-w')).toBe('640px');
+    expect(root.classList.contains('sw-collapse'), '1600 - 640 = 960 < 1000').toBe(true);
+    expect(root.classList.contains('sw-compact')).toBe(false);
+    fireEvent.keyDown(root, { key: 'Escape' });
+    await wait(30);
+    expect(root.getAttribute('data-panel')).toBeNull();
+    expect(root.classList.contains('sw-collapse')).toBe(false);
+  });
+
+  it('phone landscape 891x411: compact, docked right at 374 px, the controls behind the more button', async () => {
+    const { root, container } = await mountAt(891, 411);
+    expect(root.classList.contains('sw-compact')).toBe(true);
+    expect(root.classList.contains('sw-collapse')).toBe(true);
+    const more = screen.getByRole('button', { name: 'More controls' });
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    expect(more.getAttribute('aria-controls')).toBe('sw-menu');
+    // the menu holds every control (hidden by CSS until it opens)
+    const menu = container.querySelector('#sw-menu');
+    expect(menu.textContent).toMatch(/Scripture/);
+    expect(menu.textContent).toMatch(/Nearby/);
+    expect(menu.textContent).toMatch(/Reset/);
+    fireEvent.click(more);
+    expect(root.classList.contains('sw-menu-open')).toBe(true);
+    expect(more.getAttribute('aria-expanded')).toBe('true');
+    // Escape in the menu closes the menu only, and focus goes back to the more button
+    const nearby = screen.getByRole('button', { name: /^nearby$/i });
+    nearby.focus();
+    fireEvent.keyDown(nearby, { key: 'Escape' });
+    expect(root.classList.contains('sw-menu-open')).toBe(false);
+    expect(document.activeElement).toBe(more);
+    // a control in the menu acts and closes it
+    fireEvent.click(more);
+    fireEvent.click(nearby);
+    await wait(30);
+    expect(root.classList.contains('sw-menu-open')).toBe(false);
+    expect(root.getAttribute('data-panel')).toBe('dock');
+    expect(root.style.getPropertyValue('--sw-panel-w')).toBe('374px');
+    expect(container.querySelector('.sw-list')).toBeTruthy();
+  });
+
+  it('a press outside the controls closes the menu', async () => {
+    const { root } = await mountAt(891, 411);
+    fireEvent.click(screen.getByRole('button', { name: 'More controls' }));
+    expect(root.classList.contains('sw-menu-open')).toBe(true);
+    fireEvent.pointerDown(document.body);
+    await wait(0);
+    expect(root.classList.contains('sw-menu-open')).toBe(false);
+  });
+
+  it('below 560 px the panel is a bottom sheet of the measured height', async () => {
+    const { root } = await mountAt(500, 800);
+    expect(root.classList.contains('sw-narrow')).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+    await wait(30);
+    expect(root.getAttribute('data-panel')).toBe('sheet');
+    expect(root.style.getPropertyValue('--sw-sheet-h')).toBe('480px');
+  });
+
+  it('the go-to slot stays first in the controls (CONTRACTS.md section 9), the menu after it', async () => {
+    const { container } = await mountAt(891, 411);
+    const controls = container.querySelector('.sw-controls');
+    // goTo.button is null today: the menu leads, the more button follows it
+    expect(controls.firstElementChild.id).toBe('sw-menu');
+    expect(controls.lastElementChild.getAttribute('aria-label')).toBe('More controls');
   });
 });
