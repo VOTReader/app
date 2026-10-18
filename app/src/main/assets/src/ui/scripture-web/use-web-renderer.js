@@ -15,9 +15,9 @@
    frame loop's, use-frame-scheduler.js) always holds the latest draw. */
 
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
-import { createCamera, clampCamera, fitPPV, ribbonStyle, lensShareAt } from '../../utils/scripture-web/geometry.js';
-import { countAnchored, footBundles, lensRange } from '../../utils/scripture-web/pick.js';
-import { maxZoomOf, centreOf } from '../../utils/scripture-web/web-frame.js';
+import { createCamera, clampCamera, fitPPV, ribbonStyle } from '../../utils/scripture-web/geometry.js';
+import { countAnchored, footBundles } from '../../utils/scripture-web/pick.js';
+import { maxZoomOf, centreOf, centreRange } from '../../utils/scripture-web/web-frame.js';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
 import { readChromeTokens } from '../../utils/scripture-web/palette.js';
 import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
@@ -152,6 +152,9 @@ export function useWebRenderer({
   // the canon overlay's last painted frame, with the boxes it made tappable
   // (fs.hits): hitOverlay reads it in the tap path; null on My Web
   const overlayFrameRef = React.useRef(null);
+  // the centre chapter's range last frame (web-frame.centreRange holds it
+  // while the centre stays near it); null on My Web and at the overview
+  const centreRangeRef = React.useRef(null);
 
   // ── the frame ───────────────────────────────────────────────────────────
   const draw = React.useCallback(() => {
@@ -166,14 +169,20 @@ export function useWebRenderer({
     // height carried over from the canon web is dropped here, not drawn —
     // before the attribute below, so the published height is the drawn one.
     if (mode === 'personal') clampCamera(cam, v.W, zoomCapFor(cam));
-    // the lens (landing 10): the chapter under the frame's centre, lit at
-    // full ink past the overview while nothing is tapped; the rest keeps
-    // LENS_CONTEXT of its alpha (drawn, tappable, counted). My Web has none.
-    const lens = mode === 'personal' ? null : lensRange(g, cam, v.W);
+    // the centre chapter (spec 4.4, Q2): past the overview, the chapter under
+    // the canvas area's centre (the frame less the open panel), held while the
+    // centre stays near it. Its own arcs are emphasised; nothing else dims.
+    // Computed once per frame: the renderer and the overlay get the same one.
+    // My Web has none.
+    const panel = panelInsetRef.current;
+    const lens = mode === 'personal' ? null
+      : centreRange(g, cam, v.W, (panel && panel.right > 0 ? panel.right : 0) * v.DPR, centreRangeRef.current);
+    centreRangeRef.current = lens;
     if (wrapRef.current) {
       wrapRef.current.setAttribute('data-ppv-css', (cam.ppv / v.DPR).toPrecision(4));
       // the camera's height, device px, for the walks (0 at the baseline)
       wrapRef.current.setAttribute('data-cam-y', (cam.y > 0 ? cam.y : 0).toFixed(1));
+      // the centre chapter's verse range, for the walks (the old lens's attribute)
       wrapRef.current.setAttribute('data-lens', lens ? lens[0] + '-' + lens[1] : '');
     }
     const camV = mode === 'personal' ? camVRef.current : null;
@@ -227,10 +236,9 @@ export function useWebRenderer({
     const style = ribbonStyle(zoom, base.localize, perCssPx);
     // the convergence pills: how many threads meet at each foot cell
     const bundles = bundlesFor(bundleRef.current, g, cam, base, v, density);
-    // the lens eases in from 6x to 24x rather than switching on at 6x (sw1)
-    const lensDim = lens ? lensShareAt(zoom) : 1;
+    const centre = centreOf(g, lens, zoom);
     r.draw(Object.assign({}, base, {
-      lens, lensDim,
+      centre,
       camX: cam.x, ppv: cam.ppv,
       strokeWidth: style.strokeWidthCss * v.DPR,
       alpha: style.alpha,
@@ -248,10 +256,13 @@ export function useWebRenderer({
     const uic = uiRef.current;
     const fs = {
       g, cam, view: base, v, chrome, canvasH: uic ? uic.height : 0, inset, yFrame: yFrameFor(cam),
-      density, focusArc: base.focusArc, bundles, lens, lensDim,
+      // lens and lensDim stay on the frame until the overlay stops reading
+      // them (CONTRACTS.md section 5): the centre's range, and 1, so its pills
+      // dim nothing
+      density, focusArc: base.focusArc, bundles, lens, lensDim: 1,
       // the centre chapter (GL computes it; the overlay paints its band) and
       // what the open panel covers (the panel writes it; labels keep out)
-      centre: centreOf(g, lens, zoom), panelInset: panelInsetRef.current,
+      centre, panelInset: panelInsetRef.current,
       hits: /** @type {any[]} */ ([]),
     };
     const painted = paintCanonOverlay(uic ? uic.getContext('2d') : null, fs);

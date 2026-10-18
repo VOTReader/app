@@ -18,7 +18,7 @@
        skips whole runs of instances that cannot touch the viewport.
 
    Neither the height law (the structure law: every thread the half-ellipse
-   of its own span, every thread drawn at every zoom) nor the fly-over cull
+   of its own span, every thread drawn at every zoom) nor the fly-over leg
    is written here. Both are imported from utils/scripture-web/geometry.js
    as GLSL and inlined, because the CPU hit test applies the same laws — if
    either drifts,
@@ -27,9 +27,10 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcShapeGLSL, flyOverGLSL, segmentsFor, CLIP_MARGIN,
-  STROKE_MIN_CSS, STROKE_DEEP_CSS, LENS_CONTEXT, skyLocalize,
+  arcShapeGLSL, flyOverGLSL, segmentsFor, CLIP_MARGIN, glslFloat,
+  STROKE_MIN_CSS, STROKE_DEEP_CSS, skyLocalize,
 } from '../../utils/scripture-web/geometry.js';
+import { CENTRE_BRIGHT, CENTRE_WIDTH, FLYOVER_LEG_WIDTH } from '../../utils/scripture-web/sw-ink.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
 import { bucketDrawCount, fansOf } from '../../utils/scripture-web/decode.js';
 import { walkDrawnRuns } from '../../utils/scripture-web/chunk-walk.js';
@@ -41,7 +42,7 @@ const VERT = `#version 300 es
 precision highp float;
 uniform vec2  uRes;
 uniform float uCamX, uPPV, uBase, uSquash, uLocalize;
-uniform float uFlyLocalize;  // the fly-over law's localize: the zoom's, let go as the camera rises (geometry.skyLocalize)
+uniform float uFlyLocalize;  // the fly-over leg's localize: the zoom's, let go as the camera rises (geometry.skyLocalize)
 uniform float uCamY;         // the picture's shift down the frame, device px
 uniform float uWidth, uAlpha, uTotal;
 uniform float uSegments;
@@ -49,8 +50,8 @@ uniform float uVoteMix;      // 0 = votes drive alpha (overview), 1 = width (dep
 uniform vec2  uFocusRange;   // verse range kept lit (lo > hi = no focus)
 uniform vec2  uFocusRange2;  // with uFocusRange: a GROUP, one foot in each, lit AND drawn
 uniform float uFocusArc;     // TAPPED instance: spotlit AND dims everything else
-uniform vec2  uLens;         // the lens: the chapter under the frame's centre (lo > hi = none)
-uniform float uLensDim;      // what the rest of the web keeps of its alpha under the lens
+uniform vec2  uCentre;       // the centre chapter, canon x [x0, x1) (x0 >= x1 = none): its own arcs are emphasised
+uniform float uCentreT;      // the centre's emphasis ease, 0..1 (web-frame CentreChapter.t)
 uniform float uHoverArc;     // HOVERED instance: brightened only, dims nothing
 uniform float uInstanceBase; // gl_InstanceID offset of this draw range
 uniform float uDpr;          // device px per CSS px: the chosen line's floor width is set in CSS px
@@ -99,6 +100,17 @@ void main(){
   float strength = clamp(aVotes/70., .30, 1.);
   float wScale = mix(1., mix(${STROKE_MIN_CSS / STROKE_DEEP_CSS}, 1., (strength - .30)/.70), uVoteMix);
   float halfW = uWidth*.5*wScale;
+  // Q3 (ii): once the reader is inside a passage a thread merely passing
+  // overhead draws thinner, never fainter (geometry.flyOverWidth, inlined
+  // above), so the local weave reads and every line stays where it was.
+  halfW *= flyOverWidth(arcAnchored(x0, x1, uRes.x), uFlyLocalize, ${glslFloat(FLYOVER_LEG_WIDTH)});
+  // The centre chapter (spec 4.4, Q2): its own arcs, a foot inside it, are
+  // wider and brighter as the reader settles in (uCentreT eases 6x -> 24x);
+  // the rest of the web is left exactly as it is (web-frame.centreEmphasis).
+  float inCentre = (uCentre.x < uCentre.y
+    && ((a >= uCentre.x && a < uCentre.y) || (b >= uCentre.x && b < uCentre.y))) ? 1. : 0.;
+  float cT = uCentreT*inCentre;
+  halfW *= mix(1., ${glslFloat(CENTRE_WIDTH)}, cT);
 
   float id = float(gl_InstanceID) + uInstanceBase;
   float spot = (uFocusArc >= 0. && abs(id - uFocusArc) < .5) ? 1. : 0.;
@@ -123,23 +135,7 @@ void main(){
   // the dome must not blank the picture the reader is looking at.
   float focusing = (uFocusArc >= 0. || uFocusRange.x <= uFocusRange.y) ? 1. : 0.;
   float dim = mix(1., mix(.05, 1., lit), focusing);
-  // the lens (structure-law.md, landing 10): with nothing tapped, past the
-  // overview the chapter under the frame's centre is at full ink and the
-  // rest at uLensDim - still drawn, still tappable, never summed into a wall
-  float la = step(uLens.x, a)*step(a, uLens.y);
-  float lb = step(uLens.x, b)*step(b, uLens.y);
-  float lensOn = (uLens.x <= uLens.y) ? 1. : 0.;
-  dim *= mix(1., mix(uLensDim, 1., max(la, lb)), lensOn*(1. - focusing));
   float bright = max(spot, hovered);
-
-  // Semantic zoom: once the reader is inside a passage, arcs merely passing
-  // overhead recede (to FLYOVER_FLOOR, never to nothing) so the local weave
-  // is legible instead of fogged; under the structure law a fly-over's body
-  // is up in the sky at its own span's height, never a level run over the
-  // passage.
-  // The law lives in geometry.js, inlined above. It dims and never reaches
-  // zero (FLYOVER_FLOOR), so every thread drawn here can be tapped there.
-  dim *= flyOverDim(arcAnchored(x0, x1, uRes.x), uFlyLocalize);
 
   // colour is distance, the one law (Corbin, 2026-09-10: genre and testament retired)
   vec3 col = distanceRamp(pow(abs(b - a)/uTotal, .40));
@@ -148,7 +144,10 @@ void main(){
 
   float aStrength = mix(strength, 1., uVoteMix);
   // ...and nearly opaque: uAlpha at the overview is 0.075, so x3 left a tapped line at ~0.12.
-  vCol = vec4(col, max(uAlpha*dim*aStrength*mix(1., 3.0, bright), max(spot*.95, hovered*.7)));
+  float aOut = uAlpha*dim*aStrength*mix(1., 3.0, bright)*mix(1., ${glslFloat(CENTRE_BRIGHT)}, cT);
+  // past full ink the centre's boost lifts the colour instead, clamped
+  col = min(col*max(aOut, 1.), vec3(1.));
+  vCol = vec4(col, max(min(aOut, 1.), max(spot*.95, hovered*.7)));
   vEdge = side;
   vHalfW = halfW;
   gl_Position = vec4(p/uRes*2. - 1., 0, 1);
@@ -225,7 +224,7 @@ export function createRenderer(canvas, graph, opts = {}) {
   for (const name of ['uRes', 'uCamX', 'uCamY', 'uPPV', 'uBase', 'uSquash',
     'uLocalize', 'uFlyLocalize', 'uWidth', 'uAlpha', 'uTotal',
     'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc',
-    'uHoverArc', 'uInstanceBase', 'uFocusRange2', 'uLens', 'uLensDim', 'uDpr']) {
+    'uHoverArc', 'uInstanceBase', 'uFocusRange2', 'uCentre', 'uCentreT', 'uDpr']) {
     U[name] = gl.getUniformLocation(program, name);
   }
 
@@ -339,9 +338,8 @@ export function createRenderer(canvas, graph, opts = {}) {
      *   density:import('../../utils/scripture-web/decode.js').Density,
      *   bg:string,
      *   focusRange:(number[]|null), focusRange2?:(number[]|null), focusArc:number, hoverArc?:number,
-     *   lens?:(number[]|null), lensDim?:number}} v
-     *   lens: pick.lensRange(); the chapter under the frame's centre, lit while nothing is tapped
-     *   lensDim: what the rest keeps of its alpha under the lens (geometry.lensShareAt; LENS_CONTEXT if absent)
+     *   centre?:(import('../../utils/scripture-web/web-frame.js').CentreChapter|null)}} v
+     *   centre: the centre chapter (web-frame.centreOf over centreRange), its own arcs emphasised
      */
     draw(v) {
       if (lost) return lastStats;
@@ -370,9 +368,13 @@ export function createRenderer(canvas, graph, opts = {}) {
       gl.uniform1f(U.uTotal, graph.total);
       gl.uniform1f(U.uVoteMix, v.voteMix || 0);
       gl.uniform1f(U.uFocusArc, v.focusArc == null ? -1 : v.focusArc);
-      if (v.lens) gl.uniform2f(U.uLens, v.lens[0], v.lens[1]);
-      else gl.uniform2f(U.uLens, 1, 0);
-      gl.uniform1f(U.uLensDim, v.lensDim != null ? v.lensDim : LENS_CONTEXT);
+      if (v.centre && v.centre.x0 < v.centre.x1) {
+        gl.uniform2f(U.uCentre, v.centre.x0, v.centre.x1);
+        gl.uniform1f(U.uCentreT, v.centre.t > 0 ? Math.min(1, v.centre.t) : 0);
+      } else {
+        gl.uniform2f(U.uCentre, 1, 0);
+        gl.uniform1f(U.uCentreT, 0);
+      }
       gl.uniform1f(U.uHoverArc, v.hoverArc == null ? -1 : v.hoverArc);
       if (v.focusRange) gl.uniform2f(U.uFocusRange, v.focusRange[0], v.focusRange[1]);
       else gl.uniform2f(U.uFocusRange, 1, 0);

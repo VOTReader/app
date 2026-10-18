@@ -56,7 +56,8 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
       // a line ends up unwitnessed. Recording is additive; no other case reads it.
       draw: (opts) => {
         DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density, camY: opts && opts.camY, camX: opts && opts.camX, lens: opts && opts.lens,
-          focusArc: opts && opts.focusArc, focusRange: opts && opts.focusRange, lensDim: opts && opts.lensDim });
+          focusArc: opts && opts.focusArc, focusRange: opts && opts.focusRange, lensDim: opts && opts.lensDim,
+          centre: opts && opts.centre });
         return { instances: 0, draws: 0 };
       },
       // My Web's ground (refactor.md #10): one clear, recorded so a case can
@@ -556,50 +557,54 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     });
   });
 
-  describe('the lens (landing 10): past the overview the chapter under the centre is published and handed to the renderer', () => {
+  /* Q2 retired the lens (the rest of the web at 0.35 from 6x): nothing dims as the reader zooms, and
+     the chapter under the centre is emphasised instead (spec 4.4). These cases pinned lens/lensDim on the
+     draw; rewritten to the centre chapter the renderer is handed now (CONTRACTS.md section 5). */
+  describe('the centre chapter (Q2, the lens retired): past the overview the chapter under the centre is published and handed to the renderer', () => {
     const pressFrame = async (key) => {
       fireEvent.keyDown(document.querySelector('.sw-root'), { key });
       await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     };
     const shownLens = (container) => container.querySelector('.sw-root').getAttribute('data-lens');
 
-    it('CONTROL: at the overview there is no lens - data-lens empty, the draw carries null', async () => {
+    it('CONTROL: at the overview there is no centre chapter - data-lens empty, the draw carries null', async () => {
       const { container } = await mount();
       expect(zoomText(container)).toBe('Overview');
       expect(shownLens(container)).toBe('');
-      expect(DRAWN[DRAWN.length - 1].lens).toBeNull();
+      expect(DRAWN[DRAWN.length - 1].centre).toBeNull();
     });
 
-    it('at the ceiling the lens is the chapter under the centre (the one chapter here): published as "lo-hi" and drawn', async () => {
+    it('at the ceiling the centre is the chapter under it (the one chapter here): published as "lo-hi", drawn at full emphasis, and no draw carries a dim', async () => {
       const { container } = await mount();
       for (let i = 0; i < 40; i++) await pressFrame('+');
       expect(zoomText(container)).toBe('1711x');
       expect(shownLens(container)).toBe('0-' + (CANON - 1));
-      expect(DRAWN[DRAWN.length - 1].lens).toEqual([0, CANON - 1]);
-      // sw1: fully set in by the ceiling; on the way, one + press past 6x is a step, not the whole drop
-      expect(DRAWN[DRAWN.length - 1].lensDim).toBeCloseTo(0.35, 6);
+      expect(DRAWN[DRAWN.length - 1].centre).toEqual({ chapterIndex: 0, book: 0, chapter: 1, x0: 0, x1: CANON, t: 1 });
+      // nothing dims with zoom: the lens's share is gone from every draw
+      expect(DRAWN.every((d) => d.clear || (d.lens === undefined && d.lensDim === undefined))).toBe(true);
     });
 
-    it('the lens eases in: the first frame past 6x keeps most of the ink (sw1)', async () => {
+    it('the emphasis eases in: the first frame past 6x is a step of it, not the whole (C20)', async () => {
       await mount();
-      let firstLensed = null;
-      for (let i = 0; i < 12 && !firstLensed; i++) {
+      let first = null;
+      for (let i = 0; i < 12 && !first; i++) {
         await pressFrame('+');
         const last = DRAWN[DRAWN.length - 1];
-        if (last.lens) firstLensed = last;
+        if (last.centre) first = last;
       }
-      expect(firstLensed, 'PRECONDITION: a press reached the lens').toBeTruthy();
-      expect(firstLensed.lensDim).toBeGreaterThan(0.75);
+      expect(first, 'PRECONDITION: a press reached the centre chapter').toBeTruthy();
+      expect(first.centre.t).toBeGreaterThanOrEqual(0);
+      expect(first.centre.t).toBeLessThan(0.4);
     });
 
-    it('My Web has no lens: switching at the ceiling clears data-lens and the draw carries null', async () => {
+    it('My Web has no centre chapter: switching at the ceiling clears data-lens and the GL surface is the ground alone', async () => {
       const { container } = await mount();
       for (let i = 0; i < 40; i++) await pressFrame('+');
-      expect(shownLens(container), 'precondition: lit on the canon web').toBe('0-' + (CANON - 1));
+      expect(shownLens(container), 'precondition: a centre on the canon web').toBe('0-' + (CANON - 1));
       fireEvent.click(screen.getByRole('button', { name: /my web/i }));
       await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
       expect(shownLens(container)).toBe('');
-      // the GL surface is the ground alone (#10): no thread pass, no lens
+      // the GL surface is the ground alone (#10): no thread pass, no centre
       expect(DRAWN[DRAWN.length - 1].clear).toBe(true);
     });
   });

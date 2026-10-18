@@ -10,8 +10,9 @@
 import { describe, it, expect } from 'vitest';
 import { SHADER_SOURCE, DENSITY_STEPS, createRenderer } from './web-renderer.js';
 import {
-  arcShapeGLSL, flyOverDim, FLYOVER_FLOOR, flyOverGLSL, glslFloat,
+  arcShapeGLSL, flyOverWidth, flyOverGLSL, glslFloat,
 } from '../../utils/scripture-web/geometry.js';
+import { FLYOVER_LEG_WIDTH } from '../../utils/scripture-web/sw-ink.js';
 import {
   DISTANCE_RAMP, rampGLSL, readChromeTokens, cssColorToRGB,
 } from '../../utils/scripture-web/palette.js';
@@ -81,44 +82,36 @@ describe('shader shape', () => {
   });
 });
 
-describe('deep-zoom declutter', () => {
+/* Q3 (ii), digest section 5: the fly-over law was an ALPHA floor (0.35); it is
+   a WIDTH law now. A line zoomed into the middle of (both feet carried off
+   screen) is the line the reader is chasing, so it keeps its ink and only its
+   legs thin. The cases that pinned the floor are rewritten to that intent. */
+describe('deep-zoom declutter: fly-overs thin, never fade', () => {
   it('inlines the SHARED fly-over law rather than restating it', () => {
-    // Hand-written here, the fade could reach zero a hair before or after the
-    // picker's copy did, and taps would land on arcs painted at alpha 0 — the
-    // very thing the shared law exists to prevent. Nothing on screen would
-    // look wrong.
     expect(SHADER_SOURCE.vertex).toContain(flyOverGLSL);
   });
 
-  it('calls that law for the fly-over fade, in the viewport frame', () => {
+  it('calls that law on the WIDTH, in the viewport frame, with the ink table\'s leg share', () => {
     // uRes.x is device px, the same frame pick.js measures its feet in.
-    expect(SHADER_SOURCE.vertex).toMatch(
-      /dim \*= flyOverDim\(arcAnchored\(x0,\s*x1,\s*uRes\.x\),\s*uFlyLocalize\);/);
+    expect(SHADER_SOURCE.vertex).toContain(
+      'halfW *= flyOverWidth(arcAnchored(x0, x1, uRes.x), uFlyLocalize, ' + glslFloat(FLYOVER_LEG_WIDTH) + ');');
+    // and nothing in the vertex stage dims a fly-over any more
+    expect(SHADER_SOURCE.vertex).not.toMatch(/flyOverDim|flyFloor|dim \*= fly/);
   });
 
-  it('the fly-over law never fades a thread to nothing, at any depth', () => {
-    // By owner rule (2026-09-10, "what you're trying to zoom into and tap
-    // disappears as you get closer") a fly-over settles at FLYOVER_FLOOR and
-    // stops, so the shader has nothing to cull and the picker nothing to refuse.
-    for (const loc of [0, 0.55, 0.8, 0.99, 1]) expect(flyOverDim(0, loc)).toBeGreaterThan(0);
-    expect(flyOverDim(0, 1)).toBe(FLYOVER_FLOOR);
-  });
-
-  it('settles fly-over arcs at a VISIBLE floor at full depth — dimmer than an anchored arc, never nothing', () => {
-    /* This case used to demand the floor reach zero, because the tanh ceiling
-       flattens every large apex to one height and at depth hundreds of
-       fly-overs stacked into horizontal smears (the on-device report). The
-       owner then met the other face of that law: the line he was zooming
-       toward vanished as he arrived. Both reports are real. The trade is
-       stated here as a property: the smear is DIMMED (below an anchored arc)
-       and the chased line is NEVER GONE (above zero). The number itself is
-       design-perf's to tune. */
-    expect(flyOverDim(0, 1)).toBeGreaterThan(0);
-    expect(flyOverDim(0, 1)).toBeLessThan(flyOverDim(1, 1));
-    // The FORMATTED literal, never the raw value: at FLYOVER_FLOOR = 1 the raw
-    // form is `float flyFloor = 1;`, which the compiler rejects (glsl-float.test.js).
-    expect(flyOverGLSL).toContain('float flyFloor = ' + glslFloat(FLYOVER_FLOOR) + ';');
-    expect(flyOverGLSL).not.toContain('smoothstep(.55, 1., localize)');
+  it('a fly-over keeps FLYOVER_LEG_WIDTH of its width at full depth; an anchored arc keeps all of it', () => {
+    expect(FLYOVER_LEG_WIDTH).toBe(0.7);
+    expect(flyOverWidth(0, 1, FLYOVER_LEG_WIDTH)).toBeCloseTo(0.7, 12);
+    expect(flyOverWidth(1, 1, FLYOVER_LEG_WIDTH)).toBe(1);
+    expect(flyOverWidth(0, 0, FLYOVER_LEG_WIDTH)).toBe(1);
+    // eased with the localize, never a step (C20)
+    let prev = 1;
+    for (let loc = 0; loc <= 1.0001; loc += 0.05) {
+      const w = flyOverWidth(0, loc, FLYOVER_LEG_WIDTH);
+      expect(w).toBeLessThanOrEqual(prev + 1e-12);
+      expect(prev - w).toBeLessThan(0.02);
+      prev = w;
+    }
   });
 });
 

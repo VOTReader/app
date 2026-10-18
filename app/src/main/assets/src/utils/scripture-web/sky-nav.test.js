@@ -28,14 +28,15 @@ describe('the fly-over law lets go as the reader rises', () => {
     expect(geo.skyLocalize(0.8, 100, 0)).toBe(0.8);
   });
 
-  it('a fly-over at the ceiling of the sky keeps its full alpha; at the baseline the floor', () => {
-    expect(geo.flyOverDim(0, geo.skyLocalize(1, 512, 512))).toBe(1);
-    expect(geo.flyOverDim(0, geo.skyLocalize(1, 0, 512))).toBeCloseTo(geo.FLYOVER_FLOOR, 9);
+  // the fly-over law is a width law now (Q3 ii; it was an alpha floor): the sky lets it go the same way
+  it('a fly-over at the ceiling of the sky keeps its full width; at the baseline its leg share', () => {
+    expect(geo.flyOverWidth(0, geo.skyLocalize(1, 512, 512), 0.7)).toBe(1);
+    expect(geo.flyOverWidth(0, geo.skyLocalize(1, 0, 512), 0.7)).toBeCloseTo(0.7, 9);
   });
 
-  it('the vertex shader dims fly-overs by uFlyLocalize, not the tessellation\'s uLocalize', () => {
+  it('the vertex shader thins fly-overs by uFlyLocalize, not the tessellation\'s uLocalize', () => {
     expect(SHADER_SOURCE.vertex).toMatch(/uniform float uFlyLocalize;/);
-    expect(SHADER_SOURCE.vertex).toMatch(/flyOverDim\(arcAnchored\(x0, x1, uRes\.x\), uFlyLocalize\)/);
+    expect(SHADER_SOURCE.vertex).toMatch(/flyOverWidth\(arcAnchored\(x0, x1, uRes\.x\), uFlyLocalize,/);
     // the clip of the samples onto the viewport still reads uLocalize: the
     // sky must not draw a visible piece as one chord
     expect(SHADER_SOURCE.vertex).toMatch(/mix\(left,\s+max\(left,\s+-m\),\s+uLocalize\)/);

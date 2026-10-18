@@ -10,8 +10,9 @@
    arguments and return plain objects, so web-frame.test.js pins them. */
 
 import {
-  fitPPV, localizeFactor, squashFactor, MAX_STRETCH, maxZoomFor,
+  fitPPV, localizeFactor, squashFactor, MAX_STRETCH, maxZoomFor, LOCALIZE_START,
 } from './geometry.js';
+import { CENTRE_BRIGHT, CENTRE_WIDTH } from './sw-ink.js';
 
 /** @typedef {{ W: number, H: number, DPR: number }} View  device px, and the device pixel ratio */
 /** @typedef {{ base: number, ceil: number, ruler: number }} Frame  device px */
@@ -111,17 +112,68 @@ export function webViewArgs(v, cam, f, density, focus) {
  *   x0, x1        its canon x range, half-open: verse v spans [v, v + 1), so x0 is
  *                 its first verse id and x1 one past its last (verseToX maps both)
  *   t             the emphasis ease, 0..1: the GL draws the chapter's own arcs
- *                 at mix(1, CENTRE_BRIGHT, t) and the overlay the wash at t
+ *                 at centreEmphasis(t) and the overlay the wash at t
  */
+
+/** The centre chapter's hold (spec §4.4): a chapter stays the centre while the canvas area's
+ * centre is within it widened by this share each side, so a pan that grazes a boundary does not
+ * flicker the emphasis. The share is of the chapter's width or of the frame's, whichever is
+ * narrower: 15 % of Psalm 119 is 26 verses, more than the whole frame at the ceiling. */
+export const CENTRE_HOLD = 0.15;
+
+/**
+ * The centre chapter's inclusive verse range for one frame (spec §4.4; CONTRACTS.md §5): the
+ * chapter under the canvas area's centre (the frame less the open panel on the right, so the
+ * chapter the reader sees mid-picture is the one emphasised), from LOCALIZE_START; null at the
+ * overview, where the dome is the picture. `prev`, last frame's range, is kept while that centre
+ * stays within it widened by CENTRE_HOLD.
+ * @param {any} g  the decoded graph
+ * @param {{ x: number, ppv: number, total: number }} cam
+ * @param {number} width  the frame, device px
+ * @param {number} insetRight  what the open panel covers on the right, device px (0 when none)
+ * @param {[number, number] | null} prev  last frame's centreRange, or null
+ * @returns {[number, number] | null}
+ */
+export function centreRange(g, cam, width, insetRight, prev) {
+  if (!g || !g.chapters || !g.chapters.length || !g.chapterOfVerse || !(g.total > 0)) return null;
+  if (!(width > 0) || !(cam && cam.ppv > 0)) return null;
+  if (!(cam.ppv / fitPPV(cam, width) >= LOCALIZE_START)) return null;
+  const inset = insetRight > 0 && insetRight < width ? insetRight : 0;
+  // the canon x under the canvas area's centre: (width - inset) / 2 on screen
+  const cx = cam.x - inset / (2 * cam.ppv);
+  if (prev && prev[0] <= prev[1]) {
+    const hold = CENTRE_HOLD * Math.min(prev[1] + 1 - prev[0], (width - inset) / cam.ppv);
+    if (cx >= prev[0] - hold && cx < prev[1] + 1 + hold) return prev;
+  }
+  const v = Math.floor(cx);
+  if (!(v >= 0) || v >= g.total) return null;
+  const ci = g.chapterOfVerse[v];
+  const ch = g.chapters[ci];
+  if (!ch) return null;
+  return [ch[2], ch[2] + ch[3] - 1];
+}
+
+/**
+ * The centre chapter's emphasis on its own arcs (a foot inside it) at ease t: alpha x bright and
+ * width x width, both eased from 1 so no + press is a jump (C20). The shader's twin is in
+ * web-renderer.js (uCentreT); the rest of the web is left exactly as it is.
+ * @param {number} t  CentreChapter.t, 0..1
+ * @returns {{ bright: number, width: number }}
+ */
+export function centreEmphasis(t) {
+  const k = t > 0 ? (t < 1 ? t : 1) : 0;
+  return { bright: 1 + (CENTRE_BRIGHT - 1) * k, width: 1 + (CENTRE_WIDTH - 1) * k };
+}
 
 /**
  * The centre chapter (the Q2 lens replacement, spec §4.4) for one frame, or
- * null below the zoom where it applies. GL-owned: today it is the lens's
- * chapter (pick.lensRange, from 6x) with the lens's own log-zoom ease
- * (6x -> 24x); the GL stream adds the 15 % hysteresis and the canvas-area
- * centre. The overlay paints the band from it and dims nothing.
+ * null below the zoom where it applies. `lens` is the chapter's inclusive
+ * verse range: centreRange() (the canvas area's centre, with the hold), or
+ * pick.lensRange() (the frame's centre, no hold). t is localizeFactor(zoom),
+ * the log-zoom ease from 6x to full at 24x. GL draws the chapter's own arcs
+ * at centreEmphasis(t); the overlay paints the band from it; nothing dims.
  * @param {any} g  the decoded graph
- * @param {[number, number] | null} lens  pick.lensRange(): the chapter's inclusive verse range
+ * @param {[number, number] | null} lens  the chapter's inclusive verse range
  * @param {number} zoom  as a multiple of fit
  * @returns {CentreChapter | null}
  */

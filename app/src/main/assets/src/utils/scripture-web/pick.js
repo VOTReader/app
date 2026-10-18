@@ -15,9 +15,9 @@
    shader draws with. There are THREE of them, and geometry.js owns all.
    Height (geometry.arcShape, the half-ellipse of a thread's own span, its
    feet at geometry.footX) — or arcs become untappable exactly where they
-   look tappable. Visibility (geometry.arcAnchored + flyOverDim) only
-   dims: a fly-over settles at FLYOVER_FLOOR and never reaches zero, so
-   no thread the shader draws is refused a tap for it. Nothing is hidden (the structure law, 2026-09-21): every thread crossing
+   look tappable. A fly-over (geometry.arcAnchored + flyOverWidth) only
+   thins, its alpha unchanged, so no thread the shader draws is refused a
+   tap for it. Nothing is hidden (the structure law, 2026-09-21): every thread crossing
    the frame is drawn and pickable, so there is no third law. Visible equals
    pickable, in both directions.
    ═══════════════════════════════════════════════════════════════════════ */
@@ -84,8 +84,8 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
         const x1 = footX(cam, width, g.to[i], fanB[i]);
         // Cheap x-range reject before any ellipse maths.
         if (x1 < px - tol || x0 > px + tol) continue;
-        // Pickable iff painted: the fly-over fade dims a thread to
-        // FLYOVER_FLOOR and never to nothing, so it is there to be tapped.
+        // Pickable iff painted: a fly-over draws thinner, never fainter
+        // (geometry.flyOverWidth), so it is there to be tapped.
         // the curve as the shader draws it: the half-ellipse of its own span
         const { A } = arcShape((x1 - x0) * 0.5, squash);
         const d = arcDistance(px, py, x0, x1, base, A, tol);
@@ -384,10 +384,13 @@ export function refOfVerse(g, verseId) {
 }
 
 /**
- * The lens: the chapter under the frame's centre, as a verse range, once the
- * reader is past the overview (LOCALIZE_START x fit); null at the overview,
- * where the dome is the picture. The shader lights this range at full ink
- * and dims the rest to LENS_CONTEXT while nothing is tapped.
+ * The chapter under the frame's centre, as a verse range, once the reader is
+ * past the overview (LOCALIZE_START x fit); null at the overview, where the
+ * dome is the picture. It dims nothing: the lens that kept the rest at 0.35
+ * is retired (Q2). The Nearby list and the screen's list eyebrow read it;
+ * the emphasised centre chapter is web-frame.centreRange (the canvas area's
+ * centre, with a hold), which agrees with this whenever no panel is open
+ * and the camera is not inside a hold.
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, ppv:number, total:number}} cam
@@ -406,10 +409,10 @@ export function lensRange(g, cam, width) {
 }
 
 /**
- * The chapter the Nearby list reads (landing 15): the lens's chapter once
+ * The chapter the Nearby list reads (landing 15): lensRange's chapter once
  * the reader is past the overview, else the chapter under the frame's
- * centre - the same verse either way (cam.x IS the centre), so the list and
- * the lit chapter never disagree. -1 for an empty graph.
+ * centre - the same verse either way (cam.x IS the centre). -1 for an
+ * empty graph.
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, ppv:number, total:number}} cam
  * @param {number} width - device px

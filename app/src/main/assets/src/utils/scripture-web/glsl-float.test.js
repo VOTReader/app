@@ -99,9 +99,9 @@ describe('every constant interpolated into the GLSL templates routes through gls
     }
   });
 
-  it('is not reading an empty region: the two constants the shaders inline are seen as sites (arcShapeGLSL carries none since the structure law)', () => {
+  it('is not reading an empty region: the constant the templates inline is seen as a site (arcShapeGLSL carries none since the structure law; the fly-over floor is retired, its leg share a parameter)', () => {
     const seen = new Set(TEMPLATES.flatMap((name) => allSites(templateBody(name)).map((s) => s.replace(/^glslFloat\(|\)$/g, '').trim())));
-    for (const want of ['FLYOVER_MARGIN', 'FLYOVER_FLOOR']) {
+    for (const want of ['FLYOVER_MARGIN']) {
       expect([...seen]).toContain(want);
     }
   });

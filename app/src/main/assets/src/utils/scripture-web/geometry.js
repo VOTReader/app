@@ -28,53 +28,28 @@
    verse's own cell in the order of their far ends (footX), so a sheaf is a
    sheaf and not one stem.
 
-   The second law here is the fly-over fade: at depth an arc with neither
-   foot near the viewport recedes to FLYOVER_FLOOR (never zero), and the
-   picker applies the same test (`flyOverGLSL`; arcAnchored + flyOverDim).
+   The second law here is the fly-over leg (Q3 ii): at depth an arc with
+   neither foot near the viewport draws thinner, at FLYOVER_LEG_WIDTH of its
+   width (sw-ink.js), its alpha unchanged (`flyOverGLSL`; arcAnchored +
+   flyOverWidth). Nothing dims as the reader zooms (Q2): the lens that kept
+   the rest of the web at 0.35 is retired, and the chapter under the centre
+   is emphasised instead (web-frame.centreRange, the shader's uCentre).
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
- * THE LENS (structure-law.md, landing 10; Corbin 2026-09-21: every line
- * drawn, and "someway somehow navigate them and understand them"). Past
- * LOCALIZE_START, with nothing tapped, the chapter under the frame's centre
- * is at full ink and every other thread at this share of its alpha: still
- * drawn, still tappable, still counted, never summed into a wall. Panning
- * slides the lens; a tap takes over (the tap's own 0.05 dim); Reset clears.
- * The one taste number of the lens; 1 turns it off.
+ * Retired with the lens (Q2, 2026-10: nothing dims as the reader zooms). The
+ * lens kept every thread outside the chapter under the centre at 0.35 of its
+ * ink; the centre chapter is now emphasised instead and the rest is left
+ * exactly as it was. This returns 1 for every range so the one remaining
+ * caller (overlay-renderer.js's pills, canvas-owned) dims nothing; it goes
+ * when that call does (CONTRACTS.md section 5).
+ * @param {number} _lo @param {number} _hi - inclusive verse range
+ * @param {(number[]|null)} _lens
+ * @param {number} [_share]
+ * @returns {number} 1
  */
-export const LENS_CONTEXT = 0.35;
-
-/**
- * The lens applied to a verse range (a foot cell's count, a label): 1 with
- * no lens or when the range touches it, else LENS_CONTEXT - the same share
- * the shader leaves a thread outside the lens. The counts at the feet are
- * information about every thread, so they dim with the web, never vanish.
- * @param {number} lo @param {number} hi - inclusive verse range
- * @param {(number[]|null)} lens - pick.lensRange()
- */
-export function lensDimFor(lo, hi, lens, share = LENS_CONTEXT) {
-  // no lens, or the shader's own "off" spelling (lo > hi, uLens = (1, 0))
-  if (!lens || !(lens[0] <= lens[1])) return 1;
-  return hi >= lens[0] && lo <= lens[1] ? 1 : share;
-}
-
-/** Zoom (x fit) at which the lens has fully set in: the localize span's end, about three + presses
- * past LOCALIZE_START, so no single press (x1.6) is a visible jump (sw1, 2026-10-05). */
-export const LENS_FULL = 24;
-
-/**
- * What a thread outside the lens keeps of its alpha at this zoom. The lens used to switch fully on
- * at LOCALIZE_START, so one + press dropped every other chapter from full ink to LENS_CONTEXT (the
- * audit measured the frame's mean brightness halving between 4.1x and 6.6x). It now eases in over
- * the log-zoom from LOCALIZE_START to LENS_FULL: 1 at 6x, LENS_CONTEXT from 24x. Lenses never dim
- * anything to zero, so what is drawn, tapped and counted is unchanged.
- * @param {number} zoom - current scale as a multiple of fit-to-width
- * @returns {number} LENS_CONTEXT..1
- */
-export function lensShareAt(zoom) {
-  if (!(zoom > LOCALIZE_START)) return 1;
-  const t = (Math.log2(zoom) - Math.log2(LOCALIZE_START)) / (Math.log2(LENS_FULL) - Math.log2(LOCALIZE_START));
-  return 1 - (1 - LENS_CONTEXT) * (t > 1 ? 1 : t);
+export function lensDimFor(_lo, _hi, _lens, _share) {
+  return 1;
 }
 
 /** Zoom (× fit) at which the semicircle→ceiling crossover starts and ends. */
@@ -83,7 +58,7 @@ export const LOCALIZE_END = 24;
 
 /**
  * How far the semicircle→ceiling crossover has progressed, and how strongly
- * fly-over arcs are faded. 0 at overview, 1 once zoomed well in.
+ * fly-over arcs thin to their legs. 0 at overview, 1 once zoomed well in.
  * @param {number} zoom — current scale as a multiple of fit-to-width
  * @returns {number} 0..1
  */
@@ -347,7 +322,7 @@ function clamp1(v) { return v < -1 ? -1 : (v > 1 ? 1 : v); }
  *
  * GLSL ES 3.00 has no int->float conversion, so `${X}` with X = 1 emits
  * `float f = 1;` and the shader fails to compile. Measured by the Verifier
- * through the real compiler (ANGLE): FLYOVER_FLOOR = 0.35 links; = 1 fails
+ * through the real compiler (ANGLE): the retired FLYOVER_FLOOR = 0.35 linked; = 1 failed
  * with "cannot convert from 'const int' to 'highp float'"; and = 1.0 fails
  * IDENTICALLY, because String(1.0) is '1'. The value's own spelling cannot
  * be trusted, so the literal is formatted here. A `${X}.` suffix is the same
@@ -393,27 +368,6 @@ void arcAt(float tau, float left, float right, float A, out float x, out float h
 export const FLYOVER_MARGIN = 24;
 
 /**
- * The alpha a fly-over settles at once the reader has localized. NEVER ZERO.
- *
- * It used to fall from 0.10 to exactly 0 at full depth, so that hundreds of
- * long arcs' flattened apexes stopped smearing the view -- and the owner met
- * the other face of that law: "what you're trying to zoom into and tap
- * disappears as you get closer" (2026-09-10). Zooming into a line's middle is
- * exactly what carries both its feet out of the frame, so the line being
- * chased became a fly-over and vanished on arrival. The owner's rule: a line
- * crossing the viewport must not vanish as zoom increases.
- *
- * 0.35 is a first setting, not a measured optimum: visibly present and
- * tappable on a thin line over black, still clearly below an anchored arc so
- * the clutter case survives in a weaker form. design-perf tunes it with the
- * S-metrics they already hold. The literal rule ("never decrease with zoom")
- * is satisfiable only by deleting fly-over dimming altogether, because zoom is
- * what turns an anchored arc into a fly-over; this keeps the dimming and bans
- * the disappearance.
- */
-export const FLYOVER_FLOOR = 0.35;
-
-/**
  * 1 when either foot of an arc is within `margin` of the viewport, else 0.
  * An exact JS mirror of the shader's `step()` pair — GLSL's step(e, x) is
  * `x >= e ? 1 : 0`, so both edges are inclusive here too.
@@ -430,20 +384,24 @@ export function arcAnchored(x0, x1, width, margin = FLYOVER_MARGIN) {
 }
 
 /**
- * The alpha multiplier the shader applies to a fly-over: 1 while the reader
- * is at overview, falling to FLYOVER_FLOOR as they localize, and NO FURTHER.
- * It no longer reaches 0 -- see FLYOVER_FLOOR for why -- so the shader's
- * `dim <= 0` cull is never fed by this law, and every fly-over stays
- * pickable at its on-screen midpoint.
+ * The width multiplier the shader applies to a fly-over (Q3 ii): 1 while the
+ * reader is at the overview, easing to `leg` (sw-ink FLYOVER_LEG_WIDTH, 0.7)
+ * for a thread with neither foot near the viewport as they localize. Its
+ * ALPHA is left alone: the old law faded fly-overs to a floor, and a line
+ * zoomed into the middle of (both feet carried off screen) is exactly the
+ * line the reader is chasing. Thinner legs let the anchored weave read
+ * without taking any line away. `leg` is a parameter, not an import, so this
+ * module stays free of the ink table (sw-ink.js imports glslFloat from here).
  *
- * MUST stay identical to flyOverGLSL below and to the shader that inlines it.
+ * MUST stay identical to flyOverWidth in flyOverGLSL below.
  *
- * @param {number} anchored — arcAnchored(), 0 or 1
- * @param {number} localize — localizeFactor()
+ * @param {number} anchored - arcAnchored(), 0 or 1
+ * @param {number} localize - the fly-over's localize (skyLocalize)
+ * @param {number} leg - the fly-over's share of its width, 0..1
  */
-export function flyOverDim(anchored, localize) {
-  const floored = FLYOVER_FLOOR + (1 - FLYOVER_FLOOR) * anchored;
-  return 1 + (floored - 1) * localize;
+export function flyOverWidth(anchored, localize, leg) {
+  const target = leg + (1 - leg) * anchored;
+  return 1 + (target - 1) * localize;
 }
 
 /** GLSL's smoothstep, for the two laws that must mirror the shader exactly. */
@@ -463,9 +421,8 @@ float arcAnchored(float x0, float x1, float width){
   return max(step(-m, x0)*step(x0, width + m),
              step(-m, x1)*step(x1, width + m));
 }
-float flyOverDim(float anchored, float localize){
-  float flyFloor = ${glslFloat(FLYOVER_FLOOR)};
-  return mix(1., mix(flyFloor, 1., anchored), localize);
+float flyOverWidth(float anchored, float localize, float leg){
+  return mix(1., mix(leg, 1., anchored), localize);
 }`;
 
 /**
@@ -543,8 +500,8 @@ export function apexMaxPx(cam, yf) {
  * THE SKY (structure-law.md, landing 9). As the reader rises off the
  * baseline, the fly-over law lets go: a thread whose feet are both out of
  * frame is what the sky is made of, so at the ceiling's height it keeps its
- * full alpha. Linear in the camera's height over the frame's ceiling; only
- * the fly-over dim reads this - the clip of the samples onto the viewport
+ * full width. Linear in the camera's height over the frame's ceiling; only
+ * the fly-over leg reads this - the clip of the samples onto the viewport
  * and the ribbon's alpha law keep the zoom's own localize, or the sky would
  * draw a visible piece as one chord.
  * @param {number} localize - localizeFactor(zoom)

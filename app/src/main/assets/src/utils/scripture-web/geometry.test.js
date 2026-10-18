@@ -9,10 +9,10 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  LOCALIZE_START, LOCALIZE_END, LENS_FULL, LENS_CONTEXT, lensShareAt, lensDimFor, MAX_STRETCH, FLYOVER_MARGIN, FLYOVER_FLOOR,
+  LOCALIZE_START, LOCALIZE_END, lensDimFor, MAX_STRETCH, FLYOVER_MARGIN,
   localizeFactor, squashFactor, arcDistance, arcHeightAt,
   arcShape, arcShapeGLSL, footX,
-  arcAnchored, flyOverDim, flyOverGLSL, glslFloat,
+  arcAnchored, flyOverWidth, flyOverGLSL, glslFloat,
   createCamera, fitPPV, clampCamera, verseToX, xToVerse, zoomAbout,
   rotatePointer,
 } from './geometry.js';
@@ -384,43 +384,30 @@ describe('visibility law', () => {
     expect(arcAnchored(-9000, 9000, 1000, 9000)).toBe(1);
   });
 
-  it('leaves everything painted at overview, however far the feet are', () => {
-    expect(flyOverDim(0, 0)).toBe(1);
-    expect(flyOverDim(1, 0)).toBe(1);
+  /* The fly-over law was an alpha floor (0.35, after an older one that reached
+     zero: "what you're trying to zoom into and tap disappears as you get
+     closer"). Q3 (ii) makes it a WIDTH law: a fly-over keeps its ink and its
+     legs thin. These cases are that law's; the floor's are retired with it. */
+  it('leaves every line its full width at overview, however far the feet are', () => {
+    expect(flyOverWidth(0, 0, 0.7)).toBe(1);
+    expect(flyOverWidth(1, 0, 0.7)).toBe(1);
   });
 
-  it('never dims an anchored arc, at any depth', () => {
-    for (const loc of [0, 0.55, 0.8, 1]) expect(flyOverDim(1, loc)).toBe(1);
+  it('never thins an anchored arc, at any depth', () => {
+    for (const loc of [0, 0.55, 0.8, 1]) expect(flyOverWidth(1, loc, 0.7)).toBe(1);
   });
 
-  /* THE OLD CASE HERE ASSERTED THE DEFECT: "fades a fly-over through the floor
-     and reaches EXACTLY zero at depth". That zero is what the owner met --
-     "what you're trying to zoom into and tap disappears as you get closer" --
-     because zooming into a line's middle is exactly what carries both its feet
-     out of the frame. Inverted, not deleted. */
-  it("NEVER fades a fly-over to nothing — the line the reader is zooming toward must not vanish as they arrive", () => {
-    expect(flyOverDim(0, 1)).toBeGreaterThan(0);
+  it('thins a fly-over to its leg share at full depth and no further, eased between', () => {
+    expect(flyOverWidth(0, 1, 0.7)).toBeCloseTo(0.7, 12);
+    expect(flyOverWidth(0, 0.5, 0.7)).toBeCloseTo(0.85, 12);
+    for (const loc of [0, 0.3, 0.55, 0.8, 1]) expect(flyOverWidth(0, loc, 0.7)).toBeGreaterThanOrEqual(0.7);
   });
 
-  it('holds every fly-over at or above the named, tappable floor at every depth', () => {
-    for (const loc of [0, 0.3, 0.55, 0.8, 1]) {
-      expect(flyOverDim(0, loc)).toBeGreaterThanOrEqual(FLYOVER_FLOOR);
-    }
-    /* And the floor itself is a value a reader can see and tap, not a token
-       0.10 that reads as "trimmed away" on a thin line over black. */
-    expect(FLYOVER_FLOOR).toBeGreaterThanOrEqual(0.3);
-  });
-
-  it('still dims a fly-over below an anchored arc at depth — the clutter case is kept, weaker', () => {
-    expect(flyOverDim(0, 1)).toBeLessThan(flyOverDim(1, 1));
-  });
-
-  it('publishes the margin and the floor to the GLSL the shader inlines', () => {
-    // glslFloat spells both: `24.` was right only while the margin stayed whole,
-    // and the raw floor is an int literal the moment it is tuned to 1 (glsl-float.test.js).
+  it('publishes the margin and the width law to the GLSL the shader inlines, and no alpha floor', () => {
     expect(flyOverGLSL).toContain('float m = ' + glslFloat(FLYOVER_MARGIN) + ';');
-    expect(flyOverGLSL).toContain('float flyFloor = ' + glslFloat(FLYOVER_FLOOR) + ';');
-    expect(flyOverGLSL).toContain('mix(1., mix(flyFloor, 1., anchored), localize)');
+    expect(flyOverGLSL).toContain('float flyOverWidth(float anchored, float localize, float leg){');
+    expect(flyOverGLSL).toContain('mix(1., mix(leg, 1., anchored), localize)');
+    expect(flyOverGLSL).not.toMatch(/flyFloor|flyOverDim/);
   });
 });
 
@@ -578,25 +565,21 @@ describe('decode', () => {
   });
 });
 
-/* sw1 (audit-web 10-05): the lens switched fully on at LOCALIZE_START, so one + press past 6x dropped every
-   other chapter from full ink to LENS_CONTEXT and the frame's mean brightness halved. It eases in now. */
-describe('the lens eases in from LOCALIZE_START to LENS_FULL', () => {
-  it('keeps full ink up to 6x, reaches LENS_CONTEXT at 24x (the localize span) and stays there', () => {
-    expect(LENS_FULL).toBe(LOCALIZE_END);
-    expect(lensShareAt(1)).toBe(1);
-    expect(lensShareAt(LOCALIZE_START)).toBe(1);
-    expect(lensShareAt(LENS_FULL)).toBeCloseTo(LENS_CONTEXT, 10);
-    expect(lensShareAt(1711)).toBeCloseTo(LENS_CONTEXT, 10);
+/* sw1 (audit-web 10-05) eased the lens in from 6x to 24x; Q2 (2026-10) retired it: nothing dims as the
+   reader zooms, and the centre chapter is emphasised instead (lens-law.test.js). These cases were the
+   lens's easing; their intent that survives is that the pills dim nothing at any zoom. */
+describe('the lens is retired: nothing dims with zoom', () => {
+  it('exports no LENS_CONTEXT, LENS_FULL or lensShareAt', async () => {
+    const geo = await import('./geometry.js');
+    expect('LENS_CONTEXT' in geo).toBe(false);
+    expect('LENS_FULL' in geo).toBe(false);
+    expect('lensShareAt' in geo).toBe(false);
+    expect(LOCALIZE_END).toBe(24);
   });
-  it('never jumps: one + press (x1.6) anywhere moves the share by less than half the full step', () => {
-    let worst = 0;
-    for (let z = 1; z < 2000; z *= 1.01) worst = Math.max(worst, Math.abs(lensShareAt(z * 1.6) - lensShareAt(z)));
-    expect(worst).toBeLessThan((1 - LENS_CONTEXT) / 2 + 1e-9);
-    for (let z = 1; z < 2000; z *= 1.05) expect(lensShareAt(z * 1.05)).toBeLessThanOrEqual(lensShareAt(z) + 1e-12);
-  });
-  it('the count pills follow the same share', () => {
-    expect(lensDimFor(10, 20, [100, 200], lensShareAt(7))).toBeCloseTo(lensShareAt(7), 10);
-    expect(lensDimFor(10, 20, [100, 200])).toBe(LENS_CONTEXT);
+  it('the count pills dim nothing, inside the centre chapter or out, whatever share is asked', () => {
+    expect(lensDimFor(10, 20, [100, 200], 0.35)).toBe(1);
+    expect(lensDimFor(10, 20, [100, 200])).toBe(1);
     expect(lensDimFor(150, 160, [100, 200], 0.5)).toBe(1);
+    expect(lensDimFor(1, 2, null)).toBe(1);
   });
 });
