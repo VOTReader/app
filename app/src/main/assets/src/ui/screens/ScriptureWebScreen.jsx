@@ -223,7 +223,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
   // where the reader has been (use-journey.js): the navigation stream pushes,
   // the panel shows it and its Back
-  const journey = useJourney();
+  const journey = useJourney({ flyTo });
 
   // what the pointer is on and what is open (use-web-selection.js): the hover
   // chip, the chooser, Nearby and the sheet; the tap test and the handlers the

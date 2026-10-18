@@ -423,8 +423,10 @@ export function useWebSelection({
     const toFar = info.far === 'to';
     const verse = toFar ? info.to : info.from;
     const end = toFar ? info.b : info.a;
-    // the journey records the arrival (the navigation stream's stack; a no-op today)
-    if (journey) journey.push({ verse, label: end.label });
+    // the journey records the arrival, and where it set out from (the near foot), so Back comes
+    // home with this line open again (use-journey.js)
+    const open = { mode: 'connection', arc: info.index };
+    if (journey) journey.push({ verse, label: end.label, open }, { verse: toFar ? info.from : info.to, label: (toFar ? info.a : info.b).label, open });
     // the camera goes there through flyTo: same zoom, clamped (instant today; the ease is nav's)
     flyTo({ x: verse });
     setDetail(Object.assign({}, info, { far: toFar ? 'from' : 'to' }));

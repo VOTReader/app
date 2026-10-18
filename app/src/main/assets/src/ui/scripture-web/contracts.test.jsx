@@ -260,18 +260,22 @@ describe("camFor: My Web splits its two cameras at the gap's midline (fix-review
   });
 });
 
-describe('the journey (CONTRACTS.md section 7): the stub keeps nothing', () => {
-  it('is empty, stable across renders, and reached through the selection hook', () => {
+describe('the journey (CONTRACTS.md section 7): a real trail since the navigation stream (w3)', () => {
+  // was "the stub keeps nothing" (the spine's stub); the law it pinned is now the real trail's:
+  // the stack re-renders when it changes, and the panel still reaches it through the selection hook
+  it('keeps the trail, re-renders on it, and is reached through the selection hook', () => {
     const { hook, get } = mount();
     const j = get().journey;
     expect(j.stack).toEqual([]);
-    j.push({ verse: 100, label: 'Genesis 1:101' });
-    expect(j.stack).toEqual([]);
     expect(j.back()).toBeNull();
-    expect(() => j.clear()).not.toThrow();
+    act(() => { j.push({ verse: 100, label: 'Genesis 1:101' }, { verse: 5, label: 'Genesis 1:6' }); });
+    expect(get().journey.stack.map((e) => e.verse)).toEqual([5, 100]);
+    expect(get().sel.journey).toBe(get().journey);
+    const now = get().journey;
     hook.rerender();
-    expect(get().journey).toBe(j);
-    expect(get().sel.journey).toBe(j);
+    expect(get().journey, 'identity-stable while the trail is').toBe(now);
+    act(() => { get().journey.clear(); });
+    expect(get().journey.stack).toEqual([]);
   });
 
   it('Follow still lands on the far foot at the same zoom, through flyTo, and offers the way back', () => {

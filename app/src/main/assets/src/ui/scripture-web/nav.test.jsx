@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useWebCamera } from './use-web-camera.js';
 import { useWebSelection } from './use-web-selection.js';
-import { useJourney } from './use-journey.js';
+import { useJourney, pushed, JOURNEY_CAP } from './use-journey.js';
 import { useFrameScheduler } from './use-frame-scheduler.js';
 import { fitPPV } from '../../utils/scripture-web/geometry.js';
 
@@ -47,7 +47,7 @@ function mount({ loop = false } = {}) {
     const schedule = loop ? frames.schedule : fallback;
     const modeRef = React.useRef('canonical');
     const cam = useWebCamera({ graph: g, density: 'famous', modeRef, schedule, animate: loop ? frames.animate : undefined });
-    const journey = useJourney();
+    const journey = useJourney({ flyTo: cam.flyTo });
     const resumeRef = React.useRef(null);
     const personalRef = React.useRef(null);
     const elevatorRef = React.useRef(null);
@@ -230,5 +230,84 @@ describe('flyTo eases (A3): through the one frame loop, to exactly where the ins
     settle();
     expect(cam.ppv).toBeCloseTo(20, 9);
     expect(verseAt(250)).toBeCloseTo(v0, 6);
+  });
+});
+
+describe('the journey (A3): a breadcrumb trail whose top is where the reader is', () => {
+  const at = (verse) => ({ verse, label: 'v' + verse });
+  const verses = (s) => s.map((e) => e.verse);
+
+  it('the first arrival seeds where the reader set out from; the same place twice is one crumb', () => {
+    expect(verses(pushed([], at(100), at(5)))).toEqual([5, 100]);
+    expect(verses(pushed([], at(100)))).toEqual([100]);
+    expect(verses(pushed([], at(100), at(100))), 'set out from where it arrives: no crumb').toEqual([100]);
+    expect(verses(pushed([at(5), at(100)], at(100)))).toEqual([5, 100]);
+    expect(verses(pushed([at(5), at(100)], at(300), at(100)))).toEqual([5, 100, 300]);
+  });
+  it('walking back the way it came steps back; home again empties the trail', () => {
+    expect(verses(pushed([at(5), at(100), at(300)], at(100)))).toEqual([5, 100]);
+    expect(verses(pushed([at(5), at(100)], at(5)))).toEqual([]);
+  });
+  it('keeps the last 24', () => {
+    let s = [];
+    for (let i = 0; i < 40; i++) s = pushed(s, at(i * 10));
+    expect(s).toHaveLength(JOURNEY_CAP);
+    expect(s[s.length - 1].verse).toBe(390);
+  });
+  it('ignores what is not a place', () => {
+    const s = [at(5), at(100)];
+    expect(pushed(s, /** @type {any} */ (null))).toBe(s);
+    expect(pushed(s, /** @type {any} */ ({ verse: NaN, label: '' }))).toBe(s);
+  });
+
+  it('Follow leaves a trail home: Back flies there, eased, and the line opens again from that end', async () => {
+    const { get } = mount({ loop: true });
+    get().journey.connect({ openPanel: get().sel.openPanel, closePanel: get().sel.closePanel }); // as useGoTo does
+    act(() => { get().sel.openPanel({ mode: 'connection', arc: 0 }); });
+    expect(get().sel.detail.far).toBe('from');
+    act(() => { get().sel.followThread(get().sel.detail); });
+    settle();
+    expect(get().cam.camRef.current.x).toBeCloseTo(100, 6);
+    expect(verses(get().journey.stack), 'the near foot, then the far').toEqual([20100, 100]);
+    expect(get().sel.detail.far).toBe('to');
+    let to = null;
+    act(() => { to = get().journey.back(); });
+    expect(to).toMatchObject({ verse: 20100 });
+    expect(get().journey.stack, 'home: nothing further back').toEqual([]);
+    tick();
+    expect(get().cam.camRef.current.x, 'on its way, not jumped').not.toBeCloseTo(20100, 0);
+    await act(async () => { settle(); await Promise.resolve(); await Promise.resolve(); });
+    expect(get().cam.camRef.current.x).toBeCloseTo(20100, 6);
+    expect(get().sel.detail, 'the line is open again').toMatchObject({ kind: 'arc', index: 0 });
+    expect(get().sel.detail.far, 'and its Follow names the end it now faces away from').toBe('from');
+    expect(get().journey.back()).toBeNull();
+  });
+
+  it('Follow back along the same line is a step back, not a longer trail', () => {
+    const { get } = mount();
+    act(() => { get().sel.openPanel({ mode: 'connection', arc: 0 }); });
+    act(() => { get().sel.followThread(get().sel.detail); });
+    act(() => { get().sel.followThread(get().sel.detail); });
+    expect(get().cam.camRef.current.x).toBeCloseTo(20100, 6);
+    expect(get().journey.stack).toEqual([]);
+  });
+
+  it('three hops: Back walks them one by one, each a fly; an entry with open null closes the panel', async () => {
+    const { get } = mount();
+    const closed = vi.fn();
+    get().journey.connect({ openPanel: get().sel.openPanel, closePanel: closed });
+    act(() => {
+      get().journey.push({ verse: 9000, label: 'a', open: null }, { verse: 15551, label: 'home', open: null });
+      get().journey.push({ verse: 300, label: 'b' });
+    });
+    expect(verses(get().journey.stack)).toEqual([15551, 9000, 300]);
+    act(() => { get().journey.back(); });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(get().cam.camRef.current.x).toBe(9000);
+    expect(closed).toHaveBeenCalledTimes(1);
+    act(() => { get().journey.back(); });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(get().cam.camRef.current.x).toBe(15551);
+    expect(get().journey.stack).toEqual([]);
   });
 });
