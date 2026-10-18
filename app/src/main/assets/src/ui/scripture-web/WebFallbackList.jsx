@@ -11,10 +11,13 @@
    of the chapter ("Verse 16 · 3 connections"), each row the other end's
    reference, its verse in the reader's translation, and its tier.
    Data: utils/scripture-web/chapter-connections.js (the Famous view's
-   threads, the same ranking the map uses).
+   threads, the same ranking the map uses). Each row is the docked panel's
+   own ConnectionRow (connection-row.jsx) in its fallback skin, so the map
+   and the list draw one row (digest B1).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { chapterConnections } from '../../utils/scripture-web/chapter-connections.js';
+import { ConnectionRow } from './connection-row.jsx';
 
 const plural = (n, one) => n + ' ' + one + (n === 1 ? '' : 's');
 
@@ -93,16 +96,11 @@ export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack
           </div>
           <ul className="swf-rows">
             {grp.rows.map((row) => (
-              <li key={row.index}>
-                <button type="button" className="swf-row" onClick={() => { resumeChapter = ci; onOpen(row.other); }}
-                  aria-label={row.other.label + (row.tier === 'essential' ? ', essential' : ', famous')}>
-                  <span className="swf-row-top">
-                    <span className="swf-ref">{row.other.label}</span>
-                    <span className="swf-tier">{row.tier === 'essential' ? 'Essential' : 'Famous'}</span>
-                  </span>
-                  <span className="swf-snip">{verseText(row.other)}</span>
-                </button>
-              </li>
+              <ConnectionRow key={row.index} skin="fallback"
+                title={row.other.label} tag={row.tier === 'essential' ? 'Essential' : 'Famous'}
+                text={verseText(row.other)}
+                onMain={() => { resumeChapter = ci; onOpen(row.other); }}
+                mainLabel={row.other.label + (row.tier === 'essential' ? ', essential' : ', famous')} />
             ))}
           </ul>
         </section>
