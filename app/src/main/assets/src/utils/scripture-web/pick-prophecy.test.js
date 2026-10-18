@@ -158,3 +158,48 @@ describe('the words: a prophecy pair reads "Prophecy fulfilled" (the mockup\'s c
     expect(sheetMeta(info)).toBe('30 votes · 140 verses apart');
   });
 });
+
+/* A1 (w2 digest item 7): while a line is chosen the rest recede to the tap context and step back as
+   targets too, so a tap beside the chosen line lands on empty sky and clears. The shader recedes the
+   rest for a chosen prophecy pair as for an arc (web-renderer.js: `chosen` counts focusProphecy),
+   and the top pass recedes the prophecy class but for the chosen and the pairs the chosen range
+   keeps lit (frame-set.topSet); the targets follow the same law. */
+describe('while a line is chosen, the receded threads and prophecy pairs are not targets (A1)', () => {
+  /** A point on arc i as drawn (its feet by rank), at the share u of its span. */
+  function onArc(g, i, u) {
+    const { fanA, fanB } = fansOf(g);
+    const x0 = geo.footX(cam, W, g.from[i], fanA[i]), x1 = geo.footX(cam, W, g.to[i], fanB[i]);
+    const { A } = geo.arcShape((x1 - x0) / 2, view.squash);
+    const p = geo.arcPointAt(Math.acos(1 - 2 * u), x0, x1, A);
+    return [p.x, base - p.h];
+  }
+  const hitsAt = (g, v, [px, py]) => pickThreads(g, cam, v, px, py, 6, 8);
+
+  it('CONTROL: with nothing chosen arc 0 and pair 1 are both targets', () => {
+    const g = graph();
+    expect(hitsAt(g, view, onArc(g, 0, 0.3)).some((h) => h.index === 0)).toBe(true);
+    expect(hitsAt(g, view, onPair(g, 1, 0.7)).some((h) => h.prophecy === 1)).toBe(true);
+  });
+
+  it('a chosen prophecy pair: a tap on a receded arc finds nothing of it; the pair itself is found', () => {
+    const g = graph();
+    const v = { ...view, focusArc: -1, focusProphecy: 1, focusRange: null };
+    expect(hitsAt(g, v, onArc(g, 0, 0.3)).some((h) => h.index === 0)).toBe(false);
+    expect(hitsAt(g, v, onPair(g, 1, 0.7))[0]).toMatchObject({ prophecy: 1, index: -1 });
+  });
+
+  it('a chosen pair that is an arc too keeps that arc a target, as the one thread it is', () => {
+    const g = graph();
+    const v = { ...view, focusArc: -1, focusProphecy: 0, focusRange: null };
+    expect(hitsAt(g, v, onPair(g, 0, 0.5))[0]).toMatchObject({ prophecy: 0, index: 1 });
+    expect(hitsAt(g, v, onPair(g, 1, 0.7)).some((h) => h.prophecy === 1)).toBe(false);
+  });
+
+  it('a chosen arc: a receded prophecy pair is no target; a range with a foot of it keeps it one', () => {
+    const g = graph();
+    const chosen = { ...view, focusArc: 2, focusRange: null };
+    expect(hitsAt(g, chosen, onPair(g, 1, 0.7)).some((h) => h.prophecy === 1)).toBe(false);
+    const ranged = { ...view, focusArc: -1, focusRange: [15, 25] };
+    expect(hitsAt(g, ranged, onPair(g, 1, 0.7)).some((h) => h.prophecy === 1)).toBe(true);
+  });
+});

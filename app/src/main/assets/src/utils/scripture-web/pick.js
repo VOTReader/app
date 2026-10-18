@@ -69,21 +69,28 @@ function litSetOf(lit) {
  * Which threads are targets while something is chosen (A1): the ones the shader keeps lit
  * (web-renderer.js, its focus rule) - the chosen thread; a thread with a foot in the chosen range,
  * or with a chosen group inside it, a foot in each; and a thread in the lit set (go-to's fan, verse
- * mode). Null when nothing is chosen (no focusArc, no focusRange): then every thread is a target.
- * A chosen prophecy pair does not focus the shader (focusArc is -1 for it), so it filters nothing.
- * @param {{ focusArc?: number, focusRange?: (number[]|null), focusRange2?: (number[]|null),
+ * mode). Null when nothing is chosen (no focusArc, no focusProphecy, no focusRange): then every
+ * thread is a target. A chosen prophecy pair recedes the rest as an arc does (the shader's
+ * `chosen` counts it), so it filters too: its own OpenBible arc, when it is one (`g` names it), is
+ * the chosen thread. `index` -1 is a prophecy pair that is no arc (pickProphecy): only the range
+ * law can keep it.
+ * @param {{ focusArc?: number, focusProphecy?: number, focusRange?: (number[]|null), focusRange2?: (number[]|null),
  *   lit?: (ArrayLike<number>|null) }} view
+ * @param {any} [g]  the decoded graph, for a chosen prophecy pair's arc
  * @returns {((index: number, from: number, to: number) => boolean) | null}
  */
-export function focusedPickFilter(view) {
+export function focusedPickFilter(view, g) {
   const arc = view.focusArc != null ? view.focusArc : -1;
+  const pair = view.focusProphecy != null ? view.focusProphecy : -1;
   const r = view.focusRange && view.focusRange[0] <= view.focusRange[1] ? view.focusRange : null;
-  if (arc < 0 && !r) return null;
+  if (arc < 0 && pair < 0 && !r) return null;
   const r2 = r && view.focusRange2 && view.focusRange2[0] <= view.focusRange2[1] ? view.focusRange2 : null;
   const lit = litSetOf(view.lit);
+  const ps = pair >= 0 && g ? prophecySet(g) : null;
+  const pairArc = ps && pair < ps.count ? ps.arcOf[pair] : -1;
   return (i, from, to) => {
-    if (i === arc) return true;
-    if (lit && lit.has(i)) return true;
+    if (i >= 0 && (i === arc || i === pairArc)) return true;
+    if (i >= 0 && lit && lit.has(i)) return true;
     if (!r) return false;
     const a1 = from >= r[0] && from <= r[1], b1 = to >= r[0] && to <= r[1];
     if (!r2) return a1 || b1;
@@ -125,7 +132,7 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
   const lo = verseAtPoint - verseTolerance, hi = verseAtPoint + verseTolerance;
   // the frame's visible set (E1): a thread the renderer did not draw is not there to tap
   const set = frameSet(g, cam, view);
-  const target = focusedPickFilter(view);
+  const target = focusedPickFilter(view, g);
 
   for (const bucket of g.buckets) {
     walkDrawnRuns(bucket, bucketDrawCount(bucket, density), chunkSize, lo, hi, (start, end) => {
@@ -161,11 +168,15 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
  * feet frame-set.prophecySet gives it, so it is pickable on the same curve.
  * A hit names the pair (`prophecy`, an index into g.prophecy) and the
  * OpenBible arc that joins the same verses (`index`, or -1 when none: 107 of
- * the asset's 132 pairs). Nearest first.
+ * the asset's 132 pairs). Nearest first. While a line is chosen the class
+ * recedes with the rest (frame-set.topSet) and steps back as targets too
+ * (A1): only the chosen pair, a pair whose arc is a target
+ * (focusedPickFilter) and the pairs the chosen range keeps lit are found.
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, y?:number, ppv:number, total:number}} cam
- * @param {{width:number, base:number, squash:number}} view
+ * @param {{width:number, base:number, squash:number, focusArc?:number, focusProphecy?:number,
+ *   focusRange?:(number[]|null), focusRange2?:(number[]|null), lit?:(ArrayLike<number>|null)}} view
  * @param {number} px @param {number} py
  * @param {number} tol  device px
  * @param {number} [limit]
@@ -178,8 +189,11 @@ export function pickProphecy(g, cam, view, px, py, tol, limit) {
   const base = view.base + (cam.y > 0 ? cam.y : 0);
   const cap = Math.max(1, Math.min(limit || 4, 8));
   const best = [];
+  const target = focusedPickFilter(view, g);
+  const chosen = view.focusProphecy != null ? view.focusProphecy : -1;
   for (let k = 0; k < ps.count; k++) {
     if (ps.twin[k] !== k) continue;   // a pair given twice is one thread, found as the first
+    if (target && k !== chosen && !target(ps.arcOf[k], ps.from[k], ps.to[k])) continue;
     const x0 = footX(cam, width, ps.from[k], ps.fanA[k]);
     const x1 = footX(cam, width, ps.to[k], ps.fanB[k]);
     if (x1 < px - tol || x0 > px + tol) continue;
