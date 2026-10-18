@@ -411,9 +411,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         ) : (
           <button type="button" className={'sw-btn sw-toggle' + (showUnderlay ? ' is-on' : '')} aria-pressed={showUnderlay}
             onClick={() => { setShowUnderlay(!showUnderlay); schedule(); }}
-            aria-label={'Timothy’s notes · ' + (contextCount > 0 ? contextCount.toLocaleString() : '…') + ' curated connections'}>
-            {/* the header's own name for these threads (fix-review #13) */}
-            Timothy’s notes · {contextCount > 0 ? contextCount.toLocaleString() : '…'}
+            aria-label={'Corpus context · ' + (contextCount > 0 ? contextCount.toLocaleString() : '…') + ' curated connections'}>
+            Corpus context · {contextCount > 0 ? contextCount.toLocaleString() : '…'}
           </button>
         )}
         <button type="button" className="sw-btn" onClick={resetView} aria-label="Reset the view">Reset</button>

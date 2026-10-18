@@ -1346,13 +1346,11 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
   };
 
   // Sweep low (mw10, WCAG 2.5.3): the toggle was named "Show the curated corpus connections", leaving out
-  // the words it shows. Fix-review #13: those words are the header's own name for the threads
-  // ("from Timothy’s notes"), not a second name ("Corpus context") for one thing.
-  it('the Timothy’s notes toggle is named starting with the words it shows, the header’s name for them', async () => {
+  // the words it shows, "Corpus context".
+  it('the Corpus context toggle is named starting with the words it shows', async () => {
     await openMyWeb();
-    const btn = await screen.findByRole('button', { name: /^Timothy’s notes · / });
-    expect(btn.textContent.startsWith('Timothy’s notes · ')).toBe(true);
-    expect(screen.queryByRole('button', { name: /Corpus context/ })).toBeNull();
+    const btn = await screen.findByRole('button', { name: /^Corpus context/ });
+    expect(btn.textContent.startsWith('Corpus context')).toBe(true);
   });
 
   // ── My Web visual (design-perf, 2026-09-10; note: myweb-visual-design.md) ──
