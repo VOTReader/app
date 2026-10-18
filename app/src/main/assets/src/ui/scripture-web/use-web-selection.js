@@ -88,13 +88,17 @@ export function useWebSelection({
   personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce, relink = null,
 }) {
   const [detail, setDetail] = React.useState(() => (resumeRef.current && resumeRef.current.detail) || null);      // the open sheet
-  // My Web's rebuild found the chosen link again (use-personal-web's relink):
-  // its open card moves to the link's new index, or closes with it deleted
-  // (fix-review #8)
+  // My Web's rebuild found the chosen line again (use-personal-web's relink):
+  // its open card moves to the line's new index, or closes with it gone
+  // (fix-review #8; a Timothy thread by its key, fix-review 2 #4)
   React.useEffect(() => {
     if (!relink) return;
-    setDetail((d) => (!d || d.kind !== 'link' || !d.record || d.record.id !== relink.id ? d
-      : relink.at >= 0 ? Object.assign({}, d, { index: relink.at }) : null));
+    const kind = relink.kind || 'link';
+    setDetail((d) => {
+      const id = !d ? null : d.kind === 'link' ? d.record && d.record.id : d.kind === 'underlay' ? d.key : null;
+      if (!d || d.kind !== kind || !id || id !== relink.id) return d;
+      return relink.at >= 0 ? Object.assign({}, d, { index: relink.at }) : null;
+    });
   }, [relink]);
   const [choices, setChoices] = React.useState(null);    // overlapped line chooser
   const [listOpen, setListOpen] = React.useState(false); // accessible nearby list

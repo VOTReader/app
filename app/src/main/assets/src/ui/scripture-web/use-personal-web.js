@@ -20,13 +20,15 @@
 
    Fix-review #8: the found-again choice is written through focusState (the
    focus is replaced, never patched in place), and the open card follows it
-   through `relink` ({id, at}: the chosen link's record id and its index in
-   the rebuilt list, -1 when it was deleted), which the selection reads to
-   move its card's index or close the card. */
+   through `relink` ({kind, id, at}: 'link' and the chosen link's record id,
+   or 'underlay' and the chosen Timothy thread's key, and its index in the
+   rebuilt list, -1 when it is gone), which the selection reads to move its
+   card's index or close the card. Fix-review 2 #4: a Timothy thread is kept
+   by its key the same way (the studies landing insert rows before it). */
 
 import { createCamera, verseToX, fitPPV, clampCamera } from '../../utils/scripture-web/geometry.js';
 import { buildPersonal } from '../../utils/scripture-web/personal-build.js';
-import { linkIndexById } from '../../utils/scripture-web/personal-graph.js';
+import { linkIndexById, underlayIndexByKey } from '../../utils/scripture-web/personal-graph.js';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
 import { chromeInset } from './rail-renderer.js';
 
@@ -74,24 +76,37 @@ export function keepRailCamera(cam, total, W) {
 }
 
 /**
- * The chosen link's id: from the last build's focus when there was one, else
- * (a mount's first build) from the resume the reader brought back.
+ * The chosen line, by what it is: a reader's link by its LinkStore id, or one
+ * of Timothy's threads by its key (personal-graph's underlayKey; fix-review 2
+ * #4: kept by index, the studies landing before it moved the spotlight and
+ * its card onto another thread). From the last build's focus when there was
+ * one, else (a mount's first build) from the resume the reader brought back.
  * @param {any} prev the last build, or null
  * @param {any} focusRef
  * @param {any} resumeRef
- * @returns {{id:string, arc:number}|null}
+ * @returns {{kind:'link'|'underlay', id:string, arc:number}|null}
  */
-function chosenLink(prev, focusRef, resumeRef) {
+function chosenLine(prev, focusRef, resumeRef) {
   if (prev) {
     const f = focusRef && focusRef.current;
-    const arc = f && !f.underlay ? f.arc : -1;   // a chosen Timothy thread is not a link
-    const rec = arc >= 0 && prev.graph && prev.graph.records[arc];
-    return rec && rec.id ? { id: rec.id, arc } : null;
+    const arc = f && f.arc >= 0 ? f.arc : -1;
+    if (arc < 0) return null;
+    if (f.underlay) {
+      const key = prev.underlay && prev.underlay.keys && prev.underlay.keys[arc];
+      return key ? { kind: 'underlay', id: key, arc } : null;
+    }
+    const rec = prev.graph && prev.graph.records[arc];
+    return rec && rec.id ? { kind: 'link', id: rec.id, arc } : null;
   }
   const back = resumeRef && resumeRef.current;
   const d = back && back.mode === 'personal' && back.detail;
-  if (!d || d.kind !== 'link' || !d.record || !d.record.id) return null;
-  return { id: d.record.id, arc: back.focus && back.focus.arc >= 0 ? back.focus.arc : d.index };
+  if (!d) return null;
+  const underlay = d.kind === 'underlay';
+  const id = underlay ? d.key : d.kind === 'link' && d.record ? d.record.id : null;
+  if (!id) return null;
+  const f = back.focus;
+  const arc = f && f.arc >= 0 && !!f.underlay === underlay ? f.arc : d.index;
+  return { kind: underlay ? 'underlay' : 'link', id, arc };
 }
 
 /**
@@ -103,7 +118,7 @@ function chosenLink(prev, focusRef, resumeRef) {
 export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, viewRef, frame, chromeRef, schedule, resumeRef, focusRef, topbarRef }) {
   const personalRef = React.useRef(null);
   const [counts, setCounts] = React.useState({ links: 0, timothy: 0, skipped: 0 });
-  const [relink, setRelink] = React.useState(/** @type {{id:string, at:number}|null} */ (null));
+  const [relink, setRelink] = React.useState(/** @type {{kind:'link'|'underlay', id:string, at:number}|null} */ (null));
 
   /** Everything the rail renderer needs to place a personal endpoint. */
   const railOpts = React.useCallback(() => {
@@ -135,15 +150,16 @@ export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, vie
   React.useEffect(() => {
     if (!graph || mode !== 'personal') return;
     const prev = personalRef.current;
-    const chosen = chosenLink(prev, focusRef, resumeRef);
+    const chosen = chosenLine(prev, focusRef, resumeRef);
     const built = buildPersonal(graph);
     personalRef.current = built;
     const total = built && built.votRail ? built.votRail.total : 0;
     camVRef.current = keepRailCamera(camVRef.current, total, viewRef.current ? viewRef.current.W : 0);
     if (chosen) {
-      const at = linkIndexById(built && built.graph, chosen.id);
-      // the choice found again, or (deleted) let go whole
-      const follow = (f) => (at >= 0 ? focusState(Object.assign({}, f, { arc: at })) : focusState());
+      const thread = chosen.kind === 'underlay';
+      const at = thread ? underlayIndexByKey(built && built.underlay, chosen.id) : linkIndexById(built && built.graph, chosen.id);
+      // the choice found again, or (deleted, or no longer placed) let go whole
+      const follow = (f) => (at >= 0 ? focusState(Object.assign({}, f, { arc: at, underlay: thread })) : focusState());
       const focus = focusRef && focusRef.current;
       if (!prev) {
         // the mount's first build: the renderer restores focusRef from the
@@ -153,9 +169,10 @@ export function usePersonalWeb({ graph, mode, showUnderlay, camRef, camVRef, vie
         back.focus = follow(back.focus);
         if (back.detail) back.detail = at >= 0 ? Object.assign({}, back.detail, { index: at }) : null;
       }
-      if (focus && !focus.underlay && focus.arc === chosen.arc) focusRef.current = follow(focus);
-      // the open card follows by id (the selection's own state)
-      if (!prev || at !== chosen.arc) setRelink({ id: chosen.id, at });
+      // a thread that kept its row keeps its focus object (nothing moved)
+      if (focus && !!focus.underlay === thread && focus.arc === chosen.arc && (!thread || at !== chosen.arc)) focusRef.current = follow(focus);
+      // the open card follows by what it is (the selection's own state)
+      if (!prev || at !== chosen.arc) setRelink({ kind: chosen.kind, id: chosen.id, at });
     }
     const pg = built && built.graph;
     setCounts({

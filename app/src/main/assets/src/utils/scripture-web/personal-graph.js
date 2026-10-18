@@ -250,6 +250,34 @@ export function linkIndexById(pg, id) {
 }
 
 /**
+ * What one of Timothy's threads IS, whatever row a build gives it: its verse
+ * and the passage it names (collection-scoped when the edge names its
+ * collection or study). A row index names a row of ONE build: the studies or
+ * a collection landing insert rows before it, so a chosen thread is kept by
+ * this key (fix-review 2 #4), as a reader's link is kept by its id. '' for an
+ * edge that names no passage.
+ * @param {{v:number, volKey?:string, letterId?:string, entryId?:string, studyId?:string, chapterId?:string}} e
+ */
+export function underlayKey(e) {
+  const id = e && (e.letterId || e.entryId || e.chapterId);
+  if (!id) return '';
+  const volKey = e.volKey || (e.studyId ? 'study-' + e.studyId : null);
+  return e.v + '@' + (volKey ? volKey + ':' + id : id);
+}
+
+/**
+ * Where a thread sits in a built underlay, by its key; -1 when it is not on
+ * the web.
+ * @param {{byKey?:Map<string, number>}|null|undefined} underlay
+ * @param {string|null|undefined} key
+ */
+export function underlayIndexByKey(underlay, key) {
+  if (!underlay || !underlay.byKey || !key) return -1;
+  const i = underlay.byKey.get(key);
+  return i === undefined ? -1 : i;
+}
+
+/**
  * Curated corpus edges (votEdges from the graph asset) in the same shape, so
  * the renderer can draw them as one dimmed underlay beneath the user's own
  * links without a second code path.
@@ -263,7 +291,9 @@ export function buildCuratedUnderlay(votEdges, ctx) {
   // one thread per (verse, passage): the asset is one edge per (verse,
   // letter) already (v2), and this holds the count to the threads drawn
   // even when a source lists one twice
-  const seen = new Set();
+  const seen = new Map();
+  /** thread key -> row, an edge folded into another row's thread included */
+  const byKey = new Map();
   for (const e of votEdges || []) {
     if (!(e && e.v >= 0) || !ctx.votRail) continue;
     // Letters and entries address the rail by their own id; STUDY edges carry
@@ -280,9 +310,12 @@ export function buildCuratedUnderlay(votEdges, ctx) {
       : ctx.votRail.index.get(id);
     if (pos === undefined) continue;
     const pair = e.v + ':' + pos;
-    if (seen.has(pair)) continue;
-    seen.add(pair);
-    rows.push([e.v, pos, e]);
+    const key = underlayKey(e);
+    const had = seen.get(pair);
+    if (had !== undefined) { if (!byKey.has(key)) byKey.set(key, had); continue; }
+    seen.set(pair, rows.length);
+    if (!byKey.has(key)) byKey.set(key, rows.length);
+    rows.push([e.v, pos, e, key]);
   }
   const n = rows.length;
   const versePos = new Float32Array(n);
@@ -291,5 +324,5 @@ export function buildCuratedUnderlay(votEdges, ctx) {
   // renderer strokes by bin and never reads a record per frame
   const source = new Uint8Array(n);
   for (let i = 0; i < n; i++) { versePos[i] = rows[i][0]; votPos[i] = rows[i][1]; source[i] = myWebSourceIndex(rows[i][2].kind); }
-  return { count: n, versePos, votPos, source, records: rows.map((row) => row[2]) };
+  return { count: n, versePos, votPos, source, records: rows.map((row) => row[2]), keys: rows.map((row) => row[3]), byKey };
 }

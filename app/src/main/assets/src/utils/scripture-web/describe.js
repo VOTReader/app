@@ -97,6 +97,8 @@ export function describeFound(found, { g, personal, cam, v, viewFor, density }) 
     const seg = p.votRail.segments.find((s) => s.volKey === node.volKey);
     return {
       kind: 'underlay', index: found.index, source, target,
+      // what the thread is, so a rebuild finds it again (personal-graph's underlayKey)
+      key: underlay.keys ? underlay.keys[found.index] : undefined,
       // rail positions, published on the card (data-verse / data-vot) so a
       // walk can follow this one thread through the exported geometry
       verse: underlay.versePos[found.index], vot: underlay.votPos[found.index],

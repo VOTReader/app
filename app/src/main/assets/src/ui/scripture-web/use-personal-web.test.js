@@ -19,6 +19,7 @@ import { renderHook, act } from '@testing-library/react';
 import { usePersonalWeb } from './use-personal-web.js';
 import { useWebSelection } from './use-web-selection.js';
 import { useJourney } from './use-journey.js';
+import { underlayKey } from '../../utils/scripture-web/personal-graph.js';
 
 const g = /** @type {any} */ (globalThis);
 const STUBS = ['LinkStore', 'COLLECTIONS', 'READING_CHAIN', 'colLetterArr', 'colPreface', 'BIBLE_STUDIES', 'loadBibleStudies', '__votCorpus'];
@@ -238,6 +239,45 @@ describe('usePersonalWeb across rebuilds', () => {
     act(() => { s.set([link('b', 2, 'l2')]); });
     expect(refs.focusRef.current).toBe(before);
     expect(get().sel.panel.spec).toEqual({ mode: 'connection', arc: 0, myWeb: 'underlay' });
+  });
+
+  // the study thread comes first in the asset: until its study lands, the footnote thread is row 0
+  const STUDY_FIRST = Object.assign({}, GRAPH, { votEdges: [GRAPH.votEdges[1], GRAPH.votEdges[0]] });
+  const LAMB = [{ id: 'lamb', slug: 'lamb', title: 'The Lamb of God', chapters: [{ id: 'lamb-ch1' }, { id: 'lamb-ch2' }] }];
+  it('fix-review 2 #4: a chosen Timothy thread is found again by what it is when the studies land before it', async () => {
+    corpus();
+    g.LinkStore = store([]);
+    let resolveStudies;
+    g.loadBibleStudies = vi.fn(() => new Promise((r) => { resolveStudies = r; }));
+    const { get, refs } = mountWithSelection({ graph: STUDY_FIRST });
+    const u = () => get().web.personalRef.current.underlay;
+    expect(u().count).toBe(1);
+    // the reader taps the one thread there is (Genesis 1:4 to Letter 1); the card is describe's, with the thread's key
+    act(() => { get().sel.commitFound({ kind: 'underlay', index: 0, key: u().keys && u().keys[0], source: { label: 'Genesis 1:4' }, target: { label: 'Letter 1' } }); });
+    await tick();
+    g.BIBLE_STUDIES = LAMB;
+    await act(async () => { resolveStudies(true); await Promise.resolve(); });
+    await tick();
+    // the study's thread is row 0 now; the chosen one moved to row 1, and the spotlight and the card follow it
+    expect(u().count).toBe(2);
+    const at = u().records.findIndex((e) => e.letterId === 'l1');
+    expect(at).toBe(1);
+    expect(refs.focusRef.current).toMatchObject({ arc: 1, underlay: true });
+    expect(get().sel.panel.spec).toEqual({ mode: 'connection', arc: 1, myWeb: 'underlay' });
+  });
+
+  it('fix-review 2 #4: the resume from the reader finds its Timothy thread by key, in the focus and the open card both', () => {
+    corpus();
+    g.LinkStore = store([]);
+    g.BIBLE_STUDIES = LAMB;                  // landed in the reader, after the thread was chosen
+    g.loadBibleStudies = vi.fn(() => Promise.resolve(true));
+    const key = underlayKey(GRAPH.votEdges[0]);
+    const detail = { kind: 'underlay', index: 0, key };
+    const resumeRef = { current: { mode: 'personal', cam: { x: 30, y: 0, ppv: 10, total: 60 }, focus: { arc: 0, hover: -1, underlay: true }, detail } };
+    const { get } = mountWithSelection({ graph: STUDY_FIRST, resumeRef });
+    expect(resumeRef.current.focus).toMatchObject({ arc: 1, underlay: true });
+    expect(get().sel.panel.spec).toEqual({ mode: 'connection', arc: 1, myWeb: 'underlay' });
+    expect(get().web.personalRef.current.underlay.keys[1]).toBe(key);
   });
 
   it('fix-review #9: the web rebuilds when the VOT corpus lands, so a link into it is placed, not left skipped', () => {
