@@ -153,6 +153,8 @@ describe('the words: a prophecy pair reads "Prophecy fulfilled" (the mockup\'s c
     const info = describeFound({ kind: 'arc', hit: { index: 0, from: 10, to: 150, votes: 30 } }, ctx(g));
     expect(info).toMatchObject({ prophecy: false, prophecyIndex: -1 });
     expect(connectionMeta(info)).toBe('30 votes · 140 verses apart');
-    expect(sheetMeta(info)).toBe('140 verses apart · weight 30');
+    // the sheet and the rows read alike (the panel stream's one vocabulary, describe.js arcLine);
+    // this once pinned the sheet's old "140 verses apart · weight 30"
+    expect(sheetMeta(info)).toBe('30 votes · 140 verses apart');
   });
 });

@@ -439,7 +439,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           if (moreBtnRef.current) moreBtnRef.current.focus();
         }}>
         {/* THE HEADER SLOT: the go-to's search button, first in the row (spec
-            section 4.1). goto.jsx owns it; null today, so nothing renders */}
+            section 4.1). goto.jsx owns it (null in My Web, where nothing renders) */}
         {goTo.button}
         {/* THE MENU: the controls in the row or, collapsed (spec section 3), the drop-down the
             more button opens; the same buttons either way */}

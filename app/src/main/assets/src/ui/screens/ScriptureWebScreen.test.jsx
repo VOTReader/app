@@ -906,7 +906,8 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       const at = (v) => ({ type: 'bible', bookId: 'genesis-plain', chapter: 1, verse: v, label: 'Genesis 1:' + v });
       stubMyWeb(Array.from({ length: 40 }, (_, i) => ({ id: 'n' + i, source: at(1 + i * 770), target: at(31 + i * 770) })));
       const { container } = await mount({ settings: seen });
-      fireEvent.click(screen.getByRole('button', { name: 'My web' }));
+      // the switch reads "My Web" (the panel stream's one vocabulary for the web's words)
+      fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
       await settle(60);
       fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
       await settle(20);
@@ -1623,8 +1624,11 @@ describe('the docked panel in the web (w3, spec section 3)', () => {
   it('the go-to slot stays first in the controls (CONTRACTS.md section 9), the menu after it', async () => {
     const { container } = await mountAt(891, 411);
     const controls = container.querySelector('.sw-controls');
-    // goTo.button is null today: the menu leads, the more button follows it
-    expect(controls.firstElementChild.id).toBe('sw-menu');
+    // the go-to's search button fills the slot (goto.jsx, the navigation stream), the menu follows
+    // it, the more button ends the row (this test once pinned the empty slot: the menu leading)
+    const [first, second] = controls.children;
+    expect(first.classList.contains('sw-goto-btn'), 'the go-to button leads').toBe(true);
+    expect(second.id).toBe('sw-menu');
     expect(controls.lastElementChild.getAttribute('aria-label')).toBe('More controls');
   });
 });

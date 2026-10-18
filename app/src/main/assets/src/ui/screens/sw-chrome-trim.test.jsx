@@ -338,7 +338,10 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     // phone has about 750 beside ? and hide-UI; the phone screenshot shows it)
     const lines = compact ? 2 : 1;
     const legendTop = H - bottom - lines * size * lineHeight;
-    const books = CALLS.filter((c) => c[0] === 'fillText' && /Cinzel/.test(String(c[4])));
+    // a book label is the fixture book's name or abbreviation as the rail prints it (upper case),
+    // in the web's one face: Cinzel is retired from the canvas (sw-ink.js FONT), so the font no
+    // longer tells a book label from the other canvas text
+    const books = CALLS.filter((c) => c[0] === 'fillText' && /^(GENESIS|GEN)$/.test(String(c[1])) && /EB Garamond/.test(String(c[4])));
     expect(books.length, 'book labels recorded, with their font').toBeGreaterThan(0);
     const foot = (c) => Number(c[3]) + Number((/(\d+(?:\.\d+)?)px/.exec(String(c[4])) || [0, 0])[1]);
     const lowest = Math.max(...books.map(foot));

@@ -621,11 +621,15 @@ const graphChapters = (more) => () => {
    on long threads is over a chapter none of them touches: zooming there sent them all off screen. */
 describe("the chooser's Zoom to, from a tap", () => {
   const cam = { x: 2520, ppv: 0.2 };
-  /** Tap down the column at x until the chooser opens; y -1 when it never did. */
+  /** Tap down the column at x until the chooser opens; y -1 when it never did. Every tap is made
+   *  from the same untouched frame: a tap that finds one thread opens it and frames it (frameFound
+   *  flies the camera), and while it is chosen only its lit threads are targets (pick.js
+   *  focusedPickFilter, A1), so the scan closes it and puts the camera back before the next tap. */
   const tapAt = (more, x, ys) => {
     const m = mount({ make: graphChapters(more) });
-    m.get().cam.camRef.current = Object.assign({ total: TOTAL, y: 0 }, cam);
     for (const y of ys) {
+      act(() => { m.get().sel.closeCards(); });
+      m.get().cam.camRef.current = Object.assign({ total: TOTAL, y: 0 }, cam);
       act(() => { m.get().sel.handlersRef.current.tap(x, y); });
       if (m.get().sel.choices) return { m, y };
     }
