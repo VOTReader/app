@@ -36,7 +36,7 @@ import {
   pickThreads, pickChapter, pickVerse, chapterRange, nearbyChapter, nearbyThreads, arcsTouching,
 } from '../../utils/scripture-web/pick.js';
 import {
-  connectionFrame, chapterFrame, centreTarget, frameHolds, chapterAtX,
+  connectionFrame, chapterFrame, centreTarget, diveLimit, frameHolds, chapterAtX,
 } from '../../utils/scripture-web/panel-model.js';
 import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
 import { focusState, withLit } from '../../utils/scripture-web/focus-state.js';
@@ -301,9 +301,10 @@ export function useWebSelection({
    * Bring canon x into the canvas area the panel leaves (spec section 3), at the reader's zoom where
    * the camera's clamp lets it be centred there, else at the least zoom that does (panel-model
    * centreTarget: near the canon's end the clamp stops the camera first, and what was opened stayed
-   * under the panel, the w3 review's major finding). `always` centres it; otherwise it moves only
-   * when x sits under the panel, off the left edge or in the area's outer tenth either side (its
-   * threads fan out both ways).
+   * under the panel, the w3 review's major finding), never deeper than diveLimit (the reader's
+   * zoom x 4, or the five chapters around x: the review's second round found a 489x dive). `always`
+   * centres it; otherwise it moves only when x sits under the panel, off the left edge or in the
+   * area's outer tenth either side (its threads fan out both ways).
    * @param {number} x  canon x
    * @param {{ always?: boolean }} [how]
    */
@@ -315,7 +316,7 @@ export function useWebSelection({
       const at = verseToX(cam, v.W, x), areaW = v.W - right;
       if (at >= 0.1 * areaW && at <= 0.9 * areaW) return;
     }
-    flyTo(centreTarget(cam, v.W, right, x, maxZoomOf(graph, v)), opts);
+    flyTo(centreTarget(cam, v.W, right, x, maxZoomOf(graph, v), diveLimit(graph, cam, v.W - right, x)), opts);
   }, [camRef, viewRef, flyTo, coverNow, graph]);
 
   /**

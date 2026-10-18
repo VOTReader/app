@@ -317,6 +317,42 @@ describe('framing under the camera clamp: landingOf, centreTarget, frameHolds', 
     expect(x).toBeLessThanOrEqual(0.9 * AREA + 0.01);
   });
 
+  /* w3 review, round 2 (major): unbounded, the dive took Revelation 21:4 from the overview to 489x
+     and the far end of its Follow with it: a curtain of vertical legs, no thread's way readable.
+     The dive now stops at the reader's zoom x DIVE_ZOOM or the five chapters around the verse (the
+     go-to's verse frame, spec 4.5), whichever is deeper; what that cannot bring out waits on the
+     camera's clamp leaving the panel room (the hub's cross-stream item). */
+  it('diveLimit: the reader\'s zoom x 4, or the five chapters around the verse across the area', () => {
+    const REV_21_4 = vid('revelation', 21, 4);
+    const over = { x: T / 2, ppv: fit, total: T };
+    // Revelation 19 to 22: the canon ends two chapters short of five
+    const span = T - vid('revelation', 19, 1);
+    expect(span).toBe(84);
+    expect(pm.diveLimit(g, over, AREA, REV_21_4 + 0.5)).toBeCloseTo(AREA / span, 9);
+    // deep already: four times the reader's zoom
+    expect(pm.diveLimit(g, { x: T - 400, ppv: 20, total: T }, AREA, REV_21_4 + 0.5)).toBe(80);
+    expect(pm.DIVE_ZOOM).toBe(4);
+  });
+
+  it('a bounded dive: Revelation 21:4 from the overview stays within it; Revelation 17 is centred inside it', () => {
+    const over = { x: T / 2, ppv: fit, total: T };
+    const REV_21_4 = vid('revelation', 21, 4) + 0.5;
+    const most = pm.diveLimit(g, over, AREA, REV_21_4);
+    const t = pm.centreTarget(over, W, RIGHT, REV_21_4, cap, most);
+    expect(pm.landingOf(over, W, RIGHT, t, cap).ppv).toBeLessThanOrEqual(most * (1 + 1e-9));
+    // neither the centre nor the inner 90 % is in reach of the bound: the reader's zoom is kept
+    expect(t).toEqual({ x: REV_21_4 });
+    const REV_17_1 = vid('revelation', 17, 1) + 0.5;
+    const most17 = pm.diveLimit(g, over, AREA, REV_17_1);
+    const t17 = pm.centreTarget(over, W, RIGHT, REV_17_1, cap, most17);
+    expect(t17.zoom).toBeGreaterThan(1);
+    expect(pm.landingOf(over, W, RIGHT, t17, cap).ppv).toBeLessThanOrEqual(most17 * (1 + 1e-9));
+    expect(Math.abs(at(over, t17, REV_17_1) - AREA / 2)).toBeLessThanOrEqual(0.25);
+    // John 3:16 from the overview needs about 4.4x: well inside its bound, centred as before
+    const j = pm.centreTarget(over, W, RIGHT, JOHN_3_16 + 0.5, cap, pm.diveLimit(g, over, AREA, JOHN_3_16 + 0.5));
+    expect(Math.abs(at(over, j, JOHN_3_16 + 0.5) - AREA / 2)).toBeLessThanOrEqual(0.25);
+  });
+
   it('frameHolds: Isaiah 7:14 to Matthew 1:23 frames whole; Isaiah to Revelation and Genesis to Revelation cannot', () => {
     const cam = { x: T / 2, ppv: fit, total: T };
     const holds = (a, b) => pm.frameHolds(cam, W, RIGHT, pm.connectionFrame(a, b), a, b, cap);

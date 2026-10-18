@@ -427,13 +427,27 @@ describe("the panel brings what it opens out from under itself, even at the cano
   // where verse v's foot stands across the canvas area: 0 its left edge, 1 the panel's
   const across = (m, v) => verseToX(m.get().cam.camRef.current, W, v + 0.5) / 2 / AREA;
 
-  it('a verse in Revelation 21 opened at the overview sits inside the canvas area', () => {
+  /* w3 review, round 2 (major): this case once pinned the cure that was worse than the defect. To
+     centre Revelation 21:4 from the overview the camera dived to 489x (65 device px a verse), and
+     Follow kept that zoom: a curtain of vertical legs, no lit thread's way readable. The dive is
+     bounded now (panel-model diveLimit: the reader's zoom x 4, or the five chapters around the
+     verse; this fixture's one chapter makes that the reader's x 4). What the bound cannot bring
+     out waits on the camera's clamp leaving the panel room: the it.fails cases below. */
+  it('a verse in Revelation 21 opened at the overview never dives past the bound', () => {
     const REV_21_4 = TOTAL - 45;
     const m = pc({ x: TOTAL / 2, ppv: FIT });
     act(() => { m.get().sel.openPanel({ mode: 'verse', verse: REV_21_4 }); });
-    const f = across(m, REV_21_4);
-    expect(f).toBeGreaterThan(0.1);
-    expect(f).toBeLessThan(0.9);
+    expect(m.get().cam.camRef.current.ppv).toBeLessThanOrEqual(4 * FIT * (1 + 1e-9));
+  });
+
+  it('a verse in Revelation the bound can bring out is centred in the area inside it', () => {
+    const REV = TOTAL - 300;
+    const m = pc({ x: 18000, ppv: 2 });
+    act(() => { m.get().sel.openPanel({ mode: 'verse', verse: REV }); });
+    expect(across(m, REV)).toBeCloseTo(0.5, 2);
+    const ppv = m.get().cam.camRef.current.ppv;
+    expect(ppv).toBeGreaterThan(2); // the clamp needed a closer look
+    expect(ppv).toBeLessThanOrEqual(8); // the reader's x 4
   });
 
   it('John 3:16 at the zoom the review measured is centred in the area, not left at 888 of 960', () => {
@@ -445,8 +459,8 @@ describe("the panel brings what it opens out from under itself, even at the cano
   });
 
   it('a thread the area cannot hold whole keeps its near foot in; Follow brings the far foot in Revelation out too', () => {
-    // Isaiah to Revelation 22: the clamp keeps the frame from being centred in the area
-    const m = pc({ x: 18000, ppv: 2 }, [[18000, TOTAL - 30, 50]]);
+    // Isaiah to Revelation 13: the clamp keeps the frame from being centred in the area
+    const m = pc({ x: 18000, ppv: 2 }, [[18000, TOTAL - 300, 50]]);
     act(() => { m.get().sel.openPanel({ mode: 'connection', arc: 2 }); });
     const info = m.get().sel.detail;
     expect(info.far).toBe('to');
@@ -454,9 +468,10 @@ describe("the panel brings what it opens out from under itself, even at the cano
     expect(near).toBeGreaterThan(0.1);
     expect(near).toBeLessThan(0.9);
     act(() => { m.get().sel.followThread(info); });
-    const far = across(m, TOTAL - 30);
+    const far = across(m, TOTAL - 300);
     expect(far).toBeGreaterThan(0.1);
     expect(far).toBeLessThan(0.9);
+    expect(m.get().cam.camRef.current.ppv).toBeLessThanOrEqual(8); // inside the bound
   });
 
   it('a thread wider than the area at fit, tapped deep in Revelation, keeps the tapped foot in view', () => {
@@ -472,12 +487,49 @@ describe("the panel brings what it opens out from under itself, even at the cano
   });
 
   it("a row's Follow to Revelation lands in the area as well", () => {
-    const m = pc({ x: 18000, ppv: 2 }, [[18000, TOTAL - 30, 50]]);
+    const m = pc({ x: 18000, ppv: 2 }, [[18000, TOTAL - 300, 50]]);
     act(() => { m.get().sel.openPanel({ mode: 'verse', verse: 18000 }); });
-    act(() => { m.get().sel.followRow({ index: 2, hereVerse: 18000, otherVerse: TOTAL - 30 }); });
-    const f = across(m, TOTAL - 30);
+    act(() => { m.get().sel.followRow({ index: 2, hereVerse: 18000, otherVerse: TOTAL - 300 }); });
+    const f = across(m, TOTAL - 300);
     expect(f).toBeGreaterThan(0.1);
     expect(f).toBeLessThan(0.9);
+  });
+
+  /* KNOWN GAP, a cross-stream item for the hub (w3 review, round 2): the camera's clamp
+     (geometry.js clampCamera, called by flyTo and the gestures) holds the VIEW's right edge at the
+     canon's end, so with the panel docked the canon's last verses can never stand in the canvas
+     area: about the last 640 / ppv of them. The fix is a clamp that knows the panel (a right slack
+     of panelInsetRef.right device px), in the camera's and the gestures' own files. These pin the
+     reader's view of it; when that clamp lands they pass, it.fails fails, and each becomes it(). */
+  it.fails("Revelation 22:21 opened with the panel open stands in the area at the reader's zoom", () => {
+    const m = pc({ x: 18000, ppv: 2 });
+    act(() => { m.get().sel.openPanel({ mode: 'verse', verse: TOTAL - 1 }); });
+    const f = across(m, TOTAL - 1);
+    expect(f).toBeGreaterThan(0.1);
+    expect(f).toBeLessThan(0.9);
+    expect(m.get().cam.camRef.current.ppv).toBe(2);
+  });
+
+  it.fails("Follow to Revelation 22:21 with the panel open lands in the area at the reader's zoom", () => {
+    const m = pc({ x: 18000, ppv: 2 }, [[18000, TOTAL - 1, 50]]);
+    act(() => { m.get().sel.openPanel({ mode: 'verse', verse: 18000 }); });
+    act(() => { m.get().sel.followRow({ index: 2, hereVerse: 18000, otherVerse: TOTAL - 1 }); });
+    const f = across(m, TOTAL - 1);
+    expect(f).toBeGreaterThan(0.1);
+    expect(f).toBeLessThan(0.9);
+    expect(m.get().cam.camRef.current.ppv).toBe(2);
+  });
+
+  it.fails("Follow to Revelation 22:13 lands in the area at the reader's zoom", () => {
+    const m = pc({ x: 18000, ppv: 2 }, [[18000, TOTAL - 9, 50]]);
+    act(() => { m.get().sel.openPanel({ mode: 'connection', arc: 2 }); });
+    const info = m.get().sel.detail;
+    m.get().cam.camRef.current = Object.assign({}, m.get().cam.camRef.current, { x: 18000, ppv: 2 });
+    act(() => { m.get().sel.followThread(info); });
+    const f = across(m, TOTAL - 9);
+    expect(f).toBeGreaterThan(0.1);
+    expect(f).toBeLessThan(0.9);
+    expect(m.get().cam.camRef.current.ppv).toBe(2);
   });
 });
 
