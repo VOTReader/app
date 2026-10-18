@@ -9,6 +9,7 @@ import { useWebSelection } from './use-web-selection.js';
 import { useJourney } from './use-journey.js';
 import { useFrameScheduler } from './use-frame-scheduler.js';
 import { useGoTo, routeOverlayHit, GOTO_HINT } from './goto.jsx';
+import { useWebKeys } from './use-web-keys.js';
 import { verseToX, fitPPV } from '../../utils/scripture-web/geometry.js';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
 
@@ -49,9 +50,10 @@ const graph = () => ({
 
 /**
  * The web, as the screen wires it; `api.current` is every hook's latest answer.
- * @param {{ start?: any, cam?: { x: number, ppv: number } }} [opts]
+ * @param {{ start?: any, cam?: { x: number, ppv: number }, keys?: boolean }} [opts]  keys: the root's
+ *   onKeyDown is the web's own (use-web-keys.js), not a spy
  */
-function mountWeb({ start, cam = { x: 15551, ppv: 8 } } = {}) {
+function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false } = {}) {
   const g = graph();
   const api = { current: /** @type {any} */ (null) };
   const setAnnounce = vi.fn();
@@ -80,9 +82,17 @@ function mountWeb({ start, cam = { x: 15551, ppv: 8 } } = {}) {
     const goTo = useGoTo({ graph: g, flyTo: camera.flyTo, openPanel: sel.openPanel, journey, lightThreads: sel.lightThreads, setAnnounce, start,
       closePanel: sel.closeCards, density: 'famous', mode: 'canonical', camRef: camera.camRef, viewRef: camera.viewRef,
       focusRef: camera.focusRef, panelInsetRef: camera.panelInsetRef, viewFor: camera.viewFor, onFrame: frames.onFrame, rootRef });
+    const none = React.useRef(null);
+    const web = useWebKeys({
+      graph: g, guideOpen: false, emptyShown: false, listOpen: sel.listOpen, choices: sel.choices, detail: sel.detail, tip: null,
+      closeGuide: () => {}, dismissEmpty: () => {}, closeCards: sel.closeCards, camRef: camera.camRef, camVRef: none,
+      lastRailRef: none, viewRef: camera.viewRef, modeRef, personalRef, zoomCapFor: () => 1e9, yFrameFor: camera.yFrameFor,
+      resetView: () => {}, onBack: rootKeys, dropHover: () => {}, setAnnounce, schedule: frames.schedule,
+      cancelFly: camera.cancelFly, goTo: keys ? goTo : null,
+    });
     api.current = { cam: camera, sel, journey, goTo, frames, overlayFrameRef };
     return (
-      <div className="sw-root" ref={rootRef} tabIndex={0} onKeyDown={rootKeys}>
+      <div className="sw-root" ref={rootRef} tabIndex={0} onKeyDown={keys ? web.onKeyDown : rootKeys}>
         <div className="sw-controls">{goTo.button}</div>
         {goTo.box}
       </div>
@@ -274,6 +284,38 @@ describe('the keys\' halves (G2): Enter or Space, and [ ]', () => {
     expect(step(1)).toBe(0);
     expect(step(1)).toBe(2);
     expect(step(-1)).toBe(0);
+  });
+});
+
+describe("through the web's own keys (use-web-keys.js)", () => {
+  it('/ opens the box, Enter goes, the keyboard comes home; Escape closes the box before the panel', () => {
+    const { container, get } = mountWeb({ keys: true });
+    const root = /** @type {HTMLElement} */ (container.querySelector('.sw-root'));
+    root.focus();
+    fireEvent.keyDown(root, { key: '/' });
+    expect(box(container)).toBeTruthy();
+    expect(document.activeElement).toBe(input(container));
+    fireEvent.change(input(container), { target: { value: 'Gen 1:101' } });
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    expect(box(container)).toBeNull();
+    expect(document.activeElement, 'the web has the keyboard again').toBe(root);
+    expect(get().sel.detail).toMatchObject({ kind: 'verse', verse: 100 });
+    fireEvent.keyDown(root, { key: 'k', ctrlKey: true });
+    expect(box(container)).toBeTruthy();
+    root.focus();
+    fireEvent.keyDown(root, { key: 'Escape' });
+    expect(box(container), 'the box went first').toBeNull();
+    expect(get().sel.detail, 'the panel stays for the next press').toMatchObject({ kind: 'verse' });
+    fireEvent.keyDown(root, { key: 'Escape' });
+    expect(get().sel.detail).toBeNull();
+  });
+  it('Enter on the web takes the line at the centre; ] steps on from it', () => {
+    const { container, get } = mountWeb({ keys: true, cam: { x: 300, ppv: 8 } });
+    const root = /** @type {HTMLElement} */ (container.querySelector('.sw-root'));
+    fireEvent.keyDown(root, { key: 'Enter' });
+    expect(get().sel.detail).toMatchObject({ kind: 'arc', index: 1 });
+    fireEvent.keyDown(root, { key: ']' });
+    expect(get().sel.detail.index, 'the next line at verse 300').toBe(2);
   });
 });
 

@@ -52,7 +52,7 @@ import { useForcedLandscape } from '../scripture-web/use-forced-landscape.js';
 import { useWebGraph, useChromeTokens, useWebRenderer } from '../scripture-web/use-web-renderer.js';
 import { usePersonalWeb } from '../scripture-web/use-personal-web.js';
 import { useWebSelection } from '../scripture-web/use-web-selection.js';
-import { useWebKeys } from '../scripture-web/use-web-keys.js';
+import { useWebKeys, WEB_KEYS_HELP } from '../scripture-web/use-web-keys.js';
 import { useJourney } from '../scripture-web/use-journey.js';
 import { useGoTo } from '../scripture-web/goto.jsx';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
@@ -313,7 +313,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const { onKeyDown } = useWebKeys({
     graph, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
     camRef, camVRef, lastRailRef, viewRef, modeRef, personalRef, zoomCapFor, yFrameFor,
-    resetView, onBack, dropHover, setAnnounce, schedule, cancelFly,
+    resetView, onBack, dropHover, setAnnounce, schedule, cancelFly, goTo,
   });
 
   const openEndpoint = React.useCallback((endpoint) => {
@@ -465,10 +465,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           data-wheel-through="1" onClick={() => resetRail('bottom')}>Reset Bible</button>
       ) : null}
       <div className="sw-live" role="status" aria-live="polite">{announce}</div>
-      <div id="sw-a11y-help" className="sw-sr-only">
-        Drag to move through scripture. Pinch or scroll to zoom, or use the plus and minus keys.
-        Select a line to see its references; Nearby opens a keyboard-friendly list.
-      </div>
+      <div id="sw-a11y-help" className="sw-sr-only">{WEB_KEYS_HELP}</div>
     </div>
   );
 }
