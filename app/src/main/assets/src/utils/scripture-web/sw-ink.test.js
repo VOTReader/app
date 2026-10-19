@@ -51,10 +51,11 @@ describe('the ink table', () => {
   it('holds the spec §4.2 inks by name', () => {
     expect(INK.canvas).toEqual({ hex: '#000000', alpha: 1 });
     expect(INK.cited).toEqual({ hex: '#C4A469', alpha: 0.70 });
-    // the prophecy constellation (w4 INK review, finding 3): the gold is each study chapter's first
-    // pair alone, so it takes the spec's 1.25 CSS px in its legend key's gold, r2-01a's gold with no
-    // glow (w4 INK item 5); the asset's other pairs are threads of the field
-    expect(INK.prophecy).toEqual({ hex: '#EFD18A', alpha: 0.90, width: 1.25 });
+    // the prophecy class, retuned from the spec's .80 / 1.25 px / .12 (set for 51 pairs) to its
+    // pale-constellation intent over the asset's 131 (GL review 2026-10-18): a 1 device px core,
+    // in r2-01a's pale gold and with no glow (w4 INK item 5), at .45 (w4 INK review 2's pairs);
+    // the legend's arc in the same gold
+    expect(INK.prophecy).toEqual({ hex: '#EFD18A', alpha: 0.45 });
     expect(INK.prophecyKey).toEqual({ hex: '#EFD18A', alpha: 0.90 });
     expect(INK.prophecyGlow, 'the class has no glow').toBeUndefined();
     // the chosen, hovered and lit lines in the pictures' gold (w4 INK item 3; the spec's #E6D3A3 read
@@ -109,21 +110,21 @@ describe('the ink table', () => {
     expect(contrast(INK.chosenLabel.hex, INK.canvas.hex)).toBeGreaterThanOrEqual(7);
   });
 
-  it('the prophecy constellation is r2-01a\'s gold: distinct from the field, told from the chosen line by weight, keyed in the legend in its own gold', () => {
+  it('the prophecy class is r2-01a\'s pale gold: distinct from the field, told from the chosen line by weight, keyed in the legend in its own gold', () => {
     const { h, s } = hsl(INK.prophecy.hex);
     expect(h, 'hue: the gold family').toBeGreaterThanOrEqual(35);
     expect(h, 'hue: the gold family').toBeLessThanOrEqual(48);
     // the old #EADFC4 (.53 saturated) read as the field's own tan; r2-01a's arcs are gold
     expect(s, 'saturation: gold, not cream').toBeGreaterThanOrEqual(0.65);
-    // a few arcs, so bright enough to clear 3:1 on the field (pairs.md), but told from the chosen
-    // line by weight: under half its width, on PC and phone, and no halo
-    expect(INK.prophecy.alpha).toBeGreaterThanOrEqual(0.85);
-    expect(INK.prophecy.width).toBe(1.25);
-    expect(inkWidth('prophecy')).toBeLessThanOrEqual(inkWidth('chosen') / 2);
-    expect(inkWidth('prophecy', true)).toBeLessThanOrEqual(inkWidth('chosen', true) / 2);
+    // pale by its ink, not its colour: under half the chosen line's, on a 1 device px core, so
+    // the 131 pairs never knot into the cream tangle; legible over the field, not a haze
+    expect(INK.prophecy.alpha).toBeLessThan(INK.chosen.alpha * 0.5);
+    expect(INK.prophecy.alpha).toBeGreaterThan(0.35);
+    expect(INK.prophecy.width, '1 device px, the renderer\'s floor').toBeUndefined();
     // the legend draws the canvas's mark (the spec's legend: "[pale arc] prophecy fulfilled"),
-    // in the same gold at the same ink
-    expect(INK.prophecyKey).toEqual({ hex: INK.prophecy.hex, alpha: INK.prophecy.alpha });
+    // at a weight a 1.5 px stroke can be seen by
+    expect(INK.prophecyKey.hex).toBe(INK.prophecy.hex);
+    expect(INK.prophecyKey.alpha).toBeGreaterThanOrEqual(0.85);
   });
 
   it('the panel and every chrome fill are night slate, never cream (#18, Q4)', () => {
@@ -184,8 +185,7 @@ describe('the helpers', () => {
     expect(inkWidth('chosen', true)).toBe(2.5);
     expect(inkWidth('lit', true)).toBe(1.5);   // no compact width: the PC one
     expect(inkWidth('cited')).toBe(0);
-    expect(inkWidth('prophecy', true)).toBe(1.25);   // no compact width: the PC one
-    expect(inkWidth('prophecyKey')).toBe(0);
+    expect(inkWidth('prophecy', true)).toBe(0);   // 1 device px, the renderer's floor
   });
 
   it('inkGLSL is a vec4 whose every component carries a fraction (the shader-hygiene law)', () => {
@@ -193,6 +193,6 @@ describe('the helpers', () => {
     expect(src).toBe('vec4(0.0, 0.0, 0.0, 1.0)');
     const prophecy = inkGLSL('prophecy');
     expect(prophecy).toMatch(/^vec4\(([0-9]+\.[0-9]+, ){3}[0-9]+\.[0-9]+\)$/);
-    expect(prophecy.endsWith('0.9)')).toBe(true);
+    expect(prophecy.endsWith('0.45)')).toBe(true);
   });
 });
