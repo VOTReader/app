@@ -137,6 +137,23 @@ export function keepZoom(cam, camV, wasW, W) {
 }
 
 /**
+ * My Web's per-frame clamp: each rail's camera inside its own world, y held at 0 (a rail has no y
+ * frame, so a height carried over from the canon web is dropped), and each end bound moved by the
+ * docked panel's slack (use-web-camera slackFor), so a rail's end stops at the canvas area's right
+ * edge as the canon's does, not under the panel (w4). Without a slackFor the bound is the view's edge.
+ * @param {any} cam  the Bible rail's camera
+ * @param {any} camV  the Volumes rail's, or null
+ * @param {number} W  device px
+ * @param {(c: any) => number} capFor  each camera's zoom ceiling
+ * @param {((c: any) => number) | undefined} slackFor
+ */
+export function clampRails(cam, camV, W, capFor, slackFor) {
+  const slack = (/** @type {any} */ c) => (typeof slackFor === 'function' ? slackFor(c) : 0);
+  if (cam) clampCamera(cam, W, capFor(cam), undefined, slack(cam));
+  if (camV) clampCamera(camV, W, capFor(camV), undefined, slack(camV));
+}
+
+/**
  * The graph asset: null until it is decoded; loadError when it cannot be
  * (or when the renderer throws, through setLoadError). retryLoad is the
  * error panel's Try again.
@@ -281,7 +298,9 @@ export function useWebRenderer({
     // My Web's world is exactly the frame: its camera has no y frame, so a
     // height carried over from the canon web is dropped here, not drawn —
     // before the attribute below, so the published height is the drawn one.
-    if (mode === 'personal') clampCamera(cam, v.W, zoomCapFor(cam));
+    // Both rails' cameras clamp here, each with the docked panel's slack (w4).
+    const camV = mode === 'personal' ? camVRef.current : null;
+    if (mode === 'personal') clampRails(cam, camV, v.W, zoomCapFor, slackRef.current);
     // the centre chapter (spec 4.4, Q2): past the overview, the chapter under
     // the canvas area's centre (the frame less the open panel), held while the
     // centre stays near it. Its own arcs are emphasised; nothing else dims.
@@ -298,8 +317,6 @@ export function useWebRenderer({
       // the centre chapter's verse range, for the walks (the old lens's attribute)
       put(wrap, attrs, 'data-lens', lens ? lens[0] + '-' + lens[1] : '');
     }
-    const camV = mode === 'personal' ? camVRef.current : null;
-    if (camV) clampCamera(camV, v.W, zoomCapFor(camV));
     if (wrap && camV) put(wrap, attrs, 'data-ppv-vot', (camV.ppv / v.DPR).toPrecision(4));
     const chrome = chromeRef.current;
     const base = viewFor();

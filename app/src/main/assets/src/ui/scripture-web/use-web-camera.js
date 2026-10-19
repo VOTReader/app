@@ -22,9 +22,10 @@
      slackFor       the camera clamp's room for the docked panel (geometry.js
                     clampCamera's `right`): flyTo, the gestures, the keys and
                     the resize all clamp with it, so the canon's end stops at
-                    the canvas area's right edge, not under the panel;
-                    settleInset eases the camera back inside the view's own
-                    bound once the panel stops covering the right
+                    the canvas area's right edge, not under the panel (and, in
+                    My Web, each rail's end: w4); settleInset brings the
+                    camera back inside the view's own bound once the panel
+                    stops covering the right
      settledAt      (the navigation stream, A6) the chapter in the lens where the
                     camera last came to rest: state, set once no frame has moved
                     the camera for SETTLE_MS, and only when the chapter changes,
@@ -138,13 +139,15 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
   /**
    * The clamp's slack for the docked panel (geometry.clampCamera's `right`), device px: what the
    * panel covers on the right now, or what a fly is told it will (`flyRight`, device px, before the
-   * panel renders), whichever is more. Only the canon camera in the canon web has one: My Web's
-   * rails keep the view's own edges, as their per-frame clamp does.
+   * panel renders), whichever is more. The canon camera has one, and in My Web both rails' cameras
+   * (w4: through w3 My Web's rails kept the view's own edges, so the Bible rail's last verses and the
+   * Volumes rail's last collections stayed under a docked panel at any zoom). A camera the screen
+   * does not hold has none.
    * @param {any} c  the camera being clamped
    * @param {number} [flyRight]
    */
   const slackFor = React.useCallback((/** @type {any} */ c, flyRight = 0) => {
-    if (!c || c !== camRef.current || modeRef.current === 'personal') return 0;
+    if (!c || (c !== camRef.current && !(modeRef.current === 'personal' && c === camVRef.current))) return 0;
     const v = viewRef.current;
     const now = (panelInsetRef.current && panelInsetRef.current.right > 0 ? panelInsetRef.current.right : 0) * (v.DPR || 1);
     return Math.max(now, flyRight > 0 ? flyRight : 0);
@@ -273,10 +276,17 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
    * The panel stopped covering the right (it closed, or became the bottom sheet): a camera its
    * slack let stand past the view's own bound eases back inside it, at the same zoom, rather than
    * jumping there at the reader's next drag. usePanelInset calls it once the inset has shrunk. A fly
-   * running already clamps with the new inset every frame, so it is left to land.
+   * running already clamps with the new inset every frame, so it is left to land. My Web's Volumes
+   * rail (w4) has no fly: it steps back inside at once, as its per-frame clamp would on the next frame.
    */
   const settleInset = React.useCallback(() => {
     const cam = camRef.current, v = viewRef.current;
+    const cv = modeRef.current === 'personal' ? camVRef.current : null;
+    if (cv && v.W) {
+      const was = cv.x;
+      clampCamera(cv, v.W, zoomCapFor(cv), undefined, slackFor(cv));
+      if (cv.x !== was && schedule) schedule();
+    }
     if (!cam || !v.W || flyStopRef.current) return;
     const to = clampCamera({ x: cam.x, ppv: cam.ppv, total: cam.total, y: cam.y }, v.W, zoomCapFor(cam),
       yFrameFor(cam) || undefined, slackFor(cam));
@@ -284,7 +294,7 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
     // flyTo centres x in the canvas area: what the panel still covers is added back on landing
     const right = (panelInsetRef.current && panelInsetRef.current.right > 0 ? panelInsetRef.current.right : 0) * (v.DPR || 1);
     flyTo({ x: to.x - right / (2 * to.ppv) });
-  }, [zoomCapFor, yFrameFor, slackFor, flyTo]);
+  }, [zoomCapFor, yFrameFor, slackFor, flyTo, modeRef, schedule]);
 
   // A6: where the camera came to rest. Each drawn frame compares the camera with the last one;
   // a move restarts the wait, and SETTLE_MS without one reads the chapter in the lens.

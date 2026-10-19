@@ -11,7 +11,7 @@ import { useGoTo, routeOverlayHit } from './goto.jsx';
 import { hitOverlay } from './overlay-renderer.js';
 import { railFrame } from './rail-renderer.js';
 import { buildVotRail } from '../../utils/scripture-web/personal-graph.js';
-import { verseToX, fitPPV } from '../../utils/scripture-web/geometry.js';
+import { verseToX, fitPPV, clampCamera } from '../../utils/scripture-web/geometry.js';
 
 const TOTAL = 31102;
 // one chapter (the whole canon, as the screen's Nearby fixture) and two threads
@@ -588,6 +588,61 @@ describe("the panel brings what it opens out from under itself, even at the cano
     expect(f).toBeLessThan(1);
     expect(areaEnd(m)).toBeCloseTo(AREA, 6);
     expect(m.get().cam.camRef.current.ppv).toBe(2);
+  });
+});
+
+/* w4 item 5: My Web's two cameras take the canon's panel-aware clamp (ac8bc709a). Through w3 slackFor
+   gave My Web's rails none, so with the panel docked on a PC the Bible rail's last right / ppv verses
+   and the Volumes rail's last collections could never stand in the canvas area: they stayed under the
+   panel at any zoom. The same frame as the canon's case: 1600x900 at DPR 2, the panel 640 CSS px. */
+describe("My Web's two cameras leave the docked panel room at the rails' ends (w4)", () => {
+  // the Volumes rail in rail units (21 equal slots of 100), so 4x fit is under its own ceiling
+  const W = 3200, SPAN = 2100;
+  const myWeb = () => {
+    const m = mount({ mode: 'personal' });
+    const { cam } = m.get();
+    cam.viewRef.current = { W, H: 1800, DPR: 2 };
+    cam.camRef.current = { x: 15551, ppv: 4 * (W / TOTAL), total: TOTAL, y: 0 };
+    cam.camVRef.current = { x: SPAN / 2, ppv: 4 * (W / SPAN), total: SPAN, y: 0 };
+    return m;
+  };
+
+  it('slackFor gives both rails what the docked panel covers, device px; a bottom sheet or no panel gives none', () => {
+    const { cam } = myWeb().get();
+    const bible = cam.camRef.current, vols = cam.camVRef.current;
+    expect(cam.slackFor(bible)).toBe(0);
+    expect(cam.slackFor(vols)).toBe(0);
+    cam.panelInsetRef.current = { right: 640, bottom: 0 };
+    expect(cam.slackFor(bible)).toBe(1280);
+    expect(cam.slackFor(vols)).toBe(1280);
+    // a camera the screen does not hold has no slack
+    expect(cam.slackFor({ x: 1, ppv: 1, total: 2, y: 0 })).toBe(0);
+    cam.panelInsetRef.current = { right: 0, bottom: 300 };
+    expect(cam.slackFor(bible)).toBe(0);
+    expect(cam.slackFor(vols)).toBe(0);
+  });
+
+  it("with the panel docked each rail's end can stand at the canvas area's right edge; closing it settles both back inside the view", () => {
+    const { cam } = myWeb().get();
+    const bible = cam.camRef.current, vols = cam.camVRef.current;
+    cam.panelInsetRef.current = { right: 640, bottom: 0 };
+    // the gestures clamp with slackFor (ScriptureWebScreen's clampWithSlack): pan both rails to their ends
+    bible.x = TOTAL; vols.x = SPAN;
+    clampCamera(bible, W, 5000, undefined, cam.slackFor(bible));
+    clampCamera(vols, W, 5000, undefined, cam.slackFor(vols));
+    expect(verseToX(bible, W, TOTAL)).toBeCloseTo(W - 1280, 6);
+    expect(verseToX(vols, W, SPAN)).toBeCloseTo(W - 1280, 6);
+    // still docked: nothing to settle
+    cam.settleInset();
+    expect(verseToX(cam.camRef.current, W, TOTAL)).toBeCloseTo(W - 1280, 6);
+    expect(verseToX(cam.camVRef.current, W, SPAN)).toBeCloseTo(W - 1280, 6);
+    // closed: the view's own edge is each rail's bound again, at the same zoom (no frame loop here)
+    cam.panelInsetRef.current = { right: 0, bottom: 0 };
+    cam.settleInset();
+    expect(verseToX(cam.camRef.current, W, TOTAL)).toBeCloseTo(W, 6);
+    expect(verseToX(cam.camVRef.current, W, SPAN)).toBeCloseTo(W, 6);
+    expect(cam.camRef.current.ppv).toBeCloseTo(4 * (W / TOTAL), 9);
+    expect(cam.camVRef.current.ppv).toBeCloseTo(4 * (W / SPAN), 9);
   });
 });
 

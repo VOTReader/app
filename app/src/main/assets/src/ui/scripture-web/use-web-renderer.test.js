@@ -5,9 +5,35 @@
    relative to fit across a resize or a dpr change, the data-* attributes
    written only when they change, and the walks' flag. */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { gestureStep, backingOf, keepZoom, putAttr, walkOn, GESTURE_HOLD_MS } from './use-web-renderer.js';
+import { gestureStep, backingOf, keepZoom, putAttr, walkOn, clampRails, GESTURE_HOLD_MS } from './use-web-renderer.js';
 import { backingScale, backingSize } from './web-renderer.js';
-import { fitPPV } from '../../utils/scripture-web/geometry.js';
+import { fitPPV, verseToX } from '../../utils/scripture-web/geometry.js';
+
+describe("w4: My Web's per-frame clamp keeps each rail in its world with the docked panel's slack", () => {
+  const W = 3200, cap = () => 5000;
+  const rails = () => ({
+    bible: { x: 31102, ppv: 0.5, total: 31102, y: 40 },
+    vols: { x: 21, ppv: 600, total: 21, y: 0 },
+  });
+  it("with the panel's slack each rail's end stands at the canvas area's edge, not the view's", () => {
+    const { bible, vols } = rails();
+    clampRails(bible, vols, W, cap, () => 1280);
+    expect(verseToX(bible, W, 31102)).toBeCloseTo(W - 1280, 6);
+    expect(verseToX(vols, W, 21)).toBeCloseTo(W - 1280, 6);
+    // a rail has no y frame: a height carried over from the canon web is dropped
+    expect(bible.y).toBe(0);
+  });
+  it("without a slack (no panel, or no slackFor) the view's own edge is the bound, as before", () => {
+    for (const slack of [() => 0, undefined]) {
+      const { bible, vols } = rails();
+      clampRails(bible, vols, W, cap, slack);
+      expect(verseToX(bible, W, 31102)).toBeCloseTo(W, 6);
+      expect(verseToX(vols, W, 21)).toBeCloseTo(W, 6);
+    }
+    const { bible } = rails();
+    expect(() => clampRails(bible, null, W, cap, () => 0)).not.toThrow();
+  });
+});
 
 describe('E2: a frame in a gesture, and the settle frame after it', () => {
   it('the first frame is at rest; a moved camera is in a gesture until GESTURE_HOLD_MS after its last move', () => {
