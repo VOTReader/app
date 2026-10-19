@@ -939,8 +939,10 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       fireEvent.keyDown(root, { key: 'ArrowRight' });
       await settle(20);
       expect(live(), 'the top rail is not a Bible verse').not.toMatch(/Genesis/);
-      // the camera sits at the fitted centre of the five-letter rail: position 2.5 rounds to 3
-      expect(live()).toBe('The Fourth, Rebuke');
+      // the camera sits at the fitted centre of the five-letter rail, position 2.5: the middle of
+      // the third letter, whose foot the rail draws there (votRailX(i + 0.5)). w4 names the letter
+      // under the middle; through w3 Math.round named the fourth, half a letter off its foot.
+      expect(live()).toBe('The Third, Rebuke');
     });
 
     /* v72: onKeyDown sits on .sw-root and read every keydown that bubbled up to it. A keyboard
