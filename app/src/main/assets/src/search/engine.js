@@ -2409,7 +2409,14 @@ async function search(query, options) {
        gate's and every text's cov, and the texts are read again for ALIGN_MASS of what is left (decided once, on the
        first reading). The verse beside a verse holding ALIGN_MASS holds the quote with it (two verses run together,
        read below as one), so a word only it holds is the quote's own and keeps its weight. On the open benches
-       (2026-10-18): tri 598 -> 599 of 600, the 500's open (381) and the dropped-word probe (1765) unchanged. */
+       (2026-10-18): tri 598 -> 599 of 600, the 500's open (381) and the dropped-word probe (1765) unchanged.
+       ...BUT THE READER'S OWN WORD MAY BE THE RARE ONE (last2 review, 2026-10-18). "the joy of the lord is your
+       fortress" (Nehemiah 8:10 says strength): fortress, 28 texts, weighed enough that the texts holding it and LORD
+       held ALIGN_MASS, and the verse remembered, holding joy and LORD, fell under it; no text holds fortress and joy, so
+       joy, the verse's own word, left the weight, and the fortress verses, aligned without it, led (Nehemiah 8:10 at
+       #7). A word a text holds with as many of the typed content words as the best text holding ALIGN_MASS holds is
+       a word of a text as near the quote as any: it keeps its weight. Quietly's three texts hold it alone (1 of the
+       5 typed content words; the best gated text 4), so it still leaves. */
     let heldBits = 0;
     for (const id of gated) heldBits |= termMask[id] || 0;
     let lost = 0;
@@ -2418,9 +2425,15 @@ async function search(query, options) {
     const lostTok = new Set();
     if (lost && gated.length) {
       const inGate = new Set(gated);
+      let content = 0;
+      for (const u of units) if (u.literal && u.origin < 31 && !isStopTerm(u.term)) content |= 1 << u.origin;
+      let most = 0;
+      for (const id of gated) most = Math.max(most, popcount((termMask[id] || 0) & content));
       for (const id of rankedIds) {
         const m = (termMask[id] || 0) & lost;
-        const d = m ? docLookup[id] : null;
+        if (!m) continue;
+        if (popcount(termMask[id] & content) >= most) { lost &= ~m; continue; }
+        const d = docLookup[id];
         if (d && d.kind === 'verse' && (inGate.has(besideVerse(id, d, -1)) || inGate.has(besideVerse(id, d, 1)))) lost &= ~m;
       }
       for (const u of units) {
