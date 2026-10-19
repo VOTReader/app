@@ -97,3 +97,45 @@ describe('B10 item 1 — the mini title band', () => {
     expect(shown.transition).toMatch(/opacity 0\.15s/);
   });
 });
+
+/* "44px" or larger from a min-height declaration */
+const atLeast44 = (v) => /^\d+px$/.test(v || '') && parseInt(v, 10) >= 44;
+
+describe('B10 item 3 — real 44px search tap targets, paid for by trimmed padding', () => {
+  it('the corpus pills are 44px, fully rounded, Cinzel --fs-10 at 0.15em, outlined in --gold-border', () => {
+    const b = decls('.srch-corpus-btn');
+    expect(atLeast44(b['min-height'])).toBe(true);
+    expect(parseInt(b['border-radius'], 10)).toBeGreaterThanOrEqual(22);
+    expect(b['font-size']).toBe('var(--fs-10)');
+    expect(b['letter-spacing']).toBe('0.15em');
+    expect(b.border).toBe('1px solid var(--gold-border)');
+  });
+
+  it('the corpus row pads 8px above and below, so the band is about 60px', () => {
+    expect(decls('.srch-corpus-row').padding).toMatch(/^8px /);
+  });
+
+  it('both halves of the order switch are 44px, its outline rounded 22px, its row padding trimmed', () => {
+    expect(atLeast44(decls('.srch-sort-btn')['min-height'])).toBe(true);
+    expect(decls('.srch-sort')['border-radius']).toBe('22px');
+    expect(decls('.srch-filter-row').padding).toBe('4px 1.2rem 0');
+  });
+
+  it('group headers are 44px, the label still --fs-12', () => {
+    const h = decls('.srch-group-header');
+    expect(atLeast44(h['min-height'])).toBe(true);
+    expect(h['font-size']).toBe('var(--fs-12)');
+    expect(h.padding).toBe('0 1rem');
+  });
+
+  it('the scope chip and the quick and recent chips are 44px, their outer padding trimmed', () => {
+    const scope = decls('.srch-scope-chip');
+    expect(atLeast44(scope['min-height'])).toBe(true);
+    expect(scope.padding).toBe('0 0.9rem');
+    const chip = decls('.srch-quick-chip');
+    expect(atLeast44(chip['min-height'])).toBe(true);
+    expect(chip['align-items']).toBe('center');
+    expect(parseInt(chip['border-radius'], 10)).toBeGreaterThanOrEqual(22);
+    expect(decls('.srch-quick-row').padding).toBe('0.4rem 1rem 0.8rem');
+  });
+});
