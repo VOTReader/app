@@ -682,7 +682,10 @@ export function WebPanel(props) {
           <path d="M18 6L6 18M6 6l12 12" />
         </svg>
       </button>
-      <div className="sw-panel-body" ref={bodyRef} onScroll={onBodyScroll}>
+      {/* a document inside the dialog (w4 quality hunt): the screen's root is role="application"
+          for the web's keys, and there NVDA and JAWS stop the virtual cursor, so the verses the
+          panel exists to show read only in browse mode, which a document turns back on */}
+      <div className="sw-panel-body" ref={bodyRef} onScroll={onBodyScroll} role="document">
         {crumbs ? (
           <nav className="sw-crumbs" aria-label="Your trail">
             <button type="button" className="sw-crumbs-back" onClick={back} aria-label="Back along the trail">

@@ -97,6 +97,20 @@ describe('How to read this web: four or five short lines about controls that exi
   });
 });
 
+describe('the guide reads in browse mode (w4 quality hunt)', () => {
+  // the screen's root is role="application": the card's words sit in a document inside the
+  // dialog, so NVDA and JAWS read them with the virtual cursor
+  it('its title, lines and credit sit in a role="document" region; Got it stays outside it', () => {
+    const card = guide({ canSearch: true });
+    const doc = card.querySelector('[role="document"]');
+    expect(doc).not.toBeNull();
+    expect(doc.querySelector('.sw-guide-title')).not.toBeNull();
+    expect(doc.querySelectorAll('li').length).toBe(5);
+    expect(doc.querySelector('.sw-guide-foot').textContent).toBe(WEB_CREDIT);
+    expect(doc.contains(card.querySelector('.sw-guide-close'))).toBe(false);
+  });
+});
+
 describe('the guide card is the web\'s dark panel in both themes (Q4)', () => {
   it('paints the panel ink and face, never the theme\'s card', () => {
     const card = rule('.sw-guide');

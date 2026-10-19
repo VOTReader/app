@@ -121,6 +121,16 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     expect(panel.querySelector('.sw-panel-meta').textContent).toMatch(/^183 votes · [\d,]+ verses apart$/);
   });
 
+  /* w4 quality hunt: the screen's root is role="application" (the web's own keys), and in it
+     NVDA and JAWS stop the virtual cursor, so the verse text the panel exists to show could not
+     be read without forcing browse mode. The panel's body is a document: it reads as one. */
+  it('its body is a document, so a screen reader reads the verses in browse mode', () => {
+    const { panel } = mount({ detail: detail() });
+    const body = panel.querySelector('.sw-panel-body');
+    expect(body.getAttribute('role')).toBe('document');
+    expect(body.textContent).toContain('TEXT isaiah 7:14');
+  });
+
   /* w4 (the phone): a 24 px title in a 333 px panel read "Isaiah 11:1 ↔ Revelation" / "22:16".
      Each end is its own box, so the line breaks at the arrow and a reference stays whole (a
      reference wider than the line still wraps in its own box). The text reads as before. */
