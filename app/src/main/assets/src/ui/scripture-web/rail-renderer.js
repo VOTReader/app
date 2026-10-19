@@ -34,14 +34,16 @@ import { css as inkCss, MYWEB_TAP_CONTEXT, FLYOVER_LEG_WIDTH, FONT, INK } from '
 
 /** The Volumes rail's height from the top, CSS px (spec §3, My Web: 150 PC, 62 phone). */
 const TOP_RAIL_PC = 150;
-/** w4: the spec's 62 and a second row of names (every collection named on a phone, never dropped). */
-const TOP_RAIL_COMPACT = 74;
+/** w4: the spec's 62 and a second row of names (every collection named on a phone, never dropped),
+ * both rows clear of a reader's pin (the review: at 74 the pins overprinted the lower row). */
+const TOP_RAIL_COMPACT = 78;
 /** The band the Volumes rail's names (and the PC's overline) need above the rail, CSS px. */
 const NAME_BAND_PC = 58;
-const NAME_BAND_COMPACT = 24;
-/** The rows' baselines over the Volumes rail, CSS px: the PC's two, and the phone's two (w4). */
+const NAME_BAND_COMPACT = 28;
+/** The rows' baselines over the Volumes rail, CSS px: the PC's two, and the phone's two (w4),
+ * the lower one 8 px up so a reader's pin (its 5.5 px ring and 1 px stroke) stays under it. */
 const NAME_ROWS_PC = [14, 30];
-const NAME_ROWS_COMPACT = [4, 16];
+const NAME_ROWS_COMPACT = [8, 20];
 /** A frame this short (CSS px) is the phone's: the compact rail, type and label rows. */
 const COMPACT_H = 500;
 /** Curve tension for the S-curves: how far the control points push out (a share of the gap). */
@@ -820,8 +822,9 @@ function drawRails(ctx, opts, rails) {
 
   // The ticks stay under the names' baseline (fix-review #3): on a PC the
   // names sit 14 px over the rail, clear of 7 px ticks; on the phone the
-  // header leaves a 24 px band and the lower row sits 4 px over the rail, so
-  // the ticks there rise only 2 px over it and reach below it instead.
+  // header leaves a 28 px band and the lower row sits 8 px over the rail
+  // (clear of a pin's ring), and the ticks there rise only 2 px over it and
+  // reach below it instead.
   const letterTick = compact ? [2, 2] : [4, 0], bandTick = compact ? [2, 5] : [7, 4];
   // letter ticks, 4 px, once a collection's letters stand apart: each
   // collection has its own pitch (w4, the slots), so each decides for its own
@@ -880,7 +883,7 @@ function drawRails(ctx, opts, rails) {
     names.push({ label, x, w, max: Math.min(hi, span.labelX + span.room / 2) });
   }
   // two rows on both frames: the PC's on 136 and 120 (names 116-136), the
-  // phone's (w4) 4 and 16 px over the rail, so all 21 collections are named at
+  // phone's (w4) 8 and 20 px over the rail, so all 21 collections are named at
   // 740-891 px; through w3 the phone kept one row and dropped five
   // (VOL VII, WTLB I, BLESSED, TIMOTHY, TRINITY). A name neither row can take
   // keeps its tick and shows on a zoom.
@@ -896,8 +899,8 @@ function drawRails(ctx, opts, rails) {
 
 /**
  * The Volumes rail's names and its overline, painted after every line and
- * pin. On the phone the names sit 4 px over the rail and a reader's pin
- * (5.5 px) reaches up into them; painted before the links, the gold printed
+ * pin. On the phone the names sat 4 px over the rail (8 since the w4 review)
+ * and a reader's pin (5.5 px) reached up into them; painted before the links, the gold printed
  * over "VOL I" and "REBUKE" (fix-review 2 #3). Each name is cut out of what
  * lies under it first, a KNOCKOUT px stroke in the canvas ink (the canon's
  * chosen foot rings the same way), then filled, so the type always reads

@@ -1,7 +1,8 @@
 /* rail-renderer — the w3 picture (the r2-05 mockup; spec §3 and §4.2, Q3, Q8).
 
    P1  the rails sit where the spec puts them: the Volumes rail 150 CSS px
-       from the top on a PC, 74 on a phone (w4: 62 + a second row of names),
+       from the top on a PC, 78 on a phone (w4: 62 + a second row of names,
+       both clear of a reader's pin),
        never below 0.4 of the baseline.
    P2  a line's ink follows the rails it is anchored to on screen: the
        overview is one ink (personalInk(1)), a thread whose foot sits on a
@@ -71,23 +72,24 @@ function glowStrokes(ctx) {
 }
 
 describe('P1 the rails sit where the spec puts them', () => {
-  it('the Volumes rail is 150 CSS px down on a PC and 74 on a phone; the Bible rail keeps the baseline', () => {
+  it('the Volumes rail is 150 CSS px down on a PC and 78 on a phone; the Bible rail keeps the baseline', () => {
     expect(railFrame({ H: 900, DPR: 1 }, 508)).toEqual({ topY: 150, bottomY: 508 });
     const phone = railFrame({ H: 411 * 2.6, DPR: 2.6 }, 319 * 2.6);
-    // w4: the spec's 62 and a second 12 px row of names, so every collection is named
-    expect(phone.topY).toBeCloseTo(74 * 2.6, 6);
+    // w4: the spec's 62 and a second 12 px row of names, so every collection is named, both
+    // rows 4 px higher than the first w4 law so a reader's pin clears the lower one (review)
+    expect(phone.topY).toBeCloseTo(78 * 2.6, 6);
     expect(phone.bottomY).toBeCloseTo(319 * 2.6, 6);
     // a frame too short for the spec's place keeps the rail above 0.4 of the baseline
     expect(railFrame({ H: 600, DPR: 1 }, 300).topY).toBe(120);
   });
   it('the Volumes rail clears the top chrome whatever its height: its names never print under the header', () => {
     // a phone header that ends at 60 CSS px (the spec's ends at 50): the names' two rows
-    // need 24 px over the rail (w4; one row needed 12)
+    // need 28 px over the rail (w4; one row needed 12, and the first w4 rows 24)
     const dpr = 2.6;
     const tall = railFrame({ H: 411 * dpr, DPR: dpr, inset: 60 * dpr }, 319 * dpr);
-    expect(tall.topY).toBeCloseTo(84 * dpr, 6);
-    // the spec's own header (to 50) leaves the spec's place (74 with the second row)
-    expect(railFrame({ H: 411 * dpr, DPR: dpr, inset: 50 * dpr }, 319 * dpr).topY).toBeCloseTo(74 * dpr, 6);
+    expect(tall.topY).toBeCloseTo(88 * dpr, 6);
+    // the spec's own header (to 50) leaves the spec's place (78 with the second row)
+    expect(railFrame({ H: 411 * dpr, DPR: dpr, inset: 50 * dpr }, 319 * dpr).topY).toBeCloseTo(78 * dpr, 6);
     // on a PC the overline and both rows need 58 px: a header to 75 leaves 150
     expect(railFrame({ H: 900, DPR: 1, inset: 75 }, 508).topY).toBe(150);
     expect(railFrame({ H: 900, DPR: 1, inset: 110 }, 508).topY).toBe(168);
@@ -329,7 +331,7 @@ describe('P4 the Volumes rail in the spec\'s type and ink', () => {
     const phone = crowd(phoneFrame, 'COLLECT ');       // 58 px bands, 70 px names
     expect(phone.length).toBe(40);
     expect([...new Set(phone.map((t) => t.y))].sort((p, q) => p - q)).toEqual([58 * dpr, 70 * dpr].map((y) => expect.closeTo(y, 6)));
-    // spec §3 amended (w4): names 37-70 on two rows over the rail at 74, under the chrome's 50
+    // spec §3 amended (w4): names on two rows, 8 and 20 px over the rail at 78, under the chrome's 50
     // fix-review #13: every placed name is one ink, the second row's too
     for (const t of pc) expect(t.fill).toBe(css('volumesLabel'));
   });
@@ -373,8 +375,27 @@ describe('P4 the Volumes rail in the spec\'s type and ink', () => {
       }
     }
   });
+  it('w4 review: on a phone a reader\'s pin at the Volumes rail clears the lower row of names (its ring 5.5 px and its 1 px stroke under the baseline)', () => {
+    // the first w4 rows sat 4 and 16 px over the rail: a pin's ring overprinted the F of
+    // FLOCK and the tails of VOL III and VOL VI (the knockout cut it round the letters, but
+    // the gold still touched them)
+    const dpr = 2.6, w = 891 * dpr;
+    const phone = Object.assign({}, base, { width: w, height: 411 * dpr, DPR: dpr, base: 319 * dpr, votX: (p) => (p / 20) * w });
+    const personal = {
+      count: 1, aRail: new Uint8Array([0]), bRail: new Uint8Array([1]),
+      aPos: new Float32Array([20]), bPos: new Float32Array([4.5]), kind: new Uint8Array([2]),
+    };
+    const ctx = recordingCtx();
+    const rails = drawPersonalWeb(ctx, personal, null, phone);
+    const L = personalInk(1).link;
+    const names = ctx.texts.filter((t) => t.text.startsWith('VOL '));
+    expect(names.length).toBe(2);
+    for (const t of names) expect(rails.topY - t.y, t.text).toBeGreaterThanOrEqual((L.ring + 1) * dpr);
+    // and the second row still sits under the header (the rail at 78, its names within 20 px of it)
+    for (const t of ctx.texts) expect(t.y).toBeGreaterThanOrEqual(rails.topY - 20 * dpr - 1e-6);
+  });
   it('a reader\'s pin under a name never prints over it: the names are painted last, each over a knockout in the canvas ink (fix-review 2 #3)', () => {
-    // on the phone the names sit 4 px over the rail and a pin's ring is 5.5 px:
+    // on the phone the names sat 4 px over the rail (now 8) and a pin's ring is 5.5 px:
     // painted before the links, the gold covered "VOL I" and "REBUKE"
     const dpr = 2.6, w = 891 * dpr;
     const phone = Object.assign({}, base, {
