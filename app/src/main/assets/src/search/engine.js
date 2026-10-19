@@ -1021,7 +1021,8 @@ function alignLexiconReady() {
 }
 /** Typed tokens, at least, for the typed words to be aligned as a quote. */
 const ALIGN_MIN = 5;
-/** The share of the typed words' weight (BM25 idf) a text holds anywhere, as typed or in a form or synonym, to be aligned. */
+/** The share of the typed words' weight (BM25 idf) a text holds anywhere, as typed or in a form or synonym, to be aligned
+    (a typed word no text holding that share holds is left out of the weight: search() below). */
 const ALIGN_MASS = 0.5;
 /** Texts aligned at most: the best-scored of those holding that share. */
 const ALIGN_CANDIDATES = 300;
@@ -2390,8 +2391,48 @@ async function search(query, options) {
       for (let o = 0; o < 31; o++) if (m & (1 << o)) s += ow[o];
       return all ? s / all : 0;
     };
-    const cands = rankedIds.filter((id) => massOf(id) >= ALIGN_MASS).sort((a, b) => scoreMap[b] - scoreMap[a]).slice(0, ALIGN_CANDIDATES);
+    /** The verse beside a verse (`by` -1 or 1) in its chapter: its id, or ''. */
+    const besideVerse = (/** @type {string} */ id, /** @type {any} */ d, /** @type {number} */ by) => {
+      const k = /^d(\d+)$/.exec(id);
+      if (!k) return '';
+      const nid = 'd' + (+k[1] + by);
+      const f = docLookup[nid] || msIndex.getStoredFields(nid);
+      return f && f.kind === 'verse' && f.bookId === d.bookId && f.chapterNum === d.chapterNum && f.verseNum === d.verseNum + by ? nid : '';
+    };
+    let gated = rankedIds.filter((id) => massOf(id) >= ALIGN_MASS);
+    /* A TYPED WORD NO TEXT HOLDING THE QUOTE HOLDS (search200 last2, 2026-10-18). A word of the reader's own in the
+       quote's place that the texts barely use ("quietly" for privately: three texts say it) weighed the most of the
+       typed words, so the verse holding every other word in the typed order held under ALIGN_MASS of the weight and
+       was never aligned ("and said quietly blessed are the eyes that see what you see": Luke 10:23 held 0.49 of it,
+       and Matthew 13:16, holding three of its words, led). A typed content word that no text holding ALIGN_MASS holds,
+       as typed or in a form, a synonym or a spelling corrected, tells none of them apart: it leaves the weight, the
+       gate's and every text's cov, and the texts are read again for ALIGN_MASS of what is left (decided once, on the
+       first reading). The verse beside a verse holding ALIGN_MASS holds the quote with it (two verses run together,
+       read below as one), so a word only it holds is the quote's own and keeps its weight. On the open benches
+       (2026-10-18): tri 598 -> 599 of 600, the 500's open (381) and the dropped-word probe (1765) unchanged. */
+    let heldBits = 0;
+    for (const id of gated) heldBits |= termMask[id] || 0;
+    let lost = 0;
+    for (let o = 0; o < 31; o++) if (ow[o] > 0 && !(heldBits & (1 << o))) lost |= 1 << o;
+    /** @type {Set<string>} the typed tokens of the words no text holding the quote holds */
+    const lostTok = new Set();
+    if (lost && gated.length) {
+      const inGate = new Set(gated);
+      for (const id of rankedIds) {
+        const m = (termMask[id] || 0) & lost;
+        const d = m ? docLookup[id] : null;
+        if (d && d.kind === 'verse' && (inGate.has(besideVerse(id, d, -1)) || inGate.has(besideVerse(id, d, 1)))) lost &= ~m;
+      }
+      for (const u of units) {
+        if (!u.literal || u.origin >= 31 || !(lost & (1 << u.origin))) continue;
+        for (const t of kjvEncode(u.term)) { lostTok.add(t); if (fixedTo[t]) lostTok.add(fixedTo[t]); }
+      }
+      for (let o = 0; o < 31; o++) if (lost & (1 << o)) { all -= ow[o]; ow[o] = 0; }
+      if (lost) gated = rankedIds.filter((id) => massOf(id) >= ALIGN_MASS);
+    }
+    const cands = gated.sort((a, b) => scoreMap[b] - scoreMap[a]).slice(0, ALIGN_CANDIDATES);
     const w = alignWeights(typedTokens, df, n);
+    for (let i = 0; i < typedTokens.length; i++) if (lostTok.has(typedTokens[i]) && !STOP.has(typedTokens[i])) w[i] = 0;
     const cls = alignClasses(typedTokens, { stop: STOP, id: (t) => AS.ids.get(t), word: (x) => AS.words[x], lexicon: ALIGN_LEXICON });
     const toksOf = (/** @type {string} */ id) => { const sid = storeSpan(AS, id); return sid === null ? null : AS.toks.subarray(AS.from[sid], AS.to[sid]); };
     /* Two covs within a small word of each other (the heaviest typed, "so" for "and"), give or take ALIGN_TIE, hold the
@@ -2434,14 +2475,6 @@ async function search(query, options) {
     alignCovOf = (id) => { const t = single.has(id) ? null : toksOf(id); return single.has(id) || t ? alone(id, t) : 0; };
     /** @type {Map<string, string>} a verse lifted by its neighbour -> that neighbour */
     const pairOf = new Map();
-    /** The verse beside a verse (`by` -1 or 1) in its chapter: its id, or ''. */
-    const besideVerse = (/** @type {string} */ id, /** @type {any} */ d, /** @type {number} */ by) => {
-      const k = /^d(\d+)$/.exec(id);
-      if (!k) return '';
-      const nid = 'd' + (+k[1] + by);
-      const f = docLookup[nid] || msIndex.getStoredFields(nid);
-      return f && f.kind === 'verse' && f.bookId === d.bookId && f.chapterNum === d.chapterNum && f.verseNum === d.verseNum + by ? nid : '';
-    };
     for (const id of cands) {
       if (spent()) { const r = await pause(); if (r) return r; }
       const t = toksOf(id);
