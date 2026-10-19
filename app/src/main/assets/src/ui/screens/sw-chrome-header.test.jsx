@@ -222,13 +222,24 @@ describe('the chrome\'s CSS (spec 4.1; items 21, 24, 47, 48)', () => {
     expect(left).toBeLessThan(pull);
   });
 
-  /* w4 (r2-06): a phone's legend is ONE line. Two lines (the key, then the credit) took the
-     band's foot from the verse numerals; at 12 px, unwrapped, with the ramp's far end the short
-     word ("far"; "across the canon" on a PC), key and credit fit beside ? and hide-UI (the w4
-     band screenshots measure it). The credit stays the tail. */
-  it('a phone\'s legend is one line: 12 px, unwrapped, the ramp ending "far", the credit last', async () => {
+  /* w4 (r2-06): a phone's legend is ONE line where it fits. Two lines (the key, then the credit)
+     took the band's foot from the verse numerals; at 12 px, with the ramp's far end the short word
+     ("far"; "across the canon" on a PC), key and credit fit beside ? and hide-UI on the 891 px
+     phone. Rewritten to its intent after the w4 review: the legend clips (overflow: hidden, the
+     buttons' corner kept by max-width), so a line that may not wrap cut the credit's tail on every
+     narrower phone; the line keeps its wrap and only its items keep their words together. That
+     it is one line on the 891 px phone and never clips the credit is the walk's to see
+     (tools/e2e-sw-legend.mjs: jsdom lays nothing out). The credit stays the tail. */
+  it('a phone\'s legend: 12 px, the ramp ending "far", the credit last, and a line that wraps rather than clip the credit', async () => {
     expect(rule('.sw-root.sw-compact .sw-legend')).toMatch(/font-size:\s*var\(--fsc-12\)/);
-    expect(rule('.sw-root.sw-compact .sw-legend-line')).toMatch(/flex-wrap:\s*nowrap/);
+    expect(rule('.sw-legend')).toMatch(/overflow:\s*hidden/);
+    expect(rule('.sw-legend-line')).toMatch(/flex-wrap:\s*wrap/);
+    for (const m of BARE.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const sel = m[1].trim();
+      if (!/\.sw-legend-line\s*$/.test(sel) && !/\.sw-legend\s*$/.test(sel)) continue;
+      expect(m[2], sel + ': the legend line may not be kept from wrapping').not.toMatch(/flex-wrap:\s*nowrap|white-space:\s*nowrap/);
+    }
+    expect(rule('.sw-root.sw-compact .sw-legend-line > *')).toMatch(/white-space:\s*nowrap/);
     expect(rule('.sw-key-short')).toMatch(/display:\s*none/);
     expect(rule('.sw-root.sw-compact .sw-key-long')).toMatch(/display:\s*none/);
     expect(rule('.sw-root.sw-compact .sw-key-short')).toMatch(/display:\s*inline/);

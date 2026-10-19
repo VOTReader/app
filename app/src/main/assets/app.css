@@ -8360,15 +8360,17 @@
       font-family: var(--sw-font); font-size: var(--fsc-14); line-height: 1.35; color: var(--sw-text-muted);
       pointer-events: none;
     }
-    /* a phone's legend is ONE line, the key and then the credit (w4, r2-06: two lines took the
-       band's foot from the verse numerals): 12 px, the ramp's far end "far" and its gradient
-       shorter, about 670 px of words against the 751 beside ? and hide-UI. It never wraps, so
-       the canvas's rows above its top hold. */
+    /* a phone's legend is ONE line where it fits, the key and then the credit (w4, r2-06: two
+       lines took the band's foot from the verse numerals): 12 px, the ramp's far end "far" and its
+       gradient shorter, about 670 px of words against the 751 beside ? and hide-UI on the 891 px
+       phone. On a narrower one it WRAPS (the line's own flex-wrap), the credit to the second line:
+       never clipped, it is the licence's (w4 review: nowrap under the clip cut "(CC-BY)" at 780 px).
+       Each item keeps its words together; the canvas reads the legend's live top. */
     .sw-root.sw-compact .sw-legend {
       left: 16px; bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
       font-size: var(--fsc-12); line-height: 1.25; max-width: calc(100% - 140px);
     }
-    .sw-root.sw-compact .sw-legend-line { flex-wrap: nowrap; white-space: nowrap; }
+    .sw-root.sw-compact .sw-legend-line > * { white-space: nowrap; }
     .sw-key-short { display: none; }
     .sw-root.sw-compact .sw-key-long { display: none; }
     .sw-root.sw-compact .sw-key-short { display: inline; }
