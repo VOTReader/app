@@ -19,10 +19,13 @@ import { CENTRE_BRIGHT, CENTRE_WIDTH } from './sw-ink.js';
 
 /** Height reserved below the baseline for the ruler + book names, CSS px. */
 export const RULER_H = 74;
-/** The canon web's ruler on a tall wide frame (a PC), CSS px: the build spec's baseline at
-    H - 212 (§3), which holds the deep-zoom band (+175: chapter numerals, verse ticks and
-    numerals, the cited dots) above the legend line. Phones and My Web keep RULER_H. */
-export const RULER_PC = 212;
+/** The canon web's ruler on a tall wide frame (a PC), CSS px: the baseline at H - 180, the
+    depth of r2-01a's band (its baseline to its foot, 184 of 941 px), so the overview's bars and
+    names fill it with no black above or below the names (w4 review 2: at the build spec's
+    H - 212 the band ran 177 px to the legend where r2-01a's runs 134). The deep-zoom band
+    (chapter numerals, verse ticks and numerals, the cited dots; +175 natural) closes its gaps
+    to fit above the legend line (stackRows). Phones and My Web keep RULER_H. */
+export const RULER_PC = 180;
 
 /**
  * The zoom ceiling, from the frame rather than from a constant. 44 CSS px

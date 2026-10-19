@@ -20,10 +20,13 @@ describe('webFrame', () => {
     expect(webFrame({ W: 2317, H: 1069, DPR: 2.6 }, false).ruler).toBeCloseTo((RULER_H + 26) * 2.6, 6);
   });
 
-  it('a PC holds the deep-zoom band: the canon baseline at H - 212 (build spec §3); My Web keeps the short ruler', () => {
-    expect(RULER_PC).toBe(212);
-    expect(webFrame(desktop, false).ruler).toBe(212);
-    expect(webFrame(desktop, false).base).toBe(1080 - 212);
+  /* w4 review 2: the build spec's H - 212 left the overview's band 177 px deep to the legend
+     against r2-01a's 134 (black above or below the names wherever they stood); the baseline is at
+     r2-01a's depth now, and the deep-zoom band closes its gaps to fit (overlay-canvas.test.js). */
+  it("a PC's canon baseline sits at r2-01a's band depth, H - 180 (build spec §3, w4 amendment); My Web keeps the short ruler", () => {
+    expect(RULER_PC).toBe(180);
+    expect(webFrame(desktop, false).ruler).toBe(180);
+    expect(webFrame(desktop, false).base).toBe(1080 - 180);
     expect(webFrame(desktop, true).ruler).toBe(RULER_H + 26);
   });
 

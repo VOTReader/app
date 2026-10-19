@@ -538,23 +538,34 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
   });
 
   /* r2-01a at 900 px: the names stand about 55-60 px over the legend. w4's +90 row left about 78
-     (it was about 98 before w4: the dead band); the w4 review set the bound at the picture's 60. */
-  it('pc: the band fills the ruler as r2-01a does: the names within 60 px of the legend, the bars between the cited strip and the names', () => {
+     (it was about 98 before w4: the dead band); the w4 review set the bound at the picture's 60.
+     w4 review 2: the +110 row met that bound by moving the black above the names (58 px between the
+     common bars and the names); the band was 177 px from the baseline to the legend where r2-01a's
+     is about 134. Measured off r2-01a (row by row, 941 px tall): half its bars end within 38 px of
+     the names' cap top, nine in ten within 28, the longest 15 above it; the names' foot about 50
+     over the legend's line. Both gaps are held now, and the band's depth with them. */
+  it("pc: the band reads as r2-01a: the names just under the bars and about 55 px over the legend, the band no deeper than the picture's", () => {
     const { canvas, legendTop } = chromeRoot('pc');
     const { rec, fs } = paint('pc', 1, g.total / 2, { canvas });
     const base = fs.view.base;
     const names = bookTexts(rec);
     const foot = Math.max(...names.map((c) => c.y)), capTop = Math.min(...names.map((c) => textRect(c).y0));
-    expect(legendTop - foot, 'the gap from the names to the legend (r2-01a: about 55-60)').toBeLessThanOrEqual(60);
+    expect(legendTop - foot, 'the gap from the names to the legend (r2-01a: about 50-55)').toBeLessThanOrEqual(60);
     expect(legendTop - foot, 'and the names do not crowd the legend').toBeGreaterThanOrEqual(48);
     const bars = inked(rec, (f) => BAR_FILLS.has(f));
     const barTop = Math.min(...bars.map((b) => b.y0)), barFoot = Math.max(...bars.map((b) => b.y1));
+    const feet = bars.map((b) => b.y1).sort((p, q) => p - q);
+    const q = (t) => feet[Math.min(feet.length - 1, Math.floor(t * feet.length))];
     const cited = inked(rec, (f) => /^rgba\(196,164,105,/.test(String(f)));
     const citedFoot = Math.max(...cited.map((b) => b.y1));
     expect(barTop - citedFoot, 'the bars start just under the cited strip').toBeGreaterThanOrEqual(4);
-    expect(capTop - barFoot, 'the names stand clear under the bars').toBeGreaterThanOrEqual(16);
-    expect(barFoot - barTop, 'bars as tall as the picture\'s').toBeGreaterThanOrEqual(36);
+    expect(capTop - q(0.5), 'half the bars end near the names (r2-01a: 38; it was 62)').toBeLessThanOrEqual(42);
+    expect(capTop - q(0.9), 'nine in ten (r2-01a: 28; it was 52)').toBeLessThanOrEqual(38);
+    expect(capTop - barFoot, 'the names stand clear under the longest bar (r2-01a: 15)').toBeGreaterThanOrEqual(12);
+    expect(capTop - barFoot, 'and just under it (it was 28)').toBeLessThanOrEqual(22);
+    expect(barFoot - barTop, "bars as tall as the picture's").toBeGreaterThanOrEqual(36);
     expect(barTop - base).toBeGreaterThan(0);
+    expect(legendTop - base, 'the band from the baseline to the legend (r2-01a: about 134; it was 177)').toBeLessThanOrEqual(150);
   });
 
   /** Isaiah 7:14 - Matthew 1:23, the s04 pair, as an OpenBible thread. */

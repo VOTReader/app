@@ -217,10 +217,14 @@ const SIZES = {
    rows spread over the ruler as r2-01a's do (the cited strip, the bars, the
    names; a chosen foot's label cuts its notch in the bars, r2-06; the spec's +12..+42 bars and
    +52 / +70 names left 98 px of black above the legend, and w4's +16..+64 bars and +90 row still
-   78: the w4 review's +16..+82 and +110 leave r2-01a's 58). On a phone the names
+   78; the w4 review's +16..+82 and +110 moved that black above the names, 58 px under the common
+   bars). w4 review 2: the names hang just under the bars (+16..+60, the row at +78: half the
+   bars end within 41 px of the names, the longest 18 above them, r2-01a's 38 and 15), and the
+   PC baseline came down to H - 180 (web-frame.js RULER_PC) so the band is r2-01a's depth and the
+   names stand about 55 px over the legend with no black on either side. On a phone the names
    end above the corner buttons' zone (+44) and the deep band's numerals do too,
    so a button never takes a numeral or the sticky name. */
-const OV_PC = { rows: [{ k: 'cited', top: 5, h: 5 }, { k: 'bars', top: 16, h: 66, min: 12 }, { k: 'row0', top: 110, h: 13 * CAP }], end: 124 };
+const OV_PC = { rows: [{ k: 'cited', top: 5, h: 5 }, { k: 'bars', top: 16, h: 44, min: 12 }, { k: 'row0', top: 78, h: 13 * CAP }], end: 92 };
 const OV_COMPACT = { rows: [{ k: 'cited', top: 3, h: 4 }, { k: 'bars', top: 10, h: 18, min: 8 }, { k: 'row0', top: 35, h: 12 * CAP }], end: 44 };
 const DEEP_PC = {
   rows: [
