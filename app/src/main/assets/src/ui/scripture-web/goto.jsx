@@ -72,6 +72,29 @@ export const GOTO_BOX_MIN = 480;
 /** The verse chip (CSS px): its gap from the foot it names, and the room it keeps from the area's edges. */
 const CHIP_GAP = 10;
 const CHIP_GUTTER = 8;
+/** The page's own controls the verse chip keeps off when they stand in its row (w4: over a sheet it
+ * ran under hide-UI, "Isaiah 53:5 · 27 connecti…"). */
+const CHIP_KEEP_OFF = '.sw-hide-all, .sw-guide-btn, .sw-controls';
+
+/**
+ * The boxes of CHIP_KEEP_OFF in the root, CSS px: from the offsets, not the client rects, so a turned
+ * root (.sw-rotated) reads its own axes. A control not laid out (display none, or jsdom) has none.
+ * @param {HTMLElement | null | undefined} root
+ * @returns {{ x0: number, x1: number, y0: number, y1: number }[]}
+ */
+function keepOffBoxes(root) {
+  const out = [];
+  if (!root || typeof root.querySelectorAll !== 'function') return out;
+  for (const el of root.querySelectorAll(CHIP_KEEP_OFF)) {
+    const b = /** @type {HTMLElement} */ (el);
+    const w = b.offsetWidth, h = b.offsetHeight;
+    if (!(w > 0) || !(h > 0)) continue;
+    let x = 0, y = 0, n = /** @type {any} */ (b);
+    while (n && n !== root) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; }
+    if (n === root) out.push({ x0: x, x1: x + w, y0: y, y1: y + h });
+  }
+  return out;
+}
 
 /**
  * Where the PC box sits (spec 4.5, r3-04): 640 px at top 24, centred over the canvas area, and
@@ -525,10 +548,17 @@ export function useGoTo(web) {
       // on the foot's right; short of room there before the area's edge (the canon's end stands
       // the outer tenth inside it with the panel docked), on the foot's left, and judged on the
       // box it takes, so it never runs under the panel (w4 review: "Revelation 2" at its border)
-      const w = el.offsetWidth, edge = right / dpr - CHIP_GUTTER;
-      let tx = Math.round(x + CHIP_GAP);
-      if (tx + w > edge) tx = Math.max(CHIP_GUTTER, Math.round(x - CHIP_GAP - w));
-      const ty = Math.round(y - 12);
+      const w = el.offsetWidth, h = el.offsetHeight, ty = Math.round(y - 12);
+      // and never under the page's own controls in its row (w4): one right of the foot is the
+      // chip's right bound, one left of it its left bound
+      let edge = right / dpr - CHIP_GUTTER, floor = CHIP_GUTTER;
+      for (const o of keepOffBoxes(rootRef && rootRef.current)) {
+        if (o.y1 <= ty - h || o.y0 >= ty) continue;
+        if ((o.x0 + o.x1) / 2 >= x) edge = Math.min(edge, o.x0 - CHIP_GUTTER);
+        else floor = Math.max(floor, o.x1 + CHIP_GUTTER);
+      }
+      let tx = Math.max(floor, Math.round(x + CHIP_GAP));
+      if (tx + w > edge) tx = Math.max(floor, Math.round(x - CHIP_GAP - w));
       el.style.transform = 'translate(' + tx + 'px,' + ty + 'px) translateY(-100%)';
       const shown = x >= 0 && x <= right / dpr && tx + w <= edge && y <= v.H / dpr;
       el.style.visibility = shown ? 'visible' : 'hidden';
@@ -558,7 +588,7 @@ export function useGoTo(web) {
       const named = (e) => (e ? { arc: e.arc, verse: e.verse, label: refOfVerse(graph, e.verse).label } : null);
       setEdges({ left: named(left), right: named(rightEnd) });
     }
-  }, [graph, camRef, viewRef, focusRef, area, viewFor, panelInsetRef, keepOut]);
+  }, [graph, camRef, viewRef, focusRef, area, viewFor, panelInsetRef, keepOut, rootRef]);
 
   /** The start prop, once: as soon as the camera exists. */
   const tryStart = React.useCallback(() => {

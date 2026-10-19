@@ -71,6 +71,27 @@ export function collapsedFor(layout, open) {
 }
 
 /**
+ * The canvas-area widths below which the collapsed strip cannot sit beside the header, beside a
+ * docked panel (w4: at 768x1024 the go-to covered "Web"). PC: the header's 16 + 8 + 44 (Back) + 16 +
+ * the 24 px title (212 px on the S22's serif) + 10, then 8 and the strip's 112 at the panel's
+ * edge + 17, is 443. A phone's header wraps its count under the title first (app.css), so it needs
+ * 16 + 8 + 40 + 16 + the 20 px title (177) + 10, then 8 + 110 + 9: 394. A few px spare on each.
+ */
+export const STACK_BELOW = 460;
+export const STACK_BELOW_COMPACT = 410;
+
+/**
+ * Whether the collapsed strip drops under the header (app.css .sw-stack): a docked panel leaves
+ * the canvas area too narrow for the two side by side. Never under a sheet, and never on a narrow
+ * root, whose strip sits at the bottom.
+ * @param {PanelLayout | null} layout @param {boolean} open
+ */
+export function stackedFor(layout, open) {
+  if (!layout || !open || layout.sheet || layout.narrow) return false;
+  return layout.w - layout.panelW < (layout.compact ? STACK_BELOW_COMPACT : STACK_BELOW);
+}
+
+/**
  * The root's measured size as a layout (state: the render reads it), and `insetFor()`, what the panel
  * WILL cover once open (a ref read: the selection hook frames a connection before the panel renders).
  * Reattaches when the root element changes (the no-WebGL list unmounts it; Try again mounts a new one).

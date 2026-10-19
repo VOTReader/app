@@ -55,7 +55,7 @@ import { useForcedLandscape } from '../scripture-web/use-forced-landscape.js';
 import { useWebGraph, useChromeTokens, useWebRenderer } from '../scripture-web/use-web-renderer.js';
 import { usePersonalWeb } from '../scripture-web/use-personal-web.js';
 import { useWebSelection } from '../scripture-web/use-web-selection.js';
-import { usePanelLayout, usePanelInset, collapsedFor } from '../scripture-web/use-panel-layout.js';
+import { usePanelLayout, usePanelInset, collapsedFor, stackedFor } from '../scripture-web/use-panel-layout.js';
 import { WebPanel } from '../scripture-web/web-panel.jsx';
 import { useWebKeys, WEB_KEYS_HELP, MY_WEB_KEYS_HELP } from '../scripture-web/use-web-keys.js';
 import { useJourney } from '../scripture-web/use-journey.js';
@@ -272,6 +272,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const panelOpen = listOpen || !!choices || !!detail;
   usePanelInset({ layout, open: panelOpen, panelInsetRef, wrapRef, schedule, onShrink: settleInset });
   const collapse = collapsedFor(layout, panelOpen);
+  // too narrow beside a docked panel for the header and the strip side by side: the strip drops (w4)
+  const stack = stackedFor(layout, panelOpen);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const controlsRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const moreBtnRef = React.useRef(/** @type {HTMLButtonElement | null} */ (null));
@@ -420,7 +422,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       // the layout classes from the root's own box (use-panel-layout.js); sw-narrow agrees with the
       // renderer's classList toggle, so a re-render cannot drop it
       + (layout && layout.narrow ? ' sw-narrow' : '') + (layout && layout.compact ? ' sw-compact' : '')
-      + (panelOpen ? ' sw-panel-open' : '') + (collapse ? ' sw-collapse' : '') + (collapse && menuOpen ? ' sw-menu-open' : '')}
+      + (panelOpen ? ' sw-panel-open' : '') + (collapse ? ' sw-collapse' : '') + (collapse && menuOpen ? ' sw-menu-open' : '') + (stack ? ' sw-stack' : '')}
       ref={wrapRef} data-panel={panelOpen ? (layout && layout.sheet ? 'sheet' : 'dock') : undefined}
       tabIndex={0} onKeyDown={onKeyDown}
       role="application"

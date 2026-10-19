@@ -4,7 +4,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import {
-  panelLayout, insetOf, collapsedFor, usePanelLayout, usePanelInset, SHEET_BELOW, COLLAPSE_BELOW,
+  panelLayout, insetOf, collapsedFor, stackedFor, usePanelLayout, usePanelInset, SHEET_BELOW, COLLAPSE_BELOW,
 } from './use-panel-layout.js';
 
 describe('panelLayout: the spec\'s numbers from the root\'s own box', () => {
@@ -50,6 +50,22 @@ describe('insetOf and collapsedFor', () => {
     expect(collapsedFor(panelLayout(COLLAPSE_BELOW - 1, 700), false)).toBe(true);
     expect(collapsedFor(panelLayout(891, 411), true)).toBe(true);
     expect(collapsedFor(null, true)).toBe(false);
+  });
+
+  /* w4 (device and interaction hunts): beside a docked panel on a tablet the canvas area is too
+     narrow for the header and the collapsed strip side by side (768x1024: the go-to covered "Web"),
+     so the strip drops under the header; a phone's header wraps its count first (780x360 fits) */
+  it('the strip stacks under the header only where the two cannot sit side by side', () => {
+    expect(stackedFor(panelLayout(768, 1024), true), '348 px of canvas').toBe(true);
+    expect(stackedFor(panelLayout(820, 1180), true), '400').toBe(true);
+    expect(stackedFor(panelLayout(1024, 768), true), '604').toBe(false);
+    expect(stackedFor(panelLayout(768, 1024), false), 'closed').toBe(false);
+    expect(stackedFor(panelLayout(780, 360), true), 'the S22: 440, the count wraps instead').toBe(false);
+    expect(stackedFor(panelLayout(891, 411), true)).toBe(false);
+    expect(stackedFor(panelLayout(667, 375), true), 'a small phone: 327').toBe(true);
+    expect(stackedFor(panelLayout(500, 900), true), 'a sheet').toBe(false);
+    expect(stackedFor(panelLayout(SHEET_BELOW, 900), true), 'narrow: the strip is at the bottom').toBe(false);
+    expect(stackedFor(null, true)).toBe(false);
   });
 });
 

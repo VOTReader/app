@@ -1691,6 +1691,21 @@ describe('the docked panel in the web (w3, spec section 3)', () => {
     expect(root.classList.contains('sw-collapse')).toBe(false);
   });
 
+  /* w4 (interaction hunt): at 768x1024 the collapsed strip sat over the title ("Web" under the
+     go-to); there the strip drops under the header (use-panel-layout's stackedFor; app.css) */
+  it('a tablet 768x1024: docked, the strip stacks under the header; at 1600 it does not', async () => {
+    const { root } = await mountAt(768, 1024);
+    expect(root.classList.contains('sw-stack'), 'closed').toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'More controls' }));
+    fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+    await wait(30);
+    expect(root.getAttribute('data-panel')).toBe('dock');
+    expect(root.classList.contains('sw-stack'), '768 - 420 = 348 px of canvas').toBe(true);
+    fireEvent.keyDown(root, { key: 'Escape' });
+    await wait(30);
+    expect(root.classList.contains('sw-stack')).toBe(false);
+  });
+
   it('phone landscape 891x411: compact, docked right at 374 px, the controls behind the more button', async () => {
     const { root, container } = await mountAt(891, 411);
     expect(root.classList.contains('sw-compact')).toBe(true);

@@ -314,6 +314,58 @@ describe('the go-to box (spec 4.5)', () => {
     expect(get().keepOutRef.current).toBeNull();
   });
 
+  /* w4 interaction hunt: over a 500x900 sheet the verse chip stood on the sheet's top edge and ran
+     under hide-UI ("Isaiah 53:5 · 27 connecti…"). The corner buttons and the control strip in its
+     row are keep-outs too, read in the root's own px (offsets, so a turned root reads its axes). */
+  it('the chip keeps off the corner buttons and the strip in its row: the other side of its foot, between them, or hidden', async () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(180);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(30);
+    const { container, get } = mountWeb();
+    act(() => { get().goTo.open('Genesis 1:101'); });
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    settle(); await flush();
+    const el = () => /** @type {HTMLElement} */ (container.querySelector('.sw-goto-chip'));
+    const at = () => /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(el().style.transform).slice(1).map(Number);
+    const frame = () => { act(() => { get().frames.schedule(); }); settle(); };
+    const cam = get().cam.camRef.current;
+    cam.ppv = 8; cam.x = 100.5 - (450 - 400) / 8; // the foot at 450 of the 800 px frame
+    frame();
+    const root = /** @type {HTMLElement} */ (container.querySelector('.sw-root'));
+    const put = (cls, x, y, w, h) => {
+      const b = document.createElement('button');
+      b.className = cls;
+      root.appendChild(b);
+      for (const [k, v] of [['offsetLeft', x], ['offsetTop', y], ['offsetWidth', w], ['offsetHeight', h], ['offsetParent', root]]) {
+        Object.defineProperty(b, k, { configurable: true, get: () => v });
+      }
+      return b;
+    };
+    const ty = at()[1];
+    // ? above the chip's row, right of the foot: not in its way
+    put('sw-btn sw-guide-btn', 600, ty - 100, 44, 44);
+    frame();
+    expect(at()[0], 'nothing in its row: on the foot\'s right').toBe(460);
+    // hide-UI in its row, right of the foot: the chip stands on the foot's left
+    const hide = put('sw-btn sw-hide-all', 560, ty - 40, 44, 44);
+    frame();
+    expect(at()[0], 'on the foot\'s left').toBe(450 - 10 - 180);
+    expect(el().style.visibility).toBe('visible');
+    // the strip in its row on the left as well: between the two, clear of both
+    put('sw-controls', 14, ty - 50, 330, 58);
+    frame();
+    const [tx] = at();
+    expect(tx, 'clear of the strip').toBeGreaterThanOrEqual(344 + 8);
+    expect(tx + 180, 'clear of hide-UI').toBeLessThanOrEqual(560 - 8);
+    expect(el().style.visibility).toBe('visible');
+    expect(get().keepOutRef.current).toEqual([{ x0: tx, x1: tx + 180, y0: ty - 30, y1: ty }]);
+    // too little room between them: hidden, never half under a button
+    hide.remove();
+    put('sw-btn sw-hide-all', 500, ty - 40, 44, 44);
+    frame();
+    expect(el().style.visibility, '140 px between them for a 180 px chip').toBe('hidden');
+    expect(get().keepOutRef.current).toBeNull();
+  });
+
   it('the chip tells the overlay where it stands (keepOutRef, CSS px), so the canvas labels keep off it; it lets go when the chip goes', async () => {
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(180);
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(30);

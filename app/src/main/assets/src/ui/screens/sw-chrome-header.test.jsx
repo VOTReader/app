@@ -275,3 +275,41 @@ describe('the chrome\'s CSS (spec 4.1; items 21, 24, 47, 48)', () => {
     expect(plain).toEqual([]);
   });
 });
+
+/* w4 (the device, interaction and quality hunts): the chrome at the top keeps out of its own way.
+   The collapsed strip is PC 7 + 44 + 10 + 44 + 7 = 112 px at the panel's edge + 17, a phone's
+   7 + 44 + 8 + 44 + 7 = 110 at + 9; the header starts at 16 and stops 8 px short of the strip. */
+describe('the header keeps clear of the strip and the chips (w4)', () => {
+  it('the go-to\'s edge chips stand below the header row, never on Back (d10)', () => {
+    const top = /top:\s*([^;]+);/.exec(rule('.sw-goto-edge'))[1];
+    expect(top).toMatch(/^max\(23%/);
+    expect(top).toMatch(/var\(--sw-chrome-top\)/);
+    expect(top).toMatch(/var\(--sw-topbar-floor\)/);
+  });
+
+  it('the count under the title has the canvas\'s dark halo, so a lit arc through it cannot eat it', () => {
+    // set on the title, inherited by its count, its name and the hint; none of them takes it off
+    expect(rule('.sw-title')).toMatch(/text-shadow:[^;]*var\(--sw-canvas\)/);
+    for (const sel of ['.sw-title h1', '.sw-title p', '.sw-hint']) expect(rule(sel), sel).not.toMatch(/text-shadow/);
+  });
+
+  it('beside the docked panel the header stops short of the collapsed strip; a phone wraps its count under the title', () => {
+    expect(rule('.sw-root.sw-collapse.sw-panel-open[data-panel="dock"] .sw-topbar'))
+      .toMatch(/max-width:\s*calc\(100% - var\(--sw-panel-w, 40%\) - 153px\)/);
+    expect(rule('.sw-root.sw-compact.sw-collapse.sw-panel-open[data-panel="dock"] .sw-topbar'))
+      .toMatch(/max-width:\s*calc\(100% - var\(--sw-panel-w, 42%\) - 143px\)/);
+    expect(rule('.sw-title')).toMatch(/min-width:\s*0/);
+    expect(rule('.sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-title')).toMatch(/flex-wrap:\s*wrap/);
+  });
+
+  it('stacked (use-panel-layout\'s stackedFor), the strip drops under the header and the edge chips under the strip', () => {
+    expect(rule('.sw-root.sw-stack .sw-controls'))
+      .toMatch(/top:\s*calc\(var\(--sw-chrome-top\) \+ var\(--sw-topbar-floor\) \+ 24px\)/);
+    // as specific as the phone's docked header rule (0,6,0) and after it, so it wins on a phone too
+    const stacked = '.sw-root.sw-stack.sw-collapse.sw-panel-open[data-panel="dock"] .sw-topbar';
+    expect(rule(stacked)).toMatch(/max-width:\s*calc\(100% - var\(--sw-panel-w, 40%\) - 40px\)/);
+    expect(BARE.indexOf(stacked + ' {')).toBeGreaterThan(BARE.indexOf('.sw-root.sw-compact.sw-collapse.sw-panel-open[data-panel="dock"] .sw-topbar {'));
+    expect(rule('.sw-root.sw-stack .sw-goto-edge'))
+      .toMatch(/top:\s*max\(23%, calc\(var\(--sw-chrome-top\) \+ var\(--sw-topbar-floor\) \+ 90px\)\)/);
+  });
+});
