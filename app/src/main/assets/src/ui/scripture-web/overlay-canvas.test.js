@@ -35,10 +35,11 @@ const ISA53_6 = verseOf('isaiah', 53, 6);
 const FRAMES = {
   pc: { W: 1600, H: 900, DPR: 1 },
   phone: { W: Math.round(891 * 2.6), H: Math.round(411 * 2.6), DPR: 2.6 },
+  se: { W: 667 * 2, H: 375 * 2, DPR: 2 },   // the iPhone SE's landscape, the narrowest phone that keeps the legend
 };
 
-/** A 2D context that records what is drawn; text is 0.5 em a glyph plus the tracking. */
-function recorder(canvas = null) {
+/** A 2D context that records what is drawn; text is `em` (0.5) em a glyph plus the tracking. */
+function recorder(canvas = null, em = 0.5) {
   const calls = [];
   const state = { font: '10px serif', letterSpacing: '0px', globalAlpha: 1, fillStyle: '#000', strokeStyle: '#000', lineWidth: 1, textAlign: 'start', textBaseline: 'alphabetic', lineJoin: 'miter' };
   const stack = [];
@@ -50,6 +51,7 @@ function recorder(canvas = null) {
     fillText(t, x, y) { calls.push({ op: 'fillText', t: String(t), x, y, font: ctx.font, align: ctx.textAlign, base: ctx.textBaseline, alpha: ctx.globalAlpha, fill: ctx.fillStyle, w: textWidth(ctx, t) }); },
     fillRect(x, y, w, h) { calls.push({ op: 'fillRect', x, y, w, h, fill: ctx.fillStyle }); },
     createLinearGradient() { return { addColorStop() {} }; },
+    em,
   });
   for (const k of ['clearRect', 'strokeText', 'beginPath', 'closePath', 'moveTo', 'lineTo', 'arc', 'arcTo', 'rect', 'fill', 'stroke']) ctx[k] = (...a) => calls.push({ op: k, a });
   ctx.fill = (...a) => calls.push({ op: 'fill', a, fill: ctx.fillStyle, alpha: ctx.globalAlpha });
@@ -58,7 +60,7 @@ function recorder(canvas = null) {
 function fontPxOf(font) { return parseFloat(/([\d.]+)px/.exec(font)[1]); }
 function textWidth(ctx, t) {
   const n = String(t).length;
-  return (0.5 * fontPxOf(ctx.font) + (parseFloat(ctx.letterSpacing) || 0)) * n;
+  return ((ctx.em || 0.5) * fontPxOf(ctx.font) + (parseFloat(ctx.letterSpacing) || 0)) * n;
 }
 /** A drawn text's box (device px), from its alignment. */
 function textBox(c) {
@@ -85,7 +87,7 @@ function frameAt(name, zoom, verse, extra = {}) {
 }
 function paint(name, zoom, verse, extra) {
   const fs = frameAt(name, zoom, verse, extra);
-  const rec = recorder(extra && extra.canvas);
+  const rec = recorder(extra && extra.canvas, extra && extra.em);
   const out = paintCanonOverlay(rec.ctx, fs);
   fs.hits = out.hits;
   return { fs, rec, out };
@@ -273,7 +275,7 @@ describe('the overview ruler (r2-01a)', () => {
    area's bottom-left while the panel is docked; the hidden pill; the legend's one line), CSS px. */
 function chromeRoot(name, { panel = 0, hidden = false } = {}) {
   const pc = name === 'pc';
-  const W = pc ? 1600 : 891, H = pc ? 900 : 411;
+  const W = Math.round(FRAMES[name].W / FRAMES[name].DPR), H = Math.round(FRAMES[name].H / FRAMES[name].DPR);
   const btn = pc ? 44 : 40, bottom = pc ? 16 : 8, side = pc ? 24 : 16, pill = pc ? 160 : 148;
   const root = { className: 'sw-root' + (pc ? '' : ' sw-compact') + (panel ? ' sw-panel-open' : '') + (hidden ? ' sw-chrome-hidden' : ''), offsetParent: null };
   const el = (left, top, w, h) => ({ offsetLeft: left, offsetTop: top, offsetWidth: w, offsetHeight: h, offsetParent: root });
@@ -288,7 +290,8 @@ function chromeRoot(name, { panel = 0, hidden = false } = {}) {
     els['.sw-hide-all'] = el(W - side - btn, top, btn, btn);
     els['.sw-guide-btn'] = el(W - (pc ? 80 : 68) - btn, top, btn, btn);
   }
-  const lh = pc ? 14 * 1.35 : 12 * 1.25;
+  // the legend's lines: one, or two where it wraps (on the 667 phone, e2e-sw-legend)
+  const lh = (pc ? 14 * 1.35 : 12 * 1.25) * (W < 800 ? 2 : 1);
   if (!panel) els['.sw-legend'] = el(side, H - bottom - lh, 600, lh);
   root.querySelector = (sel) => els[sel] || null;
   const canvas = { closest: () => root, offsetLeft: 0, offsetTop: 0, offsetParent: root };
@@ -341,6 +344,32 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
         }
         for (const c of drawn) for (const z of zones) expect(meet(textRect(c), z), what + ': ' + c.t + ' under a corner button or the pill').toBe(false);
         for (const t of ['GEN', 'REV']) expect(drawn.some((c) => c.t === t), what + ': ' + t).toBe(true);
+      }
+    });
+  }
+
+  /* w4 review: at 667x375 Revelation (404 verses, about 8.7 px of the rail) went unnamed: its
+     name (about 29 px in the web's face) was over three times its span. The canon's end book,
+     wholly on the frame at the canon's edge, is named all the same: held to that edge, its name
+     can only stand over the canon's end. Real glyph widths here: the caps run about 0.7 em. */
+  for (const name of ['pc', 'phone', 'se']) {
+    it(name + ': the overview names Genesis and Revelation at the canon\'s two ends, at the real glyph widths', () => {
+      for (const hidden of [false, true]) {
+        const { canvas, zones } = chromeRoot(name, { hidden });
+        const { rec, fs } = paint(name, 1, g.total / 2, { canvas, em: 0.7 });
+        const s = fs.v.DPR, what = name + (hidden ? ' hidden' : '');
+        const X = (v) => (v - fs.cam.x) * fs.cam.ppv + fs.v.W / 2;
+        const drawn = bookTexts(rec);
+        const gen = drawn.find((c) => c.t === 'GEN'), rev = drawn.find((c) => c.t === 'REV');
+        expect(gen, what + ': GEN').toBeTruthy();
+        expect(rev, what + ': REV').toBeTruthy();
+        const rb = textBox(rev), gb = textBox(gen);
+        expect(rb.x1, what + ': REV ends on the frame').toBeLessThanOrEqual(fs.v.W);
+        expect(rb.x1, what + ': REV stands over its own book').toBeGreaterThan(X(verseOf('revelation', 1, 1)));
+        expect(gb.x0, what + ': GEN starts on the frame').toBeGreaterThanOrEqual(0);
+        const boxes = drawn.map(textBox).sort((a, b) => a.x0 - b.x0);
+        for (let i = 1; i < boxes.length; i++) expect(boxes[i].x0 - boxes[i - 1].x1, what + ': a word apart').toBeGreaterThanOrEqual(12 * s - 1e-6);
+        for (const c of drawn) for (const z of zones) expect(meet(textRect(c), z), what + ': ' + c.t + ' under a corner button or the pill').toBe(false);
       }
     });
   }

@@ -847,8 +847,10 @@ function nameForm(g, tag, share) {
  * The book names along the rail, in one form (nameForm): each centred on
  * what the frame holds of its book and kept wholly on the frame (the old
  * clamp to 30 px printed "ECHARIAH"), and only while it is under twice its
- * span (three times for a major book: REV on a phone). Placed by the ranked
- * law (rail-labels.js): the six major books first, then the longer books
+ * span (three times for a major book: REV on a phone), save the canon's first
+ * and last books wholly on the frame at its edge, whose name, held to that
+ * edge, can only stand over the canon's end (REV at 667 px, w4 review).
+ * Placed by the ranked law (rail-labels.js): the six major books first, then the longer books
  * before the shorter, each a word (NAME_GAP) from its neighbours, a row under
  * a corner button refused; the canon's overview has one row (r2-01a). The
  * major books, and only they, are in the bold and the brighter ink. A thin
@@ -877,7 +879,9 @@ function drawBookLabels(ctx, g, cam, L, rows, size, hits, tag) {
     const wF = full ? measure.width(ctx, font, full, sp) : Infinity;
     roomAll += room;
     if (wF <= room - gap) roomFull += room;
-    books.push({ bi, major, font, x0, vis0, vis1, room, full, abbr, wF, verses: span[1] - span[0] });
+    // the canon's first or last book wholly on the frame, its outer end on the frame's edge
+    const atEnd = (bi === 0 && x0 >= -0.5 && x1 <= Wc) || (bi === spans.length - 1 && x0 >= 0 && x1 <= Wc + 0.5);
+    books.push({ bi, major, font, x0, vis0, vis1, room, full, abbr, wF, atEnd, verses: span[1] - span[0] });
   }
   const form = nameForm(g, tag || 'canon', roomAll > 0 ? roomFull / roomAll : 0);
   const names = [];
@@ -885,7 +889,7 @@ function drawBookLabels(ctx, g, cam, L, rows, size, hits, tag) {
     const label = form === 'full' ? b.full : b.abbr;
     if (!label) continue;
     const w = form === 'full' ? b.wF : measure.width(ctx, b.font, label, sp);
-    if (!(w <= b.room * (b.major ? 3 : 2))) continue;
+    if (!(w <= b.room * (b.major ? 3 : 2)) && !(b.atEnd && w <= Wc - 2 * edge)) continue;
     const cx = Math.min(Math.max((b.vis0 + b.vis1) / 2, edge + w / 2), Wc - edge - w / 2);
     if (cx - w / 2 >= b.vis1 || cx + w / 2 <= b.vis0) continue;   // it would name none of its own book
     names.push({ bi: b.bi, label, font: b.font, major: b.major, x0: b.x0, verses: b.verses, left: cx - w / 2, right: cx + w / 2 });
