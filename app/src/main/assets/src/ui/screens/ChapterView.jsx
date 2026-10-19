@@ -10,6 +10,7 @@ import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { tapToggle } from '../../utils/tap-guard.js';
 import { getEchoesForVerse, getNotesForVerse } from '../../utils/scripture-parse.js';
 import { studyHlKey } from '../../utils/hl-keys.js';
+import { BackHintPill } from '../components/BackHintPill.jsx';
 
 export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, navBack = null, onNavigateToLink, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
   const bodyRef = React.useRef(null);
@@ -158,14 +159,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
         onSettings, onHistory, onSearch, theme, onThemeChange,
       })}
     >
-      {backHint && (
-        <div className="back-hint-row">
-          <button className="back-hint-pill" onClick={onTapThroughBack} aria-label={'Back to ' + (backHint.volumeLabel ? backHint.volumeLabel + ' · ' : '') + backHint.title}>
-            <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
-            <span className="back-hint-title">{backHint.volumeLabel ? `${backHint.volumeLabel} · ${backHint.title}` : backHint.title}</span>
-          </button>
-        </div>
-      )}
+      <BackHintPill backHint={backHint} onClick={onTapThroughBack} />
       <header className="hero">
         <div className="hero-bg" />
         <div className="hero-content">

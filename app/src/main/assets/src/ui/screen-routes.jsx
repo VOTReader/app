@@ -433,7 +433,8 @@ export function buildScreenRoutes({
   });
   const _backToResults = () => { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); };
   const _navBack = _searchBack ? { onBack: _backToResults, label: RESULTS_LABEL } : null;
-  const _readerBackHint = _searchBack ? { title: RESULTS_LABEL, volumeLabel: null } : backHint;
+  // `plain`: "results" is a word, not a title, so the pill reads it in its label's case (Track D).
+  const _readerBackHint = _searchBack ? { title: RESULTS_LABEL, volumeLabel: null, plain: true } : backHint;
   const _searchLook = isSearchLook({ fromSearch, searchLanding, screen, bookId, chapterNum, letterId, studyId, studyChapterId });
   const _readerMarkAsRead = _searchLook ? false : settings.markAsRead;
   const sharedViewProps = {

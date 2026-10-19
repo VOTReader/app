@@ -17,6 +17,7 @@ import { answersFiledUnder } from '../../utils/answers-shelves.js';
 import { AnswersContentsLine } from '../components/AnswersContents.jsx';
 import { passageTextBefore } from '../../utils/answers-contents.js';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
+import { BackHintPill } from '../components/BackHintPill.jsx';
 
 
 /** Readable fallback for a {{nav:bookId:ch}} target before the lazy Bible
@@ -450,14 +451,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         onSettings, onHistory, onSearch, theme, onThemeChange,
       })}
     >
-      {backHint && (
-        <div className="back-hint-row">
-          <button className="back-hint-pill" onClick={onBack} aria-label={'Back to ' + (backHint.volumeLabel ? backHint.volumeLabel + ' · ' : '') + backHint.title}>
-            <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
-            <span className="back-hint-title">{backHint.volumeLabel ? `${backHint.volumeLabel} · ${backHint.title}` : backHint.title}</span>
-          </button>
-        </div>
-      )}
+      <BackHintPill backHint={backHint} onClick={onBack} />
 
       <header className="hero">
         <div className="hero-bg vol" />

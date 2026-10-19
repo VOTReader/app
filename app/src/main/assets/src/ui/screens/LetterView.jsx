@@ -15,6 +15,7 @@ import { letterHlKey, letterHlPrefix } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
+import { BackHintPill } from '../components/BackHintPill.jsx';
 
 /** Whitespace-squashed — the search index's text domain (index-builder letterText). */
 const _squash = (s) => String(s || '').replace(/\s+/g, ' ').trim();
@@ -332,14 +333,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
         onSettings, onHistory, onSearch, theme, onThemeChange,
       })}
     >
-      {backHint && (
-        <div className="back-hint-row">
-          <button className="back-hint-pill" onClick={onBack} aria-label={'Back to ' + (backHint.volumeLabel ? backHint.volumeLabel + ' · ' : '') + backHint.title}>
-            <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
-            <span className="back-hint-title">{backHint.volumeLabel ? `${backHint.volumeLabel} · ${backHint.title}` : backHint.title}</span>
-          </button>
-        </div>
-      )}
+      <BackHintPill backHint={backHint} onClick={onBack} />
 
       <header className="hero">
         <div className={`hero-bg ${studyMode ? "study" : "vol"}`} />

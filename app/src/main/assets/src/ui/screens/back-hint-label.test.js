@@ -12,14 +12,21 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const VIEWS = ['BibleChapterView.jsx', 'ChapterView.jsx', 'LetterView.jsx', 'WtlbEntryView.jsx'];
 
+// Track D: the four now draw one shared pill (ui/components/BackHintPill.jsx), which names
+// the place it shows; BackHintPill.test.jsx renders it. Here: each view hands it its own hint.
 describe('the Back-to pill names its place (n6-07)', () => {
   for (const f of VIEWS) {
     it(f, () => {
       const src = readFileSync(resolve(here, f), 'utf8');
-      const pills = src.match(/<button className="back-hint-pill"[^>]*>/g) || [];
+      const pills = src.match(/<BackHintPill [^>]*>/g) || [];
       expect(pills.length, 'one pill').toBe(1);
-      expect(pills[0]).not.toMatch(/aria-label="Back to source/);
-      expect(pills[0]).toMatch(/aria-label=\{'Back to ' \+ .*backHint\.title\}/);
+      expect(pills[0]).toMatch(/backHint=\{backHint\}/);
+      expect(src, 'no copy of the pill markup').not.toMatch(/className="back-hint-pill"/);
     });
   }
+  it('the shared pill names the place it shows, never "source"', () => {
+    const src = readFileSync(resolve(here, '../components/BackHintPill.jsx'), 'utf8');
+    expect(src).not.toMatch(/Back to source/);
+    expect(src).toMatch(/aria-label=\{'Back to ' \+ place\}/);
+  });
 });

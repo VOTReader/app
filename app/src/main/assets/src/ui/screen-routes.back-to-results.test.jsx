@@ -117,7 +117,7 @@ describe('a letter opened from a search hit backs to the results', () => {
     const v = find(routes['vot-letter'](), G.LetterView);
     expect(v, 'the letter route did not render - this measured nothing').toBeTruthy();
     expect(v.props.navBack.label).toBe('results');
-    expect(v.props.backHint).toEqual({ title: 'results', volumeLabel: null });
+    expect(v.props.backHint).toEqual({ title: 'results', volumeLabel: null, plain: true });
     expectResultsTarget(v.props.navBack.onBack, props);
     props.setScreen.mockClear();
     v.props.onBack();   // the pill
@@ -148,7 +148,7 @@ describe('a letter opened from a search hit backs to the results', () => {
     const v = find(routes['wtlb-one-entry'](), G.WtlbEntryView);
     expect(v, 'the WTLB route did not render - this measured nothing').toBeTruthy();
     expect(v.props.navBack.label).toBe('results');
-    expect(v.props.backHint).toEqual({ title: 'results', volumeLabel: null });
+    expect(v.props.backHint).toEqual({ title: 'results', volumeLabel: null, plain: true });
     expect(v.props.markAsReadEnabled).toBe(false);
     expectResultsTarget(v.props.navBack.onBack, props);
   });
@@ -181,7 +181,7 @@ describe('a Bible chapter opened from a search hit backs to the results in one t
     const v = find(routes['bible-ch'](), G.BibleChapterView);
     expect(v, 'the bible-ch route did not render - this measured nothing').toBeTruthy();
     expect(v.props.navBack.label).toBe('results');
-    expect(v.props.backHint).toEqual({ title: 'results', volumeLabel: null });
+    expect(v.props.backHint).toEqual({ title: 'results', volumeLabel: null, plain: true });
     expect(v.props.markAsReadEnabled).toBe(false);
     expectResultsTarget(v.props.onTapThroughBack, props);
     expect(props.tapThroughBack).not.toHaveBeenCalled();
@@ -200,7 +200,7 @@ describe('a Matthew study chapter and a study chapter do the same', () => {
     const v = find(routes['matthew-ch'](), G.MatthewChapterView);
     expect(v, 'the matthew-ch route did not render - this measured nothing').toBeTruthy();
     expect(v.props.navBack.label).toBe('results');
-    expect(v.props.backHint).toEqual({ title: 'results', volumeLabel: null });
+    expect(v.props.backHint).toEqual({ title: 'results', volumeLabel: null, plain: true });
     expect(v.props.markAsReadEnabled).toBe(false);
     expectResultsTarget(v.props.tapThroughBack, props);
   });
@@ -211,7 +211,7 @@ describe('a Matthew study chapter and a study chapter do the same', () => {
     expect(v, 'the study route did not render - this measured nothing').toBeTruthy();
     const shared = v.props.sharedViewProps;
     expect(shared.navBack.label).toBe('results');
-    expect(shared.backHint).toEqual({ title: 'results', volumeLabel: null });
+    expect(shared.backHint).toEqual({ title: 'results', volumeLabel: null, plain: true });
     expect(shared.markAsReadEnabled).toBe(false);
   });
 });
