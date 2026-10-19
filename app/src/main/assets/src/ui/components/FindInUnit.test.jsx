@@ -126,13 +126,14 @@ describe('FindInUnit', () => {
   });
 
   /* A title named opens at the title (search200 B5, the S22 look): the landing is the unit's top, so no place is the
-     one landed on and none is scrolled to once the page settles; the first › goes to the first place. */
+     one landed on and none is scrolled to once the page settles; the first › goes to the first place. Until then the
+     pill counts the places ("3 places"): "0 of 3" read as none found (search200 UX B6). */
   it('a landing at the top marks every place, none current, scrolls to none; › starts at the first', () => {
     vi.useFakeTimers();
     try {
       render(<Host anchor={anchor('I shall bring upon them a flooding rain, a great', { top: true })} />);
       act(() => { vi.advanceTimersByTime(1500); });
-      expect(pill().textContent).toBe('flood0 of 3‹›×');
+      expect(pill().textContent).toBe('flood3 places‹›×');
       expect(marked('vot-find-current')).toEqual([]);
       expect(marked('vot-find')).toEqual(['flooding', 'flood', 'flood', 'flood']);
       expect(Element.prototype.scrollTo).not.toHaveBeenCalled();
@@ -144,6 +145,24 @@ describe('FindInUnit', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('a landing at the top with one place says "1 place", and › still goes to it (search200 UX B6)', () => {
+    function One() {
+      const mainRef = React.useRef(null);
+      return (
+        <div className="screen-scroll">
+          <div className="letter-body" ref={mainRef}><p>The Dam. as a flood overflowing the dam</p></div>
+          <FindInUnit anchor={anchor('The Dam.', { top: true })} unitId="vengeance" mainRef={mainRef} />
+        </div>
+      );
+    }
+    render(<One />);
+    expect(pill().querySelector('.find-pill-count').textContent).toBe('1 place');
+    const next = /** @type {HTMLButtonElement} */ (pill().querySelector('[aria-label="Next place"]'));
+    expect(next.disabled).toBe(false);
+    fireEvent.click(next);
+    expect(pill().querySelector('.find-pill-count').textContent).toBe('1 of 1');
   });
 
   it('...and from the top, ‹ goes to the last place', () => {

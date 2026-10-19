@@ -4,7 +4,8 @@
    A unit opened from search (a letter, a WTLB / Blessed / Holy Days entry,
    an Answers topic, a study chapter) marks every place the search words
    appear and carries a small pill to step between them: "flood  2 of 3
-   ‹ › ×" (Brianna, 2026-09-26). The result card already lists the places;
+   ‹ › ×" (Brianna, 2026-09-26); at the unit's top, before a step, it counts
+   them: "flood  3 places ‹ › ×". The result card already lists the places;
    this is the same list, on the page.
 
    WHAT IT READS. The unit's own reading blocks as rendered: the elements
@@ -366,10 +367,12 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
   };
 
   if (!active || !count || typeof document === 'undefined' || !document.body) return null;
+  // At the top (no place current) the pill counts the places: "0 of 3" read as none found (search200 UX B6).
+  const counted = cur < 0 ? count + (count === 1 ? ' place' : ' places') : (cur + 1) + ' of ' + count;
   return ReactDOM.createPortal(
     <div className="find-pill" role="toolbar" aria-label={'Search words in this ' + noun}>
       <span className="find-pill-word">{find.label || find.terms[0]}</span>
-      <span className="find-pill-count" role="status" aria-live="polite">{(cur + 1) + ' of ' + count}</span>
+      <span className="find-pill-count" role="status" aria-live="polite">{counted}</span>
       <button type="button" className="find-pill-btn" aria-label="Previous place" disabled={count < 2 && cur >= 0} onClick={() => go(-1)}>‹</button>
       <button type="button" className="find-pill-btn" aria-label="Next place" disabled={count < 2 && cur >= 0} onClick={() => go(1)}>›</button>
       <button type="button" className="find-pill-btn find-pill-close" aria-label="Close" onClick={() => setClosed(true)}>×</button>
