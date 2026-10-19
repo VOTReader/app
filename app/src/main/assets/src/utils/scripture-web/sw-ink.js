@@ -48,14 +48,18 @@ const TABLE = {
   prophecyGlow: { hex: '#EADFC4', alpha: 0.06, width: 4 },
 
   // ── the chosen, hovered and lit lines: the top pass (C1, C3) ────────────
-  chosen: { hex: '#E6D3A3', alpha: 1, width: 3, widthCompact: 2.5 },   // adaptive tessellation, no facets
-  chosenHalo: { hex: '#E6D3A3', alpha: 0.22, width: 10 },
-  chosenFoot: { hex: '#E6D3A3', alpha: 1, width: 8 },            // the foot dot's diameter
+  // In the pictures' gold (r2-02, r3-03, r3-04; w4 INK item 3): the spec's #E6D3A3 read as cream on
+  // the canvas, at every zoom. A light gold core under a deeper amber halo, sampled from the pictures
+  // (hue 37-45 degrees); the lit lines a step warmer. The spec's alphas and widths stand: My Web's
+  // threads read them (rail-renderer), in their own colour.
+  chosen: { hex: '#F2D38A', alpha: 1, width: 3, widthCompact: 2.5 },   // adaptive tessellation, no facets
+  chosenHalo: { hex: '#E0A84E', alpha: 0.22, width: 10 },
+  chosenFoot: { hex: '#F2D38A', alpha: 1, width: 8 },            // the foot dot's diameter
   chosenFootRing: { hex: '#000000', alpha: 1, width: 2 },
-  chosenLabel: { hex: '#E6D3A3', alpha: 1 },                     // 16 / 14 px, 10 px below the baseline
-  hover: { hex: '#E6D3A3', alpha: 1, width: 2 },                 // dims nothing (C3)
-  hoverHalo: { hex: '#E6D3A3', alpha: 0.22, width: 10 },
-  lit: { hex: '#E6D3A3', alpha: 0.85, width: 1.5 },              // focus.lit rows: go-to, verse mode, a chooser row under hover or focus
+  chosenLabel: { hex: '#F2D38A', alpha: 1 },                     // 16 / 14 px, 10 px below the baseline
+  hover: { hex: '#F2D38A', alpha: 1, width: 2 },                 // dims nothing (C3)
+  hoverHalo: { hex: '#E0A84E', alpha: 0.22, width: 10 },
+  lit: { hex: '#E8BE6E', alpha: 0.85, width: 1.5 },              // focus.lit rows: go-to, verse mode, a chooser row under hover or focus
 
   // ── deep zoom wayfinding (§4.3) ─────────────────────────────────────────
   chapterNumeral: { hex: '#B7BFC1', alpha: 1 },                  // 28 / 20 px

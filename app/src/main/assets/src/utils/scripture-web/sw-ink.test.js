@@ -17,6 +17,15 @@ const contrast = (a, b) => {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 };
+/** '#rrggbb' -> { h: degrees, s, l } (HSL). */
+function hsl(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+  if (d === 0) return { h: 0, s: 0, l };
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const h = max === r ? 60 * (((g - b) / d) % 6) : max === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+  return { h: (h + 360) % 360, s, l };
+}
 
 describe('the ink table', () => {
   it('every row is a #rrggbb hex, a straight alpha in (0, 1], and a positive width where it has one', () => {
@@ -46,10 +55,16 @@ describe('the ink table', () => {
     // pale-constellation intent over the asset's 131 (GL review 2026-10-18): a 1 device px core
     expect(INK.prophecy).toEqual({ hex: '#EADFC4', alpha: 0.40 });
     expect(INK.prophecyGlow).toEqual({ hex: '#EADFC4', alpha: 0.06, width: 4 });
-    expect(INK.chosen).toEqual({ hex: '#E6D3A3', alpha: 1, width: 3, widthCompact: 2.5 });
-    expect(INK.chosenHalo).toEqual({ hex: '#E6D3A3', alpha: 0.22, width: 10 });
-    expect(INK.hover).toEqual({ hex: '#E6D3A3', alpha: 1, width: 2 });
-    expect(INK.lit).toEqual({ hex: '#E6D3A3', alpha: 0.85, width: 1.5 });
+    // the chosen, hovered and lit lines in the pictures' gold (w4 INK item 3; the spec's #E6D3A3 read
+    // cream): the spec's alphas and widths, which My Web's threads read too (rail-renderer)
+    expect(INK.chosen).toEqual({ hex: '#F2D38A', alpha: 1, width: 3, widthCompact: 2.5 });
+    expect(INK.chosenHalo).toEqual({ hex: '#E0A84E', alpha: 0.22, width: 10 });
+    expect(INK.chosenFoot).toEqual({ hex: '#F2D38A', alpha: 1, width: 8 });
+    expect(INK.chosenFootRing).toEqual({ hex: '#000000', alpha: 1, width: 2 });
+    expect(INK.chosenLabel).toEqual({ hex: '#F2D38A', alpha: 1 });
+    expect(INK.hover).toEqual({ hex: '#F2D38A', alpha: 1, width: 2 });
+    expect(INK.hoverHalo).toEqual({ hex: '#E0A84E', alpha: 0.22, width: 10 });
+    expect(INK.lit).toEqual({ hex: '#E8BE6E', alpha: 0.85, width: 1.5 });
     expect(INK.roots).toEqual({ hex: '#C4A469', alpha: 0.25 });
     expect(INK.myWebReader).toEqual({ hex: '#E0B25A', alpha: 0.95, width: 1.5 });
     expect(INK.panel).toEqual({ hex: '#1C2527', alpha: 1 });
@@ -69,6 +84,21 @@ describe('the ink table', () => {
     const [r, , b] = rgba01('myWebReader');
     expect(r, 'the reader is warm: red over blue').toBeGreaterThan(b);
     expect(contrast(INK.myWebReader.hex, INK.canvas.hex)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('the chosen, hovered and lit lines read GOLD, not cream, and the halo is the deeper amber under the core (r2-02, r3-03, r3-04)', () => {
+    for (const name of ['chosen', 'chosenFoot', 'chosenLabel', 'hover', 'lit', 'chosenHalo', 'hoverHalo']) {
+      const { h, s } = hsl(INK[name].hex);
+      expect(h, name + ' hue: the gold family').toBeGreaterThanOrEqual(35);
+      expect(h, name + ' hue: the gold family').toBeLessThanOrEqual(48);
+      // the spec's #E6D3A3 is .57 saturated at .77 lightness: on the black canvas a cream
+      expect(s, name + ' saturation: gold, not cream').toBeGreaterThanOrEqual(0.65);
+    }
+    expect(hsl(INK.chosenHalo.hex).l, 'the halo is deeper than the core it lies under').toBeLessThan(hsl(INK.chosen.hex).l);
+    expect(INK.hoverHalo.hex).toBe(INK.chosenHalo.hex);
+    expect(INK.hover.hex).toBe(INK.chosen.hex);
+    // the label is text on the canvas: AAA
+    expect(contrast(INK.chosenLabel.hex, INK.canvas.hex)).toBeGreaterThanOrEqual(7);
   });
 
   it('the panel and every chrome fill are night slate, never cream (#18, Q4)', () => {
@@ -109,7 +139,7 @@ describe('the helpers', () => {
     expect(css('panel')).toBe('rgba(28,37,39,1)');
     expect(css('chipFill')).toBe('rgba(28,37,39,0.92)');
     expect(css('scrim')).toBe('rgba(0,0,0,0.65)');
-    expect(css('chosenHalo', 0.5)).toBe('rgba(230,211,163,0.11)');
+    expect(css('chosenHalo', 0.5)).toBe('rgba(224,168,78,0.11)');
     // the two sides agree: the 2D string is the GLSL floats, x255
     const [r, g, b, a] = rgba01('prophecy');
     expect(css('prophecy')).toBe(`rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${a})`);
