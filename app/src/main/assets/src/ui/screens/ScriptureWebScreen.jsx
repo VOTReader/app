@@ -65,7 +65,7 @@ import { focusState } from '../../utils/scripture-web/focus-state.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { WebFallbackList } from '../scripture-web/WebFallbackList.jsx';
 import { TipChip, HowToReadGuide, EmptyWebNotice, loadErrorPanel, legendFor } from '../scripture-web/panels.jsx';
-import { startChapter } from '../../utils/scripture-web/chapter-connections.js';
+import { startChapter, webChapter } from '../../utils/scripture-web/chapter-connections.js';
 import { graphStats, densityLine, myWebHeadline, myWebSkippedLine } from '../../utils/scripture-web/describe.js';
 import { verseText } from '../../utils/scripture-web/panel-model.js';
 import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
@@ -235,7 +235,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // (with the targets it drew) that the tap test reads
   // the go-to's verse chip over the canvas (CSS px boxes, goto.jsx writes them): the overlay's labels keep off it
   const keepOutRef = React.useRef(/** @type {any} */ (null));
-  const { noWebGL, glRetry, retryGL, railZoom, elevatorRef, badgeBoxesRef, overlayFrameRef } = useWebRenderer({
+  const { noWebGL, glLost, glRetry, retryGL, railZoom, elevatorRef, badgeBoxesRef, overlayFrameRef } = useWebRenderer({
     graph, mode, density, setLoadError, resumeRef, glRef, uiRef, wrapRef, topbarRef,
     camRef, camVRef, viewRef, focusRef, panelInsetRef, viewFor, zoomCapFor, yFrameFor,
     chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow, slackFor, keepOutRef,
@@ -394,12 +394,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   if (loadError) return loadErrorPanel(loadError, retryLoad, onBack, !!(layout && layout.compact));
   if (listShown && graph) {
     // A7: the web read as a list instead of a dead end (WebFallbackList.jsx).
-    // It opens on the reader's last Bible chapter (HistoryStore, newest first).
-    const hist = typeof HistoryStore !== 'undefined' ? HistoryStore.list() : [];
+    // It opens where the reader was when a live web lost its context for good (w4), and on a
+    // cold start with no WebGL2 on the reader's last Bible chapter (HistoryStore, newest first).
+    const was = glLost ? webChapter(graph, detail, camRef.current, viewRef.current ? viewRef.current.W : 0) : -1;
+    const hist = was < 0 && typeof HistoryStore !== 'undefined' ? HistoryStore.list() : [];
     const lastCh = (hist || []).find((h) => h && h.type === 'chapter' && h.bookId && h.chapterNum);
     return (
       <WebFallbackList graph={graph}
-        initialChapter={startChapter(graph, lastCh && lastCh.bookId, lastCh && lastCh.chapterNum)}
+        initialChapter={was >= 0 ? was : startChapter(graph, lastCh && lastCh.bookId, lastCh && lastCh.chapterNum)}
         onOpen={(ref) => navigateToLink && navigateToLink({ type: 'bible', bookId: ref.bookId, chapter: ref.chapter, verse: ref.verse })}
         onRetry={retryGL} onMyWeb={() => switchMode('personal')}
         onBack={onBack} verseText={(ref) => verseText(ref, translation)} />

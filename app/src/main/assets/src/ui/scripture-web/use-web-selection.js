@@ -592,9 +592,12 @@ export function useWebSelection({
     return () => {
       setDetail(was.detail); setChoices(was.choices); setListOpen(was.listOpen); setTip(null);
       focusRef.current = was.focus;
+      // and the first tap's words: the live region said a chooser or a card opened when the
+      // double-tap only zoomed (w4 a11y hunt), so it is cleared with what the tap opened
+      setAnnounce('');
       schedule();
     };
-  }, [detail, choices, listOpen, focusRef, schedule]);
+  }, [detail, choices, listOpen, focusRef, schedule, setAnnounce]);
 
   // Publish the latest handlers for the (stable) gesture listeners to call.
   /** The mouse left the web, or is over the chrome: what it hovered goes (gestures.js). */
@@ -613,6 +616,21 @@ export function useWebSelection({
     focusRef.current = focusState();
     schedule();
   }, [focusRef, schedule]);
+
+  // Timothy's notes turned off: a card or a chooser on one of their threads closes, and a hover on
+  // one lets go, as the thread is no longer drawn (w4: the card and the focus stayed on a hidden
+  // thread). A reader's own link stays open
+  const underlayWasRef = React.useRef(showUnderlay);
+  React.useEffect(() => {
+    const was = underlayWasRef.current;
+    underlayWasRef.current = showUnderlay;
+    if (showUnderlay || !was) return;
+    const onNote = (detail && detail.kind === 'underlay') || (choices && choices.some((c) => c && c.kind === 'underlay'))
+      || focusRef.current.underlay;
+    if (onNote) { closeCards(); return; }
+    if (focusRef.current.hoverUnderlay) { dropHover(); schedule(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the switch is the trigger: what is open is read as it flips
+  }, [showUnderlay]);
 
   /** Follow the chosen line to its far foot: the camera centres that verse in the canvas area at
    * the same zoom (bringIn; at the canon's end it stands right of centre, still in the area), the line

@@ -911,21 +911,24 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       for (let k = 0; k < 6; k++) fireEvent.keyDown(root, { key: '+' });
       for (let k = 0; k < 8; k++) fireEvent.keyDown(root, { key: 'ArrowRight' });
       await settle(40);
-      fireEvent.click(screen.getByRole('button', { name: 'Reset the view' }));
-      await settle(60);
+      const home = CANON / 2;
       const a = DRAWN[DRAWN.length - 1].camX;
-      await settle(60);
-      const b = DRAWN[DRAWN.length - 1].camX;
+      expect(Math.abs(a - home), 'PRECONDITION: off the middle before Reset').toBeGreaterThan(10);
+      fireEvent.click(screen.getByRole('button', { name: 'Reset the view' }));
+      // the first frame the fly has moved (polled in short steps, so a loaded machine's slow
+      // frames cannot make the window miss it), and it is not home yet
+      let b = a;
+      for (let i = 0; i < 200 && Math.abs(b - a) <= 1; i++) { await settle(5); b = DRAWN[DRAWN.length - 1].camX; }
       expect(Math.abs(b - a), 'PRECONDITION: the fly is under way').toBeGreaterThan(1);
+      expect(Math.abs(b - home), 'PRECONDITION: and not home yet').toBeGreaterThan(1);
       fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
       await settle(1200);
       // the canon's camera is the Bible rail's (camRef): back on the canon, it reads where the fly was
       fireEvent.click(screen.getByRole('button', { name: 'Scripture' }));
       await settle(40);
-      const home = CANON / 2;
       const x = DRAWN[DRAWN.length - 1].camX;
       expect(Math.abs(x - home), 'the fly did not carry on home while My Web was up').toBeGreaterThan(1);
-      expect(Math.abs(x - b), 'it stopped about where the switch found it').toBeLessThan(Math.abs(b - a) * 3);
+      expect(Math.abs(x - b), 'it stopped about where the switch found it').toBeLessThan(Math.max(1, Math.abs(home - a) / 4));
     });
 
     it('w4: the density hint does not outlive the switch to My Web', async () => {

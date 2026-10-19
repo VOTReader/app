@@ -80,6 +80,18 @@ describe('the double-tap takes back its first tap (A1): the selection keeps a wa
     expect(get().cam.focusRef.current, 'the focus is the one before the tap, whole').toBe(before);
   });
 
+  /* w4 a11y hunt: a double-tap that only zoomed left the first tap's "8 connections here. Choose
+     one." in the live region, so a screen reader heard a chooser that never stayed */
+  it("the way back takes the first tap's words with it: the live region does not keep the chooser's", () => {
+    const { get, setAnnounce } = mount();
+    const undo = get().sel.handlersRef.current.snapshot();
+    act(() => { get().sel.openPanel({ mode: 'group', ids: [0, 1] }); });
+    expect(setAnnounce, 'PRECONDITION: the chooser spoke').toHaveBeenLastCalledWith('2 connections here. Choose one.');
+    act(() => { undo(); });
+    expect(get().sel.choices).toBeNull();
+    expect(setAnnounce).toHaveBeenLastCalledWith('');
+  });
+
   it('a first tap on empty sky with nothing open: the way back is nothing open', () => {
     const { get } = mount();
     const undo = get().sel.handlersRef.current.snapshot();

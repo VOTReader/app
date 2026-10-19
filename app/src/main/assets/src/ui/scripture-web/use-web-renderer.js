@@ -236,6 +236,9 @@ export function useWebRenderer({
   const slackRef = React.useRef(slackFor);
   slackRef.current = slackFor;
   const [noWebGL, setNoWebGL] = React.useState(false);
+  // a live web's context lost for good (no restore, or a rebuild that failed), as against a device
+  // with no WebGL2 at all: the list then opens where the reader was in the web (w4)
+  const [glLost, setGlLost] = React.useState(false);
   // without WebGL2 the screen shows the canon web as a list; My Web stays drawn (w3 item 31)
   const listShown = noWebGL && mode !== 'personal';
   const [glRetry, setGlRetry] = React.useState(0);
@@ -495,7 +498,7 @@ export function useWebRenderer({
         try { if (dead) dead.dispose(); } catch (_e) { /* already dead */ }
         let next = null;
         try { next = build(); } catch (_e) { next = null; }
-        if (!next) { setNoWebGL(true); return; }
+        if (!next) { setGlLost(true); setNoWebGL(true); return; }
         renderer = next;
         rendererRef.current = next;
         schedule();
@@ -510,7 +513,7 @@ export function useWebRenderer({
         if (lossTimer) window.clearTimeout(lossTimer);
         lossTimer = window.setTimeout(() => {
           lossTimer = 0;
-          if (!disposed) setNoWebGL(true);
+          if (!disposed) { setGlLost(true); setNoWebGL(true); }
         }, 3000);
       },
     });
@@ -596,6 +599,6 @@ export function useWebRenderer({
     wrapRef, drawRef]);
 
   // the no-WebGL list's Try again: a fresh renderer on a fresh root
-  const retryGL = React.useCallback(() => { setNoWebGL(false); setGlRetry((n) => n + 1); }, []);
-  return { noWebGL, glRetry, retryGL, railZoom, elevatorRef, badgeBoxesRef, overlayFrameRef };
+  const retryGL = React.useCallback(() => { setNoWebGL(false); setGlLost(false); setGlRetry((n) => n + 1); }, []);
+  return { noWebGL, glLost, glRetry, retryGL, railZoom, elevatorRef, badgeBoxesRef, overlayFrameRef };
 }

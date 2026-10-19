@@ -11,7 +11,7 @@
    ranking (pick.js nearbyThreads), just read instead of drawn.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { arcsTouching, nearbyThreads, chapterRange, refOfVerse } from './pick.js';
+import { arcsTouching, nearbyThreads, chapterRange, refOfVerse, nearbyChapter } from './pick.js';
 
 /**
  * @param {import('./decode.js').ScriptureGraph} g
@@ -37,6 +37,26 @@ export function chapterConnections(g, chapterIndex) {
   const groups = [...byVerse.keys()].sort((x, y) => x - y)
     .map((v) => ({ verse: refOfVerse(g, v), rows: /** @type {any[]} */ (byVerse.get(v)) }));
   return { total, groups };
+}
+
+/**
+ * The chapter a live web was on, for the list that replaces it when its context is lost for good
+ * (w4: a reader at Romans 8:28 with its panel open was dropped at John 3): the open card's verse
+ * (a verse, a chapter, a bundle, a connection's near end), else the chapter at the camera's lens.
+ * -1 when it knows none.
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {any} detail  the open card (describe.js), or null
+ * @param {any} cam  the canon camera, or null
+ * @param {number} width  the canvas width, device px
+ * @returns {number} chapter index, or -1
+ */
+export function webChapter(g, detail, cam, width) {
+  if (!g || !g.chapterOfVerse || !(g.total > 0)) return -1;
+  const d = detail;
+  const v = !d ? -1 : d.kind === 'verse' ? d.verse : d.kind === 'chapter' || d.kind === 'bundle' ? d.lo
+    : d.kind === 'arc' ? (d.far === 'to' ? d.from : d.to) : -1;
+  if (v >= 0 && v < g.total) return g.chapterOfVerse[v];
+  return cam && width > 0 ? nearbyChapter(g, cam, width) : -1;
 }
 
 /**

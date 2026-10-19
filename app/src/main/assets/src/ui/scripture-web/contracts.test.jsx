@@ -36,11 +36,12 @@ const graphWith = (more) => {
 };
 
 /** The camera, the journey and the selection wired as the screen wires them. */
-function mount({ withCamera = true, mode = 'canonical', personal = null, rails = null, topbar = null, insetFor = undefined, make = graph, animate = undefined } = {}) {
+function mount({ withCamera = true, mode = 'canonical', personal = null, rails = null, topbar = null, insetFor = undefined, make = graph, animate = undefined, underlay = false } = {}) {
   const g = make();
   const schedule = vi.fn();
   const setAnnounce = vi.fn();
-  const hook = renderHook(() => {
+  // `underlay`: Timothy's notes shown at the mount; hook.rerender({ showUnderlay }) flips them
+  const hook = renderHook((/** @type {{ showUnderlay: boolean }} */ p) => {
     const modeRef = React.useRef(mode);
     const topbarRef = React.useRef(topbar);
     const cam = useWebCamera({ graph: g, density: 'famous', modeRef, schedule, topbarRef, animate });
@@ -52,13 +53,13 @@ function mount({ withCamera = true, mode = 'canonical', personal = null, rails =
     const overlayFrameRef = React.useRef(null);
     const railOpts = React.useCallback(() => rails || {}, []);
     const sel = useWebSelection({
-      graph: g, mode, density: 'famous', showUnderlay: false, resumeRef,
+      graph: g, mode, density: 'famous', showUnderlay: !!(p && p.showUnderlay), resumeRef,
       camRef: cam.camRef, viewRef: cam.viewRef, focusRef: cam.focusRef, viewFor: cam.viewFor, yFrameFor: cam.yFrameFor,
       personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo: cam.flyTo, journey, schedule, setAnnounce,
       insetFor,
     });
     return { cam, sel, journey, overlayFrameRef };
-  });
+  }, { initialProps: { showUnderlay: underlay } });
   const { cam } = hook.result.current;
   cam.viewRef.current = { W: 800, H: 360, DPR: 1 };
   // zoomed in (8 px a verse), so a centre is not clamped back to the canon's middle
@@ -292,6 +293,21 @@ describe('the lit set (CONTRACTS.md section 2): lightThreads is its one writer',
 });
 
 describe("My Web's focus names its list (fix-review #4, #11)", () => {
+  /* w4 interaction hunt: Timothy's notes turned off with one of their threads open left the card
+     ("TIMOTHY'S NOTE Genesis 35:10 ...") and the focus on a thread no longer drawn */
+  it("Timothy's notes turned off: a card on one of their threads closes, the focus lets go; a reader's link stays", () => {
+    const { get, hook } = mount({ underlay: true });
+    act(() => { get().sel.commitFound({ kind: 'underlay', index: 3, source: { label: 'Genesis 1:1' }, target: { label: 'A letter' } }); });
+    expect(get().sel.detail, 'PRECONDITION: the note is open').toMatchObject({ kind: 'underlay' });
+    act(() => { hook.rerender({ showUnderlay: false }); });
+    expect(get().sel.detail).toBeNull();
+    expect(get().cam.focusRef.current).toMatchObject({ arc: -1, underlay: false });
+    act(() => { hook.rerender({ showUnderlay: true }); });
+    act(() => { get().sel.commitFound({ kind: 'link', index: 1, source: { label: 'Genesis 1:1' }, target: { label: 'A letter' } }); });
+    act(() => { hook.rerender({ showUnderlay: false }); });
+    expect(get().sel.detail, "the reader's own link is still drawn: it stays open").toMatchObject({ kind: 'link', index: 1 });
+  });
+
   it("a chosen Timothy thread is chosen in its own list, a reader's link in theirs", () => {
     const { get } = mount();
     act(() => { get().sel.commitFound({ kind: 'underlay', index: 3, source: { label: 'Genesis 1:1' }, target: { label: 'A letter' } }); });

@@ -56,6 +56,7 @@ vi.mock('./web-renderer.js', async (importOriginal) => {
 });
 
 import { ScriptureWebScreen, _resetWebPlace } from '../screens/ScriptureWebScreen.jsx';
+import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import { _resetFallbackPlace } from './WebFallbackList.jsx';
 
 const SIZES = [['clientWidth', 800], ['clientHeight', 360]];
@@ -66,12 +67,12 @@ const props = () => ({
 const flush = async (ms = 0) => { await act(async () => { await new Promise((r) => setTimeout(r, ms)); }); };
 const list = (container) => container.querySelector('.sw-fallback-list');
 
-async function mount() {
+async function mount(extra = {}) {
   for (const [prop, value] of SIZES) {
     Object.defineProperty(HTMLCanvasElement.prototype, prop, { configurable: true, get() { return value; } });
   }
   window.SCRIPTURE_WEB_DATA = { ok: true, count: 1 };
-  const view = render(<ScriptureWebScreen {...props()} />);
+  const view = render(<ScriptureWebScreen {...props()} {...extra} />);
   for (let i = 0; i < 40 && BUILDS.length === 0; i++) await flush();
   if (BUILDS.length === 0) throw new Error('PRECONDITION: the screen never built a renderer');
   await flush(40);
@@ -136,6 +137,29 @@ describe('the renderer survives a lost and restored context (F1, bugs #1 and #3)
     await flush();
     expect(list(container)).toBeTruthy();
     expect(first.r.dispose, 'no renderer outlives the canvas it drew on').toHaveBeenCalledTimes(1);
+  });
+
+  /* w4 interaction hunt: a reader at Romans 8:28 with its panel open was dropped at "Connections
+     from John 3" (History's chapter, or the default) when the context was lost for good */
+  it('a loss nothing restores: the list opens where the reader was in the web, not at the default', async () => {
+    const T = 31102;
+    vi.mocked(decodeGraph).mockImplementationOnce(() => ({
+      total: T, count: 0, buckets: [],
+      books: [{ id: 'genesis', title: 'Genesis', abbr: 'Gen' }, { id: 'john', title: 'John', abbr: 'John' }, { id: 'romans', title: 'Romans', abbr: 'Rom' }],
+      chapters: [[0, 1, 0, 10000], [1, 3, 10000, 10000], [2, 8, 20000, T - 20000]],
+      chapterOfVerse: new Uint16Array(T).map((_, v) => (v < 10000 ? 0 : v < 20000 ? 1 : 2)),
+      from: new Uint16Array(0), to: new Uint16Array(0), votes: new Uint8Array(0),
+      votEdges: [], prophecy: [], votLinks: [],
+    }));
+    const { container } = await mount({ start: { verse: { bookId: 'romans', chapter: 8, verse: 28 } } });
+    const first = BUILDS[0];
+    vi.useFakeTimers();
+    act(() => { first.opts.onContextLost(); });
+    act(() => { vi.advanceTimersByTime(3000); });
+    vi.useRealTimers();
+    await flush();
+    expect(list(container), 'PRECONDITION: on the list').toBeTruthy();
+    expect(container.querySelector('.swf-sub').textContent).toBe('Connections from Romans 8');
   });
 
   it('Try again on the list builds a fresh renderer on the fresh canvas', async () => {
