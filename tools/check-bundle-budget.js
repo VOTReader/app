@@ -147,8 +147,10 @@ const BUDGETS = [
   { file: 'src/data/audio-sync-sections.js', measured: 150000, max: 260000, optional: true },
   // Answers Only God Can Give (ANSWERS, tools/fetch-answers.py): 121 topic pages,
   // lazy — fetched the first time a reader opens Answers (utils/sync-loaders.js).
-  // Served raw like the timings; the site is complete, so +15 %.
-  { file: 'src/data/answers.js', measured: 2488915, max: 2862000 },
+  // Served raw like the timings; the site is complete, so +15 %. `measured` was
+  // 2,488,915 B when this row landed; c72 (2026-10-19, + the Main Page and the site
+  // chrome) measures 2,507,577. The ceiling is unchanged.
+  { file: 'src/data/answers.js', measured: 2507577, max: 2862000 },
   // The Answers sidecars (ANSWERS_META, same converter, c72 2026-10-19): what the
   // site shows beyond the words (sections, links, media, attributions, underlines),
   // keyed by entry id, lazy (utils/sync-loaders.js loadAnswersMeta). +15 %.
