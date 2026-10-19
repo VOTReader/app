@@ -70,7 +70,7 @@ describe('shader / CPU agreement', () => {
   it('inlines the generated colour ramp rather than hardcoding hexes', () => {
     expect(SHADER_SOURCE.vertex).toContain(rampGLSL());
     expect(SHADER_SOURCE.vertex).toContain(`RAMP[${DISTANCE_RAMP.length}]`);
-    expect(DISTANCE_RAMP).toHaveLength(10);
+    expect(SHADER_SOURCE.vertex).toContain(`RAMP_AT[${DISTANCE_RAMP.length}]`);
   });
 });
 

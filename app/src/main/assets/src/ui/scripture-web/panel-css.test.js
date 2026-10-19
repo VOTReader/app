@@ -12,7 +12,7 @@ import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { INK, FONT } from '../../utils/scripture-web/sw-ink.js';
-import { DISTANCE_RAMP } from '../../utils/scripture-web/palette.js';
+import { DISTANCE_RAMP, DISTANCE_RAMP_AT } from '../../utils/scripture-web/palette.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const CSS = readFileSync(resolve(here, '..', '..', '..', 'app.css'), 'utf8');
@@ -81,11 +81,12 @@ describe('the panel\'s ink: app.css --sw-* tokens are sw-ink.js TABLE rows', () 
     expect(rule('.sw-key-arc')).toMatch(/border:\s*1\.5px solid var\(--sw-prophecy\)/);
   });
 
-  it('the legend\'s ramp is the shader\'s distance ramp, stop for stop (palette DISTANCE_RAMP)', () => {
+  it('the legend\'s ramp is the shader\'s distance ramp, stop for stop, each at its own t (palette DISTANCE_RAMP, DISTANCE_RAMP_AT)', () => {
     const m = /linear-gradient\(to right,\s*([^)]*)\)/.exec(rule('.sw-key-gradient') || '');
     expect(m).not.toBeNull();
     const stops = m[1].split(',').map((x) => x.trim().toUpperCase());
-    const want = DISTANCE_RAMP.map((c) => '#' + c.map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('').toUpperCase());
+    const want = DISTANCE_RAMP.map((c, i) => '#' + c.map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('').toUpperCase()
+      + ' ' + +(DISTANCE_RAMP_AT[i] * 100).toFixed(3) + '%');
     expect(stops).toEqual(want);
   });
 

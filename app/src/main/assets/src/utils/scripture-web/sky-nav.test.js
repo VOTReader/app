@@ -69,9 +69,8 @@ describe('the altitude ruler: height in verses of span, the inverse of arcShape'
     expect(pal.distanceRampRGB(0)).toEqual(first.map((c) => Math.round(c * 255)));
     expect(pal.distanceRampRGB(1)).toEqual(last.map((c) => Math.round(c * 255)));
     expect(pal.distanceRampRGB(7)).toEqual(last.map((c) => Math.round(c * 255)));
-    // half way between two stops is their mean
-    const n = pal.DISTANCE_RAMP.length - 1;
-    const mid = pal.distanceRampRGB(0.5 / n);
+    // half way between two stops (each at its own t, DISTANCE_RAMP_AT) is their mean
+    const mid = pal.distanceRampRGB((pal.DISTANCE_RAMP_AT[0] + pal.DISTANCE_RAMP_AT[1]) / 2);
     for (let k = 0; k < 3; k++) {
       expect(mid[k]).toBe(Math.round(((pal.DISTANCE_RAMP[0][k] + pal.DISTANCE_RAMP[1][k]) / 2) * 255));
     }

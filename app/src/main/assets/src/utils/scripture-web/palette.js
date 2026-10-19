@@ -18,19 +18,28 @@ import { ink } from './sw-ink.js';
 /**
  * The distance ramp, matched to the source visualization: magenta and violet
  * at the feet, through blue and steel, into red, tan, olive and finally green
- * at the top of the dome. Ten stops, linearly interpolated in the shader.
- * The magenta-to-violet stretch spans the first three intervals (two stops on
- * its own line, w4 INK review): with it in one interval, as the eight-stop
- * ramp had it, spans of about 300 to 3,000 verses took the blue and steel
- * stops, and the overview's feet read blue (Psalms to Revelation, the bottom
- * 3% of the dome: magenta-violet 9%, blue 86% of lit pixels, with the
- * prophecy class off) where r2-01a's glow is magenta-violet (70%, 29%). With
- * it, 69% and 31%, and the red middle and green canopy stay where they were.
+ * at the top of the dome. Nine stops, each at its own t (DISTANCE_RAMP_AT),
+ * linearly interpolated between them in the shader and its JS twin.
+ *
+ * The stops' positions answer three pictures at once (w4 INK review 2). The
+ * overview's feet (r2-01a: magenta-violet, about 71% of the Psalms-Revelation
+ * feet band) are the legs of the 300 to 1,000-verse arcs; the deep zoom and
+ * the go-to (r3-03, r3-04) are local domes under long legs in red, tan and
+ * green. Evenly spaced, eight stops read the feet blue (17% magenta-violet)
+ * and ten, with the magenta-violet stretch over three intervals, read the
+ * feet right (73%) but laid a magenta cage over the deep zoom (67%, where
+ * r3-03 has 15%) and moved red from t .57 to .67; with the span-ink ease at
+ * .08 (geometry SHORT_T1) the ten still read the 209x frame 53% and the go-to
+ * 43% (r3-04: 21%). Here magenta-violet runs to violet at t .30 (about 1,550
+ * verses), blue sits at .37 and red at .585, so the feet read 68%
+ * magenta-violet (71% under a .35 prophecy class), the 209x frame 48% and the go-to 35% (w4/ink pairs.md),
+ * every scene nearer its picture than either even ramp. The pictures cannot
+ * all be met by one span ramp: r3-03's blue domes are spans of 20 to 50
+ * verses, which r2-01a's feet glow paints magenta.
  */
 export const DISTANCE_RAMP = [
   [0.76, 0.32, 0.72],
   [0.69, 0.33, 0.78],
-  [0.62, 0.34, 0.83],
   [0.56, 0.36, 0.85],
   [0.31, 0.44, 0.83],
   [0.36, 0.62, 0.79],
@@ -39,18 +48,21 @@ export const DISTANCE_RAMP = [
   [0.60, 0.66, 0.31],
   [0.33, 0.76, 0.37],
 ];
+/** Each DISTANCE_RAMP stop's t, from 0 to 1, strictly rising (the legend's gradient stops too). */
+export const DISTANCE_RAMP_AT = [0, 0.14, 0.30, 0.37, 0.47, 0.585, 0.72, 0.86, 1];
 
 /**
  * distanceRamp's JS twin, for Canvas2D chrome that must match the shader's
- * colour of a span (the altitude ruler): the same stops, the same linear
- * mix, 0..255 integers.
+ * colour of a span (the altitude ruler): the same stops at the same t, the
+ * same linear mix, 0..255 integers.
  * @param {number} t 0..1 (clamped)
  * @returns {number[]} [r, g, b]
  */
 export function distanceRampRGB(t) {
-  const n = DISTANCE_RAMP.length - 1;
-  const s = Math.min(1, Math.max(0, t)) * n;
-  const i = Math.floor(s), j = Math.min(i + 1, n), f = s - i;
+  const s = Math.min(1, Math.max(0, t));
+  let j = 1;
+  while (j < DISTANCE_RAMP_AT.length - 1 && s > DISTANCE_RAMP_AT[j]) j++;
+  const i = j - 1, f = (s - DISTANCE_RAMP_AT[i]) / (DISTANCE_RAMP_AT[j] - DISTANCE_RAMP_AT[i]);
   return [0, 1, 2].map((k) => Math.round((DISTANCE_RAMP[i][k] + (DISTANCE_RAMP[j][k] - DISTANCE_RAMP[i][k]) * f) * 255));
 }
 
@@ -97,18 +109,28 @@ export const MY_WEB_LINK_KINDS = [
 export function myWebLinkColor(kind) { return (MY_WEB_LINK_KINDS[kind] || MY_WEB_LINK_KINDS[2]).rgb; }
 export const LINK_KIND_NAMES = MY_WEB_LINK_KINDS.map((k) => k.name);
 
-/** GLSL for the distance ramp, generated from the table above so the two cannot drift. */
+/**
+ * GLSL for the distance ramp, generated from the table above so the two cannot drift: the stops
+ * and their t, and a mix per interval, each clamped to 0..1, so the intervals below t are fully
+ * crossed, the one holding t is part crossed and those above it add nothing (piecewise linear,
+ * no branch).
+ */
 export function rampGLSL() {
+  const n = DISTANCE_RAMP.length;
   const vec3 = (c) => `vec3(${c.map((v) => v.toFixed(4)).join(',')})`;
   const stops = DISTANCE_RAMP.map(vec3).join(',\n    ');
+  const at = DISTANCE_RAMP_AT.map((v) => v.toFixed(4)).join(', ');
   return `
-const vec3 RAMP[${DISTANCE_RAMP.length}] = vec3[${DISTANCE_RAMP.length}](
+const vec3 RAMP[${n}] = vec3[${n}](
     ${stops});
+const float RAMP_AT[${n}] = float[${n}](${at});
 vec3 distanceRamp(float t){
-  float s = clamp(t, 0., 1.) * ${(DISTANCE_RAMP.length - 1).toFixed(1)};
-  int i = int(floor(s));
-  int j = min(i + 1, ${DISTANCE_RAMP.length - 1});
-  return mix(RAMP[i], RAMP[j], s - float(i));
+  float s = clamp(t, 0., 1.);
+  vec3 c = RAMP[0];
+  for (int i = 1; i < ${n}; i++) {
+    c = mix(c, RAMP[i], clamp((s - RAMP_AT[i - 1])/(RAMP_AT[i] - RAMP_AT[i - 1]), 0., 1.));
+  }
+  return c;
 }`;
 }
 
