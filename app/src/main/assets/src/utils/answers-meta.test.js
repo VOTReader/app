@@ -149,4 +149,23 @@ describe('ANSWERS_META', () => {
       expect(sw.includes(`'./${x.src}'`), `${x.src} in CORE_ASSETS`).toBe(true);
     }
   });
+
+  /* An embed the site plays in place keeps its address as the paragraph's words until the video
+     card draws over it (media.replaces). Format B reads every "_" as emphasis, so the converter
+     percent-encodes a "_" inside an address ("%5F", the same URL): the words decode to the very
+     address the media item opens. "‗" (U+2017), the stand-in for a "_" in prose, broke the Main
+     Page's playlist id on screen, in a copy and in a share. */
+  it('an embed paragraph reads as the address its video opens', () => {
+    const embeds = [];
+    each((e, m, P) => {
+      for (const md of (m.media || [])) if (md.replaces != null) {
+        embeds.push(`${e.id}@${md.replaces}`);
+        expect(decodeURIComponent(P[md.replaces].text), `${e.id}:${md.replaces}`).toBe(md.url);
+      }
+      P.forEach((p, i) => {
+        for (const url of String(p.text || '').match(/https?:\/\/\S+/g) || []) expect(url, `${e.id}:${i}`).not.toMatch(/[_‗]/);
+      });
+    });
+    expect(embeds).toEqual(['regarding-the-crucifixion@91', 'answers-main-page@4', 'answers-main-page@9']);
+  });
 });

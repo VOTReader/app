@@ -24,6 +24,7 @@ import json
 import os
 import tempfile
 import unittest
+import urllib.parse
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location('fetch_answers', os.path.join(_HERE, 'tools', 'fetch-answers.py'))
@@ -205,10 +206,47 @@ class LocateTokens(unittest.TestCase):
         got = [[out[s:e] for s, e in spans] for _before, spans in loc]
         self.assertEqual(got, [['Hear'], ['My‗words'], ['{{ref:John 3:16}}'], ['and', 'more here'], []])
 
+    def test_an_encoded_address_is_found_where_it_was_printed(self):
+        tokens = [('t', 'Watch: ', ''), ('t', LiteralMarkers.URL, '')]
+        out = fa.render_tokens(tokens)
+        loc, misses = fa.locate_tokens(out, tokens)
+        self.assertEqual(misses, 0)
+        self.assertEqual([out[s:e] for s, e in loc[1][1]], [LiteralMarkers.URL.replace('_', '%5F')])
+
     def test_utf16_offsets_count_an_astral_character_twice(self):
         u = fa.U16('a\U0001D50Ab c')
         self.assertEqual([u(0), u(1), u(2), u(3)], [0, 1, 3, 4])
         self.assertEqual(fa.U16('plain')(3), 3)
+
+
+class LiteralMarkers(unittest.TestCase):
+    """Format B reads every "_" and "**" as emphasis (format-b-inline.js), so render_tokens prints a
+    literal one in the words as "‗" / "∗∗". Inside a web address a "_" is percent-encoded instead:
+    "‗" turned the Main Page's embed of "The Love of The Truth" (:4, shown as its URL until the
+    video card draws over it) into a playlist id YouTube does not know, on screen, copy and share."""
+
+    URL = 'https://www.youtube.com/watch?v=ySHbcrYGFNo&list=PLSVchFJ22QYI7xUT_p_slw7_OEAixLgYt&index=105'
+
+    def test_an_address_keeps_its_underscores_percent_encoded(self):
+        out = fa.render_tokens([('t', self.URL, '')])
+        self.assertEqual(out, 'https://www.youtube.com/watch?v=ySHbcrYGFNo&list=PLSVchFJ22QYI7xUT%5Fp%5Fslw7%5FOEAixLgYt&index=105')
+        self.assertEqual(urllib.parse.unquote(out), self.URL)   # the same address (RFC 3986 2.3)
+        self.assertNotIn('‗', out)
+
+    def test_the_words_around_an_address_still_swap(self):
+        out = fa.render_tokens([('t', 'My_words at https://example.org/a_b and **this**', 'i')])
+        self.assertEqual(out, '_My‗words at https://example.org/a%5Fb and ∗∗this∗∗_')
+
+    def test_an_embed_reads_as_its_address_and_its_media_item_keeps_the_real_one(self):
+        src = '<center><embedvideo service="youtube">%s</embedvideo></center>' % self.URL
+        p = fa.Parser()
+        p.feed(fa.wiki_to_html(src))
+        p.close()
+        side = {}
+        paras = fa.blocks_to_paragraphs(p.blocks, {}, fa.Matcher([]), _stats(), side)
+        self.assertEqual(paras, [{'align': 'center', 'text': self.URL.replace('_', '%5F')}])
+        self.assertEqual([(m['kind'], m['url'], m['listId'], m['replaces']) for m in side['media']],
+                         [('video', self.URL, 'PLSVchFJ22QYI7xUT_p_slw7_OEAixLgYt', 0)])
 
 
 class SidecarsFromBlocks(unittest.TestCase):

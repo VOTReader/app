@@ -329,8 +329,19 @@ EXT_LINK_RE = re.compile(r'\[(https?://[^\s\]]+)\s+([^\]]*)\]')
 WIKI_LINK_RE = re.compile(r'\[\[([^\]|]+)(?:\|([^\]]*))?\]\]')
 TAG_RE = re.compile(r'<[^>]+>')
 REF_MARK_RE = re.compile(r'\{\{ref:[^}]*\}\}')
+URL_WORD_RE = re.compile(r'https?://\S+')
 # A run of {{ref:}} markers with the emphasis it may close before it and reopen after it (without_refs).
 REF_SPLIT_RE = re.compile(r'(_\*\*|\*\*|_)?((?:\{\{ref:[^}]*\}\})+)(\*\*_|\*\*|_)?')
+
+
+def escape_words(core):
+    """A run's words with Format B's marker characters made literal: the renderer reads every "_"
+    and "**" as emphasis (format-b-inline.js), so a "_" in the words prints as "‗" and "**" as "∗∗".
+    A "_" inside a web address is percent-encoded instead ("%5F" is the same URL, RFC 3986 2.3), so
+    an address shown as text (an embed's URL, Main Page :4) still opens when it is copied or shared;
+    "‗" there gave a playlist id YouTube does not know."""
+    core = URL_WORD_RE.sub(lambda m: m.group(0).replace('_', '%5F'), core)
+    return core.replace('_', '‗').replace('**', '∗∗')
 
 
 def split_sections(wikitext):
@@ -614,7 +625,7 @@ def render_tokens(tokens):
             if not core:
                 s += txt
                 continue
-            core = core.replace('_', '‗').replace('**', '∗∗')
+            core = escape_words(core)
             st = tok[2]
             if st == 'bi':
                 core = '**_' + core + '_**'
@@ -632,7 +643,7 @@ def render_tokens(tokens):
 
 def _piece_core(part):
     """A run's words as render_tokens prints them (whitespace collapsed, marker look-alikes swapped)."""
-    return re.sub(r'[ \t\r\f\v\xa0]+', ' ', part).strip().replace('_', '‗').replace('**', '∗∗')
+    return escape_words(re.sub(r'[ \t\r\f\v\xa0]+', ' ', part).strip())
 
 
 def _match_from(out, core, pos):
