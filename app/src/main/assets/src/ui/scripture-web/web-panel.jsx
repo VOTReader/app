@@ -54,6 +54,10 @@ export const CITED_SHOWN = 2;
  * characters stands in for one the two-line clamp cuts, and is offered "more" (Quote measures the
  * clamp itself wherever there is layout). */
 const QUOTE_LONG = 180;
+/** The band under the close X once the body scrolls (app.css .sw-panel[data-scrolled]::before),
+ * CSS px: its height on PC and compact, which is also the scroll over which it comes in whole. */
+const BAND_H = 60;
+const BAND_H_COMPACT = 54;
 
 /** @type {any} */
 let corpus = null;
@@ -403,17 +407,24 @@ export function WebPanel(props) {
   // BEFORE the panel's own focus below, so it remembers where the reader was, not the panel.
   const ref = useFocusTrap(true, { modal: false });
   const bodyRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
-  // the body scrolled off its top: app.css lays a band under the pinned close X (w4 review)
+  // the body scrolled off its top: app.css lays a band under the pinned close X (w4 review). It
+  // comes in with the scroll (--sw-scrolled, 0 to 1), whole once the head has scrolled the band's
+  // own height: switched on whole, its solid top hid the trail a 3 px nudge had barely moved
   const [scrolled, setScrolled] = React.useState(false);
+  const bandH = compact ? BAND_H_COMPACT : BAND_H;
   const onBodyScroll = React.useCallback((/** @type {any} */ e) => {
-    const s = e.currentTarget.scrollTop > 1;
+    const top = e.currentTarget.scrollTop;
+    const el = ref.current;
+    if (el) el.style.setProperty('--sw-scrolled', String(Math.min(1, Math.max(0, top) / bandH)));
+    const s = top > 1;
     setScrolled((was) => (was === s ? was : s));
-  }, []);
+  }, [ref, bandH]);
   const firstRef = React.useRef(true);
   React.useEffect(() => {
     const el = ref.current;
     if (!el) return;
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
+    el.style.setProperty('--sw-scrolled', '0');
     setScrolled(false);
     const a = document.activeElement;
     if (firstRef.current || !a || a === document.body) {

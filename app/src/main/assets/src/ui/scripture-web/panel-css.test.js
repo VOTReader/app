@@ -107,6 +107,7 @@ describe('the panel\'s ink: app.css --sw-* tokens are sw-ink.js TABLE rows', () 
     for (const t of used) {
       if (t === '--sw-panel-w' || t === '--sw-sheet-h') continue; // measured, written by use-panel-layout.js
       if (t === '--sw-ts') continue; // not a colour: the panel's Text Size multiplier (w4, 'panel density' below)
+      if (t === '--sw-scrolled') continue; // not a colour: how far the band has come in, written by web-panel.jsx
       expect(Object.keys(ROWS).concat('--sw-font'), t).toContain(t);
     }
   });
@@ -204,6 +205,19 @@ describe('what the w3 screenshots caught (PC 1600x900, phone 891x411)', () => {
     const h = (body) => Number(/height:\s*(\d+)px/.exec(body)[1]);
     expect(h(band)).toBeGreaterThanOrEqual(54);
     expect(h(rule('.sw-root.sw-compact .sw-panel[data-scrolled]::before'))).toBeGreaterThanOrEqual(48);
+  });
+
+  /* w4 review round 2 (major): whole at 2 px of scroll, the band hid the trail a 3 px nudge had
+     barely moved, and a control the keyboard reached could sit hidden under it (WCAG 2.4.11). The
+     band takes its opacity from the scroll (web-panel.jsx --sw-scrolled), and the body's scroll
+     padding keeps the band's height clear, so a focused control scrolls out from under it. */
+  it('the band comes in with the scroll, and a control the keyboard reaches scrolls clear of it', () => {
+    expect(rule('.sw-panel[data-scrolled]::before')).toMatch(/opacity:\s*var\(--sw-scrolled\b/);
+    const h = (body) => Number(/height:\s*(\d+)px/.exec(body)[1]);
+    const pad = (body) => Number((/scroll-padding-top:\s*(\d+)px/.exec(body || '') || [])[1]);
+    expect(pad(rule('.sw-panel-body')), 'PC').toBeGreaterThanOrEqual(h(rule('.sw-panel[data-scrolled]::before')));
+    expect(pad(rule('.sw-root.sw-compact .sw-panel-body')), 'compact')
+      .toBeGreaterThanOrEqual(h(rule('.sw-root.sw-compact .sw-panel[data-scrolled]::before')));
   });
 
   /* A META LINE BREAKS ONLY BETWEEN ITS ITEMS AND LEAVES NO "·" HANGING (w3 review round 2, w4).

@@ -8172,20 +8172,25 @@
     }
     /* scrolled (web-panel.jsx data-scrolled), a band the panel's width lies under the X, so what
        scrolls up passes under one clean edge, not half under the X's box (w4 review, s04b phone:
-       a sliver of the Cited chevron showed under it); a short fade, so the edge reads as depth */
+       a sliver of the Cited chevron showed under it); a short fade, so the edge reads as depth. It
+       comes in with the scroll (--sw-scrolled, 0 to 1 over the band's height): whole at 2 px, its
+       solid top hid the trail a 3 px nudge had barely moved (w4 review round 2) */
     .sw-panel[data-scrolled]::before {
       content: ''; position: absolute; z-index: 1; top: 0; left: 0; right: 0; height: 60px;
       background: linear-gradient(var(--sw-panel) 84%, transparent); pointer-events: none;
+      opacity: var(--sw-scrolled, 1);
     }
     .sw-sheet-close:hover { color: var(--sw-text); }
     .sw-sheet-close:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -2px; }
     /* The panel takes focus itself on open (web-panel.jsx): no ring on the panel; its controls
        keep theirs for the keyboard. */
     .sw-panel:focus, .sw-sheet:focus, .sw-choice:focus, .sw-list:focus { outline: none; }
-    /* the scroll: everything but the pinned credit; a 3 px #3A4547 indicator */
+    /* the scroll: everything but the pinned credit; a 3 px #3A4547 indicator. Its scroll padding
+       is the band's height, so a control the keyboard reaches scrolls clear of the band (WCAG
+       2.4.11; w4 review round 2) */
     .sw-panel-body {
       flex: 1 1 auto; min-height: 0; overflow-y: auto;
-      padding: 24px calc(24px + env(safe-area-inset-right, 0px)) 0 24px;
+      padding: 24px calc(24px + env(safe-area-inset-right, 0px)) 0 24px; scroll-padding-top: 60px;
       scrollbar-width: thin; scrollbar-color: var(--sw-panel-edge) transparent;
       touch-action: pan-y; overscroll-behavior: contain;
     }
@@ -8347,7 +8352,7 @@
     }
     .sw-panel-body > .sw-panel-credit { min-height: 0; padding: 16px 0 calc(16px + env(safe-area-inset-bottom, 0px)); }
     /* compact (root height <= 500: every phone value of the spec) */
-    .sw-root.sw-compact .sw-panel-body { padding: 12px calc(20px + env(safe-area-inset-right, 0px)) 0 20px; }
+    .sw-root.sw-compact .sw-panel-body { padding: 12px calc(20px + env(safe-area-inset-right, 0px)) 0 20px; scroll-padding-top: 54px; }
     .sw-root.sw-compact :is(.sw-sheet-eyebrow, .sw-panel-over, .sw-sec-title) { font-size: calc(var(--fsc-12) * var(--sw-ts)); }
     .sw-root.sw-compact .sw-panel-title { font-size: calc(var(--fsc-24) * var(--sw-ts)); }
     .sw-root.sw-compact :is(.sw-sheet-meta, .sw-panel-meta, .sw-link, .sw-cite-quote, .sw-zoom-row) { font-size: calc(var(--fsc-15) * var(--sw-ts)); }

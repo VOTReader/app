@@ -283,6 +283,37 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     expect(panel.hasAttribute('data-scrolled')).toBe(false);
   });
 
+  /* w4 review round 2 (major): the band came on whole at 2 px of scroll, and its solid top (about
+     50 px) is where the trail stands, so a 3 px nudge hid "Whole web › Isa 7:14" and its Back at
+     once, still live under it. The band comes in with the scroll (--sw-scrolled, 0 to 1, for
+     app.css's opacity): next to nothing while the head is still there, whole once the head has
+     scrolled the band's own height (60 px on PC, 54 compact), back to nothing at the top. */
+  it('the band comes in with the scroll: next to nothing at 3 px, whole at the band\'s height, gone at the top or on a new card', () => {
+    for (const [compact, h] of /** @type {[boolean, number][]} */ ([[false, 60], [true, 54]])) {
+      const { panel, rerender, props } = mount({ detail: detail(), compact });
+      const body = panel.querySelector('.sw-panel-body');
+      const scrollTo = (y) => {
+        Object.defineProperty(body, 'scrollTop', { configurable: true, writable: true, value: y });
+        fireEvent.scroll(body);
+      };
+      const band = () => Number(panel.style.getPropertyValue('--sw-scrolled') || 0);
+      scrollTo(3);
+      expect(band(), (compact ? 'compact' : 'PC') + ': a 3 px nudge leaves the trail in view').toBeLessThanOrEqual(0.06);
+      scrollTo(h / 2);
+      expect(band()).toBeCloseTo(0.5, 6);
+      scrollTo(h);
+      expect(band(), 'the head scrolled the band\'s height: whole').toBe(1);
+      scrollTo(400);
+      expect(band()).toBe(1);
+      scrollTo(0);
+      expect(band(), 'back at the top').toBe(0);
+      scrollTo(400);
+      rerender(<WebPanel {...props} detail={found({ kind: 'verse', verse: JOHN_3_16 })} />);
+      expect(band(), 'a new card starts at its top').toBe(0);
+      cleanup();
+    }
+  });
+
   /* w4 (the s04 phone shot read "Ps 103:2 › Isa 7:14"): each crumb named the verse under the
      centre when the step was taken, so the whole web read as whatever verse sat mid-canon (Psalm
      103:2) and a book or a chapter read as its first verse. A crumb names the place the trail
