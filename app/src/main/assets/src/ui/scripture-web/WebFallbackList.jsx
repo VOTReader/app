@@ -18,6 +18,7 @@
 
 import { chapterConnections } from '../../utils/scripture-web/chapter-connections.js';
 import { ConnectionRow } from './connection-row.jsx';
+import { WEB_CREDIT } from '../../utils/scripture-web/describe.js';
 
 const plural = (n, one) => n + ' ' + one + (n === 1 ? '' : 's');
 
@@ -64,7 +65,7 @@ export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack
       <div className="swf-head">
         {/* the list covers the screen's chrome, so the way back sits at the top, not after 500 rows */}
         <button type="button" className="swf-back" onClick={onBack} aria-label="Go back">‹ Back</button>
-        <h1 className="swf-title">Scripture Web</h1>
+        <h1 className="swf-title">The Scripture Web</h1>
         <div className="swf-sub">Connections from {label}</div>
       </div>
       <div className="swf-stepper" role="group" aria-label="Chapter">
@@ -106,6 +107,9 @@ export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack
         </section>
       ))}
       {data.total === 0 && <div className="swf-empty">Nothing in the Famous view connects to {label}.</div>}
+      {/* the CC-BY credit (w4): every face of the web credits OpenBible.info's data, a licence
+          obligation, and this one lists that data chapter by chapter */}
+      <p className="swf-credit">{graph.attribution || WEB_CREDIT}</p>
     </div>
   );
 }

@@ -43,4 +43,10 @@ describe('the Scripture Web list keeps its bearings (landing 34 follow-up)', () 
   it('the status note balances its two lines instead of leaving one word alone', () => {
     expect(rule('.swf-note > span')).toMatch(/text-wrap\s*:\s*balance/);
   });
+
+  it("the credit at the list's foot is quiet small type under a hairline, as the panel's footer is (w4)", () => {
+    const d = rule('.swf-credit');
+    expect(d).toMatch(/font-size\s*:\s*var\(--fs-13\)/);
+    expect(d).toMatch(/border-top\s*:\s*1px solid/);
+  });
 });

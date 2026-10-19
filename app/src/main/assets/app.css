@@ -8119,6 +8119,9 @@
     .swf-tier { flex: 0 0 auto; font-family: var(--font-cinzel); font-size: var(--fs-12); letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-dim); }
     .swf-snip { display: block; margin-top: 4px; font-size: var(--fs-16); color: var(--cream-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .swf-empty { padding: 18px 0; color: var(--cream-muted); font-size: var(--fs-16); }
+    /* the CC-BY credit at the list's foot (w4: the one face of the web that had none), quiet
+       small type under a hairline, as the docked panel's footer is */
+    .swf-credit { margin: 18px 0 0; padding-top: 10px; border-top: 1px solid var(--gold-faint); font-size: var(--fs-13); color: var(--cream-muted); }
     .swf-back {
       display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; padding: 0 12px 0 0; margin-bottom: 4px;
       background: none; border: none; color: var(--gold); font-family: var(--font-body); font-size: var(--fs-18); cursor: pointer;

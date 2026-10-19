@@ -6,6 +6,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup, fireEvent, screen } from '@testing-library/react';
 import { WebFallbackList } from './WebFallbackList.jsx';
+import { WEB_CREDIT } from '../../utils/scripture-web/describe.js';
 
 const graph = () => ({
   total: 30, count: 0, from: new Uint16Array(0), to: new Uint16Array(0), votes: new Int16Array(0),
@@ -110,5 +111,26 @@ describe('WebFallbackList jumps to any chapter (n6-06)', () => {
     fireEvent.click(toggle());
     const groups = screen.getByRole('combobox', { name: 'Book' }).querySelectorAll('optgroup');
     expect(Array.from(groups).map((o) => [o.label, o.children.length])).toEqual([['Old Testament', 39], ['New Testament', 27]]);
+  });
+});
+
+/* w4 quality hunt: every face of the web credits the OpenBible.info data (CC-BY, a licence
+   obligation), and the list without WebGL2 shows that data chapter by chapter, but it carried no
+   credit. It ends with one now: the graph's own attribution, or the web's standing credit. Its
+   title is the screen's own name, "The Scripture Web", as the h1 and the back pill say. */
+describe('WebFallbackList credits its data and names the screen as the web does (w4)', () => {
+  it('ends with the graph\'s CC-BY attribution, or WEB_CREDIT when the graph carries none', () => {
+    const own = list({ ...graph(), attribution: 'Cross references from OpenBible.info, CC-BY' }, 0);
+    const credit = own.container.querySelector('.swf-credit');
+    expect(credit && credit.textContent).toBe('Cross references from OpenBible.info, CC-BY');
+    expect(own.container.querySelector('.sw-fallback-list').lastElementChild).toBe(credit);
+    own.unmount();
+    const bare = list(graph(), 0);
+    expect(bare.container.querySelector('.swf-credit').textContent).toBe(WEB_CREDIT);
+  });
+
+  it('is titled "The Scripture Web"', () => {
+    list(graph(), 0);
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('The Scripture Web');
   });
 });
