@@ -3860,7 +3860,8 @@
     .srch-card-badge.badge-letter { color:var(--gold-bright); }
     .srch-card-badge.badge-heading { color:var(--gold-dim); font-style:italic; }
     .srch-card-snippet { font-family:var(--font-body); font-size:var(--fs-15); line-height:1.5; color:var(--cream-muted); }
-    .srch-snippet-scroll { max-height:4.2rem; overflow:hidden; }
+    /* Exactly three lines of the snippet's 1.5 line-height; SrchSnippet moves the text by whole lines in it (search200 UX D5). */
+    .srch-snippet-scroll { max-height:4.5em; overflow:hidden; }
     .srch-card.card-direct { background:var(--gold-faint); }
     .srch-card.card-direct .srch-card-ref { color:var(--gold-bright); font-size:var(--fs-12); }
     .srch-card.card-direct .srch-card-snippet { color:var(--gold-dim); font-size:var(--fs-10); letter-spacing:0.14em; text-transform:uppercase; font-family:'Cinzel',serif; margin-top:0.2rem; }
