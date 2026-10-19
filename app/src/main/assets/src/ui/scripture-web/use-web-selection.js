@@ -309,9 +309,9 @@ export function useWebSelection({
 
   /**
    * Bring canon x into the canvas area the panel leaves (spec section 3), centred there at the
-   * reader's zoom. Near the canon's end the camera's clamp stops it with the canon's last verse the
-   * area's outer tenth inside it (its slack for the panel, geometry.clampCamera), so x stands in the
-   * area, right of centre, and never under the panel (the w3 review's major finding); the zoom is never
+   * reader's zoom. Near either end of the canon the camera's clamp stops it with the canon's first or
+   * last verse the area's outer tenth inside it (its slack for the panel, geometry.clampCamera), so x
+   * stands in the area, off centre, and never under the panel (the w3 review's major finding); the zoom is never
    * changed to get there (its second round found the dive that once did a curtain of legs).
    * `always` centres it; otherwise it moves only when x sits under the panel, off the left edge or
    * in the area's outer tenth either side (its threads fan out both ways).

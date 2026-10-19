@@ -232,8 +232,9 @@ describe('camera', () => {
      The slack moves only the canon's END bound, by what the panel covers and the area's outer tenth
      (END_MARGIN, connectionFrame's margin: stopped AT the area's edge, Revelation 22:16's foot stood
      on the panel's border, the w4 phone review's major finding), so the area, not the view, is where
-     Revelation's last verse can stop; Genesis still stops at the left. */
-  it('a right slack lets the canon\'s end stop the outer tenth inside the canvas area, and no further', () => {
+     Revelation's last verse can stop. The canon's start keeps the same outer tenth inside the area's
+     left edge (round 2: Genesis 1:1 stood against the screen's edge, its dot clipped). */
+  it('a right slack lets the canon\'s ends stop the outer tenth inside the canvas area, and no further', () => {
     const cam = createCamera(31102);
     clampCamera(cam, 1000, 5000);
     zoomAbout(cam, 1000, 500, 50, 5000);
@@ -241,20 +242,24 @@ describe('camera', () => {
     expect(END_MARGIN).toBe(0.1);
     expect(verseToX(cam, 1000, cam.total)).toBeCloseTo(600 - 0.1 * 600, 6);
     cam.x = -99999; clampCamera(cam, 1000, 5000, undefined, 400);
-    expect(verseToX(cam, 1000, 0)).toBeCloseTo(0, 6);
+    expect(verseToX(cam, 1000, 0)).toBeCloseTo(0.1 * 600, 6);
+    cam.x = -99999; clampCamera(cam, 1000, 5000, undefined, 0);
+    expect(verseToX(cam, 1000, 0), 'no slack: the view\'s own left edge').toBeCloseTo(0, 6);
     // no slack is the view's own bound, as before
     cam.x = 99999; clampCamera(cam, 1000, 5000, undefined, 0);
     expect(verseToX(cam, 1000, cam.total)).toBeCloseTo(1000, 6);
   });
 
-  it('at fit the slack lets the overview slide left until the canon\'s end stands the outer tenth inside the area', () => {
+  it('at fit the slack lets the overview slide until either end of the canon stands the outer tenth inside the area', () => {
     const cam = createCamera(31102);
     clampCamera(cam, 1000, 5000);
     cam.x = 99999; clampCamera(cam, 1000, 5000, undefined, 400);
     expect(cam.ppv).toBeCloseTo(fitPPV(cam, 1000), 9);
     expect(verseToX(cam, 1000, cam.total)).toBeCloseTo(540, 6);
     cam.x = -99999; clampCamera(cam, 1000, 5000, undefined, 400);
-    expect(cam.x).toBeCloseTo(31102 / 2, 6);
+    expect(verseToX(cam, 1000, 0)).toBeCloseTo(60, 6);
+    cam.x = -99999; clampCamera(cam, 1000, 5000);
+    expect(cam.x, 'no slack: the overview stands centred').toBeCloseTo(31102 / 2, 6);
   });
 
   it('zoomAbout holds its anchor under the same slack', () => {

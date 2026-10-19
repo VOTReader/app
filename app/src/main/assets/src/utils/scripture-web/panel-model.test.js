@@ -336,8 +336,10 @@ describe('framing under the camera clamp: landingOf and frameHolds, with the pan
     expect(last).toBeGreaterThan(0.85 * AREA);
     expect(last).toBeLessThanOrEqual(0.9 * AREA);
     expect(land(cam, { x: T - 0.5 }).ppv).toBe(1);
-    // the canon's start needs no slack: the clamp holds Genesis at the left edge, in the area
+    // the canon's start: Genesis stands in the area, its first verse no nearer the left edge than
+    // the area's outer tenth (END_MARGIN, w4 phone review round 2)
     expect(at({ x: T / 2, ppv: fit, total: T }, { x: 70.5 }, 70.5)).toBeGreaterThan(0);
+    expect(at(cam, { x: 0.5 }, 0)).toBeCloseTo(0.1 * AREA, 6);
     // no panel, no slack: the view's own edges, as before
     expect(verseToX(pm.landingOf(cam, W, 0, { x: T - 100 }, cap), W, T)).toBeCloseTo(W, 6);
   });
@@ -371,6 +373,27 @@ describe('framing under the camera clamp: landingOf and frameHolds, with the pan
   /* w4 phone review (major): the clamp stopped the canon's last verse exactly at the area's right
      edge, eating the outer tenth connectionFrame asks for, so Revelation 22:16's foot stood on the
      panel's border, its dot half under the panel (PC 959.68 of 960, phone 516.9 of 517). */
+  /* w4 phone review round 2 (minor): the same at the canon's start. The clamp held Genesis 1:1 at
+     the view's left edge, so Genesis 1:1 <-> John 1:1 (wider than the area at fit, so its near foot
+     is brought in) left the foot at x 6 to 8 at 12 px a verse on PC, its dot against the screen's
+     edge (the line above pins that case). With the panel docked the start stands the outer tenth
+     inside the area too, so a thread that fits frames with its margin; no panel, as before. */
+  it('Genesis 1:1 to Job 38:4 frames with both feet the outer tenth inside the area, PC and phone', () => {
+    const GEN_1_1 = vid('genesis', 1, 1), JOB_38_4 = vid('job', 38, 4);
+    for (const [w, right] of [[W, RIGHT], [891 * 2.6, 374 * 2.6]]) {
+      const area = w - right, capW = 44 * T / w;
+      const cam = { x: T / 2, ppv: w / T, total: T };
+      const frame = pm.connectionFrame(GEN_1_1, JOB_38_4);
+      expect(pm.frameHolds(cam, w, right, frame, GEN_1_1, JOB_38_4, capW)).toBe(true);
+      const c = pm.landingOf(cam, w, right, frame, capW);
+      for (const v of [GEN_1_1, JOB_38_4]) {
+        const f = verseToX(c, w, v + 0.5) / area;
+        expect(f, w + ': verse ' + v).toBeGreaterThanOrEqual(0.1 - 1e-6);
+        expect(f, w + ': verse ' + v).toBeLessThanOrEqual(0.9 + 1e-6);
+      }
+    }
+  });
+
   it('Isaiah 11:1 to Revelation 22:16 frames with both feet the outer tenth inside the area, PC and phone', () => {
     const ISA_11_1 = vid('isaiah', 11, 1), REV_22_16 = vid('revelation', 22, 16);
     // PC 1600 wide at DPR 1, panel 640; phone landscape 891 at DPR 2.6, panel 374 CSS px

@@ -21,12 +21,12 @@
                     a book name, the panel's framing); cancelFly stops one
      slackFor       the camera clamp's room for the docked panel (geometry.js
                     clampCamera's `right`): flyTo, the gestures, the keys and
-                    the resize all clamp with it, so the canon's end stops the
+                    the resize all clamp with it, so the canon's ends stop the
                     area's outer tenth inside the canvas area (END_MARGIN),
-                    never under the panel or on its border (and, in My Web,
-                    each rail's end: w4); settleInset brings the camera back
-                    inside the view's own bound once the panel stops covering
-                    the right
+                    never under the panel, on its border or on the screen's
+                    (and, in My Web, each rail's end: w4); settleInset brings
+                    the camera back inside the view's own bound once the panel
+                    stops covering the right
      settledAt      (the navigation stream, A6) the chapter in the lens where the
                     camera last came to rest: state, set once no frame has moved
                     the camera for SETTLE_MS, and only when the chapter changes,
