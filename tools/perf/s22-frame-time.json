@@ -1,7 +1,7 @@
 {
-  "measured": "2026-10-19T05:30:05.914Z",
-  "sha": "218e95b1f",
-  "sourceHash": "4494b85382d63f75",
+  "measured": "2026-10-19T15:22:58.984Z",
+  "sha": "949fe8730",
+  "sourceHash": "8dc39060d41fb3e5",
   "device": {
     "renderer": "ANGLE (Qualcomm, Adreno (TM) 730, OpenGL ES 3.2)",
     "viewport": {
@@ -13,31 +13,31 @@
   },
   "scenes": {
     "fit": {
-      "frames": 177,
+      "frames": 176,
       "median": 16.7,
       "p90": 16.8,
-      "max": 67.3,
-      "fps": 59
+      "max": 67.5,
+      "fps": 58.7
     },
     "mid": {
       "frames": 174,
       "median": 16.7,
       "p90": 16.8,
-      "max": 75.7,
+      "max": 75.5,
       "fps": 58
     },
     "ceiling": {
-      "frames": 173,
+      "frames": 172,
       "median": 16.7,
       "p90": 16.8,
-      "max": 77.2,
-      "fps": 57.7
+      "max": 85.1,
+      "fps": 57.3
     },
     "ceilingUp": {
       "frames": 174,
       "median": 16.7,
       "p90": 16.8,
-      "max": 74.9,
+      "max": 76,
       "fps": 58
     }
   }
