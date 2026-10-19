@@ -8124,6 +8124,12 @@
       color: var(--sw-text-body); font-family: var(--sw-font);
       touch-action: pan-y; overscroll-behavior: contain;
       animation: sw-panel-in 220ms ease-out;
+      /* THE PANEL'S TYPE (w4): each size is its token's px times the reader's Text Size, not rem.
+         The root grows on a wide desktop (112.5 % from 1100 px, 125 % from 1600, sized for the
+         reading column), and the rem panel grew with it: at 1600x900 it ran 1.25x the spec, verse
+         text 25 px and "More from" 631 px below the fold. The panel is beside the web, not the
+         reading column; it keeps the spec's px at every width and still follows Text Size. */
+      --sw-ts: var(--font-scale, 1);
     }
     @keyframes sw-panel-in { from { transform: translateX(100%); } to { transform: none; } }
     @keyframes sw-sheet-in { from { transform: translateY(100%); } to { transform: none; } }
@@ -8150,7 +8156,7 @@
     /* the scroll: everything but the pinned credit; a 3 px #3A4547 indicator */
     .sw-panel-body {
       flex: 1 1 auto; min-height: 0; overflow-y: auto;
-      padding: 28px calc(24px + env(safe-area-inset-right, 0px)) 0 24px;
+      padding: 24px calc(24px + env(safe-area-inset-right, 0px)) 0 24px;
       scrollbar-width: thin; scrollbar-color: var(--sw-panel-edge) transparent;
       touch-action: pan-y; overscroll-behavior: contain;
     }
@@ -8160,11 +8166,11 @@
     .sw-panel-head { padding-right: 40px; }
     /* the overline (CONNECTION, NEARBY, ...): tracked caps */
     .sw-sheet-eyebrow, .sw-panel-over {
-      font-size: var(--fs-13); color: var(--sw-overline);
+      font-size: calc(var(--fsc-13) * var(--sw-ts)); color: var(--sw-overline);
       letter-spacing: 0.15em; text-transform: uppercase;
     }
-    .sw-panel-title { margin: 6px 0 0; font-size: var(--fs-30); font-weight: 500; line-height: 1.2; color: var(--sw-title); }
-    .sw-sheet-meta, .sw-panel-meta { margin-top: 6px; font-size: var(--fs-16); color: var(--sw-text-meta); }
+    .sw-panel-title { margin: 4px 0 0; font-size: calc(var(--fsc-30) * var(--sw-ts)); font-weight: 500; line-height: 1.15; color: var(--sw-title); }
+    .sw-sheet-meta, .sw-panel-meta { margin-top: 4px; font-size: calc(var(--fsc-16) * var(--sw-ts)); line-height: 1.3; color: var(--sw-text-meta); }
     /* A LINE OF ITEMS (web-panel.jsx metaItems; w4): it breaks only between items, and no "·" is
        left at a line's end or start. Each item after the first carries its dot in a 1.1em head the
        row is pulled left by, and the line clips that strip, so a dot that would start a line is
@@ -8174,8 +8180,10 @@
     .sw-dot-item { position: relative; flex: none; padding-left: 1.1em; white-space: nowrap; }
     .sw-dot-item.is-long { flex: 0 1 auto; min-width: 0; white-space: normal; }
     .sw-dot-sep { position: absolute; left: 0; top: 0; width: 1.1em; text-align: center; }
-    /* sections: a 1 px hairline with 20 px either side (16 compact) */
-    .sw-sec { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--sw-hairline); }
+    /* sections: a 1 px hairline that reads 20 px either side (16 compact): the 44 px head carries
+       14 px over its words and a link 6 px under its own, so the box adds only the rest (w4: the
+       w3 box added the full 20 on top of both and read 35) */
+    .sw-sec { margin-top: 14px; padding-top: 6px; border-top: 1px solid var(--sw-hairline); }
     .sw-sec.sw-verses, .sw-links.sw-sec { border-top: 0; padding-top: 0; }
     .sw-links.sw-sec { margin-top: 8px; }
     .sw-sec-head {
@@ -8183,49 +8191,54 @@
       width: 100%; min-height: 44px; margin: 0; padding: 0;
       background: none; border: 0; text-align: left; font: inherit; color: var(--sw-overline);
     }
-    .sw-sec-title { font-size: var(--fs-13); font-weight: 400; letter-spacing: 0.15em; text-transform: uppercase; }
+    .sw-sec-title { font-size: calc(var(--fsc-13) * var(--sw-ts)); font-weight: 400; letter-spacing: 0.15em; text-transform: uppercase; }
     .sw-sec-toggle { cursor: pointer; }
     .sw-sec-toggle:focus-visible, .sw-group-head:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; border-radius: 2px; }
     .sw-chev { flex: none; color: var(--sw-text-meta); transition: transform 150ms ease-out; }
     .sw-chev.is-open { transform: rotate(90deg); }
     /* a verse in full: the gold reference, the text in the reader's translation, its links */
-    .sw-verse + .sw-verse { margin-top: 20px; }
-    .sw-verse-ref { margin: 0; font-size: var(--fs-20); font-weight: 500; color: var(--sw-gold); }
-    .sw-verse-text { margin: 6px 0 0; font-size: var(--fs-20); line-height: 1.5; color: var(--sw-text-body); }
+    .sw-verse + .sw-verse { margin-top: 10px; }
+    .sw-verse-ref { margin: 0; font-size: calc(var(--fsc-20) * var(--sw-ts)); font-weight: 500; line-height: 1.25; color: var(--sw-gold); }
+    .sw-verse-text { margin: 2px 0 0; font-size: calc(var(--fsc-18) * var(--sw-ts)); line-height: 1.45; color: var(--sw-text-body); }
     .sw-verse-text.is-pending { color: var(--sw-text-muted); font-style: italic; }
-    .sw-links { display: flex; flex-wrap: wrap; gap: 0 20px; margin-top: 2px; }
+    /* a link is 32 px to see and 44 to hit (the ::after reaches the rest, as a row's buttons do);
+       a second row of links keeps 12 px, so two targets never overlap */
+    .sw-links { display: flex; flex-wrap: wrap; gap: 12px 20px; margin-top: 0; }
     .sw-link {
-      display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0;
-      background: none; border: 0; font-family: var(--sw-font); font-size: var(--fs-16);
+      position: relative; display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0;
+      background: none; border: 0; font-family: var(--sw-font); font-size: calc(var(--fsc-16) * var(--sw-ts));
       color: var(--sw-gold); cursor: pointer;
     }
+    .sw-link::after { content: ''; position: absolute; left: 0; right: 0; top: -6px; bottom: -6px; }
     .sw-link:hover { text-decoration: underline; text-underline-offset: 3px; }
     .sw-link:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; border-radius: 2px; }
     .sw-link-quiet { color: var(--sw-text-meta); }
     /* CITED IN THE VOLUMES: a 2 px gold rule, 14 px in */
-    .sw-cites { list-style: none; margin: 4px 0 0; padding: 0; }
-    .sw-cite { margin-top: 12px; padding-left: 14px; border-left: 2px solid var(--sw-cite-rule); }
-    .sw-cite-title { font-size: var(--fs-18); font-style: italic; color: var(--sw-title); }
-    .sw-cite-source { margin-top: 2px; font-size: var(--fs-14); color: var(--sw-text-muted); }
-    .sw-cite-quote { margin: 4px 0 0; font-size: var(--fs-16); line-height: 1.45; color: var(--sw-text-body); }
+    .sw-cites { list-style: none; margin: 0; padding: 0; }
+    .sw-cite { margin-top: 8px; padding-left: 14px; border-left: 2px solid var(--sw-cite-rule); }
+    .sw-cite:first-child { margin-top: 0; }
+    .sw-cite-title { font-size: calc(var(--fsc-18) * var(--sw-ts)); font-style: italic; line-height: 1.25; color: var(--sw-title); }
+    .sw-cite-source { margin-top: 1px; font-size: calc(var(--fsc-14) * var(--sw-ts)); line-height: 1.3; color: var(--sw-text-muted); }
+    .sw-cite-quote { margin: 2px 0 0; font-size: calc(var(--fsc-16) * var(--sw-ts)); line-height: 1.4; color: var(--sw-text-body); }
     .sw-cite-quote.is-clamped {
-      display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     }
     .sw-quote-more, .sw-more {
-      display: inline-flex; align-items: center; min-height: 44px; padding: 0;
-      background: none; border: 0; font-family: var(--sw-font); font-size: var(--fs-15);
+      position: relative; display: inline-flex; align-items: center; min-height: 32px; padding: 0;
+      background: none; border: 0; font-family: var(--sw-font); font-size: calc(var(--fsc-15) * var(--sw-ts));
       color: var(--sw-text-meta); cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
     }
+    .sw-quote-more::after, .sw-more::after { content: ''; position: absolute; left: 0; right: 0; top: -6px; bottom: -6px; }
     .sw-more { color: var(--sw-gold); text-decoration: none; }
     .sw-quote-more:focus-visible, .sw-more:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
-    .sw-sort-note { margin: 0 0 4px; font-size: var(--fs-14); font-style: italic; color: var(--sw-text-muted); }
-    .sw-panel-empty, .sw-list-empty { margin: 8px 0; font-size: var(--fs-15); color: var(--sw-text-muted); }
+    .sw-sort-note { margin: 0 0 4px; font-size: calc(var(--fsc-14) * var(--sw-ts)); font-style: italic; color: var(--sw-text-muted); }
+    .sw-panel-empty, .sw-list-empty { margin: 8px 0; font-size: calc(var(--fsc-15) * var(--sw-ts)); color: var(--sw-text-muted); }
     /* MORE FROM: one 44 px header per book with a chevron, its rows under a gold rule */
     .sw-groups { list-style: none; margin: 0; padding: 0; }
     .sw-group-head {
       display: flex; align-items: center; justify-content: space-between; gap: 12px;
       width: 100%; min-height: 44px; padding: 0; background: none; border: 0; text-align: left;
-      font-family: var(--sw-font); font-size: var(--fs-20); color: var(--sw-text); cursor: pointer;
+      font-family: var(--sw-font); font-size: calc(var(--fsc-20) * var(--sw-ts)); color: var(--sw-text); cursor: pointer;
     }
     .sw-group .sw-rows { padding-left: 14px; border-left: 2px solid var(--sw-cite-rule); }
     .sw-group > .sw-more { margin-left: 16px; }
@@ -8246,19 +8259,19 @@
        drops under it */
     .sw-row-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; max-width: 100%; }
     .sw-row-ref {
-      max-width: 100%; font-size: var(--fs-18); color: var(--sw-text-body);
+      max-width: 100%; font-size: calc(var(--fsc-18) * var(--sw-ts)); color: var(--sw-text-body);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .sw-row-tag { flex: none; font-size: var(--fs-14); color: var(--sw-text-muted); white-space: nowrap; }
+    .sw-row-tag { flex: none; font-size: calc(var(--fsc-14) * var(--sw-ts)); color: var(--sw-text-muted); white-space: nowrap; }
     .sw-row-text {
-      max-width: 100%; font-size: var(--fs-15); color: var(--sw-text-muted);
+      max-width: 100%; font-size: calc(var(--fsc-15) * var(--sw-ts)); color: var(--sw-text-muted);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .sw-row-actions { flex: none; display: flex; gap: 8px; padding-right: 4px; }
     /* 32 px to see, 44 px to hit (the ::after reaches the rest) */
     .sw-row-btn {
       position: relative; height: 32px; min-width: 64px; padding: 0 12px; border-radius: 6px;
-      background: transparent; font-family: var(--sw-font); font-size: var(--fs-15); cursor: pointer;
+      background: transparent; font-family: var(--sw-font); font-size: calc(var(--fsc-15) * var(--sw-ts)); cursor: pointer;
     }
     .sw-row-btn::after { content: ''; position: absolute; left: -4px; right: -4px; top: -6px; bottom: -6px; }
     .sw-row-open { border: 1px solid var(--sw-gold); color: var(--sw-gold); }
@@ -8273,18 +8286,18 @@
       display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; margin-top: 16px;
       padding: 0 14px; box-sizing: border-box; border-radius: 6px;
       background: var(--sw-control-fill); border: 1px solid var(--sw-control-border);
-      font-family: var(--sw-font); font-size: var(--fs-16); color: var(--sw-text); cursor: pointer;
+      font-family: var(--sw-font); font-size: calc(var(--fsc-16) * var(--sw-ts)); color: var(--sw-text); cursor: pointer;
     }
     .sw-zoom-row:hover { border-color: var(--sw-control-border-hover); }
     .sw-zoom-row:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
     /* the way back to the card this one came from, and the Follow trail */
     .sw-back-link {
       display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin: -12px 0 4px; padding: 0;
-      background: none; border: 0; font-family: var(--sw-font); font-size: var(--fs-15);
+      background: none; border: 0; font-family: var(--sw-font); font-size: calc(var(--fsc-15) * var(--sw-ts));
       color: var(--sw-text-meta); cursor: pointer;
     }
     .sw-back-link:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
-    .sw-crumbs { display: flex; align-items: center; gap: 2px; margin: -12px 40px 6px -12px; font-size: var(--fs-14); color: var(--sw-text-muted); }
+    .sw-crumbs { display: flex; align-items: center; gap: 2px; margin: -12px 40px 6px -12px; font-size: calc(var(--fsc-14) * var(--sw-ts)); color: var(--sw-text-muted); }
     .sw-crumbs ol { display: flex; flex-wrap: wrap; gap: 0 6px; list-style: none; margin: 0; padding: 0; }
     .sw-crumbs li + li::before { content: '\203A'; margin-right: 6px; color: var(--sw-text-muted); }
     .sw-crumbs li.is-here { color: var(--sw-text); }
@@ -8298,25 +8311,38 @@
       flex: none; display: flex; align-items: center; min-height: 48px; box-sizing: border-box;
       padding: 0 calc(24px + env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) 24px;
       background: var(--sw-panel); border-top: 1px solid var(--sw-hairline);
-      font-size: var(--fs-13); color: var(--sw-text-muted);
+      font-size: calc(var(--fsc-13) * var(--sw-ts)); color: var(--sw-text-muted);
     }
     .sw-panel-body > .sw-panel-credit { min-height: 0; padding: 16px 0 calc(16px + env(safe-area-inset-bottom, 0px)); }
     /* compact (root height <= 500: every phone value of the spec) */
-    .sw-root.sw-compact .sw-panel-body { padding: 16px calc(20px + env(safe-area-inset-right, 0px)) 0 20px; }
-    .sw-root.sw-compact :is(.sw-sheet-eyebrow, .sw-panel-over, .sw-sec-title) { font-size: var(--fs-12); }
-    .sw-root.sw-compact .sw-panel-title { font-size: var(--fs-24); }
-    .sw-root.sw-compact :is(.sw-sheet-meta, .sw-panel-meta, .sw-link, .sw-cite-quote, .sw-zoom-row) { font-size: var(--fs-15); }
-    .sw-root.sw-compact :is(.sw-verse-ref, .sw-verse-text, .sw-group-head) { font-size: var(--fs-18); }
-    .sw-root.sw-compact :is(.sw-cite-title, .sw-row-ref) { font-size: var(--fs-16); }
-    .sw-root.sw-compact :is(.sw-cite-source, .sw-sort-note) { font-size: var(--fs-13); }
-    .sw-root.sw-compact .sw-row-text { font-size: var(--fs-14); }
-    .sw-root.sw-compact .sw-panel-credit { font-size: var(--fs-12); }
-    .sw-root.sw-compact .sw-sec { margin-top: 16px; padding-top: 16px; }
+    .sw-root.sw-compact .sw-panel-body { padding: 12px calc(20px + env(safe-area-inset-right, 0px)) 0 20px; }
+    .sw-root.sw-compact :is(.sw-sheet-eyebrow, .sw-panel-over, .sw-sec-title) { font-size: calc(var(--fsc-12) * var(--sw-ts)); }
+    .sw-root.sw-compact .sw-panel-title { font-size: calc(var(--fsc-24) * var(--sw-ts)); }
+    .sw-root.sw-compact :is(.sw-sheet-meta, .sw-panel-meta, .sw-link, .sw-cite-quote, .sw-zoom-row) { font-size: calc(var(--fsc-15) * var(--sw-ts)); }
+    .sw-root.sw-compact :is(.sw-verse-ref, .sw-group-head) { font-size: calc(var(--fsc-18) * var(--sw-ts)); }
+    /* 16, not the spec's 17 (the scale has no 17; r2-06 reads near 15.5): README 4.6 amended */
+    .sw-root.sw-compact .sw-verse-text { font-size: calc(var(--fsc-16) * var(--sw-ts)); line-height: 1.4; }
+    .sw-root.sw-compact :is(.sw-cite-title, .sw-row-ref) { font-size: calc(var(--fsc-16) * var(--sw-ts)); }
+    .sw-root.sw-compact :is(.sw-cite-source, .sw-sort-note) { font-size: calc(var(--fsc-13) * var(--sw-ts)); }
+    .sw-root.sw-compact .sw-row-text { font-size: calc(var(--fsc-14) * var(--sw-ts)); }
+    .sw-root.sw-compact .sw-panel-credit { font-size: calc(var(--fsc-12) * var(--sw-ts)); }
+    .sw-root.sw-compact .sw-sec { margin-top: 10px; padding-top: 2px; }
     .sw-root.sw-compact :is(.sw-sec.sw-verses, .sw-links.sw-sec) { padding-top: 0; }
     .sw-root.sw-compact :is(.sw-row, .sw-row-main) { min-height: 60px; }
     .sw-root.sw-compact .sw-row-btn { height: 40px; }
     .sw-root.sw-compact .sw-row-btn::after { top: -2px; bottom: -2px; }
     .sw-root.sw-compact .sw-sheet-close { top: 4px; }
+    .sw-root.sw-compact .sw-panel-title { margin-top: 2px; }
+    .sw-root.sw-compact .sw-panel-meta { margin-top: 2px; }
+    .sw-root.sw-compact .sw-verse + .sw-verse { margin-top: 8px; }
+    /* the trail, compact: a 32 px row (its Back 44 to hit), and it stands where the overline was:
+       the trail names where the reader is, the title under it the connection (w4: the 44 px row
+       over the overline kept "Cited in the Volumes" under the fold, r2-06 has neither) */
+    .sw-root.sw-compact .sw-crumbs { min-height: 32px; margin: -8px 40px 2px -10px; }
+    .sw-root.sw-compact .sw-crumbs-back { position: relative; min-width: 36px; min-height: 32px; }
+    .sw-root.sw-compact .sw-crumbs-back::after { content: ''; position: absolute; left: 0; right: 0; top: -6px; bottom: -6px; }
+    .sw-root.sw-compact .sw-crumbs ~ .sw-panel-content .sw-panel-over { display: none; }
+    .sw-root.sw-compact .sw-crumbs ~ .sw-panel-content .sw-panel-title { margin-top: 0; }
 
     /* WHILE THE PANEL IS OPEN (spec section 3): the key hides; the controls right-align to the
        panel's left edge less the gutter (24 / 16 compact; the strip's own 7 px padding is inside

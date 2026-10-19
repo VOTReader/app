@@ -57,6 +57,12 @@ describe('Follow names where it goes as the spec words it (spec 4.6, G1; w3 revi
   it('"Follow to the other end · <the far end>"', () => {
     expect(ds.followLabel('Luke 1:31')).toBe('Follow to the other end · Luke 1:31');
   });
+  /* w4: on a phone the spec's words take a second row of links under the far verse (r2-06 has one
+     row), and that row was what kept "Cited in the Volumes" under the fold. Under the far verse,
+     "the other end" is where it stands; the short words name it and fit beside "Open in reader". */
+  it('on a phone: "Follow to <the far end>"', () => {
+    expect(ds.followLabelShort('Luke 1:31')).toBe('Follow to Luke 1:31');
+  });
 });
 
 describe('plurals are right at one', () => {

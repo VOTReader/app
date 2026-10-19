@@ -38,7 +38,7 @@
 
 import { ConnectionRow } from './connection-row.jsx';
 import {
-  connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, arcLine, plural, timesWord, followLabel,
+  connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, arcLine, plural, timesWord, followLabel, followLabelShort,
   verseEndpoint, verseTextFor,
 } from '../../utils/scripture-web/describe.js';
 import {
@@ -49,7 +49,7 @@ import { windowCorpus, letterKeyOf } from '../../utils/scripture-web/vot-citatio
 import { litKeyOf } from '../../utils/scripture-web/focus-state.js';
 
 /** Citations shown before "Show n more". */
-export const CITED_SHOWN = 4;
+export const CITED_SHOWN = 2;
 /** A quote longer than this many characters is clamped at four lines with "more". */
 const QUOTE_LONG = 180;
 
@@ -221,18 +221,40 @@ function VerseBlock({ block, heading = true, onOpen, extra = null }) {
   );
 }
 
-/** A citing passage's quote: four lines, then "more". */
-function Quote({ text }) {
+/**
+ * A citing passage's quote: two lines (r2-02), then "more" when the clamp cuts it. w4: "more" asked
+ * the text's length (QUOTE_LONG) and not the clamp, so on a phone, where two lines hold about 100
+ * characters, a 150-character quote was cut with no way to read the rest. Where there is layout
+ * the clamp is measured (and again when the panel's width or the Text Size moves it); the length
+ * stands in only where nothing is laid out.
+ */
+function Quote({ text, children }) {
   const [open, setOpen] = React.useState(false);
-  const long = text.length > QUOTE_LONG;
+  const ref = React.useRef(/** @type {HTMLParagraphElement | null} */ (null));
+  const [cut, setCut] = React.useState(text.length > QUOTE_LONG);
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || open) return undefined;
+    const measure = () => { if (el.clientHeight > 0) setCut(el.scrollHeight > el.clientHeight + 1); };
+    measure();
+    if (typeof ResizeObserver !== 'function') return undefined;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text, open]);
+  const long = cut || open;
   return (
     <React.Fragment>
-      <p className={'sw-cite-quote' + (long && !open ? ' is-clamped' : '')}>{text}</p>
-      {long ? (
-        <button type="button" className="sw-quote-more" aria-expanded={open} onClick={() => setOpen(!open)}>
-          {open ? 'less' : 'more'}
-        </button>
-      ) : null}
+      <p ref={ref} className={'sw-cite-quote' + (open ? '' : ' is-clamped')}>{text}</p>
+      {/* "more" ends the passage's own row of links (w4: on a row of its own it cost a line a quote) */}
+      <div className="sw-links">
+        {children}
+        {long ? (
+          <button type="button" className="sw-quote-more" aria-expanded={open} onClick={() => setOpen(!open)}>
+            {open ? 'less' : 'more'}
+          </button>
+        ) : null}
+      </div>
     </React.Fragment>
   );
 }
@@ -247,12 +269,9 @@ function CitedSection({ g, cited, showCites, startOpen, onOpen, openPanel }) {
   return (
     <Section title={'Cited in the Volumes · ' + cited.length} collapsible startOpen={startOpen} className="sw-sec-cited">
       <ul className="sw-cites">
-        {shown.map((c) => (
-          <li className="sw-cite" key={c.key}>
-            <div className="sw-cite-title">{c.title}</div>
-            <div className="sw-cite-source">{metaItems(c.collectionName + (showCites(c) ? ' · ' + c.cites : ''))}</div>
-            {c.excerpt ? <Quote text={c.excerpt} /> : null}
-            <div className="sw-links">
+        {shown.map((c) => {
+          const links = (
+            <React.Fragment>
               {c.endpoint ? (
                 <button type="button" className="sw-link" onClick={() => onOpen(c.endpoint)}
                   aria-label={'Open ' + c.title + ' where it cites ' + c.cites}>
@@ -264,9 +283,16 @@ function CitedSection({ g, cited, showCites, startOpen, onOpen, openPanel }) {
                   onClick={() => openPanel({ mode: 'letter', letterKey: c.letterKey }, { back: true })}
                   aria-label={'The verses ' + c.title + ' cites'}>Verses it cites <span aria-hidden="true">›</span></button>
               ) : null}
-            </div>
-          </li>
-        ))}
+            </React.Fragment>
+          );
+          return (
+            <li className="sw-cite" key={c.key}>
+              <div className="sw-cite-title">{c.title}</div>
+              <div className="sw-cite-source">{metaItems(c.collectionName + (showCites(c) ? ' · ' + c.cites : ''))}</div>
+              {c.excerpt ? <Quote text={c.excerpt}>{links}</Quote> : <div className="sw-links">{links}</div>}
+            </li>
+          );
+        })}
       </ul>
       {cited.length > shown.length ? (
         <button type="button" className="sw-more" onClick={() => setAll(true)}>Show {cited.length - shown.length} more</button>
@@ -470,9 +496,11 @@ export function WebPanel(props) {
   } else if (mode === 'connection' && model) {
     const farVerse = detail.far === 'to' ? detail.to : detail.from;
     const farEnd = detail.far === 'to' ? detail.b : detail.a;
+    // compact, the short words, so Follow shares "Open in reader"'s row (w4; describe.js)
+    const followWords = (compact ? followLabelShort : followLabel)(farEnd.label);
     const follow = (
       <button type="button" className="sw-link sw-follow" onClick={() => followThread(detail)}
-        aria-label={followLabel(farEnd.label)}><span className="sw-follow-label">{metaItems(followLabel(farEnd.label))}</span> <span aria-hidden="true">›</span></button>
+        aria-label={followWords}><span className="sw-follow-label">{metaItems(followWords)}</span> <span aria-hidden="true">›</span></button>
     );
     body = (
       <React.Fragment>

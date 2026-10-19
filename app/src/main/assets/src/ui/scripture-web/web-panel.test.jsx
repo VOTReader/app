@@ -138,6 +138,52 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     expect(props.followThread).toHaveBeenCalledWith(expect.objectContaining({ index: ARC, far: 'to' }));
   });
 
+  it('compact, Follow is the short words, its name the words it shows, on the row with "Open in reader" (w4)', () => {
+    const { panel, byLabel, props } = mount({ detail: detail(), compact: true });
+    const follow = byLabel(/^Follow to Matthew 1:23$/);
+    expect(follow).toHaveLength(1);
+    expect(follow[0].textContent).toBe('Follow to Matthew 1:23 ›');
+    expect(follow[0].parentElement.querySelector('.sw-link').textContent).toMatch(/^Open in reader/);
+    fireEvent.click(follow[0]);
+    expect(props.followThread).toHaveBeenCalledWith(expect.objectContaining({ index: ARC, far: 'to' }));
+    expect(panel.textContent).not.toContain('Follow to the other end');
+  });
+
+  it('two citations show before "Show n more", as r2-02 shows them, so More from begins on the first screen (w4)', () => {
+    expect(CITED_SHOWN).toBe(2);
+    const { panel } = mount({ detail: detail() });
+    const n = Number(/· (\d+)$/.exec(panel.querySelector('.sw-sec-cited .sw-sec-title').textContent)[1]);
+    expect(n).toBeGreaterThan(2);
+    expect(panel.querySelector('.sw-sec-cited .sw-more').textContent).toBe('Show ' + (n - 2) + ' more');
+  });
+
+  /* w4: the quote clamps at two lines (r2-02), and "more" asked the text's length (180), not the
+     clamp: on a phone two lines hold about 100 characters, so a 150-character quote was cut with
+     no way to read the rest. Where there is layout, "more" is offered when the clamp cuts. */
+  it('a quote the clamp cuts offers "more", and one it does not cut does not', () => {
+    const dims = { client: 44, scroll: 88 };
+    const own = (k) => Object.getOwnPropertyDescriptor(HTMLElement.prototype, k);
+    const saved = { c: own('clientHeight'), s: own('scrollHeight') };
+    const quoteOnly = (v) => function () { return this.classList && this.classList.contains('sw-cite-quote') ? v() : 0; };
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: quoteOnly(() => dims.client) });
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: quoteOnly(() => dims.scroll) });
+    try {
+      let { panel } = mount({ detail: detail() });
+      const quotes = panel.querySelectorAll('.sw-cite-quote');
+      expect(quotes.length).toBeGreaterThan(0);
+      for (const q of quotes) expect(q.classList.contains('is-clamped')).toBe(true);
+      expect(panel.querySelectorAll('.sw-quote-more').length, 'cut: more').toBe(quotes.length);
+      cleanup();
+      dims.scroll = 44;
+      ({ panel } = mount({ detail: detail() }));
+      expect(panel.querySelectorAll('.sw-quote-more').length, 'not cut: no more').toBe(0);
+    } finally {
+      for (const [k, d] of [['clientHeight', saved.c], ['scrollHeight', saved.s]]) {
+        if (d) Object.defineProperty(HTMLElement.prototype, k, d); else delete HTMLElement.prototype[k];
+      }
+    }
+  });
+
   it('CITED IN THE VOLUMES: each entry with its letter, collection and "Open letter" at the citing place', () => {
     const { panel, byLabel, props } = mount({ detail: detail() });
     const head = panel.querySelector('.sw-sec-cited .sw-sec-title').textContent;

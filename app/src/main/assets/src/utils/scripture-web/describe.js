@@ -96,6 +96,12 @@ export function followLabel(label) {
   return 'Follow to the other end · ' + label;
 }
 
+/** The same on a phone (w4): under the far verse "the other end" is where it stands, and the
+ * spec's words took a second row of links there (r2-06 has one): "Follow to Luke 1:31". */
+export function followLabelShort(label) {
+  return 'Follow to ' + label;
+}
+
 /** The live region as Follow pans to a thread's far foot. */
 export function followAnnouncement(label) {
   return 'Following the line to ' + label;

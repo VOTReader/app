@@ -106,6 +106,7 @@ describe('the panel\'s ink: app.css --sw-* tokens are sw-ink.js TABLE rows', () 
     const used = new Set([...block.matchAll(/var\((--sw-[a-z-]+)/g)].map((m) => m[1]));
     for (const t of used) {
       if (t === '--sw-panel-w' || t === '--sw-sheet-h') continue; // measured, written by use-panel-layout.js
+      if (t === '--sw-ts') continue; // not a colour: the panel's Text Size multiplier (w4, 'panel density' below)
       expect(Object.keys(ROWS).concat('--sw-font'), t).toContain(t);
     }
   });
@@ -206,5 +207,87 @@ describe('what the w3 screenshots caught (PC 1600x900, phone 891x411)', () => {
   it('"‹ Back to …" keeps a space between the chevron and its words', () => {
     // the PC shot: "‹Back to Isaiah 7:14", the span's trailing space trimmed by the inline-flex
     expect(rule('.sw-back-link')).toMatch(/gap:\s*\d+px/);
+  });
+});
+
+/* PANEL DENSITY (w4, r2-02 and r2-06). The w3 panel was set in rem, and the root grows on a wide
+   desktop (125 % at 1600 px, for the reading column), so the 1600x900 panel ran at 1.25x the
+   spec: verse text 25 px at 1.5, a 37.5 px title, and "More from" at 1531 px, 631 below the fold.
+   On the phone the Cited heading sat at 616 of 411. The panel's type is now the token's px times
+   the reader's own Text Size (--font-scale), the same size at every window width, leading
+   tightened, and its links 32 px to see and 44 to hit (the rows' rule). The geometry (Cited
+   peeks on the phone, More from begins on the first PC screen) is measured headlessly in the w4
+   shots; these pin the rules that produce it. */
+describe('panel density (w4)', () => {
+  const start = BARE.indexOf('.sw-panel, .sw-sheet, .sw-choice, .sw-list {');
+  const end = BARE.indexOf('.sw-root.sw-panel-open .sw-legend');
+  const BLOCK = BARE.slice(start, end);
+  const rules = () => {
+    const out = [];
+    const re = /([^{}]+)\{([^{}]*)\}/g;
+    let m;
+    while ((m = re.exec(BLOCK))) out.push({ sel: m[1].trim(), body: m[2] });
+    return out;
+  };
+  const px = (body) => {
+    const m = /font-size:\s*calc\(var\(--fsc-(\d+)\)\s*\*\s*var\(--sw-ts\)\)/.exec(body);
+    return m ? Number(m[1]) : null;
+  };
+
+  it('CONTROL: the block is found', () => {
+    expect(start).toBeGreaterThan(0);
+    expect(end).toBeGreaterThan(start);
+  });
+
+  it('every size is a token\'s px times the reader\'s Text Size, so a wide window does not grow it', () => {
+    expect(rule('.sw-panel, .sw-sheet, .sw-choice, .sw-list')).toMatch(/--sw-ts:\s*var\(--font-scale,\s*1\)/);
+    const off = rules().filter((r) => /font-size:/.test(r.body) && px(r.body) === null).map((r) => r.sel);
+    expect(off, 'a font-size that is not calc(var(--fsc-N) * var(--sw-ts))').toEqual([]);
+  });
+
+  it('the title stays the largest line, on PC and compact', () => {
+    const all = rules().filter((r) => px(r.body) !== null);
+    const pc = all.filter((r) => !/sw-compact/.test(r.sel));
+    const compact = all.filter((r) => /sw-compact/.test(r.sel));
+    const title = (list) => px(list.find((r) => /\.sw-panel-title/.test(r.sel)).body);
+    for (const [name, list] of [['PC', pc], ['compact', compact]]) {
+      const t = title(list);
+      const others = list.filter((r) => !/\.sw-panel-title/.test(r.sel)).map((r) => px(r.body));
+      expect(Math.max(...others), name).toBeLessThan(t);
+    }
+  });
+
+  it('the verse text: 18 at 1.45 on PC, 16 at 1.4 compact (the scale has no 17)', () => {
+    expect(px(rule('.sw-verse-text'))).toBe(18);
+    expect(rule('.sw-verse-text')).toMatch(/line-height:\s*1\.45/);
+    const c = rules().find((r) => /sw-compact/.test(r.sel) && /\.sw-verse-text/.test(r.sel));
+    expect(px(c.body)).toBe(16);
+    expect(rules().some((r) => /sw-compact/.test(r.sel) && /\.sw-verse-text/.test(r.sel) && /line-height:\s*1\.4\b/.test(r.body))).toBe(true);
+  });
+
+  it('a link is 32 px to see and 44 to hit', () => {
+    const link = rule('.sw-link');
+    expect(link).toMatch(/min-height:\s*32px/);
+    expect(link).toMatch(/position:\s*relative/);
+    const hit = rule('.sw-link::after');
+    expect(hit).toMatch(/top:\s*-6px/);
+    expect(hit).toMatch(/bottom:\s*-6px/);
+    // links that wrap to a second row keep their targets apart
+    expect(rule('.sw-links')).toMatch(/gap:\s*12px 20px/);
+  });
+
+  it('a citation’s quote clamps at two lines, as r2-02 shows it', () => {
+    expect(rule('.sw-cite-quote.is-clamped')).toMatch(/-webkit-line-clamp:\s*2/);
+  });
+
+  it('compact, the trail is a 32 px row (its Back 44 to hit) and stands where the overline was', () => {
+    const crumbs = rule('.sw-root.sw-compact .sw-crumbs');
+    expect(crumbs).toMatch(/min-height:\s*32px/);
+    const back = rule('.sw-root.sw-compact .sw-crumbs-back');
+    expect(back).toMatch(/min-height:\s*32px/);
+    expect(back).toMatch(/position:\s*relative/);
+    expect(rule('.sw-root.sw-compact .sw-crumbs-back::after')).toMatch(/top:\s*-6px/);
+    // the trail names where the reader is; the title under it names the connection
+    expect(rule('.sw-root.sw-compact .sw-crumbs ~ .sw-panel-content .sw-panel-over')).toMatch(/display:\s*none/);
   });
 });
