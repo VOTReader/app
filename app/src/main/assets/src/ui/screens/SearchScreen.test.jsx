@@ -1952,4 +1952,28 @@ describe('SearchScreen (search200 UX, track D)', () => {
     fireEvent.click(box());
     expect(sel()).toEqual([3, 3]);
   });
+
+  /* D4: typed whole, a named passage's name opened its suggestion, which searches what is already typed, over
+     the passage card the search had put at the top: the card's "Named passage — open" strip sat half under it
+     ("faith without works", 412 px). A suggestion that would search the box's own words is left out; the list
+     opens only for the others. */
+  it('D4: a suggestion that searches what is typed is left out, and the list opens only for the rest', () => {
+    /** @type {any} */ (window).VotSearchMini.suggest = () => [
+      { kind: 'passage', label: 'Faith Without Works', query: 'faith without works', hint: 'James 2' },
+      { kind: 'passage', label: 'Faith Without Works Is Dead', query: 'faith without works is dead', hint: 'James 2:26' }];
+    const props = baseProps();
+    const r = render(<SearchScreen {...props} />);
+    r.rerender(<SearchScreen {...props} query="Faith  without works " />);
+    act(() => { vi.advanceTimersByTime(200); });
+    expect([...document.querySelectorAll('.srch-suggest-item')].map((b) => b.textContent))
+      .toEqual(['passageFaith Without Works Is DeadJames 2:26']);
+    /** @type {any} */ (window).VotSearchMini.suggest = () => [
+      { kind: 'passage', label: 'Faith Without Works', query: 'faith without works', hint: 'James 2' }];
+    r.rerender(<SearchScreen {...props} query="faith without works" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(document.querySelector('.srch-suggest'), 'nothing left to offer: no list over the card').toBeNull();
+    r.rerender(<SearchScreen {...props} query="faith with" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(document.querySelectorAll('.srch-suggest-item'), 'a name still to finish is offered').toHaveLength(1);
+  });
 });

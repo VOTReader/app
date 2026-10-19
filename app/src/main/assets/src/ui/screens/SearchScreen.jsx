@@ -410,7 +410,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     if (!q || q.length < 1 || q.length > 40) {setSuggestions([]);setShowSuggest(false);return;}
     const E = pickEngine();
     if (!E) return;
-    const s = E.suggest(q, { max: 8 });
+    /* A suggestion that would search the box's own words offers nothing (search200 UX D4): typed whole, a
+       named passage's name opened its own entry over the passage card the search put at the top, whose
+       "Named passage — open" strip sat half under the list. It is left out; the rest still open the list. */
+    const own = q.toLowerCase().replace(/\s+/g, ' ');
+    const s = E.suggest(q, { max: 9 }).filter((x) => String(x.query || '').trim().toLowerCase().replace(/\s+/g, ' ') !== own).slice(0, 8);
     setSuggestions(s);
     setShowSuggest(s.length > 0 && !buildInfo.building && dismissedFor !== query);
   }, [query, buildInfo.building, dismissedFor]);
