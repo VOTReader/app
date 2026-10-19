@@ -39,7 +39,7 @@
 import { ConnectionRow } from './connection-row.jsx';
 import {
   connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, arcLine, plural, timesWord, followLabel, followLabelShort,
-  verseEndpoint, verseTextFor,
+  verseEndpoint, verseTextFor, WHOLE_WEB,
 } from '../../utils/scripture-web/describe.js';
 import {
   GROUP_ROWS, verseText, shortRef, connectionModel, verseModel, rangeModel, letterRows, zoomChapterOf, chapterName,
@@ -50,7 +50,9 @@ import { litKeyOf } from '../../utils/scripture-web/focus-state.js';
 
 /** Citations shown before "Show n more". */
 export const CITED_SHOWN = 2;
-/** A quote longer than this many characters is clamped at four lines with "more". */
+/** Where nothing is laid out to measure (jsdom, a first render), a quote longer than this many
+ * characters stands in for one the two-line clamp cuts, and is offered "more" (Quote measures the
+ * clamp itself wherever there is layout). */
 const QUOTE_LONG = 180;
 
 /** @type {any} */
@@ -215,7 +217,7 @@ function metaItems(meta) {
  */
 export function crumbText(g, c) {
   const label = typeof c.label === 'string' ? c.label : '';
-  if (label === 'the whole web') return 'Whole web';
+  if (label === WHOLE_WEB) return 'Whole web';
   if (!(c.verse >= 0 && c.verse < g.total)) return label;
   const r = refOfVerse(g, c.verse);
   if (!label) return shortRef(g, c.verse);

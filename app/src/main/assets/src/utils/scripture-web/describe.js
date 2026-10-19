@@ -37,6 +37,11 @@ const DENSITY_MEANS = { essential: 'the strongest', famous: 'the full classic ch
  * line as `attribution`; this is what shows when a graph arrives without one. */
 export const WEB_CREDIT = 'Cross-reference data © OpenBible.info (CC-BY)';
 
+/** What the go-to and the journey call the rest view, the whole canon in sight (goto.jsx
+ * hereLabel: "Back to the whole web"); the trail's crumb knows it by this name (web-panel.jsx
+ * crumbText: "Whole web"). One name, so the two can never drift apart. */
+export const WHOLE_WEB = 'the whole web';
+
 /** What a failed load says to the reader (item 24): the data file that never arrived is the
  * connection (web-data.js rejects with "Couldn’t fetch the cross-reference data."); anything
  * else (data that would not decode, a renderer that would not build) is said plainly, and the

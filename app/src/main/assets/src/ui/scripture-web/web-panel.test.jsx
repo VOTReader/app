@@ -17,6 +17,7 @@ import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import * as ds from '../../utils/scripture-web/describe.js';
 import * as pm from '../../utils/scripture-web/panel-model.js';
 import { WebPanel, modeOfDetail, subjectKey, strongestFirst, CITED_SHOWN } from './web-panel.jsx';
+import { hereLabel } from './goto.jsx';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DATA = resolve(here, '../../data');
@@ -265,8 +266,10 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
      103:2) and a book or a chapter read as its first verse. A crumb names the place the trail
      holds, its book abbreviated as the verse crumbs are. */
   it('a crumb names the place it holds: the whole web, a book, a chapter, a verse', () => {
+    // one name for the whole web, the go-to's and the trail's (w4 review: two literals had to agree)
+    expect(hereLabel(g, [0, g.total], 15551, true)).toBe(ds.WHOLE_WEB);
     const journey = { stack: [
-      { verse: vid('psalms', 103, 2), label: 'the whole web' },
+      { verse: vid('psalms', 103, 2), label: ds.WHOLE_WEB },
       { verse: vid('romans', 1, 1), label: 'Romans' },
       { verse: vid('john', 3, 1), label: 'John 3' },
       { verse: vid('1corinthians', 13, 1), label: '1 Corinthians 13' },

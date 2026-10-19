@@ -45,6 +45,7 @@ import { goToRows, frameOf, startPlace, bookPlace, chapterPlace, chapterIndexOf,
 import { arcsTouching, nearbyThreads, refOfVerse, verseToX, xToVerse } from '../../utils/scripture-web/pick.js';
 import { fitPPV } from '../../utils/scripture-web/geometry.js';
 import { litKeyOf } from '../../utils/scripture-web/focus-state.js';
+import { WHOLE_WEB } from '../../utils/scripture-web/describe.js';
 
 /**
  * @typedef {{ button: any, box: any, isOpen: boolean, open: (query?: string) => void, close: () => void,
@@ -155,7 +156,7 @@ const WHOLE_WEB_SHARE = 0.9;
  */
 export function hereLabel(g, span, verse, atFit) {
   const w = Math.min(g.total, span[1]) - Math.max(0, span[0]);
-  if (atFit || w >= WHOLE_WEB_SHARE * g.total) return 'the whole web';
+  if (atFit || w >= WHOLE_WEB_SHARE * g.total) return WHOLE_WEB;
   const r = refOfVerse(g, verse);
   const ch = g.chapters[r.chapterIndex];
   if (w < ch[3]) return r.label;
