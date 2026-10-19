@@ -1413,6 +1413,30 @@ describe('SearchScreen (search200 UX, track B)', () => {
     expect(document.querySelector('.srch-results-summary').textContent).toContain('9 matches across 2 sections');
   });
 
+  /* B2 review: in a short list a section whose results all went to Best Matches lost its header, and the summary
+     still counted it ("Found 21 matches across 8 sections" over three headers, for "tittle"). The summary counts
+     the sections it can show: with a section folded into Best Matches it says the matches alone. */
+  it('B2: the summary never counts a section the short list shows no header for', async () => {
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchGroup = ({ gkey }) => <div className="stub-group" data-key={gkey} />;
+    /** @type {any} */ (globalThis).SrchCard = ({ entry }) => <div className="stub-card">{entry.doc.title}</div>;
+    const headers = () => document.querySelectorAll('.stub-group').length;
+    const claimed = () => { const m = /across (\d+) section/.exec(document.querySelector('.srch-results-summary').textContent); return m ? Number(m[1]) : null; };
+    // Best Matches takes all of v7 and v1; v2 keeps a header
+    searchReturns({ results: letters('v7', 4).concat(letters('v1', 1, 4), letters('v2', 3, 5)) });
+    const r = await typeIn(baseProps(), 'tittle');
+    expect(headers()).toBe(1);
+    expect(claimed(), 'no section count over one header for three sections').toBeNull();
+    expect(document.querySelector('.srch-results-summary').textContent).toBe('Found 8 matches');
+    expect(screen.getByRole('status').textContent).toBe('Found 8 matches.');
+    r.unmount();
+    // every section keeps a header: the count stands, and matches them
+    searchReturns({ results: letters('v7', 6).concat(letters('v1', 3, 6)) });
+    await typeIn(baseProps(), 'a short list');
+    expect(claimed()).toBe(headers());
+  });
+
   /* B2: refining a query while scrolled down showed the new list from mid-list. A new search lands at the top
      (the one-shot landing LetterView makes); a list resumed on Back is scroll-restore's, and so is a restore
      under way. */

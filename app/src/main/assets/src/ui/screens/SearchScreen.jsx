@@ -712,6 +712,9 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   }, [bookOrder, topResults, state.results.length, visibleGroups]);
   const bestRow = restGroups && restGroups.length === 0 ? [] : topResults;
   const listGroups = restGroups && restGroups.length > 0 ? restGroups : visibleGroups;
+  /* A section whose results all sit in Best Matches has no header under it (search200 B2 review): "Found 21
+     matches across 8 sections" stood over three for "tittle". The summary then says the matches alone. */
+  const sectionsListed = !(restGroups && restGroups.length > 0 && restGroups.length < grouped.length);
   // The switch matters when some group has two or more results to order, or when
   // there is a Best Matches row for Book order to set aside.
   const sortToggleVisible = bestRow.length > 0 || visibleGroups.some((g) => g.items.length > 1);
@@ -874,7 +877,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
      "Found 5+ matches" read as a count of the passage (search200 B5). */
   const closestOnly = engineNav && directEntries.length > 0 && state.truncated && allWordsFor !== qTrim;
   const countText = closestOnly ? 'Showing closest matches' : 'Found ' + matchCountLabel(state.results.length, state.capped.length > 0 || state.truncated) + ' '
-    + (state.results.length === 1 ? 'match' : 'matches') + ' across ' + grouped.length + ' ' + (grouped.length === 1 ? 'section' : 'sections');
+    + (state.results.length === 1 ? 'match' : 'matches') + (sectionsListed ? ' across ' + grouped.length + ' ' + (grouped.length === 1 ? 'section' : 'sections') : '');
   const scopeIn = searchScope && searchContext ? ' in ' + searchContext.label : tabName ? ' in ' + tabName : '';
   /* A VERDICT NAMES THE TEXT SEARCHED (search200 B9 review). In the 140 ms before a key's
      search runs, the box is ahead of the list: built from the box, the region said "No
@@ -1126,7 +1129,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
               <>
                 {/* W0 (micro-gap a): at the engine cap the count is a floor — "400+", not "400". */}
                 Found <strong>{matchCountLabel(state.results.length, state.capped.length > 0 || state.truncated)} {state.results.length === 1 ? "match" : "matches"}</strong>
-                {" across "}<strong>{grouped.length} {grouped.length === 1 ? "section" : "sections"}</strong>
+                {sectionsListed ? <>{" across "}<strong>{grouped.length} {grouped.length === 1 ? "section" : "sections"}</strong></> : null}
               </>
             )}
           </div>
