@@ -3814,7 +3814,9 @@
     .search-input::-webkit-search-cancel-button { -webkit-appearance:none; appearance:none; display:none; }
     .search-input::placeholder { color:var(--cream-muted); opacity:0.6; }
     body.light .search-input { background:rgba(0,0,0,0.04); }
-    /* .search-screen — no styles needed */
+    /* The results end clear of the system nav bar (the APK draws edge to edge under it):
+       the last group's "show more" row sat under the Home button on the S22 (land-E look). */
+    .search-screen { padding-bottom:var(--dock-sys); }
     .search-no-results { padding:3rem 1.5rem; text-align:center; font-family:var(--font-body); font-size:var(--fs-16); color:var(--cream-muted); }
     /* search200 B2: no results offers a tip, then the Recent and Quick picks rows under it. */
     .search-no-results.has-picks { padding-bottom:1rem; }

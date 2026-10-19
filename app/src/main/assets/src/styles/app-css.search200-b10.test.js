@@ -277,4 +277,10 @@ describe('B10 item 6 — group headers pin under the search bar while their own 
     expect(m.color).toBe('var(--gold)');
     expect(m['border-bottom']).toBe('1px solid var(--gold-border)');
   });
+
+  it('the results end clear of the system nav bar, so the last group\'s "show more" row takes a tap', () => {
+    // On the S22 (edge to edge, 3-button nav, Kotlin --inset-bottom 48px) the last row sat
+    // at 736-780 of a 780px column, under the Home button: a tap on it went home (land-E look).
+    expect(decls('.search-screen')['padding-bottom']).toBe('var(--dock-sys)');
+  });
 });
