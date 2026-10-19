@@ -120,6 +120,30 @@ describe('ANSWERS_META', () => {
     });
   });
 
+  /* D3's data half (brief 9): the renderer draws a {{ref:}} marker as one cite, so a decoration
+     that starts or ends inside a marker would split the cite and the highlight offsets over it.
+     Every sidecar edge (a link's ends, a bare link, a note marker's ends, a mark range's ends)
+     falls outside every marker, or on its boundary. The render half (decorated vs plain
+     [data-hl-key] text) waits for the phase that draws the sidecars. */
+  it('no sidecar edge falls inside a {{ref:}} marker', () => {
+    let edges = 0;
+    each((e, m, P) => {
+      const spans = (k) => [...String(P[k].text).matchAll(/\{\{ref:[^}]*\}\}/g)].map((x) => [x.index, x.index + x[0].length]);
+      const check = (field, k, pos) => {
+        edges++;
+        const hit = spans(k).find(([s, end]) => pos > s && pos < end);
+        expect(hit, `${e.id} ${field}[${k}] edge ${pos}`).toBeUndefined();
+      };
+      for (const [k, items] of Object.entries(m.links || {})) for (const it of items) { check('links', k, it.at); check('links', k, it.at + it.text.length); }
+      for (const [k, items] of Object.entries(m.bareLinks || {})) for (const it of items) check('bareLinks', k, it.at);
+      for (const [k, items] of Object.entries(m.notes || {})) for (const it of items) { check('notes', k, it.at); check('notes', k, it.at + it.marker.length); }
+      for (const [k, mk] of Object.entries(m.marks || {})) {
+        for (const key of ['u', 'big', 'small']) for (const r of (mk[key] || [])) { check('marks.' + key, k, r[0]); check('marks.' + key, k, r[0] + r[1]); }
+      }
+    });
+    expect(edges).toBe(5515);   // c72; 53 of them sit on a marker's boundary, which is allowed
+  });
+
   it('no paragraph text carries the site\'s markup (it lives in the sidecars)', () => {
     const MARKUP = ['<u>', '<u ', '</u>', '<sup', '<span', '<font', '<big', '<small', '<a ', '<br', '[[', ']]', '&nbsp;', '&amp;'];
     each((e, m, P) => {
