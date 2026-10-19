@@ -213,10 +213,11 @@ const SIZES = {
    w4 (the band stream): the overview's names stand on one row, and on a PC the
    rows spread over the ruler as r2-01a's do (the cited strip, the bars, the
    names; a chosen foot's label cuts its notch in the bars, r2-06; the spec's +12..+42 bars and
-   +52 / +70 names left 98 px of black above the legend). On a phone the names
+   +52 / +70 names left 98 px of black above the legend, and w4's +16..+64 bars and +90 row still
+   78: the w4 review's +16..+82 and +110 leave r2-01a's 58). On a phone the names
    end above the corner buttons' zone (+44) and the deep band's numerals do too,
    so a button never takes a numeral or the sticky name. */
-const OV_PC = { rows: [{ k: 'cited', top: 5, h: 5 }, { k: 'bars', top: 16, h: 48, min: 12 }, { k: 'row0', top: 90, h: 13 * CAP }], end: 104 };
+const OV_PC = { rows: [{ k: 'cited', top: 5, h: 5 }, { k: 'bars', top: 16, h: 66, min: 12 }, { k: 'row0', top: 110, h: 13 * CAP }], end: 124 };
 const OV_COMPACT = { rows: [{ k: 'cited', top: 3, h: 4 }, { k: 'bars', top: 10, h: 18, min: 8 }, { k: 'row0', top: 35, h: 12 * CAP }], end: 44 };
 const DEEP_PC = {
   rows: [
@@ -741,8 +742,10 @@ function drawCited(ctx, g, cam, L, holes) {
 const BAR_PITCH = 3;
 /** A bar's length runs on this power of its chapters' length against the canon's longest (Psalm
     119): softened, so the short chapters still read, and never saturated, so the long ones stand
-    out (at 64 verses or more for the full bar Psalm 119 stood no taller than Numbers 7, w4 review). */
-const BAR_GAMMA = 0.5;
+    out (at 64 verses or more for the full bar Psalm 119 stood no taller than Numbers 7, w4 review);
+    at 0.4 the common chapter's bar is about half the full one, r2-01a's ragged edge (at 0.5 two
+    fifths, and the tall band left most bars short of the names). */
+const BAR_GAMMA = 0.4;
 /** @type {WeakMap<object, number>} */
 const LONGEST = new WeakMap();
 /** The canon's longest chapter, verses. */

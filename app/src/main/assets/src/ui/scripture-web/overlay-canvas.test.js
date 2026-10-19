@@ -414,11 +414,12 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
       expect(k, 'the bar holding Psalm 119').toBeGreaterThanOrEqual(0);
       const h = (b) => b.y1 - b.y0;
       for (let i = 0; i < bars.length; i++) if (i !== k) expect(h(bars[i]), 'bar ' + i + ' against Psalm 119\'s').toBeLessThan(h(bars[k]));
-      // the psalms after it (120-134, the songs of ascents, 3 to 9 verses) are among the shortest
-      const p134 = verseOf('psalms', 134, 3);
-      const songs = bars.filter((b, i) => i > k && b.x0 <= X(p134));
-      expect(songs.length).toBeGreaterThan(0);
-      for (const b of songs) expect(h(b), 'a song of ascents').toBeLessThan(0.4 * h(bars[k]));
+      // the bar after it opens at Psalm 120, the songs of ascents (3 to 9 verses), and is among the
+      // shortest (the next one, from Psalm 129, holds 132, 135 and 136 too, so it is not all songs)
+      const songs = bars[k + 1];
+      expect(songs, 'the bar after Psalm 119\'s').toBeTruthy();
+      expect(Math.abs(songs.x0 - X(verseOf('psalms', 120, 1)))).toBeLessThanOrEqual(1);
+      expect(h(songs), 'the songs of ascents').toBeLessThan(0.4 * h(bars[k]));
     });
   }
 
@@ -447,13 +448,15 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
     });
   }
 
-  it('pc: the band fills the ruler as r2-01a does: the names within 80 px of the legend, the bars between the cited strip and the names', () => {
+  /* r2-01a at 900 px: the names stand about 55-60 px over the legend. w4's +90 row left about 78
+     (it was about 98 before w4: the dead band); the w4 review set the bound at the picture's 60. */
+  it('pc: the band fills the ruler as r2-01a does: the names within 60 px of the legend, the bars between the cited strip and the names', () => {
     const { canvas, legendTop } = chromeRoot('pc');
     const { rec, fs } = paint('pc', 1, g.total / 2, { canvas });
     const base = fs.view.base;
     const names = bookTexts(rec);
     const foot = Math.max(...names.map((c) => c.y)), capTop = Math.min(...names.map((c) => textRect(c).y0));
-    expect(legendTop - foot, 'the gap from the names to the legend (it was about 98: the dead band)').toBeLessThanOrEqual(80);
+    expect(legendTop - foot, 'the gap from the names to the legend (r2-01a: about 55-60)').toBeLessThanOrEqual(60);
     expect(legendTop - foot, 'and the names do not crowd the legend').toBeGreaterThanOrEqual(48);
     const bars = inked(rec, (f) => BAR_FILLS.has(f));
     const barTop = Math.min(...bars.map((b) => b.y0)), barFoot = Math.max(...bars.map((b) => b.y1));
