@@ -485,12 +485,12 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
 
   /* w4 INK review, finding 5: at a TAP_CONTEXT of .60 the field keeps its hues (r2-02), and the
      chosen line is told from it by a dark keyline: the core over the key over the halo. */
-  it('the chosen core lies on a dark keyline, 1 CSS px each side, over its halo; it never recedes, and no other kind has one', () => {
+  it('the chosen core lies on a dark keyline, 1 CSS px each side (half of one on the phone), over its halo; it never recedes, and no other kind has one', () => {
     for (const dpr of [1, 2, 2.625]) {
       for (const compact of [false, true]) {
         const look = topLook('chosen', dpr, compact, 1);
         expect(look.keyHalf, `dpr ${dpr} compact ${compact}`).toBe((inkWidth('chosenKey', compact) * dpr) / 2);
-        expect(look.keyHalf - look.coreHalf).toBe(dpr);
+        expect(look.keyHalf - look.coreHalf).toBe((compact ? 0.5 : 1) * dpr);
         expect(look.keyHalf).toBeLessThan(look.haloHalf);
         expect(look.key).toEqual(rgba01('chosenKey'));
         expect(look.ribbon).toBe(look.haloHalf + 0.5);

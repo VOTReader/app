@@ -59,9 +59,11 @@ const TABLE = {
   // threads read them (rail-renderer), in their own colour.
   chosen: { hex: '#F2D38A', alpha: 1, width: 3, widthCompact: 2.5 },   // adaptive tessellation, no facets
   chosenHalo: { hex: '#E0A84E', alpha: 0.22, width: 10 },
-  // a dark keyline under the chosen core, 1 CSS px each side of it, in the foot ring's black (w4 INK
-  // review, finding 5): the field keeps .60 of its ink (TAP_CONTEXT), and the line still reads first
-  chosenKey: { hex: '#000000', alpha: 0.70, width: 5, widthCompact: 4.5 },
+  // a dark keyline under the chosen core, in the foot ring's black (w4 INK review, finding 5): the
+  // field keeps .60 of its ink (TAP_CONTEXT), and the line still reads first. At .70 and 1 CSS px each
+  // side the line read as a dark tube that r2-02 and r2-06 do not draw (w4 INK review 2, finding 6);
+  // at .50, 1 CSS px each side on PC and half of one on the phone, it is a thin gold line in its glow
+  chosenKey: { hex: '#000000', alpha: 0.50, width: 5, widthCompact: 3.5 },
   chosenFoot: { hex: '#F2D38A', alpha: 1, width: 8 },            // the foot dot's diameter
   chosenFootRing: { hex: '#000000', alpha: 1, width: 2 },
   chosenLabel: { hex: '#F2D38A', alpha: 1 },                     // 16 / 14 px, 10 px below the baseline

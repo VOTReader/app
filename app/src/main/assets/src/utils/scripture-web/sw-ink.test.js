@@ -64,11 +64,14 @@ describe('the ink table', () => {
     expect(INK.chosenHalo).toEqual({ hex: '#E0A84E', alpha: 0.22, width: 10 });
     expect(INK.chosenFoot).toEqual({ hex: '#F2D38A', alpha: 1, width: 8 });
     expect(INK.chosenFootRing).toEqual({ hex: '#000000', alpha: 1, width: 2 });
-    // w4 INK review, finding 5: a dark keyline under the chosen core, 1 CSS px each side of it (the
-    // foot ring's black), so the line reads first over a field that keeps .60 of its ink
-    expect(INK.chosenKey).toEqual({ hex: '#000000', alpha: 0.70, width: 5, widthCompact: 4.5 });
+    // w4 INK review, finding 5: a dark keyline under the chosen core (the foot ring's black), so the
+    // line reads first over a field that keeps .60 of its ink; review 2, finding 6: at .50, 1 CSS px
+    // each side on PC and half of one on the phone, not r2-02's absent dark tube
+    expect(INK.chosenKey).toEqual({ hex: '#000000', alpha: 0.50, width: 5, widthCompact: 3.5 });
     expect(inkWidth('chosenKey') - inkWidth('chosen')).toBe(2);
-    expect(inkWidth('chosenKey', true) - inkWidth('chosen', true)).toBe(2);
+    expect(inkWidth('chosenKey', true) - inkWidth('chosen', true)).toBe(1);
+    expect(ink('chosenKey').alpha).toBeGreaterThanOrEqual(0.45);
+    expect(ink('chosenKey').alpha).toBeLessThanOrEqual(0.55);
     expect(inkWidth('chosenKey')).toBeLessThan(inkWidth('chosenHalo'));
     expect(INK.chosenLabel).toEqual({ hex: '#F2D38A', alpha: 1 });
     expect(INK.hover).toEqual({ hex: '#F2D38A', alpha: 1, width: 2 });
