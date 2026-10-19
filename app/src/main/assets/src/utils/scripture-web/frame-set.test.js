@@ -339,7 +339,7 @@ describe('the visible set: drawn, counted, labelled and picked are one set (E1)'
           if (!listed.has(i)) bad.push(`inFrame ${i} not listed`);
         }
         if (members !== set.count) bad.push(`inFrame holds ${members}, count ${set.count}`);
-        // the list in rank order: the shortest drawn span step first, the order the web is blended in
+        // the list in rank order: the widest drawn span step first, the order the web is blended in
         for (let k = 1; k < set.count; k++) {
           if (order.rankOf[set.list[k]] <= order.rankOf[set.list[k - 1]]) bad.push(`list out of rank at ${k}`);
         }
@@ -377,14 +377,17 @@ describe('the visible set: drawn, counted, labelled and picked are one set (E1)'
      counts rose once each. Ranked by span step and by x inside a step, the
      counts rise and fall within a step; what the runs owe is the same
      intent, the overview drawn at about each thread's own count. */
-  it('the drawing order: by span step, shortest first, then by from-verse, then the asset\'s order', () => {
+  /* Restated (w4 INK, item 2): widest first and the shortest ON TOP. Every long thread's two legs come
+     down through the feet band, and drawn last they covered the short spans there (the r2-01a picture's
+     violet feet went grey: w4/ink/diagnosis.md, cause 2). Still one fixed rank (C20). */
+  it('the drawing order: by span step, widest first (the shortest on top), then by from-verse, then the asset\'s order', () => {
     const bad = [];
     let steps = 1;
     for (let r = 1; r < order.count; r++) {
       const p = order.ids[r - 1], q = order.ids[r];
       const sp = spanStep((g.to[p] + fans.fanB[p]) - (g.from[p] + fans.fanA[p]));
       const sq = spanStep((g.to[q] + fans.fanB[q]) - (g.from[q] + fans.fanA[q]));
-      if (sq < sp) bad.push(`rank ${r}: step ${sq} after ${sp}`);
+      if (sq > sp) bad.push(`rank ${r}: step ${sq} after ${sp}`);
       else if (sq === sp && g.from[q] < g.from[p]) bad.push(`rank ${r}: from ${g.from[q]} after ${g.from[p]} in step ${sq}`);
       else if (sq === sp && g.from[q] === g.from[p] && q < p) bad.push(`rank ${r}: id ${q} after ${p}`);
       if (sq !== sp) steps++;

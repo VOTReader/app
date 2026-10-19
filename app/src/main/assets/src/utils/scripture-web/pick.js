@@ -247,7 +247,7 @@ export function pickThreads(g, cam, view, px, py, tol, limit) {
  * The drawn threads, in draw order: the set a label pass walks (Corbin's
  * brief, 2026-09-11: "when zoomed close, each line shows its source and
  * target beside it"). It IS the frame's visible set (frame-set.frameSet,
- * the renderer's), shortest first, so a label is written for a line the
+ * the renderer's), widest first, so a label is written for a line the
  * reader can see and never for one the shader skipped.
  *
  * @param {import('./decode.js').ScriptureGraph} g

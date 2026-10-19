@@ -673,7 +673,7 @@ describe('E1-E3: the visible set, the gesture backing, and a frame that sends on
     expect(set.count).toBe(606);
     expect(set.runs).toBeGreaterThanOrEqual(2);
     expect(f.main.length).toBe(set.runs);
-    // the stream uploaded is the list, in rank order: the web blends shortest first, widest on top
+    // the stream uploaded is the list, in rank order: the web blends widest first, shortest on top
     const up = f.calls.find((c) => c[0] === 'bufferSubData')[1];
     const sent = Array.from(up[2].subarray(up[3], up[3] + up[4]));
     expect(sent).toEqual(Array.from(set.list.subarray(0, set.count)));
@@ -694,10 +694,11 @@ describe('E1-E3: the visible set, the gesture backing, and a frame that sends on
     expect(at).toBe(set.count);
     expect(f.stats).toEqual({ instances, vertices, draws: f.main.length });
     expect(r.stats).toEqual(f.stats);
-    // the short threads drew first, at their own few segments; the wide ones over them, at theirs
-    const last = f.main[f.main.length - 1].u.uSegments[0];
-    expect(last).toBeGreaterThan(10);
-    expect(f.main[0].u.uSegments[0]).toBeLessThan(last / 4);
+    // the wide threads drew first, at their own segments; the short ones over them, at their own few
+    // (restated for the widest-first order, w4 INK item 2: the shortest lie on top)
+    const first = f.main[0].u.uSegments[0];
+    expect(first).toBeGreaterThan(10);
+    expect(f.main[f.main.length - 1].u.uSegments[0]).toBeLessThan(first / 4);
   });
 
   it('E1: a thread whose body is out of the frame is not drawn (the height cull), and is again when the camera comes back', () => {

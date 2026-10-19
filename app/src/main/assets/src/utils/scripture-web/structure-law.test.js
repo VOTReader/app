@@ -342,10 +342,10 @@ describe('the picker agrees with the drawn curve, on the asset, at rest and in t
     expect(cam.y, 'the sky at 12x is at least three ceilings tall').toBe(3 * CEIL);
     const view = viewAt(cam);
     const list = pick.visibleArcs(graph, cam, view, 100000);
-    // Restated for E1: the list is the draw order now, shortest first, whose
-    // first threads are the ones whose crowns just reach the frame (level
-    // there by geometry), so the first 400 points of it are no sample of the
-    // sky. The share is taken over every on-screen point of every such
+    // Restated for E1: the list is the draw order now (by span step), so its
+    // first threads are no sample of the sky: in the shortest-first order
+    // they were the ones whose crowns just reach the frame (level there by
+    // geometry), and in the widest-first order (w4 INK) the widest legs. The share is taken over every on-screen point of every such
     // thread, and the picker asked at a spread of them.
     let seen = 0, curved = 0, picked = 0;
     for (const i of list) {

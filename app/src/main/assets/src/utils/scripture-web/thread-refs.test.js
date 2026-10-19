@@ -167,15 +167,15 @@ describe('threadEnds: where a thread\'s references are written', () => {
 
 describe('visibleArcs: the drawn threads a label pass walks', () => {
   /* Restated for E1 (GL step 2): the draw order is the frame's visible set's,
-     shortest drawn span first (by span step, frame-set.spanStep) so the
-     widest lies on top, the same at every zoom (it was the asset's bucket
-     order). */
-  it('returns the threads whose body is in the frame, in draw order (shortest first), and not the ones wholly off it', () => {
+     by span step (frame-set.spanStep), the same at every zoom (it was the
+     asset's bucket order). Restated again (w4 INK, item 2): widest first,
+     so the shortest lies on top. */
+  it('returns the threads whose body is in the frame, in draw order (widest first), and not the ones wholly off it', () => {
     const g = makeGraph([[5, 35], [60, 70], [0, 99], [30, 31]]);
     const view = viewOf(520);
     const cam = camAt(g, 20);                       // frame holds verses 7.5 .. 32.5
     const got = Array.from(pick.visibleArcs(g, cam, view, 100));
-    expect(got).toEqual([3, 0, 2]);
+    expect(got).toEqual([2, 0, 3]);
   });
 
   it('honours the density prefix: a thread past bucketDrawCount is not drawn, so it is not walked', () => {

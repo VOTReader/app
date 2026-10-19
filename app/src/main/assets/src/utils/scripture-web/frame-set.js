@@ -17,10 +17,14 @@
 
    Order. A density's threads are ranked once by their span on screen (the
    feet as drawn, fans included) in steps of an eighth of an octave
-   (ORDER_STEPS), so the draw is shortest first and the widest on top, in
+   (ORDER_STEPS), so the draw is widest first and the shortest on top, in
    the same order at every zoom: the web is blended over (premultiplied), so
    the order IS the picture, and a thread never changes layer as the reader
-   zooms (C20). Within a step the threads go by x (their from-verse, then
+   zooms (C20). Shortest on top because every long thread's two legs come
+   down through the feet band: drawn last they covered the short spans
+   there and the picture's violet feet went grey (w4 INK, item 2;
+   D:/Swarm/lanes/sweb/out/w4/ink/diagnosis.md, cause 2). Within a step the
+   threads go by x (their from-verse, then
    the asset's order), so consecutive draws stand side by side on the
    screen: ranked by exact span they scattered across the frame, and the
    GPU paid for it (6x on the 890M, perf.md: 12.9 ms by exact span, 6.4 by
@@ -432,8 +436,8 @@ export function spanStep(span) {
 
 /**
  * A density's threads in drawing order, cached per graph: ranked by the step of their span as
- * drawn (spanStep of (to + fanB) - (from + fanA), shortest first), then by their from-verse, then
- * in asset order, with each verse's feet.
+ * drawn (spanStep of (to + fanB) - (from + fanA), widest first, so the shortest lie on top), then
+ * by their from-verse, then in asset order, with each verse's feet.
  * @param {any} g  the decoded graph
  * @param {import('./decode.js').Density} density
  * @returns {DrawOrder}
@@ -458,7 +462,7 @@ export function drawOrder(g, density) {
     }
   }
   const from = g.from;
-  members.sort((p, q) => step[p] - step[q] || from[p] - from[q] || p - q);
+  members.sort((p, q) => step[q] - step[p] || from[p] - from[q] || p - q);
   const ids = count <= 0xffff ? new Uint16Array(n) : new Uint32Array(n);
   const rankOf = new Int32Array(count).fill(-1);
   const fx0 = new Float64Array(n), fx1 = new Float64Array(n);
@@ -513,6 +517,9 @@ export const RUN_CAP = 1024;
 const SLOTS = new WeakMap();
 let SERIAL = 0;
 const TAU = new Float64Array(2);
+/* A run's rises, scratch for the cut: a thread's segments are a byte, so a run's most rises at most
+   255 times. */
+const RISE_AT = new Int32Array(256), RISE_FROM = new Int32Array(256);
 const HEIGHTS = new Float64Array(2);
 const FEET = new Int32Array(2);
 
@@ -623,23 +630,44 @@ export function frameSetAt(g, density, width, base, squash, camX, camY, ppv, dpr
     count++;
   }
   // every id in rank order into the list, cut into runs as it goes (see the file's header): the
-  // current run [start, start + len) at max segments, and its tail since its last peak
+  // current run [start, start + len) at max segments, its rises (the k-th of `rises`: RISE_AT[k]
+  // threads into the run its most went up from RISE_FROM[k]) and its tail since its last peak
   const { list, runN, runFirst, runCount } = set;
   const ids = order.ids;
   const lam = RUN_DRAW_VERTICES;
-  let li = 0, runs = 0, start = 0, len = 0, max = 0, tailLen = 0, tailMax = 0;
+  let li = 0, runs = 0, start = 0, len = 0, max = 0, tailLen = 0, tailMax = 0, rises = 0;
   for (let rank = 0; rank < N && li < count; rank++) {
     const n = seg[rank];
     if (!n) continue;
     list[li++] = ids[rank];
-    if (!len) { len = 1; max = n; continue; }
+    if (!len) { len = 1; max = n; rises = 0; continue; }
     const room = runs < RUN_CAP - 1;
     if (n > max) {
-      // raising the run to n costs its threads more than a draw: n starts a run of its own
       if (room && 2 * len * (n - max) > lam) {
+        // raising the run to n costs its threads more than a draw: n starts a run of its own
         runFirst[runs] = start; runCount[runs] = len; runN[runs] = max; runs++;
-        start += len; len = 1; max = n;
-      } else { len++; max = n; }
+        start += len; len = 1; max = n; rises = 0;
+      } else {
+        // the tail's mirror, for counts that climb (the widest-first order deep in, where the long
+        // legs need few segments and the arches after them many): the threads before one of the
+        // run's rises, raised to n, would pay more than a draw over their own most; the dearest
+        // such head becomes a run of its own
+        let cut = -1, dearest = lam;
+        for (let k = 0; k < rises; k++) {
+          const cost = 2 * RISE_AT[k] * (n - RISE_FROM[k]);
+          if (cost > dearest) { dearest = cost; cut = k; }
+        }
+        if (room && cut >= 0) {
+          const head = RISE_AT[cut];
+          runFirst[runs] = start; runCount[runs] = head; runN[runs] = RISE_FROM[cut]; runs++;
+          start += head; len -= head;
+          let j = 0;
+          for (let k = cut + 1; k < rises; k++, j++) { RISE_AT[j] = RISE_AT[k] - head; RISE_FROM[j] = RISE_FROM[k]; }
+          rises = j;
+        }
+        RISE_AT[rises] = len; RISE_FROM[rises] = max; rises++;
+        len++; max = n;
+      }
       tailLen = 0; tailMax = 0;
       continue;
     }
@@ -650,7 +678,7 @@ export function frameSetAt(g, density, width, base, squash, camX, camY, ppv, dpr
     // the threads since the run's last peak are cheaper by more than a draw at their own most
     if (room && 2 * tailLen * (max - tailMax) > lam) {
       runFirst[runs] = start; runCount[runs] = len - tailLen; runN[runs] = max; runs++;
-      start += len - tailLen; len = tailLen; max = tailMax; tailLen = 0; tailMax = 0;
+      start += len - tailLen; len = tailLen; max = tailMax; tailLen = 0; tailMax = 0; rises = 0;
     }
   }
   if (len) { runFirst[runs] = start; runCount[runs] = len; runN[runs] = max; runs++; }
