@@ -933,6 +933,25 @@ describe('the pills and the labels', () => {
     }
   });
 
+  /* w4 integration: the band stream put the canon overview's names on ONE row (r2-01a), while My
+     Web's Bible rail, "read as the canon overview reads it", kept its two rows (34 and 48 px under
+     the baseline); the shots showed JOSH, 2SAM, 2KGS, DAN, MARK and ACTS cascading to a second row
+     where r2-05 names the Bible on one. The two rails now agree. */
+  it("My Web's Bible names stand on ONE row, as the canon overview's and r2-05's do", () => {
+    for (const name of ['pc', 'phone']) {
+      const v = FRAMES[name];
+      const fs = /** @type {any} */ (frameAt(name, 1, g.total / 2));
+      fs.rail = { width: v.W, height: v.H, DPR: v.DPR, base: fs.view.base, verseTotal: g.total, verseX: (x) => geo.verseToX(fs.cam, v.W, x), votRail: null, chrome: fs.chrome };
+      const rec = recorder();
+      paintMyWebOverlay(rec.ctx, fs);
+      const drawn = bookTexts(rec).filter((c) => c.y > fs.view.base);
+      expect(drawn.length, name + ': names').toBeGreaterThan(name === 'pc' ? 18 : 12);
+      expect([...new Set(drawn.map((c) => Math.round(c.y)))], name + ': one row').toHaveLength(1);
+      const boxes = drawn.map(textBox).sort((a, b) => a.x0 - b.x0);
+      for (let i = 1; i < boxes.length; i++) expect(boxes[i].x0 - boxes[i - 1].x1, name + ': a word apart').toBeGreaterThanOrEqual(12 * v.DPR - 1e-6);
+    }
+  });
+
   it("a DOM chip over the canvas (the go-to's verse chip, goto.jsx) is kept out of as the panel is: no label prints under it", () => {
     for (const name of ['pc', 'phone']) {
       const s = FRAMES[name].DPR;

@@ -1911,8 +1911,10 @@ export function publishRails(ro, p, g, cam, camV, v, root) {
 
 /**
  * The scripture rail under the personal web, read as the canon overview
- * reads it: the same names, the same law, the same face, at My Web's own
- * rows (34 / 48 px under its baseline, as before), within the canvas area
+ * reads it: the same names, the same law, the same face, on ONE row as the
+ * canon's (w4 integration: r2-05 names the Bible on one; its second row, 48 px
+ * under the baseline, cascaded JOSH, 2SAM, DAN, MARK), at My Web's own depth
+ * (36 px under its baseline), within the canvas area
  * as the canon's are: the frame less the docked panel (w4 review: "REV" was
  * cut by the panel's edge).
  * @param {any} ctx @param {any} g @param {any} cam @param {any} view
@@ -1928,6 +1930,6 @@ function drawRulerOnly(ctx, g, cam, view, v, pi) {
   if (right > 0) zones.push({ x0: Wc, x1: v.W, y0: 0, y1: v.H });
   const L = { s, W: v.W, Wc, zones };
   const capH = fontPx(12, s) * CAP;
-  const rows = [{ top: view.base + 36 * s, h: capH }, { top: view.base + 50 * s, h: capH }];
+  const rows = [{ top: view.base + 36 * s, h: capH }];
   drawBookLabels(ctx, g, cam, L, rows, 12, null, 'rail');
 }
