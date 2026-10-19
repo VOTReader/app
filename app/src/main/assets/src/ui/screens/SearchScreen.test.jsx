@@ -299,7 +299,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
      already in it — and its clear button announced as the glyph "✕". */
   it('[C8] the query input has an accessible name of its own', () => {
     render(<SearchScreen {...baseProps()} />);
-    const input = screen.getByRole('searchbox', { name: 'Search' });
+    const input = screen.getByRole('combobox', { name: 'Search' });
     expect(input.getAttribute('placeholder')).toMatch(/Search scriptures/i);
   });
 
@@ -828,7 +828,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     const r = await typeAndWait(props, 'psa');
     const item = document.querySelector('.srch-suggest-item');
     expect(item, 'the list, open').toBeTruthy();
-    fireEvent.mouseDown(item);
+    fireEvent.click(item);
     r.rerender(<SearchScreen {...props} query={q} />);
     act(() => { vi.advanceTimersByTime(200); });
     expect(q).toBe('psalm 23');
@@ -841,7 +841,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     /** @type {any} */ (window).VotSearchMini.suggest = () => [{ query: 'psalm 23', label: 'Psalm 23', kind: 'Ref' }];
     const onQueryChange = vi.fn();
     await typeAndWait({ ...baseProps(), onQueryChange }, 'psa');
-    const input = screen.getByRole('searchbox', { name: 'Search' });
+    const input = screen.getByRole('combobox', { name: 'Search' });
     const ev = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
     act(() => { input.dispatchEvent(ev); });
     expect(ev.defaultPrevented, 'the search box does not clear itself as well').toBe(true);
@@ -854,7 +854,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useFakeTimers();
     await typeAndWait(baseProps(), 'mercy');
     fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
-    expect(document.activeElement).toBe(screen.getByRole('searchbox', { name: 'Search' }));
+    expect(document.activeElement).toBe(screen.getByRole('combobox', { name: 'Search' }));
     vi.useRealTimers();
   });
 
@@ -1039,12 +1039,12 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     /** @type {any} */ (window).addRecentSearch = add;
     try {
       render(<SearchScreen {...baseProps()} query="ἀγάπη" settings={{ historyEnabled: true }} />);
-      fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' });
+      fireEvent.keyDown(screen.getByRole('combobox', { name: 'Search' }), { key: 'Enter' });
       expect(add).toHaveBeenCalledWith('ἀγάπη');
       add.mockClear();
       cleanup();
       render(<SearchScreen {...baseProps()} query="? !" settings={{ historyEnabled: true }} />);
-      fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' });
+      fireEvent.keyDown(screen.getByRole('combobox', { name: 'Search' }), { key: 'Enter' });
       expect(add, 'punctuation alone is still not a search to keep').not.toHaveBeenCalled();
     } finally {
       delete /** @type {any} */ (window).addRecentSearch;
@@ -1540,5 +1540,114 @@ describe('SearchScreen (search200 UX, track B)', () => {
     await typeIn(baseProps(), 'unto');
     expect(document.querySelector('.search-no-results').textContent).toContain('is in nearly every verse and letter');
     expect(document.querySelector('.srch-no-results-tip')).toBeNull();
+  });
+
+  /* B3 (major): the suggestion list could not be dismissed on a phone and caught taps meant for the controls
+     under it (a tap on Book order ran "psalm 119"). It closes on Enter, on blur and on a scroll of the results;
+     a tap, which is a click to a screen reader, picks. */
+  const psalmSuggest = () => {
+    /** @type {any} */ (window).VotSearchMini.suggest = () => [
+      { query: 'psalm 23', label: 'Psalm 23', kind: 'Ref' }, { query: 'psalm 119', label: 'Psalm 119', kind: 'Ref' }];
+  };
+  const box = () => /** @type {HTMLInputElement} */ (document.querySelector('input.search-input'));
+  const listOpen = () => !!document.querySelector('.srch-suggest-item');
+
+  it('B3: Enter closes the suggestions, keeps the search and lets the keyboard go; its key says "search"', async () => {
+    psalmSuggest();
+    const addRecentSearch = vi.fn(() => []);
+    /** @type {any} */ (window).addRecentSearch = addRecentSearch;
+    try {
+      await typeIn(baseProps(), 'psa');
+      act(() => { box().focus(); });
+      expect(listOpen(), 'open while typing').toBe(true);
+      expect(box().getAttribute('enterkeyhint')).toBe('search');
+      fireEvent.keyDown(box(), { key: 'Enter' });
+      expect(listOpen(), 'closed on Enter').toBe(false);
+      expect(document.activeElement, 'the box let go: the keyboard closes over the results').not.toBe(box());
+      expect(addRecentSearch).toHaveBeenCalledWith('psa');
+      act(() => { box().focus(); });
+      expect(listOpen(), 'still closed for the query Enter closed it on').toBe(false);
+    } finally {
+      delete /** @type {any} */ (window).addRecentSearch;
+    }
+  });
+
+  it('B3: a tap elsewhere closes the suggestions; back in the box they open again', async () => {
+    psalmSuggest();
+    await typeIn(baseProps(), 'psa');
+    act(() => { box().focus(); });
+    expect(listOpen()).toBe(true);
+    act(() => { box().blur(); });
+    expect(listOpen(), 'closed on blur').toBe(false);
+    act(() => { box().focus(); });
+    expect(listOpen(), 'open again in the box').toBe(true);
+  });
+
+  it('B3: a click on a suggestion picks it, as a finger or a screen reader sends it', async () => {
+    psalmSuggest();
+    let q = 'psa';
+    const props = { ...baseProps(), onQueryChange: (/** @type {string} */ v) => { q = v; } };
+    const r = await typeIn(props, 'psa');
+    fireEvent.click(document.querySelectorAll('.srch-suggest-item')[1]);
+    expect(q).toBe('psalm 119');
+    r.rerender(<SearchScreen {...props} query={q} />);
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(listOpen(), 'closed on the query it set').toBe(false);
+    expect(document.activeElement, 'the keyboard goes down on a pick').not.toBe(box());
+  });
+
+  it('B3: a scroll of the results closes the suggestions', async () => {
+    psalmSuggest();
+    await typeIn(baseProps(), 'psa');
+    expect(listOpen()).toBe(true);
+    act(() => { document.querySelector('.screen-scroll').dispatchEvent(new Event('scroll')); });
+    expect(listOpen(), 'closed on scroll').toBe(false);
+  });
+
+  /* B3 (critic): the box had no combobox semantics, and the suggestions answered neither the keyboard nor a
+     screen reader's click. */
+  it('B3: the box is a combobox over a listbox; the arrow keys walk the options and Enter picks one', async () => {
+    psalmSuggest();
+    let q = 'psa';
+    const props = { ...baseProps(), onQueryChange: (/** @type {string} */ v) => { q = v; } };
+    const r = await typeIn(props, 'psa');
+    const input = screen.getByRole('combobox', { name: 'Search' });
+    expect(input).toBe(box());
+    expect(input.getAttribute('aria-expanded')).toBe('true');
+    expect(input.getAttribute('aria-autocomplete')).toBe('list');
+    const list = screen.getByRole('listbox');
+    expect(input.getAttribute('aria-controls')).toBe(list.id);
+    const options = screen.getAllByRole('option');
+    expect(options).toHaveLength(2);
+    expect(input.getAttribute('aria-activedescendant')).toBeNull();
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(input.getAttribute('aria-activedescendant')).toBe(options[0].id);
+    expect(options[0].getAttribute('aria-selected')).toBe('true');
+    expect(options[1].getAttribute('aria-selected')).toBe('false');
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' }); // past the last: round to the first
+    expect(input.getAttribute('aria-activedescendant')).toBe(options[0].id);
+    fireEvent.keyDown(input, { key: 'ArrowUp' }); // before the first: round to the last
+    expect(input.getAttribute('aria-activedescendant')).toBe(options[1].id);
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(q).toBe('psalm 119');
+    r.rerender(<SearchScreen {...props} query={q} />);
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(input.getAttribute('aria-activedescendant')).toBeNull();
+    expect(document.activeElement, 'a pick is a search: the keyboard goes down, as on Enter').not.toBe(input);
+  });
+
+  /* B3 (polish): a query restored with the screen was not selected, so typing appended to it; and the box took
+     the focus 80 ms after it mounted, so a key typed at once was lost ("love" read "ove"). */
+  it('B3: a query restored with the screen is focused and selected as it mounts, so typing replaces it', () => {
+    render(<SearchScreen {...baseProps()} query="love your enemies" />);
+    expect(document.activeElement).toBe(box());
+    expect([box().selectionStart, box().selectionEnd]).toEqual([0, 17]);
+  });
+
+  it('B3: an empty box takes the focus as it mounts, so no key typed after the tap is lost', () => {
+    render(<SearchScreen {...baseProps()} />);
+    expect(document.activeElement).toBe(box());
   });
 });

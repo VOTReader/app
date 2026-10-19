@@ -306,9 +306,29 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     return () => { cancelled = true; };
   }, [translation]);
 
-  // Focus input on mount
-  React.useEffect(() => {
-    const t = setTimeout(() => {if (inputRef.current) inputRef.current.focus();}, 80);
+  /* THE BOX TAKES THE FOCUS AS IT MOUNTS (search200 B3). An 80 ms timer lost the keys
+     typed after the tap that opened the screen ("love your enemies" read "ove your
+     enemies"), and a query restored with the screen took the cursor at its end, so
+     typing appended to it. The focus comes in the commit that mounts the box; a
+     restored query is selected, so the first key replaces it. A screen that took the
+     focus back in its first frames gets it once more, and Chrome, which drops a
+     selection made before the box is first laid out (it read 0-0), gets it again
+     while the query is still the restored one. */
+  React.useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return undefined;
+    const first = el.value;
+    const take = () => {
+      if (!el.isConnected) return;
+      if (document.activeElement !== el) {
+        try { el.focus({ preventScroll: true }); } catch { el.focus(); }
+      }
+      if (first && el.value === first && el.selectionStart === el.selectionEnd) {
+        try { el.setSelectionRange(0, first.length); } catch { el.select(); }
+      }
+    };
+    take();
+    const t = setTimeout(take, 80);
     return () => clearTimeout(t);
   }, []);
 
@@ -317,8 +337,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // reset on every query change reopened them on the pick itself, which changes
   // the query (search audit 2026-09-27).
   const [dismissedFor, setDismissedFor] = React.useState(/** @type {string|null} */ (null));
+  // The option the arrow keys are on (search200 B3), -1 for none: the box keeps the focus, and names it.
+  const [activeSug, setActiveSug] = React.useState(-1);
   React.useEffect(() => {
     const q = (query || '').trim();
+    setActiveSug(-1);
     if (!q || q.length < 1 || q.length > 40) {setSuggestions([]);setShowSuggest(false);return;}
     const E = pickEngine();
     if (!E) return;
@@ -326,6 +349,15 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     setSuggestions(s);
     setShowSuggest(s.length > 0 && !buildInfo.building && dismissedFor !== query);
   }, [query, buildInfo.building, dismissedFor]);
+  const suggestOpen = showSuggest && suggestions.length > 0;
+  /** Close the list; `dismiss`: and keep it closed for this query (Enter, Escape), where a blur or a scroll
+   *  lets the box open it again. */
+  const closeSuggest = (/** @type {boolean} */ dismiss) => {
+    setShowSuggest(false);
+    setActiveSug(-1);
+    if (dismiss) setDismissedFor(query);
+  };
+  const suggestRef = React.useRef(/** @type {HTMLDivElement|null} */ (null));
 
   // Run search with debounce — one box, one index, everything included.
   React.useEffect(() => {
@@ -429,14 +461,31 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
      a quiet re-rank or "Show every match" keeps the search, so it keeps the place. */
   const screenRef = React.useRef(/** @type {HTMLDivElement|null} */ (null));
   const landedFor = React.useRef(resumed ? memo : '');
+  const landedAt = React.useRef(0);
   React.useEffect(() => {
     const m = state.memo || '';
     if (!m || m === landedFor.current) return;
     landedFor.current = m;
     if (document.body.classList.contains('scroll-restoring')) return;
     const sc = screenRef.current && screenRef.current.closest('.screen-scroll');
-    if (sc && typeof sc.scrollTo === 'function') sc.scrollTo({ top: 0 });
+    if (sc && typeof sc.scrollTo === 'function') { landedAt.current = Date.now(); sc.scrollTo({ top: 0 }); }
   }, [state.memo]);
+
+  /* THE SUGGESTIONS CLOSE WHEN THE RESULTS SCROLL (search200 B3): left open, the list sat
+     over the controls under it and caught their taps. The landing above is not the
+     reader's scroll: a refined query lands while its suggestions are open. */
+  React.useEffect(() => {
+    if (!suggestOpen) return undefined;
+    const sc = screenRef.current && screenRef.current.closest('.screen-scroll');
+    if (!sc) return undefined;
+    const onScroll = () => {
+      if (Date.now() - landedAt.current < 300) return;
+      setShowSuggest(false);
+      setActiveSug(-1);
+    };
+    sc.addEventListener('scroll', onScroll, { passive: true });
+    return () => sc.removeEventListener('scroll', onScroll);
+  }, [suggestOpen]);
 
   // Handle command-kind parsed results
   React.useEffect(() => {
@@ -659,14 +708,19 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   const clearQuery = () => {
     onQueryChange('');
     setShowSuggest(false);
+    setActiveSug(-1);
     setDismissedFor('');
     if (inputRef.current) inputRef.current.focus();
   };
 
+  /* A pick is a search, as Enter is: the keyboard goes down so the results it brings
+     are not under it (search200 B3). */
   const fireSuggestion = (sug) => {
     setDismissedFor(sug.query);
     onQueryChange(sug.query);
     setShowSuggest(false);
+    setActiveSug(-1);
+    if (inputRef.current) inputRef.current.blur();
   };
 
   // The tab in use, and the one tap out of it (search200 B2).
@@ -728,12 +782,32 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   );
 
   const handleKey = (e) => {
-    if (e.key === 'Enter') { recordSearch(); return; }
-    if (e.key === 'Escape') {
+    // A keyboard still composing a word (an IME) owns its keys, Enter among them.
+    if (e.nativeEvent && e.nativeEvent.isComposing) return;
+    const key = e.key;
+    // The arrow keys walk the suggestions (search200 B3), round from either end; the box keeps the focus.
+    if (key === 'ArrowDown' || key === 'ArrowUp') {
+      const n = suggestions.length;
+      if (!n) return;
+      e.preventDefault();
+      if (!suggestOpen) { setShowSuggest(true); setActiveSug(key === 'ArrowDown' ? 0 : n - 1); return; }
+      setActiveSug((a) => (key === 'ArrowDown' ? (a + 1) % n : (a <= 0 ? n - 1 : a - 1)));
+      return;
+    }
+    if (key === 'Enter') {
+      if (suggestOpen && activeSug >= 0 && suggestions[activeSug]) { e.preventDefault(); fireSuggestion(suggestions[activeSug]); return; }
+      // Enter is the search done (search200 B3): the list closes, and the box lets go of the
+      // focus, so the keyboard stops covering about 40% of the results.
+      recordSearch();
+      closeSuggest(true);
+      if (inputRef.current) inputRef.current.blur();
+      return;
+    }
+    if (key === 'Escape') {
       // A search box clears itself on Escape as well: closing the suggestions
       // emptied the query.
       e.preventDefault();
-      if (showSuggest) {setShowSuggest(false);setDismissedFor(query);} else
+      if (showSuggest) {closeSuggest(true);} else
       if (query) {clearQuery();} else
       onBack();
     }
@@ -751,15 +825,30 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
               placeholder — which a screen reader stops announcing the moment
               a character is typed, and which nothing announces on a field
               restored with a query already in it. */}
+          {/* search200 B3: a combobox over the suggestions' listbox (the ARIA 1.2
+              pattern): the focus stays in the box, which names the option the
+              arrow keys are on. */}
           <input
             ref={inputRef}
             className="search-input"
             type="search"
+            role="combobox"
             aria-label="Search"
+            aria-autocomplete="list"
+            aria-expanded={suggestOpen}
+            aria-controls={suggestOpen ? 'srch-suggest-list' : undefined}
+            aria-activedescendant={suggestOpen && activeSug >= 0 ? 'srch-sug-' + activeSug : undefined}
+            enterKeyHint="search"
             placeholder="Search scriptures, volumes, studies…"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             onFocus={() => setShowSuggest(suggestions.length > 0 && dismissedFor !== query)}
+            onBlur={(e) => {
+              // A tap that leaves the box closes the list; a tap on one of its options is the list's own.
+              const to = /** @type {Node|null} */ (e.relatedTarget);
+              if (to && suggestRef.current && suggestRef.current.contains(to)) return;
+              closeSuggest(false);
+            }}
             onKeyDown={handleKey}
             autoComplete="off"
             autoCorrect="off"
@@ -828,10 +917,22 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </div>
         )}
 
-        {showSuggest && suggestions.length > 0 && (
-          <div className="srch-suggest-anchor"><div className="srch-suggest">
+        {suggestOpen && (
+          <div className="srch-suggest-anchor"><div className="srch-suggest" id="srch-suggest-list" role="listbox" aria-label="Suggestions" ref={suggestRef}>
             {suggestions.map((s, i) => (
-              <button key={i} className="srch-suggest-item" onMouseDown={(e) => {e.preventDefault();fireSuggestion(s);}}>
+              /* A click picks (search200 B3): a screen reader's activation and a keyboard's
+                 send no mousedown. The mousedown only keeps the focus in the box. */
+              <button
+                key={i}
+                type="button"
+                id={'srch-sug-' + i}
+                role="option"
+                aria-selected={i === activeSug}
+                tabIndex={-1}
+                className={'srch-suggest-item' + (i === activeSug ? ' active' : '')}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => fireSuggestion(s)}
+              >
                 <span className="srch-suggest-kind">{s.kind}</span>
                 <span className="srch-suggest-label">{s.label}</span>
                 {s.hint && <span className="srch-suggest-hint">{s.hint}</span>}
