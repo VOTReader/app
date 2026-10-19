@@ -10,10 +10,20 @@
    =================================================================== */
 
 
+// Entries that sit outside their collection's array-order chain: the Answers
+// Main Page is appended LAST to ANSWERS (c72) so no topic's paragraph index
+// moves, and must not become the orphan topic's Next (aogcg phase 1a; the
+// site's own order, Main Page -> THERE IS NO OTHER, comes with answersSiteOrder).
+const UNCHAINED_ENTRY_IDS = new Set(['answers-main-page']);
+
 export function linkWtlbEntries(arr) {
-  for (let i = 0; i < arr.length; i++) {
-    arr[i].prevEntry = i > 0 ? { id: arr[i - 1].id, title: arr[i - 1].title } : null;
-    arr[i].nextEntry = i < arr.length - 1 ? { id: arr[i + 1].id, title: arr[i + 1].title } : null;
+  const chain = arr.filter((e) => !UNCHAINED_ENTRY_IDS.has(e.id));
+  for (const e of arr) {
+    if (UNCHAINED_ENTRY_IDS.has(e.id)) { e.prevEntry = null; e.nextEntry = null; }
+  }
+  for (let i = 0; i < chain.length; i++) {
+    chain[i].prevEntry = i > 0 ? { id: chain[i - 1].id, title: chain[i - 1].title } : null;
+    chain[i].nextEntry = i < chain.length - 1 ? { id: chain[i + 1].id, title: chain[i + 1].title } : null;
   }
 }
 

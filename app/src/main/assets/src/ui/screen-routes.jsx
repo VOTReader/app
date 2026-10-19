@@ -47,7 +47,7 @@ import { textKeyOf } from './components/AudioShelf.jsx';
 import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop } from '../utils/songs-route.js';
 import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
 import { AnswersHome, AnswersSubject, AnswersAZ } from './screens/AnswersHome.jsx';
-import { answersSubjectById } from '../utils/answers-shelves.js';
+import { answersSubjectById, answersTopicEntries } from '../utils/answers-shelves.js';
 import { GARDEN_DEFAULT_TIER } from '../utils/garden.js';
 import { searchBackActive, isSearchLook, RESULTS_LABEL } from '../utils/search-visit.js';
 import { PANEL_MODES } from './scripture-web/use-web-selection.js';
@@ -815,9 +815,11 @@ export function buildScreenRoutes({
   // resolves them (__finishVotInit) only knows letters whose corpus has landed.
   const _answersCorpus = typeof window.__answersCorpus !== 'undefined' ? window.__answersCorpus : null;
   const _answersReady = !!(_answersCorpus && _answersCorpus.loaded) && typeof ANSWERS !== 'undefined';
+  // The lists get the 121 topics: the Main Page, appended last to ANSWERS
+  // (c72), is opened by id (answers-entry reads the registry), never listed.
   const _wrapAnswers = (render) => {
     if (!_answersReady) return _corpusView(_answersCorpus, window.__loadAnswersCorpus, 'Loading…');
-    return _kickVot(render(ANSWERS));
+    return _kickVot(render(answersTopicEntries(ANSWERS)));
   };
   // Open a topic from the Answers landing / a subject / A–Z / a commandment.
   // It goes through the tap-through stack, so the topic shows "‹ Back to …"

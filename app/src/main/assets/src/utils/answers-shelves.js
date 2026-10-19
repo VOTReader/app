@@ -154,6 +154,29 @@ export const ANSWERS_SUBJECTS = Object.freeze([
 
 ]);
 
+/* The site's Main Page rides in ANSWERS as its LAST entry (aogcg phase 1a,
+   2026-10-19, tools/fetch-answers.py MAIN_ID): appended, so no topic's index
+   moves and every reader's marks stay put. It is not one of the 121 topics, so
+   the lists (landing, subjects, A–Z) are built from answersTopicEntries; a link
+   to the Main Page still opens it by id. */
+export const ANSWERS_MAIN_PAGE_ID = 'answers-main-page';
+
+let _topicsOf = null, _topicsLen = -1, _topics = [];
+
+/**
+ * The site's topics: every entry but the Main Page, in the corpus's order.
+ * The same array comes back for the same corpus array, so a screen that
+ * memoises on `entries` (the landing's search index) does not rebuild per render.
+ */
+export function answersTopicEntries(entries) {
+  if (!Array.isArray(entries)) return [];
+  if (entries === _topicsOf && entries.length === _topicsLen) return _topics;
+  _topicsOf = entries;
+  _topicsLen = entries.length;
+  _topics = entries.filter((e) => e && e.id !== ANSWERS_MAIN_PAGE_ID);
+  return _topics;
+}
+
 const SUBJECT_BY_ID = new Map(ANSWERS_SUBJECTS.map((s) => [s.id, s]));
 
 /** A subject row by id, or null (a saved tab can name one this build dropped). */

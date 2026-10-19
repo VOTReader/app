@@ -149,6 +149,10 @@ const BUDGETS = [
   // lazy — fetched the first time a reader opens Answers (utils/sync-loaders.js).
   // Served raw like the timings; the site is complete, so +15 %.
   { file: 'src/data/answers.js', measured: 2488915, max: 2862000 },
+  // The Answers sidecars (ANSWERS_META, same converter, c72 2026-10-19): what the
+  // site shows beyond the words (sections, links, media, attributions, underlines),
+  // keyed by entry id, lazy (utils/sync-loaders.js loadAnswersMeta). +15 %.
+  { file: 'src/data/answers-meta.js', measured: 359363, max: 413300 },
 ];
 
 const kb = (n) => (n / 1000).toFixed(1) + ' KB';

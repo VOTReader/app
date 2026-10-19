@@ -8,13 +8,15 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { AnswersHome, AnswersSubject, AnswersAZ, resetAnswersLanding } from './AnswersHome.jsx';
-import { ANSWERS_SUBJECTS, answersFiledUnder } from '../../utils/answers-shelves.js';
+import { ANSWERS_SUBJECTS, answersFiledUnder, answersTopicEntries } from '../../utils/answers-shelves.js';
 import { passageCopy } from '../../utils/passage-copy.js';
 import { useFocusTrap } from '../../hooks/use-focus-trap.js';
 
 const ctx = {};
 runInNewContext(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'answers.js'), 'utf8'), ctx);
-const ANSWERS = ctx.ANSWERS;
+// What screen-routes' _wrapAnswers hands these screens: the 121 topics, not the
+// Main Page appended after them (c72).
+const ANSWERS = answersTopicEntries(ctx.ANSWERS);
 
 const GLOBALS = ['ScreenLayout', 'LibraryNav', 'SheetHandle', 'useFocusTrap', 'ReactDOM'];
 let navProps;
