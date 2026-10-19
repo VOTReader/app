@@ -7732,6 +7732,15 @@
       --sw-cited: rgba(196, 164, 105, 0.7); --sw-prophecy: rgba(239, 209, 138, 0.9);
       --sw-font: 'EB Garamond', Georgia, serif;
     }
+    /* THE GLASS'S INSETS, BY THE FRAME'S OWN EDGES. The web's chrome reads its safe-area
+       insets from these four and never from env() directly, so the rotated root
+       (.sw-rotated, below) can remap them in one place. */
+    .sw-root {
+      --sw-safe-top: max(env(safe-area-inset-top), var(--inset-top, 0px));
+      --sw-safe-right: env(safe-area-inset-right, 0px);
+      --sw-safe-bottom: max(env(safe-area-inset-bottom), var(--inset-bottom, 0px));
+      --sw-safe-left: env(safe-area-inset-left, 0px);
+    }
     /* ONE PALETTE, ONE CANVAS. The canvas is black in both themes (SW_PALETTE,
        palette.js: "this screen has one palette") and this chrome floats over it,
        so its ink tokens are the web's own dark values in BOTH themes. When they
@@ -7764,6 +7773,15 @@
       height: 100vw; height: 100dvw;
       transform: rotate(90deg) translateY(-100%);
       transform-origin: top left;
+      /* env(safe-area-inset-*) still names the PORTRAIT glass's edges. Turned this way the
+         frame's top lies on the glass's right edge, its right on the bottom, its bottom on the
+         left and its left on the top, so the S22's 27 px portrait cutout is the frame's LEFT
+         and no longer pushes the topbar onto My Web's Volumes rail (w4 device check). */
+      --sw-safe-top: env(safe-area-inset-right, 0px);
+      --sw-safe-right: max(env(safe-area-inset-bottom), var(--inset-bottom, 0px));
+      --sw-safe-bottom: env(safe-area-inset-left, 0px);
+      --sw-safe-left: max(env(safe-area-inset-top), var(--inset-top, 0px));
+      --sw-chrome-top: calc(10px + var(--sw-safe-top));
     }
     .sw-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
     .sw-canvas-gl { z-index: 1; }
@@ -7860,9 +7878,9 @@
        and it is still the 44 px target. */
     .sw-hide-all {
       position: absolute; z-index: 5; right: 24px;
-      bottom: calc(16px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
+      bottom: calc(16px + var(--sw-safe-bottom));
     }
-    .sw-root.sw-compact .sw-hide-all { right: 16px; bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
+    .sw-root.sw-compact .sw-hide-all { right: 16px; bottom: calc(8px + var(--sw-safe-bottom)); }
     .sw-hide-label {
       position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
     }
@@ -8166,7 +8184,7 @@
     }
     /* the close X: a 24 px glyph in a 44 px target, top right, clear of the safe area */
     .sw-sheet-close {
-      position: absolute; z-index: 2; top: 10px; right: calc(10px + env(safe-area-inset-right, 0px));
+      position: absolute; z-index: 2; top: 10px; right: calc(10px + var(--sw-safe-right));
       min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center;
       background: var(--sw-panel); border: 0; border-radius: 6px; color: var(--sw-text-meta); cursor: pointer;
     }
@@ -8190,7 +8208,7 @@
        2.4.11; w4 review round 2) */
     .sw-panel-body {
       flex: 1 1 auto; min-height: 0; overflow-y: auto;
-      padding: 24px calc(24px + env(safe-area-inset-right, 0px)) 0 24px; scroll-padding-top: 60px;
+      padding: 24px calc(24px + var(--sw-safe-right)) 0 24px; scroll-padding-top: 60px;
       scrollbar-width: thin; scrollbar-color: var(--sw-panel-edge) transparent;
       touch-action: pan-y; overscroll-behavior: contain;
     }
@@ -8346,13 +8364,13 @@
     /* the CC-BY line: a 48 px band pinned at the foot on PC; last in the scroll on a phone */
     .sw-panel-credit {
       flex: none; display: flex; align-items: center; min-height: 48px; box-sizing: border-box;
-      padding: 0 calc(24px + env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) 24px;
+      padding: 0 calc(24px + var(--sw-safe-right)) var(--sw-safe-bottom) 24px;
       background: var(--sw-panel); border-top: 1px solid var(--sw-hairline);
       font-size: calc(var(--fsc-13) * var(--sw-ts)); color: var(--sw-text-muted);
     }
-    .sw-panel-body > .sw-panel-credit { min-height: 0; padding: 16px 0 calc(16px + env(safe-area-inset-bottom, 0px)); }
+    .sw-panel-body > .sw-panel-credit { min-height: 0; padding: 16px 0 calc(16px + var(--sw-safe-bottom)); }
     /* compact (root height <= 500: every phone value of the spec) */
-    .sw-root.sw-compact .sw-panel-body { padding: 12px calc(20px + env(safe-area-inset-right, 0px)) 0 20px; scroll-padding-top: 54px; }
+    .sw-root.sw-compact .sw-panel-body { padding: 12px calc(20px + var(--sw-safe-right)) 0 20px; scroll-padding-top: 54px; }
     .sw-root.sw-compact :is(.sw-sheet-eyebrow, .sw-panel-over, .sw-sec-title) { font-size: calc(var(--fsc-12) * var(--sw-ts)); }
     .sw-root.sw-compact .sw-panel-title { font-size: calc(var(--fsc-24) * var(--sw-ts)); }
     .sw-root.sw-compact :is(.sw-sheet-meta, .sw-panel-meta, .sw-link, .sw-cite-quote, .sw-zoom-row) { font-size: calc(var(--fsc-15) * var(--sw-ts)); }
@@ -8438,7 +8456,7 @@
        when the controls are hidden. */
     .sw-legend {
       position: absolute; z-index: 4; left: 24px;
-      bottom: calc(16px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
+      bottom: calc(16px + var(--sw-safe-bottom));
       max-width: calc(100% - 164px); overflow: hidden;
       font-family: var(--sw-font); font-size: var(--fsc-14); line-height: 1.35; color: var(--sw-text-muted);
       pointer-events: none;
@@ -8450,7 +8468,7 @@
        never clipped, it is the licence's (w4 review: nowrap under the clip cut "(CC-BY)" at 780 px).
        Each item keeps its words together; the canvas reads the legend's live top. */
     .sw-root.sw-compact .sw-legend {
-      left: 16px; bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
+      left: 16px; bottom: calc(8px + var(--sw-safe-bottom));
       font-size: var(--fsc-12); line-height: 1.25; max-width: calc(100% - 140px);
     }
     .sw-root.sw-compact .sw-legend-line > * { white-space: nowrap; }
@@ -8507,7 +8525,7 @@
        portrait width inside the CSS-rotated landscape and stack the controls
        over the web. */
     .sw-root.sw-narrow .sw-controls { max-width: 100%; left: 14px; right: auto; justify-content: flex-start;
-      top: auto; bottom: calc(30px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
+      top: auto; bottom: calc(30px + var(--sw-safe-bottom)); }
     .sw-root.sw-narrow .sw-legend { display: none; }
     @media (prefers-reduced-motion: reduce) {
       .sw-btn, .sw-seg-btn { transition: none; }
@@ -8545,14 +8563,14 @@
          it the button sat on the ruler's last chapter numeral (the l14 sky picture). Its ink is
          the web's own, so it reads in the light theme too (item 18, crop-pc-light-qbtn). */
       position: absolute; z-index: 5; right: 80px;
-      bottom: calc(16px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
+      bottom: calc(16px + var(--sw-safe-bottom));
       font-size: var(--fsc-20); font-weight: 500;
     }
-    .sw-root.sw-compact .sw-guide-btn { right: 68px; bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); font-size: var(--fsc-18); }
+    .sw-root.sw-compact .sw-guide-btn { right: 68px; bottom: calc(8px + var(--sw-safe-bottom)); font-size: var(--fsc-18); }
     .sw-root.sw-chrome-hidden .sw-guide-btn { display: none; }
     /* a narrow root parks the controls bottom-left and keeps the right 76 px
        column free: the ? stacks above hide-all there instead */
-    .sw-root.sw-narrow .sw-guide-btn { right: 14px; bottom: calc(60px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
+    .sw-root.sw-narrow .sw-guide-btn { right: 14px; bottom: calc(60px + var(--sw-safe-bottom)); }
 
     /* My Web — the empty state, shown until the reader's first link lands. */
     .sw-empty {
@@ -8619,7 +8637,7 @@
     .sw-empty-close:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
     .sw-empty-close:active { background: var(--bg2); }
 
-    .sw-root.sw-narrow .sw-controls { bottom: calc(10px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))); }
+    .sw-root.sw-narrow .sw-controls { bottom: calc(10px + var(--sw-safe-bottom)); }
 
     /* A rotated phone still has a landscape-sized root, but the physical
        viewport is tight enough that the last control otherwise falls onto a
