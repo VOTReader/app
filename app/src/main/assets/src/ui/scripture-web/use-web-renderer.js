@@ -354,6 +354,8 @@ export function useWebRenderer({
         // the walk's knob for the corridor pair (e2e-myweb-colour arm K): a
         // number here overrides the context's depth alpha ceiling; unset in the app
         ro.contextCeiling = typeof globalThis.__swContextCeiling === 'number' ? globalThis.__swContextCeiling : undefined;
+        // the walk's knob for the glow's cost (e2e-myweb --glow): false draws no glow; unset in the app
+        ro.contextGlow = globalThis.__swContextGlow === false ? false : undefined;
         // the overlay (overlay-renderer.js): one clear, the links, the book names
         paintMyWebOverlay(ctx, { personal: p, g, cam, view: base, v, chrome, rail: ro });
         if (wrap) put(wrap, attrs, 'data-cap-fraction', String(ro.capFraction));

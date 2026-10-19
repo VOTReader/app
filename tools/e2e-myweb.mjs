@@ -36,6 +36,13 @@
  *   C    control: with 0 links and context OFF the band is empty (coverage <=
  *        CONTROL_MAX); a reading off a canvas that draws something else is
  *        not a reading of the context
+ *   G    (--glow, information) the cost of the soft glow under Timothy's
+ *        threads (w4 review, minor 7): the draw's own time over about 30
+ *        frames held live by zero-delta wheels (the glow is drawn live since
+ *        the review) and over hover moves at rest, at the overview, with the
+ *        glow and without it (the walk's knob __swContextGlow = false), in
+ *        ABAB order, p50 of each; the ratio is printed against GLOW_COST
+ *        (1.3: past it the glow should be cached)
  *
  * EXIT: 0 pass, 1 fail, 2 nothing-to-check (the screen never drew), 3 harness.
  * A named defect outranks nothing-to-check, decided at the exit and nowhere
@@ -47,6 +54,7 @@
  *
  * Run from the repo root on a clean tree:
  *   node tools/e2e-myweb.mjs [--frames phoneLand,phone,desktop] [--out DIR] [--perf]
+ *   node tools/e2e-myweb.mjs --glow --frames phoneLand,pixelLand   (the G arm alone)
  */
 import puppeteer from 'puppeteer';
 import { execSync } from 'node:child_process';
@@ -59,8 +67,10 @@ const has = (k) => process.argv.includes('--' + k);
 const num = (k, d) => { const v = process.env[k]; return v === undefined ? d : Number(v); };
 const OUT = arg('out', null);
 const PERF = has('perf');
+const GLOW = has('glow');
 const FRAMES = {
   phoneLand: { w: 800, h: 360, dpr: 2, mobile: true, rewardArm: true },
+  pixelLand: { w: 891, h: 411, dpr: 2.6, mobile: true, rewardArm: true },
   phone: { w: 426, h: 952, dpr: 2, mobile: true, rewardArm: false },
   desktop: { w: 1920, h: 1080, dpr: 2, mobile: false, rewardArm: true },
 };
@@ -76,6 +86,7 @@ const LINK_CORE = num('MYWEB_LINK_CORE', 210);      // main 197-205 on the three
 const CONTEXT_P50 = num('MYWEB_CONTEXT_P50', 60);   // main 10; prototype 16-49 (the arm is the PAIR with LINK_CORE)
 const PANEL_COVER = num('MYWEB_PANEL_COVER', 0.45); // fraction of band rows; main ~1.0 at 800x360
 const CONTROL_MAX = num('MYWEB_CONTROL_MAX', 0.04); // main 0.0036 (426x952), 0.0296 (800x360: rail ticks)
+const GLOW_COST = num('MYWEB_GLOW_COST', 1.3);      // G: the glow's draw-time ratio past which it should be cached (w4 review)
 /* R5 ceilings: min-of-two p50 rAF ms during a 1.5 s pan, per frame and state,
    measured with NO getImageData before the timing (a read-back canvas is
    demoted to software raster and times the demotion). REGISTERED PER RENDERER
@@ -360,6 +371,46 @@ async function perfArm(page, tag, state, ceiling) {
   if (ceiling == null) { fails.push(`${tag} R5 ${state}: min-of-two draw p50 ${min} ms against NO ceiling: this renderer is not registered in R5_CEILINGS (the Verifier registers it from three runs at the landing tip)`); return; }
   if (min > ceiling) fails.push(`${tag} R5 ${state}: min-of-two draw p50 ${min} ms > ceiling ${ceiling} ms`);
 }
+/** G: the draw's own time over `n` draws, glow on or off. 'live': zero-delta wheels over the
+    canvas, a frame apart (each holds the gesture live, so the glow is timed where the review
+    turned it on); 'hover': pointer moves with no button across the band at rest. */
+async function glowPass(page, off, kind, n) {
+  await page.evaluate((o) => { /** @type {any} */ (globalThis).__swContextGlow = o ? false : undefined; }, off);
+  await sleep(900);   // past any live hold and its fade
+  await page.evaluate(() => { const c = window.__sw2d; if (c) { c.stroke = 0; c.clear = 0; c.draws = []; c.t0 = 0; c.tLast = 0; } });
+  const box = await page.evaluate(() => { const b = document.querySelector('.sw-canvas-ui').getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height }; });
+  if (kind === 'live') {
+    await page.evaluate(async (count, bx) => {
+      const el = document.querySelector('.sw-canvas-ui');
+      const two = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      for (let i = 0; i < count; i++) {
+        el.dispatchEvent(new WheelEvent('wheel', { deltaY: 0, deltaX: 0, clientX: bx.x + bx.w / 2, clientY: bx.y + bx.h / 2, bubbles: true, cancelable: true }));
+        await two();
+      }
+    }, n, box);
+  } else {
+    for (let i = 0; i < n; i++) {
+      // a sweep along the middle of the band, where the threads are densest
+      await page.mouse.move(box.x + box.w * (0.08 + (0.84 * (i % 30)) / 30), box.y + box.h * (0.45 + 0.1 * Math.sin(i)));
+      await sleep(34);
+    }
+  }
+  await sleep(200);
+  const d = await page.evaluate(() => (window.__sw2d ? window.__sw2d.draws.slice().sort((a, b) => a - b) : []));
+  const q = (p) => (d.length ? +d[Math.min(d.length - 1, Math.floor(d.length * p))].toFixed(2) : NaN);
+  return { n: d.length, p50: q(0.5), p95: q(0.95) };
+}
+async function glowArm(page, tag) {
+  for (const kind of ['live', 'hover']) {
+    const on = [], off = [];
+    // ABAB, so a drift over the arm falls on both sides
+    for (let r = 0; r < 2; r++) { on.push(await glowPass(page, false, kind, 30)); off.push(await glowPass(page, true, kind, 30)); }
+    const p50 = (xs) => { const v = xs.map((x) => x.p50).filter(Number.isFinite).sort((a, b) => a - b); return v.length ? v[0] : NaN; };
+    const a = p50(on), b = p50(off), ratio = b > 0 ? a / b : NaN;
+    note(`${tag} G glow ${kind} at the overview: draw p50 with the glow ${on.map((x) => x.p50).join('/')} ms (n ${on.map((x) => x.n).join('/')}, p95 ${on.map((x) => x.p95).join('/')}), without ${off.map((x) => x.p50).join('/')} ms (n ${off.map((x) => x.n).join('/')}, p95 ${off.map((x) => x.p95).join('/')}); min-of-two ${a} / ${b} = ${Number.isFinite(ratio) ? ratio.toFixed(2) : 'n/a'}x (cache the glow past ${GLOW_COST}x)`);
+  }
+  await page.evaluate(() => { /** @type {any} */ (globalThis).__swContextGlow = undefined; });
+}
 async function makeLink(page, route, verseIdx, ref) {
   await goHome(page);
   for (const step of route) { await clickLabel(page, step); await sleep(450); }
@@ -404,10 +455,16 @@ async function walk(page, url, fname) {
   const f = FRAMES[fname];
   const tag = `[${fname} ${f.w}x${f.h}]`;
   await page.setViewport({ width: f.w, height: f.h, deviceScaleFactor: f.dpr, isMobile: f.mobile, hasTouch: f.mobile });
-  if (PERF) await page.evaluateOnNewDocument(COUNTERS);
+  if (PERF || GLOW) await page.evaluateOnNewDocument(COUNTERS);
   await boot(page, url);
   if (!(await toMyWeb(page))) {
     nothingToCheck = `${tag} the web could not be drawn (.sw-fallback); no canvas to read`;
+    return;
+  }
+  if (GLOW) {
+    // the G arm alone: timing before any pixel read, as R5 does
+    await clickIfPresent(page, 'Dismiss'); await sleep(300);
+    await glowArm(page, tag);
     return;
   }
   if (PERF) {

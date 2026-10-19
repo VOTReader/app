@@ -1040,9 +1040,10 @@ function setTracking(ctx, px) {
  * @param {{verseX:(v:number)=>number, votX?:(p:number)=>number, votRail:any, verseTotal:number, width:number, height:number,
  *   DPR:number, base:number, chrome:any, showUnderlay?:boolean, capFraction?:number,
  *   hoverIndex?:number, focusIndex?:number, hoverUnderlay?:boolean, focusUnderlay?:boolean,
- *   contextCeiling?:number, inset?:number}} opts
+ *   contextCeiling?:number, contextGlow?:boolean, inset?:number}} opts
  *   hoverIndex / focusIndex index the reader's links, or Timothy's notes when
  *   hoverUnderlay / focusUnderlay is set (the Focus's underlay fields).
+ *   contextGlow false draws no glow (the walk's bench knob; unset in the app).
  */
 export function drawPersonalWeb(ctx, personal, underlay, opts) {
   const { width, DPR, votRail, verseX } = opts;
@@ -1097,7 +1098,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
     for (const key of [...steps.keys()].sort((p, q) => p - q)) {
       const cx = personalInk((key & 1 ? flyRungs : rungs).zoom(key >> 1), opts.contextCeiling).context;
       ctx.lineWidth = cx.width * DPR * (key & 1 ? FLYOVER_LEG_WIDTH : 1);
-      const glow = !(key & 1) ? { alpha: cx.glow.alpha * rest, width: ctx.lineWidth + cx.glow.width * DPR } : null;
+      const glow = !(key & 1) && opts.contextGlow !== false ? { alpha: cx.glow.alpha * rest, width: ctx.lineWidth + cx.glow.width * DPR } : null;
       /** @type {ContextBatches} */ (steps.get(key)).stroke(ctx, cx.alpha * rest, ctx.lineWidth * 4, opts.capFraction, glow);
     }
   }

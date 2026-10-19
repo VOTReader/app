@@ -178,6 +178,16 @@ describe('P2 a line\'s ink follows the rails it is anchored to on screen', () =>
     expect(glowStrokes(live).map((s) => [s.style, s.width])).toEqual(glows.map((s) => [s.style, s.width]));
     expect(contextStrokes(live).length).toBeGreaterThan(0);
   });
+  it('the walk\'s glow knob (contextGlow false, e2e-myweb --glow) draws the same cores and no glow, so the bench times the glow alone', () => {
+    const deep = Object.assign({}, base, { verseX: (v) => 500 + (v - 50) * 100, votX: (p) => 500 + (p - 10) * 500 });
+    const u = { count: 2, versePos: new Float32Array([50, 51]), votPos: new Float32Array([10, 10.4]), source: new Uint8Array([0, 1]) };
+    const on = recordingCtx(), off = recordingCtx();
+    drawPersonalWeb(on, null, u, deep);
+    drawPersonalWeb(off, null, u, Object.assign({}, deep, { contextGlow: false }));
+    expect(glowStrokes(on).length).toBe(2);
+    expect(glowStrokes(off).length).toBe(0);
+    expect(contextStrokes(off).map((x) => [x.style, x.width])).toEqual(contextStrokes(on).map((x) => [x.style, x.width]));
+  });
   it('w4 review: a leg (one foot on screen) glows only while its other foot is near, fading with that foot\'s presence, so a corridor of legs off a zoomed rail never fuses into a slab', () => {
     // both rails 10x (the frame above): a thread with both feet on screen (footnotes), a leg
     // whose Volumes foot sits just past the right edge (study notes) and one whose Volumes
