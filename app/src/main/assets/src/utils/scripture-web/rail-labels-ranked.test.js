@@ -83,6 +83,64 @@ describe('placeRailLabelsRanked', () => {
     expect(at[0]).toBe(47);
   });
 
+  /* w4 readdown (minor): JUDG, MARK and ROM went on a PC's one row because their neighbours had
+     already taken the middle of their own books. With `at` given, a box with no free place makes
+     room by moving the row's names along their own ranges, a pad (or the roomy gap) from each, each
+     as near where it stood as the room allows; a name without a range, or one that would have to
+     move onto a blocked place, holds, and then the box goes as before. */
+  it('a box with no free place moves its neighbours along their own ranges to make room', () => {
+    const a = { left: 0, right: 40, lo: -20, hi: 0 };
+    const c = { left: 100, right: 140, lo: 100, hi: 120 };
+    const b = { left: 50, right: 90, lo: 45, hi: 55 };
+    const at = [];
+    // without at (nobody can be told where they moved) it goes as before
+    expect(placeRailLabelsRanked([a, b, c], 13, 1, [0, 1, 0])).toEqual([0, -1, 0]);
+    expect(placeRailLabelsRanked([a, b, c], 13, 1, [0, 1, 0], undefined, at)).toEqual([0, 0, 0]);
+    expect(at[1]).toBe(50);                          // the box at its own place
+    expect(at[1] - (at[0] + 40)).toBeGreaterThanOrEqual(13);
+    expect(at[2] - (at[1] + 40)).toBeGreaterThanOrEqual(13);
+    expect(at[0]).toBeGreaterThanOrEqual(-20);       // each within its own range
+    expect(at[2]).toBeLessThanOrEqual(120);
+    expect(at[0]).toBe(-3);                          // and moved no further than the room needs
+    expect(at[2]).toBe(103);
+    // the roomy gap first, where the ranges have room for it
+    const at2 = [];
+    expect(placeRailLabelsRanked([a, b, c], 13, 1, [0, 1, 0], undefined, at2, 18)).toEqual([0, 0, 0]);
+    expect([at2[0], at2[2]]).toEqual([-8, 108]);
+    // a neighbour with no range holds, and with no room left the box goes
+    const at3 = [];
+    const tight = Object.assign({}, b, { hi: 52 });
+    expect(placeRailLabelsRanked([{ left: 0, right: 40 }, tight, c], 13, 1, [0, 1, 0], undefined, at3)).toEqual([0, -1, 0]);
+    expect([at3[0], at3[2]]).toEqual([0, 100]);
+    // a neighbour that would move onto a blocked place holds there, and the rest make the room
+    const at4 = [];
+    expect(placeRailLabelsRanked([a, b, c], 13, 1, [0, 1, 0], (i, _r, x) => i === 2 && x > 100, at4)).toEqual([0, 0, 0]);
+    expect([at4[0], at4[1], at4[2]]).toEqual([-6, 47, 100]);
+    // the box itself never takes a blocked place
+    const at5 = [];
+    expect(placeRailLabelsRanked([a, b, c], 13, 1, [0, 1, 0], (i) => i === 1, at5)).toEqual([0, -1, 0]);
+    expect([at5[0], at5[2]]).toEqual([0, 100]);
+  });
+
+  it('making room keeps the row\'s roomy cells roomy; only a box marked squeeze may close them to a pad', () => {
+    // a and c stand 30 apart, a roomy cell (roomy 24); d may move right to 156. b (between c and d)
+    // fits only if c moves left into that cell, closing it to 17
+    const a = { left: 0, right: 40 };
+    const c = { left: 70, right: 110, lo: 50, hi: 70 };
+    const d = { left: 150, right: 190, lo: 150, hi: 156 };
+    const b = { left: 110, right: 140, lo: 104, hi: 116 };
+    const run = (box) => { const at = []; return { rows: placeRailLabelsRanked([a, c, d, box], 13, 1, [0, 0, 0, 1], undefined, at, 24), at }; };
+    const plain = run(b);
+    expect(plain.rows).toEqual([0, 0, 0, -1]);
+    expect(plain.at.slice(0, 3)).toEqual([0, 70, 150]);
+    const sq = run(Object.assign({ squeeze: true }, b));
+    expect(sq.rows).toEqual([0, 0, 0, 0]);
+    expect(sq.at[1] - 40, 'the a|c cell closes, to no less than the pad').toBeGreaterThanOrEqual(13);
+    expect(sq.at[1] - 40).toBeLessThan(24);
+    expect(sq.at[3] - (sq.at[1] + 40)).toBeGreaterThanOrEqual(13);
+    expect(sq.at[2] - (sq.at[3] + 30)).toBeGreaterThanOrEqual(13);
+  });
+
   it('a slide never takes a blocked place: blocked is asked at the left edge it would take', () => {
     const john = { left: 100, right: 140 };
     const luke = { left: 50, right: 90, lo: 0, hi: 200 };

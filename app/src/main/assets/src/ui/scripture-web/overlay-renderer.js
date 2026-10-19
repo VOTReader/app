@@ -200,6 +200,11 @@ const GUTTER = 16;
 const STRIDES = [1, 2, 5, 10, 25, 50, 100];
 /** The major books (spec §3), drawn in the brighter weight and placed before their neighbours. */
 const MAJOR_BOOKS = ['genesis', 'psalms', 'isaiah', 'matthew', 'john', 'revelation'];
+/** The other books r2-01a's one row names on a PC, placed after the majors and before the rest, in
+    canon order (w4 readdown: JUDG, MARK and ROM went where 2KGS, 2SAM and 1COR, a few verses longer,
+    were placed first). At 1600 px the run from Matthew to 1 Corinthians has room for six names a word
+    apart, not r2-01a's seven: in canon order the epistles begin at ROM, and 1COR gives way. */
+const PICTURE_BOOKS = ['exodus', 'leviticus', 'numbers', 'deuteronomy', 'joshua', 'judges', 'mark', 'luke', 'acts', 'romans', '1corinthians'];
 /** The DOM chrome the canvas keeps its text off (the round buttons; the strip when it sits low). */
 const ZONE_SELECTORS = ['.sw-hide-all', '.sw-guide-btn', '.sw-controls'];
 
@@ -864,13 +869,17 @@ function nameForm(g, tag, share) {
  * span (three times for a major book: REV on a phone), save the canon's first
  * and last books wholly on the frame at its edge, whose name, held to that
  * edge, can only stand over the canon's end (REV at 667 px, w4 review).
- * Placed by the ranked law (rail-labels.js): the six major books first, then the longer books
+ * Placed by the ranked law (rail-labels.js): the six major books first, then on a PC the
+ * other books r2-01a's row names (PICTURE_BOOKS, in canon order), then the longer books
  * before the shorter, each a word (NAME_GAP) from its neighbours, a row under
  * a corner button refused; the canon's overview has one row (r2-01a). A name
  * that meets a neighbour slides along its own book to the nearest place a word
  * clear, its centre still over that book (LUKE and ACTS beside JOHN went for 3-5
  * px, w4 review 2), first looking for one NAME_ROOM clear so it does not sit
- * hard against its neighbour, and goes only where there is no such place. The
+ * hard against its neighbour; where no such place is free, its neighbours give
+ * way along their own books to make one, keeping the row's roomy cells roomy
+ * (r2-01a's names on a PC may close them to a word: JUDG, MARK and ROM), and
+ * it goes only where even that leaves no room. The
  * major books, and only they, are in the bold and the brighter ink. A thin
  * rule stands between each two neighbouring names, as r2-01a's cells: at the
  * right one's book start where that lies clear of both names, else midway
@@ -891,6 +900,7 @@ function drawBookLabels(ctx, g, cam, L, rows, size, hits, tag) {
     const x0 = verseToX(cam, W, span[0]), x1 = verseToX(cam, W, span[1]);
     if (x1 <= 0 || x0 >= Wc) continue;
     const major = isMajor(book);
+    const pictured = !L.compact && PICTURE_BOOKS.includes(String(book.id || '').toLowerCase());
     const font = major ? fontM : fontN;
     const vis0 = Math.max(x0, 0), vis1 = Math.min(x1, Wc), room = vis1 - vis0;
     const full = String(book.title || book.abbr || '').toUpperCase(), abbr = String(book.abbr || book.title || '').toUpperCase();
@@ -899,7 +909,7 @@ function drawBookLabels(ctx, g, cam, L, rows, size, hits, tag) {
     if (wF <= room - gap) roomFull += room;
     // the canon's first or last book wholly on the frame, its outer end on the frame's edge
     const atEnd = (bi === 0 && x0 >= -0.5 && x1 <= Wc) || (bi === spans.length - 1 && x0 >= 0 && x1 <= Wc + 0.5);
-    books.push({ bi, major, font, x0, vis0, vis1, room, full, abbr, wF, atEnd, verses: span[1] - span[0] });
+    books.push({ bi, major, pictured, font, x0, vis0, vis1, room, full, abbr, wF, atEnd, verses: span[1] - span[0] });
   }
   const form = nameForm(g, tag || 'canon', roomAll > 0 ? roomFull / roomAll : 0);
   const names = [];
@@ -914,13 +924,14 @@ function drawBookLabels(ctx, g, cam, L, rows, size, hits, tag) {
     // holds of it and the name wholly on the frame (w4 review 2: LUKE and ACTS went for 3-5 px)
     const lo = Math.max(edge, b.vis0 - w / 2), hi = Math.min(Wc - edge - w, b.vis1 - w / 2);
     const left = cx - w / 2;
-    names.push({ bi: b.bi, label, font: b.font, major: b.major, x0: b.x0, verses: b.verses, left, right: left + w, lo: lo <= hi ? lo : left, hi: lo <= hi ? hi : left });
+    names.push({ bi: b.bi, label, font: b.font, major: b.major, x0: b.x0, verses: b.verses, rank: b.major ? -1e9 : b.pictured ? -1e8 + b.bi : -b.verses,
+      squeeze: b.pictured, left, right: left + w, lo: lo <= hi ? lo : left, hi: lo <= hi ? hi : left });
   }
   const boxAt = (n, r) => ({ x0: n.left, x1: n.right, y0: rows[r].top, y1: rows[r].top + capH });
   const zones = L.zones || [];
   /** @type {number[]} */
   const at = [];
-  const placed = placeRailLabelsRanked(names, gap, rows.length, names.map((n) => (n.major ? -1e9 : -n.verses)),
+  const placed = placeRailLabelsRanked(names, gap, rows.length, names.map((n) => n.rank),
     (i, r, x) => zones.some((z) => boxesMeet(boxAt({ left: x, right: x + names[i].right - names[i].left }, r), z)), at, roomy);
   names.forEach((n, i) => { if (placed[i] >= 0 && at[i] !== n.left) { n.right += at[i] - n.left; n.left = at[i]; } });
   ctx.textAlign = 'left';

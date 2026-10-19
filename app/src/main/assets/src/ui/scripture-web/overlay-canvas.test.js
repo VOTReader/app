@@ -48,7 +48,7 @@ function recorder(canvas = null, em = 0.5) {
     save() { stack.push(Object.fromEntries(Object.keys(state).map((k) => [k, ctx[k]]))); },
     restore() { const s = stack.pop(); if (s) Object.assign(ctx, s); },
     measureText(t) { return { width: textWidth(ctx, t) }; },
-    fillText(t, x, y) { calls.push({ op: 'fillText', t: String(t), x, y, font: ctx.font, align: ctx.textAlign, base: ctx.textBaseline, alpha: ctx.globalAlpha, fill: ctx.fillStyle, w: textWidth(ctx, t) }); },
+    fillText(t, x, y) { calls.push({ op: 'fillText', t: String(t), x, y, font: ctx.font, align: ctx.textAlign, base: ctx.textBaseline, alpha: ctx.globalAlpha, fill: ctx.fillStyle, w: textWidth(ctx, t), ls: parseFloat(ctx.letterSpacing) || 0 }); },
     fillRect(x, y, w, h) { calls.push({ op: 'fillRect', x, y, w, h, fill: ctx.fillStyle }); },
     createLinearGradient() { return { addColorStop() {} }; },
     em,
@@ -67,6 +67,8 @@ function textBox(c) {
   const x0 = c.align === 'center' ? c.x - c.w / 2 : c.align === 'right' ? c.x - c.w : c.x;
   return { x0, x1: x0 + c.w };
 }
+/** The centre of a left-aligned name's glyphs: the tracking after its last glyph inks nothing (label-engine's measure). */
+const glyphMid = (c) => textBox(c).x0 + (c.w - (c.ls || 0)) / 2;
 
 function frameAt(name, zoom, verse, extra = {}) {
   const v = FRAMES[name];
@@ -393,7 +395,7 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
           const bi = g.books.findIndex((b) => String(b.abbr).toUpperCase() === c.t);
           const c0 = g.chapters.find((ch) => ch[0] === bi), c1 = g.chapters.filter((ch) => ch[0] === bi).pop();
           const x0 = Math.max(0, X(c0[2])), x1 = Math.min(fs.v.W, X(c1[2] + c1[3]));
-          const b = textBox(c), mid = (b.x0 + b.x1) / 2;
+          const b = textBox(c), mid = glyphMid(c);
           expect(b.x1 > x0 && b.x0 < x1, what + ': ' + c.t + ' over its own book').toBe(true);
           // the canon's end books may be held to the frame's edge, wider than their span (REV)
           if (bi === 0 || bi === g.books.length - 1) continue;
@@ -410,8 +412,11 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
   /* w4 fix 2: a name slid to the nearest place a bare word clear sat hard against its neighbour,
      "LUKE |JOHN| ACTS" and "1CHR|2CHR" 13 px apart where every other pair stands 17 to 65 apart, as
      r2-01a's roomy cells never do. A slide looks first for a place a wider gap clear, along its own
-     book, and takes the bare word only where the book has no more room, with no name lost to it. */
-  for (const [name, pairs, n] of [['pc', [['LUKE', 'JOHN'], ['JOHN', 'ACTS'], ['1CHR', '2CHR']], 23], ['phone', [['ISA', 'JER']], 15]]) {
+     book, and takes the bare word only where the book has no more room, with no name lost to it.
+     w5: a name that makes room by moving its neighbours keeps every roomy cell roomy, save r2-01a's
+     own names on a PC, which may close them to the word: MARK and ROM close the run from MATT to
+     ROM (LUKE|JOHN and JOHN|ACTS stand a word apart there, every cell of the run alike). */
+  for (const [name, pairs, n] of [['pc', [['1CHR', '2CHR'], ['JER', 'EZEK']], 25], ['phone', [['ISA', 'JER']], 15]]) {
     it(name + ': a slid name is not hard against its neighbour where its own book has room (' + pairs.map((p) => p.join('|')).join(', ') + ')', () => {
       for (const hidden of [false, true]) {
         const { canvas } = chromeRoot(name, { hidden });
@@ -425,6 +430,42 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
       }
     });
   }
+
+  /* w4 readdown (minor): on a 1600x900 PC the one row named JOSH, LUKE and ACTS again, but JUDG, MARK
+     and ROM still went. Each was placed against neighbours that had already taken the middle of their
+     own books, where sliding over their own books those neighbours left it room. A name that meets
+     its neighbours may move them along their own books (each centre still over its own book) before
+     it goes, on the one row, a word clear of each, and no name already standing is lost for it. */
+  it('pc: the one row names JUDG, MARK and ROM too, its neighbours giving way along their own books', () => {
+    for (const em of [0.65, 0.7]) {
+      for (const hidden of [false, true]) {
+        const { canvas, zones } = chromeRoot('pc', { hidden });
+        const { rec, fs } = paint('pc', 1, g.total / 2, { canvas, em });
+        const s = fs.v.DPR, what = 'pc em ' + em + (hidden ? ' hidden' : '');
+        const X = (v) => (v - fs.cam.x) * fs.cam.ppv + fs.v.W / 2;
+        const drawn = bookTexts(rec);
+        const list = drawn.map((c) => c.t).join(' ');
+        expect([...new Set(drawn.map((c) => Math.round(c.y)))], what + ': one row').toHaveLength(1);
+        for (const t of ['GEN', 'EXOD', 'LEV', 'NUM', 'DEUT', 'JOSH', 'JUDG', 'PS', 'ISA', 'MATT', 'MARK', 'LUKE', 'JOHN', 'ACTS', 'ROM', 'REV']) {
+          expect(drawn.some((c) => c.t === t), what + ': ' + t + ' in ' + list).toBe(true);
+        }
+        // the 23 it drew less 1COR (Matthew to 1 Corinthians has room for six names a word apart, not
+        // seven, and ROM stands first in canon order), with JUDG, MARK and ROM
+        expect(drawn.length, what + ': ' + list).toBeGreaterThanOrEqual(25);
+        for (const c of drawn) {
+          const bi = g.books.findIndex((b) => String(b.abbr).toUpperCase() === c.t);
+          if (bi === 0 || bi === g.books.length - 1) continue;
+          const c0 = g.chapters.find((ch) => ch[0] === bi), c1 = g.chapters.filter((ch) => ch[0] === bi).pop();
+          const mid = glyphMid(c);
+          expect(mid, what + ': ' + c.t + "'s centre over its own book").toBeGreaterThanOrEqual(Math.max(0, X(c0[2])) - 1e-6);
+          expect(mid, what + ': ' + c.t + "'s centre over its own book").toBeLessThanOrEqual(Math.min(fs.v.W, X(c1[2] + c1[3])) + 1e-6);
+        }
+        const boxes = drawn.map(textBox).sort((a, b) => a.x0 - b.x0);
+        for (let i = 1; i < boxes.length; i++) expect(boxes[i].x0 - boxes[i - 1].x1, what + ': a word apart').toBeGreaterThanOrEqual(12 * s - 1e-6);
+        for (const c of drawn) for (const z of zones) expect(meet(textRect(c), z), what + ': ' + c.t + ' under a corner button or the pill').toBe(false);
+      }
+    }
+  });
 
   it('a thin rule stands between each two neighbouring names, and only there (r2-01a\'s cells)', () => {
     for (const [name, zoom, verse] of [['pc', 1, g.total / 2], ['phone', 1, g.total / 2], ['pc', 3.5, verseOf('ezekiel', 1, 1)]]) {
