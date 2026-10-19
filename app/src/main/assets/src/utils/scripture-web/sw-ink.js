@@ -58,6 +58,9 @@ const TABLE = {
   // threads read them (rail-renderer), in their own colour.
   chosen: { hex: '#F2D38A', alpha: 1, width: 3, widthCompact: 2.5 },   // adaptive tessellation, no facets
   chosenHalo: { hex: '#E0A84E', alpha: 0.22, width: 10 },
+  // a dark keyline under the chosen core, 1 CSS px each side of it, in the foot ring's black (w4 INK
+  // review, finding 5): the field keeps .60 of its ink (TAP_CONTEXT), and the line still reads first
+  chosenKey: { hex: '#000000', alpha: 0.70, width: 5, widthCompact: 4.5 },
   chosenFoot: { hex: '#F2D38A', alpha: 1, width: 8 },            // the foot dot's diameter
   chosenFootRing: { hex: '#000000', alpha: 1, width: 2 },
   chosenLabel: { hex: '#F2D38A', alpha: 1 },                     // 16 / 14 px, 10 px below the baseline
@@ -127,12 +130,17 @@ export const INK = Object.freeze(TABLE);
 /** What the rest of the web keeps of its alpha while a line is tapped: it RECEDES, never to
  * black (Corbin 08-10: other lines may disappear "only if it is tapped"; hover dims nothing).
  * Replaces today's near-black isolation (.05) and the spec's x0.80. The one named constant
- * (w4 INK item 4, bounded .30-.60), chosen from pairs at .30, .45 and .60 on PC and phone: at
- * .30 the field sank to a brown haze, at .60 its bright upper threads crowded the chosen line;
- * at .45 the field keeps its hues and structure and the gold line reads first (r2-02).
- * My Web's rail recedes by it too (rail-renderer), and the labels two thirds as far
- * (overlay-renderer LABEL_RECEDE). */
-export const TAP_CONTEXT = 0.45;
+ * (w4 INK item 4, bounded .30-.60), from pairs at .30, .45 and .60 on PC and phone: at .30 the
+ * field sank to a brown haze, and at .45 it still read as one (w4 INK review, finding 5), against
+ * r2-02's field that keeps its hues round the chosen line. At .60 it keeps them; the bright upper
+ * threads that crowded the line there are held off it by its dark keyline (chosenKey).
+ * The labels recede two thirds as far (overlay-renderer LABEL_RECEDE); My Web by its own
+ * (MYWEB_TAP_CONTEXT). */
+export const TAP_CONTEXT = 0.60;
+/** My Web's own recede (rail-renderer), from TAP_CONTEXT's .45 (w4 INK review, finding 6): the
+ * reader's other links share the chosen one's gold, so at .60 the chosen link's lead over them fell
+ * from 3.2:1 to 2.2:1 (w4/ink pairs.md); My Web's field is sparse, with no haze to lift. */
+export const MYWEB_TAP_CONTEXT = 0.45;
 /** The centre chapter's own arcs (a foot inside it), in their own ramp colours (§4.4). */
 export const CENTRE_BRIGHT = 1.35;
 export const CENTRE_WIDTH = 1.25;

@@ -466,6 +466,9 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(f.u(f.top, 'uHalo')).toEqual([rgba01('chosenHalo')]);
     expect(f.u(f.top, 'uCoreHalf')).toEqual([[inkWidth('chosen') / 2]]);
     expect(f.u(f.top, 'uHaloHalf')).toEqual([[inkWidth('chosenHalo') / 2]]);
+    // w4 INK review, finding 5: a dark keyline under the core, between it and the halo
+    expect(f.u(f.top, 'uKey')).toEqual([rgba01('chosenKey')]);
+    expect(f.u(f.top, 'uKeyHalf')).toEqual([[inkWidth('chosenKey') / 2]]);
     const draws = f.calls.filter((c) => c[0] === 'drawArraysInstanced');
     const last = draws[draws.length - 1];
     expect(f.top[f.top.length - 1].args, 'the chosen line is the last draw of the frame').toBe(last[1]);
@@ -481,6 +484,33 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(f.u(f.top, 'uCoreHalf')).toEqual([[(inkWidth('chosen', true) * 2) / 2]]);
     const g = frame(r, calls, { focusArc: 0, height: 1200, dpr: 2 });
     expect(g.u(g.top, 'uCoreHalf')).toEqual([[(inkWidth('chosen') * 2) / 2]]);
+  });
+
+  /* w4 INK review, finding 5: at a TAP_CONTEXT of .60 the field keeps its hues (r2-02), and the
+     chosen line is told from it by a dark keyline: the core over the key over the halo. */
+  it('the chosen core lies on a dark keyline, 1 CSS px each side, over its halo; it never recedes, and no other kind has one', () => {
+    for (const dpr of [1, 2, 2.625]) {
+      for (const compact of [false, true]) {
+        const look = topLook('chosen', dpr, compact, 1);
+        expect(look.keyHalf, `dpr ${dpr} compact ${compact}`).toBe((inkWidth('chosenKey', compact) * dpr) / 2);
+        expect(look.keyHalf - look.coreHalf).toBe(dpr);
+        expect(look.keyHalf).toBeLessThan(look.haloHalf);
+        expect(look.key).toEqual(rgba01('chosenKey'));
+        expect(look.ribbon).toBe(look.haloHalf + 0.5);
+      }
+    }
+    for (const kind of ['prophecyField', 'prophecy', 'prophecyInRange', 'lit', 'hover']) {
+      const look = topLook(kind, 2, false, 0, 1, { alpha: 0.5, strokeWidth: 2, voteMix: 0 });
+      expect([look.keyHalf, look.key], kind).toEqual([0, [0, 0, 0, 0]]);
+    }
+    const src = TOP_SHADER_SOURCE.fragment;
+    expect(src).toContain('uniform float uKeyHalf;');
+    expect(src).toContain('uniform vec4  uKey;');
+    expect(src).toContain('float key = uKeyHalf > coreHalf ? (1. - smoothstep(uKeyHalf - .5*uFeather, uKeyHalf + .5*uFeather, d))*uKey.a : 0.;');
+    // premultiplied: the key over the halo, the core over both
+    expect(src).toContain('vec3 under = uKey.rgb*key + uHalo.rgb*halo*(1. - key);');
+    expect(src).toContain('float underA = key + halo*(1. - key);');
+    expect(src).toContain('o = vec4(ink*core + under*(1. - core), core + underA*(1. - core));');
   });
 
   it('a hover is drawn in the hover ink, and the rest of the web does not recede (uTapFade 0)', () => {
@@ -726,7 +756,7 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(TOP_SHADER_SOURCE.vertex).toMatch(/float A = arcShape\(rx,\s*uSquash\)\.y;/);
     expect(TOP_SHADER_SOURCE.vertex).toMatch(/uBase \+ uCamY - hgt/);
     expect(TOP_SHADER_SOURCE.fragment.split('\n')[1]).toBe('precision mediump float;');
-    expect(TOP_SHADER_SOURCE.fragment).toContain('o = vec4(ink*core + uHalo.rgb*halo*(1. - core), a);');
+    expect(TOP_SHADER_SOURCE.fragment).toContain('o = vec4(ink*core + under*(1. - core), core + underA*(1. - core));');
   });
 });
 

@@ -29,7 +29,7 @@
 
 import { MY_WEB_SOURCES, CONTEXT_BINS, myWebLinkColor, MY_WEB_LINK_KINDS } from '../../utils/scripture-web/palette.js';
 import { placeRailLabels } from '../../utils/scripture-web/rail-labels.js';
-import { css as inkCss, TAP_CONTEXT, FLYOVER_LEG_WIDTH, FONT, INK } from '../../utils/scripture-web/sw-ink.js';
+import { css as inkCss, MYWEB_TAP_CONTEXT, FLYOVER_LEG_WIDTH, FONT, INK } from '../../utils/scripture-web/sw-ink.js';
 
 /** The Volumes rail's height from the top, CSS px (spec §3, My Web: 150 PC, 62 phone). */
 const TOP_RAIL_PC = 150;
@@ -903,7 +903,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
   const zV = (votRail && votRail.total && opts.votX) ? (opts.votX(votRail.total) - opts.votX(0)) / width : zB;
   const z = Math.max(zB, zV);
   // a chosen line, the reader's link or Timothy's thread: the rest of the web
-  // recedes to TAP_CONTEXT, never to black (fix-review #4)
+  // recedes to MYWEB_TAP_CONTEXT, never to black (fix-review #4)
   const focus = opts.focusIndex == null ? -1 : opts.focusIndex, hover = opts.hoverIndex == null ? -1 : opts.hoverIndex;
   const threads = underlay && opts.showUnderlay ? underlay.count : 0;
   const linkFocus = !opts.focusUnderlay && personal && focus < personal.count ? focus : -1;
@@ -911,7 +911,7 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
   const threadFocus = opts.focusUnderlay && focus < threads ? focus : -1;
   const threadHover = opts.hoverUnderlay && hover < threads && hover !== threadFocus ? hover : -1;
   const chosen = linkFocus >= 0 || threadFocus >= 0;
-  const rest = chosen ? TAP_CONTEXT : 1;
+  const rest = chosen ? MYWEB_TAP_CONTEXT : 1;
 
   // ── Timothy's notes, beneath everything ──
   if (underlay && opts.showUnderlay && underlay.count) {
@@ -1003,7 +1003,7 @@ function drawLinks(ctx, personal, opts, rails, L, linkHover, linkFocus, chosen) 
     const { pts, rgb, thin } = paths[i];
     if (!pts) continue;
     const hot = i === linkHover || i === linkFocus;
-    const dim = (chosen && i !== linkFocus) ? TAP_CONTEXT : 1;
+    const dim = (chosen && i !== linkFocus) ? MYWEB_TAP_CONTEXT : 1;
     ctx.strokeStyle = 'rgba(' + rgb + ',' + ((hot ? L.hoverHaloAlpha : L.haloAlpha) * dim) + ')';
     ctx.lineWidth = (hot ? L.hoverHalo : L.halo) * DPR * thin;
     ctx.beginPath();
@@ -1016,7 +1016,7 @@ function drawLinks(ctx, personal, opts, rails, L, linkHover, linkFocus, chosen) 
     if (!pts) continue;
     const isHover = i === linkHover;
     const isFocus = i === linkFocus;
-    const dim = (chosen && !isFocus) ? TAP_CONTEXT : 1;
+    const dim = (chosen && !isFocus) ? MYWEB_TAP_CONTEXT : 1;
     ctx.strokeStyle = 'rgba(' + rgb + ',' + (L.alpha * dim) + ')';
     ctx.lineWidth = (isHover || isFocus ? L.hoverWidth : L.width) * DPR * thin;
     ctx.beginPath();

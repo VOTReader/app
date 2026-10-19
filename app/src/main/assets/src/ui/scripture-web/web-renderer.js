@@ -328,6 +328,8 @@ uniform float uHaloHalf;     // the halo's half width, device px (0: none)
 uniform float uFeather;      // one backing px, in full-resolution px (the main pass's uPx)
 uniform vec4  uCore;         // straight rgba
 uniform vec4  uHalo;         // straight rgba, its alpha at the core's edge
+uniform float uKeyHalf;      // the keyline's half width, device px, out from the centre (0: none)
+uniform vec4  uKey;          // straight rgba: the dark keyline under the core, over the halo
 in float vEdge; flat in vec3 vRamp; flat in float vGain; flat in float vW;
 flat in float vField;        // 1: a field kind, in the ramp's colour of its span (vRamp)
 out vec4 o;
@@ -342,9 +344,13 @@ void main(){
   // the halo: full under the core, falling softly to nothing at its own edge
   float h = uHaloHalf > coreHalf ? clamp(1. - (d - coreHalf)/(uHaloHalf - coreHalf), 0., 1.) : 0.;
   float halo = h*h*uHalo.a;
-  float a = core + halo*(1. - core);
+  // the keyline (the chosen line's, w4 INK review): a dark band just past the core's edge
+  float key = uKeyHalf > coreHalf ? (1. - smoothstep(uKeyHalf - .5*uFeather, uKeyHalf + .5*uFeather, d))*uKey.a : 0.;
+  vec3 under = uKey.rgb*key + uHalo.rgb*halo*(1. - key);
+  float underA = key + halo*(1. - key);
   vec3 ink = mix(uCore.rgb, vRamp, vField);
-  o = vec4(ink*core + uHalo.rgb*halo*(1. - core), a);   // premultiplied, the core over the halo
+  // premultiplied: the core over the keyline over the halo
+  o = vec4(ink*core + under*(1. - core), core + underA*(1. - core));
 }`;
 
 /** The top pass's shader sources, exported for the same proofs. */
@@ -363,7 +369,8 @@ const TOP_LOOK = {
   prophecyInRange: { core: 'prophecy', halo: '', cap: 192, minDevicePx: 1 },
   lit: { core: 'lit', halo: '', cap: 192 },
   hover: { core: 'hover', halo: 'hoverHalo', cap: 512 },
-  chosen: { core: 'chosen', halo: 'chosenHalo', cap: 512 },
+  // the chosen core on its dark keyline (w4 INK review, finding 5), over the halo
+  chosen: { core: 'chosen', halo: 'chosenHalo', key: 'chosenKey', cap: 512 },
 };
 
 /**
@@ -384,7 +391,7 @@ const TOP_LOOK = {
  * @param {{ alpha?: number, strokeWidth?: number, voteMix?: number }} [style]  the frame's ribbonStyle,
  *   strokeWidth in device px (a field kind's only)
  * @returns {{ coreHalf: number, haloHalf: number, core: number[], halo: number[], ribbon: number, cap: number,
- *   field: number, fieldHalf: number, fieldFit: number }}
+ *   field: number, fieldHalf: number, fieldFit: number, keyHalf: number, key: number[] }}
  */
 export function topLook(kind, dpr, compact, tapFade, px, style) {
   const look = TOP_LOOK[kind];
@@ -399,6 +406,7 @@ export function topLook(kind, dpr, compact, tapFade, px, style) {
     return {
       coreHalf: half, haloHalf: 0, core: [0, 0, 0, alpha * fade], halo: [0, 0, 0, 0],
       ribbon: Math.max(half, 0.5 * p) + 0.5 * p, cap: look.cap, field: 1, fieldHalf: half, fieldFit,
+      keyHalf: 0, key: [0, 0, 0, 0],
     };
   }
   const wide = inkWidth(look.core, compact) * d;
@@ -408,9 +416,11 @@ export function topLook(kind, dpr, compact, tapFade, px, style) {
   const haloHalf = look.halo ? (inkWidth(look.halo, compact) * d) / 2 : 0;
   const core = rgba01(look.core, thin * fade);
   const halo = look.halo ? rgba01(look.halo, fade) : [0, 0, 0, 0];
+  const keyHalf = look.key ? (inkWidth(look.key, compact) * d) / 2 : 0;
+  const key = look.key ? rgba01(look.key, fade) : [0, 0, 0, 0];
   return {
-    coreHalf, haloHalf, core, halo, ribbon: Math.max(coreHalf, haloHalf) + 0.5 * p, cap: look.cap,
-    field: 0, fieldHalf: 0, fieldFit: 0,
+    coreHalf, haloHalf, core, halo, ribbon: Math.max(coreHalf, haloHalf, keyHalf) + 0.5 * p, cap: look.cap,
+    field: 0, fieldHalf: 0, fieldFit: 0, keyHalf, key,
   };
 }
 
@@ -533,7 +543,7 @@ export function createRenderer(canvas, graph, opts = {}) {
     'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc', 'uTapFade', 'uFocusRange2', 'uCentre', 'uCentreT']);
   const TU = uniformsOf(gl, topProgram, ['uRes', 'uCamXHi', 'uCamXLo', 'uPPV', 'uBase', 'uSquash', 'uCamY',
     'uSegments', 'uRibbonHalf', 'uRibbon', 'uCoreHalf', 'uHaloHalf', 'uFeather', 'uCore', 'uHalo',
-    'uTotal', 'uFlyLocalize', 'uField', 'uFieldHalf', 'uFieldFit']);
+    'uTotal', 'uFlyLocalize', 'uField', 'uFieldHalf', 'uFieldFit', 'uKeyHalf', 'uKey']);
 
   // The threads, once: their feet and fans in one RGBA32F texture, their
   // votes in an R32F one, ARC_TEX_W a row, fetched by id in the vertex stage
@@ -692,6 +702,8 @@ export function createRenderer(canvas, graph, opts = {}) {
       TU.f1('uHaloHalf', look.haloHalf);
       TU.f4('uCore', look.core);
       TU.f4('uHalo', look.halo);
+      TU.f1('uKeyHalf', look.keyHalf);
+      TU.f4('uKey', look.key);
       TU.f1('uField', look.field);
       TU.f1('uFieldHalf', look.fieldHalf);
       TU.f1('uFieldFit', look.fieldFit);

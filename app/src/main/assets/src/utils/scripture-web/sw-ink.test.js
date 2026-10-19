@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   INK, ink, rgba01, css, inkWidth, inkGLSL,
-  TAP_CONTEXT, CENTRE_BRIGHT, CENTRE_WIDTH, FLYOVER_LEG_WIDTH, FONT,
+  TAP_CONTEXT, MYWEB_TAP_CONTEXT, CENTRE_BRIGHT, CENTRE_WIDTH, FLYOVER_LEG_WIDTH, FONT,
 } from './sw-ink.js';
 
 /** WCAG 2 relative luminance of '#rrggbb'. */
@@ -63,6 +63,12 @@ describe('the ink table', () => {
     expect(INK.chosenHalo).toEqual({ hex: '#E0A84E', alpha: 0.22, width: 10 });
     expect(INK.chosenFoot).toEqual({ hex: '#F2D38A', alpha: 1, width: 8 });
     expect(INK.chosenFootRing).toEqual({ hex: '#000000', alpha: 1, width: 2 });
+    // w4 INK review, finding 5: a dark keyline under the chosen core, 1 CSS px each side of it (the
+    // foot ring's black), so the line reads first over a field that keeps .60 of its ink
+    expect(INK.chosenKey).toEqual({ hex: '#000000', alpha: 0.70, width: 5, widthCompact: 4.5 });
+    expect(inkWidth('chosenKey') - inkWidth('chosen')).toBe(2);
+    expect(inkWidth('chosenKey', true) - inkWidth('chosen', true)).toBe(2);
+    expect(inkWidth('chosenKey')).toBeLessThan(inkWidth('chosenHalo'));
     expect(INK.chosenLabel).toEqual({ hex: '#F2D38A', alpha: 1 });
     expect(INK.hover).toEqual({ hex: '#F2D38A', alpha: 1, width: 2 });
     expect(INK.hoverHalo).toEqual({ hex: '#E0A84E', alpha: 0.22, width: 10 });
@@ -127,13 +133,19 @@ describe('the ink table', () => {
     expect(INK.panel.alpha, 'the panel is opaque').toBe(1);
   });
 
-  it('a tapped line makes the rest RECEDE, never vanish (C3, dead end 3): TAP_CONTEXT is .45, inside the .30-.60 the pictures allow', () => {
-    // w4 INK item 4: one named constant in .30-.60; .45 from the .30/.45/.60 pairs (sw-ink.js)
-    expect(TAP_CONTEXT).toBe(0.45);
+  it('a tapped line makes the rest RECEDE, never vanish (C3, dead end 3): TAP_CONTEXT is .60, inside the .30-.60 the pictures allow', () => {
+    // w4 INK item 4: one named constant in .30-.60; .60 since the w4 INK review (finding 5): at .45
+    // the field was a brown haze against r2-02's, and the chosen line keeps its lead by a keyline
+    expect(TAP_CONTEXT).toBe(0.60);
     expect(TAP_CONTEXT).toBeGreaterThanOrEqual(0.30);   // below, the field sinks to a haze
     expect(TAP_CONTEXT).toBeLessThanOrEqual(0.60);      // above, it crowds the chosen line
     expect(TAP_CONTEXT).toBeGreaterThan(0.05);   // today's near-black isolation is what it replaces
     expect(TAP_CONTEXT).toBeLessThan(1);
+    // My Web's own (w4 INK review, finding 6): its other links share the chosen one's gold, so at
+    // .60 the chosen link's lead over them fell from 3.2:1 to 2.2:1 (w4/ink pairs.md); it keeps .45
+    expect(MYWEB_TAP_CONTEXT).toBe(0.45);
+    expect(MYWEB_TAP_CONTEXT).toBeGreaterThanOrEqual(0.30);
+    expect(MYWEB_TAP_CONTEXT).toBeLessThanOrEqual(TAP_CONTEXT);
     expect(CENTRE_BRIGHT).toBe(1.35);
     expect(CENTRE_WIDTH).toBe(1.25);
     expect(FLYOVER_LEG_WIDTH).toBe(0.7);
@@ -151,7 +163,7 @@ describe('the helpers', () => {
   it('rgba01 gives straight-alpha floats for GLSL, scaled and clamped', () => {
     expect(rgba01('panel')).toEqual([28 / 255, 37 / 255, 39 / 255, 1]);
     expect(rgba01('cited')).toEqual([196 / 255, 164 / 255, 105 / 255, 0.70]);
-    expect(rgba01('lit', TAP_CONTEXT)[3]).toBeCloseTo(0.85 * 0.45, 10);
+    expect(rgba01('lit', TAP_CONTEXT)[3]).toBeCloseTo(0.85 * 0.60, 10);
     expect(rgba01('gold', 3)[3]).toBe(1);
     expect(rgba01('gold', -1)[3]).toBe(0);
   });
