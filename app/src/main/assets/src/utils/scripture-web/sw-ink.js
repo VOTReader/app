@@ -101,7 +101,7 @@ const TABLE = {
   myWebFootnote: { hex: '#7FB3B0', alpha: 0.30 },                // Timothy's notes: one teal-silver family
   myWebStudyNote: { hex: '#5E9C9A', alpha: 0.30 },
   myWebWtlb: { hex: '#A3C4C1', alpha: 0.30 },
-  myWebStudy: { hex: '#6C8FA8', alpha: 0.30 },
+  myWebStudy: { hex: '#55949E', alpha: 0.30 },                  // w4 review: lifted from #6C8FA8 (hue 205) into the teal
   myWebReader: { hex: '#E0B25A', alpha: 0.95, width: 1.5 },      // the reader's links: warm gold, >= 4.5:1 on the canvas
 
   // ── chrome (§4.1), go-to (§4.5), the panel (§4.6) ───────────────────────

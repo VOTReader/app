@@ -88,7 +88,7 @@ export const MY_WEB_SOURCES = [
   { key: 'footnote', name: 'footnotes', rgb: rgbOf('myWebFootnote') },        // L .40
   { key: 'votNote', name: 'study notes', rgb: rgbOf('myWebStudyNote') },      // L .29
   { key: 'wtlb', name: 'Words To Live By', rgb: rgbOf('myWebWtlb') },         // L .51
-  { key: 'study', name: 'studies', rgb: rgbOf('myWebStudy') },                // L .26, the bluest
+  { key: 'study', name: 'studies', rgb: rgbOf('myWebStudy') },                // L .26, the bluest (hue 188)
 ];
 const SOURCE_INDEX = new Map(MY_WEB_SOURCES.map((s, i) => [s.key, i]));
 /** Bin for a curated edge's storage kind; a kind the table does not know draws as a study, the commonest. */

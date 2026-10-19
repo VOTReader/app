@@ -53,7 +53,7 @@ function countingCtx() {
     measureText: (t) => ({ width: String(t).length * 8 }), clearRect: noop, save: noop, restore: noop,
   };
 }
-const TIMOTHY = /^rgba\((127,179,176|94,156,154|163,196,193|108,143,168),/;
+const TIMOTHY = /^rgba\((127,179,176|94,156,154|163,196,193|85,148,158),/;
 /** A context core (not the rails, ticks, links, nor the glow under the cores). */
 const contextStroke = (s) => TIMOTHY.test(s.style) && s.width < GLOW_MIN;
 const glowStroke = (s) => TIMOTHY.test(s.style) && s.width >= GLOW_MIN;

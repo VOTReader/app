@@ -60,7 +60,7 @@ function recordingCtx() {
   };
 }
 const alphaOf = (style) => Number(/,\s*([\d.]+)\)$/.exec(style)[1]);
-const TIMOTHY = /^rgba\((127,179,176|94,156,154|163,196,193|108,143,168),/;
+const TIMOTHY = /^rgba\((127,179,176|94,156,154|163,196,193|85,148,158),/;
 /** The context's strokes: the cores in a Timothy source colour (not the rails, ticks or
  * links, nor the soft glow under them: w4, CONTEXT_GLOW_WIDTH past a core that stops at 1.6 px). */
 function contextStrokes(ctx) {
@@ -142,7 +142,7 @@ describe('P2 a line\'s ink follows the rails it is anchored to on screen', () =>
     drawPersonalWeb(ctx, null, { count: 3, versePos: new Float32Array([2, 44.6, 50]), votPos: new Float32Array([18, 11.1, 10]), source: new Uint8Array([3, 2, 0]) }, deep);
     const cs = contextStrokes(ctx);
     expect(cs.length).toBe(3);
-    const far = cs.find((s) => s.style.startsWith('rgba(108,143,168,'));
+    const far = cs.find((s) => s.style.startsWith('rgba(85,148,158,'));
     const near = cs.find((s) => s.style.startsWith('rgba(163,196,193,'));
     const anchored = cs.find((s) => s.style.startsWith('rgba(127,179,176,'));
     expect(alphaOf(anchored.style)).toBeCloseTo(ten.alpha, 6);

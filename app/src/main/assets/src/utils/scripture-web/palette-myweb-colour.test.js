@@ -65,6 +65,17 @@ describe("Timothy's family: one teal-silver family, a lightness step per source"
       expect(Math.min(...rb) - Math.max(...tb), `gap ${m}`).toBeGreaterThanOrEqual(14);
     }
   });
+  it('one family by hue as well: the four sources lie within 15 degrees of hue of each other (w4 review: the studies at 205 read as a steel-blue mist beside r2-05\'s one teal)', () => {
+    const hue = (c) => {
+      const [r, g, b] = c.map((v) => v / 255), mx = Math.max(r, g, b), d = mx - Math.min(r, g, b);
+      const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return (h * 60 + 360) % 360;
+    };
+    const H = T.map(hue);
+    expect(Math.max(...H) - Math.min(...H), H.map((h) => h.toFixed(1)).join(' ')).toBeLessThanOrEqual(15);
+    // the studies stay the bluest, so hue still helps lightness tell them from the study notes
+    expect(H[3]).toBe(Math.max(...H));
+  });
   it('myWebSourceIndex maps the four kinds and sends an unknown kind to the studies bin', () => {
     expect(['footnote', 'votNote', 'wtlb', 'study'].map(myWebSourceIndex)).toEqual([0, 1, 2, 3]);
     expect(myWebSourceIndex('studyLetter')).toBe(3);
