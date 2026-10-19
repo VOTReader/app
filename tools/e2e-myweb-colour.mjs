@@ -172,6 +172,30 @@ async function clickLabel(page, label) {
   await page.evaluate((l, s) => (new Function('return ' + s)())(l).click(), label, finder.toString());
 }
 const clickIfPresent = (page, label) => page.evaluate((l, s) => { const b = (new Function('return ' + s)())(l); if (!b) return false; b.click(); return true; }, label, finder.toString());
+/** A top control as a reader reaches it (w4, as e2e-myweb-r2 does): on a frame whose controls
+ *  collapse to the "More controls" menu (spec section 3's collapse rule: a canvas under 1000 px,
+ *  so every phone frame), through that menu. need: wait for it (or the menu) and throw when
+ *  neither carries it, as clickLabel did. Through w4's first fix round this walk clicked
+ *  'My Web' directly and never reached My Web on a phone, so C13 ran on the PC only. */
+async function control(page, label, need) {
+  if (need && !(await waitFor(page, (l, s) => { const f = new Function('return ' + s)(); return !!f(l) || !!f('More controls'); }, NAV_MS, label, finder.toString()))) {
+    throw new Error('no control "' + label + '" and no More controls menu after ' + NAV_MS + ' ms');
+  }
+  if (await clickIfPresent(page, label)) { await sleep(150); await closeMenu(page); return true; }
+  if (await clickIfPresent(page, 'More controls')) {
+    await sleep(250);
+    const ok = await clickIfPresent(page, label);
+    await sleep(150);
+    await closeMenu(page);
+    if (ok) return true;
+  }
+  if (need) throw new Error('no control "' + label + '", on screen or in the More controls menu');
+  return false;
+}
+async function closeMenu(page) {
+  const open = await page.evaluate(() => { const b = document.querySelector('[aria-label="More controls"]'); return !!b && b.getAttribute('aria-expanded') === 'true'; });
+  if (open) { await clickIfPresent(page, 'More controls'); await sleep(200); }
+}
 async function boot(page, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_MS });
   if (!(await waitFor(page, () => { const r = document.getElementById('root'); return !!r && r.children.length > 0; }, NAV_MS))) throw new Error('wait timed out (main-world poll)');
@@ -194,12 +218,13 @@ async function toMyWeb(page) {
   if (!(await waitFor(page, () => !!document.querySelector('.sw-root') || !!document.querySelector('.sw-fallback'), NAV_MS))) throw new Error('wait timed out (main-world poll)');
   if (await page.$('.sw-fallback')) return false;
   if (!(await waitFor(page, () => !document.querySelector('.sw-loading'), NAV_MS))) throw new Error('wait timed out (main-world poll)');
-  await clickLabel(page, 'My Web'); await sleep(800);
   // the first-run guide ("How to read this web") opens on a fresh context and covers the band; its
   // button is "Got it" ('Dismiss' is the empty notice's x)
   await clickIfPresent(page, 'Got it'); await sleep(300);
+  await control(page, 'My Web', true); await sleep(800);
+  await clickIfPresent(page, 'Got it'); await sleep(300);
   await clickIfPresent(page, 'Dismiss'); await sleep(300);
-  await clickIfPresent(page, 'Reset the view'); await sleep(700);
+  await control(page, 'Reset the view'); await sleep(700);
   return true;
 }
 const attr = (page, k) => page.evaluate((k) => (document.querySelector('.sw-root') || { getAttribute: () => null }).getAttribute(k), k);
