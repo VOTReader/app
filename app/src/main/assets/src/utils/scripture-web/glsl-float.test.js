@@ -53,7 +53,7 @@ function bareInts(glsl) {
   return stripped.match(/\b\d+\b/g) || [];
 }
 
-const TEMPLATES = ['arcShapeGLSL', 'arcFrameGLSL', 'flyOverGLSL'];
+const TEMPLATES = ['arcShapeGLSL', 'arcFrameGLSL', 'flyOverGLSL', 'spanInkGLSL'];
 function templateBody(name) {
   const m = SOURCE.match(new RegExp('export const ' + name + ' = `([\\s\\S]*?)`;'));
   if (!m) throw new Error('glsl-float.test: could not find the ' + name + ' template in geometry.js');
@@ -93,7 +93,7 @@ describe('every constant interpolated into the GLSL templates routes through gls
     expect(rawSites('float k = ${FAN_FLOOR} + ${1 - FAN_FLOOR}*x;')).toEqual(['FAN_FLOOR', '1 - FAN_FLOOR']);
   });
 
-  it('has no raw interpolation in arcShapeGLSL, arcFrameGLSL or flyOverGLSL — THIS is the case with teeth today', () => {
+  it('has no raw interpolation in arcShapeGLSL, arcFrameGLSL, flyOverGLSL or spanInkGLSL — THIS is the case with teeth today', () => {
     for (const name of TEMPLATES) {
       expect({ template: name, raw: rawSites(templateBody(name)) }).toEqual({ template: name, raw: [] });
     }
@@ -101,7 +101,8 @@ describe('every constant interpolated into the GLSL templates routes through gls
 
   it('is not reading an empty region: the constants the templates inline are seen as sites (arcShapeGLSL carries none since the structure law; the fly-over floor is retired, its leg share a parameter; the frame law carries the clip margin, E1)', () => {
     const seen = new Set(TEMPLATES.flatMap((name) => allSites(templateBody(name)).map((s) => s.replace(/^glslFloat\(|\)$/g, '').trim())));
-    for (const want of ['FLYOVER_MARGIN', 'CLIP_MARGIN', 'Math.PI', 'HALF_PI']) {
+    // (and the span-ink law's constants, w4 INK item 2)
+    for (const want of ['FLYOVER_MARGIN', 'CLIP_MARGIN', 'Math.PI', 'HALF_PI', 'SPAN_T_EXP', 'SHORT_GAIN']) {
       expect([...seen]).toContain(want);
     }
   });
@@ -115,7 +116,7 @@ describe('every constant interpolated into the GLSL templates routes through gls
    web-renderer.js routes through glslFloat, or is one of the shared GLSL
    blocks (themselves checked above or generated). */
 const RENDERER = fs.readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../ui/scripture-web/web-renderer.js'), 'utf8');
-const SHARED_BLOCKS = /^(arcShapeGLSL|arcFrameGLSL|flyOverGLSL|rampGLSL\(\)|inkGLSL\([^)]*\))$/;
+const SHARED_BLOCKS = /^(arcShapeGLSL|arcFrameGLSL|flyOverGLSL|spanInkGLSL|rampGLSL\(\)|inkGLSL\([^)]*\))$/;
 function rendererTemplates() {
   return [...RENDERER.matchAll(/const (\w+) = `(#version 300 es[\s\S]*?)`;/g)].map((m) => ({ name: m[1], body: m[2] }));
 }
@@ -150,5 +151,6 @@ describe('the emitted GLSL carries no bare integer literal', () => {
     expect(bareInts(geo.flyOverGLSL)).toEqual([]);
     expect(bareInts(geo.arcShapeGLSL)).toEqual([]);
     expect(bareInts(geo.arcFrameGLSL)).toEqual([]);
+    expect(bareInts(geo.spanInkGLSL)).toEqual([]);
   });
 });

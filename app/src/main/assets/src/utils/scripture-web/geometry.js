@@ -34,6 +34,14 @@
    flyOverWidth). Nothing dims as the reader zooms (Q2): the lens that kept
    the rest of the web at 0.35 is retired, and the chapter under the centre
    is emphasised instead (web-frame.centreRange, the shader's uCentre).
+
+   The third is the span-ink law (w4 INK, item 2; `spanInkGLSL`): a
+   thread's ink weight is its own span's, fixed at every zoom. Short spans
+   are inked up to 1 + SHORT_GAIN times and keep the stroke law's width, so
+   they read first (the violet feet of the overview, the vivid local domes
+   deep in); a long thread is held at the overview's hairline, widened by
+   its votes alone, so deep in its legs are thin coloured lines. Nothing
+   brightens or dims with the zoom that was not already the stroke law's.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
@@ -145,6 +153,10 @@ export const STROKE_DEEP_CSS = 2.4;
 /** Narrowest stroke at depth, CSS px - the floor a 0.30-strength arc gets. */
 export const STROKE_MIN_CSS = 1.4;
 
+/** The overview's stroke, CSS px: ribbonStyle's at fit, and the hairline the span-ink law holds a
+ *  long thread to at every zoom (its votes widen it deep in, by STROKE_DEEP_CSS / STROKE_MIN_CSS at most). */
+export const STROKE_FIT_CSS = 0.9;
+
 /**
  * The alpha and stroke law, as ONE export both the screen and the probes
  * read. It used to live inline in ScriptureWebScreen's draw(), where no
@@ -160,7 +172,7 @@ export const STROKE_MIN_CSS = 1.4;
 export function ribbonStyle(zoom, localize, anchoredPerCssPx) {
   const l2 = Math.log2(zoom > 0 ? zoom : 1);
   const alpha = Math.min(0.075 + l2 * 0.028, 0.19);
-  const strokeWidthCss = Math.min(0.9 + l2 * 0.16, STROKE_DEEP_CSS);
+  const strokeWidthCss = Math.min(STROKE_FIT_CSS + l2 * 0.16, STROKE_DEEP_CSS);
   const t = smoothstep(0.55, 1, localize);
   if (!(t > 0)) return { alpha, strokeWidthCss, voteMix: 0 };
   // Crowding, not zoom, is what decides whether the deep value washes: at the
@@ -548,6 +560,83 @@ float arcAnchored(float x0, float x1, float width){
 }
 float flyOverWidth(float anchored, float localize, float leg){
   return mix(1., mix(leg, 1., anchored), localize);
+}`;
+
+/* ── THE SPAN-INK LAW (w4 INK, item 2) ─────────────────────────────────────
+   Q3 (ii): short spans read first. The r2-01a picture pools its violet at the
+   feet and the r3-03 picture keeps vivid local domes deep in, with the long
+   threads' legs thin coloured lines through them; the stroke law alone drew
+   every thread alike, so the many long legs out-inked the short arcs they
+   cross. The weight is a constant of the arc (its span), never of the zoom
+   (C14, dead end 3), and nothing is hidden or capped in height (C18). */
+
+/** The distance ramp's exponent: a span's t is pow(span / total, SPAN_T_EXP), the shader's colour input. */
+export const SPAN_T_EXP = 0.40;
+/** The ramp's t over which a thread eases from short (1) to long (0): about 10 verses to 318, the
+ *  ramp's magenta-violet first stretch (palette.DISTANCE_RAMP). */
+export const SHORT_T0 = 0.04;
+export const SHORT_T1 = 0.16;
+/** The shortest spans' extra ink: their alpha times 1 + SHORT_GAIN, clamped to full ink. */
+export const SHORT_GAIN = 4;
+
+/**
+ * A span's place on the distance ramp, 0..1: the t the shader colours it by.
+ * MUST stay identical to spanT in spanInkGLSL below (span-ink.test.js runs the twin).
+ * @param {number} span  to - from, verses (either sign)
+ * @param {number} total  verses in the canon
+ */
+export function spanT(span, total) {
+  return Math.pow(Math.abs(span) / total, SPAN_T_EXP);
+}
+
+/** How short a thread is, 1 (up to ~10 verses) .. 0 (~318 and more), eased (C20). @param {number} t spanT */
+export function spanShortness(t) {
+  return 1 - smoothstep(SHORT_T0, SHORT_T1, t);
+}
+
+/** The alpha multiplier of a thread that short: 1 + SHORT_GAIN at the shortest, 1 for a long one. */
+export function spanGain(shortness) {
+  return 1 + SHORT_GAIN * shortness;
+}
+
+/**
+ * The half width a long thread is held to: the overview's hairline (widthFit = STROKE_FIT_CSS
+ * device px a CSS px), widened by the share of the deep stroke its votes earned (wScale over the
+ * lowest vote's, at the voteMix the stroke law has reached), so the lowest-vote leg keeps exactly
+ * the overview's hairline at every zoom and the best-voted at most STROKE_DEEP / STROKE_MIN of it.
+ * @param {number} widthFit  STROKE_FIT_CSS x dpr, device px
+ * @param {number} wScale  the main pass's vote width share (1 at the overview)
+ * @param {number} voteMix  ribbonStyle's voteMix
+ */
+export function spanFitHalf(widthFit, wScale, voteMix) {
+  return (widthFit * 0.5 * wScale) / (1 + (STROKE_MIN_CSS / STROKE_DEEP_CSS - 1) * voteMix);
+}
+
+/**
+ * A thread's half width under the law: a short one keeps the stroke law's (halfW), a long one is
+ * held to fitHalf, eased between by its shortness. Never wider than halfW.
+ */
+export function spanHalfWidth(halfW, fitHalf, shortness) {
+  const held = halfW < fitHalf ? halfW : fitHalf;
+  return held + (halfW - held) * shortness;
+}
+
+/** The same five functions as GLSL ES 3.00, for the vertex shader to inline. */
+export const spanInkGLSL = `
+float spanT(float span, float total){
+  return pow(abs(span)/total, ${glslFloat(SPAN_T_EXP)});
+}
+float spanShortness(float t){
+  return 1. - smoothstep(${glslFloat(SHORT_T0)}, ${glslFloat(SHORT_T1)}, t);
+}
+float spanGain(float shortness){
+  return 1. + ${glslFloat(SHORT_GAIN)}*shortness;
+}
+float spanFitHalf(float widthFit, float wScale, float voteMix){
+  return widthFit*.5*wScale/mix(1., ${glslFloat(STROKE_MIN_CSS / STROKE_DEEP_CSS)}, voteMix);
+}
+float spanHalfWidth(float halfW, float fitHalf, float shortness){
+  return mix(min(halfW, fitHalf), halfW, shortness);
 }`;
 
 /**

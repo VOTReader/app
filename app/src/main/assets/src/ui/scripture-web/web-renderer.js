@@ -49,8 +49,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcShapeGLSL, arcFrameGLSL, flyOverGLSL, CLIP_MARGIN, glslFloat, frameHeights,
-  STROKE_MIN_CSS, STROKE_DEEP_CSS, skyLocalize,
+  arcShapeGLSL, arcFrameGLSL, flyOverGLSL, spanInkGLSL, CLIP_MARGIN, glslFloat, frameHeights,
+  STROKE_MIN_CSS, STROKE_DEEP_CSS, STROKE_FIT_CSS, skyLocalize,
 } from '../../utils/scripture-web/geometry.js';
 import {
   CENTRE_BRIGHT, CENTRE_WIDTH, FLYOVER_LEG_WIDTH, TAP_CONTEXT, rgba01, inkWidth,
@@ -103,6 +103,7 @@ uniform float uCamY;         // the picture's shift down the frame, device px
 uniform vec2  uFrameH;       // the heights a body must reach to be in the frame (geometry.frameHeights)
 uniform float uPx;           // full-resolution px per backing px: 1 at rest, more in a gesture (E2)
 uniform float uWidth, uAlpha, uTotal;
+uniform float uWidthFit;     // the span-ink law's hairline: STROKE_FIT_CSS device px a CSS px (geometry.spanFitHalf)
 uniform float uSegments;     // this run's segment count: the most any thread in it asked for
 uniform float uVoteMix;      // 0 = votes drive alpha (overview), 1 = width (depth)
 uniform vec2  uFocusRange;   // verse range kept lit (lo > hi = no focus)
@@ -117,6 +118,7 @@ flat out vec4 vCol; out float vEdge; flat out float vHalfW;
 ${arcShapeGLSL}
 ${arcFrameGLSL}
 ${flyOverGLSL}
+${spanInkGLSL}
 ${rampGLSL()}
 void main(){
   // the thread's own data, by id (an integer texel fetch: no filtering, exact)
@@ -168,6 +170,13 @@ void main(){
   float strength = clamp(aVotes/70., .30, 1.);
   float wScale = mix(1., mix(${glslFloat(STROKE_MIN_CSS / STROKE_DEEP_CSS)}, 1., (strength - .30)/.70), uVoteMix);
   float halfW = uWidth*.5*wScale;
+  // The span-ink law (w4 INK item 2; geometry.spanInkGLSL, inlined above): a
+  // thread's weight is its own span's at every zoom. A long one is held at the
+  // overview's hairline (its votes widen it deep in); a short one keeps its width
+  // and is inked up below, so the short spans read first.
+  float tSpan = spanT(b - a, uTotal);
+  float shortness = spanShortness(tSpan);
+  halfW = spanHalfWidth(halfW, spanFitHalf(uWidthFit, wScale, uVoteMix), shortness);
   // Q3 (ii): once the reader is inside a passage a thread merely passing
   // overhead draws thinner, never fainter (geometry.flyOverWidth, inlined
   // above), so the local weave reads and every line stays where it was.
@@ -210,10 +219,12 @@ void main(){
 
   // colour is distance, the one law (Corbin, 2026-09-10: genre and testament retired)
   // (the chosen, hovered and lit lines take the ink table's gold in the top pass)
-  vec3 col = distanceRamp(pow(abs(b - a)/uTotal, .40));
+  vec3 col = distanceRamp(tSpan);
 
   float aStrength = mix(strength, 1., uVoteMix);
-  float aOut = uAlpha*dim*aStrength*mix(1., ${glslFloat(CENTRE_BRIGHT)}, cT)*thin;
+  // the span's extra ink is clamped to full ink before the recede and the centre, so a tap
+  // recedes a short span as it does the rest and the centre's boost is the centre's alone
+  float aOut = min(uAlpha*aStrength*spanGain(shortness), 1.)*dim*mix(1., ${glslFloat(CENTRE_BRIGHT)}, cT)*thin;
   // past full ink the centre's boost lifts the colour instead, clamped
   col = min(col*max(aOut, 1.), vec3(1.));
   vCol = vec4(col, min(aOut, 1.));
@@ -460,7 +471,7 @@ export function createRenderer(canvas, graph, opts = {}) {
   gl.useProgram(program);
 
   const U = uniformsOf(gl, program, ['uArcs', 'uVotes', 'uRes', 'uCamXHi', 'uCamXLo', 'uCamY', 'uPPV',
-    'uBase', 'uSquash', 'uFlyLocalize', 'uFrameH', 'uPx', 'uFeather', 'uWidth', 'uAlpha', 'uTotal',
+    'uBase', 'uSquash', 'uFlyLocalize', 'uFrameH', 'uPx', 'uFeather', 'uWidth', 'uWidthFit', 'uAlpha', 'uTotal',
     'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc', 'uTapFade', 'uFocusRange2', 'uCentre', 'uCentreT']);
   const TU = uniformsOf(gl, topProgram, ['uRes', 'uCamXHi', 'uCamXLo', 'uPPV', 'uBase', 'uSquash', 'uCamY',
     'uSegments', 'uRibbonHalf', 'uRibbon', 'uCoreHalf', 'uHaloHalf', 'uFeather', 'uCore', 'uHalo']);
@@ -745,6 +756,7 @@ export function createRenderer(canvas, graph, opts = {}) {
       U.f1('uPx', px);
       U.f1('uFeather', px);
       U.f1('uWidth', v.strokeWidth);
+      U.f1('uWidthFit', STROKE_FIT_CSS * dpr);
       U.f1('uAlpha', v.alpha);
       U.f1('uTotal', graph.total);
       U.f1('uVoteMix', v.voteMix || 0);

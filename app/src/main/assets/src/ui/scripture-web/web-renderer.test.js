@@ -14,9 +14,12 @@ import {
 } from './web-renderer.js';
 import {
   arcShapeGLSL, arcFrameGLSL, flyOverWidth, flyOverGLSL, glslFloat, squashFactor, TOP_SEGMENT_MIN,
+  spanInkGLSL, STROKE_FIT_CSS,
 } from '../../utils/scripture-web/geometry.js';
 import { frameSetAt, drawOrder } from '../../utils/scripture-web/frame-set.js';
-import { FLYOVER_LEG_WIDTH, TAP_CONTEXT, rgba01, inkWidth } from '../../utils/scripture-web/sw-ink.js';
+import {
+  FLYOVER_LEG_WIDTH, TAP_CONTEXT, CENTRE_BRIGHT, CENTRE_WIDTH, rgba01, inkWidth,
+} from '../../utils/scripture-web/sw-ink.js';
 import {
   DISTANCE_RAMP, rampGLSL, readChromeTokens, cssColorToRGB,
 } from '../../utils/scripture-web/palette.js';
@@ -204,6 +207,38 @@ describe('thin lines hold a device px, and the feet do not shimmer at the ceilin
    a WIDTH law now. A line zoomed into the middle of (both feet carried off
    screen) is the line the reader is chasing, so it keeps its ink and only its
    legs thin. The cases that pinned the floor are rewritten to that intent. */
+/* w4 INK, item 2: the span-ink law (geometry.js). Short spans read first, a long thread's legs are
+   the overview's hairline at every zoom, and the weight is the arc's own, fixed (C14). */
+describe('the span-ink law: a thread\'s weight is its own span\'s, at every zoom', () => {
+  const V = SHADER_SOURCE.vertex;
+  it('inlines the SHARED law, once', () => {
+    expect(V).toContain(spanInkGLSL);
+    expect(V.split('float spanShortness(').length - 1).toBe(1);
+    expect(V).toContain('uniform float uWidthFit;');
+  });
+
+  it('reads the span once, by the ramp\'s own t, for the colour and the weight alike', () => {
+    expect(V).toContain('float tSpan = spanT(b - a, uTotal);');
+    expect(V).toContain('float shortness = spanShortness(tSpan);');
+    expect(V).toContain('vec3 col = distanceRamp(tSpan);');
+    expect(V).not.toContain('distanceRamp(pow(');
+  });
+
+  it('holds a long leg at the hairline before the fly-over leg and the centre widen or thin it', () => {
+    const cap = 'halfW = spanHalfWidth(halfW, spanFitHalf(uWidthFit, wScale, uVoteMix), shortness);';
+    expect(V).toContain(cap);
+    expect(V.indexOf(cap)).toBeGreaterThan(V.indexOf('float halfW = uWidth*.5*wScale;'));
+    expect(V.indexOf(cap)).toBeLessThan(V.indexOf('halfW *= flyOverWidth('));
+    expect(V.indexOf(cap)).toBeLessThan(V.indexOf('halfW *= mix(1., ' + glslFloat(CENTRE_WIDTH) + ', cT);'));
+    expect(V.indexOf(cap)).toBeLessThan(V.indexOf('float thin = clamp(halfW/(.5*uPx), 0., 1.);'));
+  });
+
+  it('inks the short spans up, clamped to full ink before the recede and the centre, so a tap still recedes them', () => {
+    expect(V).toContain('float aOut = min(uAlpha*aStrength*spanGain(shortness), 1.)*dim*mix(1., '
+      + glslFloat(CENTRE_BRIGHT) + ', cT)*thin;');
+  });
+});
+
 describe('deep-zoom declutter: fly-overs thin, never fade', () => {
   it('inlines the SHARED fly-over law rather than restating it', () => {
     expect(SHADER_SOURCE.vertex).toContain(flyOverGLSL);
@@ -739,6 +774,17 @@ describe('E1-E3: the visible set, the gesture backing, and a frame that sends on
     expect(g.calls.find((c) => c[0] === 'viewport')[1]).toEqual([0, 0, 800, 720]);
     expect(g.u(g.main, 'uPx').every((p) => p[0] === 1)).toBe(true);
     expect(g.stats).toEqual(f.stats);
+  });
+
+  it('the span-ink hairline (uWidthFit) is the overview stroke, STROKE_FIT_CSS device px a CSS px, and a pan does not resend it', () => {
+    for (const dpr of [1, 2, 2.6]) {
+      const { calls, r } = build();
+      const f = frameOf(r, calls, view({ dpr }));
+      expect(f.main.length).toBeGreaterThan(0);
+      for (const d of f.main) expect(d.u.uWidthFit).toEqual([STROKE_FIT_CSS * dpr]);
+      const moved = frameOf(r, calls, view({ dpr, camX: 125.5 }));
+      expect(moved.calls.filter((c) => /^uniform/.test(c[0])).map((c) => c[1][0])).not.toContain('uWidthFit');
+    }
   });
 
   it('E3: an unchanged frame sends no uniform but each run\'s segment count, and uploads nothing; the threads go up once, at creation', () => {
