@@ -167,8 +167,11 @@ export const DEEP_FULL = 5.5;
 const VERSE_TICK_PPV = 2;
 /** ... the dots under cited verses from here (to 1.5x). */
 const CITED_DOT_PPV = 4;
-/** ... verse numerals at every 5th verse from here, at every verse from VERSE_NUM_ALL (spec §4.3). */
-const VERSE_NUM_FIFTH = 6;
+/** ... verse numerals at every 5th verse from here, in full ink by VERSE_NUM_FIFTH_FULL, at every
+    verse from VERSE_NUM_ALL (spec §4.3; from 6 to 8 they were barely begun at r3-03's phone
+    frame, 6 px a verse, which has them in full, w4 review). */
+const VERSE_NUM_FIFTH = 4.5;
+const VERSE_NUM_FIFTH_FULL = 6;
 const VERSE_NUM_ALL = 22;
 /** ... and from the verse-numeral zoom the far end of each thread is written beside its leg. */
 export const LEG_PPV_CSS = 22;
@@ -1076,14 +1079,14 @@ function drawDeep(ctx, g, cam, L, t, centre, grid, hits) {
     ctx.fillText(n.text, n.lx, n.box.y1);
   }
 
-  // verse numerals: every 5th once there are 6 px a verse, every verse from 22
+  // verse numerals: every 5th from 4.5 px a verse (full by 6), every verse from 22
   const every = dp.vnums.off || !(tt > 0.01) ? 0 : ppvCss >= VERSE_NUM_ALL ? 1 : ppvCss >= VERSE_NUM_FIFTH ? 5 : 0;
   if (every) {
     const vf = canvasFont(sz.vnum, s);
     setFont(ctx, vf, 0);
     ctx.textAlign = 'center';
     ctx.fillStyle = css('verseNumeral');
-    ctx.globalAlpha = tt * (every === 5 ? smooth(VERSE_NUM_FIFTH, VERSE_NUM_FIFTH + 2, ppvCss) : 1);
+    ctx.globalAlpha = tt * (every === 5 ? smooth(VERSE_NUM_FIFTH, VERSE_NUM_FIFTH_FULL, ppvCss) : 1);
     const y0 = dp.vnums.top, y1 = dp.vnums.top + dp.vnums.h;
     for (let x = v0; x <= v1; x++) {
       const n = x - g.chapters[g.chapterOfVerse[x]][2] + 1;

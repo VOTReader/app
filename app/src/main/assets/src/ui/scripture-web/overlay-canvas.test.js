@@ -619,6 +619,23 @@ describe('the deep band (r3-03): chapter numerals, verse ticks and numerals, the
     }
   });
 
+  /* w4 review: r3-03's phone frame (about 211x, 6 CSS px a verse) has its every-5th verse
+     numerals in full ink, but they faded in from 6 to 8 px a verse, so there they were barely
+     begun, and at 196x not drawn at all. They fade in from 4.5 px a verse, full by 6. */
+  it('phone at r3-03\'s span (211x on Isaiah 53) has its every-5th verse numerals in full ink, and at 196x already drawn', () => {
+    for (const [zoom, least] of [[196, 0.5], [211, 0.95]]) {
+      const { canvas } = chromeRoot('phone');
+      const { rec, fs } = paint('phone', zoom, ISA53_6, { canvas });
+      const s = fs.v.DPR, what = 'phone ' + zoom + 'x (' + (fs.cam.ppv / s).toFixed(2) + ' px a verse)';
+      const vnums = rec.texts().filter((c) => c.align === 'center' && /^\d+$/.test(c.t) && Math.abs(fontPxOf(c.font) - 12 * s) < 1e-6);
+      expect(vnums.length, what + ': verse numerals').toBeGreaterThan(3);
+      for (const c of vnums) {
+        expect(Number(c.t) % 5, what + ': ' + c.t).toBe(0);
+        expect(c.alpha, what + ': ' + c.t + ' ink').toBeGreaterThanOrEqual(least);
+      }
+    }
+  });
+
   it('the next book is announced at the right when it starts within a frame width', () => {
     // the last verses of Malachi: Matthew is just past the right edge
     const end = verseOf('matthew', 1, 1) - 1;
