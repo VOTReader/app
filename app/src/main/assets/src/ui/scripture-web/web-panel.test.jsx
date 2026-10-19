@@ -466,7 +466,19 @@ describe('the chooser at overview', () => {
     fireEvent.mouseEnter(panel.querySelector('.sw-row'));
     expect(props.lightThreads).not.toHaveBeenCalled();
     expect(panel.querySelector('.sw-zoom-row')).toBeNull();
-    expect(panel.querySelector('.sw-panel-credit')).toBeNull();
+  });
+
+  /* w4 integration: through w3 My Web's panel had no credit, on the reading that My Web drew none
+     of the OpenBible data; the My Web stream's w4 legend ends on the credit (its Bible rail is the
+     graph asset's own), and the hub's call keeps it on screen wherever the web is. While a panel
+     is open the legend hides, so on PC the panel's pinned foot is where it shows. The w3 pin
+     (no credit on My Web) is rewritten to that intent. */
+  it('My Web\'s panel carries the CC-BY credit too, pinned at its foot on PC', () => {
+    const choices = [arcOf(ARC), arcOf(ARC + 1)];
+    const { panel } = mount({ choices, mode: 'personal' });
+    const credit = panel.querySelector('.sw-panel-credit');
+    expect(credit && credit.textContent).toBe(g.attribution);
+    expect(credit.parentElement).toBe(panel);
   });
 });
 

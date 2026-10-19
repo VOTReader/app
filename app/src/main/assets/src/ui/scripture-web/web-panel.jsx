@@ -669,8 +669,9 @@ export function WebPanel(props) {
   // Back is the journey's alone: back() flies home and reopens what was open there on landing
   // (use-journey.js); a fly of the panel's own after it took that fly over, so nothing reopened
   const back = () => { if (journey && typeof journey.back === 'function') journey.back(); };
-  const credit = webMode !== 'personal' && mode !== 'myweb' && g.attribution
-    ? <div className="sw-panel-credit">{g.attribution}</div> : null;
+  // the CC-BY credit, in My Web too (w4 integration): its legend ends on it, and while a panel is
+  // open the legend hides, so this is where it stays on screen on PC (the hub's licence call)
+  const credit = g.attribution ? <div className="sw-panel-credit">{g.attribution}</div> : null;
 
   return (
     <div className={containerClass} ref={ref} tabIndex={-1} role="dialog" aria-modal="false" aria-label={label}
