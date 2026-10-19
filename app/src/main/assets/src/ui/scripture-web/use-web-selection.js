@@ -637,8 +637,11 @@ export function useWebSelection({
     const far = info.to === row.otherVerse ? 'from' : 'to';
     const here = far === 'from' ? info.a : info.b, there = far === 'from' ? info.b : info.a;
     if (journey) {
+      // the arrival carries the row's own line (w4): left without one, the trail filled it from
+      // what was open at the push, the previous connection (setDetail has not rendered), so Back
+      // reopened the wrong line. The trail's start keeps what was open there, as it should.
       if (!journey.stack.length) journey.push({ verse: row.hereVerse, label: here.label });
-      journey.push({ verse: row.otherVerse, label: there.label });
+      journey.push({ verse: row.otherVerse, label: there.label, open: { mode: 'connection', arc: row.index } });
     }
     focusRef.current = focusState({ arc: row.index });
     setTip(null); setChoices(null); setListOpen(false);

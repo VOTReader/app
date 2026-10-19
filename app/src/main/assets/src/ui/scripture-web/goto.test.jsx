@@ -517,6 +517,25 @@ describe('Back puts the panel back as it was', () => {
     expect(litOf(get).sort(), 'its threads lit again').toEqual([0, 2]);
   });
 
+  /* w4 interaction hunt: a row's Follow pushed its arrival with no `open`, so the trail filled it
+     from what was open at the push: the PREVIOUS connection (setDetail had not rendered). Two row
+     Follows, then Back, reopened the line before the first row's. Each arrival now carries the
+     row's own connection, as followThread's do; the trail's start keeps what was open there. */
+  it('two row Follows, then Back: the first row\'s line opens again, and Back home the line set out from', async () => {
+    const { get } = mountWeb({ cam: { x: 150, ppv: 8 } });
+    act(() => { get().sel.openPanel({ mode: 'connection', arc: 0 }); });
+    settle();
+    act(() => { get().sel.followRow({ index: 2, hereVerse: 100, otherVerse: 300 }); });
+    settle(); await flush();
+    act(() => { get().sel.followRow({ index: 1, hereVerse: 300, otherVerse: 200 }); });
+    settle(); await flush();
+    expect(get().sel.panel.spec).toMatchObject({ mode: 'connection', arc: 1 });
+    await back(get);
+    expect(get().sel.panel.spec, 'the first row\'s line').toMatchObject({ mode: 'connection', arc: 2 });
+    await back(get);
+    expect(get().sel.panel.spec, 'where the trail set out: the line that was open there').toMatchObject({ mode: 'connection', arc: 0 });
+  });
+
   it('a book name\'s crumb keeps what was open when it was tapped, not the go-to\'s panel after it', async () => {
     const { container, get } = mountWeb({ cam: { x: 9000, ppv: 8 } });
     act(() => { get().sel.openPanel({ mode: 'connection', arc: 1 }); });
