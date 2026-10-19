@@ -21,6 +21,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildVotRail, railUnit, railSpan } from '../../utils/scripture-web/personal-graph.js';
 import { createCamera, fitPPV, verseToX, zoomAbout } from '../../utils/scripture-web/geometry.js';
+import { MY_WEB_SOURCES } from '../../utils/scripture-web/palette.js';
 import * as RR from './rail-renderer.js';
 
 const { drawPersonalWeb, endpointPoint, railFrame } = RR;
@@ -39,18 +40,25 @@ const opts = {
 };
 const rails = railFrame({ H, DPR }, BASE);
 
+/** A stroke in one of Timothy's source colours (a link's halo is gold, never this). */
+const isTimothy = (style) => MY_WEB_SOURCES.some((src) => String(style).startsWith('rgba(' + src.rgb + ','));
+/** A context stroke at least this wide (device px) is the soft glow under
+ * Timothy's threads (w4, r2-05): the glow is CONTEXT_GLOW_WIDTH past its core,
+ * and a core stops at 1.6 px, so the two never meet. */
+const GLOW_MIN = RR.CONTEXT_GLOW_WIDTH * DPR;
 /** A 2D context that only counts; drawImage is deliberately ABSENT so a
- * layer blit throws instead of passing quietly.
+ * layer blit throws instead of passing quietly. stroke counts the cores,
+ * glow the glow strokes.
  * @returns {any} */
 function fakeCtx() {
-  const calls = { stroke: 0, fill: 0, beginPath: 0 };
+  const calls = { stroke: 0, glow: 0, fill: 0, beginPath: 0 };
   const noop = () => {};
   return {
     calls, canvas: { classList: { contains: () => true } },
     lineWidth: 0, strokeStyle: '', fillStyle: '', font: '', textAlign: '', textBaseline: '',
     lineCap: '', lineJoin: '', globalAlpha: 1,
     beginPath() { calls.beginPath++; }, moveTo: noop, lineTo: noop, arc: noop, bezierCurveTo: noop,
-    stroke() { calls.stroke++; }, fill() { calls.fill++; },
+    stroke() { if (this.lineWidth >= GLOW_MIN && isTimothy(this.strokeStyle)) calls.glow++; else calls.stroke++; }, fill() { calls.fill++; },
     fillText: noop, strokeText: noop, measureText: () => ({ width: 40 }), clearRect: noop, save: noop, restore: noop,
     setTransform: noop,
   };
@@ -69,10 +77,14 @@ describe('My Web r2 — G1 full resolution', () => {
     drawPersonalWeb(ctx, null, underlay, opts);
     drawPersonalWeb(ctx0, null, { count: 0, versePos: new Float32Array(0), votPos: new Float32Array(0) }, opts);
     expect(ctx.calls.stroke - ctx0.calls.stroke).toBe(4);
+    // w4: and each source's threads carry ONE soft glow (r2-05), stroked as one
+    // path so the glow never piles up where they do
+    expect(ctx.calls.glow - ctx0.calls.glow).toBe(4);
     const shared = { count: 3, versePos: new Float32Array([5, 50, 95]), votPos: new Float32Array([0, 20, 60]), source: new Uint8Array([0, 0, 1]) };
     const ctx1 = fakeCtx();
     drawPersonalWeb(ctx1, null, shared, opts);
     expect(ctx1.calls.stroke - ctx0.calls.stroke).toBe(2);
+    expect(ctx1.calls.glow - ctx0.calls.glow).toBe(2);
     expect(/** @type {any} */ (RR).CONTEXT_SCALE).toBeUndefined();
   });
   it('batches threads by colour bin and layer: near-coincident threads keep a stroke each, a fan shares one', () => {
@@ -87,6 +99,7 @@ describe('My Web r2 — G1 full resolution', () => {
     const corridor = { count: 3, versePos: new Float32Array([50, 50.1, 50.2]), votPos: new Float32Array([20, 20, 20]) };
     const c1 = fakeCtx(); drawPersonalWeb(c1, null, corridor, opts);
     expect(c1.calls.stroke - ctx0.calls.stroke).toBe(3);
+    expect(c1.calls.glow - ctx0.calls.glow).toBe(1);   // one source, one glow (w4)
     const neighbours = { count: 3, versePos: new Float32Array([50, 50.1, 50.2]), votPos: new Float32Array([20, 20.02, 20.04]) };
     const c3 = fakeCtx(); drawPersonalWeb(c3, null, neighbours, opts);
     expect(c3.calls.stroke - ctx0.calls.stroke).toBe(3);
@@ -95,16 +108,23 @@ describe('My Web r2 — G1 full resolution', () => {
     const fan = { count: 3, versePos: new Float32Array([50, 50.4, 50.8]), votPos: new Float32Array([10, 20, 40]) };
     const c2 = fakeCtx(); drawPersonalWeb(c2, null, fan, opts);
     expect(c2.calls.stroke - ctx0.calls.stroke).toBe(1);
+    expect(c2.calls.glow - ctx0.calls.glow).toBe(1);
   });
   it('while a gesture is live a corridor keeps LIVE_CAP layers; at rest every visible one; the cap eases in coverage', () => {
     const base = { count: 0, versePos: new Float32Array(0), votPos: new Float32Array(0) };
     const ctx0 = fakeCtx(); drawPersonalWeb(ctx0, null, base, opts);
-    const n = 40;
+    // w4: 30, under the full cap at the overview's alpha (37 layers at CONTEXT_FLOOR
+    // 0.14; through w3 the floor was 0.06, 87 layers, and this corridor was 40)
+    const n = 30;
+    expect(RR.layerCap(RR.personalInk(1).context.alpha, 1)).toBeGreaterThan(n);
     const corridor = { count: n, versePos: new Float32Array(n).map((_, i) => 50 + i * 0.01), votPos: new Float32Array(n).fill(20) };
     const rest = fakeCtx(); drawPersonalWeb(rest, null, corridor, opts);
-    expect(rest.calls.stroke - ctx0.calls.stroke).toBe(n);   // 40 < the full cap at this alpha
+    expect(rest.calls.stroke - ctx0.calls.stroke).toBe(n);   // 30 < the full cap at this alpha
+    expect(rest.calls.glow - ctx0.calls.glow).toBe(1);
     const liveCtx = fakeCtx(); drawPersonalWeb(liveCtx, null, corridor, Object.assign({}, opts, { capFraction: 0 }));
     expect(liveCtx.calls.stroke - ctx0.calls.stroke).toBe(RR.LIVE_CAP + 1);   // LIVE_CAP layers + the shared overflow
+    // a live gesture keeps its frames: no glow until the view is at rest (w4)
+    expect(liveCtx.calls.glow - ctx0.calls.glow).toBe(0);
     // coverage, not the layer count, is what eases: at f = 0.5 the cap sits where
     // coverage is halfway between the live and the full coverage
     const a = 0.04;

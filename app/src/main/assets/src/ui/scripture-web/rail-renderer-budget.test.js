@@ -35,21 +35,28 @@ function distToLine(line, p) {
   return best;
 }
 
-/** A context that counts lineTo calls and records each stroke's style and width. @returns {any} */
+/** A context stroke at least this wide (device px at DPR 1) is the soft glow under Timothy's
+ * threads (w4, r2-05): CONTEXT_GLOW_WIDTH past a core that stops at 1.6 px. */
+const GLOW_MIN = RR.CONTEXT_GLOW_WIDTH;
+/** A context that counts lineTo calls (the cores' in lineTo, the glow's in glowLineTo) and
+ * records each stroke's style and width. @returns {any} */
 function countingCtx() {
-  const c = { lineTo: 0, strokes: /** @type {Array<{style:string, width:number}>} */ ([]) };
+  const c = { lineTo: 0, glowLineTo: 0, strokes: /** @type {Array<{style:string, width:number}>} */ ([]) };
   const st = { strokeStyle: '', lineWidth: 0 };
   const noop = () => {};
   return {
     c, canvas: {}, fillStyle: '', font: '', textAlign: '', textBaseline: '', lineCap: '', lineJoin: '', letterSpacing: '0px',
     get strokeStyle() { return st.strokeStyle; }, set strokeStyle(v) { st.strokeStyle = v; },
     get lineWidth() { return st.lineWidth; }, set lineWidth(v) { st.lineWidth = v; },
-    beginPath: noop, moveTo: noop, lineTo() { c.lineTo++; }, arc: noop, fill: noop, fillText: noop, strokeText: noop,
+    beginPath: noop, moveTo: noop, lineTo() { if (st.lineWidth >= GLOW_MIN) c.glowLineTo++; else c.lineTo++; }, arc: noop, fill: noop, fillText: noop, strokeText: noop,
     stroke() { c.strokes.push({ style: st.strokeStyle, width: st.lineWidth }); },
     measureText: (t) => ({ width: String(t).length * 8 }), clearRect: noop, save: noop, restore: noop,
   };
 }
-const contextStroke = (s) => /^rgba\((127,179,176|94,156,154|163,196,193|108,143,168),/.test(s.style);
+const TIMOTHY = /^rgba\((127,179,176|94,156,154|163,196,193|108,143,168),/;
+/** A context core (not the rails, ticks, links, nor the glow under the cores). */
+const contextStroke = (s) => TIMOTHY.test(s.style) && s.width < GLOW_MIN;
+const glowStroke = (s) => TIMOTHY.test(s.style) && s.width >= GLOW_MIN;
 const alphaOf = (style) => Number(/,\s*([\d.]+)\)$/.exec(style)[1]);
 
 // a 1600 x 900 PC frame and a synthetic corpus: 2,648 threads, over half to the NT
@@ -116,6 +123,10 @@ describe('B1 a line takes the samples its curve needs', () => {
     drawPersonalWeb(rails0, null, null, frame(1, TOTAL / 2, 1, rail.total / 2));
     const perThread = (ctx.c.lineTo - rails0.c.lineTo) / u.count;
     expect(perThread).toBeLessThan(14);
+    // the glow (w4) traces those same samples once more, never more than the cores
+    // do (each source's threads as one path; the fly-overs not at all)
+    expect(ctx.c.glowLineTo - rails0.c.glowLineTo).toBeGreaterThan(0);
+    expect(ctx.c.glowLineTo - rails0.c.glowLineTo).toBeLessThanOrEqual(ctx.c.lineTo - rails0.c.lineTo);
     expect(threadPath([800, bot], [805, top], true, { width: W, gap, n: 24, eps: 2.5 }).length - 1).toBe(4);
     expect(threadPath([-32000, bot], [33600, top], true, { width: W, gap, n: 24, eps: 2.5 }).length - 1).toBeLessThanOrEqual(6);
   });
@@ -136,6 +147,10 @@ describe('B2 the context is stroked in a bounded set of inks, both rails\' own e
     const alphas = [...inks].map((k) => Number(k.split('/')[0]));
     expect(Math.max(...alphas)).toBeCloseTo(personalInk(40).context.alpha, 6);
     expect(Math.min(...alphas)).toBeCloseTo(personalInk(1).context.alpha, 6);
+    // the glow under them (w4) takes one ink a rung, no more
+    const glows = new Set(ctx.c.strokes.filter(glowStroke).map((s) => alphaOf(s.style).toFixed(6) + '/' + s.width.toFixed(6)));
+    expect(glows.size).toBeGreaterThan(0);
+    expect(glows.size).toBeLessThanOrEqual(RR.INK_RUNGS);
   });
   it('with fly-overs too: at most twice INK_RUNGS stroke inks, the far fly-overs at the overview\'s ink', () => {
     const u = corpus(2648, 11);
@@ -149,6 +164,9 @@ describe('B2 the context is stroked in a bounded set of inks, both rails\' own e
     // the threads hanging from the Volumes rail at 3x are that rail's ink exactly, at full width
     const v3 = personalInk(3).context;
     expect(cs.some((s) => Math.abs(alphaOf(s.style) - v3.alpha) < 1e-6 && Math.abs(s.width - v3.width) < 1e-6)).toBe(true);
+    // the glow (w4) is the anchored rungs' only: at most INK_RUNGS inks, none for a fly-over
+    const glows = new Set(ctx.c.strokes.filter(glowStroke).map((s) => alphaOf(s.style).toFixed(6) + '/' + s.width.toFixed(6)));
+    expect(glows.size).toBeLessThanOrEqual(RR.INK_RUNGS);
   });
 });
 

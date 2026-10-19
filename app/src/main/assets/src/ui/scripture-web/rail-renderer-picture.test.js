@@ -18,7 +18,7 @@
        VOLUMES OF TRUTH" on a PC only; the phone's names keep one row. */
 import { describe, it, expect } from 'vitest';
 import { buildVotRail } from '../../utils/scripture-web/personal-graph.js';
-import { drawPersonalWeb, personalInk, railFrame, linkPath } from './rail-renderer.js';
+import { drawPersonalWeb, personalInk, railFrame, linkPath, CONTEXT_GLOW_WIDTH, CONTEXT_GLOW_SHARE } from './rail-renderer.js';
 import { css, FONT, MYWEB_TAP_CONTEXT, FLYOVER_LEG_WIDTH, INK } from '../../utils/scripture-web/sw-ink.js';
 
 // My Web's own recede (w4 INK review, finding 6): the Scripture Web's TAP_CONTEXT rose to .60
@@ -57,9 +57,15 @@ function recordingCtx() {
   };
 }
 const alphaOf = (style) => Number(/,\s*([\d.]+)\)$/.exec(style)[1]);
-/** The context's strokes: the ones in a Timothy source colour (not the rails, ticks or links). */
+const TIMOTHY = /^rgba\((127,179,176|94,156,154|163,196,193|108,143,168),/;
+/** The context's strokes: the cores in a Timothy source colour (not the rails, ticks or
+ * links, nor the soft glow under them: w4, CONTEXT_GLOW_WIDTH past a core that stops at 1.6 px). */
 function contextStrokes(ctx) {
-  return ctx.strokes.filter((s) => /^rgba\((127,179,176|94,156,154|163,196,193|108,143,168),/.test(s.style));
+  return ctx.strokes.filter((s) => TIMOTHY.test(s.style) && s.width < CONTEXT_GLOW_WIDTH);
+}
+/** The soft glow under Timothy's threads (w4, r2-05): a Timothy colour, CONTEXT_GLOW_WIDTH past its core. */
+function glowStrokes(ctx) {
+  return ctx.strokes.filter((s) => TIMOTHY.test(s.style) && s.width >= CONTEXT_GLOW_WIDTH);
 }
 
 describe('P1 the rails sit where the spec puts them', () => {
@@ -141,6 +147,29 @@ describe('P2 a line\'s ink follows the rails it is anchored to on screen', () =>
     expect(alphaOf(near.style)).toBeGreaterThan(overview.alpha * 2);
     expect(Math.abs(alphaOf(near.style) - ten.alpha)).toBeLessThan(0.05);
   });
+  it('w4 (r2-05): the threads with a foot on screen carry a soft glow at rest, once a source, CONTEXT_GLOW_WIDTH past the core at CONTEXT_GLOW_SHARE of its alpha; a fly-over and a live frame none', () => {
+    // the fly-over frame above, plus a second footnote thread beside the first
+    const deep = Object.assign({}, base, { verseX: (v) => 500 + (v - 50) * 100, votX: (p) => 500 + (p - 10) * 500 });
+    const ten = personalInk(10).context;
+    const u = { count: 4, versePos: new Float32Array([2, 44.6, 50, 51]), votPos: new Float32Array([18, 11.1, 10, 10.4]), source: new Uint8Array([3, 2, 0, 0]) };
+    const ctx = recordingCtx();
+    drawPersonalWeb(ctx, null, u, deep);
+    const glows = glowStrokes(ctx);
+    // one for the two footnote threads together; none for the two fly-overs, so a
+    // corridor passing over a zoomed view never glows into a sky (C17)
+    expect(glows.length).toBe(1);
+    expect(glows[0].style.startsWith('rgba(127,179,176,')).toBe(true);
+    expect(alphaOf(glows[0].style)).toBeCloseTo(ten.alpha * CONTEXT_GLOW_SHARE, 6);
+    expect(glows[0].width).toBeCloseTo(ten.width + CONTEXT_GLOW_WIDTH, 6);
+    // under its cores: the glow is stroked before them
+    const at = ctx.strokes.indexOf(glows[0]);
+    for (const s of contextStrokes(ctx).filter((x) => x.style.startsWith('rgba(127,179,176,'))) expect(ctx.strokes.indexOf(s)).toBeGreaterThan(at);
+    // while a gesture is live the frame keeps its budget: no glow
+    const live = recordingCtx();
+    drawPersonalWeb(live, null, u, Object.assign({}, deep, { capFraction: 0 }));
+    expect(glowStrokes(live).length).toBe(0);
+    expect(contextStrokes(live).length).toBeGreaterThan(0);
+  });
 });
 
 describe('P3 a chosen link recedes the rest to MYWEB_TAP_CONTEXT', () => {
@@ -187,6 +216,11 @@ describe('P3 a chosen link recedes the rest to MYWEB_TAP_CONTEXT', () => {
     expect(faint.length).toBe(1);
     expect(faint[0].style.startsWith('rgba(127,179,176,')).toBe(true);
     expect(alphaOf(faint[0].style)).toBeCloseTo(personalInk(1).context.alpha * TAP_CONTEXT, 6);
+    // its glow recedes with it (w4); the chosen one has none under it
+    const glow = glowStrokes(below);
+    expect(glow.length).toBe(1);
+    expect(glow[0].style.startsWith('rgba(127,179,176,')).toBe(true);
+    expect(alphaOf(glow[0].style)).toBeCloseTo(personalInk(1).context.glow.alpha * TAP_CONTEXT, 6);
     // last: its halo, then its core, in its own source's colour (never the reader's gold)
     const [halo, core] = ctx.strokes.slice(-2);
     expect(halo.style.startsWith(WTLB)).toBe(true);

@@ -521,15 +521,18 @@ class ContextBatches {
    * @param {number} alpha
    * @param {number} near device px within which two ends count as one line
    * @param {number} [capFraction] 0 = live cap, 1 = full (default)
+   * @param {{alpha:number, width:number}|null} [glow] a soft glow under the cores: each bin's
+   *   threads once more as ONE path (so the glow does not pile up where they do), this wide
+   *   (device px) at this alpha; the cores' width is the context's lineWidth as it was
    * @returns {number} strokes made
    */
-  stroke(ctx, alpha, near, capFraction) {
+  stroke(ctx, alpha, near, capFraction, glow) {
     const th = this.threads;
     th.sort((p, q) => p.bin - q.bin || p.bx - q.bx);
     /** @type {Map<number, Array<Array<[number, number]>>>} */
     const paths = new Map();
     // Layers beyond which one more thread moves a pixel by under 1/255 at this
-    // alpha: (1 - alpha)^n * 255 < 1. 0.06 at 1x needs 87 of them, 0.30 needs
+    // alpha: (1 - alpha)^n * 255 < 1. 0.14 at 1x needs 37 of them, 0.30 needs
     // 16; past the cap threads share and nothing shows.
     const cap = layerCap(alpha, capFraction == null ? 1 : capFraction);
     const held = new Int32Array(cap + 1);   // stamp = i + 1 when a neighbour holds that layer
@@ -554,6 +557,23 @@ class ContextBatches {
     // keys sort by bin, then layer: consecutive paths share a style, and a
     // strokeStyle set is a colour parse the canvas need not repeat
     const keys = [...paths.keys()].sort((p, q) => p - q);
+    if (glow && glow.alpha > 0 && glow.width > 0 && th.length) {
+      const core = ctx.lineWidth;
+      ctx.lineWidth = glow.width;
+      for (let i = 0; i < th.length;) {
+        const bin = th[i].bin;
+        ctx.strokeStyle = 'rgba(' + MY_WEB_SOURCES[bin].rgb + ',' + glow.alpha + ')';
+        ctx.beginPath();
+        for (; i < th.length && th[i].bin === bin; i++) {
+          const pts = th[i].pts;
+          ctx.moveTo(pts[0][0], pts[0][1]);
+          for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+        }
+        ctx.stroke();
+        n++;
+      }
+      ctx.lineWidth = core;
+    }
     let last = '';
     for (const key of keys) {
       const bin = Math.floor(key / 4096);
@@ -712,7 +732,7 @@ export function nearestUnderlay(underlay, opts, limit) {
  * with zoom only until a PLATEAU: from there to the ceiling the picture only
  * thins and widens, it never brightens. The reader's links are the only
  * saturated ink: one warm gold (sw-ink myWebReader, 1.5 px at the overview,
- * thickening with depth like a canon ribbon to 2.1 px at 40x), haloed, pinned
+ * thickening with depth like a canon ribbon to 2.3 px at 40x), haloed, pinned
  * at both ends by shape. The unit test reads this export; the walk reads the
  * pixels it makes.
  *
@@ -725,24 +745,40 @@ export function nearestUnderlay(underlay, opts, limit) {
  * put the ceiling at 0.70 is given up on his word (palette-myweb-colour.test.js
  * records it); 0.70 stays as the hard BOUND the walk's knob may raise the
  * plateau to for a corridor comparison.
+ *
+ * w4 (r2-05, "the normal is probably too faint"): at 0.06 the overview read as
+ * a haze, peak 128 of 255, where r2-05 shows Timothy's teal plainly. The floor
+ * is CONTEXT_FLOOR 0.14, the ramp keeps its shape and still STOPS at the 0.30
+ * plateau (C14: nothing brightens past it), now reached at 2.8x, so the whole
+ * rise is about 2x instead of 5x: "a little clearer ... is fine". The link
+ * thickens to 2.3 px at 40x (through w3 2.1) so its core alone still holds 5x
+ * a thread to 5.8x, now that the thread is on its plateau there. Each anchored
+ * thread carries a soft glow (r2-05), CONTEXT_GLOW_WIDTH past its core at
+ * CONTEXT_GLOW_SHARE of its alpha, stroked once a source so it does not pile
+ * up; a fly-over has none.
  */
-/** Where the context's zoom ramp stops (call 07; C14); the default look past 8.6x. */
+/** Where the context's zoom ramp stops (call 07; C14); the default look past 2.8x (w4). */
 export const CONTEXT_PLATEAU = 0.30;
 /** The context alpha's hard bound (design-myweb-colour.md, 2; the walk's knob may raise the plateau to it, never past). */
 export const CONTEXT_CEILING = 0.70;
+/** The overview's context alpha (w4: r2-05's teal reads at fit; through w3 0.06, "a haze"). */
+export const CONTEXT_FLOOR = 0.14;
+/** The soft glow under Timothy's threads (r2-05): this wide past the core, CSS px, at this share of the core's alpha. */
+export const CONTEXT_GLOW_WIDTH = 3;
+export const CONTEXT_GLOW_SHARE = 0.35;
 export function personalInk(z, ceiling) {
   const zz = Math.max(1, z || 1);
   const cap = ceiling > 0 ? Math.min(ceiling, CONTEXT_CEILING) : CONTEXT_PLATEAU;
   const t = Math.min(1, Math.log(zz) / Math.log(40));
+  const alpha = Math.min(cap, CONTEXT_FLOOR * Math.pow(zz, 0.75));
   return {
     // each thread's rgb is its source's (MY_WEB_SOURCES, the sw-ink myWeb*
-    // rows); only the alpha and width are the ink law's: 0.06 at 1x, 0.23 at
-    // 6x, the plateau from 8.6x.
-    context: { alpha: Math.min(cap, 0.06 * Math.pow(zz, 0.75)), width: 0.8 + 0.8 * t },
+    // rows); only the alpha and width are the ink law's.
+    context: { alpha, width: 0.8 + 0.8 * t, glow: { alpha: alpha * CONTEXT_GLOW_SHARE, width: CONTEXT_GLOW_WIDTH } },
     // the reader's link (sw-ink myWebReader: .95, 1.5 px), thickening with depth
-    // to 2.1 px at 40x so it stays at least 5x a context thread's ink to 5.8x and
-    // 6x with its halo to 40x
-    link: { alpha: 0.95, width: 1.5 + 0.6 * t, halo: 7, haloAlpha: 0.16, dot: 3, dotSolo: 4, ring: 5.5,
+    // to 2.3 px at 40x so it stays at least 5x a context thread's ink to 5.8x
+    // and 6x with its halo to 40x
+    link: { alpha: 0.95, width: 1.5 + 0.8 * t, halo: 7, haloAlpha: 0.16, dot: 3, dotSolo: 4, ring: 5.5,
       hoverWidth: 2.5 + 0.6 * t, hoverHalo: 11, hoverHaloAlpha: 0.3 },
   };
 }
@@ -946,10 +982,16 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
       batch.add(underlay.source ? underlay.source[i] : CONTEXT_BINS - 1, a[0], b[0], pts);
     }
     ctx.lineCap = 'round';
+    // the soft glow (r2-05, w4) under the threads that hold a foot on
+    // screen, at rest: a live gesture keeps its frames, and a fly-over (no
+    // foot on screen) gets none, so the corridors passing over a zoomed view
+    // never glow into the sky C17 forbids
+    const glowOn = !(opts.capFraction === 0);
     for (const key of [...steps.keys()].sort((p, q) => p - q)) {
       const cx = personalInk((key & 1 ? flyRungs : rungs).zoom(key >> 1), opts.contextCeiling).context;
       ctx.lineWidth = cx.width * DPR * (key & 1 ? FLYOVER_LEG_WIDTH : 1);
-      /** @type {ContextBatches} */ (steps.get(key)).stroke(ctx, cx.alpha * rest, ctx.lineWidth * 4, opts.capFraction);
+      const glow = glowOn && !(key & 1) ? { alpha: cx.glow.alpha * rest, width: ctx.lineWidth + cx.glow.width * DPR } : null;
+      /** @type {ContextBatches} */ (steps.get(key)).stroke(ctx, cx.alpha * rest, ctx.lineWidth * 4, opts.capFraction, glow);
     }
   }
 

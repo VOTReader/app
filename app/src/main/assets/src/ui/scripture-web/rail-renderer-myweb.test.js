@@ -45,17 +45,23 @@ if (typeof globalThis.Path2D === 'undefined') {
   /** @type {any} */ (globalThis).Path2D = class Path2D { moveTo() {} lineTo() {} arc() {} };
 }
 
-/** A 2D context that only counts. Every method the renderer calls is here.
+/** A stroke in one of Timothy's source colours (a link's halo is gold, never this). */
+const isTimothy = (style) => MY_WEB_SOURCES.some((src) => String(style).startsWith('rgba(' + src.rgb + ','));
+/** A context stroke at least this wide (device px) is the soft glow under
+ * Timothy's threads (w4, r2-05): CONTEXT_GLOW_WIDTH past a core that stops at 1.6. */
+const GLOW_MIN = RR.CONTEXT_GLOW_WIDTH * opts.DPR;
+/** A 2D context that only counts (stroke: the cores; glow: the glow strokes).
+ * Every method the renderer calls is here.
  * @returns {any} */
 function fakeCtx() {
-  const calls = { stroke: 0, fill: 0, beginPath: 0 };
+  const calls = { stroke: 0, glow: 0, fill: 0, beginPath: 0 };
   const noop = () => {};
   return {
     calls,
     lineWidth: 0, strokeStyle: '', fillStyle: '', font: '', textAlign: '', textBaseline: '',
     lineCap: '', lineJoin: '',
     beginPath() { calls.beginPath++; }, moveTo: noop, lineTo: noop, arc: noop,
-    stroke() { calls.stroke++; }, fill() { calls.fill++; },
+    stroke() { if (this.lineWidth >= GLOW_MIN && isTimothy(this.strokeStyle)) calls.glow++; else calls.stroke++; }, fill() { calls.fill++; },
     fillText: noop, strokeText: noop, measureText: () => ({ width: 40 }), clearRect: noop,
   };
 }
@@ -70,17 +76,25 @@ describe('My Web ink law', () => {
     // three edges land in three round-robin paths: three strokes, where main
     // makes ONE (CONTEXT_PATHS >= 3 is what keeps this reading true)
     expect(ctx.calls.stroke - ctx0.calls.stroke).toBe(3);
+    // the soft glow under them (w4) is ONE stroke for their one source, so it
+    // never piles up where the cores do
+    expect(ctx.calls.glow - ctx0.calls.glow).toBe(1);
   });
 
-  it('R1 the ink law after call 07 (Corbin, 2026-09-12: "the normal is probably too faint" and zooming "makes the colors get brighter and brighter ... odd"): floor 0.06 at 1x, today\'s curve x1.5 up to a 0.30 plateau, FLAT from there to the ceiling on both frames', () => {
+  it('R1 the ink law after call 07 (Corbin, 2026-09-12: "the normal is probably too faint" and zooming "makes the colors get brighter and brighter ... odd") and w4 (r2-05): floor CONTEXT_FLOOR at 1x, the z^0.75 ramp up to a 0.30 plateau, FLAT from there to the ceiling on both frames', () => {
     const a = (z) => personalInk(z).context.alpha;
-    expect(a(1)).toBeCloseTo(0.06, 3);                        // the overview floor, lifted from 0.04 ("a touch")
-    expect(a(6)).toBeCloseTo(0.06 * Math.pow(6, 0.75), 3);    // 0.230 - below the plateau the ramp is today's shape at 1.5x
-    expect(a(16)).toBeCloseTo(0.30, 3);                       // the plateau (reached at 8.6x)
+    // w4: the floor is 0.14 (through w3 0.06, lifted from 0.04): at 0.06 the
+    // overview read as a haze where r2-05 shows Timothy's teal plainly. The
+    // ramp keeps its shape and its 0.30 plateau, which it now reaches at 2.8x.
+    expect(RR.CONTEXT_FLOOR).toBe(0.14);
+    expect(a(1)).toBeCloseTo(RR.CONTEXT_FLOOR, 3);                       // the overview floor
+    expect(a(2)).toBeCloseTo(RR.CONTEXT_FLOOR * Math.pow(2, 0.75), 3);   // 0.235 - below the plateau the ramp keeps its shape
+    expect(a(2.8)).toBeCloseTo(0.30, 3);                                 // the plateau (reached at 2.76x)
+    expect(a(16)).toBe(a(2.8));
     expect(a(43.8)).toBe(a(16));                              // the phone's top-rail ceiling: not one bit brighter than 16x
     expect(a(18.2)).toBe(a(16));                              // the desktop's top-rail ceiling: the same
     expect(a(4000)).toBe(a(16));
-    expect(a(5.8)).toBeGreaterThanOrEqual(2 * a(1));          // the 5.8x reward survives (design-perf 09-10)
+    expect(a(5.8)).toBeGreaterThanOrEqual(2 * a(1));          // the 5.8x reward survives (design-perf 09-10): 0.30 against 0.14
     expect(a(0)).toBe(a(1));                                  // a bad z is overview, not NaN
     // the approved 0.70 ceiling is the law's hard BOUND: the walk's knob can raise the plateau to it and no further
     expect(RR.CONTEXT_PLATEAU).toBe(0.30);
@@ -90,6 +104,11 @@ describe('My Web ink law', () => {
     // "a little clearer lines as you zoom in is fine": the width, not the alpha, carries depth (0.8 -> 1.6 at 40x)
     expect(personalInk(1).context.width).toBeCloseTo(0.8, 3);
     expect(personalInk(40).context.width).toBeCloseTo(1.6, 3);
+    // the soft glow (w4, r2-05) follows its core's alpha, so it never brightens past the plateau either
+    for (const z of [1, 2, 2.8, 16, 43.8]) {
+      expect(personalInk(z).context.glow.alpha).toBeCloseTo(a(z) * RR.CONTEXT_GLOW_SHARE, 9);
+      expect(personalInk(z).context.glow.width).toBe(RR.CONTEXT_GLOW_WIDTH);
+    }
   });
 
   it('R2 a reader link outweighs a context thread (5x core to 5.8x, 6x with halo to 40x), in the other family', () => {
@@ -99,10 +118,12 @@ describe('My Web ink law', () => {
       const core = link.alpha * link.width;
       if (z <= 5.83) expect(core / thread).toBeGreaterThanOrEqual(5);
       // on the 0.30 plateau the context widens to 1.6 px at 40x; the link
-      // thickens to 2.1 px and its halo keeps the lead at 6x, with the family
-      // split (gold on teal-silver) and the pins on top of the ink
+      // thickens to 2.3 px and its halo keeps the lead at 6x, with the family
+      // split (gold on teal-silver) and the pins on top of the ink. w4: the
+      // context reaches its plateau at 2.8x now (CONTEXT_FLOOR 0.14), so the
+      // link thickens 0.8 px over the zoom (through w3 0.6) to keep 5x to 5.8x
       expect((core + link.halo * link.haloAlpha) / thread).toBeGreaterThanOrEqual(6);
-      expect(link.width).toBeCloseTo(1.5 + 0.6 * Math.min(1, Math.log(z) / Math.log(40)), 6);
+      expect(link.width).toBeCloseTo(1.5 + 0.8 * Math.min(1, Math.log(z) / Math.log(40)), 6);
       // no reader hue is a Timothy hue
       for (let k = 0; k < 3; k++) for (const src of MY_WEB_SOURCES) expect(myWebLinkColor(k)).not.toBe(src.rgb);
     }
