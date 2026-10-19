@@ -16,6 +16,7 @@ import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
 import { BackHintPill } from '../components/BackHintPill.jsx';
+import { MiniTitleBand } from '../components/MiniTitleBand.jsx';
 
 /** Whitespace-squashed — the search index's text domain (index-builder letterText). */
 const _squash = (s) => String(s || '').replace(/\s+/g, ' ').trim();
@@ -59,6 +60,14 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   React.useEffect(() => { setExpandSignal(0); setAllExpanded(true); }, [letter.id]);
 
   const mainRef = React.useRef(null);
+  /* search200 UX B10 (1): a landing mid-letter names the letter in a band pinned under
+     the top bar once this hero has scrolled away (MiniTitleBand). Its eyebrow is the
+     hero's own; an inert peek draws none. */
+  const heroRef = React.useRef(null);
+  const position = (studyMode ? (letter.num === 0 ? "Preface" : `Chapter ${letter.num}`) : (letter.num === 0 ? "Preface" : `Letter ${letter.num}`));
+  const miniTitle = inert ? null : (
+    <MiniTitleBand heroRef={heroRef} eyebrow={(volumeLabel ? volumeLabel + ' · ' : '') + position} title={letter.title} pageKey={letter.id} />
+  );
   /* The title is what the reader says before the body's first timed row
      (ReadAlongHighlight's lead-in, 2026-09-22). */
 
@@ -333,9 +342,10 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
         onSettings, onHistory, onSearch, theme, onThemeChange,
       })}
     >
-      <BackHintPill backHint={backHint} onClick={onBack} />
+      <BackHintPill backHint={backHint} onClick={onBack}>{miniTitle}</BackHintPill>
+      {!backHint && miniTitle ? <div className="mini-title-anchor">{miniTitle}</div> : null}
 
-      <header className="hero">
+      <header className="hero" ref={heroRef}>
         <div className={`hero-bg ${studyMode ? "study" : "vol"}`} />
         <div className="hero-content">
           {/* C2-C [C2]: no volumeLabel → the collection half of the eyebrow is

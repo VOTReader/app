@@ -18,6 +18,7 @@ import { AnswersContentsLine } from '../components/AnswersContents.jsx';
 import { passageTextBefore } from '../../utils/answers-contents.js';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
 import { BackHintPill } from '../components/BackHintPill.jsx';
+import { MiniTitleBand, stickyCover } from '../components/MiniTitleBand.jsx';
 
 
 /** Readable fallback for a {{nav:bookId:ch}} target before the lazy Bible
@@ -52,13 +53,20 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   // the paragraph comes to the top of the scroller, clear of a sticky "Back to" pill when one
   // is showing (measured, not guessed), and glows like a search landing. One-shot and
   // reader-initiated, the same class of write as that landing.
+  /* search200 UX B10 (1): an entry landed on mid-way names itself in a band pinned under
+     the top bar once this hero has scrolled away (MiniTitleBand), in the hero's words. */
+  const heroRef = React.useRef(null);
+  const miniTitle = inert ? null : (
+    <MiniTitleBand heroRef={heroRef} pageKey={entry.id} title={entry.title}
+      eyebrow={(volKey === 'answers' ? ['Answers', answersFiledUnder(entry)] : [partLabel, entry.num]).filter((x) => x != null && x !== '').join(' · ')} />
+  );
   const jumpTimerRef = React.useRef(/** @type {any} */ (null));
   React.useEffect(() => () => clearTimeout(jumpTimerRef.current), []);
   const jumpToPara = React.useCallback((/** @type {number} */ index) => {
     const el = wtlbMainRef.current && /** @type {HTMLElement|null} */ (wtlbMainRef.current.querySelector(`[data-hl-key="${wtlbHlKey(entry.id, index)}"]`));
     if (!el) return;
-    const hint = document.querySelector('.back-hint-row');
-    el.style.scrollMarginTop = ((hint ? hint.getBoundingClientRect().height : 0) + 16) + 'px';
+    // past the "Back to" row and the mini title band under it (search200 UX B10)
+    el.style.scrollMarginTop = (stickyCover(el) + 16) + 'px';
     el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
     setLandedPara(index);
     setLandedOff(null);
@@ -451,9 +459,10 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         onSettings, onHistory, onSearch, theme, onThemeChange,
       })}
     >
-      <BackHintPill backHint={backHint} onClick={onBack} />
+      <BackHintPill backHint={backHint} onClick={onBack}>{miniTitle}</BackHintPill>
+      {!backHint && miniTitle ? <div className="mini-title-anchor">{miniTitle}</div> : null}
 
-      <header className="hero">
+      <header className="hero" ref={heroRef}>
         <div className="hero-bg vol" />
         <div className="hero-content">
           {/* An Answers topic's num is only its place on the site's page list;

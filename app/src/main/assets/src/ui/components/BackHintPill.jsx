@@ -12,13 +12,16 @@
    than a title (`plain`: the results) is no name to set apart: it reads whole
    in the lead's case, "‹ BACK TO RESULTS", like the app's other pills. In the
    title slot it read "BACK TO results".
+
+   CHILDREN ride in the row after the pill: the reading views hang their
+   MiniTitleBand there, so the band pins under the "Back to" row (B10 item 1).
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
  * @param {{ backHint: { title: string, volumeLabel?: string | null, plain?: boolean } | null | undefined,
- *   onClick: () => void }} props
+ *   onClick: () => void, children?: import('react').ReactNode }} props
  */
-export function BackHintPill({ backHint, onClick }) {
+export function BackHintPill({ backHint, onClick, children }) {
   if (!backHint) return null;
   const place = backHint.volumeLabel ? backHint.volumeLabel + ' · ' + backHint.title : backHint.title;
   return (
@@ -29,6 +32,7 @@ export function BackHintPill({ backHint, onClick }) {
           : <><span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
             <span className="back-hint-title">{place}</span></>}
       </button>
+      {children}
     </div>
   );
 }

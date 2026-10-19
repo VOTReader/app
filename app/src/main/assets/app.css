@@ -2764,6 +2764,37 @@
       pointer-events: none;
     }
     .back-hint-row .back-hint-pill { pointer-events: auto; }
+    /* ── The mini title band (search200 UX B10 item 1, mockup
+       ux/mockups/1-sticky-title/PICK.png) ── a landing mid-letter named no
+       letter: the hero sat above, out of sight. Once it has scrolled up under
+       the top bar, this band says the hero's eyebrow over the page's title.
+       It hangs from its host's bottom edge (the sticky "Back to" row, or a
+       zero-height sticky anchor when there is none), so it takes no room and
+       moves nothing when it shows. Frozen chrome sizes (--fsc-*) keep it within
+       48px at every Text Size; a gold hairline, not a solid rule, closes it.
+       Not a tap target (MiniTitleBand.jsx). */
+    .mini-title-anchor { position: sticky; top: 0; z-index: 5; height: 0; }
+    .mini-title {
+      position: absolute; left: 0; right: 0; top: 100%;
+      box-sizing: border-box; max-height: 48px; overflow: hidden;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+      padding: 6px 16px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--gold-border);
+      pointer-events: none;
+      opacity: 0; transform: translateY(-4px); visibility: hidden;
+      transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0.15s;
+    }
+    .mini-title.shown { opacity: 1; transform: none; visibility: visible; transition: opacity 0.15s ease, transform 0.15s ease; }
+    .mini-title-eyebrow, .mini-title-name {
+      max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
+    }
+    .mini-title-eyebrow {
+      font-family: var(--font-cinzel); font-size: var(--fsc-10); line-height: 1.3;
+      letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold-dim);
+    }
+    .mini-title-name { font-family: var(--font-garamond); font-size: var(--fsc-16); line-height: 1.25; color: var(--cream); }
+    @media (prefers-reduced-motion: reduce) { .mini-title, .mini-title.shown { transition: none; transform: none; } }
     .back-hint-pill {
       display:inline-flex; align-items:center; gap:0.35rem;
       max-width:100%;
