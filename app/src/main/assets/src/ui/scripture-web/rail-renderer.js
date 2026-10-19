@@ -904,6 +904,13 @@ export function personalInk(z, ceiling) {
 function drawRails(ctx, opts, rails) {
   const { width, DPR, votRail } = opts;
   const nf = nameFrame(opts);
+  // the names stand in the canvas area, the frame less the docked panel (w4
+  // review: under it "TIMO..." and "REV" were cut by its edge). The bands keep
+  // their width (the rail spans the frame), so the type is the frame's; a band
+  // wholly under the panel is unnamed, one cut by its edge is named over what
+  // shows of it, as the screen edge cuts a band on a zoom.
+  const area = opts.areaWidth > 0 ? Math.min(width, opts.areaWidth) : width;
+  const inArea = area < width ? Object.assign({}, opts, { width: area }) : opts;
   // the Bible rail (the canon's baseline ink) and the Volumes rail (spec §4.2)
   ctx.lineWidth = DPR;
   ctx.strokeStyle = inkCss('baseline');
@@ -972,14 +979,15 @@ function drawRails(ctx, opts, rails) {
     ctx.beginPath();
     ctx.moveTo(span.x0, rails.topY - bandTick[0] * DPR); ctx.lineTo(span.x0, rails.topY + bandTick[1] * DPR);
     ctx.stroke();
-    bands.push({ span, forms: railForms(seg), group: seg.group || seg.volKey });
+    const shown = inArea === opts ? span : segmentSpan(seg, inArea);
+    if (shown && shown.room > 0) bands.push({ span: shown, forms: railForms(seg), group: seg.group || seg.volKey });
   }
   // two rows on a PC (136 and 120, names 116-136) and a landscape phone (w4:
   // 8 and 20 px over the rail), three on a narrow frame (8, 20, 32), so all 21
   // collections are named from a 360 px portrait phone up; through w3 the
   // phone kept one row and dropped five (VOL VII, WTLB I, BLESSED, TIMOTHY,
   // TRINITY). A name no row can take in any form keeps its tick and shows on a zoom.
-  const placed = placeRailNames(ctx, bands, { width, pad, inset, rows: nf.rows.length })
+  const placed = placeRailNames(ctx, bands, { width: area, pad, inset, rows: nf.rows.length })
     .map((nm) => ({ label: nm.label, x: nm.x, y: rails.topY - nf.rows[nm.row] * DPR }));
   setTracking(ctx, 0);
   return { names: placed, size, overline: nf.overline };
@@ -1040,10 +1048,12 @@ function setTracking(ctx, px) {
  * @param {{verseX:(v:number)=>number, votX?:(p:number)=>number, votRail:any, verseTotal:number, width:number, height:number,
  *   DPR:number, base:number, chrome:any, showUnderlay?:boolean, capFraction?:number,
  *   hoverIndex?:number, focusIndex?:number, hoverUnderlay?:boolean, focusUnderlay?:boolean,
- *   contextCeiling?:number, contextGlow?:boolean, inset?:number}} opts
+ *   contextCeiling?:number, contextGlow?:boolean, inset?:number, areaWidth?:number}} opts
  *   hoverIndex / focusIndex index the reader's links, or Timothy's notes when
  *   hoverUnderlay / focusUnderlay is set (the Focus's underlay fields).
  *   contextGlow false draws no glow (the walk's bench knob; unset in the app).
+ *   areaWidth is the canvas area's width (the frame less the docked panel,
+ *   device px): the Volumes names stand within it (w4 review).
  */
 export function drawPersonalWeb(ctx, personal, underlay, opts) {
   const { width, DPR, votRail, verseX } = opts;

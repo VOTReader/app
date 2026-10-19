@@ -356,8 +356,10 @@ export function useWebRenderer({
         ro.contextCeiling = typeof globalThis.__swContextCeiling === 'number' ? globalThis.__swContextCeiling : undefined;
         // the walk's knob for the glow's cost (e2e-myweb --glow): false draws no glow; unset in the app
         ro.contextGlow = globalThis.__swContextGlow === false ? false : undefined;
+        // the names stand in the canvas area, the frame less the docked panel (w4 review)
+        ro.areaWidth = panel && panel.right > 0 ? Math.max(0, v.W - panel.right * v.DPR) : undefined;
         // the overlay (overlay-renderer.js): one clear, the links, the book names
-        paintMyWebOverlay(ctx, { personal: p, g, cam, view: base, v, chrome, rail: ro });
+        paintMyWebOverlay(ctx, { personal: p, g, cam, view: base, v, chrome, rail: ro, panelInset: panel });
         if (wrap) put(wrap, attrs, 'data-cap-fraction', String(ro.capFraction));
         // the rails' JSON is for the walks; the CSS the rails' chrome sits by is always set
         if (walkOn()) publishRails(ro, p, g, cam, camV, v, wrap);

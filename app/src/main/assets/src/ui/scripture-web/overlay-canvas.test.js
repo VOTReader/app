@@ -15,7 +15,7 @@ import { footBundles, lensRange, labelFeed } from '../../utils/scripture-web/pic
 import { webFrame, webViewArgs, centreOf } from '../../utils/scripture-web/web-frame.js';
 import { citationsForVerse } from '../../utils/scripture-web/vot-citations.js';
 import { css, TAP_CONTEXT } from '../../utils/scripture-web/sw-ink.js';
-import { paintCanonOverlay, hitOverlay, stackRows, citedVerses, chipKeepers, DEEP_FULL, LABEL_RECEDE } from './overlay-renderer.js';
+import { paintCanonOverlay, paintMyWebOverlay, hitOverlay, stackRows, citedVerses, chipKeepers, DEEP_FULL, LABEL_RECEDE } from './overlay-renderer.js';
 
 vi.setConfig({ testTimeout: 60000 });
 
@@ -910,6 +910,26 @@ describe('the pills and the labels', () => {
       const b = textBox(c);
       expect(b.x1, c.t).toBeLessThanOrEqual(edge);
       expect(c.y, c.t).toBeGreaterThan(fs.inset);
+    }
+  });
+
+  it("w4 review: My Web's Bible names stand in the canvas area, never under the docked panel (TIMO..., REV cut by its edge)", () => {
+    for (const [name, right] of /** @type {Array<[string, number]>} */ ([['pc', 400], ['phone', 300]])) {
+      const v = FRAMES[name];
+      const fs = /** @type {any} */ (frameAt(name, 1, g.total / 2, { panelInset: { right, bottom: 0 } }));
+      // My Web's own rail options: no Volumes rail, so only the Bible names print here
+      fs.rail = { width: v.W, height: v.H, DPR: v.DPR, base: fs.view.base, verseTotal: g.total, verseX: (x) => geo.verseToX(fs.cam, v.W, x), votRail: null, chrome: fs.chrome };
+      const names = (pi) => {
+        const rec = recorder();
+        paintMyWebOverlay(rec.ctx, Object.assign({}, fs, { panelInset: pi }));
+        return rec.texts().filter((c) => c.y > fs.view.base);
+      };
+      const free = names(null), docked = names({ right, bottom: 0 });
+      // without the panel the names reach past where its edge would stand, so the case bites
+      const edge = v.W - right * v.DPR;
+      expect(free.some((c) => textBox(c).x1 > edge), name).toBe(true);
+      expect(docked.length, name).toBeGreaterThan(3);
+      for (const c of docked) expect(textBox(c).x1, `${name} ${c.t}`).toBeLessThanOrEqual(edge + 1e-6);
     }
   });
 

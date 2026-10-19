@@ -195,6 +195,22 @@ describe('the Volumes rail keeps its names apart (one placement law for both rai
     expect(y('HOLY DAYS')).not.toBe(y('MTAM'));
   });
 
+  it('w4 review: with the panel docked over the right of the frame, every name stands in the canvas area, centred on what it holds of its band', () => {
+    for (const [wCss, hCss, dpr, panel] of /** @type {Array<[number, number, number, number]>} */ ([[1600, 900, 1, 400], [891, 411, 2.6, 300]])) {
+      const f = frame(wCss, dpr, hCss);
+      const area = f.W - panel * dpr;
+      const ctx = recordingCtx();
+      drawPersonalWeb(ctx, null, null, Object.assign({}, f.opts, { areaWidth: area }));
+      const names = topRailLabels(ctx, f);
+      expect(names.length).toBeGreaterThan(5);
+      for (const l of names) expect(l.right, `${wCss}: ${l.text}`).toBeLessThanOrEqual(area + 1e-6);
+      // the bands wholly under the panel go unnamed; every band left of it is named
+      const slot = f.W / CHAIN.length;
+      const under = CHAIN.filter((_, i) => i * slot >= area).length;
+      expect(names.length, names.map((l) => l.text).join(',')).toBe(CHAIN.length - under);
+    }
+  });
+
   it('every visible collection keeps its tick whether or not its name was printed', () => {
     const f = frame(952, 2);
     const ctx = recordingCtx();

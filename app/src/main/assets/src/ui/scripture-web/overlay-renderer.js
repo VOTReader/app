@@ -640,7 +640,8 @@ export function paintCanonOverlay(ctx, fs) {
  * book names. The rail stays under the hidden chrome: it is the legend of
  * the web, not a control (Corbin, 2026-09-11).
  * @param {CanvasRenderingContext2D|null} ctx
- * @param {{personal:any, rail:any, g:any, cam:any, view:any, v:{W:number, H:number, DPR:number}, chrome:any}} fs
+ * @param {{personal:any, rail:any, g:any, cam:any, view:any, v:{W:number, H:number, DPR:number}, chrome:any,
+ *   panelInset?:{right:number, bottom:number}|null}} fs  panelInset: CSS px the docked panel covers
  */
 export function paintMyWebOverlay(ctx, fs) {
   if (!ctx) return;
@@ -648,7 +649,7 @@ export function paintMyWebOverlay(ctx, fs) {
   ctx.clearRect(0, 0, v.W, v.H);
   ensureWebFont();
   drawPersonalWeb(ctx, p && p.graph, p && p.underlay, fs.rail);
-  drawRulerOnly(ctx, fs.g, fs.cam, fs.view, v);
+  drawRulerOnly(ctx, fs.g, fs.cam, fs.view, v, fs.panelInset || null);
 }
 
 /* ── the ground: scrim, wash, baseline, the cited strip ────────────────── */
@@ -1911,12 +1912,21 @@ export function publishRails(ro, p, g, cam, camV, v, root) {
 /**
  * The scripture rail under the personal web, read as the canon overview
  * reads it: the same names, the same law, the same face, at My Web's own
- * rows (34 / 48 px under its baseline, as before).
+ * rows (34 / 48 px under its baseline, as before), within the canvas area
+ * as the canon's are: the frame less the docked panel (w4 review: "REV" was
+ * cut by the panel's edge).
+ * @param {any} ctx @param {any} g @param {any} cam @param {any} view
+ * @param {{W:number, H:number, DPR:number}} v
+ * @param {{right:number, bottom:number}|null} [pi]  the docked panel's inset, CSS px
  */
-function drawRulerOnly(ctx, g, cam, view, v) {
+function drawRulerOnly(ctx, g, cam, view, v, pi) {
   if (!g || !g.chapters || !g.chapters.length) return;
   const s = v.DPR || 1;
-  const L = { s, W: v.W, Wc: v.W, zones: chromeBoxes(ctx, v).zones };
+  const right = pi && pi.right > 0 ? pi.right * s : 0;
+  const Wc = Math.max(0, v.W - right);
+  const zones = chromeBoxes(ctx, v, pi).zones.slice();
+  if (right > 0) zones.push({ x0: Wc, x1: v.W, y0: 0, y1: v.H });
+  const L = { s, W: v.W, Wc, zones };
   const capH = fontPx(12, s) * CAP;
   const rows = [{ top: view.base + 36 * s, h: capH }, { top: view.base + 50 * s, h: capH }];
   drawBookLabels(ctx, g, cam, L, rows, 12, null, 'rail');
