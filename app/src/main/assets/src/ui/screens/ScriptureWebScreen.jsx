@@ -417,7 +417,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       {!graph && <div className="sw-loading">Weaving the web…</div>}
 
       <div className="sw-topbar" ref={topbarRef}>
-        <button type="button" className="sw-btn sw-btn-icon" onClick={onBack} aria-label="Back">
+        {/* with the go-to open, Back puts it away first, as Escape does (it is the top layer; w4) */}
+        <button type="button" className="sw-btn sw-btn-icon" data-sw-goto-back=""
+          onClick={() => (goTo.isOpen ? goTo.close() : onBack())} aria-label="Back">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
         <div className="sw-title">

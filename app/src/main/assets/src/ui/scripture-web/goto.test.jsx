@@ -147,6 +147,50 @@ describe('the go-to box (spec 4.5)', () => {
     expect(sel(), 'up from the first is the last').toBe(rows.length - 1);
   });
 
+  /* w4 (the phone stream): on the phone in landscape the soft keyboard takes about half of the
+     411 px root, and the box with three rows, a hairline and the hint ran 27 px under it (the
+     stand-in shot s07k). The hint is there to say what to type, so on the phone it says it until
+     there is something to choose; then the rows have the room. PC keeps both (spec 4.5). */
+  it('compact: the hint shows until rows come, then the rows have the room; PC keeps the hint under them', () => {
+    const phone = { W: Math.round(891 * 2.625), H: Math.round(411 * 2.625), DPR: 2.625 };
+    const { container, get } = mountWeb({ frame: phone });
+    act(() => { get().goTo.open(); });
+    expect(box(container).classList.contains('is-compact')).toBe(true);
+    expect(container.querySelector('.sw-goto-hint'), 'nothing typed: the hint says what to type').toBeTruthy();
+    fireEvent.change(input(container), { target: { value: 'Gen 1:1' } });
+    expect(rowTexts(container).length, 'the phone takes three rows').toBe(3);
+    expect(container.querySelector('.sw-goto-hint'), 'rows to choose: the hint gives them its room').toBeNull();
+    fireEvent.change(input(container), { target: { value: 'Zzyzx' } });
+    expect(rowTexts(container)).toEqual([]);
+    expect(container.querySelector('.sw-goto-hint'), 'nothing it can name: the hint again').toBeTruthy();
+    cleanup();
+    const pc = mountWeb();
+    act(() => { pc.get().goTo.open(); });
+    fireEvent.change(input(pc.container), { target: { value: 'Gen 1:1' } });
+    expect(rowTexts(pc.container).length).toBeGreaterThan(0);
+    expect(pc.container.querySelector('.sw-goto-hint').textContent).toBe(GOTO_HINT);
+  });
+
+  /* a keyboard taller than the stand-in leaves less than three rows: the list scrolls in the box
+     (goto CSS), and the chosen row is kept in view as the arrows move it */
+  it('the chosen row is kept in view as the arrows move it (the list scrolls when the keyboard leaves less room)', () => {
+    const into = vi.fn();
+    const had = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
+    Element.prototype.scrollIntoView = function (o) { into(this, o); };
+    try {
+      const { container, get } = mountWeb();
+      act(() => { get().goTo.open(); });
+      fireEvent.change(input(container), { target: { value: 'Gen 1:1' } });
+      into.mockClear();
+      fireEvent.keyDown(input(container), { key: 'ArrowDown' });
+      const rows = container.querySelectorAll('.sw-goto-row');
+      expect(into).toHaveBeenCalledWith(rows[1], { block: 'nearest' });
+    } finally {
+      if (had) Object.defineProperty(Element.prototype, 'scrollIntoView', had);
+      else delete Element.prototype.scrollIntoView;
+    }
+  });
+
   it('a verse row takes its text when the Bible corpus lands while the box is open (it loads lazily)', () => {
     let version = 0, loaded = false;
     const subs = new Set();

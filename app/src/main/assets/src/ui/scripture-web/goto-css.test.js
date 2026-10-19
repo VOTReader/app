@@ -55,9 +55,8 @@ describe("the go-to's chips in compact mode", () => {
   });
 });
 
-/* The compact box runs 64 px in from each side at top 8, over the title and the control row by the
-   spec's own geometry, and its 0.96 fill let their gold text ghost through behind the query (the
-   review of 2026-10-18). While it is open they are hidden (visibility, so nothing reflows); the
+/* The compact box lies over the title and the control row (the header row, w4 below), and its
+   0.96 fill let their gold text ghost through behind the query (the review of 2026-10-18). While it is open they are hidden (visibility, so nothing reflows); the
    Back button, left of the box, stays. */
 describe('the chrome under the compact box', () => {
   it('the title and the control row are hidden while a compact box is open; the topbar (Back) is not', () => {
@@ -67,5 +66,40 @@ describe('the chrome under the compact box', () => {
     // a hover tip left under it ghosted the same way (the phone walk, tools/e2e-sw-goto.mjs)
     expect(declsFor(under + ' .sw-tip')).toMatch(/visibility:\s*hidden/);
     expect(declsFor(under + ' .sw-topbar')).toBe('');
+  });
+});
+
+/* w4 (the phone stream). The spec's 64 / 64 at top 8 put the box's edge on Back's (both at 64)
+   and its field 6 px above Back's line, and with the landscape keyboard up (about half the 411 px
+   root) three rows, the hairline and the hint ran under the keyboard (shot s07k). The box now
+   takes the header row: its field on Back's centre line (Back is 40 px at chrome-top + 8, so a
+   48 px field at chrome-top + 4), 12 px after Back, out to the 16 px compact gutter where the
+   control row ended (the panel's width more when one is docked); and it is never taller than
+   the room above the keyboard (either inset: --keyboard-height on the web, --inset-bottom with
+   the IME in it on the APK), where the list scrolls. */
+describe('the compact box takes the header row and keeps above the keyboard', () => {
+  const d = () => declsFor('.sw-goto.is-compact');
+  it("its field sits on Back's line, 12 px after Back, out to the compact gutter", () => {
+    expect(d()).toMatch(/top:\s*calc\(var\(--sw-chrome-top\) \+ 4px\)/);
+    // the topbar's 16 px left and its 8 px pad, Back's 40 px, then 12
+    expect(d()).toMatch(/left:\s*calc\(16px \+ var\(--sw-topbar-pad\) \+ 40px \+ 12px\)/);
+    expect(d()).toMatch(/right:\s*calc\(16px \+ var\(--sw-goto-inset, 0px\)\)/);
+  });
+  it('it is never taller than the room above the keyboard, and the list scrolls in it', () => {
+    expect(d()).toMatch(/display:\s*flex/);
+    expect(d()).toMatch(/flex-direction:\s*column/);
+    expect(d()).toMatch(/max-height:\s*calc\(100% - var\(--sw-chrome-top\) - 8px - max\(var\(--keyboard-height, 0px\), var\(--inset-bottom, 0px\)\)\)/);
+    expect(declsFor('.sw-goto.is-compact .sw-goto-field')).toMatch(/flex:\s*none/);
+    const list = declsFor('.sw-goto.is-compact .sw-goto-list');
+    expect(list).toMatch(/overflow-y:\s*auto/);
+    expect(list).toMatch(/min-height:\s*0/);
+    expect(list).toMatch(/overscroll-behavior:\s*contain/);
+  });
+  /* a portrait phone draws the web turned (.sw-rotated): the keyboard rises from the glass's
+     bottom, which is the turned root's right end, so there it takes width, not height */
+  it('turned (a portrait phone), the keyboard takes the right end, not the height', () => {
+    const r = declsFor('.sw-root.sw-rotated > .sw-goto.is-compact');
+    expect(r).toMatch(/right:\s*calc\(16px \+ max\(var\(--sw-goto-inset, 0px\), var\(--keyboard-height, 0px\), var\(--inset-bottom, 0px\)\)\)/);
+    expect(r).toMatch(/max-height:\s*calc\(100% - var\(--sw-chrome-top\) - 8px\)/);
   });
 });

@@ -302,13 +302,16 @@ export function useGoTo(web) {
     return () => window.removeEventListener('resize', measure);
   }, [isOpen, insetNow, measure]);
 
-  // a press anywhere outside the box (and its button) closes it
+  // a press anywhere outside the box (and its button) closes it; Back (data-sw-goto-back) is the
+  // box's own way out on the phone, and its click closes it (w4: the press closed the box and the
+  // click then left the web)
   React.useEffect(() => {
     if (!isOpen) return undefined;
     const onDown = (e) => {
       const t = e.target;
       if (boxRef.current && boxRef.current.contains(t)) return;
       if (buttonRef.current && buttonRef.current.contains(t)) return;
+      if (t && typeof t.closest === 'function' && t.closest('[data-sw-goto-back]')) return;
       setOpen(false);
       openerRef.current = null;
     };
@@ -368,6 +371,12 @@ export function useGoTo(web) {
     return goToRows(graph, query, { density, limit: compact ? GOTO_ROWS_COMPACT : GOTO_ROWS });
   }, [isOpen, graph, query, density, viewRef, bibleVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const selAt = rows.length ? Math.min(sel, rows.length - 1) : -1;
+  // the chosen row stays in view: a keyboard that leaves less than three rows scrolls the list
+  React.useLayoutEffect(() => {
+    if (!isOpen || selAt < 0 || !boxRef.current) return;
+    const el = boxRef.current.querySelector('#sw-goto-opt-' + selAt);
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest' });
+  }, [isOpen, selAt, rows, boxRef]);
 
   const choose = React.useCallback((row) => {
     if (!row) return;
@@ -587,7 +596,9 @@ export function useGoTo(web) {
           ))}
         </ul>
       ) : null}
-      <div className="sw-goto-hint">{GOTO_HINT}</div>
+      {/* the phone's keyboard leaves room for the rows or the hint: it says what to type until
+          there is something to choose (w4) */}
+      {compact && rows.length ? null : <div className="sw-goto-hint">{GOTO_HINT}</div>}
     </div>
   ) : null;
 

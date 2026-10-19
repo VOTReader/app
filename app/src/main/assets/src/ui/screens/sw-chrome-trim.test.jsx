@@ -166,6 +166,30 @@ describe('the Scripture Web chrome, trimmed', () => {
     window.VotSearchData = prev;
   });
 
+  /* w4 (the phone stream): on the phone the open box takes the header row and Back stays beside
+     it. Back is then the box's way out, as Escape and the Android Back are (the box is the top
+     layer): a tap on it closed the box (the press outside) and the click then left the web, so
+     one tap threw a reader who only meant to put the search away out to the Library. */
+  it('Back with the box open puts the box away and stays on the web; the next Back leaves', async () => {
+    const prev = window.VotSearchData;
+    // @ts-ignore -- a classic script: it sets window.VotSearchData
+    await import('../../../search-data.js');
+    const onBack = vi.fn();
+    const { container } = await mount({ onBack });
+    fireEvent.click(screen.getByRole('button', { name: /go to a book, chapter or verse/i }));
+    expect(container.querySelector('.sw-goto')).toBeTruthy();
+    const back = screen.getByRole('button', { name: 'Back' });
+    // a tap: the press, then the click
+    fireEvent.pointerDown(back);
+    fireEvent.click(back);
+    expect(container.querySelector('.sw-goto'), 'the box is put away').toBeNull();
+    expect(onBack, 'and the web stays').not.toHaveBeenCalled();
+    fireEvent.pointerDown(back);
+    fireEvent.click(back);
+    expect(onBack, 'with nothing open, Back leaves').toHaveBeenCalledTimes(1);
+    window.VotSearchData = prev;
+  });
+
   it('renders NO colour-mode select — distance is the only law, hard-wired', async () => {
     await mount();
     expect(screen.queryByLabelText('Colour mode')).toBeNull();

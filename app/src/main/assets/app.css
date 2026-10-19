@@ -7934,7 +7934,7 @@
        (z 10: it is the dialog the reader just called up), centred beside an
        open panel (--sw-goto-inset is the panel's width, set inline from
        panelInsetRef);
-       compact (a root 500 px tall or less) runs it 64 px from each side. The
+       compact (a root 500 px tall or less) takes the header row (w4, below). The
        web is always night (Q4), so its ink is the spec's own, not the theme's.
        The verse chip rides the verse's foot (placed per frame from JS; it
        takes no pointer; over a bottom sheet it stands on the sheet's top
@@ -7951,8 +7951,24 @@
       box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55); color: #E9EEEF; font-family: var(--font-body);
       overflow: hidden;
     }
+    /* compact takes the header row (w4; the spec's 64 / 64 at top 8 met Back edge to edge, its
+       field 6 px above Back's line): the 48 px field on the line of Back (40 px at chrome-top + 8,
+       so chrome-top + 4), 12 px after Back, out to the 16 px compact gutter the control row ended
+       at (the docked panel's width more). It is never taller than the room above the soft
+       keyboard (--keyboard-height on the web; on the APK --inset-bottom carries the IME), and
+       the list scrolls in what is left. */
     .sw-goto.is-compact {
-      top: 8px; left: 64px; right: calc(64px + var(--sw-goto-inset, 0px)); width: auto; transform: none;
+      top: calc(var(--sw-chrome-top) + 4px);
+      left: calc(16px + var(--sw-topbar-pad) + 40px + 12px);
+      right: calc(16px + var(--sw-goto-inset, 0px)); width: auto; transform: none;
+      display: flex; flex-direction: column;
+      max-height: calc(100% - var(--sw-chrome-top) - 8px - max(var(--keyboard-height, 0px), var(--inset-bottom, 0px)));
+    }
+    /* turned (a portrait phone, .sw-rotated): the keyboard rises from the glass's bottom, which is
+       the turned root's right end, so there it takes width, not height */
+    .sw-root.sw-rotated > .sw-goto.is-compact {
+      right: calc(16px + max(var(--sw-goto-inset, 0px), var(--keyboard-height, 0px), var(--inset-bottom, 0px)));
+      max-height: calc(100% - var(--sw-chrome-top) - 8px);
     }
     /* the compact box lies over the title and the control row by the spec's geometry, and its 0.96
        fill let their gold ghost through behind the query: hidden while it is open (no reflow),
@@ -7961,7 +7977,7 @@
     .sw-root:has(> .sw-goto.is-compact) .sw-controls,
     .sw-root:has(> .sw-goto.is-compact) .sw-tip { visibility: hidden; }
     .sw-goto-field { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 18px; }
-    .sw-goto.is-compact .sw-goto-field { height: 48px; padding: 0 14px; gap: 10px; }
+    .sw-goto.is-compact .sw-goto-field { flex: none; height: 48px; padding: 0 14px; gap: 10px; }
     .sw-goto-icon { flex: none; width: 20px; height: 20px; color: #B7BFC1; }
     .sw-goto-input {
       flex: 1; min-width: 0; height: 100%; padding: 0; background: transparent; border: 0; outline: none;
@@ -7974,6 +7990,10 @@
     .sw-goto:focus-within { border-color: rgba(196, 164, 105, 0.55); }
     .sw-goto.is-compact .sw-goto-input { font-size: var(--fsc-18); }
     .sw-goto-list { list-style: none; margin: 0; padding: 4px 10px 0; }
+    /* compact: the rows end the box when they show (the hint waits for no rows, goto.jsx) */
+    .sw-goto.is-compact .sw-goto-list {
+      flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 2px 10px 4px;
+    }
     .sw-goto-row {
       display: flex; align-items: baseline; height: 48px; padding: 0 14px; border-radius: 8px;
       white-space: nowrap; overflow: hidden; cursor: pointer; font-size: var(--fsc-18); line-height: 48px; color: #E9EEEF;
