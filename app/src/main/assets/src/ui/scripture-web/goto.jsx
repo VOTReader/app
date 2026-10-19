@@ -175,16 +175,21 @@ export function hereLabel(g, span, verse, atFit) {
  * loop's onFrame and the root. keepOutRef and schedule (the integration's): the verse chip's box,
  * CSS px, is written to keepOutRef ([box], or null while no chip shows) so the overlay's labels keep
  * off it, and a frame is asked for whenever the box changes, so a still camera repaints once.
+ * insetFor (the screen's usePanelLayout, w4): what the panel will cover once open, CSS px, so a
+ * place is framed beside the panel it opens even before that panel renders (an instant fly, the
+ * door's start or reduced motion, read an inset of 0 and landed the verse at the panel's edge).
  * @param {{ graph?: any, flyTo?: Function, openPanel?: Function, journey?: any,
  *   lightThreads?: Function, setAnnounce?: Function, start?: any, closePanel?: Function, panel?: any,
  *   density?: any, mode?: string, camRef?: any, viewRef?: any, focusRef?: any, panelInsetRef?: any,
- *   viewFor?: Function, onFrame?: Function, rootRef?: any, keepOutRef?: any, schedule?: Function }} web
+ *   viewFor?: Function, onFrame?: Function, rootRef?: any, keepOutRef?: any, schedule?: Function,
+ *   insetFor?: Function }} web
  * @returns {GoTo}
  */
 export function useGoTo(web) {
   const {
     graph, flyTo, openPanel, journey, lightThreads, setAnnounce, start, closePanel, panel,
     density, mode, camRef, viewRef, focusRef, panelInsetRef, viewFor, onFrame, rootRef, keepOutRef, schedule,
+    insetFor,
   } = web || {};
   // what is open, read when a crumb is recorded (here), not when this render ran
   const panelRef = React.useRef(panel);
@@ -346,9 +351,17 @@ export function useGoTo(web) {
       entryOpen = { mode: 'group', chapter: place.chapterIndex };
       openPanel(entryOpen);
     } else if (lights) {
-      entryOpen = { mode: 'verse', verse: place.lo, lit: ids };
-      openPanel({ mode: 'verse', verse: place.lo });
+      // a range opens on the range (w4: verse mode on its first verse lit that verse's threads over
+      // the range's, so the chip never came and the count said was not the count lit)
+      const spec = place.hi > place.lo ? { mode: 'verse', verse: place.lo, verseEnd: place.hi } : { mode: 'verse', verse: place.lo };
+      entryOpen = Object.assign({}, spec, { lit: ids });
+      openPanel(spec);
       if (lightThreads) lightThreads(ids);
+    } else {
+      // a book opens nothing, so what was open closes, its lit set with it (w4: John 3:16's panel
+      // stayed docked over Romans); Back opens it again (the origin, read above, keeps it)
+      entryOpen = null;
+      if (typeof closePanel === 'function') closePanel();
     }
     setChip(null);
     if (push && journey) {
@@ -360,10 +373,16 @@ export function useGoTo(web) {
         setChip({ lo: place.lo, hi: place.hi, label: place.label, count: ids.length, litKey, ids });
       }
     };
-    Promise.resolve(flyTo(frame, how && how.instant ? { reduceMotion: true } : undefined)).then(done, done);
+    // framed in the canvas area the panel will leave (insetFor), told now: an instant fly lands
+    // before the panel renders, and a book's closes it
+    /** @type {any} */
+    const fly = how && how.instant ? { reduceMotion: true } : {};
+    const cover = place.kind === 'book' ? { right: 0, bottom: 0 } : typeof insetFor === 'function' ? insetFor() : null;
+    if (cover) { fly.insetRight = cover.right; fly.insetBottom = cover.bottom; }
+    Promise.resolve(flyTo(frame, fly)).then(done, done);
     say(ids ? place.label + ', ' + connectionsText(ids.length) : place.label);
     return true;
-  }, [graph, live, mode, openPanel, camRef, viewRef, density, lightThreads, journey, here, focusRef, flyTo, say]);
+  }, [graph, live, mode, openPanel, closePanel, camRef, viewRef, density, lightThreads, journey, here, focusRef, flyTo, say, insetFor]);
 
   // a verse row's text is the Bible corpus's, which loads lazily: a box open before it lands takes
   // the text when it does (review 2026-10-18; the signal hooks/use-lazy-bundles.js reads). The
@@ -457,7 +476,8 @@ export function useGoTo(web) {
     // 2026-10-18): it goes home to the web first, which does not scroll the page
     const root = rootRef && rootRef.current;
     if (root && typeof root.focus === 'function') root.focus({ preventScroll: true });
-    Promise.resolve(flyTo({ x: e.verse + 0.5 })).then((ok) => { if (ok) openPanel(open); }, () => {});
+    // and the line opens where it lands, not framed again (w4: framing both feet zoomed far out)
+    Promise.resolve(flyTo({ x: e.verse + 0.5 })).then((ok) => { if (ok) openPanel(open, { frame: false }); }, () => {});
   }, [edges, graph, live, journey, here, flyTo, openPanel, rootRef]);
 
   /** Backspace on the web: one step back along the trail (journey.back, which reopens what was
@@ -581,7 +601,7 @@ export function useGoTo(web) {
     boxStyle['--sw-goto-top'] = place.top + 'px';
   }
   const theBox = isOpen ? (
-    <div className={'sw-goto' + (compact ? ' is-compact' : '')} ref={boxRef} role="dialog" aria-label="Go to"
+    <div className={'sw-goto' + (compact ? ' is-compact' : '')} ref={boxRef} role="dialog" aria-modal="true" aria-label="Go to"
       style={boxStyle}>
       <div className="sw-goto-field">
         <svg className="sw-goto-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
@@ -641,7 +661,8 @@ export function useGoTo(web) {
  * opens its group. A camera move is a journey arrival, pushed before the camera moves (the trail
  * asks the go-to where it set out from).
  * @param {import('./overlay-renderer.js').OverlayHit | null} hit
- * @param {{ graph: any, flyTo: Function, openPanel: Function, journey: any }} nav
+ * @param {{ graph: any, flyTo: Function, openPanel: Function, journey: any, insetFor?: Function }} nav
+ *   insetFor: what the panel a chapter opens will cover, CSS px, so it is framed beside it (w4)
  * @returns {boolean} whether the tap was handled
  */
 export function routeOverlayHit(hit, nav) {
@@ -656,7 +677,8 @@ export function routeOverlayHit(hit, nav) {
     const open = hit.kind === 'chapter' ? { mode: 'group', chapter: ci } : undefined;
     if (nav.journey) nav.journey.push({ verse: place.lo, label: place.label, open, span: [frame.x0, frame.x1] });
     if (open && typeof nav.openPanel === 'function') nav.openPanel(open);
-    if (typeof nav.flyTo === 'function') nav.flyTo(frame);
+    const cover = open && typeof nav.insetFor === 'function' ? nav.insetFor() : null;
+    if (typeof nav.flyTo === 'function') nav.flyTo(frame, cover ? { insetRight: cover.right, insetBottom: cover.bottom } : undefined);
     return true;
   }
   if (hit.kind === 'pill') {

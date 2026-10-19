@@ -117,7 +117,7 @@ export function subjectKey(mode, d, choices) {
   if (mode === 'chooser') return 'choose:' + (choices || []).map((c) => c.kind + c.index).join(',');
   if (!d) return '';
   if (d.kind === 'arc') return 'arc:' + (d.index >= 0 ? d.index : 'p' + d.prophecyIndex);
-  if (d.kind === 'verse') return 'verse:' + d.verse;
+  if (d.kind === 'verse') return 'verse:' + d.verse + (d.verseEnd > d.verse ? '-' + d.verseEnd : '');
   if (d.kind === 'chapter') return 'ch:' + d.chapterIndex;
   if (d.kind === 'bundle') return 'b:' + d.lo + '-' + d.hi;
   if (d.kind === 'letter') return 'l:' + d.letterKey;
@@ -444,7 +444,7 @@ export function WebPanel(props) {
     if (!g || !detail || mode === 'list' || mode === 'chooser') return null;
     const opts = { density, translation, corpus: corpusNow() };
     if (mode === 'connection') return connectionModel(g, detail, opts);
-    if (mode === 'verse') return verseModel(g, detail.verse, opts);
+    if (mode === 'verse') return verseModel(g, detail.verse, Object.assign(opts, { verseEnd: detail.verseEnd }));
     if (mode === 'group') return rangeModel(g, detail.lo, detail.hi, density);
     if (mode === 'letter') return { rows: letterRows(g, detail.letterKey, translation) };
     return null;
@@ -565,7 +565,7 @@ export function WebPanel(props) {
     const n = model.threads.total;
     body = (
       <React.Fragment>
-        <PanelHead over="Verse" title={model.ref.label}
+        <PanelHead over={detail.verseEnd > detail.verse ? 'Verses' : 'Verse'} title={detail.label || model.ref.label}
           meta={plural(n, 'connection', 'connections') + (cited.length ? ' · cited in the Volumes ' + timesWord(cited.length) : '')} />
         <div className="sw-sec sw-verses"><VerseBlock block={model} heading={false} onOpen={onOpen} /></div>
         <CitedSection g={g} cited={cited} showCites={(c) => c.cites !== model.ref.label} startOpen={!compact}

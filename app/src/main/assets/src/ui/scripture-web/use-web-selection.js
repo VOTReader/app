@@ -50,9 +50,11 @@ import { routeOverlayHit } from './goto.jsx';
 /**
  * What the panel is asked to show (CONTRACTS.md section 6). `arc` is an OpenBible arc id unless
  * `prophecy` (then an index into g.prophecy); `verse` is a graph verse id; `chapter` an index into
- * g.chapters; `letterKey` is vot-citations' key for a letter (its collection and id).
+ * g.chapters; `letterKey` is vot-citations' key for a letter (its collection and id). A verse
+ * spec with `verseEnd` (a later verse id) is a range: the go-to's "John 3:16-18", its first verse's
+ * text and the range's threads (w4: verse mode on the first verse lit only that verse's).
  * @typedef {{ mode: 'connection', arc: number, prophecy?: boolean }
- *   | { mode: 'verse', verse: number }
+ *   | { mode: 'verse', verse: number, verseEnd?: number }
  *   | { mode: 'group', ids: ArrayLike<number>, label: string, chapter?: number }
  *   | { mode: 'letter', letterKey: string }} PanelSpec
  */
@@ -75,6 +77,9 @@ import { routeOverlayHit } from './goto.jsx';
  */
 export const PANEL_MODES = Object.freeze({ connection: true, verse: true, group: true, letter: true });
 
+/** A verse card's last verse: its range's end, or the verse. @param {any} found */
+const endOf = (found) => (found.verseEnd > found.verse ? found.verseEnd : found.verse);
+
 /**
  * The open card in the panel's terms. Pure, so the mapping is pinned without a mount.
  * @param {any} detail  the open sheet's described payload, or null
@@ -93,7 +98,10 @@ export function panelOf(detail, choices, choiceChapter = -1) {
         : { spec: { mode: 'connection', arc: detail.prophecyIndex, prophecy: true }, info: detail };
     }
     if (k === 'letter') return { spec: { mode: 'letter', letterKey: detail.letterKey }, info: detail };
-    if (k === 'verse') return { spec: { mode: 'verse', verse: detail.verse }, info: detail };
+    if (k === 'verse') {
+      return { spec: detail.verseEnd > detail.verse ? { mode: 'verse', verse: detail.verse, verseEnd: detail.verseEnd }
+        : { mode: 'verse', verse: detail.verse }, info: detail };
+    }
     if (k === 'chapter') {
       return { spec: { mode: 'group', ids: [], label: detail.book ? detail.book.title + ' ' + detail.chapter : '', chapter: detail.chapterIndex }, info: detail };
     }
@@ -348,7 +356,7 @@ export function useWebSelection({
       bringIn((found.far === 'to' ? found.from : found.to) + 0.5);
       return;
     }
-    const range = found.kind === 'verse' ? [found.verse, found.verse]
+    const range = found.kind === 'verse' ? [found.verse, endOf(found)]
       : found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi] : null;
     if (!range || mode === 'personal') return;
     bringIn((range[0] + range[1] + 1) / 2);
@@ -381,8 +389,8 @@ export function useWebSelection({
     focusRef.current = focusState(found.kind === 'arc'
       ? (found.index >= 0 ? { arc: found.index } : { arc: found.prophecyIndex, prophecy: true })
       : found.kind === 'link' || found.kind === 'underlay' ? { arc: found.index, underlay: found.kind === 'underlay' }
-      : found.kind === 'verse' ? { range: [found.verse, found.verse],
-        lit: g ? arcsTouching(g, found.verse, found.verse, density, 0) : null }
+      : found.kind === 'verse' ? { range: [found.verse, endOf(found)],
+        lit: g ? arcsTouching(g, found.verse, endOf(found), density, 0) : null }
       : { range: found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi] : null });
     setTip(null);
     setChoices(null);
@@ -447,15 +455,20 @@ export function useWebSelection({
    * connection (an OpenBible arc, or a prophecy pair by its index), a verse, a group (the chooser's
    * rows for ids, or a chapter), a letter (the verses it cites). Each is chosen through commitFound,
    * so the focus, the lit set and the framing are the tap's own. `opts.back` keeps the open card as
-   * the new one's parent (a letter opened from a citation, a verse from that letter).
+   * the new one's parent (a letter opened from a citation, a verse from that letter); `opts.frame:
+   * false` opens it where the camera is (an edge chip's Follow, which has flown there at the
+   * reader's zoom: w4, the opening framed both feet and zoomed far out after it).
    * @param {PanelSpec} spec
-   * @param {{ back?: boolean }} [opts]
+   * @param {{ back?: boolean, frame?: boolean }} [opts]
    * @returns {boolean} whether a panel opened
    */
   const openPanel = React.useCallback((spec, opts = {}) => {
     const g = graph;
     if (!g || !spec) return false;
-    const via = opts && opts.back ? { parent: detailRef.current } : undefined;
+    /** @type {{ parent?: any, frame?: boolean }} */
+    const via = {};
+    if (opts && opts.back) via.parent = detailRef.current;
+    if (opts && opts.frame === false) via.frame = false;
     const arcHit = (i) => ({ kind: 'arc', hit: { index: i, from: g.from[i], to: g.to[i], votes: g.votes[i] } });
     if (spec.mode === 'connection') {
       if (spec.prophecy) {
@@ -479,7 +492,8 @@ export function useWebSelection({
     }
     if (spec.mode === 'verse') {
       if (!(spec.verse >= 0 && spec.verse < g.total)) return false;
-      const info = describe({ kind: 'verse', verse: spec.verse });
+      const end = spec.verseEnd > spec.verse && spec.verseEnd < g.total ? spec.verseEnd : undefined;
+      const info = describe(end === undefined ? { kind: 'verse', verse: spec.verse } : { kind: 'verse', verse: spec.verse, verseEnd: end });
       if (!info) return false;
       commitFound(info, via);
       return true;
@@ -528,7 +542,7 @@ export function useWebSelection({
     // pill: overlay-renderer.js hitOverlay), before any line under it; the
     // navigation stream routes it (goto.jsx). Nothing records boxes yet: null.
     const overlayHit = hitOverlay(overlayFrameRef ? overlayFrameRef.current : null, cx, cy);
-    if (overlayHit && routeOverlayHit(overlayHit, { graph, flyTo, openPanel, journey })) return;
+    if (overlayHit && routeOverlayHit(overlayHit, { graph, flyTo, openPanel, journey, insetFor })) return;
     const candidates = hitCandidatesAt(cx, cy);
     const described = candidates.map(describe).filter(Boolean);
     if (!described.length) {
@@ -557,7 +571,7 @@ export function useWebSelection({
     }
     commitFound(described[0]);
   }, [liftAt, hitCandidatesAt, describe, viewRef, commitFound, schedule, focusRef, dropHover, setAnnounce,
-    overlayFrameRef, graph, flyTo, openPanel, journey, camRef, viewFor]);
+    overlayFrameRef, graph, flyTo, openPanel, journey, camRef, viewFor, insetFor]);
 
   /** Zoom in 2.5x about the tap (A4, the navigation stream): to where zoomAbout puts the camera,
    * eased through flyTo about the same point (instant under reduced motion). */

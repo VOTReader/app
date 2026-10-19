@@ -21,7 +21,7 @@
 import { refOfVerse, arcsTouching, countTouching, chapterRange } from './pick.js';
 import { clampCamera, fitPPV, verseToX, xToVerse } from './geometry.js';
 import { citationsForVerse, letterCiteSites, endpointFor } from './vot-citations.js';
-import { verseEndpoint } from './describe.js';
+import { verseEndpoint, rangeLabel } from './describe.js';
 
 /** A group shows this many rows before "Show n more" (a verse can hold hundreds of threads). */
 export const GROUP_ROWS = 40;
@@ -62,10 +62,7 @@ export function shortRef(g, verse) {
  */
 export function passageLabel(g, v, ve) {
   const a = refOfVerse(g, v);
-  if (!(ve > v)) return a.label;
-  const b = refOfVerse(g, ve);
-  if (b.bookId !== a.bookId) return a.label + '-' + b.label;
-  return a.label + '-' + (b.chapter === a.chapter ? String(b.verse) : b.chapter + ':' + b.verse);
+  return ve > v ? rangeLabel(a, refOfVerse(g, ve)) : a.label;
 }
 
 /**
@@ -261,12 +258,17 @@ export function connectionModel(g, info, { density, translation, corpus }) {
  * Verse mode: the verse in full, its citations, and every thread it carries grouped by book. The
  * ids are its lit set (verse mode lights its threads, CONTRACTS section 6).
  * @param {any} g @param {number} verse
- * @param {{ density: any, translation?: string, corpus?: any }} opts
+ * @param {{ density: any, translation?: string, corpus?: any, verseEnd?: number }} opts  verseEnd: a
+ *   range's last verse (the go-to's range)
  */
-export function verseModel(g, verse, { density, translation, corpus }) {
+export function verseModel(g, verse, { density, translation, corpus, verseEnd }) {
   const block = verseBlock(g, verse, translation);
-  const threads = threadsFrom(g, verse, verse, density);
-  return Object.assign(block, { cited: citedRows(g, [verse], corpus), threads });
+  // a range (the go-to's "John 3:16-18"): its first verse's text, the range's citations and threads
+  const end = verseEnd > verse && verseEnd < g.total ? verseEnd : verse;
+  const verses = [];
+  for (let v = verse; v <= end; v++) verses.push(v);
+  const threads = threadsFrom(g, verse, end, density);
+  return Object.assign(block, { cited: citedRows(g, verses, corpus), threads });
 }
 
 /**

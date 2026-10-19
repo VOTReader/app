@@ -293,7 +293,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // the go-to (goto.jsx): its header slot (goTo.button, first in the control
   // row) and what it puts over the canvas (goTo.box: the box, its verse chip, its edge chips)
   const goTo = useGoTo({ graph, flyTo, openPanel, journey, lightThreads, setAnnounce, start,
-    closePanel: closeCards, panel, density, mode, camRef, viewRef, focusRef, panelInsetRef, viewFor, onFrame, rootRef: wrapRef,
+    closePanel: closeCards, panel, density, mode, camRef, viewRef, focusRef, panelInsetRef, viewFor, onFrame, rootRef: wrapRef, insetFor,
     keepOutRef, schedule });
 
   // ── gestures — imperative, never React state per frame ──────────────────

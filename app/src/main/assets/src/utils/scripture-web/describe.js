@@ -225,9 +225,13 @@ export function describeFound(found, { g, personal, cam, v, viewFor, density }) 
   }
   if (found.kind === 'verse') {
     const r = refOfVerse(g, found.verse);
-    return { kind: 'verse', ref: r, verse: found.verse,
-      connections: countTouching(g, found.verse, found.verse, density),
-      cards: [verseCard('Verse', r)] };
+    // a range (the go-to's "John 3:16-18"): its threads are the range's, and it is named whole
+    const end = found.verseEnd > found.verse && found.verseEnd < g.total ? found.verseEnd : found.verse;
+    const out = /** @type {any} */ ({ kind: 'verse', ref: r, verse: found.verse,
+      connections: countTouching(g, found.verse, end, density),
+      cards: [verseCard('Verse', r)] });
+    if (end > found.verse) { out.verseEnd = end; out.label = rangeLabel(r, refOfVerse(g, end)); }
+    return out;
   }
   const [lo, hi] = chapterRange(g, found.chapterIndex);
   const ch = g.chapters[found.chapterIndex];
@@ -336,7 +340,7 @@ export function summaryOf(found) {
     const n = typeof found.passages === 'number' ? found.passages : found.verses.length;
     return found.title + ', ' + plural(n, 'verse', 'verses') + ' it cites.';
   }
-  if (found.kind === 'verse') return found.ref.label + ', ' + plural(found.connections, 'connection', 'connections') + '.';
+  if (found.kind === 'verse') return (found.label || found.ref.label) + ', ' + plural(found.connections, 'connection', 'connections') + '.';
   if (found.kind === 'bundle') {
     return found.label + ', ' + plural(found.connections, 'connection converges', 'connections converge') + ' here.';
   }
@@ -377,6 +381,20 @@ export function verseEndpoint(ref) {
     key: 'bible:' + ref.bookId + ':' + ref.chapter + ':' + ref.verse,
     bookId: ref.bookId, chapter: ref.chapter, verse: ref.verse, label: ref.label,
   };
+}
+
+/**
+ * A verse range's name from its first and last refs, with the ASCII hyphen (Permanent Rule 1):
+ * "John 3:16-18", "John 3:16-4:2", and across books "Ruth 4:22-1 Samuel 1:1" (panel-model.js
+ * passageLabel names a letter's passages the same way).
+ * @param {any} a  the first verse's ref (pick.js refOfVerse)
+ * @param {any} b  the last verse's ref
+ * @returns {string}
+ */
+export function rangeLabel(a, b) {
+  if (!b || (b.bookId === a.bookId && b.chapter === a.chapter && b.verse === a.verse)) return a.label;
+  if (b.bookId !== a.bookId) return a.label + '-' + b.label;
+  return a.label + '-' + (b.chapter === a.chapter ? String(b.verse) : b.chapter + ':' + b.verse);
 }
 
 /**

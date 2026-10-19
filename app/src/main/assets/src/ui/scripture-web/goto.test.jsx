@@ -51,13 +51,14 @@ const graph = () => ({
 
 /**
  * The web, as the screen wires it; `api.current` is every hook's latest answer.
- * @param {{ start?: any, cam?: { x: number, ppv: number }, keys?: boolean, frame?: { W: number, H: number, DPR: number }, web?: any, sheet?: boolean }} [opts]
+ * @param {{ start?: any, cam?: { x: number, ppv: number }, keys?: boolean, frame?: { W: number, H: number, DPR: number }, web?: any, sheet?: boolean, insetFor?: Function }} [opts]
  *   keys: the root's onKeyDown is the web's own (use-web-keys.js), not a spy; frame: the canvas in
  *   device px (default an 800x600 PC frame); web: the graph (default graph()); sheet: the panel's
  *   own docked panel (web-panel.jsx) renders for what is open, as the screen renders it (its focus
- *   hand-back with it)
+ *   hand-back with it); insetFor: what the panel will cover once open, CSS px (the screen's
+ *   usePanelLayout), given to the selection and the go-to as the screen gives it
  */
-function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W: 800, H: 600, DPR: 1 }, web, sheet = false } = {}) {
+function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W: 800, H: 600, DPR: 1 }, web, sheet = false, insetFor } = {}) {
   const g = web || graph();
   const api = { current: /** @type {any} */ (null) };
   const setAnnounce = vi.fn();
@@ -83,8 +84,9 @@ function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W
       graph: g, mode: 'canonical', density: 'famous', showUnderlay: false, resumeRef,
       camRef: camera.camRef, viewRef: camera.viewRef, focusRef: camera.focusRef, viewFor: camera.viewFor, yFrameFor: camera.yFrameFor,
       personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo: camera.flyTo, journey, schedule: frames.schedule, setAnnounce,
+      insetFor,
     });
-    const goTo = useGoTo({ graph: g, flyTo: camera.flyTo, openPanel: sel.openPanel, journey, lightThreads: sel.lightThreads, setAnnounce, start,
+    const goTo = useGoTo({ graph: g, flyTo: camera.flyTo, openPanel: sel.openPanel, journey, lightThreads: sel.lightThreads, setAnnounce, start, insetFor,
       closePanel: sel.closeCards, panel: sel.panel, density: 'famous', mode: 'canonical', camRef: camera.camRef, viewRef: camera.viewRef,
       focusRef: camera.focusRef, panelInsetRef: camera.panelInsetRef, viewFor: camera.viewFor, onFrame: frames.onFrame, rootRef,
       keepOutRef, schedule: frames.schedule });
@@ -225,6 +227,25 @@ describe('the go-to box (spec 4.5)', () => {
     expect(chip && chip.textContent).toBe('Genesis 1:101 · 2 connections');
     expect(chip.getAttribute('aria-hidden')).toBe('true');
     expect(get().journey.stack.map((e) => e.label)).toEqual(['Genesis 1:15552', 'Genesis 1:101']);
+  });
+
+  /* w4 interaction hunt: a range lit its threads, then opened verse mode on its first verse, whose
+     own lit set took over as the panel came: the live region said the range's count, the web lit
+     the first verse's, and the chip never came (its lit set was gone). The panel opens on the
+     range, and what it lights, the chip and the announcement agree. */
+  it('Enter on a range: the panel opens on the range, the range lit; the chip and the announcement agree', async () => {
+    const { container, get, setAnnounce } = mountWeb({ sheet: true });
+    act(() => { get().goTo.open('Genesis 1:101-201'); });
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    settle(); await flush();
+    expect(get().sel.detail).toMatchObject({ kind: 'verse', verse: 100, verseEnd: 200 });
+    expect(Array.from(get().cam.focusRef.current.lit).sort(), 'the range: 1 starts at its last verse').toEqual([0, 1, 2]);
+    expect(setAnnounce).toHaveBeenLastCalledWith('Genesis 1:101-201, 3 connections');
+    expect(container.querySelector('.sw-panel-title').textContent).toBe('Genesis 1:101-201');
+    expect(container.querySelector('.sw-panel-meta').textContent).toMatch(/^3 connections/);
+    const chip = container.querySelector('.sw-goto-chip');
+    expect(chip && chip.textContent).toBe('Genesis 1:101-201 · 3 connections');
+    expect(get().sel.panel.spec).toEqual({ mode: 'verse', verse: 100, verseEnd: 200 });
   });
 
   it('the chip keeps out of the panel (CONTRACTS.md section 5): over a bottom sheet it stands on the sheet, not under it', async () => {
@@ -377,6 +398,10 @@ describe('the go-to box (spec 4.5)', () => {
     button.focus();
     fireEvent.click(button);
     expect(document.activeElement).toBe(input(container));
+    // w4 ARIA hunt: the trap kept Tab in the box while it told assistive technology the page
+    // behind it was still there; a modal dialog says it is modal
+    expect(box(container).getAttribute('role')).toBe('dialog');
+    expect(box(container).getAttribute('aria-modal')).toBe('true');
     expect(fireEvent.keyDown(input(container), { key: 'Tab' }), 'Tab does not walk out of the box').toBe(false);
     expect(fireEvent.keyDown(input(container), { key: 'Tab', shiftKey: true })).toBe(false);
     // focus that got out (a stray .focus() behind the box) is pulled back on the next Tab
@@ -517,6 +542,26 @@ describe('Back puts the panel back as it was', () => {
     expect(litOf(get).sort(), 'its threads lit again').toEqual([0, 2]);
   });
 
+  /* w4 interaction hunt: a book from the go-to after a verse left the verse's panel open and its
+     threads lit over the book (the panel named John 3:16 over Romans). A book opens nothing, so
+     what was open closes, and Back opens it again. */
+  it('a go-to book after a verse: the verse panel closes and its threads let go; Back opens the verse again', async () => {
+    const { container, get } = mountWeb();
+    act(() => { get().goTo.open('Genesis 1:101'); });
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    settle(); await flush();
+    act(() => { get().goTo.open('Genesis'); });
+    expect(rowTexts(container)[0]).toBe('Genesis · whole book');
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    settle(); await flush();
+    expect(get().sel.panel, 'a book opens no panel').toBeNull();
+    expect(litOf(get)).toEqual([]);
+    expect(container.querySelector('.sw-goto-chip')).toBeNull();
+    await back(get);
+    expect(get().sel.panel.spec).toMatchObject({ mode: 'verse', verse: 100 });
+    expect(litOf(get).sort(), 'its threads lit again').toEqual([0, 2]);
+  });
+
   /* w4 interaction hunt: a row's Follow pushed its arrival with no `open`, so the trail filled it
      from what was open at the push: the PREVIOUS connection (setDetail had not rendered). Two row
      Follows, then Back, reopened the line before the first row's. Each arrival now carries the
@@ -592,6 +637,23 @@ describe('the edge chips (spec 4.5): where lit threads leave the frame, and Foll
     expect(get().journey.stack.map((e) => e.verse)).toEqual([120, 20100]);
   });
 
+  /* w4 interaction hunt: the chip flew to the far end at the same zoom, then the line's opening
+     framed both feet and zoomed far out (a second fly). It opens where it lands, as the panel's
+     own Follow does. Thread 2 (100-300) is one a frame could hold whole. */
+  it('a Follow keeps the zoom for a line the frame could hold whole: it opens where it lands, not reframed', async () => {
+    const { container, get } = mountWeb({ cam: { x: 120, ppv: 8 } });
+    act(() => { get().sel.lightThreads([2]); });
+    settle();
+    const right = /** @type {HTMLButtonElement} */ (container.querySelector('.sw-goto-edge-right'));
+    expect(right && right.textContent).toBe('Genesis 1:301 ›');
+    fireEvent.click(right);
+    settle(); await flush();
+    settle(); await flush();
+    expect(get().sel.detail, 'the line opens where it landed').toMatchObject({ kind: 'arc', index: 2 });
+    expect(get().cam.camRef.current.x).toBeCloseTo(300.5, 6);
+    expect(get().cam.camRef.current.ppv, 'the same zoom').toBeCloseTo(8, 9);
+  });
+
   it('compact (a root 500 px tall or less, not a narrow one) takes the compact chips: 13 px edge chips at a 16 px gutter, a 14 px verse chip', async () => {
     // the phone in landscape: 891x411 CSS px at 2.625, wider than any narrow root, but compact
     const phone = { W: Math.round(891 * 2.625), H: Math.round(411 * 2.625), DPR: 2.625 };
@@ -643,6 +705,39 @@ describe('the start prop (CONTRACTS.md section 8): the web opens on a place, onc
     act(() => { get().frames.schedule(); });
     settle();
     expect(get().sel.detail, 'consumed once: a later frame does not reopen it').toBeNull();
+  });
+  /* w4 interaction hunt: the door's start flies at once (instant), before the panel it opens has
+     rendered, so the fly read an inset of 0: the verse landed at the panel's edge, too deep, the
+     chapters after it under the panel. The fly is told what the panel will cover (insetFor). */
+  const nineChapters = () => {
+    const g = graph();
+    // Genesis 1 is verses 0-999, 2-8 are 100 verses each from 1000, 9 is the rest
+    g.chapters = [[0, 1, 0, 1000]];
+    for (let c = 2; c <= 8; c++) g.chapters.push([0, c, 1000 + (c - 2) * 100, 100]);
+    g.chapters.push([0, 9, 1700, TOTAL - 1700]);
+    g.chapterOfVerse = new Uint16Array(TOTAL).map((_, v) => (v < 1000 ? 0 : v < 1700 ? 1 + Math.floor((v - 1000) / 100) : 8));
+    return g;
+  };
+  it('a verse with a docked panel coming: framed in the canvas area the panel leaves, the verse at its centre', async () => {
+    const insetFor = () => ({ right: 300, bottom: 0 });
+    const { get } = mountWeb({ web: nineChapters(), start: { verse: { bookId: 'genesis', chapter: 5, verse: 51 } }, insetFor });
+    await flush();
+    expect(get().sel.detail).toMatchObject({ kind: 'verse', verse: 1350 });
+    const cam = get().cam.camRef.current;
+    // the five chapters around it (3-7, verses 1100-1599) fill the 500 px the panel leaves of 800
+    expect(cam.ppv).toBeCloseTo(1, 6);
+    expect(verseToX(cam, 800, 1350.5), "the canvas area's centre").toBeCloseTo(250, 6);
+  });
+  it('a chapter numeral tapped (routeOverlayHit) frames the chapter in the canvas area its group leaves', async () => {
+    const insetFor = () => ({ right: 300, bottom: 0 });
+    const g = nineChapters();
+    const { get } = mountWeb({ web: g, cam: { x: 9000, ppv: 1 }, insetFor });
+    act(() => { routeOverlayHit({ kind: 'chapter', book: 0, chapter: 5 }, { graph: g, flyTo: get().cam.flyTo, openPanel: get().sel.openPanel, journey: get().journey, insetFor }); });
+    settle(); await flush();
+    const cam = get().cam.camRef.current;
+    // Genesis 5 (1300-1399) at 70 % of the 500 px area
+    expect(cam.ppv).toBeCloseTo(3.5, 6);
+    expect(verseToX(cam, 800, 1350), "the canvas area's centre").toBeCloseTo(250, 6);
   });
   it('a letter asks the panel for letter mode (the panel stream builds it; the ask is pinned here)', () => {
     const openPanel = vi.fn(() => true);
